@@ -1,0 +1,72 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.ElevationFailedDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="480"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource SpacingMdThk}">
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+        Margin="{DynamicResource SpacingXsThk}">
+
+    <!-- 标题 -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding TitleText}"
+               FontSize="15"
+               FontWeight="Bold"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- 错误消息 -->
+    <TextBlock Grid.Row="1"
+               Text="{Binding MessageText}"
+               FontSize="12"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               TextWrapping="Wrap"
+               Margin="0,12,0,0" />
+
+    <!-- 失败的目录列表（带项目符号） -->
+    <ItemsControl Grid.Row="2"
+                  x:Name="DirectoryList"
+                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                  FontSize="12"
+                  Margin="0,12,0,0">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <TextBlock Margin="12,2,0,2"
+                     TextWrapping="Wrap"
+                     FontFamily="Consolas, Courier New, monospace">
+            <Run Text="&#x2022; " />
+            <Run Text="{Binding}" />
+          </TextBlock>
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- 可能原因说明 + 确定按钮 -->
+    <StackPanel Grid.Row="3"
+                Margin="0,16,0,0">
+      <!-- 可能原因提示文字 -->
+      <TextBlock Text="{Binding ReasonsText}"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 FontSize="11"
+                 TextWrapping="Wrap"
+                 Margin="0,0,0,16" />
+
+      <!-- 确定按钮 -->
+      <Button Content="{Binding OkText}"
+              Width="100"
+              Height="{DynamicResource ControlHeightMd}"
+              HorizontalAlignment="Right"
+              IsDefault="True"
+              IsCancel="True"
+              Click="Ok_Click"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -65,6 +65,71 @@ public static class ArchiveFixtures
     }
 
     /// <summary>
+    /// Create a ZIP archive with multiple files for parallel extraction testing.
+    /// </summary>
+    /// <param name="fileCount">Number of files to create (default 20).</param>
+    /// <param name="fileSizeKB">Size of each file in KB (default 1).</param>
+    public static string CreateMultiFileZipArchive(int fileCount = 20, int fileSizeKB = 1)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_multifile.zip");
+        var dir = Path.GetDirectoryName(path)!;
+        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+        using var fs = File.Create(path);
+        using var zipStream = new ZipOutputStream(fs);
+        zipStream.SetLevel(9);
+
+        var buffer = new byte[fileSizeKB * 1024];
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            buffer[i] = (byte)(i % 256);
+        }
+
+        for (int i = 0; i < fileCount; i++)
+        {
+            var entry = new ZipEntry($"file{i:D4}.dat");
+            zipStream.PutNextEntry(entry);
+            zipStream.Write(buffer, 0, buffer.Length);
+            zipStream.CloseEntry();
+        }
+
+        return path;
+    }
+
+    /// <summary>
+    /// Create a ZIP archive with a single large file for testing.
+    /// </summary>
+    /// <param name="sizeMB">Size of the file in MB (default 100).</param>
+    public static string CreateLargeFileZipArchive(int sizeMB = 100)
+    {
+        var path = Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_large.zip");
+        var dir = Path.GetDirectoryName(path)!;
+        if (!Directory.Exists(dir)) Directory.CreateDirectory(dir);
+
+        using var fs = File.Create(path);
+        using var zipStream = new ZipOutputStream(fs);
+        zipStream.SetLevel(9);
+
+        var entry = new ZipEntry("large.dat");
+        zipStream.PutNextEntry(entry);
+
+        // 写入指定大小的数据 (使用固定模式以便压缩)
+        var buffer = new byte[1024 * 1024]; // 1MB buffer
+        for (int i = 0; i < buffer.Length; i++)
+        {
+            buffer[i] = (byte)(i % 256);
+        }
+
+        for (int mb = 0; mb < sizeMB; mb++)
+        {
+            zipStream.Write(buffer, 0, buffer.Length);
+        }
+
+        zipStream.CloseEntry();
+        return path;
+    }
+
+    /// <summary>
     /// Create a small encrypted ZIP archive for testing. Returns the file path.
     /// Password: "test123"
     /// </summary>

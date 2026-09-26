@@ -1,0 +1,22 @@
+{
+  "schema_version": 2,
+  "active_work_id": "nuget-dependency-upgrade",
+  "works": {
+    "html-preview-webview-fallback": {
+      "work_id": "html-preview-webview-fallback",
+      "active_plan": ".omo/plans/未开始/html-preview-webview-fallback.md",
+      "plan_name": "html-preview-webview-fallback",
+      "session_ids": ["codex:opencode:ses_f795c4641ffeSD9jmH2CWwiFAH"],
+      "status": "completed",
+      "worktree_path": null
+    },
+    "nuget-dependency-upgrade": {
+      "work_id": "nuget-dependency-upgrade",
+      "active_plan": ".omo/plans/未开始/nuget-dependency-upgrade.md",
+      "plan_name": "nuget-dependency-upgrade",
+      "session_ids": ["codex:opencode:ses_f57b2eed6ffeXBVO7GZj4WST1v"],
+      "status": "completed",
+      "worktree_path": null
+    }
+  }
+}

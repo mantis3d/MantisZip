@@ -21,6 +21,7 @@ public sealed record CompressConflictResolution(
     string? CustomName);
 
 /// <summary>
-/// 压缩冲突处理回调委托
+/// 压缩冲突处理回调委托（异步版本）。
+/// 调用方需确保在合适的线程上下文中 await，避免阻塞 UI 线程导致死锁。
 /// </summary>
-public delegate CompressConflictResolution CompressConflictResolver(CompressConflictInfo info);
+public delegate Task<CompressConflictResolution> CompressConflictResolver(CompressConflictInfo info);

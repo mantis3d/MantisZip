@@ -1,0 +1,205 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MantisZip.UI.Avalonia.Controls.DynamicFormatOptionsPanel"
+             x:CompileBindings="False"
+             Background="{DynamicResource ThemeWindowBgBrush}">
+  <!-- 压缩格式动态选项面板：根据选中的压缩格式（ZIP/7z/TAR.GZ）动态显示对应的高级选项 -->
+  <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+          BorderThickness="1"
+          Padding="{DynamicResource SpacingXsThk}"
+          CornerRadius="{DynamicResource BorderRadius}"
+          MinHeight="100"
+          Background="{DynamicResource ThemeSurfaceBgBrush}">
+    <Grid>
+      <!-- ═══════ ZIP 选项面板 ═══════ -->
+      <StackPanel x:Name="ZipPanel" IsVisible="True">
+        <TextBlock Text="{Binding ZipPanelTitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,6"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- ZIP 编码设置：用于处理中文文件名编码问题 -->
+        <Grid Margin="0,0,0,6">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding EncodingLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="EncodingCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- ZIP 压缩方法：Store/Deflate 等 -->
+        <Grid>
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding ZipCompressionMethodLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="ZipMethodCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- ═══════ ZIP 自适应压缩三开关 ═══════ -->
+        <!-- 仅 ZIP 格式支持 per-entry 级别控制，7z/TAR 无此能力 -->
+        <TextBlock Text="{Binding ZipAdaptiveSectionTitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   FontWeight="SemiBold"
+                   Margin="0,6,0,4"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 自适应压缩：已压缩文件（图片/音视频等）自动 Store，其余保持用户选定级别 -->
+        <CheckBox x:Name="AdaptiveCompressionCheck"
+                  Content="{Binding AdaptiveCompressionLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="False"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 魔数检测：对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度 -->
+        <CheckBox x:Name="SmartDetectCheck"
+                  Content="{Binding SmartDetectLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="False"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 多线程压缩：利用多核 CPU 并行压缩，显著提升压缩速度。仅 ZIP 支持 -->
+        <CheckBox x:Name="ZipMultiThreadCheck"
+                  Content="{Binding ZipMultiThreadLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="False"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </StackPanel>
+
+      <!-- ═══════ 7z 选项面板 ═══════ -->
+      <StackPanel x:Name="SevenZPanel" IsVisible="False">
+        <TextBlock Text="{Binding SevenZPanelTitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   FontWeight="SemiBold"
+                   Margin="0,0,0,6"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 7z 压缩方法：LZMA/LZMA2/PPMd/BZip2 等 -->
+        <Grid Margin="0,0,0,6">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding MethodLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="MethodCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- 7z 固实压缩复选框：启用后将所有文件作为单个数据块压缩，压缩率更高但随机访问变慢 -->
+        <CheckBox x:Name="SolidCheck"
+                  Content="{Binding SolidLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="True"
+                  IsCheckedChanged="SolidCheck_IsCheckedChanged"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 7z 多线程压缩复选框：启用后利用多核 CPU 并行压缩，提升压缩速度（压缩率可能略有下降） -->
+        <CheckBox x:Name="MultiThreadCheck"
+                  Content="{Binding MultiThreadLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="True"
+                  IsCheckedChanged="MultiThreadCheck_IsCheckedChanged"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 7z 固实块大小：固实压缩时的数据块大小 -->
+        <Grid Margin="0,6,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding SolidBlockSizeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="SolidBlockSizeCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- 7z 字典大小：压缩时使用的滑动窗口大小，越大压缩率越高但内存占用越大 -->
+        <Grid Margin="0,6,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding DictSizeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="DictSizeCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- 7z 字长/快速字节数：匹配查找时的最大匹配长度，影响压缩速度与压缩率的平衡 -->
+        <Grid Margin="0,6,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding WordSizeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="WordSizeCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+
+        <!-- 7z 匹配查找器：匹配算法选择，影响压缩速度与压缩率 -->
+        <Grid Margin="0,6,0,0">
+          <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="80" />
+            <ColumnDefinition Width="*" />
+          </Grid.ColumnDefinitions>
+          <TextBlock Grid.Column="0"
+                     Text="{Binding MatchFinderLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <ComboBox x:Name="MatchFinderCombo"
+                    Grid.Column="1"
+                    Height="24"
+                    Background="{DynamicResource ThemeComboBoxBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+        </Grid>
+      </StackPanel>
+
+      <!-- ═══════ TAR.GZ 占位面板（暂无高级选项）═══════ -->
+      <StackPanel x:Name="TarGzPanel" IsVisible="False">
+        <TextBlock Text="{Binding TarGzPlaceholder, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   FontStyle="Italic"
+                   VerticalAlignment="Center"
+                   HorizontalAlignment="Center" />
+      </StackPanel>
+    </Grid>
+  </Border>
+</UserControl>

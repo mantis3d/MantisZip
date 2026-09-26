@@ -27,30 +27,30 @@ MantisZip 支持丰富的命令行参数，主要用于 Shell 右键菜单集成
 
 ```powershell
 # 打开压缩包浏览
-MantisZip.UI.exe --open "D:\文档.zip"
+MantisZip.UI.Avalonia.exe --open "D:\文档.zip"
 
 # 快速压缩（默认设置）
-MantisZip.UI.exe --compress-quick "D:\照片" -- "D:\备份.zip"
+MantisZip.UI.Avalonia.exe --compress-quick "D:\照片" -- "D:\备份.zip"
 
 # 独立压缩多个项目
-MantisZip.UI.exe --compress-separate "D:\照片" "D:\文档"
+MantisZip.UI.Avalonia.exe --compress-separate "D:\照片" "D:\文档"
 
 # 合并压缩到公共目录
-MantisZip.UI.exe --compress-combined "D:\照片" "D:\文档"
+MantisZip.UI.Avalonia.exe --compress-combined "D:\照片" "D:\文档"
 
 # 快速解压
-MantisZip.UI.exe --extract "D:\软件包.7z"
+MantisZip.UI.Avalonia.exe --extract "D:\软件包.7z"
 
 # 智能解压
-MantisZip.UI.exe --extract-smart "D:\软件包.7z"
+MantisZip.UI.Avalonia.exe --extract-smart "D:\软件包.7z"
 
 # 安装/卸载 Shell 右键菜单
-MantisZip.UI.exe --install-shell
-MantisZip.UI.exe --uninstall-shell
+MantisZip.UI.Avalonia.exe --install-shell
+MantisZip.UI.Avalonia.exe --uninstall-shell
 
 # 查看帮助
-MantisZip.UI.exe --help
-MantisZip.UI.exe -h
+MantisZip.UI.Avalonia.exe --help
+MantisZip.UI.Avalonia.exe -h
 ```
 
 ## IPC 多实例通信

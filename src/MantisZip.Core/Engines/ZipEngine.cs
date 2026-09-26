@@ -4,6 +4,7 @@ using System.Linq;
 using System.Text;
 using SharpSevenZip;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using SharpCompress.Archives;
 using SharpCompress.Archives.Zip;
@@ -20,6 +21,8 @@ namespace MantisZip.Core.Engines;
 /// </summary>
 public class ZipEngine : IArchiveEngine
 {
+    private const int CopyBufferSize = 4194304;
+
     /// <summary>
     /// 使用 SharpCompress 打开 ZIP 文件，自动检测编码（UTF-8 → GBK 回退）。
     /// SharpCompress 每实例设置编码，无全局副作用。
@@ -45,13 +48,15 @@ public class ZipEngine : IArchiveEngine
                     Default = Encoding.GetEncoding("gbk")
                 }
             };
-            return ArchiveFactory.OpenArchive(fs2, gbkOptions);
+            // 严格 ZIP 解析（不用 ArchiveFactory.OpenArchive 魔数嗅探——
+            // 损坏/全零文件会被误判为 Tar 静默返回 0 条目，吞掉损坏信号）
+            return ZipArchive.OpenArchive(fs2, gbkOptions);
         }
 
         IArchive archive;
         try
         {
-            archive = ArchiveFactory.OpenArchive(fs, options);
+            archive = ZipArchive.OpenArchive(fs, options);
         }
         catch (Exception ex)
         {
@@ -214,13 +219,49 @@ public class ZipEngine : IArchiveEngine
 
     public bool CanDelete(ArchiveFormat format) => format == ArchiveFormat.Zip;
 
+    /// <summary>
+    /// ZIP 引擎支持并行解压（多实例模式，每个线程独立打开 archive）。
+    /// </summary>
+    public bool SupportsParallelExtract => true;
+
     public async Task<ExtractResult> ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
+
+        // 读取并行度设置（0 = 默认 Environment.ProcessorCount，1 = 串行，>1 = 并行）
+        int maxParallelism = options?.ParallelExtractDegree ?? 0;
+        if (maxParallelism <= 0) maxParallelism = Environment.ProcessorCount;
+        if (maxParallelism > 16) maxParallelism = 16;
+
+        // 先快速检查文件数量决定是否走并行
+        int fileCount;
+        using (var quickArchive = OpenArchiveWithEncodingFallback(archivePath, password))
+        {
+            fileCount = quickArchive.Entries.Count(e => !e.IsDirectory);
+        }
+
+        // 文件数少于2或并行度为1时走串行
+        if (fileCount < 2 || maxParallelism <= 1)
+        {
+            CoreLog.Info($"ExtractAsync: fileCount={fileCount}, parallelism={maxParallelism} -> using sequential mode");
+            return await ExtractAsyncSequential(archivePath, destinationPath, password, progress, cancellationToken, options);
+        }
+
+        CoreLog.Info($"ExtractAsync: fileCount={fileCount}, parallelism={maxParallelism} -> using parallel mode");
+        return await ExtractAsyncParallel(archivePath, destinationPath, password, progress, cancellationToken, options, maxParallelism);
+    }
+
+    /// <summary>
+    /// 串行解压实现（原有逻辑，保留作为回退）
+    /// </summary>
+    private async Task<ExtractResult> ExtractAsyncSequential(string archivePath, string destinationPath, string? password, IProgress<ArchiveProgress>? progress, CancellationToken cancellationToken, ArchiveOptions? options)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"ExtractAsyncSequential: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
         var sw = Stopwatch.StartNew();
 
-        var result = await Task.Run(() =>
+        var result = await Task.Run(async () =>
         {
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
 
@@ -239,7 +280,7 @@ public class ZipEngine : IArchiveEngine
             var processedFiles = 0;
             int failedEntries = 0;
 
-            CoreLog.Info($"ExtractAsync: {entries.Count} entries, {totalBytes} total bytes");
+            CoreLog.Info($"ExtractAsyncSequential: {entries.Count} entries, {totalBytes} total bytes");
 
             foreach (var entry in allEntries)
             {
@@ -263,7 +304,7 @@ public class ZipEngine : IArchiveEngine
                 }
 
                 var entryModified = entry.LastModifiedTime ?? DateTime.MinValue;
-                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entryModified, entry.Size);
+                var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entryModified, entry.Size);
                 if (resolvedPath == null)
                 {
                     processedBytes += entry.Size;
@@ -277,7 +318,7 @@ public class ZipEngine : IArchiveEngine
                     using (var entryStream = entry.OpenEntryStream())
                     using (var outputStream = File.Create(resolvedPath))
                     {
-                        var buffer = new byte[81920];
+                        var buffer = new byte[CopyBufferSize];
                         var entryProcessed = 0L;
                         var lastReportTime = DateTime.Now;
                         var reportInterval = TimeSpan.FromMilliseconds(100);
@@ -311,14 +352,21 @@ public class ZipEngine : IArchiveEngine
                         }
                     }
                     // 恢复文件原始修改时间
-                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsyncSequential: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
 
                     processedBytes += entrySize;
                     processedFiles++;
                 }
                 catch (UnauthorizedAccessException uax)
                 {
-                    CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
+                    CoreLog.Info($"ExtractAsyncSequential: permission denied for '{entryKey}': {uax.Message}");
+                    failedEntries++;
+                }
+                catch (IOException iox)
+                {
+                    // 目标文件被其他进程占用（如正被 Word 打开）等 IO 失败：
+                    // 跳过该条目继续，避免单个文件导致整个解压中止（对齐 UnauthorizedAccessException 分支）
+                    CoreLog.Info($"ExtractAsyncSequential: write failed for '{entryKey}': {iox.Message}");
                     failedEntries++;
                 }
             }
@@ -329,7 +377,7 @@ public class ZipEngine : IArchiveEngine
                 PercentComplete = 100
             });
 
-            CoreLog.Info($"ExtractAsync: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
+            CoreLog.Info($"ExtractAsyncSequential: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
             return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
         }, cancellationToken).ConfigureAwait(false);
 
@@ -337,6 +385,237 @@ public class ZipEngine : IArchiveEngine
         return result;
     }
 
+    /// <summary>
+    /// 并行解压实现（批次复用 archive 实例，Round-Robin 分批，线程安全）。
+    /// </summary>
+    private async Task<ExtractResult> ExtractAsyncParallel(
+        string archivePath,
+        string destinationPath,
+        string? password,
+        IProgress<ArchiveProgress>? progress,
+        CancellationToken cancellationToken,
+        ArchiveOptions? options,
+        int maxParallelism)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"ExtractAsyncParallel: {archivePath} -> {destinationPath}, parallelism={maxParallelism}");
+        var sw = Stopwatch.StartNew();
+
+        // 1. 获取所有条目键和文件大小（单线程打开 archive 一次）
+        var entryInfos = new List<(string Key, long Size, DateTime? Modified)>();
+        long totalBytes = 0;
+
+        using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+        {
+            var hasEncrypted = archive.Entries.Any(e => e.IsEncrypted);
+            if (hasEncrypted && string.IsNullOrEmpty(password))
+            {
+                throw new InvalidOperationException("此压缩包已加密，请输入密码 (This archive is encrypted, password required)");
+            }
+
+            var allEntries = archive.Entries.ToList();
+            foreach (var entry in allEntries)
+            {
+                if (!entry.IsDirectory)
+                {
+                    var key = entry.Key ?? string.Empty;
+                    var size = entry.Size;
+                    var modified = entry.LastModifiedTime ?? DateTime.MinValue;
+                    entryInfos.Add((key, size, modified));
+                    totalBytes += size;
+                }
+            }
+        }
+
+        if (entryInfos.Count == 0)
+        {
+            progress?.Report(new ArchiveProgress { PercentComplete = 100 });
+            return new ExtractResult { SucceededEntries = 0, FailedEntries = 0 };
+        }
+
+        // 2. 创建所有目标目录（单线程，避免竞态）
+        var dirs = entryInfos
+            .Select(info => Path.GetDirectoryName(FileConflictHelper.GetSafePath(destinationPath, info.Key)))
+            .Where(d => !string.IsNullOrEmpty(d))
+            .Distinct();
+
+        foreach (var dir in dirs)
+        {
+            Directory.CreateDirectory(dir!);
+        }
+
+        // 3. 按文件大小降序排列（大文件优先，避免长尾效应）
+        var sortedInfos = entryInfos
+            .OrderByDescending(info => info.Size)
+            .ToList();
+
+        // 4. Round-Robin 分批：将排序后的文件均匀分配到 N 个批次
+        //    大文件自动分散到不同批次，实现天然负载均衡
+        var batches = new List<(string Key, long Size, DateTime? Modified)>[maxParallelism];
+        for (int i = 0; i < maxParallelism; i++)
+            batches[i] = new List<(string Key, long Size, DateTime? Modified)>();
+
+        for (int i = 0; i < sortedInfos.Count; i++)
+        {
+            batches[i % maxParallelism].Add(sortedInfos[i]);
+        }
+
+        // 过滤空批次（文件数少于并行度时）
+        var nonEmptyBatches = batches.Where(b => b.Count > 0).ToList();
+        int actualParallelism = nonEmptyBatches.Count;
+
+        // 5. 并行解压：每批次一个线程，复用 1 个 archive 实例
+        int processedFiles = 0;
+        long processedBytes = 0;
+        int failedEntries = 0;
+        var syncLock = new object();
+        var reportInterval = TimeSpan.FromMilliseconds(100);
+        // 冲突弹窗信号量：Ask 弹窗回调（异步）不可并发，需全局串行（异步不能持 lock 跨 await）
+        using var conflictGate = new SemaphoreSlim(1, 1);
+
+        await Parallel.ForEachAsync(nonEmptyBatches, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = actualParallelism,
+            CancellationToken = cancellationToken
+        }, async (batch, ct) =>
+        {
+            // ★ 每线程只打开 1 次 archive，处理整批文件
+            using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
+
+            foreach (var (entryKey, entrySize, entryModified) in batch)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                var outputPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+
+                // 冲突处理：快速路径（文件不存在）不弹窗；Ask 异步弹窗经信号量全局串行（异步不能持 lock 跨 await）
+                string? resolvedPath;
+                if (!File.Exists(outputPath))
+                {
+                    resolvedPath = outputPath;
+                }
+                else
+                {
+                    await conflictGate.WaitAsync(ct);
+                    try
+                    {
+                        resolvedPath = await FileConflictHelper.ResolvePathAsync(
+                            outputPath, options, entryModified, entrySize);
+                    }
+                    finally
+                    {
+                        conflictGate.Release();
+                    }
+                }
+
+                if (resolvedPath == null)
+                {
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                    }
+                    continue;
+                }
+
+                try
+                {
+                    var entry = archive.Entries.FirstOrDefault(e => e.Key == entryKey);
+                    if (entry == null)
+                    {
+                        lock (syncLock) Interlocked.Increment(ref failedEntries);
+                        continue;
+                    }
+
+                    using var entryStream = entry.OpenEntryStream();
+                    using var outputStream = File.Create(resolvedPath);
+                    var buffer = new byte[CopyBufferSize];
+                    long entryProcessed = 0;
+                    var entryLastReportTime = DateTime.Now;
+
+while (true)
+                        {
+                            ct.ThrowIfCancellationRequested();
+                            var read = await entryStream.ReadAsync(buffer, 0, buffer.Length, ct);
+                            if (read <= 0) break;
+
+                            await outputStream.WriteAsync(buffer, 0, read, ct);
+                            entryProcessed += read;
+
+                            // 报告当前文件进度（节流）
+                            var now = DateTime.Now;
+                            if (now - entryLastReportTime >= TimeSpan.FromMilliseconds(100) || entryProcessed >= entrySize)
+                            {
+                                // 先在锁内拷贝共享变量，释放锁后再上报进度，避免锁竞争
+                                int localProcessedFiles;
+                                long localProcessedBytes;
+                                lock (syncLock)
+                                {
+                                    localProcessedFiles = processedFiles;
+                                    localProcessedBytes = processedBytes;
+                                }
+
+                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                                var overallPct = totalBytes > 0 ? (double)(localProcessedBytes + entryProcessed) / totalBytes * 100 : 0;
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    CurrentFile = entryKey,
+                                    TotalFiles = entryInfos.Count,
+                                    ProcessedFiles = localProcessedFiles,
+                                    TotalBytes = totalBytes,
+                                    ProcessedBytes = localProcessedBytes + entryProcessed,
+                                    PercentComplete = overallPct,
+                                    FilePercentComplete = filePct
+                                });
+
+                                entryLastReportTime = now;
+                            }
+                        }
+
+                    // 恢复文件原始修改时间
+                    try { File.SetLastWriteTime(resolvedPath, entryModified ?? DateTime.MinValue); }
+                    catch (Exception tsEx) { CoreLog.Info($"ExtractAsyncParallel: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
+
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        Interlocked.Increment(ref processedFiles);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (UnauthorizedAccessException uax)
+                {
+                    CoreLog.Info($"ExtractAsyncParallel: permission denied for '{entryKey}': {uax.Message}");
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                }
+                catch (IOException iox)
+                {
+                    CoreLog.Info($"ExtractAsyncParallel: write failed for '{entryKey}': {iox.Message}");
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                }
+                catch (Exception ex)
+                {
+                    CoreLog.Info($"ExtractAsyncParallel: unexpected error for '{entryKey}': {ex.Message}");
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                }
+            }
+        });
+
+        progress?.Report(new ArchiveProgress
+        {
+            CurrentFile = string.Empty,
+            PercentComplete = 100
+        });
+
+        CoreLog.Info($"ExtractAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
+        return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
+    }
+
+    /// <summary>
+    /// 按条目键解压指定文件。根据命中文件数与并行度设置自动选择串行/并行实现。
+    /// </summary>
     public async Task ExtractEntriesAsync(
         string archivePath,
         IReadOnlyList<string> entryKeys,
@@ -348,17 +627,63 @@ public class ZipEngine : IArchiveEngine
         IReadOnlyDictionary<string, string>? outputPathOverrides = null)
     {
         CoreLog.Entry();
-        CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
+        CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}, overrides={(outputPathOverrides?.Count ?? 0)}");
+
+        // 读取并行度设置（0 = 默认 Environment.ProcessorCount，1 = 串行，>1 = 并行）
+        int maxParallelism = options?.ParallelExtractDegree ?? 0;
+        if (maxParallelism <= 0) maxParallelism = Environment.ProcessorCount;
+        if (maxParallelism > 16) maxParallelism = 16;
+
+        // 先快速检查命中文件数决定是否走并行（与 ExtractAsync 决策逻辑一致）
+        int fileCount;
+        using (var quickArchive = OpenArchiveWithEncodingFallback(archivePath, password))
+        {
+            fileCount = quickArchive.Entries.Count(e => !e.IsDirectory && entryKeys.Contains(ArchivePath.Normalize(e.Key)));
+        }
+
+        // 命中文件数少于2或并行度为1时走串行（拖拽/右键解压与全量解压共用同一决策）
+        if (fileCount < 2 || maxParallelism <= 1)
+        {
+            CoreLog.Info($"ExtractEntriesAsync: fileCount={fileCount}, parallelism={maxParallelism} -> using sequential mode");
+            await ExtractEntriesAsyncSequential(archivePath, entryKeys, destinationPath, password, progress, cancellationToken, options, outputPathOverrides);
+        }
+        else
+        {
+            CoreLog.Info($"ExtractEntriesAsync: fileCount={fileCount}, parallelism={maxParallelism} -> using parallel mode");
+            await ExtractEntriesAsyncParallel(archivePath, entryKeys, destinationPath, password, progress, cancellationToken, options, outputPathOverrides, maxParallelism);
+        }
+
+        CoreLog.Exit();
+    }
+
+    /// <summary>
+    /// 串行解压实现（原有逻辑，保留作为回退）。
+    /// </summary>
+    private async Task ExtractEntriesAsyncSequential(
+        string archivePath,
+        IReadOnlyList<string> entryKeys,
+        string destinationPath,
+        string? password,
+        IProgress<ArchiveProgress>? progress,
+        CancellationToken cancellationToken,
+        ArchiveOptions? options,
+        IReadOnlyDictionary<string, string>? outputPathOverrides)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"ExtractEntriesAsyncSequential: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
             var entries = archive.Entries.ToList();
-            var totalBytes = entries.Where(e => entryKeys.Contains(e.Key)).Sum(e => e.Size);
+            // entryKeys（来自预览树 FilteredEntryKeys）以 '/' 分隔；SharpCompress 在 Windows 下
+            // 可能返回 '\' 分隔的 Key，统一归一化后再匹配（预览 = 实际 的保证）
+            var totalBytes = entries.Where(e => entryKeys.Contains(ArchivePath.Normalize(e.Key))).Sum(e => e.Size);
             var processedBytes = 0L;
             var processedFiles = 0;
-            var filteredEntries = entries.Where(e => entryKeys.Contains(e.Key)).ToList();
+            var failedEntries = 0;
+            var filteredEntries = entries.Where(e => entryKeys.Contains(ArchivePath.Normalize(e.Key))).ToList();
 
             CoreLog.Info($"ExtractEntriesAsync: {filteredEntries.Count} matching entries");
 
@@ -367,23 +692,24 @@ public class ZipEngine : IArchiveEngine
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var entryKey = entry.Key ?? string.Empty;
+                var normalizedKey = ArchivePath.Normalize(entryKey);
 
                 if (entry.IsDirectory)
                 {
-                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, normalizedKey);
                     if (!Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
                     continue;
                 }
 
-                var outputPath = outputPathOverrides?.GetValueOrDefault(entryKey)
-                    ?? FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                var outputPath = outputPathOverrides?.GetValueOrDefault(normalizedKey)
+                    ?? FileConflictHelper.GetSafePath(destinationPath, normalizedKey);
                 var outputDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                     Directory.CreateDirectory(outputDir);
 
                 var entryModified = entry.LastModifiedTime ?? DateTime.MinValue;
-                var resolvedPath = FileConflictHelper.ResolvePath(outputPath, options, entryModified, entry.Size);
+                var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entryModified, entry.Size);
                 if (resolvedPath == null)
                 {
                     processedBytes += entry.Size;
@@ -391,47 +717,62 @@ public class ZipEngine : IArchiveEngine
                 }
 
                 var entrySize = entry.Size;
-                using (var entryStream = entry.OpenEntryStream())
-                using (var outputStream = File.Create(resolvedPath))
+                try
                 {
-                    var buffer = new byte[81920];
-                    long entryProcessed = 0;
-                    var lastReportTime = DateTime.Now;
-                    var reportInterval = TimeSpan.FromMilliseconds(100);
-
-                    while (true)
+                    using (var entryStream = entry.OpenEntryStream())
+                    using (var outputStream = File.Create(resolvedPath))
                     {
-                        cancellationToken.ThrowIfCancellationRequested();
-                        var read = entryStream.Read(buffer, 0, buffer.Length);
-                        if (read <= 0) break;
+                        var buffer = new byte[CopyBufferSize];
+                        long entryProcessed = 0;
+                        var lastReportTime = DateTime.Now;
+                        var reportInterval = TimeSpan.FromMilliseconds(100);
 
-                        outputStream.Write(buffer, 0, read);
-                        entryProcessed += read;
-
-                        var now = DateTime.Now;
-                        if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                        while (true)
                         {
-                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                            progress?.Report(new ArchiveProgress
+                            cancellationToken.ThrowIfCancellationRequested();
+                            var read = entryStream.Read(buffer, 0, buffer.Length);
+                            if (read <= 0) break;
+
+                            outputStream.Write(buffer, 0, read);
+                            entryProcessed += read;
+
+                            var now = DateTime.Now;
+                            if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
                             {
-                                CurrentFile = entryKey,
-                                TotalFiles = filteredEntries.Count,
-                                ProcessedFiles = processedFiles,
-                                TotalBytes = totalBytes,
-                                ProcessedBytes = processedBytes + entryProcessed,
-                                PercentComplete = overallPct,
-                                FilePercentComplete = filePct
-                            });
-                            lastReportTime = now;
+                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                                var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    CurrentFile = entryKey,
+                                    TotalFiles = filteredEntries.Count,
+                                    ProcessedFiles = processedFiles,
+                                    TotalBytes = totalBytes,
+                                    ProcessedBytes = processedBytes + entryProcessed,
+                                    PercentComplete = overallPct,
+                                    FilePercentComplete = filePct
+                                });
+                                lastReportTime = now;
+                            }
                         }
                     }
+
+                    try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { CoreLog.Trace("ZipEngine.ExtractAsync: failed to set last write time for '{0}'", resolvedPath); }
+
+                    processedBytes += entrySize;
+                    processedFiles++;
                 }
-
-                try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { CoreLog.Trace("ZipEngine.ExtractAsync: failed to set last write time for '{0}'", resolvedPath); }
-
-                processedBytes += entrySize;
-                processedFiles++;
+                catch (OperationCanceledException) { throw; }
+                catch (UnauthorizedAccessException uax)
+                {
+                    CoreLog.Info($"ExtractEntriesAsyncSequential: permission denied for '{entryKey}': {uax.Message}");
+                    failedEntries++;
+                }
+                catch (IOException iox)
+                {
+                    // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
+                    CoreLog.Info($"ExtractEntriesAsyncSequential: write failed for '{entryKey}': {iox.Message}");
+                    failedEntries++;
+                }
             }
 
             progress?.Report(new ArchiveProgress
@@ -440,9 +781,246 @@ public class ZipEngine : IArchiveEngine
                 PercentComplete = 100
             });
 
-            CoreLog.Info($"ExtractEntriesAsync: done, {processedFiles} files, {sw.ElapsedMilliseconds}ms");
+            CoreLog.Info($"ExtractEntriesAsyncSequential: done, {processedFiles} files, failedEntries={failedEntries}, {sw.ElapsedMilliseconds}ms");
         }, cancellationToken).ConfigureAwait(false);
 
+        CoreLog.Exit();
+    }
+
+    /// <summary>
+    /// 并行解压实现（多实例并行 + 批次复用），处理 entryKeys 指定条目。
+    /// 输出路径尊重 outputPathOverrides（与串行一致）；冲突处理经信号量全局串行。
+    /// </summary>
+    private async Task ExtractEntriesAsyncParallel(
+        string archivePath,
+        IReadOnlyList<string> entryKeys,
+        string destinationPath,
+        string? password,
+        IProgress<ArchiveProgress>? progress,
+        CancellationToken cancellationToken,
+        ArchiveOptions? options,
+        IReadOnlyDictionary<string, string>? outputPathOverrides,
+        int maxParallelism)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"ExtractEntriesAsyncParallel: {archivePath}, {entryKeys.Count} entries -> {destinationPath}, parallelism={maxParallelism}");
+        var sw = Stopwatch.StartNew();
+
+        // 1. 预读所有命中条目（单线程打开 archive 一次）：文件（Key/Size/Modified/输出路径）+ 目录 key
+        var entryInfos = new List<(string Key, long Size, DateTime? Modified, string OutputPath)>();
+        var directoryPaths = new List<string>();
+        long totalBytes = 0;
+
+        using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+        {
+            var hasEncrypted = archive.Entries.Any(e => e.IsEncrypted);
+            if (hasEncrypted && string.IsNullOrEmpty(password))
+            {
+                throw new InvalidOperationException("此压缩包已加密，请输入密码 (This archive is encrypted, password required)");
+            }
+
+            foreach (var entry in archive.Entries)
+            {
+                var entryKey = entry.Key ?? string.Empty;
+                var normalizedKey = ArchivePath.Normalize(entryKey);
+                if (!entryKeys.Contains(normalizedKey)) continue;
+
+                if (entry.IsDirectory)
+                {
+                    directoryPaths.Add(FileConflictHelper.GetSafePath(destinationPath, normalizedKey));
+                    continue;
+                }
+
+                var outputPath = outputPathOverrides?.GetValueOrDefault(normalizedKey)
+                    ?? FileConflictHelper.GetSafePath(destinationPath, normalizedKey);
+                entryInfos.Add((entryKey, entry.Size, entry.LastModifiedTime ?? DateTime.MinValue, outputPath));
+                totalBytes += entry.Size;
+            }
+        }
+
+        if (entryInfos.Count == 0)
+        {
+            progress?.Report(new ArchiveProgress { PercentComplete = 100 });
+            CoreLog.Info("ExtractEntriesAsyncParallel: no matching entries, returning");
+            CoreLog.Exit();
+            return;
+        }
+
+        // 2. 创建所有目标目录（单线程，避免竞态）
+        var dirs = entryInfos
+            .Select(info => Path.GetDirectoryName(info.OutputPath))
+            .Where(d => !string.IsNullOrEmpty(d))
+            .Concat(directoryPaths)
+            .Distinct();
+        foreach (var dir in dirs)
+        {
+            Directory.CreateDirectory(dir!);
+        }
+
+        // 3. 按文件大小降序排列（大文件优先，避免长尾效应）
+        var sortedInfos = entryInfos
+            .OrderByDescending(info => info.Size)
+            .ToList();
+
+        // 4. Round-Robin 分批：将排序后的文件均匀分配到 N 个批次
+        //    大文件自动分散到不同批次，实现天然负载均衡
+        var batches = new List<(string Key, long Size, DateTime? Modified, string OutputPath)>[maxParallelism];
+        for (int i = 0; i < maxParallelism; i++)
+            batches[i] = new List<(string Key, long Size, DateTime? Modified, string OutputPath)>();
+
+        for (int i = 0; i < sortedInfos.Count; i++)
+        {
+            batches[i % maxParallelism].Add(sortedInfos[i]);
+        }
+
+        // 过滤空批次（文件数少于并行度时）
+        var nonEmptyBatches = batches.Where(b => b.Count > 0).ToList();
+        int actualParallelism = nonEmptyBatches.Count;
+
+        // 5. 并行解压：每批次一个线程，复用 1 个 archive 实例
+        int processedFiles = 0;
+        long processedBytes = 0;
+        int failedEntries = 0;
+        var syncLock = new object();
+        // 冲突弹窗信号量：Ask 弹窗回调（异步）不可并发，需全局串行（异步不能持 lock 跨 await）
+        using var conflictGate = new SemaphoreSlim(1, 1);
+
+        await Parallel.ForEachAsync(nonEmptyBatches, new ParallelOptions
+        {
+            MaxDegreeOfParallelism = actualParallelism,
+            CancellationToken = cancellationToken
+        }, async (batch, ct) =>
+        {
+            // ★ 每线程只打开 1 次 archive，处理整批文件
+            using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
+
+            foreach (var (entryKey, entrySize, entryModified, outputPath) in batch)
+            {
+                ct.ThrowIfCancellationRequested();
+
+                // 冲突处理：快速路径（文件不存在）不弹窗；Ask 异步弹窗经信号量全局串行
+                string? resolvedPath;
+                if (!File.Exists(outputPath))
+                {
+                    resolvedPath = outputPath;
+                }
+                else
+                {
+                    await conflictGate.WaitAsync(ct);
+                    try
+                    {
+                        resolvedPath = await FileConflictHelper.ResolvePathAsync(
+                            outputPath, options, entryModified, entrySize);
+                    }
+                    finally
+                    {
+                        conflictGate.Release();
+                    }
+                }
+
+                if (resolvedPath == null)
+                {
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                    }
+                    continue;
+                }
+
+                try
+                {
+                    var entry = archive.Entries.FirstOrDefault(e => e.Key == entryKey);
+                    if (entry == null)
+                    {
+                        lock (syncLock) Interlocked.Increment(ref failedEntries);
+                        continue;
+                    }
+
+                    using var entryStream = entry.OpenEntryStream();
+                    using var outputStream = File.Create(resolvedPath);
+                    var buffer = new byte[CopyBufferSize];
+                    long entryProcessed = 0;
+                    var entryLastReportTime = DateTime.Now;
+
+                    while (true)
+                    {
+                        ct.ThrowIfCancellationRequested();
+                        var read = await entryStream.ReadAsync(buffer, 0, buffer.Length, ct);
+                        if (read <= 0) break;
+
+                        await outputStream.WriteAsync(buffer, 0, read, ct);
+                        entryProcessed += read;
+
+                        // 报告当前文件进度（节流）
+                        var now = DateTime.Now;
+                        if (now - entryLastReportTime >= TimeSpan.FromMilliseconds(100) || entryProcessed >= entrySize)
+                        {
+                            // 先在锁内拷贝共享变量，释放锁后再上报进度，避免锁竞争
+                            int localProcessedFiles;
+                            long localProcessedBytes;
+                            lock (syncLock)
+                            {
+                                localProcessedFiles = processedFiles;
+                                localProcessedBytes = processedBytes;
+                            }
+
+                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                            var overallPct = totalBytes > 0 ? (double)(localProcessedBytes + entryProcessed) / totalBytes * 100 : 0;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = entryKey,
+                                TotalFiles = entryInfos.Count,
+                                ProcessedFiles = localProcessedFiles,
+                                TotalBytes = totalBytes,
+                                ProcessedBytes = localProcessedBytes + entryProcessed,
+                                PercentComplete = overallPct,
+                                FilePercentComplete = filePct
+                            });
+
+                            entryLastReportTime = now;
+                        }
+                    }
+
+                    // 恢复文件原始修改时间
+                    try { File.SetLastWriteTime(resolvedPath, entryModified ?? DateTime.MinValue); }
+                    catch (Exception tsEx) { CoreLog.Info($"ExtractEntriesAsyncParallel: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
+
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        Interlocked.Increment(ref processedFiles);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (UnauthorizedAccessException uax)
+                {
+                    CoreLog.Info($"ExtractEntriesAsyncParallel: permission denied for '{entryKey}': {uax.Message}");
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                }
+                catch (IOException iox)
+                {
+                    // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
+                    CoreLog.Info($"ExtractEntriesAsyncParallel: write failed for '{entryKey}': {iox.Message}");
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                }
+                catch (Exception ex)
+                {
+                    CoreLog.Info($"ExtractEntriesAsyncParallel: unexpected error for '{entryKey}': {ex.Message}");
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                }
+            }
+        });
+
+        progress?.Report(new ArchiveProgress
+        {
+            CurrentFile = string.Empty,
+            PercentComplete = 100
+        });
+
+        CoreLog.Info($"ExtractEntriesAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         CoreLog.Exit();
     }
 
@@ -455,7 +1033,7 @@ public class ZipEngine : IArchiveEngine
         await Task.Run(() =>
         {
             // 收集所有文件（使用 FileScanner 共享工具，边发现边报告进度）
-            var (files, totalBytes) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken);
+            var (files, totalBytes) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
 
             if (files.Count == 0)
             {
@@ -542,10 +1120,32 @@ public class ZipEngine : IArchiveEngine
                     };
 
                     var sourceFilePaths = files.Select(f => f.FullPath).Distinct().ToArray();
-                    if (sourceFilePaths.Length > 0)
+                    CoreLog.Trace($"[TRACE] CompressAsync encrypted 7z: {sourceFilePaths.Length} files, outputPath={outputPath}");
+                    foreach (var fp in sourceFilePaths)
+                        CoreLog.Trace($"[TRACE]   7z input: {fp}");
+                    // 加密 ZIP 走 SharpSevenZip 单次原生调用，无法逐文件恢复读取错误。
+                    // 调用前预检读权限（被占用/权限 → ErrorResolver 弹窗 重试/跳过/中止），
+                    // 跳过则剔除，避免单个不可读文件导致整个加密压缩直接中止。
+                    var validated = ReadErrorHandler.FilterUnreadableFiles(sourceFilePaths, options, cancellationToken);
+                    if (validated.Count > 0)
                     {
-                        s7zCompressor.CompressFilesEncrypted(outputPath, options.Password ?? "", sourceFilePaths);
+                        s7zCompressor.CompressFilesEncrypted(outputPath, options.Password ?? "", validated.ToArray());
                     }
+                    else
+                    {
+                        CoreLog.Info("ZipEngine.CompressAsync: all files skipped due to read errors, nothing to compress");
+                    }
+
+                    // SharpSevenZip 的 Compressing 事件 delta 累积通常达不到 100，
+                    // 压缩完成后必须补发最终报告，否则进度条停在最后一个文件的中间值。
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = string.Empty,
+                        PercentComplete = 100,
+                        FilePercentComplete = 100,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = totalFiles,
+                    });
 
                     processedBytes = totalBytes;
                     processedFiles = totalFiles;
@@ -581,6 +1181,54 @@ public class ZipEngine : IArchiveEngine
                         ArchiveEncoding = new ArchiveEncoding { Default = encoding },
                     };
                     using var zipWriter = new ZipWriter(fsOut, writerOptions);
+
+                    // ── MultiThreaded 自适应压缩：已压缩文件 Store + 可压缩文件 7z mt=on ──
+                    if (options.MultiThreadedCompression && !options.Encrypt)
+                    {
+                        var method = options.ZipCompressionMethod?.ToLowerInvariant();
+                        if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
+                        {
+                            var storeGroup = new List<(string FullPath, string RelativePath)>();
+                            var compressGroup = new List<(string FullPath, string RelativePath)>();
+                            foreach (var file in files)
+                            {
+                                var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, options.AdaptiveCompression, options.MultiThreadedStoreFormatIds);
+                                if (level == 0) storeGroup.Add(file);
+                                else compressGroup.Add(file);
+                            }
+
+                            // StoreGroup：已压缩文件直接 Store 写入 ZipWriter
+                            CoreLog.Trace($"[TRACE] CompressAsync StoreGroup: {storeGroup.Count} files");
+                            foreach (var (fullPath, relativePath) in storeGroup)
+                            {
+                                CoreLog.Trace($"[TRACE]   StoreGroup entry: FullPath={fullPath} → RelativePath={relativePath} → ArchivePath.Normalize={ArchivePath.Normalize(relativePath)}");
+                                cancellationToken.ThrowIfCancellationRequested();
+                                ReadFileWithRetry(fullPath, relativePath, options, zipWriter,
+                                    ref processedBytes, totalBytes, totalFiles, ref processedFiles,
+                                    cancellationToken, progress, ref lastReportTime);
+                            }
+
+                            // CompressGroup：需要压缩的文件通过 7z.dll 多线程压缩
+                            if (compressGroup.Count > 0)
+                            {
+                                CoreLog.Trace($"[TRACE] CompressAsync CompressGroup: {compressGroup.Count} files");
+                                foreach (var (fp, rp) in compressGroup)
+                                    CoreLog.Trace($"[TRACE]   CompressGroup entry: FullPath={fp} → RelativePath={rp}");
+                                var tempZip = Path.Combine(Path.GetTempPath(), $"mantiszip_mt_{Guid.NewGuid():N}.zip");
+                                try
+                                {
+                                    CoreLog.Info($"CompressAsync: MultiThreaded mode — {storeGroup.Count} store, {compressGroup.Count} compress via 7z mt=on");
+                                    CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, processedBytes, totalBytes, totalFiles, processedFiles, ref lastReportTime);
+                                    MergeTempZipToWriter(tempZip, zipWriter, ref processedBytes, totalBytes, totalFiles, ref processedFiles, progress, ref lastReportTime, cancellationToken);
+                                }
+                                finally
+                                {
+                                    try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch { }
+                                }
+                            }
+                            return; // MultiThreaded 路径完成，跳过标准 foreach
+                        }
+                    }
 
                     foreach (var (fullPath, relativePath) in files)
                     {
@@ -663,6 +1311,22 @@ public class ZipEngine : IArchiveEngine
             }).ToList();
 
             CoreLog.Info($"ListEntriesAsync: {items.Count} entries, {sw.ElapsedMilliseconds}ms");
+
+            // 交叉校验：SharpCompress 报告了加密条目 → 用二进制解析直接检查中央目录的 flags
+            // 这是针对 SharpCompress 在某些环境（如 Win11 日文版）的假阳性 bug
+            if (items.Any(i => i.IsEncrypted))
+            {
+                var actuallyEncrypted = VerifyZipEncryptionFlags(archivePath);
+                if (!actuallyEncrypted)
+                {
+                    CoreLog.Info("WARN: ListEntriesAsync: SharpCompress reported encrypted entries but binary CD flags show none — overriding IsEncrypted to false (possible false positive on {0})", archivePath);
+                    foreach (var item in items)
+                    {
+                        item.IsEncrypted = false;
+                    }
+                }
+            }
+
             return (IReadOnlyList<ArchiveItem>)items;
         }, cancellationToken).ConfigureAwait(false);
 
@@ -692,7 +1356,46 @@ public class ZipEngine : IArchiveEngine
                     // 完全解压每个条目以验证数据完整性
                     // SharpCompress 在读取完整流时内部会检测 CRC 等错误
                     using var stream = entry.OpenEntryStream();
-                    stream.CopyTo(Stream.Null);
+
+                    long entrySize = entry.Size;
+                    long totalRead = 0;
+                    var lastReportTime = DateTime.Now;
+                    var reportInterval = TimeSpan.FromMilliseconds(100);
+
+                    // 文件开始：文件进度条归零
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = entry.Key ?? "",
+                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                        FilePercentComplete = 0,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles,
+                    });
+
+                    // 带 per-file 进度的复制循环（100ms 节流，末尾强制上报 100%）
+                    var buffer = new byte[CopyBufferSize];
+                    while (true)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        var read = stream.Read(buffer, 0, buffer.Length);
+                        if (read <= 0) break;
+                        totalRead += read;
+
+                        var now = DateTime.Now;
+                        if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
+                        {
+                            var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = entry.Key ?? "",
+                                PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                                FilePercentComplete = filePct,
+                                TotalFiles = totalFiles,
+                                ProcessedFiles = processedFiles,
+                            });
+                            lastReportTime = now;
+                        }
+                    }
 
                     processedFiles++;
 
@@ -700,6 +1403,7 @@ public class ZipEngine : IArchiveEngine
                     {
                         CurrentFile = entry.Key ?? "",
                         PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                        FilePercentComplete = 100,
                         TotalFiles = totalFiles,
                         ProcessedFiles = processedFiles,
                     });
@@ -761,7 +1465,7 @@ public class ZipEngine : IArchiveEngine
         CoreLog.Info($"AddToArchiveAsync: {archivePath}, sources=[{string.Join("; ", sourcePaths)}]");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             // 收集需要添加的新文件
             var newFiles = new List<(string FullPath, string EntryName)>();
@@ -774,6 +1478,10 @@ public class ZipEngine : IArchiveEngine
                     var dirName = ArchivePath.GetFileName(sourcePath);
                     foreach (var file in Directory.GetFiles(sourcePath, "*", SearchOption.AllDirectories))
                     {
+                        // FileWhitelist（来自压缩预览过滤 B）命中时只添加匹配文件，保证 预览=实际。
+                        // 白名单值为预览收集的原始绝对路径（\ 分隔），与 FileScanner 匹配方式一致，勿 Normalize。
+                        if (options.FileWhitelist != null && !options.FileWhitelist.Contains(file))
+                            continue;
                         var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
                         var entryName = string.IsNullOrEmpty(entryBasePath) ? relativePath : entryBasePath + "/" + relativePath;
                         newFiles.Add((file, entryName));
@@ -792,9 +1500,12 @@ public class ZipEngine : IArchiveEngine
                 return;
             }
 
-            // 计算旧条目信息（使用 SharpCompress IArchive 读取）
+            // 计算旧条目信息（使用 SharpCompress IArchive 读取）——同时收集条目名/大小/时间供冲突处理
             int oldEntryCount = 0;
             long oldTotalBytes = 0;
+            var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            var existingRawNames = new List<string>();
+            var existingEntryInfo = new Dictionary<string, (long Size, DateTime? Modified)>(StringComparer.OrdinalIgnoreCase);
             using (var archive = OpenArchiveWithEncodingFallback(archivePath))
             {
                 foreach (var entry in archive.Entries)
@@ -802,10 +1513,43 @@ public class ZipEngine : IArchiveEngine
                     if (entry.IsDirectory) continue;
                     oldTotalBytes += entry.Size;
                     oldEntryCount++;
+                    var rawName = entry.Key ?? string.Empty;
+                    var normalized = ArchivePath.Normalize(rawName);
+                    existingNames.Add(normalized);
+                    existingRawNames.Add(rawName);
+                    existingEntryInfo[normalized] = (entry.Size, entry.LastModifiedTime);
                 }
             }
 
-            long newTotalBytes = newFiles.Sum(f => new FileInfo(f.FullPath).Length);
+            // 解析条目名冲突（复用解压冲突策略；语义方向反转见 AddConflictHelper）
+            var occupiedNames = new HashSet<string>(existingNames, StringComparer.OrdinalIgnoreCase);
+            var resolvedFiles = new List<(string FullPath, string EntryName)>();
+            var overwrittenNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            foreach (var (fullPath, entryName) in newFiles)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                var normalized = ArchivePath.Normalize(entryName);
+                existingEntryInfo.TryGetValue(normalized, out var existing);
+                var fi = new FileInfo(fullPath);
+                var finalName = await AddConflictHelper.ResolveEntryNameAsync(
+                    normalized, options, existing.Modified, existing.Size, fi.LastWriteTime, fi.Length, occupiedNames);
+                if (finalName == null)
+                {
+                    CoreLog.Info($"AddToArchiveAsync: skipped '{entryName}' (conflict action)");
+                    continue;
+                }
+                if (existingNames.Contains(normalized) && finalName == normalized)
+                    overwrittenNames.Add(normalized); // 覆盖：copy-mode 需从 keepEntryNames 排除旧条目
+                resolvedFiles.Add((fullPath, finalName));
+            }
+
+            if (resolvedFiles.Count == 0)
+            {
+                CoreLog.Info("AddToArchiveAsync: all files skipped by conflict handling");
+                return;
+            }
+
+            long newTotalBytes = resolvedFiles.Sum(f => new FileInfo(f.FullPath).Length);
             // 总工作量 = 提取旧条目字节 + 压缩全部字节
             long workTotal = oldTotalBytes + oldTotalBytes + newTotalBytes;
             if (workTotal == 0) workTotal = 1;
@@ -827,9 +1571,10 @@ public class ZipEngine : IArchiveEngine
                     var streamsToDispose = new List<Stream>();
                     try
                     {
-                        foreach (var (fullPath, entryName) in newFiles)
+                        foreach (var (fullPath, entryName) in resolvedFiles)
                         {
-                            var fileStream = File.OpenRead(fullPath);
+                            // 共享读：源文件可能正被编辑器以写权限持有
+                            var fileStream = SharedReadStream.OpenRead(fullPath);
                             streamsToDispose.Add(fileStream);
                             var fi = new FileInfo(fullPath);
                             newEntries.Add(new NewEntry(
@@ -839,15 +1584,25 @@ public class ZipEngine : IArchiveEngine
                                 Size: fi.Length));
                         }
 
-                        var result = ZipBinaryRewriter.RewriteAsync(
+                        // 覆盖重名条目时排除旧条目（keepSet 存原始名 + OrdinalIgnoreCase，与 DeleteEntriesAsync 一致）
+                        HashSet<string>? keepEntryNames = null;
+                        if (overwrittenNames.Count > 0)
+                        {
+                            keepEntryNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                            foreach (var raw in existingRawNames)
+                                if (!overwrittenNames.Contains(ArchivePath.Normalize(raw)))
+                                    keepEntryNames.Add(raw);
+                        }
+
+                        var result = await ZipBinaryRewriter.RewriteAsync(
                             sourcePath: archivePath,
                             destPath: tempArchiveFast,
-                            keepEntryNames: null,  // keep all existing entries
+                            keepEntryNames: keepEntryNames,
                             addEntries: newEntries,
                             encoding: encoding,
                             comment: options.Comment,  // null = preserve original comment
                             progress: progress,
-                            cancellationToken: cancellationToken).GetAwaiter().GetResult();
+                            cancellationToken: cancellationToken);
 
                         // Atomic replace (same retry pattern as legacy path)
                         for (int retry = 0; ; retry++)
@@ -951,7 +1706,7 @@ public class ZipEngine : IArchiveEngine
                         using (var entryStream = entry.OpenEntryStream())
                         using (var outStream = File.Create(outPath))
                         {
-                            var buffer = new byte[81920];
+                            var buffer = new byte[CopyBufferSize];
                             long entryProcessed = 0;
                             while (true)
                             {
@@ -985,7 +1740,7 @@ public class ZipEngine : IArchiveEngine
                 CoreLog.Trace($"[TRACE] ZipEngine.AddToArchiveAsync: Phase 1 done, extracted {processedBytes} bytes");
 
                 // === Phase 2: 复制新文件到临时目录 ===
-                foreach (var (fullPath, entryName) in newFiles)
+                foreach (var (fullPath, entryName) in resolvedFiles)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     var outPath = Path.Combine(tempDir, entryName);
@@ -1087,20 +1842,106 @@ public class ZipEngine : IArchiveEngine
                         };
                         using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
+                        // ── MultiThreaded 自适应压缩：已压缩文件 Store + 可压缩文件 7z mt=on ──
+                        if (options.MultiThreadedCompression && !options.Encrypt)
+                        {
+                            var mtMethod = options.ZipCompressionMethod?.ToLowerInvariant();
+                            if (string.IsNullOrEmpty(mtMethod) || mtMethod == "deflate" || mtMethod == "deflate64")
+                            {
+                                var storeGroup = new List<(string FullPath, string RelativePath)>();
+                                var compressGroup = new List<(string FullPath, string RelativePath)>();
+                                foreach (var file in compressFiles)
+                                {
+                                    var level = ZipEntryClassifier.GetAdaptiveLevel(file.FullPath, options.CompressionLevel, options.AdaptiveCompression, options.MultiThreadedStoreFormatIds);
+                                    if (level == 0) storeGroup.Add(file);
+                                    else compressGroup.Add(file);
+                                }
+
+                                // StoreGroup：已压缩文件直接 Store 写入 ZipWriter
+                                CoreLog.Trace($"[TRACE] AddToArchiveAsync StoreGroup: {storeGroup.Count} files");
+                                foreach (var (fullPath, relPath) in storeGroup)
+                                {
+                                    CoreLog.Trace($"[TRACE]   StoreGroup entry: FullPath={fullPath} → relPath={relPath} → ArchivePath.Normalize={ArchivePath.Normalize(relPath)}");
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                    var fi = new FileInfo(fullPath);
+                                    var entryPath = ArchivePath.Normalize(relPath);
+                                    var entryOptions = new ZipWriterEntryOptions
+                                    {
+                                        ModificationDateTime = fi.LastWriteTime,
+                                        CompressionLevel = 0, // Store
+                                    };
+                                    using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
+                                    using (var fsInput = File.OpenRead(fullPath))
+                                    {
+                                        var buffer = new byte[CopyBufferSize];
+                                        long totalRead = 0;
+                                        var fiLen = fi.Length;
+                                        while (totalRead < fiLen)
+                                        {
+                                            cancellationToken.ThrowIfCancellationRequested();
+                                            var read = fsInput.Read(buffer, 0, buffer.Length);
+                                            if (read <= 0) break;
+                                            entryStream.Write(buffer, 0, read);
+                                            totalRead += read;
+                                            compressProcessed += read;
+                                        }
+                                    }
+                                }
+
+                                // CompressGroup：需要压缩的文件通过 7z.dll 多线程压缩
+                                if (compressGroup.Count > 0)
+                                {
+                                    CoreLog.Trace($"[TRACE] AddToArchiveAsync CompressGroup: {compressGroup.Count} files");
+                                    foreach (var (fp, rp) in compressGroup)
+                                        CoreLog.Trace($"[TRACE]   CompressGroup entry: FullPath={fp} → RelativePath={rp}");
+                                    var tempZip = Path.Combine(Path.GetTempPath(), $"mantiszip_mt_{Guid.NewGuid():N}.zip");
+                                    int mtProcessedFiles = 0;
+                                    try
+                                    {
+                                        CoreLog.Info($"AddToArchiveAsync: MultiThreaded mode — {storeGroup.Count} store, {compressGroup.Count} compress via 7z mt=on");
+                                        CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, compressProcessed, compressTotalBytes, compressFiles.Count, mtProcessedFiles, ref lastReportTime);
+                                        MergeTempZipToWriter(tempZip, zipWriter, ref compressProcessed, compressTotalBytes, compressFiles.Count, ref mtProcessedFiles, progress, ref lastReportTime, cancellationToken);
+                                    }
+                                    finally
+                                    {
+                                        try { if (File.Exists(tempZip)) File.Delete(tempZip); } catch { }
+                                    }
+                                }
+                                goto multiThreadedDone; // MultiThreaded 路径完成，跳过标准 foreach
+                            }
+                        }
+
                         foreach (var (fullPath, relPath) in compressFiles)
                         {
                             cancellationToken.ThrowIfCancellationRequested();
                             var fi = new FileInfo(fullPath);
                             var entryPath = ArchivePath.Normalize(relPath);
+                            // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）
+                            int? entryLevel = null;
+                            if (options != null && options.AdaptiveCompression && !options.Encrypt)
+                            {
+                                var method = options.ZipCompressionMethod?.ToLowerInvariant();
+                                if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
+                                {
+                                    entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true);
+                                    CoreLog.Trace("ZipEngine.CompressAsync: adaptive entry '{0}' level={1} (global={2}, adaptive={3})",
+                                        entryPath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompression);
+                                }
+                                else
+                                {
+                                    CoreLog.Trace("ZipEngine.CompressAsync: adaptive skipped for '{0}' (method={1}, not deflate)", entryPath, method);
+                                }
+                            }
                             var entryOptions = new ZipWriterEntryOptions
                             {
                                 ModificationDateTime = fi.LastWriteTime,
+                                CompressionLevel = entryLevel,
                             };
 
                             using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
                             using (var fsInput = File.OpenRead(fullPath))
                             {
-                                var buffer = new byte[81920];
+                                var buffer = new byte[CopyBufferSize];
                                 long totalRead = 0;
                                 var fiLen = fi.Length;
 
@@ -1130,6 +1971,7 @@ public class ZipEngine : IArchiveEngine
                                 }
                             }
                         }
+                        multiThreadedDone:;
                     }
                 }
 
@@ -1176,7 +2018,7 @@ public class ZipEngine : IArchiveEngine
         CoreLog.Info($"DeleteEntriesAsync: {archivePath}, entries=[{string.Join("; ", entryPaths)}]");
         var sw = Stopwatch.StartNew();
 
-        await Task.Run(() =>
+        await Task.Run(async () =>
         {
             var deletedSet = new HashSet<string>(entryPaths.Select(p => ArchivePath.Normalize(p)), StringComparer.OrdinalIgnoreCase);
             if (entryPaths.Length == 0)
@@ -1218,7 +2060,7 @@ public class ZipEngine : IArchiveEngine
                         return;
                     }
 
-                    var result = ZipBinaryRewriter.RewriteAsync(
+                    var result = await ZipBinaryRewriter.RewriteAsync(
                         sourcePath: archivePath,
                         destPath: tempArchiveFast,
                         keepEntryNames: keepSet,
@@ -1226,7 +2068,7 @@ public class ZipEngine : IArchiveEngine
                         encoding: encoding,
                         comment: null,  // preserve original comment
                         progress: progress,
-                        cancellationToken: cancellationToken).GetAwaiter().GetResult();
+                        cancellationToken: cancellationToken);
 
                     // Atomic replace
                     for (int retry = 0; ; retry++)
@@ -1383,7 +2225,7 @@ public class ZipEngine : IArchiveEngine
                         using (var entryStream = entry.OpenEntryStream())
                         using (var outStream = File.Create(outPath))
                         {
-                            var buffer = new byte[81920];
+                            var buffer = new byte[CopyBufferSize];
                             long entryProcessed = 0;
                             while (true)
                             {
@@ -1504,7 +2346,7 @@ public class ZipEngine : IArchiveEngine
                             using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
                             using (var fsInput = File.OpenRead(fullPath))
                             {
-                                var buffer = new byte[81920];
+                                var buffer = new byte[CopyBufferSize];
                                 long totalRead = 0;
                                 var fiLen = fi.Length;
 
@@ -1592,16 +2434,41 @@ public class ZipEngine : IArchiveEngine
             try
             {
                 var fi = new FileInfo(fullPath);
+                // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）。
+                // 必须用 4 参重载（传入 MultiThreadedStoreFormatIds）而非 3 参：
+                //   · 3 参仅查内置已压缩扩展名列表；4 参额外合并 MultiThreadedStoreFormatIds 自定义列表。
+                //   · MT 模式的分拣（storeGroup/compressGroup 分流）在 ZIP 条目级别用 4 参判定；
+                //     若此处写入阶段用 3 参重算，自定义列表命中的文件（如 .wav）会被降级重算为
+                //     level>0 → 实际 Deflate 压缩 —— 分拣说 Store、写入却 Deflate，自打脸。
+                //   · 非 MT 的普通自适应路径同样经此方法，4 参在无自定义列表时行为与 3 参完全一致，
+                //     故统一用 4 参无副作用。
+                int? entryLevel = null;
+                if (options != null && options.AdaptiveCompression && !options.Encrypt)
+                {
+                    var method = options.ZipCompressionMethod?.ToLowerInvariant();
+                    if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
+                    {
+                        entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds);
+                        CoreLog.Trace("ZipEngine.AddToArchiveAsync: adaptive entry '{0}' level={1} (global={2}, adaptive={3})",
+                            relativePath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompression);
+                    }
+                    else
+                    {
+                        CoreLog.Trace("ZipEngine.AddToArchiveAsync: adaptive skipped for '{0}' (method={1}, not deflate)", relativePath, method);
+                    }
+                }
                 var entryOptions = new ZipWriterEntryOptions
                 {
                     ModificationDateTime = fi.LastWriteTime,
+                    CompressionLevel = entryLevel,
                 };
 
                 var entryPath = ArchivePath.Normalize(relativePath);
                 using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
-                using (var fsInput = File.OpenRead(fullPath))
+                // 共享读：源文件可能正被 Word 等编辑器以写权限持有，File.OpenRead 会直接冲突
+                using (var fsInput = SharedReadStream.OpenRead(fullPath))
                 {
-                    var buffer = new byte[81920];
+                    var buffer = new byte[CopyBufferSize];
                     long totalRead = 0;
                     var fiLen = fi.Length;
 
@@ -1663,5 +2530,234 @@ public class ZipEngine : IArchiveEngine
             }
         }
         return false;
+    }
+
+    /// <summary>
+    /// 使用 SharpSevenZip 多线程压缩一组文件到临时 ZIP。
+    /// 用于 MultiThreadedCompression 模式：将需要压缩的文件通过 7z.dll mt=on 多线程压缩。
+    /// </summary>
+    /// <param name="files">待压缩的文件列表（FullPath + RelativePath）。</param>
+    /// <param name="tempPath">临时 ZIP 输出路径。</param>
+    /// <param name="options">压缩选项（压缩级别、方法等）。</param>
+    /// <param name="progress">进度报告回调（可为 null）。</param>
+    /// <param name="storeProcessedBytes">StoreGroup 已处理字节数（全局进度基线）。</param>
+    /// <param name="totalBytes">全部文件总字节数（全局进度分母）。</param>
+    /// <param name="totalFiles">全部文件总数。</param>
+    /// <param name="storeProcessedFiles">StoreGroup 已处理文件数（全局进度基线）。</param>
+    /// <param name="lastReportTime">上次进度报告时间（节流用，引用传递）。</param>
+    private static void CompressGroupWithSevenZip(
+        List<(string FullPath, string RelativePath)> files,
+        string tempPath,
+        ArchiveOptions options,
+        IProgress<ArchiveProgress>? progress,
+        long storeProcessedBytes,
+        long totalBytes,
+        int totalFiles,
+        int storeProcessedFiles,
+        ref DateTime lastReportTime)
+    {
+        SevenZipEngine.EnsureLibraryPath();
+
+        var compr = new SharpSevenZipCompressor
+        {
+            ArchiveFormat = OutArchiveFormat.Zip,
+            CompressionLevel = MapCompressionLevelToS7Z(options.CompressionLevel),
+            IncludeEmptyDirectories = true,
+            DirectoryStructure = true,
+        };
+
+        // 多线程压缩：利用多核 CPU 并行压缩
+        compr.CustomParameters["mt"] = "on";
+
+        // 处理 ZIP 压缩方法
+        compr.CompressionMethod = options.ZipCompressionMethod?.ToLowerInvariant() switch
+        {
+            "deflate64" => CompressionMethod.Deflate64,
+            "bzip2" => CompressionMethod.BZip2,
+            "lzma" => CompressionMethod.Lzma,
+            "ppmd" => CompressionMethod.Ppmd,
+            "copy" or "store" => CompressionMethod.Copy,
+            _ => CompressionMethod.Deflate,
+        };
+
+        // 预计算每个文件的字节数，用于进度估算（按已开始文件的字节近似已处理量）。
+        var fileSizeMap = new Dictionary<string, long>(StringComparer.OrdinalIgnoreCase);
+        foreach (var (fullPath, _) in files)
+        {
+            long size = 0;
+            try { size = new FileInfo(fullPath).Length; } catch { /* 无法读取大小则视为 0 */ }
+            fileSizeMap[fullPath] = size;
+        }
+
+        // 7z mt=on 多线程压缩时事件可能并发触发，用锁保护计数与节流，
+        // 避免此前「同步调用 + 无进度事件」导致的进度条长时间停滞。
+        var reportLock = new object();
+        int startedFiles = 0;
+        long startedBytes = 0;
+        var localLastReportTime = lastReportTime; // 拷贝 ref 参数供 lambda 捕获
+        compr.FileCompressionStarted += (_, e) =>
+        {
+            var name = e.FileName ?? "";
+            var displayName = string.IsNullOrEmpty(name) ? "" : Path.GetFileName(name);
+
+            lock (reportLock)
+            {
+                startedFiles++;
+                if (!string.IsNullOrEmpty(name) && fileSizeMap.TryGetValue(name, out var size))
+                    startedBytes += size;
+
+                var now = DateTime.Now;
+                if (now - localLastReportTime < TimeSpan.FromMilliseconds(100)) return;
+                localLastReportTime = now;
+
+                // 字节进度优先；若文件大小映射失败则退化为按文件数比例推进
+                var pct = totalBytes > 0
+                    ? Math.Min(100, (double)(storeProcessedBytes + startedBytes) / totalBytes * 100)
+                    : (totalFiles > 0 ? (double)(storeProcessedFiles + startedFiles) / totalFiles * 100 : 0);
+
+                progress?.Report(new ArchiveProgress
+                {
+                    CurrentFile = "正在压缩: " + displayName,
+                    PercentComplete = pct,
+                    FilePercentComplete = null,
+                    TotalBytes = totalBytes,
+                    ProcessedBytes = storeProcessedBytes + startedBytes,
+                    TotalFiles = totalFiles,
+                    ProcessedFiles = storeProcessedFiles + startedFiles,
+                });
+            }
+        };
+
+        // ── 路径修复：7z CompressFilesEncrypted 会剥离所有输入文件的最长公共前缀，
+        //    当 CompressGroup 文件全在同一子目录时，整个目录被剥掉，条目只剩文件名。
+        //    解决方案：创建镜像目录结构的临时目录，用 CompressDirectory 压缩——
+        //    7z 保留目录内相对路径（如 testpath/文本/.gitignore）。
+        var tempDir = Path.Combine(Path.GetTempPath(), $"mantiszip_mt_dir_{Guid.NewGuid():N}");
+        try
+        {
+            foreach (var (fullPath, relativePath) in files)
+            {
+                var destPath = Path.Combine(tempDir, relativePath);
+                var destDir = Path.GetDirectoryName(destPath)!;
+                Directory.CreateDirectory(destDir);
+                File.Copy(fullPath, destPath, overwrite: true);
+            }
+
+            var mirrorCount = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories).Length;
+            CoreLog.Trace($"[TRACE] CompressGroupWithSevenZip: {mirrorCount} mirror files, tempDir={tempDir}, tempZip={tempPath}");
+
+            if (mirrorCount > 0)
+            {
+                compr.CompressDirectory(tempDir, tempPath);
+            }
+        }
+        finally
+        {
+            try { if (Directory.Exists(tempDir)) Directory.Delete(tempDir, true); } catch { }
+        }
+
+        // 打印 7z 生成的临时 ZIP 中的条目路径，用于排查路径翻倍问题
+        try
+        {
+            using var verifyArchive = ZipArchive.OpenArchive(tempPath);
+            foreach (var e in verifyArchive.Entries.Where(e => !e.IsDirectory))
+                CoreLog.Trace($"[TRACE]   7z tempZip entry: Key={e.Key} → Normalize={ArchivePath.Normalize(e.Key ?? "")}");
+        }
+        catch (Exception ex) { CoreLog.Trace($"[TRACE]   7z tempZip verify failed: {ex.Message}"); }
+
+        lastReportTime = localLastReportTime; // 写回 ref 参数
+    }
+
+    /// <summary>
+    /// 将临时 ZIP 中的条目合并写入 ZipWriter。
+    /// 用于 MultiThreaded 模式：读取 SharpSevenZip 产生的多线程压缩条目，逐条写入最终 ZipWriter。
+    /// </summary>
+    private static void MergeTempZipToWriter(
+        string tempZipPath,
+        ZipWriter zipWriter,
+        ref long processedBytes,
+        long workTotal,
+        int totalFiles,
+        ref int processedFiles,
+        IProgress<ArchiveProgress>? progress,
+        ref DateTime lastReportTime,
+        CancellationToken ct)
+    {
+        using var tempArchive = ZipArchive.OpenArchive(tempZipPath);
+        var entries = tempArchive.Entries.Where(e => !e.IsDirectory).ToList();
+        CoreLog.Trace($"[TRACE] MergeTempZipToWriter: {entries.Count} entries from tempZip");
+
+        foreach (var entry in entries)
+        {
+            ct.ThrowIfCancellationRequested();
+
+            var entryKey = ArchivePath.Normalize(entry.Key ?? string.Empty);
+            CoreLog.Trace($"[TRACE]   Merge entry: raw Key={entry.Key} → entryKey={entryKey}");
+
+            using var entryStream = entry.OpenEntryStream();
+            var entryOptions = new ZipWriterEntryOptions
+            {
+                CompressionLevel = null, // 继承 ZipWriter 默认级别
+            };
+
+            using (var writeStream = zipWriter.WriteToStream(entryKey, entryOptions))
+            {
+                var buffer = new byte[CopyBufferSize];
+                long totalRead = 0;
+                var entrySize = entry.Size;
+
+                while (true)
+                {
+                    ct.ThrowIfCancellationRequested();
+                    var read = entryStream.Read(buffer, 0, buffer.Length);
+                    if (read <= 0) break;
+                    writeStream.Write(buffer, 0, read);
+                    totalRead += read;
+                    processedBytes += read;
+
+                    var now = DateTime.Now;
+                    if (now - lastReportTime >= TimeSpan.FromMilliseconds(100) || totalRead >= entrySize)
+                    {
+                        var pct = workTotal > 0 ? (double)processedBytes / workTotal * 100 : 0;
+                        var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CurrentFile = "正在压缩: " + entryKey,
+                            PercentComplete = Math.Min(pct, 100),
+                            FilePercentComplete = filePct,
+                            TotalFiles = totalFiles,
+                            ProcessedFiles = processedFiles,
+                        });
+                        lastReportTime = now;
+                    }
+                }
+            }
+
+            processedFiles++;
+        }
+    }
+
+    /// <summary>
+    /// 使用二进制解析直接读取 ZIP 中央目录的通用位标记，
+    /// 验证是否有任何条目的加密位（bit 0）被设置。
+    /// 用于交叉校验 SharpCompress 报告的 IsEncrypted，防范假阳性。
+    /// </summary>
+    internal static bool VerifyZipEncryptionFlags(string archivePath)
+    {
+        try
+        {
+            using var fs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            var (cdOffset, entryCount, _) = ZipBinaryRewriter.ReadEocd(fs);
+            var entries = ZipBinaryRewriter.ReadCentralDirectory(fs, cdOffset, entryCount);
+            bool encrypted = entries.Any(e => (e.Flags & 0x0001) != 0);
+            CoreLog.Trace("VerifyZipEncryptionFlags: {0} entries, encrypted={1}", entryCount, encrypted);
+            return encrypted;
+        }
+        catch (Exception ex)
+        {
+            // Zip64 或其它无法解析的情况 → 保守信任 SharpCompress
+            CoreLog.Trace("VerifyZipEncryptionFlags: failed to verify (will trust SharpCompress): {0}", ex.Message);
+            return true;
+        }
     }
 }

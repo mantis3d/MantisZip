@@ -1,0 +1,101 @@
+﻿Controls\QuickPathControl.xaml|37|U+1F550|??|<!-- ?? History -->
+Controls\QuickPathControl.xaml|46|U+1F550|??|<emoji:TextBlock Text="??" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+Controls\QuickPathControl.xaml|49|U+1FA9F|??|<!-- ?? Explorer windows -->
+Controls\QuickPathControl.xaml|61|U+1F4C1|??|<!-- ?? Browse -->
+Controls\QuickPathControl.xaml|71|U+1F4C1|??|<emoji:TextBlock Text="??" FontSize="12" Margin="0,0,3,0" VerticalAlignment="Center"/>
+Controls\QuickPathControl.xaml.cs|181|U+1F550|??|// ?? History dropdown
+Controls\QuickPathControl.xaml.cs|216|U+1FA9F|??|// ?? Explorer windows dropdown
+Controls\QuickPathControl.xaml.cs|263|U+1F4C1|??|// ?? Browse button
+Converters\BatchStatusConverters.cs|48|U+1F504|??|BatchItemStatus.InProgress => "??",
+Dialogs\CompressConflictDialog.xaml|48|U+1F504|??|<emoji:TextBlock Text="??" FontSize="24" HorizontalAlignment="Center"/>
+Dialogs\CompressSettingsWindow.xaml|246|U+1F441|??|Content="??" Click="PwdRevealBtn_Click"/>
+Dialogs\CompressSettingsWindow.xaml.cs|418|U+1F441|??|// 如果在明文模式（?? 显示密码），先将 TextBox 内容同步到 PasswordBox，
+Dialogs\ConflictDialog.xaml|78|U+1F504|??|<emoji:TextBlock Text="??" FontSize="24" HorizontalAlignment="Center"/>
+Dialogs\ConflictDialog.xaml|85|U+1F550|??|<emoji:TextBlock Text="??" FontSize="24" HorizontalAlignment="Center"/>
+Dialogs\DonationDialog.xaml|56|U+1F517|??|<Button Content="?? 爱发电 / Afdian" Click="OpenAfdian_Click"
+Dialogs\MatchedPasswordDialog.xaml|39|U+1F511|??|<TextBlock Grid.Column="0" Text="??" FontSize="14"
+Dialogs\MatchedPasswordDialog.xaml|57|U+1F441|??|Content="??" FontSize="10" Padding="0"
+Dialogs\MatchedPasswordDialog.xaml|65|U+1F4CB|??|Content="??" FontSize="10" Padding="0"
+Dialogs\MatchedPasswordDialog.xaml.cs|44|U+1F648 U+1F441|????|PwdRevealBtn.Content = _isRevealed ? "??" : "??";
+Dialogs\MatchedPasswordDialog.xaml.cs|60|U+1F4CB|??|PwdCopyBtn.Content = "??";
+Dialogs\PasswordDialog.xaml|50|U+1F441|??|Content="??" FontSize="12" Padding="0"
+Dialogs\PasswordDialog.xaml.cs|49|U+1F648|??|PwdRevealBtn.Content = "??";
+Dialogs\PasswordDialog.xaml.cs|65|U+1F511|??|Content = $"?? {entry.Description}",
+Dialogs\PasswordDialog.xaml.cs|122|U+1F648|??|PwdRevealBtn.Content = "??";
+Dialogs\PasswordDialog.xaml.cs|130|U+1F441|??|PwdRevealBtn.Content = "??";
+Dialogs\ProgressWindow.xaml|52|U+1F511|??|<TextBlock Grid.Column="0" Text="??" FontSize="14"
+Dialogs\ProgressWindow.xaml|61|U+1F441|??|Content="??" FontSize="10" Padding="0"
+Dialogs\ProgressWindow.xaml|70|U+1F4CB|??|Content="??" FontSize="12" Padding="0"
+Dialogs\ProgressWindow.xaml|224|U+1F4CC|??|<emoji:TextBlock Text="??" FontSize="16" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+Dialogs\ProgressWindow.xaml.cs|503|U+1F648 U+1F441|????|PwdRevealBtn.Content = revealByDefault ? "??" : "??";
+Dialogs\ProgressWindow.xaml.cs|538|U+1F648 U+1F441|????|PwdRevealBtn.Content = _isRevealed ? "??" : "??";
+Dialogs\QuickPathPreDialog.xaml.cs|9|U+1F550|??|/// 系统对话框前置窗。弹系统对话框之前先用 QuickPathControl 选????目录。
+Dialogs\SettingsWindow.xaml|62|U+1F4E6|??|<emoji:TextBlock x:Name="IconCompress" Text="??" FontSize="20" VerticalAlignment="Center"/>
+Dialogs\SettingsWindow.xaml|269|U+1F4C2|??|<emoji:TextBlock x:Name="IconExtract" Text="??" FontSize="20" VerticalAlignment="Center"/>
+Dialogs\SettingsWindow.xaml|327|U+1F3A8|??|<emoji:TextBlock x:Name="IconAppearance" Text="??" FontSize="20" VerticalAlignment="Center"/>
+Dialogs\SettingsWindow.xaml|356|U+1F441|??|<emoji:TextBlock x:Name="IconPreview" Text="??" FontSize="20" VerticalAlignment="Center"/>
+Dialogs\SettingsWindow.xaml|553|U+1F510|??|<emoji:TextBlock x:Name="IconPassword" Text="??" FontSize="20" VerticalAlignment="Center"/>
+Dialogs\SettingsWindow.xaml|575|U+1F310|??|<emoji:TextBlock x:Name="IconLanguage" Text="??" FontSize="20" VerticalAlignment="Center"/>
+Dialogs\SettingsWindow.xaml|600|U+1F5B1|??|<emoji:TextBlock x:Name="IconContextMenu" Text="???" FontSize="20" VerticalAlignment="Center"/>
+Dialogs\SettingsWindow.xaml|661|U+1F517|??|<emoji:TextBlock x:Name="IconFileAssoc" Text="??" FontSize="20" VerticalAlignment="Center"/>
+Dialogs\SettingsWindow.xaml|817|U+1F41B|??|<emoji:TextBlock x:Name="IconDebug" Text="??" FontSize="20" VerticalAlignment="Center"/>
+Dialogs\SettingsWindow.xaml|856|U+1F9F0|??|<emoji:TextBlock x:Name="IconAdvanced" Text="??" FontSize="20" VerticalAlignment="Center"/>
+MainWindow\Preview\MainWindow.Preview.cs|407|U+1F4C4|??|PreviewHeader.Text = $"?? {item.Name}";
+MainWindow\Preview\MainWindow.Preview.cs|817|U+1F4C1|??|PreviewHeader.Text = $"?? {item.Name.TrimEnd('/')}";
+MainWindow\Preview\MainWindow.Preview.Image.cs|257|U+1F3C1|??|new ToolbarButton { Text = "??", Tooltip = L.T(L.Preview_ToggleTransparency), IsToggle = true, IsChecked = _transparentBgEnabled, OnClick = ToggleTransparencyBg },
+MainWindow\Preview\MainWindow.Preview.Image.cs|258|U+1F3A8|??|new ToolbarButton { Text = "??", Tooltip = "切换透明 (显示 RGB 原始颜色)", IsToggle = true, IsChecked = _flattenAlphaEnabled, OnClick = ToggleFlattenAlpha }
+MainWindow\Preview\MainWindow.Preview.Image.cs|367|U+1F3C1|??|new ToolbarButton { Text = "??", Tooltip = L.T(L.Preview_ToggleTransparency), IsToggle = true, IsChecked = _transparentBgEnabled, OnClick = ToggleTransparencyBg },
+MainWindow\Preview\MainWindow.Preview.Image.cs|368|U+1F3A8|??|new ToolbarButton { Text = "??", Tooltip = "切换透明 (显示 RGB 原始颜色)", IsToggle = true, IsChecked = _flattenAlphaEnabled, OnClick = ToggleFlattenAlpha }
+MainWindow\Preview\MainWindow.Preview.Image.cs|559|U+1F50D|??|new ToolbarButton { Text = "???", Tooltip = "缩小", OnClick = () => { if (PreviewWebView2.CoreWebView2 != null && PreviewWebView2.ZoomFactor > 0.2) PreviewWebView2.ZoomFactor -= 0.1; } },
+MainWindow\Preview\MainWindow.Preview.Image.cs|560|U+1F50D|??|new ToolbarButton { Text = "??+", Tooltip = "放大", OnClick = () => { if (PreviewWebView2.CoreWebView2 != null && PreviewWebView2.ZoomFactor < 5.0) PreviewWebView2.ZoomFactor += 0.1; } },
+MainWindow\Preview\MainWindow.Preview.Web.cs|83|U+1F4DD|??|SetPreviewInfo(item, "?? Markdown");
+MainWindow\Preview\MainWindow.Preview.Web.cs|93|U+1F60A|??|new ToolbarButton { Text = "??", Tooltip = "Emoji 短代码转换", IsToggle = true, IsChecked = _markdownEmojiEnabled, OnClickAsync = ToggleMarkdownEmoji },
+MainWindow\MainWindow.UI.cs|63|U+1F511|??|PwdIcon.Text = "??";
+MainWindow\MainWindow.UI.cs|73|U+1F512|??|PwdIcon.Text = "??";
+MainWindow\MainWindow.UI.cs|83|U+1F513|??|PwdIcon.Text = "??";
+MainWindow\MainWindow.UI.cs|912|U+1F4C1|??|? $"?? {single.Name.TrimEnd('/')}"
+MainWindow\MainWindow.UI.cs|913|U+1F4C4|??|: $"?? {single.Name} ({FormatSize(single.Size)})";
+MainWindow\MainWindow.UI.cs|1037|U+1F4CB|??|var icon = "??";
+MainWindow\MainWindow.UI.cs|1038|U+1F4CF|??|if (raw == L.T(L.Main_Col_Size)) icon = "??";
+MainWindow\MainWindow.UI.cs|1039|U+1F4E6|??|else if (raw == L.T(L.Main_Col_Compressed)) icon = "??";
+MainWindow\MainWindow.UI.cs|1040|U+1F4CA|??|else if (raw == L.T(L.Main_Col_Ratio)) icon = "??";
+MainWindow\MainWindow.UI.cs|1041|U+1F510|??|else if (raw == L.T(L.Main_Col_Crc32)) icon = "??";
+MainWindow\MainWindow.UI.cs|1042|U+1F4C5|??|else if (raw == L.T(L.Main_Col_Date)) icon = "??";
+MainWindow\MainWindow.UI.cs|1043|U+1F512|??|else if (raw == L.T(L.Main_Col_Encrypted)) icon = "??";
+MainWindow\MainWindow.xaml|54|U+1F195|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|57|U+1F4C2|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|60|U+1F550|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|67|U+1F4E4|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|70|U+1F4E5|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|74|U+1F6AA|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|79|U+1F504|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|84|U+1F4CA|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|88|U+1F4C2|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center" Opacity="0.2"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|93|U+1F441|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|109|U+1F4AC|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|114|U+1F510|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|140|U+1F195|??|<emoji:TextBlock Text="??" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|146|U+1F4C2|??|<emoji:TextBlock Text="??" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|152|U+1F4E4|??|<emoji:TextBlock Text="??" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|158|U+1F4D1|??|<emoji:TextBlock Text="??" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|164|U+1F4E5|??|<emoji:TextBlock Text="??" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|170|U+1F916|??|<emoji:TextBlock Text="??" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|190|U+1F4D6|??|<emoji:TextBlock Text="??" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|196|U+1F50D|??|<emoji:TextBlock Text="??" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|210|U+1F511|??|<emoji:TextBlock x:Name="PwdIcon" Text="??" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|243|U+1F4C2|??|<emoji:TextBlock Text="??" FontSize="40" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|256|U+1F510|??|<emoji:TextBlock Text="??" FontSize="40" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|276|U+1F4E6|??|<emoji:TextBlock Text="??" FontSize="24" VerticalAlignment="Center" Margin="0,0,12,0"/>
+MainWindow\MainWindow.xaml|331|U+1F50D|??|<emoji:TextBlock Grid.Row="0" Grid.Column="0" Text="??" FontSize="14" Margin="4,0,4,0" VerticalAlignment="Center"/>
+MainWindow\MainWindow.xaml|349|U+1F4C5|??|<emoji:TextBlock Text="??" FontSize="14" Margin="0,0,4,0" VerticalAlignment="Center"/>
+MainWindow\MainWindow.xaml|353|U+1F9EA|??|<emoji:TextBlock Text="??" FontSize="12"/>
+MainWindow\MainWindow.xaml|360|U+1F9EA|??|<emoji:TextBlock Text="??" FontSize="12"/>
+MainWindow\MainWindow.xaml|371|U+1F4CF|??|<emoji:TextBlock Text="??" FontSize="14" Margin="0,0,4,0" VerticalAlignment="Center"/>
+MainWindow\MainWindow.xaml|375|U+1F9EA|??|<emoji:TextBlock Text="??" FontSize="12"/>
+MainWindow\MainWindow.xaml|388|U+1F9EA|??|<emoji:TextBlock Text="??" FontSize="12"/>
+MainWindow\MainWindow.xaml|409|U+1F4CA|??|<emoji:TextBlock Text="??" FontSize="14"/>
+MainWindow\MainWindow.xaml|476|U+1F4D1|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|479|U+1F4C2|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|483|U+1F4CB|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|486|U+1F517|??|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|593|U+1F512|??|<emoji:TextBlock Text="??" HorizontalAlignment="Center"

@@ -167,4 +167,6 @@ public enum FileFormat
     Woff2,
     // 其他
     Fits, Vhdx, Parquet,
+    /// <summary>加密文件名压缩包（EncryptHeaders=true），需密码才能识别内部格式</summary>
+    Encrypted
 }

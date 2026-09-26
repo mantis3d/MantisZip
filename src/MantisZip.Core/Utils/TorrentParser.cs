@@ -25,7 +25,12 @@ public static class TorrentParser
             // 必须是 dictionary
             if (data[pos] != (byte)'d') return null;
 
-            var root = ParseDictionary(data, ref pos);
+            // ── 探测种子声明的字符串解码编码（encoding 字段）──
+            // BitComet 1.x 等老工具生成 GBK 编码的中文种子（声明 encoding=GBK），
+            // 若一律按 UTF-8 解码，普通 path/name 字段的中文会变成乱码。
+            Encoding decodeEncoding = DetectDecodingEncoding(data);
+
+            var root = ParseDictionary(data, ref pos, decodeEncoding);
             if (root == null) return null;
 
             // ── announce (tracker) ──
@@ -64,7 +69,9 @@ public static class TorrentParser
             }
 
             // ── info 字段 ──
-            string? name = info.TryGetValue("name", out var n) ? n as string : null;
+            // 优先读取 .utf-8 后缀字段（BEP 兼容惯例，值恒为 UTF-8，不受 encoding 字段影响）
+            string? name = info.TryGetValue("name.utf-8", out var n8) && n8 is string n8s ? n8s
+                : info.TryGetValue("name", out var n) ? n as string : null;
             long? pieceLength = info.TryGetValue("piece length", out var pl) ? (long?)Convert.ToInt64(pl) : null;
 
             // pieces hash (binary)
@@ -91,7 +98,10 @@ public static class TorrentParser
                         long fileLen = fileDict.TryGetValue("length", out var len) ? Convert.ToInt64(len) : 0;
                         totalSize += fileLen;
 
-                        if (fileDict.TryGetValue("path", out var pathObj) && pathObj is List<object> pathParts)
+                        // path.utf-8 优先（BitComet/qBittorrent 等新旧客户端皆提供，值恒为 UTF-8）
+                        List<object>? pathParts = fileDict.TryGetValue("path.utf-8", out var pu) && pu is List<object> puList ? puList
+                            : fileDict.TryGetValue("path", out var p) && p is List<object> pList ? pList : null;
+                        if (pathParts != null)
                         {
                             var parts = pathParts.Select(p => p?.ToString() ?? "").ToArray();
                             fileEntries.Add((string.Join("/", parts), fileLen));
@@ -107,7 +117,8 @@ public static class TorrentParser
             }
 
             // ── comment / created by ──
-            string? comment = root.TryGetValue("comment", out var c) ? c as string : null;
+            string? comment = root.TryGetValue("comment.utf-8", out var c8) && c8 is string c8s ? c8s
+                : root.TryGetValue("comment", out var c) ? c as string : null;
             string? createdBy = root.TryGetValue("created by", out var cb) ? cb as string : null;
             long? creationDate = root.TryGetValue("creation date", out var cd) ? (long?)Convert.ToInt64(cd) : null;
 
@@ -253,7 +264,7 @@ public static class TorrentParser
         }
     }
 
-    private static Dictionary<string, object>? ParseDictionary(byte[] data, ref int pos)
+    private static Dictionary<string, object>? ParseDictionary(byte[] data, ref int pos, Encoding decodeEncoding)
     {
         if (data[pos] != (byte)'d') return null;
         pos++; // skip 'd'
@@ -263,11 +274,15 @@ public static class TorrentParser
         {
             // Key
             if (data[pos] < (byte)'0' || data[pos] > (byte)'9') return null;
-            string key = ParseString(data, ref pos);
+            // key 总是 ASCII（用 UTF-8 解码安全）
+            string key = ParseString(data, ref pos, Encoding.UTF8);
             if (key == null) return null;
 
-            // Value
-            object? value = ParseValue(data, ref pos);
+            // ── Value ──
+            // 后缀 .utf-8 的字段值恒为 UTF-8（BEP 惯例，与 encoding 字段无关）；
+            // 其余字符串按种子声明的编码（默认 UTF-8）解码。
+            Encoding valueEncoding = key.EndsWith(".utf-8", StringComparison.Ordinal) ? Encoding.UTF8 : decodeEncoding;
+            object? value = ParseValue(data, ref pos, valueEncoding);
             if (value == null) return null;
 
             dict[key] = value;
@@ -278,7 +293,7 @@ public static class TorrentParser
         return dict;
     }
 
-    private static List<object>? ParseList(byte[] data, ref int pos)
+    private static List<object>? ParseList(byte[] data, ref int pos, Encoding decodeEncoding)
     {
         if (data[pos] != (byte)'l') return null;
         pos++; // skip 'l'
@@ -286,7 +301,7 @@ public static class TorrentParser
         var list = new List<object>();
         while (pos < data.Length && data[pos] != (byte)'e')
         {
-            object? value = ParseValue(data, ref pos);
+            object? value = ParseValue(data, ref pos, decodeEncoding);
             if (value == null) return null;
             list.Add(value);
         }
@@ -296,16 +311,16 @@ public static class TorrentParser
         return list;
     }
 
-    private static object? ParseValue(byte[] data, ref int pos)
+    private static object? ParseValue(byte[] data, ref int pos, Encoding decodeEncoding)
     {
         if (pos >= data.Length) return null;
 
         return data[pos] switch
         {
-            (byte)'d' => ParseDictionary(data, ref pos),
-            (byte)'l' => ParseList(data, ref pos),
+            (byte)'d' => ParseDictionary(data, ref pos, decodeEncoding),
+            (byte)'l' => ParseList(data, ref pos, decodeEncoding),
             (byte)'i' => ParseInteger(data, ref pos),
-            >= (byte)'0' and <= (byte)'9' => ParseString(data, ref pos),
+            >= (byte)'0' and <= (byte)'9' => ParseString(data, ref pos, decodeEncoding),
             _ => null,
         };
     }
@@ -326,7 +341,7 @@ public static class TorrentParser
         return 0;
     }
 
-    private static string ParseString(byte[] data, ref int pos)
+    private static string ParseString(byte[] data, ref int pos, Encoding decodeEncoding)
     {
         int colonIdx = data.AsSpan(pos).IndexOf((byte)':');
         if (colonIdx <= 0) return "";
@@ -339,9 +354,46 @@ public static class TorrentParser
         if (pos + len > data.Length)
             return "";
 
-        // 种子文件字符串使用 UTF-8 编码（兼容纯 ASCII 键和中文文件名）
-        string value = Encoding.UTF8.GetString(data, pos, len);
+        // 字符串按种子声明的编码解码（默认 UTF-8；GBK 种子中文文件名依赖此参数）
+        string value = decodeEncoding.GetString(data, pos, len);
         pos += len;
         return value;
+    }
+
+    /// <summary>
+    /// 读取 root dict 的 encoding 字段，决定普通字符串的解码编码（默认 UTF-8）。
+    /// BitComet 1.x 等老工具生成的中文种子声明 encoding=GBK（BEP 3 允许非 UTF-8 编码），
+    /// 此时若仍按 UTF-8 解码，path/name 等字段的中文会变成 U+FFFD 乱码。
+    /// </summary>
+    private static Encoding DetectDecodingEncoding(byte[] data)
+    {
+        int valStart = FindKeyValue(data, "encoding", 1);
+        if (valStart < 0) return Encoding.UTF8;
+
+        int colonIdx = data.AsSpan(valStart).IndexOf((byte)':');
+        if (colonIdx <= 0) return Encoding.UTF8;
+        if (!int.TryParse(Encoding.ASCII.GetString(data, valStart, colonIdx), out int len) || len <= 0 || len > 32)
+            return Encoding.UTF8;
+
+        int valPos = valStart + colonIdx + 1;
+        if (valPos + len > data.Length) return Encoding.UTF8;
+
+        string encodingName = Encoding.ASCII.GetString(data, valPos, len);
+        string lower = encodingName.ToLowerInvariant();
+
+        // UTF-8 及 ASCII 变体直接返回
+        if (lower is "utf-8" or "utf8" or "utf" or "ascii") return Encoding.UTF8;
+
+        try
+        {
+            // GBK/GB2312 等代码页需要 CodePagesEncodingProvider（注册幂等，可重复调用）
+            Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+            return Encoding.GetEncoding(encodingName);
+        }
+        catch (Exception ex)
+        {
+            CoreLog.Info($"TorrentParser: unknown torrent encoding '{encodingName}', fallback to UTF-8: {ex.Message}");
+            return Encoding.UTF8;
+        }
     }
 }

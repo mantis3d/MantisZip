@@ -1,0 +1,248 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.ConflictDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="600"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        Topmost="True"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource SpacingMdThk}">
+
+  <!-- 主布局网格：8 行自动高度，分别对应标题、对比面板、对比结果、操作按钮、重命名输入、应用到全部、分隔线、暂停/取消 -->
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,Auto,Auto"
+        Margin="{DynamicResource SpacingXsThk}">
+
+    <!-- 第 0 行：标题文本，显示冲突提示信息（如"文件已存在"） -->
+    <TextBlock Grid.Row="0"
+               x:Name="HeaderText"
+               FontSize="13"
+               FontWeight="SemiBold"
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- 第 1 行：对比面板（磁盘文件 vs 压缩包条目） -->
+    <Border Grid.Row="1"
+            Margin="0,8,0,0"
+            Padding="{DynamicResource SpacingSmThk}"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource BorderRadius}">
+      <Grid ColumnDefinitions="*,Auto,*">
+        <!-- 左侧：磁盘上已存在的文件信息 -->
+        <StackPanel Grid.Column="0">
+          <TextBlock Text="{Binding DiskLabel}"
+                     FontWeight="SemiBold"
+                     FontSize="12"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     Margin="0,0,0,6" />
+          <TextBlock FontSize="11"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+            <Run Text="{Binding SizeLabel}" />
+            <Run x:Name="ExistingSizeText"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          </TextBlock>
+          <TextBlock FontSize="11"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+            <Run Text="{Binding DateLabel}" />
+            <Run x:Name="ExistingDateText"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          </TextBlock>
+        </StackPanel>
+
+        <!-- 中间：VS 标识，视觉分隔左右两侧 -->
+        <Border Grid.Column="1"
+                Width="32"
+                Height="{DynamicResource ControlHeightXs}"
+                CornerRadius="10"
+                Background="{DynamicResource ThemeAccentBrush}"
+                Margin="12,10"
+                HorizontalAlignment="Center"
+                VerticalAlignment="Top">
+          <TextBlock Text="VS"
+                     FontSize="10"
+                     FontWeight="Bold"
+                     Foreground="White"
+                     HorizontalAlignment="Center"
+                     VerticalAlignment="Center" />
+        </Border>
+
+        <!-- 右侧：压缩包内待解压条目的信息 -->
+        <StackPanel Grid.Column="2">
+          <TextBlock Text="{Binding ArchiveLabel}"
+                     FontWeight="SemiBold"
+                     FontSize="12"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     Margin="0,0,0,6" />
+          <TextBlock FontSize="11"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+            <Run Text="{Binding SizeLabel}" />
+            <Run x:Name="EntrySizeText"
+                 Foreground="{DynamicResource ThemeAccentBrush}"
+                 FontWeight="SemiBold" />
+          </TextBlock>
+          <TextBlock FontSize="11"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+            <Run Text="{Binding DateLabel}" />
+            <Run x:Name="EntryDateText"
+                 Foreground="{DynamicResource ThemeAccentBrush}"
+                 FontWeight="SemiBold" />
+          </TextBlock>
+        </StackPanel>
+      </Grid>
+    </Border>
+
+    <!-- 第 2 行：对比结果提示文本（如"压缩包内文件较新"），居中显示 -->
+    <TextBlock Grid.Row="2"
+               x:Name="CompareResultText"
+               FontSize="11"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               TextWrapping="Wrap"
+               HorizontalAlignment="Center"
+               Margin="0,4,0,0" />
+
+    <!-- 第 3 行：冲突处理操作按钮组，水平排列 -->
+    <WrapPanel Grid.Row="3"
+               HorizontalAlignment="Center"
+               Margin="0,10,0,0">
+      <!-- 覆盖：直接用压缩包文件替换磁盘文件 -->
+      <Button MinWidth="70"
+              Padding="6,4"
+              Margin="0,0,4,4"
+              Click="Overwrite_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconRefresh}" Width="24" Height="24" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding OverwriteText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+      <!-- 覆盖旧文件：仅当压缩包文件比磁盘文件新时才覆盖 -->
+      <Button MinWidth="70"
+              Padding="6,4"
+              Margin="4,0,4,4"
+              Click="OverwriteIfOlder_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconTimer}" Width="24" Height="24" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding OverwriteOlderText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+      <!-- 覆盖小文件：仅当压缩包文件比磁盘文件大时才覆盖 -->
+      <Button MinWidth="70"
+              Padding="6,4"
+              Margin="4,0,4,4"
+              Click="OverwriteIfSmaller_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconDownload}" Width="24" Height="24" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding OverwriteSmallerText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+      <!-- 重命名：弹出输入框让用户指定新文件名 -->
+      <Button MinWidth="70"
+              Padding="6,4"
+              Margin="4,0,4,4"
+              Click="Rename_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconEdit}" Width="22" Height="22" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding RenameText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+      <!-- 跳过：保留磁盘文件，不解压该条目 -->
+      <Button MinWidth="70"
+              Padding="6,4"
+              Margin="4,0,4,4"
+              Click="Skip_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconArrowRight}" Width="22" Height="22" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding SkipText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+    </WrapPanel>
+
+    <!-- 第 4 行：自定义重命名输入框，点击"重命名"按钮后显示 -->
+    <Grid Grid.Row="4"
+          ColumnDefinitions="Auto,*"
+          Margin="30,4,30,0">
+      <TextBlock Grid.Column="0"
+                 Text="{Binding NewNameLabel}"
+                 VerticalAlignment="Center"
+                 FontSize="12"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+      <TextBox Grid.Column="1"
+               x:Name="RenameTextBox"
+               FontSize="12"
+               Padding="3,2"
+               PlaceholderText="{Binding RenameHint}" />
+    </Grid>
+
+    <!-- 第 5 行："应用到全部"复选框，勾选后后续冲突自动使用当前选择 -->
+    <CheckBox Grid.Row="5"
+              x:Name="ApplyAllCheck"
+              Content="{Binding ApplyAllText}"
+              FontSize="12"
+              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               HorizontalAlignment="Center" />
+
+    <!-- 第 6 行：分隔线，视觉上分隔操作按钮与暂停/取消按钮 -->
+    <Rectangle Grid.Row="6"
+               Height="1"
+               Fill="{DynamicResource ThemeBorderBrush}"
+               Margin="0,6,0,6" />
+
+    <!-- 第 7 行：暂停/取消整个操作的按钮组 -->
+    <StackPanel Grid.Row="7"
+                Orientation="Horizontal"
+                HorizontalAlignment="Center">
+      <!-- 暂停按钮：暂停当前解压/压缩操作 -->
+      <Button x:Name="PauseBtn"
+              MinWidth="80"
+              Padding="10,5"
+              Click="Pause_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconPause}" Width="22" Height="22" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding PauseText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+      <!-- 取消全部按钮：取消整个解压/压缩任务 -->
+      <Button x:Name="CancelAllBtn"
+              MinWidth="80"
+              Padding="10,5"
+              Margin="8,0,0,0"
+              Click="CancelOperation_Click">
+        <StackPanel Orientation="Vertical"
+                    HorizontalAlignment="Center">
+          <PathIcon Data="{StaticResource IconDismiss}" Width="22" Height="22" HorizontalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <TextBlock Text="{Binding CancelOpText}"
+                     FontSize="11"
+                     HorizontalAlignment="Center"
+                     Margin="0,2,0,0" />
+        </StackPanel>
+      </Button>
+    </StackPanel>
+  </Grid>
+</Window>

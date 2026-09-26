@@ -1,0 +1,545 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ProgressWindow 增强原型 v3</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eaeaea;
+            padding: 40px;
+            min-height: 100vh;
+        }
+        h1 { text-align: center; margin-bottom: 10px; color: #6bd46b; }
+        .subtitle { text-align: center; margin-bottom: 40px; color: #888; font-size: 14px; }
+        .prototype-container { max-width: 600px; margin: 0 auto 40px; }
+        
+        /* 窗口 */
+        .progress-window {
+            background: #2d2d44;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            overflow: hidden;
+            border: 1px solid #3d3d5c;
+        }
+        .window-header {
+            background: #3d3d5c;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .window-title { font-weight: 600; font-size: 14px; }
+        
+        /* 模式切换按钮组 */
+        .mode-switcher {
+            display: flex;
+            gap: 4px;
+            background: #2d2d44;
+            padding: 3px;
+            border-radius: 6px;
+        }
+        .mode-btn {
+            padding: 4px 12px;
+            border: none;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .mode-btn.active { background: #6bd46b; color: #1a1a2e; }
+        .mode-btn:hover:not(.active) { background: #4a4a6a; }
+        
+        /* 上方区域 */
+        .file-info-section {
+            padding: 16px;
+            border-bottom: 1px solid #3d3d5c;
+        }
+        .section-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+        }
+        .section-title {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        .batch-count {
+            font-size: 11px;
+            color: #6bd46b;
+        }
+        
+        /* 批处理列表（固定） */
+        .batch-list { margin-bottom: 12px; }
+        .batch-item {
+            display: flex;
+            align-items: center;
+            padding: 8px 12px;
+            background: #3d3d5c;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+        .batch-item.completed { opacity: 0.7; }
+        .batch-item.active { background: #4a4a6a; border-left: 3px solid #6bd46b; }
+        .batch-icon { margin-right: 8px; }
+        .batch-name { flex: 1; }
+        .batch-progress { color: #6bd46b; font-weight: 500; }
+        
+        /* 内联模式切换 */
+        .mode-switcher-inline {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+            padding-top: 8px;
+            border-top: 1px solid #3d3d5c;
+        }
+        .mode-label-inline { font-size: 11px; color: #888; }
+        .mode-btn-sm {
+            padding: 2px 8px;
+            border: none;
+            background: transparent;
+            color: #888;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 11px;
+            transition: all 0.2s;
+        }
+        .mode-btn-sm.active { background: #6bd46b; color: #1a1a2e; }
+        .mode-btn-sm:hover:not(.active) { background: #4a4a6a; }
+        
+        /* 当前文件 */
+        .current-file { margin-top: 8px; }
+        .file-path { font-size: 12px; color: #888; margin-bottom: 4px; word-break: break-all; }
+        .file-name { font-size: 14px; color: #eaeaea; font-weight: 500; margin-bottom: 8px; }
+        
+        /* 进度条 */
+        .progress-row { margin-bottom: 12px; }
+        .progress-label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
+        .progress-percent { color: #6bd46b; font-weight: 600; }
+        .progress-bar { height: 20px; background: #1a1a2e; border-radius: 10px; overflow: hidden; }
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #6bd46b, #4ecdc4);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+        }
+        
+        /* 线程进度 */
+        .thread-list { display: flex; flex-direction: column; gap: 6px; }
+        .thread-item {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            background: #3d3d5c;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 12px;
+        }
+        .thread-id { color: #888; width: 50px; }
+        .thread-file { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .thread-progress { width: 80px; height: 6px; background: #1a1a2e; border-radius: 3px; overflow: hidden; }
+        .thread-progress-fill { height: 100%; background: linear-gradient(90deg, #6bd46b, #4ecdc4); border-radius: 3px; }
+        .thread-percent { color: #6bd46b; width: 35px; text-align: right; }
+        
+        /* 文件列表 */
+        .file-list { max-height: 150px; overflow-y: auto; border: 1px solid #3d3d5c; border-radius: 6px; }
+        .file-item { display: flex; align-items: center; padding: 6px 10px; border-bottom: 1px solid #3d3d5c; font-size: 12px; }
+        .file-item:last-child { border-bottom: none; }
+        .file-icon { width: 20px; margin-right: 8px; text-align: center; }
+        .file-name-list { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .file-size { width: 60px; text-align: right; color: #888; font-size: 11px; margin-right: 8px; }
+        .file-status { width: 50px; text-align: right; font-size: 11px; }
+        
+        /* 文件状态颜色 */
+        .file-item.completed .file-status { color: #6bd46b; }
+        .file-item.active .file-status { color: #ffd93d; }
+        .file-item.pending .file-status { color: #666; }
+        .file-item.error .file-status { color: #ff6b6b; }
+        .file-item.skipped .file-status { color: #888; }
+        .file-item.error { background: rgba(255, 107, 107, 0.1); }
+        .file-item.skipped { opacity: 0.6; }
+        
+        /* 下方区域 */
+        .overall-info-section {
+            padding: 16px;
+            background: #252540;
+        }
+        
+        /* 密度切换 */
+        .density-switcher {
+            display: flex;
+            gap: 4px;
+            margin-bottom: 12px;
+        }
+        .density-btn {
+            flex: 1;
+            padding: 6px;
+            border: none;
+            background: #3d3d5c;
+            color: #888;
+            cursor: pointer;
+            border-radius: 4px;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .density-btn.active { background: #6bd46b; color: #1a1a2e; }
+        .density-btn:hover:not(.active) { background: #4a4a6a; }
+        
+        /* 统计栏 */
+        .stats-bar {
+            display: flex;
+            justify-content: space-around;
+            background: #3d3d5c;
+            border-radius: 8px;
+            padding: 12px;
+            margin-bottom: 12px;
+        }
+        .stats-item { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+        .stats-icon { font-size: 18px; }
+        .stats-label { font-size: 11px; color: #888; }
+        .stats-value { font-size: 16px; font-weight: 600; }
+        .stats-value.processed { color: #6bd46b; }
+        .stats-value.skipped { color: #ffd93d; }
+        .stats-value.failed { color: #ff6b6b; }
+        
+        /* 速度显示 */
+        .speed-display {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+        }
+        .speed-value { color: #6bd46b; font-weight: 500; }
+        
+        /* 中等模式统计 */
+        .medium-stats {
+            display: flex;
+            justify-content: space-between;
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 8px;
+            padding: 8px 12px;
+            background: #3d3d5c;
+            border-radius: 4px;
+        }
+        .medium-value { color: #eaeaea; font-weight: 500; }
+        
+        /* 时间显示 */
+        .time-display {
+            display: flex;
+            justify-content: space-between;
+            padding-top: 8px;
+            border-top: 1px solid #3d3d5c;
+            font-size: 13px;
+            color: #888;
+        }
+        .time-value { color: #eaeaea; font-weight: 500; }
+        
+        /* 隐藏 */
+        .hidden { display: none !important; }
+        
+        /* 模式说明 */
+        .mode-description {
+            margin-top: 12px;
+            padding: 12px;
+            background: #3d3d5c;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.5;
+            color: #aaa;
+        }
+        .mode-description strong { color: #6bd46b; }
+    </style>
+</head>
+<body>
+    <h1>ProgressWindow 增强原型 v3</h1>
+    <p class="subtitle">点击按钮切换模式，实时预览效果</p>
+    
+    <div class="prototype-container">
+        <div class="progress-window">
+            <!-- 标题栏 -->
+            <div class="window-header">
+                <span class="window-title">正在解压...</span>
+                <div class="mode-switcher" id="bottomModeSwitcher">
+                    <button class="mode-btn" data-mode="minimal">少</button>
+                    <button class="mode-btn active" data-mode="medium">中</button>
+                    <button class="mode-btn" data-mode="full">完整</button>
+                </div>
+            </div>
+            
+            <!-- 上方 - 文件信息区 -->
+            <div class="file-info-section">
+                <!-- 批处理列表（固定显示） -->
+                <div class="batch-section">
+                    <div class="section-header">
+                        <span class="section-title">压缩包列表</span>
+                        <span class="batch-count">3 个文件</span>
+                    </div>
+                    <div class="batch-list">
+                        <div class="batch-item completed">
+                            <span class="batch-icon">✓</span>
+                            <span class="batch-name">backup.7z</span>
+                            <span class="batch-progress">100%</span>
+                        </div>
+                        <div class="batch-item active">
+                            <span class="batch-icon">⏳</span>
+                            <span class="batch-name">documents.zip</span>
+                            <span class="batch-progress">60%</span>
+                        </div>
+                        <div class="batch-item">
+                            <span class="batch-icon">○</span>
+                            <span class="batch-name">photos.zip</span>
+                            <span class="batch-progress">--</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 内联模式切换 -->
+                <div class="mode-switcher-inline">
+                    <span class="mode-label-inline">显示:</span>
+                    <button class="mode-btn-sm active" data-mode="simple">简约</button>
+                    <button class="mode-btn-sm" data-mode="detailed">详细</button>
+                    <button class="mode-btn-sm" data-mode="list">列表</button>
+                </div>
+                
+                <!-- 简约模式 -->
+                <div id="topSimple" class="top-content">
+                    <div class="current-file">
+                        <div class="file-path">D:\Backup\Documents\Projects\2024</div>
+                        <div class="file-name">report.docx</div>
+                        <div class="progress-row">
+                            <div class="progress-label">
+                                <span>文件进度</span>
+                                <span class="progress-percent">85%</span>
+                            </div>
+                            <div class="progress-bar">
+                                <div class="progress-fill" style="width: 85%"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 详细模式 -->
+                <div id="topDetailed" class="top-content hidden">
+                    <div class="thread-list">
+                        <div class="thread-item">
+                            <span class="thread-id">线程 1</span>
+                            <span class="thread-file">video.mp4</span>
+                            <div class="thread-progress">
+                                <div class="thread-progress-fill" style="width: 80%"></div>
+                            </div>
+                            <span class="thread-percent">80%</span>
+                        </div>
+                        <div class="thread-item">
+                            <span class="thread-id">线程 2</span>
+                            <span class="thread-file">photo.jpg</span>
+                            <div class="thread-progress">
+                                <div class="thread-progress-fill" style="width: 45%"></div>
+                            </div>
+                            <span class="thread-percent">45%</span>
+                        </div>
+                        <div class="thread-item">
+                            <span class="thread-id">线程 3</span>
+                            <span class="thread-file">data.csv</span>
+                            <div class="thread-progress">
+                                <div class="thread-progress-fill" style="width: 20%"></div>
+                            </div>
+                            <span class="thread-percent">20%</span>
+                        </div>
+                        <div class="thread-item">
+                            <span class="thread-id">线程 4</span>
+                            <span class="thread-file">archive.zip</span>
+                            <div class="thread-progress">
+                                <div class="thread-progress-fill" style="width: 10%"></div>
+                            </div>
+                            <span class="thread-percent">10%</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- 列表模式 -->
+                <div id="topList" class="top-content hidden">
+                    <div class="file-list">
+                        <div class="file-item completed">
+                            <span class="file-icon">✓</span>
+                            <span class="file-name-list">readme.txt</span>
+                            <span class="file-size">1 KB</span>
+                            <span class="file-status">完成</span>
+                        </div>
+                        <div class="file-item completed">
+                            <span class="file-icon">✓</span>
+                            <span class="file-name-list">photo.jpg</span>
+                            <span class="file-size">2 MB</span>
+                            <span class="file-status">完成</span>
+                        </div>
+                        <div class="file-item error">
+                            <span class="file-icon">✗</span>
+                            <span class="file-name-list">protected.doc</span>
+                            <span class="file-size">500 KB</span>
+                            <span class="file-status">出错</span>
+                        </div>
+                        <div class="file-item skipped">
+                            <span class="file-icon">⏭</span>
+                            <span class="file-name-list">temp_file.tmp</span>
+                            <span class="file-size">10 KB</span>
+                            <span class="file-status">跳过</span>
+                        </div>
+                        <div class="file-item active">
+                            <span class="file-icon">⏳</span>
+                            <span class="file-name-list">video.mp4</span>
+                            <span class="file-size">500 MB</span>
+                            <span class="file-status">45%</span>
+                        </div>
+                        <div class="file-item pending">
+                            <span class="file-icon">○</span>
+                            <span class="file-name-list">archive.zip</span>
+                            <span class="file-size">1 MB</span>
+                            <span class="file-status">等待</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 下方 - 整体信息区 -->
+            <div class="overall-info-section">
+                <!-- 密度模式切换 -->
+                <div class="density-switcher">
+                    <button class="density-btn" data-mode="minimal">少</button>
+                    <button class="density-btn active" data-mode="medium">中</button>
+                    <button class="density-btn" data-mode="full">完整</button>
+                </div>
+                
+                <!-- 统计栏（完整模式） -->
+                <div id="statsBar" class="stats-bar hidden">
+                    <div class="stats-item">
+                        <span class="stats-icon">✅</span>
+                        <span class="stats-label">已处理</span>
+                        <span class="stats-value processed">60/100</span>
+                    </div>
+                    <div class="stats-item" id="skippedStat">
+                        <span class="stats-icon">⏭</span>
+                        <span class="stats-label">跳过</span>
+                        <span class="stats-value skipped">3</span>
+                    </div>
+                    <div class="stats-item" id="failedStat">
+                        <span class="stats-icon">❌</span>
+                        <span class="stats-label">出错</span>
+                        <span class="stats-value failed">1</span>
+                    </div>
+                    <div class="stats-item" id="overwrittenStat">
+                        <span class="stats-icon">🔄</span>
+                        <span class="stats-label">已覆盖</span>
+                        <span class="stats-value processed">5</span>
+                    </div>
+                    <div class="stats-item" id="threadStat">
+                        <span class="stats-icon">⚙️</span>
+                        <span class="stats-label">进程</span>
+                        <span class="stats-value processed">8 线程</span>
+                    </div>
+                </div>
+                
+                <!-- 中等模式：已处理 + 速度 + 进程数（单行） -->
+                <div id="mediumStats" class="medium-stats hidden">
+                    <span>已处理: <span class="medium-value">60/100</span></span>
+                    <span>速度: <span class="medium-value">12.5 MB/s</span></span>
+                    <span>进程: <span class="medium-value">8 线程</span></span>
+                </div>
+                
+                <!-- 总进度条 -->
+                <div class="progress-row">
+                    <div class="progress-label">
+                        <span>总体进度</span>
+                        <span class="progress-percent">60%</span>
+                    </div>
+                    <div class="progress-bar">
+                        <div class="progress-fill" style="width: 60%"></div>
+                    </div>
+                </div>
+                
+                <!-- 时间显示 -->
+                <div id="timeDisplay" class="time-display">
+                    <span>已用: <span class="time-value">00:00:12</span></span>
+                    <span>剩余: <span class="time-value">00:00:08</span></span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- 模式说明 -->
+        <div class="mode-description">
+            <strong>上方批处理列表</strong>：固定显示，始终可见<br>
+            <strong>上方模式</strong>：简约（文件概览）| 详细（线程进度）| 列表（文件追踪）<br>
+            <strong>下方密度</strong>：少（进度+时间）| 中（+已处理+速度）| 完整（+已覆盖+线程数）
+        </div>
+    </div>
+
+    <script>
+        // 上方内联模式切换
+        document.querySelector('.mode-switcher-inline').addEventListener('click', (e) => {
+            const btn = e.target.closest('.mode-btn-sm');
+            if (!btn) return;
+            
+            const mode = btn.dataset.mode;
+            document.querySelectorAll('.mode-btn-sm').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            document.querySelectorAll('.top-content').forEach(el => el.classList.add('hidden'));
+            document.getElementById('top' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.remove('hidden');
+        });
+        
+        // 下方密度模式切换
+        document.querySelector('.density-switcher').addEventListener('click', (e) => {
+            const btn = e.target.closest('.density-btn');
+            if (!btn) return;
+            
+            const mode = btn.dataset.mode;
+            document.querySelectorAll('.density-btn').forEach(b => b.classList.remove('active'));
+            btn.classList.add('active');
+            
+            const statsBar = document.getElementById('statsBar');
+            const mediumStats = document.getElementById('mediumStats');
+            const timeDisplay = document.getElementById('timeDisplay');
+            
+            // 全部隐藏
+            statsBar.classList.add('hidden');
+            mediumStats.classList.add('hidden');
+            timeDisplay.classList.add('hidden');
+            
+            switch(mode) {
+                case 'minimal':
+                    // 少：进度条 + 时间
+                    timeDisplay.classList.remove('hidden');
+                    break;
+                case 'medium':
+                    // 中：已处理+速度（单行） + 进度条 + 时间
+                    mediumStats.classList.remove('hidden');
+                    timeDisplay.classList.remove('hidden');
+                    break;
+                case 'full':
+                    // 完整：统计栏(全部) + 进度条 + 速度+线程数 + 时间
+                    statsBar.classList.remove('hidden');
+                    timeDisplay.classList.remove('hidden');
+                    break;
+            }
+        });
+        
+        // 进度动画
+        let progress = 60;
+        setInterval(() => {
+            progress = (progress + 0.5) % 100;
+            document.querySelectorAll('.progress-fill').forEach(f => f.style.width = progress + '%');
+            document.querySelectorAll('.progress-percent').forEach(p => p.textContent = Math.round(progress) + '%');
+        }, 100);
+    </script>
+</body>
+</html>

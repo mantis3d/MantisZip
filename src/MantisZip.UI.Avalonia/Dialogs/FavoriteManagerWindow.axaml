@@ -1,0 +1,134 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.FavoriteManagerWindow"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="520"
+        Height="450"
+        MinWidth="400"
+        MinHeight="300"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource SpacingMdThk}">
+
+  <Grid RowDefinitions="Auto,*,Auto"
+        Margin="{DynamicResource SpacingXsThk}">
+
+    <!-- 标题栏 -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding WinTitle}"
+               FontSize="16"
+               FontWeight="SemiBold"
+               Margin="0,0,0,8"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- 收藏夹列表 DataGrid -->
+    <DataGrid Grid.Row="1"
+              x:Name="FavoritesGrid"
+              AutoGenerateColumns="False"
+              IsReadOnly="True"
+              SelectionMode="Single"
+              RowHeight="{DynamicResource ControlHeightMd}"
+              SelectionChanged="FavoritesGrid_SelectionChanged">
+      <DataGrid.Columns>
+        <!-- 名称列 -->
+        <DataGridTextColumn Header="{Binding NameColumnHeader}"
+                            Binding="{Binding Name}"
+                            Width="*" />
+        <!-- 路径列 -->
+        <DataGridTextColumn Header="{Binding PathColumnHeader}"
+                            Binding="{Binding PathDisplay}"
+                            Width="2*" />
+        <!-- 类型列 -->
+        <DataGridTextColumn Header="{Binding TypeColumnHeader}"
+                            Binding="{Binding TypeLabel}"
+                            Width="80" />
+      </DataGrid.Columns>
+    </DataGrid>
+
+    <!-- 底部按钮区域 -->
+    <Grid Grid.Row="2"
+          Margin="0,8,0,0">
+
+      <!-- 左侧按钮组 -->
+      <StackPanel Orientation="Horizontal"
+                  Spacing="6"
+                  HorizontalAlignment="Left">
+        <!-- 添加收藏 -->
+        <Button x:Name="AddButton"
+                Padding="12,6"
+                Click="AddButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconBookmarkAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding AddText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <!-- 编辑收藏 -->
+        <Button x:Name="EditButton"
+                Padding="12,6"
+                IsEnabled="False"
+                Click="EditButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconBookmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding EditText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <!-- 删除收藏 -->
+        <Button x:Name="DeleteButton"
+                Padding="12,6"
+                IsEnabled="False"
+                Click="DeleteButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconBookmarkOff}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding DeleteText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <!-- 上移 -->
+        <Button x:Name="MoveUpButton"
+                Padding="12,6"
+                IsEnabled="False"
+                Click="MoveUpButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconArrowUp}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding MoveUpText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+        <!-- 下移 -->
+        <Button x:Name="MoveDownButton"
+                Padding="12,6"
+                IsEnabled="False"
+                Click="MoveDownButton_Click"
+                Background="{DynamicResource ThemeButtonBgBrush}"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}">
+          <StackPanel Orientation="Horizontal" Spacing="6">
+            <PathIcon Data="{StaticResource IconArrowDown}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding MoveDownText}" VerticalAlignment="Center" />
+          </StackPanel>
+        </Button>
+      </StackPanel>
+
+      <!-- 右侧确定按钮（默认隐藏） -->
+      <Button Content="{Binding OkText}"
+              Padding="20,6"
+              HorizontalAlignment="Right"
+              Click="Ok_Click"
+              IsVisible="False"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="{DynamicResource ThemeTextOnAccentBrush}"
+              BorderThickness="0" />
+    </Grid>
+  </Grid>
+</Window>

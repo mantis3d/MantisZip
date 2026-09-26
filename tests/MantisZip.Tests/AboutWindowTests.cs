@@ -11,9 +11,9 @@ namespace MantisZip.Tests;
 public class AboutWindowTests
 {
     private static readonly string ZhJsonPath = Path.Combine(
-        GetRepoRoot(), "src", "MantisZip.UI", "Resources", "strings.zh.json");
+        GetRepoRoot(), "src", "MantisZip.UI.Avalonia", "Localization", "strings.zh-CN.json");
     private static readonly string EnJsonPath = Path.Combine(
-        GetRepoRoot(), "src", "MantisZip.UI", "Resources", "strings.en.json");
+        GetRepoRoot(), "src", "MantisZip.UI.Avalonia", "Localization", "strings.en.json");
 
     private static string GetRepoRoot()
     {
@@ -29,7 +29,7 @@ public class AboutWindowTests
             $"Base directory: {AppContext.BaseDirectory}");
     }
 
-    // 从 L.cs 中提取的全部 About_* 键
+    // 从 Avalonia 本地化中提取的核心 About_* 键（WPF 时代 About_Author_* 已改为 About_Label_*）
     private static readonly string[] ExpectedAboutKeys =
     [
         "About_Title",
@@ -42,10 +42,10 @@ public class AboutWindowTests
         "About_Formats",
         "About_License",
         "About_GitHub",
-        "About_Author_Name",
-        "About_Author_Email",
-        "About_Author_GitHub",
-        "About_Author_Gitee",
+        "About_Label_AuthorName",
+        "About_Label_Email",
+        "About_Label_GitHub",
+        "About_Label_Gitee",
         "About_Library_Name",
         "About_Library_Version",
         "About_Library_License",
@@ -156,39 +156,39 @@ public class AboutWindowTests
     }
 
     // ──────────────────────────────────────────────
-    // 5. 向后兼容：Main_About_Text 和 Main_About_Title
+    // 5. About_Title 和 About_Description 存在性
     // ──────────────────────────────────────────────
 
     [Fact]
-    public void Main_About_Text_ExistsInZh()
+    public void About_Title_ExistsInZh()
     {
         var data = LoadJson(ZhJsonPath);
-        Assert.True(data.ContainsKey("Main_About_Text"));
-        Assert.False(string.IsNullOrWhiteSpace(data["Main_About_Text"]));
+        Assert.True(data.ContainsKey("About_Title"));
+        Assert.False(string.IsNullOrWhiteSpace(data["About_Title"]));
     }
 
     [Fact]
-    public void Main_About_Text_ExistsInEn()
+    public void About_Title_ExistsInEn()
     {
         var data = LoadJson(EnJsonPath);
-        Assert.True(data.ContainsKey("Main_About_Text"));
-        Assert.False(string.IsNullOrWhiteSpace(data["Main_About_Text"]));
+        Assert.True(data.ContainsKey("About_Title"));
+        Assert.False(string.IsNullOrWhiteSpace(data["About_Title"]));
     }
 
     [Fact]
-    public void Main_About_Title_ExistsInZh()
+    public void About_Description_ExistsInZh()
     {
         var data = LoadJson(ZhJsonPath);
-        Assert.True(data.ContainsKey("Main_About_Title"));
-        Assert.False(string.IsNullOrWhiteSpace(data["Main_About_Title"]));
+        Assert.True(data.ContainsKey("About_Description"));
+        Assert.False(string.IsNullOrWhiteSpace(data["About_Description"]));
     }
 
     [Fact]
-    public void Main_About_Title_ExistsInEn()
+    public void About_Description_ExistsInEn()
     {
         var data = LoadJson(EnJsonPath);
-        Assert.True(data.ContainsKey("Main_About_Title"));
-        Assert.False(string.IsNullOrWhiteSpace(data["Main_About_Title"]));
+        Assert.True(data.ContainsKey("About_Description"));
+        Assert.False(string.IsNullOrWhiteSpace(data["About_Description"]));
     }
 
     // ──────────────────────────────────────────────

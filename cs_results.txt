@@ -1,0 +1,88 @@
+﻿App.xaml.cs|437|U+2192|→|// 已勾选"应用到全部" → 直接返回记忆的选择
+App.xaml.cs|578|U+2192|→|LogDebug("GetUniquePath: {0} → {1}", path, result);
+App.xaml.cs|580|U+2192|→|LogDebug("GetUniquePath: {0} → {0} (all names taken, fallback)", path);
+App.xaml.cs|619|U+2192|→|// "ask" 或未知值 → 弹出 QuickPathPreDialog 选目录
+AppMessageBox.xaml.cs|24|U+274C|?|MessageBoxImage.Error => "?",
+AppMessageBox.xaml.cs|25|U+26A0|?|MessageBoxImage.Warning => "??",
+AppMessageBox.xaml.cs|26|U+2753|?|MessageBoxImage.Question => "?",
+AppSettings.cs|21|U+2192|→|public bool KeepOriginalExtension { get; set; } = false;  // 保留源文件扩展名（abc.max → abc.max.zip）
+AppPartials\App.Compress.cs|141|U+2192|→|// IPC 收集期间取消窗口 → 同步终止管道
+AppPartials\App.Compress.cs|256|U+2192|→|// 已勾选"应用到全部" → 直接返回记忆的选择
+AppPartials\App.Compress.cs|450|U+2192|→|// 无公共父目录或根目录 → 弹输入框
+AppPartials\App.Compress.cs|475|U+2192|→|Log("--compress-combined: {0} paths → {1}", allPaths.Count, finalPath);
+AppPartials\App.Extract.cs|425|U+2192|→|// 逐条目权限不足 → 首次弹窗，后续静默
+AppPartials\App.Extract.cs|474|U+2192|→|// 所有条目都失败（权限不足）→ 整个压缩包标记失败
+AppPartials\App.Extract.cs|515|U+2192|→|// 首次权限不足 → 弹出对话框
+AppPartials\App.Extract.cs|594|U+2192|→|// 窗口仍可见 → 等待用户手动关闭
+AppPartials\App.Extract.cs|627|U+2192|→|/// 若所有文件在同一根目录下 → 返回压缩包所在目录；
+AppPartials\App.Extract.cs|659|U+2192|→|/// 例如压缩包内容为 my_project/a.txt、my_project/b.txt → 返回 "my_project"。
+AppPartials\App.Extract.cs|765|U+2192|→|Log("--extract: {0} → {1}", archivePath, dest);
+AppPartials\App.Password.cs|183|U+2192|→|// existingItems==null → 无密码无法列出（EncryptHeaders=true 7z）
+AppPartials\App.Password.cs|284|U+2192|→|// 密码错误 → 由外层 while 循环重试
+AppPartials\App.Password.cs|290|U+2192|→|if (userCancelled) return null;           // 用户取消 → 退出整个流程
+AppPartials\App.Password.cs|291|U+2192|→|if (dialogResult != null) return dialogResult; // 密码正确 → 返回
+AppPartials\App.Password.cs|292|U+2192 U+2192|→→|// null + !userCancelled → 密码错误 → 继续循环
+AppPartials\App.Password.cs|368|U+2192|→|// 无加密条目 → 无需密码验证
+Controls\QuickPathControl.xaml.cs|134|U+2B50|?|// ? Favorites dropdown
+Controls\QuickPathControl.xaml.cs|239|U+25B6|?|var header = win.IsActive ? $"? {win.Path}" : win.Path;
+Converters\BatchStatusConverters.cs|47|U+23F3|?|BatchItemStatus.Pending => "?",
+Converters\BatchStatusConverters.cs|49|U+2705|?|BatchItemStatus.Completed => "?",
+Converters\BatchStatusConverters.cs|50|U+23ED|?|BatchItemStatus.Skipped => "??",
+Converters\BatchStatusConverters.cs|51|U+274C|?|BatchItemStatus.Failed => "?",
+Converters\BatchStatusConverters.cs|52|U+2753|?|_ => "?"
+Dialogs\CompressSettingsWindow.xaml.cs|525|U+2192|→|// 已勾选"应用到全部" → 直接返回记忆的选择
+Dialogs\CompressSettingsWindow.xaml.cs|660|U+2192|→|// 已勾选"应用到全部" → 直接返回记忆的选择
+Dialogs\CompressSettingsWindow.xaml.cs|819|U+2192|→|// 已勾选"应用到全部" → 直接返回记忆的选择
+Dialogs\MatchedPasswordDialog.xaml.cs|53|U+2705|?|PwdCopyBtn.Content = "?";
+Dialogs\ProgressWindow.xaml.cs|431|U+2192|→|// 正在运行 → 暂停
+Dialogs\ProgressWindow.xaml.cs|439|U+2192|→|// 已暂停 → 恢复
+Dialogs\QuickPathPreDialog.xaml.cs|9|U+2B50 U+26A1|??|/// 系统对话框前置窗。弹系统对话框之前先用 QuickPathControl 选????目录。
+Dialogs\SettingsWindow.xaml.cs|567|U+2192|→|// 用户取消 → 恢复旧主题并还原 ComboBox
+Dialogs\SettingsWindow.xaml.cs|668|U+2705|?|SevenZipStatusIcon.Text = "?";
+Dialogs\SettingsWindow.xaml.cs|674|U+274C|?|SevenZipStatusIcon.Text = "?";
+Localization\LanguageManager.cs|18|U+2192 U+2192|→→|/// <summary>所有已加载的语言数据：lang_code → (key → value)</summary>
+Localization\LanguageManager.cs|21|U+2192|→|/// <summary>语言代码 → 本地化显示名称（来自 languages.json）</summary>
+Localization\LanguageManager.cs|24|U+2192|→|/// <summary>语言代码 → 翻译人员介绍（来自 languages.json）</summary>
+Localization\LanguageManager.cs|44|U+2192 U+2192|→→|/// 回退链：当前语言 → "en" → "[KEY]" 标记。
+Localization\LanguageManager.cs|153|U+2192|→|/// <summary>扫描 Resources/strings.*.json，返回 {code → strings}</summary>
+MainWindow\MainWindow.DragDrop.cs|172|U+2192|→|// 多选状态 + 点按已选中条目 → 阻止 DataGrid 内部处理此点击
+MainWindow\MainWindow.DragDrop.cs|329|U+2192 U+2705|→?|///   wbx/ButtonBarChanger/file.wbx → _dragTempDir\wbx\ButtonBarChanger\file.wbx ?
+MainWindow\MainWindow.DragDrop.cs|330|U+274C|?|///   而非 _dragTempDir\Total Commander 10\PLUGINS\wbx\ButtonBarChanger\file.wbx ?
+MainWindow\MainWindow.Menu.cs|333|U+2192|→|// 已匹配 → 打开查看/复制对话框
+MainWindow\MainWindow.Menu.cs|346|U+2192|→|// 未匹配 → 打开密码输入对话框
+MainWindow\MainWindow.UI.cs|419|U+2192|→|// 过滤后无选中项 → 显示压缩包总览（仅在非过滤触发时）
+MainWindow\MainWindow.UI.cs|960|U+25B2 U+25BC|▲▼|/// DataGrid 排序事件：在列标题上显示 ▲/▼ 排序标记
+MainWindow\MainWindow.UI.cs|968|U+25B2 U+25BC|▲▼|column.Header = headerText.TrimEnd('▲', '▼', ' ').TrimEnd();
+MainWindow\MainWindow.UI.cs|978|U+2192|→|// else (Descending) → null（回到未排序）
+MainWindow\MainWindow.UI.cs|986|U+25B2 U+25BC|▲▼|col.Header?.ToString()?.TrimEnd('▲', '▼', ' ').TrimEnd(),
+MainWindow\MainWindow.UI.cs|992|U+25B2 U+25BC|▲▼|var clean = header.TrimEnd('▲', '▼', ' ').TrimEnd();
+MainWindow\MainWindow.UI.cs|994|U+25B2|▲|col.Header = clean + " ▲";
+MainWindow\MainWindow.UI.cs|996|U+25BC|▼|col.Header = clean + " ▼";
+MainWindow\MainWindow.UI.cs|1022|U+25B2 U+25BC|▲▼|raw = raw.TrimEnd('▲', '▼', ' ').TrimEnd();
+MainWindow\MainWindow.xaml.cs|226|U+2192|→|// 构建身份→列的字典
+MainWindow\MainWindow.xaml.cs|406|U+25B2 U+25BC|▲▼|col.Header?.ToString()?.TrimEnd('▲', '▼', ' ').TrimEnd(),
+MainWindow\MainWindow.xaml.cs|412|U+2192|→|// 当前没有排序列 → 不覆盖 _savedSortColumnPath（保留从 JSON 加载或之前捕获的值）
+MainWindow\MainWindow.xaml.cs|454|U+25B2 U+25BC|▲▼|var clean = header.TrimEnd('▲', '▼', ' ').TrimEnd();
+MainWindow\MainWindow.xaml.cs|455|U+25B2 U+25BC|▲▼|sortCol.Header = clean + (direction == ListSortDirection.Ascending ? " ▲" : " ▼");
+MainWindow\MainWindow.xaml.cs|695|U+2192|→|// 用户取消 → 无法加载加密 7z 压缩包（无密码无法列出条目）
+MainWindow\MainWindow.xaml.cs|705|U+2192|→|// 检测加密条目 → 自动尝试匹配已保存的密码（支持所有格式，含 EncryptHeaders=false 7z/RAR）
+MainWindow\Preview\MainWindow.Preview.cs|422|U+26A0|?|valueBlock.Text = $"?? {realFormatName}（扩展名: {ext}）";
+MainWindow\Preview\MainWindow.Preview.cs|467|U+2192|→|// TryMagicPreview 无对应路由 → 继续走扩展名链（此时 ext 已是魔数映射后的值）
+MainWindow\Preview\MainWindow.Preview.cs|700|U+2192|→|// ── JSON/XML/INI → 文本预览 ──
+MainWindow\Preview\MainWindow.Preview.cs|717|U+2192|→|// ── 其他检测到的格式无专用预览方法 → 返回 false 走扩展名回退 ──
+MainWindow\Preview\MainWindow.Preview.cs|904|U+2192 U+2192|→→|/// 位置 1/4 → 外层 ContentGrid；位置 2/3 → 内层 InnerContentGrid。
+MainWindow\Preview\MainWindow.Preview.Image.cs|102|U+2194|?|new ToolbarButton { Text = "?", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
+MainWindow\Preview\MainWindow.Preview.Image.cs|105|U+25C0|?|new ToolbarButton { Text = "?", Tooltip = L.T(L.Preview_GifPrevFrame), OnClick = GifPrevFrame },
+MainWindow\Preview\MainWindow.Preview.Image.cs|106|U+23EF|?|new ToolbarButton { Text = "?", Tooltip = L.T(L.Preview_GifPause), OnClick = ToggleGifPlayPause },
+MainWindow\Preview\MainWindow.Preview.Image.cs|107|U+25B6|?|new ToolbarButton { Text = "?", Tooltip = L.T(L.Preview_GifNextFrame), OnClick = GifNextFrame }
+MainWindow\Preview\MainWindow.Preview.Image.cs|253|U+2194|?|new ToolbarButton { Text = "?", Tooltip = L.T(L.Preview_ZoomFitWidth), OnClick = () => ApplyZoom(ZoomMode.FitWidth) }
+MainWindow\Preview\MainWindow.Preview.Metadata.cs|94|U+2192|→|// TrueType 字体：尝试 FontFamily(path#name) → TextBlock 矢量渲染。
+MainWindow\Preview\MainWindow.Preview.Metadata.cs|444|U+2192|→|// 多表 → TabControl
+MainWindow\Preview\MainWindow.Preview.Metadata.cs|449|U+2192|→|// 单表 → 直接 DataGrid（复用 ShowTablePreview）
+MainWindow\Preview\MainWindow.Preview.Metadata.cs|454|U+2192|→|// 无数据表 → 退化为纯元数据展示（可能为空数据库）
+MainWindow\Preview\MainWindow.Preview.Text.cs|39|U+2192|→|/// 置信度不足时退化为 UTF-8 → GBK 回退。
+MainWindow\Preview\MainWindow.Preview.Web.cs|106|U+2192|→|/// 渲染 Markdown → HTML。若 <see cref="_markdownEmojiEnabled"/> 开启，
+MainWindow\Preview\MainWindow.Preview.Web.cs|150|U+2192|→|/// 用 Markdig 内置的 emoji 短代码 → Unicode 映射表替换文本中的 :emoji: 模式。
+Shell\ShellIntegration.Assoc.cs|266|U+2192|→|// 去除扩展名后缀："Bandizip.zip" → "Bandizip"
+Shell\ShellIntegration.Menu.cs|534|U+2192|→|// COM 尚未被 Explorer 加载 → 安装级联菜单作为兜底，确保右键菜单可用
+Shell\ShellIntegration.Menu.cs|572|U+2192|→|// Strip order prefix ("01_open" → "open")

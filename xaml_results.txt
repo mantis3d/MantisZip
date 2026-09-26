@@ -1,0 +1,25 @@
+﻿App.xaml|126|U+25B6|?|<!-- Submenu arrow ? -->
+Controls\QuickPathControl.xaml|25|U+2B50|?|<!-- ? Favorites -->
+Controls\QuickPathControl.xaml|34|U+2B50|?|<emoji:TextBlock Text="?" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+Controls\QuickPathControl.xaml|58|U+26A1|?|<emoji:TextBlock Text="?" FontSize="14" HorizontalAlignment="Center" VerticalAlignment="Center"/>
+Dialogs\CompressConflictDialog.xaml|55|U+2795|?|<emoji:TextBlock Text="?" FontSize="24" HorizontalAlignment="Center"/>
+Dialogs\CompressConflictDialog.xaml|62|U+270F|?|<emoji:TextBlock Text="??" FontSize="24" HorizontalAlignment="Center"/>
+Dialogs\CompressConflictDialog.xaml|69|U+23ED|?|<emoji:TextBlock Text="??" FontSize="24" HorizontalAlignment="Center"/>
+Dialogs\ConflictDialog.xaml|92|U+2B07|?|<emoji:TextBlock Text="??" FontSize="24" HorizontalAlignment="Center"/>
+Dialogs\ConflictDialog.xaml|99|U+270F|?|<emoji:TextBlock Text="??" FontSize="24" HorizontalAlignment="Center"/>
+Dialogs\ConflictDialog.xaml|106|U+23ED|?|<emoji:TextBlock Text="??" FontSize="24" HorizontalAlignment="Center"/>
+Dialogs\DonationDialog.xaml|63|U+2615|?|<Button Content="? Polar" Click="Polar_Click"
+Dialogs\MatchedPasswordDialog.xaml|45|U+25CF U+25CF U+25CF U+25CF U+25CF U+25CF U+25CF U+25CF U+25CF U+25CF|●●●●●●●●●●|Text="●●●●●●●●●●" FontSize="13" FontWeight="SemiBold"
+Dialogs\SettingsWindow.xaml|745|U+2715|?|Content="?"
+MainWindow\MainWindow.xaml|63|U+274C|?|<MenuItem.Icon><emoji:TextBlock Text="?" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|102|U+2795|?|<MenuItem.Icon><emoji:TextBlock Text="?" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|105|U+2716|?|<MenuItem.Icon><emoji:TextBlock Text="?" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|117|U+2B50|?|<MenuItem.Icon><emoji:TextBlock Text="?" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|121|U+2699|?|<MenuItem.Icon><emoji:TextBlock Text="?" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|126|U+2764|?|<MenuItem.Icon><emoji:TextBlock Text="??" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|177|U+2795|?|<emoji:TextBlock Text="?" FontSize="25" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|183|U+2716|?|<emoji:TextBlock Text="?" FontSize="25" Foreground="{StaticResource Theme_StatusError}" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|203|U+2713|?|<emoji:TextBlock Text="?" FontSize="25" Foreground="{StaticResource Theme_StatusSuccess}" HorizontalAlignment="Center"/>
+MainWindow\MainWindow.xaml|404|U+2715|?|<Button x:Name="ClearFiltersBtn" Content="?" ToolTip="{l:L Main_Filter_ClearAll}" Width="24" Height="24" FontSize="12" Margin="4,0" Click="ClearFiltersBtn_Click"/>
+MainWindow\MainWindow.xaml|469|U+2795|?|<MenuItem.Icon><emoji:TextBlock Text="?" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>
+MainWindow\MainWindow.xaml|472|U+2716|?|<MenuItem.Icon><emoji:TextBlock Text="?" FontSize="14" Margin="2,0,4,0" VerticalAlignment="Center"/></MenuItem.Icon>

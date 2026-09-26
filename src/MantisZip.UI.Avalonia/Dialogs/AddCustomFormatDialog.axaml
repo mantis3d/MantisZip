@@ -1,0 +1,36 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.AddCustomFormatDialog"
+        x:CompileBindings="False"
+        Width="400" WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Title="{Binding DialogTitle}">
+  <!-- 主布局：垂直排列的输入表单 + 底部按钮 -->
+  <StackPanel Margin="12" Spacing="{DynamicResource SpacingSm}">
+    <!-- 提示文本 -->
+    <TextBlock Text="{Binding PromptText}" />
+    <!-- 格式名称输入框 -->
+    <TextBox x:Name="NameTextBox"
+             PlaceholderText="格式名称 / Format name"
+             Background="{DynamicResource ThemeSurfaceBgBrush}"
+             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    <!-- 扩展名输入框（逗号分隔） -->
+    <TextBox x:Name="ExtensionsTextBox"
+             PlaceholderText="扩展名，逗号分隔 / Extensions, comma-separated"
+             Background="{DynamicResource ThemeSurfaceBgBrush}"
+             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    <!-- 魔数 hex 输入框（可选） -->
+    <TextBox x:Name="MagicHexTextBox"
+             PlaceholderText="魔数 hex（可选）/ Magic hex (optional)"
+             Background="{DynamicResource ThemeSurfaceBgBrush}"
+             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    <!-- 底部按钮区域：取消 / 确定 -->
+    <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="{DynamicResource SpacingSm}">
+      <Button Content="{Binding CancelText}" Click="Cancel_Click" />
+      <Button Content="{Binding OkText}" Click="Ok_Click" />
+    </StackPanel>
+  </StackPanel>
+</Window>

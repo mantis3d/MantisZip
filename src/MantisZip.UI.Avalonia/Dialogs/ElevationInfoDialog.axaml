@@ -1,0 +1,63 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.ElevationInfoDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="480"
+        Topmost="True"
+        WindowStartupLocation="CenterOwner"
+        SizeToContent="Height"
+        CanResize="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource SpacingMdThk}">
+
+  <Grid RowDefinitions="Auto,Auto,Auto"
+        Margin="{DynamicResource SpacingXsThk}">
+
+    <!-- 主提示消息 -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding MessageText}"
+               FontSize="13"
+               FontWeight="SemiBold"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               TextWrapping="Wrap" />
+
+    <!-- 目录列表 -->
+    <ItemsControl Grid.Row="1"
+                  x:Name="DirectoryList"
+                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                  FontSize="12"
+                  Margin="0,12,0,0">
+      <ItemsControl.ItemTemplate>
+        <DataTemplate>
+          <TextBlock Text="{Binding}"
+                     Margin="12,2,0,2"
+                     TextWrapping="Wrap"
+                     FontFamily="Consolas, Courier New, monospace" />
+        </DataTemplate>
+      </ItemsControl.ItemTemplate>
+    </ItemsControl>
+
+    <!-- 提示文字 + 确定按钮 -->
+    <StackPanel Grid.Row="2"
+                Margin="0,16,0,0">
+      <!-- 说明文字 -->
+      <TextBlock Text="{Binding HintText}"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 FontSize="11"
+                 TextWrapping="Wrap"
+                 Margin="0,0,0,16" />
+
+      <!-- 确定按钮 -->
+      <Button Content="{Binding OkText}"
+              Width="100"
+              Height="{DynamicResource ControlHeightMd}"
+              HorizontalAlignment="Right"
+              IsDefault="True"
+              IsCancel="True"
+              Click="Ok_Click"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -27,6 +27,9 @@ public class FileFilterPreset
         IsBuiltIn = isBuiltIn;
     }
 
+    /// <summary>返回预设名称，用于 ComboBox 显示。</summary>
+    public override string ToString() => Name;
+
     /// <summary>
     /// 获取 8 个内置预设。
     /// </summary>

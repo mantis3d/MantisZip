@@ -143,7 +143,9 @@ public static class ZipCommentHelper
         if (trimmed.Length == 0)
             return null;
 
-        return Encoding.UTF8.GetString(trimmed);
+        // ZIP EOCD 注释无编码标志：UTF-8 BOM → 严格 UTF-8 → 系统 ANSI（GBK 等）回退，
+        // 兼容新旧工具（旧工具多用本地代码页写注释，固定 UTF-8 解码会乱码）
+        return TextEncodingDetector.DecodeText(trimmed);
     }
 
     /// <summary>

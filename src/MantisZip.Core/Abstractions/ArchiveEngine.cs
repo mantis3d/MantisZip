@@ -1,3 +1,4 @@
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.Core.Abstractions;
@@ -62,6 +63,14 @@ public class ArchiveOptions
     /// 可在后台线程调用，回调需自行处理 UI 线程问题。
     /// </summary>
     public Func<FileConflictInfo, FileConflictAction>? ConflictResolver { get; set; }
+
+    /// <summary>
+    /// 异步的文件冲突回调。与 <see cref="ConflictResolver"/> 功能相同，
+    /// 但调用时可使用 <c>await</c>，适用于需要在后台异步等待 UI 的场景（如 Avalonia 的异步对话框）。
+    /// 当 <see cref="ConflictAction"/> 为 <see cref="FileConflictAction.Ask"/> 时优先使用此回调，
+    /// 其次退回到 <see cref="ConflictResolver"/>。
+    /// </summary>
+    public Func<FileConflictInfo, Task<FileConflictAction>>? ConflictResolverAsync { get; set; }
 
     /// <summary>
     /// 文件读取错误时的回调（如文件被占用无法读取）。
@@ -139,6 +148,46 @@ public class ArchiveOptions
     /// 仅当 <see cref="Encrypt"/> 为 true 且格式为 7z 时有效。
     /// </summary>
     public bool SevenZipEncryptHeaders { get; set; } = true;
+
+    /// <summary>
+    /// 压缩文件白名单（绝对路径集合）；null = 全量压缩。
+    /// 非 null 时引擎只打包白名单内的文件（过滤场景：预览构建时算好的 B 数据集 IncludedFiles）。
+    /// </summary>
+    public IReadOnlySet<string>? FileWhitelist { get; set; }
+
+    /// <summary>
+    /// 并行解压线程数（1 = 串行，>1 = 并行线程数，0 = 使用默认值 Environment.ProcessorCount）。
+    /// 仅当引擎 SupportsParallelExtract 为 true 时有效。
+    /// </summary>
+    public int ParallelExtractDegree { get; set; } = 0;
+
+    /// <summary>
+    /// 7z 多线程压缩（mt=on）。默认 true。
+    /// 启用时 7z.dll 自动利用多核 CPU 并行压缩，压缩率可能略有下降。
+    /// 仅对 7z 格式有效，ZIP/TAR/GZ 无此选项。
+    /// </summary>
+    public bool SevenZipMultithreaded { get; set; } = true;
+
+    /// <summary>
+    /// 自适应压缩：已压缩文件自动 Store。
+    /// </summary>
+    public bool AdaptiveCompression { get; set; }
+
+    /// <summary>
+    /// 魔数检测：自适应开启时，对大文件做魔数增强识别。自适应关闭时无效。
+    /// </summary>
+    public bool AdaptiveSmartDetect { get; set; }
+
+    /// <summary>
+    /// 多线程压缩：所有可压缩文件走 SharpSevenZip mt=on。可与自适应同时开启。
+    /// </summary>
+    public bool MultiThreadedCompression { get; set; }
+
+    /// <summary>
+    /// 多线程模式下用户自定义仅存储格式 ID 列表。
+    /// 仅在 <see cref="MultiThreadedCompression"/> 为 true 时生效。
+    /// </summary>
+    public HashSet<string> MultiThreadedStoreFormatIds { get; set; } = new();
 }
 
 /// <summary>
@@ -339,6 +388,11 @@ public class ExtractResult
         /// 此引擎是否支持从压缩包删除文件。
         /// </summary>
         bool CanDelete(ArchiveFormat format) => false;
+
+        /// <summary>
+        /// 此引擎是否支持并行解压。
+        /// </summary>
+        bool SupportsParallelExtract => false;
     }
 
 /// <summary>

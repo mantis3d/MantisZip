@@ -1,0 +1,174 @@
+<ResourceDictionary xmlns="https://github.com/avaloniaui"
+                     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                     xmlns:sys="clr-namespace:System;assembly=netstandard">
+  <!-- Window -->
+  <Color x:Key="ThemeWindowBg">#FF1E1E1E</Color>
+  <Color x:Key="ThemeTextPrimary">#FFE0E0E0</Color>
+  <Color x:Key="ThemeTextSecondary">#FF999999</Color>
+  <Color x:Key="ThemeBorder">#FF3E3E3E</Color>
+  <Color x:Key="ThemeAccent">#FF0078D4</Color>
+  <!-- Surfaces -->
+  <Color x:Key="ThemeSurfaceBg">#FF252525</Color>
+  <Color x:Key="ThemeHeaderBg">#FF2A2A2A</Color>
+  <!-- Buttons -->
+  <Color x:Key="ThemeButtonBg">#FF3E3E3E</Color>
+  <Color x:Key="ThemeButtonHover">#FF4E4E4E</Color>
+  <Color x:Key="ThemeButtonPressed">#FF5E5E5E</Color>
+  <!-- Lists -->
+  <Color x:Key="ThemeListBg">#FF252525</Color>
+  <Color x:Key="ThemeListSelected">#FF2A3A5A</Color>
+  <!-- Splitters -->
+  <Color x:Key="ThemeSplitterBg">#FF3E3E3E</Color>
+  <!-- TabControl -->
+  <Color x:Key="ThemeTabHeaderBg">#FF2A2A2A</Color>
+  <Color x:Key="ThemeTabHeaderFg">#FFE0E0E0</Color>
+  <Color x:Key="ThemeTabHover">#FF2A3A5A</Color>
+  <!-- ComboBox -->
+  <Color x:Key="ThemeComboBoxBg">#FF252525</Color>
+  <Color x:Key="ThemeComboBoxBorder">#FF3E3E3E</Color>
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- 紧凑度模式间距资源 (Normal) — 亮暗共用同值 -->
+  <!-- ════════════════════════════════════════════ -->
+  <sys:Double x:Key="SpacingXxs">4</sys:Double>
+  <sys:Double x:Key="SpacingXs">8</sys:Double>
+  <sys:Double x:Key="SpacingSm">12</sys:Double>
+  <sys:Double x:Key="SpacingMd">16</sys:Double>
+  <sys:Double x:Key="SpacingLg">24</sys:Double>
+  <sys:Double x:Key="SpacingXl">32</sys:Double>
+  <sys:Double x:Key="SpacingXxl">48</sys:Double>
+  <sys:Double x:Key="ControlHeightXs">22</sys:Double>
+  <sys:Double x:Key="ControlHeightSm">26</sys:Double>
+  <sys:Double x:Key="ControlHeight">28</sys:Double>
+  <sys:Double x:Key="ControlHeightMd">32</sys:Double>
+  <sys:Double x:Key="ControlHeightLg">42</sys:Double>
+  <sys:Double x:Key="ControlHeightXl">48</sys:Double>
+  <sys:Double x:Key="ControlHeightXxl">54</sys:Double>
+  <sys:Double x:Key="ControlMinHeight">40</sys:Double>
+  <sys:Double x:Key="BorderRadius">6</sys:Double>
+  <sys:Double x:Key="DialogPadding">16</sys:Double>
+
+  <!-- SolidColorBrush resources -->
+  <SolidColorBrush x:Key="ThemeWindowBgBrush" Color="{StaticResource ThemeWindowBg}" />
+  <SolidColorBrush x:Key="ThemeTextPrimaryBrush" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ThemeTextSecondaryBrush" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="ThemeBorderBrush" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="ThemeAccentBrush" Color="{StaticResource ThemeAccent}" />
+  <SolidColorBrush x:Key="ThemeToggleBrush" Color="#A90078D4" />
+  <SolidColorBrush x:Key="ThemeSurfaceBgBrush" Color="{StaticResource ThemeSurfaceBg}" />
+  <SolidColorBrush x:Key="ThemeHeaderBgBrush" Color="{StaticResource ThemeHeaderBg}" />
+  <SolidColorBrush x:Key="ThemeButtonBgBrush" Color="{StaticResource ThemeButtonBg}" />
+  <SolidColorBrush x:Key="ThemeButtonHoverBrush" Color="{StaticResource ThemeButtonHover}" />
+  <SolidColorBrush x:Key="ThemeButtonPressedBrush" Color="{StaticResource ThemeButtonPressed}" />
+  <SolidColorBrush x:Key="ThemeListBgBrush" Color="{StaticResource ThemeListBg}" />
+  <SolidColorBrush x:Key="ThemeListSelectedBrush" Color="{StaticResource ThemeListSelected}" />
+  <SolidColorBrush x:Key="ThemeSplitterBgBrush" Color="{StaticResource ThemeSplitterBg}" />
+  <SolidColorBrush x:Key="ThemeTabHeaderBgBrush" Color="{StaticResource ThemeTabHeaderBg}" />
+  <SolidColorBrush x:Key="ThemeTabHeaderFgBrush" Color="{StaticResource ThemeTabHeaderFg}" />
+  <SolidColorBrush x:Key="ThemeTabHoverBrush" Color="{StaticResource ThemeTabHover}" />
+  <SolidColorBrush x:Key="ThemeComboBoxBgBrush" Color="{StaticResource ThemeComboBoxBg}" />
+  <SolidColorBrush x:Key="ThemeComboBoxBorderBrush" Color="{StaticResource ThemeComboBoxBorder}" />
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Fluent Theme Overrides — Button            -->
+  <!-- ════════════════════════════════════════════ -->
+  <SolidColorBrush x:Key="ButtonBackgroundPointerOver" Color="{StaticResource ThemeButtonHover}" />
+  <SolidColorBrush x:Key="ButtonBackgroundPressed" Color="{StaticResource ThemeButtonPressed}" />
+  <SolidColorBrush x:Key="ButtonForegroundPointerOver" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ButtonForegroundPressed" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ButtonBorderBrushPointerOver" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="ButtonBorderBrushPressed" Color="{StaticResource ThemeBorder}" />
+
+  <!-- ToggleButton -->
+  <SolidColorBrush x:Key="ToggleButtonBackgroundPointerOver" Color="{StaticResource ThemeButtonHover}" />
+  <SolidColorBrush x:Key="ToggleButtonBackgroundPressed" Color="{StaticResource ThemeButtonPressed}" />
+  <SolidColorBrush x:Key="ToggleButtonForegroundPointerOver" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ToggleButtonForegroundPressed" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ToggleButtonBorderBrushPointerOver" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="ToggleButtonBorderBrushPressed" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPointerOver" Color="{StaticResource ThemeAccent}" />
+  <SolidColorBrush x:Key="ToggleButtonBackgroundCheckedPressed" Color="{StaticResource ThemeButtonPressed}" />
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Fluent Theme Overrides — TextBox / TextControl -->
+  <!-- ════════════════════════════════════════════ -->
+  <SolidColorBrush x:Key="TextControlBackground" Color="#FF2A2A2A" />
+  <SolidColorBrush x:Key="TextControlBackgroundPointerOver" Color="#FF2A2A2A" />
+  <SolidColorBrush x:Key="TextControlBackgroundDisabled" Color="{StaticResource ThemeButtonBg}" />
+  <SolidColorBrush x:Key="TextControlBackgroundFocused" Color="#FF2A2A2A" />
+  <SolidColorBrush x:Key="TextControlBorderBrush" Color="#FF555555" />
+  <SolidColorBrush x:Key="TextControlBorderBrushPointerOver" Color="#FF555555" />
+  <SolidColorBrush x:Key="TextControlBorderBrushDisabled" Color="{StaticResource ThemeBorder}" />
+  <SolidColorBrush x:Key="TextControlBorderBrushFocused" Color="{StaticResource ThemeAccent}" />
+  <SolidColorBrush x:Key="TextControlForeground" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="TextControlForegroundPointerOver" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="TextControlForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlForegroundFocused" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="TextControlPlaceholderForeground" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlPlaceholderForegroundPointerOver" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlPlaceholderForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlPlaceholderForegroundFocused" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TextControlSelectionHighlightColor" Color="{StaticResource ThemeAccent}" />
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Fluent Theme Overrides — MenuFlyoutPresenter -->
+  <!-- ════════════════════════════════════════════ -->
+  <SolidColorBrush x:Key="MenuFlyoutPresenterBackground" Color="{StaticResource ThemeHeaderBg}" />
+  <SolidColorBrush x:Key="MenuFlyoutPresenterBorderBrush" Color="{StaticResource ThemeBorder}" />
+
+  <!-- ════════════════════════════════════════════ -->
+  <!-- Fluent Theme Overrides — Control Foregrounds -->
+  <!-- ════════════════════════════════════════════ -->
+  <SolidColorBrush x:Key="MenuFlyoutItemForeground" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="MenuFlyoutItemForegroundPointerOver" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="MenuFlyoutItemForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="ButtonForegroundDisabled" Color="{StaticResource ThemeTextSecondary}" />
+  <!-- TabControl -->
+  <SolidColorBrush x:Key="TabItemHeaderForegroundUnselected" Color="{StaticResource ThemeTextSecondary}" />
+  <SolidColorBrush x:Key="TabItemHeaderForegroundSelected" Color="{StaticResource ThemeTextPrimary}" />
+  <!-- ComboBox -->
+  <SolidColorBrush x:Key="ComboBoxForeground" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ComboBoxItemForeground" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ComboBoxItemForegroundPointerOver" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="ComboBoxItemForegroundSelected" Color="{StaticResource ThemeTextPrimary}" />
+  <!-- CheckBox -->
+  <SolidColorBrush x:Key="CheckBoxForegroundUnchecked" Color="{StaticResource ThemeTextPrimary}" />
+  <SolidColorBrush x:Key="CheckBoxForegroundChecked" Color="{StaticResource ThemeTextPrimary}" />
+
+  <!-- Status colors -->
+  <Color x:Key="ThemeStatusWarning">#FF5C4A1E</Color>
+  <Color x:Key="ThemeStatusSuccess">#FF2E7D32</Color>
+  <Color x:Key="ThemeStatusError">#FFC62828</Color>
+
+  <SolidColorBrush x:Key="ThemeStatusWarningBrush" Color="{StaticResource ThemeStatusWarning}" />
+  <SolidColorBrush x:Key="ThemeStatusSuccessBrush" Color="{StaticResource ThemeStatusSuccess}" />
+  <SolidColorBrush x:Key="ThemeStatusErrorBrush" Color="{StaticResource ThemeStatusError}" />
+  <!-- 密码已匹配高亮底色（对齐 WPF Theme_StatusSuccessBg） -->
+  <SolidColorBrush x:Key="ThemeStatusSuccessBgBrush" Color="{StaticResource ThemeStatusSuccess}" Opacity="0.15" />
+  <!-- Progress bar foreground/background for progress window -->
+  <SolidColorBrush x:Key="ThemeProgressFillBrush" Color="#FF64B5F6" />
+  <SolidColorBrush x:Key="ThemeProgressBgBrush" Color="#FF424242" />
+
+  <!-- Progress bar colors -->
+  <Color x:Key="ProgressBarSizeColor">#FF1E3A5F</Color>
+  <Color x:Key="ProgressBarSizeDirColor">#FF0F2A45</Color>
+  <Color x:Key="ProgressBarCompressedSizeColor">#FF2D1B69</Color>
+  <Color x:Key="ProgressBarCompressedSizeDirColor">#FF1A0F3D</Color>
+  <Color x:Key="ProgressBarRatioColor">#FF5C4A1E</Color>
+  <Color x:Key="ProgressBarDateColor">#FF14532D</Color>
+
+  <SolidColorBrush x:Key="ProgressBarSizeBrush" Color="{StaticResource ProgressBarSizeColor}" />
+  <SolidColorBrush x:Key="ProgressBarSizeDirBrush" Color="{StaticResource ProgressBarSizeDirColor}" />
+  <SolidColorBrush x:Key="ProgressBarCompressedSizeBrush" Color="{StaticResource ProgressBarCompressedSizeColor}" />
+  <SolidColorBrush x:Key="ProgressBarCompressedSizeDirBrush" Color="{StaticResource ProgressBarCompressedSizeDirColor}" />
+  <SolidColorBrush x:Key="ProgressBarRatioBrush" Color="{StaticResource ProgressBarRatioColor}" />
+  <SolidColorBrush x:Key="ProgressBarDateBrush" Color="{StaticResource ProgressBarDateColor}" />
+
+  <!-- Drag-drop overlay (Win32, hardcoded reference values) -->
+  <SolidColorBrush x:Key="DragDropBorderSuccessBrush" Color="#FF4CAF50"/>
+  <SolidColorBrush x:Key="DragDropFillSuccessBrush" Color="#664CAF50"/>
+  <SolidColorBrush x:Key="DragDropBorderWarningBrush" Color="#FFF44336"/>
+  <SolidColorBrush x:Key="DragDropFillWarningBrush" Color="#66F44336"/>
+  <SolidColorBrush x:Key="DragDropBorderNoneBrush" Color="#FF808080"/>
+  <SolidColorBrush x:Key="DragDropFillNoneBrush" Color="#22808080"/>
+</ResourceDictionary>

@@ -1,0 +1,96 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.DonationDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="520"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource SpacingMdThk}">
+
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto"
+        Margin="{DynamicResource SpacingLgThk}">
+    <!-- 标题区域 -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding HeaderText}"
+               FontSize="18"
+               FontWeight="Bold"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+               HorizontalAlignment="Center"
+               Margin="0,0,0,16" />
+
+    <!-- 二维码区域 -->
+    <Border Grid.Row="1"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource BorderRadius}"
+            Padding="20"
+            Margin="0,0,0,16"
+            HorizontalAlignment="Center">
+      <StackPanel Spacing="10">
+        <!-- 捐赠二维码图片 -->
+        <Image Width="400"
+               Height="400"
+               Source="avares://MantisZip.UI.Avalonia/Resources/DonateQr.png"
+               Stretch="Uniform" />
+        <!-- 二维码提示文字 -->
+        <TextBlock Text="{Binding QrHintText}"
+                   FontSize="14"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   HorizontalAlignment="Center" />
+      </StackPanel>
+    </Border>
+
+    <!-- 平台提示文字 -->
+    <TextBlock Grid.Row="2"
+               Text="{Binding PlatformsHintText}"
+               FontSize="14"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               HorizontalAlignment="Center"
+               Margin="0,0,0,12" />
+
+    <!-- 平台链接按钮 -->
+    <StackPanel Grid.Row="3"
+                Spacing="{DynamicResource SpacingXs}"
+                Margin="0,0,0,20"
+                HorizontalAlignment="Center">
+      <!-- 爱发电按钮 -->
+      <Button Content="{Binding AfdianText}"
+              Height="{DynamicResource ControlHeightXl}"
+              Width="440"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              FontSize="18"
+              HorizontalContentAlignment="Center"
+              Click="OpenAfdian_Click" />
+      <!-- Polar 按钮 -->
+      <Button Content="{Binding PolarText}"
+              Height="{DynamicResource ControlHeightXl}"
+              Width="440"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              FontSize="18"
+              HorizontalContentAlignment="Center"
+              Click="Polar_Click" />
+    </StackPanel>
+
+    <!-- 关闭按钮 -->
+    <Button Grid.Row="4"
+            Content="{Binding CloseText}"
+            Width="80"
+            Height="{DynamicResource ControlHeightMd}"
+            HorizontalAlignment="Right"
+            IsDefault="True"
+            IsCancel="True"
+            Background="{DynamicResource ThemeButtonBgBrush}"
+            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            Click="Close_Click" />
+  </Grid>
+</Window>

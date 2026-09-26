@@ -11,7 +11,7 @@ Lightweight full-featured Windows compression/decompression tool
 <p align="center">
   <a href="https://buy.polar.sh/polar_cl_VaCaW2l2nWkob5CyHe4dOlhL6HrQDK4ueMA9n1JyhNc"><img src="https://img.shields.io/badge/Polar-Sponsor-pink?style=flat-square" alt="Polar Sponsor"></a>
   <a href="https://afdian.com/a/MantisZen"><img src="https://img.shields.io/badge/%E7%88%B1%E5%8F%91%E7%94%B5-%E8%B5%9E%E5%8A%A9-blue?style=flat-square" alt="爱发电"></a>
-  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-9.0-purple?style=flat-square" alt=".NET 9"></a>
+  <a href="https://dotnet.microsoft.com/"><img src="https://img.shields.io/badge/.NET-10.0-purple?style=flat-square" alt=".NET 10"></a>
 
   [![QQ Group](https://img.shields.io/badge/QQ%20Group-778347352-blue?style=flat-square&logo=tencent-qq&logoColor=white)](https://qm.qq.com/cgi-bin/qm/qr?k=778347352) 
   [![discord](https://img.shields.io/badge/discord-Join-blue?style=flat-square&logo=discord&logoColor=white)](https://discord.gg/PpuyhceJpZ)
@@ -24,7 +24,7 @@ Lightweight full-featured Windows compression/decompression tool
 
  ⏱️ 3-second overview: seamless switching and instant preview inside archives
 
-> Free & Open Source / Built on .NET 9 + WPF   
+> Free & Open Source / Built on .NET 10 + Avalonia   
 > 🤖 AI-assisted development by [OpenCode](https://opencode.ai) and [Reasonix](https://reasonix.io)
 </div>
 
@@ -167,9 +167,8 @@ The file list now includes a size ratio bar, directory flattening, and filtering
 ---
 
 ## 🤔 Known Issues
-- This software prioritizes features and usability, so performance may lag behind mainstream compression tools. Optimization will come in future releases.
-- **Drag-and-drop export** uses 7-Zip's eager-extraction model (extracts all files to temp before initiating drag), causing delays with many large files. This feature is off by default and can be enabled in settings. Future migration from WPF to Avalonia will natively resolve this platform's deferred rendering limitation.
-- Markdown, HTML, SVG, and PDF preview currently use the WebView2 control, with all external network requests blocked (only `file://` local access allowed). The architecture will be further streamlined after migrating to Avalonia.
+- **Drag-and-drop export** uses 7-Zip's eager-extraction model (extracts all files to temp before initiating drag), causing delays with many large files. This feature is off by default and can be enabled in settings.
+- Markdown, HTML, SVG, and PDF preview use native .NET controls (Markdig, ReverseMarkdown, PdfPig, Svg.Skia), with all external network requests blocked (only `file://` local access allowed).
 - Some archive formats do **not** support single-entry preview — a prompt will be shown in such cases.
 - RAR format does not support compression (read-only extraction).
 - Currently only supports Windows; cross-platform support is planned.
@@ -193,8 +192,7 @@ The file list now includes a size ratio bar, directory flattening, and filtering
 ## 📋 System Requirements
 
 - **OS**: Windows 10 (1809+) / Windows 11 (cross-platform support is planned)
-- **Runtime**: [.NET 9 Runtime](https://dotnet.microsoft.com/download/dotnet/9.0)
-- **WebView2 Runtime**: HTML/Markdown/SVG/PDF preview requires [WebView2 Runtime](https://developer.microsoft.com/microsoft-edge/webview2/)
+- **Runtime**: [.NET 10 Runtime](https://dotnet.microsoft.com/download/dotnet/10.0)
 
 ---
 
@@ -205,17 +203,17 @@ The file list now includes a size ratio bar, directory flattening, and filtering
 git clone https://github.com/mantis3d/MantisZip.git
 cd MantisZip
 
-# Build
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj
+# Build (Avalonia primary)
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 # Run
-dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj
+dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 # Run tests
-dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
+dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
-**Output path**: `src/MantisZip.UI/bin/Debug/net9.0-windows/MantisZip.UI.exe`
+**Output path**: `src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe`
 
 ---
 
@@ -225,10 +223,10 @@ MantisZip supports powerful command-line invocation (e.g., for context menu inte
 
 ```powershell
 # Open an archive for browsing
-MantisZip.UI.exe --open "D:\Documents.zip"
+MantisZip.UI.Avalonia.exe --open "D:\Documents.zip"
 
 # Quick compress (default settings)
-MantisZip.UI.exe --compress-quick "D:\Photos" -- "D:\backup.zip"
+MantisZip.UI.Avalonia.exe --compress-quick "D:\Photos" -- "D:\backup.zip"
 ```
 
 See the [CLI Guide](CLI.md) for the full parameter list.
@@ -272,16 +270,21 @@ MantisZip would not exist without the generous contributions of the global open-
 | [SharpZipLib](https://github.com/icsharpcode/SharpZipLib) | 1.4.2 | Testing only (test project) | MIT |
 | [System.Security.Cryptography.ProtectedData](https://github.com/dotnet/runtime) | 10.0.8 | DPAPI-encrypted password storage | MIT |
 
-#### MantisZip.UI
+#### MantisZip.UI.Avalonia
 
 | Package | Version | Purpose | License |
 |------|------|------|--------|
-| [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | 8.4.2 | MVVM utilities (partial base classes only) | MIT |
-| [Markdig](https://github.com/xoofx/markdig) | 1.2.0 | Markdown → HTML rendering | BSD-2-Clause |
-| [Ookii.Dialogs.Wpf](https://github.com/ookii-dialogs/ookii-dialogs-wpf) | 5.0.1 | Vista-style folder picker dialog | BSD-3-Clause |
+| [Avalonia](https://github.com/AvaloniaUI/Avalonia) | 12.0.4 | Cross-platform UI framework | MIT |
+| [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | 8.4.2 | MVVM utilities (ObservableObject + source generators) | MIT |
+| [Markdig](https://github.com/xoofx/markdig) | 0.40.0 | Markdown parsing (AST → native control tree) | BSD-2-Clause |
+| [ReverseMarkdown](https://github.com/magicmousen/ReverseMarkdown) | 4.7.0 | HTML → Markdown conversion (HTML preview fallback path) | MIT |
+| [PdfPig](https://github.com/UglyToad/PdfPig) | 0.1.15 | PDF parsing and page-by-page rendering | Apache-2.0 |
+| [Svg.Skia](https://github.com/nickspag/Svg.Skia) | 2.0.0.5 | SVG rasterization (no WebView2 required) | MIT |
+| [SkiaSharp](https://github.com/nickspag/SkiaSharp) | 3.119.4 | 2D graphics rendering (PDF/SVG/font bitmaps) | MIT |
+| [HarfBuzzSharp](https://github.com/nickspag/HarfBuzzSharp) | 14.2.0 | Font preview glyph layout and ligature detection | MIT |
+| [ClosedXML](https://github.com/ClosedXML/ClosedXML) | 0.105.0 | XLSX table preview | MIT |
+| [DocumentFormat.OpenXml](https://github.com/nickspag/DocumentFormat.OpenXml) | 3.5.1 | DOCX/PPTX document parsing | MIT |
 | [Ude.NetStandard](https://github.com/jehugaleahsa/udetector) | 1.2.0 | Mozilla charset detection (text preview) | MIT |
-| [WpfAnimatedGif](https://github.com/XamlAnimatedGif/WpfAnimatedGif) | 2.0.2 | GIF animation support | MIT |
-| [Microsoft.Web.WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) | 1.0.3967.48 | HTML/Markdown/SVG/PDF preview (replaces WPF WebBrowser) | BSD-3-Clause |
 
 #### External Tools (Runtime Dependencies)
 
@@ -295,7 +298,7 @@ MantisZip would not exist without the generous contributions of the global open-
 
 During agile development and refactoring, this project deeply leveraged the following advanced AI coding agents, achieving a leap in independent development productivity:
 
-- [OpenCode](https://opencode.ai) — Responsible for the foundational core async architecture and .NET 9 advanced feature refactoring.
+- [OpenCode](https://opencode.ai) — Responsible for the foundational core async architecture and .NET advanced feature refactoring.
 - [Reasonix](https://reasonix.io) — Responsible for efficient development, deep debugging, and bug fixing of core business features (e.g., in-archive preview, smart password manager).
 - [DeepSeek](https://www.deepseek.com) — Provided underlying hardcore programming large language model support throughout the project.
 
@@ -344,10 +347,21 @@ If you are in China, you can support via **Afdian (WeChat/Alipay)** or **WeChat 
 
 ### 💬 Community & Feedback
 
-If you encounter a bug, have a feature idea, or just want to chat about WPF/.NET independent development, feel free to join our developer community:
+If you encounter a bug, have a feature idea, or just want to chat about .NET/Avalonia independent development, feel free to join our developer community:
 
 * **QQ Group**: `778347352` (👉 [Click to join](https://qm.qq.com/cgi-bin/qm/qr?k=778347352))
 * **Code Repository**: [Submit a Bug or Feature Request](../../issues)
 * **Discord**: (👉 [Click to join](https://discord.gg/PpuyhceJpZ))
 
 > 💡 **Tip**: Please mention "GitHub / MantisZip" when joining the group.
+
+
+## Star History
+
+<a href="https://www.star-history.com/?repos=mantis3d%2FMantisZip&type=date&legend=top-left">
+ <picture>
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&theme=dark&legend=top-left&sealed_token=nsZLw4F-DYdClMW8mHT8lwCV9ExHMuy4eC0Ebz22DGp8NwLlC9IeKT3cZ4St3gycAR-apUAwJHJQb_Ubr50GXL9coXR1_qyce_ljatXgN40WEtu__3LiPKBw94SyCSYK6YfgYgoMdU_JtzH6GPpNIlPCD5VsAQOr2yHW8s2qH64b9BJlbpdqn3TojxdQ" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&legend=top-left&sealed_token=nsZLw4F-DYdClMW8mHT8lwCV9ExHMuy4eC0Ebz22DGp8NwLlC9IeKT3cZ4St3gycAR-apUAwJHJQb_Ubr50GXL9coXR1_qyce_ljatXgN40WEtu__3LiPKBw94SyCSYK6YfgYgoMdU_JtzH6GPpNIlPCD5VsAQOr2yHW8s2qH64b9BJlbpdqn3TojxdQ" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=mantis3d/MantisZip&type=date&legend=top-left&sealed_token=nsZLw4F-DYdClMW8mHT8lwCV9ExHMuy4eC0Ebz22DGp8NwLlC9IeKT3cZ4St3gycAR-apUAwJHJQb_Ubr50GXL9coXR1_qyce_ljatXgN40WEtu__3LiPKBw94SyCSYK6YfgYgoMdU_JtzH6GPpNIlPCD5VsAQOr2yHW8s2qH64b9BJlbpdqn3TojxdQ" />
+ </picture>
+</a>

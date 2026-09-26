@@ -4,7 +4,7 @@ namespace MantisZip.Core.Abstractions;
 
 /// <summary>
 /// 表格数据提供者接口。用于读取格式化的表格数据（SQLite、CSV、Excel 等）并返回统一的 DataTable。
-/// 后续可作为插件模块提取到独立类库，见 <c>.sisyphus/plans/preview-modular-providers.md</c>。
+/// 后续可作为插件模块提取到独立类库，见 <c>.omo/plans/preview-modular-providers.md</c>。
 /// </summary>
 public interface ITableDataProvider
 {
