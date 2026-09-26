@@ -1174,7 +1174,6 @@ var secureHtml = InjectCspMeta(html, csp);
 
     // ── Image ──
 
-    /// <summary>
     /// 显示图片预览。
     /// </summary>
     public void ShowImage(string filePath)
@@ -1187,6 +1186,13 @@ var secureHtml = InjectCspMeta(html, csp);
         if (ext.Equals(".avif", StringComparison.OrdinalIgnoreCase))
         {
             ShowAvifImage(filePath);
+            return;
+        }
+
+        // TGA 使用 ImageSharp 解码（SkiaSharp 对 TGA 解码支持有限，特别是 RLE 压缩）
+        if (ext.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowTgaImage(filePath);
             return;
         }
 
@@ -1261,6 +1267,79 @@ var formatValues = new Dictionary<string, string?>
         // 显示友好提示，建议用户解压后使用外部查看器
         var msg = LocalizationManager.T("Preview_Avif_Unsupported_Decode");
         ShowUnsupported(msg);
+    }
+
+    /// <summary>
+    /// 显示 TGA 图片预览（使用 ImageSharp 解码，SkiaSharp 对 TGA 解码支持有限，特别是 RLE 压缩）。
+    /// </summary>
+    private void ShowTgaImage(string filePath)
+    {
+        App.DebugLog($"[TGA] ShowTgaImage: {filePath}");
+
+        try
+        {
+            using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(filePath);
+            App.DebugLog($"[TGA] ImageSharp loaded: {image.Width}x{image.Height}");
+
+            // Convert ImageSharp image to Avalonia Bitmap via SkiaSharp
+            var pixelArray = new byte[image.Width * image.Height * 4];
+            image.CopyPixelDataTo(pixelArray);
+            App.DebugLog($"[TGA] Pixel array copied: {pixelArray.Length} bytes");
+
+            using var skBitmap = new SkiaSharp.SKBitmap(image.Width, image.Height, SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Premul);
+            var ptr = skBitmap.GetPixels();
+            System.Runtime.InteropServices.Marshal.Copy(pixelArray, 0, ptr, pixelArray.Length);
+            App.DebugLog($"[TGA] SkiaSharp bitmap created: {skBitmap.Width}x{skBitmap.Height}, rowBytes={skBitmap.RowBytes}");
+
+            using var skImage = SkiaSharp.SKImage.FromBitmap(skBitmap);
+            if (skImage == null)
+            {
+                throw new Exception("SKImage.FromBitmap returned null");
+            }
+            App.DebugLog($"[TGA] SKImage created");
+
+            using var skData = skImage.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            if (skData == null)
+            {
+                throw new Exception("SKImage.Encode returned null");
+            }
+            App.DebugLog($"[TGA] PNG encoded: {skData.Size} bytes");
+
+            using var ms = new MemoryStream(skData.ToArray());
+            var bitmap = new global::Avalonia.Media.Imaging.Bitmap(ms);
+
+            App.DebugLog($"[TGA] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
+
+            PreviewType = PreviewType.Image;
+            PreviewImage = bitmap;
+            _originalPreviewImage = bitmap;
+
+            _skOriginalPreview?.Dispose();
+            _skOriginalPreview = BitmapToSkia(bitmap);
+
+            ImageWidth = bitmap.PixelSize.Width;
+            ImageHeight = bitmap.PixelSize.Height;
+
+            IsPreviewVisible = true;
+            IsToolbarVisible = true;
+            PreviewHeaderText = LocalizationManager.T("Preview_Header_Tga");
+
+            var formatValues = new Dictionary<string, string?>
+            {
+                [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
+                [MetadataKeys.ImageDpi] = $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}",
+            };
+            MetadataHelper.RenderFormatToViewModel(this, formatValues, "image");
+
+            ZoomFit();
+            App.DebugLog($"[TGA] ShowTgaImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[TGA] ShowTgaImage error: {ex.Message}");
+            App.DebugLog($"[TGA] Stack: {ex.StackTrace}");
+            ShowUnsupported(LocalizationManager.T("Preview_ImageLoadFailed", ex.Message));
+        }
     }
 
     public void ShowIcoGallery(string filePath)
