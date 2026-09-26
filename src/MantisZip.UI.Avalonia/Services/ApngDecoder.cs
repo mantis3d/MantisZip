@@ -42,12 +42,10 @@ internal static class ApngDecoder
     /// <returns>List of frames with bitmaps and delay in ms, or null on failure.</returns>
     public static List<AnimationFrameData>? DecodeFramesFromImage(Image<Rgba32> image)
     {
-        Console.WriteLine($"[ApngDecoder] DecodeFramesFromImage called. Image: {image.Width}x{image.Height}, Frames: {image.Frames.Count}");
         try
         {
             var frames = image.Frames;
             var frameCount = frames.Count;
-            Console.WriteLine($"[ApngDecoder] frameCount = {frameCount}");
             if (frameCount <= 0) return null;
 
             var result = new List<AnimationFrameData>(frameCount);
@@ -68,13 +66,13 @@ internal static class ApngDecoder
                         var delay = delayProp.GetValue(framePngMeta);
                         if (delay != null)
                         {
-                            // Rational has Numerator and Denominator properties
+                            // Rational has Numerator and Denominator properties (both uint)
                             var numProp = delay.GetType().GetProperty("Numerator");
                             var denProp = delay.GetType().GetProperty("Denominator");
                             if (numProp != null && denProp != null)
                             {
-                                var numerator = (long)numProp.GetValue(delay)!;
-                                var denominator = (long)denProp.GetValue(delay)!;
+                                var numerator = (uint)numProp.GetValue(delay)!;
+                                var denominator = (uint)denProp.GetValue(delay)!;
                                 if (denominator > 0)
                                 {
                                     // Delay is in seconds (numerator/denominator), convert to ms
@@ -95,13 +93,7 @@ internal static class ApngDecoder
                 frameImage.SaveAsPng(ms);
                 ms.Position = 0;
                 
-                // Debug: Check stream size
-                Debug.WriteLine($"Frame {i}: PNG stream size = {ms.Length} bytes");
-                Console.WriteLine($"Frame {i}: PNG stream size = {ms.Length} bytes");
-                
-                // Try creating Avalonia Bitmap - this might fail if Avalonia isn't initialized
                 var avaloniaBitmap = new Bitmap(ms);
-                Console.WriteLine($"Frame {i}: Avalonia Bitmap created successfully");
 
                 result.Add(new AnimationFrameData
                 {
@@ -116,8 +108,6 @@ internal static class ApngDecoder
         {
             Debug.WriteLine($"ApngDecoder.DecodeFramesFromImage error: {ex.Message}");
             Debug.WriteLine(ex.StackTrace);
-            Console.WriteLine($"ApngDecoder ERROR: {ex.Message}");
-            Console.WriteLine(ex.StackTrace);
             return null;
         }
     }
