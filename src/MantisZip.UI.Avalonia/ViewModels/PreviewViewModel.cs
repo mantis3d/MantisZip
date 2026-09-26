@@ -1265,10 +1265,17 @@ var formatValues = new Dictionary<string, string?>
             using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(filePath);
             App.DebugLog($"[AVIF] ImageSharp loaded: {image.Width}x{image.Height}");
 
-            // Convert ImageSharp image to Avalonia Bitmap
-            using var ms = new MemoryStream();
-            image.SaveAsPng(ms);
-            ms.Position = 0;
+            // Convert ImageSharp image to Avalonia Bitmap via SkiaSharp (more reliable than PNG bytes)
+            var pixelArray = new byte[image.Width * image.Height * 4];
+            image.CopyPixelDataTo(pixelArray);
+
+            using var skBitmap = new SkiaSharp.SKBitmap(image.Width, image.Height, SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Premul);
+            var ptr = skBitmap.GetPixels();
+            System.Runtime.InteropServices.Marshal.Copy(pixelArray, 0, ptr, pixelArray.Length);
+
+            using var skImage = SkiaSharp.SKImage.FromBitmap(skBitmap);
+            using var skData = skImage.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            using var ms = new MemoryStream(skData.ToArray());
             var bitmap = new global::Avalonia.Media.Imaging.Bitmap(ms);
 
             App.DebugLog($"[AVIF] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
