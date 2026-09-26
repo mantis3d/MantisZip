@@ -214,6 +214,16 @@ public static class FileFormatDetector
             return FileFormat.Mp4;
         }
 
+        // 21b. AVIF: 'ftyp' box with 'avif' or 'avis' brand at offset 8
+        if (length >= 12 &&
+            head[4] == 0x66 && head[5] == 0x74 && head[6] == 0x79 && head[7] == 0x70 &&
+            ((head[8] == 0x61 && head[9] == 0x76 && head[10] == 0x69 && head[11] == 0x66) || // 'avif'
+             (head[8] == 0x61 && head[9] == 0x76 && head[10] == 0x69 && head[11] == 0x73)))   // 'avis'
+        {
+            CoreLog.Info("Detect: AVIF magic matched");
+            return FileFormat.Avif;
+        }
+
         // 22. MKV/WebM (EBML): 1A 45 DF A3 (4 bytes)
         if (length >= 4 &&
             head[0] == 0x1A && head[1] == 0x45 && head[2] == 0xDF && head[3] == 0xA3)

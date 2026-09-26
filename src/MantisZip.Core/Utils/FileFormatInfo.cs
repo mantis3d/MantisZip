@@ -132,12 +132,12 @@ public class FileFormatInfo
 /// 魔数检测计划 (Plan B) 的 <see cref="FileFormatDetector"/> 使用相同枚举。
 /// </summary>
 public enum FileFormat
-{
-    Unknown,
-    // 图像
-    Jpeg, Png, Apng, Gif, Bmp, WebP, Ico, Tga, Hdr, Exr, Svg,
-    // 音频
-    Wav, Flac, Mp3,
+    {
+        Unknown,
+        // 图像
+        Jpeg, Png, Apng, Avif, Gif, Bmp, WebP, Ico, Tga, Hdr, Exr, Svg,
+        // 音频
+        Wav, Flac, Mp3,
     // 视频
     Mp4, Mkv, WebM, Wmv, Mov, Avi, Flv,
     // 文档

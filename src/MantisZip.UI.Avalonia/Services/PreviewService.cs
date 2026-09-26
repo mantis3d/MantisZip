@@ -58,11 +58,12 @@ public class PreviewService
 
     private static readonly HashSet<string> ImageExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
-        ".jpg", ".jpeg", ".png", ".bmp", ".ico", ".webp"
+        ".jpg", ".jpeg", ".png", ".bmp", ".ico", ".webp", ".avif"
     };
 
     private static readonly HashSet<string> GifExtensions = new(StringComparer.OrdinalIgnoreCase) { ".gif" };
     private static readonly HashSet<string> ApngExtensions = new(StringComparer.OrdinalIgnoreCase) { ".apng" };
+    private static readonly HashSet<string> AvifExtensions = new(StringComparer.OrdinalIgnoreCase) { ".avif" };
     private static readonly HashSet<string> SvgExtensions = new(StringComparer.OrdinalIgnoreCase) { ".svg" };
     private static readonly HashSet<string> FontExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
@@ -182,6 +183,7 @@ public class PreviewService
         if (ImageExtensions.Contains(ext)) return PreviewType.Image;
         if (GifExtensions.Contains(ext)) return PreviewType.AnimatedImage;
         if (ApngExtensions.Contains(ext)) return PreviewType.AnimatedImage;
+        if (AvifExtensions.Contains(ext)) return PreviewType.Image;
         if (SvgExtensions.Contains(ext)) return PreviewType.Svg;
         if (FontExtensions.Contains(ext)) return PreviewType.Font;
         if (AudioExtensions.Contains(ext)) return PreviewType.Audio;
@@ -273,6 +275,7 @@ public class PreviewService
             // 图像 (GIF 单独处理，走动画预览路径)
             FileFormat.Gif => PreviewType.AnimatedImage,
             FileFormat.Apng => PreviewType.AnimatedImage,
+            FileFormat.Avif => PreviewType.Image,
 
             FileFormat.Png or FileFormat.Jpeg or FileFormat.Bmp
                 or FileFormat.WebP or FileFormat.Ico
