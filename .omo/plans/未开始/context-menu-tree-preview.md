@@ -1,6 +1,7 @@
 # 右键菜单目录结构预览
 
 > **状态**: 📋 待实现 | **实现版本**: TBD
+> **前置依赖**: 建议在 `nuget-dependency-upgrade`（SharpCompress 升级）之后实施，升级后 API 兼容性已在 Phase 1 验证过；若提前实施，升级后需回归测试 `SyncListTopEntries` 的 SharpCompress 调用。
 
 ## TL;DR
 

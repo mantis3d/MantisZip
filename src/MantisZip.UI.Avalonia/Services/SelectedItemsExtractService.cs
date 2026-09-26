@@ -1,6 +1,7 @@
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.Services;
 
@@ -52,6 +53,9 @@ public sealed class SelectedItemsExtractService
         }
 
         var options = CreateExtractOptions(conflictAction, conflictDialog);
+        // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
+        if (options != null)
+            options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
         if (engine == null) throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));

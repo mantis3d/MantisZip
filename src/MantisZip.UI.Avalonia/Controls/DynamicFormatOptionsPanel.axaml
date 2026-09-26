@@ -87,6 +87,13 @@
                   IsCheckedChanged="SolidCheck_IsCheckedChanged"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
+        <!-- 7z 多线程压缩复选框：启用后利用多核 CPU 并行压缩，提升压缩速度（压缩率可能略有下降） -->
+        <CheckBox x:Name="MultiThreadCheck"
+                  Content="{Binding MultiThreadLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="True"
+                  IsCheckedChanged="MultiThreadCheck_IsCheckedChanged"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
         <!-- 7z 固实块大小：固实压缩时的数据块大小 -->
         <Grid Margin="0,6,0,0">
           <Grid.ColumnDefinitions>

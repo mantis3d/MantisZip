@@ -186,14 +186,15 @@ public static class IconProvider
         };
 
         // Folder back
-        var backPath = new SKPath();
-        backPath.MoveTo(0, 4);
-        backPath.LineTo(6, 4);
-        backPath.LineTo(8, 6);
-        backPath.LineTo(16, 6);
-        backPath.LineTo(16, 14);
-        backPath.LineTo(0, 14);
-        backPath.Close();
+        var backPathBuilder = new SKPathBuilder();
+        backPathBuilder.MoveTo(0, 4);
+        backPathBuilder.LineTo(6, 4);
+        backPathBuilder.LineTo(8, 6);
+        backPathBuilder.LineTo(16, 6);
+        backPathBuilder.LineTo(16, 14);
+        backPathBuilder.LineTo(0, 14);
+        backPathBuilder.Close();
+        using var backPath = backPathBuilder.Detach();
         canvas.DrawPath(backPath, paint);
 
         // Folder tab
@@ -203,12 +204,13 @@ public static class IconProvider
             IsAntialias = true,
             Style = SKPaintStyle.Fill
         };
-        using var tabPath = new SKPath();
-        tabPath.MoveTo(0, 2);
-        tabPath.LineTo(6, 2);
-        tabPath.LineTo(7, 4);
-        tabPath.LineTo(0, 4);
-        tabPath.Close();
+        var tabPathBuilder = new SKPathBuilder();
+        tabPathBuilder.MoveTo(0, 2);
+        tabPathBuilder.LineTo(6, 2);
+        tabPathBuilder.LineTo(7, 4);
+        tabPathBuilder.LineTo(0, 4);
+        tabPathBuilder.Close();
+        using var tabPath = tabPathBuilder.Detach();
         canvas.DrawPath(tabPath, tabPaint);
 
         using var image = surface.Snapshot();
@@ -292,25 +294,26 @@ public static class IconProvider
                 }
                 break;
 
-            case "audio":
+case "audio":
                 // Music note
-                using (var notePaint = new SKPaint
+                using (var audioPaint = new SKPaint
                 {
                     Color = SKColors.White.WithAlpha(200),
                     IsAntialias = true,
                     Style = SKPaintStyle.Fill
                 })
                 {
-                    canvas.DrawCircle(cx - 1, cy + 2, 2, notePaint);
-                    var notePath = new SKPath();
-                    notePath.MoveTo(cx - 1, cy + 2);
-                    notePath.LineTo(cx - 1, cy - 4);
-                    notePath.LineTo(cx + 4, cy - 3);
-                    notePath.LineTo(cx + 4, cy - 1);
-                    notePath.LineTo(cx - 1, cy - 2);
-                    notePath.Close();
-                    canvas.DrawPath(notePath, notePaint);
-                    canvas.DrawCircle(cx + 4, cy, 2, notePaint);
+                    canvas.DrawCircle(cx - 1, cy + 2, 2, audioPaint);
+                    var notePathBuilder = new SKPathBuilder();
+                    notePathBuilder.MoveTo(cx - 1, cy + 2);
+                    notePathBuilder.LineTo(cx - 1, cy - 4);
+                    notePathBuilder.LineTo(cx + 4, cy - 3);
+                    notePathBuilder.LineTo(cx + 4, cy - 1);
+                    notePathBuilder.LineTo(cx - 1, cy - 2);
+                    notePathBuilder.Close();
+                    using var notePath = notePathBuilder.Detach();
+                    canvas.DrawPath(notePath, audioPaint);
+                    canvas.DrawCircle(cx + 4, cy, 2, audioPaint);
                 }
                 break;
 
@@ -323,11 +326,12 @@ public static class IconProvider
                     Style = SKPaintStyle.Fill
                 })
                 {
-                    var playPath = new SKPath();
-                    playPath.MoveTo(cx - 2, cy - 3);
-                    playPath.LineTo(cx + 3, cy);
-                    playPath.LineTo(cx - 2, cy + 3);
-                    playPath.Close();
+                    using var playPathBuilder = new SKPathBuilder();
+                    playPathBuilder.MoveTo(cx - 2, cy - 3);
+                    playPathBuilder.LineTo(cx + 3, cy);
+                    playPathBuilder.LineTo(cx - 2, cy + 3);
+                    playPathBuilder.Close();
+                    using var playPath = playPathBuilder.Detach();
                     canvas.DrawPath(playPath, playPaint);
                 }
                 break;

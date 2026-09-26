@@ -40,6 +40,10 @@ public partial class ExtractSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _openFolderAfterExtract;
 
+    /// <summary>并行解压线程数（1=串行，>1=并行）。默认 = CPU核心数。</summary>
+    [ObservableProperty]
+    private int _parallelExtractDegree = Environment.ProcessorCount;
+
     /// <summary>过滤后需实际解压的条目 key 列表（由 View 从对话框回传；null = 未启用过滤，全量解压）。</summary>
     public List<string>? FilteredEntryKeys { get; set; }
 
@@ -199,6 +203,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
         var settings = AppSettings.Load();
         if (!string.IsNullOrEmpty(settings.FileConflictAction))
             ConflictAction = settings.FileConflictAction;
+        // 并行解压线程数
+        ParallelExtractDegree = settings.ParallelExtractDegree;
 
         // 冲突策略选项（ComboBox 用对象绑定——Avalonia 无 WPF 的 SelectedValuePath）
         ConflictActionOptions.Add(new Option(LocalizationManager.T("Extract_Conflict_Ask"), "ask"));
@@ -229,7 +235,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_Cancel",
             "Extract_TabFilter",
             "Extract_Source_MultiFilterHint",
-            "Extract_UnlockButton"
+            "Extract_UnlockButton",
+            "Extract_ParallelDegree"
         };
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in keys)

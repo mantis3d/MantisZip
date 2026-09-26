@@ -1,9 +1,10 @@
 # 跨平台移植实施计划
 
-> WPF→Avalonia 迁移已完成（Phases 0-10），本文档规划 macOS / Linux 平台支持的实施路径。
+> Avalonia 迁移已完成（Phases 0-10），WPF 版本已删除，本文档规划 macOS / Linux 平台支持的实施路径。
 > **历史调研**: [cross-platform-port-research.md](cross-platform-port-research.md)（2026-06-11 迁移前可行性研究）
 > **状态**: 📋 待实施 | **当前版本**: 0.5.0
 > **创建日期**: 2026-09-07
+> **前置依赖**: 无（WPF 已删除，Avalonia 为唯一主力项目）
 
 ---
 
@@ -13,7 +14,7 @@
 
 | 项目 | 状态 | 说明 |
 |------|------|------|
-| WPF → Avalonia UI 迁移 | ✅ 完成 | 21 个窗口全部迁移，Phases 0-10 |
+| Avalonia UI 迁移 | ✅ 完成 | WPF 版本已删除，Avalonia 为唯一主力项目 |
 | WebView2 → 原生渲染 | ✅ 完成 | HTML→Markdig 控件树；PDF→PdfPig+SkiaSharp；SVG→Svg.Skia |
 | GIF 动画 | ✅ 完成 | 自实现 `GifDecoder`，无第三方依赖 |
 | DPAPI → AES-GCM | ✅ 完成 | `AesGcmDataProtector` + `IDataProtector` 接口 |
@@ -93,7 +94,7 @@
 
 | 任务 | 说明 | 工作量 |
 |------|------|--------|
-| 7z 读取验证 | 测试 `SharpCompress.SevenZipArchive` 在 macOS/Linux 上读取 7z 文件（加密/固实/非固实），记录兼容性差异 | 3 天 |
+| 7z 读取验证 | 测试 `SharpCompress.SevenZipArchive` 在 macOS/Linux 上读取 7z 文件（加密/固实/非固实），记录兼容性差异。**注意**：需基于 `nuget-dependency-upgrade` 升级后的 SharpCompress 0.50.x 版本验证 | 3 天 |
 | 7z 写入策略 | 选项 A: UI 标注"macOS/Linux 7z 压缩需安装 p7zip" + CLI 调用；选项 B: 禁用 7z 压缩（只支持 ZIP+tar.gz）。**需要决策** | 1 天决策 + 2 天实现 |
 | RAR 读取验证 | 测试 `SharpCompress.RarArchive` 在非 Windows 上的 RAR5/RAR4/加密兼容性 | 2 天 |
 | `ArchiveEntryExtractor` 平台分支 | 7z/RAR 单项提取的 SharpSevenZip 调用改为 SharpCompress 分支 | 2 天 |

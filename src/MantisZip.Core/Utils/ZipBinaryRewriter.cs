@@ -60,7 +60,7 @@ public readonly record struct NewEntry(
 /// </summary>
 internal static partial class ZipBinaryRewriter
 {
-    private const int CopyBufferSize = 262144;
+    private const int CopyBufferSize = 4194304;
 
     // ────────────────────────────── EOCD ──────────────────────────────
 

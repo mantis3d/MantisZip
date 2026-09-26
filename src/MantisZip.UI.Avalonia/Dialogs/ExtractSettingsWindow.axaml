@@ -123,6 +123,19 @@
                   <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
                              TextWrapping="Wrap" />
                 </CheckBox>
+
+                <!-- 并行解压线程数 -->
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                  <TextBlock Text="{Binding LocalizedStrings[Extract_ParallelDegree]}"
+                             VerticalAlignment="Center" />
+                  <NumericUpDown Minimum="1" Maximum="16"
+                                 Value="{Binding ParallelExtractDegree}"
+                                 Width="80" />
+                  <TextBlock Text="(1=串行，默认=CPU核心数)"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                             FontSize="11" />
+                </StackPanel>
               </StackPanel>
             </Border>
           </StackPanel>

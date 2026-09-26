@@ -6,12 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-26** — **APNG 动画预览支持正式上线**
+  - **核心变更**：复用 `PreviewType.AnimatedImage` 统一管线（GIF + Animated WebP 已就绪），新增 `ApngDecoder`（`SixLabors.ImageSharp 3.1.5`）解决 SKCodec 原生 `FrameCount=0` 无法识别 APNG 动画的问题
+  - **关键修复**：`FrameDelay` Rational 类型的 `Numerator`/`Denominator` 为 `uint`，修复强制转 `long` 抛异常的 bug（先转 `uint` 再转 `long`）
+  - **集成点**：`ShowGif` 优先尝试 `ApngDecoder.DecodeFrames(filePath)`（按扩展名 `.apng`/`.png`），失败回退 `GifDecoder`；完整复用播放/暂停/逐帧/缩放/透明背景/信息面板帧数
+  - **魔数检测**：`FileFormatDetector.ScanForActlChunk()` 扫描 PNG 后的 `acTL` chunk (0x6163544C) 区分 APNG/静态 PNG
+  - **依赖新增**：`SixLabors.ImageSharp 3.1.5`（Core 无新依赖，仅 Avalonia UI 层）
+  - **验收**：TestPreview/apng.zip (5帧 APNG) 正常预览播放；Core/Avalonia 单测 509/509 通过；零回归
+  - **同步**：PLAN.md 已更新状态；.omo/plans/已完成/apng-preview-support.md 归档
+
 **2026-09-22** — 修正存量文档过时的技术事实（.NET 9→10、WPF 已删除、依赖表）
-  - **RELEASE_NOTES.md**：v0.5.0「版本介绍」补齐英文对照（标题/简介/四子节逐条中英成对），并将过时描述统一修正——`（.NET 9）`→`（.NET 10）`、`WPF 版进入维护模式`→`WPF 版已完全删除`（英文同步）；便携版说明 `dotnet9`/`.NET 9 runtime`→`.NET 10`
-  - **docs/PROGRESS.md**：WPF 遗留版节备注从「进入维护模式…仅当修复仅存在于 WPF 的 bug 时追加」改为「迁移完成后完全删除…仅供历史参考，不再追加新条目」
-  - **docs/progress-wpf.md**：头部追加指令同步改为「仅供历史参考，不再追加新条目」；历史条目本身如实保留
-  - **docs/README_en.md**：将已删除的 WPF 项目 `MantisZip.UI` 依赖表替换为 `MantisZip.UI.Avalonia` 当前 11 项依赖（Avalonia 12.0.4 / Markdig / ReverseMarkdown / PdfPig / Svg.Skia / SkiaSharp / HarfBuzzSharp 等）；社区段 "WPF/.NET"→".NET/Avalonia" 对齐中文版
-  - 原则：仅改「描述当前状态」的文档；带日期的历史记录（PROGRESS 带日期条目、progress-wpf 归档、progress-avalonia-detail 逐日日志）如实保留当时状态不改写
 
 **2026-09-21** — 修复 HTML 预览安全设置回归三连（09-13 html-preview-webview-fallback 上线引入）
   - **PreviewViewModel.cs**：CSP meta 拼接两处（`RebuildHtmlAsync` / `ShowHtmlPreview`）补充 `style-src` 指令——外部资源开时 `style-src 'unsafe-inline' * data: blob:`，外部资源关时 `style-src 'unsafe-inline' 'self' data: blob:`。此前仅 `default-src` 回退时内联样式（`<style>` / `style=""`）被 CSP 拦截，开满所有安全选项的 HTML 预览样式全部丢失
@@ -90,6 +94,55 @@
 **2026-09-17** — 文件列表列标题右键菜单空白修复
   - **MainWindow.axaml.cs**：`GetColumnHeaderText` 改取列头 StackPanel 中第一个 TextBlock（列标题文字）；原 `LastOrDefault` 误取到排序箭头 TextBlock（`NameHeaderArrow` 等，初始 `Text=""`），导致 `ColumnHeaderContextMenu_Opening` 对全部列判定为空跳过、菜单空白（排序箭头功能 ca67db5 在列选择菜单 d1c0537 之后引入，打破旧假设）
   - 回归：Build 0 错误（6 条预存 NU1903 依赖审计警告）
+
+**2026-09-16** — 压缩/解压性能优化（解压并行调度 + 7z 多线程压缩 UI）
+  - **7z 多线程压缩接线**：
+    - `Controls/DynamicFormatOptionsPanel.axaml(.cs)`：7z 面板新增「多线程压缩」复选框（`MultiThreadCheck`）+ `SevenZipMultithreaded` 只读属性 + `MultiThreadCheck_IsCheckedChanged`
+    - `ViewModels/CompressSettingsViewModel.cs`：新增 `SevenZipMultithreaded` 属性 + 从 AppSettings 加载初始值
+    - `Dialogs/CompressSettingsWindow.axaml.cs`：`SnapshotFormatOptionsToViewModel` 快照面板值
+    - `Services/CompressFlow.cs`：`BuildRequest` 映射到 `CompressRequest.SevenZipMultithreaded`
+    - `Views/MainWindow.axaml.cs`：对话框 VM → 执行 VM 拷贝
+    - `Views/SettingsWindow.axaml` + `ViewModels/SettingsWindowViewModel.cs`：设置窗口 7z 默认选项新增全局开关（`SevenZipMultithreaded` 字段/文本/加载/保存/OnPropertyChanged）
+    - `Models/AppSettings.cs`：`SevenZipMultithreaded`（默认 true）
+  - **解压并行调度**（`ParallelExtractDegree` 1-16，默认 CPU 核心数）：
+    - `Dialogs/ExtractSettingsWindow.axaml` 解压标签页 NumericUpDown + `ViewModels/ExtractSettingsViewModel.cs` 绑定
+    - `Services/ExtractFlow.cs` / `SelectedItemsExtractService.cs` 传递并行度到引擎
+  - **i18n**：新增 `FormatOptions_7z_MultiThread`（压缩对话框）+ `Settings_SevenZip_MultiThread`（设置窗口），zh-CN/en 成对同步（1168 keys 对齐）
+  - 验证：Core 380 + Avalonia 96 测试全绿，0 构建错误 0 警告
+
+**2026-09-16** — Avalonia 12.0.4 → 12.1.2 全栈升级
+  - **MantisZip.UI.Avalonia.csproj**：
+    - Avalonia 12.0.4 → 12.1.2
+    - Avalonia.Controls.DataGrid 12.0.0 → 12.1.2
+    - Avalonia.Controls.WebView 12.0.1 → 12.1.0
+    - Avalonia.Desktop 12.0.4 → 12.1.2
+    - Avalonia.Themes.Fluent 12.0.4 → 12.1.2
+  - 验证：96 Avalonia + 373 Core 测试全绿，0 构建错误
+  - 新增 CS0618：`Bitmap.Save(Stream, int?)` → `BitmapEncoderOptions` 重载（PreviewViewModel.cs 2 处）
+
+**2026-09-16** — NuGet 核心依赖全面升级
+  - **MantisZip.UI.Avalonia.csproj**：
+    - Markdig 0.40.0 → 1.3.2（大版本升级，API 全向兼容，无需代码改动）
+    - SkiaSharp 3.119.4 → 4.152.0（大版本升级，24 项 CS0618 deprecation warning 为非阻塞技术债：`SKPath.MoveTo/LineTo/Close` → `SKPathBuilder`、`SKCanvas.DrawBitmap` → 新 `SKSamplingOptions` 重载）
+    - Svg.Skia 2.0.0.5 → 5.2.1（大版本升级，依赖 SkiaSharp ≥4.148.0，SVG 渲染 API 无破坏性变更）
+    - HarfBuzzSharp 14.2.0 → 14.2.1.3（次版本升级，与 SkiaSharp 无交叉依赖）
+  - **MantisZip.Core.csproj**：
+    - SharpCompress 0.48.1 → 0.50.4（次版本升级，ZipArchive.OpenArchive/TarReader/TarWriter/IEntry 属性全部兼容，无代码改动）
+  - 验证：96 Avalonia + 373 Core 测试全绿，0 构建错误
+  - 技术债：IconProvider.cs（18 项 SKPath）、IcoParser.cs（1 项 DrawBitmap）、PreviewViewModel.cs（1 项 DrawBitmap）的 deprecation warning 待后续清理
+
+**2026-09-16** — 计划文档维护：清理过时 WPF 引用，核实当前状态
+  - `selfcontained-size-optimization.md`：重写，移除所有 WPF 引用，.NET 9 → .NET 10，项目路径改为 MantisZip.UI.Avalonia，移除 WPF→Avalonia 迁移前置条件
+  - `cross-platform-port.md`：移除 `nuget-dependency-upgrade` 前置依赖，更新已完成表格（WPF 版本已删除）
+  - `cli-extract-open-folder.md`：补充当前核实结论（CLI 路径仍无打开文件夹逻辑）
+  - `compression-performance-optimization.md`：补充当前状态（缓冲区仍为 256KB）
+
+**2026-09-15** — Office 图片预览计划新增：三方案渐进式设计
+  - `.omo/plans/已完成/office-content-preview-avalonia.md`：新增「Office 图片预览」章节（现状分析 + 方案 A/B/C + 推荐实施顺序）
+    - 方案 A（PPTX 图片，~50 行）：复用 Canvas 坐标系统，`p:pic` → `a:xfrm` 定位 + `r:embed` 图片提取
+    - 方案 B（+DOCX 行内图片，~150 行）：`w:drawing/wp:inline` 检测 + `word/media/` 提取
+    - 方案 C（浮动定位，不推荐）：DOCX `w:anchor` / XLSX `xdr:twoCellAnchor`，需重构布局系统
+  - `docs/PLAN.md`：待实现表格新增 P2 条目「Office 图片预览」
 
 **2026-09-15** — 压缩预估计划文档更新：SharpCompress per-entry 级别分析与选项联动矩阵
   - `.omo/plans/未开始/compression-estimator.md`：引擎分析重写（SharpCompress 0.49.0+ per-entry 支持）、ZIP 库生态表更新、`CompressService` 路径移除、限制章节（压缩模式/加密/文件大小）、选项联动矩阵（5 种组合）、UI 提示建议、`canPerEntry` + `ComputeMajorityLevel` 实现伪代码、DoD 更新
@@ -1426,6 +1479,23 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.0 (2026-09-16) 压缩/解压性能优化 — 并行解压（批次复用）+ 7z 多线程压缩
+  - **`Core/Engines/ZipEngine.cs`**：
+    - `CopyBufferSize` 256KB → 4MB（`4194304`）
+    - 新增 `ExtractAsyncParallel`：Round-Robin 分批（`i % N`，大文件降序后自动分散到不同批次）→ `Parallel.ForEachAsync` 每批次**复用 1 个 archive 实例**处理整批（减少 80-90% OpenArchive 开销）
+    - 进度报告先在锁内拷贝共享变量（`processedFiles`/`processedBytes`），**释放锁后**再 `progress?.Report()` —— 修复锁内上报导致的 8 线程争用（100×1MB 解压 0.3s → 8.5s，25x 回退）
+    - `ExtractAsync` 按文件数 + `ParallelExtractDegree` 自动选择串行（`ExtractAsyncSequential`）/并行
+  - **`Core/Engines/TarGzEngine.cs`**、**`Core/Utils/ZipBinaryRewriter.cs`**：`CopyBufferSize` 256KB → 4MB
+  - **`Core/Abstractions/ArchiveEngine.cs`**：`IArchiveEngine.SupportsParallelExtract`（仅 ZipEngine 返回 true）+ `ArchiveOptions.ParallelExtractDegree`（1=串行，0=默认 CPU 核心数）
+  - **`Core/Engines/SevenZipEngine.cs`**：`ConfigureCompressor` 新增 `compr.CustomParameters["mt"] = options.SevenZipMultithreaded ? "on" : "off"`（7z.dll 原生多线程，`SharpSevenZipCompressor` 无 `mt` 属性只能走 CustomParameters）
+  - **`Core/Abstractions/ArchiveEngine.cs`**：`ArchiveOptions.SevenZipMultithreaded`（默认 true）
+  - **`Core/Services/CompressService.cs`**：`CompressRequest.SevenZipMultithreaded`（init 属性）+ `BuildOptions` 映射到 `ArchiveOptions`
+  - **测试**：
+    - `ParallelExtractTests`（5 用例：并行正确性/线程安全/度=1 退化串行/取消/单文件走串行）+ `Benchmark_ParallelVsSequential_Speedup`（Skip，环境依赖）
+    - `SevenZipEngineTests.CompressAsync_MultiThreaded_CreatesValidArchive`：mt=on 压缩 → 解压**逐字节比对** → `TestArchiveAsync` 完整性校验（+`CompressAsync_SingleThreaded_CreatesValidArchive` 基线 + `Benchmark_CompressMTVsST`）
+  - **实测**（100 × 1MB 随机数据，8 核）：7z 单线程 38745ms → 多线程 8370ms（**4.63x**）；ZIP 解压 100×1MB 小文件 1.04x（小文件开销占主导，大文件/NVMe 收益明显）
+  - 验证：Core 380 通过 / 2 跳过，Avalonia 96 通过 / 2 跳过，0 构建错误
 
 #### v0.5.0 (2026-09-22) 修复 GitHub Release 发版失败（release.yml 重复 Portable-Web 打包步骤）
   - **背景**：推 tag 触发 release 时在 "Package portable web zip (framework-dependent)" 步骤失败——`Compress-Archive ... MantisZip-{VERSION}-Portable-Web.zip already exists`，发版中断。根因是历史遗留双步骤产出同名文件：7-19（#29）新增独立 Compress-Archive 步骤产出 `Portable-Web.zip`（当时与自包含 zip 互不冲突）；8-07 "Package portable zips" 重构为 `New-PortableZip` 函数同时产出双变体（当时名 `Portable-FrameworkDependent.zip`）；8-07 `b0c6759` 将该名改为 `Portable-Web.zip` 后与新步骤撞名，此后每次发版必挂

@@ -143,9 +143,8 @@ public partial class PreviewViewModel : ObservableObject
         var prevKey = _currentEncodingKey;
         EncodingOptions = BuildEncodingOptions();
         OnPropertyChanged(nameof(EncodingOptions));
-        // 恢复之前选中的编码（直接赋值字段，避免触发 OnSelectedEncodingChanged 的持久化/解码副作用）
-        _selectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == (prevKey ?? "auto"));
-        OnPropertyChanged(nameof(SelectedEncoding));
+        // 恢复之前选中的编码（直接赋值属性，避免触发 OnSelectedEncodingChanged 的持久化/解码副作用）
+        SelectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == (prevKey ?? "auto"));
     }
 
     private void CleanupHtmlTempFile()
@@ -738,7 +737,7 @@ public partial class PreviewViewModel : ObservableObject
 
     public bool CanLigatureToggle => _fontSupportsLigature;
 
-    private List<GifFrameData>? _gifFrames;
+    private List<AnimationFrameData>? _gifFrames;
     private int _gifCurrentFrameIndex;
     private DispatcherTimer? _gifTimer;
 
@@ -1174,13 +1173,27 @@ var secureHtml = InjectCspMeta(html, csp);
 
     // ── Image ──
 
-    /// <summary>
     /// 显示图片预览。
     /// </summary>
     public void ShowImage(string filePath)
     {
         App.DebugLog($"[IMG] ShowImage: {filePath}");
         App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageHeight}" : "null")}");
+
+        // AVIF 使用 ImageSharp 解码（SkiaSharp 对 AVIF 解码支持有限）
+        var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        if (ext.Equals(".avif", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowAvifImage(filePath);
+            return;
+        }
+
+        // TGA 使用 ImageSharp 解码（SkiaSharp 对 TGA 解码支持有限，特别是 RLE 压缩）
+        if (ext.Equals(".tga", StringComparison.OrdinalIgnoreCase))
+        {
+            ShowTgaImage(filePath);
+            return;
+        }
 
         // 解码尺寸策略：DecodeToWidth 会无条件把位图缩放到目标宽度（小图也会被放大），
         // 因此先经 SKCodec 读头部拿真实宽度，仅当宽 > 1920 时才降采样；小图原生解码保持清晰度，
@@ -1227,14 +1240,13 @@ var secureHtml = InjectCspMeta(html, csp);
 
         ImageWidth = bitmap.PixelSize.Width;
         ImageHeight = bitmap.PixelSize.Height;
-        var ext = Path.GetExtension(filePath).ToLowerInvariant();
         IsPreviewVisible = true;
         IsToolbarVisible = true;
         PreviewHeaderText = LocalizationManager.T("Preview_Header_Image");
         // 初始缩放：适应视口
         ZoomFit();
 
-        var formatValues = new Dictionary<string, string?>
+var formatValues = new Dictionary<string, string?>
         {
             [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
             [MetadataKeys.ImageDpi] = $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}",
@@ -1243,7 +1255,99 @@ var secureHtml = InjectCspMeta(html, csp);
         App.DebugLog($"[IMG] ShowImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
     }
 
-    // ── ICO Gallery ──
+    /// <summary>
+    /// 显示 AVIF 图片预览（当前库不支持 AVIF 解码，提示用户提取后外部查看）。
+    /// </summary>
+    private void ShowAvifImage(string filePath)
+    {
+        App.DebugLog($"[AVIF] ShowAvifImage: {filePath}");
+
+        // 当前库限制：ImageSharp 4.1.2 / SkiaSharp 4.152.0 均不支持 AVIF 解码
+        // 显示友好提示，建议用户解压后使用外部查看器
+        var msg = LocalizationManager.T("Preview_Avif_Unsupported_Decode");
+        ShowUnsupported(msg);
+    }
+
+    /// <summary>
+    /// 显示 TGA 图片预览（使用 ImageSharp 解码，SkiaSharp 对 TGA 解码支持有限，特别是 RLE 压缩）。
+    /// </summary>
+    private void ShowTgaImage(string filePath)
+    {
+        App.DebugLog($"[TGA] ShowTgaImage: {filePath}");
+
+        try
+        {
+            using var image = SixLabors.ImageSharp.Image.Load<SixLabors.ImageSharp.PixelFormats.Rgba32>(filePath);
+            App.DebugLog($"[TGA] ImageSharp loaded: {image.Width}x{image.Height}");
+
+            // Convert ImageSharp image to Avalonia Bitmap via SkiaSharp
+            // ImageSharp Rgba32 stores as R,G,B,A but SkiaSharp BGRA8888 expects B,G,R,A
+            // Need to swap R and B channels
+            var pixelArray = new byte[image.Width * image.Height * 4];
+            image.CopyPixelDataTo(pixelArray);
+            App.DebugLog($"[TGA] Pixel array copied: {pixelArray.Length} bytes");
+
+            // Swap R and B channels (ImageSharp RGBA -> SkiaSharp BGRA)
+            for (int i = 0; i < pixelArray.Length; i += 4)
+            {
+                byte r = pixelArray[i];
+                pixelArray[i] = pixelArray[i + 2]; // B -> R position
+                pixelArray[i + 2] = r; // R -> B position
+            }
+            App.DebugLog($"[TGA] Channels swapped (R<->B)");
+
+            using var skBitmap = new SkiaSharp.SKBitmap(image.Width, image.Height, SkiaSharp.SKColorType.Bgra8888, SkiaSharp.SKAlphaType.Premul);
+            var ptr = skBitmap.GetPixels();
+            System.Runtime.InteropServices.Marshal.Copy(pixelArray, 0, ptr, pixelArray.Length);
+            App.DebugLog($"[TGA] SkiaSharp bitmap created: {skBitmap.Width}x{skBitmap.Height}, rowBytes={skBitmap.RowBytes}");
+
+            using var skImage = SkiaSharp.SKImage.FromBitmap(skBitmap);
+            if (skImage == null)
+            {
+                throw new Exception("SKImage.FromBitmap returned null");
+            }
+            App.DebugLog($"[TGA] SKImage created");
+
+            using var skData = skImage.Encode(SkiaSharp.SKEncodedImageFormat.Png, 100);
+            if (skData == null)
+            {
+                throw new Exception("SKImage.Encode returned null");
+            }
+            App.DebugLog($"[TGA] PNG encoded: {skData.Size} bytes");
+
+            using var ms = new MemoryStream(skData.ToArray());
+            var bitmap = new global::Avalonia.Media.Imaging.Bitmap(ms);
+
+            App.DebugLog($"[TGA] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
+
+            PreviewType = PreviewType.Image;
+            PreviewImage = bitmap;
+            _originalPreviewImage = bitmap;
+
+            _skOriginalPreview?.Dispose();
+            _skOriginalPreview = BitmapToSkia(bitmap);
+
+            ImageWidth = bitmap.PixelSize.Width;
+            ImageHeight = bitmap.PixelSize.Height;
+            PreviewHeaderText = LocalizationManager.T("Preview_Header_Tga");
+
+            var formatValues = new Dictionary<string, string?>
+            {
+                [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
+                [MetadataKeys.ImageDpi] = $"{bitmap.Dpi.X:F0} × {bitmap.Dpi.Y:F0}",
+            };
+            MetadataHelper.RenderFormatToViewModel(this, formatValues, "image");
+
+            ZoomFit();
+            App.DebugLog($"[TGA] ShowTgaImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[TGA] ShowTgaImage error: {ex.Message}");
+            App.DebugLog($"[TGA] Stack: {ex.StackTrace}");
+            ShowUnsupported(LocalizationManager.T("Preview_ImageLoadFailed", ex.Message));
+        }
+    }
 
     public void ShowIcoGallery(string filePath)
     {
@@ -1308,10 +1412,10 @@ var secureHtml = InjectCspMeta(html, csp);
         // Copy bitmap and set alpha to 255 for all pixels,
         // revealing the original RGB colors beneath transparency.
         using var dstSk = new SkiaSharp.SKBitmap(srcSk.Width, srcSk.Height);
-        using (var canvas = new SkiaSharp.SKCanvas(dstSk))
-        {
-            canvas.DrawBitmap(srcSk, 0, 0);
-        }
+using (var canvas = new SkiaSharp.SKCanvas(dstSk))
+            {
+                canvas.DrawBitmap(srcSk, 0, 0, new SkiaSharp.SKSamplingOptions());
+            }
         for (int y = 0; y < dstSk.Height; y++)
         {
             for (int x = 0; x < dstSk.Width; x++)
@@ -1370,7 +1474,7 @@ var secureHtml = InjectCspMeta(html, csp);
     // ── GIF ──
 
     /// <summary>
-    /// 显示 GIF 预览。
+    /// 显示 GIF/APNG 动画预览。
     /// </summary>
     public void ShowGif(string filePath)
     {
@@ -1379,7 +1483,31 @@ var secureHtml = InjectCspMeta(html, csp);
 
         try
         {
-            var frames = GifDecoder.DecodeFrames(filePath);
+            List<AnimationFrameData>? frames = null;
+            var ext = Path.GetExtension(filePath).ToLowerInvariant();
+            var isApng = ext.Equals(".apng", StringComparison.OrdinalIgnoreCase) || ext.Equals(".png", StringComparison.OrdinalIgnoreCase);
+            
+            // 尝试 APNG 解码器（用于 .apng 或可能被重命名为 .png 的 APNG 文件）
+            if (isApng)
+            {
+                frames = ApngDecoder.DecodeFrames(filePath);
+            }
+            
+            // 回退到 GIF 解码器
+            if (frames == null || frames.Count == 0)
+            {
+                var gifFrames = GifDecoder.DecodeFrames(filePath);
+                if (gifFrames != null && gifFrames.Count > 0)
+                {
+                    // 转换为通用 AnimationFrameData
+                    frames = new List<AnimationFrameData>(gifFrames.Count);
+                    foreach (var gf in gifFrames)
+                    {
+                        frames.Add(new AnimationFrameData { Bitmap = gf.Bitmap, DelayMs = gf.DelayMs });
+                    }
+                }
+            }
+
             if (frames == null || frames.Count == 0)
             {
                 ShowUnsupported(LocalizationManager.T("Preview_GifDecodeFailed"));
@@ -1416,8 +1544,8 @@ var secureHtml = InjectCspMeta(html, csp);
             PreviewType = PreviewType.AnimatedImage;
             IsPreviewVisible = true;
             IsToolbarVisible = true;
-            var isGif = Path.GetExtension(filePath).Equals(".gif", StringComparison.OrdinalIgnoreCase);
-            PreviewHeaderText = LocalizationManager.T(isGif ? "Preview_Header_Gif" : "Preview_Header_AnimatedImage");
+            var isGif = ext.Equals(".gif", StringComparison.OrdinalIgnoreCase);
+            PreviewHeaderText = LocalizationManager.T(isGif ? "Preview_Header_Gif" : (isApng ? "Preview_Header_Apng" : "Preview_Header_AnimatedImage"));
             var gifFormatValues = new Dictionary<string, string?>
             {
                 [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",

@@ -27,6 +27,10 @@
 
 #### 2026-09
 
+- **09-26** — **APNG 动画预览支持**：复用 `PreviewType.AnimatedImage` 管线 + ImageSharp 解码器（`SixLabors.ImageSharp 3.1.5`），修复 `FrameDelay` Rational 类型转换（`uint`→`long`）；SKCodec 原生 `FrameCount=0` 无法识别 APNG 动画，ImageSharp 兜底解码 5 帧 APNG 正常播放；集成 `ShowGif` 统一管线（播放/暂停/逐帧/缩放/透明背景/信息面板帧数），Core/Avalonia 单测 509/509 通过
+- **09-16** — 压缩/解压性能优化（ZIP 解压并行 + 7z 多线程压缩）：① **ZIP 并行解压**自研多实例实现（SharpCompress 单实例线程不安全）——Round-Robin 分批 + **每批次复用 1 个 archive 实例**（减少 80-90% OpenArchive 开销）+ 进度报告锁竞争修复（曾因锁内 `progress.Report()` 导致 8 线程争用、100×1MB 解压从 0.3s 劣化到 8.5s 的 25x 回退）；② 缓冲区 256KB→4MB（ZipEngine/TarGzEngine/ZipBinaryRewriter）；③ `ParallelExtractDegree` 设置项（1-16，默认 CPU 核心数，1=串行回退）；④ **7z 多线程压缩 `mt=on` 实测 4.63x**（100×1MB/8核：38.7s→8.4s），压缩对话框 7z 面板 + 设置窗口全局默认值双开关；Core 380 + Avalonia 96 测试全绿
+- **09-16** — NuGet 核心依赖全面升级：Markdig 0.40.0→1.3.2、SharpCompress 0.48.1→0.50.4、SkiaSharp 3.119.4→4.152.0、Svg.Skia 2.0.0.5→5.2.1、HarfBuzzSharp 14.2.0→14.2.1.3；96 Avalonia + 373 Core 测试全绿，0 构建错误（24 项 CS0618 SkiaSharp 4.x deprecation warning 为非阻塞技术债）
+- **09-16** — Avalonia 12.0.4→12.1.2 全栈升级（Avalonia/Avalonia.Controls.DataGrid/Avalonia.Controls.WebView/Avalonia.Desktop/Avalonia.Themes.Fluent）；96 Avalonia + 373 Core 测试全绿，0 构建错误（新增 2 项 CS0618）
 - **09-21** — 修复 HTML 预览安全设置回归三连：CSP 拼接缺少 `style-src` 指令导致内联样式被兜底 `default-src` 拦截（样式/脚本选项最严时预览样式全部丢失）+ CSP meta 注入在 `<!DOCTYPE>` 之前触发浏览器 Quirks Mode（布局行为异常）+ WebView 页面顶部一小条被预览滚动区裁切（WebView 移出 ScrollViewer 与预览滚动区平级）
 - **09-21** — 文本预览语法高亮计划重写为 Avalonia 方案：废弃 WPF 版 AvalonEdit+XSHD 方案（AvalonEdit WPF-only），改用 **AvaloniaEdit 12.0.0 + TextMate**（`AvaloniaEdit.TextMate`，VS Code 语法全集覆盖 `TextExtensions` 40+ 扩展名、内置 DarkPlus/LightPlus 主题 `SetTheme` 一键切换）；架构确认 PreviewType（查看器）与 Language（高亮）分离 + 扩展名→魔数→JSON/INI 结构特征三级语言识别优先级链（配合当日落地的文本内容检测）；条目从 PLAN.md 已废弃表移回正式 P2 区
 - **09-21** — CSV 预览接入编码选择器 + 修复魔数路径 CSV 被误判为纯文本：CSV 预览与 Text/Markdown/HTML 统一走 `DecodePreviewBytes()` 字节级解码管线（`RebuildCsv` 编码切换即时重建 DataGrid）；`MapFileFormatToPreviewType` 将 `FileFormat.Csv` 从 Text 组独立映射到 `PreviewType.Csv`（此前扩展名兜底已识别 Csv 却在最后映射被压回 Text，CSV 永远显示为纯文本）
@@ -105,6 +109,7 @@
 
 #### v0.5.0
 
+- **09-16** — 并行解压 + 7z 多线程压缩基础设施（Core）：`IArchiveEngine.SupportsParallelExtract` 属性 + `ArchiveOptions.ParallelExtractDegree`；`ZipEngine.ExtractAsyncParallel` 多实例并行（Round-Robin 分批、每批次复用 1 个 archive 实例、进度报告锁外上报）；`CopyBufferSize` 256KB→4MB（ZipEngine/TarGzEngine/ZipBinaryRewriter）；`ArchiveOptions.SevenZipMultithreaded`（默认 true）+ `SevenZipEngine.ConfigureCompressor` 写入 `CustomParameters["mt"]` + `CompressRequest`/`CompressService.BuildOptions` 映射；新增 `ParallelExtractTests`（5 用例）+ `SevenZipEngineTests` mt=on 验证（2 用例）
 - **09-22** — 修复 GitHub Release 发版失败（构建）：release.yml 存在重复的 Portable-Web 打包步骤——`Compress-Archive` 步骤产出 `MantisZip-*-Portable-Web.zip`，而 `New-PortableZip` 同时段也产出同名文件（8-07 改名后撞名），Compress-Archive 遇已存在文件报 already exists 导致发版中断；删除旧 Compress-Archive 步骤，Web 便携包统一由 New-PortableZip（7z 打包 + 排除 PDB + 预置默认设置）产出
 - **09-21** — 文本格式内容识别扩展（Core）：`DetectTextSubtype` 新增 JSON/INI 内容启发式 —— INI 用 `[Section]` 段头 + key=value 结构校验，JSON 用首字符 `{`/`[` + 括号配平（容忍 head 截断）+ 引号键/数组元素判定，误报率≈0；为扩展名缺失格式提供内容兜底信号（为未来语法高亮 Language 识别铺路）
 - **09-12** — 修复损坏压缩包打开静默无报错（Core）：ZipEngine 打开改用严格 ZipArchive.OpenArchive（全零/垃圾 .zip 此前被 ArchiveFactory 魔数嗅探误判为 Tar、0 条目静默打开，现抛 ArchiveException）+ TarGzEngine.ListEntriesAsync 移除静默 catch（损坏 .tar 抛错不再静默空列表）+ 新增 3 个回归测试
@@ -159,6 +164,7 @@
 | 密码错误 vs 文件损坏精准分类（`PasswordVerificationResult` 四态 + `PasswordVerifyInfo` + `TryMatchPasswordEx` 按 HRESULT/异常类型分类，损坏文件不再误报"密码错误"，密码库匹配遇损坏立即停止） | [password-error-classification.md](.omo/plans/已完成/password-error-classification.md) | v0.5.0 |
 | 压缩预览渐进式加载（浅层先行→全量逐源重建装配 + `SourceSubtree` 按源缓存 + `FilterSignature` 失效 + `ResultTreeView` 滚动位置保持 + 占位节点属性 + `BuildDirectoryNode` 深度边界重构 + 9 单测） | [compress-preview-progressive-loading.md](.omo/plans/已完成/compress-preview-progressive-loading.md) | v0.5.0 |
 | 图片预览能力系统（`PreviewCapabilities` 能力注册表 [Flags]：Zoom/Transparency/FlattenAlpha/AnimationControls 取代 `HasXxxControls` 硬编码 + `PreviewType.Gif`→`AnimatedImage`（GIF/WebP 动画共用）+ GIF 透明棋盘格 + Animated WebP 分流（SKCodec `FrameCount>1`）） | [image-preview-capabilities.md](.omo/plans/已完成/image-preview-capabilities.md) | v0.5.0 |
+| Office 文档内容预览增强（DOCX 大纲+全文+表格+Markdown 表格、XLSX DataGrid、PPTX Canvas 定位+分页；WebView 双轨基建于 2026-09-13 完成） | [office-content-preview-avalonia.md](.omo/plans/已完成/office-content-preview-avalonia.md) | v0.5.0 |
 | 文本预览编码选择器（Text/Markdown/HTML 预览统一接入字节级编码检测管线，用户手动切换编码即时重渲染；预览工具栏新增编码选择 ComboBox + 自动检测编码显示 + 本地化；激活 `TextEncodingPreference` 持久化；Core `TextEncodingDetector` 新增 `DetectEncoding`/`DetectAndDecodeText`/`DecodeText(byte[], string?)` 字节级 API） | [text-preview-encoding-selector.md](.omo/plans/已完成/text-preview-encoding-selector.md) | v0.5.0 |
 | 拖拽/右键解压流程统一（`SelectedItemsExtractService` 统一解压动作、`TarGzEngine` 按条目提取、冲突统一走设置 6 策略 + 统一 Ask 弹窗、拖拽路径语义与右键一致、`MapConflictActionString` 连字符映射漏洞修复） | [drag-extract-unify.md](.omo/plans/已完成/drag-extract-unify.md) | v0.4.5 |
 | 目录行聚合显示（`DirStats`+`ComputeDirectoryStats` 增加 `NewestModified`；Avalonia `ArchiveItemModel` 显示属性改派生计算属性 + `CompressedSizeAvailable`；`PopulateEntries` 基于过滤后 `filteredSource` 应用聚合） | [directory-size-date-aggregate.md](.omo/plans/已完成/directory-size-date-aggregate.md) | v0.4.5 |

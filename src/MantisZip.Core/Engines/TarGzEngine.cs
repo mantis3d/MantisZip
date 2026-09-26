@@ -19,7 +19,7 @@ namespace MantisZip.Core.Engines;
 /// </summary>
 public class TarGzEngine : IArchiveEngine
 {
-    private const int CopyBufferSize = 262144;
+    private const int CopyBufferSize = 4194304;
     public bool CanHandle(ArchiveFormat format) => format == ArchiveFormat.Tar || format == ArchiveFormat.GZip;
 
     public async Task<ExtractResult> ExtractAsync(string archivePath, string destinationPath, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)

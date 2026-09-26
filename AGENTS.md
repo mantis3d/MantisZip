@@ -69,6 +69,62 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 - `SevenZipEngine.ExtractAsync` and `TarGzEngine.ExtractAsync` report progress only at completion (100%)
 - `SevenZipEngine.CompressAsync` reports progress via `SharpSevenZipCompressor.Compressing` event
 
+### 并行解压架构
+
+ZIP 解压支持并行模式（`ZipEngine.SupportsParallelExtract = true`），通过**多实例并行 + 批次复用**实现线程安全与低开销：
+
+**核心原理**：SharpCompress 的 `IArchive` 内部维护共享解压状态（字典、滑动窗口），并发访问会导致 `ZlibException`。解决方案是**每个批次独占一个 archive 实例**，无共享状态。
+
+```csharp
+// ✅ 安全：每批次独立打开一次 archive，处理整批文件（Round-Robin 分配）
+await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelism = N }, async (batch, ct) => {
+    using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
+    foreach (var key in batch) {
+        var entry = archive.Entries.First(e => e.Key == key);
+        // ... 解压逻辑
+    }
+});
+```
+
+**实现细节** (`Core/Engines/ZipEngine.cs`)：
+- `SupportsParallelExtract` 属性返回 `true`（仅 ZipEngine）
+- `ExtractAsync` 根据文件数和 `ArchiveOptions.ParallelExtractDegree` 自动选择串行/并行
+- 并行实现 (`ExtractAsyncParallel`)：
+  1. 单线程获取所有条目键和大小（预读 archive 一次）
+  2. 单线程创建所有目标目录（避免竞态）
+  3. 按文件大小**降序排列**（大文件优先，避免长尾效应）
+  4. **Round-Robin 分批**（`i % N`）：大文件自动分散到不同批次，天然负载均衡
+  5. `Parallel.ForEachAsync` 并行处理各批次，**每批次仅打开 1 次 archive**（减少 80-90% OpenArchive 开销）
+  6. 冲突处理用 `lock` 同步；进度报告先在锁内拷贝共享变量、**释放锁后**再 `Report`（避免 8 线程锁竞争）
+  7. 4MB 缓冲区 (`CopyBufferSize = 4MB`) 配合 `Stream.CopyToAsync`
+
+> ⚠️ 进度报告锁竞争是性能陷阱：曾在锁内直接调用 `progress?.Report()`，8 线程争用导致 100×1MB 解压从 0.3s 劣化到 8.5s（25x 回退）。
+
+**配置** (`AppSettings.ParallelExtractDegree`)：
+- 默认 `Environment.ProcessorCount`（可在设置窗口 1-16 调整）
+- `1` = 串行回退
+
+**限制**：
+- 仅 `ZipEngine` 支持（`SupportsParallelExtract = true`）
+- `SevenZipEngine`/`TarGzEngine` 返回 `false`（7z 依赖 SharpSevenZip 原生多线程，TAR 是顺序流）
+- `ExtractEntriesAsync`（过滤解压）暂不并行，仅全量 `ExtractAsync` 支持
+
+**性能**：
+- 缓冲区 256KB → 4MB：+70% 吞吐
+- 多实例并行：理想环境 6x+ 加速（8核 NVMe）
+- 组合优化：~10x 理论峰值
+
+### 7z 多线程压缩（mt=on）
+
+`SevenZipEngine` 通过 `CustomParameters["mt"]` 启用 7z.dll 原生多线程压缩：
+
+- **配置**：`ArchiveOptions.SevenZipMultithreaded`（默认 `true`）→ `ConfigureCompressor` 写入 `mt=on/off`
+- **UI 入口**：压缩对话框 7z 面板复选框（`DynamicFormatOptionsPanel`）+ 设置窗口全局默认值（`SettingsWindowViewModel`）
+- **传递链**：`DynamicFormatOptionsPanel` → `CompressSettingsWindow.SnapshotFormatOptionsToViewModel` → `CompressSettingsViewModel` → `CompressFlow.BuildRequest` → `CompressRequest.SevenZipMultithreaded` → `CompressService.BuildOptions` → `ArchiveOptions.SevenZipMultithreaded`
+- **实测性能**（100 × 1MB 随机数据，8 核）：单线程 38.7s → 多线程 8.4s，**4.63x 加速**（压缩率可能略有下降）
+- **验证**：`SevenZipEngineTests.CompressAsync_MultiThreaded_CreatesValidArchive`（解压逐字节比对 + `TestArchiveAsync` 完整性校验）
+- **仅 7z 有效**：ZIP/TAR/GZ 无此参数；`SharpSevenZipCompressor` 无 `mt` 属性，只能走 `CustomParameters`
+
 ### ArchiveItem duality
 
 - **Core**: `MantisZip.Core.Abstractions.ArchiveItem` — engines produce these
@@ -152,7 +208,7 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 `AppSettings` singleton 存在于 `MantisZip.UI.Avalonia/Models/AppSettings.cs`，序列化到 `%LOCALAPPDATA%\MantisZip\settings.json`。
 
 设置包含以下分类：
-- **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipEncryptHeaders
+- **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipMultithreaded, SevenZipEncryptHeaders
 - **分卷**: SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB
 - **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
 - **解压扩展**: EnableDragExtract, ExtractPreserveFullPath
@@ -420,6 +476,7 @@ Build artifacts (bin/, obj/) are gitignored.
 
 ### 规则 1：Plan 变更同步
 
+新增计划文本需要放在 `.omo/plans/未开始` 内，格式与同目录计划相同
 每当新增或修改 `.omo/plans/` 内的计划文件时，**必须同步更新** `docs/PLAN.md`：
 - 新增计划 → 在 PLAN.md 对应优先级区域（P2/P3/待实现）添加一行 `| 任务 | 说明 |` 引用新计划，保持与已存在行格式一致
 - 修改计划 → 更新 PLAN.md 中对应任务的说明、优先级或状态

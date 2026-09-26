@@ -16,6 +16,8 @@
 此阶段发生在 `Program.Main` → `OnFrameworkInitializationCompleted` 之间，Avalonia 尚未就绪，
 任何 Avalonia 窗口（含 A/B/C 的反馈）都无法显示。本计划用**原生 Win32 窗口**覆盖这段空窗期。
 
+> **注意**：若 `progress-window-enhancement` 先行实施，ProgressWindow 布局变更（三种模式切换）可能影响窗口尺寸和打开时序，splash 关闭时机需回归验证。
+
 ## 目标
 
 - 进程启动后 **0.5s 内**在屏幕上出现「正在打开…」提示窗口
