@@ -1,3 +1,4 @@
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
 using Xunit;
 
@@ -28,10 +29,12 @@ public class ExtractSettingsViewModelTests
     }
 
     [Fact]
-    public void OpenFolderAfterExtract_DefaultsToFalse()
+    public void Constructor_MirrorsAppSettings_OpenFolderAfterExtract()
     {
+        // 构造函数从 AppSettings 读取 OpenFolderAfterExtract（对齐 WPF LoadDefaultsFromSettings）。
+        // 镜像断言：不改写真实 settings.json，与 CompressSettingsViewModelTests 同模式。
         var vm = new ExtractSettingsViewModel(new[] { "test.zip" });
-        Assert.False(vm.OpenFolderAfterExtract);
+        Assert.Equal(AppSettings.Load().OpenFolderAfterExtract, vm.OpenFolderAfterExtract);
     }
 
     [Fact]

@@ -1,6 +1,8 @@
 using System.IO;
+using System.Linq;
 using MantisZip.Core.Abstractions;
 using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
 using Xunit;
 
@@ -27,9 +29,23 @@ public class CompressSettingsViewModelTests
     [Fact]
     public void DefaultValues_AreSensible()
     {
+        // 默认值应与 AppSettings.Load() 的合法值一致（含回退逻辑）
+        var s = AppSettings.Load();
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        Assert.Equal("zip", vm.DefaultFormat);
-        Assert.Equal(5, vm.CompressionLevel);
+
+        // DefaultFormat: 仅当 FormatOptions 包含该值时生效，否则回退 "zip"
+        var expectedFormat = CompressionOptionData.ArchiveFormatValues.Contains(s.DefaultFormat)
+            ? s.DefaultFormat
+            : "zip";
+        Assert.Equal(expectedFormat, vm.DefaultFormat);
+
+        // CompressionLevel: 仅当 LevelOptions 包含该 Tag 时生效，否则回退 5
+        var validLevelTags = CompressionOptionData.LevelOptions.Select(o => o.Tag).ToHashSet();
+        var expectedLevel = validLevelTags.Contains(s.DefaultLevel.ToString())
+            ? s.DefaultLevel
+            : 5;
+        Assert.Equal(expectedLevel, vm.CompressionLevel);
+
         Assert.Null(vm.OutputPath);
         Assert.Null(vm.Password);
         Assert.False(vm.Encrypt);
@@ -53,6 +69,26 @@ public class CompressSettingsViewModelTests
         Assert.Equal(s.SevenZipMatchFinder ?? "", vm.SevenZipMatchFinder);
         Assert.Equal(s.ZipEncryptionMethod ?? "aes256", vm.ZipEncryptionMethod);
         Assert.Equal(s.SevenZipEncryptHeaders, vm.SevenZipEncryptHeaders);
+    }
+
+    [Fact]
+    public void Constructor_MirrorsAppSettings_DefaultFormatAndLevel()
+    {
+        // DefaultFormat 与 DefaultLevel 在构造函数中从 AppSettings 读取，
+        // 并按合法选项域做守卫回退（对齐 WPF LoadDefaultsFromSettings 行为）
+        var s = AppSettings.Load();
+        var vm = new CompressSettingsViewModel(Array.Empty<string>());
+
+        var expectedFormat = CompressionOptionData.ArchiveFormatValues.Contains(s.DefaultFormat)
+            ? s.DefaultFormat
+            : "zip";
+        var validLevelTags = CompressionOptionData.LevelOptions.Select(o => o.Tag).ToHashSet();
+        var expectedLevel = validLevelTags.Contains(s.DefaultLevel.ToString())
+            ? s.DefaultLevel
+            : 5;
+
+        Assert.Equal(expectedFormat, vm.DefaultFormat);
+        Assert.Equal(expectedLevel, vm.CompressionLevel);
     }
 
     [Fact]

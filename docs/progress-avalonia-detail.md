@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-27** — 设置项默认值批量修复（7 项「设置写了没人读」，源自「压缩对话框不读默认压缩级别」全量排查）
+  - **背景**：全量对照 WPF 旧版 `LoadDefaults*` 逻辑与 `AppSettings` 引用，共发现 10 项设置无消费者；本批修复 7 项，剩余 3 项（`ShowPasswordMatchNotification`/`ExtractDestination`/`EnableCascadingMenu`）需产品决策，立计划 `.omo/plans/未开始/settings-unwired-keys.md` 并同步 PLAN.md P3
+  - **压缩端**（`CompressSettingsViewModel.cs`）：构造函数补读 `DefaultFormat`/`DefaultLevel`——仅当值在合法选项域（`zip/7z/tar.gz`、`0/3/5/9`）内才赋值，否则保持默认并 `DebugLog`；修复压缩对话框格式恒 zip、级别恒 5
+  - **解压端**（`ExtractSettingsViewModel.cs`）：构造函数补读 `OpenFolderAfterExtract`，解压对话框「解压后打开文件夹」不再恒不勾选
+  - **解压后删原包**（`App.axaml.cs` + `MainWindowViewModel.cs`）：`TryDeleteArchiveAfterExtract` 改 `internal`，接入 GUI 全部 6 处解压成功路径（`ExtractArchive`/`ExtractArchiveHere`/`ExtractArchiveToName`/`ExtractSelectedEntriesCoreAsync`/`ExtractTo`/`SmartExtract`——后两处为审查阶段补漏），此前仅 CLI 解压生效
+  - **最近文件上限**（`RecentFilesManager.cs`）：`MaxEntries=10` 硬编码改为 `ResolveMaxEntries(AppSettings.Load().MaxRecentFiles)` 纯函数（≤0 回退 10），`AddPath` 按设置截断
+  - **启动临时清理**（`App.axaml.cs`）：新增 `CleanTempOnStartupCore()`（读开关 → 删除 `AppSettings.GetTempDir()`，失败仅 DebugLog），`OnFrameworkInitializationCompleted` 中 fire-and-forget 后台执行；落地既有计划 `clean-temp-on-startup-avalonia.md`（UI 侧，Core 层覆盖仍待 `core-temp-root-injectable`）
+  - **提权开关**（`App.axaml.cs`）：`HandleElevationAsync` 在 `IsElevated()` 分支后读 `AllowElevation`——关闭时直接显示 `ElevationInfoDialog` 并返回 false，不再弹提权确认（对齐 WPF `App.Extract.cs:445-452` 等 3 处）
+  - **测试**：`CompressSettingsViewModelTests` 硬断言 5/zip 改为 `AppSettings.Load()` 镜像断言 + 新增 `Constructor_MirrorsAppSettings_DefaultFormatAndLevel`；`ExtractSettingsViewModelTests` 移除写真实 settings.json 的测试与环境依赖断言（`DefaultsToFalse` 在设置为 true 的机器上必挂），合并为镜像断言；新增 `RecentFilesManagerTests`（`ResolveMaxEntries` 纯函数 8 例）
+  - **验证**：`dotnet build` 0 错误；Avalonia 105 通过/2 跳过/0 失败；Core 415 通过（`AllThreeLanguages_HaveSameKeySet` 1 失败经 stash 在干净 HEAD 复现，为既有本地化三语 key 不同步问题，与本批改动无关）
+
 **2026-09-26** — **APNG 动画预览支持正式上线**
   - **核心变更**：复用 `PreviewType.AnimatedImage` 统一管线（GIF + Animated WebP 已就绪），新增 `ApngDecoder`（`SixLabors.ImageSharp 3.1.5`）解决 SKCodec 原生 `FrameCount=0` 无法识别 APNG 动画的问题
   - **关键修复**：`FrameDelay` Rational 类型的 `Numerator`/`Denominator` 为 `uint`，修复强制转 `long` 抛异常的 bug（先转 `uint` 再转 `long`）

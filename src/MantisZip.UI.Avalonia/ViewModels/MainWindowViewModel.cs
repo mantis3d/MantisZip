@@ -2246,6 +2246,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractAsync）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
             if (openFolder)
             {
                 await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
@@ -2275,6 +2277,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractHere）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
             // 成功后把目标目录写入路径历史（原地解压到压缩包所在目录）
             PathHistoryManager.Record(dest);
         }
@@ -2304,6 +2308,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractToName）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
             // 成功后把目标目录写入路径历史（解压到同名子目录）
             PathHistoryManager.Record(dest);
         }
@@ -2374,6 +2380,8 @@ public partial class MainWindowViewModel : ObservableObject
         {
             case SelectedItemsExtractStatus.Success:
                 StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+                // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.Menu.cs ExtractSelectedEntriesAsync）
+                App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
                 if (settings.OpenFolderAfterExtract)
                 {
                     await OpenExtractedFolderAsync(destinationPath, CurrentArchivePath!, password);
@@ -2656,7 +2664,11 @@ public partial class MainWindowViewModel : ObservableObject
             });
 
         if (completed)
+        {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractTo 命令）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
+        }
     }
 
     [RelayCommand]
@@ -2689,6 +2701,8 @@ public partial class MainWindowViewModel : ObservableObject
             StatusMessage = hasSingleRoot
                 ? LocalizationManager.T("Status_SmartExtractSingleRoot")
                 : LocalizationManager.T("Status_SmartExtractNamed");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs 智能解压）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
         }
     }
 
