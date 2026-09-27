@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-27** — 设置项无消费者计划剩余 3 项评估完成（①② 记录结论、③ 修正 AGENTS.md）
+  - **背景**：`.omo/plans/未开始/settings-unwired-keys.md` 剩余 3 项（`ShowPasswordMatchNotification`/`ExtractDestination`/`EnableCascadingMenu`）逐项评估并经用户决策
+  - **① `ShowPasswordMatchNotification`（⏸️ 暂不动，仅记录）**：匹配时机已前移——GUI 打开/解压对话框已冗余，CLI `ResolveCliPassword` 静默是真实缺口；裁剪版移植约 1-2h 优于废弃（废弃需删 5+ 处 UI/方法/key 成本不低于接线）；启动时直接按裁剪版执行
+  - **② `ExtractDestination`（⏸️ 暂不动，仅记录）**：WPF 终版 same-dir/desktop 本就跳过对话框、主路径已富对话框化；推荐 **b 方案**——三入口按设置预填目的地（`ExtractSettingsViewModel` ctor / `ExtractTo` / `ExtractSelectedTo` defaultDest，CLI `--extract` 自动生效），约 1-2h 含镜像测试；c 跳过对话框与「解压到此处」命令重复且丢失过滤/单次冲突覆盖；启动时直接按 b 执行
+  - **③ `EnableCascadingMenu`（✅ 评估+修复闭环）**：核实该字段在 Avalonia/WPF 后期**均不存在**——WPF 已于 `5b431fb` 用已接线的 `EnableDynamicMenu` 替代（COM 动态菜单 / 静态级联回退），verb 模式作为死代码废弃；COM 版 `ContextMenuHandler` 仅支持级联形态；实际缺陷仅为 `AGENTS.md` 两处陈旧描述（设置清单误列 + 「Two modes」段落设置名/默认值/形态三处错误），已修正为 `EnableDynamicMenu` 双模式描述 + 历史注记；零代码，`rg -ni "EnableCascadingMenu" src tests` 零匹配
+  - **同步**：计划文件头部状态/三项表格/评估结论小节/尾部验收标准全部更新；docs/PLAN.md P3 ①②③ 说明同步
+
 **2026-09-27** — 设置项默认值批量修复（7 项「设置写了没人读」，源自「压缩对话框不读默认压缩级别」全量排查）
   - **背景**：全量对照 WPF 旧版 `LoadDefaults*` 逻辑与 `AppSettings` 引用，共发现 10 项设置无消费者；本批修复 7 项，剩余 3 项（`ShowPasswordMatchNotification`/`ExtractDestination`/`EnableCascadingMenu`）需产品决策，立计划 `.omo/plans/未开始/settings-unwired-keys.md` 并同步 PLAN.md P3
   - **压缩端**（`CompressSettingsViewModel.cs`）：构造函数补读 `DefaultFormat`/`DefaultLevel`——仅当值在合法选项域（`zip/7z/tar.gz`、`0/3/5/9`）内才赋值，否则保持默认并 `DebugLog`；修复压缩对话框格式恒 zip、级别恒 5
