@@ -212,7 +212,7 @@ await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelis
 - **分卷**: SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB
 - **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
 - **解压扩展**: EnableDragExtract, ExtractPreserveFullPath
-- **上下文菜单**: EnableCompressMenu, EnableOpenMenu, EnableCascadingMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu
+- **上下文菜单**: EnableCompressMenu, EnableOpenMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu（COM 动态菜单 / 静态级联回退，`EnableCascadingMenu` 已废弃移除）
 - **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, ShowPreviewInfoPanel, TextPreviewFontSize, TextPreviewFontFamily, TextEncodingPreference, MaxTablePreviewRows, MaxTablePreviewCols, MaxPreviewFileSize, FontPreviewFontSize, FontPreviewSampleText, FontPreviewEnableLigature, PreviewPosition, InfoPanelOrientation, EnableFormatDetection, PreviewHeadSize
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
 - **外观**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）
@@ -254,10 +254,12 @@ Uses pure Win32 API — no `System.Drawing` dependency (COM host can't use it).
 
 ShellExt reads localized menu text from registry (`HKCU\Software\MantisZip\ContextMenu\Text*`), written by `ShellIntegration.WriteMenuTextToRegistry()` during `InstallCom()`. The UI project's `L.T()` translates 8 `ShellExt_*` keys (zh + en in `strings.*.json`). Fallback to hardcoded Chinese defaults if registry values are absent.
 
-Two modes controlled by `AppSettings.EnableCascadingMenu`:
+Two modes controlled by `AppSettings.EnableDynamicMenu` (default: on):
 
-- **Cascade mode** (default: off): Single "MantisZip" submenu with separators between 浏览/压缩/解压 groups, numbered verbs via `ExtendedSubCommandsKey`
-- **Verb mode**: Individual top-level verbs per target (`*`, `Directory`, `Directory\Background`), with top/bottom separators to isolate from other apps' menus
+- **COM dynamic mode** (default): `InstallCom()` registers the ShellExt COM handler (`MantisZip.ShellExt.comhost.dll`); if COM is unavailable or not yet loaded in Explorer, `CheckComStatus()` installs the static cascade as fallback
+- **Static cascade mode** (`EnableDynamicMenu = off`): single "MantisZip" submenu with separators between 浏览/压缩/解压 groups, numbered verbs via `ExtendedSubCommandsKey`
+
+> 注：旧的 `EnableCascadingMenu`（Cascade vs 顶层独立 Verb 两形态开关）已于 WPF 时期移除（commit `5b431fb`，verb 模式作为死代码废弃，静态路径仅存级联一种形态）；Avalonia 全仓无此字段。
 
 Menu items with individual toggles:
 
