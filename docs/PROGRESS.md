@@ -27,6 +27,7 @@
 
 #### 2026-09
 
+- **09-27** — 修复 main→alpha 合并丢失 TGA/AVIF/APNG 预览：`c677a65` 合并时 `PreviewViewModel.cs` 整文件冲突取 ours，丢弃 main 侧 `ShowTgaImage`/`ShowAvifImage`/`ApngDecoder`（+144/-16 行），三方合并恢复 4 个预览分发方法；`strings.zh-TW.json` 补 55 个缺失 key 使三语 key 集一致；`--no-incremental` 构建 0 警告 0 错误，Core 511 + Avalonia 96 测试全绿，TGA 无损/RLE 解码冒烟通过
 - **09-26** — **APNG 动画预览支持**：复用 `PreviewType.AnimatedImage` 管线 + ImageSharp 解码器（`SixLabors.ImageSharp 3.1.5`），修复 `FrameDelay` Rational 类型转换（`uint`→`long`）；SKCodec 原生 `FrameCount=0` 无法识别 APNG 动画，ImageSharp 兜底解码 5 帧 APNG 正常播放；集成 `ShowGif` 统一管线（播放/暂停/逐帧/缩放/透明背景/信息面板帧数），Core/Avalonia 单测 509/509 通过
 - **09-24** — 过滤/拖拽/右键解压统一并行化 + 并行冲突弹窗修复：`ExtractEntriesAsync` 改造为 dispatcher（命中文件 ≥2 且并行度 >1 自动走并行，与全量解压共用决策逻辑），原串行逻辑迁入 `ExtractEntriesAsyncSequential` 不变，新增 `ExtractEntriesAsyncParallel`（多实例并行 + 批次复用 archive + outputPathOverrides 路径覆盖 + 目录条目预创建）；修复并行路径 Ask 冲突弹窗静默降级为覆盖的 bug（同步 ResolvePath 只认同步回调 → 快速路径 + 信号量串行化 ResolvePathAsync）；`CreateExtractOptions` 返回类型非 null 消除 NRE 隐患；4 个新回归测试
 - **09-23** — 修复 MultiThreaded 压缩模式 UI 冻结：`CompressGroupWithSevenZip` 挂接 `FileCompressionStarted` 进度事件，每 100ms 节流报告当前文件名 + 字节进度；mt=on 多线程事件并发触发，lock 保护计数与节流

@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-27** — 修复 main→alpha 合并（`c677a65`）丢失 TGA/AVIF/APNG 预览 + zh-TW 补 55 key
+  - **根因**：`c677a65` 合并时 `ViewModels/PreviewViewModel.cs` 整文件冲突按 ours 解决，丢弃 main 侧 `ShowTgaImage`（ImageSharp 解码 + RGBA→BGRA 交换 + SkiaSharp 位图管线）/`ShowAvifImage`/`ApngDecoder`/`ShowIcoGallery`（合计 +144/-16 行），合并后 `.tga`/`.avif`/`.apng` 预览失效
+  - **修复**：三方合并安装 main 侧 4 个预览方法；3 处内容冲突保留 ours 行为（`MVVMTK0034` pragma + `_selectedEncoding` 字段直写、`SKSamplingOptions`）；核验 `IconProvider.cs`（两侧均 4 处 `SKPathBuilder`/0 处 `new SKPath`，仅 using 风格差异）、`ExtractSettingsWindow` 并行度宽度 120（alpha 侧 `e0a4960` 引入，非 main 丢失）、`ZipEngine`/`docs/PLAN.md`/`docs/PROGRESS.md`/`compression-estimator.md`/`AGENTS.md` 等 17 个 theirs-only 文件均为 HEAD 超集或被更强规则取代，无需恢复
+  - **i18n**：`Localization/strings.zh-TW.json` 补 55 个缺失 key（三语 key 集一致，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 通过），维持 UTF-8 无 BOM + CRLF + 2 空格缩进
+  - **验证**：`dotnet build --no-incremental` 0 警告 0 错误；Core 511 通过/0 失败/3 跳过 + Avalonia 96 通过/0 失败/2 跳过；TGA 冒烟（ImageSharp 3.1.5 临时工程：无损 64×48 + 手写 RLE 40×40 双样例，完整复刻 `ShowTgaImage` 解码管线）10 项断言全 PASS，临时项目已清理；`TestTgaDirect.cs` 按约定保留
+  - 合并策略：不撤销重合并（`origin/alpha` 已推送），保留 `c677a65` + 修复提交路线
+
 **2026-09-24** — 修复 MT 自定义 Store 格式分拣/写入不一致 + 多线程/自适应压缩测试矩阵
   - **Core 层**：
     - `Engines/ZipEngine.cs`：`ReadFileWithRetry` 自适应入口改用 4 参 `GetAdaptiveLevel(fullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds)` —— 分拣阶段（`CompressAsync`/`AddToArchiveAsync` 的 StoreGroup/CompressGroup 分流）本就传 4 参，写入阶段此前用 3 参重算**忽略自定义列表**：自定义格式（如 `.wav`）被分入 StoreGroup（level=0）却在写入时退回 Deflate（自打脸 bug）。4 参在无自定义列表时行为与 3 参完全一致，统一无副作用
