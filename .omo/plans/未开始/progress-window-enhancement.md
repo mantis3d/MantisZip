@@ -1,1317 +1,1125 @@
-# ProgressWindow 增强改造 Implementation Plan
+# 进度窗口增强改造（progress-window-enhancement）— 修订版 v2
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
-
-**Goal:** 增强 ProgressWindow 的显示信息——路径/文件名分离、文件级计数、实时统计栏（已处理/跳过/出错）、批处理每包摘要、并行进度显示、模式切换（简约/详细/列表）、时间估算。
-
-**Architecture:** 
-- Core 层统一改动：`ArchiveProgress`/`ArchiveOptions`/`ExtractResult` 加字段，`FileConflictHelper` 加回调触发，引擎加跳过计数
-- 新增 `ProgressDisplayCalculator` 将显示计算逻辑抽到 Core 层，Avalonia 共享
-- UI 层做 XAML 布局调整、模式切换、三种视图（简约/详细/列表）
-- 支持并行解压时的多线程进度显示
-
-**Tech Stack:** .NET 10, Avalonia, SharpCompress, SharpSevenZip
+> **Agentic Execution Note** — 本计划为 **WPF→Avalonia 全量修订版**（v2）。v1（2026-09-15，基于已删除的 WPF 版本）经代码级审查后发现全部文件路径、API、线程模型均为 WPF 语境，不可直接执行。v2 已并入全部审查必改项 + 密码徽标 + 密码弹窗兜底两项新功能决策，所有代码引用均经当前仓库（Avalonia 版）grep/读取核实。
+>
+> 执行方式：按 Wave 顺序执行；波次内标注 `∥` 的任务可并行。每任务完成后必须运行验证命令（Rule 12），全部通过才能标记完成。
 
 ---
 
 ## TL;DR
 
-> **Quick Summary**: 重构 ProgressWindow 布局，支持三种显示模式（简约/详细/列表）；新增路径分离、文件级计数、实时统计栏、并行线程进度、时间估算；所有计算逻辑抽到 Core 层。
->
-> **Deliverables**:
-> - ProgressWindow 三种显示模式（简约/详细/列表）
-> - 路径/文件名分离显示
-> - 文件级计数（ProcessedFiles/TotalFiles）实时更新
-> - 跳过文件计数（通过 FileConflictHelper 回调统计）
-> - 并行线程进度显示（详细模式）
-> - 时间估算（已用时间 + 预计剩余）
-> - ProgressDisplayCalculator 新工具类（无 UI 依赖）
->
-> **Estimated Effort**: Medium (~5-6h)
-> **Parallel Execution**: YES - 3 waves
-> **Critical Path**: Task 1 → Task 4 → Task 6 → Task 8
+### Quick Summary
+重构 `ProgressWindow`：路径/文件名分离多行显示 + TopDisplayMode/DensityMode 双模式切换 + 实时统计栏（已处理/跳过/出错/已覆盖/速度）+ 已用/剩余时间（ETA 批次切换守卫）+ ZIP 并行批次详细行 + 批处理密码徽标（逐包点亮、行内 Flyout 查看/复制）+ 解压密码弹窗兜底（输错循环重弹、取消标记行继续批处理）。统计埋点下沉到 Core 引擎解压冲突解析点（10 处 `ResolvePathAsync`），数据通道唯一为 `IProgress<ArchiveProgress>`。
+
+### Deliverables
+- `Core/Utils/ProgressDisplayCalculator.cs`（新建，纯函数 + `ProgressSpeedTracker`，含单测）
+- `ArchiveProgress`/`ExtractResult` 可选统计字段（BatchIndex/BatchCount/SkippedFiles/FailedFiles/OverwrittenFiles 等）
+- `ProgressBatchItem` 统计字段 + `BatchPasswordState` 密码态字段
+- 三引擎 10 处冲突埋点 + ZIP 并行批次索引上报 + 硬编码「正在压缩: 」前缀清除
+- `ProgressViewModel` 模式/密度/统计/时间/ETA 属性 + 集中通知 + LocalizedStrings 新 key
+- `ProgressWindow.axaml` 布局重构（三模式上方、统计栏、时间行、中文注释）
+- 批处理行密码徽标（🔄匹配中/🔑●●●● + Flyout）+ 死横幅/死方法清理
+- `PasswordRetryLoop` 共享密码重试（4 个叶子入口接线，取消→行标记）
+
+### Effort
+**12–15h**（v1 估 3-4h 已作废——WPF 路径全废 + 功能范围扩大 2 项）
+
+### Parallel Execution
+```
+Wave 1 (Core) ── T1 ──────── T4        (T1→T4 严格依赖)
+                 T2 ∥ T3              (与 T1/T4 完全独立)
+Wave 2 (UI)  ── T5 ── T6 ── T7        (模型→VM→视图，顺序)
+Wave 3 (功能) ─ T8 ── T9               (同文件相邻区域，串行；见各任务说明)
+Final         ─ F1 → F2 → F3 → F4
+```
+
+### Critical Path
+**T1 → T4 → T6 → T7 → T8 → T9**（约 11h）；T2/T3/T5 可提前并入。
+
+---
+
+## Context
+
+### Original Request
+在 v6 交互原型（`docs/prototypes/progress-window-enhancement.html`，已 Playwright 验证 13 断言 ALL PASS）基础上，把进度窗口从「单文件名+单进度条」升级为多行信息、双模式切换、实时统计、时间/ETA、批处理密码可视化与错误兜底的完整进度中心。
+
+### Review Findings（v1 审查必改项，v2 已全部并入）
+1. **WPF→Avalonia 路径全废**：`MantisZip.UI/**` → `src/MantisZip.UI.Avalonia/`；`ProgressWindow.xaml` → `Dialogs/ProgressWindow.axaml(.cs)`；`AppPartals/App.Extract.cs` → `App.axaml.cs` + `Services/ExtractFlow.cs`；`Visibility.Visible` → `IsVisible`；`Theme_TextSecondary` → `Theme*Brush` 结尾。
+2. **MVVM**：`_isBatchMode/_currentBatchIndex/_lastProgressUpdate/ProgressThrottle` 已在 `ProgressViewModel.cs:24-27`；`ProgressWindow.SetProgress`(:126) 仅转发 `_vm.SetProgress`；状态写入任务下沉 VM。
+3. **多线程**：`ZipEngine.ExtractAsyncParallel`(:391) = `Parallel.ForEachAsync` 分批 + 每批独占 archive 实例（AGENTS.md 并行解压架构）；v1 的 `Parallel.ForEach` + `ManagedThreadId` + `progressReporter` 方案整体作废。
+4. **数据通道唯一**：`IProgress<ArchiveProgress>`；`ArchiveProgress` 是 class（`ArchiveEngine.cs:294-305`），可加可选字段；**禁止改 `IArchiveEngine` 签名**。
+5. **统计埋点**：v1 的 `ConflictActionCallback` 不存在于代码；正确位置是 `FileConflictHelper.ResolvePathAsync`（`FileConflictHelper.cs:67`）的引擎调用点——grep 实测 **10 处全为解压路径**：ZipEngine :307/:502/:712/:912、TarGzEngine :89/:154/:617/:707、SevenZipEngine :363/:749。杀掉「进程 8 线程」假统计。
+6. **矛盾修复**：Task 7b `Brush?` vs Task 8 `StatusBrushName` → 单一机制（资源键字符串 + 既有 `BrushResourceConverter`）；行号全部刷新为当前 grep 锚点；空 Acceptance Criteria 补实。
+7. **硬编码前缀**：引擎 Compress 路径 `CurrentFile = "正在压缩: " + ...` 硬中文前缀破坏 `SplitFilePath` → 前缀移出 Core，文案走 XAML/`LocalizationManager.T`。
+8. **ETA 跨批守卫**：byte 基线在批次切换时重置，overall = `(completedArchives + pct/100) / N`。
+
+### Interview Decisions（用户已拍板，8 项）
+
+| # | 决策 |
+|---|------|
+| D1 | **密码徽标 · 点亮时机**：按数据到达逐项点亮。路径 A（预匹配 `_matchedPasswords`：`ExtractSettingsViewModel:149/152`，设置点 :428/:508，经 App.axaml.cs L1184 参数 + L1224-1227 `TryGetValue` 开始前全亮）；路径 B（循环内 `ResolveCliPassword` L774 轮到才亮） |
+| D2 | **密码徽标 · 展示**：行内 `🔑+●●●●` 按钮 + Flyout（掩码尊重 `PasswordRevealByDefault`、复制恒明文、含规则/描述；Flyout 内容 code-behind 按 x:Name 填充避免 DataContext 继承问题） |
+| D3 | **删死横幅**：`ProgressWindow.axaml` Row1 `PasswordSection`(:97) + PwdMatchText(:122)/PwdRevealBtn(:130)/PwdCopyBtn(:146) + 死方法 `ShowPasswordAttempt`(VM:394)/`ShowPasswordMatched`(:409)/`HidePasswordSection`(:448) + code-behind 包装(:286/:304/:322) + 关联 password props(VM:98-119)。**删前逐符号 grep 验证零调用** |
+| D4 | 密码徽标只显示 🔄匹配中 状态，**不显示「尝试规则 N/M」** |
+| D5 | **弹窗兜底 · 错密码循环**：对齐 Phase B（`MainWindowViewModel:966-1027`）——先 `QuickVerifyPasswordEx`(`PasswordService.cs:217`)，Wrong → `Status_WrongPassword` + 重弹循环，直到正确或取消 |
+| D6 | **覆盖全部解压入口**：共享层实现（`PasswordRetryLoop`），4 个叶子接线点全覆盖 |
+| D7 | **取消语义**：当前行标 ✗ `Status_PasswordCancelled`（「已取消 - 需要密码」，zh-CN:943，三语已有），**批处理继续** |
+| D8 | 不做「密码同时用于后续压缩包」横幅功能 |
+
+### Research Findings（代码事实）
+- **引擎密码抛点全在并行派发之前**（弹窗时 0 工作线程）：ZipEngine :270-273（sequential）/:411-413（parallel 派发前）/:819（ExtractEntriesAsync 入口）、SevenZipEngine :333；TarGz 无加密。`Parallel.ForEachAsync` 等 in-flight 收尾才传播异常 → 引擎完全 unwind 后才可能弹窗，无并行中弹窗风险。
+- **批处理顺序 for+await**（App.axaml.cs L1205-1253）不跨包并行。
+- `PasswordDialog`（`Views/PasswordDialog.axaml.cs`）OK/Cancel 即 `Close(true/false)`（:159/:163/:169），**不支持弹窗内保持** → 采用 Phase B 外部重弹循环。
+- `BatchStatusConverters.cs` 已有 Text/Icon/Background 三转换器（Background 为硬编码色，v2 新增主题键承接其颜色值）。
+- `BrushResourceConverter`（主题键→Brush）已存在于 `Converters/`，直接复用。
+- `ProgressViewModel.LocalizedStrings` 在 ctor :36-50 构建（**ProgressWindow 绑定 key 的唯一登记点**，非 `MainWindowViewModel.UpdateLocalizedStrings:232`——那只管主窗口）。
+- `ArchiveProgress` 无任何 Batch/统计字段；`ExtractResult`(:310) 仅有 `SucceededEntries/FailedEntries/HasFailures`。
+- 现有本地化 key：`Status_WrongPassword`(zh:962)、`Status_PasswordCancelled`(zh:943)、`Progress_FileCompressing/Extracting`(:593-596)、`Progress_FileCount` —— 三语齐全，可直接复用。
+- 依赖链（docs/PLAN.md:68）：`nuget → compression-perf/estimator → progress-window-enhancement → progress-bar-segments`。
+
+---
+
+## Goal
+
+修复并完成进度窗口增强：多行路径/文件名显示、实时解压统计（真实埋点，非假数据）、双模式切换、密码可视化与错误兜底，全部基于 Avalonia MVVM。
+
+## Architecture
+
+- **Core 层**（框架无关）：字段扩展（T1）→ 纯函数计算（T2）→ 行模型扩展（T3）→ 引擎埋点（T4）。统计唯一数据通道 `ArchiveProgress`（class，可选字段向后兼容）。
+- **UI 层**：行模型 + key（T5）→ ViewModel 模式/统计/ETA（T6）→ 视图布局（T7）→ 密码徽标（T8）→ 密码弹窗兜底（T9）。
+- **弹窗兜底放 UI 层**：`PasswordRetryLoop`（Services）在引擎完全 unwind 后、UI 线程弹窗；**禁止进 Core**。
+- **文案分层**：Core 只产数值（`TimeSpan`/数字），中文格式化全部在 VM 经 `LocalizationManager.T`。
+
+## Tech Stack
+
+- .NET 10 / Avalonia 11 + CommunityToolkit.Mvvm 手动属性模式（`ProgressViewModel` 现有风格）
+- SharpCompress ZipEngine / SharpSevenZip SevenZipEngine / SharpCompress TarGzEngine
+- xUnit（`tests/MantisZip.Tests`）
 
 ---
 
 ## File Structure
 
-### Core 层文件
+```
+src/
+├── MantisZip.Core/
+│   ├── Abstractions/ArchiveEngine.cs            # [M] T1: ArchiveProgress + ExtractResult 字段
+│   ├── Utils/
+│   │   ├── ProgressDisplayCalculator.cs         # [NEW] T2: 纯函数 + ProgressSpeedTracker
+│   │   └── FileConflictHelper.cs                # (ref only, :67 ResolvePathAsync)
+│   ├── Models/ProgressBatchItem.cs              # [M] T3: 统计字段 + 密码态字段 + StatusBrushName
+│   └── Engines/
+│       ├── ZipEngine.cs                         # [M] T4: 4 处埋点(:307/:502/:712/:912) + 批次索引上报 + 去前缀
+│       ├── TarGzEngine.cs                       # [M] T4: 4 处埋点(:89/:154/:617/:707) + 去前缀
+│       └── SevenZipEngine.cs                    # [M] T4: 2 处埋点(:363/:749) + 去前缀
+├── MantisZip.UI.Avalonia/
+│   ├── Models/
+│   │   ├── ParallelBatchProgressItem.cs         # [NEW] T5: 并行批次详细行模型
+│   │   └── ProgressDisplayMode.cs               # [NEW] T5: TopDisplayMode + DensityMode 枚举
+│   ├── Converters/BrushResourceConverter.cs     # (reuse, T5)
+│   ├── Converters/BatchStatusConverters.cs      # (ref: 状态→文案/图标)
+│   ├── ViewModels/ProgressViewModel.cs          # [M] T6+T8: 模式/统计/ETA + LocalizedStrings + 删死方法(T8)
+│   ├── Dialogs/
+│   │   ├── ProgressWindow.axaml                 # [M] T7+T8: 布局重构 + 徽标/删横幅
+│   │   └── ProgressWindow.axaml.cs              # [M] T7+T8: 计时器/Flyout 填充 + 删死包装(T8)
+│   ├── Services/
+│   │   ├── PasswordRetryLoop.cs                 # [NEW] T9: 共享密码重试循环
+│   │   ├── ExtractService.cs                    # [M] T9: 叶子接线 1 (:28)
+│   │   ├── ExtractFlow.cs                       # [M] T9: 叶子接线 2 (过滤分支 :153)
+│   │   └── SelectedItemsExtractService.cs       # [M] T9: 叶子接线 3
+│   ├── App.axaml.cs                             # [M] T8: 徽标两路径接线; T9: 叶子接线 4 (L1379 直连 engine)
+│   ├── ViewModels/ExtractSettingsViewModel.cs   # (ref: _matchedPasswords :149/:152)
+│   └── Localization/
+│       ├── strings.zh-CN.json                   # [M] T5/T6/T8: 新 key (插入 { 后, UTF-8 无 BOM, CRLF, 2空格)
+│       ├── strings.en.json                      # [M] 同上
+│       └── strings.zh-TW.json                   # [M] 同上
+tests/
+└── MantisZip.Tests/
+    └── ProgressDisplayCalculatorTests.cs        # [NEW] T2: 单测
+docs/
+└── PLAN.md                                      # [M] F4: 同步 :32 登记行 (Rule 1)
+```
 
-| 文件 | 状态 | 职责 |
-|------|------|------|
-| `Core/Abstractions/ArchiveEngine.cs` | 修改 | `ArchiveProgress` 加 `SkippedFiles`/`FailedFiles`；`ArchiveOptions` 加 `ConflictActionCallback`；`ExtractResult` 加 `SkippedEntries` |
-| `Core/Utils/FileConflictHelper.cs` | 修改 | `ResolvePath` 里回调 `ConflictActionCallback` |
-| `Core/Models/ProgressBatchItem.cs` | 修改 | `BatchItem` 加 `TotalFiles`/`ProcessedFiles`/`SkippedFiles`/`FailedFiles` + `SummaryText` |
-| `Core/Utils/ProgressDisplayCalculator.cs` | **新增** | 显示值计算工具类（纯计算，无 UI 依赖） |
-| `Core/Engines/ZipEngine.cs` | 修改 | `ExtractAsync` 加跳过计数 |
-| `Core/Engines/SevenZipEngine.cs` | 修改 | 同上 |
-| `Core/Engines/TarGzEngine.cs` | 修改 | 同上 |
+> DragDropService（`Services/DragDropService` :92 → `ExtractFlow.RunSelectedItemsExtractionAsync`）经叶子接线 3 自动覆盖，不单独改。
 
-### UI 层文件
+---
 
-| 文件 | 状态 | 职责 |
-|------|------|------|
-| `UI/Dialogs/ProgressWindow.xaml` | 修改 | Grid 行调整，新增控件 |
-| `UI/Dialogs/ProgressWindow.xaml.cs` | 修改 | `SetProgress` 调 `ProgressDisplayCalculator` 后赋控件 |
-| `UI/AppPartials/App.Extract.cs` | 修改 | 批处理完成后从 `ExtractResult` 更新统计 |
+## 与 v6 原型的对应关系
+
+| 原型（progress-window-enhancement.html v6） | 实现任务 |
+|---|---|
+| 上方三模式切换（全路径/仅目录/仅文件名） | T5 枚举 → T6 `TopDisplayMode` 属性 → T7 切换控件 + 绑定 |
+| 下方紧凑度三档（Compact/Normal/Loose） | T5 枚举 → T6 `DensityMode` 属性 → T7 控件密度绑定（复用 Rule 5 资源键） |
+| 统计栏：已处理/跳过/出错/已覆盖/速度 | T4 埋点计数 → T6 统计属性 + 可见性 → T7 统计栏（Rule 6） |
+| 时间行：已用 / 剩余（ETA） | T2 `ProgressSpeedTracker`（批次切换重置基线）→ T6 时间属性 → T7 时间行 |
+| 路径行 + 文件名行（SplitFilePath 分离） | T2 `SplitFilePath`（含前缀防御性剥离）→ T6 `DirName/FileName` → T7 两行显示 |
+| 批处理行密码徽标（🔄 / 🔑●●●● + Flyout） | T3 密码态字段 → T8 徽标 + Flyout + 两路径接线 + 删死横幅 |
+| 批处理行完成摘要（N 成功 / M 失败 / 跳过 / 覆盖） | T4 最终 `ArchiveProgress` 携带统计 → T6 拷贝入 BatchItem → T7 行摘要文本 |
+| ZIP 并行批次详细行 | T4 `BatchIndex/BatchCount` 上报 → T5 行模型 → T6 集合 → T7 ItemsControl（无数据时 Rule 6 隐藏） |
+| 密码错误弹窗重试 | T9 `PasswordRetryLoop`（Phase B 循环对齐） |
 
 ---
 
 ## Execution Strategy
 
-### Waves
+### Dependency Matrix
 
-```
-Wave 1 (Core 数据层 — 5 任务):
-├── Task 1: ArchiveEngine.cs 模型字段扩展
-├── Task 2: ProgressBatchItem.cs 摘要字段
-├── Task 3: ProgressDisplayCalculator.cs 新建
-├── Task 4: FileConflictHelper.cs 回调
-└── Task 5: 引擎跳过计数（ZipEngine + SevenZipEngine + TarGzEngine）
+| Task | 依赖 | 可与谁并行 | 预估 |
+|------|------|-----------|------|
+| T1 ArchiveProgress/ExtractResult 字段 | — | T2、T3 | 0.5h |
+| T2 ProgressDisplayCalculator + 单测 | — | T1、T3 | 1.5h |
+| T3 BatchItem 扩展 | — | T1、T2 | 1h |
+| T4 引擎埋点 + 批次上报 + 去前缀 | T1 | T2/T3 收尾后 | 2h |
+| T5 行模型 + 三语 key | T3 | — | 1h |
+| T6 ProgressViewModel 重构 | T1、T5 | — | 2h |
+| T7 ProgressWindow.axaml 布局 | T6 | — | 2h |
+| T8 密码徽标 + 删死横幅 | T3、T7 | 不与 T9 并行（同文件相邻区域） | 1.5h |
+| T9 PasswordRetryLoop + 4 接线 | T7 | T8 完成后 | 2h |
+| F1–F4 验证波 | 全部 | — | 1h |
 
-Wave 2 (UI 层 — 5 任务):
-├── Task 6: ProgressWindow XAML 布局改动 + 模式切换
-├── Task 7: ProgressDisplayCalculator 时间估算 + 并行进度方法
-├── Task 8: ProgressWindow.cs 代码逻辑（SetProgress + 模式切换 + 时间显示）
-├── Task 9: ThreadProgressItem/FileInfoItem 模型类（新增）
-└── Task 10: App.Extract.cs 统计更新 + 引擎并行进度上报
-```
+### 决策锁定（执行时不得偏离）
+
+1. 统计埋点**唯一位置** = `ResolvePathAsync` 调用点（10 处），`resolvedPath == null` → skip、`existedBefore && resolvedPath == outputPath` → overwritten（`File.Exists` 预检须在 `ResolvePathAsync` **之前**）。
+2. UI 统计/批摘要数据**唯一来源** = `ArchiveProgress`（含最终 100% 报告携带的终值）；`ExtractResult` 新字段仅作引擎单测断言用，**不改** `ExtractService`/`ExtractFlow` 返回类型。
+3. 弹窗只在 UI 层 4 个叶子点，Core 不知道弹窗存在。
+4. 死横幅/死方法删除**只在 T8**；T7 保留 `PasswordSection` 块仅调整行号并加注释标记。
+5. `StatusBrushName` 单一机制（资源键字符串 + `BrushResourceConverter`），不引入 `Brush?` 直存。
 
 ---
 
 ## TODOs
 
-### Wave 1: Core 数据层（最大并行，5 任务）
+- [ ] 1. ArchiveProgress / ExtractResult 统计字段扩展（Core）
 
-- [ ] 1. **`ArchiveEngine.cs` 模型字段扩展**
+**Files:**
+- Modify: `src/MantisZip.Core/Abstractions/ArchiveEngine.cs`
 
-  **What to do**:
-  在 `ArchiveProgress` 中添加 `SkippedFiles` 和 `FailedFiles` 两个 int 字段（默认 0）。
-  在 `ArchiveOptions` 中添加 `Action<FileConflictAction>? ConflictActionCallback` 回调属性。
-  在 `ExtractResult` 中添加 `int SkippedEntries` 属性。
+**What to do:**
 
-  **Must NOT do**:
-  - 不要修改现有属性的 getter/setter 签名
-  - 不要改动 `IArchiveEngine` 接口
+1. 在 `ArchiveProgress` class（:294，现有字段 CurrentFile/TotalBytes/ProcessedBytes/TotalFiles/ProcessedFiles/PercentComplete/FilePercentComplete）追加可选字段：
 
-  **Recommended Agent Profile**:
-  - **Category**: `quick`
-    - 简单的字段新增，无逻辑变
-  - **Skills**: `[]`
+```csharp
+/// <summary>ZIP 并行批次索引（0-based）。非并行/未分批时为 null。</summary>
+public int? BatchIndex { get; set; }
 
-  **Parallelization**:
-  - **Can Run In Parallel**: YES
-  - **Parallel Group**: Wave 1 (with Tasks 2, 3, 4)
-  - **Blocks**: Task 5 (engines need the new fields)
-  - **Blocked By**: None
+/// <summary>ZIP 并行总批次数。非并行为 null。</summary>
+public int? BatchCount { get; set; }
 
-  **References**:
-  - `src/MantisZip.Core/Abstractions/ArchiveEngine.cs` — 三个类 `ArchiveProgress`(L245)、`ArchiveOptions`(L27)、`ExtractResult`(L261) 都在此文件
+/// <summary>解压冲突统计（null = 本报告未携带该计数，UI 隐藏对应项）。压缩路径恒为 null。</summary>
+public long? SkippedFiles { get; set; }
+public long? FailedFiles { get; set; }
+public long? OverwrittenFiles { get; set; }
+```
 
-  **Acceptance Criteria**:
+2. 在 `ExtractResult`（:310，现有 `SucceededEntries/FailedEntries/HasFailures`）追加：
 
-  **QA Scenarios**:
-  ```
-  Scenario: 编译验证新增字段
-    Tool: Bash
-    Steps:
-      1. 运行 dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-    Expected Result: 编译通过，无警告
-    Evidence: .omo/evidence/task-1-build.txt
-  ```
+```csharp
+/// <summary>因冲突策略跳过的条目数。</summary>
+public int SkippedEntries { get; init; }
 
-  **Commit**: NO (groups with Wave 1 at the end)
+/// <summary>被覆盖写入的已有文件数。</summary>
+public int OverwrittenEntries { get; init; }
+```
 
-- [ ] 2. **`ProgressBatchItem.cs` 添加摘要字段**
+**Must NOT do:**
+- ❌ 禁止改 `IArchiveEngine` 接口签名
+- ❌ 禁止给新字段加必填构造参数（保持 nullable/init，所有现有 `new ArchiveProgress{...}` 编译不受影响）
+- ❌ 禁止引入 UI 类型或中文字符串
 
-  **What to do**:
-  在 `BatchItem` 类中添加：
-  - `public int TotalFiles { get; set; }`
-  - `public int ProcessedFiles { get; set; }`
-  - `public int SkippedFiles { get; set; }`
-  - `public int FailedFiles { get; set; }`
-  - `public string SummaryText` 只读计算属性，返回格式化摘要文本（"已处理 45/200  ⏭跳过 3  ❌出错 1"）
+**References:**
+- `ArchiveEngine.cs:294-305`（ArchiveProgress 定义）、`:310-318`（ExtractResult 定义）、`:162`（ArchiveOptions.ParallelExtractDegree）
 
-  **Must NOT do**:
-  - 不要修改现有属性的行为
-  - 不要在字段 setter 中触发 `PropertyChanged`（因为目前直接从后台线程赋值，不需要通知，UI 通过外部机制刷新）
+**Verification:**
+```powershell
+dotnet build src\MantisZip.Core\MantisZip.Core.csproj
+```
+- 构建通过，0 新增错误
 
-  **Recommended Agent Profile**:
-  - **Category**: `quick`
-    - 纯模型字段新增
-  - **Skills**: `[]`
+**Acceptance Criteria:**
+- 6 个新字段存在且默认值不破坏任何现有调用点
+- `ArchiveProgress` 仍为 class、`ExtractResult` init-only 风格保持
 
-  **Parallelization**:
-  - **Can Run In Parallel**: YES
-  - **Parallel Group**: Wave 1 (with Tasks 1, 3, 4)
-  - **Blocks**: None directly (used in UI wave)
-  - **Blocked By**: None
+**Recommended Agent Profile**:
+- **Category**: `quick`（单文件追加可选字段）
+- **Skills**: `[]`
 
-  **References**:
-  - `src/MantisZip.Core/Models/ProgressBatchItem.cs` — `BatchItem` 类定义
+**QA Scenarios**:
+- Core 构建 + 全量既有测试无回归（新字段默认 null，既有 `new ArchiveProgress{...}` 与 `ExtractResult` 使用点全部编译通过）
 
-  **Acceptance Criteria**:
+**Parallelization:** 与 T2/T3 并行；T4 阻塞等待本任务。
 
-  **QA Scenarios**:
-  ```
-  Scenario: 编译验证
-    Tool: Bash
-    Steps:
-      1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-    Expected Result: 编译通过
-    Evidence: .omo/evidence/task-2-build.txt
-  ```
+---
 
-  **Commit**: NO (groups with Wave 1 at the end)
+- [ ] 2. ProgressDisplayCalculator（Core 计算层 + 单测）
 
-- [ ] 3. **新建 `ProgressDisplayCalculator.cs`**
+**Files:**
+- Create: `src/MantisZip.Core/Utils/ProgressDisplayCalculator.cs`
+- Create: `tests/MantisZip.Tests/ProgressDisplayCalculatorTests.cs`
 
-  **What to do**:
-  在 `Core/Utils/` 下新建文件 `ProgressDisplayCalculator.cs`，包含以下静态方法：
+**What to do:**
+
+1. 新建静态纯函数类 + 状态追踪器（**零中文文案**，格式化输出为数值/TimeSpan/文化中性字符串）：
+
+```csharp
+namespace MantisZip.Core.Utils;
+
+/// <summary>进度窗口显示计算：路径分离、总进度、时长格式化。
+/// 纯函数，不依赖任何 UI 框架；文案格式化由 UI 层经 LocalizationManager 完成。</summary>
+public static class ProgressDisplayCalculator
+{
+    private static readonly string[] EnginePrefixes =
+        ["正在压缩: ", "正在解压: ", "Compressing: ", "Extracting: "];
+
+    /// <summary>剥离引擎 CurrentFile 可能携带的硬编码状态前缀（防御性；T4 已在源头清除）。</summary>
+    public static string StripEnginePrefix(string? currentFile)
+    {
+        if (string.IsNullOrEmpty(currentFile)) return currentFile ?? string.Empty;
+        foreach (var p in EnginePrefixes)
+            if (currentFile.StartsWith(p, StringComparison.Ordinal))
+                return currentFile[p.Length..];
+        return currentFile;
+    }
+
+    /// <summary>路径/文件名分离（兼容 ZIP 条目 '/' 分隔符；已先剥前缀）。</summary>
+    public static (string Dir, string FileName) SplitFilePath(string? currentFile)
+    {
+        var raw = StripEnginePrefix(currentFile);
+        if (string.IsNullOrEmpty(raw)) return (string.Empty, string.Empty);
+        var trimmed = raw.Replace('\\', '/').TrimEnd('/');
+        var idx = trimmed.LastIndexOf('/');
+        return idx < 0 ? (string.Empty, trimmed)
+                       : (trimmed[..idx], trimmed[(idx + 1)..]);
+    }
+
+    /// <summary>总进度 = (已完成档案数 + 当前档案百分比/100) / 总档案数。</summary>
+    public static double ComputeOverallPercent(int completedArchives, double currentPercent, int totalArchives)
+    {
+        if (totalArchives <= 0) return Math.Clamp(currentPercent, 0, 100);
+        var frac = Math.Clamp(currentPercent, 0, 100) / 100.0;
+        return Math.Clamp((completedArchives + frac) / totalArchives * 100.0, 0, 100);
+    }
+
+    /// <summary>时长格式化（文化中性：1:02:03；>24h 启用天段）。负值归零。</summary>
+    public static string FormatDuration(TimeSpan t)
+    {
+        if (t < TimeSpan.Zero) t = TimeSpan.Zero;
+        return t.TotalHours >= 24
+            ? t.ToString(@"d\.hh\:mm\:ss")
+            : t.ToString(@"h\:mm\:ss");
+    }
+}
+
+/// <summary>速度/ETA 追踪器：EMA 平滑；批次切换必须重置字节基线（ETA 跨批守卫）。</summary>
+public sealed class ProgressSpeedTracker
+{
+    private long _archiveStartBytes;   // 当前档案开始时的累计字节（跨批基线）
+    private long _lastSampleBytes;
+    private DateTime _lastSampleTime = DateTime.MinValue;
+    private double _emaBytesPerSecond;
+
+    /// <summary>批次/档案切换时调用：重置字节基线，防止上一档案速度污染 ETA。</summary>
+    public void OnArchiveSwitch(long totalProcessedBytesBeforeArchive, DateTime now)
+    {
+        _archiveStartBytes = totalProcessedBytesBeforeArchive;
+        _lastSampleBytes = totalProcessedBytesBeforeArchive;
+        _lastSampleTime = now;
+        _emaBytesPerSecond = 0;
+    }
+
+    /// <summary>采样当前累计字节，返回平滑速度（bytes/s；0 = 无效样本）。</summary>
+    public double RecordSample(long totalProcessedBytes, DateTime now)
+    {
+        if (_lastSampleTime == DateTime.MinValue)
+        {
+            _lastSampleTime = now;
+            _lastSampleBytes = totalProcessedBytes;
+            return _emaBytesPerSecond;
+        }
+        var dt = (now - _lastSampleTime).TotalSeconds;
+        if (dt < 0.1) return _emaBytesPerSecond;   // 100ms 节流
+        var delta = totalProcessedBytes - _lastSampleBytes;
+        if (delta < 0) { OnArchiveSwitch(totalProcessedBytes, now); return 0; }  // 计数回退(换档案)→重置
+        var inst = delta / dt;
+        _emaBytesPerSecond = _emaBytesPerSecond <= 0 ? inst : _emaBytesPerSecond * 0.7 + inst * 0.3;
+        _lastSampleBytes = totalProcessedBytes;
+        _lastSampleTime = now;
+        return _emaBytesPerSecond;
+    }
+
+    /// <summary>ETA 秒数（null = 速度无效；0 = 已完成）。</summary>
+    public double? ComputeEtaSeconds(long processedInArchive, long totalInArchive)
+    {
+        if (_emaBytesPerSecond <= 0 || totalInArchive <= 0) return null;
+        var remain = totalInArchive - processedInArchive;
+        return remain <= 0 ? 0 : remain / _emaBytesPerSecond;
+    }
+
+    /// <summary>当前档案内已处理字节（相对本档案开始，clamp ≥ 0）。</summary>
+    public long ProcessedInArchive(long totalProcessedBytes) =>
+        Math.Max(0, totalProcessedBytes - _archiveStartBytes);
+}
+```
+
+2. 单测（xUnit，`tests/MantisZip.Tests`）至少覆盖：
+   - `StripEnginePrefix`：真实前缀样本（`"正在压缩: a/b.zip"` → `"a/b.zip"`；无前缀原样；null → `""`）
+   - `SplitFilePath`：`"dir/sub/file.txt"` → `("dir/sub","file.txt")`；`"file.txt"` → `("","file.txt")`；`"a\b\c.txt"` 反斜杠兼容；空/null 不抛
+   - `ComputeOverallPercent`：`(0,50,4)=12.5`、`(3,100,4)=100`、`total=0` 回退、越界 clamp
+   - `FormatDuration`：`5s → "0:00:05"`、`1h2m → "1:02:00"`、`25h → "1:01:00:00"`、负值 → `"0:00:00"`
+   - `ProgressSpeedTracker`：采样平滑、`OnArchiveSwitch` 后速度归零重起、字节回退自动重置、ETA 边界（速度 0 → null，剩 0 → 0）
+
+**Must NOT do:**
+- ❌ Core 内禁止中文文案/`"已用 {0}"` 类格式串（返回 `TimeSpan`/数字，VM 用 `LocalizationManager.T`）
+- ❌ 禁止依赖 Avalonia/WPF 类型
+- ❌ 禁止 `DateTime.Now` 直调（用注入 `now` 参数保证可测）
+
+**References:**
+- v1 计划 `FormatTimeDisplay` 曾把中文放 Core——本任务显式修正该错误
+
+**Verification:**
+```powershell
+dotnet build src\MantisZip.Core\MantisZip.Core.csproj
+dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj --filter ProgressDisplayCalculator
+```
+- 构建通过 + 新单测全绿
+
+**Acceptance Criteria:**
+- 上述单测全部通过
+- 除注释外全文无中文字符
+
+**Recommended Agent Profile**:
+- **Category**: `quick`（新建单文件 + 单测文件，纯逻辑）
+- **Skills**: `[]`
+
+**QA Scenarios**:
+- 新单测覆盖前缀剥离/路径分离/总进度/时长/ETA 守卫全部边界；Core 构建 0 错误
+
+**Parallelization:** 与 T1/T3 完全并行。
+
+---
+
+- [ ] 3. ProgressBatchItem 扩展（统计字段 + 密码态 + StatusBrushName）
+
+**Files:**
+- Modify: `src/MantisZip.Core/Models/ProgressBatchItem.cs`
+
+**What to do:**
+
+1. 文件内新增密码态枚举：
+
+```csharp
+/// <summary>批处理行密码徽标状态。</summary>
+public enum BatchPasswordState
+{
+    None,      // 无密码/未开始
+    Matching,  // 🔄 匹配中
+    Matched,   // 🔑 已匹配（显示 ●●●●，可 Flyout 查看）
+}
+```
+
+2. 给 `BatchItem`（现有 `Name/FullPath/Status/ErrorMessage/Progress`，Status 与 Progress 已带 PropertyChanged 通知）追加字段 + **集中通知**（AGENTS.md 派生属性通知模式，禁止逐字段 `[NotifyPropertyChangedFor]`）：
+
+```csharp
+// ── 解压统计（来自 ArchiveProgress 最终报告；UI 按 HasXxx 可见性控制） ──
+private long _totalFiles;
+private long _processedFiles;
+private long _skippedFiles;
+private long _failedFiles;
+private long _overwrittenFiles;
+public long TotalFiles { get => _totalFiles; set => Set(ref _totalFiles, value); }
+public long ProcessedFiles { get => _processedFiles; set { if (Set(ref _processedFiles, value)) NotifyBatchProperties(); } }
+public long SkippedFiles { get => _skippedFiles; set { if (Set(ref _skippedFiles, value)) NotifyBatchProperties(); } }
+public long FailedFiles { get => _failedFiles; set { if (Set(ref _failedFiles, value)) NotifyBatchProperties(); } }
+public long OverwrittenFiles { get => _overwrittenFiles; set { if (Set(ref _overwrittenFiles, value)) NotifyBatchProperties(); } }
+
+// ── 密码徽标 ──
+private BatchPasswordState _passwordState;
+private string? _matchedPassword;
+private string? _passwordRule;
+private string? _passwordDescription;
+public BatchPasswordState PasswordState { get => _passwordState; set { if (Set(ref _passwordState, value)) NotifyBatchProperties(); } }
+public string? MatchedPassword { get => _matchedPassword; set => Set(ref _matchedPassword, value); }
+public string? PasswordRule { get => _passwordRule; set => Set(ref _passwordRule, value); }
+public string? PasswordDescription { get => _passwordDescription; set => Set(ref _passwordDescription, value); }
+
+// ── 派生显示属性（集中通知） ──
+public bool HasSkipped => SkippedFiles > 0;
+public bool HasFailures => FailedFiles > 0;
+public bool HasOverwritten => OverwrittenFiles > 0;
+public bool HasPasswordBadge => PasswordState != BatchPasswordState.None;
+/// <summary>状态行摘要（完成时填充，如 "12 成功 · 1 跳过"——文案 key 由 UI 层拼装，此处存格式化结果）。</summary>
+public string? SummaryText { get => _summaryText; set { if (Set(ref _summaryText, value)) NotifyBatchProperties(); } }
+private string? _summaryText;
+
+// ── 状态画刷资源键（单一机制：UI 用 BrushResourceConverter 物化；Task 5 注册主题键） ──
+public string StatusBrushName => Status switch
+{
+    BatchStatus.Success => "ThemeStatusSuccessBrush",
+    BatchStatus.Failed   => "ThemeStatusFailedBrush",
+    BatchStatus.Cancelled => "ThemeStatusCancelledBrush",
+    BatchStatus.Skipped  => "ThemeStatusSkippedBrush",
+    _ => "ThemeBorderBrush",   // Pending/Running
+};
+
+private void NotifyBatchProperties()
+{
+    OnPropertyChanged(nameof(HasSkipped));
+    OnPropertyChanged(nameof(HasFailures));
+    OnPropertyChanged(nameof(HasOverwritten));
+    OnPropertyChanged(nameof(HasPasswordBadge));
+    OnPropertyChanged(nameof(StatusBrushName));
+}
+```
+
+> `Set(...)` = 文件既有属性通知辅助方法（若无则沿用 Status/Progress 的现有写法逐一套用）；`BatchStatus` 枚举值以文件现状为准（grep `enum BatchStatus` 确认，缺失的成员用现有枚举替代并在实现时记录）。
+
+**Must NOT do:**
+- ❌ Core 不得引用任何 UI 类型（Brush/Color/Avalonia）
+- ❌ 禁止逐字段 `[NotifyPropertyChangedFor]`——只允许 `NotifyBatchProperties()` 集中通知
+- ❌ 不得改变现有 `Status`/`Progress`/`ErrorMessage` 的语义
+
+**References:**
+- `ProgressBatchItem.cs` 全文（现有 5 属性）；`Converters/BatchStatusConverters.cs`（状态→文案/图标映射，图标转换器继续服务行内状态图标）
+
+**Verification:**
+```powershell
+dotnet build src\MantisZip.Core\MantisZip.Core.csproj
+```
+- 构建通过
+
+**Acceptance Criteria:**
+- 新字段全部带通知，派生属性集中在 `NotifyBatchProperties()`
+- `StatusBrushName` 仅返回资源键字符串（无 Brush 类型）
+
+**Recommended Agent Profile**:
+- **Category**: `quick`（单文件追加字段 + 集中通知）
+- **Skills**: `[]`
+
+**QA Scenarios**:
+- Core 构建通过；`StatusBrushName` 仅返回资源键字符串（grep 无 `Brush` 类型引用）；派生属性只经 `NotifyBatchProperties()` 通知
+
+**Parallelization:** 与 T1/T2 并行；T5 依赖本任务。
+
+---
+
+- [ ] 4. 三引擎解压冲突埋点 + ZIP 并行批次上报 + 去硬编码前缀（Core）
+
+  **Files:**
+  - Create: `src/MantisZip.Core/Utils/ConflictStatsCounter.cs`
+  - Modify: `src/MantisZip.Core/Engines/ZipEngine.cs`（4 处 :307/:502/:712/:912 + 批次上报 + 去前缀）
+  - Modify: `src/MantisZip.Core/Engines/TarGzEngine.cs`（4 处 :89/:154/:617/:707 + 去前缀）
+  - Modify: `src/MantisZip.Core/Engines/SevenZipEngine.cs`（2 处 :363/:749 + 密码抛点 :333 附近不动 + 去前缀）
+
+  **What to do:**
+
+  1. 新建线程安全计数器：
 
   ```csharp
   namespace MantisZip.Core.Utils;
 
-  using System.IO; // for Path methods
-
-  public static class ProgressDisplayCalculator
+  /// <summary>解压冲突统计（Interlocked 线程安全；ZIP 并行批次内多线程共享同一实例）。</summary>
+  public sealed class ConflictStatsCounter
   {
-      public static (string dirPath, string fileName) SplitFilePath(string currentFile)
-      {
-          if (string.IsNullOrEmpty(currentFile))
-              return ("", "");
-          var dir = Path.GetDirectoryName(currentFile);
-          var name = Path.GetFileName(currentFile);
-          return (dir ?? "", name);
-      }
-
-      public static double CalculateOverallPercent(
-          ArchiveProgress p, bool isBatchMode,
-          int currentBatchIndex, int batchCount)
-      {
-          if (isBatchMode && batchCount > 1)
-          {
-              double completedWeight = currentBatchIndex > 0
-                  ? (double)currentBatchIndex / batchCount * 100
-                  : 0;
-              double currentWeight = p.PercentComplete / batchCount;
-              return completedWeight + currentWeight;
-          }
-          return p.PercentComplete;
-      }
-
-      public static string FormatStatsText(
-          int processed, int total, int skipped, int failed)
-      {
-          var parts = new List<string>();
-          if (total > 0)
-              parts.Add($"✅ 已处理 {processed}/{total}");
-          if (skipped > 0)
-              parts.Add($"⏭跳过 {skipped}");
-          if (failed > 0)
-              parts.Add($"❌出错 {failed}");
-          return parts.Count > 0 ? string.Join("  ", parts) : "";
-      }
-
-      public static string FormatFileCount(int processed, int total)
-          => total > 0 ? $"文件 {processed}/{total}" : "";
+      private int _skipped, _overwritten, _failed;
+      public void RecordSkipped() => Interlocked.Increment(ref _skipped);
+      public void RecordOverwritten() => Interlocked.Increment(ref _overwritten);
+      public void RecordFailed() => Interlocked.Increment(ref _failed);
+      public (int Skipped, int Overwritten, int Failed) Snapshot =>
+          (_skipped, _overwritten, _failed);
+      public void Reset() { _skipped = 0; _overwritten = 0; _failed = 0; }
   }
   ```
 
-  **Must NOT do**:
-  - 不要引用任何 WPF/Avalonia 命名空间
-  - 方法必须是纯函数（无副作用，无 UI 依赖）
-
-  **Recommended Agent Profile**:
-  - **Category**: `quick`
-    - 纯静态工具类，无复杂逻辑
-  - **Skills**: `[]`
-
-  **Parallelization**:
-  - **Can Run In Parallel**: YES
-  - **Parallel Group**: Wave 1 (with Tasks 1, 2, 4)
-  - **Blocks**: Task 7 (ProgressWindow.cs uses this)
-  - **Blocked By**: None
-
-  **References**:
-  - `src/MantisZip.Core/Abstractions/ArchiveEngine.cs` — `ArchiveProgress` 类的属性签名
-
-  **Acceptance Criteria**:
-
-  **QA Scenarios**:
-  ```
-  Scenario: 编译验证
-    Tool: Bash
-    Steps:
-      1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-    Expected Result: 编译通过
-    Evidence: .omo/evidence/task-3-build.txt
-  ```
-
-  **Commit**: NO (groups with Wave 1 at the end)
-
-- [ ] 4. **`FileConflictHelper.cs` 添加回调触发**
-
-  **What to do**:
-  在 `FileConflictHelper.ResolvePath(string outputPath, ArchiveOptions? options, ...)` 中，在计算出最终 `action` 后、调用 `ResolveByAction` 之前，插入一行：
+  2. **10 处 `ResolvePathAsync` 调用点逐点埋点**（grep `ResolvePathAsync(` 复核行号——行号会漂移，以符号定位为准）。每处模式：
 
   ```csharp
-  // 计算出最终 action 后（包括从 Ask 弹窗获取用户选择后），通知调用方
-  options?.ConflictActionCallback?.Invoke(action);
-  ```
-
-  代码位置在 `ResolvePath` 方法中，大概在 `File.Exists` 检查之后、`ResolveByAction` 调用之前。具体：
-  - 如果 `File.Exists(outputPath)` 为 false，直接 return（无冲突，不触发回调）
-  - 如果存在冲突，计算出 action（包括走 Ask → ConflictResolver），然后插入回调调用，再调用 `ResolveByAction`
-
-  **Must NOT do**:
-  - 不要改变 `ResolvePath` 的返回值和行为
-  - 不要修改 `ResolveByAction` 私有方法
-
-  **Recommended Agent Profile**:
-  - **Category**: `quick`
-    - 单行插入，逻辑简单
-  - **Skills**: `[]`
-
-  **Parallelization**:
-  - **Can Run In Parallel**: YES
-  - **Parallel Group**: Wave 1 (with Tasks 1, 2, 3)
-  - **Blocks**: Task 5 (engines rely on the callback)
-  - **Blocked By**: Task 1 (need `ArchiveOptions.ConflictActionCallback`)
-
-  **References**:
-  - `src/MantisZip.Core/Utils/FileConflictHelper.cs` — `ResolvePath` 方法，约第 17-60 行
-
-  **Acceptance Criteria**:
-
-  **QA Scenarios**:
-  ```
-  Scenario: 编译验证
-    Tool: Bash
-    Steps:
-      1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-    Expected Result: 编译通过
-    Evidence: .omo/evidence/task-4-build.txt
-  ```
-
-  **Commit**: NO (groups with Wave 1)
-
-- [ ] 5. **引擎跳过计数（ZipEngine + SevenZipEngine + TarGzEngine）**
-
-  **What to do**:
-  在三个引擎的 `ExtractAsync` 方法中，添加跳过计数逻辑。模式三引擎通用：
-
-  1. 方法开头声明局部变量 `int skippedCount = 0`
-  2. 包装 `options.ConflictActionCallback` 来累计跳过数（保留原始回调链）
-  3. 返回 `ExtractResult` 时带上 `SkippedEntries = skippedCount`
-
-  **ZipEngine** 改动模式（在 ExtractAsync 中，options 使用前）：
-  ```csharp
-  int skippedCount = 0;
-  var originalCallback = options?.ConflictActionCallback;
-  var countingCallback = new Action<FileConflictAction>(action =>
+  var existedBefore = File.Exists(outputPath);          // 预检必须在 ResolvePathAsync 之前
+  var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, ct);
+  if (resolvedPath == null)
   {
-      if (action == FileConflictAction.Skip ||
-          action == FileConflictAction.OverwriteIfOlder ||
-          action == FileConflictAction.OverwriteIfSmaller)
-      {
-          Interlocked.Increment(ref skippedCount);
-      }
-      originalCallback?.Invoke(action);
+      conflictStats.RecordSkipped();                    // 策略=跳过
+      // ... 既有 skip 分支行为保持不变 ...
+      continue;
+  }
+  if (existedBefore && string.Equals(resolvedPath, outputPath, StringComparison.OrdinalIgnoreCase))
+      conflictStats.RecordOverwritten();                // 覆盖已有文件
+  // ... 既有逻辑不动 ...
+  ```
+
+  - 每个解压方法（`ExtractAsync`/`ExtractEntriesAsync`）入口创建一个 `ConflictStatsCounter` 实例，方法内所有调用点共享
+  - 条目级 `catch` 中调用 `conflictStats.RecordFailed()`（仅在既有 per-entry catch 存在处补一行，不新增 try 结构）
+  - **先确认每处调用点所在方法确为解压路径**（grep 实测 10 处全在 ExtractAsync/ExtractEntriesAsync 内；若行号漂移后发现压缩路径调用点则跳过并记录）
+  - TarGz :154 这类无 entryModified 重载同样计数
+
+  3. **上报**：方法内每次构造/更新 `ArchiveProgress` 时追加：
+
+  ```csharp
+  var (sk, ov, fl) = conflictStats.Snapshot;            // 锁外/无锁快照（计数器本身线程安全）
+  progress?.Report(new ArchiveProgress
+  {
+      // ... 既有字段 ...
+      SkippedFiles = sk,
+      OverwrittenFiles = ov,
+      FailedFiles = fl,
   });
-  if (options != null)
-      options.ConflictActionCallback = countingCallback;
-
-  // ... 提取循环不变（ResolvePath 内部已触发 countingCallback）
-
-  return new ExtractResult
-  {
-      SucceededEntries = successCount,
-      FailedEntries = failCount,
-      SkippedEntries = skippedCount
-  };
   ```
 
-  **需注意的引擎差异**：
-  - **ZipEngine**：跳过时已加 `processedBytes += entry.Size`，只需加 `skippedCount`
-  - **SevenZipEngine**：同上，注意 `ArchivePath.Normalize` 后的 entryKey
-  - **TarGzEngine**：有两个提取路径（TAR 条目和 .gz 文件），都需要加
+  - **进度报告已在锁内的**（ZipEngine parallel `conflictGate`/`_progressGate` 区域）：锁内只拷贝计数快照与进度字段到局部变量，**`Report` 必须在释放锁之后调用**（AGENTS.md 性能陷阱：锁内 Report 8 线程争用曾 25x 劣化）
+  - 节流维持既有 ~100ms 逻辑；**最终 100% 报告必须携带终值统计**
+  - 压缩路径（CompressAsync）**不创建计数器、不设统计字段**（保持 null）
 
-  **Must NOT do**:
-  - 不要改动提取循环的主体逻辑
-  - 不要在 `continue` 之外加新的副作用
+  4. **ZIP 并行批次索引**：`ExtractAsyncParallel`（:391）的 `Parallel.ForEachAsync`（:476）批次委托内，构造 `ArchiveProgress` 时设 `BatchIndex = 批次序号(0-based)`、`BatchCount = 批次数`；sequential/非并行路径不设（保持 null）。**按批次索引标识，禁止用 `ManagedThreadId`**。
 
-  **Recommended Agent Profile**:
-  - **Category**: `deep`
-    - 涉及三个引擎，需理解每个引擎的提取循环结构
+  5. **最终 `ExtractResult`**：各 `ExtractAsync`/`ExtractEntriesAsync` 返回处，从计数器快照填充 `SkippedEntries`/`OverwrittenEntries`（强转 int），`FailedEntries` 保持既有逻辑（如已有失败计数则不重复统计）。
+
+  6. **去硬编码前缀**：`grep -n "正在压缩" src/MantisZip.Core` 与 `"正在解压"`，将 `CurrentFile = "正在压缩: " + path` 类语句改为 `CurrentFile = path`（raw 路径）。UI 语境由既有 `Progress_FileCompressing/Extracting` key 在需要处表达（本计划不新增展示位）。`StripEnginePrefix`（T2）作防御性兜底。
+
+  **Must NOT do:**
+  - ❌ 禁止改 `IArchiveEngine` 签名 / `ArchiveOptions`
+  - ❌ 禁止在锁内调用 `progress.Report`
+  - ❌ 禁止改动冲突解决行为本身（只观察计数，不改 ResolvePathAsync 语义）
+  - ❌ 禁止给压缩路径伪造统计（保持 null）
+  - ❌ 禁止用 `ManagedThreadId`/线程 ID 做批次归属
+  - ❌ Core 内禁止新增中文用户可见文案（去前缀是删除，不是新增）
+
+  **Recommended Agent Profile:**
+  - **Category**: `deep`（跨 3 引擎 10 处精细埋点 + 锁纪律 + 线程安全，易错）
   - **Skills**: `[]`
 
-  **Parallelization**:
-  - **Can Run In Parallel**: NO (one engine at a time)
-  - **Parallel Group**: Wave 1 (sequential)
-  - **Blocks**: Wave 2 (need engines to report counts)
-  - **Blocked By**: Tasks 1, 4
+  **QA Scenarios:**
+  - 加密 ZIP 并行解压 + 覆盖/跳过策略混合：统计栏数字与实际文件操作一致；无锁竞争性能回归（对照 AGENTS.md 0.3s 基线量级）
+  - grep 确认 10 处调用点全部埋点、0 处 `正在压缩`/`正在解压` 残留在 Core
 
-  **References**:
-  - `src/MantisZip.Core/Engines/ZipEngine.cs` — `ExtractAsync`，`ResolvePath` 调用处
-  - `src/MantisZip.Core/Engines/SevenZipEngine.cs` — 同上
-  - `src/MantisZip.Core/Engines/TarGzEngine.cs` — 同上（注意两个路径）
-
-  **QA Scenarios**:
+  **Verification:**
+  ```powershell
+  dotnet build src\MantisZip.Core\MantisZip.Core.csproj
+  dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
   ```
-  Scenario: 编译验证
-    Tool: Bash
-    Steps:
-      1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-    Expected Result: 编译通过
-    Evidence: .omo/evidence/task-5-build.txt
-  ```
+  - [ ] 构建通过 + 既有测试全绿
 
-  **Commit**: NO (groups with Wave 1 — 全部 Wave 1 任务一起提交)
+  **Acceptance Criteria:**
+  - [ ] 10 处调用点全部有 skip/overwritten 计数（grep `RecordSkipped` ≥10 处调用）
+  - [ ] ZIP 并行报告携带 `BatchIndex/BatchCount`，其他路径为 null
+  - [ ] 三引擎最终报告与 `ExtractResult` 统计一致
+  - [ ] Core 无 `正在压缩`/`正在解压` 前缀残留
+
+  **Parallelization:**
+  - **Can Run In Parallel**: NO（与 T5-T7 波次串行更稳；文件独立可与 T5 并行但建议顺序）
+  - **Blocked By**: Task 1
+  - **Blocks**: Task 6（VM 消费统计字段）
 
 ---
 
-### Wave 2: UI 层（5 任务）
+- [ ] 5. 行模型 + 模式枚举 + 主题键 + 三语本地化 key（UI）
 
-- [ ] 6. **ProgressWindow XAML 布局改动 + 双模式切换**
+  **Files:**
+  - Create: `src/MantisZip.UI.Avalonia/Models/ProgressDisplayMode.cs`
+  - Create: `src/MantisZip.UI.Avalonia/Models/ParallelBatchProgressItem.cs`
+  - Modify: `src/MantisZip.UI.Avalonia/Resources/ThemeLight.axaml` + `ThemeDark.axaml`（若缺状态主题键）
+  - Modify: `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json` / `strings.en.json` / `strings.zh-TW.json`
 
-  **What to do**:
-  修改 `ProgressWindow.xaml`，采用上下两区域布局，支持独立模式切换：
+  **What to do:**
 
-  **布局结构**：
-  ```
-  ┌─────────────────────────────────────┐
-  │ 标题栏                              │
-  ├─────────────────────────────────────┤
-  │ 【上方 - 文件信息区】                │
-  │  • 批处理列表（固定显示）            │
-  │  • 显示: [简约]|详细|列表            │ ← 上方内容切换
-  │  • 模式切换内容                     │
-  ├─────────────────────────────────────┤
-  │ 【下方 - 整体信息区】（深色背景）     │
-  │  【少】|中|完整                      │ ← 下方密度切换
-  │  • 统计栏（完整模式）               │
-  │  • 中等模式: 已处理+速度（单行）     │
-  │  • 总体进度条                       │
-  │  • 时间显示                         │
-  └─────────────────────────────────────┘
+  1. 模式枚举：
+
+  ```csharp
+  namespace MantisZip.UI.Avalonia.Models;
+
+  /// <summary>进度窗口上方信息显示模式（v6 原型三模式）。</summary>
+  public enum TopDisplayMode { FullName, DirOnly, NameOnly }
+
+  /// <summary>进度窗口信息密度（三档，与紧凑度模式独立）。</summary>
+  public enum DensityMode { Compact, Normal, Loose }
   ```
 
-  **Grid 行调整**：
+  2. 并行批次详细行模型（仅 ZIP 并行时由 VM 填充；非并行集合为空 → XAML 按 Rule 6 隐藏）：
+
+  ```csharp
+  /// <summary>ZIP 并行解压批次详细行（ArchiveProgress.BatchIndex 驱动）。</summary>
+  public sealed class ParallelBatchProgressItem : ObservableObject
+  {
+      // BatchIndex+1（1-based 显示序号）
+      public int Index { get; init; }
+      [ObservableProperty] private double _percent;        // 0-100
+      [ObservableProperty] private string _statusBrushName = "ThemeBorderBrush"; // 资源键，BrushResourceConverter 物化
+      [ObservableProperty] private string _detailText = ""; // 如 "12/40 文件"（VM 用 T() 拼好传入）
+  }
   ```
-  Row 0: TitleBar (标题栏)
-  Row 1: FileInfoSection (上方区域)
-    ├── BatchFileList (固定显示)
-    ├── TopModeSwitcher (内联切换: 简约/详细/列表)
-    ├── TopSimpleContent (简约模式: 当前文件+进度条)
-    ├── TopDetailedContent (详细模式: 线程进度列表)
-    └── TopListContent (列表模式: 文件列表+状态标记)
-  Row 2: OverallInfoSection (下方区域)
-    ├── DensitySwitcher (少/中/完整 三按钮)
-    ├── StatsBar (完整模式: 已处理/跳过/出错/已覆盖 四项)
-    ├── MediumStats (中等模式: 已处理+速度 单行)
-    ├── TotalProgressBar
-    └── TimeDisplay (所有模式)
-  Row 3: ErrorSummaryBox
-  Row 4: 弹性填充
-  Row 5: 按钮行
-  ```
+  > 若文件用手工属性通知（与 ProgressViewModel 风格一致），改用手工 `Set` 模式，保持仓库风格统一——二选一，以既有 UI/Models 文件风格为准（grep `ObservableObject` in Models/ 确认）。
 
-  **上方区域 - 批处理列表（固定显示）**：
-  ```xml
-  <!-- 批处理列表 - 始终可见 -->
-  <StackPanel Grid.Row="1" Margin="0,0,0,8">
-      <TextBlock Text="压缩包列表" FontSize="11" Foreground="{StaticResource Theme_TextSecondary}"
-                 Margin="0,0,0,4"/>
-      <ListBox x:Name="BatchFileList" MaxHeight="120"
-               ItemsSource="{Binding BatchItems}">
-          <ListBox.ItemTemplate>
-              <DataTemplate>
-                  <StackPanel Orientation="Horizontal">
-                      <TextBlock Text="{Binding StatusIcon}" Width="20"/>
-                      <TextBlock Text="{Binding Name}" Width="200" TextTrimming="CharacterEllipsis"/>
-                      <TextBlock Text="{Binding ProgressText}" Width="60" HorizontalAlignment="Right"/>
-                  </StackPanel>
-              </DataTemplate>
-          </ListBox.ItemTemplate>
-      </ListBox>
-  </StackPanel>
-  ```
+  3. **状态主题键**：grep `ThemeStatusSuccessBrush` 于 `ThemeLight.axaml`/`ThemeDark.axaml`；缺失则成对新增 4 个：
+     - `ThemeStatusSuccessBrush`、`ThemeStatusFailedBrush`、`ThemeStatusCancelledBrush`、`ThemeStatusSkippedBrush`
+     - 颜色值**承接 `BatchStatusConverters.cs` 既有硬编码色**（grep `FromRgb`/`#` 取值：Failed `#F43643` 系、Success `#6BD46B`/`#4CAF50` 系、Skipped `#00BCD4` 系——以转换器实际值为准；暗色档用同色即可）
+     - Rule 4：两主题文件必须成对，键名以 `Brush` 结尾
 
-  **上方区域 - 内联模式切换器**：
-  ```xml
-  <!-- 内联模式切换 - 紧凑按钮组 -->
-  <StackPanel Orientation="Horizontal" Margin="0,4,0,8">
-      <TextBlock Text="显示:" VerticalAlignment="Center" FontSize="11"
-                 Foreground="{StaticResource Theme_TextSecondary}" Margin="0,0,6,0"/>
-      <Button Content="简约" Tag="Simple" Click="OnTopModeChanged"
-              Classes="ModeButton" />
-      <Button Content="详细" Tag="Detailed" Click="OnTopModeChanged"
-              Classes="ModeButton"/>
-      <Button Content="列表" Tag="List" Click="OnTopModeChanged"
-              Classes="ModeButton"/>
-  </StackPanel>
-  ```
+  4. **三语 key**（Rule 13：先 grep 既有 key 复用，缺失才新增；插入文件头 `{` 之后，不排序，UTF-8 无 BOM + CRLF + 2 空格缩进）：
 
-  **上方区域 - 列表模式（虚拟化 + 状态标记）**：
-  ```xml
-  <ListBox x:Name="FileListPanel" Grid.Row="1"
-           Visibility="Collapsed" MaxHeight="150"
-           ItemsSource="{Binding FileListItems}">
-      <!-- 虚拟化支持 -->
-      <ListBox.ItemsPanel>
-          <ItemsPanelTemplate>
-              <VirtualizingStackPanel />
-          </ItemsPanelTemplate>
-      </ListBox.ItemsPanel>
-      <ListBox.ItemTemplate>
-          <DataTemplate>
-              <StackPanel Orientation="Horizontal" Margin="0,2">
-                  <!-- 状态图标 -->
-                  <TextBlock Text="{Binding StatusIcon}" Width="20" FontSize="12"
-                             Foreground="{Binding StatusBrush}"/>
-                  <!-- 文件名 -->
-                  <TextBlock Text="{Binding FileName}" Width="200" FontSize="12"
-                             TextTrimming="CharacterEllipsis"
-                             Foreground="{StaticResource Theme_TextPrimary}"/>
-                  <!-- 文件大小 -->
-                  <TextBlock Text="{Binding SizeText}" Width="60" FontSize="11"
-                             HorizontalAlignment="Right"
-                             Foreground="{StaticResource Theme_TextSecondary}"/>
-                  <!-- 状态文本 -->
-                  <TextBlock Text="{Binding StatusText}" Width="50" FontSize="11"
-                             HorizontalAlignment="Right"
-                             Foreground="{Binding StatusBrush}"/>
-              </StackPanel>
-          </DataTemplate>
-      </ListBox.ItemTemplate>
-  </ListBox>
-  ```
+  | key | zh-CN | en | zh-TW |
+  |---|---|---|---|
+  | `Progress_Stats_Processed` | `已处理 {0}` | `Processed {0}` | `已處理 {0}` |
+  | `Progress_Stats_Skipped` | `跳过 {0}` | `Skipped {0}` | `跳過 {0}` |
+  | `Progress_Stats_Failed` | `出错 {0}` | `Failed {0}` | `出錯 {0}` |
+  | `Progress_Stats_Overwritten` | `已覆盖 {0}` | `Overwritten {0}` | `已覆蓋 {0}` |
+  | `Progress_Stats_Speed` | `{0}/s` | `{0}/s` | `{0}/s` |
+  | `Progress_Time_Elapsed` | `已用 {0}` | `Elapsed {0}` | `已用 {0}` |
+  | `Progress_Time_Remaining` | `剩余 {0}` | `Remaining {0}` | `剩餘 {0}` |
+  | `Progress_CurrentFileLabel` | `当前文件` | `Current file` | `目前檔案` |
+  | `Progress_Batch_ArchiveOf` | `{0} / {1}` | `{0} / {1}` | `{0} / {1}` |
+  | `Progress_Batch_Pwd_Matching` | `匹配中` | `Matching` | `匹配中` |
+  | `Progress_Batch_Pwd_MatchedTip` | `已匹配密码，点击查看` | `Password matched, click to view` | `已匹配密碼，點擊查看` |
+  | `Progress_Batch_Pwd_Rule` | `规则 {0}` | `Rule {0}` | `規則 {0}` |
+  | `Progress_Batch_Pwd_Desc` | `描述 {0}` | `Description {0}` | `描述 {0}` |
 
-  **下方区域 - 密度模式切换器（下方区域顶部）**：
-  ```xml
-  <!-- 密度切换按钮组 - 在下方区域内部 -->
-  <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Center"
-              Margin="0,0,0,8">
-      <Button Content="少" Tag="Minimal" Click="OnDensityChanged"
-              Classes="ModeButton"/>
-      <Button Content="中" Tag="Medium" Click="OnDensityChanged"
-              Classes="ModeButton"/>
-      <Button Content="完整" Tag="Full" Click="OnDensityChanged"
-              Classes="ModeButton"/>
-  </StackPanel>
-  ```
+  - **新增前必 grep**：`Status_WrongPassword`/`Status_PasswordCancelled`/`Status_ArchiveCorrupted`/`Progress_FileCount`/`Progress_CopyTooltip`/`Progress_RevealTooltip` 已存在，**复用勿重复新增**
+  - 行摘要不新增 key：VM 用 `Progress_Stats_*` 组 parts 拼 `SummaryText`
+  - 完成后跑 `AboutWindowTests.AllThreeLanguages_HaveSameKeySet`（三语 key 集校验）
 
-  **下方区域 - 三种密度模式显示内容**：
-  ```xml
-  <!-- 统计栏（完整模式：五项统计） -->
-  <StackPanel x:Name="StatsBar" Grid.Row="2" Orientation="Horizontal"
-              JustifyContent="SpaceAround" IsVisible="False">
-      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-          <TextBlock Text="✅" FontSize="18"/>
-          <TextBlock Text="已处理" FontSize="11" Foreground="..."/>
-          <TextBlock Text="60/100" FontSize="16" FontWeight="SemiBold"/>
-      </StackPanel>
-      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-          <TextBlock Text="⏭" FontSize="18"/>
-          <TextBlock Text="跳过" FontSize="11"/>
-          <TextBlock Text="3" FontSize="16" FontWeight="SemiBold"/>
-      </StackPanel>
-      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-          <TextBlock Text="❌" FontSize="18"/>
-          <TextBlock Text="出错" FontSize="11"/>
-          <TextBlock Text="1" FontSize="16" FontWeight="SemiBold"/>
-      </StackPanel>
-      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-          <TextBlock Text="🔄" FontSize="18"/>
-          <TextBlock Text="已覆盖" FontSize="11"/>
-          <TextBlock Text="5" FontSize="16" FontWeight="SemiBold"/>
-      </StackPanel>
-      <StackPanel Orientation="Vertical" HorizontalAlignment="Center">
-          <TextBlock Text="⚙️" FontSize="18"/>
-          <TextBlock Text="进程" FontSize="11"/>
-          <TextBlock Text="8 线程" FontSize="16" FontWeight="SemiBold"/>
-      </StackPanel>
-  </StackPanel>
+  **Must NOT do:**
+  - ❌ 不在 `.cs`/`.axaml` 硬编码任何用户可见文案（Rule 13）
+  - ❌ 不改既有 key 的值
+  - ❌ 键文件保持 UTF-8 无 BOM + CRLF + 2 空格缩进
 
-  <!-- 中等模式：已处理+速度+进程数（单行） -->
-  <StackPanel x:Name="MediumStats" Grid.Row="2" Orientation="Horizontal"
-              JustifyContent="SpaceBetween" IsVisible="False"
-              Padding="8,4" Background="...">
-      <TextBlock FontSize="12">
-          <Run Text="已处理:" Foreground="..."/>
-          <Run Text="60/100" FontWeight="SemiBold"/>
-      </TextBlock>
-      <TextBlock FontSize="12">
-          <Run Text="速度:" Foreground="..."/>
-          <Run Text="12.5 MB/s" FontWeight="SemiBold"/>
-      </TextBlock>
-      <TextBlock FontSize="12">
-          <Run Text="进程:" Foreground="..."/>
-          <Run Text="8 线程" FontWeight="SemiBold"/>
-      </TextBlock>
-  </StackPanel>
-
-  <!-- 时间显示（所有模式） -->
-  <StackPanel x:Name="TimeDisplay" Grid.Row="2" Orientation="Horizontal"
-              JustifyContent="SpaceBetween" Margin="0,8,0,0"
-              Padding="0,8,0,0" BorderBrush="..." BorderThickness="0,1,0,0">
-      <TextBlock FontSize="13" Foreground="...">
-          <Run Text="已用:"/>
-          <Run Text="00:00:12" FontWeight="SemiBold"/>
-      </TextBlock>
-      <TextBlock FontSize="13" Foreground="...">
-          <Run Text="剩余:"/>
-          <Run Text="00:00:08" FontWeight="SemiBold"/>
-      </TextBlock>
-  </StackPanel>
-  ```
-
-  **文件列表项状态样式**：
-  ```xml
-  <Style Selector="ListBoxItem">
-      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}"/>
-  </Style>
-  
-  <!-- 状态颜色 -->
-  <Style Selector="TextBlock.StatusCompleted">
-      <Setter Property="Foreground" Value="#6bd46b"/>
-  </Style>
-  <Style Selector="TextBlock.StatusError">
-      <Setter Property="Foreground" Value="#ff6b6b"/>
-  </Style>
-  <Style Selector="TextBlock.StatusSkipped">
-      <Setter Property="Foreground" Value="#888"/>
-      <Setter Property="Opacity" Value="0.6"/>
-  </Style>
-  ```
-
-  **Must NOT do**:
-  - 不要修改现有控件的除 `Grid.Row` 外的属性
-  - 不要改变窗口尺寸、Title、Topmost 等基本属性
-
-  **Recommended Agent Profile**:
-  - **Category**: `visual-engineering`
-    - Avalonia XAML 布局调整 + 模式切换
+  **Recommended Agent Profile:**
+  - **Category**: `quick`（枚举 + 模型小文件 + JSON key 插入）
   - **Skills**: `[]`
 
-  **Parallelization**:
-  - **Can Run In Parallel**: NO
-  - **Parallel Group**: Wave 2 (with Tasks 7, 8, 9)
-  - **Blocks**: None
-  - **Blocked By**: None
+  **QA Scenarios:**
+  - `dotnet test` 三语 key 集一致；grep 确认新 key 三文件同步；主题键两文件成对
 
-  **References**:
-  - `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml` — 现有布局
-  - HTML 原型: `docs/prototypes/progress-window-enhancement.html`
-
-  **QA Scenarios**:
+  **Verification:**
+  ```powershell
+  dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
+  dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj --filter AllThreeLanguages
   ```
-  Scenario: 编译验证
-    Tool: Bash
-    Steps:
-      1. dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
-    Expected Result: 编译通过
-    Evidence: .omo/evidence/task-6-build.txt
+  - [ ] 构建通过 + key 集测试绿
 
-  Scenario: 模式切换验证
-    Tool: Manual
-    Steps:
-      1. 启动应用，触发压缩/解压操作
-      2. 在 ProgressWindow 中切换上方模式（简约→详细→列表）
-      3. 在 ProgressWindow 中切换下方密度（少→中→完整）
-      4. 验证各模式下显示正确的控件
-    Expected Result: 两组模式独立切换，显示对应内容
-    Evidence: .omo/evidence/task-6-mode-switch.png
+  **Acceptance Criteria:**
+  - [ ] 新 key 三语同步、插入位置正确、无 BOM
+  - [ ] `StatusBrushName` 引用的主题键在亮/暗两主题均存在
 
-  Scenario: 文件列表性能验证
-    Tool: Manual
-    Steps:
-      1. 选择包含 1000+ 文件的压缩包解压
-      2. 切换到列表模式
-      3. 滚动列表，观察性能
-    Expected Result: 滚动流畅，无卡顿
-    Evidence: .omo/evidence/task-6-list-perf.png
-  ```
+  **Parallelization:**
+  - **Blocked By**: Task 3
+  - **Blocks**: Task 6（VM 引用枚举/行模型）、Task 7（XAML 绑定 key）
 
-  **Commit**: NO (groups with Wave 2 at the end)
+---
 
-- [ ] 7. **ProgressDisplayCalculator 时间估算 + 并行进度方法**
+- [ ] 6. ProgressViewModel 重构：模式/密度/统计/时间/ETA/批次集合（UI）
 
-  **What to do**:
-  在 `ProgressDisplayCalculator.cs` 中新增时间估算和并行进度相关方法：
+  **Files:**
+  - Modify: `src/MantisZip.UI.Avalonia/ViewModels/ProgressViewModel.cs`
 
-  **7a. 时间估算方法**：
+  **What to do:**
+
+  1. **新增字段**（与 :24-27 既有私有字段同区）：`_speedTracker`（`ProgressSpeedTracker`）、`_opStartUtc`（DateTime，ctor/InitBatchMode 重置）、`_topDisplayMode`、`_densityMode`、`_statsProcessed/_statsSkipped/_statsFailed/_statsOverwritten`（long）、`_hasConflictStats`（bool）、`_dirName`、`_fileName`、`_elapsedText`、`_remainingText`、`_speedText`、`_currentFileLabel`、`_batchArchiveIndexText`、`ObservableCollection<ParallelBatchProgressItem> _parallelBatchItems`。
+
+  2. **模式/密度属性**（手工通知，与文件既有风格一致）：
+
   ```csharp
-  /// <summary>
-  /// 计算已用时间和预计剩余时间。
-  /// </summary>
-  public static (TimeSpan elapsed, TimeSpan? estimated) CalculateTimeEstimate(
-      DateTime startTime, double overallPercent, long processedBytes, long totalBytes)
+  public TopDisplayMode TopDisplayMode
   {
-      var elapsed = DateTime.UtcNow - startTime;
-      
-      if (overallPercent <= 0 || overallPercent >= 100)
-          return (elapsed, null);
-      
-      // 基于字节数估算（更准确）
-      if (totalBytes > 0 && processedBytes > 0)
-      {
-          var bytesPerSecond = processedBytes / elapsed.TotalSeconds;
-          if (bytesPerSecond > 0)
-          {
-              var remainingBytes = totalBytes - processedBytes;
-              var estimated = TimeSpan.FromSeconds(remainingBytes / bytesPerSecond);
-              return (elapsed, estimated);
-          }
-      }
-      
-      // 基于百分比估算（回退方案）
-      var percentPerSecond = overallPercent / elapsed.TotalSeconds;
-      if (percentPerSecond > 0)
-      {
-          var remainingPercent = 100 - overallPercent;
-          var estimated = TimeSpan.FromSeconds(remainingPercent / percentPerSecond);
-          return (elapsed, estimated);
-      }
-      
-      return (elapsed, null);
+      get => _topDisplayMode;
+      set { if (Set(ref _topDisplayMode, value)) NotifyDisplayProperties(); }
   }
-
-  /// <summary>
-  /// 格式化时间显示文本。
-  /// </summary>
-  public static string FormatTimeDisplay(TimeSpan elapsed, TimeSpan? estimated)
+  public DensityMode DensityMode
   {
-      var elapsedStr = FormatTimeSpan(elapsed);
-      
-      if (estimated.HasValue)
-      {
-          var estimatedStr = FormatTimeSpan(estimated.Value);
-          return $"已用 {elapsedStr}  |  预计剩余 {estimatedStr}";
-      }
-      
-      return $"已用 {elapsedStr}";
+      get => _densityMode;
+      set { if (Set(ref _densityMode, value)) NotifyDisplayProperties(); }
   }
-
-  private static string FormatTimeSpan(TimeSpan ts)
+  // 派生可见性（集中通知，禁 [NotifyPropertyChangedFor] 逐个标注）
+  public bool DirVisible => TopDisplayMode != TopDisplayMode.NameOnly && DirName.Length > 0;
+  public bool NameVisible => TopDisplayMode != TopDisplayMode.DirOnly;
+  public bool IsCompactDensity => DensityMode == DensityMode.Compact;
+  // ...
+  private void NotifyDisplayProperties()
   {
-      if (ts.TotalHours >= 1)
-          return $"{(int)ts.TotalHours:D2}:{ts.Minutes:D2}:{ts.Seconds:D2}";
-      return $"{ts.Minutes:D2}:{ts.Seconds:D2}";
+      OnPropertyChanged(nameof(DirVisible));
+      OnPropertyChanged(nameof(NameVisible));
+      OnPropertyChanged(nameof(IsCompactDensity));
+      // 其余派生一并在此
   }
   ```
 
-  **7b. 并行进度方法**（支持多线程进度上报）：
-  ```csharp
-  /// <summary>
-  /// 线程进度信息（用于详细模式显示）。
-  /// </summary>
-  public class ThreadProgressInfo
-  {
-      public int ThreadId { get; set; }
-      public string FileName { get; set; } = "";
-      public double Progress { get; set; }
-      public string PercentText => $"{Progress:F0}%";
-  }
+  3. **`SetProgress` 接入计算器**（现有 :211-256 逻辑内改造，保留 100ms 节流 `_lastProgressUpdate/ProgressThrottle`）：
+  - `ProgressDisplayCalculator.SplitFilePath(p.CurrentFile)` → `DirName`/`FileName` 属性（set 时触发 `DirVisible/NameVisible` 重算经集中通知）
+  - 批次模式总进度：`ComputeOverallPercent(_currentBatchIndex, p.PercentComplete, BatchItems.Count)`；非批次 = `p.PercentComplete`
+  - 速度/ETA：`_speedTracker.RecordSample(p.ProcessedBytes, DateTime.UtcNow)` → `SpeedText = T("Progress_Stats_Speed", FormatBytes(speed))`；`ComputeEtaSeconds(ProcessedInArchive, TotalBytes)` → `RemainingText = T("Progress_Time_Remaining", FormatDuration(...))`（`FormatBytes` 用既有 KB/MB 换算辅助，grep 既有实现复用）
+  - `_hasConflictStats`：任一报告 `p.SkippedFiles != null` 时置 true（压缩路径恒 null → 统计栏隐藏，Rule 6）
+  - 统计值拷贝：`SkippedFiles/FailedFiles/OverwrittenFiles` 非 null 时更新 `_statsXxx` + 拼 `T("Progress_Stats_Xxx", value)`
+  - 并行批次集合：`p.BatchIndex != null` → upsert `_parallelBatchItems[p.BatchIndex]`（Index/Percent/StatusBrushName/DetailText）；`p.BatchIndex == null` 时**不动集合**（避免非并行清空闪烁）；`SetCurrentBatchItem`（:311）切换档案时清空集合
 
-  /// <summary>
-  /// 文件列表项信息（用于列表模式显示）。
-  /// </summary>
-  public class FileListItemInfo
-  {
-      public string StatusIcon { get; set; } = "";
-      public string FileName { get; set; } = "";
-      public string StatusText { get; set; } = "";
-      public Brush? StatusBrush { get; set; }
-  }
+  4. **`SetCurrentBatchItem` 增加 ETA 守卫**：调用 `_speedTracker.OnArchiveSwitch(当前累计字节, DateTime.UtcNow)` —— 档案切换重置字节基线与 EMA（防上一档案速度污染剩余时间）。同时把上一档案的最终统计写入 `BatchItem`：`TotalFiles/ProcessedFiles/SkippedFiles/FailedFiles/OverwrittenFiles` + `SummaryText`（parts 经 `T("Progress_Stats_*")` 拼接）。
 
-  /// <summary>
-  /// 计算文件列表项的状态信息。
-  /// </summary>
-  public static FileListItemInfo CalculateFileListItem(
-      string fileName, bool isActive, bool isCompleted, bool isFailed, 
-      bool isSkipped, double? progress = null)
-  {
-      var info = new FileListItemInfo { FileName = fileName };
-      
-      if (isActive)
-      {
-          info.StatusIcon = "⏳";
-          info.StatusText = progress.HasValue ? $"{progress:F0}%" : "进行中";
-          info.StatusBrush = Brushes.Yellow;
-      }
-      else if (isCompleted)
-      {
-          info.StatusIcon = "✓";
-          info.StatusText = "完成";
-          info.StatusBrush = Brushes.Green;
-      }
-      else if (isFailed)
-      {
-          info.StatusIcon = "✗";
-          info.StatusText = "出错";
-          info.StatusBrush = Brushes.Red;
-      }
-      else if (isSkipped)
-      {
-          info.StatusIcon = "⏭";
-          info.StatusText = "跳过";
-          info.StatusBrush = Brushes.Gray;
-      }
-      else
-      {
-          info.StatusIcon = "○";
-          info.StatusText = "等待";
-          info.StatusBrush = Brushes.LightGray;
-      }
-      
-      return info;
-  }
-  ```
+  5. **时间刷新**：新增 `RefreshTimeDisplay()`（public，供 code-behind DispatcherTimer 每 1s 调用）：`ElapsedText = T("Progress_Time_Elapsed", FormatDuration(DateTime.UtcNow - _opStartUtc))`；`_opStartUtc` 在 InitBatchMode/SetProgress 首次调用时初始化。
 
-  **Must NOT do**:
-  - 不要修改现有 ProgressDisplayCalculator 方法的签名
-  - 不要引入 Avalonia 依赖（保持 Core 层独立）
+  6. **`UpdateBatchItemStats(ArchiveProgress p)`**（新方法，SetProgress 批次分支内调用）：把统计字段写入 `BatchItems[_currentBatchIndex]`（行级实时统计）。
 
-  **Recommended Agent Profile**:
-  - **Category**: `quick`
-    - 纯工具方法新增
+  7. **LocalizedStrings 登记**（ctor :36-50 数组追加 T5 全部新 key + `Progress_CurrentFileLabel`）——**漏登记 = XAML 绑定空白**（Rule 13 特别注意：此字典由显式数组构建，非全量加载 JSON）。
+
+  8. **不动**：password props(:98-119) 与死方法(:394/:409/:448) —— T8 负责删除（决策锁定4）。
+
+  **Must NOT do:**
+  - ❌ 禁止逐字段 `[NotifyPropertyChangedFor]`（AGENTS.md 集中通知模式）
+  - ❌ 禁止硬编码中文（一律 `LocalizationManager.T`）
+  - ❌ 禁止在本任务删除任何既有成员（死代码清理归 T8）
+  - ❌ 禁止把 ETA 守卫做成「档案切换不清基线」的近似实现
+
+  **Recommended Agent Profile:**
+  - **Category**: `unspecified-high`（单 VM 大改造，属性联动多）
   - **Skills**: `[]`
 
-  **Parallelization**:
-  - **Can Run In Parallel**: NO
-  - **Parallel Group**: Wave 2 (with Tasks 6, 8, 9)
-  - **Blocks**: Task 8 (code-behind needs these methods)
-  - **Blocked By**: Task 3 (existing ProgressDisplayCalculator)
+  **QA Scenarios:**
+  - 非批次解压：统计栏出现（已处理/速度/时间），压缩时统计栏隐藏
+  - 批次解压档案切换：ETA/速度归零重起，上一行写入 SummaryText
+  - ZIP 并行解压：并行批次集合出现行；非 ZIP：集合恒空（XAML 隐藏）
 
-  **References**:
-  - `src/MantisZip.Core/Utils/ProgressDisplayCalculator.cs` — 新建的工具类
-
-  **QA Scenarios**:
+  **Verification:**
+  ```powershell
+  dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
   ```
-  Scenario: 编译验证
-    Tool: Bash
-    Steps:
-      1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-    Expected Result: 编译通过
-    Evidence: .omo/evidence/task-7-build.txt
+  - [ ] 构建通过、`lsp_diagnostics` 无错误
 
-  Scenario: 时间估算验证
-    Tool: Unit Test
-    Steps:
-      1. 编写单元测试验证 CalculateTimeEstimate 方法
-      2. 验证不同输入下的输出正确性
-    Expected Result: 所有测试通过
-    Evidence: .omo/evidence/task-7-test.txt
-  ```
+  **Acceptance Criteria:**
+  - [ ] 模式/密度/统计/时间/ETA 属性齐备且集中通知
+  - [ ] LocalizedStrings 含 T5 全部新 key
+  - [ ] ETA 守卫在 `SetCurrentBatchItem` 重置基线
 
-  **Commit**: NO (groups with Wave 2 at the end)
+  **Parallelization:**
+  - **Blocked By**: Task 1、Task 4、Task 5
+  - **Blocks**: Task 7（XAML 绑定本 VM 属性）
 
-- [ ] 8. **ThreadProgressItem/FileInfoItem 模型类（新增）**
+---
 
-  **What to do**:
-  在 `Core/Models/` 下新增两个模型类，用于 ProgressWindow 的并行进度显示：
+- [ ] 7. ProgressWindow.axaml 布局重构 + code-behind 计时器/模式接线（UI）
 
-  **8a. ThreadProgressItem.cs**：
-  ```csharp
-  namespace MantisZip.Core.Models;
+  **Files:**
+  - Modify: `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml`
+  - Modify: `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml.cs`
 
-  /// <summary>
-  /// 单个线程的进度信息（用于 ProgressWindow 详细模式）。
-  /// </summary>
-  public class ThreadProgressItem
-  {
-      public int ThreadId { get; set; }
-      public string FileName { get; set; } = "";
-      public double Progress { get; set; }
-      public string PercentText => $"{Progress:F0}%";
-  }
-  ```
+  **What to do:**
 
-  **8b. FileListItem.cs**：
-  ```csharp
-  namespace MantisZip.Core.Models;
+  1. **目标行结构**（Grid 重排，`x:CompileBindings="False"` 保留；现有控件按新行号迁移，不删功能）：
 
-  /// <summary>
-  /// 文件列表项信息（用于 ProgressWindow 列表模式）。
-  /// </summary>
-  public class FileListItem
-  {
-      public string StatusIcon { get; set; } = "";
-      public string FileName { get; set; } = "";
-      public string StatusText { get; set; } = "";
-      public string StatusBrushName { get; set; } = "Theme_TextSecondary";
-  }
-  ```
+  | 行 | 内容 | 绑定/说明 |
+  |---|---|---|
+  | 0 | **TopSection 模式切换**：TopDisplayMode 三选（全路径/仅目录/仅文件名）+ DensityMode 三选（紧凑/标准/宽松），两组 RadioButton | code-behind Click → `_vm.TopDisplayMode/_vm.DensityMode`（枚举绑定需转换器，薄接线放 code-behind 更简） |
+  | 1 | **统计栏**：`已处理 / 跳过 / 出错 / 已覆盖 / 速度` 五个 TextBlock | 跳过/出错/已覆盖 `IsVisible="{Binding HasConflictStats}"`（Rule 6，压缩隐藏） |
+  | 2 | 路径行 DirName | `IsVisible="{Binding DirVisible}"`，`ThemeTextSecondaryBrush` |
+  | 3 | 文件名行 FileName | `IsVisible="{Binding NameVisible}"`，加粗 |
+  | 4 | 当前文件标签 + 文件进度条 + 百分比（迁移既有 `FileCountText`(:222)/进度条控件） | 标签绑定 `LocalizedStrings[Progress_CurrentFileLabel]` |
+  | 5 | 时间行：`已用 / 剩余` | `ElapsedText/RemainingText` |
+  | 6 | 状态行（既有 :229 迁移） | 既有绑定不动 |
+  | 7 | 错误摘要 ErrorSummaryBox（既有 :238 迁移） | 既有绑定不动 |
+  | 8 | 批处理列表 BatchFileList（既有 :38 迁移）+ 并行批次行 ItemsControl | 批列表行高已有 `MinHeight=ControlHeightMd`（Rule 7 满足）；并行批次容器 `IsVisible` 绑 `HasParallelBatches`（VM 集合变更通知；若 T6 未加该派生属性，在此补充经 `NotifyDisplayProperties` 式集中通知）——**无数据即隐藏（Rule 6）** |
+  | 9 | PasswordSection（**原样保留**，仅迁到本行；上方加注释 `<!-- 死横幅：任务 8 删除 -->`，决策锁定4） | 既有绑定不动 |
+  | 10 | 按钮行（既有 :253 KeepOpen/Pause/Cancel 迁移） | 既有绑定不动 |
 
-  **Must NOT do**:
-  - 不要引入 Avalonia 依赖（使用字符串表示颜色，UI 层转换）
-  - 不要添加复杂的业务逻辑
+  2. **样式规则（逐条硬性）**：
+  - Rule 4：所有颜色 `DynamicResource Theme*Brush` 结尾键；新增处若缺主题键 → `ThemeLight.axaml`/`ThemeDark.axaml` 成对补
+  - Rule 5：间距 `SpacingXxxThk`（Margin/Padding）/`SpacingXxx`（Spacing）/`ControlHeightXxx`/`BorderRadius`——禁止硬编码数值
+  - Rule 6：统计项/路径行/并行容器/密码徽标（T8）一律 `IsVisible` 切换，不 `IsEnabled`
+  - Rule 14：所有新增分区/控件上方中文 `<!-- -->` 注释（模式切换区、统计栏、路径/文件名区、时间行、并行批次区、按钮区）
 
-  **Recommended Agent Profile**:
-  - **Category**: `quick`
-    - 简单模型类新增
+  3. **code-behind**：
+  - `DispatcherTimer`（1000ms）：`OnOpened` 启动 → `_vm.RefreshTimeDisplay()`；`OnClosed` 停止（防泄漏）
+  - 模式 RadioButton Click 处理器（6 个，各 1 行赋值 VM 属性）
+  - 保留既有 `DispatchIfNeeded` 包装与转发结构；**不在此任务删除任何成员**
+
+  **Must NOT do:**
+  - ❌ 禁止 `Visibility.Visible`（WPF 残留）/`Visibility` 任何用法 → `IsVisible`
+  - ❌ 禁止 `Theme_Text*` 下划线键名
+  - ❌ 禁止固定 Height/硬编码间距（除有充分理由）
+  - ❌ 禁止删除 PasswordSection 与死方法（T8 职责）
+  - ❌ 禁止新增用户可见硬编码文案（Rule 13）
+
+  **Recommended Agent Profile:**
+  - **Category**: `visual-engineering`（布局/样式域；load_skills=["frontend"] 评估，Avalonia 专用规则以上文为准）
   - **Skills**: `[]`
 
-  **Parallelization**:
-  - **Can Run In Parallel**: YES
-  - **Parallel Group**: Wave 2 (with Tasks 6, 7)
-  - **Blocks**: Task 9 (code-behind uses these models)
-  - **Blocked By**: None
+  **QA Scenarios:**
+  - 三模式切换：全路径→两行显示；仅目录→隐藏文件名行；仅文件名→隐藏路径行
+  - 压缩任务：统计栏跳过/出错/已覆盖三项隐藏；解压任务显示
+  - 紧凑/标准/宽松切换行高与间距变化（Rule 5 资源键生效）
 
-  **References**:
-  - `src/MantisZip.Core/Models/` — 现有模型类目录
-
-  **QA Scenarios**:
+  **Verification:**
+  ```powershell
+  dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
   ```
-  Scenario: 编译验证
-    Tool: Bash
-    Steps:
-      1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-    Expected Result: 编译通过
-    Evidence: .omo/evidence/task-8-build.txt
-  ```
+  - [ ] 构建通过、`lsp_diagnostics` 无错误
 
-  **Commit**: NO (groups with Wave 2 at the end)
+  **Acceptance Criteria:**
+  - [ ] 11 行结构就位，既有控件全部迁移无丢失
+  - [ ] 规则 4/5/6/14 逐条自检通过
+  - [ ] DispatcherTimer 启停正确
 
-- [ ] 9. **ProgressWindow.cs 代码逻辑（SetProgress + 模式切换 + 时间显示）**
+  **Parallelization:**
+  - **Blocked By**: Task 6
+  - **Blocks**: Task 8（行模板/Flyout 落点）、Task 9（状态行展示）
 
-  **What to do**:
-  修改 `ProgressWindow.xaml.cs`，重构 `SetProgress` 方法，新增模式切换、时间显示、并行进度支持：
+---
 
-  **9a. 新增字段**：
-  ```csharp
-  // 时间估算相关
-  private DateTime _startTime;
-  private long _processedBytes;
-  private long _totalBytes;
-  
-  // 并行进度相关
-  private readonly ObservableCollection<ThreadProgressItem> _threadProgressItems = new();
-  private readonly ObservableCollection<FileListItem> _fileListItems = new();
-  
-  // 当前显示模式
-  private enum DisplayMode { Simple, Detailed, List }
-  private DisplayMode _currentMode = DisplayMode.Simple;
-  ```
+- [ ] 8. 批处理密码徽标 + Flyout + 两路径接线 + 删死横幅/死方法（UI + 接线）
 
-  **9b. `SetProgress` 方法重构**：
-  ```csharp
-  public void SetProgress(ArchiveProgress p)
-  {
-      App.LogDebug("[TRACE] ProgressWindow.SetProgress called: ...");
+  **Files:**
+  - Modify: `src/MantisZip.Core/Models/ProgressBatchItem.cs`（补两个派生 bool）
+  - Modify: `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml`（行模板徽标 + Flyout；删 PasswordSection）
+  - Modify: `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml.cs`（Flyout 填充 + `SetBatchPasswordState` 包装；删死包装）
+  - Modify: `src/MantisZip.UI.Avalonia/ViewModels/ProgressViewModel.cs`（`SetBatchPasswordState` 方法；删死方法 :394/:409/:448 与 password props :98-119）
+  - Modify: `src/MantisZip.UI.Avalonia/App.axaml.cs`（Path A L1224-1227 + Path B L774 附近）
 
-      // ---- 计算（Core 层，无 UI 依赖） ----
-      var (dirPath, fileName) = ProgressDisplayCalculator.SplitFilePath(p.CurrentFile);
-      var overallPct = ProgressDisplayCalculator.CalculateOverallPercent(
-          p, _isBatchMode, _currentBatchIndex, _batchItems?.Count ?? 0);
-      var statsText = ProgressDisplayCalculator.FormatStatsText(
-          p.ProcessedFiles, p.TotalFiles, p.SkippedFiles, p.FailedFiles);
-      var fileCountText = ProgressDisplayCalculator.FormatFileCount(
-          p.ProcessedFiles, p.TotalFiles);
+  **What to do:**
 
-      // 时间估算
-      var (elapsed, estimated) = ProgressDisplayCalculator.CalculateTimeEstimate(
-          _startTime, overallPct, _processedBytes, _totalBytes);
-      var timeDisplayText = ProgressDisplayCalculator.FormatTimeDisplay(elapsed, estimated);
+  1. **删除前 grep 守卫（第一步，必须先做）**：
+     ```
+     grep -n "ShowPasswordAttempt\|ShowPasswordMatched\|HidePasswordSection\|IsPasswordSectionVisible\|PasswordMatchText\|PasswordRuleText\|PasswordStatusText" src/
+     ```
+     - 预期：仅命中 VM 定义(:98-119/:394/:409/:448)、code-behind 包装(:286/:304/:322)、XAML 绑定——**零外部业务调用**
+     - 若出现外部调用者 → **停止本任务，报告用户**，不得盲删
 
-      // ---- 赋值（WPF 特有，迁移时替换） ----
-      DirPathText.Text = dirPath;
-      FileNameText.Text = fileName;
-      FileProgressCountText.Text = fileCountText;
-      StatsBarText.Text = statsText;
-      ElapsedTimeText.Text = $"已用 {elapsed:hh\\:mm\\:ss}";
-      EstimatedTimeText.Text = estimated.HasValue 
-          ? $"预计剩余 {estimated:hh\\:mm\\:ss}" 
-          : "";
+  2. **删除**（grep 确认后）：
+     - XAML：`PasswordSection` Border 整块（Row 1 区，:97 起，含 PwdMatchText:122/PwdRevealBtn:130/PwdCopyBtn:146；任务 7 已把它迁到 Row 9，此时直接移除该行）
+     - VM：password props 区（:98-119 七个字段+属性）与三个死方法（:394/:409/:448）
+     - code-behind：三个包装方法（:286/:304/:322）
 
-      // 总进度
-      TotalProgressBar.Value = overallPct;
-      PercentText.Text = $"{overallPct:F1}%";
+  3. **BatchItem 补派生 bool**（Core，纳入既有 `NotifyBatchProperties()`）：
+     ```csharp
+     public bool IsPasswordMatching => PasswordState == BatchPasswordState.Matching;
+     public bool IsPasswordMatched => PasswordState == BatchPasswordState.Matched;
+     // NotifyBatchProperties() 内追加 OnPropertyChanged(nameof(IsPasswordMatching/IsPasswordMatched))
+     ```
 
-      // 文件进度条
-      if (p.FilePercentComplete.HasValue)
-      {
-          FileProgressBar.Value = p.FilePercentComplete.Value;
-          FilePercentText.Text = $"{p.FilePercentComplete.Value:F0}%";
-      }
+  4. **行模板徽标**（BatchFileList 的 DataTemplate 内，密度走既有 ControlHeight 资源键）：
+     - `匹配中` 元素：`🔄` + `TextBlock` 绑 `LocalizedStrings[Progress_Batch_Pwd_Matching]`，`IsVisible="{Binding IsPasswordMatching}"`
+     - `已匹配` 元素：`🔑 ●●●●` Button，`IsVisible="{Binding IsPasswordMatched}"`，ToolTip 绑 `LocalizedStrings[Progress_Batch_Pwd_MatchedTip]`，挂 Flyout
+     - **不显示尝试规则 N/M（D4）**
 
-      // 更新字节计数（用于时间估算）
-      if (p.TotalBytes > 0) _totalBytes = p.TotalBytes;
-      if (p.ProcessedBytes > 0) _processedBytes = p.ProcessedBytes;
+  5. **Flyout**（XAML：每行模板内实例化一个共享结构；内容控件 x:Name）：
+     - `Opening` 事件 code-behind：`(sender as Button)?.DataContext as BatchItem` → 填充：
+       - 掩码文本：默认 `●●●●●●`；**显示态尊重 `AppSettings.PasswordRevealByDefault`**（true 则初始明文）；👁 切换按钮只切显示态
+       - **复制按钮恒复制明文** `MatchedPassword`
+       - 规则行：`IsVisible` = PasswordRule 非空，文本 `T("Progress_Batch_Pwd_Rule", rule)`
+       - 描述行：同理 `Progress_Batch_Pwd_Desc`
+     - 用 code-behind 按 x:Name 填充（Flyout 内容会继承触发元素 DataContext，直接绑定会串行数据——决策 D2 明确此点）
 
-      // 压缩包计数（批处理模式）
-      if (_isBatchMode && _batchItems != null && _batchItems.Count > 0)
-      {
-          int current = _currentBatchIndex >= 0
-              ? Math.Min(_currentBatchIndex + 1, _batchItems.Count)
-              : Math.Min((int)p.PercentComplete / 100 * _batchItems.Count, _batchItems.Count);
-          if (current < 1) current = 1;
-          FileCountText.Text = L.TF(L.Progress_FileCount, current, _batchItems.Count);
-      }
-      else
-      {
-          FileCountText.Text = L.TF(L.Progress_FileCount, 1, 1);
-      }
-      FileCountText.Visibility = Visibility.Visible;
+  6. **VM/包装方法**：
+     ```csharp
+     // ProgressViewModel：安全调用（集合变更需 UI 线程；与 SetCurrentBatchItem 既有约定一致）
+     public void SetBatchPasswordState(int index, BatchPasswordState state,
+         string? password, string? rule, string? description)
+     // ProgressWindow 包装：DispatchIfNeeded(() => _vm.SetBatchPasswordState(...))
+     ```
 
-      // 批处理模式：更新当前 BatchItem 的摘要字段
-      if (_isBatchMode && _currentBatchIndex >= 0 && _batchItems != null &&
-          _currentBatchIndex < _batchItems.Count)
-      {
-          _batchItems[_currentBatchIndex].TotalFiles = p.TotalFiles;
-          _batchItems[_currentBatchIndex].ProcessedFiles = p.ProcessedFiles;
-          _batchItems[_currentBatchIndex].SkippedFiles = p.SkippedFiles;
-          _batchItems[_currentBatchIndex].FailedFiles = p.FailedFiles;
+  7. **Path A 接线（App.axaml.cs，批循环开始前 L1224-1227 `TryGetValue` 区域后）**：
+     ```csharp
+     for (int i = 0; i < archivePaths.Count; i++)
+         if (matchedPasswords.TryGetValue(archivePaths[i], out var pwd))
+         {
+             var entry = passwordService.FindSavedPasswordEntry(archivePaths[i], pwd); // 同 MainWindowViewModel:957 模式
+             progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matched,
+                 pwd, entry?.Patterns is { Count: > 0 } ? string.Join("; ", entry.Patterns) : null,
+                 entry?.Description);
+         }
+     ```
+     —— 预匹配密码**开始解压前整行全亮**（D1）
 
-          // 节流更新进度（原有逻辑）
-          var now = DateTime.UtcNow;
-          if (p.PercentComplete >= 100 || p.PercentComplete <= 0 ||
-              (now - _lastProgressUpdate) >= ProgressThrottle)
-          {
-              _batchItems[_currentBatchIndex].Progress = p.PercentComplete;
-              _lastProgressUpdate = now;
-          }
-      }
+  8. **Path B 接线（循环内 `ResolveCliPassword` L774 调用区）**：
+     - 解析前：`SetBatchPasswordState(currentIndex, Matching, null, null, null)`
+     - 解析返回非 null → `SetBatchPasswordState(currentIndex, Matched, pwd, rule, desc)`
+     - 解析返回 null（无密码包）→ `SetBatchPasswordState(currentIndex, None, null, null, null)`（熄灭 Matching）
+     - `rule/desc` 同 Path A 查找模式；查不到传 null（Flyout 行隐藏）
 
-      // 更新模式特定的视图
-      UpdateModeSpecificView(p);
-  }
-  ```
+  **Must NOT do:**
+  - ❌ grep 守卫未过禁止删除
+  - ❌ Flyout 禁止显示「尝试规则 N/M」（D4）
+  - ❌ 复制禁止只复制掩码
+  - ❌ 禁止恢复/新增横幅类全局密码提示（D3/D8：只删不加）
+  - ❌ 禁止在 Core 的 BatchItem 引入 UI 类型
 
-  **9c. 模式切换方法**：
-  ```csharp
-  // 上方内容模式切换（简约/详细/列表）
-  private void OnTopModeChanged(object sender, RoutedEventArgs e)
-  {
-      if (sender is Button btn && btn.Tag is string tag)
-      {
-          _currentTopMode = tag switch
-          {
-              "Simple" => TopDisplayMode.Simple,
-              "Detailed" => TopDisplayMode.Detailed,
-              "List" => TopDisplayMode.List,
-              _ => TopDisplayMode.Simple
-          };
-          UpdateTopModeVisibility();
-      }
-  }
-
-  private void UpdateTopModeVisibility()
-  {
-      // 隐藏所有模式内容
-      TopSimpleContent.IsVisible = false;
-      TopDetailedContent.IsVisible = false;
-      TopListContent.IsVisible = false;
-      
-      // 显示当前模式内容
-      switch (_currentTopMode)
-      {
-          case TopDisplayMode.Simple:
-              TopSimpleContent.IsVisible = true;
-              break;
-          case TopDisplayMode.Detailed:
-              TopDetailedContent.IsVisible = true;
-              break;
-          case TopDisplayMode.List:
-              TopListContent.IsVisible = true;
-              break;
-      }
-  }
-
-  // 下方密度模式切换（少/中/完整 三按钮）
-  private void OnDensityChanged(object sender, RoutedEventArgs e)
-  {
-      if (sender is Button btn && btn.Tag is string tag)
-      {
-          _currentDensityMode = tag switch
-          {
-              "Minimal" => DensityMode.Minimal,
-              "Medium" => DensityMode.Medium,
-              "Full" => DensityMode.Full,
-              _ => DensityMode.Medium
-          };
-          UpdateDensityVisibility();
-      }
-  }
-
-  private void UpdateDensityVisibility()
-  {
-      // 全部隐藏
-      StatsBar.IsVisible = false;
-      MediumStats.IsVisible = false;
-      TimeDisplay.IsVisible = false;
-
-      switch (_currentDensityMode)
-      {
-          case DensityMode.Minimal:
-              // 少：进度条 + 时间
-              TimeDisplay.IsVisible = true;
-              break;
-          case DensityMode.Medium:
-              // 中：已处理+速度+进程数（单行） + 进度条 + 时间
-              MediumStats.IsVisible = true;
-              TimeDisplay.IsVisible = true;
-              break;
-          case DensityMode.Full:
-              // 完整：统计栏(五项: 已处理/跳过/出错/已覆盖/进程数) + 进度条 + 时间
-              StatsBar.IsVisible = true;
-              TimeDisplay.IsVisible = true;
-              break;
-      }
-  }
-  ```
-
-  **9d. 并行进度更新方法**：
-  ```csharp
-  /// <summary>
-  /// 更新线程进度（从引擎调用）。
-  /// </summary>
-  public void UpdateThreadProgress(int threadId, string fileName, double progress)
-  {
-      void Update()
-      {
-          var existing = _threadProgressItems.FirstOrDefault(t => t.ThreadId == threadId);
-          if (existing != null)
-          {
-              existing.FileName = fileName;
-              existing.Progress = progress;
-          }
-          else
-          {
-              _threadProgressItems.Add(new ThreadProgressItem
-              {
-                  ThreadId = threadId,
-                  FileName = fileName,
-                  Progress = progress
-              });
-          }
-      }
-      DispatchIfNeeded(Update, DispatcherPriority.Background);
-  }
-
-  /// <summary>
-  /// 更新文件列表（从引擎调用）。
-  /// </summary>
-  public void UpdateFileList(string fileName, bool isActive, bool isCompleted, 
-      bool isFailed, bool isSkipped, double? progress = null)
-  {
-      void Update()
-      {
-          var info = ProgressDisplayCalculator.CalculateFileListItem(
-              fileName, isActive, isCompleted, isFailed, isSkipped, progress);
-          
-          _fileListItems.Add(new FileListItem
-          {
-              StatusIcon = info.StatusIcon,
-              FileName = info.FileName,
-              StatusText = info.StatusText,
-              StatusBrushName = info.StatusBrushName
-          });
-      }
-      DispatchIfNeeded(Update, DispatcherPriority.Background);
-  }
-  ```
-
-  **Must NOT do**:
-  - 不要删除现有 `SetProgress` 的任何功能（进度条、计数、密码区逻辑保持不变）
-  - 不要改动 `BackgroundDispatcherProgress` 和 `PauseAwareProgress` 类
-  - 不要引入线程安全问题（使用 `DispatchIfNeeded` 更新 UI）
-
-  **Recommended Agent Profile**:
-  - **Category**: `deep`
-    - 涉及多个方法的重构和新增
+  **Recommended Agent Profile:**
+  - **Category**: `unspecified-high`（跨 Core/UI/App 三处 + 删码守卫 + 两路径接线）
   - **Skills**: `[]`
 
-  **Parallelization**:
-  - **Can Run In Parallel**: NO
-  - **Parallel Group**: Wave 2 (sequential, after Tasks 6, 7, 8)
-  - **Blocks**: Task 10 (App.Extract.cs needs these methods)
-  - **Blocked By**: Tasks 6, 7, 8
+  **QA Scenarios:**
+  - 预匹配密码批处理：开始前徽标全亮（Path A）；无预匹配包：轮到该包时先 🔄 后 🔑（Path B），无密码包不出现徽标
+  - Flyout：默认掩码/明文随 `PasswordRevealByDefault`；👁 切换；复制后剪贴板为明文；规则/描述缺失时对应行隐藏
+  - 删除后全仓 grep 死符号 = 0 命中，构建通过
 
-  **References**:
-  - `src/MantisZip.UI/Dialogs/ProgressWindow.xaml.cs` — 现有 `SetProgress` 方法
-  - `src/MantisZip.Core/Utils/ProgressDisplayCalculator.cs` — 新建的工具类
-  - `src/MantisZip.Core/Models/ThreadProgressItem.cs` — 新建的模型类
-  - `src/MantisZip.Core/Models/FileListItem.cs` — 新建的模型类
-
-  **QA Scenarios**:
+  **Verification:**
+  ```powershell
+  dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
+  dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   ```
-  Scenario: 编译验证
-    Tool: Bash
-    Steps:
-      1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
-    Expected Result: 编译通过
-    Evidence: .omo/evidence/task-9-build.txt
+  - [ ] 构建通过、`lsp_diagnostics` 无错误
 
-  Scenario: 模式切换验证
-    Tool: Manual
-    Steps:
-      1. 启动应用，触发压缩/解压操作
-      2. 在 ProgressWindow 中切换模式（简约→详细→列表）
-      3. 验证各模式下显示正确的控件
-    Expected Result: 三种模式正确切换，显示对应内容
-    Evidence: .omo/evidence/task-9-mode-switch.png
-  ```
+  **Acceptance Criteria:**
+  - [ ] 死横幅/7 个死属性/3 个死方法/3 个包装全部移除且零调用者
+  - [ ] 两路径点亮行为与 D1 一致
+  - [ ] 无规则 N/M 展示
 
-  **Commit**: YES (groups with Task 6)
-  - Message: `feat(ui): enhance ProgressWindow with mode switching, time display, and parallel progress support`
-  - Files: `ProgressWindow.xaml.cs`
+  **Parallelization:**
+  - **Blocked By**: Task 3、Task 7
+  - **Blocks**: Task 9（同文件，串行）
 
-- [ ] 10. **App.Extract.cs 统计更新 + 引擎并行进度上报**
+---
 
-  **What to do**:
-  修改 `App.Extract.cs` 和三个引擎，支持并行进度上报和统计更新：
+- [ ] 9. PasswordRetryLoop 密码弹窗兜底 + 4 叶子入口接线（UI 服务）
 
-  **10a. `App.Extract.cs` — 批处理完成后更新统计**：
+  **Files:**
+  - Create: `src/MantisZip.UI.Avalonia/Services/PasswordRetryLoop.cs`
+  - Modify: `src/MantisZip.UI.Avalonia/Services/ExtractService.cs`（叶子 1，:28）
+  - Modify: `src/MantisZip.UI.Avalonia/Services/ExtractFlow.cs`（叶子 2，:153 过滤分支）
+  - Modify: `src/MantisZip.UI.Avalonia/Services/SelectedItemsExtractService.cs`（叶子 3）
+  - Modify: `src/MantisZip.UI.Avalonia/App.axaml.cs`（叶子 4：L1379 直连 engine + 批循环 L1248-1251 catch 补标记分支）
+
+  **What to do:**
+
+  1. **`PasswordRetryLoop`**（UI 层；引擎完全 unwind 后才可能弹窗——密码抛点全在并行派发前，见 Research Findings）：
+
   ```csharp
-  // 在批处理循环中，每个压缩包提取完成后
-  var extractResult = await engine.ExtractAsync(...);
+  namespace MantisZip.UI.Avalonia.Services;
 
-  // 新增：推送跳过计数到 ProgressWindow 的当前批处理项
-  if (progressWindow.IsBatchMode)
+  /// <summary>用户在密码弹窗点取消（区别于引擎密码错误——调用方据此标记「已取消 - 需要密码」）。</summary>
+  public sealed class PasswordRetryCancelledException(string archivePath)
+      : Exception(archivePath);
+
+  public enum PasswordRetryOutcome { Success, Cancelled, CorruptedOrInvalid }
+
+  public static class PasswordRetryLoop
   {
-      progressWindow.UpdateBatchItemSkipCount(i, extractResult.SkippedEntries);
+      /// <summary>attempt 失败且为密码类错误 → 弹 PasswordDialog → QuickVerifyPasswordEx 验证 →
+      /// 错密码回 Status_WrongPassword 并重弹（Phase B 模式, MainWindowViewModel:966-1027）；
+      /// 取消返回 Cancelled；Corrupted 返回 CorruptedOrInvalid。</summary>
+      public static async Task<(PasswordRetryOutcome Outcome, string? Password)> RunAsync(
+          string archivePath,
+          string? initialPassword,
+          IArchiveEngine engine,                 // 叶子调用点已持有 engine
+          Window? owner,                         // ProgressWindow.CurrentVisible ?? MainWindow（镜像 ExtractFlow:199 模式）
+          Action<string> setStatus,              // 错密码/损坏提示回调（批处理→行 ErrorMessage；单文件→StatusMessage）
+          Func<string?, CancellationToken, Task> attempt,
+          CancellationToken ct)
+      { ... }
   }
   ```
 
-  **10b. 引擎并行进度上报**（在 ZipEngine 中添加）：
-  ```csharp
-  // 在 ZipEngine.ExtractAsync 中，启动并行线程时
-  var threadProgressAction = new Action<int, string, double>((threadId, fileName, progress) =>
-  {
-      progressReporter?.Invoke(threadId, fileName, progress);
-  });
+  循环体要点：
+  - `attempt(initialPassword)` 成功 → `(Success, password)`
+  - catch 到 `ArchiveService.IsPasswordRelatedError(ex)`（:16）→ `Dispatcher.UIThread.InvokeAsync` 弹 `PasswordDialog(Path.GetFileName(archivePath))`（ctor :42），`ShowDialog<PasswordDialogResponse>` owner 同上
+  - 返回 null（取消）→ `(Cancelled, null)`
+  - `QuickVerifyPasswordEx(archivePath, resp.Password, engine)`（PasswordService:217）：
+     - `WrongPassword` → `setStatus(T("Status_WrongPassword"))` → **continue 重弹**（Phase B L990-994 同构）
+     - `CorruptedOrInvalid` → `setStatus(T("Status_ArchiveCorrupted"))` → `(CorruptedOrInvalid, null)`
+     - 否则 → 以新 password 重跑 `attempt`
+  - `OperationCanceledException`/`ct` 取消 → 原样抛出（既有取消链路处理，不吞）
+  - 重试用的 `attempt` 每次以传入 password 构造 options（若 `ArchiveOptions` 非 record 则复制对象改 Password，禁止共享可变实例）
 
-  // 在并行循环中调用
-  Parallel.ForEach(entries, new ParallelOptions { MaxDegreeOfParallelism = Environment.ProcessorCount }, entry =>
-  {
-      var threadId = Thread.CurrentThread.ManagedThreadId;
-      threadProgressAction(threadId, entry.Key, 0); // 开始
-      // ... 提取逻辑
-      threadProgressAction(threadId, entry.Key, 100); // 完成
-  });
+  2. **4 叶子接线（只在叶子包，禁止编排层重复包装）**：
+     1. **ExtractService.ExtractAsync**（:28→:48 `engine.ExtractAsync`）：包一层；`(Cancelled,_)` → `throw new PasswordRetryCancelledException(path)`
+     2. **ExtractFlow.ExtractAsync 过滤分支**（:153 内 `engine.ExtractEntriesAsync` 调用处）：同上（非过滤分支经 `ExtractService` 已覆盖，**不再包**）
+     3. **SelectedItemsExtractService.ExtractEntriesAsync**：同上
+     4. **App `RunCliDirectExtractBatchAsync`**（L1379 `engine.ExtractAsync`，既有 catch L1393 前）
+
+  3. **`PasswordRetryCancelledException` 捕获点（grep 每个叶子的全部调用方补 catch，置于通用 catch 之前）**：
+  - 批循环 L1248-1251：`catch (PasswordRetryCancelledException)` → `UpdateBatchItemStatus(index, Failed, T("Status_PasswordCancelled"))` → **continue 下一包（D7）**
+  - 直接批 L1393：同上（行 Failed + `Status_PasswordCancelled`，批继续）
+  - `ExtractFlow.RunSelectedItemsExtractionAsync` :110 既有 catch：加标记分支 → ErrorMessage=`T("Status_PasswordCancelled")`
+  - `MainWindowViewModel` 解压方法（ExtractArchiveHere:2257/ToName:2284/ExtractTo:2635/SmartExtract:2663 及 Selected 系列）：既有 catch 内加分支 → `StatusMessage = T("Status_PasswordCancelled")`
+  - 若某调用点**无任何 catch** → 新增 catch（仅标记，不吞其他异常）
+
+  4. **键**：`Status_WrongPassword`/`Status_PasswordCancelled`/`Status_ArchiveCorrupted` 三语已存在——**只 grep 复核，不新增**（缺则按 Rule 13 成对补三文件）。
+
+  **Must NOT do:**
+  - ❌ Core/引擎内禁止弹窗、禁止引用 PasswordDialog（弹窗只在 UI 层叶子点）
+  - ❌ 禁止在编排层（ExtractFlow.ExtractAsync 整体、批循环整体）二次包装（双弹窗风险）
+  - ❌ 禁止改 `IArchiveEngine`/`ExtractService`/`ExtractFlow` 返回类型（决策锁定2：返回类型不动，取消语义走标记异常）
+  - ❌ 禁止「密码同时用于后续压缩包」横幅（D8）
+  - ❌ 禁止吞掉 `OperationCanceledException`
+
+  **Recommended Agent Profile:**
+  - **Category**: `deep`（跨 4 入口异常语义 + UI 线程弹窗 + 批处理取消分支，易漏调用方）
+  - **Skills**: `["systematic-debugging"]`（备选：若接线后出现双弹窗/异常被吞，按该技能排查）
+
+  **QA Scenarios:**
+  - 无密码 CLI `--extract` 加密包 → 弹窗；输错 → 状态栏 `Status_WrongPassword` + 重弹；输对 → 解压成功
+  - 多包批处理中 1 包取消密码 → 该行 ✗「已取消 - 需要密码」，**后续包继续**；其余包成功行状态正确
+  - 拖拽解压加密包（叶子 3 路径）同样弹窗
+  - 断言：解压进行中（并行批次跑动时）不出现弹窗（密码抛点在派发前）
+
+  **Verification:**
+  ```powershell
+  dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
+  dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
   ```
+  - [ ] 构建通过 + 既有测试全绿
 
-  **10c. ProgressWindow 新增方法**：
-  ```csharp
-  public void UpdateBatchItemSkipCount(int index, int skippedEntries)
-  {
-      void Update()
-      {
-          if (_batchItems == null || index < 0 || index >= _batchItems.Count)
-              return;
-          _batchItems[index].SkippedFiles = skippedEntries;
-      }
-      DispatchIfNeeded(Update, DispatcherPriority.Background);
-  }
-  ```
+  **Acceptance Criteria:**
+  - [ ] 4 叶子全部接线、调用方 catch 完备（grep PasswordRetryCancelledException 覆盖检查）
+  - [ ] 错密码循环对齐 Phase B；取消批继续（D5/D6/D7）
+  - [ ] Core 零改动（本任务）
 
-  **Must NOT do**:
-  - 不要改动提取循环的主体逻辑
-  - 不要在 `continue` 之外加新的副作用
-  - 不要引入线程安全问题
-
-  **Recommended Agent Profile**:
-  - **Category**: `deep`
-    - 涉及多个文件和引擎修改
-  - **Skills**: `[]`
-
-  **Parallelization**:
-  - **Can Run In Parallel**: NO
-  - **Parallel Group**: Wave 2 (sequential, after Task 9)
-  - **Blocks**: None
-  - **Blocked By**: Tasks 5, 9
-
-  **References**:
-  - `src/MantisZip.UI/AppPartials/App.Extract.cs` — 批处理循环
-  - `src/MantisZip.Core/Engines/ZipEngine.cs` — 并行提取逻辑
-  - `src/MantisZip.UI/Dialogs/ProgressWindow.xaml.cs` — 新增方法
-
-  **QA Scenarios**:
-  ```
-  Scenario: 编译验证
-    Tool: Bash
-    Steps:
-      1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-      2. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
-    Expected Result: 编译通过
-    Evidence: .omo/evidence/task-10-build.txt
-
-  Scenario: 运行验证（并行提取场景）
-    Tool: Manual
-    Steps:
-      1. 创建包含多个文件的压缩包
-      2. 触发解压操作
-      3. 验证 ProgressWindow 显示线程进度
-    Expected Result: 详细模式下显示多个线程的进度
-    Evidence: .omo/evidence/task-10-parallel.png
-  ```
-
-  **Commit**: YES (groups with Task 6)
-  - Message: `feat(ui): enhance ProgressWindow with mode switching, time display, and parallel progress support`
-  - Files: `App.Extract.cs`, `ZipEngine.cs`
+  **Parallelization:**
+  - **Blocked By**: Task 7（状态行展示）；Task 8 完成后执行（同文件相邻区域）
+  - **Blocks**: F1-F4
 
 ---
 
 ## Final Verification Wave
 
 - [ ] F1. **Plan Compliance Audit** — `oracle`
-  Read the plan end-to-end. For each task: verify the described changes exist in code. Check: ArchiveProgress has SkippedFiles/FailedFiles? FileConflictHelper calls ConflictActionCallback? Engines count skips? ProgressDisplayCalculator exists? ProgressWindow XAML has new controls? SetProgress uses ProgressDisplayCalculator? Mode switching works? Time display works? Parallel progress display works? Evidence files in .omo/evidence/.
-  Output: `Must Have [N/N] | VERDICT: APPROVE/REJECT`
 
-- [ ] F2. **Code Quality & Build** — `unspecified-high`
-  Global build check: `dotnet build`. Run `dotnet test tests/MantisZip.Tests/` (existing tests must not regress). Review changed files for: empty catches, `#warning`/`TODO` left in, commented-out code.
-  Output: `Build [PASS/FAIL] | Tests [N pass/N fail] | VERDICT`
+  对照本计划逐条审计实现：
+  - grep 守卫（全部必须 0 命中，除历史注记节）：`MantisZip.UI\\`（非 Avalonia 路径）、`Visibility.Visible`、`Theme_Text`、`ManagedThreadId`、`ConflictActionCallback`
+  - Rule 13：新增 key 三语同步（`AboutWindowTests.AllThreeLanguages_HaveSameKeySet`）；XAML 绑定 key 全部登记在 `ProgressViewModel` ctor LocalizedStrings（grep 漏登记 = 空白文案）
+  - Rule 4/5/6/7/14：T7 新增 XAML 抽查（DynamicResource 均 `*Brush` 结尾、间距均 `*Thk`、开关均 IsVisible、中文注释齐）
+  - Core 无中文用户可见文案（`ProgressDisplayCalculator`/引擎新增代码）
+  - 与 8 项决策（D1-D8）逐条比对
+
+- [ ] F2. **Code Quality Review** — `unspecified-high`
+
+  - `dotnet build` Core + UI 两项目、`dotnet test` 两测试项目全绿
+  - `lsp_diagnostics` 变更文件无错误
+  - 重点：T4 锁纪律（Report 在锁外）、T3/T6 集中通知无漏属性、T9 无双弹窗/异常吞没
 
 - [ ] F3. **Real Manual QA** — `unspecified-high`
-  Start clean. Run app, trigger a compress operation, verify:
-  - ProgressWindow shows path (directory) + filename (separate)
-  - File progress count updates (文件 50/200)
-  - Stats bar shows processed/skipped/failed counts
-  - Batch mode: each item in the list shows summary text
-  - Error summary still appears on permission errors
-  - Mode switching works (简约→详细→列表)
-  - Time display shows elapsed and estimated remaining
-  - Parallel progress display shows thread progress in detailed mode
-  Save evidence to `.omo/evidence/final-qa/`.
-  Output: `Scenarios [N/N pass] | VERDICT`
+
+  实际运行 App 验证（对照 v6 原型 13 断言）：
+  - 单文件解压：统计栏 + 时间行 + 路径/文件名两行 + 三模式切换 + 三密度
+  - 压缩任务：跳过/出错/已覆盖三项隐藏
+  - ZIP 并行解压：批次详细行出现；7z/TAR：不出现（Rule 6）
+  - 批处理密码：Path A 全亮 / Path B 逐亮、Flyout 掩码/明文/复制明文/规则描述行
+  - 输错密码循环、取消 → 行 ✗ 且批继续
+  - 批次切换后 ETA/速度归零重起；上一行出现完成摘要
+  - 统计数字与实际文件操作抽样比对（skip/overwrite 各 ≥1 例）
 
 - [ ] F4. **Scope Fidelity Check** — `deep`
-  For each task: read "What to do" + actual diff. Verify 1:1 — everything in spec was built, nothing beyond spec was built. Check "Must NOT do" compliance. Detect cross-task contamination.
-  Output: `Tasks [N/N compliant] | VERDICT`
+
+  - 9 任务 + 4 验证项 Acceptance Criteria 全勾
+  - 「与 v6 原型对应关系」表逐行有落点
+  - `docs/PLAN.md:32` 登记行已同步（Rule 1：任务说明含密码徽标+弹窗兜底、估时 12-15h）
+  - 无超范围改动（未动 `IArchiveEngine` 签名、未动版本号 Rule 2、未 commit Rule 3）
 
 ---
 
 ## Commit Strategy
 
-| Step | Message | Scope |
-|------|---------|-------|
-| Wave 1 (after Tasks 1-5) | `feat(core): add skip counting and conflict action callback infrastructure` | ArchiveProgress, ArchiveOptions, ExtractResult, FileConflictHelper, ProgressDisplayCalculator, BatchItem, 3 engines |
-| Wave 2 (after Tasks 6-10) | `feat(ui): enhance ProgressWindow with mode switching, time display, and parallel progress support` | ProgressWindow.xaml, ProgressWindow.xaml.cs, App.Extract.cs, ZipEngine.cs, new model classes |
+**不主动 commit**（需用户明确要求）。用户要求时按波次提交，提交前必须先更新进度文档（Rule 3：`docs/PROGRESS.md` 里程碑 + `docs/progress-avalonia-detail.md` 细节）：
+
+1. `feat(core): 进度统计字段、解压冲突埋点与进度计算器`（T1-T4）
+2. `feat(avalonia): 进度窗口多行显示、统计时间行与双模式切换`（T5-T7）
+3. `feat(avalonia): 批处理密码徽标与解压密码弹窗兜底`（T8-T9）
+
+遵循 conventional commits 中文风格（Rule 10，scope: `core`/`avalonia`）。
 
 ---
 
 ## Success Criteria
 
-### Verification Commands
-```bash
-dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj
-dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
-```
+- [ ] `dotnet build src\MantisZip.Core\MantisZip.Core.csproj` 通过
+- [ ] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 通过
+- [ ] `dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj` 全绿（含新增 `ProgressDisplayCalculatorTests`）
+- [ ] `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj` 全绿（含三语 key 校验）
+- [ ] grep 守卫 0 命中：`Visibility.Visible`、`Theme_Text`、`ManagedThreadId`、`ConflictActionCallback`、非 Avalonia `MantisZip.UI\`、Core 内 `正在压缩:`/`正在解压:` 前缀
+- [ ] 10 处 `ResolvePathAsync` 调用点全部埋点，统计与实际一致
+- [ ] 密码徽标两路径（A 全亮/B 逐亮）+ Flyout + 死横幅/死方法清除
+- [ ] 密码弹窗 4 叶子接线，错密码循环、取消批继续
+- [ ] 三模式/三密度/统计栏/时间行/ETA 批次守卫全部可用
+- [ ] `docs/PLAN.md:32` 已同步（Rule 1）
+- [ ] 未擅自变更版本号（Rule 2）、未擅自 commit（Rule 3/10）
 
-### Final Checklist
-- [ ] `ProgressWindow` 显示批处理压缩包列表（固定在上方顶部）
-- [ ] 上方区域支持模式切换（简约/详细/列表）
-- [ ] 下方区域支持密度切换（少/中/完整）
-- [ ] 简约模式：显示当前文件 + 文件进度条
-- [ ] 详细模式：显示线程进度列表
-- [ ] 列表模式：显示文件列表 + 状态标记（✓⏳○✗⏭）
-- [ ] 列表模式使用虚拟化，支持大量文件
-- [ ] 少模式：进度条 + 时间
-- [ ] 中模式：已处理+速度（单行） + 进度条 + 时间
-- [ ] 完整模式：统计栏（已处理/跳过/出错/已覆盖） + 进度条 + 时间
-- [ ] `ProgressDisplayCalculator` 无任何 WPF/Avalonia 依赖
-- [ ] 所有计算逻辑抽到 Core 层

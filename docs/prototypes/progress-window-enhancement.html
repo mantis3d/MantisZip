@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>ProgressWindow 增强原型 v3</title>
+    <title>ProgressWindow 增强原型 v6</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -14,9 +14,33 @@
             min-height: 100vh;
         }
         h1 { text-align: center; margin-bottom: 10px; color: #6bd46b; }
-        .subtitle { text-align: center; margin-bottom: 40px; color: #888; font-size: 14px; }
+        .subtitle { text-align: center; margin-bottom: 16px; color: #888; font-size: 14px; }
         .prototype-container { max-width: 600px; margin: 0 auto 40px; }
-        
+
+        /* ── 密码时序演示控制条（原型辅助，非窗口本体） ── */
+        .scenario-bar {
+            max-width: 600px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .scenario-label { font-size: 12px; color: #888; }
+        .scenario-btn {
+            padding: 5px 12px;
+            border: 1px solid #3d3d5c;
+            background: #2d2d44;
+            color: #888;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .scenario-btn.active { background: #6bd46b; color: #1a1a2e; border-color: #6bd46b; }
+        .scenario-btn:hover:not(.active) { background: #4a4a6a; color: #eaeaea; }
+
         /* 窗口 */
         .progress-window {
             background: #2d2d44;
@@ -33,7 +57,7 @@
             align-items: center;
         }
         .window-title { font-weight: 600; font-size: 14px; }
-        
+
         /* 模式切换按钮组 */
         .mode-switcher {
             display: flex;
@@ -54,7 +78,7 @@
         }
         .mode-btn.active { background: #6bd46b; color: #1a1a2e; }
         .mode-btn:hover:not(.active) { background: #4a4a6a; }
-        
+
         /* 上方区域 */
         .file-info-section {
             padding: 16px;
@@ -76,7 +100,7 @@
             font-size: 11px;
             color: #6bd46b;
         }
-        
+
         /* 批处理列表（固定） */
         .batch-list { margin-bottom: 12px; }
         .batch-item {
@@ -90,10 +114,212 @@
         }
         .batch-item.completed { opacity: 0.7; }
         .batch-item.active { background: #4a4a6a; border-left: 3px solid #6bd46b; }
+        /* 失败行：标红（密码未匹配 → 引擎抛错，行内告知，批处理不中断） */
+        .batch-item.failed { background: rgba(255, 107, 107, 0.14); border-left: 3px solid #ff6b6b; }
+        .batch-item.failed .batch-icon { color: #ff6b6b; }
+        /* 失败行尾的错误消息（替代进度显示，右对齐、超长省略） */
+        .batch-error {
+            color: #ff6b6b;
+            font-size: 11px;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 60%;
+            text-align: right;
+            flex-shrink: 1;
+        }
         .batch-icon { margin-right: 8px; }
-        .batch-name { flex: 1; }
+        .batch-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .batch-progress { color: #6bd46b; font-weight: 500; }
-        
+
+        /* ── 密码徽标（行内）：none=无 / matching=🔄匹配中 / matched=🔑已匹配 ── */
+        .pwd-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            font-size: 11px;
+            padding: 2px 8px;
+            border-radius: 10px;
+            margin-right: 8px;
+            white-space: nowrap;
+            user-select: none;
+            flex-shrink: 0;
+        }
+        .pwd-badge.matching {
+            color: #ffd93d;
+            background: rgba(255, 217, 61, 0.12);
+            border: 1px solid rgba(255, 217, 61, 0.4);
+            cursor: default;
+        }
+        .pwd-badge.matching .spinner {
+            display: inline-block;
+            animation: spin 1.2s linear infinite;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .pwd-badge.matched {
+            color: #6bd46b;
+            background: rgba(107, 212, 107, 0.15);
+            border: 1px solid rgba(107, 212, 107, 0.5);
+            cursor: pointer;
+            transition: background 0.15s, box-shadow 0.15s;
+        }
+        .pwd-badge.matched:hover {
+            background: rgba(107, 212, 107, 0.28);
+            box-shadow: 0 0 6px rgba(107, 212, 107, 0.35);
+        }
+        .pwd-mask { letter-spacing: 1px; }
+        /* 徽标入场动画（预解析路径逐个淡入） */
+        .badge-enter { animation: badgeIn 0.25s ease; }
+        @keyframes badgeIn {
+            from { opacity: 0; transform: scale(0.6); }
+            to { opacity: 1; transform: scale(1); }
+        }
+
+        /* ── 密码输入弹窗（解压阶段密码匹配失败的兜底交互） ── */
+        .pwd-dialog-mask {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.55);
+            z-index: 3000;
+            display: none;
+            align-items: center;
+            justify-content: center;
+        }
+        .pwd-dialog-mask.open { display: flex; }
+        .pwd-dialog {
+            width: 330px;
+            background: #3d3d5c;
+            border: 1px solid #4a4a6a;
+            border-radius: 10px;
+            padding: 16px;
+            box-shadow: 0 12px 40px rgba(0, 0, 0, 0.5);
+            animation: flyIn 0.18s ease;
+        }
+        .pwd-dialog-title { font-size: 15px; font-weight: 600; color: #eaeaea; margin-bottom: 6px; }
+        .pwd-dialog-file { font-size: 12px; color: #888; margin-bottom: 10px; word-break: break-all; }
+        .pwd-input-row { display: flex; gap: 6px; margin-bottom: 4px; }
+        .pwd-dialog-input {
+            flex: 1;
+            min-width: 0;
+            background: #2d2d44;
+            border: 1px solid #4a4a6a;
+            border-radius: 4px;
+            color: #eaeaea;
+            font-size: 13px;
+            padding: 7px 9px;
+            outline: none;
+            letter-spacing: 1px;
+        }
+        .pwd-dialog-input:focus { border-color: #6bd46b; }
+        .pwd-dialog-err { color: #ff6b6b; font-size: 12px; min-height: 17px; margin-bottom: 6px; }
+        .pwd-dialog-actions { display: flex; justify-content: flex-end; gap: 8px; margin-bottom: 10px; }
+        .pwd-dialog-actions button {
+            padding: 6px 18px;
+            border-radius: 6px;
+            border: 1px solid #4a4a6a;
+            background: #2d2d44;
+            color: #eaeaea;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.15s;
+        }
+        .pwd-dialog-actions button:hover { background: #4a4a6a; }
+        .pwd-dialog-actions button.primary { background: #6bd46b; color: #1a1a2e; border-color: #6bd46b; font-weight: 600; }
+        .pwd-dialog-actions button.primary:hover { background: #7de07d; }
+        .pwd-dialog-hint {
+            font-size: 11px;
+            color: #888;
+            line-height: 1.6;
+            background: #2d2d44;
+            padding: 6px 8px;
+            border-radius: 4px;
+        }
+        .pwd-dialog-hint code { color: #ffd93d; font-family: Consolas, monospace; }
+
+        /* ── 密码浮层（点击 🔑 徽标弹出） ── */
+        .pwd-flyout {
+            position: fixed;
+            z-index: 1000;
+            display: none;
+            width: 264px;
+            background: #3d3d5c;
+            border: 1px solid #4a4a6a;
+            border-radius: 8px;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.45);
+            padding: 12px;
+        }
+        .pwd-flyout.open { display: block; animation: flyIn 0.15s ease; }
+        @keyframes flyIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .pwd-flyout-header {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 13px;
+            font-weight: 600;
+            color: #6bd46b;
+            margin-bottom: 10px;
+        }
+        .pwd-flyout-row { display: flex; align-items: center; gap: 6px; margin-bottom: 8px; }
+        .pwd-value {
+            flex: 1;
+            min-width: 0;
+            font-family: Consolas, 'Courier New', monospace;
+            font-size: 13px;
+            color: #eaeaea;
+            background: #2d2d44;
+            padding: 6px 8px;
+            border-radius: 4px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            letter-spacing: 1px;
+        }
+        /* 浮层图标按钮：显示/隐藏、复制 */
+        .icon-btn {
+            width: 28px;
+            height: 28px;
+            border: 1px solid #4a4a6a;
+            background: #2d2d44;
+            color: #eaeaea;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 13px;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.15s;
+            flex-shrink: 0;
+        }
+        .icon-btn:hover { background: #4a4a6a; }
+        .icon-btn.copied { color: #6bd46b; border-color: #6bd46b; }
+        .pwd-meta { font-size: 11px; color: #888; line-height: 1.7; }
+        .pwd-meta b { color: #aaa; font-weight: 500; }
+
+        /* 复制成功 toast */
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 30px;
+            transform: translateX(-50%);
+            background: #3d3d5c;
+            color: #6bd46b;
+            border: 1px solid #6bd46b;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 13px;
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.4);
+            z-index: 2000;
+            animation: toastIn 0.2s ease;
+        }
+        @keyframes toastIn {
+            from { opacity: 0; transform: translate(-50%, 8px); }
+            to { opacity: 1; transform: translate(-50%, 0); }
+        }
+
         /* 内联模式切换 */
         .mode-switcher-inline {
             display: flex;
@@ -116,12 +342,12 @@
         }
         .mode-btn-sm.active { background: #6bd46b; color: #1a1a2e; }
         .mode-btn-sm:hover:not(.active) { background: #4a4a6a; }
-        
+
         /* 当前文件 */
         .current-file { margin-top: 8px; }
         .file-path { font-size: 12px; color: #888; margin-bottom: 4px; word-break: break-all; }
         .file-name { font-size: 14px; color: #eaeaea; font-weight: 500; margin-bottom: 8px; }
-        
+
         /* 进度条 */
         .progress-row { margin-bottom: 12px; }
         .progress-label { display: flex; justify-content: space-between; margin-bottom: 6px; font-size: 13px; }
@@ -133,7 +359,7 @@
             border-radius: 10px;
             transition: width 0.3s ease;
         }
-        
+
         /* 线程进度 */
         .thread-list { display: flex; flex-direction: column; gap: 6px; }
         .thread-item {
@@ -150,7 +376,7 @@
         .thread-progress { width: 80px; height: 6px; background: #1a1a2e; border-radius: 3px; overflow: hidden; }
         .thread-progress-fill { height: 100%; background: linear-gradient(90deg, #6bd46b, #4ecdc4); border-radius: 3px; }
         .thread-percent { color: #6bd46b; width: 35px; text-align: right; }
-        
+
         /* 文件列表 */
         .file-list { max-height: 150px; overflow-y: auto; border: 1px solid #3d3d5c; border-radius: 6px; }
         .file-item { display: flex; align-items: center; padding: 6px 10px; border-bottom: 1px solid #3d3d5c; font-size: 12px; }
@@ -159,7 +385,7 @@
         .file-name-list { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .file-size { width: 60px; text-align: right; color: #888; font-size: 11px; margin-right: 8px; }
         .file-status { width: 50px; text-align: right; font-size: 11px; }
-        
+
         /* 文件状态颜色 */
         .file-item.completed .file-status { color: #6bd46b; }
         .file-item.active .file-status { color: #ffd93d; }
@@ -168,13 +394,13 @@
         .file-item.skipped .file-status { color: #888; }
         .file-item.error { background: rgba(255, 107, 107, 0.1); }
         .file-item.skipped { opacity: 0.6; }
-        
+
         /* 下方区域 */
         .overall-info-section {
             padding: 16px;
             background: #252540;
         }
-        
+
         /* 密度切换 */
         .density-switcher {
             display: flex;
@@ -194,7 +420,7 @@
         }
         .density-btn.active { background: #6bd46b; color: #1a1a2e; }
         .density-btn:hover:not(.active) { background: #4a4a6a; }
-        
+
         /* 统计栏 */
         .stats-bar {
             display: flex;
@@ -211,7 +437,7 @@
         .stats-value.processed { color: #6bd46b; }
         .stats-value.skipped { color: #ffd93d; }
         .stats-value.failed { color: #ff6b6b; }
-        
+
         /* 速度显示 */
         .speed-display {
             display: flex;
@@ -221,7 +447,7 @@
             margin-bottom: 8px;
         }
         .speed-value { color: #6bd46b; font-weight: 500; }
-        
+
         /* 中等模式统计 */
         .medium-stats {
             display: flex;
@@ -234,7 +460,7 @@
             border-radius: 4px;
         }
         .medium-value { color: #eaeaea; font-weight: 500; }
-        
+
         /* 时间显示 */
         .time-display {
             display: flex;
@@ -245,10 +471,10 @@
             color: #888;
         }
         .time-value { color: #eaeaea; font-weight: 500; }
-        
+
         /* 隐藏 */
         .hidden { display: none !important; }
-        
+
         /* 模式说明 */
         .mode-description {
             margin-top: 12px;
@@ -263,9 +489,17 @@
     </style>
 </head>
 <body>
-    <h1>ProgressWindow 增强原型 v3</h1>
-    <p class="subtitle">点击按钮切换模式，实时预览效果</p>
-    
+    <h1>ProgressWindow 增强原型 v6</h1>
+    <p class="subtitle">点击按钮切换模式 · 点击 🔑 徽标体验密码浮层 · locked.7z 轮到时会弹出密码输入窗（等你操作）</p>
+
+    <!-- 密码时序演示控制：路径 A（预解析，开始即全显）/ 路径 B（CLI 惰性，轮到才点亮） -->
+    <div class="scenario-bar">
+        <span class="scenario-label">密码演示:</span>
+        <button class="scenario-btn active" data-scenario="lazy">路径 B · CLI 惰性（逐项点亮）</button>
+        <button class="scenario-btn" data-scenario="eager">路径 A · 预解析（开始即全显）</button>
+        <button class="scenario-btn" id="replayBtn">↺ 重播</button>
+    </div>
+
     <div class="prototype-container">
         <div class="progress-window">
             <!-- 标题栏 -->
@@ -277,34 +511,19 @@
                     <button class="mode-btn" data-mode="full">完整</button>
                 </div>
             </div>
-            
+
             <!-- 上方 - 文件信息区 -->
             <div class="file-info-section">
-                <!-- 批处理列表（固定显示） -->
+                <!-- 批处理列表（固定显示；加密包带密码徽标） -->
                 <div class="batch-section">
                     <div class="section-header">
                         <span class="section-title">压缩包列表</span>
-                        <span class="batch-count">3 个文件</span>
+                        <span class="batch-count" id="batchCount">5 个文件</span>
                     </div>
-                    <div class="batch-list">
-                        <div class="batch-item completed">
-                            <span class="batch-icon">✓</span>
-                            <span class="batch-name">backup.7z</span>
-                            <span class="batch-progress">100%</span>
-                        </div>
-                        <div class="batch-item active">
-                            <span class="batch-icon">⏳</span>
-                            <span class="batch-name">documents.zip</span>
-                            <span class="batch-progress">60%</span>
-                        </div>
-                        <div class="batch-item">
-                            <span class="batch-icon">○</span>
-                            <span class="batch-name">photos.zip</span>
-                            <span class="batch-progress">--</span>
-                        </div>
-                    </div>
+                    <!-- 行结构: 状态图标 | 文件名 | 密码徽标(可选) | 进度 / 失败时为红色错误消息 -->
+                    <div class="batch-list" id="batchList"></div>
                 </div>
-                
+
                 <!-- 内联模式切换 -->
                 <div class="mode-switcher-inline">
                     <span class="mode-label-inline">显示:</span>
@@ -312,7 +531,7 @@
                     <button class="mode-btn-sm" data-mode="detailed">详细</button>
                     <button class="mode-btn-sm" data-mode="list">列表</button>
                 </div>
-                
+
                 <!-- 简约模式 -->
                 <div id="topSimple" class="top-content">
                     <div class="current-file">
@@ -329,7 +548,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- 详细模式 -->
                 <div id="topDetailed" class="top-content hidden">
                     <div class="thread-list">
@@ -367,7 +586,7 @@
                         </div>
                     </div>
                 </div>
-                
+
                 <!-- 列表模式 -->
                 <div id="topList" class="top-content hidden">
                     <div class="file-list">
@@ -410,7 +629,7 @@
                     </div>
                 </div>
             </div>
-            
+
             <!-- 下方 - 整体信息区 -->
             <div class="overall-info-section">
                 <!-- 密度模式切换 -->
@@ -419,7 +638,7 @@
                     <button class="density-btn active" data-mode="medium">中</button>
                     <button class="density-btn" data-mode="full">完整</button>
                 </div>
-                
+
                 <!-- 统计栏（完整模式） -->
                 <div id="statsBar" class="stats-bar hidden">
                     <div class="stats-item">
@@ -448,14 +667,14 @@
                         <span class="stats-value processed">8 线程</span>
                     </div>
                 </div>
-                
+
                 <!-- 中等模式：已处理 + 速度 + 进程数（单行） -->
                 <div id="mediumStats" class="medium-stats hidden">
                     <span>已处理: <span class="medium-value">60/100</span></span>
                     <span>速度: <span class="medium-value">12.5 MB/s</span></span>
                     <span>进程: <span class="medium-value">8 线程</span></span>
                 </div>
-                
+
                 <!-- 总进度条 -->
                 <div class="progress-row">
                     <div class="progress-label">
@@ -466,7 +685,7 @@
                         <div class="progress-fill" style="width: 60%"></div>
                     </div>
                 </div>
-                
+
                 <!-- 时间显示 -->
                 <div id="timeDisplay" class="time-display">
                     <span>已用: <span class="time-value">00:00:12</span></span>
@@ -474,48 +693,428 @@
                 </div>
             </div>
         </div>
-        
+
         <!-- 模式说明 -->
         <div class="mode-description">
-            <strong>上方批处理列表</strong>：固定显示，始终可见<br>
+            <strong>上方批处理列表</strong>：固定显示；加密包带 🔑 密码徽标（🔄=匹配中），点击徽标弹出密码浮层（显示/复制/规则）<br>
+            <strong>密码演示</strong>：路径 A 预解析 = 开始即全显 | 路径 B CLI 惰性 = 轮到该包才点亮（🔄→🔑）<br>
+            <strong>未匹配弹窗兜底（locked.7z）</strong>：轮到未匹配加密包 → 弹「输入密码」窗（输错循环重弹 / 输对该包重试并点亮徽标 / 取消 → 行标红✗「已取消 - 需要密码」），两种结局都<b>继续批处理</b>，引擎不再直接抛给用户<br>
             <strong>上方模式</strong>：简约（文件概览）| 详细（线程进度）| 列表（文件追踪）<br>
             <strong>下方密度</strong>：少（进度+时间）| 中（+已处理+速度）| 完整（+已覆盖+线程数）
         </div>
     </div>
 
+    <!-- 密码输入弹窗：解压阶段密码匹配失败的兜底（输错循环重弹 / 输对重试 / 取消跳过该包） -->
+    <div class="pwd-dialog-mask" id="pwdDialogMask">
+        <div class="pwd-dialog">
+            <!-- 标题 -->
+            <div class="pwd-dialog-title">🔑 输入密码</div>
+            <!-- 需要密码的压缩包提示 -->
+            <div class="pwd-dialog-file" id="pwdDlgFile">此压缩包已加密，需要密码：locked.7z</div>
+            <!-- 密码输入框 + 显隐切换 -->
+            <div class="pwd-input-row">
+                <input type="password" id="pwdDlgInput" class="pwd-dialog-input" placeholder="密码" autocomplete="off">
+                <button class="icon-btn" id="pwdDlgReveal" title="显示密码">👁</button>
+            </div>
+            <!-- 错误提示（输错时显示，弹窗保持打开循环重弹） -->
+            <div class="pwd-dialog-err" id="pwdDlgErr"></div>
+            <!-- 按钮：取消 = 跳过该包继续批处理 -->
+            <div class="pwd-dialog-actions">
+                <button id="pwdDlgCancel">取消</button>
+                <button id="pwdDlgOk" class="primary">确定</button>
+            </div>
+            <!-- 原型演示提示（非窗口本体） -->
+            <div class="pwd-dialog-hint">演示：正确密码 <code>Un1ock-7z!</code>，可先故意输错体验循环重弹；点「取消」= 跳过该包、批处理继续</div>
+        </div>
+    </div>
+
+    <!-- 密码浮层（共享单例，锚定到被点击的徽标） -->
+    <div class="pwd-flyout" id="pwdFlyout"></div>
+
     <script>
+        // ══════════════════════════════════════════
+        //  批处理数据 + 密码徽标状态机
+        //  pwdState: 'none'(未尝试/未点亮) | 'matching'(🔄) | 'matched'(🔑)
+        //  失败行(status='failed')永不显示徽标 —— 仅由用户在密码弹窗点「取消」产生
+        // ══════════════════════════════════════════
+        const batchData = [
+            { name: 'backup.7z',     encrypted: false, pwd: null,
+              status: 'completed', progress: '100%', pwdState: 'none' },
+            { name: 'documents.zip', encrypted: true,
+              pwd: { value: 'Doc@2024!', rule: '*.zip', desc: '文档备份' },
+              status: 'active', progress: '60%', pwdState: 'none' },
+            { name: 'photos.rar',    encrypted: true,
+              pwd: { value: 'Summer#2024', rule: '*.rar', desc: null },
+              status: 'pending', progress: '--', pwdState: 'none' },
+            // 加密但密码库未匹配：轮到时弹「输入密码」窗（弹窗兜底），取消才标红 ✗
+            { name: 'locked.7z',     encrypted: true, pwd: null,
+              error: '已取消 - 需要密码',
+              status: 'pending', progress: '--', pwdState: 'none' },
+            { name: 'secret.7z',     encrypted: true,
+              pwd: { value: 'N0-Clue-7z', rule: null, desc: '手动解锁' },
+              status: 'pending', progress: '--', pwdState: 'none' },
+            { name: 'archive.zip',   encrypted: false, pwd: null,
+              status: 'pending', progress: '--', pwdState: 'none' },
+        ];
+
+        const statusIcons = { completed: '✓', active: '⏳', pending: '○', failed: '✗' };
+
+        let rows = [];                // 工作副本（场景可重置）
+        let scenarioTimers = [];      // 场景定时器句柄（切换时全部清除）
+        let flyoutIndex = -1;         // 当前打开浮层的行索引（-1=关闭）
+
+        /** 深拷贝基础数据（全部 pending、无徽标） */
+        function baseRows() {
+            return batchData.map(r => ({ ...r, status: 'pending', progress: '--', pwdState: 'none' }));
+        }
+
+        /** 渲染批处理列表；enterIdx = 需要播放入场动画的行 */
+        function renderBatch(enterIdx = -1) {
+            closeFlyout();
+            const list = document.getElementById('batchList');
+            list.innerHTML = rows.map((r, i) => {
+                const cls = r.status === 'completed' ? ' completed'
+                          : r.status === 'active'    ? ' active'
+                          : r.status === 'failed'    ? ' failed' : '';
+                // 密码徽标：按 pwdState 渲染（非加密行永不出现；失败行即使 pwdState 残留也压制）
+                let badge = '';
+                if (r.status !== 'failed' && r.encrypted && r.pwdState === 'matching') {
+                    badge = `<span class="pwd-badge matching" title="正在匹配密码…">` +
+                            `<span class="spinner">🔄</span>匹配中</span>`;
+                } else if (r.status !== 'failed' && r.encrypted && r.pwdState === 'matched') {
+                    badge = `<span class="pwd-badge matched${i === enterIdx ? ' badge-enter' : ''}"` +
+                            ` data-index="${i}" title="查看密码">🔑 <span class="pwd-mask">●●●●</span></span>`;
+                }
+                // 行尾：失败行显示红色错误消息（替代进度），其余显示进度
+                const right = r.status === 'failed'
+                    ? `<span class="batch-error" title="${r.error}">${r.error}</span>`
+                    : `<span class="batch-progress">${r.progress}</span>`;
+                return `<div class="batch-item${cls}">
+                            <span class="batch-icon">${statusIcons[r.status] || '○'}</span>
+                            <span class="batch-name">${r.name}</span>
+                            ${badge}
+                            ${right}
+                        </div>`;
+            }).join('');
+            document.getElementById('batchCount').textContent = rows.length + ' 个文件';
+        }
+
+        // ── 场景定时器工具 ──
+        function clearScenario() {
+            scenarioTimers.forEach(clearTimeout);
+            scenarioTimers = [];
+        }
+        function at(ms, fn) { scenarioTimers.push(setTimeout(fn, ms)); }
+
+        /**
+         * 密码时序演示
+         *  - eager（路径 A · 预解析）：已匹配徽标开始即点亮（含尚未轮到的包）
+         *  - lazy（路径 B · CLI 惰性）：轮到加密包才 🔄 匹配 → 🔑
+         *  - locked.7z 未匹配 → 弹「输入密码」窗（弹窗等待用户操作，不自动播放）：
+         *      输对 → 该包重试完成并点亮徽标 | 输错 → 循环重弹 | 取消 → 行标红 ✗，两种结局都继续批处理
+         */
+        function runScenario(name) {
+            clearScenario();
+            closeFlyout();
+            dialogGen++;               // 场景重置 → 旧弹窗回调失效
+            closePwdDialog();
+            document.querySelectorAll('.scenario-btn[data-scenario]').forEach(b =>
+                b.classList.toggle('active', b.dataset.scenario === name));
+            const eager = name === 'eager';
+
+            rows = baseRows();
+            renderBatch();
+
+            // 路径 A 特征：开始即点亮全部已匹配徽标（包括尚未轮到的包）
+            if (eager) {
+                at(250, () => { rows[1].pwdState = 'matched'; renderBatch(1); });
+                at(450, () => { rows[2].pwdState = 'matched'; renderBatch(2); });
+                at(650, () => { rows[4].pwdState = 'matched'; renderBatch(4); });
+            }
+
+            at(300, () => { rows[0].status = 'active'; rows[0].progress = '60%'; renderBatch(); });
+            at(1100, () => {
+                rows[0].status = 'completed'; rows[0].progress = '100%';
+                rows[1].status = 'active';    rows[1].progress = '60%';
+                if (!eager) rows[1].pwdState = 'matching';
+                renderBatch();
+            });
+            if (!eager) at(2300, () => { rows[1].pwdState = 'matched'; renderBatch(1); });
+            at(2900, () => {
+                rows[1].status = 'completed'; rows[1].progress = '100%';
+                rows[2].status = 'active';    rows[2].progress = '60%';
+                if (!eager) rows[2].pwdState = 'matching';
+                renderBatch();
+            });
+            if (!eager) at(4100, () => { rows[2].pwdState = 'matched'; renderBatch(2); });
+
+            // 弹窗解决后的时间线（输对/取消共用：失败不中断，继续下一个包）
+            const finishTail = () => {
+                at(600, () => {
+                    rows[4].status = 'active'; rows[4].progress = '60%';
+                    if (!eager) rows[4].pwdState = 'matching';
+                    renderBatch();
+                });
+                if (!eager) at(2300, () => { rows[4].pwdState = 'matched'; renderBatch(4); });
+                at(2900, () => {
+                    rows[4].status = 'completed'; rows[4].progress = '100%';
+                    rows[5].status = 'active';    rows[5].progress = '60%';
+                    renderBatch();
+                });
+                at(3700, () => { rows[5].status = 'completed'; rows[5].progress = '100%'; renderBatch(); });
+            };
+
+            at(4700, () => {
+                rows[2].status = 'completed'; rows[2].progress = '100%';
+                rows[3].status = 'active'; rows[3].progress = '--';   // locked.7z：密码库未匹配，等待输入
+                if (!eager) rows[3].pwdState = 'matching';
+                renderBatch();
+            });
+            // 匹配无果 → 弹密码输入窗（等用户：输对重试 / 取消跳过），不再直接抛异常标红
+            at(eager ? 5100 : 5500, () => {
+                rows[3].pwdState = 'none';
+                renderBatch();
+                promptPassword(3, finishTail);
+            });
+        }
+
+        // ══════════════════════════════════════════
+        //  密码输入弹窗：解压阶段密码匹配失败的兜底
+        //  输错 → 循环重弹；输对 → 该包重试继续；取消 → 跳过该包（行标红）批处理继续
+        // ══════════════════════════════════════════
+        const PWD_DEMO = 'Un1ock-7z!';           // 演示用正确密码
+        const dlgMask = document.getElementById('pwdDialogMask');
+        const dlgInput = document.getElementById('pwdDlgInput');
+        const dlgErr = document.getElementById('pwdDlgErr');
+        const dlgReveal = document.getElementById('pwdDlgReveal');
+        let dialogOpen = false;
+        let dialogGen = 0;                        // 场景代际令牌：重置场景后旧回调失效
+        let dlgCtx = null;                        // { idx, gen, onDone }
+
+        function closePwdDialog() {
+            dlgMask.classList.remove('open');
+            dialogOpen = false;
+            dlgCtx = null;
+        }
+
+        /** 弹出密码输入窗并等待用户操作（onDone 在输对或取消后调用） */
+        function promptPassword(idx, onDone) {
+            dlgCtx = { idx, gen: dialogGen, onDone };
+            dialogOpen = true;
+            dlgInput.value = '';
+            dlgInput.type = 'password';
+            dlgReveal.textContent = '👁';
+            dlgReveal.title = '显示密码';
+            dlgErr.textContent = '';
+            document.getElementById('pwdDlgFile').textContent =
+                '此压缩包已加密，需要密码：' + rows[idx].name;
+            dlgMask.classList.add('open');
+            setTimeout(() => dlgInput.focus(), 60);
+        }
+
+        /** 唯一解决点：ok=true 输对重试 / ok=false 取消跳过；场景已重置时静默失效 */
+        function resolvePwdDialog(ok, password) {
+            if (!dialogOpen || !dlgCtx) return;
+            const { idx, gen, onDone } = dlgCtx;
+            if (gen !== dialogGen) { closePwdDialog(); return; }
+            closePwdDialog();
+            if (ok) {
+                rows[idx].pwd = { value: password, rule: null, desc: '本次输入' };
+                rows[idx].pwdState = 'matched';
+                rows[idx].status = 'completed';
+                rows[idx].progress = '100%';
+                renderBatch(idx);                 // 徽标入场动画
+            } else {
+                rows[idx].status = 'failed';
+                rows[idx].progress = '--';
+                rows[idx].pwdState = 'none';      // 使用 batchData 默认 error：已取消 - 需要密码
+                renderBatch();
+            }
+            onDone();
+        }
+
+        // 确定：QuickVerify 快速验证（演示为精确比对），输错提示后循环重弹
+        document.getElementById('pwdDlgOk').addEventListener('click', () => {
+            if (!dialogOpen) return;
+            const v = dlgInput.value;
+            if (v === PWD_DEMO) {
+                resolvePwdDialog(true, v);
+            } else {
+                dlgErr.textContent = '密码不正确，请重试';
+                dlgInput.value = '';
+                dlgInput.focus();
+            }
+        });
+        // 取消：跳过该包，批处理继续
+        document.getElementById('pwdDlgCancel').addEventListener('click', () => resolvePwdDialog(false));
+        // 密码框回车 = 确定
+        dlgInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') document.getElementById('pwdDlgOk').click();
+        });
+        // 显隐切换
+        dlgReveal.addEventListener('click', () => {
+            const hidden = dlgInput.type === 'password';
+            dlgInput.type = hidden ? 'text' : 'password';
+            dlgReveal.textContent = hidden ? '🙈' : '👁';
+            dlgReveal.title = hidden ? '隐藏密码' : '显示密码';
+        });
+
+        // ══════════════════════════════════════════
+        //  密码浮层：显隐切换 + 复制（始终可用）+ 规则/描述
+        // ══════════════════════════════════════════
+        const flyout = document.getElementById('pwdFlyout');
+        const MASK = '●●●●●●●●';
+
+        // 行内徽标点击（事件委托，兼容场景重渲染）
+        document.getElementById('batchList').addEventListener('click', (e) => {
+            const badge = e.target.closest('.pwd-badge.matched');
+            if (!badge) return;
+            const idx = +badge.dataset.index;
+            if (flyoutIndex === idx) { closeFlyout(); return; }   // 再点一次 = 关闭
+            openFlyout(badge, idx);
+        });
+
+        function openFlyout(badge, idx) {
+            const r = rows[idx];
+            flyoutIndex = idx;
+            flyout.innerHTML =
+                `<div class="pwd-flyout-header">🔑 密码已匹配</div>
+                 <div class="pwd-flyout-row">
+                     <div class="pwd-value" id="pwdValue">${MASK}</div>
+                     <button class="icon-btn" id="revealBtn" title="显示密码">👁</button>
+                     <button class="icon-btn" id="copyBtn" title="复制密码">⧉</button>
+                 </div>
+                 <div class="pwd-meta">
+                     <div><b>压缩包:</b> ${r.name}</div>
+                     ${r.pwd.rule ? `<div><b>匹配规则:</b> ${r.pwd.rule}</div>` : ''}
+                     ${r.pwd.desc ? `<div><b>描述:</b> ${r.pwd.desc}</div>` : ''}
+                 </div>`;
+            flyout.classList.add('open');
+            positionFlyout(badge);
+
+            // 显隐切换（默认掩码，尊重「密码默认显示」= 关的默认值）
+            const valueEl = document.getElementById('pwdValue');
+            const revealBtn = document.getElementById('revealBtn');
+            revealBtn.addEventListener('click', () => {
+                const revealed = valueEl.textContent !== MASK;
+                valueEl.textContent = revealed ? MASK : r.pwd.value;
+                revealBtn.textContent = revealed ? '👁' : '🙈';
+                revealBtn.title = revealed ? '显示密码' : '隐藏密码';
+            });
+
+            // 复制：始终复制明文，与显隐状态无关；clipboard API 失败时降级 execCommand（file:// 兼容）
+            const copyBtn = document.getElementById('copyBtn');
+            copyBtn.addEventListener('click', async () => {
+                await copyText(r.pwd.value);
+                copyBtn.textContent = '✓';
+                copyBtn.classList.add('copied');
+                setTimeout(() => { copyBtn.textContent = '⧉'; copyBtn.classList.remove('copied'); }, 1200);
+                showToast('已复制到剪贴板');
+            });
+        }
+
+        /** 定位浮层：徽标下方，越界时翻转到上方 */
+        function positionFlyout(badge) {
+            flyout.style.left = '0px';
+            flyout.style.top = '0px';
+            const rect = badge.getBoundingClientRect();
+            const fw = flyout.offsetWidth, fh = flyout.offsetHeight;
+            let left = rect.left;
+            if (left + fw > window.innerWidth - 8) left = window.innerWidth - fw - 8;
+            if (left < 8) left = 8;
+            let top = rect.bottom + 6;
+            if (top + fh > window.innerHeight - 8) top = rect.top - fh - 6;
+            flyout.style.left = left + 'px';
+            flyout.style.top = top + 'px';
+        }
+
+        function closeFlyout() {
+            flyout.classList.remove('open');
+            flyoutIndex = -1;
+        }
+
+        // 关闭：点外部 / Esc / 滚动（滚动导致锚点漂移，直接关闭最稳妥）；Esc 在弹窗打开时 = 取消弹窗
+        document.addEventListener('click', (e) => {
+            if (!e.target.closest('#pwdFlyout') && !e.target.closest('.pwd-badge')) closeFlyout();
+        });
+        document.addEventListener('keydown', (e) => {
+            if (e.key !== 'Escape') return;
+            if (dialogOpen) resolvePwdDialog(false);
+            else closeFlyout();
+        });
+        window.addEventListener('scroll', () => { if (flyoutIndex >= 0) closeFlyout(); }, true);
+
+        /** 复制：clipboard API 优先，失败降级 textarea + execCommand（file:// 下必用） */
+        async function copyText(text) {
+            try {
+                if (navigator.clipboard && window.isSecureContext) {
+                    await navigator.clipboard.writeText(text);
+                    return;
+                }
+            } catch (e) { /* 降级 */ }
+            const ta = document.createElement('textarea');
+            ta.value = text;
+            ta.style.position = 'fixed';
+            ta.style.opacity = '0';
+            document.body.appendChild(ta);
+            ta.select();
+            try { document.execCommand('copy'); } catch (e) { /* 忽略 */ }
+            document.body.removeChild(ta);
+        }
+
+        /** 轻量 toast 提示 */
+        function showToast(msg) {
+            document.querySelectorAll('.toast').forEach(t => t.remove());
+            const t = document.createElement('div');
+            t.className = 'toast';
+            t.textContent = msg;
+            document.body.appendChild(t);
+            setTimeout(() => t.remove(), 1600);
+        }
+
+        // ── 演示控制接线 ──
+        document.querySelectorAll('.scenario-btn[data-scenario]').forEach(b =>
+            b.addEventListener('click', () => runScenario(b.dataset.scenario)));
+        document.getElementById('replayBtn').addEventListener('click', () => {
+            const active = document.querySelector('.scenario-btn[data-scenario].active');
+            runScenario(active ? active.dataset.scenario : 'lazy');
+        });
+
+        // ══════════════════════════════════════════
+        //  v3 原有交互（保持不变）
+        // ══════════════════════════════════════════
         // 上方内联模式切换
         document.querySelector('.mode-switcher-inline').addEventListener('click', (e) => {
             const btn = e.target.closest('.mode-btn-sm');
             if (!btn) return;
-            
+
             const mode = btn.dataset.mode;
             document.querySelectorAll('.mode-btn-sm').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            
+
             document.querySelectorAll('.top-content').forEach(el => el.classList.add('hidden'));
             document.getElementById('top' + mode.charAt(0).toUpperCase() + mode.slice(1)).classList.remove('hidden');
         });
-        
+
         // 下方密度模式切换
         document.querySelector('.density-switcher').addEventListener('click', (e) => {
             const btn = e.target.closest('.density-btn');
             if (!btn) return;
-            
+
             const mode = btn.dataset.mode;
             document.querySelectorAll('.density-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
-            
+
             const statsBar = document.getElementById('statsBar');
             const mediumStats = document.getElementById('mediumStats');
             const timeDisplay = document.getElementById('timeDisplay');
-            
+
             // 全部隐藏
             statsBar.classList.add('hidden');
             mediumStats.classList.add('hidden');
             timeDisplay.classList.add('hidden');
-            
-            switch(mode) {
+
+            switch (mode) {
                 case 'minimal':
                     // 少：进度条 + 时间
                     timeDisplay.classList.remove('hidden');
@@ -532,7 +1131,7 @@
                     break;
             }
         });
-        
+
         // 进度动画
         let progress = 60;
         setInterval(() => {
@@ -540,6 +1139,9 @@
             document.querySelectorAll('.progress-fill').forEach(f => f.style.width = progress + '%');
             document.querySelectorAll('.progress-percent').forEach(p => p.textContent = Math.round(progress) + '%');
         }, 100);
+
+        // 初始：自动播放 CLI 惰性路径演示（打开即可看到 🔄→🔑 逐项点亮）
+        runScenario('lazy');
     </script>
 </body>
 </html>

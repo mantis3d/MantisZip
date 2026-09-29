@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-29** — progress-window-enhancement 计划 v2 全量修订 + 原型迭代至 v6
+  - `.omo/plans/未开始/progress-window-enhancement.md` 全量重写为修订版 v2（WPF→Avalonia）：v1 全部文件路径/API/线程模型基于已删除的 WPF 语境（`MantisZip.UI\`、`ProgressWindow.xaml`、`Visibility.Visible`、`Theme_TextSecondary`），不可执行；v2 并入全部审查必改项——路径/`IsVisible`/`Theme*Brush` 迁移、MVVM 属性归位（`ProgressViewModel:24-27`）、多线程方案替换（`Parallel.ForEachAsync` 多实例分批取代 `Parallel.ForEach`+`ManagedThreadId`）、统计埋点改真（`ConflictActionCallback` 不存在 → 10 处 `FileConflictHelper.ResolvePathAsync` 调用点 `File.Exists` 预检计数 skip/overwritten）、`Brush?`/`StatusBrushName` 单一机制、行号全部 grep 刷新
+  - 新增两项功能决策并入计划：密码徽标（D1-D4：`_matchedPasswords` 预匹配全亮 / `ResolveCliPassword` 轮到点亮、行内 🔑+●●●● Flyout 尊重 `PasswordRevealByDefault`、删死横幅 PasswordSection+死方法+包装前先 grep 守卫、不显示尝试规则 N/M）+ 密码弹窗兜底（D5-D8：`QuickVerifyPasswordEx` 错密码循环重弹对齐 Phase B `MainWindowViewModel:966-1027`、`PasswordRetryLoop` 共享层 4 叶子接线、取消→行标 `Status_PasswordCancelled` 批继续、不做跨包密码横幅）
+  - 结构：9 任务 3 波次 + F1-F4 终验，估时 3-4h → 12-15h；含与 v6 原型对应关系表、决策锁定 5 条、任务行格式按执行器要求（裸 `- [ ] N.`，13/13 可解析）；`docs/PLAN.md:32` 登记行同步（规则 1）
+  - `docs/prototypes/progress-window-enhancement.html` v3→v6：密码时序演示控制条（scenario-bar）等交互迭代，Playwright 13 断言 ALL PASS、零 JS 错误
+  - 方案讨论结论：包内静态分批（降序 Round-Robin）保持不变，不做 `ConcurrentQueue` 队列领取改造（尾部收益边际、需重写有 ZlibException/进度锁事故史的代码、与计划 BatchIndex 批次行模型冲突）
+
 **2026-09-27** — 修复 main→alpha 合并（`c677a65`）丢失 TGA/AVIF/APNG 预览 + zh-TW 补 55 key
   - **根因**：`c677a65` 合并时 `ViewModels/PreviewViewModel.cs` 整文件冲突按 ours 解决，丢弃 main 侧 `ShowTgaImage`（ImageSharp 解码 + RGBA→BGRA 交换 + SkiaSharp 位图管线）/`ShowAvifImage`/`ApngDecoder`/`ShowIcoGallery`（合计 +144/-16 行），合并后 `.tga`/`.avif`/`.apng` 预览失效
   - **修复**：三方合并安装 main 侧 4 个预览方法；3 处内容冲突保留 ours 行为（`MVVMTK0034` pragma + `_selectedEncoding` 字段直写、`SKSamplingOptions`）；核验 `IconProvider.cs`（两侧均 4 处 `SKPathBuilder`/0 处 `new SKPath`，仅 using 风格差异）、`ExtractSettingsWindow` 并行度宽度 120（alpha 侧 `e0a4960` 引入，非 main 丢失）、`ZipEngine`/`docs/PLAN.md`/`docs/PROGRESS.md`/`compression-estimator.md`/`AGENTS.md` 等 17 个 theirs-only 文件均为 HEAD 超集或被更强规则取代，无需恢复

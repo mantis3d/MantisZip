@@ -29,7 +29,7 @@
 | **P2** | 快速预览与渐进式加载 | [preview-quick-modes.md](.omo/plans/未开始/preview-quick-modes.md) | 🟡中 | ~25h | 三种模式（快速/渐进/完整），叠加在已实施的两阶段加载（Phase 2）之上。**Avalonia-first（规则 11，WPF 不做 UI 适配）**；☑️ 2026-08-06 计划修正：WPF 先行→Avalonia-only、HTML 现状（ReverseMarkdown→Markdig 已实现）校准、设置项与现有 `MaxTextPreviewBytes`/`MaxTablePreviewRows` 整合（不新增重复字段）、CTS+`_previewLoadVersion` 双取消机制、DBF/LNK/STL/GZ 等 Unsupported 格式降级为独立前置、Markdown 渐进降为 ~2h（控件树渲染已实现）、总工时 27h→25h（不含 🔴 格式基础预览前置） |
 | **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到… |
 | **P2** | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
-| **P2** | 进度窗口增强改造 | [progress-window-enhancement.md](.omo/plans/未开始/progress-window-enhancement.md) | 🟡中 | 3-4h | 路径/文件名分离三行显示、文件级计数、实时统计栏、批处理每包摘要；计算逻辑抽到 Core 层 |
+| **P2** | 进度窗口增强改造 | [progress-window-enhancement.md](.omo/plans/未开始/progress-window-enhancement.md) | 🟡中 | 12-15h | 路径/文件名分离多行显示、三模式切换+信息密度、实时统计栏（10 处 ResolvePathAsync 真实埋点）、时间/ETA（批次切换守卫）、ZIP 并行批次详细行、批处理密码徽标（两路径点亮+Flyout）、解压密码弹窗兜底（错密码循环重弹、取消标记行批继续）；v2 修订版已并入 WPF→Avalonia 审查必改项，计算逻辑抽 Core 层 |
 | **P2** | 进度条分段着色（按压缩包状态） | [progress-bar-segments.md](.omo/plans/未开始/progress-bar-segments.md) | 🟡中 | 3-4h | 自定义 `SegmentProgressBar` 控件替换普通 `ProgressBar`，按批处理项状态分段着色（红=失败/绿=成功/青=跳过/蓝=进行中），动态预算制缝隙；`BatchStatusConverters.GetColor()` 抽取公共颜色映射 |
 | **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.omo/plans/未开始/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
 | **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.omo/plans/未开始/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
