@@ -5,7 +5,6 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using Avalonia.Media;
-using Avalonia.Platform.Storage;
 using MantisZip.Core;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
@@ -279,24 +278,19 @@ public partial class PasswordManagerWindow : Window
     {
         LogDebug("PasswordManagerWindow: Export_Click");
 
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
+        // 自定义文件选择器（SaveFile 模式）：文件类型限定 *.json，建议文件名 passwords-export.json
+        var fullPath = await CustomFilePickerDialog.ShowSaveFileAsync(
+            this,
+            initialPath: null,
+            defaultExtension: ".json",
+            fileTypes:
+            [
+                new FileTypeOption(LocalizationManager.T("Picker_FileTypeJson"), ["*.json"])
+            ],
+            suggestedFileName: "passwords-export.json");
 
-        var file = await topLevel.StorageProvider.SaveFilePickerAsync(new FilePickerSaveOptions
-        {
-            Title = LocalizationManager.T("PasswordManager_Export"),
-            DefaultExtension = "json",
-            SuggestedFileName = "passwords-export.json",
-            FileTypeChoices = new[]
-            {
-                new FilePickerFileType("JSON files (*.json)") { Patterns = new[] { "*.json" } }
-            }
-        });
-
-        if (file == null) return;
-
-        var fullPath = file.TryGetLocalPath();
-        if (fullPath == null) return;
+        if (string.IsNullOrEmpty(fullPath))
+            return;
 
         LogDebug("PasswordManagerWindow: exporting to '{0}'", fullPath);
         try
@@ -328,24 +322,18 @@ public partial class PasswordManagerWindow : Window
     {
         LogDebug("PasswordManagerWindow: Import_Click");
 
-        var topLevel = TopLevel.GetTopLevel(this);
-        if (topLevel == null) return;
+        // 自定义文件选择器（OpenFile 模式）：文件类型限定 *.json，可切「所有文件」
+        var filePath = await CustomFilePickerDialog.ShowOpenFileAsync(
+            this,
+            initialPath: null,
+            fileTypes:
+            [
+                new FileTypeOption(LocalizationManager.T("Picker_FileTypeJson"), ["*.json"]),
+                new FileTypeOption(LocalizationManager.T("Picker_FileTypeAll"), [])
+            ]);
 
-        var files = await topLevel.StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-        {
-            Title = LocalizationManager.T("PasswordManager_Import"),
-            AllowMultiple = false,
-            FileTypeFilter = new[]
-            {
-                new FilePickerFileType("JSON files (*.json)") { Patterns = new[] { "*.json" } }
-            }
-        });
-
-        if (files == null || files.Count == 0) return;
-        var file = files[0];
-
-        var filePath = file.TryGetLocalPath();
-        if (filePath == null) return;
+        if (string.IsNullOrEmpty(filePath))
+            return;
 
         LogDebug("PasswordManagerWindow: importing from '{0}'", filePath);
 
