@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-30** — 文件选择入口统一到自定义选择器 + 拖拽解压兜底改用带解压预览的对话框
+  - **背景**：`DropTargetDetector` 在松手位置检测不到 Explorer 窗口时会失败，兜底走 `StorageProvider.OpenFolderPickerAsync` 弹原生目录框——既无解压路径/冲突预览，也与右键「解压选中项到」的交互不一致；同时工具栏「添加文件」与密码管理器导入/导出各自使用原生对话框，与项目已自建的 `CustomFilePickerDialog` 体验割裂
+  - **范围决策**：全仓盘点原生调用点后确认 4 处需迁移（拖拽兜底、添加文件、密码导出、密码导入），而 `CustomFilePickerDialog.SystemBrowse_Click` 内的原生调用是**有意保留**的用户逃生通道，不动
+  - **拖拽兜底**（`DragDropService.cs`）：删除 `PickFolderAsync()`，检测失败时改调 `CustomFilePickerDialog.ShowExtractFolderAsync(_ownerWindow, itemsToExtract, initialPath, _currentFolder, _settings.ExtractPreserveFullPath)`；`initialPath` 取压缩包同级同名文件夹（`Path.Combine(parentDir, Path.GetFileNameWithoutExtension(_archivePath))`，目录尚不存在也无妨，选择器按 `ResolveInitialPath` 回退到最近的已存在父目录，真正创建仍由解压流程负责）；**条目展开提前到选路径之前**——ExtractFolder 模式的选择器需要条目才能渲染解压路径/冲突预览，同时顺带修掉旧顺序「无可解压内容也会先弹一次选择器」的毛病；自身窗口取消判断前移，避免白弹一次框
+  - **添加文件**（`MainWindow.axaml.cs:390`）：`GetOpenFilePaths` 改调 `ShowOpenItemsAsync(this, initialPath: contextPath)`，`contextPath` 取当前压缩包所在目录；选择器放开文件夹选择，与拖拽添加及 `AddFilesToArchiveAsync` 的「文件+文件夹」语义对齐
+  - **密码管理器**（`PasswordManagerWindow.axaml.cs`）：导出改 `ShowSaveFileAsync(defaultExtension: ".json", fileTypes: [JSON 类型], suggestedFileName: "passwords-export.json")`，导入改 `ShowOpenFileAsync(fileTypes: [JSON 类型, 所有文件])`（单选，与原 `AllowMultiple = false` 一致）；删除 `using Avalonia.Platform.Storage;`（`StorageProvider`/`TryGetLocalPath`/`TopLevel` 全部不再使用）
+  - **选择器扩展**（`CustomFilePickerDialog.axaml.cs`）：新增 `public sealed record FileTypeOption(string Label, string[] Patterns)`（空 `Patterns` = 不过滤，仅 OpenFile 有意义）；`ShowSaveFileAsync`/`ShowOpenFileAsync` 增加可选尾参 `fileTypes`（保存侧另加 `suggestedFileName`），旧调用方位置参数不受影响；`BuildFileTypeOptions` 按模式生成默认值（SaveFile=zip/7z/tar.gz，OpenFile=「压缩文件/所有文件」两项）保持各调用方既有行为；`GetSelectedSaveExtension` 与 `MatchesFileFilter` 改为读 `GetSelectedFileTypeOption()?.Patterns` 并经 `NormalizeExtension` 归一化（`"*.json"`/`".json"`/`"json"` 等价，`"*"`/`"*.*"`/空 = 无约束），消除原 `SelectedIndex == 1` 硬编码魔法值；移除随之失效的 `DefaultArchiveExtensions` 常量与 `_fileExtensions` 字段
+  - **本地化**：新增 `Picker_FileTypeJson`（JSON 文件/檔案/files (*.json)）；删除已无调用方的 `Main_SelectFilesTitle`、`Status_DragPickFolder`；三语文件均无 BOM、全 CRLF、key 集完全同步（各 1177 key）
+  - **验证**：`dotnet build` EXIT=0 / 0 错误（仅剩既有 CS0618 `PreviewViewModel.Bitmap.Save` + NU1903/NU1902 依赖公告告警）；`dotnet test tests/MantisZip.UI.Avalonia.Tests` 105 通过 / 0 失败 / 2 跳过（既有 skip），含 `AboutWindowTests.AllThreeLanguages_HaveSameKeySet`；全仓 `PickerAsync` grep 仅剩 3 处且全在 `SystemBrowse_Click` 内；顺手修掉 `DragDropService.cs` 混入的 1 个裸 LF（CRLF=169 / bareLF=0）
+  - **未覆盖**：拖拽兜底链路的 GUI 冒烟（检测失败 → 弹框 → 初始路径落点）需实机点验；C# LSP 此前已被拒绝安装，以 `dotnet build` 作编译级门禁
+
 **2026-09-27** — 设置项无消费者计划剩余 3 项评估完成（①② 记录结论、③ 修正 AGENTS.md）
   - **背景**：`.omo/plans/未开始/settings-unwired-keys.md` 剩余 3 项（`ShowPasswordMatchNotification`/`ExtractDestination`/`EnableCascadingMenu`）逐项评估并经用户决策
   - **① `ShowPasswordMatchNotification`（⏸️ 暂不动，仅记录）**：匹配时机已前移——GUI 打开/解压对话框已冗余，CLI `ResolveCliPassword` 静默是真实缺口；裁剪版移植约 1-2h 优于废弃（废弃需删 5+ 处 UI/方法/key 成本不低于接线）；启动时直接按裁剪版执行
