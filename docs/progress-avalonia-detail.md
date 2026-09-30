@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-30** — 解压选择器「保留完整路径」开关立项（设计与实现计划，📋 待实施）
+  - **背景**：解压目标目录选择对话框（`CustomFilePickerDialog.ShowExtractFolderAsync`）已具备解压路径/冲突预览，但预览所用的「保留完整路径」状态只能在全局设置里改，对话框内无法调整
+  - **★ 核心缺陷**（本次立项的真正动因）：对话框只返回目标路径字符串（`Task<string?>`），调用方拿到路径后**回头独立读** `settings.ExtractPreserveFullPath` 再传给 `ExtractFlow`（`MainWindowViewModel.cs:2375`、`DragDropService.cs:105`）——用户在预览阶段无法表达意图，形成「预览所见 ≠ 实际落盘」
+  - **方案**：新增 `ExtractPickResult(DestPath, PreserveFullPath)` 作返回通道，贯穿两个有对话框的消费点（`ExtractSelectedTo` + 拖拽目标检测失败的兜底弹窗）；`ExtractSelectedHere`（`:2333`）与拖拽非兜底分支不弹对话框、无勾选值可用，**保持按设置值**；`MainWindow.axaml.cs:183-184` 表达式体闭包经逐行核实**零改动**（委托类型与被调方法返回类型同步变更，自然类型恒等匹配）
+  - **决策**（brainstorming 确认）：**A** = 仅本次解压生效、不回写 `AppSettings`（设置窗口仍是唯一来源，作初始勾选值传入）；**a** = 压缩包根目录（`currentFolder` 为空）禁用开关 + ToolTip（此时前缀无可裁剪、两模式结果相同），该等价性由契约测试实测锁定而非文字论证
+  - **⚠ 测试可行性纠正**：设计文档 §10.1 原承诺 3 条 mock 透传测试**不可写**——`ExtractFlow.RunSelectedItemsExtractionAsync` 是 `static` 且内部 `new ProgressWindow`（无 DI 缝隙无法拦截）、`DragDropService` 是 `internal class`（`Services/DragDropService.cs:20`）且 UI 项目 `InternalsVisibleTo` **仅授予 `MantisZip.Tests`**（`MantisZip.UI.Avalonia.csproj`），UI 测试项目编译期即不可引用；已诚实降级为 3 条真实落盘契约测试（`SelectedItemsExtractService` + `new ZipEngine()`，对 `preserveFullPath` × `currentFolder` 交叉断言）+ 3 条精确旧串架构守卫 + 9 项人工验证，差异表待实施后回写 spec
+  - **计划自查**：① `ArchiveEngineFactory` 无 `GetEngine(string)`（唯一工厂方法是 `GetEngineByExtension(path, fallback)`），契约测试直接 `new ZipEngine()`（public）；② `ExtractSelectedHere`（`:2333`）与 `ExtractSelectedTo`（`:2357`）两个调用点都需补参数，只改 1 处会编译失败
+  - **计划落地**：`.omo/plans/未开始/extract-preserve-full-path-toggle.md`（323 行，按 `.omo` 既有格式）+ 设计文档 `docs/superpowers/specs/2026-09-30-picker-preserve-full-path-toggle-design.md`（301 行）；**全案 25 处行号引用经源码逐条核实**，唯一未证实假设（`MainWindow.axaml.cs:183-184`）已关闭
+  - **范围**：预估 2-3h，新增 i18n 3 key（`Picker_PreserveFullPath` / `Picker_PreserveFullPathDisabledHint` / `Picker_ExtractPreviewTitle`，三语成对）；不改 `AppSettings` 字段、不改 `ExtractSettingsWindow`、不改 WPF（规则 11）
+  - **状态**：📋 待实施（用户定「后面有时间再执行」）；同步 `docs/PLAN.md` P2 区（规则 1）
+
 **2026-09-30** — 文件选择入口统一到自定义选择器 + 拖拽解压兜底改用带解压预览的对话框
   - **背景**：`DropTargetDetector` 在松手位置检测不到 Explorer 窗口时会失败，兜底走 `StorageProvider.OpenFolderPickerAsync` 弹原生目录框——既无解压路径/冲突预览，也与右键「解压选中项到」的交互不一致；同时工具栏「添加文件」与密码管理器导入/导出各自使用原生对话框，与项目已自建的 `CustomFilePickerDialog` 体验割裂
   - **范围决策**：全仓盘点原生调用点后确认 4 处需迁移（拖拽兜底、添加文件、密码导出、密码导入），而 `CustomFilePickerDialog.SystemBrowse_Click` 内的原生调用是**有意保留**的用户逃生通道，不动
