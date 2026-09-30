@@ -4,7 +4,7 @@
         xmlns:dialogs="clr-namespace:MantisZip.UI.Avalonia.Dialogs"
         x:Class="MantisZip.UI.Avalonia.Dialogs.CustomFilePickerDialog"
         x:CompileBindings="False"
-        Width="900"
+        Width="1100"
         Height="700"
         MinWidth="800"
         MinHeight="500"
@@ -111,7 +111,7 @@
           Grid.Row="1"
           ColumnSpacing="0">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="220" />
+        <ColumnDefinition Width="230" />
         <ColumnDefinition Width="5" />
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="5" />
