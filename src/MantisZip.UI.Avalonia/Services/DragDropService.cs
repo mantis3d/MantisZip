@@ -4,8 +4,8 @@ using System.Diagnostics;
 using System.IO;
 using System.Threading.Tasks;
 using Avalonia.Controls;
-using Avalonia.Platform.Storage;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
 
@@ -36,8 +36,8 @@ internal class DragDropService
 
     /// <summary>
     /// Execute the full post-drop workflow:
-    /// 1. Detect target directory (fallback to folder picker)
-    /// 2. Expand selected items to flat file list
+    /// 1. Detect target directory (fallback to the custom extract-folder picker when detection fails)
+    /// 2. Expand selected items to flat file list (BEFORE the picker, so it can show the extract preview)
     /// 3. Show modal ProgressWindow and extract via SelectedItemsExtractService (conflicts/cancellation/errors)
     /// 4. Status message, error dialog, optionally open target folder
     /// </summary>
@@ -50,29 +50,18 @@ internal class DragDropService
         var (targetDir, status) = DropTargetDetector.DetectTargetDirectory();
         App.DebugLog($"[DragDropService] DetectTargetDirectory: targetDir={targetDir ?? "(null)"}, status={status}");
 
-        // 2. Fallback folder picker if detection failed
-        if (string.IsNullOrEmpty(targetDir))
+        // 2. 如果在自己的窗口上松开且未检测到目标目录，直接取消（不弹对话框）
+        if (string.IsNullOrEmpty(targetDir) && IsOverOwnWindow())
         {
-            // 如果在自己的窗口上松开，直接取消（不弹对话框）
-            if (IsOverOwnWindow())
-            {
-                App.DebugLog("[DragDropService] Dropped on own window — cancelling");
-                if (vm != null)
-                    vm.StatusMessage = "";
-                return;
-            }
-
-            App.DebugLog("[DragDropService] DetectTargetDirectory returned null, showing folder picker...");
-            targetDir = await PickFolderAsync();
-            if (targetDir == null)
-            {
-                App.DebugLog("[DragDropService] User cancelled folder picker");
-                return;
-            }
-            App.DebugLog($"[DragDropService] User picked folder: {targetDir}");
+            App.DebugLog("[DragDropService] Dropped on own window — cancelling");
+            if (vm != null)
+                vm.StatusMessage = "";
+            return;
         }
 
         // 3. Expand selected items to flat file list
+        //    提到选路径之前：ExtractFolder 模式的选择器需要条目才能渲染解压路径/冲突预览。
+        //    顺带修掉旧顺序的毛病——无可解压内容时也会先弹一次选择器。
         var itemsToExtract = DragDropItemExpander.ExpandItems(selectedItems, allItems);
         App.DebugLog($"[DragDropService] Expanded: {selectedItems.Count} selected → {itemsToExtract.Count} files to extract");
         if (itemsToExtract.Count == 0)
@@ -81,10 +70,32 @@ internal class DragDropService
             return;
         }
 
-        // 4. 统一走 ExtractFlow.RunSelectedItemsExtractionAsync（与右键「解压选中项到」完全同一流程）：
+        // 4. 检测失败时弹自定义选择器（ExtractFolder 模式：底部实时显示解压路径与冲突预览），
+        //    与右键「解压选中项到」完全同一对话框。overlay 已在调用前关闭，弹模态窗安全。
+        if (string.IsNullOrEmpty(targetDir))
+        {
+            var parentDir = Path.GetDirectoryName(_archivePath)
+                            ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
+            // 初始目录 = 压缩包同名文件夹（尚不存在也无妨：选择器会回退到最近的已存在父目录，
+            // 真正创建由解压流程负责）
+            var initialPath = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(_archivePath));
+
+            App.DebugLog("[DragDropService] DetectTargetDirectory returned null, showing custom extract folder picker...");
+            targetDir = await CustomFilePickerDialog.ShowExtractFolderAsync(
+                _ownerWindow, itemsToExtract, initialPath,
+                _currentFolder, _settings.ExtractPreserveFullPath);
+            if (string.IsNullOrEmpty(targetDir))
+            {
+                App.DebugLog("[DragDropService] User cancelled extract folder picker");
+                return;
+            }
+            App.DebugLog($"[DragDropService] User picked folder: {targetDir}");
+        }
+
+        // 5. 统一走 ExtractFlow.RunSelectedItemsExtractionAsync（与右键「解压选中项到」完全同一流程）：
         //    进度窗口 + 压缩包一行批处理列表 + 状态驱动（SetCurrentBatchItem/UpdateBatchItemStatus）+
         //    冲突处理 + 取消 + 失败弹窗。拿到目标路径后此处与右键不再有独立逻辑。
-        // 盘根目录（如 C:\）的 GetFileName 为空 → 回退用完整路径
+        //    盘根目录（如 C:\）的 GetFileName 为空 → 回退用完整路径
         var folderName = Path.GetFileName(targetDir);
         if (string.IsNullOrEmpty(folderName))
             folderName = targetDir;
@@ -95,7 +106,7 @@ internal class DragDropService
             vm?.ShowExtractFileConflictDialogAsync,
             LocalizationManager.T("Status_DragExtractingTo", folderName));
 
-        // 5. Post-extraction: status message, optionally open target folder
+        // 6. Post-extraction: status message, optionally open target folder
         //    失败弹窗已由共享方法统一处理（拖拽与右键一致），此处仅设置状态栏消息
         switch (result.Status)
         {
@@ -135,32 +146,6 @@ internal class DragDropService
                 if (vm != null)
                     vm.StatusMessage = LocalizationManager.T("Status_DragCancelled");
                 break;
-        }
-    }
-
-    /// <summary>
-    /// Show a folder picker dialog as fallback when DropTargetDetector fails.
-    /// Uses Avalonia's StorageProvider API.
-    /// </summary>
-    private async Task<string?> PickFolderAsync()
-    {
-        try
-        {
-            var topLevel = TopLevel.GetTopLevel(_ownerWindow);
-            if (topLevel == null)
-                return null;
-
-            var folders = await topLevel.StorageProvider.OpenFolderPickerAsync(new FolderPickerOpenOptions
-            {
-                Title = LocalizationManager.T("Status_DragPickFolder"),
-                AllowMultiple = false
-            });
-
-            return folders.Count >= 1 ? folders[0].Path.LocalPath : null;
-        }
-        catch
-        {
-            return null;
         }
     }
 
