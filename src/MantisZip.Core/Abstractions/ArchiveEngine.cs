@@ -302,6 +302,24 @@ public class ArchiveProgress
 
     /// <summary>当前文件的解压/压缩进度 (0–100)，null 表示无此信息。</summary>
     public double? FilePercentComplete { get; set; }
+
+    /// <summary>ZIP 并行批次索引（0-based）。非并行/未分批时为 null。</summary>
+    public int? BatchIndex { get; set; }
+
+    /// <summary>ZIP 并行总批次数。非并行为 null。</summary>
+    public int? BatchCount { get; set; }
+
+    /// <summary>解压冲突统计（null = 本报告未携带该计数，UI 隐藏对应项）。压缩路径恒为 null。</summary>
+    public long? SkippedFiles { get; set; }
+    public long? FailedFiles { get; set; }
+    public long? OverwrittenFiles { get; set; }
+
+    /// <summary>ZIP 并行批次进度（0-100）。仅并行批次报告携带，供批次详细行 Percent。非并行为 null。</summary>
+    public double? BatchPercentComplete { get; set; }
+
+    /// <summary>当前批次已处理/总文件数（批次详细行 "N/M 文件" DetailText 数据源）。仅并行批次报告携带，非并行为 null。</summary>
+    public long? BatchProcessedFiles { get; set; }
+    public long? BatchTotalFiles { get; set; }
 }
 
 /// <summary>
@@ -315,6 +333,12 @@ public class ExtractResult
     public int FailedEntries { get; init; }
     /// <summary>是否有条目失败。</summary>
     public bool HasFailures => FailedEntries > 0;
+
+    /// <summary>因冲突策略跳过的条目数。</summary>
+    public int SkippedEntries { get; init; }
+
+    /// <summary>被覆盖写入的已有文件数。</summary>
+    public int OverwrittenEntries { get; init; }
 }
 
     /// <summary>

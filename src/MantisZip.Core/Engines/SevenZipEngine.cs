@@ -337,6 +337,7 @@ public class SevenZipEngine : IArchiveEngine
             int totalFiles = allEntries.Count(e => !e.IsDirectory);
             int processedFiles = 0;
             int failedEntries = 0;
+            var conflictStats = new ConflictStatsCounter();
             var lastReportTime = DateTime.Now;
             var reportInterval = TimeSpan.FromMilliseconds(100);
 
@@ -360,23 +361,29 @@ public class SevenZipEngine : IArchiveEngine
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);
 
+                var existedBefore = File.Exists(outputPath);
                 var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entry.LastWriteTime, (long)entry.Size);
                 if (resolvedPath == null)
                 {
                     // 跳过（跳过/覆盖旧/覆盖小）
+                    conflictStats.RecordSkipped();
                     continue;
+                }
+                if (existedBefore && resolvedPath == outputPath)
+                {
+                    conflictStats.RecordOverwritten();
                 }
 
                 var entrySize = (long)entry.Size;
 
-                progress?.Report(new ArchiveProgress
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = fileName,
                     PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
                     FilePercentComplete = 0,
                     TotalFiles = totalFiles,
                     ProcessedFiles = processedFiles,
-                });
+                }));
 
                 try
                 {
@@ -395,14 +402,14 @@ public class SevenZipEngine : IArchiveEngine
                             ? (double)(processedFiles + (double)bytesWritten / entrySize) / totalFiles * 100
                             : 0;
 
-                        progress?.Report(new ArchiveProgress
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = fileName,
                             PercentComplete = Math.Min(overallPct, 100),
                             FilePercentComplete = Math.Min(filePct, 100),
                             TotalFiles = totalFiles,
                             ProcessedFiles = processedFiles,
-                        });
+                        }));
                         lastFileReport = now;
                     }))
                     {
@@ -420,40 +427,43 @@ public class SevenZipEngine : IArchiveEngine
                     var now = DateTime.Now;
                     if (now - lastReportTime >= reportInterval || processedFiles == totalFiles)
                     {
-                        progress?.Report(new ArchiveProgress
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = fileName,
                             PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
                             FilePercentComplete = 100,
                             TotalFiles = totalFiles,
                             ProcessedFiles = processedFiles,
-                        });
+                        }));
                         lastReportTime = now;
                     }
                 }
                 catch (UnauthorizedAccessException uax)
                 {
                     CoreLog.Info($"ExtractAsync: permission denied for '{fileName}': {uax.Message}");
+                    conflictStats.RecordFailed();
                     failedEntries++;
                 }
                 catch (IOException iox)
                 {
                     // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                     CoreLog.Info($"ExtractAsync: write failed for '{fileName}': {iox.Message}");
+                    conflictStats.RecordFailed();
                     failedEntries++;
                 }
             }
 
-            progress?.Report(new ArchiveProgress
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
             {
                 CurrentFile = string.Empty,
                 PercentComplete = 100,
                 TotalFiles = totalFiles,
                 ProcessedFiles = processedFiles,
-            });
+            }));
 
             CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
-            return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
+            var extractStats = conflictStats.Snapshot;
+            return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries, SkippedEntries = extractStats.Skipped, OverwrittenEntries = extractStats.Overwritten };
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
@@ -719,6 +729,7 @@ public class SevenZipEngine : IArchiveEngine
             int totalTarget = allEntries.Count(e => !e.IsDirectory && keySet.Contains(ArchivePath.Normalize(e.FileName)));
             int processed = 0;
             int failedEntries = 0;
+            var conflictStats = new ConflictStatsCounter();
             var lastReportTime = DateTime.Now;
             var reportInterval = TimeSpan.FromMilliseconds(100);
 
@@ -746,19 +757,27 @@ public class SevenZipEngine : IArchiveEngine
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);
 
+                var existedBefore = File.Exists(outputPath);
                 var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entry.LastWriteTime, (long)entry.Size);
                 if (resolvedPath == null)
+                {
+                    conflictStats.RecordSkipped();
                     continue;
+                }
+                if (existedBefore && resolvedPath == outputPath)
+                {
+                    conflictStats.RecordOverwritten();
+                }
 
                 var entrySize = (long)entry.Size;
 
-                progress?.Report(new ArchiveProgress
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = fileName,
                     PercentComplete = totalTarget > 0 ? (double)processed / totalTarget * 100 : 0,
                     TotalFiles = totalTarget,
                     ProcessedFiles = processed,
-                });
+                }));
 
                 // 使用 WriteProgressStream 在 ExtractFile 写入过程中获得逐块进度
                 var lastFileReport = DateTime.Now;
@@ -776,14 +795,14 @@ public class SevenZipEngine : IArchiveEngine
                             ? (double)(processed + (double)bytesWritten / entrySize) / totalTarget * 100
                             : 0;
 
-                        progress?.Report(new ArchiveProgress
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = fileName,
                             PercentComplete = Math.Min(overallPct, 100),
                             FilePercentComplete = Math.Min(filePct, 100),
                             TotalFiles = totalTarget,
                             ProcessedFiles = processed,
-                        });
+                        }));
                         lastFileReport = now;
                     }))
                     {
@@ -801,14 +820,14 @@ public class SevenZipEngine : IArchiveEngine
                     var now = DateTime.Now;
                     if (now - lastReportTime >= reportInterval || processed == totalTarget)
                     {
-                        progress?.Report(new ArchiveProgress
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = fileName,
                             PercentComplete = totalTarget > 0 ? (double)processed / totalTarget * 100 : 100,
                             FilePercentComplete = 100,
                             TotalFiles = totalTarget,
                             ProcessedFiles = processed,
-                        });
+                        }));
                         lastReportTime = now;
                     }
                 }
@@ -816,23 +835,25 @@ public class SevenZipEngine : IArchiveEngine
                 catch (UnauthorizedAccessException uax)
                 {
                     CoreLog.Info($"ExtractEntriesAsync: permission denied for '{fileName}': {uax.Message}");
+                    conflictStats.RecordFailed();
                     failedEntries++;
                 }
                 catch (IOException iox)
                 {
                     // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                     CoreLog.Info($"ExtractEntriesAsync: write failed for '{fileName}': {iox.Message}");
+                    conflictStats.RecordFailed();
                     failedEntries++;
                 }
             }
 
-            progress?.Report(new ArchiveProgress
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
             {
                 CurrentFile = string.Empty,
                 PercentComplete = 100,
                 TotalFiles = totalTarget,
                 ProcessedFiles = processed,
-            });
+            }));
 
             CoreLog.Info($"ExtractEntriesAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         }, cancellationToken).ConfigureAwait(false);

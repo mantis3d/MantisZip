@@ -6,6 +6,21 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-09-30** — 进度窗口增强 T1-T6 执行完毕（Core 数据通道 + UI 行模型/VM；XAML 布局待 T7-T9）
+  - **Core 层（T1-T4）**：
+    - `Abstractions/ArchiveEngine.cs`：`ArchiveProgress` 新增 8 个 nullable 字段——冲突统计（`SkippedFiles`/`FailedFiles`/`OverwrittenFiles`）+ ZIP 并行批次（`BatchIndex`/`BatchCount`/`BatchPercentComplete`/`BatchProcessedFiles`/`BatchTotalFiles`），全部 `get; set;` 可选，存量 `new ArchiveProgress{...}` 构造不受影响；`ExtractResult` 新增 `SkippedEntries`/`OverwrittenEntries`（init-only）
+    - 新增 `Utils/ConflictStatsCounter.cs`：`RecordSkipped`/`RecordOverwritten`/`RecordFailed`（`Interlocked.Increment`，多线程安全）+ `Reset`；三引擎 10 处 `FileConflictHelper.ResolvePathAsync` 调用点（ZipEngine×4、TarGzEngine×4、SevenZipEngine×2）`File.Exists` 预检埋点——`resolvedPath == null`→skip、已存在同路径→overwritten、per-entry 异常→failed，解压完成回填 `ExtractResult.SkippedEntries`/`OverwrittenEntries` 终值
+    - `ZipEngine` 并行批次委托内上报 `BatchIndex`/`BatchCount` + 批级进度三字段（批次详细行数据源）；清除 9 处硬编码「正在压缩: 」前缀（`CurrentFile` 改存 raw 路径，`StripEnginePrefix` 防御兜底；grep 全 Core `正在压缩`/`正在解压` 0 残留）
+    - 新增 `Utils/ProgressDisplayCalculator.cs`：`StripEnginePrefix`（前缀剥离）/`SplitFilePath`（路径/文件名分离）/`ComputeOverallPercent`（多档案总进度 + clamp）/`FormatDuration`（超 24h 走 `d.h:mm:ss`）+ `ProgressSpeedTracker`（EMA 平滑速度、100ms 节流、档案切换/字节回退重置基线、ETA 边界钳制）；新增 `ProgressDisplayCalculatorTests` 15 用例（11 Fact + 4 Theory）
+    - `Models/ProgressBatchItem.cs`：新增统计字段（`ProcessedFiles`/`SkippedFiles`/`FailedFiles`/`OverwrittenFiles`，`NotifyBatchProperties` 集中通知）+ 密码态（`BatchPasswordState`/`PasswordState`/`SummaryText`/`HasPasswordBadge`）+ `StatusBrushName`（Status→主题画刷资源键，Status setter 联动通知）
+  - **Avalonia 层（T5-T6）**：
+    - 新增 `Models/ProgressDisplayMode.cs`（`TopDisplayMode`：FullName/DirOnly/NameOnly + `DensityMode`：Compact/Normal/Loose）与 `Models/ParallelBatchProgressItem.cs`（Index/Percent/StatusBrushName/DetailText）
+    - `ThemeLight`/`ThemeDark` 成对新增 `ThemeStatusFailedBrush`(#F44336)/`ThemeStatusSkippedBrush`(#00BCD4)（承接 BatchStatusConverters 既有硬编码色）
+    - 三语 `strings.*.json` 各 +20 key（`Progress_Mode_*`×3、`Progress_Density_*`×3、`Progress_Stats_*`×5、`Progress_Time_*`×2、`Progress_CurrentFileLabel`、`Progress_Batch_*`×6），`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 通过
+    - `ProgressViewModel`：`TopDisplayMode`/`DensityMode` 属性 + `NotifyDisplayProperties()` 集中通知（`DirVisible`/`NameVisible`/`IsCompactDensity`/`IsLooseDensity`）；冲突统计属性组（`HasConflictStats`——压缩路径不上报保持隐藏，规则 6）；`RefreshTimeDisplay()` 已用/剩余时间（ETA）；`UpsertParallelBatch`/`SetCurrentBatchItem` 批次行模型（切档清空 + 末档案 100% 终值兜底写行统计）；`FileCountText`/`BatchArchiveIndexText`；`LocalizedStrings` 注册 20 个新 key
+  - **验证**：`dotnet build` 0 错误（`/p:SkipShellExtCopy=true` 规避 Explorer 占用 ShellExt.dll）；Core 544 通过/3 跳过 + Avalonia 96 通过/2 跳过（含 ProgressDisplayCalculatorTests 15 用例）
+  - 计划任务 1-6 已勾选（`.omo/plans/未开始/progress-window-enhancement.md`），T7（ProgressWindow.axaml 11 行布局 + code-behind）/T8（密码徽标 + Flyout）/T9（PasswordRetryLoop 5 叶子接线）待执行
+
 **2026-09-29** — progress-window-enhancement 计划 v2 全量修订 + 原型迭代至 v6
   - `.omo/plans/未开始/progress-window-enhancement.md` 全量重写为修订版 v2（WPF→Avalonia）：v1 全部文件路径/API/线程模型基于已删除的 WPF 语境（`MantisZip.UI\`、`ProgressWindow.xaml`、`Visibility.Visible`、`Theme_TextSecondary`），不可执行；v2 并入全部审查必改项——路径/`IsVisible`/`Theme*Brush` 迁移、MVVM 属性归位（`ProgressViewModel:24-27`）、多线程方案替换（`Parallel.ForEachAsync` 多实例分批取代 `Parallel.ForEach`+`ManagedThreadId`）、统计埋点改真（`ConflictActionCallback` 不存在 → 10 处 `FileConflictHelper.ResolvePathAsync` 调用点 `File.Exists` 预检计数 skip/overwritten）、`Brush?`/`StatusBrushName` 单一机制、行号全部 grep 刷新
   - 新增两项功能决策并入计划：密码徽标（D1-D4：`_matchedPasswords` 预匹配全亮 / `ResolveCliPassword` 轮到点亮、行内 🔑+●●●● Flyout 尊重 `PasswordRevealByDefault`、删死横幅 PasswordSection+死方法+包装前先 grep 守卫、不显示尝试规则 N/M）+ 密码弹窗兜底（D5-D8：`QuickVerifyPasswordEx` 错密码循环重弹对齐 Phase B `MainWindowViewModel:966-1027`、`PasswordRetryLoop` 共享层 4 叶子接线、取消→行标 `Status_PasswordCancelled` 批继续、不做跨包密码横幅）

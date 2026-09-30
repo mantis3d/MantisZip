@@ -279,6 +279,7 @@ public class ZipEngine : IArchiveEngine
             var processedBytes = 0L;
             var processedFiles = 0;
             int failedEntries = 0;
+            var conflictStats = new ConflictStatsCounter();
 
             CoreLog.Info($"ExtractAsyncSequential: {entries.Count} entries, {totalBytes} total bytes");
 
@@ -304,11 +305,17 @@ public class ZipEngine : IArchiveEngine
                 }
 
                 var entryModified = entry.LastModifiedTime ?? DateTime.MinValue;
+                var existedBefore = File.Exists(outputPath);
                 var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entryModified, entry.Size);
                 if (resolvedPath == null)
                 {
+                    conflictStats.RecordSkipped();
                     processedBytes += entry.Size;
                     continue;
+                }
+                if (existedBefore && resolvedPath == outputPath)
+                {
+                    conflictStats.RecordOverwritten();
                 }
 
                 var entrySize = entry.Size;
@@ -337,7 +344,7 @@ public class ZipEngine : IArchiveEngine
                             {
                                 var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
                                 var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                                progress?.Report(new ArchiveProgress
+                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                                 {
                                     CurrentFile = entryKey,
                                     TotalFiles = entries.Count,
@@ -346,7 +353,7 @@ public class ZipEngine : IArchiveEngine
                                     ProcessedBytes = processedBytes + entryProcessed,
                                     PercentComplete = overallPct,
                                     FilePercentComplete = filePct
-                                });
+                                }));
                                 lastReportTime = now;
                             }
                         }
@@ -361,6 +368,7 @@ public class ZipEngine : IArchiveEngine
                 {
                     CoreLog.Info($"ExtractAsyncSequential: permission denied for '{entryKey}': {uax.Message}");
                     failedEntries++;
+                    conflictStats.RecordFailed();
                 }
                 catch (IOException iox)
                 {
@@ -368,17 +376,25 @@ public class ZipEngine : IArchiveEngine
                     // 跳过该条目继续，避免单个文件导致整个解压中止（对齐 UnauthorizedAccessException 分支）
                     CoreLog.Info($"ExtractAsyncSequential: write failed for '{entryKey}': {iox.Message}");
                     failedEntries++;
+                    conflictStats.RecordFailed();
                 }
             }
 
-            progress?.Report(new ArchiveProgress
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
             {
                 CurrentFile = string.Empty,
                 PercentComplete = 100
-            });
+            }));
 
             CoreLog.Info($"ExtractAsyncSequential: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
-            return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
+            var seqStats = conflictStats.Snapshot;
+            return new ExtractResult
+            {
+                SucceededEntries = processedFiles,
+                FailedEntries = failedEntries,
+                SkippedEntries = seqStats.Skipped,
+                OverwrittenEntries = seqStats.Overwritten
+            };
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
@@ -400,6 +416,7 @@ public class ZipEngine : IArchiveEngine
         CoreLog.Entry();
         CoreLog.Info($"ExtractAsyncParallel: {archivePath} -> {destinationPath}, parallelism={maxParallelism}");
         var sw = Stopwatch.StartNew();
+        var conflictStats = new ConflictStatsCounter();
 
         // 1. 获取所有条目键和文件大小（单线程打开 archive 一次）
         var entryInfos = new List<(string Key, long Size, DateTime? Modified)>();
@@ -429,7 +446,7 @@ public class ZipEngine : IArchiveEngine
 
         if (entryInfos.Count == 0)
         {
-            progress?.Report(new ArchiveProgress { PercentComplete = 100 });
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress { PercentComplete = 100 }));
             return new ExtractResult { SucceededEntries = 0, FailedEntries = 0 };
         }
 
@@ -460,8 +477,11 @@ public class ZipEngine : IArchiveEngine
             batches[i % maxParallelism].Add(sortedInfos[i]);
         }
 
-        // 过滤空批次（文件数少于并行度时）
-        var nonEmptyBatches = batches.Where(b => b.Count > 0).ToList();
+        // 过滤空批次（文件数少于并行度时），附 0-based 批次序号供进度上报
+        var nonEmptyBatches = batches
+            .Where(b => b.Count > 0)
+            .Select((b, idx) => (Index: idx, Items: b))
+            .ToList();
         int actualParallelism = nonEmptyBatches.Count;
 
         // 5. 并行解压：每批次一个线程，复用 1 个 archive 实例
@@ -477,8 +497,16 @@ public class ZipEngine : IArchiveEngine
         {
             MaxDegreeOfParallelism = actualParallelism,
             CancellationToken = cancellationToken
-        }, async (batch, ct) =>
+        }, async (batchInfo, ct) =>
         {
+            var batchIndex = batchInfo.Index;
+            var batch = batchInfo.Items;
+            // 批内局部进度计数（批次内单线程顺序处理，无需加锁；成功/跳过/失败均递增以收敛至 100%）
+            long batchTotalFiles = batch.Count;
+            long batchTotalBytes = batch.Sum(x => x.Size);
+            long batchProcessedFiles = 0;
+            long batchProcessedBytes = 0;
+
             // ★ 每线程只打开 1 次 archive，处理整批文件
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
 
@@ -490,7 +518,8 @@ public class ZipEngine : IArchiveEngine
 
                 // 冲突处理：快速路径（文件不存在）不弹窗；Ask 异步弹窗经信号量全局串行（异步不能持 lock 跨 await）
                 string? resolvedPath;
-                if (!File.Exists(outputPath))
+                var existedBefore = File.Exists(outputPath);
+                if (!existedBefore)
                 {
                     resolvedPath = outputPath;
                 }
@@ -510,11 +539,18 @@ public class ZipEngine : IArchiveEngine
 
                 if (resolvedPath == null)
                 {
+                    conflictStats.RecordSkipped();
                     lock (syncLock)
                     {
                         processedBytes += entrySize;
                     }
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                     continue;
+                }
+                if (existedBefore && resolvedPath == outputPath)
+                {
+                    conflictStats.RecordOverwritten();
                 }
 
                 try
@@ -522,7 +558,10 @@ public class ZipEngine : IArchiveEngine
                     var entry = archive.Entries.FirstOrDefault(e => e.Key == entryKey);
                     if (entry == null)
                     {
+                        conflictStats.RecordFailed();
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
+                        batchProcessedFiles++;
+                        batchProcessedBytes += entrySize;
                         continue;
                     }
 
@@ -556,7 +595,7 @@ while (true)
 
                                 var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
                                 var overallPct = totalBytes > 0 ? (double)(localProcessedBytes + entryProcessed) / totalBytes * 100 : 0;
-                                progress?.Report(new ArchiveProgress
+                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                                 {
                                     CurrentFile = entryKey,
                                     TotalFiles = entryInfos.Count,
@@ -564,8 +603,13 @@ while (true)
                                     TotalBytes = totalBytes,
                                     ProcessedBytes = localProcessedBytes + entryProcessed,
                                     PercentComplete = overallPct,
-                                    FilePercentComplete = filePct
-                                });
+                                    FilePercentComplete = filePct,
+                                    BatchIndex = batchIndex,
+                                    BatchCount = actualParallelism,
+                                    BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                                    BatchProcessedFiles = batchProcessedFiles,
+                                    BatchTotalFiles = batchTotalFiles
+                                }));
 
                                 entryLastReportTime = now;
                             }
@@ -580,6 +624,8 @@ while (true)
                         processedBytes += entrySize;
                         Interlocked.Increment(ref processedFiles);
                     }
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                 }
                 catch (OperationCanceledException)
                 {
@@ -588,29 +634,69 @@ while (true)
                 catch (UnauthorizedAccessException uax)
                 {
                     CoreLog.Info($"ExtractAsyncParallel: permission denied for '{entryKey}': {uax.Message}");
+                    conflictStats.RecordFailed();
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                 }
                 catch (IOException iox)
                 {
                     CoreLog.Info($"ExtractAsyncParallel: write failed for '{entryKey}': {iox.Message}");
+                    conflictStats.RecordFailed();
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                 }
                 catch (Exception ex)
                 {
                     CoreLog.Info($"ExtractAsyncParallel: unexpected error for '{entryKey}': {ex.Message}");
+                    conflictStats.RecordFailed();
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                 }
             }
+
+            // 批次完成：上报批次 100%（即使本批无节流报告，也让批次行状态收敛）；
+            // 同时携带全局进度快照，避免 UI 端计数器被空字段清零
+            int batchDoneFiles;
+            long batchDoneBytes;
+            lock (syncLock)
+            {
+                batchDoneFiles = processedFiles;
+                batchDoneBytes = processedBytes;
+            }
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+            {
+                CurrentFile = string.Empty,
+                TotalFiles = entryInfos.Count,
+                ProcessedFiles = batchDoneFiles,
+                TotalBytes = totalBytes,
+                ProcessedBytes = batchDoneBytes,
+                PercentComplete = totalBytes > 0 ? (double)batchDoneBytes / totalBytes * 100 : 100,
+                BatchIndex = batchIndex,
+                BatchCount = actualParallelism,
+                BatchPercentComplete = 100,
+                BatchProcessedFiles = batchTotalFiles,
+                BatchTotalFiles = batchTotalFiles
+            }));
         });
 
-        progress?.Report(new ArchiveProgress
+        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
         {
             CurrentFile = string.Empty,
             PercentComplete = 100
-        });
+        }));
 
         CoreLog.Info($"ExtractAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
-        return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries };
+        var parStats = conflictStats.Snapshot;
+        return new ExtractResult
+        {
+            SucceededEntries = processedFiles,
+            FailedEntries = failedEntries,
+            SkippedEntries = parStats.Skipped,
+            OverwrittenEntries = parStats.Overwritten
+        };
     }
 
     /// <summary>
@@ -683,6 +769,7 @@ while (true)
             var processedBytes = 0L;
             var processedFiles = 0;
             var failedEntries = 0;
+            var conflictStats = new ConflictStatsCounter();
             var filteredEntries = entries.Where(e => entryKeys.Contains(ArchivePath.Normalize(e.Key))).ToList();
 
             CoreLog.Info($"ExtractEntriesAsync: {filteredEntries.Count} matching entries");
@@ -709,11 +796,17 @@ while (true)
                     Directory.CreateDirectory(outputDir);
 
                 var entryModified = entry.LastModifiedTime ?? DateTime.MinValue;
+                var existedBefore = File.Exists(outputPath);
                 var resolvedPath = await FileConflictHelper.ResolvePathAsync(outputPath, options, entryModified, entry.Size);
                 if (resolvedPath == null)
                 {
+                    conflictStats.RecordSkipped();
                     processedBytes += entry.Size;
                     continue;
+                }
+                if (existedBefore && resolvedPath == outputPath)
+                {
+                    conflictStats.RecordOverwritten();
                 }
 
                 var entrySize = entry.Size;
@@ -741,7 +834,7 @@ while (true)
                             {
                                 var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
                                 var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                                progress?.Report(new ArchiveProgress
+                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                                 {
                                     CurrentFile = entryKey,
                                     TotalFiles = filteredEntries.Count,
@@ -750,7 +843,7 @@ while (true)
                                     ProcessedBytes = processedBytes + entryProcessed,
                                     PercentComplete = overallPct,
                                     FilePercentComplete = filePct
-                                });
+                                }));
                                 lastReportTime = now;
                             }
                         }
@@ -766,20 +859,22 @@ while (true)
                 {
                     CoreLog.Info($"ExtractEntriesAsyncSequential: permission denied for '{entryKey}': {uax.Message}");
                     failedEntries++;
+                    conflictStats.RecordFailed();
                 }
                 catch (IOException iox)
                 {
                     // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                     CoreLog.Info($"ExtractEntriesAsyncSequential: write failed for '{entryKey}': {iox.Message}");
                     failedEntries++;
+                    conflictStats.RecordFailed();
                 }
             }
 
-            progress?.Report(new ArchiveProgress
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
             {
                 CurrentFile = string.Empty,
                 PercentComplete = 100
-            });
+            }));
 
             CoreLog.Info($"ExtractEntriesAsyncSequential: done, {processedFiles} files, failedEntries={failedEntries}, {sw.ElapsedMilliseconds}ms");
         }, cancellationToken).ConfigureAwait(false);
@@ -805,6 +900,7 @@ while (true)
         CoreLog.Entry();
         CoreLog.Info($"ExtractEntriesAsyncParallel: {archivePath}, {entryKeys.Count} entries -> {destinationPath}, parallelism={maxParallelism}");
         var sw = Stopwatch.StartNew();
+        var conflictStats = new ConflictStatsCounter();
 
         // 1. 预读所有命中条目（单线程打开 archive 一次）：文件（Key/Size/Modified/输出路径）+ 目录 key
         var entryInfos = new List<(string Key, long Size, DateTime? Modified, string OutputPath)>();
@@ -840,7 +936,7 @@ while (true)
 
         if (entryInfos.Count == 0)
         {
-            progress?.Report(new ArchiveProgress { PercentComplete = 100 });
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress { PercentComplete = 100 }));
             CoreLog.Info("ExtractEntriesAsyncParallel: no matching entries, returning");
             CoreLog.Exit();
             return;
@@ -873,8 +969,11 @@ while (true)
             batches[i % maxParallelism].Add(sortedInfos[i]);
         }
 
-        // 过滤空批次（文件数少于并行度时）
-        var nonEmptyBatches = batches.Where(b => b.Count > 0).ToList();
+        // 过滤空批次（文件数少于并行度时），附 0-based 批次序号供进度上报
+        var nonEmptyBatches = batches
+            .Where(b => b.Count > 0)
+            .Select((b, idx) => (Index: idx, Items: b))
+            .ToList();
         int actualParallelism = nonEmptyBatches.Count;
 
         // 5. 并行解压：每批次一个线程，复用 1 个 archive 实例
@@ -889,8 +988,16 @@ while (true)
         {
             MaxDegreeOfParallelism = actualParallelism,
             CancellationToken = cancellationToken
-        }, async (batch, ct) =>
+        }, async (batchInfo, ct) =>
         {
+            var batchIndex = batchInfo.Index;
+            var batch = batchInfo.Items;
+            // 批局部计数（批内单线程顺序处理，无需加锁）；成功/跳过/失败均递增收敛至 100%
+            long batchTotalFiles = batch.Count;
+            long batchTotalBytes = batch.Sum(x => x.Size);
+            long batchProcessedFiles = 0;
+            long batchProcessedBytes = 0;
+
             // ★ 每线程只打开 1 次 archive，处理整批文件
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
 
@@ -900,7 +1007,8 @@ while (true)
 
                 // 冲突处理：快速路径（文件不存在）不弹窗；Ask 异步弹窗经信号量全局串行
                 string? resolvedPath;
-                if (!File.Exists(outputPath))
+                var existedBefore = File.Exists(outputPath);
+                if (!existedBefore)
                 {
                     resolvedPath = outputPath;
                 }
@@ -920,11 +1028,19 @@ while (true)
 
                 if (resolvedPath == null)
                 {
+                    conflictStats.RecordSkipped();
                     lock (syncLock)
                     {
                         processedBytes += entrySize;
                     }
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                     continue;
+                }
+
+                if (existedBefore && resolvedPath == outputPath)
+                {
+                    conflictStats.RecordOverwritten();
                 }
 
                 try
@@ -932,7 +1048,10 @@ while (true)
                     var entry = archive.Entries.FirstOrDefault(e => e.Key == entryKey);
                     if (entry == null)
                     {
+                        conflictStats.RecordFailed();
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
+                        batchProcessedFiles++;
+                        batchProcessedBytes += entrySize;
                         continue;
                     }
 
@@ -966,7 +1085,7 @@ while (true)
 
                             var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
                             var overallPct = totalBytes > 0 ? (double)(localProcessedBytes + entryProcessed) / totalBytes * 100 : 0;
-                            progress?.Report(new ArchiveProgress
+                            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                             {
                                 CurrentFile = entryKey,
                                 TotalFiles = entryInfos.Count,
@@ -974,8 +1093,13 @@ while (true)
                                 TotalBytes = totalBytes,
                                 ProcessedBytes = localProcessedBytes + entryProcessed,
                                 PercentComplete = overallPct,
-                                FilePercentComplete = filePct
-                            });
+                                FilePercentComplete = filePct,
+                                BatchIndex = batchIndex,
+                                BatchCount = actualParallelism,
+                                BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                                BatchProcessedFiles = batchProcessedFiles,
+                                BatchTotalFiles = batchTotalFiles
+                            }));
 
                             entryLastReportTime = now;
                         }
@@ -990,6 +1114,8 @@ while (true)
                         processedBytes += entrySize;
                         Interlocked.Increment(ref processedFiles);
                     }
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                 }
                 catch (OperationCanceledException)
                 {
@@ -998,27 +1124,60 @@ while (true)
                 catch (UnauthorizedAccessException uax)
                 {
                     CoreLog.Info($"ExtractEntriesAsyncParallel: permission denied for '{entryKey}': {uax.Message}");
+                    conflictStats.RecordFailed();
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                 }
                 catch (IOException iox)
                 {
                     // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                     CoreLog.Info($"ExtractEntriesAsyncParallel: write failed for '{entryKey}': {iox.Message}");
+                    conflictStats.RecordFailed();
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                 }
                 catch (Exception ex)
                 {
                     CoreLog.Info($"ExtractEntriesAsyncParallel: unexpected error for '{entryKey}': {ex.Message}");
+                    conflictStats.RecordFailed();
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
                 }
             }
+
+            // 批次完成：上报批次 100%（即使本批无节流报告，也让批次行状态收敛）；
+            // 同时携带全局进度快照，避免 UI 端计数器被空字段清零
+            int batchDoneFiles;
+            long batchDoneBytes;
+            lock (syncLock)
+            {
+                batchDoneFiles = processedFiles;
+                batchDoneBytes = processedBytes;
+            }
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+            {
+                CurrentFile = string.Empty,
+                TotalFiles = entryInfos.Count,
+                ProcessedFiles = batchDoneFiles,
+                TotalBytes = totalBytes,
+                ProcessedBytes = batchDoneBytes,
+                PercentComplete = totalBytes > 0 ? (double)batchDoneBytes / totalBytes * 100 : 100,
+                BatchIndex = batchIndex,
+                BatchCount = actualParallelism,
+                BatchPercentComplete = 100,
+                BatchProcessedFiles = batchTotalFiles,
+                BatchTotalFiles = batchTotalFiles
+            }));
         });
 
-        progress?.Report(new ArchiveProgress
+        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
         {
             CurrentFile = string.Empty,
             PercentComplete = 100
-        });
+        }));
 
         CoreLog.Info($"ExtractEntriesAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         CoreLog.Exit();
@@ -1111,7 +1270,7 @@ while (true)
                         s7zAccumPct = Math.Min(100, s7zAccumPct + e.PercentDelta);
                         progress?.Report(new ArchiveProgress
                         {
-                            CurrentFile = "正在压缩: " + s7zCurrentFile,
+                            CurrentFile = s7zCurrentFile,
                             PercentComplete = s7zAccumPct,
                             FilePercentComplete = s7zAccumPct,
                             TotalFiles = totalFiles,
@@ -1248,7 +1407,7 @@ while (true)
                             var pct = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0;
                             progress?.Report(new ArchiveProgress
                             {
-                                CurrentFile = "正在压缩: " + relativePath,
+                                CurrentFile = relativePath,
                                 PercentComplete = pct,
                                 FilePercentComplete = 100,
                                 TotalFiles = totalFiles,
@@ -1803,7 +1962,7 @@ while (true)
                             var pct = (double)cumProcessed / workTotal * 100;
                             progress?.Report(new ArchiveProgress
                             {
-                                CurrentFile = "正在压缩: " + s7zCurrentFile,
+                                CurrentFile = s7zCurrentFile,
                                 PercentComplete = Math.Min(pct, 100),
                                 FilePercentComplete = s7zAccumPct,
                             });
@@ -1962,7 +2121,7 @@ while (true)
                                         var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
                                         progress?.Report(new ArchiveProgress
                                         {
-                                            CurrentFile = "正在压缩: " + relPath,
+                                            CurrentFile = relPath,
                                             PercentComplete = Math.Min(pct, 100),
                                             FilePercentComplete = filePct
                                         });
@@ -2302,7 +2461,7 @@ while (true)
                             var pct = (double)cumProcessed / workTotal * 100;
                             progress?.Report(new ArchiveProgress
                             {
-                                CurrentFile = "正在压缩: " + s7zCurrentFile,
+                                CurrentFile = s7zCurrentFile,
                                 PercentComplete = Math.Min(pct, 100),
                                 FilePercentComplete = s7zAccumPct,
                             });
@@ -2367,7 +2526,7 @@ while (true)
                                         var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
                                         progress?.Report(new ArchiveProgress
                                         {
-                                            CurrentFile = "正在压缩: " + relPath,
+                                            CurrentFile = relPath,
                                             PercentComplete = Math.Min(pct, 100),
                                             FilePercentComplete = filePct
                                         });
@@ -2488,7 +2647,7 @@ while (true)
                             var filePct = fiLen > 0 ? (double)totalRead / fiLen * 100 : 100;
                             progress?.Report(new ArchiveProgress
                             {
-                                CurrentFile = "正在压缩: " + relativePath,
+                                CurrentFile = relativePath,
                                 PercentComplete = pct,
                                 FilePercentComplete = filePct,
                                 TotalFiles = totalFiles,
@@ -2617,7 +2776,7 @@ while (true)
 
                 progress?.Report(new ArchiveProgress
                 {
-                    CurrentFile = "正在压缩: " + displayName,
+                    CurrentFile = displayName,
                     PercentComplete = pct,
                     FilePercentComplete = null,
                     TotalBytes = totalBytes,
@@ -2722,7 +2881,7 @@ while (true)
                         var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
                         progress?.Report(new ArchiveProgress
                         {
-                            CurrentFile = "正在压缩: " + entryKey,
+                            CurrentFile = entryKey,
                             PercentComplete = Math.Min(pct, 100),
                             FilePercentComplete = filePct,
                             TotalFiles = totalFiles,

@@ -37,6 +37,7 @@ public class TarGzEngine : IArchiveEngine
             CoreLog.Info($"ExtractAsync: format=tar.gz={isTarGz}, ext={ext}");
 
             int successCount = 0, failedEntries = 0;
+            var conflictStats = new ConflictStatsCounter();
 
             if (isTarGz || ext == ".tar")
             {
@@ -78,19 +79,25 @@ public class TarGzEngine : IArchiveEngine
                     var entryModified = entry.LastModifiedTime ?? DateTime.MinValue;
 
                     // 逐文件报告
-                    progress?.Report(new ArchiveProgress
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                     {
                         CurrentFile = entryKey,
                         PercentComplete = Math.Min(compressedProgress, 99.9),
                         FilePercentComplete = 0
-                    });
+                    }));
 
                     // 冲突处理
+                    var existedBefore = File.Exists(outputFilePath);
                     var resolved = await FileConflictHelper.ResolvePathAsync(outputFilePath, options, entryModified, entry.Size);
                     if (resolved == null)
                     {
+                        conflictStats.RecordSkipped();
                         // 跳过文件，TarReader.MoveToNextEntry 自动处理流推进
                         continue;
+                    }
+                    if (existedBefore && resolved == outputFilePath)
+                    {
+                        conflictStats.RecordOverwritten();
                     }
 
                     try
@@ -118,12 +125,12 @@ public class TarGzEngine : IArchiveEngine
                                     compressedProgress = totalCompressedBytes > 0
                                         ? (double)inputStream.Position / totalCompressedBytes * 100
                                         : 0;
-                                    progress?.Report(new ArchiveProgress
+                                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                                     {
                                         CurrentFile = entryKey,
                                         PercentComplete = Math.Min(compressedProgress, 99.9),
                                         FilePercentComplete = filePct
-                                    });
+                                    }));
                                     lastReportTime = now;
                                 }
                             }
@@ -135,12 +142,14 @@ public class TarGzEngine : IArchiveEngine
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
+                        conflictStats.RecordFailed();
                         failedEntries++;
                     }
                     catch (IOException iox)
                     {
                         // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                         CoreLog.Info($"ExtractAsync: write failed for '{entryKey}': {iox.Message}");
+                        conflictStats.RecordFailed();
                         failedEntries++;
                     }
                 }
@@ -151,9 +160,18 @@ public class TarGzEngine : IArchiveEngine
                 using var inputStream = File.OpenRead(archivePath);
                 using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
                 var outputPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(archivePath));
+                var existedBefore = File.Exists(outputPath);
                 var resolved = await FileConflictHelper.ResolvePathAsync(outputPath, options);
-                if (resolved != null)
+                if (resolved == null)
                 {
+                    conflictStats.RecordSkipped();
+                }
+                else
+                {
+                    if (existedBefore && resolved == outputPath)
+                    {
+                        conflictStats.RecordOverwritten();
+                    }
                     try
                     {
                         using var output = File.Create(resolved);
@@ -163,30 +181,33 @@ public class TarGzEngine : IArchiveEngine
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractAsync: permission denied for '{outputPath}': {uax.Message}");
+                        conflictStats.RecordFailed();
                         failedEntries = 1;
                     }
                     catch (IOException iox)
                     {
                         CoreLog.Info($"ExtractAsync: write failed for '{outputPath}': {iox.Message}");
+                        conflictStats.RecordFailed();
                         failedEntries = 1;
                     }
                 }
 
-                progress?.Report(new ArchiveProgress
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = Path.GetFileName(outputPath),
                     PercentComplete = 100
-                });
+                }));
             }
 
-            progress?.Report(new ArchiveProgress
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
             {
                 CurrentFile = string.Empty,
                 PercentComplete = 100
-            });
+            }));
 
             CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
-            return new ExtractResult { SucceededEntries = successCount, FailedEntries = failedEntries };
+            var tarStats = conflictStats.Snapshot;
+            return new ExtractResult { SucceededEntries = successCount, FailedEntries = failedEntries, SkippedEntries = tarStats.Skipped, OverwrittenEntries = tarStats.Overwritten };
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
@@ -567,6 +588,7 @@ public class TarGzEngine : IArchiveEngine
             var isTarGz = ext == ".tgz" || archivePath.EndsWith(".tar.gz");
             CoreLog.Info($"ExtractEntriesAsync: format=tar.gz={isTarGz}, ext={ext}");
             int failedEntries = 0;
+            var conflictStats = new ConflictStatsCounter();
 
             if (isTarGz || ext == ".tar")
             {
@@ -607,16 +629,24 @@ public class TarGzEngine : IArchiveEngine
                         ? (double)inputStream.Position / totalCompressedBytes * 100
                         : 0;
 
-                    progress?.Report(new ArchiveProgress
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                     {
                         CurrentFile = entryKey,
                         PercentComplete = Math.Min(compressedProgress, 99.9),
                         FilePercentComplete = 0
-                    });
+                    }));
 
+                    var existedBefore = File.Exists(outputPath);
                     var resolved = await FileConflictHelper.ResolvePathAsync(outputPath, options, entryModified, entry.Size);
                     if (resolved == null)
+                    {
+                        conflictStats.RecordSkipped();
                         continue; // 跳过/覆盖旧/覆盖小
+                    }
+                    if (existedBefore && resolved == outputPath)
+                    {
+                        conflictStats.RecordOverwritten();
+                    }
 
                     try
                     {
@@ -643,12 +673,12 @@ public class TarGzEngine : IArchiveEngine
                                     compressedProgress = totalCompressedBytes > 0
                                         ? (double)inputStream.Position / totalCompressedBytes * 100
                                         : 0;
-                                    progress?.Report(new ArchiveProgress
+                                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                                     {
                                         CurrentFile = entryKey,
                                         PercentComplete = Math.Min(compressedProgress, 99.9),
                                         FilePercentComplete = filePct
-                                    });
+                                    }));
                                     lastReportTime = now;
                                 }
                             }
@@ -662,37 +692,39 @@ public class TarGzEngine : IArchiveEngine
                         var now2 = DateTime.Now;
                         if (now2 - lastReportTime >= reportInterval || processed == targetFound)
                         {
-                            progress?.Report(new ArchiveProgress
+                            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                             {
                                 CurrentFile = entryKey,
                                 PercentComplete = Math.Min(compressedProgress, 99.9),
                                 FilePercentComplete = 100,
                                 TotalFiles = targetFound,
                                 ProcessedFiles = processed
-                            });
+                            }));
                             lastReportTime = now2;
                         }
                     }
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{entryKey}': {uax.Message}");
+                        conflictStats.RecordFailed();
                         failedEntries++;
                     }
                     catch (IOException iox)
                     {
                         // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                         CoreLog.Info($"ExtractEntriesAsync: write failed for '{entryKey}': {iox.Message}");
+                        conflictStats.RecordFailed();
                         failedEntries++;
                     }
                 }
 
-                progress?.Report(new ArchiveProgress
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = string.Empty,
                     PercentComplete = 100,
                     TotalFiles = targetFound,
                     ProcessedFiles = processed
-                });
+                }));
             }
             else if (ext == ".gz")
             {
@@ -704,9 +736,18 @@ public class TarGzEngine : IArchiveEngine
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);
 
+                var existedBefore = File.Exists(outputPath);
                 var resolved = await FileConflictHelper.ResolvePathAsync(outputPath, options);
-                if (resolved != null)
+                if (resolved == null)
                 {
+                    conflictStats.RecordSkipped();
+                }
+                else
+                {
+                    if (existedBefore && resolved == outputPath)
+                    {
+                        conflictStats.RecordOverwritten();
+                    }
                     try
                     {
                         using var inputStream = File.OpenRead(archivePath);
@@ -717,20 +758,22 @@ public class TarGzEngine : IArchiveEngine
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{outputPath}': {uax.Message}");
+                        conflictStats.RecordFailed();
                         failedEntries++;
                     }
                     catch (IOException iox)
                     {
                         CoreLog.Info($"ExtractEntriesAsync: write failed for '{outputPath}': {iox.Message}");
+                        conflictStats.RecordFailed();
                         failedEntries++;
                     }
                 }
 
-                progress?.Report(new ArchiveProgress
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = entryName,
                     PercentComplete = 100
-                });
+                }));
             }
 
             CoreLog.Info($"ExtractEntriesAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
