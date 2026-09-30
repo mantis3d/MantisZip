@@ -1,4 +1,5 @@
 {
+  "Picker_FileTypeJson": "JSON 檔案 (*.json)",
   "Preview_Encoding_Auto": "自動檢測",
   "Preview_Encoding_SystemAnsi": "系統 ANSI ({0})",
   "Preview_Encoding_Detected": "檢測到: {0}",
@@ -118,7 +119,6 @@
   "Extract_FilterStatsFormat": "{0} / {1} 檔案符合",
   "Main_Favorites": "我的最愛",
   "Main_IconTestTitle": "圖示測試 — 所有圖示清單",
-  "Main_SelectFilesTitle": "選擇要壓縮的檔案",
   "Metadata_Type_common": "檔案資訊",
   "Preview_AudioFailed": "無法解析音訊檔案",
   "Preview_FileListLabel": "檔案清單",
@@ -1104,7 +1104,6 @@
   "Status_DragCancelled": "拖拉解壓已取消",
   "Status_DragDragCancelled": "拖拉已取消",
   "Status_DragFailed": "解壓失敗: {0}",
-  "Status_DragPickFolder": "選擇解壓目標資料夾",
 
   "Metadata_FileInfo": "檔案資訊",
   "Metadata_FormatInfo": "詳細資訊",

@@ -1,4 +1,5 @@
 {
+  "Picker_FileTypeJson": "JSON files (*.json)",
   "Preview_Encoding_Auto": "Auto detect",
   "Preview_Encoding_SystemAnsi": "System ANSI ({0})",
   "Preview_Encoding_Detected": "Detected: {0}",
@@ -118,7 +119,6 @@
   "Extract_FilterStatsFormat": "{0} / {1} files matched",
   "Main_Favorites": "Favorites",
   "Main_IconTestTitle": "Icon Test — all icons list",
-  "Main_SelectFilesTitle": "Select Files to Compress",
   "Metadata_Type_common": "File Info",
   "Preview_AudioFailed": "Failed to parse audio file",
   "Preview_FileListLabel": "File List",
@@ -1104,7 +1104,6 @@
   "Status_DragCancelled": "Drag extract cancelled",
   "Status_DragDragCancelled": "Drag cancelled",
   "Status_DragFailed": "Extraction failed: {0}",
-  "Status_DragPickFolder": "Choose extract target folder",
 
   "Metadata_FileInfo": "File Info",
   "Metadata_FormatInfo": "Details",
