@@ -56,6 +56,13 @@ public class FileBrowserItem : ObservableObject
 }
 
 /// <summary>
+/// 文件类型下拉项。<see cref="Label"/> 为显示文本，<see cref="Patterns"/> 为扩展名模式列表
+///（如 <c>"*.json"</c> / <c>".json"</c> / <c>"json"</c> 均可识别）。
+/// 空 <see cref="Patterns"/> 表示不过滤（显示所有文件），仅 OpenFile 模式有意义。
+/// </summary>
+public sealed record FileTypeOption(string Label, string[] Patterns);
+
+/// <summary>
 /// 自建文件/目录选择器：地址栏 + QuickPathControl 速选 + 文件浏览 + 解压预览区（仅解压模式）。
 /// 静态入口：<see cref="ShowFolderAsync"/> / <see cref="ShowSaveFileAsync"/> /
 /// <see cref="ShowOpenFileAsync"/> / <see cref="ShowExtractFolderAsync"/>。
@@ -66,7 +73,8 @@ public partial class CustomFilePickerDialog : Window
     private readonly PickerMode _mode;
     private readonly IReadOnlyList<ArchiveItem>? _entries;
     private readonly string? _defaultExtension;
-    private readonly string[]? _fileExtensions;
+    private readonly string? _suggestedFileName;
+    private readonly IReadOnlyList<FileTypeOption> _fileTypeOptions;
     private readonly string _extractCurrentFolder;
     private readonly bool _extractPreserveFullPath;
 
@@ -110,13 +118,19 @@ public partial class CustomFilePickerDialog : Window
         => ShowInternal(owner, PickerMode.PickFolder, null, null, initialPath, null);
 
     /// <summary>保存文件。返回完整保存路径，取消返回 null。</summary>
-    public static Task<string?> ShowSaveFileAsync(Window owner, string? initialPath = null, string? defaultExtension = null)
-        => ShowInternal(owner, PickerMode.SaveFile, null, defaultExtension, initialPath, null);
+    /// <param name="fileTypes">自定义文件类型下拉项（标签 + 扩展名模式）。为 null 时用默认压缩格式（zip/7z/tar.gz）。</param>
+    /// <param name="suggestedFileName">文件名框预填的建议文件名。为 null 时沿用默认文件名（untitled + 默认扩展名）。</param>
+    public static Task<string?> ShowSaveFileAsync(Window owner, string? initialPath = null, string? defaultExtension = null,
+        IReadOnlyList<FileTypeOption>? fileTypes = null, string? suggestedFileName = null)
+        => ShowInternal(owner, PickerMode.SaveFile, null, defaultExtension, initialPath, null, fileTypes: fileTypes, suggestedFileName: suggestedFileName);
 
     /// <summary>打开文件（单文件）。返回文件路径，取消返回 null。</summary>
     /// <param name="fileExtensions">文件筛选器（扩展名列表，如 "*.zip" / ".zip" 或 "zip"）。null 或空 = 显示所有文件。</param>
-    public static Task<string?> ShowOpenFileAsync(Window owner, string? initialPath = null, string[]? fileExtensions = null)
-        => ShowInternal(owner, PickerMode.OpenFile, null, null, initialPath, fileExtensions);
+    /// <param name="fileTypes">自定义文件类型下拉项（标签 + 扩展名模式）。为 null 时用默认的「压缩文件 / 所有文件」两项，
+    /// 其中「压缩文件」沿用 <paramref name="fileExtensions"/> 作为筛选条件。</param>
+    public static Task<string?> ShowOpenFileAsync(Window owner, string? initialPath = null, string[]? fileExtensions = null,
+        IReadOnlyList<FileTypeOption>? fileTypes = null)
+        => ShowInternal(owner, PickerMode.OpenFile, null, null, initialPath, fileExtensions, fileTypes: fileTypes);
 
     /// <summary>解压模式：选择目标目录，底部实时显示解压冲突预览。返回目录路径，取消返回 null。</summary>
     public static Task<string?> ShowExtractFolderAsync(
@@ -138,14 +152,77 @@ public partial class CustomFilePickerDialog : Window
 
     private static async Task<string?> ShowInternal(
         Window owner, PickerMode mode, IReadOnlyList<ArchiveItem>? entries, string? defaultExtension, string? initialPath, string[]? fileExtensions,
-        string currentFolder = "", bool preserveFullPath = true)
+        string currentFolder = "", bool preserveFullPath = true,
+        IReadOnlyList<FileTypeOption>? fileTypes = null, string? suggestedFileName = null)
     {
-        var dialog = new CustomFilePickerDialog(mode, entries, defaultExtension, initialPath, fileExtensions, currentFolder, preserveFullPath)
+        var dialog = new CustomFilePickerDialog(mode, entries, defaultExtension, initialPath, fileExtensions, currentFolder, preserveFullPath, fileTypes, suggestedFileName)
         {
             WindowStartupLocation = WindowStartupLocation.CenterOwner
         };
         await dialog.ShowDialog(owner);
         return dialog.SelectedPath;
+    }
+
+    // ── File type options ──────────────────────────────────────────────────
+
+    /// <summary>构建文件类型下拉项：优先用调用方传入的 <paramref name="fileTypes"/>，
+    /// 否则按模式生成默认值（保持各调用方既有行为不变）。</summary>
+    private static IReadOnlyList<FileTypeOption> BuildFileTypeOptions(
+        PickerMode mode, string[]? fileExtensions, IReadOnlyList<FileTypeOption>? fileTypes)
+    {
+        if (fileTypes is { Count: > 0 })
+            return fileTypes;
+
+        switch (mode)
+        {
+            case PickerMode.SaveFile:
+                // 默认保存目标为压缩包：下拉项即压缩格式（选中时联动文件名扩展名）
+                return
+                [
+                    new FileTypeOption("*.zip", [".zip"]),
+                    new FileTypeOption("*.7z", [".7z"]),
+                    new FileTypeOption("*.tar.gz", [".tar.gz"])
+                ];
+
+            case PickerMode.OpenFile:
+                // 默认两项：按筛选器过滤 / 不过滤。fileExtensions 为空时第一项也不过滤
+                // （保持「无筛选器 = 显示所有文件」的既有语义）。
+                return
+                [
+                    new FileTypeOption(LocalizationManager.T("Picker_FileTypeArchive"),
+                        fileExtensions is { Length: > 0 } ? fileExtensions : []),
+                    new FileTypeOption(LocalizationManager.T("Picker_FileTypeAll"), [])
+                ];
+
+            default:
+                return Array.Empty<FileTypeOption>();
+        }
+    }
+
+    /// <summary>把扩展名模式（"*.json" / ".json" / "json"）归一化为扩展名（".json"）。
+    /// "*" / "*.*" / 空 → 返回 null（表示无扩展名约束）。</summary>
+    private static string? NormalizeExtension(string? pattern)
+    {
+        if (string.IsNullOrWhiteSpace(pattern))
+            return null;
+
+        var p = pattern.Trim();
+        if (p is "*" or "*.*")
+            return null;
+        if (p.StartsWith("*."))
+            p = p[1..];              // "*.json" → ".json"
+        if (!p.StartsWith('.'))
+            p = "." + p;             // "json"  → ".json"
+        return p.Length > 1 ? p : null;
+    }
+
+    /// <summary>取当前选中的文件类型下拉项（ItemsSource 与 <see cref="_fileTypeOptions"/> 同序，索引一一对应）。</summary>
+    private FileTypeOption? GetSelectedFileTypeOption()
+    {
+        if (_fileTypeOptions.Count == 0)
+            return null;
+        var index = FileTypeSelector.SelectedIndex;
+        return index >= 0 && index < _fileTypeOptions.Count ? _fileTypeOptions[index] : null;
     }
 
     // ── Constructors ───────────────────────────────────────────────────────
@@ -157,15 +234,17 @@ public partial class CustomFilePickerDialog : Window
     }
 
     public CustomFilePickerDialog(PickerMode mode, IReadOnlyList<ArchiveItem>? entries = null, string? defaultExtension = null, string? initialPath = null, string[]? fileExtensions = null,
-        string currentFolder = "", bool preserveFullPath = true)
+        string currentFolder = "", bool preserveFullPath = true,
+        IReadOnlyList<FileTypeOption>? fileTypes = null, string? suggestedFileName = null)
     {
         InitializeComponent();
         _mode = mode;
         _entries = entries;
         _defaultExtension = defaultExtension;
-        _fileExtensions = fileExtensions;
+        _suggestedFileName = suggestedFileName;
         _extractCurrentFolder = currentFolder;
         _extractPreserveFullPath = preserveFullPath;
+        _fileTypeOptions = BuildFileTypeOptions(mode, fileExtensions, fileTypes);
 
         DataContext = this;
 
@@ -255,47 +334,37 @@ public partial class CustomFilePickerDialog : Window
     private bool _isSyncingFileType;
 
     /// <summary>
-    /// 初始化底部文件名 + 文件类型行。
-    /// - SaveFile：文件类型 = 压缩格式（zip/7z/tar.gz），切换时更新文件名扩展名（格式联动）
-    /// - OpenFile：文件类型 = 筛选器（传入扩展名组 + 所有文件），切换时重新过滤列表
+    /// 初始化底部文件名 + 文件类型行。下拉项来自 <see cref="_fileTypeOptions"/>
+    /// （调用方自定义优先，否则按模式生成默认值，见 <see cref="BuildFileTypeOptions"/>）。
+    /// - SaveFile：选中与 defaultExtension 匹配的类型，文件名框预填 suggestedFileName 或 untitled{扩展名}；切换类型时更新扩展名
+    /// - OpenFile：选中第一项；切换时按该项的 Patterns 重新过滤列表
     /// </summary>
     private void InitFileNameArea(PickerMode mode)
     {
+        FileTypeSelector.ItemsSource = _fileTypeOptions.Select(o => o.Label).ToList();
+
         if (mode == PickerMode.SaveFile)
         {
-            FileTypeSelector.ItemsSource = new List<string>
-            {
-                "*.zip",
-                "*.7z",
-                "*.tar.gz"
-            };
             _isSyncingFileType = true;
             try
             {
-                FileTypeSelector.SelectedIndex = _defaultExtension switch
-                {
-                    ".7z" => 1,
-                    ".tar.gz" => 2,
-                    _ => 0
-                };
+                var index = _defaultExtension is null ? -1 : FindSaveFileTypeIndex(_defaultExtension);
+                FileTypeSelector.SelectedIndex = index >= 0 ? index : 0;
             }
             finally
             {
                 _isSyncingFileType = false;
             }
 
-            // 预填文件名（来自 initialPath 的末尾，或默认扩展名）
-            FileNameBox.Text = _defaultExtension == null
-                ? string.Empty
-                : "untitled" + _defaultExtension;
+            // 预填文件名：调用方给了建议文件名就用它，否则沿用 untitled + 默认扩展名
+            FileNameBox.Text = !string.IsNullOrEmpty(_suggestedFileName)
+                ? _suggestedFileName
+                : _defaultExtension == null
+                    ? string.Empty
+                    : "untitled" + _defaultExtension;
         }
         else // OpenFile
         {
-            FileTypeSelector.ItemsSource = new List<string>
-            {
-                LocalizationManager.T("Picker_FileTypeArchive"),
-                LocalizationManager.T("Picker_FileTypeAll")
-            };
             _isSyncingFileType = true;
             try
             {
@@ -306,6 +375,18 @@ public partial class CustomFilePickerDialog : Window
                 _isSyncingFileType = false;
             }
         }
+    }
+
+    /// <summary>找出 Patterns 覆盖指定扩展名的下拉项索引；无匹配返回 -1。</summary>
+    private int FindSaveFileTypeIndex(string extension)
+    {
+        for (var i = 0; i < _fileTypeOptions.Count; i++)
+        {
+            if (_fileTypeOptions[i].Patterns.Any(
+                    p => string.Equals(NormalizeExtension(p), extension, StringComparison.OrdinalIgnoreCase)))
+                return i;
+        }
+        return -1;
     }
 
     private bool _isSyncingFileName;
@@ -368,14 +449,17 @@ public partial class CustomFilePickerDialog : Window
 
     private string GetSelectedSaveExtension()
     {
-        var ext = FileTypeSelector.SelectedItem as string;
-        return ext switch
+        var selected = GetSelectedFileTypeOption();
+        if (selected != null)
         {
-            "*.zip" => ".zip",
-            "*.7z" => ".7z",
-            "*.tar.gz" => ".tar.gz",
-            _ => _defaultExtension ?? ".zip"
-        };
+            foreach (var pattern in selected.Patterns)
+            {
+                var ext = NormalizeExtension(pattern);
+                if (!string.IsNullOrEmpty(ext))
+                    return ext;
+            }
+        }
+        return _defaultExtension ?? ".zip";
     }
 
     // ── Drive selector ─────────────────────────────────────────────────────
@@ -606,33 +690,25 @@ public partial class CustomFilePickerDialog : Window
     }
 
     /// <summary>
-    /// 文件筛选器匹配（OpenFile 模式）。支持 "*.zip" / ".zip" / "zip" / "*.*" 格式。
-    /// 无筛选器（null/空）或含 "*.*" 时显示所有文件。
-    /// 文件类型下拉选中「所有文件」（index 1）时同样不过滤。
+    /// 文件筛选器匹配（OpenFile 模式）。按当前选中的文件类型下拉项的 Patterns 过滤，
+    /// 支持 "*.zip" / ".zip" / "zip" 格式（统一经 <see cref="NormalizeExtension"/> 归一化）。
+    /// Patterns 为空（"所有文件" 项）或无下拉项时显示所有文件。
     /// </summary>
     private bool MatchesFileFilter(string filePath)
     {
-        if (_mode != PickerMode.OpenFile || _fileExtensions == null || _fileExtensions.Length == 0)
+        if (_mode != PickerMode.OpenFile)
             return true;
-        if (_fileExtensions.Any(e => e == "*.*" || e == "*"))
-            return true;
-        // 文件类型下拉选中「所有文件」→ 不过滤
-        if (FileTypeSelector.SelectedIndex == 1)
+
+        var patterns = GetSelectedFileTypeOption()?.Patterns;
+        if (patterns is null || patterns.Length == 0)
             return true;
 
         var ext = Path.GetExtension(filePath);
-        foreach (var pattern in _fileExtensions)
+        foreach (var pattern in patterns)
         {
-            var p = pattern.Trim().ToLowerInvariant();
-            if (p.StartsWith("*.")) p = p[1..]; // "*.zip" → ".zip"
-            if (p.StartsWith(".") || p.Length <= 1)
-            {
-                if (string.Equals(ext, p, StringComparison.OrdinalIgnoreCase)) return true;
-            }
-            else
-            {
-                if (string.Equals(ext, "." + p, StringComparison.OrdinalIgnoreCase)) return true;
-            }
+            var normalized = NormalizeExtension(pattern);
+            if (normalized != null && string.Equals(ext, normalized, StringComparison.OrdinalIgnoreCase))
+                return true;
         }
         return false;
     }
