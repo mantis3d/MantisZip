@@ -1,0 +1,1262 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>解压选择器「保留完整路径」开关 — 交互原型</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',Roboto,sans-serif;
+    background:#15152a; color:#eaeaea; padding:28px 20px 60px; min-height:100vh; font-size:14px;
+}
+h1 { text-align:center; color:#6bd46b; font-size:22px; margin-bottom:6px; }
+.subtitle { text-align:center; color:#888; font-size:13px; margin-bottom:22px; }
+.wrap { max-width:1180px; margin:0 auto; }
+
+/* ═══════ 控制条 ═══════ */
+.console {
+    background:#22223c; border:1px solid #3d3d5c; border-radius:8px;
+    padding:14px 16px; margin-bottom:18px;
+}
+.console-row { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-start; }
+.console-group { display:flex; flex-direction:column; gap:6px; }
+.console-label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:#777; }
+.seg { display:flex; background:#15152a; border:1px solid #3d3d5c; border-radius:6px; overflow:hidden; }
+.seg button {
+    padding:5px 11px; border:none; background:transparent; color:#999;
+    cursor:pointer; font-size:12px; transition:all .15s; white-space:nowrap;
+}
+.seg button:hover:not(.active) { background:#33335a; color:#eaeaea; }
+.seg button.active { background:#6bd46b; color:#15152a; font-weight:600; }
+.chk-line { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#ccc; cursor:pointer; }
+.chk-line input { accent-color:#6bd46b; width:15px; height:15px; cursor:pointer; }
+select {
+    background:#15152a; color:#eaeaea; border:1px solid #3d3d5c;
+    border-radius:5px; padding:5px 8px; font-size:12px;
+}
+
+/* ═══════ 对话框窗口 ═══════ */
+.win {
+    background:#2d2d44; border:1px solid #3d3d5c; border-radius:9px;
+    box-shadow:0 10px 44px rgba(0,0,0,.5); overflow:hidden;
+}
+.win-titlebar {
+    background:#3d3d5c; padding:9px 14px; display:flex; justify-content:space-between;
+    align-items:center; font-size:13px; font-weight:600;
+}
+.win-titlebar .tb-right { display:flex; gap:14px; color:#888; font-weight:400; font-size:11px; }
+.win-body { padding:12px; }
+.root { display:grid; grid-template-rows:auto 1fr auto auto auto; gap:10px; height:600px; }
+
+/* ── 地址栏 ── */
+.addrbar { display:grid; grid-template-columns:auto auto auto 1fr auto; gap:3px; }
+.nav-btn {
+    width:32px; height:32px; border:1px solid #3d3d5c; background:#3d3d5c;
+    border-radius:5px; cursor:pointer; color:#ccc; font-size:14px;
+    display:flex; align-items:center; justify-content:center; transition:all .15s;
+}
+.nav-btn:hover { background:#4a4a6a; }
+.path-box {
+    background:#22223c; border:1px solid #3d3d5c; border-radius:5px;
+    padding:0 10px; display:flex; align-items:center; font-size:12.5px; color:#eaeaea;
+    font-family:Consolas,'Courier New',monospace;
+}
+
+/* ── 主体三栏 ── */
+.browser { display:grid; grid-template-columns:210px 5px 1fr 5px 288px; gap:0; min-height:0; }
+.splitter { background:#3d3d5c; cursor:col-resize; }
+.pane {
+    background:#22223c; border:1px solid #3d3d5c; border-radius:5px;
+    display:flex; flex-direction:column; min-height:0; overflow:hidden;
+}
+.pane-head {
+    padding:7px 10px; font-size:10.5px; text-transform:uppercase;
+    letter-spacing:.6px; color:#777; border-bottom:1px solid #3d3d5c; flex-shrink:0;
+}
+.pane-body { overflow-y:auto; padding:6px; flex:1; min-height:0; }
+.pane-body::-webkit-scrollbar { width:8px; }
+.pane-body::-webkit-scrollbar-thumb { background:#3d3d5c; border-radius:4px; }
+
+.qlink {
+    display:flex; align-items:center; gap:7px; padding:5px 7px; border-radius:4px;
+    font-size:12px; color:#bbb; cursor:pointer;
+}
+.qlink:hover { background:#33335a; }
+.qlink.active { background:#3d3d5c; color:#6bd46b; }
+
+/* ── 文件列表 ── */
+.curpath { padding:6px 10px; font-size:10.5px; color:#888; border-bottom:1px solid #3d3d5c;
+    font-family:Consolas,monospace; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; flex-shrink:0; }
+.frow {
+    display:grid; grid-template-columns:18px 1fr 74px 96px; gap:8px; align-items:center;
+    padding:0 8px; min-height:32px; border-radius:4px; font-size:12.5px; cursor:pointer;
+}
+.frow:hover { background:#33335a; }
+.frow.sel { background:#3d5a7a; }
+.frow .fi { font-size:13px; text-align:center; }
+.frow .fn { color:#eaeaea; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.frow .fs, .frow .fm { font-size:11px; color:#888; text-align:right; font-family:Consolas,monospace; }
+.frow .fm { margin-right:4px; }
+
+/* ═══════ 解压预览面板（本次改动核心） ═══════ */
+.extract { display:grid; grid-template-rows:auto 5px 1fr; min-height:0; }
+
+/* ★ 标题行：左标题 + 右开关（决策 3） */
+.title-row {
+    display:grid; grid-template-columns:1fr auto; align-items:center;
+    column-gap:8px; padding:0 2px 0 0; min-height:26px;
+}
+.panel-title { font-size:13px; font-weight:600; color:#eaeaea; white-space:nowrap; }
+
+/* 复选框 */
+.pfp { display:flex; align-items:center; gap:5px; cursor:pointer; user-select:none; }
+.pfp input { accent-color:#6bd46b; width:14px; height:14px; margin:0; cursor:pointer; }
+.pfp span { font-size:12px; color:#eaeaea; white-space:nowrap; }
+.pfp.disabled { cursor:not-allowed; }
+.pfp.disabled input { cursor:not-allowed; }
+.pfp.disabled span { color:#666; }
+
+/* 覆层：模拟 Avalonia 禁用控件的 tooltip 陷阱（见问题 D6） */
+.tip-host { position:relative; display:inline-flex; }
+.tip-bubble {
+    position:absolute; right:0; top:calc(100% + 7px); z-index:60;
+    background:#1c1c30; color:#eaeaea; border:1px solid #4a4a6a; border-radius:6px;
+    padding:8px 11px; font-size:11.5px; line-height:1.5; width:230px;
+    box-shadow:0 6px 22px rgba(0,0,0,.55); opacity:0; pointer-events:none;
+    transition:opacity .14s; white-space:normal; font-weight:400; text-transform:none;
+    letter-spacing:0; color:#ccc;
+}
+.tip-bubble.show { opacity:1; }
+/* 手动触发的提示（禁用控件兜底方案） */
+.tip-trigger {
+    font-size:11px; color:#e0a340; cursor:help; border-bottom:1px dotted #e0a340;
+    margin-left:2px;
+}
+.preview-splitter { background:#3d3d5c; cursor:row-resize; border-radius:2px; }
+.tree-box {
+    background:#22223c; border:1px solid #3d3d5c; border-radius:5px;
+    padding:8px; overflow:auto; min-height:0;
+}
+.tree-box::-webkit-scrollbar { width:8px; }
+.tree-box::-webkit-scrollbar-thumb { background:#3d3d5c; border-radius:4px; }
+.tnode { display:flex; align-items:center; gap:6px; min-height:22px; font-size:12.5px; }
+.tnode .ti { width:14px; text-align:center; flex-shrink:0; }
+.tnode .tn { color:#eaeaea; white-space:nowrap; }
+.tnode .tbadge { font-size:10px; padding:1px 5px; border-radius:3px; margin-left:2px; }
+.tnode.conflict .tn { color:#ffb45c; }
+.tbadge.conflict { background:#5a3a1a; color:#ffb45c; }
+.tbadge.filtered { background:#3a3a4a; color:#888; }
+.tnode.flash { animation:flashbg .5s ease; }
+@keyframes flashbg { 0%{background:#6bd46b33} 100%{background:transparent} }
+.empty-tree { color:#777; font-size:12px; text-align:center; padding:26px 0; }
+
+/* ═══════ 参数区（左下，通用参数宿主） ═══════ */
+.options-row { display:grid; grid-template-columns:1fr; }
+.options-row[hidden] { display:none; }
+.options-panel {
+    display:flex; align-items:center; flex-wrap:wrap; gap:6px 18px;
+    background:#22223c; border:1px solid #3d3d5c; border-radius:5px;
+    padding:8px 12px; min-height:38px;
+}
+.options-caption {
+    font-size:10.5px; text-transform:uppercase; letter-spacing:.6px;
+    color:#777; padding-right:12px; border-right:1px solid #3d3d5c; margin-right:2px;
+}
+.opt-item { display:flex; align-items:center; gap:6px; cursor:pointer; user-select:none; }
+.opt-item input { accent-color:#6bd46b; width:14px; height:14px; margin:0; cursor:pointer; }
+.opt-item .opt-label { font-size:12.5px; color:#eaeaea; white-space:nowrap; }
+.opt-item.disabled { cursor:not-allowed; }
+.opt-item.disabled input { cursor:not-allowed; }
+.opt-item.disabled .opt-label { color:#666; }
+.opt-item .opt-trigger { font-size:11px; color:#e0a340; cursor:help; border-bottom:1px dotted #e0a340; }
+.options-empty-note { font-size:11.5px; color:#5a5a72; font-style:italic; }
+
+/* ── 底部按钮 ── */
+.btn-row { display:flex; justify-content:flex-end; gap:7px; }
+.btn {
+    min-width:92px; min-height:32px; padding:0 16px; border-radius:5px; cursor:pointer;
+    font-size:12.5px; border:1px solid #3d3d5c; background:#3d3d5c; color:#eaeaea; transition:all .15s;
+}
+.btn:hover { background:#4a4a6a; }
+.btn.primary { background:#6bd46b; color:#15152a; border-color:#6bd46b; font-weight:600; }
+.btn.primary:hover { background:#7ee07e; }
+
+/* ═══════ 返回值 / 落盘 面板 ═══════ */
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; margin-top:16px; }
+.card { background:#22223c; border:1px solid #3d3d5c; border-radius:8px; padding:13px 15px; }
+.card h3 { font-size:12px; color:#6bd46b; margin-bottom:9px; text-transform:uppercase; letter-spacing:.6px; }
+pre.code {
+    background:#15152a; border:1px solid #3d3d5c; border-radius:6px; padding:11px;
+    font-family:Consolas,'Courier New',monospace; font-size:11.5px; line-height:1.75;
+    color:#c8c8d8; overflow-x:auto; white-space:pre; margin:0;
+}
+pre.code .k { color:#c792ea; }
+pre.code .s { color:#a5e075; }
+pre.code .n { color:#f7a072; }
+pre.code .c { color:#5f6b8a; }
+pre.code .hl { color:#6bd46b; font-weight:700; }
+pre.code .bad { color:#ff6b6b; font-weight:700; }
+.pathlist { font-family:Consolas,monospace; font-size:11.5px; line-height:1.85; color:#bbb; }
+.pathlist div::before { content:'→ '; color:#555; }
+.pathlist div.trimmed { color:#6bd46b; }
+.verdict {
+    margin-top:10px; padding:9px 11px; border-radius:6px; font-size:12px; line-height:1.6;
+    display:flex; gap:8px; align-items:flex-start;
+}
+.verdict.ok { background:#1e3324; border:1px solid #2d6b3d; color:#8fdc9f; }
+.verdict.bad { background:#3a1e1e; border:1px solid #6b2d2d; color:#ff9d9d; }
+.verdict.warn { background:#3a3020; border:1px solid #6b5a2d; color:#ffd48f; }
+.verdict .vi { flex-shrink:0; }
+
+/* 消费点表 */
+table.cp { width:100%; border-collapse:collapse; font-size:11.5px; }
+table.cp th, table.cp td { padding:6px 8px; text-align:left; border-bottom:1px solid #2d2d44; }
+table.cp th { color:#777; font-size:10px; text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+table.cp td { color:#bbb; }
+table.cp td.mono { font-family:Consolas,monospace; color:#9a9ab0; }
+table.cp tr.used td { background:#1e3324; }
+table.cp tr.used td.val { color:#6bd46b; font-weight:700; }
+.dot { display:inline-block; width:7px; height:7px; border-radius:50%; margin-right:5px; }
+.dot.y { background:#6bd46b; } .dot.n { background:#666; }
+
+/* 事件日志 */
+.log {
+    background:#15152a; border:1px solid #3d3d5c; border-radius:6px; padding:10px;
+    font-family:Consolas,monospace; font-size:11px; line-height:1.8; height:132px;
+    overflow-y:auto; color:#888;
+}
+.log div { white-space:pre-wrap; }
+.log .t { color:#5f6b8a; }
+.log .ok { color:#6bd46b; } .log .warn { color:#e0a340; } .log .err { color:#ff6b6b; }
+.log::-webkit-scrollbar { width:8px; }
+.log::-webkit-scrollbar-thumb { background:#3d3d5c; border-radius:4px; }
+
+/* 问题清单 */
+.issues { margin-top:18px; background:#22223c; border:1px solid #3d3d5c; border-radius:8px; overflow:hidden; }
+.issues summary {
+    padding:12px 15px; cursor:pointer; font-size:13px; font-weight:600; color:#ffb45c;
+    background:#2a2438; list-style:none; user-select:none;
+}
+.issues summary::-webkit-details-marker { display:none; }
+.issues summary::before { content:'▸ '; }
+.issues[open] summary::before { content:'▾ '; }
+.issue {
+    padding:11px 15px; border-top:1px solid #2d2d44; font-size:12.5px; line-height:1.7; color:#bbb;
+}
+.issue .sev { display:inline-block; font-size:10px; padding:1px 7px; border-radius:3px; margin-right:8px;
+    font-weight:700; vertical-align:1px; }
+.sev.crit { background:#6b2020; color:#ff9d9d; }
+.sev.high { background:#6b4d20; color:#ffd48f; }
+.sev.mid  { background:#2d4a6b; color:#9dd0ff; }
+.issue b { color:#eaeaea; }
+.issue code { background:#15152a; padding:1px 5px; border-radius:3px; font-family:Consolas,monospace;
+    font-size:11px; color:#c792ea; }
+
+.note { font-size:11.5px; color:#777; margin-top:8px; line-height:1.6; }
+a { color:#6bd46b; }
+</style>
+</head>
+<body>
+
+<h1>解压选择器「保留完整路径」开关 — 交互原型</h1>
+<div class="subtitle">
+    计划：<code>.omo/plans/未开始/extract-preserve-full-path-toggle.md</code> ·
+    对话框：<code>CustomFilePickerDialog</code> (PickerMode.ExtractFolder) ·
+    路径计算：<code>ExtractPathResolver.ResolveRelativePath</code><br>
+    <span style="color:#6bd46b">★ 参数区设计：开关已从预览面板标题行移出，左下独立参数区统一承载（可扩展 · 空则隐藏）</span>
+</div>
+
+<div class="wrap">
+
+<!-- ══════════════ 控制台 ══════════════ -->
+<div class="console">
+    <div class="console-row">
+
+        <div class="console-group">
+            <span class="console-label">当前压缩包内位置（currentFolder）</span>
+            <div class="seg" id="segFolder">
+                <button data-v="docs" class="active">子目录 docs/</button>
+                <button data-v="">压缩包根目录</button>
+            </div>
+        </div>
+
+        <div class="console-group">
+            <span class="console-label">设置窗口全局默认 AppSettings.ExtractPreserveFullPath</span>
+            <label class="chk-line">
+                <input type="checkbox" id="settingsPfp" checked>
+                <span>解压时保留完整路径</span>
+            </label>
+        </div>
+
+        <div class="console-group">
+            <span class="console-label">目标目录（可切换，观察冲突标记变化）</span>
+            <select id="selDest">
+                <option value="empty">D:\解压\空目录\</option>
+                <option value="partial" selected>D:\解压\部分已有\</option>
+                <option value="full">D:\解压\已全有\</option>
+            </select>
+        </div>
+
+        <div class="console-group">
+            <span class="console-label">调用情形（决定参数区内容；无参数则整区隐藏）</span>
+            <div class="seg" id="segScenario">
+                <button data-v="extractTo" class="active">解压选中项到…</button>
+                <button data-v="dragFallback">拖拽兜底解压</button>
+                <button data-v="compress">压缩（多参数）</button>
+                <button data-v="pickFolder">选择文件夹（无参数）</button>
+            </div>
+        </div>
+
+        <div class="console-group">
+            <span class="console-label">扩展性</span>
+            <button class="btn" id="addOptBtn" style="min-width:auto;padding:0 12px">＋ 添加示例参数</button>
+        </div>
+
+        <div class="console-group">
+            <span class="console-label">语言（i18n）</span>
+            <div class="seg" id="segLang">
+                <button data-v="zh-CN" class="active">简中</button>
+                <button data-v="zh-TW">繁中</button>
+                <button data-v="en">EN</button>
+            </div>
+        </div>
+
+        <div class="console-group">
+            <span class="console-label">对照模式</span>
+            <div class="seg" id="segImpl">
+                <button data-v="fixed" class="active">修正后实现</button>
+                <button data-v="plan">计划原文（缺陷）</button>
+            </div>
+        </div>
+
+    </div>
+    <div class="note" id="implNote"></div>
+</div>
+
+<!-- ══════════════ 对话框 ══════════════ -->
+<div class="win">
+    <div class="win-titlebar">
+        <span id="dlgTitle">选择文件夹</span>
+        <span class="tb-right">
+            <span>ExtractFolder 模式</span><span>1100 × 620</span><span>右栏 288px（Min 200 / Max 800）</span>
+        </span>
+    </div>
+    <div class="win-body">
+        <div class="root">
+
+            <!-- 地址栏 -->
+            <div class="addrbar">
+                <div class="nav-btn" title="后退">‹</div>
+                <div class="nav-btn" title="前进">›</div>
+                <div class="nav-btn" title="上一级">↑</div>
+                <!-- 系统浏览按钮在 ExtractFolder 模式隐藏（代码 :300） -->
+                <div class="path-box" id="pathBox">D:\解压\部分已有\</div>
+                <div class="nav-btn" title="添加收藏">☆</div>
+            </div>
+
+            <!-- 主体 -->
+            <div class="browser">
+
+                <!-- 快速路径面板 -->
+                <div class="pane">
+                    <div class="pane-head">快速路径</div>
+                    <div class="pane-body">
+                        <div class="qlink active">📁 D:\解压\部分已有\</div>
+                        <div class="qlink">📁 D:\解压\空目录\</div>
+                        <div class="qlink">📁 D:\解压\已全有\</div>
+                        <div class="qlink">📁 D:\下载</div>
+                        <div class="qlink">📁 D:\文档</div>
+                        <div style="height:10px"></div>
+                        <div class="pane-head" style="border:none;padding:7px 0 4px">收藏夹</div>
+                        <div class="qlink">⭐ 项目归档</div>
+                        <div class="qlink">⭐ 临时</div>
+                        <div style="height:10px"></div>
+                        <div class="pane-head" style="border:none;padding:7px 0 4px">历史</div>
+                        <div class="qlink">🕘 D:\解压</div>
+                        <div class="qlink">🕘 D:\备份</div>
+                    </div>
+                </div>
+
+                <div class="splitter"></div>
+
+                <!-- 文件列表（ExtractFolder 模式只列目录） -->
+                <div class="pane">
+                    <div class="curpath" id="curPath">D:\解压\部分已有\</div>
+                    <div class="pane-body" id="fileList"></div>
+                </div>
+
+                <div class="splitter"></div>
+
+                <!-- ★★★ 解压预览面板（参数已移出到左下参数区） ★★★ -->
+                <div class="pane extract">
+                    <!-- 标题行：纯标题（260px 窄面板内不再塞控件，规避溢出风险） -->
+                    <div class="title-row">
+                        <span class="panel-title" id="panelTitle">解压预览</span>
+                    </div>
+
+                    <div class="preview-splitter"></div>
+
+                    <div class="tree-box" id="treeBox"></div>
+                </div>
+
+            </div>
+
+            <div></div><!-- Row2 FileNameArea：ExtractFolder 模式隐藏 -->
+
+            <!-- ★★★ 参数区（左下 · 通用参数宿主 · 无参数时整体隐藏） ★★★ -->
+            <div class="options-row" id="optionsRow">
+                <div class="options-panel" id="optionsPanel">
+                    <span class="options-caption" id="optionsCaption">参数</span>
+                    <!-- 参数项由 renderOptions() 注入 -->
+                </div>
+            </div>
+
+            <div class="btn-row">
+                <button class="btn primary" id="okBtn">选择文件夹</button>
+                <button class="btn" id="cancelBtn">取消</button>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════ 参数区设计说明 ══════════════ -->
+<div class="card" style="margin-top:14px">
+    <h3>★ 参数区设计（左下 · 通用参数宿主）</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+        <div>
+            <div style="font-size:12px;color:#6bd46b;margin-bottom:6px">结构</div>
+            <pre class="code" style="font-size:11px">RootGrid RowDefinitions=
+    "Auto,   <span class="c">// 0 地址栏</span>
+     *,     <span class="c">// 1 浏览器网格</span>
+     Auto,  <span class="c">// 2 文件名行（仅 Save/Open）</span>
+     <span class="hl">Auto,   // 3 ★参数区 ← 新增</span>
+     Auto"   <span class="c">// 4 确定/取消</span>
+
+<span class="c">// 参数区内：WrapPanel 承载参数项，自动换行</span>
+OptionsRow.IsVisible = (registry.Count &gt; 0)  <span class="c">// 空则隐藏</span></pre>
+        </div>
+        <div>
+            <div style="font-size:12px;color:#6bd46b;margin-bottom:6px">可扩展性（渲染层不认识任何具体参数）</div>
+            <pre class="code" style="font-size:11px"><span class="c">// 新增一个参数 = 注册一项，不改渲染层/布局</span>
+<span class="k">void</span> <span class="n">AddOption</span>(<span class="n">string</span> key, <span class="n">string</span> labelKey,
+        <span class="n">bool</span> initial, <span class="n">Action</span>&lt;<span class="n">bool</span>&gt; onChanged,
+        <span class="n">Func</span>&lt;<span class="n">bool</span>&gt;? isEnabled = <span class="k">null</span>);
+
+<span class="c">// 构造期按模式注册，确认时收集</span>
+AddOption(<span class="s">"preserveFullPath"</span>, <span class="s">"Picker_PreserveFullPath"</span>,
+          initial: settings.ExtractPreserveFullPath,
+          onChanged: v =&gt; { _pfp = v; SchedulePreviewRebuild(_currentDir); },
+          isEnabled: () =&gt; !<span class="n">string</span>.IsNullOrEmpty(_extractCurrentFolder));
+
+<span class="c">// 结果携带参数字典 → 消费点按键取值</span>
+<span class="k">readonly record</span> <span class="n">PickerResult</span>(
+    <span class="n">string</span>? DestPath,
+    <span class="n">IReadOnlyDictionary</span>&lt;<span class="n">string</span>, <span class="n">object</span>&gt; Options);</pre>
+        </div>
+    </div>
+    <div class="verdict ok" style="margin-top:12px">
+        <span class="vi">✓</span>
+        <div><b>参数区是宿主，不是硬编码</b>：渲染层只遍历注册表生成「标签 + 控件」，
+        不认识 <code style="background:transparent;color:#8fdc9f">preserveFullPath</code> 或任何具体 key。
+        将来别的调用情形要加参数、或参数要支持 ComboBox/TextBox 等类型，只扩展注册项的工厂，不动布局与容器。
+        <br><b style="color:#8fdc9f">上方控制台可验证</b>：切「调用情形」看不同情形注册不同参数；
+        点「＋ 添加示例参数」看多参数自动换行；切「选择文件夹（无参数）」看整区隐藏。</div>
+    </div>
+</div>
+
+<!-- ══════════════ 与计划文档的差异 ══════════════ -->
+<div class="card" style="margin-top:14px;border-color:#6b4d20">
+    <h3 style="color:#ffb45c">⚠ 本原型已偏离计划文档，实施前需回写计划</h3>
+    <div style="font-size:12.5px;line-height:1.8;color:#bbb">
+        用户新需求：参数独立成左下区域，可扩展、可为空。<br>
+        计划中受影响的三处：
+        <ul style="margin:6px 0 0 18px">
+            <li><b>§3.3 对话框 UI</b> —— 原方案把复选框放在 <code>ExtractFolderPanel</code> 标题行右侧；
+                现改为 <code>RootGrid</code> 新增一行（参数区），标题行恢复纯标题。
+                <span style="color:#8fdc9f">副作用：spec §11 列的「260px 窄面板标题+复选框溢出」风险随之消失。</span></li>
+            <li><b>§3.4 code-behind</b> —— 从「一个硬编码 CheckBox」改为「参数注册表 + 通用渲染」；
+                <code>IsChecked</code> 初值回填（D1）与禁用提示（D3）由注册项的 <code>initial</code> / <code>isEnabled</code> 统一承载。</li>
+            <li><b>§3.1 / §3.2 返回通道</b> —— <code>ExtractPickResult(DestPath, PreserveFullPath)</code>
+                可保持强类型不变（已知参数强类型更安全），同时参数区支持携带
+                <code>Dictionary&lt;string, object&gt;</code> 供未来参数使用。二者不冲突。</li>
+        </ul>
+        <div class="note" style="margin-top:8px">
+            另需同步 <code>docs/PLAN.md:37</code> 的说明（AGENTS.md 规则 1），并在 i18n 增加
+            <code>Picker_OptionsCaption</code>（参数区标题「本次参数」/「本次參數」/「Options」）。
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════ 返回值 + 落盘 ══════════════ -->
+<div class="grid2">
+
+    <div class="card">
+        <h3>对话框返回值</h3>
+        <pre class="code" id="retCode">// 尚未确认
+<span class="c">// 点「选择文件夹」后显示</span></pre>
+        <div id="retVerdict"></div>
+    </div>
+
+    <div class="card">
+        <h3>实际落盘路径（SelectedItemsExtractService → 同一 resolver）</h3>
+        <div class="pathlist" id="diskList"><span style="color:#777">尚未确认…</span></div>
+        <div id="diskVerdict"></div>
+    </div>
+
+</div>
+
+<!-- 消费点表 -->
+<div class="card" style="margin-top:14px">
+    <h3>四个消费点的取值来源（计划 §1.3 / §3.5）</h3>
+    <table class="cp">
+        <thead>
+            <tr>
+                <th style="width:34%">消费点</th>
+                <th style="width:11%">有对话框</th>
+                <th style="width:33%">preserveFullPath 来源</th>
+                <th style="width:22%">本次生效值</th>
+            </tr>
+        </thead>
+        <tbody id="cpBody"></tbody>
+    </table>
+    <div class="note">
+        行为「有对话框 = false」的两行<strong>没有勾选值可用</strong>，必须回退设置值 —— 这是本计划刻意保留的行为（DoD 12 / 13）。
+    </div>
+</div>
+
+<!-- 事件日志 -->
+<div class="card" style="margin-top:14px">
+    <h3>事件时序（含 300ms 防抖）</h3>
+    <div class="log" id="log"></div>
+</div>
+
+<!-- ══════════════ 计划问题清单 ══════════════ -->
+<details class="issues">
+    <summary>计划审阅发现的问题（7 项，2 项阻塞实施）</summary>
+
+    <div class="issue">
+        <span class="sev crit">D1 阻塞</span>
+        <b>初始勾选态从未回填到 CheckBox</b> —— 计划 §3.4 只说「构造函数订阅事件」，XAML 也没有
+        <code>IsChecked</code> 绑定；spec §5.1 明确要求的「勾选态 = 初值」被整个丢掉。
+        <br>后果：<code>_extractPreserveFullPath</code> 保留设置值，但复选框<strong>永远显示未勾选</strong>。
+        设置为 true 时，用户看到一个未勾选的框却得到保留路径的落盘结果 —— 视觉与实际背离。
+        <br>修法：ExtractFolder 分支内<strong>先</strong> <code>PreserveFullPathCheck.IsChecked = _extractPreserveFullPath;</code>
+        <strong>再</strong>订阅 <code>IsCheckedChanged</code>（反序会触发一次处理器回灌）。
+        <br><span style="color:#888">上方「对照模式 → 计划原文（缺陷）」可直接复现此现象。</span>
+    </div>
+
+    <div class="issue">
+        <span class="sev crit">D2 阻塞</span>
+        <b><code>Picker_ExtractPreviewTitle</code> 已存在，重复添加会破坏本地化加载</b> —— 计划 §5 把它列为
+        「新增 key」，但它<strong>已存在于三语文件第 1060 行</strong>。按计划再插到文件头会产生重复 JSON key，
+        <code>JsonSerializer</code> 反序列化 <code>Dictionary&lt;string,string&gt;</code> 时对重复键抛
+        <code>ArgumentException</code> —— 整个本地化表加载失败，波及全应用文案。
+        <br>修法：§5 只保留 <code>Picker_PreserveFullPath</code> 与 <code>Picker_PreserveFullPathDisabledHint</code> 两个新 key。
+    </div>
+
+    <div class="issue">
+        <span class="sev high">D3</span>
+        <b>禁用态 CheckBox 的 ToolTip 可能永不显示（直击决策 a 的目的）</b> —— 计划与 spec 都写「Tooltip 常驻绑定即可，禁用时自然显示」。
+        但 Avalonia 中 <code>IsEnabled=false</code> 的控件不参与命中测试，<code>ToolTip</code> 依赖 pointer-over 事件，
+        因此提示<strong>很可能弹不出来</strong>。这会让用户只看到一个死复选框而无任何解释 ——
+        正是决策 a 想避免的备选 c「会被误判为功能损坏」。
+        <br><b style="color:#6bd46b">修正后已解决</b>：参数移出预览面板后，参数项渲染为
+        <code>CheckBox</code> + 独立可命中的 <code>?</code> 触发器兄弟节点，禁用时提示挂在 <code>?</code> 上，
+        不依赖禁用控件自身收事件。
+    </div>
+
+    <div class="issue">
+        <span class="sev high">D4</span>
+        <b>架构守卫测试无法定位源文件，且断言字符串对空白敏感 → 假通过</b> ——
+        <code>ExtractPreserveFullPathWiringTests</code> 需在运行时读取 <code>MainWindowViewModel.cs</code> /
+        <code>DragDropService.cs</code>，但测试项目<strong>没有任何源码定位设施</strong>（csproj 无
+        <code>None Include</code> 拷贝，代码里无 <code>File.ReadAllText</code>、无仓库根发现逻辑）。
+        <br>更严重的是断言形如 <code>不含 "settings.ExtractPreserveFullPath, settings.FileConflictAction"</code>：
+        只要有人把该调用换行格式化，字符串消失，<strong>测试通过但缺陷仍在</strong> —— 比没有测试更危险（虚假信心）。
+        <br>修法：① 写仓库根发现（从 <code>AppContext.BaseDirectory</code> 上溯找 <code>MantisZip.sln</code>）；
+        ② 断言前先归一化空白（<code>Regex.Replace(src, @"\s+", " ")</code>）；③ 更稳妥的是用花括号配平
+        截出 <code>ExtractSelectedEntriesCoreAsync</code> 方法体，断言其中<strong>完全不出现</strong>
+        <code>settings.ExtractPreserveFullPath</code>。
+    </div>
+
+    <div class="issue">
+        <span class="sev mid">D5</span>
+        <b><code>ExtractPanelTitleText</code> 与既有 <code>ExtractPreviewTitle</code> 重复</b> ——
+        对话框 code-behind 已有 <code>ExtractPreviewTitle =&gt; T("Picker_ExtractPreviewTitle")</code>（:112）。
+        计划 §3.4 又新增一个取值完全相同的属性，而 §3.3 的 XAML 注释说「保留原有 Text 绑定」、
+        代码块却绑 <code>ExtractPanelTitleText</code> —— 自相矛盾，会留下一个无人使用的死属性。二选一即可。
+    </div>
+
+    <div class="issue">
+        <span class="sev mid">D6</span>
+        <b>两个消费点对空值处理不一致</b> —— §3.5 给 <code>ExtractSelectedTo</code> 写了
+        <code>if (pick is null || string.IsNullOrEmpty(pick.DestPath)) return;</code>，
+        给 <code>DragDropService</code> 却没写。且 §3.2 的返回判断
+        <code>dialog.SelectedPath is { } path</code> 对空字符串也会命中（<code>Ok_Click</code> 无条件
+        <code>SelectedPath = _currentDir</code>），理论上可能返回 <code>ExtractPickResult("", ...)</code>。
+        <br>修法：返回判断改 <code>!string.IsNullOrEmpty(path)</code>，两处消费点统一守卫。
+    </div>
+
+    <div class="issue">
+        <span class="sev mid">D7</span>
+        <b>DoD 丢失规则 3 的进度文档步骤 + 契约测试未指定 <code>[AvaloniaFact]</code></b> ——
+        spec §12 最后一条要求更新 <code>docs/PROGRESS.md</code> 与 <code>docs/progress-avalonia-detail.md</code>，
+        计划 §7 的 DoD（作为上位文档）把它整条丢了。
+        另外 <code>SelectedItemsExtractService</code> 内部调用 <code>AppSettings.Load()</code> 与
+        <code>LocalizationManager.T()</code>，契约测试需按 <code>MainWindowViewModelCommentTests</code> 的先例用
+        <code>[AvaloniaFact]</code>，并隔离 <code>%LOCALAPPDATA%\MantisZip\settings.json</code> 以免读写开发者真实设置。
+    </div>
+
+    <div class="issue" style="color:#8fdc9f">
+        <span class="sev" style="background:#2d6b3d;color:#8fdc9f">已核实无误</span>
+        全部行号（:79 / :136-139 / :2333 / :2354 / :2365 / :2375 / DragDropService :75/:84/:105）逐条比对准确；
+        <code>MainWindow.axaml.cs:183-184</code> 表达式体 lambda 确实零改动；
+        §4.1 三条「mock 不可写」理由全部成立（已核实 <code>DragDropService</code> 为 <code>internal class</code>、
+        <code>InternalsVisibleTo</code> 仅授予 <code>MantisZip.Tests</code>）；
+        决策 a 的等价性由 <code>TrimCurrentFolderPrefix</code> 源码证实；
+        测试基线 <b>105 通过 / 2 跳过</b> 实测一致，§7 的 111 算术正确；
+        规则 1 已合规（<code>docs/PLAN.md:37</code> 已有 P2 条目）。
+    </div>
+
+</details>
+
+<div class="note" style="margin-top:20px;text-align:center">
+    原型仅还原交互逻辑与数据流（resolver 语义、300ms 防抖、返回值通道、四消费点取值），
+    不复刻 Avalonia 渲染细节。数据为构造样例，与真实压缩包无关。
+</div>
+
+</div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════
+   1. 构造数据：模拟压缩包条目（已按 DragDropItemExpander 展开为文件）
+   ══════════════════════════════════════════════════════════════ */
+const ENTRIES = [
+    { path:'docs/readme.txt',              size:2048 },
+    { path:'docs/img/logo.png',            size:15360 },
+    { path:'docs/img/banner.jpg',          size:92160 },
+    { path:'docs/guide/intro.md',          size:5120 },
+    { path:'docs/guide/api/reference.html',size:30720 },
+    { path:'assets/data.json',             size:4096 },
+    { path:'assets/fonts/NotoSans.ttf',    size:556032 },
+];
+
+/* 目标目录已存在的文件（用于冲突检测 checkExists:true） */
+const DEST_EXISTING = {
+    empty:   [],
+    partial: ['docs/img/logo.png', 'assets/data.json'],
+    full:    ENTRIES.map(e => e.path),
+};
+
+const DESTS = {
+    empty:'D:\\解压\\空目录\\', partial:'D:\\解压\\部分已有\\', full:'D:\\解压\\已全有\\'
+};
+
+/* ══════════════════════════════════════════════════════════════
+   2. ExtractPathResolver.ResolveRelativePath 的 JS 移植
+      —— 与 Core/Utils/ExtractPathResolver.cs:23-46 语义逐字一致
+      —— 预览与落盘共用本函数（这就是「预览 = 实际」的结构保证）
+   ══════════════════════════════════════════════════════════════ */
+function trimCurrentFolderPrefix(entryPath, currentFolder, preserveFullPath) {
+    if (preserveFullPath || !currentFolder) return entryPath;
+    const cf = currentFolder.replace(/\/+$/,'') + '/';
+    return entryPath.toLowerCase().startsWith(cf.toLowerCase())
+        ? entryPath.substring(cf.length)
+        : entryPath;
+}
+function sanitizeEntryPath(p) {
+    // 丢弃 '..' / '.' 段（与 FileConflictHelper.SanitizeEntryPath 语义一致）
+    const parts = p.split('/').filter(s => s.length > 0 && s !== '..' && s !== '.');
+    if (parts.length === 0) throw new Error('InvalidOperationException: 净化后为空');
+    return parts.join('/');
+}
+function resolveRelativePath(entryKey, currentFolder, preserveFullPath) {
+    return sanitizeEntryPath(trimCurrentFolderPrefix(entryKey, currentFolder, preserveFullPath));
+}
+
+/* ══════════════════════════════════════════════════════════════
+   3. i18n（计划 §5 新增 2 个 key；Picker_ExtractPreviewTitle 已存在）
+   ══════════════════════════════════════════════════════════════ */
+const I18N = {
+    'zh-CN': {
+        dlgTitle:'选择文件夹', ok:'选择文件夹', cancel:'取消',
+        panelTitle:'解压预览',
+        caption:'本次参数',
+        pfp:'保留完整路径',
+        pfpHint:'在压缩包根目录，勾选与否结果相同',
+        pfpTrigger:'本设置只对本次解压生效，不回写设置窗口',
+        fileName:'文件', size:'大小', modified:'修改时间',
+        // 扩展性示例参数
+        optKeepDotFiles:'保留以 . 开头的文件',
+        optSkipExisting:'跳过已存在文件',
+        optFollowSymlinks:'跟随符号链接',
+        optUtf8Names:'文件名按 UTF-8 解析',
+        optSolidArchive:'固实压缩',
+        optTestArchive:'压缩后校验完整性',
+        noParams:'（该调用情形无参数 —— 参数区整体隐藏，不占布局空间）',
+    },
+    'zh-TW': {
+        dlgTitle:'選擇資料夾', ok:'選擇資料夾', cancel:'取消',
+        panelTitle:'解壓預覽',
+        caption:'本次參數',
+        pfp:'保留完整路徑',
+        pfpHint:'在壓縮包根目錄，勾選與否結果相同',
+        pfpTrigger:'本設定只對本次解壓生效，不回寫設定視窗',
+        fileName:'檔案', size:'大小', modified:'修改時間',
+        optKeepDotFiles:'保留以 . 開頭的檔案',
+        optSkipExisting:'跳過已存在檔案',
+        optFollowSymlinks:'跟隨符號連結',
+        optUtf8Names:'檔名稱按 UTF-8 解析',
+        optSolidArchive:'固實壓縮',
+        optTestArchive:'壓縮後校驗完整性',
+        noParams:'（該呼叫情形無參數 —— 參數區整體隱藏，不佔版面空間）',
+    },
+    'en': {
+        dlgTitle:'Select Folder', ok:'Select Folder', cancel:'Cancel',
+        panelTitle:'Extract preview',
+        caption:'Options',
+        pfp:'Preserve full paths',
+        pfpHint:'At the archive root, both settings produce the same result',
+        pfpTrigger:'Applies to this extraction only; not written back to Settings',
+        fileName:'Name', size:'Size', modified:'Modified',
+        optKeepDotFiles:'Keep dot-files',
+        optSkipExisting:'Skip existing files',
+        optFollowSymlinks:'Follow symlinks',
+        optUtf8Names:'Parse names as UTF-8',
+        optSolidArchive:'Solid archive',
+        optTestArchive:'Verify archive after compress',
+        noParams:'(no options for this scenario — the region hides entirely)',
+    },
+};
+
+/* ══════════════════════════════════════════════════════════════
+   4. 全局状态（对应字段）
+   ══════════════════════════════════════════════════════════════ */
+const state = {
+    currentFolder: 'docs',                       // _extractCurrentFolder（构造期固定）
+    preserveFullPath: true,                      // _extractPreserveFullPath（可写）
+    settingsPfp: true,                           // AppSettings.ExtractPreserveFullPath
+    dest: 'partial',
+    lang: 'zh-CN',
+    implMode: 'fixed',                           // 'fixed' | 'plan'（计划原文缺陷）
+    chkInitApplied: false,                       // 复选框初值是否已回填（D1）
+    scenario: 'extractTo',                       // 调用情形
+    extraOpts: 0,                                // 追加的示例参数个数
+    debounceTimer: null,
+    result: null,                                // ExtractPickResult
+};
+const T = () => I18N[state.lang];
+
+/* 目录列表（ExtractFolder 模式只显示目录，代码 :660） */
+const DIRS = ['子目录', '空目录', '已全有', '下载', '文档'];
+
+/* ══════════════════════════════════════════════════════════════
+   4b. 参数注册表 —— 参数区的通用宿主
+   ──────────────────────────────────────────────────────────────
+   对话框持有一个「本次调用要显示哪些参数」的注册表。每个参数项自带
+   标签 / 初值 / 变更回调 / 可用性判定。渲染层与业务层解耦：
+     · 渲染层只认注册表，不认识任何具体参数
+     · 新增参数 = 注册一项，不改渲染层、不改布局
+   注册表为空 → 参数区整体隐藏（规则 6：隐藏而非留空）
+   ══════════════════════════════════════════════════════════════ */
+
+/* 各调用情形注册哪些参数（真实实现中由模式/调用方在构造期注册） */
+const SCENARIO_OPTIONS = {
+    // 右键「解压选中项到…」—— 只有「保留完整路径」
+    extractTo: ['preserveFullPath'],
+    // 拖拽目标检测失败兜底 —— 同一对话框、同一参数
+    dragFallback: ['preserveFullPath'],
+    // 压缩：演示「多参数自动换行」
+    compress: ['keepDotFiles', 'skipExisting', 'followSymlinks', 'utf8Names', 'solidArchive', 'testArchive'],
+    // 选择文件夹：本情形无参数 → 整区隐藏
+    pickFolder: [],
+};
+
+const EXTRA_POOL = [
+    { key:'keepDotFiles',   labelKey:'optKeepDotFiles'   },
+    { key:'skipExisting',   labelKey:'optSkipExisting'   },
+    { key:'followSymlinks', labelKey:'optFollowSymlinks' },
+    { key:'utf8Names',      labelKey:'optUtf8Names'      },
+    { key:'solidArchive',   labelKey:'optSolidArchive'   },
+    { key:'testArchive',    labelKey:'optTestArchive'    },
+];
+
+/* 参数值仓：key → 当前值（真实实现里由各参数自己持有字段，这里集中存便于演示） */
+const optValues = {
+    preserveFullPath: () => state.preserveFullPath,
+    keepDotFiles: true, skipExisting: false, followSymlinks: false,
+    utf8Names: true, solidArchive: false, testArchive: true,
+};
+
+/** 当前生效的参数 key 列表 = 情形内置 + 用户追加的示例参数 */
+function activeOptionKeys() {
+    const base = SCENARIO_OPTIONS[state.scenario] || [];
+    const extra = EXTRA_POOL.slice(0, state.extraOpts).map(o => o.key);
+    return [...new Set([...base, ...extra])];
+}
+
+function optLabel(key) {
+    if (key === 'preserveFullPath') return T().pfp;
+    const hit = EXTRA_POOL.find(o => o.key === key);
+    return hit ? T()[hit.labelKey] : key;
+}
+/** 可用性：根目录下「保留完整路径」无效（决策 a） */
+function optEnabled(key) {
+    if (key === 'preserveFullPath') return state.currentFolder !== '';
+    return true;
+}
+function optTip(key) {
+    return key === 'preserveFullPath' ? T().pfpHint : null;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   5. 渲染
+   ══════════════════════════════════════════════════════════════ */
+const $ = id => document.getElementById(id);
+const treeBox = $('treeBox');
+
+function fmtSize(b) {
+    if (b < 1024) return b + ' B';
+    if (b < 1048576) return (b/1024).toFixed(1) + ' KB';
+    return (b/1048576).toFixed(1) + ' MB';
+}
+function destPath() { return DESTS[state.dest]; }
+
+function log(msg, cls) {
+    const el = $('log');
+    const d = document.createElement('div');
+    const ts = new Date().toLocaleTimeString('en-GB', { hour12:false });
+    d.innerHTML = `<span class="t">${ts}</span> <span class="${cls||''}">${msg}</span>`;
+    el.appendChild(d);
+    el.scrollTop = el.scrollHeight;
+}
+
+/* ── 文件列表 ── */
+function renderFileList() {
+    $('curPath').textContent = destPath();
+    $('pathBox').textContent = destPath();
+    $('fileList').innerHTML = DIRS.map((d,i) => `
+        <div class="frow${i===1?' sel':''}">
+            <span class="fi">📁</span>
+            <span class="fn">${d}</span>
+            <span class="fs"></span>
+            <span class="fm">2026-09-2${i+1} 14:0${i}</span>
+        </div>`).join('');
+}
+
+/* ── 标题行（纯标题：参数已移出到参数区） ── */
+function renderTitleRow() {
+    const t = T();
+    $('dlgTitle').textContent = t.dlgTitle;
+    $('panelTitle').textContent = t.panelTitle;
+    $('okBtn').textContent = t.ok;
+    $('cancelBtn').textContent = t.cancel;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   ★ 参数区渲染 —— 完全数据驱动，不认识任何具体参数
+   ══════════════════════════════════════════════════════════════ */
+function renderOptions() {
+    const keys = activeOptionKeys();
+    const row = $('optionsRow');
+    const panel = $('optionsPanel');
+    const t = T();
+
+    // ★ 空注册表 → 整区隐藏，不占布局空间（规则 6：隐藏而非留空）
+    if (keys.length === 0) {
+        row.hidden = true;
+        panel.innerHTML = '';
+        log('参数注册表为空 → 参数区整体隐藏（IsVisible=false，不占布局）', 'warn');
+        return;
+    }
+    row.hidden = false;
+    $('optionsCaption').textContent = t.caption;
+
+    const html = keys.map(key => {
+        const enabled = optEnabled(key);
+        // D1：「计划原文」模式下初值不回填 → 复选框恒为未勾选
+        const checked = (key === 'preserveFullPath' && !state.chkInitApplied)
+            ? false
+            : !!optValues[key]();
+        const tip = optTip(key);
+        return `
+        <label class="opt-item${enabled?'':' disabled'}" data-key="${key}">
+            <input type="checkbox" data-key="${key}" ${checked?'checked':''} ${enabled?'':'disabled'}>
+            <span class="opt-label">${optLabel(key)}</span>
+            ${enabled ? '' : `<span class="opt-trigger" data-tip="${key}">?</span>`}
+        </label>`;
+    }).join('');
+
+    panel.innerHTML = `<span class="options-caption">${t.caption}</span>` + html;
+
+    // 绑定变更
+    panel.querySelectorAll('input[data-key]').forEach(inp => {
+        inp.addEventListener('change', e => onOptionChanged(inp.dataset.key, e.target.checked));
+    });
+    // D3 兜底：禁用态的 ? 触发器（挂在可命中的包裹元素上，禁用控件自身收不到 pointer 事件）
+    panel.querySelectorAll('.opt-trigger').forEach(tr => {
+        tr.addEventListener('mouseenter', () => showOptTip(tr.dataset.tip, tr));
+        tr.addEventListener('mouseleave', () => hideOptTip());
+        tr.addEventListener('click', e => { e.preventDefault(); showOptTip(tr.dataset.tip, tr); });
+    });
+}
+
+function onOptionChanged(key, val) {
+    if (key === 'preserveFullPath') {
+        state.preserveFullPath = val;
+        log(`参数「保留完整路径」→ ${val}  →  SchedulePreviewRebuild()`, 'ok');
+        schedulePreviewRebuild('toggle');           // 复用既有 300ms 防抖
+    } else {
+        optValues[key] = val;
+        log(`参数「${optLabel(key)}」→ ${val}（演示：新增参数无需改渲染层）`, 'ok');
+    }
+    renderConsumers();
+}
+
+let tipEl = null;
+function showOptTip(key, anchor) {
+    hideOptTip();
+    tipEl = document.createElement('div');
+    tipEl.className = 'tip-bubble show';
+    tipEl.style.position = 'absolute';
+    tipEl.style.bottom = 'auto';
+    tipEl.style.top = (anchor.getBoundingClientRect().bottom - $('optionsPanel').getBoundingClientRect().top + 7) + 'px';
+    tipEl.style.left = Math.max(0, anchor.getBoundingClientRect().left - $('optionsPanel').getBoundingClientRect().left - 140) + 'px';
+    tipEl.style.right = 'auto';
+    tipEl.textContent = optTip(key);
+    $('optionsPanel').style.position = 'relative';
+    $('optionsPanel').appendChild(tipEl);
+}
+function hideOptTip() { if (tipEl) { tipEl.remove(); tipEl = null; } }
+
+/* ── 预览树（ResultPreviewService.BuildExtractPreview 的行为移植） ── */
+function buildTree() {
+    const existing = DEST_EXISTING[state.dest];
+    const root = { name: destPath(), children: [], isDir:true, rel:'' };
+    const dirIndex = new Map([['', root]]);
+
+    const ensureDir = rel => {
+        if (dirIndex.has(rel)) return dirIndex.get(rel);
+        const idx = rel.lastIndexOf('/');
+        const parent = ensureDir(idx >= 0 ? rel.slice(0, idx) : '');
+        const node = { name: idx>=0?rel.slice(idx+1):rel, children:[], isDir:true, rel };
+        parent.children.push(node);
+        dirIndex.set(rel, node);
+        return node;
+    };
+
+    for (const e of ENTRIES) {
+        const rel = resolveRelativePath(e.path, state.currentFolder, state.preserveFullPath);
+        const idx = rel.lastIndexOf('/');
+        const parent = ensureDir(idx >= 0 ? rel.slice(0, idx) : '');
+        parent.children.push({
+            name: idx>=0?rel.slice(idx+1):rel, isDir:false, rel,
+            size:e.size, conflict: existing.includes(rel)
+        });
+    }
+    sortTree(root);
+    return root;
+}
+function sortTree(n) {
+    n.children.sort((a,b) => (b.isDir - a.isDir) || a.name.localeCompare(b.name));
+    n.children.forEach(c => { if (c.isDir) sortTree(c); });
+}
+function countFiles(n) { return n.isDir ? n.children.reduce((s,c)=>s+countFiles(c),0) : 1; }
+
+function renderTree(flash) {
+    const tree = buildTree();
+    if (countFiles(tree) === 0) {
+        treeBox.innerHTML = `<div class="empty-tree">（无条目）</div>`;
+        return;
+    }
+    const lines = [];
+    const walk = (n, depth) => {
+        if (depth > 0) {
+            const pad = { paddingLeft:(depth*14)+'px' };
+            if (n.isDir) {
+                lines.push(`<div class="tnode" style="${pad.cssText}">
+                    <span class="ti">📁</span><span class="tn">${n.name}</span></div>`);
+            } else {
+                lines.push(`<div class="tnode${n.conflict?' conflict':''}${flash?' flash':''}" style="${pad.cssText}">
+                    <span class="ti">📄</span><span class="tn">${n.name}</span>
+                    <span style="color:#777;font-size:10.5px">${fmtSize(n.size)}</span>
+                    ${n.conflict?'<span class="tbadge conflict">冲突</span>':''}</div>`);
+            }
+        }
+        n.children.forEach(c => walk(c, depth+1));
+    };
+    walk(tree, 0);
+    treeBox.innerHTML = lines.join('');
+    // 根节点单独一行（目标目录本身）
+    treeBox.innerHTML =
+        `<div class="tnode"><span class="ti">📁</span>
+         <span class="tn" style="color:#6bd46b">${tree.name}</span></div>` + lines.join('');
+}
+
+/* ── 完整刷新 ── */
+function render(flash) {
+    renderTitleRow();
+    renderOptions();          // ★ 参数区（数据驱动，空则隐藏）
+    renderTree(flash);
+    renderConsumers();
+    $('implNote').innerHTML = state.implMode === 'fixed'
+        ? '✅ <b style="color:#6bd46b">修正后</b>：参数项初值由 <code>IsChecked = _extractPreserveFullPath</code> 回填，视觉与字段始终一致；禁用提示挂在可命中的 <code>?</code> 触发器上（D3 兜底）。'
+        : '⚠ <b style="color:#ffb45c">计划原文</b>：参数项初值<strong>从未回填</strong>（D1）。注意「保留完整路径」恒显示未勾选，但若设置值为 true，预览与落盘仍按 true 走 —— 视觉与实际背离。';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   6. 交互
+   ══════════════════════════════════════════════════════════════ */
+
+/* SchedulePreviewRebuild：300ms 防抖（对照代码 :772-801） */
+function schedulePreviewRebuild(reason) {
+    if (state.debounceTimer) clearTimeout(state.debounceTimer);
+    log(`SchedulePreviewRebuild(${reason}) — 300ms 防抖计时…`, 'warn');
+    state.debounceTimer = setTimeout(() => {
+        log(`BuildExtractPreview(preserveFullPath=${state.preserveFullPath}, currentFolder="${state.currentFolder}") → 树刷新`, 'ok');
+        renderTree(true);
+    }, 300);
+}
+
+/* 调用情形切换 → 换一组参数注册 */
+$('segScenario').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('segScenario').querySelectorAll('button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.scenario = b.dataset.v;
+    state.result = null;
+    $('retCode').innerHTML = `<span class="c">// 尚未确认</span>`;
+    $('retVerdict').innerHTML = '';
+    $('diskList').innerHTML = `<span style="color:#777">尚未确认…</span>`;
+    $('diskVerdict').innerHTML = '';
+    const n = activeOptionKeys().length;
+    log(`调用情形 = ${b.dataset.v} → 注册 ${n} 个参数${n===0?'（参数区隐藏）':''}`, 'warn');
+    // 非解压情形：右栏预览面板不显示
+    const isExtract = state.scenario === 'extractTo' || state.scenario === 'dragFallback';
+    document.querySelector('.pane.extract').style.display = isExtract ? '' : 'none';
+    document.querySelectorAll('.browser > .splitter')[1].style.display = isExtract ? '' : 'none';
+    render();
+    if (isExtract) schedulePreviewRebuild('scenario');
+});
+
+/* 追加示例参数 → 演示参数区可增长 */
+$('addOptBtn').addEventListener('click', () => {
+    if (state.extraOpts >= EXTRA_POOL.length) {
+        log('示例参数已全部添加完毕', 'warn');
+        return;
+    }
+    const key = EXTRA_POOL[state.extraOpts].key;
+    state.extraOpts++;
+    log(`注册新参数「${optLabel(key)}」→ 参数区自动重排（渲染层未改动）`, 'ok');
+    render();
+});
+
+/* currentFolder 场景切换 */
+$('segFolder').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('segFolder').querySelectorAll('button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.currentFolder = b.dataset.v;
+    const available = state.currentFolder !== '';
+    log(`currentFolder = "${state.currentFolder}" → 参数「保留完整路径」可用 = ${available}`, 'warn');
+    if (!available) {
+        log('压缩包根目录：该参数禁用（决策 a）。两种模式产出完全相同 —— 裁剪无可裁前缀。', 'warn');
+    }
+    render();
+    schedulePreviewRebuild('scenario');
+});
+
+/* 设置全局默认 */
+$('settingsPfp').addEventListener('change', e => {
+    state.settingsPfp = e.target.checked;
+    log(`AppSettings.ExtractPreserveFullPath = ${state.settingsPfp}（设置窗口，默认值来源）`, 'warn');
+    // 决策 A：勾选只作用于本次，不回写设置 —— 这里仅改变量以观察「有对话框」的两个消费点
+    renderConsumers();
+});
+
+/* 目标目录 */
+$('selDest').addEventListener('change', e => {
+    state.dest = e.target.value;
+    renderFileList();
+    render();
+    schedulePreviewRebuild('destChanged');
+});
+
+/* 语言 */
+$('segLang').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('segLang').querySelectorAll('button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.lang = b.dataset.v;
+    log(`语言切换 → ${b.dataset.v}（对话框每次 ShowExtractFolderAsync 都 new 实例，构造期求值即为当前语言）`, 'ok');
+    render();
+});
+
+/* 对照模式 */
+$('segImpl').addEventListener('click', e => {
+    const b = e.target.closest('button'); if (!b) return;
+    $('segImpl').querySelectorAll('button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    state.implMode = b.dataset.v;
+    if (state.implMode === 'fixed') {
+        state.chkInitApplied = true;
+        log('切到「修正后」：执行 IsChecked = _extractPreserveFullPath（订阅在赋值之后）', 'ok');
+    } else {
+        state.chkInitApplied = false;
+        log('切到「计划原文」：移除初值回填 → D1 现象（复选框恒未勾选，字段仍为设置值）', 'err');
+    }
+    render();
+});
+
+/* 确认：参数区收集 → 随结果返回 */
+$('okBtn').addEventListener('click', () => {
+    // 实际取值来自字段（对话框状态），不是复选框的视觉状态
+    const keys = activeOptionKeys();
+    const options = {};
+    keys.forEach(k => { options[k] = (k === 'preserveFullPath') ? state.preserveFullPath : !!optValues[k](); });
+    state.result = { destPath: destPath(), preserveFullPath: state.preserveFullPath, options };
+    renderResult();
+    renderConsumers();
+    const isExtract = state.scenario === 'extractTo' || state.scenario === 'dragFallback';
+    log(isExtract
+        ? `Ok_Click → ExtractPickResult(DestPath="${destPath()}", PreserveFullPath=${state.preserveFullPath})`
+        : `Ok_Click → PickerResult(DestPath="${destPath()}", Options[${keys.length} 项])`, 'ok');
+});
+
+$('cancelBtn').addEventListener('click', () => {
+    state.result = null;
+    $('retCode').innerHTML = `<span class="c">// Cancel_Click → SelectedPath = null → 返回 null</span>`;
+    $('retVerdict').innerHTML = '';
+    $('diskList').innerHTML = `<span style="color:#777">尚未确认…</span>`;
+    $('diskVerdict').innerHTML = '';
+    renderConsumers();
+    log('Cancel_Click → 返回 null，消费点直接 return', 'warn');
+});
+
+/* ── 返回值 + 落盘渲染 ── */
+function renderResult() {
+    const r = state.result;
+    if (!r) return;
+    const escaped = r.destPath.replace(/\\/g,'\\\\');
+    const isExtract = state.scenario === 'extractTo' || state.scenario === 'dragFallback';
+
+    // 参数区收集结果 → 通用参数字典
+    const bag = r.options || {};
+    const bagLines = Object.keys(bag).map(k =>
+        `    <span class="s">${k.padEnd(18)}</span>: ${bag[k]},`).join('\n');
+
+    $('retCode').innerHTML = isExtract
+        ? `<span class="c">// Dialogs/ExtractPickResult.cs（计划 §3.1 新建）</span>
+<span class="k">new</span> <span class="n">ExtractPickResult</span>(
+    DestPath:        <span class="s">@"${escaped}"</span>,
+    PreserveFullPath: <span class="${r.preserveFullPath?'hl':'bad'}">${r.preserveFullPath}</span>)<span class="c">;  ← 参数区收集的本次勾选值</span>
+
+<span class="c">// 关键：不再是 string?，参数意图不会在返回通道上丢失</span>
+<span class="c">// （缺陷链路见计划 §1.1：原 Task&lt;string?&gt; 丢弃勾选 →</span>
+<span class="c">//   调用方回头独立读 settings.ExtractPreserveFullPath）</span>`
+        : `<span class="c">// 通用情形：参数区注册表非空 → 结果携带参数字典</span>
+<span class="k">new</span> <span class="n">PickerResult</span>(
+    DestPath: <span class="s">@"${escaped}"</span>,
+    Options:  <span class="n">Dictionary&lt;string, object&gt;</span>
+    {
+${bagLines}
+    })
+
+<span class="c">// 渲染层不认识具体参数，只认注册表 →</span>
+<span class="c">// 新增参数无需改对话框渲染代码与布局</span>`;
+
+    if (!isExtract) {
+        $('retVerdict').innerHTML =
+            `<div class="verdict ok"><span class="vi">✓</span>
+             <div>本次共 <b>${Object.keys(bag).length}</b> 个参数由参数区收集并随结果返回；
+             若注册表为空则返回结果不含 <code style="background:transparent">Options</code>，且参数区不显示。</div></div>`;
+        $('diskList').innerHTML = `<span style="color:#777">该情形不涉及解压路径计算。</span>`;
+        $('diskVerdict').innerHTML = '';
+        return;
+    }
+
+    // 落盘路径：与预览同一个 resolver
+    const existing = DEST_EXISTING[state.dest];
+    const rows = ENTRIES.map(e => {
+        const rel = resolveRelativePath(e.path, state.currentFolder, r.preserveFullPath);
+        const trimmed = rel !== e.path;
+        return `<div class="${trimmed?'trimmed':''}">${rel}${existing.includes(rel)?'   <span style="color:#ffb45c">⚠ 冲突</span>':''}</div>`;
+    });
+    $('diskList').innerHTML = rows.join('');
+
+    // 预览 vs 实际 一致性判定
+    const previewRels = [];
+    (function collect(n){ if(!n.isDir) previewRels.push(n.rel); n.children.forEach(collect); })(buildTree());
+    const diskRels = ENTRIES.map(e => resolveRelativePath(e.path, state.currentFolder, r.preserveFullPath));
+    const same = JSON.stringify(previewRels.slice().sort()) === JSON.stringify(diskRels.slice().sort());
+
+    $('retVerdict').innerHTML = same
+        ? `<div class="verdict ok"><span class="vi">✓</span><div>预览树与落盘路径<b>逐条一致</b> —— 共用 <code style="background:transparent;color:#8fdc9f">ExtractPathResolver.ResolveRelativePath</code>，预览即实际。（DoD 7）</div></div>`
+        : `<div class="verdict bad"><span class="vi">✗</span><div>预览 ≠ 实际 —— 违反 ExtractPathResolver 单一事实来源契约。</div></div>`;
+
+    const atRoot = state.currentFolder === '';
+    $('diskVerdict').innerHTML = atRoot
+        ? `<div class="verdict warn"><span class="vi">!</span><div>当前在<b>压缩包根目录</b>：<code style="background:transparent;color:#ffd48f">currentFolder</code> 为空 → 无论开关如何，路径完全相同。这正是决策 a 禁用该参数的依据。（DoD 9）</div></div>`
+        : `<div class="verdict ok"><span class="vi">✓</span><div>currentFolder=<code style="background:transparent;color:#8fdc9f">"${state.currentFolder}"</code>，已裁剪该前缀；勾选值 <b>${r.preserveFullPath}</b> 直接驱动落盘，<b>未回读设置值</b> <code style="background:transparent;color:#8fdc9f">${state.settingsPfp}</code>。（DoD 10）</div></div>`;
+
+    // D1 现象自检：参数项视觉状态与实际取值背离
+    const box = document.querySelector('#optionsPanel input[data-key="preserveFullPath"]');
+    const visual = box ? box.checked : null;
+    if (box && visual !== r.preserveFullPath) {
+        $('diskVerdict').innerHTML +=
+            `<div class="verdict bad" style="margin-top:8px"><span class="vi">✗</span>
+             <div><b>D1 现象现场复现</b>：参数项视觉显示为
+             <b>${visual?'已勾选':'未勾选'}</b>，但对话框实际取值
+             <code style="background:transparent;color:#ff9d9d">SelectedPreserveFullPath = ${r.preserveFullPath}</code>。
+             用户看到的与实际落盘的不一致 —— 这就是「初值从未回填到 IsChecked」的后果。</div></div>`;
+    }
+
+    // 决策 A 反向验证
+    $('retVerdict').innerHTML +=
+        `<div class="verdict ${state.settingsPfp?'ok':'warn'}" style="margin-top:8px">
+         <span class="vi">${state.settingsPfp?'✓':'!'}</span>
+         <div>决策 A 反向验证：本次操作后 <code style="background:transparent">AppSettings.ExtractPreserveFullPath</code>
+         仍为 <b>${state.settingsPfp}</b>，未被对话框改写。（DoD 11）</div></div>`;
+}
+
+/* ── 消费点表 ── */
+function renderConsumers() {
+    const s = state.settingsPfp;
+    const r = state.result;
+    const pick = r ? r.preserveFullPath : '—';
+    const rows = [
+        ['MainWindowViewModel.ExtractSelectedTo', true,  'pick.PreserveFullPath', pick],
+        ['DragDropService（目标检测失败兜底）', true,  'pick.PreserveFullPath', pick],
+        ['MainWindowViewModel.ExtractSelectedHere', false, 'AppSettings.ExtractPreserveFullPath', s],
+        ['DragDropService（已检测到目标目录）', false, '_settings.ExtractPreserveFullPath', s],
+    ];
+    $('cpBody').innerHTML = rows.map(([name, hasDlg, src, val]) => {
+        const used = hasDlg && r;
+        return `<tr class="${used?'used':''}">
+            <td class="mono">${name}</td>
+            <td><span class="dot ${hasDlg?'y':'n'}"></span>${hasDlg?'是':'否'}</td>
+            <td class="mono">${src}</td>
+            <td class="mono val">${used?val:'—'}</td>
+        </tr>`;
+    }).join('')
+    + `<tr><td class="mono">AppSettings（决策 A 反向验证）</td><td>—</td>
+         <td class="mono">未被改写</td>
+         <td class="mono" style="color:#6bd46b">${s}</td></tr>`;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   7. 启动
+   ══════════════════════════════════════════════════════════════ */
+state.chkInitApplied = true;   // 默认以「修正后」呈现
+renderFileList();
+render();
+log('CustomFilePickerDialog(PickerMode.ExtractFolder, currentFolder="docs", preserveFullPath=true) 已打开', 'ok');
+log('构造期回填 PreserveFullPathCheck.IsChecked = _extractPreserveFullPath（计划 §3.4 遗漏此步 → D1）', 'err');
+schedulePreviewRebuild('init');
+</script>
+</body>
+</html>
