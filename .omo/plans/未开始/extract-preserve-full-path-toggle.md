@@ -659,7 +659,7 @@ DragDrop `:75` / `:84` / `:105` / `:128`、`ExtractSettingsWindow.axaml.cs` `:56
 | `tests/MantisZip.UI.Avalonia.Tests/ExtractPreserveFullPathWiringTests.cs` | **新建**：架构守卫 ×4（照抄 `AboutWindowTests` 仓库根模式 + 空白归一化 + 括号/花括号配平） |
 | `tests/MantisZip.UI.Avalonia.Tests/PickerOptionsRegionTests.cs` | **新建**：参数区结构测试 ×5（D1 回归锁 + 决策 a 锁） |
 | `tests/MantisZip.UI.Avalonia.Tests/ExtractPreserveFullPathPreviewMatchTests.cs` | **新建**：预览↔落盘对账 ×7（4 个 theory 全矩阵 + 前缀裁剪语义 + 决策 A 不回写 + 三语 key 非空） |
-| `tests/MantisZip.UI.Avalonia.Tests/PickerOptionsRegionLayoutTests.cs` | **新建**：布局与提示配置 ×3（H1 运行时宽度测量 + H1 容器形态 + D3 `ShowOnDisabled` 源码守卫） |
+| `tests/MantisZip.UI.Avalonia.Tests/PickerOptionsRegionLayoutTests.cs` | **新建**：布局与提示配置 ×6 通过 + ×1 显式 Skip（H1 运行时宽度测量 + H1 容器形态 + D3 运行时模板验证 ×3 + D3 源码形态 + 悬停弹出（Skip：headless 无 hover）） |
 | `tests/MantisZip.UI.Avalonia.Tests/MantisZip.UI.Avalonia.Tests.csproj` | `Avalonia.Headless.XUnit` 12.0.4 → **12.1.2**：原与 UI 项目 `Avalonia 12.1.2` 版本偏斜，构造 Window 时抛 `TypeLoadException`（既有隐患，此前无测试构造 Window 故未暴露） |
 
 > `Views/MainWindow.axaml.cs:183-184` **零改动**（✅ 已核实 2026-09-30，非推测）：表达式体 lambda `(entries, initialPath, currentFolder, preserveFullPath) => ShowExtractFolderAsync(...)` 无显式返回类型，其自然类型跟随被调方法；§3.2 改 `ShowExtractFolderAsync` 返回值与 §3.5 改委托类型是**同一个动作的两端**，二者恒等匹配，故此闭包天然编译通过、无需触碰。
@@ -673,10 +673,10 @@ DragDrop `:75` / `:84` / `:105` / `:128`、`ExtractSettingsWindow.axaml.cs` `:56
 
 ### 机器可验证部分（已自动化，实测通过）
 
-> 以下由 5 个测试文件共 **22 条用例**覆盖，证据强度高于人工点击。
-> 实测：`dotnet test tests\MantisZip.UI.Avalonia.Tests` → **127 通过 / 0 失败 / 2 跳过**（基线 105 + 22）；
+> 以下由 5 个测试文件共 **25 条通过 + 1 条显式 Skip** 覆盖，证据强度高于人工点击。
+> 实测：`dotnet test tests\MantisZip.UI.Avalonia.Tests` → **130 通过 / 0 失败 / 3 跳过**（基线 105 + 25）；
 > `dotnet test tests\MantisZip.Tests` → 416 通过 / 0 失败 / 2 跳过；
-> `dotnet build` → exit 0 / 0 error / 0 warning。
+> `dotnet build` → exit 0 / 0 error / 6 warning（均为既有：`TextEncodingDetector.cs:121` CS8604、`PreviewViewModel.cs:1406,1442` CS0618 `Bitmap.Save` 已过时，均不在本次改动文件中）。
 
 | DoD | 覆盖用例 | 文件 |
 |-----|---------|------|
@@ -691,7 +691,7 @@ DragDrop `:75` / `:84` / `:105` / `:128`、`ExtractSettingsWindow.axaml.cs` `:56
 | 22 按钮行 `Grid.Row` 3→4 不重叠 | 静态核实（`x:Name="OptionsRow"` 唯一、`Grid.Row="3"`/`"4"` 各一处、`ExtractFolderPanel` 零改动） | — |
 | **D1 回归锁** | `ExtractFolder_RegistersPreserveFullPath_WithInitialValue` —— **已做负控制验证**：把 `initial:` 改回 `false` 后该用例立即失败 | `PickerOptionsRegionTests` |
 | **H1 回归锁**（最高危布局缺陷） | `OptionsItemsControl_GetsFiniteWidth_AndDoesNotOverflow`（**运行时布局测量**：宽度有限且不溢出父容器）+ `OptionsRegion_ContainerIsGrid_NotHorizontalStackPanel`（容器形态） | `PickerOptionsRegionLayoutTests` |
-| **D3 回归锁**（禁用提示） | `OptionCheckBox_DeclaresShowOnDisabled_InXaml`（属性名拼错会被 XAML 编译器静默忽略，故锁源码形态） | `PickerOptionsRegionLayoutTests` |
+| **D3 回归锁**（禁用提示） | **运行时行为级**：`OptionItemTemplate_YieldsCheckBox_WithShowOnDisabledAndResolvedTip`（2 个 theory：手工套 `ItemTemplate` 生成真实控件树，断言 `ShowOnDisabled=True`、`Tip` 已解析为 `DisabledHint` 实际文案、`IsEnabled` 正确传导）+ `OptionItemTemplate_NullDisabledHint_ProducesNoTooltipContent`（null 提示不产生提示内容）+ `OptionCheckBox_DeclaresShowOnDisabled_InXaml`（源码形态，防属性名拼错被静默忽略） | `PickerOptionsRegionLayoutTests` |
 
 **负控制（证明测试非空测）**：
 - D1：注入 `initial: false` → `ExtractFolder_RegistersPreserveFullPath_WithInitialValue` FAIL
@@ -701,20 +701,21 @@ DragDrop `:75` / `:84` / `:105` / `:128`、`ExtractSettingsWindow.axaml.cs` `:56
 
 ### 仍需人工 GUI 验收（自动化无法覆盖渲染行为）
 
-| DoD | 验收内容 | 期望 |
-|-----|---------|------|
-| 12 | 悬停**禁用态 CheckBox 本体**时提示框是否真的弹出 | 显示「在压缩包根目录，勾选与否结果相同」。已验证 `ToolTip.ShowOnDisabled=True` 属性存在且非空提示文案，但 headless 下无法触发 hover 渲染 |
-| 20 | 多参数时参数区**换行后的视觉效果** | 已用运行时测量证明容器宽度有限不溢出（H1 已锁），但换行后观感仍需目视 |
-| 21 | `ExtractSettingsWindow` 链路「浏览」按钮 | 弹窗正常回填目标目录；参数区显示**常驻禁用**项（已知可接受副作用，见 §9） |
+| DoD | 验收内容 | 期望 | 已自动化的部分 |
+|-----|---------|------|--------------|
+| 12 | 悬停**禁用态 CheckBox 本体**时提示框**是否真的弹出** | 显示「在压缩包根目录，勾选与否结果相同」 | 已验：生成控件带 `ShowOnDisabled=True`、`Tip` 解析为真实文案、`IsEnabled` 正确传导、null 提示不产生内容。**未验**：提示框实际渲染弹出（`DisabledOptionCheckBox_ShowsToolTip_OnHover` 已写但显式 Skip） |
+| 20 | 多参数时参数区**换行后的视觉效果** | 不溢出窗口、不挤压按钮 | 已用运行时测量证明容器宽度有限且不溢出父容器（H1 已锁）。**未验**：多参数实际换行后的观感 |
+| 21 | `ExtractSettingsWindow` 链路「浏览」按钮 | 弹窗正常回填目标目录；参数区显示**常驻禁用**项 | **未验**（整条链路为模态弹窗，headless 无法驱动） |
 
-> **为什么这 3 项不能自动化**：headless Avalonia 不派发 hover 事件，也不渲染像素；
-> `ItemsControl` 的 item 容器在 headless 下不物化（已实测 `Measure/Arrange` 与 `Show()` 均无效），
-> 故「提示框是否弹出」「换行后观感」必须实机目视。
+> **为什么这 3 项不能自动化**：headless Avalonia 不派发 hover 事件、不渲染像素。
+> 已实测：`MouseMove` + `RunJobs()` 后 `ToolTip.GetIsOpen` 仍为 false，
+> 因此提示框弹出这一段无法在无桌面会话中验证 —— 相关用例已加显式 `Skip` 并在
+> `Skip` 原因中写明「需实机 GUI 验收」，避免留下一个常绿的假测试。
 
 ### 自动化验证（构建期门禁，全部已通过）
 
-1. `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → **exit 0 / 0 error / 0 warning**
-2. `dotnet test tests\MantisZip.UI.Avalonia.Tests` → **127 passed / 0 failed / 2 skipped**
+1. `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → **exit 0 / 0 error / 6 warning**（6 个均为既有：`TextEncodingDetector.cs:121` CS8604、`PreviewViewModel.cs:1406,1442` CS0618 `Bitmap.Save` 已过时，均不在本次改动文件中）
+2. `dotnet test tests\MantisZip.UI.Avalonia.Tests` → **130 passed / 0 failed / 3 skipped**
 3. `dotnet test tests\MantisZip.Tests` → **416 passed / 0 failed / 2 skipped**（无新增失败）
 4. 三语 key 集一致（`AllThreeLanguages_HaveSameKeySet` PASS）+ 本计划新增 3 key 在三语中均非空
 5. 原生 Picker 自查仅 3 处豁免（规则 15），全部位于 `SystemBrowse_Click`（L1275-1343）：

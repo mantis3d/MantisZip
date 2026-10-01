@@ -16,7 +16,7 @@
     - `MainWindowViewModel.ExtractSelectedEntriesCoreAsync` 用 `bool? preserveFullPath = null`：无对话框入口（`ExtractSelectedHere`）传 `null`，由唯一一处 `preserveFullPath ?? settings.ExtractPreserveFullPath`（`:2375`）兜底，**避免一次解压反序列化两次 `settings.json`**
   - **消费点四路取值**（三值来源不同，不可混用）：`ExtractSelectedTo`（有对话框）→ `pick.PreserveFullPath`；`DragDropService` 目标检测失败兜底（有对话框）→ `pick.PreserveFullPath`；`ExtractSelectedHere`（无对话框）→ 传 null 走设置兜底；`DragDropService` 已检测到目标（无对话框）→ 保留 `_settings` 初值。另**新发现并修复 `ExtractSettingsWindow.axaml.cs:61` / `:83-87` 两处遗漏调用点**（`BrowseFolder` 是 `Func<Task<string?>>` → CS0029；`BrowseAction` 三元失去公共类型 → CS0173），二者只取 `.DestPath`——整包解压链路 `currentFolder` 取默认 `""`，`TrimCurrentFolderPrefix` 直接早退，该值对其本就无影响
   - **本地化**：新增 3 key（`Picker_PreserveFullPath` / `Picker_PreserveFullPathDisabledHint` / `Picker_OptionsCaption`），三语成对、UTF-8 无 BOM、纯 CRLF、插入文件头；实测各 1180 key、零重复、key 集完全一致。**未重复添加已存在的 `Picker_ExtractPreviewTitle`**（三语文件第 1060 行）
-  - **测试**：新增 5 个测试文件共 **22 条用例**，Avalonia **127 通过 / 0 失败 / 2 跳过**（基线 105 + 22）、Core 416 通过、`dotnet build` exit 0 / 0 error / 0 warning
+  - **测试**：新增 5 个测试文件共 **25 条通过 + 1 条显式 Skip**，Avalonia **130 通过 / 0 失败 / 3 跳过**（基线 105 + 25）、Core 416 通过、`dotnet build` exit 0 / 0 error（6 warning 均为既有：`TextEncodingDetector.cs:121` CS8604、`PreviewViewModel.cs:1406,1442` CS0618 `Bitmap.Save` 已过时，不在本次改动文件内）
     - 落盘契约 3：真实解压断言 `preserveFullPath × currentFolder` 矩阵；第 3 条锁定「根目录两模式产出完全相同」（决策 a 的可执行证明）。夹具刻意用 `System.IO.Compression` 显式条目名而非 `ZipEngine.CompressAsync`（后者会加源目录前缀破坏断言）
     - 架构守卫 4：读取生产源码断言「坏接线没有回来」；仓库根发现照抄 `AboutWindowTests.cs:20-32`；匹配前**归一化空白**（否则换行格式化会造成假通过）；`DragDropService` 守卫用**括号配平截取实参列表**而非三元组子串（后者参数换序即假通过）
     - 参数区结构 5：含 **D1 回归锁**（初值必须播种到选项项）与决策 a 禁用锁

@@ -125,7 +125,7 @@
                 </CheckBox>
 
                 <!-- 并行解压线程数 -->
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0" IsVisible = "False">
                   <TextBlock Text="{Binding LocalizedStrings[Extract_ParallelDegree]}"
                              VerticalAlignment="Center" />
                   <NumericUpDown Minimum="1" Maximum="16"

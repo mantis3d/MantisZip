@@ -456,7 +456,7 @@ XAML 侧给 CheckBox 加 `ToolTip.ShowOnDisabled="True"` + `ToolTip.Tip="{Bindin
 
 ## 10. 测试
 
-### 10.1 自动化测试（实际落地：5 个测试文件，22 条用例）
+### 10.1 自动化测试（实际落地：5 个测试文件，25 条通过 + 1 条显式 Skip）
 
 初版承诺的三条 mock 透传测试**不可写**，原因已核验：
 
@@ -474,7 +474,7 @@ XAML 侧给 CheckBox 加 `ToolTip.ShowOnDisabled="True"` + `ToolTip.Tip="{Bindin
 | `ExtractPreserveFullPathWiringTests` | 4 | **架构守卫**（源码匹配，空白归一化 + 括号/花括号配平截取）：仓库根可定位；`ExtractSelectedEntriesCoreAsync` 签名含 `bool? preserveFullPath = null`；该方法体内完全不出现 `settings.ExtractPreserveFullPath`；`DragDropService` 调用传局部变量而非 `_settings.` 字段 |
 | `PickerOptionsRegionTests` | 5 | **参数区结构**：ExtractFolder 注册 1 项且初值等于传入值（初值回填回归锁）；4 种无参模式空态隐藏；首注册即显示；根目录禁用且提示非空（决策 a）；子目录内可用 |
 | `ExtractPreserveFullPathPreviewMatchTests` | 7 | **预览↔落盘对账**：`currentFolder × preserveFullPath` 全矩阵 4 条 theory + 前缀不匹配的条目保持原路径 + 切换参数不回写 `AppSettings`（决策 A）+ 3 个新 key 三语非空 |
-| `PickerOptionsRegionLayoutTests` | 3 | **布局与提示配置**：运行时布局测量（参数区宽度有限且不溢出父容器）+ 容器形态为 Grid 而非横向 StackPanel + `ShowOnDisabled` 源码守卫（XAML 属性拼错会被编译器静默忽略，故锁源码形态） |
+| `PickerOptionsRegionLayoutTests` | 6 + 1 skip | **布局与提示配置**：① H1 运行时布局测量（参数区宽度有限且不溢出父容器）；② H1 容器形态为 `Grid ColumnDefinitions="Auto,*"` 而非横向 `StackPanel`；③ D3 **运行时**模板验证（手工套 `ItemTemplate` 生成真实控件树，断言 `ShowOnDisabled=True`；theory 覆盖禁用/可用两态）；④ D3 `Tip` 已解析为 `DisabledHint` 实际文案（非绑定表达式本身）；⑤ `DisabledHint` 为 null 时不产生提示内容；⑥ D3 源码形态守卫（XAML 属性名拼错会被编译器静默忽略）；⏭ 悬停弹出用例显式 Skip（headless 不派发 hover，见 §10.2） |
 
 守卫的作用要诚实界定：它们证明的是"坏读取没有回来"，**不是**"正确的值流过去了"；后者由契约测试与预览对账测试覆盖，再由 §10.2 人工验收兜底渲染行为。
 
@@ -487,8 +487,8 @@ XAML 侧给 CheckBox 加 `ToolTip.ShowOnDisabled="True"` + `ToolTip.Tip="{Bindin
 
 **实测结果（2026-10-01）**：
 
-- `dotnet build` → exit 0 / 0 error / 0 warning
-- `dotnet test tests\MantisZip.UI.Avalonia.Tests` → **127 通过 / 0 失败 / 2 跳过**（基线 105 + 新增 22）
+- `dotnet build` → exit 0 / **0 error / 6 warning**（6 个均为既有：`TextEncodingDetector.cs:121` CS8604、`PreviewViewModel.cs:1406,1442` CS0618 `Bitmap.Save` 已过时；均不在本次改动文件中）
+- `dotnet test tests\MantisZip.UI.Avalonia.Tests` → **130 通过 / 0 失败 / 3 跳过**（基线 105 + 新增 25；第 3 条跳过为本次新增的悬停弹出用例）
 - `dotnet test tests\MantisZip.Tests` → **416 通过 / 0 失败 / 2 跳过**
 - 三语 key 集一致（`AllThreeLanguages_HaveSameKeySet` PASS）+ 3 个新 key 三语均非空
 
@@ -498,11 +498,11 @@ XAML 侧给 CheckBox 加 `ToolTip.ShowOnDisabled="True"` + `ToolTip.Tip="{Bindin
 
 | # | 验收内容 | 期望 | 现状 |
 |:-:|---|---|---|
-| 1 | 悬停**禁用态 CheckBox 本体**时提示框是否真的弹出 | 显示「在压缩包根目录，勾选与否结果相同」 | ⏳ 已验证 `ShowOnDisabled=True` 属性存在且提示文案非空，但 headless 不派发 hover 事件，需实机目视 |
-| 2 | 多参数时参数区**换行后的视觉效果** | 换行整齐、不溢出窗口 | ⏳ 已用运行时测量证明容器宽度有限不溢出，换行观感仍需目视 |
-| 3 | `ExtractSettingsWindow` 链路「浏览」按钮 | 弹窗正常回填目标目录；参数区显示常驻禁用项（已知可接受副作用） | ⏳ 待实机确认 |
+| 1 | 悬停**禁用态 CheckBox 本体**时提示框是否真的弹出 | 显示「在压缩包根目录，勾选与否结果相同」 | ◐ **部分自动化**：已验生成控件带 `ShowOnDisabled=True`、`Tip` 解析为真实文案（theory 覆盖禁用/可用两态）、`IsEnabled` 正确传导、null 提示不产生内容（`OptionItemTemplate_YieldsCheckBox_WithShowOnDisabledAndResolvedTip` 等）。**未验**提示框实际渲染弹出 —— `MouseMove` + `Dispatcher.UIThread.RunJobs()` 后 `ToolTip.GetIsOpen` 仍为 false（已实测） |
+| 2 | 多参数时参数区**换行后的视觉效果** | 换行整齐、不溢出窗口 | ◐ **部分自动化**：已用运行时布局测量证明容器宽度有限且不溢出父容器（H1 已锁）。**未验**多参数实际换行后的观感 |
+| 3 | `ExtractSettingsWindow` 链路「浏览」按钮 | 弹窗正常回填目标目录；参数区显示常驻禁用项（已知可接受副作用） | ✗ **完全未验**：整条链路为模态弹窗，headless 无法驱动 |
 
-**为什么这 3 项不能自动化**：headless Avalonia 不派发 hover 事件、不渲染像素；`ItemsControl` 的 item 容器在 headless 下不物化（已实测 `Measure/Arrange` 与 `Show()` 均无效）。
+**为什么不能完全自动化**：headless Avalonia 不派发 hover 事件、不渲染像素。已实测 `MouseMove` + `Dispatcher.UIThread.RunJobs()` 后提示框仍未打开，故「提示框实际渲染弹出」无法在无桌面会话中验证 —— 相关用例 `DisabledOptionCheckBox_ShowsToolTip_OnHover` 已加**显式 Skip 并在 Skip 原因中写明需实机验收**，避免留下一个常绿的假测试。
 
 以下行为观察项建议实机走一遍，但核心断言已自动化：子目录内勾选/取消的 300ms 防抖刷新观感（路径一致性已由对账测试锁定）、拖拽兜底场景实机全流程、根目录禁用态（状态断言已由 `PickerOptionsRegionTests` 锁定）、设置值初始反映与不回写（不回写已由 `TogglingOption_DoesNotWriteBackToAppSettings` 锁定）。
 
