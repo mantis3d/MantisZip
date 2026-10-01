@@ -25,6 +25,10 @@
 
 按月分组，每月按日期从新到旧排列。
 
+#### 2026-10
+
+- **10-01** — **解压选择器新增「保留完整路径」开关 + 左下通用参数区（修复「预览所见 ≠ 实际落盘」）**：解压目标目录选择对话框新增**左下参数区**（`RootGrid` 新增一行，浏览器网格下方、确定/取消上方），「保留完整路径」是该区第一个参数项；勾选变化经既有 `SchedulePreviewRebuild` 300ms 防抖实时重建预览树。**核心修复**——原对话框只返回路径字符串（`Task<string?>`），调用方拿到路径后**回头独立读** `settings.ExtractPreserveFullPath`（`MainWindowViewModel.cs:2375`、`DragDropService.cs:105`），用户在预览阶段无法表达意图，形成「预览所见 ≠ 实际落盘」；新增 `ExtractPickResult(DestPath, PreserveFullPath)` 强类型返回通道贯穿两个有对话框的消费点。**参数区是通用宿主**：`AddOption(key, labelKey, initial, onChanged, isEnabled, disabledHintKey)` 注册表 + `PickerOptionItem` 模型，渲染层只遍历注册表生成「标签 + 控件」、不认识任何具体 key，将来更多参数/别的模式加参数只扩展注册项、无参数则整区 `IsVisible=false` 隐藏（规则 6）。决策 A=仅本次生效不回写设置；决策 a=压缩包根目录（`currentFolder` 为空）禁用该参数 + ToolTip（两模式产出完全相同，由契约测试锁定）。实施经两轮审阅修正 **18 项缺陷**（2 阻塞 + 5 编译阻塞 + 2 高危布局 + 11 中低），含 `ExtractSettingsWindow` 两处遗漏调用点（否则 CS0029/CS0173）、横向 `StackPanel` 致 `WrapPanel` 永不换行溢出窗口、`ToolTip.ShowOnDisabled` 缺失导致禁用提示不显示。Avalonia **127 通过 / 0 失败 / 2 跳过**（基线 105 + 新增 22 条：落盘契约 3 + 架构守卫 4 + 参数区结构 5 + **预览↔落盘逐条对账 7** + 布局与提示配置 3）、Core 416 通过；其中 2 条关键回归锁做了**负控制验证**（注入缺陷确认测试失败）。剩余 3 项 GUI 目视验收（悬停提示弹出 / 多参数换行观感 / 解压设置窗口浏览链路）待实机
+
 #### 2026-09
 
 - **09-30** — **文件选择入口统一到自定义选择器（消除原生对话框）+ 拖拽解压兜底改用带解压预览的对话框**：① `DragDropService` 目标目录检测失败时的兜底由原生 `OpenFolderPickerAsync` 改为 `CustomFilePickerDialog.ShowExtractFolderAsync`（初始路径=压缩包同级同名文件夹，实传 `_currentFolder`/`ExtractPreserveFullPath` 保证预览=实际），条目展开提前到选路径之前，顺带修掉「无可解压内容仍先弹一次框」的旧毛病；② 工具栏「添加文件」由 `OpenFilePickerAsync` 改为 `ShowOpenItemsAsync`（放开文件夹选择，与拖拽添加/`AddFilesToArchiveAsync` 语义对齐）；③ 密码管理器导入/导出迁移到自定义选择器；④ `CustomFilePickerDialog` 新增 `FileTypeOption` + `ShowSaveFileAsync(fileTypes/suggestedFileName)`/`ShowOpenFileAsync(fileTypes)`，`GetSelectedSaveExtension`/`MatchesFileFilter` 改为读选中下拉项的 Patterns（消除硬编码 `index==1`）；⑤ 全仓仅保留选择器内「系统浏览」逃生按钮的原生调用；⑥ 新增 `Picker_FileTypeJson`、清理 2 个无调用方 key；Avalonia 测试 105 通过 0 失败（含三语 key 集同步校验）

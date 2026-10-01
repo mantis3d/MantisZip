@@ -655,9 +655,12 @@ DragDrop `:75` / `:84` / `:105` / `:128`、`ExtractSettingsWindow.axaml.cs` `:56
 | `Services/DragDropService.cs` | `:75` 前声明 `preserveFullPath` 局部变量；`:84-92` 消费 `pick`（含空值守卫）；`:105` 改传局部变量 |
 | `MantisZip.UI.Avalonia.csproj` | **⚠ 测试必需（B5）**：`:17` 旁补 `<InternalsVisibleTo Include="MantisZip.UI.Avalonia.Tests" />`（与既有授予 `MantisZip.Tests` 同款） |
 | `Localization/strings.{zh-CN,zh-TW,en}.json` | **+3 key**（`Picker_PreserveFullPath` / `Picker_PreserveFullPathDisabledHint` / `Picker_OptionsCaption`）；**不重复添加已存在的 `Picker_ExtractPreviewTitle`** |
-| `tests/MantisZip.UI.Avalonia.Tests/ExtractPreserveFullPathContractTests.cs` | **新建**：契约测试 ×3（`[AvaloniaFact]` + 夹具压缩包 + settings 隔离） |
+| `tests/MantisZip.UI.Avalonia.Tests/ExtractPreserveFullPathContractTests.cs` | **新建**：落盘契约 ×3（`[AvaloniaFact]` + 显式条目名夹具 + `overwrite` 绕开弹窗分支） |
 | `tests/MantisZip.UI.Avalonia.Tests/ExtractPreserveFullPathWiringTests.cs` | **新建**：架构守卫 ×4（照抄 `AboutWindowTests` 仓库根模式 + 空白归一化 + 括号/花括号配平） |
-| `tests/MantisZip.UI.Avalonia.Tests/PickerOptionsRegionTests.cs` | **新建**：参数区结构测试 ×5（含 D1 回归锁、决策 a 锁） |
+| `tests/MantisZip.UI.Avalonia.Tests/PickerOptionsRegionTests.cs` | **新建**：参数区结构测试 ×5（D1 回归锁 + 决策 a 锁） |
+| `tests/MantisZip.UI.Avalonia.Tests/ExtractPreserveFullPathPreviewMatchTests.cs` | **新建**：预览↔落盘对账 ×7（4 个 theory 全矩阵 + 前缀裁剪语义 + 决策 A 不回写 + 三语 key 非空） |
+| `tests/MantisZip.UI.Avalonia.Tests/PickerOptionsRegionLayoutTests.cs` | **新建**：布局与提示配置 ×3（H1 运行时宽度测量 + H1 容器形态 + D3 `ShowOnDisabled` 源码守卫） |
+| `tests/MantisZip.UI.Avalonia.Tests/MantisZip.UI.Avalonia.Tests.csproj` | `Avalonia.Headless.XUnit` 12.0.4 → **12.1.2**：原与 UI 项目 `Avalonia 12.1.2` 版本偏斜，构造 Window 时抛 `TypeLoadException`（既有隐患，此前无测试构造 Window 故未暴露） |
 
 > `Views/MainWindow.axaml.cs:183-184` **零改动**（✅ 已核实 2026-09-30，非推测）：表达式体 lambda `(entries, initialPath, currentFolder, preserveFullPath) => ShowExtractFolderAsync(...)` 无显式返回类型，其自然类型跟随被调方法；§3.2 改 `ShowExtractFolderAsync` 返回值与 §3.5 改委托类型是**同一个动作的两端**，二者恒等匹配，故此闭包天然编译通过、无需触碰。
 >
@@ -668,41 +671,59 @@ DragDrop `:75` / `:84` / `:105` / `:128`、`ExtractSettingsWindow.axaml.cs` `:56
 
 ## 7. 验收标准（DoD）
 
-### 自动验证
+### 机器可验证部分（已自动化，实测通过）
 
-1. `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 0 errors
-   —— **首要信号**：`ExtractSettingsWindow.axaml.cs`（B1）与对话框是同一编译单元外的强依赖，
-   返回类型改动若漏改必然在此暴露
-2. `dotnet test tests\MantisZip.UI.Avalonia.Tests\...` — 现有 105 + 契约 3 + 守卫 4 + 参数区 5 = **117 passed / 0 failed / 2 skipped**
-3. `dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj` 无新增失败
-4. 三语 key 集一致（`AllThreeLanguages_HaveSameKeySet` PASS），且**无重复 key**（`Picker_ExtractPreviewTitle` 仍只有 1 处/语言）
-5. 原生 Picker 自查仅 3 处豁免（规则 15）：
+> 以下由 5 个测试文件共 **22 条用例**覆盖，证据强度高于人工点击。
+> 实测：`dotnet test tests\MantisZip.UI.Avalonia.Tests` → **127 通过 / 0 失败 / 2 跳过**（基线 105 + 22）；
+> `dotnet test tests\MantisZip.Tests` → 416 通过 / 0 失败 / 2 跳过；
+> `dotnet build` → exit 0 / 0 error / 0 warning。
+
+| DoD | 覆盖用例 | 文件 |
+|-----|---------|------|
+| **10 核心验收点**：预览树路径与真实落盘路径**逐条一致** | `PreviewTreePaths_MatchActualExtraction`（**4 个 theory 用例**：`currentFolder` × `preserveFullPath` 全矩阵）、`PreviewTree_ShowsTrimmedPrefix_AndKeepsNonMatchingPrefix` | `ExtractPreserveFullPathPreviewMatchTests` |
+| 11 前缀裁剪 / 非匹配前缀保持原路径 | 同上（`PreviewTree_ShowsTrimmedPrefix_AndKeepsNonMatchingPrefix` 断言 `assets/data.json` 前缀不匹配时保持原样） | 同上 |
+| 12 根目录禁用 | `OptionItem_Disabled_AtArchiveRoot`（断言 `IsEnabled == false` 且 `DisabledHint` 非空） | `PickerOptionsRegionTests` |
+| 13 决策 A 正向（取消勾选 → 裁剪后落盘） | `Extract_PreserveFalse_WithCurrentFolder_TrimsCurrentFolderPrefix` | `ExtractPreserveFullPathContractTests` |
+| **14 决策 A 反向（不回写设置）** | `TogglingOption_DoesNotWriteBackToAppSettings`（切换参数后 `AppSettings` 原值不变） | `ExtractPreserveFullPathPreviewMatchTests` |
+| 15 / 16 / 17 三个消费点取值来源 | 架构守卫 `MainWindowViewModel_CoreMethodBodyDoesNotReadSettings`、`DragDropService_PassesLocalPreserveFullPathToExtractFlow`（括号配平实参列表，与参数换序无关） | `ExtractPreserveFullPathWiringTests` |
+| 18 三语 key 齐备且非空 | `NewOptionKeys_PresentAndNonEmpty_InAllThreeLanguages`（空标签会产生无标签孤儿复选框，比缺失更隐蔽） | `ExtractPreserveFullPathPreviewMatchTests` |
+| 19 参数区空态隐藏 | `OptionsRow_IsHidden_ForModesThatRegisterNoOptions`（4 种模式逐一断言） | `PickerOptionsRegionTests` |
+| 22 按钮行 `Grid.Row` 3→4 不重叠 | 静态核实（`x:Name="OptionsRow"` 唯一、`Grid.Row="3"`/`"4"` 各一处、`ExtractFolderPanel` 零改动） | — |
+| **D1 回归锁** | `ExtractFolder_RegistersPreserveFullPath_WithInitialValue` —— **已做负控制验证**：把 `initial:` 改回 `false` 后该用例立即失败 | `PickerOptionsRegionTests` |
+| **H1 回归锁**（最高危布局缺陷） | `OptionsItemsControl_GetsFiniteWidth_AndDoesNotOverflow`（**运行时布局测量**：宽度有限且不溢出父容器）+ `OptionsRegion_ContainerIsGrid_NotHorizontalStackPanel`（容器形态） | `PickerOptionsRegionLayoutTests` |
+| **D3 回归锁**（禁用提示） | `OptionCheckBox_DeclaresShowOnDisabled_InXaml`（属性名拼错会被 XAML 编译器静默忽略，故锁源码形态） | `PickerOptionsRegionLayoutTests` |
+
+**负控制（证明测试非空测）**：
+- D1：注入 `initial: false` → `ExtractFolder_RegistersPreserveFullPath_WithInitialValue` FAIL
+- DoD 10：注入解压侧 `currentFolder: ""`（与预览侧不一致）→ `PreviewTreePaths_MatchActualExtraction(docs, False)` FAIL
+
+> 由此可判定：「预览所见 ≠ 实际落盘」这一原始缺陷若重新出现，**必然被自动捕获**，不依赖人工观察。
+
+### 仍需人工 GUI 验收（自动化无法覆盖渲染行为）
+
+| DoD | 验收内容 | 期望 |
+|-----|---------|------|
+| 12 | 悬停**禁用态 CheckBox 本体**时提示框是否真的弹出 | 显示「在压缩包根目录，勾选与否结果相同」。已验证 `ToolTip.ShowOnDisabled=True` 属性存在且非空提示文案，但 headless 下无法触发 hover 渲染 |
+| 20 | 多参数时参数区**换行后的视觉效果** | 已用运行时测量证明容器宽度有限不溢出（H1 已锁），但换行后观感仍需目视 |
+| 21 | `ExtractSettingsWindow` 链路「浏览」按钮 | 弹窗正常回填目标目录；参数区显示**常驻禁用**项（已知可接受副作用，见 §9） |
+
+> **为什么这 3 项不能自动化**：headless Avalonia 不派发 hover 事件，也不渲染像素；
+> `ItemsControl` 的 item 容器在 headless 下不物化（已实测 `Measure/Arrange` 与 `Show()` 均无效），
+> 故「提示框是否弹出」「换行后观感」必须实机目视。
+
+### 自动化验证（构建期门禁，全部已通过）
+
+1. `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → **exit 0 / 0 error / 0 warning**
+2. `dotnet test tests\MantisZip.UI.Avalonia.Tests` → **127 passed / 0 failed / 2 skipped**
+3. `dotnet test tests\MantisZip.Tests` → **416 passed / 0 failed / 2 skipped**（无新增失败）
+4. 三语 key 集一致（`AllThreeLanguages_HaveSameKeySet` PASS）+ 本计划新增 3 key 在三语中均非空
+5. 原生 Picker 自查仅 3 处豁免（规则 15），全部位于 `SystemBrowse_Click`（L1275-1343）：
    ```powershell
    git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -- 'src/*.cs'
    ```
-6. 架构守卫 4 条全 PASS（含 `RepoRoot_IsLocatable` 前置条件）
-7. 参数区结构测试 5 条全 PASS（含 `ExtractFolder_RegistersPreserveFullPath_WithInitialValue` —— D1 回归锁、
-   `OptionItem_Disabled_AtArchiveRoot` —— 决策 a 锁）
-8. **规则 3 进度文档**：更新 `docs/PROGRESS.md`（里程碑）与 `docs/progress-avalonia-detail.md`（细节）
-9. **规则 1 计划同步**：若实施中再次变更本计划，同步 `docs/PLAN.md:37` 说明
-
-### 人工验证（逐项记录结果）
-
-10. **核心验收点** —— 勾选/取消勾选后，**逐条比对最终落盘路径与预览树完全一致**
-11. 取消勾选后预览树在 ~300ms 内重排（`CurrentFolder` 前缀被裁掉）
-12. 压缩包**根目录**解压 → 该参数呈**禁用**态 + **悬停 CheckBox 本体**（无需点 `?`）显示提示文案，且勾选状态不影响结果
-13. 决策 A 正向：设置 `ExtractPreserveFullPath=true`，子目录解压时**取消勾选** → 实际按**裁剪后**路径落盘（未回读设置）
-14. 决策 A 反向：操作后重开设置窗口 → `ExtractPreserveFullPath` 仍为 `true`（未落盘）
-15. `ExtractSelectedHere`（右键「解压选中项到此处」）路径**行为不变**（按设置值）
-16. 拖拽到已检测到的目标目录（不弹窗）→ 按设置值落盘（兜底分支之外未受影响）
-17. 拖拽目标检测失败 → 弹对话框 → 取消勾选 → 确定 → 落盘为裁剪后路径（兜底透传生效）
-18. 三语切换后重开对话框 → 参数标签 / 参数区标题 / 禁用提示 / 面板标题 均为对应语言
-19. **参数区空态**：PickFolder / SaveFile / OpenFile / PickItems 情形 → 参数区**整体不显示**，确定/取消行不因此错位
-20. **参数区扩展**：临时加第 2、第 3 个参数 → 自动换行不溢出、不挤压按钮（对应原型「＋ 添加示例参数」）
-21. **`ExtractSettingsWindow` 链路（B1/M6）**：解压设置窗口点「浏览」→ 弹窗仍能正常选目录并回填；
-    参数区显示一个**常驻禁用**的「保留完整路径」（该链路 `currentFolder` 取默认 `""`，
-    预览与实际都不受该值影响 —— 确认可接受，不出现「能点但无效」的错觉）
-22. **布局无重叠（H2）**：确认「确定/取消」按钮行与参数区不重叠（`Grid.Row` 已 3→4）
+6. **规则 3 进度文档**：`docs/PROGRESS.md`（里程碑）+ `docs/progress-avalonia-detail.md`（细节）—— 提交前更新
+7. **规则 1 计划同步**：`docs/PLAN.md` 已同步决策 3 与两轮缺陷修正
+8. **spec 回写**（§10 列出的 8 处）—— 实施已完成，待回写
 
 ---
 
@@ -712,19 +733,21 @@ DragDrop `:75` / `:84` / `:105` / `:128`、`ExtractSettingsWindow.axaml.cs` `:56
 
 | 项 | 工时 |
 |----|------|
-| 契约测试 + 架构守卫 + 参数区结构测试（§4.2 A/B/C） | 0.9h |
+| 契约 3 + 守卫 4 + 参数区 5 + 预览对账 7（共 19 条自动化用例，§4.2 A/B/C） | 1.2h |
 | `ExtractPickResult` + `ShowExtractFolderAsync` 返回通道 | 0.3h |
 | 参数区宿主（`PickerOptionItem` + `AddOption` + AXAML 含 Grid 换行修正） | 0.8h |
 | 注册「保留完整路径」参数项 + 预览联动 | 0.2h |
 | 三个消费点改造（含两个调用点区分） | 0.5h |
 | **`ExtractSettingsWindow.axaml.cs` 两处调用点适配（B1）** | 0.2h |
-| **测试项目 `InternalsVisibleTo` 授予（B5）** | 0.1h |
+| **测试项目 `InternalsVisibleTo` 授予（B5）+ Avalonia.Headless 版本对齐** | 0.2h |
 | 三语 key | 0.2h |
-| 构建 + 全量测试 + 13 项人工验证 | 0.7h |
+| 构建 + 全量测试 + 3 项 GUI 目视验收 | 0.5h |
 
-> 相比原估算（2-3h）增加约 1h：①参数区通用宿主（可扩展 + 空态隐藏 + 结构测试）是原方案没有的
+> 相比原估算（2-3h）增加约 1.5h：①参数区通用宿主（可扩展 + 空态隐藏 + 结构测试）是原方案没有的
 > 增量（原「标题行 + 复选框」约 0.5h，现分解为宿主 0.8h + 注册 0.2h）；
-> ②Oracle 评审暴露的 B1 调用点适配与 B5 测试授权各需一小步。
+> ②Oracle 评审暴露的 B1 调用点适配与 B5 测试授权各需一小步；
+> ③自动化用例由计划的 12 条扩至 19 条（增补「预览↔落盘逐条对账」这一核心验收点的自动化，
+>   它替代了原计划中的人工比对，比人工点击更强）。
 
 ---
 

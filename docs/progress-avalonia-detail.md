@@ -6,6 +6,29 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-01** — 解压选择器「保留完整路径」开关 + 左下通用参数区实施完成（✅ 已实现）
+  - **★ 核心缺陷修复**：`ShowExtractFolderAsync` 原返回 `Task<string?>`，**丢弃**用户在弹窗内表达的勾选意图，调用方拿到路径后**回头独立读** `settings.ExtractPreserveFullPath`（`MainWindowViewModel.cs:2375`、`DragDropService.cs:105`）——形成「预览所见 ≠ 实际落盘」。新增 `Dialogs/ExtractPickResult.cs`（`public sealed record ExtractPickResult(string DestPath, bool PreserveFullPath)`）作强类型返回通道，贯穿两个有对话框的消费点
+  - **参数区通用宿主**（用户新增需求，取代原「预览面板标题行右侧复选框」方案）：`RootGrid` `RowDefinitions` 由 `Auto,*,Auto,Auto` 改为 `Auto,*,Auto,Auto,Auto`，新增第 3 行参数区（浏览器网格下方、确定/取消上方，左对齐），**确定/取消 `Grid.Row` 同步 3→4**（漏改会重叠且**不报编译错**）。实现为 `Dialogs/PickerOptionItem.cs`（`public sealed` + `ObservableObject`，含 `Key`/`Label`/`IsChecked`/`IsEnabled`/`DisabledHint`）+ 对话框内 `AddOption(key, labelKey, initial, onChanged, isEnabled, disabledHintKey)` 注册表；**渲染层只遍历注册表生成「标签 + 控件」，不认识任何具体 key** → 新增参数只扩展注册项，不改渲染层与布局；注册表为空则整区 `IsVisible=false`（规则 6）。`ExtractFolderPanel` **零改动**
+  - **关键实现决策**
+    - `ExtractPickResult` **刻意不泛化**为参数字典：类型系统必须保证值一定传到解压侧（正是本缺陷的根因），泛化会削弱它；未来真需动态参数时再扩展（YAGNI）。`CollectOptions()` 经评估为死代码并删除
+    - 容器用 `Grid ColumnDefinitions="Auto,*"` 而非横向 `StackPanel` ——后者沿 orientation 给子项**无穷宽度**，`WrapPanel` 拿到 ∞ 就永不换行，整区溢出窗口
+    - 禁用提示用 Avalonia 12.0.4 提供的 `ToolTip.ShowOnDisabled="True"` + `Tip="{Binding DisabledHint}"`（禁用控件不派发指针事件，ToolTip 默认永不弹出；`DisabledHint` 为 null 时提示服务不打开，天然满足「可用时不提示」）——比原设计的独立 `?` 触发器节点更简，一次性删掉 `?` 节点、派生属性、手动 `RaiseChanged` 三样机制
+    - `MainWindowViewModel.ExtractSelectedEntriesCoreAsync` 用 `bool? preserveFullPath = null`：无对话框入口（`ExtractSelectedHere`）传 `null`，由唯一一处 `preserveFullPath ?? settings.ExtractPreserveFullPath`（`:2375`）兜底，**避免一次解压反序列化两次 `settings.json`**
+  - **消费点四路取值**（三值来源不同，不可混用）：`ExtractSelectedTo`（有对话框）→ `pick.PreserveFullPath`；`DragDropService` 目标检测失败兜底（有对话框）→ `pick.PreserveFullPath`；`ExtractSelectedHere`（无对话框）→ 传 null 走设置兜底；`DragDropService` 已检测到目标（无对话框）→ 保留 `_settings` 初值。另**新发现并修复 `ExtractSettingsWindow.axaml.cs:61` / `:83-87` 两处遗漏调用点**（`BrowseFolder` 是 `Func<Task<string?>>` → CS0029；`BrowseAction` 三元失去公共类型 → CS0173），二者只取 `.DestPath`——整包解压链路 `currentFolder` 取默认 `""`，`TrimCurrentFolderPrefix` 直接早退，该值对其本就无影响
+  - **本地化**：新增 3 key（`Picker_PreserveFullPath` / `Picker_PreserveFullPathDisabledHint` / `Picker_OptionsCaption`），三语成对、UTF-8 无 BOM、纯 CRLF、插入文件头；实测各 1180 key、零重复、key 集完全一致。**未重复添加已存在的 `Picker_ExtractPreviewTitle`**（三语文件第 1060 行）
+  - **测试**：新增 5 个测试文件共 **22 条用例**，Avalonia **127 通过 / 0 失败 / 2 跳过**（基线 105 + 22）、Core 416 通过、`dotnet build` exit 0 / 0 error / 0 warning
+    - 落盘契约 3：真实解压断言 `preserveFullPath × currentFolder` 矩阵；第 3 条锁定「根目录两模式产出完全相同」（决策 a 的可执行证明）。夹具刻意用 `System.IO.Compression` 显式条目名而非 `ZipEngine.CompressAsync`（后者会加源目录前缀破坏断言）
+    - 架构守卫 4：读取生产源码断言「坏接线没有回来」；仓库根发现照抄 `AboutWindowTests.cs:20-32`；匹配前**归一化空白**（否则换行格式化会造成假通过）；`DragDropService` 守卫用**括号配平截取实参列表**而非三元组子串（后者参数换序即假通过）
+    - 参数区结构 5：含 **D1 回归锁**（初值必须播种到选项项）与决策 a 禁用锁
+    - **预览↔落盘逐条对账 7**（核心验收点自动化）：4 个 theory 覆盖 `currentFolder × preserveFullPath` 全矩阵，对比 `ResultPreviewService.BuildExtractPreview` 的预览树路径与真实落盘文件集合——**替代原计划的人工比对，证据更强**
+    - 布局与提示配置 3：**H1 用运行时布局测量**（`ItemsControl` 宽度必须有限且不溢出父容器）+ D3 锁 `ShowOnDisabled` 源码形态（属性名拼错会被 XAML 编译器静默忽略）
+  - **负控制验证（证明非空测）**：注入 `initial: false` → D1 锁 FAIL；注入解压侧 `currentFolder` 与预览侧不一致 → 对账测试 FAIL。由此「预览所见 ≠ 实际落盘」若重现**必然被自动捕获**
+  - **实施中发现的两个环境问题**：① 测试项目 `Avalonia.Headless.XUnit 12.0.4` 与 UI 项目 `Avalonia 12.1.2` **版本偏斜**，构造 Window 时抛 `TypeLoadException`（既有隐患，此前无测试构造 Window 故未暴露）→ 已对齐 12.1.2；② headless 下 `ItemsControl` 的 item 容器不物化（`Measure/Arrange` 与 `Show()` 均无效），故 D3 视觉树路线不可行，改用源码守卫
+  - **⚠ 剩余 GUI 目视验收 3 项**（自动化无法覆盖渲染行为，headless 不派发 hover、不渲染像素）：DoD 12 悬停禁用态 CheckBox 提示是否真弹出 / DoD 20 多参数换行观感 / DoD 21 `ExtractSettingsWindow`「浏览」链路（该链路会显示**常驻禁用**项，属已知可接受副作用）
+  - **规则 15 自查**：`git grep -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync"` 仅 3 处命中，全部位于 `CustomFilePickerDialog.SystemBrowse_Click`（L1275-1343，唯一有意保留的系统浏览逃生通道）
+  - **范围**：预估 2-3h → 实际 3.5-4h；不改 `AppSettings` 字段、不改设置窗口、不改 `ExtractPathResolver`/`ResultPreviewService`/`SelectedItemsExtractService`、不改 WPF（规则 11）
+  - **同步**：计划 §7 重构为「机器可验证 / 仍需 GUI」两部分（避免把可自动化项写成人工验收）；`docs/PLAN.md` P2 区已同步（规则 1）
+
 **2026-10-01** — 解压选择器「保留完整路径」计划改用左下通用参数区 + 修正 18 项缺陷（📋 待实施）
   - **背景**：2026-09-30 立项的计划（323 行）经两轮审阅 —— 自查 7 项 + **Oracle 架构评审 11 项**，全部经源码逐条核实后修进计划；计划本身从 323 行扩至 785 行
   - **★ 决策 3（用户新增需求，取代原「标题行右侧复选框」方案）**：参数**独立成区域**放窗口左下（`RootGrid` 新增一行，浏览器网格下方、确定/取消上方，左对齐），供本次调用的参数集中承载；将来更多参数、别的调用情形需要的参数都放这里；没有参数则**整区隐藏**（`IsVisible=false`，规则 6）。实现为**参数注册表** `AddOption(key, labelKey, initial, onChanged, isEnabled, disabledHintKey)`，渲染层只遍历注册表生成「标签 + 控件」，**不认识任何具体 key** → 加参数不改布局与渲染层
