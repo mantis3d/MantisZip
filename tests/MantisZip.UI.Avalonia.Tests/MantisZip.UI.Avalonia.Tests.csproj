@@ -15,7 +15,9 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.0.4" />
+    <!-- 版本须与 UI 项目 Avalonia 主版本一致（12.1.2），否则 HeadlessWindowImpl 缺少
+         SetFrameThemeVariant 实现，构造 Window 时抛 TypeLoadException -->
+    <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.2" />
   </ItemGroup>
 
   <ItemGroup>
