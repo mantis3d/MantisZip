@@ -6,6 +6,27 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-01** — 解压选择器「保留完整路径」计划改用左下通用参数区 + 修正 18 项缺陷（📋 待实施）
+  - **背景**：2026-09-30 立项的计划（323 行）经两轮审阅 —— 自查 7 项 + **Oracle 架构评审 11 项**，全部经源码逐条核实后修进计划；计划本身从 323 行扩至 785 行
+  - **★ 决策 3（用户新增需求，取代原「标题行右侧复选框」方案）**：参数**独立成区域**放窗口左下（`RootGrid` 新增一行，浏览器网格下方、确定/取消上方，左对齐），供本次调用的参数集中承载；将来更多参数、别的调用情形需要的参数都放这里；没有参数则**整区隐藏**（`IsVisible=false`，规则 6）。实现为**参数注册表** `AddOption(key, labelKey, initial, onChanged, isEnabled, disabledHintKey)`，渲染层只遍历注册表生成「标签 + 控件」，**不认识任何具体 key** → 加参数不改布局与渲染层
+  - **决策 3 的连带收益**：① 原 spec §11「260px 窄面板标题 + 复选框溢出」风险消失（`ExtractFolderPanel` 现零改动）；② 原 D3「禁用态 ToolTip 不显示」的 `?` 节点方案被更优解取代 —— 实测确认 **Avalonia 12.0.4 提供 `ToolTip.ShowOnDisabled`**（`Avalonia.Controls.xml` 中查得 `ShowOnDisabledProperty` / `SetShowOnDisabled(Control, bool)`），直接给 CheckBox 加该属性即可，一次性删掉 `?` 节点、`ShowDisabledHint` 派生属性、手动 `RaiseChanged` 三样机制
+  - **⚠ Oracle 评审：5 项编译阻塞（全部会让 `dotnet build` 失败）**
+    - **B1 返回类型改动波及 6 处调用，原方案只覆盖 4 处** —— `grep` 实测 `ExtractSettingsWindow.axaml.cs:61`（`ViewModel.BrowseFolder` 是 `Func<Task<string?>>`，lambda 返回 `ExtractPickResult?` → **CS0029**）与 `:83-87`（`DestinationPicker.BrowseAction` 三元表达式 `Task.FromResult<string?>` 与 `Task<ExtractPickResult?>` 失去公共类型 → **CS0173**）会编译失败。已补进 §1.3/§6 并给出改法（两条是整包解压链路，`currentFolder` 取默认 `""`，`PreserveFullPath` 对其本就无影响，只取 `.DestPath` 是正确的）
+    - **B2 `item.RaiseChanged(...)` API 不存在** —— CommunityToolkit.Mvvm 8.4.2 的 `ObservableObject` 仅有 `SetProperty` 与 **protected** `OnPropertyChanged`（仓库内 0 处 `RaiseChanged` 用法，正确范式是类内 `OnPropertyChanged(nameof(X))`，见 `SourceArchiveItem.cs:68-69`）；且 protected 方法从对话框的 lambda 外部根本无法调用
+    - **B3 `DisabledHint` 为 `init`-only 却在对话框构造函数赋值** —— **CS8852**，且 `_options[0]` 索引隐含「preserveFullPath 必须第一个注册」的脆弱假设；改为 `AddOption(disabledHintKey:)` 参数、对象初始化器内设置
+    - **B4 `x:Name="OptionsCaptionText"` 与同名 `public` 属性并存** —— Avalonia name generator 在同一 partial 类生成同名 internal 成员 → **CS0102**；现有代码（属性 `ExtractPreviewTitle` vs `x:Name="ExtractPreviewTitleText"`）正是刻意避开此模式
+    - **B5 参数区结构测试 5 条中 4 条编译不过** —— `OptionsRow` 是生成的 `internal` 成员、`InternalsVisibleTo` 仅授予 `MantisZip.Tests`、`AddOption` 是 private；补 `<InternalsVisibleTo Include="MantisZip.UI.Avalonia.Tests" />` 后只测公开面
+  - **⚠ Oracle 评审：2 项高危布局缺陷**
+    - **H1 参数永远不会换行且会溢出窗口** —— 原方案 `Border > StackPanel(Horizontal) > ItemsControl > WrapPanel`，Avalonia 横向 `StackPanel` 沿 orientation 给子项**无穷宽度**，`WrapPanel` 拿到 ∞ 就不换行，一行排到底溢出窗口（DoD 20 必失败）；改用 `Grid ColumnDefinitions="Auto,*"`（本文件 `.axaml:22` 已有 `ColumnSpacing` 先例）
+    - **H2 确定/取消按钮行 `Grid.Row` 3→4 漏改** —— 原方案只是注释暗示、没进改动清单，照做会与参数区重叠且**不报编译错**；已显式列入 §3.3 + §6 + DoD 22
+  - **D2 严重性实测更正（纠正本文档此前的误判）**：原判「阻塞」并称「重复 JSON key 使 `JsonSerializer.Deserialize<Dictionary<string,string>>` 抛 `ArgumentException` → 整张本地化表加载失败 → 波及全应用文案」。**实测为假**：本机 .NET 10 上 `JsonSerializer.Deserialize<Dictionary<string,string>>("{\"a\":\"1\",\"a\":\"2\"}")` 返回 `{"a":"2"}`（**后值覆盖、不抛异常**，count=1），而 `LocalizationManager.cs:85` 正是该调用 → 降级为整洁性问题，**不重复添加已存在的 `Picker_ExtractPreviewTitle` 这个行动不变**
+  - **其他实质修正**：M4 强制要求的「先赋 `ItemsSource` 再 `AddOption`」顺序**无必要**（`ObservableCollection` 两种顺序渲染相同），且 code-behind 赋值会用本地值**覆盖掉 XAML 绑定**形成双数据源 → 删除该行；M3 那句「IsEnabled 由参数自身刷新（如 currentFolder 变化）」描述了**不存在的刷新路径**（`_extractCurrentFolder` 是 readonly）且 `IsPreserveFullPathToggleAvailable` 是死属性 → 让注册 lambda 真正使用它；`CollectOptions()` 裁定为**死代码并删除**（强类型返回使字典无消费者，且 `_options.ToDictionary` 对重复键抛异常；可扩展性由 `AddOption` 本身提供）；M5 守卫测试的仓库根定位照抄 `AboutWindowTests.cs:20-32` 现成模式，DragDrop 守卫改用括号配平截取实参列表（避免参数换序造成的假通过）；M2 契约测试补完整夹具代码（`new ZipEngine().CompressAsync` 建包 + `ListEntriesAsync` 取条目 + `conflictAction:"overwrite"` 绕开弹窗分支）；M7「唯一工厂方法是 `GetEngineByExtension(string, IArchiveEngine)`」不成立（还有单参重载 `:423` 与 `GetEngine(ArchiveFormat)` `:397`）；M6 记录 `ExtractSettingsWindow` 链路会显示**常驻禁用**项这一可接受副作用（`currentFolder` 为空 → `TrimCurrentFolderPrefix` 直接早退，该值在该链路确实无影响）
+  - **交互原型**：`docs/prototypes/extract-preserve-full-path-toggle.html`（单文件，66KB，无外部依赖）—— 复刻对话框三栏布局 + 参数区，JS 移植 `ExtractPathResolver.ResolveRelativePath` 使**预览与落盘共用同一函数**（结构化保证「预览 = 实际」）；含调用情形切换（验证无参数时整区隐藏）、「＋ 添加示例参数」（验证多参数自动换行）、「对照模式」（可交互复现 D1 初值未回填与 D3 禁用态提示）；resolver 输出已用 Node 实测，与契约测试三条断言**逐字一致**
+  - **验证**：计划 785 行 / 16 个代码块闭合 / 17 个表格列数全一致；已失效的 `CollectOptions`/`ShowDisabledHint`/`ItemsSource = _options` 零残留；测试基线 `dotnet test` 实测 **105 通过 / 0 失败 / 2 跳过**（Oracle 未复核此项）
+  - **范围调整**：预估 2-3h → **3.5-4h**（参数区通用宿主 + B1 调用点适配 + B5 测试授权）；i18n 仍为 3 key（`Picker_PreserveFullPath` / `Picker_PreserveFullPathDisabledHint` / `Picker_OptionsCaption`，三语成对）；测试诚实降级为 3 条落盘契约 + 4 条架构守卫 + 5 条参数区结构测试 + **13 项人工验证**（基线 105 + 12 = 117 passed / 0 failed / 2 skipped）
+  - **状态**：📋 待实施；计划头部已标注 spec **已过时**并列出需回写的 8 处差异；同步 `docs/PLAN.md` P2 区（规则 1）
+  - **⚠ 原型未体现 B1/H1**：原型是浏览器模拟，用 `flex-wrap` 天然换行，故 H1 的 `StackPanel`+`WrapPanel` 问题在原型里不会出现；B1 属编译期问题，原型不涉及。**实现时以计划 §3.3 的 AXAML 为准，不要照抄原型的 CSS 结构**
+
 **2026-09-30** — 解压选择器「保留完整路径」开关立项（设计与实现计划，📋 待实施）
   - **背景**：解压目标目录选择对话框（`CustomFilePickerDialog.ShowExtractFolderAsync`）已具备解压路径/冲突预览，但预览所用的「保留完整路径」状态只能在全局设置里改，对话框内无法调整
   - **★ 核心缺陷**（本次立项的真正动因）：对话框只返回目标路径字符串（`Task<string?>`），调用方拿到路径后**回头独立读** `settings.ExtractPreserveFullPath` 再传给 `ExtractFlow`（`MainWindowViewModel.cs:2375`、`DragDropService.cs:105`）——用户在预览阶段无法表达意图，形成「预览所见 ≠ 实际落盘」
