@@ -73,9 +73,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 解压目标文件夹选择回调。传入待解压条目、初始路径、当前浏览目录（压缩包内）与保留完整路径设置，
-    /// 返回所选目录路径，取消返回 null。
+    /// 返回所选结果（目标目录 <c>DestPath</c> + 对话框内「保留完整路径」勾选值 <c>PreserveFullPath</c>），取消返回 null。
     /// </summary>
-    public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<string?>>? ShowExtractFolderPicker { get; set; }
+    public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<ExtractPickResult?>>? ShowExtractFolderPicker { get; set; }
 
     /// <summary>
     /// 压缩设置对话框回调。传入 CompressSettingsViewModel，返回 true=确认，false=取消。
@@ -2330,7 +2330,8 @@ public partial class MainWindowViewModel : ObservableObject
         var dest = Path.GetDirectoryName(CurrentArchivePath)
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
-        await ExtractSelectedEntriesCoreAsync(entries, dest);
+        // 无对话框入口：不传 preserveFullPath（null → 由 Core 内部的 settings 默认值兜底，避免二次反序列化 settings.json）
+        await ExtractSelectedEntriesCoreAsync(entries, dest, null);
     }
 
     /// <summary>
@@ -2351,10 +2352,10 @@ public partial class MainWindowViewModel : ObservableObject
         var defaultDest = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
 
         var settings = AppSettings.Load();
-        var dest = await ShowExtractFolderPicker(entries, defaultDest, CurrentFolder ?? "", settings.ExtractPreserveFullPath);
-        if (string.IsNullOrEmpty(dest)) return;
+        var pick = await ShowExtractFolderPicker(entries, defaultDest, CurrentFolder ?? "", settings.ExtractPreserveFullPath);
+        if (pick is null || string.IsNullOrEmpty(pick.DestPath)) return;
 
-        await ExtractSelectedEntriesCoreAsync(entries, dest);
+        await ExtractSelectedEntriesCoreAsync(entries, pick.DestPath, pick.PreserveFullPath);
     }
 
     /// <summary>
@@ -2362,7 +2363,7 @@ public partial class MainWindowViewModel : ObservableObject
     /// 与拖拽解压拿到目标路径后完全同一流程：进度窗口、压缩包一行批处理列表、状态驱动、失败弹窗）。
     /// 冲突策略与打开文件夹行为使用 AppSettings 默认值。
     /// </summary>
-    private async Task ExtractSelectedEntriesCoreAsync(List<ArchiveItem> entries, string destinationPath)
+    private async Task ExtractSelectedEntriesCoreAsync(List<ArchiveItem> entries, string destinationPath, bool? preserveFullPath = null)
     {
         if (CurrentArchivePath == null) return;
 
@@ -2372,7 +2373,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var result = await ExtractFlow.RunSelectedItemsExtractionAsync(
             CurrentArchivePath, password, entries, destinationPath,
-            CurrentFolder ?? "", settings.ExtractPreserveFullPath, settings.FileConflictAction,
+            CurrentFolder ?? "", preserveFullPath ?? settings.ExtractPreserveFullPath, settings.FileConflictAction,
             ShowExtractFileConflictDialogAsync,
             LocalizationManager.T("Status_Extracting"));
 

@@ -1,4 +1,7 @@
 {
+  "Picker_PreserveFullPath": "保留完整路径",
+  "Picker_PreserveFullPathDisabledHint": "在压缩包根目录，勾选与否结果相同",
+  "Picker_OptionsCaption": "本次参数",
   "Picker_FileTypeJson": "JSON 文件 (*.json)",
   "Preview_Encoding_Auto": "自动检测",
   "Preview_Encoding_SystemAnsi": "系统 ANSI ({0})",

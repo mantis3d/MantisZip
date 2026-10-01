@@ -1,4 +1,7 @@
 {
+  "Picker_PreserveFullPath": "Preserve full paths",
+  "Picker_PreserveFullPathDisabledHint": "At the archive root, both settings produce the same result",
+  "Picker_OptionsCaption": "Options",
   "Picker_FileTypeJson": "JSON files (*.json)",
   "Preview_Encoding_Auto": "Auto detect",
   "Preview_Encoding_SystemAnsi": "System ANSI ({0})",

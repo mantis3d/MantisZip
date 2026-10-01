@@ -76,7 +76,8 @@ public partial class CustomFilePickerDialog : Window
     private readonly string? _suggestedFileName;
     private readonly IReadOnlyList<FileTypeOption> _fileTypeOptions;
     private readonly string _extractCurrentFolder;
-    private readonly bool _extractPreserveFullPath;
+    // 去 readonly：参数区 CheckBox 勾选变化时需回写本字段（决策 A：仅本次生效，不回写设置）
+    private bool _extractPreserveFullPath;
 
     /// <summary>确定后返回的路径。</summary>
     public string? SelectedPath { get; private set; }
@@ -111,6 +112,66 @@ public partial class CustomFilePickerDialog : Window
     public string FileTypeLabel => LocalizationManager.T("Picker_FileType");
     public string ExtractPreviewTitle => LocalizationManager.T("Picker_ExtractPreviewTitle");
 
+    // ── 通用参数区（宿主，不认识任何具体参数） ────────────────────────────
+
+    /// <summary>
+    /// 「本次调用需要显示哪些参数」的注册表。空 → 参数区（OptionsRow）整区隐藏（规则 6）。
+    /// </summary>
+    /// <remarks>
+    /// 渲染层只遍历本集合生成「标签 + 控件」，不认识任何具体 key —— 新增参数只需
+    /// 调用 <see cref="AddOption"/> 注册一项，无需改动渲染层与布局（决策 3）。
+    /// XAML 的 <c>{Binding Options}</c> 是 ItemsSource 的唯一数据源，代码后台不重复赋值。
+    /// </remarks>
+    private readonly ObservableCollection<PickerOptionItem> _options = new();
+
+    /// <summary>参数区标题文案（供 XAML 绑定；刻意无同名 x:Name，避免 CS0102）。</summary>
+    public string OptionsCaptionText => LocalizationManager.T("Picker_OptionsCaption");
+
+    /// <summary>参数项列表（供 XAML <c>{Binding Options}</c> 使用）。</summary>
+    public IReadOnlyList<PickerOptionItem> Options => _options;
+
+    /// <summary>
+    /// 注册一个参数项。新增参数只需调用此方法，不改渲染层与布局（决策 3）。
+    /// </summary>
+    /// <param name="key">参数键，同时作为返回通道取值键。</param>
+    /// <param name="labelKey">标签 i18n key（规则 13）。</param>
+    /// <param name="initial">初值（调用方传入的设置值），在构造 <see cref="PickerOptionItem"/> 时一次性写入。</param>
+    /// <param name="onChanged">值变化回调（参数自身消费）。</param>
+    /// <param name="isEnabled">可用性判定；null = 始终可用。<b>生命周期内只求值一次</b>
+    /// （可用性依赖的 <c>_extractCurrentFolder</c> 是构造期固定字段，对话框生命周期内不会变化）。</param>
+    /// <param name="disabledHintKey">禁用提示 i18n key；null = 不提示。</param>
+    private PickerOptionItem AddOption(
+        string key, string labelKey, bool initial,
+        Action<bool> onChanged, Func<bool>? isEnabled = null,
+        string? disabledHintKey = null)
+    {
+        var item = new PickerOptionItem
+        {
+            Key = key,
+            Label = LocalizationManager.T(labelKey),
+            IsChecked = initial,                                   // 初值在此一次性写入（D1 修法）
+            IsEnabled = isEnabled?.Invoke() ?? true,               // 可用性静态，只求值一次
+            DisabledHint = disabledHintKey == null ? null : LocalizationManager.T(disabledHintKey),
+        };
+        item.PropertyChanged += (_, e) =>
+        {
+            // 只有 IsChecked 会变化（CheckBox 双向绑定回推）；无派生属性，无需手动通知
+            if (e.PropertyName == nameof(PickerOptionItem.IsChecked))
+                onChanged(item.IsChecked);
+        };
+        _options.Add(item);
+        OptionsRow.IsVisible = true;                               // 空态：任一参数注册即显示
+        return item;
+    }
+
+    // ── Extract preserve-full-path toggle（参数区的一个参数项） ────────────
+
+    /// <summary>本次解压是否保留完整路径。仅本次生效，不回写 AppSettings（决策 A）。</summary>
+    public bool SelectedPreserveFullPath => _extractPreserveFullPath;
+
+    /// <summary>根目录时无前缀可裁，两模式结果相同 → 禁用（决策 a）。</summary>
+    public bool IsPreserveFullPathToggleAvailable => !string.IsNullOrEmpty(_extractCurrentFolder);
+
     // ── Static entry points ────────────────────────────────────────────────
 
     /// <summary>选择文件夹。返回所选目录路径，取消返回 null。</summary>
@@ -132,11 +193,29 @@ public partial class CustomFilePickerDialog : Window
         IReadOnlyList<FileTypeOption>? fileTypes = null)
         => ShowInternal(owner, PickerMode.OpenFile, null, null, initialPath, fileExtensions, fileTypes: fileTypes);
 
-    /// <summary>解压模式：选择目标目录，底部实时显示解压冲突预览。返回目录路径，取消返回 null。</summary>
-    public static Task<string?> ShowExtractFolderAsync(
+    /// <summary>
+    /// 解压模式：选择目标目录，底部实时显示解压冲突预览。
+    /// 返回 <see cref="ExtractPickResult"/>（目标目录 + 本次「保留完整路径」勾选值），取消返回 null。
+    /// </summary>
+    /// <remarks>
+    /// 不走 <see cref="ShowInternal"/>（后者只返回 <c>string?</c>，无法承载勾选值）。
+    /// Ok_Click 无条件 <c>SelectedPath = _currentDir</c>，理论上可能为空串，
+    /// 故用 <c>!string.IsNullOrEmpty</c> 守卫（空串视为取消）。
+    /// </remarks>
+    public static async Task<ExtractPickResult?> ShowExtractFolderAsync(
         Window owner, IReadOnlyList<ArchiveItem> entries, string? initialPath = null,
         string currentFolder = "", bool preserveFullPath = true)
-        => ShowInternal(owner, PickerMode.ExtractFolder, entries, null, initialPath, null, currentFolder, preserveFullPath);
+    {
+        var dialog = new CustomFilePickerDialog(PickerMode.ExtractFolder, entries, null, initialPath, null,
+            currentFolder, preserveFullPath)
+        {
+            WindowStartupLocation = WindowStartupLocation.CenterOwner
+        };
+        await dialog.ShowDialog(owner);
+        return !string.IsNullOrEmpty(dialog.SelectedPath)
+            ? new ExtractPickResult(dialog.SelectedPath, dialog.SelectedPreserveFullPath)
+            : null;
+    }
 
     /// <summary>打开文件/文件夹（多选，PickItems 模式）。返回选中路径列表，取消返回 null。</summary>
     public static async Task<IReadOnlyList<string>?> ShowOpenItemsAsync(Window owner, string? initialPath = null)
@@ -247,6 +326,27 @@ public partial class CustomFilePickerDialog : Window
         _fileTypeOptions = BuildFileTypeOptions(mode, fileExtensions, fileTypes);
 
         DataContext = this;
+
+        // ── Extract 保留完整路径开关（参数区的一个参数项，仅 ExtractFolder 模式注册）──
+        // 必须在 DataContext = this 之后注册：XAML {Binding Options} 绑定到本实例，
+        // 注册即触发 ItemsControl 渲染（ObservableCollection 自带 INotifyCollectionChanged）。
+        if (mode == PickerMode.ExtractFolder)
+        {
+            AddOption(
+                key: "preserveFullPath",
+                labelKey: "Picker_PreserveFullPath",
+                initial: _extractPreserveFullPath,                 // 初值即字段值（调用方传入的设置值）
+                onChanged: v =>
+                {
+                    _extractPreserveFullPath = v;
+                    // 预览树 300ms 防抖重建，实时反映勾选变化（_currentDir 由稍后的
+                    // NavigateTo(startDir) 赋值；回调仅在用户交互时触发，构造期不会执行）
+                    SchedulePreviewRebuild(_currentDir);
+                },
+                isEnabled: () => IsPreserveFullPathToggleAvailable,
+                disabledHintKey: "Picker_PreserveFullPathDisabledHint");
+        }
+        // ★ 不在此处赋 ItemsControl.ItemsSource —— XAML 已绑定 {Binding Options}（单一数据源）
 
         // 标题
         Title = mode switch

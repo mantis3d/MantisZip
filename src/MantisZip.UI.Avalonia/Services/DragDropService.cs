@@ -72,6 +72,9 @@ internal class DragDropService
 
         // 4. 检测失败时弹自定义选择器（ExtractFolder 模式：底部实时显示解压路径与冲突预览），
         //    与右键「解压选中项到」完全同一对话框。overlay 已在调用前关闭，弹模态窗安全。
+        // 本次解压的 preserveFullPath：目标已检测到时无对话框（无勾选值可用）→ 取设置值；
+        // 兜底弹窗分支会被 pick.PreserveFullPath 覆盖。
+        var preserveFullPath = _settings.ExtractPreserveFullPath;
         if (string.IsNullOrEmpty(targetDir))
         {
             var parentDir = Path.GetDirectoryName(_archivePath)
@@ -81,15 +84,17 @@ internal class DragDropService
             var initialPath = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(_archivePath));
 
             App.DebugLog("[DragDropService] DetectTargetDirectory returned null, showing custom extract folder picker...");
-            targetDir = await CustomFilePickerDialog.ShowExtractFolderAsync(
+            var pick = await CustomFilePickerDialog.ShowExtractFolderAsync(
                 _ownerWindow, itemsToExtract, initialPath,
                 _currentFolder, _settings.ExtractPreserveFullPath);
-            if (string.IsNullOrEmpty(targetDir))
+            if (pick is null || string.IsNullOrEmpty(pick.DestPath))
             {
                 App.DebugLog("[DragDropService] User cancelled extract folder picker");
                 return;
             }
-            App.DebugLog($"[DragDropService] User picked folder: {targetDir}");
+            targetDir = pick.DestPath;
+            preserveFullPath = pick.PreserveFullPath;
+            App.DebugLog($"[DragDropService] User picked folder: {pick.DestPath}");
         }
 
         // 5. 统一走 ExtractFlow.RunSelectedItemsExtractionAsync（与右键「解压选中项到」完全同一流程）：
@@ -102,7 +107,7 @@ internal class DragDropService
 
         var result = await ExtractFlow.RunSelectedItemsExtractionAsync(
             _archivePath, _password, itemsToExtract, targetDir,
-            _currentFolder, _settings.ExtractPreserveFullPath, _settings.FileConflictAction,
+            _currentFolder, preserveFullPath, _settings.FileConflictAction,
             vm?.ShowExtractFileConflictDialogAsync,
             LocalizationManager.T("Status_DragExtractingTo", folderName));
 

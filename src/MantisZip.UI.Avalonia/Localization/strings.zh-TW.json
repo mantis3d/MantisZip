@@ -1,4 +1,7 @@
 {
+  "Picker_PreserveFullPath": "保留完整路徑",
+  "Picker_PreserveFullPathDisabledHint": "在壓縮包根目錄，勾選與否結果相同",
+  "Picker_OptionsCaption": "本次參數",
   "Picker_FileTypeJson": "JSON 檔案 (*.json)",
   "Preview_Encoding_Auto": "自動檢測",
   "Preview_Encoding_SystemAnsi": "系統 ANSI ({0})",

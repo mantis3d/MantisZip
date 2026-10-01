@@ -58,7 +58,7 @@ public partial class ExtractSettingsWindow : Window
             var first = ViewModel.FirstArchiveEntries;
             if (first == null)
                 return null;
-            return await CustomFilePickerDialog.ShowExtractFolderAsync(this, first, ViewModel.DestinationPath);
+            return (await CustomFilePickerDialog.ShowExtractFolderAsync(this, first, ViewModel.DestinationPath))?.DestPath;
         };
 
         // 设置关闭回调
@@ -80,11 +80,11 @@ public partial class ExtractSettingsWindow : Window
 
         // 浏览回调：解压模式文件夹对话框（内建 ResultTreeView 实时冲突检测）。
         // QuickPathPicker 只收目录，此处返回目录即可。
-        DestinationPicker.BrowseAction = (owner, current) =>
+        DestinationPicker.BrowseAction = async (owner, current) =>
             ViewModel.FirstArchiveEntries == null
-                ? Task.FromResult<string?>(null)
-                : CustomFilePickerDialog.ShowExtractFolderAsync(
-                    owner ?? this, ViewModel.FirstArchiveEntries, ViewModel.DestinationPath);
+                ? null
+                : (await CustomFilePickerDialog.ShowExtractFolderAsync(
+                    owner ?? this, ViewModel.FirstArchiveEntries, ViewModel.DestinationPath))?.DestPath;
 
         // ── 手动解锁（自动匹配失败后的补救）：复用主流程 PasswordDialog ──
         ViewModel.ShowUnlockDialog = async (archivePath) =>
