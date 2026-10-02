@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-01** — ZIP 中文文件名编码修复（✅ 已修复，用户报告「拖拽添加中文文件到压缩包后乱码」）
+  - **根因 1（用户可见症状）**：`ZipBinaryRewriter.CompressNewEntry` 构造 LFH/CDFH 时硬编码 `Flags: 0`，写 UTF-8 文件名时**从不置 bit 11**。APPNOTE 6.4.4 要求文件名含高位字符时必须置位，否则解码器回退 CP437 → 7-Zip/WinRAR/资源管理器/`unzip` 显示乱码。**为何应用内看不出来**：`OpenArchiveWithEncodingFallback` 的 `LooksLikeValidCjk` 启发式把 UTF-8 字节猜对了，故本应用内自测正常、外部工具才暴露 —— 这也是该缺陷长期潜伏的原因。压缩对话框走 SharpCompress `ZipWriter`（自动置位）故不受影响
+  - **根因 2（更深层，删文件时损坏其它条目）**：`ReadCentralDirectory` 固定 `Encoding.UTF8.GetString(fileNameBytes)` 解码，`WriteCentralDirectory` 又用传入 `encoding` 重编码 → 「解码→重编码」往返对非 UTF-8 编码的条目必然损坏。`encoding` 参数只管输出、从不影响输入解码。**实测确认删除匹配逻辑本身无误**（keepSet 反向筛选 + OrdinalIgnoreCase 归一名，三种场景含修复前坏包均精确删除），坏的是重写环节把存活条目改成了乱码
+  - **根因 3**：Add/Delete 路径的编码来源是 `ZipHasUtf8Flag(archivePath)` 启发式而非用户设置，`AppSettings.ZipEncoding` 在这两条路径上完全失效
+  - **修复**：`CdEntry` 新增 `RawFileNameBytes`（既有条目文件名原始字节），`WriteCentralDirectory` 原样写回、不参与往返；解码改为按 bit 11 / fallback 判定；新增 `ResolveFileNameEncoding`（显式设置优先），`IArchiveEngine.DeleteEntriesAsync` 加 `ArchiveOptions?` 参数、`MainWindowViewModel.DeleteFiles` 透传 `settings.ZipEncoding`（与 `AddFilesToArchiveAsync` 同源）
+  - **★ 方法论教训**：第一轮只修了根因 3 就以为完成，写完测试**注入旧代码测试照样通过** —— 空转测试差点交付。原因是 copy-mode 保留原始 bit 11，启发式与显式设置在 UTF-8 包上结果相同。改写为「GBK 包逐字节比对删除前后存活条目」才真正锁住根因 2，负控制验证旧行为立即 FAIL。**空转测试的特征：注入缺陷后仍然全绿**
+  - **测试**：新增 7 条（`ZipEngineTests`），关键 2 条为 `DeleteEntriesAsync_NonUtf8Archive_SurvivingEntriesKeepOriginalBytes`（逐字节比对）与 `DeleteEntriesAsync_SameNameDifferentDirs_DeletesOnlyTarget`（同名不同目录不误删）。Core 423 通过 / UI 130 通过 / build 0 error
+  - **对既有乱码包的效果**：文件名现在能正确读回（解码按 bit 11 判定），删除也不再损坏其它条目；但磁盘上的字节仍是坏的，**被外部工具打开仍会乱码**，需重新压缩一次才能彻底修正
+
 **2026-10-01** — v0.5.1 版本发布准备（✅ 已完成）
   - **版本号 6 处同步升至 0.5.1**：`AppConstants.cs:11`（`Version = "0.5.1"`）、`MantisZip.UI.Avalonia.csproj:12`（`<Version>0.5.1</Version>`）、`installer.iss:6` 与 `installer-selfcontained.iss:8`（`#define MyAppVersion "0.5.1"`，原兜底值均停在 `0.4.4`）、`docs/PLAN.md:7` 与 `docs/PROGRESS.md:10`（当前版本）
   - **RELEASE_NOTES.md 新增 `## v0.5.1` 章节**：格式对齐 v0.4.5（段落式文件说明 + 中英对照成对条目），未设「版本介绍」小节（v0.5.0 大版本专属）；内容取自 `v0.5.0..HEAD` 的 59 条非合并提交，分 6 组：新预览格式 / 性能 / 交互 / 新增语言 / 修复 / 依赖升级

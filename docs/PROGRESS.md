@@ -115,6 +115,7 @@
 
 #### v0.5.1
 
+- **10-01** — 修复 ZIP 中文文件名编码三处缺陷（Core，用户报告「拖拽添加中文文件后乱码」）：① `ZipBinaryRewriter.CompressNewEntry` 写 UTF-8 文件名时未置 bit 11（APPNOTE 6.4.4 要求非 ASCII 文件名必须置位），致 7-Zip/WinRAR/资源管理器/unzip 按 CP437 解码乱码——因 `OpenArchiveWithEncodingFallback` 的 `LooksLikeValidCjk` 启发式兜底，应用内不可见；② `CdEntry` 新增 `RawFileNameBytes`，既有条目原样写回，消除 `ReadCentralDirectory` 固定 UTF-8 解码 + `WriteCentralDirectory` 换编码写回的「解码→重编码」往返损坏（删除一个文件会连带毁掉无关条目）；③ 新增 `ResolveFileNameEncoding`，Add/Delete 路径显式 `options.FileNameEncoding` 优先于 `ZipHasUtf8Flag` 启发式，`IArchiveEngine.DeleteEntriesAsync` 加 `ArchiveOptions?` 参数、UI 透传 `AppSettings.ZipEncoding`。新增 7 条测试（含逐字节比对删除前后存活条目、负控制验证旧行为必然 FAIL）
 - **10-01** — 版本号升至 v0.5.1（6 处同步）：`AppConstants.Version` / `csproj <Version>` / `installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值（原均停在 `0.4.4`）/ `docs/PLAN.md` 与 `docs/PROGRESS.md` 当前版本；新增 v0.5.1 发布说明（APNG·TGA 预览、ZIP 并行解压、7z 多线程压缩、保留完整路径开关、zh-TW 语言、7 项设置读取失效修复、Avalonia 12.1.2 升级）
 - **09-27** — 批量修复 7 项设置读取失效：`AppSettings` 压缩默认值 / 解压后删包 / 启动清理临时目录 / 提权开关等设置项改动后不生效（读取路径与 setter 未对齐）
 - **09-26** — 新增 APNG 动画预览（Core 魔数检测 `acTL` 块 + `PreviewType.AnimatedImage` 映射 `.apng`；解码器 Rational 类型转换修复）
