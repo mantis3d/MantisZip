@@ -454,8 +454,18 @@ When releasing a new version, update the version string in ALL of these location
 | 2 | `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` | `<Version>x.y.z</Version>` | Avalonia 版 assembly version |
 | 3 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
 | 4 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | 顶部版本号（里程碑总览；细节版本号以 `progress-avalonia-detail.md` 为准） |
+| 5 | `installer.iss` | `#define MyAppVersion "x.y.z"` | WebSetup + Offline 安装脚本的**兜底默认值** |
+| 6 | `installer-selfcontained.iss` | `#define MyAppVersion "x.y.z"` | 离线安装脚本的**兜底默认值** |
 
-**Note:** `installer.iss` no longer requires manual version bumps. The release workflow (`release.yml`) passes the version from the git tag via `/dMyAppVersion=${{ env.VERSION }}` to ISCC at compile time. The `#define MyAppVersion` in `installer.iss` is wrapped in `#ifndef` and serves only as a fallback default for local builds — update it occasionally but it is no longer a release-blocking item.
+**Note:** 两个 `.iss` 文件**不再要求手动改版本号才能发布** —— release workflow（`release.yml` L106 / L128）从 git tag 取版本号，通过 `/dMyAppVersion=$env:VERSION` 在 ISCC 编译期传给两个脚本。两处的 `#define MyAppVersion` 都被 `#ifndef` 包裹，仅作为**本地手工编译安装包时的兜底默认值**。
+
+但仍**建议随 checklist 一并更新**，原因：
+
+- 兜底值一旦滞后（如实际 `0.5.1`、脚本仍写 `0.4.4`），本地 `ISCC installer.iss` 打出的包会带着错误版本号，且**不会有任何编译报错** —— 属静默错误，只有用户拿到包才发现
+- 两个脚本的兜底值**可能各自漂移**（本次即发现 `installer-selfcontained.iss` 长期未随 `installer.iss` 一起更新），列进 checklist 能保证两处一起看
+- 成本极低：各改 1 行
+
+> 历史教训：2026-10-01 升 v0.5.1 时两个 `.iss` 的兜底值仍停在 `0.4.4`，说明"非发布阻塞"容易演变成"长期遗忘"。故列入 checklist，但**不作为发布门禁**。
 
 ## Build output
 
