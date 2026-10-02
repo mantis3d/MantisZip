@@ -7,7 +7,7 @@
 - **技术栈**: .NET 10 + Avalonia 12 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.5.0
+- **当前版本**: 0.5.1
 - **发布日期**: 2026-07-22
 
 ## 变更记录结构
@@ -112,6 +112,13 @@
 ### 共享层（Core / ShellExt / 构建）— 里程碑
 
 按版本分组，每组按日期从新到旧排列。
+
+#### v0.5.1
+
+- **10-01** — 版本号升至 v0.5.1（6 处同步）：`AppConstants.Version` / `csproj <Version>` / `installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值（原均停在 `0.4.4`）/ `docs/PLAN.md` 与 `docs/PROGRESS.md` 当前版本；新增 v0.5.1 发布说明（APNG·TGA 预览、ZIP 并行解压、7z 多线程压缩、保留完整路径开关、zh-TW 语言、7 项设置读取失效修复、Avalonia 12.1.2 升级）
+- **09-27** — 批量修复 7 项设置读取失效：`AppSettings` 压缩默认值 / 解压后删包 / 启动清理临时目录 / 提权开关等设置项改动后不生效（读取路径与 setter 未对齐）
+- **09-26** — 新增 APNG 动画预览（Core 魔数检测 `acTL` 块 + `PreviewType.AnimatedImage` 映射 `.apng`；解码器 Rational 类型转换修复）
+- **09-26** — 新增 TGA 预览支持（Core TGA 魔数检测 + Avalonia ImageSharp 解码 + 红蓝通道交换修复）
 
 #### v0.5.0
 

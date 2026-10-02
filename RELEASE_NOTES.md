@@ -1,3 +1,60 @@
+## v0.5.1
+
+### 文件说明 / File Description
+
+MantisZip-0.5.1-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.1-Setup-Offline.exe 是离线安装包。MantisZip-0.5.1-Portable.zip 是便携版，解压即用。MantisZip-0.5.1-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.1-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.1-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.1-Portable.zip is the portable version, extract and run. MantisZip-0.5.1-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+
+### 更新内容 / Changelog
+
+**新预览格式 / New Preview Formats**
+
+- 新增 **APNG 动画预览** — 通过 `acTL` 块魔数检测识别，与 GIF 统一走动画通道，支持逐帧播放与透明背景棋盘格
+- Added **APNG animated preview** — detected via the `acTL` chunk magic number, handled uniformly with GIF in the animation path; supports frame-by-frame playback and the transparency checkerboard
+- ![APNG 动画预览](docs/images/version/v0.5.1/ApngPreview.png)
+- 新增 **TGA 预览** — 使用 ImageSharp 解码，并修复了红蓝通道交换导致颜色错误的问题
+- Added **TGA preview** — decoded via ImageSharp, with a fix for swapped red/blue channels that caused incorrect colors
+- ![TGA 预览](docs/images/version/v0.5.1/TgaPreview.png)
+
+**性能 / Performance**
+
+- **ZIP 并行解压** — 多实例并行 + 批次复用（Round-Robin 分批 + 实例复用），解压缓冲区 256KB → 4MB
+- **Parallel ZIP extraction** — multi-instance parallelism with batch reuse (Round-Robin batching + instance reuse); extraction buffer raised from 256KB to 4MB
+- ![并行解压](docs/images/version/v0.5.1/ParallelExtract.png)
+- **7z 多线程压缩（`mt=on`）** — 实测 100 × 1MB 随机数据加速 **4.63x**，压缩对话框与设置窗口双入口开关
+- **7z multithreaded compression (`mt=on`)** — measured 4.63x speedup on 100 × 1MB random data; toggles available in both the compress dialog and Settings
+- 新增**并行解压线程数**设置项（1–16，默认随 CPU 核数，`1` 为串行回退）
+- Added a **parallel extraction thread count** setting (1–16, defaults to CPU core count; `1` falls back to serial)
+
+
+**交互 / Interactions**
+
+- 解压目标目录选择器新增**左下通用参数区**，首个参数项为**「保留完整路径」**开关 — 修复「预览所见 ≠ 实际落盘」：此前对话框只返回路径，调用方拿到路径后回头独立读设置，用户在预览阶段无法表达意图；现改为强类型 `ExtractPickResult` 贯穿两个有对话框的消费点
+- The extract folder picker gained a **generic options region** at the bottom left, whose first option is a **"Preserve full path"** toggle — fixing the "preview ≠ actual extraction" mismatch: the dialog previously returned only a path and callers re-read the setting afterwards, so the user could not express intent while previewing; a strongly-typed `ExtractPickResult` now carries it through both dialog-driven call sites
+- ![保留完整路径](docs/images/version/v0.5.1/PreserveFullPathToggle.png)
+- 自定义文件选择器新增**自定义文件类型**与**建议文件名**，添加文件支持选择文件夹，密码管理器导入导出改用自定义选择器
+- The custom file picker now supports **custom file types** and **suggested file names**; adding files accepts folders, and password manager import/export moved to the custom picker
+- 拖拽解压目标检测失败时改用带解压预览的自定义对话框兜底
+- Drag extraction now falls back to the custom dialog with extraction preview when target detection fails
+
+**新增语言 / New Language**
+
+- 新增**繁体中文（zh-TW）** 语言支持
+- Added **Traditional Chinese (zh-TW)** language support
+
+**修复 / Fixes**
+
+- 批量修复 7 项设置读取失效 — 压缩默认值、解压后删包、启动清理临时目录、提权开关等设置项改动后不生效
+- Fixed 7 settings that failed to take effect — compression defaults, delete-archive-after-extract, clean-temp-on-startup, elevation toggle, and others
+
+**依赖升级 / Dependency Upgrades**
+
+- Avalonia 12.0.4 → 12.1.2 全栈升级，NuGet 核心依赖全面升级
+- Upgraded Avalonia from 12.0.4 to 12.1.2 across the stack, plus a broad upgrade of core NuGet dependencies
+
+
 ## v0.5.0
 
 ### 版本介绍 / Version Introduction

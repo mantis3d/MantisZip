@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-01** — v0.5.1 版本发布准备（✅ 已完成）
+  - **版本号 6 处同步升至 0.5.1**：`AppConstants.cs:11`（`Version = "0.5.1"`）、`MantisZip.UI.Avalonia.csproj:12`（`<Version>0.5.1</Version>`）、`installer.iss:6` 与 `installer-selfcontained.iss:8`（`#define MyAppVersion "0.5.1"`，原兜底值均停在 `0.4.4`）、`docs/PLAN.md:7` 与 `docs/PROGRESS.md:10`（当前版本）
+  - **RELEASE_NOTES.md 新增 `## v0.5.1` 章节**：格式对齐 v0.4.5（段落式文件说明 + 中英对照成对条目），未设「版本介绍」小节（v0.5.0 大版本专属）；内容取自 `v0.5.0..HEAD` 的 59 条非合并提交，分 6 组：新预览格式 / 性能 / 交互 / 新增语言 / 修复 / 依赖升级
+  - **截图**：`docs/images/version/v0.5.1/` 下 4 张（`ApngPreview` / `TgaPreview` / `ParallelExtract` / `PreserveFullPathToggle`），附 `README.md` 记录文件名与内容对照
+  - **发布说明内容纪律**：条目须逐条核实「是否真落地」，不可仅凭提交信息转述。本次剔除 2 条未实施项 —— AVIF 预览（有 feat/fix 提交但条目已从发布说明移除）、进度窗口密度模式（**纯计划未实施**：`.omo/plans/未开始/progress-window-enhancement.md` 26 个任务零勾选，代码无密度模式实现，对应提交自述「中等已处理」即中途停止）
+  - **⚠ 已知遗留**：`Preview_ImageLoadFailed` 本地化键已随 AVIF 提交引入，但当前 build 仍有 6 个既有 warning（`TextEncodingDetector.cs:121` CS8604、`PreviewViewModel.cs:1406,1442` CS0618），「修复编译警告」因无法验证清零而未写入发布说明
+
 **2026-10-01** — 解压选择器「保留完整路径」开关 + 左下通用参数区实施完成（✅ 已实现）
   - **★ 核心缺陷修复**：`ShowExtractFolderAsync` 原返回 `Task<string?>`，**丢弃**用户在弹窗内表达的勾选意图，调用方拿到路径后**回头独立读** `settings.ExtractPreserveFullPath`（`MainWindowViewModel.cs:2375`、`DragDropService.cs:105`）——形成「预览所见 ≠ 实际落盘」。新增 `Dialogs/ExtractPickResult.cs`（`public sealed record ExtractPickResult(string DestPath, bool PreserveFullPath)`）作强类型返回通道，贯穿两个有对话框的消费点
   - **参数区通用宿主**（用户新增需求，取代原「预览面板标题行右侧复选框」方案）：`RootGrid` `RowDefinitions` 由 `Auto,*,Auto,Auto` 改为 `Auto,*,Auto,Auto,Auto`，新增第 3 行参数区（浏览器网格下方、确定/取消上方，左对齐），**确定/取消 `Grid.Row` 同步 3→4**（漏改会重叠且**不报编译错**）。实现为 `Dialogs/PickerOptionItem.cs`（`public sealed` + `ObservableObject`，含 `Key`/`Label`/`IsChecked`/`IsEnabled`/`DisabledHint`）+ 对话框内 `AddOption(key, labelKey, initial, onChanged, isEnabled, disabledHintKey)` 注册表；**渲染层只遍历注册表生成「标签 + 控件」，不认识任何具体 key** → 新增参数只扩展注册项，不改渲染层与布局；注册表为空则整区 `IsVisible=false`（规则 6）。`ExtractFolderPanel` **零改动**
