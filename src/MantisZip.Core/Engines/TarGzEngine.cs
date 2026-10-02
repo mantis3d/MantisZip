@@ -392,9 +392,11 @@ public class TarGzEngine : IArchiveEngine
         return result;
     }
 
-    public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
+        // options 仅 ZipEngine 使用（TAR/GZ 不支持删除，始终抛 NotSupportedException）
+        _ = options;
         if (!string.IsNullOrEmpty(password))
             CoreLog.Info($"WARN: TarGzEngine.DeleteEntriesAsync: password provided but TAR/GZ format does not support encryption (archive: {archivePath})");
         CoreLog.Info($"DeleteEntriesAsync: {archivePath} — NotSupportedException");

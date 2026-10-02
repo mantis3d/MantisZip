@@ -2804,10 +2804,14 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 // 复用解压冲突处理：同一 AppSettings.FileConflictAction 策略 + Ask 弹窗回调（标题区分）
                 // CreateExtractOptions 返回 null 表示 Overwrite 默认（无冲突处理），回退到仅密码的 options
+                var settings = AppSettings.Load();
                 var options = SelectedItemsExtractService.CreateExtractOptions(
-                        AppSettings.Load().FileConflictAction, ShowAddFileConflictDialogAsync)
+                        settings.FileConflictAction, ShowAddFileConflictDialogAsync)
                     ?? new ArchiveOptions();
                 options.Password = password;
+                // 文件名编码：与压缩对话框同源，透传用户的 ZIP 文件名编码设置。
+                // 此前未透传，引擎只能靠包内 bit 11 启发式猜编码，导致拖拽添加中文文件名乱码。
+                options.FileNameEncoding = settings.ZipEncoding;
                 // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
                 options.ErrorResolver = CompressFlow.CreateErrorResolver();
                 // entryBasePath：当前浏览的压缩包内目录，null=根目录（与 WPF 版行为一致）
@@ -2842,7 +2846,10 @@ public partial class MainWindowViewModel : ObservableObject
             new[] { deleteEntryPath },
             async (progress, ct) =>
             {
-                await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { deleteEntryPath }, password, progress, ct);
+                // 删除会整包重写，须透传用户的 ZIP 文件名编码设置，
+                // 否则存活的其它条目可能被降级重写成乱码（与 AddFilesToArchiveAsync 同源）。
+                await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { deleteEntryPath }, password, progress, ct,
+                    new ArchiveOptions { FileNameEncoding = AppSettings.Load().ZipEncoding });
             });
 
         if (completed)

@@ -849,7 +849,8 @@ public class SevenZipEngine : IArchiveEngine
         string[] entryPaths,
         string? password = null,
         IProgress<ArchiveProgress>? progress = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"DeleteEntriesAsync: {archivePath}, entries=[{string.Join("; ", entryPaths)}]");

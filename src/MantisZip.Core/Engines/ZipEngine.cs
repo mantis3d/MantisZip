@@ -104,6 +104,30 @@ public class ZipEngine : IArchiveEngine
     }
 
     /// <summary>
+    /// 解析条目文件名编码。<b>显式设置优先</b>——用户的「ZIP 文件名编码」设置必须被尊重，
+    /// 不能被包内启发式覆盖（该缺陷曾导致拖拽添加中文文件时编码被猜错）。
+    /// 仅当调用方未指定（null/空）时，才按包内是否已有条目置 UTF-8 标志（bit 11）来推断。
+    /// </summary>
+    private static Encoding ResolveFileNameEncoding(string? fileNameEncoding, string archivePath)
+    {
+        if (!string.IsNullOrWhiteSpace(fileNameEncoding))
+        {
+            var resolved = fileNameEncoding.ToLowerInvariant() switch
+            {
+                "gbk" => Encoding.GetEncoding("GBK"),
+                "default" => Encoding.Default,
+                _ => Encoding.UTF8,
+            };
+            CoreLog.Info($"AddToArchiveAsync: using explicit FileNameEncoding '{fileNameEncoding}' -> {resolved.WebName}");
+            return resolved;
+        }
+
+        var inferred = ZipHasUtf8Flag(archivePath) ? Encoding.UTF8 : Encoding.GetEncoding("gbk");
+        CoreLog.Info($"AddToArchiveAsync: FileNameEncoding not set, inferred from bit 11 -> {inferred.WebName}");
+        return inferred;
+    }
+
+    /// <summary>
     /// 读取 ZIP 文件的中央目录，检查是否有任何条目设置了 UTF-8 文件名标志（通用位标志 bit 11 = 0x0800）。
     /// </summary>
     private static bool ZipHasUtf8Flag(string archivePath)
@@ -1215,8 +1239,10 @@ while (true)
                     CoreLog.Info("AddToArchiveAsync: attempting copy-mode fast path");
                     tempArchiveFast = Path.GetTempFileName() + ".zip";
 
-                    // Detect encoding: check UTF-8 flag to choose between UTF-8 and GBK
-                    var encoding = ZipHasUtf8Flag(archivePath) ? Encoding.UTF8 : Encoding.GetEncoding("gbk");
+                    // 文件名编码：显式设置优先（与 CompressAsync 的 options.FileNameEncoding 同源，
+                    // 拖拽添加由 AddFilesToArchiveAsync 透传 AppSettings.ZipEncoding）；
+                    // 未设置时才按包内 bit 11 启发式推断。
+                    var encoding = ResolveFileNameEncoding(options.FileNameEncoding, archivePath);
 
                     // Build NewEntry list from source paths with auto-cleanup
                     var newEntries = new List<NewEntry>();
@@ -1577,7 +1603,7 @@ while (true)
         CoreLog.Exit();
     }
 
-    public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
+    public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"DeleteEntriesAsync: {archivePath}, entries=[{string.Join("; ", entryPaths)}]");
@@ -1600,8 +1626,9 @@ while (true)
                     CoreLog.Info("DeleteEntriesAsync: attempting copy-mode fast path");
                     tempArchiveFast = Path.GetTempFileName() + ".zip";
 
-                    // Detect encoding
-                    var encoding = ZipHasUtf8Flag(archivePath) ? Encoding.UTF8 : Encoding.GetEncoding("gbk");
+                    // 文件名编码：与 AddToArchiveAsync 同源，显式设置优先。
+                    // 删除会整包重写，此处若猜错编码会把存活的条目降级成乱码。
+                    var encoding = ResolveFileNameEncoding(options?.FileNameEncoding, archivePath);
 
                     // Build keep set: all entries NOT in entryPaths
                     var deletedNormalized = new HashSet<string>(entryPaths.Select(p => ArchivePath.Normalize(p)), StringComparer.OrdinalIgnoreCase);
