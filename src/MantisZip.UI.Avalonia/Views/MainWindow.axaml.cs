@@ -295,6 +295,17 @@ public partial class MainWindow : Window
             {
                 return false;
             }
+            catch (PasswordRetryCancelledException)
+            {
+                // 用户在密码弹窗点取消：行标记「已取消 - 需要密码」并在状态栏提示。
+                // 主窗口全部解压入口（ExtractArchive/Here/ToName/ExtractTo/SmartExtract）均经本闭包，
+                // 故在此单点接线，避免逐个方法重复分支。
+                var msg = LocalizationManager.T("Status_PasswordCancelled");
+                if (hasFileList)
+                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);
+                vm.StatusMessage = msg;
+                return false;
+            }
             catch (Exception)
             {
                 if (hasFileList)

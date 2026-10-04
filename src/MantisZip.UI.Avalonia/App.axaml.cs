@@ -803,6 +803,33 @@ public partial class App : Application
     }
 
     /// <summary>
+    /// 内联密码库查找：在匹配 <paramref name="archivePath"/> 规则命中的条目中按明文密码反查，
+    /// 取其匹配规则（Patterns 拼接）与描述，供进度窗口批处理行的密码徽标 Flyout 展示。
+    /// 镜像 <c>MainWindowViewModel.FindSavedPasswordEntry</c>（private static，不可跨类调用）的容错；
+    /// 查找失败返回 (null, null)，不阻断解压（Flyout 对应行自动隐藏）。
+    /// </summary>
+    private static (string? Rule, string? Description) LookupPasswordRuleAndDescription(
+        string archivePath, string? password)
+    {
+        if (string.IsNullOrEmpty(password))
+            return (null, null);
+        try
+        {
+            var entry = PasswordManager.Instance.FindMatchingPasswords(archivePath)
+                .FirstOrDefault(e => e.Password == password);
+            if (entry == null)
+                return (null, null);
+            var rule = entry.Patterns is { Count: > 0 } ? string.Join("; ", entry.Patterns) : null;
+            return (rule, entry.Description);
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"FindMatchingPasswords failed: {ex.Message}");
+            return (null, null);
+        }
+    }
+
+    /// <summary>
     /// 带提权支持的异步解压。先检查目标目录可写性，权限不足时弹出提权对话框。
     /// 自动尝试已保存密码。
     /// </summary>
@@ -1074,6 +1101,13 @@ public partial class App : Application
         progressWindow.InitBatchMode(new[] { archivePath });
         progressWindow.SetCurrentBatchItem(0);
 
+        // 路径 A（决策 D1）单文件变体：命令行已给定密码 → 直接点亮行 0 的 🔑●●●● 徽标
+        if (!string.IsNullOrEmpty(password))
+        {
+            var (rule, desc) = LookupPasswordRuleAndDescription(archivePath, password);
+            progressWindow.SetBatchPasswordState(0, BatchPasswordState.Matched, password, rule, desc);
+        }
+
         var ct = progressWindow.CancellationToken;
         var doneEvent = new ManualResetEventSlim(false);
         Exception? captureException = null;
@@ -1094,12 +1128,27 @@ public partial class App : Application
                     settings.FileConflictAction,
                     info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info));
 
-                var extractResult = await engine.ExtractAsync(archivePath, targetDir, password, rawProgress, ct, options);
+                // 叶子 5/5：单文件 CLI 解压入口（--extract-here / --extract-to-name / --extract 等）
+                ExtractResult? extractResult = null;
+                var (singleOutcome, _) = await PasswordRetryLoop.RunAsync(
+                    archivePath, password, engine,
+                    owner: progressWindow,
+                    setStatus: msg => progressWindow.SetStatus(msg),
+                    attempt: async (pwd, token) =>
+                        extractResult = await engine.ExtractAsync(
+                            archivePath, targetDir, pwd, rawProgress, token, options),
+                    ct: ct);
+                if (singleOutcome == PasswordRetryOutcome.Cancelled)
+                    throw new PasswordRetryCancelledException(archivePath);
+                // 损坏/无效：弹窗循环已判定继续重弹无意义 → 抛错走既有失败收尾，
+                // 禁止落成功路径（否则会记录路径历史且 TryDeleteArchiveAfterExtract 会误删损坏源包）
+                if (singleOutcome == PasswordRetryOutcome.CorruptedOrInvalid)
+                    throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
 
                 progressWindow.FinalizeBatch();
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    if (extractResult.HasFailures)
+                    if (extractResult is { HasFailures: true })
                     {
                         // 部分条目失败（如权限不足）：显示错误汇总（对齐 WPF ExtractResult.HasFailures 路径）
                         progressWindow.SetErrorSummary(
@@ -1115,6 +1164,14 @@ public partial class App : Application
             catch (OperationCanceledException)
             {
                 cancelled = true;
+            }
+            catch (PasswordRetryCancelledException)
+            {
+                // 用户在密码弹窗点取消：行 0 标 ✗「已取消 - 需要密码」，走既有失败收尾（不吞、不重抛）
+                captureException = new Exception(LocalizationManager.T("Status_PasswordCancelled"));
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                    progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed,
+                        LocalizationManager.T("Status_PasswordCancelled")));
             }
             catch (UnauthorizedAccessException)
             {
@@ -1193,6 +1250,19 @@ public partial class App : Application
         desktop.MainWindow = progressWindow;
         progressWindow.InitBatchMode(archivePaths);
 
+        // 路径 A（决策 D1）：解压设置窗口已预匹配密码的包，开始解压前整行点亮 🔑●●●● 徽标。
+        // 未预匹配的包留空，轮到该包时由路径 B 逐个点亮。
+        if (matchedPasswords != null)
+        {
+            for (int i = 0; i < archivePaths.Count; i++)
+            {
+                if (!matchedPasswords.TryGetValue(archivePaths[i], out var preUnlocked))
+                    continue;
+                var (rule, desc) = LookupPasswordRuleAndDescription(archivePaths[i], preUnlocked);
+                progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matched, preUnlocked, rule, desc);
+            }
+        }
+
         var ct = progressWindow.CancellationToken;
         var doneEvent = new ManualResetEventSlim(false);
         Exception? captureException = null;
@@ -1219,12 +1289,30 @@ public partial class App : Application
                             continue;
                         }
 
+                        // 路径 B（决策 D1）：解析前先亮 🔄 匹配中（密码库逐条尝试可能耗时）；
+                        // 解析完成后再落终态——命中 → 🔑●●●●，无密码包 → 熄灭
+                        progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matching, null, null, null);
+
                         // 解压设置窗口校验/手动解锁阶段已确定的密码优先复用（免重复验证与弹窗）；
                         // 未命中再走密码库扫描 + ResolveCliPassword 流程
                         var password =
                             matchedPasswords != null && matchedPasswords.TryGetValue(archivePath, out var preUnlocked)
                                 ? preUnlocked
                                 : ResolveCliPassword(archivePath, engine);
+
+                        // 路径 A 未点亮的行在此补亮：轮到该包且解析出密码 → Matched；
+                        // 无密码包（password == null）→ 熄灭残留的 Matching 徽标（决策 D1 路径 B）
+                        if (password != null)
+                        {
+                            var (pRule, pDesc) = LookupPasswordRuleAndDescription(archivePath, password);
+                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matched,
+                                password, pRule, pDesc);
+                        }
+                        else
+                        {
+                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.None, null, null, null);
+                        }
+
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
@@ -1240,6 +1328,14 @@ public partial class App : Application
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                             progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
+                    }
+                    catch (PasswordRetryCancelledException)
+                    {
+                        // 密码弹窗取消：该行标 ✗「已取消 - 需要密码」，批处理继续下一个包（决策 D7）
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                LocalizationManager.T("Status_PasswordCancelled")));
+                        continue;
                     }
                     catch (OperationCanceledException)
                     {
@@ -1373,10 +1469,38 @@ public partial class App : Application
                             Directory.CreateDirectory(targetDir);
 
                         var password = ResolveCliPassword(archivePath, engine);
+
+                        // 路径 B（决策 D1）：解析前先亮 🔄 匹配中（密码库逐条尝试可能耗时）；
+                        // 解析完成后再落终态——命中 → 🔑●●●●，无密码包 → 熄灭
+                        progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matching, null, null, null);
+                        if (password != null)
+                        {
+                            var (pRule, pDesc) = LookupPasswordRuleAndDescription(archivePath, password);
+                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matched,
+                                password, pRule, pDesc);
+                        }
+                        else
+                        {
+                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.None, null, null, null);
+                        }
+
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
-                        await engine.ExtractAsync(archivePath, targetDir, password, progress, ct, conflictOptions);
+                        // 叶子 4/5：直连引擎的批处理入口 → 密码弹窗兜底
+                        var (extractOutcome, _) = await PasswordRetryLoop.RunAsync(
+                            archivePath, password, engine,
+                            owner: progressWindow,
+                            setStatus: msg => progressWindow.SetStatus(msg),
+                            attempt: async (pwd, token) =>
+                                await engine.ExtractAsync(archivePath, targetDir, pwd, progress, token, conflictOptions),
+                            ct: ct);
+                        if (extractOutcome == PasswordRetryOutcome.Cancelled)
+                            throw new PasswordRetryCancelledException(archivePath);
+                        // 损坏/无效：弹窗循环已判定继续重弹无意义 → 抛错走既有失败收尾，
+                        // 禁止落成功路径（否则会记录路径历史且 TryDeleteArchiveAfterExtract 会误删损坏源包）
+                        if (extractOutcome == PasswordRetryOutcome.CorruptedOrInvalid)
+                            throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
 
                         // 成功后把目标目录写入路径历史（多文件直解批处理逐项记录，重复路径由去重置顶）
                         PathHistoryManager.Record(targetDir);
@@ -1385,6 +1509,14 @@ public partial class App : Application
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                             progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
+                    }
+                    catch (PasswordRetryCancelledException)
+                    {
+                        // 密码弹窗取消：该行标 ✗「已取消 - 需要密码」，批处理继续下一个包（决策 D7）
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                LocalizationManager.T("Status_PasswordCancelled")));
+                        continue;
                     }
                     catch (OperationCanceledException)
                     {
