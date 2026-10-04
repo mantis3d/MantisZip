@@ -19,4 +19,8 @@ public partial class ParallelBatchProgressItem : ObservableObject
     /// <summary>明细文本（如 "12/40 文件"，VM 用 T() 拼好传入）。</summary>
     [ObservableProperty]
     private string _detailText = "";
+
+    /// <summary>批次当前文件名（详细模式行显示；引擎未上报时保持空串）。</summary>
+    [ObservableProperty]
+    private string _currentFile = "";
 }

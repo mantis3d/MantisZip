@@ -35,12 +35,6 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>本次操作开始时间（UTC；ctor/InitBatchMode 重置，SetProgress 首报兜底）。</summary>
     private DateTime _opStartUtc;
 
-    /// <summary>顶部信息显示模式（全路径/仅目录/仅文件名）。</summary>
-    private TopDisplayMode _topDisplayMode = TopDisplayMode.FullName;
-
-    /// <summary>信息密度（紧凑/标准/宽松）。</summary>
-    private DensityMode _densityMode = DensityMode.Normal;
-
     /// <summary>已处理文件数（引擎上报；兼容重载 TotalFiles=0 时不清零）。</summary>
     private long _statsProcessed;
     private long _statsSkipped;
@@ -50,11 +44,31 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>是否出现过冲突统计（压缩路径恒不上报 → 统计项按 Rule 6 隐藏）。</summary>
     private bool _hasConflictStats;
 
-    /// <summary>当前文件所在目录（SplitFilePath 分离结果；变更触发 DirVisible 重算）。</summary>
+    /// <summary>当前文件所在目录（SplitFilePath 分离结果，路径行绑定）。</summary>
     private string _dirName = string.Empty;
 
     /// <summary>ZIP 并行解压批次行（BatchIndex 驱动 upsert；非并行恒为空 → 容器隐藏）。</summary>
     private readonly ObservableCollection<ParallelBatchProgressItem> _parallelBatchItems = new();
+
+    /// <summary>顶部内容模式（默认 Simple；详见 <see cref="ContentMode"/>）。</summary>
+    private ProgressContentMode _contentMode = ProgressContentMode.Simple;
+
+    /// <summary>信息量分级（默认 Medium；详见 <see cref="InfoDensity"/>）。</summary>
+    private ProgressInfoDensity _infoDensity = ProgressInfoDensity.Medium;
+
+    /// <summary>逐条目行集合（列表模式数据源；播种/引擎终态事件驱动）。</summary>
+    private readonly ObservableCollection<EntryProgressItem> _entryItems = new();
+
+    /// <summary>
+    /// EntryKey → 条目行索引（<see cref="UpdateEntryStatus"/> O(1) upsert）。
+    /// 必须与 <see cref="_entryItems"/> 同步维护（Seed/Clear 入口统一维护）。
+    /// 100k 条目场景：每条目恰好一条终态事件 → 线性扫描总计 O(n²)≈10^10 次字符串比较，
+    /// 字典将单次更新降为 O(1)、总体 O(n)，故选字典而非线性扫描。
+    /// </summary>
+    private readonly Dictionary<string, EntryProgressItem> _entryIndex = new(StringComparer.Ordinal);
+
+    /// <summary>并行解压线程度（引擎实际生效值；null = 未接线/批次已重置）。</summary>
+    private int? _parallelDegree;
 
     /// <summary>
     /// Localized strings bound by the ProgressWindow UI.
@@ -75,8 +89,6 @@ public partial class ProgressViewModel : ObservableObject
             ["Progress_Paused"] = LocalizationManager.T("Progress_Paused"),
             ["Progress_Resuming"] = LocalizationManager.T("Progress_Resuming"),
             ["MsgBox_Cancel"] = LocalizationManager.T("MsgBox_Cancel"),
-            ["Progress_RevealTooltip"] = LocalizationManager.T("Progress_RevealTooltip"),
-            ["Progress_CopyTooltip"] = LocalizationManager.T("Progress_CopyTooltip"),
             // T6 新增 key（统计/时间/并行批次/密码徽标——此字典由显式数组构建，漏登记 = XAML 绑定空白）
             ["Progress_Stats_Processed"] = LocalizationManager.T("Progress_Stats_Processed"),
             ["Progress_Stats_Skipped"] = LocalizationManager.T("Progress_Stats_Skipped"),
@@ -92,19 +104,40 @@ public partial class ProgressViewModel : ObservableObject
             ["Progress_Batch_Pwd_MatchedTip"] = LocalizationManager.T("Progress_Batch_Pwd_MatchedTip"),
             ["Progress_Batch_Pwd_Rule"] = LocalizationManager.T("Progress_Batch_Pwd_Rule"),
             ["Progress_Batch_Pwd_Desc"] = LocalizationManager.T("Progress_Batch_Pwd_Desc"),
-            // T7 新增 key（顶部显示模式/信息密度单选——此字典由显式数组构建，漏登记 = 单选文字空白）
-            ["Progress_Mode_FullPath"] = LocalizationManager.T("Progress_Mode_FullPath"),
-            ["Progress_Mode_DirOnly"] = LocalizationManager.T("Progress_Mode_DirOnly"),
-            ["Progress_Mode_NameOnly"] = LocalizationManager.T("Progress_Mode_NameOnly"),
-            ["Progress_Density_Compact"] = LocalizationManager.T("Progress_Density_Compact"),
-            ["Progress_Density_Normal"] = LocalizationManager.T("Progress_Density_Normal"),
-            ["Progress_Density_Loose"] = LocalizationManager.T("Progress_Density_Loose"),
+            // T7 新增 key（顶部内容模式/信息量分级 + 并行统计/批次/条目/Toast——
+            // 此字典由显式数组构建，漏登记 = XAML 绑定空白且构建不报错；
+            // 文案值由后续任务落 JSON，此处先登记 T() 占位调用）
+            ["Progress_Mode_Label"] = LocalizationManager.T("Progress_Mode_Label"),
+            ["Progress_Mode_Simple"] = LocalizationManager.T("Progress_Mode_Simple"),
+            ["Progress_Mode_Detailed"] = LocalizationManager.T("Progress_Mode_Detailed"),
+            ["Progress_Mode_List"] = LocalizationManager.T("Progress_Mode_List"),
+            ["Progress_Density_Minimal"] = LocalizationManager.T("Progress_Density_Minimal"),
+            ["Progress_Density_Medium"] = LocalizationManager.T("Progress_Density_Medium"),
+            ["Progress_Density_Full"] = LocalizationManager.T("Progress_Density_Full"),
+            ["Progress_Stats_Parallel"] = LocalizationManager.T("Progress_Stats_Parallel"),
+            ["Progress_Batch_SectionTitle"] = LocalizationManager.T("Progress_Batch_SectionTitle"),
+            ["Progress_Batch_Count"] = LocalizationManager.T("Progress_Batch_Count"),
+            ["Progress_Entry_Pending"] = LocalizationManager.T("Progress_Entry_Pending"),
+            ["Progress_Entry_Active"] = LocalizationManager.T("Progress_Entry_Active"),
+            // T9 新增 key（条目行终态文案）——Progress_Stats_* 是带 {0} 计数的格式串，
+            // 行内状态无计数可代，故独立成键；文案值由后续任务落 JSON，此处先登记 T() 占位调用
+            ["Progress_Entry_Completed"] = LocalizationManager.T("Progress_Entry_Completed"),
+            ["Progress_Entry_Skipped"] = LocalizationManager.T("Progress_Entry_Skipped"),
+            ["Progress_Entry_Failed"] = LocalizationManager.T("Progress_Entry_Failed"),
+            ["Progress_Entry_Overwritten"] = LocalizationManager.T("Progress_Entry_Overwritten"),
+            ["Progress_Toast_Copied"] = LocalizationManager.T("Progress_Toast_Copied"),
+            ["Progress_Batch_Label"] = LocalizationManager.T("Progress_Batch_Label"),
         };
 
-        // T6: 操作计时基线 + 当前文件标签初值 + 并行批次集合变更通知
+        // T6: 操作计时基线 + 当前文件标签初值 + 集合变更通知（并行批次行 / 条目行）
         _opStartUtc = DateTime.UtcNow;
         CurrentFileLabel = LocalizationManager.T("Progress_CurrentFileLabel");
-        _parallelBatchItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasParallelBatches));
+        _parallelBatchItems.CollectionChanged += (_, _) =>
+        {
+            OnPropertyChanged(nameof(HasParallelBatches));
+            OnPropertyChanged(nameof(IsDetailedAvailable));
+        };
+        _entryItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasEntryItems));
         RefreshTimeDisplay();
     }
 
@@ -153,37 +186,46 @@ public partial class ProgressViewModel : ObservableObject
     //  T6: 显示模式 / 统计 / 时间 / 速度 / 并行批次
     // ════════════════════════════════════════════
 
-    /// <summary>顶部信息显示模式：全路径（目录+文件名两行）/ 仅目录 / 仅文件名。</summary>
-    public TopDisplayMode TopDisplayMode
+    /// <summary>顶部内容模式（v6 原型三模式：Simple/Detailed/List；默认 Simple）。</summary>
+    public ProgressContentMode ContentMode
     {
-        get => _topDisplayMode;
-        set { if (SetProperty(ref _topDisplayMode, value)) NotifyDisplayProperties(); }
+        get => _contentMode;
+        set { if (SetProperty(ref _contentMode, value)) NotifyDisplayProperties(); }
     }
 
-    /// <summary>信息密度：紧凑/标准/宽松（行高与间距由 XAML 按 IsCompactDensity 切换）。</summary>
-    public DensityMode DensityMode
+    /// <summary>信息量分级（v6 原型三档：Minimal/Medium/Full，控制「显示多少信息」非间距；默认 Medium）。</summary>
+    public ProgressInfoDensity InfoDensity
     {
-        get => _densityMode;
-        set { if (SetProperty(ref _densityMode, value)) NotifyDisplayProperties(); }
+        get => _infoDensity;
+        set { if (SetProperty(ref _infoDensity, value)) NotifyDisplayProperties(); }
     }
 
-    /// <summary>目录行可见：非「仅文件名」模式且目录非空。</summary>
-    public bool DirVisible => TopDisplayMode != TopDisplayMode.NameOnly && _dirName.Length > 0;
+    /// <summary>简明模式（默认档）。</summary>
+    public bool IsSimpleMode => _contentMode == ProgressContentMode.Simple;
 
-    /// <summary>文件名行可见：非「仅目录」模式。</summary>
-    public bool NameVisible => TopDisplayMode != TopDisplayMode.DirOnly;
+    /// <summary>详细模式（显示并行批次详细行）。</summary>
+    public bool IsDetailedMode => _contentMode == ProgressContentMode.Detailed;
 
-    /// <summary>是否紧凑密度档。</summary>
-    public bool IsCompactDensity => DensityMode == DensityMode.Compact;
+    /// <summary>列表模式（逐条目行）。</summary>
+    public bool IsListMode => _contentMode == ProgressContentMode.List;
 
-    /// <summary>是否宽松密度档。</summary>
-    public bool IsLooseDensity => DensityMode == DensityMode.Loose;
+    /// <summary>信息量「少」档：仅总进度 + 时间（统计卡/中等单行均隐藏）。</summary>
+    public bool IsMinimalDensity => _infoDensity == ProgressInfoDensity.Minimal;
 
-    /// <summary>当前文件所在目录（路径行绑定；变更触发 DirVisible 重算）。</summary>
+    /// <summary>信息量「中」档：追加中等单行（已处理 + 速度 + 并行）。</summary>
+    public bool IsMediumDensity => _infoDensity == ProgressInfoDensity.Medium;
+
+    /// <summary>信息量「完整」档：追加统计卡（与中等单行互斥，对齐原型 JS 语义）。</summary>
+    public bool IsFullDensity => _infoDensity == ProgressInfoDensity.Full;
+
+    /// <summary>详细模式可用：并行批次行非空（CollectionChanged 驱动通知；空列表不允许停留 Detailed）。</summary>
+    public bool IsDetailedAvailable => _parallelBatchItems.Count > 0;
+
+    /// <summary>当前文件所在目录（路径行绑定）。</summary>
     public string DirName
     {
         get => _dirName;
-        set { if (SetProperty(ref _dirName, value)) NotifyDisplayProperties(); }
+        set => SetProperty(ref _dirName, value);
     }
 
     /// <summary>统计栏：是否显示跳过/出错/已覆盖（引擎上报过冲突统计才为 true；压缩恒 false）。</summary>
@@ -194,6 +236,22 @@ public partial class ProgressViewModel : ObservableObject
 
     /// <summary>并行批次行集合（ZIP 并行解压时由 BatchIndex 驱动 upsert）。</summary>
     public ObservableCollection<ParallelBatchProgressItem> ParallelBatchItems => _parallelBatchItems;
+
+    /// <summary>逐条目行集合（列表模式数据源；SeedEntryItems 播种 / UpdateEntryStatus upsert）。</summary>
+    public ObservableCollection<EntryProgressItem> EntryItems => _entryItems;
+
+    /// <summary>条目行容器可见性（集合非空时 true；CollectionChanged 驱动通知）。</summary>
+    public bool HasEntryItems => _entryItems.Count > 0;
+
+    /// <summary>并行解压线程度（ExtractFlow 接线；null = 未接线或新批次已重置）。</summary>
+    public int? ParallelDegree
+    {
+        get => _parallelDegree;
+        set { if (SetProperty(ref _parallelDegree, value)) NotifyDisplayProperties(); }
+    }
+
+    /// <summary>并行统计显示开关：仅并行度 ≥ 2 时显示（degree=1 串行路径自动隐藏，Rule 6）。</summary>
+    public bool HasParallelDegree => _parallelDegree is >= 2;
 
     /// <summary>统计栏：已处理。</summary>
     [ObservableProperty]
@@ -231,41 +289,76 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private string _batchArchiveIndexText = string.Empty;
 
-    /// <summary>派生显示属性集中通知（AGENTS.md 派生属性通知模式，禁逐字段 NotifyPropertyChangedFor）。</summary>
+    /// <summary>派生显示属性集中通知（AGENTS.md 派生属性通知模式，禁逐字段 NotifyPropertyChangedFor）。
+    /// 新增派生属性只改这一处。</summary>
     private void NotifyDisplayProperties()
     {
-        OnPropertyChanged(nameof(DirVisible));
-        OnPropertyChanged(nameof(NameVisible));
-        OnPropertyChanged(nameof(IsCompactDensity));
-        OnPropertyChanged(nameof(IsLooseDensity));
+        OnPropertyChanged(nameof(IsSimpleMode));
+        OnPropertyChanged(nameof(IsDetailedMode));
+        OnPropertyChanged(nameof(IsListMode));
+        OnPropertyChanged(nameof(IsDetailedAvailable));
+        OnPropertyChanged(nameof(HasEntryItems));
+        OnPropertyChanged(nameof(HasParallelDegree));
+        OnPropertyChanged(nameof(IsMinimalDensity));
+        OnPropertyChanged(nameof(IsMediumDensity));
+        OnPropertyChanged(nameof(IsFullDensity));
     }
 
     // ════════════════════════════════════════════
-    //  Password Section Properties
+    //  T7: 统计卡（短标签 + 计数）与批处理列表计数
     // ════════════════════════════════════════════
 
-    [ObservableProperty]
-    private bool _isPasswordSectionVisible;
+    /// <summary>统计卡短标签：从既有格式化文案剥离 {0} 占位符（"已处理 {0}" → "已处理"）。
+    /// 不新增本地化 key（三语文案由 T11 统一落地），也不随属性变更通知（语言切换刷新为既有已知缺陷）。</summary>
+    public string StatsProcessedLabel => LocalizationManager.T("Progress_Stats_Processed", string.Empty).Trim();
 
-    [ObservableProperty]
-    private string? _passwordMatchText;
+    /// <summary>统计卡短标签（跳过）。</summary>
+    public string StatsSkippedLabel => LocalizationManager.T("Progress_Stats_Skipped", string.Empty).Trim();
 
-    [ObservableProperty]
-    private string? _passwordRuleText;
+    /// <summary>统计卡短标签（出错）。</summary>
+    public string StatsFailedLabel => LocalizationManager.T("Progress_Stats_Failed", string.Empty).Trim();
 
-    [ObservableProperty]
-    private string? _passwordStatusText;
+    /// <summary>统计卡短标签（已覆盖）。</summary>
+    public string StatsOverwrittenLabel => LocalizationManager.T("Progress_Stats_Overwritten", string.Empty).Trim();
 
-    [ObservableProperty]
-    private bool _isPasswordRevealEnabled;
+    /// <summary>统计卡数值（仅计数；完整档卡片的 value 槽，label 槽用上方短标签）。</summary>
+    public long StatsProcessedCount => _statsProcessed;
 
-    [ObservableProperty]
-    private bool _isPasswordCopyEnabled;
+    /// <summary>统计卡数值（跳过）。</summary>
+    public long StatsSkippedCount => _statsSkipped;
 
-    [ObservableProperty]
-    private bool _isPasswordRevealed;
+    /// <summary>统计卡数值（出错）。</summary>
+    public long StatsFailedCount => _statsFailed;
 
-    private string? _password;
+    /// <summary>统计卡数值（已覆盖）。</summary>
+    public long StatsOverwrittenCount => _statsOverwritten;
+
+    /// <summary>统计卡数值派生属性集中通知（AGENTS.md 派生属性通知模式，禁逐字段 NotifyPropertyChangedFor）。
+    /// 引擎统计上报处调用一次即刷新全部 4 张卡的数值。</summary>
+    private void NotifyStatsProperties()
+    {
+        OnPropertyChanged(nameof(StatsProcessedCount));
+        OnPropertyChanged(nameof(StatsSkippedCount));
+        OnPropertyChanged(nameof(StatsFailedCount));
+        OnPropertyChanged(nameof(StatsOverwrittenCount));
+    }
+
+    /// <summary>批处理列表是否至少有一项（Row 0 计数文案的显隐守卫；无批次时隐藏计数而非整区，列表区始终显示）。</summary>
+    public bool HasBatchItems => _batchItems is { Count: > 0 };
+
+    /// <summary>批处理列表计数文案（如 "3 个文件"；无批次时为空串）。</summary>
+    public string BatchCountText => _batchItems is null
+        ? string.Empty
+        : LocalizationManager.T("Progress_Batch_Count", _batchItems.Count);
+
+    /// <summary>批处理相关派生属性集中通知（AGENTS.md 派生属性通知模式）：新增派生属性只改这一处。</summary>
+    private void NotifyBatchProperties()
+    {
+        OnPropertyChanged(nameof(BatchItems));
+        OnPropertyChanged(nameof(IsBatchMode));
+        OnPropertyChanged(nameof(HasBatchItems));
+        OnPropertyChanged(nameof(BatchCountText));
+    }
 
     // ════════════════════════════════════════════
     //  Batch Mode Properties
@@ -359,6 +452,15 @@ public partial class ProgressViewModel : ObservableObject
     /// </summary>
     public void SetProgress(ArchiveProgress p)
     {
+        // T6: 逐条目终态事件 = 独立通道，置于一切计数/节流逻辑之前，
+        // 不参与百分比/速度/ETA/字节/批次计算（早返回，绝不落入下方分支）
+        if (p.EntryStatus.HasValue && !string.IsNullOrEmpty(p.EntryKey))
+        {
+            UpdateEntryStatus(p.EntryKey,
+                EntryProgressItem.MapEntryStatus(p.EntryStatus.Value), null);
+            return;
+        }
+
         // 操作计时基线兜底（ctor/InitBatchMode 已重置，此处防漏）
         if (_opStartUtc == default)
             _opStartUtc = DateTime.UtcNow;
@@ -369,6 +471,10 @@ public partial class ProgressViewModel : ObservableObject
             var (dir, name) = ProgressDisplayCalculator.SplitFilePath(p.CurrentFile);
             DirName = dir;
             FileName = name;
+
+            // T6: 当前文件 → Active 行推导（列表模式 ⏳n%）：
+            // 按 Path.GetFileName 匹配条目行，同一时刻至多一行 Active
+            ActivateEntryByName(System.IO.Path.GetFileName(p.CurrentFile), p.FilePercentComplete);
         }
 
         // 总进度：批次模式用加权公式（与旧实现数学等价），非批次 = 引擎百分比
@@ -445,6 +551,9 @@ public partial class ProgressViewModel : ObservableObject
             StatsProcessedText = LocalizationManager.T("Progress_Stats_Processed", _statsProcessed);
         }
 
+        // 统计卡数值集中刷新（T7：4 张卡的计数槽位）
+        NotifyStatsProperties();
+
         // 批次模式：行级实时统计 + 当前行进度（100ms 节流）
         if (_isBatchMode && _currentBatchIndex >= 0 && _batchItems != null &&
             _currentBatchIndex < _batchItems.Count)
@@ -499,11 +608,119 @@ public partial class ProgressViewModel : ObservableObject
 
         var row = _parallelBatchItems[idx];
         row.Percent = Math.Clamp(p.BatchPercentComplete ?? p.PercentComplete, 0, 100);
+        // T6: 详细模式行显示批次当前文件名（未上报时保持上次值）
+        row.CurrentFile = p.CurrentFile ?? row.CurrentFile;
         // T7: 状态色随完成度切换（BrushResourceConverter 消费 StatusBrushName → 批次进度条前景）
         row.StatusBrushName = row.Percent >= 100 ? "ThemeStatusSuccessBrush" : "ThemeProgressFillBrush";
         if (p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue)
             row.DetailText = LocalizationManager.T("Progress_Batch_FilesProgress",
                 p.BatchProcessedFiles.Value, p.BatchTotalFiles.Value);
+    }
+
+    // ════════════════════════════════════════════
+    //  T6: 逐条目行（EntryItems）播种 / upsert / Active 推导
+    // ════════════════════════════════════════════
+
+    /// <summary>
+    /// 播种条目行（D7）：清空后按传入顺序建行，全部落 <see cref="EntryRowState.Pending"/>。
+    /// 未播种的路径由 <see cref="UpdateEntryStatus"/> 的 upsert 兜底（渐进模式）。
+    /// </summary>
+    public void SeedEntryItems(IReadOnlyList<(string Key, string Name, long Size)> items)
+    {
+        ClearEntryItems();
+        foreach (var (key, name, size) in items)
+        {
+            var row = new EntryProgressItem
+            {
+                EntryKey = key,
+                Name = name,
+                Size = size,
+                State = EntryRowState.Pending,
+                // T9: 播种行的等待文案（本地化；Rule 13 禁止硬编码）
+                StatusText = LocalizationManager.T("Progress_Entry_Pending"),
+            };
+            _entryItems.Add(row);
+            _entryIndex[key] = row;
+        }
+    }
+
+    /// <summary>清空条目行与 key 索引（新批次/新操作前调用，两者必须同步清）。</summary>
+    public void ClearEntryItems()
+    {
+        _entryItems.Clear();
+        _entryIndex.Clear();
+    }
+
+    /// <summary>
+    /// 按 EntryKey upsert 条目行：命中则更新状态（及可选进度），未命中则新建行
+    /// （未播种路径的兜底，兼容 TAR/GZ 渐进模式 D7）。
+    /// 查找走 <c>_entryIndex</c> 字典 O(1)——100k 条目线性扫描为 O(n²)，不可接受。
+    /// </summary>
+    public void UpdateEntryStatus(string entryKey, EntryRowState state, double? percent)
+    {
+        if (!_entryIndex.TryGetValue(entryKey, out var row))
+        {
+            row = new EntryProgressItem
+            {
+                EntryKey = entryKey,
+                Name = System.IO.Path.GetFileName(entryKey),
+                State = EntryRowState.Pending,
+            };
+            _entryItems.Add(row);
+            _entryIndex[entryKey] = row;
+        }
+
+        row.State = state;
+        // T9: 行内状态文案（本地化）；Active 返回 null 不赋值——视图层改显 PercentText
+        string? statusText = ResolveEntryStatusText(state);
+        if (statusText != null)
+            row.StatusText = statusText;
+        if (percent.HasValue)
+            row.Percent = percent.Value;
+    }
+
+    /// <summary>
+    /// 行状态 → 已本地化的行内状态文案（Rule 13：禁止硬编码用户可见字符串）。
+    /// <see cref="EntryRowState.Active"/> 返回 null：进行中行由视图层显示
+    /// <see cref="EntryProgressItem.PercentText"/>，此处保留既有 <see cref="EntryProgressItem.StatusText"/> 不动。
+    /// </summary>
+    private static string? ResolveEntryStatusText(EntryRowState state) => state switch
+    {
+        EntryRowState.Pending   => LocalizationManager.T("Progress_Entry_Pending"),
+        EntryRowState.Completed => LocalizationManager.T("Progress_Entry_Completed"),
+        EntryRowState.Skipped   => LocalizationManager.T("Progress_Entry_Skipped"),
+        EntryRowState.Failed    => LocalizationManager.T("Progress_Entry_Failed"),
+        EntryRowState.Overwritten => LocalizationManager.T("Progress_Entry_Overwritten"),
+        // Active（及未来新增成员）：不覆盖视图层选择的显示
+        _ => null,
+    };
+
+    /// <summary>
+    /// 「当前文件 → Active 行」推导（列表模式 ⏳n%）：按文件名匹配条目行并置 Active、写入当前文件百分比。
+    /// 不变式：同一时刻至多一行 Active——原 Active 行若非本次命中，回落为 Completed（终态行不动）。
+    /// </summary>
+    private void ActivateEntryByName(string fileName, double? percent)
+    {
+        if (_entryItems.Count == 0 || string.IsNullOrEmpty(fileName))
+            return;
+
+        EntryProgressItem? target = null;
+        EntryProgressItem? previousActive = null;
+        foreach (var row in _entryItems)
+        {
+            if (target == null && string.Equals(row.Name, fileName, StringComparison.Ordinal))
+                target = row;
+            if (row.IsActive)
+                previousActive = row;
+        }
+
+        if (target == null)
+            return;
+        if (previousActive != null && !ReferenceEquals(previousActive, target))
+            previousActive.State = EntryRowState.Completed;
+        target.State = EntryRowState.Active;
+        if (percent.HasValue)
+            target.Percent = percent.Value;
     }
 
     /// <summary>拼批次行摘要文案（已处理恒显示，跳过/出错/已覆盖 &gt;0 才追加；全走本地化）。</summary>
@@ -566,6 +783,9 @@ public partial class ProgressViewModel : ObservableObject
         // T6: 重置计时基线与并行批次行（新批次从头计时；上一批次行不得残留）
         _opStartUtc = DateTime.UtcNow;
         _parallelBatchItems.Clear();
+        // T6: 新批次不得继承上一批次的条目行与并行度
+        ClearEntryItems();
+        ParallelDegree = null;
         _batchItems = new ObservableCollection<BatchItem>(
             paths.Select(p => new BatchItem
             {
@@ -573,11 +793,10 @@ public partial class ProgressViewModel : ObservableObject
                 FullPath = p,
                 Status = BatchItemStatus.Pending
             }));
-        OnPropertyChanged(nameof(BatchItems));
-        OnPropertyChanged(nameof(IsBatchMode));
+        // 批次列表派生属性集中通知（BatchItems / IsBatchMode / HasBatchItems / BatchCountText）
+        NotifyBatchProperties();
         // 注意：不在此处覆盖 WindowTitle —— 标题由调用方传入（非批处理操作也显示列表，标题不能只属于批处理）
     }
-
     /// <summary>
     /// Set the current batch item index as "in progress".
     /// Safe to call from any thread.
@@ -613,6 +832,11 @@ public partial class ProgressViewModel : ObservableObject
         _speedTracker.OnArchiveSwitch(0, DateTime.UtcNow);
         // 并行批次行随档案切换清空（新档案重新上报 BatchIndex）
         _parallelBatchItems.Clear();
+        // T6: 归档切换后条目行必须为空（新档案的逐条目事件/播种重建行，绝不继承上一档案）
+        ClearEntryItems();
+        // D6 回落：详细模式列表已空时不允许停留（绝不显示空详细列表）
+        if (_contentMode == ProgressContentMode.Detailed && _parallelBatchItems.Count == 0)
+            ContentMode = ProgressContentMode.Simple;
         // 目录行残留清理（新档案的 DirName 由下次 SetProgress 填充）
         DirName = string.Empty;
     }
@@ -669,70 +893,22 @@ public partial class ProgressViewModel : ObservableObject
         }
     }
 
-    // ════════════════════════════════════════════
-    //  Password Section Methods
-    // ════════════════════════════════════════════
-
     /// <summary>
-    /// Show the password section with "matching..." status.
+    /// 点亮/熄灭指定批处理行的密码徽标（🔄 匹配中 / 🔑●●●● 已匹配 / 熄灭）。
+    /// 两条点亮路径共用：路径 A（预匹配密码，解压开始前整批点亮）、路径 B（批循环内轮到该包时逐个点亮）。
+    /// 调用方须在 UI 线程执行（ProgressWindow 包装层用 DispatchIfNeeded 兜底）。
     /// </summary>
-    public void ShowPasswordAttempt(string description)
+    public void SetBatchPasswordState(int index, BatchPasswordState state,
+        string? password, string? rule, string? description)
     {
-        IsPasswordSectionVisible = true;
-        _password = null;
-        IsPasswordRevealed = false;
-        PasswordMatchText = LocalizationManager.T("Progress_MatchingPassword");
-        PasswordRuleText = LocalizationManager.T("Progress_PwdRule", description);
-        PasswordStatusText = "";
-        IsPasswordRevealEnabled = false;
-        IsPasswordCopyEnabled = false;
-    }
-
-    /// <summary>
-    /// Show that password was matched successfully.
-    /// </summary>
-    public void ShowPasswordMatched(string password, string description)
-    {
-        IsPasswordSectionVisible = true;
-        _password = password;
-
-        // Respect PasswordRevealByDefault setting
-        bool revealByDefault = AppSettings.Load().PasswordRevealByDefault;
-        IsPasswordRevealed = revealByDefault;
-        PasswordMatchText = revealByDefault
-            ? LocalizationManager.T("Progress_PwdMatched", password)
-            : LocalizationManager.T("Progress_PwdMatchedHidden");
-
-        PasswordRuleText = LocalizationManager.T("Progress_PwdRule", description);
-        PasswordStatusText = LocalizationManager.T("Progress_PwdVerifying");
-        IsPasswordRevealEnabled = true;
-        IsPasswordCopyEnabled = true;
-    }
-
-    /// <summary>
-    /// Toggle password reveal/hide.
-    /// </summary>
-    [RelayCommand]
-    private void TogglePasswordReveal()
-    {
-        IsPasswordRevealed = !IsPasswordRevealed;
-        if (IsPasswordRevealed && _password != null)
-            PasswordMatchText = LocalizationManager.T("Progress_PwdMatched", _password);
-        else if (_password != null)
-            PasswordMatchText = LocalizationManager.T("Progress_PwdMatchedHidden");
-    }
-
-    /// <summary>
-    /// Get the current password text (for clipboard copy from code-behind).
-    /// </summary>
-    public string? GetPassword() => _password;
-
-    /// <summary>
-    /// Hide the password section (for non-encrypted files).
-    /// </summary>
-    public void HidePasswordSection()
-    {
-        IsPasswordSectionVisible = false;
+        if (_batchItems == null || index < 0 || index >= _batchItems.Count)
+            return;
+        var row = _batchItems[index];
+        row.PasswordState = state;
+        // 熄灭时一并清空，避免残留上一个密码的明文/规则
+        row.MatchedPassword = state == BatchPasswordState.Matched ? password : null;
+        row.PasswordRule = state == BatchPasswordState.Matched ? rule : null;
+        row.PasswordDescription = state == BatchPasswordState.Matched ? description : null;
     }
 
     /// <summary>
