@@ -87,6 +87,14 @@ public static class ExtractFlow
             // 未来扩展为「压缩包列表 + 包内文件列表」两个列表时在此调整数据源）
             pw.InitBatchMode(new[] { archivePath });
             pw.SetCurrentBatchItem(0);
+            // T6: 并行度接线（与 SelectedItemsExtractService.ExtractEntriesAsync 内读取的同一设置；
+            // 引擎不支持并行或设置为串行 → 传 1，HasParallelDegree=false 自动隐藏并行统计，Rule 6）
+            pw.SetParallelDegree(ResolveDisplayParallelDegree(archivePath));
+            // T9/D7: 列表模式播种——调用方已持有确切的待解压条目集，直接播种
+            // （无需 ListEntriesAsync：既不给 TAR/GZ 加全流扫描，也不会把未选中条目
+            // 播成永远等不到上报的 Pending 行）。数据在内存中，同步建列表即可，
+            // SeedEntries 内部负责封送到 UI 线程，不阻塞后续解压。
+            TrySeedSelectedEntries(pw, archivePath, entries);
 
             var progress = pw.CreatePauseAwareProgress(
                 ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p)));
@@ -106,6 +114,14 @@ public static class ExtractFlow
         catch (OperationCanceledException)
         {
             status = SelectedItemsExtractStatus.Cancelled;
+        }
+        catch (PasswordRetryCancelledException)
+        {
+            // 用户在密码弹窗点取消：行标记「已取消 - 需要密码」（区别于普通失败）
+            var msg = LocalizationManager.T("Status_PasswordCancelled");
+            pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);
+            status = SelectedItemsExtractStatus.Failed;
+            errorMessage = msg;
         }
         catch (Exception ex)
         {
@@ -165,6 +181,16 @@ public static class ExtractFlow
         if (options != null)
             options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
+        // T6: 同一代码路径上已持有 ProgressWindow（MainWindow RunWithProgress 闭包 / CLI 批处理
+        // 先 Show() 再进入本方法，OnOpened 已置位 CurrentVisible），把实际并行度写给进度窗口统计。
+        // 串行路径（引擎不支持并行或 degree ≤ 1）传 1 → HasParallelDegree=false 自动隐藏（Rule 6）。
+        ProgressWindow.CurrentVisible?.SetParallelDegree(ResolveDisplayParallelDegree(archivePath));
+        // T9/D7: 列表模式播种（后台列目录 → SeedEntries；不 await，解压不等播种）。
+        // TAR/GZ 与非 zip/7z 在 CanSeedEntries 内拦下 → 零 ListEntriesAsync 调用；
+        // >5000 条跳过播种转渐进模式。播种结果由 UpdateEntryStatus 的 upsert 兜底。
+        TrySeedEntryItemsInBackground(
+            ProgressWindow.CurrentVisible, archivePath, password, filteredKeys, ct);
+
         // 有过滤条件：仅解压匹配条目（统一入口；无 pathOverrides = 保留完整路径）。
         // 注意用 `!= null` 而非 `is { Count: > 0 }`：过滤激活但零匹配（空列表）也必须走
         // ExtractEntriesAsync —— 空列表 = 什么都不解压，若误走 else 全量解压会泄露全部文件。
@@ -174,8 +200,23 @@ public static class ExtractFlow
             if (engine == null)
                 throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));
 
-            await engine.ExtractEntriesAsync(
-                archivePath, filteredKeys, dest, password, progress, ct, options);
+            // 叶子 2/5：过滤分支直连引擎，绕过 ExtractService，故在此单独接密码弹窗兜底。
+            // 非过滤分支经 ExtractService（叶子 1）已覆盖，此处不重复包装。
+            var (outcome, _) = await PasswordRetryLoop.RunAsync(
+                archivePath, password, engine,
+                owner: null,
+                setStatus: _ => { },
+                attempt: async (pwd, token) =>
+                    await engine.ExtractEntriesAsync(
+                        archivePath, filteredKeys, dest, pwd, progress, token, options),
+                ct: ct);
+
+            if (outcome == PasswordRetryOutcome.Cancelled)
+                throw new PasswordRetryCancelledException(archivePath);
+            // 损坏/无效：弹窗循环已判定继续重弹无意义 → 抛错走既有失败收尾，
+            // 禁止落成功路径（否则下方 PathHistoryManager.Record 会记录损坏包的目录）
+            if (outcome == PasswordRetryOutcome.CorruptedOrInvalid)
+                throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
         }
         else
         {
@@ -247,5 +288,133 @@ public static class ExtractFlow
 
             return (result.Action, result.ApplyAll);
         }
+    }
+
+    /// <summary>
+    /// 计算用于进度窗口统计显示的并行度（T6）：
+    /// 引擎不支持并行（7z/TAR/GZ 等 SupportsParallelExtract=false）→ 1（串行，隐藏并行统计）；
+    /// 设置值 0/负数 = 引擎自动 → <c>Environment.ProcessorCount</c>（与 ZipEngine 的 0 值语义一致）。
+    /// </summary>
+    private static int ResolveDisplayParallelDegree(string archivePath)
+    {
+        if (ArchiveEngineFactory.GetEngineByExtension(archivePath)?.SupportsParallelExtract != true)
+            return 1;
+        int degree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
+        return degree > 0 ? degree : Environment.ProcessorCount;
+    }
+
+    // ════════════════════════════════════════════
+    //  T9/D7: 列表模式条目行播种
+    // ════════════════════════════════════════════
+
+    /// <summary>列表模式播种阈值（D7）：条目数超过该值不播种，转渐进模式（避免 10 万行内存 + UI 长停顿）。</summary>
+    private const int MaxSeedEntryCount = 5000;
+
+    /// <summary>
+    /// 播种资格判定（D7）：<b>TAR/GZ 一律不播</b>（其 <c>ListEntriesAsync</c> 是全流扫描，
+    /// 成本≈解压一次，仅为填充预览列表不值得）；其余仅 zip/7z。
+    /// 引擎类型兜一道的原因：魔数兜底路径下 <see cref="ArchiveEngineFactory.GetFormatByExtension"/>
+    /// 会把未知扩展名判成 Zip，仅按格式判断可能把 TAR/GZ 误放进来。
+    /// </summary>
+    private static bool CanSeedEntries(string archivePath, IArchiveEngine? engine)
+    {
+        if (engine == null || engine is TarGzEngine)
+            return false;
+        if (engine.SupportsParallelExtract)
+            return true;
+        var format = ArchiveEngineFactory.GetFormatByExtension(archivePath);
+        return format is ArchiveFormat.Zip or ArchiveFormat.SevenZip;
+    }
+
+    /// <summary>
+    /// 选中条目解压的列表模式播种：直接用调用方已持有的条目集（等价于压缩路径「用已知
+    /// 源列表播种」的思路），因此不需要 <c>ListEntriesAsync</c>，也不受 TAR/GZ 扫描成本影响
+    /// （<see cref="CanSeedEntries"/> 仍按格式把 TAR/GZ 拦下，保持「TAR/GZ 不播种」的统一语义）。
+    /// 条目数在内存中已知，超阈值直接放弃，无需先列目录再判数。
+    /// </summary>
+    private static void TrySeedSelectedEntries(
+        ProgressWindow pw, string archivePath, IReadOnlyList<ArchiveItem> entries)
+    {
+        if (entries.Count == 0 || entries.Count > MaxSeedEntryCount)
+            return;
+        if (!CanSeedEntries(archivePath, ArchiveEngineFactory.GetEngineByExtension(archivePath)))
+            return;
+
+        var seeds = BuildSeedRows(entries, null);
+        if (seeds.Count > 0)
+            pw.SeedEntries(seeds);
+    }
+
+    /// <summary>
+    /// 全量/过滤解压的列表模式播种（后台）：zip/7z 在后台线程 <c>ListEntriesAsync</c> 列目录后播种。
+    /// 本方法立即返回、不 await —— 解压绝不等待播种；列目录失败/取消/超阈值一律放弃播种，
+    /// 由 <see cref="ProgressViewModel.UpdateEntryStatus"/> 的 upsert 兜底（渐进模式）。
+    /// </summary>
+    private static void TrySeedEntryItemsInBackground(
+        ProgressWindow? pw, string archivePath, string? password,
+        List<string>? filteredKeys, CancellationToken ct)
+    {
+        if (pw == null)
+            return;
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+        if (engine == null)
+            return;
+        if (!CanSeedEntries(archivePath, engine))
+            return; // TAR/GZ / 非 zip/7z：不产生任何 ListEntriesAsync 调用
+
+        _ = SeedEntryItemsAsync(pw, engine, archivePath, password, filteredKeys, ct);
+    }
+
+    /// <summary>后台列目录 + 播种（所有异常与取消都在此吞掉，只影响预览列表，不影响解压）。</summary>
+    private static async Task SeedEntryItemsAsync(
+        ProgressWindow pw, IArchiveEngine engine, string archivePath,
+        string? password, List<string>? filteredKeys, CancellationToken ct)
+    {
+        try
+        {
+            var items = await engine.ListEntriesAsync(archivePath, password, ct).ConfigureAwait(false);
+
+            // 阈值按原始条目数判定：先学会总数再决定是否播种（>5000 → 一条行都不建）
+            if (items.Count == 0 || items.Count > MaxSeedEntryCount)
+                return;
+
+            // 过滤激活但零匹配（空列表）= 什么都不解压 → 自然也不播种
+            if (filteredKeys is { Count: 0 })
+                return;
+
+            var seeds = BuildSeedRows(items, filteredKeys);
+            if (seeds.Count > 0)
+                pw.SeedEntries(seeds);
+        }
+        catch (Exception ex)
+        {
+            // 播种只影响列表预览；失败/取消不得影响解压本身（渐进模式兜底）
+            App.DebugLog($"[ExtractFlow] Entry seeding skipped: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 把条目列表转成播种元组：<c>Key</c> 用 <see cref="ArchiveItem.Name"/>（三引擎均存归一化条目键，
+    /// 与引擎上报的 <c>ArchiveProgress.EntryKey</c> 同源）；目录条目被跳过——引擎建目录后不上报终态，
+    /// 播出来会是永远等不到上报的 Pending 行。过滤键非 null 时只保留将被实际解压的条目。
+    /// </summary>
+    private static List<(string Key, string Name, long Size)> BuildSeedRows(
+        IReadOnlyList<ArchiveItem> items, List<string>? filteredKeys)
+    {
+        HashSet<string>? filter = filteredKeys == null
+            ? null
+            : new HashSet<string>(filteredKeys, StringComparer.Ordinal);
+
+        var seeds = new List<(string Key, string Name, long Size)>(items.Count);
+        foreach (var item in items)
+        {
+            if (item.IsDirectory)
+                continue;
+            if (filter != null && !filter.Contains(item.Name))
+                continue;
+            seeds.Add((item.Name, Path.GetFileName(item.Name), item.Size));
+        }
+        return seeds;
     }
 }

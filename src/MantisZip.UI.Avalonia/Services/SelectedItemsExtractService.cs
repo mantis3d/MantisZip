@@ -61,9 +61,23 @@ public sealed class SelectedItemsExtractService
         if (engine == null) throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));
 
         // 所有格式统一走按条目提取（TarGzEngine 已实现，不再降级全量解压）
-        await engine.ExtractEntriesAsync(
-            archivePath, entryKeys, destinationPath,
-            password, progress, cancellationToken, options, pathOverrides);
+        // 叶子 3/5：选中条目解压直连引擎 → 密码弹窗兜底在此（拖拽解压经本方法自动覆盖）
+        var (outcome, _) = await PasswordRetryLoop.RunAsync(
+            archivePath, password, engine,
+            owner: null,
+            setStatus: _ => { },
+            attempt: async (pwd, token) =>
+                await engine.ExtractEntriesAsync(
+                    archivePath, entryKeys, destinationPath,
+                    pwd, progress, token, options, pathOverrides),
+            ct: cancellationToken);
+
+        if (outcome == PasswordRetryOutcome.Cancelled)
+            throw new PasswordRetryCancelledException(archivePath);
+        // 损坏/无效：弹窗循环已判定继续重弹无意义 → 抛错走既有失败收尾，
+        // 禁止落成功路径（否则调用方记录路径历史且 CLI 直解批处理会误删损坏源包）
+        if (outcome == PasswordRetryOutcome.CorruptedOrInvalid)
+            throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
     }
 
     /// <summary>
