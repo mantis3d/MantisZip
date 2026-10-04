@@ -18,13 +18,18 @@
   - **验证**：构建 0 警告 0 错误；Avalonia 测试 **114/0/2**（109 → 114）、Core **549/0/3** 与基线一致，无回归。
   - **运行时复验（已执行，结论分项）**：
     - ✅ **「并行」卡 —— 决定性证据**。`--extract-here` 单文件（15,000 × 32KB ZIP，`ParallelExtractDegree=20`）切「完整」密度后，UIA 全量枚举文本元素得到 `⚙ / 并行 / 20`，数值 20 与设置值及 `Environment.ProcessorCount` 一致。修复前单文件叶子不调 `SetParallelDegree` → `HasParallelDegree=false` → 该卡**不可能渲染**，故此项证明该叶子的并行度接线确已生效（与播种同一叶子、同一段代码，互为支撑）。
-    - ◐ **播种 —— 强证据但缺决定性证据，不宣称闭环**。列表模式确实出现条目行；两轮对照：15,000 × 32KB 采到 `f_000007, f_000010, f_000003, f_000001…`（散乱＝完成顺序，与未播种的 upsert 兜底一致），60 × 6MB 采到 `f_000000…f_000005` 严格归档顺序且 `已处理 60`/`100%` 时 60 行齐全。**但归档顺序不足以区分播种与 upsert**——60 个等大 6MB 文件的完成顺序本就≈归档顺序。决定性证据应是 `○等待`（Pending）行，**只有播种才会产生**，而两轮均未捕获（32KB 文件瞬时完成；6MB 文件被 20 线程直接推入 `⏳ Active`）。建议后续构造「单条超大 + 多条小文件」并在 t≈0.2s 采样以暴露 Pending 行。
+    - ✅ **播种 —— 决定性证据（`SizeText` 判据，与视口/时序/串并行无关）**。判据链：行模板第 3 列绑 `EntryProgressItem.SizeText`（`ProgressWindow.axaml:458-461`，注释「SizeText 未知时为空串，不显示 "0 B"」）；`SizeText => _size > 0 ? FormatUtil.FormatSize(_size) : string.Empty`（`Core/Models/EntryProgressItem.cs:88`）；`SeedEntryItems` 建行时设 `Size = size`（`ProgressViewModel.cs:633-644`），而 `UpdateEntryStatus` 的 upsert 兜底建行**不设 `Size`**（`:661-670`）⇒ **兜底行的 `SizeText` 恒为空串**。实测 `--extract-here` 单文件 51 条目 ZIP（1×1000MB + 50×1MB，归档序 `big.bin` 首），列表模式行渲染为 `big.bin | 1000 MB | 40%`、`small_000.bin | 1 MB | 已完成` —— `SizeText` **非空** ⇒ `Size > 0` ⇒ 这些行只可能由 `SeedEntryItems` 建立，播种在 CLI 单文件叶子运行时**确已生效**。
+    - **为何始终捕不到 `○等待`（Pending）行——结构性原因，勿再徒劳**：并行解压按**体积降序**启动条目，列表头部必然是已启动的条目（`⏳ Active` / `✅ 已完成`），`Pending` 行恒排在视口之外；且切「列表」需真实鼠标点击（≈0.5–0.7s），期间小文件早已终态。**UIA 对虚拟化 `ListBox` 只实体化约 7–8 行**，故按 UIA 元素总数反推行数无效（此前 `activeRowsVisible=47` 即由此误出）。结论：判播种应查 `SizeText` 是否非空，**不要**追逐 `○等待`。
   - **探针方法论修正（本轮踩坑，勿重蹈）**：
     - **输出目录必须每次唯一**：复用残留目录会触发模态冲突框把窗口冻在 0%，表现为「窗口瞬现即灭、轮询抓不到」，极易误判为「窗口没出现」。曾因此连续两轮 `FAIL_NO_WINDOW`。
     - **枚举顶层窗口不能用 `ControlType` 的 `PropertyCondition`**：对本应用 `ProgressWindow` 匹配不到（连抓两轮失败）。有效解法是 `TrueCondition` + `ProcessId`/`ClassName` 过滤。`x:Name` → `AutomationId` 的映射本身是可用的（`aid='ModeNameOnlyRadio'` 等均取到）。
     - **密度是统计卡的宿主**：XAML 注释 `完整：+ 统计卡` 说明统计卡行挂在「完整」档下，尽管卡自身 `IsVisible` 只绑 `HasParallelDegree`；只看卡自身绑定会漏判祖先密度门控。
     - **自造假象一例**：某版探针把 `activeRowsVisible` 报成 47，实际 dump 中 `⏳` 为 0 个——47 是元素总数漏进正则。该指标已作废。
-    - **控制台 mojibake 不可用于判读 CJK**：PS 5.1 按 ANSI 解析无 BOM 输出，中文全变乱码；须写入 UTF-8 文件后再读。脚本内构造中文串用码点（`[char]0x5E76+[char]0x884C`）以规避。
+    - **控制台 mojibake 不可用于判读 CJK**：PS 5.1 按 ANSI 解析无 BOM 输出，中文全变乱码；须写入 UTF-8 文件后再读。脚本内构造中文串用码点（`[char]0x5E76+[char]0x884C`）以规避。**且 dump 必须无条件落盘**——只在命中分支写文件，未命中时就没有任何可读产物，会被迫回头读控制台乱码并据此误判（本轮即因此差点误判播种失效）。
+    - **启动期调 `FindAll` 会抛 `ElementNotAvailableException`**（内含 "Creating Event for process connection"）：进程刚启动、UIA 尚未建立连接时枚举桌面即抛。若脚本设了 `$ErrorActionPreference='Stop'`，**整个探针会被这一下直接掐死**，表现为「应用明明活着却报失败」。改法：设 `Continue` + `try/catch` 包住每次枚举。
+    - **窗口类名/标题都不含 "Progress"**：实测类名为 `Avalonia-<guid>`、标题为 `正在解压...`，因此任何 `-match 'Progress|MantisZip'` 的名字过滤**永远匹配不到**。可靠定位：Win32 `EnumWindows` 取本 PID 下 `IsWindowVisible` 且类名以 `Avalonia-` 开头的 HWND（`IME` / `AvaloniaMessageWindow` / `AvaloniaSimpleWindow-<guid>` 类名均不同，可排除），再用 `AutomationElement.FromHandle($hwnd)` 包成 UIA 元素——**同时绕开桌面枚举的启动竞态与名字猜测**。
+    - **`--help` 带 stdout 重定向会崩溃**（未处理异常 `Dispatcher shut down`，退出码 `0xE0434352`）——本轮顺带发现，**未调查**，是否必须重定向亦未验证；与本次播种/并行度改动无关，登记为待查项。
+    - **待查项：串行度是否真的作用于引擎**。设 `ParallelExtractDegree=1` 后「并行」卡确实隐藏（显示层已生效），但同一样本中 `已处理 47` + `big.bin 40%` + `566 MB/s` + 总进度 `42%`，与「`big.bin` 与 50 个小文件**并发**推进」（≈400MB + 50MB ≈ 450MB ≈ 1050MB 的 42%）在算术上吻合。故**引擎实际并行度未验证**，不可拿本轮样本论证串行行为；本轮播种结论不依赖该点（`SizeText` 判据与串并行无关）。
   - **附带修正两处取证误差**（避免后续复现踩坑）：① 早期「TAR/GZ 无窗口」是 PowerShell `[int]($i/1000)` 舍入到尚未创建的 `g30` 加单实例残留造成的测试假象，实测窗口存在；② 「extracted 4000/4000」曾误数源目录而非解压输出目录（`extract-here` 落在压缩包同级），已改为统计真实输出目录。
 
 **2026-10-04** — 进度窗口原型对齐改造 T1–T11 全部落地（纠偏 v2 计划的原型误读）
@@ -52,7 +57,7 @@
     - F1 `dotnet build`（`/p:SkipShellExtCopy=true` 规避 Explorer 占用 ShellExt.dll）**0 错误 0 警告**
     - F2 **Core 549 通过 / 0 失败 / 3 跳过**；**Avalonia 109 通过 / 0 失败 / 2 跳过**
     - F4 六场景基准**中位数回退均 ≤3%**：ZIP 串行 −0.5% / parallel `progress=null` +1.5%（最大回退）/ parallel `Interlocked` −2.2% / 7z −2.2% / 压缩 −1.2% / 列表模式并发播种 +0.7%
-    - F3 自动化取证 **7✅ / 5◐ / 0✗**：UI Automation + 真实鼠标点击（`SendInput`——RadioButton 用 `Click=`，UIA `SelectionItemPattern.Select()` 只改选中态不触发处理器）+ 像素采样；实测内容模式双向切换、详细模式正/负向可见性、密度三档、明暗主题主色与声明调色板逐一吻合、Rule 7 行高三档、压缩+解压双路径真实进度；**批次级 `❌ 出错` + 行内 `Failed to locate the Zip Header` + `完成 0 项，失败 1 项`**（证明 `ErrorMessage` 只写不显示已修复）；TAR/GZ 进度窗口 t+1.7s 出现、300/300 解压成功退出码 0
+    - F3 自动化取证 **8✅ / 4◐ / 0✗**：UI Automation + 真实鼠标点击（`SendInput`——RadioButton 用 `Click=`，UIA `SelectionItemPattern.Select()` 只改选中态不触发处理器）+ 像素采样；实测内容模式双向切换、详细模式正/负向可见性、密度三档、明暗主题主色与声明调色板逐一吻合、Rule 7 行高三档、压缩+解压双路径真实进度；**批次级 `❌ 出错` + 行内 `Failed to locate the Zip Header` + `完成 0 项，失败 1 项`**（证明 `ErrorMessage` 只写不显示已修复）；TAR/GZ 进度窗口 t+1.7s 出现、300/300 解压成功退出码 0
     - 两处基准陷阱已记录：多线程共享字段消费者致伪回退 +10.1%（不可复现，真实 UI 消费者为 `Dispatcher.UIThread.Post` 入队）、列表模式须按 fire-and-forget 建模（同步 await 播种会假报 +7.3%）
   - **已记录功能缺口（用户已确认补齐，待实施）**：CLI 批处理解压（`--extract-here`/`--extract-to-name`/`--extract-smart`）的 `RunCliDirectExtractBatchAsync`（`App.axaml.cs:1415`）**直连 `engine.ExtractAsync` 绕过 `ExtractFlow`**，致 **ZIP** 列表模式为空且「并行」卡不出现；主窗口解压路径不受影响。取证注意：`--extract <path>` 遵循 `AppSettings.ExtractDestination`（默认 `ask`）会停在目录选择框，自动化须用 `--extract-here`
   - **非阻塞瑕疵**（已记录待后续）：内容模式/密度 RadioButton 的 `AutomationId` 仍用旧枚举语义命名（`ModeFullPathRadio`/`ModeDirOnlyRadio`/`ModeNameOnlyRadio`/`Density*Radio`）；`PauseButton`/`CancelButton` 可访问名取到 `Avalonia.Controls.StackPanel`
