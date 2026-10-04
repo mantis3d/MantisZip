@@ -6,6 +6,24 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-04** — 修复点击任意条目即崩溃（WebView2 初始化异常逃逸）（✅ 已修复，用户报告「点压缩包内条目后应用无提示退出」）
+  - **根因（症状放大）**：`PreviewPanel.axaml` 把 `NativeWebView` **常驻在活动视觉树**中。Avalonia 的 `NativeWebView` 在 `OnAttached` 时初始化 WebView2，而**任何**预览都会走到 attach —— 包括点目录、点不支持预览的格式。于是「WebView2 初始化失败」这个本只该影响 HTML 预览的故障，被放大成**任何条目都崩溃**
+  - **★ 异常为何会终止进程（两层）**：① WebView2 初始化是异步的，失败异常在 UI 线程 Dispatcher 上抛出时，栈上早已没有 `ShowPreviewAsync` 的 try/catch（已跨 await 边界）；② 应用**没有任何 Dispatcher 未处理异常订阅者** → 未捕获异常直接杀进程。故现象是「无提示直接退出」而非报错弹窗
+  - **实测证据**：用户环境 ja-JP Win11 报 `E_ACCESSDENIED (0x80070005)`；headless 环境复现为 `RPC_E_CHANGED_MODE (0x80010106)`。二者同源于 `NativeWebView.OnAttached`，**与系统语言无关**（曾误判 locale，已排除）
+  - **修复（三层 + 两个衍生缺陷）**
+    - `PreviewPanel.axaml` 移除常驻 WebView，改为空 `WebViewHost` 容器 + `EnsureWebViewForHtml()` **仅在 HTML 预览时惰性创建**（惰性而非彻底移除，因 HTML 预览仍走 WebView 双轨 + ReverseMarkdown 降级）
+    - `MainWindowViewModel.ShowPreviewAsync` 对 `entry.IsDirectory` **短路**到 `ShowUnsupported()` 并跳过提取 —— 目录本就没有可预览内容
+    - `InstallWebViewGuard()` 订阅 `DispatcherUnhandledException`，命中 `LooksLikeWebViewFailure()` 时标记 `e.Handled=true` 并走 `HandleWebViewUnavailable()` → 自动降级 ReverseMarkdown
+    - **衍生缺陷 1（竞态）**：attach 之后才抛的异常与 `NavigationCompleted` 失败几乎同时发生，原逻辑在导航失败时**提前关闭守卫窗口**，使异常重新无人接管。新增 `_liveWebView` 跟踪 attach 到的实例（attach 前登记、拆卸后清空），守卫条件改为「创建窗口存在 **或** 有存活 WebView」，且**仅 `e.IsSuccess` 时关窗**
+    - **衍生缺陷 2（跨用例竞态）**：`_webViewGuardInstalled` 是静态 bool，只在**首个** Dispatcher 上订阅过；测试套件每个用例各自新建 Dispatcher，后续用例实际**根本没有守卫**，导致全量套件偶发失败。改为 `_guardedDispatcher` 记录已订阅的 Dispatcher 实例，配合静态 `OnWebViewGuardUnhandledException` 按实例幂等安装
+  - **降级路径修正**：原降级方法按**压缩包内部路径** `File.ReadAllBytesAsync` 读 HTML —— 该路径在归档内并不存在，必然失败。改为新增同步 `PreviewViewModel.ShowHtmlFallbackFromSource(string? html)`，直接消费已在内存中的 `HtmlSourceContent`；确认全仓无引用后删除基于文件路径的死方法 `ShowHtmlFallback(string)`
+  - **决策：按用户明确要求走方案 A+B** —— **不强制下载 WebView2**、不引入 `Microsoft.Web.WebView2.Core` 直接依赖；WebView2 缺失或初始化失败一律降级而非崩溃。守卫基于异常类型栈特征匹配，不依赖 SDK API
+  - **测试**：新增 `PreviewWebViewLazyInitTests` **6 条**，替换探索性的 `DirectoryPreviewCrashReproTests`（已删除）。**关键修正**：初版两条用例在 `PreviewPanel` 挂载**前**就断言，属**空转测试**（等于没覆盖 attach 路径），现改为先建面板 + `window.Show()` + pump 再触发预览；目录用例补 `measure/arrange` 后断言 Bounds 有效，证明控件真实参与布局而非被短路跳过
+  - **phase1 `IsPreviewVisible=True` 的解释（非缺陷）**：`window.Show()` 之后异步预览可能已完成，故「面板已可见」与「尚未点击任何条目」并存；真正的不变式是**点击前 `WebViewHost.Content == null`**，已由断言锁定。测试日志标签由 `[phase1] hidden` 改为 `[phase1] attached` 以如实描述
+  - **验证**：Avalonia **136 通过 / 0 失败 / 3 跳过**（139）、Core **423 通过 / 0 失败 / 2 跳过**（425）、`dotnet build -c Release` exit 0（2 warning 为既有：`TextEncodingDetector.cs:121` CS8604、`PreviewViewModel.cs:1406,1442` CS0618 `Bitmap.Save` 已过时）
+  - **⚠ LSP 环境问题（非本次改动引入）**：本机 Roslyn LSP 报约 900 个 CS0246/CS0103，连 `using Avalonia;`、`InitializeComponent`、所有 `x:Name` 字段、全部 `[ObservableProperty]` 生成成员都无法解析。**用 `git stash` 在 pristine HEAD 上复现完全相同的错误**（甚至报出 HEAD 才有的 `HtmlPreviewWebView`/`ShowHtmlFallback`，可证错误与本次改动无关），确认 LSP 未加载项目引用与 source generator 输出（`lsp_status` 显示 `Active LSP clients: 0`）。中途曾因未打开文件返回「No diagnostics found」误判为项目加载正常 —— 该结果只是**未被分析**的假阴性。**结论：本项目以编译器与测试为门禁，LSP 不可作门禁**（同一手法亦用于确认上述 2 个 build warning 为既有）
+  - **未验证**：headless 环境只能模拟 WebView2 **失败**路径；真实**成功**渲染仍需用户实机确认
+
 **2026-10-01** — ZIP 中文文件名编码修复（✅ 已修复，用户报告「拖拽添加中文文件到压缩包后乱码」）
   - **根因 1（用户可见症状）**：`ZipBinaryRewriter.CompressNewEntry` 构造 LFH/CDFH 时硬编码 `Flags: 0`，写 UTF-8 文件名时**从不置 bit 11**。APPNOTE 6.4.4 要求文件名含高位字符时必须置位，否则解码器回退 CP437 → 7-Zip/WinRAR/资源管理器/`unzip` 显示乱码。**为何应用内看不出来**：`OpenArchiveWithEncodingFallback` 的 `LooksLikeValidCjk` 启发式把 UTF-8 字节猜对了，故本应用内自测正常、外部工具才暴露 —— 这也是该缺陷长期潜伏的原因。压缩对话框走 SharpCompress `ZipWriter`（自动置位）故不受影响
   - **根因 2（更深层，删文件时损坏其它条目）**：`ReadCentralDirectory` 固定 `Encoding.UTF8.GetString(fileNameBytes)` 解码，`WriteCentralDirectory` 又用传入 `encoding` 重编码 → 「解码→重编码」往返对非 UTF-8 编码的条目必然损坏。`encoding` 参数只管输出、从不影响输入解码。**实测确认删除匹配逻辑本身无误**（keepSet 反向筛选 + OrdinalIgnoreCase 归一名，三种场景含修复前坏包均精确删除），坏的是重写环节把存活条目改成了乱码
