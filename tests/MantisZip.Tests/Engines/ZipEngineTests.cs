@@ -1,7 +1,9 @@
+using System.Collections.Concurrent;
 using System.Text;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Utils;
 using MantisZip.Tests.Fixtures;
 using Xunit;
 
@@ -417,6 +419,123 @@ public class ZipEngineTests : IDisposable
         // Should have at least initial and final progress reports
         Assert.NotEmpty(progressItems);
         Assert.Contains(progressItems, p => p.PercentComplete == 100);
+    }
+
+    // ===== 逐条目状态遥测（EntryStatus / EntryKey） =====
+
+    /// <summary>
+    /// 同步线程安全的进度收集器：解压（含并行路径）会从多个工作线程直接 Report，
+    /// 不能使用 System.Progress&lt;T&gt;（它经 SynchronizationContext/线程池异步派发，
+    /// 测试在 await 返回时尚未收到回调，导致报告时序性丢失）。
+    /// </summary>
+    private sealed class ProgressCollector : IProgress<ArchiveProgress>
+    {
+        private readonly ConcurrentBag<ArchiveProgress> _items = new();
+        public void Report(ArchiveProgress value) => _items.Add(value);
+        /// <summary>当前收集到的报告快照（await 引擎完成后再读取，无时序依赖）。</summary>
+        public List<ArchiveProgress> Items => _items.ToList();
+    }
+
+    /// <summary>
+    /// (a) 全新空目录解压 5 文件压缩包：每个非目录条目恰好上报一次 Completed 终态，
+    /// EntryKey 两两不同且集合等于压缩包内条目键集合（无丢失/无重复/无截断）。
+    /// </summary>
+    [Fact]
+    public async Task ExtractAsync_ReportsPerEntryCompleted_OncePerFile()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateMultiFileZipArchive(5)); // file0000.dat ~ file0004.dat
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        var collector = new ProgressCollector();
+
+        await _engine.ExtractAsync(archive, dest, progress: collector);
+
+        var entryReports = collector.Items.Where(p => p.EntryStatus.HasValue).ToList();
+        // 5 个非目录条目 → 恰好 5 条逐条目报告（不多不少）
+        Assert.Equal(5, entryReports.Count);
+        // EntryKey 两两不同
+        var reportedKeys = entryReports.Select(p => ArchivePath.Normalize(p.EntryKey)).ToList();
+        Assert.Equal(5, reportedKeys.Distinct(StringComparer.Ordinal).Count());
+        // 键集合 == 压缩包内非目录条目键集合（键以 ListEntriesAsync 的 FullPath 为准）
+        var archiveKeys = (await _engine.ListEntriesAsync(archive))
+            .Where(e => !e.IsDirectory)
+            .Select(e => ArchivePath.Normalize(e.FullPath))
+            .ToHashSet(StringComparer.Ordinal);
+        Assert.True(archiveKeys.SetEquals(reportedKeys),
+            $"EntryKey 集合不匹配! archive=[{string.Join(", ", archiveKeys.OrderBy(k => k, StringComparer.Ordinal))}] " +
+            $"reported=[{string.Join(", ", reportedKeys.OrderBy(k => k, StringComparer.Ordinal))}]");
+        // 无冲突 → 全部 Completed（不得出现 Skipped/Failed/Overwritten）
+        Assert.All(entryReports, p => Assert.Equal(ArchiveEntryStatus.Completed, p.EntryStatus));
+    }
+
+    /// <summary>
+    /// (b) Skip 冲突策略：被跳过的条目必须上报 Skipped 终态（出现在收集结果中，而非被静默丢弃），
+    /// 且同一键不得同时上报 Completed/Overwritten（终态互斥）。
+    /// </summary>
+    [Fact]
+    public async Task ExtractAsync_SkippedEntry_ReportsSkippedStatus()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateZipArchive()); // hello.txt + subdir/nested.txt
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(dest);
+        File.WriteAllText(Path.Combine(dest, "hello.txt"), "old content"); // 制造同名冲突
+
+        var collector = new ProgressCollector();
+        var options = new ArchiveOptions { ConflictAction = FileConflictAction.Skip };
+        await _engine.ExtractAsync(archive, dest, options: options, progress: collector);
+
+        var entryReports = collector.Items.Where(p => p.EntryStatus.HasValue).ToList();
+        // 冲突被跳过的 hello.txt 必须以 Skipped 状态出现在逐条目报告中
+        Assert.Contains(entryReports, p =>
+            ArchivePath.Normalize(p.EntryKey) == "hello.txt" &&
+            p.EntryStatus == ArchiveEntryStatus.Skipped);
+        // 无冲突的另一条目正常完成
+        Assert.Contains(entryReports, p =>
+            ArchivePath.Normalize(p.EntryKey) == "subdir/nested.txt" &&
+            p.EntryStatus == ArchiveEntryStatus.Completed);
+        // Skipped 与 Completed/Overwritten 互斥：跳过的条目绝不能同时上报写入终态
+        Assert.DoesNotContain(entryReports, p =>
+            ArchivePath.Normalize(p.EntryKey) == "hello.txt" &&
+            p.EntryStatus is ArchiveEntryStatus.Completed or ArchiveEntryStatus.Overwritten);
+    }
+
+    /// <summary>
+    /// (d) EntryKey 必须是完整压缩包内相对路径，不做 Path.GetFileName 截断：
+    /// a/x.txt 与 b/x.txt 同名不同目录，必须产生两个不同的 EntryKey。
+    /// </summary>
+    [Fact]
+    public async Task ExtractAsync_ReportsEntryKeyWithoutPathTruncation()
+    {
+        // 构造含 a/x.txt + b/x.txt 的 ZIP（两个同名文件位于不同目录）
+        var archive = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}.zip"));
+        Directory.CreateDirectory(Path.GetDirectoryName(archive)!);
+        using (var fs = File.Create(archive))
+        using (var zip = new ZipOutputStream(fs))
+        {
+            zip.SetLevel(1);
+            foreach (var name in new[] { "a/x.txt", "b/x.txt" })
+            {
+                zip.PutNextEntry(new ZipEntry(name));
+                var bytes = Encoding.UTF8.GetBytes($"content of {name}");
+                zip.Write(bytes, 0, bytes.Length);
+                zip.CloseEntry();
+            }
+        }
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        var collector = new ProgressCollector();
+
+        await _engine.ExtractAsync(archive, dest, progress: collector);
+
+        var reportedKeys = collector.Items
+            .Where(p => p.EntryStatus.HasValue)
+            .Select(p => ArchivePath.Normalize(p.EntryKey))
+            .ToList();
+        Assert.Equal(2, reportedKeys.Count);
+        // 两个 EntryKey 必须不同（若被 Path.GetFileName 截断，两者都会变成 "x.txt" 而相等）
+        Assert.Equal(2, reportedKeys.Distinct(StringComparer.Ordinal).Count());
+        // 且必须携带目录前缀 = 完整相对路径
+        Assert.True(new HashSet<string>(reportedKeys, StringComparer.Ordinal).SetEquals(new[] { "a/x.txt", "b/x.txt" }),
+            $"EntryKey 应为完整相对路径而非文件名，实际: [{string.Join(", ", reportedKeys)}]");
     }
 
     // ===== MultiThreadedCompression（ZIP 外壳 + 7z mt=on 压缩组）=====

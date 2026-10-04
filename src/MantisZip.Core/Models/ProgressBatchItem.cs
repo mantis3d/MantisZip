@@ -47,12 +47,19 @@ public class BatchItem : INotifyPropertyChanged
                 OnPropertyChanged(nameof(Status));
                 // 状态变更必须同步刷新画刷资源键，否则行颜色不更新
                 OnPropertyChanged(nameof(StatusBrushName));
+                // 同步刷新 IsFailed：批量行据此在「错误信息」与「百分比」之间互斥切换显示
+                OnPropertyChanged(nameof(IsFailed));
             }
         }
     }
 
-    /// <summary>失败时的错误信息</summary>
-    public string? ErrorMessage { get; set; }
+    private string? _errorMessage;
+
+    /// <summary>失败时的错误信息（Set 通知——更新时机在 Status 之后，必须触发绑定刷新）</summary>
+    public string? ErrorMessage { get => _errorMessage; set => Set(ref _errorMessage, value); }
+
+    /// <summary>行状态为 Failed（批量行显示 ErrorMessage 而非百分比）。</summary>
+    public bool IsFailed => Status == BatchItemStatus.Failed;
 
     private double _progress;
 
@@ -105,6 +112,12 @@ public class BatchItem : INotifyPropertyChanged
     public bool HasOverwritten => OverwrittenFiles > 0;
     public bool HasPasswordBadge => PasswordState != BatchPasswordState.None;
 
+    /// <summary>显示 🔄 匹配中徽标。</summary>
+    public bool IsPasswordMatching => PasswordState == BatchPasswordState.Matching;
+
+    /// <summary>显示 🔑●●●● 已匹配徽标（挂 Flyout 查看/复制）。</summary>
+    public bool IsPasswordMatched => PasswordState == BatchPasswordState.Matched;
+
     // ── 状态画刷资源键（单一机制：UI 用 BrushResourceConverter 物化；T5 注册主题键）──
     // 枚举实名 BatchItemStatus（Pending/InProgress/Completed/Skipped/Failed——无 Success、无 Cancelled）
     public string StatusBrushName => Status switch
@@ -122,7 +135,10 @@ public class BatchItem : INotifyPropertyChanged
         OnPropertyChanged(nameof(HasFailures));
         OnPropertyChanged(nameof(HasOverwritten));
         OnPropertyChanged(nameof(HasPasswordBadge));
+        OnPropertyChanged(nameof(IsPasswordMatching));
+        OnPropertyChanged(nameof(IsPasswordMatched));
         OnPropertyChanged(nameof(StatusBrushName));
+        OnPropertyChanged(nameof(IsFailed));
     }
 
     /// <summary>字段赋值辅助：值变更时返回 true 并发出通知（镜像 ProgressViewModel 的 Set 模式）。</summary>

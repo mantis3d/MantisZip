@@ -226,6 +226,91 @@ public class SevenZipEngine : IArchiveEngine
         };
     }
 
+    /// <summary>
+    /// 逐条目状态（D2）：挂接 7z 压缩器逐文件事件，按源相对路径上报 Completed。
+    /// FileCompressionStarted 仅携带叶文件名（同名文件按展开顺序 FIFO 消歧）；
+    /// FileCompressionFinished 不带文件名 —— Started 时把解析出的条目键推入在途队列，Finished 出队上报。
+    /// </summary>
+    private static void AttachCompressorEntryTelemetry(
+        SharpSevenZipCompressor compr,
+        IProgress<ArchiveProgress>? progress,
+        IReadOnlyList<string> compressedFiles,
+        string[] sourcePaths)
+    {
+        if (progress == null)
+            return;
+
+        // 叶文件名 → 条目键 FIFO（同叶名多文件按展开顺序出队；目录不入队，压缩事件仅针对文件）
+        var keyByLeaf = new Dictionary<string, Queue<string>>(StringComparer.OrdinalIgnoreCase);
+        foreach (var path in compressedFiles)
+        {
+            if (!File.Exists(path))
+                continue;
+            var leaf = Path.GetFileName(path);
+            if (string.IsNullOrEmpty(leaf))
+                continue;
+            if (!keyByLeaf.TryGetValue(leaf, out var queue))
+                keyByLeaf[leaf] = queue = new Queue<string>();
+            queue.Enqueue(BuildSourceRelativeKey(path, sourcePaths));
+        }
+
+        // 在途队列：Started 推入（未预测到的文件推 null 占位保持配对平衡），Finished 出队上报
+        var inFlight = new Queue<string?>();
+        var telemetryLock = new object();
+
+        // 逐条目状态（D2）：Started 解析条目键并推入在途队列
+        compr.FileCompressionStarted += (_, e) =>
+        {
+            string? resolved = null;
+            var raw = e.FileName;
+            var leaf = string.IsNullOrEmpty(raw) ? "" : Path.GetFileName(raw);
+            lock (telemetryLock)
+            {
+                if (leaf.Length > 0 && keyByLeaf.TryGetValue(leaf, out var queue) && queue.Count > 0)
+                    resolved = queue.Dequeue();
+                inFlight.Enqueue(resolved);
+            }
+        };
+
+        // 逐条目状态（D2）：Finished 出队 → 上报 Completed（锁外 Report，避免锁竞争）
+        compr.FileCompressionFinished += (_, _) =>
+        {
+            string? finishedKey;
+            lock (telemetryLock)
+            {
+                finishedKey = inFlight.Count > 0 ? inFlight.Dequeue() : null;
+            }
+            if (finishedKey == null)
+                return;
+            progress.Report(new ArchiveProgress
+            {
+                EntryKey = finishedKey,
+                EntryStatus = ArchiveEntryStatus.Completed,
+            });
+        };
+    }
+
+    /// <summary>
+    /// 按 FileScanner 约定计算源相对路径条目键（目录源 = 目录名\相对路径，散文件 = 文件名），
+    /// 与 ZipEngine 的 relativePath 语义一致；不匹配任何源时回退完整路径（保持唯一，绝不按文件名截断）。
+    /// </summary>
+    private static string BuildSourceRelativeKey(string fullPath, string[] sourcePaths)
+    {
+        foreach (var source in sourcePaths)
+        {
+            if (Directory.Exists(source))
+            {
+                var relative = Path.GetRelativePath(source, fullPath);
+                if (relative == "." || relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
+                    continue;
+                return Path.Combine(Path.GetFileName(source), relative);
+            }
+            if (string.Equals(source, fullPath, StringComparison.OrdinalIgnoreCase))
+                return Path.GetFileName(fullPath);
+        }
+        return fullPath;
+    }
+
     #endregion
 
     #region 压缩器通用配置
@@ -367,11 +452,15 @@ public class SevenZipEngine : IArchiveEngine
                 {
                     // 跳过（跳过/覆盖旧/覆盖小）
                     conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Skipped });
                     continue;
                 }
                 if (existedBefore && resolvedPath == outputPath)
                 {
                     conflictStats.RecordOverwritten();
+                    // 逐条目状态（D2）
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Overwritten });
                 }
 
                 var entrySize = (long)entry.Size;
@@ -424,6 +513,10 @@ public class SevenZipEngine : IArchiveEngine
 
                     processedFiles++;
 
+                    // 逐条目状态（D2）：写盘成功即上报 Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                    if (!(existedBefore && resolvedPath == outputPath))
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Completed });
+
                     var now = DateTime.Now;
                     if (now - lastReportTime >= reportInterval || processedFiles == totalFiles)
                     {
@@ -442,6 +535,8 @@ public class SevenZipEngine : IArchiveEngine
                 {
                     CoreLog.Info($"ExtractAsync: permission denied for '{fileName}': {uax.Message}");
                     conflictStats.RecordFailed();
+                    // 逐条目状态（D2）
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed });
                     failedEntries++;
                 }
                 catch (IOException iox)
@@ -449,6 +544,8 @@ public class SevenZipEngine : IArchiveEngine
                     // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                     CoreLog.Info($"ExtractAsync: write failed for '{fileName}': {iox.Message}");
                     conflictStats.RecordFailed();
+                    // 逐条目状态（D2）
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed });
                     failedEntries++;
                 }
             }
@@ -506,6 +603,10 @@ public class SevenZipEngine : IArchiveEngine
                     && Directory.Exists(sourcePaths[0])
                     && options.FileWhitelist == null
                     && validated.Count == files.Length;
+
+                // 逐条目状态（D2）：按源相对路径预填条目键，压缩器逐文件完成事件上报 Completed
+                AttachCompressorEntryTelemetry(compr, progress, validated, sourcePaths);
+
                 if (singleDirClean)
                 {
                     // 单一目录且无文件白名单 — 使用 CompressDirectory
@@ -762,11 +863,15 @@ public class SevenZipEngine : IArchiveEngine
                 if (resolvedPath == null)
                 {
                     conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Skipped });
                     continue;
                 }
                 if (existedBefore && resolvedPath == outputPath)
                 {
                     conflictStats.RecordOverwritten();
+                    // 逐条目状态（D2）
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Overwritten });
                 }
 
                 var entrySize = (long)entry.Size;
@@ -817,6 +922,10 @@ public class SevenZipEngine : IArchiveEngine
 
                     processed++;
 
+                    // 逐条目状态（D2）：写盘成功即上报 Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                    if (!(existedBefore && resolvedPath == outputPath))
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Completed });
+
                     var now = DateTime.Now;
                     if (now - lastReportTime >= reportInterval || processed == totalTarget)
                     {
@@ -836,6 +945,8 @@ public class SevenZipEngine : IArchiveEngine
                 {
                     CoreLog.Info($"ExtractEntriesAsync: permission denied for '{fileName}': {uax.Message}");
                     conflictStats.RecordFailed();
+                    // 逐条目状态（D2）
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed });
                     failedEntries++;
                 }
                 catch (IOException iox)
@@ -843,6 +954,8 @@ public class SevenZipEngine : IArchiveEngine
                     // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                     CoreLog.Info($"ExtractEntriesAsync: write failed for '{fileName}': {iox.Message}");
                     conflictStats.RecordFailed();
+                    // 逐条目状态（D2）
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed });
                     failedEntries++;
                 }
             }

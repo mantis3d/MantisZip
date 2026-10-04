@@ -289,6 +289,24 @@ public enum ArchiveFormat
 }
 
 /// <summary>
+/// 条目终态（引擎只上报事实终态；等待/进行中由 UI 播种与推导，不污染 Core 契约）。
+/// </summary>
+public enum ArchiveEntryStatus
+{
+    /// <summary>正常写盘/压缩完成。</summary>
+    Completed,
+
+    /// <summary>因冲突策略（跳过）未写入。</summary>
+    Skipped,
+
+    /// <summary>写入失败（权限、磁盘错误等）。</summary>
+    Failed,
+
+    /// <summary>因冲突策略（覆盖）已写入并替换旧文件。</summary>
+    Overwritten
+}
+
+/// <summary>
 /// 压缩/解压进度报告
 /// </summary>
 public class ArchiveProgress
@@ -320,6 +338,13 @@ public class ArchiveProgress
     /// <summary>当前批次已处理/总文件数（批次详细行 "N/M 文件" DetailText 数据源）。仅并行批次报告携带，非并行为 null。</summary>
     public long? BatchProcessedFiles { get; set; }
     public long? BatchTotalFiles { get; set; }
+
+    /// <summary>逐条目事件：压缩包内条目键（解压）或源相对路径（压缩）。非逐条目报告时为 null。</summary>
+    public string? EntryKey { get; set; }
+
+    /// <summary>逐条目终态。非逐条目报告时为 null（此时本对象是常规进度报告）。
+    /// 不为 null 即表示这是一次逐条目事件报告，可与常规字段同时存在。</summary>
+    public ArchiveEntryStatus? EntryStatus { get; set; }
 }
 
 /// <summary>

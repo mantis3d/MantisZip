@@ -92,12 +92,16 @@ public class TarGzEngine : IArchiveEngine
                     if (resolved == null)
                     {
                         conflictStats.RecordSkipped();
+                        // 逐条目状态（D2）：冲突跳过 → Skipped
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
                         // 跳过文件，TarReader.MoveToNextEntry 自动处理流推进
                         continue;
                     }
                     if (existedBefore && resolved == outputFilePath)
                     {
                         conflictStats.RecordOverwritten();
+                        // 逐条目状态（D2）：覆盖旧文件 → Overwritten
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Overwritten });
                     }
 
                     try
@@ -138,11 +142,16 @@ public class TarGzEngine : IArchiveEngine
                         // 恢复文件原始修改时间
                         try { File.SetLastWriteTime(resolved, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolved}: {tsEx.Message}"); }
                         successCount++;
+                        // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                        if (!(existedBefore && resolved == outputFilePath))
+                            progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Completed });
                     }
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：权限失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                         failedEntries++;
                     }
                     catch (IOException iox)
@@ -150,6 +159,8 @@ public class TarGzEngine : IArchiveEngine
                         // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                         CoreLog.Info($"ExtractAsync: write failed for '{entryKey}': {iox.Message}");
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：IO 写入失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                         failedEntries++;
                     }
                 }
@@ -157,37 +168,49 @@ public class TarGzEngine : IArchiveEngine
             else if (ext == ".gz")
             {
                 // 单纯 GZip 解压单个文件
+                var gzEntryKey = Path.GetFileNameWithoutExtension(archivePath);
                 using var inputStream = File.OpenRead(archivePath);
                 using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
-                var outputPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(archivePath));
+                var outputPath = Path.Combine(destinationPath, gzEntryKey);
                 var existedBefore = File.Exists(outputPath);
                 var resolved = await FileConflictHelper.ResolvePathAsync(outputPath, options);
                 if (resolved == null)
                 {
                     conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）：冲突跳过 → Skipped
+                    progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Skipped });
                 }
                 else
                 {
                     if (existedBefore && resolved == outputPath)
                     {
                         conflictStats.RecordOverwritten();
+                        // 逐条目状态（D2）：覆盖旧文件 → Overwritten
+                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Overwritten });
                     }
                     try
                     {
                         using var output = File.Create(resolved);
                         gzipStream.CopyTo(output);
                         successCount = 1;
+                        // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                        if (!(existedBefore && resolved == outputPath))
+                            progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Completed });
                     }
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractAsync: permission denied for '{outputPath}': {uax.Message}");
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：权限失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Failed });
                         failedEntries = 1;
                     }
                     catch (IOException iox)
                     {
                         CoreLog.Info($"ExtractAsync: write failed for '{outputPath}': {iox.Message}");
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：IO 写入失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Failed });
                         failedEntries = 1;
                     }
                 }
@@ -258,6 +281,8 @@ public class TarGzEngine : IArchiveEngine
                         if (!TarWriteFileWithRetry(fullPath, relativePath, options, writer, cancellationToken))
                         {
                             if (cancellationToken.IsCancellationRequested) break;
+                            // 逐条目状态（D2）：读取失败被跳过（ErrorResolver Skip 或重试耗尽）→ Skipped
+                            progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped });
                             continue;
                         }
                         processedFiles++;
@@ -268,7 +293,10 @@ public class TarGzEngine : IArchiveEngine
                             PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
                             FilePercentComplete = 100,
                             TotalFiles = totalFiles,
-                            ProcessedFiles = processedFiles
+                            ProcessedFiles = processedFiles,
+                            // 逐条目状态（D2）：本文件写入完成 → Completed（复用既有上报，非节流路径）
+                            EntryKey = relativePath,
+                            EntryStatus = ArchiveEntryStatus.Completed
                         });
                     }
                 }
@@ -641,11 +669,15 @@ public class TarGzEngine : IArchiveEngine
                     if (resolved == null)
                     {
                         conflictStats.RecordSkipped();
+                        // 逐条目状态（D2）：冲突跳过 → Skipped
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
                         continue; // 跳过/覆盖旧/覆盖小
                     }
                     if (existedBefore && resolved == outputPath)
                     {
                         conflictStats.RecordOverwritten();
+                        // 逐条目状态（D2）：覆盖旧文件 → Overwritten
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Overwritten });
                     }
 
                     try
@@ -688,6 +720,9 @@ public class TarGzEngine : IArchiveEngine
                         catch (Exception tsEx) { CoreLog.Info($"ExtractEntriesAsync: failed to set timestamp on {resolved}: {tsEx.Message}"); }
 
                         processed++;
+                        // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                        if (!(existedBefore && resolved == outputPath))
+                            progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Completed });
 
                         var now2 = DateTime.Now;
                         if (now2 - lastReportTime >= reportInterval || processed == targetFound)
@@ -707,6 +742,8 @@ public class TarGzEngine : IArchiveEngine
                     {
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{entryKey}': {uax.Message}");
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：权限失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                         failedEntries++;
                     }
                     catch (IOException iox)
@@ -714,6 +751,8 @@ public class TarGzEngine : IArchiveEngine
                         // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                         CoreLog.Info($"ExtractEntriesAsync: write failed for '{entryKey}': {iox.Message}");
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：IO 写入失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                         failedEntries++;
                     }
                 }
@@ -741,12 +780,16 @@ public class TarGzEngine : IArchiveEngine
                 if (resolved == null)
                 {
                     conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）：冲突跳过 → Skipped
+                    progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Skipped });
                 }
                 else
                 {
                     if (existedBefore && resolved == outputPath)
                     {
                         conflictStats.RecordOverwritten();
+                        // 逐条目状态（D2）：覆盖旧文件 → Overwritten
+                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Overwritten });
                     }
                     try
                     {
@@ -754,17 +797,24 @@ public class TarGzEngine : IArchiveEngine
                         using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
                         using var output = File.Create(resolved);
                         gzipStream.CopyTo(output);
+                        // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                        if (!(existedBefore && resolved == outputPath))
+                            progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Completed });
                     }
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{outputPath}': {uax.Message}");
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：权限失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Failed });
                         failedEntries++;
                     }
                     catch (IOException iox)
                     {
                         CoreLog.Info($"ExtractEntriesAsync: write failed for '{outputPath}': {iox.Message}");
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：IO 写入失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Failed });
                         failedEntries++;
                     }
                 }

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Tests.Fixtures;
@@ -588,5 +589,46 @@ public class SevenZipEngineTests : IDisposable
 
         Assert.NotEmpty(progressItems);
         Assert.Contains(progressItems, p => p.PercentComplete == 100);
+    }
+
+    // ===== 逐条目状态遥测（EntryStatus / EntryKey） =====
+
+    /// <summary>
+    /// 同步线程安全的进度收集器：不能使用 System.Progress&lt;T&gt;（它经
+    /// SynchronizationContext/线程池异步派发，测试在 await 返回时尚未收到回调，
+    /// 导致报告时序性丢失）。
+    /// </summary>
+    private sealed class ProgressCollector : IProgress<ArchiveProgress>
+    {
+        private readonly ConcurrentBag<ArchiveProgress> _items = new();
+        public void Report(ArchiveProgress value) => _items.Add(value);
+        /// <summary>当前收集到的报告快照（await 引擎完成后再读取，无时序依赖）。</summary>
+        public List<ArchiveProgress> Items => _items.ToList();
+    }
+
+    /// <summary>
+    /// (e) 7z 解压逐条目遥测：逐条目报告数量 == 压缩包内非目录文件数，
+    /// 且全新空目录下全部为 Completed。
+    /// </summary>
+    [Fact]
+    public async Task SevenZip_ExtractAsync_ReportsPerEntry()
+    {
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return; // Skip if 7z.exe not available
+        TrackFile(archive);
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        var collector = new ProgressCollector();
+
+        await _engine.ExtractAsync(archive, dest, progress: collector);
+
+        var fileCount = (await _engine.ListEntriesAsync(archive)).Count(e => !e.IsDirectory);
+        Assert.True(fileCount > 0, "7z fixture should contain at least one file");
+
+        var entryReports = collector.Items.Where(p => p.EntryStatus.HasValue).ToList();
+        // 逐条目报告数 == 压缩包内非目录文件数（不多不少，目录条目不上报）
+        Assert.Equal(fileCount, entryReports.Count);
+        // 全新空目录无冲突 → 全部 Completed
+        Assert.All(entryReports, p => Assert.Equal(ArchiveEntryStatus.Completed, p.EntryStatus));
     }
 }

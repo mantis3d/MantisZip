@@ -310,12 +310,17 @@ public class ZipEngine : IArchiveEngine
                 if (resolvedPath == null)
                 {
                     conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）：冲突跳过 → Skipped
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
                     processedBytes += entry.Size;
                     continue;
                 }
+                // 逐条目状态（D2）：本条目写入结果按是否覆盖上报 Completed/Overwritten
+                var entryOverwritten = false;
                 if (existedBefore && resolvedPath == outputPath)
                 {
                     conflictStats.RecordOverwritten();
+                    entryOverwritten = true;
                 }
 
                 var entrySize = entry.Size;
@@ -363,12 +368,16 @@ public class ZipEngine : IArchiveEngine
 
                     processedBytes += entrySize;
                     processedFiles++;
+                    // 逐条目状态（D2）：写入成功 → Completed 或 Overwritten
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed });
                 }
                 catch (UnauthorizedAccessException uax)
                 {
                     CoreLog.Info($"ExtractAsyncSequential: permission denied for '{entryKey}': {uax.Message}");
                     failedEntries++;
                     conflictStats.RecordFailed();
+                    // 逐条目状态（D2）：权限失败 → Failed
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
                 catch (IOException iox)
                 {
@@ -377,6 +386,8 @@ public class ZipEngine : IArchiveEngine
                     CoreLog.Info($"ExtractAsyncSequential: write failed for '{entryKey}': {iox.Message}");
                     failedEntries++;
                     conflictStats.RecordFailed();
+                    // 逐条目状态（D2）：IO 写入失败 → Failed
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
             }
 
@@ -540,6 +551,8 @@ public class ZipEngine : IArchiveEngine
                 if (resolvedPath == null)
                 {
                     conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）：冲突跳过 → Skipped（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
                     lock (syncLock)
                     {
                         processedBytes += entrySize;
@@ -548,9 +561,12 @@ public class ZipEngine : IArchiveEngine
                     batchProcessedBytes += entrySize;
                     continue;
                 }
+                // 逐条目状态（D2）：本条目写入结果按是否覆盖上报 Completed/Overwritten
+                var entryOverwritten = false;
                 if (existedBefore && resolvedPath == outputPath)
                 {
                     conflictStats.RecordOverwritten();
+                    entryOverwritten = true;
                 }
 
                 try
@@ -559,6 +575,8 @@ public class ZipEngine : IArchiveEngine
                     if (entry == null)
                     {
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：条目丢失 → Failed（锁外上报，避免锁竞争）
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
@@ -626,6 +644,8 @@ while (true)
                     }
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 逐条目状态（D2）：写入成功 → Completed 或 Overwritten（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed });
                 }
                 catch (OperationCanceledException)
                 {
@@ -638,6 +658,8 @@ while (true)
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
                 catch (IOException iox)
                 {
@@ -646,6 +668,8 @@ while (true)
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
                 catch (Exception ex)
                 {
@@ -654,6 +678,8 @@ while (true)
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
             }
 
@@ -801,12 +827,17 @@ while (true)
                 if (resolvedPath == null)
                 {
                     conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）：冲突跳过 → Skipped
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
                     processedBytes += entry.Size;
                     continue;
                 }
+                // 逐条目状态（D2）：本条目写入结果按是否覆盖上报 Completed/Overwritten
+                var entryOverwritten = false;
                 if (existedBefore && resolvedPath == outputPath)
                 {
                     conflictStats.RecordOverwritten();
+                    entryOverwritten = true;
                 }
 
                 var entrySize = entry.Size;
@@ -853,6 +884,8 @@ while (true)
 
                     processedBytes += entrySize;
                     processedFiles++;
+                    // 逐条目状态（D2）：写入成功 → Completed 或 Overwritten
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed });
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (UnauthorizedAccessException uax)
@@ -860,6 +893,8 @@ while (true)
                     CoreLog.Info($"ExtractEntriesAsyncSequential: permission denied for '{entryKey}': {uax.Message}");
                     failedEntries++;
                     conflictStats.RecordFailed();
+                    // 逐条目状态（D2）：权限失败 → Failed
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
                 catch (IOException iox)
                 {
@@ -867,6 +902,8 @@ while (true)
                     CoreLog.Info($"ExtractEntriesAsyncSequential: write failed for '{entryKey}': {iox.Message}");
                     failedEntries++;
                     conflictStats.RecordFailed();
+                    // 逐条目状态（D2）：IO 写入失败 → Failed
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
             }
 
@@ -1029,6 +1066,8 @@ while (true)
                 if (resolvedPath == null)
                 {
                     conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）：冲突跳过 → Skipped（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
                     lock (syncLock)
                     {
                         processedBytes += entrySize;
@@ -1038,9 +1077,12 @@ while (true)
                     continue;
                 }
 
+                // 逐条目状态（D2）：本条目写入结果按是否覆盖上报 Completed/Overwritten
+                var entryOverwritten = false;
                 if (existedBefore && resolvedPath == outputPath)
                 {
                     conflictStats.RecordOverwritten();
+                    entryOverwritten = true;
                 }
 
                 try
@@ -1049,6 +1091,8 @@ while (true)
                     if (entry == null)
                     {
                         conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：条目丢失 → Failed（锁外上报，避免锁竞争）
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
@@ -1116,6 +1160,8 @@ while (true)
                     }
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 逐条目状态（D2）：写入成功 → Completed 或 Overwritten（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed });
                 }
                 catch (OperationCanceledException)
                 {
@@ -1128,6 +1174,8 @@ while (true)
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
                 catch (IOException iox)
                 {
@@ -1137,6 +1185,8 @@ while (true)
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
                 catch (Exception ex)
                 {
@@ -1145,6 +1195,8 @@ while (true)
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
                 }
             }
 
@@ -1362,9 +1414,15 @@ while (true)
                             {
                                 CoreLog.Trace($"[TRACE]   StoreGroup entry: FullPath={fullPath} → RelativePath={relativePath} → ArchivePath.Normalize={ArchivePath.Normalize(relativePath)}");
                                 cancellationToken.ThrowIfCancellationRequested();
-                                ReadFileWithRetry(fullPath, relativePath, options, zipWriter,
+                                var storedOk = ReadFileWithRetry(fullPath, relativePath, options, zipWriter,
                                     ref processedBytes, totalBytes, totalFiles, ref processedFiles,
                                     cancellationToken, progress, ref lastReportTime);
+                                // 逐条目状态（D2）：写入成功 → Completed；读取被跳过 → Skipped
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    EntryKey = relativePath,
+                                    EntryStatus = storedOk ? ArchiveEntryStatus.Completed : ArchiveEntryStatus.Skipped
+                                });
                             }
 
                             // CompressGroup：需要压缩的文件通过 7z.dll 多线程压缩
@@ -1398,8 +1456,13 @@ while (true)
                                 cancellationToken, progress, ref lastReportTime))
                         {
                             if (cancellationToken.IsCancellationRequested) break;
+                            // 逐条目状态（D2）：读取被跳过 → Skipped
+                            progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped });
                             continue;
                         }
+
+                        // 逐条目状态（D2）：写入成功 → Completed
+                        progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Completed });
 
                         var now = DateTime.Now;
                         if (now - lastReportTime >= reportInterval)
@@ -2751,6 +2814,8 @@ while (true)
         // 7z mt=on 多线程压缩时事件可能并发触发，用锁保护计数与节流，
         // 避免此前「同步调用 + 无进度事件」导致的进度条长时间停滞。
         var reportLock = new object();
+        // 逐条目状态（D2）：待完成条目键 FIFO 队列（按镜像枚举顺序预填充，Finished 事件出队上报）
+        var pendingEntryKeys = new Queue<string>();
         int startedFiles = 0;
         long startedBytes = 0;
         var localLastReportTime = lastReportTime; // 拷贝 ref 参数供 lambda 捕获
@@ -2759,6 +2824,7 @@ while (true)
             var name = e.FileName ?? "";
             var displayName = string.IsNullOrEmpty(name) ? "" : Path.GetFileName(name);
 
+            ArchiveProgress? startedReport;
             lock (reportLock)
             {
                 startedFiles++;
@@ -2774,7 +2840,7 @@ while (true)
                     ? Math.Min(100, (double)(storeProcessedBytes + startedBytes) / totalBytes * 100)
                     : (totalFiles > 0 ? (double)(storeProcessedFiles + startedFiles) / totalFiles * 100 : 0);
 
-                progress?.Report(new ArchiveProgress
+                startedReport = new ArchiveProgress
                 {
                     CurrentFile = displayName,
                     PercentComplete = pct,
@@ -2783,8 +2849,23 @@ while (true)
                     ProcessedBytes = storeProcessedBytes + startedBytes,
                     TotalFiles = totalFiles,
                     ProcessedFiles = storeProcessedFiles + startedFiles,
-                });
+                };
             }
+            // 锁内只拷贝共享变量，释放锁后再上报，避免锁竞争（AGENTS.md：锁内 Report 曾致 25x 回退）
+            progress?.Report(startedReport);
+        };
+
+        // 逐条目状态（D2）：7z 每完成一个文件触发 Finished（事件无文件名），按预填 FIFO 顺序出队上报 Completed。
+        // 出队在 reportLock 内，Report 在锁外，避免锁竞争（AGENTS.md：锁内 Report 曾致 25x 回退）
+        compr.FileCompressionFinished += (_, _) =>
+        {
+            string? finishedEntryKey;
+            lock (reportLock)
+            {
+                finishedEntryKey = pendingEntryKeys.Count > 0 ? pendingEntryKeys.Dequeue() : null;
+            }
+            if (string.IsNullOrEmpty(finishedEntryKey)) return;
+            progress?.Report(new ArchiveProgress { EntryKey = finishedEntryKey, EntryStatus = ArchiveEntryStatus.Completed });
         };
 
         // ── 路径修复：7z CompressFilesEncrypted 会剥离所有输入文件的最长公共前缀，
@@ -2802,11 +2883,25 @@ while (true)
                 File.Copy(fullPath, destPath, overwrite: true);
             }
 
-            var mirrorCount = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories).Length;
+            var mirrorFiles = Directory.GetFiles(tempDir, "*", SearchOption.AllDirectories);
+            var mirrorCount = mirrorFiles.Length;
             CoreLog.Trace($"[TRACE] CompressGroupWithSevenZip: {mirrorCount} mirror files, tempDir={tempDir}, tempZip={tempPath}");
 
             if (mirrorCount > 0)
             {
+                // 逐条目状态（D2）：按 GetFiles 枚举顺序（= 7z 压缩顺序，实测一致）预填 FIFO 队列，
+                // FileCompressionFinished 事件逐个出队上报 Completed
+                var relativePathByMirrorPath = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                foreach (var (_, relativePath) in files)
+                {
+                    relativePathByMirrorPath[Path.GetFullPath(Path.Combine(tempDir, relativePath))] = relativePath;
+                }
+                foreach (var mirrorPath in mirrorFiles)
+                {
+                    if (relativePathByMirrorPath.TryGetValue(mirrorPath, out var relativePath))
+                        pendingEntryKeys.Enqueue(relativePath);
+                }
+
                 compr.CompressDirectory(tempDir, tempPath);
             }
         }
