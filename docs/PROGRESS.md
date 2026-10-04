@@ -25,6 +25,10 @@
 
 按月分组，每月按日期从新到旧排列。
 
+#### 2026-10
+
+- **10-04** — 进度窗口原型对齐改造 T1–T11 全部落地（F1/F2/F4 已通过，F3 自动化部分 7✅/5◐/0✗）：**纠偏 v2 计划的原型误读**——删除 `TopDisplayMode`（全路径/仅目录/仅文件名）+ `DensityMode`（紧凑/标准/宽松），换为 v6 原型真实语义的内容模式（简约/详细/列表）+ 信息量分级（少/中/完整）；`ArchiveProgress` 扩展 `EntryKey`/`EntryStatus` 契约（**不改 `IArchiveEngine` 签名**）+ 新增 `EntryProgressItem` 行模型，三引擎 9 处埋点复用 `ConflictStatsCounter` 站点，列表模式逐文件 6 态（✓完成/✗出错/⏭跳过/⏳n%/○等待/已覆盖）；布局 10 行→7 行（批处理列表上移顶部）；5 张图标统计卡（第 5 张为**真实** `ParallelExtractDegree`「并行」，替换假「进程 N 线程」）；详细模式复用真实并行批次；补漏失败行内错误消息 + 复制 toast + 密码徽标入场动画；`ExtractFlow` 条目播种（ZIP/7z 走 `ListEntriesAsync` 含○等待行，TAR/GZ 按 D7 **不播种**走渐进建行，>5000 条转渐进）；新增 `PasswordRetryLoop` 错密码循环重弹兜底。**性能硬约束全部守住**：逐条目上报锁外 `Report`、列表虚拟化，六场景基准中位数回退均 ≤3%（最大 +1.5% 来自 `progress=null` 消费者）；F1 构建 0 错误 0 警告、F2 Core 549 + Avalonia 109 测试全绿、三语各 1257 key（新增 32/净删 0）。**已记录功能缺口**：CLI 批处理解压（`--extract-here`/`-to-name`/`-smart`）直连 `engine.ExtractAsync` 绕过 `ExtractFlow`，致 ZIP 列表模式为空且「并行」卡不出现（主窗口路径不受影响）
+
 #### 2026-09
 
 - **09-30** — 进度窗口增强 T1-T6 数据/模型层（T7-T9 UI 待续）：`ProgressDisplayMode` 枚举（TopDisplayMode 三模式 + DensityMode 三档）+ `ParallelBatchProgressItem` 批次行模型；`ProgressViewModel` 重构——模式/密度属性 + `NotifyDisplayProperties()` 集中通知、冲突统计组（`HasConflictStats`，压缩路径不上报隐藏）、已用/剩余时间 ETA、`UpsertParallelBatch`/`SetCurrentBatchItem` 批次集合（末档案终值兜底）、`CurrentFileLabel`/`FileCountText`/`BatchArchiveIndexText`；亮/暗主题成对新增 `ThemeStatusFailedBrush`/`ThemeStatusSkippedBrush`；三语各 +20 key（统计/时间/模式/密度/批次），三语 key 校验通过；构建 0 错误，Core 544 + Avalonia 96 测试全绿

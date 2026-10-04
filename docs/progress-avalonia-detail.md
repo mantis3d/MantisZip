@@ -6,6 +6,37 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-04** — 进度窗口原型对齐改造 T1–T11 全部落地（纠偏 v2 计划的原型误读）
+  - **背景**：`progress-window-enhancement.md` v2 的「原型对应表」误读了 v6 原型——把原型的「简约/详细/列表」当成「全路径/仅目录/仅文件名」，把「少/中/完整」当成「紧凑/标准/宽松」，导致 8 个点跑偏。新计划 `.omo/plans/未开始/progress-window-prototype-alignment.md` 纠偏，承接上一提交（`660fbf3` T1–T6）的数据层。
+  - **T1–T4 Core 层（逐条目遥测，不改 `IArchiveEngine` 签名）**：
+    - `Abstractions/ArchiveEngine.cs`：`ArchiveProgress` 新增 `EntryKey` + `EntryStatus`（nullable 可选，存量构造不受影响）
+    - 新增 `Models/EntryProgressItem.cs`：UI 侧行模型（`EntryRowState` = Pending/Active/Completed/Failed/Skipped/Overwritten）
+    - `Engines/ZipEngine.cs`（3 处）、`Engines/SevenZipEngine.cs`（4 处）、`Engines/TarGzEngine.cs`（2 处）：共 **9 处埋点**复用既有 `FileConflictHelper.ResolvePathAsync` / `ConflictStatsCounter` 站点，不新增计数路径
+    - `Models/ProgressBatchItem.cs`：批次行统计字段扩展
+    - **锁外 Report 硬约束**（AGENTS.md 记录过锁内 Report 致 25× 回退）：共享字段先在锁内拷贝、释放后再 `progress?.Report()`
+  - **T5–T6 UI 模型/VM 层**：
+    - `Models/ProgressDisplayMode.cs`：**删除** `TopDisplayMode` + `DensityMode`，替换为原型语义的 `ProgressContentMode`（Compact/Detailed/List）+ `ProgressDensityLevel`（Minimal/Standard/Full）
+    - `Models/ParallelBatchProgressItem.cs`：批次行改用真实 `ParallelExtractDegree` 元数据（替换假「进程 N 线程」）
+    - `ViewModels/ProgressViewModel.cs`：`SetProgress` 消费 `EntryKey`/`EntryStatus`，未播种时收到报告即 upsert 新行（兼容 TAR/GZ 渐进模式）；`RefreshTimeDisplay()` 时间/ETA；冲突统计组 `HasConflictStats`（压缩路径不上报保持隐藏，规则 6 统一隐藏而非禁用）；末档案 100% 终值兜底写行统计
+  - **T7–T9 布局与面板**：
+    - `Dialogs/ProgressWindow.axaml`：**10 行 → 7 行**网格重写，批处理列表上移至窗口顶部、整体信息区下沉加独立底色；5 张图标统计卡
+    - 内容模式三 RadioButton + 信息量分级三档；详细模式面板**复用真实并行批次**（标签「批次」而非「线程」），无并行批次时整块隐藏（规则 6）
+    - 列表模式 4 列（图标/文件名/大小/状态）逐文件 6 态 + 虚拟化；`ItemsControl` 行高走 `ControlHeightSm`、批次行走 `ControlHeightMd`（规则 7，三档实测 22/26/30 与 28/32/38）
+  - **T10 补漏**：失败行**内错误消息**渲染（此前 `ErrorMessage` 只写不显示）+ 复制 toast + 密码徽标入场动画（`BatchPasswordState` Matching→Matched→None 时序）
+  - **T11 测试与文案**：`ProgressViewModelTests.cs` 重写 + 新增 `ProgressWindowXamlTests.cs`（XAML 布局断言）；三语 `strings.*.json` **各 +32 key**（较基线 `9551e18` 净新增 32、净删除 0），`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 通过
+  - **播种策略（D7 分档）**：`ExtractFlow` 新增 `TrySeedEntryItemsInBackground`——ZIP/7z 走 `ListEntriesAsync`（仅读头，廉价，含「○等待」行），TAR/GZ **不播种**（其 `ListEntriesAsync` 是全流扫描，成本≈解压一次），任意路径条目数 > 5000 转渐进；播种为 **fire-and-forget**（`_ = SeedEntryItemsAsync(...)` 不 await），与解压并发
+  - **新增** `Services/PasswordRetryLoop.cs`：错密码循环重弹兜底（取消→行标 `Status_PasswordCancelled` 批继续）
+  - **通用压缩路径播种经用户决定正式延期**：压缩侧要拿全量条目须先列目录再压缩，对 TAR/GZ 违反 D7、对 zip/7z 多一次 `ListEntriesAsync` I/O，收益不抵成本。恢复条件：压缩流程能零额外 I/O 获得源条目全集
+  - **验证（F1–F4）**：
+    - F1 `dotnet build`（`/p:SkipShellExtCopy=true` 规避 Explorer 占用 ShellExt.dll）**0 错误 0 警告**
+    - F2 **Core 549 通过 / 0 失败 / 3 跳过**；**Avalonia 109 通过 / 0 失败 / 2 跳过**
+    - F4 六场景基准**中位数回退均 ≤3%**：ZIP 串行 −0.5% / parallel `progress=null` +1.5%（最大回退）/ parallel `Interlocked` −2.2% / 7z −2.2% / 压缩 −1.2% / 列表模式并发播种 +0.7%
+    - F3 自动化取证 **7✅ / 5◐ / 0✗**：UI Automation + 真实鼠标点击（`SendInput`——RadioButton 用 `Click=`，UIA `SelectionItemPattern.Select()` 只改选中态不触发处理器）+ 像素采样；实测内容模式双向切换、详细模式正/负向可见性、密度三档、明暗主题主色与声明调色板逐一吻合、Rule 7 行高三档、压缩+解压双路径真实进度；**批次级 `❌ 出错` + 行内 `Failed to locate the Zip Header` + `完成 0 项，失败 1 项`**（证明 `ErrorMessage` 只写不显示已修复）；TAR/GZ 进度窗口 t+1.7s 出现、300/300 解压成功退出码 0
+    - 两处基准陷阱已记录：多线程共享字段消费者致伪回退 +10.1%（不可复现，真实 UI 消费者为 `Dispatcher.UIThread.Post` 入队）、列表模式须按 fire-and-forget 建模（同步 await 播种会假报 +7.3%）
+  - **已记录功能缺口（用户已确认补齐，待实施）**：CLI 批处理解压（`--extract-here`/`--extract-to-name`/`--extract-smart`）的 `RunCliDirectExtractBatchAsync`（`App.axaml.cs:1415`）**直连 `engine.ExtractAsync` 绕过 `ExtractFlow`**，致 **ZIP** 列表模式为空且「并行」卡不出现；主窗口解压路径不受影响。取证注意：`--extract <path>` 遵循 `AppSettings.ExtractDestination`（默认 `ask`）会停在目录选择框，自动化须用 `--extract-here`
+  - **非阻塞瑕疵**（已记录待后续）：内容模式/密度 RadioButton 的 `AutomationId` 仍用旧枚举语义命名（`ModeFullPathRadio`/`ModeDirOnlyRadio`/`ModeNameOnlyRadio`/`Density*Radio`）；`PauseButton`/`CancelButton` 可访问名取到 `Avalonia.Controls.StackPanel`
+  - **未完成（F3 残余，均需人眼）**：纯观感（配色美观度/动画流畅度/裁切/失败行是否实际呈红）、条目级 6 态中 4 态（`⏳n%`/`○等待`/`⏭跳过`/`已覆盖`）、密码徽标 `🔑`/熄灭终态 + Flyout + 复制 toast、主窗口路径并行卡正向、TAR/GZ **列表模式**渐进建行、10 万条目 UI 流畅度
+
 **2026-09-30** — 进度窗口增强 T1-T6 执行完毕（Core 数据通道 + UI 行模型/VM；XAML 布局待 T7-T9）
   - **Core 层（T1-T4）**：
     - `Abstractions/ArchiveEngine.cs`：`ArchiveProgress` 新增 8 个 nullable 字段——冲突统计（`SkippedFiles`/`FailedFiles`/`OverwrittenFiles`）+ ZIP 并行批次（`BatchIndex`/`BatchCount`/`BatchPercentComplete`/`BatchProcessedFiles`/`BatchTotalFiles`），全部 `get; set;` 可选，存量 `new ArchiveProgress{...}` 构造不受影响；`ExtractResult` 新增 `SkippedEntries`/`OverwrittenEntries`（init-only）

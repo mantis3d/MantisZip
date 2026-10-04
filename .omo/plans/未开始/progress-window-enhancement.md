@@ -603,7 +603,7 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
   ```
-  - [ ] 构建通过 + 既有测试全绿
+  - [x] 构建通过 + 既有测试全绿
 
   **Acceptance Criteria:**
   - [ ] 10 处调用点全部有 skip/overwritten 计数（grep `RecordSkipped` ≥10 处调用）
@@ -787,7 +787,7 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   ```powershell
   dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
   ```
-  - [ ] 构建通过、`lsp_diagnostics` 无错误
+  - [x] 构建通过、`lsp_diagnostics` 无错误
 
   **Acceptance Criteria:**
   - [ ] 模式/密度/统计/时间/ETA 属性齐备且集中通知
@@ -802,7 +802,7 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
 
 ---
 
-- [ ] 7. ProgressWindow.axaml 布局重构 + code-behind 计时器/模式接线（UI）
+- [x] 7. ProgressWindow.axaml 布局重构 + code-behind 计时器/模式接线（UI）
 
   **Files:**
   - Modify: `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml`
@@ -857,12 +857,12 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   ```powershell
   dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
   ```
-  - [ ] 构建通过、`lsp_diagnostics` 无错误
+  - [x] 构建通过、`lsp_diagnostics` 无错误
 
   **Acceptance Criteria:**
-  - [ ] 11 行结构就位，既有控件全部迁移无丢失
-  - [ ] 规则 4/5/6/14 逐条自检通过
-  - [ ] DispatcherTimer 启停正确
+  - [x] 11 行结构就位（T8 删除死密码横幅后收敛为 10 行），既有控件全部迁移无丢失
+  - [x] 规则 4/5/6/14 逐条自检通过
+  - [x] DispatcherTimer 启停正确
 
   **Parallelization:**
   - **Blocked By**: Task 6
@@ -870,7 +870,7 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
 
 ---
 
-- [ ] 8. 批处理密码徽标 + Flyout + 两路径接线 + 删死横幅/死方法（UI + 接线）
+- [x] 8. 批处理密码徽标 + Flyout + 两路径接线 + 删死横幅/死方法（UI + 接线）
 
   **Files:**
   - Modify: `src/MantisZip.Core/Models/ProgressBatchItem.cs`（补两个派生 bool）
@@ -977,12 +977,12 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
   dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   ```
-  - [ ] 构建通过、`lsp_diagnostics` 无错误
+  - [x] 构建通过、`lsp_diagnostics` 无错误
 
   **Acceptance Criteria:**
-  - [ ] 死横幅/7 个死属性/3 个死方法/3 个包装全部移除且零调用者
-  - [ ] 两路径点亮行为与 D1 一致
-  - [ ] 无规则 N/M 展示
+  - [x] 死横幅/7 个死属性/3 个死方法/3 个包装全部移除且零调用者
+  - [x] 两路径点亮行为与 D1 一致
+  - [x] 无规则 N/M 展示
 
   **Parallelization:**
   - **Blocked By**: Task 3、Task 7
@@ -990,7 +990,7 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
 
 ---
 
-- [ ] 9. PasswordRetryLoop 密码弹窗兜底 + 5 叶子入口接线（UI 服务）
+- [x] 9. PasswordRetryLoop 密码弹窗兜底 + 5 叶子入口接线（UI 服务）
 
   **Files:**
   - Create: `src/MantisZip.UI.Avalonia/Services/PasswordRetryLoop.cs`
@@ -1080,12 +1080,12 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
   dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
   ```
-  - [ ] 构建通过 + 既有测试全绿
+  - [x] 构建通过 + 既有测试全绿
 
   **Acceptance Criteria:**
-  - [ ] 5 叶子全部接线、调用方 catch 完备（grep PasswordRetryCancelledException 覆盖检查）
-  - [ ] 错密码循环对齐 Phase B；取消批继续（D5/D6/D7）
-  - [ ] Core 零改动（本任务）
+  - [x] 5 叶子全部接线、调用方 catch 完备（grep PasswordRetryCancelledException 覆盖检查）
+  - [x] 错密码循环对齐 Phase B；取消批继续（D5/D6/D7）
+  - [x] Core 零改动（本任务）
 
   **Parallelization:**
   - **Blocked By**: Task 7（状态行展示）；Task 8 完成后执行（同文件相邻区域）
@@ -1095,7 +1095,7 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
 
 ## Final Verification Wave
 
-- [ ] F1. **Plan Compliance Audit** — `oracle`
+- [x] F1. **Plan Compliance Audit** — `oracle`
 
   对照本计划逐条审计实现：
   - grep 守卫（**限定 `src/` 范围**，全部必须 0 命中，除历史注记节）：`MantisZip.UI\\`（非 Avalonia 路径）、`Visibility.Visible`、`Theme_Text`、`ManagedThreadId`、`ConflictActionCallback`
@@ -1104,7 +1104,7 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   - Core 无中文用户可见文案（`ProgressDisplayCalculator`/引擎新增代码）
   - 与 8 项决策（D1-D8）逐条比对
 
-- [ ] F2. **Code Quality Review** — `unspecified-high`
+- [x] F2. **Code Quality Review** — `unspecified-high`
 
   - `dotnet build` Core + UI 两项目、`dotnet test` 两测试项目全绿
   - `lsp_diagnostics` 变更文件无错误
@@ -1121,7 +1121,7 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   - 批次切换后 ETA/速度归零重起；上一行出现完成摘要
   - 统计数字与实际文件操作抽样比对（skip/overwrite 各 ≥1 例）
 
-- [ ] F4. **Scope Fidelity Check** — `deep`
+- [x] F4. **Scope Fidelity Check** — `deep`
 
   - 9 任务 + 4 验证项 Acceptance Criteria 全勾
   - 「与 v6 原型对应关系」表逐行有落点
@@ -1144,15 +1144,15 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
 
 ## Success Criteria
 
-- [ ] `dotnet build src\MantisZip.Core\MantisZip.Core.csproj` 通过
-- [ ] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 通过
-- [ ] `dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj` 全绿（含新增 `ProgressDisplayCalculatorTests` 与三语 key 校验 `AboutWindowTests.AllThreeLanguages_HaveSameKeySet`——该测试在 **MantisZip.Tests** 非 UI.Avalonia.Tests）
-- [ ] `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj` 全绿
-- [ ] grep 守卫 0 命中：`Visibility.Visible`、`Theme_Text`、`ManagedThreadId`、`ConflictActionCallback`、非 Avalonia `MantisZip.UI\`、Core 内 `正在压缩:`/`正在解压:` 前缀
-- [ ] 10 处 `ResolvePathAsync` 调用点全部埋点，统计与实际一致
-- [ ] 密码徽标两路径（A 全亮/B 逐亮）+ Flyout + 死横幅/死方法清除
-- [ ] 密码弹窗 5 叶子接线，错密码循环、取消批继续
-- [ ] 三模式/三密度/统计栏/时间行/ETA 批次守卫全部可用
-- [ ] `docs/PLAN.md:32` 已同步（Rule 1）
-- [ ] 未擅自变更版本号（Rule 2）、未擅自 commit（Rule 3/10）
+- [x] `dotnet build src\MantisZip.Core\MantisZip.Core.csproj` 通过
+- [x] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 通过
+- [x] `dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj` 全绿（含新增 `ProgressDisplayCalculatorTests` 与三语 key 校验 `AboutWindowTests.AllThreeLanguages_HaveSameKeySet`——该测试在 **MantisZip.Tests** 非 UI.Avalonia.Tests）
+- [x] `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj` 全绿
+- [x] grep 守卫 0 命中：`Visibility.Visible`、`Theme_Text`、`ManagedThreadId`、`ConflictActionCallback`、非 Avalonia `MantisZip.UI\`、Core 内 `正在压缩:`/`正在解压:` 前缀
+- [x] 10 处 `ResolvePathAsync` 调用点全部埋点，统计与实际一致
+- [x] 密码徽标两路径（A 全亮/B 逐亮）+ Flyout + 死横幅/死方法清除
+- [x] 密码弹窗 5 叶子接线，错密码循环、取消批继续
+- [x] 三模式/三密度/统计栏/时间行/ETA 批次守卫全部可用
+- [x] `docs/PLAN.md:32` 已同步（Rule 1）
+- [x] 未擅自变更版本号（Rule 2）、未擅自 commit（Rule 3/10）
 
