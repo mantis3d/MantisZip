@@ -4,7 +4,6 @@
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              xmlns:services="clr-namespace:MantisZip.UI.Avalonia.Services"
              xmlns:local="clr-namespace:MantisZip.UI.Avalonia.Views"
-             xmlns:ac="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.WebView"
 
              x:Class="MantisZip.UI.Avalonia.Views.PreviewPanel"
              x:Name="ThisPanel"
@@ -741,11 +740,27 @@
       </Grid>
     </ScrollViewer>
 
-    <!-- HTML WebView 预览：置于外层网格 Row=1、与 PreviewContentScroller 平级（原生控件放 ScrollViewer 内会导致页面顶部被元数据横条裁切，此处获得真实视口高度，页面全幅渲染） -->
-    <ac:NativeWebView x:Name="HtmlPreviewWebView" Grid.Row="1" Grid.Column="0"
-                      IsVisible="{Binding IsWebViewHtmlVisible}"
-                      Source="{Binding HtmlWebViewUri}"
-                      Background="{DynamicResource ThemeSurfaceBgBrush}" />
+    <!-- HTML WebView 预览宿主：ac:NativeWebView **不在 XAML 中声明**，改为首次真正需要 HTML WebView
+         预览时由 PreviewPanel.axaml.cs 惰性创建并放入本容器（见 EnsureWebViewForHtml）。
+
+         为什么必须惰性：NativeWebView 一旦 attach 就会初始化 WebView2 Runtime，而 WebView2 创建失败
+         （Runtime 缺失 / E_ACCESSDENIED / COM 线程模型冲突）时，异常由 Avalonia 内部的 Task 重新抛到
+         Dispatcher（NativeWebView.OnAttached → Task.ThrowAsync → SendOrPostCallbackDispatcherOperation），
+         位于 ShowPreviewAsync 的 try/catch 之外，会一路传到 AppDomain 并终止进程 —— 日志里只会看到
+         「UIThread EXCEPTION」而没有 ShowPreviewAsync 的异常记录。
+
+         若声明在活动 XAML 树中，只要预览面板首次变为可见（ShowLoading 对**任意**条目都会把
+         IsPreviewVisible 置 true）就会触发 WebView2 初始化，与是否真的预览 HTML 无关，
+         导致无 WebView2 的机器「点任意条目即闪退」。惰性创建后该风险收敛到「仅打开 HTML 预览」，
+         且此时由 WebViewGuard 兜底降级到 ReverseMarkdown。
+
+         位置保持外层网格 Row=1、与 PreviewContentScroller 平级（原生控件放 ScrollViewer 内会导致
+         页面顶部被元数据横条裁切，此处获得真实视口高度，页面全幅渲染）。 -->
+    <ContentControl x:Name="WebViewHost" Grid.Row="1" Grid.Column="0"
+                    IsVisible="{Binding IsWebViewHtmlVisible}"
+                    HorizontalContentAlignment="Stretch"
+                    VerticalContentAlignment="Stretch"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}" />
 
     <!-- HTML 源码预览（WebView 模式下切换源码显示，同样在外层 Grid.Row=1） -->
     <ScrollViewer Grid.Row="1" Grid.Column="0"

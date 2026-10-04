@@ -1331,6 +1331,18 @@ public partial class MainWindowViewModel : ObservableObject
         {
             var ext = Path.GetExtension(entry.Name);
 
+            // 目录条目：没有可预览内容，直接显示"不支持预览"。
+            // 必须短路，否则魔数检测会对 0 字节目录条目发起无意义的 ExtractHeadAsync 提取。
+            // 目录的名称/大小/日期/压缩率已由 Phase 1 的 UpdateCommonMetadata 用目录聚合值填充，
+            // 因此这里与旧路径（跑完魔数检测再落到 ShowUnsupported）的最终显示效果一致。
+            if (entry.IsDirectory)
+            {
+                App.DebugLog("[PRV] Directory entry, skipping preview pipeline");
+                Preview.ShowUnsupported();
+                StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                return;
+            }
+
             // 加密条目且当前无匹配密码：不发起提取，直接提示需要密码。
             // 按条目判断——混合压缩包中未加密的文件仍可正常预览。
             if (entry.IsEncrypted && string.IsNullOrEmpty(_currentPassword))
