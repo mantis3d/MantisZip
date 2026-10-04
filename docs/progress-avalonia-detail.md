@@ -6,6 +6,27 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-04** — 修复 CLI 解压路径缺失列表模式播种与「并行」卡（缺口范围复核为两个叶子）
+  - **背景**：上一条同日记录里「已记录功能缺口」指出 CLI 解压绕过 `ExtractFlow`，导致 ZIP 列表模式为空、「并行」卡恒不出现。用户当日确认补齐（`等下，我改主意了。还是补齐吧。不过请你先提交git`）。
+  - **根因**：`ProgressWindow.SeedEntries` / `SetParallelDegree` 仅由 `ExtractFlow` 建立，而 CLI 解压叶子**直连 `engine.ExtractAsync`**、绕过 `ExtractFlow.ExtractAsync`（后者内部已调 `TrySeedEntryItemsInBackground` 与 `SetParallelDegree`）。`App.axaml.cs` 内共 3 处 `engine.ExtractAsync`：`:1322` 走 `ExtractFlow.ExtractAsync`（本就正常），另两处需补。
+  - **⚠️ 范围修正（本次最大发现）**：缺口**不止多文件批处理叶子**。路由在 `App.axaml.cs:249-254` 分叉——`Count == 1` → `RunExtractCliAsync` → `RunCliExtractWithProgressAsync`（单文件叶子）；`Count > 1` → `RunCliDirectExtractBatchAsync`（多文件叶子）。**上一轮自动化取证用的正是单个压缩包，实际命中的一直是单文件叶子**，这解释了「只改批处理叶子后运行时毫无变化」的假象。两个叶子现已同时接线。
+  - **改动**：
+    - `Services/ExtractFlow.cs`：`ResolveDisplayParallelDegree`、`TrySeedEntryItemsInBackground` 由 `private` 放宽为 `internal` 供 CLI 复用（纯可见性放宽，行为不变；注释补明 CLI 绕过原因）。
+    - `App.axaml.cs` 单文件叶子（`RunCliExtractWithProgressAsync`，`:1083`）：解压启动前 `TrySeedEntryItemsInBackground(...)` + `SetParallelDegree(...)`；无需 `ClearEntries`——`InitBatchMode`/`SetCurrentBatchItem` 已清空条目行并把并行度归零。
+    - `App.axaml.cs` 多文件叶子（`RunCliDirectExtractBatchAsync`，`:1415`）：额外 `ClearEntries()`（`InitBatchMode` 每批只清一次，**逐包必须清**，否则第 2 包显示第 1 包的行）+ 并行度**逐包重算**（非 zip/7z 返回 1 → `HasParallelDegree=false`，该卡自动隐藏，符合规则 6）。
+    - `tests/MantisZip.UI.Avalonia.Tests/ProgressViewModelTests.cs`：播种路径此前**零覆盖**（只覆盖了未播种的 upsert 兜底），新增 5 条——建行顺序与 Pending/本地化文案、二次播种清掉旧行、**播种→终态事件原地更新不重复行**、`ClearEntryItems` 同步重置 key 索引（同名 key 终态事件须新建行而非改废弃对象）、`HasEntryItems` 通知。
+  - **验证**：构建 0 警告 0 错误；Avalonia 测试 **114/0/2**（109 → 114）、Core **549/0/3** 与基线一致，无回归。
+  - **运行时复验（已执行，结论分项）**：
+    - ✅ **「并行」卡 —— 决定性证据**。`--extract-here` 单文件（15,000 × 32KB ZIP，`ParallelExtractDegree=20`）切「完整」密度后，UIA 全量枚举文本元素得到 `⚙ / 并行 / 20`，数值 20 与设置值及 `Environment.ProcessorCount` 一致。修复前单文件叶子不调 `SetParallelDegree` → `HasParallelDegree=false` → 该卡**不可能渲染**，故此项证明该叶子的并行度接线确已生效（与播种同一叶子、同一段代码，互为支撑）。
+    - ◐ **播种 —— 强证据但缺决定性证据，不宣称闭环**。列表模式确实出现条目行；两轮对照：15,000 × 32KB 采到 `f_000007, f_000010, f_000003, f_000001…`（散乱＝完成顺序，与未播种的 upsert 兜底一致），60 × 6MB 采到 `f_000000…f_000005` 严格归档顺序且 `已处理 60`/`100%` 时 60 行齐全。**但归档顺序不足以区分播种与 upsert**——60 个等大 6MB 文件的完成顺序本就≈归档顺序。决定性证据应是 `○等待`（Pending）行，**只有播种才会产生**，而两轮均未捕获（32KB 文件瞬时完成；6MB 文件被 20 线程直接推入 `⏳ Active`）。建议后续构造「单条超大 + 多条小文件」并在 t≈0.2s 采样以暴露 Pending 行。
+  - **探针方法论修正（本轮踩坑，勿重蹈）**：
+    - **输出目录必须每次唯一**：复用残留目录会触发模态冲突框把窗口冻在 0%，表现为「窗口瞬现即灭、轮询抓不到」，极易误判为「窗口没出现」。曾因此连续两轮 `FAIL_NO_WINDOW`。
+    - **枚举顶层窗口不能用 `ControlType` 的 `PropertyCondition`**：对本应用 `ProgressWindow` 匹配不到（连抓两轮失败）。有效解法是 `TrueCondition` + `ProcessId`/`ClassName` 过滤。`x:Name` → `AutomationId` 的映射本身是可用的（`aid='ModeNameOnlyRadio'` 等均取到）。
+    - **密度是统计卡的宿主**：XAML 注释 `完整：+ 统计卡` 说明统计卡行挂在「完整」档下，尽管卡自身 `IsVisible` 只绑 `HasParallelDegree`；只看卡自身绑定会漏判祖先密度门控。
+    - **自造假象一例**：某版探针把 `activeRowsVisible` 报成 47，实际 dump 中 `⏳` 为 0 个——47 是元素总数漏进正则。该指标已作废。
+    - **控制台 mojibake 不可用于判读 CJK**：PS 5.1 按 ANSI 解析无 BOM 输出，中文全变乱码；须写入 UTF-8 文件后再读。脚本内构造中文串用码点（`[char]0x5E76+[char]0x884C`）以规避。
+  - **附带修正两处取证误差**（避免后续复现踩坑）：① 早期「TAR/GZ 无窗口」是 PowerShell `[int]($i/1000)` 舍入到尚未创建的 `g30` 加单实例残留造成的测试假象，实测窗口存在；② 「extracted 4000/4000」曾误数源目录而非解压输出目录（`extract-here` 落在压缩包同级），已改为统计真实输出目录。
+
 **2026-10-04** — 进度窗口原型对齐改造 T1–T11 全部落地（纠偏 v2 计划的原型误读）
   - **背景**：`progress-window-enhancement.md` v2 的「原型对应表」误读了 v6 原型——把原型的「简约/详细/列表」当成「全路径/仅目录/仅文件名」，把「少/中/完整」当成「紧凑/标准/宽松」，导致 8 个点跑偏。新计划 `.omo/plans/未开始/progress-window-prototype-alignment.md` 纠偏，承接上一提交（`660fbf3` T1–T6）的数据层。
   - **T1–T4 Core 层（逐条目遥测，不改 `IArchiveEngine` 签名）**：

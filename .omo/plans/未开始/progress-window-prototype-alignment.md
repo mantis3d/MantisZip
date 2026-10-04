@@ -657,10 +657,10 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 
 - [x] 内容模式切换生效：简约 `elements=37/listItems=1` → 真实点击「列表」→ `elements=74/listItems=8`，回简约恢复 `39/1`（面板双向切换正常）
 - [x] 详细模式：**负向已验证**（单压缩包压缩场景仅 `简约`/`列表` 两个 RadioButton）；**正向已验证**（100k 条目并行解压场景 `详细=False` 出现于 radio 组，即可见可用）
-- [~] 列表模式：**压缩路径已验证**（ZIP 逐行转态 `✅ \| file_000.bin \| 已完成`；300 文件仅暴露 8 行 + 滚动条 → 虚拟化生效）；**ZIP 解压 CLI 路径播种缺失** —— 见下方待办 1；**TAR/GZ 进度窗口已验证存在**（`t.tar.gz` 于 t+1.7s 出现真实 `ProgressWindow`，300/300 解压成功、退出码 0），但**列表模式下的渐进建行仍未验证**（该轮窗口停在默认「简约」模式，无列表可测）；**10 万条目 UI 流畅度未验证**（播种缺失导致无行可测）
-- [~] 逐文件状态 6 态：**条目级仅观察到 `✅ 已完成`**；`⏳n% / ○等待 / ⏭跳过 / 已覆盖` 未构造出对应场景（条目行只在主窗口 `ExtractFlow` 播种，**ZIP 的** CLI 路径无条目行，见待办 1）。**批次级 `❌ 出错` 已验证**（见下条）
+- [◐] 列表模式：**压缩路径已验证**（ZIP 逐行转态 `✅ \| file_000.bin \| 已完成`；300 文件仅暴露 8 行 + 滚动条 → 虚拟化生效）；**ZIP 解压 CLI 路径播种 ◐ 强证据、缺决定性证据** —— 两个直连引擎的 CLI 叶子均已接线（见待办 1），运行时列表模式确实出现条目行且 60 × 6MB 呈严格归档顺序，但**归档顺序无法区分播种与 upsert**（等大文件完成顺序≈归档顺序），且两轮采样均未捕获只可能来自播种的 `○等待` 行，故不宣称闭环；**TAR/GZ 进度窗口已验证存在**（`t.tar.gz` 于 t+1.7s 出现真实 `ProgressWindow`，300/300 解压成功、退出码 0），但**列表模式下的渐进建行仍未验证**（该轮窗口停在默认「简约」模式，无列表可测）；**10 万条目 UI 流畅度未验证**
+- [~] 逐文件状态 6 态：**条目级仅观察到 `✅ 已完成`**；`⏳n% / ○等待 / ⏭跳过 / 已覆盖` 未构造出对应场景（条目行的播种入口此前只在 `ExtractFlow`，CLI 两个直连叶子均无条目行；该缺口已修复，见待办 1。运行时列表模式采到的仍是 `✅ 已完成` 行——32KB 文件瞬时完成、6MB 文件被 20 线程直接推入 Active，故 `⏳n%` 与 `○等待` 依旧未取证）。**批次级 `❌ 出错` 已验证**（见下条）
 - [x] 下方密度三档：`精简` 隐藏「已处理」→ `标准` 出现「已处理 N」→ `完整` 拆为 `已处理` + `165` 独立标签/值（即 5 张卡布局，非缺陷）
-- [~] 「并行」卡：**负向已验证**（压缩场景正确不出现）；**CLI 解压路径实测确认不出现** —— 100k 条目并行解压 + `完整` 密度下逐条枚举全部 14 个文本元素，`并行` / `批次` 关键词均为空（非精确匹配假阴性，已改为子元素全量枚举）。判定为待办 1 的同一根因（CLI 路径未接入并行度元数据），非独立缺陷
+- [✅] 「并行」卡：**负向已验证**（压缩场景正确不出现）；**CLI 解压路径正向已证实** —— 此前 100k 条目并行解压 + `完整` 密度下逐条枚举全部 14 个文本元素，`并行` / `批次` 关键词均为空（非精确匹配假阴性，已改为子元素全量枚举），根因同待办 1（两个 CLI 直连叶子未接入并行度元数据）；修复后同一路径采到 `⚙ / 并行 / 20`，数值与 `ParallelExtractDegree`=20 及 `ProcessorCount` 一致，**构成决定性运行时证据**（修复前 `HasParallelDegree=false`，该卡不可能渲染）。主窗口解压路径的并行卡正向仍未取证
 - [~] 批处理列表位于窗口**上方**：**位置已验证**（几何 `压缩包列表 y=520` / `BatchFileList y=541` / 内容模式 y=580 / 密度 y=727）；**失败行错误消息已验证** —— 4KB 随机字节伪装 `corrupt.zip`，批次行渲染 `❌` + **行内错误消息 `Failed to locate the Zip Header`** + 统计 `完成 0 项，失败 1 项`，证明 T 项「`ErrorMessage` 只写不显示」已修复；**红色**需人眼确认
 - [~] 密码徽标：**`🔄`（`BatchPasswordState.Matching`）已实测出现在批次行**（伴随 `●●●●`）；未捕获 `🔑`（Matched）与熄灭（None）终态 —— 非加密包的匹配过程瞬态即逝；入场动画与 Flyout/复制 toast 仍需加密包场景 + 人眼
 - [x] 标题栏**无**密度切换器（D4）：TitleBar 子元素仅 `SystemMenuBar` / `Minimize` / `Maximize` / `Close`
@@ -677,19 +677,48 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 
 **功能缺口（建议修复）**
 
-1. **CLI 批处理解压路径未接入 `ExtractFlow` 的逐条目播种与并行度元数据**。`ProgressWindow.SeedEntries`
-   仅由 `ExtractFlow` 调用（`ExtractFlow.cs:191`、`:340-345`、`:363-366`、`:388`）；而 CLI 的
-   `RunCliDirectExtractBatchAsync`（`App.axaml.cs:1415`）**直连 `engine.ExtractAsync`**、完全绕过 `ExtractFlow`。
-   同一根因导致两处可观测缺失：
-    - **ZIP 列表模式为空**：`--extract-here` / `--extract-to-name` / `--extract-smart` 下切列表模式，
-      实测 `listItems=1`、等待/已完成计数均为 0（条目行从未播种）。**该结论仅对 ZIP 成立** —— TAR/GZ 因 D7
-      本就不播种、行走渐进建行，其列表模式行为尚未取证（不得据此推断 TAR/GZ 列表同样为空）。
-   - **「并行」卡恒不出现**：即使 100k 条目确实并行解压、`完整` 密度下逐条枚举全部文本元素也无 `并行` / `批次`
-     （该卡取值依赖 `ExtractFlow` 建立的并行度元数据）。
+1. ~~**CLI 解压路径未接入 `ExtractFlow` 的逐条目播种与并行度元数据**~~ **✅ 已修复**（「并行」卡运行时已证实；播种 ◐ 强证据、缺决定性证据）。
+   `ProgressWindow.SeedEntries` / `SetParallelDegree` 仅由 `ExtractFlow` 建立，而 CLI 解压叶子**直连
+   `engine.ExtractAsync`**、绕过 `ExtractFlow.ExtractAsync`。同一根因导致两处可观测缺失：
+    - **ZIP 列表模式为空**：切列表模式后实测 `listItems=1`、等待/已完成计数均为 0（条目行从未播种）。
+      **该结论仅对 ZIP 成立** —— TAR/GZ 因 D7 本就不播种、行走渐进建行，其列表模式行为尚未取证。
+    - **「并行」卡恒不出现**：`完整` 密度下逐条枚举全部文本元素也无 `并行` / `批次`（该卡取值依赖
+      `ExtractFlow` 建立的并行度元数据）。
 
-   影响面仅限 CLI 批处理（主窗口解压走 `ExtractFlow`，播种与并行卡均正常）。是否补齐取决于「CLI 批处理是否需要
-   逐条目列表与并行度展示」的取舍；若补齐，最小改动是在 `RunCliDirectExtractBatchAsync` 中复用
-   `ExtractFlow` 的播种入口而非直连引擎。
+   **⚠️ 原记录的范围有误（已修正）**：缺口不只在多文件批处理叶子。凡是**直连 `engine.ExtractAsync`** 的
+   CLI 叶子都未接线，实为**两处**，修一处只能覆盖一半：
+    - `RunCliExtractWithProgressAsync`（`App.axaml.cs:1083`，"叶子 5/5"）—— **单文件**叶子，
+      `--extract-here` / `--extract-to-name` / `--extract-smart` 在**恰好 1 个压缩包**时走这里
+      （路由分叉见 `App.axaml.cs:249-254`：`Count == 1` → `RunExtractCliAsync` → 本方法；
+      `Count > 1` → 批处理叶子）。**上一轮自动化取证正是用单包做的，因此实际命中的就是这一条**，
+      这解释了为何最初只盯着批处理叶子会「改完仍无变化」。
+    - `RunCliDirectExtractBatchAsync`（`App.axaml.cs:1415`）—— **多文件**叶子（ShellExt 多选）。
+
+   已实施（用户 2026-10-04 确认补齐）：把 `ExtractFlow.ResolveDisplayParallelDegree` 与
+   `TrySeedEntryItemsInBackground` 由 `private` 放宽为 `internal` 复用，并在**两个叶子**内于解压启动前
+   接线：单文件叶子复用 `InitBatchMode`/`SetCurrentBatchItem` 已做的清空，多文件叶子额外
+   `ClearEntries()`（`InitBatchMode` 每批只清一次，逐包必须清，否则第 2 包会显示第 1 包的行）、
+   并行度**逐包重算**（非 zip/7z 返回 1 → `HasParallelDegree=false` 自动隐藏该卡）。
+   验证：构建 0 警告 0 错误；Avalonia 测试 114/0/2（新增 5 条播种路径用例，见下）、Core 549/0/3。
+   **运行时复验（2026-10-04 已执行，结论分项）**：
+   - ✅ **「并行」卡已证实**。`--extract-here` 单文件（15,000 × 32KB ZIP，`ParallelExtractDegree=20`）
+     切「完整」密度后，UIA 全量枚举文本元素得到 `⚙ / 并行 / 20`——数值 20 与
+     `Environment.ProcessorCount` 及设置值一致。修复前 `HasParallelDegree=false`，该卡**不可能**渲染，
+     故此项构成 `SetParallelDegree` 接线的决定性运行时证据（同一叶子内的姊妹接线）。
+   - ◐ **播种已强证据支持，但未取得决定性证据**。列表模式确实出现条目行（单测同路径另有 5 条覆盖）。
+     两次对照：15,000 × 32KB 采到 `f_000007, f_000010, f_000003, f_000001…`（**散乱 = 完成顺序**，
+     与未播种时的 upsert 兜底一致）；60 × 6MB 采到 `f_000000…f_000005`（**严格归档顺序**，且
+     `已处理 60`/`100%` 时 60 行齐全）。但**归档顺序不足以区分播种与 upsert**——60 个等大 6MB 文件的
+     完成顺序本就≈归档顺序。决定性证据应是 `○等待`（Pending）行：**只有播种才会产生**，而两轮采样
+     均未捕获（32KB 文件瞬时完成、6MB 文件被 20 线程并发直接推入 `⏳ Active`）。
+     故播种接线**不能宣称已闭环**，建议构造「单条超大 + 多条小文件」并在 t≈0.2s 采样以暴露 Pending 行。
+   - ⚠️ **探针自身两处坑（已修正，勿重蹈）**：
+     ① 输出目录若复用且残留上一次解压产物，会触发模态冲突框把窗口冻在 0%，导致「窗口瞬现即灭、
+     轮询抓不到」——必须**每次用唯一目录**；
+     ② 用 `ControlType` 的 `PropertyCondition` 枚举顶层窗口**匹配不到**本应用的 `ProgressWindow`，
+     须改用 `TrueCondition` + `ProcessId`/`ClassName` 过滤（`x:Name` 确实映射为 `AutomationId`，这部分可用）。
+   - ⚠️ 另记一次**自造假象**：某版探针把 `activeRowsVisible` 报成 47，但 dump 里 `⏳` 实际为 0 个——
+     47 是元素总数漏进正则匹配。该指标已作废，不可作为「多行 Active」证据。
 
 **非阻塞瑕疵**
 

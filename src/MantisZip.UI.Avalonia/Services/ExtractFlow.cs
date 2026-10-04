@@ -295,7 +295,11 @@ public static class ExtractFlow
     /// 引擎不支持并行（7z/TAR/GZ 等 SupportsParallelExtract=false）→ 1（串行，隐藏并行统计）；
     /// 设置值 0/负数 = 引擎自动 → <c>Environment.ProcessorCount</c>（与 ZipEngine 的 0 值语义一致）。
     /// </summary>
-    private static int ResolveDisplayParallelDegree(string archivePath)
+    /// <remarks>
+    /// CLI 批处理直解路径（<c>App.RunCliDirectExtractBatchAsync</c>）绕过 <see cref="ExtractAsync"/>，
+    /// 需自行调用本方法把并行度写给进度窗口，故为 internal 而非 private。
+    /// </remarks>
+    internal static int ResolveDisplayParallelDegree(string archivePath)
     {
         if (ArchiveEngineFactory.GetEngineByExtension(archivePath)?.SupportsParallelExtract != true)
             return 1;
@@ -350,7 +354,10 @@ public static class ExtractFlow
     /// 本方法立即返回、不 await —— 解压绝不等待播种；列目录失败/取消/超阈值一律放弃播种，
     /// 由 <see cref="ProgressViewModel.UpdateEntryStatus"/> 的 upsert 兜底（渐进模式）。
     /// </summary>
-    private static void TrySeedEntryItemsInBackground(
+    /// <remarks>
+    /// CLI 批处理直解路径绕过 <see cref="ExtractAsync"/>，需自行调用本方法，故为 internal 而非 private。
+    /// </remarks>
+    internal static void TrySeedEntryItemsInBackground(
         ProgressWindow? pw, string archivePath, string? password,
         List<string>? filteredKeys, CancellationToken ct)
     {

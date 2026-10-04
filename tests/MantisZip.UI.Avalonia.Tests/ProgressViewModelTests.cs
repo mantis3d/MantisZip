@@ -354,4 +354,127 @@ public class ProgressViewModelTests
         Assert.Equal(baselineSpeed, vm.SpeedText);
         Assert.Equal(baselineFilePercent, vm.FilePercentComplete);
     }
+
+    // ════════════════════════════════════════════
+    //  D7: 播种路径（SeedEntryItems / ClearEntryItems）
+    //  CLI 单文件/多文件叶子直连引擎、绕过 ExtractFlow.ExtractAsync 后自行播种，
+    //  故这条路径必须有独立覆盖（此前只覆盖了未播种的 upsert 兜底）。
+    // ════════════════════════════════════════════
+
+    [Fact]
+    public void SeedEntryItems_CreatesPendingRowsInOrder()
+    {
+        var vm = new ProgressViewModel();
+        Assert.Empty(vm.EntryItems);
+        Assert.False(vm.HasEntryItems);
+
+        vm.SeedEntryItems(new[]
+        {
+            ("docs/a.txt", "a.txt", 100L),
+            ("docs/b.txt", "b.txt", 200L),
+        });
+
+        Assert.Equal(2, vm.EntryItems.Count);
+        Assert.True(vm.HasEntryItems);
+
+        var row = vm.EntryItems[0];
+        Assert.Equal("docs/a.txt", row.EntryKey);
+        Assert.Equal("a.txt", row.Name);
+        Assert.Equal(100L, row.Size);
+        // 播种行必须落 Pending，等待文案走本地化（Rule 13 禁止硬编码）
+        Assert.Equal(EntryRowState.Pending, row.State);
+        Assert.False(row.IsTerminal);
+        Assert.Equal(LocalizationManager.T("Progress_Entry_Pending"), row.StatusText);
+        Assert.NotEqual("Progress_Entry_Pending", row.StatusText);
+
+        // 顺序必须与传入一致（列表行序 = 压缩包内条目序）
+        Assert.Equal("docs/b.txt", vm.EntryItems[1].EntryKey);
+    }
+
+    [Fact]
+    public void SeedEntryItems_SecondCallReplacesPreviousRows()
+    {
+        var vm = new ProgressViewModel();
+
+        vm.SeedEntryItems(new[] { ("old/1.txt", "1.txt", 1L) });
+        Assert.Single(vm.EntryItems);
+
+        // 第二次播种必须先清空（批处理多包切换：上一包行不得残留）
+        vm.SeedEntryItems(new[]
+        {
+            ("new/1.txt", "1.txt", 10L),
+            ("new/2.txt", "2.txt", 20L),
+        });
+
+        Assert.Equal(2, vm.EntryItems.Count);
+        Assert.DoesNotContain(vm.EntryItems, r => r.EntryKey == "old/1.txt");
+        Assert.All(vm.EntryItems, r => Assert.Equal(EntryRowState.Pending, r.State));
+    }
+
+    [Fact]
+    public void SeedEntryItems_ThenTerminalEvent_UpdatesSeededRowInPlace()
+    {
+        var vm = new ProgressViewModel();
+
+        vm.SeedEntryItems(new[]
+        {
+            ("docs/a.txt", "a.txt", 100L),
+            ("docs/b.txt", "b.txt", 200L),
+        });
+        var seeded = vm.EntryItems[0];
+
+        // 播种 → 终态事件的交接：命中已播行，原地更新，绝不追加重复行
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "docs/a.txt",
+            EntryStatus = ArchiveEntryStatus.Completed,
+        });
+
+        Assert.Equal(2, vm.EntryItems.Count);
+        Assert.Same(seeded, vm.EntryItems[0]);
+        Assert.Equal(EntryRowState.Completed, vm.EntryItems[0].State);
+        Assert.Equal(LocalizationManager.T("Progress_Entry_Completed"), vm.EntryItems[0].StatusText);
+        // 未收到终态的行仍停在 Pending
+        Assert.Equal(EntryRowState.Pending, vm.EntryItems[1].State);
+    }
+
+    [Fact]
+    public void ClearEntryItems_ResetsKeyIndex_SoNextEventCreatesFreshRow()
+    {
+        var vm = new ProgressViewModel();
+
+        vm.SeedEntryItems(new[] { ("docs/a.txt", "a.txt", 100L) });
+        var stale = vm.EntryItems[0];
+
+        vm.ClearEntryItems();
+        Assert.Empty(vm.EntryItems);
+        Assert.False(vm.HasEntryItems);
+
+        // key 索引必须同步清空：同名 key 的终态事件应新建行，而不是改到已废弃的旧行对象上
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "docs/a.txt",
+            EntryStatus = ArchiveEntryStatus.Failed,
+        });
+
+        Assert.Single(vm.EntryItems);
+        Assert.NotSame(stale, vm.EntryItems[0]);
+        Assert.Equal(EntryRowState.Failed, vm.EntryItems[0].State);
+    }
+
+    [Fact]
+    public void SeedAndClearEntryItems_RaiseHasEntryItemsNotification()
+    {
+        var vm = new ProgressViewModel();
+
+        var notified = new List<string>();
+        vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName ?? string.Empty);
+
+        vm.SeedEntryItems(new[] { ("a.txt", "a.txt", 1L) });
+        Assert.Contains(nameof(vm.HasEntryItems), notified);
+
+        notified.Clear();
+        vm.ClearEntryItems();
+        Assert.Contains(nameof(vm.HasEntryItems), notified);
+    }
 }

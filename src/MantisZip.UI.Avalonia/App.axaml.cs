@@ -1128,6 +1128,14 @@ public partial class App : Application
                     settings.FileConflictAction,
                     info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info));
 
+                // 列表模式播种 + 并行度元数据：CLI 单文件叶子同样直连引擎、绕过 ExtractFlow.ExtractAsync，
+                // 故在此补齐两处接线（与 RunCliDirectExtractBatchAsync 多文件叶子同源）。
+                // InitBatchMode/SetCurrentBatchItem 已清空条目行并把并行度归零，此处只需重新播种/置位。
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    progressWindow, archivePath, password, filteredKeys: null, ct);
+                progressWindow.SetParallelDegree(
+                    ExtractFlow.ResolveDisplayParallelDegree(archivePath));
+
                 // 叶子 5/5：单文件 CLI 解压入口（--extract-here / --extract-to-name / --extract 等）
                 ExtractResult? extractResult = null;
                 var (singleOutcome, _) = await PasswordRetryLoop.RunAsync(
@@ -1483,6 +1491,17 @@ public partial class App : Application
                         {
                             progressWindow.SetBatchPasswordState(i, BatchPasswordState.None, null, null, null);
                         }
+
+                        // 列表模式播种 + 并行度元数据（本方法直连引擎、绕过 ExtractFlow，故在此补齐两处接线，
+                        // 否则 ZIP 的列表模式无条目行且「并行」统计卡恒不出现）。
+                        // ClearEntries 先清上一包残留行——InitBatchMode 每批只清一次，多包批处理必须逐包清理；
+                        // 并行度逐包重算——非 zip/7z 返回 1 → HasParallelDegree=false 自动隐藏并行卡（Rule 6）。
+                        // 播种为 fire-and-forget，且必须在解压启动前发起，否则首批条目行会缺失。
+                        progressWindow.ClearEntries();
+                        ExtractFlow.TrySeedEntryItemsInBackground(
+                            progressWindow, archivePath, password, filteredKeys: null, ct);
+                        progressWindow.SetParallelDegree(
+                            ExtractFlow.ResolveDisplayParallelDegree(archivePath));
 
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
