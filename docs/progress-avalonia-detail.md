@@ -6,6 +6,21 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-05** — N 组并行压缩 Task 3/8：`CompressGroupWithSevenZip` 参数化（Core）
+  - **背景**：N 组并行需要每组能独立上报「我是第几组」，并按组身份决定7z 的 `mt` 取值。本 Task **只做参数化、不改行为**，尚无调用方使用批次参数，功能未启用。
+  - **改动**：`Engines/ZipEngine.cs`
+    - `CompressGroupWithSevenZip` 签名在 `storeProcessedFiles` 之后、`ref DateTime lastReportTime` 之前插入 `int? batchIndex, int? batchCount`（`null` = 旧单组路径）。两个既有调用点（`:1439` 旧单组路径、`:2206` `AddToArchiveAsync`）补 `null, null`，行为完全不变。
+    - `mt` 由硬编码 `"on"` 改为 `batchIndex.HasValue ? "off" : "on"`——N 组并行时每组一个压缩器，组间并行度已是 N，组内再 `mt=on` 会造成 N × cores 过度订阅；旧单组路径保持 `mt=on` 不变。
+    - 该方法内**每一处** `progress?.Report` 补 `BatchIndex` / `BatchCount`（`:3169` Started 节流上报、`:3219` Finished 逐条目上报），共 2 处，已逐处核查无遗漏。
+  - **测试**：`ParallelCompressTests.cs` 新增 `CompressGroupBatchIdentityTests` 3 个用例（累计 8 个）：
+    - `CompressGroup_ReportsBatchIndexAndCount`——组身份原样透传到进度上报
+    - `CompressGroup_LegacySingleGroupPath_ReportsNoBatchIdentity`——传 `null, null` 时批次字段必须**缺席**（调用方据此回落单通道进度）
+    - `CompressGroup_MtSetting_TracksBatchIdentity`——两条路径均产出结构完整的合法 ZIP
+    - 夹具用 `InlineProgress<T>` 同步上报（`Progress<T>` 会投递到同步上下文，断言会跑在回调之前）；语料用随机字节确保走满压缩路径而非被 Store 短路。
+  - **验证（红→绿）**：签名重构后先跑既有 `ZipEngineTests` **80 通过 / 2 跳过**（证明重构等价）→ 写新测试，`CompressGroup_ReportsBatchIndexAndCount` **失败**（`Collection: []`，批次字段未上报）→ 补 `mt` 分流与两处批次字段后 **3/3 通过**；Task 1 的 `SplitCompressGroupTests` 5/5 不受影响；Core 全量 **591 通过 / 0 失败 / 3 跳过**（588 + 新增 3），Core 构建 0 错误 0 警告。
+  - **mt 分流实测（临时探针，已删除）**：4 × 128KB 重复文本语料，`mt=on`（旧路径）938 字节 / 170ms，`mt=off`（组路径）938 字节 / 10ms。**压缩比无差异而耗时 17x**，印证组内 `mt=off` 的必要性。测试中**刻意不断言**两条路径压缩比不等——deflate 分片并行在某些数据分布下压缩比可能持平甚至更优，那是 7z 实现细节而非本引擎契约；并行度收益曲线由 Task 7 的 `bench --degrees` 实测给出。
+  - **顺带修正**：`ZipEngineTests.cs` 4 处 `CompressGroupWithSevenZip` 调用点补 `null, null`（签名变更导致的编译错误）；`ParallelCompressTests.cs` 换行归一化为仓库既有的 CRLF + UTF-8 无 BOM。
+
 **2026-10-05** — N 组并行压缩 Task 2 补测：失败路径覆盖 + 修复临时文件清理失效（Core）
   - **背景**：Task 2 完成后自查出 5 个覆盖缺口（见下方「已知覆盖缺口」），其中**失败路径完全没测**最危险——Task 4 会真正调用多源重载去合并各组 ZIP，若失败时有半成品残留或覆盖既有产物，会静默产出损坏压缩包，而 Task 4 的测试只验证「合并成功」、抓不到这类回归。经确认后先补此项再进Task 3。
   - **测试**：`ZipBinaryRewriterMultiSourceTests.cs` 从 5 个增至 **11 个**，新增 6 个：

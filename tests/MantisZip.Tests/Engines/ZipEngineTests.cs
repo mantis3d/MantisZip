@@ -832,7 +832,7 @@ public class ZipEngineTests : IDisposable
         Assert.NotEmpty(compressGroup);
 
         var dummyReportTime = DateTime.MinValue;
-        ZipEngine.CompressGroupWithSevenZip(compressGroup, refZip, options, null, 0, 0, 0, 0, ref dummyReportTime);
+        ZipEngine.CompressGroupWithSevenZip(compressGroup, refZip, options, null, 0, 0, 0, 0, null, null, ref dummyReportTime);
 
         await _engine.CompressAsync([srcDir], outputPath, options);
 
@@ -899,7 +899,7 @@ public class ZipEngineTests : IDisposable
         Assert.NotEmpty(compressGroup);
 
         var dummyReportTime = DateTime.MinValue;
-        ZipEngine.CompressGroupWithSevenZip(compressGroup, refZip, options, null, 0, 0, 0, 0, ref dummyReportTime);
+        ZipEngine.CompressGroupWithSevenZip(compressGroup, refZip, options, null, 0, 0, 0, 0, null, null, ref dummyReportTime);
 
         // 压缩 + 解压逐字节比对 + 完整性校验（共用验证链）
         await AssertRoundTripAsync(srcDir, outputPath, options);
@@ -969,7 +969,7 @@ public class ZipEngineTests : IDisposable
         Assert.NotEmpty(compressGroup);
 
         var dummyReportTime = DateTime.MinValue;
-        ZipEngine.CompressGroupWithSevenZip(compressGroup, refZip, options, null, 0, 0, 0, 0, ref dummyReportTime);
+        ZipEngine.CompressGroupWithSevenZip(compressGroup, refZip, options, null, 0, 0, 0, 0, null, null, ref dummyReportTime);
 
         // 压缩 + 解压逐字节比对（同时覆盖 7z 与重写器两条路径）
         await AssertRoundTripAsync(srcDir, outputPath, options);
@@ -1064,7 +1064,7 @@ public class ZipEngineTests : IDisposable
 
         var refZip = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_add_ref.zip"));
         var dummyReportTime = DateTime.MinValue;
-        ZipEngine.CompressGroupWithSevenZip(refFiles, refZip, options, null, 0, 0, 0, 0, ref dummyReportTime);
+        ZipEngine.CompressGroupWithSevenZip(refFiles, refZip, options, null, 0, 0, 0, 0, null, null, ref dummyReportTime);
 
         // ── 断言 ──
         var refMethods = ReadEntryMethods(refZip);

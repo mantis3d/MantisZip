@@ -1436,7 +1436,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                             try
                             {
                                 CoreLog.Info($"CompressAsync: MultiThreaded mode — {storeGroup.Count} store, {compressGroup.Count} compress via 7z mt=on");
-                                CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, 0, totalBytes, totalFiles, 0, ref lastReportTime);
+                                CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, 0, totalBytes, totalFiles, 0, null, null, ref lastReportTime);
 
                                 if (storeGroup.Count == 0)
                                 {
@@ -2203,7 +2203,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                     CoreLog.Trace($"[TRACE]   CompressGroup entry: FullPath={fp} → RelativePath={rp}");
 
                                 CoreLog.Info($"AddToArchiveAsync: MultiThreaded mode — {storeGroup.Count} store, {compressGroup.Count} compress via 7z mt=on");
-                                CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, compressProcessed, compressTotalBytes, compressFiles.Count, mtProcessedFiles, ref lastReportTime);
+                                CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, compressProcessed, compressTotalBytes, compressFiles.Count, mtProcessedFiles, null, null, ref lastReportTime);
                                 compressProcessed = compressTotalBytes;
 
                                 // fsOut 是 File.Create 出来的空文件；ZIP 内容完全来自 7z，必须先释放句柄
@@ -3103,6 +3103,8 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
         long totalBytes,
         int totalFiles,
         int storeProcessedFiles,
+        int? batchIndex,          // 组索引；null = 旧单组路径
+        int? batchCount,          // 有效组数
         ref DateTime lastReportTime)
     {
         SevenZipEngine.EnsureLibraryPath();
@@ -3116,7 +3118,9 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
         };
 
         // 多线程压缩：利用多核 CPU 并行压缩
-        compr.CustomParameters["mt"] = "on";
+        // mt 由调用方决定：N 组并行路径每组一个压缩器，并行度来自组间，
+        // 组内必须 mt=off 以免 N × cores 过度订阅；旧单组路径保持 mt=on。
+        compr.CustomParameters["mt"] = batchIndex.HasValue ? "off" : "on";
 
         // 处理 ZIP 压缩方法
 compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
@@ -3162,6 +3166,8 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                 ProcessedBytes = doneBytes,
                 TotalFiles = totalFiles,
                 ProcessedFiles = doneFiles,
+                BatchIndex = batchIndex,
+                BatchCount = batchCount,
             });
         };
 
@@ -3210,6 +3216,8 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                     ProcessedBytes = doneBytes,
                     TotalFiles = totalFiles,
                     ProcessedFiles = doneFiles,
+                    BatchIndex = batchIndex,
+                    BatchCount = batchCount,
                 };
             }
 
