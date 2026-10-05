@@ -6,6 +6,23 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-05** — N 组并行压缩 Task 2 补测：失败路径覆盖 + 修复临时文件清理失效（Core）
+  - **背景**：Task 2 完成后自查出 5 个覆盖缺口（见下方「已知覆盖缺口」），其中**失败路径完全没测**最危险——Task 4 会真正调用多源重载去合并各组 ZIP，若失败时有半成品残留或覆盖既有产物，会静默产出损坏压缩包，而 Task 4 的测试只验证「合并成功」、抓不到这类回归。经确认后先补此项再进Task 3。
+  - **测试**：`ZipBinaryRewriterMultiSourceTests.cs` 从 5 个增至 **11 个**，新增 6 个：
+    - `EmptySourceList_ThrowsArgumentException`——空源列表抛 `ArgumentException`
+    - `SfxSource_Throws_AndLeavesNoHalfProduct`——伪 SFX（前置 `MZ`）被拒
+    - `EncryptedEntry_Throws_AndLeavesNoHalfProduct`——GPBF bit 0 加密条目被拒
+    - `UnsupportedCompressionMethod_Throws_AndLeavesNoHalfProduct`——方法 12 被拒（copy-mode 只接受 0/8/9）
+    - `Zip64Source_Throws_AndLeavesNoHalfProduct`——ZIP64 被拒
+    - `FailureMidway_LeavesDestinationUntouched`——源 1 已成功复制（临时文件已含真实字节）、源 2 才触发守卫，断言**既有目标文件字节不变**且半成品 `.tmp` 被丢弃
+  - **夹具**：合法源沿用既有 `MakeZip`；畸形源新增手写字节的 `MakeRawZip`（含 `Crc32`）——加密标志、奇异压缩方法、ZIP64 结构都是 `System.IO.Compression` 永远不会产出的东西，只能逐字节伪造。ZIP64 需同时伪造 **ZIP64 EOCD record（`0x06064b50`）+ locator（`0x07064b50`，固定 20 字节）**：代码在 EOCD 前 20 字节嗅探locator 签名，仅把 `entryCount` 改成 `0xFFFF` 会落空穿过守卫。
+  - **🐛 修复真实缺陷（红→绿）**：新测试暴露出 `ZipBinaryRewriter` 的**临时文件清理在失败时完全失效**。原代码在 `catch` 里调 `CleanupFile(tempDestPath)`，而 `output?.Dispose()` 在其后的 `finally` 里——catch 执行时输出流句柄仍开着，Windows 上 `File.Delete` 对已开句柄的文件失败，而 `CleanupFile` 是 best-effort 吞异常，于是**半成品 `.tmp` 静默残留**。「不产出半成品」这条保证实际并不成立。
+    - 修法：新增 `committed` 标志，仅成功原子替换后置 `true`；`CleanupFile` 移入 `finally` 且置于 `output?.Dispose()` **之后**，`catch` 只负责记日志并 `throw`。
+    - **单源与多源两个重载同病**，单源路径已在生产启用（方案 A 的 7z+Store 混合组），一并修复。
+  - **验证**：以 HEAD（含 bug）版本跑新测试得 **8 通过 / 3 失败**（正是 3 个写流之后才抛守卫的用例；SFX / ZIP64 / 空列表因在**解析阶段**就抛、输出流尚未创建而本就通过），换修复版后 **11 通过 / 0 失败**；Core 全量 **588 通过 / 0 失败 / 3 跳过**（582 + 新增 6），Core 构建 0 错误 0 警告。
+  - **遗留的机制疑问（如实记录）**：曾试图把清理挪到 `Dispose` **之前**做反向验证，结果 11 个测试**依然全过**——说明「句柄未释放导致 Windows 拒绝删除」这一推断在本环境下不成立，失败的真实机制尚未查明。已知的可靠事实只有「HEAD 3 失败 / 修复后全过」这一对照实验结论，故保留 `Dispose` 之后再清理的稳妥顺序。
+  - **仍未覆盖的缺口（本次未做，非阻塞）**：多源 + `keepEntryNames` 跨源过滤；多源 + `addEntries`（N 组场景下实际是死代码——Task 4 只合并各组 ZIP、不追加条目，此段仅为API 对称而存在，属未测的活代码）；注释继承规则；跨源同名条目去重（ZIP 允许重复条目，当前会静默产生两个同名项）。
+
 **2026-10-05** — N 组并行压缩 Task 2/8：`ZipBinaryRewriter` 多源 copy-mode 重写（Core）
   - **背景**：Task 3/4 中 N 组各自产出一个 ZIP 后，需要把这些 ZIP 字节级拼成最终包。7z 的 `MergeTempZipToWriter` 是「解压再重压」，会丢弃 7z `mt=on` 的并行压缩成果（`4046b6c` 已改为方案 A）。故需要一条**不解压、不重压**的拼接路径。设计见 `docs/superpowers/specs/2026-10-05-mt-progress-display-design.md`，实施计划见 `docs/superpowers/plans/2026-10-05-n-group-parallel-compress.md`（共 8 个 Task，本次为 Task 2）。
   - **改动**：`Core/Utils/ZipBinaryRewriter.cs`

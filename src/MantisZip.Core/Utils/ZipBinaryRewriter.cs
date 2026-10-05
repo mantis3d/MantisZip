@@ -300,6 +300,8 @@ internal static partial class ZipBinaryRewriter
         Stream? source = null;
         Stream? output = null;
         string tempDestPath = destPath + ".tmp";
+        // 只有成功原子替换后才置 true；finally 里据此决定是否清理临时文件。
+        bool committed = false;
 
         try
         {
@@ -466,12 +468,12 @@ internal static partial class ZipBinaryRewriter
                 $"{addCount} entries added ({bytesAdded} bytes)");
             CoreLog.Exit();
 
+            committed = true;
             return new RewriteResult(copyCount, bytesCopied, addCount, bytesAdded);
         }
         catch (OperationCanceledException)
         {
             CoreLog.Info("ZipBinaryRewriter: cancelled");
-            CleanupFile(tempDestPath);
             throw;
         }
         catch (Exception ex)
@@ -480,13 +482,17 @@ internal static partial class ZipBinaryRewriter
                 CoreLog.Info("ZipBinaryRewriter: copy-mode not supported, aborting (caller must fall back to the serial path)");
             else
                 CoreLog.Error("ZipBinaryRewriter: error during rewrite", ex);
-            CleanupFile(tempDestPath);
             throw;
         }
         finally
         {
             source?.Dispose();
             output?.Dispose();
+            // 临时文件清理必须放在 Dispose 之后：输出流以 FileShare.Read 打开
+            // （不含 FileShare.Delete），句柄未释放时 Windows 会拒绝删除该文件，
+            // 而 CleanupFile 是 best-effort 吞异常的——结果就是半成品 .tmp 残留。
+            if (!committed)
+                CleanupFile(tempDestPath);
         }
     }
 
@@ -547,6 +553,8 @@ internal static partial class ZipBinaryRewriter
         var parsed = new List<(Stream Stream, List<CdEntry> Entries)>();
         Stream? output = null;
         string tempDestPath = destPath + ".tmp";
+        // 只有成功原子替换后才置 true；finally 里据此决定是否清理临时文件。
+        bool committed = false;
 
         var entriesToWrite = new List<(CdEntry Entry, long NewOffset, bool IsNew, byte[]? NewLfh)>();
         int processedEntries = 0;
@@ -741,12 +749,12 @@ internal static partial class ZipBinaryRewriter
                 $"{addCount} entries added ({bytesAdded} bytes)");
             CoreLog.Exit();
 
+            committed = true;
             return new RewriteResult(copyCount, bytesCopied, addCount, bytesAdded);
         }
         catch (OperationCanceledException)
         {
             CoreLog.Info("ZipBinaryRewriter: cancelled");
-            CleanupFile(tempDestPath);
             throw;
         }
         catch (Exception ex)
@@ -755,12 +763,15 @@ internal static partial class ZipBinaryRewriter
                 CoreLog.Info("ZipBinaryRewriter: copy-mode not supported, aborting (caller must fall back to the serial path)");
             else
                 CoreLog.Error("ZipBinaryRewriter: error during multi-source rewrite", ex);
-            CleanupFile(tempDestPath);
             throw;
         }
         finally
         {
             output?.Dispose();
+            // 同单源路径：Dispose 之后再清理，否则句柄未释放时 Windows 拒绝删除，
+            // best-effort 的 CleanupFile 会静默留下半成品 .tmp。
+            if (!committed)
+                CleanupFile(tempDestPath);
         }
     }
 
