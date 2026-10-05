@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-05** — N 组并行压缩 Task 1/8：LPT 贪心分组 `SplitCompressGroup`（Core）
+  - **背景**：为 ZIP 压缩实现 MantisZip 自主 N 组并行（不再把并行下放给 7z `mt=on`），并展示真实的逐通道字节进度。设计见 `docs/superpowers/specs/2026-10-05-mt-progress-display-design.md`，实施计划见 `docs/superpowers/plans/2026-10-05-n-group-parallel-compress.md`（共 8 个 Task，本次为 Task 1）。
+  - **改动**：`Engines/ZipEngine.cs` 新增 `internal static SplitCompressGroup(IReadOnlyList<(string FullPath, string RelativePath)> files, int degree)`，纯函数、无 IO 之外副作用：
+    - 文件按大小**降序**排列，**同大小按路径序**，保证分组结果确定性（可复现、可测试）
+    - 每轮取当前未分配最大者放入**累计字节最小**的组（LPT / longest-processing-time-first），使最重文件尽早开工、避免长尾残留
+    - 返回前**剔除空组**，故实际返回组数可能小于 `degree`——调用方须以返回值为准，不得假定组数 == degree
+    - `degree <= 1` 直接返回单组（串行退化）；`files` 为空返回空列表
+    - 文件大小经本地函数 `SafeSize` 读 `FileInfo.Length`（包 try/catch），取不到时按 0 计而不抛出
+  - **测试**：新建 `tests/MantisZip.Tests/Engines/ParallelCompressTests.cs`，5 个用例——串行退化单组、完整划分（无重复无遗漏）、空组剔除、组数随 degree 增长、LPT 最重文件独占一组。夹具按给定字节数**真实落盘**临时文件并在 `Dispose` 清理。
+  - **⚠ 实施中发现并修正的计划缺陷**：计划 Step 1 的 `MakeFiles` 原用虚构路径 `/f{i}.bin`。因分组内部读 `FileInfo.Length`，虚构路径会让所有文件大小恒为 0、LPT 退化为「全进第 0 组」，使 `LargerDegreeYieldsMoreGroups`（断言 2 组 < 4 组）必然失败。已同步修正计划文档与实际测试，避免后续实施者照抄踩坑。
+  - **验证（红→绿）**：红——`CS0117: "ZipEngine"未包含"SplitCompressGroup"的定义` ×6（符合预期）；绿——过滤运行 **5 通过 / 0 失败**；Core 全量 **577 通过 / 3 跳过**（基线 572 + 新增 5），无回归；Core 构建 0 错误 0 警告。
+  - **环境注记（非代码缺陷）**：本机 Explorer 因 COM 外壳扩展已注册并加载而锁定 `MantisZip.ShellExt.dll`，使默认输出路径下 Avalonia 重建报 MSB3021/MSB3027。测试改用 `-p:BaseOutputPath` 指向仓库外临时目录绕过。
+
 **2026-10-05** — 修复 7z `mt=on` 并行压缩成果被 100% 丢弃（方案 A：删除 `MergeTempZipToWriter`）
   - **背景**：ZIP 自适应压缩的「多线程」模式（实验性）把纯压缩文件交给 SharpSevenZip 以 `mt=on` 并行压缩，得到 7z 临时产物后需要合并回 ZipWriter 以追加 Store 类条目。
   - **根因**：合并实现 `MergeTempZipToWriter` 的策略与「多线程压缩」的目的直接冲突——它把 7z 产物**解压回原始字节、再用 .NET Deflate 重压**。`mt=on` 的全部价值在于用 7z 高阶压缩器产出更小的字节，该方法把这份成果丢掉重压，后果有三：① 并行压缩成果 100% 作废（此前实测的 4.63x 加速全部浪费）；② 文件被压两遍，耗时反而高于串行；③ 最终压缩级别与用户在 UI 选择的设置脱钩（`options.CompressionLevel` 不再决定产物字节）。

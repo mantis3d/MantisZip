@@ -2933,6 +2933,62 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
     }
 
     /// <summary>
+    /// 把待压文件按大小贪心分入<paramref name="degree"/> 组（LPT / longest-processing-time-first）。
+    /// <para>
+    /// 每轮取当前<b>未分配最大</b>的文件放入<b>累计字节最小</b>的组，
+    /// 使最重文件尽早开工、避免长尾残留。空组在返回前被剔除，
+    /// 因此返回的组数可能小于 <paramref name="degree"/>（调用方须以返回值为准）。
+    /// </para>
+    /// </summary>
+    /// <param name="files">待分组文件。</param>
+    /// <param name="degree">期望组数，&lt;= 1 时返回单组。</param>
+    internal static List<List<(string FullPath, string RelativePath)>> SplitCompressGroup(
+        IReadOnlyList<(string FullPath, string RelativePath)> files,
+        int degree)
+    {
+        var result = new List<List<(string FullPath, string RelativePath)>>();
+        if (files.Count == 0) return result;
+
+        if (degree <= 1)
+        {
+            result.Add(files.ToList());
+            return result;
+        }
+
+        var bins = new List<(long Bytes, List<(string, string)> Items)>();
+        for (int i = 0; i < degree; i++)
+            bins.Add((0L, new List<(string, string)>()));
+
+        // 待分配集合按文件大小降序；同大小按路径序，保证结果确定性
+        var pending = files
+            .Select((f, idx) => (Item: f, Idx: idx, Size: SafeSize(f.FullPath)))
+            .OrderByDescending(x => x.Size)
+            .ThenBy(x => x.Item.FullPath, StringComparer.Ordinal)
+            .ToList();
+
+        foreach (var p in pending)
+        {
+            int target = 0;
+            for (int i = 1; i < bins.Count; i++)
+                if (bins[i].Bytes < bins[target].Bytes) target = i;
+
+            bins[target].Items.Add(p.Item);
+            bins[target] = (bins[target].Bytes + p.Size, bins[target].Items);
+        }
+
+        foreach (var b in bins)
+            if (b.Items.Count > 0) result.Add(b.Items);
+
+        return result;
+
+        static long SafeSize(string path)
+        {
+            try { return new FileInfo(path).Length; }
+            catch { return 0L; }
+        }
+    }
+
+    /// <summary>
     /// MultiThreaded（7z mt=on）路径<b>前置</b>准入判定，由 <c>CompressAsync</c> 与
     /// <c>AddToArchiveAsync</c> 共用，避免两处准入条件漂移。只检查与分组/压缩方法无关的硬性条件：
     /// 开关本身、加密、分卷、ZIP32 规模上限。
