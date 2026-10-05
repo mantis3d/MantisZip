@@ -57,8 +57,18 @@ public class ZipBinaryRewriterTests : IDisposable
         IProgress<ArchiveProgress>? progress = null,
         CancellationToken cancellationToken = default)
     {
+        // 必须显式给出参数类型：ZipBinaryRewriter 现有多源重载
+        // RewriteAsync(IReadOnlyList<string>, ...)，不带类型过滤的 GetMethod
+        // 会因同名重载抛 AmbiguousMatchException。
         var method = RewriterType.GetMethod("RewriteAsync",
-            BindingFlags.Public | BindingFlags.Static)!;
+            BindingFlags.Public | BindingFlags.Static,
+            binder: null,
+            [
+                typeof(string), typeof(string), typeof(HashSet<string>), typeof(List<NewEntry>),
+                typeof(Encoding), typeof(string), typeof(IProgress<ArchiveProgress>),
+                typeof(CancellationToken)
+            ],
+            modifiers: null)!;
         var task = (Task<RewriteResult>)method.Invoke(null, [
             sourcePath,
             destPath,

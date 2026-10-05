@@ -6,6 +6,26 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-05** — N 组并行压缩 Task 2/8：`ZipBinaryRewriter` 多源 copy-mode 重写（Core）
+  - **背景**：Task 3/4 中 N 组各自产出一个 ZIP 后，需要把这些 ZIP 字节级拼成最终包。7z 的 `MergeTempZipToWriter` 是「解压再重压」，会丢弃 7z `mt=on` 的并行压缩成果（`4046b6c` 已改为方案 A）。故需要一条**不解压、不重压**的拼接路径。设计见 `docs/superpowers/specs/2026-10-05-mt-progress-display-design.md`，实施计划见 `docs/superpowers/plans/2026-10-05-n-group-parallel-compress.md`（共 8 个 Task，本次为 Task 2）。
+  - **改动**：`Core/Utils/ZipBinaryRewriter.cs`
+    - 抽出私有 `CopyEntryAsync(...)`，把原单源 Phase 1 的「校验 → 重写 LFH → 原样复制压缩字节 → 收集 CDFH」整段收敛为单一实现，单源路径改为调用它。copy-mode 的字节保真逻辑因此只有一份，多源不会与单源产生行为分叉。
+    - 新增重载 `RewriteAsync(IReadOnlyList<string> sourcePaths, string destPath, ...)`：先逐源打开并解析 EOCD + 中央目录（SFX 检出 `MZ` 即拒绝），再按 `sourcePaths` 顺序逐条目复制，**条目顺序即源顺序**；各源压缩方法码无需统一（原样复制，不经解压）。`sourcePaths` 为空抛 `ArgumentException`。
+    - 输出先写 `destPath + ".tmp"`，全部条目与中央目录、EOCD 写完后再 `File.Move` 原子替换目标；解析失败、copy-mode 不支持或取消时删除临时文件，**不产出半成品**。
+    - 注释规则：显式 `comment` 优先，否则沿用第一个非空源注释，都没有则空串。
+    - 单源（`sourcePaths.Count == 1`）直接委托既有单源实现，避免 copy-mode 逻辑出现第二份副本。
+    - 源流以 `FileShare.Read | FileShare.Delete` 打开，且在 Phase 1 结束即全部释放（嵌套 `try/finally`），不让 N 个句柄跨越 Phase 2/3。
+  - **测试**：新建 `tests/MantisZip.Tests/Utils/ZipBinaryRewriterMultiSourceTests.cs`，5 个用例——两源合并条目齐全、条目内容逐字节可读回、三源条目数为源之和、单源重载等价于多源、成功后临时文件被清理。
+  - **⚠ 实施中发现并修正的计划缺陷**：计划 Step 5 的多源实现草稿引用了 `output` / `entriesToWrite` / `existingComment` / `bytesCopied` / `bytesAdded` / `processedEntries` 六个**未声明变量**，且**从未创建输出流**，照抄无法编译。已补全为完整实现。计划给的测试代码亦漏了 `using Xunit;`（既有测试文件为显式引入），已补。
+  - **实施判断（与计划草稿的偏离，留档）**：
+    - `totalEntries` 权重改按「实际要写出的条目数」计（含 `addEntries`），而非草稿的「跨源条目总数」——与单源路径语义一致，否则 `keepEntryNames` 过滤掉大半条目时进度会提前触顶。
+    - 进度分段沿用单源语义：条目复制阶段占 0–90%，中央目录 92%、EOCD 94%、落盘 97%、完成 100%。
+  - **⚠ 既有测试的潜伏缺陷被本改动暴露**：`tests/MantisZip.Tests/Utils/ZipBinaryRewriterTests.cs` 的反射辅助方法原先用**不带类型过滤**的 `GetMethod("RewriteAsync", BindingFlags.Public | BindingFlags.Static)` 取方法。新增同名重载后必然抛 `AmbiguousMatchException`，第一次跑全量即出现 12 个失败。已改为传入精确参数类型消歧。编译期调用不受影响（`string` 不会隐式转 `IReadOnlyList<string>`），全仓库仅此一处反射调用 `RewriteAsync`。
+  - **顺带修正**：（1）第 353 行 `if (entry.CompressionMethod ...)` 顶格缩进（正好落在抽取出的代码块内）；（2）编辑引入的 1 处孤立 LF，三个受影响文件统一归一化为仓库既有的 CRLF + UTF-8 无 BOM。
+  - **验证（红→绿）**：红——`CS1503: 参数 1: 无法从"string[]"转换为"string"` ×5（符合预期）；重构后先确认既有 `ZipBinaryRewriter` 测试 **28/28 仍绿**（证明 `CopyEntryAsync` 抽取行为等价）；绿——新测试 **5 通过 / 0 失败**；Core 全量 **582 通过 / 0 失败 / 3 跳过**（基线 572 + Task 1 的 5 + 本次 5），Core 构建 0 错误 0 警告。
+  - **⚠ 已知覆盖缺口（供后续补测）**：计划仅指定 5 个用例，以下均未覆盖——(1) **失败路径**（SFX / 加密 / ZIP64 / 非 0·8·9 压缩方法应抛 `ZipCopyModeException` 且不产出半成品）；(2) 多源 + `keepEntryNames` 跨源过滤；(3) 多源 + `addEntries`（N 组场景下实际是死代码——Task 4 只合并各组 ZIP、不追加条目，此段仅为 API 对称而存在，属未测的活代码）；(4) 注释继承规则；(5) 跨源同名条目未做去重或报错（ZIP 允许重复条目，此处会静默产生两个同名项）。
+  - **环境注记**：同 Task 1，本机 Explorer 锁定 `MantisZip.ShellExt.dll` 导致默认输出路径构建报 MSB3021/MSB3027，测试继续用 `-p:BaseOutputPath` 指向**仓库内** `.buildout\` 绕过（`AboutWindowTests.GetRepoRoot()` 要求输出目录位于仓库祖先路径内，不能指向仓库外）。
+
 **2026-10-05** — 归档 ZIP 多线程压缩基准测试脚本 `scripts/bench-zip-mt.cs`（诊断工具）
   - **背景**：N 组并行压缩 Task 7 需要可复现的实测数据支撑「并行度默认值 / 是否推荐开启」的结论。此前 ZIP 多线程路径（`ArchiveOptions.MultiThreadedCompression`）**没有任何实测数据**——`AGENTS.md` 中记载的 4.63x 属于 `OutArchiveFormat.SevenZip` 的 `mt=on`，与本脚本测的 ZIP Store/CompressGroup 混合路径无关，不能直接引用。该脚本此前一直未纳入版本控制。
   - **新增**：`scripts/bench-zip-mt.cs`（872 行），.NET 10 file-based app（`#:project` 引用 `MantisZip.Core.csproj`），实验性诊断脚本、非应用代码，不参与主工程构建。
