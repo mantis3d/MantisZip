@@ -6,6 +6,21 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-05** — 归档 ZIP 多线程压缩基准测试脚本 `scripts/bench-zip-mt.cs`（诊断工具）
+  - **背景**：N 组并行压缩 Task 7 需要可复现的实测数据支撑「并行度默认值 / 是否推荐开启」的结论。此前 ZIP 多线程路径（`ArchiveOptions.MultiThreadedCompression`）**没有任何实测数据**——`AGENTS.md` 中记载的 4.63x 属于 `OutArchiveFormat.SevenZip` 的 `mt=on`，与本脚本测的 ZIP Store/CompressGroup 混合路径无关，不能直接引用。该脚本此前一直未纳入版本控制。
+  - **新增**：`scripts/bench-zip-mt.cs`（872 行），.NET 10 file-based app（`#:project` 引用 `MantisZip.Core.csproj`），实验性诊断脚本、非应用代码，不参与主工程构建。
+  - **测量设计**：
+    - **2×2 配置矩阵**：D 传统默认（全关）/ A 仅自适应 / B 仅多线程 / C 自适应+多线程，2×2 全组合覆盖
+    - **语料**：合成 text（模板拼装类 C# 源码，deflate 约 3-4x，逼近真实熵值）/ media（随机字节，模拟 JPEG·MP4·PNG 等不可压缩内容）/ mixed；`--corpus` 可指定真实文件夹
+    - **抗测量偏差**：预热轮不计时（JIT + 7z.dll 加载 + 文件缓存），计时轮**轮换配置顺序**避免文件缓存偏袒先跑者，取最小值与中位数；报告「临时/输出同盘」状态（MT 路径的临时 zip 跨盘会显著改变 IO 成本）
+  - **正确性门禁（不只比耗时）**：每个配置跑 `TestArchiveAsync` 做 CRC 校验，并把 `(条目数, 未压缩总字节)` 与基线 D 比对条目指纹——「更快但丢文件」的配置直接判负；任一配置失败即以**非零码退出**，可接入自动化。
+  - **进度遥测分析**：统计上报进度相对墙钟的最大/平均领先百分点、是否倒退、末值、`FilePercentComplete` 为 null 的比例。注释中明确写出**领先指标的正确读法**：字节加权与墙钟只在各条目压缩速率一致时同速，语料异质时二者必然发散（实测 mixed 约 +20~22pt、小文本密集 Deflate 约 -31pt），正负**都不代表引擎缺陷**，不可为压低该值改成按时间伪造百分比。逐条目终态（`EntryStatus`）被识别为独立通道单独计数，不与百分比通道混算。
+  - **回归哨兵**：脚本自动检测「双重压缩」签名——若 MT 产物与不开 MT 的 D/A **字节级完全一致**，即警告 7z `mt=on` 成果可能又被丢弃。注释中完整记录了 2026-10-04 实测发现、且现已修复的历史缺陷（`MergeTempZipToWriter` 解压重压），保留此检测作为字节保真的长期哨兵。
+  - **顺带修正**：修正 `WriteJson` 中一处 `sb.AppendLine` 语句缩进错位（8 空格 → 16 空格，纯代码缩进，不影响字符串内容与 JSON 输出）。
+  - **验证**：`dotnet run scripts/bench-zip-mt.cs -- --help` 退出码 0，file-based app 编译通过、帮助输出正常。
+  - **⚠ 已知缺口（供 Task 7 处理）**：本脚本**尚无 `--degrees` 选项**，配置矩阵固定为 2×2（自适应 × 多线程）。实施计划 Task 7 步骤 2 写的是用 `--degrees 1,2,4,8` 扫并行度——Task 7 开工时需先给脚本补上按 `ParallelCompressDegree` 扫参的能力，再据此产出并行度收益曲线。
+  - **位置说明**：`scripts/` 下已有 `scripts/copy-7z-dll.ps1`，本脚本与之同属开发期工具，不进入发布产物。
+
 **2026-10-05** — N 组并行压缩 Task 1/8：LPT 贪心分组 `SplitCompressGroup`（Core）
   - **背景**：为 ZIP 压缩实现 MantisZip 自主 N 组并行（不再把并行下放给 7z `mt=on`），并展示真实的逐通道字节进度。设计见 `docs/superpowers/specs/2026-10-05-mt-progress-display-design.md`，实施计划见 `docs/superpowers/plans/2026-10-05-n-group-parallel-compress.md`（共 8 个 Task，本次为 Task 1）。
   - **改动**：`Engines/ZipEngine.cs` 新增 `internal static SplitCompressGroup(IReadOnlyList<(string FullPath, string RelativePath)> files, int degree)`，纯函数、无 IO 之外副作用：
