@@ -19,6 +19,20 @@
   - **验证（红→绿）**：红——`CS0117: "ZipEngine"未包含"SplitCompressGroup"的定义` ×6（符合预期）；绿——过滤运行 **5 通过 / 0 失败**；Core 全量 **577 通过 / 3 跳过**（基线 572 + 新增 5），无回归；Core 构建 0 错误 0 警告。
   - **环境注记（非代码缺陷）**：本机 Explorer 因 COM 外壳扩展已注册并加载而锁定 `MantisZip.ShellExt.dll`，使默认输出路径下 Avalonia 重建报 MSB3021/MSB3027。测试改用 `-p:BaseOutputPath` 指向仓库外临时目录绕过。
 
+**2026-10-05** — 新增 N 组并行压缩设计规格与实施计划（docs）
+  - **背景**：N 组并行压缩开工前先落设计与计划文档，供后续 Task 逐项对照实施与验收。
+  - **新增**：
+    - `docs/superpowers/specs/2026-10-05-mt-progress-display-design.md`（553 行）——设计规格。已确认的关键决策：
+      - **方案 B**：进度窗口在首个有效 `BatchIndex` 到达时由「简约」自动切到「详细」
+      - 通道行 **5 列**布局 + 文件名底纹；底纹宽度用 `RatioToWidthConverter`（真实双输入 `MultiBinding`，按 `FileRatio` 渲染）
+      - **`ProgressViewModel.SetProgress` 早返回修复**：`UpsertParallelBatch` 须上移到早返回判断之前，否则批次行永不更新
+      - 全局进度**按字节加权**；组阶段封顶 **95%**，合并完成后直报 100%；`_isBatchMode` 保持 `false`
+      - 并行度：`AppSettings.ParallelCompressDegree` 默认 `Environment.ProcessorCount`、UI 限 1–16；`ArchiveOptions.ParallelCompressDegree` 默认 `0`（运行时取 CPU 数并封顶 16）；N < 2 走串行
+      - 进度窗口行模型新增 `FileRatio`，以 `[ObservableProperty]` 承载，确保底纹随进度实时刷新
+    - `docs/superpowers/plans/2026-10-05-n-group-parallel-compress.md`（1743 行）——实施计划，8 个 Task 步骤连续编号（Task1 1–4 / Task2 1–7 / Task3 1–8 / Task4 1–8 / Task5 1–5 / Task6 1–10 / Task7 1–3 / Task8 1–7）
+  - **计划文档同步修正要点**：Task 7 基准改用 `--degrees 1,2,4,8`；Task 4 补齐 `AddToArchiveAsync` 的 N 组路径；`FileRatio` 改为 `[ObservableProperty]`；`RatioToWidthConverter` 改真实双输入 MultiBinding；XAML 文件名绑定改用 `CurrentFile`（移除不存在的 `FileName`/`IsActive`）；设置链改用 `CompressSettingsViewModel`（不再经 `SettingsWindowViewModel`）；`## Self-Review` 按实际源码重写。
+  - **范围**：纯文档提交，不含代码改动。
+
 **2026-10-05** — 修复 7z `mt=on` 并行压缩成果被 100% 丢弃（方案 A：删除 `MergeTempZipToWriter`）
   - **背景**：ZIP 自适应压缩的「多线程」模式（实验性）把纯压缩文件交给 SharpSevenZip 以 `mt=on` 并行压缩，得到 7z 临时产物后需要合并回 ZipWriter 以追加 Store 类条目。
   - **根因**：合并实现 `MergeTempZipToWriter` 的策略与「多线程压缩」的目的直接冲突——它把 7z 产物**解压回原始字节、再用 .NET Deflate 重压**。`mt=on` 的全部价值在于用 7z 高阶压缩器产出更小的字节，该方法把这份成果丢掉重压，后果有三：① 并行压缩成果 100% 作废（此前实测的 4.63x 加速全部浪费）；② 文件被压两遍，耗时反而高于串行；③ 最终压缩级别与用户在 UI 选择的设置脱钩（`options.CompressionLevel` 不再决定产物字节）。
