@@ -1,4 +1,5 @@
 using System.Collections.Concurrent;
+using System.Security.Cryptography;
 using System.Text;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Abstractions;
@@ -768,4 +769,593 @@ public class ZipEngineTests : IDisposable
         Assert.Contains(progressItems, p => p.PercentComplete > 0 && p.PercentComplete < 100);
         // 无异常则自然走到这里（异常会由 xUnit 捕获）
     }
+
+    // ===== MT 压缩字节保真（回归：merge 阶段不得解压重压）=====
+
+    /// <summary>
+    /// 创建纯可压缩语料（仅 .txt），确保 storeGroup 为空、全部条目走 CompressGroup（7z mt=on）。
+    /// 条目内容足够大且高度可压缩，保证 Deflate 能显著缩小（保证断言有区分度）。
+    /// </summary>
+    private static string CreateCompressibleOnlyDirectory()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(dir);
+        for (int i = 0; i < 5; i++)
+        {
+            var sb = new StringBuilder();
+            for (int j = 0; j < 3000; j++)
+                sb.Append("MantisZip deflate sample line ").Append(j).Append(" lorem ipsum dolor sit amet consectetur\n");
+            File.WriteAllText(Path.Combine(dir, $"doc{i}.txt"), sb.ToString());
+        }
+        return dir;
+    }
+
+    /// <summary>读取 ZIP 内每个文件条目的 CompressedSize（键为条目名，分隔符已归一化为 '/'）。</summary>
+    private static Dictionary<string, long> ReadEntryCompressedSizes(string zipPath)
+    {
+        using var zipFile = new ICSharpCode.SharpZipLib.Zip.ZipFile(zipPath);
+        return zipFile.Cast<ZipEntry>()
+            .Where(e => !e.IsDirectory)
+            .ToDictionary(e => e.Name.Replace('\\', '/'), e => e.CompressedSize, StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 回归：MT 路径必须保留 7z 的压缩字节。
+    /// 修复前 <c>MergeTempZipToWriter</c> 走 <c>OpenEntryStream()</c>（解压）→
+    /// <c>ZipWriter.WriteToStream()</c>（重压），7z mt=on 的成果 100% 被丢弃，
+    /// 且 <c>CompressionLevel = null</c> 让最终压缩级别与用户设置脱钩。
+    /// 本测试断言 compressible 条目的 CompressedSize 与 7z 原生产物逐条目完全一致。
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_MultiThreaded_PreservesSevenZipCompressedBytes()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var srcDir = TrackDir(CreateCompressibleOnlyDirectory());
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_bytes.zip"));
+        var refZip = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_ref.zip"));
+
+        var options = new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            AdaptiveCompression = true,
+            ZipCompressionMethod = "deflate",
+            CompressionLevel = 5,
+        };
+
+        // 参考产物：MT 路径内部对 compressGroup 执行的同一次 7z 原生压缩
+        var (files, _) = FileScanner.CollectFiles([srcDir], null, CancellationToken.None, null);
+        var compressGroup = files
+            .Where(f => ZipEntryClassifier.GetAdaptiveLevel(f.FullPath, options.CompressionLevel,
+                          options.AdaptiveCompression, options.MultiThreadedStoreFormatIds) != 0)
+            .ToList();
+        Assert.NotEmpty(compressGroup);
+
+        var dummyReportTime = DateTime.MinValue;
+        ZipEngine.CompressGroupWithSevenZip(compressGroup, refZip, options, null, 0, 0, 0, 0, ref dummyReportTime);
+
+        await _engine.CompressAsync([srcDir], outputPath, options);
+
+        var refSizes = ReadEntryCompressedSizes(refZip);
+        var actualSizes = ReadEntryCompressedSizes(outputPath);
+
+        Assert.Equal(refSizes.Count, actualSizes.Count);
+        foreach (var (key, expected) in refSizes)
+        {
+            Assert.True(actualSizes.TryGetValue(key, out var actual), $"MT 产物缺少条目 {key}");
+            // 修复前：merge 把 7z 的字节解压后用 .NET Deflate 重压 → 与参考值不一致
+            Assert.Equal(expected, actual);
+        }
+    }
+
+    /// <summary>
+    /// 读取 ZIP 中央目录，返回 条目名 → (压缩方法, 压缩大小, 原始大小)。
+    /// 用内部二进制解析器而非 SharpCompress —— SharpCompress 不暴露 CompressionMethod，
+    /// 而「真 Store（method 0）」正是本测试要区分的语义。
+    /// </summary>
+    private static Dictionary<string, (ushort Method, long CompressedSize, long Size)> ReadEntryMethods(string zipPath)
+    {
+        using var fs = File.OpenRead(zipPath);
+        var (cdOffset, entryCount, _) = ZipBinaryRewriter.ReadEocd(fs);
+        return ZipBinaryRewriter.ReadCentralDirectory(fs, cdOffset, entryCount)
+            .Where(e => !e.FileName.EndsWith('/'))
+            .ToDictionary(
+                e => e.FileName.Replace('\\', '/'),
+                e => (e.CompressionMethod, e.CompressedSize, e.UncompressedSize),
+                StringComparer.OrdinalIgnoreCase);
+    }
+
+    /// <summary>
+    /// 回归：MT 混合语料 —— compressGroup 必须保留 7z 压缩字节，storeGroup 必须以 method 0 直存。
+    /// 覆盖 <c>RewriteAsync(tempZip 为源)</c> + <c>NewEntry.Store=true</c> 这条新路径
+    /// （纯可压缩语料只走 File.Move，不经过本测试覆盖的分支）。
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_MultiThreaded_MixedSource_StoresRawAndPreservesSevenZipBytes()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var srcDir = TrackDir(CreateMixedSourceDirectory());
+        // 放大可压缩文本，使「确实被压缩」与「method=0 直存」具备明确区分度
+        File.WriteAllText(Path.Combine(srcDir, "hello.txt"), new string('B', 64 * 1024));
+
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_mixed_bytes.zip"));
+        var refZip = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_mixed_ref.zip"));
+
+        var options = new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            AdaptiveCompression = true,
+            ZipCompressionMethod = "deflate",
+            CompressionLevel = 5,
+        };
+
+        // 参考产物：MT 路径内部对 compressGroup 执行的同一次 7z 原生压缩
+        var (files, _) = FileScanner.CollectFiles([srcDir], null, CancellationToken.None, null);
+        var compressGroup = files
+            .Where(f => ZipEntryClassifier.GetAdaptiveLevel(f.FullPath, options.CompressionLevel,
+                          options.AdaptiveCompression, options.MultiThreadedStoreFormatIds) != 0)
+            .ToList();
+        Assert.NotEmpty(compressGroup);
+
+        var dummyReportTime = DateTime.MinValue;
+        ZipEngine.CompressGroupWithSevenZip(compressGroup, refZip, options, null, 0, 0, 0, 0, ref dummyReportTime);
+
+        // 压缩 + 解压逐字节比对 + 完整性校验（共用验证链）
+        await AssertRoundTripAsync(srcDir, outputPath, options);
+
+        var refMethods = ReadEntryMethods(refZip);
+        var actual = ReadEntryMethods(outputPath);
+
+        // ① compressGroup：逐条目压缩字节与压缩方法均与 7z 原生完全一致（copy-mode 保真）。
+        //    注意不能写死 method == 8：7z 对小块/不可压缩数据会自动选 Copy(method 0)，
+        //    保真契约是「与参考逐字段相同」，而非「一定是 Deflate」。
+        Assert.NotEmpty(refMethods);
+        foreach (var (key, expected) in refMethods)
+        {
+            Assert.True(actual.TryGetValue(key, out var got), $"MT 产物缺少条目 {key}");
+            Assert.Equal(expected.CompressedSize, got.CompressedSize);
+            Assert.Equal(expected.Method, got.Method);
+        }
+
+        // ② storeGroup：真 Store（method 0），压缩大小 == 原始大小，字节未被加工
+        var jpgMatches = actual.Where(kv => kv.Key.EndsWith("photo.jpg")).ToList();
+        Assert.Single(jpgMatches);
+        var jpg = jpgMatches[0];
+        Assert.Equal((ushort)0, jpg.Value.Method);
+        Assert.Equal(jpg.Value.Size, jpg.Value.CompressedSize);
+    }
+
+    /// <summary>
+    /// 回归：混合场景（StoreGroup 非空）选中 <b>Deflate64</b> 时，必须走 copy-mode 重写且
+    /// <b>方法码保持 9</b>。
+    /// <para>
+    /// 根因：SharpCompress 的 ZipWriter 根本无法写 Deflate64（<c>ToZipCompressionMethod</c> 无该映射，
+    /// 抛 <c>InvalidFormatException: Invalid compression method: Deflate64</c>）。因此 Deflate64 一旦落入
+    /// 混合场景并回落到串行路径，就必然硬失败——copy-mode 是它唯一可用的产出路径。
+    /// </para>
+    /// <para>
+    /// 断言双重：① 可压缩条目 method == 9（未被压平成 Store）；② 与 7z 参考包的 method + 压缩后大小逐条相等
+    /// （copy-mode 原样复制压缩字节，不重压）。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_MultiThreaded_MixedSource_Deflate64_PreservesMethod9()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var srcDir = TrackDir(CreateMixedSourceDirectory());
+        // 大段高压缩文本，确保 7z 对 Deflate64 产出 method 9 而非退化为 Store
+        File.WriteAllText(Path.Combine(srcDir, "hello.txt"), new string('B', 64 * 1024));
+        File.WriteAllText(Path.Combine(srcDir, "subdir", "nested.txt"), new string('C', 64 * 1024));
+
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_mixed_d64.zip"));
+        var refZip = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_mixed_d64_ref.zip"));
+
+        var options = new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            AdaptiveCompression = true,
+            ZipCompressionMethod = "deflate64",
+            CompressionLevel = 5,
+        };
+
+        // 参考压缩包：MT 混合流程中对同一 compressGroup 执行的同一份 7z 原始压缩
+        var (files, _) = FileScanner.CollectFiles([srcDir], null, CancellationToken.None, null);
+        var compressGroup = files
+            .Where(f => ZipEntryClassifier.GetAdaptiveLevel(f.FullPath, options.CompressionLevel,
+                options.AdaptiveCompression, options.MultiThreadedStoreFormatIds) != 0)
+            .ToList();
+        Assert.NotEmpty(compressGroup);
+
+        var dummyReportTime = DateTime.MinValue;
+        ZipEngine.CompressGroupWithSevenZip(compressGroup, refZip, options, null, 0, 0, 0, 0, ref dummyReportTime);
+
+        // 压缩 + 解压逐字节比对（同时覆盖 7z 与重写器两条路径）
+        await AssertRoundTripAsync(srcDir, outputPath, options);
+
+        var refMethods = ReadEntryMethods(refZip);
+        var actual = ReadEntryMethods(outputPath);
+
+        // 对 compressGroup：method 与压缩后大小与 7z 参考包完全一致
+        Assert.NotEmpty(refMethods);
+        foreach (var (key, expected) in refMethods)
+        {
+            Assert.True(actual.TryGetValue(key, out var got), $"MT 输出缺少条目 {key}");
+            Assert.Equal(expected.CompressedSize, got.CompressedSize);
+            Assert.Equal(expected.Method, got.Method);
+        }
+
+        // 核心回归断言：文本条目在重写后仍是 Deflate64（method 9），绝不能被压平成 Store（method 0）
+        var textMatches = actual
+            .Where(kv => kv.Key.EndsWith("hello.txt") || kv.Key.EndsWith("nested.txt"))
+            .ToList();
+        Assert.Equal(2, textMatches.Count);
+        foreach (var (_, value) in textMatches)
+            Assert.Equal((ushort)9, value.Method);
+
+        // 对 storeGroup：仍为原样 Store（method 0），未经压缩
+        var jpgMatches = actual.Where(kv => kv.Key.EndsWith("photo.jpg")).ToList();
+        Assert.Single(jpgMatches);
+        var jpgEntry = jpgMatches[0];
+        Assert.Equal((ushort)0, jpgEntry.Value.Method);
+        Assert.Equal(jpgEntry.Value.Size, jpgEntry.Value.CompressedSize);
+    }
+
+    /// <summary>
+    /// 回归：<c>AddToArchiveAsync</c>（添加到已有压缩包）的 MT 路径同样必须保留 7z 压缩字节。
+    /// 该方法先把已有压缩包整体解压到 tempDir、再连同新文件一起从零重压缩，
+    /// 因此修复前同样走 MergeTempZipToWriter（解压 → .NET Deflate 重压），mt=on 成果被丢弃。
+    /// 本测试用「按原压缩包内容重建 tempDir 镜像」的方式生成 7z 参考产物，避免硬编码 fixture 内部结构。
+    /// </summary>
+    [Fact]
+    public async Task AddToArchiveAsync_MultiThreaded_PreservesSevenZipCompressedBytes()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = TrackFile(ArchiveFixtures.CreateZipArchive());
+
+        // 新增：一个可压缩文本（进 CompressGroup）+ 一个随机二进制（进 StoreGroup）
+        var addDir = Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(addDir);
+        TrackDir(addDir);
+        var addedText = Path.Combine(addDir, "added-big.txt");
+        await File.WriteAllTextAsync(addedText, new string('A', 96 * 1024));
+        var addedJpg = Path.Combine(addDir, "photo.jpg");
+        await File.WriteAllBytesAsync(addedJpg, RandomNumberGenerator.GetBytes(48 * 1024));
+
+        var options = new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            AdaptiveCompression = true,
+            ZipCompressionMethod = "deflate",
+            CompressionLevel = 5,
+        };
+
+        await _engine.AddToArchiveAsync(archive, [addedText, addedJpg], options);
+
+        // ── 构造 7z 参考产物：镜像 AddToArchiveAsync 的 tempDir 内容 ──
+        var refDir = Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(refDir);
+        TrackDir(refDir);
+        using (var zf = new ICSharpCode.SharpZipLib.Zip.ZipFile(archive))
+        {
+            // 注意：此处 archive 已被 AddToArchiveAsync 覆写，故从调用前的副本读取更稳妥；
+            // 但 AddToArchiveAsync 保留原有条目内容，因此读改后的 archive 仍能得到同样的文件集合。
+            foreach (var e in zf.Cast<ZipEntry>())
+            {
+                if (e.IsDirectory) continue;
+                var outPath = Path.Combine(refDir, e.Name);
+                Directory.CreateDirectory(Path.GetDirectoryName(outPath)!);
+                using var input = zf.GetInputStream(e);
+                using var output = File.Create(outPath);
+                input.CopyTo(output);
+            }
+        }
+
+        // 追加新增文件（AddToArchiveAsync entryBasePath=null → 条目名为文件名）
+        File.Copy(addedText, Path.Combine(refDir, "added-big.txt"), overwrite: true);
+        File.Copy(addedJpg, Path.Combine(refDir, "photo.jpg"), overwrite: true);
+
+        // 生产代码用 Path.GetRelativePath(tempDir, file) 构造 RelativePath，此处完全对齐
+        var refFiles = Directory.GetFiles(refDir, "*", SearchOption.AllDirectories)
+            .Select(f => (FullPath: f, RelativePath: ArchivePath.Normalize(Path.GetRelativePath(refDir, f))))
+            .ToList();
+
+        var refZip = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_add_ref.zip"));
+        var dummyReportTime = DateTime.MinValue;
+        ZipEngine.CompressGroupWithSevenZip(refFiles, refZip, options, null, 0, 0, 0, 0, ref dummyReportTime);
+
+        // ── 断言 ──
+        var refMethods = ReadEntryMethods(refZip);
+        var actual = ReadEntryMethods(archive);
+
+        // ① CompressGroup：逐条目压缩字节与压缩方法均与 7z 原生一致
+        Assert.NotEmpty(refMethods);
+        foreach (var (key, expected) in refMethods)
+        {
+            Assert.True(actual.TryGetValue(key, out var got), $"AddToArchiveAsync 产物缺少条目 {key}");
+            Assert.Equal(expected.CompressedSize, got.CompressedSize);
+            Assert.Equal(expected.Method, got.Method);
+        }
+
+        // ② StoreGroup：真 Store（method 0）
+        var jpgMatches = actual.Where(kv => kv.Key.EndsWith("photo.jpg")).ToList();
+        Assert.Single(jpgMatches);
+        var jpg = jpgMatches[0];
+        Assert.Equal((ushort)0, jpg.Value.Method);
+        Assert.Equal(jpg.Value.Size, jpg.Value.CompressedSize);
+
+        // ③ 产物完整性：可正常列出且原有条目未丢失
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.Name.EndsWith("hello.txt"));
+        Assert.Contains(entries, e => e.Name == "added-big.txt");
+        Assert.Contains(entries, e => e.Name == "photo.jpg");
+    }
+
+    // ===== MultiThreaded 准入守卫（IsMultiThreadedEligible / CanCopyModeRewrite） =====
+
+    /// <summary>
+    /// 全可压缩 + Deflate64：StoreGroup 为空 → 走 <c>File.Move</c>，根本不经过 copy-mode 重写，
+    /// 因此必须仍然走 7z mt=on。
+    /// <para>
+    /// 本用例锁定「方法判定必须发生在分组之后」这一次序：若在前置预检里对 deflate64 一刀切拒绝，
+    /// 该组合会被错误踢回串行路径（而串行 ZipWriter 恰恰不支持 Deflate64，直接抛
+    /// InvalidFormatException），造成真实回归。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_MultiThreaded_Deflate64_AllCompressible_StaysOnSevenZipPath()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        // 纯可压缩源：StoreGroup 必为空
+        var srcDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        Directory.CreateDirectory(srcDir);
+        await File.WriteAllTextAsync(Path.Combine(srcDir, "a.txt"), new string('A', 64 * 1024));
+        await File.WriteAllTextAsync(Path.Combine(srcDir, "b.txt"), new string('B', 64 * 1024));
+
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_d64.zip"));
+
+        await AssertRoundTripAsync(srcDir, outputPath, new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            AdaptiveCompression = true,
+            ZipCompressionMethod = "deflate64",
+            CompressionLevel = 5,
+        });
+    }
+
+    /// <summary>
+    /// AddToArchiveAsync 侧的同序次保证：全可压缩 + Deflate64 仍走 7z，不被守卫误伤。
+    /// </summary>
+    [Fact]
+    public async Task AddToArchiveAsync_MultiThreaded_Deflate64_AllCompressible_StaysOnSevenZipPath()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var archive = TrackFile(ArchiveFixtures.CreateZipArchive());
+
+        // 只加可压缩文件 → 原有条目 + 新增条目全进 CompressGroup，StoreGroup 为空
+        var addedText = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}.txt"));
+        await File.WriteAllTextAsync(addedText, new string('B', 64 * 1024));
+
+        await _engine.AddToArchiveAsync(archive, [addedText], new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            AdaptiveCompression = true,
+            ZipCompressionMethod = "deflate64",
+            CompressionLevel = 5,
+        });
+
+        var entries = await _engine.ListEntriesAsync(archive);
+        Assert.Contains(entries, e => e.Name == Path.GetFileName(addedText));
+        Assert.Contains(entries, e => e.Name.EndsWith("hello.txt"));
+    }
+
+    /// <summary>
+    /// 分卷（SplitSize &gt; 0）由 SplitOutputStream 负责，MT 路径不参与。
+    /// 验证守卫把 MT 挡在门外、分卷链路仍正常工作（产物按 {name}{ext}.{NNN} 命名）。
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_MultiThreaded_SplitSize_ProducesSplitVolumes()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var srcDir = TrackDir(CreateMixedSourceDirectory());
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_split.zip"));
+
+        await _engine.CompressAsync([srcDir], outputPath, new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            AdaptiveCompression = true,
+            SplitSize = 1024, // 1KB 分卷 → 混合源必然产生多个卷
+        });
+
+        // 分卷产物命名为 {name}{ext}.{NNN}，不会生成 base 文件本身
+        Assert.False(File.Exists(outputPath), "split archive should not produce a file at the base path");
+        var dir = Path.GetDirectoryName(outputPath)!;
+        var volumes = Directory.GetFiles(dir, Path.GetFileName(outputPath) + ".*");
+        Assert.True(volumes.Length >= 2,
+            $"expected multiple split volumes under MT-disabled serial path, got {volumes.Length}");
+    }
+
+    /// <summary>
+    /// ZIP32 上限守卫（copy-mode 不支持 ZIP64）。
+    /// 条目数与 4GB 总量都无法用小文件真实构造（需 65280 个文件 / 4GB 数据），
+    /// 因此直接对私有准入函数做边界断言，避免把重型 IO 塞进单元测试。
+    /// </summary>
+    [Theory]
+    [InlineData(10_000, 1L * 1024 * 1024 * 1024, true)]
+    // 条目数恰好等于 ZIP32 上限（ushort.MaxValue - 256 = 65279）→ 准入（边界闭合）
+    [InlineData(65_279, 1024, true)]
+    // 条目数越过 ZIP32 上限 → 不准入
+    [InlineData(65_280, 1024, false)]
+    [InlineData(70_000, 1024, false)]
+    // 总量贴近 4GB 上限 → 准入（边界闭合）
+    [InlineData(10, 4_294_967_293L, true)]
+    // 总量到达 ZIP32 安全上限（0xFFFFFFFE）→ 保守拒绝。
+    // copy-mode 遇到 0xFFFFFFFF 哨兵会抛 ZipCopyModeException 且无内部回落，
+    // 守卫宁紧勿松：差一个字节最多回落串行，放宽则可能直接压缩失败。
+    [InlineData(10, 4_294_967_294L, false)]
+    [InlineData(10, 4_294_967_295L, false)]
+    [InlineData(10, 5L * 1024 * 1024 * 1024, false)]
+    public void IsMultiThreadedEligible_Zip32Limits_GuardBoundaries(int entryCount, long totalSize, bool expected)
+    {
+        var method = typeof(ZipEngine).GetMethod(
+            "IsMultiThreadedEligible",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var eligible = (bool)method!.Invoke(null, [
+            new ArchiveOptions { MultiThreadedCompression = true, AdaptiveCompression = true },
+            entryCount,
+            totalSize,
+        ])!;
+
+        Assert.Equal(expected, eligible);
+    }
+
+    /// <summary>
+    /// copy-mode 重写器承载 method 0（Store）、method 8（Deflate）与 method 9（Deflate64）。
+    /// <para>
+    /// Deflate64 必须放行：SharpCompress 的 ZipWriter 无法写 Deflate64，混合场景回落串行必然硬失败。
+    /// BZip2/LZMA/PPMd 仍拒绝（回落串行可正常写出，只是失去 MT 加速）。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void CanCopyModeRewrite_AcceptsStoreDeflateAndDeflate64()
+    {
+        var method = typeof(ZipEngine).GetMethod(
+            "CanCopyModeRewrite",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        bool Can(string? zipMethod) => (bool)method!.Invoke(null, [zipMethod])!;
+
+        Assert.True(Can(null));          // 未指定 → 默认 Deflate
+        Assert.True(Can(""));            // 空串同上
+        Assert.True(Can("deflate"));     // Deflate (method 8)
+        Assert.True(Can("DEFLATE"));     // 大小写不敏感
+        Assert.True(Can("store"));       // Store (method 0) —— 显式全 Store 可被重写器承载
+        Assert.True(Can("deflate64"));   // method 9 —— 串行路径无法写 Deflate64，只能靠 copy-mode
+
+        Assert.False(Can("bzip2"));      // method 12 —— 回落串行可写出，仅失去 MT 加速
+        Assert.False(Can("lzma"));       // method 14
+        Assert.False(Can("ppmd"));       // method 98
+    }
+
+    /// <summary>
+    /// 加密包由串行 ZipWriter 负责 AES，MT 前置预检必须直接拒绝。
+    /// </summary>
+    [Fact]
+    public void IsMultiThreadedEligible_RejectsEncryptedArchive()
+    {
+        var method = typeof(ZipEngine).GetMethod(
+            "IsMultiThreadedEligible",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var options = new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            Encrypt = true,
+            Password = "secret",
+        };
+
+        var eligible = (bool)method!.Invoke(null, [options, 10, 1024L])!;
+        Assert.False(eligible);
+    }
+
+    /// <summary>
+    /// MultiThreadedCompression=false 时前置预检必须拒绝（用户未开启多线程）。
+    /// </summary>
+    [Fact]
+    public void IsMultiThreadedEligible_RejectsWhenSwitchOff()
+    {
+        var method = typeof(ZipEngine).GetMethod(
+            "IsMultiThreadedEligible",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var options = new ArchiveOptions { MultiThreadedCompression = false };
+        var eligible = (bool)method!.Invoke(null, [options, 10, 1024L])!;
+
+        Assert.False(eligible);
+    }
+
+    /// <summary>
+    /// 分卷（SplitSize &gt; 0）由 SplitOutputStream 负责，MT 路径不参与，前置预检必须拒绝。
+    /// 端到端行为由 <c>CompressAsync_MultiThreaded_SplitSize_ProducesSplitVolumes</c> 覆盖。
+    /// </summary>
+    [Fact]
+    public void IsMultiThreadedEligible_RejectsSplitArchive()
+    {
+        var method = typeof(ZipEngine).GetMethod(
+            "IsMultiThreadedEligible",
+            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
+        Assert.NotNull(method);
+
+        var options = new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            SplitSize = 1024 * 1024,
+        };
+
+        var eligible = (bool)method!.Invoke(null, [options, 10, 1024L])!;
+
+        Assert.False(eligible);
+    }
+
+    /// <summary>
+    /// 回归：非 Deflate 压缩方法在**默认级别 5** 下曾必然崩溃。
+    /// SharpCompress 在 <c>ZipWriterOptions.CompressionLevel</c> 的 setter 内即校验
+    /// （<c>CompressionLevelValidation.Validate</c>）：只有 Deflate / Deflate64 接受可配置级别，
+    /// BZip2 / LZMA / PPMd / None 传入非 0 直接抛 <c>ArgumentOutOfRangeException</c>。
+    /// 修复：这些方法统一传 0（0 = 该方法的默认设置，不是「不压缩」）。
+    /// <para>
+    /// 走串行路径：<c>writerOptions</c> 在 MT 判定**之前**构造，修复前 MT 用户同样崩溃，
+    /// 故此处显式 <c>MultiThreadedCompression = false</c> 以直接命中修复点。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData("bzip2", (ushort)12)] // ZIP 方法码 12
+    [InlineData("lzma", (ushort)14)]  // ZIP 方法码 14
+    [InlineData("ppmd", (ushort)98)]  // ZIP 方法码 98
+    [InlineData("store", (ushort)0)]  // ZIP 方法码 0
+    public async Task CompressAsync_NonDeflateMethod_AtDefaultLevel_WritesExpectedMethodCode(
+        string zipMethod, ushort expectedMethod)
+    {
+        var srcDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        Directory.CreateDirectory(srcDir);
+        // 足量可压缩文本：使「确实被压缩」与「直存」具备明确区分度
+        await File.WriteAllTextAsync(Path.Combine(srcDir, "a.txt"), new string('A', 64 * 1024));
+        await File.WriteAllTextAsync(Path.Combine(srcDir, "b.txt"), new string('B', 64 * 1024));
+
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_{zipMethod}.zip"));
+
+        var options = new ArchiveOptions
+        {
+            MultiThreadedCompression = false, // 串行：直接覆盖 writerOptions 构造处的修复
+            AdaptiveCompression = false,
+            ZipCompressionMethod = zipMethod,
+            CompressionLevel = 5, // 默认级别 —— 修复前正是在此崩溃
+        };
+
+        // 修复前：ArgumentOutOfRangeException:
+        //   Compression type BZip2 does not support configurable compression levels. Use 0.
+        await _engine.CompressAsync([srcDir], outputPath, options);
+
+        // 方法码必须与用户选择一致（而非静默降级为 Deflate / Store）
+        var entries = ReadEntryMethods(outputPath);
+        Assert.NotEmpty(entries);
+        foreach (var (name, info) in entries)
+        {
+            Assert.Equal(expectedMethod, info.Method);
+        }
+
+        // 解压逐字节比对 + 完整性校验
+        await AssertRoundTripAsync(srcDir, outputPath, options);
+    }
+
 }

@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-05** — 修复 7z `mt=on` 并行压缩成果被 100% 丢弃（方案 A：删除 `MergeTempZipToWriter`）
+  - **背景**：ZIP 自适应压缩的「多线程」模式（实验性）把纯压缩文件交给 SharpSevenZip 以 `mt=on` 并行压缩，得到 7z 临时产物后需要合并回 ZipWriter 以追加 Store 类条目。
+  - **根因**：合并实现 `MergeTempZipToWriter` 的策略与「多线程压缩」的目的直接冲突——它把 7z 产物**解压回原始字节、再用 .NET Deflate 重压**。`mt=on` 的全部价值在于用 7z 高阶压缩器产出更小的字节，该方法把这份成果丢掉重压，后果有三：① 并行压缩成果 100% 作废（此前实测的 4.63x 加速全部浪费）；② 文件被压两遍，耗时反而高于串行；③ 最终压缩级别与用户在 UI 选择的设置脱钩（`options.CompressionLevel` 不再决定产物字节）。
+  - **改动（方案 A：ZIP 内容以 7z 产物为准）**：
+    - `Engines/ZipEngine.cs`：删除 `MergeTempZipToWriter`。纯压缩组（`storeGroup` 为空）直接 `File.Move` 7z 产物为最终 zip，字节零改写；混合组改走 `ZipBinaryRewriter` copy-mode 重写——原样复制 7z 已压缩条目 + 以 `Store` 追加其余条目。
+    - `Utils/ZipBinaryRewriter.cs`：`NewEntry` 新增 `Store` 参数（默认 `false`）。`true` = 按压缩方法 0（Store）直写、字节透传不过 Deflate——已压缩载荷必须走此路径，否则会被二次压缩；`false` = Deflate at `Optimal`（原行为）。补齐 5 个 `<param>` 文档说明两种语义。
+    - `Utils/ZipBinaryRewriter.cs`：copy-mode 校验由「仅接受方法 0/8」放宽为「接受 0 / 8 / **9**（Deflate64）」。混合场景下 7z 可能产出 Deflate64 条目，此前会被判为不支持而抛 `ZipCopyModeException`。
+  - **回归测试**：`tests/MantisZip.Tests/Engines/ZipEngineTests.cs` 新增「MT 压缩字节保真」用例组（`CompressAsync_MultiThreaded_PreservesSevenZipCompressedBytes` / `AddToArchiveAsync_MultiThreaded_PreservesSevenZipCompressedBytes`），锁定 7z 压缩字节不被解压重压。语料用**纯可压缩内容**（仅 `.txt`，每份 3000 行重复文本）确保 `storeGroup` 为空、全部条目走 CompressGroup（7z `mt=on`），使断言有区分度。共 590 行新增测试。
+  - **验证**：`dotnet build src/MantisZip.Core` 0 警告 0 错误；Core 全量 **577 通过 / 3 跳过**，等于基线 572 + 新增 5，无回归。
+  - **注**：本条与下方 `2026-09-18` 条目内「⚠ 后续修正」小节为同一改动的两处记录——09-18 条目保留当时实现原貌并加注修正，本条按日期记录完整改动与验证。
+
 **2026-10-04** — 修复 CLI 解压路径缺失列表模式播种与「并行」卡（缺口范围复核为两个叶子）
   - **背景**：上一条同日记录里「已记录功能缺口」指出 CLI 解压绕过 `ExtractFlow`，导致 ZIP 列表模式为空、「并行」卡恒不出现。用户当日确认补齐（`等下，我改主意了。还是补齐吧。不过请你先提交git`）。
   - **根因**：`ProgressWindow.SeedEntries` / `SetParallelDegree` 仅由 `ExtractFlow` 建立，而 CLI 解压叶子**直连 `engine.ExtractAsync`**、绕过 `ExtractFlow.ExtractAsync`（后者内部已调 `TrySeedEntryItemsInBackground` 与 `SetParallelDegree`）。`App.axaml.cs` 内共 3 处 `engine.ExtractAsync`：`:1322` 走 `ExtractFlow.ExtractAsync`（本就正常），另两处需补。
@@ -145,6 +156,7 @@
     - `Utils/ZipEntryClassifier.cs`：新增 `GetAdaptiveLevel` 重载（支持自定义 Store 格式列表），MultiThreaded 模式下内置已压缩扩展名 + 用户自定义格式 → Store
     - `Services/CompressService.cs`：`CompressRequest` 新增 `MultiThreadedStoreFormatIds` + `BuildOptions` 映射到 `ArchiveOptions`
     - `Engines/ZipEngine.cs`：`CompressAsync` + `AddToArchiveAsync` 非加密路径新增 MultiThreaded 分流 —— 文件按 `ZipEntryClassifier.GetAdaptiveLevel()` 分为 StoreGroup（level=0）和 CompressGroup（level>0），StoreGroup 走 ZipWriter Store，CompressGroup 走 `CompressGroupWithSevenZip`（SharpSevenZip `mt=on`）+ `MergeTempZipToWriter` 合并回 ZipWriter；两处调用均传入 `options.MultiThreadedStoreFormatIds`
+    - ⚠ 后续修正（本条为 2026-09-18 当时的实现，保留原貌）：`MergeTempZipToWriter` 已删除。该方法把 7z mt=on 的产物解压回原始字节再用 .NET Deflate 重压，导致并行压缩成果 100% 被丢弃、文件被压两遍、最终压缩级别与用户设置脱钩。现改为「方案 A」：ZIP 内容以 7z 产物为准，纯压缩组直接 `File.Move`，混合组经 `ZipBinaryRewriter` 原样复制并追加 `Store` 条目；回归测试 `CompressAsync_MultiThreaded_PreservesSevenZipCompressedBytes` / `AddToArchiveAsync_MultiThreaded_PreservesSevenZipCompressedBytes` 锁定压缩字节不被重压。
   - **UI 层**：
     - `Models/AppSettings.cs`：新增 `MultiThreadedStoreFormatIds`（List&lt;string&gt;）+ `GetDefaultMultiThreadedStoreFormatIds()`（内置 37 个已压缩格式 ID）
     - `ViewModels/SettingsWindowViewModel.cs`：新增 `AdaptiveModeMultiThreaded` 属性 + `IsMultiThreadedMode` / `IsFormatCatalogVisible` / `IsUserRulesVisible` / `IsMultiThreadedHintVisible` 计算属性 + `MultiThreadedStoreFormats`（ObservableCollection&lt;StoreFormatItemViewModel&gt;）+ `PopulateMultiThreadedStoreFormats` / `SaveMultiThreadedStoreFormats` + `AdaptiveModeMultiThreadedText` 本地化文本

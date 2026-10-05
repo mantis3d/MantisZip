@@ -49,11 +49,21 @@ public readonly record struct RewriteResult(
 /// New entry to add during rewrite. Caller must keep <see cref="Data"/> stream alive
 /// until <c>RewriteAsync</c> completes.
 /// </summary>
+/// <param name="EntryName">Entry path inside the archive.</param>
+/// <param name="Data">Uncompressed source data.</param>
+/// <param name="LastModified">Entry timestamp (converted to MS-DOS date/time).</param>
+/// <param name="Size">Uncompressed byte count of <paramref name="Data"/>.</param>
+/// <param name="Store">
+/// <c>true</c> = write with compression method 0 (Store) — bytes are passed through
+/// untouched, which is what already-compressed payloads need.
+/// <c>false</c> (default) = Deflate at <see cref="System.IO.Compression.CompressionLevel.Optimal"/>.
+/// </param>
 public readonly record struct NewEntry(
     string EntryName,
     Stream Data,
     DateTime LastModified,
-    long Size);
+    long Size,
+    bool Store = false);
 
 /// <summary>
 /// ZIP binary rewriter providing low-level parsing and copy-mode rewrite capabilities.
@@ -340,13 +350,13 @@ internal static partial class ZipBinaryRewriter
                     continue;
 
                 // ── Copy-mode validation ─────────────────────────────
-                if (entry.CompressionMethod != 0 && entry.CompressionMethod != 8)
-                {
-                    CoreLog.Info($"Entry '{entry.FileName}': unsupported compression method {entry.CompressionMethod}");
-                    throw new ZipCopyModeException(
-                        $"Entry '{entry.FileName}' uses unsupported compression method ({entry.CompressionMethod}). " +
-                        "Only Store (0) and Deflate (8) are supported by copy-mode.");
-                }
+if (entry.CompressionMethod != 0 && entry.CompressionMethod != 8 && entry.CompressionMethod != 9)
+            {
+                CoreLog.Info($"Entry '{entry.FileName}': unsupported compression method {entry.CompressionMethod}");
+                throw new ZipCopyModeException(
+                    $"Entry '{entry.FileName}' uses unsupported compression method ({entry.CompressionMethod}). " +
+                    "Only Store (0), Deflate (8) and Deflate64 (9) are supported by copy-mode.");
+            }
 
                 if ((entry.Flags & 0x0001) != 0) // bit 0 = encrypted
                 {
@@ -435,7 +445,7 @@ internal static partial class ZipBinaryRewriter
                         Crc32: crc32,
                         CompressedSize: compressedSize,
                         UncompressedSize: newEntry.Size,
-                        CompressionMethod: 8, // Deflate
+                        CompressionMethod: (ushort)(newEntry.Store ? 0 : 8),
                         Flags: 0,
                         LastModifiedDate: dosDate,
                         LastModifiedTime: dosTime,
@@ -521,7 +531,7 @@ internal static partial class ZipBinaryRewriter
         catch (Exception ex)
         {
             if (ex is ZipCopyModeException)
-                CoreLog.Info("ZipBinaryRewriter: copy-mode not supported, falling back");
+                CoreLog.Info("ZipBinaryRewriter: copy-mode not supported, aborting (caller must fall back to the serial path)");
             else
                 CoreLog.Error("ZipBinaryRewriter: error during rewrite", ex);
             CleanupFile(tempDestPath);
@@ -648,7 +658,11 @@ internal static partial class ZipBinaryRewriter
         using var ms = new MemoryStream();
         uint crc = 0xFFFFFFFF;
 
-        using (var deflate = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true))
+        Stream? deflateStream = entry.Store
+            ? null
+            : new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true);
+        Stream sink = deflateStream ?? ms;
+        try
         {
             byte[] buffer = new byte[CopyBufferSize];
             long totalRead = 0;
@@ -665,7 +679,7 @@ internal static partial class ZipBinaryRewriter
                 for (int i = 0; i < read; i++)
                     crc = Crc32LookupTable[(int)((crc ^ buffer[i]) & 0xFF)] ^ (crc >> 8);
 
-                deflate.Write(buffer, 0, read);
+                sink.Write(buffer, 0, read);
                 totalRead += read;
 
                 var now = DateTime.Now;
@@ -681,7 +695,11 @@ internal static partial class ZipBinaryRewriter
                     lastReportTime = now;
                 }
             }
-        } // DeflateStream flushed here; ms contains the compressed data
+        }
+        finally
+        {
+            deflateStream?.Dispose(); // flush → ms 内为压缩数据；Store 路径无需 flush
+        }
 
         uint crc32 = crc ^ 0xFFFFFFFF;
         byte[] compressed = ms.ToArray();
@@ -701,8 +719,8 @@ internal static partial class ZipBinaryRewriter
         BitConverter.GetBytes((ushort)20).CopyTo(lfh, 4);
         // Flags (0 = no encryption, no data descriptor)
         BitConverter.GetBytes((ushort)0).CopyTo(lfh, 6);
-        // Compression method (8 = Deflate)
-        BitConverter.GetBytes((ushort)8).CopyTo(lfh, 8);
+        // Compression method (0 = Store, 8 = Deflate)
+        BitConverter.GetBytes((ushort)(entry.Store ? 0 : 8)).CopyTo(lfh, 8);
         // Last modified time
         BitConverter.GetBytes(dosTime).CopyTo(lfh, 10);
         // Last modified date
