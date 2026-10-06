@@ -220,6 +220,12 @@ public partial class MainWindow : Window
                 cvm.SevenZipMatchFinder = dialog.ViewModel.SevenZipMatchFinder;
                 cvm.SevenZipMultithreaded = dialog.ViewModel.SevenZipMultithreaded;
                 cvm.AdaptiveCompression = dialog.ViewModel.AdaptiveCompression;
+                // 同一 ZIP 面板（DynamicFormatOptionsPanel）的另两个开关此前漏拷 →
+                // 执行侧 MultiThreadedCompression 恒为 false，引擎永远走串行路径，
+                // 进度窗口「详细」通道 UI 永不出现。此处补齐（含 Task 5 新增的组数）。
+                cvm.AdaptiveSmartDetect = dialog.ViewModel.AdaptiveSmartDetect;
+                cvm.MultiThreadedCompression = dialog.ViewModel.MultiThreadedCompression;
+                cvm.ParallelCompressDegree = dialog.ViewModel.ParallelCompressDegree;
                 cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
                 // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
                 cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;
@@ -261,6 +267,14 @@ public partial class MainWindow : Window
         {
             var pw = new ProgressWindow(title);
             pw.InitCancellation();
+            // Task 6: 压缩流程标记（供压缩通道说明行显示；解压流程保持 false）
+            pw.IsCompressFlow = vm.PendingCompressFlow;
+            vm.PendingCompressFlow = false;
+            // 列表播种：压缩流程枚举全量条目（后台；失败/取消/超阈值放弃，终态 upsert 兜底）
+            var seedRequest = vm.PendingCompressRequest;
+            vm.PendingCompressRequest = null;
+            if (seedRequest is not null)
+                CompressFlow.TrySeedEntryItemsInBackground(pw, seedRequest, pw.CancellationToken);
             var hasFileList = filePaths is { Count: > 0 };
 
             // 批处理状态上报：操作闭包内经 BatchStatusReporter 传给引擎 onItemStatus

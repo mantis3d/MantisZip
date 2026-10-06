@@ -77,7 +77,32 @@
         <CheckBox x:Name="ZipMultiThreadCheck"
                   Content="{Binding ZipMultiThreadLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   IsChecked="False"
+                  IsCheckedChanged="ZipMultiThreadCheck_IsCheckedChanged"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 并行压缩组数：N 个单线程压缩器并行（区别于上方「多线程压缩」的单个压缩器 mt=on）。
+             按项目规则 6（方案 A）：多线程压缩关闭时整块隐藏而非禁用 —— N 组的第一条回退条件
+             就是 MultiThreadedCompression == false，组数在此情况下会被引擎静默忽略。 -->
+        <StackPanel x:Name="ParallelDegreePanel"
+                    Orientation="Horizontal"
+                    Spacing="{DynamicResource SpacingSm}"
+                    Margin="0,4,0,0"
+                    IsVisible="False">
+          <!-- 组数标签：并行压缩组数 -->
+          <TextBlock Text="{Binding ParallelDegreeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <!-- 组数输入框：1..16，1 = 串行；默认值由 LoadDefaults 从 AppSettings 注入 -->
+          <NumericUpDown x:Name="ParallelDegreeInput"
+                         Minimum="1" Maximum="16"
+                         Value="1"
+                         Width="120" />
+          <!-- 灰色提示：说明与上方「多线程压缩」的关系（缺口 A 修法） -->
+          <TextBlock Text="{Binding ParallelDegreeHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     FontSize="11" />
+        </StackPanel>
       </StackPanel>
 
       <!-- ═══════ 7z 选项面板 ═══════ -->

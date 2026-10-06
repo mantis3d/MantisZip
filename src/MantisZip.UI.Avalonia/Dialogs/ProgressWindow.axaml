@@ -20,6 +20,10 @@
     <converters:StringNotEmptyConverter x:Key="StringNotEmpty"/>
     <!-- 状态画刷资源键转画刷（批次行前景色 / 批处理行状态色） -->
     <converters:BrushResourceConverter x:Key="BrushResource"/>
+    <!-- 比例 × 容器宽度 → 像素宽（详细面板「批次当前文件名」底纹；MultiBinding 双输入转换器）。
+         此前该键只在 MainWindow.axaml 局部定义，ProgressWindow 作用域内引用不到 →
+         详细面板首次渲染批次行时解析失败，UI 线程卡死（补齐本窗口作用域）。 -->
+    <converters:RatioToWidthConverter x:Key="RatioToWidthConverter"/>
   </Window.Resources>
 
   <!-- 根容器：7 行布局（原型对齐后结构）。
@@ -273,19 +277,21 @@
                  FontSize="12"
                  VerticalAlignment="Center"
                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-      <!-- 简约模式（默认勾选） -->
+      <!-- 简约模式（默认勾选；IsChecked 单向绑到 VM 派生属性，使程序化切换内容模式时单选项同步高亮） -->
       <RadioButton x:Name="ModeFullPathRadio" GroupName="ContentMode"
                    Content="{Binding LocalizedStrings[Progress_Mode_Simple]}"
-                   IsChecked="True"
+                   IsChecked="{Binding IsSimpleMode, Mode=OneWay}"
                    Click="ModeFullPathRadio_Click"/>
       <!-- 详细模式（仅并行批次可用时显示，D6） -->
       <RadioButton x:Name="ModeDirOnlyRadio" GroupName="ContentMode"
                    Content="{Binding LocalizedStrings[Progress_Mode_Detailed]}"
                    IsVisible="{Binding IsDetailedAvailable}"
+                   IsChecked="{Binding IsDetailedMode, Mode=OneWay}"
                    Click="ModeDirOnlyRadio_Click"/>
       <!-- 列表模式（逐条目行，面板本体见 Row 2 ListPanel） -->
       <RadioButton x:Name="ModeNameOnlyRadio" GroupName="ContentMode"
                    Content="{Binding LocalizedStrings[Progress_Mode_List]}"
+                   IsChecked="{Binding IsListMode, Mode=OneWay}"
                    Click="ModeNameOnlyRadio_Click"/>
     </StackPanel>
 
@@ -314,21 +320,26 @@
                    FontSize="11"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
         <TextBlock Grid.Column="1"
-                   Text="{Binding FilePercentComplete, StringFormat=\{0\}%}"
+                   Text="{Binding SimpleFileBarValue, StringFormat=\{0\}%}"
                    FontSize="11"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
       </Grid>
 
-      <!-- 当前文件进度条（高度走紧凑度资源键；总体进度条不在此面板，位于 Row 4 下方信息区） -->
-      <ProgressBar Value="{Binding FilePercentComplete}"
+      <!-- 当前文件进度条（高度走紧凑度资源键；总体进度条不在此面板，位于 Row 4 下方信息区）。
+           准备态（引擎首次上报前）走不定进度，避免长时间停在 0% 让人误以为卡住。 -->
+      <ProgressBar Value="{Binding SimpleFileBarValue}"
                    Minimum="0" Maximum="100"
+                   IsIndeterminate="{Binding IsIndeterminate}"
                    Height="{DynamicResource ControlHeightSm}"
                    Foreground="{DynamicResource ThemeProgressFillBrush}"
                    Background="{DynamicResource ThemeProgressBgBrush}"/>
     </StackPanel>
 
-    <!-- 详细面板：ZIP 并行解压批次行（批次 N | 当前文件 | 批次进度条 | 百分比）。
-         仅并行解压时集合非空 → 详细模式才有内容；无批次时整块隐藏（D6 / Rule 6）。 -->
+    <!-- 详细面板：并行批次通道行（批次 N | 当前文件+底纹 | 批次进度条 | 百分比 | 明细）。
+         仅并行时集合非空 → 详细模式才有内容；无批次时整块隐藏（D6 / Rule 6）。
+         Task 6：压缩流程下额外置顶一行通道说明——N 行通道只覆盖 compressGroup，
+         Store（已压缩）文件不经压缩、不占通道，且压缩侧不播种条目列表，
+         用户在「详细」「列表」两种模式都找不到这些文件，故这行说明是唯一提示。 -->
     <Border x:Name="DetailedPanel" Grid.Row="2"
             IsVisible="{Binding IsDetailedMode}"
             BorderBrush="{DynamicResource ThemeSplitterBgBrush}"
@@ -336,61 +347,92 @@
             CornerRadius="{DynamicResource BorderRadius}"
             Padding="{DynamicResource SpacingXxsThk}"
             VerticalAlignment="Top">
-      <ItemsControl ItemsSource="{Binding ParallelBatchItems}">
-        <ItemsControl.ItemTemplate>
-          <DataTemplate>
-            <!-- 批次行：批次序号 | 批次当前文件名（空则隐藏） | 批次进度条 | 完成百分比 -->
-            <Grid ColumnDefinitions="Auto,*,*,Auto"
-                  MinHeight="{DynamicResource ControlHeightSm}"
-                  ColumnSpacing="{DynamicResource SpacingXs}">
-              <!-- 批次标签 + 序号：两个 TextBlock 并排（避免 StringFormat 转义，与既有 "#" 前缀写法一致） -->
-              <StackPanel Grid.Column="0"
-                          Orientation="Horizontal"
-                          Spacing="{DynamicResource SpacingXxs}"
-                          VerticalAlignment="Center">
-                <!-- 「批次」标签（Progress_Batch_Label；与 Index 分离承载，不用 StringFormat） -->
-                <TextBlock Text="{Binding DataContext.LocalizedStrings[Progress_Batch_Label],
-                                       RelativeSource={RelativeSource AncestorType=Window}}"
+      <StackPanel Spacing="{DynamicResource SpacingXxs}">
+        <!-- 压缩通道说明：仅压缩流程可见（IsCompressFlow）；解压流程保持隐藏 -->
+        <TextBlock Text="{Binding LocalizedStrings[Progress_CompressChannelHint]}"
+                   IsVisible="{Binding IsCompressFlow}"
+                   FontSize="10"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <ItemsControl ItemsSource="{Binding ParallelBatchItems}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <!-- 批次行：批次序号 | 批次当前文件名（底纹+文字） | 批次进度条 | 完成百分比 | 明细（如 12/40 文件） -->
+              <Grid ColumnDefinitions="Auto,*,*,Auto,Auto"
+                    MinHeight="{DynamicResource ControlHeightSm}"
+                    ColumnSpacing="{DynamicResource SpacingXs}">
+                <!-- 批次标签 + 序号：两个 TextBlock 并排（避免 StringFormat 转义，与既有 "#" 前缀写法一致） -->
+                <StackPanel Grid.Column="0"
+                            Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            VerticalAlignment="Center">
+                  <!-- 「批次」标签（Progress_Batch_Label；与 Index 分离承载，不用 StringFormat） -->
+                  <TextBlock Text="{Binding DataContext.LocalizedStrings[Progress_Batch_Label],
+                                         RelativeSource={RelativeSource AncestorType=Window}}"
+                             FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                  <!-- 批次序号（ParallelBatchProgressItem.Index，1-based） -->
+                  <TextBlock Text="{Binding Index}"
+                             FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+
+                <!-- 批次当前文件名格：底纹（该批次当前文件已处理字节比例）+ 文字叠加 -->
+                <Grid Grid.Column="1">
+                  <!-- 底纹：宽度 = FileRatio × 容器实际宽度，故必须用 MultiBinding（RatioToWidthConverter 是双输入转换器；
+                       单绑定写法运行时会抛 InvalidCastException 并让底纹停在 0 宽）。 -->
+                  <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
+                             HorizontalAlignment="Left"
+                             IsVisible="{Binding CurrentFile, Converter={StaticResource StringNotEmpty}}">
+                    <Rectangle.Width>
+                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                        <Binding Path="FileRatio" />
+                        <Binding Path="Bounds.Width"
+                                 RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                      </MultiBinding>
+                    </Rectangle.Width>
+                  </Rectangle>
+                  <!-- 文字叠加：引擎未上报当前文件名时为空串 → 隐藏，无布局异常 -->
+                  <TextBlock Text="{Binding CurrentFile}"
+                             IsVisible="{Binding CurrentFile, Converter={StaticResource StringNotEmpty}}"
+                             FontSize="11"
+                             TextTrimming="CharacterEllipsis"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </Grid>
+
+                <!-- 批次进度条（前景色随完成度切换，BrushResourceConverter 物化资源键） -->
+                <ProgressBar Grid.Column="2"
+                             Value="{Binding Percent}"
+                             Minimum="0" Maximum="100"
+                             Height="{DynamicResource ControlHeightSm}"
+                             VerticalAlignment="Center"
+                             Foreground="{Binding StatusBrushName, Converter={StaticResource BrushResource}}"
+                             Background="{DynamicResource ThemeProgressBgBrush}"/>
+
+                <!-- 批次完成百分比 -->
+                <TextBlock Grid.Column="3"
+                           Text="{Binding Percent, StringFormat=\{0:F0\}%}"
+                           MinWidth="38"
+                           HorizontalAlignment="Right"
                            FontSize="11"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                <!-- 批次序号（ParallelBatchProgressItem.Index，1-based） -->
-                <TextBlock Text="{Binding Index}"
-                           FontSize="11"
+
+                <!-- 批次明细（如 "12/40 文件"；VM 用 T("Progress_Batch_FilesProgress") 拼好，未上报时为空串 → 自然不占视觉空间） -->
+                <TextBlock Grid.Column="4"
+                           Text="{Binding DetailText}"
+                           FontSize="10"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                            VerticalAlignment="Center"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-              </StackPanel>
-
-              <!-- 批次当前文件名（引擎未上报时为空 → 隐藏该段，无布局异常） -->
-              <TextBlock Grid.Column="1"
-                         Text="{Binding CurrentFile}"
-                         IsVisible="{Binding CurrentFile, Converter={StaticResource StringNotEmpty}}"
-                         FontSize="11"
-                         TextTrimming="CharacterEllipsis"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-
-              <!-- 批次进度条（前景色随完成度切换，BrushResourceConverter 物化资源键） -->
-              <ProgressBar Grid.Column="2"
-                           Value="{Binding Percent}"
-                           Minimum="0" Maximum="100"
-                           Height="{DynamicResource ControlHeightSm}"
-                           VerticalAlignment="Center"
-                           Foreground="{Binding StatusBrushName, Converter={StaticResource BrushResource}}"
-                           Background="{DynamicResource ThemeProgressBgBrush}"/>
-
-              <!-- 批次完成百分比 -->
-              <TextBlock Grid.Column="3"
-                         Text="{Binding Percent, StringFormat=\{0:F0\}%}"
-                         MinWidth="38"
-                         HorizontalAlignment="Right"
-                         FontSize="11"
-                         VerticalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-            </Grid>
-          </DataTemplate>
-        </ItemsControl.ItemTemplate>
-      </ItemsControl>
+                           TextTrimming="CharacterEllipsis"/>
+              </Grid>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
     </Border>
 
     <!-- 列表面板：逐条目状态行（对齐原型 .file-list / .file-item）。

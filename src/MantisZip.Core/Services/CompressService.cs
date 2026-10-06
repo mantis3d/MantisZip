@@ -93,6 +93,9 @@ public class CompressRequest
     /// <summary>多线程压缩：可压缩文件走 SharpSevenZip mt=on。</summary>
     public bool MultiThreadedCompression { get; init; }
 
+    /// <summary>N 组并行压缩的目标组数，默认值取运行时 CPU 数；1 = 串行。</summary>
+    public int ParallelCompressDegree { get; init; } = Environment.ProcessorCount;
+
     /// <summary>多线程模式下用户自定义仅存储格式 ID 列表。</summary>
     public HashSet<string> MultiThreadedStoreFormatIds { get; init; } = new();
 
@@ -475,6 +478,7 @@ public static class CompressService
             ZipCompressionMethod = request.ZipCompressionMethod,
             ZipEncryptionMethod = request.ZipEncryptionMethod,
             SevenZipEncryptHeaders = request.SevenZipEncryptHeaders,
+            ParallelCompressDegree = request.ParallelCompressDegree,
             FileWhitelist = whitelist,
             ErrorResolver = request.ErrorResolver,
         };

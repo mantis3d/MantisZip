@@ -1,4 +1,7 @@
 {
+  "Progress_Preparing": "正在准备…",
+  "Compress_ParallelDegree": "并行压缩组数",
+  "Compress_ParallelDegree_Hint": "（N 个压缩器并行；设为 1 则与上方「多线程压缩」等效）",
   "Progress_Mode_Label": "显示：",
   "Progress_Mode_Simple": "简约",
   "Progress_Mode_Detailed": "详细",
@@ -13,6 +16,7 @@
   "Progress_Entry_Active": "进行中",
   "Progress_Toast_Copied": "已复制到剪贴板",
   "Progress_Batch_Label": "批次",
+  "Progress_CompressChannelHint": "压缩通道：仅列出需要压缩的文件；已压缩文件直接存储，不占用通道",
   "Progress_Entry_Completed": "已完成",
   "Progress_Entry_Skipped": "已跳过",
   "Progress_Entry_Failed": "失败",
@@ -1271,3 +1275,5 @@
   "Adaptive_Help_MultiThreaded_Desc": "基础模式 + 需压缩文件多线程加速。",
   "Adaptive_Help_MultiThreaded_Warning": "用户规则在此模式下不生效。需压缩文件统一使用全局级别。"
 }
+
+

@@ -1,5 +1,6 @@
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Tests.Fixtures;
 using Xunit;
 
 namespace MantisZip.Tests.Engines;
@@ -284,6 +285,52 @@ public class NGroupCompressTests : IDisposable
         return expected;
     }
 
+    /// <summary>
+    /// 同步执行的 IProgress：<c>Progress&lt;T&gt;</c> 会把回调投递到同步上下文，
+    /// 而 CompressAsync 内部是 Task.Run + Parallel.ForEachAsync，断言可能跑在回调之前。
+    /// </summary>
+    private sealed class InlineProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
+    }
+
+    /// <summary>
+    /// 接线敏感测试（Task 4 真正的 RED 门）：degree=3 时进度必须携带组身份
+    /// （BatchIndex + BatchCount），且出现 ≥2 个不同通道 —— 这是 UI 建立通道行的唯一数据源。
+    /// 旧单组路径 batchIndex 恒为 null，故本用例在 Step 5 接线前必然失败；
+    /// 同类其余 6 个用例只断言产物正确性，旧路径同样满足，不构成接线门禁。
+    /// </summary>
+    [Fact]
+    public async Task Degree3_CompressAsync_ReportsBatchIdentityForMultipleGroups()
+    {
+        await WriteBinFilesAsync(9);
+
+        var outZip = Path.Combine(_dir, "batchid.zip");
+        var seen = new System.Collections.Concurrent.ConcurrentDictionary<(int Index, int Count), byte>();
+
+        var progress = new InlineProgress<ArchiveProgress>(p =>
+        {
+            if (p.BatchIndex is int bi && p.BatchCount is int bc)
+                seen[(bi, bc)] = 0;
+        });
+
+        await new ZipEngine().CompressAsync(
+            Directory.GetFiles(_dir, "*.bin"), outZip,
+            new ArchiveOptions
+            {
+                CompressionLevel = 5,
+                MultiThreadedCompression = true,
+                ParallelCompressDegree = 3,
+            },
+            progress);
+
+        Assert.NotEmpty(seen);
+        Assert.Contains(seen.Keys, k => k.Count == 3);
+        int distinctChannels = seen.Keys.Select(k => k.Index).Distinct().Count();
+        Assert.True(distinctChannels >= 2,
+            $"应有 ≥2 个不同通道，实际仅 [{string.Join(", ", seen.Keys.Select(k => k.Index))}]");
+    }
+
     [Fact]
     public async Task Degree3_OutputIsValidAndByteIdenticalToSource()
     {
@@ -433,5 +480,104 @@ public class NGroupCompressTests : IDisposable
         // 回落后走单组 7z 路径：产物必须仍是结构完整、可读的 ZIP
         using var za = System.IO.Compression.ZipFile.OpenRead(outZip);
         Assert.Equal(6, za.Entries.Count);
+    }
+
+    /// <summary>
+    /// Step 6 接线敏感测试（AddToArchiveAsync 的 N 组 RED 门）：加密源包触发
+    /// ZipCopyModeException 回落 legacy 路径后，degree=3 的进度必须携带组身份
+    /// （BatchIndex + BatchCount），且出现 ≥2 个不同通道 —— 与 CompressAsync 同契约。
+    /// 旧单组路径恒传 <c>null, null</c>，故本用例在 Step 6 接线前必然失败。
+    /// </summary>
+    [Fact]
+    public async Task AddToArchiveAsync_Degree3_ReportsBatchIdentityForMultipleGroups()
+    {
+        // 加密源包 → copy-mode 快速路径抛 ZipCopyModeException → legacy 路径。
+        // Encrypt=false：Password 仅供 Phase 1 解密旧条目，Phase 3 走非加密 MT 分支。
+        var archive = ArchiveFixtures.CreateEncryptedZipArchive();
+        try
+        {
+            await WriteBinFilesAsync(9);
+
+            var seen = new System.Collections.Concurrent.ConcurrentDictionary<(int Index, int Count), byte>();
+            var progress = new InlineProgress<ArchiveProgress>(p =>
+            {
+                if (p.BatchIndex is int bi && p.BatchCount is int bc)
+                    seen[(bi, bc)] = 0;
+            });
+
+            await new ZipEngine().AddToArchiveAsync(
+                archive, Directory.GetFiles(_dir, "*.bin"),
+                new ArchiveOptions
+                {
+                    CompressionLevel = 5,
+                    MultiThreadedCompression = true,
+                    ParallelCompressDegree = 3,
+                    Password = "test123",
+                },
+                progress);
+
+            Assert.NotEmpty(seen);
+            Assert.Contains(seen.Keys, k => k.Count == 3);
+            int distinctChannels = seen.Keys.Select(k => k.Index).Distinct().Count();
+            Assert.True(distinctChannels >= 2,
+                $"应有 ≥2 个不同通道，实际仅 [{string.Join(", ", seen.Keys.Select(k => k.Index))}]");
+        }
+        finally
+        {
+            try { File.Delete(archive); } catch { /* best-effort */ }
+        }
+    }
+
+    /// <summary>
+    /// 守护 Step 6 的合并正确性：旧条目 + 全部新增条目必须落到最终压缩包，
+    /// 且内容逐字节一致。计划初稿把 tempArchive（File.Create 出来的<b>空</b>文件）
+    /// 当作合并源之一 —— 照抄会导致合并失败或丢条目，本用例负责守门。
+    /// </summary>
+    [Fact]
+    public async Task AddToArchiveAsync_Degree3_PreservesOldAndNewEntries()
+    {
+        var archive = ArchiveFixtures.CreateEncryptedZipArchive();
+        try
+        {
+            var expected = await WriteBinFilesAsync(9);
+
+            await new ZipEngine().AddToArchiveAsync(
+                archive, Directory.GetFiles(_dir, "*.bin"),
+                new ArchiveOptions
+                {
+                    CompressionLevel = 5,
+                    MultiThreadedCompression = true,
+                    ParallelCompressDegree = 3,
+                    Password = "test123",
+                });
+
+            using var za = System.IO.Compression.ZipFile.OpenRead(archive);
+            Assert.Equal(1 + expected.Count, za.Entries.Count);
+
+            // 加密源中的旧条目：legacy 重写后必须保留且内容不变
+            var secret = za.GetEntry("secret.txt");
+            Assert.NotNull(secret);
+            using (var s = secret!.Open())
+            using (var ms = new MemoryStream())
+            {
+                await s.CopyToAsync(ms);
+                Assert.Equal("secret data", System.Text.Encoding.UTF8.GetString(ms.ToArray()));
+            }
+
+            // 每个新增文件字节级一致
+            foreach (var (name, data) in expected)
+            {
+                var entry = za.GetEntry(name);
+                Assert.NotNull(entry);
+                using var s = entry!.Open();
+                using var ms = new MemoryStream();
+                await s.CopyToAsync(ms);
+                Assert.Equal(data, ms.ToArray());
+            }
+        }
+        finally
+        {
+            try { File.Delete(archive); } catch { /* best-effort */ }
+        }
     }
 }

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
@@ -95,6 +96,7 @@ public static class CompressFlow
             MultiThreadedStoreFormatIds = new HashSet<string>(
                 AppSettings.Load()?.MultiThreadedStoreFormatIds ?? new List<string>()),
             SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
+            ParallelCompressDegree = vm.ParallelCompressDegree,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线
             ErrorResolver = CreateErrorResolver(),
         };
@@ -308,6 +310,63 @@ public static class CompressFlow
         catch (Exception ex)
         {
             App.DebugLog($"[CompressFlow] RecordOutputHistory failed: {ex.Message}");
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  压缩侧「列表」模式播种（对齐解压侧 ExtractFlow 的做法）
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>「列表」模式播种阈值：条目数超过则一条行都不建（对齐解压侧 ExtractFlow.MaxSeedEntryCount）。</summary>
+    private const int MaxSeedEntryCount = 5000;
+
+    /// <summary>
+    /// 压缩侧「列表」模式播种（后台）：枚举待打包条目后 <see cref="ProgressWindow.SeedEntries"/>，
+    /// 让「列表」显示**全部条目**（Pending）并随终态事件更新，而不是只冒已完成行。
+    /// <para>
+    /// 本方法立即返回、不 await —— 压缩绝不等待播种；枚举失败/取消/超阈值一律放弃播种，
+    /// 由引擎逐条目终态事件的 upsert 兜底（渐进模式）。引擎若已上报出条目行，
+    /// <see cref="ProgressWindow.SeedEntries"/> 会自行跳过，避免清掉已上报的终态行。
+    /// </para>
+    /// </summary>
+    public static void TrySeedEntryItemsInBackground(ProgressWindow? pw, CompressRequest request, CancellationToken ct)
+    {
+        if (pw is null || request.SourcePaths is not { Count: > 0 })
+            return;
+
+        // 白名单与 CompressService 同源：Plan 中非空 IncludedFiles 的并集；全为 null = 未启用过滤
+        IReadOnlyCollection<string>? whitelist = null;
+        var planItems = request.Plan?.Items;
+        if (planItems is { Count: > 0 } && planItems.Any(i => i.IncludedFiles != null))
+        {
+            whitelist = planItems
+                .Where(i => i.IncludedFiles != null)
+                .SelectMany(i => i.IncludedFiles!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        _ = SeedEntryItemsAsync(pw, request.SourcePaths, whitelist, ct);
+    }
+
+    /// <summary>后台枚举 + 播种（所有异常与取消都吞掉，只影响列表预览，不影响压缩本身）。</summary>
+    private static async Task SeedEntryItemsAsync(
+        ProgressWindow pw, IReadOnlyList<string> sources,
+        IReadOnlyCollection<string>? whitelist, CancellationToken ct)
+    {
+        try
+        {
+            var items = await Task.Run(
+                () => SourceEntryEnumerator.Enumerate(sources, whitelist, ct), ct).ConfigureAwait(false);
+
+            if (items.Count == 0 || items.Count > MaxSeedEntryCount)
+                return;
+
+            pw.SeedEntries(items);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[CompressFlow] Entry seeding skipped: {ex.Message}");
         }
     }
 }

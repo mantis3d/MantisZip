@@ -23,4 +23,8 @@ public partial class ParallelBatchProgressItem : ObservableObject
     /// <summary>批次当前文件名（详细模式行显示；引擎未上报时保持空串）。</summary>
     [ObservableProperty]
     private string _currentFile = "";
+
+    /// <summary>当前文件的字节进度 0..1，驱动文件名格底纹宽度。</summary>
+    [ObservableProperty]
+    private double _fileRatio;
 }

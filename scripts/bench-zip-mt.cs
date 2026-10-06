@@ -30,6 +30,7 @@
 //   dotnet run scripts/bench-zip-mt.cs -- --profile text        # 只测文本（CPU-bound）
 //   dotnet run scripts/bench-zip-mt.cs -- --corpus D:\MyFolder   # 测真实文件夹
 //   dotnet run scripts/bench-zip-mt.cs -- --reps 5 --level 9
+//   dotnet run scripts/bench-zip-mt.cs -- --degrees 1,2,4,8
 //   dotnet run scripts/bench-zip-mt.cs -- --json out.json
 //
 // 注意：I/O 基准对环境极敏感。请先关闭其他压缩软件、杀毒实时扫描、
@@ -51,7 +52,7 @@ return await Bench.RunAsync(args);
 /// <summary>单个压缩配置。</summary>
 sealed record Config(string Id, string Label, bool Adaptive, bool MultiThreaded)
 {
-    public ArchiveOptions ToOptions(int level) => new()
+    public ArchiveOptions ToOptions(int level, int degree) => new()
     {
         Format = ArchiveFormat.Zip,
         CompressionLevel = level,
@@ -59,6 +60,7 @@ sealed record Config(string Id, string Label, bool Adaptive, bool MultiThreaded)
         ZipCompressionMethod = "deflate", // MT 路径要求 deflate/deflate64（ZipEngine.cs:1400）
         AdaptiveCompression = Adaptive,
         MultiThreadedCompression = MultiThreaded,
+        ParallelCompressDegree = degree,
     };
 }
 
@@ -322,7 +324,7 @@ sealed record ConfigSummary(
     ProgressStats Progress);
 
 sealed record ProfileSummary(
-    string Profile, long RawBytes, int FileCount,
+    string Profile, int Degree, long RawBytes, int FileCount,
     IReadOnlyList<ConfigSummary> Configs, string Verdict);
 
 // ============================================================================
@@ -353,7 +355,7 @@ static class Bench
 
         var summaries = new List<ProfileSummary>();
         foreach (var profile in profiles)
-            summaries.Add(await RunProfileAsync(profile, opt));
+            summaries.AddRange(await RunProfileAsync(profile, opt));
 
         Report(summaries, opt);
         if (opt.JsonPath is not null) WriteJson(summaries, opt.JsonPath);
@@ -374,6 +376,7 @@ static class Bench
         Console.WriteLine($"逻辑核心数  : {Environment.ProcessorCount}");
         Console.WriteLine($"压缩级别    : {opt.Level}");
         Console.WriteLine($"计时轮次    : {opt.Reps}（取最小值）");
+        Console.WriteLine($"压缩组数    : {string.Join(",", opt.Degrees)}");
         Console.WriteLine($"临时目录    : {temp}");
         Console.WriteLine($"输出目录    : {opt.WorkDir}");
         // MT 路径会把压缩结果写一份同体积临时 zip 再合并回来，跨盘会显著改变 I/O 成本
@@ -425,8 +428,9 @@ static class Bench
 
     // ---------------------------------------------------------------- 单组语料
 
-    static async Task<ProfileSummary> RunProfileAsync(string profile, Options opt)
+    static async Task<List<ProfileSummary>> RunProfileAsync(string profile, Options opt)
     {
+        var allSummaries = new List<ProfileSummary>();
         string corpusDir = Path.Combine(opt.WorkDir, $"corpus-{profile}");
         string outDir = Path.Combine(opt.WorkDir, $"out-{profile}");
 
@@ -464,11 +468,13 @@ static class Bench
 
         var engine = new ZipEngine();
 
+        foreach (var degree in opt.Degrees)
+        {
         // ---- 预热轮：JIT + 7z.dll 加载 + 文件缓存，全部不计时
-        Console.Write("预热中");
+        Console.Write($"预热中 (degree={degree})");
         foreach (var cfg in Configs.All)
         {
-            await MeasureOnceAsync(engine, cfg, sourceDir, outDir, opt, throwaway: true);
+            await MeasureOnceAsync(engine, cfg, sourceDir, outDir, opt, degree, throwaway: true);
             Console.Write(".");
         }
         Console.WriteLine(" 完成\n");
@@ -483,9 +489,9 @@ static class Bench
                                  .Concat(Configs.All.Take(rep % Configs.All.Length)).ToArray();
             foreach (var cfg in order)
             {
-                var r = await MeasureOnceAsync(engine, cfg, sourceDir, outDir, opt, throwaway: false);
+                var r = await MeasureOnceAsync(engine, cfg, sourceDir, outDir, opt, degree, throwaway: false);
                 results[cfg.Id].Add(r);
-                Console.WriteLine($"  轮 {rep + 1}/{opt.Reps}  {cfg.Id} {cfg.Label,-20} {r.Milliseconds / 1000,8:F2}s  {Fmt.Bytes(r.CompressedBytes),12}  {(r.ArchiveValid ? "OK" : "✗ CRC 校验失败")}");
+                Console.WriteLine($"  轮 {rep + 1}/{opt.Reps}  degree={degree,2}  {cfg.Id} {cfg.Label,-20} {r.Milliseconds / 1000,8:F2}s  {Fmt.Bytes(r.CompressedBytes),12}  {(r.ArchiveValid ? "OK" : "✗ CRC 校验失败")}");
             }
         }
 
@@ -517,7 +523,10 @@ static class Bench
         }
 
         Console.WriteLine();
-        return new ProfileSummary(profile, rawBytes, fileCount, summaries, string.Empty);
+        allSummaries.Add(new ProfileSummary(profile, degree, rawBytes, fileCount, summaries, string.Empty));
+        } // foreach degree
+
+        return allSummaries;
     }
 
     static (long bytes, int count) MeasureCorpus(string dir)
@@ -535,7 +544,7 @@ static class Bench
     // ---------------------------------------------------------------- 单次测量
 
     static async Task<RunResult> MeasureOnceAsync(
-        ZipEngine engine, Config cfg, string sourceDir, string outDir, Options opt, bool throwaway)
+        ZipEngine engine, Config cfg, string sourceDir, string outDir, Options opt, int degree, bool throwaway)
     {
         string outPath = Path.Combine(outDir, throwaway
             ? $"warmup-{cfg.Id}-{Guid.NewGuid():N}.zip"
@@ -546,7 +555,7 @@ static class Bench
 
         try
         {
-            await engine.CompressAsync(new[] { sourceDir }, outPath, cfg.ToOptions(opt.Level), recorder);
+            await engine.CompressAsync(new[] { sourceDir }, outPath, cfg.ToOptions(opt.Level, degree), recorder);
 
             // 必须在停止计时前结束压缩，否则文件收尾成本被排除
             sw.Stop();
@@ -616,7 +625,7 @@ static class Bench
         foreach (var s in summaries)
         {
             Console.WriteLine();
-            Console.WriteLine($"■ 语料：{s.Profile}   原始 {Fmt.Bytes(s.RawBytes)}   文件 {s.FileCount} 个");
+            Console.WriteLine($"■ 语料：{s.Profile}   degree={s.Degree}   原始 {Fmt.Bytes(s.RawBytes)}   文件 {s.FileCount} 个");
             Console.WriteLine();
             Console.WriteLine($"  {"ID",-3} {"配置",-20} {"最小耗时",10} {"中位耗时",10} {"压缩后(字节)",13} {"压缩率",9} {"相对D",8} {"校验",6}");
             Console.WriteLine($"  {new string('-', 3),-3} {new string('-', 20),-20} {new string('-', 10),10} {new string('-', 10),10} {new string('-', 13),13} {new string('-', 9),9} {new string('-', 8),8} {new string('-', 6),6}");
@@ -656,6 +665,42 @@ static class Bench
             Console.WriteLine("    读法：正领先 = 进度条跑在实际耗时前面（抢跑）；File%为空 比例高 = 该阶段无单文件进度（画不出底纹）。");
         }
 
+        // ---- 跨 degree 对比：仅当扫描了多个组数时输出（G2 验证：degree=N vs degree=1）
+        if (opt.Degrees.Length > 1)
+        {
+            Console.WriteLine();
+            Console.WriteLine("###################### 跨 degree 对比 ######################");
+            foreach (var group in summaries.GroupBy(s => s.Profile))
+            {
+                var rows = group.OrderBy(s => s.Degree).ToList();
+                int[] degs = rows.Select(s => s.Degree).ToArray();
+
+                Console.WriteLine();
+                Console.WriteLine($"■ 语料：{group.Key}");
+                Console.WriteLine();
+                Console.WriteLine($"  {"ID",-3} {"配置",-20} {string.Join("", degs.Select(d => ("deg=" + d).PadLeft(10)))}   最快组数");
+                Console.WriteLine($"  {new string('-', 3),-3} {new string('-', 20),-20} {string.Join("", degs.Select(_ => new string('-', 10).PadLeft(10)))}   --------");
+
+                foreach (var cfg in Configs.All)
+                {
+                    double[] ms = rows.Select(s => s.Configs.First(c => c.Id == cfg.Id).MinMs).ToArray();
+                    int best = Array.IndexOf(ms, ms.Min());
+                    string cells = string.Join("", ms.Select(m => ((m / 1000).ToString("F2") + "s").PadLeft(10)));
+                    Console.WriteLine($"  {cfg.Id,-3} {cfg.Label,-20} {cells}   {degs[best]}");
+                }
+
+                // B/C 相对最小组数的加速比（degree=1 时为单组基线）
+                foreach (var id in new[] { "B", "C" })
+                {
+                    double baseMs = rows[0].Configs.First(c => c.Id == id).MinMs;
+                    var ratios = rows.Select(s => s.Configs.First(c => c.Id == id).MinMs / baseMs).ToArray();
+                    string chain = string.Join(" → ", rows.Select((s, i) => "deg=" + s.Degree + " " + ratios[i].ToString("0.00") + "x"));
+                    bool speedup = ratios.Skip(1).Any(r => r < 0.98);
+                    Console.WriteLine($"  {id} 组数收益：{chain}  → {(speedup ? "存在加速，N-group 有效" : "未见明显加速")}");
+                }
+            }
+        }
+
         PrintVerdict(summaries);
     }
 
@@ -681,7 +726,7 @@ static class Bench
                                       $"双重压缩导致）；请核对 CompressGroupWithSevenZip 的产物是否被真正写入最终 ZIP");
             }
 
-            Console.WriteLine($"【{s.Profile}】");
+            Console.WriteLine($"【{s.Profile} degree={s.Degree}】");
             Console.WriteLine($"  仅多线程(B) vs 仅自适应(A)：耗时 {(b.MinMs < a.MinMs ? "更快" : "更慢")} {Math.Abs(a.MinMs - b.MinMs) / 1000:F2}s" +
                               $"（{(a.MinMs / b.MinMs * 100 - 100):+0.0;-0.0;0.0}%），压缩率 {(b.Ratio / a.Ratio * 100 - 100):+0.0;-0.0;0.0}%");
             Console.WriteLine($"  自适应+多线程(C) vs 仅自适应(A)：耗时 {(c.MinMs < a.MinMs ? "更快" : "更慢")} {Math.Abs(a.MinMs - c.MinMs) / 1000:F2}s" +
@@ -728,6 +773,7 @@ static class Bench
             var s = summaries[i];
             sb.AppendLine("  {");
             sb.AppendLine($"    \"profile\": {Str(s.Profile)},");
+            sb.AppendLine($"    \"degree\": {s.Degree},");
             sb.AppendLine($"    \"rawBytes\": {s.RawBytes},");
             sb.AppendLine($"    \"fileCount\": {s.FileCount},");
             sb.AppendLine("    \"configs\": [");
@@ -781,6 +827,8 @@ sealed class Options
     public string? SevenZipDll { get; set; }
     public string WorkDir { get; set; } = Path.Combine(Path.GetTempPath(), "mantiszip-bench-mt");
     public bool ShowHelp { get; set; }
+    /// <summary>压缩组数扫描维度。缺省 { 0 } = 引擎自动（单维，保持旧行为）。</summary>
+    public int[] Degrees { get; set; } = { 0 };
 
     public static Options Parse(string[] argv)
     {
@@ -803,6 +851,7 @@ sealed class Options
                 case "--json": o.JsonPath = Path.GetFullPath(Next()); break;
                 case "--report": o.ReportPath = Path.GetFullPath(Next()); break;
                 case "--7z": o.SevenZipDll = Next(); break;
+                case "--degrees": o.Degrees = Next().Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(int.Parse).ToArray(); break;
                 case "--workdir": o.WorkDir = Path.GetFullPath(Next()); break;
                 case "-h": case "--help": o.ShowHelp = true; break;
                 default:
@@ -823,6 +872,8 @@ sealed class Options
 
         if (o.Reps < 1) throw new ArgumentException("--reps 至少为 1");
         if (o.Level is < 1 or > 9) throw new ArgumentException("--level 必须在 1-9 之间");
+        if (o.Degrees.Length == 0) throw new ArgumentException("--degrees 至少需要一个值（如 1,2,4,8 或 0）");
+        if (o.Degrees.Any(d => d < 0)) throw new ArgumentException("--degrees 不能为负数（0 = 引擎自动）");
 
         return o;
     }
@@ -839,6 +890,7 @@ sealed class Options
   --profile <name>      只跑指定语料: text | media | mixed（默认全部）
   --reps <n>            计时轮数，默认 3（取最小值）
   --level <1-9>         压缩级别，默认 5
+  --degrees <list>      压缩组数扫描：逗号分隔（如 1,2,4,8），0 = 引擎自动；缺省不扫描
   --text-files <n>      文本文件数，默认 200
   --text-size-kb <n>    单个文本文件 KB，默认 250
   --media-files <n>     媒体文件数，默认 100

@@ -6,6 +6,20 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-06** — N 组并行压缩联调修复 + 组数 UI 补齐 + 压缩侧列表播种（Avalonia+Core）
+  - **修复① 开关传递断链**（`Views/MainWindow.axaml.cs`）：`ShowCompressSettingsDialog` 的「对话框 VM → 执行 VM」拷贝清单漏拷 `MultiThreadedCompression` / `AdaptiveSmartDetect` / `ParallelCompressDegree` → 执行侧 MT 恒 `false` → `IsMultiThreadedEligible` 首条即 false → 引擎恒走串行、从不上报 `BatchIndex` → 进度窗口「详细」被 D6 隐藏（用户现象：只有简约/列表）。补 3 行拷贝。
+  - **补齐 Task 5 Step 3 缺失 UI**（`Controls/DynamicFormatOptionsPanel.axaml[.cs]`、`Dialogs/CompressSettingsWindow.axaml.cs`、`ViewModels/CompressSettingsViewModel.cs`）：ZIP 面板多线程开关旁新增「并行压缩组数」`NumericUpDown`（1..16），多线程关闭时整块隐藏（规则 6）；`SnapshotFormatOptionsToViewModel` 快照进 VM；VM 构造自 `AppSettings` 播种。（计划原写放在 `CompressSettingsWindow.axaml`，实测多线程开关在 `DynamicFormatOptionsPanel`，按对称位置落地。）
+  - **修复② 点「详细」卡死**（`Dialogs/ProgressWindow.axaml`）：详细行模板用 `{StaticResource RatioToWidthConverter}`，该键仅 `MainWindow.axaml:25` 局部定义（App 级与本窗口均无）→ `x:CompileBindings=False` 下编译期不报、模板**首次实例化**时解析失败。补本窗口资源；两处 `StringNotEmptyConverter` 统一为本窗口 `StringNotEmpty`。
+  - **修复③ 单选项不同步**（`Dialogs/ProgressWindow.axaml`）：三模式单选项 `IsChecked` 单向绑 `IsSimpleMode`/`IsDetailedMode`/`IsListMode`，程序化自动切「详细」时按钮同步高亮。
+  - **准备态 + 不定进度条**（`ViewModels/ProgressViewModel.cs`、`Dialogs/ProgressWindow.axaml[.cs]`）：`BeginPreparing()`/`EndPreparing()` + 复用既有 `IsIndeterminate`；窗口构造即准备态、首个 `SetProgress` 结束、切换批次档案重入（`SetCurrentBatchItem`）；三语新增 `Progress_Preparing`。
+  - **MT 路径进度可见**（`ProgressViewModel` + `Core/Engines/ZipEngine.cs`）：简约面板条新增 `SimpleFileBarValue`（无逐文件百分比时**回退总进度**，`_hasFilePercent` 随每次上报更新）；配合 Core 侧镜像拷贝上报（见共享层）。
+  - **压缩侧「列表」播种**（原「经用户决定正式延期」项）：
+    - 新增 `Services/CompressFlow.cs` `TrySeedEntryItemsInBackground(pw, request, ct)`：后台枚举、阈值 `MaxSeedEntryCount=5000`、失败/取消放弃、`pw.SeedEntries`（引擎已有条目行时自行跳过，防清掉已上报终态行）；白名单与 `CompressService` 同源（Plan 非空 `IncludedFiles` 并集）。
+    - 接线：`ViewModels/MainWindowViewModel.PendingCompressRequest`（`ExecuteCompressFromSettings` 置位）→ `Views/MainWindow.axaml.cs` `RunWithProgress`；CLI `App.axaml.cs` `CompressWithProgress`。
+  - **G2 实测结论**：`scripts/bench-zip-mt.cs` 加 `--degrees` 后四轮（text / text-rev / media / mixed，degree 1/2/4/8）显示 **N 组无加速**（degree=1 全面最快或持平，degree=2 最差；倒序对照一致）→ **维持默认 `ParallelCompressDegree = Environment.ProcessorCount`**（全局 `MultiThreadedCompression` 默认关，N 组为 opt-in）。
+  - **验证**：UI 构建 0 警告 0 错误；Core **608 通过 / 0 失败 / 3 跳过**（+3）；Avalonia **114 通过 / 0 失败 / 2 跳过**。
+  - **i18n / 其他**：三语成对新增 `Progress_Preparing`；`.gitignore` 排除 `.buildout/`（验证用生成本地件，约 7.6GB）。
+
 **2026-10-05** — N 组并行压缩 Task 3/8：`CompressGroupWithSevenZip` 参数化（Core）
   - **背景**：N 组并行需要每组能独立上报「我是第几组」，并按组身份决定7z 的 `mt` 取值。本 Task **只做参数化、不改行为**，尚无调用方使用批次参数，功能未启用。
   - **改动**：`Engines/ZipEngine.cs`
@@ -1862,6 +1876,14 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.1 (2026-10-06) N 组并行压缩 Core 侧：N 组分支落地 + 镜像拷贝进度上报 + 源条目枚举器
+  - **`Core/Engines/ZipEngine.cs`**：
+    - **N 组并行分支**（计划 Task 4）：`CompressAsync` / `AddToArchiveAsync` 在既有 `IsMultiThreadedEligible` 之内追加「组数」维度——`SplitCompressGroup(compressGroup, degree)` 后有效组 ≥2 且方法可 copy-mode 承载才走 N 组（每组一个 tempZip、组内 `mt=off`、`Parallel.ForEachAsync` 组间并行；合并经 `ZipBinaryRewriter` copy-mode 原样复制），否则回落既有单组路径；`LogCopyModeUnsupported` 记录 PPMd/BZip2/LZMA 等回落原因（这些方法 copy-mode 重写器不承载，N 组下会抛 `ZipCopyModeException`）。
+    - **镜像拷贝进度上报**（`CompressGroupWithSevenZip`）：把待压缩文件复制到临时镜像目录（供 7z 保留相对路径）的阶段由 `File.Copy` 改**分块拷贝（4MB 缓冲）+ 100ms 节流上报**——上报 `CurrentFile`（被拷贝文件名）与 `FilePercentComplete`（该文件已拷贝 %），但**不推进总进度 `PercentComplete`**（保持本调用基线，避免与随后 7z 的字节进度打架/回退；N 组适配层按 `ProcessedBytes` 映射，全局仍单调）；拷贝后 `File.SetLastWriteTime` 手动补回源时间戳（`File.Copy` 原保留、分块拷贝需显式补，否则归档条目时间戳变「拷贝时刻」）。1GB 语料该阶段约占单组路径 2/3 时长，此前完全静默 → 面板「卡住」。
+    - `ResolveParallelCompressDegree`（≤0 取 CPU 数、上限 16、下限 1）；`CompressGroupWithSevenZip` 增加 `int? batchIndex, int? batchCount`（`null` = 单组路径）。
+  - **`Core/Services/SourceEntryEnumerator.cs`（新增公开 API）**：`Enumerate(sourcePaths, whitelist, ct)` → `(Key, Name, Size)`；复用内部 `FileScanner.CollectFiles` 保证 Key 与引擎 `ArchiveProgress.EntryKey`（相对路径）同源，供 UI「列表」模式播种全量 Pending 行（压缩侧播种此前为延期项）。
+  - **测试**：`tests/MantisZip.Tests/Services/SourceEntryEnumeratorTests.cs`（新增，+3）；`Engines/ParallelCompressTests.cs`（+3）、`ProgressWindowBatchLogicTests.cs`（+5）。Core 全量 **608 通过 / 0 失败 / 3 跳过**；构建 0 错误 0 警告。
 
 #### v0.5.0 (2026-09-16) 压缩/解压性能优化 — 并行解压（批次复用）+ 7z 多线程压缩
   - **`Core/Engines/ZipEngine.cs`**：

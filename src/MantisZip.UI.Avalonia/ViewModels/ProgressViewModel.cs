@@ -127,6 +127,7 @@ public partial class ProgressViewModel : ObservableObject
             ["Progress_Entry_Overwritten"] = LocalizationManager.T("Progress_Entry_Overwritten"),
             ["Progress_Toast_Copied"] = LocalizationManager.T("Progress_Toast_Copied"),
             ["Progress_Batch_Label"] = LocalizationManager.T("Progress_Batch_Label"),
+            ["Progress_CompressChannelHint"] = LocalizationManager.T("Progress_CompressChannelHint"),
         };
 
         // T6: 操作计时基线 + 当前文件标签初值 + 集合变更通知（并行批次行 / 条目行）
@@ -181,6 +182,10 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>Is the keep-open toggle currently checked (📌 pinned open).</summary>
     [ObservableProperty]
     private bool _keepOpenOnComplete;
+
+    /// <summary>当前为压缩流程（vs 解压）：控制通道区说明文字的可见性。解压侧恒为 false。</summary>
+    [ObservableProperty]
+    private bool _isCompressFlow;
 
     // ════════════════════════════════════════════
     //  T6: 显示模式 / 统计 / 时间 / 速度 / 并行批次
@@ -446,12 +451,62 @@ public partial class ProgressViewModel : ObservableObject
         _cts = new CancellationTokenSource();
     }
 
+    // ════════════════════════════════════════════
+    //  准备态（引擎首次上报之前）
+    // ════════════════════════════════════════════
+
+    private bool _isPreparing;
+    private string? _preparingText;
+
+    /// <summary>
+    /// 进入准备态：总进度条以不定进度滚动 + 状态行提示「正在准备…」。
+    /// 大目录在引擎首次上报前有「枚举 + 分组 + 启动各组」的静默期，此态避免进度条空白被误认为出错。
+    /// 操作开始（构造 / 切换批次档案）时调用；首个 SetProgress 上报即结束。
+    /// </summary>
+    public void BeginPreparing()
+    {
+        _isPreparing = true;
+        IsIndeterminate = true;
+        _preparingText = LocalizationManager.T("Progress_Preparing");
+        StatusMessage = _preparingText;
+    }
+
+    /// <summary>结束准备态：不定进度条恢复确定态，准备文案让位给真实状态（若已被其它状态覆盖则不动）。</summary>
+    private void EndPreparing()
+    {
+        if (!_isPreparing) return;
+        _isPreparing = false;
+        IsIndeterminate = false;
+        if (StatusMessage == _preparingText)
+            StatusMessage = null;
+    }
+
+    /// <summary>引擎最近一次上报是否携带「当前文件百分比」。false = 未知（如 7z mt=on 路径
+    /// 只报文件级事件、FilePercentComplete 恒为 null），此时简约面板的「当前文件」进度条
+    /// 回退到总进度 PercentComplete，避免长时间僵死在 0%。</summary>
+    private bool _hasFilePercent;
+
+    /// <summary>简约面板「当前文件」进度条取值：有逐文件百分比时用它，否则回退到总进度。</summary>
+    public int SimpleFileBarValue => _hasFilePercent ? FilePercentComplete : PercentComplete;
+
+    partial void OnPercentCompleteChanged(int value) => OnPropertyChanged(nameof(SimpleFileBarValue));
+    partial void OnFilePercentCompleteChanged(int value) => OnPropertyChanged(nameof(SimpleFileBarValue));
+
     /// <summary>
     /// Update all progress-bound properties from an <see cref="ArchiveProgress"/> report.
     /// Safe to call from any thread; dispatches internally.
     /// </summary>
     public void SetProgress(ArchiveProgress p)
     {
+        // 首个上报到达 → 结束准备态（不定进度条恢复确定态）
+        EndPreparing();
+
+        // Task 6: 批次 upsert 必须在早返回【之前】——EntryStatus 上报同样携带批次身份
+        // （ZipEngine.cs:3208-3220 的逐条目终态事件带 BatchIndex/BatchCount），
+        // 若被下方早返回拦下，通道行的 Percent/FileRatio 会冻结在中途值。
+        if (p.BatchIndex.HasValue)
+            UpsertParallelBatch(p);
+
         // T6: 逐条目终态事件 = 独立通道，置于一切计数/节流逻辑之前，
         // 不参与百分比/速度/ETA/字节/批次计算（早返回，绝不落入下方分支）
         if (p.EntryStatus.HasValue && !string.IsNullOrEmpty(p.EntryKey))
@@ -489,7 +544,16 @@ public partial class ProgressViewModel : ObservableObject
             PercentComplete = (int)Math.Clamp(p.PercentComplete, 0, 100);
         }
         if (p.FilePercentComplete.HasValue)
+        {
             FilePercentComplete = (int)Math.Clamp(p.FilePercentComplete.Value, 0, 100);
+            _hasFilePercent = true;
+        }
+        else
+        {
+            // 未携带逐文件百分比（如 7z mt=on 路径）→ 标记未知，简约面板条回退到总进度
+            _hasFilePercent = false;
+        }
+        OnPropertyChanged(nameof(SimpleFileBarValue));
 
         // File count + 批次档案序号（"2 / 5"）
         if (_isBatchMode && _batchItems != null && _batchItems.Count > 0)
@@ -577,10 +641,6 @@ public partial class ProgressViewModel : ObservableObject
                         row.ProcessedFiles, row.SkippedFiles, row.FailedFiles, row.OverwrittenFiles);
             }
         }
-
-        // 并行批次行 upsert（BatchIndex 上报时驱动；未上报不动集合，避免非并行清空闪烁）
-        if (p.BatchIndex.HasValue)
-            UpsertParallelBatch(p);
     }
 
     /// <summary>把当前档案的统计写入当前批次行（行级实时统计；SetProgress 批次分支调用）。</summary>
@@ -608,6 +668,8 @@ public partial class ProgressViewModel : ObservableObject
 
         var row = _parallelBatchItems[idx];
         row.Percent = Math.Clamp(p.BatchPercentComplete ?? p.PercentComplete, 0, 100);
+        // Task 6: 当前文件字节进度 0..1 → 驱动文件名格底纹宽度（MultiBinding）
+        row.FileRatio = Math.Clamp((p.FilePercentComplete ?? 0) / 100.0, 0.0, 1.0);
         // T6: 详细模式行显示批次当前文件名（未上报时保持上次值）
         row.CurrentFile = p.CurrentFile ?? row.CurrentFile;
         // T7: 状态色随完成度切换（BrushResourceConverter 消费 StatusBrushName → 批次进度条前景）
@@ -615,6 +677,13 @@ public partial class ProgressViewModel : ObservableObject
         if (p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue)
             row.DetailText = LocalizationManager.T("Progress_Batch_FilesProgress",
                 p.BatchProcessedFiles.Value, p.BatchTotalFiles.Value);
+
+        // Task 6 方案 B：首个 BatchIndex 到达、集合由空转非空时自动切详细。
+        // 守卫 _contentMode == Simple 保证不覆盖用户显式选择（默认即 Simple，
+        // 三个单选项 Click 只把它改写为 Simple/Detailed/List）。
+        // 回退路径永不上报 BatchIndex，故此分支永不触发 —— 无需回退兜底。
+        if (_parallelBatchItems.Count == 1 && _contentMode == ProgressContentMode.Simple)
+            ContentMode = ProgressContentMode.Detailed;
     }
 
     // ════════════════════════════════════════════
@@ -828,6 +897,7 @@ public partial class ProgressViewModel : ObservableObject
         FileName = _batchItems[index].Name;
         // 切换压缩包时重置文件进度条，避免残留上一个包未置满的脏值
         FilePercentComplete = 0;
+        _hasFilePercent = false; // 新档案的文件百分比未知，交由首次上报决定（决定回退还是逐文件）
         // ETA 守卫：档案切换字节基线归零重起 EMA（上一档案累计字节对新档案无意义）
         _speedTracker.OnArchiveSwitch(0, DateTime.UtcNow);
         // 并行批次行随档案切换清空（新档案重新上报 BatchIndex）
@@ -839,6 +909,8 @@ public partial class ProgressViewModel : ObservableObject
             ContentMode = ProgressContentMode.Simple;
         // 目录行残留清理（新档案的 DirName 由下次 SetProgress 填充）
         DirName = string.Empty;
+        // 新档案进入准备态（重新显示「正在准备…」+ 不定进度条，直到该档案首次上报）
+        BeginPreparing();
     }
 
     /// <summary>

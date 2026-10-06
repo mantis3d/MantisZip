@@ -41,6 +41,8 @@ public partial class DynamicFormatOptionsPanel : UserControl
     public string AdaptiveCompressionLabel => LocalizationManager.T("FormatOptions_ZIP_AdaptiveCompression");
     public string SmartDetectLabel => LocalizationManager.T("FormatOptions_ZIP_SmartDetect");
     public string ZipMultiThreadLabel => LocalizationManager.T("FormatOptions_ZIP_MultiThread");
+    public string ParallelDegreeLabel => LocalizationManager.T("Compress_ParallelDegree");
+    public string ParallelDegreeHint => LocalizationManager.T("Compress_ParallelDegree_Hint");
     public string ZipAdaptiveSectionTitle => LocalizationManager.T("Settings_AdaptiveCompression");
     public string TarGzPlaceholder => LocalizationManager.T("FormatOptions_TarGz_Placeholder");
 
@@ -190,6 +192,20 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    /// <summary>
+    /// N 组并行压缩目标组数（1..16；仅 ZIP 多线程压缩开启时生效，1 = 串行）。
+    /// 控件未就绪时回退到 <see cref="Environment.ProcessorCount"/>。
+    /// </summary>
+    public int ParallelCompressDegree
+    {
+        get
+        {
+            if (ParallelDegreeInput?.Value is decimal v) return Math.Clamp((int)v, 1, 16);
+            return Environment.ProcessorCount;
+        }
+        set => ParallelDegreeInput.Value = Math.Clamp(value, 1, 16);
+    }
+
     // ── Constructor ────────────────────────────────────────────────────────
 
     public DynamicFormatOptionsPanel()
@@ -228,6 +244,15 @@ public partial class DynamicFormatOptionsPanel : UserControl
         // 无需联动控件；占位以便未来添加线程数控件时启用/禁用
     }
 
+    /// <summary>
+    /// ZIP 多线程压缩复选框变更 — 联动「并行压缩组数」面板显隐（规则 6：关闭时整块隐藏）。
+    /// </summary>
+    private void ZipMultiThreadCheck_IsCheckedChanged(object? sender, RoutedEventArgs e)
+    {
+        if (ParallelDegreePanel != null)
+            ParallelDegreePanel.IsVisible = ZipMultiThreadCheck.IsChecked == true;
+    }
+
     // ── Public Methods ─────────────────────────────────────────────────────
 
     /// <summary>
@@ -260,6 +285,10 @@ public partial class DynamicFormatOptionsPanel : UserControl
         AdaptiveCompressionCheck.IsChecked = s.AdaptiveCompression;
         SmartDetectCheck.IsChecked = s.AdaptiveSmartDetect;
         ZipMultiThreadCheck.IsChecked = s.MultiThreadedCompression;
+        // Task 5 Step 3：并行压缩组数默认值 + 面板初始显隐（与 MT 开关联动）
+        ParallelCompressDegree = s.ParallelCompressDegree;
+        if (ParallelDegreePanel != null)
+            ParallelDegreePanel.IsVisible = s.MultiThreadedCompression;
 
         SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "");
         SelectComboByIntValue(DictSizeCombo, s.SevenZipDictionarySize);

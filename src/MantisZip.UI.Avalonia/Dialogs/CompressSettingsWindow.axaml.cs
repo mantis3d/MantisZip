@@ -273,6 +273,8 @@ DataContext = ViewModel;
         ViewModel.AdaptiveCompression = FormatOptionsPanel.AdaptiveCompression;
         ViewModel.AdaptiveSmartDetect = FormatOptionsPanel.AdaptiveSmartDetect;
         ViewModel.MultiThreadedCompression = FormatOptionsPanel.MultiThreadedCompression;
+        // Task 5 Step 3：N 组并行压缩目标组数（与 MT 开关同属 ZIP 面板，面板→VM 快照）
+        ViewModel.ParallelCompressDegree = FormatOptionsPanel.ParallelCompressDegree;
         // ZipEncryptionMethod / SevenZipEncryptHeaders 已通过 XAML 双向绑定到 ViewModel，无需快照
     }
 

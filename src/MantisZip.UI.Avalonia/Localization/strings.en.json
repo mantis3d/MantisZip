@@ -1,4 +1,7 @@
 {
+  "Progress_Preparing": "Preparing…",
+  "Compress_ParallelDegree": "Parallel compress groups",
+  "Compress_ParallelDegree_Hint": "(N parallel compressors; set to 1 to match Multi-threaded above)",
   "Progress_Mode_Label": "Show:",
   "Progress_Mode_Simple": "Simple",
   "Progress_Mode_Detailed": "Detailed",
@@ -13,6 +16,7 @@
   "Progress_Entry_Active": "In progress",
   "Progress_Toast_Copied": "Copied to clipboard",
   "Progress_Batch_Label": "Batch",
+  "Progress_CompressChannelHint": "Compress channels: only files needing compression are listed; already-compressed files are stored as-is and use no channel",
   "Progress_Entry_Completed": "Completed",
   "Progress_Entry_Skipped": "Skipped",
   "Progress_Entry_Failed": "Failed",
@@ -1271,3 +1275,4 @@
   "Adaptive_Help_MultiThreaded_Desc": "Basic mode + multithreaded acceleration for compressible files.",
   "Adaptive_Help_MultiThreaded_Warning": "User rules are not applied in this mode. Compressible files all use the global level."
 }
+

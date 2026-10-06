@@ -139,6 +139,18 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<string, IReadOnlyList<string>?, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
 
     /// <summary>
+    /// Task 6：下一次 <see cref="RunWithProgress"/> 为压缩流程（MainWindow.axaml.cs 的闭包读取后立即复位）。
+    /// 供进度窗口显示「压缩通道」说明行；解压入口不置位。
+    /// </summary>
+    public bool PendingCompressFlow { get; set; }
+
+    /// <summary>
+    /// 压缩侧「列表」播种：下一次 <see cref="RunWithProgress"/> 为压缩流程时，用它枚举全量条目播种
+    /// （MainWindow.axaml.cs 读取后立即复位）。非压缩入口保持 null。
+    /// </summary>
+    public CompressRequest? PendingCompressRequest { get; set; }
+
+    /// <summary>
     /// 由 View 设置的批处理状态上报回调（索引 + 状态）。
     /// 操作闭包内可将其作为 onItemStatus 传给引擎，实时更新批处理列表项状态。
     /// </summary>
@@ -2471,6 +2483,8 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         if (RunWithProgress == null) return;
+        PendingCompressFlow = true; // Task 6: 压缩流程 → 进度窗口显示「压缩通道」说明行
+        PendingCompressRequest = request; // 列表播种：供 RunWithProgress 枚举全量条目
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Compressing"),
             AvaloniaCompressService.GetOutputPaths(request),

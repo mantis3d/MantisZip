@@ -1,4 +1,7 @@
 {
+  "Progress_Preparing": "正在準備…",
+  "Compress_ParallelDegree": "並行壓縮組數",
+  "Compress_ParallelDegree_Hint": "（N 個壓縮器並行；設為 1 則與上方「多執行緒壓縮」等效）",
   "Progress_Mode_Label": "顯示：",
   "Progress_Mode_Simple": "簡約",
   "Progress_Mode_Detailed": "詳細",
@@ -13,6 +16,7 @@
   "Progress_Entry_Active": "進行中",
   "Progress_Toast_Copied": "已複製到剪貼簿",
   "Progress_Batch_Label": "批次",
+  "Progress_CompressChannelHint": "壓縮通道：僅列出需要壓縮的檔案；已壓縮檔案直接儲存，不佔用通道",
   "Progress_Entry_Completed": "已完成",
   "Progress_Entry_Skipped": "已跳過",
   "Progress_Entry_Failed": "失敗",
@@ -1271,3 +1275,4 @@
   "Adaptive_Help_MultiThreaded_Desc": "基礎模式 + 需壓縮檔案多執行緒加速。",
   "Adaptive_Help_MultiThreaded_Warning": "使用者規則在此模式下不生效。需壓縮檔案一律使用全域級別。"
 }
+

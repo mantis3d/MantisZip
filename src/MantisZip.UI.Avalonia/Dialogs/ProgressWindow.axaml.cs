@@ -53,6 +53,10 @@ public partial class ProgressWindow : Window
         _vm = new ProgressViewModel();
         DataContext = _vm;
 
+        // 窗口一打开即进入准备态（「正在准备…」+ 不定进度条），直到引擎首次上报；
+        // 大目录在枚举/分组阶段的静默期不再显示空白进度条（避免被误认为出错）。
+        _vm.BeginPreparing();
+
         // Wire up close request from ViewModel
         _vm.RequestClose += () =>
         {
@@ -117,6 +121,16 @@ public partial class ProgressWindow : Window
 
     /// <summary>Whether to keep the window open on complete.</summary>
     public bool KeepOpenOnComplete => _vm.KeepOpenOnComplete;
+
+    /// <summary>
+    /// 当前为压缩流程（vs 解压）：置 true 时详细面板显示「压缩通道」说明行。
+    /// 解压流程不设置（默认 false）。须在引擎开始上报 <c>BatchIndex</c> 之前设置。
+    /// </summary>
+    public bool IsCompressFlow
+    {
+        get => _vm.IsCompressFlow;
+        set => _vm.IsCompressFlow = value;
+    }
 
     // ════════════════════════════════════════════
     //  Initialization & Cancellation

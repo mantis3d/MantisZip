@@ -2220,12 +2220,17 @@ public partial class App : Application
         }
 
         var progressWindow = existingWindow ?? new ProgressWindow(title);
+        // Task 6: 压缩流程标记 → 详细面板显示「压缩通道」说明行（Store 类文件不占通道）
+        progressWindow.IsCompressFlow = true;
         if (existingWindow == null)
         {
             progressWindow.InitCancellation();
             progressWindow.Show();
         }
         desktop.MainWindow = progressWindow;
+
+        // 列表播种：压缩流程枚举全量条目（后台；失败/取消/超阈值放弃，终态 upsert 兜底）
+        CompressFlow.TrySeedEntryItemsInBackground(progressWindow, request, progressWindow.CancellationToken);
 
         // 始终显示文件列表（单文件也显示）：批处理列表项 = 输出路径
         var outputPaths = AvaloniaCompressService.GetOutputPaths(request);

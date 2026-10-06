@@ -77,6 +77,9 @@ public class AppSettings
     /// </summary>
     public int ParallelExtractDegree { get; set; } = Environment.ProcessorCount;
 
+    /// <summary>N 组并行压缩的目标组数，默认 CPU 数；1 = 串行。</summary>
+    public int ParallelCompressDegree { get; set; } = Environment.ProcessorCount;
+
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
     /// <summary>双击压缩包时的行为：open / extract-here / smart-extract / extract-dialog</summary>

@@ -1,4 +1,8 @@
+using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
+using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.Services;
+using MantisZip.UI.Avalonia.ViewModels;
 using Xunit;
 
 namespace MantisZip.Tests.UI;
@@ -475,5 +479,86 @@ public class ProgressWindowBatchLogicTests
         }).ToList();
 
         Assert.Empty(items);
+    }
+
+    // ──────────────────────────────────────────────
+    // Task 6：并行压缩通道视图（批次行 FileRatio + 自动切详细 + 早返回顺序）
+    // ──────────────────────────────────────────────
+
+    [Fact]
+    public void UpsertParallelBatch_WithBatchFields_CreatesRowWithFileRatio()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            CurrentFile = "a/b/c.txt",
+            BatchIndex = 0,
+            BatchCount = 3,
+            BatchPercentComplete = 42.5,
+            FilePercentComplete = 30.0,
+            BatchProcessedFiles = 2,
+            BatchTotalFiles = 7,
+        });
+
+        var row = Assert.Single(vm.ParallelBatchItems);
+        // Index 是 1-based 显示序号（BatchIndex + 1）
+        Assert.Equal(1, row.Index);
+        Assert.Equal(42.5, row.Percent, 3);
+        // FileRatio 是 0..1 比例（FilePercentComplete / 100），驱动文件名格底纹宽度
+        Assert.Equal(0.30, row.FileRatio, 3);
+        Assert.Equal("a/b/c.txt", row.CurrentFile);
+        // DetailText 由 VM 用 T("Progress_Batch_FilesProgress", 2, 7) 拼好
+        Assert.Equal(LocalizationManager.T("Progress_Batch_FilesProgress", 2, 7), row.DetailText);
+    }
+
+    [Fact]
+    public void SetProgress_WithEntryStatus_StillUpsertsParallelBatch()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            CurrentFile = "x.txt",
+            BatchIndex = 1,
+            BatchCount = 2,
+            EntryKey = "x.txt",
+            EntryStatus = ArchiveEntryStatus.Completed,
+        });
+
+        // 批次 1 到达 → 补洞建出批次 0 与批次 1 两行；Index 分别为 1 / 2
+        Assert.Equal(2, vm.ParallelBatchItems.Count);
+        Assert.Equal(1, vm.ParallelBatchItems[0].Index);
+        Assert.Equal(2, vm.ParallelBatchItems[1].Index);
+    }
+
+    [Fact]
+    public void FileRatio_IsClampedToUnitRange()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { CurrentFile = "a", BatchIndex = 0, FilePercentComplete = 150 });
+        Assert.Equal(1.0, vm.ParallelBatchItems[0].FileRatio, 3);
+
+        var vm2 = new ProgressViewModel();
+        vm2.SetProgress(new ArchiveProgress { CurrentFile = "a", BatchIndex = 0, FilePercentComplete = -20 });
+        Assert.Equal(0.0, vm2.ParallelBatchItems[0].FileRatio, 3);
+    }
+
+    [Fact]
+    public void FirstBatchArrival_AutoSwitchesToDetailedOnlyFromSimple()
+    {
+        var vm = new ProgressViewModel();
+        Assert.Equal(ProgressContentMode.Simple, vm.ContentMode);
+
+        vm.SetProgress(new ArchiveProgress { CurrentFile = "a", BatchIndex = 0, BatchCount = 2 });
+        Assert.Equal(ProgressContentMode.Detailed, vm.ContentMode);
+    }
+
+    [Fact]
+    public void ExplicitListChoice_IsNotOverriddenByFirstBatchArrival()
+    {
+        var vm = new ProgressViewModel();
+        vm.ContentMode = ProgressContentMode.List;
+
+        vm.SetProgress(new ArchiveProgress { CurrentFile = "a", BatchIndex = 0, BatchCount = 2 });
+        Assert.Equal(ProgressContentMode.List, vm.ContentMode);
     }
 }
