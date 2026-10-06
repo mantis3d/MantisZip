@@ -629,51 +629,36 @@ public class SevenZipEngine : IArchiveEngine
                     ? new SharpSevenZipExtractor(archivePath)
                     : new SharpSevenZipExtractor(archivePath, password);
 
-                // 1. 校验压缩包结构（7z.dll 的 Check 会验证头信息和结构完整性）
+                // 1. 校验压缩包完整性（7z.dll 的 Check = TestArchive 语义，逐条目解压并校验 CRC）。
+                //    全程订阅 FileExtractionFinished 事件上报实时进度：
+                //    Check() 阶段会为每个条目触发一次该事件并携带整体 PercentDone（实测确认），
+                //    否则大包校验期间进度条完全不动（旧实现 0 进度事件直到循环结束）
+                string currentFile = "";
+                extractor.FileExtractionFinished += (_, e) =>
+                {
+                    currentFile = e.FileInfo.FileName ?? currentFile;
+                    var pct = Math.Clamp((double)e.PercentDone, 0, 100);
+                    progress?.Report(new ArchiveProgress
+                    {
+                        CurrentFile = currentFile,
+                        PercentComplete = pct,
+                        FilePercentComplete = pct,
+                    });
+                };
+
                 bool valid = extractor.Check();
 
-                // 2. 逐条目解压到空流以验证每条数据的完整性（CRC 由 7z.dll 内部校验）
-                var entries = extractor.ArchiveFileData.ToList();
-                int totalEntries = entries.Count;
-                int processed = 0;
-
-                for (int i = 0; i < totalEntries; i++)
+                // 2. 结果上报：Check() 本身已全量校验所有条目 CRC，无需再逐条目提取一遍（
+                //    旧实现对固实包是 O(n²) 且 2 倍解压开销）。Check 内部抛出的任何
+                //    SharpSevenZipException 都会被外层 catch 捕获转为 false
+                progress?.Report(new ArchiveProgress
                 {
-                    cancellationToken.ThrowIfCancellationRequested();
+                    CurrentFile = currentFile,
+                    PercentComplete = 100,
+                    FilePercentComplete = 100,
+                });
 
-                    if (entries[i].IsDirectory)
-                    {
-                        processed++;
-                        continue;
-                    }
-
-                    // ExtractFile 为原子调用（内部校验 CRC），无法获取单文件中间进度；
-                    // 提取前后各上报一次 0%/100% 以驱动文件进度条
-                    progress?.Report(new ArchiveProgress
-                    {
-                        CurrentFile = entries[i].FileName,
-                        PercentComplete = totalEntries > 0 ? (double)processed / totalEntries * 100 : 100,
-                        FilePercentComplete = 0,
-                        TotalFiles = totalEntries,
-                        ProcessedFiles = processed,
-                    });
-
-                    // 实际解压条目到空流 — 7z.dll 在 ExtractFile 内部会校验 CRC
-                    extractor.ExtractFile(entries[i].Index, Stream.Null);
-
-                    processed++;
-
-                    progress?.Report(new ArchiveProgress
-                    {
-                        CurrentFile = entries[i].FileName,
-                        PercentComplete = totalEntries > 0 ? (double)processed / totalEntries * 100 : 100,
-                        FilePercentComplete = 100,
-                        TotalFiles = totalEntries,
-                        ProcessedFiles = processed,
-                    });
-                }
-
-                CoreLog.Info($"TestArchiveAsync: passed, {totalEntries} entries verified, valid={valid}");
+                CoreLog.Info($"TestArchiveAsync: passed, archive verified, valid={valid}");
                 return valid;
             }
             catch (Exception ex)
