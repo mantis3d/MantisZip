@@ -162,6 +162,12 @@ public class ArchiveOptions
     public int ParallelExtractDegree { get; set; } = 0;
 
     /// <summary>
+    /// N 组并行压缩的目标组数。0 = 自动（取 <see cref="Environment.ProcessorCount"/>），上限 16。
+    /// 运行时解析见 ZipEngine 内部；&lt;= 1 时回落标准串行路径。
+    /// </summary>
+    public int ParallelCompressDegree { get; set; } = 0;
+
+    /// <summary>
     /// 7z 多线程压缩（mt=on）。默认 true。
     /// 启用时 7z.dll 自动利用多核 CPU 并行压缩，压缩率可能略有下降。
     /// 仅对 7z 格式有效，ZIP/TAR/GZ 无此选项。

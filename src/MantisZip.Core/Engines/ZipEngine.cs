@@ -3285,6 +3285,36 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
     }
 
     /// <summary>
+    /// 解析有效并行组数：&lt;=0 取 CPU 数，上限 16，下限 1。
+    /// 与解压侧 <c>ParallelExtractDegree</c> 的解析规则保持一致。
+    /// </summary>
+    internal static int ResolveParallelCompressDegree(int configured)
+    {
+        int n = configured;
+        if (n <= 0) n = Environment.ProcessorCount;
+        if (n > 16) n = 16;
+        if (n < 1) n = 1;
+        return n;
+    }
+
+    /// <summary>
+    /// 取文件字节数；文件不存在/无权限时返回 0（进度计算用，不应中断压缩）。
+    /// </summary>
+    private static long SafeFileSize(string path)
+    {
+        try { return new FileInfo(path).Length; } catch { return 0L; }
+    }
+
+    /// <summary>
+    /// 立即执行的 <see cref="IProgress{T}"/>：不像 <see cref="Progress{T}"/> 那样
+    /// 投递到同步上下文，因此在 <c>Parallel.ForEachAsync</c> 的后台线程里也能即时上报。
+    /// </summary>
+    private sealed class InlineProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
+    }
+
+    /// <summary>
     /// 使用二进制解析直接读取 ZIP 中央目录的通用位标记，
     /// 验证是否有任何条目的加密位（bit 0）被设置。
     /// 用于交叉校验 SharpCompress 报告的 IsEncrypted，防范假阳性。

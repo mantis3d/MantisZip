@@ -38,6 +38,103 @@
 - 压缩并行时 `_isBatchMode` 必须保持 `false`，否则 `ComputeOverallPercent` 会覆盖全局字节加权百分比。
 - 回退路径行为必须与今天**完全一致**（含 `mt=on`）。
 
+### 自适应（`AdaptiveCompression`）兼容性约束 — Task 4 必读
+
+自适应与 N 组并行的**交叉点**是本计划最容易漏的地方：自适应在 `CompressGroupWithSevenZip` **之外**用
+`ZipEntryClassifier.GetAdaptiveLevel`（`ZipEngine.cs:1413`/`:2171`）把文件分成 `storeGroup`（level 0，method 0 直存）
+与 `compressGroup`（level > 0，交 7z）。只有 `compressGroup` 进 N 组，`storeGroup` 必须作为
+`addEntries` 交给 `ZipBinaryRewriter`。三条硬约束：
+
+1. **`storeGroup` 必须并入 `addEntries`** —— N 组分支整体替换了单组的合并 try 块，若照抄初稿传
+   `null, null`，开自适应时所有已压缩文件会从产物中**静默消失**。Store 条目的 `FileStream`
+   保持打开至 `RewriteAsync` 完成，随后在 `finally` 统一 `Dispose`。
+2. **`CanCopyModeRewrite` 闸门必须扩到 N 组分支** —— 既有闸门只守混合场景，因为单组全可压缩是
+   `File.Move` 直出、从不经过重写器（见 `ZipEngine.cs:2996-2999` 注释）。N 组下**每个**场景都要经
+   多源 copy-mode 合并，而 copy-mode 只接受 method 0/8/9。BZip2(12)/LZMA(14)/PPMd(98) 今天能由
+   7z 直写正常产出，N 组下若无闸门会抛 `ZipCopyModeException` —— 属「本来能用变成硬失败」的回归。
+3. **进度分母含 `storeGroup`，且合并阶段要有进度** —— 分母只算 `compressGroup` 会与今天的
+   `totalBytes` 口径不一致；给合并阶段传 `progress: null` 会让自适应 Store 占比高时进度条在长合并期间
+   完全静止。重写器只上报固定的 92/94/97/100 且无字节信息（`ZipBinaryRewriter.cs:418-460`），
+   直接转发会与组阶段百分比打架（组阶段可能才 10% 却突然跳到 92%），
+   故须线性重映射到 `[组阶段终点, 100]`。
+
+> 这三条已作为 Self-Review 的缺陷 9-11 记录。Task 4 实施时逐条自检，勿只看编译与绿测 ——
+> 它们都是「能编译、测试也绿、但运行时产出错数据或抛异常」的隐性缺陷。
+
+#### ⚠️ 严重性：`ParallelCompressDegree` 默认值 = `ProcessorCount`，故 N 组是**默认路径**
+
+`AppSettings.ParallelCompressDegree` 默认 `Environment.ProcessorCount`（镜像既有
+`ParallelExtractDegree`），`ResolveParallelCompressDegree` 只在显式设为 1 时才回退。
+因此在 ≥4 核机器上，**只要 `compressGroup` 有 ≥2 个文件，默认就走 N 组** —— 不需要用户
+碰任何开关。
+
+故缺陷 9-11 不是「新功能的边角 bug」，而是**计划落地当天即生效的默认路径缺陷**：
+任一开自适应的用户在默认设置下都会踩到（丢文件 / PPMd 抛异常 / 进度倒退）。
+这也是把三条修正列为 Task 4 硬前置、而非「Task 4 之后优化」的原因。
+
+#### 已确认的设计决策（用户 2026-10-06 裁定）：进度分母取「Store + Compress」
+
+分歧点：组阶段结束时进度条停在哪个值——
+
+| 方案 | 组阶段封顶 | 媒体包（Store≈90%）观感 | 代价 |
+|---|---|---|---|
+| A（**已选**）`Math.Min(95.0, compressTotal * 100 / globalTotal)` | `95 × compressTotal/globalTotal` | 停在 ~9.5%，合并阶段快速冲完 | 无 |
+| B `Math.Min(95.0, compressTotal * 100 / compressTotal)` | 恒 95% | 均匀铺满 0→95% | 百分比与「已处理字节/总字节」脱钩，底部总进度可能 >100% |
+
+**选 A**：进度百分比必须与 `ProcessedBytes/TotalBytes` 语义自洽，否则进度条会超 100%
+（`ComputeOverallPercent` 以字节为准，通道行以百分比为准，两者打架时 UI 无法自圆）。
+方案 B 的「视觉均匀」代价是数值说谎，不可接受。
+
+**代价已知并接受**：Store 占比高的包会出现「压缩阶段爬一小段、合并阶段猛冲」的观感。
+合并是纯字节拷贝、实际很快，且这是**如实反映**（90% 的字节工作量确实在拷贝阶段完成）。
+勿以「视觉不够均匀」为由把分母改回仅 compressTotal。
+
+### UX 缺口 A/B/C — 已识别，均已在本计划内给出修法
+
+以下三点是审查整个计划（Task 1–8）后发现的**用户体验缺口**，非自适应正确性问题。
+每条都给出**具体修法**并落到对应任务，勿只当 TODO 记着。
+
+#### 缺口 A：两个「并行」开关语义重叠，且一方关闭时另一方被静默忽略
+
+既有「多线程压缩」（`MultiThreadedCompression`）= 7z `mt=on`，**一个**压缩器内部多线程；
+新增「并行压缩组数」（`ParallelCompressDegree`）= **N 个**单线程压缩器并行。两者不是一回事，
+且 N 组生效时 `mt` 被强制 `off`（Task 3）。用户无从判断「两个都开着哪个生效」。
+
+更隐蔽的是门控：`IsMultiThreadedEligible` 的 7 条回退条件**第一条**就是
+`options.MultiThreadedCompression == false`（`ZipEngine.cs:3006`，测试
+`IsMultiThreadedEligible_RejectsWhenSwitchOff` 覆盖），而 N 组分支插在该 `if` **内部**
+（Task 4 Step 5）。故 **「多线程压缩」一关，degree 被静默忽略** —— 用户设了 8 却看不到任何变化，
+也无任何提示。
+
+**修法**（落在 Task 5 Step 3）：
+1. 按项目规则 6（方案 A：统一隐藏而非禁用），把组数控件包进命名容器，
+   `IsVisible="{Binding MultiThreadedCompression}"` —— 多线程关闭时整块从视觉树移除，不留无效控件。
+2. 提示文案改为点明二者关系，见 Task 5 Step 3 的文案定义（**不得**沿用
+   `ExtractSettingsWindow.axaml:134` 那句硬编码中文「(1=串行，默认=CPU核心数)」——
+   它既没说清与「多线程压缩」的关系，也是既有未本地化缺陷）。
+
+#### 缺口 B：自适应场景下「详细」模式的通道行看起来像丢了文件
+
+N 行通道只覆盖 `compressGroup`。一个 30 文件目录、26 个是 jpg/mp4 时，「详细」模式只有 4 行通道，
+其余 26 个 Store 文件**不在任何通道行**（它们只在「列表」模式的条目行里出现）。
+用户看到「源目录 30 个文件，通道只有 4 行」极易误判为 bug 或丢文件。
+
+**修法**（落在 Task 6 Step 7b）：在通道区上方加一行**静态**本地化说明文字，
+明示「通道只列需压缩的文件，已压缩文件直接存储、不占通道」。选静态文案而非动态统计 Store 文件数，
+是因为后者需要新增 `ArchiveProgress` 契约字段，而 Task 3 刻意遵守「不新增契约字段」（只复用既有
+`BatchIndex`/`BatchCount` 等）。静态文案零管线改动且永远准确。
+
+#### 缺口 C ⚠️：Task 8 手动验证完全没有自适应场景 —— 最危险的 bug 恰好验收不到
+
+缺陷 9 是**静默数据丢失**，Task 8 是它的最后一道防线。但：
+- Step 2 的语料是「≥8 个文件、≥50MB（含若干大文件）」→ 大概率全是可压缩文件 →
+  `storeGroup` 为空 → **缺陷 9 完全隐形**；
+- Step 6 的「确认条目完整」本来能抓到丢失，但前提是语料含 Store 类文件，而计划从未要求；
+- 原有 8 条检查项**没有一条**构造「已压缩文件 + 可压缩文件混合 + 自适应 + degree=4」。
+
+**修法**：Task 8 新增 Step 2b（自适应混合语料 + 逐条目比对）与 Step 4b（PPMd 回退端到端），
+见 Task 8。仅加验收、不改代码。
+
 ---
 
 ## File Structure
@@ -1026,7 +1123,19 @@ Expected: `Degree3_OutputIsValidAndByteIdenticalToSource` 失败 —— `Archive
                     int degree = ResolveParallelCompressDegree(options.ParallelCompressDegree);
                     var groups = SplitCompressGroup(compressGroup, degree);
 
-                    if (groups.Count >= 2)
+                    // ── 闸门：copy-mode 承载能力 ──
+                    // 既有 CanCopyModeRewrite（:3063）只守「混合场景」（:1426），因为单组
+                    // 全可压缩场景是 File.Move 直出、从不经过重写器（见 :2996-2999 注释）。
+                    // N 组把这个前提打破了：**每个**场景都要经多源 copy-mode 合并，而 copy-mode
+                    // 只接受 method 0/8/9。BZip2(12)/LZMA(14)/PPMd(98) 今天由 7z 直写 + Move
+                    // 能正常产出，若不补这道闸门，N 组下会抛 ZipCopyModeException ——
+                    // 属于「本来能用变成硬失败」的回归。故显式回落到已验证的单组路径。
+                    bool nGroupEligible = groups.Count >= 2
+                        && CanCopyModeRewrite(options.ZipCompressionMethod);
+                    if (groups.Count >= 2 && !nGroupEligible)
+                        LogCopyModeUnsupported(options.ZipCompressionMethod);
+
+                    if (nGroupEligible)
                     {
                         // 每组一个 tempZip，组内 mt=off；并行度来自组间而非 7z 内部线程
                         var tempDir = Path.Combine(Path.GetTempPath(),
@@ -1034,8 +1143,13 @@ Expected: `Degree3_OutputIsValidAndByteIdenticalToSource` 失败 —— `Archive
                         Directory.CreateDirectory(tempDir);
                         var tempZips = new string[groups.Count];
 
-                        // 全局字节加权进度的分母 = 全部输入文件的**输入**字节之和
-                        long globalTotal = compressGroup.Sum(f => SafeFileSize(f.FullPath));
+                        // 进度分母 = 压缩组 + Store 组的**输入**字节之和。
+                        // 必须含 storeGroup：既有单组路径传的是含 Store 的 totalBytes 且
+                        // storeProcessedBytes=0；若这里只算 compressGroup，自适应 Store 占比高时
+                        // 分母偏小，与今天的口径不一致，合并阶段也会凭空多出一截进度。
+                        long compressTotalBytes = compressGroup.Sum(f => SafeFileSize(f.FullPath));
+                        long storeTotalBytes = storeGroup.Sum(f => SafeFileSize(f.FullPath));
+                        long globalTotal = compressTotalBytes + storeTotalBytes;
                         if (globalTotal <= 0) globalTotal = 1;
 
                         // 已结束组的输入字节累计（Interlocked 保证并发安全）
@@ -1065,8 +1179,11 @@ Expected: `Degree3_OutputIsValidAndByteIdenticalToSource` 失败 —— `Archive
 
                                         progress?.Report(new ArchiveProgress
                                         {
-                                            // 组阶段最多推进到 95%，余下 5% 留给合并阶段
-                                            PercentComplete = Math.Min(95.0, globalDone * 100.0 / globalTotal),
+// 组阶段封顶 95%，余下留给合并阶段。注意分母含 Store 组，
+                                                // 故组阶段结束时实际停在 95 * compressTotal/globalTotal
+                                                // ——自适应 Store 占比高时会明显低于 95，这是正确的：
+                                                // 余下百分比对应合并阶段真实要拷贝的 Store 字节。
+                                                PercentComplete = Math.Min(95.0, globalDone * 100.0 / globalTotal),
                                             ProcessedBytes = globalDone,
                                             TotalBytes = globalTotal,
                                             CurrentFile = local.CurrentFile,
@@ -1088,23 +1205,82 @@ Expected: `Degree3_OutputIsValidAndByteIdenticalToSource` 失败 —— `Archive
                                     Interlocked.Add(ref finishedInputBytes, groupTotal);
                                 });
 
-                            // N 个 tempZip 原样字节拼接为最终 ZIP（copy-mode，不重压）。
-                            // 合并是纯字节拷贝，耗时占比小；**不转发**其内部 92/94/97 百分比
-                            // ——那会与组阶段的字节加权进度倒退/跳变，故 progress 传 null，
-                            // 合并完成后直接收尾到 100%。
-                            await ZipBinaryRewriter.RewriteAsync(
-                                tempZips.Where(File.Exists).ToArray(), outputPath,
-                                null, null,
-                                options.FileNameEncoding == "gbk" ? Encoding.GetEncoding("GBK")
-                                    : options.FileNameEncoding == "default" ? Encoding.Default
-                                    : Encoding.UTF8,
-                                options.Comment, null, cancellationToken);
+                            // ── 合并：N 个 tempZip + Store 条目 → 最终 ZIP（copy-mode，从不解压也从不重压）──
+                            //
+                            // 【必须带 storeGroup】既有单组路径把 Store 条目作为 addEntries 交给
+                            // 重写器（:1454-1478）。N 组分支整体替换了那段 try，若 addEntries 传 null，
+                            // 开启自适应时所有「已压缩文件」（jpg/mp4/zip…）会从产物中静默消失 ——
+                            // 计划初稿的 Step 5 正是这个 bug（Step 6 的表格是对的，Step 5 漏了）。
+                            var storeStreams = new List<Stream>(storeGroup.Count);
+                            try
+                            {
+                                var storeEntries = new List<NewEntry>(storeGroup.Count);
+                                foreach (var (fullPath, relativePath) in storeGroup)
+                                {
+                                    cancellationToken.ThrowIfCancellationRequested();
+                                    // 必须保持打开直到 RewriteAsync 完成（ZipBinaryRewriter.cs:53-56）
+                                    var storeStream = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                    storeStreams.Add(storeStream);
+                                    storeEntries.Add(new NewEntry(
+                                        // 条目名编码固定 UTF-8：与 7z 产物保持一致（混用编码会破坏条目名）
+                                        EntryName: ArchivePath.Normalize(relativePath),
+                                        Data: storeStream,
+                                        LastModified: File.GetLastWriteTime(fullPath),
+                                        Size: storeStream.Length,
+                                        Store: true));
+                                }
+
+                                // 合并阶段进度：重写器只上报固定的 92/94/97/100、**无字节信息**
+                                // （ZipBinaryRewriter.cs:418-460）。直接转发会与组阶段的字节加权
+                                // 百分比打架 —— 自适应 Store 占比高时组阶段才停在 ~10%，
+                                // 突然跳到 92%。故线性重映射到 [组阶段终点, 100]：
+                                // 既单调不回退，也让长合并阶段仍有进度反馈（计划初稿传 null 会让
+                                // 合并期间进度条完全静止）。
+                                double groupEndPercent = Math.Min(95.0, compressTotalBytes * 100.0 / globalTotal);
+                                var mergeAdapter = new InlineProgress<ArchiveProgress>(raw =>
+                                {
+                                    double p = Math.Clamp(raw.PercentComplete, 0, 100);
+                                    double pct = groupEndPercent + (100.0 - groupEndPercent) * (p / 100.0);
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        PercentComplete = pct,
+                                        ProcessedBytes = (long)(globalTotal * pct / 100.0),
+                                        TotalBytes = globalTotal,
+                                        CurrentFile = string.Empty,
+                                    });
+                                });
+
+                                await ZipBinaryRewriter.RewriteAsync(
+                                    tempZips.Where(File.Exists).ToArray(), outputPath,
+                                    null, storeEntries,
+                                    options.FileNameEncoding == "gbk" ? Encoding.GetEncoding("GBK")
+                                        : options.FileNameEncoding == "default" ? Encoding.Default
+                                        : Encoding.UTF8,
+                                    options.Comment, mergeAdapter, cancellationToken);
+                            }
+                            finally
+                            {
+                                foreach (var s in storeStreams) { try { s.Dispose(); } catch { } }
+                            }
+
+                            // 逐条目状态（D2）：与既有单组路径一致，Store 条目在合并后报 Completed
+                            foreach (var (_, relativePath) in storeGroup)
+                            {
+                                progress?.Report(new ArchiveProgress
+                                {
+                                    EntryKey = relativePath,
+                                    EntryStatus = ArchiveEntryStatus.Completed
+                                });
+                            }
 
                             progress?.Report(new ArchiveProgress
                             {
                                 PercentComplete = 100,
+                                FilePercentComplete = 100,
                                 ProcessedBytes = globalTotal,
                                 TotalBytes = globalTotal,
+                                TotalFiles = totalFiles,
+                                ProcessedFiles = totalFiles,
                                 CurrentFile = string.Empty,
                             });
                         }
@@ -1123,7 +1299,8 @@ Expected: `Degree3_OutputIsValidAndByteIdenticalToSource` 失败 —— `Archive
 不要把既有 `compressGroup.Count == 0` 分支及其后的全部旧代码搬进 `else`。正确做法是把 **既有的单组 7z 调用点包进 `else`**：即在 `if (groups.Count >= 2) { ...N 组路径... }` 之后，把原本无条件执行的那段单组 7z 压缩 + store/compress 分支用 `else { }` 括起来。这样：
 
 - `groups.Count < 2` → 走 `else`，与改动前**逐字节等价**（旧代码一行未改，只是缩进变化）；
-- `groups.Count >= 2` → 走 N 组路径，旧代码整段跳过；
+- `groups.Count >= 2` 但 `!CanCopyModeRewrite(options.ZipCompressionMethod)` → 同样走 `else`（回落单组 mt=on 路径，见「约束 → 自适应兼容性」第 2 条）；
+- `groups.Count >= 2` 且 copy-mode 可承载 → 走 N 组路径，旧代码整段跳过；
 - diff 最小，且不需要在本计划里抄写旧逻辑（避免计划与源码漂移）。
 
 实现者只需在编辑器里做这一次缩进包裹，不要重排旧代码顺序。
@@ -1171,15 +1348,27 @@ Expected: `Degree3_OutputIsValidAndByteIdenticalToSource` 失败 —— `Archive
                                     int degree = ResolveParallelCompressDegree(options.ParallelCompressDegree);
                                     var groups = SplitCompressGroup(compressGroup, degree);
 
-                                    if (groups.Count >= 2)
-                                    {
+                                    // 闸门：同 Step 5 —— N 组下「全可压缩」也要经 copy-mode 合并，
+                                        // 故 CanCopyModeRewrite 不再只是混合场景专属。
+                                        bool nGroupEligible = groups.Count >= 2
+                                            && CanCopyModeRewrite(options.ZipCompressionMethod);
+                                        if (groups.Count >= 2 && !nGroupEligible)
+                                            LogCopyModeUnsupported(options.ZipCompressionMethod);
+
+                                        if (nGroupEligible)
+                                        {
                                         var tempDir = Path.Combine(Path.GetTempPath(),
                                             "mz_ngroup_" + Guid.NewGuid().ToString("N"));
                                         Directory.CreateDirectory(tempDir);
                                         var tempZips = new string[groups.Count];
 
-                                        long globalTotal = compressGroup.Sum(f => SafeFileSize(f.FullPath));
-                                        if (globalTotal <= 0) globalTotal = 1;
+                                        // 注意：外层已有 compressTotalBytes（:2165 的入参口径），
+                                        // 故此处用 ng 前缀另起局部名，勿 shadow。
+                                        // 分母含 Store 组，与既有单组路径 compressTotalBytes 口径一致。
+                                        long ngCompressBytes = compressGroup.Sum(f => SafeFileSize(f.FullPath));
+                                        long ngStoreBytes = storeGroup.Sum(f => SafeFileSize(f.FullPath));
+                                        long ngGlobalTotal = ngCompressBytes + ngStoreBytes;
+                                        if (ngGlobalTotal <= 0) ngGlobalTotal = 1;
                                         long finishedInputBytes = 0;
 
                                         try
@@ -1204,9 +1393,9 @@ Expected: `Degree3_OutputIsValidAndByteIdenticalToSource` 失败 —— `Archive
 
                                                         progress?.Report(new ArchiveProgress
                                                         {
-                                                            PercentComplete = Math.Min(95.0, globalDone * 100.0 / globalTotal),
+                                                            PercentComplete = Math.Min(95.0, globalDone * 100.0 / ngGlobalTotal),
                                                             ProcessedBytes = globalDone,
-                                                            TotalBytes = globalTotal,
+                                                            TotalBytes = ngGlobalTotal,
                                                             CurrentFile = local.CurrentFile,
                                                             EntryKey = local.EntryKey,
                                                             BatchIndex = i,
@@ -1225,30 +1414,69 @@ Expected: `Degree3_OutputIsValidAndByteIdenticalToSource` 失败 —— `Archive
                                                     Interlocked.Add(ref finishedInputBytes, groupTotal);
                                                 });
 
-                                            // 一次合并完成：已有压缩包 + N 个 tempZip + Store 条目
+// 一次合并完成：已有压缩包 + N 个 tempZip + Store 条目
                                             // （对比旧路径的「先 Move tempZip，再单独二次合并 Store 组」两步）
-                                            var storeEntries = new List<NewEntry>(storeGroup.Count);
-                                            foreach (var (fullPath, relativePath) in storeGroup)
+                                            var ngStoreStreams = new List<FileStream>(storeGroup.Count);
+                                            try
                                             {
-                                                cancellationToken.ThrowIfCancellationRequested();
-                                                var fi = new FileInfo(fullPath);
-                                                storeEntries.Add(new NewEntry(
-                                                    EntryName: relativePath,
-                                                    Data: File.OpenRead(fullPath),
-                                                    LastModified: fi.LastWriteTime,
-                                                    Size: fi.Length,
-                                                    Store: true));
+                                                var storeEntries = new List<NewEntry>(storeGroup.Count);
+                                                foreach (var (fullPath, relativePath) in storeGroup)
+                                                {
+                                                    cancellationToken.ThrowIfCancellationRequested();
+                                                    var fi = new FileInfo(fullPath);
+                                                    var s = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                                    ngStoreStreams.Add(s);
+                                                    storeEntries.Add(new NewEntry(
+                                                        EntryName: ArchivePath.Normalize(relativePath),
+                                                        Data: s,
+                                                        LastModified: fi.LastWriteTime,
+                                                        Size: fi.Length,
+                                                        Store: true));
+                                                }
+
+                                                // 合并阶段进度：同 Step 5 —— 重写器只报固定 92/94/97/100
+                                                // 且无字节信息，直接转发会与组阶段百分比打架。
+                                                // 重映射到 [组阶段终点, 100] 保证单调不回退。
+                                                double ngGroupEnd = Math.Min(95.0, ngCompressBytes * 100.0 / ngGlobalTotal);
+                                                var mergeAdapter = new InlineProgress<ArchiveProgress>(raw =>
+                                                {
+                                                    double p = Math.Clamp(raw.PercentComplete, 0, 100);
+                                                    double pct = ngGroupEnd + (100.0 - ngGroupEnd) * (p / 100.0);
+                                                    progress?.Report(new ArchiveProgress
+                                                    {
+                                                        PercentComplete = pct,
+                                                        ProcessedBytes = (long)(ngGlobalTotal * pct / 100.0),
+                                                        TotalBytes = ngGlobalTotal,
+                                                        CurrentFile = string.Empty,
+                                                    });
+                                                });
+
+                                                await ZipBinaryRewriter.RewriteAsync(
+                                                    new[] { tempArchive }
+                                                        .Concat(tempZips.Where(File.Exists))
+                                                        .ToArray(),
+                                                    finalArchivePath,
+                                                    null, storeEntries,
+                                                    zipEncoding,
+                                                    null,   // 沿用 tempArchive 原注释
+                                                    mergeAdapter, cancellationToken);
+                                            }
+                                            finally
+                                            {
+                                                // 计划初稿在此处直接 File.OpenRead 却从不释放 —— Store 组
+                                                // 大时句柄泄漏。必须在 RewriteAsync 之后统一Dispose。
+                                                foreach (var s in ngStoreStreams) { try { s.Dispose(); } catch { } }
                                             }
 
-                                            await ZipBinaryRewriter.RewriteAsync(
-                                                new[] { tempArchive }
-                                                    .Concat(tempZips.Where(File.Exists))
-                                                    .ToArray(),
-                                                finalArchivePath,
-                                                null, storeEntries,
-                                                zipEncoding,
-                                                null,   // 沿用 tempArchive 原注释
-                                                null, cancellationToken);
+                                            // 逐条目状态（D2）：与既有单组路径一致
+                                            foreach (var (_, relativePath) in storeGroup)
+                                            {
+                                                progress?.Report(new ArchiveProgress
+                                                {
+                                                    EntryKey = relativePath,
+                                                    EntryStatus = ArchiveEntryStatus.Completed
+                                                });
+                                            }
 
                                             compressProcessed = compressTotalBytes;
                                             // 标记 N 组路径已完成，跳过下方旧的单组合并收尾
@@ -1263,7 +1491,8 @@ Expected: `Degree3_OutputIsValidAndByteIdenticalToSource` 失败 —— `Archive
 
 **必须注意的三点：**
 
-1. `NewEntry.Data` 的 `FileStream` **必须保持打开**直到 `RewriteAsync` 完成（见 `ZipBinaryRewriter.cs:53-56` 的注释），故不能写在 `using` 里。
+1. `NewEntry.Data` 的 `FileStream` **必须保持打开**直到 `RewriteAsync` 完成（见 `ZipBinaryRewriter.cs:53-56` 的注释），故不能写在 `using` 里；用 `ngStoreStreams` 收集后在 `finally` 里统一 `Dispose`（计划初稿直接 `File.OpenRead` 却从不释放，Store 组大时句柄泄漏）。
+   条目名用 `ArchivePath.Normalize(relativePath)` 与既有 `:1461` 一致（计划初稿漏了这个归一化）。
 2. `goto NGroupMergeDone` 是刻意的：既有的单组合并收尾（`:2212` 起的 `File.Move` / Store 组二次合并）应被**整体跳过**，而非复制一份。在 `:2189` 分支块末尾加标签 `NGroupMergeDone:;` 即可。若编译器对跨越变量初始化的 `goto` 报错，改为把整段包进 `if (groups.Count >= 2) { ... } else { ...旧逻辑... }`，语义等价。
 3. `finalArchivePath` 用既有临时输出路径，合并成功后按既有方式原子替换 `tempArchive`；**不要**改变对外可见的产物路径语义。
 
@@ -1333,8 +1562,13 @@ AppSettings.ParallelCompressDegree
 模式（`Minimum="1" Maximum="16" Width="120"` + 灰色提示文字）：
 
 ```xml
-                <!-- 并行压缩组数（1=串行，默认=CPU核心数；镜像 ExtractSettingsWindow 的并行解压线程数） -->
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
+                <!-- 并行压缩组数：N 个单线程压缩器并行（区别于上方「多线程压缩」的单个压缩器 mt=on）。
+                     按项目规则 6（方案 A），多线程压缩关闭时整块隐藏而非禁用 ——
+                     IsMultiThreadedEligible 第一条回退条件就是 MultiThreadedCompression == false，
+                     组数在此情况下会被引擎静默忽略，显示出来只会让用户以为设置失效。 -->
+                <StackPanel x:Name="ParallelDegreePanel" Orientation="Horizontal"
+                            Spacing="8" Margin="0,8,0,0"
+                            IsVisible="{Binding MultiThreadedCompression}">
                   <TextBlock Text="{Binding LocalizedStrings[Compress_ParallelDegree]}"
                              VerticalAlignment="Center" />
                   <NumericUpDown Minimum="1" Maximum="16"
@@ -1347,12 +1581,23 @@ AppSettings.ParallelCompressDegree
                 </StackPanel>
 ```
 
+> `IsVisible="{Binding MultiThreadedCompression}"` 直接挂在 `ParallelDegreePanel` 上即可，
+> 无需 code-behind 切换 —— `MultiThreadedCompression` 是既有 `[ObservableProperty]`，
+> 变更通知自动驱动。**不要**改成 `IsEnabled`（规则 6 明确废弃方案 B）。
+
 **按项目规则 13，新增用户可见文案必须走本地化**：
 
 1. 三语文件各加 2 个 key（插到文件头 `{` 之后，UTF-8 无 BOM + CRLF + 2 空格缩进）：
-   `Compress_ParallelDegree`（标签「并行压缩组数」/「Parallel compress groups」）、
-   `Compress_ParallelDegree_Hint`（提示「(1=串行，默认=CPU核心数)」）。
+
+   | key | zh-CN | en | zh-TW |
+   |---|---|---|---|
+   | `Compress_ParallelDegree` | 并行压缩组数 | Parallel compress groups | 並行壓縮組數 |
+   | `Compress_ParallelDegree_Hint` | （N 个压缩器并行；设为 1 则与上方「多线程压缩」等效） | (N parallel compressors; set to 1 to match Multi-threaded above) | （N 個壓縮器並行；設為 1 則與上方「多執行緒壓縮」等效） |
+
    key 集须三语完全一致，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 会校验。
+
+   > 提示文案**必须**点明与「多线程压缩」的关系（缺口 A 修法）：否则两个开关并排出现、
+   > 而 N 组生效时 `mt` 被强制 `off`，用户无法判断哪个在起作用。
 2. **必须**在 `CompressSettingsViewModel.cs:478-479` 附近（既有 `LocalizedStrings[...] = ...`
    登记处）追加两行，否则 XAML 绑定空白且构建不报错：
    ```csharp
@@ -1578,6 +1823,66 @@ Expected: 全部通过。
 > `DetailText`、`CurrentFile`。**没有 `FileName`、没有 `IsActive`**；文件名绑定一律用 `CurrentFile`，
 > 可见性沿用既有 `StringNotEmpty` 转换器（见 `ProgressWindow.axaml:367`）。
 
+- [ ] **Step 7b: XAML 改动 1b —— 通道区说明文字（缺口 B 修法）**
+
+**背景**：N 行通道只覆盖 `compressGroup`。自适应场景下 30 个文件里 26 个是 jpg/mp4 时，
+「详细」模式只有 4 行通道，其余 Store 文件不在任何通道行 —— 用户极易误判为丢文件。
+且**压缩侧进度窗口不播种条目列表**（`docs/PLAN.md` 记载「通用压缩路径播种经用户决定正式延期」，
+压缩侧要拿全量条目须先列目录），故「列表」模式里也找不到这些文件：
+**这行说明是用户唯一能得知「有文件被直接存储」的地方。**
+
+`ArchiveProgress` 无「已直接存储文件数」字段（`ArchiveEngine.cs:314-347` 逐字段核实），
+Task 3 又刻意遵守「不新增契约字段」，故**用静态文案**，不引入统计数字。
+
+**① `ProgressViewModel.cs` 加压缩流程标识**（`DetailedPanel` 为解压/压缩共用，需区分）：
+
+```csharp
+    /// <summary>当前为压缩流程（vs 解压）：控制通道区说明文字的可见性。</summary>
+    [ObservableProperty]
+    private bool _isCompressFlow;
+```
+
+**② `CompressFlow` 侧接线**：压缩流程构建/配置进度 ViewModel 处置 `IsCompressFlow = true`。
+解压流程（`ExtractFlow` / `SelectedItemsExtractService`）**不动**，默认 `false`。
+
+**③ `ProgressViewModel.cs:129` 附近登记文案 key**（既有 `["Progress_Batch_Label"]` 同处）：
+
+```csharp
+        ["Progress_CompressChannelHint"] = LocalizationManager.T("Progress_CompressChannelHint"),
+```
+
+三语文件各加 1 个 key：
+
+| key | zh-CN | en | zh-TW |
+|---|---|---|---|
+| `Progress_CompressChannelHint` | 压缩通道：仅列出需要压缩的文件；已压缩文件直接存储，不占用通道 | Compress channels: only files needing compression are listed; already-compressed files are stored as-is and use no channel | 壓縮通道：僅列出需要壓縮的檔案；已壓縮檔案直接儲存，不佔用通道 |
+
+**④ `ProgressWindow.axaml:332-339` 结构改动**：当前 `DetailedPanel` 内直接是 `ItemsControl`，
+需在 `ItemsControl` **之前**插入说明行，故用 `StackPanel` 包一层：
+
+```xml
+        <StackPanel Spacing="{DynamicResource SpacingXxs}">
+          <!-- 压缩通道说明：Store 类文件不经压缩、不占通道，且压缩侧不播种条目列表（见 Step 7b 背景） -->
+          <TextBlock Text="{Binding LocalizedStrings[Progress_CompressChannelHint]}"
+                     IsVisible="{Binding IsCompressFlow}"
+                     FontSize="10"
+                     TextWrapping="Wrap"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          <ItemsControl ItemsSource="{Binding ParallelBatchItems}">
+            <ItemsControl.ItemTemplate>
+              <!-- ↓ 原样保留既有模板内容（Step 7 改动 1 + Step 8 改动 2 作用于其内部） -->
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </StackPanel>
+```
+
+> `LocalizedStrings` 是 `ProgressViewModel` 的字典属性（`ProgressViewModel.cs:76`），
+> 直接 `{Binding LocalizedStrings[...]}` 即可，**无需** `RelativeSource AncestorType=Window`
+> —— 那是 `ItemTemplate` 内的写法（DataTemplate 的 DataContext 是行对象）。
+> 规则 13 的「必须登记进 `MainWindowViewModel.UpdateLocalizedStrings()`」**不适用于此**：
+> `ProgressWindow` 的字典由 `ProgressViewModel.cs:80-140` 独立构建（既有
+> `Progress_Batch_Label` 即在 `:129` 登记）。登记错地方会导致**文案空白且构建不报错**。
+
 - [ ] **Step 8: XAML 改动 2 —— 模板扩 5 列**
 
 `ProgressWindow.axaml:343` 的 `Grid.ColumnDefinitions` 由 4 列扩为 5 列，新增最右详情列；在 `Grid.Column="4"` 处绑定既有 `DetailText`（已在 `ProgressViewModel.cs:616` 计算，三语 key 齐全，此前未绑定）：
@@ -1687,6 +1992,44 @@ dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 **期望**：进度窗口自动切到「详细」，显示 **4 行**通道；每行有独立底纹（文件名格）与百分比；「完成 N/M 文件」列有值；底部总进度单调递增到 100%。
 
+- [ ] **Step 2b: 自适应 + N 组混合语料验证（缺口 C 修法 —— 缺陷 9「静默丢文件」的最后一道防线）**
+
+> **不可省略。** Step 2 的语料「≥8 个文件、≥50MB（含若干大文件）」大概率全是可压缩文件 →
+> `storeGroup` 为空 → **缺陷 9 完全隐形**。而缺陷 9 是本计划唯一会**静默丢数据**的缺陷：
+> 编译通过、测试全绿、进度条正常走到 100%，只有打开产物才发现少了文件。
+
+构造**混合语料**目录（关键：必须同时含已压缩类与可压缩类）：
+
+| 类别 | 数量 | 示例 | `GetAdaptiveLevel` 判定 |
+|---|---|---|---|
+| 已压缩类 | ≥4 | `.jpg` / `.png` / `.mp4` | level 0 → **Store** |
+| 可压缩类 | ≥6 | `.txt` / `.json` / `.log` | level >0 → **7z 压缩** |
+
+设置：**自适应 ON**、压缩组数 **4**。
+
+```powershell
+# 逐条比对条目数与压缩方式（PowerShell 7，无需外部工具）
+$dir = 'F:\GitHub\MantisZip\.buildout\adaptive-mix'
+$out = 'F:\GitHub\MantisZip\.buildout\adaptive-mix.zip'
+$srcCount = (Get-ChildItem $dir -Recurse -File).Count
+Add-Type -AssemblyName System.IO.Compression.FileSystem
+$zip = [System.IO.Compression.ZipFile]::OpenRead($out)
+$zip.Entries | Select-Object FullName, Length, CompressedLength | Format-Table -AutoSize
+$zipCount = $zip.Entries.Count
+$stored  = @($zip.Entries | Where-Object { $_.CompressedLength -eq $_.Length }).Count
+$zip.Dispose()
+"源文件数=$srcCount  产物条目数=$zipCount  Stored 条目数=$stored"
+```
+
+**期望（逐条判定，任一不符即视为缺陷 9 未修复）**：
+
+1. `产物条目数 == 源文件数` —— **不允许「少几个但没报错」**
+2. `Stored 条目数 == 已压缩类文件数`（≥4）—— Store 条目确实进了产物且未被重压
+3. `Stored` 条目的 `Length` 与源文件 `Length` 相等（直存、未压缩未截断）
+4. 进度窗口「详细」模式显示 **4 行通道**，且通道区**顶部出现说明文字**（Step 7b 的 `Progress_CompressChannelHint`）
+5. 底部总进度**单调、不跳变、不超 100%**；压缩阶段终点 ≈ `95 × compressBytes / totalBytes`
+6. 7-Zip / 资源管理器打开产物，确认条目完整可解压
+
 - [ ] **Step 3: 串行验证**
 
 组数设为 1，重新压缩同一目录。
@@ -1698,6 +2041,23 @@ dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 用加密 ZIP（设密码 + 组数 4）压缩同一目录。
 
 **期望**：与 Step 3 相同 —— 简约模式，无通道行，无空白面板。
+
+- [ ] **Step 4b: 非 copy-mode 方法 + 自适应 + N 组 回退验证（缺口 C 修法 —— 缺陷 10）**
+
+> 缺陷 10 若未修复：BZip2(12)/LZMA(14)/PPMd(98) + N 组会抛 `ZipCopyModeException` ——
+> 而这些组合**今天能正常产出**，属「本来能用变成硬失败」的回归。全量测试用的是默认
+> Deflate，走不到这条分支，故必须手动验。
+
+设置：**压缩方法选 PPMd**、自适应 ON、压缩组数 **4**、语料用**全可压缩**文件（不混合 Store 类，
+以确保必定进 N 组分支）。
+
+**期望**：
+
+1. 压缩**成功结束，无异常弹窗**
+2. 进度窗口停在**简约模式**，无通道行（已回退单组路径）
+3. `debug.log` 中存在 copy-mode 不支持的回退记录（`LogCopyModeUnsupported`）
+4. 产物可正常解压，且压缩方法为 PPMd（`CompressedLength < Length`，证明确由 7z 压缩而非直存）
+5. 对 BZip2、LZMA 各重复一次（同一设置面板改方法即可）
 
 - [ ] **Step 5: 用户手动切换不被打断**
 
@@ -1711,7 +2071,17 @@ dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
 - [ ] **Step 7: 报告**
 
-汇总：G1（通道真实字节进度）达成情况、G2（并行加速比）、6 项手动验证结果。**不 commit、不 push、不改版本号。**
+汇总：G1（通道真实字节进度）达成情况、G2（并行加速比）、以及 **10 项**手动验证结果
+（Step 2 / 2b / 3 / 4 / 4b / 5 / 6 / 7 —— Step 1 为命令执行）。
+
+**Step 2b 与 Step 4b 为强制项**：缺任一项则本计划不得视为验证通过
+（理由见 Self-Review 缺口 14：缺陷 9 与原验收清单的覆盖盲区精确重合）。
+
+⚠️ **G2 若显示 N 组不优于单组 `mt=on`**，不要自行把默认值改成 1 —— 先停下报告，
+连同 bench 原始数据一起提交用户决定（默认 `ProcessorCount` 是本计划的既定设计，
+改默认值属设计变更，须用户裁定）。
+
+**不 commit、不 push、不改版本号。**
 
 ---
 
@@ -1731,12 +2101,15 @@ dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 | §6 设置项 + 传递链 | Task 5 |
 | §7.3 bench `--degrees` | Task 7 |
 | §9 实施顺序 8 步 | Task 1-8 一一对应 |
+| **缺口 A**（双开关语义重叠 / 组数被静默忽略） | Task 5 Step 3（`IsVisible` 隐藏 + 提示文案点明关系） |
+| **缺口 B**（Store 文件不在通道行，易误判丢文件） | Task 6 Step 7b（`IsCompressFlow` + 静态说明文字 + `Progress_CompressChannelHint`） |
+| **缺口 C**（验收清单漏自适应场景） | Task 8 Step 2b（混合语料逐条目比对）、Step 4b（PPMd/BZip2/LZMA 回退） |
 
 无遗漏。
 
 **2. 已修正的缺陷（本轮审查实际发现并修复，非推测）**
 
-初稿存在 8 处会导致实现失败的问题，均已按源码核实后修正：
+初稿存在 11 处会导致实现失败的问题，均已按源码核实后修正：
 
 | # | 缺陷 | 后果 | 修正 |
 |---|---|---|---|
@@ -1748,10 +2121,29 @@ dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 | 6 | Task 6 Step 7 把 `RatioToWidthConverter` 当单输入 `Converter=` 用，并绑定不存在的 `FileName` / `IsActive` | 运行时转换器异常 / 绑定空 | 改为 `MultiBinding`（比例 + `Bounds.Width`），文件名改用实际的 `CurrentFile`，可见性沿用 `StringNotEmpty` |
 | 7 | Task 5 把 UI 宿主写成设置窗口 + `SettingsWindowViewModel` | 改错文件，该 VM 无 degree 属性 | 已核实：extract 侧在 `ExtractSettingsWindow.axaml:127-138` + `ExtractSettingsViewModel`；压缩侧改用对称的 `CompressSettingsWindow` + `CompressSettingsViewModel` |
 | 8 | Task 4 只接线 `CompressAsync`，与「`AddToArchiveAsync` 接入 N 组」矛盾 | 拖入已有压缩包时无通道进度 | 补 Task 4 Step 6（`AddToArchiveAsync` 走多源合并：已有包 + N 个 tempZip + Store 条目） |
+| **9** | **Task 4 Step 5 的 N 组分支整体替换了单组 try 块，却没把自己的 `storeGroup` 传进 `addEntries`（`:1097` 传 `null, null`；Step 6 的表格是对的，Step 5 漏了）** | **开自适应时所有「已压缩文件」（jpg/mp4/zip…）从产物中静默消失 —— 静默数据丢失** | Step 5 合并改为 `null, storeEntries`，并在 `finally` 里 `Dispose` 句柄；补 Store 条目的 D2 `Completed` 上报 |
+| **10** | **N 组路径下「全可压缩」也要经 copy-mode 合并，但 `CanCopyModeRewrite`（`:3063`）只守混合场景（`:1426`）—— 因为单组全可压缩是 `File.Move` 直出、从不经过重写器（`:2996-2999` 注释）** | **BZip2(12)/LZMA(14)/PPMd(98) + N 组 → `ZipCopyModeException` 硬失败，而今天能正常产出（回归）** | Step 5/6 的分支条件加 `&& CanCopyModeRewrite(options.ZipCompressionMethod)`，回落已验证的单组路径并复用 `LogCopyModeUnsupported` |
+| **11** | **进度分母只算 `compressGroup`，且给合并阶段传 `progress: null`** | **自适应 Store 占比高时：分母偏小 + 合并期间进度条完全静止** | 分母改为 `compressGroup + storeGroup`；合并阶段用 `InlineProgress` 把重写器固定的 92/94/97/100 线性重映射到 `[组阶段终点, 100]`，单调不回退 |
 
 另修正 Task 2 / Task 4 的步骤编号错乱（Task 2 原有三个 "Step 3"；Task 4 原缺 Step 6）。
 
-**3. 占位符扫描**
+**缺陷 9-11 的共性：前 8 项都是「编译不过 / 绑定不上」的显性错误，而这三项都是「能编译、测试也绿、但运行时产出错数据或死锁在异常里」的隐性错误。** 它们全部集中在**自适应（`AdaptiveCompression`）与 N 组并行的交叉点** —— 该交叉点在初稿中只被 Step 6 的表格提及，Step 5 完全没有覆盖。Task 4 实施时必须对照上表 9-11 逐条自检。
+
+**3. UX 缺口（12-14）—— 审查 Task 1-8 全量后发现，已给出修法**
+
+缺陷 1-11 都是**正确性**问题。以下三条不产生错误数据，但会让用户**误判**或**困惑**，
+故与 1-11 分开记录（详细论述见「约束 → UX 缺口 A/B/C」）：
+
+| # | 缺口 | 用户可见后果 | 修法（落点） |
+|---|---|---|---|
+| 12 | 新增「并行压缩组数」与既有「多线程压缩」语义重叠（单压缩器 `mt=on` vs N 个单线程压缩器），且 N 组生效时 `mt` 被强制 `off`；更隐蔽的是 `IsMultiThreadedEligible` 第一条回退条件即 `MultiThreadedCompression == false`，故多线程一关，组数被**静默忽略** | 两个开关并排却不知哪个生效；设了组数却毫无变化且无提示 | Task 5 Step 3：组数控件按规则 6 挂 `IsVisible="{Binding MultiThreadedCompression}"` 整块隐藏；提示文案改为点明二者关系（三语） |
+| 13 | N 行通道只覆盖 `compressGroup`；自适应下 Store 文件不在任何通道行，**且压缩侧不播种条目列表**（`docs/PLAN.md`：通用压缩播种已正式延期），故用户在进度窗口里**看不到也找不到**这些文件 | 「源目录 30 个文件，通道只有 4 行」→ 误判为丢文件 / bug | Task 6 Step 7b：通道区顶部加静态本地化说明文字；`ArchiveProgress` 无 Store 计数字段（`ArchiveEngine.cs:314-347` 已逐字段核实）且 Task 3 刻意不新增契约字段，故不引入统计数字 |
+| 14 | Task 8 原有 8 条手动检查**无一条**构造自适应场景；Step 2 语料大概率全可压缩 → `storeGroup` 为空 → 缺陷 9 完全隐形 | 最危险的数据丢失缺陷，恰好被自己的验收清单漏掉 | Task 8 新增 Step 2b（混合语料 + PowerShell 逐条目比对，6 条判定）与 Step 4b（PPMd/BZip2/LZMA + 自适应 + N 组 回退验证） |
+
+> 缺口 14 是本轮审查中最值得记录的一条：**缺陷 9 与验收清单的覆盖盲区精确重合**。
+> 仅靠「Task 8 全部通过」不能证明缺陷 9 已修复 —— 必须新增 Step 2b 才构成闭环。
+
+**4. 占位符扫描**
 
 已无占位符、无「以实际实现为准」类推脱。Task 2 早期刻意保留的「请先读源码确认字段名」注记，在核实 `RewriteResult` / `CdEntry` / `NewEntry` / `ArchiveProgress` 真实定义后已替换为可直接粘贴的代码。
 
@@ -1761,7 +2153,7 @@ dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 `ParallelBatchProgressItem.cs`（全部成员）、`ProgressViewModel.cs:453`/`:583`/`:603`/`:838`、
 `ProgressWindow.axaml:339`/`:343`/`:365-371`、`MainWindow.axaml:1144-1158`、`MantisZip.Core.csproj:13-15`。
 
-**4. 类型一致性**
+**5. 类型一致性**
 
 - `SplitCompressGroup` 返回 `List<List<(string FullPath, string RelativePath)>>` — Task 1 定义，Task 4 Step 5/6 消费，一致。
 - `CompressGroupWithSevenZip` 新参数顺序 `(..., int storeProcessedFiles, int? batchIndex, int? batchCount, ref DateTime lastReportTime)` — Task 3 Step 1 定义，Step 7 接线两个调用点，Task 4 Step 5/6 按此顺序调用，一致。

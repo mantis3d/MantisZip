@@ -237,3 +237,201 @@ public class CompressGroupBatchIdentityTests : IDisposable
         Assert.True(groupSize > 0);
     }
 }
+
+/// <summary>
+/// N 组并行压缩的端到端接线测试（Task 4）。
+/// 覆盖 <c>ZipEngine.CompressAsync</c> 的组数分流：degree ≥ 2 且 copy-mode 可承载时
+/// 走多 tempZip + 多源 copy-mode 合并；否则回落到既有单组 <c>mt=on</c> 路径。
+/// <para>
+/// 后两个用例专门守护两个<b>静默</b>缺陷：
+/// 自适应 Store 条目在合并时被漏掉（产物少文件却全程无报错），
+/// 以及非 copy-mode 方法（PPMd/BZip2/LZMA）在 N 组下抛 <c>ZipCopyModeException</c>
+/// ——后者今天本可正常产出，属回归。
+/// </para>
+/// </summary>
+public class NGroupCompressTests : IDisposable
+{
+    private readonly string _dir =
+        Path.Combine(Path.GetTempPath(), "mz_ngroup_" + Guid.NewGuid().ToString("N"));
+
+    public NGroupCompressTests() => Directory.CreateDirectory(_dir);
+
+    public void Dispose()
+    {
+        try { Directory.Delete(_dir, true); } catch { /* best-effort */ }
+        GC.SuppressFinalize(this);
+    }
+
+    private static byte[] RandomBytes(int n, int seed)
+    {
+        var rnd = new Random(seed);
+        var b = new byte[n];
+        rnd.NextBytes(b);
+        return b;
+    }
+
+    /// <summary>落盘一组随机不可压缩的 .bin（走压缩路径，不会被自适应判为 Store）。</summary>
+    private async Task<Dictionary<string, byte[]>> WriteBinFilesAsync(int count, int sizeBase = 200_000)
+    {
+        var expected = new Dictionary<string, byte[]>();
+        for (int i = 0; i < count; i++)
+        {
+            var data = RandomBytes(sizeBase + i * 1000, i);
+            var name = $"f{i}.bin";
+            await File.WriteAllBytesAsync(Path.Combine(_dir, name), data);
+            expected[name] = data;
+        }
+        return expected;
+    }
+
+    [Fact]
+    public async Task Degree3_OutputIsValidAndByteIdenticalToSource()
+    {
+        var expected = await WriteBinFilesAsync(9);
+
+        var outZip = Path.Combine(_dir, "out.zip");
+        await new ZipEngine().CompressAsync(
+            Directory.GetFiles(_dir, "*.bin"), outZip,
+            new ArchiveOptions
+            {
+                CompressionLevel = 5,
+                MultiThreadedCompression = true,
+                ParallelCompressDegree = 3,
+            });
+
+        using var za = System.IO.Compression.ZipFile.OpenRead(outZip);
+        Assert.Equal(9, za.Entries.Count);
+        foreach (var (name, data) in expected)
+        {
+            using var s = za.GetEntry(name)!.Open();
+            using var ms = new MemoryStream();
+            await s.CopyToAsync(ms);
+            Assert.Equal(data, ms.ToArray());
+        }
+    }
+
+    [Fact]
+    public async Task Degree3_ArchivePassesTestArchive()
+    {
+        await WriteBinFilesAsync(6, 50_000);
+
+        var outZip = Path.Combine(_dir, "ok.zip");
+        var engine = new ZipEngine();
+        await engine.CompressAsync(Directory.GetFiles(_dir, "*.bin"), outZip,
+            new ArchiveOptions
+            {
+                CompressionLevel = 5,
+                MultiThreadedCompression = true,
+                ParallelCompressDegree = 3,
+            });
+
+        var result = await engine.TestArchiveAsync(outZip);
+        Assert.True(result, result ? "" : "TestArchive failed");
+    }
+
+    [Fact]
+    public async Task Degree1_FallsBackToSingleGroupAndProducesValidArchive()
+    {
+        // 注意：degree=1 并**不是**串行 —— 它回落到既有的单组 7z mt=on 路径
+        // （IsMultiThreadedEligible 仍为 true，只是 SplitCompressGroup 只产出 1 组）。
+        // 方法名用 FallsBackToSingleGroup 而非 FallsBackToSerial，以免后人误读。
+        await File.WriteAllBytesAsync(Path.Combine(_dir, "a.bin"), RandomBytes(30_000, 7));
+
+        var outZip = Path.Combine(_dir, "out.zip");
+        await new ZipEngine().CompressAsync(Directory.GetFiles(_dir, "*.bin"), outZip,
+            new ArchiveOptions
+            {
+                CompressionLevel = 5,
+                MultiThreadedCompression = true,
+                ParallelCompressDegree = 1,
+            });
+
+        using var za = System.IO.Compression.ZipFile.OpenRead(outZip);
+        Assert.Single(za.Entries);
+    }
+
+    [Fact]
+    public async Task EncryptedZip_FallsBackAndStillEncrypts()
+    {
+        // 加密是 IsMultiThreadedEligible 的回退条件之一 → 必须回落串行 ZipWriter 路径
+        await File.WriteAllBytesAsync(Path.Combine(_dir, "a.bin"), RandomBytes(20_000, 3));
+
+        var outZip = Path.Combine(_dir, "enc.zip");
+        await new ZipEngine().CompressAsync(Directory.GetFiles(_dir, "*.bin"), outZip,
+            new ArchiveOptions
+            {
+                CompressionLevel = 5,
+                MultiThreadedCompression = true,
+                ParallelCompressDegree = 4,
+                Encrypt = true,
+                Password = "p@ss",
+            });
+
+        Assert.True(File.Exists(outZip));
+        Assert.True(new FileInfo(outZip).Length > 0);
+    }
+
+    [Fact]
+    public async Task NGroup_WithAdaptiveStoreGroup_PreservesEveryEntry()
+    {
+        // 守护缺陷 9（静默丢数据）：自适应把 .png 判为 Store（level 0），
+        // N 组合并必须把它们作为 addEntries 交回重写器。若漏传，产物会少掉这 4 个条目，
+        // 而压缩全程无任何报错 —— 只有比对条目数才能发现。
+        var expected = new Dictionary<string, byte[]>();
+        var bin = await WriteBinFilesAsync(6, 120_000);
+        foreach (var kv in bin)
+            expected[kv.Key] = kv.Value;
+
+        for (int i = 0; i < 4; i++)
+        {
+            var name = $"img{i}.png";
+            var data = RandomBytes(80_000 + i, 500 + i);
+            await File.WriteAllBytesAsync(Path.Combine(_dir, name), data);
+            expected[name] = data;
+        }
+
+        var outZip = Path.Combine(_dir, "adaptive.zip");
+        await new ZipEngine().CompressAsync(
+            Directory.GetFiles(_dir, "*", SearchOption.TopDirectoryOnly), outZip,
+            new ArchiveOptions
+            {
+                CompressionLevel = 5,
+                MultiThreadedCompression = true,
+                AdaptiveCompression = true,
+                ParallelCompressDegree = 3,
+            });
+
+        using var za = System.IO.Compression.ZipFile.OpenRead(outZip);
+        Assert.Equal(expected.Count, za.Entries.Count);
+        foreach (var (name, data) in expected)
+        {
+            using var s = za.GetEntry(name)!.Open();
+            using var ms = new MemoryStream();
+            await s.CopyToAsync(ms);
+            Assert.Equal(data, ms.ToArray());
+        }
+    }
+
+    [Fact]
+    public async Task NGroup_WithPpmdMethod_FallsBackInsteadOfThrowing()
+    {
+        // 守护缺陷 10（回归）：PPMd → CompressionMethod.Ppmd，且 CanCopyModeRewrite("ppmd") == false。
+        // 单组全可压缩场景是 File.Move 直出、从不经过重写器，所以今天 PPMd 能正常产出；
+        // 若 N 组不加闸门，多源 copy-mode 合并会抛 ZipCopyModeException。
+        await WriteBinFilesAsync(6, 50_000);
+
+        var outZip = Path.Combine(_dir, "ppmd.zip");
+        await new ZipEngine().CompressAsync(Directory.GetFiles(_dir, "*.bin"), outZip,
+            new ArchiveOptions
+            {
+                CompressionLevel = 5,
+                MultiThreadedCompression = true,
+                ParallelCompressDegree = 3,
+                ZipCompressionMethod = "ppmd",
+            });
+
+        // 回落后走单组 7z 路径：产物必须仍是结构完整、可读的 ZIP
+        using var za = System.IO.Compression.ZipFile.OpenRead(outZip);
+        Assert.Equal(6, za.Entries.Count);
+    }
+}
