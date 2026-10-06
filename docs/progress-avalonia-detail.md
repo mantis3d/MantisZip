@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-06** — 修复「测试压缩包」加密包静默失败 + 测试流程对齐解压（✅ 已修复，用户报告「加密 RAR 测试无密码时静默失败弹窗也不出」「rar 没有密码的压缩包测试时进度条也不动」）
+  - **根因 1（加密包静默失败）**：`TestArchive` 只从 `_sessionPasswords` 取密码，无会话密码时 `engine.TestArchiveAsync` 以 null 密码快速失败 → 状态栏仅「压缩包测试失败 ❌」，无密码弹窗、无进度。与 `LoadArchiveAsync` 打开流程的密码解析（会话缓存→自动匹配→对话框循环）完全脱节
+  - **根因 2（进度条不动，Core 层）**：`Check()`（=7z.dll TestArchive 语义，整包提取校验）阶段不触发 `Extracting` 事件、只触发 `FileExtractionFinished`（每条目 1 次，`e.PercentDone` 为 byte）；旧 `TestArchiveAsync` 在校验阶段无进度上报，且校验后还冗余逐条目 `ExtractFile` 二次解压（约 2 倍工作量，固实包 O(n²)）
+  - **修复（Avalonia + Core 双轨）**
+    - Core `SevenZipEngine.TestArchiveAsync`：`Check()` 前订阅 `FileExtractionFinished`，用 `e.PercentDone`（`Math.Clamp((double)e.PercentDone, 0, 100)`）+ `e.FileInfo.FileName` 上报 `ArchiveProgress{CurrentFile, PercentComplete, FilePercentComplete}`；**删除冗余逐条目 `ExtractFile` 循环**（编译期修正：`e.FileInfo` 为值类型 `ArchiveFileInfo` 不能用 `?.`、`PercentDone` 为 byte 需显式 double 转换）
+    - Avalonia `MainWindowViewModel`：新增公共方法 `TryEnsureArchivePasswordAsync`（对齐解压/打开流程）——会话缓存 → `TryMatchPasswordEx` 密码库自动匹配（`CorruptedOrInvalid` 直接停）→ `ShowPasswordDialog` + `QuickVerifyPasswordEx` 快速验证循环（错密码重试直到正确或取消）；`TestArchive` 测试前先调用：无密码/取消 → `Status_PasswordCancelled` 中止、不再假失败；密码已验证正确但测试仍失败 → `AppMessageBox` 弹「文件损坏」窗（损坏与密码问题区分）
+  - **实测（mztest，7z.dll v25.00）**：未加密 RAR `D:\soft\FiberShop v3.1.0 Win.rar` 130MB → True 795ms（旧约 1.4s）；未加密 7z `D:\soft\Chaos Player 2.10.00.7z` 105MB → True 776ms 5 次进度；加密 RAR `D:\soft\Phoenix.rar`（密码 aaa）三态：无密码 null→False 7ms、正确 aaa→True 631ms 89 个进度事件、错误 wrong→False 5ms
+  - **验证**：`dotnet build` UI 0 error（3 warning 为既有）、Core 423 通过 / 2 跳过、Avalonia 131 通过 / 5 失败（失败全部为预存环境问题：`TestPreview/attachment-management-0.12.1.zip` 为 gitignore 的测试样本从未入库，与本次改动无关）
+
 **2026-10-04** — 修复点击任意条目即崩溃（WebView2 初始化异常逃逸）（✅ 已修复，用户报告「点压缩包内条目后应用无提示退出」）
   - **根因（症状放大）**：`PreviewPanel.axaml` 把 `NativeWebView` **常驻在活动视觉树**中。Avalonia 的 `NativeWebView` 在 `OnAttached` 时初始化 WebView2，而**任何**预览都会走到 attach —— 包括点目录、点不支持预览的格式。于是「WebView2 初始化失败」这个本只该影响 HTML 预览的故障，被放大成**任何条目都崩溃**
   - **★ 异常为何会终止进程（两层）**：① WebView2 初始化是异步的，失败异常在 UI 线程 Dispatcher 上抛出时，栈上早已没有 `ShowPreviewAsync` 的 try/catch（已跨 await 边界）；② 应用**没有任何 Dispatcher 未处理异常订阅者** → 未捕获异常直接杀进程。故现象是「无提示直接退出」而非报错弹窗
@@ -1597,6 +1606,13 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.2 (2026-10-06) 修复「测试压缩包」进度条不动（SevenZipEngine.TestArchiveAsync）
+  - **`Core/Engines/SevenZipEngine.cs`**：
+    - 根因：`Check()`（=7z.dll TestArchive 语义，整包提取校验 CRC）阶段**不触发 `Extracting` 事件**、只触发 `FileExtractionFinished`（每条目 1 次，`e.PercentDone` 为 byte）—— 旧实现校验阶段零进度上报，且校验后还冗余逐条目 `ExtractFile` 二次解压（约 2 倍工作量，固实包 O(n²)）
+    - 修复：`Check()` 前订阅 `FileExtractionFinished`，用 `Math.Clamp((double)e.PercentDone, 0, 100)` + `e.FileInfo.FileName` 上报 `ArchiveProgress{CurrentFile, PercentComplete, FilePercentComplete}`；**删除冗余逐条目 `ExtractFile` 循环**（返回值仍由 `Check()` 的 `valid` 决定，语义不变）
+    - 编译期修正：`e.FileInfo` 为值类型 `ArchiveFileInfo` 不能用 `?.`；`PercentDone` 为 byte 需显式 double 转换
+  - **实测（mztest，7z.dll v25.00）**：未加密 RAR 130MB 1.4s→0.8s；未加密 7z 105MB 776ms 5 次进度；加密 RAR 三态正确（无密码 7ms False / 正确密码 631ms True 89 进度事件 / 错误密码 5ms False）
 
 #### v0.5.0 (2026-09-16) 压缩/解压性能优化 — 并行解压（批次复用）+ 7z 多线程压缩
   - **`Core/Engines/ZipEngine.cs`**：
