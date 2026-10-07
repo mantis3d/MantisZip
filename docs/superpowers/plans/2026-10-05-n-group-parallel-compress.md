@@ -12,6 +12,17 @@
 
 ---
 
+## 实施状态（2026-10-06 更新，已完成并提交）
+
+- **Task 1–7 全部落地**：`cd69e93`(T1 `SplitCompressGroup`) · `f9e22aa`(T2 多源重写) · `e1a3de8`(T3 参数化) · `31d034a`(T4 接入 N 组) · `7505952`(T5 设置/UI + T6 进度视图 + T7 bench，含联调修复)。Self-Review 缺陷 9/10/11 均已随 Task 4 修复并通过验证。
+- **Task 5 Step 3 修正（与计划原文不符）**：组数控件实际落在 `Controls/DynamicFormatOptionsPanel.axaml`（ZIP 面板「多线程压缩」旁），**非**本计划所写的 `CompressSettingsWindow.axaml`——因为多线程开关实际位于动态格式面板内；同时补上「对话框 VM → 执行 VM」漏拷的 `MultiThreadedCompression`/`AdaptiveSmartDetect`/`ParallelCompressDegree`（否则执行侧 MT 恒 `false`，引擎恒走串行、进度窗口无「详细」）。
+- **缺口 13 已闭合**：压缩侧「列表」播种已实现——新增 `Core/Services/SourceEntryEnumerator.cs` + `CompressFlow.TrySeedEntryItemsInBackground`，主窗口（`MainWindowViewModel.PendingCompressRequest`）与 CLI（`App.axaml.cs` `CompressWithProgress`）均接线。原「经用户决定正式延期」项**已完成**。
+- **G2 结论（bench `--degrees`，text / text-rev / media / mixed × degree 1/2/4/8）**：**N 组无加速**（degree=1 全面最快或持平，degree=2 最差；倒序对照一致）→ **维持默认 `ParallelCompressDegree = Environment.ProcessorCount`**（全局 `MultiThreadedCompression` 默认关，N 组为 opt-in）。
+- **已知边界（非本次引入）**：待压缩总量 ≥ 4GB（ZIP32 上限）时 `IsMultiThreadedEligible` 整体回退串行 → 无 N 组、进度窗口无「详细」通道（N 组产物为 ZIP32；copy-mode 重写器不支持 ZIP64）。
+- **Task 8 状态**：Step 1（全量测试）✅；Step 2 / 2b / 3 / 4b ✅（2b/4b 另有引擎级验证坐实缺陷 9/10）；Step 4 / 5 / 6 待显式补验；Step 7 报告已落在 `docs/PROGRESS.md` 与 `docs/progress-avalonia-detail.md` 的 2026-10-06 条目。
+
+---
+
 ## 关键既有事实（已核实，实现时不得矛盾）
 
 | 事实 | 位置 |
@@ -2137,7 +2148,7 @@ $zip.Dispose()
 | # | 缺口 | 用户可见后果 | 修法（落点） |
 |---|---|---|---|
 | 12 | 新增「并行压缩组数」与既有「多线程压缩」语义重叠（单压缩器 `mt=on` vs N 个单线程压缩器），且 N 组生效时 `mt` 被强制 `off`；更隐蔽的是 `IsMultiThreadedEligible` 第一条回退条件即 `MultiThreadedCompression == false`，故多线程一关，组数被**静默忽略** | 两个开关并排却不知哪个生效；设了组数却毫无变化且无提示 | Task 5 Step 3：组数控件按规则 6 挂 `IsVisible="{Binding MultiThreadedCompression}"` 整块隐藏；提示文案改为点明二者关系（三语） |
-| 13 | N 行通道只覆盖 `compressGroup`；自适应下 Store 文件不在任何通道行，**且压缩侧不播种条目列表**（`docs/PLAN.md`：通用压缩播种已正式延期），故用户在进度窗口里**看不到也找不到**这些文件 | 「源目录 30 个文件，通道只有 4 行」→ 误判为丢文件 / bug | Task 6 Step 7b：通道区顶部加静态本地化说明文字；`ArchiveProgress` 无 Store 计数字段（`ArchiveEngine.cs:314-347` 已逐字段核实）且 Task 3 刻意不新增契约字段，故不引入统计数字 |
+| 13 | N 行通道只覆盖 `compressGroup`；自适应下 Store 文件不在任何通道行，**且压缩侧不播种条目列表**（`docs/PLAN.md`：通用压缩播种已正式延期），故用户在进度窗口里**看不到也找不到**这些文件 | 「源目录 30 个文件，通道只有 4 行」→ 误判为丢文件 / bug | Task 6 Step 7b：通道区顶部加静态本地化说明文字；`ArchiveProgress` 无 Store 计数字段（`ArchiveEngine.cs:314-347` 已逐字段核实）且 Task 3 刻意不新增契约字段，故不引入统计数字。**（2026-10-06 更新：压缩侧「列表」播种已实现——`SourceEntryEnumerator` + `CompressFlow.TrySeedEntryItemsInBackground`，本缺口彻底闭合。）** |
 | 14 | Task 8 原有 8 条手动检查**无一条**构造自适应场景；Step 2 语料大概率全可压缩 → `storeGroup` 为空 → 缺陷 9 完全隐形 | 最危险的数据丢失缺陷，恰好被自己的验收清单漏掉 | Task 8 新增 Step 2b（混合语料 + PowerShell 逐条目比对，6 条判定）与 Step 4b（PPMd/BZip2/LZMA + 自适应 + N 组 回退验证） |
 
 > 缺口 14 是本轮审查中最值得记录的一条：**缺陷 9 与验收清单的覆盖盲区精确重合**。

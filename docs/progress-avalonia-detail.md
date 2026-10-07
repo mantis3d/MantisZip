@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-07** — 新增计划：进度窗口字节埋点 + 语言即时刷新（计划类）
+  - **计划**：[progress-window-bytes-i18n.md](../.omo/plans/未开始/progress-window-bytes-i18n.md)（P2，4-6h，7 任务 TDD 分解），配套设计规格 [2026-10-06-progress-bytes-i18n-design.md](superpowers/specs/2026-10-06-progress-bytes-i18n-design.md)。
+  - **内容**：① `SevenZipEngine`/`TarGzEngine` 全路径填充 `ArchiveProgress.ProcessedBytes/TotalBytes`（速度/ETA 全格式生效；7z percent 推算、TAR 经新增 `ReadProgressStream` 真实读取字节、跳过条目计字节、跨阶段单调钳制）；② `ProgressViewModel` 订阅 `CultureChanged` 运行中语言即时重灌 + `ProgressWindow.OnClosed` 退订防静态事件泄漏；③ prototype-alignment Deferred #7（通用压缩播种，commit `7505952`）回写。
+  - **同步**：`docs/PLAN.md` P2 区新增计划行（规则 1）。仅落盘计划与规格，未实施。
+
 **2026-10-06** — N 组并行压缩联调修复 + 组数 UI 补齐 + 压缩侧列表播种（Avalonia+Core）
   - **修复① 开关传递断链**（`Views/MainWindow.axaml.cs`）：`ShowCompressSettingsDialog` 的「对话框 VM → 执行 VM」拷贝清单漏拷 `MultiThreadedCompression` / `AdaptiveSmartDetect` / `ParallelCompressDegree` → 执行侧 MT 恒 `false` → `IsMultiThreadedEligible` 首条即 false → 引擎恒走串行、从不上报 `BatchIndex` → 进度窗口「详细」被 D6 隐藏（用户现象：只有简约/列表）。补 3 行拷贝。
   - **补齐 Task 5 Step 3 缺失 UI**（`Controls/DynamicFormatOptionsPanel.axaml[.cs]`、`Dialogs/CompressSettingsWindow.axaml.cs`、`ViewModels/CompressSettingsViewModel.cs`）：ZIP 面板多线程开关旁新增「并行压缩组数」`NumericUpDown`（1..16），多线程关闭时整块隐藏（规则 6）；`SnapshotFormatOptionsToViewModel` 快照进 VM；VM 构造自 `AppSettings` 播种。（计划原写放在 `CompressSettingsWindow.axaml`，实测多线程开关在 `DynamicFormatOptionsPanel`，按对称位置落地。）
