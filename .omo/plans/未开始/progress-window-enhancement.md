@@ -4,12 +4,27 @@
 >
 > 执行方式：按 Wave 顺序执行；波次内标注 `∥` 的任务可并行。每任务完成后必须运行验证命令（Rule 12），全部通过才能标记完成。
 
+> **⚠️ 效力状态（2026-10-07 整理标注）**
+>
+> 本计划 T1–T9 已实施完成，但**部分内容被纠偏续作 [progress-window-prototype-alignment.md](progress-window-prototype-alignment.md) 推翻**。阅读时请按以下效力划分，**不要按本计划的原型对应表理解当前实现**：
+>
+> | 部分 | 效力 |
+> |---|---|
+> | T1–T4（Core 统计字段 / `ProgressDisplayCalculator` / BatchItem 扩展 / 引擎埋点） | ✅ 有效，已实施并验证 |
+> | T8 密码徽标（D1–D8 决策）、T9 `PasswordRetryLoop` | ✅ 有效，已实施 |
+> | 下方 `## 与 v6 原型的对应关系` 整表 | ❌ **作废**——该表误读 v6 原型两组切换器，是返工根因；以 alignment 计划的对应关系为准 |
+> | T5/T6/T7 的 `TopDisplayMode` / `DensityMode` 双模式切换 | ❌ **已删除**（全仓 0 引用），换为原型真实语义的内容模式（简约/详细/列表）+ 信息量分级（少/中/完整） |
+> | T5/T6/T7 的统计栏 / 时间行 / ETA / 布局骨架 | ✅ 框架有效，但 10 行布局已被 alignment 重写为 7 行、统计栏升级为 5 张图标卡 |
+> | F3 手工 QA | ⏭️ **不单独执行**——UI 结构类条目归 alignment F3；仍有效的条目（密码徽标/密码循环/ETA 归零/统计抽样）已并入 alignment F3 收口清单 |
+>
+> 未勾选的 Acceptance 已于 2026-10-07 逐条实测核实：验证通过的已勾并附注，被 alignment 推翻的已标注作废。
+
 ---
 
 ## TL;DR
 
 ### Quick Summary
-重构 `ProgressWindow`：路径/文件名分离多行显示 + TopDisplayMode/DensityMode 双模式切换 + 实时统计栏（已处理/跳过/出错/已覆盖/速度）+ 已用/剩余时间（ETA 批次切换守卫）+ ZIP 并行批次详细行 + 批处理密码徽标（逐包点亮、行内 Flyout 查看/复制）+ 解压密码弹窗兜底（输错循环重弹、取消标记行继续批处理）。统计埋点下沉到 Core 引擎解压冲突解析点（10 处 `ResolvePathAsync`），数据通道唯一为 `IProgress<ArchiveProgress>`。
+重构 `ProgressWindow`：路径/文件名分离多行显示 + ~~TopDisplayMode/DensityMode 双模式切换~~（❌ 已被 alignment 废除并替换为内容模式/信息量分级，见顶部效力状态）+ 实时统计栏（已处理/跳过/出错/已覆盖/速度）+ 已用/剩余时间（ETA 批次切换守卫）+ ZIP 并行批次详细行 + 批处理密码徽标（逐包点亮、行内 Flyout 查看/复制）+ 解压密码弹窗兜底（输错循环重弹、取消标记行继续批处理）。统计埋点下沉到 Core 引擎解压冲突解析点（10 处 `ResolvePathAsync`），数据通道唯一为 `IProgress<ArchiveProgress>`。
 
 ### Deliverables
 - `Core/Utils/ProgressDisplayCalculator.cs`（新建，纯函数 + `ProgressSpeedTracker`，含单测）
@@ -146,10 +161,12 @@ docs/
 
 ## 与 v6 原型的对应关系
 
+> ❌ **本表已作废（2026-10-07 标注）**——本表把 v6 原型的两组切换器读反了（原型实际为**内容模式：简约/详细/列表**与**信息量分级：少/中/完整**，且批处理列表在**上方**、信息区在**下方**），实现严格按本表执行导致跑偏 8 个点，返工约 6h。**正确对应关系见 [progress-window-prototype-alignment.md](progress-window-prototype-alignment.md)**。下表仅作历史记录保留：前两行对应的概念已不存在（`TopDisplayMode`/`DensityMode` 全仓删除），其余行的落点虽真实存在但布局位置已随 alignment 重排。
+
 | 原型（progress-window-enhancement.html v6） | 实现任务 |
 |---|---|
-| 上方三模式切换（全路径/仅目录/仅文件名） | T5 枚举 → T6 `TopDisplayMode` 属性 → T7 切换控件 + 绑定 |
-| 下方紧凑度三档（Compact/Normal/Loose） | T5 枚举 → T6 `DensityMode` 属性 → T7 控件密度绑定（复用 Rule 5 资源键） |
+| ❌ 上方三模式切换（全路径/仅目录/仅文件名） | ~~T5 枚举 → T6 `TopDisplayMode` 属性 → T7 切换控件 + 绑定~~（误读；原型为简约/详细/列表，该枚举已删除） |
+| ❌ 下方紧凑度三档（Compact/Normal/Loose） | ~~T5 枚举 → T6 `DensityMode` 属性 → T7 控件密度绑定（复用 Rule 5 资源键）~~（误读；原型为少/中/完整，该枚举已删除） |
 | 统计栏：已处理/跳过/出错/已覆盖/速度 | T4 埋点计数 → T6 统计属性 + 可见性 → T7 统计栏（Rule 6） |
 | 时间行：已用 / 剩余（ETA） | T2 `ProgressSpeedTracker`（批次切换重置基线）→ T6 时间属性 → T7 时间行 |
 | 路径行 + 文件名行（SplitFilePath 分离） | T2 `SplitFilePath`（含前缀防御性剥离）→ T6 `DirName/FileName` → T7 两行显示 |
@@ -606,10 +623,10 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   - [x] 构建通过 + 既有测试全绿
 
   **Acceptance Criteria:**
-  - [ ] 10 处调用点全部有 skip/overwritten 计数（grep `RecordSkipped` ≥10 处调用）
-  - [ ] ZIP 并行报告携带 `BatchIndex/BatchCount`，其他路径为 null
-  - [ ] 三引擎最终报告与 `ExtractResult` 统计一致
-  - [ ] Core 无 `正在压缩`/`正在解压` 前缀残留
+  - [x] 10 处调用点全部有 skip/overwritten 计数（grep `RecordSkipped` ≥10 处调用）—— 2026-10-07 实测：ZipEngine 4 + TarGzEngine 4 + SevenZipEngine 2 = **10 处**（另有 `ConflictStatsCounter.cs` 定义 1 处）
+  - [x] ZIP 并行报告携带 `BatchIndex/BatchCount`，其他路径为 null —— 实测 `ZipEngine.cs` 6 处 `BatchIndex =` 赋值，字段为 nullable
+  - [x] 三引擎最终报告与 `ExtractResult` 统计一致 —— 三引擎 `ExtractResult` 均从同一 `ConflictStatsCounter` 快照回填（ZipEngine:406/:723、TarGzEngine:233、SevenZipEngine:563）
+  - [x] Core 无 `正在压缩`/`正在解压` 前缀残留 —— 实测全 Core 仅 `ProgressDisplayCalculator.EnginePrefixes` 防御性前缀数组 1 处命中（计划 T2 明确保留），`CurrentFile` 赋值处 0 残留
 
   **Parallelization:**
   - **Can Run In Parallel**: NO（与 T5-T7 波次串行更稳；文件独立可与 T5 并行但建议顺序）
@@ -700,11 +717,11 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
   dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj --filter AllThreeLanguages
   ```
-  - [ ] 构建通过 + key 集测试绿
+  - [x] 构建通过 + key 集测试绿 —— 2026-10-07 实测 Core/Avalonia 构建与测试全绿
 
   **Acceptance Criteria:**
-  - [ ] 新 key 三语同步、插入位置正确、无 BOM
-  - [ ] `StatusBrushName` 引用的主题键在亮/暗两主题均存在
+  - [x] 新 key 三语同步、插入位置正确、无 BOM —— 由 `AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 保证；注：alignment 阶段 `872c7e0` 又新增 32 key / 废止 6 个旧语义 key，key 集以现状为准
+  - [x] `StatusBrushName` 引用的主题键在亮/暗两主题均存在 —— 实测 `ThemeLight.axaml:147-148` 与 `ThemeDark.axaml:147-148` 成对存在（`ThemeStatusFailedBrush`/`ThemeStatusSkippedBrush`）
 
   **Parallelization:**
   - **Blocked By**: Task 3
@@ -790,11 +807,11 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   - [x] 构建通过、`lsp_diagnostics` 无错误
 
   **Acceptance Criteria:**
-  - [ ] 模式/密度/统计/时间/ETA 属性齐备且集中通知
-  - [ ] LocalizedStrings 含 T5 全部新 key
-  - [ ] ETA 守卫在 `SetCurrentBatchItem` 以 `OnArchiveSwitch(0, ...)` 归零重起
-  - [ ] `PercentComplete >= 100` 终值立即写入当前行 SummaryText+统计（末档案兜底）
-  - [ ] `HasParallelBatches` 随集合变更通知；批次行 Percent/DetailText 消费 Batch* 三字段
+  - [~] ~~模式/密度/统计/时间/ETA 属性齐备且集中通知~~ —— **部分作废**：`TopDisplayMode`/`DensityMode` 已被 alignment 删除（全仓 0 引用），统计/时间/ETA 属性与集中通知仍有效（见下列各项）
+  - [x] LocalizedStrings 含 T5 全部新 key —— 以现状为准；alignment `872c7e0` 后 key 集经再调整（新增 32 / 废止 6），三语一致性由 key 集测试保证
+  - [x] ETA 守卫在 `SetCurrentBatchItem` 以 `OnArchiveSwitch(0, ...)` 归零重起 —— 实测 `ProgressViewModel.cs:902`
+  - [x] `PercentComplete >= 100` 终值立即写入当前行 SummaryText+统计（末档案兜底）—— 实测 `ProgressViewModel.cs:636` 分支存在
+  - [x] `HasParallelBatches` 随集合变更通知；批次行 Percent/DetailText 消费 Batch* 三字段 —— 实测 `ProgressViewModel.cs:138`（CollectionChanged 通知）/`:240`（派生属性）
 
   **Parallelization:**
   - **Blocked By**: Task 1、Task 4、Task 5
@@ -1110,16 +1127,16 @@ dotnet build src\MantisZip.Core\MantisZip.Core.csproj
   - `lsp_diagnostics` 变更文件无错误
   - 重点：T4 锁纪律（Report 在锁外）、T3/T6 集中通知无漏属性、T9 无双弹窗/异常吞没
 
-- [ ] F3. **Real Manual QA** — `unspecified-high`
+- [~] F3. **Real Manual QA** — `unspecified-high` — **2026-10-07 标注：不单独执行，按下列效力拆分并入 alignment 的 F3 收口**
 
   实际运行 App 验证（对照 v6 原型 13 断言）：
-  - 单文件解压：统计栏 + 时间行 + 路径/文件名两行 + 三模式切换 + 三密度
-  - 压缩任务：跳过/出错/已覆盖三项隐藏
-  - ZIP 并行解压：批次详细行出现；7z/TAR：不出现（Rule 6）
-  - 批处理密码：Path A 全亮 / Path B 逐亮、Flyout 掩码/明文/复制明文/规则描述行
-  - 输错密码循环、取消 → 行 ✗ 且批继续
-  - 批次切换后 ETA/速度归零重起；上一行出现完成摘要
-  - 统计数字与实际文件操作抽样比对（skip/overwrite 各 ≥1 例）
+  - ~~单文件解压：统计栏 + 时间行 + 路径/文件名两行 + 三模式切换 + 三密度~~ ❌ 结构已被 alignment 重写（三模式/三密度 → 内容模式 + 信息量分级），归 alignment F3
+  - 压缩任务：跳过/出错/已覆盖三项隐藏 ✅ 仍有效（并入收口清单）
+  - ~~ZIP 并行解压：批次详细行出现；7z/TAR：不出现（Rule 6）~~ ❌ 已改述为 alignment 的「详细模式按 `HasParallelBatches` 可见性隐藏」（D6），归 alignment F3
+  - 批处理密码：Path A 全亮 / Path B 逐亮、Flyout 掩码/明文/复制明文/规则描述行 ✅ 仍有效（alignment F3 余项清单已含密码徽标 Flyout/复制 toast）
+  - 输错密码循环、取消 → 行 ✗ 且批继续 ✅ 仍有效（并入收口清单）
+  - 批次切换后 ETA/速度归零重起；上一行出现完成摘要 ✅ 仍有效（并入收口清单）
+  - 统计数字与实际文件操作抽样比对（skip/overwrite 各 ≥1 例）✅ 仍有效（并入收口清单）
 
 - [x] F4. **Scope Fidelity Check** — `deep`
 

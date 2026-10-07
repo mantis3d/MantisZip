@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-07** — 进度窗口三计划文档整理标注 + PLAN.md 登记行瘦身（计划类）
+  - **背景**：`progress-window-enhancement`（v2）的「原型对应表」误读 v6 原型两组切换器，是返工根因；由此衍生的 `progress-window-prototype-alignment`（纠偏）与 `progress-window-bytes-i18n`（后续）三份文档存在过时/错误描述（已删枚举仍在宣扬、已实施的 Deferred 仍标「明确不做」、登记行超长不可读）。执行后续计划前先做文档整理，避免再被误导。
+  - **`progress-window-enhancement.md`（只标注不重写）**：顶部新增「效力状态」表（T1–T4/T8/T9 ✅ 有效；原型对应表 ❌ 作废；`TopDisplayMode`/`DensityMode` ❌ 已删除；统计/ETA/布局 ✅ 框架有效但已重排；F3 归并）；原型对应表整表打作废戳、前两行划掉并写明返工代价；TL;DR 双开关措辞就地加注；**12 个未勾 Acceptance 实测处置**——10 项勾选并附证据（`RecordSkipped` 引擎 10 处 = Zip4+TarGz4+SevenZip2、`BatchIndex` 6 处赋值、三引擎 `ExtractResult` 均由 `ConflictStatsCounter` 快照回填、`ThemeLight/Dark:147-148` 主题键成对、`OnArchiveSwitch` `ProgressViewModel:902`、终值兜底 `:636`、`HasParallelBatches` `:138/:240`、key 集测试保证三语一致），2 项标 `[~]` 作废/部分作废；F3 拆分为 `[~]`（UI 结构类归 alignment F3，密码循环/ETA 归零/统计抽样等 5 条有效条目并入收口清单）。
+  - **`progress-window-prototype-alignment.md`**：头部新增「当前状态」块（T1–T11 全部完成、F1/F2/F4 ✅、F3 自动化 8✅/4◐/0✗，**F3 余项 6 条清单**含从 v2 并入的 4 条）；Deferred **#7 回写为已实施**（commit `7505952`，落点 `SourceEntryEnumerator`/`CompressFlow.TrySeedEntryItemsInBackground:332` + 主窗/CLI 两接线，保留历史延期理由），**#2/#3 划掉标注「已转入 bytes-i18n」**，节首加整理注。
+  - **`progress-window-bytes-i18n.md`**：任务 6 范围缩窄——原 Step 1（#7 回写）与 Step 2（PLAN.md 行 33 追注）已随本次整理提前完成，改为「Deferred #2/#3 回写（须任务 1–5 完成后）+ 行 34 状态更新」；TL;DR 第 3 点、锚点表、File Structure 同步。
+  - **`docs/PLAN.md`（规则 1）**：行 33（原型对齐）由 **3510 字瘦身至 751 字**——收敛为纠偏内容 + F1/F2/F4/F3 进度 + 缺口补齐 + Deferred 去向，执行细节/探针坑/基准陷阱留计划文件；行 32（增强）同步纠偏与标注状态；行 34（字节埋点）回写口径改为「#2/#3（#7 已提前回写）」。校验：仅 3 行变更、UTF-8 无 BOM、CRLF 完整、4 个改动文件均无裸 LF。
+  - **未做**：alignment 两项 F3 未勾（真实未完成）、三计划归档迁移（待 F3 收口）。
+
 **2026-10-07** — 新增计划：进度窗口字节埋点 + 语言即时刷新（计划类）
   - **计划**：[progress-window-bytes-i18n.md](../.omo/plans/未开始/progress-window-bytes-i18n.md)（P2，4-6h，7 任务 TDD 分解），配套设计规格 [2026-10-06-progress-bytes-i18n-design.md](superpowers/specs/2026-10-06-progress-bytes-i18n-design.md)。
   - **内容**：① `SevenZipEngine`/`TarGzEngine` 全路径填充 `ArchiveProgress.ProcessedBytes/TotalBytes`（速度/ETA 全格式生效；7z percent 推算、TAR 经新增 `ReadProgressStream` 真实读取字节、跳过条目计字节、跨阶段单调钳制）；② `ProgressViewModel` 订阅 `CultureChanged` 运行中语言即时重灌 + `ProgressWindow.OnClosed` 退订防静态事件泄漏；③ prototype-alignment Deferred #7（通用压缩播种，commit `7505952`）回写。

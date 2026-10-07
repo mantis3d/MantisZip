@@ -4,6 +4,19 @@
 >
 > 执行方式：按 Wave 顺序执行；波次内标注 `∥` 的任务可并行。每任务完成后必须运行该任务指定的验证命令（Rule 12），通过后才能标记完成。
 
+> **📌 当前状态（2026-10-07 整理标注）**
+>
+> - **T1–T11 全部实施完成**；F1 ✅ 构建、F2 ✅ 测试、F4 ✅ 性能（六场景中位数回退 ≤0.3%）；**F3 自动化取证 8✅ / 4◐ / 0✗**，尚未收口。
+> - **F3 余项**（需人眼或构造场景，收口时逐条验）：
+>   1. 纯观感：配色美观度、动画流畅度、裁切观感、失败行红色
+>   2. 条目 6 态中的 4 态（○等待 / ⏭跳过 / 已覆盖 等）取证
+>   3. 密码徽标终态与入场动画、Flyout、复制 toast
+>   4. 主窗口解压路径的「并行」卡正向取证
+>   5. TAR/GZ **列表模式**渐进建行 + 10 万条目 UI 流畅度
+>   6. 从 v2 计划并入的有效条目：输错密码循环、取消 → 行 ✗ 且批继续、批次切换 ETA/速度归零重起、统计数字抽样比对
+> - **Deferred 变动**：#2（语言刷新）、#3（7z/TAR 速度与 ETA）已转入 [progress-window-bytes-i18n.md](progress-window-bytes-i18n.md)；**#7（通用压缩播种）已于 commit `7505952` 实施**，详见文末 Deferred 节。
+> - 非阻塞瑕疵（AutomationId 旧语义命名、可访问名等）见「本轮自动化取证发现的待办」。
+
 ---
 
 ## TL;DR
@@ -800,10 +813,12 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 
 ## Deferred（明确不做）
 
+> **2026-10-07 整理注**：#2/#3 已转入 [progress-window-bytes-i18n.md](progress-window-bytes-i18n.md)，#7 已实施（不再是 Deferred）。仍为「明确不做」的仅：标题栏密度切换器、`.speed-display` 死样式、场景演示控制条、Size 格式化缓存。
+
 - **标题栏密度切换器**：原型自身 JS 未接线（死 UI），实现点不动的控件无意义（D4）
-- **`LocalizedStrings` 语言切换刷新**：构造函数一次性构建、无 `OnCultureChanged` 是既有缺陷，本次不修（不影响本计划验收）
-- **7z / TAR 的速度与 ETA**：这两类引擎不上报字节计数，补齐需改引擎压缩/解压字节累计（独立范围）。列表模式不改变此现状
+- ~~**`LocalizedStrings` 语言切换刷新**~~ → **已转入 [progress-window-bytes-i18n.md](progress-window-bytes-i18n.md) 任务 5**（`ProgressViewModel` 订阅 `CultureChanged` + `OnClosed` 退订防静态事件泄漏；2026-10-07 标注，原判断「本次不修」仍适用于本计划）
+- ~~**7z / TAR 的速度与 ETA**~~ → **已转入 [progress-window-bytes-i18n.md](progress-window-bytes-i18n.md) 任务 1–4**（引擎全路径填充 `ProcessedBytes`/`TotalBytes`；2026-10-07 标注，列表模式不改变此现状）
 - **`.speed-display` 死样式**：原型无对应元素，不实现
 - **原型场景演示控制条**（`scenario-bar`）：原型辅助 UI，非窗口本体
 - **`EntryProgressItem` 大文件的 Size 格式化缓存**：`FormatUtil.FormatSize` 每次调用，当前规模无需缓存
-- **通用压缩路径的列表模式播种（用户已决定正式延期）**：调查结论是播种能力其实已就绪——ZIP 3 处、7z 经 `AttachCompressorEntryTelemetry`、TAR/GZ 2 处均已上报 `EntryStatus`，且 `SeedEntries` 目前只在 `ExtractFlow` 接了线，压缩侧仅 `TrySeedSelectedEntries` 用「调用方已持有的源列表」播种。之所以延期而非直接接上：压缩路径要拿到全量条目必须**先列目录再压缩**，对 TAR/GZ 意味着全流扫描（D7 明令禁止），对 zip/7z 则多一次 `ListEntriesAsync` I/O；收益（列表模式逐行状态）不足以抵消该成本与风险。恢复条件：压缩流程能以零额外 I/O 获得源条目全集（例如压缩请求已持有完整文件列表），届时再接 `CompressFlow`。**解压路径的播种不受此影响，已完成。**
+- ~~**通用压缩路径的列表模式播种（用户已决定正式延期）**~~ → **已实施（commit `7505952`，2026-10-07）**：新增 `Core/Services/SourceEntryEnumerator`（复用 `FileScanner`，Key 与引擎 `EntryKey` 同源），`CompressFlow.TrySeedEntryItemsInBackground`（`CompressFlow.cs:332`）接线主窗口（`MainWindow.axaml.cs:277`）与 CLI（`App.axaml.cs:2233`）两条压缩路径，列表显示全部条目（Pending）并随终态更新。**历史记录**：当初延期是因压缩路径要拿全量条目必须先列目录再压缩——对 TAR/GZ 意味着全流扫描（D7 明令禁止）、对 zip/7z 多一次 `ListEntriesAsync` I/O；后以「公开枚举器按需取用」方式解决（原调查结论「ZIP 3 处 + 7z `AttachCompressorEntryTelemetry` + TAR/GZ 2 处均已上报 `EntryStatus`」仍成立）。**解压路径的播种自本计划起即已完成，未受影响。**

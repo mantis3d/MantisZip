@@ -9,7 +9,7 @@
 
 1. **字节埋点全格式生效**：`SevenZipEngine` / `TarGzEngine` 全路径填充 `ArchiveProgress.ProcessedBytes / TotalBytes`，让速度（B/s）与剩余时间（ETA）在 7z、tar、gz 上与 ZIP 一样可用（当前仅 `ZipEngine` 填字节）。
 2. **语言即时刷新**：`ProgressViewModel` 订阅 `LocalizationManager.CultureChanged`，解压/压缩进行中切换语言时窗口文案立即重灌；`ProgressWindow.OnClosed` 调 `DetachLocalization()` 退订（修复静态事件泄漏，全仓目前无 `CultureChanged -=` 先例）。
-3. **计划文本回写**：`progress-window-prototype-alignment.md` Deferred 第 7 项（通用压缩播种，commit `7505952` 已实施）回写为已实施，并同步 `docs/PLAN.md` 行 33。
+3. **计划文本回写**：`progress-window-prototype-alignment.md` Deferred #2（语言刷新）/#3（7z/TAR 速度 ETA）在任务 1–5 完成后回写为已实施，并更新 `docs/PLAN.md` 行 34 状态（~~Deferred #7 回写 + 行 33 追注~~ 已于 2026-10-07 计划整理中提前完成）。
 
 **执行方式**: 逐任务 TDD（每任务先失败测试后实现）；**无并行任务**（全部触碰同两个引擎文件 + 同一 VM，串行是硬约束）。**不做逐任务 commit**（提交需用户明确要求），仅任务 7 终局门控提交。
 
@@ -59,8 +59,8 @@
 | `CultureChanged` 订阅先例 | `UI.Avalonia/ViewModels/PreviewViewModel.cs` | 163-206 | 任务5 参照 |
 | 跳过先例 / 百分比→字节先例 | `Core/Engines/ZipEngine.cs` | 315 / 1564 | 引用不改 |
 | `WriteProgressStream` | `Core/Utils/WriteProgressStream.cs` | 全文 | 任务4 新增 `ReadProgressStream` 模板 |
-| Deferred #7 | `.omo/plans/未开始/progress-window-prototype-alignment.md` | 809 | 任务6 回写 |
-| `docs/PLAN.md` 行 33/34 | `docs/PLAN.md` | — | 任务6 追注 / 本计划加行（行 33 超长须 PowerShell 编辑） |
+| Deferred #2/#3 | `.omo/plans/未开始/progress-window-prototype-alignment.md` | Deferred 节 | 任务6 回写（#7 已于 2026-10-07 整理时回写，不复做） |
+| `docs/PLAN.md` 行 34 | `docs/PLAN.md` | — | 任务6 状态列更新（行 33 已于 2026-10-07 整理时瘦身为结论级） |
 
 ## Tech Stack
 
@@ -86,8 +86,8 @@
   tests/MantisZip.Tests/Engines/SevenZipEngineTests.cs    # 任务1+2 测试
   tests/MantisZip.Tests/Engines/TarGzEngineTests.cs       # 任务3+4 测试
   tests/MantisZip.UI.Avalonia.Tests/ProgressViewModelTests.cs # 任务5 测试
-  .omo/plans/未开始/progress-window-prototype-alignment.md # 任务6 回写
-  docs/PLAN.md                                            # 任务6 行33追注 + 本计划加行
+  .omo/plans/未开始/progress-window-prototype-alignment.md # 任务6 回写 #2/#3（#7 已完成）
+  docs/PLAN.md                                            # 任务6 行34 状态更新（行 33 已整理）
   docs/PROGRESS.md, docs/progress-avalonia-detail.md      # 任务7（提交前，规则3）
 ```
 
@@ -628,36 +628,27 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 
 ---
 
-## 任务 6 — 计划文本回写（Deferred #7 + PLAN.md 行 33）
+## 任务 6 — 计划文本回写（Deferred #2/#3 + PLAN.md 状态列）
 
-**目标**：把 `progress-window-prototype-alignment.md` Deferred 第 7 项（通用压缩进度播种）回写为已实施状态（commit `7505952`），并在 `docs/PLAN.md` 对应行追加进度注。
+> **2026-10-07 整理注**：原 Step 1（Deferred #7 回写）与 Step 2（PLAN.md 行 33 追注）已在计划整理中**提前完成**（#7 改为已实施并注明 `7505952`；行 33 同步瘦身为结论级）。本任务范围缩窄为下述两项。
 
-### Step 1 — prototype-alignment 回写
+**目标**：任务 1–5 完成后，把 `progress-window-prototype-alignment.md` Deferred #2/#3 回写为「本计划已实施」，并更新 `docs/PLAN.md` 中本计划登记行的状态。
 
-文件：`.omo/plans/未开始/progress-window-prototype-alignment.md`（Deferred 清单 L801-809）
+### Step 1 — Deferred #2/#3 回写（**仅在任务 1–5 全部完成后**）
 
-- 将 **第 7 项（L809，通用压缩进度播种）** 改为已实施格式，对齐该文件内其他已完成项的写法，注明 commit `7505952`。
-- **只回写 #7**（spec §4 范围）。#2（LocalizedStrings 刷新）与 #3（7z/TAR 速度 ETA）在**本计划任务 5 / 任务 1-4 实施完成后**才回写——**执行本任务时若任务 1-5 已完成，顺带把 #2/#3 也标注为「本计划 progress-window-bytes-i18n 已实施」；若尚未完成则只回写 #7**，并向用户提一句确认是否回写 #2/#3。
-- 行号为快照，以 Deferred 列表中条目文本定位（`第 7 项`/`通用压缩` 关键词）。
+文件：`.omo/plans/未开始/progress-window-prototype-alignment.md`（Deferred 清单）
 
-### Step 2 — docs/PLAN.md 行 33 追注
+- **#2（`LocalizedStrings` 语言切换刷新）** 与 **#3（7z/TAR 速度与 ETA）** 当前已标注「已转入本计划」；任务 5 / 任务 1–4 实施完成后，改注为「已实施（本计划 progress-window-bytes-i18n）」。
+- 任务 1–5 **未**完成时本步骤跳过（避免虚假回写）。
+- 行号会漂移，以 Deferred 列表条目文本定位（`语言切换刷新`/`7z / TAR 的速度` 关键词）。
 
-⚠️ 行 33（prototype-alignment 行）**超 2000 字符**，Read/grep 均截断 → 必须用 PowerShell 编辑：
+### Step 2 — docs/PLAN.md 状态更新
 
-```powershell
-$lines = [IO.File]::ReadAllLines("F:\GitHub\MantisZip\docs\PLAN.md")
-$i = [Array]::FindIndex($lines, [Predicate[string]]{ param($l) $l.StartsWith('| **P2** | 进度窗口原型对齐改造 |') })
-if ($i -lt 0) { throw "PLAN.md 行33 锚点未找到" }
-$line = $lines[$i]
-$idx = $line.LastIndexOf(' |')
-# 在倒数第二个 " |" 前插入进度注（列结构对齐；插入内容按该行既有状态列格式）
-```
+- 行 34（`进度窗口字节埋点 + 语言即时刷新`）状态列 🟡 待开始 → 完成态；说明列按实际交付追加一句（Rule 1）。
+- 若行号漂移，以 `| **P2** | 进度窗口字节埋点` 锚点定位；写回保持 UTF-8 **无 BOM**。
+- 完成后 `git diff docs/PLAN.md` 人工核对：仅目标行变更、其余行逐字节不变。
 
-- 插入注内容（列结构以实际行为准，措辞）：`已实施（含 Deferred #1-#4 等，commit 7505952 及后续）` 或按该行状态列现状最小追加。
-- 写回用 UTF-8 **无 BOM**：`[IO.File]::WriteAllLines($path, $lines, [Text.UTF8Encoding]::new($false))`
-- 完成后 `git diff docs/PLAN.md` 人工核对：仅行 33 变更、无 BOM 变化、其余行逐字节不变。
-
-**Done when**：Deferred #7 标已实施 + PLAN.md 行 33 追注完成且 diff 干净。
+**Done when**：Deferred #2/#3 标已实施 + PLAN.md 行 34 状态更新且 diff 干净。
 
 ---
 
