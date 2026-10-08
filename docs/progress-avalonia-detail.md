@@ -6,6 +6,18 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-08** — 新增计划：进度窗口统计卡三行结构（计划类）
+  - **计划**：[progress-stats-cards-three-row.md](../.omo/plans/未开始/progress-stats-cards-three-row.md)（P2 / 2-3h / 6 任务 3 波次 TDD 分解）
+  - **内容**：「完整」档 6 张统计卡改三行表格——行 1 图标+标题横排、行 2 文件数量、行 3 文件大小；行级缺数据灰显 `—`（卡级显隐与中/精简两档零改动，规则 6 维持）；VM 新增 `StatsProcessedSize`/`StatsTotalCount` 只写不清字段（`SetProgress` 的 `TotalBytes`/`TotalFiles` 块写入）+ 新建 `DashBrushConverter`（`—`→`ThemeTextSecondaryBrush`、真实值→强调色）；D6 固定恰 3 条 VM 测试；无新本地化 key；方案 A 逐卡 XAML（模板化已否决）。
+  - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。设计与任务分解已落盘，未实施。
+
+**2026-10-08** — 手工测试三问题修复（进度条可见性 / 进度统计缺项 / 解压线程数接线，Avalonia）
+  - **问题 ① 进度条 0% 不可见**（`Themes/ThemeLight.axaml`、`Themes/ThemeDark.axaml`）：进度条轨道 `ThemeProgressBgBrush` 与所在面板背景 `ThemeSplitterBg` 色差为 0（Light 均为 `#E0E0E0`）/ 仅 4（Dark `#424242` vs `#3E3E3E`），0% 时进度条与背景融为一体不可辨认。拉开对比至单通道差 ≥16：Light `#E0E0E0→#C8C8C8`（差 24）、Dark `#424242→#555555`（差 23），两处资源均加注释写明对比度依据。新增守卫 `ProgressTrackContrastTests`：正则解析两主题 hex 色值、计算 RGB 三通道最大差，<16 即失败（解析不到资源同样失败，不静默通过）。
+  - **问题 ② 进度窗口缺「文件总数 / 总大小」**（`ViewModels/ProgressViewModel.cs`、`Dialogs/ProgressWindow.axaml`、三语 `strings.*.json`）：新增私有 `_statsTotalFiles`（引擎 `TotalFiles > 0` 时更新、0 不清零）与 `[ObservableProperty]` `_statsTotalSizeText`/`_statsTotalSizeValue`（仅 `TotalBytes > 0` 写入，未上报引擎保持空串走 Rule 6 隐藏）；`StatsProcessedCount` 由 `long` 改 `string`（`_statsTotalFiles > 0` 时 `"60/100"` 分数、否则回退纯计数），格式化参数同步带分子分母；新增 `StatsTotalSizeLabel`（从 `Progress_Stats_TotalSize` 剥离占位符，与其余短标签同模式）。XAML：「完整」档统计卡区新增第 6 卡 📏 总大小（`StringNotEmpty` 控显隐），中等档单行补总大小项（同守卫）；三语新增 `Progress_Stats_TotalSize`（zh-CN "总大小 {0}" / en "Total size {0}" / zh-TW "總大小 {0}"，插入文件头，key 集同步）。
+  - **问题 ③ 解压对话框线程数选择无效**（`Dialogs/ExtractSettingsWindow.axaml`、`Views/MainWindow.axaml.cs`、`Services/ExtractFlow.cs`、`ViewModels/MainWindowViewModel.cs`）：断链共三处——`NumericUpDown` 默认单向绑定（`Value="{Binding ParallelExtractDegree}"` 补 `Mode=TwoWay`）、确认回调拷贝清单漏回传（补 `evm.ParallelExtractDegree = dialog.ViewModel.ParallelExtractDegree`）、`ExtractFlow.ExtractAsync` 只读 `AppSettings`（增 `int? parallelExtractDegree = null` 参数，对话框值优先、AppSettings 兜底；`MainWindowViewModel` 解压执行入口透传 `vm.ParallelExtractDegree`）；`ResolveDisplayParallelDegree` 同步增 `int? parallelDegree = null` 参数（进度窗口「并行」卡显示值与实际选项一致），CLI 等无对话框路径默认 null 行为不变。
+  - **测试**（3 个测试文件）：`ProgressViewModelTests` +6 条（N/M 分数、占位符不泄漏、`TotalFiles=0` 不清零分数、`StatsProcessedCount` 分数串、总大小三成员填充、未上报留空）；新增 `ExtractParallelDegreeWiringTests`（5 条源码文本守卫锁接线链路 + 2 条 `ResolveDisplayParallelDegree` 行为重载，文件头注明「守卫只证明接线在位、不证明值流到引擎」的诚实局限）；新增 `ProgressTrackContrastTests`（双主题轨道对比度）。
+  - **验证**：Avalonia 构建 0 错误 0 警告；测试 163 通过 / 5 失败（均为预存 `PreviewWebViewLazyInitTests` 环境问题，与本次无关）；Core 615 通过 / 0 失败。
+
 **2026-10-08** — 合并 origin/main（ffac140）→ alpha（10 处冲突全部解决）：① `AGENTS.md` 两侧新增规则并入并重编号——规则 0–16 连续唯一（alpha 的 `CoreLog.Initialize` 保持规则 15，main 的 `CustomFilePickerDialog` 选择器禁令顺延为规则 16）；② 进度文档双向归并——`docs/PROGRESS.md` 与本文档按日期从新到旧交错合并（双方 10-06～10-08 条目齐全），共享层 `####` 组序为 main v0.5.2 → alpha v0.5.1 → 共有 v0.5.0，版本号四处一致 0.5.2（AppConstants.cs / csproj / PLAN.md / PROGRESS.md）；③ `ZipBinaryRewriter.cs` 三处 hunk 语义合成——alpha 的 `Store` 条目追加 × main 的 UTF-8 bit-11 标志，LFH 取 `generalFlags` + `Store ? 0 : 8`；④ `MainWindowViewModel.cs` 取 main 的 `settings` 局部变量并删除死代码 `?? new ArchiveOptions()`（`CreateExtractOptions` 返回非空）。其余 5 文件（`App.axaml.cs`、三语 `strings.*.json`、`MantisZip.UI.Avalonia.Tests.csproj`）逐一核验无残留标记（含缩进标记）、JSON 解析通过。验证：全仓冲突标记为零；Core 构建 0 警告 0 错误 + 测试 615 通过 / 3 跳过（含三语 key 集同步校验 `AllThreeLanguages_HaveSameKeySet`）；Avalonia 临时输出路径构建 0/0 + 测试 149 通过 / 5 失败（TestPreview 夹具缺失为预存环境问题，main 10-06 条目已记载；常规路径构建因运行中实例文件锁未执行）
 
 **2026-10-08** — 版本号更新到 0.5.2（AppConstants.cs + csproj，docs/PLAN.md、docs/PROGRESS.md 顶部当前版本同步）
