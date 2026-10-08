@@ -165,6 +165,7 @@ public static class ExtractFlow
     /// <param name="conflictDialog">Ask 冲突弹窗回调（null 时 Ask 降级为引擎默认处理）。</param>
     /// <param name="progress">进度回调。</param>
     /// <param name="ct">取消令牌。</param>
+    /// <param name="parallelExtractDegree">解压对话框选择的线程数（1-16）；null 时回落 AppSettings（CLI 等无对话框路径）。</param>
     /// <exception cref="NotSupportedException">不支持的压缩格式。</exception>
     public static async Task ExtractAsync(
         string archivePath,
@@ -174,17 +175,18 @@ public static class ExtractFlow
         string? password,
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
         IProgress<ArchiveProgress> progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        int? parallelExtractDegree = null)
     {
         var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog);
-        // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
+        // 传递并行解压线程数：对话框值优先、AppSettings 兜底（引擎 SupportsParallelExtract 时生效）
         if (options != null)
-            options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
+            options.ParallelExtractDegree = parallelExtractDegree ?? AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
         // T6: 同一代码路径上已持有 ProgressWindow（MainWindow RunWithProgress 闭包 / CLI 批处理
         // 先 Show() 再进入本方法，OnOpened 已置位 CurrentVisible），把实际并行度写给进度窗口统计。
         // 串行路径（引擎不支持并行或 degree ≤ 1）传 1 → HasParallelDegree=false 自动隐藏（Rule 6）。
-        ProgressWindow.CurrentVisible?.SetParallelDegree(ResolveDisplayParallelDegree(archivePath));
+        ProgressWindow.CurrentVisible?.SetParallelDegree(ResolveDisplayParallelDegree(archivePath, parallelExtractDegree));
         // T9/D7: 列表模式播种（后台列目录 → SeedEntries；不 await，解压不等播种）。
         // TAR/GZ 与非 zip/7z 在 CanSeedEntries 内拦下 → 零 ListEntriesAsync 调用；
         // >5000 条跳过播种转渐进模式。播种结果由 UpdateEntryStatus 的 upsert 兜底。
@@ -293,17 +295,20 @@ public static class ExtractFlow
     /// <summary>
     /// 计算用于进度窗口统计显示的并行度（T6）：
     /// 引擎不支持并行（7z/TAR/GZ 等 SupportsParallelExtract=false）→ 1（串行，隐藏并行统计）；
+    /// 显式 <paramref name="parallelDegree"/>（解压对话框选择）优先，null 时回落 AppSettings；
     /// 设置值 0/负数 = 引擎自动 → <c>Environment.ProcessorCount</c>（与 ZipEngine 的 0 值语义一致）。
     /// </summary>
+    /// <param name="archivePath">压缩包路径（按扩展名分发引擎）。</param>
+    /// <param name="parallelDegree">显式线程数；null 表示沿用 AppSettings（CLI 等无对话框路径）。</param>
     /// <remarks>
     /// CLI 批处理直解路径（<c>App.RunCliDirectExtractBatchAsync</c>）绕过 <see cref="ExtractAsync"/>，
     /// 需自行调用本方法把并行度写给进度窗口，故为 internal 而非 private。
     /// </remarks>
-    internal static int ResolveDisplayParallelDegree(string archivePath)
+    internal static int ResolveDisplayParallelDegree(string archivePath, int? parallelDegree = null)
     {
         if (ArchiveEngineFactory.GetEngineByExtension(archivePath)?.SupportsParallelExtract != true)
             return 1;
-        int degree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
+        int degree = parallelDegree ?? AppSettings.Load()?.ParallelExtractDegree ?? 0;
         return degree > 0 ? degree : Environment.ProcessorCount;
     }
 

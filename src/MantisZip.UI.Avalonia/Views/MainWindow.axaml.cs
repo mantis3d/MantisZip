@@ -174,6 +174,8 @@ public partial class MainWindow : Window
                 evm.DestinationPath = dialog.ViewModel.DestinationPath;
                 evm.ConflictAction = dialog.ViewModel.ConflictAction;
                 evm.OpenFolderAfterExtract = dialog.ViewModel.OpenFolderAfterExtract;
+                // 线程数：对话框选择回传（缺失则用户选择恒无效——手工测试问题 3）
+                evm.ParallelExtractDegree = dialog.ViewModel.ParallelExtractDegree;
                 // 文件过滤：仅当启用过滤且有条目时，将匹配条目 key 回传，供实际解压只解压匹配项
                 evm.FilteredEntryKeys = dialog.GetFilteredEntryKeys();
             }

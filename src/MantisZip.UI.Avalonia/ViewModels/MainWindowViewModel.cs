@@ -2363,7 +2363,8 @@ public partial class MainWindowViewModel : ObservableObject
                 // 统一解压执行入口（冲突策略/过滤/全量分支）——与 CLI 弹窗批处理共用 ExtractFlow
                 await ExtractFlow.ExtractAsync(
                     CurrentArchivePath, dest, vm.ConflictAction, filteredKeys, password,
-                    ShowExtractFileConflictDialogAsync, progress, ct);
+                    ShowExtractFileConflictDialogAsync, progress, ct,
+                    vm.ParallelExtractDegree);
             });
 
         if (completed)
