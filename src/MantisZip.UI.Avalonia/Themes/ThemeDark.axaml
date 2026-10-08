@@ -150,7 +150,8 @@
   <SolidColorBrush x:Key="ThemeStatusSuccessBgBrush" Color="{StaticResource ThemeStatusSuccess}" Opacity="0.15" />
   <!-- Progress bar foreground/background for progress window -->
   <SolidColorBrush x:Key="ThemeProgressFillBrush" Color="#FF64B5F6" />
-  <SolidColorBrush x:Key="ThemeProgressBgBrush" Color="#FF424242" />
+  <!-- 进度条轨道：与 ThemeSplitterBg(#FF3E3E3E) 拉开对比（#55 vs #3E 单通道差 23≥16），否则 0% 时进度条不可见 -->
+  <SolidColorBrush x:Key="ThemeProgressBgBrush" Color="#FF555555" />
 
   <!-- Progress bar colors -->
   <Color x:Key="ProgressBarSizeColor">#FF1E3A5F</Color>
