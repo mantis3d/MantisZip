@@ -1,4 +1,5 @@
 {
+  "Progress_Stats_TotalSize": "總大小 {0}",
   "Progress_Preparing": "正在準備…",
   "Compress_ParallelDegree": "並行壓縮組數",
   "Compress_ParallelDegree_Hint": "（N 個壓縮器並行；設為 1 則與上方「多執行緒壓縮」等效）",

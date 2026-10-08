@@ -1,4 +1,5 @@
 {
+  "Progress_Stats_TotalSize": "总大小 {0}",
   "Progress_Preparing": "正在准备…",
   "Compress_ParallelDegree": "并行压缩组数",
   "Compress_ParallelDegree_Hint": "（N 个压缩器并行；设为 1 则与上方「多线程压缩」等效）",

@@ -1,4 +1,5 @@
 {
+  "Progress_Stats_TotalSize": "Total size {0}",
   "Progress_Preparing": "Preparing…",
   "Compress_ParallelDegree": "Parallel compress groups",
   "Compress_ParallelDegree_Hint": "(N parallel compressors; set to 1 to match Multi-threaded above)",
