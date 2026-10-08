@@ -570,7 +570,7 @@
                        Click="DensityLooseRadio_Click"/>
         </StackPanel>
 
-        <!-- 统计卡容器（仅「完整」档显示）：SurfaceBg 底 + 圆角，内含 5 个统计卡 -->
+        <!-- 统计卡容器（仅「完整」档显示）：SurfaceBg 底 + 圆角，内含 6 个统计卡 -->
         <Border x:Name="StatsCardsPanel"
                 IsVisible="{Binding IsFullDensity}"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
@@ -679,10 +679,30 @@
                          HorizontalAlignment="Center"
                          Foreground="{DynamicResource ThemeProgressFillBrush}"/>
             </StackPanel>
+
+            <!-- 卡 6：总大小（📏；引擎上报 TotalBytes 才出现，7z/TAR 不上报时整卡隐藏，D3/Rule 6） -->
+            <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                        HorizontalAlignment="Center"
+                        IsVisible="{Binding StatsTotalSizeValue, Converter={StaticResource StringNotEmpty}}">
+              <!-- 图标 -->
+              <TextBlock Text="📏" FontSize="18"
+                         HorizontalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+              <!-- 标签 -->
+              <TextBlock Text="{Binding StatsTotalSizeLabel}"
+                         FontSize="11"
+                         HorizontalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+              <!-- 数值 -->
+              <TextBlock Text="{Binding StatsTotalSizeValue}"
+                         FontSize="16" FontWeight="SemiBold"
+                         HorizontalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+            </StackPanel>
           </StackPanel>
         </Border>
 
-        <!-- 中等单行（仅「中」档显示，与统计卡互斥）：已处理 + 速度 + 并行 -->
+        <!-- 中等单行（仅「中」档显示，与统计卡互斥）：已处理 + 总大小 + 速度 + 并行 -->
         <StackPanel x:Name="MediumStatsPanel"
                     Orientation="Horizontal"
                     Spacing="{DynamicResource SpacingLg}"
@@ -691,6 +711,12 @@
           <!-- 已处理（引擎未上报时隐藏） -->
           <TextBlock Text="{Binding StatsProcessedText}"
                      IsVisible="{Binding StatsProcessedText, Converter={StaticResource StringNotEmpty}}"
+                     FontSize="12"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+          <!-- 总大小（引擎未上报 TotalBytes 时隐藏，Rule 6） -->
+          <TextBlock Text="{Binding StatsTotalSizeText}"
+                     IsVisible="{Binding StatsTotalSizeText, Converter={StaticResource StringNotEmpty}}"
                      FontSize="12"
                      VerticalAlignment="Center"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>

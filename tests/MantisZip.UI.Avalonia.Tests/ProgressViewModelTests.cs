@@ -477,4 +477,99 @@ public class ProgressViewModelTests
         vm.ClearEntryItems();
         Assert.Contains(nameof(vm.HasEntryItems), notified);
     }
+
+    // ════════════════════════════════════════════
+    //  手工测试问题 2：进度窗口缺「文件总数」显示（N/M 分子分母）
+    // ════════════════════════════════════════════
+
+    /// <summary>
+    /// 引擎上报 TotalFiles 时，「已处理」统计必须显示 N/M 分子分母
+    /// （如 "已处理 60/100"），而不是只有已处理数。
+    /// 锁定缺陷：进度窗口缺文件总数显示（手工测试问题 2）。
+    /// </summary>
+    [Fact]
+    public void SetProgress_WithTotalFiles_ShowsProcessedOverTotal()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { TotalFiles = 100, ProcessedFiles = 60 });
+
+        Assert.Contains("60/100", vm.StatsProcessedText);
+    }
+
+    /// <summary>
+    /// 短标签派生不得泄漏 {0} 占位符（标签从格式化文案剥离占位符而来，
+    /// 格式改为带分子分母后派生逻辑必须同步）。
+    /// </summary>
+    [Fact]
+    public void StatsProcessedLabel_DoesNotLeakPlaceholder()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { TotalFiles = 100, ProcessedFiles = 60 });
+
+        Assert.DoesNotContain("{0}", vm.StatsProcessedLabel);
+    }
+
+    /// <summary>
+    /// 兼容重载（TotalFiles=0）不得清零已显示的 N/M 统计。
+    /// </summary>
+    [Fact]
+    public void SetProgress_ZeroTotalFiles_KeepsPreviousFraction()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { TotalFiles = 100, ProcessedFiles = 60 });
+        vm.SetProgress(new ArchiveProgress { TotalFiles = 0, ProcessedFiles = 999 });
+
+        Assert.Contains("60/100", vm.StatsProcessedText);
+    }
+
+    // ════════════════════════════════════════════
+    //  波 B（编译级红）：StatsProcessedCount 改 string + 总大小新成员
+    // ════════════════════════════════════════════
+
+    /// <summary>
+    /// 统计卡计数槽必须与统计行一致显示 N/M 分子分母（编译级红：
+    /// StatsProcessedCount 由 long 改 string 后本断言才可编译）。
+    /// </summary>
+    [Fact]
+    public void StatsProcessedCount_ShowsFractionString()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { TotalFiles = 100, ProcessedFiles = 60 });
+
+        Assert.Equal("60/100", vm.StatsProcessedCount);
+    }
+
+    /// <summary>
+    /// 引擎上报 TotalBytes 时总大小三个成员必须填充（编译级红：
+    /// StatsTotalSizeText/StatsTotalSizeLabel 为新增成员）。
+    /// </summary>
+    [Fact]
+    public void SetProgress_WithTotalBytes_PopulatesTotalSizeMembers()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            TotalFiles = 10,
+            ProcessedFiles = 1,
+            TotalBytes = 1048576,
+        });
+
+        Assert.False(string.IsNullOrEmpty(vm.StatsTotalSizeText));
+        Assert.False(string.IsNullOrEmpty(vm.StatsTotalSizeValue));
+        Assert.DoesNotContain("{0}", vm.StatsTotalSizeLabel);
+    }
+
+    /// <summary>
+    /// 引擎未上报 TotalBytes（7z/TAR）时总大小为空（编译级红 + Rule 6：
+    /// 空串由 XAML 侧 StringNotEmpty 转换器隐藏整卡/整行）。
+    /// </summary>
+    [Fact]
+    public void SetProgress_WithoutTotalBytes_LeavesTotalSizeEmpty()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { TotalFiles = 10, ProcessedFiles = 1 });
+
+        Assert.Equal(string.Empty, vm.StatsTotalSizeText);
+        Assert.Equal(string.Empty, vm.StatsTotalSizeValue);
+    }
 }

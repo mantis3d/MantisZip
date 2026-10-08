@@ -37,6 +37,10 @@ public partial class ProgressViewModel : ObservableObject
 
     /// <summary>已处理文件数（引擎上报；兼容重载 TotalFiles=0 时不清零）。</summary>
     private long _statsProcessed;
+
+    /// <summary>本次操作总文件数（引擎上报；0 = 未上报，统计卡计数回退纯计数）。</summary>
+    private long _statsTotalFiles;
+
     private long _statsSkipped;
     private long _statsFailed;
     private long _statsOverwritten;
@@ -274,6 +278,14 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private string _statsOverwrittenText = string.Empty;
 
+    /// <summary>统计栏/统计卡：总大小完整文案（如 "总大小 1.00 MB"；引擎未上报 TotalBytes 时为空 → Rule 6 隐藏）。</summary>
+    [ObservableProperty]
+    private string _statsTotalSizeText = string.Empty;
+
+    /// <summary>统计卡数值：总大小数值（如 "1.00 MB"；引擎未上报 TotalBytes 时为空 → Rule 6 隐藏）。</summary>
+    [ObservableProperty]
+    private string _statsTotalSizeValue = string.Empty;
+
     /// <summary>速度文案（如 "12.3 MB/s"）。</summary>
     [ObservableProperty]
     private string _speedText = string.Empty;
@@ -326,8 +338,13 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>统计卡短标签（已覆盖）。</summary>
     public string StatsOverwrittenLabel => LocalizationManager.T("Progress_Stats_Overwritten", string.Empty).Trim();
 
-    /// <summary>统计卡数值（仅计数；完整档卡片的 value 槽，label 槽用上方短标签）。</summary>
-    public long StatsProcessedCount => _statsProcessed;
+    /// <summary>统计卡短标签（总大小，从格式化文案剥离占位符得到；与其余短标签一样不随属性变更通知）。</summary>
+    public string StatsTotalSizeLabel => LocalizationManager.T("Progress_Stats_TotalSize", string.Empty).Trim();
+
+    /// <summary>统计卡数值（已处理 N/M 分子分母，如 "60/100"；引擎未上报总数时回退纯计数）。</summary>
+    public string StatsProcessedCount => _statsTotalFiles > 0
+        ? $"{_statsProcessed}/{_statsTotalFiles}"
+        : _statsProcessed.ToString();
 
     /// <summary>统计卡数值（跳过）。</summary>
     public long StatsSkippedCount => _statsSkipped;
@@ -608,11 +625,21 @@ public partial class ProgressViewModel : ObservableObject
             _statsOverwritten = p.OverwrittenFiles.Value;
             StatsOverwrittenText = LocalizationManager.T("Progress_Stats_Overwritten", _statsOverwritten);
         }
-        // 已处理：仅引擎上报 TotalFiles 时更新（兼容重载 TotalFiles=0 不得清零）
+        // 已处理：仅引擎上报 TotalFiles 时更新（兼容重载 TotalFiles=0 不得清零）；
+        // 卡值/格式化参数用 N/M 分子分母（如 "60/100"）
         if (p.TotalFiles > 0)
         {
             _statsProcessed = p.ProcessedFiles;
-            StatsProcessedText = LocalizationManager.T("Progress_Stats_Processed", _statsProcessed);
+            _statsTotalFiles = p.TotalFiles;
+            StatsProcessedText = LocalizationManager.T("Progress_Stats_Processed", $"{_statsProcessed}/{_statsTotalFiles}");
+        }
+
+        // 总大小：仅引擎上报 TotalBytes 时更新（只写不清——未上报的引擎保持空串，Rule 6 隐藏）
+        if (p.TotalBytes > 0)
+        {
+            var sizeText = FormatUtil.FormatSize(p.TotalBytes);
+            StatsTotalSizeValue = sizeText;
+            StatsTotalSizeText = LocalizationManager.T("Progress_Stats_TotalSize", sizeText);
         }
 
         // 统计卡数值集中刷新（T7：4 张卡的计数槽位）
