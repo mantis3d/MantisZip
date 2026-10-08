@@ -93,6 +93,9 @@ public partial class App : Application
         // 必须由 UI 层在启动时注入脱敏逻辑，否则 Core 日志中的路径不会被脱敏。
         CoreLog.Initialize(appSettings.EnableDebugLogging, appSettings.LogPrivacyMode);
 
+        // ── 启动时清理临时目录（对齐 WPF App.xaml.cs:141）—— fire-and-forget，不阻塞 UI ──
+        _ = Task.Run(CleanTempOnStartupCore);
+
         // ── Initialize preview settings (runtime caches; SettingsWindow.Save 同步保持即时生效) ──
         PreviewService.EnableFormatDetection = appSettings.EnableFormatDetection;
         PreviewService.PreviewHeadSize = appSettings.PreviewHeadSize;
@@ -956,7 +959,7 @@ public partial class App : Application
     /// CLI 模式不做额外大小检查。
     /// 重试 3 次（200ms 间隔），给 7z.dll 等外部组件释放文件句柄的时间。
     /// </summary>
-    private static void TryDeleteArchiveAfterExtract(string archivePath)
+    internal static void TryDeleteArchiveAfterExtract(string archivePath)
     {
         var settings = AppSettings.Load();
         if (!settings.DeleteArchiveAfterExtract) return;
@@ -982,6 +985,31 @@ public partial class App : Application
             {
                 DebugLog($"TryDeleteArchiveAfterExtract: failed for '{archivePath}' after 3 attempts: {ex.Message}");
             }
+        }
+    }
+
+    /// <summary>
+    /// 启动时清理临时目录（对齐 WPF App.xaml.cs:141 CleanTempOnStartup）。
+    /// 读取 AppSettings.CleanTempOnStartup，为 true 时递归删除临时目录。
+    /// 失败静默（catch 后 DebugLog），绝不让启动崩溃；并发实例占用导致删除失败是正常情况。
+    /// </summary>
+    private static void CleanTempOnStartupCore()
+    {
+        try
+        {
+            var settings = AppSettings.Load();
+            if (!settings.CleanTempOnStartup) return;
+
+            var tempDir = AppSettings.GetTempDir();
+            if (Directory.Exists(tempDir))
+            {
+                Directory.Delete(tempDir, true);
+                DebugLog($"CleanTempOnStartupCore: deleted temp directory '{tempDir}'");
+            }
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"CleanTempOnStartupCore: failed to clean temp directory: {ex.Message}");
         }
     }
 
@@ -1755,6 +1783,19 @@ public partial class App : Application
                 await dlg.ShowDialog<bool?>(owner);
             else
                 dlg.Show();
+            return false;
+        }
+
+        // AllowElevation 开关：关闭时直接显示 ElevationInfoDialog，不弹提权确认（对齐 WPF App.Extract.cs:445-452 / App.Compress.cs:217 / App.Open.cs:122）
+        var settings = AppSettings.Load();
+        if (!settings.AllowElevation)
+        {
+            DebugLog("AllowElevation=false, showing ElevationInfoDialog");
+            var infoDlg = new Dialogs.ElevationInfoDialog(unwritable);
+            if (owner != null)
+                await infoDlg.ShowDialog<bool?>(owner);
+            else
+                infoDlg.Show();
             return false;
         }
 

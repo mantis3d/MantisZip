@@ -11,6 +11,7 @@ using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.Threading;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
 using MantisZip.UI.Avalonia.Models;
@@ -40,14 +41,10 @@ public partial class PreviewPanel : UserControl
         if (ContentTopBorder != null)
             ContentTopBorder.SizeChanged += OnContentTopSizeChanged;
 
-        // WebView 初始化安全检测：WebView2 Runtime 缺失时 NavigationCompleted 会触发
-        // 且 IsSuccess=false，此时降级到 ReverseMarkdown 控件树预览
-        if (HtmlPreviewWebView != null)
-            HtmlPreviewWebView.NavigationCompleted += OnWebViewNavigationCompleted;
-
-        // 导航拦截：根据设置阻止外部链接跳转
-        if (HtmlPreviewWebView != null)
-            HtmlPreviewWebView.NavigationStarted += OnWebViewNavigationStarted;
+        // WebView 相关初始化（NavigationCompleted / NavigationStarted 订阅）已移到
+        // EnsureWebViewForHtml —— NativeWebView 改为惰性创建，不再在 XAML 中声明，
+        // 详见 PreviewPanel.axaml 中 WebViewHost 的注释。
+        InstallWebViewGuard();
     }
 
     private void OnDataContextChanged(object? sender, EventArgs e)
@@ -98,6 +95,231 @@ public partial class PreviewPanel : UserControl
         {
             BuildPptxSlide(vm);
         }
+
+        // HTML WebView 预览宿主：仅在真正需要 WebView 渲染 HTML 时才惰性创建 NativeWebView，
+        // 避免「首次点击任意条目」就初始化 WebView2（详见 PreviewPanel.axaml 的 WebViewHost 注释）。
+        //
+        // IsWebViewHtmlVisible 是由 PreviewType / IsWebViewVisible / IsHtmlSourceMode 三个属性
+        // 合成的派生属性，而 ShowHtmlPreview 内部的赋值顺序是
+        // IsWebViewVisible=true（此时 PreviewType 还是 None）→ PreviewType=Html，
+        // 因此不能只监听 IsWebViewHtmlVisible 一个名字：这里监听全部相关来源，
+        // 由 EnsureWebViewForHtml 统一按合成条件复核，避免依赖某一属性的赋值时序。
+        if (args.PropertyName is nameof(PreviewViewModel.IsWebViewHtmlVisible)
+                             or nameof(PreviewViewModel.IsWebViewVisible)
+                             or nameof(PreviewViewModel.PreviewType)
+                             or nameof(PreviewViewModel.HtmlWebViewUri))
+        {
+            if (vm.IsWebViewHtmlVisible)
+            {
+                EnsureWebViewForHtml();
+            }
+            else
+            {
+                // 离开 HTML WebView 预览：关闭创建窗口期，避免后续无关的 UI 线程异常被误判为 WebView 失败
+                CloseWebViewCreationWindow();
+            }
+        }
+    }
+
+    // ─────────────────────────── WebView 惰性创建与失败降级 ───────────────────────────
+
+    /// <summary>WebView 创建窗口期标记：非 0 表示「正在创建 WebView」，此时拦截 WebView2 相关的 UI 线程未处理异常。</summary>
+    private static int _webViewCreationWindow;
+
+    /// <summary>WebView 创建窗口期内的失败回调（由静态守卫在 UI 线程上调用）。</summary>
+    private static Action<Exception>? _webViewFailed;
+
+    /// <summary>
+    /// 当前挂载在 <see cref="WebViewHost"/> 上的 NativeWebView（仅 HTML 预览期间非空）。
+    /// 用于在创建窗口期之外仍然判定「异常是否属于本控件的 WebView2」，消除时序竞态：
+    /// NavigationCompleted 可能先于异步的 WebView2 异常到达并把窗口期清零。
+    /// </summary>
+    private static NativeWebView? _liveWebView;
+
+    /// <summary>
+    /// 已安装守卫的 UI 线程 Dispatcher。
+    ///
+    /// 必须按 Dispatcher 实例记录而不是用一个静态 bool：`Dispatcher.UIThread` 会随
+    /// Avalonia headless 测试的每个用例重建，若只用一个「已安装」标记，守卫只会订阅到
+    /// 第一个 Dispatcher，后续用例新建的 Dispatcher 上根本没有守卫，WebView2 异常会直接
+    /// 逃逸并终止进程 —— 表现为该用例「单跑通过、全量跑偶发失败」。
+    /// </summary>
+    private static Dispatcher? _guardedDispatcher;
+
+    /// <summary>已确认本机 WebView2 不可用（Runtime 缺失 / 创建被拒 / COM 冲突），后续不再重试，直接走降级。</summary>
+    private bool _webViewUnavailable;
+
+    /// <summary>
+    /// 安装 UI 线程未处理异常守卫，拦截 WebView2 相关的异常并标记 Handled。
+    ///
+    /// NativeWebView attach 时初始化 WebView2 失败，异常由 Avalonia 内部 Task 重新抛到 Dispatcher
+    /// （NativeWebView.OnAttached → Task.ThrowAsync → SendOrPostCallbackDispatcherOperation.InvokeCore），
+    /// 位于 ShowPreviewAsync 的 try/catch 之外，会一路传到 AppDomain.UnhandledException 并终止进程。
+    ///
+    /// 命中条件为「处于创建窗口期 **或** 仍有 NativeWebView 挂载」且异常栈确实来自 WebView2，
+    /// 因此不会掩盖其它真实的 UI 线程异常 —— 不满足条件时一律保持系统默认的「记录 + 终止」行为。
+    /// </summary>
+    private static void InstallWebViewGuard()
+    {
+        // 按 Dispatcher 实例去重：同一个 Dispatcher 只订阅一次，换了实例则重新订阅。
+        var dispatcher = Dispatcher.UIThread;
+        if (ReferenceEquals(_guardedDispatcher, dispatcher)) return;
+        _guardedDispatcher = dispatcher;
+
+        dispatcher.UnhandledException += OnWebViewGuardUnhandledException;
+    }
+
+    /// <summary>
+    /// UI 线程未处理异常守卫的处理逻辑（静态，供所有 Dispatcher 实例复用）。
+    /// </summary>
+    private static void OnWebViewGuardUnhandledException(object? sender, DispatcherUnhandledExceptionEventArgs e)
+    {
+        // 与本控件的 WebView 无关：保持原有行为（只记录，不改 Handled）。
+        // 注意不能只看创建窗口期：WebView2 的异步失败可能在 NavigationCompleted 之后
+        // 才抛到 Dispatcher，那时窗口期已被清零 —— 因此「仍有 NativeWebView 挂载」也算命中，
+        // 以消除该时序竞态（否则守卫会漏掉异常并终止进程）。
+        if (Volatile.Read(ref _webViewCreationWindow) == 0 && _liveWebView == null) return;
+
+        // 异常栈不来自 WebView2：同样保持原有行为，避免误吞真实 bug
+        if (!LooksLikeWebViewFailure(e.Exception)) return;
+
+        Volatile.Write(ref _webViewCreationWindow, 0);
+
+        var handler = _webViewFailed;
+        _webViewFailed = null;
+
+        App.DebugLog($"WebView2 初始化失败，已拦截（降级到 ReverseMarkdown）: " +
+                     $"{e.Exception.GetType().Name}: {e.Exception.Message}");
+
+        // 标记为已处理，阻止异常继续传播到 AppDomain 造成进程终止
+        e.Handled = true;
+
+        try
+        {
+            handler?.Invoke(e.Exception);
+        }
+        catch (Exception fallbackEx)
+        {
+            App.DebugLog($"WebView 降级处理失败: {fallbackEx.GetType().Name}: {fallbackEx.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 判断异常是否源自 WebView2 / NativeWebView（检查整条异常链的调用栈）。
+    /// </summary>
+    private static bool LooksLikeWebViewFailure(Exception? ex)
+    {
+        for (Exception? cur = ex; cur != null; cur = cur.InnerException)
+        {
+            var stack = cur.StackTrace;
+            if (stack == null) continue;
+            if (stack.Contains("WebView2", StringComparison.Ordinal) ||
+                stack.Contains("NativeWebView", StringComparison.Ordinal) ||
+                stack.Contains("WebViewAdapter", StringComparison.Ordinal))
+                return true;
+        }
+        return false;
+    }
+
+    /// <summary>关闭创建窗口期并释放回调引用（离开 HTML WebView 预览或创建结束时调用）。</summary>
+    private void CloseWebViewCreationWindow()
+    {
+        Interlocked.Exchange(ref _webViewCreationWindow, 0);
+        _webViewFailed = null;
+    }
+
+    /// <summary>
+    /// 惰性创建 NativeWebView 并放入 <see cref="WebViewHost"/>。
+    /// 仅当预览类型确为 HTML 且走 WebView 渲染路径（<see cref="PreviewViewModel.IsWebViewHtmlVisible"/>）时调用。
+    /// </summary>
+    private void EnsureWebViewForHtml()
+    {
+        var vm = _vm;
+        if (vm == null || _webViewUnavailable) return;
+
+        // 已创建：只需确保 Source 绑定生效（绑定为一次性设置，随 VM 更新自动生效）
+        if (WebViewHost.Content is NativeWebView) return;
+
+        InstallWebViewGuard();
+
+        NativeWebView webView;
+        try
+        {
+            webView = new NativeWebView
+            {
+                // 沿用宿主的主题背景，保持与原 XAML 声明一致的观感
+                Background = WebViewHost.Background,
+            };
+            webView.Bind(NativeWebView.SourceProperty, new Binding(nameof(PreviewViewModel.HtmlWebViewUri)));
+
+            // WebView 初始化安全检测：Runtime 缺失 / 导航失败时 NavigationCompleted 会触发且 IsSuccess=false
+            webView.NavigationCompleted += OnWebViewNavigationCompleted;
+            // 导航拦截：根据设置阻止外部链接跳转
+            webView.NavigationStarted += OnWebViewNavigationStarted;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"NativeWebView 实例化失败，降级到 ReverseMarkdown: {ex.GetType().Name}: {ex.Message}");
+            HandleWebViewUnavailable(ex.GetType().Name);
+            return;
+        }
+
+        // 打开创建窗口期：attach 引发的 WebView2 异步失败会被守卫拦截
+        Interlocked.Exchange(ref _webViewCreationWindow, 1);
+        _webViewFailed = ex => HandleWebViewUnavailable(ex.GetType().Name);
+
+        // 在挂载**之前**登记，使守卫从 attach 的第一刻起就能识别该 WebView 的异常，
+        // 不会因窗口期被 NavigationCompleted 提前清零而漏判。
+        _liveWebView = webView;
+
+        try
+        {
+            // attach → NativeWebView.OnAttached() → 初始化 WebView2（可能同步抛出）
+            WebViewHost.Content = webView;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"WebView 挂载失败，降级到 ReverseMarkdown: {ex.GetType().Name}: {ex.Message}");
+            HandleWebViewUnavailable(ex.GetType().Name);
+        }
+    }
+
+    /// <summary>
+    /// WebView2 不可用时的降级处理：拆除损坏的 WebView，标记本机不可用，并切到 ReverseMarkdown 控件树预览。
+    /// </summary>
+    private void HandleWebViewUnavailable(string reason)
+    {
+        _webViewUnavailable = true;
+        CloseWebViewCreationWindow();
+
+        try
+        {
+            if (WebViewHost.Content is NativeWebView broken)
+            {
+                broken.NavigationCompleted -= OnWebViewNavigationCompleted;
+                broken.NavigationStarted -= OnWebViewNavigationStarted;
+                broken.ClearValue(NativeWebView.SourceProperty);
+                WebViewHost.Content = null;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"WebView 清理失败: {ex.GetType().Name}: {ex.Message}");
+        }
+        finally
+        {
+            // 必须在拆除**之后**才清除登记：detach 本身也可能抛出 WebView2 异常，
+            // 那时仍需守卫兜住，先清零反而会漏掉并终止进程。
+            _liveWebView = null;
+        }
+
+        var vm = _vm;
+        if (vm == null) return;
+
+        // 直接用内存中的 HTML 源码降级：ShowHtmlFallback(filePath) 需要真实文件路径，
+        // 而此处能拿到的 CurrentPreviewFilePath 是压缩包内部条目路径，会导致降级静默失败。
+        App.DebugLog($"HTML 预览降级到 ReverseMarkdown（原因: {reason}）");
+        vm.ShowHtmlFallbackFromSource(vm.HtmlSourceContent);
     }
 
     /// <summary>
@@ -194,13 +416,21 @@ public partial class PreviewPanel : UserControl
     /// </summary>
     private void OnWebViewNavigationCompleted(object? sender, WebViewNavigationCompletedEventArgs e)
     {
-        if (e.IsSuccess) return;
+        if (e.IsSuccess)
+        {
+            // 导航成功 → WebView2 环境创建已成功结束，关闭创建窗口期
+            CloseWebViewCreationWindow();
+            return;
+        }
 
+        // 导航失败（Runtime 缺失 / 创建被拒）：**不**关闭创建窗口期，
+        // 紧随其后的异步 WebView2 异常仍需要守卫兜住，否则会终止进程。
+        // 单次导航失败不代表 WebView2 永久不可用，故只降级本次预览，不标记 _webViewUnavailable。
         var vm = _vm;
         if (vm == null || !vm.IsWebViewVisible || vm.IsFallbackActive) return;
 
         App.DebugLog($"WebView navigation failed (IsSuccess=false), falling back to ReverseMarkdown");
-        _ = vm.ShowHtmlFallback(vm.CurrentPreviewFilePath ?? "");
+        vm.ShowHtmlFallbackFromSource(vm.HtmlSourceContent);
     }
 
     /// <summary>

@@ -15,9 +15,8 @@
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
     </PackageReference>
-    <!-- 与 Avalonia 主包版本对齐：12.0.4 与 Avalonia 12.1.2 不匹配会导致
-         Avalonia.Headless.HeadlessWindowImpl 缺 SetFrameThemeVariant 实现，
-         任何实例化 Window 的无头测试都抛 TypeLoadException。 -->
+    <!-- 版本须与 UI 项目 Avalonia 主版本一致（12.1.2），否则 HeadlessWindowImpl 缺少
+         SetFrameThemeVariant 实现，构造 Window 时抛 TypeLoadException -->
     <PackageReference Include="Avalonia.Headless.XUnit" Version="12.1.2" />
   </ItemGroup>
 

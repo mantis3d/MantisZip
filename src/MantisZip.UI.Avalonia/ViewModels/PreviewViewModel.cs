@@ -3098,25 +3098,38 @@ var formatValues = new Dictionary<string, string?>
     }
 
     /// <summary>
-    /// HTML preview fallback: ReverseMarkdown → Markdown → 控件树.
-    /// Called when WebView initialization fails.
+    /// HTML 预览降级（直接使用内存中已解码的 HTML 源码）：ReverseMarkdown → Markdown → 控件树。
+    ///
+    /// 供 PreviewPanel 的 WebView 守卫在 WebView2 不可用时调用：此时 HTML 源码已在
+    /// <see cref="HtmlSourceContent"/> 中，无需再读临时文件 —— 因此不依赖任何文件路径，
+    /// 也不会因为传入压缩包内部条目路径（并非真实文件）而静默失败。
+    /// 全同步执行，避免 fire-and-forget 吞掉异常。
     /// </summary>
-    public async Task ShowHtmlFallback(string filePath)
+    public void ShowHtmlFallbackFromSource(string? html)
     {
-        CleanupHtmlTempFile();
-        _textPreviewBytes = await File.ReadAllBytesAsync(filePath);
-        var (html, _) = DecodePreviewBytes();
-        OnPropertyChanged(nameof(CurrentDetectedEncodingName));
-        OnPropertyChanged(nameof(HasDetectedEncoding));
-        OnPropertyChanged(nameof(DetectedEncodingDisplay));
-        var converter = new Converter();
-        var markdown = converter.Convert(html);
-        RebuildMarkdown(markdown);
-        IsWebViewVisible = false;
-        IsFallbackActive = true;
-        PreviewType = PreviewType.Html;
-        IsPreviewVisible = true;
-        IsToolbarVisible = true;
+        if (string.IsNullOrEmpty(html))
+        {
+            ShowUnsupported();
+            return;
+        }
+
+        try
+        {
+            CleanupHtmlTempFile();
+            var markdown = new Converter().Convert(html);
+            RebuildMarkdown(markdown);
+            IsWebViewVisible = false;
+            IsFallbackActive = true;
+            PreviewType = PreviewType.Html;
+            IsPreviewVisible = true;
+            IsToolbarVisible = true;
+        }
+        catch (Exception ex)
+        {
+            // 降级路径本身失败：只能落到「不支持预览」，绝不让异常冒泡
+            App.DebugLog($"ShowHtmlFallbackFromSource failed: {ex.GetType().Name}: {ex.Message}");
+            ShowUnsupported();
+        }
     }
 
     /// <summary>

@@ -4,7 +4,7 @@
         xmlns:dialogs="clr-namespace:MantisZip.UI.Avalonia.Dialogs"
         x:Class="MantisZip.UI.Avalonia.Dialogs.CustomFilePickerDialog"
         x:CompileBindings="False"
-        Width="900"
+        Width="1100"
         Height="700"
         MinWidth="800"
         MinHeight="500"
@@ -13,7 +13,7 @@
         Background="{DynamicResource ThemeWindowBgBrush}">
 
   <Grid x:Name="RootGrid"
-        RowDefinitions="Auto,*,Auto,Auto"
+        RowDefinitions="Auto,*,Auto,Auto,Auto"
         Margin="{DynamicResource SpacingMdThk}">
 
     <!-- ═══════ Row 0: 地址栏 + 导航按钮 ═══════ -->
@@ -111,7 +111,7 @@
           Grid.Row="1"
           ColumnSpacing="0">
       <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="220" />
+        <ColumnDefinition Width="230" />
         <ColumnDefinition Width="5" />
         <ColumnDefinition Width="*" />
         <ColumnDefinition Width="5" />
@@ -425,8 +425,63 @@
                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
     </Grid>
 
-    <!-- ═══════ Row 3: 确定/取消按钮 ═══════ -->
-    <StackPanel Grid.Row="3"
+    <!-- ═══════ Row 3: 参数区（通用参数宿主 · 无参数时整体隐藏，规则 6） ═══════ -->
+    <!-- 本次调用需要的解压参数（如「保留完整路径」）集中承载于窗口左下；
+         由代码后台 AddOption 注册表驱动：注册任一参数即显示，空注册表整区隐藏。
+         仅 ExtractFolder 等需要参数的模式注册，其余模式 IsVisible 保持 false。 -->
+    <Grid Grid.Row="3"
+          x:Name="OptionsRow"
+          IsVisible="False">
+      <!-- 参数区外框：主题色边框 + 表面色背景 + 紧凑度圆角（规则 4/5） -->
+      <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="{DynamicResource BorderRadius}"
+              Padding="{DynamicResource SpacingSmThk}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <!-- ★ 必须用 Grid 而非横向 StackPanel：StackPanel 沿 orientation 方向给子项无穷宽度，
+             WrapPanel 拿到 ∞ 可用宽度后不会换行，参数变多时整区会溢出窗口 -->
+        <Grid ColumnDefinitions="Auto,*"
+              ColumnSpacing="{DynamicResource SpacingSm}">
+          <!-- 左：参数区标题（仅作分组视觉标识；刻意不加 x:Name，避免与同名属性重复定义导致 CS0102） -->
+          <TextBlock Grid.Column="0"
+                     VerticalAlignment="Center"
+                     FontSize="11"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     Text="{Binding OptionsCaptionText}" />
+
+          <!-- 右：参数项容器（ItemsControl + WrapPanel，参数增多自动换行）。
+               ItemsSource 只由本 XAML 绑定提供，代码后台不重复赋值（单一数据源）。 -->
+          <ItemsControl Grid.Column="1"
+                        ItemsSource="{Binding Options}">
+            <ItemsControl.ItemsPanel>
+              <ItemsPanelTemplate>
+                <WrapPanel Orientation="Horizontal" />
+              </ItemsPanelTemplate>
+            </ItemsControl.ItemsPanel>
+            <ItemsControl.ItemTemplate>
+              <DataTemplate>
+                <!-- 单个参数项：标签 + 控件。MinHeight 用紧凑度资源键（规则 7） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXs}"
+                            Margin="{DynamicResource SpacingXsThk}"
+                            MinHeight="{DynamicResource ControlHeightSm}">
+                  <!-- 参数复选框：双向回推 IsChecked；禁用态仍可弹 ToolTip 提示
+                       （Avalonia 禁用控件不派发指针事件，需 ShowOnDisabled=True） -->
+                  <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                            IsEnabled="{Binding IsEnabled}"
+                            Content="{Binding Label}"
+                            ToolTip.ShowOnDisabled="True"
+                            ToolTip.Tip="{Binding DisabledHint}" />
+                </StackPanel>
+              </DataTemplate>
+            </ItemsControl.ItemTemplate>
+          </ItemsControl>
+        </Grid>
+      </Border>
+    </Grid>
+
+    <!-- ═══════ Row 4: 确定/取消按钮 ═══════ -->
+    <StackPanel Grid.Row="4"
                 Orientation="Horizontal"
                 HorizontalAlignment="Right"
                 Spacing="{DynamicResource SpacingXs}"

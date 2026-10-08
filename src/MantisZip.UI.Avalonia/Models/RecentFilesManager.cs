@@ -10,9 +10,17 @@ public static class RecentFilesManager
 {
     private static readonly string SettingsDir = AppSettings.DataDir;
     private static readonly string RecentFile = Path.Combine(SettingsDir, "recent.json");
-    private const int MaxEntries = 10;
+    private const int DefaultMaxEntries = 10;
 
     private static List<string>? _cache;
+
+    /// <summary>
+    /// 根据配置值解析实际的最大条目数上限。
+    /// 配置值 > 0 时直接使用；<= 0 时回退到默认值 10。
+    /// </summary>
+    /// <param name="configured">AppSettings.MaxRecentFiles 配置值</param>
+    /// <returns>实际生效的最大条目数</returns>
+    public static int ResolveMaxEntries(int configured) => configured > 0 ? configured : DefaultMaxEntries;
 
     /// <summary>
     /// Get the list of recent file paths (most recent first).
@@ -34,8 +42,9 @@ public static class RecentFilesManager
         paths.RemoveAll(p => p.Equals(path, StringComparison.OrdinalIgnoreCase));
         paths.Insert(0, path);
 
-        if (paths.Count > MaxEntries)
-            paths.RemoveRange(MaxEntries, paths.Count - MaxEntries);
+        var maxEntries = ResolveMaxEntries(AppSettings.Load().MaxRecentFiles);
+        if (paths.Count > maxEntries)
+            paths.RemoveRange(maxEntries, paths.Count - maxEntries);
 
         Save(paths);
     }

@@ -33,7 +33,13 @@ internal readonly record struct CdEntry(
     byte[] RawExtraField,
     byte[] RawFileExtra,
     int LfhFilenameLength,
-    int LfhExtraLength
+    int LfhExtraLength,
+    /// <summary>
+    /// 中央目录里文件名的<b>原始字节</b>。copy-mode 重写时原样写回，
+    /// 使删除/添加操作不改变既有条目的文件名编码（避免「解码→重编码」往返损坏）。
+    /// 新增条目（<c>RawFileNameBytes = null</c>）才按传入编码写出。
+    /// </summary>
+    byte[]? RawFileNameBytes = null
 );
 
 /// <summary>
@@ -180,7 +186,9 @@ internal static partial class ZipBinaryRewriter
     /// Thrown if <paramref name="cdOffset"/> is past the stream length,
     /// or a CDFH signature is invalid mid-parse.
     /// </exception>
-    internal static List<CdEntry> ReadCentralDirectory(Stream stream, long cdOffset, int entryCount)
+    internal static List<CdEntry> ReadCentralDirectory(
+        Stream stream, long cdOffset, int entryCount,
+        Encoding? fallbackEncoding = null)
     {
         if (cdOffset >= stream.Length)
             throw new ZipCopyModeException(
@@ -188,6 +196,9 @@ internal static partial class ZipBinaryRewriter
 
         var entries = new List<CdEntry>(entryCount);
         using var reader = new BinaryReader(stream, Encoding.UTF8, leaveOpen: true);
+
+        // bit 11 未置位的条目名按此编码解码（中文 Windows 默认 GBK）
+        fallbackEncoding ??= Encoding.GetEncoding("gbk");
 
         stream.Seek(cdOffset, SeekOrigin.Begin);
 
@@ -222,9 +233,12 @@ internal static partial class ZipBinaryRewriter
             byte[] extraField = reader.ReadBytes(extraFieldLength);
             /* skip file comment */ reader.ReadBytes(fileCommentLength);
 
-            // Decode filename for the CdEntry property; raw bytes are not
-            // round-tripped here (they come from LFH during copy).
-            string fileName = Encoding.UTF8.GetString(fileNameBytes);
+            // 文件名解码：APPNOTE 6.4.4 —— bit 11 置位表示 UTF-8；未置位时按调用方
+            // 提供的编码（默认 GBK，中文 Windows 兼容旧工具）解码。
+            // 关键：**同时保留原始字节**，使 copy-mode 能原样写回，
+            // 无需「解码→重编码」往返（往返会破坏非 UTF-8 编码的包）。
+            Encoding nameEncoding = (flags & 0x0800) != 0 ? Encoding.UTF8 : fallbackEncoding;
+            string fileName = nameEncoding.GetString(fileNameBytes);
 
             entries.Add(new CdEntry(
                 FileName: fileName,
@@ -239,7 +253,8 @@ internal static partial class ZipBinaryRewriter
                 RawExtraField: extraField,
                 RawFileExtra: [],
                 LfhFilenameLength: fileNameLength,
-                LfhExtraLength: 0
+                LfhExtraLength: 0,
+                RawFileNameBytes: fileNameBytes
             ));
         }
 
@@ -318,7 +333,7 @@ internal static partial class ZipBinaryRewriter
 
             // ── Parse existing archive ───────────────────────────────
             var (cdOffset, entryCount, existingComment) = ReadEocd(source);
-            List<CdEntry> entries = ReadCentralDirectory(source, cdOffset, entryCount);
+            List<CdEntry> entries = ReadCentralDirectory(source, cdOffset, entryCount, encoding);
 
             CoreLog.Info($"ZipBinaryRewriter: source has {entries.Count} entries");
 
@@ -378,9 +393,10 @@ internal static partial class ZipBinaryRewriter
                     long entryOffset = output.Position;
 
                     // Compress and write the new entry's LFH + data (streaming with progress)
-                    var (lfhBytes, compressedSize, crc32) =
-                        CompressNewEntry(output, newEntry, encoding,
-                            basePct, entryWeight, progress, cancellationToken);
+        var (lfhBytes, compressedSize, crc32) =
+                            CompressNewEntry(output, newEntry, encoding,
+                                basePct, entryWeight, progress, cancellationToken);
+                    ushort lfhInfoFlags = BitConverter.ToUInt16(lfhBytes, 6);
 
                     bytesAdded += lfhBytes.Length + compressedSize;
 
@@ -394,7 +410,7 @@ internal static partial class ZipBinaryRewriter
                         CompressedSize: compressedSize,
                         UncompressedSize: newEntry.Size,
                         CompressionMethod: (ushort)(newEntry.Store ? 0 : 8),
-                        Flags: 0,
+                        Flags: lfhInfoFlags,
                         LastModifiedDate: dosDate,
                         LastModifiedTime: dosTime,
                         LocalHeaderOffset: 0, // unused; NewOffset in the tuple is used instead
@@ -981,6 +997,12 @@ internal static partial class ZipBinaryRewriter
         using var ms = new MemoryStream();
         uint crc = 0xFFFFFFFF;
 
+        // APPNOTE 6.4.4：文件名含高位字符时必须置 bit 11（UTF-8 标志），
+        // 否则解码器回退到 CP437 解释 → 第三方工具（7-Zip/WinRAR/资源管理器/unzip）显示乱码。
+        // 仅 UTF-8 编码需要置位；GBK 等单字节代码页靠约定识别，不设此位。
+        bool needsUtf8Flag = encoding is UTF8Encoding && entry.EntryName.Any(c => c > 127);
+        ushort generalFlags = needsUtf8Flag ? (ushort)0x0800 : (ushort)0;
+
         Stream? deflateStream = entry.Store
             ? null
             : new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true);
@@ -1040,8 +1062,8 @@ internal static partial class ZipBinaryRewriter
         BitConverter.GetBytes((uint)0x04034b50).CopyTo(lfh, 0);
         // Version needed (2.0)
         BitConverter.GetBytes((ushort)20).CopyTo(lfh, 4);
-        // Flags (0 = no encryption, no data descriptor)
-        BitConverter.GetBytes((ushort)0).CopyTo(lfh, 6);
+        // Flags（bit 11 = UTF-8 文件名标志，见上方 needsUtf8Flag 推导；无加密、无 data descriptor）
+        BitConverter.GetBytes(generalFlags).CopyTo(lfh, 6);
         // Compression method (0 = Store, 8 = Deflate)
         BitConverter.GetBytes((ushort)(entry.Store ? 0 : 8)).CopyTo(lfh, 8);
         // Last modified time
@@ -1105,8 +1127,10 @@ internal static partial class ZipBinaryRewriter
         {
             var (entry, newOffset, isNew, _) = entriesToWrite[i];
 
-            // Encode filename using the detected encoding
-            byte[] fileNameBytes = encoding.GetBytes(entry.FileName);
+            // Encode filename: existing entries reuse their **original raw bytes**
+            // so copy-mode never re-encodes them (deleting one entry must not alter
+            // the encoding of unrelated entries). New entries use the given encoding.
+            byte[] fileNameBytes = entry.RawFileNameBytes ?? encoding.GetBytes(entry.FileName);
             ushort fileNameLen = (ushort)fileNameBytes.Length;
             ushort extraLen = isNew ? (ushort)0 : (ushort)entry.RawExtraField.Length;
 

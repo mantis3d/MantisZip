@@ -171,7 +171,7 @@ await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelis
 - **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`, `IconTestViewModel`（图标测试窗口）、`UiTestViewModel`（UI 控件测试窗口）、`MetadataPanelSettingsViewModel`（元数据面板设置窗口）
 - **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `SelectedItemsExtractService`（选择条目解压，消费 `ExtractPathResolver`）、`CompressFlow`（压缩公共流程：BuildRequest/冲突弹窗/暂停，主窗口 VM 与 CLI 共用）、`ExtractFlow`（解压公共流程 + 冲突弹窗）、`DragDropService`（拖拽解压后置流程）+ `OverlayController`（Win32 覆层）+ `CustomOleDragDrop`（自实现 OLE 拖拽，根治光标）+ `DropTargetDetector`（目标目录检测）+ `DragDropItemExpander`（选中目录展开）+ `DragPreviewBitmapBuilder`（拖拽预览位图）、`PasswordService`（密码验证/自动匹配）、`FileFilterHelper`（文件过滤）、`NativeMethods`（Win32 P/Invoke）、`PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树，`BuildExtractPreview` 与解压共用 `ExtractPathResolver` 保证预览=实际）、`MetadataSettingsManager`（元数据面板配置持久化，见下方信息面板小节）、`MetadataRenderEngine`（元数据渲染引擎，见下方信息面板小节）、`ShellIntegration`（partial 拆分：`ShellIntegration.cs` + `ShellIntegration.Menu.cs` + `ShellIntegration.Assoc.cs`）
 - **Views**: `MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`, `UiTestWindow.axaml`（UI 控件测试，仅 Debug 显示）
-- **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`QuickPathPicker`（自包含路径速选控件，见下方「路径速选子系统」）、`InfoPanel`（元数据信息面板）、`FileFilterEditor`（文件过滤条件编辑器）、`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等）、`QuickPathControl`（路径速选控件）
+- **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`CustomFilePickerDialog`（**统一文件/目录选择器**，新增选择入口必须用它、禁用原生 StorageProvider，见规则 16）、`QuickPathPicker`（自包含路径速选控件，见下方「路径速选子系统」）、`InfoPanel`（元数据信息面板）、`FileFilterEditor`（文件过滤条件编辑器）、`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等）、`QuickPathControl`（路径速选控件）
 - **Converters**: `BrushResourceConverter`（主题色键→画刷）、`GeometryResourceConverter`（资源键→Geometry）
 - **紧凑度模式**: Compact/Normal/Loose 三档，`ApplyCompactness()` 运行时注入 12 个 `DynamicResource`（间距/控件高度/圆角），无需重启
 - **上下文工具栏**: 目录树工具栏（展开/折叠全部+自动展开开关+过滤器+分隔符切换）+ 文件列表工具栏（选择/反选/展平/排序/地址栏），`PathIcon` 矢量按钮
@@ -244,7 +244,7 @@ private bool _optionA;
 - **分卷**: SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB
 - **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
 - **解压扩展**: EnableDragExtract, ExtractPreserveFullPath
-- **上下文菜单**: EnableCompressMenu, EnableOpenMenu, EnableCascadingMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu
+- **上下文菜单**: EnableCompressMenu, EnableOpenMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu（COM 动态菜单 / 静态级联回退，`EnableCascadingMenu` 已废弃移除）
 - **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, ShowPreviewInfoPanel, TextPreviewFontSize, TextPreviewFontFamily, TextEncodingPreference, MaxTablePreviewRows, MaxTablePreviewCols, MaxPreviewFileSize, FontPreviewFontSize, FontPreviewSampleText, FontPreviewEnableLigature, PreviewPosition, InfoPanelOrientation, EnableFormatDetection, PreviewHeadSize
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
 - **外观**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）
@@ -286,10 +286,12 @@ Uses pure Win32 API — no `System.Drawing` dependency (COM host can't use it).
 
 ShellExt reads localized menu text from registry (`HKCU\Software\MantisZip\ContextMenu\Text*`), written by `ShellIntegration.WriteMenuTextToRegistry()` during `InstallCom()`. The UI project's `L.T()` translates 8 `ShellExt_*` keys (zh + en in `strings.*.json`). Fallback to hardcoded Chinese defaults if registry values are absent.
 
-Two modes controlled by `AppSettings.EnableCascadingMenu`:
+Two modes controlled by `AppSettings.EnableDynamicMenu` (default: on):
 
-- **Cascade mode** (default: off): Single "MantisZip" submenu with separators between 浏览/压缩/解压 groups, numbered verbs via `ExtendedSubCommandsKey`
-- **Verb mode**: Individual top-level verbs per target (`*`, `Directory`, `Directory\Background`), with top/bottom separators to isolate from other apps' menus
+- **COM dynamic mode** (default): `InstallCom()` registers the ShellExt COM handler (`MantisZip.ShellExt.comhost.dll`); if COM is unavailable or not yet loaded in Explorer, `CheckComStatus()` installs the static cascade as fallback
+- **Static cascade mode** (`EnableDynamicMenu = off`): single "MantisZip" submenu with separators between 浏览/压缩/解压 groups, numbered verbs via `ExtendedSubCommandsKey`
+
+> 注：旧的 `EnableCascadingMenu`（Cascade vs 顶层独立 Verb 两形态开关）已于 WPF 时期移除（commit `5b431fb`，verb 模式作为死代码废弃，静态路径仅存级联一种形态）；Avalonia 全仓无此字段。
 
 Menu items with individual toggles:
 
@@ -484,8 +486,18 @@ When releasing a new version, update the version string in ALL of these location
 | 2 | `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` | `<Version>x.y.z</Version>` | Avalonia 版 assembly version |
 | 3 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
 | 4 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | 顶部版本号（里程碑总览；细节版本号以 `progress-avalonia-detail.md` 为准） |
+| 5 | `installer.iss` | `#define MyAppVersion "x.y.z"` | WebSetup + Offline 安装脚本的**兜底默认值** |
+| 6 | `installer-selfcontained.iss` | `#define MyAppVersion "x.y.z"` | 离线安装脚本的**兜底默认值** |
 
-**Note:** `installer.iss` no longer requires manual version bumps. The release workflow (`release.yml`) passes the version from the git tag via `/dMyAppVersion=${{ env.VERSION }}` to ISCC at compile time. The `#define MyAppVersion` in `installer.iss` is wrapped in `#ifndef` and serves only as a fallback default for local builds — update it occasionally but it is no longer a release-blocking item.
+**Note:** 两个 `.iss` 文件**不再要求手动改版本号才能发布** —— release workflow（`release.yml` L106 / L128）从 git tag 取版本号，通过 `/dMyAppVersion=$env:VERSION` 在 ISCC 编译期传给两个脚本。两处的 `#define MyAppVersion` 都被 `#ifndef` 包裹，仅作为**本地手工编译安装包时的兜底默认值**。
+
+但仍**建议随 checklist 一并更新**，原因：
+
+- 兜底值一旦滞后（如实际 `0.5.1`、脚本仍写 `0.4.4`），本地 `ISCC installer.iss` 打出的包会带着错误版本号，且**不会有任何编译报错** —— 属静默错误，只有用户拿到包才发现
+- 两个脚本的兜底值**可能各自漂移**（本次即发现 `installer-selfcontained.iss` 长期未随 `installer.iss` 一起更新），列进 checklist 能保证两处一起看
+- 成本极低：各改 1 行
+
+> 历史教训：2026-10-01 升 v0.5.1 时两个 `.iss` 的兜底值仍停在 `0.4.4`，说明"非发布阻塞"容易演变成"长期遗忘"。故列入 checklist，但**不作为发布门禁**。
 
 ## Build output
 
@@ -793,6 +805,49 @@ CoreLog.RedactOverride = msg => LogRedactor.RedactPaths(msg, ...);
 2. `RefreshDebugLogSettings` — SettingsWindow 保存设置后同步刷新
 
 **原因**：Core 层无法引用 AppSettings（依赖倒置），若不通过 `Initialize()` 注入，`CoreLog.Trace`/`Info`/`Error` 写入的日志不会被脱敏，导致完整文件路径泄露到 debug.log。
+
+### 规则 16：文件/目录选择必须使用 CustomFilePickerDialog（禁用原生 StorageProvider）
+
+**核心禁令**：任何新增或修改的文件/目录选择入口，**禁止**使用 Avalonia 原生 `StorageProvider` 选择对话框。
+
+被禁用的 API（经 `TopLevel.GetTopLevel(x).StorageProvider` 调用）：
+
+| 类别 | API |
+|------|-----|
+| 选择对话框 | `OpenFilePickerAsync`、`SaveFilePickerAsync`、`OpenFolderPickerAsync` |
+| 选项/类型 | `FilePickerOpenOptions`、`FilePickerSaveOptions`、`FolderPickerOpenOptions`、`FilePickerFileType` |
+| 原生路径提取 | `IStorageFile`/`IStorageItem` + `TryGetLocalPath()`（自定义选择器直接返回本地路径字符串，不需要） |
+
+> 唯一豁免：`CustomFilePickerDialog.SystemBrowse_Click` 内的原生调用。那是用户主动点击「系统浏览」按钮的降级逃生通道，属有意保留。**不得新增其他豁免点。**
+
+#### 模式选择表（`CustomFilePickerDialog` 静态入口）
+
+| 场景 | 入口 |
+|------|------|
+| 选文件夹 | `ShowFolderAsync(owner, initialPath)` |
+| 保存单个文件 | `ShowSaveFileAsync(owner, initialPath, defaultExtension, fileTypes, suggestedFileName)` |
+| 打开单个文件 | `ShowOpenFileAsync(owner, initialPath, fileExtensions, fileTypes)` |
+| 选文件**或**文件夹（多选累积） | `ShowOpenItemsAsync(owner, initialPath)` → `IReadOnlyList<string>?` |
+| **解压目标目录**（带解压路径 + 冲突预览） | `ShowExtractFolderAsync(owner, entries, initialPath, currentFolder, preserveFullPath)` |
+
+新增选择入口前先在表里找最贴切的模式；表里没有合适的，说明 `CustomFilePickerDialog` 需要先扩展，而不是退回原生对话框。
+
+#### 关键约束
+
+- **解压场景首选 `ShowExtractFolderAsync`**，且**必须实参 `currentFolder` + `preserveFullPath`**（取自 `MainWindowViewModel.CurrentFolder` 与 `AppSettings.ExtractPreserveFullPath`）。漏传会导致预览树与实际解压输出路径不一致，详见上文「Extract path resolution — ExtractPathResolver」。
+- **需要限定扩展名时**用 `fileTypes: [new FileTypeOption(标签, 模式数组)]`；`Patterns` 为空数组 = 不过滤（仅 `OpenFile` 模式有意义）。模式支持 `"*.json"` / `".json"` / `"json"` 三种写法（内部经 `NormalizeExtension` 归一化）。**不要**去改 `MatchesFileFilter` 里的 `SelectedIndex` 硬编码。
+- **文件类型标签走 `LocalizationManager.T()`**（规则 13）；新 key 必须三语成对添加。
+- **`initialPath` 传上下文相关目录**（压缩包所在目录、压缩包同级同名文件夹等）。`ResolveInitialPath` 按 `AppSettings.DefaultPathOrder` 解析，**目标目录不存在是安全的** —— 会自动回退到最近的已存在父目录，真正创建仍由业务流程负责。
+- 允许同时选文件与文件夹时用 `ShowOpenItemsAsync`（原生 `OpenFilePickerAsync` 做不到这点）。
+
+#### 新增/修改后必须自查
+
+```powershell
+# 期望：仅 CustomFilePickerDialog.axaml.cs 内 SystemBrowse_Click 的 3 处命中
+git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -- 'src/*.cs'
+```
+
+出现 `SystemBrowse_Click` 以外的命中即视为违规，必须改用自定义选择器。历史迁移记录见 `docs/progress-avalonia-detail.md` 的 `2026-09-30` 条目（4 处调用点：拖拽解压兜底、添加文件、密码导出、密码导入）。
 
 ## 未来工作
 

@@ -73,9 +73,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 解压目标文件夹选择回调。传入待解压条目、初始路径、当前浏览目录（压缩包内）与保留完整路径设置，
-    /// 返回所选目录路径，取消返回 null。
+    /// 返回所选结果（目标目录 <c>DestPath</c> + 对话框内「保留完整路径」勾选值 <c>PreserveFullPath</c>），取消返回 null。
     /// </summary>
-    public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<string?>>? ShowExtractFolderPicker { get; set; }
+    public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<ExtractPickResult?>>? ShowExtractFolderPicker { get; set; }
 
     /// <summary>
     /// 压缩设置对话框回调。传入 CompressSettingsViewModel，返回 true=确认，false=取消。
@@ -1322,6 +1322,105 @@ public partial class MainWindowViewModel : ObservableObject
         StatusMessage = LocalizationManager.T("Status_PasswordMatched");
     }
 
+    /// <summary>
+    /// 确保当前压缩包已取得可用密码（对齐解压/打开流程）：
+    /// 会话缓存 → 密码库自动匹配（含快速验证）→ 密码对话框循环（错密码重试直到正确或取消）。
+    /// 返回 true=密码已就绪（含非加密包无需密码），false=应中止流程（用户取消/档案损坏/无对话框）。
+    /// </summary>
+    private async Task<bool> TryEnsureArchivePasswordAsync()
+    {
+        if (string.IsNullOrEmpty(CurrentArchivePath)) return false;
+
+        // 会话缓存已有密码 → 直接使用（打开时已快速验证过，无需重复验证）
+        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
+        if (password != null) return true;
+
+        // 非加密包 → 无需密码
+        if (!_hasEncryptedArchive) return true;
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
+        if (engine == null) return false;
+
+        // Phase A：已保存密码静默自动匹配（内部含快速验证，对齐 LoadArchiveAsync）
+        var match = _passwordService.TryMatchPasswordEx(CurrentArchivePath, engine);
+        if (match != null)
+        {
+            var (matchedPwd, _, verifyInfo) = match.Value;
+
+            // 档案损坏：直接报告错误，不再尝试其他密码
+            if (verifyInfo.Result == PasswordVerificationResult.CorruptedOrInvalid)
+            {
+                App.DebugLog($"[Test] Archive corrupted during auto-match: {verifyInfo.DetailMessage}");
+                StatusMessage = LocalizationManager.T("Status_ArchiveCorrupted");
+                await AppMessageBox.Show(
+                    LocalizationManager.T("Status_ArchiveCorrupted"),
+                    LocalizationManager.T("App_ErrorTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            // Success：写入会话缓存与已匹配状态
+            _sessionPasswords[GetSessionPasswordKey(CurrentArchivePath, _currentFormat)] = matchedPwd;
+            _currentPassword = matchedPwd;
+            var savedEntry = FindSavedPasswordEntry(CurrentArchivePath, matchedPwd);
+            _currentPasswordDescription = savedEntry?.Description;
+            _currentPasswordPatterns = savedEntry != null ? new List<string>(savedEntry.Patterns) : null;
+            UpdatePasswordStatus(isMatched: true);
+            return true;
+        }
+
+        // Phase B：密码对话框循环（错密码提示后重试直到正确或取消，对齐 LoadArchiveAsync Phase B）
+        while (_currentPassword == null)
+        {
+            if (ShowPasswordDialog == null)
+            {
+                StatusMessage = LocalizationManager.T("Status_PasswordRequired");
+                return false;
+            }
+
+            var dialogResponse = await ShowPasswordDialog(CurrentArchivePath);
+            if (dialogResponse?.Password == null)
+            {
+                StatusMessage = LocalizationManager.T("Status_PasswordCancelled");
+                return false; // 用户取消
+            }
+
+            var verifyInfo = _passwordService.QuickVerifyPasswordEx(CurrentArchivePath, dialogResponse.Password, engine);
+            if (verifyInfo.Result == PasswordVerificationResult.WrongPassword)
+            {
+                StatusMessage = LocalizationManager.T("Status_WrongPassword");
+                continue;
+            }
+            if (verifyInfo.Result == PasswordVerificationResult.CorruptedOrInvalid)
+            {
+                StatusMessage = LocalizationManager.T("Status_ArchiveCorrupted");
+                await AppMessageBox.Show(
+                    LocalizationManager.T("Status_ArchiveCorrupted"),
+                    LocalizationManager.T("App_ErrorTitle"),
+                    MessageBoxButton.OK, MessageBoxImage.Error);
+                return false;
+            }
+
+            // Success：写入会话缓存与已匹配状态
+            _sessionPasswords[GetSessionPasswordKey(CurrentArchivePath, _currentFormat)] = dialogResponse.Password;
+            _currentPassword = dialogResponse.Password;
+            _currentPasswordDescription = dialogResponse.Description;
+            _currentPasswordPatterns = dialogResponse.Patterns is { Count: > 0 } ? dialogResponse.Patterns.ToList() : null;
+
+            if (dialogResponse.SavePermanently)
+            {
+                var saved = _passwordService.TrySavePassword(dialogResponse.Password, CurrentArchivePath,
+                    dialogResponse.Patterns, dialogResponse.Description);
+                App.DebugLog($"TrySavePassword (test flow): savePermanently=true, result={saved}, path={CurrentArchivePath}");
+            }
+
+            UpdatePasswordStatus(isMatched: true);
+            return true;
+        }
+
+        return true;
+    }
+
     private async Task ShowPreviewAsync(ArchiveItemModel entry)
     {
         App.DebugLog($"[PRV] ShowPreviewAsync start: {entry.Name}, fmt={_currentFormat}");
@@ -1342,6 +1441,18 @@ public partial class MainWindowViewModel : ObservableObject
         try
         {
             var ext = Path.GetExtension(entry.Name);
+
+            // 目录条目：没有可预览内容，直接显示"不支持预览"。
+            // 必须短路，否则魔数检测会对 0 字节目录条目发起无意义的 ExtractHeadAsync 提取。
+            // 目录的名称/大小/日期/压缩率已由 Phase 1 的 UpdateCommonMetadata 用目录聚合值填充，
+            // 因此这里与旧路径（跑完魔数检测再落到 ShowUnsupported）的最终显示效果一致。
+            if (entry.IsDirectory)
+            {
+                App.DebugLog("[PRV] Directory entry, skipping preview pipeline");
+                Preview.ShowUnsupported();
+                StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
+                return;
+            }
 
             // 加密条目且当前无匹配密码：不发起提取，直接提示需要密码。
             // 按条目判断——混合压缩包中未加密的文件仍可正常预览。
@@ -2258,6 +2369,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractAsync）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
             if (openFolder)
             {
                 await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
@@ -2287,6 +2400,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractHere）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
             // 成功后把目标目录写入路径历史（原地解压到压缩包所在目录）
             PathHistoryManager.Record(dest);
         }
@@ -2316,6 +2431,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractToName）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
             // 成功后把目标目录写入路径历史（解压到同名子目录）
             PathHistoryManager.Record(dest);
         }
@@ -2336,7 +2453,8 @@ public partial class MainWindowViewModel : ObservableObject
         var dest = Path.GetDirectoryName(CurrentArchivePath)
                    ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
-        await ExtractSelectedEntriesCoreAsync(entries, dest);
+        // 无对话框入口：不传 preserveFullPath（null → 由 Core 内部的 settings 默认值兜底，避免二次反序列化 settings.json）
+        await ExtractSelectedEntriesCoreAsync(entries, dest, null);
     }
 
     /// <summary>
@@ -2357,10 +2475,10 @@ public partial class MainWindowViewModel : ObservableObject
         var defaultDest = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
 
         var settings = AppSettings.Load();
-        var dest = await ShowExtractFolderPicker(entries, defaultDest, CurrentFolder ?? "", settings.ExtractPreserveFullPath);
-        if (string.IsNullOrEmpty(dest)) return;
+        var pick = await ShowExtractFolderPicker(entries, defaultDest, CurrentFolder ?? "", settings.ExtractPreserveFullPath);
+        if (pick is null || string.IsNullOrEmpty(pick.DestPath)) return;
 
-        await ExtractSelectedEntriesCoreAsync(entries, dest);
+        await ExtractSelectedEntriesCoreAsync(entries, pick.DestPath, pick.PreserveFullPath);
     }
 
     /// <summary>
@@ -2368,7 +2486,7 @@ public partial class MainWindowViewModel : ObservableObject
     /// 与拖拽解压拿到目标路径后完全同一流程：进度窗口、压缩包一行批处理列表、状态驱动、失败弹窗）。
     /// 冲突策略与打开文件夹行为使用 AppSettings 默认值。
     /// </summary>
-    private async Task ExtractSelectedEntriesCoreAsync(List<ArchiveItem> entries, string destinationPath)
+    private async Task ExtractSelectedEntriesCoreAsync(List<ArchiveItem> entries, string destinationPath, bool? preserveFullPath = null)
     {
         if (CurrentArchivePath == null) return;
 
@@ -2378,7 +2496,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         var result = await ExtractFlow.RunSelectedItemsExtractionAsync(
             CurrentArchivePath, password, entries, destinationPath,
-            CurrentFolder ?? "", settings.ExtractPreserveFullPath, settings.FileConflictAction,
+            CurrentFolder ?? "", preserveFullPath ?? settings.ExtractPreserveFullPath, settings.FileConflictAction,
             ShowExtractFileConflictDialogAsync,
             LocalizationManager.T("Status_Extracting"));
 
@@ -2386,6 +2504,8 @@ public partial class MainWindowViewModel : ObservableObject
         {
             case SelectedItemsExtractStatus.Success:
                 StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+                // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.Menu.cs ExtractSelectedEntriesAsync）
+                App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
                 if (settings.OpenFolderAfterExtract)
                 {
                     await OpenExtractedFolderAsync(destinationPath, CurrentArchivePath!, password);
@@ -2670,7 +2790,11 @@ public partial class MainWindowViewModel : ObservableObject
             });
 
         if (completed)
+        {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractTo 命令）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
+        }
     }
 
     [RelayCommand]
@@ -2703,6 +2827,8 @@ public partial class MainWindowViewModel : ObservableObject
             StatusMessage = hasSingleRoot
                 ? LocalizationManager.T("Status_SmartExtractSingleRoot")
                 : LocalizationManager.T("Status_SmartExtractNamed");
+            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs 智能解压）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
         }
     }
 
@@ -2710,6 +2836,11 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task TestArchive()
     {
         if (CurrentArchivePath == null || RunWithProgress == null) return;
+
+        // 加密压缩包先确保密码就绪（会话缓存 → 自动匹配 → 密码对话框，对齐解压/打开流程）。
+        // 无密码/用户取消 → 中止测试，避免 TestArchiveAsync 无密码快速失败造成"静默测试失败"。
+        if (!await TryEnsureArchivePasswordAsync())
+            return; // 状态消息已在该方法内设置
 
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
@@ -2727,10 +2858,21 @@ public partial class MainWindowViewModel : ObservableObject
                 testOk = await engine.TestArchiveAsync(CurrentArchivePath, password, progress, ct);
             });
 
-        if (completed && testOk)
+        if (!completed) return;
+
+        if (testOk)
+        {
             StatusMessage = LocalizationManager.T("Status_TestOK");
+        }
         else
+        {
+            // 密码已验证正确但测试仍失败 → 弹窗提示档案损坏（区别于"需要密码/取消"的静默中止）
             StatusMessage = LocalizationManager.T("Status_TestFailed");
+            await AppMessageBox.Show(
+                LocalizationManager.T("Status_ArchiveCorrupted"),
+                LocalizationManager.T("App_ErrorTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Error);
+        }
     }
 
     [RelayCommand]
@@ -2802,9 +2944,13 @@ public partial class MainWindowViewModel : ObservableObject
             async (progress, ct) =>
             {
                 // 复用解压冲突处理：同一 AppSettings.FileConflictAction 策略 + Ask 弹窗回调（标题区分）
+                var settings = AppSettings.Load();
                 var options = SelectedItemsExtractService.CreateExtractOptions(
-                    AppSettings.Load().FileConflictAction, ShowAddFileConflictDialogAsync);
+                    settings.FileConflictAction, ShowAddFileConflictDialogAsync);
                 options.Password = password;
+                // 文件名编码：与压缩对话框同源，透传用户的 ZIP 文件名编码设置。
+                // 此前未透传，引擎只能靠包内 bit 11 启发式猜编码，导致拖拽添加中文文件名乱码。
+                options.FileNameEncoding = settings.ZipEncoding;
                 // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
                 options.ErrorResolver = CompressFlow.CreateErrorResolver();
                 // entryBasePath：当前浏览的压缩包内目录，null=根目录（与 WPF 版行为一致）
@@ -2839,7 +2985,10 @@ public partial class MainWindowViewModel : ObservableObject
             new[] { deleteEntryPath },
             async (progress, ct) =>
             {
-                await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { deleteEntryPath }, password, progress, ct);
+                // 删除会整包重写，须透传用户的 ZIP 文件名编码设置，
+                // 否则存活的其它条目可能被降级重写成乱码（与 AddFilesToArchiveAsync 同源）。
+                await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { deleteEntryPath }, password, progress, ct,
+                    new ArchiveOptions { FileNameEncoding = AppSettings.Load().ZipEncoding });
             });
 
         if (completed)

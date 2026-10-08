@@ -1,7 +1,16 @@
 # CleanTempOnStartup 设置消费方（Avalonia 启动清理临时目录）
 
-> **状态**: 📋 待实施 | **创建**: 2026-08-20 | **优先级**: P2 | **预估工时**: 1-2h
+> **状态**: 🟡 UI 侧已实施（2026-09-27），Core 层覆盖仍待 `core-temp-root-injectable` | **创建**: 2026-08-20 | **优先级**: P2 | **预估工时**: 1-2h
 > **来源**: [avalonia-wpf-diff-plan.md](avalonia-wpf-diff-plan.md) 待决策 #2
+
+## 实施记录（2026-09-27）
+
+UI 侧启动清理已随「设置项无消费者」批量修复落地（与 `settings-unwired-keys.md` 同批）：
+
+- `App.axaml.cs` 新增 `CleanTempOnStartupCore()`（读 `AppSettings.Load().CleanTempOnStartup`，删除 `AppSettings.GetTempDir()`，失败仅 `DebugLog`），`OnFrameworkInitializationCompleted` 中 `_ = Task.Run(CleanTempOnStartupCore)` fire-and-forget（不阻塞启动）
+- 与本计划方案的差异：用 `AppSettings.Load()`（Avalonia 无 `AppSettings.Instance`）、抽成独立方法并后台执行，其余语义一致
+- **未覆盖**：Core 层 4 处 `%TEMP%\MantisZip` 硬编码（便携模式残留不在 `GetTempDir()` 范围内）→ 仍依赖 [core-temp-root-injectable.md](core-temp-root-injectable.md) 实施后一并清理
+- 验证：构建 0 错误；手动验证（残留文件 → 启动删除 / 关开关 → 保留）待 GUI 测试
 
 ## 背景
 

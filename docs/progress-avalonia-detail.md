@@ -6,6 +6,8 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-08** — 合并 origin/main（ffac140）→ alpha（10 处冲突全部解决）：① `AGENTS.md` 两侧新增规则并入并重编号——规则 0–16 连续唯一（alpha 的 `CoreLog.Initialize` 保持规则 15，main 的 `CustomFilePickerDialog` 选择器禁令顺延为规则 16）；② 进度文档双向归并——`docs/PROGRESS.md` 与本文档按日期从新到旧交错合并（双方 10-06～10-08 条目齐全），共享层 `####` 组序为 main v0.5.2 → alpha v0.5.1 → 共有 v0.5.0，版本号四处一致 0.5.2（AppConstants.cs / csproj / PLAN.md / PROGRESS.md）；③ `ZipBinaryRewriter.cs` 三处 hunk 语义合成——alpha 的 `Store` 条目追加 × main 的 UTF-8 bit-11 标志，LFH 取 `generalFlags` + `Store ? 0 : 8`；④ `MainWindowViewModel.cs` 取 main 的 `settings` 局部变量并删除死代码 `?? new ArchiveOptions()`（`CreateExtractOptions` 返回非空）。其余 5 文件（`App.axaml.cs`、三语 `strings.*.json`、`MantisZip.UI.Avalonia.Tests.csproj`）逐一核验无残留标记（含缩进标记）、JSON 解析通过。验证：全仓冲突标记为零；Core 构建 0 警告 0 错误 + 测试 615 通过 / 3 跳过（含三语 key 集同步校验 `AllThreeLanguages_HaveSameKeySet`）；Avalonia 临时输出路径构建 0/0 + 测试 149 通过 / 5 失败（TestPreview 夹具缺失为预存环境问题，main 10-06 条目已记载；常规路径构建因运行中实例文件锁未执行）
+
 **2026-10-08** — 版本号更新到 0.5.2（AppConstants.cs + csproj，docs/PLAN.md、docs/PROGRESS.md 顶部当前版本同步）
 
 **2026-10-07** — 进度窗口三计划文档整理标注 + PLAN.md 登记行瘦身（计划类）
@@ -34,6 +36,15 @@
   - **G2 实测结论**：`scripts/bench-zip-mt.cs` 加 `--degrees` 后四轮（text / text-rev / media / mixed，degree 1/2/4/8）显示 **N 组无加速**（degree=1 全面最快或持平，degree=2 最差；倒序对照一致）→ **维持默认 `ParallelCompressDegree = Environment.ProcessorCount`**（全局 `MultiThreadedCompression` 默认关，N 组为 opt-in）。
   - **验证**：UI 构建 0 警告 0 错误；Core **608 通过 / 0 失败 / 3 跳过**（+3）；Avalonia **114 通过 / 0 失败 / 2 跳过**。
   - **i18n / 其他**：三语成对新增 `Progress_Preparing`；`.gitignore` 排除 `.buildout/`（验证用生成本地件，约 7.6GB）。
+
+**2026-10-06** — 修复「测试压缩包」加密包静默失败 + 测试流程对齐解压（✅ 已修复，用户报告「加密 RAR 测试无密码时静默失败弹窗也不出」「rar 没有密码的压缩包测试时进度条也不动」）
+  - **根因 1（加密包静默失败）**：`TestArchive` 只从 `_sessionPasswords` 取密码，无会话密码时 `engine.TestArchiveAsync` 以 null 密码快速失败 → 状态栏仅「压缩包测试失败 ❌」，无密码弹窗、无进度。与 `LoadArchiveAsync` 打开流程的密码解析（会话缓存→自动匹配→对话框循环）完全脱节
+  - **根因 2（进度条不动，Core 层）**：`Check()`（=7z.dll TestArchive 语义，整包提取校验）阶段不触发 `Extracting` 事件、只触发 `FileExtractionFinished`（每条目 1 次，`e.PercentDone` 为 byte）；旧 `TestArchiveAsync` 在校验阶段无进度上报，且校验后还冗余逐条目 `ExtractFile` 二次解压（约 2 倍工作量，固实包 O(n²)）
+  - **修复（Avalonia + Core 双轨）**
+    - Core `SevenZipEngine.TestArchiveAsync`：`Check()` 前订阅 `FileExtractionFinished`，用 `e.PercentDone`（`Math.Clamp((double)e.PercentDone, 0, 100)`）+ `e.FileInfo.FileName` 上报 `ArchiveProgress{CurrentFile, PercentComplete, FilePercentComplete}`；**删除冗余逐条目 `ExtractFile` 循环**（编译期修正：`e.FileInfo` 为值类型 `ArchiveFileInfo` 不能用 `?.`、`PercentDone` 为 byte 需显式 double 转换）
+    - Avalonia `MainWindowViewModel`：新增公共方法 `TryEnsureArchivePasswordAsync`（对齐解压/打开流程）——会话缓存 → `TryMatchPasswordEx` 密码库自动匹配（`CorruptedOrInvalid` 直接停）→ `ShowPasswordDialog` + `QuickVerifyPasswordEx` 快速验证循环（错密码重试直到正确或取消）；`TestArchive` 测试前先调用：无密码/取消 → `Status_PasswordCancelled` 中止、不再假失败；密码已验证正确但测试仍失败 → `AppMessageBox` 弹「文件损坏」窗（损坏与密码问题区分）
+  - **实测（mztest，7z.dll v25.00）**：未加密 RAR `D:\soft\FiberShop v3.1.0 Win.rar` 130MB → True 795ms（旧约 1.4s）；未加密 7z `D:\soft\Chaos Player 2.10.00.7z` 105MB → True 776ms 5 次进度；加密 RAR `D:\soft\Phoenix.rar`（密码 aaa）三态：无密码 null→False 7ms、正确 aaa→True 631ms 89 个进度事件、错误 wrong→False 5ms
+  - **验证**：`dotnet build` UI 0 error（3 warning 为既有）、Core 423 通过 / 2 跳过、Avalonia 131 通过 / 5 失败（失败全部为预存环境问题：`TestPreview/attachment-management-0.12.1.zip` 为 gitignore 的测试样本从未入库，与本次改动无关）
 
 **2026-10-05** — N 组并行压缩 Task 3/8：`CompressGroupWithSevenZip` 参数化（Core）
   - **背景**：N 组并行需要每组能独立上报「我是第几组」，并按组身份决定7z 的 `mt` 取值。本 Task **只做参数化、不改行为**，尚无调用方使用批次参数，功能未启用。
@@ -197,6 +208,84 @@
   - **非阻塞瑕疵**（已记录待后续）：内容模式/密度 RadioButton 的 `AutomationId` 仍用旧枚举语义命名（`ModeFullPathRadio`/`ModeDirOnlyRadio`/`ModeNameOnlyRadio`/`Density*Radio`）；`PauseButton`/`CancelButton` 可访问名取到 `Avalonia.Controls.StackPanel`
   - **未完成（F3 残余，均需人眼）**：纯观感（配色美观度/动画流畅度/裁切/失败行是否实际呈红）、条目级 6 态中 4 态（`⏳n%`/`○等待`/`⏭跳过`/`已覆盖`）、密码徽标 `🔑`/熄灭终态 + Flyout + 复制 toast、主窗口路径并行卡正向、TAR/GZ **列表模式**渐进建行、10 万条目 UI 流畅度
 
+**2026-10-04** — 修复点击任意条目即崩溃（WebView2 初始化异常逃逸）（✅ 已修复，用户报告「点压缩包内条目后应用无提示退出」）
+  - **根因（症状放大）**：`PreviewPanel.axaml` 把 `NativeWebView` **常驻在活动视觉树**中。Avalonia 的 `NativeWebView` 在 `OnAttached` 时初始化 WebView2，而**任何**预览都会走到 attach —— 包括点目录、点不支持预览的格式。于是「WebView2 初始化失败」这个本只该影响 HTML 预览的故障，被放大成**任何条目都崩溃**
+  - **★ 异常为何会终止进程（两层）**：① WebView2 初始化是异步的，失败异常在 UI 线程 Dispatcher 上抛出时，栈上早已没有 `ShowPreviewAsync` 的 try/catch（已跨 await 边界）；② 应用**没有任何 Dispatcher 未处理异常订阅者** → 未捕获异常直接杀进程。故现象是「无提示直接退出」而非报错弹窗
+  - **实测证据**：用户环境 ja-JP Win11 报 `E_ACCESSDENIED (0x80070005)`；headless 环境复现为 `RPC_E_CHANGED_MODE (0x80010106)`。二者同源于 `NativeWebView.OnAttached`，**与系统语言无关**（曾误判 locale，已排除）
+  - **修复（三层 + 两个衍生缺陷）**
+    - `PreviewPanel.axaml` 移除常驻 WebView，改为空 `WebViewHost` 容器 + `EnsureWebViewForHtml()` **仅在 HTML 预览时惰性创建**（惰性而非彻底移除，因 HTML 预览仍走 WebView 双轨 + ReverseMarkdown 降级）
+    - `MainWindowViewModel.ShowPreviewAsync` 对 `entry.IsDirectory` **短路**到 `ShowUnsupported()` 并跳过提取 —— 目录本就没有可预览内容
+    - `InstallWebViewGuard()` 订阅 `DispatcherUnhandledException`，命中 `LooksLikeWebViewFailure()` 时标记 `e.Handled=true` 并走 `HandleWebViewUnavailable()` → 自动降级 ReverseMarkdown
+    - **衍生缺陷 1（竞态）**：attach 之后才抛的异常与 `NavigationCompleted` 失败几乎同时发生，原逻辑在导航失败时**提前关闭守卫窗口**，使异常重新无人接管。新增 `_liveWebView` 跟踪 attach 到的实例（attach 前登记、拆卸后清空），守卫条件改为「创建窗口存在 **或** 有存活 WebView」，且**仅 `e.IsSuccess` 时关窗**
+    - **衍生缺陷 2（跨用例竞态）**：`_webViewGuardInstalled` 是静态 bool，只在**首个** Dispatcher 上订阅过；测试套件每个用例各自新建 Dispatcher，后续用例实际**根本没有守卫**，导致全量套件偶发失败。改为 `_guardedDispatcher` 记录已订阅的 Dispatcher 实例，配合静态 `OnWebViewGuardUnhandledException` 按实例幂等安装
+  - **降级路径修正**：原降级方法按**压缩包内部路径** `File.ReadAllBytesAsync` 读 HTML —— 该路径在归档内并不存在，必然失败。改为新增同步 `PreviewViewModel.ShowHtmlFallbackFromSource(string? html)`，直接消费已在内存中的 `HtmlSourceContent`；确认全仓无引用后删除基于文件路径的死方法 `ShowHtmlFallback(string)`
+  - **决策：按用户明确要求走方案 A+B** —— **不强制下载 WebView2**、不引入 `Microsoft.Web.WebView2.Core` 直接依赖；WebView2 缺失或初始化失败一律降级而非崩溃。守卫基于异常类型栈特征匹配，不依赖 SDK API
+  - **测试**：新增 `PreviewWebViewLazyInitTests` **6 条**，替换探索性的 `DirectoryPreviewCrashReproTests`（已删除）。**关键修正**：初版两条用例在 `PreviewPanel` 挂载**前**就断言，属**空转测试**（等于没覆盖 attach 路径），现改为先建面板 + `window.Show()` + pump 再触发预览；目录用例补 `measure/arrange` 后断言 Bounds 有效，证明控件真实参与布局而非被短路跳过
+  - **phase1 `IsPreviewVisible=True` 的解释（非缺陷）**：`window.Show()` 之后异步预览可能已完成，故「面板已可见」与「尚未点击任何条目」并存；真正的不变式是**点击前 `WebViewHost.Content == null`**，已由断言锁定。测试日志标签由 `[phase1] hidden` 改为 `[phase1] attached` 以如实描述
+  - **验证**：Avalonia **136 通过 / 0 失败 / 3 跳过**（139）、Core **423 通过 / 0 失败 / 2 跳过**（425）、`dotnet build -c Release` exit 0（2 warning 为既有：`TextEncodingDetector.cs:121` CS8604、`PreviewViewModel.cs:1406,1442` CS0618 `Bitmap.Save` 已过时）
+  - **⚠ LSP 环境问题（非本次改动引入）**：本机 Roslyn LSP 报约 900 个 CS0246/CS0103，连 `using Avalonia;`、`InitializeComponent`、所有 `x:Name` 字段、全部 `[ObservableProperty]` 生成成员都无法解析。**用 `git stash` 在 pristine HEAD 上复现完全相同的错误**（甚至报出 HEAD 才有的 `HtmlPreviewWebView`/`ShowHtmlFallback`，可证错误与本次改动无关），确认 LSP 未加载项目引用与 source generator 输出（`lsp_status` 显示 `Active LSP clients: 0`）。中途曾因未打开文件返回「No diagnostics found」误判为项目加载正常 —— 该结果只是**未被分析**的假阴性。**结论：本项目以编译器与测试为门禁，LSP 不可作门禁**（同一手法亦用于确认上述 2 个 build warning 为既有）
+  - **未验证**：headless 环境只能模拟 WebView2 **失败**路径；真实**成功**渲染仍需用户实机确认
+
+**2026-10-01** — ZIP 中文文件名编码修复（✅ 已修复，用户报告「拖拽添加中文文件到压缩包后乱码」）
+  - **根因 1（用户可见症状）**：`ZipBinaryRewriter.CompressNewEntry` 构造 LFH/CDFH 时硬编码 `Flags: 0`，写 UTF-8 文件名时**从不置 bit 11**。APPNOTE 6.4.4 要求文件名含高位字符时必须置位，否则解码器回退 CP437 → 7-Zip/WinRAR/资源管理器/`unzip` 显示乱码。**为何应用内看不出来**：`OpenArchiveWithEncodingFallback` 的 `LooksLikeValidCjk` 启发式把 UTF-8 字节猜对了，故本应用内自测正常、外部工具才暴露 —— 这也是该缺陷长期潜伏的原因。压缩对话框走 SharpCompress `ZipWriter`（自动置位）故不受影响
+  - **根因 2（更深层，删文件时损坏其它条目）**：`ReadCentralDirectory` 固定 `Encoding.UTF8.GetString(fileNameBytes)` 解码，`WriteCentralDirectory` 又用传入 `encoding` 重编码 → 「解码→重编码」往返对非 UTF-8 编码的条目必然损坏。`encoding` 参数只管输出、从不影响输入解码。**实测确认删除匹配逻辑本身无误**（keepSet 反向筛选 + OrdinalIgnoreCase 归一名，三种场景含修复前坏包均精确删除），坏的是重写环节把存活条目改成了乱码
+  - **根因 3**：Add/Delete 路径的编码来源是 `ZipHasUtf8Flag(archivePath)` 启发式而非用户设置，`AppSettings.ZipEncoding` 在这两条路径上完全失效
+  - **修复**：`CdEntry` 新增 `RawFileNameBytes`（既有条目文件名原始字节），`WriteCentralDirectory` 原样写回、不参与往返；解码改为按 bit 11 / fallback 判定；新增 `ResolveFileNameEncoding`（显式设置优先），`IArchiveEngine.DeleteEntriesAsync` 加 `ArchiveOptions?` 参数、`MainWindowViewModel.DeleteFiles` 透传 `settings.ZipEncoding`（与 `AddFilesToArchiveAsync` 同源）
+  - **★ 方法论教训**：第一轮只修了根因 3 就以为完成，写完测试**注入旧代码测试照样通过** —— 空转测试差点交付。原因是 copy-mode 保留原始 bit 11，启发式与显式设置在 UTF-8 包上结果相同。改写为「GBK 包逐字节比对删除前后存活条目」才真正锁住根因 2，负控制验证旧行为立即 FAIL。**空转测试的特征：注入缺陷后仍然全绿**
+  - **测试**：新增 7 条（`ZipEngineTests`），关键 2 条为 `DeleteEntriesAsync_NonUtf8Archive_SurvivingEntriesKeepOriginalBytes`（逐字节比对）与 `DeleteEntriesAsync_SameNameDifferentDirs_DeletesOnlyTarget`（同名不同目录不误删）。Core 423 通过 / UI 130 通过 / build 0 error
+  - **对既有乱码包的效果**：文件名现在能正确读回（解码按 bit 11 判定），删除也不再损坏其它条目；但磁盘上的字节仍是坏的，**被外部工具打开仍会乱码**，需重新压缩一次才能彻底修正
+
+**2026-10-01** — v0.5.1 版本发布准备（✅ 已完成）
+  - **版本号 6 处同步升至 0.5.1**：`AppConstants.cs:11`（`Version = "0.5.1"`）、`MantisZip.UI.Avalonia.csproj:12`（`<Version>0.5.1</Version>`）、`installer.iss:6` 与 `installer-selfcontained.iss:8`（`#define MyAppVersion "0.5.1"`，原兜底值均停在 `0.4.4`）、`docs/PLAN.md:7` 与 `docs/PROGRESS.md:10`（当前版本）
+  - **RELEASE_NOTES.md 新增 `## v0.5.1` 章节**：格式对齐 v0.4.5（段落式文件说明 + 中英对照成对条目），未设「版本介绍」小节（v0.5.0 大版本专属）；内容取自 `v0.5.0..HEAD` 的 59 条非合并提交，分 6 组：新预览格式 / 性能 / 交互 / 新增语言 / 修复 / 依赖升级
+  - **截图**：`docs/images/version/v0.5.1/` 下 4 张（`ApngPreview` / `TgaPreview` / `ParallelExtract` / `PreserveFullPathToggle`），附 `README.md` 记录文件名与内容对照
+  - **发布说明内容纪律**：条目须逐条核实「是否真落地」，不可仅凭提交信息转述。本次剔除 2 条未实施项 —— AVIF 预览（有 feat/fix 提交但条目已从发布说明移除）、进度窗口密度模式（**纯计划未实施**：`.omo/plans/未开始/progress-window-enhancement.md` 26 个任务零勾选，代码无密度模式实现，对应提交自述「中等已处理」即中途停止）
+  - **⚠ 已知遗留**：`Preview_ImageLoadFailed` 本地化键已随 AVIF 提交引入，但当前 build 仍有 6 个既有 warning（`TextEncodingDetector.cs:121` CS8604、`PreviewViewModel.cs:1406,1442` CS0618），「修复编译警告」因无法验证清零而未写入发布说明
+
+**2026-10-01** — 解压选择器「保留完整路径」开关 + 左下通用参数区实施完成（✅ 已实现）
+  - **★ 核心缺陷修复**：`ShowExtractFolderAsync` 原返回 `Task<string?>`，**丢弃**用户在弹窗内表达的勾选意图，调用方拿到路径后**回头独立读** `settings.ExtractPreserveFullPath`（`MainWindowViewModel.cs:2375`、`DragDropService.cs:105`）——形成「预览所见 ≠ 实际落盘」。新增 `Dialogs/ExtractPickResult.cs`（`public sealed record ExtractPickResult(string DestPath, bool PreserveFullPath)`）作强类型返回通道，贯穿两个有对话框的消费点
+  - **参数区通用宿主**（用户新增需求，取代原「预览面板标题行右侧复选框」方案）：`RootGrid` `RowDefinitions` 由 `Auto,*,Auto,Auto` 改为 `Auto,*,Auto,Auto,Auto`，新增第 3 行参数区（浏览器网格下方、确定/取消上方，左对齐），**确定/取消 `Grid.Row` 同步 3→4**（漏改会重叠且**不报编译错**）。实现为 `Dialogs/PickerOptionItem.cs`（`public sealed` + `ObservableObject`，含 `Key`/`Label`/`IsChecked`/`IsEnabled`/`DisabledHint`）+ 对话框内 `AddOption(key, labelKey, initial, onChanged, isEnabled, disabledHintKey)` 注册表；**渲染层只遍历注册表生成「标签 + 控件」，不认识任何具体 key** → 新增参数只扩展注册项，不改渲染层与布局；注册表为空则整区 `IsVisible=false`（规则 6）。`ExtractFolderPanel` **零改动**
+  - **关键实现决策**
+    - `ExtractPickResult` **刻意不泛化**为参数字典：类型系统必须保证值一定传到解压侧（正是本缺陷的根因），泛化会削弱它；未来真需动态参数时再扩展（YAGNI）。`CollectOptions()` 经评估为死代码并删除
+    - 容器用 `Grid ColumnDefinitions="Auto,*"` 而非横向 `StackPanel` ——后者沿 orientation 给子项**无穷宽度**，`WrapPanel` 拿到 ∞ 就永不换行，整区溢出窗口
+    - 禁用提示用 Avalonia 12.0.4 提供的 `ToolTip.ShowOnDisabled="True"` + `Tip="{Binding DisabledHint}"`（禁用控件不派发指针事件，ToolTip 默认永不弹出；`DisabledHint` 为 null 时提示服务不打开，天然满足「可用时不提示」）——比原设计的独立 `?` 触发器节点更简，一次性删掉 `?` 节点、派生属性、手动 `RaiseChanged` 三样机制
+    - `MainWindowViewModel.ExtractSelectedEntriesCoreAsync` 用 `bool? preserveFullPath = null`：无对话框入口（`ExtractSelectedHere`）传 `null`，由唯一一处 `preserveFullPath ?? settings.ExtractPreserveFullPath`（`:2375`）兜底，**避免一次解压反序列化两次 `settings.json`**
+  - **消费点四路取值**（三值来源不同，不可混用）：`ExtractSelectedTo`（有对话框）→ `pick.PreserveFullPath`；`DragDropService` 目标检测失败兜底（有对话框）→ `pick.PreserveFullPath`；`ExtractSelectedHere`（无对话框）→ 传 null 走设置兜底；`DragDropService` 已检测到目标（无对话框）→ 保留 `_settings` 初值。另**新发现并修复 `ExtractSettingsWindow.axaml.cs:61` / `:83-87` 两处遗漏调用点**（`BrowseFolder` 是 `Func<Task<string?>>` → CS0029；`BrowseAction` 三元失去公共类型 → CS0173），二者只取 `.DestPath`——整包解压链路 `currentFolder` 取默认 `""`，`TrimCurrentFolderPrefix` 直接早退，该值对其本就无影响
+  - **本地化**：新增 3 key（`Picker_PreserveFullPath` / `Picker_PreserveFullPathDisabledHint` / `Picker_OptionsCaption`），三语成对、UTF-8 无 BOM、纯 CRLF、插入文件头；实测各 1180 key、零重复、key 集完全一致。**未重复添加已存在的 `Picker_ExtractPreviewTitle`**（三语文件第 1060 行）
+  - **测试**：新增 5 个测试文件共 **25 条通过 + 1 条显式 Skip**，Avalonia **130 通过 / 0 失败 / 3 跳过**（基线 105 + 25）、Core 416 通过、`dotnet build` exit 0 / 0 error（6 warning 均为既有：`TextEncodingDetector.cs:121` CS8604、`PreviewViewModel.cs:1406,1442` CS0618 `Bitmap.Save` 已过时，不在本次改动文件内）
+    - 落盘契约 3：真实解压断言 `preserveFullPath × currentFolder` 矩阵；第 3 条锁定「根目录两模式产出完全相同」（决策 a 的可执行证明）。夹具刻意用 `System.IO.Compression` 显式条目名而非 `ZipEngine.CompressAsync`（后者会加源目录前缀破坏断言）
+    - 架构守卫 4：读取生产源码断言「坏接线没有回来」；仓库根发现照抄 `AboutWindowTests.cs:20-32`；匹配前**归一化空白**（否则换行格式化会造成假通过）；`DragDropService` 守卫用**括号配平截取实参列表**而非三元组子串（后者参数换序即假通过）
+    - 参数区结构 5：含 **D1 回归锁**（初值必须播种到选项项）与决策 a 禁用锁
+    - **预览↔落盘逐条对账 7**（核心验收点自动化）：4 个 theory 覆盖 `currentFolder × preserveFullPath` 全矩阵，对比 `ResultPreviewService.BuildExtractPreview` 的预览树路径与真实落盘文件集合——**替代原计划的人工比对，证据更强**
+    - 布局与提示配置 3：**H1 用运行时布局测量**（`ItemsControl` 宽度必须有限且不溢出父容器）+ D3 锁 `ShowOnDisabled` 源码形态（属性名拼错会被 XAML 编译器静默忽略）
+  - **负控制验证（证明非空测）**：注入 `initial: false` → D1 锁 FAIL；注入解压侧 `currentFolder` 与预览侧不一致 → 对账测试 FAIL。由此「预览所见 ≠ 实际落盘」若重现**必然被自动捕获**
+  - **实施中发现的两个环境问题**：① 测试项目 `Avalonia.Headless.XUnit 12.0.4` 与 UI 项目 `Avalonia 12.1.2` **版本偏斜**，构造 Window 时抛 `TypeLoadException`（既有隐患，此前无测试构造 Window 故未暴露）→ 已对齐 12.1.2；② headless 下 `ItemsControl` 的 item 容器不物化（`Measure/Arrange` 与 `Show()` 均无效），故 D3 视觉树路线不可行，改用源码守卫
+  - **⚠ 剩余 GUI 目视验收 3 项**（自动化无法覆盖渲染行为，headless 不派发 hover、不渲染像素）：DoD 12 悬停禁用态 CheckBox 提示是否真弹出 / DoD 20 多参数换行观感 / DoD 21 `ExtractSettingsWindow`「浏览」链路（该链路会显示**常驻禁用**项，属已知可接受副作用）
+  - **规则 16 自查**：`git grep -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync"` 仅 3 处命中，全部位于 `CustomFilePickerDialog.SystemBrowse_Click`（L1275-1343，唯一有意保留的系统浏览逃生通道）
+  - **范围**：预估 2-3h → 实际 3.5-4h；不改 `AppSettings` 字段、不改设置窗口、不改 `ExtractPathResolver`/`ResultPreviewService`/`SelectedItemsExtractService`、不改 WPF（规则 11）
+  - **同步**：计划 §7 重构为「机器可验证 / 仍需 GUI」两部分（避免把可自动化项写成人工验收）；`docs/PLAN.md` P2 区已同步（规则 1）
+
+**2026-10-01** — 解压选择器「保留完整路径」计划改用左下通用参数区 + 修正 18 项缺陷（📋 待实施）
+  - **背景**：2026-09-30 立项的计划（323 行）经两轮审阅 —— 自查 7 项 + **Oracle 架构评审 11 项**，全部经源码逐条核实后修进计划；计划本身从 323 行扩至 785 行
+  - **★ 决策 3（用户新增需求，取代原「标题行右侧复选框」方案）**：参数**独立成区域**放窗口左下（`RootGrid` 新增一行，浏览器网格下方、确定/取消上方，左对齐），供本次调用的参数集中承载；将来更多参数、别的调用情形需要的参数都放这里；没有参数则**整区隐藏**（`IsVisible=false`，规则 6）。实现为**参数注册表** `AddOption(key, labelKey, initial, onChanged, isEnabled, disabledHintKey)`，渲染层只遍历注册表生成「标签 + 控件」，**不认识任何具体 key** → 加参数不改布局与渲染层
+  - **决策 3 的连带收益**：① 原 spec §11「260px 窄面板标题 + 复选框溢出」风险消失（`ExtractFolderPanel` 现零改动）；② 原 D3「禁用态 ToolTip 不显示」的 `?` 节点方案被更优解取代 —— 实测确认 **Avalonia 12.0.4 提供 `ToolTip.ShowOnDisabled`**（`Avalonia.Controls.xml` 中查得 `ShowOnDisabledProperty` / `SetShowOnDisabled(Control, bool)`），直接给 CheckBox 加该属性即可，一次性删掉 `?` 节点、`ShowDisabledHint` 派生属性、手动 `RaiseChanged` 三样机制
+  - **⚠ Oracle 评审：5 项编译阻塞（全部会让 `dotnet build` 失败）**
+    - **B1 返回类型改动波及 6 处调用，原方案只覆盖 4 处** —— `grep` 实测 `ExtractSettingsWindow.axaml.cs:61`（`ViewModel.BrowseFolder` 是 `Func<Task<string?>>`，lambda 返回 `ExtractPickResult?` → **CS0029**）与 `:83-87`（`DestinationPicker.BrowseAction` 三元表达式 `Task.FromResult<string?>` 与 `Task<ExtractPickResult?>` 失去公共类型 → **CS0173**）会编译失败。已补进 §1.3/§6 并给出改法（两条是整包解压链路，`currentFolder` 取默认 `""`，`PreserveFullPath` 对其本就无影响，只取 `.DestPath` 是正确的）
+    - **B2 `item.RaiseChanged(...)` API 不存在** —— CommunityToolkit.Mvvm 8.4.2 的 `ObservableObject` 仅有 `SetProperty` 与 **protected** `OnPropertyChanged`（仓库内 0 处 `RaiseChanged` 用法，正确范式是类内 `OnPropertyChanged(nameof(X))`，见 `SourceArchiveItem.cs:68-69`）；且 protected 方法从对话框的 lambda 外部根本无法调用
+    - **B3 `DisabledHint` 为 `init`-only 却在对话框构造函数赋值** —— **CS8852**，且 `_options[0]` 索引隐含「preserveFullPath 必须第一个注册」的脆弱假设；改为 `AddOption(disabledHintKey:)` 参数、对象初始化器内设置
+    - **B4 `x:Name="OptionsCaptionText"` 与同名 `public` 属性并存** —— Avalonia name generator 在同一 partial 类生成同名 internal 成员 → **CS0102**；现有代码（属性 `ExtractPreviewTitle` vs `x:Name="ExtractPreviewTitleText"`）正是刻意避开此模式
+    - **B5 参数区结构测试 5 条中 4 条编译不过** —— `OptionsRow` 是生成的 `internal` 成员、`InternalsVisibleTo` 仅授予 `MantisZip.Tests`、`AddOption` 是 private；补 `<InternalsVisibleTo Include="MantisZip.UI.Avalonia.Tests" />` 后只测公开面
+  - **⚠ Oracle 评审：2 项高危布局缺陷**
+    - **H1 参数永远不会换行且会溢出窗口** —— 原方案 `Border > StackPanel(Horizontal) > ItemsControl > WrapPanel`，Avalonia 横向 `StackPanel` 沿 orientation 给子项**无穷宽度**，`WrapPanel` 拿到 ∞ 就不换行，一行排到底溢出窗口（DoD 20 必失败）；改用 `Grid ColumnDefinitions="Auto,*"`（本文件 `.axaml:22` 已有 `ColumnSpacing` 先例）
+    - **H2 确定/取消按钮行 `Grid.Row` 3→4 漏改** —— 原方案只是注释暗示、没进改动清单，照做会与参数区重叠且**不报编译错**；已显式列入 §3.3 + §6 + DoD 22
+  - **D2 严重性实测更正（纠正本文档此前的误判）**：原判「阻塞」并称「重复 JSON key 使 `JsonSerializer.Deserialize<Dictionary<string,string>>` 抛 `ArgumentException` → 整张本地化表加载失败 → 波及全应用文案」。**实测为假**：本机 .NET 10 上 `JsonSerializer.Deserialize<Dictionary<string,string>>("{\"a\":\"1\",\"a\":\"2\"}")` 返回 `{"a":"2"}`（**后值覆盖、不抛异常**，count=1），而 `LocalizationManager.cs:85` 正是该调用 → 降级为整洁性问题，**不重复添加已存在的 `Picker_ExtractPreviewTitle` 这个行动不变**
+  - **其他实质修正**：M4 强制要求的「先赋 `ItemsSource` 再 `AddOption`」顺序**无必要**（`ObservableCollection` 两种顺序渲染相同），且 code-behind 赋值会用本地值**覆盖掉 XAML 绑定**形成双数据源 → 删除该行；M3 那句「IsEnabled 由参数自身刷新（如 currentFolder 变化）」描述了**不存在的刷新路径**（`_extractCurrentFolder` 是 readonly）且 `IsPreserveFullPathToggleAvailable` 是死属性 → 让注册 lambda 真正使用它；`CollectOptions()` 裁定为**死代码并删除**（强类型返回使字典无消费者，且 `_options.ToDictionary` 对重复键抛异常；可扩展性由 `AddOption` 本身提供）；M5 守卫测试的仓库根定位照抄 `AboutWindowTests.cs:20-32` 现成模式，DragDrop 守卫改用括号配平截取实参列表（避免参数换序造成的假通过）；M2 契约测试补完整夹具代码（`new ZipEngine().CompressAsync` 建包 + `ListEntriesAsync` 取条目 + `conflictAction:"overwrite"` 绕开弹窗分支）；M7「唯一工厂方法是 `GetEngineByExtension(string, IArchiveEngine)`」不成立（还有单参重载 `:423` 与 `GetEngine(ArchiveFormat)` `:397`）；M6 记录 `ExtractSettingsWindow` 链路会显示**常驻禁用**项这一可接受副作用（`currentFolder` 为空 → `TrimCurrentFolderPrefix` 直接早退，该值在该链路确实无影响）
+  - **交互原型**：`docs/prototypes/extract-preserve-full-path-toggle.html`（单文件，66KB，无外部依赖）—— 复刻对话框三栏布局 + 参数区，JS 移植 `ExtractPathResolver.ResolveRelativePath` 使**预览与落盘共用同一函数**（结构化保证「预览 = 实际」）；含调用情形切换（验证无参数时整区隐藏）、「＋ 添加示例参数」（验证多参数自动换行）、「对照模式」（可交互复现 D1 初值未回填与 D3 禁用态提示）；resolver 输出已用 Node 实测，与契约测试三条断言**逐字一致**
+  - **验证**：计划 785 行 / 16 个代码块闭合 / 17 个表格列数全一致；已失效的 `CollectOptions`/`ShowDisabledHint`/`ItemsSource = _options` 零残留；测试基线 `dotnet test` 实测 **105 通过 / 0 失败 / 2 跳过**（Oracle 未复核此项）
+  - **范围调整**：预估 2-3h → **3.5-4h**（参数区通用宿主 + B1 调用点适配 + B5 测试授权）；i18n 仍为 3 key（`Picker_PreserveFullPath` / `Picker_PreserveFullPathDisabledHint` / `Picker_OptionsCaption`，三语成对）；测试诚实降级为 3 条落盘契约 + 4 条架构守卫 + 5 条参数区结构测试 + **13 项人工验证**（基线 105 + 12 = 117 passed / 0 failed / 2 skipped）
+  - **状态**：📋 待实施；计划头部已标注 spec **已过时**并列出需回写的 8 处差异；同步 `docs/PLAN.md` P2 区（规则 1）
+  - **⚠ 原型未体现 B1/H1**：原型是浏览器模拟，用 `flex-wrap` 天然换行，故 H1 的 `StackPanel`+`WrapPanel` 问题在原型里不会出现；B1 属编译期问题，原型不涉及。**实现时以计划 §3.3 的 AXAML 为准，不要照抄原型的 CSS 结构**
+
 **2026-09-30** — 进度窗口增强 T1-T6 执行完毕（Core 数据通道 + UI 行模型/VM；XAML 布局待 T7-T9）
   - **Core 层（T1-T4）**：
     - `Abstractions/ArchiveEngine.cs`：`ArchiveProgress` 新增 8 个 nullable 字段——冲突统计（`SkippedFiles`/`FailedFiles`/`OverwrittenFiles`）+ ZIP 并行批次（`BatchIndex`/`BatchCount`/`BatchPercentComplete`/`BatchProcessedFiles`/`BatchTotalFiles`），全部 `get; set;` 可选，存量 `new ArchiveProgress{...}` 构造不受影响；`ExtractResult` 新增 `SkippedEntries`/`OverwrittenEntries`（init-only）
@@ -212,6 +301,28 @@
   - **验证**：`dotnet build` 0 错误（`/p:SkipShellExtCopy=true` 规避 Explorer 占用 ShellExt.dll）；Core 544 通过/3 跳过 + Avalonia 96 通过/2 跳过（含 ProgressDisplayCalculatorTests 15 用例）
   - 计划任务 1-6 已勾选（`.omo/plans/未开始/progress-window-enhancement.md`），T7（ProgressWindow.axaml 11 行布局 + code-behind）/T8（密码徽标 + Flyout）/T9（PasswordRetryLoop 5 叶子接线）待执行
 
+**2026-09-30** — 解压选择器「保留完整路径」开关立项（设计与实现计划，📋 待实施）
+  - **背景**：解压目标目录选择对话框（`CustomFilePickerDialog.ShowExtractFolderAsync`）已具备解压路径/冲突预览，但预览所用的「保留完整路径」状态只能在全局设置里改，对话框内无法调整
+  - **★ 核心缺陷**（本次立项的真正动因）：对话框只返回目标路径字符串（`Task<string?>`），调用方拿到路径后**回头独立读** `settings.ExtractPreserveFullPath` 再传给 `ExtractFlow`（`MainWindowViewModel.cs:2375`、`DragDropService.cs:105`）——用户在预览阶段无法表达意图，形成「预览所见 ≠ 实际落盘」
+  - **方案**：新增 `ExtractPickResult(DestPath, PreserveFullPath)` 作返回通道，贯穿两个有对话框的消费点（`ExtractSelectedTo` + 拖拽目标检测失败的兜底弹窗）；`ExtractSelectedHere`（`:2333`）与拖拽非兜底分支不弹对话框、无勾选值可用，**保持按设置值**；`MainWindow.axaml.cs:183-184` 表达式体闭包经逐行核实**零改动**（委托类型与被调方法返回类型同步变更，自然类型恒等匹配）
+  - **决策**（brainstorming 确认）：**A** = 仅本次解压生效、不回写 `AppSettings`（设置窗口仍是唯一来源，作初始勾选值传入）；**a** = 压缩包根目录（`currentFolder` 为空）禁用开关 + ToolTip（此时前缀无可裁剪、两模式结果相同），该等价性由契约测试实测锁定而非文字论证
+  - **⚠ 测试可行性纠正**：设计文档 §10.1 原承诺 3 条 mock 透传测试**不可写**——`ExtractFlow.RunSelectedItemsExtractionAsync` 是 `static` 且内部 `new ProgressWindow`（无 DI 缝隙无法拦截）、`DragDropService` 是 `internal class`（`Services/DragDropService.cs:20`）且 UI 项目 `InternalsVisibleTo` **仅授予 `MantisZip.Tests`**（`MantisZip.UI.Avalonia.csproj`），UI 测试项目编译期即不可引用；已诚实降级为 3 条真实落盘契约测试（`SelectedItemsExtractService` + `new ZipEngine()`，对 `preserveFullPath` × `currentFolder` 交叉断言）+ 3 条精确旧串架构守卫 + 9 项人工验证，差异表待实施后回写 spec
+  - **计划自查**：① `ArchiveEngineFactory` 无 `GetEngine(string)`（唯一工厂方法是 `GetEngineByExtension(path, fallback)`），契约测试直接 `new ZipEngine()`（public）；② `ExtractSelectedHere`（`:2333`）与 `ExtractSelectedTo`（`:2357`）两个调用点都需补参数，只改 1 处会编译失败
+  - **计划落地**：`.omo/plans/未开始/extract-preserve-full-path-toggle.md`（323 行，按 `.omo` 既有格式）+ 设计文档 `docs/superpowers/specs/2026-09-30-picker-preserve-full-path-toggle-design.md`（301 行）；**全案 25 处行号引用经源码逐条核实**，唯一未证实假设（`MainWindow.axaml.cs:183-184`）已关闭
+  - **范围**：预估 2-3h，新增 i18n 3 key（`Picker_PreserveFullPath` / `Picker_PreserveFullPathDisabledHint` / `Picker_ExtractPreviewTitle`，三语成对）；不改 `AppSettings` 字段、不改 `ExtractSettingsWindow`、不改 WPF（规则 11）
+  - **状态**：📋 待实施（用户定「后面有时间再执行」）；同步 `docs/PLAN.md` P2 区（规则 1）
+
+**2026-09-30** — 文件选择入口统一到自定义选择器 + 拖拽解压兜底改用带解压预览的对话框
+  - **背景**：`DropTargetDetector` 在松手位置检测不到 Explorer 窗口时会失败，兜底走 `StorageProvider.OpenFolderPickerAsync` 弹原生目录框——既无解压路径/冲突预览，也与右键「解压选中项到」的交互不一致；同时工具栏「添加文件」与密码管理器导入/导出各自使用原生对话框，与项目已自建的 `CustomFilePickerDialog` 体验割裂
+  - **范围决策**：全仓盘点原生调用点后确认 4 处需迁移（拖拽兜底、添加文件、密码导出、密码导入），而 `CustomFilePickerDialog.SystemBrowse_Click` 内的原生调用是**有意保留**的用户逃生通道，不动
+  - **拖拽兜底**（`DragDropService.cs`）：删除 `PickFolderAsync()`，检测失败时改调 `CustomFilePickerDialog.ShowExtractFolderAsync(_ownerWindow, itemsToExtract, initialPath, _currentFolder, _settings.ExtractPreserveFullPath)`；`initialPath` 取压缩包同级同名文件夹（`Path.Combine(parentDir, Path.GetFileNameWithoutExtension(_archivePath))`，目录尚不存在也无妨，选择器按 `ResolveInitialPath` 回退到最近的已存在父目录，真正创建仍由解压流程负责）；**条目展开提前到选路径之前**——ExtractFolder 模式的选择器需要条目才能渲染解压路径/冲突预览，同时顺带修掉旧顺序「无可解压内容也会先弹一次选择器」的毛病；自身窗口取消判断前移，避免白弹一次框
+  - **添加文件**（`MainWindow.axaml.cs:390`）：`GetOpenFilePaths` 改调 `ShowOpenItemsAsync(this, initialPath: contextPath)`，`contextPath` 取当前压缩包所在目录；选择器放开文件夹选择，与拖拽添加及 `AddFilesToArchiveAsync` 的「文件+文件夹」语义对齐
+  - **密码管理器**（`PasswordManagerWindow.axaml.cs`）：导出改 `ShowSaveFileAsync(defaultExtension: ".json", fileTypes: [JSON 类型], suggestedFileName: "passwords-export.json")`，导入改 `ShowOpenFileAsync(fileTypes: [JSON 类型, 所有文件])`（单选，与原 `AllowMultiple = false` 一致）；删除 `using Avalonia.Platform.Storage;`（`StorageProvider`/`TryGetLocalPath`/`TopLevel` 全部不再使用）
+  - **选择器扩展**（`CustomFilePickerDialog.axaml.cs`）：新增 `public sealed record FileTypeOption(string Label, string[] Patterns)`（空 `Patterns` = 不过滤，仅 OpenFile 有意义）；`ShowSaveFileAsync`/`ShowOpenFileAsync` 增加可选尾参 `fileTypes`（保存侧另加 `suggestedFileName`），旧调用方位置参数不受影响；`BuildFileTypeOptions` 按模式生成默认值（SaveFile=zip/7z/tar.gz，OpenFile=「压缩文件/所有文件」两项）保持各调用方既有行为；`GetSelectedSaveExtension` 与 `MatchesFileFilter` 改为读 `GetSelectedFileTypeOption()?.Patterns` 并经 `NormalizeExtension` 归一化（`"*.json"`/`".json"`/`"json"` 等价，`"*"`/`"*.*"`/空 = 无约束），消除原 `SelectedIndex == 1` 硬编码魔法值；移除随之失效的 `DefaultArchiveExtensions` 常量与 `_fileExtensions` 字段
+  - **本地化**：新增 `Picker_FileTypeJson`（JSON 文件/檔案/files (*.json)）；删除已无调用方的 `Main_SelectFilesTitle`、`Status_DragPickFolder`；三语文件均无 BOM、全 CRLF、key 集完全同步（各 1177 key）
+  - **验证**：`dotnet build` EXIT=0 / 0 错误（仅剩既有 CS0618 `PreviewViewModel.Bitmap.Save` + NU1903/NU1902 依赖公告告警）；`dotnet test tests/MantisZip.UI.Avalonia.Tests` 105 通过 / 0 失败 / 2 跳过（既有 skip），含 `AboutWindowTests.AllThreeLanguages_HaveSameKeySet`；全仓 `PickerAsync` grep 仅剩 3 处且全在 `SystemBrowse_Click` 内；顺手修掉 `DragDropService.cs` 混入的 1 个裸 LF（CRLF=169 / bareLF=0）
+  - **未覆盖**：拖拽兜底链路的 GUI 冒烟（检测失败 → 弹框 → 初始路径落点）需实机点验；C# LSP 此前已被拒绝安装，以 `dotnet build` 作编译级门禁
+
 **2026-09-29** — progress-window-enhancement 计划 v2 全量修订 + 原型迭代至 v6
   - `.omo/plans/未开始/progress-window-enhancement.md` 全量重写为修订版 v2（WPF→Avalonia）：v1 全部文件路径/API/线程模型基于已删除的 WPF 语境（`MantisZip.UI\`、`ProgressWindow.xaml`、`Visibility.Visible`、`Theme_TextSecondary`），不可执行；v2 并入全部审查必改项——路径/`IsVisible`/`Theme*Brush` 迁移、MVVM 属性归位（`ProgressViewModel:24-27`）、多线程方案替换（`Parallel.ForEachAsync` 多实例分批取代 `Parallel.ForEach`+`ManagedThreadId`）、统计埋点改真（`ConflictActionCallback` 不存在 → 10 处 `FileConflictHelper.ResolvePathAsync` 调用点 `File.Exists` 预检计数 skip/overwritten）、`Brush?`/`StatusBrushName` 单一机制、行号全部 grep 刷新
   - 新增两项功能决策并入计划：密码徽标（D1-D4：`_matchedPasswords` 预匹配全亮 / `ResolveCliPassword` 轮到点亮、行内 🔑+●●●● Flyout 尊重 `PasswordRevealByDefault`、删死横幅 PasswordSection+死方法+包装前先 grep 守卫、不显示尝试规则 N/M）+ 密码弹窗兜底（D5-D8：`QuickVerifyPasswordEx` 错密码循环重弹对齐 Phase B `MainWindowViewModel:966-1027`、`PasswordRetryLoop` 共享层 4 叶子接线、取消→行标 `Status_PasswordCancelled` 批继续、不做跨包密码横幅）
@@ -225,6 +336,24 @@
   - **i18n**：`Localization/strings.zh-TW.json` 补 55 个缺失 key（三语 key 集一致，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 通过），维持 UTF-8 无 BOM + CRLF + 2 空格缩进
   - **验证**：`dotnet build --no-incremental` 0 警告 0 错误；Core 511 通过/0 失败/3 跳过 + Avalonia 96 通过/0 失败/2 跳过；TGA 冒烟（ImageSharp 3.1.5 临时工程：无损 64×48 + 手写 RLE 40×40 双样例，完整复刻 `ShowTgaImage` 解码管线）10 项断言全 PASS，临时项目已清理；`TestTgaDirect.cs` 按约定保留
   - 合并策略：不撤销重合并（`origin/alpha` 已推送），保留 `c677a65` + 修复提交路线
+
+**2026-09-27** — 设置项无消费者计划剩余 3 项评估完成（①② 记录结论、③ 修正 AGENTS.md）
+  - **背景**：`.omo/plans/未开始/settings-unwired-keys.md` 剩余 3 项（`ShowPasswordMatchNotification`/`ExtractDestination`/`EnableCascadingMenu`）逐项评估并经用户决策
+  - **① `ShowPasswordMatchNotification`（⏸️ 暂不动，仅记录）**：匹配时机已前移——GUI 打开/解压对话框已冗余，CLI `ResolveCliPassword` 静默是真实缺口；裁剪版移植约 1-2h 优于废弃（废弃需删 5+ 处 UI/方法/key 成本不低于接线）；启动时直接按裁剪版执行
+  - **② `ExtractDestination`（⏸️ 暂不动，仅记录）**：WPF 终版 same-dir/desktop 本就跳过对话框、主路径已富对话框化；推荐 **b 方案**——三入口按设置预填目的地（`ExtractSettingsViewModel` ctor / `ExtractTo` / `ExtractSelectedTo` defaultDest，CLI `--extract` 自动生效），约 1-2h 含镜像测试；c 跳过对话框与「解压到此处」命令重复且丢失过滤/单次冲突覆盖；启动时直接按 b 执行
+  - **③ `EnableCascadingMenu`（✅ 评估+修复闭环）**：核实该字段在 Avalonia/WPF 后期**均不存在**——WPF 已于 `5b431fb` 用已接线的 `EnableDynamicMenu` 替代（COM 动态菜单 / 静态级联回退），verb 模式作为死代码废弃；COM 版 `ContextMenuHandler` 仅支持级联形态；实际缺陷仅为 `AGENTS.md` 两处陈旧描述（设置清单误列 + 「Two modes」段落设置名/默认值/形态三处错误），已修正为 `EnableDynamicMenu` 双模式描述 + 历史注记；零代码，`rg -ni "EnableCascadingMenu" src tests` 零匹配
+  - **同步**：计划文件头部状态/三项表格/评估结论小节/尾部验收标准全部更新；docs/PLAN.md P3 ①②③ 说明同步
+
+**2026-09-27** — 设置项默认值批量修复（7 项「设置写了没人读」，源自「压缩对话框不读默认压缩级别」全量排查）
+  - **背景**：全量对照 WPF 旧版 `LoadDefaults*` 逻辑与 `AppSettings` 引用，共发现 10 项设置无消费者；本批修复 7 项，剩余 3 项（`ShowPasswordMatchNotification`/`ExtractDestination`/`EnableCascadingMenu`）需产品决策，立计划 `.omo/plans/未开始/settings-unwired-keys.md` 并同步 PLAN.md P3
+  - **压缩端**（`CompressSettingsViewModel.cs`）：构造函数补读 `DefaultFormat`/`DefaultLevel`——仅当值在合法选项域（`zip/7z/tar.gz`、`0/3/5/9`）内才赋值，否则保持默认并 `DebugLog`；修复压缩对话框格式恒 zip、级别恒 5
+  - **解压端**（`ExtractSettingsViewModel.cs`）：构造函数补读 `OpenFolderAfterExtract`，解压对话框「解压后打开文件夹」不再恒不勾选
+  - **解压后删原包**（`App.axaml.cs` + `MainWindowViewModel.cs`）：`TryDeleteArchiveAfterExtract` 改 `internal`，接入 GUI 全部 6 处解压成功路径（`ExtractArchive`/`ExtractArchiveHere`/`ExtractArchiveToName`/`ExtractSelectedEntriesCoreAsync`/`ExtractTo`/`SmartExtract`——后两处为审查阶段补漏），此前仅 CLI 解压生效
+  - **最近文件上限**（`RecentFilesManager.cs`）：`MaxEntries=10` 硬编码改为 `ResolveMaxEntries(AppSettings.Load().MaxRecentFiles)` 纯函数（≤0 回退 10），`AddPath` 按设置截断
+  - **启动临时清理**（`App.axaml.cs`）：新增 `CleanTempOnStartupCore()`（读开关 → 删除 `AppSettings.GetTempDir()`，失败仅 DebugLog），`OnFrameworkInitializationCompleted` 中 fire-and-forget 后台执行；落地既有计划 `clean-temp-on-startup-avalonia.md`（UI 侧，Core 层覆盖仍待 `core-temp-root-injectable`）
+  - **提权开关**（`App.axaml.cs`）：`HandleElevationAsync` 在 `IsElevated()` 分支后读 `AllowElevation`——关闭时直接显示 `ElevationInfoDialog` 并返回 false，不再弹提权确认（对齐 WPF `App.Extract.cs:445-452` 等 3 处）
+  - **测试**：`CompressSettingsViewModelTests` 硬断言 5/zip 改为 `AppSettings.Load()` 镜像断言 + 新增 `Constructor_MirrorsAppSettings_DefaultFormatAndLevel`；`ExtractSettingsViewModelTests` 移除写真实 settings.json 的测试与环境依赖断言（`DefaultsToFalse` 在设置为 true 的机器上必挂），合并为镜像断言；新增 `RecentFilesManagerTests`（`ResolveMaxEntries` 纯函数 8 例）
+  - **验证**：`dotnet build` 0 错误；Avalonia 105 通过/2 跳过/0 失败；Core 415 通过（`AllThreeLanguages_HaveSameKeySet` 1 失败经 stash 在干净 HEAD 复现，为既有本地化三语 key 不同步问题，与本批改动无关）
 
 **2026-09-24** — 修复 MT 自定义 Store 格式分拣/写入不一致 + 多线程/自适应压缩测试矩阵
   - **Core 层**：
@@ -1891,6 +2020,13 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.2 (2026-10-06) 修复「测试压缩包」进度条不动（SevenZipEngine.TestArchiveAsync）
+  - **`Core/Engines/SevenZipEngine.cs`**：
+    - 根因：`Check()`（=7z.dll TestArchive 语义，整包提取校验 CRC）阶段**不触发 `Extracting` 事件**、只触发 `FileExtractionFinished`（每条目 1 次，`e.PercentDone` 为 byte）—— 旧实现校验阶段零进度上报，且校验后还冗余逐条目 `ExtractFile` 二次解压（约 2 倍工作量，固实包 O(n²)）
+    - 修复：`Check()` 前订阅 `FileExtractionFinished`，用 `Math.Clamp((double)e.PercentDone, 0, 100)` + `e.FileInfo.FileName` 上报 `ArchiveProgress{CurrentFile, PercentComplete, FilePercentComplete}`；**删除冗余逐条目 `ExtractFile` 循环**（返回值仍由 `Check()` 的 `valid` 决定，语义不变）
+    - 编译期修正：`e.FileInfo` 为值类型 `ArchiveFileInfo` 不能用 `?.`；`PercentDone` 为 byte 需显式 double 转换
+  - **实测（mztest，7z.dll v25.00）**：未加密 RAR 130MB 1.4s→0.8s；未加密 7z 105MB 776ms 5 次进度；加密 RAR 三态正确（无密码 7ms False / 正确密码 631ms True 89 进度事件 / 错误密码 5ms False）
 
 #### v0.5.1 (2026-10-06) N 组并行压缩 Core 侧：N 组分支落地 + 镜像拷贝进度上报 + 源条目枚举器
   - **`Core/Engines/ZipEngine.cs`**：

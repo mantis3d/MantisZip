@@ -590,7 +590,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         // Load password library
         LoadPasswordLibrary();
 
-        // 从 AppSettings 加载默认值
+        // 从 AppSettings 加载默认值（对齐 WPF LoadDefaultsFromSettings）
         try
         {
             var settings = AppSettings.Load();
@@ -609,6 +609,28 @@ public partial class CompressSettingsViewModel : ObservableObject
             AdaptiveCompression = settings.AdaptiveCompression;
             ZipEncryptionMethod = settings.ZipEncryptionMethod ?? "aes256";
             SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders;
+
+            // 默认格式：仅当在合法选项域内时赋值，否则保持 "zip" 并记录日志
+            if (FormatOptions.Contains(settings.DefaultFormat))
+            {
+                DefaultFormat = settings.DefaultFormat;
+            }
+            else
+            {
+                App.DebugLog($"[CompressSettingsViewModel] DefaultFormat '{settings.DefaultFormat}' 不在合法选项域内，回退到 'zip'");
+            }
+
+            // 默认压缩级别：仅当 LevelOptions 包含该 Tag 时赋值，否则保持 5 并记录日志
+            var validLevelTags = CompressionLevelOptions.Select(o => o.Tag).ToHashSet();
+            var levelTag = settings.DefaultLevel.ToString();
+            if (validLevelTags.Contains(levelTag))
+            {
+                CompressionLevel = settings.DefaultLevel;
+            }
+            else
+            {
+                App.DebugLog($"[CompressSettingsViewModel] DefaultLevel {settings.DefaultLevel} 不在合法选项域内，回退到 5");
+            }
         }
         catch { /* 使用默认值 */ }
 

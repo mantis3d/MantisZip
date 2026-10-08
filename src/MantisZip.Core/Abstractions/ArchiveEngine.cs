@@ -430,9 +430,14 @@ public class ExtractResult
         /// <param name="password">密码（可选）</param>
         /// <param name="progress">进度报告</param>
         /// <param name="cancellationToken">取消令牌</param>
+        /// <param name="options">
+        /// 压缩选项。删除会整包重写，仅 <see cref="ArchiveOptions.FileNameEncoding"/> 被使用：
+        /// 决定存活条目重写时的文件名编码。传 null 时引擎按包内 bit 11 推断
+        /// （调用方应尽量透传用户的编码设置，避免把存活条目降级成乱码）。
+        /// </param>
         /// <exception cref="FileNotFoundException">条目在压缩包中不存在</exception>
         /// <exception cref="NotSupportedException">此格式不支持删除操作</exception>
-        Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default);
+        Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null);
 
         /// <summary>
         /// 此引擎是否支持向压缩包添加文件。

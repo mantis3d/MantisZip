@@ -205,6 +205,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
             ConflictAction = settings.FileConflictAction;
         // 并行解压线程数
         ParallelExtractDegree = settings.ParallelExtractDegree;
+        // 解压后打开文件夹（对齐 WPF ExtractSettingsWindow.LoadDefaultsFromSettings 读取 OpenFolderAfterExtract）
+        OpenFolderAfterExtract = settings.OpenFolderAfterExtract;
 
         // 冲突策略选项（ComboBox 用对象绑定——Avalonia 无 WPF 的 SelectedValuePath）
         ConflictActionOptions.Add(new Option(LocalizationManager.T("Extract_Conflict_Ask"), "ask"));

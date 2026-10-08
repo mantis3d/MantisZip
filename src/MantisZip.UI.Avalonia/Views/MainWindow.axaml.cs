@@ -409,12 +409,11 @@ public partial class MainWindow : Window
 
         vm.GetOpenFilePaths = async () =>
         {
-            var result = await StorageProvider.OpenFilePickerAsync(new FilePickerOpenOptions
-            {
-                Title = LocalizationManager.T("Main_SelectFilesTitle"),
-                AllowMultiple = true
-            });
-            return result.Count > 0 ? result.Select(f => f.TryGetLocalPath()).Where(p => p != null).Cast<string>().ToList() : null;
+            // 以当前已打开压缩包的所在目录作为「场景相关路径」初值（无则 null → 走优先级链其它来源）
+            var contextPath = vm.CurrentArchivePath is { } archive
+                ? Path.GetDirectoryName(archive)
+                : null;
+            return await CustomFilePickerDialog.ShowOpenItemsAsync(this, initialPath: contextPath);
         };
 
         // ── Wire up metadata panel settings → open Settings window ──
