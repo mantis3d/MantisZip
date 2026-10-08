@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>解压设置 — 内嵌文件选择器原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #1e1e2e; color: #cdd6f4; min-height: 100vh; padding: 24px; }
+  h1 { font-size: 16px; margin-bottom: 16px; color: #89b4fa; }
+  .note { font-size: 12px; color: #6c7086; margin-bottom: 16px; }
+  .window { width: 1060px; margin: 0 auto; background: #181825; border: 1px solid #313244; border-radius: 10px; padding: 16px; display: grid; grid-template-columns: 430px 6px 1fr; gap: 0; }
+  .tabs { display: flex; border-bottom: 1px solid #313244; margin-bottom: 12px; }
+  .tab { padding: 7px 14px; font-size: 13px; cursor: pointer; color: #6c7086; border-bottom: 2px solid transparent; }
+  .tab.active { color: #cdd6f4; border-bottom-color: #89b4fa; }
+  .card { background: #1e1e2e; border: 1px solid #313244; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+  .card-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .listbox { border: 1px solid #313244; border-radius: 4px; max-height: 150px; overflow-y: auto; }
+  .lb-row { display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; }
+  .lb-row:hover { background: #313244; }
+  .lb-row .path { color: #6c7086; font-size: 11px; margin-left: auto; }
+  .lb-row .rm { color: #f38ba8; cursor: pointer; opacity: .6; }
+  .lb-row .rm:hover { opacity: 1; }
+  .muted { color: #6c7086; font-size: 12px; }
+  .splitter { background: #313244; border-radius: 2px; }
+  .preview { border: 1px solid #313244; border-radius: 6px; padding: 12px; font-size: 13px; color: #6c7086; min-height: 420px; }
+  .tree-row { padding: 3px 8px; border-radius: 4px; font-size: 13px; color: #a6adc8; }
+  .tree-row:hover { background: #313244; }
+  .tree-row.dir { color: #cdd6f4; }
+  .tree-row.conflict { color: #f9e2af; }
+  .picker { border: 1px solid #45475a; border-radius: 6px; padding: 10px; }
+  .picker-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .addr { flex: 1; background: #313244; border-radius: 4px; padding: 5px 10px; font-size: 12px; color: #a6adc8; }
+  .pill { font-size: 11px; background: #313244; padding: 3px 8px; border-radius: 10px; cursor: pointer; }
+  .pill:hover { background: #45475a; }
+  .mode-switch { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; color: #a6adc8; }
+  .switch { width: 34px; height: 18px; background: #45475a; border-radius: 9px; position: relative; cursor: pointer; transition: background .2s; }
+  .switch::after { content:''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #cdd6f4; transition: left .2s; }
+  .switch.on { background: #89b4fa; }
+  .switch.on::after { left: 18px; }
+  .file-list { border: 1px solid #313244; border-radius: 4px; height: 190px; overflow-y: auto; }
+  .file-row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 13px; cursor: pointer; user-select: none; }
+  .file-row:hover { background: #313244; }
+  .file-row.sel { background: #313244; box-shadow: inset 2px 0 #89b4fa; }
+  .file-row .ic { width: 16px; text-align: center; }
+  .file-row .sz { margin-left: auto; color: #6c7086; font-size: 11px; }
+  .file-row .cb { width: 14px; height: 14px; accent-color: #89b4fa; display: none; }
+  .file-row.advanced .cb { display: inline-block; }
+  .btn { background: #313244; border: none; color: #cdd6f4; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  .btn:hover { background: #45475a; }
+  .btn.primary { background: #89b4fa; color: #181825; font-weight: 600; }
+  .footer { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .hidden { display: none; }
+  .qp-tab { background:#313244; border:1px solid #45475a; border-radius:4px; padding:2px 7px; cursor:pointer; font-size:13px; }
+  .qp-tab.on { background:#45475a; box-shadow: inset 0 0 0 1px #89b4fa; }
+  .qp-row { display:flex; align-items:center; gap:8px; padding:4px 6px; border-radius:4px; font-size:13px; cursor:pointer; }
+  .qp-row:hover { background:#313244; }
+  .qp-row > div { flex:1; min-width:0; }
+  .qp-tag { font-size:10px; background:#313244; color:#a6adc8; border-radius:3px; padding:1px 5px; }
+  select, input[type=checkbox] { accent-color: #89b4fa; }
+</style>
+</head>
+<body>
+<h1>解压设置窗 — 内嵌文件选择器（原型）</h1>
+<p class="note">要点（对称压缩端）：Tab 顺序 输出设置（最前）/ 选择源 / 解压设置（原基础设置项目移入）/ 文件过滤。目标目录内嵌目录浏览器替代弹窗。第二个 Tab 随场景切换：右键全量解压=「添加压缩包」；选中条目「解压到」/拖拽兜底=「选择要解压的文件」。用下方按钮切换场景查看。</p>
+<div style="margin-bottom:12px">
+  <button class="btn" id="sceneBtn1" onclick="setScene('full')">场景：右键全量解压</button>
+  <button class="btn" id="sceneBtn2" onclick="setScene('pick')">场景：选中条目/拖拽兜底</button>
+</div>
+
+<div class="window">
+  <!-- 左栏 -->
+  <div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(0,this)">输出设置</div>
+      <div class="tab" id="tabPickLabel" onclick="switchTab(1,this)">添加压缩包</div>
+      <div class="tab" onclick="switchTab(2,this)">解压设置</div>
+      <div class="tab" onclick="switchTab(3,this)">文件过滤</div>
+    </div>
+
+    <!-- Tab 0：输出设置（目标目录内嵌浏览器 + 解压选项） -->
+    <div id="tab0">
+      <div class="card">
+        <div class="card-title">目标目录（内嵌目录浏览器）</div>
+        <div class="picker">
+          <div class="picker-bar">
+            <div class="addr" id="outAddr">D:\\Extract</div>
+            <span class="pill">⬆ 上级</span>
+            <span class="pill">★ 收藏</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <div style="width:230px;flex-shrink:0;border:1px solid #313244;border-radius:4px;padding:6px;background:#1e1e2e">
+              <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center">
+                <button class="qp-tab on">🔖</button>
+                <button class="qp-tab">🕘</button>
+                <button class="qp-tab">⚡</button>
+                <button class="qp-tab">📁</button>
+              </div>
+              <div class="addr" style="padding:3px 8px;margin-bottom:6px">搜索路径…</div>
+              <div style="max-height:110px;overflow-y:auto">
+                <div class="qp-row"><span>📁</span><div><div>桌面</div><div class="muted" style="font-size:11px">C:\\Users\\Admin\\Desktop</div></div><span class="qp-tag">收藏</span></div>
+                <div class="qp-row"><span>📁</span><div><div>Extract</div><div class="muted" style="font-size:11px">D:\\Extract</div></div><span class="qp-tag">收藏</span></div>
+              </div>
+            </div>
+            <div style="flex:1;min-width:0">
+              <div class="file-list" id="outDirList" style="height:150px"></div>
+            </div>
+          </div>
+        </div>
+        <label class="mode-switch" style="margin-top:10px;cursor:pointer">
+          <input type="checkbox" checked> 解压后打开目标文件夹
+        </label>
+      </div>
+    </div>
+
+    <!-- Tab 1：添加压缩包（内嵌 picker，简单模式） -->
+    <div id="tab1" class="hidden">
+      <div class="picker">
+        <div class="picker-bar">
+          <div class="addr">D:\\Downloads</div>
+          <span class="pill">⬆ 上级</span>
+          <span class="pill">★ 收藏</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <div style="width:230px;flex-shrink:0;border:1px solid #313244;border-radius:4px;padding:6px;background:#1e1e2e">
+            <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center">
+              <button class="qp-tab on">🔖</button>
+              <button class="qp-tab">🕘</button>
+              <button class="qp-tab">⚡</button>
+              <button class="qp-tab">📁</button>
+            </div>
+            <div class="addr" style="padding:3px 8px;margin-bottom:6px">搜索路径…</div>
+            <div style="max-height:150px;overflow-y:auto">
+              <div class="qp-row"><span>📁</span><div><div>桌面</div><div class="muted" style="font-size:11px">C:\\Users\\Admin\\Desktop</div></div><span class="qp-tag">收藏</span></div>
+              <div class="qp-row"><span>📁</span><div><div>Downloads</div><div class="muted" style="font-size:11px">D:\\Downloads</div></div><span class="qp-tag">收藏</span></div>
+            </div>
+          </div>
+          <div style="flex:1;min-width:0">
+            <div class="mode-switch">
+              <div class="switch" id="advancedSwitch" onclick="toggleAdvanced()"></div>
+              <span id="modeLabel">简单模式（点击即选，切换目录清空选择）</span>
+            </div>
+            <div class="file-list" id="fileList" style="height:165px"></div>
+          </div>
+        </div>
+        <div style="margin-top:10px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px">
+            <b>已选压缩包</b><span class="muted" id="selCount">（0 个）</span>
+            <span style="flex:1"></span>
+            <span class="muted" style="cursor:pointer" onclick="clearSel()">清空</span>
+          </div>
+          <div class="listbox" id="srcList" style="max-height:120px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 1b：选择要解压的文件（选中条目/拖拽兜底场景，替代「添加压缩包」位置） -->
+    <div id="tab1b" class="hidden">
+      <div class="picker">
+        <div class="mode-switch">
+          <div class="switch" id="entryAdvSwitch" onclick="this.classList.toggle('on');renderEntries()"></div>
+          <span>简单模式（点击即选，Shift 范围选；高级=复选框）</span>
+        </div>
+        <div class="file-list" id="entryList" style="height:225px"></div>
+        <div style="margin-top:10px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px">
+            <b>已选条目</b><span class="muted" id="entryCount">（0 项）</span>
+            <span style="flex:1"></span>
+            <span class="muted" style="cursor:pointer" onclick="entrySel.clear();renderEntries();renderEntryList();renderPreviewEntries()">清空</span>
+          </div>
+          <div class="listbox" id="entrySelList" style="max-height:120px"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Tab 2：解压设置（原基础设置项目移入） -->
+    <div id="tab2" class="hidden">
+      <div class="card">
+        <div class="card-title">冲突处理方式</div>
+        <div class="muted">询问 / 覆盖 / 自动重命名 / 跳过 ＋ 并行线程数（1=串行）＋ 保留完整路径</div>
+      </div>
+      <div class="card">
+        <div class="card-title">多包场景提示</div>
+        <div class="muted">过滤/预览统计语义绑定首包</div>
+      </div>
+    </div>
+
+    <div id="tab3" class="hidden">
+      <div class="card"><div class="card-title">文件过滤条件（示意）</div><div class="muted">包含/排除扩展名、大小、日期…</div></div>
+    </div>
+  </div>
+
+  <div class="splitter"></div>
+
+  <!-- 右栏：结果预览树 -->
+  <div>
+    <div class="card-title" style="margin:2px 0 8px">解压预览</div>
+    <div class="preview">
+      <div class="tree-row dir">📁 out/</div>
+      <div style="padding-left:16px" id="previewChildren">
+        <div class="muted" style="padding:3px 8px">（选择压缩包后自动生成）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn primary">开始解压</button>
+    <button class="btn">取消</button>
+  </div>
+</div>
+
+<script>
+  const FILES = [
+    { name: '照片2025.zip', size: '1.2 GB' },
+    { name: '项目源码.7z', size: '86 MB' },
+    { name: '备份_2026.tar.gz', size: '640 MB' },
+    { name: 'archive.rar', size: '2.1 GB' },
+    { name: 'notes.txt', size: '4 KB' },
+    { name: 'old_disk_image.iso', size: '4.3 GB' },
+  ];
+  let selected = new Set();
+  let advanced = false;
+
+  function renderFiles() {
+    const el = document.getElementById('fileList');
+    el.innerHTML = '';
+    FILES.forEach(f => {
+      const isArchive = /\.(zip|7z|rar|tar|gz|tgz|iso)$/i.test(f.name);
+      const row = document.createElement('div');
+      row.className = 'file-row' + (selected.has(f.name) ? ' sel' : '') + (advanced ? ' advanced' : '');
+      row.innerHTML = `<input type="checkbox" class="cb" ${selected.has(f.name)?'checked':''} onclick="event.stopPropagation();cbToggle('${f.name}')">` +
+        `<span class="ic">${isArchive ? '🗃' : '📄'}</span><span>${f.name}</span><span class="sz">${f.size}</span>`;
+      row.onclick = (e) => { if (e.shiftKey) { FILES.filter(x=>/\.(zip|7z|rar|tar|gz|tgz|iso)$/i.test(x.name)).forEach(x=>selected.add(x.name)); sync(); } else toggle(f.name); };
+      el.appendChild(row);
+    });
+  }
+  function toggle(n) { selected.has(n) ? selected.delete(n) : selected.add(n); sync(); }
+  function cbToggle(n) { toggle(n); }
+  function sync() {
+    renderFiles();
+    document.getElementById('selCount').textContent = `（${selected.size} 个）`;
+    document.getElementById('srcList').innerHTML = [...selected].map(n => `<div class="lb-row"><span>🗃</span><span>${n}</span><span class="path">D:\\Downloads</span><span class="rm" onclick="selected.delete('${n}');sync()">✕</span></div>`).join('') || '<div class="muted" style="padding:8px">（空，点击上方文件列表添加）</div>';
+    document.getElementById('previewChildren').innerHTML = [...selected].map(n => `<div class="tree-row">🗃 ${n}</div>`).join('') || '<div class="muted" style="padding:3px 8px">（选择压缩包后自动生成）</div>';
+  }
+  function toggleAdvanced() {
+    advanced = !advanced;
+    document.getElementById('advancedSwitch').classList.toggle('on', advanced);
+    document.getElementById('modeLabel').textContent = advanced
+      ? '高级模式（显示复选框，切换目录时记忆已选）'
+      : '简单模式（点击即选，切换目录清空选择）';
+    sync();
+  }
+  function clearSel() { selected.clear(); sync(); }
+  const DIRS = ['Extract', '2026归档', '网盘同步', 'temp'];
+  function renderOutDirs() {
+    document.getElementById('outDirList').innerHTML = DIRS.map(d =>
+      `<div class="file-row" onclick="document.getElementById('outAddr').textContent='D:\\\\${d}'"><span class="ic">📁</span><span>${d}</span></div>`).join('');
+  }
+  let scene = 'full';
+  function setScene(s) {
+    scene = s;
+    document.getElementById('tabPickLabel').textContent = s === 'full' ? '添加压缩包' : '选择要解压的文件';
+    document.getElementById('sceneBtn1').style.background = s === 'full' ? '#45475a' : '#313244';
+    document.getElementById('sceneBtn2').style.background = s === 'pick' ? '#45475a' : '#313244';
+    const activeIdx = ['tab0','tab1','tab2','tab3'].findIndex(id => !document.getElementById(id).classList.contains('hidden'));
+    // 场景切换时，若当前在 Tab1 则切换到对应形态；否则隐藏非当前场景的 tab1/tab1b
+    const cur = document.querySelector('.tab.active');
+    const idx = cur ? [...document.querySelectorAll('.tab')].indexOf(cur) : 0;
+    switchTab(idx, cur || document.querySelector('.tab'));
+  }
+  function switchTab(i, el) {
+    const show = i === 0 ? 'tab0' : i === 1 ? (scene === 'full' ? 'tab1' : 'tab1b') : i === 2 ? 'tab2' : 'tab3';
+    ['tab0','tab1','tab1b','tab2','tab3'].forEach(id => document.getElementById(id).classList.toggle('hidden', id !== show));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    if (el) el.classList.add('active');
+  }
+  // 条目列表（场景：选中条目/拖拽兜底）
+  const ENTRIES = [
+    { name: 'photos/2025/IMG_001.jpg' }, { name: 'photos/2025/IMG_002.jpg' },
+    { name: 'docs/合同.pdf' }, { name: 'docs/说明.docx' }, { name: 'src/main.cs' }, { name: 'README.md' },
+  ];
+  let entrySel = new Set();
+  function renderEntries() {
+    document.getElementById('entryList').innerHTML = ENTRIES.map(e => {
+      const isDir = e.name.endsWith('/');
+      const adv = document.getElementById('entryAdvSwitch').classList.contains('on');
+      return `<div class="file-row" onclick="entrySel.has('${e.name}')?entrySel.delete('${e.name}'):entrySel.add('${e.name}');renderEntries();renderEntryList();renderPreviewEntries()">
+        <input type="checkbox" class="cb" ${entrySel.has(e.name)?'checked':''} style="display:${adv?'inline-block':'none'}"><span class="ic">📄</span><span>${e.name}</span></div>`;
+    }).join('');
+  }
+  function renderEntryList() {
+    document.getElementById('entryCount').textContent = `（${entrySel.size} 项）`;
+    document.getElementById('entrySelList').innerHTML = [...entrySel].map(n => `<div class="lb-row"><span>📄</span><span>${n}</span><span class="rm" onclick="entrySel.delete('${n}');renderEntries();renderEntryList();renderPreviewEntries()">✕</span></div>`).join('') || '<div class="muted" style="padding:8px">（空）</div>';
+  }
+  function renderPreviewEntries() {
+    document.getElementById('previewChildren').innerHTML = [...entrySel].map(n => `<div class="tree-row">📄 ${n}</div>`).join('');
+  }
+  renderOutDirs();
+  renderEntries(); renderEntryList(); renderPreviewEntries();
+  setScene('full');
+  sync();
+</script>
+</body>
+</html>

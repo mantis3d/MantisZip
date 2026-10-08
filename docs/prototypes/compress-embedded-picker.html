@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>压缩设置 — 内嵌文件选择器原型</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body { font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif; background: #1e1e2e; color: #cdd6f4; min-height: 100vh; padding: 24px; }
+  h1 { font-size: 16px; margin-bottom: 16px; color: #89b4fa; }
+  .note { font-size: 12px; color: #6c7086; margin-bottom: 16px; }
+
+  /* ── 窗口框架 ── */
+  .window { width: 1060px; margin: 0 auto; background: #181825; border: 1px solid #313244; border-radius: 10px; padding: 16px; display: grid; grid-template-columns: 430px 6px 1fr; gap: 0; }
+  .tabs { display: flex; border-bottom: 1px solid #313244; margin-bottom: 12px; }
+  .tab { padding: 7px 14px; font-size: 13px; cursor: pointer; color: #6c7086; border-bottom: 2px solid transparent; }
+  .tab.active { color: #cdd6f4; border-bottom-color: #89b4fa; }
+  .card { background: #1e1e2e; border: 1px solid #313244; border-radius: 6px; padding: 12px; margin-bottom: 12px; }
+  .card-title { font-size: 13px; font-weight: 600; margin-bottom: 8px; }
+  .listbox { border: 1px solid #313244; border-radius: 4px; max-height: 150px; overflow-y: auto; }
+  .lb-row { display: flex; align-items: center; gap: 6px; padding: 6px 10px; font-size: 13px; }
+  .lb-row:hover { background: #313244; }
+  .lb-row .path { color: #6c7086; font-size: 11px; margin-left: auto; }
+  .lb-row .rm { color: #f38ba8; cursor: pointer; opacity: .6; }
+  .lb-row .rm:hover { opacity: 1; }
+  .muted { color: #6c7086; font-size: 12px; }
+
+  /* ── 分割条 / 预览树占位 ── */
+  .splitter { background: #313244; border-radius: 2px; }
+  .preview { border: 1px solid #313244; border-radius: 6px; padding: 12px; font-size: 13px; color: #6c7086; min-height: 420px; }
+  .tree-row { padding: 3px 8px; border-radius: 4px; font-size: 13px; color: #a6adc8; }
+  .tree-row:hover { background: #313244; }
+  .tree-row.dir { color: #cdd6f4; }
+
+  /* ── 内嵌 picker ── */
+  .picker { border: 1px solid #45475a; border-radius: 6px; padding: 10px; }
+  .picker-bar { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; }
+  .addr { flex: 1; background: #313244; border-radius: 4px; padding: 5px 10px; font-size: 12px; color: #a6adc8; }
+  .pill { font-size: 11px; background: #313244; padding: 3px 8px; border-radius: 10px; cursor: pointer; }
+  .pill:hover { background: #45475a; }
+
+  .mode-switch { display: flex; align-items: center; gap: 8px; margin-bottom: 8px; font-size: 12px; color: #a6adc8; }
+  .switch { width: 34px; height: 18px; background: #45475a; border-radius: 9px; position: relative; cursor: pointer; transition: background .2s; }
+  .switch::after { content:''; position: absolute; top: 2px; left: 2px; width: 14px; height: 14px; border-radius: 50%; background: #cdd6f4; transition: left .2s; }
+  .switch.on { background: #89b4fa; }
+  .switch.on::after { left: 18px; }
+
+  .file-list { border: 1px solid #313244; border-radius: 4px; height: 190px; overflow-y: auto; }
+  .file-row { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 13px; cursor: pointer; user-select: none; }
+  .file-row:hover { background: #313244; }
+  .file-row.sel { background: #313244; box-shadow: inset 2px 0 #89b4fa; }
+  .file-row .ic { width: 16px; text-align: center; }
+  .file-row .sz { margin-left: auto; color: #6c7086; font-size: 11px; }
+  .file-row .cb { width: 14px; height: 14px; accent-color: #89b4fa; display: none; }
+  .file-row.advanced .cb { display: inline-block; }
+  .file-row .sub { color: #6c7086; font-size: 11px; }
+
+  /* ── 已选栏 ── */
+  .selbar { margin-top: 8px; border-top: 1px dashed #313244; padding-top: 8px; }
+  .selbar-head { display: flex; align-items: center; gap: 8px; font-size: 12px; cursor: pointer; color: #a6adc8; }
+  .selbar-head .arrow { transition: transform .2s; display: inline-block; }
+  .selbar-head .arrow.open { transform: rotate(90deg); }
+  .selbar-list { display: none; margin-top: 6px; max-height: 110px; overflow-y: auto; }
+  .selbar-list.open { display: block; }
+  .sel-row { display: flex; align-items: center; gap: 6px; font-size: 12px; padding: 3px 4px; }
+  .sel-row .x { color: #f38ba8; cursor: pointer; opacity: .6; }
+  .sel-row .x:hover { opacity: 1; }
+
+  .btn { background: #313244; border: none; color: #cdd6f4; padding: 6px 14px; border-radius: 6px; font-size: 13px; cursor: pointer; }
+  .btn:hover { background: #45475a; }
+  .btn.primary { background: #89b4fa; color: #181825; font-weight: 600; }
+  .footer { grid-column: 1 / -1; display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+  .hidden { display: none; }
+  .qp-tab { background:#313244; border:1px solid #45475a; border-radius:4px; padding:2px 7px; cursor:pointer; font-size:13px; }
+  .qp-tab.on { background:#45475a; box-shadow: inset 0 0 0 1px #89b4fa; }
+  .qp-row { display:flex; align-items:center; gap:8px; padding:4px 6px; border-radius:4px; font-size:13px; cursor:pointer; }
+  .qp-row:hover { background:#313244; }
+  .qp-row > div { flex:1; min-width:0; }
+  .qp-tag { font-size:10px; background:#313244; color:#a6adc8; border-radius:3px; padding:1px 5px; }
+</style>
+</head>
+<body>
+<h1>压缩设置窗 — 内嵌文件选择器（原型）</h1>
+<p class="note">要点：picker 不再弹窗——「添加文件」页内嵌源文件选择（简单模式默认，跨目录记忆开关即高级模式），「输出设置」页内嵌目录浏览器选输出目录；累积面板与折叠式已选栏均已去除，已选源文件列表直接置于 picker 下方；Tab 顺序：输出设置（最前）/ 添加文件 / 压缩设置（原"高级"改名并吸收原"常规设置"全部项目）/ 文件过滤。</p>
+
+<div class="window">
+  <!-- 左栏 -->
+  <div>
+    <div class="tabs">
+      <div class="tab active" onclick="switchTab(0,this)">输出设置</div>
+      <div class="tab" onclick="switchTab(1,this)">添加文件</div>
+      <div class="tab" onclick="switchTab(2,this)">压缩设置</div>
+      <div class="tab" onclick="switchTab(3,this)">文件过滤</div>
+    </div>
+
+    <!-- Tab 0：压缩设置（原"高级"改名，吸收原"常规设置"全部项目） -->
+    <div id="tab0" class="hidden">
+      <div class="card">
+        <div class="card-title">格式 / 压缩级别 / 分卷（原常规设置项目移入）</div>
+        <div class="muted">ZIP · 级别 5 · 不分卷</div>
+      </div>
+      <div class="card">
+        <div class="card-title">高级选项（原"高级"tab 内容）</div>
+        <div class="muted">7z 固实块 · 字典大小 · 多线程 · 加密文件名…</div>
+      </div>
+    </div>
+
+    <!-- 原常规设置 tab 内容已并入「压缩设置」，此 tab 移除 -->
+
+    <!-- Tab 1：内嵌文件选择器 -->
+    <div id="tab1" class="hidden">
+      <div class="picker">
+        <div class="picker-bar">
+          <div class="addr">D:\\Photos\\2026</div>
+          <span class="pill">⬆ 上级</span>
+          <span class="pill">★ 收藏</span>
+        </div>
+        <div style="display:flex;gap:8px">
+          <!-- 左：QuickPathControl（收藏/历史/窗口/目录树 + 搜索 + 路径列表） -->
+          <div style="width:230px;flex-shrink:0;border:1px solid #313244;border-radius:4px;padding:6px;background:#1e1e2e">
+            <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center">
+              <button class="qp-tab on">🔖</button>
+              <button class="qp-tab">🕘</button>
+              <button class="qp-tab">⚡</button>
+              <button class="qp-tab">📁</button>
+            </div>
+            <div class="addr" style="padding:3px 8px;margin-bottom:6px">搜索路径…</div>
+            <div style="max-height:225px;overflow-y:auto">
+              <div class="qp-row"><span>📁</span><div><div>桌面</div><div class="muted" style="font-size:11px">C:\\Users\\Admin\\Desktop</div></div><span class="qp-tag">收藏</span></div>
+              <div class="qp-row"><span>📁</span><div><div>下载</div><div class="muted" style="font-size:11px">C:\\Users\\Admin\\Downloads</div></div><span class="qp-tag">收藏</span></div>
+              <div class="qp-row"><span>📁</span><div><div>Photos 2026</div><div class="muted" style="font-size:11px">D:\\Photos\\2026</div></div><span class="qp-tag">收藏</span></div>
+            </div>
+          </div>
+          <!-- 右：模式开关 + 文件列表 -->
+          <div style="flex:1;min-width:0">
+            <div class="mode-switch">
+              <div class="switch" id="advancedSwitch" onclick="toggleAdvanced()"></div>
+              <span id="modeLabel">简单模式（点击即选，切换目录清空选择）</span>
+            </div>
+            <div class="file-list" id="fileList" style="height:225px"></div>
+          </div>
+        </div>
+
+        <!-- 源文件列表：替代原折叠式已选栏，始终可见，与 picker 选中实时同步 -->
+        <div style="margin-top:10px">
+          <div style="display:flex;align-items:center;gap:8px;font-size:12px;margin-bottom:6px">
+            <b>已选源文件</b><span class="muted" id="selCount">（0 项）</span>
+            <span style="flex:1"></span>
+            <span class="muted" style="cursor:pointer" onclick="clearSel()">清空</span>
+          </div>
+          <div class="listbox" id="srcList" style="max-height:120px"></div>
+        </div>
+      </div>
+    </div>
+
+    <div id="tab2" class="hidden">
+      <div class="card"><div class="card-title">文件过滤条件（示意）</div><div class="muted">包含/排除扩展名、大小、日期…</div></div>
+    </div>
+
+    <!-- Tab 3：输出设置（内嵌目录选择器 + 其他输出选项） -->
+    <div id="tab3">
+      <div class="card">
+        <div class="card-title">输出目录（内嵌目录浏览器，点击即选，无需弹窗）</div>
+        <div class="picker">
+          <div class="picker-bar">
+            <div class="addr" id="outAddr">D:\\backup</div>
+            <span class="pill">⬆ 上级</span>
+            <span class="pill">★ 收藏</span>
+          </div>
+          <div style="display:flex;gap:8px">
+            <!-- 左：QuickPathControl -->
+            <div style="width:230px;flex-shrink:0;border:1px solid #313244;border-radius:4px;padding:6px;background:#1e1e2e">
+              <div style="display:flex;gap:4px;margin-bottom:6px;align-items:center">
+                <button class="qp-tab on">🔖</button>
+                <button class="qp-tab">🕘</button>
+                <button class="qp-tab">⚡</button>
+                <button class="qp-tab">📁</button>
+              </div>
+              <div class="addr" style="padding:3px 8px;margin-bottom:6px">搜索路径…</div>
+              <div style="max-height:135px;overflow-y:auto">
+                <div class="qp-row"><span>📁</span><div><div>桌面</div><div class="muted" style="font-size:11px">C:\\Users\\Admin\\Desktop</div></div><span class="qp-tag">收藏</span></div>
+                <div class="qp-row"><span>📁</span><div><div>备份</div><div class="muted" style="font-size:11px">D:\\backup</div></div><span class="qp-tag">收藏</span></div>
+              </div>
+            </div>
+            <!-- 右：目录列表 -->
+            <div style="flex:1;min-width:0">
+              <div class="file-list" id="outDirList" style="height:160px"></div>
+            </div>
+          </div>
+        </div>
+        <div class="mode-switch" style="margin-top:10px">
+          <span style="min-width:64px">文件名</span>
+          <div class="addr" style="flex:0 0 240px">archive.zip</div>
+        </div>
+        <div class="muted" style="margin-top:6px">完整输出路径：<span id="outFull">D:\\backup\\archive.zip</span></div>
+      </div>
+      <div class="card">
+        <div class="card-title">其他输出选项（示意占位）</div>
+        <div class="muted">压缩完成后打开所在文件夹 · 保留原目录结构 · 加密…</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="splitter"></div>
+
+  <!-- 右栏：结果预览树 -->
+  <div>
+    <div class="card-title" style="margin:2px 0 8px">压缩预览</div>
+    <div class="preview" id="preview">
+      <div class="tree-row dir">📁 archive/</div>
+      <div style="padding-left:16px" id="previewChildren">
+        <div class="muted" style="padding:3px 8px">（选择文件后自动生成）</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="footer">
+    <button class="btn primary">开始压缩</button>
+    <button class="btn">取消</button>
+  </div>
+</div>
+
+<script>
+  // ── 模拟数据 ──
+  const FILES = [
+    { name: 'IMG_0001.jpg', size: '2.4 MB', dir: true },
+    { name: 'IMG_0002.jpg', size: '1.8 MB' },
+    { name: 'IMG_0003.jpg', size: '3.1 MB' },
+    { name: '备份.zip', size: '12 MB' },
+    { name: 'notes.txt', size: '4 KB' },
+    { name: '假期照片', size: '', folder: true },
+  ];
+  // 已选：简单模式下 = 当前目录选中；高级模式下 = 跨目录汇总（这里简化为单集合 + 记忆演示）
+  let selected = new Set();
+  let advanced = false;
+
+  function renderFiles() {
+    const el = document.getElementById('fileList');
+    el.innerHTML = '';
+    FILES.forEach((f, i) => {
+      const row = document.createElement('div');
+      row.className = 'file-row' + (selected.has(f.name) ? ' sel' : '') + (advanced ? ' advanced' : '');
+      row.innerHTML = `<input type="checkbox" class="cb" ${selected.has(f.name)?'checked':''} onclick="event.stopPropagation();cbToggle('${f.name}')">` +
+        `<span class="ic">${f.folder ? '📁' : '📄'}</span>` +
+        `<span>${f.name}</span>` +
+        (f.folder ? '' : `<span class="sz">${f.size}</span>`);
+      row.onclick = (e) => { if (e.shiftKey) { /* 范围多选：示意从上一点击到当前全部选中 */ 
+          FILES.forEach(x => { if (!x.folder) selected.add(x.name); }); sync(); }
+        else toggle(f.name); };
+      el.appendChild(row);
+    });
+  }
+  function toggle(n) { selected.has(n) ? selected.delete(n) : selected.add(n); sync(); }
+  function cbToggle(n) { toggle(n); }
+  function sync() { renderFiles(); renderSelBar(); renderSrcList(); renderPreview(); }
+  function toggleAdvanced() {
+    advanced = !advanced;
+    document.getElementById('advancedSwitch').classList.toggle('on', advanced);
+    document.getElementById('modeLabel').textContent = advanced
+      ? '高级模式（显示复选框，切换目录时记忆已选）'
+      : '简单模式（点击即选，切换目录清空选择）';
+    // 简单模式：切换目录语义直接体现为清空——这里用"回到简单即保留当前"演示，真实行为切目录时清空
+  renderOutDirs();
+  sync();
+  }
+  function toggleSelBar() {
+    document.getElementById('selList').classList.toggle('open');
+    document.getElementById('selArrow').classList.toggle('open');
+  }
+  function renderSelBar() {
+    document.getElementById('selCount').textContent = `（${selected.size} 项）`;
+  }
+  function renderSrcList() {
+    const el = document.getElementById('srcList');
+    el.innerHTML = [...selected].map(n => `<div class="lb-row"><span>📄 ${n}</span><span class="path">D:\\Photos\\2026</span><span class="rm" onclick="selected.delete('${n}');sync()">✕</span></div>`).join('') || '<div class="muted" style="padding:8px">（空，点击上方文件列表添加）</div>';
+  }
+  function renderPreview() {
+    document.getElementById('previewChildren').innerHTML = [...selected].map(n => `<div class="tree-row">📄 ${n}</div>`).join('') || '<div class="muted" style="padding:3px 8px">（选择文件后自动生成）</div>';
+  }
+  function clearSel() { selected.clear(); sync(); }
+  // 输出目录选择器（简化演示）：只列目录，点击即设为输出目录
+  const DIRS = ['backup', '2026归档', '网盘同步', 'temp'];
+  let outDir = 'D:\\backup';
+  function renderOutDirs() {
+    document.getElementById('outDirList').innerHTML = DIRS.map(d =>
+      `<div class="file-row" onclick="outDir='D:\\\\${d}';document.getElementById('outAddr').textContent=outDir;document.getElementById('outFull').textContent=outDir+'\\\\archive.zip'"><span class="ic">📁</span><span>${d}</span></div>`).join('');
+  }
+  function switchTab(i, el) {
+    ['tab3','tab1','tab0','tab2'].forEach((id,j) => document.getElementById(id).classList.toggle('hidden', i!==j));
+    document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+    el.classList.add('active');
+  }
+  sync();
+</script>
+</body>
+</html>

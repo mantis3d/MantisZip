@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-08** — 立项「文件选择器去弹窗化」：CustomFilePickerControl 内嵌方案（📋 计划阶段，含交互原型）
+  - **交互决策**：压缩/解压设置窗的文件/目录选择器全部内嵌，不再弹独立窗口；Tab 结构调整——压缩端输出设置（最前）/ 添加文件 / 压缩设置（原「高级」改名并吸收原「常规」）/ 文件过滤，解压端对称
+  - **简单选择模式**：PickItems 默认简单模式——隐藏复选框、单击即选、Shift 范围多选、覆盖语义、双击目录进入并清空选择；高级开关（复选框 + 跨目录记忆）切回累积形态
+  - **累积面板去除**：不再有独立累积面板/折叠式已选栏，「已选源文件」ListBox 置于内嵌 picker 下方并与选择实时双向同步；内嵌 picker 左栏放 QuickPathControl 左右布局
+  - **解压端**：「解压到」/拖拽兜底场景第二个 Tab 按场景形态替换（「添加压缩包」或「选择要解压的文件」），保留指定条目语义
+  - **实施分三步**：①抽取 CustomFilePickerControl 纯重构（窗口薄壳化、零行为变更）②压缩窗接入 ③解压窗接入
+  - **产物**：原型 `docs/prototypes/compress-embedded-picker.html` + `docs/prototypes/extract-settings-embedded.html`；计划 `.omo/plans/未开始/embedded-file-picker.md`；PLAN.md 已登记
+
 **2026-10-06** — 修复「测试压缩包」加密包静默失败 + 测试流程对齐解压（✅ 已修复，用户报告「加密 RAR 测试无密码时静默失败弹窗也不出」「rar 没有密码的压缩包测试时进度条也不动」）
   - **根因 1（加密包静默失败）**：`TestArchive` 只从 `_sessionPasswords` 取密码，无会话密码时 `engine.TestArchiveAsync` 以 null 密码快速失败 → 状态栏仅「压缩包测试失败 ❌」，无密码弹窗、无进度。与 `LoadArchiveAsync` 打开流程的密码解析（会话缓存→自动匹配→对话框循环）完全脱节
   - **根因 2（进度条不动，Core 层）**：`Check()`（=7z.dll TestArchive 语义，整包提取校验）阶段不触发 `Extracting` 事件、只触发 `FileExtractionFinished`（每条目 1 次，`e.PercentDone` 为 byte）；旧 `TestArchiveAsync` 在校验阶段无进度上报，且校验后还冗余逐条目 `ExtractFile` 二次解压（约 2 倍工作量，固实包 O(n²)）
