@@ -6,6 +6,8 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-08** — 版本号更新到 0.5.2（AppConstants.cs + csproj，docs/PLAN.md、docs/PROGRESS.md 顶部当前版本同步）
+
 **2026-10-07** — 进度窗口三计划文档整理标注 + PLAN.md 登记行瘦身（计划类）
   - **背景**：`progress-window-enhancement`（v2）的「原型对应表」误读 v6 原型两组切换器，是返工根因；由此衍生的 `progress-window-prototype-alignment`（纠偏）与 `progress-window-bytes-i18n`（后续）三份文档存在过时/错误描述（已删枚举仍在宣扬、已实施的 Deferred 仍标「明确不做」、登记行超长不可读）。执行后续计划前先做文档整理，避免再被误导。
   - **`progress-window-enhancement.md`（只标注不重写）**：顶部新增「效力状态」表（T1–T4/T8/T9 ✅ 有效；原型对应表 ❌ 作废；`TopDisplayMode`/`DensityMode` ❌ 已删除；统计/ETA/布局 ✅ 框架有效但已重排；F3 归并）；原型对应表整表打作废戳、前两行划掉并写明返工代价；TL;DR 双开关措辞就地加注；**12 个未勾 Acceptance 实测处置**——10 项勾选并附证据（`RecordSkipped` 引擎 10 处 = Zip4+TarGz4+SevenZip2、`BatchIndex` 6 处赋值、三引擎 `ExtractResult` 均由 `ConflictStatsCounter` 快照回填、`ThemeLight/Dark:147-148` 主题键成对、`OnArchiveSwitch` `ProgressViewModel:902`、终值兜底 `:636`、`HasParallelBatches` `:138/:240`、key 集测试保证三语一致），2 项标 `[~]` 作废/部分作废；F3 拆分为 `[~]`（UI 结构类归 alignment F3，密码循环/ETA 归零/统计抽样等 5 条有效条目并入收口清单）。
