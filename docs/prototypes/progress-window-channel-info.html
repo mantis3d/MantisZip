@@ -2,13 +2,13 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8">
-<title>进度窗口「详细」模式通道信息增强 — 原型</title>
+<title>进度窗口「详细」模式通道信息增强 — 原型 v2（左右分组）</title>
 <style>
 /* 调色板：与 progress-window-enhancement.html / channel-demo 一致（暗色） */
 :root {
   --bg:#1a1a2e; --section:#252540; --item:#3d3d5c; --item-hover:#454570;
   --accent:#6bd46b; --accent2:#4ecdc4; --text:#eaeaea; --dim:#888; --dimmer:#666;
-  --fill:#1E3A5F; --err:#ff6b6b; --warn:#ffd93d; --blue:#6c9ef8;
+  --fill-file:#1E3A5F; --fill-batch:#3D2A5C; --err:#ff6b6b; --warn:#ffd93d; --blue:#6c9ef8;
 }
 * { box-sizing:border-box; margin:0; padding:0; }
 body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
@@ -38,7 +38,6 @@ h1 { font-size:20px; color:var(--accent); }
             border-bottom:1px solid #4a4a6a; font-size:13px; font-weight:600; }
 .titlebar .dot { width:10px; height:10px; border-radius:50%; background:var(--dimmer); }
 .titlebar .name { color:var(--dim); font-size:12px; font-weight:400; }
-/* 密度单选（少/中/完整） */
 .density { margin-left:auto; display:flex; gap:2px; background:var(--bg); border-radius:5px; padding:2px; }
 .density button { border:none; background:transparent; color:var(--dimmer); font-size:11px;
                   padding:2px 9px; border-radius:4px; cursor:pointer; }
@@ -56,7 +55,6 @@ h1 { font-size:20px; color:var(--accent); }
 .batch-item .bi-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .batch-item .bi-pct { color:var(--accent); font-size:11px; font-variant-numeric:tabular-nums; }
 
-/* 模式单选：详细恒可用（D6 已推翻） */
 .mode-row { display:flex; align-items:center; gap:6px; padding:8px 14px 0; }
 .mode-row .mlbl { font-size:11px; color:var(--dim); }
 .mode-row button { border:none; background:transparent; color:var(--dimmer); font-size:12px;
@@ -64,7 +62,6 @@ h1 { font-size:20px; color:var(--accent); }
 .mode-row button.on { background:var(--accent); color:var(--bg); font-weight:600; }
 .d6note { font-size:10px; color:var(--dimmer); margin-left:auto; }
 
-/* 简约面板 */
 .panel { padding:10px 14px 12px; }
 .sp-dir { font-size:12px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .sp-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
@@ -72,49 +69,67 @@ h1 { font-size:20px; color:var(--accent); }
 .pbar { height:8px; background:var(--bg); border-radius:4px; overflow:hidden; }
 .pbar > div { height:100%; background:var(--blue); border-radius:4px; transition:width .25s ease; }
 
-/* 详细面板：压缩通道说明行（仅 压缩+并行） */
 .ch-hint { font-size:10px; color:var(--dim); background:var(--item); border-radius:4px;
            padding:5px 8px; margin-bottom:6px; line-height:1.5; }
 .ch-list { display:flex; flex-direction:column; gap:4px; }
 
-/* 通道行：批次序号|文件格(底纹+目录/文件名)|批进度条100|百分比|批明细|信息列
-   .single（非并行单行）隐藏 序号/进度条/百分比/批明细 */
-.ch { display:grid; grid-template-columns:44px minmax(0,1fr) 100px 38px 66px 128px;
-      align-items:stretch; background:var(--item); border-radius:6px; font-size:12px; transition:background .2s; }
+/* ═══ 通道行 v2：左右分组 ═══
+   左（单文件域）: 目录+文件名+文件底纹 | 文件大小
+   右（批次域）  : 批次底纹 + 序号 + 百分比(明细) + 字节/压缩率
+   非并行单行（.single）隐藏批次序号，底纹=整体进度 */
+.ch { display:flex; align-items:stretch; background:var(--item); border-radius:6px;
+      font-size:12px; transition:background .2s; position:relative; overflow:hidden; }
 .ch:hover { background:var(--item-hover); }
-.ch > * { display:flex; align-items:center; min-width:0; }
-.ch.single { grid-template-columns:minmax(0,1fr) 128px; }
-.ch.single .ch-id, .ch.single .ch-bar, .ch.single .ch-pct, .ch.single .ch-detail { display:none; }
-.ch-id { padding-left:10px; color:var(--dim); font-size:11px; white-space:nowrap; }
-.ch-id.live { color:var(--accent); }
 
-/* 文件格 = 底纹 + 目录(中间省略)/文件名(恒完整) 两列 */
-.ch-file { position:relative; overflow:hidden; padding:7px 6px; }
-.ch-fill { position:absolute; left:0; top:0; bottom:0; width:0;
-           background:var(--fill); border-radius:4px; transition:width .12s linear; }
-/* 底纹 bug 对照：宽度基准取整行 → 溢出文件格（真机 Rectangle 未裁剪） */
+/* ── 左：单文件域（弹性） ── */
+.ch-left { flex:1; min-width:0; display:flex; align-items:center; position:relative; }
+/* 文件格 = 底纹 + 目录/文件名 两列（底纹只盖文件名格） */
+.ch-file { position:relative; flex:1; min-width:0; overflow:hidden; padding:7px 6px 7px 10px; }
+.ch-file-fill { position:absolute; left:0; top:0; bottom:0; width:0;
+                background:var(--fill-file); border-radius:4px; transition:width .12s linear; }
+/* 底纹 bug 对照：宽度基准取整行 → 溢出文件格 */
 .ch-file.buggy { overflow:visible; }
-.ch-file.buggy .ch-fill { outline:1px dashed var(--err); z-index:2; }
-.ch-text { position:relative; z-index:3; display:flex; gap:5px; min-width:0; width:100%; }
-.ch-text .dir { color:var(--dim); font-size:11px; white-space:nowrap; flex-shrink:1;
-                overflow:hidden; text-overflow:ellipsis; max-width:60%; }
-.ch-text .base { color:var(--text); font-weight:500; white-space:nowrap; flex-shrink:0; }
+.ch-file.buggy .ch-file-fill { outline:1px dashed var(--err); z-index:2; }
+.ch-file-text { position:relative; z-index:3; display:flex; gap:5px; min-width:0; width:100%; align-items:baseline; }
+.ch-file-text .dir { color:var(--dim); font-size:11px; white-space:nowrap; flex-shrink:1;
+                     overflow:hidden; text-overflow:ellipsis; max-width:55%; }
+.ch-file-text .base { color:var(--text); font-weight:500; white-space:nowrap; flex-shrink:0; }
+/* 文件大小：左区右端固定段 */
+.ch-fsize { flex-shrink:0; padding:7px 8px 7px 4px; font-size:10px; color:var(--dim);
+            white-space:nowrap; font-variant-numeric:tabular-nums; align-self:center; }
 
-.ch-bar { padding:7px 6px; }
-.ch-bar .track { width:100%; height:6px; background:var(--bg); border-radius:3px; overflow:hidden; }
-.ch-bar .track > div { height:100%; background:linear-gradient(90deg,var(--accent),var(--accent2));
-                       border-radius:3px; transition:width .25s ease; }
-.ch-pct { justify-content:flex-end; padding-right:8px; color:var(--accent); font-size:11px;
-          font-variant-numeric:tabular-nums; }
-.ch-detail { justify-content:flex-end; padding-right:8px; color:var(--dim); font-size:10px;
-             white-space:nowrap; font-variant-numeric:tabular-nums; }
-/* 信息列：文件大小 · 已处理/总量 · 实时压缩率（缺段隐藏 Rule 6） */
-.ch-info { padding:7px 8px 7px 4px; font-size:10px; color:var(--dim); white-space:nowrap;
-           font-variant-numeric:tabular-nums; }
-.ch-info .i-size { color:var(--text); }
+/* ── 右：批次域（自适应，MinWidth 防跳动） ── */
+.ch-right { flex-shrink:0; min-width:180px; position:relative; display:flex; align-items:center;
+            padding:7px 10px 7px 8px; gap:6px; cursor:default; }
+/* 批次底纹：宽度 = Percent/100 × 右区实际宽度（不同色相：紫 vs 文件蓝）
+   注意：选择器须比 .ch-right > * 更特异，否则被后者 position:relative 覆盖而塌陷 */
+.ch-right > .ch-batch-fill { position:absolute; left:0; top:0; bottom:0; width:0;
+                 background:var(--fill-batch); border-radius:0 6px 6px 0; transition:width .12s linear; opacity:.7; z-index:1; }
+.ch-right > *:not(.ch-batch-fill) { position:relative; z-index:2; }
+/* 批次序号（非并行隐藏） */
+.ch-id { color:var(--dim); font-size:11px; white-space:nowrap; flex-shrink:0; }
+.ch-id.live { color:var(--accent); }
+/* 百分比+明细合并：45% (12/40) */
+.ch-pctdet { color:var(--accent); font-size:11px; font-variant-numeric:tabular-nums;
+             white-space:nowrap; flex-shrink:0; }
+.ch-pctdet .det { color:var(--dim); font-size:10px; margin-left:2px; }
+/* 信息列：已处理/总量 · 压缩率（文件大小已移左区） */
+.ch-info { color:var(--dim); font-size:10px; white-space:nowrap; font-variant-numeric:tabular-nums;
+           flex-shrink:0; }
+.ch-info .i-bytes { color:var(--text); }
 .ch-info .i-ratio { color:var(--accent2); }
 .ch-info .sep { color:var(--dimmer); margin:0 3px; }
 .ch-info .hide { display:none; }
+
+/* ToolTip：悬停右区浮层解释 */
+.ch-right .tooltip { position:absolute; bottom:calc(100% + 6px); right:0; z-index:10;
+                     background:var(--bg); border:1px solid var(--item-hover); border-radius:6px;
+                     padding:8px 12px; font-size:11px; color:var(--dim); line-height:1.7;
+                     white-space:nowrap; box-shadow:0 4px 20px rgba(0,0,0,.5);
+                     opacity:0; pointer-events:none; transition:opacity .15s; }
+.ch-right:hover .tooltip { opacity:1; }
+.tooltip .tt-title { color:var(--accent); font-weight:600; margin-bottom:2px; }
+.tooltip b { color:var(--text); font-weight:500; }
 
 /* 列表面板 */
 .file-item { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:4px; font-size:12px; }
@@ -132,7 +147,6 @@ h1 { font-size:20px; color:var(--accent); }
 .medium { display:flex; justify-content:space-between; font-size:12px; color:var(--dim);
           background:var(--item); border-radius:5px; padding:7px 12px; margin-bottom:8px; }
 .medium b { color:var(--text); font-weight:500; }
-/* 完整档统计卡：6 卡三行（图标+标题/数量/大小），缺数据灰 — */
 .stats-cards { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; margin-bottom:8px; }
 .stat { background:var(--section); border:1px solid var(--item); border-radius:6px;
         padding:6px 4px 7px; text-align:center; }
@@ -169,13 +183,15 @@ h1 { font-size:20px; color:var(--accent); }
 </head>
 <body>
 
-<h1>进度窗口「详细」模式通道信息增强 — 原型</h1>
+<h1>进度窗口「详细」模式通道信息增强 — 原型 v2</h1>
 <div class="caption">
-    基于<b>已批准设计</b>（.omo/plans/未开始/progress-window-channel-info.md + progress-stats-cards-three-row.md）绘制，窗口宽 <b>560px</b> = 真机宽度。<br>
-    <b class="k">① 信息列</b> 每行「文件大小 · 已处理/总量 · 实时压缩率」（7z/解压/缺数据段自动隐藏）&nbsp;
-    <b class="k">② 详细常显</b> 非并行合成单行，隐藏批次序号/进度条/百分比/批明细/压缩说明&nbsp;
-    <b class="k">③ 两列路径</b> 目录中间省略 + 文件名恒完整（根文件无目录列）&nbsp;
-    <b class="k">④ 底纹修复</b> 宽度基准 整行→文件格（可切「修复前」对照 bug）
+    基于<b>2026-10-09 讨论修订设计</b>（左右分组 + 批进度底纹化 + ToolTip）绘制，窗口宽 <b>560px</b> = 真机宽度。<br>
+    <b class="k">① 左右分组</b> 左=单文件域（目录/文件名/底纹/大小），右=批次域（序号/进度/字节/压缩率）&nbsp;
+    <b class="k">② 批进度底纹化</b> 右区背景紫色底纹 = 批次进度（区别于左区蓝色文件底纹）&nbsp;
+    <b class="k">③ 合并百分比</b> <code>45% (12/40)</code> 替代独立百分比列+明细列&nbsp;
+    <b class="k">④ ToolTip</b> 悬停右区浮层解释各字段含义&nbsp;
+    <b class="k">⑤ 两列路径</b> 目录中间省略 + 文件名恒完整&nbsp;
+    <b class="k">⑥ 底纹修复</b> 宽度基准 整行→文件格（可切「修复前」对照 bug）
 </div>
 
 <!-- 控制条：四场景验收 + 底纹对照（原型辅助，非窗口本体） -->
@@ -188,11 +204,11 @@ h1 { font-size:20px; color:var(--accent); }
         <button class="btn" id="sc3" onclick="setScenario('zipSingle')">ZIP 串行·单行</button>
     </div>
     <div class="ctl-row">
-        <span class="ctl-lbl">底纹④对照</span>
+        <span class="ctl-lbl">底纹对照</span>
         <button class="btn on" id="shFix" onclick="setShade(false)">修复后（文件格宽）</button>
         <button class="btn warnbtn" id="shBug" onclick="setShade(true)">修复前（整行宽·bug）</button>
         <button class="btn reset" onclick="restart()">↺ 重跑模拟</button>
-        <span class="hint">bug 态红虚线 = 溢出文件格的错误宽度（真机取 ContentPresenter 整行宽）</span>
+        <span class="hint">红虚线 = 溢出文件格的错误宽度；悬停右区可见 ToolTip</span>
     </div>
 </div>
 
@@ -261,7 +277,7 @@ h1 { font-size:20px; color:var(--accent); }
             <span>并行: <b id="mPar">4</b></span>
         </div>
 
-        <!-- 完整档：6 卡三行统计卡 -->
+        <!-- 完整档：6 卡三行统计卡（已实施 stats-cards 计划） -->
         <div class="stats-cards" id="statsCards">
             <div class="stat"><div class="r1"><span class="ic">✅</span><span>已处理</span></div>
                 <div class="r2 ok" id="cDoneR2">0/0</div><div class="r3 ok" id="cDoneR3">0 B</div></div>
@@ -290,13 +306,15 @@ h1 { font-size:20px; color:var(--accent); }
 
 <!-- 改动点 ↔ 计划任务映射 -->
 <div class="legend">
-    <b>原型改动点 ↔ 计划映射</b><br>
-    ① 信息列 + 批进度条缩短(100px) + 单行隐藏规则 → 本计划 <code>任务 6</code><br>
-    ② 详细模式常显 + 非并行单行合成（不污染 ParallelBatchItems）→ <code>任务 4</code>；三单选全程无禁用态即 D6 移除<br>
-    ③ 目录中间省略 + 文件名恒完整 + 根文件隐藏目录列 → <code>任务 5</code>（ProgressDisplayCalculator.MiddleEllipsis）<br>
-    ④ 底纹几何修复（ContentPresenter→文件格 Grid + ClipToBounds）→ <code>任务 1</code>；N 组 adapter 漏拷 FilePercentComplete → <code>任务 2</code>（引擎侧，原型仅展示几何对照）<br>
-    统计卡 6 卡×3 行 → 先行计划 <code>progress-stats-cards-three-row</code>（7z「总大小」隐藏、已处理行3 显 — = 等 bytes-i18n 补字节）<br>
-    信息列口径：已处理/总量=<b>批次级</b>（方案 A，非并行时批次=整体）；压缩率仅 ZIP 压缩显示，7z/解压/分卷隐藏
+    <b>原型改动点 ↔ 计划映射（v2 修订）</b><br>
+    ① <b>左右分组</b>（新）：左=单文件域、右=批次域 — 需修订计划任务 5/6 的 XAML 布局描述<br>
+    ② <b>批进度底纹化</b>（新）：右区紫色底纹替代 ProgressBar 控件 — 需修订计划任务 6（删批进度条列，改底纹 Rectangle）<br>
+    ③ <b>合并百分比+明细</b>（新）：<code>45% (12/40)</code> — 需修订计划任务 6（删独立百分比列与明细列，合为一列）<br>
+    ④ <b>ToolTip</b>（新）：悬停右区浮层 — 需修订计划任务 6（新增 ToolTip，1 个 i18n key 或纯代码拼）<br>
+    ⑤ 两列路径 + 目录中间省略 → 计划 <code>任务 5</code>（ProgressDisplayCalculator.MiddleEllipsis）<br>
+    ⑥ 底纹几何修复（ContentPresenter→文件格 Grid + ClipToBounds）→ <code>任务 1</code>；N 组 adapter 漏拷 FilePercentComplete → <code>任务 2</code><br>
+    ⑦ 详细常显 + 非并行单行合成 → <code>任务 4</code>（D6 移除）；信息列字段口径 → <code>任务 3</code>（ArchiveProgress 新字段）<br>
+    <b>注意</b>：文件大小从信息列移至左区（单文件域）；信息列仅保留 字节进度 + 压缩率
 </div>
 
 <script>
@@ -331,7 +349,6 @@ var NAMES = [
   'backup/system/config/appsettings.Production.json',
   'log/2026/10/08/application-debug.log'
 ];
-/* 原始大小模式：planFiles() 按场景总量等比缩放 */
 var SIZES = [1048576, 52428800, 512, 31457280, 734003200, 20971520, 102400, 125829120, 2621440, 8912896];
 
 var S = { key:'zipExtract', rows:[], queue:[], qpos:0, doneBytes:0, doneOut:0, doneFiles:0,
@@ -359,7 +376,7 @@ function mmss(ms){
 }
 function processed(){ var p = S.doneBytes; for(var i = 0; i < S.rows.length; i++) if(!S.rows[i].done) p += S.rows[i].cur; return p; }
 
-/* 场景文件队列：原始模式等比缩放到场景总量，保证 doneBytes+Σcur ≤ total */
+/* 场景文件队列：原始模式等比缩放到场景总量 */
 function planFiles(sc){
   var raw = [], sum = 0, i;
   for(i = 0; i < sc.files; i++){ var v = SIZES[i % SIZES.length]; raw.push(v); sum += v; }
@@ -369,7 +386,7 @@ function planFiles(sc){
   return out;
 }
 
-/* ── 通道行构建 ─────────────────────────────── */
+/* ── 通道行构建（v2 左右分组） ─────────────────── */
 function nextFile(r){
   var sc = SCEN[S.key];
   if(S.qpos >= S.queue.length){ r.done = true; r.cur = 0; return; }
@@ -377,9 +394,8 @@ function nextFile(r){
   r.fsize = S.queue[S.qpos++];
   r.cur = 0;
   var p = r.path.lastIndexOf('/');
-  r.dirTxt = p < 0 ? '' : r.path.slice(0, p);          /* 根文件无目录 → 列隐藏 */
+  r.dirTxt = p < 0 ? '' : r.path.slice(0, p);
   r.baseTxt = p < 0 ? r.path : r.path.slice(p + 1);
-  /* ③ 两列：目录中间省略(20)，文件名恒完整 */
   r.dirEl.textContent = r.dirTxt ? midEllipsis(r.dirTxt, 20) : '';
   r.dirEl.style.display = r.dirTxt ? '' : 'none';
   r.baseEl.textContent = r.baseTxt;
@@ -391,20 +407,39 @@ function buildRows(){
   for(var i = 0; i < sc.n; i++){
     var el = document.createElement('div');
     el.className = 'ch' + (single ? ' single' : '');
-    el.innerHTML = '<div class="ch-id">#' + (i + 1) + '</div>' +
-      '<div class="ch-file"><div class="ch-fill"></div><div class="ch-text"><span class="dir"></span><span class="base"></span></div></div>' +
-      '<div class="ch-bar"><div class="track"><div></div></div></div>' +
-      '<div class="ch-pct"></div><div class="ch-detail"></div>' +
-      '<div class="ch-info"><span class="i-size"></span><span class="sep">·</span><span class="i-proc"></span>' +
-      '<span class="sep s-r">·</span><span class="i-ratio"></span></div>';
+    /* v2 结构：左（文件格+大小）| 右（批次底纹+序号+百分比明细+信息+ToolTip） */
+    el.innerHTML =
+      '<div class="ch-left">' +
+        '<div class="ch-file"><div class="ch-file-fill"></div>' +
+          '<div class="ch-file-text"><span class="dir"></span><span class="base"></span></div>' +
+        '</div>' +
+        '<div class="ch-fsize"></div>' +
+      '</div>' +
+      '<div class="ch-right">' +
+        '<div class="ch-batch-fill"></div>' +
+        '<span class="ch-id"></span>' +
+        '<span class="ch-pctdet"></span>' +
+        '<span class="ch-info"><span class="i-bytes"></span>' +
+          '<span class="sep s-r">·</span><span class="i-ratio"></span></span>' +
+        '<div class="tooltip">' +
+          '<div class="tt-title">批次详情</div>' +
+          '进度: <b class="tt-pct"></b><br>' +
+          '字节: <b class="tt-bytes"></b>' +
+          '<span class="tt-ratio-wrap"><br>压缩率: <b class="tt-ratio"></b></span>' +
+        '</div>' +
+      '</div>';
     list.appendChild(el);
-    /* ① 信息列缺段隐藏（Rule 6：段与前置分隔符一起隐藏） */
-    if(!showRatio){ el.querySelector('.i-ratio').classList.add('hide'); el.querySelector('.s-r').classList.add('hide'); }
-    var r = { el:el, fileEl:el.querySelector('.ch-file'), fill:el.querySelector('.ch-fill'),
+    /* 非并行单行：隐藏批次序号 */
+    if(single) el.querySelector('.ch-id').style.display = 'none';
+    /* 压缩率隐藏（7z/解压） */
+    if(!showRatio){ el.querySelector('.i-ratio').classList.add('hide'); el.querySelector('.s-r').classList.add('hide');
+                    el.querySelector('.tt-ratio-wrap').style.display = 'none'; }
+    var r = { el:el, fileEl:el.querySelector('.ch-file'), fileFill:el.querySelector('.ch-file-fill'),
+      rightEl:el.querySelector('.ch-right'), batchFill:el.querySelector('.ch-batch-fill'),
       id:el.querySelector('.ch-id'), dirEl:el.querySelector('.dir'), baseEl:el.querySelector('.base'),
-      barEl:el.querySelector('.ch-bar .track > div'), pctEl:el.querySelector('.ch-pct'),
-      detEl:el.querySelector('.ch-detail'), sizeEl:el.querySelector('.i-size'),
-      procEl:el.querySelector('.i-proc'), ratioEl:el.querySelector('.i-ratio'),
+      fsizeEl:el.querySelector('.ch-fsize'), pctdetEl:el.querySelector('.ch-pctdet'),
+      bytesEl:el.querySelector('.i-bytes'), ratioEl:el.querySelector('.i-ratio'),
+      ttPct:el.querySelector('.tt-pct'), ttBytes:el.querySelector('.tt-bytes'), ttRatio:el.querySelector('.tt-ratio'),
       idx:0, cur:0, fsize:0, dur:(single ? 300 : 1100 + (i % 4) * 500), done:false };
     S.rows.push(r);
     nextFile(r);
@@ -427,7 +462,7 @@ function tick(){
         r.cur = 0;
         S.doneFiles = Math.min(sc.files, S.doneFiles + 1);
         S.doneBytes += r.fsize;
-        if(sc.op === 'compress' && sc.fmt === 'zip') S.doneOut += r.fsize * 0.41;  /* 压缩率分子 */
+        if(sc.op === 'compress' && sc.fmt === 'zip') S.doneOut += r.fsize * 0.41;
         nextFile(r);
       }
     }
@@ -435,34 +470,47 @@ function tick(){
   var p = processed(), ratio = sc.op === 'compress' && sc.fmt === 'zip' && p > 0 ? Math.round(S.doneOut / p * 100) : 0;
   var totalTxt = sc.totalKnown ? fmt(sc.total) : '—';
 
+  /* 批次级进度：并行 = 各行独立；单行 = 整体 */
+  var batchPct = sc.parallel ? 0 : (sc.total > 0 ? Math.min(100, p / sc.total * 100) : 0);
+
   for(i = 0; i < S.rows.length; i++){
     r = S.rows[i];
-    /* 已完成行保持 100%（nextFile 将 cur 归零，避免回退到 0%） */
-    var pct = r.done ? 100 : (r.fsize > 0 ? Math.min(100, r.cur / r.fsize * 100) : 0);
-    /* ④ 底纹宽度：修复后 = 文件格宽；bug 态 = 整行宽（溢出） */
+    var filePct = r.done ? 100 : (r.fsize > 0 ? Math.min(100, r.cur / r.fsize * 100) : 0);
+    /* 左区：文件底纹（蓝） */
     var base = S.shadeBug ? r.el.clientWidth : r.fileEl.clientWidth;
-    r.fill.style.width = (pct / 100 * base) + 'px';
-    r.id.classList.toggle('live', pct > 0 && pct < 100);
-    r.pctEl.textContent = Math.round(pct) + '%';
-    r.barEl.style.width = pct + '%';
-    r.detEl.textContent = r.done ? fmt(r.fsize) + '/' + fmt(r.fsize) : fmt(r.cur) + '/' + fmt(r.fsize);
-    /* ① 信息列口径（方案 A 批次级）：并行批=当前文件；单行批=整体 */
+    r.fileFill.style.width = (filePct / 100 * base) + 'px';
+    /* 左区：文件大小 */
+    r.fsizeEl.textContent = r.fsize > 0 ? fmt(r.fsize) : '';
+    /* 右区：批次底纹（紫）—— 并行=文件个数进度；单行=整体进度 */
+    var thisBatchPct = sc.parallel ? filePct : batchPct;
+    r.batchFill.style.width = thisBatchPct + '%';
+    r.id.classList.toggle('live', thisBatchPct > 0 && thisBatchPct < 100);
+    r.id.textContent = sc.parallel ? ('批' + (i + 1)) : '';
+    /* 右区：百分比+明细合并 —— 并行=当前文件百分比(文件大小)；单行=整体百分比(已处理文件数) */
     if(sc.parallel){
-      r.sizeEl.textContent = fmt(r.fsize);
-      r.procEl.textContent = fmt(r.cur) + '/' + fmt(r.fsize);
+      r.pctdetEl.innerHTML = Math.round(filePct) + '% <span class="det">' + fmt(r.fsize) + '</span>';
     }else{
-      r.sizeEl.textContent = sc.totalKnown ? fmt(sc.total) : '—';
-      r.procEl.textContent = fmt(p) + '/' + totalTxt;
+      r.pctdetEl.innerHTML = Math.round(batchPct) + '% <span class="det">(' + S.doneFiles + '/' + sc.files + ')</span>';
+    }
+    /* 右区：信息列 —— 字节进度 + 压缩率（文件大小已移左区） */
+    if(sc.parallel){
+      r.bytesEl.textContent = fmt(r.cur) + '/' + fmt(r.fsize);
+    }else{
+      r.bytesEl.textContent = fmt(p) + '/' + totalTxt;
     }
     if(ratio !== 0) r.ratioEl.textContent = ratio + '%';
+    /* ToolTip 内容 */
+    r.ttPct.textContent = Math.round(thisBatchPct) + '%';
+    r.ttBytes.textContent = r.bytesEl.textContent;
+    r.ttRatio.textContent = ratio !== 0 ? ratio + '%' : '—';
   }
 
-  /* 模式：简约面板跟随首个通道 */
+  /* 简约面板 */
   var r0 = S.rows[0];
   if(r0 && r0.baseEl){
     $('spDir').textContent = r0.dirTxt || '(根目录)';
     $('spName').textContent = r0.baseTxt;
-    var sp = sc.parallel ? (r0.fsize > 0 ? r0.cur / r0.fsize * 100 : 0) : (sc.total > 0 ? p / sc.total * 100 : 0);
+    var sp = sc.parallel ? (r0.fsize > 0 ? r0.cur / r0.fsize * 100 : 0) : batchPct;
     $('spPct').textContent = Math.round(sp) + '%';
     $('spBar').style.width = sp + '%';
     $('liActive').textContent = r0.baseTxt;
@@ -475,7 +523,7 @@ function tick(){
   $('mPar').textContent = sc.parallel ? sc.n : 1;
   $('cDoneR2').textContent = S.doneFiles + '/' + sc.files;
   var d3 = $('cDoneR3');
-  d3.textContent = sc.totalKnown ? fmt(p) : '—';          /* 7z 未完成前字节未知 = bytes-i18n 软依赖 */
+  d3.textContent = sc.totalKnown ? fmt(p) : '—';
   d3.className = 'r3 ' + (sc.totalKnown ? 'ok' : 'dash');
   $('cTotalR2').textContent = sc.files;
   $('cTotalR3').textContent = totalTxt;
@@ -500,9 +548,8 @@ function setScenario(key){
   $('winName').textContent = sc.name;
   $('btnPause').textContent = '⏸ 暂停';
   for(var i = 0; i < ORDER.length; i++) $('sc' + i).classList.toggle('on', ORDER[i] === key);
-  $('batchSec').style.display = sc.conflict ? '' : 'none';   /* 批次列表仅多档案解压 */
+  $('batchSec').style.display = sc.conflict ? '' : 'none';
   $('chHint').style.display = (sc.hint && sc.parallel) ? '' : 'none';
-  /* 统计卡显隐：冲突卡仅解压 / 并行卡仅并行 / 7z 总大小卡隐藏 */
   $('cSkip').style.display = sc.conflict ? '' : 'none';
   $('cFail').style.display = sc.conflict ? '' : 'none';
   $('cOver').style.display = sc.conflict ? '' : 'none';
@@ -519,7 +566,6 @@ function setMode(m){
   $('mDetail').classList.toggle('on', m === 'detail');
   $('mList').classList.toggle('on', m === 'list');
 }
-/* 密度：少 = 全隐；中 = 仅单行；完整 = 单行+统计卡 */
 function applyDensity(){
   var d = S.density;
   $('mediumRow').style.display = d === 'min' ? 'none' : '';
@@ -544,7 +590,7 @@ function togglePause(btn){
 function restart(){ setScenario(S.key); }
 function render(){ var was = S.paused; S.paused = false; tick(); S.paused = was; }
 
-setScenario('zipExtract');   /* 初始场景 */
+setScenario('zipExtract');
 setMode('detail');
 setInterval(tick, 60);
 </script>

@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-09** — 通道信息计划 v2 设计修订（左右分组 + 批进度底纹化 + 合并百分比 + ToolTip）+ 原型重绘（计划类）
+  - **计划修订**：[progress-window-channel-info.md](../.omo/plans/未开始/progress-window-channel-info.md)——用户讨论定稿通道行由「6 列平铺」改为**左右分组**：左=单文件域（目录中间省略 + 文件名恒完整 + 文件底纹 + 文件大小），右=批次域（批次序号 + 批次底纹 + 合并百分比 + 字节进度/压缩率 + ToolTip）。决策表重排为 D1–D11：D1 左右分组与信息列口径（信息列只留字节+压缩率，文件大小移至左区）、D2 详细门禁移除（澄清「推翻的是旧计划门禁，非本文件 D6」避免编号撞车）、D5 **批级进度底纹化**（取代原「缩窄」，删独立 ProgressBar 改右区背景底纹、新增 `ThemeProgressBatchBrush` 色相区分）、D6 **合并百分比+明细**为 `45% (12/40)` 且**不加列标题**、D7 **ToolTip**（豁免 i18n 护栏，新增 `Progress_Tooltip_Progress`/`Bytes`/`Ratio` 三 key）、D8 单行隐藏规则 + `HasParallelChannel` 派生属性、D9 双底纹机制（`FileRatio` vs `BatchRatio`）、D10 右区 `MinWidth=180` 防跳动、D11 变更清单（5→7 条）。行模型扩展为 `IsParallel`/`DirectoryText`/`FileNameText`/`FileSizeText`/`PctDetailText`/`InfoText`/`BatchRatio`/`TooltipText`；任务 4 门禁移除 + 单行合成、任务 5 左区、任务 6 右区（+主题+i18n）、任务 7 GUI **五场景**（补分卷 ZIP 压缩）。
+  - **原型**：[progress-window-channel-info.html](prototypes/progress-window-channel-info.html) 重绘为 v2（左右分组布局、右区紫色批次底纹色相区分、合并百分比 `45% (12/40)`、ToolTip 悬停浮层、右区 `MinWidth` 锁底线）；修复 CSS 特异性 bug——`.ch-right > *`（`position:relative`）覆盖了 `.ch-batch-fill`（`position:absolute`）导致批次底纹塌陷不可见，改 `.ch-right > .ch-batch-fill` 提高特异性 + `:not()` 排除。
+  - **同步**：`docs/PLAN.md` P2 区登记行更新（规则 1）。设计与任务分解已修订落盘，未实施。
+
 **2026-10-09** — 进度窗口统计卡三行结构实施（方案 A 去分母 + 终态字节累加器 + 并行度后置，Avalonia）
   - **VM 层**（`ProgressViewModel.cs`）：新增 5 个 `[ObservableProperty]` 字段——`StatsProcessedSize`（已处理字节，`SetProgress` TotalBytes 块写入）、`StatsTotalCount`（文件总数，TotalFiles 块写入）、`StatsSkippedSize`/`StatsFailedSize`/`StatsOverwrittenSize`（三终态字节累加器，`UpdateEntryStatus` 加 `long? fileSize = null` 参数 + `_statsSkippedKeys`/`_statsFailedKeys`/`_statsOverwrittenKeys` 去重守卫 + `AccumulateTerminalBytes` 方法）；`StatsProcessedCount` 由 `_statsProcessed/_statsTotalFiles` 分数改纯计数 `_statsProcessed.ToString()`（方案 A，分母与总大小卡行 2 同源重复）；`ClearEntryItems` 重置累加器与三字符串。
   - **转换器**（`Converters/DashBrushConverter.cs` 新建）：输入字符串为 `—` 时返回 `ThemeTextSecondaryBrush`（灰显），否则按 `ConverterParameter`（Brush key）返回对应主题色；`ProgressWindow.axaml` Window.Resources 注册 `x:Key="DashBrush"`。
