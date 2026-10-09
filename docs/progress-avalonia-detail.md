@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-09** — 统计卡三行计划修订（方案 A 去分母 + 终态完备性核查）+ 交互原型（计划类）
+  - **计划修订**：[progress-stats-cards-three-row.md](../.omo/plans/未开始/progress-stats-cards-three-row.md)——用户拍板方案 A：已处理卡行 2 由 `N/M` 分数改纯计数（分母与总大小卡行 2 文件总数同源重复，比例由总进度条承担；中等档 `StatsProcessedText` 一句话文案保留 `N/M` 分数不受影响）；条目终态完备性核查结论：`ArchiveEntryStatus` 4 终态（Completed/Skipped/Failed/Overwritten）完备，6 种 `FileConflictAction` 映射清晰（Ask 中间态、条件覆盖未命中归 Skipped），目录条目 `IsDirectory` continue 与取消/暂停（操作级）均不进统计卡；重命名可见性缺口（`resolvedPath != outputPath` 上报 `Completed`）记入边界备忘并加守卫条款「不得为重命名新增条目终态」；既有测试 `StatsProcessedCount_ShowsFractionString`（:534）改名改断言为 `ShowsPureCount`（断言 `"60"` 而非 `"60/100"`），中等档分数测试 :491/:516 不动。
+  - **原型**：[progress-stats-cards-three-row.html](prototypes/progress-stats-cards-three-row.html)（单文件 HTML，5 场景：ZIP 完整数据 / ZIP 无冲突 / 7z 固实 / TAR 渐进 / 串行解压；新旧对比视图经 `oldR2` 字段实现——左栏还原现状分数 `60/100`、右栏新设计纯计数 `60`；演示数据 bug 修复：场景 1/3/4 的 `c5.r2` 由错误的 `'150'` 改为与 TotalFiles=100 一致的 `'100'`）。
+  - **前向兼容契约**：`progress-window-channel-info.md` 补记——该计划任务 3 落地 `ArchiveProgress.FileTotalBytes` 后，逐条目终态报告（EntryStatus != null）必须携带该字段，使统计卡跳过/出错/已覆盖累加器在渐进模式（TAR/GZ、>5000 条目未播种）下自动升级为 100% 覆盖；stats-cards 侧接线只需把 `SetProgress` 的 `EntryStatus` 块调用末参从 `null` 改传 `p.FileTotalBytes`（计划已预留参数，零结构改动）。
+  - **同步**：`docs/PLAN.md` P2 区统计卡登记行更新（规则 1）。设计与修订已落盘，未实施。
+
 **2026-10-09** — 进度窗口通道信息增强交互原型（docs/prototypes）
   - **原型**：[progress-window-channel-info.html](prototypes/progress-window-channel-info.html)（单文件暗色 HTML，与 progress-window-enhancement / channel-demo 两既有原型调色板一致，窗口宽 560px = 真机 `ProgressWindow` 宽度），浏览器直接打开即可审阅，供实施前对齐设计。
   - **交互**：控制条四场景切换（ZIP 并行解压 / ZIP 并行压缩 / 7z 压缩·单行 / ZIP 串行·单行）对应四条验收；底纹「修复后/修复前」对照（bug 态红虚线演示整行宽溢出）；窗口内密度（少/中/完整）与模式（简约/详细/列表）双单选实时切换，「详细」恒可用标注 D6 已推翻；通道行 = 序号 | 目录(中间省略)+文件名(底纹) | 批进度条 100px | 百分比 | 批明细 | 信息列，单行变体隐藏前四项；信息列缺段连分隔符隐藏（规则 6）；完整档 6 卡三行统计卡（7z 总大小卡隐藏、已处理行 3 显 `—`）；底部 legend 映射改动点 ①–④ → 计划任务 6/4/5/1-2。
