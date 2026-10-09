@@ -31,6 +31,8 @@ public class AppSettings
     public string ZipCompressionMethod { get; set; } = "deflate";
     public string ZipEncryptionMethod { get; set; } = "aes256";
     public bool SevenZipEncryptHeaders { get; set; } = true;
+    /// <summary>压缩时输出文件已存在（文件冲突）的默认处理：ask / overwrite / add / rename / skip</summary>
+    public string CompressFileConflictAction { get; set; } = "ask";
 
     // ===== 分卷 =====
     public string SplitSizeTag { get; set; } = "0";

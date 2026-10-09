@@ -133,6 +133,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _logPrivacyMode = "extension";
 
+    // ── Compress（文件冲突默认策略） ──
+    [ObservableProperty]
+    private string _compressFileConflictAction = "ask";
+
     // ── Extract ──
     [ObservableProperty]
     private string _extractDestination;
@@ -477,6 +481,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     public System.Collections.ObjectModel.ObservableCollection<Option> FileConflictActionOptions { get; } = new();
     [ObservableProperty] private Option? _selectedFileConflictActionOption;
 
+    // 压缩文件冲突默认策略（ask/overwrite/add/rename/skip）
+    public System.Collections.ObjectModel.ObservableCollection<Option> CompressFileConflictActionOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedCompressFileConflictActionOption;
+
     public System.Collections.ObjectModel.ObservableCollection<Option> DoubleClickActionOptions { get; } = new();
     [ObservableProperty] private Option? _selectedDoubleClickActionOption;
 
@@ -627,6 +635,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string KeepOriginalExtensionText => LocalizationManager.T("Settings_Compress_KeepExt");
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
     public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
+    public string CompressConflictActionText => LocalizationManager.T("Settings_Compress_ConflictAction");
     public string ZipDefaultOptionsText => LocalizationManager.T("Settings_Zip_DefaultOptions");
     public string ZipEncodingText => LocalizationManager.T("Settings_Zip_Encoding");
     public string ZipCompressionMethodText => LocalizationManager.T("Settings_Zip_CompressionMethod");
@@ -801,6 +810,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compress (additional)
         _closeAfterCompress = _settings.CloseAfterCompress;
         _keepOriginalExtension = _settings.KeepOriginalExtension;
+        _compressFileConflictAction = _settings.CompressFileConflictAction;
 
         // Compression advanced
         _sevenZipCompressionMethod = _settings.SevenZipCompressionMethod;
@@ -950,6 +960,14 @@ public partial class SettingsWindowViewModel : ObservableObject
         FileConflictActionOptions.Add(new Option(ConflictRenameText, "rename"));
         FileConflictActionOptions.Add(new Option(ConflictSkipText, "skip"));
 
+        // 压缩文件冲突默认策略（复用压缩冲突弹窗的三语 key；ask 为新 key）
+        CompressFileConflictActionOptions.Clear();
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("Compress_Conflict_Ask"), "ask"));
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_Overwrite"), "overwrite"));
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_Add"), "add"));
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_AutoRename"), "rename"));
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_Skip"), "skip"));
+
         DoubleClickActionOptions.Clear();
         DoubleClickActionOptions.Add(new Option(DoubleClickActionOpenText, "open"));
         DoubleClickActionOptions.Add(new Option(DoubleClickActionExtractHereText, "extract-here"));
@@ -1049,6 +1067,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedLogPrivacyModeOption = LogPrivacyModeOptions.FirstOrDefault(o => o.Value == LogPrivacyMode);
         SelectedExtractDestinationOption = ExtractDestinationOptions.FirstOrDefault(o => o.Value == ExtractDestination);
         SelectedFileConflictActionOption = FileConflictActionOptions.FirstOrDefault(o => o.Value == FileConflictAction);
+        SelectedCompressFileConflictActionOption = CompressFileConflictActionOptions.FirstOrDefault(o => o.Value == CompressFileConflictAction)
+                                                   ?? CompressFileConflictActionOptions.FirstOrDefault();
 
         SelectedDoubleClickActionOption = DoubleClickActionOptions.FirstOrDefault(o => o.Value == DoubleClickAction);
 
@@ -1137,6 +1157,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(KeepOriginalExtensionText));
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
         OnPropertyChanged(nameof(CompressOptionsText));
+        OnPropertyChanged(nameof(CompressConflictActionText));
         OnPropertyChanged(nameof(ZipDefaultOptionsText));
         OnPropertyChanged(nameof(ZipEncodingText));
         OnPropertyChanged(nameof(ZipCompressionMethodText));
@@ -1262,6 +1283,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
         _settings.CloseAfterCompress = CloseAfterCompress;
         _settings.KeepOriginalExtension = KeepOriginalExtension;
+        _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
 
         // Compression advanced
         _settings.SevenZipCompressionMethod = SelectedSevenZipCompressionMethodOption?.Value ?? SevenZipCompressionMethod;

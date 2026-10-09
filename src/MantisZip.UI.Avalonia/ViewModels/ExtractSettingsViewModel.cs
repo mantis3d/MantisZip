@@ -40,6 +40,13 @@ public partial class ExtractSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _openFolderAfterExtract;
 
+    /// <summary>
+    /// 解压后将原压缩包移入回收站。默认值读取 AppSettings.DeleteArchiveAfterExtract，
+    /// 但勾选状态仅对本次解压生效，不写回全局设置。
+    /// </summary>
+    [ObservableProperty]
+    private bool _deleteArchiveAfterExtract;
+
     /// <summary>并行解压线程数（1=串行，>1=并行）。默认 = CPU核心数。</summary>
     [ObservableProperty]
     private int _parallelExtractDegree = Environment.ProcessorCount;
@@ -207,6 +214,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
         ParallelExtractDegree = settings.ParallelExtractDegree;
         // 解压后打开文件夹（对齐 WPF ExtractSettingsWindow.LoadDefaultsFromSettings 读取 OpenFolderAfterExtract）
         OpenFolderAfterExtract = settings.OpenFolderAfterExtract;
+        // 解压后将原压缩包移入回收站：读取全局设置作为默认，勾选仅本次解压生效（不写回 AppSettings）
+        DeleteArchiveAfterExtract = settings.DeleteArchiveAfterExtract;
 
         // 冲突策略选项（ComboBox 用对象绑定——Avalonia 无 WPF 的 SelectedValuePath）
         ConflictActionOptions.Add(new Option(LocalizationManager.T("Extract_Conflict_Ask"), "ask"));
@@ -233,6 +242,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_Conflict_Rename",
             "Extract_Conflict_Skip",
             "Extract_OpenFolder",
+            "Settings_Extract_DeleteArchiveAfterExtract",
             "Extract_Start",
             "Extract_Cancel",
             "Extract_TabFilter",

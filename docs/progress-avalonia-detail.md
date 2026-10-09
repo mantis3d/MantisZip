@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-09** — 四项修复/功能一次性实施（✅ 已完成：预览窗格宽度 bug、解压窗口回收站选项、宽度 bug 回归修复、压缩端文件冲突默认选项）
+  - **① 预览窗格宽度 bug（Star 布局尺寸丢失）**：`MainWindow.SaveCurrentPreviewSize` 原实现只记录 `GridUnitType.Pixel`，未保存过布局时拖分隔条产生的是 Star 尺寸（Avalonia Split 行为保持 Star）→ 不记录 → 位置重应用回退默认（3* / 200px）→ 面板缩到最小。修复：新增 `RecordPreviewSize` 对 Pixel/Star 且值 >0 均记录（Auto 与面板隐藏压缩 0 跳过），`ApplyPreviewPosition` 四个 case 由 `new GridLength(h1, Pixel)` 改为直接用存储的 `GridLength`
+  - **② 回归修复（单元类型持久化）**：`_previewSizeByPosition` 由 `Dictionary<int, double>` 升级 `Dictionary<int, GridLength>`；`LayoutStateManager.LayoutSnapshot.PreviewSizeByPosition` 同步改型，新增 `GridLengthJsonConverter`（写对象形态 `{"value":N,"unit":N}`，unit 0=Auto/1=Pixel/2=Star；**读兼容旧版裸数字=Pixel**，旧 layout.json 无需迁移），`JsonOptions` 注册转换器后 Load/Save 共用；`ApplySavedLayout` 回填校验 `GridUnitType is Pixel or Star && Value>0`
+  - **③ 解压窗口「解压后将原压缩包移到回收站」勾选项**：`ExtractSettingsViewModel` 新增 `DeleteArchiveAfterExtract`（默认读 `AppSettings.DeleteArchiveAfterExtract`，**勾选仅本次生效不写回**）+ `ExtractSettingsWindow.axaml` 冲突选项下方新增 CheckBox（复用既有三语 key `Settings_Extract_DeleteArchiveAfterExtract`，加入 LocalizedStrings 刷新数组）；`App.TryDeleteArchiveAfterExtract(string, bool? enabledOverride = null)`（override 非 null 优先于全局设置，内部仍 `RecycleOption.SendToRecycleBin`）；`MainWindow.axaml.cs` 解压对话框完成回调拷回 `evm.DeleteArchiveAfterExtract`；`MainWindowViewModel` 各解压路径（主对话框/右键解压/拖拽/CLI）透传
+  - **④ 压缩端「文件冲突默认策略」（参照解压端 FileConflictAction）**：
+    - **Core**：`AppSettings.CompressFileConflictAction`（默认 `"ask"`）；`CompressService.CompressRequest` 新增 `ConflictAction` init 属性（null/"ask"=弹窗，兼容 tests 16 处不传）
+    - **CompressFlow**：`BuildRequest` 透传 `vm.ConflictAction`；`CreateResolver(showDialog, defaultAction = null)` 非 ask 时经 `MapDefaultConflictAction` 直接映射免弹窗——`overwrite`→Overwrite、`rename`→Rename（CustomName=null 走 `ComputeRenamedPath` 自动唯一名）、`skip`→Core `Cancel`（单条跳过，非终止）、`add`→Add（`!info.CanAdd` 如 tar.gz 回退弹窗）、未知值回退弹窗
+    - **接线**：`MainWindowViewModel.ExecuteCompressFromSettings` CreateResolver 传 `request.ConflictAction`；`App.axaml.cs` CreateResolver 同 + `--compress-quick/separate/combined` 三处 request 构造传 `settings.CompressFileConflictAction`
+    - **设置窗口**：`SettingsWindowViewModel` 8 处（字段 `_compressFileConflictAction="ask"`/选项对 `CompressFileConflictActionOptions`/label `CompressConflictActionText`/ctor 加载/`PopulateComboOptions` 5 选项（复用 `CompressConflict_Overwrite/Add/AutoRename/Skip` + 新 `Compress_Conflict_Ask`）/`SetSelectedOptions`（含 FirstOrDefault 回退）/Save/`OnCultureChanged` 刷新）+ `SettingsWindow.axaml` 压缩通用页新增 Border+ComboBox（`DisplayMemberBinding` 模板）
+    - **压缩对话框**：`CompressSettingsViewModel` `ConflictAction` 属性 + `ConflictActionOptions`（ComboOption 5 项）+ `SelectedConflictActionOption` 双向同步 partial + ctor 从设置加载（非法值回退首项）+ LocalizedStrings 补 `Compress_WhenFileExists`；`CompressSettingsWindow.axaml` 输出模式组后新增「文件存在时：」Border+ComboBox
+    - **i18n**：三语头部 `{` 后成对插入 3 key：`Settings_Compress_ConflictAction`（文件冲突处理/File conflict action/檔案衝突處理）、`Compress_WhenFileExists`（文件存在时：/When file exists:/檔案存在時：）、`Compress_Conflict_Ask`（每次询问/Ask each time/每次詢問）
+  - **验证**：`dotnet build -t:Compile` 0 错误（3 warning 既有）；Core **423 通过 / 0 失败**、Avalonia **131 通过 / 5 失败（预存 TestPreview 样本缺失）/ 3 跳过**——与基线完全一致
+
 **2026-10-06** — 修复「测试压缩包」加密包静默失败 + 测试流程对齐解压（✅ 已修复，用户报告「加密 RAR 测试无密码时静默失败弹窗也不出」「rar 没有密码的压缩包测试时进度条也不动」）
   - **根因 1（加密包静默失败）**：`TestArchive` 只从 `_sessionPasswords` 取密码，无会话密码时 `engine.TestArchiveAsync` 以 null 密码快速失败 → 状态栏仅「压缩包测试失败 ❌」，无密码弹窗、无进度。与 `LoadArchiveAsync` 打开流程的密码解析（会话缓存→自动匹配→对话框循环）完全脱节
   - **根因 2（进度条不动，Core 层）**：`Check()`（=7z.dll TestArchive 语义，整包提取校验）阶段不触发 `Extracting` 事件、只触发 `FileExtractionFinished`（每条目 1 次，`e.PercentDone` 为 byte）；旧 `TestArchiveAsync` 在校验阶段无进度上报，且校验后还冗余逐条目 `ExtractFile` 二次解压（约 2 倍工作量，固实包 O(n²)）

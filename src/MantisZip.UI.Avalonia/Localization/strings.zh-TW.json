@@ -1,4 +1,7 @@
 {
+  "Settings_Compress_ConflictAction": "檔案衝突處理",
+  "Compress_WhenFileExists": "檔案存在時：",
+  "Compress_Conflict_Ask": "每次詢問",
   "Picker_PreserveFullPath": "保留完整路徑",
   "Picker_PreserveFullPathDisabledHint": "在壓縮包根目錄，勾選與否結果相同",
   "Picker_OptionsCaption": "本次參數",

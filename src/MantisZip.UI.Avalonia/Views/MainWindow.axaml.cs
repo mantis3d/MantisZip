@@ -45,8 +45,8 @@ public partial class MainWindow : Window
     /// <summary>拖拽期间是否被取消（Esc 或右键取消手势，由自实现 IDropSource.QueryContinueDrag 同步置位）</summary>
     private bool _dragCancelled;
 
-    /// <summary>预览位置切换时各位置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）的记忆尺寸，切换后恢复用</summary>
-    private readonly Dictionary<int, double> _previewSizeByPosition = new();
+    /// <summary>预览位置切换时各位置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）的记忆尺寸（含单元类型：Star 保持比例伸缩、Pixel 固定），切换后恢复用</summary>
+    private readonly Dictionary<int, GridLength> _previewSizeByPosition = new();
 
     /// <summary>当前已应用的预览位置（切换前据此保存旧位置尺寸）</summary>
     private int _lastAppliedPreviewPosition = 4;
@@ -174,6 +174,8 @@ public partial class MainWindow : Window
                 evm.DestinationPath = dialog.ViewModel.DestinationPath;
                 evm.ConflictAction = dialog.ViewModel.ConflictAction;
                 evm.OpenFolderAfterExtract = dialog.ViewModel.OpenFolderAfterExtract;
+                // 解压后移入回收站：默认值来自全局设置，勾选仅本次解压生效（不写回 AppSettings）
+                evm.DeleteArchiveAfterExtract = dialog.ViewModel.DeleteArchiveAfterExtract;
                 // 文件过滤：仅当启用过滤且有条目时，将匹配条目 key 回传，供实际解压只解压匹配项
                 evm.FilteredEntryKeys = dialog.GetFilteredEntryKeys();
             }
@@ -718,10 +720,11 @@ public partial class MainWindow : Window
         if (ArchiveContentGrid == null || PreviewPanelHost == null)
             return;
 
-        // 切换位置前保存旧位置的当前尺寸（仅 Pixel 布局记录，Star 不记录）。
+        // 切换位置前保存旧位置的当前尺寸（Star 保留星号权重维持比例伸缩、Pixel 保持固定，
+        // 见 SaveCurrentPreviewSize）。
         // 位置未变化（设置窗口保存/菜单切换触发同位置重应用）时同样先记录当前尺寸：
-        // 分隔条拖拽产生的 Pixel 尺寸只存在于 Grid 定义中，若不记录，下面的完整重置
-        // 会把它丢弃，回退到默认（3* 星号 / 200px）或字典里过期的旧值 → 面板缩到最小。
+        // 分隔条拖拽产生的尺寸只存在于 Grid 定义中，若不记录，下面的完整重置
+        // 会把它丢弃，回退到默认（3* 星号 / 1* / 200px）或字典里过期的旧值 → 面板缩到最小。
         if (position != _lastAppliedPreviewPosition)
             SaveCurrentPreviewSize(_lastAppliedPreviewPosition);
         else
@@ -745,7 +748,7 @@ public partial class MainWindow : Window
             case 1: // 底部：预览横跨全部 5 列
                 ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
                 ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(1, out var h1)
-                    ? new GridLength(h1, GridUnitType.Pixel)
+                    ? h1
                     : new GridLength(1, GridUnitType.Star);
                 PreviewRowSplitter.IsVisible = true;
                 Grid.SetColumn(PreviewRowSplitter, 0);
@@ -758,7 +761,7 @@ public partial class MainWindow : Window
             case 2: // 目录树下方：文件列表跨 3 行占满底部
                 ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
                 ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(2, out var h2)
-                    ? new GridLength(h2, GridUnitType.Pixel)
+                    ? h2
                     : new GridLength(200);
                 Grid.SetRowSpan(FileListPanel, 3);
                 Grid.SetRowSpan(TreeFileSplitter, 3);
@@ -773,7 +776,7 @@ public partial class MainWindow : Window
             case 3: // 文件列表下方：目录树跨 3 行占满底部
                 ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
                 ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(3, out var h3)
-                    ? new GridLength(h3, GridUnitType.Pixel)
+                    ? h3
                     : new GridLength(200);
                 Grid.SetRowSpan(FolderTreeBorder, 3);
                 Grid.SetRowSpan(TreeFileSplitter, 3);
@@ -788,7 +791,7 @@ public partial class MainWindow : Window
             default: // 4: 文件列表右侧（默认布局）
                 ArchiveContentGrid.ColumnDefinitions[3].Width = new GridLength(5);
                 ArchiveContentGrid.ColumnDefinitions[4].Width = _previewSizeByPosition.TryGetValue(4, out var w4)
-                    ? new GridLength(w4, GridUnitType.Pixel)
+                    ? w4
                     : new GridLength(3, GridUnitType.Star);
                 PreviewColSplitter.IsVisible = true;
                 Grid.SetRow(PreviewPanelHost, 0);
@@ -799,7 +802,7 @@ public partial class MainWindow : Window
         // 面板隐藏时：压缩预览占位行列 + 隐藏 splitter + 复位 RowSpan，让树/列表撑满
         if (!_previewPanelEnabled)
         {
-            // 隐藏前记录当前 Pixel 尺寸，保证重新打开时保留用户拖过的宽度/高度
+            // 隐藏前记录当前尺寸（保留单元类型），保证重新打开时保留用户拖过的宽度/高度
             SaveCurrentPreviewSize(position);
             PreviewRowSplitter.IsVisible = false;
             PreviewColSplitter.IsVisible = false;
@@ -833,24 +836,29 @@ public partial class MainWindow : Window
         ApplyPreviewPosition(settings.PreviewPosition);
     }
 
-    /// <summary>保存指定预览位置的当前尺寸到记忆字典（仅在布局为 Pixel 且值有效时记录，面板隐藏压缩产生的 0 不记录）。</summary>
+    /// <summary>
+    /// 保存指定预览位置的当前尺寸到记忆字典（保留 GridLength 单元类型）：
+    /// Star 布局（未保存过布局时拖拽分隔条，Avalonia Split 行为保持 Star）记录星号权重，
+    /// 恢复后仍随窗口比例伸缩；Pixel 布局（树/文件列宽恢复为像素后拖分隔条，经 Resize 分支
+    /// 转成的像素值）恢复后固定。若统一降级成像素值记录，恢复时会把比例伸缩的窗格固定死。
+    /// 面板隐藏压缩产生的 0 / Auto 不记录。
+    /// </summary>
     private void SaveCurrentPreviewSize(int position)
     {
         if (ArchiveContentGrid == null)
             return;
 
         if (position == 4)
-        {
-            var w = ArchiveContentGrid.ColumnDefinitions[4].Width;
-            if (w.GridUnitType == GridUnitType.Pixel && w.Value > 0)
-                _previewSizeByPosition[4] = w.Value;
-        }
+            RecordPreviewSize(4, ArchiveContentGrid.ColumnDefinitions[4].Width);
         else if (position is 1 or 2 or 3)
-        {
-            var h = ArchiveContentGrid.RowDefinitions[2].Height;
-            if (h.GridUnitType == GridUnitType.Pixel && h.Value > 0)
-                _previewSizeByPosition[position] = h.Value;
-        }
+            RecordPreviewSize(position, ArchiveContentGrid.RowDefinitions[2].Height);
+    }
+
+    /// <summary>记录预览尺寸：仅 Pixel/Star 且值有效时记录；Auto 与 0（面板隐藏压缩态）跳过。</summary>
+    private void RecordPreviewSize(int position, GridLength length)
+    {
+        if (length.GridUnitType is GridUnitType.Pixel or GridUnitType.Star && length.Value > 0)
+            _previewSizeByPosition[position] = length;
     }
 
     /// <summary>
@@ -870,7 +878,7 @@ public partial class MainWindow : Window
             {
                 foreach (var kvp in snapshot.PreviewSizeByPosition)
                 {
-                    if (kvp.Value > 0)
+                    if (kvp.Value.GridUnitType is GridUnitType.Pixel or GridUnitType.Star && kvp.Value.Value > 0)
                         _previewSizeByPosition[kvp.Key] = kvp.Value;
                 }
             }
@@ -889,7 +897,8 @@ public partial class MainWindow : Window
     /// <summary>
     /// 手动保存内容区布局快照（菜单「保存布局」触发）：
     /// 目录树列宽（col 0）+ 文件列表列宽（col 2）+ 预览面板各位置记忆尺寸。
-    /// Star 布局的列用 ActualWidth 捕获实际像素值，保证恢复后布局与保存时一致。
+    /// 树/文件列 Star 布局用 ActualWidth 捕获实际像素值；预览尺寸保留单元类型
+    /// （Star 维持比例伸缩、Pixel 维持固定），保证恢复后与保存时一致。
     /// </summary>
     private void SaveLayout()
     {
@@ -902,7 +911,7 @@ public partial class MainWindow : Window
             {
                 TreeColumnWidth = CaptureColumnActualWidth(ArchiveContentGrid, 0),
                 FileListColumnWidth = CaptureColumnActualWidth(ArchiveContentGrid, 2),
-                PreviewSizeByPosition = new Dictionary<int, double>(_previewSizeByPosition)
+                PreviewSizeByPosition = new Dictionary<int, GridLength>(_previewSizeByPosition)
             };
 
             LayoutStateManager.Save(snapshot);

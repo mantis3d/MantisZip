@@ -2357,8 +2357,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractAsync）
-            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
+            // 解压成功后按弹窗勾选将原包移入回收站（未在弹窗改过则等于全局设置；仅本次生效，对齐 WPF MainWindow.xaml.cs ExtractAsync）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!, vm.DeleteArchiveAfterExtract);
             if (openFolder)
             {
                 await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
@@ -2603,7 +2603,7 @@ public partial class MainWindowViewModel : ObservableObject
                         if (ShowCompressConflictDialog == null)
                             return (Core.Abstractions.CompressConflictAction.Overwrite, null, false);
                         return await ShowCompressConflictDialog(info);
-                    }),
+                    }, request.ConflictAction),
                     onItemStatus: BatchStatusReporter);
             });
 
@@ -2778,8 +2778,8 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractTo 命令）
-            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
+            // 解压成功后按弹窗勾选将原包移入回收站（未在弹窗改过则等于全局设置；仅本次生效，对齐 WPF MainWindow.xaml.cs ExtractTo 命令）
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!, vm.DeleteArchiveAfterExtract);
         }
     }
 

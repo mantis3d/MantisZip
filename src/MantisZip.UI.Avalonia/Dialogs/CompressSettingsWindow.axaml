@@ -189,6 +189,22 @@
 
               </StackPanel>
             </Border>
+
+            <!-- 分组：文件冲突策略（本次压缩遇到同名文件时的处理方式，覆盖/追加/自动重命名/跳过） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <!-- 标签：文件存在时： -->
+                <TextBlock Text="{Binding LocalizedStrings[Compress_WhenFileExists]}"
+                           FontWeight="SemiBold" />
+                <!-- 冲突策略下拉：每次询问 / 覆盖 / 追加 / 自动重命名 / 跳过 -->
+                <ComboBox ItemsSource="{Binding ConflictActionOptions}"
+                          SelectedItem="{Binding SelectedConflictActionOption}"
+                          DisplayMemberBinding="{Binding Display}"
+                          Width="240" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
