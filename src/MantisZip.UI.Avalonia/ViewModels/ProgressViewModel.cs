@@ -286,6 +286,32 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private string _statsTotalSizeValue = string.Empty;
 
+    /// <summary>统计卡行 3（已处理）：文件大小（引擎上报 TotalBytes 后随进度更新；默认 "—" 行级占位，D2/D4）。</summary>
+    [ObservableProperty]
+    private string _statsProcessedSize = "—";
+
+    /// <summary>统计卡行 2（总大小卡）：文件总数（引擎上报 TotalFiles 后填充；默认 "—" 行级占位，D2/D4）。</summary>
+    [ObservableProperty]
+    private string _statsTotalCount = "—";
+
+    /// <summary>统计卡行 3（跳过）：终态字节累加值（FileTotalBytes 事件优先 ↘ 播种行 Size 回退；从未累加到字节保持 "—"，D2 注 2/D4）。</summary>
+    [ObservableProperty]
+    private string _statsSkippedSize = "—";
+
+    /// <summary>统计卡行 3（出错）：终态字节累加值（同 StatsSkippedSize 规则）。</summary>
+    [ObservableProperty]
+    private string _statsFailedSize = "—";
+
+    /// <summary>统计卡行 3（已覆盖）：终态字节累加值（同 StatsSkippedSize 规则）。</summary>
+    [ObservableProperty]
+    private string _statsOverwrittenSize = "—";
+
+    // 终态字节累加器（D4）：驱动 StatsSkippedSize/StatsFailedSize/StatsOverwrittenSize；
+    // 仅 UI 线程访问（SetProgress/UpdateEntryStatus 均经 dispatch），无需同步
+    private long _statsSkippedBytes;
+    private long _statsFailedBytes;
+    private long _statsOverwrittenBytes;
+
     /// <summary>速度文案（如 "12.3 MB/s"）。</summary>
     [ObservableProperty]
     private string _speedText = string.Empty;
@@ -341,10 +367,8 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>统计卡短标签（总大小，从格式化文案剥离占位符得到；与其余短标签一样不随属性变更通知）。</summary>
     public string StatsTotalSizeLabel => LocalizationManager.T("Progress_Stats_TotalSize", string.Empty).Trim();
 
-    /// <summary>统计卡数值（已处理 N/M 分子分母，如 "60/100"；引擎未上报总数时回退纯计数）。</summary>
-    public string StatsProcessedCount => _statsTotalFiles > 0
-        ? $"{_statsProcessed}/{_statsTotalFiles}"
-        : _statsProcessed.ToString();
+    /// <summary>统计卡行 2（已处理）：已处理文件数纯计数（方案 A 去分母——分母与总大小卡行 2 StatsTotalCount 同源重复，比例由总进度条承担；中等档 StatsProcessedText 保留 N/M 分数）。</summary>
+    public string StatsProcessedCount => _statsProcessed.ToString();
 
     /// <summary>统计卡数值（跳过）。</summary>
     public long StatsSkippedCount => _statsSkipped;
@@ -528,8 +552,9 @@ public partial class ProgressViewModel : ObservableObject
         // 不参与百分比/速度/ETA/字节/批次计算（早返回，绝不落入下方分支）
         if (p.EntryStatus.HasValue && !string.IsNullOrEmpty(p.EntryKey))
         {
+            // fileSize 末参预留前向兼容：channel-info 落地 FileTotalBytes 后改传 p.FileTotalBytes（D4）
             UpdateEntryStatus(p.EntryKey,
-                EntryProgressItem.MapEntryStatus(p.EntryStatus.Value), null);
+                EntryProgressItem.MapEntryStatus(p.EntryStatus.Value), null, null);
             return;
         }
 
@@ -632,6 +657,7 @@ public partial class ProgressViewModel : ObservableObject
             _statsProcessed = p.ProcessedFiles;
             _statsTotalFiles = p.TotalFiles;
             StatsProcessedText = LocalizationManager.T("Progress_Stats_Processed", $"{_statsProcessed}/{_statsTotalFiles}");
+            StatsTotalCount = _statsTotalFiles.ToString();
         }
 
         // 总大小：仅引擎上报 TotalBytes 时更新（只写不清——未上报的引擎保持空串，Rule 6 隐藏）
@@ -640,6 +666,7 @@ public partial class ProgressViewModel : ObservableObject
             var sizeText = FormatUtil.FormatSize(p.TotalBytes);
             StatsTotalSizeValue = sizeText;
             StatsTotalSizeText = LocalizationManager.T("Progress_Stats_TotalSize", sizeText);
+            StatsProcessedSize = FormatUtil.FormatSize(p.ProcessedBytes);
         }
 
         // 统计卡数值集中刷新（T7：4 张卡的计数槽位）
@@ -740,11 +767,17 @@ public partial class ProgressViewModel : ObservableObject
         }
     }
 
-    /// <summary>清空条目行与 key 索引（新批次/新操作前调用，两者必须同步清）。</summary>
+    /// <summary>清空条目行、key 索引与终态字节累加器（新批次/新操作前调用，三者必须同步清）。</summary>
     public void ClearEntryItems()
     {
         _entryItems.Clear();
         _entryIndex.Clear();
+        _statsSkippedBytes = 0;
+        _statsFailedBytes = 0;
+        _statsOverwrittenBytes = 0;
+        StatsSkippedSize = "—";
+        StatsFailedSize = "—";
+        StatsOverwrittenSize = "—";
     }
 
     /// <summary>
@@ -752,7 +785,7 @@ public partial class ProgressViewModel : ObservableObject
     /// （未播种路径的兜底，兼容 TAR/GZ 渐进模式 D7）。
     /// 查找走 <c>_entryIndex</c> 字典 O(1)——100k 条目线性扫描为 O(n²)，不可接受。
     /// </summary>
-    public void UpdateEntryStatus(string entryKey, EntryRowState state, double? percent)
+    public void UpdateEntryStatus(string entryKey, EntryRowState state, double? percent, long? fileSize = null)
     {
         if (!_entryIndex.TryGetValue(entryKey, out var row))
         {
@@ -766,6 +799,16 @@ public partial class ProgressViewModel : ObservableObject
             _entryIndex[entryKey] = row;
         }
 
+        // 终态字节累加（D4）：同终态重复上报只计一次（检查旧状态）；
+        // 字节来源 = fileSize 事件值（前向兼容 FileTotalBytes，非空且 >0）↘ 播种行 Size 回退
+        if (state is EntryRowState.Skipped or EntryRowState.Failed or EntryRowState.Overwritten
+            && row.State != state)
+        {
+            var size = fileSize is > 0 ? fileSize.Value : row.Size;
+            if (size > 0)
+                AccumulateTerminalBytes(state, size);
+        }
+
         row.State = state;
         // T9: 行内状态文案（本地化）；Active 返回 null 不赋值——视图层改显 PercentText
         string? statusText = ResolveEntryStatusText(state);
@@ -773,6 +816,26 @@ public partial class ProgressViewModel : ObservableObject
             row.StatusText = statusText;
         if (percent.HasValue)
             row.Percent = percent.Value;
+    }
+
+    /// <summary>按终态类别累加字节并刷新对应统计卡行 3（0 字节保持 "—"：未知不装真，D2 注 2）。</summary>
+    private void AccumulateTerminalBytes(EntryRowState state, long size)
+    {
+        switch (state)
+        {
+            case EntryRowState.Skipped:
+                _statsSkippedBytes += size;
+                StatsSkippedSize = FormatUtil.FormatSize(_statsSkippedBytes);
+                break;
+            case EntryRowState.Failed:
+                _statsFailedBytes += size;
+                StatsFailedSize = FormatUtil.FormatSize(_statsFailedBytes);
+                break;
+            case EntryRowState.Overwritten:
+                _statsOverwrittenBytes += size;
+                StatsOverwrittenSize = FormatUtil.FormatSize(_statsOverwrittenBytes);
+                break;
+        }
     }
 
     /// <summary>

@@ -1,5 +1,6 @@
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
@@ -527,16 +528,17 @@ public class ProgressViewModelTests
     // ════════════════════════════════════════════
 
     /// <summary>
-    /// 统计卡计数槽必须与统计行一致显示 N/M 分子分母（编译级红：
-    /// StatsProcessedCount 由 long 改 string 后本断言才可编译）。
+    /// 统计卡计数槽显示已处理数纯计数（2026-10-09 方案 A 去分母：原 N/M 分数
+    /// 的分母与总大小卡行 2 的文件总数同源重复，完成比例由总进度条承担）。
+    /// 中等档 StatsProcessedText 仍为 N/M 分数，见 SetProgress_WithTotalFiles_ShowsProcessedOverTotal。
     /// </summary>
     [Fact]
-    public void StatsProcessedCount_ShowsFractionString()
+    public void StatsProcessedCount_ShowsPureCount()
     {
         var vm = new ProgressViewModel();
         vm.SetProgress(new ArchiveProgress { TotalFiles = 100, ProcessedFiles = 60 });
 
-        Assert.Equal("60/100", vm.StatsProcessedCount);
+        Assert.Equal("60", vm.StatsProcessedCount);
     }
 
     /// <summary>
@@ -571,5 +573,116 @@ public class ProgressViewModelTests
 
         Assert.Equal(string.Empty, vm.StatsTotalSizeText);
         Assert.Equal(string.Empty, vm.StatsTotalSizeValue);
+    }
+
+    // ════════════════════════════════════════════
+    //  统计卡三行结构（progress-stats-cards-three-row）：行 3 文件大小
+    // ════════════════════════════════════════════
+
+    /// <summary>
+    /// 引擎上报 TotalBytes 时，已处理卡行 3 必须填充文件大小（编译级红：
+    /// StatsProcessedSize 为新增成员）。行值映射见设计 D2。
+    /// </summary>
+    [Fact]
+    public void SetProgress_WithTotalBytes_PopulatesProcessedSize()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { TotalBytes = 1048576, ProcessedBytes = 524288 });
+
+        Assert.Equal(FormatUtil.FormatSize(524288), vm.StatsProcessedSize);
+    }
+
+    /// <summary>
+    /// 引擎未上报 TotalBytes（7z/TAR）时，已处理卡行 3 保持默认 — 占位
+    /// （行级永不隐藏，缺数据显 —，设计 D1）。
+    /// </summary>
+    [Fact]
+    public void SetProgress_WithoutTotalBytes_ProcessedSizeStaysDash()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { TotalFiles = 10, ProcessedFiles = 1 });
+
+        Assert.Equal("—", vm.StatsProcessedSize);
+    }
+
+    /// <summary>
+    /// 引擎上报 TotalFiles 时，总大小卡行 2 必须填充文件总数；
+    /// 初始默认 —（行级占位，D2/D4）。编译级红：StatsTotalCount 为新增成员。
+    /// </summary>
+    [Fact]
+    public void SetProgress_WithTotalFiles_PopulatesTotalCount()
+    {
+        var vm = new ProgressViewModel();
+        Assert.Equal("—", vm.StatsTotalCount);
+
+        vm.SetProgress(new ArchiveProgress { TotalFiles = 100, ProcessedFiles = 60 });
+
+        Assert.Equal("100", vm.StatsTotalCount);
+    }
+
+    /// <summary>
+    /// 播种带 Size 的条目行后上报 Skipped 终态，跳过卡行 3 必须累加该行
+    /// 原始（未压缩）尺寸（D2 注 2 / D4 累加器：播种行 Size 回退路径）。
+    /// </summary>
+    [Fact]
+    public void UpdateEntryStatus_SkippedWithSeededSize_AccumulatesSkippedSize()
+    {
+        var vm = new ProgressViewModel();
+        vm.SeedEntryItems(new[] { ("a.txt", "a.txt", 1048576L), ("b.txt", "b.txt", 2097152L) });
+
+        vm.UpdateEntryStatus("a.txt", EntryRowState.Skipped, null);
+        Assert.Equal(FormatUtil.FormatSize(1048576), vm.StatsSkippedSize);
+
+        vm.UpdateEntryStatus("b.txt", EntryRowState.Skipped, null);
+        Assert.Equal(FormatUtil.FormatSize(1048576 + 2097152), vm.StatsSkippedSize);
+    }
+
+    /// <summary>
+    /// Failed 终态累加到出错卡行 3（与 Skipped 通道互不干扰）。
+    /// </summary>
+    [Fact]
+    public void UpdateEntryStatus_FailedWithSeededSize_AccumulatesFailedSize()
+    {
+        var vm = new ProgressViewModel();
+        vm.SeedEntryItems(new[] { ("a.txt", "a.txt", 4096L) });
+
+        vm.UpdateEntryStatus("a.txt", EntryRowState.Failed, null);
+
+        Assert.Equal(FormatUtil.FormatSize(4096), vm.StatsFailedSize);
+        Assert.Equal("—", vm.StatsSkippedSize);
+    }
+
+    /// <summary>
+    /// 同一条目行重复上报同一终态只计一次（D4 去重守卫：累加前检查旧状态）。
+    /// </summary>
+    [Fact]
+    public void UpdateEntryStatus_SameTerminalStateReportedTwice_CountsOnce()
+    {
+        var vm = new ProgressViewModel();
+        vm.SeedEntryItems(new[] { ("a.txt", "a.txt", 1048576L) });
+
+        vm.UpdateEntryStatus("a.txt", EntryRowState.Skipped, null);
+        vm.UpdateEntryStatus("a.txt", EntryRowState.Skipped, null);
+
+        Assert.Equal(FormatUtil.FormatSize(1048576), vm.StatsSkippedSize);
+    }
+
+    /// <summary>
+    /// ClearEntryItems 清零累加器并复位三个 Size 字符串为 —
+    /// （SeedEntryItems 内部先调 ClearEntryItems，新批次语义自动覆盖）。
+    /// </summary>
+    [Fact]
+    public void ClearEntryItems_ResetsAccumulatedSizes()
+    {
+        var vm = new ProgressViewModel();
+        vm.SeedEntryItems(new[] { ("a.txt", "a.txt", 1048576L) });
+        vm.UpdateEntryStatus("a.txt", EntryRowState.Overwritten, null);
+        Assert.Equal(FormatUtil.FormatSize(1048576), vm.StatsOverwrittenSize);
+
+        vm.ClearEntryItems();
+
+        Assert.Equal("—", vm.StatsSkippedSize);
+        Assert.Equal("—", vm.StatsFailedSize);
+        Assert.Equal("—", vm.StatsOverwrittenSize);
     }
 }

@@ -24,6 +24,8 @@
          此前该键只在 MainWindow.axaml 局部定义，ProgressWindow 作用域内引用不到 →
          详细面板首次渲染批次行时解析失败，UI 线程卡死（补齐本窗口作用域）。 -->
     <converters:RatioToWidthConverter x:Key="RatioToWidthConverter"/>
+    <!-- 三行统计卡动态 — 画刷：—/空 → 灰 secondary，真实值 → ConverterParameter 强调色（D3） -->
+    <converters:DashBrushConverter x:Key="DashBrush"/>
   </Window.Resources>
 
   <!-- 根容器：7 行布局（原型对齐后结构）。
@@ -570,135 +572,182 @@
                        Click="DensityLooseRadio_Click"/>
         </StackPanel>
 
-        <!-- 统计卡容器（仅「完整」档显示）：SurfaceBg 底 + 圆角，内含 6 个统计卡 -->
+        <!-- 统计卡容器（仅「完整」档显示）：SurfaceBg 底 + 圆角，内含 5 个三行统计卡 + 并行度后置单行元素 -->
         <Border x:Name="StatsCardsPanel"
                 IsVisible="{Binding IsFullDensity}"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"
                 CornerRadius="{DynamicResource BorderRadius}"
                 Padding="{DynamicResource SpacingSmThk}">
-          <StackPanel Orientation="Horizontal"
-                      Spacing="{DynamicResource SpacingLg}"
-                      HorizontalAlignment="Center">
+          <!-- 竖排两段：段 1 文件统计卡行 + 段 2 并行度后置元素（并行度非文件统计，移出卡片行） -->
+          <StackPanel Orientation="Vertical">
 
-            <!-- 卡 1：已处理（✅；引擎上报后才出现） -->
-            <StackPanel Spacing="{DynamicResource SpacingXxs}"
-                        HorizontalAlignment="Center"
-                        IsVisible="{Binding StatsProcessedText, Converter={StaticResource StringNotEmpty}}">
-              <!-- 图标 -->
-              <TextBlock Text="✅" FontSize="18"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
-              <!-- 标签（由格式化文案剥离占位符得到的短标签） -->
-              <TextBlock Text="{Binding StatsProcessedLabel}"
-                         FontSize="11"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-              <!-- 数值 -->
-              <TextBlock Text="{Binding StatsProcessedCount}"
-                         FontSize="16" FontWeight="SemiBold"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+            <!-- 段 1：文件统计卡行（5 张三行卡；并行度不在此行——非文件统计，见段 2） -->
+            <StackPanel Orientation="Horizontal"
+                        Spacing="{DynamicResource SpacingLg}"
+                        HorizontalAlignment="Center">
+
+              <!-- 卡 1：已处理（✅；引擎上报后才出现）— 三行：图标+标题横排 / 文件数量 / 文件大小（未上报字节时 — 灰显）；MinWidth 锁定卡宽防止文字长度变化导致相邻卡跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsProcessedText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="✅" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                  <TextBlock Text="{Binding StatsProcessedLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：文件数量（已处理数纯计数，方案 A 去分母——比例由总进度条承担） -->
+                <TextBlock Text="{Binding StatsProcessedCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                <!-- 行 3：文件大小（— 灰 / 真实值绿，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsProcessedSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsProcessedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeStatusSuccessBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 2：跳过（⏭；引擎上报过冲突统计才出现）— 三行：图标+标题 / 文件数量 / 文件大小（终态累加值，无字节 — 灰显）；MinWidth 防跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsSkippedText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="⏭" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusWarningBrush}"/>
+                  <TextBlock Text="{Binding StatsSkippedLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：跳过数量 -->
+                <TextBlock Text="{Binding StatsSkippedCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusWarningBrush}"/>
+                <!-- 行 3：文件大小（终态字节累加值；— 灰 / 真实值 warning，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsSkippedSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsSkippedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeStatusWarningBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 3：出错（❌；引擎上报过冲突统计才出现）— 三行：图标+标题 / 文件数量 / 文件大小（终态累加值，无字节 — 灰显）；MinWidth 防跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsFailedText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="❌" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusErrorBrush}"/>
+                  <TextBlock Text="{Binding StatsFailedLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：出错数量 -->
+                <TextBlock Text="{Binding StatsFailedCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusErrorBrush}"/>
+                <!-- 行 3：文件大小（终态字节累加值；— 灰 / 真实值 error，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsFailedSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsFailedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeStatusErrorBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 4：已覆盖（🔄；引擎上报过冲突统计才出现）— 三行：图标+标题 / 文件数量 / 文件大小（终态累加值，无字节 — 灰显）；MinWidth 防跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsOverwrittenText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="🔄" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                  <TextBlock Text="{Binding StatsOverwrittenLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：已覆盖数量 -->
+                <TextBlock Text="{Binding StatsOverwrittenCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                <!-- 行 3：文件大小（终态字节累加值；— 灰 / 真实值 primary，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsOverwrittenSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsOverwrittenSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeTextPrimaryBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 5：总大小（📏；引擎上报 TotalBytes 才出现，7z/TAR 不上报时整卡隐藏，D3/Rule 6）— 三行：图标+标题 / 文件总数（未上报时 — 灰显） / 文件大小（卡可见即必有值）；MinWidth 防跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsTotalSizeValue, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="📏" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                  <TextBlock Text="{Binding StatsTotalSizeLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：文件总数（— 灰 / 真实值 primary，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsTotalCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsTotalCount, Converter={StaticResource DashBrush}, ConverterParameter=ThemeTextPrimaryBrush}"/>
+                <!-- 行 3：文件大小（卡可见即必有值，静态 primary） -->
+                <TextBlock Text="{Binding StatsTotalSizeValue}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+              </StackPanel>
+
             </StackPanel>
 
-            <!-- 卡 2：跳过（⏭；引擎上报过冲突统计才出现） -->
-            <StackPanel Spacing="{DynamicResource SpacingXxs}"
+            <!-- 段 2：并行度后置元素（2026-10-09 用户修订：并行度非文件统计，移出卡片行、置于表格之后；单行横排，显隐仍绑 HasParallelDegree） -->
+            <StackPanel Orientation="Horizontal"
+                        Spacing="{DynamicResource SpacingXxs}"
                         HorizontalAlignment="Center"
-                        IsVisible="{Binding StatsSkippedText, Converter={StaticResource StringNotEmpty}}">
-              <!-- 图标 -->
-              <TextBlock Text="⏭" FontSize="18"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeStatusWarningBrush}"/>
-              <!-- 标签 -->
-              <TextBlock Text="{Binding StatsSkippedLabel}"
-                         FontSize="11"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-              <!-- 数值 -->
-              <TextBlock Text="{Binding StatsSkippedCount}"
-                         FontSize="16" FontWeight="SemiBold"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeStatusWarningBrush}"/>
-            </StackPanel>
-
-            <!-- 卡 3：出错（❌；引擎上报过冲突统计才出现） -->
-            <StackPanel Spacing="{DynamicResource SpacingXxs}"
-                        HorizontalAlignment="Center"
-                        IsVisible="{Binding StatsFailedText, Converter={StaticResource StringNotEmpty}}">
-              <!-- 图标 -->
-              <TextBlock Text="❌" FontSize="18"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeStatusErrorBrush}"/>
-              <!-- 标签 -->
-              <TextBlock Text="{Binding StatsFailedLabel}"
-                         FontSize="11"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-              <!-- 数值 -->
-              <TextBlock Text="{Binding StatsFailedCount}"
-                         FontSize="16" FontWeight="SemiBold"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeStatusErrorBrush}"/>
-            </StackPanel>
-
-            <!-- 卡 4：已覆盖（🔄；引擎上报过冲突统计才出现） -->
-            <StackPanel Spacing="{DynamicResource SpacingXxs}"
-                        HorizontalAlignment="Center"
-                        IsVisible="{Binding StatsOverwrittenText, Converter={StaticResource StringNotEmpty}}">
-              <!-- 图标 -->
-              <TextBlock Text="🔄" FontSize="18"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
-              <!-- 标签 -->
-              <TextBlock Text="{Binding StatsOverwrittenLabel}"
-                         FontSize="11"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-              <!-- 数值 -->
-              <TextBlock Text="{Binding StatsOverwrittenCount}"
-                         FontSize="16" FontWeight="SemiBold"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-            </StackPanel>
-
-            <!-- 卡 5：并行度（⚙；真实 ParallelExtractDegree，degree < 2 串行时整卡隐藏，D3/Rule 6） -->
-            <StackPanel Spacing="{DynamicResource SpacingXxs}"
-                        HorizontalAlignment="Center"
+                        Margin="0,8,0,0"
                         IsVisible="{Binding HasParallelDegree}">
-              <!-- 图标 -->
-              <TextBlock Text="⚙" FontSize="18"
-                         HorizontalAlignment="Center"
+              <!-- 图标（14 略小于卡内 16，弱化为附属信息） -->
+              <TextBlock Text="⚙" FontSize="14"
+                         VerticalAlignment="Center"
                          Foreground="{DynamicResource ThemeProgressFillBrush}"/>
-              <!-- 标签（本地化「并行」） -->
-              <TextBlock Text="{Binding LocalizedStrings[Progress_Stats_Parallel]}"
-                         FontSize="11"
-                         HorizontalAlignment="Center"
+              <!-- 标题（本地化「并行」） -->
+              <TextBlock Text="{Binding LocalizedStrings[Progress_Stats_Parallel]}" FontSize="11"
+                         VerticalAlignment="Center"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-              <!-- 数值（实际并行度） -->
-              <TextBlock Text="{Binding ParallelDegree}"
-                         FontSize="16" FontWeight="SemiBold"
-                         HorizontalAlignment="Center"
+              <!-- 线程数 -->
+              <TextBlock Text="{Binding ParallelDegree}" FontSize="13" FontWeight="SemiBold"
+                         VerticalAlignment="Center"
                          Foreground="{DynamicResource ThemeProgressFillBrush}"/>
             </StackPanel>
 
-            <!-- 卡 6：总大小（📏；引擎上报 TotalBytes 才出现，7z/TAR 不上报时整卡隐藏，D3/Rule 6） -->
-            <StackPanel Spacing="{DynamicResource SpacingXxs}"
-                        HorizontalAlignment="Center"
-                        IsVisible="{Binding StatsTotalSizeValue, Converter={StaticResource StringNotEmpty}}">
-              <!-- 图标 -->
-              <TextBlock Text="📏" FontSize="18"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-              <!-- 标签 -->
-              <TextBlock Text="{Binding StatsTotalSizeLabel}"
-                         FontSize="11"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-              <!-- 数值 -->
-              <TextBlock Text="{Binding StatsTotalSizeValue}"
-                         FontSize="16" FontWeight="SemiBold"
-                         HorizontalAlignment="Center"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-            </StackPanel>
           </StackPanel>
         </Border>
 
