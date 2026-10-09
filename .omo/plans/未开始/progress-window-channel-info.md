@@ -169,7 +169,8 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 
 ## 依赖与后续
 
-- **依赖**：`progress-stats-cards-three-row` 计划**先实施**（两者都改 `ProgressViewModel.cs`，避免行号冲突）；`progress-window-bytes-i18n` 为软依赖（7z/TAR 字节埋点补齐后，信息列「已处理/总量」在 7z/TAR 下由隐藏变真实，本设计零改动）。
+- **依赖**：`progress-stats-cards-three-row` 计划**先实施**（两者都改 `ProgressViewModel.cs`，避免行号冲突；该计划 2026-10-09 已修订为「5 卡三行 + 并行度后置 + 终态字节累加器」，并预留 `UpdateEntryStatus(..., long? fileSize)` 前向兼容参数）；`progress-window-bytes-i18n` 为软依赖（7z/TAR 字节埋点补齐后，信息列「已处理/总量」在 7z/TAR 下由隐藏变真实，本设计零改动）。
+- **前向兼容契约（stats-cards 累加器依赖）**：本计划任务 3 落地 `ArchiveProgress.FileTotalBytes` 后，**逐条目终态报告（EntryStatus != null）也必须携带 `FileTotalBytes`**（当前条目原始尺寸），使 stats-cards 的跳过/出错/已覆盖累加器在渐进模式（TAR/GZ、>5000 条目未播种）下自动升级为 100% 覆盖；stats-cards 侧接线只需把 `SetProgress` 的 `EntryStatus` 块调用末参从 `null` 改传 `p.FileTotalBytes`（该计划已预留参数，零结构改动）。
 - **后续受益**：信息列与统计卡同源 `ArchiveProgress`，字节埋点到位即自动生效。
 - **文档同步**：本文件新增 → `docs/PLAN.md` P2 区登记（规则 1）。
 
@@ -265,7 +266,7 @@ Wave FINAL
       public double? CompressionRatio { get; set; }
   ```
 
-  (3b) ZipEngine 各站点填充（目标是每条常规报告都带这 4 字段；逐条目终态报告（EntryStatus != null）不必）：
+  (3b) ZipEngine 各站点填充（目标是每条常规报告都带这 4 字段；逐条目终态报告（EntryStatus != null）时 `BatchProcessedBytes`/`BatchTotalBytes`/`CompressionRatio` 不必填，但 **`FileTotalBytes` 必须携带**——前向兼容 stats-cards 终态字节累加器，见「依赖与后续」契约）：
 
   - 并行解压 `:640-654`：`FileTotalBytes = entry.Size`（条目为 ArchiveEntry 时）/ `entrySize`；`BatchProcessedBytes = batchProcessedBytes`；`BatchTotalBytes = batchTotalBytes`；`CompressionRatio = null`。
   - 并行批次完成 `:719-731` / `:1236-1249`：`BatchProcessedBytes = batchTotalBytes`（批次完成）；`BatchTotalBytes = batchTotalBytes`；`FileTotalBytes = 0`（批次交汇点无单文件概念——用 0 触发 Rule 6 隐藏文件大小段）；`CompressionRatio = null`。
