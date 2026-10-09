@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-09** — 新增计划：进度窗口通道信息增强（计划类）
+  - **计划**：[progress-window-channel-info.md](../.omo/plans/未开始/progress-window-channel-info.md)（P2 / 1.5-2.5天 / 8 任务 4 波次 TDD 分解）
+  - **内容**：四项改造——① 通道行新增信息列（文件大小 · 已处理/总量 · 实时压缩率，方案 A `ArchiveProgress` 新增 `FileTotalBytes`/`BatchProcessedBytes`/`BatchTotalBytes`/`CompressionRatio` 四字段，7z/解压/分卷按规则 6 隐藏压缩率段）；② 「详细」模式推翻 D6 恒可用 + 非并行合成单条通道行（隐藏批次序号/批进度条/百分比/批明细/压缩说明，不污染 `ParallelBatchItems`）；③ 路径拆目录（`MiddleEllipsis` 中间省略）+ 文件名两列，根文件无目录列；④ 底纹双缺陷修复（几何基准 ContentPresenter→文件格 Grid + ClipToBounds；N 组并行压缩 adapter 漏拷 `FilePercentComplete`）；批级进度条列缩至 ~100px 固定。
+  - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。依赖 stats-cards 计划先行；无新增本地化 key。设计+任务分解已落盘，未实施。
+
 **2026-10-08** — 新增计划：进度窗口统计卡三行结构（计划类）
   - **计划**：[progress-stats-cards-three-row.md](../.omo/plans/未开始/progress-stats-cards-three-row.md)（P2 / 2-3h / 6 任务 3 波次 TDD 分解）
   - **内容**：「完整」档 6 张统计卡改三行表格——行 1 图标+标题横排、行 2 文件数量、行 3 文件大小；行级缺数据灰显 `—`（卡级显隐与中/精简两档零改动，规则 6 维持）；VM 新增 `StatsProcessedSize`/`StatsTotalCount` 只写不清字段（`SetProgress` 的 `TotalBytes`/`TotalFiles` 块写入）+ 新建 `DashBrushConverter`（`—`→`ThemeTextSecondaryBrush`、真实值→强调色）；D6 固定恰 3 条 VM 测试；无新本地化 key；方案 A 逐卡 XAML（模板化已否决）。
