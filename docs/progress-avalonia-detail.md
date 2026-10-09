@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-09** — 进度窗口通道信息增强交互原型（docs/prototypes）
+  - **原型**：[progress-window-channel-info.html](prototypes/progress-window-channel-info.html)（单文件暗色 HTML，与 progress-window-enhancement / channel-demo 两既有原型调色板一致，窗口宽 560px = 真机 `ProgressWindow` 宽度），浏览器直接打开即可审阅，供实施前对齐设计。
+  - **交互**：控制条四场景切换（ZIP 并行解压 / ZIP 并行压缩 / 7z 压缩·单行 / ZIP 串行·单行）对应四条验收；底纹「修复后/修复前」对照（bug 态红虚线演示整行宽溢出）；窗口内密度（少/中/完整）与模式（简约/详细/列表）双单选实时切换，「详细」恒可用标注 D6 已推翻；通道行 = 序号 | 目录(中间省略)+文件名(底纹) | 批进度条 100px | 百分比 | 批明细 | 信息列，单行变体隐藏前四项；信息列缺段连分隔符隐藏（规则 6）；完整档 6 卡三行统计卡（7z 总大小卡隐藏、已处理行 3 显 `—`）；底部 legend 映射改动点 ①–④ → 计划任务 6/4/5/1-2。
+  - **验证**：`node --check` JS 语法通过；JS 引用 41 个元素 ID 与 HTML 定义全部对应；`</body></html>` 闭合完整。
+
 **2026-10-09** — 新增计划：进度窗口通道信息增强（计划类）
   - **计划**：[progress-window-channel-info.md](../.omo/plans/未开始/progress-window-channel-info.md)（P2 / 1.5-2.5天 / 8 任务 4 波次 TDD 分解）
   - **内容**：四项改造——① 通道行新增信息列（文件大小 · 已处理/总量 · 实时压缩率，方案 A `ArchiveProgress` 新增 `FileTotalBytes`/`BatchProcessedBytes`/`BatchTotalBytes`/`CompressionRatio` 四字段，7z/解压/分卷按规则 6 隐藏压缩率段）；② 「详细」模式推翻 D6 恒可用 + 非并行合成单条通道行（隐藏批次序号/批进度条/百分比/批明细/压缩说明，不污染 `ParallelBatchItems`）；③ 路径拆目录（`MiddleEllipsis` 中间省略）+ 文件名两列，根文件无目录列；④ 底纹双缺陷修复（几何基准 ContentPresenter→文件格 Grid + ClipToBounds；N 组并行压缩 adapter 漏拷 `FilePercentComplete`）；批级进度条列缩至 ~100px 固定。
