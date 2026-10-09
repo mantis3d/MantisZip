@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>进度窗口统计卡三行结构 — 专属审阅原型</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   调色板双层：
+   ① 页面框架层 —— 沿用原型家族配色（progress-window-channel-info.html 同源）
+   ② 模拟窗口层 —— ThemeDark.axaml 真实资源键色值（真机暗色主题如实还原）
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  /* ① 原型家族框架配色 */
+  --bg:#1a1a2e; --section:#252540; --item:#3d3d5c; --item-hover:#454570;
+  --accent:#6bd46b; --accent2:#4ecdc4; --text:#eaeaea; --dim:#888; --dimmer:#666;
+  /* ② 真机暗色主题真实色值（取自 src/MantisZip.UI.Avalonia/Themes/ThemeDark.axaml） */
+  --mz-window:#1E1E1E;     /* ThemeWindowBgBrush   = #FF1E1E1E */
+  --mz-splitter:#3E3E3E;   /* ThemeSplitterBgBrush = #FF3E3E3E（下方信息区底色） */
+  --mz-surface:#252525;    /* ThemeSurfaceBgBrush  = #FF252525（统计卡容器底色） */
+  --mz-border:#3E3E3E;     /* ThemeBorderBrush     = #FF3E3E3E */
+  --mz-primary:#E0E0E0;    /* ThemeTextPrimaryBrush   = #FFE0E0E0 */
+  --mz-secondary:#999999;  /* ThemeTextSecondaryBrush = #FF999999（灰 — 占位色） */
+  --mz-success:#2E7D32;    /* ThemeStatusSuccessBrush = #FF2E7D32（✅ 卡强调色） */
+  --mz-warning:#5C4A1E;    /* ThemeStatusWarningBrush = #FF5C4A1E（⏭ 卡强调色，真机暗色即此暗黄） */
+  --mz-error:#C62828;      /* ThemeStatusErrorBrush   = #FFC62828（❌ 卡强调色） */
+  --mz-progress:#64B5F6;   /* ThemeProgressFillBrush  = #FF64B5F6（⚙ 强调色） */
+  --mz-accent:#0078D4;     /* ThemeAccent（密度单选选中点） */
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+       padding:28px 16px 60px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+h1 { font-size:20px; color:var(--accent); }
+
+/* 顶部说明块（原型家族 .caption 样式） */
+.caption { max-width:560px; font-size:12px; color:var(--dim); line-height:1.8; }
+.caption b { color:var(--accent); } .caption .k { color:var(--accent2); }
+
+/* ═══ 模拟窗口：560px = 真机 ProgressWindow Width ═══ */
+.window { width:560px; background:var(--mz-window); border:1px solid var(--item);
+          border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,.5); }
+.titlebar { display:flex; align-items:center; gap:8px; padding:9px 14px; background:var(--section);
+            border-bottom:1px solid #4a4a6a; font-size:13px; font-weight:600; }
+.titlebar .dot { width:10px; height:10px; border-radius:50%; background:var(--dimmer); }
+.titlebar .name { color:var(--dim); font-size:12px; font-weight:400; }
+
+/* 窗口上部占位（真机此处为文件列表/预览区，本原型省略） */
+.stub { padding:26px 14px; text-align:center; font-size:11px; color:var(--dimmer);
+        letter-spacing:.5px; border-bottom:1px solid var(--mz-border); }
+
+/* 下方信息区：真机 Grid.Row=4，底色 ThemeSplitterBgBrush + 1px ThemeBorderBrush + 圆角 6 + 内边距 12 */
+.info { background:var(--mz-splitter); border:1px solid var(--mz-border);
+        border-radius:6px; margin:12px; padding:12px; }
+/* 密度单选行（真机三选：精简/标准/完整）— 本原型静态停在「完整」，中/精简零改动（D5）不演示 */
+.density { display:flex; justify-content:center; align-items:center; gap:16px; margin-bottom:12px; }
+.dr { display:flex; align-items:center; gap:5px; font-size:12px; color:var(--mz-secondary); cursor:default; }
+.rd { width:13px; height:13px; border-radius:50%; border:1px solid var(--mz-secondary); display:inline-block; }
+.dr.on { color:var(--mz-primary); }
+.dr.on .rd { border-color:var(--mz-accent); background:radial-gradient(circle, var(--mz-accent) 0 3.5px, transparent 4px); }
+.dens-note { font-size:10px; color:var(--dimmer); }
+
+/* ═══ 统计卡容器（真机 StatsCardsPanel）：SurfaceBg 底 + 圆角 6 + 内边距 12；
+   2026-10-09 修订：容器内竖排两段 —— 段1 文件统计卡行（5 卡）+ 段2 并行度后置单行 ═══ */
+.stats-panel { background:var(--mz-surface); border-radius:6px; padding:12px; margin-bottom:10px; }
+/* 段 1：卡片行 —— 真机为横向 StackPanel（SpacingLg=24，居中，**不换行** —— 现状非 WrapPanel） */
+.stats-cards { display:flex; flex-wrap:nowrap; justify-content:center; align-items:flex-start; gap:24px; }
+/* 段 2：并行度后置元素（2026-10-09 用户修订：非文件统计，移出卡片行、置于表格之后；单行横排居中） */
+.parallel-after { display:flex; justify-content:center; align-items:center; gap:4px;
+                  margin-top:8px; font-size:12px; }
+.parallel-after .pa-ic { font-size:14px; color:var(--mz-progress); }
+.parallel-after .pa-lbl { font-size:11px; color:var(--mz-secondary); }
+.parallel-after .pa-val { font-size:13px; font-weight:600; color:var(--mz-progress);
+                          font-variant-numeric:tabular-nums; }
+
+/* ── 新设计：三行卡（D3 字号/间距） ──
+   行1 图标 16 + 标题 11（横排居中 SpacingXxs=4）
+   行2 数量 15 SemiBold（颜色 = 该卡强调色）
+   行3 大小 13（动态格 DashBrushConverter 着色：— 灰 / 真实值强调色） */
+.stat { display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; }
+.stat .r1 { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:4px;
+            font-size:11px; color:var(--mz-secondary); white-space:nowrap; }
+.stat .r1 .ic { font-size:16px; line-height:1.1; }
+.stat .r2 { font-size:15px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.2; }
+.stat .r3 { font-size:13px; font-variant-numeric:tabular-nums; line-height:1.2; }
+
+/* ── 现状：竖排卡（图标 18 / 标签 11 / 数值 16 SemiBold）—— 新旧对比用 ── */
+.stat-old { display:flex; flex-direction:column; align-items:center; gap:4px; text-align:center; }
+.stat-old .o-ic { font-size:18px; line-height:1.15; }
+.stat-old .o-lbl { font-size:11px; color:var(--mz-secondary); white-space:nowrap; }
+.stat-old .o-val { font-size:16px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.2; }
+
+/* 强调色类：真机画刷键 → 色值（见 :root ②） */
+.c-ok   { color:var(--mz-success); }
+.c-warn { color:var(--mz-warning); }
+.c-err  { color:var(--mz-error); }
+.c-prim { color:var(--mz-primary); }
+.c-fill { color:var(--mz-progress); }
+.c-dash { color:var(--mz-secondary); }   /* 灰 —（ThemeTextSecondaryBrush） */
+
+/* 字段名标注（默认隐藏，「显示绑定字段名」开启后显示；D2/D4 审阅辅助） */
+.fld { display:none; font-size:8px; font-family:Consolas,"Courier New",monospace;
+       color:var(--accent2); font-weight:400; margin-top:1px; }
+body.anno .fld { display:block; }
+body.anno .stat .r1 .fld { flex-basis:100%; }   /* 行1 标注独占一行 */
+body.anno .stats-cards { flex-wrap:wrap; }      /* 标注较宽时允许换行（真机无标注不换行） */
+/* DashBrushConverter 动态着色格（2026-10-09 修订：全场景 5 处 —— 卡1/2/3/4 行3 + 总大小卡行2）——标注开启时青色虚线框 */
+body.anno .dyn { outline:1px dashed var(--accent2); outline-offset:2px; border-radius:3px; }
+
+/* 新旧对比双栏（栏宽减半故卡片换行；真机 560px 单行不换行） */
+.cmp { display:flex; gap:12px; align-items:flex-start; }
+.cmp-col { flex:1; min-width:0; }
+.cmp-head { font-size:10px; color:var(--accent2); text-align:center; margin-bottom:8px;
+            letter-spacing:.5px; }
+.cmp .stats-cards { flex-wrap:wrap; gap:14px 20px; }
+.cmp-col .stats-cards { justify-content:center; }
+/* 对比视图右栏（新设计）：并行度后置元素同样置于卡片行之后 */
+.cmp-col .parallel-after { margin-top:6px; }
+
+/* 总进度/时间（静态示意，非本原型范围） */
+.ovrow { display:flex; justify-content:space-between; font-size:12px; color:var(--mz-secondary); margin-bottom:5px; }
+.ovrow .cur { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:78%; }
+.ovrow .pct { color:var(--mz-progress); font-weight:600; font-variant-numeric:tabular-nums; }
+.ovbar { height:16px; background:var(--mz-surface); border:1px solid var(--mz-border);
+         border-radius:8px; overflow:hidden; margin-bottom:8px; }
+.ovbar > div { height:100%; background:var(--mz-progress); transition:width .25s ease; }
+.timerow { display:flex; justify-content:space-between; font-size:12px; color:var(--mz-secondary); }
+.timerow b { color:var(--mz-primary); font-weight:500; font-variant-numeric:tabular-nums; }
+
+/* ═══ 底部控制条（原型辅助，非窗口本体）—— 场景切换 + 审阅工具 ═══ */
+.controls { width:560px; background:var(--section); border:1px solid var(--item);
+            border-radius:8px; padding:10px 14px; font-size:12px; }
+.ctl-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.ctl-row:last-child { margin-bottom:0; }
+.ctl-lbl { color:var(--dim); width:76px; font-size:11px; flex-shrink:0; }
+.btn { padding:4px 12px; border:1px solid transparent; background:var(--item); color:var(--dim);
+       border-radius:5px; font-size:12px; cursor:pointer; transition:all .15s; }
+.btn:hover { background:var(--item-hover); color:var(--text); }
+.btn.on { background:var(--accent); color:var(--bg); font-weight:600; }
+.hint { color:var(--dimmer); font-size:10px; }
+/* 当前场景的差异说明 */
+.scen-note { width:560px; font-size:11px; color:var(--accent2); background:var(--section);
+             border:1px solid var(--item); border-left:3px solid var(--accent);
+             border-radius:6px; padding:7px 12px; line-height:1.7; }
+.scen-note b { color:var(--accent); }
+
+/* ═══ 底部图例：设计决策 D1–D6 ↔ 原型元素 ═══ */
+.legend { width:560px; background:var(--section); border:1px solid var(--item); border-radius:8px;
+          padding:12px 14px; font-size:11px; color:var(--dim); line-height:1.9; }
+.legend b { color:var(--accent); }
+.legend code { background:var(--bg); padding:1px 5px; border-radius:3px; color:var(--accent2); font-size:10px; }
+.legend .sw { display:inline-block; width:9px; height:9px; border-radius:2px; margin:0 3px 0 6px;
+              vertical-align:middle; }
+</style>
+</head>
+<body>
+
+<h1>进度窗口统计卡三行结构 — 专属审阅原型</h1>
+
+<!-- ═══ 顶部说明：设计来源与总体结构（2026-10-09 修订） ═══ -->
+<div class="caption">
+    基于<b>已确认设计</b>（.omo/plans/未开始/progress-stats-cards-three-row.md 的 D1–D6，
+    <span class="k">2026-10-09 修订</span>）绘制的实施前审阅原型，
+    模拟窗口宽 <b>560px</b> = 真机 ProgressWindow 宽度。<br>
+    统计卡区从现状「图标 / 标签 / 数值」竖排改为 <b class="k">三行表格语义</b>：
+    行1 = 图标 + 标题（横排居中）· 行2 = 文件数量 · 行3 = 文件大小；缺数据显示灰 <b>—</b>
+    （行级永不隐藏；卡级显隐完全沿用现状，规则 6）。<br>
+    <b class="k">2026-10-09 修订</b>：<b>「并行」移出卡片行</b>——它不是文件统计，改为
+    <b>表格之后的单行元素</b>（⚙ 并行 N）；跳过/出错/已覆盖行3 从静态 — 改为
+    <b>终态字节累加值</b>（前向兼容 FileTotalBytes，渐进模式下无字节来源时诚实显 —）。<br>
+    模拟窗口内部色值取自 <b>ThemeDark.axaml 真实资源键</b>（含跳过卡暗黄 <span class="k">#5C4A1E</span>，
+    真机暗色主题即为此色）；页面框架沿用原型家族配色。
+</div>
+
+<!-- ═══ 模拟窗口（560px = 真机宽度） ═══ -->
+<div class="window">
+    <!-- 标题栏 -->
+    <div class="titlebar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span id="winTitle">正在解压…</span><span class="name" id="winName">backup-2026-10-08.zip</span>
+    </div>
+
+    <!-- 窗口上部占位：真机此处为文件列表/预览区，本原型省略（仅演示统计卡） -->
+    <div class="stub">文件列表 / 预览区（真机上部内容，本原型省略）</div>
+
+    <!-- 下方信息区（真机 Grid.Row=4，底色 ThemeSplitterBgBrush） -->
+    <div class="info">
+
+        <!-- 密度三选（静态示意）：本原型仅演示「完整」档，中/精简档零改动（D5）不在此范围 -->
+        <div class="density">
+            <span class="dr"><i class="rd"></i>精简</span>
+            <span class="dr"><i class="rd"></i>标准</span>
+            <span class="dr on"><i class="rd"></i>完整</span>
+            <span class="dens-note">本原型仅「完整」档；中/精简零改动（D5）</span>
+        </div>
+
+        <!-- 统计卡容器（真机 StatsCardsPanel：SurfaceBg 底 + 圆角；2026-10-09 修订：竖排两段） -->
+        <div class="stats-panel">
+            <!-- 段 1：默认视图 —— 新设计 5 张文件统计卡单行（真机横向 StackPanel，不换行） -->
+            <div class="stats-cards" id="statsCards"></div>
+            <!-- 段 2：并行度后置元素（2026-10-09：移出卡片行，置于表格之后） -->
+            <div class="parallel-after" id="parallelAfter"></div>
+
+            <!-- 新旧对比视图：左 = 现状竖排 6 卡，右 = 新设计 5 卡 + 并行后置（栏宽减半故换行） -->
+            <div class="cmp" id="cmpBox" style="display:none">
+                <div class="cmp-col">
+                    <div class="cmp-head">现状 · 竖排 6 卡（并行在行内第 5 位）</div>
+                    <div class="stats-cards" id="oldCards"></div>
+                </div>
+                <div class="cmp-col">
+                    <div class="cmp-head">新设计 · 5 卡三行 + 并行后置</div>
+                    <div class="stats-cards" id="newCards"></div>
+                    <div class="parallel-after" id="newParallelAfter"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 总进度 / 时间（静态示意，非本原型审阅范围） -->
+        <div class="ovrow"><span class="cur">正在解压: Photos/2026/Trip Japan/DSC_00421.jpg</span><span class="pct">60%</span></div>
+        <div class="ovbar"><div style="width:60%"></div></div>
+        <div class="timerow"><span>已用: <b>0:42</b></span><span>剩余: <b>0:28</b></span></div>
+    </div>
+</div>
+
+<!-- ═══ 场景差异说明（跟随按钮切换） ═══ -->
+<div class="scen-note" id="scenNote"></div>
+
+<!-- ═══ 底部控制条：五场景单选 + 审阅工具（原型辅助，非窗口本体） ═══ -->
+<div class="controls">
+    <div class="ctl-row">
+        <span class="ctl-lbl">场景 · 五验收</span>
+        <button class="btn on" id="sc0" onclick="setScen('zipFull')">ZIP · 完整数据</button>
+        <button class="btn" id="sc1" onclick="setScen('z7')">7z · 无字节上报</button>
+        <button class="btn" id="sc2" onclick="setScen('serial')">串行 · 无并行</button>
+        <button class="btn" id="sc3" onclick="setScen('noConflict')">冲突统计为空</button>
+        <button class="btn" id="sc4" onclick="setScen('progressive')">渐进 · 无字节累加</button>
+    </div>
+    <div class="ctl-row">
+        <span class="ctl-lbl">审阅工具</span>
+        <button class="btn" id="btnCmp" onclick="setCmp(!S.cmp)">新旧对比（左现状 6 卡 / 右新 5 卡+并行后置）</button>
+        <button class="btn" id="btnAnno" onclick="setAnno(!S.anno)">显示绑定字段名</button>
+        <span class="hint">切换场景实时重渲统计卡区；数据为写死的演示值，非真实绑定</span>
+    </div>
+</div>
+
+<!-- ═══ 底部图例：设计决策 D1–D6 ↔ 原型元素映射（2026-10-09 修订） ═══ -->
+<div class="legend">
+    <b>设计决策 ↔ 原型元素 图例</b>（<b>2026-10-09 修订</b>）<br>
+    <b>D1</b>（范围与缺数据表现：5 张文件卡统一三行 / <b>并行移出卡片行置后</b> / 行级显 — 不隐藏 / 卡级可见性不动）→
+    卡片区竖排两段：段1 = 5 卡横向行、段2 = <b>⚙ 并行 N 后置单行</b>（显隐仍绑 <code>HasParallelDegree</code>）；
+    每卡<b>恒渲染 3 行</b>，行3 缺数据仍占位显灰 —；场景「<b>冲突统计为空</b>」演示卡 2/3/4 <b>整卡消失</b>，
+    场景「<b>7z · 无字节上报</b>」演示总大小卡整卡隐藏、场景「<b>串行 · 无并行</b>」演示后置并行<b>整段隐藏</b><br>
+    <b>D2</b>（行值映射表 + 累加修订 + 方案 A 去分母）→ 卡内固定 行1 图标+标题 / 行2 文件数量 / 行3 文件大小；
+    <b>已处理行2 = 纯计数</b>（2026-10-09 方案 A：原「N/M」分母与总大小卡行2 的文件总数同源重复，比例由总进度条承担；
+    对比视图左栏还原现状分数 60/100）；
+    <b>卡2/3/4 行3 = 终态字节累加值</b>（<code>StatsSkippedSize</code>/<code>StatsFailedSize</code>/<code>StatsOverwrittenSize</code>，
+    字节来源 = 事件 FileTotalBytes 优先 ↘ 播种行 Size 回退）；场景「<b>渐进 · 无字节累加</b>」演示
+    未播种路径下累加器无字节来源 → 诚实显灰 —（不装 0 B）<br>
+    <b>D3</b>（结构与样式：16/11/15/13 字号 + DashBrushConverter <b>5 处</b>动态格）→
+    行1 图标 16px + 标题 11px、行2 15px SemiBold、行3 13px、行距 4px（SpacingXxs）、卡距 24px（SpacingLg）；
+    开启「<b>显示绑定字段名</b>」后 <span style="color:var(--accent2)">青色虚线框</span> 圈出的
+    <b>卡1/2/3/4 行3 与 总大小卡行2</b> 共 5 格即 DashBrushConverter 动态着色格<br>
+    <b>D4</b>（五个新 VM 字段 + 终态累加器）→ 字段标注中 <code>StatsProcessedSize</code>（卡1 行3）、
+    <code>StatsSkippedSize</code>/<code>StatsFailedSize</code>/<code>StatsOverwrittenSize</code>（卡2/3/4 行3）、
+    <code>StatsTotalCount</code>（总大小卡行2）；累加器去重（同终态重复上报只计一次）+ ClearEntryItems 清零<br>
+    <b>D5</b>（中/精简档零改动）→ 不在本原型范围：密度单选静态停在「完整」并附提示文字<br>
+    <b>D6</b>（7 条 VM 单测）→ 不在本原型范围（实施阶段 TDD 验证）；本原型仅供视觉审阅<br>
+    <b>审阅工具</b>：「新旧对比」= 左现状 6 卡竖排（并行为第 5 卡）/ 右新 5 卡三行 + 并行后置<br>
+    <b>强调色对照</b>（真机 ThemeDark.axaml 色值）：
+    <span class="sw" style="background:#2E7D32"></span>✅ 成功/已处理 #2E7D32
+    <span class="sw" style="background:#5C4A1E"></span>⏭ 警告/跳过 #5C4A1E
+    <span class="sw" style="background:#C62828"></span>❌ 错误/出错 #C62828
+    <span class="sw" style="background:#E0E0E0"></span>主文本 #E0E0E0
+    <span class="sw" style="background:#64B5F6"></span>⚙ 并行后置 #64B5F6
+    <span class="sw" style="background:#999999"></span>灰 — #999999
+</div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════
+   卡片定义（2026-10-09 修订）—— 5 张文件统计卡 + 独立的并行后置元素。
+   严格对应设计 D2 行值映射表 + D3 样式：
+   icls = 行1 图标色；r2c/r3c = 行2/行3 强调色；
+   r2dyn/r3dyn = 是否 DashBrushConverter 动态着色格（D3：修订后全场景 5 处）；
+   f1/f2/f3 = 行1/行2/行3 绑定字段名（D2/D4，字段标注用）
+   PARALLEL = 并行后置单行元素定义（不属于文件统计卡行）
+   ══════════════════════════════════════════════════════════════ */
+var DEFS = [
+  { key:'c1', icon:'✅', icls:'ok',   title:'已处理',
+    f1:'StatsProcessedLabel',  f2:'StatsProcessedCount',  f3:'StatsProcessedSize',
+    r2c:'ok',   r3c:'ok',   r2dyn:false, r3dyn:true,  oldFld:'StatsProcessedCount' },
+  { key:'c2', icon:'⏭', icls:'warn', title:'跳过',
+    f1:'StatsSkippedLabel',    f2:'StatsSkippedCount',    f3:'StatsSkippedSize（累加）',
+    r2c:'warn', r3c:'warn', r2dyn:false, r3dyn:true,  oldFld:'StatsSkippedCount' },
+  { key:'c3', icon:'❌', icls:'err',  title:'出错',
+    f1:'StatsFailedLabel',     f2:'StatsFailedCount',     f3:'StatsFailedSize（累加）',
+    r2c:'err',  r3c:'err',  r2dyn:false, r3dyn:true,  oldFld:'StatsFailedCount' },
+  { key:'c4', icon:'🔄', icls:'ok',   title:'已覆盖',
+    f1:'StatsOverwrittenLabel',f2:'StatsOverwrittenCount',f3:'StatsOverwrittenSize（累加）',
+    r2c:'prim', r3c:'prim', r2dyn:false, r3dyn:true,  oldFld:'StatsOverwrittenCount' },
+  { key:'c5', icon:'📏', icls:'dash', title:'总大小',
+    f1:'StatsTotalSizeLabel',  f2:'StatsTotalCount',      f3:'StatsTotalSizeValue',
+    r2c:'prim', r3c:'prim', r2dyn:true,  r3dyn:false, oldFld:'StatsTotalSizeValue' }
+];
+/* 并行后置元素（2026-10-09：非文件统计，置于表格之后；字段标注用） */
+var PARALLEL = { f1:'Progress_Stats_Parallel', f2:'ParallelDegree', vis:'HasParallelDegree' };
+
+/* ══════════════════════════════════════════════════════════════
+   五场景（演示值写死，非真实数据绑定；2026-10-09 新增场景 5 渐进）
+   show = 卡级/段级可见性（D1/D5 规则 6）；cN.r2/r3 = 行2/行3 值（D2）
+   c2/c3/c4.r3 = 终态字节累加值（D4：FileTotalBytes 优先 ↘ 播种行 Size 回退；
+   渐进未播种路径无字节来源 → —）
+   ══════════════════════════════════════════════════════════════ */
+var SCEN = {
+  /* 场景 1：ZIP · 完整数据 —— 5 卡全显 + 并行后置；累加器已累计真实字节 */
+  zipFull: { title:'正在解压…', name:'backup-2026-10-08.zip',
+    show:{ c1:1, c2:1, c3:1, c4:1, c5:1, parallel:1 },
+    c1:{ r2:'60', oldR2:'60/100', r3:'1.2 GB' }, c2:{ r2:'3', r3:'15.4 MB' }, c3:{ r2:'1', r3:'2.1 MB' },
+    c4:{ r2:'5', r3:'8.7 MB' }, c5:{ r2:'100', r3:'8.5 GB' }, parallel:{ r2:'8' },
+    note:'<b>ZIP · 完整数据</b>（默认）：5 张文件卡全显 + <b>并行度后置单行</b>（⚙ 并行 8，不在卡片行内）。已处理行2 = <b>纯计数 60</b>（2026-10-09 方案 A 去分母——原「60/100」分母与总大小卡行2 的文件总数同源重复，比例由总进度条承担）、行3 = 真实已处理大小 <b>1.2 GB</b>；跳过/出错/已覆盖行3 = <b>终态累加值</b> 15.4 MB / 2.1 MB / 8.7 MB（播种行 Size 逐条累加，各卡强调色）；总大小卡行2 = 总数 100、行3 = 8.5 GB。' },
+
+  /* 场景 2：7z · 无字节上报 —— 总大小卡整卡隐藏；已处理行2 纯计数（方案 A 后与 ZIP 同形）；行3 灰 —；
+     卡2/3/4 行3 仍有累加值（7z 解压同样有播种行 Size） */
+  z7: { title:'正在压缩…', name:'system-backup.7z',
+    show:{ c1:1, c2:1, c3:1, c4:1, c5:0, parallel:1 },
+    c1:{ r2:'60', r3:'—' }, c2:{ r2:'3', r3:'15.4 MB' }, c3:{ r2:'1', r3:'2.1 MB' },
+    c4:{ r2:'5', r3:'8.7 MB' }, parallel:{ r2:'8' },
+    note:'<b>7z · 无字节上报</b>：总大小卡<b>整卡隐藏</b>（7z 不上报 TotalBytes）；已处理行2 = 纯计数 <b>60</b>、行3 = 灰 <b>—</b>（DashBrushConverter 灰态）。注意：<b>卡2/3/4 行3 仍有累加值</b>——7z 解压同样播种条目行，终态事件可从播种 Size 取字节（与已处理行3 的全局 TotalBytes 上报无关）。' },
+
+  /* 场景 3：串行 · 无并行 —— 并行后置整段隐藏，其余同场景 1 */
+  serial: { title:'正在解压…', name:'backup-2026-10-08.zip',
+    show:{ c1:1, c2:1, c3:1, c4:1, c5:1, parallel:0 },
+    c1:{ r2:'60', oldR2:'60/100', r3:'1.2 GB' }, c2:{ r2:'3', r3:'15.4 MB' }, c3:{ r2:'1', r3:'2.1 MB' },
+    c4:{ r2:'5', r3:'8.7 MB' }, c5:{ r2:'100', r3:'8.5 GB' },
+    note:'<b>串行 · 无并行</b>：并行度后置元素<b>整段隐藏</b>（degree &lt; 2 时 HasParallelDegree = false）；5 张文件卡同场景 1。卡片行在并行移出后仍单行居中布局成立。' },
+
+  /* 场景 4：冲突统计为空 —— 卡2/3/4 整卡隐藏，只剩 已处理+总大小（卡级隐藏后单行布局仍成立） */
+  noConflict: { title:'正在解压…', name:'backup-2026-10-08.zip',
+    show:{ c1:1, c2:0, c3:0, c4:0, c5:1, parallel:1 },
+    c1:{ r2:'60', oldR2:'60/100', r3:'1.2 GB' },
+    c5:{ r2:'100', r3:'8.5 GB' }, parallel:{ r2:'8' },
+    note:'<b>冲突统计为空</b>：卡2/3/4（跳过/出错/已覆盖）对应 Stats*Text 为空 → <b>整卡隐藏</b>；只剩 已处理 + 总大小 两卡 + 并行后置单行，<b>单行居中布局仍成立</b>（卡级隐藏不动行结构）。' },
+
+  /* 场景 5（2026-10-09 新增）：渐进模式（TAR/GZ 或 >5000 条目未播种）——
+     累加器无字节来源（渐进行 Size=0 且暂无 FileTotalBytes）→ 卡2/3/4 行3 诚实显 — ；
+     已处理行3 同样 —（TAR/GZ 不上报 TotalBytes）；总大小卡隐藏；并行后置隐藏（TAR 串行） */
+  progressive: { title:'正在解压…', name:'backup.tar.gz',
+    show:{ c1:1, c2:1, c3:1, c4:1, c5:0, parallel:0 },
+    c1:{ r2:'60', r3:'—' }, c2:{ r2:'3', r3:'—' }, c3:{ r2:'1', r3:'—' },
+    c4:{ r2:'5', r3:'—' },
+    note:'<b>渐进 · 无字节累加</b>（TAR/GZ 或 &gt;5000 条目未播种路径）：渐进行无 Size 且暂无 FileTotalBytes 事件字段 → 累加器无字节来源，<b>卡2/3/4 行3 诚实显灰 —</b>（不装 0 B）；已处理行3 同样 —（TAR/GZ 不上报 TotalBytes）。<b>前向兼容</b>：channel-info 计划落地 FileTotalBytes 后，终态事件携带字节 → 同一场景自动变真实值，本设计零改动。' }
+};
+var ORDER = ['zipFull', 'z7', 'serial', 'noConflict', 'progressive'];
+
+var S = { key:'zipFull', cmp:false, anno:false };
+var $ = function(id){ return document.getElementById(id); };
+
+/* 灰 / 强调色判定：DashBrushConverter 语义（—/null/空 → 灰 secondary，真实值 → 强调色） */
+function dashCls(v, accent){
+  return (v === undefined || v === null || v === '' || v === '—') ? 'dash' : accent;
+}
+
+/* 现状竖排卡的数值：总大小卡取 StatsTotalSizeValue（大小）；已处理卡用 oldR2（现状 N/M 分数，
+   方案 A 后新设计为纯计数——对比视图左栏须还原现状分数）；其余取与新设计行2 同一字段 */
+function oldVal(d, scen){
+  if(!scen.show[d.key]) return '—';
+  var dat = scen[d.key] || {};
+  if(d.key === 'c5') return (dat.r3 !== undefined) ? dat.r3 : '—';
+  if(dat.oldR2 !== undefined) return dat.oldR2;
+  return (dat.r2 !== undefined) ? dat.r2 : '—';
+}
+
+/* 并行后置元素 HTML（2026-10-09 新增；显隐由 show.parallel 控制，隐藏时返回空串） */
+function parallelHtml(scen){
+  if(!scen.show.parallel) return '';
+  var dat = scen.parallel || {};
+  var val = (dat.r2 !== undefined) ? dat.r2 : '—';
+  return '<span class="pa-ic">⚙</span>' +
+         '<span class="pa-lbl">并行</span>' +
+         '<span class="pa-val">' + val + '</span>' +
+         '<span class="fld">' + PARALLEL.vis + ' / ' + PARALLEL.f2 + '</span>';
+}
+
+/* ── 重渲统计卡区（新设计单行视图 + 对比视图三容器同步填充；2026-10-09 并行后置） ── */
+function render(){
+  var scen = SCEN[S.key], newHtml = '', oldHtml = '', i, d, dat, r2, r3, cls2, cls3, ov, ocls;
+
+  for(i = 0; i < DEFS.length; i++){
+    d = DEFS[i];
+    if(!scen.show[d.key]) continue;              /* 卡级可见性（D1/D5）：隐藏 = 整卡不渲染 */
+    dat = scen[d.key] || {};
+    r2 = (dat.r2 !== undefined) ? dat.r2 : '—';   /* 行级永不隐藏（D1）：缺数据显灰 — */
+    r3 = (dat.r3 !== undefined) ? dat.r3 : '—';
+    cls2 = d.r2dyn ? dashCls(r2, d.r2c) : d.r2c;  /* 动态格走 DashBrushConverter 语义（D3） */
+    cls3 = d.r3dyn ? dashCls(r3, d.r3c) : d.r3c;
+
+    /* 新设计：三行卡（行1 图标16+标题11 / 行2 数量15 SemiBold / 行3 大小13） */
+    newHtml +=
+      '<div class="stat">' +
+        '<div class="r1"><span class="ic c-' + d.icls + '">' + d.icon + '</span>' +
+        '<span class="ttl">' + d.title + '</span><span class="fld">' + d.f1 + '</span></div>' +
+        '<div class="r2 c-' + cls2 + (d.r2dyn ? ' dyn' : '') + '">' + r2 +
+        '<span class="fld">' + d.f2 + '</span></div>' +
+        '<div class="r3 c-' + cls3 + (d.r3dyn ? ' dyn' : '') + '">' + r3 +
+        '<span class="fld">' + d.f3 + '</span></div>' +
+      '</div>';
+
+    /* 现状竖排卡：图标 18 / 标签 11 / 数值 16 SemiBold（新旧对比用） */
+    ov = oldVal(d, scen);
+    ocls = (d.key === 'c5') ? 'prim' : (d.r2dyn ? dashCls(ov, d.r2c) : d.r2c);
+    oldHtml +=
+      '<div class="stat-old">' +
+        '<div class="o-ic c-' + d.icls + '">' + d.icon + '</div>' +
+        '<div class="o-lbl">' + d.title + '</div>' +
+        '<div class="o-val c-' + ocls + '">' + ov +
+        '<span class="fld">' + d.oldFld + '</span></div>' +
+      '</div>';
+  }
+
+  /* 现状对比左栏额外追加并行卡（现状并行为行内第 5 卡，竖排对比需补齐；隐藏时不渲染） */
+  if(scen.show.parallel){
+    var pdat = scen.parallel || {};
+    var pval = (pdat.r2 !== undefined) ? pdat.r2 : '—';
+    oldHtml +=
+      '<div class="stat-old">' +
+        '<div class="o-ic c-fill">⚙</div>' +
+        '<div class="o-lbl">并行</div>' +
+        '<div class="o-val c-fill">' + pval + '</div>' +
+      '</div>';
+  }
+
+  $('statsCards').innerHTML = newHtml;              /* 默认视图段 1 */
+  $('parallelAfter').innerHTML = parallelHtml(scen);/* 默认视图段 2：并行后置 */
+  $('oldCards').innerHTML = oldHtml;                /* 对比视图：左现状 6 卡 */
+  $('newCards').innerHTML = newHtml;                /* 对比视图：右新 5 卡 */
+  $('newParallelAfter').innerHTML = parallelHtml(scen); /* 对比视图右栏并行后置 */
+  $('winTitle').textContent = scen.title;
+  $('winName').textContent = scen.name;
+  $('scenNote').innerHTML = scen.note;
+}
+
+/* ── 场景切换（单选） ── */
+function setScen(key){
+  S.key = key;
+  for(var i = 0; i < ORDER.length; i++) $('sc' + i).classList.toggle('on', ORDER[i] === key);
+  render();
+}
+
+/* ── 新旧对比开关：左 现状竖排 6 卡 / 右 新 5 卡三行 + 并行后置 ── */
+function setCmp(on){
+  S.cmp = on;
+  $('btnCmp').classList.toggle('on', on);
+  $('statsCards').style.display = on ? 'none' : 'flex';
+  $('parallelAfter').style.display = on ? 'none' : 'flex';
+  $('cmpBox').style.display = on ? 'flex' : 'none';
+  render();
+}
+
+/* ── 字段标注开关：显示每格绑定字段名 + 5 处动态着色格虚线框（D2/D3/D4 审阅） ── */
+function setAnno(on){
+  S.anno = on;
+  $('btnAnno').classList.toggle('on', on);
+  document.body.classList.toggle('anno', on);
+}
+
+/* 初始化：默认 ZIP 完整数据场景，单行新设计视图，标注关闭 */
+setScen('zipFull');
+setCmp(false);
+setAnno(false);
+</script>
+</body>
+</html>
