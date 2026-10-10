@@ -351,6 +351,24 @@ public class ArchiveProgress
     /// <summary>逐条目终态。非逐条目报告时为 null（此时本对象是常规进度报告）。
     /// 不为 null 即表示这是一次逐条目事件报告，可与常规字段同时存在。</summary>
     public ArchiveEntryStatus? EntryStatus { get; set; }
+
+    /// <summary>当前条目/文件总字节（信息列「文件大小」）。未上报为 0。</summary>
+    public long FileTotalBytes { get; set; }
+
+    /// <summary>批次已处理字节数（信息列「已处理/总量」分子；非并行时等于 ProcessedBytes 含义）。未上报为 0。</summary>
+    public long BatchProcessedBytes { get; set; }
+
+    /// <summary>批次总字节数（信息列「已处理/总量」分母；非并行时等于 TotalBytes 含义）。未上报为 0。</summary>
+    public long BatchTotalBytes { get; set; }
+
+    /// <summary>实时压缩率 0–100（批次累计输出字节/输入字节×100）。7z 格式压缩/解压/分卷 ZIP 置 null → 该段隐藏。</summary>
+    public double? CompressionRatio { get; set; }
+
+    /// <summary>逐条目压缩后字节（后置回填；0 = 未知/非 ZIP 压缩）。</summary>
+    public long EntryCompressedBytes { get; set; }
+
+    /// <summary>整体压缩后字节（后置回填；0 = 未知）。</summary>
+    public long TotalCompressedBytes { get; set; }
 }
 
 /// <summary>

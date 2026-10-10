@@ -157,13 +157,122 @@ public class ProgressViewModelTests
         Assert.Contains(nameof(vm.IsSimpleMode), notified);
         Assert.Contains(nameof(vm.IsDetailedMode), notified);
         Assert.Contains(nameof(vm.IsListMode), notified);
+    }
 
-        // D6 回落：无并行批次行时不允许停留在 Detailed（切批次后必须回落 Simple）
+    // channel-info：详细门禁已移除，详细模式常显；非并行由单行通道承载。
+    [Fact]
+    public void SetCurrentBatchItem_DetailedMode_NoLongerFallsBackToSimple()
+    {
+        var vm = new ProgressViewModel();
         vm.InitBatchMode(new[] { "a.zip", "b.zip" });
         vm.ContentMode = ProgressContentMode.Detailed;
         vm.SetCurrentBatchItem(0);
-        Assert.Equal(ProgressContentMode.Simple, vm.ContentMode);
-        Assert.True(vm.IsSimpleMode);
+        Assert.Equal(ProgressContentMode.Detailed, vm.ContentMode);
+    }
+
+    [Fact]
+    public void SetProgress_NonParallel_SynthesizesSingleChannelRow()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            CurrentFile = "docs/a.txt",
+            PercentComplete = 40,
+            FileTotalBytes = 400,
+            BatchTotalBytes = 1000,
+            BatchProcessedBytes = 400,
+        });
+        var rows = vm.ParallelBatchItems;
+        Assert.Single(rows);
+        Assert.False(rows[0].IsParallel);
+        Assert.Equal("docs", rows[0].DirectoryText);
+        Assert.Equal("a.txt", rows[0].FileNameText);
+        Assert.Equal("400 B", rows[0].FileSizeText);        // 左区文件大小
+        Assert.Contains("400 B/1000 B", rows[0].InfoText);  // 右区字节进度
+    }
+
+    [Fact]
+    public void SetProgress_Parallel_MarksRowsIsParallel()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            CurrentFile = "a.txt",
+            BatchIndex = 0,
+            BatchCount = 2,
+            BatchPercentComplete = 50,
+            TotalBytes = 10,
+            ProcessedBytes = 5,
+        });
+        Assert.True(vm.ParallelBatchItems[0].IsParallel);
+    }
+
+    // P1 回归：预选详细模式下，首个并行行到达必须通知 HasParallelChannel
+    // （防 CollectionChanged 只通知 HasParallelBatches 的通知缺口）
+    [Fact]
+    public void ParallelBatchRowAdded_RaisesHasParallelChannelNotification()
+    {
+        var vm = new ProgressViewModel();
+        vm.ContentMode = ProgressContentMode.Detailed;   // 预选详细（门禁已移除，允许）
+        var raised = false;
+        vm.PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ProgressViewModel.HasParallelChannel)) raised = true;
+        };
+        vm.SetProgress(new ArchiveProgress
+        {
+            CurrentFile = "a.txt",
+            BatchIndex = 0,
+            BatchCount = 2,
+            BatchPercentComplete = 10,
+        });
+        Assert.True(raised);
+    }
+
+    // ════ 逐文件压缩率计划（progress-file-compression-ratio）════
+
+    [Fact]
+    public void UpdateEntryStatus_WithCompressedBytes_SetsCompressedSize()
+    {
+        var vm = new ProgressViewModel();
+        vm.SeedEntryItems(new[] { ("docs/a.txt", "a.txt", 1000L) });
+        vm.UpdateEntryStatus("docs/a.txt", EntryRowState.Completed, null, fileSize: 1000, compressedBytes: 500);
+        var row = vm.EntryItems[0];
+        Assert.Equal(500, row.CompressedSize);
+        Assert.Contains("500 B", row.CompressedText);
+        Assert.Contains("50%", row.CompressedText);
+    }
+
+    [Fact]
+    public void UpdateEntryStatus_WithoutCompressedBytes_LeavesCompressedTextEmpty()
+    {
+        var vm = new ProgressViewModel();
+        vm.SeedEntryItems(new[] { ("a.txt", "a.txt", 1000L) });
+        vm.UpdateEntryStatus("a.txt", EntryRowState.Completed, null);
+        Assert.Equal(string.Empty, vm.EntryItems[0].CompressedText);
+    }
+
+    [Fact]
+    public void SetProgress_TotalCompressedBytes_PopulatesOverallSummary()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { TotalBytes = 1000, PercentComplete = 100, TotalCompressedBytes = 600 });
+        Assert.True(vm.HasOverallCompression);
+        Assert.Contains("600 B", vm.OverallCompressionText);
+        Assert.Contains("60%", vm.OverallCompressionText);
+    }
+
+    // 回归：压缩侧播种键含反斜杠（FileScanner），后置回填键为正斜杠（ZIP 条目键）——归一化后必须命中同一行，
+    // 否则后置回填会新建 Size=0 的重复行，压缩率列恒空。
+    [Fact]
+    public void UpdateEntryStatus_BackslashSeededKey_MatchesSlashReportKey()
+    {
+        var vm = new ProgressViewModel();
+        vm.SeedEntryItems(new[] { (@"dir\sub\a.txt", "a.txt", 1000L) });
+        vm.UpdateEntryStatus("dir/sub/a.txt", EntryRowState.Completed, null, fileSize: 1000, compressedBytes: 500);
+        Assert.Single(vm.EntryItems);                 // 不新建重复行
+        Assert.Equal(500, vm.EntryItems[0].CompressedSize);
+        Assert.Contains("50%", vm.EntryItems[0].CompressedText);
     }
 
     [Fact]

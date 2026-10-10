@@ -1082,6 +1082,41 @@ public class ZipEngineTests : IDisposable
         // 无异常则自然走到这里（异常会由 xUnit 捕获）
     }
 
+    /// <summary>
+    /// 回归（进度 A 方案）：MT 压缩的镜像拷贝阶段必须推进「总体进度」，而非冻结在基线
+    /// （改前 mirror 阶段 PercentComplete 恒为 storeProcessedBytes/totalBytes，单组路径即 0）。
+    /// 镜像报告携带 FilePercentComplete（当前文件百分比），7z 阶段为 null —— 以此区分两阶段。
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_MultiThreaded_MirrorPhase_AdvancesOverallProgress()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var srcDir = CreateCompressibleOnlyDirectory();
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mirror_progress.zip"));
+        var progressItems = new List<ArchiveProgress>();
+
+        await _engine.CompressAsync([srcDir], outputPath, new ArchiveOptions
+        {
+            MultiThreadedCompression = true,
+            AdaptiveCompression = false,   // 全部进 CompressGroup，确保发生镜像拷贝阶段
+        }, progress: new SyncProgress<ArchiveProgress>(progressItems.Add));
+
+        Assert.True(File.Exists(outputPath));
+        // 镜像阶段报告：FilePercentComplete 有值 且 总体进度已 > 0（改前恒 0）
+        Assert.True(
+            progressItems.Any(p => p.FilePercentComplete.HasValue && p.PercentComplete > 0 && p.PercentComplete < 100),
+            "MT 报告序列: " +
+            string.Join(" | ", progressItems.Select(p =>
+                $"P={p.PercentComplete:F1} F={p.FilePercentComplete?.ToString("F1") ?? "-"} cf={(p.CurrentFile.Length > 10 ? p.CurrentFile[..10] : p.CurrentFile)}")));
+    }
+
+    /// <summary>同步 IProgress（在调用线程即时回调，不用 SynchronizationContext 投递）。</summary>
+    private sealed class SyncProgress<T>(Action<T> handler) : IProgress<T>
+    {
+        public void Report(T value) => handler(value);
+    }
+
     // ===== MT 压缩字节保真（回归：merge 阶段不得解压重压）=====
 
     /// <summary>

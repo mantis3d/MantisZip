@@ -104,13 +104,13 @@ public class ProgressWindowXamlTests
     }
 
     /// <summary>
-    /// T7：非并行解压（无 BatchIndex）不得产生并行批次行，容器保持隐藏（Rule 6）。
+    /// channel-info：非并行解压（无 BatchIndex）合成单条 IsParallel=false 通道行（不伪装并行批次）。
     /// </summary>
     [AvaloniaFact]
-    public void SetProgress_WithoutBatchIndex_KeepsParallelRowsHidden()
+    public void SetProgress_WithoutBatchIndex_SynthesizesSingleNonParallelRow()
     {
         var vm = new ProgressViewModel();
-        Assert.False(vm.HasParallelBatches);
+        Assert.False(vm.HasParallelChannel);
 
         vm.SetProgress(new ArchiveProgress
         {
@@ -119,8 +119,10 @@ public class ProgressWindowXamlTests
             BatchIndex = null
         });
 
-        Assert.False(vm.HasParallelBatches);
-        Assert.Empty(vm.ParallelBatchItems);
+        // 单行合成：集合至多 1 条且 IsParallel=false；HasParallelChannel 仍为 false（不伪装并行）
+        Assert.False(vm.HasParallelChannel);
+        Assert.True(vm.ParallelBatchItems.Count <= 1);
+        Assert.All(vm.ParallelBatchItems, r => Assert.False(r.IsParallel));
     }
 
     /// <summary>T7：并行报告携带 BatchIndex 时应按索引补洞建行（批次行 UI 依赖此不变量）。</summary>
@@ -165,6 +167,7 @@ public class ProgressWindowXamlTests
         vm.SetProgress(new ArchiveProgress { PercentComplete = 10, ProcessedBytes = 0, TotalBytes = 10_000_000 });
 
         Assert.NotNull(before);
-        Assert.Empty(vm.ParallelBatchItems);
+        // 单行合成后集合可能有 1 条非并行行，但绝无并行通道
+        Assert.False(vm.HasParallelChannel);
     }
 }

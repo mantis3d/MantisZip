@@ -29,6 +29,26 @@ public static class ProgressDisplayCalculator
                        : (trimmed[..idx], trimmed[(idx + 1)..]);
     }
 
+    /// <summary>目录中间省略：保留首段与末段，中间以 "…" 连接。超短或不超长时原样返回。</summary>
+    public static string MiddleEllipsis(string? path, int maxLength = 24)
+    {
+        if (string.IsNullOrEmpty(path)) return string.Empty;
+        if (path.Length <= maxLength) return path;
+        var parts = path.Split('/', StringSplitOptions.RemoveEmptyEntries);
+        if (parts.Length <= 2)
+        {
+            // 段数太少无法保留首末：退化为前 maxLength-1 字符 + "…"
+            return path[..(maxLength - 1)] + "…";
+        }
+        var first = parts[0];
+        var last = parts[^1];
+        var skeleton = $"{first}/…/{last}";
+        // 末段保留尾部字符（尾部目录名最具辨识度）
+        return skeleton.Length <= maxLength
+            ? skeleton
+            : $"{first[..Math.Max(1, maxLength / 4)]}/…/{last[^Math.Min(last.Length, maxLength / 2)..]}";
+    }
+
     /// <summary>总进度 = (已完成档案数 + 当前档案百分比/100) / 总档案数。</summary>
     public static double ComputeOverallPercent(int completedArchives, double currentPercent, int totalArchives)
     {

@@ -45,7 +45,16 @@ public class EntryProgressItem : INotifyPropertyChanged
     public long Size
     {
         get => _size;
-        set { if (Set(ref _size, value)) OnPropertyChanged(nameof(SizeText)); }
+        set { if (Set(ref _size, value)) { OnPropertyChanged(nameof(SizeText)); OnPropertyChanged(nameof(CompressedText)); } }
+    }
+
+    private long _compressedSize;
+
+    /// <summary>压缩后字节（后置回填；0 = 未知）。</summary>
+    public long CompressedSize
+    {
+        get => _compressedSize;
+        set { if (Set(ref _compressedSize, value)) OnPropertyChanged(nameof(CompressedText)); }
     }
 
     private double _percent;
@@ -86,6 +95,11 @@ public class EntryProgressItem : INotifyPropertyChanged
 
     /// <summary>大小文本；<see cref="Size"/> 为 0（未知）时返回空串，不显示 "0 B"。</summary>
     public string SizeText => _size > 0 ? FormatUtil.FormatSize(_size) : string.Empty;
+
+    /// <summary>压缩后大小 + 压缩率（如 "600 KB (50%)"）；<see cref="Size"/> 或 <see cref="CompressedSize"/> 未知（0）时返回空串（Rule 6 隐藏）。</summary>
+    public string CompressedText => _compressedSize > 0 && _size > 0
+        ? $"{FormatUtil.FormatSize(_compressedSize)} ({_compressedSize * 100.0 / _size:0}%)"
+        : string.Empty;
 
     /// <summary>百分比文本（Active 行显示 "42%"）。</summary>
     public string PercentText => $"{_percent:F0}%";

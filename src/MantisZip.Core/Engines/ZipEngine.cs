@@ -335,7 +335,7 @@ public class ZipEngine : IArchiveEngine
                 {
                     conflictStats.RecordSkipped();
                     // 逐条目状态（D2）：冲突跳过 → Skipped
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = entry.Size });
                     processedBytes += entry.Size;
                     continue;
                 }
@@ -381,7 +381,10 @@ public class ZipEngine : IArchiveEngine
                                     TotalBytes = totalBytes,
                                     ProcessedBytes = processedBytes + entryProcessed,
                                     PercentComplete = overallPct,
-                                    FilePercentComplete = filePct
+                                    FilePercentComplete = filePct,
+                                    FileTotalBytes = entrySize,
+                                    BatchProcessedBytes = processedBytes + entryProcessed,
+                                    BatchTotalBytes = totalBytes
                                 }));
                                 lastReportTime = now;
                             }
@@ -393,7 +396,7 @@ public class ZipEngine : IArchiveEngine
                     processedBytes += entrySize;
                     processedFiles++;
                     // 逐条目状态（D2）：写入成功 → Completed 或 Overwritten
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed, FileTotalBytes = entrySize });
                 }
                 catch (UnauthorizedAccessException uax)
                 {
@@ -401,7 +404,7 @@ public class ZipEngine : IArchiveEngine
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：权限失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
                 catch (IOException iox)
                 {
@@ -411,7 +414,7 @@ public class ZipEngine : IArchiveEngine
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：IO 写入失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
             }
 
@@ -576,7 +579,7 @@ public class ZipEngine : IArchiveEngine
                 {
                     conflictStats.RecordSkipped();
                     // 逐条目状态（D2）：冲突跳过 → Skipped（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = entrySize });
                     lock (syncLock)
                     {
                         processedBytes += entrySize;
@@ -600,7 +603,7 @@ public class ZipEngine : IArchiveEngine
                     {
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：条目丢失 → Failed（锁外上报，避免锁竞争）
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
@@ -646,6 +649,9 @@ while (true)
                                     ProcessedBytes = localProcessedBytes + entryProcessed,
                                     PercentComplete = overallPct,
                                     FilePercentComplete = filePct,
+                                    FileTotalBytes = entrySize,
+                                    BatchProcessedBytes = batchProcessedBytes,
+                                    BatchTotalBytes = batchTotalBytes,
                                     BatchIndex = batchIndex,
                                     BatchCount = actualParallelism,
                                     BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
@@ -669,7 +675,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：写入成功 → Completed 或 Overwritten（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed, FileTotalBytes = entrySize });
                 }
                 catch (OperationCanceledException)
                 {
@@ -683,7 +689,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
                 catch (IOException iox)
                 {
@@ -693,7 +699,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
                 catch (Exception ex)
                 {
@@ -703,7 +709,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
             }
 
@@ -724,6 +730,9 @@ while (true)
                 TotalBytes = totalBytes,
                 ProcessedBytes = batchDoneBytes,
                 PercentComplete = totalBytes > 0 ? (double)batchDoneBytes / totalBytes * 100 : 100,
+                FileTotalBytes = 0,
+                BatchProcessedBytes = batchTotalBytes,
+                BatchTotalBytes = batchTotalBytes,
                 BatchIndex = batchIndex,
                 BatchCount = actualParallelism,
                 BatchPercentComplete = 100,
@@ -852,7 +861,7 @@ while (true)
                 {
                     conflictStats.RecordSkipped();
                     // 逐条目状态（D2）：冲突跳过 → Skipped
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = entry.Size });
                     processedBytes += entry.Size;
                     continue;
                 }
@@ -897,7 +906,10 @@ while (true)
                                     TotalBytes = totalBytes,
                                     ProcessedBytes = processedBytes + entryProcessed,
                                     PercentComplete = overallPct,
-                                    FilePercentComplete = filePct
+                                    FilePercentComplete = filePct,
+                                    FileTotalBytes = entrySize,
+                                    BatchProcessedBytes = processedBytes + entryProcessed,
+                                    BatchTotalBytes = totalBytes
                                 }));
                                 lastReportTime = now;
                             }
@@ -909,7 +921,7 @@ while (true)
                     processedBytes += entrySize;
                     processedFiles++;
                     // 逐条目状态（D2）：写入成功 → Completed 或 Overwritten
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed, FileTotalBytes = entrySize });
                 }
                 catch (OperationCanceledException) { throw; }
                 catch (UnauthorizedAccessException uax)
@@ -918,7 +930,7 @@ while (true)
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：权限失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
                 catch (IOException iox)
                 {
@@ -927,7 +939,7 @@ while (true)
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：IO 写入失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
             }
 
@@ -1091,7 +1103,7 @@ while (true)
                 {
                     conflictStats.RecordSkipped();
                     // 逐条目状态（D2）：冲突跳过 → Skipped（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = entrySize });
                     lock (syncLock)
                     {
                         processedBytes += entrySize;
@@ -1116,7 +1128,7 @@ while (true)
                     {
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：条目丢失 → Failed（锁外上报，避免锁竞争）
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
@@ -1162,6 +1174,9 @@ while (true)
                                 ProcessedBytes = localProcessedBytes + entryProcessed,
                                 PercentComplete = overallPct,
                                 FilePercentComplete = filePct,
+                                FileTotalBytes = entrySize,
+                                BatchProcessedBytes = batchProcessedBytes,
+                                BatchTotalBytes = batchTotalBytes,
                                 BatchIndex = batchIndex,
                                 BatchCount = actualParallelism,
                                 BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
@@ -1185,7 +1200,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：写入成功 → Completed 或 Overwritten（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed, FileTotalBytes = entrySize });
                 }
                 catch (OperationCanceledException)
                 {
@@ -1199,7 +1214,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
                 catch (IOException iox)
                 {
@@ -1210,7 +1225,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
                 catch (Exception ex)
                 {
@@ -1220,7 +1235,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
                 }
             }
 
@@ -1241,6 +1256,9 @@ while (true)
                 TotalBytes = totalBytes,
                 ProcessedBytes = batchDoneBytes,
                 PercentComplete = totalBytes > 0 ? (double)batchDoneBytes / totalBytes * 100 : 100,
+                FileTotalBytes = 0,
+                BatchProcessedBytes = batchTotalBytes,
+                BatchTotalBytes = batchTotalBytes,
                 BatchIndex = batchIndex,
                 BatchCount = actualParallelism,
                 BatchPercentComplete = 100,
@@ -1515,7 +1533,8 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                             // 同时携带 BatchIndex/BatchCount 供 UI 建立并更新通道行。
                                             var adapter = new InlineProgress<ArchiveProgress>(local =>
                                             {
-                                                long localDone = Math.Min(local.ProcessedBytes, groupTotal);
+                                                long localRealDone = Math.Min(local.ProcessedBytes, groupTotal);
+                                                long localDone = groupTotal > 0 ? (long)Math.Round(groupTotal * Math.Clamp(local.PercentComplete, 0.0, 100.0) / 100.0) : 0;
                                                 long globalDone = Interlocked.Read(ref finishedInputBytes) + localDone;
 
                                                 progress?.Report(new ArchiveProgress
@@ -1532,6 +1551,13 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                                     // 逐条目终态（D2）透传：与既有单组路径一致，否则 N 组下
                                                     // 压缩条目的 Completed 事件会在适配层丢失。
                                                     EntryStatus = local.EntryStatus,
+                                                    // 漏拷修复（D4 几何修复配套）：组内当前文件的字节进度透传，
+                                                    // 否则详细模式左区文件底纹在 N 组压缩下恒为 0。
+                                                    FilePercentComplete = local.FilePercentComplete,
+                                                    FileTotalBytes = local.FileTotalBytes,
+                                                    BatchProcessedBytes = localDone,
+                                                    BatchTotalBytes = groupTotal,
+                                                    CompressionRatio = TryFileOutputRatio(tempZips[i], localRealDone),
                                                     BatchIndex = i,
                                                     BatchCount = groups.Count,
                                                     BatchPercentComplete = groupTotal > 0
@@ -1734,11 +1760,11 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
 
                         if (!ReadFileWithRetry(fullPath, relativePath, options, zipWriter,
                                 ref processedBytes, totalBytes, totalFiles, ref processedFiles,
-                                cancellationToken, progress, ref lastReportTime))
+                                cancellationToken, progress, ref lastReportTime, fsOut))
                         {
                             if (cancellationToken.IsCancellationRequested) break;
                             // 逐条目状态（D2）：读取被跳过 → Skipped
-                            progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped });
+                            progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = SafeFileSize(fullPath) });
                             continue;
                         }
 
@@ -1755,7 +1781,13 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                 PercentComplete = pct,
                                 FilePercentComplete = 100,
                                 TotalFiles = totalFiles,
-                                ProcessedFiles = processedFiles
+                                ProcessedFiles = processedFiles,
+                                TotalBytes = totalBytes,
+                                ProcessedBytes = processedBytes,
+                                FileTotalBytes = SafeFileSize(fullPath),
+                                BatchProcessedBytes = processedBytes,
+                                BatchTotalBytes = totalBytes,
+                                CompressionRatio = TryStreamOutputRatio(fsOut, processedBytes)
                             });
                             lastReportTime = now;
                         }
@@ -1779,6 +1811,41 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
             {
                 CoreLog.Error($"CompressAsync failed", ex);
                 throw;
+            }
+
+            // 后置回填（压缩率计划 D2）：成品 ZIP 写出后读中央目录，逐条目回填压缩后大小 + 整体汇总。
+            // 仅 ZIP（本引擎）；分卷跳过（不读 .zip.001）；加密包中央目录未加密，无需密码；异常吞掉仅影响展示。
+            if (options.SplitSize <= 0)
+            {
+                try
+                {
+                    long totalCompressed = 0;
+                    using (var finalArchive = OpenArchiveWithEncodingFallback(outputPath, options.Password))
+                    {
+                        foreach (var entry in finalArchive.Entries)
+                        {
+                            if (entry.IsDirectory) continue;
+                            var key = ArchivePath.Normalize(entry.Key);
+                            totalCompressed += entry.CompressedSize;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                EntryKey = key,
+                                EntryStatus = ArchiveEntryStatus.Completed,
+                                EntryCompressedBytes = entry.CompressedSize,
+                            });
+                        }
+                    }
+                    if (totalCompressed > 0)
+                        progress?.Report(new ArchiveProgress
+                        {
+                            TotalBytes = totalBytes,
+                            TotalCompressedBytes = totalCompressed,
+                        });
+                }
+                catch (Exception ex)
+                {
+                    CoreLog.Trace("CompressAsync: post-pass compressed-size fill skipped: {0}", ex.Message);
+                }
             }
 
             CoreLog.Info($"CompressAsync: done, {processedBytes}/{totalBytes} bytes, {sw.ElapsedMilliseconds}ms");
@@ -2458,7 +2525,8 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                             // 同时携带 BatchIndex/BatchCount 供 UI 建立并更新通道行。
                                             var adapter = new InlineProgress<ArchiveProgress>(local =>
                                             {
-                                                long localDone = Math.Min(local.ProcessedBytes, groupTotal);
+                                                long localRealDone = Math.Min(local.ProcessedBytes, groupTotal);
+                                                long localDone = groupTotal > 0 ? (long)Math.Round(groupTotal * Math.Clamp(local.PercentComplete, 0.0, 100.0) / 100.0) : 0;
                                                 long globalDone = Interlocked.Read(ref finishedInputBytes) + localDone;
 
                                                 progress?.Report(new ArchiveProgress
@@ -2474,6 +2542,13 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                                     // 逐条目终态（D2）透传：与既有单组路径一致，否则 N 组下
                                                     // 压缩条目的 Completed 事件会在适配层丢失。
                                                     EntryStatus = local.EntryStatus,
+                                                    // 漏拷修复（D4 几何修复配套）：组内当前文件的字节进度透传，
+                                                    // 否则详细模式左区文件底纹在 N 组压缩下恒为 0。
+                                                    FilePercentComplete = local.FilePercentComplete,
+                                                    FileTotalBytes = local.FileTotalBytes,
+                                                    BatchProcessedBytes = localDone,
+                                                    BatchTotalBytes = groupTotal,
+                                                    CompressionRatio = TryFileOutputRatio(tempZips[i], localRealDone),
                                                     BatchIndex = i,
                                                     BatchCount = groups.Count,
                                                     BatchPercentComplete = groupTotal > 0
@@ -3210,7 +3285,8 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
     private bool ReadFileWithRetry(string fullPath, string relativePath,
         ArchiveOptions options, ZipWriter zipWriter, ref long processedBytes, long totalBytes,
         int totalFiles, ref int processedFiles,
-        CancellationToken ct, IProgress<ArchiveProgress>? progress, ref DateTime lastReportTime)
+        CancellationToken ct, IProgress<ArchiveProgress>? progress, ref DateTime lastReportTime,
+        Stream? fsOut = null)
     {
         int retries = 3;
         while (retries > 0)
@@ -3276,7 +3352,13 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                 PercentComplete = pct,
                                 FilePercentComplete = filePct,
                                 TotalFiles = totalFiles,
-                                ProcessedFiles = processedFiles
+                                ProcessedFiles = processedFiles,
+                                TotalBytes = totalBytes,
+                                ProcessedBytes = processedBytes,
+                                FileTotalBytes = fiLen,
+                                BatchProcessedBytes = processedBytes,
+                                BatchTotalBytes = totalBytes,
+                                CompressionRatio = TryStreamOutputRatio(fsOut, processedBytes)
                             });
                             lastReportTime = now;
                         }
@@ -3465,6 +3547,34 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
             $"ZipEngine: MultiThreaded skipped — method '{zipCompressionMethod}' cannot be carried by copy-mode rewrite " +
             "(mixed Store/Compress only); using serial path");
 
+    /// <summary>流式输出压缩率（输出字节/输入字节×100）；不可 seek / 未创建 / 分卷（Length 抛异常）→ null（Rule 6 隐藏）。</summary>
+    private static double? TryStreamOutputRatio(Stream? output, long inputBytes)
+    {
+        if (inputBytes <= 0) return null;
+        try
+        {
+            if (output is null || !output.CanSeek) return null;
+            var len = output.Length;
+            if (len <= 0) return null;
+            return Math.Clamp((double)len / inputBytes * 100.0, 0, 100);
+        }
+        catch (NotSupportedException) { return null; }   // SplitOutputStream.Length 抛异常 → 分卷隐藏
+        catch (IOException) { return null; }
+        catch (ObjectDisposedException) { return null; }
+    }
+
+    /// <summary>文件输出压缩率（文件长度/输入字节×100）；文件尚未创建/被占用 → null（隐藏压缩率段）。</summary>
+    private static double? TryFileOutputRatio(string? path, long inputBytes)
+    {
+        if (inputBytes <= 0 || string.IsNullOrEmpty(path)) return null;
+        try
+        {
+            var len = new FileInfo(path).Length;
+            return len > 0 ? Math.Clamp((double)len / inputBytes * 100.0, 0, 100) : null;
+        }
+        catch (Exception) { return null; }
+    }
+
     /// <summary>
     /// 使用 SharpSevenZip 多线程压缩一组文件到临时 ZIP。
     /// 用于 MultiThreadedCompression 模式：将需要压缩的文件通过 7z.dll mt=on 多线程压缩。
@@ -3519,6 +3629,17 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
         int completedFiles = 0;
         var localLastReportTime = lastReportTime; // 拷贝 ref 参数供 lambda 捕获
 
+        // A 方案：把该组总体进度区间 [overallBasePct, groupEndPct] 的前半段（MirrorWeight）分给镜像拷贝、
+        // 后半段分给 7z 压缩，使两阶段都推进总体且单调不回退（原先镜像阶段冻结在基线、7z 再从基线重起）。
+        long groupBytes = 0;
+        foreach (var (gp, _) in files) groupBytes += SafeFileSize(gp);
+        double overallBasePct = totalBytes > 0 ? (double)storeProcessedBytes / totalBytes * 100.0 : 0.0;
+        double groupRangePct = totalBytes > 0 ? (double)groupBytes / totalBytes * 100.0 : 0.0;
+        const double MirrorWeight = 0.5;
+        double mirrorCeilPct = overallBasePct + groupRangePct * MirrorWeight;
+        double groupEndPct = overallBasePct + groupRangePct;
+        long mirroredTotal = 0;
+
         // Started 只用于刷新「当前文件名」，绝不推进百分比：7z mt=on 下所有文件几乎同时开始，
         // 若把「已开始」的文件字节计入进度，进度条会瞬间抢跑到接近 100%（实测混合语料抢跑 43 个百分点）。
         compr.FileCompressionStarted += (_, e) =>
@@ -3535,9 +3656,11 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
             {
                 doneBytes = storeProcessedBytes + completedBytes;
                 doneFiles = storeProcessedFiles + completedFiles;
-                pct = totalBytes > 0
-                    ? Math.Min(100, (double)doneBytes / totalBytes * 100)
-                    : (totalFiles > 0 ? (double)doneFiles / totalFiles * 100 : 0);
+                // 已完成字节占比 → 映射到该组区间后半段（[mirrorCeilPct, groupEndPct]），与镜像阶段衔接
+                double frac = groupBytes > 0
+                    ? Math.Min(1.0, (double)completedBytes / groupBytes)
+                    : (totalFiles > 0 ? Math.Min(1.0, (double)completedFiles / totalFiles) : 0.0);
+                pct = mirrorCeilPct + frac * (groupEndPct - mirrorCeilPct);
             }
 
             // 锁内只拷贝共享变量，释放锁后再上报，避免锁竞争（AGENTS.md：锁内 Report 曾致 25x 回退）
@@ -3550,6 +3673,10 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                 ProcessedBytes = doneBytes,
                 TotalFiles = totalFiles,
                 ProcessedFiles = doneFiles,
+                FileTotalBytes = 0,
+                BatchProcessedBytes = doneBytes,
+                BatchTotalBytes = totalBytes,
+                CompressionRatio = TryFileOutputRatio(tempPath, doneBytes),
                 BatchIndex = batchIndex,
                 BatchCount = batchCount,
             });
@@ -3587,19 +3714,25 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
 
                 var doneBytes = storeProcessedBytes + completedBytes;
                 var doneFiles = storeProcessedFiles + completedFiles;
+                // 已完成字节占比 → 映射到该组区间后半段（[mirrorCeilPct, groupEndPct]）
+                double doneFrac = groupBytes > 0
+                    ? Math.Min(1.0, (double)completedBytes / groupBytes)
+                    : (totalFiles > 0 ? Math.Min(1.0, (double)completedFiles / totalFiles) : 0.0);
                 completedReport = new ArchiveProgress
                 {
                     EntryKey = finishedEntryKey,
                     EntryStatus = ArchiveEntryStatus.Completed,
                     CurrentFile = Path.GetFileName(finishedEntryKey),
-                    PercentComplete = totalBytes > 0
-                        ? Math.Min(100, (double)doneBytes / totalBytes * 100)
-                        : (totalFiles > 0 ? (double)doneFiles / totalFiles * 100 : 0),
+                    PercentComplete = mirrorCeilPct + doneFrac * (groupEndPct - mirrorCeilPct),
                     FilePercentComplete = null,
                     TotalBytes = totalBytes,
                     ProcessedBytes = doneBytes,
                     TotalFiles = totalFiles,
                     ProcessedFiles = doneFiles,
+                    FileTotalBytes = finishedSize,
+                    BatchProcessedBytes = doneBytes,
+                    BatchTotalBytes = totalBytes,
+                    CompressionRatio = TryFileOutputRatio(tempPath, doneBytes),
                     BatchIndex = batchIndex,
                     BatchCount = batchCount,
                 };
@@ -3619,10 +3752,8 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
             // 镜像拷贝：把每个文件复制到临时目录（为让 7z 保留相对路径）。
             // 此阶段可能占大头（1GB 语料实测 ~12s），原先 File.Copy 无任何上报 →
             // 简约/详细面板整段「卡住」。改为分块拷贝并节流上报「当前文件 + 当前文件百分比」；
-            // 但**不**推进总进度 PercentComplete（保持本调用内的基线，避免与随后 7z 的字节进度打架/回退）。
-            double mirrorBaselinePercent = totalBytes > 0
-                ? Math.Min(100, (double)storeProcessedBytes / totalBytes * 100)
-                : 0;
+            // 总体进度（PercentComplete）按已拷贝字节映射到该组区间前半段（[overallBasePct, mirrorCeilPct]），
+            // 与随后 7z 阶段的后半段衔接（A 方案，两阶段均推进、单调不回退）。
             var copyBuffer = new byte[4 * 1024 * 1024];
 
             foreach (var (fullPath, relativePath) in files)
@@ -3643,10 +3774,15 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                     {
                         dst.Write(copyBuffer, 0, read);
                         copied += read;
+                        mirroredTotal += read;
 
                         var now = DateTime.Now;
                         if (now - localLastReportTime < TimeSpan.FromMilliseconds(100) && copied < fileLen) continue;
                         localLastReportTime = now;
+
+                        // 已拷贝字节占比 → 映射到该组区间前半段（单调；跨文件亦不回退）
+                        double mirrorFrac = groupBytes > 0 ? Math.Min(1.0, (double)mirroredTotal / groupBytes) : 0.0;
+                        double mirrorPct = overallBasePct + mirrorFrac * (mirrorCeilPct - overallBasePct);
 
                         progress?.Report(new ArchiveProgress
                         {
@@ -3654,11 +3790,14 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                             FilePercentComplete = fileLen > 0
                                 ? Math.Min(100.0, (double)copied / fileLen * 100.0)
                                 : 100.0,
-                            PercentComplete = mirrorBaselinePercent,
+                            PercentComplete = mirrorPct,
                             ProcessedBytes = storeProcessedBytes,
                             TotalBytes = totalBytes,
                             TotalFiles = totalFiles,
                             ProcessedFiles = storeProcessedFiles,
+                            FileTotalBytes = fileLen,
+                            BatchProcessedBytes = storeProcessedBytes,
+                            BatchTotalBytes = totalBytes,
                             BatchIndex = batchIndex,
                             BatchCount = batchCount,
                         });

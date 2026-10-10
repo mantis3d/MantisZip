@@ -119,6 +119,7 @@ public partial class ProgressViewModel : ObservableObject
             ["Progress_Density_Medium"] = LocalizationManager.T("Progress_Density_Medium"),
             ["Progress_Density_Full"] = LocalizationManager.T("Progress_Density_Full"),
             ["Progress_Stats_Parallel"] = LocalizationManager.T("Progress_Stats_Parallel"),
+            ["Progress_Stats_Compressed"] = LocalizationManager.T("Progress_Stats_Compressed"),
             ["Progress_Batch_SectionTitle"] = LocalizationManager.T("Progress_Batch_SectionTitle"),
             ["Progress_Batch_Count"] = LocalizationManager.T("Progress_Batch_Count"),
             ["Progress_Entry_Pending"] = LocalizationManager.T("Progress_Entry_Pending"),
@@ -132,6 +133,9 @@ public partial class ProgressViewModel : ObservableObject
             ["Progress_Toast_Copied"] = LocalizationManager.T("Progress_Toast_Copied"),
             ["Progress_Batch_Label"] = LocalizationManager.T("Progress_Batch_Label"),
             ["Progress_CompressChannelHint"] = LocalizationManager.T("Progress_CompressChannelHint"),
+            ["Progress_Tooltip_Progress"] = LocalizationManager.T("Progress_Tooltip_Progress"),
+            ["Progress_Tooltip_Bytes"] = LocalizationManager.T("Progress_Tooltip_Bytes"),
+            ["Progress_Tooltip_Ratio"] = LocalizationManager.T("Progress_Tooltip_Ratio"),
         };
 
         // T6: 操作计时基线 + 当前文件标签初值 + 集合变更通知（并行批次行 / 条目行）
@@ -140,7 +144,7 @@ public partial class ProgressViewModel : ObservableObject
         _parallelBatchItems.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(HasParallelBatches));
-            OnPropertyChanged(nameof(IsDetailedAvailable));
+            NotifyChannelProperties();
         };
         _entryItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasEntryItems));
         RefreshTimeDisplay();
@@ -191,6 +195,9 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private bool _isCompressFlow;
 
+    // 切压缩/解压流程时刷新通道派生属性（ShowCompressChannelHint 依赖本字段）
+    partial void OnIsCompressFlowChanged(bool value) => NotifyChannelProperties();
+
     // ════════════════════════════════════════════
     //  T6: 显示模式 / 统计 / 时间 / 速度 / 并行批次
     // ════════════════════════════════════════════
@@ -227,9 +234,6 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>信息量「完整」档：追加统计卡（与中等单行互斥，对齐原型 JS 语义）。</summary>
     public bool IsFullDensity => _infoDensity == ProgressInfoDensity.Full;
 
-    /// <summary>详细模式可用：并行批次行非空（CollectionChanged 驱动通知；空列表不允许停留 Detailed）。</summary>
-    public bool IsDetailedAvailable => _parallelBatchItems.Count > 0;
-
     /// <summary>当前文件所在目录（路径行绑定）。</summary>
     public string DirName
     {
@@ -242,6 +246,30 @@ public partial class ProgressViewModel : ObservableObject
 
     /// <summary>并行批次容器可见性（集合非空时 true；CollectionChanged 驱动通知）。</summary>
     public bool HasParallelBatches => _parallelBatchItems.Count > 0;
+
+    /// <summary>存在真实并行批次行（区别于 HasParallelBatches「集合非空」——非并行单行也会使后者为 true）。</summary>
+    public bool HasParallelChannel => _parallelBatchItems.Any(x => x.IsParallel);
+
+    /// <summary>压缩通道说明行可见性：压缩流程且有并行通道（非并行单行时不显示，D8）。</summary>
+    public bool ShowCompressChannelHint => IsCompressFlow && HasParallelChannel;
+
+    // ── 压缩率计划：整体压缩汇总（后置回填，仅 ZIP 压缩完成）──
+    private long _overallCompressedBytes;
+    private long _overallTotalBytes;
+
+    /// <summary>整体压缩汇总可用（后置回填 TotalCompressedBytes > 0；仅 ZIP 压缩完成）。</summary>
+    public bool HasOverallCompression => _overallCompressedBytes > 0;
+
+    /// <summary>整体压缩汇总文案（格式 A："300 MB (60%)"＝输出大小 (率%)，D4/D6）。</summary>
+    public string OverallCompressionText => _overallCompressedBytes > 0
+        ? $"{FormatUtil.FormatSize(_overallCompressedBytes)} ({_overallCompressedBytes * 100.0 / Math.Max(1, _overallTotalBytes):0}%)"
+        : string.Empty;
+
+    /// <summary>段 2 分隔符可见性：并行度与整体压缩汇总都在时显示（D5）。</summary>
+    public bool ShowChannelMetaSeparator => HasParallelDegree && HasOverallCompression;
+
+    /// <summary>段 2 整行可见性：并行度或整体压缩汇总任一存在即显示（都无则整段隐藏，D5）。</summary>
+    public bool ShowChannelMetaRow => HasParallelDegree || HasOverallCompression;
 
     /// <summary>并行批次行集合（ZIP 并行解压时由 BatchIndex 驱动 upsert）。</summary>
     public ObservableCollection<ParallelBatchProgressItem> ParallelBatchItems => _parallelBatchItems;
@@ -339,12 +367,22 @@ public partial class ProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSimpleMode));
         OnPropertyChanged(nameof(IsDetailedMode));
         OnPropertyChanged(nameof(IsListMode));
-        OnPropertyChanged(nameof(IsDetailedAvailable));
         OnPropertyChanged(nameof(HasEntryItems));
         OnPropertyChanged(nameof(HasParallelDegree));
         OnPropertyChanged(nameof(IsMinimalDensity));
         OnPropertyChanged(nameof(IsMediumDensity));
         OnPropertyChanged(nameof(IsFullDensity));
+        OnPropertyChanged(nameof(ShowChannelMetaSeparator));
+        OnPropertyChanged(nameof(ShowChannelMetaRow));
+        NotifyChannelProperties();
+    }
+
+    /// <summary>通道派生属性集中通知（P1）：CollectionChanged 与 NotifyDisplayProperties 均调用本方法，
+    /// 保证「首个并行行到达」与「用户切换模式/并行度」两种路径都刷新 HasParallelChannel/ShowCompressChannelHint。</summary>
+    private void NotifyChannelProperties()
+    {
+        OnPropertyChanged(nameof(HasParallelChannel));
+        OnPropertyChanged(nameof(ShowCompressChannelHint));
     }
 
     // ════════════════════════════════════════════
@@ -552,10 +590,19 @@ public partial class ProgressViewModel : ObservableObject
         // 不参与百分比/速度/ETA/字节/批次计算（早返回，绝不落入下方分支）
         if (p.EntryStatus.HasValue && !string.IsNullOrEmpty(p.EntryKey))
         {
-            // fileSize 末参预留前向兼容：channel-info 落地 FileTotalBytes 后改传 p.FileTotalBytes（D4）
+            // fileSize 末参：channel-info 的 FileTotalBytes（逐条目终态字节，供统计卡跳过/出错/已覆盖累加器）
+            // compressedBytes 末参：压缩率计划的后置回填逐条目压缩后字节（仅 ZIP 压缩）
             UpdateEntryStatus(p.EntryKey,
-                EntryProgressItem.MapEntryStatus(p.EntryStatus.Value), null, null);
+                EntryProgressItem.MapEntryStatus(p.EntryStatus.Value), null, p.FileTotalBytes, p.EntryCompressedBytes);
             return;
+        }
+
+        // 非并行报告（无 BatchIndex 且非逐条目终态）：合成/更新单条通道行（IsParallel=false），复用批次行样式。
+        // 防御条件：已有并行行时不落单行（并行/非并行报告在切换瞬间可能交错）。
+        if (p.BatchIndex == null && p.EntryKey == null
+            && !_parallelBatchItems.Any(x => x.IsParallel))
+        {
+            UpsertSingleChannelRow(p);
         }
 
         // 操作计时基线兜底（ctor/InitBatchMode 已重置，此处防漏）
@@ -669,6 +716,17 @@ public partial class ProgressViewModel : ObservableObject
             StatsProcessedSize = FormatUtil.FormatSize(p.ProcessedBytes);
         }
 
+        // 整体压缩汇总（压缩率计划）：后置回填，仅 ZIP 压缩完成时上报
+        if (p.TotalCompressedBytes > 0)
+        {
+            _overallCompressedBytes = p.TotalCompressedBytes;
+            _overallTotalBytes = p.TotalBytes;
+            OnPropertyChanged(nameof(HasOverallCompression));
+            OnPropertyChanged(nameof(OverallCompressionText));
+            OnPropertyChanged(nameof(ShowChannelMetaSeparator));
+            OnPropertyChanged(nameof(ShowChannelMetaRow));
+        }
+
         // 统计卡数值集中刷新（T7：4 张卡的计数槽位）
         NotifyStatsProperties();
 
@@ -718,14 +776,27 @@ public partial class ProgressViewModel : ObservableObject
     {
         int idx = p.BatchIndex!.Value;
         while (_parallelBatchItems.Count <= idx)
-            _parallelBatchItems.Add(new ParallelBatchProgressItem { Index = _parallelBatchItems.Count + 1 });
+            _parallelBatchItems.Add(new ParallelBatchProgressItem { Index = _parallelBatchItems.Count + 1, IsParallel = true });
 
         var row = _parallelBatchItems[idx];
         row.Percent = Math.Clamp(p.BatchPercentComplete ?? p.PercentComplete, 0, 100);
+        row.BatchRatio = Math.Clamp(row.Percent / 100.0, 0.0, 1.0);   // 右区批次底纹
         // Task 6: 当前文件字节进度 0..1 → 驱动文件名格底纹宽度（MultiBinding）
         row.FileRatio = Math.Clamp((p.FilePercentComplete ?? 0) / 100.0, 0.0, 1.0);
         // T6: 详细模式行显示批次当前文件名（未上报时保持上次值）
         row.CurrentFile = p.CurrentFile ?? row.CurrentFile;
+        // 左区：目录（中间省略）+ 文件名（恒完整）+ 文件大小
+        var (dir, name) = ProgressDisplayCalculator.SplitFilePath(row.CurrentFile);
+        row.DirectoryText = ProgressDisplayCalculator.MiddleEllipsis(dir);
+        row.FileNameText = name;
+        row.FileSizeText = p.FileTotalBytes > 0 ? FormatUtil.FormatSize(p.FileTotalBytes) : string.Empty;
+        // 右区：合并百分比（进度优先，文件个数括注；任一 null 退化仅百分比，P5）
+        row.PctDetailText = p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue
+            ? $"{Math.Round(row.Percent)}% ({p.BatchProcessedFiles.Value}/{p.BatchTotalFiles.Value})"
+            : (row.Percent > 0 ? $"{Math.Round(row.Percent)}%" : string.Empty);
+        // 右区：信息列（字节进度 · 压缩率）+ ToolTip
+        row.InfoText = BuildInfoText(p);
+        row.TooltipText = BuildTooltipText(p);
         // T7: 状态色随完成度切换（BrushResourceConverter 消费 StatusBrushName → 批次进度条前景）
         row.StatusBrushName = row.Percent >= 100 ? "ThemeStatusSuccessBrush" : "ThemeProgressFillBrush";
         if (p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue)
@@ -738,6 +809,52 @@ public partial class ProgressViewModel : ObservableObject
         // 回退路径永不上报 BatchIndex，故此分支永不触发 —— 无需回退兜底。
         if (_parallelBatchItems.Count == 1 && _contentMode == ProgressContentMode.Simple)
             ContentMode = ProgressContentMode.Detailed;
+    }
+
+    /// <summary>非并行单行 upsert：集合恒保持至多 1 条 IsParallel=false 的行（复用批次行样式，D2/D8）。</summary>
+    private void UpsertSingleChannelRow(ArchiveProgress p)
+    {
+        var existing = _parallelBatchItems.FirstOrDefault(x => !x.IsParallel);
+        if (existing == null)
+        {
+            existing = new ParallelBatchProgressItem { IsParallel = false };
+            _parallelBatchItems.Add(existing);
+        }
+        existing.Percent = Math.Clamp(p.PercentComplete, 0, 100);
+        existing.BatchRatio = Math.Clamp(p.PercentComplete / 100.0, 0.0, 1.0);            // 右区批次底纹（=整体进度）
+        existing.FileRatio = Math.Clamp((p.FilePercentComplete ?? 0) / 100.0, 0.0, 1.0);  // 左区文件底纹
+        existing.CurrentFile = string.IsNullOrEmpty(p.CurrentFile) ? existing.CurrentFile : p.CurrentFile;
+        var (dir, name) = ProgressDisplayCalculator.SplitFilePath(existing.CurrentFile);
+        existing.DirectoryText = ProgressDisplayCalculator.MiddleEllipsis(dir);
+        existing.FileNameText = name;
+        existing.FileSizeText = p.FileTotalBytes > 0 ? FormatUtil.FormatSize(p.FileTotalBytes) : string.Empty;
+        existing.PctDetailText = p.PercentComplete > 0 ? $"{Math.Round(p.PercentComplete)}%" : string.Empty;  // 单行无括注
+        existing.InfoText = BuildInfoText(p);
+        existing.TooltipText = BuildTooltipText(p);
+    }
+
+    /// <summary>右区信息列：字节进度 · 压缩率（缺段省略，规则 6）。</summary>
+    private static string BuildInfoText(ArchiveProgress p)
+    {
+        var parts = new List<string>();
+        if (p.BatchTotalBytes > 0)
+            parts.Add($"{FormatUtil.FormatSize(p.BatchProcessedBytes)}/{FormatUtil.FormatSize(p.BatchTotalBytes)}");
+        if (p.CompressionRatio is { } r) parts.Add($"{r:0.#}%");
+        return string.Join(" · ", parts);
+    }
+
+    /// <summary>右区 ToolTip：进度 / 字节 / 压缩率（缺段省略行，规则 6）。</summary>
+    private static string BuildTooltipText(ArchiveProgress p)
+    {
+        var lines = new List<string>
+        {
+            $"{LocalizationManager.T("Progress_Tooltip_Progress")}: {Math.Round(p.PercentComplete)}%",
+        };
+        if (p.BatchTotalBytes > 0)
+            lines.Add($"{LocalizationManager.T("Progress_Tooltip_Bytes")}: {FormatUtil.FormatSize(p.BatchProcessedBytes)}/{FormatUtil.FormatSize(p.BatchTotalBytes)}");
+        if (p.CompressionRatio is { } r)
+            lines.Add($"{LocalizationManager.T("Progress_Tooltip_Ratio")}: {r:0.#}%");
+        return string.Join("\n", lines);
     }
 
     // ════════════════════════════════════════════
@@ -763,7 +880,9 @@ public partial class ProgressViewModel : ObservableObject
                 StatusText = LocalizationManager.T("Progress_Entry_Pending"),
             };
             _entryItems.Add(row);
-            _entryIndex[key] = row;
+            // 分隔符归一化（\→/）：压缩侧 FileScanner 产出的键含反斜杠，而引擎 ZIP 条目键为正斜杠，
+            // 归一化后两种来源命中同一行（防后置回填/终态事件新建重复行）。
+            _entryIndex[ArchivePath.Normalize(key)] = row;
         }
     }
 
@@ -778,6 +897,13 @@ public partial class ProgressViewModel : ObservableObject
         StatsSkippedSize = "—";
         StatsFailedSize = "—";
         StatsOverwrittenSize = "—";
+        // 压缩率计划：整体压缩汇总随条目行一起清空
+        _overallCompressedBytes = 0;
+        _overallTotalBytes = 0;
+        OnPropertyChanged(nameof(HasOverallCompression));
+        OnPropertyChanged(nameof(OverallCompressionText));
+        OnPropertyChanged(nameof(ShowChannelMetaSeparator));
+        OnPropertyChanged(nameof(ShowChannelMetaRow));
     }
 
     /// <summary>
@@ -785,9 +911,10 @@ public partial class ProgressViewModel : ObservableObject
     /// （未播种路径的兜底，兼容 TAR/GZ 渐进模式 D7）。
     /// 查找走 <c>_entryIndex</c> 字典 O(1)——100k 条目线性扫描为 O(n²)，不可接受。
     /// </summary>
-    public void UpdateEntryStatus(string entryKey, EntryRowState state, double? percent, long? fileSize = null)
+    public void UpdateEntryStatus(string entryKey, EntryRowState state, double? percent, long? fileSize = null, long? compressedBytes = null)
     {
-        if (!_entryIndex.TryGetValue(entryKey, out var row))
+        var lookupKey = ArchivePath.Normalize(entryKey);   // 分隔符归一化，与 SeedEntryItems 一致
+        if (!_entryIndex.TryGetValue(lookupKey, out var row))
         {
             row = new EntryProgressItem
             {
@@ -796,7 +923,7 @@ public partial class ProgressViewModel : ObservableObject
                 State = EntryRowState.Pending,
             };
             _entryItems.Add(row);
-            _entryIndex[entryKey] = row;
+            _entryIndex[lookupKey] = row;
         }
 
         // 终态字节累加（D4）：同终态重复上报只计一次（检查旧状态）；
@@ -808,6 +935,10 @@ public partial class ProgressViewModel : ObservableObject
             if (size > 0)
                 AccumulateTerminalBytes(state, size);
         }
+
+        // 压缩率计划：后置回填的逐条目压缩后字节（仅 ZIP 压缩完成；0/空不覆盖既有值）
+        if (compressedBytes is > 0)
+            row.CompressedSize = compressedBytes.Value;
 
         row.State = state;
         // T9: 行内状态文案（本地化）；Active 返回 null 不赋值——视图层改显 PercentText
@@ -994,9 +1125,6 @@ public partial class ProgressViewModel : ObservableObject
         _parallelBatchItems.Clear();
         // T6: 归档切换后条目行必须为空（新档案的逐条目事件/播种重建行，绝不继承上一档案）
         ClearEntryItems();
-        // D6 回落：详细模式列表已空时不允许停留（绝不显示空详细列表）
-        if (_contentMode == ProgressContentMode.Detailed && _parallelBatchItems.Count == 0)
-            ContentMode = ProgressContentMode.Simple;
         // 目录行残留清理（新档案的 DirName 由下次 SetProgress 填充）
         DirName = string.Empty;
         // 新档案进入准备态（重新显示「正在准备…」+ 不定进度条，直到该档案首次上报）

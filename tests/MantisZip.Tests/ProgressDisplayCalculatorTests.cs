@@ -154,4 +154,18 @@ public class ProgressDisplayCalculatorTests
         Assert.Equal(0, t.ProcessedInArchive(3000));   // 低于基线 → 0
         Assert.Equal(2000, t.ProcessedInArchive(7000));
     }
+
+    // ── MiddleEllipsis（目录中间省略）──
+
+    [Fact]
+    public void MiddleEllipsis_ShortPath_ReturnsAsIs()
+        => Assert.Equal("docs", ProgressDisplayCalculator.MiddleEllipsis("docs", 24));
+
+    [Fact]
+    public void MiddleEllipsis_LongPath_KeepsFirstAndLastSegments()
+        => Assert.Equal("very-long-top/…/leaf-dir", ProgressDisplayCalculator.MiddleEllipsis("very-long-top/sub1/sub2/sub3/leaf-dir", 24));
+
+    [Fact]
+    public void MiddleEllipsis_Empty_ReturnsEmpty()
+        => Assert.Equal("", ProgressDisplayCalculator.MiddleEllipsis("", 24));
 }

@@ -1,4 +1,7 @@
 {
+  "Progress_Tooltip_Progress": "進度",
+  "Progress_Tooltip_Bytes": "位元組",
+  "Progress_Tooltip_Ratio": "壓縮率",
   "Progress_Stats_TotalSize": "總大小 {0}",
   "Progress_Preparing": "正在準備…",
   "Compress_ParallelDegree": "並行壓縮組數",
@@ -11,6 +14,7 @@
   "Progress_Density_Medium": "標準",
   "Progress_Density_Full": "完整",
   "Progress_Stats_Parallel": "並行",
+  "Progress_Stats_Compressed": "壓縮",
   "Progress_Batch_SectionTitle": "壓縮檔列表",
   "Progress_Batch_Count": "{0} 個壓縮檔",
   "Progress_Entry_Pending": "等待中",
