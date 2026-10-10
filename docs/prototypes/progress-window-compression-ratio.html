@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>进度窗口增强 — 完整原型（通道行左右分组 + 逐文件压缩率 + 整体汇总）</title>
+<style>
+/* 调色板：与 progress-window-channel-info / progress-stats-cards-three-row 一致（暗色） */
+:root {
+  --bg:#1a1a2e; --section:#252540; --item:#3d3d5c; --item-hover:#454570;
+  --accent:#6bd46b; --accent2:#4ecdc4; --text:#eaeaea; --dim:#888; --dimmer:#666;
+  --fill-file:#1E3A5F; --fill-batch:#3D2A5C; --err:#ff6b6b; --warn:#ffd93d; --blue:#6c9ef8;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+       padding:28px 16px 60px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+h1 { font-size:20px; color:var(--accent); text-align:center; line-height:1.4; }
+.caption { max-width:620px; font-size:12px; color:var(--dim); line-height:1.9; }
+.caption b { color:var(--accent); } .caption .k { color:var(--accent2); }
+.caption .new { color:var(--warn); }
+
+/* 控制条（原型辅助，非窗口本体） */
+.controls { width:560px; background:var(--section); border:1px solid var(--item);
+            border-radius:8px; padding:10px 14px; font-size:12px; }
+.ctl-row { display:flex; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap; }
+.ctl-row:last-child { margin-bottom:0; }
+.ctl-lbl { color:var(--dim); width:76px; font-size:11px; flex-shrink:0; }
+.btn { padding:4px 12px; border:1px solid transparent; background:var(--item); color:var(--dim);
+       border-radius:5px; font-size:12px; cursor:pointer; transition:all .15s; }
+.btn:hover { background:var(--item-hover); color:var(--text); }
+.btn.on { background:var(--accent); color:var(--bg); font-weight:600; }
+.btn.warnbtn.on { background:var(--err); color:#fff; }
+.btn.reset { border-color:var(--accent); color:var(--accent); background:transparent; }
+.hint { color:var(--dimmer); font-size:10px; }
+
+/* 模拟窗口：560 = 真机 ProgressWindow Width */
+.window { width:560px; background:var(--section); border:1px solid var(--item);
+          border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,.5); }
+.titlebar { display:flex; align-items:center; gap:8px; padding:9px 14px; background:var(--item);
+            border-bottom:1px solid #4a4a6a; font-size:13px; font-weight:600; }
+.titlebar .dot { width:10px; height:10px; border-radius:50%; background:var(--dimmer); }
+.titlebar .name { color:var(--dim); font-size:12px; font-weight:400; }
+.density { margin-left:auto; display:flex; gap:2px; background:var(--bg); border-radius:5px; padding:2px; }
+.density button { border:none; background:transparent; color:var(--dimmer); font-size:11px;
+                  padding:2px 9px; border-radius:4px; cursor:pointer; }
+.density button.on { background:var(--accent); color:var(--bg); font-weight:600; }
+
+.section { padding:10px 14px; }
+.sec-head { display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+.sec-title { font-size:11px; color:var(--dim); letter-spacing:.5px; }
+.sec-count { font-size:11px; color:var(--accent); }
+.batch-item { display:flex; align-items:center; padding:6px 10px; background:var(--item);
+              border-radius:5px; margin-bottom:4px; font-size:12px; }
+.batch-item.active { background:var(--item-hover); border-left:3px solid var(--accent); }
+.batch-item.done { opacity:.6; }
+.batch-item .bi-ic { margin-right:8px; font-size:11px; }
+.batch-item .bi-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.batch-item .bi-pct { color:var(--accent); font-size:11px; font-variant-numeric:tabular-nums; }
+
+.mode-row { display:flex; align-items:center; gap:6px; padding:8px 14px 0; }
+.mode-row .mlbl { font-size:11px; color:var(--dim); }
+.mode-row button { border:none; background:transparent; color:var(--dimmer); font-size:12px;
+                   padding:3px 12px; border-radius:4px; cursor:pointer; }
+.mode-row button.on { background:var(--accent); color:var(--bg); font-weight:600; }
+.d6note { font-size:10px; color:var(--dimmer); margin-left:auto; }
+
+.panel { padding:10px 14px 12px; }
+.sp-dir { font-size:12px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sp-name { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.sp-lblrow { display:flex; justify-content:space-between; font-size:11px; color:var(--dim); margin:8px 0 4px; }
+.pbar { height:8px; background:var(--bg); border-radius:4px; overflow:hidden; }
+.pbar > div { height:100%; background:var(--blue); border-radius:4px; transition:width .25s ease; }
+
+.ch-hint { font-size:10px; color:var(--dim); background:var(--item); border-radius:4px;
+           padding:5px 8px; margin-bottom:6px; line-height:1.5; }
+.ch-list { display:flex; flex-direction:column; gap:4px; }
+
+/* ═══ 通道行：左右分组 ═══ */
+.ch { display:flex; align-items:stretch; background:var(--item); border-radius:6px;
+      font-size:12px; transition:background .2s; position:relative; overflow:hidden; }
+.ch:hover { background:var(--item-hover); }
+.ch-left { flex:1; min-width:0; display:flex; align-items:center; position:relative; }
+.ch-file { position:relative; flex:1; min-width:0; overflow:hidden; padding:7px 6px 7px 10px; }
+.ch-file-fill { position:absolute; left:0; top:0; bottom:0; width:0;
+                background:var(--fill-file); border-radius:4px; transition:width .12s linear; }
+.ch-file.buggy { overflow:visible; }
+.ch-file.buggy .ch-file-fill { outline:1px dashed var(--err); z-index:2; }
+.ch-file-text { position:relative; z-index:3; display:flex; gap:5px; min-width:0; width:100%; align-items:baseline; }
+.ch-file-text .dir { color:var(--dim); font-size:11px; white-space:nowrap; flex-shrink:1;
+                     overflow:hidden; text-overflow:ellipsis; max-width:55%; }
+.ch-file-text .base { color:var(--text); font-weight:500; white-space:nowrap; flex-shrink:0; }
+.ch-fsize { flex-shrink:0; padding:7px 8px 7px 4px; font-size:10px; color:var(--dim);
+            white-space:nowrap; font-variant-numeric:tabular-nums; align-self:center; }
+.ch-right { flex-shrink:0; min-width:180px; position:relative; display:flex; align-items:center;
+            padding:7px 10px 7px 8px; gap:6px; cursor:default; }
+.ch-right > .ch-batch-fill { position:absolute; left:0; top:0; bottom:0; width:0;
+                 background:var(--fill-batch); border-radius:0 6px 6px 0; transition:width .12s linear; opacity:.7; z-index:1; }
+.ch-right > *:not(.ch-batch-fill) { position:relative; z-index:2; }
+.ch-id { color:var(--dim); font-size:11px; white-space:nowrap; flex-shrink:0; }
+.ch-id.live { color:var(--accent); }
+.ch-pctdet { color:var(--accent); font-size:11px; font-variant-numeric:tabular-nums;
+             white-space:nowrap; flex-shrink:0; }
+.ch-pctdet .det { color:var(--dim); font-size:10px; margin-left:2px; }
+.ch-info { color:var(--dim); font-size:10px; white-space:nowrap; font-variant-numeric:tabular-nums;
+           flex-shrink:0; }
+.ch-info .i-bytes { color:var(--text); }
+.ch-info .i-ratio { color:var(--accent2); }
+.ch-info .sep { color:var(--dimmer); margin:0 3px; }
+.ch-info .hide { display:none; }
+.ch-right .tooltip { position:absolute; bottom:calc(100% + 6px); right:0; z-index:10;
+                     background:var(--bg); border:1px solid var(--item-hover); border-radius:6px;
+                     padding:8px 12px; font-size:11px; color:var(--dim); line-height:1.7;
+                     white-space:nowrap; box-shadow:0 4px 20px rgba(0,0,0,.5);
+                     opacity:0; pointer-events:none; transition:opacity .15s; }
+.ch-right:hover .tooltip { opacity:1; }
+.tooltip .tt-title { color:var(--accent); font-weight:600; margin-bottom:2px; }
+.tooltip b { color:var(--text); font-weight:500; }
+
+/* 列表面板（v3：新增压缩后大小 + 压缩率列） */
+.file-item { display:flex; align-items:center; gap:8px; padding:5px 8px; border-radius:4px; font-size:12px; }
+.file-item:nth-child(odd) { background:rgba(255,255,255,.03); }
+.file-item .fi-ic { width:14px; text-align:center; font-size:11px; }
+.file-item .fi-name { flex:1; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.file-item .fi-size { color:var(--dim); font-size:11px; width:62px; text-align:right; }
+/* ★ 新增：压缩后大小 (率%) —— 仅 ZIP 压缩完成回填 */
+.file-item .fi-cmp { font-size:11px; width:118px; text-align:right; font-variant-numeric:tabular-nums;
+                     color:var(--dim); }
+.file-item .fi-cmp .r { color:var(--accent2); }
+/* 回填高亮：完成回填瞬间闪烁，便于审阅时注意到 */
+.file-item .fi-cmp.flash { animation:fillFlash .9s ease-out; border-radius:3px; }
+@keyframes fillFlash { from { background:rgba(78,205,196,.40); } to { background:transparent; } }
+.file-item .fi-st { width:52px; text-align:right; font-size:11px; color:var(--dim); }
+.file-item.active .fi-st { color:var(--accent); }
+.file-item.done .fi-ic { color:var(--accent); }
+.file-item.err .fi-ic, .file-item.err .fi-st { color:var(--err); }
+
+/* 下方信息区 */
+.overall { background:var(--bg); border-top:1px solid var(--item); padding:10px 14px 12px; }
+.medium { display:flex; justify-content:space-between; font-size:12px; color:var(--dim);
+          background:var(--item); border-radius:5px; padding:7px 12px; margin-bottom:8px; }
+.medium b { color:var(--text); font-weight:500; }
+/* 完整档：5 张文件卡三行 + 段2 全局元信息后置单行 */
+.stats-cards { display:grid; grid-template-columns:repeat(5,1fr); gap:6px; margin-bottom:8px; }
+.stat { background:var(--section); border:1px solid var(--item); border-radius:6px;
+        padding:6px 2px 7px; text-align:center; }
+.stat .r1 { display:flex; justify-content:center; align-items:center; gap:3px; font-size:10px;
+            color:var(--dim); margin-bottom:3px; }
+.stat .r1 .ic { font-size:13px; }
+.stat .r2 { font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; line-height:1.25; }
+.stat .r3 { font-size:11px; line-height:1.25; }
+.r2.ok,.r3.ok { color:var(--accent); }
+.r2.warn { color:var(--warn); }
+.r2.err { color:var(--err); }
+.r2.prim,.r3.prim { color:var(--text); }
+.r3.dash { color:var(--dimmer); }
+/* ★ 段2：全局元信息后置单行（并行度 + 整体压缩汇总） */
+.ch-meta { display:flex; align-items:center; justify-content:center; gap:6px; margin-bottom:9px; min-height:18px; }
+.ch-meta .sep { color:var(--dimmer); font-size:11px; }
+.ch-meta .meta-item { display:flex; align-items:center; gap:4px; }
+.ch-meta .meta-item .ic { font-size:14px; color:var(--blue); }
+.ch-meta .meta-item .lbl { font-size:11px; color:var(--dim); }
+.ch-meta .meta-item .val { font-size:13px; font-weight:600; color:var(--blue); }
+.ch-meta .meta-item.hidden { display:none; }
+.ovrow { display:flex; justify-content:space-between; font-size:12px; color:var(--dim); margin-bottom:5px; }
+.ovrow .pct { color:var(--blue); font-weight:600; font-variant-numeric:tabular-nums; }
+.ovbar { height:16px; background:var(--section); border:1px solid var(--item); border-radius:8px;
+         overflow:hidden; margin-bottom:8px; }
+.ovbar > div { height:100%; background:var(--blue); transition:width .25s ease; }
+.timerow { display:flex; justify-content:space-between; font-size:12px; color:var(--dim); margin-bottom:9px; }
+.timerow b { color:var(--text); font-weight:500; font-variant-numeric:tabular-nums; }
+.actrow { display:flex; gap:8px; }
+.actrow button { flex:1; padding:6px 0; border:1px solid var(--item); background:var(--section);
+                 color:var(--text); border-radius:6px; font-size:12px; cursor:pointer; }
+.actrow button:hover { background:var(--item); }
+.actrow .danger { color:var(--err); border-color:rgba(255,107,107,.4); }
+
+/* 底部：改动点 ↔ 计划映射 */
+.legend { width:560px; background:var(--section); border:1px solid var(--item); border-radius:8px;
+          padding:12px 14px; font-size:11px; color:var(--dim); line-height:1.9; }
+.legend b { color:var(--accent); }
+.legend .nl { color:var(--warn); }
+.legend code { background:var(--bg); padding:1px 5px; border-radius:3px; color:var(--accent2); font-size:10px; }
+</style>
+</head>
+<body>
+
+<h1>进度窗口增强 — 完整原型 v3<br>通道行左右分组 + 逐文件压缩率 + 整体压缩汇总</h1>
+<div class="caption">
+    整合<b>两个计划</b>的全部改进，窗口宽 <b>560px</b> = 真机宽度。<br>
+    <b class="k">① 左右分组</b> 详细模式：左=单文件域（目录/文件名/文件底纹/大小），右=批次域（序号/批次底纹/合并百分比/字节/压缩率）&nbsp;
+    <b class="k">② 批进度底纹化</b> 右区紫底纹 = 批次进度&nbsp;
+    <b class="k">③ 合并百分比</b> <code>45% (12/40)</code>&nbsp;
+    <b class="k">④ ToolTip</b> 悬停批次域浮层&nbsp;
+    <b class="k">⑤ 两列路径</b> 目录中间省略 + 文件名恒完整&nbsp;
+    <b class="k">⑥ 底纹修复</b> 宽度基准 整行→文件格<br>
+    <b class="nl">⑦ 逐文件压缩率（新）</b> 列表模式每行「压缩后大小 (率%)」——仅 ZIP 压缩（原型直接显示最终态；真机为完成时回填）&nbsp;
+    <b class="nl">⑧ 整体压缩汇总（新）</b> 完整档段 2 后置单行、并行度旁 <code>🗜 300 MB (60%)</code>
+</div>
+
+<!-- 控制条 -->
+<div class="controls">
+    <div class="ctl-row">
+        <span class="ctl-lbl">场景</span>
+        <button class="btn on" id="sc0" onclick="setScenario('zipCompress')">ZIP 并行压缩</button>
+        <button class="btn" id="sc1" onclick="setScenario('zipSingle')">ZIP 串行压缩·单行</button>
+        <button class="btn" id="sc2" onclick="setScenario('zipExtract')">ZIP 并行解压</button>
+        <button class="btn" id="sc3" onclick="setScenario('z7')">7z 压缩·单行</button>
+    </div>
+    <div class="ctl-row">
+        <span class="ctl-lbl">显示模式</span>
+        <button class="btn" id="mSimple" onclick="setMode('simple')">简约</button>
+        <button class="btn" id="mDetail" onclick="setMode('detail')">详细</button>
+        <button class="btn on" id="mList" onclick="setMode('list')">列表</button>
+        <span class="hint">← 列表模式看「压缩后大小 (率%)」；详细模式看「通道行左右分组」</span>
+    </div>
+    <div class="ctl-row">
+        <span class="ctl-lbl">辅助</span>
+        <button class="btn on" id="shFix" onclick="setShade(false)">底纹修复后</button>
+        <button class="btn warnbtn" id="shBug" onclick="setShade(true)">底纹修复前·bug</button>
+        <button class="btn reset" onclick="restart()">↺ 重跑模拟</button>
+        <span class="hint">压缩率列/汇总为「审阅便利」直接显示最终态；真机为 ZIP 压缩<b>完成时回填</b>（非实时）</span>
+    </div>
+</div>
+
+<!-- ═══ 模拟窗口 ═══ -->
+<div class="window">
+    <div class="titlebar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span id="winTitle">正在压缩…</span><span class="name" id="winName">release-bundle.zip</span>
+        <div class="density">
+            <button id="dMin" onclick="setDensity('min')">少</button>
+            <button id="dMid" onclick="setDensity('mid')">中</button>
+            <button class="on" id="dFull" onclick="setDensity('full')">完整</button>
+        </div>
+    </div>
+
+    <!-- 批处理列表：仅多档案解压场景显示 -->
+    <div class="section" id="batchSec" style="display:none">
+        <div class="sec-head"><span class="sec-title">压缩包列表</span><span class="sec-count">5 个文件</span></div>
+        <div class="batch-item done"><span class="bi-ic">✓</span><span class="bi-name">photos-2025.zip</span><span class="bi-pct">100%</span></div>
+        <div class="batch-item done"><span class="bi-ic">✓</span><span class="bi-name">docs-backup.zip</span><span class="bi-pct">100%</span></div>
+        <div class="batch-item active"><span class="bi-ic">⏳</span><span class="bi-name">games-archive.zip</span><span class="bi-pct">45%</span></div>
+        <div class="batch-item"><span class="bi-ic">○</span><span class="bi-name">music-collection.zip</span><span class="bi-pct"></span></div>
+        <div class="batch-item"><span class="bi-ic">○</span><span class="bi-name">videos-old.zip</span><span class="bi-pct"></span></div>
+    </div>
+
+    <!-- 模式单选：详细恒可用（门禁已推翻，无禁用态） -->
+    <div class="mode-row">
+        <span class="mlbl">显示:</span>
+        <button id="mSimple2" onclick="setMode('simple')">简约</button>
+        <button id="mDetail2" onclick="setMode('detail')">详细</button>
+        <button id="mList2" onclick="setMode('list')">列表</button>
+        <span class="d6note">详细门禁已推翻：「详细」恒可用</span>
+    </div>
+
+    <!-- 简约面板 -->
+    <div class="panel" id="panelSimple" style="display:none">
+        <div class="sp-dir" id="spDir">D:\Projects\release</div>
+        <div class="sp-name" id="spName">—</div>
+        <div class="sp-lblrow"><span>当前文件</span><span id="spPct">0%</span></div>
+        <div class="pbar"><div id="spBar" style="width:0%"></div></div>
+    </div>
+
+    <!-- 详细面板：压缩通道说明 + 通道行（左右分组） -->
+    <div class="panel" id="panelDetail" style="display:none">
+        <div class="ch-hint" id="chHint" style="display:none">压缩通道说明：N 行通道只覆盖需压缩文件（compressGroup），已压缩 Store 文件不占通道</div>
+        <div class="ch-list" id="chList"></div>
+    </div>
+
+    <!-- 列表面板（v3：新增压缩后大小 + 压缩率列） -->
+    <div class="panel" id="panelList">
+        <div class="file-item done"><span class="fi-ic">✓</span><span class="fi-name">readme.txt</span><span class="fi-size">1 KB</span><span class="fi-cmp"></span><span class="fi-st">完成</span></div>
+        <div class="file-item done"><span class="fi-ic">✓</span><span class="fi-name">photo.jpg</span><span class="fi-size">2 MB</span><span class="fi-cmp"></span><span class="fi-st">完成</span></div>
+        <div class="file-item err"><span class="fi-ic">✗</span><span class="fi-name">protected.doc</span><span class="fi-size">500 KB</span><span class="fi-cmp"></span><span class="fi-st">出错</span></div>
+        <div class="file-item"><span class="fi-ic">⏭</span><span class="fi-name">temp.tmp</span><span class="fi-size">10 KB</span><span class="fi-cmp"></span><span class="fi-st">跳过</span></div>
+        <div class="file-item active"><span class="fi-ic">⏳</span><span class="fi-name" id="liActive">video.mp4</span><span class="fi-size">500 MB</span><span class="fi-cmp"></span><span class="fi-st">45%</span></div>
+        <div class="file-item done"><span class="fi-ic">✓</span><span class="fi-name">archive.zip</span><span class="fi-size">1 MB</span><span class="fi-cmp"></span><span class="fi-st">完成</span></div>
+    </div>
+
+    <!-- ═══ 下方信息区 ═══ -->
+    <div class="overall">
+        <!-- 中档单行 -->
+        <div class="medium" id="mediumRow">
+            <span>已处理: <b id="mDone">0/0</b></span>
+            <span>速度: <b id="mSpeed">0 MB/s</b></span>
+            <span>并行: <b id="mPar">4</b></span>
+        </div>
+
+        <!-- 完整档：5 张文件卡三行 + 段2 全局元信息后置单行 -->
+        <div class="stats-cards" id="statsCards">
+            <div class="stat"><div class="r1"><span class="ic">✅</span><span>已处理</span></div>
+                <div class="r2 ok" id="cDoneR2">0</div><div class="r3 ok" id="cDoneR3">0 B</div></div>
+            <div class="stat" id="cSkip"><div class="r1"><span class="ic">⏭</span><span>跳过</span></div>
+                <div class="r2 warn">3</div><div class="r3 dash">—</div></div>
+            <div class="stat" id="cFail"><div class="r1"><span class="ic">❌</span><span>出错</span></div>
+                <div class="r2 err">1</div><div class="r3 dash">—</div></div>
+            <div class="stat" id="cOver"><div class="r1"><span class="ic">🔄</span><span>已覆盖</span></div>
+                <div class="r2 prim">5</div><div class="r3 dash">—</div></div>
+            <div class="stat" id="cTotal"><div class="r1"><span class="ic">📏</span><span>总大小</span></div>
+                <div class="r2 prim" id="cTotalR2">0</div><div class="r3 prim" id="cTotalR3">0 B</div></div>
+        </div>
+
+        <!-- ★ 段2：全局元信息后置单行（并行度 + 整体压缩汇总，各自独立显隐 + 条件分隔符） -->
+        <div class="ch-meta" id="chMeta">
+            <div class="meta-item" id="parMeta">
+                <span class="ic">⚙</span><span class="lbl">并行</span><span class="val" id="parVal">4</span>
+            </div>
+            <span class="sep" id="metaSep">·</span>
+            <div class="meta-item hidden" id="cmpMeta">
+                <span class="ic">🗜</span><span class="lbl">压缩</span><span class="val" id="cmpVal">—</span>
+            </div>
+        </div>
+
+        <!-- 总进度 / 时间 / 操作 -->
+        <div class="ovrow"><span id="ovCur">—</span><span class="pct" id="ovPct">0%</span></div>
+        <div class="ovbar"><div id="ovFill" style="width:0%"></div></div>
+        <div class="timerow"><span>已用: <b id="tElapsed">0:00</b></span><span>剩余: <b id="tRemain">--:--</b></span></div>
+        <div class="actrow">
+            <button onclick="togglePause(this)" id="btnPause">⏸ 暂停</button>
+            <button class="danger">✕ 取消</button>
+        </div>
+    </div>
+</div>
+
+<!-- 改动点 ↔ 计划映射 -->
+<div class="legend">
+    <b>改动点 ↔ 计划映射</b><br>
+    <b>通道信息计划</b>（<code>progress-window-channel-info.md</code>）：① 左右分组 ② 批进度底纹化 ③ 合并百分比 ④ ToolTip ⑤ 两列路径 ⑥ 底纹修复 → 任务 1/4/5/6<br>
+    <span class="nl"><b>逐文件压缩率计划（新）</b></span>（<code>progress-file-compression-ratio.md</code>）：<br>
+    &nbsp;&nbsp;⑦ <b>列表模式逐文件列</b>「压缩后大小 (率%)」→ 任务 3（`EntryProgressItem.CompressedText`）<br>
+    &nbsp;&nbsp;⑧ <b>完整档段 2 整体汇总</b> <code>🗜 300 MB (60%)</code>（并行度旁，格式 A）→ 任务 4（`HasOverallCompression`/`OverallCompressionText`）<br>
+    &nbsp;&nbsp;机制：ZIP 压缩<b>完成后后置回填</b>（读成品 ZIP 中央目录）；解压、7z 固实、TAR/GZ、分卷<b>不显示</b>（Rule 6 隐藏）<br>
+    统计卡 5 卡三行 + 并行后置 → 已实施 <code>progress-stats-cards-three-row</code>（commit 6fc2b01）
+</div>
+
+<script>
+'use strict';
+/* ── 场景配置 ─────────────────────────────
+   zipCompress: ZIP 并行压缩（压缩率列 + 段2 汇总；并行 + 汇总同显，带分隔符）
+   zipSingle:   ZIP 串行压缩·单行（压缩率列 + 段2 汇总；无并行，汇总单独显示无分隔符）
+   zipExtract:  ZIP 并行解压（无压缩率列、无汇总；有并行）
+   z7:          7z 压缩·单行（无压缩率列、无汇总；无并行） */
+var SCEN = {
+  zipCompress: { title:'正在压缩…', name:'release-bundle.zip', op:'compress', fmt:'zip',
+                 parallel:true,  hint:true,  conflict:false, showRatio:true,  outRatio:41,
+                 n:4, total:134217728, files:16 },
+  zipSingle:   { title:'正在压缩…', name:'docs-only.zip',      op:'compress', fmt:'zip',
+                 parallel:false, hint:false, conflict:false, showRatio:true,  outRatio:58,
+                 n:1, total:52428800,  files:8 },
+  zipExtract:  { title:'正在解压…', name:'backup-2026-10-08.zip', op:'extract', fmt:'zip',
+                 parallel:true,  hint:false, conflict:true,  showRatio:false, outRatio:0,
+                 n:4, total:268435456, files:24 },
+  z7:          { title:'正在压缩…', name:'system-backup.7z',     op:'compress', fmt:'7z',
+                 parallel:false, hint:false, conflict:false, showRatio:false, outRatio:0,
+                 n:1, total:201326592, files:12 }
+};
+var ORDER = ['zipCompress','zipSingle','zipExtract','z7'];
+
+var NAMES = [
+  'Projects/MantisZip/src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs',
+  'readme.txt',
+  'Photos/2026/Trip Japan/DSC_00421.jpg',
+  'Documents/Work/Q4 reports/quarterly-summary-final-v3.xlsx',
+  'Games/archive/data/pak01.pak',
+  'Music/Albums/Best of 90s/01 - track.flac',
+  'src/MantisZip.Core/Engines/ZipEngine.cs',
+  'Videos/Raw footage/2026-09-30 drone take 07.mp4',
+  'backup/system/config/appsettings.Production.json',
+  'log/2026/10/08/application-debug.log'
+];
+var SIZES = [1048576, 52428800, 512, 31457280, 734003200, 20971520, 102400, 125829120, 2621440, 8912896];
+
+/* 列表模式静态行：压缩后大小 / 压缩率（仅 ZIP 压缩完成回填；err/skip/active 不回填） */
+var LIST_ROWS = [
+  { size:1024,      cmp:410,     done:true,  err:false, skip:false },
+  { size:2097152,   cmp:1980000, done:true,  err:false, skip:false },
+  { size:512000,    cmp:0,       done:false, err:true,  skip:false },
+  { size:10240,     cmp:0,       done:false, err:false, skip:true  },
+  { size:524288000, cmp:0,       done:false, err:false, skip:false },
+  { size:1048576,   cmp:900000,  done:true,  err:false, skip:false }
+];
+
+var S = { key:'zipCompress', rows:[], queue:[], qpos:0, doneBytes:0, doneFiles:0,
+          elapsedMs:0, paused:false, shadeBug:false, mode:'list', density:'full', ended:false };
+var $ = function(id){ return document.getElementById(id); };
+
+function fmt(b){
+  if(b == null || isNaN(b) || b <= 0) return '—';
+  if(b < 1024) return b + ' B';
+  var u = ['KB','MB','GB','TB'], i = -1;
+  do { b /= 1024; i++; } while(b >= 1024 && i < u.length - 1);
+  return (b < 10 ? b.toFixed(1) : Math.round(b)) + ' ' + u[i];
+}
+function midEllipsis(s, max){
+  if(s.length <= max) return s;
+  var keep = max - 3, head = Math.ceil(keep / 2), tail = keep - head;
+  return s.slice(0, head) + '...' + (tail > 0 ? s.slice(s.length - tail) : '');
+}
+function mmss(ms){ var s = Math.floor(ms/1000), m = Math.floor(s/60); s = s % 60; return m + ':' + (s<10?'0':'') + s; }
+function processed(){ var p = S.doneBytes; for(var i=0;i<S.rows.length;i++) if(!S.rows[i].done) p += S.rows[i].cur; return p; }
+function planFiles(sc){
+  var raw=[], sum=0, i;
+  for(i=0;i<sc.files;i++){ var v=SIZES[i%SIZES.length]; raw.push(v); sum+=v; }
+  var k=sc.total/sum, out=[], acc=0;
+  for(i=0;i<sc.files;i++){ var x=Math.max(512, Math.round(raw[i]*k)); out.push(x); acc+=x; }
+  out[out.length-1] += sc.total - acc;
+  return out;
+}
+
+/* ── 通道行构建（左右分组） ── */
+function nextFile(r){
+  if(S.qpos >= S.queue.length){ r.done=true; r.cur=0; return; }
+  r.path = NAMES[S.qpos % NAMES.length];
+  r.fsize = S.queue[S.qpos++]; r.cur = 0;
+  var p = r.path.lastIndexOf('/');
+  r.dirTxt = p<0 ? '' : r.path.slice(0,p);
+  r.baseTxt = p<0 ? r.path : r.path.slice(p+1);
+  r.dirEl.textContent = r.dirTxt ? midEllipsis(r.dirTxt, 20) : '';
+  r.dirEl.style.display = r.dirTxt ? '' : 'none';
+  r.baseEl.textContent = r.baseTxt;
+}
+function buildRows(){
+  var sc = SCEN[S.key], single = !sc.parallel, list = $('chList'), showRatio = sc.showRatio;
+  S.queue = planFiles(sc); S.qpos = 0; list.innerHTML = ''; S.rows = [];
+  for(var i=0;i<sc.n;i++){
+    var el = document.createElement('div');
+    el.className = 'ch' + (single ? ' single' : '');
+    el.innerHTML =
+      '<div class="ch-left">' +
+        '<div class="ch-file"><div class="ch-file-fill"></div>' +
+          '<div class="ch-file-text"><span class="dir"></span><span class="base"></span></div></div>' +
+        '<div class="ch-fsize"></div></div>' +
+      '<div class="ch-right"><div class="ch-batch-fill"></div>' +
+        '<span class="ch-id"></span><span class="ch-pctdet"></span>' +
+        '<span class="ch-info"><span class="i-bytes"></span>' +
+          '<span class="sep s-r">·</span><span class="i-ratio"></span></span>' +
+        '<div class="tooltip"><div class="tt-title">批次详情</div>' +
+          '进度: <b class="tt-pct"></b><br>字节: <b class="tt-bytes"></b>' +
+          '<span class="tt-ratio-wrap"><br>压缩率: <b class="tt-ratio"></b></span></div></div>';
+    list.appendChild(el);
+    if(single) el.querySelector('.ch-id').style.display = 'none';
+    if(!showRatio){ el.querySelector('.i-ratio').classList.add('hide'); el.querySelector('.s-r').classList.add('hide');
+                    el.querySelector('.tt-ratio-wrap').style.display = 'none'; }
+    var r = { el:el, fileEl:el.querySelector('.ch-file'), fileFill:el.querySelector('.ch-file-fill'),
+      batchFill:el.querySelector('.ch-batch-fill'), id:el.querySelector('.ch-id'),
+      dirEl:el.querySelector('.dir'), baseEl:el.querySelector('.base'), fsizeEl:el.querySelector('.ch-fsize'),
+      pctdetEl:el.querySelector('.ch-pctdet'), bytesEl:el.querySelector('.i-bytes'), ratioEl:el.querySelector('.i-ratio'),
+      ttPct:el.querySelector('.tt-pct'), ttBytes:el.querySelector('.tt-bytes'), ttRatio:el.querySelector('.tt-ratio'),
+      cur:0, fsize:0, dur:(single?250:450+(i%4)*140), done:false };
+    S.rows.push(r); nextFile(r);
+    if(S.shadeBug) r.fileEl.classList.add('buggy');
+  }
+}
+
+/* ── 列表模式压缩率回填（后置：完成时才填） ── */
+function fillListRatio(){
+  var sc = SCEN[S.key], cells = document.querySelectorAll('#panelList .fi-cmp');
+  if(!sc.showRatio){ for(var c=0;c<cells.length;c++) cells[c].innerHTML=''; return; }
+  for(var i=0;i<cells.length && i<LIST_ROWS.length;i++){
+    var row = LIST_ROWS[i];
+    if(row.done && row.cmp > 0 && row.size > 0){
+      var pct = Math.round(row.cmp*100/row.size);
+      cells[i].innerHTML = fmt(row.cmp) + ' <span class="r">(' + pct + '%)</span>';
+      cells[i].classList.add('flash');
+    } else cells[i].innerHTML = '';
+  }
+}
+
+/* ── 段2 全局元信息（并行 + 整体压缩汇总） ── */
+function fillMeta(){
+  var sc = SCEN[S.key];
+  var parVis = sc.parallel;
+  var cmpVis = sc.showRatio;                  /* 原型：直接显示最终态便于审阅（真机为压缩完成时回填） */
+  $('parMeta').classList.toggle('hidden', !parVis);
+  $('cmpMeta').classList.toggle('hidden', !cmpVis);
+  $('metaSep').style.display = (parVis && cmpVis) ? '' : 'none';
+  if(parVis) $('parVal').textContent = sc.parallel ? sc.n : 1;
+  if(cmpVis){
+    var outB = Math.round(sc.total * sc.outRatio / 100);
+    $('cmpVal').textContent = fmt(outB) + ' (' + sc.outRatio + '%)';
+  }
+}
+
+/* ── 模拟主循环 ── */
+function tick(){
+  if(S.paused || S.ended) return;
+  var sc = SCEN[S.key], allDone = true, i, r;
+  S.elapsedMs += 60;
+  for(i=0;i<S.rows.length;i++){
+    r = S.rows[i];
+    if(r.done) continue;
+    allDone = false;
+    if(r.fsize > 0){
+      r.cur += r.fsize * 60 / r.dur;
+      if(r.cur >= r.fsize){
+        r.cur = 0; S.doneFiles = Math.min(sc.files, S.doneFiles+1); S.doneBytes += r.fsize;
+        nextFile(r);
+      }
+    }
+  }
+  var p = processed(), totalTxt = fmt(sc.total);
+  var batchPct = sc.parallel ? 0 : (sc.total>0 ? Math.min(100, p/sc.total*100) : 0);
+
+  for(i=0;i<S.rows.length;i++){
+    r = S.rows[i];
+    var filePct = r.done ? 100 : (r.fsize>0 ? Math.min(100, r.cur/r.fsize*100) : 0);
+    var base = S.shadeBug ? r.el.clientWidth : r.fileEl.clientWidth;
+    r.fileFill.style.width = (filePct/100*base) + 'px';
+    r.fsizeEl.textContent = r.fsize>0 ? fmt(r.fsize) : '';
+    var thisBatchPct = sc.parallel ? filePct : batchPct;
+    r.batchFill.style.width = thisBatchPct + '%';
+    r.id.classList.toggle('live', thisBatchPct>0 && thisBatchPct<100);
+    r.id.textContent = sc.parallel ? ('批'+(i+1)) : '';
+    if(sc.parallel) r.pctdetEl.innerHTML = Math.round(filePct)+'% <span class="det">'+fmt(r.fsize)+'</span>';
+    else r.pctdetEl.innerHTML = Math.round(batchPct)+'% <span class="det">('+S.doneFiles+'/'+sc.files+')</span>';
+    r.bytesEl.textContent = sc.parallel ? (fmt(r.cur)+'/'+fmt(r.fsize)) : (fmt(p)+'/'+totalTxt);
+    if(sc.showRatio) r.ratioEl.textContent = (r.done ? sc.outRatio : Math.round(filePct*sc.outRatio/100)) + '%';
+    r.ttPct.textContent = Math.round(thisBatchPct)+'%';
+    r.ttBytes.textContent = r.bytesEl.textContent;
+    r.ttRatio.textContent = sc.showRatio ? sc.outRatio+'%' : '—';
+  }
+
+  var r0 = S.rows[0];
+  if(r0 && r0.baseEl){
+    $('spDir').textContent = r0.dirTxt || '(根目录)';
+    $('spName').textContent = r0.baseTxt;
+    var sp = sc.parallel ? (r0.fsize>0 ? r0.cur/r0.fsize*100 : 0) : batchPct;
+    $('spPct').textContent = Math.round(sp)+'%'; $('spBar').style.width = sp+'%';
+    $('liActive').textContent = r0.baseTxt;
+  }
+
+  var speed = S.elapsedMs>500 ? p/(S.elapsedMs/1000) : 0;
+  $('mDone').textContent = fmt(p)+'/'+totalTxt;
+  $('mSpeed').textContent = fmt(speed)+'/s';
+  $('mPar').textContent = sc.parallel ? sc.n : 1;
+  $('cDoneR2').textContent = S.doneFiles;
+  $('cDoneR3').textContent = fmt(S.doneBytes);
+  $('cTotalR2').textContent = sc.files;
+  $('cTotalR3').textContent = totalTxt;
+
+  var op = sc.total>0 ? p/sc.total*100 : 0;
+  $('ovCur').textContent = fmt(p)+' / '+totalTxt;
+  $('ovPct').textContent = Math.min(100, Math.round(op))+'%';
+  $('ovFill').style.width = Math.min(100, op)+'%';
+  $('tElapsed').textContent = mmss(S.elapsedMs);
+  $('tRemain').textContent = (speed>0 && p<sc.total) ? mmss((sc.total-p)/speed*1000) : '--:--';
+
+  if(allDone){ S.ended = true; $('ovPct').textContent='100%'; $('ovFill').style.width='100%'; }
+
+  fillMeta();
+}
+
+/* ── 场景/模式/密度切换 ── */
+function setScenario(key){
+  S.key = key; S.doneBytes=0; S.doneFiles=0; S.elapsedMs=0; S.paused=false; S.ended=false;
+  var sc = SCEN[key];
+  $('winTitle').textContent = sc.title; $('winName').textContent = sc.name;
+  $('btnPause').textContent = '⏸ 暂停';
+  for(var i=0;i<ORDER.length;i++) $('sc'+i).classList.toggle('on', ORDER[i]===key);
+  $('batchSec').style.display = sc.conflict ? '' : 'none';
+  $('chHint').style.display = (sc.hint && sc.parallel) ? '' : 'none';
+  $('cSkip').style.display = sc.conflict ? '' : 'none';
+  $('cFail').style.display = sc.conflict ? '' : 'none';
+  $('cOver').style.display = sc.conflict ? '' : 'none';
+  buildRows(); render();
+  fillListRatio();   /* 原型：直接回填最终态便于审阅（真机为压缩完成时回填） */
+}
+function setMode(m){
+  S.mode = m;
+  $('panelSimple').style.display = m==='simple' ? '' : 'none';
+  $('panelDetail').style.display = m==='detail' ? '' : 'none';
+  $('panelList').style.display = m==='list' ? '' : 'none';
+  $('mSimple').classList.toggle('on', m==='simple'); $('mDetail').classList.toggle('on', m==='detail'); $('mList').classList.toggle('on', m==='list');
+  $('mSimple2').classList.toggle('on', m==='simple'); $('mDetail2').classList.toggle('on', m==='detail'); $('mList2').classList.toggle('on', m==='list');
+}
+function applyDensity(){
+  var d = S.density;
+  $('mediumRow').style.display = d==='min' ? 'none' : '';
+  $('statsCards').style.display = d==='full' ? 'grid' : 'none';
+  $('chMeta').style.display = d==='full' ? 'flex' : 'none';
+  $('dMin').classList.toggle('on', d==='min'); $('dMid').classList.toggle('on', d==='mid'); $('dFull').classList.toggle('on', d==='full');
+}
+function setDensity(d){ S.density=d; applyDensity(); }
+function setShade(bug){
+  S.shadeBug = bug;
+  $('shFix').classList.toggle('on', !bug); $('shBug').classList.toggle('on', bug);
+  for(var i=0;i<S.rows.length;i++) S.rows[i].fileEl.classList.toggle('buggy', bug);
+  render();
+}
+function togglePause(btn){ if(S.ended) return; S.paused=!S.paused; btn.textContent = S.paused?'▶ 继续':'⏸ 暂停'; }
+function restart(){ setScenario(S.key); }
+function render(){ var was=S.paused; S.paused=false; tick(); S.paused=was; }
+
+setScenario('zipCompress');
+setMode('list');
+setDensity('full');
+setInterval(tick, 60);
+</script>
+</body>
+</html>
