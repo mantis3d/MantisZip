@@ -22,6 +22,7 @@
 | **P1** | 压缩/解压性能优化（并行化 + 缓冲区） | [compression-performance-optimization.md](.omo/plans/未开始/compression-performance-optimization.md) | 🟡中 | 5-8h | 🟢 大部分完成（2026-09-16 核实，4/5 阶段）：① 缓冲区 256KB→4MB；② ZIP 并行解压；③ 7z 多线程压缩（mt=on）实测 4.63x。**剩余**：ZIP 多线程压缩 → 见下方两个方案 |
 | **P1** | ZIP 多线程压缩方案 D（自适应 + 多线程第四个选项） | [parallel-compress-plan-d.md](.omo/plans/未开始/parallel-compress-plan-d.md) | 🟡中 | 4-5h | 自适应压缩新增"自适应 + 多线程"选项：Store 类直接写入 + 需压缩类 SharpSevenZip mt=on；UI 联动（格式目录/用户规则/多线程提示可见性）；实验性标签 + 帮助弹窗 |
 | **P2** | ZIP 多线程压缩方案 A（分组并行 + 多级别） | [parallel-compress-plan-a.md](.omo/plans/未开始/parallel-compress-plan-a.md) | 🟡中 | 6-8h | 按级别分组 → 各组独立 ZipWriter 并行 → 合并 ZIP，完整多级别自适应 + 多线程。方案 D 完成后实施 |
+| **P2** | 智能并行解压（全局开关 + SSD/HDD 智能度 + 大包预测试） | [smart-parallel-extract.md](.omo/plans/未开始/smart-parallel-extract.md) | 🟡中 | 6-8h | 📋 2026-10-05 计划完成（spec + 原型 + 11 Task 实施计划）：5 步决策链（调用方覆盖 → 全局关→串行 → 智能关→手动值 → ≥1GB 预测试选优 → 磁盘类型默认 SSD 12/HDD 8）；Core 新增 `DiskTypeDetector`（DeviceIoControl SeekPenalty）+ `ParallelDegreeOptimizer`（样本解压计时）+ `ParallelDegreeResolver`；UI 设置窗口并行解压卡片（预测试随智能隐藏，规则 6）+ 帮助弹窗；解压对话框线程数默认 0=自动；磁盘基准测试功能（方案 A 分层整合）留待下期 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.omo/plans/未开始/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P2** | Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.omo/plans/未开始/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
