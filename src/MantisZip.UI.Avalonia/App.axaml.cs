@@ -53,6 +53,9 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // 启动打点：Avalonia 框架初始化完成锚点（含 BuildAvaloniaApp/UsePlatformDetect/App.axaml 资源解析）
+        Services.StartupTimer.Mark("Avalonia.InitDone");
+
         // ── 注册代码页编码提供程序（GBK/GB2312/936 等中文编码）──
         // 必须在所有路径（CLI/正常启动）最早执行，否则 Encoding.GetEncoding(936)
         // 抛 NotSupportedException 导致文本预览退化为 "coding 936 无法预览"。
@@ -61,9 +64,11 @@ public partial class App : Application
         // ── Initialize OLE for drag-drop (required on Windows for DragDrop.DoDragDropAsync) ──
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             NativeMethods.OleInitialize(nint.Zero);
+        Services.StartupTimer.Mark("Init.EncodingOle");
 
         // ── Apply theme (System/Light/Dark) ──
         ApplyTheme();
+        Services.StartupTimer.Mark("Init.Theme");
         if (PlatformSettings is IPlatformSettings ps)
         {
             ps.ColorValuesChanged += (_, _) =>
@@ -77,6 +82,7 @@ public partial class App : Application
 
         // ── Apply global font from settings ──
         ApplyAppFontFamily();
+        Services.StartupTimer.Mark("Init.Font");
 
         // ── Apply compactness mode ──
         var appSettings = AppSettings.Load();
@@ -87,6 +93,7 @@ public partial class App : Application
             _ => CompactnessMode.Normal,
         };
         ApplyCompactness(compactMode);
+        Services.StartupTimer.Mark("Init.Settings");
 
         // ── 启动时清理临时目录（对齐 WPF App.xaml.cs:141）—— fire-and-forget，不阻塞 UI ──
         _ = Task.Run(CleanTempOnStartupCore);
@@ -104,6 +111,7 @@ public partial class App : Application
         // ── Restore saved language (AppSettings uses "zh"/"en"/"zh-TW") ──
         LocalizationManager.CurrentLanguage =
             LocalizationManager.FromSettingsCode(appSettings.Language);
+        Services.StartupTimer.Mark("Init.PreviewCfgLocale");
 
         // ── 7z.dll 路径接线 + 用户解析回调（对齐 WPF InitializeApp，App.xaml.cs:46-68）──
         // 从用户设置加载 7z.dll 路径，覆盖 SevenZipEngine 的默认值
@@ -122,6 +130,7 @@ public partial class App : Application
 
         // 注册 7z.dll 解析回调 — 默认位置找不到时弹出对话框让用户手动指定
         SevenZipEngine.SevenZipDllResolveCallback = ResolveSevenZipDllViaDialog;
+        Services.StartupTimer.Mark("Init.SevenZip");
 
         // ── 首次运行：Shell 集成安装（延迟到用户进程，非提权）──
         // 安装程序会写入 FirstRunShell=1 / FirstRunAssoc=1 到注册表，首次启动时处理
@@ -172,6 +181,10 @@ public partial class App : Application
         {
             App.DebugLog("OnFrameworkInitializationCompleted: portable mode detected, skipping shell integration and file association registration");
         }
+        Services.StartupTimer.Mark("Init.ShellFirstRun");
+
+        // 启动打点：App 初始化全部完成（CLI 分发之前）
+        Services.StartupTimer.Mark("Init.Done");
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
