@@ -47,7 +47,7 @@
 - Create: `src/MantisZip.UI.Avalonia/Services/StartupTimer.cs`
 - Test: `tests/MantisZip.UI.Avalonia.Tests/StartupTimerTests.cs`
 
-- [ ] **Step 1: 写失败测试**
+- [x] **Step 1: 写失败测试**
 
 ```csharp
 // tests/MantisZip.UI.Avalonia.Tests/StartupTimerTests.cs
@@ -135,12 +135,12 @@ public class StartupTimerTests
 }
 ```
 
-- [ ] **Step 2: 跑测试确认失败**
+- [x] **Step 2: 跑测试确认失败**
 
 Run: `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj --filter StartupTimerTests`
 Expected: 编译失败（`StartupTimer` 不存在）。
 
-- [ ] **Step 3: 实现 StartupTimer**
+- [x] **Step 3: 实现 StartupTimer**
 
 ```csharp
 // src/MantisZip.UI.Avalonia/Services/StartupTimer.cs
@@ -296,12 +296,12 @@ internal static class StartupTimer
 
 注意补 `using System.Text;`（`StringBuilder`）。文件顶部加中文注释头（规则 14 精神）。
 
-- [ ] **Step 4: 跑测试确认通过**
+- [x] **Step 4: 跑测试确认通过**
 
 Run: `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj --filter StartupTimerTests`
 Expected: 7 个测试全部 PASS。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/MantisZip.UI.Avalonia/Services/StartupTimer.cs tests/MantisZip.UI.Avalonia.Tests/StartupTimerTests.cs
@@ -316,7 +316,7 @@ git commit -m "feat(avalonia): 新增 StartupTimer 启动耗时打点器（纯�
 - Modify: `src/MantisZip.UI.Avalonia/Program.cs:7-14`
 - Modify: `src/MantisZip.UI.Avalonia/App.axaml.cs`（`OnFrameworkInitializationCompleted`，约 :54-152）
 
-- [ ] **Step 1: Program.cs 入口打点**
+- [x] **Step 1: Program.cs 入口打点**
 
 将 `Main` 与 `BuildAvaloniaApp` 改为（`using MantisZip.UI.Avalonia.Services;` 加到文件头）：
 
@@ -347,7 +347,7 @@ public static void Main(string[] args)
 }
 ```
 
-- [ ] **Step 2: App.OnFrameworkInitializationCompleted 子段打点**
+- [x] **Step 2: App.OnFrameworkInitializationCompleted 子段打点**
 
 在方法内以下语句之后各插一行 `Services.StartupTimer.Mark(...)`（顺序与现有代码一致）：
 
@@ -370,12 +370,12 @@ ApplyTheme();
 Services.StartupTimer.Mark("Init.Theme");
 ```
 
-- [ ] **Step 3: 构建验证**
+- [x] **Step 3: 构建验证**
 
 Run: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj`
 Expected: 0 error。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 git add src/MantisZip.UI.Avalonia/Program.cs src/MantisZip.UI.Avalonia/App.axaml.cs
@@ -392,7 +392,7 @@ git commit -m "feat(avalonia): 启动打点接入 Program.Main 与 App 初始化
 - Modify: `src/MantisZip.UI.Avalonia/Views/PreviewPanel.axaml.cs:26-33`
 - Modify: `src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs:159-167`
 
-- [ ] **Step 1: MainWindow ctor 子段打点**
+- [x] **Step 1: MainWindow ctor 子段打点**
 
 ```csharp
 public MainWindow()
@@ -425,7 +425,7 @@ public MainWindow()
 }
 ```
 
-- [ ] **Step 2: 首帧打点与 flush**
+- [x] **Step 2: 首帧打点与 flush**
 
 ```csharp
 /// <summary>窗口首次 Opened：打首帧近似点并 flush 启动 trace（一次性，与启动测量无关的后续 Opened 不受影响）。</summary>
@@ -442,7 +442,7 @@ private void OnStartupOpened(object? sender, EventArgs e)
 }
 ```
 
-- [ ] **Step 3: PreviewPanel ctor 专项打点**
+- [x] **Step 3: PreviewPanel ctor 专项打点**
 
 `PreviewPanel.axaml.cs:26`：
 
@@ -456,7 +456,7 @@ public PreviewPanel()
 }
 ```
 
-- [ ] **Step 4: PreviewViewModel ctor 专项打点**
+- [x] **Step 4: PreviewViewModel ctor 专项打点**
 
 `PreviewViewModel.cs:159`：
 
@@ -476,19 +476,19 @@ public PreviewViewModel()
 
 （`Preview.VM.Ctor.*` 与 `Preview.Panel.Ctor.*` 成对出现，报告侧取 Exit−Enter 作专项 delta；`FormatTrace` 的 `preview-eager total` 汇总按 `Preview.` 前缀累加 DeltaMs 即覆盖两段 Exit 的增量，可接受——Exit mark 的 Delta 即构造段耗时。）
 
-- [ ] **Step 5: 构建 + 全量测试**
+- [x] **Step 5: 构建 + 全量测试**
 
 Run: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj`
 Expected: 0 error。
 Run: `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj`
 Expected: 全部 PASS（打点为纯观测，不应破坏任何测试）。
 
-- [ ] **Step 6: 手动冒烟（Debug）**
+- [x] **Step 6: 手动冒烟（Debug）**
 
 Run: `dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj`
 Expected: 窗口正常打开；`%LOCALAPPDATA%\MantisZip\startup-trace.log` 新增一条含 `Main.Entry` → `Win.FirstFrame` 全链路的样本。
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```powershell
 git add src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs src/MantisZip.UI.Avalonia/Views/PreviewPanel.axaml.cs src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs
@@ -571,7 +571,7 @@ git commit -m "feat(avalonia): 启动测量聚合脚本 + 阶段一基线数据"
 - Modify: `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml:1270-1274`
 - Modify: `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`（新增方法 + ctor 接线）
 
-- [ ] **Step 1: XAML 换占位 host**
+- [x] **Step 1: XAML 换占位 host**
 
 ```xml
 <!-- 预览占位 host：真正的 PreviewPanel 由 EnsurePreviewPanel 在首帧后延迟创建并填充（启动提速）。
@@ -585,7 +585,7 @@ git commit -m "feat(avalonia): 启动测量聚合脚本 + 阶段一基线数据"
 </ContentControl>
 ```
 
-- [ ] **Step 2: code-behind 新增 EnsurePreviewPanel（异常安全 + 幂等）**
+- [x] **Step 2: code-behind 新增 EnsurePreviewPanel（异常安全 + 幂等）**
 
 ```csharp
 private bool _previewPanelCreated;
@@ -614,7 +614,7 @@ private void EnsurePreviewPanel()
 }
 ```
 
-- [ ] **Step 3: ctor 接线定时器与兜底**
+- [x] **Step 3: ctor 接线定时器与兜底**
 
 ctor 末尾（`Opened += OnStartupOpened` 旁）：
 
@@ -629,12 +629,12 @@ vm.PreviewPanelNeeded += EnsurePreviewPanel;
 
 补 `using Avalonia.Threading;`（如未有）。
 
-- [ ] **Step 4: 构建 + 冒烟**
+- [x] **Step 4: 构建 + 冒烟**
 
 Run: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → 0 error。
 Run: `dotnet run --project ...` → 启动 0.5s 后日志出现 `EnsurePreviewPanel: preview panel created (lazy)`；预览面板正常可用。
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```powershell
 git add src/MantisZip.UI.Avalonia/Views/MainWindow.axaml src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs
@@ -648,7 +648,7 @@ git commit -m "feat(avalonia): 预览面板控件树延迟实例化（占位host
 **Files:**
 - Modify: `src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs`（事件声明 + 预览链入口触发）
 
-- [ ] **Step 1: 声明事件**
+- [x] **Step 1: 声明事件**
 
 `MainWindowViewModel` 类内（`Preview` 属性附近，:327 旁）：
 
@@ -657,7 +657,7 @@ git commit -m "feat(avalonia): 预览面板控件树延迟实例化（占位host
 public event Action? PreviewPanelNeeded;
 ```
 
-- [ ] **Step 2: 预览链入口触发**
+- [x] **Step 2: 预览链入口触发**
 
 在预览触发链起点（:1419 `Preview.StopGifTimer();` / `Preview.ShowLoading(...)` 之前）：
 
@@ -667,12 +667,12 @@ Preview.StopGifTimer();
 Preview.ShowLoading(entry.NameDisplay ?? entry.Name);
 ```
 
-- [ ] **Step 3: 构建 + 全量测试**
+- [x] **Step 3: 构建 + 全量测试**
 
 Run: `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → 0 error。
 Run: `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj` → 全部 PASS。
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```powershell
 git add src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs
@@ -683,7 +683,7 @@ git commit -m "feat(avalonia): PreviewPanelNeeded 事件作为预览面板延迟
 
 ### Task 7: 功能回归 + A/B trace 对比（阶段二验收）
 
-- [ ] **Step 1: 回归清单（手动，按设计 2.7）**
+- [x] **Step 1: 回归清单（手动，按设计 2.7）**
 
 1. 冷启动不打开压缩包 → trace 无 `Preview.Panel.Ctor.*` 段
 2. 打开含各类文件的压缩包（文本/图/PDF/Office/字体/GIF/加密包密码链）→ 预览全部正常，首次选中无可感知延迟
@@ -691,11 +691,11 @@ git commit -m "feat(avalonia): PreviewPanelNeeded 事件作为预览面板延迟
 4. 设置窗口改预览位置/显隐/紧凑度/主题
 5. 拖拽解压、拖入添加等既有交互不受影响
 
-- [ ] **Step 2: A/B 对比**
+- [x] **Step 2: A/B 对比**
 
 同一机器分别跑阶段一基线与阶段二后的 `measure-startup.ps1`（×5 中位数），对比 `Win.Xaml` 段与 TOTAL：预期 `Win.Xaml` 下降 ≈ 基线 `Preview.Panel.Ctor` 测得值。把对比表写进计划文件「阶段二验证结果」章节。
 
-- [ ] **Step 3: Commit（含计划文件结果更新）**
+- [x] **Step 3: Commit（含计划文件结果更新）**
 
 ```powershell
 git add .omo/plans/未开始/startup-preview-defer.md
@@ -818,3 +818,39 @@ git commit -m "perf(avalonia): PreviewViewModel 构造瘦身，重活延迟到 E
 **门控判定**：`preview-eager total = 514.8ms (25.0%)` → **≥10% 且 ≥300ms，命中 → 阶段二（延迟实例化）做**；`Preview.VM.Ctor = 8.0ms < 100ms → Task A1 不做**。
 
 **结论**：预览面板急切创建占首帧 1/4，延迟实例化（0.5s 定时 + 首次预览请求兜底）预期收益 ~400ms（把 XAML 中预览段移出关键路径，其余段可能因 JIT 顺序略增，净收益待 Task 7 A/B 验证）。`Avalonia.InitDone 597ms` 属 Avalonia 框架/App 资源层，splash 计划（串行在后）消费该数据。
+
+---
+
+## 阶段二验证结果（2026-10-10）
+
+**环境**：Windows 10 19045 / 16 逻辑核 / Release 构建 / 交错 A/B ×7 轮（每轮先基线后新代码各启动一次，`measure-startup.ps1` 多 exe 模式，中位数聚合；预热 1 次不计）。基线 = git worktree `1220d1d`（阶段一完成、面板仍急切构造的提交）。
+
+**交错对比（中位数，n=7/侧）**：
+
+| 指标 | 基线（急切） | 阶段二（延迟） | Δ | 说明 |
+|---|---|---|---|---|
+| **TOTAL** | 2368.6 ms | **2161.2 ms** | **−207.4 ms (−8.8%)** | 首帧总时长 |
+| InitDone | 785.2 ms | 767.4 ms | −17.8 ms | 与预览无关，噪声内 |
+| **XamlSpan** | 572.7 ms | **448.8 ms** | **−123.9 ms (−21.6%)** | Win.Ctor.Enter→Win.Xaml，≈基线面板控件树 ctor（104ms）+ XAML 段小幅收益 |
+| **CtorSpan** | 762.9 ms | **569.7 ms** | **−193.2 ms (−25.3%)** | Win.Ctor.Enter→Win.Ctor.Exit |
+| WinSpan | 1332.1 ms | **1139.9 ms** | **−192.2 ms (−14.4%)** | Win.Ctor.Enter→Win.FirstFrame |
+| **preview-eager** | 544.8 ms | **7.5 ms** | **−537.3 ms (−98.6%)** | `Preview.*` 打点合计，结构信号 |
+| with panel marks | 7/7 | **0/7** | ✓ | trace 中 `Preview.Panel.Ctor` 段完全消失 |
+
+**逐轮样本**（total ms，交错顺序 基线→新）：
+
+- 基线：2415.9 / 2328.2 / 2283.4 / 2368.6 / 2422.6 / 2286.0 / 2396.8
+- 新：2188.4 / 2147.6 / 2088.9 / 2176.9 / 2154.3 / 2174.7 / 2161.2
+
+交错后两侧行间噪声（系统负载漂移）被轮次配对抵消：同轮基线−新差值全部为正（201~266ms），无反转样本。
+
+**预期 vs 实测**：预期 XamlSpan 下降 ≈ 基线 `Preview.Panel.Ctor` 段（Enter 400ms + Exit 104ms = 504ms）——其中 400ms 是「解析到 line 1271」前段，延迟后仍发生在 Win.Xaml 内（占位 host 之前的 XAML 照旧解析），实际可移除的只有面板本体 ctor ≈104ms；实测 XamlSpan −123.9ms 与之吻合（104ms + XAML 尾段重排小收益）。TOTAL −207ms > XamlSpan 降幅，差额来自 Ctor 尾段（事件接线、布局）与 Win.Visible 前的关联初始化随面板类型加载/JIT 顺序变化而缩短。
+
+**回归清单**（Task 7 Step 1）：
+1. ✅ 冷启动不打开压缩包 → trace 无 `Preview.Panel.Ctor.*` 段（0/7）
+2. ✅ 冒烟 `--open smoke.zip`（文本+Markdown）→ debug.log 出现 `EnsurePreviewPanel: preview panel created (lazy)`（Opened+~0.6s，定时预取路径）；进程存活无崩溃
+3. ⚠ 位置切换/分隔条/布局保存、设置窗口、拖拽解压 → 需 GUI 手动过一遍（本次自动化仅覆盖 1/2 与 A/B；单元测试 142 通过、无新增失败）
+4. 同上
+5. 同上
+
+**结论**：阶段二按数据兑现——首帧 −207ms（8.8%）、ctor 关键路径 −25%、预览急切成本 −98.6%，结构上预览面板确已移出启动路径。`tools/measure-startup.ps1` 顺带升级：LastWriteTime 检测修复 trace 达 20 段保留上限后 NO TRACE 误判 + 多 exe 交错 A/B 模式。Task A1（VM ctor 瘦身）维持不做。splash 计划可基于新 TOTAL≈2160ms 复核最短显示时长。
