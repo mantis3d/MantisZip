@@ -3,7 +3,6 @@
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
         xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
-        xmlns:views="clr-namespace:MantisZip.UI.Avalonia.Views"
         x:Class="MantisZip.UI.Avalonia.Views.MainWindow"
          x:Name="ThisWindow"
          x:DataType="vm:MainWindowViewModel"
@@ -1267,11 +1266,15 @@
                     Height="4"
                     IsVisible="False" />
 
-      <!-- Preview area -->
-      <views:PreviewPanel x:Name="PreviewPanelHost"
-                          Grid.Column="4"
-                          IsVisible="{Binding IsPreviewVisible}"
-                          DataContext="{Binding Preview}" />
+      <!-- 预览占位 host：真正的 PreviewPanel 由 EnsurePreviewPanel 在首帧后延迟创建并填充（启动提速，
+           把 855 行预览控件树挪出启动关键路径）。IsVisible 绑定 MainWindowViewModel.IsPreviewVisible
+           （菜单勾选态；原面板级绑定经 DataContext=Preview 解析到 PreviewViewModel.IsPreviewVisible，
+           语义不同——原面板内部 Show* 置 true 的内容驱动逻辑保持在面板内部不变）。 -->
+      <ContentControl x:Name="PreviewPanelHost"
+                      Grid.Column="4"
+                      IsVisible="{Binding IsPreviewVisible}">
+        <!-- PreviewPanel 由 code-behind 的 EnsurePreviewPanel 填充 -->
+      </ContentControl>
 
       <!-- 拖拽添加覆层（DragOver 悬停期间显示：覆盖文件列表列，视觉对齐拖拽解压覆层——
             状态色背景呼吸透明 alpha 40-120、8px 同色不透明边框、白色粗体文字+阴影、✓/⚠ 状态图标。

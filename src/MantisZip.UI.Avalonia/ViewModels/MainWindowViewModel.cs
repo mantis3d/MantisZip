@@ -326,6 +326,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     public PreviewViewModel Preview { get; } = new();
 
+    /// <summary>预览面板控件树需要就绪（首次预览请求兜底触发；View 侧订阅 EnsurePreviewPanel）。</summary>
+    public event Action? PreviewPanelNeeded;
+
     [ObservableProperty]
     private string _title = "MantisZip";
 

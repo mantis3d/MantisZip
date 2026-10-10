@@ -54,6 +54,9 @@ public partial class MainWindow : Window
     /// <summary>预览面板显隐（与 AppSettings.ShowPreviewPanel 同步；false 时压缩占位行列，树/列表撑满）</summary>
     private bool _previewPanelEnabled = true;
 
+    /// <summary>预览面板是否已延迟创建（EnsurePreviewPanel 幂等标记）。</summary>
+    private bool _previewPanelCreated;
+
     /// <summary>拖拽添加覆层呼吸动画计时器（100ms tick，正弦 alpha 40-120，与拖拽解压 OverlayController 参数一致）</summary>
     private readonly DispatcherTimer _dragAddOverlayTimer;
 
@@ -651,6 +654,36 @@ public partial class MainWindow : Window
         Services.StartupTimer.Mark("Win.Ctor.Exit");
         // 首帧打点 + flush 启动 trace（一次性）
         Opened += OnStartupOpened;
+
+        // 预览面板延迟创建：首帧后 0.5s 定时预取（把控件树构造挪出启动与打开压缩包关键路径）；
+        // 0.5s 内即发生预览请求时由 vm.PreviewPanelNeeded 兜底同步创建。
+        Opened += (_, _) => DispatcherTimer.RunOnce(
+            () => Dispatcher.UIThread.Post(EnsurePreviewPanel, DispatcherPriority.Background),
+            TimeSpan.FromMilliseconds(500));
+        vm.PreviewPanelNeeded += EnsurePreviewPanel;
+    }
+
+    /// <summary>
+    /// 延迟创建预览面板控件树（启动时 XAML 仅保留占位 host，855 行控件树不再计入启动关键路径）。
+    /// 幂等；构造异常时清理半成品 Content 且 flag 不置位，允许兜底路径重试。
+    /// </summary>
+    private void EnsurePreviewPanel()
+    {
+        if (_previewPanelCreated) return;
+        _previewPanelCreated = true; // 先置位防重入（构造中再触发直接返回）
+        try
+        {
+            if (DataContext is not MainWindowViewModel vm) { _previewPanelCreated = false; return; }
+            var panel = new PreviewPanel { DataContext = vm.Preview };
+            PreviewPanelHost.Content = panel;
+            App.DebugLog("EnsurePreviewPanel: preview panel created (lazy)");
+        }
+        catch (Exception ex)
+        {
+            _previewPanelCreated = false;
+            PreviewPanelHost.Content = null; // 清理半成品
+            App.DebugLog($"EnsurePreviewPanel failed: {ex.Message}");
+        }
     }
 
     /// <summary>
