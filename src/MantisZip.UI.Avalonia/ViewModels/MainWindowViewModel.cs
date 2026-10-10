@@ -1419,6 +1419,7 @@ public partial class MainWindowViewModel : ObservableObject
         // Phase 1: Immediate — show loading state + populate info panel from in-memory data.
         // This runs synchronously before any async extraction, so user never sees stale content.
         var version = Interlocked.Increment(ref _previewLoadVersion);
+        PreviewPanelNeeded?.Invoke(); // 兜底：面板未建好时同步创建（幂等，View 侧 EnsurePreviewPanel）
         Preview.StopGifTimer();
         Preview.ShowLoading(entry.NameDisplay ?? entry.Name);
         Preview.UpdateCommonMetadata(
