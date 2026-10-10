@@ -1,6 +1,6 @@
 # 进度窗口详细模式通道信息增强（信息列 + 常显 + 两列路径 + 底纹修复）
 
-> **状态**: 📋 设计已确认 + 任务分解已生成（2026-10-08），待实施
+> **状态**: 📋 设计已确认 + 任务分解已生成（2026-10-08；2026-10-09 设计修订 v2 + 评审修订 P1–P5 已合入任务文本），待实施
 >
 > **For agentic workers:** 本文档是设计规格 + 完整任务分解（澄清 5 问 + Rule 0 补问已定稿，见「已确认设计决策」；文末「任务分解」含 8 任务 checkbox 步骤）。执行时使用 superpowers:subagent-driven-development 或 superpowers:executing-plans。
 
@@ -46,10 +46,10 @@
 
 ### Research Findings
 
-- **`IsDetailedAvailable`（详细门禁，继承自旧计划）分布**：XAML `ProgressWindow.axaml:270`(注释)/`:288`(`IsVisible="{Binding IsDetailedAvailable}"`)；VM `ProgressViewModel.cs:231`（`_parallelBatchItems.Count > 0`）、通知 `:143`/`:316`（`NotifyDisplayProperties:311-322` 经 ContentMode/InfoDensity setter `:199-210` 调用）；门禁回落约 `SetCurrentBatchItem:934-936`（详细模式且集合空 → 回退 Simple）；测试 `ProgressViewModelTests.cs:160-166` 断言该回落（门禁移除后必改）。grep 确认测试中无其他 `IsDetailedAvailable` 引用。
-- **`UpsertParallelBatch`**（`ProgressViewModel.cs:690-714`）：Percent 钳制写入、`FileRatio = FilePercentComplete/100`、CurrentFile 保持、StatusBrushName、DetailText（`T("Progress_Batch_FilesProgress")`）、自动切详细守卫 `:712`（保留）。
-- **`SetProgress:516`**：`EndPreparing` → `:524` BatchIndex upsert → `:529` EntryStatus 早返回 → `:541-550` `SplitFilePath` → `:553` 批次总进度。
-- **批次行 XAML**（`ProgressWindow.axaml`，**改造前现状**，任务 5/6 将重构为左右分组）：列 `Auto,*,*,Auto,Auto`（批次序号 | 当前文件 | 批级进度条 | 百分比 | 明细）；内层 Grid `:383`；底纹 Rectangle `:386-396` 绑 `Bounds.Width` + `RelativeSource AncestorType=ContentPresenter`（bug：ContentPresenter 是整行容器，应取内层 Grid）；批进度条 `:407`；窗口 `Width=560`（`:7`）。
+- **`IsDetailedAvailable`（详细门禁，继承自旧计划）分布**（行号已于 2026-10-09 评审时校准）：XAML `ProgressWindow.axaml:272`(注释)/`:290`(`IsVisible="{Binding IsDetailedAvailable}"`)；VM `ProgressViewModel.cs:230-231`（`_parallelBatchItems.Count > 0`）、通知 `:143`（CollectionChanged 处理器内）/`:342`（`NotifyDisplayProperties:337-348` 经 ContentMode/InfoDensity/ParallelDegree setter `:199-210` 调用）；门禁回落 `SetCurrentBatchItem:998-999`（详细模式且集合空 → 回退 Simple）；测试 `ProgressViewModelTests.cs:161-166`（**嵌于 `ContentMode_ExposesThreeModes` 尾部**，非独立测试）断言该回落（门禁移除后必改）。grep 确认测试中无其他 `IsDetailedAvailable` 引用。
+- **`UpsertParallelBatch`**（`ProgressViewModel.cs:717-741`）：Percent 钳制写入、`FileRatio = FilePercentComplete/100`、CurrentFile 保持、StatusBrushName、DetailText（`T("Progress_Batch_FilesProgress")`）、自动切详细守卫 `:739`（保留）。
+- **`SetProgress:540`**：`EndPreparing`(:543) → `:548` BatchIndex upsert → `:553` EntryStatus 早返回 → `:566-575` `SplitFilePath` → `:577` 批次总进度。
+- **批次行 XAML**（`ProgressWindow.axaml`，**改造前现状**，任务 5/6 将重构为左右分组）：列 `Auto,*,*,Auto,Auto`（批次序号 | 当前文件 | 批级进度条 | 百分比 | 明细）；内层 Grid `:385`；底纹 Rectangle `:388-398` 绑 `Bounds.Width` + `RelativeSource AncestorType=ContentPresenter`（`:395`，bug：ContentPresenter 是整行容器，应取内层 Grid）；批进度条 `:409`；窗口 `Width=560`（`:7`）。
 - **`ParallelBatchProgressItem.cs`**（30 行）：Index(init)/Percent/StatusBrushName/DetailText/CurrentFile/FileRatio（本计划追加 IsParallel/DirectoryText/FileNameText/FileSizeText/PctDetailText/InfoText/BatchRatio/TooltipText，见任务 4）。
 - **`ArchiveProgress`**（`ArchiveEngine.cs:318-354`）：CurrentFile/TotalBytes/ProcessedBytes/TotalFiles/ProcessedFiles/PercentComplete/FilePercentComplete/BatchIndex/BatchCount/SkippedFiles/FailedFiles/OverwrittenFiles/BatchPercentComplete/BatchProcessedFiles/BatchTotalFiles/EntryKey/EntryStatus —— 待加 4 字段。
 - **ZipEngine 填充点**：批次字节变量 `batchTotalBytes`（`:541` sync / `:1058` async）、`batchProcessedBytes`（`:543` / `:1060`）；并行报告 `:640-654`/`:1156-1170`、批次完成 `:719-731`/`:1236-1249`；串行提取 `:376-385`；异步提取 `:1143-1162`；串行 ZipWriter 节流报告 `:1748-1761` + `ReadFileWithRetry` 内 `:3273-3280`（均缺 TotalBytes/ProcessedBytes，唯一调用点 `:1735`）；`CompressGroupWithSevenZip:3481`（mt 设置 `:3507`、站点 `:3553`/`:3603`/`:3662`、mirror copy fileLen `:3651-3654`、7z 事件 FilePercentComplete=null、`pendingEntryKeys` FIFO `:3516`）；N 组 adapter `:1516-1541` 与 `:2459-2483`（已核实两处均漏拷 `FilePercentComplete`）。
@@ -84,13 +84,13 @@
 
 > 注：本决策推翻的是**旧计划的「详细模式可用性门禁」**（原 `IsDetailedAvailable`：无并行数据即隐藏「详细」），与该门禁的旧编号 D6 同名仅属继承标签，**非本文件 D6**（本文件 D6 已改为「合并百分比+明细」，见下）。
 
-- 移除 `IsDetailedAvailable`（属性 `:231`、两处通知 `:143`/`:316`、XAML `:288` + 注释 `:270/:285`、`SetCurrentBatchItem:934-936` 回落、测试 `:160-166` 重写）；「详细」单选按钮不再受可用性门禁。
-- 非并行（`BatchIndex` 为 null）时，VM 在 `SetProgress`（`:529` EntryStatus 早返回之后、`:541` 路径拆分之前）合成单条 `ParallelBatchProgressItem`（`IsParallel=false`）并 upsert 进集合，复用批次行样式：
+- 移除 `IsDetailedAvailable`（属性 `:230-231`、两处通知 `:143`（CollectionChanged 处理器内——**不删整段**，该行改为调用 `NotifyChannelProperties()`，见 4b/4f P1 修订）/`:342`（`NotifyDisplayProperties` 内，删除）、XAML `:290` + 注释 `:272`、`SetCurrentBatchItem:998-999` 回落、测试 `:161-166`（嵌于 `ContentMode_ExposesThreeModes` 尾部）重写）；「详细」单选按钮不再受可用性门禁。
+- 非并行（`BatchIndex` 为 null）时，VM 在 `SetProgress`（`:553` EntryStatus 早返回之后、`:566` 路径拆分之前）合成单条 `ParallelBatchProgressItem`（`IsParallel=false`）并 upsert 进集合，复用批次行样式：
   - 隐藏：批次序号、批明细（`DetailText`，文件个数分数）；**保留**右区百分比（`PctDetailText` 仅 `45%` 无括注）与批次底纹——单行时二者 = 整体进度（`PercentComplete`），是有效信息。
   - 压缩通道说明行（`IsCompressFlow`）：绑定改为「压缩流程 **且** 有并行通道」（D8 `HasParallelChannel`）——单行即无并行通道，说明行无意义。
   - 进度表达：左区文件底纹（`FileRatio`）+ 右区批次底纹（整体 `Percent`）+ 信息列数字。
-  - 注意：`ProgressWindowXamlTests:110-149` 断言非并行时 `ParallelBatchItems` 空集合——该等价断言改测「无批次数据时区分单行与批次行」：新增字段 `IsParallel`（批次行 true / 单行 false），测试改为断言 `ParallelBatchItems` 中所有项 `IsParallel == false` 或数量≤1（语义保留「不伪装并行批次」）。
-- 保留 Task 6 并行自动切详细（`UpsertParallelBatch:712`）。
+  - 注意：`ProgressWindowXamlTests.cs:110-124`（`SetProgress_WithoutBatchIndex_KeepsParallelRowsHidden`，断言 `Assert.False(vm.HasParallelBatches)` + `Assert.Empty(vm.ParallelBatchItems)`）在单行合成落地后**必红**——该等价断言改测「无批次数据时区分单行与批次行」：新增字段 `IsParallel`（批次行 true / 单行 false），测试改为断言 `ParallelBatchItems` 中所有项 `IsParallel == false` 或数量≤1（语义保留「不伪装并行批次」）；同文件 `:128-149`（`SetProgress_WithBatchIndex_PopulatesParallelRows`）不受影响（BatchIndex 驱动，全部 IsParallel=true）。
+- 保留 Task 6 并行自动切详细（`UpsertParallelBatch:739` 守卫）。
 - `HasParallelBatches:244`（`_parallelBatchItems.Count > 0`）语义**不足以**区分「有并行通道」——单行也会进入该集合使其为 true。新增派生属性 `HasParallelChannel`（`_parallelBatchItems.Any(x => x.IsParallel)`，D8），实施任务 4 时 grep 全部 `HasParallelBatches` 引用按语义替换。
 
 ### D3 路径两列（目录中间省略 + 文件名恒完整）
@@ -102,7 +102,7 @@
 
 ### D4 底纹双缺陷修复
 
-- **几何**：`ProgressWindow.axaml` 底纹 Rectangle 的 `MultiBinding` 第二输入由 `RelativeSource AncestorType=ContentPresenter`（整行宽度）改为最近 `Grid`（文件名格内层 Grid `:383`），内层 Grid 加 `ClipToBounds="True"`。**右区批次底纹同理**（容器取右区自身 Grid + `ClipToBounds`）。
+- **几何**：`ProgressWindow.axaml` 底纹 Rectangle 的 `MultiBinding` 第二输入由 `RelativeSource AncestorType=ContentPresenter`（整行宽度，`:395`）改为最近 `Grid`（文件名格内层 Grid `:385`），内层 Grid 加 `ClipToBounds="True"`。**右区批次底纹同理**（容器取右区自身 Grid + `ClipToBounds`）。
 - **漏拷**：`ZipEngine.cs` N 组 adapter `:1516-1541` 与 `:2459-2483` 两处 `new ArchiveProgress` 补上 `FilePercentComplete = local.FilePercentComplete`（及新增的 4 字段，见任务 3）。
 - 解压实测已完成：不再单独做「复现→排查」，几何修复后直接进入五场景 GUI 验收（D11 变更清单 ②）。
 
@@ -114,7 +114,7 @@
 
 ### D6 合并百分比 + 明细、不加列标题
 
-- 原独立「百分比列」（`Percent` → `45%`）与「批明细列」（`DetailText` → `12/40 文件`）**合并为单字段** `PctDetailText`：格式 `45% (12/40)`（进度优先、分数括注）；单行时仅 `45%`。
+- 原独立「百分比列」（`Percent` → `45%`）与「批明细列」（`DetailText` → `12/40 文件`）**合并为单字段** `PctDetailText`：格式 `45% (12/40)`（进度优先、分数括注）；单行时仅 `45%`；**`BatchProcessedFiles`/`BatchTotalFiles` 任一为 null 时退化为仅 `45%`**（P5：禁显 `45% (0/0)`）。
 - **不加列标题**：左右分组本身即语义分区（左=文件、右=批次），进度窗口为瞬态 UI，加标题徒增噪音且需 6+ i18n key；用户困惑由 ToolTip（D7）兜底。
 
 ### D7 ToolTip（悬停右区解释字段）
@@ -127,7 +127,7 @@
 
 - 非并行单行（`IsParallel=false`）隐藏：批次序号、批明细；**保留**右区百分比（=整体进度）与批次底纹（=整体进度）。
 - 压缩通道说明行：`IsCompressFlow && HasParallelChannel` → 单行时不显示。
-- 新增派生属性 `HasParallelChannel => _parallelBatchItems.Any(x => x.IsParallel)`（走 `NotifyDisplayProperties` 集中通知）；实施任务 4 时 grep `HasParallelBatches` 全部引用点，按语义决定替换为 `HasParallelChannel`（并行专属 UI）或保留（批次列表区显示）。
+- 新增派生属性 `HasParallelChannel => _parallelBatchItems.Any(x => x.IsParallel)`（走**新增的 `NotifyChannelProperties()` 集中通知**——P1：CollectionChanged 与 `NotifyDisplayProperties` 均须触发，见 4f）；实施任务 4 时 grep `HasParallelBatches` 全部引用点，按语义决定替换为 `HasParallelChannel`（并行专属 UI）或保留（批次列表区显示）。
 - 实现：XAML 元素直接 `IsVisible="{Binding IsParallel}"`（正向绑，无需反转转换器）。
 
 ### D9 双底纹机制（file vs batch）
@@ -196,7 +196,7 @@
 - **不得**新增信息列相关 i18n key（信息列纯符号/数值）；**唯一豁免**：ToolTip 的 3 个标签 key（D7）。
 - **不得**把非并行场景伪装成多批次（`IsParallel=false` 单行，数量恒 1）。
 - **不得**改 `ArchiveProgress` 既有字段语义（只加字段）；`ConflictStats.ApplyTo` 不丢新字段（已核实原地改）。
-- **不得**破坏并行自动切详细（`UpsertParallelBatch:712` 保留）。
+- **不得**破坏并行自动切详细（`UpsertParallelBatch:739` 守卫保留）。
 - **不得**混入 stats-cards 改动（行号漂移来源，先后落地）。
 - 版本号不变（规则 2）。
 
@@ -253,7 +253,7 @@ Wave 3（VM 语义）
 
 Wave 4（UI 布局，同 XAML 文件需顺序）
 ├── 任务 5: 左区（目录/文件名两列 + 中间省略 + 文件大小）（Blocked By: 4）
-└── 任务 6: 右区（批次底纹化 + 合并百分比 + 信息列 + ToolTip）+ 单行隐藏规则（Blocked By: 4）
+└── 任务 6: 右区（批次底纹化 + 合并百分比 + 信息列 + ToolTip）+ 单行隐藏规则（Blocked By: 4, 5）
 
 Wave FINAL
 ├── 任务 7: 构建 + 双测试套 + GUI 五场景验收（Blocked By: 1–6）
@@ -266,9 +266,9 @@ Wave FINAL
 
   **What to do**:
 
-  (1a) `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml` 底纹 Rectangle 所在内层 Grid（约 `:383`）上加 `ClipToBounds="True"`。
+  (1a) `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml` 底纹 Rectangle 所在内层 Grid（`:385`）上加 `ClipToBounds="True"`。
 
-  (1b) 同区块 `MultiBinding`（约 `:392-393`）第二输入：
+  (1b) 同区块 `MultiBinding`（`:394-395`）第二输入：
 
   ```xml
   <!-- 改前（错误：取整行宽度的 ContentPresenter） -->
@@ -277,7 +277,7 @@ Wave FINAL
   <Binding Path="Bounds.Width" RelativeSource="{RelativeSource AncestorType=Grid}" />
   ```
 
-  内层 Grid 是 Rectangle 直接父容器（约 `:383`-`:404`），`AncestorType=Grid` 即该格自身；外层整行 Grid 不受影响。
+  内层 Grid 是 Rectangle 直接父容器（`:385`-`:406`），`AncestorType=Grid` 即该格自身；外层整行 Grid 不受影响。
 
   (1c) 在内层 Grid 起始标签补一行中文注释：
 
@@ -330,10 +330,10 @@ Wave FINAL
   - 异步提取 `:1156-1170`：同并行解压，变量为 async 版 `batchProcessedBytes(:1060)`/`batchTotalBytes(:1058)`。
   - 串行提取 `:376-385`：`FileTotalBytes = entrySize`；`BatchProcessedBytes = processedBytes + entryProcessed`；`BatchTotalBytes = totalBytes`；`CompressionRatio = null`。
   - 异步解压 `:1143-1162`：同串行提取口径。
-  - 串行 ZipWriter 节流报告 `:1748-1761`：补 `TotalBytes = totalBytes`、`ProcessedBytes = processedBytes + entryProcessed`；`FileTotalBytes = entryTotalBytes`（循环内当前文件总长）；`BatchProcessedBytes = processedBytes + entryProcessed`、`BatchTotalBytes = totalBytes`；`CompressionRatio = TryGetOutputRatio(fsOut, processedBytes + entryProcessed)`。
-  - `ReadFileWithRetry` 内报告 `:3273-3280`：补 `TotalBytes`/`ProcessedBytes`（需向方法签名透传或让调用点 `:1735` 后的站点覆盖——优先：给 `ReadFileWithRetry` 增加 `totalFiles` 已有，再加 `fsOut`/输出长度源参数，内部报告填同口径字段与压缩率）。
-  - N 组 adapter 两处（任务 2 已补 `FilePercentComplete`）：再补 `FileTotalBytes = local.FileTotalBytes`、`BatchProcessedBytes = localDone`、`BatchTotalBytes = groupTotal`、`CompressionRatio = TryGroupOutputRatio(tempZipPath, localDone)`。
-  - `CompressGroupWithSevenZip:3481` 站点 `:3553`/`:3603`/`:3662`：`BatchProcessedBytes = doneBytes`、`BatchTotalBytes = totalBytes`、`FileTotalBytes = pendingEntryKeys.Peek=当前文件 size`（FIFO 有条目时取，空则 0）；`CompressionRatio`：若 temp 输出路径可用（mirror `:3651` 时 tempPath）则 `FileInfo.Length/localDone*100`，try/catch → null。
+  - 串行 ZipWriter 节流报告 `:1748-1761`（该站点仅在节流窗口触发、报告刚完成的文件）：补 `TotalBytes = totalBytes`、`ProcessedBytes = processedBytes`（ReadFileWithRetry 已把本文件计入，**无 `entryProcessed` 局部变量**）；`FileTotalBytes = new FileInfo(fullPath).Length`（**无 `entryTotalBytes` 变量**，需现取）；`BatchProcessedBytes = processedBytes`、`BatchTotalBytes = totalBytes`；`CompressionRatio = TryStreamOutputRatio(fsOut, processedBytes)`（`fsOut` 在该作用域可见）。
+  - `ReadFileWithRetry` 内报告 `:3273-3280`（P4）：补 `TotalBytes = totalBytes`、`ProcessedBytes = processedBytes`（ref 参数直接可用）、**`FileTotalBytes = fiLen`**（`:3257` 作用域内 `var fiLen = fi.Length`）、`BatchProcessedBytes = processedBytes`、`BatchTotalBytes = totalBytes`；压缩率需给方法签名追加 `Stream? fsOut` 参数（调用点 `:1735` 传入，分卷 `SplitOutputStream.Length` 抛异常由 helper 捕获 → null），内部报告填 `CompressionRatio = TryStreamOutputRatio(fsOut, processedBytes)`。
+  - N 组 adapter 两处（任务 2 已补 `FilePercentComplete`）：再补 `FileTotalBytes = local.FileTotalBytes`、`BatchProcessedBytes = localDone`、`BatchTotalBytes = groupTotal`、`CompressionRatio = TryFileOutputRatio(tempZipPath, localDone)`（**笔误订正：helper 名为 `TryFileOutputRatio`**，3c 定义，不存在 `TryGroupOutputRatio`）。
+  - `CompressGroupWithSevenZip:3481` 站点 `:3553`/`:3603`/`:3662`：`BatchProcessedBytes = doneBytes`、`BatchTotalBytes = totalBytes`、`FileTotalBytes = pendingEntryKeys.Peek=当前文件 size`（FIFO 有条目时取，空则 0）；`CompressionRatio`：若 temp 输出路径可用（mirror `:3651` 时 tempPath）则 `FileInfo.Length/localDone*100`，try/catch → null。**注**：本方法 `ArchiveFormat = OutArchiveFormat.Zip`（`:3498`）——压的是 ZIP 格式（借 7z.dll 加速），**不是 7z 格式**，故压缩率可填，与「7z 格式压缩置 null」口径不矛盾。
 
   (3c) 辅助方法（放 `ZipEngine.cs` 私有静态）：
 
@@ -371,7 +371,7 @@ Wave FINAL
 
   **What to do**:
 
-  (4a) 写失败测试 —— `tests/MantisZip.UI.Avalonia.Tests/ProgressViewModelTests.cs` 现有门禁测试（`:160-166`）后改写为：
+  (4a) 写失败测试 —— `tests/MantisZip.UI.Avalonia.Tests/ProgressViewModelTests.cs` 现有门禁断言（`:161-166`，**嵌于 `ContentMode_ExposesThreeModes` 尾部**，非独立测试）后改写为：
 
   ```csharp
   // 详细门禁已移除（2026-10-09 方案）：SetCurrentBatchItem 不再回落 ContentMode；
@@ -421,9 +421,31 @@ Wave FINAL
       });
       Assert.True(vm.ParallelBatchItems[0].IsParallel);
   }
+
+  // P1 回归：预选详细模式下，首个并行行到达必须通知 HasParallelChannel
+  // （防 CollectionChanged 只通知 HasParallelBatches 的通知缺口，见 4f）
+  [AvaloniaFact]
+  public void ParallelBatchRowAdded_RaisesHasParallelChannelNotification()
+  {
+      var vm = new ProgressViewModel();
+      vm.ContentMode = ProgressContentMode.Detailed;   // 预选详细（门禁已移除，允许）
+      var raised = false;
+      vm.PropertyChanged += (_, e) =>
+      {
+          if (e.PropertyName == nameof(ProgressViewModel.HasParallelChannel)) raised = true;
+      };
+      vm.SetProgress(new ArchiveProgress
+      {
+          CurrentFile = "a.txt",
+          BatchIndex = 0,
+          BatchCount = 2,
+          BatchPercentComplete = 10,
+      });
+      Assert.True(raised);
+  }
   ```
 
-  运行确认编译级红（`IsParallel`/`DirectoryText`/`FileNameText`/`FileSizeText`/`InfoText` 尚不存在）：
+  运行确认编译级红（`IsParallel`/`DirectoryText`/`FileNameText`/`FileSizeText`/`InfoText`/`HasParallelChannel` 尚不存在）：
 
   ```powershell
   dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj --filter "FullyQualifiedName~ProgressViewModelTests"
@@ -432,16 +454,18 @@ Wave FINAL
   (4b) 移除门禁代码 —— `ProgressViewModel.cs`：
 
   - 删除 `IsDetailedAvailable` 属性（`:230-231` 含注释）。
-  - 删除通知点：CollectionChanged 处理器内 `OnPropertyChanged(nameof(IsDetailedAvailable));`（`:143`）、`NotifyDisplayProperties` 内同名行（`:316`）。
-  - 删除 `SetCurrentBatchItem` 内回落（`:934-936` 的 `if (_contentMode == ProgressContentMode.Detailed && _parallelBatchItems.Count == 0) ContentMode = ProgressContentMode.Simple;`）。
+  - **P1 通知链重接（不整删）**：CollectionChanged 处理器内 `:143` 的 `OnPropertyChanged(nameof(IsDetailedAvailable));` —— 删除该行但**同一位置改调 `NotifyChannelProperties()`**（4f 新增），否则首个并行行到达时 `HasParallelChannel` 无通知；`NotifyDisplayProperties:342` 内同名行删除（4f 会改为调 `NotifyChannelProperties()`，由其覆盖）。
+  - 删除 `SetCurrentBatchItem` 内回落（`:998-999` 的 `if (_contentMode == ProgressContentMode.Detailed && _parallelBatchItems.Count == 0) ContentMode = ProgressContentMode.Simple;`）。
 
-  (4c) XAML 移除门禁绑定 —— `ProgressWindow.axaml`：模式单选区注释 `:270`/`:285` 改为描述「始终显示三模式」；`:288` 的 `IsVisible="{Binding IsDetailedAvailable}"` 删除。
+  (4c) XAML 移除门禁绑定 —— `ProgressWindow.axaml`：模式单选区注释 `:272` 改为描述「始终显示三模式」；`:290` 的 `IsVisible="{Binding IsDetailedAvailable}"` 删除。
 
-  (4d) 单行合成 —— `ProgressViewModel.cs` `SetProgress`（`:529` EntryStatus 早返回之后、`:541` SplitFilePath 之前插入）：
+  (4d) 单行合成 —— `ProgressViewModel.cs` `SetProgress`（`:553` EntryStatus 早返回之后、`:566` SplitFilePath 之前插入）：
 
   ```csharp
       // 非并行报告（无 BatchIndex 且非逐条目终态）：合成/更新单条通道行（IsParallel=false），复用批次行样式。
-      if (p.BatchIndex == null && p.EntryKey == null)
+      // 防御条件：已有并行行时不落单行（并行/非并行报告在切换瞬间可能交错）。
+      if (p.BatchIndex == null && p.EntryKey == null
+          && !_parallelBatchItems.Any(x => x.IsParallel))
       {
           UpsertSingleChannelRow(p);
       }
@@ -481,20 +505,21 @@ Wave FINAL
       return string.Join(" · ", parts);
   }
 
-  /// <summary>右区 ToolTip：进度 / 字节 / 压缩率（压缩率缺省则省略该行）。</summary>
+  /// <summary>右区 ToolTip：进度 / 字节 / 压缩率（缺段省略行，规则 6；字节行与 BuildInfoText 同守卫，防 0/0 显示）。</summary>
   private static string BuildTooltipText(ArchiveProgress p)
   {
       var lines = new List<string>
       {
           $"{LocalizationManager.T("Progress_Tooltip_Progress")}: {Math.Round(p.PercentComplete)}%",
-          $"{LocalizationManager.T("Progress_Tooltip_Bytes")}: {FormatUtil.FormatSize(p.BatchProcessedBytes)}/{FormatUtil.FormatSize(p.BatchTotalBytes)}",
       };
+      if (p.BatchTotalBytes > 0)
+          lines.Add($"{LocalizationManager.T("Progress_Tooltip_Bytes")}: {FormatUtil.FormatSize(p.BatchProcessedBytes)}/{FormatUtil.FormatSize(p.BatchTotalBytes)}");
       if (p.CompressionRatio is { } r) lines.Add($"{LocalizationManager.T("Progress_Tooltip_Ratio")}: {r:0.#}%");
       return string.Join("\n", lines);
   }
   ```
 
-  `UpsertParallelBatch`（`:690-714`）内同步填充同名新字段：`DirectoryText`/`FileNameText`（`SplitFilePath` + `MiddleEllipsis`）、`FileSizeText`、`InfoText`（`BuildInfoText`）、`TooltipText`；`BatchRatio = Percent/100`；`PctDetailText = $"{Percent:0}% ({doneFiles}/{totalFiles})"`（文件个数分数）；新行上标 `IsParallel = true`。
+  `UpsertParallelBatch`（`:717-741`）内同步填充同名新字段：`DirectoryText`/`FileNameText`（`SplitFilePath` + `MiddleEllipsis`）、`FileSizeText`、`InfoText`（`BuildInfoText`）、`TooltipText`；`BatchRatio = Percent/100`；`PctDetailText`：**`BatchProcessedFiles`/`BatchTotalFiles` 均非 null 时** `"{Percent:0}% ({doneFiles}/{totalFiles})"`（文件个数分数），**任一为 null 时退化为 `"{Percent:0}%"`**（P5：禁显 `45% (0/0)`）；新行上标 `IsParallel = true`（init-only，须在对象初始化器/`Add` 前设置）。
 
   (4e) `ParallelBatchProgressItem.cs` 追加字段（`[ObservableProperty]`，与 `Percent`/`DetailText` 一致；`IsParallel` 行创建后不变用 init）：
 
@@ -520,17 +545,32 @@ Wave FINAL
   /// <summary>右区：批次底纹比例 0-1（= Percent/100）。</summary>
   [ObservableProperty] private double _batchRatio;
 
-  /// <summary>右区：ToolTip 文本（VM 拼好，\n 分隔）。</summary>
-  [ObservableProperty] private string _tooltipText = "";
+  /// <summary>右区：ToolTip 文本（VM 拼好，\n 分隔；null = 无 ToolTip）。</summary>
+  [ObservableProperty] private string? _tooltipText;
   ```
 
-  注意：`IsParallel` 为普通 init 属性；其余均为 `[ObservableProperty]`（与 `Percent`/`DetailText` 通知一致）。
+  注意：`IsParallel` 为普通 init 属性；其余均为 `[ObservableProperty]`（与 `Percent`/`DetailText` 通知一致）。**`TooltipText` 用 `string?` 初始 null**（P9）——Avalonia 对空串 `ToolTip.Tip` 仍可能弹出空白浮层，null 才保证不弹；XAML 绑定无需转换器（null 即不显示 ToolTip）。
 
-  (4f) `HasParallelChannel` 派生属性：`public bool HasParallelChannel => _parallelBatchItems.Any(x => x.IsParallel);`，在 `NotifyDisplayProperties` 追加 `OnPropertyChanged(nameof(HasParallelChannel));`。实施时 grep `HasParallelBatches` 全部引用点，按语义决定替换（并行专属 UI 用 `HasParallelChannel`；批次列表区显示保留原属性）。
+  (4f) `HasParallelChannel` 派生属性 + 通知机制（P1 核心）：
 
-  (4g) 清空语义：`InitBatchMode:881` 与 `SetCurrentBatchItem:931` 的 `_parallelBatchItems.Clear()` 不变（单行随批次切换重置）。`HasParallelBatches` 语义维持「集合非空」。
+  ```csharp
+  /// <summary>存在真实并行批次行（区别于 HasParallelBatches 的“集合非空”——单行也会使其为 true）。</summary>
+  public bool HasParallelChannel => _parallelBatchItems.Any(x => x.IsParallel);
 
-  (4h) 验证：`dotnet build` → 0 错误；`dotnet test tests\MantisZip.UI.Avalonia.Tests` → 新测试绿 + 既有门禁语义相关断言全绿（`ProgressWindowBatchLogicTests:485-531` 不受影响，其操作的仍是 BatchIndex 驱动的行）。
+  /// <summary>通道派生属性集中通知（P1）：CollectionChanged 与 NotifyDisplayProperties 均调用本方法，
+  /// 保证“首个并行行到达”与“用户切换模式/并行度”两种路径都能刷新 HasParallelChannel/ShowCompressChannelHint。</summary>
+  private void NotifyChannelProperties()
+  {
+      OnPropertyChanged(nameof(HasParallelChannel));
+      OnPropertyChanged(nameof(ShowCompressChannelHint));
+  }
+  ```
+
+  接线两处：① CollectionChanged 处理器内（原 `IsDetailedAvailable` 通知位置 `:143`）；② `NotifyDisplayProperties`（`:337-348`）内追加调用。`ShowCompressChannelHint` 定义见 6d（其通知并入本方法 + `partial void OnIsCompressFlowChanged`）。实施时 grep `HasParallelBatches` 全部引用点，按语义决定替换（并行专属 UI 用 `HasParallelChannel`；批次列表区显示保留原属性）。
+
+  (4g) 清空语义：`InitBatchMode:944` 与 `SetCurrentBatchItem:994` 的 `_parallelBatchItems.Clear()` 不变（单行随批次切换重置）。`HasParallelBatches` 语义维持「集合非空」。
+
+  (4h) 验证：`dotnet build` → 0 错误；`dotnet test tests\MantisZip.UI.Avalonia.Tests` → 新测试绿（**注意**：`ProgressWindowBatchLogicTests:485-531` 位于 `tests/MantisZip.Tests/` 工程，需跑第二套 `dotnet test tests\MantisZip.Tests` 覆盖——其操作的仍是 BatchIndex 驱动的行，预期不受影响）。
 
 - [ ] 5. 左区（目录/文件名两列 + 中间省略 + 文件大小）（`ProgressDisplayCalculator` + XAML 模板）
 
@@ -579,7 +619,7 @@ Wave FINAL
 
   运行确认三条在实现前失败（方法不存在即编译级红），实现后绿。
 
-  (5d) `ProgressWindow.axaml` 通道行模板改为**左右分组**结构（外层 Grid 见任务 6）。本任务先落**左区**（原单格 `:383-404` 整段替换）：目录列（中间省略，根文件隐藏）+ 文件名列（恒完整，底纹随字节进度）+ 文件大小。
+  (5d) `ProgressWindow.axaml` 通道行模板改为**左右分组**结构（外层 Grid 见任务 6）。本任务先落**左区**（原单格 `:385-406` 整段替换）：目录列（中间省略，根文件隐藏）+ 文件名列（恒完整，底纹随字节进度）+ 文件大小。
 
   ```xml
   <!-- 外层通道行：左区（*，弹性）| 右区（Auto + MinWidth，见任务 6） -->
@@ -672,14 +712,15 @@ Wave FINAL
   </Grid>
   ```
 
-  （`TooltipText` 为 `\n` 分隔多行字符串，Avalonia 默认 `TextBlock` 保留换行。）
+  （`TooltipText` 为 `\n` 分隔多行字符串，Avalonia 默认 `TextBlock` 保留换行；字段为 `string?` 初始 null（4e P9），null 时 `ToolTip.Tip` 不弹浮层，XAML 无需额外转换器。）
 
   (6d) 单行隐藏规则（`IsParallel` 正向绑，无需反转转换器）：
 
   - 批次序号：`IsVisible="{Binding IsParallel}"`（已含于 6c）。
-  - **删除**旧独立「批级进度条 `ProgressBar`」列（约 `:407`）——已被批次底纹取代。
-  - **删除**旧独立「百分比」列（约 `:416`）与「批明细」列（约 `:425`）——已合并入 `PctDetailText`。
-  - 压缩通道说明行：VM 派生 `ShowCompressChannelHint => IsCompressFlow && HasParallelChannel`（D8，通知挂 `NotifyDisplayProperties`），XAML 绑 `ShowCompressChannelHint` 取代原 `IsCompressFlow`。
+  - **删除**旧独立「批级进度条 `ProgressBar`」列（`:409-415`，注释 `:408`）——已被批次底纹取代。
+  - **删除**旧独立「百分比」列（`:418-424`，注释 `:417`）与「批明细」列（`:427-432`，注释 `:426`）——已合并入 `PctDetailText`。
+  - 压缩通道说明行：VM 派生 `ShowCompressChannelHint => IsCompressFlow && HasParallelChannel`（D8），**通知并入 4f 的 `NotifyChannelProperties()`，并加 `partial void OnIsCompressFlowChanged(bool value) => NotifyChannelProperties();`**（`IsCompressFlow` 是 `[ObservableProperty]`，切压缩/解压流程时也要刷新）；XAML 绑 `ShowCompressChannelHint` 取代原 `IsCompressFlow`（`:355`）。
+  - **P1 回归测试**：`ProgressViewModelTests` 已在 4a 加 `ParallelBatchRowAdded_RaisesHasParallelChannelNotification`；本步实现 `ShowCompressChannelHint` 后如断言缺通知，回查 `NotifyChannelProperties` 两处接线。
 
   (6e) 验证：build 0 错误；人工 GUI 验收并入任务 7。
 
@@ -699,24 +740,30 @@ Wave FINAL
 
 ---
 
-## 附：关键行号索引（stats-cards 已于 commit `6fc2b01` 落地，下列行号已漂移，**实施前须重新 grep 定位**）
+## 附：关键行号索引（2026-10-09 评审后已按当前 HEAD 校准一轮；**实施前仍须重新 grep 定位**，任何先行落地的计划都会使其漂移）
 
-| 符号 | 文件 | 行（落笔时，待校准） |
+| 符号 | 文件 | 行（2026-10-09 校准） |
 |------|------|-----|
-| `ArchiveProgress` 字段区 | Core/Abstractions/ArchiveEngine.cs | :318-354（+新字段） |
-| `SetProgress` 主体 | UI.Avalonia/ViewModels/ProgressViewModel.cs | :516 |
-| EntryStatus 早返回 | 同上 | :529 |
-| `UpsertParallelBatch` | 同上 | :690-714 |
-| 自动切详细守卫 | 同上 | :712 |
-| 详细门禁回落（删除） | 同上 | :934-936 |
+| `ArchiveProgress` 字段区 | Core/Abstractions/ArchiveEngine.cs | :318-354（+4 新字段插在 `:354` EntryStatus 后） |
+| `SetProgress` 主体 | UI.Avalonia/ViewModels/ProgressViewModel.cs | :540 |
+| EntryStatus 早返回 | 同上 | :553-558（单行合成插在其后、`:566` SplitFilePath 前） |
+| `UpsertParallelBatch` | 同上 | :717-741 |
+| 自动切详细守卫 | 同上 | :739 |
+| 详细门禁回落（删除） | 同上 | :998-999 |
 | `IsDetailedAvailable`（删除） | 同上 | :230-231 |
-| 通知点（删除） | 同上 | :143 / :316 |
-| 模式单选门禁绑定（删除） | UI.Avalonia/Dialogs/ProgressWindow.axaml | :288（注释 :270/:285） |
-| 批次行模板 | 同上 | :361-435 |
-| 底纹 Rectangle bug（修复） | 同上 | :386-396 |
+| 通知点 | 同上 | :143（CollectionChanged，改调 `NotifyChannelProperties`）/ `:342`（NotifyDisplayProperties 内，删） |
+| `NotifyDisplayProperties` | 同上 | :337-348 |
+| `InitBatchMode`/`SetCurrentBatchItem` Clear | 同上 | :944 / :994 |
+| 模式单选门禁绑定（删除） | UI.Avalonia/Dialogs/ProgressWindow.axaml | :290（注释 :272） |
+| 压缩通道说明行（绑 IsCompressFlow） | 同上 | :353-358（IsVisible :355） |
+| 批次行模板 | 同上 | :359-436（行 Grid :363-433） |
+| 内层 Grid / 底纹 Rectangle bug（修复） | 同上 | :385 / :388-398（ContentPresenter 绑定 :395） |
+| 待删列：批进度条 / 百分比 / 批明细 | 同上 | :409-415 / :418-424 / :427-432 |
+| 门禁回落测试断言（重写） | tests/…/ProgressViewModelTests.cs | :161-166（嵌于 `ContentMode_ExposesThreeModes`） |
 | `ParallelBatchProgressItem` 字段区 | UI.Avalonia/Models/ParallelBatchProgressItem.cs | 全文件（约 30 行） |
 | 主题画刷（新增批次底纹） | UI.Avalonia/Themes/ThemeLight.axaml / ThemeDark.axaml | 待定 |
-| 串行 ZipWriter 报告 | Core/Engines/ZipEngine.cs | :1748-1761 |
+| 串行 ZipWriter 报告 | Core/Engines/ZipEngine.cs | :1748-1761（调用点 :1735） |
+| `ReadFileWithRetry` 内报告 | 同上 | :3273-3280（fiLen :3257） |
 | N 组 adapter ×2 | 同上 | :1516-1541 / :2459-2483 |
-| `CompressGroupWithSevenZip` | 同上 | :3481 |
+| `CompressGroupWithSevenZip` | 同上 | :3481（ArchiveFormat=Zip :3498） |
 | `SplitOutputStream.Length` 抛异常 | Core/Utils/SplitOutputStream.cs | :91 |
