@@ -6,7 +6,7 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
-**2026-10-10** — 启动优化阶段一（进行中，`feat/startup-preview-defer` 分支，计划 [startup-preview-defer.md](../.omo/plans/未开始/startup-preview-defer.md)）
+**2026-10-10** — 启动优化（✅ 已完成，`feat/startup-preview-defer` 分支，计划 [startup-preview-defer.md](../.omo/plans/已完成/startup-preview-defer.md)）
   - **Task 1 ✅**：新增 `Services/StartupTimer.cs`（internal static）——零分配内存打点（`MarkInfo` record struct 预分配 List、收集期零 I/O），`Begin()` 记录 `Process.StartTime` 墒的 pre-Main 基线，`Flush(reason)` 幂等一次性写 `%LOCALAPPDATA%\MantisZip\startup-trace.log`（保留 20 条、命令行走 `LogRedactor`）；`preview-eager total` 行直接服务阶段二门控；测试钩子经 `InternalsVisibleTo`
   - **测试**：新增 `StartupTimerTests` 7 条（TDD 红绿：Begin/Mark 记录、增量非负、Begin 前 Mark 忽略、Flush 后 Mark 忽略、Begin 幂等、异常降级不抛、进程基线存在），7/7 通过
   - **Task 2 ✅**：`Program.Main` 首行 `Begin()` + `AppBuilder.Ready` + 阻塞启动后 `Flush("app-exit")` 兜底；`App.OnFrameworkInitializationCompleted` 子段打点——`Avalonia.InitDone`/`Init.EncodingOle`/`Init.Theme`/`Init.Font`/`Init.Settings`/`Init.PreviewCfgLocale`/`Init.SevenZip`/`Init.ShellFirstRun`/`Init.Done`（CLI 分发前），构建 0 错误
