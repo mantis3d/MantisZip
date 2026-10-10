@@ -503,7 +503,7 @@ git commit -m "feat(avalonia): 启动打点接入 MainWindow/PreviewPanel/Previe
 - Create: `tools/measure-startup.ps1`（可选聚合脚本）
 - 产出：测量报告（写入本计划文件末尾「阶段一测量结果」章节，或单独 `docs/` 片段——按用户偏好）
 
-- [ ] **Step 1: 写聚合脚本**
+- [x] **Step 1: 写聚合脚本**
 
 ```powershell
 # tools/measure-startup.ps1
@@ -536,7 +536,7 @@ $median = $sorted[[int][math]::Floor($sorted.Count / 2)]
 "`nmedian TOTAL = $median ms  (samples: $($totals -join ', '))"
 ```
 
-- [ ] **Step 2: Release 构建 + 冷/热采样**
+- [x] **Step 2: Release 构建 + 冷/热采样**
 
 ```powershell
 dotnet build -c Release src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
@@ -544,7 +544,7 @@ dotnet build -c Release src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 .\tools\measure-startup.ps1 -ExePath src\MantisZip.UI.Avalonia\bin\Release\net10.0\MantisZip.UI.Avalonia.exe -Runs 5 -WarmupRuns 1
 ```
 
-- [ ] **Step 3: 按 trace 逐段分析并对照决策规则**
+- [x] **Step 3: 按 trace 逐段分析并对照决策规则**
 
 打开 `%LOCALAPPDATA%\MantisZip\startup-trace.log` 最新样本，产出报告：
 1. 冷样本中位数的完整分布表（pre-Main / Avalonia.InitDone / Init.* / Win.* 各段）
@@ -552,7 +552,7 @@ dotnet build -c Release src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 3. `preview-eager total` 与占比 → **对照 1.7 门控给出「阶段二做/不做」结论**
 4. 若 Stopwatch 加总 < 实际总时长 70%（存在未解释黑盒）→ 可选 `dotnet-trace collect` 加餐定位 JIT/程序集加载
 
-- [ ] **Step 4: 把结论写进计划文件末尾「阶段一测量结果」章节，Commit**
+- [x] **Step 4: 把结论写进计划文件末尾「阶段一测量结果」章节，Commit**
 
 ```powershell
 git add tools/measure-startup.ps1 .omo/plans/未开始/startup-preview-defer.md
@@ -777,3 +777,44 @@ git commit -m "perf(avalonia): PreviewViewModel 构造瘦身，重活延迟到 E
 | Task 7 回归验证 | 1h |
 | Task A1（按需） | 1h |
 | **合计** | **7-9h** |
+
+---
+
+## 阶段一测量结果（2026-10-10）
+
+**环境**：Windows 10 19045 / 16 逻辑核 / Release 构建 / 暖启动 ×5（预热 1 次不计）
+
+**聚合**：median TOTAL = **2061.1 ms**（样本 2058.6 / 2086.5 / 2050.9 / 2080.1 / 2061.1，极差 <2%，稳定）
+
+**逐段（最近样本，delta = 本段耗时，cumulative = 累计）**：
+
+| phase | delta | cumulative | 说明 |
+|---|---|---|---|
+| Main.Entry | 0.7ms | 57.4ms | pre-Main 进程基线（进程启动→Main） |
+| AppBuilder.Ready | 40.0ms | 97.4ms | BuildAvaloniaApp + UsePlatformDetect |
+| **Avalonia.InitDone** | **597.2ms** | **694.6ms** | **Top1：App.axaml 资源解析 + 框架初始化** |
+| Init.EncodingOle | 0.2ms | 694.9ms | |
+| **Init.Theme** | **116.5ms** | **811.3ms** | **Top3：主题资源应用** |
+| Init.Font | 3.0ms | 814.3ms | |
+| Init.Settings | 3.8ms | 818.1ms | |
+| Init.PreviewCfgLocale | 8.7ms | 826.9ms | |
+| Init.SevenZip | 4.7ms | 831.6ms | |
+| Init.ShellFirstRun | 2.6ms | 834.2ms | |
+| Init.Done | 0.0ms | 834.2ms | |
+| Win.Ctor.Enter | 129.5ms | 963.7ms | CLI 分发→ctor 入口 |
+| **Preview.Panel.Ctor.Enter** | **400.1ms** | **1363.8ms** | **Top2：MainWindow XAML 解析至预览面板（line 1271 前）** |
+| **Preview.Panel.Ctor.Exit** | **104.4ms** | **1468.1ms** | **预览面板 855 行控件树本体** |
+| Win.Xaml | 41.6ms | 1509.7ms | |
+| Win.State | 24.6ms | 1534.3ms | |
+| Win.Layout | 13.8ms | 1548.1ms | |
+| Preview.VM.Ctor.Exit | 8.0ms | 1558.4ms | **7.2ms，远低于 100ms → Task A1 不触发** |
+| Win.VM | 31.5ms | 1590.0ms | |
+| Win.Ctor.Exit | 78.9ms | 1668.9ms | VM→ctor 尾（事件接线等） |
+| Win.Visible | 315.9ms | 1984.7ms | 首次上屏（Show + 布局测量） |
+| Win.FirstFrame | 76.3ms | **2061.1ms** | Render 优先级首帧 |
+
+**Top 3 增量阶段**：Avalonia.InitDone 597ms / PreviewPanel XAML+ctor 段 504ms（400+104）/ Win.Visible 316ms。
+
+**门控判定**：`preview-eager total = 514.8ms (25.0%)` → **≥10% 且 ≥300ms，命中 → 阶段二（延迟实例化）做**；`Preview.VM.Ctor = 8.0ms < 100ms → Task A1 不做**。
+
+**结论**：预览面板急切创建占首帧 1/4，延迟实例化（0.5s 定时 + 首次预览请求兜底）预期收益 ~400ms（把 XAML 中预览段移出关键路径，其余段可能因 JIT 顺序略增，净收益待 Task 7 A/B 验证）。`Avalonia.InitDone 597ms` 属 Avalonia 框架/App 资源层，splash 计划（串行在后）消费该数据。
