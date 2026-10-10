@@ -62,7 +62,10 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        Services.StartupTimer.Mark("Win.Ctor.Enter");
         InitializeComponent();
+        // 1359 行 XAML 解析 + 子控件构造（含内嵌 PreviewPanel 855 行控件树）
+        Services.StartupTimer.Mark("Win.Xaml");
 
         // 拖拽添加覆层呼吸动画（与拖拽解压覆层一致：约 2s 周期，正弦 alpha 40-120，仅背景层呼吸）
         _dragAddOverlayTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher.UIThread)
@@ -92,6 +95,8 @@ public partial class MainWindow : Window
         _lastSortMemberPath = string.IsNullOrEmpty(savedSortColumnPath) ? null : savedSortColumnPath;
         _lastSortDescending = savedSortDirection == 2;
         UpdateSortArrows();
+        // WindowStateManager.Load 读盘 + 列状态/排序恢复
+        Services.StartupTimer.Mark("Win.State");
 
         // 应用上次手动保存的布局快照（目录树/文件列表列宽 + 预览各位置记忆尺寸）。
         // 必须在 ApplyPreviewLayout() 之前调用，保证 ApplyPreviewPosition 能读到已回填的预览尺寸。
@@ -99,8 +104,12 @@ public partial class MainWindow : Window
 
         // 应用预览面板显隐 + 位置设置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）
         ApplyPreviewLayout();
+        // 布局快照恢复 + 预览位置应用
+        Services.StartupTimer.Mark("Win.Layout");
 
         var vm = new MainWindowViewModel();
+        // 主 VM 构造（内含 PreviewViewModel 构造）
+        Services.StartupTimer.Mark("Win.VM");
         vm.GetOpenFilePath = OpenFileDialogAsync;
         vm.SaveLayoutAction = SaveLayout;
         vm.ShowSettingsWindow = async () =>
@@ -638,6 +647,26 @@ public partial class MainWindow : Window
         // Persist window position/size/state + column widths on close
         Closing += (_, _) => WindowStateManager.Save(this, CaptureColumnStates(), _lastSortMemberPath,
             _lastSortMemberPath == null ? 0 : (_lastSortDescending ? 2 : 1));
+
+        Services.StartupTimer.Mark("Win.Ctor.Exit");
+        // 首帧打点 + flush 启动 trace（一次性）
+        Opened += OnStartupOpened;
+    }
+
+    /// <summary>
+    /// 窗口首次 Opened：打首帧近似点并 flush 启动 trace（一次性）。
+    /// 与 splash 计划衔接：splash 也在 Opened 关闭，语义一致。
+    /// </summary>
+    private void OnStartupOpened(object? sender, EventArgs e)
+    {
+        Opened -= OnStartupOpened;
+        Services.StartupTimer.Mark("Win.Visible");
+        // Avalonia 无 WPF ContentRendered：用 Render 优先级回调近似首帧上屏
+        Dispatcher.UIThread.Post(() =>
+        {
+            Services.StartupTimer.Mark("Win.FirstFrame");
+            Services.StartupTimer.Flush("first-frame");
+        }, DispatcherPriority.Render);
     }
 
     /// <summary>

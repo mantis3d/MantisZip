@@ -158,12 +158,15 @@ public partial class PreviewViewModel : ObservableObject
 
     public PreviewViewModel()
     {
+        // 启动打点专项：预览 VM 构造成本（含 AppSettings.Load 第二次读盘）
+        Services.StartupTimer.Mark("Preview.VM.Ctor.Enter");
         MetadataSettingsManager.SettingsChanged += OnMetadataSettingsChanged;
         LocalizationManager.CultureChanged += OnCultureChanged;
         UpdateLocalizedStrings();
         var savedEncodingKey = AppSettings.Load().TextEncodingPreference;
         SelectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == savedEncodingKey)
                            ?? EncodingOptions.FirstOrDefault(o => o.Key == "auto");
+        Services.StartupTimer.Mark("Preview.VM.Ctor.Exit");
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)
