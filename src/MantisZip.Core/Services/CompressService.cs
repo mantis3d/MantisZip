@@ -57,6 +57,12 @@ public class CompressRequest
     /// </summary>
     public CompressPlan? Plan { get; init; }
 
+    /// <summary>
+    /// 输出文件已存在（文件冲突）的默认处理："overwrite" / "add" / "rename" / "skip"，
+    /// null 或 "ask" = 弹窗询问（默认）。由 UI/CLI 注入，CompressFlow.CreateResolver 消费。
+    /// </summary>
+    public string? ConflictAction { get; init; }
+
     /// <summary>压缩单文件夹时是否保留外层目录根，仅 SevenZipEngine 有效</summary>
     public bool PreserveDirectoryRoot { get; init; } = true;
 

@@ -6,6 +6,37 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-10** — 音频预览新增 MP3 + FLAC 内嵌封面显示（✅ 已完成，对齐 WPF 版行为）
+  - **Core `FlacParser.cs`**：由只读 STREAMINFO 重构为遍历全部元数据块——`ExtractStreamInfo` 保留「首个块载荷 <34 → null」语义，新增 `ExtractPictureBlock`/`TryParsePicturePayload` 提取 PICTURE（type 6）图片数据填入 `CoverArtData`；封面块损坏 → cover 为 null 但解析仍成功；`FileFormatInfo.CoverArtData` 注释补充 FLAC PICTURE 说明
+  - **`MetadataRegistry.cs`**：`audio` 类型注册表首项加 `MetadataKeys.Title`（`Metadata_Key_Title` 三语已存在 → 零新增 i18n key）
+  - **`PreviewViewModel.cs`**：新增 `AudioCoverImage`(Bitmap?)/`AudioFallbackText` + `HasAudioCover`/`HasAudioFallback`（**不复用 `PreviewImage`**，避免与图片预览状态互相污染）；`ShowAudio` 先清状态再解码（`Length > 8` 门槛 + try/catch + `App.DebugLog`），无封面回退 Title/Artist 大字；`OnPreviewTypeChanged` 离开音频（value != Audio）时释放位图防泄漏；信息面板渲染 Title
+  - **`PreviewPanel.axaml`**：音频区改 ScrollViewer + 封面 `Image`（Stretch Uniform、MaxWidth/MaxHeight 400 居中）+ 回退 `TextBlock`（FontSize 24 居中）；间距用 `SpacingXxx` DynamicResource（规则 5）、不显式设 Foreground（规则 4）、全中文注释（规则 14）
+  - **范围决定**：VORBIS_COMMENT 解析（FLAC 无封面时的标题回退文字）**不在本次范围**——FLAC 无封面时回退文字为空（与现状一致）；MP3 无封面走 ID3 Title/Artist 回退
+  - **测试（TDD 严格红绿）**：Core 新增 `FlacParserTests` 5 条（封面字节精确断言 + 时长采样率 / 无封面 null / 超长声明长度容错 / magic + 首块有效性锁定）+ `Id3v2ParserTests` 1 条（APIC 回归锁定）；Avalonia 新增 `PreviewAudioPreviewTests` 4 条（无封面回退文字 / 有封面解码 / 离开音频清理 / 切换文件不残留）
+  - **验证**：`dotnet build` 0 错误（3 warning 既有 `TextEncodingDetector` CS8604 + `PreviewViewModel` 2× CS0618）；Core **429 通过 / 0 失败 / 2 跳过**（基线 423 + 新增 6）、Avalonia **135 通过 / 5 失败 / 3 跳过**（基线 131 + 新增 4；5 失败全部为预存 `PreviewWebViewLazyInitTests` TestPreview 样本缺失）；验证时 Everything.exe 锁 `bin\...\MantisZip.ShellExt.dll` 致 post-build 拷贝失败（MSB3027），用 csproj 自带 `-p:SkipShellExtCopy=true` 逃生开关绕过（未改仓库文件，编译本身始终成功）
+
+**2026-10-09** — 四项修复/功能一次性实施（✅ 已完成：预览窗格宽度 bug、解压窗口回收站选项、宽度 bug 回归修复、压缩端文件冲突默认选项）
+  - **① 预览窗格宽度 bug（Star 布局尺寸丢失）**：`MainWindow.SaveCurrentPreviewSize` 原实现只记录 `GridUnitType.Pixel`，未保存过布局时拖分隔条产生的是 Star 尺寸（Avalonia Split 行为保持 Star）→ 不记录 → 位置重应用回退默认（3* / 200px）→ 面板缩到最小。修复：新增 `RecordPreviewSize` 对 Pixel/Star 且值 >0 均记录（Auto 与面板隐藏压缩 0 跳过），`ApplyPreviewPosition` 四个 case 由 `new GridLength(h1, Pixel)` 改为直接用存储的 `GridLength`
+  - **② 回归修复（单元类型持久化）**：`_previewSizeByPosition` 由 `Dictionary<int, double>` 升级 `Dictionary<int, GridLength>`；`LayoutStateManager.LayoutSnapshot.PreviewSizeByPosition` 同步改型，新增 `GridLengthJsonConverter`（写对象形态 `{"value":N,"unit":N}`，unit 0=Auto/1=Pixel/2=Star；**读兼容旧版裸数字=Pixel**，旧 layout.json 无需迁移），`JsonOptions` 注册转换器后 Load/Save 共用；`ApplySavedLayout` 回填校验 `GridUnitType is Pixel or Star && Value>0`
+  - **③ 解压窗口「解压后将原压缩包移到回收站」勾选项**：`ExtractSettingsViewModel` 新增 `DeleteArchiveAfterExtract`（默认读 `AppSettings.DeleteArchiveAfterExtract`，**勾选仅本次生效不写回**）+ `ExtractSettingsWindow.axaml` 冲突选项下方新增 CheckBox（复用既有三语 key `Settings_Extract_DeleteArchiveAfterExtract`，加入 LocalizedStrings 刷新数组）；`App.TryDeleteArchiveAfterExtract(string, bool? enabledOverride = null)`（override 非 null 优先于全局设置，内部仍 `RecycleOption.SendToRecycleBin`）；`MainWindow.axaml.cs` 解压对话框完成回调拷回 `evm.DeleteArchiveAfterExtract`；`MainWindowViewModel` 各解压路径（主对话框/右键解压/拖拽/CLI）透传
+  - **④ 压缩端「文件冲突默认策略」（参照解压端 FileConflictAction）**：
+    - **Core**：`AppSettings.CompressFileConflictAction`（默认 `"ask"`）；`CompressService.CompressRequest` 新增 `ConflictAction` init 属性（null/"ask"=弹窗，兼容 tests 16 处不传）
+    - **CompressFlow**：`BuildRequest` 透传 `vm.ConflictAction`；`CreateResolver(showDialog, defaultAction = null)` 非 ask 时经 `MapDefaultConflictAction` 直接映射免弹窗——`overwrite`→Overwrite、`rename`→Rename（CustomName=null 走 `ComputeRenamedPath` 自动唯一名）、`skip`→Core `Cancel`（单条跳过，非终止）、`add`→Add（`!info.CanAdd` 如 tar.gz 回退弹窗）、未知值回退弹窗
+    - **接线**：`MainWindowViewModel.ExecuteCompressFromSettings` CreateResolver 传 `request.ConflictAction`；`App.axaml.cs` CreateResolver 同 + `--compress-quick/separate/combined` 三处 request 构造传 `settings.CompressFileConflictAction`
+    - **设置窗口**：`SettingsWindowViewModel` 8 处（字段 `_compressFileConflictAction="ask"`/选项对 `CompressFileConflictActionOptions`/label `CompressConflictActionText`/ctor 加载/`PopulateComboOptions` 5 选项（复用 `CompressConflict_Overwrite/Add/AutoRename/Skip` + 新 `Compress_Conflict_Ask`）/`SetSelectedOptions`（含 FirstOrDefault 回退）/Save/`OnCultureChanged` 刷新）+ `SettingsWindow.axaml` 压缩通用页新增 Border+ComboBox（`DisplayMemberBinding` 模板）
+    - **压缩对话框**：`CompressSettingsViewModel` `ConflictAction` 属性 + `ConflictActionOptions`（ComboOption 5 项）+ `SelectedConflictActionOption` 双向同步 partial + ctor 从设置加载（非法值回退首项）+ LocalizedStrings 补 `Compress_WhenFileExists`；`CompressSettingsWindow.axaml` 输出模式组后新增「文件存在时：」Border+ComboBox
+    - **i18n**：三语头部 `{` 后成对插入 3 key：`Settings_Compress_ConflictAction`（文件冲突处理/File conflict action/檔案衝突處理）、`Compress_WhenFileExists`（文件存在时：/When file exists:/檔案存在時：）、`Compress_Conflict_Ask`（每次询问/Ask each time/每次詢問）
+  - **验证**：`dotnet build -t:Compile` 0 错误（3 warning 既有）；Core **423 通过 / 0 失败**、Avalonia **131 通过 / 5 失败（预存 TestPreview 样本缺失）/ 3 跳过**——与基线完全一致
+
+**2026-10-06** — 修复「测试压缩包」加密包静默失败 + 测试流程对齐解压（✅ 已修复，用户报告「加密 RAR 测试无密码时静默失败弹窗也不出」「rar 没有密码的压缩包测试时进度条也不动」）
+  - **根因 1（加密包静默失败）**：`TestArchive` 只从 `_sessionPasswords` 取密码，无会话密码时 `engine.TestArchiveAsync` 以 null 密码快速失败 → 状态栏仅「压缩包测试失败 ❌」，无密码弹窗、无进度。与 `LoadArchiveAsync` 打开流程的密码解析（会话缓存→自动匹配→对话框循环）完全脱节
+  - **根因 2（进度条不动，Core 层）**：`Check()`（=7z.dll TestArchive 语义，整包提取校验）阶段不触发 `Extracting` 事件、只触发 `FileExtractionFinished`（每条目 1 次，`e.PercentDone` 为 byte）；旧 `TestArchiveAsync` 在校验阶段无进度上报，且校验后还冗余逐条目 `ExtractFile` 二次解压（约 2 倍工作量，固实包 O(n²)）
+  - **修复（Avalonia + Core 双轨）**
+    - Core `SevenZipEngine.TestArchiveAsync`：`Check()` 前订阅 `FileExtractionFinished`，用 `e.PercentDone`（`Math.Clamp((double)e.PercentDone, 0, 100)`）+ `e.FileInfo.FileName` 上报 `ArchiveProgress{CurrentFile, PercentComplete, FilePercentComplete}`；**删除冗余逐条目 `ExtractFile` 循环**（编译期修正：`e.FileInfo` 为值类型 `ArchiveFileInfo` 不能用 `?.`、`PercentDone` 为 byte 需显式 double 转换）
+    - Avalonia `MainWindowViewModel`：新增公共方法 `TryEnsureArchivePasswordAsync`（对齐解压/打开流程）——会话缓存 → `TryMatchPasswordEx` 密码库自动匹配（`CorruptedOrInvalid` 直接停）→ `ShowPasswordDialog` + `QuickVerifyPasswordEx` 快速验证循环（错密码重试直到正确或取消）；`TestArchive` 测试前先调用：无密码/取消 → `Status_PasswordCancelled` 中止、不再假失败；密码已验证正确但测试仍失败 → `AppMessageBox` 弹「文件损坏」窗（损坏与密码问题区分）
+  - **实测（mztest，7z.dll v25.00）**：未加密 RAR `D:\soft\FiberShop v3.1.0 Win.rar` 130MB → True 795ms（旧约 1.4s）；未加密 7z `D:\soft\Chaos Player 2.10.00.7z` 105MB → True 776ms 5 次进度；加密 RAR `D:\soft\Phoenix.rar`（密码 aaa）三态：无密码 null→False 7ms、正确 aaa→True 631ms 89 个进度事件、错误 wrong→False 5ms
+  - **验证**：`dotnet build` UI 0 error（3 warning 为既有）、Core 423 通过 / 2 跳过、Avalonia 131 通过 / 5 失败（失败全部为预存环境问题：`TestPreview/attachment-management-0.12.1.zip` 为 gitignore 的测试样本从未入库，与本次改动无关）
+
 **2026-10-04** — 修复点击任意条目即崩溃（WebView2 初始化异常逃逸）（✅ 已修复，用户报告「点压缩包内条目后应用无提示退出」）
   - **根因（症状放大）**：`PreviewPanel.axaml` 把 `NativeWebView` **常驻在活动视觉树**中。Avalonia 的 `NativeWebView` 在 `OnAttached` 时初始化 WebView2，而**任何**预览都会走到 attach —— 包括点目录、点不支持预览的格式。于是「WebView2 初始化失败」这个本只该影响 HTML 预览的故障，被放大成**任何条目都崩溃**
   - **★ 异常为何会终止进程（两层）**：① WebView2 初始化是异步的，失败异常在 UI 线程 Dispatcher 上抛出时，栈上早已没有 `ShowPreviewAsync` 的 try/catch（已跨 await 边界）；② 应用**没有任何 Dispatcher 未处理异常订阅者** → 未捕获异常直接杀进程。故现象是「无提示直接退出」而非报错弹窗
@@ -1597,6 +1628,13 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.2 (2026-10-06) 修复「测试压缩包」进度条不动（SevenZipEngine.TestArchiveAsync）
+  - **`Core/Engines/SevenZipEngine.cs`**：
+    - 根因：`Check()`（=7z.dll TestArchive 语义，整包提取校验 CRC）阶段**不触发 `Extracting` 事件**、只触发 `FileExtractionFinished`（每条目 1 次，`e.PercentDone` 为 byte）—— 旧实现校验阶段零进度上报，且校验后还冗余逐条目 `ExtractFile` 二次解压（约 2 倍工作量，固实包 O(n²)）
+    - 修复：`Check()` 前订阅 `FileExtractionFinished`，用 `Math.Clamp((double)e.PercentDone, 0, 100)` + `e.FileInfo.FileName` 上报 `ArchiveProgress{CurrentFile, PercentComplete, FilePercentComplete}`；**删除冗余逐条目 `ExtractFile` 循环**（返回值仍由 `Check()` 的 `valid` 决定，语义不变）
+    - 编译期修正：`e.FileInfo` 为值类型 `ArchiveFileInfo` 不能用 `?.`；`PercentDone` 为 byte 需显式 double 转换
+  - **实测（mztest，7z.dll v25.00）**：未加密 RAR 130MB 1.4s→0.8s；未加密 7z 105MB 776ms 5 次进度；加密 RAR 三态正确（无密码 7ms False / 正确密码 631ms True 89 进度事件 / 错误密码 5ms False）
 
 #### v0.5.0 (2026-09-16) 压缩/解压性能优化 — 并行解压（批次复用）+ 7z 多线程压缩
   - **`Core/Engines/ZipEngine.cs`**：

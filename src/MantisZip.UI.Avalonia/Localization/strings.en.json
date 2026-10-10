@@ -1,4 +1,7 @@
 {
+  "Settings_Compress_ConflictAction": "File conflict action",
+  "Compress_WhenFileExists": "When file exists:",
+  "Compress_Conflict_Ask": "Ask each time",
   "Picker_PreserveFullPath": "Preserve full paths",
   "Picker_PreserveFullPathDisabledHint": "At the archive root, both settings produce the same result",
   "Picker_OptionsCaption": "Options",

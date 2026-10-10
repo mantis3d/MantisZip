@@ -86,6 +86,23 @@
                                 IsChecked="{Binding PreserveDirectoryRoot}" />
                     </StackPanel>
                   </Border>
+
+                  <!-- 文件冲突默认策略：压缩时遇到同名文件的处理方式（ask=每次询问；仅本次压缩外的全局默认） -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding CompressConflictActionText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding CompressFileConflictActionOptions}"
+                                SelectedItem="{Binding SelectedCompressFileConflictActionOption}"
+                                Width="240" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
       
                 </StackPanel>
               </ScrollViewer>

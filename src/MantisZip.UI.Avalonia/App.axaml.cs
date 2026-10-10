@@ -921,14 +921,17 @@ public partial class App : Application
 
     /// <summary>
     /// 尝试在解压后删除原始压缩包（移动到回收站）。
+    /// enabledOverride 非 null 时优先使用（解压窗口逐次勾选，不读全局设置、不写回）；
+    /// null 时读 AppSettings.DeleteArchiveAfterExtract。
     /// 基于 DoubleClickOpenThreshold 的文件大小检查由 UI 侧的点击事件完成，
     /// CLI 模式不做额外大小检查。
     /// 重试 3 次（200ms 间隔），给 7z.dll 等外部组件释放文件句柄的时间。
     /// </summary>
-    internal static void TryDeleteArchiveAfterExtract(string archivePath)
+    internal static void TryDeleteArchiveAfterExtract(string archivePath, bool? enabledOverride = null)
     {
         var settings = AppSettings.Load();
-        if (!settings.DeleteArchiveAfterExtract) return;
+        var enabled = enabledOverride ?? settings.DeleteArchiveAfterExtract;
+        if (!enabled) return;
         if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath)) return;
 
         for (int retry = 0; retry < 3; retry++)
@@ -1059,7 +1062,7 @@ public partial class App : Application
 
             await RunCliExtractBatchWithProgressAsync(
                 existing, dest, conflictAction, filteredKeys, desktop,
-                dialog.ViewModel.MatchedPasswords);
+                dialog.ViewModel.MatchedPasswords, dialog.ViewModel.DeleteArchiveAfterExtract);
         }
         catch (Exception ex)
         {
@@ -1202,7 +1205,8 @@ public partial class App : Application
         string conflictAction,
         List<string>? filteredEntryKeys,
         IClassicDesktopStyleApplicationLifetime desktop,
-        IReadOnlyDictionary<string, string>? matchedPasswords = null)
+        IReadOnlyDictionary<string, string>? matchedPasswords = null,
+        bool deleteAfterExtract = false)
     {
         // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
         // 点击 X 时立即退出进程，后台解压被强杀中断（对齐 WPF 的 OnExplicitShutdown 用法）
@@ -1258,6 +1262,9 @@ public partial class App : Application
                             password,
                             info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info),
                             progress, ct);
+
+                        // 解压成功后按弹窗勾选将原包移入回收站（逐次勾选，不读全局设置、不写回）
+                        TryDeleteArchiveAfterExtract(archivePath, deleteAfterExtract);
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                             progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
@@ -1891,6 +1898,8 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             OutputPath = outputPath,
             PreserveDirectoryRoot = true,
+            // 文件冲突默认策略（ask = 弹窗；来自设置，仅本次压缩生效）
+            ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
             ErrorResolver = CompressFlow.CreateErrorResolver(),
         };
@@ -1978,6 +1987,8 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             KeepOriginalExtension = false,
             PreserveDirectoryRoot = true,
+            // 文件冲突默认策略（ask = 弹窗；来自设置，仅本次压缩生效）
+            ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
             ErrorResolver = CompressFlow.CreateErrorResolver(),
         };
@@ -2077,6 +2088,8 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             OutputPath = outputPath,
             PreserveDirectoryRoot = true,
+            // 文件冲突默认策略（ask = 弹窗；来自设置，仅本次压缩生效）
+            ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
             ErrorResolver = CompressFlow.CreateErrorResolver(),
         };
@@ -2135,7 +2148,8 @@ public partial class App : Application
                     progressWindow.CancellationToken,
                     // 冲突处理统一走 CompressFlow（弹窗 + ApplyToAll 记忆），与主窗口共用
                     conflictResolver: CompressFlow.CreateResolver(
-                        info => CompressFlow.ShowConflictDialogAsync(progressWindow, info)),
+                        info => CompressFlow.ShowConflictDialogAsync(progressWindow, info),
+                        request.ConflictAction),
                     onItemStatus: (index, status) =>
                     {
                         // 逐项状态更新驱动批处理文件列表（对齐 WPF CompressAsync onItemStatus 接线）

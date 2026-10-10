@@ -87,6 +87,8 @@ public static class CompressFlow
             SevenZipMatchFinder = vm.SevenZipMatchFinder,
             SevenZipMultithreaded = vm.SevenZipMultithreaded,
             SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
+            // 输出文件冲突默认策略（本次压缩生效，来自压缩对话框/全局设置）
+            ConflictAction = vm.ConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线
             ErrorResolver = CreateErrorResolver(),
         };
@@ -166,8 +168,13 @@ public static class CompressFlow
     /// 弹窗回调：传入冲突信息，返回用户选择（Action、重命名名、是否应用到全部）。
     /// 返回 Cancel 且取消整个操作时抛 OperationCanceledException 以终止压缩。
     /// </param>
+    /// <param name="defaultAction">
+    /// 默认冲突策略（来自设置/压缩对话框，仅本次压缩生效）："overwrite" / "add" / "rename" / "skip"。
+    /// 非 "ask" 时直接映射不再弹窗；"add" 在格式不支持追加（!info.CanAdd）时回退弹窗。
+    /// </param>
     public static CompressConflictResolver CreateResolver(
-        Func<CompressConflictInfo, Task<(MantisZip.Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>> showDialog)
+        Func<CompressConflictInfo, Task<(MantisZip.Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>> showDialog,
+        string? defaultAction = null)
     {
         bool applyToAll = false;
         MantisZip.Core.Abstractions.CompressConflictAction? chosenAction = null;
@@ -177,6 +184,14 @@ public static class CompressFlow
             // 已勾选"应用到全部" → 直接返回记忆的选择
             if (applyToAll && chosenAction.HasValue)
                 return new CompressConflictResolution(chosenAction.Value, null);
+
+            // 默认冲突策略非 ask → 直接映射免弹窗（映射不可用时回退弹窗）
+            if (!string.IsNullOrEmpty(defaultAction) && defaultAction != "ask")
+            {
+                var mapped = MapDefaultConflictAction(defaultAction, info);
+                if (mapped.HasValue)
+                    return new CompressConflictResolution(mapped.Value, null);
+            }
 
             var (action, customName, applyAll) = await showDialog(info);
             if (applyAll)
@@ -192,6 +207,36 @@ public static class CompressFlow
                 _ => new CompressConflictResolution(action, customName),
             };
         };
+    }
+
+    /// <summary>
+    /// 将默认冲突策略字符串映射为 Core 冲突动作。
+    /// </summary>
+    /// <param name="defaultAction">"overwrite" / "add" / "rename" / "skip"（"ask" 由调用方过滤）。</param>
+    /// <param name="info">当前冲突信息（用于 "add" 的 CanAdd 判定）。</param>
+    /// <returns>
+    /// 映射结果；null 表示该策略在当前冲突下不可用（如格式不支持追加），
+    /// 调用方应回退弹窗询问用户。
+    /// </returns>
+    private static MantisZip.Core.Abstractions.CompressConflictAction? MapDefaultConflictAction(
+        string defaultAction, CompressConflictInfo info)
+    {
+        switch (defaultAction)
+        {
+            case "overwrite":
+                return MantisZip.Core.Abstractions.CompressConflictAction.Overwrite;
+            case "rename":
+                // CustomName 传 null → Core ComputeRenamedPath 自动生成唯一名
+                return MantisZip.Core.Abstractions.CompressConflictAction.Rename;
+            case "skip":
+                // Core 无 Skip 动作；Dialog Skip → Cancel（resolver 单项跳过，非终止压缩）
+                return MantisZip.Core.Abstractions.CompressConflictAction.Cancel;
+            case "add":
+                // 格式不支持追加（如 tar.gz）→ 返回 null 回退弹窗
+                return info.CanAdd ? MantisZip.Core.Abstractions.CompressConflictAction.Add : null;
+            default:
+                return null;
+        }
     }
 
     /// <summary>

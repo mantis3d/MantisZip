@@ -1,4 +1,7 @@
 {
+  "Settings_Compress_ConflictAction": "文件冲突处理",
+  "Compress_WhenFileExists": "文件存在时：",
+  "Compress_Conflict_Ask": "每次询问",
   "Picker_PreserveFullPath": "保留完整路径",
   "Picker_PreserveFullPathDisabledHint": "在压缩包根目录，勾选与否结果相同",
   "Picker_OptionsCaption": "本次参数",

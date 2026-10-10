@@ -124,6 +124,12 @@
                              TextWrapping="Wrap" />
                 </CheckBox>
 
+                <!-- 解压后将原压缩包移入回收站：默认值取自设置窗口同名选项，勾选仅本次解压生效，不写回全局设置 -->
+                <CheckBox IsChecked="{Binding DeleteArchiveAfterExtract}">
+                  <TextBlock Text="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
+                             TextWrapping="Wrap" />
+                </CheckBox>
+
                 <!-- 并行解压线程数 -->
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
                   <TextBlock Text="{Binding LocalizedStrings[Extract_ParallelDegree]}"

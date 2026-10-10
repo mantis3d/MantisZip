@@ -381,6 +381,14 @@ public partial class PreviewViewModel : ObservableObject
 
     partial void OnPreviewTypeChanged(PreviewType value)
     {
+        // 离开音频预览时释放内嵌封面位图与回退文本，避免大封面常驻内存。
+        // 注意：进入 Audio 时不清空——ShowAudio 会在解码封面前自行清空。
+        if (value != PreviewType.Audio)
+        {
+            AudioCoverImage = null;
+            AudioFallbackText = string.Empty;
+        }
+
         // 离开字体预览时取消主题切换订阅
         if (value != PreviewType.Font)
             UnsubscribeThemeChanged();
@@ -515,6 +523,35 @@ public partial class PreviewViewModel : ObservableObject
     /// </summary>
     internal double ViewportWidth { get; set; } = 800;
     internal double ViewportHeight { get; set; } = 600;
+
+    // ── Audio cover ──
+
+    /// <summary>
+    /// 音频内嵌封面位图（MP3 APIC / FLAC PICTURE 帧解码）。
+    /// 对齐 _previewImage 的声明风格：global:: 前缀规避 Avalonia 命名空间源码生成器问题。
+    /// </summary>
+    [ObservableProperty]
+    private global::Avalonia.Media.Imaging.Bitmap? _audioCoverImage;
+
+    /// <summary>是否存在内嵌封面（供界面显隐，计算属性）。</summary>
+    public bool HasAudioCover => AudioCoverImage != null;
+
+    /// <summary>无内嵌封面时的回退文本（标题 + 歌手），无内容时为空串。</summary>
+    [ObservableProperty]
+    private string _audioFallbackText = string.Empty;
+
+    /// <summary>是否存在回退文本（供界面显隐，计算属性）。</summary>
+    public bool HasAudioFallback => !string.IsNullOrEmpty(AudioFallbackText);
+
+    partial void OnAudioCoverImageChanged(global::Avalonia.Media.Imaging.Bitmap? value)
+    {
+        OnPropertyChanged(nameof(HasAudioCover));
+    }
+
+    partial void OnAudioFallbackTextChanged(string value)
+    {
+        OnPropertyChanged(nameof(HasAudioFallback));
+    }
 
     // ── Torrent ──
 
@@ -2105,6 +2142,10 @@ using (var canvas = new SkiaSharp.SKCanvas(dstSk))
     /// </summary>
     public void ShowAudio(string filePath)
     {
+        // 先清空上一个文件的封面/回退状态，防止无封面文件残留陈旧封面位图
+        AudioCoverImage = null;
+        AudioFallbackText = string.Empty;
+
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         FileFormatInfo? info = ext switch
         {
@@ -2122,6 +2163,34 @@ using (var canvas = new SkiaSharp.SKCanvas(dstSk))
         IsPreviewVisible = true;
         IsToolbarVisible = false;
         PreviewHeaderText = LocalizationManager.T("Preview_Header_Audio");
+
+        // 内嵌封面解码（对齐 WPF 行为：CoverArtData 非空且长度 > 8 才尝试解码）
+        if (info.CoverArtData is { Length: > 8 })
+        {
+            try
+            {
+                using var ms = new MemoryStream(info.CoverArtData);
+                AudioCoverImage = new global::Avalonia.Media.Imaging.Bitmap(ms);
+            }
+            catch (Exception ex)
+            {
+                // 解码失败（非图片数据/损坏数据）时回退到文本，行为对齐 WPF
+                App.DebugLog($"ShowAudio: failed to load cover art: {ex.Message}");
+                AudioCoverImage = null;
+            }
+        }
+
+        // 无内嵌封面回退：标题行 + 歌手行（对齐 WPF 行为，FontSize 24 居中大字）
+        if (AudioCoverImage == null)
+        {
+            var fallback = new StringBuilder();
+            if (!string.IsNullOrWhiteSpace(info.Title))
+                fallback.AppendLine(info.Title);
+            if (!string.IsNullOrWhiteSpace(info.Artist))
+                fallback.Append(info.Artist);
+            AudioFallbackText = fallback.ToString().Trim();
+        }
+
         var audioFormatValues = new Dictionary<string, string?>();
         if (info.Duration.HasValue)
             audioFormatValues[MetadataKeys.Duration] = info.Duration.Value.ToString(@"mm\:ss");
@@ -2133,6 +2202,8 @@ using (var canvas = new SkiaSharp.SKCanvas(dstSk))
             audioFormatValues[MetadataKeys.Bitrate] = $"{info.Bitrate} kbps";
         if (info.BitDepth.HasValue)
             audioFormatValues[MetadataKeys.BitDepth] = $"{info.BitDepth}-bit";
+        if (info.Title != null)
+            audioFormatValues[MetadataKeys.Title] = info.Title;
         if (info.Artist != null)
             audioFormatValues[MetadataKeys.Artist] = info.Artist;
         if (info.Album != null)
