@@ -431,13 +431,32 @@
           </StackPanel>
         </ScrollViewer>
 
-        <!-- 音频预览：仅显示元数据（时长、采样率、位深等） -->
-        <StackPanel IsVisible="{Binding IsAudioVisible}"
-                    Spacing="{DynamicResource SpacingXs}">
-          <TextBlock Text="{Binding PreviewHeaderText}"
-                     FontSize="20"
-                     FontWeight="Bold" />
-        </StackPanel>
+        <!-- 音频预览：优先显示内嵌封面（MP3 APIC / FLAC PICTURE），无封面时回退标题/歌手大字 -->
+        <ScrollViewer IsVisible="{Binding IsAudioVisible}"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+          <StackPanel Spacing="{DynamicResource SpacingXs}">
+            <!-- 标题栏 -->
+            <TextBlock Text="{Binding PreviewHeaderText}"
+                       FontSize="20"
+                       FontWeight="Bold" />
+            <!-- 内嵌封面：等比缩放，限最大 400×400 防止超大封面撑爆面板 -->
+            <Image Source="{Binding AudioCoverImage}"
+                   IsVisible="{Binding HasAudioCover}"
+                   Stretch="Uniform"
+                   MaxWidth="400"
+                   MaxHeight="400"
+                   HorizontalAlignment="Center" />
+            <!-- 无封面回退：标题/歌手居中大字（对齐 WPF 行为，FontSize 24） -->
+            <TextBlock Text="{Binding AudioFallbackText}"
+                       IsVisible="{Binding HasAudioFallback}"
+                       FontSize="24"
+                       TextAlignment="Center"
+                       TextWrapping="Wrap"
+                       HorizontalAlignment="Center"
+                       Margin="{DynamicResource SpacingMdThk}" />
+          </StackPanel>
+        </ScrollViewer>
         <!-- SQLite 数据库预览：TabControl 显示表名，DataGrid 显示表数据 -->
         <Grid IsVisible="{Binding IsSqliteVisible}"
               RowDefinitions="Auto,*">

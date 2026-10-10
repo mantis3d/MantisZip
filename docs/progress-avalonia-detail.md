@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-10** — 音频预览新增 MP3 + FLAC 内嵌封面显示（✅ 已完成，对齐 WPF 版行为）
+  - **Core `FlacParser.cs`**：由只读 STREAMINFO 重构为遍历全部元数据块——`ExtractStreamInfo` 保留「首个块载荷 <34 → null」语义，新增 `ExtractPictureBlock`/`TryParsePicturePayload` 提取 PICTURE（type 6）图片数据填入 `CoverArtData`；封面块损坏 → cover 为 null 但解析仍成功；`FileFormatInfo.CoverArtData` 注释补充 FLAC PICTURE 说明
+  - **`MetadataRegistry.cs`**：`audio` 类型注册表首项加 `MetadataKeys.Title`（`Metadata_Key_Title` 三语已存在 → 零新增 i18n key）
+  - **`PreviewViewModel.cs`**：新增 `AudioCoverImage`(Bitmap?)/`AudioFallbackText` + `HasAudioCover`/`HasAudioFallback`（**不复用 `PreviewImage`**，避免与图片预览状态互相污染）；`ShowAudio` 先清状态再解码（`Length > 8` 门槛 + try/catch + `App.DebugLog`），无封面回退 Title/Artist 大字；`OnPreviewTypeChanged` 离开音频（value != Audio）时释放位图防泄漏；信息面板渲染 Title
+  - **`PreviewPanel.axaml`**：音频区改 ScrollViewer + 封面 `Image`（Stretch Uniform、MaxWidth/MaxHeight 400 居中）+ 回退 `TextBlock`（FontSize 24 居中）；间距用 `SpacingXxx` DynamicResource（规则 5）、不显式设 Foreground（规则 4）、全中文注释（规则 14）
+  - **范围决定**：VORBIS_COMMENT 解析（FLAC 无封面时的标题回退文字）**不在本次范围**——FLAC 无封面时回退文字为空（与现状一致）；MP3 无封面走 ID3 Title/Artist 回退
+  - **测试（TDD 严格红绿）**：Core 新增 `FlacParserTests` 5 条（封面字节精确断言 + 时长采样率 / 无封面 null / 超长声明长度容错 / magic + 首块有效性锁定）+ `Id3v2ParserTests` 1 条（APIC 回归锁定）；Avalonia 新增 `PreviewAudioPreviewTests` 4 条（无封面回退文字 / 有封面解码 / 离开音频清理 / 切换文件不残留）
+  - **验证**：`dotnet build` 0 错误（3 warning 既有 `TextEncodingDetector` CS8604 + `PreviewViewModel` 2× CS0618）；Core **429 通过 / 0 失败 / 2 跳过**（基线 423 + 新增 6）、Avalonia **135 通过 / 5 失败 / 3 跳过**（基线 131 + 新增 4；5 失败全部为预存 `PreviewWebViewLazyInitTests` TestPreview 样本缺失）；验证时 Everything.exe 锁 `bin\...\MantisZip.ShellExt.dll` 致 post-build 拷贝失败（MSB3027），用 csproj 自带 `-p:SkipShellExtCopy=true` 逃生开关绕过（未改仓库文件，编译本身始终成功）
+
 **2026-10-09** — 四项修复/功能一次性实施（✅ 已完成：预览窗格宽度 bug、解压窗口回收站选项、宽度 bug 回归修复、压缩端文件冲突默认选项）
   - **① 预览窗格宽度 bug（Star 布局尺寸丢失）**：`MainWindow.SaveCurrentPreviewSize` 原实现只记录 `GridUnitType.Pixel`，未保存过布局时拖分隔条产生的是 Star 尺寸（Avalonia Split 行为保持 Star）→ 不记录 → 位置重应用回退默认（3* / 200px）→ 面板缩到最小。修复：新增 `RecordPreviewSize` 对 Pixel/Star 且值 >0 均记录（Auto 与面板隐藏压缩 0 跳过），`ApplyPreviewPosition` 四个 case 由 `new GridLength(h1, Pixel)` 改为直接用存储的 `GridLength`
   - **② 回归修复（单元类型持久化）**：`_previewSizeByPosition` 由 `Dictionary<int, double>` 升级 `Dictionary<int, GridLength>`；`LayoutStateManager.LayoutSnapshot.PreviewSizeByPosition` 同步改型，新增 `GridLengthJsonConverter`（写对象形态 `{"value":N,"unit":N}`，unit 0=Auto/1=Pixel/2=Star；**读兼容旧版裸数字=Pixel**，旧 layout.json 无需迁移），`JsonOptions` 注册转换器后 Load/Save 共用；`ApplySavedLayout` 回填校验 `GridUnitType is Pixel or Star && Value>0`
