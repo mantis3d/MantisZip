@@ -4,12 +4,14 @@
         x:Class="MantisZip.UI.Avalonia.Dialogs.ProgressWindow"
         x:CompileBindings="False"
         Title="{Binding WindowTitle}"
-        Width="560"
+        Width="800"
+        MinWidth="500"
+        MinHeight="500"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         CanResize="True"
         Topmost="True"
-        ShowInTaskbar="False"
+        ShowInTaskbar="True"
         Background="{DynamicResource ThemeWindowBgBrush}">
   <Window.Resources>
     <!-- 批处理状态转图标转换器 -->
