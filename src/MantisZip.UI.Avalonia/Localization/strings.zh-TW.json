@@ -1,4 +1,5 @@
 {
+  "FormatOptions_ZIP_MultiThreadOver4Gb": "待壓縮總量超過 4GB（ZIP32 單包上限）時暫不支援多執行緒壓縮，將自動回退為單執行緒。此限制將在後續版本解決。",
   "Progress_Tooltip_Progress": "進度",
   "Progress_Tooltip_Bytes": "位元組",
   "Progress_Tooltip_Ratio": "壓縮率",

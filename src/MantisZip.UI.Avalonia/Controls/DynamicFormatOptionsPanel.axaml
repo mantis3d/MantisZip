@@ -80,6 +80,16 @@
                   IsCheckedChanged="ZipMultiThreadCheck_IsCheckedChanged"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
+        <!-- ZIP 多线程超 4GB 限制说明：待压缩总量达到 ZIP32 上限时禁用上方选项并显示本提示
+             （与引擎侧 IsMultiThreadedEligible 的 MaxZip32Size 判定同源；后续版本将支持 ZIP64 多线程） -->
+        <TextBlock x:Name="ZipMtOverLimitHintText"
+                   Text="{Binding ZipMtOverLimitHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   IsVisible="False"
+                   TextWrapping="Wrap"
+                   FontSize="11"
+                   Margin="24,2,0,0"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
         <!-- 并行压缩组数：N 个单线程压缩器并行（区别于上方「多线程压缩」的单个压缩器 mt=on）。
              按项目规则 6（方案 A）：多线程压缩关闭时整块隐藏而非禁用 —— N 组的第一条回退条件
              就是 MultiThreadedCompression == false，组数在此情况下会被引擎静默忽略。 -->

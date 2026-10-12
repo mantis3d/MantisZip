@@ -1,4 +1,5 @@
 {
+  "FormatOptions_ZIP_MultiThreadOver4Gb": "待压缩总量超过 4GB（ZIP32 单包上限）时暂不支持多线程压缩，将自动回退为单线程。此限制将在后续版本解决。",
   "Progress_Tooltip_Progress": "进度",
   "Progress_Tooltip_Bytes": "字节",
   "Progress_Tooltip_Ratio": "压缩率",

@@ -24,6 +24,22 @@ public partial class DynamicFormatOptionsPanel : UserControl
             nameof(SelectedFormat), "zip",
             defaultBindingMode: BindingMode.TwoWay);
 
+    /// <summary>
+    /// ZIP32 单包未压缩大小上限（与 ZipEngine.MaxZip32Size 同源：uint.MaxValue - 1）。
+    /// 达到该值时 ZIP 多线程压缩不可用（ZipBinaryRewriter 不支持 ZIP64）。
+    /// </summary>
+    private const long MaxZip32Size = uint.MaxValue - 1L;
+
+    /// <summary>
+    /// 当前待压缩总量是否达到 ZIP32 上限（由 <see cref="UpdateTotalSourceSize"/> 驱动）。
+    /// </summary>
+    private bool _zipMtOverSizeLimit;
+
+    /// <summary>
+    /// 进入超限状态前用户的勾选状态（退出超限时恢复，避免灰勾与提示矛盾）。
+    /// </summary>
+    private bool _mtCheckedBeforeLimit;
+
     // ── Localized Binding Properties ───────────────────────────────────────
 
     public string ZipPanelTitle => LocalizationManager.T("FormatOptions_Zip_Title");
@@ -41,6 +57,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
     public string AdaptiveCompressionLabel => LocalizationManager.T("FormatOptions_ZIP_AdaptiveCompression");
     public string SmartDetectLabel => LocalizationManager.T("FormatOptions_ZIP_SmartDetect");
     public string ZipMultiThreadLabel => LocalizationManager.T("FormatOptions_ZIP_MultiThread");
+    public string ZipMtOverLimitHint => LocalizationManager.T("FormatOptions_ZIP_MultiThreadOver4Gb");
     public string ParallelDegreeLabel => LocalizationManager.T("Compress_ParallelDegree");
     public string ParallelDegreeHint => LocalizationManager.T("Compress_ParallelDegree_Hint");
     public string ZipAdaptiveSectionTitle => LocalizationManager.T("Settings_AdaptiveCompression");
@@ -182,12 +199,14 @@ public partial class DynamicFormatOptionsPanel : UserControl
 
     /// <summary>
     /// ZIP 多线程压缩。仅对 ZIP 格式有效（非加密 + Deflate 方法）；非 ZIP 格式返回 false。
+    /// 超过 4GB ZIP32 上限时恒返回 false（即使勾选框残留 IsChecked=true）。
     /// </summary>
     public bool MultiThreadedCompression
     {
         get
         {
             if (SelectedFormat != "zip") return false;
+            if (_zipMtOverSizeLimit) return false;
             return ZipMultiThreadCheck.IsChecked == true;
         }
     }
@@ -246,14 +265,50 @@ public partial class DynamicFormatOptionsPanel : UserControl
 
     /// <summary>
     /// ZIP 多线程压缩复选框变更 — 联动「并行压缩组数」面板显隐（规则 6：关闭时整块隐藏）。
+    /// 超 4GB 限制期间强制隐藏组数面板（即使勾选框残留选中状态）。
     /// </summary>
     private void ZipMultiThreadCheck_IsCheckedChanged(object? sender, RoutedEventArgs e)
     {
         if (ParallelDegreePanel != null)
-            ParallelDegreePanel.IsVisible = ZipMultiThreadCheck.IsChecked == true;
+            ParallelDegreePanel.IsVisible = !_zipMtOverSizeLimit && ZipMultiThreadCheck.IsChecked == true;
     }
 
     // ── Public Methods ─────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 由压缩设置窗口在预览树重建后调用：传入本次待压缩的最大单包未压缩大小（字节），
+    /// 达到 <see cref="MaxZip32Size"/> 时禁用 ZIP 多线程勾选框并显示说明文字，
+    /// 否则恢复可用并隐藏说明（规则 6：联动面板整块显隐）。
+    /// Separate 模式下每个源各自成包，引擎按单包判定，故调用方应传最大单包而非总和。
+    /// </summary>
+    public void UpdateTotalSourceSize(long maxArchiveBytes)
+    {
+        bool overLimit = maxArchiveBytes >= MaxZip32Size;
+        if (overLimit == _zipMtOverSizeLimit) return;
+
+        if (ZipMultiThreadCheck != null)
+        {
+            if (overLimit)
+            {
+                // 进入超限：记住用户勾选状态并取消勾选（避免禁用后残留灰勾与提示矛盾）
+                _mtCheckedBeforeLimit = ZipMultiThreadCheck.IsChecked == true;
+                ZipMultiThreadCheck.IsChecked = false;
+            }
+            else
+            {
+                // 退出超限：恢复原勾选状态
+                ZipMultiThreadCheck.IsChecked = _mtCheckedBeforeLimit;
+            }
+            ZipMultiThreadCheck.IsEnabled = !overLimit;
+        }
+
+        _zipMtOverSizeLimit = overLimit;
+
+        if (ZipMultiThreadCheck != null && ParallelDegreePanel != null)
+            ParallelDegreePanel.IsVisible = !overLimit && ZipMultiThreadCheck.IsChecked == true;
+        if (ZipMtOverLimitHintText != null)
+            ZipMtOverLimitHintText.IsVisible = overLimit;
+    }
 
     /// <summary>
     /// Load default values from AppSettings into all controls.

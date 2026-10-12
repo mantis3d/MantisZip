@@ -1,4 +1,5 @@
 {
+  "FormatOptions_ZIP_MultiThreadOver4Gb": "Multi-threaded compression is unavailable when the total size exceeds 4GB (ZIP32 per-archive limit) and will fall back to single-threaded. This limitation will be addressed in a future version.",
   "Progress_Tooltip_Progress": "Progress",
   "Progress_Tooltip_Bytes": "Bytes",
   "Progress_Tooltip_Ratio": "Ratio",
