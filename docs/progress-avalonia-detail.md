@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-12** — 修复整数型 NumericUpDown 可输入小数（全局 `.intOnly` 类样式）
+  - **缺陷**：所有「线程数 / 并行压缩组数」数字框（设置窗口 SSD/HDD/手动线程数 ×3、解压对话框 ×3、压缩对话框并行组数 ×1，共 7 处）均可输入小数（如 8.5）——Avalonia `NumericUpDown` 默认 `ParsingNumberStyle=NumberStyles.Any`，绑定到 `int` 属性也拦不住（UI 显示 8.5、写回 `int` 才截断，具误导；压缩组数 code-behind 为 `(int)v` 截断）。
+  - **修复**：`App.axaml` 新增 `Style Selector="NumericUpDown.intOnly"`（`ParsingNumberStyle=Integer` + `FormatString="{}{0:0}"`），7 处挂 `Classes="intOnly"`。边界：整数样式阻止小数被解析/提交为值，但输入过程中 "." 字符仍可能瞬时可见（Avalonia 对 NumericUpDown 输入框不做按键级过滤；如要彻底拒收字符需额外输入拦截，本次不做）。
+  - **验证**：构建 0 错误。
+
 **2026-10-12** — 智能并行解压（全局开关 + SSD/HDD 智能度 + 大包预测试，Avalonia + Core）
   - **计划迁移**：[smart-parallel-extract.md](../.omo/plans/已完成/smart-parallel-extract.md) 由「未开始」移至「已完成」（11 Task 全部落地）。
   - **Core 决策链**：`ParallelDegreeResolver.ResolveAsync` 5 步——①调用方覆盖（clamp 1-16）②全局关→1 ③智能关→`ManualDegree`/ProcessorCount ④智能开+≥1GB+预测试开→`ParallelDegreeOptimizer.FindOptimalDegreeAsync` ⑤磁盘默认 SSD 12/HDD 8/Unknown→min(CPU,12)；`ParallelExtractSettings` record 快照由调用方注入（Core 不依赖 UI AppSettings）。

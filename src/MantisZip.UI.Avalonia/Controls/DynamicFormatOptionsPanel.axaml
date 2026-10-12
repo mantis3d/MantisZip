@@ -104,6 +104,7 @@
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <!-- 组数输入框：1..16，1 = 串行；默认值由 LoadDefaults 从 AppSettings 注入 -->
           <NumericUpDown x:Name="ParallelDegreeInput"
+                         Classes="intOnly"
                          Minimum="1" Maximum="16"
                          Value="1"
                          Width="120" />
