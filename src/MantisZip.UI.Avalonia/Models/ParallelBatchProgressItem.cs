@@ -2,7 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace MantisZip.UI.Avalonia.Models;
 
-/// <summary>ZIP 并行解压批次详细行（ArchiveProgress.BatchIndex 驱动；仅并行时由 VM 填充，非并行集合为空按 Rule 6 隐藏）。</summary>
+/// <summary>进度窗通道行（并行批次行 IsParallel=true，或非并行合成单行 IsParallel=false；详细模式常显，D2）。</summary>
 public partial class ParallelBatchProgressItem : ObservableObject
 {
     /// <summary>BatchIndex+1（1-based 显示序号）。</summary>
@@ -45,17 +45,21 @@ public partial class ParallelBatchProgressItem : ObservableObject
     [ObservableProperty]
     private string _fileSizeText = "";
 
-    /// <summary>右区：合并百分比+明细（"45% (12/40)"；单行仅 "45%"）。</summary>
+    /// <summary>右区：合并百分比+明细（"45% (12/40)"；仅并行行使用——单行与底部总进度重复，不填充）。</summary>
     [ObservableProperty]
     private string _pctDetailText = "";
 
-    /// <summary>右区：信息列（字节进度 · 压缩率；空=隐藏）。</summary>
+    /// <summary>右区：信息列（字节进度 · 压缩率；空=隐藏）。变更时同步刷新 ShowRightRegion。</summary>
     [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(ShowRightRegion))]
     private string _infoText = "";
 
-    /// <summary>右区：批次底纹比例 0-1（= Percent/100）。</summary>
+    /// <summary>右区：批次底纹比例 0-1（= Percent/100；仅并行行使用——单行底纹与底部总进度重复，不填充）。</summary>
     [ObservableProperty]
     private double _batchRatio;
+
+    /// <summary>右区整体是否显示：并行行恒显（序号/底纹/百分比有效）；单行仅信息列非空时显示（空时整区隐藏让左区占满，7z/解压无字节无压缩率即此场景）。</summary>
+    public bool ShowRightRegion => IsParallel || !string.IsNullOrEmpty(InfoText);
 
     /// <summary>右区：ToolTip 文本（VM 拼好，\n 分隔；null = 无 ToolTip）。</summary>
     [ObservableProperty]

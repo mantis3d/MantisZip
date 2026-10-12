@@ -821,16 +821,16 @@ public partial class ProgressViewModel : ObservableObject
             _parallelBatchItems.Add(existing);
         }
         existing.Percent = Math.Clamp(p.PercentComplete, 0, 100);
-        existing.BatchRatio = Math.Clamp(p.PercentComplete / 100.0, 0.0, 1.0);            // 右区批次底纹（=整体进度）
+        // 单行不填充 BatchRatio/PctDetailText：批次底纹与合并百分比与底部总进度重复（2026-10-10 修订，D2/D8/D10），
+        // 右区仅信息列（压缩率全窗口唯一出处）；信息列为空时 ShowRightRegion=false 整右区隐藏。
         existing.FileRatio = Math.Clamp((p.FilePercentComplete ?? 0) / 100.0, 0.0, 1.0);  // 左区文件底纹
         existing.CurrentFile = string.IsNullOrEmpty(p.CurrentFile) ? existing.CurrentFile : p.CurrentFile;
         var (dir, name) = ProgressDisplayCalculator.SplitFilePath(existing.CurrentFile);
         existing.DirectoryText = ProgressDisplayCalculator.MiddleEllipsis(dir);
         existing.FileNameText = name;
         existing.FileSizeText = p.FileTotalBytes > 0 ? FormatUtil.FormatSize(p.FileTotalBytes) : string.Empty;
-        existing.PctDetailText = p.PercentComplete > 0 ? $"{Math.Round(p.PercentComplete)}%" : string.Empty;  // 单行无括注
-        existing.InfoText = BuildInfoText(p);
-        existing.TooltipText = BuildTooltipText(p);
+        existing.InfoText = BuildInfoText(p);   // 右区：字节进度 + 压缩率
+        existing.TooltipText = BuildTooltipText(p); // 右区 ToolTip
     }
 
     /// <summary>右区信息列：字节进度 · 压缩率（缺段省略，规则 6）。</summary>

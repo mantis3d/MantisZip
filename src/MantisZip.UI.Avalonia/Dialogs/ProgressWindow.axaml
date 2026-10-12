@@ -1,3 +1,6 @@
+<!-- 进度窗口。
+     高度下限（MinHeight）双机制：XAML 的 100 仅为初始兜底；真实下限由 code-behind
+     LayoutUpdated 动态设置为「内容自然高度 + 窗口 chrome」，保证任何状态 UI 不被裁切。 -->
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:MantisZip.UI.Avalonia.Converters"
@@ -6,7 +9,7 @@
         Title="{Binding WindowTitle}"
         Width="800"
         MinWidth="500"
-        MinHeight="500"
+        MinHeight="100"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         CanResize="True"
@@ -32,17 +35,29 @@
 
   <!-- 根容器：7 行布局（原型对齐后结构）。
        行距固定绑定紧凑度资源 SpacingXs——间距唯一来源是全局紧凑度（CompactnessMode），
-       信息量分级只控制「显示多少信息」，不再改行距（ApplyInfoDensity 已移除动态行距）。 -->
+       信息量分级只控制「显示多少信息」，不再改行距（ApplyInfoDensity 已移除动态行距）。
+       ClipToBounds=True：兑底裁剪（动态 Window.MinHeight 已保证正常状态不溢出，
+       此处仅防御极端时序下内容瞬时高于窗口的过渡帧）。 -->
   <Grid x:Name="RootGrid"
         Margin="{DynamicResource SpacingMdThk}"
-        RowSpacing="{DynamicResource SpacingXs}">
+        RowSpacing="{DynamicResource SpacingXs}"
+        ClipToBounds="True">
     <Grid.RowDefinitions>
       <RowDefinition Height="Auto"/>  <!-- 0: 批处理区（表头 + 批处理文件列表） -->
       <RowDefinition Height="Auto"/>  <!-- 1: 内容模式切换（显示: 简约/详细/列表） -->
-      <RowDefinition Height="*"/>     <!-- 2: 内容区（简约 / 详细 / 列表 三面板互斥） -->
+      <!-- 2: 内容区（简约 / 详细 / 列表 三面板互斥）。
+           Auto：按内容自然高度收高，不再垫高（旧 MinHeight=120 会在简约/少线程模式
+           内容只有 ~70px 时垫出大块空白——问题 1 根因之一）。窗口调矮的保护改由
+           动态 Window.MinHeight（code-behind）承担，不再靠本行 MinHeight。 -->
+      <RowDefinition Height="Auto"/>
       <RowDefinition Height="Auto"/>  <!-- 3: 状态消息行 -->
       <RowDefinition Height="Auto"/>  <!-- 4: 下方信息区（密度切换 + 统计 + 总进度 + 时间） -->
-      <RowDefinition Height="Auto"/>  <!-- 5: 错误摘要 -->
+      <!-- 5: 错误摘要 —— 全窗口唯一弹性行（*）。
+           窗口被手动拉高时，富余高度全部归本行（错误文本框随之拉伸，无错误时即为空白），
+           使按钮行恒贴窗口底边、内容区保持紧贴内容；自然高度（SizeToContent=Height）下
+           本行按其子内容测量（无限高测量 treatStarAsAuto）= 错误文本高度 / 无错误时 0，
+           不产生空白。窗口调矮时本行先收缩（先压到 0），Auto 行永不被压。 -->
+      <RowDefinition Height="*"/>
       <RowDefinition Height="Auto"/>  <!-- 6: 按钮行 -->
     </Grid.RowDefinitions>
 
@@ -396,14 +411,16 @@
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
                 </Grid>
 
-                <!-- 右区：批次域（批次底纹 + 序号 + 合并百分比 + 信息列；悬停 ToolTip 解释字段） -->
-                <Grid Grid.Column="1" MinWidth="180" ClipToBounds="True"
+                <!-- 右区：批次域（固定宽 256 防数字位宽变化导致边界跳动；右对齐 + ClipToBounds 兜底裁剪，
+                     溢出时最左元素先裁 = 序号→百分比→信息列左端。IsParallel=false 单行仅信息列非空时显示（ShowRightRegion）。 -->
+                <Grid Grid.Column="1" Width="256" ClipToBounds="True"
+                      IsVisible="{Binding ShowRightRegion}"
                       Margin="{DynamicResource SpacingXsThk}"
                       ToolTip.Tip="{Binding TooltipText}">
-                  <!-- 批次底纹：宽 = BatchRatio × 本格宽（紫系，区别于左区文件底纹） -->
+                  <!-- 批次底纹：宽 = BatchRatio × 本格宽（紫系，区别于左区文件底纹）；仅并行行显示（单行与底部总进度重复） -->
                   <Rectangle Fill="{DynamicResource ThemeProgressBatchBrush}"
                              HorizontalAlignment="Left"
-                             IsVisible="{Binding CurrentFile, Converter={StaticResource StringNotEmpty}}">
+                             IsVisible="{Binding IsParallel}">
                     <Rectangle.Width>
                       <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                         <Binding Path="BatchRatio" />
@@ -411,18 +428,22 @@
                       </MultiBinding>
                     </Rectangle.Width>
                   </Rectangle>
-                  <!-- 文字层：序号（非并行单行隐藏） | 合并百分比 | 信息列（字节进度 · 压缩率，空=隐藏） -->
+                  <!-- 文字层：序号（非并行隐藏） | 合并百分比（非并行隐藏，与底部总进度重复） | 信息列（字节进度 · 压缩率，空=隐藏）
+                       tnum 等宽数字：数字位数增减时不改变字形宽度，防右区内容跳动 -->
                   <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}"
                               HorizontalAlignment="Right" VerticalAlignment="Center">
                     <TextBlock Text="{Binding Index}" IsVisible="{Binding IsParallel}"
                                FontSize="11" VerticalAlignment="Center"
+                               FontFeatures="+tnum"
                                Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                    <TextBlock Text="{Binding PctDetailText}"
+                    <TextBlock Text="{Binding PctDetailText}" IsVisible="{Binding IsParallel}"
                                FontSize="11" VerticalAlignment="Center"
+                               FontFeatures="+tnum"
                                Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
                     <TextBlock Text="{Binding InfoText}"
                                IsVisible="{Binding InfoText, Converter={StaticResource StringNotEmpty}}"
                                FontSize="10" VerticalAlignment="Center"
+                               FontFeatures="+tnum"
                                TextTrimming="CharacterEllipsis"
                                Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
                   </StackPanel>

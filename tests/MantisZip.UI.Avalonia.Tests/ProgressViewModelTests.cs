@@ -189,6 +189,44 @@ public class ProgressViewModelTests
         Assert.Equal("a.txt", rows[0].FileNameText);
         Assert.Equal("400 B", rows[0].FileSizeText);        // 左区文件大小
         Assert.Contains("400 B/1000 B", rows[0].InfoText);  // 右区字节进度
+        // 2026-10-10 修订（D2/D8/D10）：单行右区仅信息列——底纹/百分比与底部总进度重复，不再填充
+        Assert.Equal(string.Empty, rows[0].PctDetailText);
+        Assert.Equal(0.0, rows[0].BatchRatio);
+        Assert.True(rows[0].ShowRightRegion);               // 信息列非空 → 右区显示
+    }
+
+    // 2026-10-10 修订（决策 b）：单行信息列为空（7z 压缩/解压无字节无压缩率）→ 整右区隐藏，左区占满
+    [Fact]
+    public void SetProgress_NonParallel_NoBytesNoRatio_HidesRightRegion()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            CurrentFile = "docs/a.txt",
+            PercentComplete = 40,
+            // 不填 BatchTotalBytes/CompressionRatio → InfoText 为空
+        });
+        var row = Assert.Single(vm.ParallelBatchItems);
+        Assert.False(row.IsParallel);
+        Assert.Equal(string.Empty, row.InfoText);
+        Assert.False(row.ShowRightRegion);
+    }
+
+    // 并行行右区恒显（序号/底纹/百分比有效），即使信息列为空
+    [Fact]
+    public void ParallelRow_EmptyInfoText_StillShowsRightRegion()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            CurrentFile = "a.txt",
+            BatchIndex = 0,
+            BatchCount = 2,
+            BatchPercentComplete = 50,
+        });
+        var row = vm.ParallelBatchItems[0];
+        Assert.True(row.IsParallel);
+        Assert.True(row.ShowRightRegion);
     }
 
     [Fact]
