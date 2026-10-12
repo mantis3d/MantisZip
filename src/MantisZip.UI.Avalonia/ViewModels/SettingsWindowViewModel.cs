@@ -229,6 +229,36 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(DoubleClickOpenThresholdMB));
     }
 
+    // ── Parallel Extract ──
+    [ObservableProperty]
+    private bool _enableParallelExtract;
+
+    [ObservableProperty]
+    private bool _smartParallelDegree;
+
+    [ObservableProperty]
+    private int _smartSsdDegree = 12;
+
+    [ObservableProperty]
+    private int _smartHddDegree = 8;
+
+    [ObservableProperty]
+    private bool _largeArchivePreTest;
+
+    [RelayCommand]
+    private void ShowParallelHelp()
+    {
+        ShowParallelHelpRequested?.Invoke();
+    }
+
+    /// <summary>帮助弹窗打开请求（由 SettingsWindow code-behind 订阅并弹窗）。</summary>
+    public event Action? ShowParallelHelpRequested;
+
+    partial void OnSmartParallelDegreeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(SmartParallelDegreeText));
+    }
+
     // ── ContextMenu ──
     [ObservableProperty]
     private bool _enableOpenMenu;
@@ -800,6 +830,16 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ExtractDoubleClickActionText => LocalizationManager.T("Settings_Extract_DoubleClickAction");
     public string ExtractDoubleClickThresholdText => LocalizationManager.T("Settings_Extract_DoubleClickThreshold");
 
+    // Parallel Extract strings
+    public string EnableParallelExtractText => LocalizationManager.T("Settings_EnableParallelExtract");
+    public string SmartParallelDegreeText => SmartParallelDegree
+        ? LocalizationManager.T("Settings_SmartParallelDegree")
+        : LocalizationManager.T("Settings_SmartParallelDegreeOff");
+    public string SmartSsdLabelText => LocalizationManager.T("Settings_SmartSsdLabel");
+    public string SmartHddLabelText => LocalizationManager.T("Settings_SmartHddLabel");
+    public string LargeArchivePreTestText => LocalizationManager.T("Settings_LargeArchivePreTest");
+    public string ParallelHelpButtonText => LocalizationManager.T("Settings_ParallelHelpButton");
+
     // DoubleClickAction option display texts
     public string DoubleClickActionOpenText => LocalizationManager.T("Settings_DoubleClick_Open");
     public string DoubleClickActionExtractHereText => LocalizationManager.T("Settings_DoubleClick_ExtractHere");
@@ -973,6 +1013,13 @@ public partial class SettingsWindowViewModel : ObservableObject
         _deleteArchiveAfterExtract = _settings.DeleteArchiveAfterExtract;
         _doubleClickAction = _settings.DoubleClickAction;
         _doubleClickOpenThreshold = _settings.DoubleClickOpenThreshold;
+
+        // Parallel Extract
+        _enableParallelExtract = _settings.EnableParallelExtract;
+        _smartParallelDegree = _settings.SmartParallelDegree;
+        _smartSsdDegree = _settings.SmartSsdDegree;
+        _smartHddDegree = _settings.SmartHddDegree;
+        _largeArchivePreTest = _settings.LargeArchivePreTest;
 
         // ContextMenu
         _enableOpenMenu = _settings.EnableOpenMenu;
@@ -1335,6 +1382,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ExtractDeleteAfterExtractText));
         OnPropertyChanged(nameof(ExtractDoubleClickActionText));
         OnPropertyChanged(nameof(ExtractDoubleClickThresholdText));
+        OnPropertyChanged(nameof(EnableParallelExtractText));
+        OnPropertyChanged(nameof(SmartParallelDegreeText));
+        OnPropertyChanged(nameof(SmartSsdLabelText));
+        OnPropertyChanged(nameof(SmartHddLabelText));
+        OnPropertyChanged(nameof(LargeArchivePreTestText));
+        OnPropertyChanged(nameof(ParallelHelpButtonText));
         OnPropertyChanged(nameof(DoubleClickActionOpenText));
         OnPropertyChanged(nameof(DoubleClickActionExtractHereText));
         OnPropertyChanged(nameof(DoubleClickActionSmartExtractText));
@@ -1504,6 +1557,13 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.DeleteArchiveAfterExtract = DeleteArchiveAfterExtract;
         _settings.DoubleClickAction = SelectedDoubleClickActionOption?.Value ?? DoubleClickAction;
         _settings.DoubleClickOpenThreshold = DoubleClickOpenThreshold;
+
+        // Parallel Extract
+        _settings.EnableParallelExtract = EnableParallelExtract;
+        _settings.SmartParallelDegree = SmartParallelDegree;
+        _settings.SmartSsdDegree = Math.Clamp(SmartSsdDegree, 1, 16);
+        _settings.SmartHddDegree = Math.Clamp(SmartHddDegree, 1, 16);
+        _settings.LargeArchivePreTest = LargeArchivePreTest;
 
         // ContextMenu
         _settings.EnableOpenMenu = EnableOpenMenu;
