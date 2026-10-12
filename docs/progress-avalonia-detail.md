@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-12** — 依赖安全升级（ImageSharp 3.1.5 → 4.1.3 + SQLitePCLRaw 原生库覆盖）
+  - **ImageSharp 3.1.5 → 4.1.3**（直接依赖，用于 TGA/APNG 预览解码不可信内容）：3.1.5 命中 **4 High + 3 Moderate**（含 `GHSA-2cmq-823j-5qj8` GIF 越界写 CVE-2025-27598、`j3p4`/`j9gm`/`jjfr` High、`rxmq`/`gwg2`/`wmxv` Moderate）。实测（NuGet 审计 DB）：3.1.12 / 3.2.0 仅清 High、仍留 `gwg2`（Moderate）；唯 **4.1.3 全清**。4.1.3 编译通过（现有 APNG/TGA 用法兼容）；许可证不变（Six Labors Split License）。
+  - **`SQLitePCLRaw.lib.e_sqlite3` 2.1.11 → 3.53.3**（`MantisZip.Core` / UI 经 Microsoft.Data.Sqlite 传递）：2.1.11 捆绑 SQLite < 3.50.2（CVE-2025-6965 内存损坏，`GHSA-2m69-gcr7-jv3q`）。Microsoft.Data.Sqlite 10.0.8 仍钉 2.1.11，故在 Core/UI 显式覆盖**仅原生库包**（e_sqlite3 ABI 稳定；managed `provider`/`core`/`bundle` 维持 2.1.11 不动）。运行时冒烟：新原生库可加载、`sqlite_version ≥ 3.50.2`、建表/查询正常。
+  - **验证**：`dotnet list package --vulnerable` 两项目均**清零**；Core 构建 0 错、全量 **655 通过**；UI 构建 0 错、Avalonia **182 通过**（5 既有 `PreviewWebViewLazyInitTests` 缺夹具失败）。
+
 **2026-10-12** — 修复整数型 NumericUpDown 可输入小数（全局 `.intOnly` 类样式）
   - **缺陷**：所有「线程数 / 并行压缩组数」数字框（设置窗口 SSD/HDD/手动线程数 ×3、解压对话框 ×3、压缩对话框并行组数 ×1，共 7 处）均可输入小数（如 8.5）——Avalonia `NumericUpDown` 默认 `ParsingNumberStyle=NumberStyles.Any`，绑定到 `int` 属性也拦不住（UI 显示 8.5、写回 `int` 才截断，具误导；压缩组数 code-behind 为 `(int)v` 截断）。
   - **修复**：`App.axaml` 新增 `Style Selector="NumericUpDown.intOnly"`（`ParsingNumberStyle=Integer` + `FormatString="{}{0:0}"`），7 处挂 `Classes="intOnly"`。边界：整数样式阻止小数被解析/提交为值，但输入过程中 "." 字符仍可能瞬时可见（Avalonia 对 NumericUpDown 输入框不做按键级过滤；如要彻底拒收字符需额外输入拦截，本次不做）。
