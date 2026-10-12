@@ -124,14 +124,14 @@
                              TextWrapping="Wrap" />
                 </CheckBox>
 
-                <!-- 并行解压线程数 -->
+                <!-- 并行解压线程数：0=自动（智能/设置），1=串行，2-16=线程数 -->
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
                   <TextBlock Text="{Binding LocalizedStrings[Extract_ParallelDegree]}"
                              VerticalAlignment="Center" />
-                  <NumericUpDown Minimum="1" Maximum="16"
+                  <NumericUpDown Minimum="0" Maximum="16"
                                  Value="{Binding ParallelExtractDegree, Mode=TwoWay}"
                                  Width="120" />
-                  <TextBlock Text="(1=串行，默认=CPU核心数)"
+                  <TextBlock Text="{Binding LocalizedStrings[Extract_ParallelDegreeAutoHint]}"
                              VerticalAlignment="Center"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                              FontSize="11" />

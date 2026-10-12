@@ -40,9 +40,9 @@ public partial class ExtractSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _openFolderAfterExtract;
 
-    /// <summary>并行解压线程数（1=串行，>1=并行）。默认 = CPU核心数。</summary>
+    /// <summary>并行解压线程数：0=自动（由 ParallelDegreeResolver 决策），1=串行，2-16=线程数。默认 0=自动。</summary>
     [ObservableProperty]
-    private int _parallelExtractDegree = Environment.ProcessorCount;
+    private int _parallelExtractDegree = 0;
 
     /// <summary>过滤后需实际解压的条目 key 列表（由 View 从对话框回传；null = 未启用过滤，全量解压）。</summary>
     public List<string>? FilteredEntryKeys { get; set; }
@@ -203,8 +203,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
         var settings = AppSettings.Load();
         if (!string.IsNullOrEmpty(settings.FileConflictAction))
             ConflictAction = settings.FileConflictAction;
-        // 并行解压线程数
-        ParallelExtractDegree = settings.ParallelExtractDegree;
+        // 并行解压线程数：默认 0=自动（由 ParallelDegreeResolver 按全局开关/智能/预测试/磁盘类型决定）。
+        // 不从 AppSettings.ParallelExtractDegree 读取——该值仅作 resolver 步骤 3（智能关闭时）的 ManualDegree 回退。
         // 解压后打开文件夹（对齐 WPF ExtractSettingsWindow.LoadDefaultsFromSettings 读取 OpenFolderAfterExtract）
         OpenFolderAfterExtract = settings.OpenFolderAfterExtract;
 
@@ -238,7 +238,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_TabFilter",
             "Extract_Source_MultiFilterHint",
             "Extract_UnlockButton",
-            "Extract_ParallelDegree"
+            "Extract_ParallelDegree",
+            "Extract_ParallelDegreeAutoHint"
         };
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in keys)
