@@ -50,12 +50,29 @@ public static class ParallelDegreeResolver
     /// <param name="callerDegree">调用方覆盖（null 或 ≤0 = 无覆盖）。</param>
     /// <param name="settings">并行解压设置快照。</param>
     /// <param name="diskType">目标磁盘类型（步骤 5 输入）。</param>
-    /// <param name="archiveSize">压缩包大小（当前同步路径不触发预测试，仅记录；预测试由 ResolveAsync 处理）。</param>
+    /// <param name="archiveSize">预留参数（当前未使用，保留以兼容后续诊断）。</param>
     public static int Resolve(
         int? callerDegree,
         ParallelExtractSettings settings,
         DiskType diskType,
         long archiveSize = 0)
+    {
+        // 步骤 1-3 短路；null = 继续走步骤 5 智能路径
+        return TryResolveShortCircuit(callerDegree, settings)
+            // 步骤 5：磁盘类型默认值（步骤 4 预测试不适用/失败时也落到这里）
+            ?? diskType switch
+            {
+                DiskType.Ssd => Math.Clamp(settings.SmartSsdDegree, 1, MaxDegree),
+                DiskType.Hdd => Math.Clamp(settings.SmartHddDegree, 1, MaxDegree),
+                _ => Math.Clamp(Math.Min(Environment.ProcessorCount, UnknownDiskCap), 1, MaxDegree)
+            };
+    }
+
+    /// <summary>
+    /// 步骤 1-3 同步短路（Resolve 与 ResolveAsync 共享的单一实现，防漂移）；
+    /// 返回 null 表示继续走智能路径。
+    /// </summary>
+    private static int? TryResolveShortCircuit(int? callerDegree, ParallelExtractSettings settings)
     {
         // 步骤 1：调用方明确指定（最高优先级）
         if (callerDegree is > 0)
@@ -72,13 +89,7 @@ public static class ParallelDegreeResolver
             return Math.Clamp(manual, 1, MaxDegree);
         }
 
-        // 步骤 5：磁盘类型默认值（步骤 4 预测试不适用/失败时也落到这里）
-        return diskType switch
-        {
-            DiskType.Ssd => Math.Clamp(settings.SmartSsdDegree, 1, MaxDegree),
-            DiskType.Hdd => Math.Clamp(settings.SmartHddDegree, 1, MaxDegree),
-            _ => Math.Clamp(Math.Min(Environment.ProcessorCount, UnknownDiskCap), 1, MaxDegree)
-        };
+        return null;
     }
 
     /// <summary>
@@ -103,16 +114,9 @@ public static class ParallelDegreeResolver
         IProgress<ArchiveProgress>? progress,
         CancellationToken ct)
     {
-        // 步骤 1-3 同步短路（不进入 I/O 路径）
-        if (callerDegree is > 0)
-            return Math.Clamp(callerDegree.Value, 1, MaxDegree);
-        if (!settings.EnableParallel)
-            return 1;
-        if (!settings.SmartParallel)
-        {
-            var manual = settings.ManualDegree > 0 ? settings.ManualDegree : Environment.ProcessorCount;
-            return Math.Clamp(manual, 1, MaxDegree);
-        }
+        // 步骤 1-3 同步短路（不进入 I/O 路径；与 Resolve 共享 TryResolveShortCircuit）
+        var shortCircuit = TryResolveShortCircuit(callerDegree, settings);
+        if (shortCircuit is int v) return v;
 
         // 磁盘检测（优先目标目录——写盘是瓶颈；不可用回退压缩包路径）
         var diskType = DiskTypeDetector.GetDiskType(destinationPath);
@@ -130,15 +134,16 @@ public static class ParallelDegreeResolver
 
         if (ParallelDegreeOptimizer.ShouldPreTest(archiveSize, settings.LargeArchivePreTest, engineSupportsParallel))
         {
+            // 上报预测试状态（不显示百分比，CurrentFile 携带状态文案）。
+            // 置于 try 外：订阅方抛异常不应静默吞掉预测试
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = "STATUS_TESTING_PARALLEL_DEGREE", // 调用方可替换为本地化文案
+                PercentComplete = 0
+            });
+
             try
             {
-                // 上报预测试状态（不显示百分比，CurrentFile 携带状态文案）
-                progress?.Report(new ArchiveProgress
-                {
-                    CurrentFile = "STATUS_TESTING_PARALLEL_DEGREE", // 调用方可替换为本地化文案
-                    PercentComplete = 0
-                });
-
                 var optimal = await ParallelDegreeOptimizer.FindOptimalDegreeAsync(
                     archivePath, destinationPath, password, progress, ct);
                 if (optimal > 0)

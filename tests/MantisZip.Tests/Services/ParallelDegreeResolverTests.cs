@@ -64,7 +64,8 @@ public class ParallelDegreeResolverTests
         var s = DefaultSettings with { SmartParallel = false, ManualDegree = 0 };
         var result = ParallelDegreeResolver.Resolve(
             callerDegree: null, s, DiskType.Ssd, archiveSize: 0);
-        Assert.Equal(Environment.ProcessorCount, result);
+        // 代码会 clamp 到 16，>16 核机器上原始 ProcessorCount 会越界
+        Assert.Equal(Math.Min(Environment.ProcessorCount, 16), result);
     }
 
     // ── 步骤 5（同步路径，无预测试触发时）：磁盘类型默认值 ──
@@ -113,12 +114,49 @@ public class ParallelDegreeResolverTests
     }
 
     [Fact]
-    public void Resolve_CallerOverrideNegative_ClampsTo1()
+    public void Resolve_CallerOverrideNegative_NotAnOverride_FallsToGlobalOff()
     {
-        // 负数不视为 override（<=0 落入决策链），但最终值仍 clamp
+        // 负数不视为 override（<=0 落入决策链），走步骤 2 全局关
         var s = DefaultSettings with { EnableParallel = false };
         var result = ParallelDegreeResolver.Resolve(
             callerDegree: -5, s, DiskType.Ssd, archiveSize: 0);
         Assert.Equal(1, result); // 全局关
+    }
+
+    // ── ResolveAsync 短路路径（步骤 1-3 不触碰 I/O，null 路径安全） ──
+
+    [Fact]
+    public async Task ResolveAsync_CallerOverride_ReturnsClampedWithoutIo()
+    {
+        var result = await ParallelDegreeResolver.ResolveAsync(
+            callerDegree: 6, DefaultSettings,
+            archivePath: null!, destinationPath: null!,
+            password: null, engineSupportsParallel: true,
+            progress: null, CancellationToken.None);
+        Assert.Equal(6, result);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_GlobalDisabled_Returns1WithoutIo()
+    {
+        var s = DefaultSettings with { EnableParallel = false };
+        var result = await ParallelDegreeResolver.ResolveAsync(
+            callerDegree: null, s,
+            archivePath: null!, destinationPath: null!,
+            password: null, engineSupportsParallel: true,
+            progress: null, CancellationToken.None);
+        Assert.Equal(1, result);
+    }
+
+    [Fact]
+    public async Task ResolveAsync_SmartOffManual_ReturnsManualWithoutIo()
+    {
+        var s = DefaultSettings with { SmartParallel = false, ManualDegree = 5 };
+        var result = await ParallelDegreeResolver.ResolveAsync(
+            callerDegree: null, s,
+            archivePath: null!, destinationPath: null!,
+            password: null, engineSupportsParallel: true,
+            progress: null, CancellationToken.None);
+        Assert.Equal(5, result);
     }
 }
