@@ -6,6 +6,18 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-12** — ZIP 总大小超 4GB 自动禁用多线程压缩（Avalonia）
+  - **背景**：ZIP32 格式上限 ~4GB，`ZipEngine.IsMultiThreadedEligible` 在总量超 `uint.MaxValue-1` 时整体回退串行，但压缩对话框 UI 不知情——用户勾选「多线程」实际无效。
+  - **实现**：`DynamicFormatOptionsPanel` 新增 `MaxZip32Size` 阈值 + `UpdateTotalSourceSize(long)`（进入超限：记住勾选态 → 取消勾选 → 禁用复选框 → 显示提示 → 隐藏组数面板；退出恢复），`MultiThreadedCompression` getter 超限恒 false，`ZipMtOverLimitHint` 提示文案（`FormatOptions_ZIP_MultiThreadOver4Gb`，三语文件头插入）。
+  - **接线**：`CompressSettingsWindow.OnViewModelPropertyChanged` 监听 `PreviewRoot`/`OutputMode` → `UpdateZipMultiThreadAvailability()`；Manual/Combined 用根 `TotalDescendantSize`，Separate 遍历 `EnumerateArchiveNodes` 取最大单包（引擎按单包判定）。
+  - **验证**：构建 0 错误；Avalonia 180 通过 / 5 预存失败（`PreviewWebViewLazyInitTests` 缺夹具）/ 3 跳过。
+
+**2026-10-12** — 进度窗口通道行右区显隐修订 + 内容区空白修复（Avalonia，部分完成）
+  - **右区显隐**（2026-10-10 决策 D2/D8/D10 落地）：右区 `MinWidth=180` → 固定 `Width=256` 防数字位宽变化导致边界跳动；`ParallelBatchProgressItem` 新增 `ShowRightRegion => IsParallel || InfoText 非空`——并行行恒显（序号/底纹/百分比有效），非并行单行仅信息列非空时显示（7z/解压无字节无压缩率 → 整右区隐藏，左区占满）；VM 单行不再填充 `BatchRatio`/`PctDetailText`（与底部总进度重复）；批次底纹 `IsVisible` 改绑 `IsParallel`，序号/合并百分比加 `IsVisible=IsParallel`，文字层加 `FontFeatures=+tnum` 等宽数字防跳动。测试 +3（`ShowRightRegion` 三态）。
+  - **布局行结构调整**（问题 1：简约/少线程模式内容区下方大块空白）：内容区 Row 2 `Height="*" MinHeight="120"` → `Auto`（旧 `*` 行吃掉全部手动拉高富余 + MinHeight 垫高 70px 内容到 120 → 双重空白根因）；错误摘要 Row 5 `Auto` → `*` 成全窗唯一弹性行——手动拉高时富余归错误区（无错误即空白）、按钮行恒贴底边，自然高度（`SizeToContent=Height` 无限高测量 `treatStarAsAuto`）下按子内容测量不产生空白；`RootGrid` 加 `ClipToBounds=True` 兜底；XAML 顶注释说明 MinHeight 双机制。
+  - **待续**（问题 2：窗口可缩到很小裁切 UI）：code-behind `LayoutUpdated` 动态 `MinHeight = RootGrid.DesiredSize.Height + (Height − ClientSize.Height)`，XAML 静态 `MinHeight=100` 仅初始兜底——尚未实施。
+  - **验证**：构建 0 错误；Avalonia 180 通过 / 5 预存失败 / 3 跳过（`ProgressWindowXamlTests` 行数断言 7 行仍通过）。
+
 **2026-10-11** — 新增计划：进度窗口状态行 + 失败原因明细 + 关闭链统一 + 自动关闭倒计时 + 解压后置开关（计划类）
   - **新计划**：[progress-window-status-line.md](../.omo/plans/未开始/progress-window-status-line.md)（P2 / 12-16h / 13 任务 5 波次），配套设计规格 [2026-10-11-progress-window-status-line-design.md](superpowers/specs/2026-10-11-progress-window-status-line-design.md)（12 节、决策 D1–D19 用户逐项拍板）。五大改造：① **状态行**下移到信息区与按钮行之间 + 可复制（只读 TextBox 14px + 复制按钮），错误摘要加复制按钮（复用既有 `ShowCopyFeedback` toast）；② **失败原因枚举通道**——Core 新增 `EntryFailureReason`（`PermissionDenied`/`IoFailed`/`Other`）+ `ArchiveProgress.EntryFailureReason` + `FailureReasonMapper`，三引擎 24 处失败埋点带原因、压缩端 `ReadFileWithRetry`/`TarWriteFileWithRetry` 带 `out` 原因、`ReadErrorHandler.FilterUnreadableFiles` 加预检回调补 7z/加密 ZIP 静默剔除缺口，UI 侧三语映射（Core 禁中文文案、不透传 `ex.Message`）；③ **错误摘要红/黄分层**——红段=整包异常头+逐条目失败、黄段=压缩端带原因跳过（不触发 `HasErrors`），按 EntryKey 去重 + 每段 20 行上限溢出提示，复制=红段+单换行+黄段；④ **三条件不自动关闭统一走「自动按下 📌」**（D10）——红段写入/批行置 Failed/测试流标志三个触发点，无独立 `ShouldAutoClose` 判定；`RunWithProgress` 增 pending 完成回调（15 调用点零改动）把测试结果写进窗口状态行/错误摘要、**移除测试失败模态框**（`ExtractFlow` 失败模态框保留且时序前移到等待之前），泛型 catch 补吞异常缺口（写摘要+落日志），`AutoCloseOrWaitAsync` 删 `delayMs` 参数收口 4 处 CLI 魔法数字 2500、删 `WaitForWindowCloseAsync`；⑤ **自动关闭延时进设置**（`AutoCloseDelaySeconds` 默认 3s、0–60 clamp、外观页）+ 按钮行左侧倒计时（复用 100ms 轮询，无新计时器）+ 行内可改（聚焦冻结/离开以最终有效值重置/`CountdownParser` 纯函数夹紧 0–60，**仅本次生效不回写设置**，否决 NumericUpDown 与 `{0}` 包数字）；⑥ **解压后置开关**「打开目录」「移入回收站」进按钮行——能力位显隐（压缩/测试/CLI 打开目录全藏，D18）、初值镜像设置/对话框选择、**实例级不回写设置**（D17 选项 A），`TryDeleteArchiveAfterExtract` 改签名传 `enabled`、CLI 两处删包挪到关窗后（D19）。Follow-ups（黄段扩解压冲突跳过、读/写权限细分、测试逐条目定位等 6 项）见 spec §12。
   - **原型**：[progress-window-status-line.html](prototypes/progress-window-status-line.html)（4 场景：状态行 14px、摘要复制按钮、倒计时、解压后置开关）。
