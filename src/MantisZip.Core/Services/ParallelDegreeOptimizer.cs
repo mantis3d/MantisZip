@@ -6,7 +6,8 @@ namespace MantisZip.Core.Services;
 
 /// <summary>
 /// 大包预测试优化器：解压 ≥1GB 压缩包前，用小样本对比不同线程数耗时，选出最优线程数。
-/// 测试写入目标目录下的临时子目录（用户已确认），测完立即删除。
+/// 测试写入目标目录下的唯一临时根目录（__parallel_test_{GUID}，避免与预已存在的
+/// 用户目录/并发实例冲突），测完整树删除，绝不触碰自己未创建的路径。
 /// 任何异常/取消 → 返回负数（调用方回退磁盘类型默认值）。
 /// </summary>
 public static class ParallelDegreeOptimizer
@@ -16,6 +17,9 @@ public static class ParallelDegreeOptimizer
 
     /// <summary>样本目标大小（约 50MB）。</summary>
     private const long SampleTargetBytes = 50L * 1024 * 1024;
+
+    /// <summary>样本硬上限（500MB）：防止少量超大条目使样本规模失控。</summary>
+    private const long HardCapBytes = 500L * 1024 * 1024;
 
     /// <summary>样本最少文件数（避免单文件大包主导结果）。</summary>
     private const int MinSampleFiles = 5;
@@ -46,6 +50,15 @@ public static class ParallelDegreeOptimizer
     /// <summary>
     /// 快速测试找出最优并行度。
     /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 返回值未按用户设置的最大线程数钳制 —— 调用方负责 clamp
+    /// （本方法只输出候选最优值，UserMaxThreads 等策略属调用方职责）。
+    /// </para>
+    /// <para>
+    /// progress 参数暂不转发给引擎（预测试不向 UI 上报进度，避免与正式解压进度冲突）。
+    /// </para>
+    /// </remarks>
     /// <returns>最优线程数；失败/取消返回负数（-1），调用方回退磁盘类型默认值。</returns>
     public static async Task<int> FindOptimalDegreeAsync(
         string archivePath,
@@ -67,7 +80,7 @@ public static class ParallelDegreeOptimizer
             return -1;
         }
 
-        // 1. 选取测试样本（按压缩包内条目顺序累加到 ~50MB）
+        // 1. 选取测试样本（按压缩包内条目顺序累加到 ~50MB，500MB 硬上限）
         IReadOnlyList<ArchiveItem> allEntries;
         try
         {
@@ -92,47 +105,56 @@ public static class ParallelDegreeOptimizer
 
         CoreLog.Info($"FindOptimalDegreeAsync: {sampleKeys.Count} sample files, configs=[{string.Join(",", configs)}]");
 
-        // 2. 逐配置测试
+        // 2. 逐配置测试。
+        //    唯一运行根目录：同名 __parallel_test_{degree} 可能是用户已有内容
+        //    （或并发实例所有），只在 GUID 命名的 runRoot 内创建子目录，只删 runRoot。
+        var runRoot = Path.Combine(destinationPath, $"__parallel_test_{Guid.NewGuid():N}");
         int bestDegree = -1;
         long bestElapsed = long.MaxValue;
 
-        foreach (var degree in configs)
+        try
         {
-            ct.ThrowIfCancellationRequested();
-
-            var tempDir = Path.Combine(destinationPath, $"__parallel_test_{degree}");
-            try
+            foreach (var degree in configs)
             {
-                Directory.CreateDirectory(tempDir);
+                ct.ThrowIfCancellationRequested();
 
-                var sw = Stopwatch.StartNew();
-                await engine.ExtractEntriesAsync(
-                    archivePath, sampleKeys, tempDir,
-                    password, progress: null, ct,
-                    options: new ArchiveOptions { ParallelExtractDegree = degree });
-                sw.Stop();
-
-                CoreLog.Info($"FindOptimalDegreeAsync: degree={degree}, elapsed={sw.ElapsedMilliseconds}ms");
-                if (sw.ElapsedMilliseconds < bestElapsed)
+                var tempDir = Path.Combine(runRoot, degree.ToString());
+                try
                 {
-                    bestElapsed = sw.ElapsedMilliseconds;
-                    bestDegree = degree;
+                    Directory.CreateDirectory(tempDir);
+
+                    var sw = Stopwatch.StartNew();
+                    await engine.ExtractEntriesAsync(
+                        archivePath, sampleKeys, tempDir,
+                        password, progress: null, ct,
+                        options: new ArchiveOptions { ParallelExtractDegree = degree });
+                    sw.Stop();
+
+                    CoreLog.Info($"FindOptimalDegreeAsync: degree={degree}, elapsed={sw.ElapsedMilliseconds}ms");
+                    if (sw.ElapsedMilliseconds < bestElapsed)
+                    {
+                        bestElapsed = sw.ElapsedMilliseconds;
+                        bestDegree = degree;
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    throw;
+                }
+                catch (Exception ex)
+                {
+                    CoreLog.Info($"FindOptimalDegreeAsync: degree={degree} failed: {ex.Message}");
+                    // 本配置失败跳过，继续下一配置
+                }
+                finally
+                {
+                    CleanupTempDir(tempDir);
                 }
             }
-            catch (OperationCanceledException)
-            {
-                CleanupTempDir(tempDir);
-                throw;
-            }
-            catch (Exception ex)
-            {
-                CoreLog.Info($"FindOptimalDegreeAsync: degree={degree} failed: {ex.Message}");
-                // 本配置失败跳过，继续下一配置
-            }
-            finally
-            {
-                CleanupTempDir(tempDir);
-            }
+        }
+        finally
+        {
+            CleanupTempDir(runRoot);
         }
 
         CoreLog.Exit();
@@ -141,7 +163,8 @@ public static class ParallelDegreeOptimizer
 
     /// <summary>
     /// 按压缩包内条目顺序累加文件大小到 ~50MB 选样本。
-    /// 至少 MinSampleFiles 个（不足则全部取），最多 MaxSampleFiles 个。
+    /// 至少 MinSampleFiles 个（仅在 50MB 增长阶段内保证；硬上限触发即停，不足也照收），
+    /// 最多 MaxSampleFiles 个，总量硬上限 HardCapBytes（防止超大条目使样本失控）。
     /// </summary>
     private static List<string> SelectSampleEntries(IReadOnlyList<ArchiveItem> entries)
     {
@@ -152,14 +175,17 @@ public static class ParallelDegreeOptimizer
         foreach (var entry in files)
         {
             if (result.Count >= MaxSampleFiles) break;
-            result.Add(entry.FullPath ?? entry.Name);
+            result.Add(string.IsNullOrEmpty(entry.FullPath) ? entry.Name : entry.FullPath);
             accumulated += entry.Size;
             if (accumulated >= SampleTargetBytes && result.Count >= MinSampleFiles) break;
+            if (accumulated >= HardCapBytes) break; // 硬上限，防止超大条目样本失控
         }
 
-        // 文件太少时全取
-        if (result.Count < MinSampleFiles)
-            result = files.Take(MaxSampleFiles).Select(e => e.FullPath ?? e.Name).ToList();
+        // 文件太少时全取（硬上限已触发则不再回填，保持当前样本）
+        if (result.Count < MinSampleFiles && accumulated < HardCapBytes)
+            result = files.Take(MaxSampleFiles)
+                .Select(e => string.IsNullOrEmpty(e.FullPath) ? e.Name : e.FullPath)
+                .ToList();
 
         return result;
     }

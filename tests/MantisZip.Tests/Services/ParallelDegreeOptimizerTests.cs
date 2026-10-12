@@ -1,3 +1,5 @@
+using System.Text;
+using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Services;
 using MantisZip.Tests.Fixtures;
 using Xunit;
@@ -123,5 +125,71 @@ public class ParallelDegreeOptimizerTests : IDisposable
 
         var leftovers = Directory.GetDirectories(dest, "__parallel_test_*");
         Assert.Empty(leftovers);
+    }
+
+    [Fact]
+    public async Task FindOptimalDegreeAsync_MaliciousEntryKeys_ReturnsNegativeAndNoEscape()
+    {
+        // 构造含 ../ 逃逸条目的 ZIP：全部配置应失败返回负数，且目标目录父级不出现逃逸文件
+        var archive = Path.Combine(NewTempDir(), "evil.zip");
+        CreateZipWithTraversalEntry(archive);
+        var dest = TrackDir(NewTempDir());
+        var parent = Directory.GetParent(dest)!.FullName;
+        var escaped = Path.Combine(parent, "evil.txt");
+
+        var result = await ParallelDegreeOptimizer.FindOptimalDegreeAsync(
+            archive, dest, password: null, progress: null, CancellationToken.None);
+
+        Assert.True(result < 0, $"malicious archive should return negative, got {result}");
+        Assert.False(File.Exists(escaped), "Zip Slip escape file must not be written outside dest");
+    }
+
+    [Fact]
+    public async Task FindOptimalDegreeAsync_PreExistingUserDirs_Survive()
+    {
+        // 数据丢失回归：目标目录下预建的 __parallel_test_{degree} 用户目录（同名/并发场景），
+        // 预测试既不能写入其中，也不能在清理时递归删除
+        var archive = ArchiveFixtures.CreateMultiFileZipArchive(30, 10);
+        var dest = TrackDir(NewTempDir());
+
+        var sentinels = new List<string>();
+        foreach (var degree in ParallelDegreeOptimizer.GetTestConfigs(Environment.ProcessorCount))
+        {
+            var userDir = Path.Combine(dest, $"__parallel_test_{degree}");
+            Directory.CreateDirectory(userDir);
+            var sentinel = Path.Combine(userDir, "user_sentinel.txt");
+            File.WriteAllText(sentinel, "pre-existing user content");
+            sentinels.Add(sentinel);
+        }
+
+        var result = await ParallelDegreeOptimizer.FindOptimalDegreeAsync(
+            archive, dest, password: null, progress: null, CancellationToken.None);
+
+        Assert.InRange(result, 1, 16);
+        foreach (var s in sentinels)
+            Assert.True(File.Exists(s), $"pre-existing user file must survive: {s}");
+    }
+
+    /// <summary>
+    /// 创建含 4 个普通小文件 + 1 个 ../ 逃逸条目（key 原样写入）的 ZIP。
+    /// </summary>
+    private static void CreateZipWithTraversalEntry(string archivePath)
+    {
+        using var fs = File.Create(archivePath);
+        using var zipStream = new ZipOutputStream(fs);
+        zipStream.SetLevel(1);
+
+        var buffer = new byte[1024];
+        for (int i = 0; i < 4; i++)
+        {
+            zipStream.PutNextEntry(new ZipEntry($"file{i}.txt"));
+            zipStream.Write(buffer, 0, buffer.Length);
+            zipStream.CloseEntry();
+        }
+
+        zipStream.PutNextEntry(new ZipEntry("../evil.txt"));
+        var evilBytes = Encoding.UTF8.GetBytes("evil");
+        zipStream.Write(evilBytes, 0, evilBytes.Length);
+        zipStream.CloseEntry();
     }
 }
