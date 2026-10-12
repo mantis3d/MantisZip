@@ -36,7 +36,7 @@
 **2026-10-12** — 进度窗口通道行右区显隐修订 + 内容区空白修复（Avalonia，部分完成）
   - **右区显隐**（2026-10-10 决策 D2/D8/D10 落地）：右区 `MinWidth=180` → 固定 `Width=256` 防数字位宽变化导致边界跳动；`ParallelBatchProgressItem` 新增 `ShowRightRegion => IsParallel || InfoText 非空`——并行行恒显（序号/底纹/百分比有效），非并行单行仅信息列非空时显示（7z/解压无字节无压缩率 → 整右区隐藏，左区占满）；VM 单行不再填充 `BatchRatio`/`PctDetailText`（与底部总进度重复）；批次底纹 `IsVisible` 改绑 `IsParallel`，序号/合并百分比加 `IsVisible=IsParallel`，文字层加 `FontFeatures=+tnum` 等宽数字防跳动。测试 +3（`ShowRightRegion` 三态）。
   - **布局行结构调整**（问题 1：简约/少线程模式内容区下方大块空白）：内容区 Row 2 `Height="*" MinHeight="120"` → `Auto`（旧 `*` 行吃掉全部手动拉高富余 + MinHeight 垫高 70px 内容到 120 → 双重空白根因）；错误摘要 Row 5 `Auto` → `*` 成全窗唯一弹性行——手动拉高时富余归错误区（无错误即空白）、按钮行恒贴底边，自然高度（`SizeToContent=Height` 无限高测量 `treatStarAsAuto`）下按子内容测量不产生空白；`RootGrid` 加 `ClipToBounds=True` 兜底；XAML 顶注释说明 MinHeight 双机制。
-  - **待续**（问题 2：窗口可缩到很小裁切 UI）：code-behind `LayoutUpdated` 动态 `MinHeight = RootGrid.DesiredSize.Height + (Height − ClientSize.Height)`，XAML 静态 `MinHeight=100` 仅初始兜底——尚未实施。
+  - **动态 MinHeight（问题 2 已实施）**：code-behind `UpdateDynamicMinHeight()` 挂 `RootGrid.LayoutUpdated`——`MinHeight = RootGrid.DesiredSize.Height + max(0, Height − ClientSize.Height)`（DesiredSize 已含 Grid Margin；chrome 项通常为 0，留作平台差异兜底），0.5px 节流防布局循环；XAML 静态 `MinHeight=100` 仅作首帧兜底，模式/密度切换、错误摘要出现等任何内容变化后窗口下限自动跟随，无法再缩到裁切 UI。
   - **验证**：构建 0 错误；Avalonia 180 通过 / 5 预存失败 / 3 跳过（`ProgressWindowXamlTests` 行数断言 7 行仍通过）。
 
 **2026-10-11** — 新增计划：进度窗口状态行 + 失败原因明细 + 关闭链统一 + 自动关闭倒计时 + 解压后置开关（计划类）

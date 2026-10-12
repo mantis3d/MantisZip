@@ -68,6 +68,30 @@ public partial class ProgressWindow : Window
 
         // 按初始信息量分级（Medium）落地行距与批处理列表高度
         ApplyInfoDensity();
+
+        // 动态窗口高度下限：每次布局完成后同步 MinHeight = 内容自然高度（防手动缩窗裁切 UI）
+        RootGrid.LayoutUpdated += (_, _) => UpdateDynamicMinHeight();
+    }
+
+    /// <summary>
+    /// 动态窗口高度下限：MinHeight = 内容自然高度（RootGrid.DesiredSize.Height，已含其 Margin）
+    /// + 窗口 chrome（Height − ClientSize；Avalonia 二者同为客户区语义，通常为 0，留作平台差异兜底）。
+    /// 由 RootGrid.LayoutUpdated 驱动——模式切换/密度切换/错误摘要出现/批处理列表增减都会重新布局，
+    /// 窗口下限随之更新，用户无法再缩到裁切 UI。XAML 静态 MinHeight=100 仅作首帧兜底。
+    /// 0.5px 节流：MinHeight 变更会触发新一轮布局，差值过小直接跳过以防布局循环。
+    /// </summary>
+    private void UpdateDynamicMinHeight()
+    {
+        var needed = RootGrid.DesiredSize.Height;
+        if (double.IsNaN(needed) || needed <= 0)
+            return;
+
+        var chrome = double.IsNaN(Height) ? 0 : Math.Max(0, Height - ClientSize.Height);
+        var target = needed + chrome;
+
+        if (Math.Abs(MinHeight - target) < 0.5)
+            return;
+        MinHeight = target;
     }
 
     /// <summary>
