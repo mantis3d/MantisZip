@@ -40,6 +40,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
     public string TarGzPlaceholder => LocalizationManager.T("FormatOptions_TarGz_Placeholder");
     public string CustomDictSizeHint => LocalizationManager.T("FormatOptions_7z_DictSize_CustomHint");
     public string DictSizeMemoryHint => LocalizationManager.T("FormatOptions_7z_DictSize_MemoryHint");
+    public string CustomSolidSizeHint => LocalizationManager.T("FormatOptions_7z_SolidBlockSize_CustomHint");
 
     // ── CLR Properties ─────────────────────────────────────────────────────
 
@@ -91,13 +92,28 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
+    /// <summary>
+    /// 7z 固实块大小：""=引擎默认，或 "64m" / "256m" / "1g" / "4g"（CustomParameters["s"] 直传）。
+    /// 选「自定义」（tag="-1"）时读取输入框 MB 数值拼为 "Nm"；输入非法返回 ""。
+    /// 固实开关未勾选时恒返回 ""（引擎据此走 s=off）。
+    /// </summary>
     public string? SevenZipSolidBlockSize
     {
         get
         {
             if (SelectedFormat != "7z") return null;
-            if (SolidBlockSizeCombo.SelectedItem is ComboBoxItem item)
-                return item.Tag as string;
+            if (SolidCheck.IsChecked != true) return "";
+            if (SolidBlockSizeCombo.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+            {
+                if (tag == "-1")
+                {
+                    // 自定义：输入框收 MB 数字，拼 "Nm"（裸数字直传 7z 会被解释为 2^N 幂次，必须带单位）
+                    if (long.TryParse(CustomSolidSizeBox?.Text?.Trim(), out var mb) && mb > 0)
+                        return $"{mb}m";
+                    return "";
+                }
+                return tag; // ""=默认 或 "16m"/"1g" 等预设
+            }
             return "";
         }
     }
@@ -189,6 +205,23 @@ public partial class DynamicFormatOptionsPanel : UserControl
     {
         if (SolidBlockSizeCombo != null)
             SolidBlockSizeCombo.IsEnabled = SolidCheck.IsChecked == true;
+        UpdateCustomSolidPanelVisibility();
+    }
+
+    /// <summary>
+    /// 固实块大小下拉变更 — 选「自定义」（tag="-1"）时显示 MB 输入框（规则 6：隐藏而非禁用）。
+    /// </summary>
+    private void SolidBlockSizeCombo_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        UpdateCustomSolidPanelVisibility();
+    }
+
+    /// <summary>自定义固实块输入框可见性 = 选中「自定义」且固实开关开启（规则 6：隐藏而非禁用）。</summary>
+    private void UpdateCustomSolidPanelVisibility()
+    {
+        if (CustomSolidSizePanel == null) return;
+        bool isCustom = SolidBlockSizeCombo?.SelectedItem is ComboBoxItem item && item.Tag as string == "-1";
+        CustomSolidSizePanel.IsVisible = isCustom && SolidCheck.IsChecked == true;
     }
 
     /// <summary>
@@ -261,7 +294,15 @@ public partial class DynamicFormatOptionsPanel : UserControl
 
         MultiThreadCheck.IsChecked = s.SevenZipMultithreaded;
 
-        SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "");
+        // 固实块大小：settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
+        if (!SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "")
+            && !string.IsNullOrEmpty(s.SevenZipSolidBlockSize))
+        {
+            SelectComboByTag(SolidBlockSizeCombo, "-1");
+            var sv = s.SevenZipSolidBlockSize.Trim();
+            if (CustomSolidSizeBox != null)
+                CustomSolidSizeBox.Text = sv.EndsWith("m", StringComparison.OrdinalIgnoreCase) ? sv[..^1] : sv;
+        }
         // 字典大小：settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
         if (!SelectComboByTag(DictSizeCombo, s.SevenZipDictionarySize ?? "")
             && !string.IsNullOrEmpty(s.SevenZipDictionarySize))
@@ -298,7 +339,9 @@ public partial class DynamicFormatOptionsPanel : UserControl
         Fill(MethodCombo, CompressionOptionData.SevenZipMethods);
 
         Fill(SolidBlockSizeCombo, CompressionOptionData.SevenZipSolidBlockSizes, opt =>
-            opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default") : opt.Display);
+            opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default")
+            : opt.Tag == "-1" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Custom")
+            : opt.Display);
 
         Fill(DictSizeCombo, CompressionOptionData.SevenZipDictionarySizes, opt =>
             opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_DictSize_Default")
@@ -329,6 +372,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
                 SevenZPanel.IsVisible = true;
                 if (SolidBlockSizeCombo != null)
                     SolidBlockSizeCombo.IsEnabled = SolidCheck.IsChecked == true;
+                UpdateCustomSolidPanelVisibility();
                 break;
             case "tar.gz":
             case "tgz":

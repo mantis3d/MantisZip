@@ -110,6 +110,20 @@ public partial class SettingsWindowViewModel : ObservableObject
     private string _sevenZipSolidBlockSize = "";
 
     [ObservableProperty]
+    private string _customSolidSizeText = "";
+
+    /// <summary>自定义固实块大小输入框是否可见（选「自定义」时显示，规则 6：隐藏而非禁用）。</summary>
+    public bool IsCustomSolidSizeVisible => SelectedSevenZipSolidBlockSizeOption?.Value == "-1";
+
+    /// <summary>自定义固实块大小输入框旁的单位提示（i18n）。</summary>
+    public string CustomSolidSizeHintText => LocalizationManager.T("FormatOptions_7z_SolidBlockSize_CustomHint");
+
+    partial void OnSelectedSevenZipSolidBlockSizeOptionChanged(Option? value)
+    {
+        OnPropertyChanged(nameof(IsCustomSolidSizeVisible));
+    }
+
+    [ObservableProperty]
     private string _sevenZipDictionarySize = "";
 
     [ObservableProperty]
@@ -999,7 +1013,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         SevenZipSolidBlockSizeOptions.Clear();
         foreach (var opt in CompressionOptionData.SevenZipSolidBlockSizes)
         {
-            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default") : opt.Display;
+            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default")
+                        : opt.Tag == "-1" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Custom")
+                        : opt.Display;
             SevenZipSolidBlockSizeOptions.Add(new Option(display, opt.Tag));
         }
 
@@ -1097,6 +1113,13 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compression advanced
         SelectedSevenZipCompressionMethodOption = SevenZipCompressionMethodOptions.FirstOrDefault(o => o.Value == SevenZipCompressionMethod);
         SelectedSevenZipSolidBlockSizeOption = SevenZipSolidBlockSizeOptions.FirstOrDefault(o => o.Value == SevenZipSolidBlockSize);
+        // settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
+        if (SelectedSevenZipSolidBlockSizeOption == null && !string.IsNullOrEmpty(SevenZipSolidBlockSize))
+        {
+            SelectedSevenZipSolidBlockSizeOption = SevenZipSolidBlockSizeOptions.FirstOrDefault(o => o.Value == "-1");
+            var sv = SevenZipSolidBlockSize.Trim();
+            CustomSolidSizeText = sv.EndsWith("m", StringComparison.OrdinalIgnoreCase) ? sv[..^1] : sv;
+        }
         SelectedSevenZipDictionarySizeOption = SevenZipDictionarySizeOptions.FirstOrDefault(o => o.Value == SevenZipDictionarySize);
         // settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
         if (SelectedSevenZipDictionarySizeOption == null && !string.IsNullOrEmpty(SevenZipDictionarySize))
@@ -1312,7 +1335,17 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.SevenZipCompressionMethod = SelectedSevenZipCompressionMethodOption?.Value ?? SevenZipCompressionMethod;
         _settings.SevenZipSolid = SevenZipSolid;
         _settings.SevenZipMultithreaded = SevenZipMultithreaded;
-        _settings.SevenZipSolidBlockSize = SelectedSevenZipSolidBlockSizeOption?.Value ?? SevenZipSolidBlockSize;
+        // 固实块大小：选「自定义」时拼输入框 MB 值为 "Nm"，否则直存预设 tag
+        if (SelectedSevenZipSolidBlockSizeOption?.Value == "-1")
+        {
+            _settings.SevenZipSolidBlockSize = long.TryParse(CustomSolidSizeText?.Trim(), out var solidMb) && solidMb > 0
+                ? $"{solidMb}m"
+                : "";
+        }
+        else
+        {
+            _settings.SevenZipSolidBlockSize = SelectedSevenZipSolidBlockSizeOption?.Value ?? SevenZipSolidBlockSize;
+        }
         // 字典大小：选「自定义」时拼输入框 MB 值为 "Nm"，否则直存预设 tag
         if (SelectedSevenZipDictionarySizeOption?.Value == "-1")
         {

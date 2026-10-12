@@ -443,6 +443,8 @@
   "FormatOptions_7z_MultiThread": "Multi-threaded Compression",
   "FormatOptions_7z_Solid": "Solid Compression",
   "FormatOptions_7z_SolidBlockSize": "Solid Block Size:",
+  "FormatOptions_7z_SolidBlockSize_Custom": "Custom",
+  "FormatOptions_7z_SolidBlockSize_CustomHint": "In MB, e.g. 4096 = 4GB",
   "FormatOptions_7z_SolidBlockSize_Default": "Default (Full Solid)",
   "FormatOptions_7z_Title": "7z Options",
   "FormatOptions_7z_WordSize": "Word Size:",

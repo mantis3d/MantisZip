@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-12** — 7z 固实块大小支持自定义 MB 输入（对齐字典方案）
+  - **背景**：字典大小支持自定义后，固实块大小（`s` 参数）结构上完全同构（同为走 `CustomParameters` 的 7z 大小字符串），`SevenZipSolidBlockSize` 全链路本就是 `string` → Core 零改动，仅补 UI
+  - **预设**：`CompressionOptionData.SevenZipSolidBlockSizes` 尾部加 `new("-1", "")`（自定义），原 10 项 `""`/16m…4g 保持
+  - **UI（压缩对话框 `DynamicFormatOptionsPanel` + 设置窗口 `SettingsWindow`）**：固实块下拉旁新增「自定义」MB 输入框（选 `-1` 且固实开关开启才显示，规则 6 隐藏而非禁用）；加载时非预设值自动回退选「自定义」并回填 MB 数字；保存时拼 `"{mb}m"`；**不加内存警告**（固实块大主要是压缩率↑ / 随机访问↓，内存影响远小于字典）
+  - **隐患修正**：固实块 getter 在固实复选框未勾选时恒返回 `""`（引擎据此走 `s=off`）——修复此前「取消勾选固实但块大小非空仍被强制开启固实」的行为
+  - **i18n**：新增 `FormatOptions_7z_SolidBlockSize_Custom` / `_CustomHint` 三语成对
+  - **验证**：`dotnet build -c Release` 0 错误（3 warning 既有）；UI 全量 147 通过 / 0 失败 / 3 跳过
+
 **2026-10-12** — `PreviewWebViewLazyInitTests` 自包含化（去除 gitignore 夹具依赖）
   - **根因**：该回归测试类依赖 `TestPreview/attachment-management-0.12.1.zip`，而 `TestPreview/` 在 `.gitignore`（第 36 行）中从未入库 → 换机 / CI 必缺，5 个用例 fail 在 `Assert.True(File.Exists(...))`
   - **修复**：删除 `ReproZipName` 常量与 `RepoFile()`（原向上找仓库根定位 `TestPreview/`），改为运行时合成最小结构 `CreateSyntheticReproZip()`（`%TEMP%\MantisZip\Tests\repro_webview_{guid}.zip`：`attachment-management/` 目录 + `styles.css` + `page.html`）；测试类实现 `IDisposable`，构造建包、`Dispose` 删包；`LoadReproArchive()` 改实例方法

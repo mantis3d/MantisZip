@@ -185,15 +185,36 @@
       
                       <Grid ColumnDefinitions="120,*">
                         <TextBlock Text="{Binding SevenZipSolidBlockSizeText}" VerticalAlignment="Center" />
-                        <ComboBox Grid.Column="1" ItemsSource="{Binding SevenZipSolidBlockSizeOptions}"
-                                  SelectedItem="{Binding SelectedSevenZipSolidBlockSizeOption}"
-                                  Width="200" HorizontalAlignment="Left">
-                          <ComboBox.ItemTemplate>
-                            <DataTemplate>
-                              <TextBlock Text="{Binding Display}" />
-                            </DataTemplate>
-                          </ComboBox.ItemTemplate>
-                        </ComboBox>
+                        <Grid Grid.Column="1">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <ComboBox ItemsSource="{Binding SevenZipSolidBlockSizeOptions}"
+                                    SelectedItem="{Binding SelectedSevenZipSolidBlockSizeOption}"
+                                    Width="200" HorizontalAlignment="Left">
+                            <ComboBox.ItemTemplate>
+                              <DataTemplate>
+                                <TextBlock Text="{Binding Display}" />
+                              </DataTemplate>
+                            </ComboBox.ItemTemplate>
+                          </ComboBox>
+                          <!-- 自定义固实块大小输入：单位 MB，仅选「自定义」时显示（规则 6：隐藏而非禁用） -->
+                          <StackPanel Grid.Column="1"
+                                      Orientation="Horizontal"
+                                      Spacing="4"
+                                      Margin="6,0,0,0"
+                                      IsVisible="{Binding IsCustomSolidSizeVisible}"
+                                      VerticalAlignment="Center">
+                            <TextBox Width="80"
+                                     Text="{Binding CustomSolidSizeText}"
+                                     PlaceholderText="MB" />
+                            <TextBlock Text="{Binding CustomSolidSizeHintText}"
+                                       VerticalAlignment="Center"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                       FontSize="11" />
+                          </StackPanel>
+                        </Grid>
                       </Grid>
       
                       <Grid ColumnDefinitions="120,*">

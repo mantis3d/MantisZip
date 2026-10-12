@@ -80,10 +80,12 @@ public static class CompressionOptionData
         new("Deflate", "Deflate"),
     ];
 
-    /// <summary>7z 固实块大小（10 项，与 WPF 一致）。</summary>
+    /// <summary>
+    /// 7z 固实块大小（Tag 为 7z 大小字符串直传 CustomParameters["s"]，""=默认，"-1"=自定义）。
+    /// </summary>
     public static readonly ComboOption[] SevenZipSolidBlockSizes =
     [
-        new("", ""),    // display: localize via CompressOpt_SolidBlockSize_Default
+        new("", ""),    // display: localize via FormatOptions_7z_SolidBlockSize_Default
         new("16m", "16MB"),
         new("32m", "32MB"),
         new("64m", "64MB"),
@@ -93,6 +95,7 @@ public static class CompressionOptionData
         new("1g", "1GB"),
         new("2g", "2GB"),
         new("4g", "4GB"),
+        new("-1", ""),  // display: localize via FormatOptions_7z_SolidBlockSize_Custom
     ];
 
     /// <summary>

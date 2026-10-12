@@ -443,6 +443,8 @@
   "FormatOptions_7z_MultiThread": "多執行緒壓縮",
   "FormatOptions_7z_Solid": "固實壓縮",
   "FormatOptions_7z_SolidBlockSize": "固實塊大小:",
+  "FormatOptions_7z_SolidBlockSize_Custom": "自訂",
+  "FormatOptions_7z_SolidBlockSize_CustomHint": "單位 MB，如 4096 表示 4GB",
   "FormatOptions_7z_SolidBlockSize_Default": "預設(全固實)",
   "FormatOptions_7z_Title": "7z 選項",
   "FormatOptions_7z_WordSize": "單字大小:",

@@ -443,6 +443,8 @@
   "FormatOptions_7z_MultiThread": "多线程压缩",
   "FormatOptions_7z_Solid": "固实压缩",
   "FormatOptions_7z_SolidBlockSize": "固实块大小:",
+  "FormatOptions_7z_SolidBlockSize_Custom": "自定义",
+  "FormatOptions_7z_SolidBlockSize_CustomHint": "单位 MB，如 4096 表示 4GB",
   "FormatOptions_7z_SolidBlockSize_Default": "默认(全固实)",
   "FormatOptions_7z_Title": "7z 选项",
   "FormatOptions_7z_WordSize": "单词大小:",
