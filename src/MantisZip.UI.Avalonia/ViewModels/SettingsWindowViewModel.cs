@@ -257,7 +257,16 @@ public partial class SettingsWindowViewModel : ObservableObject
     partial void OnSmartParallelDegreeChanged(bool value)
     {
         OnPropertyChanged(nameof(SmartParallelDegreeText));
+        OnPropertyChanged(nameof(IsPreTestVisible));
     }
+
+    partial void OnEnableParallelExtractChanged(bool value)
+    {
+        OnPropertyChanged(nameof(IsPreTestVisible));
+    }
+
+    /// <summary>大包预测试开关可见性：全局开关与智能并行度均开启时显示（规则 6）。</summary>
+    public bool IsPreTestVisible => EnableParallelExtract && SmartParallelDegree;
 
     // ── ContextMenu ──
     [ObservableProperty]
@@ -831,6 +840,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ExtractDoubleClickThresholdText => LocalizationManager.T("Settings_Extract_DoubleClickThreshold");
 
     // Parallel Extract strings
+    public string ExtractParallelExtractTitle => LocalizationManager.T("Settings_ParallelExtractTitle");
     public string EnableParallelExtractText => LocalizationManager.T("Settings_EnableParallelExtract");
     public string SmartParallelDegreeText => SmartParallelDegree
         ? LocalizationManager.T("Settings_SmartParallelDegree")
@@ -1382,6 +1392,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ExtractDeleteAfterExtractText));
         OnPropertyChanged(nameof(ExtractDoubleClickActionText));
         OnPropertyChanged(nameof(ExtractDoubleClickThresholdText));
+        OnPropertyChanged(nameof(ExtractParallelExtractTitle));
         OnPropertyChanged(nameof(EnableParallelExtractText));
         OnPropertyChanged(nameof(SmartParallelDegreeText));
         OnPropertyChanged(nameof(SmartSsdLabelText));

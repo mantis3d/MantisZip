@@ -17,6 +17,16 @@ public partial class SettingsWindow : Window
     {
         InitializeComponent();
         DataContext = new SettingsWindowViewModel();
+
+        // 并行解压帮助弹窗：VM 发起请求 → code-behind 弹窗（规则：对话框经回调委托与 View 解耦）
+        if (DataContext is SettingsWindowViewModel vm)
+        {
+            vm.ShowParallelHelpRequested += () =>
+            {
+                var dlg = new ParallelExtractHelpDialog();
+                dlg.ShowDialog(this);
+            };
+        }
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)

@@ -38,7 +38,7 @@
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1">
           <StackPanel Spacing="8">
-            <TextBlock Text="并行解压"
+            <TextBlock Text="{Binding EnableSectionTitle}"
                        FontWeight="SemiBold"
                        FontSize="14" />
             <TextBlock Text="{Binding EnableSectionText}"
@@ -54,7 +54,7 @@
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1">
           <StackPanel Spacing="8">
-            <TextBlock Text="智能并行度"
+            <TextBlock Text="{Binding SmartSectionTitle}"
                        FontWeight="SemiBold"
                        FontSize="14" />
             <TextBlock Text="{Binding SmartSectionText}"
@@ -70,7 +70,7 @@
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 BorderThickness="1">
           <StackPanel Spacing="8">
-            <TextBlock Text="大包预测试"
+            <TextBlock Text="{Binding PreTestSectionTitle}"
                        FontWeight="SemiBold"
                        FontSize="14" />
             <TextBlock Text="{Binding PreTestSectionText}"

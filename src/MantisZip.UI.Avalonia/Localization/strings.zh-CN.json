@@ -1,7 +1,11 @@
 {
+  "HelpSection_ParallelExtract": "并行解压",
+  "HelpSection_SmartDegree": "智能并行度",
+  "HelpSection_PreTest": "大包预测试",
+  "Settings_ParallelExtractTitle": "并行解压",
   "Settings_EnableParallelExtract": "并行解压（关闭则始终串行解压）",
   "Settings_SmartParallelDegree": "智能并行度（根据磁盘类型选择线程数）",
-  "Settings_SmartParallelDegreeOff": "智能并行度（关闭 → 使用下方固定线程数）",
+  "Settings_SmartParallelDegreeOff": "智能并行度（关闭 → 使用解压对话框线程数设置）",
   "Settings_SmartSsdLabel": "SSD 线程数:",
   "Settings_SmartHddLabel": "HDD 线程数:",
   "Settings_ManualDegreeLabel": "线程数:",

@@ -17,6 +17,9 @@ public partial class ParallelExtractHelpDialog : Window
         EnableSectionText = LocalizationManager.T("ParallelHelp_EnableSection");
         SmartSectionText = LocalizationManager.T("ParallelHelp_SmartSection");
         PreTestSectionText = LocalizationManager.T("ParallelHelp_PreTestSection");
+        EnableSectionTitle = LocalizationManager.T("HelpSection_ParallelExtract");
+        SmartSectionTitle = LocalizationManager.T("HelpSection_SmartDegree");
+        PreTestSectionTitle = LocalizationManager.T("HelpSection_PreTest");
         CloseText = LocalizationManager.T("MsgBox_Close");
         DataContext = this;
     }
@@ -25,6 +28,12 @@ public partial class ParallelExtractHelpDialog : Window
     public string EnableSectionText { get; }
     public string SmartSectionText { get; }
     public string PreTestSectionText { get; }
+    /// <summary>章节 1 标题（本地化）。</summary>
+    public string EnableSectionTitle { get; }
+    /// <summary>章节 2 标题（本地化）。</summary>
+    public string SmartSectionTitle { get; }
+    /// <summary>章节 3 标题（本地化）。</summary>
+    public string PreTestSectionTitle { get; }
     public string CloseText { get; }
 
     private void OnCloseClick(object? sender, RoutedEventArgs e) => Close();

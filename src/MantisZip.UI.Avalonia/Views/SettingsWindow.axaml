@@ -484,6 +484,81 @@
                 </Grid>
               </StackPanel>
             </Border>
+
+            <!-- ═══ 并行解压卡片（全局开关 + 智能并行度 + SSD/HDD 线程数 + 预测试 + 帮助） ═══ -->
+            <!-- 此卡片内不重复固定线程数输入（线程数由智能模式 SSD/HDD 或解压对话框设置提供） -->
+            <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                    CornerRadius="{DynamicResource BorderRadius}"
+                    Padding="{DynamicResource DialogPadding}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+
+                <!-- 卡片标题行：标题 + [?] 帮助按钮 -->
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Text="{Binding ExtractParallelExtractTitle}"
+                             FontWeight="Bold"
+                             FontSize="15"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <Button Grid.Column="1"
+                          Classes="ToolbarIcon"
+                          Content="?"
+                          Command="{Binding ShowParallelHelpCommand}"
+                          ToolTip.Tip="{Binding ParallelHelpButtonText}"
+                          Background="{DynamicResource ThemeHeaderBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </Grid>
+
+                <!-- 全局并行开关：关闭则始终串行 -->
+                <CheckBox Content="{Binding EnableParallelExtractText}"
+                          IsChecked="{Binding EnableParallelExtract}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+                <!-- 智能并行度区域（全局开关关闭时隐藏，规则 6） -->
+                <StackPanel Spacing="{DynamicResource SpacingSm}"
+                            IsVisible="{Binding EnableParallelExtract}">
+                  <CheckBox Content="{Binding SmartParallelDegreeText}"
+                            IsChecked="{Binding SmartParallelDegree}"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+                  <!-- 智能开启：SSD/HDD 双线程数输入 -->
+                  <Grid ColumnDefinitions="Auto,*,Auto,*,"
+                        IsVisible="{Binding SmartParallelDegree}"
+                        Margin="24,0,0,0">
+                    <TextBlock Text="{Binding SmartSsdLabelText}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <NumericUpDown Grid.Column="1"
+                                   Minimum="1"
+                                   Maximum="16"
+                                   Increment="1"
+                                   Value="{Binding SmartSsdDegree}"
+                                   Width="80"
+                                   HorizontalAlignment="Left" />
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding SmartHddLabelText}"
+                               VerticalAlignment="Center"
+                               Margin="12,0,0,0"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <NumericUpDown Grid.Column="3"
+                                   Minimum="1"
+                                   Maximum="16"
+                                   Increment="1"
+                                   Value="{Binding SmartHddDegree}"
+                                   Width="80"
+                                   HorizontalAlignment="Left" />
+                  </Grid>
+                </StackPanel>
+
+                <!-- 大包预测试开关（仅全局开关 + 智能并行度均开启时显示，规则 6 → IsPreTestVisible） -->
+                <CheckBox Content="{Binding LargeArchivePreTestText}"
+                          IsChecked="{Binding LargeArchivePreTest}"
+                          IsVisible="{Binding IsPreTestVisible}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          Margin="24,4,0,0" />
+
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>

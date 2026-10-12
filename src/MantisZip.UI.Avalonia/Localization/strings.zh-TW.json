@@ -1,7 +1,11 @@
 {
+  "HelpSection_ParallelExtract": "並行解壓",
+  "HelpSection_SmartDegree": "智慧並行度",
+  "HelpSection_PreTest": "大包預測試",
+  "Settings_ParallelExtractTitle": "並行解壓",
   "Settings_EnableParallelExtract": "並行解壓（關閉則始終序列解壓）",
   "Settings_SmartParallelDegree": "智慧並行度（根據磁碟類型選擇執行緒數）",
-  "Settings_SmartParallelDegreeOff": "智慧並行度（關閉 → 使用下方固定執行緒數）",
+  "Settings_SmartParallelDegreeOff": "智慧並行度（關閉 → 使用解壓對話框執行緒數設定）",
   "Settings_SmartSsdLabel": "SSD 執行緒數:",
   "Settings_SmartHddLabel": "HDD 執行緒數:",
   "Settings_ManualDegreeLabel": "執行緒數:",

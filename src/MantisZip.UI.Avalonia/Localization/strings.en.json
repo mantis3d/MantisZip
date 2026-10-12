@@ -1,7 +1,11 @@
 {
+  "HelpSection_ParallelExtract": "Parallel Extract",
+  "HelpSection_SmartDegree": "Smart Parallel Degree",
+  "HelpSection_PreTest": "Large Archive Pre-test",
+  "Settings_ParallelExtractTitle": "Parallel Extract",
   "Settings_EnableParallelExtract": "Parallel extract (off = always serial)",
   "Settings_SmartParallelDegree": "Smart parallel degree (pick threads by disk type)",
-  "Settings_SmartParallelDegreeOff": "Smart parallel degree (off = use fixed thread count below)",
+  "Settings_SmartParallelDegreeOff": "Smart parallel degree (off = use extract-dialog thread count)",
   "Settings_SmartSsdLabel": "SSD threads:",
   "Settings_SmartHddLabel": "HDD threads:",
   "Settings_ManualDegreeLabel": "Threads:",
