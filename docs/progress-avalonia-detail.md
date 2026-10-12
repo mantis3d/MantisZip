@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-12** — `PreviewWebViewLazyInitTests` 自包含化（去除 gitignore 夹具依赖）
+  - **根因**：该回归测试类依赖 `TestPreview/attachment-management-0.12.1.zip`，而 `TestPreview/` 在 `.gitignore`（第 36 行）中从未入库 → 换机 / CI 必缺，5 个用例 fail 在 `Assert.True(File.Exists(...))`
+  - **修复**：删除 `ReproZipName` 常量与 `RepoFile()`（原向上找仓库根定位 `TestPreview/`），改为运行时合成最小结构 `CreateSyntheticReproZip()`（`%TEMP%\MantisZip\Tests\repro_webview_{guid}.zip`：`attachment-management/` 目录 + `styles.css` + `page.html`）；测试类实现 `IDisposable`，构造建包、`Dispose` 删包；`LoadReproArchive()` 改实例方法
+  - **语义不变**：仍锁定「点目录 / 非 HTML 条目不得初始化 WebView2」；6/6 通过，任何机器 / CI 可跑
+
 **2026-10-12** — startup-native-splash 计划修订（📋 计划文档，未实施）
   - **覆盖范围扩大（选B）**：splash 从 CLI 慢路径扩大到**所有启动路径**（含无参普通启动）——实测无参启动到主窗口可见 TOTAL≈2160ms（`Avalonia.InitDone` ~950ms + MainWindow 构造+首帧 ~1070ms），原「普通启动约 1s 不值得闪」排除理由不成立
   - **实现要点补全**：splash 线程标注 `IsBackground=true`（防 desktop.Shutdown 后前台消息泵阻止进程退出）；终端窗口枚举表加无参行（`MainWindow` 即终端）；无参启动用**新增 key** `Status_Starting`（「正在启动…」，三语成对）；排除条件改为非 UI 命令（`--install-shell`/`--help` 等秒退命令）
