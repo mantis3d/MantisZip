@@ -90,9 +90,9 @@
                 </StackPanel>
               </ScrollViewer>
             </TabItem>
-            <!-- 自适应 Adaptive -->
+            <!-- 加速（原「自适应」：自适应压缩 + 多线程压缩，统一为加速主题） -->
             <TabItem Header="{Binding CompressTabAdaptiveHeader}" Classes="compactTab"
-              controls:TabItemExtensions.TabIcon="IconSettings">
+              controls:TabItemExtensions.TabIcon="IconLightning">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
                   <!-- 压缩优化区：三个独立开关 -->

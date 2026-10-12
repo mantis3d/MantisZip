@@ -814,7 +814,7 @@
   "Settings_Compress_PreserveRoot": "壓縮資料夾時保留外層目錄",
   "Settings_CompressionLevel": "壓縮層級",
   "Settings_Compress_Tab_General": "通用",
-  "Settings_Compress_Tab_Adaptive": "自適應",
+  "Settings_Compress_Tab_Adaptive": "加速",
   "Settings_Compress_Tab_Format": "格式",
   "Settings_Compress_Options": "選項",
   "Settings_Zip_DefaultOptions": "ZIP 預設選項",
