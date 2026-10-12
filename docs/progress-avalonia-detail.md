@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-12** — startup-native-splash 计划修订（📋 计划文档，未实施）
+  - **覆盖范围扩大（选B）**：splash 从 CLI 慢路径扩大到**所有启动路径**（含无参普通启动）——实测无参启动到主窗口可见 TOTAL≈2160ms（`Avalonia.InitDone` ~950ms + MainWindow 构造+首帧 ~1070ms），原「普通启动约 1s 不值得闪」排除理由不成立
+  - **实现要点补全**：splash 线程标注 `IsBackground=true`（防 desktop.Shutdown 后前台消息泵阻止进程退出）；终端窗口枚举表加无参行（`MainWindow` 即终端）；无参启动用**新增 key** `Status_Starting`（「正在启动…」，三语成对）；排除条件改为非 UI 命令（`--install-shell`/`--help` 等秒退命令）
+  - **审阅补全**（同批）：终端窗口枚举表（`--compress` 终端为 `CompressSettingsWindow` 而非首个 `CollectingWindow`）、splash 文案按命令选择现有 key、`CollectingWindow` 保留决定（降级兜底/时序无冲突/零维护成本）
+  - **平台范围（Windows-only）**：纯 Win32 P/Invoke，跨平台移植时归入「砍掉」类（与 OverlayController / ShellExt COM 同列）；`Show()` 首行 `OperatingSystem.IsWindows()` 护栏使挂接点移植时零改动
+  - **同步**：`docs/PLAN.md` splash 条目说明已同步；实施需新增 `Status_Starting` 三语 key
+
 **2026-10-10** — 启动优化（✅ 已完成，`feat/startup-preview-defer` 分支，计划 [startup-preview-defer.md](../.omo/plans/已完成/startup-preview-defer.md)）
   - **Task 1 ✅**：新增 `Services/StartupTimer.cs`（internal static）——零分配内存打点（`MarkInfo` record struct 预分配 List、收集期零 I/O），`Begin()` 记录 `Process.StartTime` 墒的 pre-Main 基线，`Flush(reason)` 幂等一次性写 `%LOCALAPPDATA%\MantisZip\startup-trace.log`（保留 20 条、命令行走 `LogRedactor`）；`preview-eager total` 行直接服务阶段二门控；测试钩子经 `InternalsVisibleTo`
   - **测试**：新增 `StartupTimerTests` 7 条（TDD 红绿：Begin/Mark 记录、增量非负、Begin 前 Mark 忽略、Flush 后 Mark 忽略、Begin 幂等、异常降级不抛、进程基线存在），7/7 通过
