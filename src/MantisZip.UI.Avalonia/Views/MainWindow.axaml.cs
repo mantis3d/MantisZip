@@ -174,8 +174,13 @@ public partial class MainWindow : Window
                 evm.DestinationPath = dialog.ViewModel.DestinationPath;
                 evm.ConflictAction = dialog.ViewModel.ConflictAction;
                 evm.OpenFolderAfterExtract = dialog.ViewModel.OpenFolderAfterExtract;
-                // 线程数：对话框选择回传（缺失则用户选择恒无效——手工测试问题 3）
-                evm.ParallelExtractDegree = dialog.ViewModel.ParallelExtractDegree;
+                // 并行解压：对话框快照回传（初值读设置、本次解压生效、不回写设置）
+                evm.EnableParallelExtract = dialog.ViewModel.EnableParallelExtract;
+                evm.SmartParallelDegree = dialog.ViewModel.SmartParallelDegree;
+                evm.SmartSsdDegree = dialog.ViewModel.SmartSsdDegree;
+                evm.SmartHddDegree = dialog.ViewModel.SmartHddDegree;
+                evm.ManualParallelDegree = dialog.ViewModel.ManualParallelDegree;
+                evm.LargeArchivePreTest = dialog.ViewModel.LargeArchivePreTest;
                 // 文件过滤：仅当启用过滤且有条目时，将匹配条目 key 回传，供实际解压只解压匹配项
                 evm.FilteredEntryKeys = dialog.GetFilteredEntryKeys();
             }

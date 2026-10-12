@@ -23,7 +23,7 @@ using Xunit;
 namespace MantisZip.UI.Avalonia.Tests;
 
 /// <summary>
-/// 解压对话框线程数接线的架构守卫测试（源码守卫 6 个 + 行为测试 1 个）。
+/// 解压对话框线程数接线的架构守卫测试（源码守卫 7 个 + 行为测试 1 个）。
 /// 目的与诚实局限见文件头注释；每个测试的 XML 注释说明其锁定的具体回归。
 /// </summary>
 public class ExtractParallelDegreeWiringTests
@@ -43,6 +43,10 @@ public class ExtractParallelDegreeWiringTests
     /// <summary>选中条目解压服务（ExtractEntriesAsync 接线 resolver）所在文件。</summary>
     private const string SelectedItemsExtractServiceRelPath =
         "src/MantisZip.UI.Avalonia/Services/SelectedItemsExtractService.cs";
+
+    /// <summary>解压设置对话框 ViewModel（并行选项镜像设置、不回写）所在文件。</summary>
+    private const string ExtractSettingsViewModelRelPath =
+        "src/MantisZip.UI.Avalonia/ViewModels/ExtractSettingsViewModel.cs";
 
     /// <summary>主窗口解压入口 ExtractArchive 所在文件。</summary>
     private const string MainViewModelRelPath =
@@ -108,6 +112,7 @@ public class ExtractParallelDegreeWiringTests
             MainWindowRelPath,
             ExtractFlowRelPath,
             SelectedItemsExtractServiceRelPath,
+            ExtractSettingsViewModelRelPath,
             MainViewModelRelPath,
             ExtractSettingsWindowRelPath,
         };
@@ -122,47 +127,53 @@ public class ExtractParallelDegreeWiringTests
 
     /// <summary>
     /// 测试 2：MainWindow.axaml.cs 的 ShowExtractSettingsDialog 回调在 result=true
-    /// 回传块中必须包含 evm.ParallelExtractDegree = dialog.ViewModel.ParallelExtractDegree。
+    /// 回传块中必须包含 evm.EnableParallelExtract = dialog.ViewModel.EnableParallelExtract
+    /// （以及其余并行字段的回传）。
     ///
-    /// 锁定的回归：缺陷的原始形态正是回传块只拷贝 DestinationPath/ConflictAction/
-    /// OpenFolderAfterExtract/FilteredEntryKeys 四项，唯独漏掉线程数——对话框里
-    /// 用户选择的线程数从未进入 evm，后续全部环节拿到的都是默认值。
+    /// 锁定的回归：回传块曾只拷贝 DestinationPath/ConflictAction/OpenFolderAfterExtract/
+    /// FilteredEntryKeys 四项，唯独漏掉线程数——对话框里的并行选择从未进入 evm。
     /// </summary>
     [Fact]
-    public void MainWindow_DialogCallback_ReturnsParallelExtractDegree()
+    public void MainWindow_DialogCallback_ReturnsParallelOverride()
     {
         var source = ReadSource(MainWindowRelPath);
         var normalized = NormalizeWhitespace(source);
 
         Assert.Contains(
-            "evm.ParallelExtractDegree = dialog.ViewModel.ParallelExtractDegree",
+            "evm.EnableParallelExtract = dialog.ViewModel.EnableParallelExtract",
+            normalized);
+        Assert.Contains(
+            "evm.ManualParallelDegree = dialog.ViewModel.ManualParallelDegree",
             normalized);
     }
 
     /// <summary>
-    /// 测试 3：ExtractFlow.ExtractAsync 签名必须带「int? parallelExtractDegree = null」
-    /// 可空参数（对话框值的穿透通道），且方法体必须经 <c>ParallelDegreeResolver.ResolveAsync</c>
-    /// 决策链解析（callerDegree = 对话框值），再把解析结果写入 options.ParallelExtractDegree
-    /// （智能并行解压接线后的唯一合法形态）。
+    /// 测试 3：ExtractFlow.ExtractAsync 签名必须带「ParallelExtractSettings? parallelOverride = null」
+    /// 可空参数（解压对话框本次设置快照的穿透通道），且方法体必须以
+    /// 「parallelOverride ?? new ParallelExtractSettings { ... }」形态取设置快照（快照优先、否则读
+    /// AppSettings），再经 <c>ParallelDegreeResolver.ResolveAsync</c> 解析并把结果写入
+    /// options.ParallelExtractDegree（对话框快照接线后的唯一合法形态）。
     ///
-    /// 锁定的回归：接线改造曾把「对话框值 ?? AppSettings」直读形态改为 resolver 决策链；
-    /// 若有人删掉签名参数、绕过 resolver 直读设置，或漏写 options 赋值，守卫失败。
+    /// 锁定的回归：接线改造把「单个数字参数」升级为「整份设置快照」；若有人删掉签名参数、
+    /// 绕过 resolver 直读设置，或漏写 options 赋值，守卫失败。
     ///
-    /// 为什么空白归一：签名可能被折行（本文件内 ExtractAsync 的 8 个参数就分 9 行
-    /// 书写），不归一会造成假失败。
+    /// 为什么空白归一：签名可能被折行，不归一会造成假失败。
     /// </summary>
     [Fact]
-    public void ExtractFlow_ExtractAsync_TakesAndUsesNullableParallelDegree()
+    public void ExtractFlow_ExtractAsync_TakesAndUsesNullableParallelOverride()
     {
         var source = ReadSource(ExtractFlowRelPath);
         var normalized = NormalizeWhitespace(source);
 
-        // 签名通道（对话框值穿透）
-        Assert.Contains("int? parallelExtractDegree = null", normalized);
+        // 签名通道（对话框快照穿透）
+        Assert.Contains("ParallelExtractSettings? parallelOverride = null", normalized);
 
-        // 方法体：经 resolver 决策链解析（callerDegree = 对话框单次值）
+        // 方法体：快照优先，否则读 AppSettings
+        Assert.Contains("parallelOverride ?? new ParallelExtractSettings", normalized);
+
+        // 经 resolver 决策链解析（callerDegree 不再使用——手动线程数走快照的 ManualDegree）
         Assert.Contains("ParallelDegreeResolver.ResolveAsync", normalized);
-        Assert.Contains("callerDegree: parallelExtractDegree", normalized);
+        Assert.Contains("callerDegree: null", normalized);
 
         // 解析结果写入解压选项（引擎 SupportsParallelExtract 时生效）
         Assert.Contains("ParallelExtractDegree = resolvedDegree", normalized);
@@ -175,16 +186,16 @@ public class ExtractParallelDegreeWiringTests
 
     /// <summary>
     /// 测试 4：MainWindowViewModel.ExtractArchive 的 ExtractFlow.ExtractAsync 调用点
-    /// 实参表必须包含 vm.ParallelExtractDegree（对话框值真正传入公共流程）。
+    /// 实参表必须包含 vm.BuildParallelSettings()（对话框并行快照真正传入公共流程）。
     ///
-    /// 锁定的回归：缺陷的第三环是调用点不传线程数（参数缺省为 null → 全部回落
-    /// AppSettings，对话框选择恒无效）。回传块修了但调用点没修，缺陷仍然存在。
+    /// 锁定的回归：调用点漏传快照 → 参数缺省 null → 全部回落 AppSettings，
+    /// 对话框里的并行选择恒无效。回传块修了但调用点没修，缺陷仍然存在。
     ///
     /// 为什么限定实参表而非全文：vm 是常见局部变量名，全文匹配可能命中无关文本；
     /// 提取 ExtractFlow.ExtractAsync( 的圆括号配对实参表后断言，与实参顺序无关。
     /// </summary>
     [Fact]
-    public void MainWindowViewModel_ExtractArchive_PassesParallelDegree()
+    public void MainWindowViewModel_ExtractArchive_PassesParallelOverride()
     {
         var source = ReadSource(MainViewModelRelPath);
 
@@ -198,26 +209,29 @@ public class ExtractParallelDegreeWiringTests
         var argumentList = NormalizeWhitespace(
             source.Substring(openParen + 1, closeParen - openParen - 1));
 
-        Assert.Contains("vm.ParallelExtractDegree", argumentList);
+        Assert.Contains("vm.BuildParallelSettings()", argumentList);
     }
 
     /// <summary>
-    /// 测试 5：ExtractSettingsWindow.axaml 的线程数 NumericUpDown 必须用
-    /// Mode=TwoWay 绑定 ParallelExtractDegree（对话框值写回 ViewModel）。
+    /// 测试 5：ExtractSettingsWindow.axaml 新增「并行解压」子 Tab，且三个线程数
+    /// NumericUpDown 均用 Mode=TwoWay 绑定（对话框值写回 dialog.ViewModel，
+    /// 测试 2 的回传块/测试 4 的快照才有意义）。
     ///
     /// 锁定的回归：若绑定是 OneWay（Avalonia NumericUpDown 默认值未经显式声明，
-    /// 升级或重构可能改变默认），用户在 UI 上的调整不会写回 dialog.ViewModel，
-    /// 测试 2 的回传块将回传过期的默认值——缺陷以新形态回归。
+    /// 升级或重构可能改变默认），用户在 UI 上的调整不会写回 dialog.ViewModel。
     /// </summary>
     [Fact]
-    public void ExtractSettingsWindow_NumericUpDown_BindsTwoWay()
+    public void ExtractSettingsWindow_ParallelTab_BindsTwoWay()
     {
         var source = ReadSource(ExtractSettingsWindowRelPath);
         var normalized = NormalizeWhitespace(source);
 
-        Assert.Contains(
-            "Value=\"{Binding ParallelExtractDegree, Mode=TwoWay}\"",
-            normalized);
+        // 并行解压子 Tab 存在（与设置窗口对称）
+        Assert.Contains("LocalizedStrings[Settings_ExtractTab_Parallel]", normalized);
+        // 三个线程数输入均 TwoWay
+        Assert.Contains("Value=\"{Binding SmartSsdDegree, Mode=TwoWay}\"", normalized);
+        Assert.Contains("Value=\"{Binding SmartHddDegree, Mode=TwoWay}\"", normalized);
+        Assert.Contains("Value=\"{Binding ManualParallelDegree, Mode=TwoWay}\"", normalized);
     }
 
     /// <summary>
@@ -239,6 +253,34 @@ public class ExtractParallelDegreeWiringTests
         // 选中条目解压无对话框覆盖 → callerDegree 恒为 null
         Assert.Contains("callerDegree: null", normalized);
         Assert.Contains("ParallelExtractDegree = resolvedDegree", normalized);
+    }
+
+    /// <summary>
+    /// 测试 7：ExtractSettingsViewModel 的并行选项初值必须从设置读取（镜像设置），
+    /// 且不得写回设置（本次解压一次性生效），并暴露 BuildParallelSettings() 供调用点取快照。
+    ///
+    /// 锁定的回归：若初值写死或不读设置，"读取设置但不影响回来"的契约破裂；
+    /// 若出现 settings.X = ... 写回，则对话框会悄悄改掉用户默认设置。
+    /// </summary>
+    [Fact]
+    public void ExtractSettingsViewModel_ParallelMirrorsSettings_NoWriteBack()
+    {
+        var source = ReadSource(ExtractSettingsViewModelRelPath);
+        var normalized = NormalizeWhitespace(source);
+
+        // 初值读取设置（镜像）
+        Assert.Contains("_enableParallelExtract = settings.EnableParallelExtract", normalized);
+        Assert.Contains(
+            "_manualParallelDegree = Math.Clamp(settings.ParallelExtractDegree, 1, 16)", normalized);
+
+        // 提供本次快照构建
+        Assert.Contains("public ParallelExtractSettings BuildParallelSettings()", normalized);
+
+        // 不回写设置（不存在 settings.X = ... 形态的赋值）
+        Assert.DoesNotContain("settings.EnableParallelExtract =", normalized);
+        Assert.DoesNotContain("settings.SmartParallelDegree =", normalized);
+        Assert.DoesNotContain("settings.ParallelExtractDegree =", normalized);
+        Assert.DoesNotContain("settings.LargeArchivePreTest =", normalized);
     }
 
     /// <summary>

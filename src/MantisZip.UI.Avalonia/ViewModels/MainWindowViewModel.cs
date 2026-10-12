@@ -2364,7 +2364,7 @@ public partial class MainWindowViewModel : ObservableObject
                 await ExtractFlow.ExtractAsync(
                     CurrentArchivePath, dest, vm.ConflictAction, filteredKeys, password,
                     ShowExtractFileConflictDialogAsync, progress, ct,
-                    vm.ParallelExtractDegree);
+                    vm.BuildParallelSettings());
             });
 
         if (completed)

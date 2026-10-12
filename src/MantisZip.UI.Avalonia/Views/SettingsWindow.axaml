@@ -408,11 +408,18 @@
         </Grid>
       </TabItem>
 
-      <!-- 解压设置选项卡：默认目标路径、冲突处理、打开文件夹、拖拽解压、双击行为等 -->
+      <!-- 解压设置选项卡：含「通用」与「并行解压」两个子选项卡（仿压缩主 Tab 的子 Tab 结构） -->
       <TabItem Header="{Binding TabExtractHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconFolder">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+        <Grid>
+          <TabControl TabStripPlacement="Top"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <!-- 子选项卡 1：通用（默认目标路径 / 冲突处理 / 选项 / 双击行为） -->
+            <TabItem Header="{Binding ExtractTabGeneralHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconSettings">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
@@ -485,8 +492,17 @@
               </StackPanel>
             </Border>
 
-            <!-- ═══ 并行解压卡片（全局开关 + 智能并行度 + SSD/HDD 线程数 + 预测试 + 帮助） ═══ -->
-            <!-- 此卡片内不重复固定线程数输入（线程数由智能模式 SSD/HDD 或解压对话框设置提供） -->
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- 子选项卡 2：并行解压（全局开关 / 智能 / 手动线程数 / SSD / HDD / 大包预测试 + 帮助） -->
+            <TabItem Header="{Binding ExtractTabParallelHeader}" Classes="compactTab"
+              controls:TabItemExtensions.TabIcon="IconSettings">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+
+            <!-- ═══ 并行解压卡片（全局开关 + 智能并行度 + SSD/HDD 线程数 + 手动线程数 + 预测试 + 帮助） ═══ -->
             <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
                     CornerRadius="{DynamicResource BorderRadius}"
                     Padding="{DynamicResource DialogPadding}"
@@ -522,8 +538,8 @@
                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
                   <!-- 智能开启：SSD/HDD 双线程数输入 -->
-                  <Grid ColumnDefinitions="Auto,*,Auto,*,"
-                        IsVisible="{Binding SmartParallelDegree}"
+                  <Grid ColumnDefinitions="Auto,*,Auto,*"
+                        IsVisible="{Binding IsSmartDegreeVisible}"
                         Margin="24,0,0,0">
                     <TextBlock Text="{Binding SmartSsdLabelText}"
                                VerticalAlignment="Center"
@@ -533,7 +549,7 @@
                                    Maximum="16"
                                    Increment="1"
                                    Value="{Binding SmartSsdDegree, Mode=TwoWay}"
-                                   Width="80"
+                                   Width="120"
                                    HorizontalAlignment="Left" />
                     <TextBlock Grid.Column="2"
                                Text="{Binding SmartHddLabelText}"
@@ -545,9 +561,28 @@
                                    Maximum="16"
                                    Increment="1"
                                    Value="{Binding SmartHddDegree, Mode=TwoWay}"
-                                   Width="80"
+                                   Width="120"
                                    HorizontalAlignment="Left" />
                   </Grid>
+
+                  <!-- 智能关闭：手动线程数（1-16） -->
+                  <StackPanel Orientation="Horizontal" Spacing="8"
+                              IsVisible="{Binding IsManualDegreeVisible}"
+                              Margin="24,0,0,0">
+                    <TextBlock Text="{Binding ManualParallelDegreeLabelText}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <NumericUpDown Minimum="1"
+                                   Maximum="16"
+                                   Increment="1"
+                                   Value="{Binding ManualParallelDegree, Mode=TwoWay}"
+                                   Width="120"
+                                   HorizontalAlignment="Left" />
+                    <TextBlock Text="{Binding ManualParallelDegreeHintText}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               FontSize="11" />
+                  </StackPanel>
                 </StackPanel>
 
                 <!-- 大包预测试开关（仅全局开关 + 智能并行度均开启时显示，规则 6 → IsPreTestVisible） -->
@@ -559,8 +594,11 @@
 
               </StackPanel>
             </Border>
-          </StackPanel>
-        </ScrollViewer>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+          </TabControl>
+        </Grid>
       </TabItem>
 
       <!-- 外观设置选项卡：主题、紧凑度、最近文件数、界面字体 -->

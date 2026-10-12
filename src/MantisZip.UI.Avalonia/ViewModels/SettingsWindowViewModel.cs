@@ -242,6 +242,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private int _smartHddDegree = 8;
 
+    /// <summary>智能关闭时使用的固定线程数（手动，1-16）。</summary>
+    [ObservableProperty]
+    private int _manualParallelDegree = 4;
+
     [ObservableProperty]
     private bool _largeArchivePreTest;
 
@@ -257,16 +261,30 @@ public partial class SettingsWindowViewModel : ObservableObject
     partial void OnSmartParallelDegreeChanged(bool value)
     {
         OnPropertyChanged(nameof(SmartParallelDegreeText));
-        OnPropertyChanged(nameof(IsPreTestVisible));
+        NotifyParallelVisibility();
     }
 
     partial void OnEnableParallelExtractChanged(bool value)
     {
+        NotifyParallelVisibility();
+    }
+
+    /// <summary>集中通知并行解压相关派生属性（规则：集中通知模式）。</summary>
+    private void NotifyParallelVisibility()
+    {
         OnPropertyChanged(nameof(IsPreTestVisible));
+        OnPropertyChanged(nameof(IsSmartDegreeVisible));
+        OnPropertyChanged(nameof(IsManualDegreeVisible));
     }
 
     /// <summary>大包预测试开关可见性：全局开关与智能并行度均开启时显示（规则 6）。</summary>
     public bool IsPreTestVisible => EnableParallelExtract && SmartParallelDegree;
+
+    /// <summary>SSD/HDD 线程数可见性：全局开关与智能并行度均开启时显示。</summary>
+    public bool IsSmartDegreeVisible => EnableParallelExtract && SmartParallelDegree;
+
+    /// <summary>手动线程数可见性：全局开关开启且智能关闭时显示。</summary>
+    public bool IsManualDegreeVisible => EnableParallelExtract && !SmartParallelDegree;
 
     // ── ContextMenu ──
     [ObservableProperty]
@@ -840,6 +858,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ExtractDoubleClickThresholdText => LocalizationManager.T("Settings_Extract_DoubleClickThreshold");
 
     // Parallel Extract strings
+    public string ExtractTabGeneralHeader => LocalizationManager.T("Settings_ExtractTab_General");
+    public string ExtractTabParallelHeader => LocalizationManager.T("Settings_ExtractTab_Parallel");
     public string ExtractParallelExtractTitle => LocalizationManager.T("Settings_ParallelExtractTitle");
     public string EnableParallelExtractText => LocalizationManager.T("Settings_EnableParallelExtract");
     public string SmartParallelDegreeText => SmartParallelDegree
@@ -847,6 +867,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         : LocalizationManager.T("Settings_SmartParallelDegreeOff");
     public string SmartSsdLabelText => LocalizationManager.T("Settings_SmartSsdLabel");
     public string SmartHddLabelText => LocalizationManager.T("Settings_SmartHddLabel");
+    public string ManualParallelDegreeLabelText => LocalizationManager.T("Settings_ManualDegreeLabel");
+    public string ManualParallelDegreeHintText => LocalizationManager.T("Settings_ManualDegreeHint");
     public string LargeArchivePreTestText => LocalizationManager.T("Settings_LargeArchivePreTest");
     public string ParallelHelpButtonText => LocalizationManager.T("Settings_ParallelHelpButton");
 
@@ -1029,6 +1051,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _smartParallelDegree = _settings.SmartParallelDegree;
         _smartSsdDegree = _settings.SmartSsdDegree;
         _smartHddDegree = _settings.SmartHddDegree;
+        _manualParallelDegree = Math.Clamp(_settings.ParallelExtractDegree, 1, 16);
         _largeArchivePreTest = _settings.LargeArchivePreTest;
 
         // ContextMenu
@@ -1392,11 +1415,15 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ExtractDeleteAfterExtractText));
         OnPropertyChanged(nameof(ExtractDoubleClickActionText));
         OnPropertyChanged(nameof(ExtractDoubleClickThresholdText));
+        OnPropertyChanged(nameof(ExtractTabGeneralHeader));
+        OnPropertyChanged(nameof(ExtractTabParallelHeader));
         OnPropertyChanged(nameof(ExtractParallelExtractTitle));
         OnPropertyChanged(nameof(EnableParallelExtractText));
         OnPropertyChanged(nameof(SmartParallelDegreeText));
         OnPropertyChanged(nameof(SmartSsdLabelText));
         OnPropertyChanged(nameof(SmartHddLabelText));
+        OnPropertyChanged(nameof(ManualParallelDegreeLabelText));
+        OnPropertyChanged(nameof(ManualParallelDegreeHintText));
         OnPropertyChanged(nameof(LargeArchivePreTestText));
         OnPropertyChanged(nameof(ParallelHelpButtonText));
         OnPropertyChanged(nameof(DoubleClickActionOpenText));
@@ -1574,6 +1601,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.SmartParallelDegree = SmartParallelDegree;
         _settings.SmartSsdDegree = Math.Clamp(SmartSsdDegree, 1, 16);
         _settings.SmartHddDegree = Math.Clamp(SmartHddDegree, 1, 16);
+        _settings.ParallelExtractDegree = Math.Clamp(ManualParallelDegree, 1, 16);
         _settings.LargeArchivePreTest = LargeArchivePreTest;
 
         // ContextMenu

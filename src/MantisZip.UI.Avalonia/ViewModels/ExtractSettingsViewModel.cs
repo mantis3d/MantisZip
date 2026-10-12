@@ -4,6 +4,7 @@ using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
+using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -40,9 +41,71 @@ public partial class ExtractSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _openFolderAfterExtract;
 
-    /// <summary>并行解压线程数：0=自动（由 ParallelDegreeResolver 决策），1=串行，2-16=线程数。默认 0=自动。</summary>
+    // ── 并行解压（本次解压生效；初值读取设置，不回写设置） ──
+    /// <summary>全局并行开关（关闭则始终串行）。</summary>
     [ObservableProperty]
-    private int _parallelExtractDegree = 0;
+    private bool _enableParallelExtract = true;
+
+    /// <summary>智能并行度开关（按磁盘类型/预测试选线程数）。</summary>
+    [ObservableProperty]
+    private bool _smartParallelDegree = true;
+
+    /// <summary>智能模式 SSD 线程数（1-16）。</summary>
+    [ObservableProperty]
+    private int _smartSsdDegree = 12;
+
+    /// <summary>智能模式 HDD 线程数（1-16）。</summary>
+    [ObservableProperty]
+    private int _smartHddDegree = 8;
+
+    /// <summary>智能关闭时使用的固定线程数（1-16）。</summary>
+    [ObservableProperty]
+    private int _manualParallelDegree = 4;
+
+    /// <summary>大包预测试开关（仅智能模式参与决策链第 4 步）。</summary>
+    [ObservableProperty]
+    private bool _largeArchivePreTest = true;
+
+    partial void OnSmartParallelDegreeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(SmartParallelDegreeText));
+        NotifyParallelVisibility();
+    }
+
+    partial void OnEnableParallelExtractChanged(bool value) => NotifyParallelVisibility();
+
+    /// <summary>集中通知并行解压相关派生属性（规则：集中通知模式）。</summary>
+    private void NotifyParallelVisibility()
+    {
+        OnPropertyChanged(nameof(IsSmartDegreeVisible));
+        OnPropertyChanged(nameof(IsManualDegreeVisible));
+        OnPropertyChanged(nameof(IsPreTestVisible));
+    }
+
+    /// <summary>智能并行度复选框文案（开/关两种）。</summary>
+    public string SmartParallelDegreeText => SmartParallelDegree
+        ? LocalizationManager.T("Settings_SmartParallelDegree")
+        : LocalizationManager.T("Settings_SmartParallelDegreeOff");
+
+    /// <summary>SSD/HDD 线程数可见性：全局开关与智能并行度均开启时显示。</summary>
+    public bool IsSmartDegreeVisible => EnableParallelExtract && SmartParallelDegree;
+
+    /// <summary>手动线程数可见性：全局开关开启且智能关闭时显示。</summary>
+    public bool IsManualDegreeVisible => EnableParallelExtract && !SmartParallelDegree;
+
+    /// <summary>大包预测试开关可见性：全局开关与智能并行度均开启时显示。</summary>
+    public bool IsPreTestVisible => EnableParallelExtract && SmartParallelDegree;
+
+    /// <summary>构建本次解压的并行设置快照（初值读设置、本次解压生效、不回写设置）。</summary>
+    public ParallelExtractSettings BuildParallelSettings() => new()
+    {
+        EnableParallel = EnableParallelExtract,
+        SmartParallel = SmartParallelDegree,
+        SmartSsdDegree = Math.Clamp(SmartSsdDegree, 1, 16),
+        SmartHddDegree = Math.Clamp(SmartHddDegree, 1, 16),
+        LargeArchivePreTest = LargeArchivePreTest,
+        ManualDegree = Math.Clamp(ManualParallelDegree, 1, 16)
+    };
 
     /// <summary>过滤后需实际解压的条目 key 列表（由 View 从对话框回传；null = 未启用过滤，全量解压）。</summary>
     public List<string>? FilteredEntryKeys { get; set; }
@@ -203,8 +266,13 @@ public partial class ExtractSettingsViewModel : ObservableObject
         var settings = AppSettings.Load();
         if (!string.IsNullOrEmpty(settings.FileConflictAction))
             ConflictAction = settings.FileConflictAction;
-        // 并行解压线程数：默认 0=自动（由 ParallelDegreeResolver 按全局开关/智能/预测试/磁盘类型决定）。
-        // 不从 AppSettings.ParallelExtractDegree 读取——该值仅作 resolver 步骤 3（智能关闭时）的 ManualDegree 回退。
+        // 并行解压（本次解压生效；初值读取设置，不回写设置——对话框镜像设置但不改变设置）
+        _enableParallelExtract = settings.EnableParallelExtract;
+        _smartParallelDegree = settings.SmartParallelDegree;
+        _smartSsdDegree = Math.Clamp(settings.SmartSsdDegree, 1, 16);
+        _smartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
+        _manualParallelDegree = Math.Clamp(settings.ParallelExtractDegree, 1, 16);
+        _largeArchivePreTest = settings.LargeArchivePreTest;
         // 解压后打开文件夹（对齐 WPF ExtractSettingsWindow.LoadDefaultsFromSettings 读取 OpenFolderAfterExtract）
         OpenFolderAfterExtract = settings.OpenFolderAfterExtract;
 
@@ -238,8 +306,13 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_TabFilter",
             "Extract_Source_MultiFilterHint",
             "Extract_UnlockButton",
-            "Extract_ParallelDegree",
-            "Extract_ParallelDegreeAutoHint"
+            "Settings_ExtractTab_Parallel",
+            "Settings_EnableParallelExtract",
+            "Settings_SmartSsdLabel",
+            "Settings_SmartHddLabel",
+            "Settings_ManualDegreeLabel",
+            "Settings_ManualDegreeHint",
+            "Settings_LargeArchivePreTest"
         };
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in keys)

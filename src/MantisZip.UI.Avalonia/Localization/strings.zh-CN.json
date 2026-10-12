@@ -1,4 +1,7 @@
 {
+  "Settings_ExtractTab_General": "通用",
+  "Settings_ExtractTab_Parallel": "并行解压",
+  "Extract_ParallelNotSavedHint": "以上选项仅对本次解压生效，不会修改默认设置。",
   "HelpSection_ParallelExtract": "并行解压",
   "HelpSection_SmartDegree": "智能并行度",
   "HelpSection_PreTest": "大包预测试",

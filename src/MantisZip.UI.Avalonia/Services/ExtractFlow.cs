@@ -166,7 +166,7 @@ public static class ExtractFlow
     /// <param name="conflictDialog">Ask 冲突弹窗回调（null 时 Ask 降级为引擎默认处理）。</param>
     /// <param name="progress">进度回调。</param>
     /// <param name="ct">取消令牌。</param>
-    /// <param name="parallelExtractDegree">解压对话框选择的线程数（1-16）；null 时回落 AppSettings（CLI 等无对话框路径）。</param>
+    /// <param name="parallelOverride">解压对话框的本次并行设置快照（读设置初值、不回写）；null（CLI 等无对话框路径）时读 AppSettings。</param>
     /// <exception cref="NotSupportedException">不支持的压缩格式。</exception>
     public static async Task ExtractAsync(
         string archivePath,
@@ -177,24 +177,26 @@ public static class ExtractFlow
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
         IProgress<ArchiveProgress> progress,
         CancellationToken ct,
-        int? parallelExtractDegree = null)
+        ParallelExtractSettings? parallelOverride = null)
     {
         var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog);
 
-        // 智能并行解压：经 ParallelDegreeResolver 5 步决策链解析线程数
-        // （callerDegree = 对话框单次值；null/≤0 = 无覆盖，交由全局开关/智能/预测试/磁盘类型决定）
+        // 智能并行解压：经 ParallelDegreeResolver 5 步决策链解析线程数。
+        // parallelOverride = 对话框本次快照（初值读设置、不回写）；null → 读 AppSettings（CLI 等无对话框路径）。
         var settings = AppSettings.Load();
+        var parallelSettings = parallelOverride ?? new ParallelExtractSettings
+        {
+            EnableParallel = settings?.EnableParallelExtract ?? true,
+            SmartParallel = settings?.SmartParallelDegree ?? true,
+            SmartSsdDegree = settings?.SmartSsdDegree ?? 12,
+            SmartHddDegree = settings?.SmartHddDegree ?? 8,
+            LargeArchivePreTest = settings?.LargeArchivePreTest ?? true,
+            ManualDegree = settings?.ParallelExtractDegree ?? 0
+        };
+
         var resolvedDegree = await ParallelDegreeResolver.ResolveAsync(
-            callerDegree: parallelExtractDegree,
-            settings: new ParallelExtractSettings
-            {
-                EnableParallel = settings?.EnableParallelExtract ?? true,
-                SmartParallel = settings?.SmartParallelDegree ?? true,
-                SmartSsdDegree = settings?.SmartSsdDegree ?? 12,
-                SmartHddDegree = settings?.SmartHddDegree ?? 8,
-                LargeArchivePreTest = settings?.LargeArchivePreTest ?? true,
-                ManualDegree = settings?.ParallelExtractDegree ?? 0
-            },
+            callerDegree: null,
+            settings: parallelSettings,
             archivePath: archivePath,
             destinationPath: dest,
             password: password,

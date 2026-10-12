@@ -1,4 +1,7 @@
 {
+  "Settings_ExtractTab_General": "一般",
+  "Settings_ExtractTab_Parallel": "並行解壓",
+  "Extract_ParallelNotSavedHint": "以上選項僅對本次解壓生效，不會修改預設設定。",
   "HelpSection_ParallelExtract": "並行解壓",
   "HelpSection_SmartDegree": "智慧並行度",
   "HelpSection_PreTest": "大包預測試",

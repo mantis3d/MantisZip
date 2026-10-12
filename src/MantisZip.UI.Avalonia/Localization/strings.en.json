@@ -1,4 +1,7 @@
 {
+  "Settings_ExtractTab_General": "General",
+  "Settings_ExtractTab_Parallel": "Parallel Extract",
+  "Extract_ParallelNotSavedHint": "These options apply to this extraction only and won't change your default settings.",
   "HelpSection_ParallelExtract": "Parallel Extract",
   "HelpSection_SmartDegree": "Smart Parallel Degree",
   "HelpSection_PreTest": "Large Archive Pre-test",
