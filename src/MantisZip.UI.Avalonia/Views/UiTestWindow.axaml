@@ -305,16 +305,129 @@
                     <Slider Width="220" Minimum="0" Maximum="100" Value="{Binding SliderValue}"
                             TickFrequency="10" IsSnapToTickEnabled="True" TickPlacement="Outside" />
                   </StackPanel>
-                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
-                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="NumericUpDown（滚轮）" />
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- ═══ 数字输入框（NumericUpDown）样式大全：并排展示可用配置变体，供统一风格选型 ═══ -->
+            <!-- 背景：Avalonia 的 NumericUpDown 是自带 Fluent 按钮滚轮的独立模板控件，不继承本项目对
+                 TextBox 的全局样式，外观可能与其它输入控件不一致；此处列出全部常用开关 / 格式组合。 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="数字输入框（NumericUpDown）样式大全" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" TextWrapping="Wrap"
+                           Text="所有变体绑定同一 NumericValue（默认 42），编辑任一个会同步；各标签说明对应属性。" />
+                <WrapPanel Orientation="Horizontal">
+                  <!-- 1 默认（滚轮在右） -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="默认（滚轮在右）" />
                     <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}" />
                   </StackPanel>
-                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
-                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="NumericUpDown（隐藏滚轮）" />
+                  <!-- 2 滚轮在左 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="滚轮在左（ButtonSpinnerLocation=Left）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   ButtonSpinnerLocation="Left" />
+                  </StackPanel>
+                  <!-- 3 隐藏滚轮 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="隐藏滚轮（ShowButtonSpinner=False）" />
                     <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
                                    ShowButtonSpinner="False" />
                   </StackPanel>
-                </StackPanel>
+                  <!-- 4 小数步进 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="小数步进（Increment=0.5, FormatString=0.0）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Increment="0.5" Value="{Binding NumericValue}"
+                                   FormatString="{}{0:0.0}" />
+                  </StackPanel>
+                  <!-- 5 禁用滚轮拖动/滚轮 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="禁用滚轮（AllowSpin=False）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   AllowSpin="False" />
+                  </StackPanel>
+                  <!-- 6 禁用整控件 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="禁用（IsEnabled=False）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   IsEnabled="False" />
+                  </StackPanel>
+                  <!-- 7 水印 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="水印（Watermark）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Watermark="输入数值" />
+                  </StackPanel>
+                  <!-- 8 文本右对齐 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="文本右对齐（TextAlignment=Right）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   TextAlignment="Right" />
+                  </StackPanel>
+                  <!-- 9 文本居中 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="文本居中（TextAlignment=Center）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   TextAlignment="Center" />
+                  </StackPanel>
+                  <!-- 10 越界钳制 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="越界钳制（ClipValueToMinMax=True，可输 2000 试）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   ClipValueToMinMax="True" />
+                  </StackPanel>
+                  <!-- 11 千分位 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="千分位（FormatString={0:N0}）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000000" Value="{Binding NumericValue}"
+                                   FormatString="{}{0:N0}" />
+                  </StackPanel>
+                  <!-- 12 两位小数 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="两位小数（FormatString={0:0.00}）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   FormatString="{}{0:0.00}" />
+                  </StackPanel>
+                  <!-- 13 带单位 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="带单位（FormatString={0} 个）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   FormatString="{}{0} 个" />
+                  </StackPanel>
+                  <!-- 14 步进 5 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="步进 5（Increment=5）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Increment="5" Value="{Binding NumericValue}" />
+                  </StackPanel>
+                  <!-- 15 窄宽（重现「数字不可见」问题） -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="窄（Width=80，旧设置卡片值）" />
+                    <NumericUpDown Width="80" Minimum="1" Maximum="16" Value="{Binding NumericValue}" />
+                  </StackPanel>
+                  <!-- 16 宽 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="宽（Width=200）" />
+                    <NumericUpDown Width="200" Minimum="0" Maximum="1000" Value="{Binding NumericValue}" />
+                  </StackPanel>
+                  <!-- 17 显式主题色（让控件跟随应用主题） -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="显式主题色（Background/Foreground/BorderBrush）" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  </StackPanel>
+                  <!-- 18 显式主题色 + 左滚轮 -->
+                  <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="显式主题色 + 左滚轮" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Value="{Binding NumericValue}"
+                                   ButtonSpinnerLocation="Left"
+                                   Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  </StackPanel>
+                </WrapPanel>
               </StackPanel>
             </Border>
 
