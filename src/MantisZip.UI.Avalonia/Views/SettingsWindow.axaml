@@ -532,7 +532,7 @@
                                    Minimum="1"
                                    Maximum="16"
                                    Increment="1"
-                                   Value="{Binding SmartSsdDegree}"
+                                   Value="{Binding SmartSsdDegree, Mode=TwoWay}"
                                    Width="80"
                                    HorizontalAlignment="Left" />
                     <TextBlock Grid.Column="2"
@@ -544,7 +544,7 @@
                                    Minimum="1"
                                    Maximum="16"
                                    Increment="1"
-                                   Value="{Binding SmartHddDegree}"
+                                   Value="{Binding SmartHddDegree, Mode=TwoWay}"
                                    Width="80"
                                    HorizontalAlignment="Left" />
                   </Grid>
