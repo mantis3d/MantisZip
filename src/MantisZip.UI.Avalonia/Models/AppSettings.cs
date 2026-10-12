@@ -77,6 +77,21 @@ public class AppSettings
     /// </summary>
     public int ParallelExtractDegree { get; set; } = Environment.ProcessorCount;
 
+    /// <summary>并行解压全局开关：false = 始终串行（线程数=1）。</summary>
+    public bool EnableParallelExtract { get; set; } = true;
+
+    /// <summary>智能并行度：true = 按磁盘类型/预测试自动选择线程数。</summary>
+    public bool SmartParallelDegree { get; set; } = true;
+
+    /// <summary>智能模式下 SSD 的线程数（1-16）。</summary>
+    public int SmartSsdDegree { get; set; } = 12;
+
+    /// <summary>智能模式下 HDD 的线程数（1-16）。</summary>
+    public int SmartHddDegree { get; set; } = 8;
+
+    /// <summary>大包预测试：≥1GB 压缩包先测最优线程数（仅智能模式生效）。</summary>
+    public bool LargeArchivePreTest { get; set; } = true;
+
     /// <summary>N 组并行压缩的目标组数，默认 CPU 数；1 = 串行。</summary>
     public int ParallelCompressDegree { get; set; } = Environment.ProcessorCount;
 
@@ -260,6 +275,9 @@ public class AppSettings
             {
                 settings.MultiThreadedStoreFormatIds = GetDefaultMultiThreadedStoreFormatIds();
             }
+            // 并行解压智能线程数越界 clamp 到 [1,16]（边界情况 #8）
+            settings.SmartSsdDegree = Math.Clamp(settings.SmartSsdDegree, 1, 16);
+            settings.SmartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
             return settings;
         }
         catch
