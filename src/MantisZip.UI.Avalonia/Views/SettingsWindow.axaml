@@ -496,9 +496,9 @@
               </ScrollViewer>
             </TabItem>
 
-            <!-- 子选项卡 2：并行解压（全局开关 / 智能 / 手动线程数 / SSD / HDD / 大包预测试 + 帮助） -->
+            <!-- 子选项卡 2：加速（并行解压：全局开关 / 智能 / 手动线程数 / SSD / HDD / 大包预测试 + 帮助） -->
             <TabItem Header="{Binding ExtractTabParallelHeader}" Classes="compactTab"
-              controls:TabItemExtensions.TabIcon="IconSettings">
+              controls:TabItemExtensions.TabIcon="IconLightning">
               <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
                 <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
 

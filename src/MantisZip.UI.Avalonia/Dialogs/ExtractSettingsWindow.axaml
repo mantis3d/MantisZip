@@ -139,10 +139,10 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 选项卡 3：并行解压（与设置窗口对称；初值读取设置，本次解压生效不回写） -->
+      <!-- 选项卡 3：加速（并行解压；与设置窗口对称；初值读取设置，本次解压生效不回写） -->
       <TabItem Header="{Binding LocalizedStrings[Settings_ExtractTab_Parallel]}"
                Classes="compactTab"
-               controls:TabItemExtensions.TabIcon="IconSettings">
+               controls:TabItemExtensions.TabIcon="IconLightning">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <StackPanel Spacing="12" Margin="0,8,0,0">
