@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-12** — 智能并行解压（全局开关 + SSD/HDD 智能度 + 大包预测试，Avalonia + Core）
+  - **计划迁移**：[smart-parallel-extract.md](../.omo/plans/已完成/smart-parallel-extract.md) 由「未开始」移至「已完成」（11 Task 全部落地）。
+  - **Core 决策链**：`ParallelDegreeResolver.ResolveAsync` 5 步——①调用方覆盖（clamp 1-16）②全局关→1 ③智能关→`ManualDegree`/ProcessorCount ④智能开+≥1GB+预测试开→`ParallelDegreeOptimizer.FindOptimalDegreeAsync` ⑤磁盘默认 SSD 12/HDD 8/Unknown→min(CPU,12)；`ParallelExtractSettings` record 快照由调用方注入（Core 不依赖 UI AppSettings）。
+  - **UI 接线**：`ExtractFlow.ExtractAsync` 把对话框值作 `callerDegree`（不再直读 AppSettings），解析结果写 `ArchiveOptions.ParallelExtractDegree` 与进度窗口显示（`ResolveDisplayParallelDegree` 二参改为「resolver 结果」语义，CLI 无 resolver 路径仍回落 AppSettings）；`SelectedItemsExtractService.ExtractEntriesAsync` 同接线（callerDegree=null）。预测试状态占位 `STATUS_TESTING_PARALLEL_DEGREE` 经新增 `PreTestStatusLocalizingProgress`（同步转发 `IProgress`，不引入 SynchronizationContext 调度）替换为本地化文案 `Status_TestingParallelDegree`。
+  - **设置 UI**：`SettingsWindow` 解压 Tab 新增并行解压卡片（`EnableParallelExtract`/`SmartParallelDegree`/`SmartSsdDegree`/`SmartHddDegree`/`LargeArchivePreTest` 五开关，SSD/HDD NumericUpDown 显式 `Mode=TwoWay`，预测试随智能隐藏——规则 6，`IsPreTestVisible` 集中通知）+ `[?]` → `ParallelExtractHelpDialog`（3 章节，标题本地化）；`SettingsWindowViewModel` 新增 5 属性 + `ShowParallelHelpCommand`/`ShowParallelHelpRequested` + 6 文本属性 + `OnCultureChanged` 通知。
+  - **解压对话框**：`ExtractSettingsViewModel._parallelExtractDegree` 默认 `Environment.ProcessorCount` → `0`（=自动），不再从 `AppSettings.ParallelExtractDegree` 读取（该值仅作 resolver 步骤 3 的 `ManualDegree` 回退）；`ExtractSettingsWindow.axaml` NumericUpDown `Minimum=0` + 提示改绑 `Extract_ParallelDegreeAutoHint`。
+  - **本地化**：三语新增 `Settings_EnableParallelExtract` 等 15 key + `HelpSection_*` 3 + `Settings_ParallelExtractTitle` + `Status_TestingParallelDegree` + `Extract_ParallelDegreeAutoHint`（三语 key 集一致 1288/1288/1288）；zh-TW 术语对齐（智慧/序列/壓縮檔/最佳）。
+  - **验证**：构建 0 错误（UI 输出目录被 Explorer 锁 `MantisZip.ShellExt.dll`，改用隔离输出目录验证）；`ExtractParallelDegreeWiringTests` 7/7（6 源码守卫 + 1 行为）；Core 655 通过/3 跳过；Avalonia 181 通过/5 预存失败（`PreviewWebViewLazyInitTests` 缺夹具 `/TestPreview/*.zip`）/3 跳过。**GUI 手测待实机**（卡片交互 / ≥1GB 触发预测试 / 临时目录清理）。
+
 **2026-10-12** — ZIP 总大小超 4GB 自动禁用多线程压缩（Avalonia）
   - **背景**：ZIP32 格式上限 ~4GB，`ZipEngine.IsMultiThreadedEligible` 在总量超 `uint.MaxValue-1` 时整体回退串行，但压缩对话框 UI 不知情——用户勾选「多线程」实际无效。
   - **实现**：`DynamicFormatOptionsPanel` 新增 `MaxZip32Size` 阈值 + `UpdateTotalSourceSize(long)`（进入超限：记住勾选态 → 取消勾选 → 禁用复选框 → 显示提示 → 隐藏组数面板；退出恢复），`MultiThreadedCompression` getter 超限恒 false，`ZipMtOverLimitHint` 提示文案（`FormatOptions_ZIP_MultiThreadOver4Gb`，三语文件头插入）。
@@ -2094,6 +2103,12 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.2 (2026-10-12) 智能并行解压 Core 三组件（DiskTypeDetector / ParallelDegreeOptimizer / ParallelDegreeResolver）
+  - **`Core/Utils/DiskTypeDetector.cs`（新增）**：`DeviceIoControl` 打开 `\\.\C:` 卷设备句柄（access=0）读 `SeekPenalty` 判 SSD/HDD，盘符缓存（`OrdinalIgnoreCase`，`Unknown` 不缓存），枚举 `DiskType{ Ssd, Hdd, Unknown }`。
+  - **`Core/Services/ParallelDegreeOptimizer.cs`（新增）**：`ShouldPreTest(size, enabled, supportsParallel)`（≥1GB 且预测试开且引擎支持并行）；`GetTestConfigs(cpu)`（≥16 核 `[4,8,12,16]` / ≥8 核 `[2,4,8,N]` / <8 核 `[1,2,4,N]`，去重排序 ≤4）；`FindOptimalDegreeAsync` 在唯一 `__parallel_test_{GUID}` 运行根内逐配置解压 ~50MB 样本计时选优，样本 500MB 硬上限、失败/取消返回 -1（回退磁盘默认），`CleanupTempDir` 只删自建目录。
+  - **`Core/Services/ParallelDegreeResolver.cs`（新增）**：5 步决策链；`Resolve`（同步，测试/非大包路径）与 `ResolveAsync`（异步，含预测试）共享 `TryResolveShortCircuit`（步骤 1-3 去重防漂移）；预测试状态经 `ArchiveProgress.CurrentFile = "STATUS_TESTING_PARALLEL_DEGREE"` 上报（调用方替换本地化）。
+  - **测试**：`DiskTypeDetectorTests` 7、`ParallelDegreeOptimizerTests` 15、`ParallelDegreeResolverTests` 14（含短路不触 I/O、>16 核 clamp、异步短路）。Core 全量 655 通过/3 跳过，构建 0 错误。
 
 #### v0.5.2 (2026-10-06) 修复「测试压缩包」进度条不动（SevenZipEngine.TestArchiveAsync）
   - **`Core/Engines/SevenZipEngine.cs`**：
