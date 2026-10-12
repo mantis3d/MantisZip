@@ -23,7 +23,7 @@ using Xunit;
 namespace MantisZip.UI.Avalonia.Tests;
 
 /// <summary>
-/// 解压对话框线程数接线的架构守卫测试（源码守卫 5 个 + 行为测试 2 个）。
+/// 解压对话框线程数接线的架构守卫测试（源码守卫 6 个 + 行为测试 1 个）。
 /// 目的与诚实局限见文件头注释；每个测试的 XML 注释说明其锁定的具体回归。
 /// </summary>
 public class ExtractParallelDegreeWiringTests
@@ -39,6 +39,10 @@ public class ExtractParallelDegreeWiringTests
     /// <summary>解压公共流程 ExtractAsync 所在文件。</summary>
     private const string ExtractFlowRelPath =
         "src/MantisZip.UI.Avalonia/Services/ExtractFlow.cs";
+
+    /// <summary>选中条目解压服务（ExtractEntriesAsync 接线 resolver）所在文件。</summary>
+    private const string SelectedItemsExtractServiceRelPath =
+        "src/MantisZip.UI.Avalonia/Services/SelectedItemsExtractService.cs";
 
     /// <summary>主窗口解压入口 ExtractArchive 所在文件。</summary>
     private const string MainViewModelRelPath =
@@ -103,6 +107,7 @@ public class ExtractParallelDegreeWiringTests
         {
             MainWindowRelPath,
             ExtractFlowRelPath,
+            SelectedItemsExtractServiceRelPath,
             MainViewModelRelPath,
             ExtractSettingsWindowRelPath,
         };
@@ -136,12 +141,12 @@ public class ExtractParallelDegreeWiringTests
 
     /// <summary>
     /// 测试 3：ExtractFlow.ExtractAsync 签名必须带「int? parallelExtractDegree = null」
-    /// 可空参数（对话框值的穿透通道），且方法体必须以
-    /// 「parallelExtractDegree ?? AppSettings.Load()?.ParallelExtractDegree ?? 0」
-    /// 这一形态写入 options.ParallelExtractDegree（参数优先、设置兜底）。
+    /// 可空参数（对话框值的穿透通道），且方法体必须经 <c>ParallelDegreeResolver.ResolveAsync</c>
+    /// 决策链解析（callerDegree = 对话框值），再把解析结果写入 options.ParallelExtractDegree
+    /// （智能并行解压接线后的唯一合法形态）。
     ///
-    /// 锁定的回归：缺陷的第二环是 ExtractAsync 只读 AppSettings（对话框选择被
-    /// 丢弃）。若有人删掉参数或改回直读设置，守卫失败。
+    /// 锁定的回归：接线改造曾把「对话框值 ?? AppSettings」直读形态改为 resolver 决策链；
+    /// 若有人删掉签名参数、绕过 resolver 直读设置，或漏写 options 赋值，守卫失败。
     ///
     /// 为什么空白归一：签名可能被折行（本文件内 ExtractAsync 的 8 个参数就分 9 行
     /// 书写），不归一会造成假失败。
@@ -152,17 +157,19 @@ public class ExtractParallelDegreeWiringTests
         var source = ReadSource(ExtractFlowRelPath);
         var normalized = NormalizeWhitespace(source);
 
-        // 签名通道
+        // 签名通道（对话框值穿透）
         Assert.Contains("int? parallelExtractDegree = null", normalized);
 
-        // 方法体：参数优先、AppSettings 兜底的唯一合法写入形态
-        Assert.Contains(
-            "parallelExtractDegree ?? AppSettings.Load()?.ParallelExtractDegree ?? 0",
-            normalized);
+        // 方法体：经 resolver 决策链解析（callerDegree = 对话框单次值）
+        Assert.Contains("ParallelDegreeResolver.ResolveAsync", normalized);
+        Assert.Contains("callerDegree: parallelExtractDegree", normalized);
 
-        // 显示回写：进度窗口并行度统计必须用同一参数（而非重读设置）
+        // 解析结果写入解压选项（引擎 SupportsParallelExtract 时生效）
+        Assert.Contains("ParallelExtractDegree = resolvedDegree", normalized);
+
+        // 显示回写：进度窗口并行度统计必须用 resolver 结果（而非重读设置）
         Assert.Contains(
-            "ResolveDisplayParallelDegree(archivePath, parallelExtractDegree)",
+            "ResolveDisplayParallelDegree(archivePath, resolvedDegree)",
             normalized);
     }
 
@@ -214,12 +221,33 @@ public class ExtractParallelDegreeWiringTests
     }
 
     /// <summary>
-    /// 行为测试（波 B）：ResolveDisplayParallelDegree 的二参重载语义——
-    /// 显式传入的线程数覆盖 AppSettings（对话框值的最终消费点）；
-    /// 引擎不支持并行时无论传什么都返回 1（串行隐藏，Rule 6）。
+    /// 测试 6：SelectedItemsExtractService.ExtractEntriesAsync（选中条目解压，无对话框覆盖）
+    /// 必须经 <c>ParallelDegreeResolver.ResolveAsync</c> 解析线程数（callerDegree = null），
+    /// 并把结果写入 options.ParallelExtractDegree。
     ///
-    /// 锁定的回归：若实现只在签名加参数但方法体仍读 AppSettings，
-    /// 对话框选择依旧无效（缺陷以新形态回归）。
+    /// 锁定的回归：接线改造前该方法直读 AppSettings.ParallelExtractDegree；若有人漏改此
+    /// 路径（只改 ExtractFlow），选中条目/拖拽解压会绕过智能并行度决策链，行为与全量
+    /// 解压不一致。
+    /// </summary>
+    [Fact]
+    public void SelectedItemsExtractService_UsesParallelDegreeResolver()
+    {
+        var source = ReadSource(SelectedItemsExtractServiceRelPath);
+        var normalized = NormalizeWhitespace(source);
+
+        Assert.Contains("ParallelDegreeResolver.ResolveAsync", normalized);
+        // 选中条目解压无对话框覆盖 → callerDegree 恒为 null
+        Assert.Contains("callerDegree: null", normalized);
+        Assert.Contains("ParallelExtractDegree = resolvedDegree", normalized);
+    }
+
+    /// <summary>
+    /// 行为测试：ResolveDisplayParallelDegree 的二参重载语义——
+    /// 传入的 resolver 解析结果（&gt;0）直接采用（并行度统计的最终消费点）；
+    /// 未传时回落 AppSettings；引擎不支持并行时无论传什么都返回 1（串行隐藏，Rule 6）。
+    ///
+    /// 锁定的回归：若实现只在签名加参数但方法体仍无条件读 AppSettings，
+    /// resolver 结果无法反映到进度窗口统计（显示与实际线程数漂移）。
     /// </summary>
     [Fact]
     public void ResolveDisplayParallelDegree_ExplicitParameter_OverridesSettings()
