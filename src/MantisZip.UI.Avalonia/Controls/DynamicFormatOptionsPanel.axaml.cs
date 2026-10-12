@@ -38,6 +38,8 @@ public partial class DynamicFormatOptionsPanel : UserControl
     public string MatchFinderLabel => LocalizationManager.T("FormatOptions_7z_MatchFinder");
     public string MultiThreadLabel => LocalizationManager.T("FormatOptions_7z_MultiThread");
     public string TarGzPlaceholder => LocalizationManager.T("FormatOptions_TarGz_Placeholder");
+    public string CustomDictSizeHint => LocalizationManager.T("FormatOptions_7z_DictSize_CustomHint");
+    public string DictSizeMemoryHint => LocalizationManager.T("FormatOptions_7z_DictSize_MemoryHint");
 
     // ── CLR Properties ─────────────────────────────────────────────────────
 
@@ -100,16 +102,27 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
-    public int SevenZipDictionarySize
+    /// <summary>
+    /// 7z 字典大小：""=引擎默认，或 "64m" / "256m" / "1g" / "4g"（CustomParameters["d"] 直传）。
+    /// 选「自定义」（tag="-1"）时读取输入框 MB 数值拼为 "Nm"；输入非法返回 ""。
+    /// </summary>
+    public string SevenZipDictionarySize
     {
         get
         {
-            if (SelectedFormat != "7z") return 0;
-            if (DictSizeCombo.SelectedItem is ComboBoxItem item
-                && item.Tag is string tag
-                && int.TryParse(tag, out var val))
-                return val;
-            return 0;
+            if (SelectedFormat != "7z") return "";
+            if (DictSizeCombo.SelectedItem is ComboBoxItem item && item.Tag is string tag)
+            {
+                if (tag == "-1")
+                {
+                    // 自定义：输入框收 MB 数字，拼 "Nm"（裸数字直传 7z 会被解释为 2^N 幂次，必须带单位）
+                    if (long.TryParse(CustomDictSizeBox?.Text?.Trim(), out var mb) && mb > 0)
+                        return $"{mb}m";
+                    return "";
+                }
+                return tag; // ""=默认 或 "16m"/"1g" 等预设
+            }
+            return "";
         }
     }
 
@@ -187,6 +200,37 @@ public partial class DynamicFormatOptionsPanel : UserControl
         // 无需联动控件；占位以便未来添加线程数控件时启用/禁用
     }
 
+    /// <summary>
+    /// 字典大小下拉变更 — 选「自定义」（tag="-1"）时显示 MB 输入框（规则 6：隐藏而非禁用），
+    /// 并按输入值联动内存提示（>1GB 显示「解压需同等可用内存」灰字）。
+    /// </summary>
+    private void DictSizeCombo_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+    {
+        if (CustomDictSizePanel == null) return;
+
+        bool isCustom = DictSizeCombo.SelectedItem is ComboBoxItem item && item.Tag as string == "-1";
+        CustomDictSizePanel.IsVisible = isCustom;
+        UpdateDictSizeMemoryWarning(isCustom);
+    }
+
+    /// <summary>
+    /// 自定义字典输入变化时刷新内存提示可见性（仅在自定义模式下且输入 ≥1024 MB 时显示）。
+    /// </summary>
+    private void CustomDictSizeBox_TextChanged(object? sender, TextChangedEventArgs e)
+    {
+        bool isCustom = DictSizeCombo?.SelectedItem is ComboBoxItem item && item.Tag as string == "-1";
+        UpdateDictSizeMemoryWarning(isCustom);
+    }
+
+    private void UpdateDictSizeMemoryWarning(bool isCustom)
+    {
+        if (DictSizeMemoryWarning == null) return;
+        bool show = isCustom
+            && long.TryParse(CustomDictSizeBox?.Text?.Trim(), out var mb)
+            && mb >= 1024;
+        DictSizeMemoryWarning.IsVisible = show;
+    }
+
     // ── Public Methods ─────────────────────────────────────────────────────
 
     /// <summary>
@@ -218,7 +262,15 @@ public partial class DynamicFormatOptionsPanel : UserControl
         MultiThreadCheck.IsChecked = s.SevenZipMultithreaded;
 
         SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "");
-        SelectComboByIntValue(DictSizeCombo, s.SevenZipDictionarySize);
+        // 字典大小：settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
+        if (!SelectComboByTag(DictSizeCombo, s.SevenZipDictionarySize ?? "")
+            && !string.IsNullOrEmpty(s.SevenZipDictionarySize))
+        {
+            SelectComboByTag(DictSizeCombo, "-1");
+            var v = s.SevenZipDictionarySize.Trim();
+            if (CustomDictSizeBox != null)
+                CustomDictSizeBox.Text = v.EndsWith("m", StringComparison.OrdinalIgnoreCase) ? v[..^1] : v;
+        }
         SelectComboByIntValue(WordSizeCombo, s.SevenZipNumFastBytes);
         SelectComboByTag(MatchFinderCombo, s.SevenZipMatchFinder ?? "");
     }
@@ -249,7 +301,9 @@ public partial class DynamicFormatOptionsPanel : UserControl
             opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default") : opt.Display);
 
         Fill(DictSizeCombo, CompressionOptionData.SevenZipDictionarySizes, opt =>
-            opt.Tag == "0" ? LocalizationManager.T("FormatOptions_7z_DictSize_Default") : opt.Display);
+            opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_DictSize_Default")
+            : opt.Tag == "-1" ? LocalizationManager.T("FormatOptions_7z_DictSize_Custom")
+            : opt.Display);
 
         Fill(WordSizeCombo, CompressionOptionData.SevenZipNumFastBytes, opt =>
             opt.Tag == "0" ? LocalizationManager.T("FormatOptions_7z_WordSize_Default") : opt.Display);
@@ -287,7 +341,10 @@ public partial class DynamicFormatOptionsPanel : UserControl
         }
     }
 
-    private static void SelectComboByTag(ComboBox combo, string targetTag)
+    /// <summary>
+    /// 按 tag 精确匹配选中下拉项；返回是否命中（供自定义值回退分支判断）。
+    /// </summary>
+    private static bool SelectComboByTag(ComboBox combo, string targetTag)
     {
         foreach (var item in combo.Items)
         {
@@ -295,9 +352,10 @@ public partial class DynamicFormatOptionsPanel : UserControl
                 && string.Equals(tag, targetTag, StringComparison.OrdinalIgnoreCase))
             {
                 combo.SelectedItem = ci;
-                return;
+                return true;
             }
         }
+        return false;
     }
 
     private static void SelectComboByIntValue(ComboBox combo, int targetValue)

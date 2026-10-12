@@ -11,6 +11,14 @@
   - **修复**：删除 `ReproZipName` 常量与 `RepoFile()`（原向上找仓库根定位 `TestPreview/`），改为运行时合成最小结构 `CreateSyntheticReproZip()`（`%TEMP%\MantisZip\Tests\repro_webview_{guid}.zip`：`attachment-management/` 目录 + `styles.css` + `page.html`）；测试类实现 `IDisposable`，构造建包、`Dispose` 删包；`LoadReproArchive()` 改实例方法
   - **语义不变**：仍锁定「点目录 / 非 HTML 条目不得初始化 WebView2」；6/6 通过，任何机器 / CI 可跑
 
+**2026-10-12** — 7z 字典大小支持自定义 MB 输入（预设扩至 8GB，突破 2GB 上限）
+  - **Core**：`ArchiveOptions` / `CompressRequest.SevenZipDictionarySize` 由 `int?` 改 `string?`；`SevenZipEngine.ConfigureCompressor` 弃用 `SharpSevenZipCompressor.LzmaDictionarySize`（静态 int 属性上限约 2GB + 并发隐患），改走 `CustomParameters["d"]` 直传 7z.dll（与固实块 `["s"]` 同路径，字符串格式支持 >2GB）
+  - **持久化**：`AppSettings.SevenZipDictionarySize` 由 `int` 改 `string`，新增 `LegacyIntToSizeStringConverter`（`[JsonConverter]`）兼容旧 settings.json 的裸字节值，旧配置无损迁移
+  - **预设**：`CompressionOptionData.SevenZipDictionarySizes` 由 6 项裸字节数改为 11 项 `""`/16m/32m/…/8g + `"-1"` 自定义（Tag 为 7z 大小字符串）；`SevenZipNumFastBytes` 补 `273`（LZMA/LZMA2 硬上限）
+  - **UI（压缩对话框 `DynamicFormatOptionsPanel` + 设置窗口 `SettingsWindow`）**：字典下拉旁新增「自定义」MB 输入框（选 `-1` 才显示，规则 6 隐藏而非禁用）；输入 ≥1024MB 时压缩对话框显示「大字典解压需同等可用内存」提示；加载时非预设值自动回退选「自定义」并回填 MB 数字；保存时拼 `"{mb}m"`（裸数字会被 7z 解释为 2^N 幂次，必须带单位）
+  - **i18n**：新增 `FormatOptions_7z_DictSize_Custom` / `_CustomHint` / `_MemoryHint` 三语成对
+  - **测试**：`CompressSettingsViewModelTests` 适配 string
+
 **2026-10-12** — startup-native-splash 计划修订（📋 计划文档，未实施）
   - **覆盖范围扩大（选B）**：splash 从 CLI 慢路径扩大到**所有启动路径**（含无参普通启动）——实测无参启动到主窗口可见 TOTAL≈2160ms（`Avalonia.InitDone` ~950ms + MainWindow 构造+首帧 ~1070ms），原「普通启动约 1s 不值得闪」排除理由不成立
   - **实现要点补全**：splash 线程标注 `IsBackground=true`（防 desktop.Shutdown 后前台消息泵阻止进程退出）；终端窗口枚举表加无参行（`MainWindow` 即终端）；无参启动用**新增 key** `Status_Starting`（「正在启动…」，三语成对）；排除条件改为非 UI 命令（`--install-shell`/`--help` 等秒退命令）

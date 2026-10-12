@@ -112,7 +112,7 @@
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
 
-        <!-- 7z 字典大小：压缩时使用的滑动窗口大小，越大压缩率越高但内存占用越大 -->
+        <!-- 7z 字典大小：压缩时使用的滑动窗口大小，越大压缩率越高但内存占用越大；选「自定义」时显示 MB 输入框 -->
         <Grid Margin="0,6,0,0">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -122,13 +122,49 @@
                      Text="{Binding DictSizeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                      VerticalAlignment="Center"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-          <ComboBox x:Name="DictSizeCombo"
-                    Grid.Column="1"
-                    Height="24"
-                    Background="{DynamicResource ThemeComboBoxBgBrush}"
-                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+          <Grid Grid.Column="1">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="DictSizeCombo"
+                      Grid.Column="0"
+                      Height="24"
+                      Background="{DynamicResource ThemeComboBoxBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}"
+                      SelectionChanged="DictSizeCombo_SelectionChanged" />
+            <!-- 自定义字典大小输入：单位 MB，仅选「自定义」时显示（规则 6：隐藏而非禁用） -->
+            <StackPanel x:Name="CustomDictSizePanel"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        IsVisible="False"
+                        Margin="6,0,0,0">
+              <TextBox x:Name="CustomDictSizeBox"
+                       Width="80"
+                       Height="24"
+                       PlaceholderText="MB"
+                       TextChanged="CustomDictSizeBox_TextChanged"
+                       Background="{DynamicResource ThemeSurfaceBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              <TextBlock Text="{Binding CustomDictSizeHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         FontSize="11" />
+            </StackPanel>
+          </Grid>
         </Grid>
+
+        <!-- 自定义字典内存提示：大字典解压需同等可用内存，选自定义且输入较大值时显示 -->
+        <TextBlock x:Name="DictSizeMemoryWarning"
+                   Text="{Binding DictSizeMemoryHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   Margin="86,2,0,0"
+                   IsVisible="False"
+                   FontSize="11"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   TextWrapping="Wrap" />
 
         <!-- 7z 字长/快速字节数：匹配查找时的最大匹配长度，影响压缩速度与压缩率的平衡 -->
         <Grid Margin="0,6,0,0">

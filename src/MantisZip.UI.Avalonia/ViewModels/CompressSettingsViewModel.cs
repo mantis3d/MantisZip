@@ -185,8 +185,8 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>7z 固实块大小：""=默认，或 "64m" / "256m" / "512m" / "1g"。</summary>
     public string SevenZipSolidBlockSize { get; set; } = "";
 
-    /// <summary>7z 字典大小（字节），0 表示引擎默认。</summary>
-    public int SevenZipDictionarySize { get; set; }
+    /// <summary>7z 字典大小：""=默认，或 "64m" / "256m" / "1g" / "4g"（CustomParameters["d"] 直传 7z.dll）。</summary>
+    public string SevenZipDictionarySize { get; set; } = "";
 
     /// <summary>7z Word Size（快速字节数），0 表示引擎默认。</summary>
     public int SevenZipNumFastBytes { get; set; }

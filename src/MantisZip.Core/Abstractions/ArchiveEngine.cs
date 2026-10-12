@@ -114,10 +114,10 @@ public class ArchiveOptions
     public string? SevenZipSolidBlockSize { get; set; }
 
     /// <summary>
-    /// 7z 字典大小（字节），null 表示引擎默认。
-    /// 仅对 LZMA/LZMA2 压缩方法有效。
+    /// 7z 字典大小：null/""=默认，或 "64m" / "256m" / "1g" / "4g"（经 CustomParameters["d"] 直传 7z.dll）。
+    /// 仅对 LZMA/LZMA2 压缩方法有效。字符串格式支持 >2GB（int 字节上限约 2GB，已弃用）。
     /// </summary>
-    public int? SevenZipDictionarySize { get; set; }
+    public string? SevenZipDictionarySize { get; set; }
 
     /// <summary>
     /// 7z Word Size（快速字节数），null 表示引擎默认。
