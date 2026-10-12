@@ -3,6 +3,7 @@ using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Core.Models;
+using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
@@ -179,14 +180,37 @@ public static class ExtractFlow
         int? parallelExtractDegree = null)
     {
         var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog);
-        // 传递并行解压线程数：对话框值优先、AppSettings 兜底（引擎 SupportsParallelExtract 时生效）
+
+        // 智能并行解压：经 ParallelDegreeResolver 5 步决策链解析线程数
+        // （callerDegree = 对话框单次值；null/≤0 = 无覆盖，交由全局开关/智能/预测试/磁盘类型决定）
+        var settings = AppSettings.Load();
+        var resolvedDegree = await ParallelDegreeResolver.ResolveAsync(
+            callerDegree: parallelExtractDegree,
+            settings: new ParallelExtractSettings
+            {
+                EnableParallel = settings?.EnableParallelExtract ?? true,
+                SmartParallel = settings?.SmartParallelDegree ?? true,
+                SmartSsdDegree = settings?.SmartSsdDegree ?? 12,
+                SmartHddDegree = settings?.SmartHddDegree ?? 8,
+                LargeArchivePreTest = settings?.LargeArchivePreTest ?? true,
+                ManualDegree = settings?.ParallelExtractDegree ?? 0
+            },
+            archivePath: archivePath,
+            destinationPath: dest,
+            password: password,
+            engineSupportsParallel:
+                ArchiveEngineFactory.GetEngineByExtension(archivePath)?.SupportsParallelExtract ?? false,
+            // 预测试阶段 resolver 上报的状态占位 key 在此替换为本地化文案
+            progress: progress is null ? null : new PreTestStatusLocalizingProgress(progress),
+            ct: ct);
+
         if (options != null)
-            options.ParallelExtractDegree = parallelExtractDegree ?? AppSettings.Load()?.ParallelExtractDegree ?? 0;
+            options.ParallelExtractDegree = resolvedDegree;
 
         // T6: 同一代码路径上已持有 ProgressWindow（MainWindow RunWithProgress 闭包 / CLI 批处理
         // 先 Show() 再进入本方法，OnOpened 已置位 CurrentVisible），把实际并行度写给进度窗口统计。
         // 串行路径（引擎不支持并行或 degree ≤ 1）传 1 → HasParallelDegree=false 自动隐藏（Rule 6）。
-        ProgressWindow.CurrentVisible?.SetParallelDegree(ResolveDisplayParallelDegree(archivePath, parallelExtractDegree));
+        ProgressWindow.CurrentVisible?.SetParallelDegree(ResolveDisplayParallelDegree(archivePath, resolvedDegree));
         // T9/D7: 列表模式播种（后台列目录 → SeedEntries；不 await，解压不等播种）。
         // TAR/GZ 与非 zip/7z 在 CanSeedEntries 内拦下 → 零 ListEntriesAsync 调用；
         // >5000 条跳过播种转渐进模式。播种结果由 UpdateEntryStatus 的 upsert 兜底。
@@ -295,20 +319,23 @@ public static class ExtractFlow
     /// <summary>
     /// 计算用于进度窗口统计显示的并行度（T6）：
     /// 引擎不支持并行（7z/TAR/GZ 等 SupportsParallelExtract=false）→ 1（串行，隐藏并行统计）；
-    /// 显式 <paramref name="parallelDegree"/>（解压对话框选择）优先，null 时回落 AppSettings；
+    /// 传入 <paramref name="resolvedDegree"/>（resolver 解析结果）时直接采用（>0 恒成立）；
+    /// 未传（CLI 直解等无 resolver 路径）时回落 AppSettings.ParallelExtractDegree，
     /// 设置值 0/负数 = 引擎自动 → <c>Environment.ProcessorCount</c>（与 ZipEngine 的 0 值语义一致）。
     /// </summary>
     /// <param name="archivePath">压缩包路径（按扩展名分发引擎）。</param>
-    /// <param name="parallelDegree">显式线程数；null 表示沿用 AppSettings（CLI 等无对话框路径）。</param>
+    /// <param name="resolvedDegree">resolver 已解析的线程数；null 表示沿用 AppSettings（CLI 等无对话框路径）。</param>
     /// <remarks>
     /// CLI 批处理直解路径（<c>App.RunCliDirectExtractBatchAsync</c>）绕过 <see cref="ExtractAsync"/>，
     /// 需自行调用本方法把并行度写给进度窗口，故为 internal 而非 private。
     /// </remarks>
-    internal static int ResolveDisplayParallelDegree(string archivePath, int? parallelDegree = null)
+    internal static int ResolveDisplayParallelDegree(string archivePath, int? resolvedDegree = null)
     {
         if (ArchiveEngineFactory.GetEngineByExtension(archivePath)?.SupportsParallelExtract != true)
             return 1;
-        int degree = parallelDegree ?? AppSettings.Load()?.ParallelExtractDegree ?? 0;
+        if (resolvedDegree is int d && d > 0)
+            return d;
+        int degree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
         return degree > 0 ? degree : Environment.ProcessorCount;
     }
 
@@ -428,5 +455,25 @@ public static class ExtractFlow
             seeds.Add((item.Name, Path.GetFileName(item.Name), item.Size));
         }
         return seeds;
+    }
+}
+
+/// <summary>
+/// 进度包装：把 <see cref="ParallelDegreeResolver"/> 预测试阶段上报的状态占位 key
+/// （<c>STATUS_TESTING_PARALLEL_DEGREE</c>）替换为本地化文案后再同步转发给真实消费者。
+/// 仅包裹传给 resolver 的实例，实际解压仍用原始 progress（同步转发，不引入
+/// SynchronizationContext 调度，避免改变进度上报线程语义）。
+/// </summary>
+internal sealed class PreTestStatusLocalizingProgress : IProgress<ArchiveProgress>
+{
+    private readonly IProgress<ArchiveProgress> _inner;
+
+    public PreTestStatusLocalizingProgress(IProgress<ArchiveProgress> inner) => _inner = inner;
+
+    public void Report(ArchiveProgress value)
+    {
+        if (value.CurrentFile == "STATUS_TESTING_PARALLEL_DEGREE")
+            value.CurrentFile = LocalizationManager.T("Status_TestingParallelDegree");
+        _inner.Report(value);
     }
 }

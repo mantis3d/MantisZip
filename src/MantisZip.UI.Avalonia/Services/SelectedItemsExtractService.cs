@@ -53,12 +53,33 @@ public sealed class SelectedItemsExtractService
         }
 
         var options = CreateExtractOptions(conflictAction, conflictDialog);
-        // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
-        if (options != null)
-            options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
         if (engine == null) throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));
+
+        // 智能并行解压：选中条目解压无对话框覆盖（callerDegree = null），经 resolver 5 步决策链解析
+        var settings = AppSettings.Load();
+        var resolvedDegree = await ParallelDegreeResolver.ResolveAsync(
+            callerDegree: null,
+            settings: new ParallelExtractSettings
+            {
+                EnableParallel = settings?.EnableParallelExtract ?? true,
+                SmartParallel = settings?.SmartParallelDegree ?? true,
+                SmartSsdDegree = settings?.SmartSsdDegree ?? 12,
+                SmartHddDegree = settings?.SmartHddDegree ?? 8,
+                LargeArchivePreTest = settings?.LargeArchivePreTest ?? true,
+                ManualDegree = settings?.ParallelExtractDegree ?? 0
+            },
+            archivePath: archivePath,
+            destinationPath: destinationPath,
+            password: password,
+            engineSupportsParallel: engine.SupportsParallelExtract,
+            // 预测试阶段 resolver 上报的状态占位 key 在此替换为本地化文案
+            progress: new PreTestStatusLocalizingProgress(progress),
+            ct: cancellationToken);
+
+        if (options != null)
+            options.ParallelExtractDegree = resolvedDegree;
 
         // 所有格式统一走按条目提取（TarGzEngine 已实现，不再降级全量解压）
         // 叶子 3/5：选中条目解压直连引擎 → 密码弹窗兜底在此（拖拽解压经本方法自动覆盖）
