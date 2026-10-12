@@ -23,6 +23,14 @@ public class DiskTypeDetectorTests
     }
 
     [Fact]
+    public void GetDiskType_LocalFixedDrive_DetectsSsdOrHdd()
+    {
+        // 本地固定盘（Temp 所在卷）必须检测成功；非 Windows 实现返回 Unknown，此处仅验证 Windows
+        if (!OperatingSystem.IsWindows()) return;
+        Assert.NotEqual(DiskType.Unknown, DiskTypeDetector.GetDiskType(Path.GetTempPath()));
+    }
+
+    [Fact]
     public void GetDiskType_EmptyPath_ReturnsUnknown()
         => Assert.Equal(DiskType.Unknown, DiskTypeDetector.GetDiskType(""));
 

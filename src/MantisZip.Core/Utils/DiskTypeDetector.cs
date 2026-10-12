@@ -22,7 +22,8 @@ public enum DiskType
 /// </summary>
 public static class DiskTypeDetector
 {
-    private static readonly ConcurrentDictionary<string, DiskType> Cache = new();
+    private static readonly ConcurrentDictionary<string, DiskType> Cache =
+        new(StringComparer.OrdinalIgnoreCase);
 
     private const uint IOCTL_STORAGE_QUERY_PROPERTY = 0x002D1400;
     private const int StorageDeviceSeekPenaltyProperty = 7;
@@ -56,7 +57,6 @@ public static class DiskTypeDetector
         ref DEVICE_SEEK_PENALTY_DESCRIPTOR lpOutBuffer, uint nOutBufferSize,
         out uint lpBytesReturned, IntPtr lpOverlapped);
 
-    private const uint GENERIC_READ = 0x80000000;
     private const uint FILE_SHARE_READWRITE = 3;
     private const uint OPEN_EXISTING = 3;
     private const uint FILE_ATTRIBUTE_NORMAL = 0x80;
@@ -76,8 +76,9 @@ public static class DiskTypeDetector
             if (root.Length >= 2 && root[1] == ':') return root[..2];
             return null;
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace($"DiskTypeDetector.ExtractDriveRoot failed for path '{path}': {ex.Message}");
             return null;
         }
     }
@@ -90,23 +91,34 @@ public static class DiskTypeDetector
         var root = ExtractDriveRoot(path);
         if (root == null) return DiskType.Unknown;
 
-        return Cache.GetOrAdd(root, QuerySeekPenalty);
+        // Unknown 不缓存（瞬态失败可重试），仅缓存确定的 Ssd/Hdd
+        if (Cache.TryGetValue(root, out var cached)) return cached;
+
+        var type = QuerySeekPenalty(root);
+        if (type != DiskType.Unknown) Cache[root] = type;
+        return type;
     }
 
     private static DiskType QuerySeekPenalty(string driveRoot)
     {
         try
         {
+            // 卷设备句柄 \\.\C: 才服务存储 IOCTL；目录句柄会 CreateFile 失败或 ERROR_INVALID_PARAMETER。
+            // dwDesiredAccess=0：非管理员对 \\.\C: 请求 GENERIC_READ 会 ACCESS_DENIED (err=5)
             using var handle = CreateFile(
-                driveRoot + @"\",
-                GENERIC_READ,
+                @"\\.\" + driveRoot,
+                0,
                 FILE_SHARE_READWRITE,
                 IntPtr.Zero,
                 OPEN_EXISTING,
                 FILE_ATTRIBUTE_NORMAL,
                 IntPtr.Zero);
 
-            if (handle.IsInvalid) return DiskType.Unknown;
+            if (handle.IsInvalid)
+            {
+                CoreLog.Trace($"DiskTypeDetector: CreateFile failed for {driveRoot}, win32error={Marshal.GetLastWin32Error()}");
+                return DiskType.Unknown;
+            }
 
             var query = new STORAGE_PROPERTY_QUERY
             {
@@ -121,13 +133,15 @@ public static class DiskTypeDetector
                     ref descriptor, (uint)Marshal.SizeOf<DEVICE_SEEK_PENALTY_DESCRIPTOR>(),
                     out _, IntPtr.Zero))
             {
+                CoreLog.Trace($"DiskTypeDetector: DeviceIoControl SeekPenalty failed for {driveRoot}, win32error={Marshal.GetLastWin32Error()}");
                 return DiskType.Unknown;
             }
 
             return descriptor.IncursSeekPenalty != 0 ? DiskType.Hdd : DiskType.Ssd;
         }
-        catch
+        catch (Exception ex)
         {
+            CoreLog.Trace($"DiskTypeDetector.QuerySeekPenalty failed for {driveRoot}: {ex.Message}");
             return DiskType.Unknown;
         }
     }
