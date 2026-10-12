@@ -431,6 +431,53 @@
               </StackPanel>
             </Border>
 
+            <!-- ═══ 数字输入替代方案（非 NumericUpDown）：Avalonia 内置可选路线横向对比 ═══ -->
+            <!-- RangeSlider 属第三方（Avalonia.Labs），未纳入；FluentAvalonia NumberBox 亦未引入。 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="数字输入替代方案（非 NumericUpDown）" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" TextWrapping="Wrap"
+                           Text="Avalonia 内置、无需额外依赖的数字输入路线对比。" />
+                <WrapPanel Orientation="Horizontal">
+                  <!-- 1 MaskedTextBox：纯数字掩码（此处限 4 位数字） -->
+                  <StackPanel Width="250" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="MaskedTextBox（掩码 0000，仅 4 位数字，无调值）" />
+                    <MaskedTextBox Width="140" Mask="0000" Text="{Binding MaskedNumberText}" />
+                  </StackPanel>
+                  <!-- 2 ButtonSpinner + TextBox：自组数字框，外观完全自控 -->
+                  <StackPanel Width="250" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ButtonSpinner + TextBox（自组，外观可控）" />
+                    <ButtonSpinner ButtonSpinnerLocation="Right" Width="140"
+                                   Height="{DynamicResource ControlHeight}">
+                      <TextBox Text="{Binding SpinnerTextValue}" VerticalAlignment="Stretch" />
+                    </ButtonSpinner>
+                  </StackPanel>
+                  <!-- 3 TextBox + 数字过滤（code-behind TextInput 拒绝非数字） -->
+                  <StackPanel Width="250" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="TextBox + 数字过滤（仅接受 0-9，无调值）" />
+                    <TextBox Width="140" Text="{Binding NumericFilterText}"
+                             TextInput="NumericOnlyTextBox_TextInput" />
+                  </StackPanel>
+                  <!-- 4 ComboBox 预设值：离散选择，规避自由输入 -->
+                  <StackPanel Width="250" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="ComboBox 预设值（线程数 1/2/4/8/12/16）" />
+                    <ComboBox Width="140" ItemsSource="{Binding ThreadCountOptions}"
+                              SelectedItem="{Binding SelectedThreadCount}" />
+                  </StackPanel>
+                  <!-- 5 Slider + 数值回显（范围型；另一处刻度吸附变体见「下拉与滑块」） -->
+                  <StackPanel Width="250" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="Slider + 数值回显（范围型）" />
+                    <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}">
+                      <Slider Width="100" Minimum="0" Maximum="100" Value="{Binding SliderValue}" />
+                      <TextBlock Text="{Binding SliderValue, StringFormat={}{0:0}}" FontSize="12"
+                                 VerticalAlignment="Center" Width="26" />
+                    </StackPanel>
+                  </StackPanel>
+                </WrapPanel>
+              </StackPanel>
+            </Border>
+
           </StackPanel>
         </ScrollViewer>
       </TabItem>

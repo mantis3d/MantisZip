@@ -37,6 +37,17 @@ public partial class UiTestViewModel : ObservableObject
     [ObservableProperty] private bool _toggleSwitchOn = true;
     [ObservableProperty] private double _sliderValue = 65;
     [ObservableProperty] private decimal _numericValue = 42;
+
+    // ── 数字输入（NumericUpDown 之外的替代方案） ──
+    /// <summary>MaskedTextBox 纯数字掩码输入的文本。</summary>
+    [ObservableProperty] private string _maskedNumberText = "0042";
+    /// <summary>ButtonSpinner + TextBox 自组数字框的文本。</summary>
+    [ObservableProperty] private string _spinnerTextValue = "8";
+    /// <summary>TextBox + 数字过滤（仅接受 0-9）的文本。</summary>
+    [ObservableProperty] private string _numericFilterText = "128";
+    /// <summary>ComboBox 预设线程数（离散选择，规避自由输入）。</summary>
+    public List<int> ThreadCountOptions { get; } = new() { 1, 2, 4, 8, 12, 16 };
+    [ObservableProperty] private int _selectedThreadCount = 8;
     [ObservableProperty] private DateTimeOffset? _filterDateFrom = new(DateTime.Today.AddDays(-7));
     [ObservableProperty] private DateTimeOffset? _filterDateTo = new(DateTime.Today);
     [ObservableProperty] private DateTime? _calendarDate = DateTime.Today;
