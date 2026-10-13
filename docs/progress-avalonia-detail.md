@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-13** — 「测试压缩包」逐条目失败定位 + 测试/解压全流程列表播种 + 状态行去状态 emoji（实现 spec §12 Follow-up #6）
+  - **引擎逐条目测试定位**：`ZipEngine.TestArchiveAsync` 逐条目 try/catch，成功报 `EntryStatus=Completed`、失败报 `Failed`+`EntryFailureReason`（`FailureReasonMapper`）并带 `EntryKey`、继续校验其余条目，整体返回有无失败；`TarGzEngine.TestArchiveAsync` TAR 循环 + GZ 单条目同构；`SevenZipEngine.TestArchiveAsync` 快路径 `Check()` 通过后逐条报 `Completed`（不再 O(n²)），**仅在校验失败时**逐条 `ExtractFile` 定位坏条目、无逐条失败时补一条整包失败。
+  - **列表播种补全**：`MainWindowViewModel` 的 `TestArchive` 与 `ExtractArchiveHere`/`ExtractArchiveToName`/`ExtractTo`/`SmartExtract`（此前 `new ExtractService().ExtractAsync(...)` 直连、不播种）在操作内先 `ExtractFlow.TrySeedEntryItemsInBackground(ProgressWindow.CurrentVisible, ...)` 列出全部条目——修复这些入口「列表」模式全空（测试引擎此前也不上报逐条状态，故连渐进都无）。
+  - **状态行去 emoji**：状态行左侧已有状态图标表意，去掉文案重复 emoji——`Status_TestOK`（✅）、`Status_TestFailed`（❌）、`Progress_Paused`（⏸），zh-CN/en/zh-TW 三语成对。
+  - **测试**：新增 `Engines/ZipEngineTestArchiveLocalizationTests`（损坏 deflate 条目 → `False` + 单条 `Failed 'damaged.bin'` + 原因；健康包 → `True` + 逐条 `Completed`）。Core **670 通过**/3 跳过、UI **232 通过**/3 跳过。
+  - **环境说明**：默认 `bin` 下 `MantisZip.ShellExt.dll` 被资源管理器加载占用，导致常规构建文件锁；本次以 `-p:BaseOutputPath=obj\altout\` 验证（编译/测试均通过），重启资源管理器即恢复。
+
 **2026-10-13** — 进度窗口状态行下移可复制 + 失败明细红/黄分层 + 关闭链统一（自动按下 📌）+ 自动关闭倒计时 + 解压后置开关（实现 `progress-window-status-line` 计划 Task 1–11，Avalonia+Core）
   - **Core 失败原因通道**（Task 1/3/4）：`Abstractions/ArchiveEngine.cs` 新增 `EntryFailureReason` 枚举（`PermissionDenied`/`IoFailed`/`Other`，Core 只产事实类别，禁中文文案）+ `ArchiveProgress.EntryFailureReason?`；新增 `Utils/FailureReasonMapper.FromException`（异常→类别）；Zip/TarGz/SevenZip 三引擎 **24 处** `ArchiveEntryStatus.Failed` 埋点在同一 `ArchiveProgress` 初始化器内携带原因（`entry==null` 两处归 `Other` 并注记）；压缩端 `ZipEngine.ReadFileWithRetry`/`TarGzEngine.TarWriteFileWithRetry` 加 `out EntryFailureReason? skipReason`、跳过上报带原因；`ReadErrorHandler.FilterUnreadableFiles` 加 `onSkipped` 回调 + `CreateSkippedReporter`，补齐 7z/加密 ZIP 预检静默剔除缺口。
   - **失败明细红/黄分层**（Task 2/5）：新增 `Error_Reason_*`/`Progress_Failed_EntryFmt`/`Progress_Skipped_EntryFmt`/`Progress_ErrorSummary_More`/`Progress_AutoCloseSuffix`/`Settings_ProgressAutoCloseDelay` 等 **8 组三语 key**；`ProgressViewModel` 新增 `SkippedSummaryText`/`HasSkippedEntries`/`CombinedSummaryText`/`HasAnySummary`/`IsTestFlow` + 私有 `_failedEntries`/`_skippedEntries`/`_wholeArchiveError`，`CollectEntryOutcome`/`RebuildSummaryTexts`/`BuildSummaryText`（20 行上限 + `EntryKey` 去重 first-wins + 溢出行）——红段收 `Failed`、黄段只收带原因的 `Skipped`（不触发 `HasErrors`，D4/D5），`SetErrorSummary` 改写为整包头 + 重算。
