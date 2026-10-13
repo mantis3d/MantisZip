@@ -1,4 +1,12 @@
 ﻿{
+  "Progress_Failed_EntryFmt": "{0} 解壓失敗：{1}",
+  "Progress_Skipped_EntryFmt": "{0} 未包含進壓縮包：{1}",
+  "Error_Reason_PermissionDenied": "權限不足",
+  "Error_Reason_IoFailed": "I/O 錯誤（檔案被佔用或磁碟異常）",
+  "Error_Reason_Other": "未知錯誤",
+  "Progress_ErrorSummary_More": "…另 {0} 項",
+  "Progress_AutoCloseSuffix": "秒後自動關閉",
+  "Settings_ProgressAutoCloseDelay": "完成後自動關閉延時（秒，0–60，0 = 立即關閉）",
   "Settings_ExtractTab_General": "一般",
   "Settings_ExtractTab_Parallel": "加速",
   "Extract_ParallelNotSavedHint": "以上選項僅對本次解壓生效，不會修改預設設定。",

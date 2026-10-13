@@ -1,4 +1,12 @@
 ﻿{
+  "Progress_Failed_EntryFmt": "{0}: extraction failed: {1}",
+  "Progress_Skipped_EntryFmt": "{0} not included in archive: {1}",
+  "Error_Reason_PermissionDenied": "Access denied",
+  "Error_Reason_IoFailed": "I/O error (file in use or disk problem)",
+  "Error_Reason_Other": "Unknown error",
+  "Progress_ErrorSummary_More": "…and {0} more",
+  "Progress_AutoCloseSuffix": "s until auto-close",
+  "Settings_ProgressAutoCloseDelay": "Auto-close delay after completion (0–60 s, 0 = close immediately)",
   "Settings_ExtractTab_General": "General",
   "Settings_ExtractTab_Parallel": "Speed Up",
   "Extract_ParallelNotSavedHint": "These options apply to this extraction only and won't change your default settings.",

@@ -1,4 +1,12 @@
 ﻿{
+  "Progress_Failed_EntryFmt": "{0} 解压失败：{1}",
+  "Progress_Skipped_EntryFmt": "{0} 未包含进压缩包：{1}",
+  "Error_Reason_PermissionDenied": "权限不足",
+  "Error_Reason_IoFailed": "I/O 错误（文件被占用或磁盘异常）",
+  "Error_Reason_Other": "未知错误",
+  "Progress_ErrorSummary_More": "…另 {0} 项",
+  "Progress_AutoCloseSuffix": "秒后自动关闭",
+  "Settings_ProgressAutoCloseDelay": "完成后自动关闭延时（秒，0–60，0 = 立即关闭）",
   "Settings_ExtractTab_General": "通用",
   "Settings_ExtractTab_Parallel": "加速",
   "Extract_ParallelNotSavedHint": "以上选项仅对本次解压生效，不会修改默认设置。",
