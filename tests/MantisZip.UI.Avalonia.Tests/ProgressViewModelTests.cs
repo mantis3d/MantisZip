@@ -120,10 +120,10 @@ public class ProgressViewModelTests
     {
         var vm = new ProgressViewModel();
 
-        // 默认 Simple（构造后无需赋值即生效）
-        Assert.Equal(ProgressContentMode.Simple, vm.ContentMode);
-        Assert.True(vm.IsSimpleMode);
-        Assert.False(vm.IsDetailedMode);
+        // 默认 Detailed（构造后无需赋值即生效；窗口构造时按 AppSettings 持久化值覆盖）
+        Assert.Equal(ProgressContentMode.Detailed, vm.ContentMode);
+        Assert.False(vm.IsSimpleMode);
+        Assert.True(vm.IsDetailedMode);
         Assert.False(vm.IsListMode);
 
         // 收集派生属性变更通知（集中通知模式：一次赋值应同时通知三个派生属性）
@@ -1154,5 +1154,67 @@ public class ProgressViewModelTests
         vm.InitBatchMode(new[] { "a.zip" });
         vm.UpdateBatchItemStatus(0, BatchItemStatus.Failed, "x");
         Assert.Equal(ProgressStatusKind.Failed, vm.StatusKind);
+    }
+
+    // ===== 语言即时刷新 + 退订（CultureChanged） =====
+
+    /// <summary>
+    /// 切换语言应触发 LocalizedStrings 的 PropertyChanged，且字典值与 T() 当前值一致。
+    /// try/finally 快速恢复语言（xUnit 跨类并行，静态 CultureChanged 不得外泄）。
+    /// </summary>
+    [Fact]
+    public void CultureChanged_RefreshesLocalizedStrings()
+    {
+        var original = LocalizationManager.CurrentLanguage;
+        try
+        {
+            var vm = new ProgressViewModel();
+            bool raised = false;
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ProgressViewModel.LocalizedStrings)) raised = true;
+            };
+
+            // 切到与当前不同的语言（保证触发 CultureChanged）
+            LocalizationManager.CurrentLanguage =
+                original == AppLanguage.English ? AppLanguage.Chinese : AppLanguage.English;
+
+            Assert.True(raised, "CultureChanged 后应触发 LocalizedStrings PropertyChanged");
+            Assert.Equal(
+                LocalizationManager.T("Progress_Cancel"),
+                vm.LocalizedStrings["Progress_Cancel"]);
+        }
+        finally
+        {
+            LocalizationManager.CurrentLanguage = original;
+        }
+    }
+
+    /// <summary>
+    /// DetachLocalization 后不应再响应 CultureChanged（防止窗口关闭后 VM 被静态事件根引用泄漏）。
+    /// </summary>
+    [Fact]
+    public void DetachLocalization_PreventsCultureChangedRefresh()
+    {
+        var original = LocalizationManager.CurrentLanguage;
+        try
+        {
+            var vm = new ProgressViewModel();
+            vm.DetachLocalization();
+            bool raised = false;
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(ProgressViewModel.LocalizedStrings)) raised = true;
+            };
+
+            LocalizationManager.CurrentLanguage =
+                original == AppLanguage.English ? AppLanguage.Chinese : AppLanguage.English;
+
+            Assert.False(raised, "Detach 后不应再响应 CultureChanged");
+        }
+        finally
+        {
+            LocalizationManager.CurrentLanguage = original;
+        }
     }
 }

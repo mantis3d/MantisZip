@@ -23,6 +23,25 @@
   - **验证**：`dotnet build` 0 错误；Core **668 通过**/3 跳过（+`FailureReasonMapperTests` 3 / `ReadErrorHandlerSkipReasonTests` 2 / `MiddleEllipsis` 回归 2）；UI **231 通过**/3 跳过（+`ProgressViewModelTests` 聚合/状态机/后置开关 21、`ProgressWindowXamlTests` +2、`CountdownParserTests` 10）；静态门禁：24/24 `Failed` 埋点带原因、`AutoCloseOrWaitAsync((2500|0),` 0 命中、`WaitForWindowCloseAsync` 0 命中、原生 picker 未新增。**GUI 人工验收（12 条）待做**。
   - **修复既有 bug（方案 A）**：CLI/右键解压对**非加密包**误报「密码匹配」——`PasswordService.QuickVerifyPassword` 在包无加密条目时对任意密码返回 `true`，`ResolveCliPassword` 据此返回密码 → 批处理行点亮只应在加密包出现的 🔑 徽标。新增 `PasswordService.HasEncryptedEntries(archivePath, engine, password?)`（ZIP 查 `IsEncrypted`、7z 查 `Encrypted`，检测异常保守视为加密），`ResolveCliPassword` 先判是否含加密条目、非加密直接返回 `null`；新增回归测试 `PasswordServiceEncryptionTests`。主窗口密码流程不受影响（未改 `QuickVerifyPassword` 语义/`TryMatchPasswordEx`）。
 
+**2026-10-13** — 进度窗口显示偏好持久化 + 移除内容模式自动切换（Avalonia）
+  - **背景**：进度窗口有两组三选 RadioButton——**内容模式**（简约/详细/列表，`ProgressContentMode`）与**信息量分级**（少/中/完整，`ProgressInfoDensity`）。两者原本每次都重置为硬编码默认（Simple / Medium），用户无法「记住上次选择」；且内容模式存在一处自动切换。
+  - **移除自动切换**：`ProgressViewModel.UpsertParallelBatch` 末尾原先在「首个并行批次行出现且当前为简约」时自动切到「详细」；按用户要求**删除**该逻辑，内容模式此后**仅**由用户点选切换（处于简约时并行批次不再自动展示详细通道行）。
+  - **持久化**：`AppSettings` 新增 `ProgressContentMode`（`"simple"/"detailed"/"list"`，默认 `"detailed"`）与 `ProgressInfoDensity`（`"minimal"/"medium"/"full"`，默认 `"medium"`）；`ProgressWindow` 构造函数 `AppSettings.Load()` 后写入 `_vm.ContentMode`/`_vm.InfoDensity`（在 `ApplyInfoDensity()` 之前，保证批列表高度按持久化分级计算），6 个 RadioButton 的 Click 处理器内 `SaveDisplayPreferences()` 只改这两个字段再 `Save()`（不触碰其它设置）。新增 `ProgressDisplayModeParser`（`Models/ProgressDisplayMode.cs`，静态）承载枚举 ↔ 字符串的双向映射与未知/空值回退默认，便于单测。**刻意的边界**：VM 自身不读写 AppSettings，保持 `new ProgressViewModel()` 的单测确定性（读写只在窗口 code-behind）。
+  - **默认值变更**：内容模式默认 `Simple → Detailed`（信息量仍 `Medium`），即首次运行/未设置时打开即「详细 / 中」。
+  - **XAML**：信息量三选去掉硬编码 `IsChecked="True"`（中档），改为单向绑定 `IsMinimalDensity`/`IsMediumDensity`/`IsFullDensity`（与内容模式组 `IsSimpleMode`/… 写法一致），使持久化值与程序化切换时单选项正确高亮。
+  - **未加设置窗口 UI 项**（按用户要求：只「记住上次选择」）。
+  - **测试**：新增 `ProgressDisplayModeParserTests`（+14：三枚举往返 + 未知/空值回退 + AppSettings 默认值）；`ProgressViewModelTests.ContentMode_ExposesThreeModes` 默认断言改 Detailed；`ProgressWindowBatchLogicTests.FirstBatchArrival_AutoSwitchesToDetailedOnlyFromSimple` 改写为 `FirstBatchArrival_DoesNotAutoSwitchContentMode`。**验证**：Core 670 通过 / 0 失败 / 3 跳过；Avalonia 214 通过 / 0 失败 / 3 跳过；UI.Avalonia 构建 0 错误。
+
+**2026-10-13** — 修复进度窗口在连续跳过/失败时冻结（Avalonia + Core）
+  - **现象**：解压/压缩时若连续出现大量「跳过」条目（如解压到已存在目录且冲突策略=跳过），进度条与文本长时间不更新，窗口看似卡死（「已用时间」仍每秒走字，其余全部冻结）。
+  - **根因**：跳过/失败条目**只**上报逐条目终态报告（`new ArchiveProgress { EntryKey, EntryStatus = Skipped/Failed, FileTotalBytes }`，不带 `PercentComplete`/`CurrentFile`/字节等字段），而 `ProgressViewModel.SetProgress`（`ProgressViewModel.cs` 早返回分支）对 `EntryStatus && EntryKey` 的报告直接 `UpdateEntryStatus(...)` 后 `return`——设计上为「逐条目终态独立通道，不参与百分比/速度/ETA/字节/计数计算」。于是连续跳过/失败期间主进度一次都不刷新。
+  - **修复（方案 A：引擎侧补发常规报告）**：在每个跳过/失败站点于原有终态报告之后**再补发一条常规进度报告**（无 `EntryStatus`），驱动主进度分支。
+    - `ZipEngine`（字节基准百分比）：跳过/失败均把该条目字节计入 `processedBytes`（跳过原本已计入；失败本次新增）后上报 `PercentComplete = processedBytes/totalBytes*100`；顺序解压 `TotalFiles = entries.Count`、过滤解压 `TotalFiles = filteredEntries.Count`、压缩跳过用独立 `skippedBytes` 累计（**压缩率仍按实际压缩字节计算，不被跳过污染**）。共 5 跳过 + 12 失败站点（`ExtractAsyncSequential`/`ExtractAsyncParallel`/`ExtractEntriesAsyncSequential`/`ExtractEntriesAsyncParallel` + `CompressAsync`）。
+    - `SevenZipEngine`（文件计数基准百分比）：新增 `handledFiles`（`ExtractAsync`）/`handled`（`ExtractEntriesAsync`）计数「成功+跳过+失败」，百分比分子改用它（`ProcessedFiles` 仍只计成功）；跳过/失败分支 `handled*++` + `processedBytes += entrySize` + 补发报告。共 2 跳过 + 4 失败站点。
+    - 并行路径：在 `lock (syncLock)` 内累加共享 `processedBytes` 并读取快照，报告镜像现有批次字段（`BatchIndex`/`BatchCount`/`BatchProcessedBytes`/`BatchTotalBytes`/`BatchPercentComplete`/`BatchProcessedFiles`/`BatchTotalFiles`）。
+    - **口径**：跳过/失败**计入进度分子**（推动进度条）但**不计入「已处理」（`ProcessedFiles`）**——符合用户确认口径。`TarGzEngine` 无需改动（其逐文件百分比报告在冲突判定之前发出，跳过/失败均已刷新）。
+  - **测试**：Core +4——`ZipEngineTests.ExtractAsync_ConsecutiveSkips_EmitsMainProgressPerFile`、`ZipEngineTests.ExtractAsync_AllFailures_EmitsMainProgressPerFile`（目标目录预建同名**目录**使 `File.Create` 确定性抛 IO 异常）、`SevenZipEngineTests.ExtractAsync_ConsecutiveSkips_EmitsMainProgressPerFile`（+ 复用的有序进度收集器）。断言：每个跳过/失败条目产生一条非终态主进度报告、`PercentComplete` 单调不减、收尾 100、`ProcessedFiles` 恒 0。**验证**：Core 670 通过 / 0 失败 / 3 跳过；Avalonia 200 通过 / 0 失败 / 3 跳过；Core + UI.Avalonia 构建 0 错误。
+
 **2026-10-13** — UI 控件测试窗口补充缺失控件变体 + 修复 AVLN5001 弃用警告（开发者诊断工具，规则 13 豁免本地化）
   - **补充 7 区块**（`Views/UiTestWindow.axaml`）：① PathIcon 尺寸矩阵（同一 Geometry 在 10/11/12/13/14/16/22/24/64px 下的渲染，左组显式 `Foreground` vs 右组不设的继承陷阱对比）；② 图标+文字组合按钮（Button Content 嵌套 StackPanel + 14px PathIcon，含禁用态）；③ 带 Command 按钮（`RelayCommand` 绑定 + 快捷键提示）；④ ComboBox ItemTemplate（自定义项模板 PathIcon + TextBlock）；⑤ ToggleIconBox（规则 4 类样式，开/开硬编码/关硬编码/隐藏 4 态 + `BoolToToggleBgBrushConverter`）；⑥ TabItemExtensions.TabIcon（附加属性页签头图标）；⑦ Image Stretch 模式对比（Uniform/Fill/None，120×120 容器）。DataGrid 增图标列（`DataGridTemplateColumn`）+ `SortMemberPath` + `CanUserSortColumns="True"`。
   - **ViewModel**（`ViewModels/UiTestViewModel.cs`）：新增 `CommandButtonText`/`ToggleIconBool` 属性 + `TestCommand` RelayCommand（执行后回填当前时间戳验证命令绑定）。
@@ -33,6 +52,13 @@
   - **背景**：ImageSharp 4.1.3 起构建期强制校验许可证，无 key 时 Debug 降级为警告、Release 直接失败（`.targets` 的 `ContinueOnError="$(Configuration.StartsWith('Debug'))"`）。曾评估三方案——降级 3.2.0（无效，v3 线自 3.2.0 起同样强制）、替换 SkiaSharp（TGA 无 codec + APNG 帧延迟元数据不覆盖）、社区许可证（改动最小、免费、保留 4.1.3 漏洞全清）。
   - **实施**：`licensing.sixlabors.com` 以 OpenSource 类别申请（assembly-scoped key，绑定 `MantisZip.UI.Avalonia`）；`sixlabors.lic` 置于 `src/MantisZip.UI.Avalonia/` 并随仓库提交（2026-10-09 官方新政策明确允许 assembly-scoped 社区 key 公开提交）；`MantisZip.UI.Avalonia.csproj` 新增 `<SixLaborsLicenseFile>` 显式指向该文件（默认递归搜索在部分场景未命中）。
   - **验证**：`dotnet build` 0 错误，4 条 ImageSharp 许可证警告全部消除。
+
+**2026-10-13** — 进度窗口字节埋点全格式生效 + 语言即时刷新（Avalonia + Core，[progress-window-bytes-i18n.md](../.omo/plans/已完成/progress-window-bytes-i18n.md) 任务 1–7）
+  - **字节埋点全格式（Core）**：`SevenZipEngine` 全路径填充 `ArchiveProgress.ProcessedBytes`/`TotalBytes`——`ExtractAsync`/`ExtractEntriesAsync` 用真实写入字节（跳过条目 `processedBytes += entry.Size` 计入，回调值 `processedBytes + Math.Min(bytesWritten, entrySize)` 钳制防回退，最终报告强制 `Processed == Total`）；`CompressAsync`/`AddToArchiveAsync` 用百分比推算 `totalSourceBytes × accumulatedPercent / 100`（新增 `SumSourceFileSizes`，`totalSourceBytes` 声明提前出 `using` 作用域供最终报告用）；`DeleteEntriesAsync` 三段单调映射（提取段 `extractPct = pct × 0.5`、重打包段 `50 + 0.5p`，字节从映射后 percent 重算）。`TarGzEngine` 解压以压缩流 `Position` 为字节进度（tar 分支 `TotalBytes = inputStream.Length`）、gz 分支两处 `CopyTo` 改手动缓冲循环按 `Position / gzLen` 报告；压缩侧新增 `Core/Utils/ReadProgressStream.cs`（`WriteProgressStream` 镜像，`Read`/`ReadAsync` 累加已读字节回调；**保持可寻**（`CanSeek`/`Seek`/`Position`/`Length` 代理内层）以规避 `TarWriter.Write` 无显式 size 时的 "Seekable stream is required" 异常），经 `TarWriteFileWithRetry` 新增 `onRead` 形参接入 tar 多文件循环（tar percent 仍为文件计数基准，字节独立上报），gz 单文件分支按 byte 基准报 percent（新增 `SafeFileSize` 辅助）。
+  - **同步报告根治字节回退**：`AttachCompressorProgress` 由事件内 `System.Progress<T>` 异步派发改**同步 `progress.Report`**（异步派发使低百分比回调晚于最终 100% 报告到达，实测 `ProcessedBytes` 回退 `98304 → 81592`），并新增 `percentBase`/`percentScale` 形参承载删除重打包段的 `50 + 0.5p` 映射（替代原 `new Progress<>` 包装）。
+  - **语言即时刷新（Avalonia）**：`ProgressViewModel` ctor 抽取 `FillLocalizedStrings()`（49 键）并订阅 `LocalizationManager.CultureChanged`（`EventHandler`，处理器 `OnCultureChanged(object? sender, EventArgs e)`，不 dispatch，参照 `PreviewViewModel`）；`OnCultureChanged` 重灌静态文案 + `OnPropertyChanged(nameof(LocalizedStrings))`，并按缓存字段（`_lastSpeedBytesPerSec`/`_lastEtaSeconds`/`_lastFileCountCurrent·Total·IsBatch`）重渲速度/剩余时间/文件计数/批次序号/统计栏/统计卡短标签（空值守卫不把未上报项填成 0）。新增 `public void DetachLocalization()` 退订；`ProgressWindow.OnClosed` 在 `_vm.PauseEvent.Set()` 后调用（修复全仓首个 `CultureChanged -=` 泄漏闭环）。
+  - **计划/文档回写**：`progress-window-prototype-alignment.md` Deferred #2/#3 由「已转入」改「已实施」；`docs/PLAN.md` 本计划行状态 → ✅已完 + 交付说明。
+  - **验证**：`lsp_diagnostics` 不可用（本机未装 C# LSP，`csharp: missing`），以 `dotnet build` 0 错误为等价门控；Core **667 通过 / 0 失败 / 3 跳过**（+6 字节单调断言：7z ExtractAsync/CompressAsync/DeleteEntriesAsync + TarGz ExtractAsync/CompressAsync/gz roundtrip），Avalonia **200 通过 / 0 失败 / 3 跳过**（+2：`CultureChanged_RefreshesLocalizedStrings`/`DetachLocalization_PreventsCultureChangedRefresh`）；两处测试均改为同步 `IProgress`（刻意不用 `System.Progress<T>`，其线程池异步派发会打乱字节单调性断言顺序）。
 
 **2026-10-12** — 计划文档状态整理：2 个已实施计划移入「已完成」（计划类，规则 1 同步）
   - **移目录**：`progress-stats-cards-three-row.md`（2026-10-09 已实施：VM 5 新字段 + 3 累加器 + `DashBrushConverter` 动态格 5 处 + 5 卡三行 XAML + 7 单测）、`progress-window-enhancement.md`（T1–T9 已实施：路径/文件名分离、实时统计栏、时间/ETA、ZIP 并行批次详细行、批处理密码徽标、`PasswordRetryLoop` 兜底，计算逻辑抽 Core `ProgressDisplayCalculator`；UI 部分已被 prototype-alignment 推翻重做，F3 并入对齐计划收口，本计划无剩余独立任务）由 `.omo/plans/未开始/` 移至 `.omo/plans/已完成/`，头部补/改 ✅ 已实施状态行（enhancement 为新增效力状态块）。
@@ -2212,6 +2238,12 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.2 (2026-10-13) 三引擎进度字节埋点全覆盖 + `ReadProgressStream`
+  - **`SevenZipEngine`**：`ExtractAsync`/`ExtractEntriesAsync` 每份常规报告携带 `TotalBytes`（非目录条目 Size 和；过滤解压仅统计命中条目）+ 单调递增 `ProcessedBytes`（跳过累加、回调钳制 `processedBytes + Math.Min(bytesWritten, entrySize)`、最终 `Processed == Total`）；`CompressAsync`/`AddToArchiveAsync` 按 percent 推算（`SumSourceFileSizes` 求源文件未压缩总和，`totalSourceBytes` 声明提到 `using` 作用域外供最终报告）；`DeleteEntriesAsync` 提取 0-50% + 重打包 `50 + 0.5p` 三段单调（`keepEntries` 扩为三元组含 size）。`AttachCompressorProgress` 改同步 Report + `percentBase`/`percentScale` 形参。
+  - **`TarGzEngine`**：解压 tar 分支 `TotalBytes = inputStream.Length`、`ProcessedBytes = inputStream.Position`，gz 分支 `CopyTo` 改手动缓冲循环；压缩侧新增 `SafeFileSize`，tar 多文件循环经 `TarWriteFileWithRetry` 新增 `onRead` 形参接入 `ReadProgressStream`（percent 保持文件计数基准，字节独立真实读取），gz 单文件分支按 byte 基准报 percent；最终报告 `Processed == Total`。
+  - **`Core/Utils/ReadProgressStream.cs`（新增）**：`WriteProgressStream` 镜像包装只读流，`Read`/`ReadAsync` 累加已读字节回调 `onRead(totalRead)`；保持可寻（代理内层 `CanSeek`/`Seek`/`Position`/`Length`）以规避 `TarWriter.Write` 未显式传 size 时的 "Seekable stream is required if no size is given."。
+  - **测试**：`SevenZipEngineTests` +3（ExtractAsync/CompressAsync/DeleteEntriesAsync 字节单调断言，`AssertByteProgressMonotonic` + 同步 `OrderedProgressCollector`）、`TarGzEngineTests` +3（ExtractAsync/CompressAsync/gz roundtrip）。Core 全量 667 通过 / 0 失败 / 3 跳过。
 
 #### v0.5.2 (2026-10-12) 智能并行解压 Core 三组件（DiskTypeDetector / ParallelDegreeOptimizer / ParallelDegreeResolver）
   - **`Core/Utils/DiskTypeDetector.cs`（新增）**：`DeviceIoControl` 打开 `\\.\C:` 卷设备句柄（access=0）读 `SeekPenalty` 判 SSD/HDD，盘符缓存（`OrdinalIgnoreCase`，`Unknown` 不缓存），枚举 `DiskType{ Ssd, Hdd, Unknown }`。

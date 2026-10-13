@@ -67,14 +67,24 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>是否出现过冲突统计（压缩路径恒不上报 → 统计项按 Rule 6 隐藏）。</summary>
     private bool _hasConflictStats;
 
+    // ── 语言切换重渲缓存（OnCultureChanged 用最近一次值重新格式化动态文案）──
+    /// <summary>最近一次有效速度采样（B/s；0 = 尚无）。</summary>
+    private double _lastSpeedBytesPerSec;
+    /// <summary>最近一次 ETA（秒；null = 未知）。</summary>
+    private double? _lastEtaSeconds;
+    /// <summary>最近一次文件计数文案的分子/分母与批次标志。</summary>
+    private int _lastFileCountCurrent;
+    private int _lastFileCountTotal;
+    private bool _lastFileCountIsBatch;
+
     /// <summary>当前文件所在目录（SplitFilePath 分离结果，路径行绑定）。</summary>
     private string _dirName = string.Empty;
 
     /// <summary>ZIP 并行解压批次行（BatchIndex 驱动 upsert；非并行恒为空 → 容器隐藏）。</summary>
     private readonly ObservableCollection<ParallelBatchProgressItem> _parallelBatchItems = new();
 
-    /// <summary>顶部内容模式（默认 Simple；详见 <see cref="ContentMode"/>）。</summary>
-    private ProgressContentMode _contentMode = ProgressContentMode.Simple;
+    /// <summary>顶部内容模式（默认 Detailed；详见 <see cref="ContentMode"/>。窗口构造时按 AppSettings 持久化值覆盖）。</summary>
+    private ProgressContentMode _contentMode = ProgressContentMode.Detailed;
 
     /// <summary>信息量分级（默认 Medium；详见 <see cref="InfoDensity"/>）。</summary>
     private ProgressInfoDensity _infoDensity = ProgressInfoDensity.Medium;
@@ -100,67 +110,11 @@ public partial class ProgressViewModel : ObservableObject
 
     public ProgressViewModel()
     {
-        LocalizedStrings = new Dictionary<string, string>
-        {
-            ["Progress_Cancel"] = LocalizationManager.T("Progress_Cancel"),
-            ["Progress_Complete"] = LocalizationManager.T("Progress_Complete"),
-            ["Progress_Cancelling"] = LocalizationManager.T("Progress_Cancelling"),
-            ["Progress_Button_Pause"] = LocalizationManager.T("Progress_Button_Pause"),
-            ["Progress_Button_Resume"] = LocalizationManager.T("Progress_Button_Resume"),
-            ["Progress_Button_Close"] = LocalizationManager.T("Progress_Button_Close"),
-            ["Progress_KeepOpen"] = LocalizationManager.T("Progress_KeepOpen"),
-            ["Progress_Paused"] = LocalizationManager.T("Progress_Paused"),
-            ["Progress_Resuming"] = LocalizationManager.T("Progress_Resuming"),
-            ["MsgBox_Cancel"] = LocalizationManager.T("MsgBox_Cancel"),
-            // T6 新增 key（统计/时间/并行批次/密码徽标——此字典由显式数组构建，漏登记 = XAML 绑定空白）
-            ["Progress_Stats_Processed"] = LocalizationManager.T("Progress_Stats_Processed"),
-            ["Progress_Stats_Skipped"] = LocalizationManager.T("Progress_Stats_Skipped"),
-            ["Progress_Stats_Failed"] = LocalizationManager.T("Progress_Stats_Failed"),
-            ["Progress_Stats_Overwritten"] = LocalizationManager.T("Progress_Stats_Overwritten"),
-            ["Progress_Stats_Speed"] = LocalizationManager.T("Progress_Stats_Speed"),
-            ["Progress_Time_Elapsed"] = LocalizationManager.T("Progress_Time_Elapsed"),
-            ["Progress_Time_Remaining"] = LocalizationManager.T("Progress_Time_Remaining"),
-            ["Progress_CurrentFileLabel"] = LocalizationManager.T("Progress_CurrentFileLabel"),
-            ["Progress_Batch_ArchiveOf"] = LocalizationManager.T("Progress_Batch_ArchiveOf"),
-            ["Progress_Batch_FilesProgress"] = LocalizationManager.T("Progress_Batch_FilesProgress"),
-            ["Progress_Batch_Pwd_Matching"] = LocalizationManager.T("Progress_Batch_Pwd_Matching"),
-            ["Progress_Batch_Pwd_MatchedTip"] = LocalizationManager.T("Progress_Batch_Pwd_MatchedTip"),
-            ["Progress_Batch_Pwd_Rule"] = LocalizationManager.T("Progress_Batch_Pwd_Rule"),
-            ["Progress_Batch_Pwd_Desc"] = LocalizationManager.T("Progress_Batch_Pwd_Desc"),
-            // T7 新增 key（顶部内容模式/信息量分级 + 并行统计/批次/条目/Toast——
-            // 此字典由显式数组构建，漏登记 = XAML 绑定空白且构建不报错；
-            // 文案值由后续任务落 JSON，此处先登记 T() 占位调用）
-            ["Progress_Mode_Label"] = LocalizationManager.T("Progress_Mode_Label"),
-            ["Progress_Mode_Simple"] = LocalizationManager.T("Progress_Mode_Simple"),
-            ["Progress_Mode_Detailed"] = LocalizationManager.T("Progress_Mode_Detailed"),
-            ["Progress_Mode_List"] = LocalizationManager.T("Progress_Mode_List"),
-            ["Progress_Density_Minimal"] = LocalizationManager.T("Progress_Density_Minimal"),
-            ["Progress_Density_Medium"] = LocalizationManager.T("Progress_Density_Medium"),
-            ["Progress_Density_Full"] = LocalizationManager.T("Progress_Density_Full"),
-            ["Progress_Stats_Parallel"] = LocalizationManager.T("Progress_Stats_Parallel"),
-            ["Progress_Stats_Compressed"] = LocalizationManager.T("Progress_Stats_Compressed"),
-            ["Progress_Batch_SectionTitle"] = LocalizationManager.T("Progress_Batch_SectionTitle"),
-            ["Progress_Batch_Count"] = LocalizationManager.T("Progress_Batch_Count"),
-            ["Progress_Entry_Pending"] = LocalizationManager.T("Progress_Entry_Pending"),
-            ["Progress_Entry_Active"] = LocalizationManager.T("Progress_Entry_Active"),
-            // T9 新增 key（条目行终态文案）——Progress_Stats_* 是带 {0} 计数的格式串，
-            // 行内状态无计数可代，故独立成键；文案值由后续任务落 JSON，此处先登记 T() 占位调用
-            ["Progress_Entry_Completed"] = LocalizationManager.T("Progress_Entry_Completed"),
-            ["Progress_Entry_Skipped"] = LocalizationManager.T("Progress_Entry_Skipped"),
-            ["Progress_Entry_Failed"] = LocalizationManager.T("Progress_Entry_Failed"),
-            ["Progress_Entry_Overwritten"] = LocalizationManager.T("Progress_Entry_Overwritten"),
-            ["Progress_Toast_Copied"] = LocalizationManager.T("Progress_Toast_Copied"),
-            ["Progress_Batch_Label"] = LocalizationManager.T("Progress_Batch_Label"),
-            ["Progress_CompressChannelHint"] = LocalizationManager.T("Progress_CompressChannelHint"),
-            ["Progress_Tooltip_Progress"] = LocalizationManager.T("Progress_Tooltip_Progress"),
-            ["Progress_Tooltip_Bytes"] = LocalizationManager.T("Progress_Tooltip_Bytes"),
-            ["Progress_Tooltip_Ratio"] = LocalizationManager.T("Progress_Tooltip_Ratio"),
-            // Task 10：自动关闭倒计时后缀（数字由可编辑 TextBox 承载，此 key 刻意不含 {0}）
-            ["Progress_AutoCloseSuffix"] = LocalizationManager.T("Progress_AutoCloseSuffix"),
-            // Task 11：解压后置开关的 tooltip（复用设置页既有文案 key）
-            ["Settings_Extract_OpenFolderAfter"] = LocalizationManager.T("Settings_Extract_OpenFolderAfter"),
-            ["Settings_Extract_DeleteArchiveAfterExtract"] = LocalizationManager.T("Settings_Extract_DeleteArchiveAfterExtract"),
-        };
+        LocalizedStrings = new Dictionary<string, string>();
+        FillLocalizedStrings();
+
+        // 语言即时刷新：进行中切换语言时重灌窗口文案；窗口关闭必须 DetachLocalization 退订（防静态事件泄漏）
+        LocalizationManager.CultureChanged += OnCultureChanged;
 
         // T6: 操作计时基线 + 当前文件标签初值 + 集合变更通知（并行批次行 / 条目行）
         _opStartUtc = DateTime.UtcNow;
@@ -173,6 +127,134 @@ public partial class ProgressViewModel : ObservableObject
         _entryItems.CollectionChanged += (_, _) => OnPropertyChanged(nameof(HasEntryItems));
         RefreshTimeDisplay();
     }
+
+    /// <summary>
+    /// 把 ProgressWindow 绑定的静态文案灌入 <see cref="LocalizedStrings"/>（ctor 与 OnCultureChanged 共用）。
+    /// 该字典由本方法显式逐键填充，漏登记 = XAML 绑定空白且构建不报错。
+    /// </summary>
+    private void FillLocalizedStrings()
+    {
+        var s = LocalizedStrings;
+        s["Progress_Cancel"] = LocalizationManager.T("Progress_Cancel");
+        s["Progress_Complete"] = LocalizationManager.T("Progress_Complete");
+        s["Progress_Cancelling"] = LocalizationManager.T("Progress_Cancelling");
+        s["Progress_Button_Pause"] = LocalizationManager.T("Progress_Button_Pause");
+        s["Progress_Button_Resume"] = LocalizationManager.T("Progress_Button_Resume");
+        s["Progress_Button_Close"] = LocalizationManager.T("Progress_Button_Close");
+        s["Progress_KeepOpen"] = LocalizationManager.T("Progress_KeepOpen");
+        s["Progress_Paused"] = LocalizationManager.T("Progress_Paused");
+        s["Progress_Resuming"] = LocalizationManager.T("Progress_Resuming");
+        s["MsgBox_Cancel"] = LocalizationManager.T("MsgBox_Cancel");
+        // T6 新增 key（统计/时间/并行批次/密码徽标——此字典由显式数组构建，漏登记 = XAML 绑定空白）
+        s["Progress_Stats_Processed"] = LocalizationManager.T("Progress_Stats_Processed");
+        s["Progress_Stats_Skipped"] = LocalizationManager.T("Progress_Stats_Skipped");
+        s["Progress_Stats_Failed"] = LocalizationManager.T("Progress_Stats_Failed");
+        s["Progress_Stats_Overwritten"] = LocalizationManager.T("Progress_Stats_Overwritten");
+        s["Progress_Stats_Speed"] = LocalizationManager.T("Progress_Stats_Speed");
+        s["Progress_Time_Elapsed"] = LocalizationManager.T("Progress_Time_Elapsed");
+        s["Progress_Time_Remaining"] = LocalizationManager.T("Progress_Time_Remaining");
+        s["Progress_CurrentFileLabel"] = LocalizationManager.T("Progress_CurrentFileLabel");
+        s["Progress_Batch_ArchiveOf"] = LocalizationManager.T("Progress_Batch_ArchiveOf");
+        s["Progress_Batch_FilesProgress"] = LocalizationManager.T("Progress_Batch_FilesProgress");
+        s["Progress_Batch_Pwd_Matching"] = LocalizationManager.T("Progress_Batch_Pwd_Matching");
+        s["Progress_Batch_Pwd_MatchedTip"] = LocalizationManager.T("Progress_Batch_Pwd_MatchedTip");
+        s["Progress_Batch_Pwd_Rule"] = LocalizationManager.T("Progress_Batch_Pwd_Rule");
+        s["Progress_Batch_Pwd_Desc"] = LocalizationManager.T("Progress_Batch_Pwd_Desc");
+        // T7 新增 key（顶部内容模式/信息量分级 + 并行统计/批次/条目/Toast——
+        // 此字典由显式数组构建，漏登记 = XAML 绑定空白且构建不报错；
+        // 文案值由后续任务落 JSON，此处先登记 T() 占位调用）
+        s["Progress_Mode_Label"] = LocalizationManager.T("Progress_Mode_Label");
+        s["Progress_Mode_Simple"] = LocalizationManager.T("Progress_Mode_Simple");
+        s["Progress_Mode_Detailed"] = LocalizationManager.T("Progress_Mode_Detailed");
+        s["Progress_Mode_List"] = LocalizationManager.T("Progress_Mode_List");
+        s["Progress_Density_Minimal"] = LocalizationManager.T("Progress_Density_Minimal");
+        s["Progress_Density_Medium"] = LocalizationManager.T("Progress_Density_Medium");
+        s["Progress_Density_Full"] = LocalizationManager.T("Progress_Density_Full");
+        s["Progress_Stats_Parallel"] = LocalizationManager.T("Progress_Stats_Parallel");
+        s["Progress_Stats_Compressed"] = LocalizationManager.T("Progress_Stats_Compressed");
+        s["Progress_Batch_SectionTitle"] = LocalizationManager.T("Progress_Batch_SectionTitle");
+        s["Progress_Batch_Count"] = LocalizationManager.T("Progress_Batch_Count");
+        s["Progress_Entry_Pending"] = LocalizationManager.T("Progress_Entry_Pending");
+        s["Progress_Entry_Active"] = LocalizationManager.T("Progress_Entry_Active");
+        // T9 新增 key（条目行终态文案）——Progress_Stats_* 是带 {0} 计数的格式串，
+        // 行内状态无计数可代，故独立成键；文案值由后续任务落 JSON，此处先登记 T() 占位调用
+        s["Progress_Entry_Completed"] = LocalizationManager.T("Progress_Entry_Completed");
+        s["Progress_Entry_Skipped"] = LocalizationManager.T("Progress_Entry_Skipped");
+        s["Progress_Entry_Failed"] = LocalizationManager.T("Progress_Entry_Failed");
+        s["Progress_Entry_Overwritten"] = LocalizationManager.T("Progress_Entry_Overwritten");
+        s["Progress_Toast_Copied"] = LocalizationManager.T("Progress_Toast_Copied");
+        s["Progress_Batch_Label"] = LocalizationManager.T("Progress_Batch_Label");
+        s["Progress_CompressChannelHint"] = LocalizationManager.T("Progress_CompressChannelHint");
+        s["Progress_Tooltip_Progress"] = LocalizationManager.T("Progress_Tooltip_Progress");
+        s["Progress_Tooltip_Bytes"] = LocalizationManager.T("Progress_Tooltip_Bytes");
+        s["Progress_Tooltip_Ratio"] = LocalizationManager.T("Progress_Tooltip_Ratio");
+        // Task 10：自动关闭倒计时后缀（数字由可编辑 TextBox 承载，此 key 刻意不含 {0}）
+        s["Progress_AutoCloseSuffix"] = LocalizationManager.T("Progress_AutoCloseSuffix");
+        // Task 11：解压后置开关的 tooltip（复用设置页既有文案 key）
+        s["Settings_Extract_OpenFolderAfter"] = LocalizationManager.T("Settings_Extract_OpenFolderAfter");
+        s["Settings_Extract_DeleteArchiveAfterExtract"] = LocalizationManager.T("Settings_Extract_DeleteArchiveAfterExtract");
+    }
+
+    /// <summary>
+    /// 语言切换处理器：重灌静态文案并重生依赖本地化格式串的动态文案
+    /// （速度 / 剩余时间 / 文件计数 / 统计栏 / 统计卡短标签）。
+    /// 不 dispatch（<see cref="LocalizationManager.CultureChanged"/> 由 UI 线程 setter 触发，
+    /// 见 PreviewViewModel.OnCultureChanged 先例）。StatusMessage/准备态文案不在刷新范围（spec 范围外）。
+    /// </summary>
+    private void OnCultureChanged(object? sender, EventArgs e)
+    {
+        FillLocalizedStrings();
+        OnPropertyChanged(nameof(LocalizedStrings));
+
+        // 「当前文件」标签 + 已用时间
+        CurrentFileLabel = LocalizationManager.T("Progress_CurrentFileLabel");
+        RefreshTimeDisplay();
+
+        // 速度（按上次采样值重格式化）
+        if (_lastSpeedBytesPerSec > 0)
+            SpeedText = LocalizationManager.T("Progress_Stats_Speed", FormatUtil.FormatSize((long)_lastSpeedBytesPerSec));
+
+        // 剩余时间（ETA）
+        RemainingText = _lastEtaSeconds is { } eta && eta > 0
+            ? LocalizationManager.T("Progress_Time_Remaining",
+                ProgressDisplayCalculator.FormatDuration(TimeSpan.FromSeconds(eta)))
+            : string.Empty;
+
+        // 文件计数 + 批次档案序号
+        if (_lastFileCountTotal > 0)
+        {
+            FileCountText = LocalizationManager.T("Progress_FileCount", _lastFileCountCurrent, _lastFileCountTotal);
+            BatchArchiveIndexText = _lastFileCountIsBatch
+                ? LocalizationManager.T("Progress_Batch_ArchiveOf", _lastFileCountCurrent, _lastFileCountTotal)
+                : string.Empty;
+        }
+
+        // 统计栏（含计数的格式串）——按缓存计数重渲；空值不重渲（避免把未上报的项填成 0）
+        if (_statsTotalFiles > 0)
+            StatsProcessedText = LocalizationManager.T("Progress_Stats_Processed", $"{_statsProcessed}/{_statsTotalFiles}");
+        if (!string.IsNullOrEmpty(StatsSkippedText))
+            StatsSkippedText = LocalizationManager.T("Progress_Stats_Skipped", _statsSkipped);
+        if (!string.IsNullOrEmpty(StatsFailedText))
+            StatsFailedText = LocalizationManager.T("Progress_Stats_Failed", _statsFailed);
+        if (!string.IsNullOrEmpty(StatsOverwrittenText))
+            StatsOverwrittenText = LocalizationManager.T("Progress_Stats_Overwritten", _statsOverwritten);
+        if (!string.IsNullOrEmpty(StatsTotalSizeValue))
+            StatsTotalSizeText = LocalizationManager.T("Progress_Stats_TotalSize", StatsTotalSizeValue);
+
+        // 统计卡短标签（get-only 派生属性，读取 T()）
+        OnPropertyChanged(nameof(StatsProcessedLabel));
+        OnPropertyChanged(nameof(StatsSkippedLabel));
+        OnPropertyChanged(nameof(StatsFailedLabel));
+        OnPropertyChanged(nameof(StatsOverwrittenLabel));
+        OnPropertyChanged(nameof(StatsTotalSizeLabel));
+
+        // 批处理计数文案（BatchCountText 等）
+        NotifyBatchProperties();
+    }
+
+    /// <summary>窗口关闭时调用，退订静态 CultureChanged，防止 VM 被静态事件根引用泄漏。</summary>
+    public void DetachLocalization()
+        => LocalizationManager.CultureChanged -= OnCultureChanged;
 
     // ════════════════════════════════════════════
     //  Observable Properties
@@ -778,21 +860,31 @@ public partial class ProgressViewModel : ObservableObject
             if (current < 1) current = 1;
             FileCountText = LocalizationManager.T("Progress_FileCount", current, _batchItems.Count);
             BatchArchiveIndexText = LocalizationManager.T("Progress_Batch_ArchiveOf", current, _batchItems.Count);
+            _lastFileCountCurrent = current;
+            _lastFileCountTotal = _batchItems.Count;
+            _lastFileCountIsBatch = true;
         }
         else
         {
             FileCountText = LocalizationManager.T("Progress_FileCount", 1, 1);
             BatchArchiveIndexText = string.Empty;
+            _lastFileCountCurrent = 1;
+            _lastFileCountTotal = 1;
+            _lastFileCountIsBatch = false;
         }
 
         // 速度采样（EMA 平滑；tracker 内置 100ms 节流）→ 速度文案
         double speed = _speedTracker.RecordSample(p.ProcessedBytes, DateTime.UtcNow);
         if (speed > 0)
+        {
+            _lastSpeedBytesPerSec = speed;
             SpeedText = LocalizationManager.T("Progress_Stats_Speed", FormatUtil.FormatSize((long)speed));
+        }
 
         // ETA → 剩余时间（速度无效/总字节未知时清空）
         double? eta = _speedTracker.ComputeEtaSeconds(
             _speedTracker.ProcessedInArchive(p.ProcessedBytes), p.TotalBytes);
+        _lastEtaSeconds = eta;
         RemainingText = eta.HasValue
             ? LocalizationManager.T("Progress_Time_Remaining",
                 ProgressDisplayCalculator.FormatDuration(TimeSpan.FromSeconds(eta.Value)))
@@ -927,13 +1019,6 @@ public partial class ProgressViewModel : ObservableObject
         if (p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue)
             row.DetailText = LocalizationManager.T("Progress_Batch_FilesProgress",
                 p.BatchProcessedFiles.Value, p.BatchTotalFiles.Value);
-
-        // Task 6 方案 B：首个 BatchIndex 到达、集合由空转非空时自动切详细。
-        // 守卫 _contentMode == Simple 保证不覆盖用户显式选择（默认即 Simple，
-        // 三个单选项 Click 只把它改写为 Simple/Detailed/List）。
-        // 回退路径永不上报 BatchIndex，故此分支永不触发 —— 无需回退兜底。
-        if (_parallelBatchItems.Count == 1 && _contentMode == ProgressContentMode.Simple)
-            ContentMode = ProgressContentMode.Detailed;
     }
 
     /// <summary>非并行单行 upsert：集合恒保持至多 1 条 IsParallel=false 的行（复用批次行样式，D2/D8）。</summary>

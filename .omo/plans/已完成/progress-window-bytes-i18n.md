@@ -1,5 +1,7 @@
 # 进度窗口字节埋点 + 语言即时刷新
 
+> **状态**: ✅ 已实施（2026-10-13 任务 1–7 全部落地：`SevenZipEngine`/`TarGzEngine` 全路径字节埋点 + 新增 `ReadProgressStream` + `ProgressViewModel` 语言即时刷新/`DetachLocalization` 退订 + prototype-alignment Deferred #2/#3 回写；Core 667 / Avalonia 200 测试全绿；2026-10-13 计划整理移入已完成）
+
 > **Spec**: `docs/superpowers/specs/2026-10-06-progress-bytes-i18n-design.md`（权威设计，实施依据）
 > **优先级**: P2 · **预估**: 4-6h · **分支**: alpha · **版本**: 保持 0.5.1（规则 2）
 

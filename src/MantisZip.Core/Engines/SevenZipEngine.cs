@@ -196,12 +196,44 @@ public class SevenZipEngine : IArchiveEngine
     #region 进度挂接
 
     /// <summary>
+    /// 求源文件未压缩字节总和（跳过目录）；单文件读取失败仅 Trace 并计 0，
+    /// 不阻断压缩（字节进度是尽力而为）。
+    /// </summary>
+    private static long SumSourceFileSizes(IEnumerable<string> paths)
+    {
+        long total = 0;
+        foreach (var path in paths)
+        {
+            try
+            {
+                var attrs = File.GetAttributes(path);
+                if ((attrs & FileAttributes.Directory) != 0) continue;
+                total += new FileInfo(path).Length;
+            }
+            catch (Exception ex)
+            {
+                CoreLog.Trace($"SumSourceFileSizes skip {path}: {ex.Message}");
+            }
+        }
+        return total;
+    }
+
+    /// <summary>
     /// 将 SharpSevenZipCompressor 的进度事件桥接到 IProgress&lt;ArchiveProgress&gt;。
     /// 注意：SharpSevenZipCompressor 无公开取消 API，CancellationToken 在操作前后检查。
     /// </summary>
+    /// <param name="percentBase">百分比映射基准（删除重打包段传 50，占整体后 50%）。</param>
+    /// <param name="percentScale">百分比映射比例（删除重打包段传 0.5）。</param>
+    /// <remarks>
+    /// 事件回调内同步 Report（不使用 System.Progress 的异步派发），保证报告顺序与
+    /// 字节单调性——异步派发会让低百分比回调晚于最终 100% 报告到达，造成 ProcessedBytes 回退。
+    /// </remarks>
     private static void AttachCompressorProgress(
         SharpSevenZipCompressor compr,
-        IProgress<ArchiveProgress>? progress)
+        IProgress<ArchiveProgress>? progress,
+        long totalSourceBytes,
+        double percentBase = 0,
+        double percentScale = 1)
     {
         if (progress == null)
             return;
@@ -217,11 +249,14 @@ public class SevenZipEngine : IArchiveEngine
         compr.Compressing += (_, e) =>
         {
             accumulatedPercent = Math.Min(100, accumulatedPercent + e.PercentDelta);
+            var mappedPercent = percentBase + accumulatedPercent * percentScale;
             progress.Report(new ArchiveProgress
             {
                 CurrentFile = currentFile,
-                PercentComplete = accumulatedPercent,
+                PercentComplete = mappedPercent,
                 FilePercentComplete = accumulatedPercent,
+                TotalBytes = totalSourceBytes,
+                ProcessedBytes = (long)(totalSourceBytes * mappedPercent / 100.0),
             });
         };
     }
@@ -421,10 +456,13 @@ public class SevenZipEngine : IArchiveEngine
             var allEntries = extractor.ArchiveFileData.ToList();
             int totalFiles = allEntries.Count(e => !e.IsDirectory);
             int processedFiles = 0;
+            int handledFiles = 0;   // 已处理（成功+跳过）文件数，仅用于百分比推进；跳过不计入 ProcessedFiles（已处理显示）
             int failedEntries = 0;
             var conflictStats = new ConflictStatsCounter();
             var lastReportTime = DateTime.Now;
             var reportInterval = TimeSpan.FromMilliseconds(100);
+            long totalBytes = allEntries.Where(e => !e.IsDirectory).Sum(e => (long)e.Size);
+            long processedBytes = 0;
 
             // 逐条目提取（使用 ExtractFile(index, stream) 支持所有 7z 类型包括 solid 归档）
             for (int i = 0; i < allEntries.Count; i++)
@@ -454,6 +492,21 @@ public class SevenZipEngine : IArchiveEngine
                     conflictStats.RecordSkipped();
                     // 逐条目状态（D2）
                     progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Skipped });
+                    processedBytes += (long)entry.Size;
+                    handledFiles++;
+                    // 主进度报告：跳过条目也刷新进度（连续大量跳过时窗口长时间无更新、看似卡死）。
+                    // 7z 百分比为文件计数基准 → 用 handledFiles 推进；跳过不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = fileName,
+                        PercentComplete = totalFiles > 0 ? (double)handledFiles / totalFiles * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = (long)entry.Size,
+                    }));
                     continue;
                 }
                 if (existedBefore && resolvedPath == outputPath)
@@ -468,10 +521,12 @@ public class SevenZipEngine : IArchiveEngine
                 progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = fileName,
-                    PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
+                    PercentComplete = totalFiles > 0 ? (double)handledFiles / totalFiles * 100 : 0,
                     FilePercentComplete = 0,
                     TotalFiles = totalFiles,
                     ProcessedFiles = processedFiles,
+                    TotalBytes = totalBytes,
+                    ProcessedBytes = processedBytes,
                 }));
 
                 try
@@ -488,7 +543,7 @@ public class SevenZipEngine : IArchiveEngine
 
                         var filePct = entrySize > 0 ? (double)bytesWritten / entrySize * 100 : 100;
                         var overallPct = totalFiles > 0
-                            ? (double)(processedFiles + (double)bytesWritten / entrySize) / totalFiles * 100
+                            ? (double)(handledFiles + (double)bytesWritten / entrySize) / totalFiles * 100
                             : 0;
 
                         progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -498,6 +553,7 @@ public class SevenZipEngine : IArchiveEngine
                             FilePercentComplete = Math.Min(filePct, 100),
                             TotalFiles = totalFiles,
                             ProcessedFiles = processedFiles,
+                            ProcessedBytes = processedBytes + Math.Min(bytesWritten, entrySize),
                         }));
                         lastFileReport = now;
                     }))
@@ -512,6 +568,8 @@ public class SevenZipEngine : IArchiveEngine
                     }
 
                     processedFiles++;
+                    handledFiles++;
+                    processedBytes += entrySize;
 
                     // 逐条目状态（D2）：写盘成功即上报 Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
                     if (!(existedBefore && resolvedPath == outputPath))
@@ -523,10 +581,12 @@ public class SevenZipEngine : IArchiveEngine
                         progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = fileName,
-                            PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                            PercentComplete = totalFiles > 0 ? (double)handledFiles / totalFiles * 100 : 100,
                             FilePercentComplete = 100,
                             TotalFiles = totalFiles,
                             ProcessedFiles = processedFiles,
+                            TotalBytes = totalBytes,
+                            ProcessedBytes = processedBytes,
                         }));
                         lastReportTime = now;
                     }
@@ -538,6 +598,20 @@ public class SevenZipEngine : IArchiveEngine
                         // 逐条目状态（D2）
                         progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
                     failedEntries++;
+                    handledFiles++;
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = fileName,
+                        PercentComplete = totalFiles > 0 ? (double)handledFiles / totalFiles * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = (long)entry.Size,
+                    }));
                 }
                 catch (IOException iox)
                 {
@@ -547,6 +621,20 @@ public class SevenZipEngine : IArchiveEngine
                         // 逐条目状态（D2）
                         progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
                     failedEntries++;
+                    handledFiles++;
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = fileName,
+                        PercentComplete = totalFiles > 0 ? (double)handledFiles / totalFiles * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = totalFiles,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = (long)entry.Size,
+                    }));
                 }
             }
 
@@ -556,6 +644,8 @@ public class SevenZipEngine : IArchiveEngine
                 PercentComplete = 100,
                 TotalFiles = totalFiles,
                 ProcessedFiles = processedFiles,
+                TotalBytes = totalBytes,
+                ProcessedBytes = totalBytes,
             }));
 
             CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
@@ -588,7 +678,6 @@ public class SevenZipEngine : IArchiveEngine
             {
                 var compr = new SharpSevenZipCompressor();
                 ConfigureCompressor(compr, options);
-                AttachCompressorProgress(compr, progress);
 
                 // 预检：7z 原生压缩是单次调用，无法逐文件恢复。先展开待压缩文件集，
                 // 统一做读权限预检（文件被占用/权限不足 → ErrorResolver 弹窗 重试/跳过/中止），
@@ -599,6 +688,9 @@ public class SevenZipEngine : IArchiveEngine
                     files = files.Where(f => options.FileWhitelist.Contains(f)).ToArray();
                 var validated = ReadErrorHandler.FilterUnreadableFiles(files, options, cancellationToken,
                     ReadErrorHandler.CreateSkippedReporter(progress, files));
+
+                long totalSourceBytes = SumSourceFileSizes(validated);
+                AttachCompressorProgress(compr, progress, totalSourceBytes);
 
                 // 单一目录·无白名单·且无文件被跳过 → 保留 CompressDirectory 的 PreserveDirectoryRoot 语义
                 bool singleDirClean = sourcePaths.Length == 1
@@ -641,6 +733,8 @@ public class SevenZipEngine : IArchiveEngine
                     CurrentFile = string.Empty,
                     PercentComplete = 100,
                     FilePercentComplete = 100,
+                    TotalBytes = totalSourceBytes,
+                    ProcessedBytes = totalSourceBytes,
                 });
 
                 CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
@@ -893,10 +987,15 @@ public class SevenZipEngine : IArchiveEngine
             var allEntries = extractor.ArchiveFileData.ToList();
             int totalTarget = allEntries.Count(e => !e.IsDirectory && keySet.Contains(ArchivePath.Normalize(e.FileName)));
             int processed = 0;
+            int handled = 0;   // 已处理（成功+跳过）文件数，仅用于百分比推进；跳过不计入 ProcessedFiles（已处理显示）
             int failedEntries = 0;
             var conflictStats = new ConflictStatsCounter();
             var lastReportTime = DateTime.Now;
             var reportInterval = TimeSpan.FromMilliseconds(100);
+            long totalBytes = allEntries
+                .Where(e => !e.IsDirectory && keySet.Contains(ArchivePath.Normalize(e.FileName)))
+                .Sum(e => (long)e.Size);
+            long processedBytes = 0;
 
             foreach (var entry in allEntries)
             {
@@ -929,6 +1028,21 @@ public class SevenZipEngine : IArchiveEngine
                     conflictStats.RecordSkipped();
                     // 逐条目状态（D2）
                     progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Skipped });
+                    processedBytes += (long)entry.Size;
+                    handled++;
+                    // 主进度报告：跳过条目也刷新进度（连续大量跳过时窗口长时间无更新、看似卡死）。
+                    // 7z 百分比为文件计数基准 → 用 handled 推进；跳过不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = fileName,
+                        PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = totalTarget,
+                        ProcessedFiles = processed,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = (long)entry.Size,
+                    }));
                     continue;
                 }
                 if (existedBefore && resolvedPath == outputPath)
@@ -943,9 +1057,11 @@ public class SevenZipEngine : IArchiveEngine
                 progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = fileName,
-                    PercentComplete = totalTarget > 0 ? (double)processed / totalTarget * 100 : 0,
+                    PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 0,
                     TotalFiles = totalTarget,
                     ProcessedFiles = processed,
+                    TotalBytes = totalBytes,
+                    ProcessedBytes = processedBytes,
                 }));
 
                 // 使用 WriteProgressStream 在 ExtractFile 写入过程中获得逐块进度
@@ -961,7 +1077,7 @@ public class SevenZipEngine : IArchiveEngine
 
                         var filePct = entrySize > 0 ? (double)bytesWritten / entrySize * 100 : 100;
                         var overallPct = totalTarget > 0
-                            ? (double)(processed + (double)bytesWritten / entrySize) / totalTarget * 100
+                            ? (double)(handled + (double)bytesWritten / entrySize) / totalTarget * 100
                             : 0;
 
                         progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -971,6 +1087,7 @@ public class SevenZipEngine : IArchiveEngine
                             FilePercentComplete = Math.Min(filePct, 100),
                             TotalFiles = totalTarget,
                             ProcessedFiles = processed,
+                            ProcessedBytes = processedBytes + Math.Min(bytesWritten, entrySize),
                         }));
                         lastFileReport = now;
                     }))
@@ -985,6 +1102,8 @@ public class SevenZipEngine : IArchiveEngine
                     }
 
                     processed++;
+                    handled++;
+                    processedBytes += entrySize;
 
                     // 逐条目状态（D2）：写盘成功即上报 Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
                     if (!(existedBefore && resolvedPath == outputPath))
@@ -996,10 +1115,12 @@ public class SevenZipEngine : IArchiveEngine
                         progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = fileName,
-                            PercentComplete = totalTarget > 0 ? (double)processed / totalTarget * 100 : 100,
+                            PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 100,
                             FilePercentComplete = 100,
                             TotalFiles = totalTarget,
                             ProcessedFiles = processed,
+                            TotalBytes = totalBytes,
+                            ProcessedBytes = processedBytes,
                         }));
                         lastReportTime = now;
                     }
@@ -1012,6 +1133,20 @@ public class SevenZipEngine : IArchiveEngine
                         // 逐条目状态（D2）
                         progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
                     failedEntries++;
+                    handled++;
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = fileName,
+                        PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = totalTarget,
+                        ProcessedFiles = processed,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = (long)entry.Size,
+                    }));
                 }
                 catch (IOException iox)
                 {
@@ -1021,6 +1156,20 @@ public class SevenZipEngine : IArchiveEngine
                         // 逐条目状态（D2）
                         progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
                     failedEntries++;
+                    handled++;
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = fileName,
+                        PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = totalTarget,
+                        ProcessedFiles = processed,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = (long)entry.Size,
+                    }));
                 }
             }
 
@@ -1030,6 +1179,8 @@ public class SevenZipEngine : IArchiveEngine
                 PercentComplete = 100,
                 TotalFiles = totalTarget,
                 ProcessedFiles = processed,
+                TotalBytes = totalBytes,
+                ProcessedBytes = totalBytes,
             }));
 
             CoreLog.Info($"ExtractEntriesAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
@@ -1059,7 +1210,7 @@ public class SevenZipEngine : IArchiveEngine
         await Task.Run(() =>
         {
             // 1. 列出所有条目，排除要删除项
-            var keepEntries = new List<(string path, bool isDir)>();
+            var keepEntries = new List<(string path, bool isDir, long size)>();
             using (var extractor = string.IsNullOrEmpty(password)
                        ? new SharpSevenZipExtractor(archivePath)
                        : new SharpSevenZipExtractor(archivePath, password))
@@ -1070,7 +1221,7 @@ public class SevenZipEngine : IArchiveEngine
                     var normalized = ArchivePath.Normalize(entry.FileName);
                     if (!deletedSet.Contains(normalized))
                     {
-                        keepEntries.Add((normalized, entry.IsDirectory));
+                        keepEntries.Add((normalized, entry.IsDirectory, entry.IsDirectory ? 0 : (long)entry.Size));
                     }
                 }
             }
@@ -1088,6 +1239,7 @@ public class SevenZipEngine : IArchiveEngine
             try
             {
                 Directory.CreateDirectory(tempDir);
+                long totalSourceBytes = keepEntries.Where(t => !t.isDir).Sum(t => t.size);
 
                 using (var extractor = string.IsNullOrEmpty(password)
                            ? new SharpSevenZipExtractor(archivePath)
@@ -1099,7 +1251,7 @@ public class SevenZipEngine : IArchiveEngine
 
                     int total = keepEntries.Count;
                     int processed = 0;
-                    foreach (var (path, isDir) in keepEntries)
+                    foreach (var (path, isDir, _) in keepEntries)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
 
@@ -1126,10 +1278,13 @@ public class SevenZipEngine : IArchiveEngine
 
                         processed++;
                         var pct = total > 0 ? (double)processed / total * 100 : 100;
+                        var extractPct = pct * 0.5; // 提取阶段占 50%
                         progress?.Report(new ArchiveProgress
                         {
                             CurrentFile = path,
-                            PercentComplete = pct * 0.5, // 提取阶段占 50%
+                            PercentComplete = extractPct,
+                            TotalBytes = totalSourceBytes,
+                            ProcessedBytes = (long)(totalSourceBytes * extractPct / 100.0),
                         });
                     }
                 }
@@ -1152,16 +1307,8 @@ public class SevenZipEngine : IArchiveEngine
                         compr.EncryptHeaders = true;
                     }
 
-                    AttachCompressorProgress(compr, progress is not null
-                        ? new Progress<ArchiveProgress>(p =>
-                        {
-                            progress.Report(new ArchiveProgress
-                            {
-                                CurrentFile = p.CurrentFile,
-                                PercentComplete = 50 + p.PercentComplete * 0.5, // 压缩阶段占 50%
-                            });
-                        })
-                        : null);
+                    AttachCompressorProgress(compr, progress, totalSourceBytes,
+                        percentBase: 50, percentScale: 0.5); // 压缩阶段占后 50%
 
                     compr.PreserveDirectoryRoot = true;
                     compr.CompressDirectory(tempDir, tempArchive, password ?? "", "*", true);
@@ -1174,6 +1321,8 @@ public class SevenZipEngine : IArchiveEngine
                     {
                         CurrentFile = string.Empty,
                         PercentComplete = 100,
+                        TotalBytes = totalSourceBytes,
+                        ProcessedBytes = totalSourceBytes,
                     });
 
                     CoreLog.Info($"DeleteEntriesAsync: done, {sw.ElapsedMilliseconds}ms");
@@ -1221,8 +1370,6 @@ public class SevenZipEngine : IArchiveEngine
             var compr = new SharpSevenZipCompressor();
             ConfigureCompressor(compr, options);
             compr.CompressionMode = CompressionMode.Append; // 追加到已有归档
-
-            AttachCompressorProgress(compr, progress);
 
             // entryBasePath 前缀（与 ZipEngine 语义一致）："docs" → 条目名 "docs/<相对路径>"。
             // 空/根目录时无前缀，条目落在归档根目录。
@@ -1309,6 +1456,9 @@ public class SevenZipEngine : IArchiveEngine
                 return;
             }
 
+            long totalSourceBytes = SumSourceFileSizes(finalDict.Keys);
+            AttachCompressorProgress(compr, progress, totalSourceBytes);
+
             // 覆盖条目先删除（探针验证：ModifyArchive(index→null) 删除有效），再追加
             if (deleteIndexes.Count > 0)
             {
@@ -1326,6 +1476,8 @@ public class SevenZipEngine : IArchiveEngine
             {
                 CurrentFile = string.Empty,
                 PercentComplete = 100,
+                TotalBytes = totalSourceBytes,
+                ProcessedBytes = totalSourceBytes,
             });
 
             CoreLog.Info($"AddToArchiveAsync: done, {sw.ElapsedMilliseconds}ms");

@@ -750,6 +750,21 @@ public class ZipEngineTests : IDisposable
     }
 
     /// <summary>
+    /// 有序进度收集器：同步 Report 按报告顺序记录，供单调性断言。
+    /// 刻意不用 System.Progress&lt;T&gt;（其经线程池异步派发会打乱顺序）。
+    /// </summary>
+    private sealed class OrderedProgressCollector : IProgress<ArchiveProgress>
+    {
+        private readonly List<ArchiveProgress> _items = new();
+        public void Report(ArchiveProgress value) { lock (_items) _items.Add(value); }
+        public IReadOnlyList<ArchiveProgress> Snapshot()
+        {
+            lock (_items) return _items.ToList();
+        }
+        public IProgress<ArchiveProgress> Progress => this;
+    }
+
+    /// <summary>
     /// (a) 全新空目录解压 5 文件压缩包：每个非目录条目恰好上报一次 Completed 终态，
     /// EntryKey 两两不同且集合等于压缩包内条目键集合（无丢失/无重复/无截断）。
     /// </summary>
@@ -849,6 +864,87 @@ public class ZipEngineTests : IDisposable
         // 且必须携带目录前缀 = 完整相对路径
         Assert.True(new HashSet<string>(reportedKeys, StringComparer.Ordinal).SetEquals(new[] { "a/x.txt", "b/x.txt" }),
             $"EntryKey 应为完整相对路径而非文件名，实际: [{string.Join(", ", reportedKeys)}]");
+    }
+
+    /// <summary>
+    /// (e) 连续冲突跳过也必须刷新主进度：每个被跳过的条目都补发一条常规进度报告
+    /// （非 EntryStatus 通道），否则连续大量跳过时进度窗口长时间无更新、看似卡死。
+    /// 跳过不计入 ProcessedFiles（已处理），但推进总进度百分比。
+    /// </summary>
+    [Fact]
+    public async Task ExtractAsync_ConsecutiveSkips_EmitsMainProgressPerFile()
+    {
+        const int n = 5;
+        var archive = TrackFile(ArchiveFixtures.CreateMultiFileZipArchive(n)); // file0000.dat ~ file0004.dat
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(dest);
+        for (int i = 0; i < n; i++)
+            File.WriteAllText(Path.Combine(dest, $"file{i:D4}.dat"), "old"); // 全部同名冲突 → 全部跳过
+
+        var collector = new OrderedProgressCollector();
+        var options = new ArchiveOptions { ConflictAction = FileConflictAction.Skip };
+        await _engine.ExtractAsync(archive, dest, options: options, progress: collector.Progress);
+
+        var reports = collector.Snapshot();
+        Assert.Equal(n, reports.Count(p => p.EntryStatus == ArchiveEntryStatus.Skipped));
+
+        // 主进度报告（非 EntryStatus 通道）：每个跳过条目一条 + 收尾 → 至少 n 条
+        var main = reports.Where(p => !p.EntryStatus.HasValue).ToList();
+        Assert.True(main.Count >= n,
+            $"连续跳过应逐条刷新主进度，期望 ≥{n} 条常规报告，实际 {main.Count} 条");
+
+        // 主进度百分比单调不减，且收尾达到 100
+        double last = -1;
+        foreach (var p in main)
+        {
+            Assert.True(p.PercentComplete >= last, $"主进度回退 {last} -> {p.PercentComplete}");
+            last = p.PercentComplete;
+        }
+        Assert.Equal(100.0, main[^1].PercentComplete, 3);
+
+        // 跳过不计入「已处理」：携带 TotalFiles 的主进度报告 ProcessedFiles 恒为 0（无成功条目）
+        Assert.All(main.Where(p => p.TotalFiles > 0), p => Assert.Equal(0, p.ProcessedFiles));
+    }
+
+    /// <summary>
+    /// (f) 连续写入失败也必须刷新主进度：每个失败条目除 Failed 逐条目状态外，
+    /// 还补发一条常规进度报告（非 EntryStatus 通道），否则连续大量失败时
+    /// 进度窗口长时间无更新、看似卡死。失败不计入 ProcessedFiles（已处理），
+    /// 但计入字节进度，使总进度条推进并最终收敛至 100。
+    /// 确定性失败方式：目标目录中预建与输出文件同名的目录，使 File.Create 抛 IO 异常。
+    /// </summary>
+    [Fact]
+    public async Task ExtractAsync_AllFailures_EmitsMainProgressPerFile()
+    {
+        const int n = 5;
+        var archive = TrackFile(ArchiveFixtures.CreateMultiFileZipArchive(n)); // file0000.dat ~ file0004.dat
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(dest);
+        for (int i = 0; i < n; i++)
+            Directory.CreateDirectory(Path.Combine(dest, $"file{i:D4}.dat")); // 同名目录 → File.Create 抛异常 → 全部失败
+
+        var collector = new OrderedProgressCollector();
+        await _engine.ExtractAsync(archive, dest, progress: collector.Progress);
+
+        var reports = collector.Snapshot();
+        Assert.Equal(n, reports.Count(p => p.EntryStatus == ArchiveEntryStatus.Failed));
+
+        // 主进度报告（非 EntryStatus 通道）：每个失败条目一条 + 批次收尾 + 总收尾 → 至少 n 条
+        var main = reports.Where(p => !p.EntryStatus.HasValue).ToList();
+        Assert.True(main.Count >= n,
+            $"连续失败应逐条刷新主进度，期望 ≥{n} 条常规报告，实际 {main.Count} 条");
+
+        // 主进度百分比单调不减，且收尾达到 100
+        double last = -1;
+        foreach (var p in main)
+        {
+            Assert.True(p.PercentComplete >= last, $"主进度回退 {last} -> {p.PercentComplete}");
+            last = p.PercentComplete;
+        }
+        Assert.Equal(100.0, main[^1].PercentComplete, 3);
+
+        // 失败不计入「已处理」：携带 TotalFiles 的主进度报告 ProcessedFiles 恒为 0（无成功条目）
+        Assert.All(main.Where(p => p.TotalFiles > 0), p => Assert.Equal(0, p.ProcessedFiles));
     }
 
     // ===== MultiThreadedCompression（ZIP 外壳 + 7z mt=on 压缩组）=====

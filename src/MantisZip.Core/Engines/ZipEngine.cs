@@ -337,6 +337,19 @@ public class ZipEngine : IArchiveEngine
                     // 逐条目状态（D2）：冲突跳过 → Skipped
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = entry.Size });
                     processedBytes += entry.Size;
+                    // 主进度报告：跳过条目也刷新进度（连续大量跳过时窗口长时间无更新、看似卡死）。
+                    // 跳过不计入 ProcessedFiles（已处理），但计入字节进度，使总进度条推进。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = entries.Count,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = entry.Size,
+                    }));
                     continue;
                 }
                 // 逐条目状态（D2）：本条目写入结果按是否覆盖上报 Completed/Overwritten
@@ -405,6 +418,19 @@ public class ZipEngine : IArchiveEngine
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：权限失败 → Failed
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = entries.Count,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = entrySize,
+                    }));
                 }
                 catch (IOException iox)
                 {
@@ -415,6 +441,19 @@ public class ZipEngine : IArchiveEngine
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：IO 写入失败 → Failed
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = entries.Count,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = entrySize,
+                    }));
                 }
             }
 
@@ -580,12 +619,36 @@ public class ZipEngine : IArchiveEngine
                     conflictStats.RecordSkipped();
                     // 逐条目状态（D2）：冲突跳过 → Skipped（锁外上报，避免锁竞争）
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = entrySize });
+                    long skipProcessedBytes;
+                    int skipProcessedFiles;
                     lock (syncLock)
                     {
                         processedBytes += entrySize;
+                        skipProcessedBytes = processedBytes;
+                        skipProcessedFiles = processedFiles;
                     }
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 主进度报告：跳过条目也刷新进度（连续大量跳过时窗口长时间无更新、看似卡死）。
+                    // 跳过不计入 ProcessedFiles（已处理），但计入字节进度，使总进度条与批次行推进。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = skipProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = skipProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)skipProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                     continue;
                 }
                 // 逐条目状态（D2）：本条目写入结果按是否覆盖上报 Completed/Overwritten
@@ -607,6 +670,33 @@ public class ZipEngine : IArchiveEngine
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
+                        long failProcessedBytes;
+                        int failProcessedFiles;
+                        lock (syncLock)
+                        {
+                            processedBytes += entrySize;
+                            failProcessedBytes = processedBytes;
+                            failProcessedFiles = processedFiles;
+                        }
+                        // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                        {
+                            CurrentFile = entryKey,
+                            TotalFiles = entryInfos.Count,
+                            ProcessedFiles = failProcessedFiles,
+                            TotalBytes = totalBytes,
+                            ProcessedBytes = failProcessedBytes,
+                            PercentComplete = totalBytes > 0 ? (double)failProcessedBytes / totalBytes * 100 : 0,
+                            FilePercentComplete = 100,
+                            FileTotalBytes = entrySize,
+                            BatchProcessedBytes = batchProcessedBytes,
+                            BatchTotalBytes = batchTotalBytes,
+                            BatchIndex = batchIndex,
+                            BatchCount = actualParallelism,
+                            BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                            BatchProcessedFiles = batchProcessedFiles,
+                            BatchTotalFiles = batchTotalFiles
+                        }));
                         continue;
                     }
 
@@ -690,6 +780,33 @@ while (true)
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                    long failProcessedBytes;
+                    int failProcessedFiles;
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        failProcessedBytes = processedBytes;
+                        failProcessedFiles = processedFiles;
+                    }
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = failProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = failProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)failProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                 }
                 catch (IOException iox)
                 {
@@ -700,6 +817,33 @@ while (true)
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
+                    long failProcessedBytes;
+                    int failProcessedFiles;
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        failProcessedBytes = processedBytes;
+                        failProcessedFiles = processedFiles;
+                    }
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = failProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = failProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)failProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                 }
                 catch (Exception ex)
                 {
@@ -710,6 +854,33 @@ while (true)
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other });
+                    long failProcessedBytes;
+                    int failProcessedFiles;
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        failProcessedBytes = processedBytes;
+                        failProcessedFiles = processedFiles;
+                    }
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = failProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = failProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)failProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                 }
             }
 
@@ -863,6 +1034,19 @@ while (true)
                     // 逐条目状态（D2）：冲突跳过 → Skipped
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = entry.Size });
                     processedBytes += entry.Size;
+                    // 主进度报告：跳过条目也刷新进度（连续大量跳过时窗口长时间无更新、看似卡死）。
+                    // 跳过不计入 ProcessedFiles（已处理），但计入字节进度，使总进度条推进。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = filteredEntries.Count,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = entry.Size,
+                    }));
                     continue;
                 }
                 // 逐条目状态（D2）：本条目写入结果按是否覆盖上报 Completed/Overwritten
@@ -931,6 +1115,19 @@ while (true)
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：权限失败 → Failed
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = filteredEntries.Count,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = entrySize,
+                    }));
                 }
                 catch (IOException iox)
                 {
@@ -940,6 +1137,19 @@ while (true)
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：IO 写入失败 → Failed
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = filteredEntries.Count,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = entrySize,
+                    }));
                 }
             }
 
@@ -1104,12 +1314,36 @@ while (true)
                     conflictStats.RecordSkipped();
                     // 逐条目状态（D2）：冲突跳过 → Skipped（锁外上报，避免锁竞争）
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = entrySize });
+                    long skipProcessedBytes;
+                    int skipProcessedFiles;
                     lock (syncLock)
                     {
                         processedBytes += entrySize;
+                        skipProcessedBytes = processedBytes;
+                        skipProcessedFiles = processedFiles;
                     }
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
+                    // 主进度报告：跳过条目也刷新进度（连续大量跳过时窗口长时间无更新、看似卡死）。
+                    // 跳过不计入 ProcessedFiles（已处理），但计入字节进度，使总进度条与批次行推进。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = skipProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = skipProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)skipProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                     continue;
                 }
 
@@ -1132,6 +1366,33 @@ while (true)
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
+                        long failProcessedBytes;
+                        int failProcessedFiles;
+                        lock (syncLock)
+                        {
+                            processedBytes += entrySize;
+                            failProcessedBytes = processedBytes;
+                            failProcessedFiles = processedFiles;
+                        }
+                        // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                        {
+                            CurrentFile = entryKey,
+                            TotalFiles = entryInfos.Count,
+                            ProcessedFiles = failProcessedFiles,
+                            TotalBytes = totalBytes,
+                            ProcessedBytes = failProcessedBytes,
+                            PercentComplete = totalBytes > 0 ? (double)failProcessedBytes / totalBytes * 100 : 0,
+                            FilePercentComplete = 100,
+                            FileTotalBytes = entrySize,
+                            BatchProcessedBytes = batchProcessedBytes,
+                            BatchTotalBytes = batchTotalBytes,
+                            BatchIndex = batchIndex,
+                            BatchCount = actualParallelism,
+                            BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                            BatchProcessedFiles = batchProcessedFiles,
+                            BatchTotalFiles = batchTotalFiles
+                        }));
                         continue;
                     }
 
@@ -1215,6 +1476,33 @@ while (true)
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                    long failProcessedBytes;
+                    int failProcessedFiles;
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        failProcessedBytes = processedBytes;
+                        failProcessedFiles = processedFiles;
+                    }
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = failProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = failProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)failProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                 }
                 catch (IOException iox)
                 {
@@ -1226,6 +1514,33 @@ while (true)
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
+                    long failProcessedBytes;
+                    int failProcessedFiles;
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        failProcessedBytes = processedBytes;
+                        failProcessedFiles = processedFiles;
+                    }
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = failProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = failProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)failProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                 }
                 catch (Exception ex)
                 {
@@ -1236,6 +1551,33 @@ while (true)
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other });
+                    long failProcessedBytes;
+                    int failProcessedFiles;
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        failProcessedBytes = processedBytes;
+                        failProcessedFiles = processedFiles;
+                    }
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = failProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = failProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)failProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                 }
             }
 
@@ -1756,6 +2098,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
 
                     using var zipWriter = new ZipWriter(fsOut, writerOptions);
 
+                    long skippedBytes = 0; // 因读取失败被跳过文件的字节：仅用于推进总进度；不计入 ProcessedFiles，也不污染压缩率
                     foreach (var (fullPath, relativePath) in files)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -1766,7 +2109,28 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                         {
                             if (cancellationToken.IsCancellationRequested) break;
                             // 逐条目状态（D2）：读取被跳过 → Skipped（带原因类别，spec §5.3）
-                            progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = SafeFileSize(fullPath), EntryFailureReason = skipReason ?? EntryFailureReason.Other });
+                            var skippedFileSize = SafeFileSize(fullPath);
+                            progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = skippedFileSize, EntryFailureReason = skipReason ?? EntryFailureReason.Other });
+                            // 主进度报告：跳过条目也刷新进度（连续大量跳过时窗口长时间无更新、看似卡死）。
+                            // 跳过不计入 ProcessedFiles（已处理），但计入字节进度 skippedBytes 使总进度条推进；
+                            // 压缩率仍按实际压缩字节 processedBytes 计算，不受跳过影响。
+                            skippedBytes += skippedFileSize;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = relativePath,
+                                PercentComplete = totalBytes > 0
+                                    ? Math.Min((double)(processedBytes + skippedBytes) / totalBytes * 100, 100)
+                                    : 100,
+                                FilePercentComplete = 100,
+                                TotalFiles = totalFiles,
+                                ProcessedFiles = processedFiles,
+                                TotalBytes = totalBytes,
+                                ProcessedBytes = processedBytes + skippedBytes,
+                                FileTotalBytes = skippedFileSize,
+                                BatchProcessedBytes = processedBytes + skippedBytes,
+                                BatchTotalBytes = totalBytes,
+                                CompressionRatio = TryStreamOutputRatio(fsOut, processedBytes)
+                            });
                             continue;
                         }
 
