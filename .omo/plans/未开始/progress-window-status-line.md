@@ -1,6 +1,6 @@
 # 进度窗口状态行 + 失败原因明细 + 关闭链统一 + 倒计时 + 解压后置开关
 
-> **状态**: 📋 设计已确认（2026-10-11 spec 全量拍板，D1–D19），任务分解已生成，待实施
+> **状态**: 🟢 核心已实施（2026-10-13，Task 1–11 全部落地并构建/测试通过），**GUI 人工验收待做**（Task 12 清单）；实施记录见 `docs/progress-avalonia-detail.md` `2026-10-13` 条目。另发现既有 bug（CLI/右键解压对非加密包误报密码匹配）待修（方案 A）
 >
 > **For agentic workers:** 本文档是设计规格摘要 + 完整任务分解。设计全文见 `docs/superpowers/specs/2026-10-11-progress-window-status-line-design.md`（12 节，D1–D19 决策表——**执行时不得偏离 spec**；本文档只摘执行所需代码与位置）。执行时使用 superpowers:subagent-driven-development 或 superpowers:executing-plans。Steps use checkbox (`- [ ]`) syntax for tracking.
 
