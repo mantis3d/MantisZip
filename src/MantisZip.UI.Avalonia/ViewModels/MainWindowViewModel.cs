@@ -2417,6 +2417,9 @@ public partial class MainWindowViewModel : ObservableObject
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：列出全部条目（Pending），解压中逐条目状态驱动列表
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
                     CurrentArchivePath, dest, password, progress, ct);
             });
@@ -2456,6 +2459,9 @@ public partial class MainWindowViewModel : ObservableObject
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：列出全部条目（Pending），解压中逐条目状态驱动列表
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
                     CurrentArchivePath, dest, password, progress, ct);
             });
@@ -2825,6 +2831,9 @@ public partial class MainWindowViewModel : ObservableObject
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：列出全部条目（Pending），解压中逐条目状态驱动列表
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
                     CurrentArchivePath, vm.DestinationPath, password, progress, ct);
             });
@@ -2866,6 +2875,9 @@ public partial class MainWindowViewModel : ObservableObject
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：列出全部条目（Pending），解压中逐条目状态驱动列表
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
                     CurrentArchivePath, dest, password, progress, ct);
             });
@@ -2924,6 +2936,9 @@ public partial class MainWindowViewModel : ObservableObject
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：测试前列出全部条目（Pending），测试中逐条目状态驱动列表（spec §12 #6）
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 testOk = await engine.TestArchiveAsync(CurrentArchivePath, password, progress, ct);
             });
 
