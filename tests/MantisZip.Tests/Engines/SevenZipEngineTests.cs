@@ -730,6 +730,62 @@ public class SevenZipEngineTests : IDisposable
 
         AssertByteProgressMonotonic(collector.Snapshot(), "DeleteEntriesAsync");
     }
+
+    // ===== 连续跳过的主进度刷新（7z 计数基准） =====
+
+    /// <summary>
+    /// 连续冲突跳过也必须刷新主进度：每个被跳过的条目都补发一条常规进度报告
+    /// （非 EntryStatus 通道），否则连续大量跳过时进度窗口长时间无更新、看似卡死。
+    /// 7z 百分比为文件计数基准 → 用 handledFiles 推进；跳过不计入 ProcessedFiles（已处理）。
+    /// </summary>
+    [Fact]
+    public async Task ExtractAsync_ConsecutiveSkips_EmitsMainProgressPerFile()
+    {
+        if (!Is7zDllAvailable()) return;
+        const int n = 5;
+
+        var dir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        var src = Path.Combine(dir, "src");
+        Directory.CreateDirectory(src);
+        for (int i = 0; i < n; i++)
+            await File.WriteAllBytesAsync(Path.Combine(src, $"f{i}.bin"), new byte[1024]);
+
+        var archivePath = TrackFile(Path.Combine(dir, "skips.7z"));
+        var engine = new SevenZipEngine();
+        await engine.CompressAsync([src], archivePath,
+            new ArchiveOptions { SevenZipMultithreaded = false });
+
+        // 预创建同名文件（条目为 src/fN.bin）制造冲突 → 全部跳过
+        var dest = TrackDir(Path.Combine(dir, "out"));
+        Directory.CreateDirectory(Path.Combine(dest, "src"));
+        for (int i = 0; i < n; i++)
+            await File.WriteAllBytesAsync(Path.Combine(dest, "src", $"f{i}.bin"), new byte[10]);
+
+        var collector = new OrderedProgressCollector();
+        await engine.ExtractAsync(archivePath, dest,
+            password: null, progress: collector.Progress, cancellationToken: CancellationToken.None,
+            options: new ArchiveOptions { ConflictAction = FileConflictAction.Skip });
+
+        var reports = collector.Snapshot();
+        Assert.Equal(n, reports.Count(p => p.EntryStatus == ArchiveEntryStatus.Skipped));
+
+        // 主进度报告（非 EntryStatus 通道）：每个跳过条目一条 + 收尾 → 至少 n 条
+        var main = reports.Where(p => !p.EntryStatus.HasValue).ToList();
+        Assert.True(main.Count >= n,
+            $"连续跳过应逐条刷新主进度，期望 ≥{n} 条常规报告，实际 {main.Count} 条");
+
+        // 主进度百分比单调不减，且收尾达到 100
+        double last = -1;
+        foreach (var p in main)
+        {
+            Assert.True(p.PercentComplete >= last, $"主进度回退 {last} -> {p.PercentComplete}");
+            last = p.PercentComplete;
+        }
+        Assert.Equal(100.0, main[^1].PercentComplete, 3);
+
+        // 跳过不计入「已处理」：携带 TotalFiles 的主进度报告 ProcessedFiles 恒为 0（无成功条目）
+        Assert.All(main.Where(p => p.TotalFiles > 0), p => Assert.Equal(0, p.ProcessedFiles));
+    }
 }
 
 /// <summary>
