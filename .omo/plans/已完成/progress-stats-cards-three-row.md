@@ -1,6 +1,6 @@
 # 进度窗口统计卡三行结构（数量 + 大小）
 
-> **状态**: 📋 设计已确认 + 任务分解已生成（2026-10-08，2026-10-09 按用户拍板修订 D2/并行后置/方案 A 去分母），待实施
+> **状态**: ✅ 已实施（2026-10-09 落地：5 张三行统计卡 + 并行度后置单行 + `DashBrushConverter` + `StatsProcessedSize`/`StatsTotalCount`/三终态字节累加器 + 7 条单测，见 `docs/progress-avalonia-detail.md` 2026-10-09 条目；2026-10-12 计划整理移入已完成）
 >
 > **For agentic workers:** 本文档是设计规格 + 完整任务分解（brainstorming 四段设计已获用户逐段确认；2026-10-09 用户确认三处修订：卡 2/3/4 行 3 动态累加（前向兼容）+ 并行度移出表格置后 + 已处理行 2 去分母改纯计数（方案 A））。文末「任务分解」含 7 任务 3 波次 checkbox 步骤。执行时使用 superpowers:subagent-driven-development 或 superpowers:executing-plans。
 

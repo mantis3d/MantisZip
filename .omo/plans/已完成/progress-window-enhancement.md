@@ -1,12 +1,14 @@
 # 进度窗口增强改造（progress-window-enhancement）— 修订版 v2
 
+> **状态**: ✅ 已实施（T1–T9 落地，见下方「效力状态」表；被纠偏续作 [progress-window-prototype-alignment.md](../未开始/progress-window-prototype-alignment.md) 推翻的 UI 部分以对齐计划为准、F3 并入其收口清单；2026-10-12 计划整理移入已完成）
+>
 > **Agentic Execution Note** — 本计划为 **WPF→Avalonia 全量修订版**（v2）。v1（2026-09-15，基于已删除的 WPF 版本）经代码级审查后发现全部文件路径、API、线程模型均为 WPF 语境，不可直接执行。v2 已并入全部审查必改项 + 密码徽标 + 密码弹窗兜底两项新功能决策，所有代码引用均经当前仓库（Avalonia 版）grep/读取核实。
 >
 > 执行方式：按 Wave 顺序执行；波次内标注 `∥` 的任务可并行。每任务完成后必须运行验证命令（Rule 12），全部通过才能标记完成。
 
 > **⚠️ 效力状态（2026-10-07 整理标注）**
 >
-> 本计划 T1–T9 已实施完成，但**部分内容被纠偏续作 [progress-window-prototype-alignment.md](progress-window-prototype-alignment.md) 推翻**。阅读时请按以下效力划分，**不要按本计划的原型对应表理解当前实现**：
+> 本计划 T1–T9 已实施完成，但**部分内容被纠偏续作 [progress-window-prototype-alignment.md](../未开始/progress-window-prototype-alignment.md) 推翻**。阅读时请按以下效力划分，**不要按本计划的原型对应表理解当前实现**：
 >
 > | 部分 | 效力 |
 > |---|---|
@@ -161,7 +163,7 @@ docs/
 
 ## 与 v6 原型的对应关系
 
-> ❌ **本表已作废（2026-10-07 标注）**——本表把 v6 原型的两组切换器读反了（原型实际为**内容模式：简约/详细/列表**与**信息量分级：少/中/完整**，且批处理列表在**上方**、信息区在**下方**），实现严格按本表执行导致跑偏 8 个点，返工约 6h。**正确对应关系见 [progress-window-prototype-alignment.md](progress-window-prototype-alignment.md)**。下表仅作历史记录保留：前两行对应的概念已不存在（`TopDisplayMode`/`DensityMode` 全仓删除），其余行的落点虽真实存在但布局位置已随 alignment 重排。
+> ❌ **本表已作废（2026-10-07 标注）**——本表把 v6 原型的两组切换器读反了（原型实际为**内容模式：简约/详细/列表**与**信息量分级：少/中/完整**，且批处理列表在**上方**、信息区在**下方**），实现严格按本表执行导致跑偏 8 个点，返工约 6h。**正确对应关系见 [progress-window-prototype-alignment.md](../未开始/progress-window-prototype-alignment.md)**。下表仅作历史记录保留：前两行对应的概念已不存在（`TopDisplayMode`/`DensityMode` 全仓删除），其余行的落点虽真实存在但布局位置已随 alignment 重排。
 
 | 原型（progress-window-enhancement.html v6） | 实现任务 |
 |---|---|
