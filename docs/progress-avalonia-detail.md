@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-13** — 进度窗口显示偏好持久化 + 移除内容模式自动切换（Avalonia）
+  - **背景**：进度窗口有两组三选 RadioButton——**内容模式**（简约/详细/列表，`ProgressContentMode`）与**信息量分级**（少/中/完整，`ProgressInfoDensity`）。两者原本每次都重置为硬编码默认（Simple / Medium），用户无法「记住上次选择」；且内容模式存在一处自动切换。
+  - **移除自动切换**：`ProgressViewModel.UpsertParallelBatch` 末尾原先在「首个并行批次行出现且当前为简约」时自动切到「详细」；按用户要求**删除**该逻辑，内容模式此后**仅**由用户点选切换（处于简约时并行批次不再自动展示详细通道行）。
+  - **持久化**：`AppSettings` 新增 `ProgressContentMode`（`"simple"/"detailed"/"list"`，默认 `"detailed"`）与 `ProgressInfoDensity`（`"minimal"/"medium"/"full"`，默认 `"medium"`）；`ProgressWindow` 构造函数 `AppSettings.Load()` 后写入 `_vm.ContentMode`/`_vm.InfoDensity`（在 `ApplyInfoDensity()` 之前，保证批列表高度按持久化分级计算），6 个 RadioButton 的 Click 处理器内 `SaveDisplayPreferences()` 只改这两个字段再 `Save()`（不触碰其它设置）。新增 `ProgressDisplayModeParser`（`Models/ProgressDisplayMode.cs`，静态）承载枚举 ↔ 字符串的双向映射与未知/空值回退默认，便于单测。**刻意的边界**：VM 自身不读写 AppSettings，保持 `new ProgressViewModel()` 的单测确定性（读写只在窗口 code-behind）。
+  - **默认值变更**：内容模式默认 `Simple → Detailed`（信息量仍 `Medium`），即首次运行/未设置时打开即「详细 / 中」。
+  - **XAML**：信息量三选去掉硬编码 `IsChecked="True"`（中档），改为单向绑定 `IsMinimalDensity`/`IsMediumDensity`/`IsFullDensity`（与内容模式组 `IsSimpleMode`/… 写法一致），使持久化值与程序化切换时单选项正确高亮。
+  - **未加设置窗口 UI 项**（按用户要求：只「记住上次选择」）。
+  - **测试**：新增 `ProgressDisplayModeParserTests`（+14：三枚举往返 + 未知/空值回退 + AppSettings 默认值）；`ProgressViewModelTests.ContentMode_ExposesThreeModes` 默认断言改 Detailed；`ProgressWindowBatchLogicTests.FirstBatchArrival_AutoSwitchesToDetailedOnlyFromSimple` 改写为 `FirstBatchArrival_DoesNotAutoSwitchContentMode`。**验证**：Core 670 通过 / 0 失败 / 3 跳过；Avalonia 214 通过 / 0 失败 / 3 跳过；UI.Avalonia 构建 0 错误。
+
 **2026-10-13** — 修复进度窗口在连续跳过/失败时冻结（Avalonia + Core）
   - **现象**：解压/压缩时若连续出现大量「跳过」条目（如解压到已存在目录且冲突策略=跳过），进度条与文本长时间不更新，窗口看似卡死（「已用时间」仍每秒走字，其余全部冻结）。
   - **根因**：跳过/失败条目**只**上报逐条目终态报告（`new ArchiveProgress { EntryKey, EntryStatus = Skipped/Failed, FileTotalBytes }`，不带 `PercentComplete`/`CurrentFile`/字节等字段），而 `ProgressViewModel.SetProgress`（`ProgressViewModel.cs` 早返回分支）对 `EntryStatus && EntryKey` 的报告直接 `UpdateEntryStatus(...)` 后 `return`——设计上为「逐条目终态独立通道，不参与百分比/速度/ETA/字节/计数计算」。于是连续跳过/失败期间主进度一次都不刷新。

@@ -15,6 +15,7 @@ using Avalonia.VisualTree;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
 
@@ -52,6 +53,12 @@ public partial class ProgressWindow : Window
         InitializeComponent();
         _vm = new ProgressViewModel();
         DataContext = _vm;
+
+        // 应用上次持久化的显示偏好（内容模式 / 信息量分级；首次使用为默认 详细 / 中）。
+        // 须在 ApplyInfoDensity() 之前写入 VM——该调用按 InfoDensity 计算批列表高度。
+        var displaySettings = AppSettings.Load();
+        _vm.ContentMode = ProgressDisplayModeParser.ParseContentMode(displaySettings.ProgressContentMode);
+        _vm.InfoDensity = ProgressDisplayModeParser.ParseDensity(displaySettings.ProgressInfoDensity);
 
         // 窗口一打开即进入准备态（「正在准备…」+ 不定进度条），直到引擎首次上报；
         // 大目录在枚举/分组阶段的静默期不再显示空白进度条（避免被误认为出错）。
@@ -460,27 +467,37 @@ public partial class ProgressWindow : Window
     private void ModeFullPathRadio_Click(object? sender, RoutedEventArgs e)
     {
         if (ModeFullPathRadio.IsChecked == true)
+        {
             _vm.ContentMode = Models.ProgressContentMode.Simple;
+            SaveDisplayPreferences();
+        }
     }
 
     private void ModeDirOnlyRadio_Click(object? sender, RoutedEventArgs e)
     {
         if (ModeDirOnlyRadio.IsChecked == true)
+        {
             _vm.ContentMode = Models.ProgressContentMode.Detailed;
+            SaveDisplayPreferences();
+        }
     }
 
     private void ModeNameOnlyRadio_Click(object? sender, RoutedEventArgs e)
     {
         if (ModeNameOnlyRadio.IsChecked == true)
+        {
             _vm.ContentMode = Models.ProgressContentMode.List;
+            SaveDisplayPreferences();
+        }
     }
 
-    // 信息量分级三选：赋值 VM 枚举后立即重排（行距 + 批处理列表高度）。
+    // 信息量分级三选：赋值 VM 枚举后立即重排（行距 + 批处理列表高度），并持久化用户选择。
     private void DensityCompactRadio_Click(object? sender, RoutedEventArgs e)
     {
         if (DensityCompactRadio.IsChecked != true) return;
         _vm.InfoDensity = Models.ProgressInfoDensity.Minimal;
         ApplyInfoDensity();
+        SaveDisplayPreferences();
     }
 
     private void DensityNormalRadio_Click(object? sender, RoutedEventArgs e)
@@ -488,6 +505,7 @@ public partial class ProgressWindow : Window
         if (DensityNormalRadio.IsChecked != true) return;
         _vm.InfoDensity = Models.ProgressInfoDensity.Medium;
         ApplyInfoDensity();
+        SaveDisplayPreferences();
     }
 
     private void DensityLooseRadio_Click(object? sender, RoutedEventArgs e)
@@ -495,6 +513,19 @@ public partial class ProgressWindow : Window
         if (DensityLooseRadio.IsChecked != true) return;
         _vm.InfoDensity = Models.ProgressInfoDensity.Full;
         ApplyInfoDensity();
+        SaveDisplayPreferences();
+    }
+
+    /// <summary>
+    /// 把当前「内容模式 / 信息量分级」持久化到 AppSettings（用户手动切换时调用）。
+    /// 仅窗口侧写入，VM 自身不依赖 AppSettings（保持 new ProgressViewModel() 单测确定性）。
+    /// </summary>
+    private void SaveDisplayPreferences()
+    {
+        var s = AppSettings.Load();
+        s.ProgressContentMode = ProgressDisplayModeParser.ToSetting(_vm.ContentMode);
+        s.ProgressInfoDensity = ProgressDisplayModeParser.ToSetting(_vm.InfoDensity);
+        s.Save();
     }
 
     /// <summary>

@@ -120,10 +120,10 @@ public class ProgressViewModelTests
     {
         var vm = new ProgressViewModel();
 
-        // 默认 Simple（构造后无需赋值即生效）
-        Assert.Equal(ProgressContentMode.Simple, vm.ContentMode);
-        Assert.True(vm.IsSimpleMode);
-        Assert.False(vm.IsDetailedMode);
+        // 默认 Detailed（构造后无需赋值即生效；窗口构造时按 AppSettings 持久化值覆盖）
+        Assert.Equal(ProgressContentMode.Detailed, vm.ContentMode);
+        Assert.False(vm.IsSimpleMode);
+        Assert.True(vm.IsDetailedMode);
         Assert.False(vm.IsListMode);
 
         // 收集派生属性变更通知（集中通知模式：一次赋值应同时通知三个派生属性）

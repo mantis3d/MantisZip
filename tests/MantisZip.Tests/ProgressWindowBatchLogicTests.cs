@@ -482,7 +482,7 @@ public class ProgressWindowBatchLogicTests
     }
 
     // ──────────────────────────────────────────────
-    // Task 6：并行压缩通道视图（批次行 FileRatio + 自动切详细 + 早返回顺序）
+    // Task 6：并行压缩通道视图（批次行 FileRatio + 早返回顺序；内容模式仅手动切换）
     // ──────────────────────────────────────────────
 
     [Fact]
@@ -543,13 +543,14 @@ public class ProgressWindowBatchLogicTests
     }
 
     [Fact]
-    public void FirstBatchArrival_AutoSwitchesToDetailedOnlyFromSimple()
+    public void FirstBatchArrival_DoesNotAutoSwitchContentMode()
     {
         var vm = new ProgressViewModel();
-        Assert.Equal(ProgressContentMode.Simple, vm.ContentMode);
+        vm.ContentMode = ProgressContentMode.Simple;
 
+        // 首个并行批次到达不应改变内容模式（自动切换已移除，仅手动点选才切换）
         vm.SetProgress(new ArchiveProgress { CurrentFile = "a", BatchIndex = 0, BatchCount = 2 });
-        Assert.Equal(ProgressContentMode.Detailed, vm.ContentMode);
+        Assert.Equal(ProgressContentMode.Simple, vm.ContentMode);
     }
 
     [Fact]

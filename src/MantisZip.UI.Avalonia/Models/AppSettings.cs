@@ -173,6 +173,10 @@ public class AppSettings
     public string CompactnessMode { get; set; } = "Normal";
     public string Language { get; set; } = "zh";
     public bool ShowProgressBars { get; set; } = true;
+    /// <summary>进度窗口内容模式持久化（"simple"/"detailed"/"list"；默认 "detailed"）。</summary>
+    public string ProgressContentMode { get; set; } = "detailed";
+    /// <summary>进度窗口信息量分级持久化（"minimal"/"medium"/"full"；默认 "medium"）。</summary>
+    public string ProgressInfoDensity { get; set; } = "medium";
     public bool SeparateDirBaseline { get; set; } = false;
     /// <summary>目录树：切换目录时自动展开到当前目录并收起其他分支。</summary>
     public bool AutoExpandTreeToCurrent { get; set; } = false;

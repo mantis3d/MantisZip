@@ -585,18 +585,20 @@
         <StackPanel Orientation="Horizontal"
                     Spacing="{DynamicResource SpacingMd}"
                     HorizontalAlignment="Center">
-          <!-- 少：仅总进度 + 时间 -->
+          <!-- 少：仅总进度 + 时间（IsChecked 单向绑 VM 派生属性，使持久化/程序化切换时单选项同步高亮） -->
           <RadioButton x:Name="DensityCompactRadio" GroupName="InfoDensity"
                        Content="{Binding LocalizedStrings[Progress_Density_Minimal]}"
+                       IsChecked="{Binding IsMinimalDensity, Mode=OneWay}"
                        Click="DensityCompactRadio_Click"/>
           <!-- 中：+ 中等单行（默认档） -->
           <RadioButton x:Name="DensityNormalRadio" GroupName="InfoDensity"
                        Content="{Binding LocalizedStrings[Progress_Density_Medium]}"
-                       IsChecked="True"
+                       IsChecked="{Binding IsMediumDensity, Mode=OneWay}"
                        Click="DensityNormalRadio_Click"/>
           <!-- 完整：+ 统计卡 -->
           <RadioButton x:Name="DensityLooseRadio" GroupName="InfoDensity"
                        Content="{Binding LocalizedStrings[Progress_Density_Full]}"
+                       IsChecked="{Binding IsFullDensity, Mode=OneWay}"
                        Click="DensityLooseRadio_Click"/>
         </StackPanel>
 

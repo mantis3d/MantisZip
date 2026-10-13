@@ -64,8 +64,8 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>ZIP 并行解压批次行（BatchIndex 驱动 upsert；非并行恒为空 → 容器隐藏）。</summary>
     private readonly ObservableCollection<ParallelBatchProgressItem> _parallelBatchItems = new();
 
-    /// <summary>顶部内容模式（默认 Simple；详见 <see cref="ContentMode"/>）。</summary>
-    private ProgressContentMode _contentMode = ProgressContentMode.Simple;
+    /// <summary>顶部内容模式（默认 Detailed；详见 <see cref="ContentMode"/>。窗口构造时按 AppSettings 持久化值覆盖）。</summary>
+    private ProgressContentMode _contentMode = ProgressContentMode.Detailed;
 
     /// <summary>信息量分级（默认 Medium；详见 <see cref="InfoDensity"/>）。</summary>
     private ProgressInfoDensity _infoDensity = ProgressInfoDensity.Medium;
@@ -894,13 +894,6 @@ public partial class ProgressViewModel : ObservableObject
         if (p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue)
             row.DetailText = LocalizationManager.T("Progress_Batch_FilesProgress",
                 p.BatchProcessedFiles.Value, p.BatchTotalFiles.Value);
-
-        // Task 6 方案 B：首个 BatchIndex 到达、集合由空转非空时自动切详细。
-        // 守卫 _contentMode == Simple 保证不覆盖用户显式选择（默认即 Simple，
-        // 三个单选项 Click 只把它改写为 Simple/Detailed/List）。
-        // 回退路径永不上报 BatchIndex，故此分支永不触发 —— 无需回退兜底。
-        if (_parallelBatchItems.Count == 1 && _contentMode == ProgressContentMode.Simple)
-            ContentMode = ProgressContentMode.Detailed;
     }
 
     /// <summary>非并行单行 upsert：集合恒保持至多 1 条 IsParallel=false 的行（复用批次行样式，D2/D8）。</summary>
