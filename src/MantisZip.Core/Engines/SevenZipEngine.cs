@@ -759,20 +759,97 @@ public class SevenZipEngine : IArchiveEngine
                     });
                 };
 
-                bool valid = extractor.Check();
-
-                // 2. 结果上报：Check() 本身已全量校验所有条目 CRC，无需再逐条目提取一遍（
-                //    旧实现对固实包是 O(n²) 且 2 倍解压开销）。Check 内部抛出的任何
-                //    SharpSevenZipException 都会被外层 catch 捕获转为 false
-                progress?.Report(new ArchiveProgress
+                bool valid;
+                Exception? checkError = null;
+                try
                 {
-                    CurrentFile = currentFile,
-                    PercentComplete = 100,
-                    FilePercentComplete = 100,
-                });
+                    valid = extractor.Check();
+                }
+                catch (Exception ex)
+                {
+                    valid = false;
+                    checkError = ex;
+                }
 
-                CoreLog.Info($"TestArchiveAsync: passed, archive verified, valid={valid}");
-                return valid;
+                var fileEntries = extractor.ArchiveFileData.Where(e => !e.IsDirectory).ToList();
+
+                if (valid)
+                {
+                    // 快路径：整包校验通过 → 逐条目上报 Completed（供进度窗口「列表」显示全部条目已校验）。
+                    // 与 ZIP/TAR 一致；不走 Check 的 O(n²) 逐条目解压。
+                    int done = 0;
+                    foreach (var e in fileEntries)
+                    {
+                        done++;
+                        var key = e.FileName ?? "";
+                        progress?.Report(new ArchiveProgress
+                        {
+                            EntryKey = key,
+                            EntryStatus = ArchiveEntryStatus.Completed,
+                            CurrentFile = key,
+                            FileTotalBytes = (long)e.Size,
+                            PercentComplete = fileEntries.Count > 0 ? (double)done / fileEntries.Count * 100 : 100,
+                            FilePercentComplete = 100,
+                        });
+                    }
+                    CoreLog.Info($"TestArchiveAsync: passed, archive verified, {fileEntries.Count} entries");
+                    return true;
+                }
+
+                // 失败路径：逐条目提取定位坏条目（spec §12 Follow-up #6）。
+                // 仅在校验失败时执行，避免常态固实包 O(n²) 开销。
+                int failedFiles = 0;
+                int idx = 0;
+                foreach (var e in fileEntries)
+                {
+                    idx++;
+                    var key = e.FileName ?? "";
+                    try
+                    {
+                        extractor.ExtractFile(e.Index, Stream.Null);
+                        progress?.Report(new ArchiveProgress
+                        {
+                            EntryKey = key,
+                            EntryStatus = ArchiveEntryStatus.Completed,
+                            CurrentFile = key,
+                            FileTotalBytes = (long)e.Size,
+                            PercentComplete = fileEntries.Count > 0 ? (double)idx / fileEntries.Count * 100 : 100,
+                            FilePercentComplete = 100,
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        failedFiles++;
+                        CoreLog.Error($"TestArchiveAsync: entry '{key}' failed", ex);
+                        progress?.Report(new ArchiveProgress
+                        {
+                            EntryKey = key,
+                            EntryStatus = ArchiveEntryStatus.Failed,
+                            EntryFailureReason = FailureReasonMapper.FromException(ex),
+                            CurrentFile = key,
+                            FileTotalBytes = (long)e.Size,
+                            PercentComplete = fileEntries.Count > 0 ? (double)idx / fileEntries.Count * 100 : 100,
+                            FilePercentComplete = 100,
+                        });
+                    }
+                }
+
+                if (failedFiles == 0)
+                {
+                    // 逐条目提取均成功但 Check() 判定无效（如整包级异常）→ 上报一条整包失败（无 EntryKey）
+                    var ce = checkError ?? new InvalidDataException("7z integrity check failed");
+                    CoreLog.Error($"TestArchiveAsync: archive-level failure with no per-entry failure", ce);
+                    progress?.Report(new ArchiveProgress
+                    {
+                        EntryStatus = ArchiveEntryStatus.Failed,
+                        EntryFailureReason = FailureReasonMapper.FromException(ce),
+                        CurrentFile = currentFile,
+                        PercentComplete = 100,
+                    });
+                }
+
+                CoreLog.Info($"TestArchiveAsync: failed, {failedFiles} entries failed");
+                return false;
             }
             catch (Exception ex)
             {
