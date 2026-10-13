@@ -14,7 +14,7 @@
 >   4. 主窗口解压路径的「并行」卡正向取证
 >   5. TAR/GZ **列表模式**渐进建行 + 10 万条目 UI 流畅度
 >   6. 从 v2 计划并入的有效条目：输错密码循环、取消 → 行 ✗ 且批继续、批次切换 ETA/速度归零重起、统计数字抽样比对
-> - **Deferred 变动**：#2（语言刷新）、#3（7z/TAR 速度与 ETA）已转入 [progress-window-bytes-i18n.md](progress-window-bytes-i18n.md)；**#7（通用压缩播种）已于 commit `7505952` 实施**，详见文末 Deferred 节。
+> - **Deferred 变动**：#2（语言刷新）、#3（7z/TAR 速度与 ETA）已转入 [progress-window-bytes-i18n.md](../已完成/progress-window-bytes-i18n.md)；**#7（通用压缩播种）已于 commit `7505952` 实施**，详见文末 Deferred 节。
 > - 非阻塞瑕疵（AutomationId 旧语义命名、可访问名等）见「本轮自动化取证发现的待办」。
 
 ---
@@ -813,11 +813,11 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 
 ## Deferred（明确不做）
 
-> **2026-10-07 整理注**：#2/#3 已转入 [progress-window-bytes-i18n.md](progress-window-bytes-i18n.md)，#7 已实施（不再是 Deferred）。仍为「明确不做」的仅：标题栏密度切换器、`.speed-display` 死样式、场景演示控制条、Size 格式化缓存。
+> **2026-10-13 整理注**：#2/#3 已实施（本计划 [progress-window-bytes-i18n.md](../已完成/progress-window-bytes-i18n.md) 任务 1–5），#7 已实施（commit `7505952`，2026-10-07）。仍为「明确不做」的仅：标题栏密度切换器、`.speed-display` 死样式、场景演示控制条、Size 格式化缓存。
 
 - **标题栏密度切换器**：原型自身 JS 未接线（死 UI），实现点不动的控件无意义（D4）
-- ~~**`LocalizedStrings` 语言切换刷新**~~ → **已转入 [progress-window-bytes-i18n.md](progress-window-bytes-i18n.md) 任务 5**（`ProgressViewModel` 订阅 `CultureChanged` + `OnClosed` 退订防静态事件泄漏；2026-10-07 标注，原判断「本次不修」仍适用于本计划）
-- ~~**7z / TAR 的速度与 ETA**~~ → **已转入 [progress-window-bytes-i18n.md](progress-window-bytes-i18n.md) 任务 1–4**（引擎全路径填充 `ProcessedBytes`/`TotalBytes`；2026-10-07 标注，列表模式不改变此现状）
+- ~~**`LocalizedStrings` 语言切换刷新**~~ → **已实施（本计划 [progress-window-bytes-i18n.md](../已完成/progress-window-bytes-i18n.md) 任务 5）**（`ProgressViewModel` 订阅 `CultureChanged` 运行中即时重灌静态文案 + 速度/ETA/文件计数/统计动态重渲，`OnClosed` 调 `DetachLocalization()` 退订防静态事件泄漏；2026-10-13 标注）
+- ~~**7z / TAR 的速度与 ETA**~~ → **已实施（本计划 [progress-window-bytes-i18n.md](../已完成/progress-window-bytes-i18n.md) 任务 1–4）**（三引擎全路径填充 `ProcessedBytes`/`TotalBytes`：7z 解压真实字节 + 压缩百分比推算、TarGz 解压压缩流位置 + 压缩 `ReadProgressStream` 真实读取字节；列表模式不改变此现状；2026-10-13 标注）
 - **`.speed-display` 死样式**：原型无对应元素，不实现
 - **原型场景演示控制条**（`scenario-bar`）：原型辅助 UI，非窗口本体
 - **`EntryProgressItem` 大文件的 Size 格式化缓存**：`FormatUtil.FormatSize` 每次调用，当前规模无需缓存

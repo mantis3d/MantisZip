@@ -731,6 +731,8 @@ if (_vm.IsPaused)
         _copyToastTimer?.Stop();
         _copyToastTimer = null;
         _vm.PauseEvent.Set();
+        // 退订静态 CultureChanged（VM 在 ctor 订阅；不退订则窗口关闭后 VM 被静态事件根引用泄漏）
+        _vm.DetachLocalization();
         base.OnClosed(e);
     }
 

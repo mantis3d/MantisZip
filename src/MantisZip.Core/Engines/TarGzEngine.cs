@@ -38,6 +38,7 @@ public class TarGzEngine : IArchiveEngine
 
             int successCount = 0, failedEntries = 0;
             var conflictStats = new ConflictStatsCounter();
+            long bytesTotal = 0; // 链尾最终报告使用；tar 分支=压缩流长度，gz 分支=gz 流长度
 
             if (isTarGz || ext == ".tar")
             {
@@ -45,6 +46,7 @@ public class TarGzEngine : IArchiveEngine
                 // 注意：不手动解压 GZip，直接传入原始压缩流让 TarReader 自动检测 gzip 头
                 using var inputStream = File.OpenRead(archivePath);
                 var totalCompressedBytes = inputStream.Length;
+                bytesTotal = totalCompressedBytes;
 
                 using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
 
@@ -83,7 +85,9 @@ public class TarGzEngine : IArchiveEngine
                     {
                         CurrentFile = entryKey,
                         PercentComplete = Math.Min(compressedProgress, 99.9),
-                        FilePercentComplete = 0
+                        FilePercentComplete = 0,
+                        TotalBytes = totalCompressedBytes,
+                        ProcessedBytes = inputStream.Position
                     }));
 
                     // 冲突处理
@@ -133,7 +137,9 @@ public class TarGzEngine : IArchiveEngine
                                     {
                                         CurrentFile = entryKey,
                                         PercentComplete = Math.Min(compressedProgress, 99.9),
-                                        FilePercentComplete = filePct
+                                        FilePercentComplete = filePct,
+                                        TotalBytes = totalCompressedBytes,
+                                        ProcessedBytes = inputStream.Position
                                     }));
                                     lastReportTime = now;
                                 }
@@ -191,7 +197,37 @@ public class TarGzEngine : IArchiveEngine
                     try
                     {
                         using var output = File.Create(resolved);
-                        gzipStream.CopyTo(output);
+                        // 手动缓冲循环：以压缩流位置（inputStream.Position）为字节进度；单文件 gz 无文件计数语义
+                        long gzLen = inputStream.Length;
+                        bytesTotal = gzLen;
+                        long gzLastReport = Environment.TickCount64;
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                        {
+                            CurrentFile = gzEntryKey,
+                            PercentComplete = 0,
+                            FilePercentComplete = 0,
+                            TotalBytes = gzLen,
+                            ProcessedBytes = 0,
+                        }));
+                        var gzBuffer = new byte[CopyBufferSize];
+                        int gzRead;
+                        while ((gzRead = gzipStream.Read(gzBuffer, 0, gzBuffer.Length)) > 0)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            output.Write(gzBuffer, 0, gzRead);
+                            if (Environment.TickCount64 - gzLastReport >= 100)
+                            {
+                                gzLastReport = Environment.TickCount64;
+                                double gzPct = gzLen > 0 ? Math.Min(inputStream.Position * 100.0 / gzLen, 99.9) : 0;
+                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                                {
+                                    CurrentFile = gzEntryKey,
+                                    PercentComplete = gzPct,
+                                    TotalBytes = gzLen,
+                                    ProcessedBytes = inputStream.Position,
+                                }));
+                            }
+                        }
                         successCount = 1;
                         // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
                         if (!(existedBefore && resolved == outputPath))
@@ -225,7 +261,9 @@ public class TarGzEngine : IArchiveEngine
             progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
             {
                 CurrentFile = string.Empty,
-                PercentComplete = 100
+                PercentComplete = 100,
+                TotalBytes = bytesTotal,
+                ProcessedBytes = bytesTotal
             }));
 
             CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
@@ -254,6 +292,8 @@ public class TarGzEngine : IArchiveEngine
                 var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
                 CoreLog.Info($"CompressAsync: {files.Count} files to compress");
 
+                long totalSourceBytes = 0; // 源文件未压缩字节总和（tar 逐文件累加，gz 为单文件大小）
+
                 if (isTarGz || ext == ".tar")
                 {
                     using var fileStream = File.Create(outputPath);
@@ -263,29 +303,55 @@ public class TarGzEngine : IArchiveEngine
                         CompressionLevel = options.CompressionLevel
                     });
 
+                    foreach (var (fullPath, _) in files)
+                        totalSourceBytes += SafeFileSize(fullPath);
+                    long bytesDone = 0;
+
                     int processedFiles = 0;
                     int totalFiles = files.Count;
                     foreach (var (fullPath, relativePath) in files)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        long srcSize = SafeFileSize(fullPath);
 
                         progress?.Report(new ArchiveProgress
                         {
                             CurrentFile = relativePath,
+                            // percent 语义保持文件计数基准不变（字节只挂在 ProcessedBytes 上）
                             PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
                             FilePercentComplete = 0,
                             TotalFiles = totalFiles,
-                            ProcessedFiles = processedFiles
+                            ProcessedFiles = processedFiles,
+                            TotalBytes = totalSourceBytes,
+                            ProcessedBytes = bytesDone
                         });
 
-                        if (!TarWriteFileWithRetry(fullPath, relativePath, options, writer, cancellationToken))
+                        long lastByteReport = Environment.TickCount64;
+                        if (!TarWriteFileWithRetry(fullPath, relativePath, options, writer, cancellationToken,
+                                onRead: read =>
+                                {
+                                    if (Environment.TickCount64 - lastByteReport < 100 && read < srcSize) return;
+                                    lastByteReport = Environment.TickCount64;
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        CurrentFile = relativePath,
+                                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
+                                        FilePercentComplete = srcSize > 0 ? Math.Min(read, srcSize) * 100.0 / srcSize : 100,
+                                        TotalFiles = totalFiles,
+                                        ProcessedFiles = processedFiles,
+                                        TotalBytes = totalSourceBytes,
+                                        ProcessedBytes = bytesDone + Math.Min(read, srcSize)
+                                    });
+                                }))
                         {
                             if (cancellationToken.IsCancellationRequested) break;
                             // 逐条目状态（D2）：读取失败被跳过（ErrorResolver Skip 或重试耗尽）→ Skipped
                             progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped });
+                            bytesDone += srcSize; // 跳过也计入已处理字节（ZipEngine.cs 先例）
                             continue;
                         }
                         processedFiles++;
+                        bytesDone += srcSize;
 
                         progress?.Report(new ArchiveProgress
                         {
@@ -302,15 +368,32 @@ public class TarGzEngine : IArchiveEngine
                 }
                 else if (ext == ".gz")
                 {
-                    // 单纯 GZip 压缩（单文件）
+                    // 单纯 GZip 压缩（单文件）— 单文件无文件计数语义，percent 采用 byte 基准
                     if (files.Count > 0)
                     {
                         using var outputStream = File.Create(outputPath);
                         using var gzipWriter = GZipWriter.OpenWriter(outputStream, new GZipWriterOptions(options.CompressionLevel));
 
+                        long gzSrcSize = SafeFileSize(files[0].FullPath);
+                        totalSourceBytes = gzSrcSize;
+                        long gzLastReport = Environment.TickCount64;
                         // 共享读：源文件可能正被编辑器以写权限持有
                         using var input = SharedReadStream.OpenRead(files[0].FullPath);
-                        gzipWriter.Write(Path.GetFileName(files[0].FullPath), input, null);
+                        using var progressInput = new ReadProgressStream(input, read =>
+                        {
+                            if (Environment.TickCount64 - gzLastReport < 100 && read < gzSrcSize) return;
+                            gzLastReport = Environment.TickCount64;
+                            double gzPct = gzSrcSize > 0 ? Math.Min(read * 100.0 / gzSrcSize, 99.9) : 0;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = Path.GetFileName(files[0].FullPath),
+                                PercentComplete = gzPct,
+                                FilePercentComplete = gzSrcSize > 0 ? Math.Min(read * 100.0 / gzSrcSize, 100) : 100,
+                                TotalBytes = gzSrcSize,
+                                ProcessedBytes = read,
+                            });
+                        });
+                        gzipWriter.Write(Path.GetFileName(files[0].FullPath), progressInput, null);
                     }
                 }
 
@@ -319,7 +402,9 @@ public class TarGzEngine : IArchiveEngine
                     CurrentFile = string.Empty,
                     PercentComplete = 100,
                     TotalFiles = files.Count,
-                    ProcessedFiles = files.Count
+                    ProcessedFiles = files.Count,
+                    TotalBytes = totalSourceBytes,
+                    ProcessedBytes = totalSourceBytes
                 });
 
                 CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
@@ -339,10 +424,31 @@ public class TarGzEngine : IArchiveEngine
     }
 
     /// <summary>
+    /// 求单文件未压缩字节数；目录或读取失败（含属性查询失败）返回 0，
+    /// 不阻断压缩（字节进度是尽力而为）。语义对齐 SevenZipEngine.SumSourceFileSizes 的单文件版。
+    /// </summary>
+    private static long SafeFileSize(string path)
+    {
+        try
+        {
+            var attrs = File.GetAttributes(path);
+            if ((attrs & FileAttributes.Directory) != 0) return 0;
+            return new FileInfo(path).Length;
+        }
+        catch (Exception ex)
+        {
+            CoreLog.Trace($"SafeFileSize skip {path}: {ex.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>
     /// 带重试/跳过/中止的 TAR 文件压缩。返回 false 表示跳过此文件。
     /// </summary>
+    /// <param name="onRead">可选的已读字节回调（传入时源流经 <see cref="ReadProgressStream"/> 包装，用于字节进度）。</param>
     private static bool TarWriteFileWithRetry(string fullPath, string relativePath,
-        ArchiveOptions options, SharpCompress.Writers.IWriter writer, CancellationToken ct)
+        ArchiveOptions options, SharpCompress.Writers.IWriter writer, CancellationToken ct,
+        Action<long>? onRead = null)
     {
         int retries = 3;
         while (retries > 0)
@@ -353,7 +459,11 @@ public class TarGzEngine : IArchiveEngine
                 var fi = new FileInfo(fullPath);
                 // 共享读：源文件可能正被 Word 等编辑器以写权限持有，File.OpenRead 会直接冲突
                 using var sourceStream = SharedReadStream.OpenRead(fullPath);
-                writer.Write(relativePath, sourceStream, fi.LastWriteTime);
+                using Stream readStream = onRead is null
+                    ? sourceStream
+                    : new ReadProgressStream(sourceStream, onRead);
+                // ReadProgressStream 保持可寻（TarWriter.Write 无显式 size 时会读 source.Length）
+                writer.Write(relativePath, readStream, fi.LastWriteTime);
                 return true;
             }
             catch (OperationCanceledException) { throw; }
@@ -619,12 +729,14 @@ public class TarGzEngine : IArchiveEngine
             CoreLog.Info($"ExtractEntriesAsync: format=tar.gz={isTarGz}, ext={ext}");
             int failedEntries = 0;
             var conflictStats = new ConflictStatsCounter();
+            long bytesTotal = 0; // 链尾最终报告使用
 
             if (isTarGz || ext == ".tar")
             {
                 // TAR 或 TAR.GZ — 单次顺序扫描，匹配 entryKeys 的条目按 override/默认路径输出
                 using var inputStream = File.OpenRead(archivePath);
                 var totalCompressedBytes = inputStream.Length;
+                bytesTotal = totalCompressedBytes;
                 using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
 
                 int processed = 0, targetFound = 0;
@@ -663,7 +775,9 @@ public class TarGzEngine : IArchiveEngine
                     {
                         CurrentFile = entryKey,
                         PercentComplete = Math.Min(compressedProgress, 99.9),
-                        FilePercentComplete = 0
+                        FilePercentComplete = 0,
+                        TotalBytes = totalCompressedBytes,
+                        ProcessedBytes = inputStream.Position
                     }));
 
                     var existedBefore = File.Exists(outputPath);
@@ -711,7 +825,9 @@ public class TarGzEngine : IArchiveEngine
                                     {
                                         CurrentFile = entryKey,
                                         PercentComplete = Math.Min(compressedProgress, 99.9),
-                                        FilePercentComplete = filePct
+                                        FilePercentComplete = filePct,
+                                        TotalBytes = totalCompressedBytes,
+                                        ProcessedBytes = inputStream.Position
                                     }));
                                     lastReportTime = now;
                                 }
@@ -735,7 +851,9 @@ public class TarGzEngine : IArchiveEngine
                                 PercentComplete = Math.Min(compressedProgress, 99.9),
                                 FilePercentComplete = 100,
                                 TotalFiles = targetFound,
-                                ProcessedFiles = processed
+                                ProcessedFiles = processed,
+                                TotalBytes = totalCompressedBytes,
+                                ProcessedBytes = inputStream.Position
                             }));
                             lastReportTime = now2;
                         }
@@ -764,7 +882,9 @@ public class TarGzEngine : IArchiveEngine
                     CurrentFile = string.Empty,
                     PercentComplete = 100,
                     TotalFiles = targetFound,
-                    ProcessedFiles = processed
+                    ProcessedFiles = processed,
+                    TotalBytes = bytesTotal,
+                    ProcessedBytes = bytesTotal
                 }));
             }
             else if (ext == ".gz")
@@ -798,7 +918,37 @@ public class TarGzEngine : IArchiveEngine
                         using var inputStream = File.OpenRead(archivePath);
                         using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
                         using var output = File.Create(resolved);
-                        gzipStream.CopyTo(output);
+                        // 手动缓冲循环：以压缩流位置为字节进度
+                        long gzLen = inputStream.Length;
+                        bytesTotal = gzLen;
+                        long gzLastReport = Environment.TickCount64;
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                        {
+                            CurrentFile = entryName,
+                            PercentComplete = 0,
+                            FilePercentComplete = 0,
+                            TotalBytes = gzLen,
+                            ProcessedBytes = 0,
+                        }));
+                        var gzBuffer = new byte[CopyBufferSize];
+                        int gzRead;
+                        while ((gzRead = gzipStream.Read(gzBuffer, 0, gzBuffer.Length)) > 0)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            output.Write(gzBuffer, 0, gzRead);
+                            if (Environment.TickCount64 - gzLastReport >= 100)
+                            {
+                                gzLastReport = Environment.TickCount64;
+                                double gzPct = gzLen > 0 ? Math.Min(inputStream.Position * 100.0 / gzLen, 99.9) : 0;
+                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                                {
+                                    CurrentFile = entryName,
+                                    PercentComplete = gzPct,
+                                    TotalBytes = gzLen,
+                                    ProcessedBytes = inputStream.Position,
+                                }));
+                            }
+                        }
                         // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
                         if (!(existedBefore && resolved == outputPath))
                             progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Completed });
@@ -824,7 +974,9 @@ public class TarGzEngine : IArchiveEngine
                 progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = entryName,
-                    PercentComplete = 100
+                    PercentComplete = 100,
+                    TotalBytes = bytesTotal,
+                    ProcessedBytes = bytesTotal
                 }));
             }
 

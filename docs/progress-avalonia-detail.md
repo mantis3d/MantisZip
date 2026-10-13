@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-13** — 进度窗口字节埋点全格式生效 + 语言即时刷新（Avalonia + Core，[progress-window-bytes-i18n.md](../.omo/plans/已完成/progress-window-bytes-i18n.md) 任务 1–7）
+  - **字节埋点全格式（Core）**：`SevenZipEngine` 全路径填充 `ArchiveProgress.ProcessedBytes`/`TotalBytes`——`ExtractAsync`/`ExtractEntriesAsync` 用真实写入字节（跳过条目 `processedBytes += entry.Size` 计入，回调值 `processedBytes + Math.Min(bytesWritten, entrySize)` 钳制防回退，最终报告强制 `Processed == Total`）；`CompressAsync`/`AddToArchiveAsync` 用百分比推算 `totalSourceBytes × accumulatedPercent / 100`（新增 `SumSourceFileSizes`，`totalSourceBytes` 声明提前出 `using` 作用域供最终报告用）；`DeleteEntriesAsync` 三段单调映射（提取段 `extractPct = pct × 0.5`、重打包段 `50 + 0.5p`，字节从映射后 percent 重算）。`TarGzEngine` 解压以压缩流 `Position` 为字节进度（tar 分支 `TotalBytes = inputStream.Length`）、gz 分支两处 `CopyTo` 改手动缓冲循环按 `Position / gzLen` 报告；压缩侧新增 `Core/Utils/ReadProgressStream.cs`（`WriteProgressStream` 镜像，`Read`/`ReadAsync` 累加已读字节回调；**保持可寻**（`CanSeek`/`Seek`/`Position`/`Length` 代理内层）以规避 `TarWriter.Write` 无显式 size 时的 "Seekable stream is required" 异常），经 `TarWriteFileWithRetry` 新增 `onRead` 形参接入 tar 多文件循环（tar percent 仍为文件计数基准，字节独立上报），gz 单文件分支按 byte 基准报 percent（新增 `SafeFileSize` 辅助）。
+  - **同步报告根治字节回退**：`AttachCompressorProgress` 由事件内 `System.Progress<T>` 异步派发改**同步 `progress.Report`**（异步派发使低百分比回调晚于最终 100% 报告到达，实测 `ProcessedBytes` 回退 `98304 → 81592`），并新增 `percentBase`/`percentScale` 形参承载删除重打包段的 `50 + 0.5p` 映射（替代原 `new Progress<>` 包装）。
+  - **语言即时刷新（Avalonia）**：`ProgressViewModel` ctor 抽取 `FillLocalizedStrings()`（49 键）并订阅 `LocalizationManager.CultureChanged`（`EventHandler`，处理器 `OnCultureChanged(object? sender, EventArgs e)`，不 dispatch，参照 `PreviewViewModel`）；`OnCultureChanged` 重灌静态文案 + `OnPropertyChanged(nameof(LocalizedStrings))`，并按缓存字段（`_lastSpeedBytesPerSec`/`_lastEtaSeconds`/`_lastFileCountCurrent·Total·IsBatch`）重渲速度/剩余时间/文件计数/批次序号/统计栏/统计卡短标签（空值守卫不把未上报项填成 0）。新增 `public void DetachLocalization()` 退订；`ProgressWindow.OnClosed` 在 `_vm.PauseEvent.Set()` 后调用（修复全仓首个 `CultureChanged -=` 泄漏闭环）。
+  - **计划/文档回写**：`progress-window-prototype-alignment.md` Deferred #2/#3 由「已转入」改「已实施」；`docs/PLAN.md` 本计划行状态 → ✅已完 + 交付说明。
+  - **验证**：`lsp_diagnostics` 不可用（本机未装 C# LSP，`csharp: missing`），以 `dotnet build` 0 错误为等价门控；Core **667 通过 / 0 失败 / 3 跳过**（+6 字节单调断言：7z ExtractAsync/CompressAsync/DeleteEntriesAsync + TarGz ExtractAsync/CompressAsync/gz roundtrip），Avalonia **200 通过 / 0 失败 / 3 跳过**（+2：`CultureChanged_RefreshesLocalizedStrings`/`DetachLocalization_PreventsCultureChangedRefresh`）；两处测试均改为同步 `IProgress`（刻意不用 `System.Progress<T>`，其线程池异步派发会打乱字节单调性断言顺序）。
+
 **2026-10-12** — 计划文档状态整理：2 个已实施计划移入「已完成」（计划类，规则 1 同步）
   - **移目录**：`progress-stats-cards-three-row.md`（2026-10-09 已实施：VM 5 新字段 + 3 累加器 + `DashBrushConverter` 动态格 5 处 + 5 卡三行 XAML + 7 单测）、`progress-window-enhancement.md`（T1–T9 已实施：路径/文件名分离、实时统计栏、时间/ETA、ZIP 并行批次详细行、批处理密码徽标、`PasswordRetryLoop` 兜底，计算逻辑抽 Core `ProgressDisplayCalculator`；UI 部分已被 prototype-alignment 推翻重做，F3 并入对齐计划收口，本计划无剩余独立任务）由 `.omo/plans/未开始/` 移至 `.omo/plans/已完成/`，头部补/改 ✅ 已实施状态行（enhancement 为新增效力状态块）。
   - **状态行修正（2 个既有已完成计划此前误留「待实施」）**：`progress-window-channel-info.md`、`progress-file-compression-ratio.md` 头部状态改 ✅ 已实施（2026-10-10 落地）。
@@ -2184,6 +2191,12 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.2 (2026-10-13) 三引擎进度字节埋点全覆盖 + `ReadProgressStream`
+  - **`SevenZipEngine`**：`ExtractAsync`/`ExtractEntriesAsync` 每份常规报告携带 `TotalBytes`（非目录条目 Size 和；过滤解压仅统计命中条目）+ 单调递增 `ProcessedBytes`（跳过累加、回调钳制 `processedBytes + Math.Min(bytesWritten, entrySize)`、最终 `Processed == Total`）；`CompressAsync`/`AddToArchiveAsync` 按 percent 推算（`SumSourceFileSizes` 求源文件未压缩总和，`totalSourceBytes` 声明提到 `using` 作用域外供最终报告）；`DeleteEntriesAsync` 提取 0-50% + 重打包 `50 + 0.5p` 三段单调（`keepEntries` 扩为三元组含 size）。`AttachCompressorProgress` 改同步 Report + `percentBase`/`percentScale` 形参。
+  - **`TarGzEngine`**：解压 tar 分支 `TotalBytes = inputStream.Length`、`ProcessedBytes = inputStream.Position`，gz 分支 `CopyTo` 改手动缓冲循环；压缩侧新增 `SafeFileSize`，tar 多文件循环经 `TarWriteFileWithRetry` 新增 `onRead` 形参接入 `ReadProgressStream`（percent 保持文件计数基准，字节独立真实读取），gz 单文件分支按 byte 基准报 percent；最终报告 `Processed == Total`。
+  - **`Core/Utils/ReadProgressStream.cs`（新增）**：`WriteProgressStream` 镜像包装只读流，`Read`/`ReadAsync` 累加已读字节回调 `onRead(totalRead)`；保持可寻（代理内层 `CanSeek`/`Seek`/`Position`/`Length`）以规避 `TarWriter.Write` 未显式传 size 时的 "Seekable stream is required if no size is given."。
+  - **测试**：`SevenZipEngineTests` +3（ExtractAsync/CompressAsync/DeleteEntriesAsync 字节单调断言，`AssertByteProgressMonotonic` + 同步 `OrderedProgressCollector`）、`TarGzEngineTests` +3（ExtractAsync/CompressAsync/gz roundtrip）。Core 全量 667 通过 / 0 失败 / 3 跳过。
 
 #### v0.5.2 (2026-10-12) 智能并行解压 Core 三组件（DiskTypeDetector / ParallelDegreeOptimizer / ParallelDegreeResolver）
   - **`Core/Utils/DiskTypeDetector.cs`（新增）**：`DeviceIoControl` 打开 `\\.\C:` 卷设备句柄（access=0）读 `SeekPenalty` 判 SSD/HDD，盘符缓存（`OrdinalIgnoreCase`，`Unknown` 不缓存），枚举 `DiskType{ Ssd, Hdd, Unknown }`。
