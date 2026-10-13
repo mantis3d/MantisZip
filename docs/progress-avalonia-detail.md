@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-13** — UI 控件测试窗口补充缺失控件变体 + 修复 AVLN5001 弃用警告（开发者诊断工具，规则 13 豁免本地化）
+  - **补充 7 区块**（`Views/UiTestWindow.axaml`）：① PathIcon 尺寸矩阵（同一 Geometry 在 10/11/12/13/14/16/22/24/64px 下的渲染，左组显式 `Foreground` vs 右组不设的继承陷阱对比）；② 图标+文字组合按钮（Button Content 嵌套 StackPanel + 14px PathIcon，含禁用态）；③ 带 Command 按钮（`RelayCommand` 绑定 + 快捷键提示）；④ ComboBox ItemTemplate（自定义项模板 PathIcon + TextBlock）；⑤ ToggleIconBox（规则 4 类样式，开/开硬编码/关硬编码/隐藏 4 态 + `BoolToToggleBgBrushConverter`）；⑥ TabItemExtensions.TabIcon（附加属性页签头图标）；⑦ Image Stretch 模式对比（Uniform/Fill/None，120×120 容器）。DataGrid 增图标列（`DataGridTemplateColumn`）+ `SortMemberPath` + `CanUserSortColumns="True"`。
+  - **ViewModel**（`ViewModels/UiTestViewModel.cs`）：新增 `CommandButtonText`/`ToggleIconBool` 属性 + `TestCommand` RelayCommand（执行后回填当前时间戳验证命令绑定）。
+  - **警告修复**：`NumericUpDown.Watermark`（Avalonia 12 弃用）→ `PlaceholderText`，消除 AVLN5001。
+  - **验证**：构建 0 错误 0 警告；新增区块均带中文注释（规则 14）+ 全主题资源键无硬编码色（规则 4）；窗口级 `BoolToToggleBgBrushConverter` 资源声明与 `MainWindow.axaml` 同模式。
+
 **2026-10-13** — SixLabors.ImageSharp 社区许可证配置（依赖/许可管理）
   - **背景**：ImageSharp 4.1.3 起构建期强制校验许可证，无 key 时 Debug 降级为警告、Release 直接失败（`.targets` 的 `ContinueOnError="$(Configuration.StartsWith('Debug'))"`）。曾评估三方案——降级 3.2.0（无效，v3 线自 3.2.0 起同样强制）、替换 SkiaSharp（TGA 无 codec + APNG 帧延迟元数据不覆盖）、社区许可证（改动最小、免费、保留 4.1.3 漏洞全清）。
   - **实施**：`licensing.sixlabors.com` 以 OpenSource 类别申请（assembly-scoped key，绑定 `MantisZip.UI.Avalonia`）；`sixlabors.lic` 置于 `src/MantisZip.UI.Avalonia/` 并随仓库提交（2026-10-09 官方新政策明确允许 assembly-scoped 社区 key 公开提交）；`MantisZip.UI.Avalonia.csproj` 新增 `<SixLaborsLicenseFile>` 显式指向该文件（默认递归搜索在部分场景未命中）。

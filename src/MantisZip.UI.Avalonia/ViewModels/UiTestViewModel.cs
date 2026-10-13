@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
@@ -53,6 +54,17 @@ public partial class UiTestViewModel : ObservableObject
     [ObservableProperty] private DateTime? _calendarDate = DateTime.Today;
     [ObservableProperty] private string _autoCompletePath = @"D:\";
     [ObservableProperty] private string _quickPath = @"D:\下载";
+
+    // ── 新增：PathIcon / ToggleIconBox / Command 按钮 / Image 演示 ──
+    [ObservableProperty] private string _commandButtonText = "点击执行命令";
+    [ObservableProperty] private bool _toggleIconBool = true;
+
+    /// <summary>测试 RelayCommand：执行后更新按钮文本为当前时间。</summary>
+    [RelayCommand]
+    private void TestCommand()
+    {
+        CommandButtonText = $"命令已执行 {DateTime.Now:HH:mm:ss}";
+    }
 
     // ── 列表与数据组 ──
     /// <summary>文件列表（ListBox / DataGrid / ItemsControl 共用同一份数据）。</summary>

@@ -10,12 +10,18 @@
         xmlns:vm="using:MantisZip.UI.Avalonia.ViewModels"
         xmlns:models="using:MantisZip.UI.Avalonia.Models"
         xmlns:controls="using:MantisZip.UI.Avalonia.Controls"
+        xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
         x:DataType="vm:UiTestViewModel"
         Title="UI 控件测试窗口"
         Width="1150" Height="820" MinWidth="960" MinHeight="640"
         WindowStartupLocation="CenterOwner"
         Background="{DynamicResource ThemeWindowBgBrush}"
         Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+
+  <!-- 窗口级资源：ToggleIconBox 背景转换器 -->
+  <Window.Resources>
+    <conv:BoolToToggleBgBrushConverter x:Key="BoolToToggleBgBrushConverter" />
+  </Window.Resources>
 
   <DockPanel Margin="{DynamicResource SpacingMdThk}" LastChildFill="True">
     <!-- 顶部说明栏 -->
@@ -188,6 +194,151 @@
               </StackPanel>
             </Border>
 
+            <!-- Block A：PathIcon 尺寸矩阵 — 显式 Foreground vs 继承父控件对比 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="PathIcon 尺寸矩阵（同一 Geometry 图标不同尺寸）" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" TextWrapping="Wrap"
+                           Text="PathIcon 不继承父控件 Foreground（规则 4），必须显式设置；右侧组演示未设置 Foreground 的陷阱效果。" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <!-- 左组：显式 Foreground（正确用法） -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource ThemeAccentBrush}"
+                               Text="显式 Foreground（正确）" />
+                    <WrapPanel>
+                      <PathIcon Data="{StaticResource IconSettings}" Width="10" Height="10" Margin="2"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="11" Height="11" Margin="2"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="12" Height="12" Margin="2"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="13" Height="13" Margin="2"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Margin="2"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="16" Height="16" Margin="2"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="22" Height="22" Margin="2"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="24" Height="24" Margin="2"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="64" Height="64" Margin="2"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    </WrapPanel>
+                    <!-- 尺寸标注 -->
+                    <WrapPanel>
+                      <TextBlock FontSize="10" Text="10" Width="14" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="11" Width="15" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="12" Width="16" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="13" Width="17" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="14" Width="18" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="16" Width="20" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="22" Width="26" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="24" Width="28" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="64" Width="68" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    </WrapPanel>
+                  </StackPanel>
+                  <!-- 右组：未设置 Foreground（陷阱演示 — 图标将呈黑色不可见） -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               Text="继承父控件（陷阱）" />
+                    <WrapPanel>
+                      <PathIcon Data="{StaticResource IconSettings}" Width="10" Height="10" Margin="2" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="11" Height="11" Margin="2" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="12" Height="12" Margin="2" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="13" Height="13" Margin="2" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Margin="2" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="16" Height="16" Margin="2" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="22" Height="22" Margin="2" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="24" Height="24" Margin="2" />
+                      <PathIcon Data="{StaticResource IconSettings}" Width="64" Height="64" Margin="2" />
+                    </WrapPanel>
+                    <!-- 尺寸标注 -->
+                    <WrapPanel>
+                      <TextBlock FontSize="10" Text="10" Width="14" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="11" Width="15" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="12" Width="16" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="13" Width="17" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="14" Width="18" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="16" Width="20" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="22" Width="26" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="24" Width="28" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <TextBlock FontSize="10" Text="64" Width="68" TextAlignment="Center"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    </WrapPanel>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- Block B：图标+文字组合按钮 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="图标+文字组合按钮（Button Content 嵌套 StackPanel + PathIcon）" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <!-- 正常状态：PathIcon + TextBlock 横向排列 -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="正常" />
+                    <Button>
+                      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                        <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14"
+                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="图标+文字按钮" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                  <!-- 禁用状态 -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="禁用" />
+                    <Button IsEnabled="False">
+                      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                        <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14"
+                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" VerticalAlignment="Center" />
+                        <TextBlock Text="图标+文字按钮" VerticalAlignment="Center" />
+                      </StackPanel>
+                    </Button>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- Block C：带 Command 按钮（RelayCommand 绑定演示） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="带 Command 按钮（RelayCommand 绑定演示）" FontSize="13" FontWeight="SemiBold" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <!-- Command 绑定按钮：点击后 CommandButtonText 更新为当前时间 -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="Command 绑定" />
+                    <Button Command="{Binding TestCommand}" Content="{Binding CommandButtonText}" />
+                  </StackPanel>
+                </StackPanel>
+                <!-- 快捷键提示 -->
+                <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           Text="快捷键提示：Ctrl+T" />
+              </StackPanel>
+            </Border>
+
           </StackPanel>
         </ScrollViewer>
       </TabItem>
@@ -357,7 +508,7 @@
                   <!-- 7 水印 -->
                   <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="水印（Watermark）" />
-                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" Watermark="输入数值" />
+                    <NumericUpDown Width="140" Minimum="0" Maximum="1000" PlaceholderText="输入数值" />
                   </StackPanel>
                   <!-- 8 文本右对齐 -->
                   <StackPanel Width="210" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
@@ -478,6 +629,32 @@
               </StackPanel>
             </Border>
 
+            <!-- Block D：ComboBox ItemTemplate — 自定义项模板（PathIcon + TextBlock） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="ComboBox ItemTemplate（自定义项模板：图标 + 文字）" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" TextWrapping="Wrap"
+                           Text="使用 ItemTemplate 自定义下拉项显示，每项包含 PathIcon 与文本。" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="带图标下拉框" />
+                    <ComboBox ItemsSource="{Binding Formats}" SelectedItem="{Binding SelectedFormat}" Width="200">
+                      <ComboBox.ItemTemplate>
+                        <DataTemplate>
+                          <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                            <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14"
+                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" VerticalAlignment="Center" />
+                            <TextBlock Text="{Binding}" VerticalAlignment="Center" />
+                          </StackPanel>
+                        </DataTemplate>
+                      </ComboBox.ItemTemplate>
+                    </ComboBox>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
           </StackPanel>
         </ScrollViewer>
       </TabItem>
@@ -582,20 +759,37 @@
               </StackPanel>
             </Border>
 
-            <!-- DataGrid 文件条目 -->
+            <!-- DataGrid 文件条目（含图标列 + 排序演示 + 内嵌比例条） -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
               <StackPanel Spacing="{DynamicResource SpacingSm}">
-                <TextBlock Text="DataGrid 文件条目（含内嵌比例条）" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock Text="DataGrid 文件条目（含图标列 + 排序演示 + 内嵌比例条）" FontSize="13" FontWeight="SemiBold" />
                 <DataGrid ItemsSource="{Binding Entries}" Height="280"
                           RowHeight="{DynamicResource ControlHeightMd}" AutoGenerateColumns="False"
                           IsReadOnly="True" GridLinesVisibility="Horizontal"
+                          CanUserSortColumns="True"
                           HeadersVisibility="Column">
                   <DataGrid.Columns>
-                    <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" MinWidth="150" />
-                    <DataGridTextColumn Header="类型" Binding="{Binding Type}" Width="90" />
-                    <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="80" />
-                    <DataGridTextColumn Header="压缩后" Binding="{Binding CompressedDisplay}" Width="80" />
+                    <!-- 图标列：PathIcon 展示文件类型图标 -->
+                    <DataGridTemplateColumn Header="图标" Width="Auto">
+                      <DataGridTemplateColumn.CellTemplate>
+                        <DataTemplate x:DataType="vm:UiTestEntry">
+                          <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14"
+                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                    HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </DataTemplate>
+                      </DataGridTemplateColumn.CellTemplate>
+                    </DataGridTemplateColumn>
+                    <!-- 文本列：SortMemberPath 指定排序字段 -->
+                    <DataGridTextColumn Header="名称" Binding="{Binding Name}" Width="*" MinWidth="150"
+                                        SortMemberPath="Name" />
+                    <DataGridTextColumn Header="类型" Binding="{Binding Type}" Width="90"
+                                        SortMemberPath="Type" />
+                    <DataGridTextColumn Header="大小" Binding="{Binding SizeDisplay}" Width="80"
+                                        SortMemberPath="SizeDisplay" />
+                    <DataGridTextColumn Header="压缩后" Binding="{Binding CompressedDisplay}" Width="80"
+                                        SortMemberPath="CompressedDisplay" />
+                    <!-- 比例条列（模板列） -->
                     <DataGridTemplateColumn Header="压缩比" Width="150">
                       <DataGridTemplateColumn.CellTemplate>
                         <DataTemplate x:DataType="vm:UiTestEntry">
@@ -604,7 +798,8 @@
                         </DataTemplate>
                       </DataGridTemplateColumn.CellTemplate>
                     </DataGridTemplateColumn>
-                    <DataGridTextColumn Header="修改时间" Binding="{Binding Modified}" Width="130" />
+                    <DataGridTextColumn Header="修改时间" Binding="{Binding Modified}" Width="130"
+                                        SortMemberPath="Modified" />
                   </DataGrid.Columns>
                 </DataGrid>
               </StackPanel>
@@ -786,6 +981,78 @@
                   </TabItem>
                   <TabItem Header="高级" IsEnabled="False">
                     <TextBlock Text="禁用页" Margin="12" />
+                  </TabItem>
+                </TabControl>
+              </StackPanel>
+            </Border>
+
+            <!-- Block E：ToggleIconBox — 规则 4 定义的切换图标类样式 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="ToggleIconBox：规则 4 定义的切换图标类样式" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" TextWrapping="Wrap"
+                           Text="16×16 Border + 10×10 PathIcon，Background 经 BoolToToggleBgBrushConverter 绑定：true 为强调色底，false 为透明空心。" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <!-- 开状态（ToggleIconBool = true）：月亮图标 -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="开（ToggleIconBool=true）" />
+                    <Border Classes="ToggleIconBox"
+                            Background="{Binding ToggleIconBool, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                      <PathIcon Data="{StaticResource IconMoon}" Width="10" Height="10"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                  </StackPanel>
+                  <!-- 开状态（硬编码 true）：柱状图图标 -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="开（true 硬编码）" />
+                    <Border Classes="ToggleIconBox"
+                            Background="{Binding Source=True, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                      <PathIcon Data="{StaticResource IconDataBarVertical}" Width="10" Height="10"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                  </StackPanel>
+                  <!-- 关状态（硬编码 false）：眼睛图标 -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="关（false 硬编码）" />
+                    <Border Classes="ToggleIconBox"
+                            Background="{Binding Source=False, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                      <PathIcon Data="{StaticResource IconEye}" Width="10" Height="10"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                  </StackPanel>
+                  <!-- 隐藏状态：IsVisible=False -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="隐藏（IsVisible=False）" />
+                    <Border Classes="ToggleIconBox" IsVisible="False"
+                            Background="{Binding Source=True, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+                      <PathIcon Data="{StaticResource IconMoon}" Width="10" Height="10"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- Block F：TabItemExtensions.TabIcon — 附加属性页签图标演示 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="TabItemExtensions.TabIcon — 附加属性页签图标" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" TextWrapping="Wrap"
+                           Text="TabItemExtensions.TabIcon 附加属性在页签头显示矢量图标（App.axaml 定义样式）。" />
+                <TabControl Height="120">
+                  <!-- 页签 1：齿轮图标 -->
+                  <TabItem Header="设置" controls:TabItemExtensions.TabIcon="IconSettings">
+                    <TextBlock Text="设置页内容" Margin="12" />
+                  </TabItem>
+                  <!-- 页签 2：文件夹图标 -->
+                  <TabItem Header="文件" controls:TabItemExtensions.TabIcon="IconFolder">
+                    <TextBlock Text="文件页内容" Margin="12" />
                   </TabItem>
                 </TabControl>
               </StackPanel>
@@ -1008,6 +1275,48 @@
                       <TextBlock Text="Left" FontSize="12" ToolTip.Tip="左方向提示" ToolTip.Placement="Left" />
                       <TextBlock Text="Right" FontSize="12" ToolTip.Tip="右方向提示" ToolTip.Placement="Right" />
                     </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+              </StackPanel>
+            </Border>
+
+            <!-- Block G：Image 控件 Stretch 模式对比（同一图像三种缩放模式） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="Image 控件 Stretch 模式对比" FontSize="13" FontWeight="SemiBold" />
+                <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" TextWrapping="Wrap"
+                           Text="同一图像（App.ico）在固定 120×120 容器内的三种 Stretch 模式：Uniform 等比缩放 / Fill 拉伸填充 / None 原始尺寸。" />
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingLg}" HorizontalAlignment="Left">
+                  <!-- Stretch=Uniform：等比缩放，完整显示在容器内 -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="Uniform（等比缩放）" />
+                    <Border Width="120" Height="120" BorderBrush="{DynamicResource ThemeBorderBrush}"
+                            BorderThickness="1" CornerRadius="4"
+                            Background="{DynamicResource ThemeSurfaceBgBrush}">
+                      <Image Source="avares://MantisZip.UI.Avalonia/Resources/App.ico"
+                             Stretch="Uniform" Width="120" Height="120" />
+                    </Border>
+                  </StackPanel>
+                  <!-- Stretch=Fill：拉伸填充整个容器，可能变形 -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="Fill（拉伸填充）" />
+                    <Border Width="120" Height="120" BorderBrush="{DynamicResource ThemeBorderBrush}"
+                            BorderThickness="1" CornerRadius="4"
+                            Background="{DynamicResource ThemeSurfaceBgBrush}">
+                      <Image Source="avares://MantisZip.UI.Avalonia/Resources/App.ico"
+                             Stretch="Fill" Width="120" Height="120" />
+                    </Border>
+                  </StackPanel>
+                  <!-- Stretch=None：原始尺寸，超出裁剪 -->
+                  <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                    <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="None（原始尺寸）" />
+                    <Border Width="120" Height="120" BorderBrush="{DynamicResource ThemeBorderBrush}"
+                            BorderThickness="1" CornerRadius="4" ClipToBounds="True"
+                            Background="{DynamicResource ThemeSurfaceBgBrush}">
+                      <Image Source="avares://MantisZip.UI.Avalonia/Resources/App.ico"
+                             Stretch="None" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
                   </StackPanel>
                 </StackPanel>
               </StackPanel>
