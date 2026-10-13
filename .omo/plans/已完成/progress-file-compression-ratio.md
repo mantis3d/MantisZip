@@ -1,6 +1,6 @@
 # 进度窗口逐文件压缩后大小 + 压缩率 + 整体压缩汇总（列表列 + 统计卡段2）
 
-> **状态**: 📋 设计已确认（2026-10-10 讨论定稿），待实施
+> **状态**: ✅ 已实施（2026-10-10 Task 1–5 落地：ZIP 后置回填压缩后大小 + 列表列 + 统计卡段 2 整体汇总，见 `docs/progress-avalonia-detail.md` 2026-10-10 条目；2026-10-12 计划整理修正状态行——此前误留「待实施」）
 >
 > **For agentic workers:** 本文档是设计规格 + 任务分解（澄清确认已定稿，见「已确认设计决策」；文末「任务分解」含 checkbox 步骤）。执行时使用 superpowers:subagent-driven-development 或 superpowers:executing-plans。
 
