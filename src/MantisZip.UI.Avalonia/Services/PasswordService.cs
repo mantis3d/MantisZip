@@ -103,6 +103,36 @@ public class PasswordService
     }
 
     /// <summary>
+    /// 判断压缩包是否含加密条目。用于避免对**非加密包**误报「密码匹配」——
+    /// <see cref="QuickVerifyPassword"/> 在无加密条目时对任意密码都返回 true，
+    /// 调用方（如 CLI 的 ResolveCliPassword）据此会误判为已匹配并点亮密码徽标。
+    /// 检测异常（如加密头 7z 未给密码）时保守返回 true，不影响真正的加密包密码流程。
+    /// </summary>
+    public bool HasEncryptedEntries(string archivePath, IArchiveEngine engine, string? password = null)
+    {
+        try
+        {
+            if (engine is ZipEngine)
+            {
+                using var fs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                using var archive = ZipArchive.OpenArchive(fs, new ReaderOptions { Password = password });
+                return archive.Entries.Any(e => e.IsEncrypted);
+            }
+            if (engine is SevenZipEngine)
+            {
+                using var extractor = new SharpSevenZipExtractor(archivePath, password);
+                return extractor.ArchiveFileData.Any(e => !e.IsDirectory && e.Encrypted);
+            }
+        }
+        catch
+        {
+            // 检测失败（加密头 7z 无密码等）→ 保守视为加密，保持既有密码流程
+            return true;
+        }
+        return true;   // 未知引擎：保守视为加密，不改变既有行为
+    }
+
+    /// <summary>
     /// 从已保存密码中匹配并快速验证。返回 (密码, 描述) 或 null。
     /// limitReached 表示匹配到的密码超过上限（防暴力破解），已截断。
     /// </summary>

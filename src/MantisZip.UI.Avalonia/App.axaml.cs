@@ -791,13 +791,22 @@ public partial class App : Application
     {
         try
         {
+            var service = new PasswordService();
+
+            // 方案 A：非加密包不做密码匹配。否则 QuickVerifyPassword 在包无加密条目时对任意密码
+            // 恒返回 true → 误判「密码匹配成功」→ 进度窗口批处理行点亮只应在加密包出现的 🔑 徽标。
+            if (!service.HasEncryptedEntries(archivePath, engine))
+            {
+                DebugLog($"CLI extract: '{archivePath}' has no encrypted entries, skipping password matching");
+                return null;
+            }
+
             var allMatches = PasswordManager.Instance.FindMatchingPasswords(archivePath);
             foreach (var entry in allMatches)
             {
                 var pwd = entry.Password;
                 if (string.IsNullOrEmpty(pwd)) continue;
 
-                var service = new PasswordService();
                 var verifyInfo = service.QuickVerifyPasswordEx(archivePath, pwd, engine);
                 if (verifyInfo.Result == PasswordVerificationResult.Success)
                 {
