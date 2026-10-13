@@ -54,6 +54,15 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>本次操作开始时间（UTC；ctor/InitBatchMode 重置，SetProgress 首报兜底）。</summary>
     private DateTime _opStartUtc;
 
+    /// <summary>当前冻结段的起点（null = 未冻结）。暂停/模态弹窗期间不计入已用时间。</summary>
+    private DateTime? _clockFrozenSinceUtc;
+
+    /// <summary>已结算的历史冻结总时长。</summary>
+    private TimeSpan _clockFrozenTotal;
+
+    /// <summary>模态弹窗冻结计数（冲突/密码弹窗，防嵌套）。</summary>
+    private int _modalFreezeCount;
+
     /// <summary>已处理文件数（引擎上报；兼容重载 TotalFiles=0 时不清零）。</summary>
     private long _statsProcessed;
 
@@ -281,6 +290,16 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private bool _isPaused;
 
+    // 暂停/继续直接改 IsPaused（TogglePause 与 PauseFromConflict 均如此）→ 冻结/解冻自动跟随
+    partial void OnIsPausedChanged(bool value)
+    {
+        // 暂停：保存当前状态文本；恢复：还原（取代旧的永久"正在恢复"文案）
+        _statusBeforePause = value ? StatusMessage : _statusBeforePause;
+        if (!value && _statusBeforePause is not null)
+            StatusMessage = _statusBeforePause;
+        UpdateClockFreezeState();
+    }
+
     [ObservableProperty]
     private bool _hasErrors;
 
@@ -333,6 +352,10 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private bool _isCancelEnabled = true;
 
+    /// <summary>是否显示暂停按钮（完成/失败终态隐藏——操作已结束，暂停无意义）。</summary>
+    [ObservableProperty]
+    private bool _isPauseButtonVisible = true;
+
     /// <summary>Is the keep-open toggle currently checked (📌 pinned open).</summary>
     [ObservableProperty]
     private bool _keepOpenOnComplete;
@@ -340,6 +363,12 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>自动关闭倒计时可见（仅延时等待期间 true；📌/失败/测试流为手动等待不显示）。</summary>
     [ObservableProperty]
     private bool _autoCloseCountdownVisible;
+
+    partial void OnKeepOpenOnCompleteChanged(bool value)
+    {
+        // 📌 钉住 → 隐藏倒计时组（手动等待无倒计时）；不自动恢复（切手动等待是单向的）
+        if (value) AutoCloseCountdownVisible = false;
+    }
 
     /// <summary>当前状态类别：驱动状态行左侧状态图标（图标始终存在且始终对应当前状态）。</summary>
     [ObservableProperty]
@@ -713,7 +742,6 @@ public partial class ProgressViewModel : ObservableObject
             // Paused → resume
             _pauseEvent.Set();
             IsPaused = false;
-            StatusMessage = LocalizationManager.T("Progress_Resuming");
             StatusKind = ProgressStatusKind.Running;
         }
     }
@@ -738,6 +766,8 @@ public partial class ProgressViewModel : ObservableObject
 
     private bool _isPreparing;
     private string? _preparingText;
+    /// <summary>暂停前的状态文本（恢复时还原，取代永久停留的"正在恢复"）。</summary>
+    private string? _statusBeforePause;
 
     /// <summary>
     /// 进入准备态：总进度条以不定进度滚动 + 状态行提示「正在准备…」。
@@ -760,7 +790,7 @@ public partial class ProgressViewModel : ObservableObject
         _isPreparing = false;
         IsIndeterminate = false;
         if (StatusMessage == _preparingText)
-            StatusMessage = null;
+            StatusMessage = string.IsNullOrEmpty(WindowTitle) ? null : WindowTitle;
         if (StatusKind == ProgressStatusKind.Preparing)
             StatusKind = ProgressStatusKind.Running;
     }
@@ -1235,12 +1265,50 @@ public partial class ProgressViewModel : ObservableObject
         return string.Join(" ", parts);
     }
 
-    /// <summary>刷新"已用时"文本（code-behind DispatcherTimer 每 1s 调用；未开始时跳过）。</summary>
+    /// <summary>模态弹窗（冲突/密码）弹出：已用时间开始冻结。均在 UI 线程调用，无需加锁。</summary>
+    public void BeginModalFreeze()
+    {
+        _modalFreezeCount++;
+        UpdateClockFreezeState();
+    }
+
+    /// <summary>模态弹窗关闭：解除冻结（若此时仍处于暂停态，冻结由 IsPaused 延续）。</summary>
+    public void EndModalFreeze()
+    {
+        if (_modalFreezeCount > 0) _modalFreezeCount--;
+        UpdateClockFreezeState();
+    }
+
+    /// <summary>
+    /// 冻结状态机：冻结条件 = 暂停 或 有未结算的模态弹窗。
+    /// 进入冻结记起点，退出冻结把本段时长累加进 <see cref="_clockFrozenTotal"/>。
+    /// </summary>
+    private void UpdateClockFreezeState()
+    {
+        bool shouldFreeze = IsPaused || _modalFreezeCount > 0;
+        if (shouldFreeze && _clockFrozenSinceUtc == null)
+        {
+            _clockFrozenSinceUtc = DateTime.UtcNow;
+        }
+        else if (!shouldFreeze && _clockFrozenSinceUtc is { } frozenSince)
+        {
+            _clockFrozenTotal += DateTime.UtcNow - frozenSince;
+            _clockFrozenSinceUtc = null;
+        }
+    }
+
+    /// <summary>刷新"已用时"文本（code-behind DispatcherTimer 每 1s 调用；未开始时跳过）。
+    /// 冻结期间（暂停/模态弹窗）不计入已用时间。</summary>
     public void RefreshTimeDisplay()
     {
         if (_opStartUtc == default) return;
+        var now = DateTime.UtcNow;
+        var elapsed = now - _opStartUtc - _clockFrozenTotal;
+        if (_clockFrozenSinceUtc is { } frozenSince)
+            elapsed -= now - frozenSince;
+        if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
         ElapsedText = LocalizationManager.T("Progress_Time_Elapsed",
-            ProgressDisplayCalculator.FormatDuration(DateTime.UtcNow - _opStartUtc));
+            ProgressDisplayCalculator.FormatDuration(elapsed));
     }
 
     /// <summary>
@@ -1271,6 +1339,8 @@ public partial class ProgressViewModel : ObservableObject
         // 已完成（成功）；失败/取消态不被覆盖（失败测试流会 SetErrorSummary→SetComplete 两步走）
         if (StatusKind is not (ProgressStatusKind.Failed or ProgressStatusKind.Cancelled))
             StatusKind = ProgressStatusKind.Completed;
+        // 终态：操作已结束，暂停无意义 → 隐藏暂停按钮
+        IsPauseButtonVisible = false;
     }
 
     // ════════════════════════════════════════════
@@ -1443,6 +1513,9 @@ public partial class ProgressViewModel : ObservableObject
         if (string.IsNullOrEmpty(message)) return;
         _wholeArchiveError = message;
         RebuildSummaryTexts();
+        // 失败终态：操作已结束，暂停无意义 → 隐藏暂停按钮
+        // （批中单项失败走 SetBatchItemStatus/OnHasErrorsChanged，不在这里隐藏——批操作仍在继续）
+        IsPauseButtonVisible = false;
     }
 
     // ════════════════════════════════════════════

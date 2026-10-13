@@ -263,8 +263,7 @@ public partial class ProgressWindow : Window
             return;
         }
 
-        // 与设置窗口一致的 0–60 秒钳制（Task 9），负值/超限按边界处理
-        _countdownRemainingMs = Math.Clamp(AppSettings.Load().AutoCloseDelaySeconds, 0, 60) * 1000;
+        // 倒计时初值已在 OnOpened 初始化（窗口打开即显示、可提前编辑，此处不再重置）
         if (_countdownRemainingMs <= 0)
         {
             closeAction();
@@ -401,7 +400,6 @@ public partial class ProgressWindow : Window
         PauseButtonText.Text = _vm.LocalizedStrings.TryGetValue("Progress_Button_Pause", out var pauseText)
             ? pauseText
             : "Pause";
-        Width = 560;
     }
 
     /// <summary>
@@ -560,6 +558,12 @@ public partial class ProgressWindow : Window
     {
         return _vm.CreatePauseAwareProgress(inner);
     }
+
+    /// <summary>模态弹窗期间冻结已用时间（冲突/密码弹窗）。Safe to call from any thread.</summary>
+    public void BeginModalFreeze() => DispatchIfNeeded(() => _vm.BeginModalFreeze());
+
+    /// <summary>模态弹窗关闭后解除冻结。Safe to call from any thread.</summary>
+    public void EndModalFreeze() => DispatchIfNeeded(() => _vm.EndModalFreeze());
 
     // ════════════════════════════════════════════
     //  Content Mode / Info Density（顶部切换区）
@@ -896,6 +900,13 @@ if (_vm.IsPaused)
     {
         base.OnOpened(e);
         _currentVisible = this;
+        // 倒计时盒窗口打开即显示（可提前编辑，不倒数）；设置 0 = 不自动关闭 → 整组隐藏
+        _countdownRemainingMs = Math.Clamp(AppSettings.Load().AutoCloseDelaySeconds, 0, 60) * 1000;
+        if (_countdownRemainingMs > 0)
+        {
+            _vm.AutoCloseCountdownVisible = true;
+            UpdateCountdownText((_countdownRemainingMs + 999) / 1000);
+        }
         // 启动「已用时间」刷新（窗口关闭时停止，防计时器泄漏）
         _elapsedTimer.Start();
     }

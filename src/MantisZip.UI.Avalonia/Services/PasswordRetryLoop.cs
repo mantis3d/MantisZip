@@ -127,19 +127,29 @@ public static class PasswordRetryLoop
     private static async Task<string?> ShowPasswordDialogAsync(string archivePath, Window? owner)
     {
         var dialogOwner = ResolveDialogOwner(owner);
-        return await Dispatcher.UIThread.InvokeAsync(async () =>
+        // 密码弹窗是模态等待：期间已用时间冻结（try/finally 保证任何出口都配对解除，防计数泄漏）
+        var pw = ProgressWindow.CurrentVisible;
+        pw?.BeginModalFreeze();
+        try
         {
-            var dialog = new PasswordDialog(Path.GetFileName(archivePath));
-            if (dialogOwner != null)
-                return await dialog.ShowDialog<bool>(dialogOwner) ? dialog.Password : null;
+            return await Dispatcher.UIThread.InvokeAsync(async () =>
+            {
+                var dialog = new PasswordDialog(Path.GetFileName(archivePath));
+                if (dialogOwner != null)
+                    return await dialog.ShowDialog<bool>(dialogOwner) ? dialog.Password : null;
 
-            // 无可用 owner（无头/纯后台调用）：非模态显示并等关闭，行为等价于模态取消路径
-            var closed = new TaskCompletionSource();
-            dialog.Closed += (_, _) => closed.TrySetResult();
-            dialog.Show();
-            await closed.Task;
-            return dialog.Password;
-        });
+                // 无可用 owner（无头/纯后台调用）：非模态显示并等关闭，行为等价于模态取消路径
+                var closed = new TaskCompletionSource();
+                dialog.Closed += (_, _) => closed.TrySetResult();
+                dialog.Show();
+                await closed.Task;
+                return dialog.Password;
+            });
+        }
+        finally
+        {
+            pw?.EndModalFreeze();
+        }
     }
 
     /// <summary>按「进度窗口 → 调用方窗口 → 当前活动窗口」顺序解析弹窗 owner。</summary>

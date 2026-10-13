@@ -265,6 +265,10 @@ public static class CompressFlow
         // 循环重入：暂停后恢复时重新弹窗（对齐 WPF AppPartials/App.Compress.cs CompressConflictResolver）
         while (true)
         {
+            // 冲突弹窗是模态等待：期间已用时间冻结（每次重入都配对 Begin/End，防计数泄漏）
+            var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
+            pw?.BeginModalFreeze();
+
             var result = await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var dlg = new CompressConflictDialog(info.OutputPath, info.SuggestedName, info.CanAdd);
@@ -311,22 +315,27 @@ public static class CompressFlow
             });
 
             if (result.IsCancelled)
+            {
+                pw?.EndModalFreeze();
                 throw new OperationCanceledException("压缩被用户取消");
+            }
 
             if (result.IsPaused)
             {
                 // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标，
                 // 在 UI 线程调用 PauseFromConflict 进入暂停态，然后在后台线程等待暂停事件
                 // （不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）。
-                var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
                 if (pw != null)
                 {
                     await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
+                    // IsPaused 已为 true → 解除模态冻结后由暂停态无缝接续冻结
+                    pw.EndModalFreeze();
                     pw.PauseEvent.Wait(pw.CancellationToken);
                 }
                 continue; // 恢复后重新弹窗
             }
 
+            pw?.EndModalFreeze();
             return (result.Action, result.CustomName, result.ApplyAll);
         }
     }

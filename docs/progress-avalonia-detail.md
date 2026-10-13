@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-14** — 进度窗口计时器冻结 + 倒计时盒常显 + 暂停按钮完成态隐藏 + 状态行/宽度/间距修复（含用户手动 AGENTS.md 规则补充）
+  - **计时器冻结**：`ProgressViewModel` 新增模态冻结——`BeginModalFreeze`/`EndModalFreeze` 引用计数（`_modalFreezeCount`）+ `_clockFrozenSinceUtc`/`_clockFrozenTotal`，已用/剩余时间在弹窗期间停走；与用户暂停共用 `OnIsPausedChanged` 统一钩子（冲突弹窗先 `PauseFromConflict()` 再 `EndModalFreeze()`，IsPaused 已 true → 冻结无缝续接为用户暂停）。接线：`ExtractFlow`/`CompressFlow` 冲突弹窗、`PasswordRetryLoop` 密码重试循环；所有冻结/解冻经 `DispatchIfNeeded` 或 UI dispatch 内调用。
+  - **倒计时盒常显**：`ProgressWindow.OnOpened` 初始化倒计时（此前等首条进度报告才显示）；用户手动调整样式——`CountdownBox` Width 44→14、FontSize 13→18，后缀 `Progress_AutoCloseSuffix` FontSize 12→13。
+  - **暂停按钮完成态隐藏**：`IsPauseButtonVisible` 在完成/失败/取消等终态为 false。
+  - **状态行与布局修复**：① `EndPreparing` 回填 `WindowTitle`（修「准备中」阶段标题为空）；② 暂停前保存 `_statusBeforePause`、恢复时还原（修恢复后状态行卡「正在恢复」，删除原「正在恢复」硬赋值）；③ 删 `Width = 560` 硬编码（修窗口被压到过窄，恢复 XAML 声明宽度 800）；④ `CancelButton` 补 `Margin="8,0,0,0"`。
+  - **AGENTS.md（用户手动）**：规则 0 补「回复用户的文本必须是中文，除非是引用的其他语言」；规则 1 补计划目录流转——执行计划前移入 `.omo/plans/进行中`，计划完成时移入 `.omo/plans/已完成`。
+  - **测试**：Core **679 通过**/0 失败、Avalonia **248 通过**/0 失败（各 3 跳过）。
+
 **2026-10-13** — 「测试压缩包」逐条目失败定位 + 测试/解压全流程列表播种 + 状态行去状态 emoji（实现 spec §12 Follow-up #6）
   - **引擎逐条目测试定位**：`ZipEngine.TestArchiveAsync` 逐条目 try/catch，成功报 `EntryStatus=Completed`、失败报 `Failed`+`EntryFailureReason`（`FailureReasonMapper`）并带 `EntryKey`、继续校验其余条目，整体返回有无失败；`TarGzEngine.TestArchiveAsync` TAR 循环 + GZ 单条目同构；`SevenZipEngine.TestArchiveAsync` 快路径 `Check()` 通过后逐条报 `Completed`（不再 O(n²)），**仅在校验失败时**逐条 `ExtractFile` 定位坏条目、无逐条失败时补一条整包失败。
   - **列表播种补全**：`MainWindowViewModel` 的 `TestArchive` 与 `ExtractArchiveHere`/`ExtractArchiveToName`/`ExtractTo`/`SmartExtract`（此前 `new ExtractService().ExtractAsync(...)` 直连、不播种）在操作内先 `ExtractFlow.TrySeedEntryItemsInBackground(ProgressWindow.CurrentVisible, ...)` 列出全部条目——修复这些入口「列表」模式全空（测试引擎此前也不上报逐条状态，故连渐进都无）。

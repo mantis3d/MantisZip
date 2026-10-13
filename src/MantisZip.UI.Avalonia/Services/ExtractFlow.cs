@@ -287,6 +287,10 @@ public static class ExtractFlow
         // 循环重入：暂停后恢复时重新弹窗（对齐 WPF App.xaml.cs ConflictResolver）
         while (true)
         {
+            // 冲突弹窗是模态等待：期间已用时间冻结（每次重入都配对 Begin/End，防计数泄漏）
+            var freezePw = ProgressWindow.CurrentVisible;
+            freezePw?.BeginModalFreeze();
+
             var result = await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var dlg = new ConflictDialog(info, titleKey);
@@ -314,7 +318,10 @@ public static class ExtractFlow
             });
 
             if (result.IsCancelled)
+            {
+                freezePw?.EndModalFreeze();
                 throw new OperationCanceledException("用户取消整个解压操作");
+            }
 
             if (result.IsPaused)
             {
@@ -325,11 +332,18 @@ public static class ExtractFlow
                 if (pw != null)
                 {
                     await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
+                    // IsPaused 已为 true → 此刻解除模态冻结由暂停态无缝接续（冻结不断档）
+                    freezePw?.EndModalFreeze();
                     pw.PauseEvent.Wait(pw.CancellationToken);
+                }
+                else
+                {
+                    freezePw?.EndModalFreeze();   // 无进度窗口可暂停也要结算冻结，防计数泄漏
                 }
                 continue; // 恢复后重新弹窗
             }
 
+            freezePw?.EndModalFreeze();
             return (result.Action, result.ApplyAll);
         }
     }

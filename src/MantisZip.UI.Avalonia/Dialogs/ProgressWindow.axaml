@@ -1017,9 +1017,9 @@
                   IsVisible="{Binding AutoCloseCountdownVisible}">
         <!-- 数字框：聚焦即冻结倒数，Enter 提交 / Esc 回退 / 失焦提交 -->
         <TextBox x:Name="CountdownBox"
-                 Width="44"
+                 Width="14"
                  TextAlignment="Right"
-                 FontSize="13"
+                 FontSize="18"
                  GotFocus="CountdownBox_GotFocus"
                  LostFocus="CountdownBox_LostFocus"
                  KeyDown="CountdownBox_KeyDown"
@@ -1029,11 +1029,12 @@
         <!-- 静态后缀「秒后自动关闭」（数字由上方 TextBox 承载，故本 key 不含 {0}） -->
         <TextBlock Text="{Binding LocalizedStrings[Progress_AutoCloseSuffix]}"
                    VerticalAlignment="Center"
-                   FontSize="12"
+                   FontSize="13"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
       </StackPanel>
-      <!-- 暂停/继续按钮 -->
+      <!-- 暂停/继续按钮：完成/失败终态（IsPauseButtonVisible=false）自动隐藏 -->
       <Button x:Name="PauseButton" Grid.Column="2"
+              IsVisible="{Binding IsPauseButtonVisible}"
               Width="80" Height="{DynamicResource ControlHeightLg}"
               Click="PauseButton_Click"
               Background="{DynamicResource ThemeButtonBgBrush}"
@@ -1044,9 +1045,10 @@
           <TextBlock x:Name="PauseButtonText" Text="{Binding LocalizedStrings[Progress_Button_Pause]}" />
         </StackPanel>
       </Button>
-      <!-- 取消按钮 -->
+      <!-- 取消按钮：Margin 左 8 与暂停按钮保持 8px 间距 -->
       <Button x:Name="CancelButton" Grid.Column="3"
               Width="80" Height="{DynamicResource ControlHeightLg}"
+              Margin="8,0,0,0"
               Command="{Binding CancelCommand}"
               IsEnabled="{Binding IsCancelEnabled}"
               Background="{DynamicResource ThemeButtonBgBrush}"
