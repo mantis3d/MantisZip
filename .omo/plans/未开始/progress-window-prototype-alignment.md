@@ -1,6 +1,6 @@
 # 进度窗口原型对齐改造（progress-window-prototype-alignment）
 
-> **Agentic Execution Note** — 本计划是 [progress-window-enhancement.md](progress-window-enhancement.md)（修订版 v2）的**纠偏续作**。v2 的 T1–T9 已实施（除 F3 手工 QA），但其「原型对应表」误读了 v6 原型的两组切换器，导致成品语义与原型不符。本计划只做**对齐**，不复用 v2 的错误映射。所有文件路径、行号、API 均已对当前仓库（Avalonia 版）逐字节核实。
+> **Agentic Execution Note** — 本计划是 [progress-window-enhancement.md](../已完成/progress-window-enhancement.md)（修订版 v2）的**纠偏续作**。v2 的 T1–T9 已实施（除 F3 手工 QA），但其「原型对应表」误读了 v6 原型的两组切换器，导致成品语义与原型不符。本计划只做**对齐**，不复用 v2 的错误映射。所有文件路径、行号、API 均已对当前仓库（Avalonia 版）逐字节核实。
 >
 > 执行方式：按 Wave 顺序执行；波次内标注 `∥` 的任务可并行。每任务完成后必须运行该任务指定的验证命令（Rule 12），通过后才能标记完成。
 
