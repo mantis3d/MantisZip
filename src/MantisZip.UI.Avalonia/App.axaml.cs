@@ -1141,6 +1141,9 @@ public partial class App : Application
         progressWindow.Show();
         desktop.MainWindow = progressWindow;
 
+        // spec §11.2: CLI 解压 → 只显示「删包」开关（打开目录的 CLI 接线属挂起计划 cli-extract-open-folder.md，D18）
+        progressWindow.SetExtractPostActions(openFolder: false, deleteArchive: true, openFolderSeed: null);
+
         // 始终显示文件列表（单文件也显示）：批处理列表项 = 压缩包路径
         progressWindow.InitBatchMode(new[] { archivePath });
         progressWindow.SetCurrentBatchItem(0);
@@ -1211,7 +1214,7 @@ public partial class App : Application
                 Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
                 // 成功后把目标目录写入路径历史（--extract-here / --extract-to-name / --extract-smart 单文件直解）
                 PathHistoryManager.Record(targetDir);
-                TryDeleteArchiveAfterExtract(archivePath);
+                // D19: 删包时序移至窗口关闭之后（倒计时内用户可切换 🗑 开关）
             }
             catch (OperationCanceledException)
             {
@@ -1270,12 +1273,13 @@ public partial class App : Application
                 progressWindow.SetErrorSummary(captureException!.Message);
                 progressWindow.CompleteWithErrors();
             });
-            await WaitForWindowCloseAsync(progressWindow);
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
             return false;
         }
 
-        // 成功：自动关闭或等待（KeepOpenOnComplete 生效）
-        await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Close());
+        // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待用户手动关闭；关闭后按开关最终值删包（D19）
+        await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
+        TryDeleteArchiveAfterExtract(archivePath, progressWindow.DeleteArchiveAfterExtractValue);
         return false;
     }
 
@@ -1303,6 +1307,9 @@ public partial class App : Application
         desktop.MainWindow = progressWindow;
         progressWindow.InitBatchMode(archivePaths);
 
+        // spec §11.2: CLI 解压 → 只显示「删包」开关；初值取弹窗勾选（deleteAfterExtract）
+        progressWindow.SetExtractPostActions(openFolder: false, deleteArchive: true, openFolderSeed: null, deleteArchiveSeed: deleteAfterExtract);
+
         // 路径 A（决策 D1）：解压设置窗口已预匹配密码的包，开始解压前整行点亮 🔑●●●● 徽标。
         // 未预匹配的包留空，轮到该包时由路径 B 逐个点亮。
         if (matchedPasswords != null)
@@ -1320,6 +1327,7 @@ public partial class App : Application
         var doneEvent = new ManualResetEventSlim(false);
         Exception? captureException = null;
         bool cancelled = false;
+        var succeededArchives = new List<string>();   // D19: 关窗后按开关最终值统一删包
 
         _ = Task.Run(async () =>
         {
@@ -1379,8 +1387,8 @@ public partial class App : Application
                             info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info),
                             progress, ct);
 
-                        // 解压成功后按弹窗勾选将原包移入回收站（逐次勾选，不读全局设置、不写回）
-                        TryDeleteArchiveAfterExtract(archivePath, deleteAfterExtract);
+                        // D19: 删包延后到窗口关闭后（倒计时内用户可切换 🗑 开关），此处仅登记成功项
+                        succeededArchives.Add(archivePath);
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                             progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
@@ -1441,13 +1449,18 @@ public partial class App : Application
                 progressWindow.SetErrorSummary(captureException!.Message);
                 progressWindow.CompleteWithErrors();
             });
-            await WaitForWindowCloseAsync(progressWindow);
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
             desktop.Shutdown();
             return;
         }
 
-        // 成功：自动关闭（2.5s）或等待用户手动关闭后退出
-        await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
+        // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待用户手动关闭；关闭时按开关最终值删包再退出（D19）
+        await progressWindow.AutoCloseOrWaitAsync(() =>
+        {
+            foreach (var p in succeededArchives)
+                TryDeleteArchiveAfterExtract(p, progressWindow.DeleteArchiveAfterExtractValue);
+            desktop.Shutdown();
+        });
     }
 
     /// <summary>
@@ -1481,10 +1494,14 @@ public partial class App : Application
         desktop.MainWindow = progressWindow;
         progressWindow.InitBatchMode(archivePaths);
 
+        // spec §11.2: CLI 解压 → 只显示「删包」开关（打开目录的 CLI 接线属挂起计划，D18）
+        progressWindow.SetExtractPostActions(openFolder: false, deleteArchive: true, openFolderSeed: null);
+
         var ct = progressWindow.CancellationToken;
         var doneEvent = new ManualResetEventSlim(false);
         Exception? captureException = null;
         bool cancelled = false;
+        var succeededArchives = new List<string>();   // D19: 关窗后按开关最终值统一删包
 
         var settings = AppSettings.Load();
         var conflictOptions = SelectedItemsExtractService.CreateExtractOptions(
@@ -1572,7 +1589,8 @@ public partial class App : Application
                         // 成功后把目标目录写入路径历史（多文件直解批处理逐项记录，重复路径由去重置顶）
                         PathHistoryManager.Record(targetDir);
 
-                        TryDeleteArchiveAfterExtract(archivePath);
+                        // D19: 删包延后到窗口关闭后，此处仅登记成功项
+                        succeededArchives.Add(archivePath);
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                             progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
@@ -1633,36 +1651,18 @@ public partial class App : Application
                 progressWindow.SetErrorSummary(captureException!.Message);
                 progressWindow.CompleteWithErrors();
             });
-            await WaitForWindowCloseAsync(progressWindow);
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
             desktop.Shutdown();
             return;
         }
 
-        // 成功：自动关闭（2.5s）或等待用户手动关闭后退出
-        await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
-    }
-
-    /// <summary>
-    /// 等待用户手动关闭进度窗口（等待 Closed 事件）。
-    /// 若窗口已不可见（如取消流程已关闭），立即返回。
-    /// </summary>
-    private static async Task WaitForWindowCloseAsync(ProgressWindow window)
-    {
-        if (!window.IsVisible)
-            return;
-
-        var closed = new ManualResetEventSlim(false);
-        EventHandler handler = null!;
-        handler = (_, _) => { closed.Set(); window.Closed -= handler; };
-        window.Closed += handler;
-        try
+        // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待用户手动关闭；关闭时按开关最终值删包再退出（D19）
+        await progressWindow.AutoCloseOrWaitAsync(() =>
         {
-            await Task.Run(() => closed.Wait());
-        }
-        finally
-        {
-            window.Closed -= handler;
-        }
+            foreach (var p in succeededArchives)
+                TryDeleteArchiveAfterExtract(p, progressWindow.DeleteArchiveAfterExtractValue);
+            desktop.Shutdown();
+        });
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -2385,7 +2385,7 @@ public partial class App : Application
                 progressWindow.SetErrorSummary(captureException!.Message);
                 progressWindow.CompleteWithErrors();
             });
-            await WaitForWindowCloseAsync(progressWindow);
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
             desktop.Shutdown();
             return;
         }
@@ -2393,15 +2393,15 @@ public partial class App : Application
         if (partialFailure)
         {
             // 部分失败：等待用户手动关闭窗口后退出
-            await WaitForWindowCloseAsync(progressWindow);
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
             desktop.Shutdown();
             return;
         }
 
-        // 成功：自动关闭（2.5s）或等待（📌 KeepOpenOnComplete 生效），窗口关闭后退出进程
+        // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待（📌 KeepOpenOnComplete 生效），窗口关闭后退出进程
         // 压缩完成后把输出目录写入路径历史（含部分条目失败——输出已落盘；取消/异常路径不会走到此处）
         CompressFlow.RecordOutputHistory(request);
-        await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
+        await progressWindow.AutoCloseOrWaitAsync(() => desktop.Shutdown());
     }
 
     // ════════════════════════════════════════════════════════════════

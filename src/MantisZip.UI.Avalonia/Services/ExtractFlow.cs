@@ -24,7 +24,11 @@ public enum SelectedItemsExtractStatus
 /// <summary>
 /// 选中条目解压的结果载荷。
 /// </summary>
-public sealed record SelectedItemsExtractResult(SelectedItemsExtractStatus Status, string? ErrorMessage);
+public sealed record SelectedItemsExtractResult(
+    SelectedItemsExtractStatus Status,
+    string? ErrorMessage,
+    bool OpenFolderAfterExtract = false,
+    bool DeleteArchiveAfterExtract = false);
 
 /// <summary>
 /// 解压流程公共逻辑（主窗口与 CLI 右键菜单共用，消除两套实现漂移）。
@@ -65,6 +69,7 @@ public static class ExtractFlow
     /// <param name="conflictAction">冲突策略字符串（AppSettings.FileConflictAction 值）。</param>
     /// <param name="conflictDialog">Ask 冲突弹窗回调（null 时 Ask 降级为引擎默认处理）。</param>
     /// <param name="progressTitle">进度窗口标题（拖拽 = Status_DragExtractingTo，右键 = Status_Extracting）。</param>
+    /// <param name="allowDeleteArchive">是否显示「解压后移入回收站」开关（拖拽解压传 false 隐藏，spec §11.2 D18）。</param>
     public static async Task<SelectedItemsExtractResult> RunSelectedItemsExtractionAsync(
         string archivePath,
         string? password,
@@ -74,10 +79,13 @@ public static class ExtractFlow
         bool preserveFullPath,
         string conflictAction,
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
-        string progressTitle)
+        string progressTitle,
+        bool allowDeleteArchive = true)
     {
         var pw = new ProgressWindow(progressTitle);
         pw.InitCancellation();
+        // spec §11.2: 选中条目解压 → 两开关可见（拖拽流程 allowDeleteArchive=false 隐藏删包开关）；初值镜像设置
+        pw.SetExtractPostActions(openFolder: true, deleteArchive: allowDeleteArchive, openFolderSeed: null);
 
         var status = SelectedItemsExtractStatus.Success;
         string? errorMessage = null;
@@ -110,7 +118,7 @@ public static class ExtractFlow
             pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
             // 成功后把目标目录写入路径历史（拖拽解压 / 右键解压选中项共用本入口；取消/失败不记录）
             PathHistoryManager.Record(destinationPath);
-            await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
+            await pw.AutoCloseOrWaitAsync(() => pw.Close());
         }
         catch (OperationCanceledException)
         {
@@ -126,18 +134,21 @@ public static class ExtractFlow
         }
         catch (Exception ex)
         {
+            // 失败：写错误汇总（自动压钉 📌）+ 日志（Task 6 统一关窗职责）
+            pw.SetErrorSummary(ex.Message);
+            App.DebugLog($"[ExtractFlow] extraction failed: {ex}");
             pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, ex.Message);
             status = SelectedItemsExtractStatus.Failed;
             errorMessage = ex.Message;
         }
-        finally
-        {
-            pw.Close();
-        }
 
-        // 失败统一弹窗：拖拽与右键选中解压均无确认环节，用户容易忽略状态栏小字
+        // 关窗职责按状态分支（Task 6）：成功已在 try 内 AutoCloseOrWaitAsync；
+        // 失败 → 先弹窗（D12）再 AutoCloseOrWaitAsync（SetErrorSummary 已自动压钉）；
+        // 取消 → 立即关闭（D13）。
         if (status == SelectedItemsExtractStatus.Failed)
         {
+            // 失败统一弹窗：拖拽与右键选中解压均无确认环节，用户容易忽略状态栏小字
+            // （spec §9.3 时序：错误汇总压钉 → 弹窗 → 等待手动关闭）
             try
             {
                 await AppMessageBox.Show(
@@ -149,9 +160,14 @@ public static class ExtractFlow
             {
                 App.DebugLog($"[ExtractFlow] Failed to show error dialog: {dlgEx.Message}");
             }
+            await pw.AutoCloseOrWaitAsync(() => pw.Close());
+        }
+        else if (status == SelectedItemsExtractStatus.Cancelled)
+        {
+            pw.Close();   // D13：取消不是错误，立即关闭
         }
 
-        return new SelectedItemsExtractResult(status, errorMessage);
+        return new SelectedItemsExtractResult(status, errorMessage, pw.OpenFolderAfterExtractValue, pw.DeleteArchiveAfterExtractValue);
     }
     /// <summary>
     /// 执行一次解压（单压缩包）。目标目录、冲突策略、过滤条件、密码均已解析完毕。

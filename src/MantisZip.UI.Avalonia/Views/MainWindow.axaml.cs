@@ -291,6 +291,17 @@ public partial class MainWindow : Window
             // Task 6: 压缩流程标记（供压缩通道说明行显示；解压流程保持 false）
             pw.IsCompressFlow = vm.PendingCompressFlow;
             vm.PendingCompressFlow = false;
+            // Task 6: 测试流标记（自动按下 📌，完成后不自动关闭）与完成回调/最近窗口回读通道
+            pw.IsTestFlow = vm.PendingTestFlow;
+            vm.PendingTestFlow = false;
+            var onCompleted = vm.PendingCompletedCallback;
+            vm.PendingCompletedCallback = null;
+            vm.LastProgressWindow = pw;
+            // spec §11.2: 解压后置开关能力位 + 初值（仅解压入口置位 → 压缩/测试流两开关隐藏）
+            var postActions = vm.PendingExtractPostActions;
+            vm.PendingExtractPostActions = null;
+            if (postActions is { } pa)
+                pw.SetExtractPostActions(pa.OpenFolder, pa.DeleteArchive, pa.OpenFolderSeed);
             // 列表播种：压缩流程枚举全量条目（后台；失败/取消/超阈值放弃，终态 upsert 兜底）
             var seedRequest = vm.PendingCompressRequest;
             vm.PendingCompressRequest = null;
@@ -321,13 +332,19 @@ public partial class MainWindow : Window
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
 
-                // 成功：标记完成态 + 尊重 📌 KeepOpenOnComplete（对齐 WPF MainWindow.Menu.cs AutoCloseOrWaitAsync(0, ...)）
-                pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
-                await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
+                // 成功：完成回调（测试流结果通道）优先，否则默认完成态；
+                // 再尊重 📌 KeepOpenOnComplete 统一走 AutoCloseOrWaitAsync（延迟来自设置，Task 6）
+                if (onCompleted is not null)
+                    onCompleted(pw);
+                else
+                    pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
+                await pw.AutoCloseOrWaitAsync(() => pw.Close());
                 return true;
             }
             catch (OperationCanceledException)
             {
+                // D13：取消不是错误 → 立即关闭（不写错误汇总、不压钉）
+                pw.Close();
                 return false;
             }
             catch (PasswordRetryCancelledException)
@@ -337,19 +354,23 @@ public partial class MainWindow : Window
                 // 故在此单点接线，避免逐个方法重复分支。
                 var msg = LocalizationManager.T("Status_PasswordCancelled");
                 if (hasFileList)
-                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);
+                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);   // 行 Failed 自动压钉 → 等手动关闭
                 vm.StatusMessage = msg;
+                await pw.AutoCloseOrWaitAsync(() => pw.Close());   // 📌 已由行 Failed 压下 → 等手动关闭
                 return false;
             }
-            catch (Exception)
+            catch (Exception ex)
             {
+                // 失败：写错误汇总（自动压钉 📌）+ 日志，行标 Failed；关窗决策交给 AutoCloseOrWaitAsync 等待手动关闭
+                pw.SetErrorSummary(ex.Message);
+                App.DebugLog($"[RunWithProgress] operation failed: {ex}");
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
+                await pw.AutoCloseOrWaitAsync(() => pw.Close());   // SetErrorSummary 已自动压钉 → 等手动关闭
                 return false;
             }
             finally
             {
-                pw.Close();
                 vm.BatchStatusReporter = null;
             }
         };
