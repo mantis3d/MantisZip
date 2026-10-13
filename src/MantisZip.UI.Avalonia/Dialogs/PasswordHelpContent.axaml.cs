@@ -1,15 +1,14 @@
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Dialogs;
 
 /// <summary>
-/// 密码管理器帮助对话框 — 显示匹配规则说明
+/// 密码管理器帮助内容（UserControl）— 显示匹配规则说明。
+/// 配合 HelpDialog 使用。
 /// </summary>
-public partial class PasswordHelpDialog : Window
+public partial class PasswordHelpContent : UserControl
 {
-    public string WinTitle => LocalizationManager.T("PwdHelp_Title");
     public string SectionTitle => LocalizationManager.T("PwdHelp_Section_Title");
     public string IntroText => LocalizationManager.T("PwdHelp_Intro");
     public string GlobTitle => LocalizationManager.T("PwdHelp_Glob_Title");
@@ -50,16 +49,9 @@ public partial class PasswordHelpDialog : Window
     public string MatchStep4 => LocalizationManager.T("PwdHelp_Match_Step4");
     public string MatchStep5 => LocalizationManager.T("PwdHelp_Match_Step5");
 
-    public string CloseText => LocalizationManager.T("PwdHelp_Close");
-
-    public PasswordHelpDialog()
+    public PasswordHelpContent()
     {
         InitializeComponent();
         DataContext = this;
-    }
-
-    private void OnCloseClick(object? sender, RoutedEventArgs e)
-    {
-        Close();
     }
 }

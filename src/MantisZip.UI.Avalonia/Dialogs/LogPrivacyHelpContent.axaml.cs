@@ -1,13 +1,13 @@
 using Avalonia.Controls;
-using Avalonia.Interactivity;
 using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Dialogs;
 
 /// <summary>
-/// 日志隐私模式帮助对话框
+/// 日志隐私模式帮助内容（UserControl）。
+/// 配合 HelpDialog 使用。
 /// </summary>
-public partial class LogPrivacyHelpDialog : Window
+public partial class LogPrivacyHelpContent : UserControl
 {
     public string WinTitle => LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Title");
     public string IntroText => LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Intro");
@@ -17,16 +17,10 @@ public partial class LogPrivacyHelpDialog : Window
     public string ModeFullText => LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Mode_Full");
     public string WhatText => LocalizationManager.T("Settings_Debug_LogPrivacyHelp_What");
     public string WhatNotText => LocalizationManager.T("Settings_Debug_LogPrivacyHelp_WhatNot");
-    public string CloseText => LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Close");
 
-    public LogPrivacyHelpDialog()
+    public LogPrivacyHelpContent()
     {
         InitializeComponent();
         DataContext = this;
-    }
-
-    private void OnCloseClick(object? sender, RoutedEventArgs e)
-    {
-        Close();
     }
 }

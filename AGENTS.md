@@ -458,9 +458,9 @@ Four modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"extension"`
 - `CoreLog.Initialize(diagnosticsEnabled, privacyMode)` — UI 层在 `OnFrameworkInitializationCompleted` 和 `RefreshDebugLogSettings` 中调用，统一注入诊断开关与脱敏委托。**禁止直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`**，必须走 `Initialize()` 方法
 - `App.Log()`, `App.LogDebug()`, and `LogStartup()` call `LogRedactor.RedactPaths()` directly (they're in UI project and have AppSettings access)
 
-**Help dialog**: `LogPrivacyHelpDialog` opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
+**Help dialog**: `LogPrivacyHelpContent` rendered through the shared `HelpDialog` shell (见规则 17), opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
 
-**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI.Avalonia/Dialogs/LogPrivacyHelpDialog.axaml/.cs` (Avalonia).
+**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI.Avalonia/Dialogs/LogPrivacyHelpContent.axaml/.cs` + `UI.Avalonia/Dialogs/HelpDialog.axaml(.cs)` (Avalonia).
 
 ## Known issues (already fixed)
 
@@ -848,6 +848,16 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 ```
 
 出现 `SystemBrowse_Click` 以外的命中即视为违规，必须改用自定义选择器。历史迁移记录见 `docs/progress-avalonia-detail.md` 的 `2026-09-30` 条目（4 处调用点：拖拽解压兜底、添加文件、密码导出、密码导入）。
+
+### 规则 17：帮助/介绍弹窗必须复用 HelpDialog 外壳
+
+**核心禁令**：任何新增的用户可见帮助/介绍弹窗，**必须**复用统一外壳 `Dialogs/HelpDialog.axaml`，**禁止**另建一次性 `Window` 帮助对话框。
+
+- **外壳**：`new HelpDialog(title, content, closeText?)` —— `title` 为窗口标题（走 `LocalizationManager.T()`，规则 13）、`content` 为内容 `UserControl`、`closeText` 可选（默认 `MsgBox_Close`）；原对话框的窗口尺寸经对象初始化器在构造后补设（`{ Width = ..., Height = ... }`）
+- **内容**：新建 `UserControl`（镜像 `Dialogs/AdaptiveHelpContent.axaml(.cs)` 模式）：根 `x:CompileBindings="False"` + `ScrollViewer` 包裹 `StackPanel`；代码后置用 `=> LocalizationManager.T("key")` 只读属性 + 构造函数末尾 `DataContext = this`
+- **原因（根因回归防护）**：`HelpDialog` 在构造函数内、`DataContext = this` **之前**完成 title/content 赋值且属性只读 —— 绑定在 attach 后求值时值已就绪；若另建一次性 Window、或在构造**之后**再赋值属性（无变更通知），绑定不刷新，整窗静默空白（曾实际发生）
+- **已迁移消费者**：自适应压缩帮助（`AdaptiveHelpContent`）、并行解压帮助（`ParallelExtractHelpContent`）、密码管理器帮助（`PasswordHelpContent`）、日志隐私帮助（`LogPrivacyHelpContent`）
+- **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/HelpDialogRenderTests.cs`（无头 Avalonia，验证 ContentPresenter 注入内容 + 标题文本真实渲染）
 
 ## 未来工作
 

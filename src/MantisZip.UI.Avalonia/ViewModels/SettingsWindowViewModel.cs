@@ -1977,7 +1977,14 @@ public partial class SettingsWindowViewModel : ObservableObject
     [RelayCommand]
     private void OpenLogPrivacyHelp()
     {
-        var dialog = new LogPrivacyHelpDialog();
+        var dialog = new HelpDialog(
+            LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Title"),
+            new LogPrivacyHelpContent(),
+            LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Close"))
+        {
+            Width = 520,
+            Height = 500
+        };
         dialog.Show();
     }
 

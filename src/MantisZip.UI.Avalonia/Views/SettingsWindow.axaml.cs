@@ -23,7 +23,11 @@ public partial class SettingsWindow : Window
         {
             vm.ShowParallelHelpRequested += () =>
             {
-                var dlg = new ParallelExtractHelpDialog();
+                var dlg = new HelpDialog(LocalizationManager.T("ParallelHelp_Title"), new ParallelExtractHelpContent())
+                {
+                    Width = 520,
+                    Height = 460
+                };
                 dlg.ShowDialog(this);
             };
         }
@@ -122,11 +126,7 @@ public partial class SettingsWindow : Window
 
     private void OnAdaptiveHelpClick(object? sender, RoutedEventArgs e)
     {
-        var dialog = new HelpDialog
-        {
-            HelpTitle = LocalizationManager.T("Adaptive_Help_Title"),
-            HelpContent = new AdaptiveHelpContent(),
-        };
+        var dialog = new HelpDialog(LocalizationManager.T("Adaptive_Help_Title"), new AdaptiveHelpContent());
         dialog.ShowDialog(this);
     }
 }

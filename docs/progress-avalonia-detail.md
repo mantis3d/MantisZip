@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-13** — 根治可复用帮助弹窗空白 + 全部帮助弹窗迁移到 `HelpDialog` 外壳（Avalonia）
+  - **现象**：设置窗口「压缩 → 加速」页的 `[?]`「自适应压缩级别介绍」弹窗**整窗空白**（只剩「关闭」按钮）。
+  - **根因（无头测试复现确认）**：通用外壳 `Dialogs/HelpDialog.axaml(.cs)` 把内容绑到 `<ContentPresenter Content="{Binding HelpContent}"/>`、标题绑到 `Title="{Binding HelpTitle}"`，但 `HelpTitle`/`HelpContent` 是**普通自动属性**，`HelpDialog` 在**构造函数内**就 `DataContext = this`（此刻二者为 null）；调用方随后用对象初始化器赋值，因**无 `INotifyPropertyChanged`** 绑定不重算 → 内容/标题恒空。解压端 `ParallelExtractHelpDialog` 正常，是因为它是**自包含 Window**、在构造函数内 `DataContext = this` **之前**就给所有文案属性赋了值。
+  - **根治外壳**：`HelpDialog` 改为构造函数注入 `public HelpDialog(string title, object? content, string? closeText = null)`，在 `InitializeComponent()`/`DataContext = this` **之前**赋值，三个属性改**只读**（`{ get; }`）——从构造上杜绝时序坑；`CloseText` 缺省取 `MsgBox_Close`。消费者用对象初始化器覆盖 `Width`/`Height` 保持各自尺寸。
+  - **隐藏坑 `AVLN3000`**：Avalonia XAML 编译器要求带 `x:Class` 的类型必须具备**公共无参构造**，否则 `AVLN3000: Unable to find public constructor`（增量构建会**掩盖**它——XAML 未重编，运行期改为大面积 `XamlLoadException: No precompiled XAML found for …`，实测一次 28 个不相关用例连锁失败）。故补 `public HelpDialog() : this(string.Empty, null) { }` 并注释说明（仅供编译期/设计器）。
+  - **统一迁移到外壳**（内容原样搬进 `UserControl`）：新建 `ParallelExtractHelpContent`（3 章节卡，绑定 WinTitle/EnableSection*/SmartSection*/PreTestSection*）、`PasswordHelpContent`（Glob/Regex/Match 全部绑定）、`LogPrivacyHelpContent`（WinTitle/Intro/Mode*/What*），均镜像 `AdaptiveHelpContent` 模式（`x:CompileBindings="False"` + `ScrollViewer` + 只读 `=> LocalizationManager.T()` 属性 + `DataContext = this`）；`AdaptiveHelpContent` 直接复用。**删除** 3 个一次性 Window（`ParallelExtractHelpDialog`/`PasswordHelpDialog`/`LogPrivacyHelpDialog` 各 .axaml + .axaml.cs）。**调用点改写** 5 处：`SettingsWindow`（并行解压帮助 `ShowParallelHelpRequested` + `OnAdaptiveHelpClick`）、`PasswordManagerWindow.OnHelpClick`、`SettingsWindowViewModel.OpenLogPrivacyHelp`、`MainWindow.TestWindow_Click` 调试菜单两 arm —— 关闭文案（`MsgBox_Close`/`PwdHelp_Close`/`Settings_Debug_LogPrivacyHelp_Close`）与窗口尺寸（520×460 / 560×500 / 520×500）逐一保留。
+  - **AGENTS.md**：新增**规则 17「帮助/介绍弹窗必须复用 HelpDialog 外壳」**（含禁令、用法、根因防护说明、已迁移消费者、回归测试指引）；更新日志隐私的 Key files 引用（`LogPrivacyHelpDialog` → `LogPrivacyHelpContent` + `HelpDialog`）。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/HelpDialogRenderTests.cs`（无头 `[AvaloniaFact]`）：断言注入的 content 对象**引用相等**地进入 `ContentPresenter`，且本地化标题文本真实渲染（`Adaptive_Help_Title` / `ParallelHelp_Title`）。
+  - **验证**：`dotnet build --no-incremental`（UI + 测试工程）0 错误；Avalonia **216 通过 / 0 失败 / 3 跳过**（基线 214 + 新 2）；Core **670 通过 / 0 失败 / 3 跳过**；本地化三语文件零改动；无遗留被删类型引用。**未改自适应帮助正文**（旧四模式文案 → 三开关，另立后续任务）。
+
 **2026-10-13** — 进度窗口显示偏好持久化 + 移除内容模式自动切换（Avalonia）
   - **背景**：进度窗口有两组三选 RadioButton——**内容模式**（简约/详细/列表，`ProgressContentMode`）与**信息量分级**（少/中/完整，`ProgressInfoDensity`）。两者原本每次都重置为硬编码默认（Simple / Medium），用户无法「记住上次选择」；且内容模式存在一处自动切换。
   - **移除自动切换**：`ProgressViewModel.UpsertParallelBatch` 末尾原先在「首个并行批次行出现且当前为简约」时自动切到「详细」；按用户要求**删除**该逻辑，内容模式此后**仅**由用户点选切换（处于简约时并行批次不再自动展示详细通道行）。
