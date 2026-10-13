@@ -712,6 +712,19 @@
               </StackPanel>
             </Border>
 
+            <!-- 进度窗口：完成后自动关闭延时（秒，0–60，0 = 立即关闭；📌/失败/测试流始终留窗） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding AppearanceAutoCloseDelayText}" FontWeight="SemiBold" />
+                <TextBox Text="{Binding AutoCloseDelaySeconds}"
+                         Width="120" HorizontalAlignment="Left"
+                         Background="{DynamicResource ThemeWindowBgBrush}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              </StackPanel>
+            </Border>
+
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">

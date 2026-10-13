@@ -393,6 +393,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     private int _maxRecentFiles = 10;
 
     [ObservableProperty]
+    private int _autoCloseDelaySeconds = 3;
+
+    [ObservableProperty]
     private string _appFontFamily = "";
 
     [ObservableProperty]
@@ -1000,6 +1003,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AppearanceThemeLightText => LocalizationManager.T("Settings_Appearance_Theme_Light");
     public string AppearanceThemeDarkText => LocalizationManager.T("Settings_Appearance_Theme_Dark");
     public string AppearanceMaxRecentFilesText => LocalizationManager.T("Settings_Appearance_MaxRecentFiles");
+    public string AppearanceAutoCloseDelayText => LocalizationManager.T("Settings_ProgressAutoCloseDelay");
     public string AppearanceAppFontFamilyText => LocalizationManager.T("Settings_Appearance_AppFontFamily");
     public string AppearanceCompactnessText => LocalizationManager.T("Settings_Appearance_Compactness");
     public string AppearanceCompactnessCompactText => LocalizationManager.T("Settings_Appearance_Compactness_Compact");
@@ -1128,6 +1132,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _maxRecentFiles = _settings.MaxRecentFiles;
         _appFontFamily = _settings.AppFontFamily;
         _compactnessMode = _settings.CompactnessMode;
+        _autoCloseDelaySeconds = _settings.AutoCloseDelaySeconds;
 
         // Password
         _showPasswordMatchNotification = _settings.ShowPasswordMatchNotification;
@@ -1567,6 +1572,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AppearanceThemeDarkText));
         OnPropertyChanged(nameof(AppearanceAppFontFamilyText));
         OnPropertyChanged(nameof(AppearanceMaxRecentFilesText));
+        OnPropertyChanged(nameof(AppearanceAutoCloseDelayText));
         OnPropertyChanged(nameof(AppearanceCompactnessText));
         OnPropertyChanged(nameof(AppearanceCompactnessCompactText));
         OnPropertyChanged(nameof(AppearanceCompactnessNormalText));
@@ -1722,6 +1728,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.MaxRecentFiles = MaxRecentFiles;
         _settings.AppFontFamily = SelectedAppFontFamilyOption?.Value ?? AppFontFamily;
         _settings.CompactnessMode = SelectedCompactnessModeOption?.Value ?? CompactnessMode;
+        _settings.AutoCloseDelaySeconds = Math.Clamp(AutoCloseDelaySeconds, 0, 60);
 
         // Password
         _settings.ShowPasswordMatchNotification = ShowPasswordMatchNotification;
