@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-12** — 计划文档状态整理：2 个已实施计划移入「已完成」（计划类，规则 1 同步）
+  - **移目录**：`progress-stats-cards-three-row.md`（2026-10-09 已实施：VM 5 新字段 + 3 累加器 + `DashBrushConverter` 动态格 5 处 + 5 卡三行 XAML + 7 单测）、`progress-window-enhancement.md`（T1–T9 已实施：路径/文件名分离、实时统计栏、时间/ETA、ZIP 并行批次详细行、批处理密码徽标、`PasswordRetryLoop` 兜底，计算逻辑抽 Core `ProgressDisplayCalculator`；UI 部分已被 prototype-alignment 推翻重做，F3 并入对齐计划收口，本计划无剩余独立任务）由 `.omo/plans/未开始/` 移至 `.omo/plans/已完成/`，头部补/改 ✅ 已实施状态行（enhancement 为新增效力状态块）。
+  - **状态行修正（2 个既有已完成计划此前误留「待实施」）**：`progress-window-channel-info.md`、`progress-file-compression-ratio.md` 头部状态改 ✅ 已实施（2026-10-10 落地）。
+  - **docs/PLAN.md 同步**：删除 enhancement / stats-cards 两行 P2 登记；执行顺序注记改 4 项依赖链（enhancement 标注已完成、时间估算已按简单实时速度方案落地，`progress-bar-segments` 直接在现有布局上做）；最后更新日期 → 2026-10-12。
+  - **docs/PROGRESS.md 同步**：【历史设计方案索引】按从新到旧新增 2 行（stats-cards、enhancement，实现版本均「未发布」）。
+  - **断链修复（仅本次移动产生）**：本文档 2 处 stats-cards 计划链接、`docs/prototypes/progress-stats-cards-three-row.html` 归属路径、`progress-window-prototype-alignment.md` 内 2 处对 enhancement 的相对链接、enhancement 计划内 2 处对 alignment 的相对链接；正文历史条目中的路径提及（release 纪律/勾选状态/v2 重写记录等 enhancement、smart-parallel）按惯例不追改——历史移动造成的旧断链（smart-parallel/channel-info/compression-ratio 等）同样不回改。
+  - **边界（保持「未开始」不动）**：`progress-window-prototype-alignment.md`（T1–T11 完成但 F3 余 6 项人眼验收）、`progress-window-status-line.md`/`progress-bar-segments.md`/`progress-window-bytes-i18n.md`（代码核实未实施）、`skeleton-progress-counter.md`（预览骨架屏子系统，非 ProgressWindow 范畴）。
+
 **2026-10-12** — 依赖安全升级（ImageSharp 3.1.5 → 4.1.3 + SQLitePCLRaw 原生库覆盖）
   - **ImageSharp 3.1.5 → 4.1.3**（直接依赖，用于 TGA/APNG 预览解码不可信内容）：3.1.5 命中 **4 High + 3 Moderate**（含 `GHSA-2cmq-823j-5qj8` GIF 越界写 CVE-2025-27598、`j3p4`/`j9gm`/`jjfr` High、`rxmq`/`gwg2`/`wmxv` Moderate）。实测（NuGet 审计 DB）：3.1.12 / 3.2.0 仅清 High、仍留 `gwg2`（Moderate）；唯 **4.1.3 全清**。4.1.3 编译通过（现有 APNG/TGA 用法兼容）；许可证不变（Six Labors Split License）。
   - **`SQLitePCLRaw.lib.e_sqlite3` 2.1.11 → 3.53.3**（`MantisZip.Core` / UI 经 Microsoft.Data.Sqlite 传递）：2.1.11 捆绑 SQLite < 3.50.2（CVE-2025-6965 内存损坏，`GHSA-2m69-gcr7-jv3q`）。Microsoft.Data.Sqlite 10.0.8 仍钉 2.1.11，故在 Core/UI 显式覆盖**仅原生库包**（e_sqlite3 ABI 稳定；managed `provider`/`core`/`bundle` 维持 2.1.11 不动）。运行时冒烟：新原生库可加载、`sqlite_version ≥ 3.50.2`、建表/查询正常。
@@ -74,7 +82,7 @@
   - **验证**：`dotnet build` 0 错 0 警；Avalonia 170 通过 / 5 预存败（PreviewWebViewLazyInitTests）/ 3 跳过；Core 615 通过 / 0 败 / 3 跳过。
 
 **2026-10-09** — 统计卡三行计划修订（方案 A 去分母 + 终态完备性核查）+ 交互原型（计划类）
-  - **计划修订**：[progress-stats-cards-three-row.md](../.omo/plans/未开始/progress-stats-cards-three-row.md)——用户拍板方案 A：已处理卡行 2 由 `N/M` 分数改纯计数（分母与总大小卡行 2 文件总数同源重复，比例由总进度条承担；中等档 `StatsProcessedText` 一句话文案保留 `N/M` 分数不受影响）；条目终态完备性核查结论：`ArchiveEntryStatus` 4 终态（Completed/Skipped/Failed/Overwritten）完备，6 种 `FileConflictAction` 映射清晰（Ask 中间态、条件覆盖未命中归 Skipped），目录条目 `IsDirectory` continue 与取消/暂停（操作级）均不进统计卡；重命名可见性缺口（`resolvedPath != outputPath` 上报 `Completed`）记入边界备忘并加守卫条款「不得为重命名新增条目终态」；既有测试 `StatsProcessedCount_ShowsFractionString`（:534）改名改断言为 `ShowsPureCount`（断言 `"60"` 而非 `"60/100"`），中等档分数测试 :491/:516 不动。
+  - **计划修订**：[progress-stats-cards-three-row.md](../.omo/plans/已完成/progress-stats-cards-three-row.md)——用户拍板方案 A：已处理卡行 2 由 `N/M` 分数改纯计数（分母与总大小卡行 2 文件总数同源重复，比例由总进度条承担；中等档 `StatsProcessedText` 一句话文案保留 `N/M` 分数不受影响）；条目终态完备性核查结论：`ArchiveEntryStatus` 4 终态（Completed/Skipped/Failed/Overwritten）完备，6 种 `FileConflictAction` 映射清晰（Ask 中间态、条件覆盖未命中归 Skipped），目录条目 `IsDirectory` continue 与取消/暂停（操作级）均不进统计卡；重命名可见性缺口（`resolvedPath != outputPath` 上报 `Completed`）记入边界备忘并加守卫条款「不得为重命名新增条目终态」；既有测试 `StatsProcessedCount_ShowsFractionString`（:534）改名改断言为 `ShowsPureCount`（断言 `"60"` 而非 `"60/100"`），中等档分数测试 :491/:516 不动。
   - **原型**：[progress-stats-cards-three-row.html](prototypes/progress-stats-cards-three-row.html)（单文件 HTML，5 场景：ZIP 完整数据 / ZIP 无冲突 / 7z 固实 / TAR 渐进 / 串行解压；新旧对比视图经 `oldR2` 字段实现——左栏还原现状分数 `60/100`、右栏新设计纯计数 `60`；演示数据 bug 修复：场景 1/3/4 的 `c5.r2` 由错误的 `'150'` 改为与 TotalFiles=100 一致的 `'100'`）。
   - **前向兼容契约**：`progress-window-channel-info.md` 补记——该计划任务 3 落地 `ArchiveProgress.FileTotalBytes` 后，逐条目终态报告（EntryStatus != null）必须携带该字段，使统计卡跳过/出错/已覆盖累加器在渐进模式（TAR/GZ、>5000 条目未播种）下自动升级为 100% 覆盖；stats-cards 侧接线只需把 `SetProgress` 的 `EntryStatus` 块调用末参从 `null` 改传 `p.FileTotalBytes`（计划已预留参数，零结构改动）。
   - **同步**：`docs/PLAN.md` P2 区统计卡登记行更新（规则 1）。设计与修订已落盘，未实施。
@@ -90,7 +98,7 @@
   - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。依赖 stats-cards 计划先行；无新增本地化 key。设计+任务分解已落盘，未实施。
 
 **2026-10-08** — 新增计划：进度窗口统计卡三行结构（计划类）
-  - **计划**：[progress-stats-cards-three-row.md](../.omo/plans/未开始/progress-stats-cards-three-row.md)（P2 / 2-3h / 6 任务 3 波次 TDD 分解）
+  - **计划**：[progress-stats-cards-three-row.md](../.omo/plans/已完成/progress-stats-cards-three-row.md)（P2 / 2-3h / 6 任务 3 波次 TDD 分解）
   - **内容**：「完整」档 6 张统计卡改三行表格——行 1 图标+标题横排、行 2 文件数量、行 3 文件大小；行级缺数据灰显 `—`（卡级显隐与中/精简两档零改动，规则 6 维持）；VM 新增 `StatsProcessedSize`/`StatsTotalCount` 只写不清字段（`SetProgress` 的 `TotalBytes`/`TotalFiles` 块写入）+ 新建 `DashBrushConverter`（`—`→`ThemeTextSecondaryBrush`、真实值→强调色）；D6 固定恰 3 条 VM 测试；无新本地化 key；方案 A 逐卡 XAML（模板化已否决）。
   - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。设计与任务分解已落盘，未实施。
 
