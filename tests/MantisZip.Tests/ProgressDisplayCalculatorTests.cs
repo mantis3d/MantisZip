@@ -168,4 +168,22 @@ public class ProgressDisplayCalculatorTests
     [Fact]
     public void MiddleEllipsis_Empty_ReturnsEmpty()
         => Assert.Equal("", ProgressDisplayCalculator.MiddleEllipsis("", 24));
+
+    [Fact]
+    public void MiddleEllipsis_ShortFirstSegment_LongSkeleton_DoesNotThrow()
+    {
+        // 回归：首段 "a"(1) 短于 maxLength/4(6)，骨架超长 → 旧实现 first[..6] 越界崩�?
+        // （崩溃现象：解压含超长路径条目时 UpsertParallelBatch 报 ArgumentOutOfRangeException）
+        var path = "a/b/" + new string('d', 30);
+        var result = ProgressDisplayCalculator.MiddleEllipsis(path, 24);
+        Assert.False(string.IsNullOrEmpty(result));
+    }
+
+    [Fact]
+    public void MiddleEllipsis_ShortFirstAndLast_LongSkeleton_DoesNotThrow()
+    {
+        var path = "a/" + string.Join('/', Enumerable.Repeat(new string('d', 40), 3)) + "/c";
+        var result = ProgressDisplayCalculator.MiddleEllipsis(path, 24);
+        Assert.False(string.IsNullOrEmpty(result));
+    }
 }

@@ -38,15 +38,17 @@ public static class ProgressDisplayCalculator
         if (parts.Length <= 2)
         {
             // 段数太少无法保留首末：退化为前 maxLength-1 字符 + "…"
-            return path[..(maxLength - 1)] + "…";
+            return path[..Math.Max(0, maxLength - 1)] + "…";
         }
         var first = parts[0];
         var last = parts[^1];
         var skeleton = $"{first}/…/{last}";
-        // 末段保留尾部字符（尾部目录名最具辨识度）
+        // 末段保留尾部字符（尾部目录名最具辨识度）。
+        // 取首段/末段的子串必须夹紧到各自实际长度：首段可能短于 maxLength/4（如 "a" + 超长路径），
+        // 直接 first[..maxLength/4] 会 Substring 越界抛 ArgumentOutOfRangeException（崩溃）。
         return skeleton.Length <= maxLength
             ? skeleton
-            : $"{first[..Math.Max(1, maxLength / 4)]}/…/{last[^Math.Min(last.Length, maxLength / 2)..]}";
+            : $"{first[..Math.Min(first.Length, Math.Max(1, maxLength / 4))]}/…/{last[^Math.Min(last.Length, Math.Max(1, maxLength / 2))..]}";
     }
 
     /// <summary>总进度 = (已完成档案数 + 当前档案百分比/100) / 总档案数。</summary>
