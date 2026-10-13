@@ -16,6 +16,8 @@ using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Services;
+using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.Utils;
 using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Dialogs;
@@ -156,6 +158,23 @@ public partial class ProgressWindow : Window
         set => _vm.IsCompressFlow = value;
     }
 
+    /// <summary>测试压缩包流程：置 true 自动按下 📌（完成后不自动关闭）。须在窗口 Show 前设置。</summary>
+    public bool IsTestFlow
+    {
+        get => _vm.IsTestFlow;
+        set => _vm.IsTestFlow = value;
+    }
+
+    /// <summary>声明解压后置开关（能力位 + 初值）；须在 Show 前调用。非解压流程不调用 → 两开关隐藏。</summary>
+    public void SetExtractPostActions(bool openFolder, bool deleteArchive, bool? openFolderSeed = null, bool? deleteArchiveSeed = null)
+        => _vm.SetExtractPostActions(openFolder, deleteArchive, openFolderSeed, deleteArchiveSeed);
+
+    /// <summary>「完成后打开目录」开关当前值（消费点在窗口关闭后回读，spec §11.3）。</summary>
+    public bool OpenFolderAfterExtractValue => _vm.OpenFolderAfterExtract;
+
+    /// <summary>「完成后删原包」开关当前值（同上）。</summary>
+    public bool DeleteArchiveAfterExtractValue => _vm.DeleteArchiveAfterExtract;
+
     // ════════════════════════════════════════════
     //  Initialization & Cancellation
     // ════════════════════════════════════════════
@@ -226,29 +245,115 @@ public partial class ProgressWindow : Window
     /// <summary>
     /// After completion, wait for auto-close or manual close.
     /// If KeepOpenOnComplete is set during countdown, switches to manual wait.
+    /// 延迟秒数来自设置 AppSettings.AutoCloseDelaySeconds（Task 6：统一关窗职责，调用方不再传魔法数字）。
+    /// Task 10：延时等待期间在按钮行显示倒计时，支持行内临时修改（实例级，不回写设置）。
     /// </summary>
-    public async Task AutoCloseOrWaitAsync(int delayMs, Action closeAction)
+    public async Task AutoCloseOrWaitAsync(Action closeAction)
     {
         if (_vm.KeepOpenOnComplete)
         {
             await WaitForManualCloseAsync();
+            closeAction();
+            return;
         }
-        else
+
+        // 与设置窗口一致的 0–60 秒钳制（Task 9），负值/超限按边界处理
+        _countdownRemainingMs = Math.Clamp(AppSettings.Load().AutoCloseDelaySeconds, 0, 60) * 1000;
+        if (_countdownRemainingMs <= 0)
         {
-            int step = 100;
-            int elapsed = 0;
-            while (elapsed < delayMs)
+            closeAction();
+            return;
+        }
+
+        _vm.AutoCloseCountdownVisible = true;
+        try
+        {
+            int lastShownSecs = -1;
+            while (_countdownRemainingMs > 0)
             {
-                await Task.Delay(step);
-                elapsed += step;
+                await Task.Delay(100);
+                // D11：倒计时中按下 📌 → 立即转手动等待（按钮状态 = 实际行为）
                 if (_vm.KeepOpenOnComplete)
                 {
                     await WaitForManualCloseAsync();
-                    break;
+                    closeAction();
+                    return;
+                }
+                // §10.4：行内编辑期间时间冻结（不回写文本，避免覆盖用户输入）
+                if (_countdownEditing)
+                    continue;
+
+                _countdownRemainingMs -= 100;
+                int secs = (_countdownRemainingMs + 999) / 1000;   // 向上取整 → 首显满值
+                if (secs != lastShownSecs)
+                {
+                    lastShownSecs = secs;
+                    UpdateCountdownText(secs);
                 }
             }
+            closeAction();
         }
-        closeAction();
+        finally
+        {
+            _vm.AutoCloseCountdownVisible = false;
+        }
+    }
+
+    /// <summary>倒计时编辑态（仅 UI 线程访问）：编辑期间冻结倒数与文本回写（§10.4）。</summary>
+    private bool _countdownEditing;
+
+    /// <summary>倒计时剩余毫秒（编辑态冻结时不清零，作为回退基准）。</summary>
+    private int _countdownRemainingMs;
+
+    /// <summary>回写倒计时数字文本（聚焦中不回写，防覆盖用户输入）。</summary>
+    private void UpdateCountdownText(int secs)
+    {
+        if (this.FindControl<TextBox>("CountdownBox") is not { } box)
+            return;
+        if (box.IsFocused)
+            return;
+        box.Text = secs.ToString();
+    }
+
+    /// <summary>聚焦即冻结（§10.4）：停止倒数流逝，全选便于直接键入。</summary>
+    private void CountdownBox_GotFocus(object? sender, RoutedEventArgs e)
+    {
+        _countdownEditing = true;
+        if (sender is TextBox box)
+            box.SelectAll();
+    }
+
+    /// <summary>离开编辑态：以最终有效值重置倒数起点（非法输入回退冻结时的剩余值），恢复流逝。</summary>
+    private void CountdownBox_LostFocus(object? sender, RoutedEventArgs e) => CommitCountdownEdit();
+
+    /// <summary>Enter 提交；Esc 放弃修改（恢复冻结时剩余值）后提交。</summary>
+    private void CountdownBox_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == global::Avalonia.Input.Key.Enter)
+        {
+            CommitCountdownEdit();
+            e.Handled = true;
+        }
+        else if (e.Key == global::Avalonia.Input.Key.Escape)
+        {
+            if (sender is TextBox box)
+                box.Text = ((_countdownRemainingMs + 999) / 1000).ToString();
+            CommitCountdownEdit();
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>提交编辑：解析最终值（非法回退冻结剩余值）并以之重置倒数起点，恢复流逝。</summary>
+    private void CommitCountdownEdit()
+    {
+        if (!_countdownEditing) return;
+        _countdownEditing = false;
+        if (this.FindControl<TextBox>("CountdownBox") is not { } box) return;
+
+        var frozenSecs = (_countdownRemainingMs + 999) / 1000;   // 冻结期间未流逝 → 等价当前值
+        var secs = CountdownParser.Parse(box.Text, frozenSecs);
+        _countdownRemainingMs = secs * 1000;                     // 以最终有效值重置起点
+        box.Text = secs.ToString();                              // 规范化显示（夹紧后值）
     }
 
     /// <summary>
@@ -624,6 +729,51 @@ public partial class ProgressWindow : Window
             // 剪贴板为尽力而为操作，失败仅提示不抛出
             if (statusTarget != null)
                 statusTarget.Text = LocalizationManager.T("Progress_PwdCopyFailed");
+        }
+    }
+
+    /// <summary>状态行复制：复制 StatusMessage 全文，复用既有 ShowCopyFeedback（✓ 翻转 + Toast）。</summary>
+    private async void StatusCopyBtn_Click(object? sender, RoutedEventArgs e)
+    {
+        var text = _vm.StatusMessage;
+        if (string.IsNullOrEmpty(text)) return;
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard == null) return;
+            var transfer = new global::Avalonia.Input.DataTransfer();
+            var item = new global::Avalonia.Input.DataTransferItem();
+            item.SetText(text);
+            transfer.Add(item);
+            await clipboard.SetDataAsync(transfer);
+            ShowCopyFeedback(sender);
+        }
+        catch (Exception ex)
+        {
+            // 剪贴板为尽力而为操作，失败仅记录不抛出（与密码复制一致）
+            App.DebugLog($"[ProgressWindow] status copy failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>错误摘要复制：复制 CombinedSummaryText（红段 + 换行 + 黄段，spec §6 复制契约）。</summary>
+    private async void SummaryCopyBtn_Click(object? sender, RoutedEventArgs e)
+    {
+        var text = _vm.CombinedSummaryText;
+        if (string.IsNullOrEmpty(text)) return;
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard == null) return;
+            var transfer = new global::Avalonia.Input.DataTransfer();
+            var item = new global::Avalonia.Input.DataTransferItem();
+            item.SetText(text);
+            transfer.Add(item);
+            await clipboard.SetDataAsync(transfer);
+            ShowCopyFeedback(sender);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[ProgressWindow] summary copy failed: {ex.Message}");
         }
     }
 

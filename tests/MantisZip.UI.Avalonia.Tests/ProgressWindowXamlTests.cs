@@ -1,4 +1,5 @@
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Headless.XUnit;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
@@ -30,8 +31,45 @@ public class ProgressWindowXamlTests
 
         var root = window.FindControl<Grid>("RootGrid");
         Assert.NotNull(root);
-        // 与 HTML 原型对齐的 7 行结构（原型对齐改版将旧 10 行布局收敛为 7 行）
+        // 对齐 HTML 原型后的 7 行结构（原型对齐改版将旧 10 行布局收敛到 7 行）
         Assert.Equal(7, root!.RowDefinitions.Count);
+        window.Close();
+    }
+
+    /// <summary>spec §2/§4：状态行与错误摘要均有复制控件；7 行布局不变（仅调行序）。</summary>
+    [AvaloniaFact]
+    public void ProgressWindow_StatusLineAndSummary_HaveCopyControls()
+    {
+        var window = new ProgressWindow("test");
+        window.Show();
+
+        Assert.NotNull(window.FindControl<TextBox>("StatusLineBox"));
+        Assert.NotNull(window.FindControl<Button>("StatusCopyBtn"));
+        Assert.NotNull(window.FindControl<TextBox>("ErrorSummaryRedBox"));
+        Assert.NotNull(window.FindControl<TextBox>("ErrorSummaryYellowBox"));
+        Assert.NotNull(window.FindControl<Button>("SummaryCopyBtn"));
+
+        var grid = window.FindControl<Grid>("RootGrid");
+        Assert.NotNull(grid);
+        Assert.Equal(7, grid!.RowDefinitions.Count);
+
+        window.Close();
+    }
+
+    /// <summary>spec §11.2: 解压后置开关默认隐藏（能力位 false，压缩/测试流全藏）。</summary>
+    [AvaloniaFact]
+    public void ProgressWindow_PostExtractToggles_DefaultHidden()
+    {
+        var window = new ProgressWindow("test");
+        window.Show();
+
+        var openFolderToggle = window.FindControl<ToggleButton>("OpenFolderToggle");
+        var deleteArchiveToggle = window.FindControl<ToggleButton>("DeleteArchiveToggle");
+        Assert.NotNull(openFolderToggle);
+        Assert.NotNull(deleteArchiveToggle);
+        Assert.False(openFolderToggle!.IsVisible);    // 能力位默认 false → IsVisible=false
+        Assert.False(deleteArchiveToggle!.IsVisible);
+
         window.Close();
     }
 

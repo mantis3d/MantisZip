@@ -832,4 +832,327 @@ public class ProgressViewModelTests
         Assert.Equal("—", vm.StatsFailedSize);
         Assert.Equal("—", vm.StatsOverwrittenSize);
     }
+
+    // ════════════════════════════════════════════
+    //  T5: 确定性条目结果聚合（红/黄摘要段 + 📌 自动钉住）
+    // ════════════════════════════════════════════
+
+    [Fact]
+    public void SetProgress_FailedWithReason_BuildsRedSummary_AndPinsOpen()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "a/b.txt",
+            EntryStatus = ArchiveEntryStatus.Failed,
+            EntryFailureReason = EntryFailureReason.PermissionDenied,
+        });
+
+        Assert.True(vm.HasErrors);
+        Assert.False(vm.HasSkippedEntries);
+        Assert.Contains("a/b.txt", vm.ErrorSummaryText);
+        Assert.Contains(LocalizationManager.T("Error_Reason_PermissionDenied"), vm.ErrorSummaryText);
+        Assert.True(vm.KeepOpenOnComplete);
+    }
+
+    [Fact]
+    public void SetProgress_SkippedWithReason_BuildsYellowSummary_WithoutHasErrors()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "c.dat",
+            EntryStatus = ArchiveEntryStatus.Skipped,
+            EntryFailureReason = EntryFailureReason.IoFailed,
+        });
+
+        Assert.False(vm.HasErrors);
+        Assert.True(vm.HasSkippedEntries);
+        Assert.Contains("c.dat", vm.SkippedSummaryText);
+        Assert.False(vm.KeepOpenOnComplete);
+    }
+
+    [Fact]
+    public void SetProgress_SkippedWithoutReason_NotCollected()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "c.dat",
+            EntryStatus = ArchiveEntryStatus.Skipped,
+        });
+
+        Assert.False(vm.HasSkippedEntries);
+        Assert.False(vm.HasErrors);
+    }
+
+    [Fact]
+    public void SetProgress_DuplicateEntryKey_CollapsedToSingleLine()
+    {
+        var vm = new ProgressViewModel();
+        for (int i = 0; i < 3; i++)
+        {
+            vm.SetProgress(new ArchiveProgress
+            {
+                EntryKey = "a/b.txt",
+                EntryStatus = ArchiveEntryStatus.Failed,
+                EntryFailureReason = EntryFailureReason.IoFailed,
+            });
+        }
+
+        Assert.True(vm.HasErrors);
+        Assert.Equal(1, vm.ErrorSummaryText!.Split('\n').Length);
+    }
+
+    [Fact]
+    public void SetProgress_MoreThan20Failures_TruncatesWithMoreLine()
+    {
+        var vm = new ProgressViewModel();
+        for (int i = 0; i < 25; i++)
+        {
+            vm.SetProgress(new ArchiveProgress
+            {
+                EntryKey = $"f{i}.txt",
+                EntryStatus = ArchiveEntryStatus.Failed,
+                EntryFailureReason = EntryFailureReason.IoFailed,
+            });
+        }
+
+        // 截断公式：SummaryMaxLines=20 → 无头部时 19 条明细行 + 1 条溢出行 = 20 行；
+        // 溢出计数 = 总数 25 - 已展示 19 = 6。
+        var lines = vm.ErrorSummaryText!.Split('\n');
+        Assert.Equal(20, lines.Length);
+        Assert.Contains(LocalizationManager.T("Progress_ErrorSummary_More", 6), lines[^1]);
+    }
+
+    [Fact]
+    public void CombinedSummaryText_RedThenYellow_SingleNewline()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "x.txt",
+            EntryStatus = ArchiveEntryStatus.Failed,
+            EntryFailureReason = EntryFailureReason.Other,
+        });
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "y.txt",
+            EntryStatus = ArchiveEntryStatus.Skipped,
+            EntryFailureReason = EntryFailureReason.IoFailed,
+        });
+
+        Assert.NotNull(vm.ErrorSummaryText);
+        Assert.NotNull(vm.SkippedSummaryText);
+        Assert.StartsWith(vm.ErrorSummaryText!, vm.CombinedSummaryText);
+        Assert.Contains("\n" + vm.SkippedSummaryText, vm.CombinedSummaryText);
+        Assert.DoesNotContain("\n\n", vm.CombinedSummaryText);
+    }
+
+    [Fact]
+    public void SetErrorSummary_WholeArchiveError_PinsOpen_AndKeepsEntryLines()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "x.txt",
+            EntryStatus = ArchiveEntryStatus.Failed,
+            EntryFailureReason = EntryFailureReason.Other,
+        });
+
+        vm.SetErrorSummary("disk full");
+
+        Assert.True(vm.KeepOpenOnComplete);
+        Assert.StartsWith("disk full", vm.ErrorSummaryText!);
+        Assert.Contains("x.txt", vm.ErrorSummaryText!);
+    }
+
+    [Fact]
+    public void UpdateBatchItemStatus_Failed_PinsOpen_OtherStatusDoesNot()
+    {
+        // Failed → 钉住
+        var failedVm = new ProgressViewModel();
+        failedVm.InitBatchMode(new[] { "a.zip" });
+        failedVm.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
+        Assert.True(failedVm.KeepOpenOnComplete);
+
+        // Completed → 不钉住
+        var okVm = new ProgressViewModel();
+        okVm.InitBatchMode(new[] { "a.zip" });
+        okVm.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
+        Assert.False(okVm.KeepOpenOnComplete);
+    }
+
+    [Fact]
+    public void IsTestFlow_True_PinsOpen()
+    {
+        var vm = new ProgressViewModel();
+        Assert.False(vm.KeepOpenOnComplete);
+
+        vm.IsTestFlow = true;
+
+        Assert.True(vm.KeepOpenOnComplete);
+    }
+
+    [Fact]
+    public void ClearEntryOutcomes_ResetsSummaryAndCounts()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "x.txt",
+            EntryStatus = ArchiveEntryStatus.Failed,
+            EntryFailureReason = EntryFailureReason.Other,
+        });
+        Assert.True(vm.HasErrors);
+
+        vm.ClearEntryOutcomes();
+
+        Assert.False(vm.HasErrors);
+        Assert.False(vm.HasSkippedEntries);
+        Assert.Null(vm.ErrorSummaryText);
+        Assert.Null(vm.SkippedSummaryText);
+        Assert.Null(vm.CombinedSummaryText);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  解压后置开关（spec §11；实例级，不回写设置，D17/D18）
+    // ═══════════════════════════════════════════════════════════
+
+    [Fact]
+    public void PostExtractToggles_DefaultsAndNoPersist()
+    {
+        var vm = new ProgressViewModel();
+        // 能力位默认 false（压缩/测试流全藏，D18）
+        Assert.False(vm.ShowOpenFolderToggle);
+        Assert.False(vm.ShowDeleteArchiveToggle);
+
+        var settings = AppSettings.Load();
+        vm.SetExtractPostActions(openFolder: true, deleteArchive: true, openFolderSeed: null);
+
+        // 能力位置 true + 初值镜像设置（不回写——再读设置应不变）
+        Assert.True(vm.ShowOpenFolderToggle);
+        Assert.True(vm.ShowDeleteArchiveToggle);
+        Assert.Equal(settings.OpenFolderAfterExtract, vm.OpenFolderAfterExtract);
+        Assert.Equal(settings.DeleteArchiveAfterExtract, vm.DeleteArchiveAfterExtract);
+
+        // 用户在窗口内翻转 → 仅实例级，设置不动
+        vm.OpenFolderAfterExtract = !vm.OpenFolderAfterExtract;
+        Assert.Equal(settings.OpenFolderAfterExtract, AppSettings.Load().OpenFolderAfterExtract);
+    }
+
+    [Fact]
+    public void SetExtractPostActions_OpenFolderSeed_OverridesSettingMirror()
+    {
+        var vm = new ProgressViewModel();
+
+        vm.SetExtractPostActions(true, true, openFolderSeed: true);
+
+        Assert.True(vm.OpenFolderAfterExtract);   // 对话框选择优先于设置镜像（§11.3）
+    }
+
+    [Fact]
+    public void SetExtractPostActions_DeleteArchiveSeed_OverridesSettingMirror()
+    {
+        var vm = new ProgressViewModel();
+
+        vm.SetExtractPostActions(true, true, openFolderSeed: null, deleteArchiveSeed: true);
+
+        Assert.True(vm.DeleteArchiveAfterExtract);   // CLI 弹窗勾选作种子
+    }
+
+    [Fact]
+    public void SetExtractPostActions_BothDisabled_LeavesInitialsDefault()
+    {
+        var vm = new ProgressViewModel();
+
+        vm.SetExtractPostActions(false, false, null);
+
+        Assert.False(vm.ShowOpenFolderToggle);
+        Assert.False(vm.ShowDeleteArchiveToggle);
+        Assert.False(vm.OpenFolderAfterExtract);
+        Assert.False(vm.DeleteArchiveAfterExtract);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    //  状态图标 ↔ 当前状态对应（状态行左侧图标，始终存在且对应状态）
+    // ═══════════════════════════════════════════════════════════
+
+    [Fact]
+    public void StatusKind_Default_Preparing()
+    {
+        var vm = new ProgressViewModel();
+        Assert.Equal(ProgressStatusKind.Preparing, vm.StatusKind);
+        Assert.Equal("IconArchiveClock", vm.StatusIconKey);
+    }
+
+    [Fact]
+    public void StatusKind_FirstProgress_TransitionsToRunning()
+    {
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 10, CurrentFile = "a.txt" });
+        Assert.Equal(ProgressStatusKind.Running, vm.StatusKind);
+        Assert.Equal("IconLightning", vm.StatusIconKey);
+    }
+
+    [Fact]
+    public void StatusKind_PauseResume()
+    {
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 10 });
+
+        vm.TogglePauseCommand.Execute(null);
+        Assert.Equal(ProgressStatusKind.Paused, vm.StatusKind);
+        Assert.Equal("IconPause", vm.StatusIconKey);
+
+        vm.TogglePauseCommand.Execute(null);
+        Assert.Equal(ProgressStatusKind.Running, vm.StatusKind);
+    }
+
+    [Fact]
+    public void StatusKind_SetComplete_Completed()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetComplete("done");
+        Assert.Equal(ProgressStatusKind.Completed, vm.StatusKind);
+        Assert.Equal("IconCheckmark", vm.StatusIconKey);
+    }
+
+    [Fact]
+    public void StatusKind_SetErrorSummary_Failed()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetErrorSummary("boom");
+        Assert.Equal(ProgressStatusKind.Failed, vm.StatusKind);
+        Assert.Equal("IconWarning", vm.StatusIconKey);
+        Assert.Equal("ThemeStatusErrorBrush", vm.StatusBrushKey);
+    }
+
+    [Fact]
+    public void StatusKind_Cancel_RunningToCancelled_ButNotAfterComplete()
+    {
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 10 });
+        vm.CancelCommand.Execute(null);
+        Assert.Equal(ProgressStatusKind.Cancelled, vm.StatusKind);
+        Assert.Equal("IconProhibited", vm.StatusIconKey);
+
+        // 已完成窗口点击「关闭」（同一命令）不得改写状态
+        var vm2 = new ProgressViewModel();
+        vm2.SetComplete("done");
+        vm2.CancelCommand.Execute(null);
+        Assert.Equal(ProgressStatusKind.Completed, vm2.StatusKind);
+    }
+
+    [Fact]
+    public void StatusKind_BatchFailed_Failed()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.zip" });
+        vm.UpdateBatchItemStatus(0, BatchItemStatus.Failed, "x");
+        Assert.Equal(ProgressStatusKind.Failed, vm.StatusKind);
+    }
 }

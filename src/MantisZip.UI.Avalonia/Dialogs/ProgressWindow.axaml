@@ -25,6 +25,8 @@
     <converters:StringNotEmptyConverter x:Key="StringNotEmpty"/>
     <!-- 状态画刷资源键转画刷（批次行前景色 / 批处理行状态色） -->
     <converters:BrushResourceConverter x:Key="BrushResource"/>
+    <!-- 状态图标资源键 → Geometry（状态行左侧图标，随 StatusKind 变化） -->
+    <converters:GeometryResourceConverter x:Key="GeometryResource"/>
     <!-- 比例 × 容器宽度 → 像素宽（详细面板「批次当前文件名」底纹；MultiBinding 双输入转换器）。
          此前该键只在 MainWindow.axaml 局部定义，ProgressWindow 作用域内引用不到 →
          详细面板首次渲染批次行时解析失败，UI 线程卡死（补齐本窗口作用域）。 -->
@@ -561,19 +563,11 @@
       </ListBox>
     </Border>
 
-    <!-- ═══ Row 3: 状态消息行（暂停/恢复/完成/失败等状态文字）═══ -->
-    <TextBlock Grid.Row="3"
-               Text="{Binding StatusMessage}"
-               FontSize="12"
-               FontWeight="SemiBold"
-               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-               TextTrimming="CharacterEllipsis"/>
-
-    <!-- ═══ Row 4: 下方信息区（对齐原型 .overall-info-section）═══
+    <!-- ═══ Row 3: 下方信息区（对齐原型 .overall-info-section；原 Row 4 上移）═══
          底色刻意区别于窗口底色（窗口 ThemeWindowBgBrush / 本区 ThemeSplitterBgBrush），
          形成独立信息面板。自上而下：密度切换 → 统计卡(完整) / 中等单行(中) → 总体进度 → 时间。
          密度三档互斥：少 = 仅总进度+时间；中 = +中等单行；完整 = +统计卡。 -->
-    <Border Grid.Row="4"
+    <Border Grid.Row="3"
             Background="{DynamicResource ThemeSplitterBgBrush}"
             BorderBrush="{DynamicResource ThemeBorderBrush}"
             BorderThickness="1"
@@ -881,20 +875,91 @@
       </StackPanel>
     </Border>
 
-    <!-- ═══ Row 5: 错误摘要（仅有错误时可见，可选中复制）═══ -->
-    <TextBox x:Name="ErrorSummaryBox" Grid.Row="5"
-             Text="{Binding ErrorSummaryText}"
-             IsReadOnly="True"
-             IsVisible="{Binding HasErrors}"
-             TextWrapping="Wrap"
-             FontSize="12"
-             Foreground="{DynamicResource ThemeStatusErrorBrush}"
-             Background="Transparent"
-             BorderThickness="0"
-             Padding="0,0,0,2"
-             IsTabStop="False"
-             Focusable="False"
-             Cursor="Arrow"/>
+    <!-- ═══ Row 4: 状态行（左侧状态图标 + 可复制只读文本框，20px；位于信息区之后、错误摘要/按钮行之前）═══ -->
+    <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto">
+      <!-- 状态图标：始终存在，随 StatusKind 变化（准备/进行/暂停/完成/失败/取消） -->
+      <PathIcon Grid.Column="0"
+                Data="{Binding StatusIconKey, Converter={StaticResource GeometryResource}}"
+                Foreground="{Binding StatusBrushKey, Converter={StaticResource BrushResource}}"
+                Width="20" Height="20"
+                VerticalAlignment="Center"
+                Margin="0,0,8,0" />
+      <!-- 状态行文本框：只读可选中，文案随暂停/恢复/完成变化（原 Row 3 TextBlock 下移并升级） -->
+      <TextBox x:Name="StatusLineBox"
+               Grid.Column="1"
+               Text="{Binding StatusMessage}"
+               IsReadOnly="True"
+               TextWrapping="Wrap"
+               FontSize="20"
+               FontWeight="SemiBold"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               Background="Transparent"
+               BorderThickness="0"
+               Padding="0"
+               VerticalAlignment="Center"
+               IsTabStop="False" />
+      <!-- 状态行复制按钮：复制 StatusMessage 全文，复用 ShowCopyFeedback（PathIcon 必须直接作 Content） -->
+      <Button x:Name="StatusCopyBtn"
+              Grid.Column="2"
+              Click="StatusCopyBtn_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              Height="{DynamicResource ControlHeightSm}"
+              Padding="6,2"
+              VerticalAlignment="Center"
+              Margin="6,0,0,0">
+        <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+    </Grid>
+
+    <!-- ═══ Row 5: 错误摘要（红段=失败 + 黄段=带原因跳过；两段独立显隐；复制按钮聚合两段）═══ -->
+    <Grid Grid.Row="5" ColumnDefinitions="*,Auto">
+      <StackPanel Spacing="0">
+        <!-- 红段：整包异常 + 逐条目失败（既有 HasErrors 驱动） -->
+        <TextBox x:Name="ErrorSummaryRedBox"
+                 Text="{Binding ErrorSummaryText}"
+                 IsReadOnly="True"
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 Foreground="{DynamicResource ThemeStatusErrorBrush}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0,0,0,2"
+                 IsVisible="{Binding HasErrors}"
+                 IsTabStop="False"
+                 Focusable="False" />
+        <!-- 黄段：压缩端带原因跳过（不触发 HasErrors，D4） -->
+        <TextBox x:Name="ErrorSummaryYellowBox"
+                 Text="{Binding SkippedSummaryText}"
+                 IsReadOnly="True"
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 Foreground="{DynamicResource ThemeStatusWarningBrush}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0,0,0,2"
+                 IsVisible="{Binding HasSkippedEntries}"
+                 IsTabStop="False"
+                 Focusable="False" />
+      </StackPanel>
+      <!-- 摘要复制按钮：复制 CombinedSummaryText（红段 + 换行 + 黄段）；红或黄任一非空即显示 -->
+      <Button x:Name="SummaryCopyBtn"
+              Grid.Column="1"
+              Click="SummaryCopyBtn_Click"
+              IsVisible="{Binding HasAnySummary}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              Height="{DynamicResource ControlHeightSm}"
+              Padding="6,2"
+              VerticalAlignment="Top"
+              Margin="6,0,0,0">
+        <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+    </Grid>
 
     <!-- ═══ Row 6: 底部按钮行 ═══
          保持打开（📌 置顶开关） | 弹性填充 | 暂停/继续 | 取消。 -->
@@ -905,17 +970,66 @@
         <ColumnDefinition Width="Auto"/>
         <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
-      <!-- 保持打开切换按钮（完成后不自动关闭） -->
-      <ToggleButton x:Name="KeepOpenToggle" Grid.Column="0"
-                    Height="{DynamicResource ControlHeightLg}" Width="44"
-                    IsChecked="{Binding KeepOpenOnComplete}"
-                    ToolTip.Tip="{Binding LocalizedStrings[Progress_KeepOpen]}"
-                    VerticalAlignment="Center"
-                    Background="{DynamicResource ThemeButtonBgBrush}"
-                    BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1">
-        <PathIcon Data="{StaticResource IconPin}" Width="16" Height="16" />
-      </ToggleButton>
+      <!-- Column 0 左侧簇：保持打开 + 解压后置开关（📁 打开目录 / 🗑 移回收站） -->
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+        <!-- 保持打开切换按钮（完成后不自动关闭） -->
+        <ToggleButton x:Name="KeepOpenToggle"
+                      Height="{DynamicResource ControlHeightLg}" Width="44"
+                      IsChecked="{Binding KeepOpenOnComplete}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Progress_KeepOpen]}"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+          <PathIcon Data="{StaticResource IconPin}" Width="16" Height="16" />
+        </ToggleButton>
+        <!-- 解压后打开目标目录（实例级；IsVisible 由能力位驱动 → 压缩/测试流隐藏，规则 6） -->
+        <ToggleButton x:Name="OpenFolderToggle"
+                      IsChecked="{Binding OpenFolderAfterExtract}"
+                      IsVisible="{Binding ShowOpenFolderToggle}"
+                      Height="{DynamicResource ControlHeightLg}" Width="44"
+                      ToolTip.Tip="{Binding LocalizedStrings[Settings_Extract_OpenFolderAfter]}"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+          <PathIcon Data="{StaticResource IconFolder}" Width="16" Height="16" />
+        </ToggleButton>
+        <!-- 解压后把原压缩包移入回收站（同上） -->
+        <ToggleButton x:Name="DeleteArchiveToggle"
+                      IsChecked="{Binding DeleteArchiveAfterExtract}"
+                      IsVisible="{Binding ShowDeleteArchiveToggle}"
+                      Height="{DynamicResource ControlHeightLg}" Width="44"
+                      ToolTip.Tip="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+          <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16" />
+        </ToggleButton>
+      </StackPanel>
+      <!-- 倒计时组：自动关闭剩余秒数（仅延时等待期显示；行内可临时改，实例级不回写设置，spec §10.3/§10.4） -->
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Center"
+                  IsVisible="{Binding AutoCloseCountdownVisible}">
+        <!-- 数字框：聚焦即冻结倒数，Enter 提交 / Esc 回退 / 失焦提交 -->
+        <TextBox x:Name="CountdownBox"
+                 Width="44"
+                 TextAlignment="Right"
+                 FontSize="13"
+                 GotFocus="CountdownBox_GotFocus"
+                 LostFocus="CountdownBox_LostFocus"
+                 KeyDown="CountdownBox_KeyDown"
+                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        <!-- 静态后缀「秒后自动关闭」（数字由上方 TextBox 承载，故本 key 不含 {0}） -->
+        <TextBlock Text="{Binding LocalizedStrings[Progress_AutoCloseSuffix]}"
+                   VerticalAlignment="Center"
+                   FontSize="12"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+      </StackPanel>
       <!-- 暂停/继续按钮 -->
       <Button x:Name="PauseButton" Grid.Column="2"
               Width="80" Height="{DynamicResource ControlHeightLg}"

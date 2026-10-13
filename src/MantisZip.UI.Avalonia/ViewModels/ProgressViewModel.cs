@@ -14,6 +14,25 @@ using MantisZip.UI.Avalonia.Services;
 namespace MantisZip.UI.Avalonia.ViewModels;
 
 /// <summary>
+/// 进度窗口状态类别：驱动状态行左侧「状态图标」——图标始终存在且始终对应当前状态。
+/// </summary>
+public enum ProgressStatusKind
+{
+    /// <summary>准备中（枚举/分组/启动各组的静默期）。</summary>
+    Preparing,
+    /// <summary>进行中（引擎已开始上报）。</summary>
+    Running,
+    /// <summary>已暂停。</summary>
+    Paused,
+    /// <summary>已完成（成功）。</summary>
+    Completed,
+    /// <summary>失败（整包异常或逐条目失败）。</summary>
+    Failed,
+    /// <summary>已取消（用户主动取消，非错误）。</summary>
+    Cancelled,
+}
+
+/// <summary>
 /// ViewModel for the progress window — shared between compress and extract operations.
 /// Uses CommunityToolkit.Mvvm for observable properties and relay commands.
 /// </summary>
@@ -136,6 +155,11 @@ public partial class ProgressViewModel : ObservableObject
             ["Progress_Tooltip_Progress"] = LocalizationManager.T("Progress_Tooltip_Progress"),
             ["Progress_Tooltip_Bytes"] = LocalizationManager.T("Progress_Tooltip_Bytes"),
             ["Progress_Tooltip_Ratio"] = LocalizationManager.T("Progress_Tooltip_Ratio"),
+            // Task 10：自动关闭倒计时后缀（数字由可编辑 TextBox 承载，此 key 刻意不含 {0}）
+            ["Progress_AutoCloseSuffix"] = LocalizationManager.T("Progress_AutoCloseSuffix"),
+            // Task 11：解压后置开关的 tooltip（复用设置页既有文案 key）
+            ["Settings_Extract_OpenFolderAfter"] = LocalizationManager.T("Settings_Extract_OpenFolderAfter"),
+            ["Settings_Extract_DeleteArchiveAfterExtract"] = LocalizationManager.T("Settings_Extract_DeleteArchiveAfterExtract"),
         };
 
         // T6: 操作计时基线 + 当前文件标签初值 + 集合变更通知（并行批次行 / 条目行）
@@ -181,6 +205,46 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private string? _errorSummaryText;
 
+    /// <summary>黄色摘要段：压缩端带原因跳过的逐条目汇总（≤20 行，溢出加 …另 N 项）。</summary>
+    [ObservableProperty]
+    private string? _skippedSummaryText;
+
+    /// <summary>是否存在带原因的跳过条目。独立于 <see cref="HasErrors"/>——黄色段绝不影响红段标志（D4）。</summary>
+    [ObservableProperty]
+    private bool _hasSkippedEntries;
+
+    /// <summary>红+黄合并摘要（红段 + 单个 \n + 黄段，空段省略无空行；供复制按钮使用）。</summary>
+    [ObservableProperty]
+    private string? _combinedSummaryText;
+
+    /// <summary>红段或黄段任一非空（错误摘要复制按钮显隐；集中通知模式，避免逐字段标注）。</summary>
+    [ObservableProperty]
+    private bool _hasAnySummary;
+
+    // ════════════════════════════════════════════
+    //  解压后置动作开关（spec §11；实例级，仅本次生效，不回写设置，D17）
+    // ════════════════════════════════════════════
+
+    /// <summary>显示「解压后打开目录」开关（能力位；压缩/测试/拖拽场景 false，D18）。</summary>
+    [ObservableProperty]
+    private bool _showOpenFolderToggle;
+
+    /// <summary>显示「解压后移入回收站」开关（能力位；压缩/测试/CLI 拖拽场景 false，D18）。</summary>
+    [ObservableProperty]
+    private bool _showDeleteArchiveToggle;
+
+    /// <summary>本次解压完成后打开目标目录（初值镜像设置或对话框选择；不回写设置）。</summary>
+    [ObservableProperty]
+    private bool _openFolderAfterExtract;
+
+    /// <summary>本次解压完成后把原压缩包移入回收站（同上）。</summary>
+    [ObservableProperty]
+    private bool _deleteArchiveAfterExtract;
+
+    /// <summary>测试流程标记（自检窗口）；置 true 自动钉住窗口（📌）。</summary>
+    [ObservableProperty]
+    private bool _isTestFlow;
+
     [ObservableProperty]
     private string? _fileCountText;
 
@@ -191,12 +255,63 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private bool _keepOpenOnComplete;
 
+    /// <summary>自动关闭倒计时可见（仅延时等待期间 true；📌/失败/测试流为手动等待不显示）。</summary>
+    [ObservableProperty]
+    private bool _autoCloseCountdownVisible;
+
+    /// <summary>当前状态类别：驱动状态行左侧状态图标（图标始终存在且始终对应当前状态）。</summary>
+    [ObservableProperty]
+    private ProgressStatusKind _statusKind = ProgressStatusKind.Preparing;
+
+    /// <summary>状态图标资源键（GeometryResourceConverter → PathIcon.Data）。</summary>
+    public string StatusIconKey => StatusKind switch
+    {
+        ProgressStatusKind.Preparing => "IconArchiveClock",
+        ProgressStatusKind.Running => "IconLightning",
+        ProgressStatusKind.Paused => "IconPause",
+        ProgressStatusKind.Completed => "IconCheckmark",
+        ProgressStatusKind.Failed => "IconWarning",
+        ProgressStatusKind.Cancelled => "IconProhibited",
+        _ => "IconInfo",
+    };
+
+    /// <summary>状态图标前景画刷资源键（BrushResourceConverter → PathIcon.Foreground）。</summary>
+    public string StatusBrushKey => StatusKind switch
+    {
+        ProgressStatusKind.Paused => "ThemeStatusWarningBrush",
+        ProgressStatusKind.Completed => "ThemeStatusSuccessBrush",
+        ProgressStatusKind.Failed => "ThemeStatusErrorBrush",
+        _ => "ThemeTextSecondaryBrush",
+    };
+
+    partial void OnStatusKindChanged(ProgressStatusKind value)
+    {
+        OnPropertyChanged(nameof(StatusIconKey));
+        OnPropertyChanged(nameof(StatusBrushKey));
+    }
+
     /// <summary>当前为压缩流程（vs 解压）：控制通道区说明文字的可见性。解压侧恒为 false。</summary>
     [ObservableProperty]
     private bool _isCompressFlow;
 
     // 切压缩/解压流程时刷新通道派生属性（ShowCompressChannelHint 依赖本字段）
     partial void OnIsCompressFlowChanged(bool value) => NotifyChannelProperties();
+
+    // T5: 红段驱动 HasErrors；false→true 时自动钉住 📌（绝不反向解除，D10）
+    partial void OnHasErrorsChanged(bool value)
+    {
+        if (value)
+        {
+            KeepOpenOnComplete = true;
+            StatusKind = ProgressStatusKind.Failed;   // 状态图标转「失败」
+        }
+    }
+
+    // T5: 测试流程标记置 true 时自动钉住 📌
+    partial void OnIsTestFlowChanged(bool value)
+    {
+        if (value) KeepOpenOnComplete = true;
+    }
 
     // ════════════════════════════════════════════
     //  T6: 显示模式 / 统计 / 时间 / 速度 / 并行批次
@@ -480,6 +595,9 @@ public partial class ProgressViewModel : ObservableObject
     [RelayCommand]
     private void Cancel()
     {
+        // 进行中/暂停/准备态主动取消 → 图标转「已取消」；已完成/失败后点击「关闭」不改状态
+        if (StatusKind is ProgressStatusKind.Preparing or ProgressStatusKind.Running or ProgressStatusKind.Paused)
+            StatusKind = ProgressStatusKind.Cancelled;
         CancelOperation();
         RequestClose?.Invoke();
     }
@@ -506,6 +624,7 @@ public partial class ProgressViewModel : ObservableObject
             _pauseEvent.Reset();
             IsPaused = true;
             StatusMessage = LocalizationManager.T("Progress_Paused");
+            StatusKind = ProgressStatusKind.Paused;
         }
         else
         {
@@ -513,6 +632,7 @@ public partial class ProgressViewModel : ObservableObject
             _pauseEvent.Set();
             IsPaused = false;
             StatusMessage = LocalizationManager.T("Progress_Resuming");
+            StatusKind = ProgressStatusKind.Running;
         }
     }
 
@@ -548,6 +668,7 @@ public partial class ProgressViewModel : ObservableObject
         IsIndeterminate = true;
         _preparingText = LocalizationManager.T("Progress_Preparing");
         StatusMessage = _preparingText;
+        StatusKind = ProgressStatusKind.Preparing;
     }
 
     /// <summary>结束准备态：不定进度条恢复确定态，准备文案让位给真实状态（若已被其它状态覆盖则不动）。</summary>
@@ -558,6 +679,8 @@ public partial class ProgressViewModel : ObservableObject
         IsIndeterminate = false;
         if (StatusMessage == _preparingText)
             StatusMessage = null;
+        if (StatusKind == ProgressStatusKind.Preparing)
+            StatusKind = ProgressStatusKind.Running;
     }
 
     /// <summary>引擎最近一次上报是否携带「当前文件百分比」。false = 未知（如 7z mt=on 路径
@@ -594,6 +717,8 @@ public partial class ProgressViewModel : ObservableObject
             // compressedBytes 末参：压缩率计划的后置回填逐条目压缩后字节（仅 ZIP 压缩）
             UpdateEntryStatus(p.EntryKey,
                 EntryProgressItem.MapEntryStatus(p.EntryStatus.Value), null, p.FileTotalBytes, p.EntryCompressedBytes);
+            // T5: 确定性条目结果聚合（红/黄摘要段）——必须在早返回前收集，不落入速度采样路径
+            CollectEntryOutcome(p.EntryKey, p.EntryStatus.Value, p.EntryFailureReason);
             return;
         }
 
@@ -904,6 +1029,8 @@ public partial class ProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(OverallCompressionText));
         OnPropertyChanged(nameof(ShowChannelMetaSeparator));
         OnPropertyChanged(nameof(ShowChannelMetaRow));
+        // T5: 新批次/新操作不得继承上一操作的失败/跳过聚合（红黄摘要段、整包错误一并清空）
+        ClearEntryOutcomes();
     }
 
     /// <summary>
@@ -1056,6 +1183,9 @@ public partial class ProgressViewModel : ObservableObject
         DirName = string.Empty;
         StatusMessage = message;
         IsIndeterminate = false;
+        // 已完成（成功）；失败/取消态不被覆盖（失败测试流会 SetErrorSummary→SetComplete 两步走）
+        if (StatusKind is not (ProgressStatusKind.Failed or ProgressStatusKind.Cancelled))
+            StatusKind = ProgressStatusKind.Completed;
     }
 
     // ════════════════════════════════════════════
@@ -1142,7 +1272,12 @@ public partial class ProgressViewModel : ObservableObject
 
         _batchItems[index].Status = status;
         if (status == BatchItemStatus.Failed)
+        {
+            // T5: 批次行置 Failed 时自动钉住 📌（失败窗口保持打开，D10）
+            KeepOpenOnComplete = true;
             _batchItems[index].ErrorMessage = errorMessage;
+            StatusKind = ProgressStatusKind.Failed;   // 状态图标转「失败」
+        }
         if (status is BatchItemStatus.Skipped or BatchItemStatus.Completed)
         {
             _batchItems[index].Progress = 100;
@@ -1165,6 +1300,7 @@ public partial class ProgressViewModel : ObservableObject
         int succeeded = _batchItems.Count(i => i.Status == BatchItemStatus.Completed);
         int failed = _batchItems.Count(i => i.Status == BatchItemStatus.Failed);
         SetComplete(LocalizationManager.T("Progress_Batch_CompleteWithErrors", succeeded, failed));
+        StatusKind = ProgressStatusKind.Failed;   // 完成但含错误 → 状态图标转「失败」
     }
 
     /// <summary>
@@ -1214,12 +1350,131 @@ public partial class ProgressViewModel : ObservableObject
     // ════════════════════════════════════════════
 
     /// <summary>
-    /// Set error summary text (selectable, shown between progress bars and buttons).
+    /// Set whole-archive error summary (red segment header, selectable, shown between progress bars and buttons).
+    /// Header 恒为红段首行，逐条目红行列在其后。
     /// </summary>
     public void SetErrorSummary(string message)
     {
-        ErrorSummaryText = message;
-        HasErrors = true;
+        if (string.IsNullOrEmpty(message)) return;
+        _wholeArchiveError = message;
+        RebuildSummaryTexts();
+    }
+
+    // ════════════════════════════════════════════
+    //  T5: 确定性条目结果聚合（红/黄摘要段）
+    // ════════════════════════════════════════════
+
+    /// <summary>红段：逐条目 Failed（EntryKey 去重，first-wins）。</summary>
+    private readonly Dictionary<string, EntryFailureReason> _failedEntries = new(StringComparer.Ordinal);
+
+    /// <summary>黄段：压缩端带原因 Skipped（EntryKey 去重，first-wins）。冲突跳过无原因不收集。</summary>
+    private readonly Dictionary<string, EntryFailureReason> _skippedEntries = new(StringComparer.Ordinal);
+
+    /// <summary>整包级错误（SetErrorSummary 传入，红段首行）。</summary>
+    private string? _wholeArchiveError;
+
+    /// <summary>每个摘要段的最大行数（含溢出行；溢出计数 = 总数 - 已展示）。</summary>
+    private const int SummaryMaxLines = 20;
+
+    /// <summary>
+    /// 收集单条目终态结果：Failed → 红段；Skipped 且带原因 → 黄段。
+    /// EntryKey 去重（first-wins），新条目入表才重建摘要文本。
+    /// </summary>
+    private void CollectEntryOutcome(string key, ArchiveEntryStatus status, EntryFailureReason? reason)
+    {
+        if (status == ArchiveEntryStatus.Failed)
+        {
+            if (_failedEntries.TryAdd(key, reason ?? EntryFailureReason.Other))
+                RebuildSummaryTexts();
+        }
+        else if (status == ArchiveEntryStatus.Skipped && reason.HasValue)
+        {
+            if (_skippedEntries.TryAdd(key, reason.Value))
+                RebuildSummaryTexts();
+        }
+    }
+
+    /// <summary>
+    /// 重建红/黄摘要文本与派生标志（HasErrors 仅由红段文本驱动，D4；黄段驱动 HasSkippedEntries）。
+    /// 合并摘要 = 红段 + 单个 \n + 黄段，空段省略无空行。
+    /// </summary>
+    private void RebuildSummaryTexts()
+    {
+        ErrorSummaryText = BuildSummaryText(_wholeArchiveError, _failedEntries,
+            (key, reason) => LocalizationManager.T("Progress_Failed_EntryFmt", key, ReasonText(reason)));
+        SkippedSummaryText = BuildSummaryText(null, _skippedEntries,
+            (key, reason) => LocalizationManager.T("Progress_Skipped_EntryFmt", key, ReasonText(reason)));
+        HasErrors = !string.IsNullOrEmpty(ErrorSummaryText);
+        HasSkippedEntries = !string.IsNullOrEmpty(SkippedSummaryText);
+        HasAnySummary = HasErrors || HasSkippedEntries;
+        CombinedSummaryText = (ErrorSummaryText, SkippedSummaryText) switch
+        {
+            ({ } r, { } s) => r + "\n" + s,
+            ({ } r, null) => r,
+            (null, { } s) => s,
+            _ => null,
+        };
+    }
+
+    /// <summary>
+    /// 构建单段摘要：header 恒为首行（可空），条目行紧随；每段封顶 <see cref="SummaryMaxLines"/> 行，
+    /// 溢出时追加本地化「…另 N 项」行并截断。
+    /// </summary>
+    private static string? BuildSummaryText(string? header, Dictionary<string, EntryFailureReason> entries,
+        Func<string, EntryFailureReason, string> format)
+    {
+        var lines = new List<string>();
+        if (!string.IsNullOrEmpty(header)) lines.Add(header!);
+        int shown = 0;
+        foreach (var (key, reason) in entries)
+        {
+            if (lines.Count >= SummaryMaxLines - 1 && shown + 1 < entries.Count)
+            {
+                lines.Add(LocalizationManager.T("Progress_ErrorSummary_More", entries.Count - shown));
+                return string.Join("\n", lines);
+            }
+            lines.Add(format(key, reason));
+            shown++;
+        }
+        return lines.Count == 0 ? null : string.Join("\n", lines);
+    }
+
+    /// <summary>失败根因 → 本地化文案（Rule 13：禁止硬编码用户可见字符串）。</summary>
+    private static string ReasonText(EntryFailureReason reason) => reason switch
+    {
+        EntryFailureReason.PermissionDenied => LocalizationManager.T("Error_Reason_PermissionDenied"),
+        EntryFailureReason.IoFailed => LocalizationManager.T("Error_Reason_IoFailed"),
+        _ => LocalizationManager.T("Error_Reason_Other"),
+    };
+
+    /// <summary>公开重置：清空红/黄聚合、整包错误与三个摘要文本及其派生标志（新操作前调用）。</summary>
+    public void ClearEntryOutcomes()
+    {
+        _failedEntries.Clear();
+        _skippedEntries.Clear();
+        _wholeArchiveError = null;
+        ErrorSummaryText = null;
+        SkippedSummaryText = null;
+        CombinedSummaryText = null;
+        HasErrors = false;
+        HasSkippedEntries = false;
+        HasAnySummary = false;
+    }
+
+    /// <summary>
+    /// 声明解压后置开关能力位并镜像初值（spec §11.3）：
+    /// openFolderSeed 非 null → 对话框流程，用对话框选择作初值；否则镜像 AppSettings。
+    /// 全部为实例级，不回写设置（D17）。
+    /// </summary>
+    public void SetExtractPostActions(bool openFolder, bool deleteArchive, bool? openFolderSeed, bool? deleteArchiveSeed = null)
+    {
+        ShowOpenFolderToggle = openFolder;
+        ShowDeleteArchiveToggle = deleteArchive;
+        if (!openFolder && !deleteArchive) return;   // 能力位关 → 不镜像（保持默认 false）
+
+        var settings = AppSettings.Load();
+        OpenFolderAfterExtract = openFolderSeed ?? settings.OpenFolderAfterExtract;
+        DeleteArchiveAfterExtract = deleteArchiveSeed ?? settings.DeleteArchiveAfterExtract;
     }
 
     // ════════════════════════════════════════════
