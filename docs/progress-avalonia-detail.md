@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-13** — SixLabors.ImageSharp 社区许可证配置（依赖/许可管理）
+  - **背景**：ImageSharp 4.1.3 起构建期强制校验许可证，无 key 时 Debug 降级为警告、Release 直接失败（`.targets` 的 `ContinueOnError="$(Configuration.StartsWith('Debug'))"`）。曾评估三方案——降级 3.2.0（无效，v3 线自 3.2.0 起同样强制）、替换 SkiaSharp（TGA 无 codec + APNG 帧延迟元数据不覆盖）、社区许可证（改动最小、免费、保留 4.1.3 漏洞全清）。
+  - **实施**：`licensing.sixlabors.com` 以 OpenSource 类别申请（assembly-scoped key，绑定 `MantisZip.UI.Avalonia`）；`sixlabors.lic` 置于 `src/MantisZip.UI.Avalonia/` 并随仓库提交（2026-10-09 官方新政策明确允许 assembly-scoped 社区 key 公开提交）；`MantisZip.UI.Avalonia.csproj` 新增 `<SixLaborsLicenseFile>` 显式指向该文件（默认递归搜索在部分场景未命中）。
+  - **验证**：`dotnet build` 0 错误，4 条 ImageSharp 许可证警告全部消除。
+
 **2026-10-12** — 计划文档状态整理：2 个已实施计划移入「已完成」（计划类，规则 1 同步）
   - **移目录**：`progress-stats-cards-three-row.md`（2026-10-09 已实施：VM 5 新字段 + 3 累加器 + `DashBrushConverter` 动态格 5 处 + 5 卡三行 XAML + 7 单测）、`progress-window-enhancement.md`（T1–T9 已实施：路径/文件名分离、实时统计栏、时间/ETA、ZIP 并行批次详细行、批处理密码徽标、`PasswordRetryLoop` 兜底，计算逻辑抽 Core `ProgressDisplayCalculator`；UI 部分已被 prototype-alignment 推翻重做，F3 并入对齐计划收口，本计划无剩余独立任务）由 `.omo/plans/未开始/` 移至 `.omo/plans/已完成/`，头部补/改 ✅ 已实施状态行（enhancement 为新增效力状态块）。
   - **状态行修正（2 个既有已完成计划此前误留「待实施」）**：`progress-window-channel-info.md`、`progress-file-compression-ratio.md` 头部状态改 ✅ 已实施（2026-10-10 落地）。

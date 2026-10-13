@@ -6,6 +6,8 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <NoWarn>CA1416</NoWarn>
+    <!-- SixLabors.ImageSharp 社区许可证（OSS 免费） -->
+    <SixLaborsLicenseFile>$(MSBuildProjectDirectory)\sixlabors.lic</SixLaborsLicenseFile>
     <BuiltInComInteropSupport>true</BuiltInComInteropSupport>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <ApplicationIcon>Resources\App.ico</ApplicationIcon>
