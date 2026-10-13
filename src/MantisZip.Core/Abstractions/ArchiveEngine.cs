@@ -313,6 +313,22 @@ public enum ArchiveEntryStatus
 }
 
 /// <summary>
+/// 逐条目失败/跳过原因类别（spec §5）。Core 只产事实类别，
+/// 本地化文案由 UI 映射（规则 13：Core 禁止新增中文用户可见文案）。
+/// </summary>
+public enum EntryFailureReason
+{
+    /// <summary>权限不足（UnauthorizedAccessException）。</summary>
+    PermissionDenied,
+
+    /// <summary>读写错误：文件被占用、磁盘满、路径过长等（IOException）。</summary>
+    IoFailed,
+
+    /// <summary>其它异常（CRC/数据损坏等，含 ZIP 并行路径通用 catch）。</summary>
+    Other,
+}
+
+/// <summary>
 /// 压缩/解压进度报告
 /// </summary>
 public class ArchiveProgress
@@ -366,6 +382,9 @@ public class ArchiveProgress
 
     /// <summary>逐条目压缩后字节（后置回填；0 = 未知/非 ZIP 压缩）。</summary>
     public long EntryCompressedBytes { get; set; }
+
+    /// <summary>失败/带原因跳过的根因类别。仅 EntryStatus=Failed 或压缩端带原因 Skipped 时携带。</summary>
+    public EntryFailureReason? EntryFailureReason { get; set; }
 
     /// <summary>整体压缩后字节（后置回填；0 = 未知）。</summary>
     public long TotalCompressedBytes { get; set; }

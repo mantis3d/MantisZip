@@ -404,7 +404,7 @@ public class ZipEngine : IArchiveEngine
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：权限失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
                 }
                 catch (IOException iox)
                 {
@@ -414,7 +414,7 @@ public class ZipEngine : IArchiveEngine
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：IO 写入失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
                 }
             }
 
@@ -603,7 +603,7 @@ public class ZipEngine : IArchiveEngine
                     {
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：条目丢失 → Failed（锁外上报，避免锁竞争）
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other }); // 异常对象不在作用域，归 Other（spec §5.2）
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
@@ -689,7 +689,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
                 }
                 catch (IOException iox)
                 {
@@ -699,7 +699,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
                 }
                 catch (Exception ex)
                 {
@@ -709,7 +709,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other });
                 }
             }
 
@@ -930,7 +930,7 @@ while (true)
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：权限失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
                 }
                 catch (IOException iox)
                 {
@@ -939,7 +939,7 @@ while (true)
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：IO 写入失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
                 }
             }
 
@@ -1128,7 +1128,7 @@ while (true)
                     {
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：条目丢失 → Failed（锁外上报，避免锁竞争）
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other }); // 异常对象不在作用域，归 Other（spec §5.2）
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
@@ -1214,7 +1214,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
                 }
                 catch (IOException iox)
                 {
@@ -1225,7 +1225,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
                 }
                 catch (Exception ex)
                 {
@@ -1235,7 +1235,7 @@ while (true)
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other });
                 }
             }
 
@@ -1378,7 +1378,9 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                     // 加密 ZIP 走 SharpSevenZip 单次原生调用，无法逐文件恢复读取错误。
                     // 调用前预检读权限（被占用/权限 → ErrorResolver 弹窗 重试/跳过/中止），
                     // 跳过则剔除，避免单个不可读文件导致整个加密压缩直接中止。
-                    var validated = ReadErrorHandler.FilterUnreadableFiles(sourceFilePaths, options, cancellationToken);
+                    // 剔除的同时经 CreateSkippedReporter 上报逐条目 Skipped + 原因（spec §5.3）。
+                    var validated = ReadErrorHandler.FilterUnreadableFiles(sourceFilePaths, options, cancellationToken,
+                        ReadErrorHandler.CreateSkippedReporter(progress, sourceFilePaths));
                     if (validated.Count > 0)
                     {
                         s7zCompressor.CompressFilesEncrypted(outputPath, options.Password ?? "", validated.ToArray());
@@ -1760,11 +1762,11 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
 
                         if (!ReadFileWithRetry(fullPath, relativePath, options, zipWriter,
                                 ref processedBytes, totalBytes, totalFiles, ref processedFiles,
-                                cancellationToken, progress, ref lastReportTime, fsOut))
+                                cancellationToken, progress, ref lastReportTime, out var skipReason, fsOut))
                         {
                             if (cancellationToken.IsCancellationRequested) break;
-                            // 逐条目状态（D2）：读取被跳过 → Skipped
-                            progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = SafeFileSize(fullPath) });
+                            // 逐条目状态（D2）：读取被跳过 → Skipped（带原因类别，spec §5.3）
+                            progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped, FileTotalBytes = SafeFileSize(fullPath), EntryFailureReason = skipReason ?? EntryFailureReason.Other });
                             continue;
                         }
 
@@ -3286,8 +3288,9 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
         ArchiveOptions options, ZipWriter zipWriter, ref long processedBytes, long totalBytes,
         int totalFiles, ref int processedFiles,
         CancellationToken ct, IProgress<ArchiveProgress>? progress, ref DateTime lastReportTime,
-        Stream? fsOut = null)
+        out EntryFailureReason? skipReason, Stream? fsOut = null)
     {
+        skipReason = null;
         int retries = 3;
         while (retries > 0)
         {
@@ -3370,6 +3373,8 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                // 在重试/决策前先分类原因（spec §5.3）：即便最终 Retry 成功，分类也与其它埋点一致
+                skipReason = FailureReasonMapper.FromException(ex);
                 retries--;
                 if (options?.ErrorResolver == null)
                 {

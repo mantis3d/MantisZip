@@ -533,19 +533,19 @@ public class SevenZipEngine : IArchiveEngine
                 }
                 catch (UnauthorizedAccessException uax)
                 {
-                    CoreLog.Info($"ExtractAsync: permission denied for '{fileName}': {uax.Message}");
-                    conflictStats.RecordFailed();
-                    // 逐条目状态（D2）
-                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed });
+                        CoreLog.Info($"ExtractAsync: permission denied for '{fileName}': {uax.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
                     failedEntries++;
                 }
                 catch (IOException iox)
                 {
                     // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
-                    CoreLog.Info($"ExtractAsync: write failed for '{fileName}': {iox.Message}");
-                    conflictStats.RecordFailed();
-                    // 逐条目状态（D2）
-                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed });
+                        CoreLog.Info($"ExtractAsync: write failed for '{fileName}': {iox.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
                     failedEntries++;
                 }
             }
@@ -593,10 +593,12 @@ public class SevenZipEngine : IArchiveEngine
                 // 预检：7z 原生压缩是单次调用，无法逐文件恢复。先展开待压缩文件集，
                 // 统一做读权限预检（文件被占用/权限不足 → ErrorResolver 弹窗 重试/跳过/中止），
                 // 跳过则从文件集中剔除，避免单个不可读文件导致整个压缩直接中止。
+                // 剔除的同时经 CreateSkippedReporter 上报逐条目 Skipped + 原因（spec §5.3）。
                 var files = ExpandSourcePaths(sourcePaths);
                 if (options.FileWhitelist != null)
                     files = files.Where(f => options.FileWhitelist.Contains(f)).ToArray();
-                var validated = ReadErrorHandler.FilterUnreadableFiles(files, options, cancellationToken);
+                var validated = ReadErrorHandler.FilterUnreadableFiles(files, options, cancellationToken,
+                    ReadErrorHandler.CreateSkippedReporter(progress, files));
 
                 // 单一目录·无白名单·且无文件被跳过 → 保留 CompressDirectory 的 PreserveDirectoryRoot 语义
                 bool singleDirClean = sourcePaths.Length == 1
@@ -928,19 +930,19 @@ public class SevenZipEngine : IArchiveEngine
                 catch (OperationCanceledException) { throw; }
                 catch (UnauthorizedAccessException uax)
                 {
-                    CoreLog.Info($"ExtractEntriesAsync: permission denied for '{fileName}': {uax.Message}");
-                    conflictStats.RecordFailed();
-                    // 逐条目状态（D2）
-                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed });
+                        CoreLog.Info($"ExtractEntriesAsync: permission denied for '{fileName}': {uax.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
                     failedEntries++;
                 }
                 catch (IOException iox)
                 {
                     // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
-                    CoreLog.Info($"ExtractEntriesAsync: write failed for '{fileName}': {iox.Message}");
-                    conflictStats.RecordFailed();
-                    // 逐条目状态（D2）
-                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed });
+                        CoreLog.Info($"ExtractEntriesAsync: write failed for '{fileName}': {iox.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
                     failedEntries++;
                 }
             }

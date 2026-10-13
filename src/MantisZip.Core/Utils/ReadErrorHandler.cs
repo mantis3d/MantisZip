@@ -21,10 +21,12 @@ public static class ReadErrorHandler
     /// <param name="filePaths">待预检的完整文件路径集合。</param>
     /// <param name="options">归档选项（携带 ErrorResolver），可为 null。</param>
     /// <param name="cancellationToken">取消令牌。</param>
+    /// <param name="onSkipped">剔除回调（spec §5.3）：文件被 Skip 剔除时上报（完整路径, 原因类别），可为 null。</param>
     public static List<string> FilterUnreadableFiles(
         IEnumerable<string> filePaths,
         ArchiveOptions? options,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        Action<string, EntryFailureReason>? onSkipped = null)
     {
         var result = new List<string>();
         foreach (var path in filePaths)
@@ -32,19 +34,53 @@ public static class ReadErrorHandler
             cancellationToken.ThrowIfCancellationRequested();
             // 目录条目无法以读方式打开文件（OpenRead 抛 UnauthorizedAccessException），
             // 且目录本身也不需要读权限校验 —— 只对真正的文件做可读性预检，目录原样保留。
-            if (File.Exists(path) && !EnsureReadable(path, options))
+            if (File.Exists(path) && !EnsureReadable(path, options, out var reason))
+            {
+                // 预检剔除上报：补上 7z/加密 ZIP 单次原生调用无法逐文件上报的静默缺口
+                onSkipped?.Invoke(path, reason ?? EntryFailureReason.Other);
                 continue;
+            }
             result.Add(path);
         }
         return result;
     }
 
     /// <summary>
+    /// 为预检剔除构造 Skipped 上报回调：EntryKey 相对任一源目录前缀优先，退化为文件名（spec §5.3）。
+    /// </summary>
+    public static Action<string, EntryFailureReason> CreateSkippedReporter(
+        IProgress<ArchiveProgress>? progress, IReadOnlyList<string> sourcePaths)
+    {
+        return (fullPath, reason) =>
+        {
+            var key = fullPath;
+            foreach (var sp in sourcePaths)
+            {
+                if (!string.IsNullOrEmpty(sp) && Directory.Exists(sp)
+                    && fullPath.StartsWith(sp, StringComparison.OrdinalIgnoreCase))
+                {
+                    key = Path.GetRelativePath(sp, fullPath);
+                    break;
+                }
+            }
+            if (key == fullPath) key = Path.GetFileName(fullPath);
+            progress?.Report(new ArchiveProgress
+            {
+                EntryKey = key,
+                EntryStatus = ArchiveEntryStatus.Skipped,
+                EntryFailureReason = reason,
+            });
+        };
+    }
+
+    /// <summary>
     /// 校验单个文件是否可读（共享读模式打开）。不可读时按 <see cref="ArchiveOptions.ErrorResolver"/>
     /// 决定 重试/跳过/中止；无 ErrorResolver 时自动重试 3 次后抛异常。
     /// </summary>
-    private static bool EnsureReadable(string fullPath, ArchiveOptions? options)
+    /// <param name="reason">返回 false 时携带不可读原因类别（spec §5.3）；返回 true 时为 null。</param>
+    private static bool EnsureReadable(string fullPath, ArchiveOptions? options, out EntryFailureReason? reason)
     {
+        reason = null;
         int retries = 3;
         while (true)
         {
@@ -57,6 +93,8 @@ public static class ReadErrorHandler
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
+                // 在重试/决策前先分类原因：即便最终 Retry 成功，分类也保持与三引擎埋点一致
+                reason = FailureReasonMapper.FromException(ex);
                 retries--;
                 if (options?.ErrorResolver == null)
                 {
