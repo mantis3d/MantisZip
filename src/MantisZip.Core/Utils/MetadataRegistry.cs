@@ -141,6 +141,7 @@ public static class MetadataRegistry
         ]);
 
         Register("audio", [
+            new(MetadataKeys.Title, "标题", "音频信息"),
             new(MetadataKeys.Duration, "时长", "音频信息"),
             new(MetadataKeys.SampleRate, "采样率", "音频信息"),
             new(MetadataKeys.BitDepth, "位深", "音频信息"),

@@ -1,4 +1,4 @@
-# MantisZip 开发进度 — Avalonia + 共享层详细变更记录
+﻿# MantisZip 开发进度 — Avalonia + 共享层详细变更记录
 
 > 本文档为 [PROGRESS.md](PROGRESS.md) 的详细变更记录（里程碑总览见 PROGRESS.md），按日期从新到旧排列。
 
@@ -139,6 +139,67 @@
   - **G2 实测结论**：`scripts/bench-zip-mt.cs` 加 `--degrees` 后四轮（text / text-rev / media / mixed，degree 1/2/4/8）显示 **N 组无加速**（degree=1 全面最快或持平，degree=2 最差；倒序对照一致）→ **维持默认 `ParallelCompressDegree = Environment.ProcessorCount`**（全局 `MultiThreadedCompression` 默认关，N 组为 opt-in）。
   - **验证**：UI 构建 0 警告 0 错误；Core **608 通过 / 0 失败 / 3 跳过**（+3）；Avalonia **114 通过 / 0 失败 / 2 跳过**。
   - **i18n / 其他**：三语成对新增 `Progress_Preparing`；`.gitignore` 排除 `.buildout/`（验证用生成本地件，约 7.6GB）。
+**2026-10-12** — 7z 固实块大小支持自定义 MB 输入（对齐字典方案）
+  - **背景**：字典大小支持自定义后，固实块大小（`s` 参数）结构上完全同构（同为走 `CustomParameters` 的 7z 大小字符串），`SevenZipSolidBlockSize` 全链路本就是 `string` → Core 零改动，仅补 UI
+  - **预设**：`CompressionOptionData.SevenZipSolidBlockSizes` 尾部加 `new("-1", "")`（自定义），原 10 项 `""`/16m…4g 保持
+  - **UI（压缩对话框 `DynamicFormatOptionsPanel` + 设置窗口 `SettingsWindow`）**：固实块下拉旁新增「自定义」MB 输入框（选 `-1` 且固实开关开启才显示，规则 6 隐藏而非禁用）；加载时非预设值自动回退选「自定义」并回填 MB 数字；保存时拼 `"{mb}m"`；**不加内存警告**（固实块大主要是压缩率↑ / 随机访问↓，内存影响远小于字典）
+  - **隐患修正**：固实块 getter 在固实复选框未勾选时恒返回 `""`（引擎据此走 `s=off`）——修复此前「取消勾选固实但块大小非空仍被强制开启固实」的行为
+  - **i18n**：新增 `FormatOptions_7z_SolidBlockSize_Custom` / `_CustomHint` 三语成对
+  - **验证**：`dotnet build -c Release` 0 错误（3 warning 既有）；UI 全量 147 通过 / 0 失败 / 3 跳过
+
+**2026-10-12** — `PreviewWebViewLazyInitTests` 自包含化（去除 gitignore 夹具依赖）
+  - **根因**：该回归测试类依赖 `TestPreview/attachment-management-0.12.1.zip`，而 `TestPreview/` 在 `.gitignore`（第 36 行）中从未入库 → 换机 / CI 必缺，5 个用例 fail 在 `Assert.True(File.Exists(...))`
+  - **修复**：删除 `ReproZipName` 常量与 `RepoFile()`（原向上找仓库根定位 `TestPreview/`），改为运行时合成最小结构 `CreateSyntheticReproZip()`（`%TEMP%\MantisZip\Tests\repro_webview_{guid}.zip`：`attachment-management/` 目录 + `styles.css` + `page.html`）；测试类实现 `IDisposable`，构造建包、`Dispose` 删包；`LoadReproArchive()` 改实例方法
+  - **语义不变**：仍锁定「点目录 / 非 HTML 条目不得初始化 WebView2」；6/6 通过，任何机器 / CI 可跑
+
+**2026-10-12** — 7z 字典大小支持自定义 MB 输入（预设扩至 8GB，突破 2GB 上限）
+  - **Core**：`ArchiveOptions` / `CompressRequest.SevenZipDictionarySize` 由 `int?` 改 `string?`；`SevenZipEngine.ConfigureCompressor` 弃用 `SharpSevenZipCompressor.LzmaDictionarySize`（静态 int 属性上限约 2GB + 并发隐患），改走 `CustomParameters["d"]` 直传 7z.dll（与固实块 `["s"]` 同路径，字符串格式支持 >2GB）
+  - **持久化**：`AppSettings.SevenZipDictionarySize` 由 `int` 改 `string`，新增 `LegacyIntToSizeStringConverter`（`[JsonConverter]`）兼容旧 settings.json 的裸字节值，旧配置无损迁移
+  - **预设**：`CompressionOptionData.SevenZipDictionarySizes` 由 6 项裸字节数改为 11 项 `""`/16m/32m/…/8g + `"-1"` 自定义（Tag 为 7z 大小字符串）；`SevenZipNumFastBytes` 补 `273`（LZMA/LZMA2 硬上限）
+  - **UI（压缩对话框 `DynamicFormatOptionsPanel` + 设置窗口 `SettingsWindow`）**：字典下拉旁新增「自定义」MB 输入框（选 `-1` 才显示，规则 6 隐藏而非禁用）；输入 ≥1024MB 时压缩对话框显示「大字典解压需同等可用内存」提示；加载时非预设值自动回退选「自定义」并回填 MB 数字；保存时拼 `"{mb}m"`（裸数字会被 7z 解释为 2^N 幂次，必须带单位）
+  - **i18n**：新增 `FormatOptions_7z_DictSize_Custom` / `_CustomHint` / `_MemoryHint` 三语成对
+  - **测试**：`CompressSettingsViewModelTests` 适配 string
+
+**2026-10-12** — startup-native-splash 计划修订（📋 计划文档，未实施）
+  - **覆盖范围扩大（选B）**：splash 从 CLI 慢路径扩大到**所有启动路径**（含无参普通启动）——实测无参启动到主窗口可见 TOTAL≈2160ms（`Avalonia.InitDone` ~950ms + MainWindow 构造+首帧 ~1070ms），原「普通启动约 1s 不值得闪」排除理由不成立
+  - **实现要点补全**：splash 线程标注 `IsBackground=true`（防 desktop.Shutdown 后前台消息泵阻止进程退出）；终端窗口枚举表加无参行（`MainWindow` 即终端）；无参启动用**新增 key** `Status_Starting`（「正在启动…」，三语成对）；排除条件改为非 UI 命令（`--install-shell`/`--help` 等秒退命令）
+  - **审阅补全**（同批）：终端窗口枚举表（`--compress` 终端为 `CompressSettingsWindow` 而非首个 `CollectingWindow`）、splash 文案按命令选择现有 key、`CollectingWindow` 保留决定（降级兜底/时序无冲突/零维护成本）
+  - **平台范围（Windows-only）**：纯 Win32 P/Invoke，跨平台移植时归入「砍掉」类（与 OverlayController / ShellExt COM 同列）；`Show()` 首行 `OperatingSystem.IsWindows()` 护栏使挂接点移植时零改动
+  - **同步**：`docs/PLAN.md` splash 条目说明已同步；实施需新增 `Status_Starting` 三语 key
+
+**2026-10-10** — 启动优化（✅ 已完成，`feat/startup-preview-defer` 分支，计划 [startup-preview-defer.md](../.omo/plans/已完成/startup-preview-defer.md)）
+  - **Task 1 ✅**：新增 `Services/StartupTimer.cs`（internal static）——零分配内存打点（`MarkInfo` record struct 预分配 List、收集期零 I/O），`Begin()` 记录 `Process.StartTime` 墒的 pre-Main 基线，`Flush(reason)` 幂等一次性写 `%LOCALAPPDATA%\MantisZip\startup-trace.log`（保留 20 条、命令行走 `LogRedactor`）；`preview-eager total` 行直接服务阶段二门控；测试钩子经 `InternalsVisibleTo`
+  - **测试**：新增 `StartupTimerTests` 7 条（TDD 红绿：Begin/Mark 记录、增量非负、Begin 前 Mark 忽略、Flush 后 Mark 忽略、Begin 幂等、异常降级不抛、进程基线存在），7/7 通过
+  - **Task 2 ✅**：`Program.Main` 首行 `Begin()` + `AppBuilder.Ready` + 阻塞启动后 `Flush("app-exit")` 兜底；`App.OnFrameworkInitializationCompleted` 子段打点——`Avalonia.InitDone`/`Init.EncodingOle`/`Init.Theme`/`Init.Font`/`Init.Settings`/`Init.PreviewCfgLocale`/`Init.SevenZip`/`Init.ShellFirstRun`/`Init.Done`（CLI 分发前），构建 0 错误
+  - **Task 3 ✅**：`MainWindow` ctor 子段（`Win.Ctor.Enter`/`Win.Xaml`/`Win.State`/`Win.Layout`/`Win.VM`/`Win.Ctor.Exit`）+ `Opened` 首帧打点（`Win.Visible` → Dispatcher Render 优先级 `Win.FirstFrame` → `Flush("first-frame")`）；专项打点 `PreviewPanel` ctor（`Preview.Panel.Ctor.Enter/Exit`，隔离 855 行控件树）与 `PreviewViewModel` ctor（`Preview.VM.Ctor.Enter/Exit`）。构建 0 错误；测试 142 通过 / 5 失败（全部为预存 `PreviewWebViewLazyInitTests` 样本缺失，与基线一致）；冒烟运行 trace 文件正常落盘，Debug 冷启动首帧 2752ms、`preview-eager total = 712.2ms (25.9%)`，门控信号（≥10% 且 ≥300ms）已明确命中
+  - **Task 4 ✅**：新增 `tools/measure-startup.ps1`（GUI 进程不自退 → 轮询 trace 首帧 Flush 后 Stop-Process；解析逐段 delta/cumulative + 中位数聚合）。Release 基线 ×5：median TOTAL = **2061ms**（样本极差 <2%），Top3 = Avalonia.InitDone 597ms / 预览面板 XAML+ctor 段 504ms / Win.Visible 316ms；`preview-eager total = 514.8ms (25.0%)` → **门控命中，阶段二做**；`Preview.VM.Ctor = 8ms < 100ms` → Task A1 不做。结果写入计划文件「阶段一测量结果」章节
+  - **Task 5 ✅（阶段二）**：`MainWindow.axaml` 预览区改为 `ContentControl` 占位 host（`PreviewPanelHost` 保留原名，移除 `views:` xmlns 与面板内联声明）；`MainWindow.axaml.cs` 新增 `EnsurePreviewPanel()`（幂等、构造异常清半成品 Content 且 flag 不置位允许重试）+ ctor 末尾 Opened 后 0.5s `DispatcherTimer.RunOnce` 到 Background 优先级预取 + `vm.PreviewPanelNeeded += EnsurePreviewPanel`；`MainWindowViewModel` 新增 `PreviewPanelNeeded` 事件声明。Release 构建 0 错误（Debug 构建暂被 Explorer 锁定 ShellExt.dll 阻塞，仅复制步骤失败，无编译错误）
+  - **Task 6 ✅（阶段二）**：`MainWindowViewModel.ShowPreviewAsync` 预览链入口（Phase 1 加载状态前）插入 `PreviewPanelNeeded?.Invoke()` 兜底——0.5s 定时器未到即发起预览时同步创建面板（幂等，重复触发直接返回）。Release 构建 0 错误；Core 429 通过 / Avalonia 142 通过 + 5 预存失败（`PreviewWebViewLazyInitTests` 样本缺失，与基线一致）；冒烟验证 trace 已无 `Preview.Panel.Ctor` 段（`preview-eager total` 514.8ms → 7.9ms / 0.4%），debug.log 出现 `EnsurePreviewPanel: preview panel created (lazy)`（Opened+0.6s，即 0.5s 定时预取路径）
+  - **Task 7 ✅（阶段二验收）**：交错 A/B ×7（基线 worktree `1220d1d` vs 阶段二，`measure-startup.ps1` 多 exe 模式，轮次配对抵消漂移，同轮差值全部为正无反转）——TOTAL 中位数 **2368.6 → 2161.2ms（−207.4ms / −8.8%）**、XamlSpan 572.7→448.8（−21.6%）、CtorSpan 762.9→569.7（−25.3%）、WinSpan 1332.1→1139.9（−14.4%）、`preview-eager` 544.8→7.5ms（−98.6%）、trace 面板段 7/7→0/7；XamlSpan 降幅与基线面板本体 ctor（≈104ms）吻合（400ms 前段 XAML 解析延迟后仍在 Win.Xaml 内，属预期）；回归清单冷启动无面板段 + `--open smoke.zip` 冒烟（debug.log 定时预取创建）通过，GUI 手动项（位置切换/设置/拖拽）待人工过一遍；计划文件回填「阶段二验证结果」章节
+  - **measure-startup.ps1 升级**：trace 检测由长度比较改为 `LastWriteTime`（修复达 20 段保留上限后长度近似恒定导致的 NO TRACE 误判）；新增多 exe 交错 A/B 模式（`-ExePath` 接数组、每轮对每 exe 各启动一次、按 exe 分组中位数聚合 XamlSpan/CtorSpan/WinSpan/InitDone/Eager/HasPanel）
+  - **待定后续候选（仅记录，未立项）**：剩余 Top 段 `Avalonia.InitDone` 597ms / `Win.Visible` 316ms / `Init.Theme` 116ms——打点仅到段级、段内黑盒（JIT vs 资源解析 vs 固定成本占比未知），可优化性**未证实**；判定路径为一次 `dotnet-trace` 冷启动采样拆段内热点（约半小时），JIT 大头 → R2R/NativeAOT 另立项、资源大头 → 裁剪 App.axaml、固定成本 → 靠 splash 覆盖；已写入计划文件「待定后续候选」章节，建议 splash 先行、按需 trace 再定
+
+**2026-10-10** — 音频预览新增 MP3 + FLAC 内嵌封面显示（✅ 已完成，对齐 WPF 版行为）
+  - **Core `FlacParser.cs`**：由只读 STREAMINFO 重构为遍历全部元数据块——`ExtractStreamInfo` 保留「首个块载荷 <34 → null」语义，新增 `ExtractPictureBlock`/`TryParsePicturePayload` 提取 PICTURE（type 6）图片数据填入 `CoverArtData`；封面块损坏 → cover 为 null 但解析仍成功；`FileFormatInfo.CoverArtData` 注释补充 FLAC PICTURE 说明
+  - **`MetadataRegistry.cs`**：`audio` 类型注册表首项加 `MetadataKeys.Title`（`Metadata_Key_Title` 三语已存在 → 零新增 i18n key）
+  - **`PreviewViewModel.cs`**：新增 `AudioCoverImage`(Bitmap?)/`AudioFallbackText` + `HasAudioCover`/`HasAudioFallback`（**不复用 `PreviewImage`**，避免与图片预览状态互相污染）；`ShowAudio` 先清状态再解码（`Length > 8` 门槛 + try/catch + `App.DebugLog`），无封面回退 Title/Artist 大字；`OnPreviewTypeChanged` 离开音频（value != Audio）时释放位图防泄漏；信息面板渲染 Title
+  - **`PreviewPanel.axaml`**：音频区改 ScrollViewer + 封面 `Image`（Stretch Uniform、MaxWidth/MaxHeight 400 居中）+ 回退 `TextBlock`（FontSize 24 居中）；间距用 `SpacingXxx` DynamicResource（规则 5）、不显式设 Foreground（规则 4）、全中文注释（规则 14）
+  - **范围决定**：VORBIS_COMMENT 解析（FLAC 无封面时的标题回退文字）**不在本次范围**——FLAC 无封面时回退文字为空（与现状一致）；MP3 无封面走 ID3 Title/Artist 回退
+  - **测试（TDD 严格红绿）**：Core 新增 `FlacParserTests` 5 条（封面字节精确断言 + 时长采样率 / 无封面 null / 超长声明长度容错 / magic + 首块有效性锁定）+ `Id3v2ParserTests` 1 条（APIC 回归锁定）；Avalonia 新增 `PreviewAudioPreviewTests` 4 条（无封面回退文字 / 有封面解码 / 离开音频清理 / 切换文件不残留）
+  - **验证**：`dotnet build` 0 错误（3 warning 既有 `TextEncodingDetector` CS8604 + `PreviewViewModel` 2× CS0618）；Core **429 通过 / 0 失败 / 2 跳过**（基线 423 + 新增 6）、Avalonia **135 通过 / 5 失败 / 3 跳过**（基线 131 + 新增 4；5 失败全部为预存 `PreviewWebViewLazyInitTests` TestPreview 样本缺失）；验证时 Everything.exe 锁 `bin\...\MantisZip.ShellExt.dll` 致 post-build 拷贝失败（MSB3027），用 csproj 自带 `-p:SkipShellExtCopy=true` 逃生开关绕过（未改仓库文件，编译本身始终成功）
+
+**2026-10-09** — 四项修复/功能一次性实施（✅ 已完成：预览窗格宽度 bug、解压窗口回收站选项、宽度 bug 回归修复、压缩端文件冲突默认选项）
+  - **① 预览窗格宽度 bug（Star 布局尺寸丢失）**：`MainWindow.SaveCurrentPreviewSize` 原实现只记录 `GridUnitType.Pixel`，未保存过布局时拖分隔条产生的是 Star 尺寸（Avalonia Split 行为保持 Star）→ 不记录 → 位置重应用回退默认（3* / 200px）→ 面板缩到最小。修复：新增 `RecordPreviewSize` 对 Pixel/Star 且值 >0 均记录（Auto 与面板隐藏压缩 0 跳过），`ApplyPreviewPosition` 四个 case 由 `new GridLength(h1, Pixel)` 改为直接用存储的 `GridLength`
+  - **② 回归修复（单元类型持久化）**：`_previewSizeByPosition` 由 `Dictionary<int, double>` 升级 `Dictionary<int, GridLength>`；`LayoutStateManager.LayoutSnapshot.PreviewSizeByPosition` 同步改型，新增 `GridLengthJsonConverter`（写对象形态 `{"value":N,"unit":N}`，unit 0=Auto/1=Pixel/2=Star；**读兼容旧版裸数字=Pixel**，旧 layout.json 无需迁移），`JsonOptions` 注册转换器后 Load/Save 共用；`ApplySavedLayout` 回填校验 `GridUnitType is Pixel or Star && Value>0`
+  - **③ 解压窗口「解压后将原压缩包移到回收站」勾选项**：`ExtractSettingsViewModel` 新增 `DeleteArchiveAfterExtract`（默认读 `AppSettings.DeleteArchiveAfterExtract`，**勾选仅本次生效不写回**）+ `ExtractSettingsWindow.axaml` 冲突选项下方新增 CheckBox（复用既有三语 key `Settings_Extract_DeleteArchiveAfterExtract`，加入 LocalizedStrings 刷新数组）；`App.TryDeleteArchiveAfterExtract(string, bool? enabledOverride = null)`（override 非 null 优先于全局设置，内部仍 `RecycleOption.SendToRecycleBin`）；`MainWindow.axaml.cs` 解压对话框完成回调拷回 `evm.DeleteArchiveAfterExtract`；`MainWindowViewModel` 各解压路径（主对话框/右键解压/拖拽/CLI）透传
+  - **④ 压缩端「文件冲突默认策略」（参照解压端 FileConflictAction）**：
+    - **Core**：`AppSettings.CompressFileConflictAction`（默认 `"ask"`）；`CompressService.CompressRequest` 新增 `ConflictAction` init 属性（null/"ask"=弹窗，兼容 tests 16 处不传）
+    - **CompressFlow**：`BuildRequest` 透传 `vm.ConflictAction`；`CreateResolver(showDialog, defaultAction = null)` 非 ask 时经 `MapDefaultConflictAction` 直接映射免弹窗——`overwrite`→Overwrite、`rename`→Rename（CustomName=null 走 `ComputeRenamedPath` 自动唯一名）、`skip`→Core `Cancel`（单条跳过，非终止）、`add`→Add（`!info.CanAdd` 如 tar.gz 回退弹窗）、未知值回退弹窗
+    - **接线**：`MainWindowViewModel.ExecuteCompressFromSettings` CreateResolver 传 `request.ConflictAction`；`App.axaml.cs` CreateResolver 同 + `--compress-quick/separate/combined` 三处 request 构造传 `settings.CompressFileConflictAction`
+    - **设置窗口**：`SettingsWindowViewModel` 8 处（字段 `_compressFileConflictAction="ask"`/选项对 `CompressFileConflictActionOptions`/label `CompressConflictActionText`/ctor 加载/`PopulateComboOptions` 5 选项（复用 `CompressConflict_Overwrite/Add/AutoRename/Skip` + 新 `Compress_Conflict_Ask`）/`SetSelectedOptions`（含 FirstOrDefault 回退）/Save/`OnCultureChanged` 刷新）+ `SettingsWindow.axaml` 压缩通用页新增 Border+ComboBox（`DisplayMemberBinding` 模板）
+    - **压缩对话框**：`CompressSettingsViewModel` `ConflictAction` 属性 + `ConflictActionOptions`（ComboOption 5 项）+ `SelectedConflictActionOption` 双向同步 partial + ctor 从设置加载（非法值回退首项）+ LocalizedStrings 补 `Compress_WhenFileExists`；`CompressSettingsWindow.axaml` 输出模式组后新增「文件存在时：」Border+ComboBox
+    - **i18n**：三语头部 `{` 后成对插入 3 key：`Settings_Compress_ConflictAction`（文件冲突处理/File conflict action/檔案衝突處理）、`Compress_WhenFileExists`（文件存在时：/When file exists:/檔案存在時：）、`Compress_Conflict_Ask`（每次询问/Ask each time/每次詢問）
+  - **验证**：`dotnet build -t:Compile` 0 错误（3 warning 既有）；Core **423 通过 / 0 失败**、Avalonia **131 通过 / 5 失败（预存 TestPreview 样本缺失）/ 3 跳过**——与基线完全一致
 
 **2026-10-06** — 修复「测试压缩包」加密包静默失败 + 测试流程对齐解压（✅ 已修复，用户报告「加密 RAR 测试无密码时静默失败弹窗也不出」「rar 没有密码的压缩包测试时进度条也不动」）
   - **根因 1（加密包静默失败）**：`TestArchive` 只从 `_sessionPasswords` 取密码，无会话密码时 `engine.TestArchiveAsync` 以 null 密码快速失败 → 状态栏仅「压缩包测试失败 ❌」，无密码弹窗、无进度。与 `LoadArchiveAsync` 打开流程的密码解析（会话缓存→自动匹配→对话框循环）完全脱节

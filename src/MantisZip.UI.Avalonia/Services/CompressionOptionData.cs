@@ -80,10 +80,12 @@ public static class CompressionOptionData
         new("Deflate", "Deflate"),
     ];
 
-    /// <summary>7z 固实块大小（10 项，与 WPF 一致）。</summary>
+    /// <summary>
+    /// 7z 固实块大小（Tag 为 7z 大小字符串直传 CustomParameters["s"]，""=默认，"-1"=自定义）。
+    /// </summary>
     public static readonly ComboOption[] SevenZipSolidBlockSizes =
     [
-        new("", ""),    // display: localize via CompressOpt_SolidBlockSize_Default
+        new("", ""),    // display: localize via FormatOptions_7z_SolidBlockSize_Default
         new("16m", "16MB"),
         new("32m", "32MB"),
         new("64m", "64MB"),
@@ -93,20 +95,30 @@ public static class CompressionOptionData
         new("1g", "1GB"),
         new("2g", "2GB"),
         new("4g", "4GB"),
+        new("-1", ""),  // display: localize via FormatOptions_7z_SolidBlockSize_Custom
     ];
 
-    /// <summary>7z 字典大小。</summary>
+    /// <summary>
+    /// 7z 字典大小（Tag 为 7z 大小字符串直传 CustomParameters["d"]，""=默认，"-1"=自定义）。
+    /// 7z.dll（64 位）LZMA/LZMA2 上限 64GB；预设扩到 8GB，其余经自定义输入。
+    /// </summary>
     public static readonly ComboOption[] SevenZipDictionarySizes =
     [
-        new("0", ""),               // display: localize via CompressOpt_DictSize_Default
-        new("16777216", "16MB"),
-        new("33554432", "32MB"),
-        new("67108864", "64MB"),
-        new("134217728", "128MB"),
-        new("268435456", "256MB"),
+        new("", ""),               // display: localize via CompressOpt_DictSize_Default
+        new("16m", "16MB"),
+        new("32m", "32MB"),
+        new("64m", "64MB"),
+        new("128m", "128MB"),
+        new("256m", "256MB"),
+        new("512m", "512MB"),
+        new("1g", "1GB"),
+        new("2g", "2GB"),
+        new("4g", "4GB"),
+        new("8g", "8GB"),
+        new("-1", ""),  // display: localize via CompressOpt_DictSize_Custom
     ];
 
-    /// <summary>7z 单词大小（FastBytes）。</summary>
+    /// <summary>7z 单词大小（FastBytes）。LZMA/LZMA2 引擎硬上限 273。</summary>
     public static readonly ComboOption[] SevenZipNumFastBytes =
     [
         new("0", ""),   // display: localize via CompressOpt_WordSize_Default
@@ -114,6 +126,7 @@ public static class CompressionOptionData
         new("64", "64"),
         new("128", "128"),
         new("255", "255"),
+        new("273", "273"),
     ];
 
     /// <summary>7z 匹配器。</summary>

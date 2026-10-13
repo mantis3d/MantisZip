@@ -1,4 +1,5 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using MantisZip.Core;
 using MantisZip.Core.FileFilter;
 using MantisZip.Core.Models;
@@ -21,7 +22,12 @@ public class AppSettings
     public string SevenZipCompressionMethod { get; set; } = "LZMA2";
     public bool SevenZipSolid { get; set; } = true;
     public string SevenZipSolidBlockSize { get; set; } = "";
-    public int SevenZipDictionarySize { get; set; } = 0;
+    /// <summary>
+    /// 7z 字典大小：""=默认，或 "64m" / "256m" / "1g" / "4g"（CustomParameters["d"] 直传 7z.dll）。
+    /// 旧版为 int 字节值，经 <see cref="LegacyIntToSizeStringConverter"/> 兼容读取。
+    /// </summary>
+    [JsonConverter(typeof(LegacyIntToSizeStringConverter))]
+    public string SevenZipDictionarySize { get; set; } = "";
     public int SevenZipNumFastBytes { get; set; } = 0;
     public string SevenZipMatchFinder { get; set; } = "";
     /// <summary>
@@ -61,6 +67,8 @@ public class AppSettings
     public string ZipCompressionMethod { get; set; } = "deflate";
     public string ZipEncryptionMethod { get; set; } = "aes256";
     public bool SevenZipEncryptHeaders { get; set; } = true;
+    /// <summary>压缩时输出文件已存在（文件冲突）的默认处理：ask / overwrite / add / rename / skip</summary>
+    public string CompressFileConflictAction { get; set; } = "ask";
 
     // ===== 分卷 =====
     public string SplitSizeTag { get; set; } = "0";
@@ -336,4 +344,34 @@ public class AppSettings
         // 文档
         "Pdf", "Docx", "Xlsx", "Pptx", "Epub",
     };
+}
+
+/// <summary>
+/// 兼容旧版 settings.json：SevenZipDictionarySize 原为 int 字节值（如 268435456 = 256MB），
+/// 新版改为 string（"256m" / "1g"）。读取时数字 → 转换为带单位字符串；写入时一律写 string。
+/// </summary>
+internal sealed class LegacyIntToSizeStringConverter : JsonConverter<string>
+{
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType switch
+        {
+            JsonTokenType.String => reader.GetString() ?? "",
+            JsonTokenType.Number when reader.TryGetInt64(out var bytes) => BytesToSizeString(bytes),
+            _ => "",
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value);
+
+    /// <summary>字节数 → 7z 大小字符串（取整到最大单位，如 268435456 → "256m"）。</summary>
+    internal static string BytesToSizeString(long bytes)
+    {
+        if (bytes <= 0) return "";
+        if (bytes % (1L << 30) == 0) return $"{bytes >> 30}g";
+        if (bytes % (1L << 20) == 0) return $"{bytes >> 20}m";
+        if (bytes % (1L << 10) == 0) return $"{bytes >> 10}k";
+        return $"{bytes}b";
+    }
 }

@@ -114,7 +114,35 @@ public partial class SettingsWindowViewModel : ObservableObject
     private string _sevenZipSolidBlockSize = "";
 
     [ObservableProperty]
-    private int _sevenZipDictionarySize = 0;
+    private string _customSolidSizeText = "";
+
+    /// <summary>自定义固实块大小输入框是否可见（选「自定义」时显示，规则 6：隐藏而非禁用）。</summary>
+    public bool IsCustomSolidSizeVisible => SelectedSevenZipSolidBlockSizeOption?.Value == "-1";
+
+    /// <summary>自定义固实块大小输入框旁的单位提示（i18n）。</summary>
+    public string CustomSolidSizeHintText => LocalizationManager.T("FormatOptions_7z_SolidBlockSize_CustomHint");
+
+    partial void OnSelectedSevenZipSolidBlockSizeOptionChanged(Option? value)
+    {
+        OnPropertyChanged(nameof(IsCustomSolidSizeVisible));
+    }
+
+    [ObservableProperty]
+    private string _sevenZipDictionarySize = "";
+
+    [ObservableProperty]
+    private string _customDictSizeText = "";
+
+    /// <summary>自定义字典大小输入框是否可见（选「自定义」时显示，规则 6：隐藏而非禁用）。</summary>
+    public bool IsCustomDictSizeVisible => SelectedSevenZipDictionarySizeOption?.Value == "-1";
+
+    /// <summary>自定义字典大小输入框旁的单位提示（i18n）。</summary>
+    public string CustomDictSizeHintText => LocalizationManager.T("FormatOptions_7z_DictSize_CustomHint");
+
+    partial void OnSelectedSevenZipDictionarySizeOptionChanged(Option? value)
+    {
+        OnPropertyChanged(nameof(IsCustomDictSizeVisible));
+    }
 
     [ObservableProperty]
     private int _sevenZipNumFastBytes = 0;
@@ -186,6 +214,10 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _logPrivacyMode = "extension";
+
+    // ── Compress（文件冲突默认策略） ──
+    [ObservableProperty]
+    private string _compressFileConflictAction = "ask";
 
     // ── Extract ──
     [ObservableProperty]
@@ -663,6 +695,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     public System.Collections.ObjectModel.ObservableCollection<Option> FileConflictActionOptions { get; } = new();
     [ObservableProperty] private Option? _selectedFileConflictActionOption;
 
+    // 压缩文件冲突默认策略（ask/overwrite/add/rename/skip）
+    public System.Collections.ObjectModel.ObservableCollection<Option> CompressFileConflictActionOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedCompressFileConflictActionOption;
+
     public System.Collections.ObjectModel.ObservableCollection<Option> DoubleClickActionOptions { get; } = new();
     [ObservableProperty] private Option? _selectedDoubleClickActionOption;
 
@@ -814,6 +850,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string KeepOriginalExtensionText => LocalizationManager.T("Settings_Compress_KeepExt");
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
     public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
+    public string CompressConflictActionText => LocalizationManager.T("Settings_Compress_ConflictAction");
     public string ZipDefaultOptionsText => LocalizationManager.T("Settings_Zip_DefaultOptions");
     public string ZipEncodingText => LocalizationManager.T("Settings_Zip_Encoding");
     public string ZipCompressionMethodText => LocalizationManager.T("Settings_Zip_CompressionMethod");
@@ -1022,6 +1059,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compress (additional)
         _closeAfterCompress = _settings.CloseAfterCompress;
         _keepOriginalExtension = _settings.KeepOriginalExtension;
+        _compressFileConflictAction = _settings.CompressFileConflictAction;
 
         // Compression advanced
         _sevenZipCompressionMethod = _settings.SevenZipCompressionMethod;
@@ -1187,6 +1225,14 @@ public partial class SettingsWindowViewModel : ObservableObject
         FileConflictActionOptions.Add(new Option(ConflictRenameText, "rename"));
         FileConflictActionOptions.Add(new Option(ConflictSkipText, "skip"));
 
+        // 压缩文件冲突默认策略（复用压缩冲突弹窗的三语 key；ask 为新 key）
+        CompressFileConflictActionOptions.Clear();
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("Compress_Conflict_Ask"), "ask"));
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_Overwrite"), "overwrite"));
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_Add"), "add"));
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_AutoRename"), "rename"));
+        CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_Skip"), "skip"));
+
         DoubleClickActionOptions.Clear();
         DoubleClickActionOptions.Add(new Option(DoubleClickActionOpenText, "open"));
         DoubleClickActionOptions.Add(new Option(DoubleClickActionExtractHereText, "extract-here"));
@@ -1204,14 +1250,18 @@ public partial class SettingsWindowViewModel : ObservableObject
         SevenZipSolidBlockSizeOptions.Clear();
         foreach (var opt in CompressionOptionData.SevenZipSolidBlockSizes)
         {
-            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default") : opt.Display;
+            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default")
+                        : opt.Tag == "-1" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Custom")
+                        : opt.Display;
             SevenZipSolidBlockSizeOptions.Add(new Option(display, opt.Tag));
         }
 
         SevenZipDictionarySizeOptions.Clear();
         foreach (var opt in CompressionOptionData.SevenZipDictionarySizes)
         {
-            var display = opt.Tag == "0" ? LocalizationManager.T("FormatOptions_7z_DictSize_Default") : opt.Display;
+            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_DictSize_Default")
+                        : opt.Tag == "-1" ? LocalizationManager.T("FormatOptions_7z_DictSize_Custom")
+                        : opt.Display;
             SevenZipDictionarySizeOptions.Add(new Option(display, opt.Tag));
         }
 
@@ -1286,6 +1336,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedLogPrivacyModeOption = LogPrivacyModeOptions.FirstOrDefault(o => o.Value == LogPrivacyMode);
         SelectedExtractDestinationOption = ExtractDestinationOptions.FirstOrDefault(o => o.Value == ExtractDestination);
         SelectedFileConflictActionOption = FileConflictActionOptions.FirstOrDefault(o => o.Value == FileConflictAction);
+        SelectedCompressFileConflictActionOption = CompressFileConflictActionOptions.FirstOrDefault(o => o.Value == CompressFileConflictAction)
+                                                   ?? CompressFileConflictActionOptions.FirstOrDefault();
 
         SelectedDoubleClickActionOption = DoubleClickActionOptions.FirstOrDefault(o => o.Value == DoubleClickAction);
 
@@ -1298,7 +1350,21 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compression advanced
         SelectedSevenZipCompressionMethodOption = SevenZipCompressionMethodOptions.FirstOrDefault(o => o.Value == SevenZipCompressionMethod);
         SelectedSevenZipSolidBlockSizeOption = SevenZipSolidBlockSizeOptions.FirstOrDefault(o => o.Value == SevenZipSolidBlockSize);
-        SelectedSevenZipDictionarySizeOption = SevenZipDictionarySizeOptions.FirstOrDefault(o => o.Value == SevenZipDictionarySize.ToString());
+        // settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
+        if (SelectedSevenZipSolidBlockSizeOption == null && !string.IsNullOrEmpty(SevenZipSolidBlockSize))
+        {
+            SelectedSevenZipSolidBlockSizeOption = SevenZipSolidBlockSizeOptions.FirstOrDefault(o => o.Value == "-1");
+            var sv = SevenZipSolidBlockSize.Trim();
+            CustomSolidSizeText = sv.EndsWith("m", StringComparison.OrdinalIgnoreCase) ? sv[..^1] : sv;
+        }
+        SelectedSevenZipDictionarySizeOption = SevenZipDictionarySizeOptions.FirstOrDefault(o => o.Value == SevenZipDictionarySize);
+        // settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
+        if (SelectedSevenZipDictionarySizeOption == null && !string.IsNullOrEmpty(SevenZipDictionarySize))
+        {
+            SelectedSevenZipDictionarySizeOption = SevenZipDictionarySizeOptions.FirstOrDefault(o => o.Value == "-1");
+            var v = SevenZipDictionarySize.Trim();
+            CustomDictSizeText = v.EndsWith("m", StringComparison.OrdinalIgnoreCase) ? v[..^1] : v;
+        }
         SelectedSevenZipNumFastBytesOption = SevenZipNumFastBytesOptions.FirstOrDefault(o => o.Value == SevenZipNumFastBytes.ToString());
         SelectedSevenZipMatchFinderOption = SevenZipMatchFinderOptions.FirstOrDefault(o => o.Value == SevenZipMatchFinder);
         SelectedZipCompressionMethodOption = ZipCompressionMethodOptions.FirstOrDefault(o => o.Value == ZipCompressionMethod);
@@ -1375,6 +1441,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(KeepOriginalExtensionText));
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
         OnPropertyChanged(nameof(CompressOptionsText));
+        OnPropertyChanged(nameof(CompressConflictActionText));
         OnPropertyChanged(nameof(ZipDefaultOptionsText));
         OnPropertyChanged(nameof(ZipEncodingText));
         OnPropertyChanged(nameof(ZipCompressionMethodText));
@@ -1529,6 +1596,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
         _settings.CloseAfterCompress = CloseAfterCompress;
         _settings.KeepOriginalExtension = KeepOriginalExtension;
+        _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
 
         // Adaptive Compression (三个独立开关)
         _settings.AdaptiveCompression = AdaptiveCompression;
@@ -1550,8 +1618,28 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.SevenZipCompressionMethod = SelectedSevenZipCompressionMethodOption?.Value ?? SevenZipCompressionMethod;
         _settings.SevenZipSolid = SevenZipSolid;
         _settings.SevenZipMultithreaded = SevenZipMultithreaded;
-        _settings.SevenZipSolidBlockSize = SelectedSevenZipSolidBlockSizeOption?.Value ?? SevenZipSolidBlockSize;
-        _settings.SevenZipDictionarySize = int.Parse(SelectedSevenZipDictionarySizeOption?.Value ?? SevenZipDictionarySize.ToString());
+        // 固实块大小：选「自定义」时拼输入框 MB 值为 "Nm"，否则直存预设 tag
+        if (SelectedSevenZipSolidBlockSizeOption?.Value == "-1")
+        {
+            _settings.SevenZipSolidBlockSize = long.TryParse(CustomSolidSizeText?.Trim(), out var solidMb) && solidMb > 0
+                ? $"{solidMb}m"
+                : "";
+        }
+        else
+        {
+            _settings.SevenZipSolidBlockSize = SelectedSevenZipSolidBlockSizeOption?.Value ?? SevenZipSolidBlockSize;
+        }
+        // 字典大小：选「自定义」时拼输入框 MB 值为 "Nm"，否则直存预设 tag
+        if (SelectedSevenZipDictionarySizeOption?.Value == "-1")
+        {
+            _settings.SevenZipDictionarySize = long.TryParse(CustomDictSizeText?.Trim(), out var mb) && mb > 0
+                ? $"{mb}m"
+                : "";
+        }
+        else
+        {
+            _settings.SevenZipDictionarySize = SelectedSevenZipDictionarySizeOption?.Value ?? SevenZipDictionarySize;
+        }
         _settings.SevenZipNumFastBytes = int.Parse(SelectedSevenZipNumFastBytesOption?.Value ?? SevenZipNumFastBytes.ToString());
         _settings.SevenZipMatchFinder = SelectedSevenZipMatchFinderOption?.Value ?? SevenZipMatchFinder;
         _settings.ZipCompressionMethod = SelectedZipCompressionMethodOption?.Value ?? ZipCompressionMethod;

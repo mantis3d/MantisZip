@@ -25,7 +25,10 @@ public partial class PreviewPanel : UserControl
 
     public PreviewPanel()
     {
+        // 启动打点专项：单独隔离 855 行预览控件树的解析构造成本（被 MainWindow XAML 嵌套调用）
+        Services.StartupTimer.Mark("Preview.Panel.Ctor.Enter");
         InitializeComponent();
+        Services.StartupTimer.Mark("Preview.Panel.Ctor.Exit");
 
         this.DataContextChanged += OnDataContextChanged;
         // FontPreviewScrollViewer 在 InitializeComponent 后可用，只订阅一次

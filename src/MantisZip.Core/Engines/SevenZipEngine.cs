@@ -346,10 +346,10 @@ public class SevenZipEngine : IArchiveEngine
         // 多线程压缩（mt=on）— 利用多核 CPU 并行压缩，提升压缩速度
         compr.CustomParameters["mt"] = options.SevenZipMultithreaded ? "on" : "off";
 
-        // 字典大小（仅 LZMA/LZMA2 有效，但设了也无害）
-        // 在 SharpSevenZip 中这些是静态属性（全局生效于 7z.dll 上下文）
-        if (options.SevenZipDictionarySize.HasValue)
-            SharpSevenZipCompressor.LzmaDictionarySize = options.SevenZipDictionarySize.Value;
+        // 字典大小（仅 LZMA/LZMA2 有效）— 走 CustomParameters["d"] 直传 7z.dll，
+        // 与固实块 ["s"] 同路径；字符串格式支持 >2GB（LzmaDictionarySize 静态 int 属性上限约 2GB，已弃用）
+        if (!string.IsNullOrEmpty(options.SevenZipDictionarySize))
+            compr.CustomParameters["d"] = options.SevenZipDictionarySize;
 
         // Word Size（快速字节数）
         if (options.SevenZipNumFastBytes.HasValue)
