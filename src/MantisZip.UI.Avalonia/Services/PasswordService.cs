@@ -120,7 +120,10 @@ public class PasswordService
             }
             if (engine is SevenZipEngine)
             {
-                using var extractor = new SharpSevenZipExtractor(archivePath, password);
+                // 与 SevenZipEngine/ArchiveEntryExtractor 一致：无密码走无密码构造函数，避免 null 传入（CS8604）
+                using var extractor = string.IsNullOrEmpty(password)
+                    ? new SharpSevenZipExtractor(archivePath)
+                    : new SharpSevenZipExtractor(archivePath, password);
                 return extractor.ArchiveFileData.Any(e => !e.IsDirectory && e.Encrypted);
             }
         }

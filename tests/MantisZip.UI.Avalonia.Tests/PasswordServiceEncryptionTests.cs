@@ -1,6 +1,8 @@
 using System;
 using System.IO;
 using System.IO.Compression;
+using System.Threading.Tasks;
+using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.UI.Avalonia.Services;
 using Xunit;
@@ -32,6 +34,37 @@ public class PasswordServiceEncryptionTests
         finally
         {
             try { File.Delete(path); } catch { /* 临时文件尽力清理 */ }
+        }
+    }
+
+    /// <summary>
+    /// 7z 非加密包不得被判定为「含加密条目」。
+    /// 同时覆盖 HasEncryptedEntries 对 <c>SharpSevenZipExtractor</c> 无密码构造分支
+    /// （<c>string.IsNullOrEmpty(password)</c> 三元）的 null 传入路径（CS8604 修复回归）。
+    /// </summary>
+    [Fact]
+    public async Task HasEncryptedEntries_NonEncryptedSevenZip_ReturnsFalse()
+    {
+        // 7z.dll 不可用时跳过（与 SevenZipEngineTests 相同的环境守卫）
+        if (!File.Exists(SevenZipEngine.SevenZipDllPath)) return;
+
+        var dir = Path.Combine(Path.GetTempPath(), "pwdtest7z-" + Guid.NewGuid().ToString("N"));
+        var path = Path.Combine(dir, "a.7z");
+        try
+        {
+            Directory.CreateDirectory(dir);
+            var src = Path.Combine(dir, "src.txt");
+            File.WriteAllText(src, "hello");
+            await new SevenZipEngine().CompressAsync([src], path,
+                new ArchiveOptions { PreserveDirectoryRoot = false },
+                cancellationToken: TestContext.Current.CancellationToken);
+
+            var svc = new PasswordService();
+            Assert.False(svc.HasEncryptedEntries(path, new SevenZipEngine()));
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch { /* 临时目录尽力清理 */ }
         }
     }
 }
