@@ -740,11 +740,11 @@ while (true)
                                     PercentComplete = overallPct,
                                     FilePercentComplete = filePct,
                                     FileTotalBytes = entrySize,
-                                    BatchProcessedBytes = batchProcessedBytes,
+                                    BatchProcessedBytes = batchProcessedBytes + entryProcessed,
                                     BatchTotalBytes = batchTotalBytes,
                                     BatchIndex = batchIndex,
                                     BatchCount = actualParallelism,
-                                    BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                                    BatchPercentComplete = batchTotalBytes > 0 ? (double)(batchProcessedBytes + entryProcessed) / batchTotalBytes * 100 : 100,
                                     BatchProcessedFiles = batchProcessedFiles,
                                     BatchTotalFiles = batchTotalFiles
                                 }));
@@ -1436,11 +1436,11 @@ while (true)
                                 PercentComplete = overallPct,
                                 FilePercentComplete = filePct,
                                 FileTotalBytes = entrySize,
-                                BatchProcessedBytes = batchProcessedBytes,
+                                BatchProcessedBytes = batchProcessedBytes + entryProcessed,
                                 BatchTotalBytes = batchTotalBytes,
                                 BatchIndex = batchIndex,
                                 BatchCount = actualParallelism,
-                                BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                                BatchPercentComplete = batchTotalBytes > 0 ? (double)(batchProcessedBytes + entryProcessed) / batchTotalBytes * 100 : 100,
                                 BatchProcessedFiles = batchProcessedFiles,
                                 BatchTotalFiles = batchTotalFiles
                             }));
