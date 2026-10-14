@@ -51,4 +51,10 @@ public class ProgressDisplayModeParserTests
         Assert.Equal("detailed", s.ProgressContentMode);
         Assert.Equal("medium", s.ProgressInfoDensity);
     }
+
+    [Fact]
+    public void AppSettings_ProgressWindowWidthDefault_Is800()
+    {
+        Assert.Equal(800, new AppSettings().ProgressWindowWidth);
+    }
 }

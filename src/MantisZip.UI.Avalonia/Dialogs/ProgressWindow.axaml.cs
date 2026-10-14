@@ -55,11 +55,16 @@ public partial class ProgressWindow : Window
         _vm = new ProgressViewModel();
         DataContext = _vm;
 
-        // 应用上次持久化的显示偏好（内容模式 / 信息量分级；首次使用为默认 详细 / 中）。
+        // 应用上次持久化的显示偏好（内容模式 / 信息量分级；首次使用为默认 详细 / 标准）。
         // 须在 ApplyInfoDensity() 之前写入 VM——该调用按 InfoDensity 计算批列表高度。
         var displaySettings = AppSettings.Load();
         _vm.ContentMode = ProgressDisplayModeParser.ParseContentMode(displaySettings.ProgressContentMode);
         _vm.InfoDensity = ProgressDisplayModeParser.ParseDensity(displaySettings.ProgressInfoDensity);
+
+        // 应用上次持久化的窗口宽度（非法值回落 XAML 默认 800；XAML MinWidth=500 兜底）
+        var savedWidth = displaySettings.ProgressWindowWidth;
+        if (double.IsFinite(savedWidth) && savedWidth > 0)
+            Width = savedWidth;
 
         // 窗口一打开即进入准备态（「正在准备…」+ 不定进度条），直到引擎首次上报；
         // 大目录在枚举/分组阶段的静默期不再显示空白进度条（避免被误认为出错）。
@@ -924,6 +929,10 @@ if (_vm.IsPaused)
         _vm.PauseEvent.Set();
         // 退订静态 CultureChanged（VM 在 ctor 订阅；不退订则窗口关闭后 VM 被静态事件根引用泄漏）
         _vm.DetachLocalization();
+        // 持久化窗口宽度（关闭时写回；非法值回落默认 800）。用户调整宽度后下次打开沿用。
+        var s = AppSettings.Load();
+        s.ProgressWindowWidth = double.IsFinite(Width) && Width > 0 ? Width : 800;
+        s.Save();
         base.OnClosed(e);
     }
 

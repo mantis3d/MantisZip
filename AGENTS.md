@@ -247,7 +247,7 @@ private bool _optionA;
 - **上下文菜单**: EnableCompressMenu, EnableOpenMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu（COM 动态菜单 / 静态级联回退，`EnableCascadingMenu` 已废弃移除）
 - **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, ShowPreviewInfoPanel, TextPreviewFontSize, TextPreviewFontFamily, TextEncodingPreference, MaxTablePreviewRows, MaxTablePreviewCols, MaxPreviewFileSize, FontPreviewFontSize, FontPreviewSampleText, FontPreviewEnableLigature, PreviewPosition, InfoPanelOrientation, EnableFormatDetection, PreviewHeadSize
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
-- **外观**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）
+- **外观**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）, ProgressContentMode / ProgressInfoDensity / ProgressWindowWidth（进度窗口显示偏好：内容模式 / 信息量分级 / 窗口宽度，关闭时写回）
 - **文件关联（Avalonia 新增）**: AssocZip/7z/Rar/Tar/TarGz/Gz/Iso, CustomAssocExtensions
 - **收藏夹（Avalonia 新增）**: FavoritePaths (List<string>)
 - **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)

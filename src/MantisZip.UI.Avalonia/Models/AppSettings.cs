@@ -181,6 +181,8 @@ public class AppSettings
     public string ProgressContentMode { get; set; } = "detailed";
     /// <summary>进度窗口信息量分级持久化（"minimal"/"medium"/"full"；默认 "medium"）。</summary>
     public string ProgressInfoDensity { get; set; } = "medium";
+    /// <summary>进度窗口宽度持久化（像素；默认 800，窗口 MinWidth=500 兜底）。</summary>
+    public double ProgressWindowWidth { get; set; } = 800;
     public bool SeparateDirBaseline { get; set; } = false;
     /// <summary>目录树：切换目录时自动展开到当前目录并收起其他分支。</summary>
     public bool AutoExpandTreeToCurrent { get; set; } = false;
