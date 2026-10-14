@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-14** — 修复并行解压「详细面板」批次进度条首行恒 0（漏计当前文件已拷字节）
+  - **根因**：`ZipEngine` 两条并行路径（`ExtractAsyncParallel` / `ExtractEntriesAsyncParallel`）的每文件进度上报里，批次字节字段写的是裸 `batchProcessedBytes`（仅含**已完成**条目），漏了当前正在复制文件的 `entryProcessed`（对比同报告 `ProcessedBytes = localProcessedBytes + entryProcessed` 本就含当前文件）。Round-Robin 按大小降序把**最大文件**放进 batch 0 且为其首文件 → 详细面板第一行在整个大文件拷贝期间恒 0；末文件完成也永远进不了该行（到不了 100%）。
+  - **修复**：两处上报改为 `BatchProcessedBytes = batchProcessedBytes + entryProcessed`、`BatchPercentComplete = (batchProcessedBytes + entryProcessed) / batchTotalBytes * 100`。
+  - **验证**：新增 `ZipEngineParallelBatchProgressTests`（2 文件 + 并行度 2 → batch0 恰含 1 文件，断言其最终上报 `BatchPercentComplete=100`）；**负向对照**回退修复该用例失败、恢复通过。Core **680 通过**/3 跳过、UI **248 通过**/3 跳过。
+
 **2026-10-14** — 进度窗口计时器冻结 + 倒计时盒常显 + 暂停按钮完成态隐藏 + 状态行/宽度/间距修复（含用户手动 AGENTS.md 规则补充）
   - **计时器冻结**：`ProgressViewModel` 新增模态冻结——`BeginModalFreeze`/`EndModalFreeze` 引用计数（`_modalFreezeCount`）+ `_clockFrozenSinceUtc`/`_clockFrozenTotal`，已用/剩余时间在弹窗期间停走；与用户暂停共用 `OnIsPausedChanged` 统一钩子（冲突弹窗先 `PauseFromConflict()` 再 `EndModalFreeze()`，IsPaused 已 true → 冻结无缝续接为用户暂停）。接线：`ExtractFlow`/`CompressFlow` 冲突弹窗、`PasswordRetryLoop` 密码重试循环；所有冻结/解冻经 `DispatchIfNeeded` 或 UI dispatch 内调用。
   - **倒计时盒常显**：`ProgressWindow.OnOpened` 初始化倒计时（此前等首条进度报告才显示）；用户手动调整样式——`CountdownBox` Width 44→14、FontSize 13→18，后缀 `Progress_AutoCloseSuffix` FontSize 12→13。
