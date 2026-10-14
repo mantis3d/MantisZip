@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-12
+**最后更新**: 2026-10-15
 **当前版本**: 0.5.2
 
 ---
@@ -20,6 +20,7 @@
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P1** | ~~加密文件名 7z 魔数检测修复~~ | [encrypted-filename-magic-detection.md](.omo/plans/已完成/encrypted-filename-magic-detection.md) | ✅已完 | 3-4h | ✅ 已完成（2026-09-15 核实）：`PasswordRequiredException` + `IsSevenZipEncryptHeaders` 检测加密文件名 7z → `PreviewType.NeedsPassword` → `ShowNeedsPassword()` 锁图标+文案 → 密码输入后重新触发预览 |
 | **P1** | 压缩/解压性能优化（并行化 + 缓冲区） | [compression-performance-optimization.md](.omo/plans/未开始/compression-performance-optimization.md) | 🟡中 | 5-8h | 🟢 大部分完成（2026-09-16 核实，4/5 阶段）：① 缓冲区 256KB→4MB；② ZIP 并行解压；③ 7z 多线程压缩（mt=on）实测 4.63x。**剩余**：ZIP 多线程压缩 → 见下方两个方案 |
+| **P1** | ZIP 损坏检测（CRC 校验）修复 | [zip-crc-validation.md](.omo/plans/进行中/zip-crc-validation.md) | 🟢低 | 3-5h | 🔄 实施中（2026-10-15）：根因=引擎用 `OpenEntryStream()` 裸流不校验 CRC（SharpCompress 校验只挂在官方 `WriteTo/WriteToAsync` + `ExtractionOptions.CheckCrc` 路径；0.48.1 尚无该 API，故非版本问题、换版本无解）。已改 `ZipEngine` 测试 + 四处解压走官方校验路径、新增 `EntryFailureReason.CrcMismatch` + 三语文案 + 4 条回归测试（Core 全量 684 通过 / 0 失败）；Avalonia 全量测试 30 失败为增量构建毒化（规则 17），待全量重建复验 |
 | **P1** | ZIP 多线程压缩方案 D（自适应 + 多线程第四个选项） | [parallel-compress-plan-d.md](.omo/plans/未开始/parallel-compress-plan-d.md) | 🟡中 | 4-5h | 自适应压缩新增"自适应 + 多线程"选项：Store 类直接写入 + 需压缩类 SharpSevenZip mt=on；UI 联动（格式目录/用户规则/多线程提示可见性）；实验性标签 + 帮助弹窗 |
 | **P2** | ZIP 多线程压缩方案 A（分组并行 + 多级别） | [parallel-compress-plan-a.md](.omo/plans/未开始/parallel-compress-plan-a.md) | 🟡中 | 6-8h | 按级别分组 → 各组独立 ZipWriter 并行 → 合并 ZIP，完整多级别自适应 + 多线程。方案 D 完成后实施 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.omo/plans/未开始/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
