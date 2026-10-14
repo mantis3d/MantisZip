@@ -419,7 +419,7 @@ public partial class PasswordManagerWindow : Window
     {
         var dialog = new HelpDialog(
             LocalizationManager.T("PwdHelp_Title"),
-            new PasswordHelpContent(),
+            new MarkdownHelpContent(LocalizationManager.T("PasswordHelp_Markdown")),
             LocalizationManager.T("PwdHelp_Close"))
         {
             Width = 560,

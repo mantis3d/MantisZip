@@ -458,9 +458,9 @@ Four modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"extension"`
 - `CoreLog.Initialize(diagnosticsEnabled, privacyMode)` — UI 层在 `OnFrameworkInitializationCompleted` 和 `RefreshDebugLogSettings` 中调用，统一注入诊断开关与脱敏委托。**禁止直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`**，必须走 `Initialize()` 方法
 - `App.Log()`, `App.LogDebug()`, and `LogStartup()` call `LogRedactor.RedactPaths()` directly (they're in UI project and have AppSettings access)
 
-**Help dialog**: `LogPrivacyHelpContent` rendered through the shared `HelpDialog` shell (见规则 17), opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
+**Help dialog**: the log-privacy help is Markdown-driven — `MarkdownHelpContent(LocalizationManager.T("LogPrivacyHelp_Markdown"))` rendered through the shared `HelpDialog` shell (见规则 17), opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
 
-**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI.Avalonia/Dialogs/LogPrivacyHelpContent.axaml/.cs` + `UI.Avalonia/Dialogs/HelpDialog.axaml(.cs)` (Avalonia).
+**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI.Avalonia/Dialogs/MarkdownHelpContent.axaml(.cs)` + `UI.Avalonia/Dialogs/HelpDialog.axaml(.cs)` + `Localization/strings.*.json` 的 `LogPrivacyHelp_Markdown`（Avalonia）。
 
 ## Known issues (already fixed)
 
@@ -854,10 +854,11 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 **核心禁令**：任何新增的用户可见帮助/介绍弹窗，**必须**复用统一外壳 `Dialogs/HelpDialog.axaml`，**禁止**另建一次性 `Window` 帮助对话框。
 
 - **外壳**：`new HelpDialog(title, content, closeText?)` —— `title` 为窗口标题（走 `LocalizationManager.T()`，规则 13）、`content` 为内容 `UserControl`、`closeText` 可选（默认 `MsgBox_Close`）；原对话框的窗口尺寸经对象初始化器在构造后补设（`{ Width = ..., Height = ... }`）
-- **内容**：新建 `UserControl`（镜像 `Dialogs/AdaptiveHelpContent.axaml(.cs)` 模式）：根 `x:CompileBindings="False"` + `ScrollViewer` 包裹 `StackPanel`；代码后置用 `=> LocalizationManager.T("key")` 只读属性 + 构造函数末尾 `DataContext = this`
+- **内容**（两种，任选）：① **Markdown 驱动（当前唯一在用的方式，推荐）**——`new MarkdownHelpContent(LocalizationManager.T("Xxx_Markdown"))`，把本地化 Markdown 经 `Services/MarkdownPreviewBuilder`（Markdig AST → 原生控件树）渲染（支持标题/列表/**表格**/代码块/引用块/粗斜体；段落为 `SelectableTextBlock`，文本可选中复制）；正文只维护三语 Markdown 键，无需改 XAML。② **手写卡片式**——自建 `UserControl`（根 `x:CompileBindings="False"` + `ScrollViewer` 包裹内容；代码后置用 `=> LocalizationManager.T("key")` 只读属性 + 构造函数末尾 `DataContext = this`），仅当 Markdown 表达不了时使用。
+- **⚠️ `x:Class` 类型必须有公共无参构造**：Avalonia XAML 编译器要求（否则 `AVLN3000: Unable to find public constructor`）；带参构造 + `public Xxx() : this(defaults) { }` 兜底。**增量构建会掩盖该错**——只在运行期表现为大面积 `XamlLoadException: No precompiled XAML found`，务必用 `--no-incremental` 验证。
 - **原因（根因回归防护）**：`HelpDialog` 在构造函数内、`DataContext = this` **之前**完成 title/content 赋值且属性只读 —— 绑定在 attach 后求值时值已就绪；若另建一次性 Window、或在构造**之后**再赋值属性（无变更通知），绑定不刷新，整窗静默空白（曾实际发生）
-- **已迁移消费者**：自适应压缩帮助（`AdaptiveHelpContent`）、并行解压帮助（`ParallelExtractHelpContent`）、密码管理器帮助（`PasswordHelpContent`）、日志隐私帮助（`LogPrivacyHelpContent`）
-- **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/HelpDialogRenderTests.cs`（无头 Avalonia，验证 ContentPresenter 注入内容 + 标题文本真实渲染）
+- **已迁移消费者（全部 Markdown 驱动）**：压缩加速帮助（三语 `AdaptiveHelp_Markdown`）、并行解压帮助（`ParallelHelp_Markdown`）、密码管理器帮助（`PasswordHelp_Markdown`，含 Glob/Regex 表格）、日志隐私帮助（`LogPrivacyHelp_Markdown`）
+- **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/HelpDialogRenderTests.cs`（无头 Avalonia，验证 ContentPresenter 注入内容引用相等 + 内容真实渲染 + 三语 Markdown key 存在）
 
 ## 未来工作
 

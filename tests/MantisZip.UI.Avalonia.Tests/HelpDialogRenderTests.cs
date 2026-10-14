@@ -16,12 +16,12 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// </summary>
 public class HelpDialogRenderTests
 {
-    /// <summary>外壳必须原样注入内容对象（引用相等），并渲染内容控件的本地化标题。</summary>
+    /// <summary>外壳必须原样注入内容对象（引用相等），且 Markdown 帮助内容真实渲染出块级控件。</summary>
     [AvaloniaFact]
-    public void HelpDialog_Show_InjectsContentPresenter_AndRendersContentTitle()
+    public void HelpDialog_Show_InjectsMarkdownContent_AndRendersBlocks()
     {
-        var content = new AdaptiveHelpContent();
-        var dialog = new HelpDialog("T", content);
+        var content = new MarkdownHelpContent(LocalizationManager.T("AdaptiveHelp_Markdown"));
+        var dialog = new HelpDialog(LocalizationManager.T("AdaptiveHelp_Title"), content);
 
         dialog.Show();
 
@@ -30,33 +30,32 @@ public class HelpDialogRenderTests
             dialog.GetVisualDescendants().OfType<ContentPresenter>(),
             cp => ReferenceEquals(cp.Content, content));
 
-        // 渲染文本必须包含内容控件的本地化标题（证明绑定在 attach 后求值成功）
-        var texts = dialog.GetVisualDescendants().OfType<TextBlock>()
-            .Select(tb => tb.Text ?? string.Empty)
-            .ToList();
-        Assert.Contains(LocalizationManager.T("Adaptive_Help_Title"), texts);
+        // Markdown 控件树渲染出块级控件（标题/段落均为 SelectableTextBlock），证明 help 内容真实呈现
+        Assert.Contains(dialog.GetVisualDescendants().OfType<SelectableTextBlock>(), _ => true);
 
         dialog.Close();
     }
 
-    /// <summary>已迁移的并行解压帮助内容必须经外壳渲染出其章节标题（与窗口标题同一本地化 key）。</summary>
+    /// <summary>迁移到 Markdown 的其余帮助（并行解压/密码/日志隐私）经外壳渲染出块级控件，且三语 key 存在。</summary>
     [AvaloniaFact]
-    public void HelpDialog_Show_RendersMigratedContentTitle()
+    public void HelpDialog_Show_RendersMigratedMarkdown()
     {
-        var content = new ParallelExtractHelpContent();
-        var dialog = new HelpDialog(LocalizationManager.T("ParallelHelp_Title"), content);
+        foreach (var markdownKey in new[] { "ParallelHelp_Markdown", "PasswordHelp_Markdown", "LogPrivacyHelp_Markdown" })
+        {
+            // key 必须真实存在（T() 未命中会回退返回 key 本身）
+            Assert.NotEqual(markdownKey, LocalizationManager.T(markdownKey));
 
-        dialog.Show();
+            var content = new MarkdownHelpContent(LocalizationManager.T(markdownKey));
+            var dialog = new HelpDialog("T", content);
 
-        Assert.Contains(
-            dialog.GetVisualDescendants().OfType<ContentPresenter>(),
-            cp => ReferenceEquals(cp.Content, content));
+            dialog.Show();
 
-        var texts = dialog.GetVisualDescendants().OfType<TextBlock>()
-            .Select(tb => tb.Text ?? string.Empty)
-            .ToList();
-        Assert.Contains(LocalizationManager.T("ParallelHelp_Title"), texts);
+            Assert.Contains(
+                dialog.GetVisualDescendants().OfType<ContentPresenter>(),
+                cp => ReferenceEquals(cp.Content, content));
+            Assert.Contains(dialog.GetVisualDescendants().OfType<SelectableTextBlock>(), _ => true);
 
-        dialog.Close();
+            dialog.Close();
+        }
     }
 }

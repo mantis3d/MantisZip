@@ -6,6 +6,20 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-13** — 帮助窗全面 Markdown 化 + 问号图标 + 章节留白（Avalonia）
+  - **背景**：上一步已把 4 个帮助弹窗统一迁移到可复用外壳 `HelpDialog`，但正文仍是手写卡片 `UserControl`（改文案要动 XAML），且压缩加速帮助的正文内容仍描述已废弃的四模式。
+  - **Markdown 驱动**：新增可复用 `Dialogs/MarkdownHelpContent.axaml(.cs)` —— `new MarkdownHelpContent(LocalizationManager.T("Xxx_Markdown"))`，把本地化 Markdown 交给既有 `Services/MarkdownPreviewBuilder.Build()`（Markdig AST → 原生控件树）渲染（标题/列表/表格/代码块/引用块/粗斜体；段落为 `SelectableTextBlock`，文本可选中复制）；含 `x:Class` 必要的公共无参构造。4 个帮助全部改用之：
+    - **压缩加速帮助**（`AdaptiveHelp_Markdown`）：重写为当前三开关模型（自适应压缩 / 魔数检测 / 多线程压缩）+ 组合提示引用块——**替换**旧四模式文案（`Adaptive_Help_Disabled_*`/`Basic_*`/`Smart_*`/`MultiThreaded_*`/`Intro`/`Title` 共 11 键）；窗口标题 `AdaptiveHelp_Title` = 压缩加速说明。
+    - **并行解压帮助**（`ParallelHelp_Markdown`）：3 章节（并行解压 / 智能并行度 / 大包预测试），替换 `HelpSection_*` + `ParallelHelp_*Section`。
+    - **密码管理器帮助**（`PasswordHelp_Markdown`）：Glob/Regex **表格** + 示例列表 + 匹配执行逻辑有序列表（`|` 符号用 `\|` 转义；正则示例用行内代码避免转义问题），替换 `PwdHelp_Glob_*`/`Regex_*`/`Match_*`/`Intro`/`Section_Title` 约 40 键。
+    - **日志隐私帮助**（`LogPrivacyHelp_Markdown`）：列表（4 模式）+ 前后段落，替换 `_Intro`/`_Mode_*`/`_What`/`_WhatNot`。
+    - 删除 4 个旧卡片 `UserControl`（各 `.axaml` + `.axaml.cs`）；调用点（`SettingsWindow`×2 / `PasswordManagerWindow` / `SettingsWindowViewModel` / `MainWindow` 调试菜单）全部改 `MarkdownHelpContent`；保留各窗标题/关闭文案/尺寸。翻译**逐字沿用**现有三语文案。
+  - **问号图标**：压缩加速 + 并行解压帮助按钮的纯文本 `Content="?"` 改为 `<PathIcon Data="{StaticResource IconQuestion}"/>`（`IconQuestion` 已存在于 `AppIcons.axaml`；密码管理器按钮早已在用）；同时移除密码帮助按钮内**历史遗留的重复 `TextBlock Text="?"`**（图标 + 文本 = 双问号）。压缩加速帮助按钮的**硬编码中文 `ToolTip.Tip`** 改为绑定 VM 新属性 `AdaptiveHelpButtonText`（复用 `AdaptiveHelp_Title`，随语言刷新，遵守规则 13）。
+  - **章节留白**：`MarkdownPreviewBuilder.Build` 原先所有块统一 4px 间距导致正文与下一标题粘连；现对**非首个块的 `HeadingBlock`** 加 `Margin(0,14,0,0)`（首块标题不留白）——帮助窗与 Markdown 文件预览共享该 builder，故预览一并改善。
+  - **AGENTS.md**：规则 17 更新（Markdown 驱动为当前唯一在用内容方式、`AVLN3000` 公共无参构造注意、`x:Class` 类型必须有无参构造）；日志隐私段落 Key files 引用由已删的 `LogPrivacyHelpContent` 改为 `MarkdownHelpContent` + `LogPrivacyHelp_Markdown`。
+  - **测试**：`HelpDialogRenderTests` 更新为断言 3 个 Markdown key 存在且真实渲染 + 注入引用相等；新增 `MarkdownPreviewBuilderTests`（非首块标题有顶部留白、首块无）。**验证**：`--no-incremental` 干净重建 0 错误；Avalonia 218 / 0 / 3；Core 670 / 0 / 3；三语 JSON 合法、key 集一致、无残留旧引用。
+  - **过程记录**：中途用 PowerShell `[regex]::Replace` 改 JSON 时，替换串里的 `$`（Markdown 含 `^...$`）被当成正则组引用，写坏 `strings.zh-CN.json`（行数翻倍）；`git checkout` 恢复后用 `edit` 工具重做，三语均合法。
+
 **2026-10-13** — 根治可复用帮助弹窗空白 + 全部帮助弹窗迁移到 `HelpDialog` 外壳（Avalonia）
   - **现象**：设置窗口「压缩 → 加速」页的 `[?]`「自适应压缩级别介绍」弹窗**整窗空白**（只剩「关闭」按钮）。
   - **根因（无头测试复现确认）**：通用外壳 `Dialogs/HelpDialog.axaml(.cs)` 把内容绑到 `<ContentPresenter Content="{Binding HelpContent}"/>`、标题绑到 `Title="{Binding HelpTitle}"`，但 `HelpTitle`/`HelpContent` 是**普通自动属性**，`HelpDialog` 在**构造函数内**就 `DataContext = this`（此刻二者为 null）；调用方随后用对象初始化器赋值，因**无 `INotifyPropertyChanged`** 绑定不重算 → 内容/标题恒空。解压端 `ParallelExtractHelpDialog` 正常，是因为它是**自包含 Window**、在构造函数内 `DataContext = this` **之前**就给所有文案属性赋了值。
