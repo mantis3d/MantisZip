@@ -377,9 +377,11 @@
         <ItemsControl ItemsSource="{Binding ParallelBatchItems}">
           <ItemsControl.ItemTemplate>
             <DataTemplate>
-              <!-- 通道行：左区（单文件域）+ 右区（批次域：底纹/序号/合并百分比/信息列/ToolTip） -->
+              <!-- 通道行：左区（单文件域）+ 右区（批次域：底纹/序号/合并百分比/信息列/ToolTip）。
+                   行高 = 10–11px 信息文字 + 紧凑度内边距（Border Padding=SpacingXxsThk，随三档呼吸）；
+                   不设固定 MinHeight（否则看起来像按大号字体设高）。规则 7 例外：本行为紧凑多字段信息通道行。 -->
+              <Border Padding="{DynamicResource SpacingXxsThk}">
               <Grid ColumnDefinitions="*,Auto"
-                    MinHeight="{DynamicResource ControlHeightSm}"
                     ColumnSpacing="{DynamicResource SpacingXs}">
                 <!-- 左区：单文件域（目录中间省略 | 文件名恒完整+文件底纹 | 文件大小） -->
                 <Grid Grid.Column="0" ColumnDefinitions="Auto,*,Auto"
@@ -417,7 +419,6 @@
                      溢出时最左元素先裁 = 序号→百分比→信息列左端。IsParallel=false 单行仅信息列非空时显示（ShowRightRegion）。 -->
                 <Grid Grid.Column="1" Width="256" ClipToBounds="True"
                       IsVisible="{Binding ShowRightRegion}"
-                      Margin="{DynamicResource SpacingXsThk}"
                       ToolTip.Tip="{Binding TooltipText}">
                   <!-- 批次底纹：宽 = BatchRatio × 本格宽（紫系，区别于左区文件底纹）；仅并行行显示（单行与底部总进度重复） -->
                   <Rectangle Fill="{DynamicResource ThemeProgressBatchBrush}"
@@ -451,6 +452,7 @@
                   </StackPanel>
                 </Grid>
               </Grid>
+              </Border>
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
