@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-14** — 修复 `HasEncryptedEntries` 7z 分支 null 密码直传 `SharpSevenZipExtractor` 的 CS8604 警告
+  - **问题**：`PasswordService.HasEncryptedEntries(archivePath, engine, string? password = null)` 的 7z 分支把可空 `password` 直接传给非空注解的 `SharpSevenZipExtractor(archivePath, password)` 构造函数 → CS8604。生产调用点 `App.axaml.cs` 的 `ResolveCliPassword` 不传密码 → `null` 真实可达，非误报。
+  - **修复**：沿用全库既有三元模式（`string.IsNullOrEmpty(password) ? new SharpSevenZipExtractor(archivePath) : new SharpSevenZipExtractor(archivePath, password)`，与 `SevenZipEngine`/`ArchiveEntryExtractor`/`ArchiveCommentReader` 共 11 处一致）——无密码走无密码构造函数，语义明确；加密头 7z 无密码抛异常仍由 `catch` 保守返回 `true`，行为不变。
+  - **测试**：`PasswordServiceEncryptionTests` 新增 `HasEncryptedEntries_NonEncryptedSevenZip_ReturnsFalse`（非加密 7z 不传密码 → `false`，锁定无密码构造分支；7z.dll 不可用时跳过）。主项目全量构建 **0 警告 0 错误**；过滤测试 2/2 通过。
+
 **2026-10-14** — 详细面板通道行高贴合小号字体并随紧凑度呼吸
   - **问题**：详细面板并行批次通道行（`ItemsControl` DataTemplate 根 Grid）固定 `MinHeight="{DynamicResource ControlHeightSm}"`（22/26/30），且右区 Grid `Margin="{DynamicResource SpacingXsThk}"`（四边 4/8/12，纵向上下各加一份）→ 行高被撑到约 30–40px，而行内信息文字仅 10–11px，观感「行高像是按大号字体设置的」。
   - **修复**：去掉根 Grid 的固定 `MinHeight`（不再按大号高度撑高）与右区 Grid 的 `Margin`（左右间距已由行 Grid 的 `ColumnSpacing` 承担，纵向 Margin 属有害冗余）；改为行外包一层 `Border Padding="{DynamicResource SpacingXxsThk}"` → 行高 = 信息文字 + 紧凑度内边距（Compact/Normal/Loose = 2/4/6），既贴身又随三档呼吸。
