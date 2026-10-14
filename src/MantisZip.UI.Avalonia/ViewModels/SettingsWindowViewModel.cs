@@ -911,6 +911,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ManualParallelDegreeHintText => LocalizationManager.T("Settings_ManualDegreeHint");
     public string LargeArchivePreTestText => LocalizationManager.T("Settings_LargeArchivePreTest");
     public string ParallelHelpButtonText => LocalizationManager.T("Settings_ParallelHelpButton");
+    /// <summary>压缩加速帮助按钮 ToolTip（复用帮助窗标题 key；消除原先的硬编码中文，遵守规则 13）。</summary>
+    public string AdaptiveHelpButtonText => LocalizationManager.T("AdaptiveHelp_Title");
 
     // DoubleClickAction option display texts
     public string DoubleClickActionOpenText => LocalizationManager.T("Settings_DoubleClick_Open");
@@ -1498,6 +1500,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ManualParallelDegreeHintText));
         OnPropertyChanged(nameof(LargeArchivePreTestText));
         OnPropertyChanged(nameof(ParallelHelpButtonText));
+        OnPropertyChanged(nameof(AdaptiveHelpButtonText));
         OnPropertyChanged(nameof(DoubleClickActionOpenText));
         OnPropertyChanged(nameof(DoubleClickActionExtractHereText));
         OnPropertyChanged(nameof(DoubleClickActionSmartExtractText));
@@ -1984,7 +1987,14 @@ public partial class SettingsWindowViewModel : ObservableObject
     [RelayCommand]
     private void OpenLogPrivacyHelp()
     {
-        var dialog = new LogPrivacyHelpDialog();
+        var dialog = new HelpDialog(
+            LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Title"),
+            new MarkdownHelpContent(LocalizationManager.T("LogPrivacyHelp_Markdown")),
+            LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Close"))
+        {
+            Width = 520,
+            Height = 500
+        };
         dialog.Show();
     }
 

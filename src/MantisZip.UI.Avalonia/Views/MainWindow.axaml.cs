@@ -1675,8 +1675,16 @@ public partial class MainWindow : Window
             "SettingsWindow" => new Views.SettingsWindow(),
             "PasswordManagerWindow" => new PasswordManagerWindow(),
             "DonationDialog" => new DonationDialog(),
-            "LogPrivacyHelpDialog" => new LogPrivacyHelpDialog(),
-            "PasswordHelpDialog" => new PasswordHelpDialog(),
+            "LogPrivacyHelpDialog" => new HelpDialog(
+                LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Title"),
+                new MarkdownHelpContent(LocalizationManager.T("LogPrivacyHelp_Markdown")),
+                LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Close"))
+            { Width = 520, Height = 500 },
+            "PasswordHelpDialog" => new HelpDialog(
+                LocalizationManager.T("PwdHelp_Title"),
+                new MarkdownHelpContent(LocalizationManager.T("PasswordHelp_Markdown")),
+                LocalizationManager.T("PwdHelp_Close"))
+            { Width = 560, Height = 500 },
             "CommentDialog" => new CommentDialog(),
             "PasswordEditDialog" => new PasswordEditDialog(),
             "PasswordDialog" => new PasswordDialog("test.7z"),

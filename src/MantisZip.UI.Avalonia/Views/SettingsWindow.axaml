@@ -130,9 +130,11 @@
                         </Border>
                         <!-- 帮助按钮 -->
                         <Button Grid.Column="2" Classes="ToolbarIcon"
-                                Content="?" FontSize="14" Width="20" Height="20"
                                 Margin="6,0,0,0" Click="OnAdaptiveHelpClick"
-                                ToolTip.Tip="自适应压缩级别介绍"/>
+                                ToolTip.Tip="{Binding AdaptiveHelpButtonText}">
+                          <PathIcon Data="{StaticResource IconQuestion}" Width="16" Height="16"
+                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                        </Button>
                       </Grid>
 
                       <!-- 开关1：自适应压缩 -->
@@ -577,11 +579,13 @@
                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                   <Button Grid.Column="1"
                           Classes="ToolbarIcon"
-                          Content="?"
                           Command="{Binding ShowParallelHelpCommand}"
                           ToolTip.Tip="{Binding ParallelHelpButtonText}"
                           Background="{DynamicResource ThemeHeaderBgBrush}"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+                    <PathIcon Data="{StaticResource IconQuestion}" Width="16" Height="16"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                  </Button>
                 </Grid>
 
                 <!-- 全局并行开关：关闭则始终串行 -->
