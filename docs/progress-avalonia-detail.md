@@ -2281,7 +2281,11 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
-#### v0.5.2 (2026-10-13) 三引擎进度字节埋点全覆盖 + `ReadProgressStream`
+#### v0.5.2 (2026-10-14) 修复 ZIP 并行解压主进度 PercentComplete 回退（`MonotonicProgress` 包装器）
+  - **根因（c6891d9 引入）**：`ExtractAsyncParallel`/`ExtractEntriesAsyncParallel` 的批次循环在 `lock (syncLock)` 内更新共享计数并取快照、释放锁后才 `progress.Report(...)` —— 多批次线程的「快照值」与「上报时刻」交错，消费端（进度窗口 / `OrderedProgressCollector` 单调断言）观察到 `PercentComplete` 先高后低（进度条回跳）；回归测试 `ExtractAsync_AllFailures_EmitsMainProgressPerFile` 因此间歇失败、阻塞发布打包验证。
+  - **修复**：两条并行方法入口将参数 `progress` 重赋值为 `new MonotonicProgress(progress)`（包装器为 ZipEngine 私有嵌套类，**零调用点改动**）。`MonotonicProgress.Report` 分流：`EntryStatus != null` 的逐条终态报告**直通不上锁**（不携带全局百分比语义）；主进度报告在专用 `_reportLock` 内完成「钳位 + Report」原子操作——`value.PercentComplete < _lastPercent` 时抬升到 `_lastPercent`（过期低值被钳平），否则推进 `_lastPercent`。**只钳 `PercentComplete`**，`ProcessedFiles`/`ProcessedBytes`/`BatchPercentComplete`/`BatchProcessedBytes`/`FilePercentComplete` 等字段原样透传（避免破坏各消费端分母语义）。
+  - **性能约束**：专用 `_reportLock` 与 `syncLock` 分离，Report 不进入字节计数热路径锁（AGENTS.md：syncLock 内 Report 曾致 8 线程 100×1MB 解压 0.3s→8.5s 的 25x 回退）；`MonotonicProgress` 仅挂在两条并行解压路径，串行/压缩路径不受影响。
+  - **验证**：Core Release 构建 0 错误 0 警告；目标回归测试复跑 5 次全过；全量 `dotnet test`（MantisZip.Tests，含 SevenZip）**680 通过 / 0 失败 / 3 跳过**（跳过均为 benchmark/probe）。
   - **`SevenZipEngine`**：`ExtractAsync`/`ExtractEntriesAsync` 每份常规报告携带 `TotalBytes`（非目录条目 Size 和；过滤解压仅统计命中条目）+ 单调递增 `ProcessedBytes`（跳过累加、回调钳制 `processedBytes + Math.Min(bytesWritten, entrySize)`、最终 `Processed == Total`）；`CompressAsync`/`AddToArchiveAsync` 按 percent 推算（`SumSourceFileSizes` 求源文件未压缩总和，`totalSourceBytes` 声明提到 `using` 作用域外供最终报告）；`DeleteEntriesAsync` 提取 0-50% + 重打包 `50 + 0.5p` 三段单调（`keepEntries` 扩为三元组含 size）。`AttachCompressorProgress` 改同步 Report + `percentBase`/`percentScale` 形参。
   - **`TarGzEngine`**：解压 tar 分支 `TotalBytes = inputStream.Length`、`ProcessedBytes = inputStream.Position`，gz 分支 `CopyTo` 改手动缓冲循环；压缩侧新增 `SafeFileSize`，tar 多文件循环经 `TarWriteFileWithRetry` 新增 `onRead` 形参接入 `ReadProgressStream`（percent 保持文件计数基准，字节独立真实读取），gz 单文件分支按 byte 基准报 percent；最终报告 `Processed == Total`。
   - **`Core/Utils/ReadProgressStream.cs`（新增）**：`WriteProgressStream` 镜像包装只读流，`Read`/`ReadAsync` 累加已读字节回调 `onRead(totalRead)`；保持可寻（代理内层 `CanSeek`/`Seek`/`Position`/`Length`）以规避 `TarWriter.Write` 未显式传 size 时的 "Seekable stream is required if no size is given."。

@@ -495,6 +495,12 @@ public class ZipEngine : IArchiveEngine
         var sw = Stopwatch.StartNew();
         var conflictStats = new ConflictStatsCounter();
 
+        // 主进度单调包装：EntryStatus 状态报告直通；主进度报告在专用锁内「钳位 + 上报」原子化，
+        // 保证 PercentComplete 单调不减（并行批次线程在锁外取共享计数快照后上报，快照顺序与
+        // 上报顺序可能交错，导致消费端看到进度回退）。专用锁不与 syncLock（字节计数热路径）
+        // 共用 —— 禁止在 syncLock 内 Report，避免历史 25x 锁竞争回退（见 AGENTS.md 并行解压架构）。
+        progress = progress is null ? null : new MonotonicProgress(progress);
+
         // 1. 获取所有条目键和文件大小（单线程打开 archive 一次）
         var entryInfos = new List<(string Key, long Size, DateTime? Modified)>();
         long totalBytes = 0;
@@ -1185,6 +1191,9 @@ while (true)
         var sw = Stopwatch.StartNew();
         var conflictStats = new ConflictStatsCounter();
 
+        // 主进度单调包装：与 ExtractAsyncParallel 相同，根治并行批次快照乱序导致的进度回退
+        progress = progress is null ? null : new MonotonicProgress(progress);
+
         // 1. 预读所有命中条目（单线程打开 archive 一次）：文件（Key/Size/Modified/输出路径）+ 目录 key
         var entryInfos = new List<(string Key, long Size, DateTime? Modified, string OutputPath)>();
         var directoryPaths = new List<string>();
@@ -1617,6 +1626,43 @@ while (true)
 
         CoreLog.Info($"ExtractEntriesAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         CoreLog.Exit();
+    }
+
+    /// <summary>
+    /// 主进度单调包装器：保证上报到内层 <see cref="IProgress{T}"/> 的主进度 <c>PercentComplete</c> 单调不减。
+    /// 并行解压各批次线程在 syncLock 内取共享计数快照、释放锁后再上报，快照顺序与上报顺序可能交错，
+    /// 使消费端（进度窗口 / 有序收集测试）看到百分比回退（进度条回跳）。
+    /// 此处在专用锁内完成「钳位 + 上报」原子操作：过期的低百分比被钳到最近一次已上报值。
+    /// EntryStatus 状态报告不携带全局百分比语义，直通不上锁。
+    /// 专用锁与 syncLock 分离 —— 禁止在 syncLock 内 Report（历史 25x 锁竞争回退，见 AGENTS.md）。
+    /// </summary>
+    private sealed class MonotonicProgress(IProgress<ArchiveProgress> inner) : IProgress<ArchiveProgress>
+    {
+        private readonly object _reportLock = new();
+        private double _lastPercent;
+
+        public void Report(ArchiveProgress value)
+        {
+            if (value.EntryStatus is not null)
+            {
+                inner.Report(value);
+                return;
+            }
+
+            lock (_reportLock)
+            {
+                if (value.PercentComplete < _lastPercent)
+                {
+                    value.PercentComplete = _lastPercent;
+                }
+                else
+                {
+                    _lastPercent = value.PercentComplete;
+                }
+
+                inner.Report(value);
+            }
+        }
     }
 
     public async Task CompressAsync(string[] sourcePaths, string outputPath, ArchiveOptions options, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)
