@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-14** — 详细面板通道行高贴合小号字体并随紧凑度呼吸
+  - **问题**：详细面板并行批次通道行（`ItemsControl` DataTemplate 根 Grid）固定 `MinHeight="{DynamicResource ControlHeightSm}"`（22/26/30），且右区 Grid `Margin="{DynamicResource SpacingXsThk}"`（四边 4/8/12，纵向上下各加一份）→ 行高被撑到约 30–40px，而行内信息文字仅 10–11px，观感「行高像是按大号字体设置的」。
+  - **修复**：去掉根 Grid 的固定 `MinHeight`（不再按大号高度撑高）与右区 Grid 的 `Margin`（左右间距已由行 Grid 的 `ColumnSpacing` 承担，纵向 Margin 属有害冗余）；改为行外包一层 `Border Padding="{DynamicResource SpacingXxsThk}"` → 行高 = 信息文字 + 紧凑度内边距（Compact/Normal/Loose = 2/4/6），既贴身又随三档呼吸。
+  - **坑**：Avalonia 的 `Grid` **没有 `Padding` 属性**（直接加 `Padding` 报 `AVLN2000: Unable to resolve suitable ... Padding on type Grid`）；该错误曾被 `-p:BaseOutputPath=obj\altout\` 增量构建**掩盖**（复用旧已编译 XAML → 跑出 28 个假「No precompiled XAML found」失败），常规构建才暴露真正错误 → 最终改用 `Border` 承载内边距。
+  - **验证**：常规构建 0 错误（资源管理器占用 `MantisZip.ShellExt.dll` 已解除）；UI **248 通过**/3 跳过、Core **680 通过**/3 跳过。
+
 **2026-10-14** — 修复并行解压「详细面板」批次进度条首行恒 0（漏计当前文件已拷字节）
   - **根因**：`ZipEngine` 两条并行路径（`ExtractAsyncParallel` / `ExtractEntriesAsyncParallel`）的每文件进度上报里，批次字节字段写的是裸 `batchProcessedBytes`（仅含**已完成**条目），漏了当前正在复制文件的 `entryProcessed`（对比同报告 `ProcessedBytes = localProcessedBytes + entryProcessed` 本就含当前文件）。Round-Robin 按大小降序把**最大文件**放进 batch 0 且为其首文件 → 详细面板第一行在整个大文件拷贝期间恒 0；末文件完成也永远进不了该行（到不了 100%）。
   - **修复**：两处上报改为 `BatchProcessedBytes = batchProcessedBytes + entryProcessed`、`BatchPercentComplete = (batchProcessedBytes + entryProcessed) / batchTotalBytes * 100`。
