@@ -1602,6 +1602,7 @@ public partial class ProgressViewModel : ObservableObject
     {
         EntryFailureReason.PermissionDenied => LocalizationManager.T("Error_Reason_PermissionDenied"),
         EntryFailureReason.IoFailed => LocalizationManager.T("Error_Reason_IoFailed"),
+        EntryFailureReason.CrcMismatch => LocalizationManager.T("Error_Reason_CrcMismatch"),
         _ => LocalizationManager.T("Error_Reason_Other"),
     };
 

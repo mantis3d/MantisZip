@@ -324,7 +324,10 @@ public enum EntryFailureReason
     /// <summary>读写错误：文件被占用、磁盘满、路径过长等（IOException）。</summary>
     IoFailed,
 
-    /// <summary>其它异常（CRC/数据损坏等，含 ZIP 并行路径通用 catch）。</summary>
+    /// <summary>压缩包数据损坏：条目 CRC 校验失败（ZIP 解压/测试经官方 CheckCrc 路径检出）。</summary>
+    CrcMismatch,
+
+    /// <summary>其它异常（含其它数据损坏、ZIP 并行路径通用 catch）。</summary>
     Other,
 }
 

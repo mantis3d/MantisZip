@@ -364,44 +364,29 @@ public class ZipEngine : IArchiveEngine
 
                 try
                 {
-                    using (var entryStream = entry.OpenEntryStream())
                     using (var outputStream = File.Create(resolvedPath))
                     {
-                        var buffer = new byte[CopyBufferSize];
-                        var entryProcessed = 0L;
-                        var lastReportTime = DateTime.Now;
-                        var reportInterval = TimeSpan.FromMilliseconds(100);
-
-                        while (true)
+                        // 官方 CRC 校验路径（见 CreateCrcExtractionOptions）：读完即比对 CRC，
+                        // 损坏则抛 InvalidFormatException，由下方 catch 逐条目上报失败（不中止整批）。
+                        entry.WriteTo(outputStream, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var read = entryStream.Read(buffer, 0, buffer.Length);
-                            if (read <= 0) break;
-
-                            outputStream.Write(buffer, 0, read);
-                            entryProcessed += read;
-
-                            var now = DateTime.Now;
-                            if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                            var entryProcessed = rep.BytesTransferred;
+                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                             {
-                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                                var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
-                                {
-                                    CurrentFile = entryKey,
-                                    TotalFiles = entries.Count,
-                                    ProcessedFiles = processedFiles,
-                                    TotalBytes = totalBytes,
-                                    ProcessedBytes = processedBytes + entryProcessed,
-                                    PercentComplete = overallPct,
-                                    FilePercentComplete = filePct,
-                                    FileTotalBytes = entrySize,
-                                    BatchProcessedBytes = processedBytes + entryProcessed,
-                                    BatchTotalBytes = totalBytes
-                                }));
-                                lastReportTime = now;
-                            }
-                        }
+                                CurrentFile = entryKey,
+                                TotalFiles = entries.Count,
+                                ProcessedFiles = processedFiles,
+                                TotalBytes = totalBytes,
+                                ProcessedBytes = processedBytes + entryProcessed,
+                                PercentComplete = overallPct,
+                                FilePercentComplete = filePct,
+                                FileTotalBytes = entrySize,
+                                BatchProcessedBytes = processedBytes + entryProcessed,
+                                BatchTotalBytes = totalBytes
+                            }));
+                        }));
                     }
                     // 恢复文件原始修改时间
                     try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsyncSequential: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
@@ -410,6 +395,28 @@ public class ZipEngine : IArchiveEngine
                     processedFiles++;
                     // 逐条目状态（D2）：写入成功 → Completed 或 Overwritten
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed, FileTotalBytes = entrySize });
+                }
+                catch (InvalidFormatException ifx)
+                {
+                    // 官方 CRC 校验失败（数据损坏）→ 逐条目失败、不中止整批；删除已写出的损坏文件。
+                    CoreLog.Info($"ExtractAsyncSequential: integrity check failed for '{entryKey}': {ifx.Message}");
+                    TryDeleteCorruptOutput(resolvedPath);
+                    failedEntries++;
+                    conflictStats.RecordFailed();
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx) });
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = entries.Count,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = entrySize,
+                    }));
                 }
                 catch (UnauthorizedAccessException uax)
                 {
@@ -706,58 +713,41 @@ public class ZipEngine : IArchiveEngine
                         continue;
                     }
 
-                    using var entryStream = entry.OpenEntryStream();
                     using var outputStream = File.Create(resolvedPath);
-                    var buffer = new byte[CopyBufferSize];
-                    long entryProcessed = 0;
-                    var entryLastReportTime = DateTime.Now;
-
-while (true)
+                    // 官方 CRC 校验路径（见 CreateCrcExtractionOptions）：损坏则抛 InvalidFormatException，由下方 catch 逐条目上报。
+                    await entry.WriteToAsync(outputStream, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
+                    {
+                        var entryProcessed = rep.BytesTransferred;
+                        // 先在锁内拷贝共享变量，释放锁后再上报进度，避免锁竞争
+                        int localProcessedFiles;
+                        long localProcessedBytes;
+                        lock (syncLock)
                         {
-                            ct.ThrowIfCancellationRequested();
-                            var read = await entryStream.ReadAsync(buffer, 0, buffer.Length, ct);
-                            if (read <= 0) break;
-
-                            await outputStream.WriteAsync(buffer, 0, read, ct);
-                            entryProcessed += read;
-
-                            // 报告当前文件进度（节流）
-                            var now = DateTime.Now;
-                            if (now - entryLastReportTime >= TimeSpan.FromMilliseconds(100) || entryProcessed >= entrySize)
-                            {
-                                // 先在锁内拷贝共享变量，释放锁后再上报进度，避免锁竞争
-                                int localProcessedFiles;
-                                long localProcessedBytes;
-                                lock (syncLock)
-                                {
-                                    localProcessedFiles = processedFiles;
-                                    localProcessedBytes = processedBytes;
-                                }
-
-                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                                var overallPct = totalBytes > 0 ? (double)(localProcessedBytes + entryProcessed) / totalBytes * 100 : 0;
-                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
-                                {
-                                    CurrentFile = entryKey,
-                                    TotalFiles = entryInfos.Count,
-                                    ProcessedFiles = localProcessedFiles,
-                                    TotalBytes = totalBytes,
-                                    ProcessedBytes = localProcessedBytes + entryProcessed,
-                                    PercentComplete = overallPct,
-                                    FilePercentComplete = filePct,
-                                    FileTotalBytes = entrySize,
-                                    BatchProcessedBytes = batchProcessedBytes + entryProcessed,
-                                    BatchTotalBytes = batchTotalBytes,
-                                    BatchIndex = batchIndex,
-                                    BatchCount = actualParallelism,
-                                    BatchPercentComplete = batchTotalBytes > 0 ? (double)(batchProcessedBytes + entryProcessed) / batchTotalBytes * 100 : 100,
-                                    BatchProcessedFiles = batchProcessedFiles,
-                                    BatchTotalFiles = batchTotalFiles
-                                }));
-
-                                entryLastReportTime = now;
-                            }
+                            localProcessedFiles = processedFiles;
+                            localProcessedBytes = processedBytes;
                         }
+
+                        var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                        var overallPct = totalBytes > 0 ? (double)(localProcessedBytes + entryProcessed) / totalBytes * 100 : 0;
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                        {
+                            CurrentFile = entryKey,
+                            TotalFiles = entryInfos.Count,
+                            ProcessedFiles = localProcessedFiles,
+                            TotalBytes = totalBytes,
+                            ProcessedBytes = localProcessedBytes + entryProcessed,
+                            PercentComplete = overallPct,
+                            FilePercentComplete = filePct,
+                            FileTotalBytes = entrySize,
+                            BatchProcessedBytes = batchProcessedBytes + entryProcessed,
+                            BatchTotalBytes = batchTotalBytes,
+                            BatchIndex = batchIndex,
+                            BatchCount = actualParallelism,
+                            BatchPercentComplete = batchTotalBytes > 0 ? (double)(batchProcessedBytes + entryProcessed) / batchTotalBytes * 100 : 100,
+                            BatchProcessedFiles = batchProcessedFiles,
+                            BatchTotalFiles = batchTotalFiles
+                        }));
+                    }), ct);
 
                     // 恢复文件原始修改时间
                     try { File.SetLastWriteTime(resolvedPath, entryModified ?? DateTime.MinValue); }
@@ -776,6 +766,43 @@ while (true)
                 catch (OperationCanceledException)
                 {
                     throw;
+                }
+                catch (InvalidFormatException ifx)
+                {
+                    // 官方 CRC 校验失败（数据损坏）→ 逐条目失败、不中止整批；删除已写出的损坏文件。
+                    CoreLog.Info($"ExtractAsyncParallel: integrity check failed for '{entryKey}': {ifx.Message}");
+                    TryDeleteCorruptOutput(resolvedPath);
+                    conflictStats.RecordFailed();
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx) });
+                    long ifxProcessedBytes;
+                    int ifxProcessedFiles;
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        ifxProcessedBytes = processedBytes;
+                        ifxProcessedFiles = processedFiles;
+                    }
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = ifxProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = ifxProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)ifxProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                 }
                 catch (UnauthorizedAccessException uax)
                 {
@@ -1066,44 +1093,28 @@ while (true)
                 var entrySize = entry.Size;
                 try
                 {
-                    using (var entryStream = entry.OpenEntryStream())
                     using (var outputStream = File.Create(resolvedPath))
                     {
-                        var buffer = new byte[CopyBufferSize];
-                        long entryProcessed = 0;
-                        var lastReportTime = DateTime.Now;
-                        var reportInterval = TimeSpan.FromMilliseconds(100);
-
-                        while (true)
+                        // 官方 CRC 校验路径（见 CreateCrcExtractionOptions）：损坏则抛 InvalidFormatException，由下方 catch 逐条目上报。
+                        entry.WriteTo(outputStream, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var read = entryStream.Read(buffer, 0, buffer.Length);
-                            if (read <= 0) break;
-
-                            outputStream.Write(buffer, 0, read);
-                            entryProcessed += read;
-
-                            var now = DateTime.Now;
-                            if (now - lastReportTime >= reportInterval || entryProcessed >= entrySize)
+                            var entryProcessed = rep.BytesTransferred;
+                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                            var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
+                            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                             {
-                                var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                                var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
-                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
-                                {
-                                    CurrentFile = entryKey,
-                                    TotalFiles = filteredEntries.Count,
-                                    ProcessedFiles = processedFiles,
-                                    TotalBytes = totalBytes,
-                                    ProcessedBytes = processedBytes + entryProcessed,
-                                    PercentComplete = overallPct,
-                                    FilePercentComplete = filePct,
-                                    FileTotalBytes = entrySize,
-                                    BatchProcessedBytes = processedBytes + entryProcessed,
-                                    BatchTotalBytes = totalBytes
-                                }));
-                                lastReportTime = now;
-                            }
-                        }
+                                CurrentFile = entryKey,
+                                TotalFiles = filteredEntries.Count,
+                                ProcessedFiles = processedFiles,
+                                TotalBytes = totalBytes,
+                                ProcessedBytes = processedBytes + entryProcessed,
+                                PercentComplete = overallPct,
+                                FilePercentComplete = filePct,
+                                FileTotalBytes = entrySize,
+                                BatchProcessedBytes = processedBytes + entryProcessed,
+                                BatchTotalBytes = totalBytes
+                            }));
+                        }));
                     }
 
                     try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { CoreLog.Trace("ZipEngine.ExtractAsync: failed to set last write time for '{0}'", resolvedPath); }
@@ -1114,6 +1125,28 @@ while (true)
                     progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = entryOverwritten ? ArchiveEntryStatus.Overwritten : ArchiveEntryStatus.Completed, FileTotalBytes = entrySize });
                 }
                 catch (OperationCanceledException) { throw; }
+                catch (InvalidFormatException ifx)
+                {
+                    // 官方 CRC 校验失败（数据损坏）→ 逐条目失败、不中止整批；删除已写出的损坏文件。
+                    CoreLog.Info($"ExtractEntriesAsyncSequential: integrity check failed for '{entryKey}': {ifx.Message}");
+                    TryDeleteCorruptOutput(resolvedPath);
+                    failedEntries++;
+                    conflictStats.RecordFailed();
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx) });
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        PercentComplete = totalBytes > 0 ? (double)processedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        TotalFiles = filteredEntries.Count,
+                        ProcessedFiles = processedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = entrySize,
+                    }));
+                }
                 catch (UnauthorizedAccessException uax)
                 {
                     CoreLog.Info($"ExtractEntriesAsyncSequential: permission denied for '{entryKey}': {uax.Message}");
@@ -1405,58 +1438,41 @@ while (true)
                         continue;
                     }
 
-                    using var entryStream = entry.OpenEntryStream();
                     using var outputStream = File.Create(resolvedPath);
-                    var buffer = new byte[CopyBufferSize];
-                    long entryProcessed = 0;
-                    var entryLastReportTime = DateTime.Now;
-
-                    while (true)
+                    // 官方 CRC 校验路径（见 CreateCrcExtractionOptions）：损坏则抛 InvalidFormatException，由下方 catch 逐条目上报。
+                    await entry.WriteToAsync(outputStream, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
                     {
-                        ct.ThrowIfCancellationRequested();
-                        var read = await entryStream.ReadAsync(buffer, 0, buffer.Length, ct);
-                        if (read <= 0) break;
-
-                        await outputStream.WriteAsync(buffer, 0, read, ct);
-                        entryProcessed += read;
-
-                        // 报告当前文件进度（节流）
-                        var now = DateTime.Now;
-                        if (now - entryLastReportTime >= TimeSpan.FromMilliseconds(100) || entryProcessed >= entrySize)
+                        var entryProcessed = rep.BytesTransferred;
+                        // 先在锁内拷贝共享变量，释放锁后再上报进度，避免锁竞争
+                        int localProcessedFiles;
+                        long localProcessedBytes;
+                        lock (syncLock)
                         {
-                            // 先在锁内拷贝共享变量，释放锁后再上报进度，避免锁竞争
-                            int localProcessedFiles;
-                            long localProcessedBytes;
-                            lock (syncLock)
-                            {
-                                localProcessedFiles = processedFiles;
-                                localProcessedBytes = processedBytes;
-                            }
-
-                            var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
-                            var overallPct = totalBytes > 0 ? (double)(localProcessedBytes + entryProcessed) / totalBytes * 100 : 0;
-                            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
-                            {
-                                CurrentFile = entryKey,
-                                TotalFiles = entryInfos.Count,
-                                ProcessedFiles = localProcessedFiles,
-                                TotalBytes = totalBytes,
-                                ProcessedBytes = localProcessedBytes + entryProcessed,
-                                PercentComplete = overallPct,
-                                FilePercentComplete = filePct,
-                                FileTotalBytes = entrySize,
-                                BatchProcessedBytes = batchProcessedBytes + entryProcessed,
-                                BatchTotalBytes = batchTotalBytes,
-                                BatchIndex = batchIndex,
-                                BatchCount = actualParallelism,
-                                BatchPercentComplete = batchTotalBytes > 0 ? (double)(batchProcessedBytes + entryProcessed) / batchTotalBytes * 100 : 100,
-                                BatchProcessedFiles = batchProcessedFiles,
-                                BatchTotalFiles = batchTotalFiles
-                            }));
-
-                            entryLastReportTime = now;
+                            localProcessedFiles = processedFiles;
+                            localProcessedBytes = processedBytes;
                         }
-                    }
+
+                        var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
+                        var overallPct = totalBytes > 0 ? (double)(localProcessedBytes + entryProcessed) / totalBytes * 100 : 0;
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                        {
+                            CurrentFile = entryKey,
+                            TotalFiles = entryInfos.Count,
+                            ProcessedFiles = localProcessedFiles,
+                            TotalBytes = totalBytes,
+                            ProcessedBytes = localProcessedBytes + entryProcessed,
+                            PercentComplete = overallPct,
+                            FilePercentComplete = filePct,
+                            FileTotalBytes = entrySize,
+                            BatchProcessedBytes = batchProcessedBytes + entryProcessed,
+                            BatchTotalBytes = batchTotalBytes,
+                            BatchIndex = batchIndex,
+                            BatchCount = actualParallelism,
+                            BatchPercentComplete = batchTotalBytes > 0 ? (double)(batchProcessedBytes + entryProcessed) / batchTotalBytes * 100 : 100,
+                            BatchProcessedFiles = batchProcessedFiles,
+                            BatchTotalFiles = batchTotalFiles
+                        }));
+                    }), ct);
 
                     // 恢复文件原始修改时间
                     try { File.SetLastWriteTime(resolvedPath, entryModified ?? DateTime.MinValue); }
@@ -1475,6 +1491,43 @@ while (true)
                 catch (OperationCanceledException)
                 {
                     throw;
+                }
+                catch (InvalidFormatException ifx)
+                {
+                    // 官方 CRC 校验失败（数据损坏）→ 逐条目失败、不中止整批；删除已写出的损坏文件。
+                    CoreLog.Info($"ExtractEntriesAsyncParallel: integrity check failed for '{entryKey}': {ifx.Message}");
+                    TryDeleteCorruptOutput(resolvedPath);
+                    conflictStats.RecordFailed();
+                    lock (syncLock) Interlocked.Increment(ref failedEntries);
+                    batchProcessedFiles++;
+                    batchProcessedBytes += entrySize;
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx) });
+                    long ifxProcessedBytes;
+                    int ifxProcessedFiles;
+                    lock (syncLock)
+                    {
+                        processedBytes += entrySize;
+                        ifxProcessedBytes = processedBytes;
+                        ifxProcessedFiles = processedFiles;
+                    }
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = entryKey,
+                        TotalFiles = entryInfos.Count,
+                        ProcessedFiles = ifxProcessedFiles,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = ifxProcessedBytes,
+                        PercentComplete = totalBytes > 0 ? (double)ifxProcessedBytes / totalBytes * 100 : 0,
+                        FilePercentComplete = 100,
+                        FileTotalBytes = entrySize,
+                        BatchProcessedBytes = batchProcessedBytes,
+                        BatchTotalBytes = batchTotalBytes,
+                        BatchIndex = batchIndex,
+                        BatchCount = actualParallelism,
+                        BatchPercentComplete = batchTotalBytes > 0 ? (double)batchProcessedBytes / batchTotalBytes * 100 : 100,
+                        BatchProcessedFiles = batchProcessedFiles,
+                        BatchTotalFiles = batchTotalFiles
+                    }));
                 }
                 catch (UnauthorizedAccessException uax)
                 {
@@ -2351,39 +2404,23 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
 
                     try
                     {
-                        // 完全解压每个条目以验证数据完整性
-                        // SharpCompress 在读取完整流时内部会检测 CRC 等错误
-                        using var stream = entry.OpenEntryStream();
-
-                        long totalRead = 0;
-                        var lastReportTime = DateTime.Now;
-                        var reportInterval = TimeSpan.FromMilliseconds(100);
-
-                        // 带 per-file 进度的复制循环（100ms 节流，末尾强制上报 100%）
-                        var buffer = new byte[CopyBufferSize];
-                        while (true)
+                        // 用官方 CheckCrc 路径把条目完整写出以验证数据完整性。
+                        // 注意：OpenEntryStream() 是裸流、不校验 CRC（旧注释的假设不成立），
+                        // 只有 WriteTo + CheckCrc=true 才会在读完时对比条目 CRC，
+                        // 不一致时抛 InvalidFormatException → 由下方 catch 归类为失败。
+                        entry.WriteTo(Stream.Null, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var read = stream.Read(buffer, 0, buffer.Length);
-                            if (read <= 0) break;
-                            totalRead += read;
-
-                            var now = DateTime.Now;
-                            if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
+                            var filePct = entrySize > 0 ? (double)rep.BytesTransferred / entrySize * 100 : 100;
+                            progress?.Report(new ArchiveProgress
                             {
-                                var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
-                                progress?.Report(new ArchiveProgress
-                                {
-                                    EntryKey = entryKey,
-                                    CurrentFile = entryKey,
-                                    PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
-                                    FilePercentComplete = filePct,
-                                    TotalFiles = totalFiles,
-                                    ProcessedFiles = processedFiles,
-                                });
-                                lastReportTime = now;
-                            }
-                        }
+                                EntryKey = entryKey,
+                                CurrentFile = entryKey,
+                                PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 100,
+                                FilePercentComplete = filePct,
+                                TotalFiles = totalFiles,
+                                ProcessedFiles = processedFiles,
+                            });
+                        }));
 
                         processedFiles++;
                         progress?.Report(new ArchiveProgress
@@ -4319,6 +4356,33 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
     private static long SafeFileSize(string path)
     {
         try { return new FileInfo(path).Length; } catch { return 0L; }
+    }
+
+    /// <summary>
+    /// 构造启用官方 CRC 校验的提取选项。
+    /// <para>
+    /// ⚠️ <c>IArchiveEntry.OpenEntryStream()</c> 返回的是**裸流，不校验 CRC**——
+    /// 引擎曾在测试/解压路径直接使用它，导致「数据被改动但仍能解码」的损坏包
+    /// （典型：stored 条目字节翻转、CRC 字段错）被静默解出而不报错。
+    /// SharpCompress 的校验能力只挂在官方的 <c>WriteTo/WriteToAsync</c> 扩展方法上，
+    /// 由 <see cref="ExtractionOptions.CheckCrc"/> 触发（默认 true，此处显式指定以防上游改默认）。
+    /// 该校验路径内部已正确处理目录条目、CRC 不可用、以及 WinZip AES AE-2
+    /// （其 CRC 字段按设计为 0）等边界，故对加密包不会误报。
+    /// </para>
+    /// BufferSize 沿用 <see cref="CopyBufferSize"/> 以保持吞吐（进度上报粒度随之与旧实现一致）。
+    /// </summary>
+    private static ExtractionOptions CreateCrcExtractionOptions() =>
+        new() { CheckCrc = true, BufferSize = CopyBufferSize };
+
+    /// <summary>
+    /// 删除 CRC 校验失败而写出的损坏文件（best-effort）。
+    /// CRC 校验发生在条目读完时，此时目标文件已含**内容错误**的完整数据；
+    /// 保留它会让用户误以为解压成功，故直接删除、只留失败明细。
+    /// </summary>
+    private static void TryDeleteCorruptOutput(string path)
+    {
+        try { if (!string.IsNullOrEmpty(path) && File.Exists(path)) File.Delete(path); }
+        catch (Exception ex) { CoreLog.Trace("TryDeleteCorruptOutput: failed to delete '{0}': {1}", path, ex.Message); }
     }
 
     /// <summary>

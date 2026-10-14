@@ -6,6 +6,10 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-15** — 进度窗口失败原因新增「数据损坏（CRC 校验失败）」
+  - **改动**：`ProgressViewModel.ReasonText`（失败根因 → 本地化文案）新增 `EntryFailureReason.CrcMismatch => LocalizationManager.T("Error_Reason_CrcMismatch")` 分支；`Localization/strings.{zh-CN,en,zh-TW}.json` 成对新增 `Error_Reason_CrcMismatch`（「数据损坏（CRC 校验失败）」/ "Data corruption (CRC check failed)" / 「資料損壞（CRC 校驗失敗）」），插于 `Error_Reason_IoFailed` 之后，维持 UTF-8 BOM + CRLF + 2 空格缩进。
+  - **背景**：Core 侧 ZIP 损坏检测（见共享层 2026-10-15 条目）现会产出 `EntryFailureReason.CrcMismatch`，UI 据此在错误摘要显示可读原因而非「未知错误」。
+
 **2026-10-14** — 修复 `HasEncryptedEntries` 7z 分支 null 密码直传 `SharpSevenZipExtractor` 的 CS8604 警告
   - **问题**：`PasswordService.HasEncryptedEntries(archivePath, engine, string? password = null)` 的 7z 分支把可空 `password` 直接传给非空注解的 `SharpSevenZipExtractor(archivePath, password)` 构造函数 → CS8604。生产调用点 `App.axaml.cs` 的 `ResolveCliPassword` 不传密码 → `null` 真实可达，非误报。
   - **修复**：沿用全库既有三元模式（`string.IsNullOrEmpty(password) ? new SharpSevenZipExtractor(archivePath) : new SharpSevenZipExtractor(archivePath, password)`，与 `SevenZipEngine`/`ArchiveEntryExtractor`/`ArchiveCommentReader` 共 11 处一致）——无密码走无密码构造函数，语义明确；加密头 7z 无密码抛异常仍由 `catch` 保守返回 `true`，行为不变。
@@ -2285,6 +2289,14 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.2 (2026-10-15) 修复损坏 ZIP 被静默通过——改用 SharpCompress 官方 CRC 校验路径（ZipEngine）
+  - **根因**：`ZipEngine` 的测试与解压（串行/并行/过滤四处）均用 `IArchiveEntry.OpenEntryStream()` 读裸流。SharpCompress 的 `OpenEntryStream()` **不校验 CRC**（实测 0.48.1 / 0.50.4 行为一致，`ReaderFactory` 前向读同样不校验）；代码注释「SharpCompress 在读取完整流时内部会检测 CRC」的假设不成立 → 损坏仅在解码器自身报错（deflate 的 zlib 自检、头部解析）时偶然检出，而「数据被改动但仍可解码」的条目（stored 字节翻转、CRC 字段错）被静默解出且无任何报错。
+  - **官方机制**：校验能力只挂在官方高层提取 API——`ZipEntry.Checksum` 返回 `ChecksumDescriptor(Crc32, IsAvailable: true)`，`ChecksumValidationStream` 仅在 `IArchiveEntryExtensions.WriteTo`/`WriteToAsync` 中按 `ExtractionOptions.CheckCrc`（默认 true）包裹；官方 `ZipCrcExtractionTests` 证明 `CheckCrc=true` 抛 `InvalidFormatException`。0.48.1 尚无 `ExtractionOptions.CheckCrc`（该机制为 0.48.1 之后新增）→ 非版本回归，换版本无解。
+  - **修复**：新增 `CreateCrcExtractionOptions()`（`CheckCrc=true`，`BufferSize=CopyBufferSize` 保吞吐）；`TestArchiveAsync` 与四处解压循环由裸流改为 `entry.WriteTo`/`WriteToAsync(outputStream, CreateCrcExtractionOptions(), InlineProgress<ProgressReport>)`（进度经 `ProgressReport` 映射回 `ArchiveProgress`）；四处新增 `catch (InvalidFormatException)` → 逐条目 `Failed`（不中止整批）+ `TryDeleteCorruptOutput(resolvedPath)`（CRC 在读完时校验，此时文件已含错误数据，删除以免误导）。
+  - **边界安全**：官方路径内部已正确处理目录条目、`IsCrcAvailable=false`、WinZip AES AE-2（CRC 字段按设计为 0，`IsReliableCrcMetadata` 跳过）→ 加密包不误报。
+  - **新增**：`EntryFailureReason.CrcMismatch`（`ArchiveEngine.cs`）+ `FailureReasonMapper` 映射（`InvalidFormatException` 且消息含 "CRC"）；回归测试 `ZipEngineCrcValidationTests`（4 条：损坏检测 ×2 + 正常对照 ×2）。Core 全量 684 通过 / 0 失败 / 3 跳过；UI 全量（全量重建后）254 通过 / 0 失败 / 3 跳过。
+  - **坑**：`dotnet test` 增量构建会毒化 Avalonia XAML（`No precompiled XAML found`，规则 17），须 `-t:Rebuild` 全量重建复验。
 
 #### v0.5.2 (2026-10-14) 修复 ZIP 并行解压主进度 PercentComplete 回退（`MonotonicProgress` 包装器）
   - **根因（c6891d9 引入）**：`ExtractAsyncParallel`/`ExtractEntriesAsyncParallel` 的批次循环在 `lock (syncLock)` 内更新共享计数并取快照、释放锁后才 `progress.Report(...)` —— 多批次线程的「快照值」与「上报时刻」交错，消费端（进度窗口 / `OrderedProgressCollector` 单调断言）观察到 `PercentComplete` 先高后低（进度条回跳）；回归测试 `ExtractAsync_AllFailures_EmitsMainProgressPerFile` 因此间歇失败、阻塞发布打包验证。

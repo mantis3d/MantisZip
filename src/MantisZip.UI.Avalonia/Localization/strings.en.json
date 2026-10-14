@@ -3,6 +3,7 @@
   "Progress_Skipped_EntryFmt": "{0} not included in archive: {1}",
   "Error_Reason_PermissionDenied": "Access denied",
   "Error_Reason_IoFailed": "I/O error (file in use or disk problem)",
+  "Error_Reason_CrcMismatch": "Data corruption (CRC check failed)",
   "Error_Reason_Other": "Unknown error",
   "Progress_ErrorSummary_More": "…and {0} more",
   "Progress_AutoCloseSuffix": "s until auto-close",

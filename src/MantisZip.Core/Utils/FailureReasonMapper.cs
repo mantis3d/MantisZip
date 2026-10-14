@@ -1,5 +1,6 @@
 using System.IO;
 using MantisZip.Core.Abstractions;
+using SharpCompress.Common;
 
 namespace MantisZip.Core.Utils;
 
@@ -10,11 +11,15 @@ namespace MantisZip.Core.Utils;
 /// </summary>
 public static class FailureReasonMapper
 {
-    /// <summary>按异常运行时类型分类；不在已知两类内一律归 Other。</summary>
+    /// <summary>按异常运行时类型分类；不在已知类别内一律归 Other。</summary>
     public static EntryFailureReason FromException(Exception ex) => ex switch
     {
         UnauthorizedAccessException => EntryFailureReason.PermissionDenied,
         IOException => EntryFailureReason.IoFailed,
+        // 官方 CheckCrc 路径在条目 CRC 不匹配时抛 InvalidFormatException（消息含 "CRC mismatch"）。
+        // 仅 CRC 类归 CrcMismatch，其它格式异常仍归 Other。
+        InvalidFormatException ifx when ifx.Message.Contains("CRC", StringComparison.OrdinalIgnoreCase)
+            => EntryFailureReason.CrcMismatch,
         _ => EntryFailureReason.Other,
     };
 }

@@ -3,6 +3,7 @@
   "Progress_Skipped_EntryFmt": "{0} 未包含进压缩包：{1}",
   "Error_Reason_PermissionDenied": "权限不足",
   "Error_Reason_IoFailed": "I/O 错误（文件被占用或磁盘异常）",
+  "Error_Reason_CrcMismatch": "数据损坏（CRC 校验失败）",
   "Error_Reason_Other": "未知错误",
   "Progress_ErrorSummary_More": "…另 {0} 项",
   "Progress_AutoCloseSuffix": "秒后自动关闭",
