@@ -4,6 +4,7 @@
 > **来源**: [docs/superpowers/specs/2026-10-15-icon-theme-system-design.md](../../docs/superpowers/specs/2026-10-15-icon-theme-system-design.md)（已批准，§6/§7/§8）
 > **前置**: **计划 1**（`icon-theme-infra.md`）必须已完成 —— 本文依赖其交付的 `IconView` / `SourceKey` / `AppSettings.SelectedIconTheme` / `ApplyTheme` 三层装配（`AddIconOverrideLayer()`、`ResolveIconThemeUri()`）。
 > **后续**: 计划 3（C/D/E/F/G 内容生产）可选独立进行；导入管线与之无耦合。
+> **规格偏差（D-C，2026-10-15 决策）**: 规格 §6.4/§8 原为「任一 SVG 不兼容 → **整包原子拒绝**」。现调整：**渐变/图案填充**类不兼容 → **跳过该图标 + 计入警告清单（非静默）**，不阻断整包；**结构性不兼容**（`clipPath`/`mask`/`filter`/`text`/`use`/嵌套 `<svg>`/外链）、解析损坏、XXE/DTD、Zip Slip 仍按**原子拒绝**。理由：真实图标包常用渐变，整包拒绝体验过差；且渐变属「填充画刷」而非「元素结构」，分类处理合理。渐变解析支持留作后续小计划（届时取消该降级）。
 
 ## 1. 目标与交付标准
 
@@ -82,15 +83,22 @@ public sealed class ParsedPart
 ```csharp
 public static class SvgIconParser
 {
-    public sealed record Result(bool Ok, IReadOnlyList<ParsedPart>? Parts, string? Error);
+    public enum Outcome { Ok, SkippedUnsupportedPaint, Error }
 
-    /// <summary>解析单个 SVG 文本为归一化(24×24)几何部件；不支持特性/元素 → Ok=false + Error（不静默丢内容）。</summary>
+    public sealed record Result(Outcome Outcome, IReadOnlyList<ParsedPart>? Parts, string? Message);
+
+    /// <summary>
+    /// 解析单个 SVG 文本为归一化(24×24)几何部件。
+    /// Ok=成功；SkippedUnsupportedPaint=仅因渐变/图案填充不支持而跳过（不阻断整包，D-C）；
+    /// Error=结构性不兼容或解析损坏（触发整包原子拒绝）。
+    /// </summary>
     public static Result Parse(string svgText);
 }
 ```
 
 - **支持**：`path`(d) / `circle` / `rect` / `line` / `polygon` / `polyline`；solid 填充（`#rgb`/`#rrggbb`/`#aarrggbb`/`none`/`currentColor`）；`viewBox` 归一化到 24×24（`Geometry.Transform` 或 `TransformGroup`）；多部件多色。
-- **不支持即 Error**：`clipPath` / `mask` / `filter` / `text` / `use` / 嵌套 `<svg>` / 外链（`href`/`xlink:href`）；渐变/图案填充作为 fill 暂不支持（Error，留作扩展）。
+- **不支持 → `SkippedUnsupportedPaint`（D-C，跳过该图标 + 警告，不阻断）**：`linearGradient` / `radialGradient` / 图案（`pattern`）填充。仅当**该图标**用到这些画刷时跳过它；同包其它图标照常导入。
+- **不支持 → `Error`（结构性，触发原子拒绝）**：`clipPath` / `mask` / `filter` / `text` / `use` / 嵌套 `<svg>` / 外链（`href`/`xlink:href`）。
 - `fill` 缺省或 `none`/`currentColor` → `ParsedPart.Fill = null`（跟随 `Foreground`）。
 - 归一化：计算 `viewBox` 尺寸 → 缩放 + 平移，使内容映射进 24×24。
 
@@ -100,9 +108,12 @@ public static class SvgIconParser
 public sealed class IconPackImporter
 {
     public sealed record ImportResult(
-        bool Ok, string? PackId, int Covered, int Missing, IReadOnlyList<string> Failures, string? Error);
+        bool Ok, string? PackId, int Covered, int Missing,
+        IReadOnlyList<string> Warnings,   // 非阻断：渐变跳过、manifest 损坏等（D-C）
+        IReadOnlyList<string> Failures,   // 阻断：结构性不兼容/损坏（触发整包拒绝）
+        string? Error);
 
-    /// <summary>导入文件夹或 ZIP（同构）。原子性：任一失败 → 不落盘 + 返回失败清单。</summary>
+    /// <summary>导入文件夹或 ZIP（同构）。原子性：任一 Failures → 不落盘 + 返回失败清单。</summary>
     public Task<ImportResult> ImportAsync(string sourcePath, bool overwriteExisting, CancellationToken ct);
 }
 ```
@@ -110,13 +121,16 @@ public sealed class IconPackImporter
 数据流（对应 §6.3）：
 
 1. 源为 ZIP → 解压到临时目录（SharpCompress；条目名经 `FileConflictHelper.SanitizeEntryPath` 防 Zip Slip）；源为文件夹 → 直接读。
-2. 读 `manifest.json`（可选）：损坏 → 警告 + 按键名约定继续（不阻断）。
+2. 读 `manifest.json`（可选）：损坏 → 记 `Warnings` + 按键名约定继续（不阻断）。
 3. 枚举 `icons/*.svg`（或按 `manifest.mapping`）→ 键名 = `IconPascalCase`（文件名去 `.svg`，或映射目标）。
-4. 每个 SVG 过 `SvgIconParser.Parse` → 任一 `Ok=false` → **整包原子拒绝**，收集 `Failures`（文件 + 错误）。
-5. 覆盖率校验：对照 116 键清单 → `Covered`/`MissingKeys`（缺键只警告）。
+4. 每个 SVG 过 `SvgIconParser.Parse`：
+   - `Ok` → 收集部件；
+   - `SkippedUnsupportedPaint`（渐变/图案）→ 记 `Warnings`（文件 + 原因）、**跳过该键**，继续处理其余；
+   - `Error`（结构性/解析损坏）→ 记 `Failures`，**整包原子拒绝**。
+5. 覆盖率校验：对照 116 键清单 → `Covered`/`MissingKeys`（缺键只警告，含被跳过的渐变键）。
 6. id 冲突且 `!overwriteExisting` → 返回「询问覆盖/取消」信号（UI 层弹窗；本服务不弹窗）。
 7. 落盘：`icon-packs/<id>/Icons.json`（`IconPackData`）+ 更新 `registry.json`。
-8. 返回 `ImportResult`；UI 触发 `App.RefreshIconTheme()`（见 3.6）→ 第②层替换 → 全 UI 刷新 + `SelectedIconTheme = id` 持久化。
+8. 返回 `ImportResult`；UI 触发 `App.RefreshIconTheme()`（见 3.6）→ 第②层替换 → 全 UI 刷新 + `SelectedIconTheme = id` 持久化。若 `Warnings` 非空 → 弹「部分图标已跳过」提示（列出键名）。
 
 ### 3.4 注册表与存储（`Services/IconPackRegistry.cs`）
 
@@ -186,16 +200,16 @@ public sealed class IconOverrideService
 ## 4. 任务分解（TDD；每任务一 commit）
 
 - [ ] **T1 — `SvgIconParser`**
-  - 实现 `Parse`；`XmlReader` 禁 DTD/实体。
-  - **测试**：合法 `path`/`circle`/`rect`/`polygon` → 期望部件数 + `Fill`（含 `none`→null、`currentColor`→null）；`viewBox="0 0 48 48"` → 归一化到 24×24（断言包围盒）；`clipPath`/`text`/`use`/嵌套 `svg`/含 DTD 的样本 → `Ok=false`。commit。
+  - 实现 `Parse`（`Outcome` 三态）；`XmlReader` 禁 DTD/实体。
+  - **测试**：合法 `path`/`circle`/`rect`/`polygon` → `Ok` + 期望部件数 + `Fill`（含 `none`→null、`currentColor`→null）；`viewBox="0 0 48 48"` → 归一化到 24×24（断言包围盒）；`linearGradient`/`radialGradient` 填充 → `SkippedUnsupportedPaint`（D-C）；`clipPath`/`text`/`use`/嵌套 `svg`/含 DTD 的样本 → `Error`。commit。
 
 - [ ] **T2 — 覆盖率计算 + registry 序列化**
   - `IconPackRegistry`（load/save/upsert/remove）+ 覆盖率（全套/部分/空）。
   - **测试**：`registry.json` round-trip；覆盖率对照一个 mock 116 键集；空包 = 全缺。commit。
 
-- [ ] **T3 — `IconPackImporter`（文件夹 + ZIP，原子性）**
-  - 解压（Zip Slip 防护）+ manifest 容错 + 逐 SVG 解析 + 原子拒绝 + 落盘。
-  - **测试**：合法文件夹/ZIP → `Ok` + `Covered/Missing`；含 1 个非法 SVG → `Ok=false` 且**不落盘** + `Failures` 含该文件；Zip Slip 条目名 → 拒绝；manifest 损坏 → 仍按键名导入。commit。
+- [ ] **T3 — `IconPackImporter`（文件夹 + ZIP，原子性 + 渐变降级）**
+  - 解压（Zip Slip 防护）+ manifest 容错 + 逐 SVG 解析（三态分流）+ 原子拒绝 + 落盘。
+  - **测试**：合法文件夹/ZIP → `Ok` + `Covered/Missing`；含 1 个结构性非法 SVG → `Ok=false` 且**不落盘** + `Failures` 含该文件；含 1 个渐变图标 → `Ok=true` + 该键**不在**结果中（`Missing++`）+ `Warnings` 含该文件，其余键正常导入；Zip Slip 条目名 → 拒绝；manifest 损坏 → 仍按键名导入（记 `Warnings`）。commit。
 
 - [ ] **T4 — 第②层接线（导入包 → 资源字典）**
   - `ResolveIconThemeUri`/新增 `ResolveIconProvider` 支持导入包 id；`RefreshIconTheme()`。
@@ -251,7 +265,7 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 ## 7. 边界 / 非目标
 
 - **不做**：C/D/E/F/G 内置套内容（计划 3）；`assoc/*.ico`（D6 留口，本期不接）。
-- **不做**：渐变/图案填充 SVG（v1 明确不支持 → Error，留扩展）。
+- **渐变/图案填充**：v1 **不渲染** → 该图标**跳过 + 警告**（D-C，非整包拒绝）；渐变解析支持留作后续小计划，届时取消降级。
 - **不引依赖**：SVG 解析自实现（只取几何+填充，不引 Svg.Skia 渲染；Svg.Skia 已是预览依赖但此处**不用**它执行 SVG，避免执行面）。
 - **不改**：第①层 A（永远可用，缺键兜底）；`AppSettings` 其它字段。
 
@@ -259,7 +273,7 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 
 | 风险 | 缓解 |
 |------|------|
-| SVG 解析覆盖不足致大量合法包被拒 | v1 明确支持集（§6.4）；失败清单对话框让用户可定位；后续扩渐变/`use` |
+| SVG 解析覆盖不足致大量合法包被拒 | v1 明确结构支持集（§6.4）；**渐变降级跳过**（D-C）避免常见的整包误拒；失败/警告清单对话框让用户可定位；后续扩渐变/`use` |
 | 导入包 id / 文件名注入 | id 归一化（仅 `[a-zA-Z0-9_-]`）；`SanitizeEntryPath` 防 Zip Slip；落盘目录固定前缀 |
 | 第②层内存字典 vs avares 字典混装 | 统一用 `IResourceProvider` 接口 Add；测试覆盖两种来源 |
 | 启动期同步解析大包拖慢启动 | 落盘 `Icons.json` 缓存解析产物；启动仅反序列化 + 构建 DrawingImage |

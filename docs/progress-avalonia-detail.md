@@ -9,6 +9,7 @@
 **2026-10-15** — 图标主题系统：实施计划编写完成（3 份串行计划 + PLAN.md 登记）（📋 计划阶段）
   - 依规格 §12 拆 **3 份串行计划**落 `.omo/plans/未开始/`：① `icon-theme-infra.md`（IconView + Geometry→DrawingImage 契约迁移 + 三层字典骨架 + 182 处 `PathIcon` 迁移，交付标准 = **A 套零视觉差异**）② `icon-theme-packs.md`（SVG 包导入 + 覆盖率校验 + 原子拒绝 + 单图标覆盖 + 外观 Tab 图标风格分区 + `IconManagerWindow`）③ `icon-theme-sets.md`（IconGen 多套 + C/D/E/F/G 内容生产 + 6×116 覆盖率契约）
   - **两处实施偏差**（规格 §12 允许的计划阶段细节，理由已记入计划 1 头部）：**D-A** 以 `IconView.SourceKey`（内部 `GetResourceObservable` 订阅）取代规格 §4.4 的 `GeometryResourceConverter` 改名——converter 输出为一次性求值，字典②层被替换后 binding 源不变 → 不重算，违反 §4.2「切主题自动刷新」；**D-B** `IconView.Foreground` **复用** `TextElement.ForegroundProperty`（`AddOwner<IconView>(new StyledPropertyMetadata<IBrush?>(null))`）而非自注册新属性——Avalonia 继承按 **property 实例**解析，只有复用同一实例才能真正继承父级文字色（源码核实：`TextElement.cs:68` 默认 `Brushes.Black` + `inherits:true`；`StyledProperty.AddOwner` 返回 `this`；值优先级 `Inherited(4)` 被 `Style(3)` 压过，故显式选择器仍生效）
+  - **第三处规格偏差 D-C（渐变降级，2026-10-15 决策）**：规格 §6.4 原「任一 SVG 不兼容 → 整包原子拒绝」调整为——**渐变/图案填充**（`linearGradient`/`radialGradient`/`pattern`）→ **跳过该图标 + 计入警告清单（非静默），不阻断整包**；结构性不兼容（`clipPath`/`mask`/`filter`/`text`/`use`/嵌套 `svg`/外链）、解析损坏、XXE/DTD、Zip Slip 仍**原子拒绝**。理由：真实图标包常用渐变，整包拒绝体验过差。已同步规格 §6.4 决策补充 + 计划 2 偏差表/§3.2/§3.3/§4/§7/§8 + `docs/PLAN.md` 描述；渐变解析支持留作后续小计划
   - `docs/PLAN.md` 登记 3 行（P2 / P2 / P3）
   - **下一步**：待确认执行方式（inline，因子任务不可用）；本立项不涉及版本号变更
 
