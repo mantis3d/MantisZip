@@ -27,6 +27,7 @@ MantisZip 当前只有一套内置图标（`AppIcons.axaml`，Fluent 风格）�
 | D4 | 导入粒度 | **B：整套导入 + 单图标覆盖** |
 | D5 | 总体方案 | **方案 1**（DrawingImage + DynamicResource 资源字典交换）+ 方案 3 的**控件层**（IconView 薄控件，不要服务层） |
 | D6 | 文件关联图标 | **机制完全分离**（注册表 + .ico 独立流程）；将来包可选附带 `assoc/*.ico`，由设置里的**显式按钮**单独应用，不随主题自动触发 |
+| D7 | 主题色 × 图标的关系 | **选择各自 + 渲染层自动配套**：图标风格与主题（Light/Dark 及 `ThemeAccentBrush`）是两个正交开关，**不成套绑定**；颜色适配由部件级画刷在渲染层自动完成（null→Foreground、G 底块→ThemeAccentBrush DynamicResource、E/F baked 固定色），不在选择层做耦合。成套预设打包留作未来扩展（§11） |
 
 ### 关键事实（2026-10-15 实测）
 
@@ -53,7 +54,7 @@ MantisZip 当前只有一套内置图标（`AppIcons.axaml`，Fluent 风格）�
 - Shell 右键菜单 .ico（ShellExt COM 宿主）
 - 文件关联注册表图标（机制分离，D6）
 - `ToolbarButtonIcon` 字符文本（13 处保持现状，后续若统一另行立项）
-- 图标风格与 Light/Dark 主题耦合（两者**正交**，互不干扰）
+- 图标风格与主题（Light/Dark 及 `ThemeAccentBrush`）**正交**，互不干扰（D7：颜色适配由渲染层部件级画刷自动完成，不在选择层绑定）
 
 ## 4. 架构
 
@@ -253,6 +254,7 @@ manifest 损坏 → 警告 + 按键名约定继续（不阻断）。
 ## 11. 未来扩展（非本期）
 
 - 包附带 `assoc/*.ico` + 设置显式按钮「同时更新文件关联图标」（D6 留口）
+- 主题 × 图标成套预设（D7 留口；若未来引入用户自定义主题色再评估成套打包）
 - `ToolbarButtonIcon` 字符文本统一迁入 IconView
 - 按主题分档的图标密度/大小预设
 
