@@ -93,6 +93,54 @@ public class EntryProgressItem : INotifyPropertyChanged
         set => Set(ref _statusText, value);
     }
 
+    private string? _failureReasonText;
+
+    /// <summary>失败/跳过原因本地化文案（由 UI 层赋值；用于行 tooltip）。</summary>
+    public string? FailureReasonText
+    {
+        get => _failureReasonText;
+        set { if (Set(ref _failureReasonText, value)) OnPropertyChanged(nameof(FailureTooltip)); }
+    }
+
+    private string? _failureHint;
+
+    /// <summary>可操作提示（如磁盘满/文件占用，由 UI 层 <c>IoErrorHintResolver</c> 赋值；仅供 tooltip）。</summary>
+    public string? FailureHint
+    {
+        get => _failureHint;
+        set { if (Set(ref _failureHint, value)) OnPropertyChanged(nameof(FailureTooltip)); }
+    }
+
+    private string? _failureDetail;
+
+    /// <summary>失败/跳过原因的异常原文（由 UI 层赋值；仅供 tooltip，勿展示于摘要正文）。</summary>
+    public string? FailureDetail
+    {
+        get => _failureDetail;
+        set { if (Set(ref _failureDetail, value)) OnPropertyChanged(nameof(FailureTooltip)); }
+    }
+
+    /// <summary>行 tooltip：原因 + 可操作提示 + 异常原文（拼接非空项；全空时为 null → 不显示 tooltip）。</summary>
+    public string? FailureTooltip
+    {
+        get
+        {
+            var sb = new System.Text.StringBuilder();
+            if (!string.IsNullOrEmpty(_failureReasonText)) sb.Append(_failureReasonText);
+            if (!string.IsNullOrEmpty(_failureHint))
+            {
+                if (sb.Length > 0) sb.Append('\n');
+                sb.Append(_failureHint);
+            }
+            if (!string.IsNullOrEmpty(_failureDetail))
+            {
+                if (sb.Length > 0) sb.Append('\n');
+                sb.Append(_failureDetail);
+            }
+            return sb.Length == 0 ? null : sb.ToString();
+        }
+    }
+
     /// <summary>大小文本；<see cref="Size"/> 为 0（未知）时返回空串，不显示 "0 B"。</summary>
     public string SizeText => _size > 0 ? FormatUtil.FormatSize(_size) : string.Empty;
 

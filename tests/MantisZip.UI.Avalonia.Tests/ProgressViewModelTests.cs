@@ -901,7 +901,10 @@ public class ProgressViewModelTests
         }
 
         Assert.True(vm.HasErrors);
-        Assert.Equal(1, vm.ErrorSummaryText!.Split('\n').Length);
+        // 分布行 + 去重后的单条目行 = 2 行；同 key 条目仅出现一次（去重）
+        var lines = vm.ErrorSummaryText!.Split('\n');
+        Assert.Equal(2, lines.Length);
+        Assert.Equal(1, lines.Count(l => l.Contains("a/b.txt")));
     }
 
     [Fact]
@@ -918,11 +921,102 @@ public class ProgressViewModelTests
             });
         }
 
-        // 截断公式：SummaryMaxLines=20 → 无头部时 19 条明细行 + 1 条溢出行 = 20 行；
-        // 溢出计数 = 总数 25 - 已展示 19 = 6。
+        // 截断公式：SummaryMaxLines=20 → 分布行 1 + 18 条明细行 + 1 条溢出行 = 20 行；
+        // 溢出计数 = 总数 25 - 已展示 18 = 7。
         var lines = vm.ErrorSummaryText!.Split('\n');
         Assert.Equal(20, lines.Length);
-        Assert.Contains(LocalizationManager.T("Progress_ErrorSummary_More", 6), lines[^1]);
+        Assert.Contains(LocalizationManager.T("Progress_ErrorSummary_More", 7), lines[^1]);
+    }
+
+    [Fact]
+    public void SetProgress_MultipleFailReasons_RedBreakdownLineFirst()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { EntryKey = "a.txt", EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
+        vm.SetProgress(new ArchiveProgress { EntryKey = "b.txt", EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
+        vm.SetProgress(new ArchiveProgress { EntryKey = "c.txt", EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.CrcMismatch });
+
+        var expected = LocalizationManager.T("Progress_FailedBreakdown_Fmt", 3,
+            $"{LocalizationManager.T("Error_Reason_PermissionDenied")} 2 · {LocalizationManager.T("Error_Reason_CrcMismatch")} 1");
+        // 分布行为首行（无整包头），按数量降序
+        Assert.Equal(expected, vm.ErrorSummaryText!.Split('\n')[0]);
+    }
+
+    [Fact]
+    public void SetProgress_SkippedWithReason_YellowBreakdownLine()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { EntryKey = "c.dat", EntryStatus = ArchiveEntryStatus.Skipped, EntryFailureReason = EntryFailureReason.IoFailed });
+
+        var expected = LocalizationManager.T("Progress_SkippedBreakdown_Fmt", 1,
+            $"{LocalizationManager.T("Error_Reason_IoFailed")} 1");
+        Assert.Contains(expected, vm.SkippedSummaryText);
+    }
+
+    [Fact]
+    public void SetErrorSummary_WholeArchiveOnly_NoBreakdownLine()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetErrorSummary("disk full");
+
+        // 无逐条目失败 → 仅整包头 1 行，不显示分布行
+        Assert.Equal(1, vm.ErrorSummaryText!.Split('\n').Length);
+    }
+
+    [Fact]
+    public void SetErrorSummary_WithEntries_BreakdownAfterHeader()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { EntryKey = "x.txt", EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.Other });
+        vm.SetErrorSummary("disk full");
+
+        var lines = vm.ErrorSummaryText!.Split('\n');
+        Assert.Equal("disk full", lines[0]);
+        Assert.Equal(LocalizationManager.T("Progress_FailedBreakdown_Fmt", 1,
+            $"{LocalizationManager.T("Error_Reason_Other")} 1"), lines[1]);
+    }
+
+    [Fact]
+    public void SetProgress_FailedWithDetail_BuildsSummaryTooltipWithHint()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "a.txt",
+            EntryStatus = ArchiveEntryStatus.Failed,
+            EntryFailureReason = EntryFailureReason.IoFailed,
+            EntryErrorDetail = "The disk is full.",
+            EntryErrorHResult = unchecked((int)0x80070070), // ERROR_DISK_FULL
+        });
+
+        Assert.NotNull(vm.ErrorSummaryTooltip);
+        Assert.Contains("a.txt", vm.ErrorSummaryTooltip);
+        Assert.Contains("The disk is full.", vm.ErrorSummaryTooltip);
+        Assert.Contains(LocalizationManager.T("Error_Hint_DiskFull"), vm.ErrorSummaryTooltip);
+    }
+
+    [Fact]
+    public void SetProgress_FailedWithoutDetail_NoSummaryTooltip()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            EntryKey = "a.txt",
+            EntryStatus = ArchiveEntryStatus.Failed,
+            EntryFailureReason = EntryFailureReason.Other,
+        });
+
+        Assert.Null(vm.ErrorSummaryTooltip);
+    }
+
+    [Fact]
+    public void SetErrorSummary_WithDetail_BuildsSummaryTooltip()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetErrorSummary("disk full", "raw detail text");
+
+        Assert.NotNull(vm.ErrorSummaryTooltip);
+        Assert.Contains("raw detail text", vm.ErrorSummaryTooltip);
     }
 
     [Fact]

@@ -1216,7 +1216,7 @@ public partial class App : Application
                     {
                         // 部分条目失败（如权限不足）：显示错误汇总（对齐 WPF ExtractResult.HasFailures 路径）
                         progressWindow.SetErrorSummary(
-                            $"{extractResult.FailedEntries} 个文件未能写入到 {targetDir}（可能权限不足）");
+                            LocalizationManager.T("Progress_WriteFailed_Fmt", extractResult.FailedEntries, targetDir));
                     }
                     progressWindow.SetComplete(LocalizationManager.T("Cli_StatusDone"));
                 });
@@ -1279,7 +1279,8 @@ public partial class App : Application
             // 显示错误汇总并等待用户手动关闭窗口
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                progressWindow.SetErrorSummary(captureException!.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(captureException!);
+                progressWindow.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 progressWindow.CompleteWithErrors();
             });
             await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
@@ -1455,7 +1456,8 @@ public partial class App : Application
             progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException.Message);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                progressWindow.SetErrorSummary(captureException!.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(captureException!);
+                progressWindow.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 progressWindow.CompleteWithErrors();
             });
             await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
@@ -1657,7 +1659,8 @@ public partial class App : Application
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException!.Message);
-                progressWindow.SetErrorSummary(captureException!.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(captureException!);
+                progressWindow.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 progressWindow.CompleteWithErrors();
             });
             await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
@@ -2350,7 +2353,7 @@ public partial class App : Application
                     {
                         // 部分条目失败（如权限不足）：显示错误汇总（对齐 WPF result.Failed > 0 → CompleteWithErrors 分支）
                         progressWindow.SetErrorSummary(
-                            $"{result.Failed} 个文件未能写入到 {request.OutputPath}（可能权限不足）");
+                            LocalizationManager.T("Progress_WriteFailed_Fmt", result.Failed, request.OutputPath));
                         progressWindow.CompleteWithErrors();
                     }
                     else
@@ -2391,7 +2394,8 @@ public partial class App : Application
             // 显示错误汇总并等待用户手动关闭窗口（对齐 WPF 失败分支 CompleteWithErrors + wait Closed）
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                progressWindow.SetErrorSummary(captureException!.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(captureException!);
+                progressWindow.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 progressWindow.CompleteWithErrors();
             });
             await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());

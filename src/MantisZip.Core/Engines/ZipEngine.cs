@@ -403,7 +403,7 @@ public class ZipEngine : IArchiveEngine
                     TryDeleteCorruptOutput(resolvedPath);
                     failedEntries++;
                     conflictStats.RecordFailed();
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx) });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx), EntryErrorDetail = ifx.Message, EntryErrorHResult = ifx.HResult });
                     processedBytes += entrySize;
                     // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
                     progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -424,7 +424,7 @@ public class ZipEngine : IArchiveEngine
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：权限失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                     processedBytes += entrySize;
                     // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
                     progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -447,7 +447,7 @@ public class ZipEngine : IArchiveEngine
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：IO 写入失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                     processedBytes += entrySize;
                     // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
                     progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -679,7 +679,7 @@ public class ZipEngine : IArchiveEngine
                     {
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：条目丢失 → Failed（锁外上报，避免锁竞争）
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other }); // 异常对象不在作用域，归 Other（spec §5.2）
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other }); // 条目丢失（entry == null），无异常对象，归 Other（spec §5.2）
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
@@ -776,7 +776,7 @@ public class ZipEngine : IArchiveEngine
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx) });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx), EntryErrorDetail = ifx.Message, EntryErrorHResult = ifx.HResult });
                     long ifxProcessedBytes;
                     int ifxProcessedFiles;
                     lock (syncLock)
@@ -812,7 +812,7 @@ public class ZipEngine : IArchiveEngine
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                     long failProcessedBytes;
                     int failProcessedFiles;
                     lock (syncLock)
@@ -849,7 +849,7 @@ public class ZipEngine : IArchiveEngine
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                     long failProcessedBytes;
                     int failProcessedFiles;
                     lock (syncLock)
@@ -886,7 +886,7 @@ public class ZipEngine : IArchiveEngine
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other, EntryErrorDetail = ex.Message, EntryErrorHResult = ex.HResult });
                     long failProcessedBytes;
                     int failProcessedFiles;
                     lock (syncLock)
@@ -1132,7 +1132,7 @@ public class ZipEngine : IArchiveEngine
                     TryDeleteCorruptOutput(resolvedPath);
                     failedEntries++;
                     conflictStats.RecordFailed();
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx) });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx), EntryErrorDetail = ifx.Message, EntryErrorHResult = ifx.HResult });
                     processedBytes += entrySize;
                     // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
                     progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -1153,7 +1153,7 @@ public class ZipEngine : IArchiveEngine
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：权限失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                     processedBytes += entrySize;
                     // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
                     progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -1175,7 +1175,7 @@ public class ZipEngine : IArchiveEngine
                     failedEntries++;
                     conflictStats.RecordFailed();
                     // 逐条目状态（D2）：IO 写入失败 → Failed
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                     processedBytes += entrySize;
                     // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
                     progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -1404,7 +1404,7 @@ public class ZipEngine : IArchiveEngine
                     {
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：条目丢失 → Failed（锁外上报，避免锁竞争）
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other }); // 异常对象不在作用域，归 Other（spec §5.2）
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other }); // 条目丢失（entry == null），无异常对象，归 Other（spec §5.2）
                         lock (syncLock) Interlocked.Increment(ref failedEntries);
                         batchProcessedFiles++;
                         batchProcessedBytes += entrySize;
@@ -1501,7 +1501,7 @@ public class ZipEngine : IArchiveEngine
                     lock (syncLock) Interlocked.Increment(ref failedEntries);
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx) });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = FailureReasonMapper.FromException(ifx), EntryErrorDetail = ifx.Message, EntryErrorHResult = ifx.HResult });
                     long ifxProcessedBytes;
                     int ifxProcessedFiles;
                     lock (syncLock)
@@ -1537,7 +1537,7 @@ public class ZipEngine : IArchiveEngine
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：权限失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.PermissionDenied, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                     long failProcessedBytes;
                     int failProcessedFiles;
                     lock (syncLock)
@@ -1575,7 +1575,7 @@ public class ZipEngine : IArchiveEngine
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：IO 写入失败 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.IoFailed, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                     long failProcessedBytes;
                     int failProcessedFiles;
                     lock (syncLock)
@@ -1612,7 +1612,7 @@ public class ZipEngine : IArchiveEngine
                     batchProcessedFiles++;
                     batchProcessedBytes += entrySize;
                     // 逐条目状态（D2）：意外异常 → Failed（锁外上报，避免锁竞争）
-                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other });
+                    progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, FileTotalBytes = entrySize, EntryFailureReason = EntryFailureReason.Other, EntryErrorDetail = ex.Message, EntryErrorHResult = ex.HResult });
                     long failProcessedBytes;
                     int failProcessedFiles;
                     lock (syncLock)
@@ -2456,6 +2456,8 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                             FileTotalBytes = entrySize,
                             TotalFiles = totalFiles,
                             ProcessedFiles = processedFiles,
+                            EntryErrorDetail = ex.Message,
+                            EntryErrorHResult = ex.HResult,
                         });
                     }
                 }

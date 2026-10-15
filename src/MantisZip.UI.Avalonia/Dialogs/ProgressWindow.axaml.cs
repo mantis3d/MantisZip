@@ -244,9 +244,11 @@ public partial class ProgressWindow : Window
     /// <summary>
     /// Set error summary text (selectable, shown between progress bars and buttons).
     /// </summary>
-    public void SetErrorSummary(string message)
+    /// <param name="message">本地化后的整包错误文案（红段首行）。</param>
+    /// <param name="detail">异常原文（可选，供摘要框 tooltip）。</param>
+    public void SetErrorSummary(string message, string? detail = null)
     {
-        _vm.SetErrorSummary(message);
+        _vm.SetErrorSummary(message, detail);
     }
 
     // ════════════════════════════════════════════

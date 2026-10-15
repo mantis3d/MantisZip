@@ -362,7 +362,8 @@ public partial class MainWindow : Window
             catch (Exception ex)
             {
                 // 失败：写错误汇总（自动压钉 📌）+ 日志，行标 Failed；关窗决策交给 AutoCloseOrWaitAsync 等待手动关闭
-                pw.SetErrorSummary(ex.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(ex);
+                pw.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 App.DebugLog($"[RunWithProgress] operation failed: {ex}");
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed);

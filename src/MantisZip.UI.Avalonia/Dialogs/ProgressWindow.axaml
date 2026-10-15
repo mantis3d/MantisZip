@@ -489,8 +489,10 @@
         </ListBox.ItemContainerTheme>
         <ListBox.ItemTemplate>
           <DataTemplate>
-            <!-- 条目行：状态图标 | 文件名（弹性省略） | 大小（右对齐 60） | 状态文本（右对齐，Active 显实时百分比） -->
-            <Grid Background="Transparent" ColumnSpacing="{DynamicResource SpacingXs}">
+            <!-- 条目行：状态图标 | 文件名（弹性省略） | 大小（右对齐 60） | 状态文本（右对齐，Active 显实时百分比）
+                 ToolTip.Tip 绑定 FailureTooltip（失败/跳过行显示原因 + 可操作提示 + 异常原文；其余行为 null → 无 tooltip） -->
+            <Grid Background="Transparent" ColumnSpacing="{DynamicResource SpacingXs}"
+                  ToolTip.Tip="{Binding FailureTooltip}">
               <Grid.ColumnDefinitions>
                 <ColumnDefinition Width="Auto"/>  <!-- 状态图标 -->
                 <ColumnDefinition Width="*"/>     <!-- 文件名（占满余量） -->
@@ -933,7 +935,8 @@
                  Padding="0,0,0,2"
                  IsVisible="{Binding HasErrors}"
                  IsTabStop="False"
-                 Focusable="False" />
+                 Focusable="False"
+                 ToolTip.Tip="{Binding ErrorSummaryTooltip}" />
         <!-- 黄段：压缩端带原因跳过（不触发 HasErrors，D4） -->
         <TextBox x:Name="ErrorSummaryYellowBox"
                  Text="{Binding SkippedSummaryText}"
@@ -946,7 +949,8 @@
                  Padding="0,0,0,2"
                  IsVisible="{Binding HasSkippedEntries}"
                  IsTabStop="False"
-                 Focusable="False" />
+                 Focusable="False"
+                 ToolTip.Tip="{Binding SkippedSummaryTooltip}" />
       </StackPanel>
       <!-- 摘要复制按钮：复制 CombinedSummaryText（红段 + 换行 + 黄段）；红或黄任一非空即显示 -->
       <Button x:Name="SummaryCopyBtn"
