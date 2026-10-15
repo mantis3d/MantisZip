@@ -48,6 +48,7 @@ Thumbs.db
 *.zip
 
 # Agent temp files
+.superpowers/
 .omo/tmp_*
 .omo/run-continuation/
 replace_strings.ps1
