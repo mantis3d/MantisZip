@@ -1,5 +1,7 @@
 # 压缩包对比 (Archive Diff)
 
+> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+
 > 对比两个压缩包的内容差异 — 哪些文件相同、哪些不同、哪些只有一边有
 > **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜] (0/4)
 
@@ -94,9 +96,9 @@ public enum DiffType
 |------|------|---------|
 | `Core/Abstractions/ArchiveItem.cs` | 可能需加 `Crc32` 字段（若引擎支持返回） | 10min |
 | `Core/Utils/ArchiveComparer.cs` | 🆕 新增 — 核心对比逻辑 | 2h |
-| `UI/MainWindow.xaml` | 添加「对比压缩包」按钮/菜单 | 15min |
+| `UI/MainWindow.axaml` | 添加「对比压缩包」按钮/菜单 | 15min |
 | `UI/MainWindow.Menu.cs` | 添加对比事件处理 | 20min |
-| `UI/ArchiveDiffWindow.xaml/.cs` | 🆕 新增 — 对比结果展示窗口 | 1.5h |
+| `UI/ArchiveDiffWindow.axaml/.cs` | 🆕 新增 — 对比结果展示窗口 | 1.5h |
 
 **运行时依赖变更：** 无
 

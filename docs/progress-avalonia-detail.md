@@ -6,6 +6,18 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-16** — 合并 main → beta（4 处冲突全部解决）
+  - **背景**：`git merge main`（base `68ef1ad`）——main 带来「计划库审计与重新归类」，beta 有较新计划/进度条目，4 处冲突全为文档：`.omo/plans/未开始/progress-window-enhancement.md`（deleted by us）+ `docs/PLAN.md`（3 块）+ `docs/PROGRESS.md`（历史索引表）+ `docs/progress-avalonia-detail.md`（同日条目块）
+  - **解决**：① `progress-window-enhancement.md` 接受 beta 的 `已完成/` v2 全量重写（main 对 v1 的路径修正已被 v2 覆盖），删除 `未开始/` 副本；② `PLAN.md`——日期取 2026-10-16、保留 beta 新增 3 行（zip-crc-validation / parallel-compress-plan-d / parallel-compress-plan-a）、删除 compression-performance-optimization 行（main 审计已把该计划移入 `已完成`，保留会造成 `未开始/` 死链，其剩余工作由 D/A 两方案承接）、执行顺序段落按两分支事实合并为「3 项依赖链」；③ `PROGRESS.md` 历史索引取并集（beta 7 条「未发布」在前 + main 2 条 v0.5.1/v0.5.0 在后）；④ 本文件取并集（main 的 10-16 审计条目置顶 + beta 的 10-15…10-10 块）
+  - **验证**：`git ls-files -u` 为空、全仓无冲突标记、编码/换行保持（PLAN 无 BOM，PROGRESS/本文件保留 BOM，均 CRLF）
+
+**2026-10-16** — 计划库审计与重新归类（全量核查 `.omo/plans/未开始/` 38 个设计文档）
+  - **背景**：对照代码库逐条验证 38 个「未开始」计划的真实完成度，纠正文本与实际不符者，并按完成度重新归档（规则 1）
+  - **移入 `已完成/`（2）**：`compression-performance-optimization.md`（ZIP 并行解压 + 7z 多线程 `mt=on` + 4MB 缓冲区全部落地，随 v0.5.0 发布；Task 7 分组并行压缩移交 custom-zip-engine）；`clean-temp-on-startup-avalonia.md`（Avalonia 启动清理消费方，2026-09-27 落地）
+  - **移入 `进行中/`（4）**：`preview-modular-providers.md`（Task 1/4——`Core/Abstractions/ITableDataProvider.cs` + `SqliteDataReader` 已实现但 UI 仍直连 `Microsoft.Data.Sqlite`、接口零消费者）；`floating-preview-panel.md`（Phase 2 四位置停靠切换已实现，Phase 1/3 未做；计划文本原写 0/13 已修正）；`extract-preserve-full-path-toggle.md`（实现随 v0.5.1 发布，残留 3 项人工 GUI 验收 + §10 spec 回写）；`settings-unwired-keys.md`（第 10 项 EnableCascadingMenu 文档闭环，第 5/9 项评估后由用户决策暂缓实施）
+  - **保留 `未开始/`（32）**：文本声称与实际一致；顺带清理多个计划内过时的 WPF 时代文件路径（`src/MantisZip.UI/`→`src/MantisZip.UI.Avalonia/`、`.xaml`→`.axaml`、`L.cs`→`LocalizationManager`、`strings.zh.json`→`strings.zh-CN.json` 等），并为 `startup-native-splash.md` 补状态行
+  - **同步**：本文件 + `PROGRESS.md` 历史设计方案索引（新增 2 条已完成）+ `PLAN.md`（移除 2 条已完成条目、4 条进行中条目路径与说明更新、修正 5 项计划依赖链执行顺序说明）
+
 **2026-10-15** — 压缩/解压出错信息增强 Task 1–8（`error-info-enhancement` 计划）
   - **Task 1（规则 13）**：`App.axaml.cs` 两处硬编码 `"{N} 个文件未能写入到 {dir}（可能权限不足）"` → `LocalizationManager.T("Progress_WriteFailed_Fmt", n, dir)`；三语新增该 key，去掉猜测措辞。
   - **Task 3（i18n）**：三语各补 9 组 key（`Progress_FailedBreakdown_Fmt`/`Progress_SkippedBreakdown_Fmt`/`Error_Whole_*`4/`Error_Hint_*`3），三语 **1259 key 一致**。

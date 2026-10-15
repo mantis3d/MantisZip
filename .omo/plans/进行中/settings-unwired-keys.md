@@ -16,7 +16,7 @@
 | 4 | `DeleteArchiveAfterExtract` | GUI 解压路径从不删原包（仅 CLI 调） | ✅ 已修复 |
 | 5 | `ShowPasswordMatchNotification` | 无消费者（功能整体未移植） | ⏸️ 2026-09-27 评估：暂不动，结论已记录（启动按裁剪版） |
 | 6 | `MaxRecentFiles` | RecentFilesManager 硬编码 10 | ✅ 已修复 |
-| 7 | `CleanTempOnStartup` | 启动从不清理 | ✅ 已修复（另见 [clean-temp-on-startup-avalonia.md](clean-temp-on-startup-avalonia.md)） |
+| 7 | `CleanTempOnStartup` | 启动从不清理 | ✅ 已修复（另见 [clean-temp-on-startup-avalonia.md](../已完成/clean-temp-on-startup-avalonia.md)） |
 | 8 | `AllowElevation` | 提权确认不读开关 | ✅ 已修复 |
 | 9 | `ExtractDestination` | 无消费者 | ⏸️ 2026-09-27 评估：暂不动，结论已记录（启动按 b 方案） |
 | 10 | `EnableCascadingMenu` | 无消费者 | ✅ 2026-09-27 评估+修复（字段本就不存在，已修 AGENTS.md 陈旧描述，见文内评估结论） |
@@ -120,7 +120,7 @@
 
 ## 影响文件（预估）
 
-- 5: `App.Password.cs` / 解压流程（`ExtractFlow` 或 `MainWindowViewModel`）+ `ProgressWindow.xaml(.cs)` + 测试
+- 5: `PasswordService`（GUI 匹配）/ `App.ResolveCliPassword`（CLI，`App.axaml.cs`） + 解压流程（`ExtractFlow` 或 `MainWindowViewModel`）+ `ProgressWindow.axaml(.cs)` + 测试
 - 9: `MainWindowViewModel.ExtractSelectedTo` 或 `ExtractArchive` + `ExtractSettingsWindow` 预填 + 测试
 - 10: ✅ 已完成——仅 `AGENTS.md`（215 / 257-260 两处），零代码改动
 
