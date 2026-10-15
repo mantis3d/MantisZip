@@ -208,4 +208,39 @@ public class ProgressWindowXamlTests
         // 单行合成后集合可能有 1 条非并行行，但绝无并行通道
         Assert.False(vm.HasParallelChannel);
     }
+
+    /// <summary>
+    /// 出错信息增强（Task 7）接线守卫：红/黄摘要框 + 条目行 tooltip 绑定、以及
+    /// <c>SetErrorSummary(message, detail)</c> 增参必须存在。
+    /// AXAML 绑定拼写错误在编译期不报错、运行期静默失效，故以源码守卫兜底。
+    /// </summary>
+    [Fact]
+    public void ErrorInfoEnhancement_TooltipAndSummaryWiring_IsPresent()
+    {
+        var axaml = File.ReadAllText(SourcePath("src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml"));
+        Assert.Contains("ToolTip.Tip=\"{Binding ErrorSummaryTooltip}\"", axaml);
+        Assert.Contains("ToolTip.Tip=\"{Binding SkippedSummaryTooltip}\"", axaml);
+        Assert.Contains("ToolTip.Tip=\"{Binding FailureTooltip}\"", axaml);
+
+        var windowCs = File.ReadAllText(SourcePath("src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml.cs"));
+        Assert.Contains("SetErrorSummary(string message, string? detail = null)", windowCs);
+
+        var vmCs = File.ReadAllText(SourcePath("src/MantisZip.UI.Avalonia/ViewModels/ProgressViewModel.cs"));
+        Assert.Contains("SetErrorSummary(string message, string? detail = null)", vmCs);
+        Assert.Contains("_errorSummaryTooltip", vmCs);
+        Assert.Contains("_skippedSummaryTooltip", vmCs);
+    }
+
+    private static string SourcePath(string relative) =>
+        Path.Combine(GetRepoRoot(), relative.Replace('/', Path.DirectorySeparatorChar));
+
+    /// <summary>从测试输出目录向上找含 src 的目录作为仓库根（源码守卫用）。</summary>
+    private static string GetRepoRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null && !Directory.Exists(Path.Combine(dir, "src")))
+            dir = Path.GetDirectoryName(dir);
+        return dir ?? throw new InvalidOperationException(
+            $"无法定位仓库根（未找到 'src' 目录）。Base directory: {AppContext.BaseDirectory}");
+    }
 }

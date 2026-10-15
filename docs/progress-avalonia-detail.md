@@ -15,7 +15,8 @@
   - **Task 8**：Core `ArchiveProgress.EntryErrorHResult` + UI `Services/IoErrorHintResolver`（HResult 低 16 位 → `Error_Hint_DiskFull`(112/39) / `Error_Hint_FileInUse`(32/33) / `Error_Hint_PathTooLong`(206)）；`IoErrorHintResolverTests` 10 例。
   - **Task 7**：`ProgressViewModel.CollectEntryOutcome` 增 detail/hresult；`EntryProgressItem` 加 `FailureReasonText`/`FailureHint`/`FailureDetail`/`FailureTooltip`；摘要框 `ErrorSummaryTooltip`/`SkippedSummaryTooltip`；`SetErrorSummary(message, detail)` 增参（VM + `ProgressWindow`）；`ProgressWindow.axaml` 红/黄摘要框 + 条目行 `ToolTip.Tip` 绑定；`ProgressViewModelTests` +3。
   - **测试基建**：`tests/MantisZip.UI.Avalonia.Tests/TestParallelization.cs` 关闭 xUnit 并行——`LocalizationManager.CurrentLanguage` 为全局静态、语言即时刷新用例切换它，与其它类读取 `T()` 竞态致偶发假失败。
-  - **验证**：Core **709** / UI **286** 全绿（`-p:SkipShellExtCopy=true`）。**GUI 人工验收待做**（清单见计划任务 9）。
+  - **接线守卫**：`ProgressWindowXamlTests.ErrorInfoEnhancement_TooltipAndSummaryWiring_IsPresent`——断言 `ProgressWindow.axaml` 三处 `ToolTip.Tip` 绑定与 `SetErrorSummary(message, detail)` 增参存在（AXAML 绑定拼写错误编译期不报错）。
+  - **验证**：Core **709** / UI **287** 全绿（`-p:SkipShellExtCopy=true`）。**GUI 人工验收待做**（清单见计划任务 9）。
 
 **2026-10-15** — 修复损坏 7z/RAR 被误判为加密包（打开时误弹密码框）
   - **问题**：`ArchiveService.IsPasswordRelatedError` 纯关键词启发式（消息含 "password"/"encrypted" 即判密码相关）。经损坏语料实测（`tests/corpus/corrupt-archives/`）：SharpSevenZip 对「7z/RAR 加密头无密码」与「7z/RAR 头部损坏」抛**完全相同**的异常（同类型 `SharpSevenZipArchiveException`、同 HRESULT `0x80131500`、同消息 "Invalid archive: open/read error! Is it encrypted and a wrong password was provided?..."）——损坏包被误判 `PasswordRequired` → 弹密码框；进框后 `ClassifySharpSevenZipException` 对此消息仍返回 `WrongPassword` → 输入任何密码都提示「密码错误」，永远到不了「损坏」。
