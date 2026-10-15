@@ -1,8 +1,9 @@
 # 浮动/停靠预览面板
 
-> **状态**: 📋 计划中 | **Phase 1**: [⬜⬜⬜⬜⬜] (0/5) | **Phase 2**: [⬜⬜⬜⬜] (0/4) | **Phase 3**: [⬜⬜⬜⬜] (0/4) | **总进度**: (0/13)
+> **状态**: 🟡 进行中（Phase 2 完成；Phase 1、Phase 3 未开始） | **Phase 1**: [⬜⬜⬜⬜⬜] (0/5) | **Phase 2**: [✅✅✅✅] (4/4) | **Phase 3**: [⬜⬜⬜⬜] (0/4) | **总进度**: (~4/13)
 > **分支**: `avalonia-port`
 > **设计文档**: `docs/superpowers/specs/2026-07-16-floating-preview-panel-design.md`
+> 进度核实（2026-10-16）：Phase 2 四位置切换已实现，但与计划命名不同——持久化字段为 `AppSettings.PreviewPosition`（非 `PreviewDockPosition`），切换 UI 位于设置窗口 ComboBox（无 `CycleDockPositionCommand`）；Phase 1 浮动窗口、Phase 3 拖拽停靠均未实现。
 
 ---
 
@@ -40,7 +41,7 @@
 
 - 只有右侧一种位置，没有停靠切换
 - 无法浮动为独立窗口
-- WPF 版已经有 4 位置切换逻辑（`ApplyPreviewPosition()`）但未移植
+- ~~WPF 版已经有 4 位置切换逻辑（`ApplyPreviewPosition()`）但未移植~~ → 已移植：Avalonia 版 `MainWindow.axaml.cs:718` 实现 `ApplyPreviewPosition()`（2026-08-13 落地）
 
 ### 设计决策（详见设计文档）
 
@@ -451,7 +452,7 @@ protected override void OnInitialized(EventArgs e)
 
 **步骤**:
 
-- [ ] **2.1a 重构内容区 Grid 定义**
+- [x] **2.1a 重构内容区 Grid 定义**
 
 当前单层 Grid：
 ```axaml
@@ -479,7 +480,7 @@ protected override void OnInitialized(EventArgs e)
 </Grid>
 ```
 
-- [ ] **2.1b 添加额外的 GridSplitter 引用**（用于底部/目录树下/文件列表下模式的横条分割线）
+- [x] **2.1b 添加额外的 GridSplitter 引用**（用于底部/目录树下/文件列表下模式的横条分割线）
 
 ---
 
@@ -490,7 +491,7 @@ protected override void OnInitialized(EventArgs e)
 
 **步骤**:
 
-- [ ] **2.2a 实现 ApplyPreviewPosition(int position)**
+- [x] **2.2a 实现 ApplyPreviewPosition(int position)**
 
 参考 WPF 版 `MainWindow.Preview.cs` 的 `ApplyPreviewPosition()`（~80 行逻辑），用 Avalonia API 重写：
 
@@ -506,7 +507,7 @@ protected override void OnInitialized(EventArgs e)
 - `GridLength` 类型一致
 - 需要为每个位置管理独立的 `GridSplitter` 可见性
 
-- [ ] **2.2b 实现 ShowPreviewPanel() 和位置大小记忆**
+- [x] **2.2b 实现 ShowPreviewPanel() 和位置大小记忆**
 
 从 WPF 版移植 `ShowPreviewPanel()` + `_lastPreviewSizes` 字典，每个位置独立记忆大小。
 
@@ -520,13 +521,13 @@ protected override void OnInitialized(EventArgs e)
 
 **步骤**:
 
-- [ ] **2.3a AppSettings 加字段**
+- [x] **2.3a AppSettings 加字段**
 
 ```csharp
 public int PreviewDockPosition { get; set; } = 2;  // 1=底部 2=目录树下 3=文件列表下 4=文件列表右侧
 ```
 
-- [ ] **2.3b ViewModel 加属性 + 命令**
+- [x] **2.3b ViewModel 加属性 + 命令**
 
 ```csharp
 [ObservableProperty]
@@ -550,7 +551,7 @@ private void CycleDockPosition()
 
 #### Task 2.4: 位置切换 UI
 
-- [ ] **2.4a 在预览面板工具栏添加位置切换按钮**（或 dropdown）
+- [x] **2.4a 在预览面板工具栏添加位置切换按钮**（或 dropdown）
 
 ```axaml
 <Button Command="{Binding CycleDockPositionCommand}"
@@ -559,7 +560,7 @@ private void CycleDockPosition()
 </Button>
 ```
 
-- [ ] **2.4b 验证每个位置的布局正确性**
+- [x] **2.4b 验证每个位置的布局正确性**
 
 ---
 

@@ -565,7 +565,7 @@ public class ThumbnailCache : IDisposable
 
 #### 文件列表模式切换
 
-`MainWindow.xaml` 中现有 `DataGrid` 的图标列加入模式切换：
+`MainWindow.axaml` 中现有 `DataGrid` 的图标列加入模式切换：
 
 ```csharp
 private bool _showThumbnails;

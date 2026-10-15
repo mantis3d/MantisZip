@@ -1,5 +1,7 @@
 # 原生 Win32 启动 Splash（覆盖进程冷启动）
 
+> **状态**: 📋 未开始（前置一期 A+B+C——CollectingWindow 收集弹窗 / MainWindow IsLoading 遮罩 / --extract 立即弹窗——已实施；本计划 NativeSplash 本体未实现）
+
 ## 背景
 
 用户反馈：打开大压缩包 / 右键压缩大目录时，窗口迟迟不出现，用户不知道该等还是不等。

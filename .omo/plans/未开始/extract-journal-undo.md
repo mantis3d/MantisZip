@@ -80,9 +80,9 @@ ExtractJournal.Rollback(journalEntry) → 倒序删除文件 + 清理空目录
 |------|------|---------|
 | `Core/Utils/ExtractJournal.cs` | 🆕 新增 — 日志记录 + 回滚逻辑 | 1.5h |
 | `Core/Utils/ExtractJournalManager.cs` | 🆕 新增 — 日志列表、查询、清理 | 0.5h |
-| `UI/MainWindow.xaml` | 添加「提取历史」菜单项 | 10min |
+| `UI/MainWindow.axaml` | 添加「提取历史」菜单项 | 10min |
 | `UI/MainWindow.Menu.cs` | 添加「提取历史」事件处理 | 15min |
-| `UI/ExtractHistoryWindow.xaml/.cs` | 🆕 新增 — 历史记录查看与回滚 UI | 1h |
+| `UI/ExtractHistoryWindow.axaml/.cs` | 🆕 新增 — 历史记录查看与回滚 UI | 1h |
 
 **运行时依赖变更：** 无（只用 `System.Text.Json` + `System.Security.Cryptography`，均已引用）
 
@@ -134,7 +134,7 @@ public static class ExtractJournal
 
 ### 集成到现有提取流程
 
-在 `MainWindow.xaml.cs` 和 `App.xaml.cs` 中所有调用 `engine.ExtractAsync` 的地方，在成功后追加：
+在 `MainWindow.axaml.cs` 和 `App.axaml.cs` 中所有调用 `engine.ExtractAsync` 的地方，在成功后追加：
 
 ```csharp
 // 提取完成后，异步记录日志（不阻塞 UI）

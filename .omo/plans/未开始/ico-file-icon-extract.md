@@ -1,5 +1,7 @@
 # ICO 文件列表图标 — 显示文件自身嵌入图标
 
+> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`IconService`/`IconProvider`、`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+
 > **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜] (0/5)
 
 ## TL;DR
@@ -25,7 +27,7 @@
 
 ### Current Behavior
 
-`MainWindow.xaml.cs:601-603` 设置图标时，对 `.ico` 文件走统一的 `SystemIconHelper.GetFileIcon(".ico")`，内部用虚拟文件名 `"file.ico"` 调 `SHGetFileInfo`。Windows Shell 返回的是 **.ico 扩展名的关联图标**（空白文档带小画笔），而不是每个 ICO 文件**自身嵌入的图标图像**。
+`MainWindow.axaml.cs:601-603` 设置图标时，对 `.ico` 文件走统一的 `SystemIconHelper.GetFileIcon(".ico")`，内部用虚拟文件名 `"file.ico"` 调 `SHGetFileInfo`。Windows Shell 返回的是 **.ico 扩展名的关联图标**（空白文档带小画笔），而不是每个 ICO 文件**自身嵌入的图标图像**。
 
 另外 `SystemIconHelper` 按扩展名缓存（key = `".ico"`），所以所有 `.ico` 文件图标完全相同。
 
@@ -66,7 +68,7 @@
 
 ### Task 1 — `IcoIconHelper`（新增文件）
 
-**文件**: `src/MantisZip.UI/IcoIconHelper.cs`
+**文件**: `src/MantisZip.UI.Avalonia/IcoIconHelper.cs`
 
 **行为**:
 
@@ -128,7 +130,7 @@ public interface IArchiveEngine
 
 ### Task 3 — 文件列表异步图标加载
 
-**涉及文件**: `src/MantisZip.UI/MainWindow.xaml.cs`、`src/MantisZip.UI/MainWindow.UI.cs`
+**涉及文件**: `src/MantisZip.UI.Avalonia/MainWindow.axaml.cs`、`src/MantisZip.UI.Avalonia/MainWindow.axaml.cs`
 
 **改动思路**:
 
@@ -178,7 +180,7 @@ public interface IArchiveEngine
 
 ### Task 4 — 本地化字符串
 
-**涉及文件**: `src/MantisZip.UI/Localization/L.cs` + 对应翻译文件
+**涉及文件**: `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json` + 对应翻译文件
 
 可能需要的字符串：
 - `"LoadingIcons"` → "正在加载文件图标…" / "Loading file icons…"
@@ -207,14 +209,14 @@ public interface IArchiveEngine
 
 | 文件 | 操作 | 说明 |
 |------|------|------|
-| `src/MantisZip.UI/IcoIconHelper.cs` | **新增** | ICO 字节 → ImageSource 解析 |
+| `src/MantisZip.UI.Avalonia/IcoIconHelper.cs` | **新增** | ICO 字节 → ImageSource 解析 |
 | `src/MantisZip.Core/Abstractions/ArchiveEngine.cs` | **修改** | `IArchiveEngine` 新增 `ReadEntryBytesAsync` |
 | `src/MantisZip.Core/Engines/ZipEngine.cs` | **修改** | 实现 `ReadEntryBytesAsync` |
 | `src/MantisZip.Core/Engines/SevenZipEngine.cs` | **修改** | 实现 `ReadEntryBytesAsync`（或 `NotSupportedException`） |
 | `src/MantisZip.Core/Engines/TarGzEngine.cs` | **修改** | 实现 `ReadEntryBytesAsync` |
-| `src/MantisZip.UI/MainWindow.xaml.cs` | **修改** | `LoadArchiveAsync` 异步图标替换 |
-| `src/MantisZip.UI/MainWindow.UI.cs` | **修改** | `ArchiveItem` 可选新增 `IsIconLoading` |
-| `src/MantisZip.UI/Localization/L.cs` | **修改** | 本地化字符串（可选） |
+| `src/MantisZip.UI.Avalonia/MainWindow.axaml.cs` | **修改** | `LoadArchiveAsync` 异步图标替换 |
+| `src/MantisZip.UI.Avalonia/MainWindow.axaml.cs` | **修改** | `ArchiveItem` 可选新增 `IsIconLoading` |
+| `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json` | **修改** | 本地化字符串（可选） |
 | `tests/MantisZip.Tests/IcoIconHelperTests.cs` | **新增** | 单元测试 |
 
 ---
@@ -234,7 +236,7 @@ public interface IArchiveEngine
 ### Verification Commands
 
 ```bash
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj       # 0 errors
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj       # 0 errors
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj   # all pass
 ```
 

@@ -1,5 +1,7 @@
 # 嵌入缩略图预览 (Embedded Thumbnail Preview)
 
+> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+
 > **状态**: 📋 待实施 | **阶段**: [⬜⬜⬜⬜] (0/4)
 
 ## TL;DR
@@ -262,7 +264,7 @@ private static extern bool DeleteObject(IntPtr hObject);
 ## Task 3: 预览管道集成
 
 **Files:**
-- Modify: `src/MantisZip.UI/MainWindow/Preview/MainWindow.Preview.cs`
+- Modify: `src/MantisZip.UI.Avalonia/MainWindow/Preview/MainWindow.Preview.cs`
 
 ### 3.1 新增 `ThumbnailExtensions` 集合
 
@@ -342,7 +344,7 @@ else if (ThumbnailExtensions.Contains(ext))
 ## Task 4: 预览展示方法
 
 **Files:**
-- Modify: `src/MantisZip.UI/MainWindow/Preview/MainWindow.Preview.Metadata.cs`
+- Modify: `src/MantisZip.UI.Avalonia/MainWindow/Preview/MainWindow.Preview.Metadata.cs`
 
 ### 4.1 新增 `ShowEmbeddedThumbnailPreview` 方法
 
@@ -429,7 +431,7 @@ private async Task ShowEmbeddedThumbnailPreview(
 
 ### 4.2 确认 L 本地化键
 
-检查 `MantisZip.UI/Localization/` 中是否存在 `L.Preview_ImageHeader`。若存在，则直接使用；若不存在，使用字符串 `"{0} 预览"` 或创建新的本地化键。
+检查 `MantisZip.UI.Avalonia/Localization/` 中是否存在 `L.Preview_ImageHeader`。若存在，则直接使用；若不存在，使用字符串 `"{0} 预览"` 或创建新的本地化键。
 
 实际上从 `MainWindow.Preview.Image.cs` line 74 可以看到：
 ```csharp

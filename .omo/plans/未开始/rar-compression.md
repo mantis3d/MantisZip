@@ -1,5 +1,7 @@
 # RAR 压缩（外置 rar.exe / WinRAR.exe）
 
+> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+
 > **状态**: 📋 待定（已修订 2026-07-08）| **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/10)
 > **前置依赖**: 无硬依赖。若 `progress-window-enhancement` 先行实施，RAR 压缩进度上报的 ProgressWindow 将自动获得路径分离、统计栏、模式切换等增强。
 >
@@ -54,7 +56,7 @@
 5. `Core/Engines/SevenZipEngine.cs` — 移除 `CanHandle(Rar)` 避免冲突
 6. `AppSettings.cs` — RarExePath + RAR 默认选项
 7. `CompressSettingsWindow` — 格式下拉增加 RAR + `DynamicFormatOptionsPanel` RAR 选项
-8. `App.Compress.cs` — Quick Compress CLI 守卫
+8. `App.axaml.cs` — Quick Compress CLI 守卫
 9. i18n 字符串（中/英）
 10. 端到端验证
 
@@ -142,7 +144,7 @@ rar.exe 支持的压缩级别（`-m` 参数）：
 
 ### DynamicFormatOptionsPanel 集成
 
-已有 `Controls/DynamicFormatOptionsPanel.xaml/.cs`，`SelectedFormat` 为 `"rar"` 时显示 RAR 专有选项面板。RAR 选项应加入此面板而非创建独立面板。
+已有 `Controls/DynamicFormatOptionsPanel.axaml/.axaml.cs`，`SelectedFormat` 为 `"rar"` 时显示 RAR 专有选项面板。RAR 选项应加入此面板而非创建独立面板。
 
 ---
 
@@ -176,7 +178,7 @@ rar.exe 支持的压缩级别（`-m` 参数）：
 
   **Files**:
   - `src/MantisZip.Core/Abstractions/ArchiveEngine.cs` — ArchiveOptions
-  - `src/MantisZip.UI/AppSettings.cs`
+  - `src/MantisZip.UI.Avalonia/Models/AppSettings.cs`
   - `src/MantisZip.Core/Services/CompressService.cs` — CompressRequest + BuildOptions
 
   **What to do**:
@@ -236,7 +238,7 @@ rar.exe 支持的压缩级别（`-m` 参数）：
 
 - [ ] **3. RAR 相关 i18n 字符串**
 
-  **Files**: `src/MantisZip.UI/Localization/strings.zh.json`, `src/MantisZip.UI/Localization/strings.en.json`, `src/MantisZip.UI/Localization/L.cs`
+  **Files**: `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json`, `src/MantisZip.UI.Avalonia/Localization/strings.en.json`, `src/MantisZip.UI.Avalonia/Services/LocalizationManager.cs`
 
   **What to do**:
   - 新增中/英 JSON 条目：
@@ -250,7 +252,7 @@ rar.exe 支持的压缩级别（`-m` 参数）：
     - `Rar_DetectButton` = "检测"
     - `Rar_DetectSuccess` = "已找到 rar.exe: {0}"
     - `Rar_DetectFailed` = "未找到 rar.exe"
-  - 在 `L.cs` 中添加对应静态 key 常量
+  - 在 `strings.zh-CN.json`/`strings.en.json` 中添加对应 key（经 `LocalizationManager.T()` 读取）
 
   **Parallelization**: YES (Wave 1, with tasks 1, 2)
   **Blocks**: Task 7, 8
@@ -397,7 +399,7 @@ rar.exe 支持的压缩级别（`-m` 参数）：
 
 - [ ] **6. DynamicFormatOptionsPanel — RAR 选项面板**
 
-  **Files**: `src/MantisZip.UI/Controls/DynamicFormatOptionsPanel.xaml`, `src/MantisZip.UI/Controls/DynamicFormatOptionsPanel.xaml.cs`
+  **Files**: `src/MantisZip.UI.Avalonia/Controls/DynamicFormatOptionsPanel.axaml`, `src/MantisZip.UI.Avalonia/Controls/DynamicFormatOptionsPanel.axaml.cs`
 
   **What to do**:
   - 在 XAML 中添加 RAR 选项面板（`SelectedFormat` 为 `"rar"` 时可见，其他格式时隐藏）
@@ -417,8 +419,8 @@ rar.exe 支持的压缩级别（`-m` 参数）：
 - [ ] **7. CompressSettingsWindow — RAR 格式下拉 + CompressButton 中传递 RAR 选项**
 
   **Files**:
-  - `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml`
-  - `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml.cs`
+  - `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml`
+  - `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml.cs`
 
   **What to do**:
   - 在 `FormatComboBox` 新增 `<ComboBoxItem Content="RAR (.rar)" Tag="rar"/>`
@@ -440,7 +442,7 @@ rar.exe 支持的压缩级别（`-m` 参数）：
 
 - [ ] **8. SettingsWindow — RarExePath 配置 + 格式下拉 RAR 选项**
 
-  **Files**: `src/MantisZip.UI/Dialogs/SettingsWindow.xaml`, `src/MantisZip.UI/Dialogs/SettingsWindow.xaml.cs`
+  **Files**: `src/MantisZip.UI.Avalonia/Views/SettingsWindow.axaml`, `src/MantisZip.UI.Avalonia/Views/SettingsWindow.axaml.cs`
 
   **What to do**:
   - 高级标签页增加 rar.exe 路径配置行（路径 TextBox + 浏览按钮 + "检测"按钮）
@@ -454,9 +456,9 @@ rar.exe 支持的压缩级别（`-m` 参数）：
 
   **Commit**: YES — `feat(ui): add RarExePath setting and default format option`
 
-- [ ] **9. App.Compress.cs — Quick Compress CLI 守卫**
+- [ ] **9. App.axaml.cs — Quick Compress CLI 守卫**
 
-  **Files**: `src/MantisZip.UI/AppPartials/App.Compress.cs`
+  **Files**: `src/MantisZip.UI.Avalonia/App.axaml.cs`
 
   **What to do**:
   - `HandleCompressQuick` 中如果格式为 RAR：
@@ -532,7 +534,7 @@ Wave 3 (UI 集成):
 ├── 6. DynamicFormatOptionsPanel RAR 选项面板
 ├── 7. CompressSettingsWindow RAR 格式 + 选项传递
 ├── 8. SettingsWindow RarExePath + 格式下拉 + 默认值
-├── 9. App.Compress.cs CLI 守卫
+├── 9. App.axaml.cs CLI 守卫
 
 Wave 4 (验证):
 └── 10. 端到端测试 + bug 修复

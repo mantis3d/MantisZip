@@ -1,5 +1,7 @@
 # 冻结列功能
 
+> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+
 ## TL;DR
 
 > **Quick Summary**: 为文件列表 DataGrid 添加「冻结列」功能——水平滚动时，指定列保持可见不动。使用 WPF DataGrid 原生 `FrozenColumnCount` 属性实现。
@@ -35,7 +37,7 @@
 - `CanUserReorderColumns="False"`，`RowHeaderWidth="0"`
 - 已有列标题右键菜单（ColumnHeaderContextMenu）控制列显隐
 - 窗口设置持久化到 `%LOCALAPPDATA%\MantisZip\window.json`
-- 本地化通过 L.cs + strings.zh.json / strings.en.json
+- 本地化通过 `LocalizationManager.T()` + strings.zh-CN.json / strings.en.json
 
 ### Metis Review
 **Identified Gaps** (addressed):
@@ -44,7 +46,7 @@
 - 分隔线颜色需绑 DynamicResource 支持运行时主题切换 ✓
 - FrozenColumnCount 不可超过 Columns.Count - 1 ✓（设上限）
 - 冻结状态跨会话/跨存档自动保持 ✓（通过 window.json 持久化）
-- L.cs 修改方式 ✓（手动添加常量，无自动生成脚本）
+- 本地化 key 修改方式 ✓（strings json 成对添加，无自动生成脚本）
 - 取消冻结语义 ✓（用户确认：从此列向右取消）
 
 ---
@@ -110,11 +112,11 @@ Every task includes agent-executed QA scenarios. Evidence saved to `.omo/evidenc
 This is a straightforward feature with no parallel execution needed — all changes touch the same set of files.
 
 ```
-Task 1: 字符串资源 + 常量（strings.zh.json, strings.en.json, L.cs）
-Task 2: XAML 分隔线（MainWindow.xaml）+ DataGrid FrozenColumnCount
-Task 3: 右键菜单冻结项 + 事件处理（MainWindow.UI.cs）
-Task 4: 分隔线定位 UpdateFrozenSeparator（MainWindow.xaml.cs）
-Task 5: 持久化 Save/Load（MainWindow.xaml.cs）
+Task 1: 字符串资源（strings.zh-CN.json, strings.en.json）
+Task 2: XAML 分隔线（MainWindow.axaml）+ DataGrid FrozenColumnCount
+Task 3: 右键菜单冻结项 + 事件处理（MainWindow.axaml.cs）
+Task 4: 分隔线定位 UpdateFrozenSeparator（MainWindow.axaml.cs）
+Task 5: 持久化 Save/Load（MainWindow.axaml.cs）
 Task 6: 单元测试
 ```
 
@@ -124,15 +126,13 @@ No blocking dependencies — each task builds on the previous.
 
 ## TODOs
 
-- [ ] 1. 新增字符串资源（中英文 + L.cs 常量）
+- [ ] 1. 新增字符串资源（中英 json key）
 
   **What to do**:
-  - 在 `strings.zh.json` 和 `strings.en.json` 中添加两个新条目：
+  - 在 `strings.zh-CN.json` 和 `strings.en.json` 中添加两个新条目：
     - `"Main_Col_FreezeToHere"` → "冻结至当前列" / "Freeze to This Column"
     - `"Main_Col_Unfreeze"` → "取消冻结" / "Unfreeze Column"
-  - 在 `L.cs` 中添加对应常量，放在 `Main_Col_Encrypted` 下方（字母序区域）：
-    - `public const string Main_Col_FreezeToHere = "Main_Col_FreezeToHere";`
-    - `public const string Main_Col_Unfreeze = "Main_Col_Unfreeze";`
+  - 三语 JSON（`strings.zh-CN.json` / `strings.en.json` / `strings.zh-TW.json`）成对添加 key（规则 13）；Avalonia 版无 `L.cs` 常量类，经 `LocalizationManager.T("Main_Col_FreezeToHere")` 直接读取
 
   **Must NOT do**:
   - 不要修改已有条目的值
@@ -148,14 +148,14 @@ No blocking dependencies — each task builds on the previous.
   - **Blocked By**: None
 
   **References**:
-  - `strings.zh.json:172-180` — 现有 Main_Col_* 和 Main_Ctx_* 条目格式
+  - `strings.zh-CN.json:172-180` — 现有 Main_Col_* 和 Main_Ctx_* 条目格式
   - `strings.en.json:170-178` — 英文对应条目格式
-  - `L.cs:210-212` — Main_Col_* 常量定义位置和格式
+  - `strings.zh-CN.json` — Main_Col_* 条目定义位置和格式
 
   **Acceptance Criteria**:
-  - [ ] strings.zh.json 包含 `Main_Col_FreezeToHere` 和 `Main_Col_Unfreeze`
+  - [ ] strings.zh-CN.json 包含 `Main_Col_FreezeToHere` 和 `Main_Col_Unfreeze`
   - [ ] strings.en.json 包含对应条目
-  - [ ] L.cs 包含两条新常量
+  - [ ] strings.zh-CN.json / strings.en.json 包含两条新 key
   - [ ] `dotnet build` 通过
 
   **QA Scenarios**:
@@ -164,7 +164,7 @@ No blocking dependencies — each task builds on the previous.
     Tool: Bash
     Preconditions: 文件已修改
     Steps:
-      1. `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` → 编译成功
+      1. `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → 编译成功
     Expected Result: exit code 0, no build errors
     Evidence: .omo/evidence/task-1-build.txt
 
@@ -172,23 +172,23 @@ No blocking dependencies — each task builds on the previous.
     Tool: Bash
     Preconditions: 文件已修改
     Steps:
-      1. `Select-String "Main_Col_FreezeToHere" src\MantisZip.UI\Resources\strings.zh.json` → 找到匹配
-      2. `Select-String "Main_Col_FreezeToHere" src\MantisZip.UI\Resources\strings.en.json` → 找到匹配
-      3. `Select-String "Main_Col_FreezeToHere" src\MantisZip.UI\Localization\L.cs` → 找到匹配
+      1. `Select-String "Main_Col_FreezeToHere" src\MantisZip.UI.Avalonia\Localization\strings.zh-CN.json` → 找到匹配
+      2. `Select-String "Main_Col_FreezeToHere" src\MantisZip.UI.Avalonia\Localization\strings.en.json` → 找到匹配
+      3. `Select-String "Main_Col_FreezeToHere" src\MantisZip.UI.Avalonia\Localization/strings.zh-CN.json` → 找到匹配
     Expected Result: 所有搜索均返回匹配结果
     Evidence: .omo/evidence/task-1-strings.txt
   ```
 
   **Commit**: YES
   - Message: `feat(l10n): add freeze column string resources`
-  - Files: `src/MantisZip.UI/Resources/strings.zh.json`, `src/MantisZip.UI/Resources/strings.en.json`, `src/MantisZip.UI/Localization/L.cs`
+  - Files: `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json`, `src/MantisZip.UI.Avalonia/Localization/strings.en.json`, `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json`
 
 ---
 
-- [ ] 2. 添加 FrozenColumn 视觉分隔线（MainWindow.xaml）
+- [ ] 2. 添加 FrozenColumn 视觉分隔线（MainWindow.axaml）
 
   **What to do**:
-  - 在 MainWindow.xaml 中找到 DataGrid 所在的 Grid（`Grid.Row="1" Grid.Column="2"`）
+  - 在 MainWindow.axaml 中找到 DataGrid 所在的 Grid（`Grid.Row="1" Grid.Column="2"`）
   - DataGrid 已经在这个 Grid 中（与 NoResultsText 共存），不需要额外包装
   - 在 DataGrid 之后添加一个 Border 元素作为冻结列分隔线：
     ```xml
@@ -216,8 +216,8 @@ No blocking dependencies — each task builds on the previous.
   - **Blocked By**: None
 
   **References**:
-  - `MainWindow.xaml:420-587` — DataGrid 所在的 Grid 结构
-  - `MainWindow.xaml:20-40` — 现有主题资源引用模式（DynamicResource Theme_Border 等）
+  - `MainWindow.axaml:420-587` — DataGrid 所在的 Grid 结构
+  - `MainWindow.axaml:20-40` — 现有主题资源引用模式（DynamicResource Theme_Border 等）
 
   **Acceptance Criteria**:
   - [ ] XAML 中包含 `x:Name="FrozenColumnSeparator"` 的 Border 元素
@@ -232,19 +232,19 @@ No blocking dependencies — each task builds on the previous.
     Tool: Bash
     Preconditions: 任务 1 已完成
     Steps:
-      1. `dotnet build src\MantisZip.UI\MantisZip.UI.csproj` → 编译成功
-      2. `Select-String "FrozenColumnSeparator" src\MantisZip.UI\MainWindow\MainWindow.xaml` → 找到定义
+      1. `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → 编译成功
+      2. `Select-String "FrozenColumnSeparator" src\MantisZip.UI.Avalonia\Views\MainWindow.axaml` → 找到定义
     Expected Result: 编译通过，元素定义存在
     Evidence: .omo/evidence/task-2-xaml.txt
   ```
 
   **Commit**: YES (groups with Task 3-5)
   - Message: `feat(ui): add frozen column separator overlay to file list DataGrid`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.xaml`
+  - Files: `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml`
 
 ---
 
-- [ ] 3. 冻结列右键菜单（MainWindow.UI.cs）
+- [ ] 3. 冻结列右键菜单（MainWindow.axaml.cs）
 
   **What to do**:
   - 在 `ColumnHeaderContextMenu_Opened` 方法中（约第883行），在循环结束后：
@@ -287,8 +287,8 @@ No blocking dependencies — each task builds on the previous.
   - **Blocked By**: Task 1 (需要字符串常量)
 
   **References**:
-  - `MainWindow.UI.cs:883-943` — `ColumnHeaderContextMenu_Opened` 和 `ColumnVisibilityMenuItem_Click`，粘帖此模式的完整代码
-  - `MainWindow.xaml.cs:30-40` — `FileListGrid` 声明
+  - `MainWindow.axaml.cs:883-943` — `ColumnHeaderContextMenu_Opened` 和 `ColumnVisibilityMenuItem_Click`，粘帖此模式的完整代码
+  - `MainWindow.axaml.cs:30-40` — `FileListGrid` 声明
 
   **Acceptance Criteria**:
   - [ ] 列标题右键菜单在分隔线后有冻结/取消冻结项
@@ -311,14 +311,14 @@ No blocking dependencies — each task builds on the previous.
 
   **Commit**: YES (groups with Task 2, 4, 5)
   - Message: `feat(ui): add freeze column context menu to DataGrid headers`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.UI.cs`
+  - Files: `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`
 
 ---
 
-- [ ] 4. 分隔线定位和更新逻辑（MainWindow.xaml.cs）
+- [ ] 4. 分隔线定位和更新逻辑（MainWindow.axaml.cs）
 
   **What to do**:
-  - 在 `MainWindow.xaml.cs` 的 `MainWindow` 分部类中添加以下方法：
+  - 在 `MainWindow.axaml.cs` 的 `MainWindow` 分部类中添加以下方法：
 
   ```csharp
   private void UpdateFrozenSeparator()
@@ -413,8 +413,8 @@ No blocking dependencies — each task builds on the previous.
   - **Blocked By**: Task 2 (需要 Border 元素 x:Name)
 
   **References**:
-  - `MainWindow.xaml.cs:80-90` — 构造函数，添加 LayoutUpdated 订阅
-  - `MainWindow.xaml.cs:30-40` — 文件顶部 using 区域
+  - `MainWindow.axaml.cs:80-90` — 构造函数，添加 LayoutUpdated 订阅
+  - `MainWindow.axaml.cs:30-40` — 文件顶部 using 区域
 
   **Acceptance Criteria**:
   - [ ] `UpdateFrozenSeparator()` 方法存在
@@ -436,11 +436,11 @@ No blocking dependencies — each task builds on the previous.
 
   **Commit**: YES (groups with Task 2, 3, 5)
   - Message: `feat(ui): implement frozen column separator positioning logic`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.xaml.cs`
+  - Files: `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`
 
 ---
 
-- [ ] 5. 冻结状态持久化（MainWindow.xaml.cs）
+- [ ] 5. 冻结状态持久化（MainWindow.axaml.cs）
 
   **What to do**:
   - 在 `WindowSize` 类中添加属性：
@@ -476,9 +476,9 @@ No blocking dependencies — each task builds on the previous.
   - **Blocked By**: Task 2-4 (需要在同一文件中)
 
   **References**:
-  - `MainWindow.xaml.cs:162-174` — `WindowSize` 类定义，直接在其后添加 FrozenColumnCount
-  - `MainWindow.xaml.cs:271-340` — `SaveWindowSettings()`，在列状态保存后追加
-  - `MainWindow.xaml.cs:176-270` — `LoadWindowSettings()`，在列状态恢复后追加
+  - `MainWindow.axaml.cs:162-174` — `WindowSize` 类定义，直接在其后添加 FrozenColumnCount
+  - `MainWindow.axaml.cs:271-340` — `SaveWindowSettings()`，在列状态保存后追加
+  - `MainWindow.axaml.cs:176-270` — `LoadWindowSettings()`，在列状态恢复后追加
 
   **Acceptance Criteria**:
   - [ ] `WindowSize.FrozenColumnCount` 属性存在
@@ -499,7 +499,7 @@ No blocking dependencies — each task builds on the previous.
 
   **Commit**: YES (groups with Task 2, 3, 4)
   - Message: `feat(ui): persist frozen column state in window.json`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.xaml.cs`
+  - Files: `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`
 
 ---
 
@@ -517,7 +517,7 @@ No blocking dependencies — each task builds on the previous.
   **简化方案**（推荐）:
   由于 `WindowSize` 是 private 嵌套类，建议直接测试 JSON 序列化的 round-trip：
   - 使用 `JsonSerializer.Serialize/Deserialize` 模拟
-  - 在测试项目中引用 `MainWindow.xaml.cs` 需要 `[InternalsVisibleTo]` 或将测试逻辑提取为可测试的 helper
+  - 在测试项目中引用 `MainWindow.axaml.cs` 需要 `[InternalsVisibleTo]` 或将测试逻辑提取为可测试的 helper
 
   或者最简单的方案：只验证 `FrozenColumnCount` 被正确使用 `>= 0` 的整数值，使用 `DataGrid` 实例测试：
   ```csharp
@@ -595,8 +595,8 @@ No blocking dependencies — each task builds on the previous.
 
 ## Commit Strategy
 
-- **1**: `feat(l10n): add freeze column string resources` — strings.zh.json, strings.en.json, L.cs
-- **2-5** (squash): `feat(ui): add frozen column feature with separator and persistence` — MainWindow.xaml, MainWindow.xaml.cs, MainWindow.UI.cs
+- **1**: `feat(l10n): add freeze column string resources` — strings.zh-CN.json, strings.en.json
+- **2-5** (squash): `feat(ui): add frozen column feature with separator and persistence` — MainWindow.axaml, MainWindow.axaml.cs
 - **6**: `test: add frozen column serialization tests` — tests/*.cs
 
 ---
@@ -605,7 +605,7 @@ No blocking dependencies — each task builds on the previous.
 
 ### Verification Commands
 ```bash
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj  # Expected: exit code 0, no warnings
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj  # Expected: exit code 0, no warnings
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj  # Expected: all tests pass
 ```
 

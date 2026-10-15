@@ -1,5 +1,7 @@
 # 压缩文件名后缀模板
 
+> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+
 ## TL;DR
 
 > **Quick Summary**: 在压缩文件名中添加灵活的后缀模板（日期/时间/序号），防止不同日期的同文件名压缩包互相覆盖。采用占位符替换机制，支持 `{date}`、`{datetime}`、`{seq}`。
@@ -322,7 +324,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   - 不要添加预设系统
 
   **References**:
-  - `src/MantisZip.UI/AppSettings.cs:12-23` — 压缩设置区域，在 `KeepOriginalExtension` 行后插入
+  - `src/MantisZip.UI.Avalonia/AppSettings.cs:12-23` — 压缩设置区域，在 `KeepOriginalExtension` 行后插入
 
   **Parallelization**:
   - **Can Run In Parallel**: YES
@@ -350,12 +352,12 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
 
   **Commit**: YES (groups with 4-6)
   - Message: `feat(ui): add filename suffix template UI, settings, and CLI support`
-  - Files: `src/MantisZip.UI/AppSettings.cs`
+  - Files: `src/MantisZip.UI.Avalonia/AppSettings.cs`
 
 - [ ] 4. `CompressSettingsWindow` 模板文本框 + 帮助按钮 (XAML)
 
   **What to do**:
-  - 在 `CompressSettingsWindow.xaml` 的通用页（General Tab）中，`Archive` GroupBox 内的**第 6 行（分卷大小下方，Grid.Row="7"）**添加后缀模板行：
+  - 在 `CompressSettingsWindow.axaml` 的通用页（General Tab）中，`Archive` GroupBox 内的**第 6 行（分卷大小下方，Grid.Row="7"）**添加后缀模板行：
     ```xml
     <!-- Row 7: FileNameSuffixTemplate -->
     <TextBlock Grid.Row="7" Grid.Column="0"
@@ -385,8 +387,8 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   - 不要使用系统默认颜色—所有控件绑定 `{DynamicResource Theme_*}`
 
   **References**:
-  - `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml:52-146` — Archive GroupBox 布局
-  - `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml.cs:76-104` — `RefreshOutputPathState` 方法
+  - `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml:52-146` — Archive GroupBox 布局
+  - `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml.cs:76-104` — `RefreshOutputPathState` 方法
   - `AGENTS.md` 中「规则 4：新 UI 控件必须应用主题样式」
 
   **Parallelization**:
@@ -415,12 +417,12 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   ```
 
   **Commit**: NO (groups with Task 5)
-  - Files: `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml`
+  - Files: `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml`
 
 - [ ] 5. `CompressSettingsWindow` code-behind 集成
 
   **What to do**:
-  - 在 `CompressSettingsWindow.xaml.cs` 中：
+  - 在 `CompressSettingsWindow.axaml.cs` 中：
     - 初始化：从 `AppSettings.Instance.FileNameSuffixTemplate` 加载模板到 `SuffixTemplateTextBox.Text`
     - `LoadDefaultsFromSettings()` 之后读取 AppSettings 填充文本框
     - `UpdateSuffixTemplateState()` — 根据输出模式切换文本框启用状态
@@ -446,9 +448,9 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   - 不要保存空字符串到 AppSettings（避免写入默认值）
 
   **References**:
-  - `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml.cs:60-74` — `OutputMode_Changed` 事件处理
-  - `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml.cs:76-104` — `RefreshOutputPathState`
-  - `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml.cs:475-501` — `RunSeparateCompressAsync` request 创建
+  - `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml.cs:60-74` — `OutputMode_Changed` 事件处理
+  - `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml.cs:76-104` — `RefreshOutputPathState`
+  - `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml.cs:475-501` — `RunSeparateCompressAsync` request 创建
 
   **Parallelization**:
   - **Can Run In Parallel**: YES
@@ -477,7 +479,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
 
   **Commit**: YES (groups with 4)
   - Message: `feat(ui): integrate filename suffix template with CompressSettingsWindow`
-  - Files: `src/MantisZip.UI/Dialogs/CompressSettingsWindow.xaml.cs`
+  - Files: `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml.cs`
 
 - [ ] 6. `HandleCompressQuick` CLI 集成
 
@@ -499,7 +501,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   - 不改变 CLI 参数解析
 
   **References**:
-  - `src/MantisZip.UI/AppPartials/App.Open.cs:63-78` — Quick Compress 输出路径计算
+  - `src/MantisZip.UI.Avalonia/AppPartials/App.Open.cs:63-78` — Quick Compress 输出路径计算
 
   **Parallelization**:
   - **Can Run In Parallel**: YES
@@ -518,7 +520,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
     Tool: Bash
     Preconditions: AppSettings.FileNameSuffixTemplate = "_{date}"; temp file exists
     Steps:
-      1. dotnet run --project src\MantisZip.UI\MantisZip.UI.csproj -- --compress-quick E:\temp\testfile.txt
+      1. dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj -- --compress-quick E:\temp\testfile.txt
       2. Check output path includes _2026-07-10 suffix before extension
     Expected Result: testfile_2026-07-10.zip created
     Evidence: .omo/evidence/task-6-quick-compress.txt
@@ -526,13 +528,13 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
 
   **Commit**: YES (groups with 3-5)
   - Message: `feat(ui): add filename suffix template UI, settings, and CLI support`
-  - Files: `src/MantisZip.UI/AppPartials/App.Open.cs`
+  - Files: `src/MantisZip.UI.Avalonia/AppPartials/App.Open.cs`
 
 - [ ] 7. 占位符帮助弹窗
 
   **What to do**:
   - 仿照 `LogPrivacyHelpDialog` 的轻量弹窗样式，创建 `SuffixTemplateHelpDialog`：
-    - 新建 `src/MantisZip.UI/Dialogs/SuffixTemplateHelpDialog.xaml` + `.cs`
+    - 新建 `src/MantisZip.UI.Avalonia/Dialogs/SuffixTemplateHelpDialog.axaml` + `.cs`
     - Window 属性：`Width="400" Height="Auto" SizeToContent="Height" ResizeMode="NoResize"`
     - 内容：一个简易表格显示 placeholder → 说明 → 示例
     - 布局：
@@ -565,7 +567,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   - 不要引用 `System.Windows.Documents`（无富文本）
 
   **References**:
-  - `src/MantisZip.UI/Dialogs/LogPrivacyHelpDialog.xaml` — 参考样式和结构
+  - `src/MantisZip.UI.Avalonia/Dialogs/LogPrivacyHelpDialog.axaml` — 参考样式和结构
 
   **Parallelization**:
   - **Can Run In Parallel**: YES
@@ -596,13 +598,13 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   **Commit**: YES (groups with 8)
   - Message: `feat(ui): add placeholder help dialog and localization strings`
   - Files:
-    - `src/MantisZip.UI/Dialogs/SuffixTemplateHelpDialog.xaml`
-    - `src/MantisZip.UI/Dialogs/SuffixTemplateHelpDialog.xaml.cs`
+    - `src/MantisZip.UI.Avalonia/Dialogs/SuffixTemplateHelpDialog.axaml`
+    - `src/MantisZip.UI.Avalonia/Dialogs/SuffixTemplateHelpDialog.axaml.cs`
 
 - [ ] 8. 本地化字符串
 
   **What to do**:
-  - 在 `L.cs`（或 `Localization/L.cs`）中添加 key 常量：
+  - 在 `Localization/LocalizationManager.T()` 中添加 key 常量（key 实际存放于 `Localization/strings.{zh-CN,en,zh-TW}.json`）：
     ```csharp
     public const string Compress_TemplateSuffix = "Compress_TemplateSuffix";
     public const string Compress_TemplateHelp = "Compress_TemplateHelp";
@@ -613,7 +615,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
     public const string Compress_TemplatePlaceholder_SeqCustom = "Compress_TemplatePlaceholder_SeqCustom";
     public const string Compress_TemplateHelp_Example = "Compress_TemplateHelp_Example";
     ```
-  - 在 `strings.zh.json` 中添加翻译：
+  - 在 `strings.zh-CN.json` 中添加翻译：
     ```json
     "Compress_TemplateSuffix": "文件名后缀:",
     "Compress_TemplateHelp": "占位符说明",
@@ -643,9 +645,9 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   - 不要在中英文字符串中包含具体的日期示例（由代码动态生成）
 
   **References**:
-  - `src/MantisZip.UI/Resources/strings.zh.json` — 中文翻译
-  - `src/MantisZip.UI/Resources/strings.en.json` — 英文翻译
-  - `src/MantisZip.UI/Localization/L.cs` — Key 常量定义
+  - `src/MantisZip.UI.Avalonia/Resources/strings.zh-CN.json` — 中文翻译
+  - `src/MantisZip.UI.Avalonia/Resources/strings.en.json` — 英文翻译
+  - `src/MantisZip.UI.Avalonia/Localization/LocalizationManager.T()` — Key 常量定义
 
   **Parallelization**:
   - **Can Run In Parallel**: YES
@@ -654,7 +656,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   - **Blocked By**: None
 
   **Acceptance Criteria**:
-  - [ ] All new keys defined in L.cs
+  - [ ] All new keys defined in `Localization/LocalizationManager.T()`（key 存放于 `Localization/strings.{zh-CN,en,zh-TW}.json`）
   - [ ] zh.json contains all keys with Chinese translation
   - [ ] en.json contains all keys with English translation
   - [ ] XAML `{l:L Compress_TemplateSuffix}` renders correctly
@@ -665,7 +667,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
     Tool: Bash
     Preconditions: Project builds
     Steps:
-      1. Run: dotnet build src\MantisZip.UI\MantisZip.UI.csproj
+      1. Run: dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
     Expected Result: Build succeeds (no missing resource errors)
     Evidence: .omo/evidence/task-8-localization-build.txt
   ```
@@ -673,9 +675,9 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   **Commit**: YES (groups with 7)
   - Message: `feat(i18n): add placeholder help dialog and localization strings`
   - Files:
-    - `src/MantisZip.UI/Resources/strings.zh.json`
-    - `src/MantisZip.UI/Resources/strings.en.json`
-    - `src/MantisZip.UI/Localization/L.cs`
+    - `src/MantisZip.UI.Avalonia/Resources/strings.zh-CN.json`
+    - `src/MantisZip.UI.Avalonia/Resources/strings.en.json`
+    - `src/MantisZip.UI.Avalonia/Localization/LocalizationManager.T()`
 
 - [ ] 9. 集成验证
 
@@ -749,7 +751,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
 ### Verification Commands
 ```bash
 dotnet test --filter "FullyQualifiedName~FileNameTemplate"  # Expected: All pass
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj  # Expected: Build succeeded
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj  # Expected: Build succeeded
 ```
 
 ### Final Checklist

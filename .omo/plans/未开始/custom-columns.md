@@ -1,5 +1,7 @@
 # 文件列表自定义列 — 实现计划
 
+> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for completion tracking.
 >
 > **Design doc**: `.omo/drafts/custom-columns-design.md`
@@ -61,11 +63,11 @@
 
 ### Concrete Deliverables
 - `src/MantisZip.Core/Utils/MetadataExtractor.cs` — 元数据提取调度器
-- `src/MantisZip.UI/MainWindow/MainWindow.Types.cs` — ArchiveItem 增加 CustomMetadata 字典 + CustomColumnDefinition 类
-- `src/MantisZip.UI/MainWindow/MainWindow.xaml.cs` — 动态列生成 + 懒加载逻辑
-- `src/MantisZip.UI/MainWindow/MainWindow.xaml` — 右键/菜单增加"自定义列"项
-- `src/MantisZip.UI/ChooseColumnsDialog.xaml` + `.cs` — 配置对话框
-- `src/MantisZip.UI/Converters/CustomMetadataValueConverter.cs` — 值格式化
+- `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.Types.cs` — ArchiveItem 增加 CustomMetadata 字典 + CustomColumnDefinition 类
+- `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.axaml.cs` — 动态列生成 + 懒加载逻辑
+- `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.axaml` — 右键/菜单增加"自定义列"项
+- `src/MantisZip.UI.Avalonia/ChooseColumnsDialog.axaml` + `.cs` — 配置对话框
+- `src/MantisZip.UI.Avalonia/Converters/CustomMetadataValueConverter.cs` — 值格式化
 
 ### Must Have
 - [ ] 用户可以通过对话框添加、删除、排序自定义列
@@ -147,7 +149,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
     }
     ```
   - 定义静态 `MetadataKeyRegistry`：`Dictionary<string, (string DisplayName, string DataType)>` 包含所有数据源（见设计文档 3.2 节）
-  - 修改 `WindowSize` 类（`MainWindow.xaml.cs`）增加 `List<CustomColumnDefinition> CustomColumns`
+  - 修改 `WindowSize` 类（`MainWindow.axaml.cs`）增加 `List<CustomColumnDefinition> CustomColumns`
   - 修改 `SaveWindowSettings()` / `LoadWindowSettings()` 序列化/反序列化 `CustomColumns`
   - 注意反序列化时 ColumnId 缺失（旧配置）的处理：自动生成新 GUID
 
@@ -168,8 +170,8 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
   - **Blocked By**: None
 
   **References**:
-  - `MainWindow.xaml.cs:150-252` — 现有 ColumnState + WindowSize 类，参考其序列化模式
-  - `MainWindow.xaml.cs:268-310` — `SaveWindowSettings()` 方法，参考其 JSON 序列化
+  - `MainWindow.axaml.cs:150-252` — 现有 ColumnState + WindowSize 类，参考其序列化模式
+  - `MainWindow.axaml.cs:268-310` — `SaveWindowSettings()` 方法，参考其 JSON 序列化
   - `MainWindow.Types.cs:36-130` — 现有 ArchiveItem 类定义位置
   - Design doc 3.1-3.4 — CustomColumnDefinition + MetadataKey 注册表定义
 
@@ -197,7 +199,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **Commit**: YES
   - Message: `feat(data): add CustomColumnDefinition model and persistence`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.Types.cs`, `src/MantisZip.UI/MainWindow/MainWindow.xaml.cs`
+  - Files: `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.Types.cs`, `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.axaml.cs`
 
 - [ ] 2. ArchiveItem 增加 CustomMetadata 字典
 
@@ -251,12 +253,12 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **Commit**: YES (with Task 1)
   - Message: `feat(data): add CustomMetadata dictionary to ArchiveItem`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.Types.cs`
+  - Files: `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.Types.cs`
 
 - [ ] 3. CustomMetadataValueConverter
 
   **What to do**:
-  - 新建 `src/MantisZip.UI/Converters/CustomMetadataValueConverter.cs`
+  - 新建 `src/MantisZip.UI.Avalonia/Converters/CustomMetadataValueConverter.cs`
   - 实现 `IValueConverter`：
     - `Convert`: 接收原始值 + `CustomColumnDefinition` 作为 parameter
       - 如果 value 为 null → 检查 MetadataLoading / MetadataFailed → 返回 "…"（加载中）或 "—"（失败或无数据）
@@ -285,7 +287,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **References**:
   - `MainWindow.Types.cs:132` — `FormatSize` 方法，参考其单位转换逻辑
-  - `MainWindow.xaml:22-23` — 现有 Converter 注册模式（RatioToWidthConverter）
+  - `MainWindow.axaml:22-23` — 现有 Converter 注册模式（RatioToWidthConverter）
   - WPF IValueConverter 文档
 
   **QA Scenarios**:
@@ -305,7 +307,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **Commit**: YES (with Task 1)
   - Message: `feat(ui): add CustomMetadataValueConverter for column value formatting`
-  - Files: `src/MantisZip.UI/Converters/CustomMetadataValueConverter.cs`
+  - Files: `src/MantisZip.UI.Avalonia/Converters/CustomMetadataValueConverter.cs`
 
 - [ ] 4. MetadataExtractor — 核心调度器
 
@@ -325,7 +327,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
     }
     ```
   - 按 `metadataKey` switch 路由到对应提取方法
-  - 对于需要临时提取的格式：复用 `ExtractPreviewFileAsync` 模式（见 `MainWindow.xaml.cs:139` 附近的 `ExtractPreviewFileAsync`）先提取文件到 `%TEMP%\MantisZip\Preview\`，然后调用 Core 解析器，最后清理临时文件
+  - 对于需要临时提取的格式：复用 `ExtractPreviewFileAsync` 模式（见 `MainWindow.axaml.cs:139` 附近的 `ExtractPreviewFileAsync`）先提取文件到 `%TEMP%\MantisZip\Preview\`，然后调用 Core 解析器，最后清理临时文件
   - **关键集成**：现有 Core parsers 都返回 `FileFormatInfo`，所以 MetadataExtractor 需要从 `FileFormatInfo` 属性映射到 `metadataKey`
     - 例如 `"Title"` → 依次尝试 `PeParser` 的 `FileFormatInfo.ProductName`、`Id3v2Parser` 的 `Title`、`OfficeParser` 的 `Title`、`PdfParser` 的 `Title`
   - 对于不可提取的条目（加密 7z/RAR）：抛 `NotSupportedException`，调用处捕获返回 null
@@ -350,9 +352,9 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
   **References**:
   - `Core/Utils/PeParser.cs`、`Core/Utils/Id3v2Parser.cs`、`Core/Utils/FlacParser.cs` 等 — 各解析器的 Parse 方法签名和 FileFormatInfo 属性
   - `Core/Utils/FileFormatInfo.cs` — 所有解析器的返回类型
-  - `MainWindow.xaml.cs:139` — `ExtractPreviewFileAsync` 临时提取模式
+  - `MainWindow.axaml.cs:139` — `ExtractPreviewFileAsync` 临时提取模式
   - `Core/Abstractions/ArchiveEngine.cs:8-20` — Core 层的 ArchiveItem 类型（参数引用）
-  - `MainWindow.xaml.cs:630-644` — 如何从 Core ArchiveItem 映射到 UI ArchiveItem
+  - `MainWindow.axaml.cs:630-644` — 如何从 Core ArchiveItem 映射到 UI ArchiveItem
 
   **QA Scenarios**:
   ```
@@ -525,7 +527,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 - [ ] 8. ChooseColumnsDialog XAML 布局
 
   **What to do**:
-  - 新建 `src/MantisZip.UI/ChooseColumnsDialog.xaml` + `src/MantisZip.UI/ChooseColumnsDialog.xaml.cs`
+  - 新建 `src/MantisZip.UI.Avalonia/ChooseColumnsDialog.axaml` + `src/MantisZip.UI.Avalonia/ChooseColumnsDialog.axaml.cs`
   - 对话框窗口标题："自定义列"
   - 主题绑定（遵循 AGENTS.md 规则 3：新 UI 控件必须使用主题样式）：
     - `Background="{DynamicResource Theme_WindowBg}"`
@@ -573,8 +575,8 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
   - **Blocked By**: Task 1 (需要 CustomColumnDefinition 类型)
 
   **References**:
-  - `MainWindow.xaml:1-40` — 主题色绑定模式（Theme_WindowBg, Theme_TextPrimary 等）
-  - `CompressSettingsWindow.xaml` — 参考现有对话框的主题绑定风格
+  - `MainWindow.axaml:1-40` — 主题色绑定模式（Theme_WindowBg, Theme_TextPrimary 等）
+  - `CompressSettingsWindow.axaml` — 参考现有对话框的主题绑定风格
   - `AGENTS.md` — "规则 3：新 UI 控件必须应用主题样式"
 
   **QA Scenarios**:
@@ -592,12 +594,12 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **Commit**: YES
   - Message: `feat(ui): add ChooseColumnsDialog layout`
-  - Files: `src/MantisZip.UI/ChooseColumnsDialog.xaml`, `src/MantisZip.UI/ChooseColumnsDialog.xaml.cs`
+  - Files: `src/MantisZip.UI.Avalonia/ChooseColumnsDialog.axaml`, `src/MantisZip.UI.Avalonia/ChooseColumnsDialog.axaml.cs`
 
 - [ ] 9. ChooseColumnsDialog 交互逻辑
 
   **What to do**:
-  - 在 `ChooseColumnsDialog.xaml.cs` 中实现：
+  - 在 `ChooseColumnsDialog.axaml.cs` 中实现：
   - 加载时从 MetadataKeyRegistry 获取所有数据源，按 DataType 分组
   - ComboBox "列类型" 选项：Text / Integer / Size / Time
     - 选中类型 → 过滤数据源 ComboBox 只显示该类型的条目
@@ -632,8 +634,8 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
   - **Blocked By**: Task 1 (需要 CustomColumnDefinition 类型)
 
   **References**:
-  - `CompressSettingsWindow.xaml.cs` — 参考现有对话框的交互模式
-  - `PasswordDialog.xaml.cs` — 参考简单对话框的 DialogResult 模式
+  - `CompressSettingsWindow.axaml.cs` — 参考现有对话框的交互模式
+  - `PasswordDialog.axaml.cs` — 参考简单对话框的 DialogResult 模式
   - Design doc 4.2 — 对话框交互流程
 
   **QA Scenarios**:
@@ -655,12 +657,12 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **Commit**: YES (with Task 8)
   - Message: `feat(ui): implement ChooseColumnsDialog interaction logic`
-  - Files: `src/MantisZip.UI/ChooseColumnsDialog.xaml.cs`
+  - Files: `src/MantisZip.UI.Avalonia/ChooseColumnsDialog.axaml.cs`
 
 - [ ] 10. 动态列生成 (RebuildCustomColumns)
 
   **What to do**:
-  - 在 `MainWindow.xaml.cs` 中新增 `RebuildCustomColumns()` 方法
+  - 在 `MainWindow.axaml.cs` 中新增 `RebuildCustomColumns()` 方法
   - 逻辑：
     1. 确定固定列的 SortMemberPath 集合：`Name`, `Size`, `CompressedSize`, `RatioSort`, `Crc32`, `LastModified`, `IsEncrypted`
     2. 从 `FileListGrid.Columns` 移除所有不属于固定列的列
@@ -718,11 +720,11 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
   - **Blocked By**: Tasks 1, 2, 3, 4, 8, 9
 
   **References**:
-  - `MainWindow.xaml:405-562` — DataGrid 定义和现有列模板
-  - `MainWindow.xaml.cs:150-252` — SaveWindowSettings 列管理
+  - `MainWindow.axaml:405-562` — DataGrid 定义和现有列模板
+  - `MainWindow.axaml.cs:150-252` — SaveWindowSettings 列管理
   - `MainWindow.UI.cs:938-982` — ColumnHeaderContextMenu_Opened 列标题右键菜单
   - `MainWindow.UI.cs:874-933` — FileListGrid_Sorting 自定义排序
-  - `MainWindow.xaml:456-465` — Name 列的 DataGridTemplateColumn 定义模式
+  - `MainWindow.axaml:456-465` — Name 列的 DataGridTemplateColumn 定义模式
 
   **QA Scenarios**:
   ```
@@ -748,7 +750,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **Commit**: YES
   - Message: `feat(ui): add dynamic column generation and lazy loading`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.xaml.cs`
+  - Files: `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.axaml.cs`
 
 - [ ] 11. 菜单位置整合
 
@@ -784,7 +786,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **References**:
   - `MainWindow.UI.cs:938-982` — ColumnHeaderContextMenu_Opened 方法（动态构建菜单）
-  - `MainWindow.xaml:50-120` — MenuBar 定义，"查看"菜单位置
+  - `MainWindow.axaml:50-120` — MenuBar 定义，"查看"菜单位置
   - `MainWindow.Menu.cs` — 现有菜单事件处理方法
 
   **QA Scenarios**:
@@ -802,7 +804,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **Commit**: YES (with Task 10)
   - Message: `feat(ui): add custom columns menu entries`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.xaml`, `src/MantisZip.UI/MainWindow/MainWindow.xaml.cs`, `src/MantisZip.UI/MainWindow/MainWindow.UI.cs`
+  - Files: `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.axaml`, `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.axaml.cs`, `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.UI.cs`
 
 - [ ] 12. 自定义列排序支持
 
@@ -832,8 +834,8 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **References**:
   - `MainWindow.UI.cs:874-933` — `FileListGrid_Sorting` 方法
-  - `MainWindow.xaml:430` — Sorting 事件绑定
-  - `MainWindow.xaml.cs:378-397` — `CaptureCurrentSort` 方法
+  - `MainWindow.axaml:430` — Sorting 事件绑定
+  - `MainWindow.axaml.cs:378-397` — `CaptureCurrentSort` 方法
 
   **QA Scenarios**:
   ```
@@ -850,7 +852,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **Commit**: YES (with Task 10)
   - Message: `feat(ui): support sorting on custom columns`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.UI.cs`
+  - Files: `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.UI.cs`
 
 - [ ] 13. 缓存管理 + 清理 + 边缘情况
 
@@ -886,10 +888,10 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
   - **Blocked By**: Tasks 4, 10
 
   **References**:
-  - `MainWindow.xaml.cs:93-114` — `CloseArchive_Click` 清理逻辑
+  - `MainWindow.axaml.cs:93-114` — `CloseArchive_Click` 清理逻辑
   - `MainWindow.UI.cs:268-350` — `FilterFiles` 目录切换
   - `Core/Utils/LogRedactor.cs` — 日志记录模式
-  - `MainWindow.xaml.cs:139` — `ExtractPreviewFileAsync` 临时文件模式
+  - `MainWindow.axaml.cs:139` — `ExtractPreviewFileAsync` 临时文件模式
 
   **QA Scenarios**:
   ```
@@ -912,7 +914,7 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
   **Commit**: YES (with Task 10)
   - Message: `feat(ui): add cache management and edge case handling`
-  - Files: `src/MantisZip.UI/MainWindow/MainWindow.xaml.cs`
+  - Files: `src/MantisZip.UI.Avalonia/MainWindow/MainWindow.axaml.cs`
 
 - [ ] 14. 集成测试 + 最终 QA
 
@@ -997,10 +999,10 @@ Critical Path: T1 → T4 → T8/T9/T10 → T11-T14
 
 | Task | Message | Files |
 |------|---------|-------|
-| 1+2+3 | `feat(data): add CustomColumnDefinition, CustomMetadata, and value converter` | `MainWindow.Types.cs`, `MainWindow.xaml.cs`, `Converters/CustomMetadataValueConverter.cs` |
+| 1+2+3 | `feat(data): add CustomColumnDefinition, CustomMetadata, and value converter` | `MainWindow.Types.cs`, `MainWindow.axaml.cs`, `Converters/CustomMetadataValueConverter.cs` |
 | 4+5+6+7 | `feat(core): add MetadataExtractor with image/duration/text extraction` | `Core/Utils/MetadataExtractor.cs` |
-| 8+9 | `feat(ui): add ChooseColumnsDialog for custom column configuration` | `ChooseColumnsDialog.xaml`, `ChooseColumnsDialog.xaml.cs` |
-| 10+11+12+13 | `feat(ui): implement dynamic custom columns with lazy loading and sorting` | `MainWindow.xaml.cs`, `MainWindow.xaml`, `MainWindow.UI.cs` |
+| 8+9 | `feat(ui): add ChooseColumnsDialog for custom column configuration` | `ChooseColumnsDialog.axaml`, `ChooseColumnsDialog.axaml.cs` |
+| 10+11+12+13 | `feat(ui): implement dynamic custom columns with lazy loading and sorting` | `MainWindow.axaml.cs`, `MainWindow.axaml`, `MainWindow.UI.cs` |
 
 ---
 
