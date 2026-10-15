@@ -26,6 +26,69 @@ public class SourceArchiveValidationTests
     public void IsPasswordRelatedError_CorruptionMessages_ReturnsFalse(string message)
         => Assert.False(ArchiveService.IsPasswordRelatedError(new InvalidOperationException(message)));
 
+    // 损坏指标优先于密码指标：7z.dll 错误消息有限且复用，损坏场景可能同时含 password/encrypted 字样
+    // （如 "CRC Failed in Encrypted file. Wrong password?"）——打开阶段尚未尝试密码，不应弹密码框
+    [Theory]
+    [InlineData("CRC Failed in Encrypted file. Wrong password?")]
+    [InlineData("Data Error in file. Wrong password?")]
+    [InlineData("The archive is corrupt: data error at offset 1234")]
+    [InlineData("Cannot open the file as archive: encrypted header looks damaged")]
+    public void IsPasswordRelatedError_CorruptionWithPasswordKeywords_ReturnsFalse(string message)
+        => Assert.False(ArchiveService.IsPasswordRelatedError(new InvalidOperationException(message)));
+
+    /// <summary>
+    /// SharpSevenZip 对「7z/RAR 加密头无密码」与「7z/RAR 损坏」抛同一条歧义消息，
+    /// 传入路径时靠头部结构探测区分（方案 B）。语料见 tests/corpus/corrupt-archives/。
+    /// </summary>
+    private const string AmbiguousSevenZipMessage =
+        "Invalid archive: open/read error! Is it encrypted and a wrong password was provided? " +
+        "If your archive is an exotic one, it is possible that SharpSevenZipSharp has no signature for its format.";
+
+    [Fact]
+    public void IsPasswordRelatedError_AmbiguousMessage_Corrupt7z_ReturnsFalse()
+        => Assert.False(ArchiveService.IsPasswordRelatedError(
+            new InvalidOperationException(AmbiguousSevenZipMessage),
+            CorpusPath("corrupt-14-7z-truncated-tail.7z")));
+
+    [Fact]
+    public void IsPasswordRelatedError_AmbiguousMessage_EncryptedHeader7z_ReturnsTrue()
+        => Assert.True(ArchiveService.IsPasswordRelatedError(
+            new InvalidOperationException(AmbiguousSevenZipMessage),
+            CorpusPath("enc-04-7z-encrypt-headers.7z")));
+
+    [Fact]
+    public void IsPasswordRelatedError_AmbiguousMessage_CorruptRar_ReturnsFalse()
+        => Assert.False(ArchiveService.IsPasswordRelatedError(
+            new InvalidOperationException(AmbiguousSevenZipMessage),
+            CorpusPath("corrupt-24-rar-bad-signature.rar")));
+
+    [Fact]
+    public void IsPasswordRelatedError_AmbiguousMessage_EncryptedHeaderRar_ReturnsTrue()
+        => Assert.True(ArchiveService.IsPasswordRelatedError(
+            new InvalidOperationException(AmbiguousSevenZipMessage),
+            CorpusPath("enc-06-rar-headers-encrypted.rar")));
+
+    [Fact]
+    public void IsPasswordRelatedError_PasswordMessage_NoPath_ReturnsTrue()
+    {
+        // 旧签名（无路径）不做结构探测，保持纯消息启发式
+        Assert.True(ArchiveService.IsPasswordRelatedError(
+            new InvalidOperationException("Wrong password for 'a.zip'")));
+    }
+
+    private static string CorpusPath(string fileName) =>
+        Path.Combine(GetRepoRoot(), "tests", "corpus", "corrupt-archives", fileName);
+
+    /// <summary>从测试程序集输出目录向上遍历，找到第一个含 src 子目录的目录作为仓库根。</summary>
+    private static string GetRepoRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null && !Directory.Exists(Path.Combine(dir, "src")))
+            dir = Path.GetDirectoryName(dir);
+        return dir ?? throw new InvalidOperationException(
+            $"无法定位仓库根（未找到 'src' 目录）。Base directory: {AppContext.BaseDirectory}");
+    }
+
     [Fact]
     public void SourceArchiveItem_StatusChange_UpdatesIcon()
     {

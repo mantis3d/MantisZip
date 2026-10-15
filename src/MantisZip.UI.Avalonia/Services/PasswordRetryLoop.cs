@@ -93,8 +93,8 @@ public static class PasswordRetryLoop
             }
             catch (Exception ex)
             {
-                // 非密码类错误（磁盘满、权限、文件缺失…）不属于本循环职责，原样上抛
-                if (!ArchiveService.IsPasswordRelatedError(ex))
+                // 非密码类错误（磁盘满、权限、文件缺失、头部损坏…）不属于本循环职责，原样上抛
+                if (!ArchiveService.IsPasswordRelatedError(ex, archivePath))
                     throw;
 
                 var entered = await ShowPasswordDialogAsync(archivePath, owner);

@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-15** — 修复损坏 7z/RAR 被误判为加密包（打开时误弹密码框）
+  - **问题**：`ArchiveService.IsPasswordRelatedError` 纯关键词启发式（消息含 "password"/"encrypted" 即判密码相关）。经损坏语料实测（`tests/corpus/corrupt-archives/`）：SharpSevenZip 对「7z/RAR 加密头无密码」与「7z/RAR 头部损坏」抛**完全相同**的异常（同类型 `SharpSevenZipArchiveException`、同 HRESULT `0x80131500`、同消息 "Invalid archive: open/read error! Is it encrypted and a wrong password was provided?..."）——损坏包被误判 `PasswordRequired` → 弹密码框；进框后 `ClassifySharpSevenZipException` 对此消息仍返回 `WrongPassword` → 输入任何密码都提示「密码错误」，永远到不了「损坏」。
+  - **修复（方案 B：字节级结构探测）**：新增 `Core/Utils/ArchiveHeaderProbe`（`HeaderStructure{Unknown,Intact,Broken}`）——魔数分派（不依赖扩展名）+ 7z StartHeader 校验（签名 / 版本主号 / StartHeaderCRC / next-header 越界，分卷按兄弟卷求和）+ RAR 签名（RAR4/RAR5）；魔数不符但扩展名声称 7z/RAR → `Broken`。`IsPasswordRelatedError(ex, archivePath = null)` 改三段式：损坏关键词 → false；无密码关键词 → false；歧义 → 结构探测 `Broken` → false，否则 true。三处消费方传 path（`ArchiveService.LoadArchiveAsync` / `ExtractSettingsViewModel` / `PasswordRetryLoop`）。
+  - **实测**：corrupt-08/14（7z 损坏）、corrupt-24（RAR 签名损坏）、vol-02（分卷缺卷）→ `Broken`（不弹密码框）；enc-04/06（加密头）、valid.7z/rar、vol-01（完整分卷）→ `Intact`（走密码流程）。
+  - **语料入库**：`tests/corpus/corrupt-archives/`（53 样本：损坏/加密/边缘/分卷/有效对照）+ `tools/CorruptProbe/`（诊断 harness，独立于 `MantisZip.sln`）。
+  - **测试**：`ArchiveHeaderProbeTests` 24/24（`tests/MantisZip.Tests/Utils`）；`SourceArchiveValidationTests` 增 path-aware 用例，**UI 263✓ / Core 708✓**。
+  - **更正**：此前一轮以 `-p:BaseOutputPath=temp` 跑出的「16 既有失败」实为输出移到仓库外导致 `GetRepoRoot` 找不到 `src` 的假失败；改用 `-p:SkipShellExtCopy=true`（默认仓库内输出）后两测试项目全绿。
+  - **备注**：损坏包对话框文案仍裸露 SharpSevenZip 英文原文（`ArchiveService` 失败路径 `Status_OpenArchiveFailed` 拼 `ex.Message`），未在本轮改；留给 `error-info-enhancement` 计划 Task 4（整包错误本地化）统一处理。
+
 **2026-10-15** — 修复 PROGRESS.md merge 双重编码乱码（19feaee 引入）
   - **问题**：merge commit `19feaee`（Merge branch 'beta' into alpha）将 UTF-8 中文按 GBK（CP936）误读后重新存为 UTF-8（双重编码），导致 PROGRESS.md 约 135 行乱码（典型标记 € / 寮 / 鈥）。两个父版本 `13cde41`（alpha）/ `8328178`（beta）内容均完好。
   - **修复**：方案 2 —— 以 `13cde41` 为基底重建，叠加 beta 独有 2 行（10-13 帮助窗 Markdown 化 / 10-13 根治帮助弹窗空白，插入 2026-10 区对应位置）+ merge 后新增 3 条未受损行（10-15 CRC / 10-15 ZIP / 10-14 PercentComplete），保持原文件 BOM + CRLF 格式写回。

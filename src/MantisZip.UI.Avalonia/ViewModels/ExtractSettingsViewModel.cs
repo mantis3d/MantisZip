@@ -410,7 +410,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
                 {
                     entries = await engine.ListEntriesAsync(item.Path, null, ct);
                 }
-                catch (Exception ex) when (ArchiveService.IsPasswordRelatedError(ex))
+                catch (Exception ex) when (ArchiveService.IsPasswordRelatedError(ex, item.Path))
                 {
                     // ── A 类：自动尝试密码库，命中后用密码重新列出条目 ──
                     entries = await TryAutoUnlockAsync(item, engine, relist: true, ct);
