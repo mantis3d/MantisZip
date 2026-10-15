@@ -185,8 +185,8 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>7z 固实块大小：""=默认，或 "64m" / "256m" / "512m" / "1g"。</summary>
     public string SevenZipSolidBlockSize { get; set; } = "";
 
-    /// <summary>7z 字典大小（字节），0 表示引擎默认。</summary>
-    public int SevenZipDictionarySize { get; set; }
+    /// <summary>7z 字典大小：""=默认，或 "64m" / "256m" / "1g" / "4g"（CustomParameters["d"] 直传 7z.dll）。</summary>
+    public string SevenZipDictionarySize { get; set; } = "";
 
     /// <summary>7z Word Size（快速字节数），0 表示引擎默认。</summary>
     public int SevenZipNumFastBytes { get; set; }
@@ -196,6 +196,19 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>7z 多线程压缩（mt=on）。默认 true，利用多核 CPU 并行压缩。</summary>
     public bool SevenZipMultithreaded { get; set; } = true;
+
+    /// <summary>自适应压缩。启用时对已压缩文件自动 Store，其余保持用户选定级别。</summary>
+    public bool AdaptiveCompression { get; set; }
+
+    /// <summary>魔数检测。启用时对大文件进行魔数采样检测，更准确识别已压缩格式。</summary>
+    public bool AdaptiveSmartDetect { get; set; }
+
+    /// <summary>ZIP 多线程压缩。启用时利用多核 CPU 并行压缩已分组的文件。</summary>
+    public bool MultiThreadedCompression { get; set; }
+
+    /// <summary>N 组并行压缩的目标组数。</summary>
+    [ObservableProperty]
+    private int _parallelCompressDegree = Environment.ProcessorCount;
 
     // ── 分卷 ──
 
@@ -231,6 +244,18 @@ public partial class CompressSettingsViewModel : ObservableObject
             return 0;
         }
     }
+
+    // ── 文件冲突 ──
+
+    /// <summary>文件冲突默认策略（ask/overwrite/add/rename/skip），仅本次压缩生效。</summary>
+    [ObservableProperty]
+    private string _conflictAction = "ask";
+
+    /// <summary>冲突策略下拉选项（共享数据源，本地化 Display）。</summary>
+    public List<CompressionOptionData.ComboOption> ConflictActionOptions { get; }
+
+    [ObservableProperty]
+    private CompressionOptionData.ComboOption? _selectedConflictActionOption;
 
     // -- Password mode (library vs new password)
 
@@ -465,6 +490,24 @@ public partial class CompressSettingsViewModel : ObservableObject
             UpdateCanCompress();
         };
 
+        LocalizedStrings["Compress_ParallelDegree"] = LocalizationManager.T("Compress_ParallelDegree");
+        LocalizedStrings["Compress_ParallelDegree_Hint"] = LocalizationManager.T("Compress_ParallelDegree_Hint");
+
+        // ParallelCompressDegree 针制：1..16
+        _parallelCompressDegree = Math.Clamp(_parallelCompressDegree, 1, 16);
+        PropertyChanged += (_, e) =>
+        {
+            if (e.PropertyName == nameof(ParallelCompressDegree))
+            {
+                int clamped = Math.Clamp(_parallelCompressDegree, 1, 16);
+                if (clamped != _parallelCompressDegree)
+                {
+                    _parallelCompressDegree = clamped;
+                    OnPropertyChanged(nameof(ParallelCompressDegree));
+                }
+            }
+        };
+
         // Populate localized strings
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
         LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
@@ -521,6 +564,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_Pwd_RulesWatermark"] = LocalizationManager.T("Compress_Pwd_RulesWatermark");
         LocalizedStrings["Compress_Start"] = LocalizationManager.T("Compress_Start");
         LocalizedStrings["Compress_Cancel"] = LocalizationManager.T("Compress_Cancel");
+        LocalizedStrings["Compress_WhenFileExists"] = LocalizationManager.T("Compress_WhenFileExists");
 
         // 初始化压缩级别下拉选项（共享数据源，本地化 Display）
         CompressionLevelOptions = CompressionOptionData.LevelOptions
@@ -556,6 +600,17 @@ public partial class CompressSettingsViewModel : ObservableObject
             .ToList();
         SelectedSplitSizeOption = SplitSizeOptions.FirstOrDefault(o => o.Tag == "0");
 
+        // 初始化文件冲突策略下拉选项（每次询问/覆盖/追加到已有包/自动重命名/跳过）
+        ConflictActionOptions = new List<CompressionOptionData.ComboOption>
+        {
+            new CompressionOptionData.ComboOption("ask", LocalizationManager.T("Compress_Conflict_Ask")),
+            new CompressionOptionData.ComboOption("overwrite", LocalizationManager.T("CompressConflict_Overwrite")),
+            new CompressionOptionData.ComboOption("add", LocalizationManager.T("CompressConflict_Add")),
+            new CompressionOptionData.ComboOption("rename", LocalizationManager.T("CompressConflict_AutoRename")),
+            new CompressionOptionData.ComboOption("skip", LocalizationManager.T("CompressConflict_Skip")),
+        };
+        SelectedConflictActionOption = ConflictActionOptions.FirstOrDefault(o => o.Tag == ConflictAction);
+
         // Load password library
         LoadPasswordLibrary();
 
@@ -573,8 +628,13 @@ public partial class CompressSettingsViewModel : ObservableObject
             SevenZipNumFastBytes = settings.SevenZipNumFastBytes;
             SevenZipMatchFinder = settings.SevenZipMatchFinder ?? "";
             SevenZipMultithreaded = settings.SevenZipMultithreaded;
+            // Task 5 Step 3：默认组数取自 AppSettings（与 ParallelExtractDegree 对称）
+            ParallelCompressDegree = settings.ParallelCompressDegree;
+            AdaptiveCompression = settings.AdaptiveCompression;
             ZipEncryptionMethod = settings.ZipEncryptionMethod ?? "aes256";
             SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders;
+            // 文件冲突默认策略：非法值经 OnConflictActionChanged 同步回退到第一项（每次询问）
+            ConflictAction = settings.CompressFileConflictAction;
 
             // 默认格式：仅当在合法选项域内时赋值，否则保持 "zip" 并记录日志
             if (FormatOptions.Contains(settings.DefaultFormat))
@@ -781,6 +841,19 @@ public partial class CompressSettingsViewModel : ObservableObject
     {
         if (ZipEncryptionMethodOptions is { } options)
             SelectedZipEncryptionMethodOption = options.FirstOrDefault(o => o.Tag == value);
+    }
+
+    partial void OnConflictActionChanged(string value)
+    {
+        // 同步下拉选中项；非法值回退到第一项（每次询问）
+        if (ConflictActionOptions is { } options)
+            SelectedConflictActionOption = options.FirstOrDefault(o => o.Tag == value) ?? options.FirstOrDefault();
+    }
+
+    partial void OnSelectedConflictActionOptionChanged(CompressionOptionData.ComboOption? value)
+    {
+        if (value != null)
+            ConflictAction = value.Tag;
     }
 
     partial void OnConfirmPasswordChanged(string? value)

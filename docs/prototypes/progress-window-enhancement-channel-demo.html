@@ -1,0 +1,378 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>进度窗口「详细」模式 —— 通道视图（双进度条）</title>
+<style>
+    :root {
+        --bg:          #1a1a2e;
+        --section:     #252540;
+        --item:        #3d3d5c;
+        --item-hover:  #454570;
+        --accent:      #6bd46b;
+        --accent-2:    #4ecdc4;
+        --text:        #eaeaea;
+        --text-dim:    #888;
+        --text-dimmer: #666;
+        /* 复制 MainWindow.axaml 的 ProgressBarSizeBrush（深色主题 ProgressBarSizeColor） */
+        --fill-list:   #1E3A5F;
+    }
+    * { box-sizing: border-box; }
+    body {
+        margin: 0; padding: 24px; background: #12121f;
+        font-family: "Segoe UI", "Microsoft YaHei", system-ui, sans-serif;
+        color: var(--text);
+        display: flex; flex-direction: column; align-items: center; gap: 16px;
+    }
+    .caption { max-width: 840px; font-size: 12px; color: var(--text-dim); line-height: 1.75; }
+    .caption b { color: var(--accent); }
+    .caption .k { color: var(--accent-2); }
+
+    /* ── 模拟窗口 ── */
+    .window {
+        width: 860px; background: var(--bg); border: 1px solid var(--item);
+        border-radius: 10px; overflow: hidden; box-shadow: 0 8px 40px rgba(0,0,0,.5);
+    }
+    .titlebar {
+        display: flex; align-items: center; gap: 8px; padding: 10px 14px;
+        background: var(--section); border-bottom: 1px solid var(--item); font-size: 13px;
+    }
+    .titlebar .dot { width: 10px; height: 10px; border-radius: 50%; background: #3d3d5c; }
+    .titlebar .name { color: var(--text-dim); font-size: 12px; margin-left: 6px; }
+
+    .top-section { padding: 14px 16px 12px; }
+    .mode-row { display: flex; align-items: center; gap: 6px; margin-bottom: 12px; }
+    .mode-label { font-size: 11px; color: var(--text-dim); margin-right: 4px; }
+    .mode-btn { padding: 3px 12px; border: none; background: transparent; color: var(--text-dimmer);
+                cursor: default; border-radius: 4px; font-size: 12px; }
+    .mode-btn.active { background: var(--accent); color: var(--bg); font-weight: 600; }
+
+    .ch-list { display: flex; flex-direction: column; gap: 4px; }
+
+    /* 通道行：align-items:stretch 让文件名格撑满行高，底纹才能是「满高」而非「贴文字」 */
+    .ch {
+        display: grid;
+        grid-template-columns: 66px minmax(0, 1fr) 160px 46px 92px;
+        align-items: stretch; background: var(--item); border-radius: 6px; font-size: 12px;
+        transition: opacity .3s, background .2s;
+    }
+    .ch:hover { background: var(--item-hover); }
+    .ch.idle { opacity: .45; }
+    .ch > * { display: flex; align-items: center; }
+    .ch-id     { padding: 7px 0 7px 12px; color: var(--text-dim); font-size: 11px; white-space: nowrap; }
+    .ch-id.live{ color: var(--accent); }
+    .ch-bar-wrap, .ch-pct, .ch-detail { padding: 7px 0; }
+    .ch-bar-wrap { padding-left: 8px; }
+
+    /* ── 文件名格 = 底纹条 + 文字，等价于 Avalonia 的 Grid[ Rectangle, TextBlock ] ── */
+    .ch-file { position: relative; padding: 7px 0; min-width: 0; }
+    .ch-file-fill {
+        position: absolute; left: 0; top: 0; bottom: 0; width: 0;
+        background: var(--fill-list); border-radius: 3px;
+        transition: width .12s linear;
+    }
+    .ch-file-fill.vivid {
+        background: linear-gradient(90deg, rgba(107,212,107,.55), rgba(78,205,196,.55));
+    }
+    .ch-file-text {
+        position: relative; padding: 0 8px; min-width: 0;
+        white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    }
+    .ch-file .dir  { color: var(--text-dim); font-size: 11px; }
+    .ch-file .base { color: var(--text); font-weight: 500; }
+
+    /* ── 批次进度条：跟现在一样 ── */
+    .ch-bar { width: 100%; height: 6px; background: var(--bg); border-radius: 3px; overflow: hidden; }
+    .ch-fill {
+        height: 100%; width: 0; border-radius: 3px;
+        background: linear-gradient(90deg, var(--accent), var(--accent-2));
+        transition: width .25s ease;
+    }
+    .ch-pct { color: var(--accent); text-align: right; padding-right: 10px; font-variant-numeric: tabular-nums; }
+    .ch-pct .unit { font-size: 10px; }
+    .ch-detail { color: var(--text-dim); font-size: 11px; text-align: right; padding-right: 12px; font-variant-numeric: tabular-nums; }
+    .ch-detail .done { color: var(--accent); }
+
+    /* ── 总体 ── */
+    .overall { padding: 12px 16px 14px; background: var(--section); border-top: 1px solid var(--item); }
+    .ov-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 6px; }
+    .ov-pct { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+    .ov-bar { height: 16px; background: var(--bg); border-radius: 8px; overflow: hidden; }
+    .ov-fill { height: 100%; width: 0; border-radius: 8px;
+               background: linear-gradient(90deg, var(--accent), var(--accent-2)); transition: width .25s ease; }
+    .stats { display: flex; gap: 10px; margin-top: 12px; }
+    .stat { flex: 1; background: var(--bg); border: 1px solid var(--item); border-radius: 6px;
+            padding: 7px 10px; text-align: center; }
+    .stat-label { font-size: 10px; color: var(--text-dim); margin-bottom: 3px; }
+    .stat-value { font-size: 15px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+    .stat-value.plain { color: var(--text); }
+
+    /* ── 控制条 ── */
+    .controls { width: 860px; background: var(--section); border: 1px solid var(--item);
+                border-radius: 8px; padding: 12px 16px; font-size: 12px; }
+    .ctl-title { color: var(--text-dim); font-size: 11px; margin-bottom: 9px; }
+    .ctl-row { display: flex; align-items: center; gap: 8px; margin-bottom: 7px; flex-wrap: wrap; }
+    .ctl-row:last-child { margin-bottom: 0; }
+    .ctl-row .lbl { color: var(--text-dim); width: 108px; font-size: 11px; }
+    .btn { padding: 3px 11px; border: 1px solid transparent; background: #31314d; color: var(--text-dim);
+           border-radius: 4px; font-size: 11px; cursor: pointer; transition: all .15s; }
+    .btn:hover { background: #3f3f60; }
+    .btn.on { background: var(--accent); color: var(--bg); font-weight: 600; }
+    .btn-reset { border-color: var(--accent); color: var(--accent); }
+    .hint { color: var(--text-dimmer); font-size: 10px; }
+</style>
+</head>
+<body>
+
+<div class="caption">
+    每行一条<b class="k">通道</b>，两个进度条分表两个量纲：
+    <b>文件名底纹</b> = 该通道<b>当前文件</b>的实时字节进度（连续流动，照搬文件列表 <code>SizeRatio</code> 的画法）；
+    <b>独立进度条 + 百分比</b> = 该通道<b>整份任务</b>的累计进度（跟现在一样，台阶式）。
+</div>
+
+<div class="controls">
+    <div class="ctl-title">模拟控制</div>
+    <div class="ctl-row">
+        <span class="lbl">文件名底纹</span>
+        <button class="btn on" id="fOn"  onclick="setFill('on')">显示（当前文件进度）</button>
+        <button class="btn"    id="fOff" onclick="setFill('off')">关闭（对比）</button>
+        <span class="hint" id="fillHint">底纹宽度 = 该文件已写字节 / 该文件总字节</span>
+    </div>
+    <div class="ctl-row">
+        <span class="lbl">底纹配色</span>
+        <button class="btn on" id="cList"  onclick="setFillColor('list')">文件列表同款（低饱和）</button>
+        <button class="btn"    id="cVivid" onclick="setFillColor('vivid')">更醒目（绿青半透明）</button>
+        <span class="hint" id="colorHint">#1E3A5F = 深色主题 ProgressBarSizeColor</span>
+    </div>
+    <div class="ctl-row">
+        <span class="lbl">文件名</span>
+        <button class="btn on" id="pFull" onclick="setPath('full')">完整路径</button>
+        <button class="btn"    id="pBase" onclick="setPath('base')">仅文件名</button>
+        <span style="flex:1"></span>
+        <button class="btn btn-reset" onclick="reset()">重跑模拟</button>
+    </div>
+</div>
+
+<div class="window">
+    <div class="titlebar">
+        <span class="dot"></span><span class="dot"></span><span class="dot"></span>
+        <span>正在解压…</span><span class="name">backup-2026-10-04.zip</span>
+    </div>
+
+    <div class="top-section">
+        <div class="mode-row">
+            <span class="mode-label">内容模式</span>
+            <button class="mode-btn">简约</button>
+            <button class="mode-btn active">详细</button>
+            <button class="mode-btn">列表</button>
+        </div>
+        <div class="ch-list" id="chList"></div>
+    </div>
+
+    <div class="overall">
+        <div class="ov-row">
+            <span id="ovCurrent">—</span>
+            <span class="ov-pct" id="ovPct">0%</span>
+        </div>
+        <div class="ov-bar"><div class="ov-fill" id="ovFill"></div></div>
+        <div class="stats">
+            <div class="stat"><div class="stat-label">⚙ 并行</div><div class="stat-value plain" id="sPar">8</div></div>
+            <div class="stat"><div class="stat-label">已处理</div><div class="stat-value plain" id="sDone">0</div></div>
+            <div class="stat"><div class="stat-label">速度</div><div class="stat-value" id="sSpeed">0 MB/s</div></div>
+            <div class="stat"><div class="stat-label">已用时间</div><div class="stat-value plain" id="sElapsed">0s</div></div>
+        </div>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+const CHANNELS   = 8;
+const FILES_EACH = 24;
+const TICK_MS    = 60;
+const MAX_MB     = 10;          // 上限调小，让「单个超大文件拖尾」在几轮内可见
+
+const NAMES = [
+    'video.mp4', 'photo.jpg', 'data.csv', 'archive.zip',
+    'docs/api/v2/generated/clients/enterprise-resource-manager.ts',
+    'assets/media/footage/2026/q3/product-launch-final-v3-revised.mp4',
+    'src/MantisZip.Core/Engines/ZipEngine.cs',
+    'a.bin',
+    'node_modules/@vendor/some-really-long-package-name/dist/bundled/index.mjs',
+    'database/schema/migrations/2026_10_04_add_parallel_lane_index.sql',
+    'readme.txt',
+];
+
+const state = {
+    showFill: true, fillColor: 'list', pathMode: 'full',
+    startTs: Date.now(), doneFiles: 0, totalFiles: 0, totalBytes: 0, procBytes: 0, chans: [],
+};
+
+function rnd(a, b) { return a + Math.random() * (b - a); }
+function curFile(c) { return c.files[c.cursor] || null; }
+function splitPath(full) {
+    const i = full.lastIndexOf('/');
+    return i < 0 ? ['', full] : [full.slice(0, i + 1), full.slice(i + 1)];
+}
+
+function renderFile(c) {
+    const f = curFile(c);
+    const t = c.fileEl.querySelector('.ch-file-text');
+    if (state.pathMode === 'base') {
+        t.innerHTML = '<span class="base"></span>';
+        t.querySelector('.base').textContent = f ? f.name.split('/').pop() : '—';
+    } else {
+        const [dir, base] = f ? splitPath(f.name) : ['', '—'];
+        t.innerHTML = '<span class="dir"></span><span class="base"></span>';
+        t.querySelector('.dir').textContent  = dir;
+        t.querySelector('.base').textContent = base;
+    }
+}
+
+function makeChannel(idx) {
+    const files = [];
+    for (let i = 0; i < FILES_EACH; i++) {
+        const name = NAMES[(idx * 3 + i) % NAMES.length];
+        // 约 8% 概率出超大文件 → 制造「一根通道拖很久」的尾部
+        const size = Math.random() < 0.08 ? rnd(MAX_MB * 4, MAX_MB * 8) : rnd(3, MAX_MB);
+        files.push({ name, size });
+    }
+    const el = document.createElement('div');
+    el.className = 'ch';
+    el.innerHTML =
+        '<div class="ch-id"></div>' +
+        '<div class="ch-file"><div class="ch-file-fill"></div><div class="ch-file-text"></div></div>' +
+        '<div class="ch-bar-wrap"><div class="ch-bar"><div class="ch-fill"></div></div></div>' +
+        '<div class="ch-pct"></div>' +
+        '<div class="ch-detail"></div>';
+    document.getElementById('chList').appendChild(el);
+
+    const chan = {
+        idx, files, cursor: 0, curDone: 0, chanDoneBytes: 0,
+        chanTotalBytes: files.reduce((s, f) => s + f.size, 0),
+        speed: rnd(12, 26), state: 'run',
+        el,
+        idEl:     el.querySelector('.ch-id'),
+        fileEl:   el.querySelector('.ch-file'),
+        fillEl:   el.querySelector('.ch-file-fill'),
+        barEl:    el.querySelector('.ch-bar'),
+        barFill:  el.querySelector('.ch-fill'),
+        pctEl:    el.querySelector('.ch-pct'),
+        detailEl: el.querySelector('.ch-detail'),
+    };
+    state.totalFiles += files.length;
+    state.totalBytes  += chan.chanTotalBytes;
+    renderFile(chan);
+    return chan;
+}
+
+function reset() {
+    document.getElementById('chList').innerHTML = '';
+    state.chans = [];
+    for (let i = 0; i < CHANNELS; i++) state.chans.push(makeChannel(i));
+    state.startTs = Date.now();
+    state.doneFiles = 0;
+    state.procBytes = 0;
+}
+
+function tick() {
+    const elapsed = (Date.now() - state.startTs) / 1000;
+
+    for (const c of state.chans) {
+        if (c.state === 'idle') continue;
+        const f = curFile(c);
+        if (!f) { c.state = 'idle'; continue; }
+
+        c.curDone = Math.min(f.size, c.curDone + c.speed * (TICK_MS / 1000));
+
+        if (c.curDone >= f.size) {
+            c.chanDoneBytes += f.size;
+            state.doneFiles++;
+            c.cursor++;
+            c.curDone = 0;
+            if (c.cursor >= c.files.length) { c.state = 'idle'; renderFile(c); continue; }
+            if (c.cursor === c.files.length - 1) c.state = 'draining';
+            renderFile(c);
+        }
+    }
+
+    // 总体：已完成文件字节 + 各通道当前文件的实时字节（与逐条上报口径一致）
+    let procBytes = 0;
+    for (const c of state.chans) procBytes += c.chanDoneBytes + (c.state === 'idle' ? 0 : c.curDone);
+    state.procBytes = procBytes;
+
+    draw(elapsed);
+
+    if (state.chans.every(c => c.state === 'idle')) {
+        document.getElementById('ovCurrent').textContent = '解压完成';
+        setTimeout(reset, 2600);
+        return;
+    }
+    setTimeout(tick, TICK_MS);
+}
+
+function draw(elapsed) {
+    for (const c of state.chans) {
+        const f = curFile(c);
+        c.el.classList.toggle('idle', c.state === 'idle');
+        c.idEl.textContent = '通道 ' + (c.idx + 1);
+        c.idEl.classList.toggle('live', c.state !== 'idle');
+
+        // ① 文件名底纹 = 当前文件的实时字节进度
+        const filePct = c.state === 'idle' ? 100 : (f && f.size > 0 ? (c.curDone / f.size) * 100 : 0);
+        c.fillEl.style.display = state.showFill ? '' : 'none';
+        c.fillEl.classList.toggle('vivid', state.fillColor === 'vivid');
+        c.fillEl.style.width = filePct.toFixed(1) + '%';
+
+        // ② 独立进度条 + 百分比 = 批次累计进度（跟现在一样）
+        const batchPct = c.chanTotalBytes > 0 ? (c.chanDoneBytes / c.chanTotalBytes) * 100 : 100;
+        c.barFill.style.width = (c.state === 'idle' ? 100 : batchPct).toFixed(1) + '%';
+        c.pctEl.innerHTML = (c.state === 'idle' ? 100 : batchPct).toFixed(0) + '<span class="unit">%</span>';
+
+        // ③ N/M 文件
+        c.detailEl.innerHTML = c.state === 'idle'
+            ? '<span class="done">全部完成</span>'
+            : '<span class="done">' + c.cursor + '</span>/' + c.files.length + ' 文件';
+    }
+
+    const ov = state.totalBytes > 0 ? (state.procBytes / state.totalBytes) * 100 : 0;
+    document.getElementById('ovFill').style.width = ov.toFixed(1) + '%';
+    document.getElementById('ovPct').textContent = ov.toFixed(0) + '%';
+
+    const big = state.chans.filter(c => c.state !== 'idle').map(curFile).filter(Boolean)
+                    .sort((a, b) => b.size - a.size)[0];
+    document.getElementById('ovCurrent').textContent = big ? '正在写入：' + big.name : '—';
+
+    document.getElementById('sPar').textContent = String(CHANNELS);
+    document.getElementById('sDone').textContent = state.doneFiles + ' / ' + state.totalFiles;
+    document.getElementById('sSpeed').textContent =
+        (state.procBytes / Math.max(elapsed, 0.001)).toFixed(0) + ' MB/s';
+    document.getElementById('sElapsed').textContent = elapsed.toFixed(0) + 's';
+}
+
+function setFill(v) {
+    state.showFill = v === 'on';
+    document.getElementById('fOn').classList.toggle('on',  v === 'on');
+    document.getElementById('fOff').classList.toggle('on', v === 'off');
+}
+function setFillColor(v) {
+    state.fillColor = v;
+    document.getElementById('cList').classList.toggle('on',  v === 'list');
+    document.getElementById('cVivid').classList.toggle('on', v === 'vivid');
+    document.getElementById('colorHint').textContent = v === 'list'
+        ? '#1E3A5F = 深色主题 ProgressBarSizeColor'
+        : 'rgba(107,212,107,.55) → rgba(78,205,196,.55)';
+}
+function setPath(p) {
+    state.pathMode = p;
+    document.getElementById('pFull').classList.toggle('on', p === 'full');
+    document.getElementById('pBase').classList.toggle('on', p === 'base');
+    for (const c of state.chans) renderFile(c);
+}
+
+setFill('on');
+reset();
+tick();
+</script>
+</body>
+</html>

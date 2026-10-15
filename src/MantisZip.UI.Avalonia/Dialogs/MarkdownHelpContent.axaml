@@ -1,0 +1,12 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MantisZip.UI.Avalonia.Dialogs.MarkdownHelpContent"
+             x:CompileBindings="False">
+  <!-- Markdown 驱动的帮助内容：复用 MarkdownPreviewBuilder（Markdig AST → 原生控件树）渲染本地化 Markdown -->
+  <!-- 前景色用主题资源，随亮/暗主题适配；文本可选中复制（builder 产出 SelectableTextBlock） -->
+  <ScrollViewer VerticalScrollBarVisibility="Auto"
+                TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+    <!-- Markdown 控件树宿主：代码后置把 MarkdownPreviewBuilder.Build(markdown) 的结果塞进 Content -->
+    <ContentControl x:Name="MarkdownHost" Margin="20" />
+  </ScrollViewer>
+</UserControl>

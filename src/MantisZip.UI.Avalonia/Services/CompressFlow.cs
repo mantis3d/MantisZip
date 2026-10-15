@@ -2,12 +2,14 @@ using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -51,7 +53,7 @@ public static class CompressFlow
         }
 
         var settings = AppSettings.Load();
-        return new CompressRequest
+        var result = new CompressRequest
         {
             // 目录粒度源（过滤语义在白名单中表达，不再扁平化为文件列表）
             SourcePaths = items.Select(i => i.SourcePath).ToList(),
@@ -86,10 +88,24 @@ public static class CompressFlow
             SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
             SevenZipMatchFinder = vm.SevenZipMatchFinder,
             SevenZipMultithreaded = vm.SevenZipMultithreaded,
+            // 自适应压缩：三个独立开关，全部从对话框读取（per-operation override，不污染全局设置）
+            AdaptiveCompression = vm.AdaptiveCompression,
+            AdaptiveSmartDetect = vm.AdaptiveSmartDetect,
+            MultiThreadedCompression = vm.MultiThreadedCompression,
+            // 多线程模式：传递用户自定义仅存储格式列表
+            MultiThreadedStoreFormatIds = new HashSet<string>(
+                AppSettings.Load()?.MultiThreadedStoreFormatIds ?? new List<string>()),
             SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
+            ParallelCompressDegree = vm.ParallelCompressDegree,
+            // 输出文件冲突默认策略（本次压缩生效，来自压缩对话框/全局设置）
+            ConflictAction = vm.ConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线
             ErrorResolver = CreateErrorResolver(),
         };
+
+        CoreLog.Trace("CompressFlow.BuildRequest: adaptive={0}, smartDetect={1}, multiThreaded={2}, vm.AdaptiveCompression={3}",
+            result.AdaptiveCompression, result.AdaptiveSmartDetect, result.MultiThreadedCompression, vm.AdaptiveCompression);
+        return result;
     }
 
     /// <summary>
@@ -166,8 +182,13 @@ public static class CompressFlow
     /// 弹窗回调：传入冲突信息，返回用户选择（Action、重命名名、是否应用到全部）。
     /// 返回 Cancel 且取消整个操作时抛 OperationCanceledException 以终止压缩。
     /// </param>
+    /// <param name="defaultAction">
+    /// 默认冲突策略（来自设置/压缩对话框，仅本次压缩生效）："overwrite" / "add" / "rename" / "skip"。
+    /// 非 "ask" 时直接映射不再弹窗；"add" 在格式不支持追加（!info.CanAdd）时回退弹窗。
+    /// </param>
     public static CompressConflictResolver CreateResolver(
-        Func<CompressConflictInfo, Task<(MantisZip.Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>> showDialog)
+        Func<CompressConflictInfo, Task<(MantisZip.Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>> showDialog,
+        string? defaultAction = null)
     {
         bool applyToAll = false;
         MantisZip.Core.Abstractions.CompressConflictAction? chosenAction = null;
@@ -177,6 +198,14 @@ public static class CompressFlow
             // 已勾选"应用到全部" → 直接返回记忆的选择
             if (applyToAll && chosenAction.HasValue)
                 return new CompressConflictResolution(chosenAction.Value, null);
+
+            // 默认冲突策略非 ask → 直接映射免弹窗（映射不可用时回退弹窗）
+            if (!string.IsNullOrEmpty(defaultAction) && defaultAction != "ask")
+            {
+                var mapped = MapDefaultConflictAction(defaultAction, info);
+                if (mapped.HasValue)
+                    return new CompressConflictResolution(mapped.Value, null);
+            }
 
             var (action, customName, applyAll) = await showDialog(info);
             if (applyAll)
@@ -195,6 +224,36 @@ public static class CompressFlow
     }
 
     /// <summary>
+    /// 将默认冲突策略字符串映射为 Core 冲突动作。
+    /// </summary>
+    /// <param name="defaultAction">"overwrite" / "add" / "rename" / "skip"（"ask" 由调用方过滤）。</param>
+    /// <param name="info">当前冲突信息（用于 "add" 的 CanAdd 判定）。</param>
+    /// <returns>
+    /// 映射结果；null 表示该策略在当前冲突下不可用（如格式不支持追加），
+    /// 调用方应回退弹窗询问用户。
+    /// </returns>
+    private static MantisZip.Core.Abstractions.CompressConflictAction? MapDefaultConflictAction(
+        string defaultAction, CompressConflictInfo info)
+    {
+        switch (defaultAction)
+        {
+            case "overwrite":
+                return MantisZip.Core.Abstractions.CompressConflictAction.Overwrite;
+            case "rename":
+                // CustomName 传 null → Core ComputeRenamedPath 自动生成唯一名
+                return MantisZip.Core.Abstractions.CompressConflictAction.Rename;
+            case "skip":
+                // Core 无 Skip 动作；Dialog Skip → Cancel（resolver 单项跳过，非终止压缩）
+                return MantisZip.Core.Abstractions.CompressConflictAction.Cancel;
+            case "add":
+                // 格式不支持追加（如 tar.gz）→ 返回 null 回退弹窗
+                return info.CanAdd ? MantisZip.Core.Abstractions.CompressConflictAction.Add : null;
+            default:
+                return null;
+        }
+    }
+
+    /// <summary>
     /// 弹 CompressConflictDialog 并映射结果（供主窗口/CLI 的弹窗回调复用）。
     /// resolver 由 Core 在后台线程调用，本方法内部通过 Dispatcher 封送回 UI 线程弹窗。
     /// 循环重入：用户点击"暂停"时收起冲突对话框并进入进度窗口暂停态，
@@ -206,6 +265,10 @@ public static class CompressFlow
         // 循环重入：暂停后恢复时重新弹窗（对齐 WPF AppPartials/App.Compress.cs CompressConflictResolver）
         while (true)
         {
+            // 冲突弹窗是模态等待：期间已用时间冻结（每次重入都配对 Begin/End，防计数泄漏）
+            var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
+            pw?.BeginModalFreeze();
+
             var result = await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var dlg = new CompressConflictDialog(info.OutputPath, info.SuggestedName, info.CanAdd);
@@ -252,22 +315,27 @@ public static class CompressFlow
             });
 
             if (result.IsCancelled)
+            {
+                pw?.EndModalFreeze();
                 throw new OperationCanceledException("压缩被用户取消");
+            }
 
             if (result.IsPaused)
             {
                 // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标，
                 // 在 UI 线程调用 PauseFromConflict 进入暂停态，然后在后台线程等待暂停事件
                 // （不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）。
-                var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
                 if (pw != null)
                 {
                     await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
+                    // IsPaused 已为 true → 解除模态冻结后由暂停态无缝接续冻结
+                    pw.EndModalFreeze();
                     pw.PauseEvent.Wait(pw.CancellationToken);
                 }
                 continue; // 恢复后重新弹窗
             }
 
+            pw?.EndModalFreeze();
             return (result.Action, result.CustomName, result.ApplyAll);
         }
     }
@@ -296,6 +364,63 @@ public static class CompressFlow
         catch (Exception ex)
         {
             App.DebugLog($"[CompressFlow] RecordOutputHistory failed: {ex.Message}");
+        }
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  压缩侧「列表」模式播种（对齐解压侧 ExtractFlow 的做法）
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>「列表」模式播种阈值：条目数超过则一条行都不建（对齐解压侧 ExtractFlow.MaxSeedEntryCount）。</summary>
+    private const int MaxSeedEntryCount = 5000;
+
+    /// <summary>
+    /// 压缩侧「列表」模式播种（后台）：枚举待打包条目后 <see cref="ProgressWindow.SeedEntries"/>，
+    /// 让「列表」显示**全部条目**（Pending）并随终态事件更新，而不是只冒已完成行。
+    /// <para>
+    /// 本方法立即返回、不 await —— 压缩绝不等待播种；枚举失败/取消/超阈值一律放弃播种，
+    /// 由引擎逐条目终态事件的 upsert 兜底（渐进模式）。引擎若已上报出条目行，
+    /// <see cref="ProgressWindow.SeedEntries"/> 会自行跳过，避免清掉已上报的终态行。
+    /// </para>
+    /// </summary>
+    public static void TrySeedEntryItemsInBackground(ProgressWindow? pw, CompressRequest request, CancellationToken ct)
+    {
+        if (pw is null || request.SourcePaths is not { Count: > 0 })
+            return;
+
+        // 白名单与 CompressService 同源：Plan 中非空 IncludedFiles 的并集；全为 null = 未启用过滤
+        IReadOnlyCollection<string>? whitelist = null;
+        var planItems = request.Plan?.Items;
+        if (planItems is { Count: > 0 } && planItems.Any(i => i.IncludedFiles != null))
+        {
+            whitelist = planItems
+                .Where(i => i.IncludedFiles != null)
+                .SelectMany(i => i.IncludedFiles!)
+                .Distinct(StringComparer.OrdinalIgnoreCase)
+                .ToList();
+        }
+
+        _ = SeedEntryItemsAsync(pw, request.SourcePaths, whitelist, ct);
+    }
+
+    /// <summary>后台枚举 + 播种（所有异常与取消都吞掉，只影响列表预览，不影响压缩本身）。</summary>
+    private static async Task SeedEntryItemsAsync(
+        ProgressWindow pw, IReadOnlyList<string> sources,
+        IReadOnlyCollection<string>? whitelist, CancellationToken ct)
+    {
+        try
+        {
+            var items = await Task.Run(
+                () => SourceEntryEnumerator.Enumerate(sources, whitelist, ct), ct).ConfigureAwait(false);
+
+            if (items.Count == 0 || items.Count > MaxSeedEntryCount)
+                return;
+
+            pw.SeedEntries(items);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[CompressFlow] Entry seeding skipped: {ex.Message}");
         }
     }
 }

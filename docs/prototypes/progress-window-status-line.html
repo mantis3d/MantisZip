@@ -1,0 +1,555 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>进度窗口 · 状态行原型（方案 B：两行并存）</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #1a1a2e;
+            color: #eaeaea;
+            padding: 40px;
+            min-height: 100vh;
+        }
+        h1 { text-align: center; margin-bottom: 10px; color: #6bd46b; }
+        h2 { text-align: center; margin-bottom: 10px; color: #4ecdc4; font-size: 16px; font-weight: 600; }
+        .subtitle { text-align: center; margin-bottom: 16px; color: #888; font-size: 14px; }
+        .prototype-container { max-width: 600px; margin: 0 auto 40px; }
+
+        /* ── 场景切换控制条（原型辅助，非窗口本体） ── */
+        .scenario-bar {
+            max-width: 600px;
+            margin: 0 auto 16px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        .scenario-label { font-size: 12px; color: #888; }
+        .scenario-btn {
+            padding: 5px 12px;
+            border: 1px solid #3d3d5c;
+            background: #2d2d44;
+            color: #888;
+            cursor: pointer;
+            border-radius: 6px;
+            font-size: 12px;
+            transition: all 0.2s;
+        }
+        .scenario-btn.active { background: #6bd46b; color: #1a1a2e; border-color: #6bd46b; }
+        .scenario-btn:hover:not(.active) { background: #4a4a6a; color: #eaeaea; }
+
+        /* 窗口 */
+        .progress-window {
+            background: #2d2d44;
+            border-radius: 8px;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+            overflow: hidden;
+            border: 1px solid #3d3d5c;
+        }
+        .window-header {
+            background: #3d3d5c;
+            padding: 10px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .window-title { font-weight: 600; font-size: 14px; }
+
+        /* 上方区域（内容区，简化复刻） */
+        .file-info-section { padding: 16px; border-bottom: 1px solid #3d3d5c; }
+        .section-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+        .section-title { font-size: 12px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; }
+        .batch-count { font-size: 11px; color: #6bd46b; }
+
+        .batch-list { margin-bottom: 12px; }
+        .batch-item {
+            display: flex; align-items: center;
+            padding: 8px 12px;
+            background: #3d3d5c;
+            border-radius: 6px;
+            margin-bottom: 4px;
+            font-size: 13px;
+        }
+        .batch-item.completed { opacity: 0.7; }
+        .batch-item.active { background: #4a4a6a; border-left: 3px solid #6bd46b; }
+        .batch-item.failed { background: rgba(255, 107, 107, 0.14); border-left: 3px solid #ff6b6b; }
+        .batch-item.failed .batch-icon { color: #ff6b6b; }
+        .batch-error {
+            color: #ff6b6b; font-size: 11px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+            max-width: 60%; text-align: right; flex-shrink: 1;
+        }
+        .batch-icon { margin-right: 8px; }
+        .batch-name { flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .batch-progress { color: #6bd46b; font-weight: 500; }
+
+        /* 简约内容面板：路径 / 文件名 / 文件进度 */
+        .dir-path { font-size: 12px; color: #888; margin-bottom: 2px; }
+        .file-name { font-size: 15px; font-weight: 600; margin-bottom: 8px; }
+        .file-progress-label { display: flex; justify-content: space-between; font-size: 11px; color: #888; margin-bottom: 4px; }
+        .file-progress-bar { height: 8px; background: #1a1a2e; border-radius: 4px; overflow: hidden; margin-bottom: 4px; }
+        .file-progress-fill { height: 100%; background: linear-gradient(90deg, #6bd46b, #4ecdc4); border-radius: 4px; transition: width 0.3s; }
+
+        /* 下方信息区 */
+        .overall-info-section { padding: 16px; background: #252540; border-bottom: 1px solid #3d3d5c; }
+        .density-switcher { display: flex; gap: 4px; margin-bottom: 12px; }
+        .density-btn {
+            flex: 1; padding: 6px; border: none;
+            background: #3d3d5c; color: #888; cursor: pointer;
+            border-radius: 4px; font-size: 12px; transition: all 0.2s;
+        }
+        .density-btn.active { background: #6bd46b; color: #1a1a2e; }
+        .density-btn:hover:not(.active) { background: #4a4a6a; }
+
+        /* 中等模式统计 */
+        .medium-stats {
+            display: flex; justify-content: space-between;
+            font-size: 12px; color: #888;
+            margin-bottom: 8px; padding: 8px 12px;
+            background: #3d3d5c; border-radius: 4px;
+        }
+        .medium-value { color: #eaeaea; font-weight: 500; }
+
+        /* 总体进度 */
+        .progress-row { margin-bottom: 8px; }
+        .progress-label { display: flex; justify-content: space-between; font-size: 12px; color: #888; margin-bottom: 4px; }
+        .progress-percent { color: #eaeaea; font-weight: 700; }
+        .progress-bar { height: 10px; background: #1a1a2e; border-radius: 5px; overflow: hidden; }
+        .progress-fill { height: 100%; background: linear-gradient(90deg, #6bd46b, #4ecdc4); border-radius: 5px; transition: width 0.3s; }
+
+        .time-display {
+            display: flex; justify-content: space-between;
+            padding-top: 8px; border-top: 1px solid #3d3d5c;
+            font-size: 13px; color: #888;
+        }
+        .time-value { color: #eaeaea; font-weight: 500; }
+
+        /* ══════════════════════════════════════
+           ① 状态行（方案 B 新增/下移行）：恒显示、可复制
+           ══════════════════════════════════════ */
+        .status-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #252540;
+            border-bottom: 1px solid #3d3d5c;
+        }
+        /* 状态文本：可选中（只读 TextBox 语义）；字号加大以便扫读 */
+        .status-text {
+            flex: 1;
+            font-size: 14px;
+            font-weight: 600;
+            color: #9ecbff;               /* 状态色：区别于普通说明文字 */
+            user-select: text;            /* ← 可复制的核心：允许选中 */
+            cursor: text;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            padding: 2px 0;
+        }
+        /* 复制按钮：点击复制状态全文，反馈 ✓ + toast */
+        .copy-btn {
+            flex-shrink: 0;
+            width: 26px; height: 22px;
+            border: 1px solid #3d3d5c;
+            background: #3d3d5c;
+            color: #888;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            line-height: 1;
+            transition: all 0.15s;
+        }
+        .copy-btn:hover { background: #4a4a6a; color: #eaeaea; }
+        .copy-btn.copied { background: #6bd46b; border-color: #6bd46b; color: #1a1a2e; }
+
+        /* ══════════════════════════════════════
+           ② 错误摘要（既有 Row 5，方案 B 保持原位）：仅有错误时出现、可选中 + 复制按钮
+           ══════════════════════════════════════ */
+        .error-summary {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 8px 16px;
+            background: #252540;
+            border-bottom: 1px solid #3d3d5c;
+            font-size: 12px;
+            color: #ff6b6b;
+            line-height: 1.5;
+        }
+        /* 错误文本：可选中（既有只读 TextBox 语义） */
+        .error-summary-text {
+            flex: 1;
+            user-select: text;
+            cursor: text;
+            word-break: break-all;
+        }
+
+        /* 按钮行 */
+        .button-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            padding: 10px 16px;
+            background: #2d2d44;
+        }
+        .btn {
+            padding: 7px 16px;
+            border: 1px solid #3d3d5c;
+            background: #3d3d5c;
+            color: #eaeaea;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 13px;
+            transition: all 0.2s;
+        }
+        .btn:hover { background: #4a4a6a; }
+        .btn.primary { background: #6bd46b; color: #1a1a2e; border-color: #6bd46b; }
+        .btn.primary:hover { background: #58c058; }
+        .spacer { flex: 1; }
+        .keep-open { font-size: 14px; padding: 7px 12px; }
+
+        /* 复制 toast（对齐既有 Progress_Toast_Copied 交互） */
+        .toast {
+            position: fixed;
+            left: 50%;
+            bottom: 40px;
+            transform: translateX(-50%) translateY(20px);
+            background: #3d3d5c;
+            border: 1px solid #6bd46b;
+            color: #6bd46b;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 13px;
+            opacity: 0;
+            pointer-events: none;
+            transition: all 0.25s;
+            z-index: 2000;
+        }
+        .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
+        /* 隐藏 */
+        .hidden { display: none !important; }
+
+        /* 原型注解（原型辅助，非窗口本体） */
+        .notes {
+            max-width: 600px;
+            margin: 0 auto 24px;
+            padding: 12px;
+            background: #3d3d5c;
+            border-radius: 6px;
+            font-size: 12px;
+            line-height: 1.7;
+            color: #aaa;
+        }
+        .notes strong { color: #6bd46b; }
+        .notes .warn { color: #ffd93d; }
+        .notes .dup { color: #ff9f6b; }
+        .anno {
+            max-width: 600px;
+            margin: 0 auto 12px;
+            display: flex;
+            gap: 8px;
+            font-size: 12px;
+            color: #888;
+            line-height: 1.6;
+        }
+        .anno .tag {
+            flex-shrink: 0;
+            background: #4ecdc4;
+            color: #1a1a2e;
+            font-weight: 600;
+            border-radius: 4px;
+            padding: 1px 6px;
+            height: fit-content;
+        }
+        .anno .tag.warn { background: #ffd93d; }
+        .anno .tag.dup { background: #ff9f6b; }
+    </style>
+</head>
+<body>
+    <h1>进度窗口 · 状态行原型（方案 B：两行并存）</h1>
+    <p class="subtitle">点击上方按钮切换场景 · 状态行与错误摘要均可选中、可点 ⧉ 复制 · 观察场景 4 中两行是否冗余</p>
+
+    <!-- 场景切换（原型辅助，非窗口本体） -->
+    <div class="scenario-bar">
+        <span class="scenario-label">场景:</span>
+        <button class="scenario-btn active" data-scenario="running">① 解压中</button>
+        <button class="scenario-btn" data-scenario="paused">② 已暂停</button>
+        <button class="scenario-btn" data-scenario="done">③ 完成（无错误）</button>
+        <button class="scenario-btn" data-scenario="failed">④ 完成（有失败）</button>
+    </div>
+
+    <div class="prototype-container">
+        <div class="progress-window">
+            <!-- 标题栏 -->
+            <div class="window-header">
+                <span class="window-title" id="windowTitle">正在解压...</span>
+                <div class="density-switcher" style="margin-bottom:0">
+                    <button class="density-btn">少</button>
+                    <button class="density-btn active">中</button>
+                    <button class="density-btn">完整</button>
+                </div>
+            </div>
+
+            <!-- 上方：批处理列表 + 简约内容面板（复刻现状，非本次改动范围） -->
+            <div class="file-info-section">
+                <div class="section-header">
+                    <span class="section-title">压缩包列表</span>
+                    <span class="batch-count">5 个文件</span>
+                </div>
+                <!-- 行结构: 状态图标 | 文件名 | 进度 / 失败时为红色错误消息 -->
+                <div class="batch-list" id="batchList"></div>
+
+                <!-- 简约面板：路径 / 文件名 / 文件进度 -->
+                <div class="dir-path">D:\Projects\mantis-zip\tests\large-files</div>
+                <div class="file-name" id="curFile">video-04.mp4</div>
+                <div class="file-progress-label">
+                    <span>当前文件</span>
+                    <span id="filePercent">62%</span>
+                </div>
+                <div class="file-progress-bar"><div class="file-progress-fill" id="fileFill" style="width:62%"></div></div>
+            </div>
+
+            <!-- 下方信息区：密度切换 / 中等统计 / 总体进度 / 时间 -->
+            <div class="overall-info-section">
+                <div class="density-switcher">
+                    <button class="density-btn">少</button>
+                    <button class="density-btn active">中</button>
+                    <button class="density-btn">完整</button>
+                </div>
+                <div class="medium-stats">
+                    <span>已处理: <span class="medium-value" id="processedStat">38/120</span></span>
+                    <span>速度: <span class="medium-value" id="speedStat">12.5 MB/s</span></span>
+                    <span>并行: <span class="medium-value">4</span></span>
+                </div>
+                <div class="progress-row">
+                    <div class="progress-label">
+                        <span>总体进度</span>
+                        <span class="progress-percent" id="overallPercent">45%</span>
+                    </div>
+                    <div class="progress-bar"><div class="progress-fill" id="overallFill" style="width:45%"></div></div>
+                </div>
+                <div class="time-display">
+                    <span>已用: <span class="time-value" id="elapsed">00:01:12</span></span>
+                    <span>剩余: <span class="time-value" id="remaining">00:01:28</span></span>
+                </div>
+            </div>
+
+            <!-- ═══ ① 状态行（方案 B）：恒显示的可复制状态文本 ═══
+                 当前实现里它是 Row 3 的普通 TextBlock（位置在上方、不可复制）；
+                 方案 B = 把它下移到这里 + 改为可选中 + 加复制按钮 -->
+            <div class="status-row">
+                <div class="status-text" id="statusText" title="可选中复制">正在解压</div>
+                <button class="copy-btn" id="statusCopyBtn" title="复制状态文本">⧉</button>
+            </div>
+
+            <!-- ═══ ② 错误摘要（既有 Row 5，方案 B 保持原位）：仅有错误时出现、可选中 + 复制按钮 ═══ -->
+            <div class="error-summary hidden" id="errorSummary">
+                <div class="error-summary-text" id="errorSummaryText" title="可选中复制">video-04.mp4 解压失败，原因是没有写入权限</div>
+                <button class="copy-btn" id="errorCopyBtn" title="复制错误摘要">⧉</button>
+            </div>
+
+            <!-- 按钮行 -->
+            <div class="button-row">
+                <button class="btn keep-open" title="保持打开">📌</button>
+                <div class="spacer"></div>
+                <button class="btn" id="pauseBtn">⏸ 暂停</button>
+                <button class="btn primary" id="cancelBtn">取消</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 原型注解：每个场景标出观察点（原型辅助，非窗口本体） -->
+    <div class="anno" id="anno1"><span class="tag">观察 1</span><span>状态行恒显示当前状态，与「完成/失败」无关；错误摘要隐藏（Rule 6）。位置：总进度信息区之下、按钮行之上。</span></div>
+    <div class="anno hidden" id="anno2"><span class="tag">观察 2</span><span>暂停态由状态行单独承载（现 Row 3 的语义原样下移，文案不变）。</span></div>
+    <div class="anno hidden" id="anno3"><span class="tag">观察 3</span><span>无错误时错误摘要不出现，状态行独占该区域 —— 与方案 A（合并为一行）在此场景下视觉等价。</span></div>
+    <div class="anno hidden" id="anno4"><span class="tag dup">观察 4 · 冗余点</span><span>失败时两行<strong>同时</strong>出现：状态行给「结果概览」、错误摘要给「失败明细」。<span class="dup">请判断此时状态行是否多余 / 信息是否重复</span> —— 这是 B 区别于 A 的唯一场景。</span></div>
+
+    <!-- 方案 B 说明 -->
+    <div class="notes">
+        <strong>方案 B 定义</strong>：状态行（①）与错误摘要（②）两条并存，均位于总进度信息区与按钮行之间；<strong>两行都可复制</strong>（文本可选中 + 各自 ⧉ 复制按钮 + toast），状态行恒显示，错误摘要仅有错误时出现。<br>
+        <strong>字号</strong>：状态行 14px SemiBold（比既有 12px 状态文字加大一档），错误摘要维持 12px（明细性质，视觉层级低于状态行）。<br>
+        <strong>对应当前实现</strong>：① = Row 3 <code>StatusMessage</code>（下移 + 改可复制 + 字号加大，7 行布局不变，仅行序调整）；② = Row 5 <code>ErrorSummaryBox</code>（现状已是可选中 TextBox，<strong>方案 B 追加复制按钮</strong>）。<br>
+        <strong>数据通道</strong>：① 的「正在解压/已暂停/解压完成」现已有源（<code>SetStatus</code>/<code>SetComplete</code>）；② 的逐文件失败明细目前只有整操作异常 message ——
+        <span class="warn">「video-04.mp4 解压失败，原因是没有写入权限」这类逐条明细需要新增数据通道（ArchiveProgress 目前只有 FailedFiles 计数 + EntryStatus 四态，无错误文本）</span>，此为该方案改动最大的一块。<br>
+        <strong>本原型不含</strong>：状态行随语言切换刷新、复制内容是否含时间戳、多条错误的滚动/截断策略（后续设计再定）。
+    </div>
+
+    <!-- 复制 toast -->
+    <div class="toast" id="toast">已复制到剪贴板</div>
+
+    <script>
+        // ══════════════════════════════════════
+        //  场景数据：四场景切换状态行 / 错误摘要 / 窗口态
+        // ══════════════════════════════════════
+        const scenarios = {
+            running: {
+                title: '正在解压...',
+                status: '正在解压',
+                error: null,                       // 无错误 → 错误摘要隐藏
+                overall: 45, file: 62,
+                processed: '38/120', speed: '12.5 MB/s',
+                elapsed: '00:01:12', remaining: '00:01:28',
+                curFile: 'video-04.mp4',
+                pause: '⏸ 暂停',
+                rows: [
+                    { icon: '✅', name: 'archive-a.zip', tail: '100%' },
+                    { icon: '✅', name: 'archive-b.7z', tail: '100%' },
+                    { icon: '⏳', name: 'archive-c.zip', tail: '45%', active: true },
+                    { icon: '○', name: 'archive-d.rar', tail: '--' },
+                    { icon: '○', name: 'archive-e.tar.gz', tail: '--' },
+                ],
+            },
+            paused: {
+                title: '已暂停',
+                status: '已暂停',
+                error: null,
+                overall: 45, file: 62,
+                processed: '38/120', speed: '—',
+                elapsed: '00:01:12', remaining: '—',
+                curFile: 'video-04.mp4',
+                pause: '▶ 继续',
+                rows: [
+                    { icon: '✅', name: 'archive-a.zip', tail: '100%' },
+                    { icon: '✅', name: 'archive-b.7z', tail: '100%' },
+                    { icon: '⏳', name: 'archive-c.zip', tail: '45%', active: true },
+                    { icon: '○', name: 'archive-d.rar', tail: '--' },
+                    { icon: '○', name: 'archive-e.tar.gz', tail: '--' },
+                ],
+            },
+            done: {
+                title: '解压完成',
+                status: '解压完成（5 个文件 · 用时 00:02:40）',
+                error: null,
+                overall: 100, file: 100,
+                processed: '120/120', speed: '—',
+                elapsed: '00:02:40', remaining: '',
+                curFile: 'archive-e.tar.gz',
+                pause: '⏸ 暂停',
+                rows: [
+                    { icon: '✅', name: 'archive-a.zip', tail: '100%' },
+                    { icon: '✅', name: 'archive-b.7z', tail: '100%' },
+                    { icon: '✅', name: 'archive-c.zip', tail: '100%' },
+                    { icon: '✅', name: 'archive-d.rar', tail: '100%' },
+                    { icon: '✅', name: 'archive-e.tar.gz', tail: '100%' },
+                ],
+            },
+            failed: {
+                title: '解压完成（有错误）',
+                // 状态行 = 结果概览；错误摘要 = 失败明细（两行并存 → 观察冗余）
+                status: '解压完成（4 成功 · 1 失败 · 用时 00:02:41）',
+                error: 'video-04.mp4 解压失败，原因是没有写入权限',
+                overall: 100, file: 100,
+                processed: '119/120', speed: '—',
+                elapsed: '00:02:41', remaining: '',
+                curFile: 'video-04.mp4',
+                pause: '⏸ 暂停',
+                rows: [
+                    { icon: '✅', name: 'archive-a.zip', tail: '100%' },
+                    { icon: '✅', name: 'archive-b.7z', tail: '100%' },
+                    { icon: '✅', name: 'archive-c.zip', tail: '100%' },
+                    { icon: '❌', name: 'archive-d.rar', tail: '没有写入权限', failed: true },
+                    { icon: '✅', name: 'archive-e.tar.gz', tail: '100%' },
+                ],
+            },
+        };
+
+        let current = 'running';
+
+        function render(key) {
+            const s = scenarios[key];
+            current = key;
+
+            // 窗口态
+            document.getElementById('windowTitle').textContent = s.title;
+            document.getElementById('statusText').textContent = s.status;
+            document.getElementById('overallPercent').textContent = s.overall + '%';
+            document.getElementById('overallFill').style.width = s.overall + '%';
+            document.getElementById('filePercent').textContent = s.file + '%';
+            document.getElementById('fileFill').style.width = s.file + '%';
+            document.getElementById('processedStat').textContent = s.processed;
+            document.getElementById('speedStat').textContent = s.speed;
+            document.getElementById('elapsed').textContent = s.elapsed;
+            document.getElementById('remaining').textContent = s.remaining;
+            document.getElementById('curFile').textContent = s.curFile;
+            document.getElementById('pauseBtn').textContent = s.pause;
+
+            // ② 错误摘要显隐（仅有错误时出现，Rule 6）
+            const errEl = document.getElementById('errorSummary');
+            const errText = document.getElementById('errorSummaryText');
+            if (s.error) {
+                errText.textContent = s.error;
+                errEl.classList.remove('hidden');
+            } else {
+                errEl.classList.add('hidden');
+            }
+
+            // 批处理列表
+            document.getElementById('batchList').innerHTML = s.rows.map(r => {
+                const cls = r.failed ? 'failed' : r.active ? 'active' : r.tail === '100%' ? 'completed' : '';
+                const tail = r.failed
+                    ? `<span class="batch-error">${r.tail}</span>`
+                    : `<span class="batch-progress">${r.tail}</span>`;
+                return `<div class="batch-item ${cls}"><span class="batch-icon">${r.icon}</span><span class="batch-name">${r.name}</span>${tail}</div>`;
+            }).join('');
+
+            // 观察注解切换
+            ['anno1', 'anno2', 'anno3', 'anno4'].forEach((id, i) => {
+                document.getElementById(id).classList.toggle('hidden', (i + 1) !== ({ running: 1, paused: 2, done: 3, failed: 4 })[key]);
+            });
+
+            // 场景按钮高亮
+            document.querySelectorAll('.scenario-btn[data-scenario]').forEach(b =>
+                b.classList.toggle('active', b.dataset.scenario === key));
+        }
+
+        // 场景切换
+        document.querySelectorAll('.scenario-btn[data-scenario]').forEach(btn =>
+            btn.addEventListener('click', () => render(btn.dataset.scenario)));
+
+        // ── 复制交互：点按钮复制该行全文 → 按钮变 ✓ + toast（对齐既有 Progress_Toast_Copied）──
+        const toast = document.getElementById('toast');
+        let toastTimer = null;
+
+        function showToast(msg) {
+            toast.textContent = msg;
+            toast.classList.add('show');
+            clearTimeout(toastTimer);
+            toastTimer = setTimeout(() => toast.classList.remove('show'), 1600);
+        }
+
+        async function copyFrom(btn, text) {
+            try {
+                await navigator.clipboard.writeText(text);
+            } catch (e) {
+                // file:// 兼容降级（对齐既有原型做法）
+                const ta = document.createElement('textarea');
+                ta.value = text;
+                document.body.appendChild(ta);
+                ta.select();
+                document.execCommand('copy');
+                document.body.removeChild(ta);
+            }
+            btn.textContent = '✓';
+            btn.classList.add('copied');
+            showToast('已复制到剪贴板');
+            setTimeout(() => { btn.textContent = '⧉'; btn.classList.remove('copied'); }, 1200);
+        }
+
+        // ① 状态行复制
+        document.getElementById('statusCopyBtn').addEventListener('click', e =>
+            copyFrom(e.currentTarget, document.getElementById('statusText').textContent));
+        // ② 错误摘要复制（与状态行同款交互）
+        document.getElementById('errorCopyBtn').addEventListener('click', e =>
+            copyFrom(e.currentTarget, document.getElementById('errorSummaryText').textContent));
+
+        render('running');
+    </script>
+</body>
+</html>

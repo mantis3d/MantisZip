@@ -139,6 +139,30 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<string, IReadOnlyList<string>?, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
 
     /// <summary>
+    /// Task 6：下一次 <see cref="RunWithProgress"/> 为压缩流程（MainWindow.axaml.cs 的闭包读取后立即复位）。
+    /// 供进度窗口显示「压缩通道」说明行；解压入口不置位。
+    /// </summary>
+    public bool PendingCompressFlow { get; set; }
+
+    /// <summary>
+    /// 压缩侧「列表」播种：下一次 <see cref="RunWithProgress"/> 为压缩流程时，用它枚举全量条目播种
+    /// （MainWindow.axaml.cs 读取后立即复位）。非压缩入口保持 null。
+    /// </summary>
+    public CompressRequest? PendingCompressRequest { get; set; }
+
+    /// <summary>测试流标记：传给进度窗口自动按下 📌（D10 触发点 3，完成后不自动关闭）。</summary>
+    public bool PendingTestFlow { get; set; }
+
+    /// <summary>完成回调：RunWithProgress 在关窗决策前把最终状态写进进度窗口（spec §9.4 测试结果通道）。</summary>
+    public Action<ProgressWindow>? PendingCompletedCallback { get; set; }
+
+    /// <summary>最近一次 RunWithProgress 创建的进度窗口（后置开关消费点回读最终值用，spec §11.3）。</summary>
+    public ProgressWindow? LastProgressWindow { get; set; }
+
+    /// <summary>待声明的解压后置开关能力位 + 对话框初值（RunWithProgress 消费，默认 false/null，spec §11.2）。</summary>
+    public (bool OpenFolder, bool DeleteArchive, bool? OpenFolderSeed)? PendingExtractPostActions { get; set; }
+
+    /// <summary>
     /// 由 View 设置的批处理状态上报回调（索引 + 状态）。
     /// 操作闭包内可将其作为 onItemStatus 传给引擎，实时更新批处理列表项状态。
     /// </summary>
@@ -325,6 +349,9 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     public PreviewViewModel Preview { get; } = new();
+
+    /// <summary>预览面板控件树需要就绪（首次预览请求兜底触发；View 侧订阅 EnsurePreviewPanel）。</summary>
+    public event Action? PreviewPanelNeeded;
 
     [ObservableProperty]
     private string _title = "MantisZip";
@@ -1416,6 +1443,7 @@ public partial class MainWindowViewModel : ObservableObject
         // Phase 1: Immediate — show loading state + populate info panel from in-memory data.
         // This runs synchronously before any async extraction, so user never sees stale content.
         var version = Interlocked.Increment(ref _previewLoadVersion);
+        PreviewPanelNeeded?.Invoke(); // 兜底：面板未建好时同步创建（幂等，View 侧 EnsurePreviewPanel）
         Preview.StopGifTimer();
         Preview.ShowLoading(entry.NameDisplay ?? entry.Name);
         Preview.UpdateCommonMetadata(
@@ -2343,6 +2371,9 @@ public partial class MainWindowViewModel : ObservableObject
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
         var filteredKeys = vm.FilteredEntryKeys;
 
+        // spec §11.2: 解压流程 → 两开关可见；对话框流程把「打开文件夹」选择作种子（D17 实例级）
+        PendingExtractPostActions = (true, true, vm.OpenFolderAfterExtract);
+
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
             new[] { CurrentArchivePath! },
@@ -2351,15 +2382,17 @@ public partial class MainWindowViewModel : ObservableObject
                 // 统一解压执行入口（冲突策略/过滤/全量分支）——与 CLI 弹窗批处理共用 ExtractFlow
                 await ExtractFlow.ExtractAsync(
                     CurrentArchivePath, dest, vm.ConflictAction, filteredKeys, password,
-                    ShowExtractFileConflictDialogAsync, progress, ct);
+                    ShowExtractFileConflictDialogAsync, progress, ct,
+                    vm.BuildParallelSettings());
             });
 
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractAsync）
-            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
-            if (openFolder)
+            // D19: 后置动作读进度窗口开关最终值（倒计时内可改），回退弹窗选择
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!,
+                LastProgressWindow?.DeleteArchiveAfterExtractValue ?? vm.DeleteArchiveAfterExtract);
+            if (LastProgressWindow?.OpenFolderAfterExtractValue ?? openFolder)
             {
                 await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
             }
@@ -2376,11 +2409,17 @@ public partial class MainWindowViewModel : ObservableObject
 
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
+        // spec §11.2: 解压流程 → 两开关可见；非对话框流程种子 null → 镜像设置
+        PendingExtractPostActions = (true, true, null);
+
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：列出全部条目（Pending），解压中逐条目状态驱动列表
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
                     CurrentArchivePath, dest, password, progress, ct);
             });
@@ -2388,8 +2427,13 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractHere）
-            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
+            // D19: 后置动作读进度窗口开关最终值，回退设置
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!,
+                LastProgressWindow?.DeleteArchiveAfterExtractValue ?? AppSettings.Load().DeleteArchiveAfterExtract);
+            if (LastProgressWindow?.OpenFolderAfterExtractValue ?? AppSettings.Load().OpenFolderAfterExtract)
+            {
+                await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
+            }
             // 成功后把目标目录写入路径历史（原地解压到压缩包所在目录）
             PathHistoryManager.Record(dest);
         }
@@ -2407,11 +2451,17 @@ public partial class MainWindowViewModel : ObservableObject
 
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
+        // spec §11.2: 解压流程 → 两开关可见；非对话框流程种子 null → 镜像设置
+        PendingExtractPostActions = (true, true, null);
+
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：列出全部条目（Pending），解压中逐条目状态驱动列表
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
                     CurrentArchivePath, dest, password, progress, ct);
             });
@@ -2419,8 +2469,13 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractToName）
-            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
+            // D19: 后置动作读进度窗口开关最终值，回退设置
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!,
+                LastProgressWindow?.DeleteArchiveAfterExtractValue ?? AppSettings.Load().DeleteArchiveAfterExtract);
+            if (LastProgressWindow?.OpenFolderAfterExtractValue ?? AppSettings.Load().OpenFolderAfterExtract)
+            {
+                await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
+            }
             // 成功后把目标目录写入路径历史（解压到同名子目录）
             PathHistoryManager.Record(dest);
         }
@@ -2492,9 +2547,9 @@ public partial class MainWindowViewModel : ObservableObject
         {
             case SelectedItemsExtractStatus.Success:
                 StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-                // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.Menu.cs ExtractSelectedEntriesAsync）
-                App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
-                if (settings.OpenFolderAfterExtract)
+                // D19: 开关值来自进度窗口实例（结果记录携带），不再直接读设置
+                App.TryDeleteArchiveAfterExtract(CurrentArchivePath!, result.DeleteArchiveAfterExtract);
+                if (result.OpenFolderAfterExtract)
                 {
                     await OpenExtractedFolderAsync(destinationPath, CurrentArchivePath!, password);
                 }
@@ -2591,6 +2646,8 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         if (RunWithProgress == null) return;
+        PendingCompressFlow = true; // Task 6: 压缩流程 → 进度窗口显示「压缩通道」说明行
+        PendingCompressRequest = request; // 列表播种：供 RunWithProgress 枚举全量条目
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Compressing"),
             AvaloniaCompressService.GetOutputPaths(request),
@@ -2603,7 +2660,7 @@ public partial class MainWindowViewModel : ObservableObject
                         if (ShowCompressConflictDialog == null)
                             return (Core.Abstractions.CompressConflictAction.Overwrite, null, false);
                         return await ShowCompressConflictDialog(info);
-                    }),
+                    }, request.ConflictAction),
                     onItemStatus: BatchStatusReporter);
             });
 
@@ -2766,11 +2823,17 @@ public partial class MainWindowViewModel : ObservableObject
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
         if (RunWithProgress == null) return;
 
+        // spec §11.2: 解压流程 → 两开关可见；对话框流程把「打开文件夹」选择作种子
+        PendingExtractPostActions = (true, true, vm.OpenFolderAfterExtract);
+
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：列出全部条目（Pending），解压中逐条目状态驱动列表
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
                     CurrentArchivePath, vm.DestinationPath, password, progress, ct);
             });
@@ -2778,8 +2841,13 @@ public partial class MainWindowViewModel : ObservableObject
         if (completed)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs ExtractTo 命令）
-            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
+            // D19: 后置动作读进度窗口开关最终值，回退弹窗选择
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!,
+                LastProgressWindow?.DeleteArchiveAfterExtractValue ?? vm.DeleteArchiveAfterExtract);
+            if (LastProgressWindow?.OpenFolderAfterExtractValue ?? vm.OpenFolderAfterExtract)
+            {
+                await OpenExtractedFolderAsync(vm.DestinationPath, CurrentArchivePath!, password);
+            }
         }
     }
 
@@ -2799,11 +2867,17 @@ public partial class MainWindowViewModel : ObservableObject
 
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
+        // spec §11.2: 解压流程 → 两开关可见；非对话框流程种子 null → 镜像设置
+        PendingExtractPostActions = (true, true, null);
+
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_SmartExtracting"),
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：列出全部条目（Pending），解压中逐条目状态驱动列表
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
                     CurrentArchivePath, dest, password, progress, ct);
             });
@@ -2813,8 +2887,13 @@ public partial class MainWindowViewModel : ObservableObject
             StatusMessage = hasSingleRoot
                 ? LocalizationManager.T("Status_SmartExtractSingleRoot")
                 : LocalizationManager.T("Status_SmartExtractNamed");
-            // 解压成功后按设置将原包移入回收站（对齐 WPF MainWindow.xaml.cs 智能解压）
-            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!);
+            // D19: 后置动作读进度窗口开关最终值，回退设置
+            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!,
+                LastProgressWindow?.DeleteArchiveAfterExtractValue ?? AppSettings.Load().DeleteArchiveAfterExtract);
+            if (LastProgressWindow?.OpenFolderAfterExtractValue ?? AppSettings.Load().OpenFolderAfterExtract)
+            {
+                await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
+            }
         }
     }
 
@@ -2836,29 +2915,42 @@ public partial class MainWindowViewModel : ObservableObject
         // 捕获 TestArchiveAsync 的完整性结果：RunWithProgress 的 completed 只表示
         // "未取消/未抛异常"，不代表测试通过——不捕获的话损坏包也会显示"测试通过"
         bool testOk = false;
+        // spec §9: 测试流自动按下 📌 + 结果在关窗前写进窗口（状态行/错误摘要）
+        PendingTestFlow = true;
+        PendingCompletedCallback = pw =>
+        {
+            if (testOk)
+            {
+                pw.SetComplete(LocalizationManager.T("Status_TestOK"));
+            }
+            else
+            {
+                // 失败：错误摘要（写入即自动按下 📌）+ 状态行完成文案（按钮翻转为关闭）
+                pw.SetErrorSummary(LocalizationManager.T("Status_ArchiveCorrupted"));
+                pw.SetComplete(LocalizationManager.T("Status_TestFailed"));
+            }
+        };
+
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_TestingArchive"),
             new[] { CurrentArchivePath! },
             async (progress, ct) =>
             {
+                // 列表模式播种：测试前列出全部条目（Pending），测试中逐条目状态驱动列表（spec §12 #6）
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 testOk = await engine.TestArchiveAsync(CurrentArchivePath, password, progress, ct);
             });
 
         if (!completed) return;
 
-        if (testOk)
-        {
-            StatusMessage = LocalizationManager.T("Status_TestOK");
-        }
-        else
-        {
-            // 密码已验证正确但测试仍失败 → 弹窗提示档案损坏（区别于"需要密码/取消"的静默中止）
-            StatusMessage = LocalizationManager.T("Status_TestFailed");
-            await AppMessageBox.Show(
-                LocalizationManager.T("Status_ArchiveCorrupted"),
-                LocalizationManager.T("App_ErrorTitle"),
-                MessageBoxButton.OK, MessageBoxImage.Error);
-        }
+        // 既有主窗口状态栏文案保留
+        StatusMessage = testOk
+            ? LocalizationManager.T("Status_TestOK")
+            : LocalizationManager.T("Status_TestFailed");
+
+        // D12: 测试失败模态框已移除（结果由进度窗口状态行 + 错误摘要承载，📌 保证留窗）
+        App.DebugLog($"[TestArchive] completed: ok={testOk}, archive={CurrentArchivePath}");
     }
 
     [RelayCommand]
@@ -2930,11 +3022,9 @@ public partial class MainWindowViewModel : ObservableObject
             async (progress, ct) =>
             {
                 // 复用解压冲突处理：同一 AppSettings.FileConflictAction 策略 + Ask 弹窗回调（标题区分）
-                // CreateExtractOptions 返回 null 表示 Overwrite 默认（无冲突处理），回退到仅密码的 options
                 var settings = AppSettings.Load();
                 var options = SelectedItemsExtractService.CreateExtractOptions(
-                        settings.FileConflictAction, ShowAddFileConflictDialogAsync)
-                    ?? new ArchiveOptions();
+                    settings.FileConflictAction, ShowAddFileConflictDialogAsync);
                 options.Password = password;
                 // 文件名编码：与压缩对话框同源，透传用户的 ZIP 文件名编码设置。
                 // 此前未透传，引擎只能靠包内 bit 11 启发式猜编码，导致拖拽添加中文文件名乱码。

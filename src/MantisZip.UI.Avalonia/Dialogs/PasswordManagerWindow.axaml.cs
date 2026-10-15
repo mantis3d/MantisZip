@@ -417,7 +417,14 @@ public partial class PasswordManagerWindow : Window
 
     private void OnHelpClick(object? sender, RoutedEventArgs e)
     {
-        var dialog = new PasswordHelpDialog();
+        var dialog = new HelpDialog(
+            LocalizationManager.T("PwdHelp_Title"),
+            new MarkdownHelpContent(LocalizationManager.T("PasswordHelp_Markdown")),
+            LocalizationManager.T("PwdHelp_Close"))
+        {
+            Width = 560,
+            Height = 500
+        };
         dialog.ShowDialog(this);
     }
 

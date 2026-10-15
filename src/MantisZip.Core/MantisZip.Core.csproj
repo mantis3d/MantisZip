@@ -10,10 +10,17 @@
     <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
       <_Parameter1>MantisZip.UI.Avalonia</_Parameter1>
     </AssemblyAttribute>
+    <AssemblyAttribute Include="System.Runtime.CompilerServices.InternalsVisibleTo">
+      <_Parameter1>MantisZip.Tests</_Parameter1>
+    </AssemblyAttribute>
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.Sqlite" Version="10.0.8" />
+    <!-- 覆盖传递依赖的原生库：Microsoft.Data.Sqlite 10.0.8 传递钉住 SQLitePCLRaw.lib.e_sqlite3 2.1.11
+         （捆绑 SQLite < 3.50.2，CVE-2025-6965 / GHSA-2m69-gcr7-jv3q）。仅替换纯原生 e_sqlite3（ABI 稳定，
+         不动 managed provider/core/bundle），消除该高危告警。 -->
+    <PackageReference Include="SQLitePCLRaw.lib.e_sqlite3" Version="3.53.3" />
     <PackageReference Include="SharpCompress" Version="0.50.4" />
     <PackageReference Include="SharpSevenZip" Version="2.0.45" />
     <PackageReference Include="System.Security.Cryptography.ProtectedData" Version="10.0.8" />

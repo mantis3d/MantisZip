@@ -1,6 +1,8 @@
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using MantisZip.Core;
 using MantisZip.Core.FileFilter;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Models;
@@ -20,7 +22,12 @@ public class AppSettings
     public string SevenZipCompressionMethod { get; set; } = "LZMA2";
     public bool SevenZipSolid { get; set; } = true;
     public string SevenZipSolidBlockSize { get; set; } = "";
-    public int SevenZipDictionarySize { get; set; } = 0;
+    /// <summary>
+    /// 7z 字典大小：""=默认，或 "64m" / "256m" / "1g" / "4g"（CustomParameters["d"] 直传 7z.dll）。
+    /// 旧版为 int 字节值，经 <see cref="LegacyIntToSizeStringConverter"/> 兼容读取。
+    /// </summary>
+    [JsonConverter(typeof(LegacyIntToSizeStringConverter))]
+    public string SevenZipDictionarySize { get; set; } = "";
     public int SevenZipNumFastBytes { get; set; } = 0;
     public string SevenZipMatchFinder { get; set; } = "";
     /// <summary>
@@ -28,9 +35,40 @@ public class AppSettings
     /// 仅对 7z 格式有效。
     /// </summary>
     public bool SevenZipMultithreaded { get; set; } = true;
+
+    // ===== 自适应压缩（三个独立开关） =====
+    /// <summary>自适应压缩：已压缩文件自动 Store。仅对 ZIP + Deflate/Deflate64 有效。</summary>
+    public bool AdaptiveCompression { get; set; }
+
+    /// <summary>魔数检测：自适应开启时，对大文件做魔数增强识别。自适应关闭时无效。</summary>
+    public bool AdaptiveSmartDetect { get; set; }
+
+    /// <summary>多线程压缩：所有可压缩文件走 SharpSevenZip mt=on。可与自适应同时开启。</summary>
+    public bool MultiThreadedCompression { get; set; }
+
+    /// <summary>
+    /// 旧版自适应压缩模式（向后兼容反序列化）。
+    /// 已废弃：新代码应使用 <see cref="AdaptiveCompression"/> + <see cref="AdaptiveSmartDetect"/> + <see cref="MultiThreadedCompression"/>。
+    /// </summary>
+    // CS0618 抑制：刻意保留旧枚举属性以读取旧 settings.json，Load() 中迁移为三个新开关
+#pragma warning disable CS0618
+    public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.Disabled;
+#pragma warning restore CS0618
+
+    /// <summary>多线程模式下用户自定义仅存储格式 ID 列表（不可删除的唯一规则）。</summary>
+    public List<string> MultiThreadedStoreFormatIds { get; set; } = new();
+
+    /// <summary>用户自定义格式列表。</summary>
+    public List<FormatDefinition> CustomFormats { get; set; } = new();
+
+    /// <summary>用户自定义压缩级别覆盖规则。</summary>
+    public List<AdaptiveOverrideRule> AdaptiveOverrides { get; set; } = new();
+
     public string ZipCompressionMethod { get; set; } = "deflate";
     public string ZipEncryptionMethod { get; set; } = "aes256";
     public bool SevenZipEncryptHeaders { get; set; } = true;
+    /// <summary>压缩时输出文件已存在（文件冲突）的默认处理：ask / overwrite / add / rename / skip</summary>
+    public string CompressFileConflictAction { get; set; } = "ask";
 
     // ===== 分卷 =====
     public string SplitSizeTag { get; set; } = "0";
@@ -46,6 +84,28 @@ public class AppSettings
     /// 默认值 = Environment.ProcessorCount。
     /// </summary>
     public int ParallelExtractDegree { get; set; } = Environment.ProcessorCount;
+
+    /// <summary>并行解压全局开关：false = 始终串行（线程数=1）。</summary>
+    public bool EnableParallelExtract { get; set; } = true;
+
+    /// <summary>智能并行度：true = 按磁盘类型/预测试自动选择线程数。</summary>
+    public bool SmartParallelDegree { get; set; } = true;
+
+    /// <summary>智能模式下 SSD 的线程数（1-16）。</summary>
+    public int SmartSsdDegree { get; set; } = 12;
+
+    /// <summary>智能模式下 HDD 的线程数（1-16）。</summary>
+    public int SmartHddDegree { get; set; } = 8;
+
+    /// <summary>大包预测试：≥1GB 压缩包先测最优线程数（仅智能模式生效）。</summary>
+    public bool LargeArchivePreTest { get; set; } = true;
+
+    /// <summary>N 组并行压缩的目标组数，默认 CPU 数；1 = 串行。</summary>
+    public int ParallelCompressDegree { get; set; } = Environment.ProcessorCount;
+
+    // ===== 进度窗口 =====
+    /// <summary>完成后自动关闭延时（秒，0–60；0 = 立即关闭）。📌/失败/测试流不受此影响（始终留窗）。</summary>
+    public int AutoCloseDelaySeconds { get; set; } = 3;
 
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
@@ -117,6 +177,12 @@ public class AppSettings
     public string CompactnessMode { get; set; } = "Normal";
     public string Language { get; set; } = "zh";
     public bool ShowProgressBars { get; set; } = true;
+    /// <summary>进度窗口内容模式持久化（"simple"/"detailed"/"list"；默认 "detailed"）。</summary>
+    public string ProgressContentMode { get; set; } = "detailed";
+    /// <summary>进度窗口信息量分级持久化（"minimal"/"medium"/"full"；默认 "medium"）。</summary>
+    public string ProgressInfoDensity { get; set; } = "medium";
+    /// <summary>进度窗口宽度持久化（像素；默认 800，窗口 MinWidth=500 兜底）。</summary>
+    public double ProgressWindowWidth { get; set; } = 800;
     public bool SeparateDirBaseline { get; set; } = false;
     /// <summary>目录树：切换目录时自动展开到当前目录并收起其他分支。</summary>
     public bool AutoExpandTreeToCurrent { get; set; } = false;
@@ -206,9 +272,31 @@ public class AppSettings
     {
         try
         {
-            if (!File.Exists(SettingsFile)) return new AppSettings();
+            if (!File.Exists(SettingsFile)) return CreateWithDefaults();
             var json = File.ReadAllText(SettingsFile);
-            return JsonSerializer.Deserialize<AppSettings>(json) ?? new AppSettings();
+            var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? CreateWithDefaults();
+            // 向后兼容：从旧 AdaptiveCompressionMode 枚举迁移为三个独立开关
+            if (settings.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled)
+            {
+                settings.AdaptiveCompression = true;
+                settings.AdaptiveSmartDetect = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.SmartDetect;
+                settings.MultiThreadedCompression = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
+                settings.AdaptiveCompressionMode = AdaptiveCompressionMode.Disabled;
+            }
+            // 首次安装时填充默认规则
+            if (settings.AdaptiveOverrides.Count == 0)
+            {
+                settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+            }
+            // 首次安装时填充默认仅存储格式（多线程模式用）
+            if (settings.MultiThreadedStoreFormatIds.Count == 0)
+            {
+                settings.MultiThreadedStoreFormatIds = GetDefaultMultiThreadedStoreFormatIds();
+            }
+            // 并行解压智能线程数越界 clamp 到 [1,16]（边界情况 #8）
+            settings.SmartSsdDegree = Math.Clamp(settings.SmartSsdDegree, 1, 16);
+            settings.SmartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
+            return settings;
         }
         catch
         {
@@ -230,5 +318,70 @@ public class AppSettings
         {
             return false;
         }
+    }
+
+    /// <summary>创建带默认自适应规则的新实例。</summary>
+    private static AppSettings CreateWithDefaults()
+    {
+        var settings = new AppSettings();
+        settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+        settings.MultiThreadedStoreFormatIds = GetDefaultMultiThreadedStoreFormatIds();
+        return settings;
+    }
+
+    /// <summary>返回默认自适应压缩覆盖规则。</summary>
+    private static List<AdaptiveOverrideRule> GetDefaultAdaptiveOverrides() => new()
+    {
+        new() { Name = "图片类", FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "视频类", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "音频类", FormatIds = new() { "Mp3", "Flac", "Wav", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "压缩包类", FormatIds = new() { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
+    };
+
+    /// <summary>返回多线程模式默认仅存储格式 ID（内置已压缩格式）。</summary>
+    private static List<string> GetDefaultMultiThreadedStoreFormatIds() => new()
+    {
+        // 图片
+        "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg",
+        // 视频
+        "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv",
+        // 音频
+        "Mp3", "Flac", "Wav", "Ogg",
+        // 压缩包
+        "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso",
+        // 字体
+        "Ttf", "Otf", "Woff", "Woff2",
+        // 文档
+        "Pdf", "Docx", "Xlsx", "Pptx", "Epub",
+    };
+}
+
+/// <summary>
+/// 兼容旧版 settings.json：SevenZipDictionarySize 原为 int 字节值（如 268435456 = 256MB），
+/// 新版改为 string（"256m" / "1g"）。读取时数字 → 转换为带单位字符串；写入时一律写 string。
+/// </summary>
+internal sealed class LegacyIntToSizeStringConverter : JsonConverter<string>
+{
+    public override string? Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+    {
+        return reader.TokenType switch
+        {
+            JsonTokenType.String => reader.GetString() ?? "",
+            JsonTokenType.Number when reader.TryGetInt64(out var bytes) => BytesToSizeString(bytes),
+            _ => "",
+        };
+    }
+
+    public override void Write(Utf8JsonWriter writer, string value, JsonSerializerOptions options)
+        => writer.WriteStringValue(value);
+
+    /// <summary>字节数 → 7z 大小字符串（取整到最大单位，如 268435456 → "256m"）。</summary>
+    internal static string BytesToSizeString(long bytes)
+    {
+        if (bytes <= 0) return "";
+        if (bytes % (1L << 30) == 0) return $"{bytes >> 30}g";
+        if (bytes % (1L << 20) == 0) return $"{bytes >> 20}m";
+        if (bytes % (1L << 10) == 0) return $"{bytes >> 10}k";
+        return $"{bytes}b";
     }
 }

@@ -45,14 +45,17 @@ public partial class MainWindow : Window
     /// <summary>拖拽期间是否被取消（Esc 或右键取消手势，由自实现 IDropSource.QueryContinueDrag 同步置位）</summary>
     private bool _dragCancelled;
 
-    /// <summary>预览位置切换时各位置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）的记忆尺寸，切换后恢复用</summary>
-    private readonly Dictionary<int, double> _previewSizeByPosition = new();
+    /// <summary>预览位置切换时各位置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）的记忆尺寸（含单元类型：Star 保持比例伸缩、Pixel 固定），切换后恢复用</summary>
+    private readonly Dictionary<int, GridLength> _previewSizeByPosition = new();
 
     /// <summary>当前已应用的预览位置（切换前据此保存旧位置尺寸）</summary>
     private int _lastAppliedPreviewPosition = 4;
 
     /// <summary>预览面板显隐（与 AppSettings.ShowPreviewPanel 同步；false 时压缩占位行列，树/列表撑满）</summary>
     private bool _previewPanelEnabled = true;
+
+    /// <summary>预览面板是否已延迟创建（EnsurePreviewPanel 幂等标记）。</summary>
+    private bool _previewPanelCreated;
 
     /// <summary>拖拽添加覆层呼吸动画计时器（100ms tick，正弦 alpha 40-120，与拖拽解压 OverlayController 参数一致）</summary>
     private readonly DispatcherTimer _dragAddOverlayTimer;
@@ -62,7 +65,10 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        Services.StartupTimer.Mark("Win.Ctor.Enter");
         InitializeComponent();
+        // 1359 行 XAML 解析 + 子控件构造（含内嵌 PreviewPanel 855 行控件树）
+        Services.StartupTimer.Mark("Win.Xaml");
 
         // 拖拽添加覆层呼吸动画（与拖拽解压覆层一致：约 2s 周期，正弦 alpha 40-120，仅背景层呼吸）
         _dragAddOverlayTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher.UIThread)
@@ -92,6 +98,8 @@ public partial class MainWindow : Window
         _lastSortMemberPath = string.IsNullOrEmpty(savedSortColumnPath) ? null : savedSortColumnPath;
         _lastSortDescending = savedSortDirection == 2;
         UpdateSortArrows();
+        // WindowStateManager.Load 读盘 + 列状态/排序恢复
+        Services.StartupTimer.Mark("Win.State");
 
         // 应用上次手动保存的布局快照（目录树/文件列表列宽 + 预览各位置记忆尺寸）。
         // 必须在 ApplyPreviewLayout() 之前调用，保证 ApplyPreviewPosition 能读到已回填的预览尺寸。
@@ -99,8 +107,12 @@ public partial class MainWindow : Window
 
         // 应用预览面板显隐 + 位置设置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）
         ApplyPreviewLayout();
+        // 布局快照恢复 + 预览位置应用
+        Services.StartupTimer.Mark("Win.Layout");
 
         var vm = new MainWindowViewModel();
+        // 主 VM 构造（内含 PreviewViewModel 构造）
+        Services.StartupTimer.Mark("Win.VM");
         vm.GetOpenFilePath = OpenFileDialogAsync;
         vm.SaveLayoutAction = SaveLayout;
         vm.ShowSettingsWindow = async () =>
@@ -174,6 +186,15 @@ public partial class MainWindow : Window
                 evm.DestinationPath = dialog.ViewModel.DestinationPath;
                 evm.ConflictAction = dialog.ViewModel.ConflictAction;
                 evm.OpenFolderAfterExtract = dialog.ViewModel.OpenFolderAfterExtract;
+                // 并行解压：对话框快照回传（初值读设置、本次解压生效、不回写设置）
+                evm.EnableParallelExtract = dialog.ViewModel.EnableParallelExtract;
+                evm.SmartParallelDegree = dialog.ViewModel.SmartParallelDegree;
+                evm.SmartSsdDegree = dialog.ViewModel.SmartSsdDegree;
+                evm.SmartHddDegree = dialog.ViewModel.SmartHddDegree;
+                evm.ManualParallelDegree = dialog.ViewModel.ManualParallelDegree;
+                evm.LargeArchivePreTest = dialog.ViewModel.LargeArchivePreTest;
+                // 解压后移入回收站：默认值来自全局设置，勾选仅本次解压生效（不写回 AppSettings）
+                evm.DeleteArchiveAfterExtract = dialog.ViewModel.DeleteArchiveAfterExtract;
                 // 文件过滤：仅当启用过滤且有条目时，将匹配条目 key 回传，供实际解压只解压匹配项
                 evm.FilteredEntryKeys = dialog.GetFilteredEntryKeys();
             }
@@ -219,6 +240,13 @@ public partial class MainWindow : Window
                 cvm.SevenZipNumFastBytes = dialog.ViewModel.SevenZipNumFastBytes;
                 cvm.SevenZipMatchFinder = dialog.ViewModel.SevenZipMatchFinder;
                 cvm.SevenZipMultithreaded = dialog.ViewModel.SevenZipMultithreaded;
+                cvm.AdaptiveCompression = dialog.ViewModel.AdaptiveCompression;
+                // 同一 ZIP 面板（DynamicFormatOptionsPanel）的另两个开关此前漏拷 →
+                // 执行侧 MultiThreadedCompression 恒为 false，引擎永远走串行路径，
+                // 进度窗口「详细」通道 UI 永不出现。此处补齐（含 Task 5 新增的组数）。
+                cvm.AdaptiveSmartDetect = dialog.ViewModel.AdaptiveSmartDetect;
+                cvm.MultiThreadedCompression = dialog.ViewModel.MultiThreadedCompression;
+                cvm.ParallelCompressDegree = dialog.ViewModel.ParallelCompressDegree;
                 cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
                 // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
                 cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;
@@ -260,6 +288,25 @@ public partial class MainWindow : Window
         {
             var pw = new ProgressWindow(title);
             pw.InitCancellation();
+            // Task 6: 压缩流程标记（供压缩通道说明行显示；解压流程保持 false）
+            pw.IsCompressFlow = vm.PendingCompressFlow;
+            vm.PendingCompressFlow = false;
+            // Task 6: 测试流标记（自动按下 📌，完成后不自动关闭）与完成回调/最近窗口回读通道
+            pw.IsTestFlow = vm.PendingTestFlow;
+            vm.PendingTestFlow = false;
+            var onCompleted = vm.PendingCompletedCallback;
+            vm.PendingCompletedCallback = null;
+            vm.LastProgressWindow = pw;
+            // spec §11.2: 解压后置开关能力位 + 初值（仅解压入口置位 → 压缩/测试流两开关隐藏）
+            var postActions = vm.PendingExtractPostActions;
+            vm.PendingExtractPostActions = null;
+            if (postActions is { } pa)
+                pw.SetExtractPostActions(pa.OpenFolder, pa.DeleteArchive, pa.OpenFolderSeed);
+            // 列表播种：压缩流程枚举全量条目（后台；失败/取消/超阈值放弃，终态 upsert 兜底）
+            var seedRequest = vm.PendingCompressRequest;
+            vm.PendingCompressRequest = null;
+            if (seedRequest is not null)
+                CompressFlow.TrySeedEntryItemsInBackground(pw, seedRequest, pw.CancellationToken);
             var hasFileList = filePaths is { Count: > 0 };
 
             // 批处理状态上报：操作闭包内经 BatchStatusReporter 传给引擎 onItemStatus
@@ -285,24 +332,45 @@ public partial class MainWindow : Window
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
 
-                // 成功：标记完成态 + 尊重 📌 KeepOpenOnComplete（对齐 WPF MainWindow.Menu.cs AutoCloseOrWaitAsync(0, ...)）
-                pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
-                await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
+                // 成功：完成回调（测试流结果通道）优先，否则默认完成态；
+                // 再尊重 📌 KeepOpenOnComplete 统一走 AutoCloseOrWaitAsync（延迟来自设置，Task 6）
+                if (onCompleted is not null)
+                    onCompleted(pw);
+                else
+                    pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
+                await pw.AutoCloseOrWaitAsync(() => pw.Close());
                 return true;
             }
             catch (OperationCanceledException)
             {
+                // D13：取消不是错误 → 立即关闭（不写错误汇总、不压钉）
+                pw.Close();
                 return false;
             }
-            catch (Exception)
+            catch (PasswordRetryCancelledException)
             {
+                // 用户在密码弹窗点取消：行标记「已取消 - 需要密码」并在状态栏提示。
+                // 主窗口全部解压入口（ExtractArchive/Here/ToName/ExtractTo/SmartExtract）均经本闭包，
+                // 故在此单点接线，避免逐个方法重复分支。
+                var msg = LocalizationManager.T("Status_PasswordCancelled");
+                if (hasFileList)
+                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);   // 行 Failed 自动压钉 → 等手动关闭
+                vm.StatusMessage = msg;
+                await pw.AutoCloseOrWaitAsync(() => pw.Close());   // 📌 已由行 Failed 压下 → 等手动关闭
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // 失败：写错误汇总（自动压钉 📌）+ 日志，行标 Failed；关窗决策交给 AutoCloseOrWaitAsync 等待手动关闭
+                pw.SetErrorSummary(ex.Message);
+                App.DebugLog($"[RunWithProgress] operation failed: {ex}");
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
+                await pw.AutoCloseOrWaitAsync(() => pw.Close());   // SetErrorSummary 已自动压钉 → 等手动关闭
                 return false;
             }
             finally
             {
-                pw.Close();
                 vm.BatchStatusReporter = null;
             }
         };
@@ -636,6 +704,56 @@ public partial class MainWindow : Window
         // Persist window position/size/state + column widths on close
         Closing += (_, _) => WindowStateManager.Save(this, CaptureColumnStates(), _lastSortMemberPath,
             _lastSortMemberPath == null ? 0 : (_lastSortDescending ? 2 : 1));
+
+        Services.StartupTimer.Mark("Win.Ctor.Exit");
+        // 首帧打点 + flush 启动 trace（一次性）
+        Opened += OnStartupOpened;
+
+        // 预览面板延迟创建：首帧后 0.5s 定时预取（把控件树构造挪出启动与打开压缩包关键路径）；
+        // 0.5s 内即发生预览请求时由 vm.PreviewPanelNeeded 兜底同步创建。
+        Opened += (_, _) => DispatcherTimer.RunOnce(
+            () => Dispatcher.UIThread.Post(EnsurePreviewPanel, DispatcherPriority.Background),
+            TimeSpan.FromMilliseconds(500));
+        vm.PreviewPanelNeeded += EnsurePreviewPanel;
+    }
+
+    /// <summary>
+    /// 延迟创建预览面板控件树（启动时 XAML 仅保留占位 host，855 行控件树不再计入启动关键路径）。
+    /// 幂等；构造异常时清理半成品 Content 且 flag 不置位，允许兜底路径重试。
+    /// </summary>
+    private void EnsurePreviewPanel()
+    {
+        if (_previewPanelCreated) return;
+        _previewPanelCreated = true; // 先置位防重入（构造中再触发直接返回）
+        try
+        {
+            if (DataContext is not MainWindowViewModel vm) { _previewPanelCreated = false; return; }
+            var panel = new PreviewPanel { DataContext = vm.Preview };
+            PreviewPanelHost.Content = panel;
+            App.DebugLog("EnsurePreviewPanel: preview panel created (lazy)");
+        }
+        catch (Exception ex)
+        {
+            _previewPanelCreated = false;
+            PreviewPanelHost.Content = null; // 清理半成品
+            App.DebugLog($"EnsurePreviewPanel failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 窗口首次 Opened：打首帧近似点并 flush 启动 trace（一次性）。
+    /// 与 splash 计划衔接：splash 也在 Opened 关闭，语义一致。
+    /// </summary>
+    private void OnStartupOpened(object? sender, EventArgs e)
+    {
+        Opened -= OnStartupOpened;
+        Services.StartupTimer.Mark("Win.Visible");
+        // Avalonia 无 WPF ContentRendered：用 Render 优先级回调近似首帧上屏
+        Dispatcher.UIThread.Post(() =>
+        {
+            Services.StartupTimer.Mark("Win.FirstFrame");
+            Services.StartupTimer.Flush("first-frame");
+        }, DispatcherPriority.Render);
     }
 
     /// <summary>
@@ -718,10 +836,11 @@ public partial class MainWindow : Window
         if (ArchiveContentGrid == null || PreviewPanelHost == null)
             return;
 
-        // 切换位置前保存旧位置的当前尺寸（仅 Pixel 布局记录，Star 不记录）。
+        // 切换位置前保存旧位置的当前尺寸（Star 保留星号权重维持比例伸缩、Pixel 保持固定，
+        // 见 SaveCurrentPreviewSize）。
         // 位置未变化（设置窗口保存/菜单切换触发同位置重应用）时同样先记录当前尺寸：
-        // 分隔条拖拽产生的 Pixel 尺寸只存在于 Grid 定义中，若不记录，下面的完整重置
-        // 会把它丢弃，回退到默认（3* 星号 / 200px）或字典里过期的旧值 → 面板缩到最小。
+        // 分隔条拖拽产生的尺寸只存在于 Grid 定义中，若不记录，下面的完整重置
+        // 会把它丢弃，回退到默认（3* 星号 / 1* / 200px）或字典里过期的旧值 → 面板缩到最小。
         if (position != _lastAppliedPreviewPosition)
             SaveCurrentPreviewSize(_lastAppliedPreviewPosition);
         else
@@ -745,7 +864,7 @@ public partial class MainWindow : Window
             case 1: // 底部：预览横跨全部 5 列
                 ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
                 ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(1, out var h1)
-                    ? new GridLength(h1, GridUnitType.Pixel)
+                    ? h1
                     : new GridLength(1, GridUnitType.Star);
                 PreviewRowSplitter.IsVisible = true;
                 Grid.SetColumn(PreviewRowSplitter, 0);
@@ -758,7 +877,7 @@ public partial class MainWindow : Window
             case 2: // 目录树下方：文件列表跨 3 行占满底部
                 ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
                 ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(2, out var h2)
-                    ? new GridLength(h2, GridUnitType.Pixel)
+                    ? h2
                     : new GridLength(200);
                 Grid.SetRowSpan(FileListPanel, 3);
                 Grid.SetRowSpan(TreeFileSplitter, 3);
@@ -773,7 +892,7 @@ public partial class MainWindow : Window
             case 3: // 文件列表下方：目录树跨 3 行占满底部
                 ArchiveContentGrid.RowDefinitions[1].Height = new GridLength(4);
                 ArchiveContentGrid.RowDefinitions[2].Height = _previewSizeByPosition.TryGetValue(3, out var h3)
-                    ? new GridLength(h3, GridUnitType.Pixel)
+                    ? h3
                     : new GridLength(200);
                 Grid.SetRowSpan(FolderTreeBorder, 3);
                 Grid.SetRowSpan(TreeFileSplitter, 3);
@@ -788,7 +907,7 @@ public partial class MainWindow : Window
             default: // 4: 文件列表右侧（默认布局）
                 ArchiveContentGrid.ColumnDefinitions[3].Width = new GridLength(5);
                 ArchiveContentGrid.ColumnDefinitions[4].Width = _previewSizeByPosition.TryGetValue(4, out var w4)
-                    ? new GridLength(w4, GridUnitType.Pixel)
+                    ? w4
                     : new GridLength(3, GridUnitType.Star);
                 PreviewColSplitter.IsVisible = true;
                 Grid.SetRow(PreviewPanelHost, 0);
@@ -799,7 +918,7 @@ public partial class MainWindow : Window
         // 面板隐藏时：压缩预览占位行列 + 隐藏 splitter + 复位 RowSpan，让树/列表撑满
         if (!_previewPanelEnabled)
         {
-            // 隐藏前记录当前 Pixel 尺寸，保证重新打开时保留用户拖过的宽度/高度
+            // 隐藏前记录当前尺寸（保留单元类型），保证重新打开时保留用户拖过的宽度/高度
             SaveCurrentPreviewSize(position);
             PreviewRowSplitter.IsVisible = false;
             PreviewColSplitter.IsVisible = false;
@@ -833,24 +952,29 @@ public partial class MainWindow : Window
         ApplyPreviewPosition(settings.PreviewPosition);
     }
 
-    /// <summary>保存指定预览位置的当前尺寸到记忆字典（仅在布局为 Pixel 且值有效时记录，面板隐藏压缩产生的 0 不记录）。</summary>
+    /// <summary>
+    /// 保存指定预览位置的当前尺寸到记忆字典（保留 GridLength 单元类型）：
+    /// Star 布局（未保存过布局时拖拽分隔条，Avalonia Split 行为保持 Star）记录星号权重，
+    /// 恢复后仍随窗口比例伸缩；Pixel 布局（树/文件列宽恢复为像素后拖分隔条，经 Resize 分支
+    /// 转成的像素值）恢复后固定。若统一降级成像素值记录，恢复时会把比例伸缩的窗格固定死。
+    /// 面板隐藏压缩产生的 0 / Auto 不记录。
+    /// </summary>
     private void SaveCurrentPreviewSize(int position)
     {
         if (ArchiveContentGrid == null)
             return;
 
         if (position == 4)
-        {
-            var w = ArchiveContentGrid.ColumnDefinitions[4].Width;
-            if (w.GridUnitType == GridUnitType.Pixel && w.Value > 0)
-                _previewSizeByPosition[4] = w.Value;
-        }
+            RecordPreviewSize(4, ArchiveContentGrid.ColumnDefinitions[4].Width);
         else if (position is 1 or 2 or 3)
-        {
-            var h = ArchiveContentGrid.RowDefinitions[2].Height;
-            if (h.GridUnitType == GridUnitType.Pixel && h.Value > 0)
-                _previewSizeByPosition[position] = h.Value;
-        }
+            RecordPreviewSize(position, ArchiveContentGrid.RowDefinitions[2].Height);
+    }
+
+    /// <summary>记录预览尺寸：仅 Pixel/Star 且值有效时记录；Auto 与 0（面板隐藏压缩态）跳过。</summary>
+    private void RecordPreviewSize(int position, GridLength length)
+    {
+        if (length.GridUnitType is GridUnitType.Pixel or GridUnitType.Star && length.Value > 0)
+            _previewSizeByPosition[position] = length;
     }
 
     /// <summary>
@@ -870,7 +994,7 @@ public partial class MainWindow : Window
             {
                 foreach (var kvp in snapshot.PreviewSizeByPosition)
                 {
-                    if (kvp.Value > 0)
+                    if (kvp.Value.GridUnitType is GridUnitType.Pixel or GridUnitType.Star && kvp.Value.Value > 0)
                         _previewSizeByPosition[kvp.Key] = kvp.Value;
                 }
             }
@@ -889,7 +1013,8 @@ public partial class MainWindow : Window
     /// <summary>
     /// 手动保存内容区布局快照（菜单「保存布局」触发）：
     /// 目录树列宽（col 0）+ 文件列表列宽（col 2）+ 预览面板各位置记忆尺寸。
-    /// Star 布局的列用 ActualWidth 捕获实际像素值，保证恢复后布局与保存时一致。
+    /// 树/文件列 Star 布局用 ActualWidth 捕获实际像素值；预览尺寸保留单元类型
+    /// （Star 维持比例伸缩、Pixel 维持固定），保证恢复后与保存时一致。
     /// </summary>
     private void SaveLayout()
     {
@@ -902,7 +1027,7 @@ public partial class MainWindow : Window
             {
                 TreeColumnWidth = CaptureColumnActualWidth(ArchiveContentGrid, 0),
                 FileListColumnWidth = CaptureColumnActualWidth(ArchiveContentGrid, 2),
-                PreviewSizeByPosition = new Dictionary<int, double>(_previewSizeByPosition)
+                PreviewSizeByPosition = new Dictionary<int, GridLength>(_previewSizeByPosition)
             };
 
             LayoutStateManager.Save(snapshot);
@@ -1550,8 +1675,16 @@ public partial class MainWindow : Window
             "SettingsWindow" => new Views.SettingsWindow(),
             "PasswordManagerWindow" => new PasswordManagerWindow(),
             "DonationDialog" => new DonationDialog(),
-            "LogPrivacyHelpDialog" => new LogPrivacyHelpDialog(),
-            "PasswordHelpDialog" => new PasswordHelpDialog(),
+            "LogPrivacyHelpDialog" => new HelpDialog(
+                LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Title"),
+                new MarkdownHelpContent(LocalizationManager.T("LogPrivacyHelp_Markdown")),
+                LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Close"))
+            { Width = 520, Height = 500 },
+            "PasswordHelpDialog" => new HelpDialog(
+                LocalizationManager.T("PwdHelp_Title"),
+                new MarkdownHelpContent(LocalizationManager.T("PasswordHelp_Markdown")),
+                LocalizationManager.T("PwdHelp_Close"))
+            { Width = 560, Height = 500 },
             "CommentDialog" => new CommentDialog(),
             "PasswordEditDialog" => new PasswordEditDialog(),
             "PasswordDialog" => new PasswordDialog("test.7z"),

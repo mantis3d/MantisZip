@@ -1,276 +1,1043 @@
+<!-- 进度窗口。
+     高度下限（MinHeight）双机制：XAML 的 100 仅为初始兜底；真实下限由 code-behind
+     LayoutUpdated 动态设置为「内容自然高度 + 窗口 chrome」，保证任何状态 UI 不被裁切。 -->
 <Window xmlns="https://github.com/avaloniaui"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:converters="clr-namespace:MantisZip.UI.Avalonia.Converters"
         x:Class="MantisZip.UI.Avalonia.Dialogs.ProgressWindow"
         x:CompileBindings="False"
         Title="{Binding WindowTitle}"
-        Width="500"
+        Width="800"
+        MinWidth="500"
+        MinHeight="100"
         SizeToContent="Height"
         WindowStartupLocation="CenterScreen"
         CanResize="True"
         Topmost="True"
-        ShowInTaskbar="False"
+        ShowInTaskbar="True"
         Background="{DynamicResource ThemeWindowBgBrush}">
   <Window.Resources>
     <!-- 批处理状态转图标转换器 -->
     <converters:BatchStatusToIconConverter x:Key="BatchStatusIconConverter"/>
     <!-- 进度状态转背景色转换器 -->
     <converters:ProgressStatusToBackgroundConverter x:Key="ProgressStatusBackgroundConverter"/>
-    <!-- 布尔值转图标转换器 -->
-    <converters:BoolToIconConverter x:Key="BoolToIconConverter"/>
+    <!-- 字符串非空转可见性（统计项/当前文件名空值隐藏） -->
+    <converters:StringNotEmptyConverter x:Key="StringNotEmpty"/>
+    <!-- 状态画刷资源键转画刷（批次行前景色 / 批处理行状态色） -->
+    <converters:BrushResourceConverter x:Key="BrushResource"/>
+    <!-- 状态图标资源键 → Geometry（状态行左侧图标，随 StatusKind 变化） -->
+    <converters:GeometryResourceConverter x:Key="GeometryResource"/>
+    <!-- 比例 × 容器宽度 → 像素宽（详细面板「批次当前文件名」底纹；MultiBinding 双输入转换器）。
+         此前该键只在 MainWindow.axaml 局部定义，ProgressWindow 作用域内引用不到 →
+         详细面板首次渲染批次行时解析失败，UI 线程卡死（补齐本窗口作用域）。 -->
+    <converters:RatioToWidthConverter x:Key="RatioToWidthConverter"/>
+    <!-- 三行统计卡动态 — 画刷：—/空 → 灰 secondary，真实值 → ConverterParameter 强调色（D3） -->
+    <converters:DashBrushConverter x:Key="DashBrush"/>
   </Window.Resources>
-  <Grid Margin="{DynamicResource SpacingMdThk}"
-        RowSpacing="6">
+
+  <!-- 根容器：7 行布局（原型对齐后结构）。
+       行距固定绑定紧凑度资源 SpacingXs——间距唯一来源是全局紧凑度（CompactnessMode），
+       信息量分级只控制「显示多少信息」，不再改行距（ApplyInfoDensity 已移除动态行距）。
+       ClipToBounds=True：兑底裁剪（动态 Window.MinHeight 已保证正常状态不溢出，
+       此处仅防御极端时序下内容瞬时高于窗口的过渡帧）。 -->
+  <Grid x:Name="RootGrid"
+        Margin="{DynamicResource SpacingMdThk}"
+        RowSpacing="{DynamicResource SpacingXs}"
+        ClipToBounds="True">
     <Grid.RowDefinitions>
-      <RowDefinition Height="Auto"/>  <!-- 0: 批处理文件列表 -->
-      <RowDefinition Height="Auto"/>  <!-- 1: 密码匹配区 -->
-      <RowDefinition Height="Auto"/>  <!-- 2: 当前文件名 -->
-      <RowDefinition Height="Auto"/>  <!-- 3: 文件进度条 -->
-      <RowDefinition Height="Auto"/>  <!-- 4: 总体进度条 -->
-      <RowDefinition Height="Auto"/>  <!-- 5: 文件计数 -->
-      <RowDefinition Height="Auto"/>  <!-- 6: 状态消息 -->
-      <RowDefinition Height="Auto"/>  <!-- 7: 错误摘要 -->
-      <RowDefinition Height="*"/>      <!-- 8: 弹性填充 -->
-      <RowDefinition Height="Auto"/>  <!-- 9: 按钮行 -->
+      <RowDefinition Height="Auto"/>  <!-- 0: 批处理区（表头 + 批处理文件列表） -->
+      <RowDefinition Height="Auto"/>  <!-- 1: 内容模式切换（显示: 简约/详细/列表） -->
+      <!-- 2: 内容区（简约 / 详细 / 列表 三面板互斥）。
+           Auto：按内容自然高度收高，不再垫高（旧 MinHeight=120 会在简约/少线程模式
+           内容只有 ~70px 时垫出大块空白——问题 1 根因之一）。窗口调矮的保护改由
+           动态 Window.MinHeight（code-behind）承担，不再靠本行 MinHeight。 -->
+      <RowDefinition Height="Auto"/>
+      <RowDefinition Height="Auto"/>  <!-- 3: 状态消息行 -->
+      <RowDefinition Height="Auto"/>  <!-- 4: 下方信息区（密度切换 + 统计 + 总进度 + 时间） -->
+      <!-- 5: 错误摘要 —— 全窗口唯一弹性行（*）。
+           窗口被手动拉高时，富余高度全部归本行（错误文本框随之拉伸，无错误时即为空白），
+           使按钮行恒贴窗口底边、内容区保持紧贴内容；自然高度（SizeToContent=Height）下
+           本行按其子内容测量（无限高测量 treatStarAsAuto）= 错误文本高度 / 无错误时 0，
+           不产生空白。窗口调矮时本行先收缩（先压到 0），Auto 行永不被压。 -->
+      <RowDefinition Height="*"/>
+      <RowDefinition Height="Auto"/>  <!-- 6: 按钮行 -->
     </Grid.RowDefinitions>
 
-    <!-- ═══ 批处理文件列表（始终可见，单文件操作也显示列表）═══ -->
-    <ListBox x:Name="BatchFileList" Grid.Row="0"
-             ItemsSource="{Binding BatchItems}"
-             MaxHeight="160" Margin="0,0,0,8"
-             BorderThickness="1"
-             BorderBrush="{DynamicResource ThemeBorderBrush}"
-             Background="{DynamicResource ThemeSurfaceBgBrush}"
-             ScrollViewer.VerticalScrollBarVisibility="Auto"
-             SelectionMode="Single">
-      <ListBox.ItemContainerTheme>
-        <ControlTheme TargetType="ListBoxItem">
-          <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
-          <Setter Property="Padding" Value="0"/>
-          <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}"/>
-        </ControlTheme>
-      </ListBox.ItemContainerTheme>
-      <ListBox.ItemTemplate>
-        <DataTemplate>
-          <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
-          <Grid Background="Transparent">
-            <Grid.ColumnDefinitions>
-              <ColumnDefinition Width="28"/>
-              <ColumnDefinition Width="*"/>
-              <ColumnDefinition Width="50"/>
-            </Grid.ColumnDefinitions>
-
-            <!-- 第 1 列: 状态图标（通过转换器显示对应图标） -->
-            <TextBlock Grid.Column="0"
-                       Text="{Binding Status, Converter={StaticResource BatchStatusIconConverter}}"
-                       FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center"/>
-
-            <!-- 第 2 列: 文件名 + 进度条背景（背景色随进度/状态变化） -->
-            <TextBlock Grid.Column="1"
-                       Text="{Binding Name}"
-                       TextTrimming="CharacterEllipsis"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                       Padding="4,2">
-              <TextBlock.Background>
-                <MultiBinding Converter="{StaticResource ProgressStatusBackgroundConverter}">
-                  <Binding Path="Progress"/>
-                  <Binding Path="Status"/>
-                </MultiBinding>
-              </TextBlock.Background>
-            </TextBlock>
-
-            <!-- 第 3 列: 进度百分比 -->
-            <TextBlock Grid.Column="2"
-                       Text="{Binding Progress, StringFormat=\{0:F0\}%}"
-                       HorizontalAlignment="Right"
-                       VerticalAlignment="Center"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                       FontSize="11"
-                       Padding="0,0,6,0"/>
-          </Grid>
-        </DataTemplate>
-      </ListBox.ItemTemplate>
-    </ListBox>
-
-    <!-- ═══ 密码匹配区（默认隐藏，仅在尝试密码规则时显示）═══ -->
-    <Border x:Name="PasswordSection" Grid.Row="1"
-            Background="{DynamicResource ThemeStatusWarningBrush}"
-            BorderBrush="{DynamicResource ThemeStatusWarningBrush}"
+    <!-- ═══ Row 0: 批处理区 ═══
+         表头（分区标题「压缩包列表」+ 批次计数）+ 批处理文件列表。
+         计数仅在批次列表非空时显示（HasBatchItems），列表区本身始终显示（单文件操作也走列表）。 -->
+    <Border Grid.Row="0"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeSplitterBgBrush}"
             BorderThickness="1"
-            CornerRadius="4" Padding="8,6" Margin="0,0,0,8"
-            IsVisible="{Binding IsPasswordSectionVisible}">
-      <Grid RowSpacing="2">
-        <Grid.RowDefinitions>
-          <RowDefinition Height="Auto"/>
-          <RowDefinition Height="Auto"/>
-          <RowDefinition Height="Auto"/>
-        </Grid.RowDefinitions>
-
-        <!-- 第 1 行：钥匙图标 + 密码文本 + 显示切换按钮 + 复制按钮 -->
-        <Grid Grid.Row="0">
-          <Grid.ColumnDefinitions>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="*"/>
-            <ColumnDefinition Width="Auto"/>
-            <ColumnDefinition Width="Auto"/>
-          </Grid.ColumnDefinitions>
-
-          <PathIcon Grid.Column="0" Data="{StaticResource IconKey}" Width="14" Height="14"
-                    Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                    VerticalAlignment="Center" Margin="0,0,6,0"/>
-          <TextBlock x:Name="PwdMatchText" Grid.Column="1"
-                     Text="{Binding PasswordMatchText}"
-                     FontSize="14" FontWeight="SemiBold"
-                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+            CornerRadius="{DynamicResource BorderRadius}"
+            Padding="{DynamicResource SpacingXsThk}">
+      <StackPanel Spacing="{DynamicResource SpacingXs}">
+        <!-- 表头行：左分区标题（本地化）+ 右批次计数（无批次时隐藏） -->
+        <Grid ColumnDefinitions="*,Auto">
+          <!-- 分区标题：压缩包列表 -->
+          <TextBlock Text="{Binding LocalizedStrings[Progress_Batch_SectionTitle]}"
+                     FontSize="12" FontWeight="SemiBold"
                      VerticalAlignment="Center"
-                     TextTrimming="CharacterEllipsis"/>
-
-          <!-- 密码显示/隐藏切换按钮 -->
-          <Button x:Name="PwdRevealBtn" Grid.Column="2"
-                  Width="24" Height="22" Margin="4,0,0,0"
-                  Padding="0"
-                  Command="{Binding TogglePasswordRevealCommand}"
-                  IsEnabled="{Binding IsPasswordRevealEnabled}"
-                  ToolTip.Tip="{Binding LocalizedStrings[Progress_RevealTooltip]}"
-                  Background="{DynamicResource ThemeButtonBgBrush}"
-                  BorderThickness="1"
-                  BorderBrush="{DynamicResource ThemeBorderBrush}"
-                  Foreground="{DynamicResource ThemeTextSecondaryBrush}">
-            <PathIcon Data="{Binding IsPasswordRevealed, Converter={StaticResource BoolToIconConverter}, ConverterParameter=IconEye|IconEyeOff}"
-                      Width="14" Height="14"
-                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-          </Button>
-
-          <!-- 复制密码按钮 -->
-          <Button x:Name="PwdCopyBtn" Grid.Column="3"
-                  Width="24" Height="22" Margin="4,0,0,0"
-                  Padding="0"
-                  IsEnabled="{Binding IsPasswordCopyEnabled}"
-                  ToolTip.Tip="{Binding LocalizedStrings[Progress_CopyTooltip]}"
-                  Background="{DynamicResource ThemeButtonBgBrush}"
-                  BorderThickness="1"
-                  BorderBrush="{DynamicResource ThemeBorderBrush}"
-                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                  Click="PwdCopyBtn_Click">
-            <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
-                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-          </Button>
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+          <!-- 批次计数（如 "3 个文件"；BatchCountText 由 VM 集中通知驱动） -->
+          <TextBlock Grid.Column="1"
+                     Text="{Binding BatchCountText}"
+                     IsVisible="{Binding HasBatchItems}"
+                     FontSize="11"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
         </Grid>
 
-        <!-- 第 2 行：匹配规则描述 -->
-        <TextBlock Grid.Row="1"
-                   Text="{Binding PasswordRuleText}"
-                   FontSize="12" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                   Margin="22,2,0,0"/>
+        <!-- 批处理文件列表：状态图标 | 文件名+完成摘要（进度底色） | 密码徽标 | 百分比 -->
+        <ListBox x:Name="BatchFileList"
+                 ItemsSource="{Binding BatchItems}"
+                 BorderThickness="1"
+                 BorderBrush="{DynamicResource ThemeBorderBrush}"
+                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                 ScrollViewer.VerticalScrollBarVisibility="Auto"
+                 SelectionMode="Single">
+          <!-- Rule 7: 列表行高走紧凑度感知资源键 -->
+          <ListBox.ItemContainerTheme>
+            <ControlTheme TargetType="ListBoxItem">
+              <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+              <Setter Property="Padding" Value="0"/>
+              <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}"/>
+            </ControlTheme>
+          </ListBox.ItemContainerTheme>
+          <ListBox.ItemTemplate>
+            <DataTemplate>
+              <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
+              <Grid Background="Transparent" ColumnSpacing="{DynamicResource SpacingXs}">
+                <Grid.ColumnDefinitions>
+                  <ColumnDefinition Width="Auto"/>
+                  <ColumnDefinition Width="*"/>
+                  <!-- 第 3 列：密码徽标槽位（🔄匹配中 / 🔑●●●● + Flyout） -->
+                  <ColumnDefinition Width="Auto"/>
+                  <!-- 第 4 列：错误消息/百分比双态槽位。Auto 而非固定 50——
+                       错误消息宽度可变（MaxWidth 300 封顶），右边缘靠右对齐保持各行一致 -->
+                  <ColumnDefinition Width="Auto"/>
+                </Grid.ColumnDefinitions>
 
-        <!-- 第 3 行：密码验证状态（验证通过 / 正在尝试） -->
-        <TextBlock Grid.Row="2"
-                   Text="{Binding PasswordStatusText}"
-                   FontSize="12" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                   Margin="22,2,0,0"/>
-      </Grid>
+                <!-- 第 1 列: 状态图标（通过转换器显示对应图标），前景色取状态画刷资源键 -->
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Status, Converter={StaticResource BatchStatusIconConverter}}"
+                           Foreground="{Binding StatusBrushName, Converter={StaticResource BrushResource}}"
+                           FontSize="14" VerticalAlignment="Center" HorizontalAlignment="Center"/>
+
+                <!-- 第 2 列: 文件名 + 完成摘要（进度背景色随进度/状态变化） -->
+                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                  <TextBlock Text="{Binding Name}"
+                             TextTrimming="CharacterEllipsis"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+                    <TextBlock.Background>
+                      <MultiBinding Converter="{StaticResource ProgressStatusBackgroundConverter}">
+                        <Binding Path="Progress"/>
+                        <Binding Path="Status"/>
+                      </MultiBinding>
+                    </TextBlock.Background>
+                  </TextBlock>
+                  <!-- 完成摘要（如 "已处理 12 跳过 1"；非终态为空自动隐藏） -->
+                  <TextBlock Text="{Binding SummaryText}"
+                             IsVisible="{Binding SummaryText, Converter={StaticResource StringNotEmpty}}"
+                             FontSize="11"
+                             TextTrimming="CharacterEllipsis"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+
+                <!-- 第 3 列：密码徽标（🔄 匹配中 / 🔑●●●● 已匹配 + Flyout 查看/复制；无密码包不出现） -->
+                <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="2" VerticalAlignment="Center">
+                  <!-- 匹配中：🔄 + 本地化文案（不显示尝试规则 N/M，决策 D4） -->
+                  <StackPanel Orientation="Horizontal" Spacing="2"
+                              IsVisible="{Binding IsPasswordMatching}">
+                    <TextBlock Text="🔄" FontSize="11" VerticalAlignment="Center"/>
+                    <TextBlock Text="{Binding DataContext.LocalizedStrings[Progress_Batch_Pwd_Matching],
+                                       RelativeSource={RelativeSource AncestorType=Window}}"
+                               FontSize="11"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource ThemeStatusWarningBrush}"/>
+                  </StackPanel>
+
+                  <!-- 已匹配：🔑 ●●●● 按钮，点击弹出 Flyout（内容由 code-behind 按 x:Name 填充）。
+                       入场动画（原型 .badge-enter :172-176，0.25s 淡入+缩放）：
+                       - Opacity 绑定 IsPasswordMatched（bool→double 经 DefaultValueConverter，false=0/true=1），
+                         配合下方 Transitions 中的 Opacity DoubleTransition 实现声明式淡入；
+                       - 缩放为 code-behind 一次性触发（SetBatchPasswordState 包装里摘/挂过渡置 0.6→1.0），
+                         初始 ScaleX/Y 保持 1.0，避免从未点亮的行永久停在压扁态。 -->
+                  <Button x:Name="PwdBadgeBtn"
+                          IsVisible="{Binding IsPasswordMatched}"
+                          Opacity="{Binding IsPasswordMatched}"
+                          RenderTransformOrigin="50%,50%"
+                          Padding="{DynamicResource SpacingXxsThk}"
+                          MinHeight="{DynamicResource ControlHeightSm}"
+                          Background="Transparent"
+                          BorderThickness="1"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}"
+                          ToolTip.Tip="{Binding DataContext.LocalizedStrings[Progress_Batch_Pwd_MatchedTip],
+                                                 RelativeSource={RelativeSource AncestorType=Window}}"
+                          Click="PwdBadgeBtn_Click">
+                    <!-- 本地 Transitions 会整体覆盖全局 Button 样式的 Transitions（本地值优先级更高），
+                         故需连同 Background/Foreground 的 BrushTransition 一并重声明，否则悬停变色会失去 0.15s 渐变；
+                         Opacity DoubleTransition 即徽标淡入（0.25s 对齐原型 badge-enter） -->
+                    <Button.Transitions>
+                      <Transitions>
+                        <BrushTransition Property="Background" Duration="0:0:0.15"/>
+                        <BrushTransition Property="Foreground" Duration="0:0:0.15"/>
+                        <DoubleTransition Property="Opacity" Duration="0:0:0.25"/>
+                      </Transitions>
+                    </Button.Transitions>
+                    <!-- 徽标缩放入场变换：以中心为原点，code-behind 一次性 0.6→1.0（0.25s） -->
+                    <Button.RenderTransform>
+                      <ScaleTransform ScaleX="1" ScaleY="1">
+                        <ScaleTransform.Transitions>
+                          <Transitions>
+                            <DoubleTransition Property="ScaleX" Duration="0:0:0.25"/>
+                            <DoubleTransition Property="ScaleY" Duration="0:0:0.25"/>
+                          </Transitions>
+                        </ScaleTransform.Transitions>
+                      </ScaleTransform>
+                    </Button.RenderTransform>
+                    <StackPanel Orientation="Horizontal" Spacing="2">
+                      <PathIcon Data="{StaticResource IconKey}" Width="12" Height="12"
+                                Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                      <TextBlock Text="●●●●" FontSize="11"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                    </StackPanel>
+                    <Button.Flyout>
+                      <Flyout Placement="BottomEdgeAlignedRight">
+                        <!-- 密码查看面板：掩码/明文 + 复制（恒明文）+ 规则/描述行。
+                             DataContext 会被 Flyout 根节点继承，故一律用 x:Name 由 code-behind 填充。 -->
+                        <StackPanel x:Name="PwdFlyoutRoot" Spacing="{DynamicResource SpacingXs}"
+                                    MinWidth="220">
+                          <!-- 掩码/明文文本 + 👁 显示切换 + 复制按钮 -->
+                          <Grid ColumnDefinitions="*,Auto,Auto">
+                            <TextBlock x:Name="PwdFlyoutMaskText" Grid.Column="0"
+                                       FontWeight="SemiBold"
+                                       VerticalAlignment="Center"
+                                       TextTrimming="CharacterEllipsis"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                            <!-- 👁 切换：仅切显示态（初始态由 PasswordRevealByDefault 决定） -->
+                            <Button x:Name="PwdFlyoutRevealBtn" Grid.Column="1"
+                                    Width="24" Height="22" Margin="4,0,0,0"
+                                    Padding="0"
+                                    Click="PwdFlyoutRevealBtn_Click"
+                                    Background="{DynamicResource ThemeButtonBgBrush}"
+                                    BorderThickness="1"
+                                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+                              <PathIcon x:Name="PwdFlyoutEyeIcon"
+                                        Data="{StaticResource IconEye}"
+                                        Width="14" Height="14"
+                                        Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            </Button>
+                            <!-- 复制：恒复制明文 MatchedPassword -->
+                            <Button x:Name="PwdFlyoutCopyBtn" Grid.Column="2"
+                                    Width="24" Height="22" Margin="4,0,0,0"
+                                    Padding="0"
+                                    Click="PwdFlyoutCopyBtn_Click"
+                                    Background="{DynamicResource ThemeButtonBgBrush}"
+                                    BorderThickness="1"
+                                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+                              <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
+                                        Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                            </Button>
+                          </Grid>
+                          <!-- 匹配规则行（PasswordRule 为空时隐藏） -->
+                          <TextBlock x:Name="PwdFlyoutRuleText"
+                                     FontSize="11"
+                                     TextWrapping="Wrap"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                          <!-- 描述行（PasswordDescription 为空时隐藏） -->
+                          <TextBlock x:Name="PwdFlyoutDescText"
+                                     FontSize="11"
+                                     TextWrapping="Wrap"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                        </StackPanel>
+                      </Flyout>
+                    </Button.Flyout>
+                  </Button>
+                </StackPanel>
+
+                <!-- 第 4 列：失败/非失败互斥双态——失败行显红色错误消息（替代百分比），
+                     非失败行显进度百分比；两者 IsVisible 互斥（原型 .batch-error :121-130）。
+                     MaxWidth 300 对应原型 max-width:60%（Avalonia 无百分比 MaxWidth），
+                     超长以省略号截断，靠右对齐保证各行右边缘一致。 -->
+                <TextBlock Grid.Column="3"
+                           Text="{Binding ErrorMessage}"
+                           IsVisible="{Binding IsFailed}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           MaxWidth="300"
+                           Foreground="{DynamicResource ThemeStatusErrorBrush}"
+                           FontSize="11"
+                           Padding="0,0,6,0"/>
+                <TextBlock Grid.Column="3"
+                           Text="{Binding Progress, StringFormat=\{0:F0\}%}"
+                           IsVisible="{Binding !IsFailed}"
+                           HorizontalAlignment="Right"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           FontSize="11"
+                           Padding="0,0,6,0"/>
+              </Grid>
+            </DataTemplate>
+          </ListBox.ItemTemplate>
+        </ListBox>
+      </StackPanel>
     </Border>
 
-    <!-- Row 2: 当前处理的文件名 -->
-    <TextBlock Grid.Row="2"
-               Text="{Binding FileName}"
-               TextTrimming="CharacterEllipsis"
-               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+    <!-- ═══ Row 1: 内容模式切换 ═══
+         「显示:」标签 + 简约 / 详细 / 列表 三选一（写 VM.ContentMode，派生可见性由 VM 集中通知）。
+         详细模式始终可用（门禁已移除）：非并行时由单行通道承载。 -->
+    <StackPanel Grid.Row="1"
+                Orientation="Horizontal"
+                Spacing="{DynamicResource SpacingMd}"
+                HorizontalAlignment="Center">
+      <!-- 模式标签（显示:） -->
+      <TextBlock Text="{Binding LocalizedStrings[Progress_Mode_Label]}"
+                 FontSize="12"
+                 VerticalAlignment="Center"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+      <!-- 简约模式（默认勾选；IsChecked 单向绑到 VM 派生属性，使程序化切换内容模式时单选项同步高亮） -->
+      <RadioButton x:Name="ModeFullPathRadio" GroupName="ContentMode"
+                   Content="{Binding LocalizedStrings[Progress_Mode_Simple]}"
+                   IsChecked="{Binding IsSimpleMode, Mode=OneWay}"
+                   Click="ModeFullPathRadio_Click"/>
+      <!-- 详细模式（详细门禁已移除：始终可选；非并行时由单行通道承载） -->
+      <RadioButton x:Name="ModeDirOnlyRadio" GroupName="ContentMode"
+                   Content="{Binding LocalizedStrings[Progress_Mode_Detailed]}"
+                   IsChecked="{Binding IsDetailedMode, Mode=OneWay}"
+                   Click="ModeDirOnlyRadio_Click"/>
+      <!-- 列表模式（逐条目行，面板本体见 Row 2 ListPanel） -->
+      <RadioButton x:Name="ModeNameOnlyRadio" GroupName="ContentMode"
+                   Content="{Binding LocalizedStrings[Progress_Mode_List]}"
+                   IsChecked="{Binding IsListMode, Mode=OneWay}"
+                   Click="ModeNameOnlyRadio_Click"/>
+    </StackPanel>
 
-    <!-- Row 3: 当前文件进度条 -->
-    <Grid Grid.Row="3" Margin="0,6,0,2">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="Auto"/>
-      </Grid.ColumnDefinitions>
-      <ProgressBar Grid.Column="0"
-                   Value="{Binding FilePercentComplete}"
-                   Minimum="0" Maximum="100"
-                   Height="14"
-                   Foreground="{DynamicResource ThemeProgressFillBrush}"
-                   Background="{DynamicResource ThemeProgressBgBrush}"/>
-      <TextBlock Grid.Column="1"
-                 Text="{Binding FilePercentComplete, StringFormat=\{0\}%}"
-                 Width="42" Margin="6,0,0,0"
-                 HorizontalAlignment="Right"
-                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                 FontSize="12"/>
-    </Grid>
+    <!-- ═══ Row 2: 内容区（简约 / 详细 / 列表 三面板互斥）═══
+         三个面板同占 Row 2，靠 IsVisible 互斥（Rule 6：隐藏而非禁用）。 -->
+    <StackPanel x:Name="SimplePanel" Grid.Row="2"
+                IsVisible="{Binding IsSimpleMode}"
+                Spacing="{DynamicResource SpacingXxs}"
+                VerticalAlignment="Top">
 
-    <!-- Row 4: 总体进度条（支持不定进度模式） -->
-    <Grid Grid.Row="4" Margin="0,4,0,2">
-      <Grid.ColumnDefinitions>
-        <ColumnDefinition Width="*"/>
-        <ColumnDefinition Width="Auto"/>
-      </Grid.ColumnDefinitions>
-      <ProgressBar Grid.Column="0"
-                   Value="{Binding PercentComplete}"
+      <!-- 路径行（当前文件所在目录；D1 恒显示） -->
+      <TextBlock Text="{Binding DirName}"
+                 FontSize="12"
+                 TextTrimming="CharacterEllipsis"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+
+      <!-- 文件名行（当前文件；加粗突出，D1 恒显示） -->
+      <TextBlock Text="{Binding FileName}"
+                 FontSize="14" FontWeight="SemiBold"
+                 TextTrimming="CharacterEllipsis"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+      <!-- 当前文件进度标签行：左「当前文件」标签 + 右百分比 -->
+      <Grid ColumnDefinitions="*,Auto">
+        <TextBlock Text="{Binding CurrentFileLabel}"
+                   FontSize="11"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+        <TextBlock Grid.Column="1"
+                   Text="{Binding SimpleFileBarValue, StringFormat=\{0\}%}"
+                   FontSize="11"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+      </Grid>
+
+      <!-- 当前文件进度条（高度走紧凑度资源键；总体进度条不在此面板，位于 Row 4 下方信息区）。
+           准备态（引擎首次上报前）走不定进度，避免长时间停在 0% 让人误以为卡住。 -->
+      <ProgressBar Value="{Binding SimpleFileBarValue}"
                    Minimum="0" Maximum="100"
                    IsIndeterminate="{Binding IsIndeterminate}"
-                   Height="22"
-                   Foreground="{DynamicResource ThemeProgressFillBrush}"/>
-      <TextBlock Grid.Column="1"
-                 Text="{Binding PercentComplete, StringFormat=\{0\}%}"
-                 Width="42" Margin="6,0,0,0"
-                 HorizontalAlignment="Right"
-                 FontWeight="Bold"
-                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-    </Grid>
+                   Height="{DynamicResource ControlHeightSm}"
+                   Foreground="{DynamicResource ThemeProgressFillBrush}"
+                   Background="{DynamicResource ThemeProgressBgBrush}"/>
+    </StackPanel>
 
-    <!-- Row 5: 文件计数（已处理/总数） -->
-    <TextBlock x:Name="FileCountText" Grid.Row="5"
-               Text="{Binding FileCountText}"
-               FontSize="12"
-               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-               Margin="0,0,0,4"/>
+    <!-- 详细面板：并行批次通道行（批次 N | 当前文件+底纹 | 批次进度条 | 百分比 | 明细）。
+         仅并行时集合非空 → 详细模式才有内容；无批次时整块隐藏（D6 / Rule 6）。
+         Task 6：压缩流程下额外置顶一行通道说明——N 行通道只覆盖 compressGroup，
+         Store（已压缩）文件不经压缩、不占通道，且压缩侧不播种条目列表，
+         用户在「详细」「列表」两种模式都找不到这些文件，故这行说明是唯一提示。 -->
+    <Border x:Name="DetailedPanel" Grid.Row="2"
+            IsVisible="{Binding IsDetailedMode}"
+            BorderBrush="{DynamicResource ThemeSplitterBgBrush}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource BorderRadius}"
+            Padding="{DynamicResource SpacingXxsThk}"
+            VerticalAlignment="Top">
+      <StackPanel Spacing="{DynamicResource SpacingXxs}">
+        <!-- 压缩通道说明：仅压缩流程且有并行通道时可见（ShowCompressChannelHint，D8）；解压/非并行单行保持隐藏 -->
+        <TextBlock Text="{Binding LocalizedStrings[Progress_CompressChannelHint]}"
+                   IsVisible="{Binding ShowCompressChannelHint}"
+                   FontSize="10"
+                   TextWrapping="Wrap"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+        <ItemsControl ItemsSource="{Binding ParallelBatchItems}">
+          <ItemsControl.ItemTemplate>
+            <DataTemplate>
+              <!-- 通道行：左区（单文件域）+ 右区（批次域：底纹/序号/合并百分比/信息列/ToolTip）。
+                   行高 = 10–11px 信息文字 + 紧凑度内边距（Border Padding=SpacingXxsThk，随三档呼吸）；
+                   不设固定 MinHeight（否则看起来像按大号字体设高）。规则 7 例外：本行为紧凑多字段信息通道行。 -->
+              <Border Padding="{DynamicResource SpacingXxsThk}">
+              <Grid ColumnDefinitions="*,Auto"
+                    ColumnSpacing="{DynamicResource SpacingXs}">
+                <!-- 左区：单文件域（目录中间省略 | 文件名恒完整+文件底纹 | 文件大小） -->
+                <Grid Grid.Column="0" ColumnDefinitions="Auto,*,Auto"
+                      ColumnSpacing="{DynamicResource SpacingXs}">
+                  <!-- 目录列（中间省略；根文件 DirectoryText="" → 隐藏，规则 6） -->
+                  <TextBlock Text="{Binding DirectoryText}"
+                             IsVisible="{Binding DirectoryText, Converter={StaticResource StringNotEmpty}}"
+                             FontSize="11" VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                  <!-- 文件名列（恒完整；底纹只覆盖本格，宽度基准取本 Grid） -->
+                  <Grid Grid.Column="1" ClipToBounds="True">
+                    <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
+                               HorizontalAlignment="Left"
+                               IsVisible="{Binding CurrentFile, Converter={StaticResource StringNotEmpty}}">
+                      <Rectangle.Width>
+                        <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                          <Binding Path="FileRatio" />
+                          <Binding Path="Bounds.Width" RelativeSource="{RelativeSource AncestorType=Grid}" />
+                        </MultiBinding>
+                      </Rectangle.Width>
+                    </Rectangle>
+                    <TextBlock Text="{Binding FileNameText}"
+                               FontSize="11" VerticalAlignment="Center"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  </Grid>
+                  <!-- 文件大小（左区右端；空=隐藏，规则 6） -->
+                  <TextBlock Grid.Column="2" Text="{Binding FileSizeText}"
+                             IsVisible="{Binding FileSizeText, Converter={StaticResource StringNotEmpty}}"
+                             FontSize="10" VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </Grid>
 
-    <!-- Row 6: 状态消息（暂停/恢复/完成/失败等状态文字） -->
-    <TextBlock Grid.Row="6"
+                <!-- 右区：批次域（固定宽 256 防数字位宽变化导致边界跳动；右对齐 + ClipToBounds 兜底裁剪，
+                     溢出时最左元素先裁 = 序号→百分比→信息列左端。IsParallel=false 单行仅信息列非空时显示（ShowRightRegion）。 -->
+                <Grid Grid.Column="1" Width="256" ClipToBounds="True"
+                      IsVisible="{Binding ShowRightRegion}"
+                      ToolTip.Tip="{Binding TooltipText}">
+                  <!-- 批次底纹：宽 = BatchRatio × 本格宽（紫系，区别于左区文件底纹）；仅并行行显示（单行与底部总进度重复） -->
+                  <Rectangle Fill="{DynamicResource ThemeProgressBatchBrush}"
+                             HorizontalAlignment="Left"
+                             IsVisible="{Binding IsParallel}">
+                    <Rectangle.Width>
+                      <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                        <Binding Path="BatchRatio" />
+                        <Binding Path="Bounds.Width" RelativeSource="{RelativeSource AncestorType=Grid}" />
+                      </MultiBinding>
+                    </Rectangle.Width>
+                  </Rectangle>
+                  <!-- 文字层：序号（非并行隐藏） | 合并百分比（非并行隐藏，与底部总进度重复） | 信息列（字节进度 · 压缩率，空=隐藏）
+                       tnum 等宽数字：数字位数增减时不改变字形宽度，防右区内容跳动 -->
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}"
+                              HorizontalAlignment="Right" VerticalAlignment="Center">
+                    <TextBlock Text="{Binding Index}" IsVisible="{Binding IsParallel}"
+                               FontSize="11" VerticalAlignment="Center"
+                               FontFeatures="+tnum"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                    <TextBlock Text="{Binding PctDetailText}" IsVisible="{Binding IsParallel}"
+                               FontSize="11" VerticalAlignment="Center"
+                               FontFeatures="+tnum"
+                               Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                    <TextBlock Text="{Binding InfoText}"
+                               IsVisible="{Binding InfoText, Converter={StaticResource StringNotEmpty}}"
+                               FontSize="10" VerticalAlignment="Center"
+                               FontFeatures="+tnum"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                  </StackPanel>
+                </Grid>
+              </Grid>
+              </Border>
+            </DataTemplate>
+          </ItemsControl.ItemTemplate>
+        </ItemsControl>
+      </StackPanel>
+    </Border>
+
+    <!-- 列表面板：逐条目状态行（对齐原型 .file-list / .file-item）。
+         与简约 / 详细面板同占 Row 2，靠 IsVisible 互斥（Rule 6：隐藏而非禁用）。
+         虚拟化要点：MaxHeight 直接设在 ListBox 上（对齐原型 max-height:150px），
+         刻意不外包 ScrollViewer——外套滚动容器会击穿容器回收，万级条目将实体化全部行导致
+         卡死与内存暴涨；ListBox 自身内滚 + MaxHeight 限高，视觉上限一致且保留回收。 -->
+    <Border x:Name="ListPanel" Grid.Row="2"
+            IsVisible="{Binding IsListMode}"
+            BorderBrush="{DynamicResource ThemeSplitterBgBrush}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource BorderRadius}"
+            Padding="{DynamicResource SpacingXxsThk}"
+            VerticalAlignment="Top">
+      <!-- 逐条目列表：绑定 EntryItems（预播种 Pending 行 / 渐进 upsert 终态行，两条渲染路径一致）。
+           MaxHeight 150 为原型 .file-list 上限值（版式数值，非紧凑度间距键，故不走 DynamicResource）。 -->
+      <ListBox ItemsSource="{Binding EntryItems}"
+               MaxHeight="150"
+               Background="Transparent"
+               BorderThickness="0"
+               ScrollViewer.VerticalScrollBarVisibility="Auto"
+               SelectionMode="Single">
+        <!-- Rule 7: 列表行高走紧凑度感知资源键（只设 MinHeight 不设固定 Height，保留容器回收） -->
+        <ListBox.ItemContainerTheme>
+          <ControlTheme TargetType="ListBoxItem">
+            <Setter Property="HorizontalContentAlignment" Value="Stretch"/>
+            <Setter Property="Padding" Value="0"/>
+            <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}"/>
+          </ControlTheme>
+        </ListBox.ItemContainerTheme>
+        <ListBox.ItemTemplate>
+          <DataTemplate>
+            <!-- 条目行：状态图标 | 文件名（弹性省略） | 大小（右对齐 60） | 状态文本（右对齐，Active 显实时百分比） -->
+            <Grid Background="Transparent" ColumnSpacing="{DynamicResource SpacingXs}">
+              <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto"/>  <!-- 状态图标 -->
+                <ColumnDefinition Width="*"/>     <!-- 文件名（占满余量） -->
+                <ColumnDefinition Width="60"/>    <!-- 大小 -->
+                <ColumnDefinition Width="Auto"/>  <!-- 压缩后大小 + 压缩率（仅 ZIP 压缩完成回填；空=隐藏，规则 6） -->
+                <ColumnDefinition Width="Auto"/>  <!-- 状态文本 -->
+              </Grid.ColumnDefinitions>
+
+              <!-- 行底色：状态画刷低透明度铺底（失败行泛红、跳过行弱化）。
+                   复用 StatusIcon 同款机制：StatusBrushName 经 BrushResource 转换器物化为画刷。 -->
+              <Border Grid.ColumnSpan="5"
+                      IsHitTestVisible="False"
+                      Opacity="0.12"
+                      Background="{Binding StatusBrushName, Converter={StaticResource BrushResource}}"/>
+
+              <!-- 第 1 列: 状态图标（✅ 完成 / ⏭ 跳过 / ❌ 失败 / 🔄 覆盖 / ⏳ 进行中 / ○ 等待），前景色取状态画刷资源键 -->
+              <TextBlock Grid.Column="0"
+                         Text="{Binding StatusIcon}"
+                         Foreground="{Binding StatusBrushName, Converter={StaticResource BrushResource}}"
+                         FontSize="12"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Center"/>
+
+              <!-- 第 2 列: 文件名（星宽占满剩余空间，超长以省略号截断） -->
+              <TextBlock Grid.Column="1"
+                         Text="{Binding Name}"
+                         FontSize="12"
+                         TextTrimming="CharacterEllipsis"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+
+              <!-- 第 3 列: 条目大小（右对齐固定 60；SizeText 未知时为空串，不显示 "0 B"） -->
+              <TextBlock Grid.Column="2"
+                         Text="{Binding SizeText}"
+                         FontSize="11"
+                         TextAlignment="Right"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+
+              <!-- 第 4 列: 压缩后大小 + 压缩率（如 "600 KB (50%)"；仅 ZIP 压缩完成后置回填，空=隐藏，规则 6） -->
+              <TextBlock Grid.Column="3"
+                         Text="{Binding CompressedText}"
+                         IsVisible="{Binding CompressedText, Converter={StaticResource StringNotEmpty}}"
+                         FontSize="11"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+
+              <!-- 第 5 列: 状态文本（右对齐）——Active 与非 Active 互斥双 TextBlock 同格切换：
+                   Active 行 VM 刻意不赋 StatusText（ResolveEntryStatusText 返回 null），
+                   故 Active 行显实时 PercentText（如 "42%"），其余状态显 StatusText。 -->
+              <!-- Active 行：实时百分比（PercentText 随 Percent 变更刷新） -->
+              <TextBlock Grid.Column="4"
+                         Text="{Binding PercentText}"
+                         IsVisible="{Binding IsActive}"
+                         FontSize="11"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Center"
+                         Foreground="{Binding StatusBrushName, Converter={StaticResource BrushResource}}"/>
+              <!-- 非 Active 行：状态文案（StatusText；渐进 upsert 刚建行时可为空，不留占位） -->
+              <TextBlock Grid.Column="4"
+                         Text="{Binding StatusText}"
+                         IsVisible="{Binding !IsActive}"
+                         FontSize="11"
+                         HorizontalAlignment="Right"
+                         VerticalAlignment="Center"
+                         Foreground="{Binding StatusBrushName, Converter={StaticResource BrushResource}}"/>
+            </Grid>
+          </DataTemplate>
+        </ListBox.ItemTemplate>
+      </ListBox>
+    </Border>
+
+    <!-- ═══ Row 3: 下方信息区（对齐原型 .overall-info-section；原 Row 4 上移）═══
+         底色刻意区别于窗口底色（窗口 ThemeWindowBgBrush / 本区 ThemeSplitterBgBrush），
+         形成独立信息面板。自上而下：密度切换 → 统计卡(完整) / 中等单行(中) → 总体进度 → 时间。
+         密度三档互斥：少 = 仅总进度+时间；中 = +中等单行；完整 = +统计卡。 -->
+    <Border Grid.Row="3"
+            Background="{DynamicResource ThemeSplitterBgBrush}"
+            BorderBrush="{DynamicResource ThemeBorderBrush}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource BorderRadius}"
+            Padding="{DynamicResource SpacingSmThk}">
+      <StackPanel Spacing="{DynamicResource SpacingSm}">
+
+        <!-- 信息量分级三选：点击后写 VM.InfoDensity（显示多少信息，非间距） -->
+        <StackPanel Orientation="Horizontal"
+                    Spacing="{DynamicResource SpacingMd}"
+                    HorizontalAlignment="Center">
+          <!-- 少：仅总进度 + 时间（IsChecked 单向绑 VM 派生属性，使持久化/程序化切换时单选项同步高亮） -->
+          <RadioButton x:Name="DensityCompactRadio" GroupName="InfoDensity"
+                       Content="{Binding LocalizedStrings[Progress_Density_Minimal]}"
+                       IsChecked="{Binding IsMinimalDensity, Mode=OneWay}"
+                       Click="DensityCompactRadio_Click"/>
+          <!-- 中：+ 中等单行（默认档） -->
+          <RadioButton x:Name="DensityNormalRadio" GroupName="InfoDensity"
+                       Content="{Binding LocalizedStrings[Progress_Density_Medium]}"
+                       IsChecked="{Binding IsMediumDensity, Mode=OneWay}"
+                       Click="DensityNormalRadio_Click"/>
+          <!-- 完整：+ 统计卡 -->
+          <RadioButton x:Name="DensityLooseRadio" GroupName="InfoDensity"
+                       Content="{Binding LocalizedStrings[Progress_Density_Full]}"
+                       IsChecked="{Binding IsFullDensity, Mode=OneWay}"
+                       Click="DensityLooseRadio_Click"/>
+        </StackPanel>
+
+        <!-- 统计卡容器（仅「完整」档显示）：SurfaceBg 底 + 圆角，内含 5 个三行统计卡 + 并行度后置单行元素 -->
+        <Border x:Name="StatsCardsPanel"
+                IsVisible="{Binding IsFullDensity}"
+                Background="{DynamicResource ThemeSurfaceBgBrush}"
+                CornerRadius="{DynamicResource BorderRadius}"
+                Padding="{DynamicResource SpacingSmThk}">
+          <!-- 竖排两段：段 1 文件统计卡行 + 段 2 并行度后置元素（并行度非文件统计，移出卡片行） -->
+          <StackPanel Orientation="Vertical">
+
+            <!-- 段 1：文件统计卡行（5 张三行卡；并行度不在此行——非文件统计，见段 2） -->
+            <StackPanel Orientation="Horizontal"
+                        Spacing="{DynamicResource SpacingLg}"
+                        HorizontalAlignment="Center">
+
+              <!-- 卡 1：已处理（✅；引擎上报后才出现）— 三行：图标+标题横排 / 文件数量 / 文件大小（未上报字节时 — 灰显）；MinWidth 锁定卡宽防止文字长度变化导致相邻卡跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsProcessedText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="✅" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                  <TextBlock Text="{Binding StatsProcessedLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：文件数量（已处理数纯计数，方案 A 去分母——比例由总进度条承担） -->
+                <TextBlock Text="{Binding StatsProcessedCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                <!-- 行 3：文件大小（— 灰 / 真实值绿，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsProcessedSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsProcessedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeStatusSuccessBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 2：跳过（⏭；引擎上报过冲突统计才出现）— 三行：图标+标题 / 文件数量 / 文件大小（终态累加值，无字节 — 灰显）；MinWidth 防跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsSkippedText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="⏭" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusWarningBrush}"/>
+                  <TextBlock Text="{Binding StatsSkippedLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：跳过数量 -->
+                <TextBlock Text="{Binding StatsSkippedCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusWarningBrush}"/>
+                <!-- 行 3：文件大小（终态字节累加值；— 灰 / 真实值 warning，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsSkippedSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsSkippedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeStatusWarningBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 3：出错（❌；引擎上报过冲突统计才出现）— 三行：图标+标题 / 文件数量 / 文件大小（终态累加值，无字节 — 灰显）；MinWidth 防跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsFailedText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="❌" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusErrorBrush}"/>
+                  <TextBlock Text="{Binding StatsFailedLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：出错数量 -->
+                <TextBlock Text="{Binding StatsFailedCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusErrorBrush}"/>
+                <!-- 行 3：文件大小（终态字节累加值；— 灰 / 真实值 error，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsFailedSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsFailedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeStatusErrorBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 4：已覆盖（🔄；引擎上报过冲突统计才出现）— 三行：图标+标题 / 文件数量 / 文件大小（终态累加值，无字节 — 灰显）；MinWidth 防跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsOverwrittenText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="🔄" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                  <TextBlock Text="{Binding StatsOverwrittenLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：已覆盖数量 -->
+                <TextBlock Text="{Binding StatsOverwrittenCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                <!-- 行 3：文件大小（终态字节累加值；— 灰 / 真实值 primary，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsOverwrittenSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsOverwrittenSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeTextPrimaryBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 5：总大小（📏；引擎上报 TotalBytes 才出现，7z/TAR 不上报时整卡隐藏，D3/Rule 6）— 三行：图标+标题 / 文件总数（未上报时 — 灰显） / 文件大小（卡可见即必有值）；MinWidth 防跳动 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsTotalSizeValue, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="📏" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                  <TextBlock Text="{Binding StatsTotalSizeLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：文件总数（— 灰 / 真实值 primary，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsTotalCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsTotalCount, Converter={StaticResource DashBrush}, ConverterParameter=ThemeTextPrimaryBrush}"/>
+                <!-- 行 3：文件大小（卡可见即必有值，静态 primary） -->
+                <TextBlock Text="{Binding StatsTotalSizeValue}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+              </StackPanel>
+
+            </StackPanel>
+
+            <!-- 段 2：全局元信息后置单行（并行度 + 整体压缩汇总；两者各自显隐，仅都在时显分隔符） -->
+            <StackPanel Orientation="Horizontal"
+                        Spacing="{DynamicResource SpacingXs}"
+                        HorizontalAlignment="Center"
+                        Margin="0,8,0,0"
+                        IsVisible="{Binding ShowChannelMetaRow}">
+              <!-- 并行度（仅并行操作显示） -->
+              <StackPanel Orientation="Horizontal"
+                          Spacing="{DynamicResource SpacingXxs}"
+                          IsVisible="{Binding HasParallelDegree}">
+                <TextBlock Text="⚙" FontSize="14"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+                <TextBlock Text="{Binding LocalizedStrings[Progress_Stats_Parallel]}" FontSize="11"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                <TextBlock Text="{Binding ParallelDegree}" FontSize="13" FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+              </StackPanel>
+              <!-- 分隔符（仅并行与压缩汇总都在时显示） -->
+              <TextBlock Text="·" FontSize="11"
+                         VerticalAlignment="Center"
+                         IsVisible="{Binding ShowChannelMetaSeparator}"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+              <!-- 整体压缩汇总（仅 ZIP 压缩完成后显示；格式 A：输出大小 (率%)） -->
+              <StackPanel Orientation="Horizontal"
+                          Spacing="{DynamicResource SpacingXxs}"
+                          IsVisible="{Binding HasOverallCompression}">
+                <TextBlock Text="🗜" FontSize="14"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+                <TextBlock Text="{Binding LocalizedStrings[Progress_Stats_Compressed]}" FontSize="11"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                <TextBlock Text="{Binding OverallCompressionText}" FontSize="13" FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+              </StackPanel>
+            </StackPanel>
+
+          </StackPanel>
+        </Border>
+
+        <!-- 中等单行（仅「中」档显示，与统计卡互斥）：已处理 + 总大小 + 速度 + 并行 -->
+        <StackPanel x:Name="MediumStatsPanel"
+                    Orientation="Horizontal"
+                    Spacing="{DynamicResource SpacingLg}"
+                    HorizontalAlignment="Center"
+                    IsVisible="{Binding IsMediumDensity}">
+          <!-- 已处理（引擎未上报时隐藏） -->
+          <TextBlock Text="{Binding StatsProcessedText}"
+                     IsVisible="{Binding StatsProcessedText, Converter={StaticResource StringNotEmpty}}"
+                     FontSize="12"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+          <!-- 总大小（引擎未上报 TotalBytes 时隐藏，Rule 6） -->
+          <TextBlock Text="{Binding StatsTotalSizeText}"
+                     IsVisible="{Binding StatsTotalSizeText, Converter={StaticResource StringNotEmpty}}"
+                     FontSize="12"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+          <!-- 实时速度（EMA 平滑；无字节上报的引擎为空 → 隐藏） -->
+          <TextBlock Text="{Binding SpeedText}"
+                     IsVisible="{Binding SpeedText, Converter={StaticResource StringNotEmpty}}"
+                     FontSize="12" FontWeight="SemiBold"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+          <!-- 并行度（仅并行解压出现；标签与数值两个 TextBlock，避免 StringFormat） -->
+          <StackPanel Orientation="Horizontal"
+                      Spacing="{DynamicResource SpacingXxs}"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding HasParallelDegree}">
+            <TextBlock Text="{Binding LocalizedStrings[Progress_Stats_Parallel]}"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+            <TextBlock Text="{Binding ParallelDegree}"
+                       FontSize="12" FontWeight="SemiBold"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+          </StackPanel>
+        </StackPanel>
+
+        <!-- 总体进度标签行：左批次档案序号（"N / M"，非批次为空）+ 右总体百分比 -->
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Text="{Binding BatchArchiveIndexText}"
+                     IsVisible="{Binding BatchArchiveIndexText, Converter={StaticResource StringNotEmpty}}"
+                     FontSize="11"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+          <TextBlock Grid.Column="1"
+                     Text="{Binding PercentComplete, StringFormat=\{0\}%}"
+                     FontSize="12" FontWeight="Bold"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+        </Grid>
+
+        <!-- 总体进度条（支持不定进度模式；比文件进度条更粗以区分层级） -->
+        <ProgressBar Value="{Binding PercentComplete}"
+                     Minimum="0" Maximum="100"
+                     IsIndeterminate="{Binding IsIndeterminate}"
+                     Height="{DynamicResource ControlHeightMd}"
+                     Foreground="{DynamicResource ThemeProgressFillBrush}"
+                     Background="{DynamicResource ThemeProgressBgBrush}"/>
+
+        <!-- 文件计数（压缩包 N/M；非批次模式为 1/1） -->
+        <TextBlock x:Name="FileCountText"
+                   Text="{Binding FileCountText}"
+                   FontSize="11"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+
+        <!-- 时间行：左「已用」由 code-behind DispatcherTimer 每秒刷新，右「剩余」为 ETA（无效时为空） -->
+        <Grid ColumnDefinitions="*,Auto">
+          <TextBlock Grid.Column="0"
+                     Text="{Binding ElapsedText}"
+                     FontSize="12"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+          <TextBlock Grid.Column="1"
+                     Text="{Binding RemainingText}"
+                     IsVisible="{Binding RemainingText, Converter={StaticResource StringNotEmpty}}"
+                     FontSize="12"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+        </Grid>
+      </StackPanel>
+    </Border>
+
+    <!-- ═══ Row 4: 状态行（左侧状态图标 + 可复制只读文本框，20px；位于信息区之后、错误摘要/按钮行之前）═══ -->
+    <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto">
+      <!-- 状态图标：始终存在，随 StatusKind 变化（准备/进行/暂停/完成/失败/取消） -->
+      <PathIcon Grid.Column="0"
+                Data="{Binding StatusIconKey, Converter={StaticResource GeometryResource}}"
+                Foreground="{Binding StatusBrushKey, Converter={StaticResource BrushResource}}"
+                Width="20" Height="20"
+                VerticalAlignment="Center"
+                Margin="0,0,8,0" />
+      <!-- 状态行文本框：只读可选中，文案随暂停/恢复/完成变化（原 Row 3 TextBlock 下移并升级） -->
+      <TextBox x:Name="StatusLineBox"
+               Grid.Column="1"
                Text="{Binding StatusMessage}"
-               FontSize="12"
+               IsReadOnly="True"
+               TextWrapping="Wrap"
+               FontSize="20"
                FontWeight="SemiBold"
                Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-               Margin="0,0,0,4"
-               TextTrimming="CharacterEllipsis"/>
+               Background="Transparent"
+               BorderThickness="0"
+               Padding="0"
+               VerticalAlignment="Center"
+               IsTabStop="False" />
+      <!-- 状态行复制按钮：复制 StatusMessage 全文，复用 ShowCopyFeedback（PathIcon 必须直接作 Content） -->
+      <Button x:Name="StatusCopyBtn"
+              Grid.Column="2"
+              Click="StatusCopyBtn_Click"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              Height="{DynamicResource ControlHeightSm}"
+              Padding="6,2"
+              VerticalAlignment="Center"
+              Margin="6,0,0,0">
+        <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+    </Grid>
 
-    <!-- Row 7: 错误摘要（仅有错误时可见） -->
-    <TextBox x:Name="ErrorSummaryBox" Grid.Row="7"
-             Text="{Binding ErrorSummaryText}"
-             IsReadOnly="True"
-             IsVisible="{Binding HasErrors}"
-             TextWrapping="Wrap"
-             FontSize="12"
-             Foreground="{DynamicResource ThemeStatusErrorBrush}"
-             Background="Transparent"
-             BorderThickness="0"
-             Padding="0,0,0,6"
-             IsTabStop="False"
-             Focusable="False"
-             Cursor="Arrow"/>
+    <!-- ═══ Row 5: 错误摘要（红段=失败 + 黄段=带原因跳过；两段独立显隐；复制按钮聚合两段）═══ -->
+    <Grid Grid.Row="5" ColumnDefinitions="*,Auto">
+      <StackPanel Spacing="0">
+        <!-- 红段：整包异常 + 逐条目失败（既有 HasErrors 驱动） -->
+        <TextBox x:Name="ErrorSummaryRedBox"
+                 Text="{Binding ErrorSummaryText}"
+                 IsReadOnly="True"
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 Foreground="{DynamicResource ThemeStatusErrorBrush}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0,0,0,2"
+                 IsVisible="{Binding HasErrors}"
+                 IsTabStop="False"
+                 Focusable="False" />
+        <!-- 黄段：压缩端带原因跳过（不触发 HasErrors，D4） -->
+        <TextBox x:Name="ErrorSummaryYellowBox"
+                 Text="{Binding SkippedSummaryText}"
+                 IsReadOnly="True"
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 Foreground="{DynamicResource ThemeStatusWarningBrush}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0,0,0,2"
+                 IsVisible="{Binding HasSkippedEntries}"
+                 IsTabStop="False"
+                 Focusable="False" />
+      </StackPanel>
+      <!-- 摘要复制按钮：复制 CombinedSummaryText（红段 + 换行 + 黄段）；红或黄任一非空即显示 -->
+      <Button x:Name="SummaryCopyBtn"
+              Grid.Column="1"
+              Click="SummaryCopyBtn_Click"
+              IsVisible="{Binding HasAnySummary}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              Height="{DynamicResource ControlHeightSm}"
+              Padding="6,2"
+              VerticalAlignment="Top"
+              Margin="6,0,0,0">
+        <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+    </Grid>
 
-    <!-- Row 9: 底部按钮行：保持打开 / 暂停 / 取消 -->
-    <Grid Grid.Row="9" Margin="0,4,0,2">
+    <!-- ═══ Row 6: 底部按钮行 ═══
+         保持打开（📌 置顶开关） | 弹性填充 | 暂停/继续 | 取消。 -->
+    <Grid Grid.Row="6" Margin="0,2,0,0">
       <Grid.ColumnDefinitions>
         <ColumnDefinition Width="Auto"/>
         <ColumnDefinition Width="*"/>
         <ColumnDefinition Width="Auto"/>
         <ColumnDefinition Width="Auto"/>
       </Grid.ColumnDefinitions>
-      <!-- 保持打开切换按钮（完成后不自动关闭） -->
-      <ToggleButton x:Name="KeepOpenToggle" Grid.Column="0"
-               Height="34" Width="44"
-               IsChecked="{Binding KeepOpenOnComplete}"
-               ToolTip.Tip="{Binding LocalizedStrings[Progress_KeepOpen]}"
-               VerticalAlignment="Center" Margin="0,0,4,0"
-               Background="{DynamicResource ThemeButtonBgBrush}"
-               BorderBrush="{DynamicResource ThemeBorderBrush}"
-               BorderThickness="1">
-        <PathIcon Data="{StaticResource IconPin}" Width="16" Height="16" />
-      </ToggleButton>
-      <!-- 暂停/继续按钮 -->
+      <!-- Column 0 左侧簇：保持打开 + 解压后置开关（📁 打开目录 / 🗑 移回收站） -->
+      <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+        <!-- 保持打开切换按钮（完成后不自动关闭） -->
+        <ToggleButton x:Name="KeepOpenToggle"
+                      Height="{DynamicResource ControlHeightLg}" Width="44"
+                      IsChecked="{Binding KeepOpenOnComplete}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Progress_KeepOpen]}"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+          <PathIcon Data="{StaticResource IconPin}" Width="16" Height="16" />
+        </ToggleButton>
+        <!-- 解压后打开目标目录（实例级；IsVisible 由能力位驱动 → 压缩/测试流隐藏，规则 6） -->
+        <ToggleButton x:Name="OpenFolderToggle"
+                      IsChecked="{Binding OpenFolderAfterExtract}"
+                      IsVisible="{Binding ShowOpenFolderToggle}"
+                      Height="{DynamicResource ControlHeightLg}" Width="44"
+                      ToolTip.Tip="{Binding LocalizedStrings[Settings_Extract_OpenFolderAfter]}"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+          <PathIcon Data="{StaticResource IconFolder}" Width="16" Height="16" />
+        </ToggleButton>
+        <!-- 解压后把原压缩包移入回收站（同上） -->
+        <ToggleButton x:Name="DeleteArchiveToggle"
+                      IsChecked="{Binding DeleteArchiveAfterExtract}"
+                      IsVisible="{Binding ShowDeleteArchiveToggle}"
+                      Height="{DynamicResource ControlHeightLg}" Width="44"
+                      ToolTip.Tip="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+          <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16" />
+        </ToggleButton>
+      </StackPanel>
+      <!-- 倒计时组：自动关闭剩余秒数（仅延时等待期显示；行内可临时改，实例级不回写设置，spec §10.3/§10.4） -->
+      <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                  HorizontalAlignment="Left"
+                  VerticalAlignment="Center"
+                  IsVisible="{Binding AutoCloseCountdownVisible}">
+        <!-- 数字框：聚焦即冻结倒数，Enter 提交 / Esc 回退 / 失焦提交 -->
+        <TextBox x:Name="CountdownBox"
+                 Width="14"
+                 TextAlignment="Right"
+                 FontSize="18"
+                 GotFocus="CountdownBox_GotFocus"
+                 LostFocus="CountdownBox_LostFocus"
+                 KeyDown="CountdownBox_KeyDown"
+                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+        <!-- 静态后缀「秒后自动关闭」（数字由上方 TextBox 承载，故本 key 不含 {0}） -->
+        <TextBlock Text="{Binding LocalizedStrings[Progress_AutoCloseSuffix]}"
+                   VerticalAlignment="Center"
+                   FontSize="13"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+      </StackPanel>
+      <!-- 暂停/继续按钮：完成/失败终态（IsPauseButtonVisible=false）自动隐藏 -->
       <Button x:Name="PauseButton" Grid.Column="2"
-              Width="80" Height="34" Margin="0,0,8,0"
+              IsVisible="{Binding IsPauseButtonVisible}"
+              Width="80" Height="{DynamicResource ControlHeightLg}"
               Click="PauseButton_Click"
               Background="{DynamicResource ThemeButtonBgBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -280,9 +1047,10 @@
           <TextBlock x:Name="PauseButtonText" Text="{Binding LocalizedStrings[Progress_Button_Pause]}" />
         </StackPanel>
       </Button>
-      <!-- 取消按钮 -->
+      <!-- 取消按钮：Margin 左 8 与暂停按钮保持 8px 间距 -->
       <Button x:Name="CancelButton" Grid.Column="3"
-              Width="80" Height="34"
+              Width="80" Height="{DynamicResource ControlHeightLg}"
+              Margin="8,0,0,0"
               Command="{Binding CancelCommand}"
               IsEnabled="{Binding IsCancelEnabled}"
               Background="{DynamicResource ThemeButtonBgBrush}"
@@ -294,5 +1062,37 @@
         </StackPanel>
       </Button>
     </Grid>
+
+    <!-- ═══ 复制成功 Toast（原型 .toast，底部居中浮现 1.6s 后隐藏）═══
+         作为 RootGrid 最后一个子级 RowSpan=7 叠加在按钮行之上（末位声明 = 渲染在最上层；
+         按钮行中央为弹性填充列，Toast 居中不遮挡两侧按钮）。
+         初始 IsVisible=False 不参与测量，SizeToContent=Height 不受影响；
+         显示时 code-behind 先置 IsVisible 再异步抬 Opacity，触发下方 0.2s 淡入过渡。
+         IsHitTestVisible=False：Toast 仅作提示，点击穿透不拦截底部按钮操作。 -->
+    <Border x:Name="CopyToast"
+            Grid.Row="0" Grid.RowSpan="7"
+            HorizontalAlignment="Center"
+            VerticalAlignment="Bottom"
+            Margin="{DynamicResource SpacingXsThk}"
+            Padding="{DynamicResource SpacingSmThk}"
+            Background="{DynamicResource ThemeSurfaceBgBrush}"
+            BorderBrush="{DynamicResource ThemeStatusSuccessBrush}"
+            BorderThickness="1"
+            CornerRadius="{DynamicResource BorderRadius}"
+            BoxShadow="0 2 8 0 #40000000"
+            IsVisible="False"
+            IsHitTestVisible="False"
+            Opacity="0">
+      <!-- 淡入过渡：Opacity 0→1（对齐原型 toastIn 0.2s） -->
+      <Border.Transitions>
+        <Transitions>
+          <DoubleTransition Property="Opacity" Duration="0:0:0.2"/>
+        </Transitions>
+      </Border.Transitions>
+      <!-- 提示文案（Progress_Toast_Copied 三语值由 T11 补齐；缺失时 T() 回退显示 key 字面量） -->
+      <TextBlock Text="{Binding LocalizedStrings[Progress_Toast_Copied]}"
+                 FontSize="12"
+                 Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+    </Border>
   </Grid>
 </Window>
