@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-15** — 修复 PROGRESS.md merge 双重编码乱码（19feaee 引入）
+  - **问题**：merge commit `19feaee`（Merge branch 'beta' into alpha）将 UTF-8 中文按 GBK（CP936）误读后重新存为 UTF-8（双重编码），导致 PROGRESS.md 约 135 行乱码（典型标记 € / 寮 / 鈥）。两个父版本 `13cde41`（alpha）/ `8328178`（beta）内容均完好。
+  - **修复**：方案 2 —— 以 `13cde41` 为基底重建，叠加 beta 独有 2 行（10-13 帮助窗 Markdown 化 / 10-13 根治帮助弹窗空白，插入 2026-10 区对应位置）+ merge 后新增 3 条未受损行（10-15 CRC / 10-15 ZIP / 10-14 PercentComplete），保持原文件 BOM + CRLF 格式写回。
+  - **验证**：重建后 294 行与 HEAD 结构签名 0 diff、乱码标记 0 行、3+2 条关键行全部存在；`git status` 仅 `docs/PROGRESS.md` 变更。
+
 **2026-10-15** — 进度窗口失败原因新增「数据损坏（CRC 校验失败）」
   - **改动**：`ProgressViewModel.ReasonText`（失败根因 → 本地化文案）新增 `EntryFailureReason.CrcMismatch => LocalizationManager.T("Error_Reason_CrcMismatch")` 分支；`Localization/strings.{zh-CN,en,zh-TW}.json` 成对新增 `Error_Reason_CrcMismatch`（「数据损坏（CRC 校验失败）」/ "Data corruption (CRC check failed)" / 「資料損壞（CRC 校驗失敗）」），插于 `Error_Reason_IoFailed` 之后，维持 UTF-8 BOM + CRLF + 2 空格缩进。
   - **背景**：Core 侧 ZIP 损坏检测（见共享层 2026-10-15 条目）现会产出 `EntryFailureReason.CrcMismatch`，UI 据此在错误摘要显示可读原因而非「未知错误」。
