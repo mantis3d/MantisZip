@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-15** — 立项「图标主题系统」：可切换图标风格 + 用户可导入图标库（📋 设计阶段，brainstorming 规格已批准）
+  - **决策**：内置 6 套风格（A 现状默认 / C 粗圆角 / D 双色 / E 彩彩色 / F 渐变 / G 强调色）；范围**仅应用内矢量图标**（`AppIcons.axaml` 实测 116 键），文件类型系统图标 / Shell 右键 .ico / 文件关联注册表图标**全部排除、机制分离**；导入粒度 = 整套导入 + 单图标覆盖
+  - **架构**：资源契约 Geometry → `DrawingImage`（多部件，吸收彩色/渐变/双色）；三层字典层叠（默认 A 垫底 → 当前主题 → 单图标覆盖）+ 自定义 `IconView` 薄控件（`Source` 走 DynamicResource 换主题自动刷新，`Foreground` 语义保留「选中变白」上下文着色——证据：Fluent 模板 PathIcon 靠 Foreground 上色，纯 `Image` 方案会丢该语义）
+  - **迁移**：~175 处 `PathIcon Data={StaticResource}` → `IconView Source={DynamicResource}`、11 处 converter、2 处 BoolToIconConverter、1 处 C# 动态设置
+  - **导入**：文件夹/ZIP（manifest 全可选 + `IconXxx.svg` 键名约定）→ SVG 仅提取几何+填充色（禁 DTD/实体防 XXE）→ 覆盖率对照 116 键清单（缺键只警告，层叠兜底）→ `%LOCALAPPDATA%\MantisZip\icon-packs\`；错误处理以「原子拒绝 / 静默回退」为原则
+  - **产物**：规格 `docs/superpowers/specs/2026-10-15-icon-theme-system-design.md`（含 5 轮决策记录 + 3 方案权衡）；视觉对比稿存 `.superpowers/brainstorm/`（未入库）
+  - **下一步**：writing-plans 生成实施计划；本立项不涉及版本号变更
+
 **2026-10-08** — 立项「文件选择器去弹窗化」：CustomFilePickerControl 内嵌方案（📋 计划阶段，含交互原型）
   - **交互决策**：压缩/解压设置窗的文件/目录选择器全部内嵌，不再弹独立窗口；Tab 结构调整——压缩端输出设置（最前）/ 添加文件 / 压缩设置（原「高级」改名并吸收原「常规」）/ 文件过滤，解压端对称
   - **简单选择模式**：PickItems 默认简单模式——隐藏复选框、单击即选、Shift 范围多选、覆盖语义、双击目录进入并清空选择；高级开关（复选框 + 跨目录记忆）切回累积形态
