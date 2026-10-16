@@ -77,4 +77,63 @@ public class WholeArchiveErrorLocalizerTests
         Assert.Equal(LocalizationManager.T("Error_Whole_FallbackFmt", "boom"), message);
         Assert.Equal("boom", detail);
     }
+
+    // ── 引擎损坏异常 → 本地化「文件损坏」（借真实语料异常，避免猜测异常构造函数） ──
+
+    [Fact]
+    public async Task ToUserText_SharpCompressArchiveException_LocalizesToCorrupted()
+    {
+        var engine = new MantisZip.Core.Engines.ZipEngine();
+        var ex = await Assert.ThrowsAnyAsync<Exception>(
+            () => engine.ListEntriesAsync(CorpusPath("corrupt-01-truncated-tail.zip")));
+
+        var (message, detail) = WholeArchiveErrorLocalizer.ToUserText(ex);
+
+        Assert.Equal(LocalizationManager.T("Error_Whole_Corrupted"), message);
+        Assert.Equal(ex.Message, detail);
+    }
+
+    [Fact]
+    public async Task ToUserText_SharpCompressInvalidFormat_LocalizesToCorrupted()
+    {
+        var engine = new MantisZip.Core.Engines.TarGzEngine();
+        var ex = await Assert.ThrowsAnyAsync<Exception>(
+            () => engine.ListEntriesAsync(CorpusPath("corrupt-22-targz-inner-not-tar.tar.gz")));
+
+        var (message, _) = WholeArchiveErrorLocalizer.ToUserText(ex);
+
+        Assert.Equal(LocalizationManager.T("Error_Whole_Corrupted"), message);
+    }
+
+    [Fact]
+    public void ToUserText_SharpSevenZipArchiveException_LocalizesToCorruptedOrPassword()
+    {
+        var ex = new SharpSevenZip.Exceptions.SharpSevenZipArchiveException("Invalid archive: open/read error!");
+
+        var (message, _) = WholeArchiveErrorLocalizer.ToUserText(ex);
+
+        Assert.Equal(LocalizationManager.T("Error_Whole_CorruptedOrPassword"), message);
+    }
+
+    [Fact]
+    public void ToUserText_ExtractionFailedException_LocalizesToCorrupted()
+    {
+        var ex = new SharpSevenZip.Exceptions.ExtractionFailedException("File is corrupted. Data error has occured.");
+
+        var (message, _) = WholeArchiveErrorLocalizer.ToUserText(ex);
+
+        Assert.Equal(LocalizationManager.T("Error_Whole_Corrupted"), message);
+    }
+
+    private static string CorpusPath(string fileName) =>
+        Path.Combine(GetRepoRoot(), "tests", "corpus", "corrupt-archives", fileName);
+
+    private static string GetRepoRoot()
+    {
+        var dir = AppContext.BaseDirectory;
+        while (dir != null && !Directory.Exists(Path.Combine(dir, "src")))
+            dir = Path.GetDirectoryName(dir);
+        return dir ?? throw new InvalidOperationException(
+            $"无法定位仓库根（未找到 'src' 目录）。Base directory: {AppContext.BaseDirectory}");
+    }
 }

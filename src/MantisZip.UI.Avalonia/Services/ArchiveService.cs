@@ -119,7 +119,15 @@ public class ArchiveService
                 return ArchiveLoadResult.PasswordRequired();
             }
 
-            return ArchiveLoadResult.Failure(LocalizationManager.T("Status_OpenArchiveFailed", ex.Message));
+            // 打开失败：本地化整包错误，不再裸露引擎英文原文。
+            // 头部结构明确损坏（7z/RAR）→ 直接判「文件损坏」；否则走 WholeArchiveErrorLocalizer 映射。
+            if (ArchiveHeaderProbe.Probe(archivePath) == HeaderStructure.Broken)
+            {
+                return ArchiveLoadResult.Failure(LocalizationManager.T("Error_Whole_Corrupted"));
+            }
+
+            var (message, _) = WholeArchiveErrorLocalizer.ToUserText(ex);
+            return ArchiveLoadResult.Failure(message);
         }
     }
 }

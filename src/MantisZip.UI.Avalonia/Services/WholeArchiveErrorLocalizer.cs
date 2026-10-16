@@ -1,3 +1,6 @@
+using SharpCompress.Common;
+using SharpSevenZip.Exceptions;
+
 namespace MantisZip.UI.Avalonia.Services;
 
 /// <summary>
@@ -44,6 +47,22 @@ public static class WholeArchiveErrorLocalizer
             // thrower 侧已本地化（如 Status_ArchiveCorrupted），透传原文避免双重本地化
             case InvalidDataException:
                 return (ex.Message, null);
+
+            // SharpCompress 损坏/格式异常（如 "Failed to locate the Zip Header"、
+            // "Unexpected EOF reading tar file"、"Not a tar file."）→ 本地化「文件损坏」。
+            // 派生类型置于基类 ArchiveException 之前（避免 switch 不可达）。
+            case InvalidFormatException:
+            case IncompleteArchiveException:
+            case ArchiveException:
+                return (LocalizationManager.T("Error_Whole_Corrupted"), ex.Message);
+
+            // SharpSevenZip 解压/校验失败（"File is corrupted. Data error has occured."）→ 明确数据损坏
+            case ExtractionFailedException:
+                return (LocalizationManager.T("Error_Whole_Corrupted"), ex.Message);
+
+            // SharpSevenZipArchiveException：加密头无密码 与 头部损坏 抛同一异常，措辞保留歧义
+            case SharpSevenZipArchiveException:
+                return (LocalizationManager.T("Error_Whole_CorruptedOrPassword"), ex.Message);
 
             default:
                 return (LocalizationManager.T("Error_Whole_FallbackFmt", ex.Message), ex.Message);

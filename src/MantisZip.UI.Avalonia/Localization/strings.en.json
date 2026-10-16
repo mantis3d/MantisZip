@@ -6,6 +6,8 @@
   "Error_Whole_DirectoryNotFound": "Directory not found: {0}",
   "Error_Whole_UnauthorizedAccess": "Access denied: {0} (check folder permissions)",
   "Error_Whole_FallbackFmt": "Operation failed: {0}",
+  "Error_Whole_Corrupted": "File is corrupted or invalid",
+  "Error_Whole_CorruptedOrPassword": "Cannot read archive: it may be corrupted or password-protected",
   "Error_Hint_DiskFull": "Not enough disk space; free up space and retry",
   "Error_Hint_FileInUse": "File is in use by another program; close it and retry",
   "Error_Hint_PathTooLong": "Path too long; move the target to a shorter directory",

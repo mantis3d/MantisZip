@@ -1,3 +1,4 @@
+using Avalonia.Headless.XUnit;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
@@ -1256,7 +1257,11 @@ public class ProgressViewModelTests
     /// 切换语言应触发 LocalizedStrings 的 PropertyChanged，且字典值与 T() 当前值一致。
     /// try/finally 快速恢复语言（xUnit 跨类并行，静态 CultureChanged 不得外泄）。
     /// </summary>
-    [Fact]
+    // 切换语言会改全局静态 LocalizationManager.CurrentLanguage，并触发 CultureChanged；
+    // 泄漏的 Avalonia 绑定（如其它测试残留的 ProgressWindow）会在该事件上更新显示，
+    // 若在非 UI 线程发出会抛「The calling thread cannot access this object」。
+    // 故这两个用例走 AvaloniaFact（headless UI 线程）。
+    [AvaloniaFact]
     public void CultureChanged_RefreshesLocalizedStrings()
     {
         var original = LocalizationManager.CurrentLanguage;
@@ -1287,7 +1292,7 @@ public class ProgressViewModelTests
     /// <summary>
     /// DetachLocalization 后不应再响应 CultureChanged（防止窗口关闭后 VM 被静态事件根引用泄漏）。
     /// </summary>
-    [Fact]
+    [AvaloniaFact]
     public void DetachLocalization_PreventsCultureChangedRefresh()
     {
         var original = LocalizationManager.CurrentLanguage;

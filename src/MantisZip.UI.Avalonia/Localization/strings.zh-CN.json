@@ -6,6 +6,8 @@
   "Error_Whole_DirectoryNotFound": "找不到目录：{0}",
   "Error_Whole_UnauthorizedAccess": "拒绝访问：{0}（请检查文件夹权限）",
   "Error_Whole_FallbackFmt": "操作失败：{0}",
+  "Error_Whole_Corrupted": "文件损坏或格式无效",
+  "Error_Whole_CorruptedOrPassword": "无法读取压缩包：文件可能已损坏，或需要密码",
   "Error_Hint_DiskFull": "磁盘空间不足，请清理后重试",
   "Error_Hint_FileInUse": "文件正被其他程序占用，请关闭后重试",
   "Error_Hint_PathTooLong": "路径过长，请将目标移动到更短的目录",
