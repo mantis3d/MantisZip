@@ -1021,6 +1021,21 @@ public class ProgressViewModelTests
     }
 
     [Fact]
+    public void SetErrorSummary_AfterBeginPreparing_SwitchesStatusFromPreparingToFailed()
+    {
+        // 回归：引擎在「准备静默期」（首次上报前）抛错时，状态行原先永久停在 BeginPreparing
+        // 写入的「正在准备…」（EndPreparing 只在首个 SetProgress 调用）→ SetErrorSummary 须切到失败文案。
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+        Assert.Equal(LocalizationManager.T("Progress_Preparing"), vm.StatusMessage);
+
+        vm.SetErrorSummary("压缩条目包含非法路径: ../evil.txt");
+
+        Assert.Equal(LocalizationManager.T("Status_OperationFailed"), vm.StatusMessage);
+        Assert.Equal(ProgressStatusKind.Failed, vm.StatusKind);
+    }
+
+    [Fact]
     public void CombinedSummaryText_RedThenYellow_SingleNewline()
     {
         var vm = new ProgressViewModel();

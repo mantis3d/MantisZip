@@ -1522,6 +1522,12 @@ public partial class ProgressViewModel : ObservableObject
         _wholeArchiveError = message;
         _wholeArchiveErrorDetail = detail;
         RebuildSummaryTexts();
+        // 状态行切到失败文案：否则引擎在「准备静默期」（首次进度上报前）抛错时，状态行会
+        // 永久停在 BeginPreparing 写入的「正在准备…」（EndPreparing 只在首个 SetProgress 时调用）。
+        // 后续若再走 SetComplete/CompleteWithErrors 会覆盖本文案（如「部分失败但整体完成」）。
+        _isPreparing = false;
+        IsIndeterminate = false;
+        StatusMessage = LocalizationManager.T("Status_OperationFailed");
         // 失败终态：操作已结束，暂停无意义 → 隐藏暂停按钮
         // （批中单项失败走 SetBatchItemStatus/OnHasErrorsChanged，不在这里隐藏——批操作仍在继续）
         IsPauseButtonVisible = false;

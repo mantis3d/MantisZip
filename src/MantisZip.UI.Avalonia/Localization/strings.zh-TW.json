@@ -1,5 +1,6 @@
 ﻿{
   "Progress_WriteFailed_Fmt": "有 {0} 個檔案未能寫入到 {1}",
+  "Status_OperationFailed": "操作失敗",
   "Progress_FailedBreakdown_Fmt": "共 {0} 個失敗：{1}",
   "Progress_SkippedBreakdown_Fmt": "共 {0} 個跳過：{1}",
   "Error_Whole_FileNotFound": "找不到檔案：{0}",

@@ -1,5 +1,6 @@
 ﻿{
   "Progress_WriteFailed_Fmt": "{0} file(s) failed to write to {1}",
+  "Status_OperationFailed": "Operation failed",
   "Progress_FailedBreakdown_Fmt": "{0} failed: {1}",
   "Progress_SkippedBreakdown_Fmt": "{0} skipped: {1}",
   "Error_Whole_FileNotFound": "File not found: {0}",
