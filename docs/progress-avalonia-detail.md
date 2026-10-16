@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-16** — 压缩加速三开关：两阶段计划立项 + 交互原型（Phase 1 UI 收敛 / Phase 2 实现）
+  - **背景**：用户实测「不启用自适应的情况下开启多线程反而起到了反作用」→ 展开为实测 + 全仓代码审计，查出 4 个问题：① **「并行压缩组数」是性能陷阱**（16 核设 2 组只用 **1.95 个核**，5.47s vs 设 16 组的 1.64s，3.3x；根因 `ZipEngine.cs:4103` N 组路径每组强制 `mt=off` → **并行度 = 组数**，实测 `avgCores ≈ degree`）；② **多线程压缩在自适应关闭时是负收益**（可压缩数据上比完全不开多线程慢 **1.5–1.8x**，根因 MT 路径改用 7z 的 Deflate：压缩率 +15.2% 但更慢）；③ **`AdaptiveSmartDetect`（魔数检测）空转**——全仓无引擎消费者，只有 UI 绑定 + `AppSettings` 持久化 + 参数透传，`AdaptiveRuleMatcher.ResolveLevel(..., adaptiveSmartDetect:)` 形参只写日志不参与分支，而 `ArchiveEngine.cs:183` 注释却写「自适应关闭时无效」；④ **`AdaptiveOverrides`（自适应规则）同样空转**——`AdaptiveRuleMatcher.ResolveLevel` 无生产调用点（仅测试引用），`CompressRequest`/`ArchiveOptions` 根本没有规则字段；另发现自定义格式的 `MagicHex` 也不被 `ZipEntryClassifier.GetAdaptiveLevel` 读取（只读 `Extensions`）
+  - **实测数据**（16 核 / level 5 / 关调试日志 / reps=3–5）：2×2 矩阵（全关 / 仅自适应 / 仅多线程 / 自适应+多线程）× text/media/mixed 三语料；**SSD(C:,NVMe) 与 HDD(E:,SATA) 两盘复测结论一致**（语料 50–100MB 全落在 32GB 页缓存内 → 负载是 CPU-bound 不是 I/O-bound，据此推翻「MT 的临时文件+合并 I/O 吃掉收益」的旧判断）；组数扫描 deg=1/2/4/8/16；**方案 C 端到端验证**（`mt=N` 经 `CustomParameters` 被 7z 接受即 `-mmt=N`，avgCores ≈ N；`G 组 × mt=核数/G` 时 **avgCores 恒 ≈12 与 G 无关**，deg=2 从 5.47s → 1.32s）
+  - **产出计划**：`.omo/plans/未开始/adaptive-compress-ui-convergence.md`（Phase 1 = 删「并行压缩组数」控件 + 引擎 `mt` 解耦（默认组数 `clamp(核数,2,8)`）+ 多线程依赖自适应 + 隐藏三个空转控件；Phase 2 = 实现魔数检测（复用现成 `Core/Utils/FileFormatDetector`）与自适应规则 + 接回隐藏 UI；含「Phase 2 恢复清单」兜住隐藏门控）；`docs/PLAN.md` P1 行同步
+  - **交互原型**：`docs/prototypes/compress-format-options-panel.html`（单文件离线，覆盖「压缩设置 → 高级 → 格式选项面板」与「设置 → 加速」两处受影响界面；控制条含格式/主题/改动前后/超 4GB 四组开关，主题色逐值取自 `Themes/ThemeLight.axaml`、`ThemeDark.axaml`）
+  - **验证**：原型经 Edge 无头截图逐态核对（默认 / 自适应关闭 / 深色+改动前视图 / 超 4GB），无 JS 报错；`git status` 仅文档与原型变更，未触碰源码
+
 **2026-10-16** — 合并 main → beta（4 处冲突全部解决）
   - **背景**：`git merge main`（base `68ef1ad`）——main 带来「计划库审计与重新归类」，beta 有较新计划/进度条目，4 处冲突全为文档：`.omo/plans/未开始/progress-window-enhancement.md`（deleted by us）+ `docs/PLAN.md`（3 块）+ `docs/PROGRESS.md`（历史索引表）+ `docs/progress-avalonia-detail.md`（同日条目块）
   - **解决**：① `progress-window-enhancement.md` 接受 beta 的 `已完成/` v2 全量重写（main 对 v1 的路径修正已被 v2 覆盖），删除 `未开始/` 副本；② `PLAN.md`——日期取 2026-10-16、保留 beta 新增 3 行（zip-crc-validation / parallel-compress-plan-d / parallel-compress-plan-a）、删除 compression-performance-optimization 行（main 审计已把该计划移入 `已完成`，保留会造成 `未开始/` 死链，其剩余工作由 D/A 两方案承接）、执行顺序段落按两分支事实合并为「3 项依赖链」；③ `PROGRESS.md` 历史索引取并集（beta 7 条「未发布」在前 + main 2 条 v0.5.1/v0.5.0 在后）；④ 本文件取并集（main 的 10-16 审计条目置顶 + beta 的 10-15…10-10 块）
