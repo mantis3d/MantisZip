@@ -64,8 +64,20 @@ public static class WholeArchiveErrorLocalizer
             case SharpSevenZipArchiveException:
                 return (LocalizationManager.T("Error_Whole_CorruptedOrPassword"), ex.Message);
 
+            // Core 对「加密包无密码」抛 InvalidOperationException（消息含「加密」/encrypted）：
+            // 映射到干净本地化文案。不改 Core 消息本身——其为中英双语且被密码分类启发式
+            // （PasswordService.ClassifyGenericException 查 "password"/"encrypted"）依赖。
+            // 置于最后：若某引擎异常派生自 InvalidOperationException，其专属分支优先命中。
+            case InvalidOperationException ioe when IsEncryptedSignal(ioe.Message):
+                return (LocalizationManager.T("Error_ArchiveEncrypted"), ioe.Message);
+
             default:
                 return (LocalizationManager.T("Error_Whole_FallbackFmt", ex.Message), ex.Message);
         }
     }
+
+    /// <summary>消息是否表示「加密包需要密码」（Core 双语消息含「加密」或 "encrypted"）。</summary>
+    private static bool IsEncryptedSignal(string message) =>
+        message.Contains("加密", StringComparison.Ordinal)
+        || message.Contains("encrypted", StringComparison.OrdinalIgnoreCase);
 }

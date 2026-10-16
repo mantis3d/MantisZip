@@ -125,6 +125,38 @@ public class WholeArchiveErrorLocalizerTests
         Assert.Equal(LocalizationManager.T("Error_Whole_Corrupted"), message);
     }
 
+    [Fact]
+    public void ToUserText_EncryptedArchiveMessage_MapsToEncryptedKey()
+    {
+        var ex = new InvalidOperationException(
+            "此压缩包已加密，请输入密码 (This archive is encrypted, password required)");
+
+        var (message, _) = WholeArchiveErrorLocalizer.ToUserText(ex);
+
+        Assert.Equal(LocalizationManager.T("Error_ArchiveEncrypted"), message);
+    }
+
+    [Fact]
+    public async Task ToUserText_EncryptedZipExtractWithoutPassword_MapsToEncryptedKey()
+    {
+        var dest = Path.Combine(Path.GetTempPath(), "mztest-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dest);
+        try
+        {
+            var engine = new MantisZip.Core.Engines.ZipEngine();
+            var ex = await Assert.ThrowsAnyAsync<Exception>(
+                () => engine.ExtractAsync(CorpusPath("enc-01-zip-aes.zip"), dest));
+
+            var (message, _) = WholeArchiveErrorLocalizer.ToUserText(ex);
+
+            Assert.Equal(LocalizationManager.T("Error_ArchiveEncrypted"), message);
+        }
+        finally
+        {
+            try { Directory.Delete(dest, recursive: true); } catch { }
+        }
+    }
+
     private static string CorpusPath(string fileName) =>
         Path.Combine(GetRepoRoot(), "tests", "corpus", "corrupt-archives", fileName);
 
