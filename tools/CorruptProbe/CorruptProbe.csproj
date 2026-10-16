@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AssemblyName>CorruptProbe</AssemblyName>
+    <RootNamespace>CorruptProbe</RootNamespace>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- forensics\ 是独立子项目，不能被根项目默认 glob 编译进来（否则其 obj 生成的 AssemblyInfo 与本项目重复 → CS0579） -->
+    <Compile Remove="forensics\**" />
+    <None Remove="forensics\**" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- 只读引用仓库内 Core 项目（project reference only）——不修改仓库任何源文件。
+         本工具不在 MantisZip.sln 内，属独立诊断工具，手动 dotnet run 调用。 -->
+    <ProjectReference Include="..\..\src\MantisZip.Core\MantisZip.Core.csproj" />
+  </ItemGroup>
+
+</Project>

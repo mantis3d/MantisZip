@@ -129,19 +129,6 @@
                   <TextBlock Text="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
                              TextWrapping="Wrap" />
                 </CheckBox>
-
-                <!-- 并行解压线程数 -->
-                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
-                  <TextBlock Text="{Binding LocalizedStrings[Extract_ParallelDegree]}"
-                             VerticalAlignment="Center" />
-                  <NumericUpDown Minimum="1" Maximum="16"
-                                 Value="{Binding ParallelExtractDegree}"
-                                 Width="120" />
-                  <TextBlock Text="(1=串行，默认=CPU核心数)"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                             FontSize="11" />
-                </StackPanel>
               </StackPanel>
             </Border>
           </StackPanel>
@@ -155,6 +142,79 @@
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <controls:FileFilterEditor x:Name="FileFilterControl" />
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- 选项卡 3：加速（并行解压；与设置窗口对称；初值读取设置，本次解压生效不回写） -->
+      <TabItem Header="{Binding LocalizedStrings[Settings_ExtractTab_Parallel]}"
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconLightning">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <StackPanel Spacing="12" Margin="0,8,0,0">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="4" Padding="12"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="8">
+                <!-- 全局并行开关：关闭则始终串行 -->
+                <CheckBox IsChecked="{Binding EnableParallelExtract}"
+                          Content="{Binding LocalizedStrings[Settings_EnableParallelExtract]}" />
+
+                <!-- 智能并行度区域（全局开关关闭时隐藏，规则 6） -->
+                <StackPanel Spacing="8" IsVisible="{Binding EnableParallelExtract}">
+                  <!-- 智能并行度开关 -->
+                  <CheckBox IsChecked="{Binding SmartParallelDegree}"
+                            Content="{Binding SmartParallelDegreeText}" />
+
+                  <!-- 智能开启：SSD/HDD 双线程数输入 -->
+                  <Grid ColumnDefinitions="Auto,*,Auto,*"
+                        IsVisible="{Binding IsSmartDegreeVisible}"
+                        Margin="24,0,0,0">
+                    <TextBlock Text="{Binding LocalizedStrings[Settings_SmartSsdLabel]}"
+                               VerticalAlignment="Center" />
+                    <NumericUpDown Classes="intOnly"
+                                   Grid.Column="1" Minimum="1" Maximum="16" Increment="1"
+                                   Value="{Binding SmartSsdDegree, Mode=TwoWay}"
+                                   Width="120" HorizontalAlignment="Left" />
+                    <TextBlock Grid.Column="2"
+                               Text="{Binding LocalizedStrings[Settings_SmartHddLabel]}"
+                               VerticalAlignment="Center" Margin="12,0,0,0" />
+                    <NumericUpDown Classes="intOnly"
+                                   Grid.Column="3" Minimum="1" Maximum="16" Increment="1"
+                                   Value="{Binding SmartHddDegree, Mode=TwoWay}"
+                                   Width="120" HorizontalAlignment="Left" />
+                  </Grid>
+
+                  <!-- 智能关闭：手动线程数（1-16） -->
+                  <StackPanel Orientation="Horizontal" Spacing="8"
+                              IsVisible="{Binding IsManualDegreeVisible}"
+                              Margin="24,0,0,0">
+                    <TextBlock Text="{Binding LocalizedStrings[Settings_ManualDegreeLabel]}"
+                               VerticalAlignment="Center" />
+                    <NumericUpDown Classes="intOnly"
+                                   Minimum="1" Maximum="16" Increment="1"
+                                   Value="{Binding ManualParallelDegree, Mode=TwoWay}"
+                                   Width="120" HorizontalAlignment="Left" />
+                    <TextBlock Text="{Binding LocalizedStrings[Settings_ManualDegreeHint]}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                               FontSize="11" />
+                  </StackPanel>
+
+                  <!-- 大包预测试开关（智能开启时显示） -->
+                  <CheckBox IsChecked="{Binding LargeArchivePreTest}"
+                            Content="{Binding LocalizedStrings[Settings_LargeArchivePreTest]}"
+                            IsVisible="{Binding IsPreTestVisible}"
+                            Margin="24,4,0,0" />
+                </StackPanel>
+
+                <!-- 说明：本次解压一次性生效，不改设置 -->
+                <TextBlock Text="{Binding LocalizedStrings[Extract_ParallelNotSavedHint]}"
+                           FontSize="11" TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
         </ScrollViewer>
       </TabItem>
     </TabControl>

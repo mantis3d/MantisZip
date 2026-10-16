@@ -270,6 +270,11 @@ DataContext = ViewModel;
         ViewModel.SevenZipNumFastBytes = FormatOptionsPanel.SevenZipNumFastBytes;
         ViewModel.SevenZipMatchFinder = FormatOptionsPanel.SevenZipMatchFinder ?? "";
         ViewModel.SevenZipMultithreaded = FormatOptionsPanel.SevenZipMultithreaded;
+        ViewModel.AdaptiveCompression = FormatOptionsPanel.AdaptiveCompression;
+        ViewModel.AdaptiveSmartDetect = FormatOptionsPanel.AdaptiveSmartDetect;
+        ViewModel.MultiThreadedCompression = FormatOptionsPanel.MultiThreadedCompression;
+        // Task 5 Step 3：N 组并行压缩目标组数（与 MT 开关同属 ZIP 面板，面板→VM 快照）
+        ViewModel.ParallelCompressDegree = FormatOptionsPanel.ParallelCompressDegree;
         // ZipEncryptionMethod / SevenZipEncryptHeaders 已通过 XAML 双向绑定到 ViewModel，无需快照
     }
 
@@ -309,6 +314,53 @@ DataContext = ViewModel;
                 // 切换加密时密码区域展开/折叠，等布局完成后再检查位置
                 Dispatcher.UIThread.Post(AdjustWindowPosition, DispatcherPriority.Background);
                 break;
+            case nameof(ViewModel.PreviewRoot):
+                // 预览树重建后，把本次待压缩的单包大小推给格式选项面板，驱动 ZIP 多线程 4GB 限制
+                UpdateZipMultiThreadAvailability();
+                break;
+            case nameof(ViewModel.OutputMode):
+                // 输出模式切换会改变单包划分（Separate 每源自成包），需重新判定
+                UpdateZipMultiThreadAvailability();
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 根据预览树更新 ZIP 多线程选项可用性。
+    /// Manual/Combined：所有文件进同一个包，判定用根节点 TotalDescendantSize；
+    /// Separate：每个源各自成包，引擎按单包大小判定，取所有压缩包节点的最大值。
+    /// 与 ZipEngine.IsMultiThreadedEligible 的 MaxZip32Size（ZIP32 上限）语义对齐。
+    /// </summary>
+    private void UpdateZipMultiThreadAvailability()
+    {
+        var root = ViewModel.PreviewRoot;
+        long maxArchiveBytes = 0;
+
+        if (root != null)
+        {
+            if (ViewModel.OutputMode == CompressOutputMode.Separate)
+            {
+                foreach (var node in EnumerateArchiveNodes(root))
+                    maxArchiveBytes = Math.Max(maxArchiveBytes, node.TotalDescendantSize);
+            }
+            else
+            {
+                maxArchiveBytes = root.TotalDescendantSize;
+            }
+        }
+
+        FormatOptionsPanel.UpdateTotalSourceSize(maxArchiveBytes);
+    }
+
+    /// <summary>枚举子树中所有压缩包节点（IsArchiveNode）。</summary>
+    private static IEnumerable<PreviewTreeNode> EnumerateArchiveNodes(PreviewTreeNode node)
+    {
+        if (node.IsArchiveNode)
+            yield return node;
+        foreach (var child in node.Children.OfType<PreviewTreeNode>())
+        {
+            foreach (var found in EnumerateArchiveNodes(child))
+                yield return found;
         }
     }
 

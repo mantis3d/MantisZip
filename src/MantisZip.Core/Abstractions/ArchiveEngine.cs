@@ -1,3 +1,4 @@
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 
 namespace MantisZip.Core.Abstractions;
@@ -114,10 +115,10 @@ public class ArchiveOptions
     public string? SevenZipSolidBlockSize { get; set; }
 
     /// <summary>
-    /// 7z 字典大小（字节），null 表示引擎默认。
-    /// 仅对 LZMA/LZMA2 压缩方法有效。
+    /// 7z 字典大小：null/""=默认，或 "64m" / "256m" / "1g" / "4g"（经 CustomParameters["d"] 直传 7z.dll）。
+    /// 仅对 LZMA/LZMA2 压缩方法有效。字符串格式支持 >2GB（int 字节上限约 2GB，已弃用）。
     /// </summary>
-    public int? SevenZipDictionarySize { get; set; }
+    public string? SevenZipDictionarySize { get; set; }
 
     /// <summary>
     /// 7z Word Size（快速字节数），null 表示引擎默认。
@@ -161,11 +162,38 @@ public class ArchiveOptions
     public int ParallelExtractDegree { get; set; } = 0;
 
     /// <summary>
+    /// N 组并行压缩的目标组数。0 = 自动（取 <see cref="Environment.ProcessorCount"/>），上限 16。
+    /// 运行时解析见 ZipEngine 内部；&lt;= 1 时回落标准串行路径。
+    /// </summary>
+    public int ParallelCompressDegree { get; set; } = 0;
+
+    /// <summary>
     /// 7z 多线程压缩（mt=on）。默认 true。
     /// 启用时 7z.dll 自动利用多核 CPU 并行压缩，压缩率可能略有下降。
     /// 仅对 7z 格式有效，ZIP/TAR/GZ 无此选项。
     /// </summary>
     public bool SevenZipMultithreaded { get; set; } = true;
+
+    /// <summary>
+    /// 自适应压缩：已压缩文件自动 Store。
+    /// </summary>
+    public bool AdaptiveCompression { get; set; }
+
+    /// <summary>
+    /// 魔数检测：自适应开启时，对大文件做魔数增强识别。自适应关闭时无效。
+    /// </summary>
+    public bool AdaptiveSmartDetect { get; set; }
+
+    /// <summary>
+    /// 多线程压缩：所有可压缩文件走 SharpSevenZip mt=on。可与自适应同时开启。
+    /// </summary>
+    public bool MultiThreadedCompression { get; set; }
+
+    /// <summary>
+    /// 多线程模式下用户自定义仅存储格式 ID 列表。
+    /// 仅在 <see cref="MultiThreadedCompression"/> 为 true 时生效。
+    /// </summary>
+    public HashSet<string> MultiThreadedStoreFormatIds { get; set; } = new();
 }
 
 /// <summary>
@@ -267,6 +295,43 @@ public enum ArchiveFormat
 }
 
 /// <summary>
+/// 条目终态（引擎只上报事实终态；等待/进行中由 UI 播种与推导，不污染 Core 契约）。
+/// </summary>
+public enum ArchiveEntryStatus
+{
+    /// <summary>正常写盘/压缩完成。</summary>
+    Completed,
+
+    /// <summary>因冲突策略（跳过）未写入。</summary>
+    Skipped,
+
+    /// <summary>写入失败（权限、磁盘错误等）。</summary>
+    Failed,
+
+    /// <summary>因冲突策略（覆盖）已写入并替换旧文件。</summary>
+    Overwritten
+}
+
+/// <summary>
+/// 逐条目失败/跳过原因类别（spec §5）。Core 只产事实类别，
+/// 本地化文案由 UI 映射（规则 13：Core 禁止新增中文用户可见文案）。
+/// </summary>
+public enum EntryFailureReason
+{
+    /// <summary>权限不足（UnauthorizedAccessException）。</summary>
+    PermissionDenied,
+
+    /// <summary>读写错误：文件被占用、磁盘满、路径过长等（IOException）。</summary>
+    IoFailed,
+
+    /// <summary>压缩包数据损坏：条目 CRC 校验失败（ZIP 解压/测试经官方 CheckCrc 路径检出）。</summary>
+    CrcMismatch,
+
+    /// <summary>其它异常（含其它数据损坏、ZIP 并行路径通用 catch）。</summary>
+    Other,
+}
+
+/// <summary>
 /// 压缩/解压进度报告
 /// </summary>
 public class ArchiveProgress
@@ -280,6 +345,52 @@ public class ArchiveProgress
 
     /// <summary>当前文件的解压/压缩进度 (0–100)，null 表示无此信息。</summary>
     public double? FilePercentComplete { get; set; }
+
+    /// <summary>ZIP 并行批次索引（0-based）。非并行/未分批时为 null。</summary>
+    public int? BatchIndex { get; set; }
+
+    /// <summary>ZIP 并行总批次数。非并行为 null。</summary>
+    public int? BatchCount { get; set; }
+
+    /// <summary>解压冲突统计（null = 本报告未携带该计数，UI 隐藏对应项）。压缩路径恒为 null。</summary>
+    public long? SkippedFiles { get; set; }
+    public long? FailedFiles { get; set; }
+    public long? OverwrittenFiles { get; set; }
+
+    /// <summary>ZIP 并行批次进度（0-100）。仅并行批次报告携带，供批次详细行 Percent。非并行为 null。</summary>
+    public double? BatchPercentComplete { get; set; }
+
+    /// <summary>当前批次已处理/总文件数（批次详细行 "N/M 文件" DetailText 数据源）。仅并行批次报告携带，非并行为 null。</summary>
+    public long? BatchProcessedFiles { get; set; }
+    public long? BatchTotalFiles { get; set; }
+
+    /// <summary>逐条目事件：压缩包内条目键（解压）或源相对路径（压缩）。非逐条目报告时为 null。</summary>
+    public string? EntryKey { get; set; }
+
+    /// <summary>逐条目终态。非逐条目报告时为 null（此时本对象是常规进度报告）。
+    /// 不为 null 即表示这是一次逐条目事件报告，可与常规字段同时存在。</summary>
+    public ArchiveEntryStatus? EntryStatus { get; set; }
+
+    /// <summary>当前条目/文件总字节（信息列「文件大小」）。未上报为 0。</summary>
+    public long FileTotalBytes { get; set; }
+
+    /// <summary>批次已处理字节数（信息列「已处理/总量」分子；非并行时等于 ProcessedBytes 含义）。未上报为 0。</summary>
+    public long BatchProcessedBytes { get; set; }
+
+    /// <summary>批次总字节数（信息列「已处理/总量」分母；非并行时等于 TotalBytes 含义）。未上报为 0。</summary>
+    public long BatchTotalBytes { get; set; }
+
+    /// <summary>实时压缩率 0–100（批次累计输出字节/输入字节×100）。7z 格式压缩/解压/分卷 ZIP 置 null → 该段隐藏。</summary>
+    public double? CompressionRatio { get; set; }
+
+    /// <summary>逐条目压缩后字节（后置回填；0 = 未知/非 ZIP 压缩）。</summary>
+    public long EntryCompressedBytes { get; set; }
+
+    /// <summary>失败/带原因跳过的根因类别。仅 EntryStatus=Failed 或压缩端带原因 Skipped 时携带。</summary>
+    public EntryFailureReason? EntryFailureReason { get; set; }
+
+    /// <summary>整体压缩后字节（后置回填；0 = 未知）。</summary>
+    public long TotalCompressedBytes { get; set; }
 }
 
 /// <summary>
@@ -293,6 +404,12 @@ public class ExtractResult
     public int FailedEntries { get; init; }
     /// <summary>是否有条目失败。</summary>
     public bool HasFailures => FailedEntries > 0;
+
+    /// <summary>因冲突策略跳过的条目数。</summary>
+    public int SkippedEntries { get; init; }
+
+    /// <summary>被覆盖写入的已有文件数。</summary>
+    public int OverwrittenEntries { get; init; }
 }
 
     /// <summary>

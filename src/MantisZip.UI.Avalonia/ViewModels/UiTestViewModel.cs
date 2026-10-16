@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
 using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
@@ -37,11 +38,33 @@ public partial class UiTestViewModel : ObservableObject
     [ObservableProperty] private bool _toggleSwitchOn = true;
     [ObservableProperty] private double _sliderValue = 65;
     [ObservableProperty] private decimal _numericValue = 42;
+
+    // ── 数字输入（NumericUpDown 之外的替代方案） ──
+    /// <summary>MaskedTextBox 纯数字掩码输入的文本。</summary>
+    [ObservableProperty] private string _maskedNumberText = "0042";
+    /// <summary>ButtonSpinner + TextBox 自组数字框的文本。</summary>
+    [ObservableProperty] private string _spinnerTextValue = "8";
+    /// <summary>TextBox + 数字过滤（仅接受 0-9）的文本。</summary>
+    [ObservableProperty] private string _numericFilterText = "128";
+    /// <summary>ComboBox 预设线程数（离散选择，规避自由输入）。</summary>
+    public List<int> ThreadCountOptions { get; } = new() { 1, 2, 4, 8, 12, 16 };
+    [ObservableProperty] private int _selectedThreadCount = 8;
     [ObservableProperty] private DateTimeOffset? _filterDateFrom = new(DateTime.Today.AddDays(-7));
     [ObservableProperty] private DateTimeOffset? _filterDateTo = new(DateTime.Today);
     [ObservableProperty] private DateTime? _calendarDate = DateTime.Today;
     [ObservableProperty] private string _autoCompletePath = @"D:\";
     [ObservableProperty] private string _quickPath = @"D:\下载";
+
+    // ── 新增：PathIcon / ToggleIconBox / Command 按钮 / Image 演示 ──
+    [ObservableProperty] private string _commandButtonText = "点击执行命令";
+    [ObservableProperty] private bool _toggleIconBool = true;
+
+    /// <summary>测试 RelayCommand：执行后更新按钮文本为当前时间。</summary>
+    [RelayCommand]
+    private void TestCommand()
+    {
+        CommandButtonText = $"命令已执行 {DateTime.Now:HH:mm:ss}";
+    }
 
     // ── 列表与数据组 ──
     /// <summary>文件列表（ListBox / DataGrid / ItemsControl 共用同一份数据）。</summary>

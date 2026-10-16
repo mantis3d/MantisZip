@@ -952,74 +952,81 @@ new AdaptiveOverrideRule
 
 ### 引擎改动与 per-file 级别可行性分析
 
-> ⚠️ **重要修正**（2026-09-14 代码审查）：原计划假设引擎支持"按文件切换压缩级别"，但经实际代码验证，**当前三个引擎均不支持 per-file level**。以下为详细分析。
+> ✅ **已实测验证**（2026-09-17，18 条探针全绿）：SharpCompress 0.50.4 per-entry `ZipWriterEntryOptions.CompressionLevel` **可用但有严格约束**。以下为实测结论。
 
-#### 格式 vs 引擎：per-file 级别支持矩阵
+#### 实测能力矩阵（2026-09-17 钉死）
 
-| 格式 | 格式本身支持 per-file? | 当前引擎支持? | 换引擎可解决? |
-|------|----------------------|-------------|-------------|
-| ZIP | ✅ 是（每个 entry 有独立 local file header） | ❌ SharpCompress `ZipWriterOptions.CompressionLevel` 全局一次 | ⚠️ 需升级 SharpCompress 到 0.49.0+（见下方） |
-| 7z | ✅ 是（每个文件可有独立压缩方法/级别） | ❌ `SharpSevenZipCompressor` 原子调用 | ⚠️ 需直接调 7z.dll COM 低层接口，复杂度高 |
-| Tar/GZip | ❌ 否（GZip 压缩整个 tar 流，非 per-file） | ❌ | ❌ 格式设计限制，任何引擎都无法做到 |
+| 归档压缩类型 | 逐条目级别 | 逐条目 Store | 说明 |
+|---|:---:|:---:|---|
+| Deflate / Deflate64 | ✅ 0–9 | ✅ | 完整自适应 |
+| ZStandard | ✅ 1–22 | ✅ | **level=0 抛异常**（有效范围 1–22） |
+| BZip2 / LZMA / PPMd | ❌ 抛异常 | ✅ `type=None,lvl=0` | 只能 Store，不能调级别 |
+| 加密 ZIP | ❌ | ❌ | SharpCompress ZipWriter 无 password 属性 |
+| 7z | ❌ | ❌ | SharpSevenZip 原子调用 |
+| Tar / GZip | ❌ | ❌ | 格式限制 |
 
-#### .NET ZIP 库生态分析（per-file level 可用库）
+#### ⚠️ 三个实测陷阱（实现时必须处理）
 
-| 库 | 最新版本 | 最后更新 | 下载量 | 维护状态 | per-entry 1-9 级别 |
-|---|---|---|---|---|---|
-| **SharpCompress** | 0.50.3 | 2026-08（活跃维护） | 高 | ✅ 活跃维护，向 1.0 迈进 | ✅ **0.49.0+ 支持**（见下方） |
-| **SharpZipLib** | 1.4.2 | 2023-01（~3.5 年前） | 高 | ⛔ 基本停更，health 34/100，唯一维护者已失联，OpenSSF 报告 unmaintained | ✅ |
-| **DotNetZip** | 1.16.0 | 2021-11（~4.5 年前） | 2800 万 | ⛔ 官方 deprecated，高危漏洞 CVE-2024-48510（CVSS 9.8） | ✅ |
-| **System.IO.Compression** | 内置 | 持续维护 | — | ✅ 微软维护 | ⚠️ 仅 Optimal/Fastest/NoCompression/SmallestSize，**无 1-9 数值** |
-
-#### 🔑 关键发现：SharpCompress 0.49.0+ 已支持 per-entry 压缩级别
-
-> **2026-09-14 新发现**：SharpCompress 在 0.49.0 版本（2026-05-28）通过 PR #934 添加了
-> `ZipWriterEntryOptions.CompressionLevel` 属性，支持 per-entry 压缩级别控制。
-
-**项目当前版本**：0.48.1  
-**升级目标版本**：0.50.3（最新稳定版）
-
-##### SharpCompress per-entry 级别 API
+**陷阱 1：`CompressionLevel = 0` 不是通用 Store 写法**
 
 ```csharp
-// SharpCompress 0.49.0+ — per-entry 压缩级别
-var writerOptions = new ZipWriterOptions(CompressionType.Deflate)
-{
-    CompressionLevel = 5,  // 全局默认级别
-};
-using var writer = new ZipWriter(stream, writerOptions);
-
-// 每个 entry 可以单独设置级别
-writer.Write("already_compressed.jpg", jpegStream, new ZipWriterEntryOptions
-{
-    CompressionLevel = 0,  // Store — 不压缩（已压缩文件）
-});
-
-writer.Write("text.txt", textStream, new ZipWriterEntryOptions
-{
-    CompressionLevel = 9,  // 最高压缩级别（文本文件）
-});
+// ❌ ZStandard 归档下 level=0 → ArgumentOutOfRangeException
+entryOptions.CompressionLevel = 0;  // ZStandard: "must be between 1 and 22"
 ```
 
-##### 升级影响评估
+→ 必须判断归档类型：Deflate 用 `level=0`，ZStandard 用 `type=None,lvl=0`。
 
-| 维度 | 影响 |
-|------|------|
-| **改动量** | 极小 — 只需改 `.csproj` 版本号 + 适配少量 Breaking Changes |
-| **Breaking Changes** | 0.49.0 有 API 变更（`DeflateCompressionLevel` → `CompressionLevel`），但 MantisZip 代码中用的是 `ZipWriterOptions.CompressionLevel`（archive 级别），不受影响 |
-| **测试** | 需要验证 ZIP 读写、加密 ZIP、分卷等功能正常 |
-| **风险** | 低 — SharpCompress 是成熟库，0.49.0 已发布 3 个月，社区在用 |
+**陷阱 2：per-entry `CompressionType = None` 单独设置会抛异常**
 
-##### 升级后的能力对比
+```csharp
+// ❌ 缺少 level=0 → 抛异常
+entryOptions.CompressionType = CompressionType.None;
+// → "Compression type None does not support configurable compression levels. Use 0."
+```
 
-| 能力 | ZIP 格式本身 | SharpCompress 0.48.1（当前） | SharpCompress 0.50.3（升级后） |
-|------|------------|---------------------------|------------------------------|
-| per-entry 压缩级别 | ✅ | ❌ 全局一次 | ✅ **0-9 数值级别** |
-| 压缩算法 | Deflate/BZip2/LZMA/PPMd | ✅ 全部 | ✅ 全部 + ZStandard |
-| 密码加密 | ✅ | ✅ AES-256 | ✅ AES-256 |
-| ZIP64 大文件 | ✅ | ✅ | ✅ |
+原因：level 回落到 writer 级别（如 9）→ 校验失败。**必须配对 `CompressionLevel = 0`**。
 
-##### 自适应引擎选择策略（修正版）
+**陷阱 3：不支持的级别是「抛异常」而非「静默忽略」**
+
+BZip2/LZMA/PPMd + `CompressionLevel = 9` → `ArgumentOutOfRangeException`。**`canPerEntry` 门控是硬性要求，不是「效果降级」。**
+
+#### 验证过的安全配方
+
+```csharp
+// 归档级（writer）—— 保持现有写法
+new ZipWriterOptions(CompressionType.Deflate) { CompressionLevel = globalLevel }
+
+// 逐条目自适应 —— Deflate/Deflate64 归档（默认路径，最简单）
+entryOptions.CompressionLevel = adaptiveLevel;   // 0–9；Store 用 0
+// ⚠️ 不要单独设 CompressionType = None（除非同时给 level=0）
+
+// 逐条目 Store —— 任何归档类型的安全写法
+entryOptions.CompressionType = CompressionType.None;
+entryOptions.CompressionLevel = 0;               // 必须！否则抛异常
+```
+
+#### 接线点（已确认 3 处，均使用 `ZipWriterEntryOptions` + `WriteToStream`）
+
+| 位置 | 方法 | 说明 |
+|---|---|---|
+| `ZipEngine.cs:2002` | `ReadFileWithRetry`（主压缩路径） | 只需在 `entryOptions` 加 `CompressionLevel` |
+| `ZipEngine.cs:1502` | `AddToArchiveAsync` | 同上 |
+| `ZipEngine.cs:1906` | `DeleteEntriesAsync` | 同上 |
+
+#### 意外收获：BZip2/LZMA/PPMd 可逐条目 Store
+
+计划原认为「BZip2/LZMA/PPMd 场景自适应无效」。实测证明：
+
+```csharp
+// BZip2 归档里，已压缩文件可以逐条目 Store
+entryOptions.CompressionType = CompressionType.None;
+entryOptions.CompressionLevel = 0;
+// → BZip2 + Store 混合写入：7z.dll 解压逐字节一致 ✅
+```
+
+即：**即使不能调级别，仍可跳过已经压缩过的文件**。
+
+#### 自适应引擎选择策略（实测修正版）
 
 ```
 用户点击「压缩」
@@ -1029,57 +1036,34 @@ writer.Write("text.txt", textStream, new ZipWriterEntryOptions
   │   │       → 全局级别，不支持 per-entry（引擎限制，非格式限制）
   │   └─ 否 → 继续判断
   │
-  ├─ 需要 BZip2/LZMA/PPMd 算法？
-  │   ├─ 是 → SharpCompress（对应算法）
-  │   │       → 全局级别
-  │   └─ 否 → 继续判断
-  │
   ├─ 格式是 ZIP？
-  │   ├─ 是 → SharpCompress 0.49.0+（per-entry 级别，0-9 数值）
-  │   │       → 可混合 Store(0) + 用户选定级别（自适应核心需求）
+  │   ├─ 是 → SharpCompress（per-entry 级别）
+  │   │       ├─ Deflate/Deflate64 → 完整自适应（级别 0-9）
+  │   │       ├─ ZStandard → 自适应级别 1-22（level=0 非法！）
+  │   │       ├─ BZip2/LZMA/PPMd → 逐条目 Store（type=None,lvl=0），不能调级别
+  │   │       └─ 加密 → 回退全局级别
   │   └─ 否 → 继续判断
   │
   └─ 7z/Tar/GZip → 对应引擎，全局级别
 ```
 
-##### 为什么升级 SharpCompress 是最优方案
+#### 引擎共存架构（实测修正版）
 
-| 方案 | 优点 | 缺点 |
-|------|------|------|
-| **升级 SharpCompress 到 0.50.3** | ✅ 零新依赖（项目已在用）<br>✅ 0-9 完整数值级别<br>✅ 活跃维护<br>✅ 已有 ZIP 读写代码无需重写 | ⚠️ 需适配少量 Breaking Changes |
-| System.IO.Compression | ✅ .NET 内置 | ❌ 仅 4 档（NoCompression/Optimal/Fastest/SmallestSize）<br>❌ 需重写 ZIP 写入逻辑<br>❌ 加密/特殊算法需回退 |
-| Fork SharpCompress 自定义 | ✅ 完全控制 | ❌ 维护成本高<br>❌ 需持续跟进上游 |
-
-**结论**：升级 SharpCompress 是最务实的方案——零新依赖、完整功能、最小改动。
-
-##### 引擎共存架构（升级后）
-
-| 场景 | 引擎 | per-entry? | 原因 |
-|------|------|-----------|------|
-| ZIP + 无加密 | SharpCompress 0.49.0+ | ✅ 0-9 数值级别 | 自适应核心路径 |
-| ZIP + 加密 | `SharpSevenZip` 或 `SharpCompress` | ❌ 全局级别 | 加密需要这些库 |
-| 7z | `SharpSevenZip` | ❌ 全局级别 | COM API 原子调用 |
-| Tar | `SharpCompress` | ❌ 全局级别 | 格式不支持 per-file |
-| GZip | `SharpCompress` | ❌ 全局级别 | 格式不支持 per-file |
-
-**优势**：
-- ✅ 零新依赖（SharpCompress 已在项目中）
-- ✅ 0-9 完整数值级别（比 System.IO.Compression 的 4 档更精细）
-- ✅ 最常见场景（非加密 ZIP）有 per-entry 能力
-- ✅ 活跃维护，持续获得 bug 修复和新功能
-
-**劣势**：
-- ⚠️ 需适配 0.49.0 Breaking Changes（`DeflateCompressionLevel` → `CompressionLevel`）
-- ⚠️ 加密 ZIP 不支持 per-entry（必须全局级别）
-- ⚠️ 仅 ZIP 格式，7z/Tar/GZip 做不了 per-entry
+| 场景 | 引擎 | per-entry? | 说明 |
+|------|------|:---:|------|
+| ZIP + Deflate/Deflate64 + 无加密 | SharpCompress | ✅ 0–9 | 自适应核心路径 |
+| ZIP + ZStandard + 无加密 | SharpCompress | ✅ 1–22 | level=0 非法，需特殊处理 |
+| ZIP + BZip2/LZMA/PPMd + 无加密 | SharpCompress | ⚠️ Store only | 可跳过已压缩文件，不能调级别 |
+| ZIP + 加密 | SharpCompress / SharpSevenZip | ❌ | 全局级别 |
+| 7z | SharpSevenZip | ❌ | COM 原子调用 |
+| Tar / GZip | SharpCompress | ❌ | 格式限制 |
 
 #### 本次修正后的引擎改动计划
 
 | 引擎/组件 | 改动 | 说明 |
 |----------|------|------|
-| `MantisZip.Core.csproj` | SharpCompress 版本从 0.48.1 升级到 0.50.3 | 启用 per-entry 级别支持 |
 | `ArchiveOptions` | 新增 `AdaptiveCompressionLevel`（三态枚举：Disabled/StoreForCompressed/SmartDetect） | 自适应开关 |
-| `ZipEngine` | 非加密 ZIP 路径使用 `ZipWriterEntryOptions.CompressionLevel` per-entry 控制 | 自适应核心路径 |
+| `ZipEngine` | 非加密 ZIP 路径使用 `ZipWriterEntryOptions.CompressionLevel` per-entry 控制（3 处接入点） | 自适应核心路径 |
 | `SevenZipEngine` | 根据自适应设置决定全局 CompressionLevel（加密/非加密均走此引擎时） | 全局级别 |
 | `TarGzEngine` | 根据自适应设置决定全局 CompressionLevel | GZip 不支持 per-file |
 | `CompressService.BuildOptions` | 新增文件分类逻辑，根据 `CompressionCoefficients.ClassifyByExtension` 决定是否降级 | 分类中枢 |

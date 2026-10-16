@@ -17,6 +17,9 @@ namespace MantisZip.UI.Avalonia.Services;
 /// </summary>
 public static class MarkdownPreviewBuilder
 {
+    /// <summary>标题前的额外留白（章节分隔，避免上一段正文与下一段标题粘连）。</summary>
+    private const double HeadingTopGap = 14;
+
     /// <summary>
     /// Parse the given Markdown string and return an Avalonia <see cref="StackPanel"/> control tree.
     /// </summary>
@@ -31,10 +34,18 @@ public static class MarkdownPreviewBuilder
 
         var panel = new StackPanel { Spacing = 4 };
 
+        bool first = true;
         foreach (var block in doc)
         {
-            if (TryBuildBlock(block, markdown) is Control c)
-                panel.Children.Add(c);
+            if (TryBuildBlock(block, markdown) is not Control c)
+                continue;
+
+            // 章节分隔：非首个块且为标题时上方留白（首块标题不留，避免文档顶部多余空隙）
+            if (!first && block is HeadingBlock)
+                c.Margin = new Thickness(0, HeadingTopGap, 0, 0);
+
+            panel.Children.Add(c);
+            first = false;
         }
 
         return panel;

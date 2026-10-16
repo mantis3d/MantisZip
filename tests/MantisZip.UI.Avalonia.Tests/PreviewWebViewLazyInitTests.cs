@@ -30,22 +30,50 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// 修复：NativeWebView 改为惰性创建（仅在真正预览 HTML 时才实例化）+ 创建失败降级
 /// ReverseMarkdown。本类锁定该行为不再回退。
 /// </summary>
-public class PreviewWebViewLazyInitTests
+public class PreviewWebViewLazyInitTests : IDisposable
 {
     private readonly ITestOutputHelper _out;
+    private readonly string _reproZipPath;
 
-    public PreviewWebViewLazyInitTests(ITestOutputHelper output) => _out = output;
-
-    private const string ReproZipName = "attachment-management-0.12.1.zip";
-
-    /// <summary>从测试程序集位置向上找仓库根，定位 TestPreview 下的真实压缩包。</summary>
-    private static string RepoFile(params string[] rel)
+    public PreviewWebViewLazyInitTests(ITestOutputHelper output)
     {
-        var dir = new DirectoryInfo(AppContext.BaseDirectory);
-        while (dir != null && !Directory.Exists(Path.Combine(dir.FullName, "TestPreview")))
-            dir = dir.Parent;
-        Assert.NotNull(dir);
-        return Path.Combine(new[] { dir!.FullName }.Concat(rel).ToArray());
+        _out = output;
+        _reproZipPath = CreateSyntheticReproZip();
+    }
+
+    public void Dispose()
+    {
+        try { if (File.Exists(_reproZipPath)) File.Delete(_reproZipPath); }
+        catch (IOException) { /* best-effort */ }
+    }
+
+    /// <summary>
+    /// 合成最小复现压缩包：attachment-management/ 目录 + styles.css + page.html。
+    /// 原先依赖 TestPreview/attachment-management-0.12.1.zip（TestPreview/ 在 .gitignore 中，
+    /// 换机/CI 必缺），改为运行时自建，测试完全自包含，回归语义不变。
+    /// </summary>
+    private static string CreateSyntheticReproZip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "MantisZip", "Tests");
+        Directory.CreateDirectory(dir);
+        var zipPath = Path.Combine(dir, $"repro_webview_{Guid.NewGuid():N}.zip");
+        using var fs = File.Create(zipPath);
+        using var archive = new ZipArchive(fs, ZipArchiveMode.Create);
+
+        // 显式目录条目（FullName 以 / 结尾，SharpCompress 识别为目录）
+        archive.CreateEntry("attachment-management/");
+
+        var css = archive.CreateEntry("attachment-management/styles.css");
+        using (var s = css.Open())
+        using (var w = new StreamWriter(s))
+            w.Write("body { color: red; }");
+
+        var html = archive.CreateEntry("attachment-management/page.html");
+        using (var s = html.Open())
+        using (var w = new StreamWriter(s))
+            w.Write("<html><body><h1>hello</h1></body></html>");
+
+        return zipPath;
     }
 
     /// <summary>直接 await 私有的 ShowPreviewAsync，让异常在测试里可观测
@@ -88,12 +116,7 @@ public class PreviewWebViewLazyInitTests
         return host?.Content;
     }
 
-    private static async Task<MainWindowViewModel> LoadReproArchive()
-    {
-        var zipPath = RepoFile("TestPreview", ReproZipName);
-        Assert.True(File.Exists(zipPath), $"zip not found: {zipPath}");
-        return await LoadArchive(zipPath);
-    }
+    private Task<MainWindowViewModel> LoadReproArchive() => LoadArchive(_reproZipPath);
 
     /// <summary>必须 await 而非 GetAwaiter().GetResult()：headless 下只有一个 UI 线程，
     /// LoadArchiveAsync 的 await 需要调度器推进，阻塞等待会死锁。</summary>

@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
 using MantisZip.Tests.Fixtures;
@@ -483,6 +484,92 @@ public class SevenZipEngineTests : IDisposable
         Console.WriteLine($"  Speedup: {(double)stSw.ElapsedMilliseconds / mtSw.ElapsedMilliseconds:F2}x");
     }
 
+    // ===== 探针：7z.dll 的 ZIP 输出是否支持 mt 并行 =====
+
+    /// <summary>
+    /// 探针测试：用 SharpSevenZip 的 OutArchiveFormat.Zip + Deflate 输出 ZIP，
+    /// 对比 mt=off / mt=on 的墙钟时间与 CPU 时间，判断 7z.dll 的 ZIP 编码器是否并行。
+    /// 判据：CPU时间/墙钟时间 ≈ 1 → 单线程；> 1 → 已并行（约等于并发核数）。
+    /// 场景 A（100×1MB 多文件）探测「文件级并行」，场景 B（1×100MB 单文件）探测「文件内并行」。
+    /// </summary>
+    [Fact(Skip = "性能探针，环境依赖强，需手动运行验证；结论：多文件 6.75-7.29x，单文件无收益")]
+    public async Task Probe_SevenZip_Zip_MultiThread()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        static byte[] MakeCompressible(int size)
+        {
+            var pattern = System.Text.Encoding.UTF8.GetBytes(
+                "MantisZip zip mt probe data 0123456789 abcdefghijklmnopqrstuvwxyz ");
+            var buf = new byte[size];
+            for (int i = 0; i < size; i++) buf[i] = pattern[i % pattern.Length];
+            return buf;
+        }
+
+        var root = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipZipMtProbe", Guid.NewGuid().ToString("N")));
+
+        // 场景 A：100 × 1MB 多文件（可探测跨文件并行）
+        var manyDir = Path.Combine(root, "many");
+        Directory.CreateDirectory(manyDir);
+        for (int i = 0; i < 100; i++)
+            await File.WriteAllBytesAsync(Path.Combine(manyDir, $"f{i:D3}.bin"), MakeCompressible(1024 * 1024));
+
+        // 场景 B：1 × 100MB 单文件（可探测文件内并行）
+        var singleDir = Path.Combine(root, "single");
+        Directory.CreateDirectory(singleDir);
+        await File.WriteAllBytesAsync(Path.Combine(singleDir, "big.bin"), MakeCompressible(100 * 1024 * 1024));
+
+        var proc = System.Diagnostics.Process.GetCurrentProcess();
+
+        (long Wall, double Cpu, long Size) Run(string dir, bool mt, string tag)
+        {
+            var outPath = Path.Combine(root, $"{tag}.zip");
+            if (File.Exists(outPath)) File.Delete(outPath);
+
+            var c = new SharpSevenZipCompressor
+            {
+                ArchiveFormat = OutArchiveFormat.Zip,
+                CompressionMethod = CompressionMethod.Deflate,
+                CompressionLevel = CompressionLevel.Normal,
+                IncludeEmptyDirectories = true,
+                DirectoryStructure = true,
+            };
+            c.CustomParameters["mt"] = mt ? "on" : "off";
+
+            var cpu0 = proc.TotalProcessorTime;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            c.CompressDirectory(dir, outPath);
+            sw.Stop();
+            var cpu1 = proc.TotalProcessorTime;
+
+            return (sw.ElapsedMilliseconds, (cpu1 - cpu0).TotalMilliseconds, new FileInfo(outPath).Length);
+        }
+
+        var aOff = Run(manyDir, false, "a_off");
+        var aOn = Run(manyDir, true, "a_on");
+        var bOff = Run(singleDir, false, "b_off");
+        var bOn = Run(singleDir, true, "b_on");
+
+        Console.WriteLine("=== PROBE: 7z.dll ZIP + mt (Deflate Normal) ===");
+        Console.WriteLine($"A 100x1MB  off: wall={aOff.Wall}ms cpu={aOff.Cpu:F0}ms size={aOff.Size}");
+        Console.WriteLine($"A 100x1MB  on : wall={aOn.Wall}ms cpu={aOn.Cpu:F0}ms size={aOn.Size}");
+        Console.WriteLine($"A          speedup={(double)aOff.Wall / aOn.Wall:F2}x  parallelism(cpu/wall)={aOn.Cpu / aOn.Wall:F2}");
+        Console.WriteLine($"B 1x100MB  off: wall={bOff.Wall}ms cpu={bOff.Cpu:F0}ms size={bOff.Size}");
+        Console.WriteLine($"B 1x100MB  on : wall={bOn.Wall}ms cpu={bOn.Cpu:F0}ms size={bOn.Size}");
+        Console.WriteLine($"B          speedup={(double)bOff.Wall / bOn.Wall:F2}x  parallelism(cpu/wall)={bOn.Cpu / bOn.Wall:F2}");
+
+        // 正确性校验：mt=on 产物必须可正常解压（7z.dll 解压时校验 CRC）且文件数一致
+        var verifyDir = Path.Combine(root, "verify");
+        Directory.CreateDirectory(verifyDir);
+        using (var ex = new SharpSevenZipExtractor(Path.Combine(root, "a_on.zip")))
+        {
+            ex.ExtractArchive(verifyDir);
+        }
+        var srcCount = Directory.GetFiles(manyDir).Length;
+        var outCount = Directory.GetFiles(verifyDir, "*", SearchOption.AllDirectories).Length;
+        Console.WriteLine($"VERIFY     src={srcCount} extracted={outCount} match={srcCount == outCount}");
+    }
+
     // ===== Progress Reporting =====
 
     [Fact]
@@ -502,5 +589,214 @@ public class SevenZipEngineTests : IDisposable
 
         Assert.NotEmpty(progressItems);
         Assert.Contains(progressItems, p => p.PercentComplete == 100);
+    }
+
+    // ===== 逐条目状态遥测（EntryStatus / EntryKey） =====
+
+    /// <summary>
+    /// 同步线程安全的进度收集器：不能使用 System.Progress&lt;T&gt;（它经
+    /// SynchronizationContext/线程池异步派发，测试在 await 返回时尚未收到回调，
+    /// 导致报告时序性丢失）。
+    /// </summary>
+    private sealed class ProgressCollector : IProgress<ArchiveProgress>
+    {
+        private readonly ConcurrentBag<ArchiveProgress> _items = new();
+        public void Report(ArchiveProgress value) => _items.Add(value);
+        /// <summary>当前收集到的报告快照（await 引擎完成后再读取，无时序依赖）。</summary>
+        public List<ArchiveProgress> Items => _items.ToList();
+    }
+
+    /// <summary>
+    /// (e) 7z 解压逐条目遥测：逐条目报告数量 == 压缩包内非目录文件数，
+    /// 且全新空目录下全部为 Completed。
+    /// </summary>
+    [Fact]
+    public async Task SevenZip_ExtractAsync_ReportsPerEntry()
+    {
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return; // Skip if 7z.exe not available
+        TrackFile(archive);
+
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        var collector = new ProgressCollector();
+
+        await _engine.ExtractAsync(archive, dest, progress: collector);
+
+        var fileCount = (await _engine.ListEntriesAsync(archive)).Count(e => !e.IsDirectory);
+        Assert.True(fileCount > 0, "7z fixture should contain at least one file");
+
+        var entryReports = collector.Items.Where(p => p.EntryStatus.HasValue).ToList();
+        // 逐条目报告数 == 压缩包内非目录文件数（不多不少，目录条目不上报）
+        Assert.Equal(fileCount, entryReports.Count);
+        // 全新空目录无冲突 → 全部 Completed
+        Assert.All(entryReports, p => Assert.Equal(ArchiveEntryStatus.Completed, p.EntryStatus));
+    }
+
+    // ===== 字节埋点（ProcessedBytes / TotalBytes） =====
+
+    /// <summary>
+    /// 有序进度收集器：同步 Report 按报告顺序记录，供字节单调性断言。
+    /// 刻意不用 System.Progress&lt;T&gt;（其经线程池异步派发会打乱顺序，见本类 ProgressCollector 注释）。
+    /// </summary>
+    private sealed class OrderedProgressCollector : IProgress<ArchiveProgress>
+    {
+        private readonly List<ArchiveProgress> _items = new();
+        public void Report(ArchiveProgress value) { lock (_items) _items.Add(value); }
+        public IReadOnlyList<ArchiveProgress> Snapshot()
+        {
+            lock (_items) return _items.ToList();
+        }
+        public IProgress<ArchiveProgress> Progress => this;
+    }
+
+    /// <summary>
+    /// 断言：所有带 TotalBytes &gt; 0 的报告中 ProcessedBytes 单调不减，
+    /// 且最后一个（最终 100%）报告满足 ProcessedBytes == TotalBytes。
+    /// </summary>
+    private static void AssertByteProgressMonotonic(
+        IReadOnlyList<ArchiveProgress> items, string label)
+    {
+        var withBytes = items.Where(p => p.TotalBytes > 0).ToList();
+        Assert.True(withBytes.Count > 0,
+            $"{label}: 未捕获任何带 TotalBytes 的进度报告");
+        long last = -1;
+        foreach (var p in withBytes)
+        {
+            Assert.True(p.ProcessedBytes >= last,
+                $"{label}: ProcessedBytes 回退 {last} -> {p.ProcessedBytes} (Percent={p.PercentComplete})");
+            last = p.ProcessedBytes;
+        }
+        var final = withBytes[^1];
+        Assert.Equal(final.TotalBytes, final.ProcessedBytes);
+    }
+
+    [Fact]
+    public async Task ExtractAsync_ReportsByteProgress()
+    {
+        var archive = ArchiveFixtures.CreateSevenZipArchive();
+        if (archive == null) return; // Skip if 7z.dll not available
+        TrackFile(archive);
+
+        var engine = new SevenZipEngine();
+        var dest = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        var collector = new OrderedProgressCollector();
+        await engine.ExtractAsync(archive, dest,
+            password: null, progress: collector.Progress, cancellationToken: CancellationToken.None);
+
+        AssertByteProgressMonotonic(collector.Snapshot(), "ExtractAsync");
+    }
+
+    [Fact]
+    public async Task CompressAsync_ReportsByteProgress()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var dir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        var src = Path.Combine(dir, "src");
+        Directory.CreateDirectory(src);
+        await File.WriteAllBytesAsync(Path.Combine(src, "a.bin"), new byte[64 * 1024]);
+        await File.WriteAllBytesAsync(Path.Combine(src, "b.bin"), new byte[32 * 1024]);
+
+        var archivePath = TrackFile(Path.Combine(dir, "out.7z"));
+        var engine = new SevenZipEngine();
+        var collector = new OrderedProgressCollector();
+        await engine.CompressAsync(new[] { src }, archivePath,
+            new ArchiveOptions { SevenZipMultithreaded = false },
+            collector.Progress, CancellationToken.None);
+
+        AssertByteProgressMonotonic(collector.Snapshot(), "CompressAsync");
+    }
+
+    [Fact]
+    public async Task DeleteEntriesAsync_ReportsMonotonicByteProgress()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        using var dir = new TempDirectory();
+        var archivePath = Path.Combine(dir.Path, "del.7z");
+        var src = Path.Combine(dir.Path, "src");
+        Directory.CreateDirectory(src);
+        await File.WriteAllBytesAsync(Path.Combine(src, "a.bin"), new byte[64 * 1024]);
+        await File.WriteAllBytesAsync(Path.Combine(src, "b.bin"), new byte[32 * 1024]);
+
+        var engine = new SevenZipEngine();
+        await engine.CompressAsync([src], archivePath,
+            new ArchiveOptions { SevenZipMultithreaded = false });
+
+        var collector = new OrderedProgressCollector();
+        await engine.DeleteEntriesAsync(archivePath, ["src/a.bin"],
+            password: null, progress: collector.Progress, cancellationToken: CancellationToken.None,
+            options: new ArchiveOptions { SevenZipMultithreaded = false });
+
+        AssertByteProgressMonotonic(collector.Snapshot(), "DeleteEntriesAsync");
+    }
+
+    // ===== 连续跳过的主进度刷新（7z 计数基准） =====
+
+    /// <summary>
+    /// 连续冲突跳过也必须刷新主进度：每个被跳过的条目都补发一条常规进度报告
+    /// （非 EntryStatus 通道），否则连续大量跳过时进度窗口长时间无更新、看似卡死。
+    /// 7z 百分比为文件计数基准 → 用 handledFiles 推进；跳过不计入 ProcessedFiles（已处理）。
+    /// </summary>
+    [Fact]
+    public async Task ExtractAsync_ConsecutiveSkips_EmitsMainProgressPerFile()
+    {
+        if (!Is7zDllAvailable()) return;
+        const int n = 5;
+
+        var dir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        var src = Path.Combine(dir, "src");
+        Directory.CreateDirectory(src);
+        for (int i = 0; i < n; i++)
+            await File.WriteAllBytesAsync(Path.Combine(src, $"f{i}.bin"), new byte[1024]);
+
+        var archivePath = TrackFile(Path.Combine(dir, "skips.7z"));
+        var engine = new SevenZipEngine();
+        await engine.CompressAsync([src], archivePath,
+            new ArchiveOptions { SevenZipMultithreaded = false });
+
+        // 预创建同名文件（条目为 src/fN.bin）制造冲突 → 全部跳过
+        var dest = TrackDir(Path.Combine(dir, "out"));
+        Directory.CreateDirectory(Path.Combine(dest, "src"));
+        for (int i = 0; i < n; i++)
+            await File.WriteAllBytesAsync(Path.Combine(dest, "src", $"f{i}.bin"), new byte[10]);
+
+        var collector = new OrderedProgressCollector();
+        await engine.ExtractAsync(archivePath, dest,
+            password: null, progress: collector.Progress, cancellationToken: CancellationToken.None,
+            options: new ArchiveOptions { ConflictAction = FileConflictAction.Skip });
+
+        var reports = collector.Snapshot();
+        Assert.Equal(n, reports.Count(p => p.EntryStatus == ArchiveEntryStatus.Skipped));
+
+        // 主进度报告（非 EntryStatus 通道）：每个跳过条目一条 + 收尾 → 至少 n 条
+        var main = reports.Where(p => !p.EntryStatus.HasValue).ToList();
+        Assert.True(main.Count >= n,
+            $"连续跳过应逐条刷新主进度，期望 ≥{n} 条常规报告，实际 {main.Count} 条");
+
+        // 主进度百分比单调不减，且收尾达到 100
+        double last = -1;
+        foreach (var p in main)
+        {
+            Assert.True(p.PercentComplete >= last, $"主进度回退 {last} -> {p.PercentComplete}");
+            last = p.PercentComplete;
+        }
+        Assert.Equal(100.0, main[^1].PercentComplete, 3);
+
+        // 跳过不计入「已处理」：携带 TotalFiles 的主进度报告 ProcessedFiles 恒为 0（无成功条目）
+        Assert.All(main.Where(p => p.TotalFiles > 0), p => Assert.Equal(0, p.ProcessedFiles));
+    }
+}
+
+/// <summary>
+/// 轻量临时目录辅助：IDisposable 模式，Dispose 时递归删除。
+/// </summary>
+internal sealed class TempDirectory : IDisposable
+{
+    public string Path { get; }
+    public TempDirectory() => Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString());
+    public void Dispose()
+    {
+        try { if (Directory.Exists(Path)) Directory.Delete(Path, true); } catch { }
     }
 }

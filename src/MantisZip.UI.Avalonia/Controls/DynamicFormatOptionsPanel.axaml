@@ -53,6 +53,67 @@
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
         </Grid>
+
+        <!-- ═══════ ZIP 自适应压缩三开关 ═══════ -->
+        <!-- 仅 ZIP 格式支持 per-entry 级别控制，7z/TAR 无此能力 -->
+        <TextBlock Text="{Binding ZipAdaptiveSectionTitle, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   FontWeight="SemiBold"
+                   Margin="0,6,0,4"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 自适应压缩：已压缩文件（图片/音视频等）自动 Store，其余保持用户选定级别 -->
+        <CheckBox x:Name="AdaptiveCompressionCheck"
+                  Content="{Binding AdaptiveCompressionLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="False"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 魔数检测：对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度 -->
+        <CheckBox x:Name="SmartDetectCheck"
+                  Content="{Binding SmartDetectLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="False"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- 多线程压缩：利用多核 CPU 并行压缩，显著提升压缩速度。仅 ZIP 支持 -->
+        <CheckBox x:Name="ZipMultiThreadCheck"
+                  Content="{Binding ZipMultiThreadLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                  IsChecked="False"
+                  IsCheckedChanged="ZipMultiThreadCheck_IsCheckedChanged"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+        <!-- ZIP 多线程超 4GB 限制说明：待压缩总量达到 ZIP32 上限时禁用上方选项并显示本提示
+             （与引擎侧 IsMultiThreadedEligible 的 MaxZip32Size 判定同源；后续版本将支持 ZIP64 多线程） -->
+        <TextBlock x:Name="ZipMtOverLimitHintText"
+                   Text="{Binding ZipMtOverLimitHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   IsVisible="False"
+                   TextWrapping="Wrap"
+                   FontSize="11"
+                   Margin="24,2,0,0"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+        <!-- 并行压缩组数：N 个单线程压缩器并行（区别于上方「多线程压缩」的单个压缩器 mt=on）。
+             按项目规则 6（方案 A）：多线程压缩关闭时整块隐藏而非禁用 —— N 组的第一条回退条件
+             就是 MultiThreadedCompression == false，组数在此情况下会被引擎静默忽略。 -->
+        <StackPanel x:Name="ParallelDegreePanel"
+                    Orientation="Horizontal"
+                    Spacing="{DynamicResource SpacingSm}"
+                    Margin="0,4,0,0"
+                    IsVisible="False">
+          <!-- 组数标签：并行压缩组数 -->
+          <TextBlock Text="{Binding ParallelDegreeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <!-- 组数输入框：1..16，1 = 串行；默认值由 LoadDefaults 从 AppSettings 注入 -->
+          <NumericUpDown x:Name="ParallelDegreeInput"
+                         Classes="intOnly"
+                         Minimum="1" Maximum="16"
+                         Value="1"
+                         Width="120" />
+          <!-- 灰色提示：说明与上方「多线程压缩」的关系（缺口 A 修法） -->
+          <TextBlock Text="{Binding ParallelDegreeHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     FontSize="11" />
+        </StackPanel>
       </StackPanel>
 
       <!-- ═══════ 7z 选项面板 ═══════ -->
@@ -95,6 +156,7 @@
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
         <!-- 7z 固实块大小：固实压缩时的数据块大小 -->
+        <!-- 7z 固实块大小：每块固实流的累积大小，越大压缩率越高但随机访问越慢；选「自定义」时显示 MB 输入框 -->
         <Grid Margin="0,6,0,0">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -104,15 +166,41 @@
                      Text="{Binding SolidBlockSizeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                      VerticalAlignment="Center"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-          <ComboBox x:Name="SolidBlockSizeCombo"
-                    Grid.Column="1"
-                    Height="24"
-                    Background="{DynamicResource ThemeComboBoxBgBrush}"
-                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+          <Grid Grid.Column="1">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="SolidBlockSizeCombo"
+                      Grid.Column="0"
+                      Height="24"
+                      Background="{DynamicResource ThemeComboBoxBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}"
+                      SelectionChanged="SolidBlockSizeCombo_SelectionChanged" />
+            <!-- 自定义固实块大小输入：单位 MB，仅选「自定义」且固实开启时显示（规则 6：隐藏而非禁用） -->
+            <StackPanel x:Name="CustomSolidSizePanel"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        IsVisible="False"
+                        Margin="6,0,0,0">
+              <TextBox x:Name="CustomSolidSizeBox"
+                       Width="80"
+                       Height="24"
+                       PlaceholderText="MB"
+                       Background="{DynamicResource ThemeSurfaceBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              <TextBlock Text="{Binding CustomSolidSizeHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         FontSize="11" />
+            </StackPanel>
+          </Grid>
         </Grid>
 
-        <!-- 7z 字典大小：压缩时使用的滑动窗口大小，越大压缩率越高但内存占用越大 -->
+        <!-- 7z 字典大小：压缩时使用的滑动窗口大小，越大压缩率越高但内存占用越大；选「自定义」时显示 MB 输入框 -->
         <Grid Margin="0,6,0,0">
           <Grid.ColumnDefinitions>
             <ColumnDefinition Width="80" />
@@ -122,13 +210,49 @@
                      Text="{Binding DictSizeLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                      VerticalAlignment="Center"
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-          <ComboBox x:Name="DictSizeCombo"
-                    Grid.Column="1"
-                    Height="24"
-                    Background="{DynamicResource ThemeComboBoxBgBrush}"
-                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
+          <Grid Grid.Column="1">
+            <Grid.ColumnDefinitions>
+              <ColumnDefinition Width="*" />
+              <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <ComboBox x:Name="DictSizeCombo"
+                      Grid.Column="0"
+                      Height="24"
+                      Background="{DynamicResource ThemeComboBoxBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}"
+                      SelectionChanged="DictSizeCombo_SelectionChanged" />
+            <!-- 自定义字典大小输入：单位 MB，仅选「自定义」时显示（规则 6：隐藏而非禁用） -->
+            <StackPanel x:Name="CustomDictSizePanel"
+                        Grid.Column="1"
+                        Orientation="Horizontal"
+                        Spacing="4"
+                        IsVisible="False"
+                        Margin="6,0,0,0">
+              <TextBox x:Name="CustomDictSizeBox"
+                       Width="80"
+                       Height="24"
+                       PlaceholderText="MB"
+                       TextChanged="CustomDictSizeBox_TextChanged"
+                       Background="{DynamicResource ThemeSurfaceBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              <TextBlock Text="{Binding CustomDictSizeHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         FontSize="11" />
+            </StackPanel>
+          </Grid>
         </Grid>
+
+        <!-- 自定义字典内存提示：大字典解压需同等可用内存，选自定义且输入较大值时显示 -->
+        <TextBlock x:Name="DictSizeMemoryWarning"
+                   Text="{Binding DictSizeMemoryHint, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                   Margin="86,2,0,0"
+                   IsVisible="False"
+                   FontSize="11"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                   TextWrapping="Wrap" />
 
         <!-- 7z 字长/快速字节数：匹配查找时的最大匹配长度，影响压缩速度与压缩率的平衡 -->
         <Grid Margin="0,6,0,0">

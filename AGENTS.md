@@ -171,11 +171,43 @@ await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelis
 - **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`, `IconTestViewModel`（图标测试窗口）、`UiTestViewModel`（UI 控件测试窗口）、`MetadataPanelSettingsViewModel`（元数据面板设置窗口）
 - **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `SelectedItemsExtractService`（选择条目解压，消费 `ExtractPathResolver`）、`CompressFlow`（压缩公共流程：BuildRequest/冲突弹窗/暂停，主窗口 VM 与 CLI 共用）、`ExtractFlow`（解压公共流程 + 冲突弹窗）、`DragDropService`（拖拽解压后置流程）+ `OverlayController`（Win32 覆层）+ `CustomOleDragDrop`（自实现 OLE 拖拽，根治光标）+ `DropTargetDetector`（目标目录检测）+ `DragDropItemExpander`（选中目录展开）+ `DragPreviewBitmapBuilder`（拖拽预览位图）、`PasswordService`（密码验证/自动匹配）、`FileFilterHelper`（文件过滤）、`NativeMethods`（Win32 P/Invoke）、`PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树，`BuildExtractPreview` 与解压共用 `ExtractPathResolver` 保证预览=实际）、`MetadataSettingsManager`（元数据面板配置持久化，见下方信息面板小节）、`MetadataRenderEngine`（元数据渲染引擎，见下方信息面板小节）、`ShellIntegration`（partial 拆分：`ShellIntegration.cs` + `ShellIntegration.Menu.cs` + `ShellIntegration.Assoc.cs`）
 - **Views**: `MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`, `UiTestWindow.axaml`（UI 控件测试，仅 Debug 显示）
-- **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`CustomFilePickerDialog`（**统一文件/目录选择器**，新增选择入口必须用它、禁用原生 StorageProvider，见规则 15）、`QuickPathPicker`（自包含路径速选控件，见下方「路径速选子系统」）、`InfoPanel`（元数据信息面板）、`FileFilterEditor`（文件过滤条件编辑器）、`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等）、`QuickPathControl`（路径速选控件）
+- **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`CustomFilePickerDialog`（**统一文件/目录选择器**，新增选择入口必须用它、禁用原生 StorageProvider，见规则 16）、`QuickPathPicker`（自包含路径速选控件，见下方「路径速选子系统」）、`InfoPanel`（元数据信息面板）、`FileFilterEditor`（文件过滤条件编辑器）、`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等）、`QuickPathControl`（路径速选控件）
 - **Converters**: `BrushResourceConverter`（主题色键→画刷）、`GeometryResourceConverter`（资源键→Geometry）
 - **紧凑度模式**: Compact/Normal/Loose 三档，`ApplyCompactness()` 运行时注入 12 个 `DynamicResource`（间距/控件高度/圆角），无需重启
 - **上下文工具栏**: 目录树工具栏（展开/折叠全部+自动展开开关+过滤器+分隔符切换）+ 文件列表工具栏（选择/反选/展平/排序/地址栏），`PathIcon` 矢量按钮
 - 对话框通过 ViewModel 的回调委托（`ShowPasswordDialog`, `ShowExtractSettingsDialog` 等）与 View 解耦
+
+#### 派生属性通知：集中通知模式
+
+当多个计算属性依赖同一组源属性时，**禁止**在每个 `[ObservableProperty]` 字段上逐个标注 `[NotifyPropertyChangedFor]`（容易漏、难维护）。改用 `partial void OnXxxChanged` + 集中通知方法：
+
+```csharp
+// ✅ 正确：集中通知
+[ObservableProperty]
+private bool _optionA;
+
+[ObservableProperty]
+private bool _optionB;
+
+partial void OnOptionAChanged(bool value) => NotifyXxxProperties();
+partial void OnOptionBChanged(bool value) => NotifyXxxProperties();
+
+private void NotifyXxxProperties()
+{
+    OnPropertyChanged(nameof(IsVisibleA));
+    OnPropertyChanged(nameof(IsVisibleB));
+    OnPropertyChanged(nameof(SummaryText));
+}
+
+// ❌ 错误：逐个标注，容易漏
+[ObservableProperty]
+[NotifyPropertyChangedFor(nameof(IsVisibleA))]
+[NotifyPropertyChangedFor(nameof(IsVisibleB))]
+[NotifyPropertyChangedFor(nameof(SummaryText))]
+private bool _optionA;
+```
+
+原则：新增派生属性只需改 `NotifyXxxProperties()` 一处，源字段保持干净。
 
 ### 预览子系统
 
@@ -215,7 +247,7 @@ await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelis
 - **上下文菜单**: EnableCompressMenu, EnableOpenMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu（COM 动态菜单 / 静态级联回退，`EnableCascadingMenu` 已废弃移除）
 - **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, ShowPreviewInfoPanel, TextPreviewFontSize, TextPreviewFontFamily, TextEncodingPreference, MaxTablePreviewRows, MaxTablePreviewCols, MaxPreviewFileSize, FontPreviewFontSize, FontPreviewSampleText, FontPreviewEnableLigature, PreviewPosition, InfoPanelOrientation, EnableFormatDetection, PreviewHeadSize
 - **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
-- **外观**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）
+- **外观**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）, ProgressContentMode / ProgressInfoDensity / ProgressWindowWidth（进度窗口显示偏好：内容模式 / 信息量分级 / 窗口宽度，关闭时写回）
 - **文件关联（Avalonia 新增）**: AssocZip/7z/Rar/Tar/TarGz/Gz/Iso, CustomAssocExtensions
 - **收藏夹（Avalonia 新增）**: FavoritePaths (List<string>)
 - **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
@@ -423,12 +455,12 @@ Four modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"extension"`
 - **full**: Same → `[PATH_1]` (sequential IDs, same path → same ID, capped at 10000 entries)
 
 **Injection**: 
-- `CoreLog.RedactOverride` (internal `Func<string, string>?`) set by UI's `App.OnStartup` so CoreLog can redact without referencing AppSettings
+- `CoreLog.Initialize(diagnosticsEnabled, privacyMode)` — UI 层在 `OnFrameworkInitializationCompleted` 和 `RefreshDebugLogSettings` 中调用，统一注入诊断开关与脱敏委托。**禁止直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`**，必须走 `Initialize()` 方法
 - `App.Log()`, `App.LogDebug()`, and `LogStartup()` call `LogRedactor.RedactPaths()` directly (they're in UI project and have AppSettings access)
 
-**Help dialog**: `LogPrivacyHelpDialog` opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
+**Help dialog**: the log-privacy help is Markdown-driven — `MarkdownHelpContent(LocalizationManager.T("LogPrivacyHelp_Markdown"))` rendered through the shared `HelpDialog` shell (见规则 17), opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
 
-**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI.Avalonia/Dialogs/LogPrivacyHelpDialog.axaml/.cs` (Avalonia).
+**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI.Avalonia/Dialogs/MarkdownHelpContent.axaml(.cs)` + `UI.Avalonia/Dialogs/HelpDialog.axaml(.cs)` + `Localization/strings.*.json` 的 `LogPrivacyHelp_Markdown`（Avalonia）。
 
 ## Known issues (already fixed)
 
@@ -486,13 +518,16 @@ Build artifacts (bin/, obj/) are gitignored.
 
 如果用户是以疑问的方式描述某个问题，则先找到问题所在和解决方案后，必须先与用户沟通，待用户完全确定问题与解决方案后，再执行。
 
+回复用户的文本必须是中文，除非是引用的其他语言。
+
 ### 规则 1：Plan 变更同步
 
 新增计划文本需要放在 `.omo/plans/未开始` 内，格式与同目录计划相同
 每当新增或修改 `.omo/plans/` 内的计划文件时，**必须同步更新** `docs/PLAN.md`：
 - 新增计划 → 在 PLAN.md 对应优先级区域（P2/P3/待实现）添加一行 `| 任务 | 说明 |` 引用新计划，保持与已存在行格式一致
 - 修改计划 → 更新 PLAN.md 中对应任务的说明、优先级或状态
-- 计划完成 → 将条目从 PLAN.md 移至 PROGRESS.md 的 【历史设计方案索引】 章节
+- 执行计划 → 若计划文档不在 `.omo\plans\进行中` 内，先将对应计划移入 `.omo\plans\进行中` 目录再执行。
+- 计划完成 → 将条目从 PLAN.md 移至 PROGRESS.md 的 【历史设计方案索引】 章节。先将对应计划移入 `.omo\plans\已完成` 中。
 
 ### 规则 2：版本号变更
 - 只有在用户明确说明变更版本号时才会变更，不要未经用户允许擅自变更版本号。如果你觉得应该变更版本号，需要向用户询问。
@@ -755,7 +790,26 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 #### 验证
 完成注释后，运行 `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 确保无编译错误。
 
-### 规则 15：文件/目录选择必须使用 CustomFilePickerDialog（禁用原生 StorageProvider）
+### 规则 15：CoreLog 初始化必须走 Initialize() 方法
+
+Core 层 `CoreLog` 的诊断开关与脱敏委托**必须**通过 `CoreLog.Initialize()` 统一注入，**禁止**直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`：
+
+```csharp
+// ✅ 正确：一行调用，注入诊断开关 + 路径脱敏
+CoreLog.Initialize(appSettings.EnableDebugLogging, appSettings.LogPrivacyMode);
+
+// ❌ 错误：直接设置属性，分散且容易遗漏脱敏委托
+CoreLog.DiagnosticsEnabled = appSettings.EnableDebugLogging;
+CoreLog.RedactOverride = msg => LogRedactor.RedactPaths(msg, ...);
+```
+
+**注入时机**（两处）：
+1. `OnFrameworkInitializationCompleted` — 启动时首次注入
+2. `RefreshDebugLogSettings` — SettingsWindow 保存设置后同步刷新
+
+**原因**：Core 层无法引用 AppSettings（依赖倒置），若不通过 `Initialize()` 注入，`CoreLog.Trace`/`Info`/`Error` 写入的日志不会被脱敏，导致完整文件路径泄露到 debug.log。
+
+### 规则 16：文件/目录选择必须使用 CustomFilePickerDialog（禁用原生 StorageProvider）
 
 **核心禁令**：任何新增或修改的文件/目录选择入口，**禁止**使用 Avalonia 原生 `StorageProvider` 选择对话框。
 
@@ -797,6 +851,17 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 ```
 
 出现 `SystemBrowse_Click` 以外的命中即视为违规，必须改用自定义选择器。历史迁移记录见 `docs/progress-avalonia-detail.md` 的 `2026-09-30` 条目（4 处调用点：拖拽解压兜底、添加文件、密码导出、密码导入）。
+
+### 规则 17：帮助/介绍弹窗必须复用 HelpDialog 外壳
+
+**核心禁令**：任何新增的用户可见帮助/介绍弹窗，**必须**复用统一外壳 `Dialogs/HelpDialog.axaml`，**禁止**另建一次性 `Window` 帮助对话框。
+
+- **外壳**：`new HelpDialog(title, content, closeText?)` —— `title` 为窗口标题（走 `LocalizationManager.T()`，规则 13）、`content` 为内容 `UserControl`、`closeText` 可选（默认 `MsgBox_Close`）；原对话框的窗口尺寸经对象初始化器在构造后补设（`{ Width = ..., Height = ... }`）
+- **内容**（两种，任选）：① **Markdown 驱动（当前唯一在用的方式，推荐）**——`new MarkdownHelpContent(LocalizationManager.T("Xxx_Markdown"))`，把本地化 Markdown 经 `Services/MarkdownPreviewBuilder`（Markdig AST → 原生控件树）渲染（支持标题/列表/**表格**/代码块/引用块/粗斜体；段落为 `SelectableTextBlock`，文本可选中复制）；正文只维护三语 Markdown 键，无需改 XAML。② **手写卡片式**——自建 `UserControl`（根 `x:CompileBindings="False"` + `ScrollViewer` 包裹内容；代码后置用 `=> LocalizationManager.T("key")` 只读属性 + 构造函数末尾 `DataContext = this`），仅当 Markdown 表达不了时使用。
+- **⚠️ `x:Class` 类型必须有公共无参构造**：Avalonia XAML 编译器要求（否则 `AVLN3000: Unable to find public constructor`）；带参构造 + `public Xxx() : this(defaults) { }` 兜底。**增量构建会掩盖该错**——只在运行期表现为大面积 `XamlLoadException: No precompiled XAML found`，务必用 `--no-incremental` 验证。
+- **原因（根因回归防护）**：`HelpDialog` 在构造函数内、`DataContext = this` **之前**完成 title/content 赋值且属性只读 —— 绑定在 attach 后求值时值已就绪；若另建一次性 Window、或在构造**之后**再赋值属性（无变更通知），绑定不刷新，整窗静默空白（曾实际发生）
+- **已迁移消费者（全部 Markdown 驱动）**：压缩加速帮助（三语 `AdaptiveHelp_Markdown`）、并行解压帮助（`ParallelHelp_Markdown`）、密码管理器帮助（`PasswordHelp_Markdown`，含 Glob/Regex 表格）、日志隐私帮助（`LogPrivacyHelp_Markdown`）
+- **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/HelpDialogRenderTests.cs`（无头 Avalonia，验证 ContentPresenter 注入内容引用相等 + 内容真实渲染 + 三语 Markdown key 存在）
 
 ## 未来工作
 
