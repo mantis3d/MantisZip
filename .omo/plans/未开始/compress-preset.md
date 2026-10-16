@@ -236,7 +236,7 @@ COM Menu → Task 7 → Task 9 → F1-F4 (Phase 2)
 
   **Commit**: YES (groups with 1)
   - Message: `feat(ui): add preset persistence to AppSettings`
-  - Files: `src/MantisZip.UI/AppSettings.cs`
+  - Files: `src/MantisZip.UI.Avalonia/AppSettings.cs`
 
 ---
 
@@ -275,8 +275,8 @@ COM Menu → Task 7 → Task 9 → F1-F4 (Phase 2)
   **Commit**: YES
   - Message: `feat(ui): add compress preset management to CompressSettingsWindow`
   - Files:
-    - `src/MantisZip.UI/CompressSettingsWindow.xaml`
-    - `src/MantisZip.UI/CompressSettingsWindow.xaml.cs`
+    - `src/MantisZip.UI.Avalonia/CompressSettingsWindow.axaml`
+    - `src/MantisZip.UI.Avalonia/CompressSettingsWindow.axaml.cs`
 
 ---
 
@@ -292,7 +292,7 @@ COM Menu → Task 7 → Task 9 → F1-F4 (Phase 2)
   **References**:
   - Core/Presets/ExtractPreset.cs (Task 2)
   - UI/AppSettings.cs (Task 3)
-  - UI/ExtractSettingsWindow.xaml (已有)
+  - UI/ExtractSettingsWindow.axaml (已有)
 
   **Parallelization**:
   - Wave: Phase 1
@@ -305,8 +305,8 @@ COM Menu → Task 7 → Task 9 → F1-F4 (Phase 2)
   **Commit**: YES
   - Message: `feat(ui): add extract preset management to ExtractSettingsWindow`
   - Files:
-    - `src/MantisZip.UI/ExtractSettingsWindow.xaml`
-    - `src/MantisZip.UI/ExtractSettingsWindow.xaml.cs`
+    - `src/MantisZip.UI.Avalonia/ExtractSettingsWindow.axaml`
+    - `src/MantisZip.UI.Avalonia/ExtractSettingsWindow.axaml.cs`
 
 ---
 
@@ -344,7 +344,7 @@ COM Menu → Task 7 → Task 9 → F1-F4 (Phase 2)
 
   **References**:
   - UI/App.Cli.cs — 现有 CLI 入口
-  - UI/App.xaml.cs — CLI 路由
+  - UI/App.axaml.cs — CLI 路由
 
   **Parallelization**:
   - Wave: Phase 2

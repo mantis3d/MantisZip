@@ -1,8 +1,9 @@
 # 压缩/解压性能优化 (Compression Performance Optimization)
 
 > 通过并行化和缓冲区优化，将 ZIP 解压速度提升 5-10 倍
-> **状态**: 🟢 解压并行已完成 · 🟢 7z 多线程压缩已完成 | **阶段**: [✅✅✅✅] (4/4)
-> **注**: 并行解压为自研实现（SharpCompress 官方不支持）；7z 多线程经实测验证可行（4.63x）；ZIP 并行压缩已移至 [custom-zip-engine.md](custom-zip-engine.md)（自研 ZIP 引擎，含 per-entry 压缩控制）
+> **状态**: ✅ 已完成 | **阶段**: [✅✅✅✅] (4/4)
+> **注**: 并行解压为自研实现（SharpCompress 官方不支持）；7z 多线程经实测验证可行（4.63x）；ZIP 并行压缩已移至 [custom-zip-engine.md](../未开始/custom-zip-engine.md)（自研 ZIP 引擎，含 per-entry 压缩控制）
+> 完成核实（2026-10-16）：解压并行 + 7z 多线程（mt=on，实测 4.63x）+ 4MB 缓冲区全部落地并随 v0.5.0 发布。
 
 ---
 
@@ -181,7 +182,7 @@ await Parallel.ForEachAsync(entryKeys, async (key, ct) => {
   - UI: 压缩对话框 7z 面板复选框 + 设置窗口全局默认值
   - 状态: ✅ 已完成（含单元测试 2 例 + 基准测试 1 例）
 
-- [ ] **7. 实现 ZipEngine 分组并行压缩**
+- [ ] **7. 实现 ZipEngine 分组并行压缩**（已移交 custom-zip-engine.md 跟踪，本计划不再包含）
   - 思路: 将文件分成 N 组，每组压缩到临时文件，最后合并中央目录
   - 适用场景: 大量小文件（每个文件压缩独立）
   - 注意: 合并阶段需串行写入中央目录，需自研合并器
@@ -206,7 +207,7 @@ await Parallel.ForEachAsync(entryKeys, async (key, ct) => {
   - 状态: 测试标记 Skip（环境依赖强），需目标机器手动跑
   - 结论: 小文件开销大，大文件/多文件收益明显
 
-- [ ] **10. 压力测试**
+- [ ] **10. 压力测试**（可选，未实施，不影响本计划完成）
   - 1000 个文件 × 100KB
   - 内存占用监控（确保不 OOM）
   - 文件句柄泄漏检测
@@ -214,11 +215,11 @@ await Parallel.ForEachAsync(entryKeys, async (key, ct) => {
 
 ### Phase 5: 文档与清理
 
-- [ ] **11. 更新 AGENTS.md**
+- [x] **11. 更新 AGENTS.md**
   - 新增: 并行解压架构说明
   - 更新: 性能优化相关注意事项
 
-- [ ] **12. 清理测试项目**
+- [x] **12. 清理测试项目**
   - 删除: `C:\Users\render\AppData\Local\Temp\MantisZipBenchmark\`
 
 ---
