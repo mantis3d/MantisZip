@@ -157,6 +157,28 @@ public class WholeArchiveErrorLocalizerTests
         }
     }
 
+    [Fact]
+    public async Task ToUserText_ZipSlipInvalidPath_PassesThroughWithoutPrefix()
+    {
+        var dest = Path.Combine(Path.GetTempPath(), "mztest-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dest);
+        try
+        {
+            var engine = new MantisZip.Core.Engines.ZipEngine();
+            var ex = await Assert.ThrowsAnyAsync<Exception>(
+                () => engine.ExtractAsync(CorpusPath("edge-02-zip-slip.zip"), dest));
+
+            var (message, detail) = WholeArchiveErrorLocalizer.ToUserText(ex);
+
+            Assert.Equal(ex.Message, message); // 透传（Core 已是中文可读），无「操作失败：」前缀
+            Assert.Null(detail);
+        }
+        finally
+        {
+            try { Directory.Delete(dest, recursive: true); } catch { }
+        }
+    }
+
     private static string CorpusPath(string fileName) =>
         Path.Combine(GetRepoRoot(), "tests", "corpus", "corrupt-archives", fileName);
 

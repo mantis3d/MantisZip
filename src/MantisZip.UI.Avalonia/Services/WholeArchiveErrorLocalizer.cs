@@ -71,6 +71,11 @@ public static class WholeArchiveErrorLocalizer
             case InvalidOperationException ioe when IsEncryptedSignal(ioe.Message):
                 return (LocalizationManager.T("Error_ArchiveEncrypted"), ioe.Message);
 
+            // Core 检测到的「已知可读条件」异常（如 Zip Slip「压缩条目包含非法路径」、
+            // 「条目路径净化后为空」）：消息本身已是用户可读中文，直接透传，不加「操作失败：」前缀。
+            case InvalidOperationException ioe when ContainsCjk(ioe.Message):
+                return (ioe.Message, null);
+
             default:
                 return (LocalizationManager.T("Error_Whole_FallbackFmt", ex.Message), ex.Message);
         }
@@ -80,4 +85,14 @@ public static class WholeArchiveErrorLocalizer
     private static bool IsEncryptedSignal(string message) =>
         message.Contains("加密", StringComparison.Ordinal)
         || message.Contains("encrypted", StringComparison.OrdinalIgnoreCase);
+
+    /// <summary>消息是否含 CJK 表意文字（判定 Core 已给出用户可读中文文案，无需再套前缀）。</summary>
+    private static bool ContainsCjk(string message)
+    {
+        foreach (var c in message)
+        {
+            if (c is >= '\u4e00' and <= '\u9fff') return true;
+        }
+        return false;
+    }
 }
