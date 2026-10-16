@@ -244,9 +244,20 @@ public partial class ProgressWindow : Window
     /// <summary>
     /// Set error summary text (selectable, shown between progress bars and buttons).
     /// </summary>
-    public void SetErrorSummary(string message)
+    /// <param name="message">本地化后的整包错误文案（红段首行）。</param>
+    /// <param name="detail">异常原文（可选，供摘要框 tooltip）。</param>
+    public void SetErrorSummary(string message, string? detail = null)
     {
-        _vm.SetErrorSummary(message);
+        _vm.SetErrorSummary(message, detail);
+    }
+
+    /// <summary>
+    /// 直接设置进度窗口状态行文案（用于无错误汇总的终态，如密码取消：避免停在 BeginPreparing
+    /// 写入的「正在准备…」——EndPreparing 只在首个 SetProgress 调用，而取消可能发生在首报之前）。
+    /// </summary>
+    public void SetStatusMessage(string? message)
+    {
+        if (!string.IsNullOrEmpty(message)) _vm.StatusMessage = message;
     }
 
     // ════════════════════════════════════════════

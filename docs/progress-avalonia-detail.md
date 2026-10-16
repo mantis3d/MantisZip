@@ -17,6 +17,11 @@
   - **P4 归档归类**：`PLAN.md`「已废弃方案」表补 4 行（`preview-format-detection.old`/`office-content-preview`/`explorer-path-switcher`/`quick-path-control`）；`PROGRESS.md` 历史索引补 4 条（`cross-platform-port-research`/`icon-dll`/`quickpath-control-redesign`/`preview-avalonia-opportunities`）；`archive-manager.md` 登记进 `PLAN.md`；`.omo/plans` 孤儿文件清零。
   - **结果**：三份 docs 零链接目录错位、零日期逆序、零重复条目；未开始/进行中/已归档 计划文件全量有引用。
 
+**2026-10-16** — 合并 main → beta（4 处冲突全部解决）
+  - **背景**：`git merge main`（base `68ef1ad`）——main 带来「计划库审计与重新归类」，beta 有较新计划/进度条目，4 处冲突全为文档：`.omo/plans/未开始/progress-window-enhancement.md`（deleted by us）+ `docs/PLAN.md`（3 块）+ `docs/PROGRESS.md`（历史索引表）+ `docs/progress-avalonia-detail.md`（同日条目块）
+  - **解决**：① `progress-window-enhancement.md` 接受 beta 的 `已完成/` v2 全量重写（main 对 v1 的路径修正已被 v2 覆盖），删除 `未开始/` 副本；② `PLAN.md`——日期取 2026-10-16、保留 beta 新增 3 行（zip-crc-validation / parallel-compress-plan-d / parallel-compress-plan-a）、删除 compression-performance-optimization 行（main 审计已把该计划移入 `已完成`，保留会造成 `未开始/` 死链，其剩余工作由 D/A 两方案承接）、执行顺序段落按两分支事实合并为「3 项依赖链」；③ `PROGRESS.md` 历史索引取并集（beta 7 条「未发布」在前 + main 2 条 v0.5.1/v0.5.0 在后）；④ 本文件取并集（main 的 10-16 审计条目置顶 + beta 的 10-15…10-10 块）
+  - **验证**：`git ls-files -u` 为空、全仓无冲突标记、编码/换行保持（PLAN 无 BOM，PROGRESS/本文件保留 BOM，均 CRLF）
+
 **2026-10-16** — 计划库审计与重新归类（全量核查 `.omo/plans/未开始/` 38 个设计文档）
   - **背景**：对照代码库逐条验证 38 个「未开始」计划的真实完成度，纠正文本与实际不符者，并按完成度重新归档（规则 1）
   - **移入 `已完成/`（2）**：`compression-performance-optimization.md`（ZIP 并行解压 + 7z 多线程 `mt=on` + 4MB 缓冲区全部落地，随 v0.5.0 发布；Task 7 分组并行压缩移交 custom-zip-engine）；`clean-temp-on-startup-avalonia.md`（Avalonia 启动清理消费方，2026-09-27 落地）
@@ -39,6 +44,22 @@
   - **产物**：规格 `docs/superpowers/specs/2026-10-15-icon-theme-system-design.md`（含 5 轮决策记录 + 3 方案权衡）；视觉对比稿存 `.superpowers/brainstorm/`（未入库）
   - **下一步**：writing-plans 生成实施计划；本立项不涉及版本号变更
   - **审阅补充（同日）**：规格审阅通过；**D7 决策**——主题色×图标 = 选择各自 + 渲染层自动配套（两正交开关、不成套绑定，成套预设留规格 §11）；`.gitignore` 忽略 `.superpowers/`（本次视觉伴侣产物目录）
+
+**2026-10-15** — 压缩/解压出错信息增强 Task 1–8（`error-info-enhancement` 计划）
+  - **Task 1（规则 13）**：`App.axaml.cs` 两处硬编码 `"{N} 个文件未能写入到 {dir}（可能权限不足）"` → `LocalizationManager.T("Progress_WriteFailed_Fmt", n, dir)`；三语新增该 key，去掉猜测措辞。
+  - **Task 3（i18n）**：三语各补 9 组 key（`Progress_FailedBreakdown_Fmt`/`Progress_SkippedBreakdown_Fmt`/`Error_Whole_*`4/`Error_Hint_*`3），三语 **1259 key 一致**。
+  - **Task 4**：新增 `Services/WholeArchiveErrorLocalizer`（FileNotFound/DirectoryNotFound/UnauthorizedAccess 各有专属文案；`InvalidDataException` 透传防双重本地化；其余回退）+ 附加 `IoErrorHintResolver` 提示；6 个 `SetErrorSummary(ex.Message)` 直传点改本地化并传 detail。`WholeArchiveErrorLocalizerTests` 6 例。
+  - **Task 5**：`ProgressViewModel` 失败原因分布行（`BuildBreakdownLine`：按数量降序、同数量按枚举序，格式 `共 N 个失败：权限不足 2 · 数据损坏 1`，占 `SummaryMaxLines` 一行配额）；`ProgressViewModelTests` +4，同步更新 2 个受分布行影响的行数断言（去重行数 1→2、More 计数 6→7）。
+  - **Task 6**：Core `ArchiveProgress.EntryErrorDetail`（异常原文）；三引擎约 30 处 Failed/带原因 Skipped 埋点填充（异常在作用域处；条目丢失 `entry==null` 分支留 null 并修正误导注释）；`FailureReasonMapper` 注释更新（D2 修订说明）；`ZipEngineCrcValidationTests` +1（详情非空含 "CRC" + 字节）。
+  - **Task 8**：Core `ArchiveProgress.EntryErrorHResult` + UI `Services/IoErrorHintResolver`（HResult 低 16 位 → `Error_Hint_DiskFull`(112/39) / `Error_Hint_FileInUse`(32/33) / `Error_Hint_PathTooLong`(206)）；`IoErrorHintResolverTests` 10 例。
+  - **Task 7**：`ProgressViewModel.CollectEntryOutcome` 增 detail/hresult；`EntryProgressItem` 加 `FailureReasonText`/`FailureHint`/`FailureDetail`/`FailureTooltip`；摘要框 `ErrorSummaryTooltip`/`SkippedSummaryTooltip`；`SetErrorSummary(message, detail)` 增参（VM + `ProgressWindow`）；`ProgressWindow.axaml` 红/黄摘要框 + 条目行 `ToolTip.Tip` 绑定；`ProgressViewModelTests` +3。
+  - **测试基建**：`tests/MantisZip.UI.Avalonia.Tests/TestParallelization.cs` 关闭 xUnit 并行——`LocalizationManager.CurrentLanguage` 为全局静态、语言即时刷新用例切换它，与其它类读取 `T()` 竞态致偶发假失败。
+  - **接线守卫**：`ProgressWindowXamlTests.ErrorInfoEnhancement_TooltipAndSummaryWiring_IsPresent`——断言 `ProgressWindow.axaml` 三处 `ToolTip.Tip` 绑定与 `SetErrorSummary(message, detail)` 增参存在（AXAML 绑定拼写错误编译期不报错）。
+  - **缺口修复（打开路径 + 引擎异常本地化）**：① `ArchiveService.LoadArchiveAsync` 打开失败路径改走 `WholeArchiveErrorLocalizer`（头部结构 `Broken` → 直接「文件损坏或格式无效」，其余走映射），不再裸露 `无法打开压缩包: {英文}`；② `WholeArchiveErrorLocalizer` 补映射引擎异常——`SharpCompress.Common.{InvalidFormatException,IncompleteArchiveException,ArchiveException}` 与 `SharpSevenZip.Exceptions.ExtractionFailedException` → `Error_Whole_Corrupted`（「文件损坏或格式无效」），`SharpSevenZipArchiveException` → `Error_Whole_CorruptedOrPassword`（「无法读取压缩包：文件可能已损坏，或需要密码」，因加密头/损坏抛同消息）；③ `InvalidOperationException` 消息含「加密」/encrypted（Core「加密包无密码」4 处抛点）→ `Error_ArchiveEncrypted`（干净中文，去掉「操作失败：」前缀与英文注解）；**不改 Core 双语消息**——`PasswordService.ClassifyGenericException` 的密码分类启发式依赖其中的 "password"/"encrypted"；④ 含 CJK 的 `InvalidOperationException`（Core 已给出用户可读中文，如 Zip Slip「压缩条目包含非法路径」）→ 透传、不加「操作失败：」前缀。三语 +2 key。`WholeArchiveErrorLocalizerTests`+7（2 语料引擎异常 + 2 个 7z 异常直构 + 加密消息直构 + enc-01 真实提取 + edge-02 Zip Slip 真实提取）。
+  - **失败状态行修复**：`ProgressViewModel.SetErrorSummary` 现在同步把进度窗口状态行从「正在准备…」切到失败文案（新增三语 `Status_OperationFailed`「操作失败」）。此前引擎在「准备静默期」（首次进度上报前）抛错时，状态行会**永久停在** `BeginPreparing` 写入的「正在准备…」（`EndPreparing` 只在首个 `SetProgress` 调用），只留一个红叉——`edge-02-zip-slip.zip` 经「解压设置窗口→解压」时即如此（CLI 路径因先解压后弹窗/应用层处理正常报错）。
+  - **密码取消状态行**：`RunWithProgress` 的 `PasswordRetryCancelledException` 分支新增 `ProgressWindow.SetStatusMessage`（直接写状态行）→ 显示 `Status_PasswordCancelled`（「已取消 - 需要密码」），不再停在「正在准备…」；`ProgressWindowXamlTests.SetStatusMessage_UpdatesStatusLine` 回归。
+  - **测试线程亲和性修复**：`ProgressViewModelTests` 的 `CultureChanged_RefreshesLocalizedStrings` / `DetachLocalization_PreventsCultureChangedRefresh` 改 `[AvaloniaFact]`——改全局 `LocalizationManager.CurrentLanguage` 会触发泄漏 Avalonia 绑定的 `ExpressionNode` 更新，非 UI 线程发出即抛「The calling thread cannot access this object」。
+  - **验证**：Core **709** / UI **296** 全绿（`-p:SkipShellExtCopy=true`，连续复跑稳定）。**GUI 人工验收待做**（清单见计划任务 9）。
 
 **2026-10-15** — 修复损坏 7z/RAR 被误判为加密包（打开时误弹密码框）
   - **问题**：`ArchiveService.IsPasswordRelatedError` 纯关键词启发式（消息含 "password"/"encrypted" 即判密码相关）。经损坏语料实测（`tests/corpus/corrupt-archives/`）：SharpSevenZip 对「7z/RAR 加密头无密码」与「7z/RAR 头部损坏」抛**完全相同**的异常（同类型 `SharpSevenZipArchiveException`、同 HRESULT `0x80131500`、同消息 "Invalid archive: open/read error! Is it encrypted and a wrong password was provided?..."）——损坏包被误判 `PasswordRequired` → 弹密码框；进框后 `ClassifySharpSevenZipException` 对此消息仍返回 `WrongPassword` → 输入任何密码都提示「密码错误」，永远到不了「损坏」。

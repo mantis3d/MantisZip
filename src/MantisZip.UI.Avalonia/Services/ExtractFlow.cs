@@ -135,7 +135,8 @@ public static class ExtractFlow
         catch (Exception ex)
         {
             // 失败：写错误汇总（自动压钉 📌）+ 日志（Task 6 统一关窗职责）
-            pw.SetErrorSummary(ex.Message);
+            var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(ex);
+            pw.SetErrorSummary(wholeErrorText, wholeErrorDetail);
             App.DebugLog($"[ExtractFlow] extraction failed: {ex}");
             pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, ex.Message);
             status = SelectedItemsExtractStatus.Failed;

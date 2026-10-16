@@ -138,6 +138,34 @@ public class ZipEngineCrcValidationTests
         finally { TryCleanup(dir); }
     }
 
+    [Fact]
+    public async Task ExtractAsync_CrcCorruptEntry_ReportsErrorDetailAndFileSize()
+    {
+        var dir = NewDir();
+        try
+        {
+            var content = Content();
+            var zip = CreateStoredZip(dir, "data.bin", content);
+            FlipFirstEntryDataByte(zip);
+            var dest = Path.Combine(dir, "out");
+            Directory.CreateDirectory(dest);
+
+            var engine = new ZipEngine();
+            var progress = new ProgressCollector();
+            await engine.ExtractAsync(zip, dest, password: null, progress: progress,
+                options: new ArchiveOptions { ParallelExtractDegree = 1 });
+
+            var failed = progress.Events.FirstOrDefault(e => e.EntryStatus == ArchiveEntryStatus.Failed);
+            Assert.NotNull(failed);
+            // Task 6：失败详情透传异常原文（供 UI tooltip），非空且含可辨识子串
+            Assert.False(string.IsNullOrEmpty(failed!.EntryErrorDetail));
+            Assert.Contains("CRC", failed.EntryErrorDetail!, StringComparison.OrdinalIgnoreCase);
+            // Task 2/6：失败条目携带文件字节
+            Assert.Equal(content.Length, failed.FileTotalBytes);
+        }
+        finally { TryCleanup(dir); }
+    }
+
     private static void TryCleanup(string dir)
     {
         try { if (Directory.Exists(dir)) Directory.Delete(dir, recursive: true); } catch { }
