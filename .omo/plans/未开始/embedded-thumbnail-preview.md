@@ -1,6 +1,6 @@
 # 嵌入缩略图预览 (Embedded Thumbnail Preview)
 
-> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+> ⚠️ **2026-10-16 修正**：本计划为 WPF 时代文档，正文含 WPF 独占 API 与**不存在的文件/方法名**，实施前须按 Avalonia 重写。关键错位：① 路径 `MainWindow/Preview/MainWindow.Preview*.cs` **不存在**——实际预览系统为 MVVM：`ViewModels/PreviewViewModel.cs` + `Services/PreviewService.cs`；② 成像互操作 `System.Windows.Interop.Imaging.CreateBitmapSourceFromHBitmap` + `BitmapImage.BeginInit/EndInit/Freeze` + `PngBitmapEncoder` + `System.Windows.Int32Rect` 均为 WPF 类型，Avalonia 应改 `SKCodec`/`SKBitmap` → `Avalonia.Media.Imaging.WriteableBitmap`；③ 方法 `HideAllPreviewControls`/`ApplyZoom`/`SetPreviewInfo`/`SetToolbar`/`ShowPreviewPanel`/`ShowUnsupportedPreview` 在当前代码库**均不存在**，对应能力在 `PreviewViewModel`（`ShowImage`/`ShowUnsupported`/缩放等）。
 
 > **状态**: 📋 待实施 | **阶段**: [⬜⬜⬜⬜] (0/4)
 
@@ -165,7 +165,7 @@ public static class EmbeddedThumbnailExtractor
                 if (hBitmap == IntPtr.Zero)
                     return false;
 
-                // HBITMAP → BitmapSource → PNG byte[]
+                // ⚠️ 2026-10-16 修正：以下为 WPF 成像 API，Avalonia 应改 SKBitmap/SKCodec → WriteableBitmap`r`n                // HBITMAP → BitmapSource → PNG byte[]
                 using var bitmapStream = new MemoryStream();
                 var source = System.Windows.Interop.Imaging
                     .CreateBitmapSourceFromHBitmap(
@@ -264,7 +264,7 @@ private static extern bool DeleteObject(IntPtr hObject);
 ## Task 3: 预览管道集成
 
 **Files:**
-- Modify: `src/MantisZip.UI.Avalonia/MainWindow/Preview/MainWindow.Preview.cs`
+- Modify: `src/MantisZip.UI.Avalonia/ViewModels/PreviewViewModel.cs`
 
 ### 3.1 新增 `ThumbnailExtensions` 集合
 
@@ -344,7 +344,7 @@ else if (ThumbnailExtensions.Contains(ext))
 ## Task 4: 预览展示方法
 
 **Files:**
-- Modify: `src/MantisZip.UI.Avalonia/MainWindow/Preview/MainWindow.Preview.Metadata.cs`
+- Modify: `src/MantisZip.UI.Avalonia/Services/PreviewService.cs`
 
 ### 4.1 新增 `ShowEmbeddedThumbnailPreview` 方法
 
@@ -377,7 +377,7 @@ private async Task ShowEmbeddedThumbnailPreview(
 
         if (thumbnailBytes == null || thumbnailBytes.Length == 0)
         {
-            ShowUnsupportedPreview(item, L.TF(L.Preview_Failed, 
+            // ⚠️ 2026-10-16 修正：方法名为 WPF 时代；实际对应 PreviewViewModel.ShowUnsupported / ShowImage 等`r`n            ShowUnsupportedPreview(item, L.TF(L.Preview_Failed, 
                 "嵌入式缩略图提取失败"));
             return;
         }
@@ -433,7 +433,7 @@ private async Task ShowEmbeddedThumbnailPreview(
 
 检查 `MantisZip.UI.Avalonia/Localization/` 中是否存在 `L.Preview_ImageHeader`。若存在，则直接使用；若不存在，使用字符串 `"{0} 预览"` 或创建新的本地化键。
 
-实际上从 `MainWindow.Preview.Image.cs` line 74 可以看到：
+实际上从 `ViewModels/PreviewViewModel.cs` line 74 可以看到：
 ```csharp
 PreviewHeader.Text = L.TF(L.Preview_ImageHeader, Path.GetFileName(filePath));
 ```

@@ -3,6 +3,8 @@
 > 将 MantisZip 的安装包从 Inno Setup EXE 迁移为 WiX MSI。
 > **状态**: 📋 待定 | **任务**: [⬜⬜⬜⬜] (0/4)
 > 创建日期：2026-05-18
+>
+> ⚠️ 2026-10-16 修正：文中示例版本号已从 `0.2.7` 更新为当前版本 `0.5.2`；仓库现有**两个** Inno Setup 脚本——`installer.iss`（WebSetup，在线下载运行时）与 `installer-selfcontained.iss`（离线自包含脚本），WiX 迁移需同时覆盖两者。
 
 ## 动机
 
@@ -66,7 +68,7 @@ Components.wxs     # heat 自动收集的文件组件（可选）
 <?xml version="1.0" encoding="UTF-8"?>
 <Wix xmlns="http://wixtoolset.org/schemas/v4/wxs">
   <Package Name="MantisZip"
-           Version="0.2.7"
+           Version="0.5.2"
            Manufacturer="MantisZip Contributors"
            UpgradeCode="PUT-GUID-HERE"
            Scope="perMachine">
@@ -117,10 +119,10 @@ dotnet publish src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj `
 #   -dr INSTALLDIR -out Components.wxs
 
 # 3. 编译 .wxs → .wixobj
-wix build installer.wxs -out installer\MantisZip-0.2.7.msi
+wix build installer.wxs -out installer\MantisZip-0.5.2.msi
 
 # 或一步完成（推荐）：
-wix build installer.wxs -arch x64 -out installer\MantisZip-0.2.7.msi
+wix build installer.wxs -arch x64 -out installer\MantisZip-0.5.2.msi
 ```
 
 ## 需要处理的关键点
@@ -165,9 +167,9 @@ Inno Setup 中的 Setup icon 来自编译时指定的图标文件。WiX 中同�
 ### 5. 静默安装
 
 ```powershell
-msiexec /i MantisZip-0.2.7.msi /quiet /norestart
-msiexec /x MantisZip-0.2.7.msi /quiet /norestart
-msiexec /i MantisZip-0.2.7.msi /log install.log
+msiexec /i MantisZip-0.5.2.msi /quiet /norestart
+msiexec /x MantisZip-0.5.2.msi /quiet /norestart
+msiexec /i MantisZip-0.5.2.msi /log install.log
 ```
 
 ## 可选增强：WiX Bundle（自动装 .NET）
@@ -175,10 +177,10 @@ msiexec /i MantisZip-0.2.7.msi /log install.log
 创建一个 `.wixproj` Bundle 项目，用 `ExePackage` 引导 .NET 10 Runtime 安装：
 
 ```xml
-<Bundle Name="MantisZip" Version="0.2.7" ...>
+<Bundle Name="MantisZip" Version="0.5.2" ...>
   <Chain>
     <PackageGroupRef Id="Net9Runtime" />
-    <MsiPackage SourceFile="installer\MantisZip-0.2.7.msi" />
+    <MsiPackage SourceFile="installer\MantisZip-0.5.2.msi" />
   </Chain>
 </Bundle>
 ```

@@ -9,6 +9,7 @@
 >
 > **⚠️ 2026-06-29 修正**: 本计划编写时假设全部格式在主项目中直接实现。Avalonia 迁移后，**含重大原生依赖的功能改为插件化**（见 [preview-avalonia-opportunities.md](.omo/plans/preview-avalonia-opportunities.md) 第 8 节）。以下章节已据此更新：Phase 2D、Phase 3.10/3.11、Phase 4。
 > **⚠️ 2026-08-07 核实修正**: 对照实际代码修正完成度（详见各 Phase 段）：Phase 3 中 LNK/DBF/EPUB/字幕/STL 实际未实现；Phase 4 中 4.3 MKV/WebM 已实现；Phase 5 中 5.1（`ExtractHeadAsync`/`ExtractHeadTailAsync`）、5.3（两阶段加载，独立子计划 [preview-two-phase-loading.md](.omo/plans/preview-two-phase-loading.md) 已完成）、5.5（`IsSevenZipSolid`）已完成。
+> **⚠️ 2026-10-16 修正**: 行号/路径/链接校正——`ArchiveEntryExtractor.cs` 行号 `:213`→`:221`（`ExtractHeadAsync`）、`:257`→`:270`（`ExtractHeadTailAsync`）、`:323`→`:336`（`IsSevenZipSolid`）；`SvgParser.cs` **不存在**（SVG 经 `Svg.Skia` 内联于 `PreviewViewModel.ShowSvg`，无独立 Parser）；`MainWindow.Preview.cs` → `ViewModels/PreviewViewModel.cs`；5 处 `office-content-preview.md` 链接改指 `已完成/office-content-preview-avalonia.md`。
 
 ## TL;DR
 
@@ -28,7 +29,7 @@
   - Phase 2C TGA + Phase 2D Magick.NET 统一方案 → 已纳入插件化计划
   - 注：Phase 2 声称的 STL/GZ 实际未实现（见下方 Phase 2A 段）
 - [~] **Phase 3: 中等价值格式** — SVG/字体/LNK/DBF/ICO/字幕/Office/EPUB/HDR/~~音视频播放~~
-  - Office 内容预览增强 → [office-content-preview.md](office-content-preview.md)（独立子计划，✅ 已完成）
+  - Office 内容预览增强 → [office-content-preview-avalonia.md](../已完成/office-content-preview-avalonia.md)（独立子计划，✅ 已完成）
   - 音视频播放（原 3.10/3.11）→ 已移至插件化方案（LibVLC，未实施）
   - HDR 图像 → Magick.NET 插件（未实施）
   - **已完成**: SVG/字体/ICO 画廊/Office(Docx/Xlsx/Pptx)；**未实现**: LNK/DBF/EPUB/字幕/STL
@@ -97,7 +98,7 @@ public class PreviewToolbarAction
 ### 工作项
 
 #### 0.1 工具栏容器
-- **文件**: `MainWindow.axaml` + `MainWindow.Preview.cs`
+- **文件**: `MainWindow.axaml` + `ViewModels/PreviewViewModel.cs`
 - 在预览内容区域顶部添加 `ToolBar` 或自定义工具栏（水平 `StackPanel`）
 - 工具栏通过 `<ContentControl Content="{Binding ...}" />` 或代码动态填充
 - **约束**: 不破坏现有 Grid 行列布局；与 PreviewInfoPanel 保持同级
@@ -303,7 +304,7 @@ public class FileFormatInfo
 | VHD/VMDK | 磁盘容量、格式版本 | ⬜ 空置 |
 | MP4/MKV | 分辨率、时长、编解码器 | ⬜ 空置 |
 | 字幕 (SRT/ASS/VTT) | 条目数、时间范围 | ✅ 文本内容（复用 TextPreview） |
-| DOCX/XLSX/PPTX | 标题、作者、页数 | ⬜ 原为空置 → ✅ **[Office 内容预览计划](office-content-preview.md)** |
+| DOCX/XLSX/PPTX | 标题、作者、页数 | ⬜ 原为空置 → ✅ **[Office 内容预览计划](../已完成/office-content-preview-avalonia.md)** |
 | EPUB | 标题、作者、语种 | ⬜ 空置 |
 | ODT/ODS/ODP | 标题、作者、页数 | ⬜ 空置 |
 
@@ -345,7 +346,7 @@ public class FileFormatInfo
 | **ICO (增强)** | 图标数、各尺寸/色深列表 | 🖼 图标缩略图排列 |
 | **ICL** | 图标数、尺寸范围、色深、版本信息 | 🖼 图标网格 |
 | **SRT/ASS/VTT** | 条目数、起始/结束时间、大小 | ✅ 文本内容 |
-| **DOCX/XLSX/PPTX** | 标题、作者、页数/工作表数、大小 | ✅ **升级为内容预览** — 详见 [Office 内容预览计划](office-content-preview.md) |
+| **DOCX/XLSX/PPTX** | 标题、作者、页数/工作表数、大小 | ✅ **升级为内容预览** — 详见 [Office 内容预览计划](../已完成/office-content-preview-avalonia.md) |
 | **EPUB** | 标题、作者、语种、大小 | 🖼 **封面图**（从 OPF 提取）|
 | **CER/PFX** | 主题、颁发者、有效期(start/end)、签名算法、大小 | ⬜ 空置 |
 | **VHD/VMDK** | 磁盘容量、格式版本、大小 | ⬜ 空置 |
@@ -405,7 +406,7 @@ if (SomeExtensions.Contains(ext))
 
 #### 2A.3 PDF 元数据 + 第一页预览 + 完整内容切换 ✅ 已完成（实现方式有差异）
 > **⚠️ 2026-08-07 核实**: `PdfParser.cs` + Avalonia `ShowPdfAsync`（PdfPig + SkiaSharp 逐页位图渲染 + 翻页导航，PdfPig 0.1.15 + PdfPig.Rendering.Skia）；**WebView2 完整内容切换仅 WPF 遗留版保留**，Avalonia 无 WebView2 依赖。
-- **文件**: `Core/Utils/PdfParser.cs` + `MainWindow.Preview.cs` 修改
+- **文件**: `Core/Utils/PdfParser.cs` + `ViewModels/PreviewViewModel.cs` 修改
 - **扩展名**: `.pdf`
 - **类别**: 第一类（内容 ≠ 信息，有图片渲染 + WebView2 切换）
 - **信息面板**: PDF 版本 (1.x)、标题、作者、页数、是否加密
@@ -583,7 +584,7 @@ private async Task ShowPdfFullContent()
 > **⚠️ 2026-08-07 核实**: 2C.1 TGA 依赖下方 Phase 2D（Magick.NET 插件），**未实施**（`ImageExtensions` 不含 `.tga`）。
 
 #### 2C.1 TGA 图像 ⬜ 未实施（依赖 Magick.NET 插件）
-- **文件**: `MainWindow.Preview.cs` 修改
+- **文件**: `ViewModels/PreviewViewModel.cs` 修改
 - **扩展名**: `.tga`, `.targa`
 - **类别**: 第一类（内容 ≠ 信息）
 - **信息面板**: 分辨率、位深、压缩类型 (Type 2/10/3)
@@ -685,17 +686,17 @@ public class MagickPreviewProvider : IPreviewProvider
 
 | # | 格式 | 类别 | 信息面板 | 内容区 | 文件 | 预估 |
 |---|------|------|---------|--------|------|------|
-| 3.1 | SVG ✅ | 第一类 | viewBox 宽高 | ✅ 渲染为图片 | `SvgParser.cs` | ~3h |
+| 3.1 | SVG ✅ | 第一类 | viewBox 宽高 | ✅ 渲染为图片 | `PreviewViewModel.ShowSvg`（Svg.Skia 内联，无独立 Parser） | ~3h |
 | 3.2 | TTF/OTF 字体 ✅ | 第一类 | 字体名、样式、字形数 | ✅ 字体样本 "AaBbCc..." | `FontParser.cs` | ~4h |
 | 3.3 | LNK 快捷方式 ⬜ | 第二类 | 目标路径 | ℹ️ 链接详情（参数/快捷键） | `LnkParser.cs` | ~3h |
 | 3.4 | DBF 数据库 ⬜ | 第二类 | 记录数、字段数 | 📋 字段定义列表（名\|类型\|长度） | `DbfParser.cs` | ~3h |
 | 3.5 | ICO 图标信息 ✅ | 第二类 | 图标数、各尺寸/色深 | 🖼 图标缩略图排列 | `IcoParser.cs` | ~2h |
 | 3.6 | SRT/ASS/VTT 字幕 ⬜ | 第一类 | 条目数、时间范围 | ✅ 文本内容（复用 TextPreview） | 复用 TextPreview | ~2h |
-| 3.7 | DOCX/XLSX/PPTX ✅ | ~~第三类~~→增强 | 页数 | 标题、作者 | `OfficeParser.cs` + [内容预览计划](office-content-preview.md) | ~6h + ~8h |
+| 3.7 | DOCX/XLSX/PPTX ✅ | ~~第三类~~→增强 | 页数 | 标题、作者 | `OfficeParser.cs` + [内容预览计划](../已完成/office-content-preview-avalonia.md) | ~6h + ~8h |
 | 3.8 | EPUB ⬜ | 第三类 | 标题、作者、语种 | 🖼 **封面图**（从 OPF 提取 zip 内的图片） | `EpubParser.cs` | ~5h |
 | 3.9 | HDR 图像 ⬜ | 第一类 | 分辨率、曝光值 | ✅ Magick.NET 解码（纳入 [Phase 2D](#phase-2d--统一图像解码方案magicknet)）| — | → ~1h |
-| 3.10 | **🎵 音频播放** | 播放器 | WAV/FLAC 同 Phase 2A；MP3 同 Phase 2B | ▶ `MediaElement` + 播放/暂停/进度条/音量 | `MainWindow.Preview.cs` | ~6h |
-| 3.11 | **🎬 视频播放** | 播放器 | 分辨率、时长、编解码器 | ▶ `MediaElement` + 播放/暂停/进度条 | `MainWindow.Preview.cs` | ~4h |
+| 3.10 | **🎵 音频播放** | 播放器 | WAV/FLAC 同 Phase 2A；MP3 同 Phase 2B | ▶ `MediaElement` + 播放/暂停/进度条/音量 | `ViewModels/PreviewViewModel.cs` | ~6h |
+| 3.11 | **🎬 视频播放** | 播放器 | 分辨率、时长、编解码器 | ▶ `MediaElement` + 播放/暂停/进度条 | `ViewModels/PreviewViewModel.cs` | ~4h |
 
 ### 3.10/3.11 音视频播放（已移至插件化方案） ⬜ 未实施
 
@@ -921,7 +922,7 @@ ShowPreviewAsync(item)
 ### 工作项
 
 #### 5.1 ArchiveEntryExtractor 新增部分提取方法 ✅ 已完成
-> **⚠️ 2026-08-07 核实**: 实际以 `ExtractHeadAsync`（`ArchiveEntryExtractor.cs:213`）+ `ExtractHeadTailAsync`（:257）实现，返回 `byte[]` 而非临时文件；ZIP/7z/RAR/Tar/Gz 均支持，7z 固实自动降级到全量提取（`ExtractHeadViaFullExtractAsync`），Deflate ZIP 尾部提取有 10MB 上限注释。魔数检测（`ClassifyPreviewByMagicAsync`）已消费该能力。
+> **⚠️ 2026-08-07 核实**: 实际以 `ExtractHeadAsync`（`ArchiveEntryExtractor.cs:221`）+ `ExtractHeadTailAsync`（:257）实现，返回 `byte[]` 而非临时文件；ZIP/7z/RAR/Tar/Gz 均支持，7z 固实自动降级到全量提取（`ExtractHeadViaFullExtractAsync`），Deflate ZIP 尾部提取有 10MB 上限注释。魔数检测（`ClassifyPreviewByMagicAsync`）已消费该能力。
 - **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
 - 新增 `ExtractEntryHeadToFileAsync` — ZIP/非固实 7z/Tar/Gz 支持
 - 新增 `ExtractEntryHeadTailToFileAsync` — 用于 PDF/MP4 双端提取
@@ -939,7 +940,7 @@ ShowPreviewAsync(item)
 
 #### 5.3 ShowPreviewAsync 两阶段编排 ✅ 已完成
 > **⚠️ 2026-08-07 核实**: Avalonia `MainWindowViewModel.ShowPreviewAsync` 已实现 Phase 1（`Preview.ShowLoading` + 内存信息面板填充）+ Phase 2（魔数检测 → 提取 → `switch(previewType)` 分发）两阶段，`_previewLoadVersion` 版本守卫防竞态。独立子计划 [preview-two-phase-loading.md](.omo/plans/preview-two-phase-loading.md) 已完成（2026-07-16）。
-- **文件**: `MainWindow.Preview.cs`
+- **文件**: `ViewModels/PreviewViewModel.cs`
 - 修改入口流程为两阶段
 - 头部提取失败 → 静默降级到原全文件流程
 - Loading 状态管理（第一阶段：元数据解析中；第二阶段：内容加载中）
@@ -947,13 +948,13 @@ ShowPreviewAsync(item)
 
 #### 5.4 特殊格式处理：PDF / MP4 ⬜ 未实施
 > **⚠️ 2026-08-07 核实**: `ExtractHeadTailAsync` 已在 Core 就绪，但 Avalonia `ShowPdfAsync` 走全量提取 + PdfPig 逐页渲染（非双端提取特例），MP4 未使用 tail 提取 `moov` box。
-- **文件**: `MainWindow.Preview.cs` + 对应 Parser
+- **文件**: `ViewModels/PreviewViewModel.cs` + 对应 Parser
 - PDF: 头部 100KB 不够 → 双端提取 → 若 tail 搜不到 xref 则全量提取
 - MP4: head 搜 `ftyp`, tail 搜 `moov` box → 从中解析 `mvhd` 时长
 - **预估**: ~3h
 
 #### 5.5 7z 固实检测与降级 ✅ 已完成
-> **⚠️ 2026-08-07 核实**: `IsSevenZipSolid`（`ArchiveEntryExtractor.cs:323`）通过 `SharpSevenZipExtractor.IsSolid` 判断，异常时保守假设固实；固实条目走 `ExtractHeadViaFullExtractAsync` 全量提取降级。
+> **⚠️ 2026-08-07 核实**: `IsSevenZipSolid`（`ArchiveEntryExtractor.cs:336`）通过 `SharpSevenZipExtractor.IsSolid` 判断，异常时保守假设固实；固实条目走 `ExtractHeadViaFullExtractAsync` 全量提取降级。
 - **文件**: `Core/Utils/ArchiveEntryExtractor.cs`
 - `SevenZipExtractor` 提供 `IsSolidArchive(stream)` 判断
 - 固实时跳过部分提取，使用扩展名分支逻辑
@@ -1035,7 +1036,7 @@ Avalonia 迁移后:
 ### Final Checklist
 
 > **Office 内容预览增强**: DOCX/XLSX/PPTX 的内容预览已从"空置"升级为实质性预览
-> （Mammoth HTML / ClosedXML DataGrid / 手动 XML 文本列表），见 [Office 内容预览计划](office-content-preview.md)。
+> （Mammoth HTML / ClosedXML DataGrid / 手动 XML 文本列表），见 [Office 内容预览计划](../已完成/office-content-preview-avalonia.md)。
 
 - [x] 预览工具栏在图片/文本/HTML/GIF 等格式中正确显示
 - [x] GIF 播放/暂停控制正常

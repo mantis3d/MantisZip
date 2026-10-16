@@ -1,6 +1,9 @@
 # 多线程压缩方案 A：分组并行 + 多级别自适应
 
 > 状态: 📋 待定 | 阶段: [⬜⬜⬜⬜⬜] (0/5)
+
+> ⚠️ **2026-10-16 修正：前提已变。** ① `AdaptiveCompressionMode` 枚举已 `[Obsolete]`，被 `AdaptiveCompression` + `AdaptiveSmartDetect` + `MultiThreadedCompression` 三独立开关取代；② `AppSettings.ParallelCompressDegree` 已存在（无需本文 Task 6 新增）；③ 本方案核心设计（`GroupByCompressionLevel` / `CompressGroupParallel` / `MergeParallelResults`）**未实现**；其前置「方案 D」已由不同架构落地（见 [parallel-compress-plan-d.md](parallel-compress-plan-d.md) 修正说明）。实施前需在新架构下重新评估。
+
 > 前置: 自适应压缩已实现（`alpha` 分支 `e97010a`）
 > 升级路径: 方案 D 完成后实施
 

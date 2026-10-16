@@ -625,17 +625,12 @@ public async Task PreserveFullPath_True_KeepsPrefix()
 ③ `_options.ToDictionary` 对重复键抛异常，而重复注册本就不该发生；
 ④ **可扩展性由 `AddOption` 注册表本身提供**，等真的出现第二个消费者时再提取字典。
 
-**已核实无误**（不需改动）：全部行号（`:13` / `:78` / `:79` / `:112` / `:136-139` / `:153-164` / `:163` /
-`:249` / `:310` / `:683` / `:772` / `:791-792` / `:82` / `:245`、`RootGrid` = `Auto,*,Auto,Auto`、
-VM `:78` / `:2333` / `:2354` / `:2357` / `:2365` / `:2371` / `:2375` / `:2385`、
-DragDrop `:75` / `:84` / `:105` / `:128`、`ExtractSettingsWindow.axaml.cs` `:56-62` / `:83-87`）；
-`MainWindow.axaml.cs:183-184` 零改动成立；§4.1 三条「mock 不可写」理由全部成立；
-决策 a 的等价性由 `TrimCurrentFolderPrefix`（`ExtractPathResolver.cs:25-31`）证实；
-`ExtractFlow` 参数顺序与 `:105` 的改动一致（`ExtractFlow.cs:67-76`）；
-规则 4/6/13/14/15 合规（`ThemeSurfaceBgBrush`/`ThemeTextSecondaryBrush`/`ThemeBorderBrush`
-在 `ThemeLight.axaml:54,58` 与 `ThemeDark.axaml:54,58` **成对存在**；
-`AllThreeLanguages_HaveSameKeySet` 存在于 `AboutWindowTests.cs:99`）；
-规则 1 已合规（`docs/PLAN.md:37` 已有 P2 条目）。
+**⚠️ 2026-10-16 修正：原「已核实无误」行号声明已失效** —— 本文档行号为立项时（2026-10-01）快照，后续实现漂移。实测现况（旧 → 新）：
+`CustomFilePickerDialog`：`_extractPreserveFullPath` `:79`→`:80`、`ShowExtractFolderAsync` `:136-139`→`:205`、`SchedulePreviewRebuild` `:772`→`:872`；
+`MainWindowViewModel`：`ExtractSelectedHere` `:2333`→`:2488`、`ExtractSelectedTo` `:2357`→`:2508`、`ExtractSelectedEntriesCoreAsync` `:2365`→`:2532`；
+`DragDropService`：`:75`/`:84`/`:105`→`:77`/`:87`/`:108`。
+其余结论仍成立（`MainWindow.axaml.cs:183-184` 零改动、§4.1 三条「mock 不可写」理由、决策 a 等价性由 `TrimCurrentFolderPrefix` 证实、`ExtractFlow` 参数顺序、规则 4/6/13/14/15 合规、三语 key 集校验）。
+规则 1 已合规（原 `docs/PLAN.md` 条目已迁至 PROGRESS.md 历史设计方案索引）。
 
 **未由 Oracle 复核的两项**（本文档自行实测声明）：105 通过 / 2 跳过 的测试基线（`dotnet test`，2026-10-01）；
 原型 resolver 的 Node 实测输出。

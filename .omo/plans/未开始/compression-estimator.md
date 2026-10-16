@@ -1,7 +1,9 @@
 # 压缩预估 (Compression Estimator)
 
 > 选好文件后、实际压缩前，快速估算各格式/级别的最终大小
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜] (0/5)
+> **状态**: 🔶 部分实现（Task 12/13/14 已完成） | **阶段**: [⬜⬜⬜⬜⬜] (0/5)
+>
+> ⚠️ 2026-10-16 修正：Task 12/13/14 已落地——`FormatCatalog`（`Core/Services/FormatCatalog.cs`）、`FormatDefinition`（`Core/Models/FormatDefinition.cs`）、`AdaptiveOverrideRule`（`Core/Models/AdaptiveOverrideRule.cs`）、`AdaptiveRuleMatcher`（`Core/Utils/AdaptiveRuleMatcher.cs`）、`ZipEntryClassifier`（`Core/Utils/ZipEntryClassifier.cs`）、`CompressionCoefficients`（`Core/Utils/CompressionCoefficients.cs`），UI 侧 `EditAdaptiveRuleDialog` + `AddCustomFormatDialog` 已完成。**未实现**：`CompressionEstimator` / `CompressionHistoryStore`（核心预估）、`RuntimeEstimator`（ETA）、UI 预估面板。
 
 ---
 
@@ -167,9 +169,9 @@ public static class CompressionCoefficients
 - [ ] **9. UI: `ProgressWindow` 时间信息行** — XAML 布局 + 时间格式化 + 防抖
 - [ ] **10. UI: ETA 集成逻辑** — `App.Compress.cs` / `CompressService` 传递预估数据到 ProgressWindow，批处理模式支持
 - [ ] **11. Test: `RuntimeEstimatorTests`** — 速度推算 + 加权融合 + 批处理汇总
-- [ ] **12. Core: 格式目录 FormatCatalog** — `FormatDefinition` 模型 + 内置格式注册 + 自定义格式管理 + 查询匹配
-- [ ] **13. Core+UI: 自适应规则系统** — `AdaptiveOverrideRule` + `AdaptiveLevel` 枚举 + SettingsWindow 规则编辑器 + 预设规则
-- [ ] **14. Core: 规则匹配集成** — 引擎压缩 + 预估器自适应列均按「用户规则 → 格式目录 → 内置分类」优先级查表
+- [x] **12. Core: 格式目录 FormatCatalog** — `FormatDefinition` 模型 + 内置格式注册 + 自定义格式管理 + 查询匹配 ✅ 2026-10-16 已完成
+- [x] **13. Core+UI: 自适应规则系统** — `AdaptiveOverrideRule` + `AdaptiveLevel` 枚举 + SettingsWindow 规则编辑器 + 预设规则 ✅ 2026-10-16 已完成
+- [x] **14. Core: 规则匹配集成** — 引擎压缩 + 预估器自适应列均按「用户规则 → 格式目录 → 内置分类」优先级查表 ✅ 2026-10-16 已完成（引擎侧；预估器自适应列随预估面板未实现）
 
 ## 改动范围
 

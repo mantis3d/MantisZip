@@ -1,6 +1,8 @@
 # 压缩文件名后缀模板
 
 > ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+>
+> ⚠️ 2026-10-16 修正：`AppPartials/App.Open.cs` 已合并入 `App.axaml.cs`（`HandleCompressQuick` 在 `App.axaml.cs:2052`，输出路径计算在 :2063-2071）；本地化文件路径为 `Localization/strings.*.json`（非 `Resources/strings.*`）；帮助弹窗按规则 17 必须复用 `HelpDialog` 外壳 + `MarkdownHelpContent`（`LogPrivacyHelpDialog` 已移除）。
 
 ## TL;DR
 
@@ -11,7 +13,7 @@
 > - `CompressRequest.FileNameSuffixTemplate` 属性
 > - `AppSettings.FileNameSuffixTemplate` 持久化
 > - CompressSettingsWindow 模板文本框 + 帮助按钮（通用页）
-> - 占位符帮助弹窗（类似 LogPrivacyHelpDialog）
+> - 占位符帮助弹窗（复用 `HelpDialog` 外壳 + `MarkdownHelpContent`，见规则 17）
 > - HandleCompressQuick(CLI) 模板支持
 > - 本地化字符串（zh + en）
 > - xUnit 单元测试（`FileNameTemplateTests.cs`）
@@ -39,7 +41,7 @@
 **Research Findings**:
 - `ComputeSeparateOutputPath` (CompressService.cs:308-334) — 唯一 Separate 模式文件名生成点
 - `GetOutputPaths` (CompressService.cs:93-108) — 委托给 `ComputeSeparateOutputPath`
-- `HandleCompressQuick` (App.Open.cs:44) — 使用 Manual 模式，有独立路径计算逻辑
+- `HandleCompressQuick`（`App.axaml.cs:2052`，输出路径计算 :2063-2071）— 使用 Manual 模式，有独立路径计算逻辑
 - `UpdateCommentDistributionState()` — UI 控件可见性跟随输出模式切换的模式参考
 
 ### Metis Review
@@ -484,9 +486,9 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
 - [ ] 6. `HandleCompressQuick` CLI 集成
 
   **What to do**:
-  - 在 `HandleCompressQuick` (App.Open.cs:44) 中修改自动输出路径计算：
+  - 在 `HandleCompressQuick`（`App.axaml.cs:2052`）中修改自动输出路径计算：
     - 读取 `AppSettings.Instance.FileNameSuffixTemplate`
-    - 计算完 `baseName` 后（第 75 行）、拼接扩展名前，应用模板：
+    - 计算完 `baseName` 后（`App.axaml.cs:2069`）、拼接扩展名前，应用模板：
       ```csharp
       var suffixTemplate = settings.FileNameSuffixTemplate;
       if (!string.IsNullOrEmpty(suffixTemplate))
@@ -501,7 +503,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   - 不改变 CLI 参数解析
 
   **References**:
-  - `src/MantisZip.UI.Avalonia/AppPartials/App.Open.cs:63-78` — Quick Compress 输出路径计算
+  - `src/MantisZip.UI.Avalonia/App.axaml.cs:2063-2071` — Quick Compress 输出路径计算（`HandleCompressQuick`，方法起点 :2052）
 
   **Parallelization**:
   - **Can Run In Parallel**: YES
@@ -528,14 +530,15 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
 
   **Commit**: YES (groups with 3-5)
   - Message: `feat(ui): add filename suffix template UI, settings, and CLI support`
-  - Files: `src/MantisZip.UI.Avalonia/AppPartials/App.Open.cs`
+  - Files: `src/MantisZip.UI.Avalonia/App.axaml.cs`
 
 - [ ] 7. 占位符帮助弹窗
 
   **What to do**:
-  - 仿照 `LogPrivacyHelpDialog` 的轻量弹窗样式，创建 `SuffixTemplateHelpDialog`：
-    - 新建 `src/MantisZip.UI.Avalonia/Dialogs/SuffixTemplateHelpDialog.axaml` + `.cs`
-    - Window 属性：`Width="400" Height="Auto" SizeToContent="Height" ResizeMode="NoResize"`
+  - ⚠️ 2026-10-16 修正：`LogPrivacyHelpDialog` 已移除；按规则 17 必须复用统一外壳 `HelpDialog` + Markdown 驱动内容 `MarkdownHelpContent`，**禁止**另建一次性 Window：
+    - 调用方式：`new HelpDialog(LocalizationManager.T("Compress_TemplateHelp_Title"), new MarkdownHelpContent(LocalizationManager.T("SuffixTemplateHelp_Markdown"))) { Width = 400, SizeToContent = SizeToContent.Height }`
+    - 正文维护三语 Markdown key `SuffixTemplateHelp_Markdown`（无需新建对话框 XAML）
+    - 原设计窗口属性参考：`Width="400" Height="Auto" SizeToContent="Height" ResizeMode="NoResize"`
     - 内容：一个简易表格显示 placeholder → 说明 → 示例
     - 布局：
       ```
@@ -557,9 +560,11 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
     - 所有控件绑定主题色
   - `SuffixTemplateHelpBtn_Click` 中打开此弹窗：
     ```csharp
-    var dlg = new SuffixTemplateHelpDialog();
-    dlg.Owner = this;
-    dlg.ShowDialog();
+    var dlg = new HelpDialog(
+        LocalizationManager.T("Compress_TemplateHelp_Title"),
+        new MarkdownHelpContent(LocalizationManager.T("SuffixTemplateHelp_Markdown")))
+    { Width = 400, SizeToContent = SizeToContent.Height };
+    await dlg.ShowDialog(this);
     ```
 
   **Must NOT do**:
@@ -567,7 +572,7 @@ Task 1 → Task 2 → Task 5 → Task 9 → F1-F4
   - 不要引用 `System.Windows.Documents`（无富文本）
 
   **References**:
-  - `src/MantisZip.UI.Avalonia/Dialogs/LogPrivacyHelpDialog.axaml` — 参考样式和结构
+  - `src/MantisZip.UI.Avalonia/Dialogs/HelpDialog.axaml(.cs)` + `MarkdownHelpContent.axaml(.cs)` — 统一帮助外壳与 Markdown 内容控件（规则 17）
 
   **Parallelization**:
   - **Can Run In Parallel**: YES

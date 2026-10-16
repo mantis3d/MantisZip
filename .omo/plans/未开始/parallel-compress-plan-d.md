@@ -1,6 +1,9 @@
 # 多线程压缩方案 D：自适应 + 多线程（第四个选项）
 
 > 状态: 📋 待定 | 阶段: [⬜⬜⬜⬜] (0/4)
+
+> ⚠️ **2026-10-16 修正：本设计已被不同架构实现取代。** `AdaptiveCompressionMode.MultiThreaded` 枚举已标记 `[Obsolete]`（`Core/Models/AdaptiveOverrideRule.cs`）；「自适应 + 多线程」功能现经**三个独立开关**（`AdaptiveCompression` + `AdaptiveSmartDetect` + `MultiThreadedCompression`）落地，配合 `ZipEngine.CompressGroupWithSevenZip`（`Core/Engines/ZipEngine.cs`）。UI 为复选框组合（`DynamicFormatOptionsPanel` + 设置窗口），**非**本文描述的四选一 RadioButton + 实验性标签 + 隐藏用户规则区。本文剩余价值仅作历史设计参考。
+
 > 前置: 自适应压缩已实现（`alpha` 分支 `e97010a`）
 
 ---

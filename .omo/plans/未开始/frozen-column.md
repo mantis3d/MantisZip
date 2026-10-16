@@ -1,10 +1,10 @@
 # 冻结列功能
 
-> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+> ⚠️ **2026-10-16 修正**：本计划核心机制**在 Avalonia 中有效**——`Avalonia.Controls.DataGrid` 原生支持 `FrozenColumnCount`（官方文档「Frozen Columns」、API 参考、`DataGrid.cs` 源码、Discussion #18090 均证实；此前「Avalonia DataGrid 无 FrozenColumnCount」的判断有误）。本计划无需推倒重写，但示例代码含 WPF 独占 API/命名空间，需按 Avalonia 替换：`System.Windows.Controls.Primitives`→`Avalonia.Controls.Primitives`、`System.Windows.Media`→`Avalonia.Media`、`Visibility.Collapsed/Visible`→`IsVisible=false/true`、`DependencyObject`→`Visual`、`Theme_Border`→`ThemeBorderBrush`（规则 4，Avalonia 资源键以 `Brush` 结尾）、`L.T(L.Main_Col_*)`→`LocalizationManager.T("Main_Col_*")`（Avalonia 无 `L.cs`）。文件路径已更新为 Avalonia 项目路径。
 
 ## TL;DR
 
-> **Quick Summary**: 为文件列表 DataGrid 添加「冻结列」功能——水平滚动时，指定列保持可见不动。使用 WPF DataGrid 原生 `FrozenColumnCount` 属性实现。
+> **Quick Summary**: 为文件列表 DataGrid 添加「冻结列」功能——水平滚动时，指定列保持可见不动。使用 Avalonia DataGrid 原生 `FrozenColumnCount` 属性实现（`Avalonia.Controls.DataGrid` 支持）。
 >
 > **Deliverables**:
 > - DataGrid 支持右键列标题 → 冻结至当前列 / 取消冻结
@@ -32,7 +32,7 @@
 - **测试**: 需要（序列化方向）
 
 **Technical Environment**:
-- FileListGrid 是 WPF DataGrid（不是 ListView）
+- FileListGrid 是 Avalonia `DataGrid`（`Avalonia.Controls.DataGrid`，非 ListView）
 - 列：名称、大小、压缩后、比率、CRC32、日期、加密（7列）
 - `CanUserReorderColumns="False"`，`RowHeaderWidth="0"`
 - 已有列标题右键菜单（ColumnHeaderContextMenu）控制列显隐
@@ -194,9 +194,9 @@ No blocking dependencies — each task builds on the previous.
     ```xml
     <Border x:Name="FrozenColumnSeparator"
             Width="2"
-            Background="{DynamicResource Theme_Border}"
+            Background="{DynamicResource ThemeBorderBrush}"
             IsHitTestVisible="False"
-            Visibility="Collapsed"
+            IsVisible="False"
             HorizontalAlignment="Left"/>
     ```
   - **关键**: 使用 `DynamicResource`（不是 `StaticResource`）以支持运行时主题切换
@@ -217,13 +217,13 @@ No blocking dependencies — each task builds on the previous.
 
   **References**:
   - `MainWindow.axaml:420-587` — DataGrid 所在的 Grid 结构
-  - `MainWindow.axaml:20-40` — 现有主题资源引用模式（DynamicResource Theme_Border 等）
+  - `MainWindow.axaml:20-40` — 现有主题资源引用模式（DynamicResource ThemeBorderBrush 等）
 
   **Acceptance Criteria**:
   - [ ] XAML 中包含 `x:Name="FrozenColumnSeparator"` 的 Border 元素
-  - [ ] `Background` 绑定 `DynamicResource Theme_Border`
+  - [ ] `Background` 绑定 `DynamicResource ThemeBorderBrush`
   - [ ] `IsHitTestVisible="False"`
-  - [ ] `Visibility="Collapsed"`（默认隐藏）
+  - [ ] `IsVisible="False"`（默认隐藏）
   - [ ] `dotnet build` 通过
 
   **QA Scenarios**:
@@ -255,10 +255,10 @@ No blocking dependencies — each task builds on the previous.
        - 判断其 `DisplayIndex` 是否 < `FileListGrid.FrozenColumnCount`
     3. 如果列在冻结区内（DisplayIndex < FrozenColumnCount）：
        - 添加「取消冻结」菜单项
-       - Header = `L.T(L.Main_Col_Unfreeze)` + 列名，如 "取消冻结「名称」"
+       - Header = `LocalizationManager.T("Main_Col_Unfreeze")` + 列名，如 "取消冻结「名称」"
     4. 如果列不在冻结区内（DisplayIndex >= FrozenColumnCount）：
        - 添加「冻结至当前列」菜单项
-       - Header = `L.T(L.Main_Col_FreezeToHere)` + 列名，如 "冻结至当前列「大小」"
+       - Header = `LocalizationManager.T("Main_Col_FreezeToHere")` + 列名，如 "冻结至当前列「大小」"
     5. 创建 `ColumnFreezeMenuItem_Click` 事件处理方法：
        - 判断点击的是冻结还是取消冻结
        - 冻结: `FrozenColumnCount = clickedColumn.DisplayIndex + 1`
@@ -325,20 +325,20 @@ No blocking dependencies — each task builds on the previous.
   {
       if (FileListGrid.FrozenColumnCount <= 0)
       {
-          FrozenColumnSeparator.Visibility = Visibility.Collapsed;
+          FrozenColumnSeparator.IsVisible = false;
           return;
       }
 
       // 获取最后一个可见的冻结列
       var lastFrozen = FileListGrid.Columns
-          .Where(c => c.Visibility == Visibility.Visible)
+          .Where(c => c.IsVisible)
           .OrderBy(c => c.DisplayIndex)
           .Take(FileListGrid.FrozenColumnCount)
           .LastOrDefault();
 
       if (lastFrozen == null)
       {
-          FrozenColumnSeparator.Visibility = Visibility.Collapsed;
+          FrozenColumnSeparator.IsVisible = false;
           return;
       }
 
@@ -350,11 +350,11 @@ No blocking dependencies — each task builds on the previous.
           var point = header.TranslatePoint(new Point(header.ActualWidth, 0), FileListGrid);
           FrozenColumnSeparator.Margin = new Thickness(point.X - 1, 0, 0, 0); // -1 让分隔线居中在边界
           FrozenColumnSeparator.Height = FileListGrid.ActualHeight;
-          FrozenColumnSeparator.Visibility = Visibility.Visible;
+          FrozenColumnSeparator.IsVisible = true;
       }
       else
       {
-          FrozenColumnSeparator.Visibility = Visibility.Collapsed;
+          FrozenColumnSeparator.IsVisible = false;
       }
   }
 
@@ -375,7 +375,7 @@ No blocking dependencies — each task builds on the previous.
       return null;
   }
 
-  private static T? FindVisualChild<T>(DependencyObject parent) where T : DependencyObject
+  private static T? FindVisualChild<T>(Visual parent) where T : Visual
   {
       for (int i = 0; i < VisualTreeHelper.GetChildrenCount(parent); i++)
       {
@@ -395,8 +395,8 @@ No blocking dependencies — each task builds on the previous.
     > 使用 `LayoutUpdated` 是因为列拖拽宽度、显隐切换、DataGrid 大小变化等都会触发它。
     > 由于只会在 `FrozenColumnCount > 0` 时做实际工作，性能开销可忽略。
 
-  - 确保 `using System.Windows.Controls.Primitives;` 存在（DataGridColumnHeader 所在命名空间）
-  - 如果需要，添加 `using System.Windows.Media;`
+  - 确保 `using Avalonia.Controls.Primitives;` 存在（DataGridColumnHeader 所在命名空间）
+  - 如果需要，添加 `using Avalonia.Media;`
 
   **Must NOT do**:
   - 不要给 FrozenColumnSeparator 设固定 Height

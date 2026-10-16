@@ -6,6 +6,24 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-16** — 计划库 / 进度文档一致性审计与修正（P0–P4：去重 + 死链 + 排序 + 归类 + 内容校正）
+  - **P0 去重**：`PROGRESS.md` 删除 3 条重复里程碑（10-04~10-06「测试压缩包静默失败」/「7z mt=on」/「进度窗口原型对齐」，merge 残留、逐字节相同）；`progress-avalonia-detail.md` 删除 5 条重复条目块（09-15/09-16 块 14 行逐字节相同 + Avalonia 升级/NuGet 升级/计划维护/Office 图片各 1 条）。
+  - **P1 死链**：`PLAN.md` 删重复死链行（`extract-preserve-full-path-toggle` 旧行指向 `未开始/`）、修正 `compression-performance-optimization`/`nuget-dependency-upgrade` 链接目录（`未开始/`→`已完成/`）；`PROGRESS.md` 修正 `settings-unwired-keys` 链接（`未开始/`→`进行中/`）；detail 文档 `drag-extract-unify.md` 补 `已完成/` 前缀。
+  - **P2 目录提升**：3 个已实现计划移入 `已完成/`（`progress-window-prototype-alignment`、`progress-window-status-line`←未开始，`extract-preserve-full-path-toggle`←进行中）；目录计数 未开始 40→38、进行中 7→6、已完成 86→89；`PLAN.md` 移除对应 3 行、`PROGRESS.md` 历史索引新增 3 条（含 ⏳ GUI 验收注记）。
+  - **C2 排序**：`progress-avalonia-detail.md` Avalonia 段 304 条按日期**稳定排序**（同日保序、行数守恒 2558）；`PROGRESS.md` 各 `####` 分节条目稳定排序（16 行位移）。
+  - **C3 链接**：detail 文档 6 处 Markdown 链接目录修正（status-line / smart-parallel-extract / progress-file-compression-ratio / progress-window-channel-info×2 / progress-window-bytes-i18n）；8 处反引号历史记录（描述当时状态）保留不改。
+  - **A5 出表**：`PLAN.md`「待实现」表移出 6 行已完成计划（`compression-performance-optimization`/`encrypted-filename-magic-detection`/`apng-preview-support`/`office-content-preview-avalonia`/`password-error-classification`/`nuget-dependency-upgrade`）→ `PROGRESS.md` 历史索引补 3 条（nuget / encrypted / apng）；保留 4 行遗留待办（Office 图片预览 / `avalonia-ui-feature-parity` / `result-preview-panel` 遗留①②）。
+  - **P3 计划内容修正（12 文件）**：`ico-file-icon-extract`（`SystemIconHelper`→`IconService`/`IconProvider`）、`msi-packaging-wix`（0.2.7→0.5.2 + 补 `installer-selfcontained.iss`）、`compression-estimator`（Task 12-14 标已完成）、`filename-suffix-template`（`AppPartials/App.Open.cs`→`App.axaml.cs` 等 3 处）、`custom-columns`（WPF 路径/API→Avalonia：`Models/ArchiveItemModel.cs`/`Views/MainWindow.axaml.cs`/`ColumnHeaderContextMenu_Opening`）、`parallel-compress-plan-a`/`-d`（标注架构已被三独立开关取代）、`preview-extended-formats`（行号 213→221/257→270/323→336 + `SvgParser.cs` 不存在 + `MainWindow.Preview.cs`→`PreviewViewModel.cs` + 5 处 office 链接）、`floating-preview-panel`（`PreviewDockPosition`→`PreviewPosition` 默认 4 + `AppSettings.Instance`→`Load()`）、`zip-crc-validation`（SharpCompress 0.48.1→0.50.4 注记）、`extract-preserve-full-path-toggle`（「已核实无误」行号失效更正）、`frozen-column`（**更正审计误判**：Avalonia `DataGrid` 原生支持 `FrozenColumnCount`，仅需 WPF 命名空间/API→Avalonia）、`embedded-thumbnail-preview`（WPF 成像 API→SkiaSharp/`WriteableBitmap` + 路径/方法名更正）。
+  - **P4 归档归类**：`PLAN.md`「已废弃方案」表补 4 行（`preview-format-detection.old`/`office-content-preview`/`explorer-path-switcher`/`quick-path-control`）；`PROGRESS.md` 历史索引补 4 条（`cross-platform-port-research`/`icon-dll`/`quickpath-control-redesign`/`preview-avalonia-opportunities`）；`archive-manager.md` 登记进 `PLAN.md`；`.omo/plans` 孤儿文件清零。
+  - **结果**：三份 docs 零链接目录错位、零日期逆序、零重复条目；未开始/进行中/已归档 计划文件全量有引用。
+
+**2026-10-16** — 计划库审计与重新归类（全量核查 `.omo/plans/未开始/` 38 个设计文档）
+  - **背景**：对照代码库逐条验证 38 个「未开始」计划的真实完成度，纠正文本与实际不符者，并按完成度重新归档（规则 1）
+  - **移入 `已完成/`（2）**：`compression-performance-optimization.md`（ZIP 并行解压 + 7z 多线程 `mt=on` + 4MB 缓冲区全部落地，随 v0.5.0 发布；Task 7 分组并行压缩移交 custom-zip-engine）；`clean-temp-on-startup-avalonia.md`（Avalonia 启动清理消费方，2026-09-27 落地）
+  - **移入 `进行中/`（4）**：`preview-modular-providers.md`（Task 1/4——`Core/Abstractions/ITableDataProvider.cs` + `SqliteDataReader` 已实现但 UI 仍直连 `Microsoft.Data.Sqlite`、接口零消费者）；`floating-preview-panel.md`（Phase 2 四位置停靠切换已实现，Phase 1/3 未做；计划文本原写 0/13 已修正）；`extract-preserve-full-path-toggle.md`（实现随 v0.5.1 发布，残留 3 项人工 GUI 验收 + §10 spec 回写）；`settings-unwired-keys.md`（第 10 项 EnableCascadingMenu 文档闭环，第 5/9 项评估后由用户决策暂缓实施）
+  - **保留 `未开始/`（32）**：文本声称与实际一致；顺带清理多个计划内过时的 WPF 时代文件路径（`src/MantisZip.UI/`→`src/MantisZip.UI.Avalonia/`、`.xaml`→`.axaml`、`L.cs`→`LocalizationManager`、`strings.zh.json`→`strings.zh-CN.json` 等），并为 `startup-native-splash.md` 补状态行
+  - **同步**：本文件 + `PROGRESS.md` 历史设计方案索引（新增 2 条已完成）+ `PLAN.md`（移除 2 条已完成条目、4 条进行中条目路径与说明更新、修正 5 项计划依赖链执行顺序说明）
+
 **2026-10-15** — 图标主题系统：实施计划编写完成（3 份串行计划 + PLAN.md 登记）（📋 计划阶段）
   - 依规格 §12 拆 **3 份串行计划**落 `.omo/plans/未开始/`：① `icon-theme-infra.md`（IconView + Geometry→DrawingImage 契约迁移 + 三层字典骨架 + 182 处 `PathIcon` 迁移，交付标准 = **A 套零视觉差异**）② `icon-theme-packs.md`（SVG 包导入 + 覆盖率校验 + 原子拒绝 + 单图标覆盖 + 外观 Tab 图标风格分区 + `IconManagerWindow`）③ `icon-theme-sets.md`（IconGen 多套 + C/D/E/F/G 内容生产 + 6×116 覆盖率契约）
   - **两处实施偏差**（规格 §12 允许的计划阶段细节，理由已记入计划 1 头部）：**D-A** 以 `IconView.SourceKey`（内部 `GetResourceObservable` 订阅）取代规格 §4.4 的 `GeometryResourceConverter` 改名——converter 输出为一次性求值，字典②层被替换后 binding 源不变 → 不重算，违反 §4.2「切主题自动刷新」；**D-B** `IconView.Foreground` **复用** `TextElement.ForegroundProperty`（`AddOwner<IconView>(new StyledPropertyMetadata<IBrush?>(null))`）而非自注册新属性——Avalonia 继承按 **property 实例**解析，只有复用同一实例才能真正继承父级文字色（源码核实：`TextElement.cs:68` 默认 `Brushes.Black` + `inherits:true`；`StyledProperty.AddOwner` 返回 `this`；值优先级 `Inherited(4)` 被 `Style(3)` 压过，故显式选择器仍生效）
@@ -21,20 +39,6 @@
   - **产物**：规格 `docs/superpowers/specs/2026-10-15-icon-theme-system-design.md`（含 5 轮决策记录 + 3 方案权衡）；视觉对比稿存 `.superpowers/brainstorm/`（未入库）
   - **下一步**：writing-plans 生成实施计划；本立项不涉及版本号变更
   - **审阅补充（同日）**：规格审阅通过；**D7 决策**——主题色×图标 = 选择各自 + 渲染层自动配套（两正交开关、不成套绑定，成套预设留规格 §11）；`.gitignore` 忽略 `.superpowers/`（本次视觉伴侣产物目录）
-
-**2026-10-08** — 立项「文件选择器去弹窗化」：CustomFilePickerControl 内嵌方案（📋 计划阶段，含交互原型）
-  - **交互决策**：压缩/解压设置窗的文件/目录选择器全部内嵌，不再弹独立窗口；Tab 结构调整——压缩端输出设置（最前）/ 添加文件 / 压缩设置（原「高级」改名并吸收原「常规」）/ 文件过滤，解压端对称
-  - **简单选择模式**：PickItems 默认简单模式——隐藏复选框、单击即选、Shift 范围多选、覆盖语义、双击目录进入并清空选择；高级开关（复选框 + 跨目录记忆）切回累积形态
-  - **累积面板去除**：不再有独立累积面板/折叠式已选栏，「已选源文件」ListBox 置于内嵌 picker 下方并与选择实时双向同步；内嵌 picker 左栏放 QuickPathControl 左右布局
-  - **解压端**：「解压到」/拖拽兜底场景第二个 Tab 按场景形态替换（「添加压缩包」或「选择要解压的文件」），保留指定条目语义
-  - **实施分三步**：①抽取 CustomFilePickerControl 纯重构（窗口薄壳化、零行为变更）②压缩窗接入 ③解压窗接入
-  - **产物**：原型 `docs/prototypes/compress-embedded-picker.html` + `docs/prototypes/extract-settings-embedded.html`；计划 `.omo/plans/未开始/embedded-file-picker.md`；PLAN.md 已登记
-**2026-10-16** — 计划库审计与重新归类（全量核查 `.omo/plans/未开始/` 38 个设计文档）
-  - **背景**：对照代码库逐条验证 38 个「未开始」计划的真实完成度，纠正文本与实际不符者，并按完成度重新归档（规则 1）
-  - **移入 `已完成/`（2）**：`compression-performance-optimization.md`（ZIP 并行解压 + 7z 多线程 `mt=on` + 4MB 缓冲区全部落地，随 v0.5.0 发布；Task 7 分组并行压缩移交 custom-zip-engine）；`clean-temp-on-startup-avalonia.md`（Avalonia 启动清理消费方，2026-09-27 落地）
-  - **移入 `进行中/`（4）**：`preview-modular-providers.md`（Task 1/4——`Core/Abstractions/ITableDataProvider.cs` + `SqliteDataReader` 已实现但 UI 仍直连 `Microsoft.Data.Sqlite`、接口零消费者）；`floating-preview-panel.md`（Phase 2 四位置停靠切换已实现，Phase 1/3 未做；计划文本原写 0/13 已修正）；`extract-preserve-full-path-toggle.md`（实现随 v0.5.1 发布，残留 3 项人工 GUI 验收 + §10 spec 回写）；`settings-unwired-keys.md`（第 10 项 EnableCascadingMenu 文档闭环，第 5/9 项评估后由用户决策暂缓实施）
-  - **保留 `未开始/`（32）**：文本声称与实际一致；顺带清理多个计划内过时的 WPF 时代文件路径（`src/MantisZip.UI/`→`src/MantisZip.UI.Avalonia/`、`.xaml`→`.axaml`、`L.cs`→`LocalizationManager`、`strings.zh.json`→`strings.zh-CN.json` 等），并为 `startup-native-splash.md` 补状态行
-  - **同步**：本文件 + `PROGRESS.md` 历史设计方案索引（新增 2 条已完成）+ `PLAN.md`（移除 2 条已完成条目、4 条进行中条目路径与说明更新、修正 5 项计划依赖链执行顺序说明）
 
 **2026-10-15** — 修复损坏 7z/RAR 被误判为加密包（打开时误弹密码框）
   - **问题**：`ArchiveService.IsPasswordRelatedError` 纯关键词启发式（消息含 "password"/"encrypted" 即判密码相关）。经损坏语料实测（`tests/corpus/corrupt-archives/`）：SharpSevenZip 对「7z/RAR 加密头无密码」与「7z/RAR 头部损坏」抛**完全相同**的异常（同类型 `SharpSevenZipArchiveException`、同 HRESULT `0x80131500`、同消息 "Invalid archive: open/read error! Is it encrypted and a wrong password was provided?..."）——损坏包被误判 `PasswordRequired` → 弹密码框；进框后 `ClassifySharpSevenZipException` 对此消息仍返回 `WrongPassword` → 输入任何密码都提示「密码错误」，永远到不了「损坏」。
@@ -196,98 +200,6 @@
   - **动态 MinHeight（问题 2 已实施）**：code-behind `UpdateDynamicMinHeight()` 挂 `RootGrid.LayoutUpdated`——`MinHeight = RootGrid.DesiredSize.Height + max(0, Height − ClientSize.Height)`（DesiredSize 已含 Grid Margin；chrome 项通常为 0，留作平台差异兜底），0.5px 节流防布局循环；XAML 静态 `MinHeight=100` 仅作首帧兜底，模式/密度切换、错误摘要出现等任何内容变化后窗口下限自动跟随，无法再缩到裁切 UI。
   - **验证**：构建 0 错误；Avalonia 180 通过 / 5 预存失败 / 3 跳过（`ProgressWindowXamlTests` 行数断言 7 行仍通过）。
 
-**2026-10-11** — 新增计划：进度窗口状态行 + 失败原因明细 + 关闭链统一 + 自动关闭倒计时 + 解压后置开关（计划类）
-  - **新计划**：[progress-window-status-line.md](../.omo/plans/未开始/progress-window-status-line.md)（P2 / 12-16h / 13 任务 5 波次），配套设计规格 [2026-10-11-progress-window-status-line-design.md](superpowers/specs/2026-10-11-progress-window-status-line-design.md)（12 节、决策 D1–D19 用户逐项拍板）。五大改造：① **状态行**下移到信息区与按钮行之间 + 可复制（只读 TextBox 14px + 复制按钮），错误摘要加复制按钮（复用既有 `ShowCopyFeedback` toast）；② **失败原因枚举通道**——Core 新增 `EntryFailureReason`（`PermissionDenied`/`IoFailed`/`Other`）+ `ArchiveProgress.EntryFailureReason` + `FailureReasonMapper`，三引擎 24 处失败埋点带原因、压缩端 `ReadFileWithRetry`/`TarWriteFileWithRetry` 带 `out` 原因、`ReadErrorHandler.FilterUnreadableFiles` 加预检回调补 7z/加密 ZIP 静默剔除缺口，UI 侧三语映射（Core 禁中文文案、不透传 `ex.Message`）；③ **错误摘要红/黄分层**——红段=整包异常头+逐条目失败、黄段=压缩端带原因跳过（不触发 `HasErrors`），按 EntryKey 去重 + 每段 20 行上限溢出提示，复制=红段+单换行+黄段；④ **三条件不自动关闭统一走「自动按下 📌」**（D10）——红段写入/批行置 Failed/测试流标志三个触发点，无独立 `ShouldAutoClose` 判定；`RunWithProgress` 增 pending 完成回调（15 调用点零改动）把测试结果写进窗口状态行/错误摘要、**移除测试失败模态框**（`ExtractFlow` 失败模态框保留且时序前移到等待之前），泛型 catch 补吞异常缺口（写摘要+落日志），`AutoCloseOrWaitAsync` 删 `delayMs` 参数收口 4 处 CLI 魔法数字 2500、删 `WaitForWindowCloseAsync`；⑤ **自动关闭延时进设置**（`AutoCloseDelaySeconds` 默认 3s、0–60 clamp、外观页）+ 按钮行左侧倒计时（复用 100ms 轮询，无新计时器）+ 行内可改（聚焦冻结/离开以最终有效值重置/`CountdownParser` 纯函数夹紧 0–60，**仅本次生效不回写设置**，否决 NumericUpDown 与 `{0}` 包数字）；⑥ **解压后置开关**「打开目录」「移入回收站」进按钮行——能力位显隐（压缩/测试/CLI 打开目录全藏，D18）、初值镜像设置/对话框选择、**实例级不回写设置**（D17 选项 A），`TryDeleteArchiveAfterExtract` 改签名传 `enabled`、CLI 两处删包挪到关窗后（D19）。Follow-ups（黄段扩解压冲突跳过、读/写权限细分、测试逐条目定位等 6 项）见 spec §12。
-  - **原型**：[progress-window-status-line.html](prototypes/progress-window-status-line.html)（4 场景：状态行 14px、摘要复制按钮、倒计时、解压后置开关）。
-  - **同步**：`docs/PLAN.md` P2 区登记行（规则 1）。设计 + 13 任务分解已落盘，未实施。
-
-**2026-10-10** — 新增计划：智能并行解压（全局开关 + SSD/HDD 智能度 + 大包预测试）+ 交互原型（计划类）
-  - **新计划**：[smart-parallel-extract.md](../.omo/plans/未开始/smart-parallel-extract.md)（P2 / 6-8h / 11 Task）。5 步决策链：①调用方覆盖（解压对话框单次指定 >0）②全局关→串行 ③智能关→手动值/ProcessorCount ④智能开+≥1GB+预测试开→`ParallelDegreeOptimizer` 样本解压计时选优（临时目录测完即删）⑤磁盘类型默认值（SSD→12 / HDD→8 / Unknown→min(CPU,12)）。Core 新增 `DiskTypeDetector`（DeviceIoControl SeekPenalty + 盘符缓存）/`ParallelDegreeOptimizer`/`ParallelDegreeResolver`（纯函数+异步封装，`ParallelExtractSettings` record 隔离 UI AppSettings 依赖）；UI 设置窗口解压 Tab 新增并行解压卡片（全局开关+智能开关+SSD/HDD 双输入+预测试开关随智能隐藏 Rule 6+帮助弹窗 `ParallelExtractHelpDialog`）；解压对话框线程数默认 0=自动；`ExtractFlow`/`SelectedItemsExtractService` 接线 resolver 经 `ArchiveOptions.ParallelExtractDegree` 传入（`ZipEngine` 无需改动）。磁盘基准测试功能（方案 A 分层整合）留待下期。
-  - **原型**：[smart-parallel-extract-settings.html](prototypes/smart-parallel-extract-settings.html)（单文件 HTML），5 步决策条 s1-s5、SSD/HDD 双输入切换、预测试随智能隐藏、帮助弹窗 3 章节（预测试标注「仅智能并行度开启时可用」）。
-  - **同步**：`docs/PLAN.md` P2 区登记行（规则 1）。设计与 11 Task 实施计划已落盘，未实施。
-
-**2026-10-10** — 进度窗口两份计划实施 + 两处缺陷修复（Avalonia + Core）
-  - **channel-info 计划**（[progress-window-channel-info.md](../.omo/plans/已完成/progress-window-channel-info.md) Task 1–7）：通道行改**左右分组**（左=目录中间省略 + 文件名恒完整 + 文件底纹 + 文件大小；右=批次序号 + 批次底纹 `ThemeProgressBatchBrush` + 合并百分比 `45% (12/40)` + 信息列字节·压缩率 + ToolTip），删旧批进度条/百分比/明细三列，右区 `MinWidth=180`；详细门禁移除 + `UpsertSingleChannelRow` 非并行单行合成（`IsParallel=false`，不伪装并行）；`ProgressDisplayCalculator.MiddleEllipsis` 中间省略；`ParallelBatchProgressItem` 8 新字段；VM `HasParallelChannel`/`ShowCompressChannelHint`/`NotifyChannelProperties` 集中通知；底纹几何修复（`AncestorType=Grid` + `ClipToBounds`）；N 组 adapter ×2 漏拷 `FilePercentComplete` 修复；`ArchiveProgress` +4 字段并在串行/并行/过滤解压、批次完成、串行 ZipWriter、`ReadFileWithRetry`（加 `fsOut` 参数）、`CompressGroupWithSevenZip` 全站点填充 + `TryStreamOutputRatio`/`TryFileOutputRatio` helper；逐条目终态报告补 `FileTotalBytes`（前向兼容 stats-cards 字节累加器）。
-  - **compression-ratio 计划**（[progress-file-compression-ratio.md](../.omo/plans/已完成/progress-file-compression-ratio.md) Task 1–5）：`ArchiveProgress` +`EntryCompressedBytes`/`TotalCompressedBytes`；`EntryProgressItem` +`CompressedSize`/`CompressedText`；`UpdateEntryStatus` +`long? compressedBytes`；`ZipEngine.CompressAsync` 末尾后置回填成品 ZIP 中央目录（分卷跳过、异常吞掉）；列表行新增列「压缩后大小 (率%)」；统计卡段 2 整体汇总 `🗜 300 MB (60%)` + 条件分隔符 + `ShowChannelMetaSeparator`/`ShowChannelMetaRow`；三语 +`Progress_Stats_Compressed` + 3 ToolTip key。
-  - **缺陷修复**：① 压缩侧播种/实时上报 `EntryKey` 用反斜杠（`FileScanner`）而后置回填/解压用正斜杠，不匹配致回填新建 `Size=0` 重复行 → VM 索引边界统一 `ArchivePath.Normalize`（`SeedEntryItems`+`UpdateEntryStatus`）；② MT 压缩镜像阶段进度冻结 → `CompressGroupWithSevenZip` 两阶段进度区间（镜像前半段按已拷贝字节映射、7z 后半段衔接）+ N 组 adapter 改用组 `PercentComplete` 推导（原按字节重算丢弃镜像进度），`localRealDone` 保留真实字节供压缩率。
-  - **测试**：`ProgressViewModelTests` +7、`ProgressWindowXamlTests` 2 改、`ProgressDisplayCalculatorTests` +3 `MiddleEllipsis`、`ZipEngineTests` +`CompressAsync_MultiThreaded_MirrorPhase_AdvancesOverallProgress`（+`SyncProgress` 辅助类）。
-  - **验证**：`dotnet build` 0 错 0 警；Core **619 通过 / 0 失败** / 3 跳过；Avalonia **178 通过 / 5 预存失败**（`PreviewWebViewLazyInitTests` 缺夹具 `TestPreview\*.zip`）/ 3 跳过。两份计划文档移至 `.omo/plans/已完成/`。
-
-**2026-10-10** — 新增计划：逐文件压缩后大小 + 压缩率 + 整体压缩汇总（+ 整合原型 v3）（计划类）
-  - **新计划**：[progress-file-compression-ratio.md](../.omo/plans/未开始/progress-file-compression-ratio.md)（P2 / 1-1.5天 / 独立计划）。用户讨论定稿：ZIP 压缩**完成后后置回填**每条目压缩后大小（读成品 ZIP 中央目录，`OpenArchiveWithEncodingFallback` → `entry.CompressedSize`，**非实时**；`CompressAsync` 末尾，`ListEntriesAsync:1808` 同模式）；**仅 ZIP**（解压/7z 固实/TAR/GZ/分卷不显示，Rule 6 隐藏）；两处展示——① 「列表」模式每行新增一列「压缩后大小 (率%)」（`EntryProgressItem.CompressedText`）；② 「完整」档统计卡**段 2 后置单行**（并行度旁）新增整体压缩汇总（格式 A：`🗜 300 MB (60%)`，不重复 📏 总大小卡的输入量）；契约：`ArchiveProgress` +`EntryCompressedBytes`/`TotalCompressedBytes`，`UpdateEntryStatus` +`compressedBytes` 参数（前向兼容）；D-decisions D1–D6（范围/回填机制/逐文件列/整体汇总/显隐/字段契约）。**已核实**：串行 `ZipWriter`（`:1746`）与 MT/N 组 FIFO（`:3572-3610`）均逐条目上报 Completed → 回填幂等补 `EntryCompressedBytes`；`SplitOutputStream` 分卷须跳过。与 channel-info 计划同改 3 文件（`ArchiveEngine.cs`/`ProgressViewModel.cs`/`ProgressWindow.axaml`）→ 计划内建议后者先行。
-  - **整合原型**：[progress-window-compression-ratio.html](prototypes/progress-window-compression-ratio.html)（单文件暗色 HTML，窗口宽 560px = 真机）；整合两计划全部改进——通道行左右分组/批底纹/合并百分比/ToolTip（channel-info v2）+ **逐文件压缩率列 + 段 2 整体汇总**（新）；4 场景（ZIP 并行压缩 / ZIP 串行压缩 / ZIP 并行解压 / 7z 压缩）× 3 模式 × 3 密度；压缩率列/汇总「审阅便利」直接显示最终态（caption 注明真机为完成时回填）；回填时青色闪烁高亮。校验：JS 语法 OK、48 元素 ID 全对应、HTML 闭合、CRLF + noBOM。**未改动**已确认的 channel-info v2 原型。
-  - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。设计 + 任务分解已落盘，未实施。
-
-**2026-10-09** — 通道信息计划 v2 设计修订（左右分组 + 批进度底纹化 + 合并百分比 + ToolTip）+ 原型重绘（计划类）
-  - **计划修订**：[progress-window-channel-info.md](../.omo/plans/未开始/progress-window-channel-info.md)——用户讨论定稿通道行由「6 列平铺」改为**左右分组**：左=单文件域（目录中间省略 + 文件名恒完整 + 文件底纹 + 文件大小），右=批次域（批次序号 + 批次底纹 + 合并百分比 + 字节进度/压缩率 + ToolTip）。决策表重排为 D1–D11：D1 左右分组与信息列口径（信息列只留字节+压缩率，文件大小移至左区）、D2 详细门禁移除（澄清「推翻的是旧计划门禁，非本文件 D6」避免编号撞车）、D5 **批级进度底纹化**（取代原「缩窄」，删独立 ProgressBar 改右区背景底纹、新增 `ThemeProgressBatchBrush` 色相区分）、D6 **合并百分比+明细**为 `45% (12/40)` 且**不加列标题**、D7 **ToolTip**（豁免 i18n 护栏，新增 `Progress_Tooltip_Progress`/`Bytes`/`Ratio` 三 key）、D8 单行隐藏规则 + `HasParallelChannel` 派生属性、D9 双底纹机制（`FileRatio` vs `BatchRatio`）、D10 右区 `MinWidth=180` 防跳动、D11 变更清单（5→7 条）。行模型扩展为 `IsParallel`/`DirectoryText`/`FileNameText`/`FileSizeText`/`PctDetailText`/`InfoText`/`BatchRatio`/`TooltipText`；任务 4 门禁移除 + 单行合成、任务 5 左区、任务 6 右区（+主题+i18n）、任务 7 GUI **五场景**（补分卷 ZIP 压缩）。
-  - **原型**：[progress-window-channel-info.html](prototypes/progress-window-channel-info.html) 重绘为 v2（左右分组布局、右区紫色批次底纹色相区分、合并百分比 `45% (12/40)`、ToolTip 悬停浮层、右区 `MinWidth` 锁底线）；修复 CSS 特异性 bug——`.ch-right > *`（`position:relative`）覆盖了 `.ch-batch-fill`（`position:absolute`）导致批次底纹塌陷不可见，改 `.ch-right > .ch-batch-fill` 提高特异性 + `:not()` 排除。
-  - **同步**：`docs/PLAN.md` P2 区登记行更新（规则 1）。设计与任务分解已修订落盘，未实施。
-
-**2026-10-09** — 进度窗口统计卡三行结构实施（方案 A 去分母 + 终态字节累加器 + 并行度后置，Avalonia）
-  - **VM 层**（`ProgressViewModel.cs`）：新增 5 个 `[ObservableProperty]` 字段——`StatsProcessedSize`（已处理字节，`SetProgress` TotalBytes 块写入）、`StatsTotalCount`（文件总数，TotalFiles 块写入）、`StatsSkippedSize`/`StatsFailedSize`/`StatsOverwrittenSize`（三终态字节累加器，`UpdateEntryStatus` 加 `long? fileSize = null` 参数 + `_statsSkippedKeys`/`_statsFailedKeys`/`_statsOverwrittenKeys` 去重守卫 + `AccumulateTerminalBytes` 方法）；`StatsProcessedCount` 由 `_statsProcessed/_statsTotalFiles` 分数改纯计数 `_statsProcessed.ToString()`（方案 A，分母与总大小卡行 2 同源重复）；`ClearEntryItems` 重置累加器与三字符串。
-  - **转换器**（`Converters/DashBrushConverter.cs` 新建）：输入字符串为 `—` 时返回 `ThemeTextSecondaryBrush`（灰显），否则按 `ConverterParameter`（Brush key）返回对应主题色；`ProgressWindow.axaml` Window.Resources 注册 `x:Key="DashBrush"`。
-  - **XAML**（`ProgressWindow.axaml` 统计卡区）：6 张竖排卡替换为 5 张三行卡（水平 StackPanel，`SpacingLg`，`HorizontalAlignment=Center`）+ 并行度后置单行（⚙ 14px + 标题 11px + 值 13px，`IsVisible=HasParallelDegree`，`Margin=0,8,0,0`）；卡 1 行 2 绑 `StatsProcessedCount`（纯计数）、行 3 绑 `StatsProcessedSize` + DashBrush/`ThemeStatusSuccessBrush`；卡 2/3/4 行 3 分别绑 `StatsSkippedSize`/`StatsFailedSize`/`StatsOverwrittenSize` + DashBrush Warning/Error/Primary；卡 5 行 2 绑 `StatsTotalCount` + DashBrush Primary、行 3 绑 `StatsTotalSizeValue`（静态 Primary）；5 卡均加 `MinWidth="80"` 防文字长度变化导致相邻卡跳动；卡级 `IsVisible` 与中/精简两档零改动（D5/Rule 6）。
-  - **测试**（`ProgressViewModelTests.cs`）：+7 新测试（`SetProgress_WithTotalBytes_PopulatesProcessedSize`/`SetProgress_WithoutTotalBytes_ProcessedSizeStaysDash`/`SetProgress_WithTotalFiles_PopulatesTotalCount`/`UpdateEntryStatus_SkippedWithSeededSize_AccumulatesSkippedSize`/`UpdateEntryStatus_FailedWithSeededSize_AccumulatesFailedSize`/`UpdateEntryStatus_OverwrittenWithSeededSize_AccumulatesOverwrittenSize`/`UpdateEntryStatus_DuplicateKey_DoesNotDoubleCount`）+ 1 改名（`StatsProcessedCount_ShowsFractionString`→`ShowsPureCount` 断言 `"60"`）；`StatsProcessedText` 分数文案测试 :491/:516 不动。
-  - **验证**：`dotnet build` 0 错 0 警；Avalonia 170 通过 / 5 预存败（PreviewWebViewLazyInitTests）/ 3 跳过；Core 615 通过 / 0 败 / 3 跳过。
-
-**2026-10-09** — 统计卡三行计划修订（方案 A 去分母 + 终态完备性核查）+ 交互原型（计划类）
-  - **计划修订**：[progress-stats-cards-three-row.md](../.omo/plans/已完成/progress-stats-cards-three-row.md)——用户拍板方案 A：已处理卡行 2 由 `N/M` 分数改纯计数（分母与总大小卡行 2 文件总数同源重复，比例由总进度条承担；中等档 `StatsProcessedText` 一句话文案保留 `N/M` 分数不受影响）；条目终态完备性核查结论：`ArchiveEntryStatus` 4 终态（Completed/Skipped/Failed/Overwritten）完备，6 种 `FileConflictAction` 映射清晰（Ask 中间态、条件覆盖未命中归 Skipped），目录条目 `IsDirectory` continue 与取消/暂停（操作级）均不进统计卡；重命名可见性缺口（`resolvedPath != outputPath` 上报 `Completed`）记入边界备忘并加守卫条款「不得为重命名新增条目终态」；既有测试 `StatsProcessedCount_ShowsFractionString`（:534）改名改断言为 `ShowsPureCount`（断言 `"60"` 而非 `"60/100"`），中等档分数测试 :491/:516 不动。
-  - **原型**：[progress-stats-cards-three-row.html](prototypes/progress-stats-cards-three-row.html)（单文件 HTML，5 场景：ZIP 完整数据 / ZIP 无冲突 / 7z 固实 / TAR 渐进 / 串行解压；新旧对比视图经 `oldR2` 字段实现——左栏还原现状分数 `60/100`、右栏新设计纯计数 `60`；演示数据 bug 修复：场景 1/3/4 的 `c5.r2` 由错误的 `'150'` 改为与 TotalFiles=100 一致的 `'100'`）。
-  - **前向兼容契约**：`progress-window-channel-info.md` 补记——该计划任务 3 落地 `ArchiveProgress.FileTotalBytes` 后，逐条目终态报告（EntryStatus != null）必须携带该字段，使统计卡跳过/出错/已覆盖累加器在渐进模式（TAR/GZ、>5000 条目未播种）下自动升级为 100% 覆盖；stats-cards 侧接线只需把 `SetProgress` 的 `EntryStatus` 块调用末参从 `null` 改传 `p.FileTotalBytes`（计划已预留参数，零结构改动）。
-  - **同步**：`docs/PLAN.md` P2 区统计卡登记行更新（规则 1）。设计与修订已落盘，未实施。
-
-**2026-10-09** — 进度窗口通道信息增强交互原型（docs/prototypes）
-  - **原型**：[progress-window-channel-info.html](prototypes/progress-window-channel-info.html)（单文件暗色 HTML，与 progress-window-enhancement / channel-demo 两既有原型调色板一致，窗口宽 560px = 真机 `ProgressWindow` 宽度），浏览器直接打开即可审阅，供实施前对齐设计。
-  - **交互**：控制条四场景切换（ZIP 并行解压 / ZIP 并行压缩 / 7z 压缩·单行 / ZIP 串行·单行）对应四条验收；底纹「修复后/修复前」对照（bug 态红虚线演示整行宽溢出）；窗口内密度（少/中/完整）与模式（简约/详细/列表）双单选实时切换，「详细」恒可用标注 D6 已推翻；通道行 = 序号 | 目录(中间省略)+文件名(底纹) | 批进度条 100px | 百分比 | 批明细 | 信息列，单行变体隐藏前四项；信息列缺段连分隔符隐藏（规则 6）；完整档 6 卡三行统计卡（7z 总大小卡隐藏、已处理行 3 显 `—`）；底部 legend 映射改动点 ①–④ → 计划任务 6/4/5/1-2。
-  - **验证**：`node --check` JS 语法通过；JS 引用 41 个元素 ID 与 HTML 定义全部对应；`</body></html>` 闭合完整。
-
-**2026-10-09** — 新增计划：进度窗口通道信息增强（计划类）
-  - **计划**：[progress-window-channel-info.md](../.omo/plans/未开始/progress-window-channel-info.md)（P2 / 1.5-2.5天 / 8 任务 4 波次 TDD 分解）
-  - **内容**：四项改造——① 通道行新增信息列（文件大小 · 已处理/总量 · 实时压缩率，方案 A `ArchiveProgress` 新增 `FileTotalBytes`/`BatchProcessedBytes`/`BatchTotalBytes`/`CompressionRatio` 四字段，7z/解压/分卷按规则 6 隐藏压缩率段）；② 「详细」模式推翻 D6 恒可用 + 非并行合成单条通道行（隐藏批次序号/批进度条/百分比/批明细/压缩说明，不污染 `ParallelBatchItems`）；③ 路径拆目录（`MiddleEllipsis` 中间省略）+ 文件名两列，根文件无目录列；④ 底纹双缺陷修复（几何基准 ContentPresenter→文件格 Grid + ClipToBounds；N 组并行压缩 adapter 漏拷 `FilePercentComplete`）；批级进度条列缩至 ~100px 固定。
-  - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。依赖 stats-cards 计划先行；无新增本地化 key。设计+任务分解已落盘，未实施。
-
-**2026-10-08** — 新增计划：进度窗口统计卡三行结构（计划类）
-  - **计划**：[progress-stats-cards-three-row.md](../.omo/plans/已完成/progress-stats-cards-three-row.md)（P2 / 2-3h / 6 任务 3 波次 TDD 分解）
-  - **内容**：「完整」档 6 张统计卡改三行表格——行 1 图标+标题横排、行 2 文件数量、行 3 文件大小；行级缺数据灰显 `—`（卡级显隐与中/精简两档零改动，规则 6 维持）；VM 新增 `StatsProcessedSize`/`StatsTotalCount` 只写不清字段（`SetProgress` 的 `TotalBytes`/`TotalFiles` 块写入）+ 新建 `DashBrushConverter`（`—`→`ThemeTextSecondaryBrush`、真实值→强调色）；D6 固定恰 3 条 VM 测试；无新本地化 key；方案 A 逐卡 XAML（模板化已否决）。
-  - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。设计与任务分解已落盘，未实施。
-
-**2026-10-08** — 手工测试三问题修复（进度条可见性 / 进度统计缺项 / 解压线程数接线，Avalonia）
-  - **问题 ① 进度条 0% 不可见**（`Themes/ThemeLight.axaml`、`Themes/ThemeDark.axaml`）：进度条轨道 `ThemeProgressBgBrush` 与所在面板背景 `ThemeSplitterBg` 色差为 0（Light 均为 `#E0E0E0`）/ 仅 4（Dark `#424242` vs `#3E3E3E`），0% 时进度条与背景融为一体不可辨认。拉开对比至单通道差 ≥16：Light `#E0E0E0→#C8C8C8`（差 24）、Dark `#424242→#555555`（差 23），两处资源均加注释写明对比度依据。新增守卫 `ProgressTrackContrastTests`：正则解析两主题 hex 色值、计算 RGB 三通道最大差，<16 即失败（解析不到资源同样失败，不静默通过）。
-  - **问题 ② 进度窗口缺「文件总数 / 总大小」**（`ViewModels/ProgressViewModel.cs`、`Dialogs/ProgressWindow.axaml`、三语 `strings.*.json`）：新增私有 `_statsTotalFiles`（引擎 `TotalFiles > 0` 时更新、0 不清零）与 `[ObservableProperty]` `_statsTotalSizeText`/`_statsTotalSizeValue`（仅 `TotalBytes > 0` 写入，未上报引擎保持空串走 Rule 6 隐藏）；`StatsProcessedCount` 由 `long` 改 `string`（`_statsTotalFiles > 0` 时 `"60/100"` 分数、否则回退纯计数），格式化参数同步带分子分母；新增 `StatsTotalSizeLabel`（从 `Progress_Stats_TotalSize` 剥离占位符，与其余短标签同模式）。XAML：「完整」档统计卡区新增第 6 卡 📏 总大小（`StringNotEmpty` 控显隐），中等档单行补总大小项（同守卫）；三语新增 `Progress_Stats_TotalSize`（zh-CN "总大小 {0}" / en "Total size {0}" / zh-TW "總大小 {0}"，插入文件头，key 集同步）。
-  - **问题 ③ 解压对话框线程数选择无效**（`Dialogs/ExtractSettingsWindow.axaml`、`Views/MainWindow.axaml.cs`、`Services/ExtractFlow.cs`、`ViewModels/MainWindowViewModel.cs`）：断链共三处——`NumericUpDown` 默认单向绑定（`Value="{Binding ParallelExtractDegree}"` 补 `Mode=TwoWay`）、确认回调拷贝清单漏回传（补 `evm.ParallelExtractDegree = dialog.ViewModel.ParallelExtractDegree`）、`ExtractFlow.ExtractAsync` 只读 `AppSettings`（增 `int? parallelExtractDegree = null` 参数，对话框值优先、AppSettings 兜底；`MainWindowViewModel` 解压执行入口透传 `vm.ParallelExtractDegree`）；`ResolveDisplayParallelDegree` 同步增 `int? parallelDegree = null` 参数（进度窗口「并行」卡显示值与实际选项一致），CLI 等无对话框路径默认 null 行为不变。
-  - **测试**（3 个测试文件）：`ProgressViewModelTests` +6 条（N/M 分数、占位符不泄漏、`TotalFiles=0` 不清零分数、`StatsProcessedCount` 分数串、总大小三成员填充、未上报留空）；新增 `ExtractParallelDegreeWiringTests`（5 条源码文本守卫锁接线链路 + 2 条 `ResolveDisplayParallelDegree` 行为重载，文件头注明「守卫只证明接线在位、不证明值流到引擎」的诚实局限）；新增 `ProgressTrackContrastTests`（双主题轨道对比度）。
-  - **验证**：Avalonia 构建 0 错误 0 警告；测试 163 通过 / 5 失败（均为预存 `PreviewWebViewLazyInitTests` 环境问题，与本次无关）；Core 615 通过 / 0 失败。
-
-**2026-10-08** — 合并 origin/main（ffac140）→ alpha（10 处冲突全部解决）：① `AGENTS.md` 两侧新增规则并入并重编号——规则 0–16 连续唯一（alpha 的 `CoreLog.Initialize` 保持规则 15，main 的 `CustomFilePickerDialog` 选择器禁令顺延为规则 16）；② 进度文档双向归并——`docs/PROGRESS.md` 与本文档按日期从新到旧交错合并（双方 10-06～10-08 条目齐全），共享层 `####` 组序为 main v0.5.2 → alpha v0.5.1 → 共有 v0.5.0，版本号四处一致 0.5.2（AppConstants.cs / csproj / PLAN.md / PROGRESS.md）；③ `ZipBinaryRewriter.cs` 三处 hunk 语义合成——alpha 的 `Store` 条目追加 × main 的 UTF-8 bit-11 标志，LFH 取 `generalFlags` + `Store ? 0 : 8`；④ `MainWindowViewModel.cs` 取 main 的 `settings` 局部变量并删除死代码 `?? new ArchiveOptions()`（`CreateExtractOptions` 返回非空）。其余 5 文件（`App.axaml.cs`、三语 `strings.*.json`、`MantisZip.UI.Avalonia.Tests.csproj`）逐一核验无残留标记（含缩进标记）、JSON 解析通过。验证：全仓冲突标记为零；Core 构建 0 警告 0 错误 + 测试 615 通过 / 3 跳过（含三语 key 集同步校验 `AllThreeLanguages_HaveSameKeySet`）；Avalonia 临时输出路径构建 0/0 + 测试 149 通过 / 5 失败（TestPreview 夹具缺失为预存环境问题，main 10-06 条目已记载；常规路径构建因运行中实例文件锁未执行）
-
-**2026-10-08** — 版本号更新到 0.5.2（AppConstants.cs + csproj，docs/PLAN.md、docs/PROGRESS.md 顶部当前版本同步）
-
-**2026-10-07** — 进度窗口三计划文档整理标注 + PLAN.md 登记行瘦身（计划类）
-  - **背景**：`progress-window-enhancement`（v2）的「原型对应表」误读 v6 原型两组切换器，是返工根因；由此衍生的 `progress-window-prototype-alignment`（纠偏）与 `progress-window-bytes-i18n`（后续）三份文档存在过时/错误描述（已删枚举仍在宣扬、已实施的 Deferred 仍标「明确不做」、登记行超长不可读）。执行后续计划前先做文档整理，避免再被误导。
-  - **`progress-window-enhancement.md`（只标注不重写）**：顶部新增「效力状态」表（T1–T4/T8/T9 ✅ 有效；原型对应表 ❌ 作废；`TopDisplayMode`/`DensityMode` ❌ 已删除；统计/ETA/布局 ✅ 框架有效但已重排；F3 归并）；原型对应表整表打作废戳、前两行划掉并写明返工代价；TL;DR 双开关措辞就地加注；**12 个未勾 Acceptance 实测处置**——10 项勾选并附证据（`RecordSkipped` 引擎 10 处 = Zip4+TarGz4+SevenZip2、`BatchIndex` 6 处赋值、三引擎 `ExtractResult` 均由 `ConflictStatsCounter` 快照回填、`ThemeLight/Dark:147-148` 主题键成对、`OnArchiveSwitch` `ProgressViewModel:902`、终值兜底 `:636`、`HasParallelBatches` `:138/:240`、key 集测试保证三语一致），2 项标 `[~]` 作废/部分作废；F3 拆分为 `[~]`（UI 结构类归 alignment F3，密码循环/ETA 归零/统计抽样等 5 条有效条目并入收口清单）。
-  - **`progress-window-prototype-alignment.md`**：头部新增「当前状态」块（T1–T11 全部完成、F1/F2/F4 ✅、F3 自动化 8✅/4◐/0✗，**F3 余项 6 条清单**含从 v2 并入的 4 条）；Deferred **#7 回写为已实施**（commit `7505952`，落点 `SourceEntryEnumerator`/`CompressFlow.TrySeedEntryItemsInBackground:332` + 主窗/CLI 两接线，保留历史延期理由），**#2/#3 划掉标注「已转入 bytes-i18n」**，节首加整理注。
-  - **`progress-window-bytes-i18n.md`**：任务 6 范围缩窄——原 Step 1（#7 回写）与 Step 2（PLAN.md 行 33 追注）已随本次整理提前完成，改为「Deferred #2/#3 回写（须任务 1–5 完成后）+ 行 34 状态更新」；TL;DR 第 3 点、锚点表、File Structure 同步。
-  - **`docs/PLAN.md`（规则 1）**：行 33（原型对齐）由 **3510 字瘦身至 751 字**——收敛为纠偏内容 + F1/F2/F4/F3 进度 + 缺口补齐 + Deferred 去向，执行细节/探针坑/基准陷阱留计划文件；行 32（增强）同步纠偏与标注状态；行 34（字节埋点）回写口径改为「#2/#3（#7 已提前回写）」。校验：仅 3 行变更、UTF-8 无 BOM、CRLF 完整、4 个改动文件均无裸 LF。
-  - **未做**：alignment 两项 F3 未勾（真实未完成）、三计划归档迁移（待 F3 收口）。
-
-**2026-10-07** — 新增计划：进度窗口字节埋点 + 语言即时刷新（计划类）
-  - **计划**：[progress-window-bytes-i18n.md](../.omo/plans/未开始/progress-window-bytes-i18n.md)（P2，4-6h，7 任务 TDD 分解），配套设计规格 [2026-10-06-progress-bytes-i18n-design.md](superpowers/specs/2026-10-06-progress-bytes-i18n-design.md)。
-  - **内容**：① `SevenZipEngine`/`TarGzEngine` 全路径填充 `ArchiveProgress.ProcessedBytes/TotalBytes`（速度/ETA 全格式生效；7z percent 推算、TAR 经新增 `ReadProgressStream` 真实读取字节、跳过条目计字节、跨阶段单调钳制）；② `ProgressViewModel` 订阅 `CultureChanged` 运行中语言即时重灌 + `ProgressWindow.OnClosed` 退订防静态事件泄漏；③ prototype-alignment Deferred #7（通用压缩播种，commit `7505952`）回写。
-  - **同步**：`docs/PLAN.md` P2 区新增计划行（规则 1）。仅落盘计划与规格，未实施。
-
-**2026-10-06** — N 组并行压缩联调修复 + 组数 UI 补齐 + 压缩侧列表播种（Avalonia+Core）
-  - **修复① 开关传递断链**（`Views/MainWindow.axaml.cs`）：`ShowCompressSettingsDialog` 的「对话框 VM → 执行 VM」拷贝清单漏拷 `MultiThreadedCompression` / `AdaptiveSmartDetect` / `ParallelCompressDegree` → 执行侧 MT 恒 `false` → `IsMultiThreadedEligible` 首条即 false → 引擎恒走串行、从不上报 `BatchIndex` → 进度窗口「详细」被 D6 隐藏（用户现象：只有简约/列表）。补 3 行拷贝。
-  - **补齐 Task 5 Step 3 缺失 UI**（`Controls/DynamicFormatOptionsPanel.axaml[.cs]`、`Dialogs/CompressSettingsWindow.axaml.cs`、`ViewModels/CompressSettingsViewModel.cs`）：ZIP 面板多线程开关旁新增「并行压缩组数」`NumericUpDown`（1..16），多线程关闭时整块隐藏（规则 6）；`SnapshotFormatOptionsToViewModel` 快照进 VM；VM 构造自 `AppSettings` 播种。（计划原写放在 `CompressSettingsWindow.axaml`，实测多线程开关在 `DynamicFormatOptionsPanel`，按对称位置落地。）
-  - **修复② 点「详细」卡死**（`Dialogs/ProgressWindow.axaml`）：详细行模板用 `{StaticResource RatioToWidthConverter}`，该键仅 `MainWindow.axaml:25` 局部定义（App 级与本窗口均无）→ `x:CompileBindings=False` 下编译期不报、模板**首次实例化**时解析失败。补本窗口资源；两处 `StringNotEmptyConverter` 统一为本窗口 `StringNotEmpty`。
-  - **修复③ 单选项不同步**（`Dialogs/ProgressWindow.axaml`）：三模式单选项 `IsChecked` 单向绑 `IsSimpleMode`/`IsDetailedMode`/`IsListMode`，程序化自动切「详细」时按钮同步高亮。
-  - **准备态 + 不定进度条**（`ViewModels/ProgressViewModel.cs`、`Dialogs/ProgressWindow.axaml[.cs]`）：`BeginPreparing()`/`EndPreparing()` + 复用既有 `IsIndeterminate`；窗口构造即准备态、首个 `SetProgress` 结束、切换批次档案重入（`SetCurrentBatchItem`）；三语新增 `Progress_Preparing`。
-  - **MT 路径进度可见**（`ProgressViewModel` + `Core/Engines/ZipEngine.cs`）：简约面板条新增 `SimpleFileBarValue`（无逐文件百分比时**回退总进度**，`_hasFilePercent` 随每次上报更新）；配合 Core 侧镜像拷贝上报（见共享层）。
-  - **压缩侧「列表」播种**（原「经用户决定正式延期」项）：
-    - 新增 `Services/CompressFlow.cs` `TrySeedEntryItemsInBackground(pw, request, ct)`：后台枚举、阈值 `MaxSeedEntryCount=5000`、失败/取消放弃、`pw.SeedEntries`（引擎已有条目行时自行跳过，防清掉已上报终态行）；白名单与 `CompressService` 同源（Plan 非空 `IncludedFiles` 并集）。
-    - 接线：`ViewModels/MainWindowViewModel.PendingCompressRequest`（`ExecuteCompressFromSettings` 置位）→ `Views/MainWindow.axaml.cs` `RunWithProgress`；CLI `App.axaml.cs` `CompressWithProgress`。
-  - **G2 实测结论**：`scripts/bench-zip-mt.cs` 加 `--degrees` 后四轮（text / text-rev / media / mixed，degree 1/2/4/8）显示 **N 组无加速**（degree=1 全面最快或持平，degree=2 最差；倒序对照一致）→ **维持默认 `ParallelCompressDegree = Environment.ProcessorCount`**（全局 `MultiThreadedCompression` 默认关，N 组为 opt-in）。
-  - **验证**：UI 构建 0 警告 0 错误；Core **608 通过 / 0 失败 / 3 跳过**（+3）；Avalonia **114 通过 / 0 失败 / 2 跳过**。
-  - **i18n / 其他**：三语成对新增 `Progress_Preparing`；`.gitignore` 排除 `.buildout/`（验证用生成本地件，约 7.6GB）。
 **2026-10-12** — 7z 固实块大小支持自定义 MB 输入（对齐字典方案）
   - **背景**：字典大小支持自定义后，固实块大小（`s` 参数）结构上完全同构（同为走 `CustomParameters` 的 7z 大小字符串），`SevenZipSolidBlockSize` 全链路本就是 `string` → Core 零改动，仅补 UI
   - **预设**：`CompressionOptionData.SevenZipSolidBlockSizes` 尾部加 `new("-1", "")`（自定义），原 10 项 `""`/16m…4g 保持
@@ -316,6 +228,28 @@
   - **平台范围（Windows-only）**：纯 Win32 P/Invoke，跨平台移植时归入「砍掉」类（与 OverlayController / ShellExt COM 同列）；`Show()` 首行 `OperatingSystem.IsWindows()` 护栏使挂接点移植时零改动
   - **同步**：`docs/PLAN.md` splash 条目说明已同步；实施需新增 `Status_Starting` 三语 key
 
+**2026-10-11** — 新增计划：进度窗口状态行 + 失败原因明细 + 关闭链统一 + 自动关闭倒计时 + 解压后置开关（计划类）
+  - **新计划**：[progress-window-status-line.md](../.omo/plans/已完成/progress-window-status-line.md)（P2 / 12-16h / 13 任务 5 波次），配套设计规格 [2026-10-11-progress-window-status-line-design.md](superpowers/specs/2026-10-11-progress-window-status-line-design.md)（12 节、决策 D1–D19 用户逐项拍板）。五大改造：① **状态行**下移到信息区与按钮行之间 + 可复制（只读 TextBox 14px + 复制按钮），错误摘要加复制按钮（复用既有 `ShowCopyFeedback` toast）；② **失败原因枚举通道**——Core 新增 `EntryFailureReason`（`PermissionDenied`/`IoFailed`/`Other`）+ `ArchiveProgress.EntryFailureReason` + `FailureReasonMapper`，三引擎 24 处失败埋点带原因、压缩端 `ReadFileWithRetry`/`TarWriteFileWithRetry` 带 `out` 原因、`ReadErrorHandler.FilterUnreadableFiles` 加预检回调补 7z/加密 ZIP 静默剔除缺口，UI 侧三语映射（Core 禁中文文案、不透传 `ex.Message`）；③ **错误摘要红/黄分层**——红段=整包异常头+逐条目失败、黄段=压缩端带原因跳过（不触发 `HasErrors`），按 EntryKey 去重 + 每段 20 行上限溢出提示，复制=红段+单换行+黄段；④ **三条件不自动关闭统一走「自动按下 📌」**（D10）——红段写入/批行置 Failed/测试流标志三个触发点，无独立 `ShouldAutoClose` 判定；`RunWithProgress` 增 pending 完成回调（15 调用点零改动）把测试结果写进窗口状态行/错误摘要、**移除测试失败模态框**（`ExtractFlow` 失败模态框保留且时序前移到等待之前），泛型 catch 补吞异常缺口（写摘要+落日志），`AutoCloseOrWaitAsync` 删 `delayMs` 参数收口 4 处 CLI 魔法数字 2500、删 `WaitForWindowCloseAsync`；⑤ **自动关闭延时进设置**（`AutoCloseDelaySeconds` 默认 3s、0–60 clamp、外观页）+ 按钮行左侧倒计时（复用 100ms 轮询，无新计时器）+ 行内可改（聚焦冻结/离开以最终有效值重置/`CountdownParser` 纯函数夹紧 0–60，**仅本次生效不回写设置**，否决 NumericUpDown 与 `{0}` 包数字）；⑥ **解压后置开关**「打开目录」「移入回收站」进按钮行——能力位显隐（压缩/测试/CLI 打开目录全藏，D18）、初值镜像设置/对话框选择、**实例级不回写设置**（D17 选项 A），`TryDeleteArchiveAfterExtract` 改签名传 `enabled`、CLI 两处删包挪到关窗后（D19）。Follow-ups（黄段扩解压冲突跳过、读/写权限细分、测试逐条目定位等 6 项）见 spec §12。
+  - **原型**：[progress-window-status-line.html](prototypes/progress-window-status-line.html)（4 场景：状态行 14px、摘要复制按钮、倒计时、解压后置开关）。
+  - **同步**：`docs/PLAN.md` P2 区登记行（规则 1）。设计 + 13 任务分解已落盘，未实施。
+
+**2026-10-10** — 新增计划：智能并行解压（全局开关 + SSD/HDD 智能度 + 大包预测试）+ 交互原型（计划类）
+  - **新计划**：[smart-parallel-extract.md](../.omo/plans/已完成/smart-parallel-extract.md)（P2 / 6-8h / 11 Task）。5 步决策链：①调用方覆盖（解压对话框单次指定 >0）②全局关→串行 ③智能关→手动值/ProcessorCount ④智能开+≥1GB+预测试开→`ParallelDegreeOptimizer` 样本解压计时选优（临时目录测完即删）⑤磁盘类型默认值（SSD→12 / HDD→8 / Unknown→min(CPU,12)）。Core 新增 `DiskTypeDetector`（DeviceIoControl SeekPenalty + 盘符缓存）/`ParallelDegreeOptimizer`/`ParallelDegreeResolver`（纯函数+异步封装，`ParallelExtractSettings` record 隔离 UI AppSettings 依赖）；UI 设置窗口解压 Tab 新增并行解压卡片（全局开关+智能开关+SSD/HDD 双输入+预测试开关随智能隐藏 Rule 6+帮助弹窗 `ParallelExtractHelpDialog`）；解压对话框线程数默认 0=自动；`ExtractFlow`/`SelectedItemsExtractService` 接线 resolver 经 `ArchiveOptions.ParallelExtractDegree` 传入（`ZipEngine` 无需改动）。磁盘基准测试功能（方案 A 分层整合）留待下期。
+  - **原型**：[smart-parallel-extract-settings.html](prototypes/smart-parallel-extract-settings.html)（单文件 HTML），5 步决策条 s1-s5、SSD/HDD 双输入切换、预测试随智能隐藏、帮助弹窗 3 章节（预测试标注「仅智能并行度开启时可用」）。
+  - **同步**：`docs/PLAN.md` P2 区登记行（规则 1）。设计与 11 Task 实施计划已落盘，未实施。
+
+**2026-10-10** — 进度窗口两份计划实施 + 两处缺陷修复（Avalonia + Core）
+  - **channel-info 计划**（[progress-window-channel-info.md](../.omo/plans/已完成/progress-window-channel-info.md) Task 1–7）：通道行改**左右分组**（左=目录中间省略 + 文件名恒完整 + 文件底纹 + 文件大小；右=批次序号 + 批次底纹 `ThemeProgressBatchBrush` + 合并百分比 `45% (12/40)` + 信息列字节·压缩率 + ToolTip），删旧批进度条/百分比/明细三列，右区 `MinWidth=180`；详细门禁移除 + `UpsertSingleChannelRow` 非并行单行合成（`IsParallel=false`，不伪装并行）；`ProgressDisplayCalculator.MiddleEllipsis` 中间省略；`ParallelBatchProgressItem` 8 新字段；VM `HasParallelChannel`/`ShowCompressChannelHint`/`NotifyChannelProperties` 集中通知；底纹几何修复（`AncestorType=Grid` + `ClipToBounds`）；N 组 adapter ×2 漏拷 `FilePercentComplete` 修复；`ArchiveProgress` +4 字段并在串行/并行/过滤解压、批次完成、串行 ZipWriter、`ReadFileWithRetry`（加 `fsOut` 参数）、`CompressGroupWithSevenZip` 全站点填充 + `TryStreamOutputRatio`/`TryFileOutputRatio` helper；逐条目终态报告补 `FileTotalBytes`（前向兼容 stats-cards 字节累加器）。
+  - **compression-ratio 计划**（[progress-file-compression-ratio.md](../.omo/plans/已完成/progress-file-compression-ratio.md) Task 1–5）：`ArchiveProgress` +`EntryCompressedBytes`/`TotalCompressedBytes`；`EntryProgressItem` +`CompressedSize`/`CompressedText`；`UpdateEntryStatus` +`long? compressedBytes`；`ZipEngine.CompressAsync` 末尾后置回填成品 ZIP 中央目录（分卷跳过、异常吞掉）；列表行新增列「压缩后大小 (率%)」；统计卡段 2 整体汇总 `🗜 300 MB (60%)` + 条件分隔符 + `ShowChannelMetaSeparator`/`ShowChannelMetaRow`；三语 +`Progress_Stats_Compressed` + 3 ToolTip key。
+  - **缺陷修复**：① 压缩侧播种/实时上报 `EntryKey` 用反斜杠（`FileScanner`）而后置回填/解压用正斜杠，不匹配致回填新建 `Size=0` 重复行 → VM 索引边界统一 `ArchivePath.Normalize`（`SeedEntryItems`+`UpdateEntryStatus`）；② MT 压缩镜像阶段进度冻结 → `CompressGroupWithSevenZip` 两阶段进度区间（镜像前半段按已拷贝字节映射、7z 后半段衔接）+ N 组 adapter 改用组 `PercentComplete` 推导（原按字节重算丢弃镜像进度），`localRealDone` 保留真实字节供压缩率。
+  - **测试**：`ProgressViewModelTests` +7、`ProgressWindowXamlTests` 2 改、`ProgressDisplayCalculatorTests` +3 `MiddleEllipsis`、`ZipEngineTests` +`CompressAsync_MultiThreaded_MirrorPhase_AdvancesOverallProgress`（+`SyncProgress` 辅助类）。
+  - **验证**：`dotnet build` 0 错 0 警；Core **619 通过 / 0 失败** / 3 跳过；Avalonia **178 通过 / 5 预存失败**（`PreviewWebViewLazyInitTests` 缺夹具 `TestPreview\*.zip`）/ 3 跳过。两份计划文档移至 `.omo/plans/已完成/`。
+
+**2026-10-10** — 新增计划：逐文件压缩后大小 + 压缩率 + 整体压缩汇总（+ 整合原型 v3）（计划类）
+  - **新计划**：[progress-file-compression-ratio.md](../.omo/plans/已完成/progress-file-compression-ratio.md)（P2 / 1-1.5天 / 独立计划）。用户讨论定稿：ZIP 压缩**完成后后置回填**每条目压缩后大小（读成品 ZIP 中央目录，`OpenArchiveWithEncodingFallback` → `entry.CompressedSize`，**非实时**；`CompressAsync` 末尾，`ListEntriesAsync:1808` 同模式）；**仅 ZIP**（解压/7z 固实/TAR/GZ/分卷不显示，Rule 6 隐藏）；两处展示——① 「列表」模式每行新增一列「压缩后大小 (率%)」（`EntryProgressItem.CompressedText`）；② 「完整」档统计卡**段 2 后置单行**（并行度旁）新增整体压缩汇总（格式 A：`🗜 300 MB (60%)`，不重复 📏 总大小卡的输入量）；契约：`ArchiveProgress` +`EntryCompressedBytes`/`TotalCompressedBytes`，`UpdateEntryStatus` +`compressedBytes` 参数（前向兼容）；D-decisions D1–D6（范围/回填机制/逐文件列/整体汇总/显隐/字段契约）。**已核实**：串行 `ZipWriter`（`:1746`）与 MT/N 组 FIFO（`:3572-3610`）均逐条目上报 Completed → 回填幂等补 `EntryCompressedBytes`；`SplitOutputStream` 分卷须跳过。与 channel-info 计划同改 3 文件（`ArchiveEngine.cs`/`ProgressViewModel.cs`/`ProgressWindow.axaml`）→ 计划内建议后者先行。
+  - **整合原型**：[progress-window-compression-ratio.html](prototypes/progress-window-compression-ratio.html)（单文件暗色 HTML，窗口宽 560px = 真机）；整合两计划全部改进——通道行左右分组/批底纹/合并百分比/ToolTip（channel-info v2）+ **逐文件压缩率列 + 段 2 整体汇总**（新）；4 场景（ZIP 并行压缩 / ZIP 串行压缩 / ZIP 并行解压 / 7z 压缩）× 3 模式 × 3 密度；压缩率列/汇总「审阅便利」直接显示最终态（caption 注明真机为完成时回填）；回填时青色闪烁高亮。校验：JS 语法 OK、48 元素 ID 全对应、HTML 闭合、CRLF + noBOM。**未改动**已确认的 channel-info v2 原型。
+  - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。设计 + 任务分解已落盘，未实施。
+
 **2026-10-10** — 启动优化（✅ 已完成，`feat/startup-preview-defer` 分支，计划 [startup-preview-defer.md](../.omo/plans/已完成/startup-preview-defer.md)）
   - **Task 1 ✅**：新增 `Services/StartupTimer.cs`（internal static）——零分配内存打点（`MarkInfo` record struct 预分配 List、收集期零 I/O），`Begin()` 记录 `Process.StartTime` 墒的 pre-Main 基线，`Flush(reason)` 幂等一次性写 `%LOCALAPPDATA%\MantisZip\startup-trace.log`（保留 20 条、命令行走 `LogRedactor`）；`preview-eager total` 行直接服务阶段二门控；测试钩子经 `InternalsVisibleTo`
   - **测试**：新增 `StartupTimerTests` 7 条（TDD 红绿：Begin/Mark 记录、增量非负、Begin 前 Mark 忽略、Flush 后 Mark 忽略、Begin 幂等、异常降级不抛、进程基线存在），7/7 通过
@@ -337,6 +271,34 @@
   - **测试（TDD 严格红绿）**：Core 新增 `FlacParserTests` 5 条（封面字节精确断言 + 时长采样率 / 无封面 null / 超长声明长度容错 / magic + 首块有效性锁定）+ `Id3v2ParserTests` 1 条（APIC 回归锁定）；Avalonia 新增 `PreviewAudioPreviewTests` 4 条（无封面回退文字 / 有封面解码 / 离开音频清理 / 切换文件不残留）
   - **验证**：`dotnet build` 0 错误（3 warning 既有 `TextEncodingDetector` CS8604 + `PreviewViewModel` 2× CS0618）；Core **429 通过 / 0 失败 / 2 跳过**（基线 423 + 新增 6）、Avalonia **135 通过 / 5 失败 / 3 跳过**（基线 131 + 新增 4；5 失败全部为预存 `PreviewWebViewLazyInitTests` TestPreview 样本缺失）；验证时 Everything.exe 锁 `bin\...\MantisZip.ShellExt.dll` 致 post-build 拷贝失败（MSB3027），用 csproj 自带 `-p:SkipShellExtCopy=true` 逃生开关绕过（未改仓库文件，编译本身始终成功）
 
+**2026-10-09** — 通道信息计划 v2 设计修订（左右分组 + 批进度底纹化 + 合并百分比 + ToolTip）+ 原型重绘（计划类）
+  - **计划修订**：[progress-window-channel-info.md](../.omo/plans/已完成/progress-window-channel-info.md)——用户讨论定稿通道行由「6 列平铺」改为**左右分组**：左=单文件域（目录中间省略 + 文件名恒完整 + 文件底纹 + 文件大小），右=批次域（批次序号 + 批次底纹 + 合并百分比 + 字节进度/压缩率 + ToolTip）。决策表重排为 D1–D11：D1 左右分组与信息列口径（信息列只留字节+压缩率，文件大小移至左区）、D2 详细门禁移除（澄清「推翻的是旧计划门禁，非本文件 D6」避免编号撞车）、D5 **批级进度底纹化**（取代原「缩窄」，删独立 ProgressBar 改右区背景底纹、新增 `ThemeProgressBatchBrush` 色相区分）、D6 **合并百分比+明细**为 `45% (12/40)` 且**不加列标题**、D7 **ToolTip**（豁免 i18n 护栏，新增 `Progress_Tooltip_Progress`/`Bytes`/`Ratio` 三 key）、D8 单行隐藏规则 + `HasParallelChannel` 派生属性、D9 双底纹机制（`FileRatio` vs `BatchRatio`）、D10 右区 `MinWidth=180` 防跳动、D11 变更清单（5→7 条）。行模型扩展为 `IsParallel`/`DirectoryText`/`FileNameText`/`FileSizeText`/`PctDetailText`/`InfoText`/`BatchRatio`/`TooltipText`；任务 4 门禁移除 + 单行合成、任务 5 左区、任务 6 右区（+主题+i18n）、任务 7 GUI **五场景**（补分卷 ZIP 压缩）。
+  - **原型**：[progress-window-channel-info.html](prototypes/progress-window-channel-info.html) 重绘为 v2（左右分组布局、右区紫色批次底纹色相区分、合并百分比 `45% (12/40)`、ToolTip 悬停浮层、右区 `MinWidth` 锁底线）；修复 CSS 特异性 bug——`.ch-right > *`（`position:relative`）覆盖了 `.ch-batch-fill`（`position:absolute`）导致批次底纹塌陷不可见，改 `.ch-right > .ch-batch-fill` 提高特异性 + `:not()` 排除。
+  - **同步**：`docs/PLAN.md` P2 区登记行更新（规则 1）。设计与任务分解已修订落盘，未实施。
+
+**2026-10-09** — 进度窗口统计卡三行结构实施（方案 A 去分母 + 终态字节累加器 + 并行度后置，Avalonia）
+  - **VM 层**（`ProgressViewModel.cs`）：新增 5 个 `[ObservableProperty]` 字段——`StatsProcessedSize`（已处理字节，`SetProgress` TotalBytes 块写入）、`StatsTotalCount`（文件总数，TotalFiles 块写入）、`StatsSkippedSize`/`StatsFailedSize`/`StatsOverwrittenSize`（三终态字节累加器，`UpdateEntryStatus` 加 `long? fileSize = null` 参数 + `_statsSkippedKeys`/`_statsFailedKeys`/`_statsOverwrittenKeys` 去重守卫 + `AccumulateTerminalBytes` 方法）；`StatsProcessedCount` 由 `_statsProcessed/_statsTotalFiles` 分数改纯计数 `_statsProcessed.ToString()`（方案 A，分母与总大小卡行 2 同源重复）；`ClearEntryItems` 重置累加器与三字符串。
+  - **转换器**（`Converters/DashBrushConverter.cs` 新建）：输入字符串为 `—` 时返回 `ThemeTextSecondaryBrush`（灰显），否则按 `ConverterParameter`（Brush key）返回对应主题色；`ProgressWindow.axaml` Window.Resources 注册 `x:Key="DashBrush"`。
+  - **XAML**（`ProgressWindow.axaml` 统计卡区）：6 张竖排卡替换为 5 张三行卡（水平 StackPanel，`SpacingLg`，`HorizontalAlignment=Center`）+ 并行度后置单行（⚙ 14px + 标题 11px + 值 13px，`IsVisible=HasParallelDegree`，`Margin=0,8,0,0`）；卡 1 行 2 绑 `StatsProcessedCount`（纯计数）、行 3 绑 `StatsProcessedSize` + DashBrush/`ThemeStatusSuccessBrush`；卡 2/3/4 行 3 分别绑 `StatsSkippedSize`/`StatsFailedSize`/`StatsOverwrittenSize` + DashBrush Warning/Error/Primary；卡 5 行 2 绑 `StatsTotalCount` + DashBrush Primary、行 3 绑 `StatsTotalSizeValue`（静态 Primary）；5 卡均加 `MinWidth="80"` 防文字长度变化导致相邻卡跳动；卡级 `IsVisible` 与中/精简两档零改动（D5/Rule 6）。
+  - **测试**（`ProgressViewModelTests.cs`）：+7 新测试（`SetProgress_WithTotalBytes_PopulatesProcessedSize`/`SetProgress_WithoutTotalBytes_ProcessedSizeStaysDash`/`SetProgress_WithTotalFiles_PopulatesTotalCount`/`UpdateEntryStatus_SkippedWithSeededSize_AccumulatesSkippedSize`/`UpdateEntryStatus_FailedWithSeededSize_AccumulatesFailedSize`/`UpdateEntryStatus_OverwrittenWithSeededSize_AccumulatesOverwrittenSize`/`UpdateEntryStatus_DuplicateKey_DoesNotDoubleCount`）+ 1 改名（`StatsProcessedCount_ShowsFractionString`→`ShowsPureCount` 断言 `"60"`）；`StatsProcessedText` 分数文案测试 :491/:516 不动。
+  - **验证**：`dotnet build` 0 错 0 警；Avalonia 170 通过 / 5 预存败（PreviewWebViewLazyInitTests）/ 3 跳过；Core 615 通过 / 0 败 / 3 跳过。
+
+**2026-10-09** — 统计卡三行计划修订（方案 A 去分母 + 终态完备性核查）+ 交互原型（计划类）
+  - **计划修订**：[progress-stats-cards-three-row.md](../.omo/plans/已完成/progress-stats-cards-three-row.md)——用户拍板方案 A：已处理卡行 2 由 `N/M` 分数改纯计数（分母与总大小卡行 2 文件总数同源重复，比例由总进度条承担；中等档 `StatsProcessedText` 一句话文案保留 `N/M` 分数不受影响）；条目终态完备性核查结论：`ArchiveEntryStatus` 4 终态（Completed/Skipped/Failed/Overwritten）完备，6 种 `FileConflictAction` 映射清晰（Ask 中间态、条件覆盖未命中归 Skipped），目录条目 `IsDirectory` continue 与取消/暂停（操作级）均不进统计卡；重命名可见性缺口（`resolvedPath != outputPath` 上报 `Completed`）记入边界备忘并加守卫条款「不得为重命名新增条目终态」；既有测试 `StatsProcessedCount_ShowsFractionString`（:534）改名改断言为 `ShowsPureCount`（断言 `"60"` 而非 `"60/100"`），中等档分数测试 :491/:516 不动。
+  - **原型**：[progress-stats-cards-three-row.html](prototypes/progress-stats-cards-three-row.html)（单文件 HTML，5 场景：ZIP 完整数据 / ZIP 无冲突 / 7z 固实 / TAR 渐进 / 串行解压；新旧对比视图经 `oldR2` 字段实现——左栏还原现状分数 `60/100`、右栏新设计纯计数 `60`；演示数据 bug 修复：场景 1/3/4 的 `c5.r2` 由错误的 `'150'` 改为与 TotalFiles=100 一致的 `'100'`）。
+  - **前向兼容契约**：`progress-window-channel-info.md` 补记——该计划任务 3 落地 `ArchiveProgress.FileTotalBytes` 后，逐条目终态报告（EntryStatus != null）必须携带该字段，使统计卡跳过/出错/已覆盖累加器在渐进模式（TAR/GZ、>5000 条目未播种）下自动升级为 100% 覆盖；stats-cards 侧接线只需把 `SetProgress` 的 `EntryStatus` 块调用末参从 `null` 改传 `p.FileTotalBytes`（计划已预留参数，零结构改动）。
+  - **同步**：`docs/PLAN.md` P2 区统计卡登记行更新（规则 1）。设计与修订已落盘，未实施。
+
+**2026-10-09** — 进度窗口通道信息增强交互原型（docs/prototypes）
+  - **原型**：[progress-window-channel-info.html](prototypes/progress-window-channel-info.html)（单文件暗色 HTML，与 progress-window-enhancement / channel-demo 两既有原型调色板一致，窗口宽 560px = 真机 `ProgressWindow` 宽度），浏览器直接打开即可审阅，供实施前对齐设计。
+  - **交互**：控制条四场景切换（ZIP 并行解压 / ZIP 并行压缩 / 7z 压缩·单行 / ZIP 串行·单行）对应四条验收；底纹「修复后/修复前」对照（bug 态红虚线演示整行宽溢出）；窗口内密度（少/中/完整）与模式（简约/详细/列表）双单选实时切换，「详细」恒可用标注 D6 已推翻；通道行 = 序号 | 目录(中间省略)+文件名(底纹) | 批进度条 100px | 百分比 | 批明细 | 信息列，单行变体隐藏前四项；信息列缺段连分隔符隐藏（规则 6）；完整档 6 卡三行统计卡（7z 总大小卡隐藏、已处理行 3 显 `—`）；底部 legend 映射改动点 ①–④ → 计划任务 6/4/5/1-2。
+  - **验证**：`node --check` JS 语法通过；JS 引用 41 个元素 ID 与 HTML 定义全部对应；`</body></html>` 闭合完整。
+
+**2026-10-09** — 新增计划：进度窗口通道信息增强（计划类）
+  - **计划**：[progress-window-channel-info.md](../.omo/plans/已完成/progress-window-channel-info.md)（P2 / 1.5-2.5天 / 8 任务 4 波次 TDD 分解）
+  - **内容**：四项改造——① 通道行新增信息列（文件大小 · 已处理/总量 · 实时压缩率，方案 A `ArchiveProgress` 新增 `FileTotalBytes`/`BatchProcessedBytes`/`BatchTotalBytes`/`CompressionRatio` 四字段，7z/解压/分卷按规则 6 隐藏压缩率段）；② 「详细」模式推翻 D6 恒可用 + 非并行合成单条通道行（隐藏批次序号/批进度条/百分比/批明细/压缩说明，不污染 `ParallelBatchItems`）；③ 路径拆目录（`MiddleEllipsis` 中间省略）+ 文件名两列，根文件无目录列；④ 底纹双缺陷修复（几何基准 ContentPresenter→文件格 Grid + ClipToBounds；N 组并行压缩 adapter 漏拷 `FilePercentComplete`）；批级进度条列缩至 ~100px 固定。
+  - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。依赖 stats-cards 计划先行；无新增本地化 key。设计+任务分解已落盘，未实施。
+
 **2026-10-09** — 四项修复/功能一次性实施（✅ 已完成：预览窗格宽度 bug、解压窗口回收站选项、宽度 bug 回归修复、压缩端文件冲突默认选项）
   - **① 预览窗格宽度 bug（Star 布局尺寸丢失）**：`MainWindow.SaveCurrentPreviewSize` 原实现只记录 `GridUnitType.Pixel`，未保存过布局时拖分隔条产生的是 Star 尺寸（Avalonia Split 行为保持 Star）→ 不记录 → 位置重应用回退默认（3* / 200px）→ 面板缩到最小。修复：新增 `RecordPreviewSize` 对 Pixel/Star 且值 >0 均记录（Auto 与面板隐藏压缩 0 跳过），`ApplyPreviewPosition` 四个 case 由 `new GridLength(h1, Pixel)` 改为直接用存储的 `GridLength`
   - **② 回归修复（单元类型持久化）**：`_previewSizeByPosition` 由 `Dictionary<int, double>` 升级 `Dictionary<int, GridLength>`；`LayoutStateManager.LayoutSnapshot.PreviewSizeByPosition` 同步改型，新增 `GridLengthJsonConverter`（写对象形态 `{"value":N,"unit":N}`，unit 0=Auto/1=Pixel/2=Star；**读兼容旧版裸数字=Pixel**，旧 layout.json 无需迁移），`JsonOptions` 注册转换器后 Load/Save 共用；`ApplySavedLayout` 回填校验 `GridUnitType is Pixel or Star && Value>0`
@@ -350,6 +312,55 @@
     - **i18n**：三语头部 `{` 后成对插入 3 key：`Settings_Compress_ConflictAction`（文件冲突处理/File conflict action/檔案衝突處理）、`Compress_WhenFileExists`（文件存在时：/When file exists:/檔案存在時：）、`Compress_Conflict_Ask`（每次询问/Ask each time/每次詢問）
   - **验证**：`dotnet build -t:Compile` 0 错误（3 warning 既有）；Core **423 通过 / 0 失败**、Avalonia **131 通过 / 5 失败（预存 TestPreview 样本缺失）/ 3 跳过**——与基线完全一致
 
+**2026-10-08** — 立项「文件选择器去弹窗化」：CustomFilePickerControl 内嵌方案（📋 计划阶段，含交互原型）
+  - **交互决策**：压缩/解压设置窗的文件/目录选择器全部内嵌，不再弹独立窗口；Tab 结构调整——压缩端输出设置（最前）/ 添加文件 / 压缩设置（原「高级」改名并吸收原「常规」）/ 文件过滤，解压端对称
+  - **简单选择模式**：PickItems 默认简单模式——隐藏复选框、单击即选、Shift 范围多选、覆盖语义、双击目录进入并清空选择；高级开关（复选框 + 跨目录记忆）切回累积形态
+  - **累积面板去除**：不再有独立累积面板/折叠式已选栏，「已选源文件」ListBox 置于内嵌 picker 下方并与选择实时双向同步；内嵌 picker 左栏放 QuickPathControl 左右布局
+  - **解压端**：「解压到」/拖拽兜底场景第二个 Tab 按场景形态替换（「添加压缩包」或「选择要解压的文件」），保留指定条目语义
+  - **实施分三步**：①抽取 CustomFilePickerControl 纯重构（窗口薄壳化、零行为变更）②压缩窗接入 ③解压窗接入
+  - **产物**：原型 `docs/prototypes/compress-embedded-picker.html` + `docs/prototypes/extract-settings-embedded.html`；计划 `.omo/plans/未开始/embedded-file-picker.md`；PLAN.md 已登记
+**2026-10-08** — 新增计划：进度窗口统计卡三行结构（计划类）
+  - **计划**：[progress-stats-cards-three-row.md](../.omo/plans/已完成/progress-stats-cards-three-row.md)（P2 / 2-3h / 6 任务 3 波次 TDD 分解）
+  - **内容**：「完整」档 6 张统计卡改三行表格——行 1 图标+标题横排、行 2 文件数量、行 3 文件大小；行级缺数据灰显 `—`（卡级显隐与中/精简两档零改动，规则 6 维持）；VM 新增 `StatsProcessedSize`/`StatsTotalCount` 只写不清字段（`SetProgress` 的 `TotalBytes`/`TotalFiles` 块写入）+ 新建 `DashBrushConverter`（`—`→`ThemeTextSecondaryBrush`、真实值→强调色）；D6 固定恰 3 条 VM 测试；无新本地化 key；方案 A 逐卡 XAML（模板化已否决）。
+  - **同步**：`docs/PLAN.md` P2 区新增登记行（规则 1）。设计与任务分解已落盘，未实施。
+
+**2026-10-08** — 手工测试三问题修复（进度条可见性 / 进度统计缺项 / 解压线程数接线，Avalonia）
+  - **问题 ① 进度条 0% 不可见**（`Themes/ThemeLight.axaml`、`Themes/ThemeDark.axaml`）：进度条轨道 `ThemeProgressBgBrush` 与所在面板背景 `ThemeSplitterBg` 色差为 0（Light 均为 `#E0E0E0`）/ 仅 4（Dark `#424242` vs `#3E3E3E`），0% 时进度条与背景融为一体不可辨认。拉开对比至单通道差 ≥16：Light `#E0E0E0→#C8C8C8`（差 24）、Dark `#424242→#555555`（差 23），两处资源均加注释写明对比度依据。新增守卫 `ProgressTrackContrastTests`：正则解析两主题 hex 色值、计算 RGB 三通道最大差，<16 即失败（解析不到资源同样失败，不静默通过）。
+  - **问题 ② 进度窗口缺「文件总数 / 总大小」**（`ViewModels/ProgressViewModel.cs`、`Dialogs/ProgressWindow.axaml`、三语 `strings.*.json`）：新增私有 `_statsTotalFiles`（引擎 `TotalFiles > 0` 时更新、0 不清零）与 `[ObservableProperty]` `_statsTotalSizeText`/`_statsTotalSizeValue`（仅 `TotalBytes > 0` 写入，未上报引擎保持空串走 Rule 6 隐藏）；`StatsProcessedCount` 由 `long` 改 `string`（`_statsTotalFiles > 0` 时 `"60/100"` 分数、否则回退纯计数），格式化参数同步带分子分母；新增 `StatsTotalSizeLabel`（从 `Progress_Stats_TotalSize` 剥离占位符，与其余短标签同模式）。XAML：「完整」档统计卡区新增第 6 卡 📏 总大小（`StringNotEmpty` 控显隐），中等档单行补总大小项（同守卫）；三语新增 `Progress_Stats_TotalSize`（zh-CN "总大小 {0}" / en "Total size {0}" / zh-TW "總大小 {0}"，插入文件头，key 集同步）。
+  - **问题 ③ 解压对话框线程数选择无效**（`Dialogs/ExtractSettingsWindow.axaml`、`Views/MainWindow.axaml.cs`、`Services/ExtractFlow.cs`、`ViewModels/MainWindowViewModel.cs`）：断链共三处——`NumericUpDown` 默认单向绑定（`Value="{Binding ParallelExtractDegree}"` 补 `Mode=TwoWay`）、确认回调拷贝清单漏回传（补 `evm.ParallelExtractDegree = dialog.ViewModel.ParallelExtractDegree`）、`ExtractFlow.ExtractAsync` 只读 `AppSettings`（增 `int? parallelExtractDegree = null` 参数，对话框值优先、AppSettings 兜底；`MainWindowViewModel` 解压执行入口透传 `vm.ParallelExtractDegree`）；`ResolveDisplayParallelDegree` 同步增 `int? parallelDegree = null` 参数（进度窗口「并行」卡显示值与实际选项一致），CLI 等无对话框路径默认 null 行为不变。
+  - **测试**（3 个测试文件）：`ProgressViewModelTests` +6 条（N/M 分数、占位符不泄漏、`TotalFiles=0` 不清零分数、`StatsProcessedCount` 分数串、总大小三成员填充、未上报留空）；新增 `ExtractParallelDegreeWiringTests`（5 条源码文本守卫锁接线链路 + 2 条 `ResolveDisplayParallelDegree` 行为重载，文件头注明「守卫只证明接线在位、不证明值流到引擎」的诚实局限）；新增 `ProgressTrackContrastTests`（双主题轨道对比度）。
+  - **验证**：Avalonia 构建 0 错误 0 警告；测试 163 通过 / 5 失败（均为预存 `PreviewWebViewLazyInitTests` 环境问题，与本次无关）；Core 615 通过 / 0 失败。
+
+**2026-10-08** — 合并 origin/main（ffac140）→ alpha（10 处冲突全部解决）：① `AGENTS.md` 两侧新增规则并入并重编号——规则 0–16 连续唯一（alpha 的 `CoreLog.Initialize` 保持规则 15，main 的 `CustomFilePickerDialog` 选择器禁令顺延为规则 16）；② 进度文档双向归并——`docs/PROGRESS.md` 与本文档按日期从新到旧交错合并（双方 10-06～10-08 条目齐全），共享层 `####` 组序为 main v0.5.2 → alpha v0.5.1 → 共有 v0.5.0，版本号四处一致 0.5.2（AppConstants.cs / csproj / PLAN.md / PROGRESS.md）；③ `ZipBinaryRewriter.cs` 三处 hunk 语义合成——alpha 的 `Store` 条目追加 × main 的 UTF-8 bit-11 标志，LFH 取 `generalFlags` + `Store ? 0 : 8`；④ `MainWindowViewModel.cs` 取 main 的 `settings` 局部变量并删除死代码 `?? new ArchiveOptions()`（`CreateExtractOptions` 返回非空）。其余 5 文件（`App.axaml.cs`、三语 `strings.*.json`、`MantisZip.UI.Avalonia.Tests.csproj`）逐一核验无残留标记（含缩进标记）、JSON 解析通过。验证：全仓冲突标记为零；Core 构建 0 警告 0 错误 + 测试 615 通过 / 3 跳过（含三语 key 集同步校验 `AllThreeLanguages_HaveSameKeySet`）；Avalonia 临时输出路径构建 0/0 + 测试 149 通过 / 5 失败（TestPreview 夹具缺失为预存环境问题，main 10-06 条目已记载；常规路径构建因运行中实例文件锁未执行）
+
+**2026-10-08** — 版本号更新到 0.5.2（AppConstants.cs + csproj，docs/PLAN.md、docs/PROGRESS.md 顶部当前版本同步）
+
+**2026-10-07** — 进度窗口三计划文档整理标注 + PLAN.md 登记行瘦身（计划类）
+  - **背景**：`progress-window-enhancement`（v2）的「原型对应表」误读 v6 原型两组切换器，是返工根因；由此衍生的 `progress-window-prototype-alignment`（纠偏）与 `progress-window-bytes-i18n`（后续）三份文档存在过时/错误描述（已删枚举仍在宣扬、已实施的 Deferred 仍标「明确不做」、登记行超长不可读）。执行后续计划前先做文档整理，避免再被误导。
+  - **`progress-window-enhancement.md`（只标注不重写）**：顶部新增「效力状态」表（T1–T4/T8/T9 ✅ 有效；原型对应表 ❌ 作废；`TopDisplayMode`/`DensityMode` ❌ 已删除；统计/ETA/布局 ✅ 框架有效但已重排；F3 归并）；原型对应表整表打作废戳、前两行划掉并写明返工代价；TL;DR 双开关措辞就地加注；**12 个未勾 Acceptance 实测处置**——10 项勾选并附证据（`RecordSkipped` 引擎 10 处 = Zip4+TarGz4+SevenZip2、`BatchIndex` 6 处赋值、三引擎 `ExtractResult` 均由 `ConflictStatsCounter` 快照回填、`ThemeLight/Dark:147-148` 主题键成对、`OnArchiveSwitch` `ProgressViewModel:902`、终值兜底 `:636`、`HasParallelBatches` `:138/:240`、key 集测试保证三语一致），2 项标 `[~]` 作废/部分作废；F3 拆分为 `[~]`（UI 结构类归 alignment F3，密码循环/ETA 归零/统计抽样等 5 条有效条目并入收口清单）。
+  - **`progress-window-prototype-alignment.md`**：头部新增「当前状态」块（T1–T11 全部完成、F1/F2/F4 ✅、F3 自动化 8✅/4◐/0✗，**F3 余项 6 条清单**含从 v2 并入的 4 条）；Deferred **#7 回写为已实施**（commit `7505952`，落点 `SourceEntryEnumerator`/`CompressFlow.TrySeedEntryItemsInBackground:332` + 主窗/CLI 两接线，保留历史延期理由），**#2/#3 划掉标注「已转入 bytes-i18n」**，节首加整理注。
+  - **`progress-window-bytes-i18n.md`**：任务 6 范围缩窄——原 Step 1（#7 回写）与 Step 2（PLAN.md 行 33 追注）已随本次整理提前完成，改为「Deferred #2/#3 回写（须任务 1–5 完成后）+ 行 34 状态更新」；TL;DR 第 3 点、锚点表、File Structure 同步。
+  - **`docs/PLAN.md`（规则 1）**：行 33（原型对齐）由 **3510 字瘦身至 751 字**——收敛为纠偏内容 + F1/F2/F4/F3 进度 + 缺口补齐 + Deferred 去向，执行细节/探针坑/基准陷阱留计划文件；行 32（增强）同步纠偏与标注状态；行 34（字节埋点）回写口径改为「#2/#3（#7 已提前回写）」。校验：仅 3 行变更、UTF-8 无 BOM、CRLF 完整、4 个改动文件均无裸 LF。
+  - **未做**：alignment 两项 F3 未勾（真实未完成）、三计划归档迁移（待 F3 收口）。
+
+**2026-10-07** — 新增计划：进度窗口字节埋点 + 语言即时刷新（计划类）
+  - **计划**：[progress-window-bytes-i18n.md](../.omo/plans/已完成/progress-window-bytes-i18n.md)（P2，4-6h，7 任务 TDD 分解），配套设计规格 [2026-10-06-progress-bytes-i18n-design.md](superpowers/specs/2026-10-06-progress-bytes-i18n-design.md)。
+  - **内容**：① `SevenZipEngine`/`TarGzEngine` 全路径填充 `ArchiveProgress.ProcessedBytes/TotalBytes`（速度/ETA 全格式生效；7z percent 推算、TAR 经新增 `ReadProgressStream` 真实读取字节、跳过条目计字节、跨阶段单调钳制）；② `ProgressViewModel` 订阅 `CultureChanged` 运行中语言即时重灌 + `ProgressWindow.OnClosed` 退订防静态事件泄漏；③ prototype-alignment Deferred #7（通用压缩播种，commit `7505952`）回写。
+  - **同步**：`docs/PLAN.md` P2 区新增计划行（规则 1）。仅落盘计划与规格，未实施。
+
+**2026-10-06** — N 组并行压缩联调修复 + 组数 UI 补齐 + 压缩侧列表播种（Avalonia+Core）
+  - **修复① 开关传递断链**（`Views/MainWindow.axaml.cs`）：`ShowCompressSettingsDialog` 的「对话框 VM → 执行 VM」拷贝清单漏拷 `MultiThreadedCompression` / `AdaptiveSmartDetect` / `ParallelCompressDegree` → 执行侧 MT 恒 `false` → `IsMultiThreadedEligible` 首条即 false → 引擎恒走串行、从不上报 `BatchIndex` → 进度窗口「详细」被 D6 隐藏（用户现象：只有简约/列表）。补 3 行拷贝。
+  - **补齐 Task 5 Step 3 缺失 UI**（`Controls/DynamicFormatOptionsPanel.axaml[.cs]`、`Dialogs/CompressSettingsWindow.axaml.cs`、`ViewModels/CompressSettingsViewModel.cs`）：ZIP 面板多线程开关旁新增「并行压缩组数」`NumericUpDown`（1..16），多线程关闭时整块隐藏（规则 6）；`SnapshotFormatOptionsToViewModel` 快照进 VM；VM 构造自 `AppSettings` 播种。（计划原写放在 `CompressSettingsWindow.axaml`，实测多线程开关在 `DynamicFormatOptionsPanel`，按对称位置落地。）
+  - **修复② 点「详细」卡死**（`Dialogs/ProgressWindow.axaml`）：详细行模板用 `{StaticResource RatioToWidthConverter}`，该键仅 `MainWindow.axaml:25` 局部定义（App 级与本窗口均无）→ `x:CompileBindings=False` 下编译期不报、模板**首次实例化**时解析失败。补本窗口资源；两处 `StringNotEmptyConverter` 统一为本窗口 `StringNotEmpty`。
+  - **修复③ 单选项不同步**（`Dialogs/ProgressWindow.axaml`）：三模式单选项 `IsChecked` 单向绑 `IsSimpleMode`/`IsDetailedMode`/`IsListMode`，程序化自动切「详细」时按钮同步高亮。
+  - **准备态 + 不定进度条**（`ViewModels/ProgressViewModel.cs`、`Dialogs/ProgressWindow.axaml[.cs]`）：`BeginPreparing()`/`EndPreparing()` + 复用既有 `IsIndeterminate`；窗口构造即准备态、首个 `SetProgress` 结束、切换批次档案重入（`SetCurrentBatchItem`）；三语新增 `Progress_Preparing`。
+  - **MT 路径进度可见**（`ProgressViewModel` + `Core/Engines/ZipEngine.cs`）：简约面板条新增 `SimpleFileBarValue`（无逐文件百分比时**回退总进度**，`_hasFilePercent` 随每次上报更新）；配合 Core 侧镜像拷贝上报（见共享层）。
+  - **压缩侧「列表」播种**（原「经用户决定正式延期」项）：
+    - 新增 `Services/CompressFlow.cs` `TrySeedEntryItemsInBackground(pw, request, ct)`：后台枚举、阈值 `MaxSeedEntryCount=5000`、失败/取消放弃、`pw.SeedEntries`（引擎已有条目行时自行跳过，防清掉已上报终态行）；白名单与 `CompressService` 同源（Plan 非空 `IncludedFiles` 并集）。
+    - 接线：`ViewModels/MainWindowViewModel.PendingCompressRequest`（`ExecuteCompressFromSettings` 置位）→ `Views/MainWindow.axaml.cs` `RunWithProgress`；CLI `App.axaml.cs` `CompressWithProgress`。
+  - **G2 实测结论**：`scripts/bench-zip-mt.cs` 加 `--degrees` 后四轮（text / text-rev / media / mixed，degree 1/2/4/8）显示 **N 组无加速**（degree=1 全面最快或持平，degree=2 最差；倒序对照一致）→ **维持默认 `ParallelCompressDegree = Environment.ProcessorCount`**（全局 `MultiThreadedCompression` 默认关，N 组为 opt-in）。
+  - **验证**：UI 构建 0 警告 0 错误；Core **608 通过 / 0 失败 / 3 跳过**（+3）；Avalonia **114 通过 / 0 失败 / 2 跳过**。
+  - **i18n / 其他**：三语成对新增 `Progress_Preparing`；`.gitignore` 排除 `.buildout/`（验证用生成本地件，约 7.6GB）。
 **2026-10-06** — 修复「测试压缩包」加密包静默失败 + 测试流程对齐解压（✅ 已修复，用户报告「加密 RAR 测试无密码时静默失败弹窗也不出」「rar 没有密码的压缩包测试时进度条也不动」）
   - **根因 1（加密包静默失败）**：`TestArchive` 只从 `_sessionPasswords` 取密码，无会话密码时 `engine.TestArchiveAsync` 以 null 密码快速失败 → 状态栏仅「压缩包测试失败 ❌」，无密码弹窗、无进度。与 `LoadArchiveAsync` 打开流程的密码解析（会话缓存→自动匹配→对话框循环）完全脱节
   - **根因 2（进度条不动，Core 层）**：`Check()`（=7z.dll TestArchive 语义，整包提取校验）阶段不触发 `Extracting` 事件、只触发 `FileExtractionFinished`（每条目 1 次，`e.PercentDone` 为 byte）；旧 `TestArchiveAsync` 在校验阶段无进度上报，且校验后还冗余逐条目 `ExtractFile` 二次解压（约 2 倍工作量，固实包 O(n²)）
@@ -668,6 +679,15 @@
   - **测试**：`CompressSettingsViewModelTests` 硬断言 5/zip 改为 `AppSettings.Load()` 镜像断言 + 新增 `Constructor_MirrorsAppSettings_DefaultFormatAndLevel`；`ExtractSettingsViewModelTests` 移除写真实 settings.json 的测试与环境依赖断言（`DefaultsToFalse` 在设置为 true 的机器上必挂），合并为镜像断言；新增 `RecentFilesManagerTests`（`ResolveMaxEntries` 纯函数 8 例）
   - **验证**：`dotnet build` 0 错误；Avalonia 105 通过/2 跳过/0 失败；Core 415 通过（`AllThreeLanguages_HaveSameKeySet` 1 失败经 stash 在干净 HEAD 复现，为既有本地化三语 key 不同步问题，与本批改动无关）
 
+**2026-09-26** — **APNG 动画预览支持正式上线**
+  - **核心变更**：复用 `PreviewType.AnimatedImage` 统一管线（GIF + Animated WebP 已就绪），新增 `ApngDecoder`（`SixLabors.ImageSharp 3.1.5`）解决 SKCodec 原生 `FrameCount=0` 无法识别 APNG 动画的问题
+  - **关键修复**：`FrameDelay` Rational 类型的 `Numerator`/`Denominator` 为 `uint`，修复强制转 `long` 抛异常的 bug（先转 `uint` 再转 `long`）
+  - **集成点**：`ShowGif` 优先尝试 `ApngDecoder.DecodeFrames(filePath)`（按扩展名 `.apng`/`.png`），失败回退 `GifDecoder`；完整复用播放/暂停/逐帧/缩放/透明背景/信息面板帧数
+  - **魔数检测**：`FileFormatDetector.ScanForActlChunk()` 扫描 PNG 后的 `acTL` chunk (0x6163544C) 区分 APNG/静态 PNG
+  - **依赖新增**：`SixLabors.ImageSharp 3.1.5`（Core 无新依赖，仅 Avalonia UI 层）
+  - **验收**：TestPreview/apng.zip (5帧 APNG) 正常预览播放；Core/Avalonia 单测 509/509 通过；零回归
+  - **同步**：PLAN.md 已更新状态；.omo/plans/已完成/apng-preview-support.md 归档
+
 **2026-09-24** — 修复 MT 自定义 Store 格式分拣/写入不一致 + 多线程/自适应压缩测试矩阵
   - **Core 层**：
     - `Engines/ZipEngine.cs`：`ReadFileWithRetry` 自适应入口改用 4 参 `GetAdaptiveLevel(fullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds)` —— 分拣阶段（`CompressAsync`/`AddToArchiveAsync` 的 StoreGroup/CompressGroup 分流）本就传 4 参，写入阶段此前用 3 参重算**忽略自定义列表**：自定义格式（如 `.wav`）被分入 StoreGroup（level=0）却在写入时退回 Deflate（自打脸 bug）。4 参在无自定义列表时行为与 3 参完全一致，统一无副作用
@@ -714,6 +734,63 @@
   - **测试**：`AdaptiveCompressionTests` 6 处调用更新为新 API
   - 验证：0 errors / 0 warnings，424 测试通过
 
+**2026-09-22** — 修正存量文档过时的技术事实（.NET 9→10、WPF 已删除、依赖表）
+
+**2026-09-21** — 修复 HTML 预览安全设置回归三连（09-13 html-preview-webview-fallback 上线引入）
+  - **PreviewViewModel.cs**：CSP meta 拼接两处（`RebuildHtmlAsync` / `ShowHtmlPreview`）补充 `style-src` 指令——外部资源开时 `style-src 'unsafe-inline' * data: blob:`，外部资源关时 `style-src 'unsafe-inline' 'self' data: blob:`。此前仅 `default-src` 回退时内联样式（`<style>` / `style=""`）被 CSP 拦截，开满所有安全选项的 HTML 预览样式全部丢失
+  - **PreviewViewModel.cs**：新增 `InjectCspMeta(html, csp)` 私有静态方法，两处注入点改用它——文档以 `<!DOCTYPE` 开头时把 CSP meta 插入到 DOCTYPE 之后（`html.IndexOf('>')` + `Insert`），消除 meta 先于 DOCTYPE 导致的 Quirks Mode 布局异常；无 DOCTYPE 文档保持原有注入位置（meta 前置）
+  - **PreviewPanel.axaml**：NativeWebView 与 HTML 源码视图从 `PreviewContentScroller`（ScrollViewer）内部移出，置于外层 `PreviewRootGrid` 的 `Grid.Row="1" Grid.Column="0"` 与滚动区平级——修复 WebView 页面顶部一小条被（滚出视口的）元数据横条裁切的布局回归
+  - 回归：Build 0 错误
+
+**2026-09-21** — 文本预览语法高亮计划重写为 Avalonia 方案（AvaloniaEdit + TextMate）
+  - **背景**：原 `.omo/plans/未开始/text-preview-syntax-highlighting.md` 为 WPF 时代方案（AvalonEdit 控件 + 自研 XSHD），AvalonEdit 是 WPF-only，跨平台移植后不可用，条目位于 PLAN.md 已废弃表
+  - **调研结论**（librarian）：`Avalonia.AvaloniaEdit` 12.0.0（MIT，AvaloniaUI 官方维护，要求 Avalonia ≥12.0.0，本项目 12.0.4 满足）+ `AvaloniaEdit.TextMate` 12.0.0——TextMate 方案用 VS Code 语法全集（`TextMateSharp.Grammars`），覆盖 `PreviewService.TextExtensions` 40+ 扩展名，**无需自研 XSHD**；内置 DarkPlus/LightPlus 主题，`Installation.SetTheme(RegistryOptions.LoadTheme(...))` 一行切换；rope-based TextDocument + 行虚拟化，大文件无压力
+  - **架构确认**：PreviewType（查看器）与 Language（高亮）分离；语言识别优先级链 = 扩展名 `GetLanguageByExtension` → 魔数 `FileFormatDetector.Detect` → JSON/INI 结构特征（2026-09-21 已落地）→ 纯文本降级。Markdown 是纯文本超集无法内容识别、CSV 有独立查看器，均不需高亮
+  - **实施路径**：Phase 1 NuGet+XAML（ScrollViewer+TextBox → TextEditor，去外层 ScrollViewer，caret 隐藏）→ Phase 2 语法分发（扩展名+结构特征兜底）→ Phase 3 主题联动（复用 `ActualThemeVariantChanged` 先例）→ Phase 4 回归（编码切换/字号/字体/降级/性能）→ Phase 5 可选增强（高亮开关、WordWrap、行号、结构 .txt 高亮）
+  - **同步**：PLAN.md 条目从已废弃表移回正式 P2 区，预估 5-7h → 4-5h（免去自研 XSHD 的 ~2.5h）
+
+**2026-09-21** — 文本格式内容识别扩展（B 保守版）：JSON/INI 内容启发式
+  - **Core/Utils/FileFormatDetector.cs**：`DetectTextSubtype` 在 SVG/HTML/XML 之后新增 INI、JSON 两级内容识别
+  - **INI 判定 `LooksLikeIni(content)`**（前 64 行逐行）：`[Section]` 段头 + 至少一行 key=value（或 ≥2 个段头）；key 不含空格/引号/方括号以排除 JSON 数组、Markdown 引用链接等误报；`;`/`#` 注释行、空行跳过
+  - **JSON 判定 `LooksLikeJson(trimmed)`**（整体扫描）：首字符 `{`/`[`（计入括号配平基数）+ 括号不提前闭合（`}`/`]` 使深度为负即返回 false，容忍 head 截断未闭合）+ 对象要求含 `"key":` 引号键模式 + 数组要求含字符串或逗号分隔元素
+  - 设计定位：为扩展名缺失/错误的格式识别提供内容兜底信号（层 2 结构特征，误报率≈0），为未来语法高亮 Language 识别铺路；Markdown/CSV 弱启发式不启用（Markdown 是纯文本超集无法可靠识别，CSV 由方案 A 扩展名兜底路径处理）
+  - 预览链路验证：`ClassifyPreviewByMagicAsync` 扩展名兜底列表本已含 Json/Ini/Csv，`MapFileFormatToPreviewType` 将 Json/Xml/Ini 映射 `PreviewType.Text`（JSON/INI 按纯文本预览），Csv 已独立映射 `PreviewType.Csv`——内容识别与扩展名路径等效不冲突
+  - 新增测试 `tests/MantisZip.Tests/Utils/FileFormatDetectorTextSubtypeTests.cs`（40 用例：JSON/INI 正反例 + XML/HTML/SVG/Text 回归）；修正 `LooksLikeJson` 首字符括号未计数导致闭合深度为负的 bug
+  - 回归：Build 0 错误 0 警告，Core 403/403 通过，Avalonia 96/96 通过
+
+**2026-09-21** — CSV 预览接入编码选择器 + 修复魔数路径 CSV 被误判为纯文本
+  - **PreviewViewModel.cs**：`HasEncodingSelector`（预览面板编码选择是否显示）新增 `PreviewType.Csv`；`ShowCsv` 从 `File.ReadLines`（UTF-8 硬读 → GBK/Shift_JIS 中文 CSV 乱码）改为 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级解码，与 Text/Markdown/HTML 共享同一编码检测管线，并缓存 `_textPreviewBytes` 供编码切换复用
+  - 新增 `RebuildCsv(string text)` 辅助方法（`text.Split('\n')` + `TrimEnd('\r')` + `Take(maxRows+1)` → `CsvData = table.DefaultView`），`ApplyEncodingRefresh()` 新增 `case PreviewType.Csv: RebuildCsv(text)`，编码切换即时重建 DataGrid
+  - `ShowCsv` 补发 `CurrentDetectedEncodingName` / `HasDetectedEncoding` / `DetectedEncodingDisplay` 通知（与 ShowText 一致），编码选择器状态栏显示自动检测编码
+  - **PreviewService.cs**：`MapFileFormatToPreviewType` 将 `FileFormat.Csv` 从 Text 分组独立出来映射到 `PreviewType.Csv`——修复魔数检测下 CSV 显示为纯文本的 bug（`ClassifyPreviewByMagicAsync` 扩展名兜底已正确识别 `FileFormat.Csv`，但最后映射被压回 `PreviewType.Text` 走 ShowText）
+  - 回归：Build 0 错误，Tests 378/378 通过
+
+**2026-09-20** — 文本预览编码选择器（Task 5 收尾）：进度文档双轨更新 + PLAN.md→PROGRESS.md 历史索引迁移 + 计划文件归档（`.omo/plans/未开始/text-preview-encoding-selector.md` → `已完成/`）
+
+**2026-09-20** — 预览工具栏编码选择 ComboBox + 本地化（Task 4/5）
+  - **PreviewPanel.axaml**：字体大小按钮之后插入编码选择 ComboBox（`ItemsSource=EncodingOptions` / `SelectedItem=SelectedEncoding` / `IsVisible=HasEncodingSelector`），带 `ItemContainerTheme`（`MinHeight=ControlHeightSm`）；紧随其后添加检测编码显示 TextBlock（`IsVisible=HasDetectedEncoding` / `Text=DetectedEncodingDisplay`）
+  - **PreviewViewModel.cs**：`EncodingOptions` 改为 `private set` 支持语言切换重建；新增 `RefreshEncodingOptions()` 方法（重建整个列表 + `OnPropertyChanged` + 恢复当前选中项，直接赋值字段避免触发 `OnSelectedEncodingChanged` 副作用）；新增 `HasDetectedEncoding`（`bool`，null→Collapsed）和 `DetectedEncodingDisplay`（格式化字符串 `string.Format(T("Preview_Encoding_Detected"), name)`）；`OnCultureChanged` 调用 `RefreshEncodingOptions()`；`UpdateLocalizedStrings()` 新增 4 个 `Preview_Encoding_*` / `Preview_Tooltip_Encoding` 条目；`ApplyEncodingRefresh()` / `ShowText` 新增 `HasDetectedEncoding` / `DetectedEncodingDisplay` PropertyChanged 通知
+  - **strings.zh-CN.json** + **strings.en.json**：新增 `Preview_Encoding_Auto`、`Preview_Encoding_SystemAnsi`（`{0}` 格式）、`Preview_Encoding_Detected`（`{0}` 格式）、`Preview_Tooltip_Encoding` 四个 key，zh/en 成对
+  - **MainWindowViewModel.UpdateLocalizedStrings() keys 数组**：未添加（与现有 `Preview_*` 系列 key 不在此数组中的模式一致——预览绑定解析到 PreviewViewModel 自身的 `LocalizedStrings` 字典）
+  - 检测编码 TextBlock 可见性方案：无现有 NullToVisibility 转换器，采用 `HasDetectedEncoding` bool 计算属性 + `IsVisible` 绑定（最简方案，无需新增转换器）
+  - Patch: ComboBox 新增 `DisplayMemberBinding="{Binding DisplayName}"` 避免 record ToString 显示；ShowHtmlPreview/ShowHtmlFallback/ShowMarkdownPreview 补齐 `HasDetectedEncoding` + `DetectedEncodingDisplay` PropertyChanged 通知
+  - 回归：Build 0 错误，Tests 378/378 通过
+
+**2026-09-20** — 文本预览编码选择器：ViewModel 状态与解码管线（Task 2/5）
+  - **PreviewViewModel.cs**：新增 `EncodingOption` 记录类型（Key/DisplayName）、`EncodingOptions` 下拉数据源（固定 9 项：auto + 7 种常用编码 + system ANSI）、`[ObservableProperty] SelectedEncoding`、`HasEncodingSelector`（Text/Markdown/Html 三类）、`CurrentDetectedEncodingName`
+  - 新增解码管线：`DecodePreviewBytes()`（按 _currentEncodingKey 分发 auto→DetectAndDecodeText / system→DecodeText(null) / explicit→DecodeText(name)）、`OnSelectedEncodingChanged` partial method（切换+持久化+刷新）、`ApplyEncodingRefresh()`（按 PreviewType 刷新 TextContent/RebuildMarkdown/RebuildHtmlAsync）、`PersistEncodingPreference()`（写入 AppSettings.TextEncodingPreference）
+  - `ShowText` 改为 `File.ReadAllBytes` + `DecodePreviewBytes()`，不再直接调用 `DetectAndReadText`
+  - `RebuildMarkdown` / `RebuildHtmlAsync` 辅助方法（编码切换时重建控件树/WebView）
+  - `OnPreviewTypeChanged` 新增 `HasEncodingSelector` 属性变更通知
+  - Patch: 构造函数初始化 `SelectedEncoding`（从 `AppSettings.TextEncodingPreference` 恢复上次选择）；`PersistEncodingPreference` 跳过 "auto" 避免冗余写入；`RebuildHtmlAsync` 降级路径加 try/catch 防 fire-and-forget 未观察异常
+  - 回归：Build 0 错误，Tests 378/378 通过
+
+**2026-09-20** — Markdown/HTML 预览接入编码解码管线（Task 3/5）
+  - **PreviewViewModel.cs**：`ShowMarkdownPreview` / `ShowHtmlPreview` / `ShowHtmlFallback` 三个入口方法从 `File.ReadAllText(Async)`（隐式 UTF-8）改为 `File.ReadAllBytes(Async)` + `DecodePreviewBytes()` 字节级解码，与 `ShowText` 共享同一编码检测管线
+  - `ShowMarkdownPreview` 改为 `RebuildMarkdown()` 复用控件树重建，`IsToolbarVisible` 改为 `true`（显示编码选择器）；`ShowHtmlFallback` 同样改用 `RebuildMarkdown()`
+  - 三个方法均调用 `OnPropertyChanged(nameof(CurrentDetectedEncodingName))` 通知 UI 刷新自动检测编码显示
+  - 回归：Build 0 错误，Tests 378/378 通过
+
 **2026-09-18** — 自适应压缩级别：多线程模式（第四选项）+ 统一帮助弹窗 + 仅存储格式自定义
   - **Core 层**：
     - `Models/AdaptiveOverrideRule.cs`：`AdaptiveCompressionMode` 新增 `MultiThreaded` 枚举值（基础模式 + 需压缩文件多线程加速）
@@ -733,6 +810,19 @@
     - `Services/CompressFlow.cs`：`BuildRequest` 传递 `MultiThreadedStoreFormatIds` 到 `CompressRequest`
   - **i18n**：新增 13 个 key（`Settings_AdaptiveMode_MultiThreaded` / `Settings_AdaptiveMode_MultiThreaded_Hint` / `MsgBox_Close` / `Adaptive_Help_*` / `Settings_StoreFormat_Section` / `Settings_StoreFormat_Desc`），zh-CN + en 成对
   - 验证：0 errors / 0 warnings，424 测试通过
+
+**2026-09-18** — 拖拽目标路径检测：修复工具栏松手失败 + 抽取共享方法
+  - **DropTargetDetector.cs**：`TryGetExplorerPath` default 分支原来返回 `(null, None)`，未处理 `ToolbarWindow32`、`SysListView32` 等 Explorer 子窗口；新增 `FindRecognizedAncestor(hWnd)` 共享方法，向上遍历父窗口链查找 `CabinetWClass` / `#32770` / `Progman` / `WorkerW`；`TryGetExplorerPath` 改为调用 `FindRecognizedAncestor` 后按类名分发；删除冗余 `TryGetDesktopPath`
+  - **OverlayController.cs**：`ClassifyWindow` 改为调用 `DropTargetDetector.FindRecognizedAncestor`，拆分为 `ClassifyCabinetWindow` / `ClassifyDialogWindow` 辅助方法；与松手后检测共用同一套父窗口链遍历逻辑，杜绝 overlay 显示路径但松手后识别失败的不一致问题
+  - 回归：Build 0 错误
+
+**2026-09-18** — Win32 P/Invoke 辅助方法抽取：消除重复模式
+  - **NativeMethods.cs**：新增 `GetWindowUnderCursor()`（封装 `GetCursorPos` + `WindowFromPoint`）、`GetWindowClassName(hWnd)`（封装 `GetClassName` + `StringBuilder`）
+  - **DropTargetDetector.cs**：`DetectTargetDirectory` 改用 `GetWindowUnderCursor()`；`FindRecognizedAncestor` 改用 `GetWindowClassName()`；`TryGetDialogPathViaWin32` 回调内改用 `GetWindowClassName()`
+  - **OverlayController.cs**：`UpdatePosition` 改用 `GetWindowUnderCursor()`
+  - **DragDropService.cs**：`IsOverOwnWindow` 改用 `GetWindowUnderCursor()`
+  - 消除 3 处 `GetCursorPos` + `WindowFromPoint` 重复、5+ 处 `GetClassName` + `StringBuilder` 重复
+  - 回归：Build 0 错误
 
 **2026-09-17** — ZIP 自适应压缩（per-entry Store 已压缩文件）
   - **Core 层**：
@@ -800,21 +890,6 @@
   - `Services/SelectedItemsExtractService.cs`：1 处 CS8602 同上修复
   - 构建结果：0 warnings / 0 errors
 
-**2026-09-16** — 压缩/解压性能优化（解压并行调度 + 7z 多线程压缩 UI）
-  - **7z 多线程压缩接线**：
-    - `Controls/DynamicFormatOptionsPanel.axaml(.cs)`：7z 面板新增「多线程压缩」复选框（`MultiThreadCheck`）+ `SevenZipMultithreaded` 只读属性 + `MultiThreadCheck_IsCheckedChanged`
-    - `ViewModels/CompressSettingsViewModel.cs`：新增 `SevenZipMultithreaded` 属性 + 从 AppSettings 加载初始值
-    - `Dialogs/CompressSettingsWindow.axaml.cs`：`SnapshotFormatOptionsToViewModel` 快照面板值
-    - `Services/CompressFlow.cs`：`BuildRequest` 映射到 `CompressRequest.SevenZipMultithreaded`
-    - `Views/MainWindow.axaml.cs`：对话框 VM → 执行 VM 拷贝
-    - `Views/SettingsWindow.axaml` + `ViewModels/SettingsWindowViewModel.cs`：设置窗口 7z 默认选项新增全局开关（`SevenZipMultithreaded` 字段/文本/加载/保存/OnPropertyChanged）
-    - `Models/AppSettings.cs`：`SevenZipMultithreaded`（默认 true）
-  - **解压并行调度**（`ParallelExtractDegree` 1-16，默认 CPU 核心数）：
-    - `Dialogs/ExtractSettingsWindow.axaml` 解压标签页 NumericUpDown + `ViewModels/ExtractSettingsViewModel.cs` 绑定
-    - `Services/ExtractFlow.cs` / `SelectedItemsExtractService.cs` 传递并行度到引擎
-  - **i18n**：新增 `FormatOptions_7z_MultiThread`（压缩对话框）+ `Settings_SevenZip_MultiThread`（设置窗口），zh-CN/en 成对同步（1168 keys 对齐）
-  - 验证：Core 380 + Avalonia 96 测试全绿，0 构建错误 0 警告
-
 **2026-09-17** — 自适应压缩可行性验证（18 条探针，全绿）
   - 新增 `AdaptiveCompressionFeasibilityTests.cs`：验证 per-entry 压缩级别、Store 配方、格式限制、7z.dll 互操作、内存压缩能力
   - 发现 3 个计划未覆盖的陷阱：
@@ -825,119 +900,6 @@
   - 验证 SharpSevenZip `CompressStream(in, out, pwd)` 纯内存压缩可用（预估器采样路径）
   - `SevenZipEngineTests.cs` 新增 ZIP mt=on 探针测试（Skip）
   - 全量：Core 398 通过 / 3 跳过，Avalonia 96 通过 / 2 跳过
-
-**2026-09-16** — Avalonia 12.0.4 → 12.1.2 全栈升级
-  - **MantisZip.UI.Avalonia.csproj**：
-    - Avalonia 12.0.4 → 12.1.2
-    - Avalonia.Controls.DataGrid 12.0.0 → 12.1.2
-    - Avalonia.Controls.WebView 12.0.1 → 12.1.0
-    - Avalonia.Desktop 12.0.4 → 12.1.2
-    - Avalonia.Themes.Fluent 12.0.4 → 12.1.2
-  - 验证：96 Avalonia + 373 Core 测试全绿，0 构建错误
-  - 新增 CS0618：`Bitmap.Save(Stream, int?)` → `BitmapEncoderOptions` 重载（PreviewViewModel.cs 2 处）
-
-**2026-09-16** — NuGet 核心依赖全面升级
-  - **MantisZip.UI.Avalonia.csproj**：
-    - Markdig 0.40.0 → 1.3.2（大版本升级，API 全向兼容，无需代码改动）
-    - SkiaSharp 3.119.4 → 4.152.0（大版本升级，24 项 CS0618 deprecation warning 为非阻塞技术债：`SKPath.MoveTo/LineTo/Close` → `SKPathBuilder`、`SKCanvas.DrawBitmap` → 新 `SKSamplingOptions` 重载）
-    - Svg.Skia 2.0.0.5 → 5.2.1（大版本升级，依赖 SkiaSharp ≥4.148.0，SVG 渲染 API 无破坏性变更）
-    - HarfBuzzSharp 14.2.0 → 14.2.1.3（次版本升级，与 SkiaSharp 无交叉依赖）
-  - **MantisZip.Core.csproj**：
-    - SharpCompress 0.48.1 → 0.50.4（次版本升级，ZipArchive.OpenArchive/TarReader/TarWriter/IEntry 属性全部兼容，无代码改动）
-  - 验证：96 Avalonia + 373 Core 测试全绿，0 构建错误
-  - 技术债：IconProvider.cs（18 项 SKPath）、IcoParser.cs（1 项 DrawBitmap）、PreviewViewModel.cs（1 项 DrawBitmap）的 deprecation warning 待后续清理
-
-**2026-09-16** — 计划文档维护：清理过时 WPF 引用，核实当前状态
-  - `selfcontained-size-optimization.md`：重写，移除所有 WPF 引用，.NET 9 → .NET 10，项目路径改为 MantisZip.UI.Avalonia，移除 WPF→Avalonia 迁移前置条件
-  - `cross-platform-port.md`：移除 `nuget-dependency-upgrade` 前置依赖，更新已完成表格（WPF 版本已删除）
-  - `cli-extract-open-folder.md`：补充当前核实结论（CLI 路径仍无打开文件夹逻辑）
-  - `compression-performance-optimization.md`：补充当前状态（缓冲区仍为 256KB）
-
-**2026-09-15** — Office 图片预览计划新增：三方案渐进式设计
-  - `.omo/plans/已完成/office-content-preview-avalonia.md`：新增「Office 图片预览」章节（现状分析 + 方案 A/B/C + 推荐实施顺序）
-    - 方案 A（PPTX 图片，~50 行）：复用 Canvas 坐标系统，`p:pic` → `a:xfrm` 定位 + `r:embed` 图片提取
-    - 方案 B（+DOCX 行内图片，~150 行）：`w:drawing/wp:inline` 检测 + `word/media/` 提取
-    - 方案 C（浮动定位，不推荐）：DOCX `w:anchor` / XLSX `xdr:twoCellAnchor`，需重构布局系统
-  - `docs/PLAN.md`：待实现表格新增 P2 条目「Office 图片预览」
-
-**2026-09-26** — **APNG 动画预览支持正式上线**
-  - **核心变更**：复用 `PreviewType.AnimatedImage` 统一管线（GIF + Animated WebP 已就绪），新增 `ApngDecoder`（`SixLabors.ImageSharp 3.1.5`）解决 SKCodec 原生 `FrameCount=0` 无法识别 APNG 动画的问题
-  - **关键修复**：`FrameDelay` Rational 类型的 `Numerator`/`Denominator` 为 `uint`，修复强制转 `long` 抛异常的 bug（先转 `uint` 再转 `long`）
-  - **集成点**：`ShowGif` 优先尝试 `ApngDecoder.DecodeFrames(filePath)`（按扩展名 `.apng`/`.png`），失败回退 `GifDecoder`；完整复用播放/暂停/逐帧/缩放/透明背景/信息面板帧数
-  - **魔数检测**：`FileFormatDetector.ScanForActlChunk()` 扫描 PNG 后的 `acTL` chunk (0x6163544C) 区分 APNG/静态 PNG
-  - **依赖新增**：`SixLabors.ImageSharp 3.1.5`（Core 无新依赖，仅 Avalonia UI 层）
-  - **验收**：TestPreview/apng.zip (5帧 APNG) 正常预览播放；Core/Avalonia 单测 509/509 通过；零回归
-  - **同步**：PLAN.md 已更新状态；.omo/plans/已完成/apng-preview-support.md 归档
-
-**2026-09-22** — 修正存量文档过时的技术事实（.NET 9→10、WPF 已删除、依赖表）
-
-**2026-09-21** — 修复 HTML 预览安全设置回归三连（09-13 html-preview-webview-fallback 上线引入）
-  - **PreviewViewModel.cs**：CSP meta 拼接两处（`RebuildHtmlAsync` / `ShowHtmlPreview`）补充 `style-src` 指令——外部资源开时 `style-src 'unsafe-inline' * data: blob:`，外部资源关时 `style-src 'unsafe-inline' 'self' data: blob:`。此前仅 `default-src` 回退时内联样式（`<style>` / `style=""`）被 CSP 拦截，开满所有安全选项的 HTML 预览样式全部丢失
-  - **PreviewViewModel.cs**：新增 `InjectCspMeta(html, csp)` 私有静态方法，两处注入点改用它——文档以 `<!DOCTYPE` 开头时把 CSP meta 插入到 DOCTYPE 之后（`html.IndexOf('>')` + `Insert`），消除 meta 先于 DOCTYPE 导致的 Quirks Mode 布局异常；无 DOCTYPE 文档保持原有注入位置（meta 前置）
-  - **PreviewPanel.axaml**：NativeWebView 与 HTML 源码视图从 `PreviewContentScroller`（ScrollViewer）内部移出，置于外层 `PreviewRootGrid` 的 `Grid.Row="1" Grid.Column="0"` 与滚动区平级——修复 WebView 页面顶部一小条被（滚出视口的）元数据横条裁切的布局回归
-  - 回归：Build 0 错误
-
-**2026-09-21** — 文本预览语法高亮计划重写为 Avalonia 方案（AvaloniaEdit + TextMate）
-  - **背景**：原 `.omo/plans/未开始/text-preview-syntax-highlighting.md` 为 WPF 时代方案（AvalonEdit 控件 + 自研 XSHD），AvalonEdit 是 WPF-only，跨平台移植后不可用，条目位于 PLAN.md 已废弃表
-  - **调研结论**（librarian）：`Avalonia.AvaloniaEdit` 12.0.0（MIT，AvaloniaUI 官方维护，要求 Avalonia ≥12.0.0，本项目 12.0.4 满足）+ `AvaloniaEdit.TextMate` 12.0.0——TextMate 方案用 VS Code 语法全集（`TextMateSharp.Grammars`），覆盖 `PreviewService.TextExtensions` 40+ 扩展名，**无需自研 XSHD**；内置 DarkPlus/LightPlus 主题，`Installation.SetTheme(RegistryOptions.LoadTheme(...))` 一行切换；rope-based TextDocument + 行虚拟化，大文件无压力
-  - **架构确认**：PreviewType（查看器）与 Language（高亮）分离；语言识别优先级链 = 扩展名 `GetLanguageByExtension` → 魔数 `FileFormatDetector.Detect` → JSON/INI 结构特征（2026-09-21 已落地）→ 纯文本降级。Markdown 是纯文本超集无法内容识别、CSV 有独立查看器，均不需高亮
-  - **实施路径**：Phase 1 NuGet+XAML（ScrollViewer+TextBox → TextEditor，去外层 ScrollViewer，caret 隐藏）→ Phase 2 语法分发（扩展名+结构特征兜底）→ Phase 3 主题联动（复用 `ActualThemeVariantChanged` 先例）→ Phase 4 回归（编码切换/字号/字体/降级/性能）→ Phase 5 可选增强（高亮开关、WordWrap、行号、结构 .txt 高亮）
-  - **同步**：PLAN.md 条目从已废弃表移回正式 P2 区，预估 5-7h → 4-5h（免去自研 XSHD 的 ~2.5h）
-
-**2026-09-21** — 文本格式内容识别扩展（B 保守版）：JSON/INI 内容启发式
-  - **Core/Utils/FileFormatDetector.cs**：`DetectTextSubtype` 在 SVG/HTML/XML 之后新增 INI、JSON 两级内容识别
-  - **INI 判定 `LooksLikeIni(content)`**（前 64 行逐行）：`[Section]` 段头 + 至少一行 key=value（或 ≥2 个段头）；key 不含空格/引号/方括号以排除 JSON 数组、Markdown 引用链接等误报；`;`/`#` 注释行、空行跳过
-  - **JSON 判定 `LooksLikeJson(trimmed)`**（整体扫描）：首字符 `{`/`[`（计入括号配平基数）+ 括号不提前闭合（`}`/`]` 使深度为负即返回 false，容忍 head 截断未闭合）+ 对象要求含 `"key":` 引号键模式 + 数组要求含字符串或逗号分隔元素
-  - 设计定位：为扩展名缺失/错误的格式识别提供内容兜底信号（层 2 结构特征，误报率≈0），为未来语法高亮 Language 识别铺路；Markdown/CSV 弱启发式不启用（Markdown 是纯文本超集无法可靠识别，CSV 由方案 A 扩展名兜底路径处理）
-  - 预览链路验证：`ClassifyPreviewByMagicAsync` 扩展名兜底列表本已含 Json/Ini/Csv，`MapFileFormatToPreviewType` 将 Json/Xml/Ini 映射 `PreviewType.Text`（JSON/INI 按纯文本预览），Csv 已独立映射 `PreviewType.Csv`——内容识别与扩展名路径等效不冲突
-  - 新增测试 `tests/MantisZip.Tests/Utils/FileFormatDetectorTextSubtypeTests.cs`（40 用例：JSON/INI 正反例 + XML/HTML/SVG/Text 回归）；修正 `LooksLikeJson` 首字符括号未计数导致闭合深度为负的 bug
-  - 回归：Build 0 错误 0 警告，Core 403/403 通过，Avalonia 96/96 通过
-
-**2026-09-21** — CSV 预览接入编码选择器 + 修复魔数路径 CSV 被误判为纯文本
-  - **PreviewViewModel.cs**：`HasEncodingSelector`（预览面板编码选择是否显示）新增 `PreviewType.Csv`；`ShowCsv` 从 `File.ReadLines`（UTF-8 硬读 → GBK/Shift_JIS 中文 CSV 乱码）改为 `File.ReadAllBytes` + `DecodePreviewBytes()` 字节级解码，与 Text/Markdown/HTML 共享同一编码检测管线，并缓存 `_textPreviewBytes` 供编码切换复用
-  - 新增 `RebuildCsv(string text)` 辅助方法（`text.Split('\n')` + `TrimEnd('\r')` + `Take(maxRows+1)` → `CsvData = table.DefaultView`），`ApplyEncodingRefresh()` 新增 `case PreviewType.Csv: RebuildCsv(text)`，编码切换即时重建 DataGrid
-  - `ShowCsv` 补发 `CurrentDetectedEncodingName` / `HasDetectedEncoding` / `DetectedEncodingDisplay` 通知（与 ShowText 一致），编码选择器状态栏显示自动检测编码
-  - **PreviewService.cs**：`MapFileFormatToPreviewType` 将 `FileFormat.Csv` 从 Text 分组独立出来映射到 `PreviewType.Csv`——修复魔数检测下 CSV 显示为纯文本的 bug（`ClassifyPreviewByMagicAsync` 扩展名兜底已正确识别 `FileFormat.Csv`，但最后映射被压回 `PreviewType.Text` 走 ShowText）
-  - 回归：Build 0 错误，Tests 378/378 通过
-
-**2026-09-20** — 文本预览编码选择器（Task 5 收尾）：进度文档双轨更新 + PLAN.md→PROGRESS.md 历史索引迁移 + 计划文件归档（`.omo/plans/未开始/text-preview-encoding-selector.md` → `已完成/`）
-
-**2026-09-20** — 预览工具栏编码选择 ComboBox + 本地化（Task 4/5）
-  - **PreviewPanel.axaml**：字体大小按钮之后插入编码选择 ComboBox（`ItemsSource=EncodingOptions` / `SelectedItem=SelectedEncoding` / `IsVisible=HasEncodingSelector`），带 `ItemContainerTheme`（`MinHeight=ControlHeightSm`）；紧随其后添加检测编码显示 TextBlock（`IsVisible=HasDetectedEncoding` / `Text=DetectedEncodingDisplay`）
-  - **PreviewViewModel.cs**：`EncodingOptions` 改为 `private set` 支持语言切换重建；新增 `RefreshEncodingOptions()` 方法（重建整个列表 + `OnPropertyChanged` + 恢复当前选中项，直接赋值字段避免触发 `OnSelectedEncodingChanged` 副作用）；新增 `HasDetectedEncoding`（`bool`，null→Collapsed）和 `DetectedEncodingDisplay`（格式化字符串 `string.Format(T("Preview_Encoding_Detected"), name)`）；`OnCultureChanged` 调用 `RefreshEncodingOptions()`；`UpdateLocalizedStrings()` 新增 4 个 `Preview_Encoding_*` / `Preview_Tooltip_Encoding` 条目；`ApplyEncodingRefresh()` / `ShowText` 新增 `HasDetectedEncoding` / `DetectedEncodingDisplay` PropertyChanged 通知
-  - **strings.zh-CN.json** + **strings.en.json**：新增 `Preview_Encoding_Auto`、`Preview_Encoding_SystemAnsi`（`{0}` 格式）、`Preview_Encoding_Detected`（`{0}` 格式）、`Preview_Tooltip_Encoding` 四个 key，zh/en 成对
-  - **MainWindowViewModel.UpdateLocalizedStrings() keys 数组**：未添加（与现有 `Preview_*` 系列 key 不在此数组中的模式一致——预览绑定解析到 PreviewViewModel 自身的 `LocalizedStrings` 字典）
-  - 检测编码 TextBlock 可见性方案：无现有 NullToVisibility 转换器，采用 `HasDetectedEncoding` bool 计算属性 + `IsVisible` 绑定（最简方案，无需新增转换器）
-  - Patch: ComboBox 新增 `DisplayMemberBinding="{Binding DisplayName}"` 避免 record ToString 显示；ShowHtmlPreview/ShowHtmlFallback/ShowMarkdownPreview 补齐 `HasDetectedEncoding` + `DetectedEncodingDisplay` PropertyChanged 通知
-  - 回归：Build 0 错误，Tests 378/378 通过
-
-**2026-09-20** — 文本预览编码选择器：ViewModel 状态与解码管线（Task 2/5）
-  - **PreviewViewModel.cs**：新增 `EncodingOption` 记录类型（Key/DisplayName）、`EncodingOptions` 下拉数据源（固定 9 项：auto + 7 种常用编码 + system ANSI）、`[ObservableProperty] SelectedEncoding`、`HasEncodingSelector`（Text/Markdown/Html 三类）、`CurrentDetectedEncodingName`
-  - 新增解码管线：`DecodePreviewBytes()`（按 _currentEncodingKey 分发 auto→DetectAndDecodeText / system→DecodeText(null) / explicit→DecodeText(name)）、`OnSelectedEncodingChanged` partial method（切换+持久化+刷新）、`ApplyEncodingRefresh()`（按 PreviewType 刷新 TextContent/RebuildMarkdown/RebuildHtmlAsync）、`PersistEncodingPreference()`（写入 AppSettings.TextEncodingPreference）
-  - `ShowText` 改为 `File.ReadAllBytes` + `DecodePreviewBytes()`，不再直接调用 `DetectAndReadText`
-  - `RebuildMarkdown` / `RebuildHtmlAsync` 辅助方法（编码切换时重建控件树/WebView）
-  - `OnPreviewTypeChanged` 新增 `HasEncodingSelector` 属性变更通知
-  - Patch: 构造函数初始化 `SelectedEncoding`（从 `AppSettings.TextEncodingPreference` 恢复上次选择）；`PersistEncodingPreference` 跳过 "auto" 避免冗余写入；`RebuildHtmlAsync` 降级路径加 try/catch 防 fire-and-forget 未观察异常
-  - 回归：Build 0 错误，Tests 378/378 通过
-
-**2026-09-20** — Markdown/HTML 预览接入编码解码管线（Task 3/5）
-  - **PreviewViewModel.cs**：`ShowMarkdownPreview` / `ShowHtmlPreview` / `ShowHtmlFallback` 三个入口方法从 `File.ReadAllText(Async)`（隐式 UTF-8）改为 `File.ReadAllBytes(Async)` + `DecodePreviewBytes()` 字节级解码，与 `ShowText` 共享同一编码检测管线
-  - `ShowMarkdownPreview` 改为 `RebuildMarkdown()` 复用控件树重建，`IsToolbarVisible` 改为 `true`（显示编码选择器）；`ShowHtmlFallback` 同样改用 `RebuildMarkdown()`
-  - 三个方法均调用 `OnPropertyChanged(nameof(CurrentDetectedEncodingName))` 通知 UI 刷新自动检测编码显示
-  - 回归：Build 0 错误，Tests 378/378 通过
-
-**2026-09-18** — 拖拽目标路径检测：修复工具栏松手失败 + 抽取共享方法
-  - **DropTargetDetector.cs**：`TryGetExplorerPath` default 分支原来返回 `(null, None)`，未处理 `ToolbarWindow32`、`SysListView32` 等 Explorer 子窗口；新增 `FindRecognizedAncestor(hWnd)` 共享方法，向上遍历父窗口链查找 `CabinetWClass` / `#32770` / `Progman` / `WorkerW`；`TryGetExplorerPath` 改为调用 `FindRecognizedAncestor` 后按类名分发；删除冗余 `TryGetDesktopPath`
-  - **OverlayController.cs**：`ClassifyWindow` 改为调用 `DropTargetDetector.FindRecognizedAncestor`，拆分为 `ClassifyCabinetWindow` / `ClassifyDialogWindow` 辅助方法；与松手后检测共用同一套父窗口链遍历逻辑，杜绝 overlay 显示路径但松手后识别失败的不一致问题
-  - 回归：Build 0 错误
-
-**2026-09-18** — Win32 P/Invoke 辅助方法抽取：消除重复模式
-  - **NativeMethods.cs**：新增 `GetWindowUnderCursor()`（封装 `GetCursorPos` + `WindowFromPoint`）、`GetWindowClassName(hWnd)`（封装 `GetClassName` + `StringBuilder`）
-  - **DropTargetDetector.cs**：`DetectTargetDirectory` 改用 `GetWindowUnderCursor()`；`FindRecognizedAncestor` 改用 `GetWindowClassName()`；`TryGetDialogPathViaWin32` 回调内改用 `GetWindowClassName()`
-  - **OverlayController.cs**：`UpdatePosition` 改用 `GetWindowUnderCursor()`
-  - **DragDropService.cs**：`IsOverOwnWindow` 改用 `GetWindowUnderCursor()`
-  - 消除 3 处 `GetCursorPos` + `WindowFromPoint` 重复、5+ 处 `GetClassName` + `StringBuilder` 重复
-  - 回归：Build 0 错误
 
 **2026-09-17** — 修复文本预览 936 编码报错 + 种子文件 GBK 中文乱码
   - **App.axaml.cs**：`OnFrameworkInitializationCompleted` 开头注册 `CodePagesEncodingProvider`（此前 Avalonia 迁移遗漏，AGENTS.md 声称已注册但代码无）。未注册时 `Encoding.GetEncoding(936)` 抛 `NotSupportedException`，文本预览 fallback 到系统 ANSI 代码页（中文系统 936）时提示 "coding 936 无法预览"
@@ -1783,7 +1745,7 @@
   - **工具栏联动**：工具栏导出按钮由 `ExtractSelectedCommand` 改绑 `ExtractSelectedToCommand`（ToolTip 同步）；删除 `ExtractSelected` 命令及 `Ctx_ExtractSelected`/`Tooltip_ExtractSelected` key，新增 `Tooltip_ExtractSelectedTo`（zh/en 双语）
   - **解耦**：`MainWindowViewModel` 新增 `ShowExtractFolderPicker` 回调委托（`Func<IReadOnlyList<ArchiveItem>, string?, Task<string?>>`），由 `MainWindow.axaml.cs` 注入 `CustomFilePickerDialog.ShowExtractFolderAsync`
   - 构建 0 errors
-**2026-08-03** — 拖拽解压与「解压选中项」流程统一（[drag-extract-unify.md](.omo/plans/drag-extract-unify.md)）
+**2026-08-03** — 拖拽解压与「解压选中项」流程统一（[drag-extract-unify.md](.omo/plans/已完成/drag-extract-unify.md)）
   - **统一解压流程**：新建 `SelectedItemsExtractService`（Services/）统一「拿到输出路径后」的解压动作；右键「解压选中项到…/到此处」与拖拽解压差异仅剩获取输出路径的方式（文件选择器 vs 目标检测）；统一引擎批量通道（一次开包）+ `pathOverrides` 路径计算 + 统一 `ArchiveOptions` 冲突处理
   - **拖拽路径语义改与右键一致**：删除 `DragDropItemExpander.GetExtractPath`（选中目录锚点），路径计算统一走 `ExtractPreserveFullPath` + 裁剪当前浏览层（`currentFolder` 由拖拽入口传入）；拖出单文件即为文件本身、不再带路径
   - **TarGzEngine 实现按条目提取**：`ExtractEntriesAsync` 从抛 `NotSupportedException` 改为实现（tar/tar.gz 单次扫描匹配 keySet + 纯 .gz 整流解压），推翻原「降级全量」决策；右键 tar/gz 不再降级全量（选中子目录文件按条目解压，语义修正）

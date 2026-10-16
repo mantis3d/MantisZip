@@ -27,9 +27,11 @@
 
 ### Current Behavior
 
-`MainWindow.axaml.cs:601-603` 设置图标时，对 `.ico` 文件走统一的 `SystemIconHelper.GetFileIcon(".ico")`，内部用虚拟文件名 `"file.ico"` 调 `SHGetFileInfo`。Windows Shell 返回的是 **.ico 扩展名的关联图标**（空白文档带小画笔），而不是每个 ICO 文件**自身嵌入的图标图像**。
+> ⚠️ 2026-10-16 修正：原文引用的 `SystemIconHelper.GetFileIcon(...)` 类已不存在。当前实现为 `IconService`（`Services/IconService.cs`，`GetFileIcon(extension)`/`GetFolderIcon()`）——Windows 优先走 `Win32IconProvider`（`Models/Win32IconProvider.cs`，`SHGetFileInfo`），其他平台回退 `IconProvider`（`Models/IconProvider.cs`，SkiaSharp 绘制）。旧行号引用 `MainWindow.axaml.cs:601-603` 已失效（该行现为拖拽光标代码）；实际图标设置在 `ViewModels/MainWindowViewModel.cs:1898-1903`（`PopulateEntries`）。
 
-另外 `SystemIconHelper` 按扩展名缓存（key = `".ico"`），所以所有 `.ico` 文件图标完全相同。
+`ViewModels/MainWindowViewModel.cs:1898-1903` 设置图标时，对 `.ico` 文件走统一的 `IconService.GetFileIcon(".ico")`，Windows 上经 `Win32IconProvider` 用虚拟文件名调 `SHGetFileInfo`。Windows Shell 返回的是 **.ico 扩展名的关联图标**（空白文档带小画笔），而不是每个 ICO 文件**自身嵌入的图标图像**。
+
+另外 `IconService` 按扩展名缓存（key = `".ico"`），所以所有 `.ico` 文件图标完全相同。
 
 ### Design Decisions
 
@@ -140,7 +142,7 @@ public interface IArchiveEngine
    ```
 
 2. **`LoadArchiveAsync` 加载流程**:
-   - `.ico` 文件在 `.Select()` 阶段先给一个**默认占位图标**（`SystemIconHelper.GetFileIcon(".ico")` 返回的通用图标）
+   - `.ico` 文件在 `.Select()` 阶段先给一个**默认占位图标**（`IconService.GetFileIcon(".ico")` 返回的通用图标）
    - 保持现有同步路径不变，不阻塞列表显示
    - 列表显示后，后台遍历 `_allItems` 中所有 `.ico` 文件
 

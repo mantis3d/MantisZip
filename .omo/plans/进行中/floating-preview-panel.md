@@ -3,7 +3,7 @@
 > **状态**: 🟡 进行中（Phase 2 完成；Phase 1、Phase 3 未开始） | **Phase 1**: [⬜⬜⬜⬜⬜] (0/5) | **Phase 2**: [✅✅✅✅] (4/4) | **Phase 3**: [⬜⬜⬜⬜] (0/4) | **总进度**: (~4/13)
 > **分支**: `avalonia-port`
 > **设计文档**: `docs/superpowers/specs/2026-07-16-floating-preview-panel-design.md`
-> 进度核实（2026-10-16）：Phase 2 四位置切换已实现，但与计划命名不同——持久化字段为 `AppSettings.PreviewPosition`（非 `PreviewDockPosition`），切换 UI 位于设置窗口 ComboBox（无 `CycleDockPositionCommand`）；Phase 1 浮动窗口、Phase 3 拖拽停靠均未实现。
+> 进度核实（2026-10-16）：Phase 2 四位置切换已实现，但与计划命名不同——持久化字段为 `AppSettings.PreviewPosition`（非 `PreviewPosition`），切换 UI 位于设置窗口 ComboBox（无 `CycleDockPositionCommand`）；Phase 1 浮动窗口、Phase 3 拖拽停靠均未实现。
 
 ---
 
@@ -221,7 +221,7 @@ public PreviewFloatingWindow()
 
 private void OnPositionChanged(object? sender, PixelPointEventArgs e)
 {
-    var settings = AppSettings.Instance;
+    var settings = AppSettings.Load();
     settings.PreviewFloatingX = Position.X;
     settings.PreviewFloatingY = Position.Y;
     settings.Save();
@@ -229,7 +229,7 @@ private void OnPositionChanged(object? sender, PixelPointEventArgs e)
 
 private void OnResized(object? sender, ResizedEventArgs e)
 {
-    var settings = AppSettings.Instance;
+    var settings = AppSettings.Load();
     settings.PreviewFloatingWidth = ClientSize.Width;
     settings.PreviewFloatingHeight = ClientSize.Height;
     settings.Save();
@@ -355,7 +355,7 @@ private void FloatPreviewInternal()
     };
 
     // 5. 恢复上次位置/大小
-    var s = AppSettings.Instance;
+    var s = AppSettings.Load();
     if (s.PreviewFloatingX >= 0 && s.PreviewFloatingY >= 0)
     {
         _floatingWindow.Position = new PixelPoint(
@@ -371,7 +371,7 @@ private void FloatPreviewInternal()
     _floatingWindow.Show();
 
     // 8. 持久化状态
-    var settings = AppSettings.Instance;
+    var settings = AppSettings.Load();
     settings.PreviewDockState = "Floating";
     settings.Save();
 }
@@ -392,7 +392,7 @@ private void DockPreviewInternal()
     _floatingWindow = null;
 
     // 4. 持久化状态
-    var settings = AppSettings.Instance;
+    var settings = AppSettings.Load();
     settings.PreviewDockState = "Docked";
     settings.Save();
 }
@@ -406,7 +406,7 @@ private void DockPreviewInternal()
 protected override void OnInitialized(EventArgs e)
 {
     base.OnInitialized(e);
-    if (AppSettings.Instance.PreviewDockState == "Floating")
+    if (AppSettings.Load().PreviewDockState == "Floating")
     {
         // 延迟一帧执行，确保布局已完成
         Dispatcher.UIThread.Post(() => ViewModel?.ToggleFloatPreviewCommand.Execute(null));
@@ -439,8 +439,8 @@ protected override void OnInitialized(EventArgs e)
 |------|------|
 | `Views/MainWindow.axaml` | 🔧 修改 — Grid 布局重构支持多位置 |
 | `Views/MainWindow.axaml.cs` | 🔧 修改 — 移植 `ApplyPreviewPosition()` |
-| `Models/AppSettings.cs` | 🔧 修改 — 加 `PreviewDockPosition` |
-| `ViewModels/MainWindowViewModel.cs` | 🔧 修改 — 加 `PreviewDockPosition` 属性 + 切换命令 |
+| `Models/AppSettings.cs` | 🔧 修改 — 加 `PreviewPosition` |
+| `ViewModels/MainWindowViewModel.cs` | 🔧 修改 — 加 `PreviewPosition` 属性 + 切换命令 |
 | `Views/PreviewPanel.axaml.cs` | 🔧 可能修改 — 确保自适应不同宽度 |
 
 ---
@@ -524,26 +524,26 @@ protected override void OnInitialized(EventArgs e)
 - [x] **2.3a AppSettings 加字段**
 
 ```csharp
-public int PreviewDockPosition { get; set; } = 2;  // 1=底部 2=目录树下 3=文件列表下 4=文件列表右侧
+public int PreviewPosition { get; set; } = 4;  // 1=底部 2=目录树下 3=文件列表下 4=文件列表右侧
 ```
 
 - [x] **2.3b ViewModel 加属性 + 命令**
 
 ```csharp
 [ObservableProperty]
-private int _previewDockPosition = 2;
+private int _previewPosition = 4;
 
-partial void OnPreviewDockPositionChanged(int value)
+partial void OnPreviewPositionChanged(int value)
 {
-    AppSettings.Instance.PreviewDockPosition = value;
-    AppSettings.Instance.Save();
+    AppSettings.Load().PreviewPosition = value;
+    AppSettings.Load().Save();
     // View code-behind 监听此变化触发 ApplyPreviewPosition
 }
 
 [RelayCommand]
 private void CycleDockPosition()
 {
-    PreviewDockPosition = (PreviewDockPosition % 4) + 1;
+    PreviewPosition = (PreviewPosition % 4) + 1;
 }
 ```
 
