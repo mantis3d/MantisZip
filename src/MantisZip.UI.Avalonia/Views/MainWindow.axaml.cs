@@ -353,6 +353,8 @@ public partial class MainWindow : Window
                 // 主窗口全部解压入口（ExtractArchive/Here/ToName/ExtractTo/SmartExtract）均经本闭包，
                 // 故在此单点接线，避免逐个方法重复分支。
                 var msg = LocalizationManager.T("Status_PasswordCancelled");
+                // 同步进度窗口状态行（否则取消发生在首报前时会停在「正在准备…」）
+                pw.SetStatusMessage(msg);
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);   // 行 Failed 自动压钉 → 等手动关闭
                 vm.StatusMessage = msg;

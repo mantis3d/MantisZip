@@ -231,6 +231,19 @@ public class ProgressWindowXamlTests
         Assert.Contains("_skippedSummaryTooltip", vmCs);
     }
 
+    /// <summary>SetStatusMessage 直接写状态行（密码取消等无汇总终态用；避免停在「正在准备…」）。</summary>
+    [AvaloniaFact]
+    public void SetStatusMessage_UpdatesStatusLine()
+    {
+        var window = new ProgressWindow("test");
+        window.Show();
+
+        window.SetStatusMessage("已取消 - 需要密码");
+
+        Assert.Equal("已取消 - 需要密码", ((ProgressViewModel)window.DataContext!).StatusMessage);
+        window.Close();
+    }
+
     private static string SourcePath(string relative) =>
         Path.Combine(GetRepoRoot(), relative.Replace('/', Path.DirectorySeparatorChar));
 
