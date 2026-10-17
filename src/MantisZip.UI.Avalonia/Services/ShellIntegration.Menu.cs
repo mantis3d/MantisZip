@@ -14,21 +14,21 @@ internal static partial class ShellIntegration
         get
         {
             // 检查 COM 注册（优先）
-            using var comKey = Registry.CurrentUser.OpenSubKey(
+            using var comKey = RegistryHost.Open(
                 $@"Software\Classes\CLSID\{ComClsid}");
             if (comKey != null) return true;
 
             // 回退：检查静态注册表
-            using var key = Registry.CurrentUser.OpenSubKey(
+            using var key = RegistryHost.Open(
                 $@"Software\Classes\*\shell\{CascadeRoot}");
             if (key != null) return true;
-            using var key2 = Registry.CurrentUser.OpenSubKey(
+            using var key2 = RegistryHost.Open(
                 $@"Software\Classes\*\shell\{CompressVerb}\command");
             if (key2 != null) return true;
-            using var key3 = Registry.CurrentUser.OpenSubKey(
+            using var key3 = RegistryHost.Open(
                 $@"Software\Classes\*\shell\{ExtractSmartVerb}\command");
             if (key3 != null) return true;
-            using var key4 = Registry.CurrentUser.OpenSubKey(
+            using var key4 = RegistryHost.Open(
                 $@"Software\Classes\*\shell\{CompressSeparateVerb}\command");
             return key4 != null;
         }
@@ -252,7 +252,7 @@ internal static partial class ShellIntegration
                 string? actualValue = null;
                 try
                 {
-                    using var key = Registry.CurrentUser.OpenSubKey(
+                    using var key = RegistryHost.Open(
                         $@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}");
                     actualValue = key?.GetValue(null) as string;
                 }
@@ -515,7 +515,7 @@ internal static partial class ShellIntegration
     {
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(ContextMenuRegPath);
+            using var key = RegistryHost.Create(ContextMenuRegPath);
             key?.SetValue("DynamicMenuStatus", status, RegistryValueKind.String);
         }
         catch (Exception ex)

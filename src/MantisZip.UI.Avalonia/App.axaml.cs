@@ -144,7 +144,7 @@ public partial class App : Application
         {
             try
             {
-                using var firstRunKey = Registry.CurrentUser.OpenSubKey(
+                using var firstRunKey = RegistryHost.Open(
                     @"Software\MantisZip", writable: true);
                 if (firstRunKey != null)
                 {

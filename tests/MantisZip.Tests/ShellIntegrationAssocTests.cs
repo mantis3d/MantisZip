@@ -16,8 +16,33 @@ public class RegistryTestsCollection { }
 /// 所有测试使用 try/finally 确保清理自身产生的注册表条目。
 /// </summary>
 [Collection("RegistryTests")]
-public class ShellIntegrationAssocTests
+public class ShellIntegrationAssocTests : IDisposable
 {
+    /// <summary>
+    /// 测试装配：将 RegistryHost 切换到独立沙箱（HKCU\Software\MantisZip\AssocTestSandbox），
+    /// 使本类所有注册表读写只落在沙箱内，不再污染真实的文件关联 / 右键菜单注册。
+    /// ⚠ 以下四步顺序不可颠倒。
+    /// </summary>
+    public ShellIntegrationAssocTests()
+    {
+        RegistryHost.Reset();                                   // ① 先恢复生产映射（确定性起点）
+        Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(  // ② 原语幂等清残留（不经 RegistryHost）
+            @"Software\MantisZip\AssocTestSandbox", throwOnMissingSubKey: false);
+        RegistryHost.UseSandbox(@"MantisZip\AssocTestSandbox"); // ③ 挂沙箱
+        RegistryHost.DeleteInterceptionForTesting = null;       // ④ 生产语义
+    }
+
+    /// <summary>
+    /// 测试拆卸：先复位 RegistryHost 映射，再用注册表原语删除沙箱键。
+    /// 复位后 RegistryHost.Delete 会落到生产路径，故此处必须用原语删除。
+    /// </summary>
+    public void Dispose()
+    {
+        RegistryHost.Reset();                                   // 先复位，避免任何后续调用被重定向
+        Microsoft.Win32.Registry.CurrentUser.DeleteSubKeyTree(  // 原语删沙箱（此时 RegistryHost.Delete 会落到生产路径，故必须用原语）
+            @"Software\MantisZip\AssocTestSandbox", throwOnMissingSubKey: false);
+    }
+
     private static void CleanupExtension(string ext)
     {
         ShellIntegration.UninstallAssociationForExtension(ext);

@@ -94,7 +94,7 @@ internal static partial class ShellIntegration
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(ContextMenuRegPath);
+            using var key = RegistryHost.Open(ContextMenuRegPath);
             if (key == null) return "not_installed";
             var val = key.GetValue("DynamicMenuStatus") as string;
             return val ?? "unknown";
@@ -109,19 +109,19 @@ internal static partial class ShellIntegration
 
     private static void SetRegistryValue(string subKey, string? valueName, string value)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(subKey);
+        using var key = RegistryHost.Create(subKey);
         key?.SetValue(valueName, value);
     }
 
     private static void SetRegistryDword(string subKey, string valueName, int value)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(subKey);
+        using var key = RegistryHost.Create(subKey);
         key?.SetValue(valueName, value, RegistryValueKind.DWord);
     }
 
     private static void DeleteRegistryKey(string subKey)
     {
-        Registry.CurrentUser.DeleteSubKeyTree(subKey, throwOnMissingSubKey: false);
+        RegistryHost.Delete(subKey);
     }
 
     private static string GetExePath()

@@ -14,7 +14,7 @@ internal static partial class ShellIntegration
     public static bool AreAssociationsInstalledForExtension(string ext)
     {
         var progId = GetProgId(ext);
-        using var key = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}\OpenWithProgids");
+        using var key = RegistryHost.Open($@"Software\Classes\{ext}\OpenWithProgids");
         if (key == null) return false;
         return key.GetValue(progId) != null;
     }
@@ -27,7 +27,7 @@ internal static partial class ShellIntegration
 
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey($@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice");
+            using var key = RegistryHost.Open($@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice");
             var progId = key?.GetValue("Progid") as string;
             if (!string.IsNullOrEmpty(progId) && progId.IndexOf("MantisZip", StringComparison.OrdinalIgnoreCase) >= 0)
                 return AssocStatus.IsDefault;
@@ -47,7 +47,7 @@ internal static partial class ShellIntegration
 
         // 2. 写 OpenWithProgids
         var extKey = $@"Software\Classes\{ext}\OpenWithProgids";
-        using var key = Registry.CurrentUser.CreateSubKey(extKey);
+        using var key = RegistryHost.Create(extKey);
         key?.SetValue(progId, Array.Empty<byte>(), RegistryValueKind.None);
 
         // 3. 写 DefaultIcon
@@ -99,7 +99,7 @@ internal static partial class ShellIntegration
         var progIdKey = $@"Software\Classes\{progId}";
 
         bool isNew;
-        using (var check = Registry.CurrentUser.OpenSubKey(progIdKey))
+        using (var check = RegistryHost.Open(progIdKey))
         {
             isNew = check == null;
         }
@@ -170,7 +170,7 @@ internal static partial class ShellIntegration
         // 删除 OpenWithProgids 条目
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}\OpenWithProgids", writable: true);
+            using var key = RegistryHost.Open($@"Software\Classes\{ext}\OpenWithProgids", writable: true);
             key?.DeleteValue(progId, throwOnMissingValue: false);
         }
         catch (Exception ex) { App.DebugLog($"ShellIntegration.UninstallAssociationForExtension: failed to delete OpenWithProgids: {ex.Message}"); }
@@ -180,7 +180,7 @@ internal static partial class ShellIntegration
         {
             var iconPath = GetIconPath(ext);
             var exePath = GetExePath();
-            using var extKey = Registry.CurrentUser.OpenSubKey($@"Software\Classes\{ext}", writable: true);
+            using var extKey = RegistryHost.Open($@"Software\Classes\{ext}", writable: true);
             if (extKey?.GetValue(null) is string currentIcon)
             {
                 if (iconPath != null && currentIcon.Equals(iconPath, StringComparison.OrdinalIgnoreCase))
@@ -213,7 +213,7 @@ internal static partial class ShellIntegration
         }
 
         // 也清理自定义扩展名（残留）
-        if (Registry.CurrentUser.OpenSubKey($@"Software\Classes\{CustomProgId}") != null)
+        if (RegistryHost.Open($@"Software\Classes\{CustomProgId}") != null)
         {
             DeleteRegistryKey($@"Software\Classes\{CustomProgId}");
         }
@@ -243,7 +243,7 @@ internal static partial class ShellIntegration
         try
         {
             var userChoice = $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice";
-            using var key = Registry.CurrentUser.OpenSubKey(userChoice);
+            using var key = RegistryHost.Open(userChoice);
             var progId = key?.GetValue("Progid") as string;
 
             if (string.IsNullOrEmpty(progId))
@@ -263,6 +263,7 @@ internal static partial class ShellIntegration
             // 尝试从 ProgId 获取友好名称
             try
             {
+                // HKCR 只读查询，不在 HKCU 写入收口范围，沙箱不适用
                 using var progIdKey = Registry.ClassesRoot.OpenSubKey(progId);
                 var displayName = progIdKey?.GetValue(null) as string;
                 if (!string.IsNullOrEmpty(displayName))
