@@ -88,6 +88,8 @@ Windows 的 `UserChoice` 带 `Hash`（由 SID+扩展名+ProgId+时间戳派生�
 
 ### Task A: 注册表访问收口 + 测试沙箱隔离
 
+> **执行拆分（2026-10-17）**：Task A 的执行拆为 **A-1**（swarm 任务 `1.1.1`：新增 `src/MantisZip.UI.Avalonia/Services/RegistryHost.cs` + `RegistryHost.DeleteInterceptionForTesting` 测试注入缝 + 其单元测试 `tests/MantisZip.Tests/RegistryHostTests.cs`）/ **A-2**（`1.1.2`：全部 HKCU 调用点收口到 `RegistryHost` + `ShellIntegrationAssocTests.cs` 迁入沙箱）；设计与验收基线**不变**，仅执行粒度变细。
+
 **Files:**
 - Create: `src/MantisZip.UI.Avalonia/Services/RegistryHost.cs`
 - Modify: `src/MantisZip.UI.Avalonia/Services/ShellIntegration.cs:97,112,118,124`
@@ -95,11 +97,13 @@ Windows 的 `UserChoice` 带 `Hash`（由 SID+扩展名+ProgId+时间戳派生�
 - Modify: `src/MantisZip.UI.Avalonia/Services/ShellIntegration.Menu.cs:17,22,25,28,31,255,518`
 - Modify: `src/MantisZip.UI.Avalonia/App.axaml.cs:147`
 - Test: `tests/MantisZip.Tests/ShellIntegrationAssocTests.cs`
+- Test: `tests/MantisZip.Tests/RegistryHostTests.cs`
 
 **Interfaces:**
 - Produces: `internal static class RegistryHost`（`Open(string fullPath, bool writable=false)` / `Create(string fullPath)` / `Delete(string fullPath)` / `UseSandbox(string sandboxRelativeToSoftware)` / `Reset()`）
 - Produces: `RegistryHost.DeleteInterceptionForTesting`（`internal static Action<string>?`，默认 `null`）—— **测试注入缝**：非 `null` 时 `Delete(string fullPath)` 在真正删除**之前**先调用该委托，委托抛出的异常直接向上传播（用于模拟 UCPD/权限拒绝），委托正常返回则继续执行真实删除；为 `null` 时行为与原来完全一致。`RegistryHost` 是 `static class`、**没有其它注入点**，真实注册表上无法稳定复现"删除被拒绝"，故由本缝支撑 Task B 的确定性失败用例。
 - 路径字符串保持**原样**（如 `@"Software\Classes\{ext}\OpenWithProgids"`），只有调用的方法名变。
+- **沙箱态 fail-closed（安全约束）**：`Map()` 在沙箱激活（`_sandbox != null`）时**只**接受以 `Software\` 开头的路径；传入非 `Software\` 路径时**必须直接抛异常**（`InvalidOperationException`），**禁止**静默按原路径落到真实 HKCU。理由：本计划涉及的 **20 处** HKCU 调用点（`ShellIntegration.cs` 97/112/118/124、`ShellIntegration.Assoc.cs` 17/30/50/102/173/183/216/246、`ShellIntegration.Menu.cs` 17/22/25/28/31/255/518、`App.axaml.cs:147`）**全部**以 `Software\` 开头，故该约束**不影响任何生产行为**（生产态 `_sandbox == null`，`Map` 原样返回）；它只机械封死"测试在沙箱态下误写真实注册表"这一逃逸面。**必须**有一条单测：沙箱态（`UseSandbox` 之后）传入非 `Software\` 路径（含 `SoftwareX\Foo` 这类"以 `Software` 开头但并非 `Software\` 前缀"的路径）→ 断言抛出异常（落在 `tests/MantisZip.Tests/RegistryHostTests.cs`）。
 
 - [ ] **Step 1: 新建 `RegistryHost.cs`（测试构造函数必须幂等清理沙箱 `Software\MantisZip\AssocTestSandbox`，否则上次崩溃残留会让 `Assert.False` 前置断言失败）**
 
@@ -112,7 +116,8 @@ namespace MantisZip.UI.Avalonia.Services;
 /// HKCU 注册表访问的唯一入口。
 /// 生产：路径原样落盘。
 /// 测试：<see cref="UseSandbox"/> 后，所有以 "Software\" 开头的路径被重定向到
-/// "Software\{sandbox}\..."，从而不污染真实的文件关联/右键菜单注册。
+/// "Software\{sandbox}\..."，从而不污染真实的文件关联/右键菜单注册；
+/// 沙箱态下传入**非** "Software\" 的路径会直接抛异常（fail-closed，见 Interfaces 约束）。
 /// </summary>
 internal static class RegistryHost
 {
@@ -136,8 +141,15 @@ internal static class RegistryHost
 
     private static string Map(string fullPath)
     {
-        if (_sandbox == null) return fullPath;
-        if (!fullPath.StartsWith(Root, System.StringComparison.OrdinalIgnoreCase)) return fullPath;
+        if (_sandbox == null) return fullPath;   // 生产：路径原样落盘，行为完全不变
+        // 沙箱态 fail-closed：只映射 "Software\" 下的路径；其余路径一律抛异常，
+        // 绝不放行到真实 HKCU（机械封死"测试在沙箱态下误写真实注册表"的逃逸面）。
+        // 前缀判断须精确到**分隔符级**：SoftwareX\Foo 这类"以 Software 开头但并非 Software\ 前缀"
+        // 的路径也必须抛异常，不得被静默改写进沙箱。
+        if (!(fullPath.StartsWith(@"Software\", System.StringComparison.OrdinalIgnoreCase)
+              || fullPath.Equals("Software", System.StringComparison.OrdinalIgnoreCase)))
+            throw new System.InvalidOperationException(
+                $@"RegistryHost sandbox only maps paths under 'Software\'; got: {fullPath}");
         var rest = fullPath.Substring(Root.Length).TrimStart('\\');
         return string.IsNullOrEmpty(rest)
             ? $@"{Root}\{_sandbox}"
@@ -237,14 +249,17 @@ public class ShellIntegrationAssocTests : IDisposable
 ```
 `RegistryHost` 为 `internal`，`MantisZip.UI.Avalonia.csproj:19` 已有 `InternalsVisibleTo("MantisZip.Tests")`，可直接访问。
 
-- [ ] **Step 6: 构建并跑测试**
+- [ ] **Step 6: 构建并跑测试（按 A-1 / A-2 分阶段）**
 
 Run:
 ```powershell
 dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
+# A-1 阶段：只跑新增的 RegistryHost 单元测试
+dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj --filter FullyQualifiedName~RegistryHostTests
+# A-2 完成后（ShellIntegrationAssocTests 已迁入沙箱）才允许跑无 filter 的完整测试项目
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 ```
-Expected: 编译 0 错误；测试全绿。
+Expected: 编译 0 错误；**A-1 阶段**：新增的 `tests/MantisZip.Tests/RegistryHostTests.cs` 全绿，且**禁止**跑整个测试项目（此时 `ShellIntegrationAssocTests` 尚未迁入沙箱，跑整项目会重现"测试污染真实文件关联"病灶）；**A-2 完成后**：无 filter 的完整测试项目全绿。
 
 - [ ] **Step 7: 验证真实注册表不被污染**
 
@@ -255,11 +270,21 @@ reg query "HKCU\Software\Classes\.zip\OpenWithProgids"
 ```
 Expected: 测试前后逐项一致（值可非空，不得有新键、不得有值变化）；沙箱被清理干净（`reg query "HKCU\Software\MantisZip\AssocTestSandbox"` 报找不到）。
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 8: Commit（按任务拆分：A-1 / A-2 各自独立提交）**
 
+每个任务完成后**分别**提交（conventional commits，规则 10），不再合并为单个 commit：
+
+**`1.1.1`（A-1：新增 `RegistryHost` + 其单元测试）：**
 ```bash
-git add src/MantisZip.UI.Avalonia/Services/RegistryHost.cs src/MantisZip.UI.Avalonia/Services/ShellIntegration.cs src/MantisZip.UI.Avalonia/Services/ShellIntegration.Assoc.cs src/MantisZip.UI.Avalonia/Services/ShellIntegration.Menu.cs src/MantisZip.UI.Avalonia/App.axaml.cs tests/MantisZip.Tests/ShellIntegrationAssocTests.cs
-git commit -m "fix(avalonia): 文件关联注册表访问收口 + 测试沙箱隔离，杜绝 dotnet test 污染真实关联"
+git add src/MantisZip.UI.Avalonia/Services/RegistryHost.cs tests/MantisZip.Tests/RegistryHostTests.cs
+git commit -m "fix(avalonia): 新增 RegistryHost 收口 HKCU 注册表访问 + 测试沙箱重定向"
+```
+> 注意：`tests/MantisZip.Tests/RegistryHostTests.cs` **必须**包含在 `1.1.1` 的提交清单中（`RegistryHost` 与其单测同批，保证"新增即被测"）。
+
+**`1.1.2`（A-2：全部 HKCU 调用点收口 + `ShellIntegrationAssocTests` 迁入沙箱）：**
+```bash
+git add src/MantisZip.UI.Avalonia/App.axaml.cs src/MantisZip.UI.Avalonia/Services/ShellIntegration.cs src/MantisZip.UI.Avalonia/Services/ShellIntegration.Assoc.cs src/MantisZip.UI.Avalonia/Services/ShellIntegration.Menu.cs tests/MantisZip.Tests/ShellIntegrationAssocTests.cs
+git commit -m "fix(avalonia): HKCU 调用点全部收口到 RegistryHost，关联测试迁入沙箱杜绝污染真实注册表"
 ```
 
 ---
@@ -477,12 +502,15 @@ if (iconKey?.GetValue(null) is string currentIcon && !string.IsNullOrWhiteSpace(
     //   ① 与安装时写入的现值相等；
     //   ② 与快照（"exe",0）相等；
     //   ③ 指向的文件不存在（安装目录变更、或测试输出目录被 dotnet clean 清掉）；
-    //   ④ 指向 ...\Resources\Icons\...（本项目与测试程序集唯一的图标落点；测试输出目录、
-    //      旧安装目录的残留都命中该特征，而严格相等判据永远匹配不到 → 残留永久清不掉的根因）。
+    //   ④ 值路径含 \Resources\Icons\ **且** basename ∈ {zip,sevenz,rar,tar,targz,gz,iso}.ico ——
+    //      加 basename 白名单是为**避免误删第三方图标**；该收窄不影响命中现场残留
+    //      （残留值为 …\…\Resources\Icons\zip.ico，basename 为 zip.ico ∈ 白名单）。
     bool matchesCurrent  = iconPath != null && currentIcon.Equals(iconPath, StringComparison.OrdinalIgnoreCase);
     bool matchesSnapshot = exePath != null && currentIcon.Equals($@"""{exePath}"",0", StringComparison.OrdinalIgnoreCase);
     bool pointsToMissing = !File.Exists(TrimIconIndex(currentIcon));
-    bool isOurIconDir    = currentIcon.IndexOf(@"\Resources\Icons\", StringComparison.OrdinalIgnoreCase) >= 0;
+    bool isOurIconDir    = currentIcon.IndexOf(@"\Resources\Icons\", StringComparison.OrdinalIgnoreCase) >= 0
+        && new[] { "zip.ico", "sevenz.ico", "rar.ico", "tar.ico", "targz.ico", "gz.ico", "iso.ico" }
+               .Contains(Path.GetFileName(TrimIconIndex(currentIcon)), StringComparer.OrdinalIgnoreCase);
 
     if (matchesCurrent || matchesSnapshot || pointsToMissing || isOurIconDir)
         iconKey.DeleteValue(null!);
@@ -858,6 +886,7 @@ git commit -m "chore(installer): 卸载钩子加 RunOnceId 防止重复条目"
 - 新增：`src/MantisZip.UI.Avalonia/Services/RegistryHost.cs`
 - 修改：`Services/ShellIntegration.cs`、`Services/ShellIntegration.Assoc.cs`、`Services/ShellIntegration.Menu.cs`、`App.axaml.cs`、`ViewModels/SettingsWindowViewModel.cs`
 - 测试：`tests/MantisZip.Tests/ShellIntegrationAssocTests.cs`
+- 测试：`tests/MantisZip.Tests/RegistryHostTests.cs`
 - 安装包：`installer.iss`、`installer-selfcontained.iss`
 - 文档：`docs/PROGRESS.md`、`docs/progress-avalonia-detail.md`、`docs/PLAN.md`
 
@@ -874,6 +903,8 @@ git commit -m "chore(installer): 卸载钩子加 RunOnceId 防止重复条目"
    - 设置页"安装关联"后"取消全部关联" → `DefaultIcon` 残留（含测试目录 ico）已清除、`OpenWithProgids` 旧值残留已清除；`UserChoice` 按 **best-effort** 处理（删除失败仅记日志，不作为验收硬指标）。
 5. **卸载**：安装包安装 → 卸载 → `HKCU\Software\Classes\MantisZip.*` 全部消失；指向我们的 `UserChoice` **尽力清除**（失败仅记日志、不视为阻塞，由 Task E 自愈兜底）。
 6. **.7z 回归组**：验证 `FileExts\.7z\UserChoice` 仍为 `MantisZip.7z`，且自愈不破坏其他格式。
+7. **新增测试文件全绿**：`tests/MantisZip.Tests/RegistryHostTests.cs`（`RegistryHost` 单元测试）必须全绿。
+8. **阶段约束（Task A 拆分）**：**A-1 阶段只允许** `dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj --filter FullyQualifiedName~RegistryHostTests`，**禁止**跑整个测试项目（此时 `ShellIntegrationAssocTests` 尚未迁入沙箱，跑整项目会重现"测试污染真实文件关联"病灶）；**A-2 完成后**才跑无 filter 的完整测试项目。
 
 ## 边界
 
@@ -891,7 +922,7 @@ git commit -m "chore(installer): 卸载钩子加 RunOnceId 防止重复条目"
 - **应用无法设默认**：这是平台限制，非本计划可解。若用户机器的 `UserChoice` 被 Windows 自身清空，E 无能为力，需在设置页提示"到 Windows 默认应用里重设"（**本计划不含此 UI 提示，记为后续项**）。
 - **测试仍用真实注册表（沙箱子树）**：需保证 `Dispose` 一定清理；沿用现有 `[Collection("RegistryTests", DisableParallelization = true)]` 串行约束。
 - **Task B 的 best-effort 删除会静默移除 Windows 默认关联**：与旧行为（关联悬空但键完好、重新启用即可复活）不同，把指向我们的 `UserChoice` 整键删掉后，Windows 会回退到内置/别家处理程序，用户需在系统"默认应用"里重新指定；这是**有意为之**（悬空默认比没有默认更糟），且重建关联（`--install-assoc` / 设置页）即可恢复。本轮**不新增 UI 提示文案**（避免三语本地化范围膨胀，规则 13），仅在文档中说明该语义，后续如需提示再单独评估。
-- **串行实施约束**：Task A / B / C / D / E / G **都改 `ShellIntegration.Assoc.cs`**（共享同一批修改点），因此这些任务必须**按 A → B → C → D → E → G 串行执行**，不得并行修改同一文件；Task F（安装包）与其它文件互不相干，可独立进行。
+- **串行实施约束**：Task A / B / C / D / E / G **都改 `ShellIntegration.Assoc.cs`**（共享同一批修改点），因此这些任务必须**按 A → B → C → E → D → F → G 串行执行**，不得并行修改同一文件；Task F（安装包）与其它文件互不相干，可独立进行。
 
 ## 执行流程
 
