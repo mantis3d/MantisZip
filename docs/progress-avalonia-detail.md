@@ -1,10 +1,13 @@
-﻿# MantisZip 开发进度 — Avalonia + 共享层详细变更记录
+# MantisZip 开发进度 — Avalonia + 共享层详细变更记录
 
 > 本文档为 [PROGRESS.md](PROGRESS.md) 的详细变更记录（里程碑总览见 PROGRESS.md），按日期从新到旧排列。
 
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+
+**2026-10-18** — DSH 维护插件落地 + AGENTS.md 瘦身 + zh-TW 重复 key 清理（工具/文档类）
+  - **i18n 修复**：`strings.zh-TW.json` 删除重复定义的 `Extract_ParallelDegree`（`平行解压執行緒數…` 被后一条 `並行解壓執行緒數…` 覆盖，属死条目、用户可见文案不变）。现有 `AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 对重复 key **无效**——JSON 解析会折叠同名 key，两份文件 key 集合仍相等；该问题由新插件的 `mantiszip_i18n` 首次运行发现，修复后三语一致（1262 key）
 
 **2026-10-18** — 压缩加速三开关计划完成「Task 0 基线复测 + 三项拍板」修订（计划类）
   - `.omo/plans/未开始/adaptive-compress-ui-convergence.md`：**Task 0 基线复测实跑完成**（`dotnet run scripts\bench-zip-mt.cs -- --profile text|media|mixed --degrees 0,1,2,4,8,16 --reps 3`，本机 **20 逻辑核** / `dotnet 10.0.13` / 合成语料 text 54MB·200 文件 + media 49MB·100 文件 + mixed 103MB·300 文件；报告 `.buildout\bench-before-{text,media,mixed}.txt|json`，已 gitignore）。结果表与 5 条观测已写入 Task 0
