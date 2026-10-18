@@ -180,17 +180,25 @@ internal static partial class ShellIntegration
         {
             var iconPath = GetIconPath(ext);
             var exePath = GetExePath();
-            using var extKey = RegistryHost.Open($@"Software\Classes\{ext}", writable: true);
-            if (extKey?.GetValue(null) is string currentIcon)
+            using var iconKey = RegistryHost.Open($@"Software\Classes\{ext}\DefaultIcon", writable: true);
+            if (iconKey?.GetValue(null) is string currentIcon && !string.IsNullOrWhiteSpace(currentIcon))
             {
-                if (iconPath != null && currentIcon.Equals(iconPath, StringComparison.OrdinalIgnoreCase))
-                {
-                    extKey.DeleteValue(null!);
-                }
-                else if (exePath != null && currentIcon.Equals($@"""{exePath}"",0", StringComparison.OrdinalIgnoreCase))
-                {
-                    extKey.DeleteValue(null!);
-                }
+                // 判据放宽（命中任一即清）：
+                //   ① 与安装时写入的现值相等；
+                //   ② 与快照（"exe",0）相等；
+                //   ③ 指向的文件不存在（安装目录变更、或测试输出目录被 dotnet clean 清掉）；
+                //   ④ 值路径含 \Resources\Icons\ **且** basename ∈ {zip,sevenz,rar,tar,targz,gz,iso}.ico ——
+                //      加 basename 白名单是为**避免误删第三方图标**；该收窄不影响命中现场残留
+                //      （残留值为 …\…\Resources\Icons\zip.ico，basename 为 zip.ico ∈ 白名单）。
+                bool matchesCurrent  = iconPath != null && currentIcon.Equals(iconPath, StringComparison.OrdinalIgnoreCase);
+                bool matchesSnapshot = exePath != null && currentIcon.Equals($@"""{exePath}"",0", StringComparison.OrdinalIgnoreCase);
+                bool pointsToMissing = !File.Exists(TrimIconIndex(currentIcon));
+                bool isOurIconDir    = currentIcon.IndexOf(@"\Resources\Icons\", StringComparison.OrdinalIgnoreCase) >= 0
+                    && new[] { "zip.ico", "sevenz.ico", "rar.ico", "tar.ico", "targz.ico", "gz.ico", "iso.ico" }
+                           .Contains(Path.GetFileName(TrimIconIndex(currentIcon)), StringComparer.OrdinalIgnoreCase);
+
+                if (matchesCurrent || matchesSnapshot || pointsToMissing || isOurIconDir)
+                    iconKey.DeleteValue(null!);
             }
         }
         catch (Exception ex) { App.DebugLog($"ShellIntegration.UninstallAssociationForExtension: failed to delete DefaultIcon: {ex.Message}"); }
@@ -355,6 +363,19 @@ internal static partial class ShellIntegration
 
         var iconPath = Path.Combine(baseDir, "Resources", "Icons", iconName);
         return File.Exists(iconPath) ? iconPath : null;
+    }
+
+    /// <summary>从图标注册表值中提取文件路径：去掉引号与 ",0" / ",1" 索引后缀。</summary>
+    private static string TrimIconIndex(string rawValue)
+    {
+        var value = rawValue.Trim();
+        if (value.StartsWith('"'))
+        {
+            var end = value.IndexOf('"', 1);
+            if (end > 1) return value.Substring(1, end - 1);
+        }
+        var comma = value.LastIndexOf(',');
+        return comma > 0 ? value.Substring(0, comma) : value;
     }
 
     #endregion

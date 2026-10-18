@@ -207,6 +207,40 @@ public class ShellIntegrationAssocTests : IDisposable
         }
     }
 
+    [Fact]
+    public void Uninstall_RemovesDefaultIcon()
+    {
+        try
+        {
+            ShellIntegration.InstallAssociationForExtension(".zip");
+            using (var k = RegistryHost.Open(@"Software\Classes\.zip\DefaultIcon"))
+                Assert.NotNull(k?.GetValue(null));     // 安装后应存在
+
+            ShellIntegration.UninstallAssociationForExtension(".zip");
+
+            using var after = RegistryHost.Open(@"Software\Classes\.zip\DefaultIcon");
+            Assert.Null(after?.GetValue(null));        // 卸载后应清掉
+        }
+        finally { CleanupExtension(".zip"); }
+    }
+
+    [Fact]
+    public void Uninstall_RemovesOrphanedDefaultIcon_PointingToTestsOutputDir()
+    {
+        try
+        {
+            // 构造现场症状：DefaultIcon 指向测试输出目录的 ico（与现值/快照均不相等）
+            using (var k = RegistryHost.Create(@"Software\Classes\.zip\DefaultIcon"))
+                k.SetValue(null, @"D:\Github\MantisZip\tests\MantisZip.Tests\bin\Debug\net10.0-windows10.0.17763.0\Resources\Icons\zip.ico");
+
+            ShellIntegration.UninstallAssociationForExtension(".zip");
+
+            using var after = RegistryHost.Open(@"Software\Classes\.zip\DefaultIcon");
+            Assert.Null(after?.GetValue(null));   // 残留值必须被清掉（这是用户实际症状）
+        }
+        finally { CleanupExtension(".zip"); }
+    }
+
     // ──────────────────────────────────────────────
     // AreAssociationsInstalledForExtension
     // ──────────────────────────────────────────────
