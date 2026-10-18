@@ -1,40 +1,40 @@
 # 压缩加速三开关 — UI 收敛（Phase 1）+ 魔数检测/自适应规则实现（Phase 2）
 
-> **状态**: 📋 待实施 | **日期**: 2026-10-16（**2026-10-18 评审修订 + 实测拍板**）| **优先级**: P1 | **预估工时**: Phase 1 = **4-5h**（实测拍板后下调：**改动 B 取消** + 组数规则简化为 `clamp(核数,4,16)`，Task 0 已实跑完成）/ Phase 2 = 3-4h
+> **状态**: 📋 待实施 | **日期**: 2026-10-16（**2026-10-18 评审修订 + 实测拍板 + 同日双机复测改判**）| **优先级**: P1 | **预估工时**: Phase 1 = **4-5h**（组数规则简化为 `clamp(核数,4,16)`，Task 0 双机实跑完成；改动 B 暂缓 → Phase 1 无门控代码）/ Phase 2 = **5-7h**（原 3-4h + Task 12 本机基准测试约 +2-3h）
 > **来源**: 用户 2026-10-16 提出「压缩有个选项有两个开关『多线程』和『自适应』，测试发现不启用自适应时开启多线程反而有反作用」→ 实测 + 代码审计后扩展为两阶段计划
 > **原型**: [docs/prototypes/compress-format-options-panel.html](../../docs/prototypes/compress-format-options-panel.html)（交互原型，已覆盖两处界面）
 > **评审**: 2026-10-18 逐条核对源码，修正 4 处会直接踩坑的事实错误（A1–A4）、1 处与既有 bench 结论冲突（B1）、若干语义/文档遗漏（C/D 项），详见文末「修订记录」
-> **实测拍板（2026-10-18）**: Task 0 基线复测已实跑（本机 20 逻辑核，报告 `.buildout\bench-before-{text,media,mixed}.txt`）→ **改动 B 取消**（MT 保持独立）、引擎默认组数 `clamp(核数,4,16)`、方案 C 保留但标注「未验证」；详见文末「拍板记录」，评审项 A1/A2/C3/C4 随之关闭
+> **实测拍板（2026-10-18）**: Task 0 基线复测已实跑（20 逻辑核机 + 8 逻辑核机双机对照，报告 `.buildout\bench-before-*.txt` / `bench-retest-8lp-*.txt`）→ 引擎默认组数 `clamp(核数,4,16)`、方案 C 保留但标注「未验证」；**改动 B（MT 依赖自适应）暂缓拍板**——20 核机上「仅 MT」有真实收益、8 逻辑核机上「仅 MT」净负收益（用户原始观察在弱 CPU 上复现），任何一刀切静态策略均片面 → Phase 1 维持三开关独立（无门控代码），最终策略待 Phase 2「本机基准测试」按机器定夺；详见文末「拍板记录」
 
 ## 背景
 
-压缩加速面板有三个开关（`自适应压缩` / `魔数检测` / `多线程压缩`），压缩对话框 ZIP 面板另有一个 `并行压缩组数`。2026-10-16 实测 + 全仓代码审计后发现四个问题（2026-10-18 已逐条复核，证据全部成立）：
+压缩加速面板有三个开关（`自适应压缩` / `魔数检测` / `多线程压缩`），压缩对话框 ZIP 面板另有一个 `并行压缩组数`。2026-10-16 实测 + 全仓代码审计后发现五个问题（2026-10-18 已逐条复核；其中 #2 经同日双机复测后判定为硬件相关、暂缓拍板，其余证据成立）：
 
 | # | 问题 | 证据 |
 |---|------|------|
 | 1 | **「并行压缩组数」是性能陷阱** | 16 核机器把组数设为 2，压缩只用 **1.95 个核**（进程 CPU/墙钟实测），耗时 **5.47s vs 设 16 组的 1.64s（3.3x）**。根因：N 组路径每组强制 `mt=off`（`Core/Engines/ZipEngine.cs:4103`），**并行度 = 组数**（实测 `avgCores ≈ degree`）。且该旋钮对速度**无正收益**（deg=1/2/4/8/16 互有胜负，平台区 2–8）⚠ 与 2026-10-05 bench 结论方向相反，见 Task 0 |
-| 2 | ~~**「多线程压缩」在自适应关闭时是负收益**~~ → **已证伪，改动取消** | 原证据：可压缩数据（text 语料）上「仅多线程」比**完全不开多线程**慢 **1.5–1.8x**（机制：MT 路径改用 7z 的 Deflate，无自适应剔除时慢压缩器白跑）。**2026-10-18 实测未在默认组数下复现**：text 上「仅多线程」0.88s **快于**全关 0.95s 与仅自适应 0.97s（压缩率还高 15%）、mixed 上 0.98s ≪ 全关 2.13s；「慢 1.5–1.8x」仅在 deg≤4（用户可设的陷阱档）出现 → **用户 2026-10-18 拍板：取消改动 B**（详见 Task 0 实测结果 + Task 3） |
+| 2 | ~~**「多线程压缩」在自适应关闭时是负收益**~~ → **双机数据矛盾，暂缓拍板** | 原证据：可压缩数据（text 语料）上「仅多线程」比**完全不开多线程**慢 **1.5–1.8x**。2026-10-18 **双机复测**：20 核机上**未复现**（text B 0.88s < D 0.95s，MT 有真实收益）；但 **8 逻辑核机（i7-3770 4C/8T）上复现**（text B 2.66s vs D 1.87s 慢 42%；mixed B 3.90s vs A 2.85s 慢 37%）——**强 CPU 有收益 / 弱 CPU 负收益，一刀切静态策略必然片面** → 改动 B **暂缓**：Phase 1 维持三开关独立（无门控代码），最终策略待 Phase 2 本机基准测试（Task 12）按机器定夺 |
 | 3 | **「魔数检测」是空转开关** | `AdaptiveSmartDetect` 全仓**无任何引擎消费者**：只有 UI 绑定 + `AppSettings` 持久化 + `CompressRequest → ArchiveOptions` 透传；`AdaptiveRuleMatcher.ResolveLevel(..., adaptiveSmartDetect:)` 形参**只写日志、不参与分支**（`Core/Utils/AdaptiveRuleMatcher.cs:30`）。而 `Core/Abstractions/ArchiveEngine.cs:183` 注释写的是「自适应关闭时无效」——语义上该联动，UI 也漏了 |
 | 4 | **「自适应规则」也是空转** | `AdaptiveRuleMatcher.ResolveLevel`（唯一会应用规则的函数）**无生产调用点**（仅 `AdaptiveCompressionTests` 引用）；`CompressRequest` / `ArchiveOptions` **根本没有规则字段**。即用户配了规则不生效 |
 | 5 | 自定义格式的「魔数 hex」也不生效 | `ZipEntryClassifier.GetAdaptiveLevel` 只读 `format.Extensions`（`Core/Utils/ZipEntryClassifier.cs:73-94`），**从不读 `MagicHex`** |
 
-**Phase 1 目标**：先出一版「UI 不说谎」的可用版本 —— 删除/隐藏空转控件，修掉 #1 这个真实性能坑（删「并行压缩组数」旋钮 + 引擎默认组数改 `clamp(核数,4,16)`，见 Task 1/2）。#2 经实跑**证伪** → **改动 B 取消**（MT 与自适应保持独立，见 Task 3 记录）。
-**Phase 2 目标**：实现 #3 #4（魔数检测 + 自适应规则），并把 Phase 1 隐藏的 UI 接回来。
+**Phase 1 目标**：先出一版「UI 不说谎」的可用版本 —— 删除/隐藏空转控件，修掉 #1 这个真实性能坑（删「并行压缩组数」旋钮 + 引擎默认组数改 `clamp(核数,4,16)`，见 Task 1/2）。#2 经双机实测**判定为硬件相关、无法一刀切** → 改动 B **暂缓**（Phase 1 维持独立无门控，见 Task 3）。
+**Phase 2 目标**：实现 #3 #4（魔数检测 + 自适应规则），把 Phase 1 隐藏的 UI 接回来，并新增**本机基准测试**（Task 12：按机器实测 MT 收益，决定默认勾选 + 常驻收益提示文案）。
 
 ## 决策记录（2026-10-16 用户授权「按你觉得合适的来」+ 2026-10-18 评审补充）
 
 | 决策 | 取值 | 理由 |
 |------|------|------|
 | 改动 A（删「并行压缩组数」）是否进 Phase 1 | **进** | 实测确认「deg=2 陷阱」（比默认慢 3.5–3.7x），且该旋钮对速度无正收益 → 属真实缺陷修复 |
-| 改动 B（多线程依赖自适应）是否进 Phase 1 | **取消（2026-10-18 实测拍板）** | 前提在默认组数下**证伪**：「仅多线程」并不慢于「全关 / 仅自适应」（text 0.88s vs 0.95/0.97s，且压缩率 +15%；mixed 0.98s vs 2.13/1.18s）。强制依赖会白丢真实收益 |
+| 改动 B（多线程依赖自适应）是否进 Phase 1 | **暂缓（2026-10-18 双机数据后改判）** | 曾基于 20 核机数据拍板「取消」（仅 MT 有真实收益），但 8 逻辑核机复测**方向反转**（text B 2.66s vs D 1.87s 慢 42%）→ **强 CPU 有收益 / 弱 CPU 负收益，一刀切必然片面**。Phase 1 维持独立无门控，最终策略待 Phase 2 本机基准测试（Task 12） |
 | 引擎侧方案 C（`mt = 核数/组数`）是否进 Phase 1 | **进（4 行改动），标注「未验证」** | 2026-10-16 测量：`mt=N` 被 7z 接受（`-mmt=N`）、端到端 avgCores 恒 ≈12。⚠ **2026-10-18 实测补充**：默认路径（本机 16 组）下 C 是 **no-op**（`mt = max(1, 20/16) = 1`），仅在「核数 > 16」或「文件数 < 组数（少量大文件）」时生效，而这两场景的收益**尚未验证**（本机小文件语料证明单组 `mt=on` 只用约 1 个核）→ 保留但不得当性能依据，验证方法见 Task 2「待验证」 |
 | 默认组数取多少 | **`clamp(核数,4,16)`（2026-10-18 实测拍板）** | Task 0 实测否决两个候选：`clamp(核数,2,8)` 相对现默认（cap 16）是回退（deg=8 比 deg=16 慢 21–30%）；`deg=1` 更慢（text ~1.8x）。取 `clamp(核数,4,16)`：保留本机 16 组的最优表现，低核下限 4 避开已证实的 deg=2 陷阱 |
 | 自定义格式「魔数 hex」（#5）是否一起隐藏 | **一起隐藏** | 与魔数检测是同一件事，留着同样是骗人 UI |
 | 「隐藏」的实现方式 | **用显式 `false` 门控 + Phase 2 注释，不删标记** | Phase 2 = 改回来（1 行），避免重建标记；代价是留少量 dead markup（计划内已列「Phase 2 恢复清单」）。⚠ XAML 内占位注释必须写 `<!-- -->`（不是 `//`） |
 | 保留不动的部分 | **仅「与魔数/规则相关」的部分**：`AppSettings.AdaptiveSmartDetect` / `AdaptiveOverrides` / `MultiThreadedStoreFormatIds`、`CompressRequest`/`ArchiveOptions` 透传链路、其余三语 key、`EditAdaptiveRuleDialog`、`AddCustomFormatDialog` | Phase 2 只需「UI 接回来 + 引擎实现」，链路不重做。**`AppSettings.ParallelCompressDegree` 与 2 个组数 key 不在保留范围内（Task 1 要删）** —— 2026-10-18 评审修正：原文「保留 AppSettings 字段」与 Task 1 自相矛盾 |
-| ~~「MT 依赖自适应」的生效值由谁计算~~ → **不适用（改动 B 取消）** | **不做任何夹取** | `MultiThreadedCompression` 与 `AdaptiveCompression` 保持**互相独立**；`CompressService.BuildOptions` / `CompressFlow.BuildRequest` 均不引入相关夹取（评审 A1 随之关闭） |
-| 「多线程压缩」的持久化语义 | **维持原语义**：`AppSettings.MultiThreadedCompression` 直存直用，**不引入「意图 / 生效值」二分** | 改动 B 取消后无需区分意图与生效值（评审 C3 随之关闭）；UI 显示的就是引擎收到的值 |
-| ZIP 面板 MT 的联动条件 | **仅剩 1 个：ZIP32 4GB 超限**（现有 `UpdateTotalSourceSize` 逻辑**保留不动**：超限 → 取消勾选 + 置灰 + 灰字提示；退出超限 → 恢复原勾选 `_mtCheckedBeforeLimit`） | 自适应不再是 MT 的门控（改动 B 取消）→ 不需要 `RefreshZipMtState()` 状态机（评审 A2 随之关闭）。另：删掉组数面板后 `ZipMultiThreadCheck_IsCheckedChanged` 已无联动对象 → Task 1 连带删除该处理器及其 axaml 事件属性 |
+| ~~「MT 依赖自适应」的生效值由谁计算~~ → **不适用（改动 B 暂缓）** | **Phase 1 不做任何夹取** | `MultiThreadedCompression` 与 `AdaptiveCompression` Phase 1 保持**互相独立**（无门控代码，同现状）；`CompressService.BuildOptions` / `CompressFlow.BuildRequest` 均不引入相关夹取（评审 A1 随之关闭）。最终策略（若需要门控/默认值调整）待 Task 12 基准测试结果 |
+| 「多线程压缩」的持久化语义 | **维持原语义**：`AppSettings.MultiThreadedCompression` 直存直用，**不引入「意图 / 生效值」二分** | Phase 1 无门控无需区分意图与生效值（评审 C3 随之关闭）；UI 显示的就是引擎收到的值。Task 12 若引入「基准测试建议默认值」，只影响**首次默认播种**与提示文案，不改直存直用语义 |
+| ZIP 面板 MT 的联动条件 | **仅剩 1 个：ZIP32 4GB 超限**（现有 `UpdateTotalSourceSize` 逻辑**保留不动**：超限 → 取消勾选 + 置灰 + 灰字提示；退出超限 → 恢复原勾选 `_mtCheckedBeforeLimit`） | 自适应不是 MT 的门控（改动 B 暂缓，Phase 1 无联动）→ 不需要 `RefreshZipMtState()` 状态机（评审 A2 随之关闭）。另：删掉组数面板后 `ZipMultiThreadCheck_IsCheckedChanged` 已无联动对象 → Task 1 连带删除该处理器及其 axaml 事件属性 |
 
 ## Phase 1：UI 收敛（4-5h）
 
@@ -63,14 +63,11 @@
     - 但「2–8 组快于 deg=1」也不足以支撑 `clamp(核数,2,8)`：本机 **deg=8 明显慢于 deg=16**（text +21% / mixed +30%）→ 该候选同样否决；
     - **定调：`clamp(核数,4,16)`**（本机 = 16 组）。旧 bench「N 组无加速、degree=1 全面最快」不成立的可能成因：旧扫描**未含 deg=16**，且当时 `MultiThreadedCompression` 默认关闭（`docs/PROGRESS.md` 2026-10-06 条目自身注明）→ 原结论适用范围有限。
 
-- [ ] **Step 3: 低核数对照（评审 B2）—— ⚠ 未做**（本机 20 核，无低核环境）
+- [x] **Step 3: 低核数对照（评审 B2）—— ✅ 部分完成（2026-10-18 8 逻辑核机复测）**
 
-    ```powershell
-    dotnet run scripts\bench-zip-mt.cs -- --profile mixed --degrees 0,1,2,4 --reps 3 --report .buildout\bench-before-lowcore.txt
-    ```
+    原计划在 4 核 VM 上跑；实际在 **8 逻辑核机（i7-3770 4C/8T）** 上完成三语料全扫描（`.buildout\bench-retest-8lp-{text,media,mixed}.txt`，数据见下方「8 逻辑核机复测」小节）。纯 2–4 物理核环境仍未测。
 
-    在 4 核机器/虚拟机上跑（或据此对照低核默认组数表现）。
-    Expected: 记录 2/4 核下的默认组数表现。**定调为 `clamp(核数,4,16)` 后：若低核下出现回退（如 2 核时 4 组超订反而变慢），退化为 `min(核数,16)`（1 行）—— 不再是「默认 = 1」分支。**
+    结论：8 逻辑核下 **deg=2 陷阱依旧成立**（text B 6.83s vs deg=0 2.66s，慢 2.6x），其余组数（1/4/8/16）相对 deg=0 落在 1.0–1.7x 区间，**未出现新的超订塌陷** → `clamp(核数,4,16)` 在 8 核级别无额外风险。但更重要的发现是 **MT 路径在本机整体净负收益**（见观测 4′），该问题无法靠调组数解决。
 
 - [x] **Step 4: 把 before 数据与定调结论写进本计划（供 Task 8 做 after 对照）** ✅ 数据与拍板结果均已在下方
 
@@ -104,20 +101,59 @@
 1. ✅ **deg=2 陷阱确认**：三语料 B/C 的 `deg=2` 全部最差（text 3.07/3.05、mixed 3.59/3.25、media 0.56），相对 `deg=0` 慢 **3.5–3.7x** → 删旋钮的正当性成立。
 2. ❌ **「平台区 2–8」不成立**：本机是「**越多组越快（至 16）**」。text deg=8 0.96 vs deg=16 0.79（+21%）；mixed 1.26 vs 0.97（+30%）→ **`clamp(核数,2,8)` 相对现默认是性能回退**。
 3. ❌ **「deg=1 只慢 5%」不成立**：text deg=1 远慢于 deg=16（单组 `mt=on` 2.60s vs 16 组 0.79s；即便按噪声折算 ~1.44s 仍慢 ~1.8x）→ 「**默认 = 1**」分支**否决**。但 mixed 上 deg=1 反而最快（B 0.81 / C 0.96）—— 该语料一半是 Store，N 组合并有额外 IO 开销。
-4. ❌ **改动 B 的前提在默认组数下不成立**：text **B 0.88 < D 0.95 < A 0.97**（且 B 压缩率还高 15%）、mixed **B 0.98 ≪ A 1.18 ≪ D 2.13**。「仅多线程更慢 1.5–1.8x」只在 **deg≤4** 出现（vs D：deg=1 1.58x、deg=2 3.4x、deg=4 1.8x）→ 若按计划强制「自适应关 ⇒ MT 关」，用户在 text/mixed 上会**白丢真实收益**（含 +15%/+2% 压缩率）。
+4. ❌ **改动 B 的前提在 20 核机默认组数下不成立**：text **B 0.88 < D 0.95 < A 0.97**（且 B 压缩率还高 15%）、mixed **B 0.98 ≪ A 1.18 ≪ D 2.13**。「仅多线程更慢 1.5–1.8x」只在 **deg≤4** 出现（vs D：deg=1 1.58x、deg=2 3.4x、deg=4 1.8x）。⚠ **此结论仅对强 CPU 成立——8 逻辑核机方向反转，见下方复测小节与观测 4′**。
 5. ⚠ **方案 C（`mt = 核数/组数`）在本机默认路径上是 no-op**（groups=16 → `mt = max(1, 20/16) = 1`）。其价值取决于「7z 的 `mt` 能否在**单文件内**并行」——本语料（200×250KB 小文件）证明单组 `mt=on` 只用约 1 个核（2.60s vs 16 组 0.79s），故需**大文件语料**（`--corpus <含数百 MB 级单文件的目录>`）才能验证；未验证前不应作为 Phase 1 的必要条件。
 
-**✅ 拍板结果（2026-10-18 用户决策）**
+#### 📊 8 逻辑核机复测（2026-10-18 · i7-3770 4C/8T / dotnet 10.0.11 / level 5 / reps 3）
 
-- **(a) 改动 B：取消** —— MT 与自适应保持**互相独立**；Task 3 改为「记录该决策 + 不做任何夹取」。
-- **(b) 默认组数：`clamp(核数,4,16)`** —— 本机 = 16 组（与现默认一致，保留实测最优）；低核下限 4 避开已证实的 deg=2 陷阱。
+> **为什么补测**：20 核机的「改动 B 取消」拍板仅基于单机数据；用户报告两台电脑结论不一致 → 在第二台机器（弱 CPU）上按相同参数复跑三语料。报告：`.buildout\bench-retest-8lp-{text,media,mixed}.txt` + `.json`。
+
+**最小耗时（秒）** —— `deg=0` 在本机解析为 `ProcessorCount=8` 组
+
+| 语料 | 配置 | deg=0 | deg=1 | deg=2 | deg=4 | deg=8 | deg=16 |
+|------|------|-------|-------|-------|-------|-------|--------|
+| text 54MB / 200 文件 | **B** | **2.66** | 2.72 | 6.83 ⚠ | 3.93 | 3.17 | 3.01 |
+| text | **C** | **2.61** | 2.79 | 7.65 ⚠ | 4.43 | 2.86 | 3.10 |
+| text | A | 2.11 | 2.64 | 2.39 | 2.29 | **1.99** | 2.61 |
+| text | D | **1.87** | 2.01 | 1.93 | 2.08 | **1.82** | 2.02 |
+| media 49MB / 100 文件 | A | **0.60** | 0.57 | 0.61 | 0.78 | 0.68 | 0.60 |
+| media | C | **0.60** | 0.66 | 0.75 | 0.94 | 0.71 | 0.62 |
+| media | B | 1.00 | 1.09 | 1.62 | 1.58 | 1.09 | **0.95** |
+| media | D | 2.62 | 2.41 | 2.86 | 2.83 | 2.84 | **2.31** |
+| mixed 103MB / 300 文件 | A | **2.85** | 3.09 | **2.60** | 2.68 | 2.84 | 3.03 |
+| mixed | C | **3.32** | 4.09 | 6.14 ⚠ | 4.04 | 3.59 | 3.84 |
+| mixed | B | **3.90** | 4.24 | 7.49 ⚠ | 4.72 | 4.08 | 4.23 |
+| mixed | D | **4.16** | 4.18 | 4.37 | 4.46 | 4.93 | 4.59 |
+
+**双机对照（deg=0，即各自引擎默认组数）**
+
+| 语料/对比 | 20 核机（deg=0→16 组） | 8 逻辑核机（deg=0→8 组） | 方向 |
+|---|---|---|---|
+| text：B（仅MT）vs D（全关） | B 0.88 **<** D 0.95（MT 快 7%） | B 2.66 **>** D 1.87（MT **慢 42%**） | **反转** |
+| mixed：B vs A（仅自适应） | B 0.98 **<** A 1.18（MT 快 17%） | B 3.90 **>** A 2.85（MT **慢 37%**） | **反转** |
+| media：A vs B vs D | A 0.22 < B 0.27 < D 1.22 | A 0.60 < B 1.00 < D 2.62 | 一致（A 最优） |
+| deg=2 陷阱（B 相对 deg=0 慢） | 3.5x | 2.6x | 一致 |
+| B/C 压缩率优势 | text +15%、mixed +2.1% | text +15%、mixed +2.1% | **完全一致**（硬件无关） |
+
+**观测 4′（8 逻辑核机，Task 3 / Task 12 的定调依据）**
+
+- ❌ **「改动 B 取消」的前提在弱 CPU 上不成立**：text 上 **B 2.66 > A 2.11 > D 1.87**（B 比 D 慢 42%）、mixed 上 **A 2.85 < C 3.32 < B 3.90 < D 4.16**——**用户 2026-10-16 的原始观察「不启用自适应时开启多线程反而有反作用」在本机成立**。
+- 机制解释：i7-3770 仅 **4 物理核**（8 逻辑核是超线程），8/16 组并行是超订；Deflate 为 ALU 密集负载，超线程仅带来约 20–30% 额外吞吐，撑不起 8 路真并行。20 核机 16 组并行把 2.6s 压到 0.79s（并行效率高），本机同机制只能得到 ~2.7s（并行效率坍塌），再叠加 MT 路径固有的临时文件写入 + 合并开销 → 净收益转负。
+- 组数调整救不了：本机 B 最优组数是 deg=0/1（~2.7s），仍显著差于串行 D（1.87s）——**问题不在组数，在 MT 路径本身对弱 CPU 不划算**。
+- 两机一致的事实：**deg=1（单组 `mt=on`）在小文件语料上都只用约 1 个核**（本机 B deg=1 2.72s vs D 1.87s；20 核机 2.60s vs 0.91s）—— 印证「7z 的 mt 对多小文件无效」，Task 2 方案 C 的「未验证」标注继续成立。
+
+**✅ 拍板结果（2026-10-18 用户决策 · 双机数据后修订）**
+
+- **(a) 改动 B：暂缓** —— 20 核机有收益 / 8 逻辑核机负收益，一刀切静态策略（无论「独立」还是「依赖」）必然片面。Phase 1 **维持三开关独立、无门控代码**（同现状，Task 3 无代码改动）；最终策略待 **Task 12 本机基准测试**按机器定夺（检测到负收益 → 默认不勾选 + 常驻科普提示，用户仍可手动开启）。
+- **(b) 默认组数：`clamp(核数,4,16)`** —— 20 核机 = 16 组（实测最优）；8 逻辑核机 = 8 组（虽非本机 B 最优，但与现默认一致，且 deg=2 陷阱已被下限 4 避开）。低核下限 4 在 8 逻辑核级别未见新塌陷（Step 3）。
 - **(c) 方案 C：保留**（`mt = max(1, 核数/组数)`），但**标注「未验证」** —— 默认路径下为 no-op，仅在「核数 > 16」或「文件数 < 组数」时生效（见 Task 2）。
 
 **⚠ 仍然悬空的验证项（不阻塞 Phase 1，但须在计划里留痕）**
 
-- **Step 3 低核对照未做**（本机 20 核，无 4 核环境）→ `clamp(核数,4,16)` 的低核行为（尤其 2 核时 4 组 > 核数的轻度超订）**仍未实测**；若日后在低核机器上发现回退，退化为 `min(核数,16)` 即可（1 行）。
-- **Step 1 的 deg=1 批疑有环境噪声**（该批里与组数无关的 A/D 也整体 +80%）→ 若要引用 deg=1 的绝对秒数，先 `--degrees 1 --reps 5` 复测。
-- **方案 C 的收益未验证**（需 `--corpus <含数百 MB 级单文件的目录>`；本机小文件语料下 7z 的 `mt` 近似 no-op）。
+- **纯 2–4 物理核环境未测**（8 逻辑核 = 4 物理核部分回答了 Step 3；`clamp(核数,4,16)` 的 2 核行为仍未实测）→ 若日后发现回退，退化为 `min(核数,16)` 即可（1 行）。
+- **Step 1 的 deg=1 批疑有环境噪声**（20 核机该批里与组数无关的 A/D 也整体 +80%）→ 若要引用 deg=1 的绝对秒数，先 `--degrees 1 --reps 5` 复测。
+- **方案 C 的收益未验证**（需 `--corpus <含数百 MB 级单文件的目录>`；两机小文件语料下 7z 的 `mt` 近似 no-op）。
+- **8 逻辑核机的 MT 负收益幅度是否代表所有弱 CPU**（本机是 2012 年 Ivy Bridge；较新的 6–8 核 CPU 可能介于两机之间）→ Task 12 基准测试正是为此设计，不做硬件白名单猜测。
 
 ---
 
@@ -125,7 +161,7 @@
 
 | 文件 | 改动 |
 |------|------|
-| `Controls/DynamicFormatOptionsPanel.axaml` | 删 `ParallelDegreePanel`（:96-116，标签 + `ParallelDegreeInput` + 灰色提示），**以及 `ZipMultiThreadCheck` 上的 `IsCheckedChanged="ZipMultiThreadCheck_IsCheckedChanged"`（:80）** —— 该处理器的唯一作用是联动组数面板显隐；改动 B 取消后它没有任何用途（**不是**「留给 Task 3 复用」） |
+| `Controls/DynamicFormatOptionsPanel.axaml` | 删 `ParallelDegreePanel`（:96-116，标签 + `ParallelDegreeInput` + 灰色提示），**以及 `ZipMultiThreadCheck` 上的 `IsCheckedChanged="ZipMultiThreadCheck_IsCheckedChanged"`（:80）** —— 该处理器的唯一作用是联动组数面板显隐；改动 B 暂缓（Phase 1 无门控）后它没有任何用途（**不是**「留给 Task 3 复用」） |
 | `Controls/DynamicFormatOptionsPanel.axaml.cs` | 删 `ParallelDegreeLabel`/`ParallelDegreeHint`（:61-62）、`ParallelCompressDegree` 属性（:247-255）、**`ZipMultiThreadCheck_IsCheckedChanged` 整个处理器**（:312-320，连同 XML 注释）、`UpdateTotalSourceSize` 里的面板显隐 2 行（:384-385）、`LoadDefaults` 里的组数播种与面板显隐（:420-423）、面板相关 XML 注释（:93-95）。**保留** `_mtCheckedBeforeLimit`（:41）与 `UpdateTotalSourceSize` 其余逻辑（ZIP32 4GB 门控仍需要它） |
 | `ViewModels/CompressSettingsViewModel.cs` | 删 `_parallelCompressDegree`（:209-211）、钳制 handler（:496-509）、设置默认值播种（:631-632）、`LocalizedStrings` 2 行（:493-494） |
 | `Dialogs/CompressSettingsWindow.axaml.cs` | 删 `ParallelCompressDegree` 快照（:276-277，含注释） |
@@ -166,34 +202,39 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 
 **测试**：`ParallelCompressTests` 使用显式 1/3/4 → 不受影响；已核对**无**测试断言 `ResolveParallelCompressDegree(0)` → 补一条 `ResolveParallelCompressDegree_Zero_UsesEngineDefault`，断言 `clamp(ProcessorCount,4,16)`（本机 20 → 16），把默认语义钉住。
 
-### Task 3 — 改动 B 已取消（2026-10-18 实测拍板）：三开关互相独立
+### Task 3 — 改动 B 暂缓（2026-10-18 双机数据后改判）：Phase 1 三开关保持独立
 
-> **决策**：**不做**「多线程压缩依赖自适应压缩」。`MultiThreadedCompression` 与 `AdaptiveCompression` 在引擎 / 请求 / UI 三层**保持互相独立**；本 Task **无代码改动**，只记录决策 + 留回归护栏。
+> **决策**：**暂缓**「多线程压缩依赖自适应压缩」的最终拍板。`MultiThreadedCompression` 与 `AdaptiveCompression` 在 Phase 1 引擎 / 请求 / UI 三层**保持互相独立（无门控代码，同现状）**；本 Task **无代码改动**，只记录决策 + 留回归护栏。**最终策略待 Task 12 本机基准测试按机器定夺**（检测到 MT 负收益 → 默认不勾选 + 常驻科普提示，不做强制门控）。
 
-**证据（Task 0 实测，本机 20 核，默认组数下）**
+**双机证据（Task 0 实测，默认组数下 deg=0）**
 
-| 语料 | 仅多线程（B） | 仅自适应（A） | 全关（D） | 结论 |
-|------|--------------|--------------|-----------|------|
-| text 54MB | **0.88s**（7.15x） | 0.97s（6.21x） | 0.95s | MT 更快且压缩率 +15% |
-| mixed 103MB | **0.98s**（1.823x） | 1.18s（1.786x） | 2.13s | MT 比 A 快 17%、比 D 快 2.2x |
-| media 49MB | 0.27s | **0.22s** | 1.22s | 自适应小胜（已压缩数据 Store 更快，差 0.05s） |
+| 语料 | 20 核机 | 8 逻辑核机（i7-3770） | 结论 |
+|------|---------|---------------------|------|
+| text：B（仅MT）vs D（全关） | B **0.88s** < D 0.95s（MT 快 7%） | B **2.66s** > D 1.87s（MT **慢 42%**） | **方向反转** |
+| mixed：B vs A（仅自适应） | B **0.98s** < A 1.18s（MT 快 17%） | B **3.90s** > A 2.85s（MT **慢 37%**） | **方向反转** |
+| media：A vs B vs D | A 0.22s < B 0.27s < D 1.22s | A 0.60s < B 1.00s < D 2.62s | 一致（A 最优） |
+| B/C 压缩率优势 | text +15%、mixed +2.1% | text +15%、mixed +2.1% | 一致（硬件无关） |
 
-原假设「仅多线程比全关慢 1.5–1.8x」只在 `deg≤4` 复现（deg=1 1.58x / deg=2 3.4x / deg=4 1.8x）—— 那正是「并行压缩组数」旋钮能设出的陷阱档；Task 1 删掉旋钮后该路径不可达 → **强制依赖的代价（丢 text/mixed 的真实收益）大于收益（省 media 上 0.05s）**，故取消。
+**为什么暂缓而不是「取消」或「恢复门控」**
 
-**随之关闭的评审项**
+- 原「取消」拍板（曾写为「已证伪」）仅基于 20 核机 → 对弱 CPU 用户片面（其上用户 2026-10-16 原始观察成立）。
+- 原改动 B（自适应关 ⇒ MT 强制关）会对强 CPU 用户片面（剥夺 text/mixed 真实收益，含压缩率 +15%）。
+- **任何一刀切静态策略都只对一半硬件正确** → Phase 1 不引入门控（零代码改动，风险最低），Phase 2 用基准测试按机器给答案。
 
-- **A1**（只做 UI 门控会漏遗留配置/CLI）→ 关闭：不做夹取，无遗漏可言。
+**随之关闭的评审项**（关闭理由从「改动 B 取消」改为「Phase 1 无门控代码」，结论不变）
+
+- **A1**（只做 UI 门控会漏遗留配置/CLI）→ 关闭：Phase 1 不做夹取，无遗漏可言。
 - **A2**（自适应门控与 ZIP32 超限双重置灰互相覆盖）→ 关闭：MT 只剩 ZIP32 一个门控，现有 `UpdateTotalSourceSize` 逻辑不动。
 - **C3**（「意图 vs 生效值」持久化语义）→ 关闭：直接用 `AppSettings.MultiThreadedCompression`。
 - **C4**（面板侧联动改动点）→ 关闭：`ZipMultiThreadCheck_IsCheckedChanged` 随组数面板一并删除（Task 1）。
 - **A3 的镜像风险**：删除时必须**同时**删 axaml 事件属性与处理器，否则 XAML 编译失败（已写入 Task 1 表格与自查）。
 
-**回归护栏（并入 Task 8 验收）**
+**回归护栏（并入 Task 8 验收；Phase 1 期间有效）**
 
 - 关闭「自适应压缩」**不影响** ZIP 面板「多线程压缩」的勾选与生效值（`CompressRequest.MultiThreadedCompression == AppSettings.MultiThreadedCompression`）。
-- `rg -n "MultiThreadedCompression\s*&&\s*.*AdaptiveCompression" src` → 0 命中（防未来误加依赖）。
-- 遗留 `settings.json`（`MT=true` & `AdaptiveCompression=false`）：压缩请求里 MT 仍为 `true`（实测该组合在 text/mixed 上更快）。
-- 若日后仍想省掉 media 上的 0.05s：用 **UI 提示**（如灰字「已压缩数据居多时建议同时开启自适应」）而非强制夹取，**不引入字段依赖**。
+- `rg -n "MultiThreadedCompression\s*&&\s*.*AdaptiveCompression" src` → 0 命中（防 Phase 1 期间误加依赖；Task 12 落地后此护栏按最终策略修订）。
+- 遗留 `settings.json`（`MT=true` & `AdaptiveCompression=false`）：压缩请求里 MT 仍为 `true`（20 核机实测该组合更快；8 逻辑核机上用户可自行关闭或跑基准测试）。
+- Phase 1 **不引入**任何「MT 依赖自适应」的夹取/门控/默认值播种逻辑。
 
 ### Task 4 — 隐藏「魔数检测」（两处）
 
@@ -228,13 +269,13 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 
 ### Task 7 — 文案与文档同步
 
-- **不新增任何三语 key**（改动 B 取消后，「MT 依赖自适应」的说明行不再需要；设置窗口与 ZIP 面板均无需新增文案）。
+- **Phase 1 不新增任何三语 key**（改动 B 暂缓后，「MT 依赖自适应」的说明行不需要；ZIP 面板常驻收益提示属 Phase 2 Task 12，不在本阶段）。Task 12 将新增 MT 收益提示 + 基准测试相关三语 key（见该 Task）。
 - 删除三语 key `Compress_ParallelDegree` / `Compress_ParallelDegree_Hint`（Task 1）。
 - **`AGENTS.md`（评审 A4，原指令不成立）**：AGENTS.md **没有**「加速」段落，也**从未提及**「并行压缩组数」→ 原指令「改写加速段落 + 删除组数描述（含 `DynamicFormatOptionsPanel` 的 7z 面板说明）」全部作废。实际动作：
   - **不要动** `AGENTS.md:117-124`（「7z 多线程压缩（mt=on）」讲的是 `SevenZipMultithreaded`，与本次删除无关）
   - `AGENTS.md:174` Controls 列表行（`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等））保持准确，无需改
-  - **新增一小节**（建议放在「7z 多线程压缩（mt=on）」之后）：「ZIP 压缩加速（自适应 / 多线程 / 引擎侧组数）」——写明：三开关**互相独立**（MT 不依赖自适应，2026-10-18 实测决策，可附 before 数据）；组数已从 UI 移除（引擎默认 `clamp(核数,4,16)`，「组内线程数 = 核数/组数」未验证）；魔数检测与自适应规则 UI 暂隐藏（Phase 2 实现）。同时点明 **ZIP 的 MT 路径与 7z 的 `mt=on` 是两件事**（前者按「纯压缩组 / 混合组」分派并用 `mt=off` 的 N 组并行，后者是 7z.dll 原生线程），避免读者把本节与上面那节混为一谈
-- `RELEASE_NOTES.md:19`（v0.5.2 宣传点含「可设置并行压缩组数」）→ 下一版 notes 必须写明：**移除组数旋钮**（引擎自动 `clamp(核数,4,16)`）；**不要**写「多线程依赖自适应」（该改动已取消）；可补实测结论（ZIP 多线程在文本/mixed 语料有 10–20% 收益且压缩率更好，对已压缩数据无增益）。
+  - **新增一小节**（建议放在「7z 多线程压缩（mt=on）」之后）：「ZIP 压缩加速（自适应 / 多线程 / 引擎侧组数）」——写明：三开关 Phase 1 **互相独立**（MT 与自适应无门控依赖；2026-10-18 双机实测表明 MT 收益与 CPU 相关——强 CPU 有收益、弱 CPU 可能负收益，最终策略待 Phase 2 本机基准测试，可附双机数据）；组数已从 UI 移除（引擎默认 `clamp(核数,4,16)`，「组内线程数 = 核数/组数」未验证）；魔数检测与自适应规则 UI 暂隐藏（Phase 2 实现）。同时点明 **ZIP 的 MT 路径与 7z 的 `mt=on` 是两件事**（前者按「纯压缩组 / 混合组」分派并用 `mt=off` 的 N 组并行，后者是 7z.dll 原生线程），避免读者把本节与上面那节混为一谈
+- `RELEASE_NOTES.md:19`（v0.5.2 宣传点含「可设置并行压缩组数」）→ 下一版 notes 必须写明：**移除组数旋钮**（引擎自动 `clamp(核数,4,16)`）；**不要**写「多线程依赖自适应」（该改动已暂缓，Phase 1 无门控）；可补实测结论（ZIP 多线程收益与 CPU 相关：20 核机 text/mixed 有 10–20% 收益且压缩率更好，8 逻辑核机净负收益，Phase 2 将以本机基准测试适配；对已压缩数据无增益）。
 - `docs/prototypes/compress-format-options-panel.html` → 页首加 Phase 标注（Phase 1 隐藏项 / Phase 2 恢复项），避免原型与实际不符。
 - `docs/PLAN.md` 本计划行补「2026-10-18 评审修订」要点。
 - `docs/progress-avalonia-detail.md` 记录本次变更（规则 3）。
@@ -252,9 +293,9 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 
 - [ ] 压缩对话框 ZIP 面板不再出现「并行压缩组数」；勾选多线程时也不再出现
 - [ ] 默认路径速度不低于改前（Task 0/8 before/after：本机 `deg=0` 应与 before 的 `deg=16` 重合，text ≈0.79s / mixed ≈0.97s）
-- [ ] 低核数（≤4 核）默认组数无回退（Task 0 Step 3 **仍待做**；若回退 → 退化为 `min(核数,16)`）
-- [ ] **三开关互相独立（改动 B 取消的回归护栏）**：关闭「自适应压缩」后，ZIP 面板「多线程压缩」的勾选状态与生效值**均不变**；请求里 `MultiThreadedCompression == AppSettings.MultiThreadedCompression`
-- [ ] **遗留 `settings.json`（`MultiThreadedCompression=true` & `AdaptiveCompression=false`）**：MT 仍勾选且生效，请求里 `MultiThreadedCompression=true`（实测该组合在 text/mixed 上更快）
+- [ ] 低核数默认组数无回退（Task 0 Step 3 **8 逻辑核机已测：deg=2 陷阱依旧、无新塌陷**；纯 2–4 物理核仍待做；若回退 → 退化为 `min(核数,16)`）
+- [ ] **三开关互相独立（改动 B 暂缓的 Phase 1 回归护栏）**：关闭「自适应压缩」后，ZIP 面板「多线程压缩」的勾选状态与生效值**均不变**；请求里 `MultiThreadedCompression == AppSettings.MultiThreadedCompression`
+- [ ] **遗留 `settings.json`（`MultiThreadedCompression=true` & `AdaptiveCompression=false`）**：MT 仍勾选且生效，请求里 `MultiThreadedCompression=true`（20 核机实测该组合 text/mixed 更快；弱 CPU 上可能负收益——Phase 1 不干预，Task 12 处理）
 - [ ] `rg -n "MultiThreadedCompression\s*&&\s*.*AdaptiveCompression" src` → 0 命中（防未来误加依赖）
 - [ ] **超 4GB**：MT 勾选框禁用 + 灰字提示显示；退出超限后**恢复原勾选**（`_mtCheckedBeforeLimit` 逻辑），全程无互相覆盖
 - [ ] `rg -n "ZipMultiThreadCheck_IsCheckedChanged" src` → 0 命中（axaml 事件属性与处理器**同时**删除，无 XAML 编译残留）
@@ -264,7 +305,7 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 - [ ] `settings.json` 旧字段仍可加载（不抛异常、不丢其它设置）
 - [ ] 全量构建 + 测试通过；bench before/after 数据已归档
 
-## Phase 2：实现（3-4h，Phase 1 发布后启动）
+## Phase 2：实现（5-7h，Phase 1 发布后启动；原 3-4h + Task 12 基准测试约 +2-3h）
 
 ### Task 9 — 实现魔数检测
 
@@ -301,7 +342,38 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 | `SettingsWindowViewModel.MagicHexDisplay`（:2214） | `""` → `[hex]` 显示 |
 | 设置窗口「加速」页 魔数检测 的「自适应关闭时禁用」联动（原「改动 C」） | 重新加回 |
 
-> **不适用**：「MT 依赖自适应压缩」（原 Task 3）已于 2026-10-18 **取消**，Phase 2 也不引入 —— 三开关保持互相独立。设置窗口 `SaveChanges` 的 `AdaptiveSmartDetect` 写回（:1644）在 Phase 1 未改动 → 无需恢复动作。
+> **不适用**：「MT 依赖自适应压缩」（原 Task 3）已于 2026-10-18 **暂缓**（双机数据矛盾），Phase 1/2 均不引入硬门控 —— 三开关保持互相独立；MT 收益适配改由 **Task 12 基准测试**（软提示 + 默认值建议）承担。设置窗口 `SaveChanges` 的 `AdaptiveSmartDetect` 写回（:1644）在 Phase 1 未改动 → 无需恢复动作。
+
+### Task 12（新增 · 2026-10-18 双机复测后追加）— 本机基准测试 + MT 收益适配
+
+> **动机**：Task 0 双机实测证明 MT 收益与硬件强相关（20 核机有收益 / 8 逻辑核机负收益），任何一刀切静态策略都片面 → 用「每台机器自己测一次」给出数据驱动答案，替代已暂缓的改动 B 硬门控。
+
+**功能设计**
+
+| 组件 | 内容 |
+|------|------|
+| 测试逻辑 | 设置 → 加速页 → 「运行本机基准测试」按钮（**手动触发，不自动跑**）；合成小语料（复用 `scripts/bench-zip-mt.cs` 的 `Corpus.GenerateText` 思路精简，目标 20×250KB ≈ 5MB，写入 `%TEMP%` 临时目录，测完删除）；用 `ZipEngine` 对比「串行（`MultiThreadedCompression=false`）vs MT（`true` + 引擎默认组数）」各 1 次（先预热不计时），目标 **< 20 秒**完成 |
+| 结果判定 | `ratio = 串行耗时 / MT耗时`；`ratio > 1.05` → 「本机 MT 有收益」；`ratio < 0.95` → 「本机 MT 负收益」；其间 → 「收益不明显」 |
+| 持久化 | `AppSettings` 新增 `MultiThreadedBenchRatio`（double?，null = 未测）+ `MultiThreadedBenchTimestamp`（DateTime?）；**不引入意图/生效值二分**，只存测量结果 |
+| 默认值播种 | 首次打开压缩对话框时：若 `MultiThreadedBenchRatio` 非 null 且 < 0.95 → ZIP 面板 MT **默认不勾选**（无论 `AppSettings.MultiThreadedCompression` 旧值；用户改动后仍直存直用）；≥ 0.95 或未测 → 维持 `AppSettings` 现值 |
+| 常驻提示（三语 key） | MT 复选框下方灰字常驻提示（仿 `ZipMtOverLimitHintText` 的样式，`:76-81` 旁新增 `TextBlock`）：**「收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。」** —— 独立于基准测试结果，所有用户可见（科普性质，避免弱 CPU 用户盲开） |
+| 动态结果提示 | 设置页基准测试结果区显示本机实测结论（如「本机实测：开启多线程约慢 1.4x，已建议默认关闭」）+ 「重新测试」按钮；**不在压缩对话框叠加第二条提示**（避免文案堆叠，常驻科普 + 设置页数据已足够） |
+| 进度反馈 | 测试期间设置页按钮旁显示「测试中…（约 15 秒）」+ 禁用重复点击；异常（磁盘满等）→ 弹错并清理临时文件，不写入 ratio |
+
+**三语 key（规则 13，新增）**
+
+- `Compress_MT_BenefitHint`（常驻科普提示，上表文案）
+- `Settings_RunBench` / `Settings_BenchRunning` / `Settings_BenchResult_Fast` / `Settings_BenchResult_Slow` / `Settings_BenchResult_Neutral` / `Settings_BenchRetry`（设置页按钮与结果）
+
+**边界与风险缓解**
+
+- **插电/电池、后台负载**差异会导致单次测量波动 → 结果带时间戳，UI 提示「结果基于测试时的系统状态」；提供重新测试。
+- **不做硬件白名单**（不按 `ProcessorCount` 猜测）——Task 0 已证明核数不是唯一变量（同为少核，较新 CPU 可能介于两机之间），以实测为准。
+- 测试语料**不含媒体**（media 语料 A/D 差异由自适应 Store 解释，与 MT 无关；text 语料已足够区分 MT 正/负收益，两机数据均如此）。
+
+**测试**：基准服务单测（ratio 判定三分支）；默认值播种逻辑单测（ratio < 0.95 → 不勾选）；三语 key 同步校验。
+
+**验收**：8 逻辑核机上跑基准 → 得到「负收益」结论 → 重新打开压缩对话框 MT 默认不勾选 + 常驻提示可见；20 核机（或模拟 ratio > 1.05）→ 默认勾选行为不受影响。
 
 ## 风险
 
@@ -310,29 +382,29 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 | 方案 C（`mt = 核数/组数`）收益**未验证** → 若被当作依据写进文档/发布说明会留下错误结论 | 🟡 中 | Task 2 保留「未验证」标注 + 给出大文件语料验证命令；默认路径下明确为 no-op；文档只写「组数已自动」不写提速 |
 | 删 MT 处理器时遗漏 axaml 事件属性（或反过来）→ XAML 编译失败（评审 A3 的镜像） | 🟡 中 | Task 1 要求两者**同时**删除 + `rg -n "ZipMultiThreadCheck_IsCheckedChanged" src` 0 命中 + Task 8 用 `--no-incremental` 全量构建 |
 | 本计划性能结论与 2026-10-05 bench 相反 → 默认组数无依据 | 🟢 低（**已闭环**） | Task 0 **已实跑**并定调 `clamp(核数,4,16)`；旧 bench 差异成因（未扫 deg=16、当时 MT 默认关）已写入 Task 0 Step 2 |
-| 低核数（2–4 核）默认组数未实测 | 🟡 中（评审 B2，**仍未闭环**） | Task 0 Step 3 待做；不达标则退化为 `min(核数,16)`（1 行） |
-| 用户 2026-10-16 的「MT 无自适应 = 反作用」观察被本次实测推翻 → 真实语料下可能仍存在 | 🟡 中 | 改动 B 取消以本机数据为准；若日后在真实语料复现，先 `--corpus <真实目录>` 补测再议，不反向重开改动 B |
+| 低核数（2–4 核）默认组数未实测 | 🟢 低（评审 B2，**部分闭环**） | 8 逻辑核机（4C/8T）三语料复测已做（Task 0 复测小节），deg=2 陷阱依旧、未见新塌陷；纯 2–4 物理核仍未测 → 若日后发现回退，退化为 `min(核数,16)`（1 行） |
+| 「MT 收益因 CPU 而异」——两台电脑数据相反，任何一刀切策略都片面 | 🟡 中（**2026-10-18 新增**） | 改动 B 暂缓（Phase 1 无门控）；Phase 2 **Task 12 本机基准测试**按机器给默认值 + 常驻科普提示，不做硬件白名单猜测 |
 | Phase 2 激活默认规则 = 用户可见输出变化 | 🟡 中（评审 C5） | 释放说明 + 三语说明 + 保留 `ResetDefaults` |
 | 删除 `AppSettings.ParallelCompressDegree` 后旧 `settings.json` 反序列化异常 | 🟢 低 | `Load()` 未启用 `UnmappedMemberHandling.Disallow`，未知字段被忽略；验收清单已含「旧 settings.json 可加载」 |
 | XAML 隐藏门控（`IsVisible="False"`）被后续开发当成「无用代码」清掉 | 🟡 中 | 每处加 `<!-- Phase 2：实现后移除 -->`（**XAML 必须用 XML 注释，不是 `//`**）+ 本计划「恢复清单」 |
 | 规则 17 陷阱：增量构建掩盖 `AVLN3000` | 🟡 中 | Task 8 强制 `--no-incremental` |
-| Phase 2 拖太久，隐藏的 UI 长期缺席 | 🟡 中 | Phase 2 仅 3-4h 且基础设施（`FileFormatDetector` / `AdaptiveRuleMatcher`）已存在 |
+| Phase 2 拖太久，隐藏的 UI 长期缺席 | 🟡 中 | Phase 2 共 5-7h（Task 9-11 仍为 3-4h，Task 12 约 +2-3h）且基础设施（`FileFormatDetector` / `AdaptiveRuleMatcher`）已存在；可拆两次发布推进 |
 | 删除三语 key 造成三语 key 集不同步 | 🟢 低 | 三语同步删除；`AllThreeLanguages_HaveSameKeySet` 会兜住 |
 | 文档漂移（AGENTS.md 无该段落 / 行号漂移） | 🟢 低 | Task 7 按实测改写；引用行号已逐条核对 |
 
-## 修订记录（2026-10-18 评审）
+## 修订记录（2026-10-18 评审 + 同日双机复测修订）
 
 | 编号 | 评审发现 | 处置 |
 |------|----------|------|
-| A1 | 改动 B 只做 UI 门控，引擎只认 `options.MultiThreadedCompression`（`ZipEngine.cs:3960`）→ 遗留 `settings.json` / CLI 仍走慢路径 | 新增决策行 + Task 3.1 引擎边界夹取；`_mtUserIntent` 承载意图 → **已关闭**（2026-10-18 改动 B 取消，不做夹取） |
+| A1 | 改动 B 只做 UI 门控，引擎只认 `options.MultiThreadedCompression`（`ZipEngine.cs:3960`）→ 遗留 `settings.json` / CLI 仍走慢路径 | 新增决策行 + Task 3.1 引擎边界夹取；`_mtUserIntent` 承载意图 → **已关闭**（2026-10-18 改动 B 暂缓，Phase 1 不做夹取） |
 | A2 | `UpdateTotalSourceSize`（`:379`/`:377`）无条件写 `IsEnabled`/恢复勾选，与自适应门控互相覆盖 | Task 3.2 统一 `RefreshZipMtState()`（3 输入 / 4 调用点），删除 `_mtCheckedBeforeLimit` → **已关闭**（MT 只剩 ZIP32 一个门控） |
-| A3 | Task 1 只删 `ZipMultiThreadCheck_IsCheckedChanged` 却保留 axaml 事件属性（`:80`）→ XAML 编译失败 | Task 1 改为**保留处理器骨架**（删面板显隐 2 行），Task 3.2 填充意图记录 → **再修订**：改动 B 取消后处理器彻底无用 → 改为「axaml 事件属性与处理器**同时**删除」（Task 1 + 自查 + 风险表） |
+| A3 | Task 1 只删 `ZipMultiThreadCheck_IsCheckedChanged` 却保留 axaml 事件属性（`:80`）→ XAML 编译失败 | Task 1 改为**保留处理器骨架**（删面板显隐 2 行），Task 3.2 填充意图记录 → **再修订**：改动 B 暂缓（Phase 1 无门控）后处理器彻底无用 → 改为「axaml 事件属性与处理器**同时**删除」（Task 1 + 自查 + 风险表） |
 | A4 | Task 7 的 AGENTS.md 指令不成立：无「加速」段落、全文无「并行压缩组数」；`:122-123` 讲的是 7z `mt=on` | Task 7 改写为「新增 ZIP 压缩加速小节 + 不动 7z 段落」 |
 | B1 | 与 `2026-10-05-n-group-parallel-compress.md:20`（N 组无加速、degree=1 最快）方向相反 | 新增 **Task 0**：同机同语料 before/after 复测，二选一定调默认组数 |
 | B2 | 低核数（2–4 核）默认组数未验证 | Task 0 Step 3 + 风险表 |
 | C1 | 决策记录「保留 AppSettings 字段」与 Task 1 删字段/删 key 矛盾 | 决策记录行改为「仅保留与魔数/规则相关的部分」，并显式标注删除项 |
 | C2 | Task 4 隐藏不对称（设置窗口仍写回 `AdaptiveSmartDetect`） | Task 4 补充说明：保留写回原值（等价 no-op，供 Phase 2 恢复） |
-| C3 | 「记住原状态」的持久化语义未定义（跨会话会丢） | Task 3.3：持久化**意图**，生效值 = 意图 && 自适应 → **已关闭**（改动 B 取消，无需意图/生效值二分） |
+| C3 | 「记住原状态」的持久化语义未定义（跨会话会丢） | Task 3.3：持久化**意图**，生效值 = 意图 && 自适应 → **已关闭**（改动 B 暂缓，Phase 1 无需意图/生效值二分） |
 | C4 | 面板侧联动改动点未指定 | Task 3.2 明确 `DynamicFormatOptionsPanel` code-behind（含 axaml 事件属性补齐）→ **已关闭**（该处理器随组数面板一并删除） |
 | C5 | Task 10 会激活已持久化的 4 条默认规则 → 用户可见输出变化 | Task 10 增加行为变更处置 |
 | C6 | 两套「已压缩」判定并存（`CompressedExtensions` vs `CompressionCoefficients`） | Task 10 要求先指定 SSOT |
@@ -343,18 +415,21 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 | D5 | 风险表建议的 `//` 注释在 `.axaml` 中非法；Task 6 的「所在行」措辞 | 风险表 + Task 6 更正 |
 | D6 | Task 8「同步更新引用了被删成员的测试」实际不存在这种引用 | Task 8 改为补新单测 + after 对照 bench |
 | D7 | 漏掉的文档同步（RELEASE_NOTES、原型 HTML）；AGENTS.md 设置分类无需改 | Task 7 补充 |
-| D8 | 死属性 `IsAdaptiveContentVisible`；规则 6 的置灰例外未说明 | Task 3.3 顺带删除 + 写明理由 → **随改动 B 取消而挂起**：改为「可选清理」（`SettingsWindowViewModel.cs:192` 确认无 XAML 绑定，删不删都不影响行为） |
+| D8 | 死属性 `IsAdaptiveContentVisible`；规则 6 的置灰例外未说明 | Task 3.3 顺带删除 + 写明理由 → **随改动 B 暂缓而挂起**：改为「可选清理」（`SettingsWindowViewModel.cs:192` 确认无 XAML 绑定，删不删都不影响行为） |
+| E1 | 用户报告两台电脑 Task 0 结论不一致（同日 20 核机拍板后） | 8 逻辑核机（i7-3770 4C/8T）复跑三语料：deg=2 陷阱复现、压缩率优势复现，但 **MT 收益方向反转**（text B 慢 42%、mixed B 慢 37%）→ 数据入 Task 0 新增「8 逻辑核机复测」小节，Step 3 改为部分完成 |
+| E2 | E1 导致议题 1「改动 B 取消」不再成立（单机结论片面） | 改判为**暂缓**：头部拍板行、问题表 #2、Phase 1 目标、决策记录 3 行、Task 3、Task 7/8 措辞、风险表、拍板记录同步修订；评审项 A1/A2/C3/C4 关闭理由改为「Phase 1 无门控代码」（结论不变） |
+| E3 | 一刀切静态策略（独立或依赖）必然对一半硬件片面 | 新增 **Task 12 本机基准测试 + MT 收益适配**（手动触发、小语料、串行 vs MT 对比、默认值播种、常驻科普提示三语 key）；Phase 2 工时 3-4h → 5-7h；风险表新增「MT 收益因 CPU 而异」 |
 
-## 拍板记录（2026-10-18 实测后）
+## 拍板记录（2026-10-18 实测后 · 同日双机复测修订）
 
-Task 0 基线复测（本机 20 逻辑核，报告 `.buildout\bench-before-{text,media,mixed}.txt`）跑完后，用户于同日拍板三项，计划据此定稿：
+Task 0 基线复测先在 20 逻辑核机跑完（报告 `.buildout\bench-before-{text,media,mixed}.txt`），用户拍板三项；随后用户报告**另一台电脑结论不一致**，同日在 8 逻辑核机（i7-3770 4C/8T）复跑三语料（`.buildout\bench-retest-8lp-{text,media,mixed}.txt`），议题 1 据此改判。计划最终按此定稿：
 
 | # | 议题 | 拍板结果 | 依据 / 影响 |
 |---|------|----------|-------------|
-| 1 | 改动 B（MT 依赖自适应）存废 | **取消** | 默认组数下「仅多线程」不慢于「全关 / 仅自适应」（text 0.88s vs 0.95/0.97s 且压缩率 +15%；mixed 0.98s vs 2.13/1.18s）；原「慢 1.5–1.8x」只在 deg≤4（旋钮陷阱档）复现。**Phase 1 因此减少约 2-3h**，评审项 A1/A2/C3/C4 关闭 |
-| 2 | 引擎默认组数 | **`clamp(核数,4,16)`** | 否决 `clamp(核数,2,8)`（deg=8 比 deg=16 慢 21–30%）与「默认 = 1」（text 慢 ~1.8x）；本机 = 16 组，与现默认一致 → 删旋钮即纯收益 |
-| 3 | 方案 C（`mt = 核数/组数`） | **保留，但标注「未验证」** | 默认路径下为 no-op（本机 16 组 → `mt=max(1,20/16)=1`）；仅在「核数 > 16」或「文件数 < 组数」时生效，收益需大文件语料验证（Task 2 给出命令）；**不得**写入文档当性能依据 |
+| 1 | 改动 B（MT 依赖自适应）存废 | **暂缓（同日由「取消」改判）** | 20 核机：仅 MT 有真实收益（text 0.88s < D 0.95s、mixed 0.98s ≪ D 2.13s，压缩率 +15%）→ 曾拍板取消；**8 逻辑核机方向反转**（text B 2.66s vs D 1.87s 慢 42%、mixed B 3.90s vs A 2.85s 慢 37%，用户 2026-10-16 原始观察在弱 CPU 上复现）→ 一刀切静态策略片面。**Phase 1 维持三开关独立、无门控代码**（零代码改动，A1/A2/C3/C4 关闭结论不变），最终策略待 **Task 12 本机基准测试**按机器定夺（默认值播种 + 常驻科普提示，不做强制门控） |
+| 2 | 引擎默认组数 | **`clamp(核数,4,16)`** | 否决 `clamp(核数,2,8)`（deg=8 比 deg=16 慢 21–30%）与「默认 = 1」（text 慢 ~1.8x）；20 核机 = 16 组，8 逻辑核机 = 8 组且 deg=2 陷阱依旧（慢 2.6x）、未见新塌陷（Task 0 Step 3 补测）→ 下限 4 避开陷阱，删旋钮即纯收益 |
+| 3 | 方案 C（`mt = 核数/组数`） | **保留，但标注「未验证」** | 默认路径下为 no-op（20 核机 16 组 → `mt=max(1,20/16)=1`）；两机小文件语料均证明单组 `mt=on` 只用约 1 个核，收益需大文件语料验证（Task 2 给出命令）；**不得**写入文档当性能依据 |
 
-**连带修订（本轮）**：Task 1（MT 处理器 + axaml 事件属性同时删除）、Task 2（默认规则 `clamp(4,16)` + 方案 C 标注未验证）、Task 3（改为「已取消 + 回归护栏」）、Task 7（不新增三语 key；AGENTS.md 小节改为「三开关互相独立」）、Task 8 验收（before/after 预期、三开关独立护栏、`rg` 自查）、风险表（方案 C 未验证 / 删处理器风险 / 低核未闭环 / 用户原始观察被推翻）、头部工时 6-8h → **4-5h**。
+**连带修订（本轮 + 双机复测轮）**：Task 1（MT 处理器 + axaml 事件属性同时删除）、Task 2（默认规则 `clamp(4,16)` + 方案 C 标注未验证）、Task 3（改为「暂缓 + Phase 1 无门控 + 回归护栏 + 双机证据表」）、Task 7（Phase 1 不新增三语 key，Task 12 负责新增；AGENTS.md 小节改为「三开关独立 + MT 收益与 CPU 相关」）、Task 8 验收（before/after 预期、三开关独立护栏、`rg` 自查）、**Task 12（新增：本机基准测试 + MT 常驻提示）**、风险表（方案 C 未验证 / 删处理器风险 / 低核部分闭环 / **MT 收益因 CPU 而异**）、头部工时 Phase 1 6-8h → **4-5h**、Phase 2 3-4h → **5-7h**。
 
-**仍未闭环的验证项**（详见 Task 0 末）：① 低核（≤4 核）默认组数（Step 3 未做，无低核环境）；② deg=1 批次的环境噪声（如需引用绝对秒数则 `--degrees 1 --reps 5` 复测）；③ 方案 C 的大文件语料收益。
+**仍未闭环的验证项**（详见 Task 0 末）：① 纯 2–4 物理核默认组数（8 逻辑核 = 4 物理核已部分回答，2 核未测）；② 20 核机 deg=1 批次的环境噪声（如需引用绝对秒数则 `--degrees 1 --reps 5` 复测）；③ 方案 C 的大文件语料收益；④ 各类弱 CPU 的 MT 负收益幅度是否一致（不猜硬件白名单，Task 12 基准测试按机器实测）。
