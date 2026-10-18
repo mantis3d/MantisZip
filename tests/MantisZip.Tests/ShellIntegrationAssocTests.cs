@@ -1,3 +1,5 @@
+using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using Xunit;
 
@@ -414,5 +416,112 @@ public class ShellIntegrationAssocTests : IDisposable
         var normalized = NormalizeExt(input);
         Assert.Equal(".myext", normalized);
         Assert.True(IsValidExt(normalized));
+    }
+
+    // ──────────────────────────────────────────────
+    // SelfHealAssociations（启动自愈：重建缺失 ProgId）
+    // 触发判据为三条 AND：① UserChoice.Progid 以 MantisZip 开头
+    // ② Software\Classes\{ProgId} 键缺失 ③ 该格式未被用户显式禁用
+    // ──────────────────────────────────────────────
+
+    [Fact]
+    public void SelfHeal_RebuildsProgId_WhenUserChoiceDangles()
+    {
+        try
+        {
+            // 模拟损坏现场：UserChoice 指向我们，但 ProgId 缺失
+            using (var uc = RegistryHost.Create(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice"))
+                uc.SetValue("Progid", "MantisZip.Zip");
+            using (var chk = RegistryHost.Open(@"Software\Classes\MantisZip.Zip"))
+                Assert.Null(chk);   // 前置：ProgId 不存在
+
+            ShellIntegration.SelfHealAssociations(new AppSettings());
+
+            using var after = RegistryHost.Open(@"Software\Classes\MantisZip.Zip\shell\open\command");
+            Assert.NotNull(after?.GetValue(null));   // ProgId 被重建，UserChoice 恢复可解析
+        }
+        finally { CleanupExtension(".zip"); }
+    }
+
+    [Fact]
+    public void SelfHeal_DoesNotHeal_WhenNoRegistryTrace()
+    {
+        // 无注册表痕迹 → 不自愈
+        var s = new AppSettings { AssocZip = false };
+        ShellIntegration.SelfHealAssociations(s);
+        using var chk = RegistryHost.Open(@"Software\Classes\MantisZip.Zip");
+        Assert.Null(chk);
+    }
+
+    [Fact]
+    public void SelfHeal_DoesNotHeal_WhenExplicitlyDisabledAndProgIdMissing()
+    {
+        // 显式禁用 + ProgId 缺失 → 不自愈
+        try
+        {
+            using (var uc = RegistryHost.Create(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice"))
+                uc.SetValue("Progid", "MantisZip.Zip");
+            var s = new AppSettings { AssocZip = false };
+            ShellIntegration.SelfHealAssociations(s);
+            using var chk = RegistryHost.Open(@"Software\Classes\MantisZip.Zip");
+            Assert.Null(chk);
+        }
+        finally { CleanupExtension(".zip"); }
+    }
+
+    [Fact]
+    public void SelfHeal_Rebuilds_TwoFormats()
+    {
+        try
+        {
+            // 模拟损坏现场：.zip 与 .7z 的 UserChoice 都指向我们，但两个 ProgId 键都不存在
+            using (var ucZip = RegistryHost.Create(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice"))
+                ucZip.SetValue("Progid", "MantisZip.Zip");
+            using (var uc7z = RegistryHost.Create(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.7z\UserChoice"))
+                uc7z.SetValue("Progid", "MantisZip.7z");
+            using (var chkZip = RegistryHost.Open(@"Software\Classes\MantisZip.Zip"))
+                Assert.Null(chkZip);
+            using (var chk7z = RegistryHost.Open(@"Software\Classes\MantisZip.7z"))
+                Assert.Null(chk7z);
+
+            ShellIntegration.SelfHealAssociations(new AppSettings());   // 默认各格式均启用
+
+            // 硬约束：全格式统一——两个格式都必须被重建，不得只救 .zip
+            using var afterZip = RegistryHost.Open(@"Software\Classes\MantisZip.Zip\shell\open\command");
+            Assert.NotNull(afterZip?.GetValue(null));
+            using var after7z = RegistryHost.Open(@"Software\Classes\MantisZip.7z\shell\open\command");
+            Assert.NotNull(after7z?.GetValue(null));
+        }
+        finally
+        {
+            CleanupExtension(".zip");
+            CleanupExtension(".7z");
+        }
+    }
+
+    [Fact]
+    public void IsAssocEnabledInSettings_CoversSupportedExtensions()
+    {
+        // 防未来新增格式导致自愈被静默关闭：ArchiveEngineFactory.SupportedExtensions 中每个扩展名
+        // 都必须命中显式分支，不得落进 `_ => false` 默认分支。
+        var s = new AppSettings
+        {
+            AssocZip = true,
+            Assoc7z = true,
+            AssocRar = true,
+            AssocTar = true,
+            AssocTarGz = true,
+            AssocGz = true,
+            AssocIso = true,
+        };
+        foreach (var ext in ArchiveEngineFactory.SupportedExtensions)   // [".zip",".7z",".rar",".tar",".tgz",".tar.gz",".gz",".iso"]
+        {
+            Assert.True(ShellIntegration.IsAssocEnabledInSettings(s, ext),
+                $"{ext} 落入了 `_ => false` 默认分支：未来新增格式会让自愈被静默关闭");
+        }
+
+        // 反向哨兵：防上一条断言因实现恒真而假通过
+        Assert.False(ShellIntegration.IsAssocEnabledInSettings(s, ".not-a-real-ext"));
+        Assert.False(ShellIntegration.IsAssocEnabledInSettings(new AppSettings { AssocTarGz = false }, ".tgz"));
     }
 }

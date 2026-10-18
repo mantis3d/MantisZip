@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.Services;
 
@@ -33,6 +34,19 @@ internal static partial class ShellIntegration
     private const uint SHCNF_IDLIST = 0x0000;
     private static readonly string[] ArchiveExtensions =
         ArchiveEngineFactory.SupportedExtensions;
+
+    /// <summary>该格式关联是否"未被用户显式禁用"。注意：默认值为 true（并不代表用户主动启用），false 只会由用户主动取消关联的动作产生——自愈判据把 false 视为"显式禁用，不得自愈"。</summary>
+    internal static bool IsAssocEnabledInSettings(AppSettings s, string ext) => ext.ToLowerInvariant() switch
+    {
+        ".zip"    => s.AssocZip,
+        ".7z"     => s.Assoc7z,
+        ".rar"    => s.AssocRar,
+        ".tar"    => s.AssocTar,
+        ".tgz" or ".tar.gz" => s.AssocTarGz,
+        ".gz"     => s.AssocGz,
+        ".iso"    => s.AssocIso,
+        _         => false,
+    };
 
     // Registry key identifiers — must stay as fixed English strings (language-independent)
     private const string CascadeRoot = "MantisZip";

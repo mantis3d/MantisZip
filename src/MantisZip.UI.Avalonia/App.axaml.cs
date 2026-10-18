@@ -172,6 +172,16 @@ public partial class App : Application
                 App.DebugLog($"OnFrameworkInitializationCompleted: first-run handling failed: {firstRunEx.Message}");
             }
 
+            // ── 文件关联自愈：修复"UserChoice 悬空/ProgId 被误删"的历史损坏 ──
+            try
+            {
+                ShellIntegration.SelfHealAssociations(AppSettings.Load());
+            }
+            catch (Exception healEx)
+            {
+                App.DebugLog($"OnFrameworkInitializationCompleted: SelfHealAssociations failed: {healEx.Message}");
+            }
+
             // ── 检查 COM 动态菜单状态（如果 pending，检测 Explorer 是否已加载 comhost.dll）──
             try
             {

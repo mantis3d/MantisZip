@@ -1,5 +1,6 @@
 using System.IO;
 using Microsoft.Win32;
+using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.Services;
 
@@ -260,6 +261,55 @@ internal static partial class ShellIntegration
         }
 
         App.DebugLog("ShellIntegration.UninstallAssociations: done");
+    }
+
+    /// <summary>
+    /// 启动自愈：对每个内置扩展名，**仅当同时满足以下三条（AND）**时，才重建缺失的 per-format ProgId：
+    ///   1) `UserChoice.Progid` 以 `MantisZip` 开头（注册表事实：用户曾把我们设为默认）；
+    ///   2) `Software\Classes\{ProgId}` 键缺失（确实损坏）；
+    ///   3) 该格式未被用户在设置里显式禁用（`IsAssocEnabledInSettings` 为 true）。
+    /// 注意：**不是 OR**——第 1 条是必需的注册表事实，第 3 条只是"用户未显式禁用"的闸门，
+    /// 单独满足"设置里启用"而无注册表痕迹时**不得**自愈（否则会凭空给从未关联过的格式写注册表）。
+    /// 本三条 AND 即判据的权威口径，与代码内注释一致。
+    ///
+    /// 只重建 ProgId + OpenWithProgids + DefaultIcon，**从不写 UserChoice**（哈希保护），
+    /// 因此绝不会覆盖用户在 Windows 里对其他程序的选择——只把自己丢失的注册补回来。
+    /// 若 UserChoice 仍指向我们，重建 ProgId 后双击默认即自动恢复。
+    /// </summary>
+    public static void SelfHealAssociations(AppSettings s)
+    {
+        foreach (var ext in ArchiveExtensions)
+        {
+            try
+            {
+                var progId = GetProgId(ext);
+                bool userChoseUs;
+                using (var uc = RegistryHost.Open($@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice"))
+                    userChoseUs = (uc?.GetValue("Progid") as string)
+                        ?.StartsWith("MantisZip", StringComparison.OrdinalIgnoreCase) == true;
+
+                // 触发判据（三条 AND）：
+                //   1) UserChoice.Progid 以 MantisZip 开头（注册表痕迹）
+                //   2) Software\Classes\{ProgId} 键缺失（确实损坏）
+                //   3) 该格式未被用户在设置里显式禁用
+                if (!userChoseUs) continue;                        // 无我们的痕迹 → 不自愈
+                if (!IsAssocEnabledInSettings(s, ext)) continue;   // 显式禁用 → 不自愈
+
+                bool progIdMissing;
+                using (var k = RegistryHost.Open($@"Software\Classes\{progId}"))
+                    progIdMissing = k == null;
+
+                if (progIdMissing)
+                {
+                    App.DebugLog($"ShellIntegration.SelfHealAssociations: rebuilding missing ProgId for {ext} (userChoseUs={userChoseUs})");
+                    InstallAssociationForExtension(ext);
+                    // 自愈成功后注册应用
+                    EnsureApplicationsRegistered();
+                }
+                // 额外加固：ProgId 键存在但 shell\open\command 指向失效路径时也可考虑重建（本计划先标记，后续如需再细化）
+            }
+            catch (Exception ex) { App.DebugLog($"ShellIntegration.SelfHealAssociations: failed for {ext}: {ex.Message}"); }
+        }
     }
 
     /// <summary>返回已安装文件关联的扩展名数量（用于 UI 状态显示）。</summary>
