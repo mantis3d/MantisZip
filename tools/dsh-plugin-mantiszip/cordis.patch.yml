@@ -1,0 +1,5 @@
+# mantiszip-dsh-plugin 的 bundle patch：安装后自动插入这三个只读工具。
+# id 固定为 mantiszip-tools，重复安装只会覆盖同一行。
+- insert:
+    - id: mantiszip-tools
+      name: 'mantiszip-dsh-plugin'
