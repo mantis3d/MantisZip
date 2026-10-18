@@ -548,4 +548,78 @@ public class ShellIntegrationAssocTests : IDisposable
         }
         finally { CleanupExtension(".zip"); }
     }
+
+    // ──────────────────────────────────────────────
+    // NotifyAssocChanged（写完关联键后必须通知 Shell 刷新）
+    // 用测试注入缝断言"确实通知了"——漏通知是本任务唯一风险，
+    // 且漏掉后用户侧表现为"图标/打开方式不刷新"，静默无报错。
+    // ──────────────────────────────────────────────
+
+    [Fact]
+    public void NotifyAssocChanged_CalledOnInstall()
+    {
+        var n = 0;
+        try
+        {
+            ShellIntegration.NotifyAssocChangedForTesting = () => n++;
+            ShellIntegration.InstallAssociationForExtension(".zip");
+            Assert.True(n > 0, "安装关联后必须通知 Shell 刷新（SHChangeNotify）");
+        }
+        finally
+        {
+            ShellIntegration.NotifyAssocChangedForTesting = null;
+            CleanupExtension(".zip");
+        }
+    }
+
+    [Fact]
+    public void NotifyAssocChanged_CalledOnUninstall()
+    {
+        var n = 0;
+        try
+        {
+            ShellIntegration.InstallAssociationForExtension(".zip");   // 先造出可卸载的现场
+            ShellIntegration.NotifyAssocChangedForTesting = () => n++;
+            ShellIntegration.UninstallAssociationForExtension(".zip");
+            Assert.True(n > 0, "卸载关联后必须通知 Shell 刷新（SHChangeNotify）");
+        }
+        finally
+        {
+            ShellIntegration.NotifyAssocChangedForTesting = null;
+            CleanupExtension(".zip");
+        }
+    }
+
+    [Fact]
+    public void NotifyAssocChanged_CalledOnSelfHealRebuild()
+    {
+        var n = 0;
+        try
+        {
+            // 悬空 UserChoice → 自愈会重建 .zip 的 ProgId
+            using (var uc = RegistryHost.Create(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice"))
+                uc.SetValue("Progid", "MantisZip.Zip");
+            ShellIntegration.NotifyAssocChangedForTesting = () => n++;
+            ShellIntegration.SelfHealAssociations(new AppSettings());
+            Assert.True(n > 0, "自愈重建 ProgId 后必须通知 Shell 刷新（否则双击默认仍是旧缓存）");
+        }
+        finally
+        {
+            ShellIntegration.NotifyAssocChangedForTesting = null;
+            CleanupExtension(".zip");
+        }
+    }
+
+    [Fact]
+    public void NotifyAssocChanged_CalledOnCleanupOldProgId()
+    {
+        var n = 0;
+        try
+        {
+            ShellIntegration.NotifyAssocChangedForTesting = () => n++;
+            ShellIntegration.CleanupOldProgId();
+            Assert.True(n > 0, "迁移清理旧版 ProgId 后必须通知 Shell 刷新");
+        }
+        finally { ShellIntegration.NotifyAssocChangedForTesting = null; }
+    }
 }

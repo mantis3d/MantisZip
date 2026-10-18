@@ -73,7 +73,7 @@ internal static partial class ShellIntegration
         }
 
         // 通知 Windows Shell 刷新上下文菜单缓存
-        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        NotifyAssocChanged();
 
         // ── Install summary ──
         var dynStatus = GetDynamicMenuStatus();
@@ -92,7 +92,7 @@ internal static partial class ShellIntegration
         UninstallCom();
         DeleteRegistryKey(ContextMenuRegPath);
         RestartExplorerForUnload();
-        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        NotifyAssocChanged();
         App.DebugLog("ShellIntegration.Uninstall: done");
     }
 
@@ -572,7 +572,7 @@ internal static partial class ShellIntegration
             SetDynamicMenuStatus(DynamicMenuStatus_Active);
             App.DebugLog("CheckComStatus: status changed to active, removing static cascade menus");
             UninstallStaticMenus();
-            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+            NotifyAssocChanged();
         }
         else
         {
@@ -580,7 +580,7 @@ internal static partial class ShellIntegration
             App.DebugLog($"CheckComStatus: comhost.dll not found in {explorerCount} Explorer process(es), installing cascade as fallback");
             var s = AppSettings.Load();
             InstallCascade(s, GetExePath());
-            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+            NotifyAssocChanged();
         }
     }
 

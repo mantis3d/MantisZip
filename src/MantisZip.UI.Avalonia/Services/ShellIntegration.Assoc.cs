@@ -123,6 +123,9 @@ internal static partial class ShellIntegration
             SetRegistryValue($@"{progIdKey}\DefaultIcon", null, iconPath);
         else
             SetRegistryValue($@"{progIdKey}\DefaultIcon", null, $@"""{exePath},0""");
+
+        // 写完关联键后必须通知 Shell，否则图标 / "打开方式" 列表沿用旧缓存
+        NotifyAssocChanged();
     }
 
     /// <summary>
@@ -144,6 +147,8 @@ internal static partial class ShellIntegration
             }
             catch (Exception ex) { App.DebugLog($"ShellIntegration.CleanupOldProgId: failed to clear {ext} OpenWithProgids: {ex.Message}"); }
         }
+
+        NotifyAssocChanged();
     }
 
     /// <summary>安装文件关联前的预备工作：迁移旧版 + 注册 Applications 条目。</summary>
@@ -247,6 +252,9 @@ internal static partial class ShellIntegration
             }
         }
         catch (Exception ex) { App.DebugLog($"ShellIntegration.UninstallAssociationForExtension: failed to clear UserChoice: {ex.Message}"); }
+
+        // 卸载后同样要通知 Shell，否则"打开方式"里仍挂着已删除的条目
+        NotifyAssocChanged();
     }
 
     /// <summary>
@@ -274,6 +282,9 @@ internal static partial class ShellIntegration
         {
             DeleteRegistryKey($@"Software\Classes\Applications\{Path.GetFileName(exePath)}");
         }
+
+        // 自定义 ProgId / Applications 清理发生在最后一次逐扩展通知之后，收口点统一补一次通知
+        NotifyAssocChanged();
 
         App.DebugLog("ShellIntegration.UninstallAssociations: done");
     }
@@ -320,6 +331,8 @@ internal static partial class ShellIntegration
                     InstallAssociationForExtension(ext);
                     // 自愈成功后注册应用
                     EnsureApplicationsRegistered();
+                    // 重建后通知 Shell，双击默认才会立即用回 MantisZip（否则仍读旧缓存）
+                    NotifyAssocChanged();
                 }
                 // 额外加固：ProgId 键存在但 shell\open\command 指向失效路径时也可考虑重建（本计划先标记，后续如需再细化）
             }
