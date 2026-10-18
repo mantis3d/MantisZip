@@ -135,6 +135,78 @@ public class ShellIntegrationAssocTests : IDisposable
         }
     }
 
+    [Fact]
+    public void Uninstall_ClearsDanglingUserChoice_WhenPointsToUs()
+    {
+        try
+        {
+            ShellIntegration.InstallAssociationForExtension(".zip");
+            // 模拟用户"打开方式→始终"写入的默认（沙箱内）
+            using (var uc = RegistryHost.Create(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice"))
+                uc.SetValue("Progid", "MantisZip.Zip");
+
+            ShellIntegration.UninstallAssociationForExtension(".zip");
+
+            using var check = RegistryHost.Open(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice");
+            Assert.Null(check);   // 指向我们的 UserChoice 应被删除
+        }
+        finally { CleanupExtension(".zip"); }
+    }
+
+    [Fact]
+    public void Uninstall_PreservesUserChoice_WhenPointsToOtherApp()
+    {
+        try
+        {
+            ShellIntegration.InstallAssociationForExtension(".zip");
+            using (var uc = RegistryHost.Create(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice"))
+                uc.SetValue("Progid", "CompressedFolder");
+
+            ShellIntegration.UninstallAssociationForExtension(".zip");
+
+            using var check = RegistryHost.Open(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice");
+            Assert.NotNull(check);                     // 别家的默认不得动
+            Assert.Equal("CompressedFolder", check!.GetValue("Progid"));
+        }
+        finally { CleanupExtension(".zip"); }
+    }
+
+    [Fact]
+    public void Uninstall_DoesNotThrow_WhenUserChoiceDeleteThrows()
+    {
+        try
+        {
+            ShellIntegration.InstallAssociationForExtension(".zip");
+            using (var uc = RegistryHost.Create(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice"))
+                uc.SetValue("Progid", "MantisZip.Zip");
+
+            // 注入"删除被拒绝"：只对 UserChoice 路径抛异常（模拟 UCPD / 权限拒绝）
+            RegistryHost.DeleteInterceptionForTesting = path =>
+            {
+                if (path.IndexOf("UserChoice", StringComparison.OrdinalIgnoreCase) >= 0)
+                    throw new UnauthorizedAccessException("simulated UCPD denial");
+            };
+
+            var thrown = Record.Exception(() => ShellIntegration.UninstallAssociationForExtension(".zip"));
+            Assert.Null(thrown);   // best-effort：整体不抛异常；异常路径写入 App.DebugLog（不中断卸载）
+
+            // UserChoice 仍在（删除失败属预期，不视为阻塞；由 Task E 自愈兜底）
+            using (var uc = RegistryHost.Open(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice"))
+                Assert.Equal("MantisZip.Zip", uc?.GetValue("Progid"));
+
+            // 其余卸载步骤仍然完成：ProgId 键已删、OpenWithProgids 里的值已删
+            using (var progId = RegistryHost.Open(@"Software\Classes\MantisZip.Zip"))
+                Assert.Null(progId);
+            using (var owp = RegistryHost.Open(@"Software\Classes\.zip\OpenWithProgids"))
+                Assert.Null(owp?.GetValue("MantisZip.Zip"));
+        }
+        finally
+        {
+            RegistryHost.DeleteInterceptionForTesting = null;   // 恢复注入缝，防跨用例串扰
+            CleanupExtension(".zip");
+        }
+    }
+
     // ──────────────────────────────────────────────
     // AreAssociationsInstalledForExtension
     // ──────────────────────────────────────────────

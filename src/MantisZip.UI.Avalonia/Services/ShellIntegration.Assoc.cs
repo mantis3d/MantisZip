@@ -197,6 +197,32 @@ internal static partial class ShellIntegration
 
         // 删除独立 ProgId 键（仅当该 ProgId 不被其他扩展引用时）
         DeleteRegistryKey($@"Software\Classes\{progId}");
+
+        // 清理"悬空默认"：仅当 UserChoice 指向我们的 ProgId 时删除该键。
+        // UserChoice 的 SetValue 权限被系统 DENY，但删除整键是允许的——
+        // 删掉后 Windows 干净回退，而不是保留一个指向已删 ProgId 的幽灵默认。
+        try
+        {
+            var ucPath = $@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\{ext}\UserChoice";
+            string? curProgId;
+            using (var uc = RegistryHost.Open(ucPath))
+                curProgId = uc?.GetValue("Progid") as string;
+
+            if (!string.IsNullOrEmpty(curProgId) &&
+                curProgId.StartsWith("MantisZip", StringComparison.OrdinalIgnoreCase))
+            {
+                try
+                {
+                    RegistryHost.Delete(ucPath);
+                }
+                catch (Exception ex)
+                {
+                    App.DebugLog($"ShellIntegration.UninstallAssociationForExtension: failed to clear UserChoice: {ex.Message}");
+                    // best-effort：不清理 UserChoice 不应中断卸载流程
+                }
+            }
+        }
+        catch (Exception ex) { App.DebugLog($"ShellIntegration.UninstallAssociationForExtension: failed to clear UserChoice: {ex.Message}"); }
     }
 
     /// <summary>
