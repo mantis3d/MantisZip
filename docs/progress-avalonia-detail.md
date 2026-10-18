@@ -8,6 +8,7 @@
 
 **2026-10-18** — DSH 维护插件落地 + AGENTS.md 瘦身 + zh-TW 重复 key 清理（工具/文档类）
   - **i18n 修复**：`strings.zh-TW.json` 删除重复定义的 `Extract_ParallelDegree`（`平行解压執行緒數…` 被后一条 `並行解壓執行緒數…` 覆盖，属死条目、用户可见文案不变）。现有 `AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 对重复 key **无效**——JSON 解析会折叠同名 key，两份文件 key 集合仍相等；该问题由新插件的 `mantiszip_i18n` 首次运行发现，修复后三语一致（1262 key）
+  - **AGENTS.md 瘦身**：70,016 → 59,092 字节，解决工作区指令 65,536 预算截断（此前规则 15/16/17 尾部在新会话里读不到）。并行解压架构（2,552B）、7z 多线程压缩（1,108B）、预览子系统（5,473B）、Shell integration（4,798B）四段**整段迁入** `docs/ARCHITECTURE.md` 新增「实现细节（自 AGENTS.md 迁出，2026-10-18）」章节（原文一字未丢），原位保留「摘要 + 链接」——摘要只留不可违反的约束（每批次独占 archive、禁止锁内 `Report`、`PreviewCapabilities` 能力查表、级联动词禁用 `CommandFlags=8` 等）；顺带修正两处因迁出失效的「见下方信息面板小节」引用
 
 **2026-10-18** — 压缩加速三开关计划完成「Task 0 基线复测 + 三项拍板」修订（计划类）
   - `.omo/plans/未开始/adaptive-compress-ui-convergence.md`：**Task 0 基线复测实跑完成**（`dotnet run scripts\bench-zip-mt.cs -- --profile text|media|mixed --degrees 0,1,2,4,8,16 --reps 3`，本机 **20 逻辑核** / `dotnet 10.0.13` / 合成语料 text 54MB·200 文件 + media 49MB·100 文件 + mixed 103MB·300 文件；报告 `.buildout\bench-before-{text,media,mixed}.txt|json`，已 gitignore）。结果表与 5 条观测已写入 Task 0
