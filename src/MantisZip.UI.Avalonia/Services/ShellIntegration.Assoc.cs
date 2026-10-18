@@ -125,10 +125,25 @@ internal static partial class ShellIntegration
             SetRegistryValue($@"{progIdKey}\DefaultIcon", null, $@"""{exePath},0""");
     }
 
-    /// <summary>清理旧的 MantisZip.Archive 单 ProgId（v0.5 以前版本迁移用）。</summary>
+    /// <summary>
+    /// 清理旧的 MantisZip.Archive 单 ProgId（v0.5 以前版本迁移用），
+    /// 并清理各格式 OpenWithProgids 下遗留的该旧 ProgId 值。
+    /// </summary>
     public static void CleanupOldProgId()
     {
         DeleteRegistryKey($@"Software\Classes\{OldProgId}");
+
+        // 旧版单 ProgId 时代在 OpenWithProgids 里留下的值也要清（只删键不删值会永久残留，
+        // 且该值指向已删除的 ProgId，导致"打开方式"里出现一个打不开的条目）。
+        foreach (var ext in ArchiveExtensions)
+        {
+            try
+            {
+                using var key = RegistryHost.Open($@"Software\Classes\{ext}\OpenWithProgids", writable: true);
+                key?.DeleteValue(OldProgId, throwOnMissingValue: false);
+            }
+            catch (Exception ex) { App.DebugLog($"ShellIntegration.CleanupOldProgId: failed to clear {ext} OpenWithProgids: {ex.Message}"); }
+        }
     }
 
     /// <summary>安装文件关联前的预备工作：迁移旧版 + 注册 Applications 条目。</summary>

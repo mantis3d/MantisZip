@@ -524,4 +524,28 @@ public class ShellIntegrationAssocTests : IDisposable
         Assert.False(ShellIntegration.IsAssocEnabledInSettings(s, ".not-a-real-ext"));
         Assert.False(ShellIntegration.IsAssocEnabledInSettings(new AppSettings { AssocTarGz = false }, ".tgz"));
     }
+
+    // ──────────────────────────────────────────────
+    // CleanupOldProgId（旧版单 ProgId 迁移清理）
+    // ──────────────────────────────────────────────
+
+    [Fact]
+    public void CleanupOldProgId_RemovesLegacyOpenWithValue_ButKeepsCurrent()
+    {
+        try
+        {
+            using (var k = RegistryHost.Create(@"Software\Classes\.zip\OpenWithProgids"))
+            {
+                k.SetValue("MantisZip.Archive", Array.Empty<byte>(), Microsoft.Win32.RegistryValueKind.None);
+                k.SetValue("MantisZip.Zip", Array.Empty<byte>(), Microsoft.Win32.RegistryValueKind.None);
+            }
+
+            ShellIntegration.CleanupOldProgId();
+
+            using var after = RegistryHost.Open(@"Software\Classes\.zip\OpenWithProgids");
+            Assert.Null(after?.GetValue("MantisZip.Archive"));   // 旧值清掉
+            Assert.NotNull(after?.GetValue("MantisZip.Zip"));    // 现值保留
+        }
+        finally { CleanupExtension(".zip"); }
+    }
 }
