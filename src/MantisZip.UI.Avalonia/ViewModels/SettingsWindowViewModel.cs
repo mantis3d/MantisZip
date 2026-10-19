@@ -493,6 +493,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             ShellIntegration.PrepareAssocRegistration();
             ShellIntegration.InstallAssociations(selected);
+            PersistAssocFlagsNow();
             RefreshAssocStatus();
             await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_InstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -508,6 +509,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         try
         {
             ShellIntegration.UninstallAssociations();
+            SetBuiltInAssocFlags(false);
+            PersistAssocFlagsNow();
             RefreshAssocStatus();
             await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_UninstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -566,6 +569,35 @@ public partial class SettingsWindowViewModel : ObservableObject
             item.CurrentHandler = ShellIntegration.GetCurrentHandler(item.Extension);
             item.IsEnabled = IsEnabledFromSettings(item.Extension);
         }
+    }
+
+    /// <summary>把全部内置格式的关联复选框置为指定状态（不刷新状态、不持久化）。</summary>
+    private void SetBuiltInAssocFlags(bool enabled)
+    {
+        AssocZip = enabled;
+        Assoc7z = enabled;
+        AssocRar = enabled;
+        AssocTar = enabled;
+        AssocTarGz = enabled;
+        AssocGz = enabled;
+        AssocIso = enabled;
+    }
+
+    /// <summary>
+    /// 立即把内置格式关联开关（当前复选框状态）写回 AppSettings 并持久化（不等"保存"按钮）。
+    /// 自愈判据含「该格式未被用户显式禁用」，故取消/卸载关联必须立刻留痕，
+    /// 否则下次启动会被 ShellIntegration.SelfHealAssociations 重新装回来。
+    /// </summary>
+    private void PersistAssocFlagsNow()
+    {
+        _settings.AssocZip = AssocZip;
+        _settings.Assoc7z = Assoc7z;
+        _settings.AssocRar = AssocRar;
+        _settings.AssocTar = AssocTar;
+        _settings.AssocTarGz = AssocTarGz;
+        _settings.AssocGz = AssocGz;
+        _settings.AssocIso = AssocIso;
+        _settings.Save();
     }
 
     private void PopulateBuiltInFormats()
@@ -2070,13 +2102,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     [RelayCommand]
     private void DeselectAllAssoc()
     {
-        AssocZip = false;
-        Assoc7z = false;
-        AssocRar = false;
-        AssocTar = false;
-        AssocTarGz = false;
-        AssocGz = false;
-        AssocIso = false;
+        SetBuiltInAssocFlags(false);
+        PersistAssocFlagsNow();
         RefreshAssocStatus();
     }
 

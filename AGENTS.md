@@ -71,59 +71,17 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 
 ### 并行解压架构
 
-ZIP 解压支持并行模式（`ZipEngine.SupportsParallelExtract = true`），通过**多实例并行 + 批次复用**实现线程安全与低开销：
+ZIP 解压默认并行（`ZipEngine.SupportsParallelExtract = true`）：按文件大小降序 + Round-Robin 分批，**每批次独占一个 SharpCompress archive 实例**（共享实例并发会 `ZlibException`），4MB 缓冲区；`AppSettings.ParallelExtractDegree` 默认 `ProcessorCount`（1 = 串行回退）。`SevenZipEngine`/`TarGzEngine` 不支持；过滤解压（`ExtractEntriesAsync`）仍串行。
 
-**核心原理**：SharpCompress 的 `IArchive` 内部维护共享解压状态（字典、滑动窗口），并发访问会导致 `ZlibException`。解决方案是**每个批次独占一个 archive 实例**，无共享状态。
+> ⚠️ 进度上报禁止在锁内调用 `progress?.Report()`：曾导致 100×1MB 解压从 0.3s 劣化到 8.5s（25x 回退）。
 
-```csharp
-// ✅ 安全：每批次独立打开一次 archive，处理整批文件（Round-Robin 分配）
-await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelism = N }, async (batch, ct) => {
-    using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
-    foreach (var key in batch) {
-        var entry = archive.Entries.First(e => e.Key == key);
-        // ... 解压逻辑
-    }
-});
-```
-
-**实现细节** (`Core/Engines/ZipEngine.cs`)：
-- `SupportsParallelExtract` 属性返回 `true`（仅 ZipEngine）
-- `ExtractAsync` 根据文件数和 `ArchiveOptions.ParallelExtractDegree` 自动选择串行/并行
-- 并行实现 (`ExtractAsyncParallel`)：
-  1. 单线程获取所有条目键和大小（预读 archive 一次）
-  2. 单线程创建所有目标目录（避免竞态）
-  3. 按文件大小**降序排列**（大文件优先，避免长尾效应）
-  4. **Round-Robin 分批**（`i % N`）：大文件自动分散到不同批次，天然负载均衡
-  5. `Parallel.ForEachAsync` 并行处理各批次，**每批次仅打开 1 次 archive**（减少 80-90% OpenArchive 开销）
-  6. 冲突处理用 `lock` 同步；进度报告先在锁内拷贝共享变量、**释放锁后**再 `Report`（避免 8 线程锁竞争）
-  7. 4MB 缓冲区 (`CopyBufferSize = 4MB`) 配合 `Stream.CopyToAsync`
-
-> ⚠️ 进度报告锁竞争是性能陷阱：曾在锁内直接调用 `progress?.Report()`，8 线程争用导致 100×1MB 解压从 0.3s 劣化到 8.5s（25x 回退）。
-
-**配置** (`AppSettings.ParallelExtractDegree`)：
-- 默认 `Environment.ProcessorCount`（可在设置窗口 1-16 调整）
-- `1` = 串行回退
-
-**限制**：
-- 仅 `ZipEngine` 支持（`SupportsParallelExtract = true`）
-- `SevenZipEngine`/`TarGzEngine` 返回 `false`（7z 依赖 SharpSevenZip 原生多线程，TAR 是顺序流）
-- `ExtractEntriesAsync`（过滤解压）暂不并行，仅全量 `ExtractAsync` 支持
-
-**性能**：
-- 缓冲区 256KB → 4MB：+70% 吞吐
-- 多实例并行：理想环境 6x+ 加速（8核 NVMe）
-- 组合优化：~10x 理论峰值
+分批算法、锁内拷贝变量、性能数据见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ### 7z 多线程压缩（mt=on）
 
-`SevenZipEngine` 通过 `CustomParameters["mt"]` 启用 7z.dll 原生多线程压缩：
+`SevenZipEngine` 通过 `CustomParameters["mt"]` 启用（`ArchiveOptions.SevenZipMultithreaded`，默认 `true`）；**仅 7z 有效**（ZIP/TAR/GZ 无此参数，`SharpSevenZipCompressor` 也没有 `mt` 属性）。实测 4.63x 加速（100×1MB / 8 核）。
 
-- **配置**：`ArchiveOptions.SevenZipMultithreaded`（默认 `true`）→ `ConfigureCompressor` 写入 `mt=on/off`
-- **UI 入口**：压缩对话框 7z 面板复选框（`DynamicFormatOptionsPanel`）+ 设置窗口全局默认值（`SettingsWindowViewModel`）
-- **传递链**：`DynamicFormatOptionsPanel` → `CompressSettingsWindow.SnapshotFormatOptionsToViewModel` → `CompressSettingsViewModel` → `CompressFlow.BuildRequest` → `CompressRequest.SevenZipMultithreaded` → `CompressService.BuildOptions` → `ArchiveOptions.SevenZipMultithreaded`
-- **实测性能**（100 × 1MB 随机数据，8 核）：单线程 38.7s → 多线程 8.4s，**4.63x 加速**（压缩率可能略有下降）
-- **验证**：`SevenZipEngineTests.CompressAsync_MultiThreaded_CreatesValidArchive`（解压逐字节比对 + `TestArchiveAsync` 完整性校验）
-- **仅 7z 有效**：ZIP/TAR/GZ 无此参数；`SharpSevenZipCompressor` 无 `mt` 属性，只能走 `CustomParameters`
+UI 传递链、实测数据与验证用例见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ### ArchiveItem duality
 
@@ -169,7 +127,7 @@ await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelis
 使用 `CommunityToolkit.Mvvm` 的 `ObservableObject` + source generators (`[ObservableProperty]`, `[RelayCommand]`)：
 
 - **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`, `IconTestViewModel`（图标测试窗口）、`UiTestViewModel`（UI 控件测试窗口）、`MetadataPanelSettingsViewModel`（元数据面板设置窗口）
-- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `SelectedItemsExtractService`（选择条目解压，消费 `ExtractPathResolver`）、`CompressFlow`（压缩公共流程：BuildRequest/冲突弹窗/暂停，主窗口 VM 与 CLI 共用）、`ExtractFlow`（解压公共流程 + 冲突弹窗）、`DragDropService`（拖拽解压后置流程）+ `OverlayController`（Win32 覆层）+ `CustomOleDragDrop`（自实现 OLE 拖拽，根治光标）+ `DropTargetDetector`（目标目录检测）+ `DragDropItemExpander`（选中目录展开）+ `DragPreviewBitmapBuilder`（拖拽预览位图）、`PasswordService`（密码验证/自动匹配）、`FileFilterHelper`（文件过滤）、`NativeMethods`（Win32 P/Invoke）、`PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树，`BuildExtractPreview` 与解压共用 `ExtractPathResolver` 保证预览=实际）、`MetadataSettingsManager`（元数据面板配置持久化，见下方信息面板小节）、`MetadataRenderEngine`（元数据渲染引擎，见下方信息面板小节）、`ShellIntegration`（partial 拆分：`ShellIntegration.cs` + `ShellIntegration.Menu.cs` + `ShellIntegration.Assoc.cs`）
+- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `SelectedItemsExtractService`（选择条目解压，消费 `ExtractPathResolver`）、`CompressFlow`（压缩公共流程：BuildRequest/冲突弹窗/暂停，主窗口 VM 与 CLI 共用）、`ExtractFlow`（解压公共流程 + 冲突弹窗）、`DragDropService`（拖拽解压后置流程）+ `OverlayController`（Win32 覆层）+ `CustomOleDragDrop`（自实现 OLE 拖拽，根治光标）+ `DropTargetDetector`（目标目录检测）+ `DragDropItemExpander`（选中目录展开）+ `DragPreviewBitmapBuilder`（拖拽预览位图）、`PasswordService`（密码验证/自动匹配）、`FileFilterHelper`（文件过滤）、`NativeMethods`（Win32 P/Invoke）、`PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树，`BuildExtractPreview` 与解压共用 `ExtractPathResolver` 保证预览=实际）、`MetadataSettingsManager`（元数据面板配置持久化，见 docs/ARCHITECTURE.md）、`MetadataRenderEngine`（元数据渲染引擎，见 docs/ARCHITECTURE.md）、`ShellIntegration`（partial 拆分：`ShellIntegration.cs` + `ShellIntegration.Menu.cs` + `ShellIntegration.Assoc.cs`）
 - **Views**: `MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`, `UiTestWindow.axaml`（UI 控件测试，仅 Debug 显示）
 - **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`CustomFilePickerDialog`（**统一文件/目录选择器**，新增选择入口必须用它、禁用原生 StorageProvider，见规则 16）、`QuickPathPicker`（自包含路径速选控件，见下方「路径速选子系统」）、`InfoPanel`（元数据信息面板）、`FileFilterEditor`（文件过滤条件编辑器）、`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等）、`QuickPathControl`（路径速选控件）
 - **Converters**: `BrushResourceConverter`（主题色键→画刷）、`GeometryResourceConverter`（资源键→Geometry）
@@ -211,29 +169,13 @@ private bool _optionA;
 
 ### 预览子系统
 
-预览系统在独立的 `PreviewPanel.axaml` (UserControl) + `PreviewViewModel` + `PreviewService`，MVVM 模式：
+预览在 `PreviewPanel.axaml` + `PreviewViewModel` + `PreviewService`，入口 `ClassifyPreviewByMagicAsync()`（**魔数优先**，扩展名回退）→ `ShowXxx(filePath)`。
 
-- **预览类型枚举**: `PreviewType` (Services/PreviewService.cs): `None`, `Text`, `Csv`, `Pe`, `Image`, `AnimatedImage`（GIF / Animated WebP 共用，`Gif` 保留但废弃），`Svg`, `Font`, `Audio`, `Sqlite`, `Iso`, `Torrent`, `Office`, `Docx`, `Xlsx`, `Pptx`, `Video`, `Html`, `Markdown`, `Pdf`, `IcoGallery`, `Unsupported`
-- **格式分发**: `PreviewService.ClassifyPreviewByMagicAsync()`（魔数优先）→ `PreviewViewModel.ShowXxx(filePath)` 方法，扩展名回退
-- **HTML/Markdown**: 当前 HTML 走 ReverseMarkdown → Markdig → 原生控件树，Markdown 直接 Markdig AST → 控件树。**计划恢复 WebView 双轨方案**：`Avalonia.Controls.WebView`（各平台原生引擎，Win→WebView2, Mac→WKWebView, Linux→WebKit GTK），不可用时降级到 ReverseMarkdown（详见 `.omo/plans/未开始/html-preview-webview-fallback.md`）
-- **PDF**: `UglyToad.PdfPig` + `SkiaSharp` 逐页位图渲染 + 翻页导航（PdfPig 0.1.15 + PdfPig.Rendering.Skia 0.1.15.4）
-- **ICO 画廊**: 自实现 `IcoParser` 提取全部多帧，`WrapPanel` 画廊布局，FlattenAlpha 切换，透明背景棋盘格
-- **SVG**: `Svg.Skia` 直接栅格化 → `WriteableBitmap`（无需 WebView2）
-- **字体预览**: `HarfBuzzSharp` shaping + `SkiaSharp` 位图渲染 + 自动折行 + 连字检测（`CheckFontSupportsLigature` 自动检测，`IsLigatureEnabled` 可开关）
-- **GIF**: 自实现 `GifDecoder` + `DispatcherTimer` 逐帧动画（无需 `WpfAnimatedGif`）
-- **动画图像（AnimatedImage）**: `PreviewType.AnimatedImage` 取代废弃的 `Gif`，GIF 与 Animated WebP 共用（`ShowImage` 内 SKCodec `FrameCount>1` 分流到动画路径，静态 WebP 保持 Image 预览）
-- **预览能力注册表**: `PreviewCapabilities`（[Flags] `PreviewCapability`：Zoom/Transparency/FlattenAlpha/AnimationControls，对齐 MetadataRegistry 模式）按 PreviewType 声明能力，`HasZoomControls`/`HasTransparencyControls`/`HasFlattenAlphaControls`/`HasAnimationControls` 全部查表取代 `HasXxxControls` 硬编码；新增格式注册能力即可复用工具栏
-- **两阶段加载**: `ShowPreviewAsync` 拆分 Phase 1（同步显示加载状态+弹跳点动画+信息栏）→ Phase 2（异步提取后显示内容），`_previewLoadVersion` 版本号守卫防竞态
-- **透明背景切换**: 图片/GIF/ICO 预览的 `DrawingBrush` 棋盘格（8×8），`IsTransparencyBgShown` 绑定 🏁 按钮
-- **信息面板（可配置元数据系统）**: 已从硬编码 `FormatMetadata` 重构为可配置系统（方案见 [metadata-panel-configurable.md](.omo/plans/已完成/metadata-panel-configurable.md)）：
-  - **存储**: `MetadataSettingsManager` 持久化到独立 `%LOCALAPPDATA%\MantisZip\metadata-panel.json`（与 AppSettings 同目录不同文件），`SettingsChanged` 事件驱动刷新，`InitializeDefaultConfig` 自动补齐注册类型默认配置
-  - **注册与渲染**: `MetadataRegistry`（字段键/显示名/分类注册表）→ `MetadataRenderEngine.RenderCommon/RenderFormat` 按 `MetadataPanelSettings`（`TypeMetadataConfig.Enabled` + `FieldConfig.Position`(infoPanel/contentTop/hidden)/`Order`/`Row`）将字段分发到信息栏（`CommonSections`/`FormatSections` 分区渲染，`SectionOrder` 控制上下）与内容区顶部横条（`ContentTopItems`，随内容滚动）；PE 的旧 `PeTitle`/`PeSubtitle` 已被新系统替代
-  - **接线**: `MetadataHelper.RenderCommonToViewModel/RenderFormatToViewModel` 供 `PreviewViewModel` 调用，同时同步 `FormatMetadata` 向后兼容；`UpdateCommonMetadata`（Phase 1）→ `ShowXxx`（Phase 2）两阶段填充
-  - **全局显隐（持久化）**: 面板显隐 = 内容驱动 `IsInfoPanelVisible` && 用户偏好 `ShowInfoPanel`（`IsInfoPanelEffectiveVisible`）；`ShowInfoPanel` 持久化到 `AppSettings.ShowPreviewInfoPanel`（默认 true，与 WPF 同名），菜单（`ToggleInfoPanelVisibility`）与设置窗口双入口；`ApplyInfoPanelOrientation()` 切换右侧/下方位置（`InfoPanelOrientation` 已持久化）
-- **DataGrid**: CSV/SQLite 预览用 `Avalonia.Controls.DataGrid`（手动列创建以绕过 `AutoGenerateColumns` 对 `DataView` 的 bug）
-- **结果预览面板**: `ResultPreviewService` 构建文件树 → `ResultTreeView` 控件（Compact/Full 模式、冲突高亮、过滤灰显、深度/文件数截断、摘要栏）。构建期间显示加载覆层：`IsLoading`/`BuildProgress` StyledProperties 驱动（`OnIsLoadingChanged`/`OnBuildProgressChanged`，进度经 `IProgress<double>` 上报，<250ms 快速构建闪覆层、慢构建显示确定/不定进度条）
-- **魔数检测**: `PreviewService.ClassifyPreviewByMagicAsync` 通过文件魔数优先判定格式，与扩展名冲突时 FormatMetadata 显示警告提示
-- **部分提取（元数据优先）**: `ArchiveEntryExtractor.ExtractHeadAsync`（Core/Utils，`ArchiveEntryExtractor.cs:213`）提取条目前 N 字节到内存，`ExtractHeadTailAsync`（:257）双端提取（head + tail）；ZIP/7z/RAR/Tar/Gz 均支持，**7z 固实自动降级**（`IsSevenZipSolid` 检测 + `ExtractHeadViaFullExtractAsync` 全量提取），Deflate ZIP 尾部提取有 10MB 上限。被魔数检测消费，为元数据优先预览的横切基础设施（对应 preview-extended-formats.md Phase 5）
+新增预览格式必须同步三处：`PreviewType` 枚举、`PreviewCapabilities`（能力查表驱动工具栏按钮，禁止再加 `HasXxxControls` 硬编码）、`MetadataRegistry` 元数据字段。预览路径与实际解压共用 `ExtractPathResolver`（预览=实际）；部分提取走 `ArchiveEntryExtractor.ExtractHeadAsync`/`ExtractHeadTailAsync`（7z 固实自动降级）。
+
+两阶段加载用 `_previewLoadVersion` 防竞态；CSV/SQLite 的 `DataGrid` 必须手动建列（`AutoGenerateColumns` 对 `DataView` 有 bug）。
+
+完整格式清单、信息面板配置系统、PDF/字体/ICO/GIF 实现见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ### 设置系统
 
@@ -255,58 +197,14 @@ private bool _optionA;
 
 ### Shell integration
 
-`ShellIntegration` (static class) 实现 Windows Explorer 上下文菜单集成。CLI 全部原生化（`--install-shell`/`--uninstall-shell` 等直接调用 ShellIntegration）。
+`ShellIntegration`（static）写 `HKCU\Software\Classes`，**无需管理员**。`Install()` 优先注册 COM（`MantisZip.ShellExt.comhost.dll`），缺失时回退静态动词；`Uninstall()` 两边都清；`IsInstalled` 先查 COM CLSID。
 
-安装 Windows Explorer 上下文菜单条目 via `HKCU\Software\Classes` — no admin required.
+- **COM 模式**（默认，`EnableDynamicMenu = true`）：`ContextMenuHandler` 实现 `IShellExtInit` + `IContextMenu`，解压组/压缩组两个子菜单；菜单文本从 `HKCU\Software\MantisZip\ContextMenu\Text*` 读取（`ShellExt_*` 8 个 key，缺失回退硬编码中文）
+- **静态级联**（`EnableDynamicMenu = false`）：单个 MantisZip 子菜单，8 个动词各有开关，打开/解压动词用 `AppliesTo` 限定压缩包扩展名
 
-Since v0.3.7, `Install()` tries COM component registration first (`MantisZip.ShellExt.comhost.dll` via `InstallCom()`), falling back to static registry verbs if the COM host file is missing. `Uninstall()` clears both COM CLSID + shellex and all static verbs. `IsInstalled` checks the COM CLSID first.
+新增菜单项要同时改：`ShellIntegration.Menu.cs`（注册）、`strings.*.json`（`ShellExt_*`，三语）、`WriteMenuTextToRegistry()`（写注册表）。**不要给级联动词设 `CommandFlags=8`**（部分 Windows 会隐藏该项）。
 
-#### COM context menu (ShellExt)
-
-`ContextMenuHandler.cs` implements `IShellExtInit` + `IContextMenu` as a COM component hosted by `Explorer.exe`. Two groups:
-
-- **Extract group** (inside "打开/解压" submenu, archive files only): 打开压缩包, 原地解压包, 智能原地解压, 解压到 {name}, 解压到……
-- **Compress group** (inside "压缩" submenu): 压缩到 {name}.zip, 压缩到 {parentDir}.zip, 压缩……
-
-Multi-file selection changes text dynamically: "打开压缩包 等 {N} 个文件", "原地解压{N}个压缩包", "智能原地解压{N}个压缩包".
-
-#### Icon system
-
-11 `.ico` files (`App.ico`, `Open.ico`, `Extract.ico`, `ExtractHere.ico`, `ExtractSmart.ico`, `ExtractToNamed.ico`, `ExtractTo.ico`, `Compress.ico`, `CompressSeparate.ico`, `CompressCombined.ico`, `CompressDialog.ico`) from `src\MantisZip.UI\Resources\MenuIcons\` are embedded as managed resources in `MantisZip.ShellExt.dll` (`MantisZip.ShellExt.csproj` EmbeddedResource, lines 30-41). Loaded at runtime via `GetIconForCommand()`:
-
-1. Read .ico header → find 16×16 entry → extract raw image data
-2. `CreateIconFromResourceEx` → get HICON
-3. `ConvertIconToBitmap`: `CreateDIBSection` (32-bit DIB, top-down, alpha channel) → `DrawIconEx` → HBITMAP
-4. HBITMAPs cached per command type (11 static fields: `_cachedIconMantisZip`, `_cachedIconOpen`, `_cachedIconExtract`, `_cachedIconExtractHere`, `_cachedIconSmartExtract`, `_cachedIconExtractToNamed`, `_cachedIconExtractTo`, `_cachedIconCompress`, `_cachedIconCompressSeparate`, `_cachedIconCompressCombined`, `_cachedIconCompressDialog`)
-5. `CleanupIconCache` called at the **start** of each `QueryContextMenu` (not the end, because Explorer draws asynchronously after `QueryContextMenu` returns)
-
-Uses pure Win32 API — no `System.Drawing` dependency (COM host can't use it).
-
-#### Menu text localization
-
-ShellExt reads localized menu text from registry (`HKCU\Software\MantisZip\ContextMenu\Text*`), written by `ShellIntegration.WriteMenuTextToRegistry()` during `InstallCom()`. The UI project's `L.T()` translates 8 `ShellExt_*` keys (zh + en in `strings.*.json`). Fallback to hardcoded Chinese defaults if registry values are absent.
-
-Two modes controlled by `AppSettings.EnableDynamicMenu` (default: on):
-
-- **COM dynamic mode** (default): `InstallCom()` registers the ShellExt COM handler (`MantisZip.ShellExt.comhost.dll`); if COM is unavailable or not yet loaded in Explorer, `CheckComStatus()` installs the static cascade as fallback
-- **Static cascade mode** (`EnableDynamicMenu = off`): single "MantisZip" submenu with separators between 浏览/压缩/解压 groups, numbered verbs via `ExtendedSubCommandsKey`
-
-> 注：旧的 `EnableCascadingMenu`（Cascade vs 顶层独立 Verb 两形态开关）已于 WPF 时期移除（commit `5b431fb`，verb 模式作为死代码废弃，静态路径仅存级联一种形态）；Avalonia 全仓无此字段。
-
-Menu items with individual toggles:
-
-| # | Menu Item | Toggle | CLI Trigger |
-|---|---|---|---|
-| 1 | 打开压缩包 — Open archive | EnableOpenMenu | `--open` |
-| 2 | 压缩菜单 — Compress dialog | EnableCompressMenu | `--compress` |
-| 3 | 压缩到独立的（文件名）— Per-item archives | EnableCompressSeparate | `--compress-separate` |
-| 4 | 压缩到（父目录名）— Combined archive | EnableCompressCombined | `--compress-combined` |
-| 5 | 解压到此处 — Extract here | EnableExtractHereMenu | `--extract-here` |
-| 6 | 智能解压到此处 — Smart extract | EnableSmartExtractMenu | `--extract-smart` |
-| 7 | 解压到（压缩包名）— Extract to named folder | EnableExtractToNamedMenu | `--extract-to-name` |
-| 8 | 解压到…… — Extract to… | EnableExtractToMenu | `--extract` |
-
-Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons via `GetMenuIconPath()` (static cascade mode only; COM mode uses embedded .ico resources) — maps each verb to `Resources\MenuIcons\*.ico` in the output dir (Open/ExtractHere/ExtractSmart/ExtractToNamed/ExtractTo/CompressSeparate/CompressCombined/CompressDialog), returns null if the file is missing.
+COM handler 细节、图标嵌入与 Win32 绘制见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ### CLI entry points
 
@@ -498,6 +396,8 @@ When releasing a new version, update the version string in ALL of these location
 - 成本极低：各改 1 行
 
 > 历史教训：2026-10-01 升 v0.5.1 时两个 `.iss` 的兜底值仍停在 `0.4.4`，说明"非发布阻塞"容易演变成"长期遗忘"。故列入 checklist，但**不作为发布门禁**。
+
+> 改完 6 处后跑 `mantiszip_version`（DSH 本地插件工具，只读）核对一致性，它会同时报出两处 `.iss` 兜底值是否漂移；工具不可用时逐处人工比对。
 
 ## Build output
 
@@ -729,7 +629,9 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
-只有构建通过、`lsp_diagnostics` 无错误后，任务才算完成。
+优先用 DSH 本地插件工具 `mantiszip_verify`（`target`：avalonia/core/shell/tests/ui-tests/solution；`action`：build/test）：它把 MSBuild 输出压成「文件:行:列 + 错误码」，比原始日志省几十倍上下文。**工具不可用时**（未装插件、换 profile、非 DSH 环境）回退到上面的 `dotnet build` / `dotnet test`，判定标准不变。
+
+只有构建通过（工具返回 `ok=true`，或回退命令 exit 0）后，任务才算完成。
 
 ### 规则 13：新增 UI 文案必须走本地化（禁止硬编码）
 
@@ -741,6 +643,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - **新增 key 必须成对添加**到 `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json`、`strings.en.json` 与 `strings.zh-TW.json`（三语文件 key 集必须完全同步，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 会校验）；插入到文件头 `{` 之后（key 不排序），维持 UTF-8 无 BOM + CRLF + 2 空格缩进
 - **XAML 用 `LocalizedStrings[Key]` 绑定的 key 必须额外登记**到 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组（`ViewModels/MainWindowViewModel.cs`，约 line 203 起的 `new[] { ... }`）。`LocalizedStrings` 字典**不是全量加载** JSON，而是由该显式数组构建——漏登记会导致菜单/工具栏文字空白（图标仍在），构建不会报错。新增 XAML 绑定 key 后必须同步补进此数组
 - 完成后自检：`dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 无新增错误，并扫描确认无遗漏硬编码
+- **改完文案必须跑 `mantiszip_i18n`**（DSH 本地插件工具）：校验三语 key 集合、`{0}` 占位符、重复 key、空值。工具不可用时手工比对三份文件——注意现有测试只校验解析后的 key 集合，**测不出重复 key**（重复定义会被 JSON 解析折叠，后面的覆盖前面的）
 
 **豁免**（须在代码注释中注明原因）：
 - 开发者诊断工具（如 `IconTestWindow` 的图标元数据、调试菜单 `TestWindow_Click` 的测试内容）

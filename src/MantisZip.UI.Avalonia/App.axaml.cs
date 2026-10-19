@@ -144,7 +144,7 @@ public partial class App : Application
         {
             try
             {
-                using var firstRunKey = Registry.CurrentUser.OpenSubKey(
+                using var firstRunKey = RegistryHost.Open(
                     @"Software\MantisZip", writable: true);
                 if (firstRunKey != null)
                 {
@@ -170,6 +170,16 @@ public partial class App : Application
             catch (Exception firstRunEx)
             {
                 App.DebugLog($"OnFrameworkInitializationCompleted: first-run handling failed: {firstRunEx.Message}");
+            }
+
+            // ── 文件关联自愈：修复"UserChoice 悬空/ProgId 被误删"的历史损坏 ──
+            try
+            {
+                ShellIntegration.SelfHealAssociations(AppSettings.Load());
+            }
+            catch (Exception healEx)
+            {
+                App.DebugLog($"OnFrameworkInitializationCompleted: SelfHealAssociations failed: {healEx.Message}");
             }
 
             // ── 检查 COM 动态菜单状态（如果 pending，检测 Explorer 是否已加载 comhost.dll）──
@@ -263,7 +273,7 @@ public partial class App : Application
                         {
                             var herePaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
                             if (herePaths.Count == 0)
-                                desktop.Shutdown();
+                                AppShutdown.Request(desktop.Shutdown);
                             else if (herePaths.Count == 1)
                                 _ = RunExtractCliAsync(herePaths[0], Path.GetDirectoryName(herePaths[0]) ?? ".", args, desktop);
                             else
@@ -276,7 +286,7 @@ public partial class App : Application
                         {
                             var toNamePaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
                             if (toNamePaths.Count == 0)
-                                desktop.Shutdown();
+                                AppShutdown.Request(desktop.Shutdown);
                             else if (toNamePaths.Count == 1)
                             {
                                 var toNameTarget = Path.Combine(
@@ -295,7 +305,7 @@ public partial class App : Application
                         {
                             var smartPaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
                             if (smartPaths.Count == 0)
-                                desktop.Shutdown();
+                                AppShutdown.Request(desktop.Shutdown);
                             else if (smartPaths.Count == 1)
                                 _ = RunExtractSmartCliAsync(smartPaths[0], args, desktop);
                             else
@@ -351,6 +361,9 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+
+        // 主循环启动窗口结束：此后 AppShutdown.Request 与直接 Shutdown 等价（见 Services/AppShutdown.cs）
+        AppShutdown.MarkFrameworkInitCompleted();
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -377,13 +390,13 @@ public partial class App : Application
         {
             Console.WriteLine(helpText);
             FreeConsole();
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
         await AppMessageBox.Show(helpText, LocalizationManager.T("App_CliHelpTitle"),
             MessageBoxButton.OK, MessageBoxImage.Information);
-        desktop.Shutdown();
+        AppShutdown.Request(desktop.Shutdown);
     }
 
     /// <summary>
@@ -397,7 +410,7 @@ public partial class App : Application
                 AppConstants.Version, AppContext.BaseDirectory),
             LocalizationManager.T("App_StartupTestTitle"),
             MessageBoxButton.OK, MessageBoxImage.Information);
-        desktop.Shutdown();
+        AppShutdown.Request(desktop.Shutdown);
     }
 
     /// <summary>
@@ -1049,7 +1062,7 @@ public partial class App : Application
     {
         var restarted = await TryExtractArchiveAsync(archivePath, targetDir, originalArgs, desktop);
         if (!restarted)
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
     }
 
     /// <summary>
@@ -1062,7 +1075,7 @@ public partial class App : Application
     {
         var restarted = await TryExtractSmartAsync(archivePath, originalArgs, desktop);
         if (!restarted)
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
     }
 
     /// <summary>
@@ -1079,7 +1092,7 @@ public partial class App : Application
             var existing = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
             if (existing.Count == 0)
             {
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
                 return;
             }
 
@@ -1101,7 +1114,7 @@ public partial class App : Application
             var ok = await closeTcs.Task;
             if (!ok)
             {
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
                 return;
             }
 
@@ -1112,7 +1125,7 @@ public partial class App : Application
 
             if (string.IsNullOrWhiteSpace(dest))
             {
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
                 return;
             }
 
@@ -1123,7 +1136,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Extract dialog failed: {ex.Message}");
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
         }
     }
 
@@ -1446,7 +1459,7 @@ public partial class App : Application
         if (cancelled)
         {
             await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -1461,7 +1474,7 @@ public partial class App : Application
                 progressWindow.CompleteWithErrors();
             });
             await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -1470,7 +1483,7 @@ public partial class App : Application
         {
             foreach (var p in succeededArchives)
                 TryDeleteArchiveAfterExtract(p, progressWindow.DeleteArchiveAfterExtractValue);
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
         });
     }
 
@@ -1649,7 +1662,7 @@ public partial class App : Application
         if (cancelled)
         {
             await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -1664,7 +1677,7 @@ public partial class App : Application
                 progressWindow.CompleteWithErrors();
             });
             await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -1673,7 +1686,7 @@ public partial class App : Application
         {
             foreach (var p in succeededArchives)
                 TryDeleteArchiveAfterExtract(p, progressWindow.DeleteArchiveAfterExtractValue);
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
         });
     }
 
@@ -1683,9 +1696,10 @@ public partial class App : Application
 
     /// <summary>
     /// Handle headless shell commands (--install-shell, --uninstall-shell, etc.).
-    /// Uses Environment.Exit(0) instead of desktop.Shutdown() because these commands
-    /// run during OnFrameworkInitializationCompleted, before the Dispatcher main loop
-    /// starts — calling Shutdown() there causes InvalidOperationException.
+    /// Uses Environment.Exit(exitCode) instead of AppShutdown.Request(desktop.Shutdown) because these headless
+    /// commands run during OnFrameworkInitializationCompleted, before the Dispatcher main loop
+    /// starts — a Shutdown() there would throw InvalidOperationException (see Services/AppShutdown.cs),
+    /// and they need an explicit exit code without starting the Avalonia lifetime.
     /// </summary>
     private static void HandleShellCommand(string command, IClassicDesktopStyleApplicationLifetime desktop)
     {
@@ -1850,7 +1864,7 @@ public partial class App : Application
         {
             // User chose to elevate — restart as admin and shutdown current process
             RestartAsAdmin(originalArgs);
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return true;
         }
         else
@@ -1933,7 +1947,7 @@ public partial class App : Application
     private static void HandleCompress(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+        if (myPaths.Count == 0) { AppShutdown.Request(desktop.Shutdown); return; }
 
         // 显式管理退出：对话框关闭时默认 ShutdownMode(OnLastWindowClose) 会立即退出进程，
         // 但压缩流程需要在对话框关闭后继续显示 ProgressWindow（对齐 WPF HandleCompress 的
@@ -1971,14 +1985,14 @@ public partial class App : Application
                             collectingWindow.Close();
                             await ShowCompressDialogAndRun(allPaths, desktop);
                         }
-                        catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); desktop.Shutdown(); }
+                        catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); AppShutdown.Request(desktop.Shutdown); }
                     });
                 });
             }
             else
             {
                 SendPathsThroughPipe(myPaths, CompressPipeName);
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
             }
         }
         else
@@ -1987,7 +2001,7 @@ public partial class App : Application
             Dispatcher.UIThread.Post(async () =>
             {
                 try { await ShowCompressDialogAndRun(myPaths, desktop); }
-                catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); desktop.Shutdown(); }
+                catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); AppShutdown.Request(desktop.Shutdown); }
             });
         }
     }
@@ -2003,7 +2017,7 @@ public partial class App : Application
         dlg.Closed += (_, _) =>
         {
             if (!compressStarted)
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
         };
 
         // Intercept CloseAction: on "Compress", run the compression
@@ -2018,7 +2032,7 @@ public partial class App : Application
                 // 统一构建（含文件过滤），与主窗口 ExecuteCompressFromSettings 共用 CompressFlow。
                 // StartCompress 已等待 B 数据集就绪，但 BuildRequest 仍可能返回 null（如过滤后全部无匹配）：
                 // 此时保持窗口打开并提示（对齐主窗口路径的 Compress_FilteredAllSkipped 提示），
-                // 而不是静默关闭窗口并退出进程（原 bug：request==null → desktop.Shutdown() 无任何反馈）。
+                // 而不是静默关闭窗口并退出进程（原 bug：request==null → AppShutdown.Request(desktop.Shutdown) 无任何反馈）。
                 var request = CompressFlow.BuildRequest(vm);
                 if (request == null)
                 {
@@ -2055,7 +2069,7 @@ public partial class App : Application
     private static void HandleCompressQuick(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+        if (myPaths.Count == 0) { AppShutdown.Request(desktop.Shutdown); return; }
 
         // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
         // 点击 X 时立即退出进程，后台压缩被强杀留下损坏的压缩包（对齐 WPF 的 OnExplicitShutdown 用法）
@@ -2097,7 +2111,7 @@ public partial class App : Application
     private static void HandleCompressSeparate(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+        if (myPaths.Count == 0) { AppShutdown.Request(desktop.Shutdown); return; }
 
         // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
         // 点击 X 时立即退出进程，后台压缩被强杀留下损坏的压缩包（对齐 WPF 的 OnExplicitShutdown 用法）
@@ -2135,14 +2149,14 @@ public partial class App : Application
                     Dispatcher.UIThread.Post(async () =>
                     {
                         try { await RunCompressSeparate(allPaths, desktop, progressWindow); }
-                        finally { desktop.Shutdown(); }
+                        finally { AppShutdown.Request(desktop.Shutdown); }
                     });
                 });
             }
             else
             {
                 SendPathsThroughPipe(myPaths, CompressSeparatePipeName);
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
             }
         }
         else
@@ -2150,7 +2164,7 @@ public partial class App : Application
             Dispatcher.UIThread.Post(async () =>
             {
                 try { await RunCompressSeparate(myPaths, desktop); }
-                finally { desktop.Shutdown(); }
+                finally { AppShutdown.Request(desktop.Shutdown); }
             });
         }
     }
@@ -2191,7 +2205,7 @@ public partial class App : Application
     private static void HandleCompressCombined(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+        if (myPaths.Count == 0) { AppShutdown.Request(desktop.Shutdown); return; }
 
         // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
         // 点击 X 时立即退出进程，后台压缩被强杀留下损坏的压缩包（对齐 WPF 的 OnExplicitShutdown 用法）
@@ -2217,14 +2231,14 @@ public partial class App : Application
                     Dispatcher.UIThread.Post(async () =>
                     {
                         try { await RunCompressCombined(allPaths, desktop); }
-                        finally { desktop.Shutdown(); }
+                        finally { AppShutdown.Request(desktop.Shutdown); }
                     });
                 });
             }
             else
             {
                 SendPathsThroughPipe(myPaths, CompressCombinedPipeName);
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
             }
         }
         else
@@ -2232,7 +2246,7 @@ public partial class App : Application
             Dispatcher.UIThread.Post(async () =>
             {
                 try { await RunCompressCombined(myPaths, desktop); }
-                finally { desktop.Shutdown(); }
+                finally { AppShutdown.Request(desktop.Shutdown); }
             });
         }
     }
@@ -2294,7 +2308,7 @@ public partial class App : Application
         // OnLastWindowClose 自动终止，必须显式 Shutdown，否则后台压缩会继续在不可见窗口上运行）
         if (existingWindow != null && !existingWindow.IsVisible)
         {
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -2383,7 +2397,7 @@ public partial class App : Application
         if (cancelled)
         {
             await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -2399,7 +2413,7 @@ public partial class App : Application
                 progressWindow.CompleteWithErrors();
             });
             await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -2407,14 +2421,14 @@ public partial class App : Application
         {
             // 部分失败：等待用户手动关闭窗口后退出
             await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
         // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待（📌 KeepOpenOnComplete 生效），窗口关闭后退出进程
         // 压缩完成后把输出目录写入路径历史（含部分条目失败——输出已落盘；取消/异常路径不会走到此处）
         CompressFlow.RecordOutputHistory(request);
-        await progressWindow.AutoCloseOrWaitAsync(() => desktop.Shutdown());
+        await progressWindow.AutoCloseOrWaitAsync(() => AppShutdown.Request(desktop.Shutdown));
     }
 
     // ════════════════════════════════════════════════════════════════

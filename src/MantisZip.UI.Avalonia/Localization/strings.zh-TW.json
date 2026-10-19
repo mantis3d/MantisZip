@@ -1,4 +1,4 @@
-﻿{
+{
   "Progress_WriteFailed_Fmt": "有 {0} 個檔案未能寫入到 {1}",
   "Status_OperationFailed": "操作失敗",
   "Progress_FailedBreakdown_Fmt": "共 {0} 個失敗：{1}",
@@ -477,7 +477,6 @@
   "Extract_DestinationPlaceholder": "選擇目標資料夾",
   "Extract_Header": "解壓到",
   "Extract_OpenFolder": "解壓後開啟資料夾",
-  "Extract_ParallelDegree": "平行解壓執行緒數 (1=序列)",
   "Extract_Options": "解壓選項",
   "Extract_ParallelDegree": "並行解壓執行緒數 (1=序列)",
   "Extract_PreserveRoot": "保留目錄結構",
