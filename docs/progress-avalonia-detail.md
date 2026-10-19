@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-19** — 图标主题系统①计划修订（普查复核）+ `PLAN.md` 说明字段瘦身（计划文档维护）
+  - **icon-theme-infra.md 修订**：§3 现状核实按 2026-10-19 全仓 grep 重测——`PathIcon` 总量 182→**215**（补普查遗漏的 `UiTestWindow` 26 处；ProgressWindow 6→11、SettingsWindow 5→7 等逐文件校正）；`GeometryResourceConverter` 真用 5→6 处（补 `ProgressWindow.axaml:888`）+ 声明清单 2→6 处（补 ResultTreeView:8/QuickPathControl:9/ExtractSettingsWindow:17/ProgressWindow:29，漏删即编译错）；`BoolToIconConverter` 确认已零引用，T5 由「新增 BoolToIconKeyConverter」改为直接删除；补 2 处 VM 直接绑定（`MainWindow.axaml:640/1344`）与 ProgressWindow C# 站点最新锚点（238/415/564/723-752/838-849/885/891，含 `Content: PathIcon` 模式匹配与 `FindControl<PathIcon>` 类型联动）；xmlns:controls 缺失清单 10→11（补 IconTestWindow）。
+  - **方案对齐**：`IconView` Foreground 回退由 `ThemeTextPrimaryBrush` 改为 **`TextControlForeground`**（实测与 Fluent PathIcon ControlTheme 默认同 key；`ThemeLight/Dark` 中两者同源色）；核实 `IconElementThemeWidth/Height` 在 Avalonia 12.1.2 Fluent `BaseResources`（20/20）存在；全部 215 处 `PathIcon` 显式带 `Width`（原「27 处依赖默认尺寸」表述作废）；4.4 补删旧常量 `IconResourcesUri`；选中态 3 个选择器逐条并列 Style（不依赖逗号分组）；预估工时 12-16h → 14-18h。
+  - **PLAN.md 同步**：P2 图标主题①行（215 处 / 14-18h / 修订普查注记）。
+  - **PLAN.md 说明字段瘦身**：16+ 行「说明」由详细实施记录精简为 1-3 句功能简介 + 状态标记（重灾：progress-window-status-line / error-info-enhancement / startup-native-splash / settings-unwired-keys / file-assoc-persistence-fix / embedded-file-picker；轻量：new-format-support / zip-crc-validation / preview-quick-modes / preview-extended-formats / floating-preview-panel / cli-extract-open-folder 等）；实现细节统一指向各计划文档，表格 6 列完整性已验证。
+
 **2026-10-16** — 计划库 / 进度文档一致性审计与修正（P0–P4：去重 + 死链 + 排序 + 归类 + 内容校正）
   - **P0 去重**：`PROGRESS.md` 删除 3 条重复里程碑（10-04~10-06「测试压缩包静默失败」/「7z mt=on」/「进度窗口原型对齐」，merge 残留、逐字节相同）；`progress-avalonia-detail.md` 删除 5 条重复条目块（09-15/09-16 块 14 行逐字节相同 + Avalonia 升级/NuGet 升级/计划维护/Office 图片各 1 条）。
   - **P1 死链**：`PLAN.md` 删重复死链行（`extract-preserve-full-path-toggle` 旧行指向 `未开始/`）、修正 `compression-performance-optimization`/`nuget-dependency-upgrade` 链接目录（`未开始/`→`已完成/`）；`PROGRESS.md` 修正 `settings-unwired-keys` 链接（`未开始/`→`进行中/`）；detail 文档 `drag-extract-unify.md` 补 `已完成/` 前缀。
