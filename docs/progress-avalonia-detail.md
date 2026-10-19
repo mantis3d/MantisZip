@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-19** — 启动优化二期计划立项（`startup-theme-dedup-trace.md`）
+  - **背景结论**：前置 `startup-preview-defer`（已完成，首帧 −207ms）交付后剩余黑盒段定罪推进——①`Init.Theme` 116ms 从黑盒转为**确定有肉**：通读代码发现 `ApplyTheme`（`App.axaml.cs:516-550`）双重加载——`App.axaml:10-12` 已静态合并 ThemeLight(13KB)+AppIcons(85KB)，ApplyTheme 又无条件 Clear 后运行时重新解析两份字典（亮色用户两份各解析两遍、暗色用户额外浪费一份 Light、System 模式系统联动同样重解析）；顺带核实现有实现 `Clear()` 先于 `Load`，Load 失败会清空字典（新方案「先 Load 成功再替换」捎带修复）。②WebView2 已排除：`NativeWebView` 不在 XAML 声明、惰性创建（`EnsureWebViewForHtml`）且 PreviewPanel 本身首帧后 0.5s 才建，启动关键路径零触碰。
+  - **方案（用户确认 A+B）**：方案一 ApplyTheme 同主题跳过（`_loadedThemeUri` 初值=LightThemeUri 契约）+ 换肤单 Load + 图标字典缓存复用（`_cachedIconProvider`，`MergedDictionaries[1]` 取法），预期 `Init.Theme` 116ms→个位数 ms、合计 −100ms 量级；方案二 `dotnet-trace` launch 模式 3 次采样定罪 `Avalonia.InitDone` 597ms / `Win.Visible` 316ms 内部构成（JIT/XAML/布局/铁板四分类），R2R 门控预先锁定（JIT 相关 ≥300ms → 登记三期 R2R 试点条目）。任务级 Task 1–6 已写入计划文档；`measure-startup.ps1` 现行聚合约缺 `Init.Theme` 指标，Task 2 补 `ThemeSpan`。
+  - **顺序衔接**：与 `large-file-split` 计划任一先行均可行，两序衔接注记已写入计划文档（本计划先行时行号锚点有效，拆分先行时按 `App.Theming.cs` 方法名定位）。
+  - **计划库同步**：新建 `.omo/plans/未开始/startup-theme-dedup-trace.md`（设计+任务 2.5-3.5h）；PLAN.md P2 区登记（与 splash 相邻）。
+
 **2026-10-19** — 大文件 partial 拆分计划立项（core + avalonia 第一梯队 3 文件）
   - **large-file-split.md 新建**（`.omo/plans/未开始/`）：`ZipEngine.cs` 4422 行 / `MainWindowViewModel.cs` 3185 行 / `App.axaml.cs` 2455 行多职责堆叠。形态 A（partial class 分文件，与 `ShellIntegration.*` 惯例一致）纯移动零行为变化：App → 主干 + `App.Theming`/`CliExtract`/`CliCompress`/`CliInfra`，ZipEngine → 主干 + `Open`/`Extract`/`Compress`/`CompressGroup`，MainWindowViewModel → 主干 + `Password`/`Preview`/`Navigation`/`Extract`/`Compress`。设计中已获用户三节批准；不抽服务类（YAGNI）。排除：`PreviewViewModel`（3752 行，等预览 WebView 重构）、第二梯队（SettingsWindowViewModel/ProgressViewModel/MainWindow.axaml.cs）、`SevenZipEngine`/`ContextMenuHandler`。行数统计方法修正：`Measure-Object -Line` 忽略空行少算 ~10%，以 `[IO.File]::ReadAllLines().Count` 为准。
   - **交叉影响核验**（会话讨论）：startup-preview-defer「待定后续候选」`Init.Theme`（116ms，ApplyTheme 黑盒）若后续立项将落在拆分后的 `App.Theming.cs`——顺序建议先拆分后 trace，避免 diff 混叠；splash 计划衔接契约「代码重叠仅 App.axaml.cs 少量行」在拆分后需按新布局解读（打点插点全在主干 `OnFrameworkInitializationCompleted` 内，`Program.cs` flush 兜底不受影响，trace 格式与 measure-startup.ps1 兼容）；启动速度预期中性（partial 编译期合并、IL 与调用图不变，唯一理论风险字段初始化顺序已被「字段留主干」纪律覆盖）。
