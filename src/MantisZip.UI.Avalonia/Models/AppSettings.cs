@@ -268,39 +268,55 @@ public class AppSettings
         }
     }
 
+    // ── 进程级缓存（startup-appsettings-cache：启动路径 72 处 Load 全量读盘+STJ 反序列化，冷 60-77ms/暖 2-16ms 每次重复支付）──
+    private static AppSettings? _cached;
+    private static readonly object SyncRoot = new();
+
     public static AppSettings Load()
     {
-        try
+        lock (SyncRoot)
         {
-            if (!File.Exists(SettingsFile)) return CreateWithDefaults();
-            var json = File.ReadAllText(SettingsFile);
-            var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? CreateWithDefaults();
-            // 向后兼容：从旧 AdaptiveCompressionMode 枚举迁移为三个独立开关
-            if (settings.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled)
+            // 缓存命中（startup-appsettings-cache：每进程只读盘一次）
+            if (_cached != null) return _cached;
+            try
             {
-                settings.AdaptiveCompression = true;
-                settings.AdaptiveSmartDetect = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.SmartDetect;
-                settings.MultiThreadedCompression = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
-                settings.AdaptiveCompressionMode = AdaptiveCompressionMode.Disabled;
+                if (!File.Exists(SettingsFile))
+                {
+                    var defaults = CreateWithDefaults();
+                    _cached = defaults; // 不存在时缓存默认值，避免每次重新生成默认规则表
+                    return defaults;
+                }
+                var json = File.ReadAllText(SettingsFile);
+                var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? CreateWithDefaults();
+                // 向后兼容：从旧 AdaptiveCompressionMode 枚举迁移为三个独立开关
+                if (settings.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled)
+                {
+                    settings.AdaptiveCompression = true;
+                    settings.AdaptiveSmartDetect = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.SmartDetect;
+                    settings.MultiThreadedCompression = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
+                    settings.AdaptiveCompressionMode = AdaptiveCompressionMode.Disabled;
+                }
+                // 首次安装时填充默认规则
+                if (settings.AdaptiveOverrides.Count == 0)
+                {
+                    settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+                }
+                // 首次安装时填充默认仅存储格式（多线程模式用）
+                if (settings.MultiThreadedStoreFormatIds.Count == 0)
+                {
+                    settings.MultiThreadedStoreFormatIds = GetDefaultMultiThreadedStoreFormatIds();
+                }
+                // 并行解压智能线程数越界 clamp 到 [1,16]（边界情况 #8）
+                settings.SmartSsdDegree = Math.Clamp(settings.SmartSsdDegree, 1, 16);
+                settings.SmartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
+                _cached = settings;
+                return settings;
             }
-            // 首次安装时填充默认规则
-            if (settings.AdaptiveOverrides.Count == 0)
+            catch
             {
-                settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+                // 异常态不缓存：下次 Load 重试读盘，避免把损坏文件态固化
+                return new AppSettings();
             }
-            // 首次安装时填充默认仅存储格式（多线程模式用）
-            if (settings.MultiThreadedStoreFormatIds.Count == 0)
-            {
-                settings.MultiThreadedStoreFormatIds = GetDefaultMultiThreadedStoreFormatIds();
-            }
-            // 并行解压智能线程数越界 clamp 到 [1,16]（边界情况 #8）
-            settings.SmartSsdDegree = Math.Clamp(settings.SmartSsdDegree, 1, 16);
-            settings.SmartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
-            return settings;
-        }
-        catch
-        {
-            return new AppSettings();
         }
     }
 
@@ -312,11 +328,26 @@ public class AppSettings
                 Directory.CreateDirectory(SettingsDir);
             var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(SettingsFile, json);
+            // 落盘成功后缓存同步为被保存实例（外部可见值与内存一致）
+            lock (SyncRoot)
+            {
+                _cached = this;
+            }
             return true;
         }
         catch
         {
+            // 失败不动缓存：缓存仍代表最后一次成功落盘值
             return false;
+        }
+    }
+
+    /// <summary>测试钩子：清空进程级缓存（internal，经 InternalsVisibleTo；沿 StartupTimer.ResetForTest 惯例）。</summary>
+    internal static void ResetCacheForTests()
+    {
+        lock (SyncRoot)
+        {
+            _cached = null;
         }
     }
 
