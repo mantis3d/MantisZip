@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-19** — 启动优化三期完成：AppSettings 进程级缓存（`startup-appsettings-cache.md` 归档）
+  - **实现**（`Models/AppSettings.cs:271+`，commit `a96db21`）：`Load()`/`Save()` 静态缓存（lock + `_cached`，72 处调用点零改造）——cache 每进程只读盘一次；`Save()` 落盘成功后把被保存实例写回缓存（外部可见值与内存一致）；损坏文件异常分支不缓存（下次重试）、文件不存在缓存默认值、Save 失败不动缓存；`ResetCacheForTests()` internal 测试钩子（沿 `StartupTimer.ResetForTest` 的 InternalsVisibleTo 惯例）。
+  - **TDD**：新增 `AppSettingsCacheTests` 2 条（Load 同实例 / Reset 后新实例+镜像值）先败后成；全量 `-c Release` **308 总 / 301 过 / 3 跳过 / 4 失败**（4 失败全部为预存 corpus 语料缺失的 `WholeArchiveErrorLocalizerTests`，**新增失败 = 0**）；`--test` 冒烟无 ERROR。
+  - **A/B 实测（安静环境）**：TOTAL 1396.6→1387.8ms（−8.8ms）、ThemeSpan 72.6→72.6ms 险同、Init.Settings 1.5→1.5ms——**启动端收益虽小但极稳定**（两轮 n=5 中位差 <1ms 波动）；主要价值在**运行期交互**：72 处调用点重开窗口/打开对话框从每次 2-16ms 读盘+反序列化 → 0，未来新增调用点零成本。
+  - **门控如实记录**：两项立项门控均未达——ThemeSpan<10ms **立项时即逻辑不可达**（ApplyTheme 内 Load 是全进程首调，缓存必须先付一次冷读，设计错误已记入归档计划）；TOTAL≥50ms 差值实测 −8.8ms（暖态 Load 基数比预想小）。首次测量被 UnrealEditor/Baidu/EpicGamesLauncher 重负载污染（TOTAL 出现 4-25s 样本作废），用户关闭后干净重测取数。
+  - **文档同步**：计划 `.omo/plans/已完成/` 归档；行为变化（外部编辑 settings.json 不再有运行期热拾取）已在计划「行为变化说明」登记；STJ source-gen（可压 ApplyTheme 内首调 73ms）保留为后续评估候选。
+
 **2026-10-19** — 启动优化三期立项：AppSettings 进程级缓存（`startup-appsettings-cache.md`）
   - **立项依据**（二期定罪直接产出，用户授权继续）：`AppSettings.Load()`（`Models/AppSettings.cs:271-305`）无缓存，72 个调用点（20+ 文件）每次全量读盘 + STJ 反序列化——冷启动首调 ~60-77ms（STJ 反射元数据 + 磁盘 IO）、暖调 2-16ms/次，启动路径至少 4 次串行调用；且每次运行再触碰的调用点（如重开设置窗）也重复支付。即二期 ThemeSpan 余量 76.8ms 的归属。
   - **方案**：`Load()`/`Save()` 静态缓存（lock + `_cached`，冷 60-77ms 只付一次、暖调用归零）+ `Save()` 落盘成功后把被保存实例写回缓存（零调用点改造，72 处全走同一静态方法）+ `ResetCacheForTests()` internal 测试钩子（沿 `StartupTimer.ResetForTest` 的 InternalsVisibleTo 惯例）。

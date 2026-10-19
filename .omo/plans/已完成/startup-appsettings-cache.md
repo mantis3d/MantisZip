@@ -292,6 +292,24 @@ A/B 结果小节追加 to 本文件 Task 3 之下 →
 Move-Item ".omo\plans\未开始\startup-appsettings-cache.md" ".omo\plans\已完成\startup-appsettings-cache.md"
 ```
 
+#### A/B 结果（2026-10-19 实测回填，安静环境：UnrealEditor/Baidu/Epic 关闭后重测）
+
+| 指标（中位数 n=5） | baseline-v3（无缓存） | fixed-v3（a96db21） | 差值 |
+|---|---|---|---|
+| TOTAL | 1396.6ms | 1387.8ms | **−8.8ms** |
+| `ThemeSpan` | 72.6ms | 72.6ms | 0 |
+| `Init.Settings` | 1.5ms | 1.5ms | 0 |
+
+- **门控执行**：两项门控均**未达**——
+  1. `ThemeSpan < 10ms`：**不可达**，立项门控设计错误（晋升实施期发现）：ApplyTheme 内的 `Load()` 是全进程**首次调用**，缓存必然先付一次冷读盘+反序列化（~73ms 之后才命中），成本无法由缓存消除——该门控从立项起就在逻辑上不可达，实施前复核该假设
+  2. `TOTAL ≥ 50ms 差值`：实测 −8.8ms（干净环境 TOTAL 噪声极小、数据可信），低于预期下沿 −10~40ms——**启动端暖调用基数比预想小**（`Init.Settings` 段仅 1.5ms 佐证：暖态 Load 在实际调用序列中大多为 1-3ms 而非 2-16ms 上限）
+- **缓存的价值重估（如实）**：
+  - **启动端**：TOTAL −8.8ms（小而真实——两轮 n=5 中位数差稳定，波幅 <2ms）
+  - **运行期（主要价值）**：72 处调用点（每次重开设置窗/打开压缩/解压对话框/右键菜单触发路径等）从每次 2-16ms 读盘+反序列化 → **0ms**；未来任何新增 `Load()` 调用点位零成本
+  - 与二期修复组合后，`Init.Theme` 段的总开销为 ApplyTheme 内首调 Load 的 ~73ms；彻底消除它只能靠 STJ source-gen（本期「明确不做」，另行评估）
+- **污染样本记录**：首次测量在重负载（UnrealEditor/BaiduNetdisk/EpicGamesLauncher 占 CPU）下进行，TOTAL 出现 4-25s 量级样本、全部作废；用户关闭重负载程序后重测，数据如上
+- GUI 验收（Save→缓存同步 + 二期清单 5 项）待用户手动确认
+
 ### Task 4: PLAN/PROGRESS/detail 同步（规则 1/3）
 
 - [ ] **Step 1: PLAN.md** — P2 区本期登记行改为已完成语义（含 ThemeSpan 前后数值）
