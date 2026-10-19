@@ -243,10 +243,9 @@ public partial class MainWindow : Window
                 cvm.AdaptiveCompression = dialog.ViewModel.AdaptiveCompression;
                 // 同一 ZIP 面板（DynamicFormatOptionsPanel）的另两个开关此前漏拷 →
                 // 执行侧 MultiThreadedCompression 恒为 false，引擎永远走串行路径，
-                // 进度窗口「详细」通道 UI 永不出现。此处补齐（含 Task 5 新增的组数）。
+                // 进度窗口「详细」通道 UI 永不出现。此处补齐。
                 cvm.AdaptiveSmartDetect = dialog.ViewModel.AdaptiveSmartDetect;
                 cvm.MultiThreadedCompression = dialog.ViewModel.MultiThreadedCompression;
-                cvm.ParallelCompressDegree = dialog.ViewModel.ParallelCompressDegree;
                 cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
                 // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
                 cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;

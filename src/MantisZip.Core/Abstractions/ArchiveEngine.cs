@@ -162,8 +162,8 @@ public class ArchiveOptions
     public int ParallelExtractDegree { get; set; } = 0;
 
     /// <summary>
-    /// N 组并行压缩的目标组数。0 = 自动（取 <see cref="Environment.ProcessorCount"/>），上限 16。
-    /// 运行时解析见 ZipEngine 内部；&lt;= 1 时回落标准串行路径。
+    /// N 组并行压缩的目标组数。0 = 引擎默认（<c>clamp(CPU 核数, 4, 16)</c>），
+    /// 显式值上限 16。运行时解析见 ZipEngine 内部；&lt;= 1 时回落标准串行路径。
     /// </summary>
     public int ParallelCompressDegree { get; set; } = 0;
 

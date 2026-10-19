@@ -6,6 +6,45 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-19** — 压缩加速三开关 Phase 1 UI 收敛（删「并行压缩组数」旋钮 + 隐藏三个空转控件）
+  - **背景**：2026-10-16 用户实测「不启用自适应时开启多线程反而有反作用」→ 实测 + 全仓代码审计；2026-10-18 双机复测后改判。Phase 1 目标 = 出一版「UI 不说谎」的可用版本（`.omo/plans/进行中/adaptive-compress-ui-convergence.md`）
+  - **改动 A（删「并行压缩组数」）**：删除 7 个源文件 + `AppSettings.ParallelCompressDegree` + 三语 `Compress_ParallelDegree`/`_Hint`；`rg` 自查 `ParallelDegreeInput|ParallelDegreePanel|ZipMultiThreadCheck_IsCheckedChanged` 均 0 命中；`ArchiveOptions.ParallelCompressDegree` 与 `CompressRequest` 字段**保留**（引擎层输入，`ParallelCompressTests` / `bench-zip-mt.cs` 在用，显式值仍生效）
+  - **引擎侧**：`ResolveParallelCompressDegree` 默认规则 `<=0 → clamp(ProcessorCount, 4, 16)`（原 `ProcessorCount` 无下限，下限 4 避开已证实的 deg=2 陷阱）；`CompressRequest.ParallelCompressDegree` 默认 `ProcessorCount` → `0`；新增 `mt = max(1, 核数/组数)`（方案 C，**标注未验证** —— 默认路径下多为 no-op，不得当性能依据）；同步更新 `ArchiveEngine.cs` / `ZipEngine.cs` 相关 XML 注释
+  - **改动 B 暂缓**：双机实测 MT 收益与 CPU 相关（20 核机有收益 / 8 逻辑核机 i7-3770 净负收益），Phase 1 三开关保持互相独立（无门控代码）；回归护栏 `rg "MultiThreadedCompression\s*&&\s*.*AdaptiveCompression" src` → 0 命中
+  - **隐藏三个空转控件**：魔数检测（设置窗口 `IsSmartDetectVisible` → `false` + 压缩对话框 ZIP 面板 `IsVisible="False"` + getter 恒 `false`）、自适应规则（`IsUserRulesSectionVisible` → `false`）、自定义格式魔数 hex（`MagicHexTextBox` 隐藏 + `MagicHexDisplay` 恒空）；每处加 Phase 2 注释，保留设置字段 / 透传链路 / 三语 key
+  - **before 基线**（本机 16 逻辑核，Task 0 同参数，`.buildout/bench-before-{text,media,mixed}.txt`）：text B `deg=0` 1.90s / `deg=2` 5.02s；mixed B `deg=0` 2.34s / `deg=2` 5.10s → **deg=2 陷阱在本机复现**（慢 2.2–2.6x）
+  - **验证**：Core 0 错 0 警 / 737 通过（3 跳过）；Avalonia 0 错 0 警 / 296 通过（3 跳过，`--no-incremental` 全量重建防 AVLN3000，规则 17）；**构建需 `-p:SkipShellExtCopy=true`**（ShellExt COM 已注册 → Explorer 锁定 `ShellExt.dll`，本机每次构建都会命中；`csproj:86` 自带 `SkipShellExtCopy` 开关）
+
+**2026-10-19（第六次）** — 帮助文本开关数修正 + MT 措辞软化（三语）
+  - **帮助弹窗开关数**：`AdaptiveHelp_Markdown` 开头「下面的三个开关可以独立组合」→「**两个开关**」（魔数检测段落已删，只剩自适应压缩 + 多线程压缩）；三语同步（zh-CN 两个开关 / en two switches / zh-TW 兩個開關）
+  - **措辞冲突软化**（用户确认处理）：① `Settings_MultiThreadedCompression_Desc`「显著提升压缩速度」→「以提升压缩速度」（en: significantly improving → for faster compression；zh-TW: 顯著提升 → 以提升）；② `AdaptiveHelp_Markdown` 多线程段「显著提升速度」→「以提升速度」（en: greatly improving speed → for faster compression；zh-TW: 顯著提升速度 → 以提升速度）。原因：与新加常驻提示「核心数较少时收益有限，甚至可能变慢」并列时自相矛盾
+  - **验证**：三语 JSON 有效、key 集各 **1261** 一致；9 个旧措辞模式全部 0 命中；Core 737 通过 / Avalonia 296 通过
+
+**2026-10-19（第五次）** — 「设置 → 加速」页同步加 MT 收益常驻提示
+  - **背景**：用户要求与压缩对话框一致，「设置 → 加速」页也加常驻科普提示（原只在 ZIP 面板有）
+  - **改动**：`Views/SettingsWindow.axaml` 多线程压缩 CheckBox 下方新增一行常驻灰字（`TextBlock`，`Margin="16,2,0,0"` / FontSize 11 / `ThemeTextSecondaryBrush` / `TextWrapping="Wrap"`）；VM 加 `MultiThreadedBenefitHint` 属性，**复用** `Compress_MT_BenefitHint`（两处共用同一 key，单一事实来源）
+  - **验证**：Core 737 通过 / 0 失败；Avalonia 296 通过 / 0 失败
+  - ⚠ **待用户定**：现有 `Settings_MultiThreadedCompression_Desc` 三语含「显著提升压缩速度」，与新提示「核心数较少时收益有限，甚至可能变慢」措辞冲突 —— 是否将 desc 的「显著提升」软化为「以提升」？
+
+**2026-10-19（第四次）** — 自适应帮助文本删除「魔数检测」段落（三语）
+  - **背景**：`AdaptiveHelp_Markdown`（压缩加速说明弹窗，经 `HelpDialog` → `MarkdownPreviewBuilder` 渲染）中的「## 魔数检测」段落描述了一个**尚未实现**的功能（Phase 2 Task 9 才落地）。2026-10-19 用户要求先删掉，等功能修正后再加回来
+  - **改动**：三语 `AdaptiveHelp_Markdown` 各删 `\n\n## 魔数检测\n<body>\n\n` 整段（zh-CN/en/zh-TW 同步）；删后标题序列从 3 个（自适应压缩 / 魔数检测 / 多线程压缩）变为 2 个（自适应压缩 / 多线程压缩）
+  - **验证**：三语 JSON 有效、key 集各 **1261** 完全一致；`rg` 确认三语 Markdown 均无「魔数检测 / Magic-Number Detection / 魔數檢測」残留
+  - **计划同步**：Task 11 恢复清单补「重新加回该段落」
+
+**2026-10-19（第三次）** — 自适应行为统一：串行路径也读自定义仅存储格式（消除「时灵时不灵」）
+  - **背景**：2026-10-19 用户问「单独启用自适应时压缩是什么样」，核对源码发现不一致 —— `CompressAsync` 串行写入（`ZipEngine.cs:3262`）用 **3 参** `GetAdaptiveLevel`（不传 `MultiThreadedStoreFormatIds`），而 MT 分拣（1899/2930）与 `AddToArchiveAsync`（3795）用 **4 参** → 同一个「自适应压缩」开关，压缩（新建）与添加（已有包）行为不同，用户配的自定义仅存储格式「时灵时不灵」
+  - **改动**：`:3262` 统一为 4 参（传 `options.MultiThreadedStoreFormatIds`），四个调用点同口径，注释同步；`IsStoreFormatSectionVisible` 由 `自适应 && 多线程` 改为 `自适应`（与引擎行为对齐 —— 串行路径现在也读该列表，卡片在 MT 关闭时也显示，消除「卡片隐藏但值生效」）
+  - **零影响验证**：`MultiThreadedStoreFormatIds` 默认为空 → 3 参与 4 参行为完全一致；Task 8 已跑完的 before/after bench 数据**仍然有效**，无需重跑
+  - **验证**：Core 737 通过 / 0 失败；Avalonia 296 通过 / 0 失败；`rg` 确认四个调用点均为 4 参
+
+**2026-10-19（第二次）** — 多线程压缩常驻科普提示提前到 Phase 1（`Compress_MT_BenefitHint`）
+  - **背景**：原计划把该提示归 Phase 2 Task 12（与本机基准测试捆绑）。2026-10-19 评审时用户提出「文本应该有一个类似"高配置cpu收益高"的提示」，经讨论决定**提前到 Phase 1**：提示本身可独立成立（不依赖基准测试），且弱 CPU 用户在 Phase 1 就会遇到「MT 默认开着但可能更慢」的风险窗口，提前保护优于等 Phase 2 捆绑上线
+  - **改动**：新增 1 个三语 key `Compress_MT_BenefitHint`（zh-CN「收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。」/ en「Gain depends on CPU: ...」/ zh-TW「收益與 CPU 設定相關：...」，三语成对插入文件头，规则 13）；ZIP 面板 `ZipMultiThreadCheck` 下方新增一行常驻灰字（`TextBlock`，仿 `ZipMtOverLimitHintText` 样式：FontSize 11 / `Margin="24,2,0,0"` / `ThemeTextSecondaryBrush` / `TextWrapping="Wrap"`），code-behind 加 `BenefitHint` 属性（`LocalizationManager.T("Compress_MT_BenefitHint")`）
+  - **计划同步**：Task 7 改为「Phase 1 新增 1 个三语 key」；Task 12 的「常驻提示」一行标注「Phase 1 已加，不重复」；修订记录加 **E5**；头部状态/日期更新
+  - **原型**：`docs/prototypes/compress-format-options-panel.html` 页首 Phase 横幅补充提示说明 + ZIP 面板加提示行
+  - **验证**：Core 737 通过 / 0 失败；Avalonia 296 通过 / 0 失败；三语 key 集各 **1261** 个完全一致（新增 1 key）；`Compress_MT_BenefitHint` 已在三语文件头确认存在
+
 **2026-10-18** — 压缩加速计划双机复测改判：改动 B「取消」→「暂缓」+ 新增 Task 12 本机基准测试（计划类）
   - **双机复测对照（20 逻辑核机 + 8 逻辑核机 i7-3770 4C/8T，报告 `.buildout\bench-retest-8lp-*.txt|json`）**：deg=2 性能陷阱与「仅多线程」压缩率优势（text +15% / mixed +2.1%）**双机复现**；但「默认组数下仅多线程更快」在 8 逻辑核机**方向反转**（text B 2.66s vs D 1.87s 慢 42%、mixed B 3.90s vs A 2.85s 慢 37%），2026-10-16 用户原始观察在弱 CPU 上复现 → **改动 B 同日由「取消」改判「暂缓」**：Phase 1 维持三开关独立（无门控代码），评审 A1/A2/A3/C3/C4 关闭理由改为「Phase 1 无门控」，最终策略待 Phase 2
   - **计划修订**：新增 **Task 12 本机基准测试**（~5MB 语料 <20s、串行/MT 比值持久化 `MultiThreadedBenchRatio`、比值 <0.95 播种为默认不勾选）+ 三语 key（`Compress_MT_BenefitHint` 等 6 个）与 MT 静态科普提示「收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。」；Phase 2 工时 **3-4h → 5-7h**；拍板记录整节按双机数据重写、修订记录标题标注「2026-10-18 评审 + 同日双机复测修订」

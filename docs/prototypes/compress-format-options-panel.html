@@ -14,6 +14,9 @@ body {
     background:#15152a; color:#eaeaea; padding:28px 20px 60px; min-height:100vh; font-size:14px;
 }
 h1 { text-align:center; color:#6bd46b; font-size:22px; margin-bottom:6px; }
+.phase-banner { max-width:960px; margin:0 auto 14px; padding:10px 14px; font-size:12px; line-height:1.7;
+                color:#ffd93d; background:#2a2a14; border:1px solid #6b5b1e; border-radius:6px; }
+.phase-banner b { color:#ffd93d; } .phase-banner code { color:#6bd46b; background:transparent; }
 .subtitle { text-align:center; color:#888; font-size:13px; margin-bottom:22px; line-height:1.75; max-width:900px; margin-left:auto; margin-right:auto; }
 .wrap { max-width:1000px; margin:0 auto; }
 code { background:#15152a; padding:1px 5px; border-radius:3px; font-family:Consolas,monospace; font-size:11.5px; color:#c792ea; }
@@ -157,6 +160,11 @@ code { background:#15152a; padding:1px 5px; border-radius:3px; font-family:Conso
 <div class="wrap">
 
   <h1>压缩格式选项面板 — 界面改动原型</h1>
+  <div class="phase-banner">
+    <b>Phase 1 实施版（2026-10-19 更新）</b>：改动 A（删「并行压缩组数」）已落地；<b>改动 B（多线程依赖自适应）已暂缓</b>——双机实测 MT 收益与 CPU 相关，一刀切会片面 → 原型中「取消自适应 → 多线程置灰」的联动演示<b>仅作历史参考</b>，Phase 1 三开关互相独立。<br>
+    <b>常驻科普提示（Phase 1 新增）</b>：ZIP 面板「多线程压缩」下方灰字「收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。」—— 因提示独立成立、弱 CPU 用户在 Phase 1 即有风险窗口，故提前到本阶段（原计划归 Phase 2 Task 12 与基准测试捆绑）。<br>
+    Phase 2 待实现：魔数检测 / 自适应规则 / 自定义格式魔数 hex / 本机基准测试。计划见 <code>.omo/plans/进行中/adaptive-compress-ui-convergence.md</code>。
+  </div>
   <p class="subtitle">
     对应「压缩设置」对话框 →「高级」标签页里的格式选项面板（<code>DynamicFormatOptionsPanel</code>）。<br>
     本原型演示两处改动：<b>改动 A</b> 删除「并行压缩组数」控件；<b>改动 B</b> 自适应关闭时多线程自动关闭并禁用。<br>
@@ -252,6 +260,11 @@ code { background:#15152a; padding:1px 5px; border-radius:3px; font-family:Conso
           <span class="box"></span>
           <span class="txt">多线程压缩（利用多核 CPU 并行压缩，显著提升压缩速度）</span>
         </label>
+
+        <!-- 多线程压缩常驻科普提示：收益与 CPU 相关（双机实测），常驻显示不绑显隐 -->
+        <div class="hint" style="margin-left:24px">
+          收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。
+        </div>
 
         <!-- 改动 B 说明：自适应关闭时出现 -->
         <div class="hint" id="hintAdaptive" style="display:none">
@@ -500,9 +513,10 @@ function render() {
     // 魔数检测：真实实现 IsVisible 绑定自适应开关 → 关闭时整行隐藏（规则 6）
     $('s2WrapSmart').style.display = S.adaptive ? '' : 'none';
     $('s2Hint').style.display = !S.adaptive ? '' : 'none';
-    // 三个区域显隐（改动 B 后「多线程」必然伴随「自适应」，故「仅存储格式」等价于「多线程开启时」）
+    // 三个区域显隐：格式目录/自适应规则 = 自适应开启且多线程关闭；
+    // 仅存储格式 = 仅自适应开启（2026-10-19 起与多线程解耦，串行路径也读自定义仅存储格式）
     $('s2Catalog').style.display = (S.adaptive && !effMt) ? '' : 'none';
-    $('s2Store').style.display   = (S.adaptive && effMt) ? '' : 'none';
+    $('s2Store').style.display   = S.adaptive ? '' : 'none';
     $('s2Rules').style.display   = (S.adaptive && !effMt) ? '' : 'none';
 
     // ── 控制条按钮激活态 ──

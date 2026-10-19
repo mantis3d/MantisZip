@@ -21,8 +21,9 @@
              Background="{DynamicResource ThemeSurfaceBgBrush}"
              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
              BorderBrush="{DynamicResource ThemeBorderBrush}" />
-    <!-- 魔数 hex 输入框（可选） -->
+    <!-- 魔数 hex 输入框（可选）—— Phase 2：实现魔数检测后移除 IsVisible=False -->
     <TextBox x:Name="MagicHexTextBox"
+             IsVisible="False"
              PlaceholderText="魔数 hex（可选）/ Magic hex (optional)"
              Background="{DynamicResource ThemeSurfaceBgBrush}"
              Foreground="{DynamicResource ThemeTextPrimaryBrush}"

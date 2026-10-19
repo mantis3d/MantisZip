@@ -3257,7 +3257,9 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                 var method = options.ZipCompressionMethod?.ToLowerInvariant();
                                 if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
                                 {
-                                    entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true);
+                                    // 统一用 4 参重载（传 MultiThreadedStoreFormatIds），与 MT 分拣（CompressAsync/AddToArchiveAsync）
+                                    // 及本方法写入阶段同口径；无自定义列表时行为与 3 参完全一致。
+                                    entryLevel = ZipEntryClassifier.GetAdaptiveLevel(fullPath, options.CompressionLevel, true, options.MultiThreadedStoreFormatIds);
                                     CoreLog.Trace("ZipEngine.CompressAsync: adaptive entry '{0}' level={1} (global={2}, adaptive={3})",
                                         entryPath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompression);
                                 }
@@ -4097,10 +4099,13 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
             DirectoryStructure = true,
         };
 
-        // 多线程压缩：利用多核 CPU 并行压缩
-        // mt 由调用方决定：N 组并行路径每组一个压缩器，并行度来自组间，
-        // 组内必须 mt=off 以免 N × cores 过度订阅；旧单组路径保持 mt=on。
-        compr.CustomParameters["mt"] = batchIndex.HasValue ? "off" : "on";
+        // 多线程压缩（方案 C）：N 组路径每组 mt=核数/组数，使总并行度恒 ≈ 核数；
+        // 旧单组路径保持 mt=on（= 全部核）。
+        // ⚠ 未验证：默认路径下多为 no-op（核数 ≤ 16 且组数 = 核数时 mt=1）；
+        //   收益仅可能出现在「核数 > 16」或「文件数 < 组数」场景，不得当性能依据。
+        compr.CustomParameters["mt"] = batchIndex.HasValue
+            ? Math.Max(1, Environment.ProcessorCount / Math.Max(1, batchCount ?? 1)).ToString()
+            : "on";
 
         // 处理 ZIP 压缩方法
 compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
@@ -4340,13 +4345,14 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
     }
 
     /// <summary>
-    /// 解析有效并行组数：&lt;=0 取 CPU 数，上限 16，下限 1。
-    /// 与解压侧 <c>ParallelExtractDegree</c> 的解析规则保持一致。
+    /// 解析有效并行组数：显式值 1..16 照旧生效；&lt;=0 取引擎默认
+    /// <c>clamp(ProcessorCount, 4, 16)</c>（下限 4 避开已证实的 deg=2 陷阱，
+    /// 上限 16 与解压侧一致）。与解压侧 <c>ParallelExtractDegree</c> 的解析规则保持一致。
     /// </summary>
     internal static int ResolveParallelCompressDegree(int configured)
     {
         int n = configured;
-        if (n <= 0) n = Environment.ProcessorCount;
+        if (n <= 0) n = Math.Clamp(Environment.ProcessorCount, 4, 16);
         if (n > 16) n = 16;
         if (n < 1) n = 1;
         return n;
