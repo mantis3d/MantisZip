@@ -1339,9 +1339,9 @@ public partial class MainWindow : Window
         }
         else
         {
-            // 分支 3b：拖入非压缩包 → 压缩对话框预填源文件
-            var dialog = new CompressSettingsWindow(paths);
-            await dialog.ShowDialog(this);
+            // 分支 3b：拖入非压缩包 → 压缩对话框预填源文件，确认后走统一压缩管道
+            // （与「新建压缩包」同一执行链：选项回传 + AdoptPlan + 进度窗口 + 冲突弹窗）
+            await vm.DragInCompressAsync(paths);
         }
     }
 
