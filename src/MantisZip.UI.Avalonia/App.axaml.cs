@@ -42,6 +42,16 @@ public partial class App : Application
     private const string CompressCombinedMutexName = "MantisZipCompressCombinedMutex";
     private const string CompressCombinedPipeName = "MantisZipCompressCombinedPipe";
 
+    // ── 主题字典缓存（startup-theme-dedup-trace：消除启动期 ApplyTheme 双重加载）──
+
+    // 当前已合并的主题字典 URI。初值 = LightThemeUri：App.axaml:10 静态合并的默认主题。
+    // ⚠ 契约：若修改 App.axaml MergedDictionaries 的默认主题，必须同步此初值；
+    //   若修改其顺序（[主题, 图标]），必须同步 ApplyTheme 内的图标取法（MergedDictionaries[1]）。
+    private Uri? _loadedThemeUri = new Uri(LightThemeUri);
+
+    // 图标字典缓存（与主题无关，跨主题切换复用，避免 85KB AppIcons.axaml 反复解析）
+    private IResourceProvider? _cachedIconProvider;
+
     public override void Initialize()
     {
         AvaloniaXamlLoader.Load(this);
@@ -525,6 +535,9 @@ public partial class App : Application
     /// <summary>
     /// 应用主题（三态）：System=跟随系统，Light=亮色，Dark=暗色。
     /// 替换主题 ResourceDictionary 并设置 RequestedThemeVariant 供 FluentTheme 使用。
+    /// 启动优化（startup-theme-dedup-trace）：同主题跳过 Clear+重解析（App.axaml 已静态合并
+    /// ThemeLight + AppIcons(85KB)，启动时重复解析两次为纯浪费）；换肤时先 Load 新字典成功后
+    /// 再替换，图标字典复用缓存实例（异常时旧字典完整保留，优于旧实现的 Clear 先于 Load）。
     /// </summary>
     private void ApplyTheme()
     {
@@ -540,16 +553,29 @@ public partial class App : Application
             };
             DebugLog($"[Theme] ApplyTheme theme={settings.Theme} dark={isDark}");
 
-            // ── Swap resource dictionary ──
-            var uri = new Uri(isDark ? DarkThemeUri : LightThemeUri);
-            Resources.MergedDictionaries.Clear();
-            if (AvaloniaXamlLoader.Load(uri) is IResourceProvider themeProvider)
-                Resources.MergedDictionaries.Add(themeProvider);
+            var targetUri = new Uri(isDark ? DarkThemeUri : LightThemeUri);
 
-            // ── Re-add icon resources (cleared above) ──
-            var iconUri = new Uri(IconResourcesUri);
-            if (AvaloniaXamlLoader.Load(iconUri) is IResourceProvider iconProvider)
-                Resources.MergedDictionaries.Add(iconProvider);
+            // ── 同主题（启动默认亮色 / 重复调用）：跳过全部字典操作，只切 Fluent 变体 ──
+            if (_loadedThemeUri == targetUri)
+            {
+                RequestedThemeVariant = isDark
+                    ? global::Avalonia.Styling.ThemeVariant.Dark
+                    : global::Avalonia.Styling.ThemeVariant.Light;
+                return;
+            }
+
+            // ── 换肤：先 Load 新主题（失败则进入 catch 保留旧字典），图标复用缓存不重解析 ──
+            var themeProvider = AvaloniaXamlLoader.Load(targetUri) as IResourceProvider;
+
+            _cachedIconProvider ??= Resources.MergedDictionaries.Count >= 2
+                ? Resources.MergedDictionaries[1]
+                : AvaloniaXamlLoader.Load(new Uri(IconResourcesUri)) as IResourceProvider;
+
+            Resources.MergedDictionaries.Clear();
+            if (themeProvider != null) Resources.MergedDictionaries.Add(themeProvider);
+            if (_cachedIconProvider != null) Resources.MergedDictionaries.Add(_cachedIconProvider);
+
+            _loadedThemeUri = targetUri;
 
             // ── Set theme variant for FluentTheme ──
             RequestedThemeVariant = isDark
