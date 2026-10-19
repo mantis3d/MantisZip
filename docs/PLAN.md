@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-16  
+**最后更新**: 2026-10-19  
 **当前版本**: 0.5.2
 
 ---
@@ -21,6 +21,7 @@
 | **P1** | 文件关联失效修复（悬空 UserChoice + 测试污染真实注册表） | [file-assoc-persistence-fix.md](.omo/plans/未开始/file-assoc-persistence-fix.md) | 🟡中 | 3.5-5h | 📋 2026-10-15 现场注册表取证立项：`.zip` 关联「随机失效」根因——卸载/`dotnet test` 删掉 ProgId 却不清理指向它的 `UserChoice`，形成悬空默认（双击回退内置、图标失效）。方案分 A–F 六步（注册表访问收口与测试沙箱、卸载清残留、启动自愈等），详见计划文档 |
 | **P1** | ZIP 损坏检测（CRC 校验）修复 | [zip-crc-validation.md](.omo/plans/进行中/zip-crc-validation.md) | 🟢低 | 3-5h | 🔄 实施中（2026-10-15）：根因=解压走 `OpenEntryStream()` 裸流绕过 CRC 校验；已改走官方校验路径并新增失败原因枚举 + 三语文案 + 回归测试（Core 684 通过），Avalonia 侧待全量重建复验（详见计划文档） |
 | **P1** | ZIP 多线程压缩方案 D（自适应 + 多线程第四个选项） | [parallel-compress-plan-d.md](.omo/plans/未开始/parallel-compress-plan-d.md) | 🟡中 | 4-5h | 自适应压缩新增"自适应 + 多线程"选项：Store 类直接写入 + 需压缩类 SharpSevenZip mt=on；UI 联动（格式目录/用户规则/多线程提示可见性）；实验性标签 + 帮助弹窗 |
+| **P2** | 大文件 partial 拆分（App / ZipEngine / MainWindowViewModel） | [large-file-split.md](.omo/plans/未开始/large-file-split.md) | 🟡中 | 4-6h | 📋 2026-10-19 立项：`ZipEngine.cs` 4422 行 / `MainWindowViewModel.cs` 3185 行 / `App.axaml.cs` 2455 行多职责堆叠。形态 A（partial 分文件，与 ShellIntegration.* 惯例一致）纯移动零行为变化；PreviewViewModel 等预览重构、SettingsWindowViewModel 等第二梯队排除；含 AGENTS.md 过期引用（App.Password.cs）修正 |
 | **P2** | ZIP 多线程压缩方案 A（分组并行 + 多级别） | [parallel-compress-plan-a.md](.omo/plans/未开始/parallel-compress-plan-a.md) | 🟡中 | 6-8h | 按级别分组 → 各组独立 ZipWriter 并行 → 合并 ZIP，完整多级别自适应 + 多线程。方案 D 完成后实施 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.omo/plans/未开始/compression-estimator.md) | 🟡中 | 4-5h | 压缩前估算大小/耗时 |
 | **P2** | Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |

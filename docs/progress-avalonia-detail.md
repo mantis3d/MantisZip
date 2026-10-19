@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-19** — 大文件 partial 拆分计划立项（core + avalonia 第一梯队 3 文件）
+  - **large-file-split.md 新建**（`.omo/plans/未开始/`）：`ZipEngine.cs` 4422 行 / `MainWindowViewModel.cs` 3185 行 / `App.axaml.cs` 2455 行多职责堆叠。形态 A（partial class 分文件，与 `ShellIntegration.*` 惯例一致）纯移动零行为变化：App → 主干 + `App.Theming`/`CliExtract`/`CliCompress`/`CliInfra`，ZipEngine → 主干 + `Open`/`Extract`/`Compress`/`CompressGroup`，MainWindowViewModel → 主干 + `Password`/`Preview`/`Navigation`/`Extract`/`Compress`。设计中已获用户三节批准；不抽服务类（YAGNI）。排除：`PreviewViewModel`（3752 行，等预览 WebView 重构）、第二梯队（SettingsWindowViewModel/ProgressViewModel/MainWindow.axaml.cs）、`SevenZipEngine`/`ContextMenuHandler`。行数统计方法修正：`Measure-Object -Line` 忽略空行少算 ~10%，以 `[IO.File]::ReadAllLines().Count` 为准。
+  - **交叉影响核验**（会话讨论）：startup-preview-defer「待定后续候选」`Init.Theme`（116ms，ApplyTheme 黑盒）若后续立项将落在拆分后的 `App.Theming.cs`——顺序建议先拆分后 trace，避免 diff 混叠；splash 计划衔接契约「代码重叠仅 App.axaml.cs 少量行」在拆分后需按新布局解读（打点插点全在主干 `OnFrameworkInitializationCompleted` 内，`Program.cs` flush 兜底不受影响，trace 格式与 measure-startup.ps1 兼容）；启动速度预期中性（partial 编译期合并、IL 与调用图不变，唯一理论风险字段初始化顺序已被「字段留主干」纪律覆盖）。
+  - **PLAN.md 同步**：P2 区首行登记 + 最后更新日期 2026-10-19。
+
 **2026-10-19** — 图标主题系统①计划修订（普查复核）+ `PLAN.md` 说明字段瘦身（计划文档维护）
   - **icon-theme-infra.md 修订**：§3 现状核实按 2026-10-19 全仓 grep 重测——`PathIcon` 总量 182→**215**（补普查遗漏的 `UiTestWindow` 26 处；ProgressWindow 6→11、SettingsWindow 5→7 等逐文件校正）；`GeometryResourceConverter` 真用 5→6 处（补 `ProgressWindow.axaml:888`）+ 声明清单 2→6 处（补 ResultTreeView:8/QuickPathControl:9/ExtractSettingsWindow:17/ProgressWindow:29，漏删即编译错）；`BoolToIconConverter` 确认已零引用，T5 由「新增 BoolToIconKeyConverter」改为直接删除；补 2 处 VM 直接绑定（`MainWindow.axaml:640/1344`）与 ProgressWindow C# 站点最新锚点（238/415/564/723-752/838-849/885/891，含 `Content: PathIcon` 模式匹配与 `FindControl<PathIcon>` 类型联动）；xmlns:controls 缺失清单 10→11（补 IconTestWindow）。
   - **方案对齐**：`IconView` Foreground 回退由 `ThemeTextPrimaryBrush` 改为 **`TextControlForeground`**（实测与 Fluent PathIcon ControlTheme 默认同 key；`ThemeLight/Dark` 中两者同源色）；核实 `IconElementThemeWidth/Height` 在 Avalonia 12.1.2 Fluent `BaseResources`（20/20）存在；全部 215 处 `PathIcon` 显式带 `Width`（原「27 处依赖默认尺寸」表述作废）；4.4 补删旧常量 `IconResourcesUri`；选中态 3 个选择器逐条并列 Style（不依赖逗号分组）；预估工时 12-16h → 14-18h。
