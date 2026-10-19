@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-19** — 启动优化三期立项：AppSettings 进程级缓存（`startup-appsettings-cache.md`）
+  - **立项依据**（二期定罪直接产出，用户授权继续）：`AppSettings.Load()`（`Models/AppSettings.cs:271-305`）无缓存，72 个调用点（20+ 文件）每次全量读盘 + STJ 反序列化——冷启动首调 ~60-77ms（STJ 反射元数据 + 磁盘 IO）、暖调 2-16ms/次，启动路径至少 4 次串行调用；且每次运行再触碰的调用点（如重开设置窗）也重复支付。即二期 ThemeSpan 余量 76.8ms 的归属。
+  - **方案**：`Load()`/`Save()` 静态缓存（lock + `_cached`，冷 60-77ms 只付一次、暖调用归零）+ `Save()` 落盘成功后把被保存实例写回缓存（零调用点改造，72 处全走同一静态方法）+ `ResetCacheForTests()` internal 测试钩子（沿 `StartupTimer.ResetForTest` 的 InternalsVisibleTo 惯例）。
+  - **边界/行为变化如实登记**：损坏文件异常分支不缓存（下次重试）、文件不存在时缓存默认值、Save 失败不动缓存；外部编辑器改 settings.json 不再有运行期热拾取（旧行为也仅在再次 Load 时读取，未受支持场景，接受）。
+  - **范围豁免**：STJ source-gen（可压首调冷成本但 AppSettings 387 行 + `LegacyIntToSizeStringConverter` 迁移风险高，另行评估）、后台预加载线程、FileSystemWatcher 热更均明确不做；Save→缓存同步语义不写单测（`SettingsFile` static readonly 不可沙箱注入，测试写真实用户文件违禁——测试侧零 `Save()` 调用已核实），改由 GUI 验收覆盖（沿用二期 Task 3 TDD 例外先例）。
+  - **门控**：A/B 后 ThemeSpan < 10ms（ApplyTheme 内 Load 走缓存命中）；TOTAL 预期 −10~40ms 只记录不作门控。
+
 **2026-10-19** — 启动优化二期完成（`startup-theme-dedup-trace.md` 归档）
   - **ApplyTheme 双重加载修复**（`App.axaml.cs`，commit `b7ec7b7`）：新增 `_loadedThemeUri`（初值 = App.axaml 静态合并的 LightThemeUri**契约**：改默认主题/字典顺序需同步）与 `_cachedIconProvider`（85KB AppIcons 图标字典跨主题复用）；同主题直接跳过 Clear+重解析、换肤改为**先 Load 新字典成功再替换**（顺带修复旧实现 `Clear()` 先于 `Load`、失败即清空整树的缺陷）。临时 marks 实测 skip 路径仅 0.3ms（Uri 相等判断 0.0ms），`--test`/GUI 冒烟无 ERROR。
   - **ThemeSpan 指标**（`tools/measure-startup.ps1`，commit `f08d414`）：新增 `ThemeSpan` = `cum(Init.Theme) − cum(Init.EncodingOle)`（round 行 + 聚合中位数行）。
