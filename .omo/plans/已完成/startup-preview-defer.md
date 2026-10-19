@@ -867,6 +867,19 @@ git commit -m "perf(avalonia): PreviewViewModel 构造瘦身，重活延迟到 E
 | `Win.Visible` | 316ms（Top3，15%） | Show + 布局测量内部构成未知（网格复杂度？图标加载？渲染管线固定开销？） | 拆解后若指向可缓存/可延迟的子项再议；否则同上靠 splash |
 | `Init.Theme` | 116ms | ApplyTheme 内是重复解析可缓存资源还是一次性 JIT 未知 | 同上 |
 
+## 待定后续候选（二期定罪，2026-10-19 回填）
+
+`startup-theme-dedup-trace` 计划已按本表「判定路径」完成 trace 定罪（dotnet-trace
+`dotnet-sampled-thread-time,dotnet-common` ×3 共识热点 + specialize marks 实验），逐段实测构成：
+
+| 候选段 | 原阶段一实测 | 二期定罪结论（3 共识样本 + 打点实验） | 遗留可优化性 |
+|---|---|---|---|
+| `Avalonia.InitDone`（597ms） | 三方黑盒 | 无顶层 JIT 热点（`topN` 未现单函数 ≥1% JIT 项）→ **R2R 门控不命中（<300ms），不立项**；大头为 Avalonia 平台初始化/框架固定成本+`Main.Entry→Ready` 链 → **铁板**，splash 覆盖域 | 低（除 splash） |
+| `Win.Visible`（316ms） | 布局黑盒 | 无集中布局/渲染单函数热点；启动期 XAML `XamlIlPopulate` 家族（MainWindow ~1.2-1.5% Inclusive 共识）属 Win.Xaml 段在途成本，**populate 而非运行时解析** | 低-中（若深挖 populate 装配另立项） |
+| `Init.Theme`（116ms） | ApplyTheme 黑盒 | 已由二期修复（`startup-theme-dedup-trace`）：同主题跳过路径实测 0.3ms；A/B 真实 XAML 重载仅 ~13ms；**段内隐形大头 = `AppSettings.Load()` 反复全量读盘+STJ 反序列化（冷 60-77ms/次、暖 2-16ms/次）** → singleton 化/预热缓存单独立项候选 | **高**（AppSettings.Load 廉价高收益） |
+
+原「可能的对策方向」列 → R2R 判定：不立项；资源裁剪：InitDone/Win.Xaml 如需另议；铁板：splash。
+
 **注意**：以上均为**暖启动**测量（文件已在缓存），所以若大头是 JIT，它**每次进程启动都会重新支付**——这是 R2R 唯一能真正消除的部分；若是资源解析/固定成本，暖启动与冷启动同价。
 
 **判定路径（若要定罪）**：一次 `dotnet-trace collect` 对冷启动采样，看三段内部热点函数分布（JIT 时间 vs XAML 解析 vs 布局），约半小时工作量，可直接给出「哪段有肉、哪段是铁板」。
