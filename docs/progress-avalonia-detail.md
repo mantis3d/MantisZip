@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-19** — 启动优化二期完成（`startup-theme-dedup-trace.md` 归档）
+  - **ApplyTheme 双重加载修复**（`App.axaml.cs`，commit `b7ec7b7`）：新增 `_loadedThemeUri`（初值 = App.axaml 静态合并的 LightThemeUri**契约**：改默认主题/字典顺序需同步）与 `_cachedIconProvider`（85KB AppIcons 图标字典跨主题复用）；同主题直接跳过 Clear+重解析、换肤改为**先 Load 新字典成功再替换**（顺带修复旧实现 `Clear()` 先于 `Load`、失败即清空整树的缺陷）。临时 marks 实测 skip 路径仅 0.3ms（Uri 相等判断 0.0ms），`--test`/GUI 冒烟无 ERROR。
+  - **ThemeSpan 指标**（`tools/measure-startup.ps1`，commit `f08d414`）：新增 `ThemeSpan` = `cum(Init.Theme) − cum(Init.EncodingOle)`（round 行 + 聚合中位数行）。
+  - **A/B 实测与黑盒定性**：交错 ×5 中位 ThemeSpan baseline 89.8ms → fixed 76.8ms（−13ms，XAML 重载的真实成本，远小于立项估算 ~100ms）；TOTAL 差 +43ms 属环境噪声。prewarm/X.Theme 四 mark 实验定性：段内余量 = `AppSettings.Load()` 反复全量读盘 + STJ 反序列化（冷 ~60-77ms/次、暖 ~2-16ms/次），singleton 化为后续立项候选。
+  - **trace 定罪**（dotnet-trace 10.0，`--profile dotnet-sampled-thread-time,dotnet-common` ×3 共识样本，计划内 `cpu-sampling` profile 不存在已作修正记录）：**R2R 门控不命中**（无单函数 ≥1% 的 JIT 顶层热点，不立项三期）；挑战热点为 `MainWindow.!XamlIlPopulate` 家族（预生成装配，Win.Xaml ~340ms wall 段）与 `App.OnFrameworkInitializationCompleted`（~137ms，编排层）；`Avalonia.InitDone` 属框架铁板（splash 覆盖域）；`Kernel32.WriteFile`（日志/trace 写盘 ~0.6%）为次要新发现。
+  - **文档同步**：`startup-preview-defer.md` 待定后续候选表回填三期定罪结论（InitDone=铁板/Win.Visible=低-中/Init.Theme=高可优化性归 AppSettings.Load）；计划 `.omo/plans/已完成/` 归档。
+
 **2026-10-19** — 启动优化二期计划立项（`startup-theme-dedup-trace.md`）
   - **背景结论**：前置 `startup-preview-defer`（已完成，首帧 −207ms）交付后剩余黑盒段定罪推进——①`Init.Theme` 116ms 从黑盒转为**确定有肉**：通读代码发现 `ApplyTheme`（`App.axaml.cs:516-550`）双重加载——`App.axaml:10-12` 已静态合并 ThemeLight(13KB)+AppIcons(85KB)，ApplyTheme 又无条件 Clear 后运行时重新解析两份字典（亮色用户两份各解析两遍、暗色用户额外浪费一份 Light、System 模式系统联动同样重解析）；顺带核实现有实现 `Clear()` 先于 `Load`，Load 失败会清空字典（新方案「先 Load 成功再替换」捎带修复）。②WebView2 已排除：`NativeWebView` 不在 XAML 声明、惰性创建（`EnsureWebViewForHtml`）且 PreviewPanel 本身首帧后 0.5s 才建，启动关键路径零触碰。
   - **方案（用户确认 A+B）**：方案一 ApplyTheme 同主题跳过（`_loadedThemeUri` 初值=LightThemeUri 契约）+ 换肤单 Load + 图标字典缓存复用（`_cachedIconProvider`，`MergedDictionaries[1]` 取法），预期 `Init.Theme` 116ms→个位数 ms、合计 −100ms 量级；方案二 `dotnet-trace` launch 模式 3 次采样定罪 `Avalonia.InitDone` 597ms / `Win.Visible` 316ms 内部构成（JIT/XAML/布局/铁板四分类），R2R 门控预先锁定（JIT 相关 ≥300ms → 登记三期 R2R 试点条目）。任务级 Task 1–6 已写入计划文档；`measure-startup.ps1` 现行聚合约缺 `Init.Theme` 指标，Task 2 补 `ThemeSpan`。
