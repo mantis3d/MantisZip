@@ -66,6 +66,8 @@ function New-Sample([string]$section) {
     $winXaml = Get-Cumulative $section 'Win.Xaml'
     $ctorExit = Get-Cumulative $section 'Win.Ctor.Exit'
     $firstFrame = Get-Cumulative $section 'Win.FirstFrame'
+    $initEncoding = Get-Cumulative $section 'Init.EncodingOle'
+    $initTheme = Get-Cumulative $section 'Init.Theme'
     $eager = $null
     if ($section -match 'preview-eager total = ([\d\.]+)ms') { $eager = [double]$Matches[1] }
     return [pscustomobject]@{
@@ -74,6 +76,7 @@ function New-Sample([string]$section) {
         XamlSpan = if ($null -ne $ctorEnter -and $null -ne $winXaml) { $winXaml - $ctorEnter } else { $null }
         CtorSpan = if ($null -ne $ctorEnter -and $null -ne $ctorExit) { $ctorExit - $ctorEnter } else { $null }
         WinSpan  = if ($null -ne $ctorEnter -and $null -ne $firstFrame) { $firstFrame - $ctorEnter } else { $null }
+        ThemeSpan = if ($null -ne $initEncoding -and $null -ne $initTheme) { $initTheme - $initEncoding } else { $null }
         Eager    = $eager
         HasPanel = [bool]($section -match 'Preview\.Panel\.Ctor')
     }
@@ -104,7 +107,7 @@ for ($i = 1; $i -le $Runs; $i++) {
         if ($sample) {
             [void]$byExe[$exe].Add($sample)
             $lastSection = $section
-            "round ${i} [$tag]: total $($sample.Total), init $($sample.Init), xaml $($sample.XamlSpan), ctor $($sample.CtorSpan), win $($sample.WinSpan), eager $($sample.Eager), panel=$($sample.HasPanel)"
+            "round ${i} [$tag]: total $($sample.Total), init $($sample.Init), xaml $($sample.XamlSpan), ctor $($sample.CtorSpan), win $($sample.WinSpan), theme $($sample.ThemeSpan), eager $($sample.Eager), panel=$($sample.HasPanel)"
         } else {
             "round ${i} [$tag]: NO TRACE (timeout or flush missing)"
         }
@@ -126,6 +129,7 @@ foreach ($exe in $resolved) {
     "XamlSpan         = $(Get-Median @($s | ForEach-Object XamlSpan)) ms   (Win.Ctor.Enter -> Win.Xaml)"
     "CtorSpan         = $(Get-Median @($s | ForEach-Object CtorSpan)) ms   (Win.Ctor.Enter -> Win.Ctor.Exit)"
     "WinSpan          = $(Get-Median @($s | ForEach-Object WinSpan)) ms   (Win.Ctor.Enter -> Win.FirstFrame)"
+    "ThemeSpan        = $(Get-Median @($s | ForEach-Object ThemeSpan)) ms   (Init.EncodingOle -> Init.Theme)"
     if ($eagers.Count -gt 0) { "preview-eager    = $(Get-Median $eagers) ms" }
     "with panel marks = $panels/$($s.Count)"
 }
