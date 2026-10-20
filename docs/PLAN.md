@@ -26,7 +26,7 @@
 | **P2** | Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
 | **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.omo/plans/未开始/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
 | **P2** | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理） |
-| **P2** | 快速预览与渐进式加载 | [preview-quick-modes.md](.omo/plans/未开始/preview-quick-modes.md) | 🟡中 | ~25h | 三种预览模式（快速/渐进/完整），叠加在已实施的两阶段加载（Phase 2）之上。**Avalonia-only（规则 11）**；已按 2026-08-06 修正版收敛（设置项复用现有字段、Unsupported 格式降级前置、Markdown 渐进降级等，不必新增重复设置） |
+| **P2** | 快速预览与渐进式加载 | [preview-quick-modes.md](.omo/plans/未开始/preview-quick-modes.md) | 🟡中 | ~25h | 三种预览模式（快速/渐进/完整），叠加在已实施的两阶段加载（Phase 2）之上。**Avalonia-only（规则 11）**；已按 2026-10-20 修正版校准（设置项复用现有字段、DBF/字幕等 Unsupported 格式降级前置、GIF→AnimatedImage、ICO→IcoGallery、HTML WebView 双轨已落地、文件列表缩略图已独立成 `file-list-thumbnails.md`） |
 | **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到… |
 | **P2** | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | **P2** | 进度条分段着色（按压缩包状态） | [progress-bar-segments.md](.omo/plans/未开始/progress-bar-segments.md) | 🟡中 | 3-4h | 自定义分段进度条控件替换普通 `ProgressBar`，按批处理项状态着色（红=失败/绿=成功/青=跳过/蓝=进行中），动态预算缝隙 |

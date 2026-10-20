@@ -1,8 +1,8 @@
 # 快速预览与渐进式加载 (Quick Preview & Progressive Loading)
 
-> **状态**: 📋 待计划 | **创建日期**: 2026-06-29 | **最近修正**: 2026-08-06
-> **关联计划**: `preview-extended-formats.md`（基础预览框架）、`preview-avalonia-opportunities.md`（Avalonia 下的预览能力变化）、`preview-two-phase-loading.md`（✅ 已完成的两阶段加载，本计划叠加其上）、`html-preview-webview-fallback.md`（HTML WebView 双轨，P1 待实施）
-> **前置**: 无（Avalonia 直接实施；规则 11：新功能只进 Avalonia，WPF 仅通过 Core 逻辑被动受益，不做 UI 适配）
+> **状态**: 📋 待计划 | **创建日期**: 2026-06-29 | **最近修正**: 2026-10-20
+> **关联计划**: `preview-extended-formats.md`（基础预览框架，进行中）、`preview-avalonia-opportunities.md`（Avalonia 下的预览能力变化，已归档）、`preview-two-phase-loading.md`（✅ 已完成的两阶段加载，本计划叠加其上）、`html-preview-webview-fallback.md`（✅ HTML WebView 双轨 + ReverseMarkdown 降级，已完成）
+> **前置**: 无（Avalonia 直接实施；规则 11：新功能只进 Avalonia。WPF 版已整体删除，无同步负担）
 
 ## TL;DR
 
@@ -24,21 +24,22 @@
 
 这些格式可以低成本展示一部分，后台继续加载剩余部分：
 
-> **⚠️ 现状校准（2026-08-06）**：下表除 DBF 外均为 Avalonia 已实现的 `PreviewType`（Text/Csv/Pe/Image/Gif/Svg/Font/Pdf/Docx/Xlsx/Pptx/Markdown）。**DBF 现状为 `Unsupported`**，需先建基础预览（同 §1.3 校准，计入前置工作项，不计本计划工时）。
+> **⚠️ 现状校准（2026-10-20）**：下表除 DBF、字幕外均为 Avalonia 已实现的 `PreviewType`（Text/Csv/Pe/Image/AnimatedImage/Svg/Font/Pdf/Docx/Xlsx/Pptx/Markdown）。**DBF 与字幕（SRT/ASS/VTT）现状为 `Unsupported`**——Core `FileFormatDetector` 虽识别 `FileFormat.Subtitle`，但 `PreviewService.ClassifyPreview`/魔数映射均无 Subtitle 分支（`TextExtensions` 亦不含 `.srt` 等），需先建基础预览（同 §1.3 校准，计入前置工作项，不计本计划工时）。另：ICO 多帧为独立 `PreviewType.IcoGallery`（现状已实现多帧画廊）。
 
 | 格式 | 快速预览 | 渐进加载 | 完整加载 | 依赖 |
 |:----:|---------|---------|---------|:----:|
-| **图片** (JPG/PNG/BMP/WebP/ICO) | `SKBitmap` 降采样解码至预览窗格尺寸（如 400px），秒出 | 后台解码全尺寸，完成后替换 Source | 全尺寸一次性解码 | 🟢 |
-| **GIF** | 只解码第一帧，显示静止图 | 后台加载完整动画帧，替换为动画源 | 完整动画播放 | 🟢 |
+| **图片** (JPG/PNG/BMP/WebP/AVIF) | `SKCodec` 降采样解码至预览窗格尺寸（如 400px）——复用现有 `ShowImage` 已有的 >1920px 降采样管线（`_skOriginalPreview` 缓存），秒出 | 后台解码全尺寸，完成后替换 Source | 全尺寸一次性解码（现状） | 🟢 |
+| **动画图像** (GIF/Animated WebP/APNG，`AnimatedImage`，自建解码器) | 只解码第一帧，显示静止图 | 后台加载完整动画帧，替换为动画源（现有 GifDecoder SKCodec 通用帧 API 零改动） | 完整动画播放 | 🟢 |
 | **文本** (TXT/Code/LOG) | 读前 N 字节（如 1024），末尾加 `…` 标记 | 后台 `FileStream` 继续读取剩余，追加到 `TextBox` | 全文加载 | 🟢 |
 | **CSV** | 读前 N 行 × 检测到的列数 | 后台读更多行追加到 DataGrid | 全部行加载 | 🟢 |
-| **字幕** (SRT/ASS/VTT) | 读前 N 条，取时间范围 | 后台读完剩余，追加列表 | 全部条目 | 🟢 |
+| **字幕** (SRT/ASS/VTT) | 读前 N 条，取时间范围 | 后台读完剩余，追加列表 | 全部条目 | 🔴* |
 | **PDF** | PdfPig 渲染第一页（小尺寸 400px） | 后台依次渲染第 2、3、4…页，翻页即时显示 | 全部页渲染完成再展示 | 🟢 |
 | **字体** (TTF/OTF/WOFF) | 读 name table + glyph count，渲染小样本 "AaBb" | 后台加载完整字体，可支持更丰富的字形展示 | 完整字体渲染 | 🟢 |
 | **DBF** | 读前 N 条记录的字段值 | 后台读更多记录 | 全部记录 | 🟢 🔴* |
 | **SVG** | `Avalonia.Svg.Skia` 原生渲染（本身就快，不需要分段） | 同快速（无需渐进） | 同快速 | 🟡 |
 
 > *DBF：快速预览能力依赖基础 DBF 元数据预览先行（当前 Unsupported）。
+> *字幕：Core `FileFormatDetector` 识别 `FileFormat.Subtitle` 与条目数，但 UI 侧 `PreviewService.ClassifyPreview`/魔数映射均无 Subtitle 分支（`TextExtensions` 亦不含 `.srt` 等）→ 零预览路径，需基础预览先行（同 DBF）。
 
 ### 1.2 元数据→内容（快速只展示元数据，渐进加载完整内容）
 
@@ -50,7 +51,7 @@
 | **Office (PPTX)** | 读 slide1.xml，显示第一页文本 | 后台读 slide2、3…，翻页即时 | 所有页 | 🟢 |
 | **Markdown** | 纯文本取前 N 字符显示 | 后台 Markdig 解析 → Avalonia 原生控件渲染全文 | 完整渲染 | 🟡 |
 | **EPUB** | 标题/作者 + 封面小图 | 后台加载全文内容 | 完整显示 | 🟢 |
-| **HTML** | ReverseMarkdown 降级取前 N 字符纯文本 | 后台 ReverseMarkdown → Markdig 控件树渲染全文（现状已实现）；WebView 双轨落地后替换为原生渲染 | 完整渲染（ReverseMarkdown 现状；WebView 双轨见 `html-preview-webview-fallback.md`） | 🟡 |
+| **HTML** | 无 WebView 降级路径取前 N 字符纯文本起步 | 后台 ReverseMarkdown → Markdig 控件树渲染全文；WebView 主轨可用时直接原生渲染（✅ 双轨已落地：NativeWebView 主轨 + ReverseMarkdown 降级，见 `html-preview-webview-fallback.md`） | 完整渲染（主轨/降级双轨均需可用） | 🟡 |
 
 ### 1.3 快速 = 完整（元数据格式，不需要渐进）
 
@@ -81,8 +82,9 @@
 | 格式 | 原因 |
 |:----:|------|
 | **AI** (Illustrator) | 必须安装 Ghostscript 才能做任何渲染。无 GS 时降级为第三类（仅文件基本属性） |
-| **音视频播放** | 播放的是插件功能（LibVLC），跟三模式正交。元数据展示走第三类（始终可用） |
-| **HTML** (富文本) | 无 WebView 后无法渲染，仅支持纯文本预览 |
+| **音视频播放** | 播放未来可能以插件形式提供（代码库当前无播放器依赖），跟三模式正交。元数据展示走第三类（始终可用） |
+
+> **2026-10-20 修正**：原第三行「HTML 无 WebView 后无法渲染，仅支持纯文本预览」已删除——HTML WebView 双轨（NativeWebView 主轨 + ReverseMarkdown 降级）已落地（`html-preview-webview-fallback.md` ✅），HTML 按 §1.2 行执行。
 
 ---
 
@@ -120,7 +122,7 @@
 
 ### 2.3 设置项
 
-`AppSettings`（Avalonia `Models/AppSettings.cs`，WPF 侧字段需保持同步）新增：
+`AppSettings`（仅 Avalonia `Models/AppSettings.cs`；WPF 版已删除，无字段同步负担）新增：
 
 ```csharp
 public class AppSettings
@@ -346,7 +348,7 @@ PreviewImage.Source = bitmap;
 // 改造后：根据模式降采样
 if (mode == PreviewMode.Quick || mode == PreviewMode.Progressive)
 {
-    int maxDim = AppSettings.Instance.QuickPreviewImageMaxDimension;  // 400
+    int maxDim = AppSettings.Load().QuickPreviewImageMaxDimension;  // 400（现状 API 为 AppSettings.Load() 静态缓存）
     // 等比缩放到 maxDim 内再解码（SKBitmap.Resize 或 CreateScaledBitmap）
     var scaled = src.Resize(new SKImageInfo(maxDim, maxDim), SKFilterQuality.Medium);
     PreviewImage.Source = scaled.ToWriteableBitmap();
@@ -446,28 +448,34 @@ while (reader.Read() && paraCount < QuickPreviewOfficeMaxParagraphs)
 | **P2** | CSV 快速预览 + 渐进加载 | ~1h | 同文本模式 |
 | **P2** | PDF 第一页快速 + 逐页渐进 | ~4h | PdfPig 天然支持，改动独立 |
 | **P2** | Office 流式加载 | ~4h | 现有 DOCX/XLSX/PPTX 预览改造 |
-| **P3** | GIF 快速 + 渐进 | ~2h | 第一帧 → 完整动画 |
-| **P3** | 字幕、字体等快速预览 | ~2h | 逐个格式适配（移除 DBF——基础预览未实现，见下） |
+| **P3** | 动画图像 (GIF/Animated WebP/APNG) 快速 + 渐进 | ~2h | 第一帧 → 完整动画（复用现有 AnimatedImage 解码器） |
+| **P3** | 字体、ICO 多帧画廊等快速预览 | ~2h | 逐个格式适配（移除 DBF 与字幕——基础预览未实现，见下） |
 | **P4** | SQLite、EPUB 等快速预览 | ~2h | 纯 C# 解析，改动小 |
 | **P4** | Markdown 渐进加载 | ~2h | 现有 ReverseMarkdown→Markdig 控件树管线（已实现）加"前 N 字符快速档" |
 
 > **⚠️ 2026-08-06 修正**：
 > - ~~Markdown 渐进"依赖 Avalonia 迁移"~~ → **Markdown 控件树渲染已实现**（`MarkdownPreviewBuilder`），降为 ~2h
 > - ~~字幕、DBF、字体~~ → **DBF 移除**：现状 `Unsupported`，需先建基础预览（不计本计划工时，见 §1.1/§1.3 校准）
-> - **🔴 格式前置工作项**（独立计划/需求，不在本计划工时内）：LNK/STL/GZ-BZ2-XZ-Zstd/证书/VHD/VMDK/DICOM/MOBI/DXF/DBF 的基础元数据预览 → 完成后再按 §1.3 接入三模式
+> - **🔴 格式前置工作项**（独立计划/需求，不在本计划工时内）：LNK/STL/GZ-BZ2-XZ-Zstd/证书/VHD/VMDK/DICOM/MOBI/DXF/DBF/**字幕** 的基础元数据预览 → 完成后再按 §1.3 接入三模式
+>
+> **⚠️ 2026-10-20 修正**：
+> - `PreviewType.Gif` 已废弃（不再产出）→ **`AnimatedImage`**（GIF / Animated WebP / APNG 共用，自建解码器），P3「GIF」行同步改名
+> - **字幕移除**：SRT/ASS/VTT 现状 `Unsupported`（UI 侧无 Subtitle 映射），与 DBF 同为前置
+> - ICO 多帧为独立 `PreviewType.IcoGallery`（现状已实现多帧画廊），快速档=首帧小图
+> - §7 文件列表缩略图已独立为 `file-list-thumbnails.md` / `embedded-thumbnail-preview.md`（均不依赖本计划），本章细节已删除
 
 **总计（本计划）**：~25h（不含 🔴 格式基础预览前置）
 
 ---
 
-## 5. 平台策略：Avalonia-only（2026-08-06 修正）
+## 5. 平台策略：Avalonia-only（2026-08-06 修正 / 2026-10-20 更新 WPF 现状）
 
-> **修正说明**：原计划按"WPF 先行，Avalonia 迁移时适配"撰写（2026-06 规划时 WPF 仍是主力）。现状 WPF 处于维护模式（规则 11），**本计划全部按 Avalonia 实现，WPF 不做 UI 适配**，仅 Core 层逻辑（若有）被动受益。
+> **修正说明**：原计划按"WPF 先行，Avalonia 迁移时适配"撰写（2026-06 规划时 WPF 仍是主力）。现状 **WPF 版已整体删除**（`.sln` 仅存 Core/ShellExt/Avalonia 三项目），**本计划全部只进 Avalonia，无任何 WPF 同步负担**；Core 层逻辑（若有）天然共享。
 
 | 组件 | Avalonia 实现 | 纯 C# 复用 |
 |------|--------------|:---------:|
 | `ProgressiveLoadManager` | 直接实现 | ✅ |
-| `AppSettings` 新属性 | Avalonia `Models/AppSettings.cs`；WPF 侧字段同步（规则 11 例外） | ✅ |
+| `AppSettings` 新属性 | 仅 Avalonia `Models/AppSettings.cs`（WPF 已删除，无同步例外） | ✅ |
 | 文本渐进追加 | Avalonia `TextBox.Text += chunk`（或 `TextBlock` 局部替换） | — |
 | 图片渐进解码 | Avalonia `Bitmap` 手动创建（`SKBitmap`/`WriteableBitmap`），替代 WPF `BitmapImage.DecodePixelWidth` | — |
 | PDF 渲染 | PdfPig + SkiaSharp → Avalonia `Bitmap`（现有 `ShowPdf` 同款管线） | ✅ |
@@ -480,7 +488,7 @@ while (reader.Read() && paraCount < QuickPreviewOfficeMaxParagraphs)
 
 ## 6. Definition of Done
 
-> **⚠️ 2026-08-06 修正**：DoD 基准为 Avalonia 已实现的 `PreviewType`（Text/Csv/Pe/Image/Gif/Svg/Font/Audio/Sqlite/Iso/Torrent/Docx/Xlsx/Pptx/Video/Html/Markdown/Pdf）。DBF 及 §1.3 🔴 格式为独立前置，不计入本 DoD。
+> **⚠️ 2026-10-20 修正**：DoD 基准为 Avalonia 已实现的 `PreviewType`（Text/Csv/Pe/Image/AnimatedImage/Svg/Font/Audio/Sqlite/Iso/Torrent/Docx/Xlsx/Pptx/Video/Html/Markdown/Pdf/IcoGallery）。DBF、字幕及 §1.3 🔴 格式为独立前置，不计入本 DoD。
 
 - [ ] `ProgressiveLoadManager` 实现（取消/替换/批处理，与 `_previewLoadVersion` 版本守卫协同）
 - [ ] `AppSettings` 新增预览模式 + 快速参数（复用现有 `MaxTextPreviewBytes`/`MaxTablePreviewRows` 档位）
@@ -490,154 +498,24 @@ while (reader.Read() && paraCount < QuickPreviewOfficeMaxParagraphs)
 - [ ] 文本快速预览（前 N 字节）+ 渐进加载（分段追加）
 - [ ] CSV 快速预览（前 N 行）+ 渐进加载
 - [ ] PDF 快速预览（第一页）+ 渐进加载（逐页渲染）
-- [ ] GIF 快速预览（第一帧）+ 渐进加载
+- [ ] 动画图像 (GIF/Animated WebP/APNG) 快速预览（第一帧）+ 渐进加载
 - [ ] Office (DOCX/XLSX/PPTX) 流式预览
-- [ ] 字幕/字体快速预览
+- [ ] 字体快速预览；ICO 多帧画廊首帧快速档（字幕为前置，不计）
 - [ ] SQLite/EPUB 快速预览
 - [ ] Markdown 快速档（前 N 字符 → 后台 Markdig 控件树全文）
-- [ ] HTML 快速档（前 N 字符纯文本 → 后台 ReverseMarkdown 控件树全文；WebView 双轨落地后升级）
+- [ ] HTML 快速档（纯文本起步 → 后台升级；WebView 双轨已落地，主轨与降级路径均需回归）
 - [ ] 格式不支持快速预览时，模式切换按钮禁用或灰显
 - [ ] 切换文件/模式时后台加载正确取消（CTS）+ 过期结果不覆盖（版本号）
 - [ ] `dotnet build` 通过（Core + Avalonia）
 
 ---
 
-## 7. 后续扩展：文件列表缩略图模式
+## 7. 文件列表缩略图 → 已独立成后续计划（2026-10-20 删除细节）
 
-### 7.1 概述
+本章（2026-06 撰写）的技术假设与后续探索结论漂移，缩略图需求已拆分为独立计划，且**均不依赖本计划先行**：
 
-快速预览模式的"降级解码"能力天然可扩展到文件列表：将每行条目左侧的文件类型图标替换为文件内容的小预览图。快速预览是"点一个看一个"，缩略图是"一屏同时看几十个"。
+- **`file-list-thumbnails.md`**（未开始）：详情/平铺/内容三态布局 + 图像缩略图/文本文字卡片。内存提取走 `ArchiveEntryExtractor.ExtractHeadAsync` + `SKCodec`（8MB 条目上限），复用 `PreviewService.ClassifyPreview` 分类；**固定 128px**（显式不做本计划原 §7.1 的 32~128 尺寸选择器）；**排除** Magick.NET 格式（PSD/HDR/EXR/TIFF/TGA，插件尚不存在）。
+- **`embedded-thumbnail-preview.md`**（未开始）：嵌入式（元数据内嵌）缩略图提取，完成后可作为含缩略图资源的格式。
+- **`archive-manager.md`**（未开始）中另有「缩略图预览」条目，独立维护。
 
-```
-┌─────────────────────────────────────────┐
-│ ☑ 显示缩略图  [尺寸: 32·48·64·96·128]   │ ← 工具栏切换
-├─────────────────────────────────────────┤
-│  🖼️  photo.jpg            1.2 MB   [###]│ ← 64px 缩略图
-│  🖼️  screenshot.png       340 KB   [###]│
-│  📄  readme.txt            12 KB   [   ]│ ← 文本没有，用图标
-│  🖼️  panorama.hdr          8 MB    [###]│ ← HDR tone-mapped 小图
-│  📄  main.cs               3 KB    [   ]│ ← 代码没有，用图标
-│  🖼️  document.pdf         2.5 MB   [###]│ ← PDF 第一页小图
-└─────────────────────────────────────────┘
-```
-
-### 7.2 与快速预览的关系
-
-| 能力 | 快速预览（预览面板） | 缩略图（文件列表） |
-|:----:|:------------------:|:-----------------:|
-| 解码尺寸 | 400px | 32~128px（可配置） |
-| 同时处理 | 1 个 | 视口内 N 个 |
-| 优先级 | 用户点击 → 即时 | 可见项先加载，滚动按需 |
-| 延迟要求 | < 200ms | < 50ms（滚动不卡顿） |
-| 缓存 | 不需要（切文件就清） | **必须缓存** |
-| 范围 | 全部格式 | 有视觉内容的格式（图片/PDF/SVG/PSD/HDR） |
-| 兜底 | — | 无缩略图的项保持 SystemIconHelper 图标 |
-
-### 7.3 基础设施复用
-
-快速预览完成的以下组件可直接用于缩略图：
-
-1. **降级解码策略** — `SKBitmap` 降采样动态控制，缩略图只需传更小的尺寸（64px）
-2. **取消机制** — `ProgressiveLoadManager.Cancel()` 用于取消滚动后不可见项的加载
-3. **Magick.NET 插件** — 通过已有 `IPreviewProvider` 解码 PSD/HDR/EXR 为小图，零额外集成
-
-### 7.4 新增组件
-
-#### 缩略图缓存
-
-```csharp
-public class ThumbnailCache : IDisposable
-{
-    private readonly LRUCache<string, Bitmap> _cache;
-
-    // LRU 缓存，上限 200 项（约 3.2MB 以 64×64×4 计算）
-    public ThumbnailCache(int maxEntries = 200, int defaultSize = 64);
-
-    // 异步获取：缓存命中直接返回，未命中则后台解码
-    public Task<Bitmap?> GetOrCreateAsync(
-        string archivePath, string entryName, string extension,
-        int size, CancellationToken ct);
-
-    // 主动清除（关闭压缩包时）
-    public void Clear();
-}
-```
-
-#### 文件列表模式切换
-
-`MainWindow.axaml` 中现有 `DataGrid` 的图标列加入模式切换：
-
-```csharp
-private bool _showThumbnails;
-public bool ShowThumbnails
-{
-    get => _showThumbnails;
-    set
-    {
-        _showThumbnails = value;
-        if (value)
-            SwitchToThumbnailMode();
-        else
-            SwitchToIconMode();
-        // 保存设置
-        AppSettings.Instance.ShowFileListThumbnails = value;
-    }
-}
-```
-
-图标列模板根据模式切换：
-
-```xml
-<!-- 缩略图模式 -->
-<Image Width="{Binding ThumbnailSize}" Height="{Binding ThumbnailSize}"
-       Source="{Binding Thumbnail, TargetNullValue={StaticResource DefaultIcon}}" />
-
-<!-- 图标模式（当前）-->
-<Image Width="16" Height="16" Source="{Binding Icon}" />
-```
-
-#### 虚拟化滚动加载
-
-- 监听 `DataGrid` 滚动事件，计算视口内可见行
-- 为可见行发起 `ThumbnailCache.GetOrCreateAsync`
-- 滚动离开视口的行，`Cancel()` 其加载任务
-- 利用 `INotifyPropertyChanged` 的 `Thumbnail` 属性绑定
-
-### 7.5 受益格式
-
-| 格式 | 缩略图内容 | 数据来源 |
-|:----:|-----------|---------|
-| **图片** (JPG/PNG/GIF/WebP/BMP/ICO) | 缩小后的图像 | `SKBitmap` 降采样到缩略图尺寸（替代 WPF `DecodePixelWidth`） |
-| **PSD/PSB** | 合成后的展平图 | Magick.NET 插件 |
-| **HDR** | tone-mapped 小图 | Magick.NET 插件 |
-| **EXR/TIFF/TGA** | 解码图 | Magick.NET 插件 |
-| **PDF** | 第一页渲染 64px | PdfPig + SkiaSharp |
-| **SVG** | 渲染 64px | `Avalonia.Svg.Skia` |
-| **GIF** | 第一帧 | 同图片解码 |
-
-**约 70% 的文件将拥有视觉缩略图**，其余保持系统图标。相比现有方案（全部文件只有系统图标），体验提升明显。
-
-### 7.6 预估
-
-| 工作项 | 预估 | 前置 |
-|:------|:----:|:----:|
-| `ThumbnailCache` 实现 | ~2h | 快速预览（降级解码） |
-| 文件列表模式切换 UI | ~2h | — |
-| DataGrid 列模板 + Virtualization | ~3h | — |
-| 图片类缩略图生成 | ~1h | 快速预览完成 |
-| PDF/SVG 缩略图 | ~2h | 快速预览完成 |
-| Magick.NET 缩略图（PSD/HDR） | ~1h | Magick.NET 插件完成 |
-| 滚动加载优先级 + 取消 | ~2h | — |
-| **合计** | **~13h** | 需快速预览先行 |
-
-### 7.7 与快速预览的集成点
-
-```
-快速预览完成                                 缩略图模式
-──────────────                               ──────────
-降采样至 400px              ──复用──▶    降采样至 64px
-ProgressiveLoadManager.Cancel ──复用──▶    滚动取消不可见项
-IPreviewProvider 接口         ──复用──▶    缩略图解码走同接口
-Magick.NET 插件               ──复用──▶    PSD/HDR 缩略图
-第一阶段 ~27h                               第二阶段 +~13h
-```
+> 原因：原章假设的 LRU `ThumbnailCache`、Magick.NET 插件复用、`IPreviewProvider` 解码等已与实际架构不符——删除细节避免两份计划漂移。实现文件列表缩略图时以 `file-list-thumbnails.md` 为准，本计划只需提供「降采样解码 + 取消机制」两类可复用能力。
