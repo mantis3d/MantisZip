@@ -53,6 +53,9 @@ public partial class App : Application
 
     public override void OnFrameworkInitializationCompleted()
     {
+        // 启动打点：Avalonia 框架初始化完成锚点（含 BuildAvaloniaApp/UsePlatformDetect/App.axaml 资源解析）
+        Services.StartupTimer.Mark("Avalonia.InitDone");
+
         // ── 注册代码页编码提供程序（GBK/GB2312/936 等中文编码）──
         // 必须在所有路径（CLI/正常启动）最早执行，否则 Encoding.GetEncoding(936)
         // 抛 NotSupportedException 导致文本预览退化为 "coding 936 无法预览"。
@@ -61,9 +64,11 @@ public partial class App : Application
         // ── Initialize OLE for drag-drop (required on Windows for DragDrop.DoDragDropAsync) ──
         if (RuntimeInformation.IsOSPlatform(OSPlatform.Windows))
             NativeMethods.OleInitialize(nint.Zero);
+        Services.StartupTimer.Mark("Init.EncodingOle");
 
         // ── Apply theme (System/Light/Dark) ──
         ApplyTheme();
+        Services.StartupTimer.Mark("Init.Theme");
         if (PlatformSettings is IPlatformSettings ps)
         {
             ps.ColorValuesChanged += (_, _) =>
@@ -77,6 +82,7 @@ public partial class App : Application
 
         // ── Apply global font from settings ──
         ApplyAppFontFamily();
+        Services.StartupTimer.Mark("Init.Font");
 
         // ── Apply compactness mode ──
         var appSettings = AppSettings.Load();
@@ -87,6 +93,12 @@ public partial class App : Application
             _ => CompactnessMode.Normal,
         };
         ApplyCompactness(compactMode);
+        Services.StartupTimer.Mark("Init.Settings");
+
+        // ── CoreLog 初始化：注入诊断开关 + 路径脱敏委托 ──
+        // CoreLog.Trace/Info/Error 写入同一 debug.log，但 Core 层无法引用 AppSettings，
+        // 必须由 UI 层在启动时注入脱敏逻辑，否则 Core 日志中的路径不会被脱敏。
+        CoreLog.Initialize(appSettings.EnableDebugLogging, appSettings.LogPrivacyMode);
 
         // ── 启动时清理临时目录（对齐 WPF App.xaml.cs:141）—— fire-and-forget，不阻塞 UI ──
         _ = Task.Run(CleanTempOnStartupCore);
@@ -104,6 +116,7 @@ public partial class App : Application
         // ── Restore saved language (AppSettings uses "zh"/"en"/"zh-TW") ──
         LocalizationManager.CurrentLanguage =
             LocalizationManager.FromSettingsCode(appSettings.Language);
+        Services.StartupTimer.Mark("Init.PreviewCfgLocale");
 
         // ── 7z.dll 路径接线 + 用户解析回调（对齐 WPF InitializeApp，App.xaml.cs:46-68）──
         // 从用户设置加载 7z.dll 路径，覆盖 SevenZipEngine 的默认值
@@ -122,6 +135,7 @@ public partial class App : Application
 
         // 注册 7z.dll 解析回调 — 默认位置找不到时弹出对话框让用户手动指定
         SevenZipEngine.SevenZipDllResolveCallback = ResolveSevenZipDllViaDialog;
+        Services.StartupTimer.Mark("Init.SevenZip");
 
         // ── 首次运行：Shell 集成安装（延迟到用户进程，非提权）──
         // 安装程序会写入 FirstRunShell=1 / FirstRunAssoc=1 到注册表，首次启动时处理
@@ -130,7 +144,7 @@ public partial class App : Application
         {
             try
             {
-                using var firstRunKey = Registry.CurrentUser.OpenSubKey(
+                using var firstRunKey = RegistryHost.Open(
                     @"Software\MantisZip", writable: true);
                 if (firstRunKey != null)
                 {
@@ -158,6 +172,16 @@ public partial class App : Application
                 App.DebugLog($"OnFrameworkInitializationCompleted: first-run handling failed: {firstRunEx.Message}");
             }
 
+            // ── 文件关联自愈：修复"UserChoice 悬空/ProgId 被误删"的历史损坏 ──
+            try
+            {
+                ShellIntegration.SelfHealAssociations(AppSettings.Load());
+            }
+            catch (Exception healEx)
+            {
+                App.DebugLog($"OnFrameworkInitializationCompleted: SelfHealAssociations failed: {healEx.Message}");
+            }
+
             // ── 检查 COM 动态菜单状态（如果 pending，检测 Explorer 是否已加载 comhost.dll）──
             try
             {
@@ -172,6 +196,10 @@ public partial class App : Application
         {
             App.DebugLog("OnFrameworkInitializationCompleted: portable mode detected, skipping shell integration and file association registration");
         }
+        Services.StartupTimer.Mark("Init.ShellFirstRun");
+
+        // 启动打点：App 初始化全部完成（CLI 分发之前）
+        Services.StartupTimer.Mark("Init.Done");
 
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
@@ -245,7 +273,7 @@ public partial class App : Application
                         {
                             var herePaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
                             if (herePaths.Count == 0)
-                                desktop.Shutdown();
+                                AppShutdown.Request(desktop.Shutdown);
                             else if (herePaths.Count == 1)
                                 _ = RunExtractCliAsync(herePaths[0], Path.GetDirectoryName(herePaths[0]) ?? ".", args, desktop);
                             else
@@ -258,7 +286,7 @@ public partial class App : Application
                         {
                             var toNamePaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
                             if (toNamePaths.Count == 0)
-                                desktop.Shutdown();
+                                AppShutdown.Request(desktop.Shutdown);
                             else if (toNamePaths.Count == 1)
                             {
                                 var toNameTarget = Path.Combine(
@@ -277,7 +305,7 @@ public partial class App : Application
                         {
                             var smartPaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
                             if (smartPaths.Count == 0)
-                                desktop.Shutdown();
+                                AppShutdown.Request(desktop.Shutdown);
                             else if (smartPaths.Count == 1)
                                 _ = RunExtractSmartCliAsync(smartPaths[0], args, desktop);
                             else
@@ -333,6 +361,9 @@ public partial class App : Application
         }
 
         base.OnFrameworkInitializationCompleted();
+
+        // 主循环启动窗口结束：此后 AppShutdown.Request 与直接 Shutdown 等价（见 Services/AppShutdown.cs）
+        AppShutdown.MarkFrameworkInitCompleted();
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -359,13 +390,13 @@ public partial class App : Application
         {
             Console.WriteLine(helpText);
             FreeConsole();
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
         await AppMessageBox.Show(helpText, LocalizationManager.T("App_CliHelpTitle"),
             MessageBoxButton.OK, MessageBoxImage.Information);
-        desktop.Shutdown();
+        AppShutdown.Request(desktop.Shutdown);
     }
 
     /// <summary>
@@ -379,7 +410,7 @@ public partial class App : Application
                 AppConstants.Version, AppContext.BaseDirectory),
             LocalizationManager.T("App_StartupTestTitle"),
             MessageBoxButton.OK, MessageBoxImage.Information);
-        desktop.Shutdown();
+        AppShutdown.Request(desktop.Shutdown);
     }
 
     /// <summary>
@@ -741,6 +772,8 @@ public partial class App : Application
         var settings = AppSettings.Load();
         _debugLogEnabled = settings.EnableDebugLogging;
         _debugLogPrivacyMode = settings.LogPrivacyMode;
+        // 同步刷新 CoreLog 的诊断开关与脱敏委托
+        CoreLog.Initialize(settings.EnableDebugLogging, settings.LogPrivacyMode);
     }
 
     /// <summary>
@@ -771,13 +804,22 @@ public partial class App : Application
     {
         try
         {
+            var service = new PasswordService();
+
+            // 方案 A：非加密包不做密码匹配。否则 QuickVerifyPassword 在包无加密条目时对任意密码
+            // 恒返回 true → 误判「密码匹配成功」→ 进度窗口批处理行点亮只应在加密包出现的 🔑 徽标。
+            if (!service.HasEncryptedEntries(archivePath, engine))
+            {
+                DebugLog($"CLI extract: '{archivePath}' has no encrypted entries, skipping password matching");
+                return null;
+            }
+
             var allMatches = PasswordManager.Instance.FindMatchingPasswords(archivePath);
             foreach (var entry in allMatches)
             {
                 var pwd = entry.Password;
                 if (string.IsNullOrEmpty(pwd)) continue;
 
-                var service = new PasswordService();
                 var verifyInfo = service.QuickVerifyPasswordEx(archivePath, pwd, engine);
                 if (verifyInfo.Result == PasswordVerificationResult.Success)
                 {
@@ -796,6 +838,33 @@ public partial class App : Application
             DebugLog($"CLI extract: password lookup failed: {ex.Message}");
         }
         return null;
+    }
+
+    /// <summary>
+    /// 内联密码库查找：在匹配 <paramref name="archivePath"/> 规则命中的条目中按明文密码反查，
+    /// 取其匹配规则（Patterns 拼接）与描述，供进度窗口批处理行的密码徽标 Flyout 展示。
+    /// 镜像 <c>MainWindowViewModel.FindSavedPasswordEntry</c>（private static，不可跨类调用）的容错；
+    /// 查找失败返回 (null, null)，不阻断解压（Flyout 对应行自动隐藏）。
+    /// </summary>
+    private static (string? Rule, string? Description) LookupPasswordRuleAndDescription(
+        string archivePath, string? password)
+    {
+        if (string.IsNullOrEmpty(password))
+            return (null, null);
+        try
+        {
+            var entry = PasswordManager.Instance.FindMatchingPasswords(archivePath)
+                .FirstOrDefault(e => e.Password == password);
+            if (entry == null)
+                return (null, null);
+            var rule = entry.Patterns is { Count: > 0 } ? string.Join("; ", entry.Patterns) : null;
+            return (rule, entry.Description);
+        }
+        catch (Exception ex)
+        {
+            DebugLog($"FindMatchingPasswords failed: {ex.Message}");
+            return (null, null);
+        }
     }
 
     /// <summary>
@@ -993,7 +1062,7 @@ public partial class App : Application
     {
         var restarted = await TryExtractArchiveAsync(archivePath, targetDir, originalArgs, desktop);
         if (!restarted)
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
     }
 
     /// <summary>
@@ -1006,7 +1075,7 @@ public partial class App : Application
     {
         var restarted = await TryExtractSmartAsync(archivePath, originalArgs, desktop);
         if (!restarted)
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
     }
 
     /// <summary>
@@ -1023,7 +1092,7 @@ public partial class App : Application
             var existing = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
             if (existing.Count == 0)
             {
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
                 return;
             }
 
@@ -1045,7 +1114,7 @@ public partial class App : Application
             var ok = await closeTcs.Task;
             if (!ok)
             {
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
                 return;
             }
 
@@ -1056,7 +1125,7 @@ public partial class App : Application
 
             if (string.IsNullOrWhiteSpace(dest))
             {
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
                 return;
             }
 
@@ -1067,7 +1136,7 @@ public partial class App : Application
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Extract dialog failed: {ex.Message}");
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
         }
     }
 
@@ -1094,9 +1163,19 @@ public partial class App : Application
         progressWindow.Show();
         desktop.MainWindow = progressWindow;
 
+        // spec §11.2: CLI 解压 → 只显示「删包」开关（打开目录的 CLI 接线属挂起计划 cli-extract-open-folder.md，D18）
+        progressWindow.SetExtractPostActions(openFolder: false, deleteArchive: true, openFolderSeed: null);
+
         // 始终显示文件列表（单文件也显示）：批处理列表项 = 压缩包路径
         progressWindow.InitBatchMode(new[] { archivePath });
         progressWindow.SetCurrentBatchItem(0);
+
+        // 路径 A（决策 D1）单文件变体：命令行已给定密码 → 直接点亮行 0 的 🔑●●●● 徽标
+        if (!string.IsNullOrEmpty(password))
+        {
+            var (rule, desc) = LookupPasswordRuleAndDescription(archivePath, password);
+            progressWindow.SetBatchPasswordState(0, BatchPasswordState.Matched, password, rule, desc);
+        }
 
         var ct = progressWindow.CancellationToken;
         var doneEvent = new ManualResetEventSlim(false);
@@ -1118,27 +1197,58 @@ public partial class App : Application
                     settings.FileConflictAction,
                     info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info));
 
-                var extractResult = await engine.ExtractAsync(archivePath, targetDir, password, rawProgress, ct, options);
+                // 列表模式播种 + 并行度元数据：CLI 单文件叶子同样直连引擎、绕过 ExtractFlow.ExtractAsync，
+                // 故在此补齐两处接线（与 RunCliDirectExtractBatchAsync 多文件叶子同源）。
+                // InitBatchMode/SetCurrentBatchItem 已清空条目行并把并行度归零，此处只需重新播种/置位。
+                ExtractFlow.TrySeedEntryItemsInBackground(
+                    progressWindow, archivePath, password, filteredKeys: null, ct);
+                progressWindow.SetParallelDegree(
+                    ExtractFlow.ResolveDisplayParallelDegree(archivePath));
+
+                // 叶子 5/5：单文件 CLI 解压入口（--extract-here / --extract-to-name / --extract 等）
+                ExtractResult? extractResult = null;
+                var (singleOutcome, _) = await PasswordRetryLoop.RunAsync(
+                    archivePath, password, engine,
+                    owner: progressWindow,
+                    setStatus: msg => progressWindow.SetStatus(msg),
+                    attempt: async (pwd, token) =>
+                        extractResult = await engine.ExtractAsync(
+                            archivePath, targetDir, pwd, rawProgress, token, options),
+                    ct: ct);
+                if (singleOutcome == PasswordRetryOutcome.Cancelled)
+                    throw new PasswordRetryCancelledException(archivePath);
+                // 损坏/无效：弹窗循环已判定继续重弹无意义 → 抛错走既有失败收尾，
+                // 禁止落成功路径（否则会记录路径历史且 TryDeleteArchiveAfterExtract 会误删损坏源包）
+                if (singleOutcome == PasswordRetryOutcome.CorruptedOrInvalid)
+                    throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
 
                 progressWindow.FinalizeBatch();
                 await Dispatcher.UIThread.InvokeAsync(() =>
                 {
-                    if (extractResult.HasFailures)
+                    if (extractResult is { HasFailures: true })
                     {
                         // 部分条目失败（如权限不足）：显示错误汇总（对齐 WPF ExtractResult.HasFailures 路径）
                         progressWindow.SetErrorSummary(
-                            $"{extractResult.FailedEntries} 个文件未能写入到 {targetDir}（可能权限不足）");
+                            LocalizationManager.T("Progress_WriteFailed_Fmt", extractResult.FailedEntries, targetDir));
                     }
                     progressWindow.SetComplete(LocalizationManager.T("Cli_StatusDone"));
                 });
                 Console.WriteLine($"Extracted: {archivePath} -> {targetDir}");
                 // 成功后把目标目录写入路径历史（--extract-here / --extract-to-name / --extract-smart 单文件直解）
                 PathHistoryManager.Record(targetDir);
-                TryDeleteArchiveAfterExtract(archivePath);
+                // D19: 删包时序移至窗口关闭之后（倒计时内用户可切换 🗑 开关）
             }
             catch (OperationCanceledException)
             {
                 cancelled = true;
+            }
+            catch (PasswordRetryCancelledException)
+            {
+                // 用户在密码弹窗点取消：行 0 标 ✗「已取消 - 需要密码」，走既有失败收尾（不吞、不重抛）
+                captureException = new Exception(LocalizationManager.T("Status_PasswordCancelled"));
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                    progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed,
+                        LocalizationManager.T("Status_PasswordCancelled")));
             }
             catch (UnauthorizedAccessException)
             {
@@ -1182,15 +1292,17 @@ public partial class App : Application
             // 显示错误汇总并等待用户手动关闭窗口
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                progressWindow.SetErrorSummary(captureException!.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(captureException!);
+                progressWindow.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 progressWindow.CompleteWithErrors();
             });
-            await WaitForWindowCloseAsync(progressWindow);
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
             return false;
         }
 
-        // 成功：自动关闭或等待（KeepOpenOnComplete 生效）
-        await progressWindow.AutoCloseOrWaitAsync(2500, () => progressWindow.Close());
+        // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待用户手动关闭；关闭后按开关最终值删包（D19）
+        await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
+        TryDeleteArchiveAfterExtract(archivePath, progressWindow.DeleteArchiveAfterExtractValue);
         return false;
     }
 
@@ -1218,10 +1330,27 @@ public partial class App : Application
         desktop.MainWindow = progressWindow;
         progressWindow.InitBatchMode(archivePaths);
 
+        // spec §11.2: CLI 解压 → 只显示「删包」开关；初值取弹窗勾选（deleteAfterExtract）
+        progressWindow.SetExtractPostActions(openFolder: false, deleteArchive: true, openFolderSeed: null, deleteArchiveSeed: deleteAfterExtract);
+
+        // 路径 A（决策 D1）：解压设置窗口已预匹配密码的包，开始解压前整行点亮 🔑●●●● 徽标。
+        // 未预匹配的包留空，轮到该包时由路径 B 逐个点亮。
+        if (matchedPasswords != null)
+        {
+            for (int i = 0; i < archivePaths.Count; i++)
+            {
+                if (!matchedPasswords.TryGetValue(archivePaths[i], out var preUnlocked))
+                    continue;
+                var (rule, desc) = LookupPasswordRuleAndDescription(archivePaths[i], preUnlocked);
+                progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matched, preUnlocked, rule, desc);
+            }
+        }
+
         var ct = progressWindow.CancellationToken;
         var doneEvent = new ManualResetEventSlim(false);
         Exception? captureException = null;
         bool cancelled = false;
+        var succeededArchives = new List<string>();   // D19: 关窗后按开关最终值统一删包
 
         _ = Task.Run(async () =>
         {
@@ -1244,12 +1373,30 @@ public partial class App : Application
                             continue;
                         }
 
+                        // 路径 B（决策 D1）：解析前先亮 🔄 匹配中（密码库逐条尝试可能耗时）；
+                        // 解析完成后再落终态——命中 → 🔑●●●●，无密码包 → 熄灭
+                        progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matching, null, null, null);
+
                         // 解压设置窗口校验/手动解锁阶段已确定的密码优先复用（免重复验证与弹窗）；
                         // 未命中再走密码库扫描 + ResolveCliPassword 流程
                         var password =
                             matchedPasswords != null && matchedPasswords.TryGetValue(archivePath, out var preUnlocked)
                                 ? preUnlocked
                                 : ResolveCliPassword(archivePath, engine);
+
+                        // 路径 A 未点亮的行在此补亮：轮到该包且解析出密码 → Matched；
+                        // 无密码包（password == null）→ 熄灭残留的 Matching 徽标（决策 D1 路径 B）
+                        if (password != null)
+                        {
+                            var (pRule, pDesc) = LookupPasswordRuleAndDescription(archivePath, password);
+                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matched,
+                                password, pRule, pDesc);
+                        }
+                        else
+                        {
+                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.None, null, null, null);
+                        }
+
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
@@ -1263,11 +1410,19 @@ public partial class App : Application
                             info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info),
                             progress, ct);
 
-                        // 解压成功后按弹窗勾选将原包移入回收站（逐次勾选，不读全局设置、不写回）
-                        TryDeleteArchiveAfterExtract(archivePath, deleteAfterExtract);
+                        // D19: 删包延后到窗口关闭后（倒计时内用户可切换 🗑 开关），此处仅登记成功项
+                        succeededArchives.Add(archivePath);
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                             progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
+                    }
+                    catch (PasswordRetryCancelledException)
+                    {
+                        // 密码弹窗取消：该行标 ✗「已取消 - 需要密码」，批处理继续下一个包（决策 D7）
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                LocalizationManager.T("Status_PasswordCancelled")));
+                        continue;
                     }
                     catch (OperationCanceledException)
                     {
@@ -1304,7 +1459,7 @@ public partial class App : Application
         if (cancelled)
         {
             await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -1314,16 +1469,22 @@ public partial class App : Application
             progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException.Message);
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                progressWindow.SetErrorSummary(captureException!.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(captureException!);
+                progressWindow.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 progressWindow.CompleteWithErrors();
             });
-            await WaitForWindowCloseAsync(progressWindow);
-            desktop.Shutdown();
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
-        // 成功：自动关闭（2.5s）或等待用户手动关闭后退出
-        await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
+        // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待用户手动关闭；关闭时按开关最终值删包再退出（D19）
+        await progressWindow.AutoCloseOrWaitAsync(() =>
+        {
+            foreach (var p in succeededArchives)
+                TryDeleteArchiveAfterExtract(p, progressWindow.DeleteArchiveAfterExtractValue);
+            AppShutdown.Request(desktop.Shutdown);
+        });
     }
 
     /// <summary>
@@ -1357,10 +1518,14 @@ public partial class App : Application
         desktop.MainWindow = progressWindow;
         progressWindow.InitBatchMode(archivePaths);
 
+        // spec §11.2: CLI 解压 → 只显示「删包」开关（打开目录的 CLI 接线属挂起计划，D18）
+        progressWindow.SetExtractPostActions(openFolder: false, deleteArchive: true, openFolderSeed: null);
+
         var ct = progressWindow.CancellationToken;
         var doneEvent = new ManualResetEventSlim(false);
         Exception? captureException = null;
         bool cancelled = false;
+        var succeededArchives = new List<string>();   // D19: 关窗后按开关最终值统一删包
 
         var settings = AppSettings.Load();
         var conflictOptions = SelectedItemsExtractService.CreateExtractOptions(
@@ -1401,18 +1566,66 @@ public partial class App : Application
                             Directory.CreateDirectory(targetDir);
 
                         var password = ResolveCliPassword(archivePath, engine);
+
+                        // 路径 B（决策 D1）：解析前先亮 🔄 匹配中（密码库逐条尝试可能耗时）；
+                        // 解析完成后再落终态——命中 → 🔑●●●●，无密码包 → 熄灭
+                        progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matching, null, null, null);
+                        if (password != null)
+                        {
+                            var (pRule, pDesc) = LookupPasswordRuleAndDescription(archivePath, password);
+                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matched,
+                                password, pRule, pDesc);
+                        }
+                        else
+                        {
+                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.None, null, null, null);
+                        }
+
+                        // 列表模式播种 + 并行度元数据（本方法直连引擎、绕过 ExtractFlow，故在此补齐两处接线，
+                        // 否则 ZIP 的列表模式无条目行且「并行」统计卡恒不出现）。
+                        // ClearEntries 先清上一包残留行——InitBatchMode 每批只清一次，多包批处理必须逐包清理；
+                        // 并行度逐包重算——非 zip/7z 返回 1 → HasParallelDegree=false 自动隐藏并行卡（Rule 6）。
+                        // 播种为 fire-and-forget，且必须在解压启动前发起，否则首批条目行会缺失。
+                        progressWindow.ClearEntries();
+                        ExtractFlow.TrySeedEntryItemsInBackground(
+                            progressWindow, archivePath, password, filteredKeys: null, ct);
+                        progressWindow.SetParallelDegree(
+                            ExtractFlow.ResolveDisplayParallelDegree(archivePath));
+
                         var progress = progressWindow.CreatePauseAwareProgress(
                             ProgressWindow.CreateBackgroundProgress(progressWindow));
 
-                        await engine.ExtractAsync(archivePath, targetDir, password, progress, ct, conflictOptions);
+                        // 叶子 4/5：直连引擎的批处理入口 → 密码弹窗兜底
+                        var (extractOutcome, _) = await PasswordRetryLoop.RunAsync(
+                            archivePath, password, engine,
+                            owner: progressWindow,
+                            setStatus: msg => progressWindow.SetStatus(msg),
+                            attempt: async (pwd, token) =>
+                                await engine.ExtractAsync(archivePath, targetDir, pwd, progress, token, conflictOptions),
+                            ct: ct);
+                        if (extractOutcome == PasswordRetryOutcome.Cancelled)
+                            throw new PasswordRetryCancelledException(archivePath);
+                        // 损坏/无效：弹窗循环已判定继续重弹无意义 → 抛错走既有失败收尾，
+                        // 禁止落成功路径（否则会记录路径历史且 TryDeleteArchiveAfterExtract 会误删损坏源包）
+                        if (extractOutcome == PasswordRetryOutcome.CorruptedOrInvalid)
+                            throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
 
                         // 成功后把目标目录写入路径历史（多文件直解批处理逐项记录，重复路径由去重置顶）
                         PathHistoryManager.Record(targetDir);
 
-                        TryDeleteArchiveAfterExtract(archivePath);
+                        // D19: 删包延后到窗口关闭后，此处仅登记成功项
+                        succeededArchives.Add(archivePath);
 
                         await Dispatcher.UIThread.InvokeAsync(() =>
                             progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
+                    }
+                    catch (PasswordRetryCancelledException)
+                    {
+                        // 密码弹窗取消：该行标 ✗「已取消 - 需要密码」，批处理继续下一个包（决策 D7）
+                        await Dispatcher.UIThread.InvokeAsync(() =>
+                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
+                                LocalizationManager.T("Status_PasswordCancelled")));
+                        continue;
                     }
                     catch (OperationCanceledException)
                     {
@@ -1449,7 +1662,7 @@ public partial class App : Application
         if (cancelled)
         {
             await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -1459,39 +1672,22 @@ public partial class App : Application
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException!.Message);
-                progressWindow.SetErrorSummary(captureException!.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(captureException!);
+                progressWindow.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 progressWindow.CompleteWithErrors();
             });
-            await WaitForWindowCloseAsync(progressWindow);
-            desktop.Shutdown();
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
-        // 成功：自动关闭（2.5s）或等待用户手动关闭后退出
-        await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
-    }
-
-    /// <summary>
-    /// 等待用户手动关闭进度窗口（等待 Closed 事件）。
-    /// 若窗口已不可见（如取消流程已关闭），立即返回。
-    /// </summary>
-    private static async Task WaitForWindowCloseAsync(ProgressWindow window)
-    {
-        if (!window.IsVisible)
-            return;
-
-        var closed = new ManualResetEventSlim(false);
-        EventHandler handler = null!;
-        handler = (_, _) => { closed.Set(); window.Closed -= handler; };
-        window.Closed += handler;
-        try
+        // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待用户手动关闭；关闭时按开关最终值删包再退出（D19）
+        await progressWindow.AutoCloseOrWaitAsync(() =>
         {
-            await Task.Run(() => closed.Wait());
-        }
-        finally
-        {
-            window.Closed -= handler;
-        }
+            foreach (var p in succeededArchives)
+                TryDeleteArchiveAfterExtract(p, progressWindow.DeleteArchiveAfterExtractValue);
+            AppShutdown.Request(desktop.Shutdown);
+        });
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -1500,9 +1696,10 @@ public partial class App : Application
 
     /// <summary>
     /// Handle headless shell commands (--install-shell, --uninstall-shell, etc.).
-    /// Uses Environment.Exit(0) instead of desktop.Shutdown() because these commands
-    /// run during OnFrameworkInitializationCompleted, before the Dispatcher main loop
-    /// starts — calling Shutdown() there causes InvalidOperationException.
+    /// Uses Environment.Exit(exitCode) instead of AppShutdown.Request(desktop.Shutdown) because these headless
+    /// commands run during OnFrameworkInitializationCompleted, before the Dispatcher main loop
+    /// starts — a Shutdown() there would throw InvalidOperationException (see Services/AppShutdown.cs),
+    /// and they need an explicit exit code without starting the Avalonia lifetime.
     /// </summary>
     private static void HandleShellCommand(string command, IClassicDesktopStyleApplicationLifetime desktop)
     {
@@ -1667,7 +1864,7 @@ public partial class App : Application
         {
             // User chose to elevate — restart as admin and shutdown current process
             RestartAsAdmin(originalArgs);
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return true;
         }
         else
@@ -1750,7 +1947,7 @@ public partial class App : Application
     private static void HandleCompress(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+        if (myPaths.Count == 0) { AppShutdown.Request(desktop.Shutdown); return; }
 
         // 显式管理退出：对话框关闭时默认 ShutdownMode(OnLastWindowClose) 会立即退出进程，
         // 但压缩流程需要在对话框关闭后继续显示 ProgressWindow（对齐 WPF HandleCompress 的
@@ -1788,14 +1985,14 @@ public partial class App : Application
                             collectingWindow.Close();
                             await ShowCompressDialogAndRun(allPaths, desktop);
                         }
-                        catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); desktop.Shutdown(); }
+                        catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); AppShutdown.Request(desktop.Shutdown); }
                     });
                 });
             }
             else
             {
                 SendPathsThroughPipe(myPaths, CompressPipeName);
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
             }
         }
         else
@@ -1804,7 +2001,7 @@ public partial class App : Application
             Dispatcher.UIThread.Post(async () =>
             {
                 try { await ShowCompressDialogAndRun(myPaths, desktop); }
-                catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); desktop.Shutdown(); }
+                catch (Exception ex) { App.DebugLog($"HandleCompress: ShowCompressDialogAndRun 异常: {ex.Message}"); AppShutdown.Request(desktop.Shutdown); }
             });
         }
     }
@@ -1820,7 +2017,7 @@ public partial class App : Application
         dlg.Closed += (_, _) =>
         {
             if (!compressStarted)
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
         };
 
         // Intercept CloseAction: on "Compress", run the compression
@@ -1835,7 +2032,7 @@ public partial class App : Application
                 // 统一构建（含文件过滤），与主窗口 ExecuteCompressFromSettings 共用 CompressFlow。
                 // StartCompress 已等待 B 数据集就绪，但 BuildRequest 仍可能返回 null（如过滤后全部无匹配）：
                 // 此时保持窗口打开并提示（对齐主窗口路径的 Compress_FilteredAllSkipped 提示），
-                // 而不是静默关闭窗口并退出进程（原 bug：request==null → desktop.Shutdown() 无任何反馈）。
+                // 而不是静默关闭窗口并退出进程（原 bug：request==null → AppShutdown.Request(desktop.Shutdown) 无任何反馈）。
                 var request = CompressFlow.BuildRequest(vm);
                 if (request == null)
                 {
@@ -1872,7 +2069,7 @@ public partial class App : Application
     private static void HandleCompressQuick(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+        if (myPaths.Count == 0) { AppShutdown.Request(desktop.Shutdown); return; }
 
         // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
         // 点击 X 时立即退出进程，后台压缩被强杀留下损坏的压缩包（对齐 WPF 的 OnExplicitShutdown 用法）
@@ -1914,7 +2111,7 @@ public partial class App : Application
     private static void HandleCompressSeparate(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+        if (myPaths.Count == 0) { AppShutdown.Request(desktop.Shutdown); return; }
 
         // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
         // 点击 X 时立即退出进程，后台压缩被强杀留下损坏的压缩包（对齐 WPF 的 OnExplicitShutdown 用法）
@@ -1952,14 +2149,14 @@ public partial class App : Application
                     Dispatcher.UIThread.Post(async () =>
                     {
                         try { await RunCompressSeparate(allPaths, desktop, progressWindow); }
-                        finally { desktop.Shutdown(); }
+                        finally { AppShutdown.Request(desktop.Shutdown); }
                     });
                 });
             }
             else
             {
                 SendPathsThroughPipe(myPaths, CompressSeparatePipeName);
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
             }
         }
         else
@@ -1967,7 +2164,7 @@ public partial class App : Application
             Dispatcher.UIThread.Post(async () =>
             {
                 try { await RunCompressSeparate(myPaths, desktop); }
-                finally { desktop.Shutdown(); }
+                finally { AppShutdown.Request(desktop.Shutdown); }
             });
         }
     }
@@ -2008,7 +2205,7 @@ public partial class App : Application
     private static void HandleCompressCombined(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
     {
         var myPaths = paths.Where(p => File.Exists(p) || Directory.Exists(p)).ToList();
-        if (myPaths.Count == 0) { desktop.Shutdown(); return; }
+        if (myPaths.Count == 0) { AppShutdown.Request(desktop.Shutdown); return; }
 
         // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
         // 点击 X 时立即退出进程，后台压缩被强杀留下损坏的压缩包（对齐 WPF 的 OnExplicitShutdown 用法）
@@ -2034,14 +2231,14 @@ public partial class App : Application
                     Dispatcher.UIThread.Post(async () =>
                     {
                         try { await RunCompressCombined(allPaths, desktop); }
-                        finally { desktop.Shutdown(); }
+                        finally { AppShutdown.Request(desktop.Shutdown); }
                     });
                 });
             }
             else
             {
                 SendPathsThroughPipe(myPaths, CompressCombinedPipeName);
-                desktop.Shutdown();
+                AppShutdown.Request(desktop.Shutdown);
             }
         }
         else
@@ -2049,7 +2246,7 @@ public partial class App : Application
             Dispatcher.UIThread.Post(async () =>
             {
                 try { await RunCompressCombined(myPaths, desktop); }
-                finally { desktop.Shutdown(); }
+                finally { AppShutdown.Request(desktop.Shutdown); }
             });
         }
     }
@@ -2111,17 +2308,22 @@ public partial class App : Application
         // OnLastWindowClose 自动终止，必须显式 Shutdown，否则后台压缩会继续在不可见窗口上运行）
         if (existingWindow != null && !existingWindow.IsVisible)
         {
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
         var progressWindow = existingWindow ?? new ProgressWindow(title);
+        // Task 6: 压缩流程标记 → 详细面板显示「压缩通道」说明行（Store 类文件不占通道）
+        progressWindow.IsCompressFlow = true;
         if (existingWindow == null)
         {
             progressWindow.InitCancellation();
             progressWindow.Show();
         }
         desktop.MainWindow = progressWindow;
+
+        // 列表播种：压缩流程枚举全量条目（后台；失败/取消/超阈值放弃，终态 upsert 兜底）
+        CompressFlow.TrySeedEntryItemsInBackground(progressWindow, request, progressWindow.CancellationToken);
 
         // 始终显示文件列表（单文件也显示）：批处理列表项 = 输出路径
         var outputPaths = AvaloniaCompressService.GetOutputPaths(request);
@@ -2165,7 +2367,7 @@ public partial class App : Application
                     {
                         // 部分条目失败（如权限不足）：显示错误汇总（对齐 WPF result.Failed > 0 → CompleteWithErrors 分支）
                         progressWindow.SetErrorSummary(
-                            $"{result.Failed} 个文件未能写入到 {request.OutputPath}（可能权限不足）");
+                            LocalizationManager.T("Progress_WriteFailed_Fmt", result.Failed, request.OutputPath));
                         progressWindow.CompleteWithErrors();
                     }
                     else
@@ -2195,7 +2397,7 @@ public partial class App : Application
         if (cancelled)
         {
             await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
-            desktop.Shutdown();
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
@@ -2206,26 +2408,27 @@ public partial class App : Application
             // 显示错误汇总并等待用户手动关闭窗口（对齐 WPF 失败分支 CompleteWithErrors + wait Closed）
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
-                progressWindow.SetErrorSummary(captureException!.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(captureException!);
+                progressWindow.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 progressWindow.CompleteWithErrors();
             });
-            await WaitForWindowCloseAsync(progressWindow);
-            desktop.Shutdown();
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
         if (partialFailure)
         {
             // 部分失败：等待用户手动关闭窗口后退出
-            await WaitForWindowCloseAsync(progressWindow);
-            desktop.Shutdown();
+            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
+            AppShutdown.Request(desktop.Shutdown);
             return;
         }
 
-        // 成功：自动关闭（2.5s）或等待（📌 KeepOpenOnComplete 生效），窗口关闭后退出进程
+        // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待（📌 KeepOpenOnComplete 生效），窗口关闭后退出进程
         // 压缩完成后把输出目录写入路径历史（含部分条目失败——输出已落盘；取消/异常路径不会走到此处）
         CompressFlow.RecordOutputHistory(request);
-        await progressWindow.AutoCloseOrWaitAsync(2500, () => desktop.Shutdown());
+        await progressWindow.AutoCloseOrWaitAsync(() => AppShutdown.Request(desktop.Shutdown));
     }
 
     // ════════════════════════════════════════════════════════════════

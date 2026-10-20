@@ -55,11 +55,21 @@ public readonly record struct RewriteResult(
 /// New entry to add during rewrite. Caller must keep <see cref="Data"/> stream alive
 /// until <c>RewriteAsync</c> completes.
 /// </summary>
+/// <param name="EntryName">Entry path inside the archive.</param>
+/// <param name="Data">Uncompressed source data.</param>
+/// <param name="LastModified">Entry timestamp (converted to MS-DOS date/time).</param>
+/// <param name="Size">Uncompressed byte count of <paramref name="Data"/>.</param>
+/// <param name="Store">
+/// <c>true</c> = write with compression method 0 (Store) — bytes are passed through
+/// untouched, which is what already-compressed payloads need.
+/// <c>false</c> (default) = Deflate at <see cref="System.IO.Compression.CompressionLevel.Optimal"/>.
+/// </param>
 public readonly record struct NewEntry(
     string EntryName,
     Stream Data,
     DateTime LastModified,
-    long Size);
+    long Size,
+    bool Store = false);
 
 /// <summary>
 /// ZIP binary rewriter providing low-level parsing and copy-mode rewrite capabilities.
@@ -305,6 +315,8 @@ internal static partial class ZipBinaryRewriter
         Stream? source = null;
         Stream? output = null;
         string tempDestPath = destPath + ".tmp";
+        // 只有成功原子替换后才置 true；finally 里据此决定是否清理临时文件。
+        bool committed = false;
 
         try
         {
@@ -354,68 +366,14 @@ internal static partial class ZipBinaryRewriter
                 if (!keepAll && !keepSet.Contains(entry.FileName))
                     continue;
 
-                // ── Copy-mode validation ─────────────────────────────
-                if (entry.CompressionMethod != 0 && entry.CompressionMethod != 8)
-                {
-                    CoreLog.Info($"Entry '{entry.FileName}': unsupported compression method {entry.CompressionMethod}");
-                    throw new ZipCopyModeException(
-                        $"Entry '{entry.FileName}' uses unsupported compression method ({entry.CompressionMethod}). " +
-                        "Only Store (0) and Deflate (8) are supported by copy-mode.");
-                }
-
-                if ((entry.Flags & 0x0001) != 0) // bit 0 = encrypted
-                {
-                    CoreLog.Info($"Entry '{entry.FileName}': encrypted, not supported by copy-mode");
-                    throw new ZipCopyModeException(
-                        $"Entry '{entry.FileName}' is encrypted. Encrypted entries are not supported by copy-mode.");
-                }
-
-                if (entry.CompressedSize >= 0xFFFFFFFF)
-                {
-                    CoreLog.Info($"Entry '{entry.FileName}': ZIP64 compressed size, not supported by copy-mode");
-                    throw new ZipCopyModeException(
-                        $"Entry '{entry.FileName}' uses ZIP64 compressed size. ZIP64 is not supported by copy-mode.");
-                }
-
-                if (entry.LocalHeaderOffset >= 0xFFFFFFFF)
-                {
-                    CoreLog.Info($"Entry '{entry.FileName}': ZIP64 local header offset, not supported by copy-mode");
-                    throw new ZipCopyModeException(
-                        $"Entry '{entry.FileName}' uses ZIP64 local header offset. ZIP64 is not supported by copy-mode.");
-                }
-
                 double basePct = totalEntries > 0
                     ? (double)processedEntries / totalEntries * 100
                     : 0;
                 double entryWeight = 90.0 / totalEntries;
 
-                // ── Read and optionally rewrite LFH ──────────────────
-                LfhInfo lfhInfo = ReadAndMaybeRewriteLfh(
-                    source, entry.LocalHeaderOffset, entry, out byte[] lfhHeader);
-
-                long entryOffset = output.Position;
-
-                // Write LFH header to output
-                output.Write(lfhHeader, 0, lfhHeader.Length);
-
-                // Stream-copy compressed data with per-chunk progress
-                await CopyStreamRangeAsync(
-                    source, output, entry.CompressedSize,
-                    entry.FileName, basePct, entryWeight,
-                    progress, cancellationToken);
-
-                bytesCopied += lfhHeader.Length + entry.CompressedSize;
-
-                // If bit 3 was cleared in the LFH rewrite, propagate the flag change
-                // to the CDFH so it matches the LFH (no data descriptor present).
-                var entryForCd = lfhInfo.Flags != entry.Flags
-                    ? entry with { Flags = lfhInfo.Flags }
-                    : entry;
-                entriesToWrite.Add((entryForCd, entryOffset, false, lfhHeader));
+                bytesCopied += await CopyEntryAsync(source, output, entry,
+                    entriesToWrite, basePct, entryWeight, progress, cancellationToken);
                 processedEntries++;
-
-                CoreLog.Trace("ZipBinaryRewriter: copied entry '{0}' ({1} bytes)",
-                    entry.FileName, entry.CompressedSize);
             }
 
             // ═══════════════════════════════════════════════════════════
@@ -451,7 +409,7 @@ internal static partial class ZipBinaryRewriter
                         Crc32: crc32,
                         CompressedSize: compressedSize,
                         UncompressedSize: newEntry.Size,
-                        CompressionMethod: 8, // Deflate
+                        CompressionMethod: (ushort)(newEntry.Store ? 0 : 8),
                         Flags: lfhInfoFlags,
                         LastModifiedDate: dosDate,
                         LastModifiedTime: dosTime,
@@ -526,28 +484,403 @@ internal static partial class ZipBinaryRewriter
                 $"{addCount} entries added ({bytesAdded} bytes)");
             CoreLog.Exit();
 
+            committed = true;
             return new RewriteResult(copyCount, bytesCopied, addCount, bytesAdded);
         }
         catch (OperationCanceledException)
         {
             CoreLog.Info("ZipBinaryRewriter: cancelled");
-            CleanupFile(tempDestPath);
             throw;
         }
         catch (Exception ex)
         {
             if (ex is ZipCopyModeException)
-                CoreLog.Info("ZipBinaryRewriter: copy-mode not supported, falling back");
+                CoreLog.Info("ZipBinaryRewriter: copy-mode not supported, aborting (caller must fall back to the serial path)");
             else
                 CoreLog.Error("ZipBinaryRewriter: error during rewrite", ex);
-            CleanupFile(tempDestPath);
             throw;
         }
         finally
         {
             source?.Dispose();
             output?.Dispose();
+            // 临时文件清理必须放在 Dispose 之后：输出流以 FileShare.Read 打开
+            // （不含 FileShare.Delete），句柄未释放时 Windows 会拒绝删除该文件，
+            // 而 CleanupFile 是 best-effort 吞异常的——结果就是半成品 .tmp 残留。
+            if (!committed)
+                CleanupFile(tempDestPath);
         }
+    }
+
+    /// <summary>
+    /// 多源 copy-mode 拼接：把多个 ZIP 的条目<b>原样复制</b>（LFH + 压缩字节 + CDFH）到单一输出。
+    /// <para>
+    /// 从不解压也从不重压，因此各源的压缩方法码无需统一。按 <paramref name="sourcePaths"/>
+    /// 顺序写出，条目顺序即源顺序。任一源解析失败即整体失败（不产出半成品：输出先写
+    /// <c>destPath + ".tmp"</c>，全部成功后原子替换）。
+    /// </para>
+    /// <para>
+    /// 供 N 组并行 ZIP 压缩使用——各组各自产出一个 ZIP，再由此处字节级拼成最终包。
+    /// 单源时直接委托 <see cref="RewriteAsync(string, string, HashSet{string}, List{NewEntry}, Encoding, string, IProgress{ArchiveProgress}, CancellationToken)"/>，
+    /// 避免 copy-mode 逻辑出现第二份实现。
+    /// </para>
+    /// </summary>
+    /// <param name="sourcePaths">待拼接的源 ZIP 路径，至少 1 个。</param>
+    /// <param name="destPath">拼接后的输出 ZIP 路径。</param>
+    /// <param name="keepEntryNames">
+    /// Set of entry names to keep. <c>null</c> means keep all existing entries.
+    /// </param>
+    /// <param name="addEntries">New entries to add, or <c>null</c> for none.</param>
+    /// <param name="encoding">Encoding for ZIP filenames (UTF-8 or GBK).</param>
+    /// <param name="comment">
+    /// Optional ZIP comment. If <c>null</c>, the first non-empty source comment is preserved.
+    /// </param>
+    /// <param name="progress">Optional progress reporter.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>A <see cref="RewriteResult"/> summarizing the operation.</returns>
+    /// <exception cref="ArgumentException"><paramref name="sourcePaths"/> is empty.</exception>
+    /// <exception cref="ZipCopyModeException">
+    /// Thrown when any source or entry doesn't support copy-mode rewriting.
+    /// Callers should fall back the serial path.
+    /// </exception>
+    public static async Task<RewriteResult> RewriteAsync(
+        IReadOnlyList<string> sourcePaths,
+        string destPath,
+        HashSet<string>? keepEntryNames,
+        List<NewEntry>? addEntries,
+        Encoding encoding,
+        string? comment = null,
+        IProgress<ArchiveProgress>? progress = null,
+        CancellationToken cancellationToken = default)
+    {
+        CoreLog.Entry();
+        CoreLog.Info($"ZipBinaryRewriter.RewriteAsync(multi): sources={sourcePaths.Count}, dest='{destPath}'");
+
+        if (sourcePaths is null || sourcePaths.Count == 0)
+            throw new ArgumentException("sourcePaths must not be empty", nameof(sourcePaths));
+
+        // 单源直接委托既有实现，避免重复实现 copy-mode 逻辑
+        if (sourcePaths.Count == 1)
+        {
+            return await RewriteAsync(sourcePaths[0], destPath, keepEntryNames,
+                addEntries, encoding, comment, progress, cancellationToken);
+        }
+
+        var parsed = new List<(Stream Stream, List<CdEntry> Entries)>();
+        Stream? output = null;
+        string tempDestPath = destPath + ".tmp";
+        // 只有成功原子替换后才置 true；finally 里据此决定是否清理临时文件。
+        bool committed = false;
+
+        var entriesToWrite = new List<(CdEntry Entry, long NewOffset, bool IsNew, byte[]? NewLfh)>();
+        int processedEntries = 0;
+        long bytesCopied = 0;
+        long bytesAdded = 0;
+        string? existingComment = null;
+        int totalEntries;
+
+        try
+        {
+            // 源流在 Phase 1 结束时统一释放：解析中途抛错时已入队的流也在此覆盖，
+            // 避免 N 组并行时同时持 N 个句柄跨越 Phase 2/3。
+            try
+            {
+                // ── Parse every source up front ─────────────────────
+                foreach (var src in sourcePaths)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var source = File.Open(src, FileMode.Open, FileAccess.Read,
+                        FileShare.Read | FileShare.Delete);
+
+                    // 解析失败时不能把流漏在列表外
+                    try
+                    {
+                        // ── SFX detection ────────────────────────────
+                        byte[] magic = new byte[2];
+                        source.ReadExactly(magic, 0, 2);
+                        source.Seek(0, SeekOrigin.Begin);
+                        if (magic[0] == 'M' && magic[1] == 'Z')
+                            throw new ZipCopyModeException("SFX ZIP not supported by copy-mode");
+
+                        var (cdOffset, srcEntryCount, srcComment) = ReadEocd(source);
+                        parsed.Add((source, ReadCentralDirectory(source, cdOffset, srcEntryCount)));
+                        existingComment ??= srcComment;
+                    }
+                    catch
+                    {
+                        source.Dispose();
+                        throw;
+                    }
+                }
+
+                CoreLog.Info($"ZipBinaryRewriter: {parsed.Count} sources parsed, " +
+                             $"{parsed.Sum(p => p.Entries.Count)} entries total");
+
+                // Determine which entries to keep
+                bool keepAll = keepEntryNames == null;
+                HashSet<string> keepSet = keepEntryNames ?? new HashSet<string>();
+
+                // 权重按「实际要写出的条目数」计算，与单源路径语义一致——
+                // 否则 keep 过滤掉大半条目时进度会提前触顶。
+                totalEntries = (keepAll
+                        ? parsed.Sum(p => p.Entries.Count)
+                        : parsed.Sum(p => p.Entries.Count(e => keepSet.Contains(e.FileName))))
+                                   + (addEntries?.Count ?? 0);
+                if (totalEntries == 0) totalEntries = 1; // avoid division by zero
+
+                // ── Open output (write to .tmp for atomic replace) ───────
+                output = File.Create(tempDestPath);
+
+                // ═══════════════════════════════════════════════════════════
+                // Phase 1: 按源顺序复制条目 (binary copy-mode)
+                // ═══════════════════════════════════════════════════════════
+                foreach (var (source, entries) in parsed)
+                {
+                    foreach (var entry in entries)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        // Skip entries not in the keep set (when keepAll == false)
+                        if (!keepAll && !keepSet.Contains(entry.FileName))
+                            continue;
+
+                        double basePct = (double)processedEntries / totalEntries * 100;
+                        double entryWeight = 90.0 / totalEntries;
+
+                        bytesCopied += await CopyEntryAsync(source, output, entry,
+                            entriesToWrite, basePct, entryWeight, progress, cancellationToken);
+                        processedEntries++;
+                    }
+                }
+            }
+            finally
+            {
+                foreach (var (s, _) in parsed) s.Dispose();
+            }
+
+            // ══════════════════════════════════════════════════════════
+            // Phase 2: Add new entries
+            // ══════════════════════════════════════════════════════════
+            if (addEntries != null)
+            {
+                foreach (var newEntry in addEntries)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    double basePct = (double)processedEntries / totalEntries * 100;
+                    double entryWeight = 90.0 / totalEntries;
+
+                    long entryOffset = output.Position;
+
+                    // Compress and write the new entry's LFH + data (streaming with progress)
+                    var (lfhBytes, compressedSize, crc32) =
+                        CompressNewEntry(output, newEntry, encoding,
+                            basePct, entryWeight, progress, cancellationToken);
+
+                    bytesAdded += lfhBytes.Length + compressedSize;
+
+                    // Build a synthetic CdEntry for the central directory
+                    var (dosDate, dosTime) = DateTimeToDos(newEntry.LastModified);
+                    byte[] fileNameBytes = encoding.GetBytes(newEntry.EntryName);
+
+                    var syntheticEntry = new CdEntry(
+                        FileName: newEntry.EntryName,
+                        Crc32: crc32,
+                        CompressedSize: compressedSize,
+                        UncompressedSize: newEntry.Size,
+                        CompressionMethod: (ushort)(newEntry.Store ? 0 : 8),
+                        Flags: 0,
+                        LastModifiedDate: dosDate,
+                        LastModifiedTime: dosTime,
+                        LocalHeaderOffset: 0, // unused; NewOffset in the tuple is used instead
+                        RawExtraField: [],
+                        RawFileExtra: [],
+                        LfhFilenameLength: fileNameBytes.Length,
+                        LfhExtraLength: 0
+                    );
+
+                    entriesToWrite.Add((syntheticEntry, entryOffset, true, lfhBytes));
+                    processedEntries++;
+
+                    CoreLog.Trace("ZipBinaryRewriter: added new entry '{0}' ({1} bytes compressed)",
+                        newEntry.EntryName, compressedSize);
+                }
+            }
+
+            // ══════════════════════════════════════════════════════════
+            // Phase 3: Write central directory
+            // ══════════════════════════════════════════════════════════
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = "正在写入中央目录...",
+                PercentComplete = 92,
+                FilePercentComplete = 100
+            });
+
+            long centralDirStart = output.Position;
+            WriteCentralDirectory(output, entriesToWrite, encoding, progress);
+
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = "正在写入目录结束标记...",
+                PercentComplete = 94,
+                FilePercentComplete = 100
+            });
+
+            // ══════════════════════════════════════════════════════════
+            // Phase 4: Write EOCD
+            // ══════════════════════════════════════════════════════════
+            // 注释规则：显式传入优先；否则沿用第一个非空源的注释；都没有则空串。
+            string effectiveComment = comment ?? existingComment ?? string.Empty;
+            WriteEocd(output, centralDirStart, entriesToWrite.Count, effectiveComment);
+
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = "正在保存到磁盘...",
+                PercentComplete = 97,
+                FilePercentComplete = 100
+            });
+
+            // ── Finalize (close then atomically replace) ─────────────
+            output.Dispose();
+            output = null;
+
+            if (File.Exists(destPath))
+                File.Delete(destPath);
+            File.Move(tempDestPath, destPath);
+
+            progress?.Report(new ArchiveProgress
+            {
+                CurrentFile = string.Empty,
+                PercentComplete = 100,
+                FilePercentComplete = 100
+            });
+
+            int copyCount = entriesToWrite.Count(e => !e.IsNew);
+            int addCount = entriesToWrite.Count - copyCount;
+
+            CoreLog.Info(
+                $"ZipBinaryRewriter: multi-source rewrite complete — {copyCount} entries copied ({bytesCopied} bytes), " +
+                $"{addCount} entries added ({bytesAdded} bytes)");
+            CoreLog.Exit();
+
+            committed = true;
+            return new RewriteResult(copyCount, bytesCopied, addCount, bytesAdded);
+        }
+        catch (OperationCanceledException)
+        {
+            CoreLog.Info("ZipBinaryRewriter: cancelled");
+            throw;
+        }
+        catch (Exception ex)
+        {
+            if (ex is ZipCopyModeException)
+                CoreLog.Info("ZipBinaryRewriter: copy-mode not supported, aborting (caller must fall back to the serial path)");
+            else
+                CoreLog.Error("ZipBinaryRewriter: error during multi-source rewrite", ex);
+            throw;
+        }
+        finally
+        {
+            output?.Dispose();
+            // 同单源路径：Dispose 之后再清理，否则句柄未释放时 Windows 拒绝删除，
+            // best-effort 的 CleanupFile 会静默留下半成品 .tmp。
+            if (!committed)
+                CleanupFile(tempDestPath);
+        }
+    }
+
+    // ────────────────────── Entry Copy ───────────────────
+
+    /// <summary>
+    /// Copy a single entry (LFH + already-compressed data) to the output stream and
+    /// append its CDFH record to <paramref name="entriesToWrite"/>.
+    /// <para>
+    /// Shared by the single-source and multi-source paths so that copy-mode validation
+    /// (Store/Deflate/Deflate64, unencrypted, non-ZIP64) and the LFH rewrite exist in
+    /// exactly one place — otherwise they would drift between the two paths.
+    /// </para>
+    /// </summary>
+    /// <param name="source">Source archive stream, positioned anywhere (seeks as needed).</param>
+    /// <param name="output">Destination archive stream.</param>
+    /// <param name="entry">Central directory entry to copy.</param>
+    /// <param name="entriesToWrite">Collector that receives the CDFH record and its new offset.</param>
+    /// <param name="basePct">Overall progress percentage before this entry starts.</param>
+    /// <param name="entryWeight">Overall progress percentage weight of this entry.</param>
+    /// <param name="progress">Optional progress reporter.</param>
+    /// <param name="cancellationToken">Cancellation token.</param>
+    /// <returns>Bytes written for this entry (LFH header + compressed data).</returns>
+    /// <exception cref="ZipCopyModeException">
+    /// Thrown when the entry uses an unsupported compression method, is encrypted,
+    /// or requires ZIP64.
+    /// </exception>
+    private static async Task<long> CopyEntryAsync(
+        Stream source,
+        Stream output,
+        CdEntry entry,
+        List<(CdEntry Entry, long NewOffset, bool IsNew, byte[]? NewLfh)> entriesToWrite,
+        double basePct,
+        double entryWeight,
+        IProgress<ArchiveProgress>? progress,
+        CancellationToken cancellationToken)
+    {
+        // ── Copy-mode validation ─────────────────────────────
+        if (entry.CompressionMethod != 0 && entry.CompressionMethod != 8 && entry.CompressionMethod != 9)
+        {
+            CoreLog.Info($"Entry '{entry.FileName}': unsupported compression method {entry.CompressionMethod}");
+            throw new ZipCopyModeException(
+                $"Entry '{entry.FileName}' uses unsupported compression method ({entry.CompressionMethod}). " +
+                "Only Store (0), Deflate (8) and Deflate64 (9) are supported by copy-mode.");
+        }
+
+        if ((entry.Flags & 0x0001) != 0) // bit 0 = encrypted
+        {
+            CoreLog.Info($"Entry '{entry.FileName}': encrypted, not supported by copy-mode");
+            throw new ZipCopyModeException(
+                $"Entry '{entry.FileName}' is encrypted. Encrypted entries are not supported by copy-mode.");
+        }
+
+        if (entry.CompressedSize >= 0xFFFFFFFF)
+        {
+            CoreLog.Info($"Entry '{entry.FileName}': ZIP64 compressed size, not supported by copy-mode");
+            throw new ZipCopyModeException(
+                $"Entry '{entry.FileName}' uses ZIP64 compressed size. ZIP64 is not supported by copy-mode.");
+        }
+
+        if (entry.LocalHeaderOffset >= 0xFFFFFFFF)
+        {
+            CoreLog.Info($"Entry '{entry.FileName}': ZIP64 local header offset, not supported by copy-mode");
+            throw new ZipCopyModeException(
+                $"Entry '{entry.FileName}' uses ZIP64 local header offset. ZIP64 is not supported by copy-mode.");
+        }
+
+        // ── Read and optionally rewrite LFH ──────────────────
+        LfhInfo lfhInfo = ReadAndMaybeRewriteLfh(
+            source, entry.LocalHeaderOffset, entry, out byte[] lfhHeader);
+
+        long entryOffset = output.Position;
+
+        // Write LFH header to output
+        output.Write(lfhHeader, 0, lfhHeader.Length);
+
+        // Stream-copy compressed data with per-chunk progress
+        await CopyStreamRangeAsync(
+            source, output, entry.CompressedSize,
+            entry.FileName, basePct, entryWeight,
+            progress, cancellationToken);
+
+        // If bit 3 was cleared in the LFH rewrite, propagate the flag change
+        // to the CDFH so it matches the LFH (no data descriptor present).
+        var entryForCd = lfhInfo.Flags != entry.Flags
+            ? entry with { Flags = lfhInfo.Flags }
+            : entry;
+        entriesToWrite.Add((entryForCd, entryOffset, false, lfhHeader));
+
+        CoreLog.Trace("ZipBinaryRewriter: copied entry '{0}' ({1} bytes)",
+            entry.FileName, entry.CompressedSize);
+
+        return lfhHeader.Length + entry.CompressedSize;
     }
 
     // ────────────────────── LFH Parsing ───────────────────
@@ -670,7 +1003,11 @@ internal static partial class ZipBinaryRewriter
         bool needsUtf8Flag = encoding is UTF8Encoding && entry.EntryName.Any(c => c > 127);
         ushort generalFlags = needsUtf8Flag ? (ushort)0x0800 : (ushort)0;
 
-        using (var deflate = new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true))
+        Stream? deflateStream = entry.Store
+            ? null
+            : new DeflateStream(ms, CompressionLevel.Optimal, leaveOpen: true);
+        Stream sink = deflateStream ?? ms;
+        try
         {
             byte[] buffer = new byte[CopyBufferSize];
             long totalRead = 0;
@@ -687,7 +1024,7 @@ internal static partial class ZipBinaryRewriter
                 for (int i = 0; i < read; i++)
                     crc = Crc32LookupTable[(int)((crc ^ buffer[i]) & 0xFF)] ^ (crc >> 8);
 
-                deflate.Write(buffer, 0, read);
+                sink.Write(buffer, 0, read);
                 totalRead += read;
 
                 var now = DateTime.Now;
@@ -703,7 +1040,11 @@ internal static partial class ZipBinaryRewriter
                     lastReportTime = now;
                 }
             }
-        } // DeflateStream flushed here; ms contains the compressed data
+        }
+        finally
+        {
+            deflateStream?.Dispose(); // flush → ms 内为压缩数据；Store 路径无需 flush
+        }
 
         uint crc32 = crc ^ 0xFFFFFFFF;
         byte[] compressed = ms.ToArray();
@@ -721,10 +1062,10 @@ internal static partial class ZipBinaryRewriter
         BitConverter.GetBytes((uint)0x04034b50).CopyTo(lfh, 0);
         // Version needed (2.0)
         BitConverter.GetBytes((ushort)20).CopyTo(lfh, 4);
-        // Flags（bit 11 = UTF-8 文件名标志，见上方 needsUtf8Flag 推导）
+        // Flags（bit 11 = UTF-8 文件名标志，见上方 needsUtf8Flag 推导；无加密、无 data descriptor）
         BitConverter.GetBytes(generalFlags).CopyTo(lfh, 6);
-        // Compression method (8 = Deflate)
-        BitConverter.GetBytes((ushort)8).CopyTo(lfh, 8);
+        // Compression method (0 = Store, 8 = Deflate)
+        BitConverter.GetBytes((ushort)(entry.Store ? 0 : 8)).CopyTo(lfh, 8);
         // Last modified time
         BitConverter.GetBytes(dosTime).CopyTo(lfh, 10);
         // Last modified date

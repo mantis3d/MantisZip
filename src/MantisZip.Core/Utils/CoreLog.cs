@@ -32,6 +32,19 @@ internal static class CoreLog
     /// </summary>
     internal static bool DiagnosticsEnabled { get; set; } = true;
 
+    /// <summary>
+    /// 初始化 CoreLog 的诊断开关与脱敏委托。
+    /// UI 层在启动时和设置变更时调用，统一注入点，避免分散设置导致遗漏。
+    /// </summary>
+    /// <param name="diagnosticsEnabled">是否启用调试日志（对应 AppSettings.EnableDebugLogging）。</param>
+    /// <param name="privacyMode">脱敏模式字符串（"off"/"filename"/"extension"/"full"）。</param>
+    /// <param name="redactFunc">脱敏函数（可选，为 null 时使用内置 LogRedactor）。</param>
+    internal static void Initialize(bool diagnosticsEnabled, string privacyMode, Func<string, string>? redactFunc = null)
+    {
+        DiagnosticsEnabled = diagnosticsEnabled;
+        RedactOverride = redactFunc ?? (msg => Utils.LogRedactor.RedactPaths(msg, Utils.LogRedactor.ParseMode(privacyMode)));
+    }
+
     /// <summary>Log a message (DEBUG only).</summary>
     [Conditional("DEBUG")]
     public static void Info(string msg,

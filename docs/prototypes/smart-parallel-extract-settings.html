@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智能并行解压设置 — 交互原型</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',Roboto,sans-serif;
+    background:#15152a; color:#eaeaea; padding:28px 20px 60px; min-height:100vh; font-size:14px;
+}
+h1 { text-align:center; color:#6bd46b; font-size:22px; margin-bottom:6px; }
+.subtitle { text-align:center; color:#888; font-size:13px; margin-bottom:22px; line-height:1.7; }
+.wrap { max-width:1180px; margin:0 auto; }
+code { background:#15152a; padding:1px 5px; border-radius:3px; font-family:Consolas,monospace; font-size:11.5px; color:#c792ea; }
+.note { font-size:11.5px; color:#777; margin-top:8px; line-height:1.6; }
+a { color:#6bd46b; }
+
+/* ═══════ 控制条（模拟运行环境） ═══════ */
+.console {
+    background:#22223c; border:1px solid #3d3d5c; border-radius:8px;
+    padding:14px 16px; margin-bottom:18px;
+}
+.console-row { display:flex; flex-wrap:wrap; gap:18px; align-items:flex-start; }
+.console-group { display:flex; flex-direction:column; gap:6px; }
+.console-label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:#777; }
+.seg { display:flex; background:#15152a; border:1px solid #3d3d5c; border-radius:6px; overflow:hidden; }
+.seg button {
+    padding:5px 11px; border:none; background:transparent; color:#999;
+    cursor:pointer; font-size:12px; transition:all .15s; white-space:nowrap;
+}
+.seg button:hover:not(.active) { background:#33335a; color:#eaeaea; }
+.seg button.active { background:#6bd46b; color:#15152a; font-weight:600; }
+
+/* ═══════ 设置窗口 mockup ═══════ */
+.win {
+    background:#2d2d44; border:1px solid #3d3d5c; border-radius:9px;
+    box-shadow:0 10px 44px rgba(0,0,0,.5); overflow:hidden;
+}
+.win-titlebar {
+    background:#3d3d5c; padding:9px 14px; display:flex; justify-content:space-between;
+    align-items:center; font-size:13px; font-weight:600;
+}
+.win-titlebar .tb-right { display:flex; gap:14px; color:#888; font-weight:400; font-size:11px; }
+.win-body { display:grid; grid-template-columns:170px 5px 1fr; min-height:560px; }
+
+/* 左侧 tab 列表（模拟 TabControl 左边竖排，仅展示相关 tab） */
+.tablist { background:#22223c; padding:8px 6px; display:flex; flex-direction:column; gap:2px; }
+.tab {
+    padding:7px 10px; border-radius:5px; font-size:12.5px; color:#999; cursor:pointer;
+    display:flex; align-items:center; gap:7px; transition:all .15s;
+}
+.tab:hover { background:#33335a; color:#eaeaea; }
+.tab.active { background:#3d5a7a; color:#eaeaea; font-weight:600; }
+.tab .ti { width:15px; text-align:center; }
+.tablist-sep { height:1px; background:#3d3d5c; margin:6px 4px; }
+.tab.minor { font-size:11.5px; opacity:.65; }
+
+.vsplit { background:#3d3d5c; }
+
+/* Tab 内容 */
+.tabpane { padding:14px; overflow-y:auto; max-height:640px; }
+.tabpane::-webkit-scrollbar { width:8px; }
+.tabpane::-webkit-scrollbar-thumb { background:#3d3d5c; border-radius:4px; }
+.stack { display:flex; flex-direction:column; gap:10px; }
+
+/* 设置卡片（对应 Avalonia Border 卡片） */
+.card-box {
+    background:#22223c; border:1px solid #3d3d5c; border-radius:6px; padding:12px;
+}
+.card-box > .card-title { font-weight:600; font-size:13px; margin-bottom:8px; color:#eaeaea; }
+.card-inner { display:flex; flex-direction:column; gap:8px; }
+
+/* 静态示意控件 */
+.mock-select {
+    background:#15152a; border:1px solid #3d3d5c; border-radius:5px;
+    padding:6px 9px; font-size:12.5px; color:#eaeaea; width:240px;
+    display:flex; justify-content:space-between; align-items:center;
+}
+.mock-select::after { content:'▾'; color:#777; font-size:10px; }
+.mock-chk { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#ccc; cursor:default; }
+.mock-chk .box {
+    width:14px; height:14px; border:1px solid #6bd46b; border-radius:3px; background:#6bd46b;
+    display:inline-flex; align-items:center; justify-content:center; color:#15152a; font-size:10px; font-weight:700;
+}
+.mock-chk.off .box { background:transparent; border-color:#5a5a72; }
+.mock-chk.off { color:#777; }
+.dim { opacity:.45; }
+
+/* ═══════ ★ 新增「并行解压」卡片 ═══════ */
+.card-box.new { border-color:#2d6b3d; box-shadow:0 0 0 1px #2d6b3d33; position:relative; }
+.card-box.new::after {
+    content:'★ 新增'; position:absolute; top:-9px; right:10px; font-size:9.5px;
+    background:#1e3324; color:#8fdc9f; border:1px solid #2d6b3d; padding:1px 7px;
+    border-radius:3px; font-weight:700; letter-spacing:.4px;
+}
+.row-line { display:flex; align-items:flex-start; gap:7px; }
+.row-line .help-btn {
+    flex-shrink:0; width:17px; height:17px; border-radius:50%; border:1px solid #5a5a72;
+    background:transparent; color:#999; font-size:10.5px; cursor:pointer; line-height:1;
+    display:inline-flex; align-items:center; justify-content:center; transition:all .15s;
+    font-weight:700; margin-top:1px;
+}
+.row-line .help-btn:hover { border-color:#6bd46b; color:#6bd46b; }
+.row-desc { font-size:11.5px; color:#888; line-height:1.55; padding-left:21px; margin-top:-3px; }
+
+/* 手动线程数行（仅智能关闭时显示 —— 规则 6：隐藏而非禁用） */
+.manual-row {
+    display:flex; align-items:center; gap:8px; padding-left:21px;
+    animation:fadein .18s ease;
+}
+.manual-row .lbl { font-size:12.5px; color:#eaeaea; }
+.manual-row .hint { font-size:11px; color:#888; }
+@keyframes fadein { from { opacity:0; transform:translateY(-3px); } to { opacity:1; transform:none; } }
+
+/* NumericUpDown mockup */
+.num-input {
+    display:flex; align-items:center; border:1px solid #3d3d5c; border-radius:5px;
+    background:#15152a; overflow:hidden; height:28px;
+}
+.num-input .val { padding:0 10px; font-size:12.5px; color:#eaeaea; min-width:44px; text-align:center; font-family:Consolas,monospace; }
+.num-input .stepper { display:flex; flex-direction:column; border-left:1px solid #3d3d5c; height:100%; }
+.num-input .stepper button {
+    border:none; background:#3d3d5c; color:#ccc; cursor:pointer; font-size:8px;
+    padding:0 7px; height:50%; transition:background .12s;
+}
+.num-input .stepper button:hover { background:#4a4a6a; }
+
+/* ═══════ 决策结果条 ═══════ */
+.decision {
+    margin-top:12px; background:#15152a; border:1px solid #3d3d5c; border-radius:8px;
+    padding:13px 15px;
+}
+.decision h3 { font-size:11px; color:#777; text-transform:uppercase; letter-spacing:.6px; margin-bottom:9px; }
+.dec-result { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.dec-deg {
+    font-family:Consolas,monospace; font-size:26px; font-weight:700; color:#6bd46b;
+    line-height:1;
+}
+.dec-deg small { font-size:12px; color:#888; font-weight:400; }
+.dec-path {
+    display:flex; align-items:center; gap:6px; font-size:11.5px; flex-wrap:wrap;
+    margin-top:9px; color:#777; font-family:Consolas,monospace;
+}
+.dec-step {
+    padding:2.5px 8px; border-radius:4px; background:#22223c; border:1px solid #2d2d44;
+    color:#666; transition:all .2s;
+}
+.dec-step.on { background:#1e3324; border-color:#2d6b3d; color:#8fdc9f; }
+.dec-step.skip { text-decoration:line-through; opacity:.5; }
+.dec-arrow { color:#3d3d5c; }
+
+/* 预测试模拟进度 */
+.pretest-box {
+    margin-top:10px; background:#22223c; border:1px solid #3d3d5c; border-radius:6px;
+    padding:10px 12px; font-family:Consolas,monospace; font-size:11.5px; line-height:1.9;
+    color:#888;
+}
+.pretest-box .running { color:#e0a340; }
+.pretest-box .done { color:#6bd46b; font-weight:700; }
+.pretest-box .pt-line b { color:#eaeaea; }
+
+/* ═══════ 帮助弹窗 ═══════ */
+.overlay {
+    position:fixed; inset:0; background:rgba(0,0,0,.55); z-index:100;
+    display:none; align-items:center; justify-content:center; padding:20px;
+}
+.overlay.show { display:flex; }
+.help-dlg {
+    background:#2d2d44; border:1px solid #3d3d5c; border-radius:9px; width:520px;
+    max-width:94vw; box-shadow:0 18px 60px rgba(0,0,0,.6); overflow:hidden;
+    animation:dlgin .18s ease;
+}
+@keyframes dlgin { from { opacity:0; transform:scale(.97); } to { opacity:1; transform:none; } }
+.help-dlg .hd {
+    background:#3d3d5c; padding:10px 14px; font-size:13px; font-weight:600;
+    display:flex; justify-content:space-between; align-items:center;
+}
+.help-dlg .hd button { background:none; border:none; color:#999; cursor:pointer; font-size:15px; }
+.help-dlg .hd button:hover { color:#eaeaea; }
+.help-dlg .bd { padding:16px 18px; font-size:12.5px; line-height:1.75; color:#ccc; }
+.help-dlg .bd h4 { font-size:12.5px; color:#6bd46b; margin:14px 0 5px; }
+.help-dlg .bd h4:first-child { margin-top:0; }
+.help-dlg .bd ul { margin:4px 0 4px 18px; }
+.help-dlg .bd li { margin-bottom:2px; }
+.help-dlg .bd .sep { height:1px; background:#3d3d5c; margin:13px 0; }
+.help-dlg .bd .flow {
+    background:#15152a; border:1px solid #3d3d5c; border-radius:5px; padding:8px 11px;
+    font-family:Consolas,monospace; font-size:11px; line-height:1.8; color:#9a9ab0;
+    margin:6px 0;
+}
+.help-dlg .ft { padding:10px 14px; border-top:1px solid #2d2d44; display:flex; justify-content:flex-end; }
+
+.btn {
+    min-width:76px; min-height:30px; padding:0 14px; border-radius:5px; cursor:pointer;
+    font-size:12.5px; border:1px solid #3d3d5c; background:#3d3d5c; color:#eaeaea; transition:all .15s;
+}
+.btn:hover { background:#4a4a6a; }
+.btn.primary { background:#6bd46b; color:#15152a; border-color:#6bd46b; font-weight:600; }
+.btn.primary:hover { background:#7ee07e; }
+
+/* ═══════ 说明卡片 ═══════ */
+.card { background:#22223c; border:1px solid #3d3d5c; border-radius:8px; padding:13px 15px; margin-top:14px; }
+.card h3 { font-size:12px; color:#6bd46b; margin-bottom:9px; text-transform:uppercase; letter-spacing:.6px; }
+.card h3.warn { color:#ffb45c; }
+pre.code {
+    background:#15152a; border:1px solid #3d3d5c; border-radius:6px; padding:11px;
+    font-family:Consolas,'Courier New',monospace; font-size:11.5px; line-height:1.75;
+    color:#c8c8d8; overflow-x:auto; white-space:pre; margin:0;
+}
+pre.code .k { color:#c792ea; } pre.code .s { color:#a5e075; }
+pre.code .n { color:#f7a072; } pre.code .c { color:#5f6b8a; }
+pre.code .hl { color:#6bd46b; font-weight:700; }
+
+table.cp { width:100%; border-collapse:collapse; font-size:11.5px; }
+table.cp th, table.cp td { padding:6px 8px; text-align:left; border-bottom:1px solid #2d2d44; }
+table.cp th { color:#777; font-size:10px; text-transform:uppercase; letter-spacing:.5px; font-weight:600; }
+table.cp td { color:#bbb; }
+table.cp td.mono { font-family:Consolas,monospace; color:#9a9ab0; }
+.badge { display:inline-block; font-size:10px; padding:1px 7px; border-radius:3px; font-weight:700; }
+.badge.add { background:#1e3324; color:#8fdc9f; }
+.badge.mod { background:#2d4a6b; color:#9dd0ff; }
+
+.grid2 { display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:900px) { .grid2 { grid-template-columns:1fr; } .win-body { grid-template-columns:1fr; } .tablist { flex-direction:row; flex-wrap:wrap; } .vsplit { display:none; } }
+</style>
+</head>
+<body>
+
+<h1>智能并行解压设置 — 交互原型</h1>
+<div class="subtitle">
+    Spec：<code>docs/superpowers/specs/2026-10-04-smart-parallel-extract-design.md</code> ·
+    位置：<code>SettingsWindow</code> 解压设置 Tab · 新增第 5 张卡片「并行解压」<br>
+    <span style="color:#6bd46b">★ 下方 mockup 可交互：切换磁盘类型 / 压缩包大小，观察决策链与线程数变化；点 [?] 看帮助弹窗</span>
+</div>
+
+<div class="wrap">
+
+<!-- ══════════════ 控制条：模拟运行环境 ══════════════ -->
+<div class="console">
+    <div class="console-row">
+        <div class="console-group">
+            <span class="console-label">目标磁盘类型（DiskTypeDetector）</span>
+            <div class="seg" id="segDisk">
+                <button data-v="ssd" class="active">SSD（C:）</button>
+                <button data-v="hdd">HDD（E:）</button>
+                <button data-v="unknown">未知</button>
+            </div>
+        </div>
+        <div class="console-group">
+            <span class="console-label">压缩包大小</span>
+            <div class="seg" id="segSize">
+                <button data-v="small" class="active">500 MB（小包）</button>
+                <button data-v="large">2.4 GB（大包）</button>
+            </div>
+        </div>
+        <div class="console-group">
+            <span class="console-label">CPU 逻辑核数</span>
+            <div class="seg" id="segCpu">
+                <button data-v="8">8 核</button>
+                <button data-v="16" class="active">16 核</button>
+            </div>
+        </div>
+        <div class="console-group">
+            <span class="console-label">快捷场景</span>
+            <div class="seg">
+                <button class="active" style="pointer-events:none;background:#3d3d5c;color:#8fdc9f">与下方 mockup 联动</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════ 设置窗口 mockup ══════════════ -->
+<div class="win">
+    <div class="win-titlebar">
+        <span>设置</span>
+        <span class="tb-right"><span>850 × 640</span><span>TabControl · 解压设置</span></span>
+    </div>
+    <div class="win-body">
+
+        <!-- 左侧 tab 列表 -->
+        <div class="tablist">
+            <div class="tab"><span class="ti">🗜</span>常规</div>
+            <div class="tab"><span class="ti">🗜</span>压缩</div>
+            <div class="tab active"><span class="ti">📂</span>解压</div>
+            <div class="tab minor"><span class="ti">🎨</span>外观</div>
+            <div class="tab minor"><span class="ti">👁</span>预览</div>
+            <div class="tab minor"><span class="ti">🔑</span>密码管理</div>
+            <div class="tab minor"><span class="ti">🌐</span>语言</div>
+            <div class="tab minor"><span class="ti">📋</span>右键菜单</div>
+            <div class="tab minor"><span class="ti">🔗</span>文件关联</div>
+            <div class="tab minor"><span class="ti">🐞</span>调试</div>
+            <div class="tab minor"><span class="ti">⚙️</span>高级</div>
+        </div>
+
+        <div class="vsplit"></div>
+
+        <!-- 解压 Tab 内容 -->
+        <div class="tabpane">
+            <div class="stack">
+
+                <!-- 卡片 1：默认目标路径（现状，静态示意） -->
+                <div class="card-box">
+                    <div class="card-title">解压默认目标路径</div>
+                    <div class="mock-select">每次询问</div>
+                </div>
+
+                <!-- 卡片 2：冲突处理（现状，静态示意） -->
+                <div class="card-box">
+                    <div class="card-title">文件存在时</div>
+                    <div class="mock-select">询问</div>
+                </div>
+
+                <!-- 卡片 3：解压选项（现状，静态示意） -->
+                <div class="card-box">
+                    <div class="card-title">解压选项</div>
+                    <div class="card-inner">
+                        <div class="mock-chk"><span class="box">✓</span>解压后打开文件夹</div>
+                        <div class="mock-chk"><span class="box">✓</span>启用拖拽解压</div>
+                        <div class="mock-chk"><span class="box">✓</span>解压时保留完整路径</div>
+                        <div class="mock-chk off"><span class="box"></span>解压后删除压缩包</div>
+                    </div>
+                </div>
+
+                <!-- 卡片 4：双击行为（现状，静态示意） -->
+                <div class="card-box">
+                    <div class="card-title">双击压缩包行为</div>
+                    <div class="mock-select">打开解压对话框</div>
+                </div>
+
+                <!-- ═══════ ★ 卡片 5：并行解压（新增） ═══════ -->
+                <div class="card-box new">
+                    <div class="card-title">并行解压</div>
+                    <div class="card-inner">
+
+                        <!-- 全局开关：关闭 = 始终串行，下方全部隐藏 -->
+                        <div class="row-line">
+                            <label class="mock-chk" id="chkEnable" style="cursor:pointer">
+                                <span class="box">✓</span>
+                            </label>
+                            <span style="font-size:12.5px">启用并行解压（关闭则始终串行解压）</span>
+                            <button class="help-btn" data-help="enable" title="说明">?</button>
+                        </div>
+
+                        <!-- 子设置容器：全局关闭时整体隐藏（规则 6） -->
+                        <div id="parallelChildren" style="display:flex;flex-direction:column;gap:8px;padding-left:8px;border-left:2px solid #3d3d5c;margin-left:6px">
+
+                            <!-- 智能并行度开关 -->
+                            <div>
+                                <div class="row-line">
+                                    <label class="mock-chk" id="chkSmart" style="cursor:pointer">
+                                        <span class="box">✓</span>
+                                    </label>
+                                    <span style="font-size:12.5px" id="smartLabel">智能并行度（根据磁盘类型选择线程数）</span>
+                                    <button class="help-btn" data-help="smart" title="说明">?</button>
+                                </div>
+
+                                <!-- 智能开启：SSD / HDD 两个线程数 -->
+                                <div class="manual-row" id="smartDegRow">
+                                    <span class="lbl">SSD 线程数</span>
+                                    <div class="num-input">
+                                        <div class="val" id="ssdVal">12</div>
+                                        <div class="stepper">
+                                            <button id="ssdUp">▲</button><button id="ssdDown">▼</button>
+                                        </div>
+                                    </div>
+                                    <span class="lbl" style="margin-left:10px">HDD 线程数</span>
+                                    <div class="num-input">
+                                        <div class="val" id="hddVal">8</div>
+                                        <div class="stepper">
+                                            <button id="hddUp">▲</button><button id="hddDown">▼</button>
+                                        </div>
+                                    </div>
+                                    <span class="hint">(1-16；未知磁盘取 CPU核数与 12 较小值)</span>
+                                </div>
+
+                                <!-- 智能关闭：单个手动线程数 -->
+                                <div class="manual-row" id="manualRow" style="display:none">
+                                    <span class="lbl">线程数</span>
+                                    <div class="num-input">
+                                        <div class="val" id="numVal">8</div>
+                                        <div class="stepper">
+                                            <button id="numUp">▲</button><button id="numDown">▼</button>
+                                        </div>
+                                    </div>
+                                    <span class="hint">(1=串行，1-16)</span>
+                                </div>
+                            </div>
+
+                            <!-- 大包预测试开关（仅智能开启时显示——预测试只在智能链路第4步参与） -->
+                            <div id="pretestRow">
+                                <div class="row-line">
+                                    <label class="mock-chk" id="chkPretest" style="cursor:pointer">
+                                        <span class="box">✓</span>
+                                    </label>
+                                    <span style="font-size:12.5px">大包预测试（≥1GB 时自动测试最优线程数）</span>
+                                    <button class="help-btn" data-help="pretest" title="说明">?</button>
+                                </div>
+                                <div class="row-desc">约 1-2 秒：在目标目录临时解压约 50MB 数据对比 4 种线程数，测完删除，用最优配置正式解压</div>
+                            </div>
+
+                        </div><!-- /parallelChildren -->
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- ═══════ 决策结果条（原型辅助说明，非 UI 实件） ═══════ -->
+            <div class="decision">
+                <h3>原型辅助 · 当前配置下的线程数决策（实时）</h3>
+                <div class="dec-result">
+                    <span class="dec-deg" id="decDeg">12 <small>线程</small></span>
+                    <span id="decReason" style="font-size:12.5px;color:#8fdc9f">SSD 智能默认值</span>
+                </div>
+                <div class="dec-path">
+                    <span class="dec-step" id="s1">调用方指定?</span><span class="dec-arrow">→</span>
+                    <span class="dec-step" id="s2">全局并行开?</span><span class="dec-arrow">→</span>
+                    <span class="dec-step" id="s3">智能开启?</span><span class="dec-arrow">→</span>
+                    <span class="dec-step" id="s4">大包且预测试开?</span><span class="dec-arrow">→</span>
+                    <span class="dec-step" id="s5">磁盘类型默认</span>
+                </div>
+                <div class="pretest-box" id="pretestBox" style="display:none"></div>
+            </div>
+
+        </div>
+    </div>
+</div>
+
+<!-- ══════════════ 说明区 ══════════════ -->
+
+<div class="grid2" style="margin-top:14px">
+    <div class="card" style="margin-top:0">
+        <h3>决策逻辑（Spec §2）</h3>
+        <pre class="code"><span class="c">// 优先级从高到低</span>
+1. options.ParallelExtractDegree &gt; 0
+   → 调用方指定（测试/特殊场景）
+2. EnableParallelExtract = <span class="k">false</span>
+   → <span class="hl">返回 1（串行）</span>
+3. SmartParallelDegree = <span class="k">false</span>
+   → 手动值 &gt; 0 ? 手动值 : <span class="n">ProcessorCount</span>
+4. Smart 开 且 ≥1GB 且 预测试开
+   → <span class="hl">ParallelDegreeOptimizer</span> 快速测试
+5. Smart 开（默认路径）
+   → <span class="hl">DiskTypeDetector</span>
+     SSD → <span class="s">SmartSsdDegree</span>(12)
+     HDD → <span class="s">SmartHddDegree</span>(8)
+     Unknown → min(CPU核数, <span class="s">12</span>)</pre>
+        <div class="note">上方 mockup 右下决策条即按此链实时推导；步骤灰=未命中，绿=命中。</div>
+    </div>
+
+    <div class="card" style="margin-top:0">
+        <h3>大包预测试流程（Spec §4）</h3>
+        <pre class="code"><span class="c">// 触发：size ≥ 1GB && LargeArchivePreTest</span>
+1. 取前 <span class="n">~50MB</span> 样本（≥5 条 ≤50 条）
+2. 按核数选 4 个配置，逐个：
+   <span class="n">16核</span> → [4, 8, 12, 16]
+   <span class="n">8核</span>  → [2, 4, 8, 8] 去重
+3. 解压到目标目录 <span class="hl">__parallel_test_{n}</span>
+   → 计时 → <span class="k">立即删除</span>
+4. 取最快 → 正式解压
+<span class="c">// 任一步失败/取消 → 回退磁盘类型默认值</span></pre>
+        <div class="note">点上方 mockup「大包」+ 保持预测试勾选，可看模拟过程。</div>
+    </div>
+</div>
+
+<!-- 文件变更 -->
+<div class="card">
+    <h3>文件变更清单</h3>
+    <table class="cp">
+        <thead><tr><th style="width:52%">文件</th><th style="width:10%">动作</th><th>说明</th></tr></thead>
+        <tbody>
+            <tr><td class="mono">Core/Utils/DiskTypeDetector.cs</td><td><span class="badge add">新增</span></td><td>SSD/HDD 检测（盘符级缓存）</td></tr>
+            <tr><td class="mono">Core/Services/ParallelDegreeOptimizer.cs</td><td><span class="badge add">新增</span></td><td>预测试选优 + 决策入口</td></tr>
+            <tr><td class="mono">Dialogs/ParallelExtractHelpDialog.axaml(.cs)</td><td><span class="badge add">新增</span></td><td>[?] 帮助弹窗（3 章节）</td></tr>
+            <tr><td class="mono">Models/AppSettings.cs</td><td><span class="badge mod">修改</span></td><td>+5 属性：EnableParallelExtract / SmartParallelDegree / SmartSsdDegree / SmartHddDegree / LargeArchivePreTest</td></tr>
+            <tr><td class="mono">Core/Engines/ZipEngine.cs</td><td><span class="badge mod">修改</span></td><td>ExtractAsync 走优化器取线程数</td></tr>
+            <tr><td class="mono">Views/SettingsWindow.axaml + ViewModel</td><td><span class="badge mod">修改</span></td><td>解压 Tab 新增卡片 5 + 帮助命令</td></tr>
+            <tr><td class="mono">Localization/strings.{zh-CN,zh-TW,en}.json</td><td><span class="badge mod">修改</span></td><td>10 个新 key × 3 语（规则 13）</td></tr>
+            <tr><td class="mono">tests/…/DiskTypeDetectorTests.cs</td><td><span class="badge add">新增</span></td><td>磁盘检测单测</td></tr>
+            <tr><td class="mono">tests/…/ParallelDegreeOptimizerTests.cs</td><td><span class="badge add">新增</span></td><td>决策链 + 样本选取单测</td></tr>
+        </tbody>
+    </table>
+</div>
+
+<!-- 与现状的关系 -->
+<div class="card">
+    <h3 class="warn">与现状的关系（两处「并行线程数」入口）</h3>
+    <div style="font-size:12.5px;line-height:1.8;color:#bbb">
+        <b>1. 设置窗口（本原型）</b> —— 全局默认：并行总开关 + 智能（SSD/HDD 双线程数）/ 手动单值。<br>
+        <b>2. 解压设置对话框</b>（<code>ExtractSettingsWindow.axaml:127-138</code>）—— 既有的
+        <code>NumericUpDown(1-16)</code> + 硬编码提示「(1=串行，默认=CPU核心数)」。该对话框值经
+        <code>ExtractSettingsViewModel</code> 直接写入 <code>ArchiveOptions</code>，属<b>单次解压覆盖</b>，
+        优先级最高（决策链第 1 步），不受全局开关与智能模式影响。<br>
+        <span style="color:#e0a340">⚠ 实施时需处理：解压对话框的提示文案在智能模式下会与新默认值矛盾
+        （显示「默认=CPU核心数」但实际默认已是 SSD=12）——计划中需同步改为动态提示或中性文案。</span>
+    </div>
+</div>
+
+<!-- 帮助弹窗内容（Spec §6 本地化 key） -->
+<div class="card">
+    <h3>帮助弹窗（ParallelExtractHelpDialog）— 点 mockup 中 [?] 查看</h3>
+    <div style="font-size:12.5px;line-height:1.8;color:#bbb">
+        三个 [?] 按钮打开<b>同一个</b>帮助弹窗，弹窗内三个章节分别对应（并行解压 / 智能并行度 / 大包预测试）；
+        弹窗为<b>独立 Window</b>（非内联 ToolTip），规避规则 14 中禁用控件 ToolTip 不弹的问题，
+        也与既有 <code>LogPrivacyHelpDialog</code> / 密码库帮助对话框风格一致。
+        文案 key：<code>ParallelHelp_Title</code> / <code>ParallelHelp_EnableSection</code> / <code>ParallelHelp_SmartSection</code> /
+        <code>ParallelHelp_PreTestSection</code>（三语成对）。
+    </div>
+</div>
+
+<div class="note" style="margin-top:20px;text-align:center">
+    原型还原设置卡片布局与决策逻辑（隐藏规则、预测试触发条件、帮助弹窗入口），
+    卡片 1-4 为现状静态示意，颜色为原型暗色 house style，非 Avalonia 真实主题值。
+</div>
+
+</div><!-- /wrap -->
+
+<!-- ══════════════ 帮助弹窗 ══════════════ -->
+<div class="overlay" id="overlay">
+    <div class="help-dlg">
+        <div class="hd">
+            <span>并行解压说明</span>
+            <button id="helpCloseX">✕</button>
+        </div>
+        <div class="bd" id="helpBody"></div>
+        <div class="ft">
+            <button class="btn primary" id="helpClose">知道了</button>
+        </div>
+    </div>
+</div>
+
+<script>
+'use strict';
+
+/* ══════════════════════════════════════════════════════════════
+   状态（对应真实字段）
+   ══════════════════════════════════════════════════════════════ */
+const state = {
+    disk: 'ssd',           // DiskTypeDetector 结果
+    size: 'large',         // 压缩包大小（控制台默认大包，便于展示预测试）
+    cpu: 16,               // Environment.ProcessorCount
+    enable: true,          // AppSettings.EnableParallelExtract（全局开关）
+    smart: true,           // AppSettings.SmartParallelDegree
+    ssd: 12,               // AppSettings.SmartSsdDegree
+    hdd: 8,                // AppSettings.SmartHddDegree
+    pretest: true,         // AppSettings.LargeArchivePreTest
+    manual: 8,             // AppSettings.ParallelExtractDegree（手动值）
+    ptRunning: false,
+};
+
+/* 控制台默认：大包已选，方便一眼看到预测试效果 */
+document.querySelectorAll('#segSize button').forEach(b => {
+    b.classList.toggle('active', b.dataset.v === 'large');
+});
+
+const $ = id => document.getElementById(id);
+
+/* ══════════════════════════════════════════════════════════════
+   决策逻辑（与 Spec §2 逐条对应）
+   path: [调用方指定, 全局并行开?, 智能开启?, 大包预测试, 磁盘默认]
+   ══════════════════════════════════════════════════════════════ */
+function diskDefault() {
+    if (state.disk === 'ssd') return state.ssd;
+    if (state.disk === 'hdd') return state.hdd;
+    return Math.min(state.cpu, 12);          // Unknown
+}
+function isLarge() { return state.size === 'large'; }
+
+/** 返回 { degree, reason, path:[steps命中情况] } */
+function decide() {
+    // 步1：调用方指定（本原型无调用方覆盖，恒未命中）
+    // 步2：全局开关关闭 → 串行
+    if (!state.enable) {
+        return { degree:1, reason:'并行解压已关闭 → 串行', path:[false,false,false,false,false] };
+    }
+    // 步3：智能关闭 → 手动值
+    if (!state.smart) {
+        return { degree:state.manual, reason:'手动设置（智能已关闭）', path:[false,true,true,false,false] };
+    }
+    // 步4：大包 + 预测试
+    if (isLarge() && state.pretest) {
+        return { degree:'PT', reason:'大包预测试：测完选最优', path:[false,true,true,true,false] };
+    }
+    // 步5：磁盘类型默认（SSD/HDD 用用户设置值）
+    const d = diskDefault();
+    const why = {
+        ssd:`SSD 智能值（用户设置 ${state.ssd}）`,
+        hdd:`HDD 智能值（用户设置 ${state.hdd}）`,
+        unknown:'未知磁盘 → min(CPU核数, 12)',
+    }[state.disk];
+    return { degree:d, reason:why, path:[false,true,true,false,true] };
+}
+
+/* ══════════════════════════════════════════════════════════════
+   预测试模拟（4 配置逐个计时，展示后给出结果）
+   ══════════════════════════════════════════════════════════════ */
+const PT_RESULTS = {
+    // 模拟数据：HDD 上 8 线程最佳（与 spec 默认一致），SSD 上 12 最佳
+    hdd: { configs:[4,8,12,16], times:['0.61s','0.48s','0.50s','0.52s'], best:8 },
+    ssd: { configs:[4,8,12,16], times:['0.19s','0.13s','0.11s','0.12s'], best:12 },
+    unknown: { configs:[4,8,12,16], times:['0.31s','0.24s','0.22s','0.23s'], best:12 },
+};
+
+let ptTimer = null;
+function runPretest() {
+    clearTimeout(ptTimer);
+    state.ptRunning = true;
+    const box = $('pretestBox');
+    const cfg = PT_RESULTS[state.disk];
+    box.style.display = 'block';
+    box.innerHTML = '<span class="running">⟳ 正在测试最优线程数...（目标目录 __parallel_test_{n}，测完即删）</span>';
+
+    let i = 0;
+    const step = () => {
+        if (i === 0) box.innerHTML = '';
+        if (i < cfg.configs.length) {
+            box.innerHTML += `<div class="pt-line">degree=${String(cfg.configs[i]).padStart(2)} → ${cfg.times[i]} <span style="color:#5f6b8a">（解压 50MB 样本 → 删除）</span></div>`;
+            i++;
+            ptTimer = setTimeout(step, 420);
+        } else {
+            box.innerHTML += `<div class="done">✓ 最优：degree=${cfg.best} → 正式解压采用此配置</div>`;
+            state.ptRunning = false;
+            renderDecision(true);
+        }
+    };
+    ptTimer = setTimeout(step, 420);
+}
+
+/* ══════════════════════════════════════════════════════════════
+   渲染
+   ══════════════════════════════════════════════════════════════ */
+function renderDecision(fromPretest) {
+    const r = decide();
+    const cfg = PT_RESULTS[state.disk];
+
+    // 结果数字与文案
+    if (r.degree === 'PT') {
+        $('decDeg').innerHTML = (state.ptRunning ? '…' : cfg.best) + ' <small>线程</small>';
+        $('decReason').textContent = state.ptRunning
+            ? '预测试进行中（结果见下方日志）'
+            : `预测试结果：degree=${cfg.best} 最快（${r.reason}）`;
+        $('decReason').style.color = state.ptRunning ? '#e0a340' : '#8fdc9f';
+    } else {
+        $('decDeg').innerHTML = r.degree + ' <small>线程</small>';
+        $('decReason').textContent = r.reason;
+        $('decReason').style.color = '#8fdc9f';
+    }
+
+    // 决策链高亮（5 步）
+    ['s1','s2','s3','s4','s5'].forEach((id, idx) => {
+        const el = $(id);
+        el.className = 'dec-step';
+        if (r.path[idx]) el.classList.add('on');
+        else if (idx === 0) el.classList.add('skip');   // 步1 本原型恒未命中
+    });
+
+    // 预测试框显隐 + 触发
+    const box = $('pretestBox');
+    if (r.degree === 'PT') {
+        box.style.display = 'block';
+        if (!state.ptRunning && box.dataset.ran !== '1') {
+            box.dataset.ran = '1';
+            runPretest();
+        }
+    } else {
+        clearTimeout(ptTimer);
+        state.ptRunning = false;
+        box.style.display = 'none';
+        box.dataset.ran = '';
+        box.innerHTML = '';
+    }
+
+    // 子设置区显隐（全局关 → 整体隐藏，规则 6）
+    $('parallelChildren').style.display = state.enable ? 'flex' : 'none';
+    // 智能开 → SSD/HDD 双输入；智能关 → 单手动输入
+    $('smartDegRow').style.display = state.smart ? 'flex' : 'none';
+    $('manualRow').style.display = state.smart ? 'none' : 'flex';
+    // 预测试仅智能链路（第4步）参与 → 智能关闭时隐藏（规则 6）
+    $('pretestRow').style.display = state.smart ? 'block' : 'none';
+    $('smartLabel').textContent = state.smart
+        ? '智能并行度（根据磁盘类型选择线程数）'
+        : '智能并行度（关闭 → 使用下方固定线程数）';
+    $('ssdVal').textContent = state.ssd;
+    $('hddVal').textContent = state.hdd;
+    $('numVal').textContent = state.manual;
+
+    // 复选框外观同步（✓/空 + off 类）
+    syncChk('chkEnable', state.enable);
+    syncChk('chkSmart', state.smart);
+    syncChk('chkPretest', state.pretest);
+}
+
+/** 同步 mock 复选框外观：勾选 = 绿底 ✓，取消 = 空心 */
+function syncChk(id, checked) {
+    const el = $(id);
+    el.classList.toggle('off', !checked);
+    el.querySelector('.box').textContent = checked ? '✓' : '';
+}
+
+/* ══════════════════════════════════════════════════════════════
+   事件绑定
+   ══════════════════════════════════════════════════════════════ */
+function segBind(id, fn) {
+    document.querySelectorAll('#' + id + ' button').forEach(b => {
+        b.addEventListener('click', () => {
+            document.querySelectorAll('#' + id + ' button').forEach(x => x.classList.remove('active'));
+            b.classList.add('active');
+            fn(b.dataset.v);
+        });
+    });
+}
+segBind('segDisk', v => { state.disk = v; $('pretestBox').dataset.ran = ''; renderDecision(); });
+segBind('segSize', v => { state.size = v; $('pretestBox').dataset.ran = ''; renderDecision(); });
+segBind('segCpu',  v => { state.cpu = +v; renderDecision(); });
+
+$('chkEnable').addEventListener('click', () => { state.enable = !state.enable; renderDecision(); });
+$('chkSmart').addEventListener('click', () => { state.smart = !state.smart; renderDecision(); });
+$('chkPretest').addEventListener('click', () => { state.pretest = !state.pretest; renderDecision(); });
+$('numUp').addEventListener('click', () => { state.manual = Math.min(16, state.manual + 1); renderDecision(); });
+$('numDown').addEventListener('click', () => { state.manual = Math.max(1, state.manual - 1); renderDecision(); });
+$('ssdUp').addEventListener('click', () => { state.ssd = Math.min(16, state.ssd + 1); renderDecision(); });
+$('ssdDown').addEventListener('click', () => { state.ssd = Math.max(1, state.ssd - 1); renderDecision(); });
+$('hddUp').addEventListener('click', () => { state.hdd = Math.min(16, state.hdd + 1); renderDecision(); });
+$('hddDown').addEventListener('click', () => { state.hdd = Math.max(1, state.hdd - 1); renderDecision(); });
+
+/* ══════════════════════════════════════════════════════════════
+   帮助弹窗（三入口同一弹窗，三个章节）
+   ══════════════════════════════════════════════════════════════ */
+const HELP_HTML = `
+    <h4>并行解压</h4>
+    <div>并行解压允许同时用多个线程解压不同文件。关闭后始终串行解压（最兼容，速度最慢）。</div>
+    <div class="sep"></div>
+    <h4>智能并行度</h4>
+    <div>根据目标磁盘类型选择线程数：</div>
+    <ul>
+        <li><b>SSD（固态硬盘）</b>：用「SSD 线程数」设置（默认 <b>12</b>）</li>
+        <li><b>HDD（机械硬盘）</b>：用「HDD 线程数」设置（默认 <b>8</b>）</li>
+        <li>未知磁盘：取 CPU 核数与 12 的较小值</li>
+    </ul>
+    <div>两个线程数均可在设置中调整（1-16）。关闭智能后可设一个固定线程数。</div>
+    <div class="flow">优先级：单次解压覆盖 &gt; 并行开关(关=串行) &gt; 智能默认 &gt; 手动设置 &gt; CPU 核数</div>
+    <div class="sep"></div>
+    <h4>大包预测试</h4>
+    <div><b>仅智能并行度开启时可用。</b>解压 ≥1GB 的压缩包时，先用 1-2 秒在目标目录测试不同线程数的速度，选择最优配置再正式解压。</div>
+    <div class="flow">1. 临时解压约 50MB 样本（写入目标目录）
+2. 对比 4 种线程数的耗时
+3. 删除测试文件 → 用最优线程数正式解压</div>
+    <div>测试文件用完即删，不会残留；关闭此功能可节省这 1-2 秒。</div>`;
+
+function openHelp() {
+    $('helpBody').innerHTML = HELP_HTML;
+    $('overlay').classList.add('show');
+}
+function closeHelp() { $('overlay').classList.remove('show'); }
+
+document.querySelectorAll('.help-btn').forEach(b => b.addEventListener('click', openHelp));
+$('helpClose').addEventListener('click', closeHelp);
+$('helpCloseX').addEventListener('click', closeHelp);
+$('overlay').addEventListener('click', e => { if (e.target === $('overlay')) closeHelp(); });
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeHelp(); });
+
+/* 初始化 */
+renderDecision();
+</script>
+</body>
+</html>

@@ -109,7 +109,8 @@ internal class DragDropService
             _archivePath, _password, itemsToExtract, targetDir,
             _currentFolder, preserveFullPath, _settings.FileConflictAction,
             vm?.ShowExtractFileConflictDialogAsync,
-            LocalizationManager.T("Status_DragExtractingTo", folderName));
+            LocalizationManager.T("Status_DragExtractingTo", folderName),
+            allowDeleteArchive: false);   // D18: 拖拽解压不显示「删原包」开关
 
         // 6. Post-extraction: status message, optionally open target folder
         //    失败弹窗已由共享方法统一处理（拖拽与右键一致），此处仅设置状态栏消息
@@ -126,7 +127,7 @@ internal class DragDropService
                 if (vm != null)
                     vm.StatusMessage = LocalizationManager.T("Status_DragDone", itemsToExtract.Count, itemsToExtract.Count, folderName);
 
-                if (_settings.OpenFolderAfterExtract)
+                if (result.OpenFolderAfterExtract)   // D19: 开关值来自进度窗口实例
                 {
                     try
                     {

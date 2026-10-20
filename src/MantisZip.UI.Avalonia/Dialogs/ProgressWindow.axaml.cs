@@ -7,12 +7,17 @@ using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using Avalonia.Media;
+using Avalonia.Styling;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
+using MantisZip.UI.Avalonia.Utils;
 using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Dialogs;
@@ -31,6 +36,13 @@ public partial class ProgressWindow : Window
     private static ProgressWindow? _currentVisible;
 
     /// <summary>
+    /// 「已用时间」刷新计时器（1s）：进度由引擎经 IProgress 推送，
+    /// 但两个档案之间可能长时间无报告，故时间行需独立定时刷新。
+    /// OnOpened 启动 / OnClosed 停止，避免窗口关闭后继续计时（防泄漏）。
+    /// </summary>
+    private readonly DispatcherTimer _elapsedTimer = new() { Interval = TimeSpan.FromSeconds(1) };
+
+    /// <summary>
     /// 当前可见的进度窗口；无则为 null。
     /// 冲突对话框点击"暂停"时由 ExtractFlow/CompressFlow 通过此属性找到进度窗口，
     /// 调用 <see cref="PauseFromConflict"/> 进入暂停态（对齐 WPF App.xaml.cs ConflictResolver）。
@@ -43,11 +55,56 @@ public partial class ProgressWindow : Window
         _vm = new ProgressViewModel();
         DataContext = _vm;
 
+        // 应用上次持久化的显示偏好（内容模式 / 信息量分级；首次使用为默认 详细 / 标准）。
+        // 须在 ApplyInfoDensity() 之前写入 VM——该调用按 InfoDensity 计算批列表高度。
+        var displaySettings = AppSettings.Load();
+        _vm.ContentMode = ProgressDisplayModeParser.ParseContentMode(displaySettings.ProgressContentMode);
+        _vm.InfoDensity = ProgressDisplayModeParser.ParseDensity(displaySettings.ProgressInfoDensity);
+
+        // 应用上次持久化的窗口宽度（非法值回落 XAML 默认 800；XAML MinWidth=500 兜底）
+        var savedWidth = displaySettings.ProgressWindowWidth;
+        if (double.IsFinite(savedWidth) && savedWidth > 0)
+            Width = savedWidth;
+
+        // 窗口一打开即进入准备态（「正在准备…」+ 不定进度条），直到引擎首次上报；
+        // 大目录在枚举/分组阶段的静默期不再显示空白进度条（避免被误认为出错）。
+        _vm.BeginPreparing();
+
         // Wire up close request from ViewModel
         _vm.RequestClose += () =>
         {
             Dispatcher.UIThread.Post(() => Close());
         };
+
+        // 已用时间行每秒刷新（引擎无报告期间也走字）
+        _elapsedTimer.Tick += (_, _) => _vm.RefreshTimeDisplay();
+
+        // 按初始信息量分级（Medium）落地行距与批处理列表高度
+        ApplyInfoDensity();
+
+        // 动态窗口高度下限：每次布局完成后同步 MinHeight = 内容自然高度（防手动缩窗裁切 UI）
+        RootGrid.LayoutUpdated += (_, _) => UpdateDynamicMinHeight();
+    }
+
+    /// <summary>
+    /// 动态窗口高度下限：MinHeight = 内容自然高度（RootGrid.DesiredSize.Height，已含其 Margin）
+    /// + 窗口 chrome（Height − ClientSize；Avalonia 二者同为客户区语义，通常为 0，留作平台差异兜底）。
+    /// 由 RootGrid.LayoutUpdated 驱动——模式切换/密度切换/错误摘要出现/批处理列表增减都会重新布局，
+    /// 窗口下限随之更新，用户无法再缩到裁切 UI。XAML 静态 MinHeight=100 仅作首帧兜底。
+    /// 0.5px 节流：MinHeight 变更会触发新一轮布局，差值过小直接跳过以防布局循环。
+    /// </summary>
+    private void UpdateDynamicMinHeight()
+    {
+        var needed = RootGrid.DesiredSize.Height;
+        if (double.IsNaN(needed) || needed <= 0)
+            return;
+
+        var chrome = double.IsNaN(Height) ? 0 : Math.Max(0, Height - ClientSize.Height);
+        var target = needed + chrome;
+
+        if (Math.Abs(MinHeight - target) < 0.5)
+            return;
+        MinHeight = target;
     }
 
     /// <summary>
@@ -101,6 +158,33 @@ public partial class ProgressWindow : Window
 
     /// <summary>Whether to keep the window open on complete.</summary>
     public bool KeepOpenOnComplete => _vm.KeepOpenOnComplete;
+
+    /// <summary>
+    /// 当前为压缩流程（vs 解压）：置 true 时详细面板显示「压缩通道」说明行。
+    /// 解压流程不设置（默认 false）。须在引擎开始上报 <c>BatchIndex</c> 之前设置。
+    /// </summary>
+    public bool IsCompressFlow
+    {
+        get => _vm.IsCompressFlow;
+        set => _vm.IsCompressFlow = value;
+    }
+
+    /// <summary>测试压缩包流程：置 true 自动按下 📌（完成后不自动关闭）。须在窗口 Show 前设置。</summary>
+    public bool IsTestFlow
+    {
+        get => _vm.IsTestFlow;
+        set => _vm.IsTestFlow = value;
+    }
+
+    /// <summary>声明解压后置开关（能力位 + 初值）；须在 Show 前调用。非解压流程不调用 → 两开关隐藏。</summary>
+    public void SetExtractPostActions(bool openFolder, bool deleteArchive, bool? openFolderSeed = null, bool? deleteArchiveSeed = null)
+        => _vm.SetExtractPostActions(openFolder, deleteArchive, openFolderSeed, deleteArchiveSeed);
+
+    /// <summary>「完成后打开目录」开关当前值（消费点在窗口关闭后回读，spec §11.3）。</summary>
+    public bool OpenFolderAfterExtractValue => _vm.OpenFolderAfterExtract;
+
+    /// <summary>「完成后删原包」开关当前值（同上）。</summary>
+    public bool DeleteArchiveAfterExtractValue => _vm.DeleteArchiveAfterExtract;
 
     // ════════════════════════════════════════════
     //  Initialization & Cancellation
@@ -160,9 +244,20 @@ public partial class ProgressWindow : Window
     /// <summary>
     /// Set error summary text (selectable, shown between progress bars and buttons).
     /// </summary>
-    public void SetErrorSummary(string message)
+    /// <param name="message">本地化后的整包错误文案（红段首行）。</param>
+    /// <param name="detail">异常原文（可选，供摘要框 tooltip）。</param>
+    public void SetErrorSummary(string message, string? detail = null)
     {
-        _vm.SetErrorSummary(message);
+        _vm.SetErrorSummary(message, detail);
+    }
+
+    /// <summary>
+    /// 直接设置进度窗口状态行文案（用于无错误汇总的终态，如密码取消：避免停在 BeginPreparing
+    /// 写入的「正在准备…」——EndPreparing 只在首个 SetProgress 调用，而取消可能发生在首报之前）。
+    /// </summary>
+    public void SetStatusMessage(string? message)
+    {
+        if (!string.IsNullOrEmpty(message)) _vm.StatusMessage = message;
     }
 
     // ════════════════════════════════════════════
@@ -172,29 +267,114 @@ public partial class ProgressWindow : Window
     /// <summary>
     /// After completion, wait for auto-close or manual close.
     /// If KeepOpenOnComplete is set during countdown, switches to manual wait.
+    /// 延迟秒数来自设置 AppSettings.AutoCloseDelaySeconds（Task 6：统一关窗职责，调用方不再传魔法数字）。
+    /// Task 10：延时等待期间在按钮行显示倒计时，支持行内临时修改（实例级，不回写设置）。
     /// </summary>
-    public async Task AutoCloseOrWaitAsync(int delayMs, Action closeAction)
+    public async Task AutoCloseOrWaitAsync(Action closeAction)
     {
         if (_vm.KeepOpenOnComplete)
         {
             await WaitForManualCloseAsync();
+            closeAction();
+            return;
         }
-        else
+
+        // 倒计时初值已在 OnOpened 初始化（窗口打开即显示、可提前编辑，此处不再重置）
+        if (_countdownRemainingMs <= 0)
         {
-            int step = 100;
-            int elapsed = 0;
-            while (elapsed < delayMs)
+            closeAction();
+            return;
+        }
+
+        _vm.AutoCloseCountdownVisible = true;
+        try
+        {
+            int lastShownSecs = -1;
+            while (_countdownRemainingMs > 0)
             {
-                await Task.Delay(step);
-                elapsed += step;
+                await Task.Delay(100);
+                // D11：倒计时中按下 📌 → 立即转手动等待（按钮状态 = 实际行为）
                 if (_vm.KeepOpenOnComplete)
                 {
                     await WaitForManualCloseAsync();
-                    break;
+                    closeAction();
+                    return;
+                }
+                // §10.4：行内编辑期间时间冻结（不回写文本，避免覆盖用户输入）
+                if (_countdownEditing)
+                    continue;
+
+                _countdownRemainingMs -= 100;
+                int secs = (_countdownRemainingMs + 999) / 1000;   // 向上取整 → 首显满值
+                if (secs != lastShownSecs)
+                {
+                    lastShownSecs = secs;
+                    UpdateCountdownText(secs);
                 }
             }
+            closeAction();
         }
-        closeAction();
+        finally
+        {
+            _vm.AutoCloseCountdownVisible = false;
+        }
+    }
+
+    /// <summary>倒计时编辑态（仅 UI 线程访问）：编辑期间冻结倒数与文本回写（§10.4）。</summary>
+    private bool _countdownEditing;
+
+    /// <summary>倒计时剩余毫秒（编辑态冻结时不清零，作为回退基准）。</summary>
+    private int _countdownRemainingMs;
+
+    /// <summary>回写倒计时数字文本（聚焦中不回写，防覆盖用户输入）。</summary>
+    private void UpdateCountdownText(int secs)
+    {
+        if (this.FindControl<TextBox>("CountdownBox") is not { } box)
+            return;
+        if (box.IsFocused)
+            return;
+        box.Text = secs.ToString();
+    }
+
+    /// <summary>聚焦即冻结（§10.4）：停止倒数流逝，全选便于直接键入。</summary>
+    private void CountdownBox_GotFocus(object? sender, RoutedEventArgs e)
+    {
+        _countdownEditing = true;
+        if (sender is TextBox box)
+            box.SelectAll();
+    }
+
+    /// <summary>离开编辑态：以最终有效值重置倒数起点（非法输入回退冻结时的剩余值），恢复流逝。</summary>
+    private void CountdownBox_LostFocus(object? sender, RoutedEventArgs e) => CommitCountdownEdit();
+
+    /// <summary>Enter 提交；Esc 放弃修改（恢复冻结时剩余值）后提交。</summary>
+    private void CountdownBox_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)
+    {
+        if (e.Key == global::Avalonia.Input.Key.Enter)
+        {
+            CommitCountdownEdit();
+            e.Handled = true;
+        }
+        else if (e.Key == global::Avalonia.Input.Key.Escape)
+        {
+            if (sender is TextBox box)
+                box.Text = ((_countdownRemainingMs + 999) / 1000).ToString();
+            CommitCountdownEdit();
+            e.Handled = true;
+        }
+    }
+
+    /// <summary>提交编辑：解析最终值（非法回退冻结剩余值）并以之重置倒数起点，恢复流逝。</summary>
+    private void CommitCountdownEdit()
+    {
+        if (!_countdownEditing) return;
+        _countdownEditing = false;
+        if (this.FindControl<TextBox>("CountdownBox") is not { } box) return;
+
+        var frozenSecs = (_countdownRemainingMs + 999) / 1000;   // 冻结期间未流逝 → 等价当前值
+        var secs = CountdownParser.Parse(box.Text, frozenSecs);
+        _countdownRemainingMs = secs * 1000;                     // 以最终有效值重置起点
+        box.Text = secs.ToString();                              // 规范化显示（夹紧后值）
     }
 
     /// <summary>
@@ -236,7 +416,6 @@ public partial class ProgressWindow : Window
         PauseButtonText.Text = _vm.LocalizedStrings.TryGetValue("Progress_Button_Pause", out var pauseText)
             ? pauseText
             : "Pause";
-        Width = 500;
     }
 
     /// <summary>
@@ -276,52 +455,91 @@ public partial class ProgressWindow : Window
     }
 
     // ════════════════════════════════════════════
-    //  Password Section
+    //  Batch Password Badge（行内密码徽标）
     // ════════════════════════════════════════════
 
     /// <summary>
-    /// Show the password section with "matching..." status.
+    /// 点亮/熄灭指定批处理行的密码徽标（🔄 匹配中 / 🔑●●●● 已匹配）。
+    /// 路径 A（预匹配密码整批点亮）与路径 B（批循环内逐包点亮）共用此入口。
     /// Safe to call from any thread.
     /// </summary>
-    public void ShowPasswordAttempt(string description)
+    public void SetBatchPasswordState(int index, BatchPasswordState state,
+        string? password, string? rule, string? description)
     {
         DispatchIfNeeded(() =>
         {
-            _vm.ShowPasswordAttempt(description);
-            // Set warning background
-            if (Application.Current?.Resources.TryGetResource("ThemeStatusWarningBrush", null, out var warningBrush) == true)
-            {
-                PasswordSection.Background = (IBrush)warningBrush!;
-                PasswordSection.BorderBrush = (IBrush)warningBrush!;
-            }
-        });
+            _vm.SetBatchPasswordState(index, state, password, rule, description);
+            // 徽标入场缩放动画：仅 Matched 点亮瞬间一次性触发（淡入由 Opacity 绑定 + Transitions 声明式完成）
+            if (state == BatchPasswordState.Matched)
+                PlayBadgeEnterScale(index);
+        }, DispatcherPriority.Background);
     }
 
     /// <summary>
-    /// Show that password was matched successfully.
+    /// 密码徽标 0.6→1.0 缩放入场（原型 .badge-enter :172-176，0.25s；与 Opacity 淡入同步）。
+    /// 一次性触发，不引入 VM 状态：先摘掉 ScaleTransform 的 Transitions 静默置 0.6（避免反向动画），
+    /// 再挂回过渡并 Post 到下一帧抬到 1.0，由 0.25s DoubleTransition 完成缩放。
+    /// 行容器未实现（虚拟化未命中）或找不到徽标时静默跳过——纯视觉增强，不影响功能。
+    /// </summary>
+    private void PlayBadgeEnterScale(int index)
+    {
+        if (index < 0 || _vm.BatchItems is not { } batchItems || index >= batchItems.Count)
+            return;
+        if (BatchFileList.ContainerFromIndex(index) is not { } container)
+            return; // 行容器未创建/被虚拟化裁剪 → 跳过动画
+        var badge = container.GetVisualDescendants().OfType<Button>()
+            .FirstOrDefault(b => b.Name == "PwdBadgeBtn");
+        if (badge?.RenderTransform is not ScaleTransform scale)
+            return;
+
+        var transitions = scale.Transitions;
+        scale.Transitions = null;          // 摘过渡：0.6 起始值瞬时生效
+        scale.ScaleX = 0.6;
+        scale.ScaleY = 0.6;
+        scale.Transitions = transitions;   // 挂回：随后的 1.0 走 0.25s 过渡
+        Dispatcher.UIThread.Post(() =>
+        {
+            scale.ScaleX = 1;
+            scale.ScaleY = 1;
+        });
+    }
+
+    // ════════════════════════════════════════════
+    //  T6: 并行度 / 条目行（EntryItems）包装
+    // ════════════════════════════════════════════
+
+    /// <summary>
+    /// 设置并行解压线程度（进度窗口并行统计显示用；串行路径传 1 → HasParallelDegree=false 自动隐藏）。
     /// Safe to call from any thread.
     /// </summary>
-    public void ShowPasswordMatched(string password, string description)
+    public void SetParallelDegree(int degree)
+    {
+        DispatchIfNeeded(() => _vm.ParallelDegree = degree, DispatcherPriority.Background);
+    }
+
+    /// <summary>
+    /// 播种条目行（列表模式初始 Pending 行；未播种路径由引擎终态事件 upsert 兜底）。
+    /// 列目录在后台进行期间解压可能已先行上报若干条目——此时播种会 <c>ClearEntryItems</c>
+    /// 清掉这些已上报的终态行（每条目只上报一次 → 永久停留在 Pending），故已有任何条目行时
+    /// 跳过播种，整体转渐进模式（确定性优于「有时清、有时不清」）。需强制重播先调 <see cref="ClearEntries"/>。
+    /// Safe to call from any thread.
+    /// </summary>
+    public void SeedEntries(System.Collections.Generic.IReadOnlyList<(string Key, string Name, long Size)> items)
     {
         DispatchIfNeeded(() =>
         {
-            _vm.ShowPasswordMatched(password, description);
-            // Set success background
-            if (Application.Current?.Resources.TryGetResource("ThemeStatusSuccessBrush", null, out var successBrush) == true)
-            {
-                PasswordSection.Background = (IBrush)successBrush!;
-                PasswordSection.BorderBrush = (IBrush)successBrush!;
-            }
-        });
+            if (_vm.HasEntryItems) return;
+            _vm.SeedEntryItems(items);
+        }, DispatcherPriority.Background);
     }
 
     /// <summary>
-    /// Hide the password section.
+    /// 清空条目行（新批次/新操作开始前调用）。
     /// Safe to call from any thread.
     /// </summary>
-    public void HidePasswordSection()
+    public void ClearEntries()
     {
-        DispatchIfNeeded(() => _vm.HidePasswordSection());
+        DispatchIfNeeded(() => _vm.ClearEntryItems(), DispatcherPriority.Background);
     }
 
     /// <summary>
@@ -357,35 +575,307 @@ public partial class ProgressWindow : Window
         return _vm.CreatePauseAwareProgress(inner);
     }
 
+    /// <summary>模态弹窗期间冻结已用时间（冲突/密码弹窗）。Safe to call from any thread.</summary>
+    public void BeginModalFreeze() => DispatchIfNeeded(() => _vm.BeginModalFreeze());
+
+    /// <summary>模态弹窗关闭后解除冻结。Safe to call from any thread.</summary>
+    public void EndModalFreeze() => DispatchIfNeeded(() => _vm.EndModalFreeze());
+
     // ════════════════════════════════════════════
-    //  Event Handlers
+    //  Content Mode / Info Density（顶部切换区）
     // ════════════════════════════════════════════
 
-    private async void PwdCopyBtn_Click(object? sender, RoutedEventArgs e)
+    // 内容模式三选：仅切换 VM 枚举属性，派生可见性（IsSimpleMode/IsDetailedMode/IsListMode）由 VM 集中通知。
+    // 处理器内二次校验 IsChecked——RadioButton 取消勾选时也会触发 Click，直接赋值会误重置模式。
+
+    private void ModeFullPathRadio_Click(object? sender, RoutedEventArgs e)
     {
-        var password = _vm.GetPassword();
-        if (string.IsNullOrEmpty(password)) return;
+        if (ModeFullPathRadio.IsChecked == true)
+        {
+            _vm.ContentMode = Models.ProgressContentMode.Simple;
+            SaveDisplayPreferences();
+        }
+    }
+
+    private void ModeDirOnlyRadio_Click(object? sender, RoutedEventArgs e)
+    {
+        if (ModeDirOnlyRadio.IsChecked == true)
+        {
+            _vm.ContentMode = Models.ProgressContentMode.Detailed;
+            SaveDisplayPreferences();
+        }
+    }
+
+    private void ModeNameOnlyRadio_Click(object? sender, RoutedEventArgs e)
+    {
+        if (ModeNameOnlyRadio.IsChecked == true)
+        {
+            _vm.ContentMode = Models.ProgressContentMode.List;
+            SaveDisplayPreferences();
+        }
+    }
+
+    // 信息量分级三选：赋值 VM 枚举后立即重排（行距 + 批处理列表高度），并持久化用户选择。
+    private void DensityCompactRadio_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DensityCompactRadio.IsChecked != true) return;
+        _vm.InfoDensity = Models.ProgressInfoDensity.Minimal;
+        ApplyInfoDensity();
+        SaveDisplayPreferences();
+    }
+
+    private void DensityNormalRadio_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DensityNormalRadio.IsChecked != true) return;
+        _vm.InfoDensity = Models.ProgressInfoDensity.Medium;
+        ApplyInfoDensity();
+        SaveDisplayPreferences();
+    }
+
+    private void DensityLooseRadio_Click(object? sender, RoutedEventArgs e)
+    {
+        if (DensityLooseRadio.IsChecked != true) return;
+        _vm.InfoDensity = Models.ProgressInfoDensity.Full;
+        ApplyInfoDensity();
+        SaveDisplayPreferences();
+    }
+
+    /// <summary>
+    /// 把当前「内容模式 / 信息量分级」持久化到 AppSettings（用户手动切换时调用）。
+    /// 仅窗口侧写入，VM 自身不依赖 AppSettings（保持 new ProgressViewModel() 单测确定性）。
+    /// </summary>
+    private void SaveDisplayPreferences()
+    {
+        var s = AppSettings.Load();
+        s.ProgressContentMode = ProgressDisplayModeParser.ToSetting(_vm.ContentMode);
+        s.ProgressInfoDensity = ProgressDisplayModeParser.ToSetting(_vm.InfoDensity);
+        s.Save();
+    }
+
+    /// <summary>
+    /// 按当前信息量分级重排批处理列表可视高度（信息量分级控制「显示多少信息」，非间距）。
+    /// 数值全部从紧凑度资源键推导（Rule 5：不硬编码间距/高度），跟随全局紧凑度设置联动。
+    /// 行距不再由此处动态调整——<c>RootGrid.RowSpacing</c> 固定绑定 {DynamicResource SpacingXs}，
+    /// 间距唯一来源是全局紧凑度（CompactnessMode）。
+    /// </summary>
+    private void ApplyInfoDensity()
+    {
+        // 批处理列表可视行数：Minimal 5 行 / Medium 8 行 / Full 11 行（行高基准 = ControlHeightMd）
+        double rowHeight = GetResourceDouble("ControlHeightMd", fallback: 32);
+        double rows = _vm.InfoDensity == Models.ProgressInfoDensity.Minimal ? 5
+            : (_vm.InfoDensity == Models.ProgressInfoDensity.Full ? 11 : 8);
+        BatchFileList.MaxHeight = rowHeight * rows;
+    }
+
+    /// <summary>从窗口/应用资源中读取 double 类型的紧凑度资源键（如 SpacingXs / ControlHeightMd）。</summary>
+    private double GetResourceDouble(string key, double fallback)
+    {
+        if (this.TryFindResource(key, ThemeVariant.Default, out var res) && res is double d)
+            return d;
+        if (Application.Current?.Resources.TryGetResource(key, ThemeVariant.Default, out var appRes) == true
+            && appRes is double ad)
+            return ad;
+        return fallback;
+    }
+
+    // ════════════════════════════════════════════
+    //  批处理行密码徽标 Flyout（掩码/明文 + 复制明文 + 规则/描述）
+    // ════════════════════════════════════════════
+
+    /// <summary>Flyout 当前显示的密码与显示态（Flyout 关闭即失效，由 Opening 重置）。</summary>
+    private string? _flyoutPassword;
+
+    /// <summary>Flyout 是否处于明文显示态（初始值取 PasswordRevealByDefault 设置）。</summary>
+    private bool _flyoutRevealed;
+
+    /// <summary>
+    /// 当前打开的密码 Flyout 内容根面板（同一时刻仅一个 Flyout 打开，故单字段即可）。
+    /// 由 <see cref="PwdBadgeBtn_Click"/> 填充，👁/复制两个处理器据此定位命名控件。
+    /// </summary>
+    private StackPanel? _pwdFlyoutPanel;
+
+    /// <summary>复制 ✓ 图标复原计时器（1.2s 一次性，对齐原型 :1011；OnClosed 停止防泄漏）。</summary>
+    private DispatcherTimer? _copyIconTimer;
+
+    /// <summary>复制成功 Toast 隐藏计时器（1.6s 一次性，对齐原型 :1072；OnClosed 停止防泄漏）。</summary>
+    private DispatcherTimer? _copyToastTimer;
+
+    /// <summary>
+    /// 点击行内 🔑●●●● 徽标：填充 Flyout 内容（按 x:Name，避免继承触发元素 DataContext 导致串行数据）。
+    /// </summary>
+    private void PwdBadgeBtn_Click(object? sender, RoutedEventArgs e)
+    {
+        if (sender is not Button button || button.DataContext is not BatchItem item)
+            return;
+
+        _flyoutPassword = item.MatchedPassword;
+        _flyoutRevealed = Models.AppSettings.Load().PasswordRevealByDefault;
+
+        var flyout = button.Flyout;
+        if (flyout is not Flyout { Content: StackPanel panel })
+            return;
+        _pwdFlyoutPanel = panel;
+
+        // 掩码/明文文本（初始态尊重 PasswordRevealByDefault）
+        panel.FindControl<TextBlock>("PwdFlyoutMaskText")!.Text =
+            _flyoutRevealed ? _flyoutPassword ?? string.Empty : MaskPassword(_flyoutPassword);
+        // 👁 图标同步（IconEye / IconEyeOff 均为既有图标资源）
+        panel.FindControl<PathIcon>("PwdFlyoutEyeIcon")!.Data =
+            (Geometry?)this.FindResource(_flyoutRevealed ? "IconEye" : "IconEyeOff");
+
+        // 规则行（为空则隐藏该行）
+        var ruleText = panel.FindControl<TextBlock>("PwdFlyoutRuleText")!;
+        ruleText.Text = string.IsNullOrEmpty(item.PasswordRule)
+            ? string.Empty
+            : LocalizationManager.T("Progress_Batch_Pwd_Rule", item.PasswordRule);
+        ruleText.IsVisible = !string.IsNullOrEmpty(item.PasswordRule);
+
+        // 描述行（为空则隐藏该行）
+        var descText = panel.FindControl<TextBlock>("PwdFlyoutDescText")!;
+        descText.Text = string.IsNullOrEmpty(item.PasswordDescription)
+            ? string.Empty
+            : LocalizationManager.T("Progress_Batch_Pwd_Desc", item.PasswordDescription);
+        descText.IsVisible = !string.IsNullOrEmpty(item.PasswordDescription);
+    }
+
+    /// <summary>👁 切换：仅切显示态（不影响复制——复制恒为明文）。</summary>
+    private void PwdFlyoutRevealBtn_Click(object? sender, RoutedEventArgs e)
+    {
+        var panel = _pwdFlyoutPanel;
+        var maskText = panel?.FindControl<TextBlock>("PwdFlyoutMaskText");
+        var eyeIcon = panel?.FindControl<PathIcon>("PwdFlyoutEyeIcon");
+        if (maskText == null || eyeIcon == null)
+            return;
+
+        _flyoutRevealed = !_flyoutRevealed;
+        maskText.Text = _flyoutRevealed ? _flyoutPassword ?? string.Empty : MaskPassword(_flyoutPassword);
+        eyeIcon.Data = (Geometry?)this.FindResource(_flyoutRevealed ? "IconEye" : "IconEyeOff");
+    }
+
+    /// <summary>复制按钮：恒复制明文密码（不复制掩码）。</summary>
+    private async void PwdFlyoutCopyBtn_Click(object? sender, RoutedEventArgs e)
+    {
+        if (string.IsNullOrEmpty(_flyoutPassword)) return;
+
+        var statusTarget = _pwdFlyoutPanel?.FindControl<TextBlock>("PwdFlyoutMaskText");
 
         try
         {
-            var topLevel = TopLevel.GetTopLevel(this);
-            var clipboard = topLevel?.Clipboard;
-            if (clipboard != null)
-            {
-                var transfer = new global::Avalonia.Input.DataTransfer();
-                var item = new global::Avalonia.Input.DataTransferItem();
-                item.SetText(password);
-                transfer.Add(item);
-                await clipboard.SetDataAsync(transfer);
-                _vm.PasswordStatusText = LocalizationManager.T("Progress_PwdToClipboard");
-            }
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard == null) return;
+            var transfer = new global::Avalonia.Input.DataTransfer();
+            var item = new global::Avalonia.Input.DataTransferItem();
+            item.SetText(_flyoutPassword);
+            transfer.Add(item);
+            await clipboard.SetDataAsync(transfer);
+            if (statusTarget != null)
+                statusTarget.Text = LocalizationManager.T("Progress_PwdToClipboard");
+
+            // ✓ 复制反馈：图标翻转 1.2s 后复原 + 底部 Toast 1.6s 后隐藏（原型 :1007-1013）
+            ShowCopyFeedback(sender);
         }
         catch
         {
-            // Best-effort clipboard copy
-            _vm.PasswordStatusText = LocalizationManager.T("Progress_PwdCopyFailed");
+            // 剪贴板为尽力而为操作，失败仅提示不抛出
+            if (statusTarget != null)
+                statusTarget.Text = LocalizationManager.T("Progress_PwdCopyFailed");
         }
     }
+
+    /// <summary>状态行复制：复制 StatusMessage 全文，复用既有 ShowCopyFeedback（✓ 翻转 + Toast）。</summary>
+    private async void StatusCopyBtn_Click(object? sender, RoutedEventArgs e)
+    {
+        var text = _vm.StatusMessage;
+        if (string.IsNullOrEmpty(text)) return;
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard == null) return;
+            var transfer = new global::Avalonia.Input.DataTransfer();
+            var item = new global::Avalonia.Input.DataTransferItem();
+            item.SetText(text);
+            transfer.Add(item);
+            await clipboard.SetDataAsync(transfer);
+            ShowCopyFeedback(sender);
+        }
+        catch (Exception ex)
+        {
+            // 剪贴板为尽力而为操作，失败仅记录不抛出（与密码复制一致）
+            App.DebugLog($"[ProgressWindow] status copy failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>错误摘要复制：复制 CombinedSummaryText（红段 + 换行 + 黄段，spec §6 复制契约）。</summary>
+    private async void SummaryCopyBtn_Click(object? sender, RoutedEventArgs e)
+    {
+        var text = _vm.CombinedSummaryText;
+        if (string.IsNullOrEmpty(text)) return;
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard == null) return;
+            var transfer = new global::Avalonia.Input.DataTransfer();
+            var item = new global::Avalonia.Input.DataTransferItem();
+            item.SetText(text);
+            transfer.Add(item);
+            await clipboard.SetDataAsync(transfer);
+            ShowCopyFeedback(sender);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[ProgressWindow] summary copy failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 复制成功反馈（原型 .copied + showToast）：
+    /// ① 按钮 Content 图标短暂翻转为 ✓，1.2s 后复原为复制图标；
+    /// ② 窗口底部 CopyToast 淡入显示，1.6s 后隐藏。
+    /// 两个一次性计时器重复触发前先停旧的（防叠加），OnClosed 统一清理。
+    /// </summary>
+    private void ShowCopyFeedback(object? sender)
+    {
+        // ① 图标翻转：sender 即复制按钮，其 Content 为未命名 PathIcon（无需 x:Name）
+        if (sender is Button { Content: PathIcon copyIcon })
+        {
+            copyIcon.Data = (Geometry?)this.FindResource("IconCheckmark");
+
+            _copyIconTimer?.Stop();
+            var iconTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
+            iconTimer.Tick += (_, _) =>
+            {
+                iconTimer.Stop();
+                if (ReferenceEquals(_copyIconTimer, iconTimer)) _copyIconTimer = null;
+                copyIcon.Data = (Geometry?)this.FindResource("IconCopy");
+            };
+            _copyIconTimer = iconTimer;
+            iconTimer.Start();
+        }
+
+        // ② Toast 淡入：先置可见（Opacity 保持 0），下一拍抬到 1 触发 DoubleTransition 0.2s 淡入
+        if (this.FindControl<Border>("CopyToast") is { } toast)
+        {
+            toast.Opacity = 0;
+            toast.IsVisible = true;
+            Dispatcher.UIThread.Post(() => toast.Opacity = 1);
+
+            _copyToastTimer?.Stop();
+            var toastTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1600) };
+            toastTimer.Tick += (_, _) =>
+            {
+                toastTimer.Stop();
+                if (ReferenceEquals(_copyToastTimer, toastTimer)) _copyToastTimer = null;
+                toast.IsVisible = false;
+                toast.Opacity = 0;
+            };
+            _copyToastTimer = toastTimer;
+            toastTimer.Start();
+        }
+    }
+
+    /// <summary>密码掩码（固定 6 位 ●，不泄露密码长度；空密码返回空串）。</summary>
+    private static string MaskPassword(string? password) =>
+        string.IsNullOrEmpty(password) ? string.Empty : "●●●●●●";
 
     private void PauseButton_Click(object? sender, RoutedEventArgs e)
     {
@@ -426,13 +916,34 @@ if (_vm.IsPaused)
     {
         base.OnOpened(e);
         _currentVisible = this;
+        // 倒计时盒窗口打开即显示（可提前编辑，不倒数）；设置 0 = 不自动关闭 → 整组隐藏
+        _countdownRemainingMs = Math.Clamp(AppSettings.Load().AutoCloseDelaySeconds, 0, 60) * 1000;
+        if (_countdownRemainingMs > 0)
+        {
+            _vm.AutoCloseCountdownVisible = true;
+            UpdateCountdownText((_countdownRemainingMs + 999) / 1000);
+        }
+        // 启动「已用时间」刷新（窗口关闭时停止，防计时器泄漏）
+        _elapsedTimer.Start();
     }
 
     protected override void OnClosed(EventArgs e)
     {
         if (ReferenceEquals(_currentVisible, this))
             _currentVisible = null;
+        _elapsedTimer.Stop();
+        // 复制反馈一次性计时器清理（关闭后不再触发图标复原/Toast 隐藏，防残留）
+        _copyIconTimer?.Stop();
+        _copyIconTimer = null;
+        _copyToastTimer?.Stop();
+        _copyToastTimer = null;
         _vm.PauseEvent.Set();
+        // 退订静态 CultureChanged（VM 在 ctor 订阅；不退订则窗口关闭后 VM 被静态事件根引用泄漏）
+        _vm.DetachLocalization();
+        // 持久化窗口宽度（关闭时写回；非法值回落默认 800）。用户调整宽度后下次打开沿用。
+        var s = AppSettings.Load();
+        s.ProgressWindowWidth = double.IsFinite(Width) && Width > 0 ? Width : 800;
+        s.Save();
         base.OnClosed(e);
     }
 

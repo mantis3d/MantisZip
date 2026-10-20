@@ -37,6 +37,8 @@ public class TarGzEngine : IArchiveEngine
             CoreLog.Info($"ExtractAsync: format=tar.gz={isTarGz}, ext={ext}");
 
             int successCount = 0, failedEntries = 0;
+            var conflictStats = new ConflictStatsCounter();
+            long bytesTotal = 0; // 链尾最终报告使用；tar 分支=压缩流长度，gz 分支=gz 流长度
 
             if (isTarGz || ext == ".tar")
             {
@@ -44,6 +46,7 @@ public class TarGzEngine : IArchiveEngine
                 // 注意：不手动解压 GZip，直接传入原始压缩流让 TarReader 自动检测 gzip 头
                 using var inputStream = File.OpenRead(archivePath);
                 var totalCompressedBytes = inputStream.Length;
+                bytesTotal = totalCompressedBytes;
 
                 using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
 
@@ -78,19 +81,31 @@ public class TarGzEngine : IArchiveEngine
                     var entryModified = entry.LastModifiedTime ?? DateTime.MinValue;
 
                     // 逐文件报告
-                    progress?.Report(new ArchiveProgress
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                     {
                         CurrentFile = entryKey,
                         PercentComplete = Math.Min(compressedProgress, 99.9),
-                        FilePercentComplete = 0
-                    });
+                        FilePercentComplete = 0,
+                        TotalBytes = totalCompressedBytes,
+                        ProcessedBytes = inputStream.Position
+                    }));
 
                     // 冲突处理
+                    var existedBefore = File.Exists(outputFilePath);
                     var resolved = await FileConflictHelper.ResolvePathAsync(outputFilePath, options, entryModified, entry.Size);
                     if (resolved == null)
                     {
+                        conflictStats.RecordSkipped();
+                        // 逐条目状态（D2）：冲突跳过 → Skipped
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
                         // 跳过文件，TarReader.MoveToNextEntry 自动处理流推进
                         continue;
+                    }
+                    if (existedBefore && resolved == outputFilePath)
+                    {
+                        conflictStats.RecordOverwritten();
+                        // 逐条目状态（D2）：覆盖旧文件 → Overwritten
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Overwritten });
                     }
 
                     try
@@ -118,12 +133,14 @@ public class TarGzEngine : IArchiveEngine
                                     compressedProgress = totalCompressedBytes > 0
                                         ? (double)inputStream.Position / totalCompressedBytes * 100
                                         : 0;
-                                    progress?.Report(new ArchiveProgress
+                                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                                     {
                                         CurrentFile = entryKey,
                                         PercentComplete = Math.Min(compressedProgress, 99.9),
-                                        FilePercentComplete = filePct
-                                    });
+                                        FilePercentComplete = filePct,
+                                        TotalBytes = totalCompressedBytes,
+                                        ProcessedBytes = inputStream.Position
+                                    }));
                                     lastReportTime = now;
                                 }
                             }
@@ -131,16 +148,25 @@ public class TarGzEngine : IArchiveEngine
                         // 恢复文件原始修改时间
                         try { File.SetLastWriteTime(resolved, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsync: failed to set timestamp on {resolved}: {tsEx.Message}"); }
                         successCount++;
+                        // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                        if (!(existedBefore && resolved == outputFilePath))
+                            progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Completed });
                     }
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：权限失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = entry.Size, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                         failedEntries++;
                     }
                     catch (IOException iox)
                     {
                         // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                         CoreLog.Info($"ExtractAsync: write failed for '{entryKey}': {iox.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：IO 写入失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = entry.Size, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                         failedEntries++;
                     }
                 }
@@ -148,45 +174,101 @@ public class TarGzEngine : IArchiveEngine
             else if (ext == ".gz")
             {
                 // 单纯 GZip 解压单个文件
+                var gzEntryKey = Path.GetFileNameWithoutExtension(archivePath);
                 using var inputStream = File.OpenRead(archivePath);
                 using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
-                var outputPath = Path.Combine(destinationPath, Path.GetFileNameWithoutExtension(archivePath));
+                var outputPath = Path.Combine(destinationPath, gzEntryKey);
+                var existedBefore = File.Exists(outputPath);
                 var resolved = await FileConflictHelper.ResolvePathAsync(outputPath, options);
-                if (resolved != null)
+                if (resolved == null)
                 {
+                    conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）：冲突跳过 → Skipped
+                    progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Skipped });
+                }
+                else
+                {
+                    if (existedBefore && resolved == outputPath)
+                    {
+                        conflictStats.RecordOverwritten();
+                        // 逐条目状态（D2）：覆盖旧文件 → Overwritten
+                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Overwritten });
+                    }
                     try
                     {
                         using var output = File.Create(resolved);
-                        gzipStream.CopyTo(output);
+                        // 手动缓冲循环：以压缩流位置（inputStream.Position）为字节进度；单文件 gz 无文件计数语义
+                        long gzLen = inputStream.Length;
+                        bytesTotal = gzLen;
+                        long gzLastReport = Environment.TickCount64;
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                        {
+                            CurrentFile = gzEntryKey,
+                            PercentComplete = 0,
+                            FilePercentComplete = 0,
+                            TotalBytes = gzLen,
+                            ProcessedBytes = 0,
+                        }));
+                        var gzBuffer = new byte[CopyBufferSize];
+                        int gzRead;
+                        while ((gzRead = gzipStream.Read(gzBuffer, 0, gzBuffer.Length)) > 0)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            output.Write(gzBuffer, 0, gzRead);
+                            if (Environment.TickCount64 - gzLastReport >= 100)
+                            {
+                                gzLastReport = Environment.TickCount64;
+                                double gzPct = gzLen > 0 ? Math.Min(inputStream.Position * 100.0 / gzLen, 99.9) : 0;
+                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                                {
+                                    CurrentFile = gzEntryKey,
+                                    PercentComplete = gzPct,
+                                    TotalBytes = gzLen,
+                                    ProcessedBytes = inputStream.Position,
+                                }));
+                            }
+                        }
                         successCount = 1;
+                        // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                        if (!(existedBefore && resolved == outputPath))
+                            progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Completed });
                     }
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractAsync: permission denied for '{outputPath}': {uax.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：权限失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = inputStream.Length, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                         failedEntries = 1;
                     }
                     catch (IOException iox)
                     {
                         CoreLog.Info($"ExtractAsync: write failed for '{outputPath}': {iox.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：IO 写入失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = inputStream.Length, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                         failedEntries = 1;
                     }
                 }
 
-                progress?.Report(new ArchiveProgress
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = Path.GetFileName(outputPath),
                     PercentComplete = 100
-                });
+                }));
             }
 
-            progress?.Report(new ArchiveProgress
+            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
             {
                 CurrentFile = string.Empty,
-                PercentComplete = 100
-            });
+                PercentComplete = 100,
+                TotalBytes = bytesTotal,
+                ProcessedBytes = bytesTotal
+            }));
 
             CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
-            return new ExtractResult { SucceededEntries = successCount, FailedEntries = failedEntries };
+            var tarStats = conflictStats.Snapshot;
+            return new ExtractResult { SucceededEntries = successCount, FailedEntries = failedEntries, SkippedEntries = tarStats.Skipped, OverwrittenEntries = tarStats.Overwritten };
         }, cancellationToken).ConfigureAwait(false);
 
         CoreLog.Exit();
@@ -210,6 +292,8 @@ public class TarGzEngine : IArchiveEngine
                 var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
                 CoreLog.Info($"CompressAsync: {files.Count} files to compress");
 
+                long totalSourceBytes = 0; // 源文件未压缩字节总和（tar 逐文件累加，gz 为单文件大小）
+
                 if (isTarGz || ext == ".tar")
                 {
                     using var fileStream = File.Create(outputPath);
@@ -219,27 +303,55 @@ public class TarGzEngine : IArchiveEngine
                         CompressionLevel = options.CompressionLevel
                     });
 
+                    foreach (var (fullPath, _) in files)
+                        totalSourceBytes += SafeFileSize(fullPath);
+                    long bytesDone = 0;
+
                     int processedFiles = 0;
                     int totalFiles = files.Count;
                     foreach (var (fullPath, relativePath) in files)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
+                        long srcSize = SafeFileSize(fullPath);
 
                         progress?.Report(new ArchiveProgress
                         {
                             CurrentFile = relativePath,
+                            // percent 语义保持文件计数基准不变（字节只挂在 ProcessedBytes 上）
                             PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
                             FilePercentComplete = 0,
                             TotalFiles = totalFiles,
-                            ProcessedFiles = processedFiles
+                            ProcessedFiles = processedFiles,
+                            TotalBytes = totalSourceBytes,
+                            ProcessedBytes = bytesDone
                         });
 
-                        if (!TarWriteFileWithRetry(fullPath, relativePath, options, writer, cancellationToken))
+                        long lastByteReport = Environment.TickCount64;
+                        if (!TarWriteFileWithRetry(fullPath, relativePath, options, writer, cancellationToken, out var skipReason,
+                                onRead: read =>
+                                {
+                                    if (Environment.TickCount64 - lastByteReport < 100 && read < srcSize) return;
+                                    lastByteReport = Environment.TickCount64;
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        CurrentFile = relativePath,
+                                        PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
+                                        FilePercentComplete = srcSize > 0 ? Math.Min(read, srcSize) * 100.0 / srcSize : 100,
+                                        TotalFiles = totalFiles,
+                                        ProcessedFiles = processedFiles,
+                                        TotalBytes = totalSourceBytes,
+                                        ProcessedBytes = bytesDone + Math.Min(read, srcSize)
+                                    });
+                                }))
                         {
                             if (cancellationToken.IsCancellationRequested) break;
+                            // 逐条目状态（D2）：读取失败被跳过（ErrorResolver Skip 或重试耗尽）→ Skipped（带原因类别，spec §5.3）
+                            progress?.Report(new ArchiveProgress { EntryKey = relativePath, EntryStatus = ArchiveEntryStatus.Skipped, EntryFailureReason = skipReason ?? EntryFailureReason.Other });
+                            bytesDone += srcSize; // 跳过也计入已处理字节（ZipEngine.cs 先例）
                             continue;
                         }
                         processedFiles++;
+                        bytesDone += srcSize;
 
                         progress?.Report(new ArchiveProgress
                         {
@@ -247,21 +359,41 @@ public class TarGzEngine : IArchiveEngine
                             PercentComplete = totalFiles > 0 ? (double)processedFiles / totalFiles * 100 : 0,
                             FilePercentComplete = 100,
                             TotalFiles = totalFiles,
-                            ProcessedFiles = processedFiles
+                            ProcessedFiles = processedFiles,
+                            // 逐条目状态（D2）：本文件写入完成 → Completed（复用既有上报，非节流路径）
+                            EntryKey = relativePath,
+                            EntryStatus = ArchiveEntryStatus.Completed
                         });
                     }
                 }
                 else if (ext == ".gz")
                 {
-                    // 单纯 GZip 压缩（单文件）
+                    // 单纯 GZip 压缩（单文件）— 单文件无文件计数语义，percent 采用 byte 基准
                     if (files.Count > 0)
                     {
                         using var outputStream = File.Create(outputPath);
                         using var gzipWriter = GZipWriter.OpenWriter(outputStream, new GZipWriterOptions(options.CompressionLevel));
 
+                        long gzSrcSize = SafeFileSize(files[0].FullPath);
+                        totalSourceBytes = gzSrcSize;
+                        long gzLastReport = Environment.TickCount64;
                         // 共享读：源文件可能正被编辑器以写权限持有
                         using var input = SharedReadStream.OpenRead(files[0].FullPath);
-                        gzipWriter.Write(Path.GetFileName(files[0].FullPath), input, null);
+                        using var progressInput = new ReadProgressStream(input, read =>
+                        {
+                            if (Environment.TickCount64 - gzLastReport < 100 && read < gzSrcSize) return;
+                            gzLastReport = Environment.TickCount64;
+                            double gzPct = gzSrcSize > 0 ? Math.Min(read * 100.0 / gzSrcSize, 99.9) : 0;
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CurrentFile = Path.GetFileName(files[0].FullPath),
+                                PercentComplete = gzPct,
+                                FilePercentComplete = gzSrcSize > 0 ? Math.Min(read * 100.0 / gzSrcSize, 100) : 100,
+                                TotalBytes = gzSrcSize,
+                                ProcessedBytes = read,
+                            });
+                        });
+                        gzipWriter.Write(Path.GetFileName(files[0].FullPath), progressInput, null);
                     }
                 }
 
@@ -270,7 +402,9 @@ public class TarGzEngine : IArchiveEngine
                     CurrentFile = string.Empty,
                     PercentComplete = 100,
                     TotalFiles = files.Count,
-                    ProcessedFiles = files.Count
+                    ProcessedFiles = files.Count,
+                    TotalBytes = totalSourceBytes,
+                    ProcessedBytes = totalSourceBytes
                 });
 
                 CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
@@ -290,11 +424,34 @@ public class TarGzEngine : IArchiveEngine
     }
 
     /// <summary>
+    /// 求单文件未压缩字节数；目录或读取失败（含属性查询失败）返回 0，
+    /// 不阻断压缩（字节进度是尽力而为）。语义对齐 SevenZipEngine.SumSourceFileSizes 的单文件版。
+    /// </summary>
+    private static long SafeFileSize(string path)
+    {
+        try
+        {
+            var attrs = File.GetAttributes(path);
+            if ((attrs & FileAttributes.Directory) != 0) return 0;
+            return new FileInfo(path).Length;
+        }
+        catch (Exception ex)
+        {
+            CoreLog.Trace($"SafeFileSize skip {path}: {ex.Message}");
+            return 0;
+        }
+    }
+
+    /// <summary>
     /// 带重试/跳过/中止的 TAR 文件压缩。返回 false 表示跳过此文件。
     /// </summary>
+    /// <param name="onRead">可选的已读字节回调（传入时源流经 <see cref="ReadProgressStream"/> 包装，用于字节进度）。</param>
     private static bool TarWriteFileWithRetry(string fullPath, string relativePath,
-        ArchiveOptions options, SharpCompress.Writers.IWriter writer, CancellationToken ct)
+        ArchiveOptions options, SharpCompress.Writers.IWriter writer, CancellationToken ct,
+        out EntryFailureReason? skipReason,
+        Action<long>? onRead = null)
     {
+        skipReason = null;
         int retries = 3;
         while (retries > 0)
         {
@@ -304,13 +461,19 @@ public class TarGzEngine : IArchiveEngine
                 var fi = new FileInfo(fullPath);
                 // 共享读：源文件可能正被 Word 等编辑器以写权限持有，File.OpenRead 会直接冲突
                 using var sourceStream = SharedReadStream.OpenRead(fullPath);
-                writer.Write(relativePath, sourceStream, fi.LastWriteTime);
+                using Stream readStream = onRead is null
+                    ? sourceStream
+                    : new ReadProgressStream(sourceStream, onRead);
+                // ReadProgressStream 保持可寻（TarWriter.Write 无显式 size 时会读 source.Length）
+                writer.Write(relativePath, readStream, fi.LastWriteTime);
                 return true;
             }
             catch (OperationCanceledException) { throw; }
             catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
             {
                 CoreLog.Trace("ExtractAsync: IO error on '{0}': {1}", relativePath, ex.Message);
+                // 在重试/决策前先分类原因（spec §5.3）：即便最终 Retry 成功，分类也与其它埋点一致
+                skipReason = FailureReasonMapper.FromException(ex);
                 retries--;
                 if (options?.ErrorResolver == null)
                 {
@@ -441,8 +604,9 @@ public class TarGzEngine : IArchiveEngine
 
         try
         {
-            await Task.Run(() =>
+            var ok = await Task.Run(() =>
             {
+                int failedFiles = 0;
                 var ext = Path.GetExtension(archivePath).ToLowerInvariant();
                 var isTarGz = ext == ".tgz" || archivePath.EndsWith(".tar.gz");
 
@@ -461,12 +625,10 @@ public class TarGzEngine : IArchiveEngine
                         var entryKey = reader.Entry.Key ?? "";
                         long entrySize = reader.Entry.Size;
 
-                        using var entryStream = reader.OpenEntryStream();
-                        // 完全解压条目以验证数据完整性（带 per-file 进度）
-
                         // 文件开始：文件进度条归零
                         progress?.Report(new ArchiveProgress
                         {
+                            EntryKey = entryKey,
                             CurrentFile = entryKey,
                             PercentComplete = totalCompressedBytes > 0
                                 ? (double)inputStream.Position / totalCompressedBytes * 100
@@ -474,64 +636,117 @@ public class TarGzEngine : IArchiveEngine
                             FilePercentComplete = 0,
                         });
 
-                        // 带 per-file 进度的复制循环（100ms 节流，末尾强制上报 100%）
-                        long totalRead = 0;
-                        var lastReportTime = DateTime.Now;
-                        var reportInterval = TimeSpan.FromMilliseconds(100);
-                        var buffer = new byte[CopyBufferSize];
-                        while (true)
+                        try
                         {
-                            cancellationToken.ThrowIfCancellationRequested();
-                            var read = entryStream.Read(buffer, 0, buffer.Length);
-                            if (read <= 0) break;
-                            totalRead += read;
-
-                            var now = DateTime.Now;
-                            if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
+                            using var entryStream = reader.OpenEntryStream();
+                            // 完全解压条目以验证数据完整性（带 per-file 进度）
+                            long totalRead = 0;
+                            var lastReportTime = DateTime.Now;
+                            var reportInterval = TimeSpan.FromMilliseconds(100);
+                            var buffer = new byte[CopyBufferSize];
+                            while (true)
                             {
-                                var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
-                                progress?.Report(new ArchiveProgress
-                                {
-                                    CurrentFile = entryKey,
-                                    PercentComplete = totalCompressedBytes > 0
-                                        ? (double)inputStream.Position / totalCompressedBytes * 100
-                                        : 0,
-                                    FilePercentComplete = filePct,
-                                });
-                                lastReportTime = now;
-                            }
-                        }
+                                cancellationToken.ThrowIfCancellationRequested();
+                                var read = entryStream.Read(buffer, 0, buffer.Length);
+                                if (read <= 0) break;
+                                totalRead += read;
 
-                        progress?.Report(new ArchiveProgress
+                                var now = DateTime.Now;
+                                if (now - lastReportTime >= reportInterval || totalRead >= entrySize)
+                                {
+                                    var filePct = entrySize > 0 ? (double)totalRead / entrySize * 100 : 100;
+                                    progress?.Report(new ArchiveProgress
+                                    {
+                                        EntryKey = entryKey,
+                                        CurrentFile = entryKey,
+                                        PercentComplete = totalCompressedBytes > 0
+                                            ? (double)inputStream.Position / totalCompressedBytes * 100
+                                            : 0,
+                                        FilePercentComplete = filePct,
+                                    });
+                                    lastReportTime = now;
+                                }
+                            }
+
+                            progress?.Report(new ArchiveProgress
+                            {
+                                EntryKey = entryKey,
+                                EntryStatus = ArchiveEntryStatus.Completed,
+                                CurrentFile = entryKey,
+                                PercentComplete = totalCompressedBytes > 0
+                                    ? (double)inputStream.Position / totalCompressedBytes * 100
+                                    : 0,
+                                FilePercentComplete = 100,
+                                FileTotalBytes = entrySize,
+                            });
+                        }
+                        catch (OperationCanceledException)
                         {
-                            CurrentFile = entryKey,
-                            PercentComplete = totalCompressedBytes > 0
-                                ? (double)inputStream.Position / totalCompressedBytes * 100
-                                : 0,
-                            FilePercentComplete = 100,
-                        });
+                            throw;
+                        }
+                        catch (Exception ex)
+                        {
+                            // 逐条目测试失败定位（spec §12 Follow-up #6）
+                            failedFiles++;
+                            CoreLog.Error($"TestArchiveAsync: entry '{entryKey}' failed", ex);
+                            progress?.Report(new ArchiveProgress
+                            {
+                                EntryKey = entryKey,
+                                EntryStatus = ArchiveEntryStatus.Failed,
+                                EntryFailureReason = FailureReasonMapper.FromException(ex),
+                                CurrentFile = entryKey,
+                                PercentComplete = totalCompressedBytes > 0
+                                    ? (double)inputStream.Position / totalCompressedBytes * 100
+                                    : 0,
+                                FilePercentComplete = 100,
+                                FileTotalBytes = entrySize,
+                            });
+                        }
                     }
                 }
                 else if (ext == ".gz")
                 {
                     // 单个 GZip 文件 — 解压到空流验证
+                    var gzKey = Path.GetFileNameWithoutExtension(archivePath);
                     using var inputStream = File.OpenRead(archivePath);
                     using var gzipStream = new System.IO.Compression.GZipStream(inputStream, System.IO.Compression.CompressionMode.Decompress);
-                    gzipStream.CopyTo(Stream.Null);
-
-                    progress?.Report(new ArchiveProgress
+                    try
                     {
-                        CurrentFile = Path.GetFileNameWithoutExtension(archivePath),
-                        PercentComplete = 100,
-                        FilePercentComplete = 100,
-                    });
+                        gzipStream.CopyTo(Stream.Null);
+                        progress?.Report(new ArchiveProgress
+                        {
+                            EntryKey = gzKey,
+                            EntryStatus = ArchiveEntryStatus.Completed,
+                            CurrentFile = gzKey,
+                            PercentComplete = 100,
+                            FilePercentComplete = 100,
+                        });
+                    }
+                    catch (Exception ex)
+                    {
+                        failedFiles++;
+                        CoreLog.Error($"TestArchiveAsync: gz entry '{gzKey}' failed", ex);
+                        progress?.Report(new ArchiveProgress
+                        {
+                            EntryKey = gzKey,
+                            EntryStatus = ArchiveEntryStatus.Failed,
+                            EntryFailureReason = FailureReasonMapper.FromException(ex),
+                            CurrentFile = gzKey,
+                            PercentComplete = 100,
+                            FilePercentComplete = 100,
+                            FileTotalBytes = inputStream.Length,
+                            EntryErrorDetail = ex.Message,
+                            EntryErrorHResult = ex.HResult,
+                        });
+                    }
                 }
 
-                CoreLog.Info("TestArchiveAsync: passed");
+                CoreLog.Info($"TestArchiveAsync: {(failedFiles > 0 ? "failed" : "passed")}");
+                return failedFiles == 0;
             }, cancellationToken).ConfigureAwait(false);
 
             CoreLog.Exit();
-            return true;
+            return ok;
         }
         catch (Exception ex)
         {
@@ -569,12 +784,15 @@ public class TarGzEngine : IArchiveEngine
             var isTarGz = ext == ".tgz" || archivePath.EndsWith(".tar.gz");
             CoreLog.Info($"ExtractEntriesAsync: format=tar.gz={isTarGz}, ext={ext}");
             int failedEntries = 0;
+            var conflictStats = new ConflictStatsCounter();
+            long bytesTotal = 0; // 链尾最终报告使用
 
             if (isTarGz || ext == ".tar")
             {
                 // TAR 或 TAR.GZ — 单次顺序扫描，匹配 entryKeys 的条目按 override/默认路径输出
                 using var inputStream = File.OpenRead(archivePath);
                 var totalCompressedBytes = inputStream.Length;
+                bytesTotal = totalCompressedBytes;
                 using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
 
                 int processed = 0, targetFound = 0;
@@ -609,16 +827,30 @@ public class TarGzEngine : IArchiveEngine
                         ? (double)inputStream.Position / totalCompressedBytes * 100
                         : 0;
 
-                    progress?.Report(new ArchiveProgress
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                     {
                         CurrentFile = entryKey,
                         PercentComplete = Math.Min(compressedProgress, 99.9),
-                        FilePercentComplete = 0
-                    });
+                        FilePercentComplete = 0,
+                        TotalBytes = totalCompressedBytes,
+                        ProcessedBytes = inputStream.Position
+                    }));
 
+                    var existedBefore = File.Exists(outputPath);
                     var resolved = await FileConflictHelper.ResolvePathAsync(outputPath, options, entryModified, entry.Size);
                     if (resolved == null)
+                    {
+                        conflictStats.RecordSkipped();
+                        // 逐条目状态（D2）：冲突跳过 → Skipped
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Skipped });
                         continue; // 跳过/覆盖旧/覆盖小
+                    }
+                    if (existedBefore && resolved == outputPath)
+                    {
+                        conflictStats.RecordOverwritten();
+                        // 逐条目状态（D2）：覆盖旧文件 → Overwritten
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Overwritten });
+                    }
 
                     try
                     {
@@ -645,12 +877,14 @@ public class TarGzEngine : IArchiveEngine
                                     compressedProgress = totalCompressedBytes > 0
                                         ? (double)inputStream.Position / totalCompressedBytes * 100
                                         : 0;
-                                    progress?.Report(new ArchiveProgress
+                                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                                     {
                                         CurrentFile = entryKey,
                                         PercentComplete = Math.Min(compressedProgress, 99.9),
-                                        FilePercentComplete = filePct
-                                    });
+                                        FilePercentComplete = filePct,
+                                        TotalBytes = totalCompressedBytes,
+                                        ProcessedBytes = inputStream.Position
+                                    }));
                                     lastReportTime = now;
                                 }
                             }
@@ -660,41 +894,54 @@ public class TarGzEngine : IArchiveEngine
                         catch (Exception tsEx) { CoreLog.Info($"ExtractEntriesAsync: failed to set timestamp on {resolved}: {tsEx.Message}"); }
 
                         processed++;
+                        // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                        if (!(existedBefore && resolved == outputPath))
+                            progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Completed });
 
                         var now2 = DateTime.Now;
                         if (now2 - lastReportTime >= reportInterval || processed == targetFound)
                         {
-                            progress?.Report(new ArchiveProgress
+                            progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                             {
                                 CurrentFile = entryKey,
                                 PercentComplete = Math.Min(compressedProgress, 99.9),
                                 FilePercentComplete = 100,
                                 TotalFiles = targetFound,
-                                ProcessedFiles = processed
-                            });
+                                ProcessedFiles = processed,
+                                TotalBytes = totalCompressedBytes,
+                                ProcessedBytes = inputStream.Position
+                            }));
                             lastReportTime = now2;
                         }
                     }
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{entryKey}': {uax.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：权限失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = entry.Size, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                         failedEntries++;
                     }
                     catch (IOException iox)
                     {
                         // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
                         CoreLog.Info($"ExtractEntriesAsync: write failed for '{entryKey}': {iox.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：IO 写入失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = entry.Size, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                         failedEntries++;
                     }
                 }
 
-                progress?.Report(new ArchiveProgress
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = string.Empty,
                     PercentComplete = 100,
                     TotalFiles = targetFound,
-                    ProcessedFiles = processed
-                });
+                    ProcessedFiles = processed,
+                    TotalBytes = bytesTotal,
+                    ProcessedBytes = bytesTotal
+                }));
             }
             else if (ext == ".gz")
             {
@@ -706,33 +953,87 @@ public class TarGzEngine : IArchiveEngine
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);
 
+                var existedBefore = File.Exists(outputPath);
                 var resolved = await FileConflictHelper.ResolvePathAsync(outputPath, options);
-                if (resolved != null)
+                if (resolved == null)
                 {
+                    conflictStats.RecordSkipped();
+                    // 逐条目状态（D2）：冲突跳过 → Skipped
+                    progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Skipped });
+                }
+                else
+                {
+                    if (existedBefore && resolved == outputPath)
+                    {
+                        conflictStats.RecordOverwritten();
+                        // 逐条目状态（D2）：覆盖旧文件 → Overwritten
+                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Overwritten });
+                    }
                     try
                     {
                         using var inputStream = File.OpenRead(archivePath);
                         using var gzipStream = new GZipStream(inputStream, CompressionMode.Decompress);
                         using var output = File.Create(resolved);
-                        gzipStream.CopyTo(output);
+                        // 手动缓冲循环：以压缩流位置为字节进度
+                        long gzLen = inputStream.Length;
+                        bytesTotal = gzLen;
+                        long gzLastReport = Environment.TickCount64;
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                        {
+                            CurrentFile = entryName,
+                            PercentComplete = 0,
+                            FilePercentComplete = 0,
+                            TotalBytes = gzLen,
+                            ProcessedBytes = 0,
+                        }));
+                        var gzBuffer = new byte[CopyBufferSize];
+                        int gzRead;
+                        while ((gzRead = gzipStream.Read(gzBuffer, 0, gzBuffer.Length)) > 0)
+                        {
+                            cancellationToken.ThrowIfCancellationRequested();
+                            output.Write(gzBuffer, 0, gzRead);
+                            if (Environment.TickCount64 - gzLastReport >= 100)
+                            {
+                                gzLastReport = Environment.TickCount64;
+                                double gzPct = gzLen > 0 ? Math.Min(inputStream.Position * 100.0 / gzLen, 99.9) : 0;
+                                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                                {
+                                    CurrentFile = entryName,
+                                    PercentComplete = gzPct,
+                                    TotalBytes = gzLen,
+                                    ProcessedBytes = inputStream.Position,
+                                }));
+                            }
+                        }
+                        // 逐条目状态（D2）：写盘成功 → Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
+                        if (!(existedBefore && resolved == outputPath))
+                            progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Completed });
                     }
                     catch (UnauthorizedAccessException uax)
                     {
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{outputPath}': {uax.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：权限失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = bytesTotal, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                         failedEntries++;
                     }
                     catch (IOException iox)
                     {
                         CoreLog.Info($"ExtractEntriesAsync: write failed for '{outputPath}': {iox.Message}");
+                        conflictStats.RecordFailed();
+                        // 逐条目状态（D2）：IO 写入失败 → Failed
+                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = bytesTotal, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                         failedEntries++;
                     }
                 }
 
-                progress?.Report(new ArchiveProgress
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = entryName,
-                    PercentComplete = 100
-                });
+                    PercentComplete = 100,
+                    TotalBytes = bytesTotal,
+                    ProcessedBytes = bytesTotal
+                }));
             }
 
             CoreLog.Info($"ExtractEntriesAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");

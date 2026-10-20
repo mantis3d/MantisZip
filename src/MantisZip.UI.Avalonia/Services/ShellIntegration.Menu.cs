@@ -14,21 +14,21 @@ internal static partial class ShellIntegration
         get
         {
             // 检查 COM 注册（优先）
-            using var comKey = Registry.CurrentUser.OpenSubKey(
+            using var comKey = RegistryHost.Open(
                 $@"Software\Classes\CLSID\{ComClsid}");
             if (comKey != null) return true;
 
             // 回退：检查静态注册表
-            using var key = Registry.CurrentUser.OpenSubKey(
+            using var key = RegistryHost.Open(
                 $@"Software\Classes\*\shell\{CascadeRoot}");
             if (key != null) return true;
-            using var key2 = Registry.CurrentUser.OpenSubKey(
+            using var key2 = RegistryHost.Open(
                 $@"Software\Classes\*\shell\{CompressVerb}\command");
             if (key2 != null) return true;
-            using var key3 = Registry.CurrentUser.OpenSubKey(
+            using var key3 = RegistryHost.Open(
                 $@"Software\Classes\*\shell\{ExtractSmartVerb}\command");
             if (key3 != null) return true;
-            using var key4 = Registry.CurrentUser.OpenSubKey(
+            using var key4 = RegistryHost.Open(
                 $@"Software\Classes\*\shell\{CompressSeparateVerb}\command");
             return key4 != null;
         }
@@ -73,7 +73,7 @@ internal static partial class ShellIntegration
         }
 
         // 通知 Windows Shell 刷新上下文菜单缓存
-        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        NotifyAssocChanged();
 
         // ── Install summary ──
         var dynStatus = GetDynamicMenuStatus();
@@ -92,7 +92,7 @@ internal static partial class ShellIntegration
         UninstallCom();
         DeleteRegistryKey(ContextMenuRegPath);
         RestartExplorerForUnload();
-        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+        NotifyAssocChanged();
         App.DebugLog("ShellIntegration.Uninstall: done");
     }
 
@@ -252,7 +252,7 @@ internal static partial class ShellIntegration
                 string? actualValue = null;
                 try
                 {
-                    using var key = Registry.CurrentUser.OpenSubKey(
+                    using var key = RegistryHost.Open(
                         $@"Software\Classes\{target}\shellex\ContextMenuHandlers\{ComHandlerKey}");
                     actualValue = key?.GetValue(null) as string;
                 }
@@ -515,7 +515,7 @@ internal static partial class ShellIntegration
     {
         try
         {
-            using var key = Registry.CurrentUser.CreateSubKey(ContextMenuRegPath);
+            using var key = RegistryHost.Create(ContextMenuRegPath);
             key?.SetValue("DynamicMenuStatus", status, RegistryValueKind.String);
         }
         catch (Exception ex)
@@ -572,7 +572,7 @@ internal static partial class ShellIntegration
             SetDynamicMenuStatus(DynamicMenuStatus_Active);
             App.DebugLog("CheckComStatus: status changed to active, removing static cascade menus");
             UninstallStaticMenus();
-            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+            NotifyAssocChanged();
         }
         else
         {
@@ -580,7 +580,7 @@ internal static partial class ShellIntegration
             App.DebugLog($"CheckComStatus: comhost.dll not found in {explorerCount} Explorer process(es), installing cascade as fallback");
             var s = AppSettings.Load();
             InstallCascade(s, GetExePath());
-            SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+            NotifyAssocChanged();
         }
     }
 

@@ -186,16 +186,18 @@ public static class IconProvider
         };
 
         // Folder back
-        var backPathBuilder = new SKPathBuilder();
-        backPathBuilder.MoveTo(0, 4);
-        backPathBuilder.LineTo(6, 4);
-        backPathBuilder.LineTo(8, 6);
-        backPathBuilder.LineTo(16, 6);
-        backPathBuilder.LineTo(16, 14);
-        backPathBuilder.LineTo(0, 14);
-        backPathBuilder.Close();
-        using var backPath = backPathBuilder.Detach();
-        canvas.DrawPath(backPath, paint);
+        using (var backBuilder = new SKPathBuilder())
+        {
+            backBuilder.MoveTo(0, 4);
+            backBuilder.LineTo(6, 4);
+            backBuilder.LineTo(8, 6);
+            backBuilder.LineTo(16, 6);
+            backBuilder.LineTo(16, 14);
+            backBuilder.LineTo(0, 14);
+            backBuilder.Close();
+            using var backPath = backBuilder.Detach();
+            canvas.DrawPath(backPath, paint);
+        }
 
         // Folder tab
         using var tabPaint = new SKPaint
@@ -204,14 +206,16 @@ public static class IconProvider
             IsAntialias = true,
             Style = SKPaintStyle.Fill
         };
-        var tabPathBuilder = new SKPathBuilder();
-        tabPathBuilder.MoveTo(0, 2);
-        tabPathBuilder.LineTo(6, 2);
-        tabPathBuilder.LineTo(7, 4);
-        tabPathBuilder.LineTo(0, 4);
-        tabPathBuilder.Close();
-        using var tabPath = tabPathBuilder.Detach();
-        canvas.DrawPath(tabPath, tabPaint);
+        using (var tabBuilder = new SKPathBuilder())
+        {
+            tabBuilder.MoveTo(0, 2);
+            tabBuilder.LineTo(6, 2);
+            tabBuilder.LineTo(7, 4);
+            tabBuilder.LineTo(0, 4);
+            tabBuilder.Close();
+            using var tabPath = tabBuilder.Detach();
+            canvas.DrawPath(tabPath, tabPaint);
+        }
 
         using var image = surface.Snapshot();
         using var data = image.Encode(SKEncodedImageFormat.Png, 100);
@@ -294,7 +298,7 @@ public static class IconProvider
                 }
                 break;
 
-case "audio":
+            case "audio":
                 // Music note
                 using (var audioPaint = new SKPaint
                 {
@@ -304,15 +308,17 @@ case "audio":
                 })
                 {
                     canvas.DrawCircle(cx - 1, cy + 2, 2, audioPaint);
-                    var notePathBuilder = new SKPathBuilder();
-                    notePathBuilder.MoveTo(cx - 1, cy + 2);
-                    notePathBuilder.LineTo(cx - 1, cy - 4);
-                    notePathBuilder.LineTo(cx + 4, cy - 3);
-                    notePathBuilder.LineTo(cx + 4, cy - 1);
-                    notePathBuilder.LineTo(cx - 1, cy - 2);
-                    notePathBuilder.Close();
-                    using var notePath = notePathBuilder.Detach();
-                    canvas.DrawPath(notePath, audioPaint);
+                    using (var noteBuilder = new SKPathBuilder())
+                    {
+                        noteBuilder.MoveTo(cx - 1, cy + 2);
+                        noteBuilder.LineTo(cx - 1, cy - 4);
+                        noteBuilder.LineTo(cx + 4, cy - 3);
+                        noteBuilder.LineTo(cx + 4, cy - 1);
+                        noteBuilder.LineTo(cx - 1, cy - 2);
+                        noteBuilder.Close();
+                        using var notePath = noteBuilder.Detach();
+                        canvas.DrawPath(notePath, audioPaint);
+                    }
                     canvas.DrawCircle(cx + 4, cy, 2, audioPaint);
                 }
                 break;
@@ -326,13 +332,15 @@ case "audio":
                     Style = SKPaintStyle.Fill
                 })
                 {
-                    using var playPathBuilder = new SKPathBuilder();
-                    playPathBuilder.MoveTo(cx - 2, cy - 3);
-                    playPathBuilder.LineTo(cx + 3, cy);
-                    playPathBuilder.LineTo(cx - 2, cy + 3);
-                    playPathBuilder.Close();
-                    using var playPath = playPathBuilder.Detach();
-                    canvas.DrawPath(playPath, playPaint);
+                    using (var playBuilder = new SKPathBuilder())
+                    {
+                        playBuilder.MoveTo(cx - 2, cy - 3);
+                        playBuilder.LineTo(cx + 3, cy);
+                        playBuilder.LineTo(cx - 2, cy + 3);
+                        playBuilder.Close();
+                        using var playPath = playBuilder.Detach();
+                        canvas.DrawPath(playPath, playPaint);
+                    }
                 }
                 break;
 

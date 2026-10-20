@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
@@ -6,6 +7,7 @@ using System.Text;
 using System.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Utils;
 using MantisZip.Tests.Fixtures;
 using Xunit;
 
@@ -32,6 +34,19 @@ public class ParallelExtractTests : IDisposable
 
     private string TrackFile(string path) { _tempFiles.Add(path); return path; }
     private string TrackDir(string path) { _tempDirs.Add(path); return path; }
+
+    /// <summary>
+    /// 同步线程安全的进度收集器：并行解压从多个工作线程直接 Report，
+    /// 不能使用 System.Progress&lt;T&gt;（它经 SynchronizationContext/线程池异步派发，
+    /// 测试在 await 返回时尚未收到回调，导致报告时序性丢失）。
+    /// </summary>
+    private sealed class ProgressCollector : IProgress<ArchiveProgress>
+    {
+        private readonly ConcurrentBag<ArchiveProgress> _items = new();
+        public void Report(ArchiveProgress value) => _items.Add(value);
+        /// <summary>当前收集到的报告快照（await 引擎完成后再读取，无时序依赖）。</summary>
+        public List<ArchiveProgress> Items => _items.ToList();
+    }
 
     [Fact]
     public async Task ExtractAsync_ParallelMode_ProducesSameResultAsSequential()
@@ -138,6 +153,168 @@ public class ParallelExtractTests : IDisposable
     public void SupportsParallelExtract_ZipEngine_ReturnsTrue()
     {
         Assert.True(_engine.SupportsParallelExtract);
+    }
+
+    [Fact]
+    public async Task ExtractEntriesAsync_ParallelMode_ProducesSameResultAsSequential()
+    {
+        // 过滤解压（ExtractEntriesAsync）并行 vs 串行结果一致性
+        var archive = TrackFile(ArchiveFixtures.CreateMultiFileZipArchive(20));
+        var keys = Enumerable.Range(0, 20).Select(i => $"file{i:D4}.dat").ToList();
+
+        var sequentialDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        var parallelDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(sequentialDir);
+        Directory.CreateDirectory(parallelDir);
+
+        // 串行 (ParallelExtractDegree = 1)
+        var seqOptions = new ArchiveOptions { ParallelExtractDegree = 1 };
+        await _engine.ExtractEntriesAsync(archive, keys, sequentialDir, options: seqOptions);
+
+        // 并行 (ParallelExtractDegree = 4)
+        var parOptions = new ArchiveOptions { ParallelExtractDegree = 4 };
+        await _engine.ExtractEntriesAsync(archive, keys, parallelDir, options: parOptions);
+
+        var seqFiles = Directory.GetFiles(sequentialDir, "*", SearchOption.AllDirectories).OrderBy(f => f).ToList();
+        var parFiles = Directory.GetFiles(parallelDir, "*", SearchOption.AllDirectories).OrderBy(f => f).ToList();
+
+        Assert.Equal(seqFiles.Count, parFiles.Count);
+        Assert.Equal(20, seqFiles.Count);
+        for (int i = 0; i < seqFiles.Count; i++)
+        {
+            Assert.Equal(File.ReadAllBytes(seqFiles[i]), File.ReadAllBytes(parFiles[i]));
+        }
+    }
+
+    [Fact]
+    public async Task ExtractEntriesAsync_ParallelWithPathOverrides_RespectsOverrides()
+    {
+        // 过滤解压 + 路径覆盖（拖拽解压场景）：并行模式必须尊重 outputPathOverrides，
+        // 且未请求的条目绝不解压（预览 = 实际 的边界保证）。
+        var archive = TrackFile(ArchiveFixtures.CreateMultiFileZipArchive(6)); // file0000.dat ~ file0005.dat
+        var destDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(destDir);
+
+        var keys = new[] { "file0000.dat", "file0001.dat", "file0002.dat" };
+        var overrides = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["file0000.dat"] = Path.Combine(destDir, "sub", "renamed0.dat"),
+            ["file0001.dat"] = Path.Combine(destDir, "renamed1.dat"),
+            ["file0002.dat"] = Path.Combine(destDir, "renamed2.dat"),
+        };
+
+        await _engine.ExtractEntriesAsync(archive, keys, destDir,
+            options: new ArchiveOptions { ParallelExtractDegree = 4 },
+            outputPathOverrides: overrides);
+
+        // 覆盖路径生效
+        Assert.True(File.Exists(Path.Combine(destDir, "sub", "renamed0.dat")), "file0000.dat override failed");
+        Assert.True(File.Exists(Path.Combine(destDir, "renamed1.dat")), "file0001.dat override failed");
+        Assert.True(File.Exists(Path.Combine(destDir, "renamed2.dat")), "file0002.dat override failed");
+        // 未请求的条目未解压
+        Assert.False(File.Exists(Path.Combine(destDir, "file0003.dat")), "file0003.dat should NOT be extracted");
+        Assert.False(File.Exists(Path.Combine(destDir, "file0004.dat")), "file0004.dat should NOT be extracted");
+        Assert.False(File.Exists(Path.Combine(destDir, "file0005.dat")), "file0005.dat should NOT be extracted");
+    }
+
+    [Fact]
+    public async Task ExtractAsync_ParallelMode_AskConflict_InvokesAsyncResolver()
+    {
+        // 回归：并行全量解压遇到冲突，Ask 策略必须调异步弹窗回调（此前同步 ResolvePath
+        // 只认同步 ConflictResolver，Ask 静默降级为覆盖）。
+        var archive = TrackFile(ArchiveFixtures.CreateMultiFileZipArchive(10));
+        var destDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(destDir);
+
+        // 预置同名冲突文件
+        for (int i = 0; i < 10; i++)
+            File.WriteAllText(Path.Combine(destDir, $"file{i:D4}.dat"), "existing");
+
+        int resolverCalls = 0;
+        var options = new ArchiveOptions
+        {
+            ParallelExtractDegree = 4,
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = _ =>
+            {
+                Interlocked.Increment(ref resolverCalls);
+                return Task.FromResult(FileConflictAction.Rename);
+            }
+        };
+
+        var result = await _engine.ExtractAsync(archive, destDir, options: options);
+
+        Assert.Equal(10, result.SucceededEntries);
+        Assert.Equal(0, result.FailedEntries);
+        Assert.Equal(10, resolverCalls); // Ask 必须触发异步回调，而非静默覆盖
+
+        // 原文件保留 + 重命名文件生成（GetUniquePath: file0000 (1).dat）
+        Assert.Equal("existing", File.ReadAllText(Path.Combine(destDir, "file0000.dat")));
+        for (int i = 0; i < 10; i++)
+        {
+            Assert.True(File.Exists(Path.Combine(destDir, $"file{i:D4} (1).dat")),
+                $"renamed file file{i:D4} (1).dat missing");
+        }
+    }
+
+    [Fact]
+    public async Task ExtractEntriesAsync_ParallelMode_AskConflict_InvokesAsyncResolver()
+    {
+        // 回归：过滤解压并行路径同样必须触发异步弹窗回调
+        var archive = TrackFile(ArchiveFixtures.CreateMultiFileZipArchive(10));
+        var destDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(destDir);
+
+        var keys = Enumerable.Range(0, 10).Select(i => $"file{i:D4}.dat").ToList();
+        for (int i = 0; i < 10; i++)
+            File.WriteAllText(Path.Combine(destDir, $"file{i:D4}.dat"), "existing");
+
+        int resolverCalls = 0;
+        var options = new ArchiveOptions
+        {
+            ParallelExtractDegree = 4,
+            ConflictAction = FileConflictAction.Ask,
+            ConflictResolverAsync = _ =>
+            {
+                Interlocked.Increment(ref resolverCalls);
+                return Task.FromResult(FileConflictAction.Rename);
+            }
+        };
+
+        await _engine.ExtractEntriesAsync(archive, keys, destDir, options: options);
+
+        Assert.Equal(10, resolverCalls);
+        Assert.Equal("existing", File.ReadAllText(Path.Combine(destDir, "file0000.dat")));
+        for (int i = 0; i < 10; i++)
+        {
+            Assert.True(File.Exists(Path.Combine(destDir, $"file{i:D4} (1).dat")),
+                $"renamed file file{i:D4} (1).dat missing");
+        }
+    }
+
+    /// <summary>
+    /// (c) 并行解压逐条目遥测回归：100 文件 × 4 并行度，EntryStatus 报告必须
+    /// 恰好 100 条且 EntryKey 无重复（多工作线程 Report 不丢不重）。
+    /// </summary>
+    [Fact]
+    public async Task ExtractAsyncParallel_ReportsPerEntry_ExactlyOncePerFile()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateMultiFileZipArchive(100)); // file0000.dat ~ file0099.dat
+        var destDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        var collector = new ProgressCollector();
+
+        await _engine.ExtractAsync(archive, destDir,
+            options: new ArchiveOptions { ParallelExtractDegree = 4 },
+            progress: collector);
+
+        var entryReports = collector.Items.Where(p => p.EntryStatus.HasValue).ToList();
+        // 100 个文件 → 恰好 100 条逐条目报告（无丢失、无重复上报）
+        Assert.Equal(100, entryReports.Count);
+        // EntryKey 集合无重复（每文件恰好一次）
+        var reportedKeys = entryReports.Select(p => ArchivePath.Normalize(p.EntryKey)).ToList();
+        Assert.Equal(100, reportedKeys.Distinct(StringComparer.Ordinal).Count());
+        // 全新空目录 → 全部 Completed
+        Assert.All(entryReports, p => Assert.Equal(ArchiveEntryStatus.Completed, p.EntryStatus));
     }
 
     /// <summary>

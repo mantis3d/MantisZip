@@ -102,7 +102,7 @@ public class CompressSettingsViewModelTests
         vm.SevenZipCompressionMethod = "PPMd";
         vm.SevenZipSolid = false;
         vm.SevenZipSolidBlockSize = "64m";
-        vm.SevenZipDictionarySize = 64 * 1024 * 1024;
+        vm.SevenZipDictionarySize = "4g";
         vm.SevenZipNumFastBytes = 128;
         vm.SevenZipMatchFinder = "bt4";
         vm.ZipEncryptionMethod = "zipcrypto";
@@ -113,7 +113,7 @@ public class CompressSettingsViewModelTests
         Assert.Equal("PPMd", vm.SevenZipCompressionMethod);
         Assert.False(vm.SevenZipSolid);
         Assert.Equal("64m", vm.SevenZipSolidBlockSize);
-        Assert.Equal(64 * 1024 * 1024, vm.SevenZipDictionarySize);
+        Assert.Equal("4g", vm.SevenZipDictionarySize);
         Assert.Equal(128, vm.SevenZipNumFastBytes);
         Assert.Equal("bt4", vm.SevenZipMatchFinder);
         Assert.Equal("zipcrypto", vm.ZipEncryptionMethod);

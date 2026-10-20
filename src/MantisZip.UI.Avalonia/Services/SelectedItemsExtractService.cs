@@ -53,17 +53,52 @@ public sealed class SelectedItemsExtractService
         }
 
         var options = CreateExtractOptions(conflictAction, conflictDialog);
-        // 传递并行解压线程数（引擎 SupportsParallelExtract 时生效）
-        if (options != null)
-            options.ParallelExtractDegree = AppSettings.Load()?.ParallelExtractDegree ?? 0;
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
         if (engine == null) throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));
 
+        // 智能并行解压：选中条目解压无对话框覆盖（callerDegree = null），经 resolver 5 步决策链解析
+        var settings = AppSettings.Load();
+        var resolvedDegree = await ParallelDegreeResolver.ResolveAsync(
+            callerDegree: null,
+            settings: new ParallelExtractSettings
+            {
+                EnableParallel = settings?.EnableParallelExtract ?? true,
+                SmartParallel = settings?.SmartParallelDegree ?? true,
+                SmartSsdDegree = settings?.SmartSsdDegree ?? 12,
+                SmartHddDegree = settings?.SmartHddDegree ?? 8,
+                LargeArchivePreTest = settings?.LargeArchivePreTest ?? true,
+                ManualDegree = settings?.ParallelExtractDegree ?? 0
+            },
+            archivePath: archivePath,
+            destinationPath: destinationPath,
+            password: password,
+            engineSupportsParallel: engine.SupportsParallelExtract,
+            // 预测试阶段 resolver 上报的状态占位 key 在此替换为本地化文案
+            progress: new PreTestStatusLocalizingProgress(progress),
+            ct: cancellationToken);
+
+        if (options != null)
+            options.ParallelExtractDegree = resolvedDegree;
+
         // 所有格式统一走按条目提取（TarGzEngine 已实现，不再降级全量解压）
-        await engine.ExtractEntriesAsync(
-            archivePath, entryKeys, destinationPath,
-            password, progress, cancellationToken, options, pathOverrides);
+        // 叶子 3/5：选中条目解压直连引擎 → 密码弹窗兜底在此（拖拽解压经本方法自动覆盖）
+        var (outcome, _) = await PasswordRetryLoop.RunAsync(
+            archivePath, password, engine,
+            owner: null,
+            setStatus: _ => { },
+            attempt: async (pwd, token) =>
+                await engine.ExtractEntriesAsync(
+                    archivePath, entryKeys, destinationPath,
+                    pwd, progress, token, options, pathOverrides),
+            ct: cancellationToken);
+
+        if (outcome == PasswordRetryOutcome.Cancelled)
+            throw new PasswordRetryCancelledException(archivePath);
+        // 损坏/无效：弹窗循环已判定继续重弹无意义 → 抛错走既有失败收尾，
+        // 禁止落成功路径（否则调用方记录路径历史且 CLI 直解批处理会误删损坏源包）
+        if (outcome == PasswordRetryOutcome.CorruptedOrInvalid)
+            throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
     }
 
     /// <summary>
@@ -88,14 +123,14 @@ public sealed class SelectedItemsExtractService
     /// </summary>
     /// <param name="conflictAction">冲突策略字符串值。</param>
     /// <param name="conflictDialog">Ask 冲突弹窗回调（null 时 Ask 降级为直接弹引擎默认）。</param>
-    /// <returns>ArchiveOptions，Overwrite 且无 resolver 时返回 null。</returns>
-    internal static ArchiveOptions? CreateExtractOptions(
+    /// <returns>ArchiveOptions（Overwrite 也返回显式 options，调用方可直接设置 ParallelExtractDegree）。</returns>
+    internal static ArchiveOptions CreateExtractOptions(
         string conflictAction,
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog)
     {
         var action = MapConflictActionString(conflictAction);
         if (action == FileConflictAction.Overwrite)
-            return null; // 默认行为无需传 options
+            return new ArchiveOptions { ConflictAction = FileConflictAction.Overwrite }; // 默认行为即覆盖
 
         if (action != FileConflictAction.Ask || conflictDialog == null)
             return new ArchiveOptions { ConflictAction = action };

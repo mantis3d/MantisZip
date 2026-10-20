@@ -143,11 +143,15 @@
   <SolidColorBrush x:Key="ThemeStatusWarningBrush" Color="{StaticResource ThemeStatusWarning}" />
   <SolidColorBrush x:Key="ThemeStatusSuccessBrush" Color="{StaticResource ThemeStatusSuccess}" />
   <SolidColorBrush x:Key="ThemeStatusErrorBrush" Color="{StaticResource ThemeStatusError}" />
+  <!-- 批次行状态画刷：失败/跳过（承接 BatchStatusConverters 既有硬编码色；暗色档同色） -->
+  <SolidColorBrush x:Key="ThemeStatusFailedBrush" Color="#FFF44336" />
+  <SolidColorBrush x:Key="ThemeStatusSkippedBrush" Color="#FF00BCD4" />
   <!-- 密码已匹配高亮底色（对齐 WPF Theme_StatusSuccessBg） -->
   <SolidColorBrush x:Key="ThemeStatusSuccessBgBrush" Color="{StaticResource ThemeStatusSuccess}" Opacity="0.15" />
   <!-- Progress bar foreground/background for progress window -->
   <SolidColorBrush x:Key="ThemeProgressFillBrush" Color="#FF2196F3" />
-  <SolidColorBrush x:Key="ThemeProgressBgBrush" Color="#FFE0E0E0" />
+  <!-- 进度条轨道：与 ThemeSplitterBg(#FFE0E0E0) 拉开对比（#C8 vs #E0 单通道差 24≥16），否则 0% 时进度条不可见 -->
+  <SolidColorBrush x:Key="ThemeProgressBgBrush" Color="#FFC8C8C8" />
 
   <!-- Progress bar colors -->
   <Color x:Key="ProgressBarSizeColor">#FFE0E7FF</Color>
@@ -156,6 +160,8 @@
   <Color x:Key="ProgressBarCompressedSizeDirColor">#FFC4B0FF</Color>
   <Color x:Key="ProgressBarRatioColor">#FFFDE68A</Color>
   <Color x:Key="ProgressBarDateColor">#FFD1FAE5</Color>
+  <!-- 批次底纹（详细模式右区；紫系，与左区文件底纹 ProgressBarSizeBrush 蓝系区分） -->
+  <Color x:Key="ThemeProgressBatchColor">#FFE9DFFF</Color>
 
   <SolidColorBrush x:Key="ProgressBarSizeBrush" Color="{StaticResource ProgressBarSizeColor}" />
   <SolidColorBrush x:Key="ProgressBarSizeDirBrush" Color="{StaticResource ProgressBarSizeDirColor}" />
@@ -163,6 +169,7 @@
   <SolidColorBrush x:Key="ProgressBarCompressedSizeDirBrush" Color="{StaticResource ProgressBarCompressedSizeDirColor}" />
   <SolidColorBrush x:Key="ProgressBarRatioBrush" Color="{StaticResource ProgressBarRatioColor}" />
   <SolidColorBrush x:Key="ProgressBarDateBrush" Color="{StaticResource ProgressBarDateColor}" />
+  <SolidColorBrush x:Key="ThemeProgressBatchBrush" Color="{StaticResource ThemeProgressBatchColor}" />
 
   <!-- Drag-drop overlay (Win32, hardcoded reference values) -->
   <SolidColorBrush x:Key="DragDropBorderSuccessBrush" Color="#FF4CAF50"/>

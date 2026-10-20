@@ -69,6 +69,14 @@
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
     </Style>
 
+    <!-- NumericUpDown（整数型输入：线程数 / 并行压缩组数等）
+         默认 ParsingNumberStyle=NumberStyles.Any 会接受小数（UI 可显示 8.5，写回 int 才被截断，具误导性），
+         故加 .intOnly 类只解析整数并统一整型显示；小数演示类场景（如 UiTestWindow）不挂此类。 -->
+    <Style Selector="NumericUpDown.intOnly">
+      <Setter Property="ParsingNumberStyle" Value="Integer" />
+      <Setter Property="FormatString" Value="{}{0:0}" />
+    </Style>
+
     <!-- Button -->
     <Style Selector="Button">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />

@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>压缩格式选项面板 — 界面改动原型（多线程 / 自适应）</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   页面骨架（与 docs/prototypes 其它原型一致的「深色工具页」风格）
+   ══════════════════════════════════════════════════════════════════ */
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',Roboto,sans-serif;
+    background:#15152a; color:#eaeaea; padding:28px 20px 60px; min-height:100vh; font-size:14px;
+}
+h1 { text-align:center; color:#6bd46b; font-size:22px; margin-bottom:6px; }
+.phase-banner { max-width:960px; margin:0 auto 14px; padding:10px 14px; font-size:12px; line-height:1.7;
+                color:#ffd93d; background:#2a2a14; border:1px solid #6b5b1e; border-radius:6px; }
+.phase-banner b { color:#ffd93d; } .phase-banner code { color:#6bd46b; background:transparent; }
+.subtitle { text-align:center; color:#888; font-size:13px; margin-bottom:22px; line-height:1.75; max-width:900px; margin-left:auto; margin-right:auto; }
+.wrap { max-width:1000px; margin:0 auto; }
+code { background:#15152a; padding:1px 5px; border-radius:3px; font-family:Consolas,monospace; font-size:11.5px; color:#c792ea; }
+
+/* ── 顶部控制条 ───────────────────────────────────────────────── */
+.console { background:#22223c; border:1px solid #3d3d5c; border-radius:8px; padding:14px 16px; margin-bottom:18px; }
+.console-row { display:flex; flex-wrap:wrap; gap:22px; align-items:flex-start; }
+.console-group { display:flex; flex-direction:column; gap:6px; }
+.console-label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:#777; }
+.seg { display:flex; background:#15152a; border:1px solid #3d3d5c; border-radius:6px; overflow:hidden; }
+.seg button { padding:5px 11px; border:none; background:transparent; color:#999; cursor:pointer; font-size:12px; transition:all .15s; white-space:nowrap; }
+.seg button:hover:not(.active) { background:#33335a; color:#eaeaea; }
+.seg button.active { background:#6bd46b; color:#15152a; font-weight:600; }
+.switch { display:flex; align-items:center; gap:8px; font-size:12px; color:#999; cursor:pointer; user-select:none; }
+.switch input { width:15px; height:15px; accent-color:#6bd46b; cursor:pointer; }
+.btn-reset { padding:5px 13px; border:1px solid #6bd46b; background:transparent; color:#6bd46b; border-radius:6px; font-size:12px; cursor:pointer; }
+.btn-reset:hover { background:#6bd46b; color:#15152a; }
+
+/* ══════════════════════════════════════════════════════════════════
+   模拟对话框（外观严格对齐真实主题色，见下方 CSS 变量）
+   浅色 / 深色取自 Themes/ThemeLight.axaml、ThemeDark.axaml
+   ══════════════════════════════════════════════════════════════════ */
+.themed {
+    /* 浅色（ThemeLight.axaml） */
+    --win-bg:#F5F5F5;        /* ThemeWindowBg   */
+    --surface:#FFFFFF;       /* ThemeSurfaceBg  */
+    --header:#F0F0F0;        /* ThemeHeaderBg   */
+    --text:#1A1A1A;          /* ThemeTextPrimary   */
+    --text2:#666666;         /* ThemeTextSecondary */
+    --border:#E0E0E0;        /* ThemeBorder     */
+    --accent:#60B8FC;        /* ThemeAccent     */
+    --combo:#FFFFFF;         /* ThemeComboBoxBg */
+    --toggle:rgba(0,120,212,.66);  /* ThemeToggleBrush */
+}
+.themed[data-theme="dark"] {
+    /* 深色（ThemeDark.axaml） */
+    --win-bg:#1E1E1E; --surface:#252525; --header:#2A2A2A;
+    --text:#E0E0E0; --text2:#999999; --border:#3E3E3E; --accent:#0078D4;
+    --combo:#252525; --toggle:rgba(0,120,212,.66);
+}
+
+.win {
+    background:var(--win-bg); color:var(--text);
+    border:1px solid var(--border); border-radius:9px; overflow:hidden;
+    box-shadow:0 10px 44px rgba(0,0,0,.5); transition:background .2s,color .2s;
+}
+.win-titlebar { background:var(--header); border-bottom:1px solid var(--border); padding:9px 14px; display:flex; align-items:center; justify-content:space-between; font-size:13px; font-weight:600; }
+.win-titlebar .tb-right { display:flex; gap:12px; color:var(--text2); font-weight:400; font-size:11px; }
+
+/* 顶部 TabControl（压缩设置：常规 / 高级 / 密码 / 注释 / 过滤） */
+.tabs { display:flex; gap:2px; background:var(--header); border-bottom:1px solid var(--border); padding:0 10px; }
+.tab { padding:8px 14px; font-size:12.5px; color:var(--text2); border-bottom:2px solid transparent; }
+.tab.active { color:var(--text); font-weight:600; border-bottom-color:var(--accent); }
+
+.win-body { padding:14px; }
+
+/* ── 格式选项面板本体（对齐 DynamicFormatOptionsPanel.axaml）───────
+   Border: 1px 边框 / 圆角 6 / Padding 8 / MinHeight 100 / 背景 Surface
+   ────────────────────────────────────────────────────────────── */
+.panel {
+    background:var(--surface); border:1px solid var(--border);
+    border-radius:6px; padding:8px; min-height:100px; transition:background .2s,border-color .2s;
+}
+.panel-title { font-weight:600; margin:0 0 6px; font-size:13px; }
+.row { display:flex; align-items:center; gap:0; margin:0 0 6px; }
+.row .lbl { width:80px; font-size:13px; flex-shrink:0; }
+.combo {
+    height:24px; min-width:150px; display:inline-flex; align-items:center; justify-content:space-between;
+    gap:10px; padding:0 8px; font-size:12px; background:var(--combo);
+    border:1px solid var(--border); border-radius:4px; color:var(--text);
+}
+.combo .caret { color:var(--text2); font-size:9px; }
+.sec-title { font-weight:600; margin:6px 0 4px; font-size:13px; }
+
+/* ── 复选框（模拟 Avalonia CheckBox）───────────────────────────── */
+.chk { display:flex; align-items:flex-start; gap:7px; margin-top:4px; font-size:13px; cursor:pointer; line-height:1.5; }
+.chk input { position:absolute; opacity:0; width:0; height:0; }
+.chk .box {
+    width:15px; height:15px; flex-shrink:0; margin-top:2px; border:1.5px solid var(--text2);
+    border-radius:3px; background:transparent; position:relative; transition:background .12s,border-color .12s;
+}
+.chk input:checked + .box { background:var(--toggle); border-color:var(--toggle); }
+.chk input:checked + .box::after {
+    content:""; position:absolute; left:4px; top:1px; width:4px; height:8px;
+    border:solid #fff; border-width:0 2px 2px 0; transform:rotate(45deg);
+}
+.chk input:focus-visible + .box { outline:2px solid var(--accent); outline-offset:1px; }
+/* 禁用态：整行置灰（改动 B / 超 4GB） */
+.chk.disabled { cursor:not-allowed; }
+.chk.disabled .box { border-color:var(--border); background:var(--border); opacity:.55; }
+.chk.disabled .txt { color:var(--text2); opacity:.65; }
+
+/* ── 灰色小字提示（FontSize 11 / Secondary / 缩进 24）────────────── */
+.hint { font-size:11px; color:var(--text2); margin:2px 0 0 24px; line-height:1.6; }
+
+/* ── 「并行压缩组数」行（仅旧版对比视图显示）────────────────────── */
+.degree-row { display:none; align-items:center; gap:12px; margin-top:4px; }
+.degree-row .lbl { font-size:13px; }
+.num {
+    width:120px; height:24px; padding:0 6px; font-size:12px; text-align:center;
+    background:var(--combo); border:1px solid var(--border); border-radius:4px; color:var(--text);
+}
+.degree-row .inline-hint { font-size:11px; color:var(--text2); }
+
+/* ── 7z / TAR.GZ 面板 ─────────────────────────────────────────── */
+.placeholder { font-style:italic; color:var(--text2); text-align:center; padding:24px 0; font-size:13px; }
+
+/* ── 设置窗口「加速」页专用 ────────────────────────────────────── */
+.panel-title-row { display:flex; align-items:center; gap:6px; }
+.badge-exp { background:#FF9800; color:#fff; font-size:10px; font-weight:600; border-radius:3px; padding:1px 5px; }
+.icon-btn { width:24px; height:24px; border:1px solid var(--border); background:transparent; color:var(--text); border-radius:4px; cursor:pointer; font-size:12px; line-height:1; }
+.icon-btn:hover { background:var(--header); }
+.chk .txt b { display:block; font-weight:600; }
+.chk .txt .desc { display:block; font-size:11px; color:var(--text2); margin-top:2px; line-height:1.55; }
+.chk .txt .ext { color:var(--text2); font-size:11px; margin-left:4px; }
+.sec-note { font-size:12px; color:var(--text2); margin:2px 0 6px; line-height:1.6; }
+.sec-item { display:flex; align-items:center; gap:8px; font-size:12.5px; padding:3px 2px; }
+.sec-item .ext { color:var(--text2); font-size:11px; }
+.sec-item .arrow { color:var(--text2); }
+.sec-item .lvl { color:var(--text); }
+.row-sep { display:flex; align-items:center; gap:6px; }
+.mini-btn { border:1px solid var(--border); background:transparent; color:var(--text2); border-radius:4px; padding:2px 8px; font-size:11px; cursor:pointer; }
+
+/* ══════════════════════════════════════════════════════════════════
+   说明区
+   ══════════════════════════════════════════════════════════════════ */
+.caption { background:#22223c; border:1px solid #3d3d5c; border-radius:8px; padding:14px 16px; margin-top:18px; }
+.caption h2 { font-size:14px; color:#6bd46b; margin-bottom:8px; }
+.caption h2 .tag { font-size:10px; background:#3d5a7a; color:#cfe4ff; border-radius:3px; padding:1px 6px; margin-left:8px; vertical-align:middle; font-weight:400; }
+.caption p { font-size:12.5px; color:#b9b9c9; line-height:1.85; margin-bottom:6px; }
+.caption p:last-child { margin-bottom:0; }
+.caption b { color:#eaeaea; }
+.caption .old { color:#ff9a9a; }
+.caption .new { color:#6bd46b; }
+.caption ul { margin:2px 0 6px 20px; font-size:12.5px; color:#b9b9c9; line-height:1.85; }
+.readout { font-size:11.5px; color:#8a8a9a; margin-top:10px; padding-top:10px; border-top:1px dashed #3d3d5c; }
+.readout code { color:#6bd46b; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>压缩格式选项面板 — 界面改动原型</h1>
+  <div class="phase-banner">
+    <b>Phase 1 实施版（2026-10-19 更新）</b>：改动 A（删「并行压缩组数」）已落地；<b>改动 B（多线程依赖自适应）已暂缓</b>——双机实测 MT 收益与 CPU 相关，一刀切会片面 → 原型中「取消自适应 → 多线程置灰」的联动演示<b>仅作历史参考</b>，Phase 1 三开关互相独立。<br>
+    <b>常驻科普提示（Phase 1 新增）</b>：ZIP 面板「多线程压缩」下方灰字「收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。」—— 因提示独立成立、弱 CPU 用户在 Phase 1 即有风险窗口，故提前到本阶段（原计划归 Phase 2 Task 12 与基准测试捆绑）。<br>
+    Phase 2 待实现：魔数检测 / 自适应规则 / 自定义格式魔数 hex / 本机基准测试。计划见 <code>.omo/plans/进行中/adaptive-compress-ui-convergence.md</code>。
+  </div>
+  <p class="subtitle">
+    对应「压缩设置」对话框 →「高级」标签页里的格式选项面板（<code>DynamicFormatOptionsPanel</code>）。<br>
+    本原型演示两处改动：<b>改动 A</b> 删除「并行压缩组数」控件；<b>改动 B</b> 自适应关闭时多线程自动关闭并禁用。<br>
+    受影响的界面共两处，都在这一页：<b>① 压缩设置 → 高级 → 格式选项面板</b>（改动 A + 改动 B）、<b>② 设置 → 加速</b>（改动 B）。
+  </p>
+
+  <!-- ══════════ 顶部控制条 ══════════ -->
+  <div class="console">
+    <div class="console-row">
+      <div class="console-group">
+        <span class="console-label">压缩格式</span>
+        <div class="seg" id="segFormat">
+          <button data-v="zip" class="active">ZIP</button>
+          <button data-v="7z">7z</button>
+          <button data-v="targz">TAR.GZ</button>
+        </div>
+      </div>
+      <div class="console-group">
+        <span class="console-label">主题</span>
+        <div class="seg" id="segTheme">
+          <button data-v="light" class="active">浅色</button>
+          <button data-v="dark">深色</button>
+        </div>
+      </div>
+      <div class="console-group">
+        <span class="console-label">视图</span>
+        <div class="seg" id="segView">
+          <button data-v="new" class="active">改动后</button>
+          <button data-v="old">改动前（含组数控件）</button>
+        </div>
+      </div>
+      <div class="console-group">
+        <span class="console-label">模拟条件</span>
+        <label class="switch">
+          <input type="checkbox" id="chk4gb">
+          <span>待压缩总量 ≥ 4GB（ZIP32 上限）</span>
+        </label>
+      </div>
+      <div class="console-group">
+        <span class="console-label">&nbsp;</span>
+        <button class="btn-reset" id="btnReset">重置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════ 模拟对话框 ══════════ -->
+  <div class="win themed" id="win" data-theme="light">
+    <div class="win-titlebar">
+      <span>压缩设置</span>
+      <span class="tb-right"><span>3 个源项目</span><span>输出：D:\归档.zip</span></span>
+    </div>
+    <div class="tabs">
+      <div class="tab">常规</div>
+      <div class="tab active">高级</div>
+      <div class="tab">密码</div>
+      <div class="tab">注释</div>
+      <div class="tab">过滤</div>
+    </div>
+    <div class="win-body">
+
+      <!-- ── ZIP 面板 ── -->
+      <div class="panel" id="panelZip">
+        <div class="panel-title">压缩格式选项</div>
+
+        <!-- 编码 -->
+        <div class="row">
+          <span class="lbl">编码</span>
+          <span class="combo"><span>UTF-8</span><span class="caret">▼</span></span>
+        </div>
+        <!-- 压缩方法 -->
+        <div class="row">
+          <span class="lbl">压缩方法</span>
+          <span class="combo"><span>Deflate</span><span class="caret">▼</span></span>
+        </div>
+
+        <!-- 自适应压缩分组（三开关） -->
+        <div class="sec-title">自适应压缩</div>
+
+        <label class="chk" id="wrapAdaptive">
+          <input type="checkbox" id="chkAdaptive" checked>
+          <span class="box"></span>
+          <span class="txt">自适应压缩（已压缩文件自动 Store）</span>
+        </label>
+
+        <label class="chk" id="wrapSmart">
+          <input type="checkbox" id="chkSmart">
+          <span class="box"></span>
+          <span class="txt">魔数检测（对大文件魔数采样，更准确识别已压缩格式，会略微降低压缩速度）</span>
+        </label>
+
+        <label class="chk" id="wrapMt">
+          <input type="checkbox" id="chkMt" checked>
+          <span class="box"></span>
+          <span class="txt">多线程压缩（利用多核 CPU 并行压缩，显著提升压缩速度）</span>
+        </label>
+
+        <!-- 多线程压缩常驻科普提示：收益与 CPU 相关（双机实测），常驻显示不绑显隐 -->
+        <div class="hint" style="margin-left:24px">
+          收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。
+        </div>
+
+        <!-- 改动 B 说明：自适应关闭时出现 -->
+        <div class="hint" id="hintAdaptive" style="display:none">
+          多线程压缩需要与自适应压缩配合使用，单独开启反而更慢
+        </div>
+        <!-- 超 4GB 说明（既有行为，保留） -->
+        <div class="hint" id="hint4gb" style="display:none">
+          待压缩总量已达到 ZIP32 上限（约 4GB），多线程压缩暂不可用
+        </div>
+
+        <!-- 改动 A：本行在新版中已删除，仅「改动前」视图显示 -->
+        <div class="degree-row" id="degreeRow">
+          <span class="lbl">并行压缩组数</span>
+          <input class="num" type="number" value="16" min="1" max="16">
+          <span class="inline-hint">（N 个压缩器并行；设为 1 则与上方「多线程压缩」等效）</span>
+        </div>
+      </div>
+
+      <!-- ── 7z 面板 ── -->
+      <div class="panel" id="panel7z" style="display:none">
+        <div class="panel-title">压缩格式选项</div>
+        <div class="row"><span class="lbl">方法</span><span class="combo"><span>LZMA2</span><span class="caret">▼</span></span></div>
+        <label class="chk"><input type="checkbox" checked><span class="box"></span><span class="txt">固实压缩（所有文件作为单个数据块压缩，压缩率更高但随机访问变慢）</span></label>
+        <label class="chk"><input type="checkbox" checked><span class="box"></span><span class="txt">多线程压缩（利用多核 CPU 并行压缩，提升压缩速度）</span></label>
+        <div class="row" style="margin-top:6px"><span class="lbl">固实块大小</span><span class="combo"><span>默认</span><span class="caret">▼</span></span></div>
+        <div class="row" style="margin-top:6px"><span class="lbl">字典大小</span><span class="combo"><span>默认</span><span class="caret">▼</span></span></div>
+        <div class="row" style="margin-top:6px"><span class="lbl">字长</span><span class="combo"><span>默认</span><span class="caret">▼</span></span></div>
+        <div class="row" style="margin-top:6px"><span class="lbl">匹配查找器</span><span class="combo"><span>默认</span><span class="caret">▼</span></span></div>
+      </div>
+
+      <!-- ── TAR.GZ 面板 ── -->
+      <div class="panel" id="panelTargz" style="display:none">
+        <div class="placeholder">该格式暂无高级选项</div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════ 模拟对话框 ②：设置 → 加速 ══════════ -->
+  <div class="win themed" id="win2" data-theme="light" style="margin-top:18px">
+    <div class="win-titlebar">
+      <span>设置</span>
+      <span class="tb-right"><span>保存后立即生效</span></span>
+    </div>
+    <div class="tabs">
+      <div class="tab">常规</div>
+      <div class="tab">外观</div>
+      <div class="tab">预览</div>
+      <div class="tab active">加速</div>
+      <div class="tab">压缩</div>
+      <div class="tab">解压</div>
+      <div class="tab">调试</div>
+    </div>
+    <div class="win-body" style="display:flex; flex-direction:column; gap:12px">
+
+      <!-- 卡片①：压缩优化区（三个独立开关） -->
+      <div class="panel">
+        <div class="panel-title-row">
+          <span class="panel-title" style="margin:0">自适应压缩</span>
+          <span class="badge-exp">实验性</span>
+          <button class="icon-btn" type="button" title="压缩加速说明">?</button>
+        </div>
+
+        <label class="chk" style="margin-top:6px">
+          <input type="checkbox" id="s2Adaptive" checked><span class="box"></span>
+          <span class="txt"><b>自适应压缩</b><span class="desc">已压缩格式（图片/音视频/压缩包）自动跳过压缩，显著提速</span></span>
+        </label>
+
+        <!-- 魔数检测：真实实现里 IsVisible 绑定自适应开关 → 关闭时整行隐藏（规则 6：隐藏而非禁用） -->
+        <label class="chk" id="s2WrapSmart" style="margin-left:16px">
+          <input type="checkbox" id="s2Smart"><span class="box"></span>
+          <span class="txt"><b>魔数检测</b><span class="desc">对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度。</span></span>
+        </label>
+
+        <label class="chk" id="s2WrapMt" style="margin-top:6px">
+          <input type="checkbox" id="s2Mt" checked><span class="box"></span>
+          <span class="txt"><b>多线程压缩</b><span class="desc">利用多核 CPU 并行压缩，显著提升压缩速度。可与自适应压缩同时开启。</span></span>
+        </label>
+
+        <div class="hint" id="s2Hint" style="display:none; margin-left:24px">
+          多线程压缩需要与自适应压缩配合使用，单独开启反而更慢
+        </div>
+      </div>
+
+      <!-- 卡片②：格式目录（自适应开启、多线程关闭时可见） -->
+      <div class="panel" id="s2Catalog">
+        <div class="panel-title" style="margin-bottom:4px">格式目录</div>
+        <div class="sec-note">自适应压缩按文件类型自动选择级别；下列内置格式会被识别为「已压缩」。</div>
+        <div class="sec-item"><span>JPEG 图片</span><span class="ext">.jpg .jpeg</span></div>
+        <div class="sec-item"><span>PNG 图片</span><span class="ext">.png</span></div>
+        <div class="sec-item"><span>MP4 视频</span><span class="ext">.mp4 .m4v</span></div>
+        <div class="sec-item"><span>ZIP 压缩包</span><span class="ext">.zip</span></div>
+        <div class="sec-item" style="margin-top:4px"><span class="mini-btn">展开全部内置格式</span></div>
+      </div>
+
+      <!-- 卡片③：仅存储格式选择（多线程开启时可见） -->
+      <div class="panel" id="s2Store">
+        <div class="panel-title" style="margin-bottom:4px">仅存储格式</div>
+        <div class="sec-note">多线程压缩时，下列格式不参与压缩（直接存储），把 CPU 让给真正需要压缩的文件。</div>
+        <label class="chk"><input type="checkbox" checked><span class="box"></span><span class="txt">JPEG 图片<span class="ext">.jpg .jpeg</span></span></label>
+        <label class="chk"><input type="checkbox" checked><span class="box"></span><span class="txt">MP4 视频<span class="ext">.mp4</span></span></label>
+        <label class="chk"><input type="checkbox"><span class="box"></span><span class="txt">PDF 文档<span class="ext">.pdf</span></span></label>
+      </div>
+
+      <!-- 卡片④：自适应规则（自适应开启、多线程关闭时可见） -->
+      <div class="panel" id="s2Rules">
+        <div class="panel-title" style="margin-bottom:4px">自适应规则</div>
+        <div class="sec-note">自定义「某类格式用哪个压缩级别」，优先级高于内置分类。</div>
+        <div class="sec-item">
+          <label class="chk" style="margin-top:0"><input type="checkbox" checked><span class="box"></span><span class="txt">照片存档</span></label>
+          <span class="ext">.jpg .heic</span><span class="arrow">→</span><span class="lvl">存储</span>
+          <span style="margin-left:auto"><span class="mini-btn">编辑</span> <span class="mini-btn">删除</span></span>
+        </div>
+        <div class="sec-item">
+          <label class="chk" style="margin-top:0"><input type="checkbox" checked><span class="box"></span><span class="txt">日志文本</span></label>
+          <span class="ext">.log</span><span class="arrow">→</span><span class="lvl">全局 +1</span>
+          <span style="margin-left:auto"><span class="mini-btn">编辑</span> <span class="mini-btn">删除</span></span>
+        </div>
+        <div class="sec-item" style="margin-top:4px"><span class="mini-btn">添加规则</span><span class="mini-btn">恢复默认</span></div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- ══════════ 说明区 ══════════ -->
+  <div class="caption">
+    <h2>改动 A<span class="tag">删除控件</span></h2>
+    <p>
+      <span class="old">改动前</span>：ZIP 面板在多线程压缩下方还有一个 <b>「并行压缩组数」</b> 数字输入框（1–16，默认取 CPU 核数），
+      只在勾选「多线程压缩」时显示。
+    </p>
+    <p>
+      <span class="new">改动后</span>：该控件<b>整块删除</b>。组数改由引擎内部按 <code>clamp(CPU 核数, 2, 8)</code> 自动决定（本机 16 核 → 8 组）。
+    </p>
+    <p>
+      <b>为什么删</b>：实测该旋钮对速度<b>没有正收益</b>，反而在把组数设到核数以下时会静默限流——
+      在 16 核机器上把组数设成 2，压缩只用到约 2 个核，耗时是设成 16 组的 <b>约 3 倍</b>（5.47s → 1.64s）。
+      组数本质上同时充当了「工作线程数」和「进度窗口通道行数」两个角色，耦合在一起就会误导用户。
+    </p>
+
+    <h2 style="margin-top:16px">改动 B<span class="tag">联动禁用</span></h2>
+    <p>
+      取消勾选「自适应压缩」时，「多线程压缩」<b>自动取消勾选并置灰禁用</b>，并在下方出现一行灰色说明；
+      重新勾选「自适应压缩」后恢复可用，并<b>还原用户之前的勾选状态</b>。
+    </p>
+    <p>
+      <b>为什么</b>：多线程路径改用 7z 的 Deflate 压缩器（压缩率更高但更慢）。没有自适应先剔除已压缩文件时，
+      可压缩数据上「仅多线程」实测比<b>完全不开多线程</b>还慢约 <b>1.5–1.8 倍</b>。
+    </p>
+    <p style="margin-top:6px">
+      <b>连带效果（设置 → 加速 页）</b>：改动 B 让「多线程压缩」依赖「自适应压缩」之后，下方三个区域的显隐关系也随之简化——
+      「仅存储格式」等价于「多线程开启时」显示；「格式目录」「自适应规则」在「自适应开启且多线程关闭」时显示；
+      自适应关闭时三者全部隐藏（与既有规则一致）。
+    </p>
+
+    <h2 style="margin-top:16px">改动 C<span class="tag">补联动</span></h2>
+    <p>
+      压缩对话框面板里，「自适应压缩」关闭时「魔数检测」<b>置灰禁用</b>（当前实现漏了这条联动）。
+    </p>
+    <p>
+      <b>为什么</b>：Core 里 <code>ArchiveOptions.AdaptiveSmartDetect</code> 的注释已写明「自适应开启时，对大文件做魔数增强识别。<b>自适应关闭时无效</b>」，
+      但 UI 没做这条联动，用户可以在自适应关闭时勾选一个根本不生效的选项。
+    </p>
+    <p style="color:#ff9a9a">
+      备注（评审时需一并决定）：全仓检索确认该开关目前<b>没有任何引擎消费者</b> —— 只有 UI 绑定、设置持久化和参数透传
+      （<code>ArchiveOptions.AdaptiveSmartDetect</code> → <code>AdaptiveRuleMatcher.ResolveLevel(adaptiveSmartDetect:)</code> 形参只写日志、不参与分支）。
+      也就是说这个选项当前是空转的，补联动只是修 UI 一致性，不改变压缩结果。
+    </p>
+
+    <h2 style="margin-top:16px">保留的既有行为<span class="tag">不变</span></h2>
+    <ul>
+      <li><b>设置 → 加速</b>页里「魔数检测」随「自适应压缩」<b>整行隐藏</b>（自适应关闭时；规则 6：隐藏而非禁用）。</li>
+      <li>两处形态不同（对话框＝置灰禁用 / 设置页＝整行隐藏），沿用各自现状；若要统一请告知。</li>
+      <li>待压缩总量达到 ZIP32 上限（约 4GB）时，「多线程压缩」仍自动取消勾选 + 禁用并显示提示。</li>
+    </ul>
+
+    <div class="readout">
+      当前状态读数：
+      自适应 = <code id="roAdaptive">开</code> ·
+      多线程 = <code id="roMt">开</code> ·
+      多线程可交互 = <code id="roMtEnabled">是</code> ·
+      引擎内部组数 = <code id="roDegree">8（自动）</code> ·
+      显示的组数控件 = <code id="roDegreeCtl">隐藏</code>
+    </div>
+  </div>
+
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   原型交互逻辑
+   状态说明：
+     adaptive   —— 用户对「自适应压缩」的勾选
+     userMt     —— 用户对「多线程压缩」的【意图】勾选（仅在可交互时被写入，
+                   禁用期间保持不变，恢复后据此还原，与真实实现同一套「记住/还原」思路）
+     overLimit  —— 模拟「待压缩总量 ≥ 4GB」
+     showOld    —— 是否显示「改动前」视图（即是否显示已删除的组数控件）
+   ══════════════════════════════════════════════════════════════════ */
+
+const DEFAULTS = { format:'zip', theme:'light', showOld:false, overLimit:false, adaptive:true, smart:false, userMt:true };
+let S = Object.assign({}, DEFAULTS);
+
+const $ = id => document.getElementById(id);
+
+/* 派生渲染：所有显隐/禁用/勾选都从这里统一算出来，避免各处漏改 */
+function render() {
+    // ── 多线程是否被禁用（改动 B 或 超 4GB，任一成立即禁用）──
+    const mtDisabled = !S.adaptive || S.overLimit;
+
+    // ── 格式面板切换 ──
+    $('panelZip').style.display   = S.format === 'zip'   ? '' : 'none';
+    $('panel7z').style.display    = S.format === '7z'    ? '' : 'none';
+    $('panelTargz').style.display = S.format === 'targz' ? '' : 'none';
+
+    // ── 主题 ──
+    $('win').dataset.theme = S.theme;
+
+    // ── 复选框状态 ──
+    $('chkAdaptive').checked = S.adaptive;
+    $('chkSmart').checked    = S.smart;
+    // 禁用期间强制显示为未勾选；可交互时显示用户意图
+    $('chkMt').checked   = mtDisabled ? false : S.userMt;
+    $('chkMt').disabled  = mtDisabled;
+    $('wrapMt').classList.toggle('disabled', mtDisabled);
+
+    // 魔数检测（压缩对话框面板）：自适应关闭时置灰禁用（改动 C —— 当前实现漏了这条联动）
+    $('chkSmart').disabled = !S.adaptive;
+    $('wrapSmart').classList.toggle('disabled', !S.adaptive);
+
+    // ── 提示文字（改动 B 优先于 4GB 提示，二者不会同时出现）──
+    $('hintAdaptive').style.display = !S.adaptive ? '' : 'none';
+    $('hint4gb').style.display      = (S.adaptive && S.overLimit) ? '' : 'none';
+
+    // ── 组数控件：仅「改动前」视图 + 多线程勾选时显示（对齐原实现的显隐条件）──
+    const degreeVisible = S.showOld && $('chkMt').checked;
+    $('degreeRow').style.display = degreeVisible ? 'flex' : 'none';
+
+    // ── ② 设置 → 加速 页（与①共享同一份自适应/多线程状态：真实实现里是同一个设置项）──
+    const effMt = !mtDisabled && S.userMt;   // 实际生效的多线程
+    $('win2').dataset.theme = S.theme;
+    $('s2Adaptive').checked = S.adaptive;
+    $('s2Smart').checked    = S.smart;
+    $('s2Mt').checked       = mtDisabled ? false : S.userMt;
+    $('s2Mt').disabled      = mtDisabled;
+    $('s2WrapMt').classList.toggle('disabled', mtDisabled);
+    // 魔数检测：真实实现 IsVisible 绑定自适应开关 → 关闭时整行隐藏（规则 6）
+    $('s2WrapSmart').style.display = S.adaptive ? '' : 'none';
+    $('s2Hint').style.display = !S.adaptive ? '' : 'none';
+    // 三个区域显隐：格式目录/自适应规则 = 自适应开启且多线程关闭；
+    // 仅存储格式 = 仅自适应开启（2026-10-19 起与多线程解耦，串行路径也读自定义仅存储格式）
+    $('s2Catalog').style.display = (S.adaptive && !effMt) ? '' : 'none';
+    $('s2Store').style.display   = S.adaptive ? '' : 'none';
+    $('s2Rules').style.display   = (S.adaptive && !effMt) ? '' : 'none';
+
+    // ── 控制条按钮激活态 ──
+    segSet('segFormat', S.format);
+    segSet('segTheme', S.theme);
+    segSet('segView', S.showOld ? 'old' : 'new');
+
+    // ── 状态读数 ──
+    $('roAdaptive').textContent  = S.adaptive ? '开' : '关';
+    $('roMt').textContent        = $('chkMt').checked ? '开' : '关';
+    $('roMtEnabled').textContent = mtDisabled ? '否' : '是';
+    $('roDegree').textContent    = S.showOld ? '（旧版：用户指定）' : '8（自动）';
+    $('roDegreeCtl').textContent = degreeVisible ? '显示' : '隐藏';
+}
+
+function segSet(segId, value) {
+    document.querySelectorAll('#' + segId + ' button').forEach(b => {
+        b.classList.toggle('active', b.dataset.v === value);
+    });
+}
+
+/* ── 事件绑定 ───────────────────────────────────────────────────── */
+
+// 分段按钮（格式 / 主题 / 视图）
+function bindSeg(segId, onPick) {
+    document.querySelectorAll('#' + segId + ' button').forEach(btn => {
+        btn.addEventListener('click', () => { onPick(btn.dataset.v); render(); });
+    });
+}
+bindSeg('segFormat', v => S.format = v);
+bindSeg('segTheme',  v => S.theme  = v);
+bindSeg('segView',   v => S.showOld = (v === 'old'));
+
+// 自适应：改动 B 的触发点
+$('chkAdaptive').addEventListener('change', e => { S.adaptive = e.target.checked; render(); });
+
+// 魔数检测
+$('chkSmart').addEventListener('change', e => { S.smart = e.target.checked; render(); });
+
+// 多线程：只有可交互时才会触发 change，此时才更新「用户意图」
+$('chkMt').addEventListener('change', e => { S.userMt = e.target.checked; render(); });
+
+// 模拟超 4GB
+$('chk4gb').addEventListener('change', e => { S.overLimit = e.target.checked; render(); });
+
+// ② 设置 → 加速 页的三个开关（与①共享状态）
+$('s2Adaptive').addEventListener('change', e => { S.adaptive = e.target.checked; render(); });
+$('s2Smart').addEventListener('change',    e => { S.smart    = e.target.checked; render(); });
+$('s2Mt').addEventListener('change',       e => { S.userMt   = e.target.checked; render(); });
+
+// 重置
+$('btnReset').addEventListener('click', () => {
+    S = Object.assign({}, DEFAULTS);
+    $('chk4gb').checked = false;
+    render();
+});
+
+// 首帧
+render();
+</script>
+</body>
+</html>

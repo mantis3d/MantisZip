@@ -14,12 +14,48 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 - 音频预览新增 **MP3 / FLAC 内嵌封面显示** — 直接读取 ID3 标签（MP3）与 PICTURE 块（FLAC）中的内嵌封面图并居中展示；无封面时回退显示标题/艺术家大字
 - Added **embedded cover art display for MP3 / FLAC audio preview** — reads the embedded cover image from the ID3 tag (MP3) and the PICTURE block (FLAC) and shows it centered; falls back to a large title/artist text when no cover is present
 
+**性能 / Performance**
+
+- **自适应压缩体系** — 压缩对话框与设置新增「加速」选项卡，压缩策略收敛为两个独立开关：**多线程压缩**（可压缩文件走 7z 多线程并发压缩；ZIP 场景由 N 组并行管线承接）与**自适应压缩**（已压缩内容自动转为仅存储、不再重复压缩，仅存储作用范围的格式列表可自定义维护）；两个开关可任意组合独立生效
+- **Adaptive compression system** — the compress dialog and Settings gain a "speed-up" tab; the compression strategy converges into two independent switches: **multithreaded compression** (compressible files are compressed concurrently via 7z multithreading, with ZIP routed through the N-group parallel pipeline) and **adaptive compression** (already-compressed content is automatically stored without re-compression, over a customizable store-format list); the two switches combine freely and each works on its own
+- **ZIP N 组并行压缩** — 开启「多线程压缩」后 ZIP 经 N 组并行管线压缩：文件按 LPT 贪心算法分组，各组 7z 多线程并发压缩，最后 copy-mode 合并进最终 ZIP（不重压缩）；并行组数**自动按 CPU 核数决策**（约取核数值并限制在 4–16 区间），无需手动设置；总大小超过 ZIP32 上限（约 4GB）时自动禁用并提示
+- **ZIP N-group parallel compression** — with "multithreaded compression" enabled, ZIP compression runs through an N-group parallel pipeline: files are split by LPT greedy grouping, each group is compressed concurrently via 7z multithreading, then merged into the final ZIP via copy mode (no re-compression); the group count is **resolved automatically from the CPU core count** (roughly the core count, clamped to 4–16) and needs no manual setting; automatically disabled with a notice when the total size exceeds the ZIP32 limit (~4GB)
+- ![压缩加速设置](docs/images/version/v0.5.2/CompressSpeedUpSetting.png)
+- **智能并行解压** — 解压线程数改为自动决策：智能模式按磁盘类型给出默认值（SSD / HDD 不同），≥1GB 的大包先用小样本预测试选优；解压对话框线程数默认 0=自动；设置窗口解压页新增并行解压卡片（全局开关 / 智能并行 / SSD·HDD 线程数 / 大包预测试）
+- **Smart parallel extraction** — the extraction thread count is now resolved automatically: smart mode picks disk-type-aware defaults (different for SSD vs HDD), and archives ≥1GB run a small-sample pre-test to pick the optimal degree; the extract dialog defaults to thread count 0 = auto; Settings gains a parallel-extraction card (global toggle / smart mode / SSD & HDD thread counts / large-archive pre-test)
+- ![解压加速设置](docs/images/version/v0.5.2/ExtractSpeedUpSetting.png)
+- **启动速度优化** — 预览面板控件树改为延迟实例化（首帧后空闲预取 + 首次预览兜底），实测整体启动耗时降低约 9%，预览面板构造开销降低约 98%
+- **Faster startup** — the preview panel's control tree is now instantiated lazily (idle-time prefetch after the first frame, with a fallback on first preview); measured overall startup time down ~9% and preview-panel construction cost down ~98%
+
+**进度窗口 / Progress Window**
+
+- **统计卡三行结构** — 「完整」信息量下 6 张统计卡重构为三行（图标+标题 / 文件数量 / 文件大小）；已处理卡改纯计数（去掉与总大小卡重复的 N/M 分母）；新增跳过 / 失败 / 已覆盖的终态字节累加统计；缺数据显示「—」
+- **Three-row statistics cards** — at "full" info density the six statistics cards are restructured into three rows (icon+title / file count / file size); the processed card shows a pure count (dropping the N/M denominator that duplicated the total-size card); new terminal byte accumulators for skipped / failed / overwritten entries; missing data shows a dash
+- ![进度窗口统计卡](docs/images/version/v0.5.2/ProgressCompress.png)
+- **通道行左右分组 + 实时压缩率** — 通道行重构为左右两区：左=单文件域（路径中间省略两列 + 文件名恒完整显示 + 文件大小），右=批次域（批序号 / 批进度底纹线 / 合并百分比），批进度底纹替代独立进度条；列表模式新增「压缩后大小 (率)」列（如 `600 KB (50%)`），ZIP 压缩时统计卡区还显示整体压缩汇总
+- **Channel rows regrouped with live compression ratios** — each channel row is split into a file area on the left (two middle-ellipsized path columns + always-complete file name + file size) and a batch area on the right (batch index / batch progress underline / merged percentage), replacing separate batch progress bars; list mode gains a "compressed size (ratio)" column (e.g. `600 KB (50%)`), and ZIP compression also shows an overall compression summary
+- ![进度窗口通道行](docs/images/version/v0.5.2/ProgressExtract.png)
+- **速度与剩余时间全格式可用** — 7z / TAR / GZ 的解压、压缩、删除全路径按真实字节上报进度（此前仅 ZIP），所有格式的速度（B/s）与 ETA 一致生效
+- **Speed and ETA now work for every format** — 7z / TAR / GZ extraction, compression and deletion now report true byte-level progress (previously ZIP-only), so speed (B/s) and ETA are consistent across all formats
+- **状态行 + 失败明细分层 + 自动关闭倒计时** — 状态行下移到信息区下方（可复制）并带六态状态图标；错误摘要红（整包异常）/ 黄（逐条目跳过）分层显示；关闭逻辑统一（出现错误时自动「钉住」不自动关）；自动关闭延迟可配置（3–60 秒）且倒计时盒常显；「测试压缩包」结果写入窗口状态行与错误摘要；解压完成后可在按钮行直接选择「移入回收站」/「打开文件夹」
+- **Status line, layered errors and auto-close countdown** — the status line moved below the info section (copyable) with a six-state icon; error summaries are layered red (archive-level) / yellow (per-entry skips); the close chain is unified (errors auto-pin the window); the auto-close delay is configurable (3–60s) with an always-visible countdown box; "test archive" results are written into the status line and error summary; after extraction you can choose "recycle bin" / "open folder" directly from the button row
+- ![状态行 + 失败明细红/黄分层 + 自动关闭倒计时](docs/images/version/v0.5.2/TestErrorStatus.png)
+- **显示偏好持久化 + 语言即时刷新** — 内容模式（简洁 / 详细 / 列表）、信息量分级与窗口宽度均记住选择（默认「详细 / 中」）；任务运行中切换语言即时刷新全部文案
+- **Persisted display preferences + instant language switch** — content mode (simple / detailed / list), info density and window width are remembered (default: detailed / medium); switching language mid-operation refreshes all texts instantly
+
 **交互 / Interactions**
 
 - 压缩端新增**「文件冲突默认策略」**（对齐解压端）— 可选每次询问 / 覆盖 / 追加 / 自动重命名 / 跳过，设置窗口与压缩对话框均可配置；非「每次询问」时直接按策略执行、不再弹窗
 - Added a **default file-conflict strategy for compression** (matching the extract side) — choose ask-each-time / overwrite / add / auto-rename / skip, configurable in both Settings and the compress dialog; anything other than "ask each time" is applied directly without a prompt
 - 解压设置窗口新增**「解压后将原压缩包移到回收站」勾选项** — 默认读取全局设置，勾选仅本次解压生效、不写回设置
 - The extract settings dialog gained a **"move the original archive to the Recycle Bin after extraction" checkbox** — defaults to the global setting; the choice applies to this extraction only and is not written back
+- 7z **字典大小 / 固实块大小支持自定义 MB 输入** — 字典预设从 6 项扩至 11 项（最大 8GB，突破此前 2GB 上限），并支持手动输入任意 MB 值；固实块大小同步支持自定义
+- 7z **dictionary size and solid block size now accept custom MB input** — dictionary presets extended from 6 to 11 (up to 8GB, breaking the previous 2GB cap) with free-form MB entry; solid block size supports custom input as well
+- ![7z 字典大小/固实块自定义 MB 输入](docs/images/version/v0.5.2/7ZdictSetting.png)
+- **帮助弹窗全面 Markdown 化** — 压缩加速 / 并行解压 / 密码管理器 / 日志隐私四处帮助统一改为 Markdown 驱动渲染（支持表格、文本可选中复制），帮助按钮统一为问号图标
+- **Help dialogs fully Markdown-driven** — the four help windows (compression speed-up / parallel extraction / password manager / log privacy) now render from localized Markdown (tables supported, text selectable and copyable); help buttons unified as a question-mark icon
+- ![帮助弹窗 Markdown 渲染效果](docs/images/version/v0.5.2/HelpDialog.png)
+
 
 **修复 / Fixes**
 
@@ -29,6 +65,25 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 - Fixed **silent "Test archive" failure on encrypted RAR/7z archives** — the test previously read the password only from the session cache; with no session password the test API quickly returned false and the status bar showed only "test failed" with no prompt. The test now resolves the password exactly like open/extract first: session cache → password library auto-match → password dialog (with quick verification and retry on wrong password); cancelling shows "Cancelled - password required" and aborts instead of falsely failing
 - 修复**测试压缩包时进度条不动** — 底层 `TestArchiveAsync` 此前在 `Check()`（=7z.dll 整包提取校验语义）阶段不订阅任何进度事件，同时校验完后还冗余地对每个条目再解压一次（约 2 倍工作量）。现改为消费校验阶段的 `FileExtractionFinished` 事件逐条目上报进度，并删除冗余的逐条目二次解压；实测 130MB 未加密 RAR 测试由约 1.4s 降至约 0.8s，且加密/未加密 RAR、7z 测试均实时显示进度
 - Fixed **the progress bar not moving during "Test archive"** — `TestArchiveAsync` previously subscribed to no progress events during `Check()` (the 7z.dll full-extraction verify), and afterwards redundantly extracted every entry again (~2x the work). It now reports per-entry progress from the `FileExtractionFinished` events raised during verification and drops the redundant per-entry re-extraction; measured 130MB unencrypted RAR test dropped from ~1.4s to ~0.8s, and both encrypted and unencrypted RAR and 7z tests now show live progress
+- 修复**非加密压缩包误报「密码匹配」** — 密码快速验证在压缩包不含加密条目时对任意密码都返回成功，导致非加密包被误判为已匹配密码；现无加密条目时直接短路返回，不再误报
+- Fixed **false "password matched" reports on non-encrypted archives** — quick password verification returned success for any password when the archive had no encrypted entries, misclassifying non-encrypted archives; it now short-circuits when there are no encrypted entries
+- 修复**损坏 ZIP 被静默通过** — 引擎此前用 SharpCompress 的裸流读取条目（不校验 CRC），导致「数据被改动但仍可解码」的损坏条目（如 stored 条目字节翻转、CRC 字段错）在「测试压缩包」与解压时均不报错、静默解出错误内容。现改走官方 CRC 校验路径：损坏条目在测试中判为失败，解压时逐条目报告**「数据损坏（CRC 校验失败）」**并删除已写出的损坏文件、不再中止整批；加密包（含 WinZip AES AE-2）、CRC 不可用等边界由官方路径自动跳过，不会误报
+- Fixed **corrupted ZIPs passing silently** — the engine previously read entries through SharpCompress's raw stream (which does not verify CRC), so damaged-but-decodable entries (e.g. a bit-flipped stored entry, or a wrong CRC field) passed both "test archive" and extraction with no error and silently produced wrong output. It now uses the official CRC-validating path: damaged entries fail the test and, on extraction, are reported per-entry as **"Data corruption (CRC check failed)"** with the corrupt output deleted and the rest of the batch continuing; edge cases such as encrypted archives (incl. WinZip AES AE-2) and unavailable CRC are skipped automatically by the official path, so there are no false positives
+- 压缩/解压**出错信息全面本地化与分层** — 整包级错误（文件未找到 / 无权限 / 目录不存在 / 压缩包损坏 / 已加密）不再直接弹原始异常文本，改为映射到本地化文案，原始异常信息保留在可展开的详情中；逐条目失败原因（损坏 / 加密 / 读取失败等）会同时写入状态行与失败明细；弹窗与状态行不再出现「操作失败：」等冗余前缀。含两个状态行修复：测试校验完成后状态行不再一直卡在「正在准备…」，出错后状态行不再被反复覆盖刷新
+- **Localized and layered error messages for compression / extraction** — archive-level errors (file not found / access denied / directory missing / corrupted archive / encrypted) no longer surface as raw exception text: they are mapped to localized messages, with the original exception kept in an expandable detail; per-entry failure reasons (corrupted / encrypted / read failure, etc.) are written to both the status line and the failure list; redundant prefixes such as "Operation failed:" are gone from prompts and status lines. Includes two status-line fixes: it no longer stays stuck at "preparing…" after verification completes, and error states are no longer overwritten by repeated refreshes
+- 修复**损坏的 7z / RAR 压缩包被误判为「已加密」** — 此前损坏包（头部结构异常）会触发「请输入密码」提示，输入正确密码也无济于事；现按头部结构区分「损坏」与「加密」，损坏包给出正确的损坏提示
+- Fixed **corrupted 7z / RAR archives being misclassified as encrypted** — damaged archives (with a broken header structure) used to trigger the "enter password" prompt, which never succeeded even with the correct password; header-structure inspection now distinguishes "corrupted" from "encrypted" and reports the actual damage
+- 修复**Windows 文件关联失效系列问题** — 关联注册统一收口到 RegistryHost（不再散落多处直连注册表导致部分写字段丢失）；修复升级安装后残留悬空的 UserChoice 选择导致关联被系统拒绝；修复关联后文件图标缺失（补 DefaultIcon）；卸载/重装时清理旧版本遗留的 ProgId；启动时自动检测并修复被第三方软件篡改的关联项；写注册表后广播 SHChangeNotify， Explorer 图标与关联即时刷新、无需重启或重启 Explorer；卸载时通过 RunOnce 钩子清理注销后残留的注册数据
+- Fixed **a series of Windows file-association failures** — association registry writes are now funneled through a single RegistryHost (previously scattered direct writes could drop sub-keys); dangling UserChoice entries left behind by upgrades no longer make the system reject the association; a missing DefaultIcon is now supplied so associated files keep their icon; legacy ProgIds from old installs are cleaned up on uninstall/reinstall; associations tampered with by third-party tools are auto-detected and repaired at startup; SHChangeNotify is broadcast after registry writes so Explorer refreshes icons and associations immediately, without restarting the app or Explorer; a RunOnce hook cleans up leftover registry data after uninstall
+- CLI 压缩/解压命令**退出路径统一收口 AppShutdown** — 此前 12 条直接退出路径各自收尾，可能出现日志未落盘或进程驻留；现统一走关停流程后再退出
+- CLI compress/extract commands now **exit through the unified AppShutdown path** — 12 direct-exit paths previously did their own teardown, which could leave logs unflushed or the process lingering; all exits now go through the unified shutdown flow
+- 修复**未打开压缩包时拖入文件/目录后点「压缩」无反应** — 拖入路径能预填进压缩对话框，但点「压缩」关闭对话框后没有接上执行管道，压缩静默不执行；现拖入压缩与「新建压缩包」走同一执行链（选项拷贝回传 → 构建压缩请求 → 进度窗口 → 冲突/错误弹窗），行为完全一致
+- Fixed **clicking "Compress" after dropping files/folders into the main window doing nothing** — dropped paths did pre-fill the compress dialog, but nothing was wired up after clicking "Compress" and closing it, so the compression silently never ran; drag-in compression now goes through the exact same execution chain as "New Archive" (dialog options copied back → request built → progress window → conflict/error prompts)
+
+**依赖升级 / Dependency Upgrades**
+
+- SixLabors.ImageSharp 安全升级 3.1.5 → 4.1.3，并覆盖 SQLitePCLRaw 原生库至 3.53.3
+- Security-upgraded SixLabors.ImageSharp from 3.1.5 to 4.1.3 and overlaid SQLitePCLRaw native binaries at 3.53.3
 
 
 ## v0.5.1

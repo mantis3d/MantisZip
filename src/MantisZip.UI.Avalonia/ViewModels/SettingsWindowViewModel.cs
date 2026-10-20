@@ -1,5 +1,9 @@
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
+using Avalonia.Controls;
+using Avalonia.Controls.ApplicationLifetimes;
+using MantisZip.Core.Models;
+using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -110,7 +114,35 @@ public partial class SettingsWindowViewModel : ObservableObject
     private string _sevenZipSolidBlockSize = "";
 
     [ObservableProperty]
-    private int _sevenZipDictionarySize = 0;
+    private string _customSolidSizeText = "";
+
+    /// <summary>自定义固实块大小输入框是否可见（选「自定义」时显示，规则 6：隐藏而非禁用）。</summary>
+    public bool IsCustomSolidSizeVisible => SelectedSevenZipSolidBlockSizeOption?.Value == "-1";
+
+    /// <summary>自定义固实块大小输入框旁的单位提示（i18n）。</summary>
+    public string CustomSolidSizeHintText => LocalizationManager.T("FormatOptions_7z_SolidBlockSize_CustomHint");
+
+    partial void OnSelectedSevenZipSolidBlockSizeOptionChanged(Option? value)
+    {
+        OnPropertyChanged(nameof(IsCustomSolidSizeVisible));
+    }
+
+    [ObservableProperty]
+    private string _sevenZipDictionarySize = "";
+
+    [ObservableProperty]
+    private string _customDictSizeText = "";
+
+    /// <summary>自定义字典大小输入框是否可见（选「自定义」时显示，规则 6：隐藏而非禁用）。</summary>
+    public bool IsCustomDictSizeVisible => SelectedSevenZipDictionarySizeOption?.Value == "-1";
+
+    /// <summary>自定义字典大小输入框旁的单位提示（i18n）。</summary>
+    public string CustomDictSizeHintText => LocalizationManager.T("FormatOptions_7z_DictSize_CustomHint");
+
+    partial void OnSelectedSevenZipDictionarySizeOptionChanged(Option? value)
+    {
+        OnPropertyChanged(nameof(IsCustomDictSizeVisible));
+    }
 
     [ObservableProperty]
     private int _sevenZipNumFastBytes = 0;
@@ -129,6 +161,56 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private bool _sevenZipEncryptHeaders = true;
+
+    // ── Adaptive Compression (三个独立开关) ──
+    [ObservableProperty]
+    private bool _adaptiveCompression;
+
+    [ObservableProperty]
+    private bool _adaptiveSmartDetect;
+
+    [ObservableProperty]
+    private bool _multiThreadedCompression;
+
+    partial void OnAdaptiveCompressionChanged(bool value) => NotifyAdaptiveProperties();
+    partial void OnAdaptiveSmartDetectChanged(bool value) => NotifyAdaptiveProperties();
+    partial void OnMultiThreadedCompressionChanged(bool value) => NotifyAdaptiveProperties();
+
+    private void NotifyAdaptiveProperties()
+    {
+        OnPropertyChanged(nameof(IsSmartDetectVisible));
+        OnPropertyChanged(nameof(IsAdaptiveContentVisible));
+        OnPropertyChanged(nameof(IsStoreFormatSectionVisible));
+        OnPropertyChanged(nameof(IsUserRulesSectionVisible));
+        OnPropertyChanged(nameof(IsFormatCatalogSectionVisible));
+    }
+
+    /// <summary>魔数检测开关是否可见 —— Phase 2：实现魔数检测后改回 AdaptiveCompression。</summary>
+    public bool IsSmartDetectVisible => false;
+
+    /// <summary>自适应内容区域是否可见（自适应或多线程任一开启）。</summary>
+    public bool IsAdaptiveContentVisible => AdaptiveCompression || MultiThreadedCompression;
+
+    /// <summary>仅存储格式选择区域是否可见（仅自适应开启；2026-10-19 起与多线程解耦 —— 串行路径也读自定义仅存储格式）。</summary>
+    public bool IsStoreFormatSectionVisible => AdaptiveCompression;
+
+    /// <summary>用户自定义规则区域是否可见 —— Phase 2：实现自适应规则后改回 AdaptiveCompression && !MultiThreadedCompression。</summary>
+    public bool IsUserRulesSectionVisible => false;
+
+    /// <summary>格式目录区域是否可见（仅自适应开启，多线程关闭）。</summary>
+    public bool IsFormatCatalogSectionVisible => AdaptiveCompression && !MultiThreadedCompression;
+
+    /// <summary>内置格式（只读，供 UI 展示）。</summary>
+    public ObservableCollection<FormatDefinitionViewModel> BuiltInFormats { get; } = new();
+
+    /// <summary>用户自定义格式（ObservableCollection for UI binding）。</summary>
+    public ObservableCollection<FormatDefinitionViewModel> CustomFormats { get; } = new();
+
+    /// <summary>用户自定义规则（ObservableCollection for UI binding）。</summary>
+    public ObservableCollection<AdaptiveOverrideRuleViewModel> AdaptiveOverrides { get; } = new();
+
+    /// <summary>多线程模式下仅存储格式选择（ObservableCollection for UI binding）。</summary>
+    public ObservableCollection<StoreFormatItemViewModel> MultiThreadedStoreFormats { get; } = new();
 
     [ObservableProperty]
     private string _logPrivacyMode = "extension";
@@ -178,6 +260,63 @@ public partial class SettingsWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(DoubleClickOpenThresholdMB));
     }
+
+    // ── Parallel Extract ──
+    [ObservableProperty]
+    private bool _enableParallelExtract;
+
+    [ObservableProperty]
+    private bool _smartParallelDegree;
+
+    [ObservableProperty]
+    private int _smartSsdDegree = 12;
+
+    [ObservableProperty]
+    private int _smartHddDegree = 8;
+
+    /// <summary>智能关闭时使用的固定线程数（手动，1-16）。</summary>
+    [ObservableProperty]
+    private int _manualParallelDegree = 4;
+
+    [ObservableProperty]
+    private bool _largeArchivePreTest;
+
+    [RelayCommand]
+    private void ShowParallelHelp()
+    {
+        ShowParallelHelpRequested?.Invoke();
+    }
+
+    /// <summary>帮助弹窗打开请求（由 SettingsWindow code-behind 订阅并弹窗）。</summary>
+    public event Action? ShowParallelHelpRequested;
+
+    partial void OnSmartParallelDegreeChanged(bool value)
+    {
+        OnPropertyChanged(nameof(SmartParallelDegreeText));
+        NotifyParallelVisibility();
+    }
+
+    partial void OnEnableParallelExtractChanged(bool value)
+    {
+        NotifyParallelVisibility();
+    }
+
+    /// <summary>集中通知并行解压相关派生属性（规则：集中通知模式）。</summary>
+    private void NotifyParallelVisibility()
+    {
+        OnPropertyChanged(nameof(IsPreTestVisible));
+        OnPropertyChanged(nameof(IsSmartDegreeVisible));
+        OnPropertyChanged(nameof(IsManualDegreeVisible));
+    }
+
+    /// <summary>大包预测试开关可见性：全局开关与智能并行度均开启时显示（规则 6）。</summary>
+    public bool IsPreTestVisible => EnableParallelExtract && SmartParallelDegree;
+
+    /// <summary>SSD/HDD 线程数可见性：全局开关与智能并行度均开启时显示。</summary>
+    public bool IsSmartDegreeVisible => EnableParallelExtract && SmartParallelDegree;
+
+    /// <summary>手动线程数可见性：全局开关开启且智能关闭时显示。</summary>
+    public bool IsManualDegreeVisible => EnableParallelExtract && !SmartParallelDegree;
 
     // ── ContextMenu ──
     [ObservableProperty]
@@ -252,6 +391,9 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private int _maxRecentFiles = 10;
+
+    [ObservableProperty]
+    private int _autoCloseDelaySeconds = 3;
 
     [ObservableProperty]
     private string _appFontFamily = "";
@@ -351,6 +493,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             ShellIntegration.PrepareAssocRegistration();
             ShellIntegration.InstallAssociations(selected);
+            PersistAssocFlagsNow();
             RefreshAssocStatus();
             await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_InstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -366,6 +509,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         try
         {
             ShellIntegration.UninstallAssociations();
+            SetBuiltInAssocFlags(false);
+            PersistAssocFlagsNow();
             RefreshAssocStatus();
             await AppMessageBox.Show(LocalizationManager.T("Settings_Assoc_UninstallDone"), LocalizationManager.T("Settings_Title"), MessageBoxButton.OK, MessageBoxImage.Information);
         }
@@ -424,6 +569,110 @@ public partial class SettingsWindowViewModel : ObservableObject
             item.CurrentHandler = ShellIntegration.GetCurrentHandler(item.Extension);
             item.IsEnabled = IsEnabledFromSettings(item.Extension);
         }
+    }
+
+    /// <summary>把全部内置格式的关联复选框置为指定状态（不刷新状态、不持久化）。</summary>
+    private void SetBuiltInAssocFlags(bool enabled)
+    {
+        AssocZip = enabled;
+        Assoc7z = enabled;
+        AssocRar = enabled;
+        AssocTar = enabled;
+        AssocTarGz = enabled;
+        AssocGz = enabled;
+        AssocIso = enabled;
+    }
+
+    /// <summary>
+    /// 立即把内置格式关联开关（当前复选框状态）写回 AppSettings 并持久化（不等"保存"按钮）。
+    /// 自愈判据含「该格式未被用户显式禁用」，故取消/卸载关联必须立刻留痕，
+    /// 否则下次启动会被 ShellIntegration.SelfHealAssociations 重新装回来。
+    /// </summary>
+    private void PersistAssocFlagsNow()
+    {
+        _settings.AssocZip = AssocZip;
+        _settings.Assoc7z = Assoc7z;
+        _settings.AssocRar = AssocRar;
+        _settings.AssocTar = AssocTar;
+        _settings.AssocTarGz = AssocTarGz;
+        _settings.AssocGz = AssocGz;
+        _settings.AssocIso = AssocIso;
+        _settings.Save();
+    }
+
+    private void PopulateBuiltInFormats()
+    {
+        BuiltInFormats.Clear();
+        var allFormats = FormatCatalog.GetAll();
+        foreach (var fmt in allFormats.Where(f => f.IsBuiltIn))
+        {
+            BuiltInFormats.Add(new FormatDefinitionViewModel
+            {
+                Id = fmt.Id,
+                DisplayName = fmt.DisplayName,
+                Extensions = fmt.Extensions,
+                IsBuiltIn = true,
+            });
+        }
+
+        // 用户自定义格式
+        CustomFormats.Clear();
+        if (_settings.CustomFormats != null)
+        {
+            foreach (var fmt in _settings.CustomFormats.Where(f => !f.IsBuiltIn))
+            {
+                CustomFormats.Add(new FormatDefinitionViewModel
+                {
+                    Id = fmt.Id,
+                    DisplayName = fmt.DisplayName,
+                    Extensions = fmt.Extensions,
+                    MagicHex = fmt.MagicHex,
+                    IsBuiltIn = false,
+                });
+            }
+        }
+    }
+
+    private void PopulateAdaptiveOverrides()
+    {
+        AdaptiveOverrides.Clear();
+        foreach (var rule in _settings.AdaptiveOverrides)
+        {
+            AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
+            {
+                Name = rule.Name,
+                FormatIds = rule.FormatIds,
+                Level = rule.Level,
+                Enabled = rule.Enabled,
+                CustomLevel = rule.CustomLevel,
+            });
+        }
+    }
+
+    private void PopulateMultiThreadedStoreFormats()
+    {
+        MultiThreadedStoreFormats.Clear();
+        var allFormats = FormatCatalog.GetAll(_settings.CustomFormats);
+        var selectedIds = new HashSet<string>(_settings.MultiThreadedStoreFormatIds);
+        foreach (var fmt in allFormats)
+        {
+            MultiThreadedStoreFormats.Add(new StoreFormatItemViewModel
+            {
+                Id = fmt.Id,
+                DisplayName = fmt.DisplayName,
+                Extensions = fmt.Extensions,
+                IsSelected = selectedIds.Contains(fmt.Id),
+            });
+        }
+    }
+
+    /// <summary>将多线程仅存储格式选择同步回 AppSettings。</summary>
+    private void SaveMultiThreadedStoreFormats()
+    {
+        _settings.MultiThreadedStoreFormatIds = MultiThreadedStoreFormats
+            .Where(f => f.IsSelected)
+            .Select(f => f.Id)
+            .ToList();
     }
 
     private void PopulateAssocItems()
@@ -536,6 +785,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // Compress sub-tab headers
     public string CompressTabGeneralHeader => LocalizationManager.T("Settings_Compress_Tab_General");
+    public string CompressTabAdaptiveHeader => LocalizationManager.T("Settings_Compress_Tab_Adaptive");
     public string CompressTabFormatHeader => LocalizationManager.T("Settings_Compress_Tab_Format");
 
     // Preview strings
@@ -650,6 +900,27 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string SevenZipNumFastBytesText => LocalizationManager.T("Settings_SevenZip_NumFastBytes");
     public string SevenZipMatchFinderText => LocalizationManager.T("Settings_SevenZip_MatchFinder");
 
+    // Adaptive Compression strings (三个独立开关)
+    public string AdaptiveCompressionSectionText => LocalizationManager.T("Settings_AdaptiveCompression");
+    public string AdaptiveCompressionText => LocalizationManager.T("Settings_AdaptiveCompression");
+    public string AdaptiveCompressionDescText => LocalizationManager.T("Settings_AdaptiveCompression_Desc");
+    public string AdaptiveSmartDetectText => LocalizationManager.T("Settings_AdaptiveSmartDetect");
+    public string AdaptiveSmartDetectDescText => LocalizationManager.T("Settings_AdaptiveSmartDetect_Desc");
+    public string MultiThreadedCompressionText => LocalizationManager.T("Settings_MultiThreadedCompression");
+    public string MultiThreadedCompressionDescText => LocalizationManager.T("Settings_MultiThreadedCompression_Desc");
+    /// <summary>多线程压缩常驻科普提示（收益与 CPU 相关，双机实测；常驻显示不绑显隐）。</summary>
+    public string MultiThreadedBenefitHint => LocalizationManager.T("Compress_MT_BenefitHint");
+    public string FormatCatalogSectionText => LocalizationManager.T("Settings_FormatCatalog");
+    public string StoreFormatSectionText => LocalizationManager.T("Settings_StoreFormat_Section");
+    public string StoreFormatDescText => LocalizationManager.T("Settings_StoreFormat_Desc");
+    public string BuiltInFormatsText => LocalizationManager.T("Settings_FormatCatalog_BuiltIn");
+    public string CustomFormatsText => LocalizationManager.T("Settings_FormatCatalog_Custom");
+    public string AddCustomFormatText => LocalizationManager.T("Settings_FormatCatalog_AddCustom");
+    public string AdaptiveOverridesSectionText => LocalizationManager.T("Settings_AdaptiveOverrides");
+    public string AdaptiveOverridesDescText => LocalizationManager.T("Settings_AdaptiveOverrides_Desc");
+    public string AddRuleText => LocalizationManager.T("Settings_AdaptiveOverrides_AddRule");
+    public string ResetDefaultsText => LocalizationManager.T("Settings_AdaptiveOverrides_ResetDefaults");
+
     // Extract strings
     public string ExtractDefaultDestText => LocalizationManager.T("Settings_Extract_DefaultDest");
     public string ExtractConflictActionText => LocalizationManager.T("Settings_Extract_ConflictAction");
@@ -659,6 +930,23 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ExtractDeleteAfterExtractText => LocalizationManager.T("Settings_Extract_DeleteArchiveAfterExtract");
     public string ExtractDoubleClickActionText => LocalizationManager.T("Settings_Extract_DoubleClickAction");
     public string ExtractDoubleClickThresholdText => LocalizationManager.T("Settings_Extract_DoubleClickThreshold");
+
+    // Parallel Extract strings
+    public string ExtractTabGeneralHeader => LocalizationManager.T("Settings_ExtractTab_General");
+    public string ExtractTabParallelHeader => LocalizationManager.T("Settings_ExtractTab_Parallel");
+    public string ExtractParallelExtractTitle => LocalizationManager.T("Settings_ParallelExtractTitle");
+    public string EnableParallelExtractText => LocalizationManager.T("Settings_EnableParallelExtract");
+    public string SmartParallelDegreeText => SmartParallelDegree
+        ? LocalizationManager.T("Settings_SmartParallelDegree")
+        : LocalizationManager.T("Settings_SmartParallelDegreeOff");
+    public string SmartSsdLabelText => LocalizationManager.T("Settings_SmartSsdLabel");
+    public string SmartHddLabelText => LocalizationManager.T("Settings_SmartHddLabel");
+    public string ManualParallelDegreeLabelText => LocalizationManager.T("Settings_ManualDegreeLabel");
+    public string ManualParallelDegreeHintText => LocalizationManager.T("Settings_ManualDegreeHint");
+    public string LargeArchivePreTestText => LocalizationManager.T("Settings_LargeArchivePreTest");
+    public string ParallelHelpButtonText => LocalizationManager.T("Settings_ParallelHelpButton");
+    /// <summary>压缩加速帮助按钮 ToolTip（复用帮助窗标题 key；消除原先的硬编码中文，遵守规则 13）。</summary>
+    public string AdaptiveHelpButtonText => LocalizationManager.T("AdaptiveHelp_Title");
 
     // DoubleClickAction option display texts
     public string DoubleClickActionOpenText => LocalizationManager.T("Settings_DoubleClick_Open");
@@ -751,6 +1039,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AppearanceThemeLightText => LocalizationManager.T("Settings_Appearance_Theme_Light");
     public string AppearanceThemeDarkText => LocalizationManager.T("Settings_Appearance_Theme_Dark");
     public string AppearanceMaxRecentFilesText => LocalizationManager.T("Settings_Appearance_MaxRecentFiles");
+    public string AppearanceAutoCloseDelayText => LocalizationManager.T("Settings_ProgressAutoCloseDelay");
     public string AppearanceAppFontFamilyText => LocalizationManager.T("Settings_Appearance_AppFontFamily");
     public string AppearanceCompactnessText => LocalizationManager.T("Settings_Appearance_Compactness");
     public string AppearanceCompactnessCompactText => LocalizationManager.T("Settings_Appearance_Compactness_Compact");
@@ -835,6 +1124,14 @@ public partial class SettingsWindowViewModel : ObservableObject
         _doubleClickAction = _settings.DoubleClickAction;
         _doubleClickOpenThreshold = _settings.DoubleClickOpenThreshold;
 
+        // Parallel Extract
+        _enableParallelExtract = _settings.EnableParallelExtract;
+        _smartParallelDegree = _settings.SmartParallelDegree;
+        _smartSsdDegree = _settings.SmartSsdDegree;
+        _smartHddDegree = _settings.SmartHddDegree;
+        _manualParallelDegree = Math.Clamp(_settings.ParallelExtractDegree, 1, 16);
+        _largeArchivePreTest = _settings.LargeArchivePreTest;
+
         // ContextMenu
         _enableOpenMenu = _settings.EnableOpenMenu;
         _enableCompressMenu = _settings.EnableCompressMenu;
@@ -871,6 +1168,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _maxRecentFiles = _settings.MaxRecentFiles;
         _appFontFamily = _settings.AppFontFamily;
         _compactnessMode = _settings.CompactnessMode;
+        _autoCloseDelaySeconds = _settings.AutoCloseDelaySeconds;
 
         // Password
         _showPasswordMatchNotification = _settings.ShowPasswordMatchNotification;
@@ -884,6 +1182,14 @@ public partial class SettingsWindowViewModel : ObservableObject
         _assocTarGz = _settings.AssocTarGz;
         _assocGz = _settings.AssocGz;
         _assocIso = _settings.AssocIso;
+
+        // Adaptive Compression (三个独立开关)
+        _adaptiveCompression = _settings.AdaptiveCompression;
+        _adaptiveSmartDetect = _settings.AdaptiveSmartDetect;
+        _multiThreadedCompression = _settings.MultiThreadedCompression;
+        PopulateBuiltInFormats();
+        PopulateAdaptiveOverrides();
+        PopulateMultiThreadedStoreFormats();
 
         PopulateComboOptions();
         SetSelectedOptions();
@@ -985,14 +1291,18 @@ public partial class SettingsWindowViewModel : ObservableObject
         SevenZipSolidBlockSizeOptions.Clear();
         foreach (var opt in CompressionOptionData.SevenZipSolidBlockSizes)
         {
-            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default") : opt.Display;
+            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Default")
+                        : opt.Tag == "-1" ? LocalizationManager.T("FormatOptions_7z_SolidBlockSize_Custom")
+                        : opt.Display;
             SevenZipSolidBlockSizeOptions.Add(new Option(display, opt.Tag));
         }
 
         SevenZipDictionarySizeOptions.Clear();
         foreach (var opt in CompressionOptionData.SevenZipDictionarySizes)
         {
-            var display = opt.Tag == "0" ? LocalizationManager.T("FormatOptions_7z_DictSize_Default") : opt.Display;
+            var display = opt.Tag == "" ? LocalizationManager.T("FormatOptions_7z_DictSize_Default")
+                        : opt.Tag == "-1" ? LocalizationManager.T("FormatOptions_7z_DictSize_Custom")
+                        : opt.Display;
             SevenZipDictionarySizeOptions.Add(new Option(display, opt.Tag));
         }
 
@@ -1081,7 +1391,21 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compression advanced
         SelectedSevenZipCompressionMethodOption = SevenZipCompressionMethodOptions.FirstOrDefault(o => o.Value == SevenZipCompressionMethod);
         SelectedSevenZipSolidBlockSizeOption = SevenZipSolidBlockSizeOptions.FirstOrDefault(o => o.Value == SevenZipSolidBlockSize);
-        SelectedSevenZipDictionarySizeOption = SevenZipDictionarySizeOptions.FirstOrDefault(o => o.Value == SevenZipDictionarySize.ToString());
+        // settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
+        if (SelectedSevenZipSolidBlockSizeOption == null && !string.IsNullOrEmpty(SevenZipSolidBlockSize))
+        {
+            SelectedSevenZipSolidBlockSizeOption = SevenZipSolidBlockSizeOptions.FirstOrDefault(o => o.Value == "-1");
+            var sv = SevenZipSolidBlockSize.Trim();
+            CustomSolidSizeText = sv.EndsWith("m", StringComparison.OrdinalIgnoreCase) ? sv[..^1] : sv;
+        }
+        SelectedSevenZipDictionarySizeOption = SevenZipDictionarySizeOptions.FirstOrDefault(o => o.Value == SevenZipDictionarySize);
+        // settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
+        if (SelectedSevenZipDictionarySizeOption == null && !string.IsNullOrEmpty(SevenZipDictionarySize))
+        {
+            SelectedSevenZipDictionarySizeOption = SevenZipDictionarySizeOptions.FirstOrDefault(o => o.Value == "-1");
+            var v = SevenZipDictionarySize.Trim();
+            CustomDictSizeText = v.EndsWith("m", StringComparison.OrdinalIgnoreCase) ? v[..^1] : v;
+        }
         SelectedSevenZipNumFastBytesOption = SevenZipNumFastBytesOptions.FirstOrDefault(o => o.Value == SevenZipNumFastBytes.ToString());
         SelectedSevenZipMatchFinderOption = SevenZipMatchFinderOptions.FirstOrDefault(o => o.Value == SevenZipMatchFinder);
         SelectedZipCompressionMethodOption = ZipCompressionMethodOptions.FirstOrDefault(o => o.Value == ZipCompressionMethod);
@@ -1099,6 +1423,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(TabAdvancedHeader));
         OnPropertyChanged(nameof(TabDebugHeader));
         OnPropertyChanged(nameof(CompressTabGeneralHeader));
+        OnPropertyChanged(nameof(CompressTabAdaptiveHeader));
         OnPropertyChanged(nameof(CompressTabFormatHeader));
 
         OnPropertyChanged(nameof(EnableImagePreviewText));
@@ -1171,6 +1496,24 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SevenZipDictionarySizeText));
         OnPropertyChanged(nameof(SevenZipNumFastBytesText));
         OnPropertyChanged(nameof(SevenZipMatchFinderText));
+        OnPropertyChanged(nameof(AdaptiveCompressionSectionText));
+        OnPropertyChanged(nameof(AdaptiveCompressionDescText));
+        OnPropertyChanged(nameof(AdaptiveCompressionText));
+        OnPropertyChanged(nameof(AdaptiveCompressionDescText));
+        OnPropertyChanged(nameof(AdaptiveSmartDetectText));
+        OnPropertyChanged(nameof(AdaptiveSmartDetectDescText));
+        OnPropertyChanged(nameof(MultiThreadedCompressionText));
+        OnPropertyChanged(nameof(MultiThreadedCompressionDescText));
+        OnPropertyChanged(nameof(FormatCatalogSectionText));
+        OnPropertyChanged(nameof(StoreFormatSectionText));
+        OnPropertyChanged(nameof(StoreFormatDescText));
+        OnPropertyChanged(nameof(BuiltInFormatsText));
+        OnPropertyChanged(nameof(CustomFormatsText));
+        OnPropertyChanged(nameof(AddCustomFormatText));
+        OnPropertyChanged(nameof(AdaptiveOverridesSectionText));
+        OnPropertyChanged(nameof(AdaptiveOverridesDescText));
+        OnPropertyChanged(nameof(AddRuleText));
+        OnPropertyChanged(nameof(ResetDefaultsText));
 
         OnPropertyChanged(nameof(ExtractDefaultDestText));
         OnPropertyChanged(nameof(ExtractConflictActionText));
@@ -1180,6 +1523,18 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ExtractDeleteAfterExtractText));
         OnPropertyChanged(nameof(ExtractDoubleClickActionText));
         OnPropertyChanged(nameof(ExtractDoubleClickThresholdText));
+        OnPropertyChanged(nameof(ExtractTabGeneralHeader));
+        OnPropertyChanged(nameof(ExtractTabParallelHeader));
+        OnPropertyChanged(nameof(ExtractParallelExtractTitle));
+        OnPropertyChanged(nameof(EnableParallelExtractText));
+        OnPropertyChanged(nameof(SmartParallelDegreeText));
+        OnPropertyChanged(nameof(SmartSsdLabelText));
+        OnPropertyChanged(nameof(SmartHddLabelText));
+        OnPropertyChanged(nameof(ManualParallelDegreeLabelText));
+        OnPropertyChanged(nameof(ManualParallelDegreeHintText));
+        OnPropertyChanged(nameof(LargeArchivePreTestText));
+        OnPropertyChanged(nameof(ParallelHelpButtonText));
+        OnPropertyChanged(nameof(AdaptiveHelpButtonText));
         OnPropertyChanged(nameof(DoubleClickActionOpenText));
         OnPropertyChanged(nameof(DoubleClickActionExtractHereText));
         OnPropertyChanged(nameof(DoubleClickActionSmartExtractText));
@@ -1254,6 +1609,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AppearanceThemeDarkText));
         OnPropertyChanged(nameof(AppearanceAppFontFamilyText));
         OnPropertyChanged(nameof(AppearanceMaxRecentFilesText));
+        OnPropertyChanged(nameof(AppearanceAutoCloseDelayText));
         OnPropertyChanged(nameof(AppearanceCompactnessText));
         OnPropertyChanged(nameof(AppearanceCompactnessCompactText));
         OnPropertyChanged(nameof(AppearanceCompactnessNormalText));
@@ -1285,12 +1641,48 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.KeepOriginalExtension = KeepOriginalExtension;
         _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
 
+        // Adaptive Compression (三个独立开关)
+        _settings.AdaptiveCompression = AdaptiveCompression;
+        _settings.AdaptiveSmartDetect = AdaptiveSmartDetect;
+        _settings.MultiThreadedCompression = MultiThreadedCompression;
+        _settings.AdaptiveOverrides = AdaptiveOverrides.Select(vm => new AdaptiveOverrideRule
+        {
+            Name = vm.Name,
+            FormatIds = vm.FormatIds,
+            Level = vm.Level,
+            Enabled = vm.Enabled,
+            CustomLevel = vm.CustomLevel,
+        }).ToList();
+
+        // Custom formats
+        _settings.CustomFormats = CustomFormats.Select(vm => vm.ToFormatDefinition()).ToList();
+
         // Compression advanced
         _settings.SevenZipCompressionMethod = SelectedSevenZipCompressionMethodOption?.Value ?? SevenZipCompressionMethod;
         _settings.SevenZipSolid = SevenZipSolid;
         _settings.SevenZipMultithreaded = SevenZipMultithreaded;
-        _settings.SevenZipSolidBlockSize = SelectedSevenZipSolidBlockSizeOption?.Value ?? SevenZipSolidBlockSize;
-        _settings.SevenZipDictionarySize = int.Parse(SelectedSevenZipDictionarySizeOption?.Value ?? SevenZipDictionarySize.ToString());
+        // 固实块大小：选「自定义」时拼输入框 MB 值为 "Nm"，否则直存预设 tag
+        if (SelectedSevenZipSolidBlockSizeOption?.Value == "-1")
+        {
+            _settings.SevenZipSolidBlockSize = long.TryParse(CustomSolidSizeText?.Trim(), out var solidMb) && solidMb > 0
+                ? $"{solidMb}m"
+                : "";
+        }
+        else
+        {
+            _settings.SevenZipSolidBlockSize = SelectedSevenZipSolidBlockSizeOption?.Value ?? SevenZipSolidBlockSize;
+        }
+        // 字典大小：选「自定义」时拼输入框 MB 值为 "Nm"，否则直存预设 tag
+        if (SelectedSevenZipDictionarySizeOption?.Value == "-1")
+        {
+            _settings.SevenZipDictionarySize = long.TryParse(CustomDictSizeText?.Trim(), out var mb) && mb > 0
+                ? $"{mb}m"
+                : "";
+        }
+        else
+        {
+            _settings.SevenZipDictionarySize = SelectedSevenZipDictionarySizeOption?.Value ?? SevenZipDictionarySize;
+        }
         _settings.SevenZipNumFastBytes = int.Parse(SelectedSevenZipNumFastBytesOption?.Value ?? SevenZipNumFastBytes.ToString());
         _settings.SevenZipMatchFinder = SelectedSevenZipMatchFinderOption?.Value ?? SevenZipMatchFinder;
         _settings.ZipCompressionMethod = SelectedZipCompressionMethodOption?.Value ?? ZipCompressionMethod;
@@ -1335,6 +1727,14 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.DoubleClickAction = SelectedDoubleClickActionOption?.Value ?? DoubleClickAction;
         _settings.DoubleClickOpenThreshold = DoubleClickOpenThreshold;
 
+        // Parallel Extract
+        _settings.EnableParallelExtract = EnableParallelExtract;
+        _settings.SmartParallelDegree = SmartParallelDegree;
+        _settings.SmartSsdDegree = Math.Clamp(SmartSsdDegree, 1, 16);
+        _settings.SmartHddDegree = Math.Clamp(SmartHddDegree, 1, 16);
+        _settings.ParallelExtractDegree = Math.Clamp(ManualParallelDegree, 1, 16);
+        _settings.LargeArchivePreTest = LargeArchivePreTest;
+
         // ContextMenu
         _settings.EnableOpenMenu = EnableOpenMenu;
         _settings.EnableCompressMenu = EnableCompressMenu;
@@ -1365,6 +1765,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.MaxRecentFiles = MaxRecentFiles;
         _settings.AppFontFamily = SelectedAppFontFamilyOption?.Value ?? AppFontFamily;
         _settings.CompactnessMode = SelectedCompactnessModeOption?.Value ?? CompactnessMode;
+        _settings.AutoCloseDelaySeconds = Math.Clamp(AutoCloseDelaySeconds, 0, 60);
 
         // Password
         _settings.ShowPasswordMatchNotification = ShowPasswordMatchNotification;
@@ -1390,6 +1791,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Default path priority
         _settings.DefaultPathOrder = PathPriorityItems.Select(p => p.Kind).ToList();
         _settings.CustomDefaultPath = CustomPath ?? "";
+
+        // 多线程仅存储格式
+        SaveMultiThreadedStoreFormats();
 
         // 预览运行时配置同步：保存即生效，无需重启（与 App.axaml.cs 启动初始化保持一致）
         PreviewService.EnableFormatDetection = EnableFormatDetection;
@@ -1617,7 +2021,14 @@ public partial class SettingsWindowViewModel : ObservableObject
     [RelayCommand]
     private void OpenLogPrivacyHelp()
     {
-        var dialog = new LogPrivacyHelpDialog();
+        var dialog = new HelpDialog(
+            LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Title"),
+            new MarkdownHelpContent(LocalizationManager.T("LogPrivacyHelp_Markdown")),
+            LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Close"))
+        {
+            Width = 520,
+            Height = 500
+        };
         dialog.Show();
     }
 
@@ -1693,15 +2104,183 @@ public partial class SettingsWindowViewModel : ObservableObject
     [RelayCommand]
     private void DeselectAllAssoc()
     {
-        AssocZip = false;
-        Assoc7z = false;
-        AssocRar = false;
-        AssocTar = false;
-        AssocTarGz = false;
-        AssocGz = false;
-        AssocIso = false;
+        SetBuiltInAssocFlags(false);
+        PersistAssocFlagsNow();
         RefreshAssocStatus();
+    }
+
+    [RelayCommand]
+    private async Task AddCustomFormat(Window? owner)
+    {
+        var dialog = new AddCustomFormatDialog();
+        if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
+        if (result == true)
+        {
+            var newFmt = new FormatDefinitionViewModel
+            {
+                Id = $"Custom_{DateTime.Now:yyyyMMddHHmmss}",
+                DisplayName = dialog.FormatName,
+                Extensions = dialog.ExtensionsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(e => e.StartsWith(".") ? e.ToLowerInvariant() : "." + e.ToLowerInvariant()).ToList(),
+                MagicHex = string.IsNullOrWhiteSpace(dialog.MagicHex) ? null : dialog.MagicHex.Trim(),
+                IsBuiltIn = false,
+            };
+            CustomFormats.Add(newFmt);
+        }
+    }
+
+    public async void EditCustomFormat(FormatDefinitionViewModel fmt, Window? owner)
+    {
+        var dialog = new AddCustomFormatDialog();
+        dialog.Title = LocalizationManager.T("Settings_FormatCatalog_EditTitle");
+        dialog.SetExistingValues(fmt.DisplayName, fmt.Extensions, fmt.MagicHex);
+        if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
+        if (result == true)
+        {
+            fmt.DisplayName = dialog.FormatName;
+            fmt.Extensions = dialog.ExtensionsRaw.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries).Select(e => e.StartsWith(".") ? e.ToLowerInvariant() : "." + e.ToLowerInvariant()).ToList();
+            fmt.MagicHex = string.IsNullOrWhiteSpace(dialog.MagicHex) ? null : dialog.MagicHex.Trim();
+        }
+    }
+
+    public void DeleteCustomFormat(FormatDefinitionViewModel fmt)
+    {
+        CustomFormats.Remove(fmt);
+    }
+
+    [RelayCommand]
+    private async Task AddRule(Window? owner)
+    {
+        var dialog = new EditAdaptiveRuleDialog();
+        // 合并内置 + 自定义格式，传给对话框
+        var allFormats = FormatCatalog.GetAll().Concat(CustomFormats.Select(f => f.ToFormatDefinition())).ToList();
+        dialog.PopulateFormats(allFormats);
+        if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
+        if (result == true)
+        {
+            AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
+            {
+                Name = dialog.RuleName,
+                Level = dialog.SelectedLevel,
+                FormatIds = dialog.SelectedFormatIds,
+                Enabled = true,
+            });
+        }
+    }
+
+    public async void EditRule(AdaptiveOverrideRuleViewModel rule, Window? owner)
+    {
+        var dialog = new EditAdaptiveRuleDialog();
+        var allFormats = FormatCatalog.GetAll().Concat(CustomFormats.Select(f => f.ToFormatDefinition())).ToList();
+        dialog.PopulateFormats(allFormats, rule.FormatIds);
+        dialog.SetExistingValues(rule.Name, rule.Level, rule.FormatIds);
+        if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
+        var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
+        if (result == true)
+        {
+            rule.Name = dialog.RuleName;
+            rule.Level = dialog.SelectedLevel;
+            rule.FormatIds = dialog.SelectedFormatIds;
+        }
+    }
+
+    public void DeleteRule(AdaptiveOverrideRuleViewModel rule)
+    {
+        AdaptiveOverrides.Remove(rule);
+    }
+
+    [RelayCommand]
+    private void ResetDefaults()
+    {
+        foreach (var rule in AdaptiveOverrides)
+            rule.Enabled = false;
     }
 }
 
 public record Option(string Display, string Value);
+
+/// <summary>
+/// 格式定义 ViewModel — 用于设置窗口中格式目录的展示。
+/// </summary>
+public partial class FormatDefinitionViewModel : ObservableObject
+{
+    [ObservableProperty] private string _id = "";
+    [ObservableProperty] private string _displayName = "";
+    [ObservableProperty] private List<string> _extensions = new();
+    [ObservableProperty] private string? _magicHex;
+    [ObservableProperty] private bool _isBuiltIn = true;
+
+    public string ExtensionsDisplay => string.Join(" ", Extensions.Select(e => e));
+    /// <summary>魔数 hex 显示 —— Phase 2 实现魔数检测前恒空（输入框已隐藏）。</summary>
+    public string MagicHexDisplay => "";
+
+    /// <summary>将 ViewModel 转换为 FormatDefinition 模型，用于持久化保存。</summary>
+    public FormatDefinition ToFormatDefinition() => new()
+    {
+        Id = Id,
+        DisplayName = DisplayName,
+        Extensions = Extensions?.ToList() ?? new(),
+        MagicHex = MagicHex,
+        IsBuiltIn = IsBuiltIn,
+    };
+}
+
+/// <summary>
+/// 自适应覆盖规则 ViewModel — 用于设置窗口中规则列表的展示和编辑。
+/// </summary>
+public partial class AdaptiveOverrideRuleViewModel : ObservableObject
+{
+    [ObservableProperty] private string _name = "";
+    [ObservableProperty] private bool _enabled = true;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LevelDisplay))]
+    [NotifyPropertyChangedFor(nameof(FormatIdsDisplay))]
+    private AdaptiveLevel _level = AdaptiveLevel.Store;
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(LevelDisplay))]
+    private int? _customLevel;
+
+    /// <summary>格式 ID 列表（逗号分隔显示）。</summary>
+    public string FormatIdsDisplay => string.Join(", ", FormatIds);
+
+    public List<string> FormatIds { get; set; } = new();
+
+    partial void OnLevelChanged(AdaptiveLevel value)
+    {
+        OnPropertyChanged(nameof(LevelDisplay));
+    }
+
+    partial void OnCustomLevelChanged(int? value)
+    {
+        OnPropertyChanged(nameof(LevelDisplay));
+    }
+
+    public string LevelDisplay => Level switch
+    {
+        AdaptiveLevel.Store => "存储",
+        AdaptiveLevel.Fast => "快速",
+        AdaptiveLevel.Normal => "正常",
+        AdaptiveLevel.Max => "最大",
+        AdaptiveLevel.Global => "跟随全局",
+        AdaptiveLevel.GlobalPlusOne => "全局+1",
+        AdaptiveLevel.GlobalMinusOne => "全局-1",
+        AdaptiveLevel.Custom => $"自定义({CustomLevel})",
+        _ => "未知"
+    };
+}
+
+/// <summary>
+/// 多线程模式下仅存储格式选择项 ViewModel。
+/// 用户可勾选/取消格式目录中的格式，控制哪些格式在多线程压缩时走 Store 路径。
+/// </summary>
+public partial class StoreFormatItemViewModel : ObservableObject
+{
+    [ObservableProperty] private string _id = "";
+    [ObservableProperty] private string _displayName = "";
+    [ObservableProperty] private List<string> _extensions = new();
+    [ObservableProperty] private bool _isSelected = true;
+
+    public string ExtensionsDisplay => string.Join(" ", Extensions.Select(e => e));
+}

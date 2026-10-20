@@ -143,8 +143,12 @@ public partial class PreviewViewModel : ObservableObject
         var prevKey = _currentEncodingKey;
         EncodingOptions = BuildEncodingOptions();
         OnPropertyChanged(nameof(EncodingOptions));
-        // 恢复之前选中的编码（直接赋值属性，避免触发 OnSelectedEncodingChanged 的持久化/解码副作用）
-        SelectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == (prevKey ?? "auto"));
+        // 恢复之前选中的编码（直接赋值字段，避免触发 OnSelectedEncodingChanged 的持久化/解码副作用）
+        // MVVMTK0034 抑制：刻意直接写字段（绕过生成属性，避免触发解码副作用），随后手动通知
+#pragma warning disable MVVMTK0034
+        _selectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == (prevKey ?? "auto"));
+#pragma warning restore MVVMTK0034
+        OnPropertyChanged(nameof(SelectedEncoding));
     }
 
     private void CleanupHtmlTempFile()
@@ -158,12 +162,15 @@ public partial class PreviewViewModel : ObservableObject
 
     public PreviewViewModel()
     {
+        // 启动打点专项：预览 VM 构造成本（含 AppSettings.Load 第二次读盘）
+        Services.StartupTimer.Mark("Preview.VM.Ctor.Enter");
         MetadataSettingsManager.SettingsChanged += OnMetadataSettingsChanged;
         LocalizationManager.CultureChanged += OnCultureChanged;
         UpdateLocalizedStrings();
         var savedEncodingKey = AppSettings.Load().TextEncodingPreference;
         SelectedEncoding = EncodingOptions.FirstOrDefault(o => o.Key == savedEncodingKey)
                            ?? EncodingOptions.FirstOrDefault(o => o.Key == "auto");
+        Services.StartupTimer.Mark("Preview.VM.Ctor.Exit");
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)
@@ -1440,7 +1447,7 @@ var formatValues = new Dictionary<string, string?>
         byte[] srcBytes;
         using (var ms = new MemoryStream())
         {
-            source.Save(ms);
+            source.Save(ms, new PngBitmapEncoderOptions());
             srcBytes = ms.ToArray();
         }
         using var srcSk = SkiaSharp.SKBitmap.Decode(srcBytes);
@@ -1449,10 +1456,10 @@ var formatValues = new Dictionary<string, string?>
         // Copy bitmap and set alpha to 255 for all pixels,
         // revealing the original RGB colors beneath transparency.
         using var dstSk = new SkiaSharp.SKBitmap(srcSk.Width, srcSk.Height);
-using (var canvas = new SkiaSharp.SKCanvas(dstSk))
-            {
-                canvas.DrawBitmap(srcSk, 0, 0, new SkiaSharp.SKSamplingOptions());
-            }
+        using (var canvas = new SkiaSharp.SKCanvas(dstSk))
+        {
+            canvas.DrawBitmap(srcSk, 0, 0, new SKSamplingOptions());
+        }
         for (int y = 0; y < dstSk.Height; y++)
         {
             for (int x = 0; x < dstSk.Width; x++)
@@ -1476,7 +1483,7 @@ using (var canvas = new SkiaSharp.SKCanvas(dstSk))
         byte[] bytes;
         using (var ms = new MemoryStream())
         {
-            source.Save(ms);
+            source.Save(ms, new PngBitmapEncoderOptions());
             bytes = ms.ToArray();
         }
         return SkiaSharp.SKBitmap.Decode(bytes);

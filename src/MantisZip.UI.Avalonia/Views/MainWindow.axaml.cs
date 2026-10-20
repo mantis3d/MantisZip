@@ -54,6 +54,9 @@ public partial class MainWindow : Window
     /// <summary>预览面板显隐（与 AppSettings.ShowPreviewPanel 同步；false 时压缩占位行列，树/列表撑满）</summary>
     private bool _previewPanelEnabled = true;
 
+    /// <summary>预览面板是否已延迟创建（EnsurePreviewPanel 幂等标记）。</summary>
+    private bool _previewPanelCreated;
+
     /// <summary>拖拽添加覆层呼吸动画计时器（100ms tick，正弦 alpha 40-120，与拖拽解压 OverlayController 参数一致）</summary>
     private readonly DispatcherTimer _dragAddOverlayTimer;
 
@@ -62,7 +65,10 @@ public partial class MainWindow : Window
 
     public MainWindow()
     {
+        Services.StartupTimer.Mark("Win.Ctor.Enter");
         InitializeComponent();
+        // 1359 行 XAML 解析 + 子控件构造（含内嵌 PreviewPanel 855 行控件树）
+        Services.StartupTimer.Mark("Win.Xaml");
 
         // 拖拽添加覆层呼吸动画（与拖拽解压覆层一致：约 2s 周期，正弦 alpha 40-120，仅背景层呼吸）
         _dragAddOverlayTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher.UIThread)
@@ -92,6 +98,8 @@ public partial class MainWindow : Window
         _lastSortMemberPath = string.IsNullOrEmpty(savedSortColumnPath) ? null : savedSortColumnPath;
         _lastSortDescending = savedSortDirection == 2;
         UpdateSortArrows();
+        // WindowStateManager.Load 读盘 + 列状态/排序恢复
+        Services.StartupTimer.Mark("Win.State");
 
         // 应用上次手动保存的布局快照（目录树/文件列表列宽 + 预览各位置记忆尺寸）。
         // 必须在 ApplyPreviewLayout() 之前调用，保证 ApplyPreviewPosition 能读到已回填的预览尺寸。
@@ -99,8 +107,12 @@ public partial class MainWindow : Window
 
         // 应用预览面板显隐 + 位置设置（1=底部, 2=目录树下方, 3=文件列表下方, 4=右侧）
         ApplyPreviewLayout();
+        // 布局快照恢复 + 预览位置应用
+        Services.StartupTimer.Mark("Win.Layout");
 
         var vm = new MainWindowViewModel();
+        // 主 VM 构造（内含 PreviewViewModel 构造）
+        Services.StartupTimer.Mark("Win.VM");
         vm.GetOpenFilePath = OpenFileDialogAsync;
         vm.SaveLayoutAction = SaveLayout;
         vm.ShowSettingsWindow = async () =>
@@ -174,6 +186,13 @@ public partial class MainWindow : Window
                 evm.DestinationPath = dialog.ViewModel.DestinationPath;
                 evm.ConflictAction = dialog.ViewModel.ConflictAction;
                 evm.OpenFolderAfterExtract = dialog.ViewModel.OpenFolderAfterExtract;
+                // 并行解压：对话框快照回传（初值读设置、本次解压生效、不回写设置）
+                evm.EnableParallelExtract = dialog.ViewModel.EnableParallelExtract;
+                evm.SmartParallelDegree = dialog.ViewModel.SmartParallelDegree;
+                evm.SmartSsdDegree = dialog.ViewModel.SmartSsdDegree;
+                evm.SmartHddDegree = dialog.ViewModel.SmartHddDegree;
+                evm.ManualParallelDegree = dialog.ViewModel.ManualParallelDegree;
+                evm.LargeArchivePreTest = dialog.ViewModel.LargeArchivePreTest;
                 // 解压后移入回收站：默认值来自全局设置，勾选仅本次解压生效（不写回 AppSettings）
                 evm.DeleteArchiveAfterExtract = dialog.ViewModel.DeleteArchiveAfterExtract;
                 // 文件过滤：仅当启用过滤且有条目时，将匹配条目 key 回传，供实际解压只解压匹配项
@@ -221,6 +240,12 @@ public partial class MainWindow : Window
                 cvm.SevenZipNumFastBytes = dialog.ViewModel.SevenZipNumFastBytes;
                 cvm.SevenZipMatchFinder = dialog.ViewModel.SevenZipMatchFinder;
                 cvm.SevenZipMultithreaded = dialog.ViewModel.SevenZipMultithreaded;
+                cvm.AdaptiveCompression = dialog.ViewModel.AdaptiveCompression;
+                // 同一 ZIP 面板（DynamicFormatOptionsPanel）的另两个开关此前漏拷 →
+                // 执行侧 MultiThreadedCompression 恒为 false，引擎永远走串行路径，
+                // 进度窗口「详细」通道 UI 永不出现。此处补齐。
+                cvm.AdaptiveSmartDetect = dialog.ViewModel.AdaptiveSmartDetect;
+                cvm.MultiThreadedCompression = dialog.ViewModel.MultiThreadedCompression;
                 cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
                 // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
                 cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;
@@ -262,6 +287,25 @@ public partial class MainWindow : Window
         {
             var pw = new ProgressWindow(title);
             pw.InitCancellation();
+            // Task 6: 压缩流程标记（供压缩通道说明行显示；解压流程保持 false）
+            pw.IsCompressFlow = vm.PendingCompressFlow;
+            vm.PendingCompressFlow = false;
+            // Task 6: 测试流标记（自动按下 📌，完成后不自动关闭）与完成回调/最近窗口回读通道
+            pw.IsTestFlow = vm.PendingTestFlow;
+            vm.PendingTestFlow = false;
+            var onCompleted = vm.PendingCompletedCallback;
+            vm.PendingCompletedCallback = null;
+            vm.LastProgressWindow = pw;
+            // spec §11.2: 解压后置开关能力位 + 初值（仅解压入口置位 → 压缩/测试流两开关隐藏）
+            var postActions = vm.PendingExtractPostActions;
+            vm.PendingExtractPostActions = null;
+            if (postActions is { } pa)
+                pw.SetExtractPostActions(pa.OpenFolder, pa.DeleteArchive, pa.OpenFolderSeed);
+            // 列表播种：压缩流程枚举全量条目（后台；失败/取消/超阈值放弃，终态 upsert 兜底）
+            var seedRequest = vm.PendingCompressRequest;
+            vm.PendingCompressRequest = null;
+            if (seedRequest is not null)
+                CompressFlow.TrySeedEntryItemsInBackground(pw, seedRequest, pw.CancellationToken);
             var hasFileList = filePaths is { Count: > 0 };
 
             // 批处理状态上报：操作闭包内经 BatchStatusReporter 传给引擎 onItemStatus
@@ -287,24 +331,48 @@ public partial class MainWindow : Window
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
 
-                // 成功：标记完成态 + 尊重 📌 KeepOpenOnComplete（对齐 WPF MainWindow.Menu.cs AutoCloseOrWaitAsync(0, ...)）
-                pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
-                await pw.AutoCloseOrWaitAsync(0, () => pw.Close());
+                // 成功：完成回调（测试流结果通道）优先，否则默认完成态；
+                // 再尊重 📌 KeepOpenOnComplete 统一走 AutoCloseOrWaitAsync（延迟来自设置，Task 6）
+                if (onCompleted is not null)
+                    onCompleted(pw);
+                else
+                    pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
+                await pw.AutoCloseOrWaitAsync(() => pw.Close());
                 return true;
             }
             catch (OperationCanceledException)
             {
+                // D13：取消不是错误 → 立即关闭（不写错误汇总、不压钉）
+                pw.Close();
                 return false;
             }
-            catch (Exception)
+            catch (PasswordRetryCancelledException)
             {
+                // 用户在密码弹窗点取消：行标记「已取消 - 需要密码」并在状态栏提示。
+                // 主窗口全部解压入口（ExtractArchive/Here/ToName/ExtractTo/SmartExtract）均经本闭包，
+                // 故在此单点接线，避免逐个方法重复分支。
+                var msg = LocalizationManager.T("Status_PasswordCancelled");
+                // 同步进度窗口状态行（否则取消发生在首报前时会停在「正在准备…」）
+                pw.SetStatusMessage(msg);
+                if (hasFileList)
+                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);   // 行 Failed 自动压钉 → 等手动关闭
+                vm.StatusMessage = msg;
+                await pw.AutoCloseOrWaitAsync(() => pw.Close());   // 📌 已由行 Failed 压下 → 等手动关闭
+                return false;
+            }
+            catch (Exception ex)
+            {
+                // 失败：写错误汇总（自动压钉 📌）+ 日志，行标 Failed；关窗决策交给 AutoCloseOrWaitAsync 等待手动关闭
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(ex);
+                pw.SetErrorSummary(wholeErrorText, wholeErrorDetail);
+                App.DebugLog($"[RunWithProgress] operation failed: {ex}");
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
+                await pw.AutoCloseOrWaitAsync(() => pw.Close());   // SetErrorSummary 已自动压钉 → 等手动关闭
                 return false;
             }
             finally
             {
-                pw.Close();
                 vm.BatchStatusReporter = null;
             }
         };
@@ -638,6 +706,56 @@ public partial class MainWindow : Window
         // Persist window position/size/state + column widths on close
         Closing += (_, _) => WindowStateManager.Save(this, CaptureColumnStates(), _lastSortMemberPath,
             _lastSortMemberPath == null ? 0 : (_lastSortDescending ? 2 : 1));
+
+        Services.StartupTimer.Mark("Win.Ctor.Exit");
+        // 首帧打点 + flush 启动 trace（一次性）
+        Opened += OnStartupOpened;
+
+        // 预览面板延迟创建：首帧后 0.5s 定时预取（把控件树构造挪出启动与打开压缩包关键路径）；
+        // 0.5s 内即发生预览请求时由 vm.PreviewPanelNeeded 兜底同步创建。
+        Opened += (_, _) => DispatcherTimer.RunOnce(
+            () => Dispatcher.UIThread.Post(EnsurePreviewPanel, DispatcherPriority.Background),
+            TimeSpan.FromMilliseconds(500));
+        vm.PreviewPanelNeeded += EnsurePreviewPanel;
+    }
+
+    /// <summary>
+    /// 延迟创建预览面板控件树（启动时 XAML 仅保留占位 host，855 行控件树不再计入启动关键路径）。
+    /// 幂等；构造异常时清理半成品 Content 且 flag 不置位，允许兜底路径重试。
+    /// </summary>
+    private void EnsurePreviewPanel()
+    {
+        if (_previewPanelCreated) return;
+        _previewPanelCreated = true; // 先置位防重入（构造中再触发直接返回）
+        try
+        {
+            if (DataContext is not MainWindowViewModel vm) { _previewPanelCreated = false; return; }
+            var panel = new PreviewPanel { DataContext = vm.Preview };
+            PreviewPanelHost.Content = panel;
+            App.DebugLog("EnsurePreviewPanel: preview panel created (lazy)");
+        }
+        catch (Exception ex)
+        {
+            _previewPanelCreated = false;
+            PreviewPanelHost.Content = null; // 清理半成品
+            App.DebugLog($"EnsurePreviewPanel failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>
+    /// 窗口首次 Opened：打首帧近似点并 flush 启动 trace（一次性）。
+    /// 与 splash 计划衔接：splash 也在 Opened 关闭，语义一致。
+    /// </summary>
+    private void OnStartupOpened(object? sender, EventArgs e)
+    {
+        Opened -= OnStartupOpened;
+        Services.StartupTimer.Mark("Win.Visible");
+        // Avalonia 无 WPF ContentRendered：用 Render 优先级回调近似首帧上屏
+        Dispatcher.UIThread.Post(() =>
+        {
+            Services.StartupTimer.Mark("Win.FirstFrame");
+            Services.StartupTimer.Flush("first-frame");
+        }, DispatcherPriority.Render);
     }
 
     /// <summary>
@@ -1220,9 +1338,9 @@ public partial class MainWindow : Window
         }
         else
         {
-            // 分支 3b：拖入非压缩包 → 压缩对话框预填源文件
-            var dialog = new CompressSettingsWindow(paths);
-            await dialog.ShowDialog(this);
+            // 分支 3b：拖入非压缩包 → 压缩对话框预填源文件，确认后走统一压缩管道
+            // （与「新建压缩包」同一执行链：选项回传 + AdoptPlan + 进度窗口 + 冲突弹窗）
+            await vm.DragInCompressAsync(paths);
         }
     }
 
@@ -1559,8 +1677,16 @@ public partial class MainWindow : Window
             "SettingsWindow" => new Views.SettingsWindow(),
             "PasswordManagerWindow" => new PasswordManagerWindow(),
             "DonationDialog" => new DonationDialog(),
-            "LogPrivacyHelpDialog" => new LogPrivacyHelpDialog(),
-            "PasswordHelpDialog" => new PasswordHelpDialog(),
+            "LogPrivacyHelpDialog" => new HelpDialog(
+                LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Title"),
+                new MarkdownHelpContent(LocalizationManager.T("LogPrivacyHelp_Markdown")),
+                LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Close"))
+            { Width = 520, Height = 500 },
+            "PasswordHelpDialog" => new HelpDialog(
+                LocalizationManager.T("PwdHelp_Title"),
+                new MarkdownHelpContent(LocalizationManager.T("PasswordHelp_Markdown")),
+                LocalizationManager.T("PwdHelp_Close"))
+            { Width = 560, Height = 500 },
             "CommentDialog" => new CommentDialog(),
             "PasswordEditDialog" => new PasswordEditDialog(),
             "PasswordDialog" => new PasswordDialog("test.7z"),

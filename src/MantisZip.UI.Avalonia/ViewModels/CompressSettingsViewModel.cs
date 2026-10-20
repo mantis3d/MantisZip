@@ -185,8 +185,8 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>7z 固实块大小：""=默认，或 "64m" / "256m" / "512m" / "1g"。</summary>
     public string SevenZipSolidBlockSize { get; set; } = "";
 
-    /// <summary>7z 字典大小（字节），0 表示引擎默认。</summary>
-    public int SevenZipDictionarySize { get; set; }
+    /// <summary>7z 字典大小：""=默认，或 "64m" / "256m" / "1g" / "4g"（CustomParameters["d"] 直传 7z.dll）。</summary>
+    public string SevenZipDictionarySize { get; set; } = "";
 
     /// <summary>7z Word Size（快速字节数），0 表示引擎默认。</summary>
     public int SevenZipNumFastBytes { get; set; }
@@ -196,6 +196,19 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>7z 多线程压缩（mt=on）。默认 true，利用多核 CPU 并行压缩。</summary>
     public bool SevenZipMultithreaded { get; set; } = true;
+
+    /// <summary>自适应压缩。启用时对已压缩文件自动 Store，其余保持用户选定级别。</summary>
+    public bool AdaptiveCompression { get; set; }
+
+    /// <summary>魔数检测。启用时对大文件进行魔数采样检测，更准确识别已压缩格式。</summary>
+    public bool AdaptiveSmartDetect { get; set; }
+
+    /// <summary>ZIP 多线程压缩。启用时利用多核 CPU 并行压缩已分组的文件。</summary>
+    public bool MultiThreadedCompression { get; set; }
+
+    /// <summary>N 组并行压缩的目标组数。</summary>
+    [ObservableProperty]
+    private int _parallelCompressDegree = Environment.ProcessorCount;
 
     // ── 分卷 ──
 
@@ -597,6 +610,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             SevenZipNumFastBytes = settings.SevenZipNumFastBytes;
             SevenZipMatchFinder = settings.SevenZipMatchFinder ?? "";
             SevenZipMultithreaded = settings.SevenZipMultithreaded;
+            AdaptiveCompression = settings.AdaptiveCompression;
             ZipEncryptionMethod = settings.ZipEncryptionMethod ?? "aes256";
             SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders;
             // 文件冲突默认策略：非法值经 OnConflictActionChanged 同步回退到第一项（每次询问）

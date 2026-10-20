@@ -78,8 +78,8 @@ public class CompressRequest
     /// <summary>7z 固实块大小：null/""=默认，或 "64m" / "256m" / "512m" / "1g"</summary>
     public string? SevenZipSolidBlockSize { get; init; }
 
-    /// <summary>7z 字典大小（字节），null 表示引擎默认</summary>
-    public int? SevenZipDictionarySize { get; init; }
+    /// <summary>7z 字典大小：null/""=默认，或 "64m" / "256m" / "1g" / "4g"</summary>
+    public string? SevenZipDictionarySize { get; init; }
 
     /// <summary>7z Word Size（快速字节数），null 表示引擎默认</summary>
     public int? SevenZipNumFastBytes { get; init; }
@@ -89,6 +89,21 @@ public class CompressRequest
 
     /// <summary>7z 多线程压缩（mt=on）。默认 true，利用多核 CPU 并行压缩。</summary>
     public bool SevenZipMultithreaded { get; init; } = true;
+
+    /// <summary>自适应压缩：已压缩文件自动 Store。仅 ZIP+Deflate。</summary>
+    public bool AdaptiveCompression { get; init; }
+
+    /// <summary>魔数检测：自适应开启时增强识别。</summary>
+    public bool AdaptiveSmartDetect { get; init; }
+
+    /// <summary>多线程压缩：可压缩文件走 SharpSevenZip mt=on。</summary>
+    public bool MultiThreadedCompression { get; init; }
+
+    /// <summary>N 组并行压缩的目标组数，默认值取运行时 CPU 数；1 = 串行。</summary>
+    public int ParallelCompressDegree { get; init; } = 0;
+
+    /// <summary>多线程模式下用户自定义仅存储格式 ID 列表。</summary>
+    public HashSet<string> MultiThreadedStoreFormatIds { get; init; } = new();
 
     /// <summary>ZIP 压缩方法：null/""=默认（Deflate），或 "deflate64" / "bzip2" / "lzma" / "ppmd" / "store"</summary>
     public string? ZipCompressionMethod { get; init; }
@@ -462,9 +477,14 @@ public static class CompressService
             SevenZipNumFastBytes = request.SevenZipNumFastBytes,
             SevenZipMatchFinder = request.SevenZipMatchFinder,
             SevenZipMultithreaded = request.SevenZipMultithreaded,
+            AdaptiveCompression = request.AdaptiveCompression,
+            AdaptiveSmartDetect = request.AdaptiveSmartDetect,
+            MultiThreadedCompression = request.MultiThreadedCompression,
+            MultiThreadedStoreFormatIds = request.MultiThreadedStoreFormatIds,
             ZipCompressionMethod = request.ZipCompressionMethod,
             ZipEncryptionMethod = request.ZipEncryptionMethod,
             SevenZipEncryptHeaders = request.SevenZipEncryptHeaders,
+            ParallelCompressDegree = request.ParallelCompressDegree,
             FileWhitelist = whitelist,
             ErrorResolver = request.ErrorResolver,
         };
