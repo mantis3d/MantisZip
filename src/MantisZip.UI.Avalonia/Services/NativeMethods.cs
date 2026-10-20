@@ -55,7 +55,26 @@ internal static class NativeMethods
 
     // ── NativeSplash（startup-native-splash 计划）──
 
-    [DllImport("user32.dll", SetLastError = true, EntryPoint = "PostMessageW")]
+    [DllImport("user32.dll")]
+    public static extern nint GetForegroundWindow();
+
+    /// <summary>返回值是窗口所属线程 id；pid 经传出参数。</summary>
+    [DllImport("user32.dll")]
+    public static extern uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
+
+    [DllImport("kernel32.dll")]
+    public static extern uint GetCurrentThreadId();
+
+    [DllImport("user32.dll")]
+    public static extern bool AttachThreadInput(uint idAttach, uint idAttachTo, bool fAttach);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool SetForegroundWindow(nint hWnd);
+
+    [DllImport("user32.dll", SetLastError = true)]
+    public static extern bool BringWindowToTop(nint hWnd);
+
+    [DllImport("user32.dll")]
     public static extern bool PostMessage(nint hWnd, uint Msg, nint wParam, nint lParam);
 
     [DllImport("user32.dll")]

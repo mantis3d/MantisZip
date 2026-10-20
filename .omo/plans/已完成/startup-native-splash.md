@@ -169,6 +169,21 @@ Program.Main
 - **GUI 手动验收清单（待做）**：焦点不抢（焦点直达真实窗口）/任务栏不显示/`--compress <目录>` 全链路 /`--open <压缩包>` 全链路/最短显示时长/150-200% DPI 清晰/语言切换后 splash 文案
 - **对已有沉浸式的全部承接**：无参数启动 → splash「正在启动…」；CLI 慢路径逐场景 key 对应；关闭时机在该 CLI 自有「终端窗口」出现时（CollectingWindow 保留为降级兜底）
 - **样式升级（2026-10-20 第二轮，commit `1c4e214`，用户确认「图标左+文字右」）**：① `Paint` 重排为图标左 + 文字右——`DT_CALCRECT` 先量文本宽，`（图标32dp + 间隔16dp + 文本宽）`整体水平居中，图标 DrawIconEx 垂直居中，文字 `DT_LEFT|DT_VCENTER`；② 图标来源 `ExtractIconExW(executablePath, 0, big, small, 1)`——零资产工作（复用 csproj `<ApplicationIcon>Resources\App.ico` 内嵌资源），ThreadProc 一次性提取缓存 `_hIcon`，finally `DestroyIcon` 释放，提取失败 Paint 自动退化为纯文本布局；③ Win11 圆角：`DwmSetWindowAttribute(DWMWA_WINDOW_CORNER_PREFERENCE=33, DWMWCP_ROUND=2)`（Win10 无此属性 → 失败静默直角）；④ 字号从 22dp 调至 18dp 适配横向布局；规律 13 免（图元无文案变更）
+- **主窗口被糊住修复（2026-10-20 第三轮，用户报告 splash 消失后主窗留在既有量层窗口后面被异物遮挡）**：
+  - **根因链**：Windows 把「进程启动后第一个可见窗口」的前台激活机会给了 splash，但 splash 是
+    `WS_EX_NOACTIVATE`（设计初衷不抢键盘焦点）不接激活；splash 销毁时系统把前台回落给既有前
+    台窗口（用户当时活动的背景应用），而 Avalonia `Window.Show()` 只显示不
+    `SetForegroundWindow` —— 主窗口因此留在 z-order 后层被异物糊住（探针取证：`GetForegroundWindow`
+    仍指向环境窗口 pid=36400，`MantisZip` 主窗 `isfg=False` 可见未最小化）。
+  - **修复**：`NativeSplash.Hook` 的 `Opened` 钩子加 **`EnsureForeground(window)`**：`GetForegroundWindow`
+    不是自己 → `AttachThreadInput(前台线程, 自己, true)` 挂接输入队列解锁前台转换权限 →
+    `BringWindowToTop` + `SetForegroundWindow` → finally 解挂（官方认可跨进程激活 hack，浏览器
+    类应用通例）；`fg==hwnd` no-op（首帧激活成功场景），TryGetPlatformHandle 失败/异常静默降级
+    不影响启动。`NativeMethods` +5 P/Invoke（GetForegroundWindow/GetWindowThreadProcessId/
+    GetCurrentThreadId/AttachThreadInput/SetForegroundWindow + BringWindowToTop）。
+  - **验证**：无参启动探针 `isfg=True`（前台 hwnd 即对 MantisZip 主窗）；`--open <真实 zip>`
+    同样 `isfg=True`；headless 单测 `NativeSplashForegroundTests` 1 条（Hook 链路不抛异常）。
+    全部启动方式（双击 exe/CLI/右键）走 Hook 统一受益。
 5. splash 不抢焦点（焦点直达真实窗口）、不进任务栏、不闪烁（最短显示时长生效）
 6. 高 DPI（150%/200%）下 splash 尺寸/文字清晰
 7. `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 通过

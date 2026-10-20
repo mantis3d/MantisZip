@@ -78,7 +78,53 @@ internal static class NativeSplash
     /// </summary>
     internal static void Hook(Window window)
     {
-        window.Opened += (_, _) => Hide();
+        window.Opened += (_, _) =>
+        {
+            EnsureForeground(window); // splash 修复：Avalonia Show() 不激活，NOACTIVATE splash 吞掉前台后主窗被糊住
+            Hide();
+        };
+    }
+
+    /// <summary>
+    /// 终端窗口显示后强制置前（startup-native-splash 计划「主窗口被糊住」修复）。
+    /// 背景机制：Windows 把「进程启动后第一个可见窗口」的前台激活机会给了 splash，但 splash
+    /// 是 WS_EX_NOACTIVATE 不接激活；splash 销毁时系统把前台回落给既有前台窗口，
+    /// Avalonia 的 Show() 又不主动 SetForegroundWindow——主窗口因此留在 z-order 后层。
+    /// 兼容手法：AttachThreadInput 挂到前台线程解锁前台转换权限 → SetForegroundWindow（官方
+    /// 认可的跨进程激活 HACK，浏览器类应用通例）。
+    /// </summary>
+    private static void EnsureForeground(Window window)
+    {
+        if (!OperatingSystem.IsWindows()) return;
+        try
+        {
+            var hwnd = window.TryGetPlatformHandle()?.Handle ?? nint.Zero;
+            if (hwnd == nint.Zero) return;
+
+            var fg = NativeMethods.GetForegroundWindow();
+            if (fg == hwnd) return; // 已经在前台（首帧激活成功的场景），no-op
+
+            var fgThread = NativeMethods.GetWindowThreadProcessId(fg, out _);
+            var me = NativeMethods.GetCurrentThreadId();
+            var attached = false;
+            try
+            {
+                if (fg != nint.Zero && fgThread != nint.Zero && fgThread != me)
+                    attached = NativeMethods.AttachThreadInput(fgThread, me, true);
+                NativeMethods.BringWindowToTop(hwnd);
+                if (!NativeMethods.SetForegroundWindow(hwnd))
+                    App.DebugLog($"EnsureForeground: SetForegroundWindow failed (fgThread={fgThread})");
+            }
+            finally
+            {
+                if (attached)
+                    NativeMethods.AttachThreadInput(fgThread, me, false);
+            }
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"EnsureForeground crashed: {ex.Message}"); // 置前失败不影响启动流程
+        }
     }
 
     // ── 消息泵线程 ──

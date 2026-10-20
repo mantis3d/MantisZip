@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — Splash 修复：主窗口启动后被既有窗口糊住（前台激活时序）
+  - **现象（用户报告）**：splash 消失后主窗留在 z-order 后层，被启动前最大化的其他应用完全遮挡；所有启动方式（双击 exe / CLI / 右键）均复现，splash 之前无此问题，任务栏可拉起。
+  - **根因链**：Windows 把「进程启动后第一个可见窗口」的前台激活机会给了 splash，但 splash 是 `WS_EX_NOACTIVATE`（不抢键盘焦点的设计初衷）不接激活；splash 销毁时系统把前台回落给既有前台窗口；Avalonia `Window.Show()` 只显示不 `SetForegroundWindow`——主窗因此无前台。**探针取证**：启动后前台窗口仍是环境窗口（pid=36400），`MantisZip` 主窗 `isfg=False`、可见、未最小化，与假设完全吻合。
+  - **修复（方案 A，用户选定）**：`NativeSplash.Hook` 的 `Opened` 钩子先 `EnsureForeground(window)` 再 `Hide()`——`GetForegroundWindow()` 不是自己时，`AttachThreadInput(前台线程, 自己, true)` 解锁前台转换权限 → `BringWindowToTop` + `SetForegroundWindow` → finally 解挂；`fg==hwnd` no-op，headless 无真实 hwnd 静默降级，失败不影响启动。`NativeMethods` +5 P/Invoke（GetForegroundWindow/GetWindowThreadProcessId/GetCurrentThreadId/AttachThreadInput/SetForegroundWindow/BringWindowToTop）。
+  - **验证**：无参与 `--open <真实 zip>` 两场景探针 `isfg=True`（前台 hwnd 即 MantisZip 主窗）；headless 单测 `NativeSplashForegroundTests` 1 条（Hook 链路不抛异常）；Release 构建 0 错误。
+
 **2026-10-20** — Splash 动态文案（单文件带文件名 / 多文件带数量）+ 超长名截断
   - **分发重构**（`Program.cs`）：`SplashTextKey` 改为 `SplashTextSpec` 纯函数返回 `(Key, Args)`（internal，InternalsVisibleTo 直测），`T()` 格式化统一收口在 `Main` 处——测试与语言解耦。按启动方式选择：`--open`/`--open-dispatch` 单文件带名；`--extract*` 四命令单文件带名、多文件带数量；`--compress-quick` 多文件带数量、单文件静态（用户拍板不带名）；`--compress`/`--compress-separate`/`--compress-combined` 保持静态「正在收集文件」（IPC 收集期总数未知）；路径过滤与 CLI 路由同逻辑（`File.Exists`），无效路径回退静态 key。
   - **三语 +4 key**（文件头插入，`Status_Starting` 之后）：`Status_OpeningArchiveFmt` / `Status_ExtractingFmt` / `Status_ExtractingBatchFmt` / `Status_CompressingBatchFmt`；手工三语校验 1267/1267/1267 key 全集一致；`SplashTextSpecTests` 19 条全过（含 nonexistent 路径回退 / 全 --extract* 命令分支 / 数量插值 int 型 args[0]），全量 327 总 / 321 过 / 3 跳过 / 3 失败（3 失败同前 = 预存 corpus 缺失，新增失败 0）。
