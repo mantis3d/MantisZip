@@ -6,6 +6,10 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 计划文档校准：winget-publishing / preview-quick-modes / auto-update 三份计划按 v0.5.3 现状修正
+  - **winget-publishing**：删除 WebView2 过时引用（WebSetup 风险改为 .NET 10 运行时下载提示）；CI 片段改用 `WINGET_CREATE_GITHUB_TOKEN` 环境变量防 token 泄露；Task 1 补 `delete_repo` 可选权限说明与 fine-grained PAT 限制（winget-create#595）；版本示例 0.4.4 → 0.5.3
+  - **preview-quick-modes**：关联计划状态定稿（html-preview-webview-fallback 已完成 / preview-extended-formats 进行中）；GIF 统一为 AnimatedImage 命名（GIF/Animated WebP/APNG）；字幕格式标注「未支持待补」；HTML 双轨已落地说明（NativeWebView 主轨 + ReverseMarkdown 降级）；`AppSettings.Instance` → `AppSettings.Load()`；缩略图冗余章节收敛为指向三个独立计划的引用；PLAN.md 对应登记说明同步
+  - **auto-update**：i18n 要求升级为三语（zh-CN / en / zh-TW，规则 13 + `AboutWindowTests` 把关 + `mantiszip_i18n` 校验）；`AppSettings.Instance` → `Load()`+`Save()`（现无 Instance 属性）；便携模式 guardrail 反转（`Portable.txt` 已实现，两形态行为一致）；AboutWindow Tab 头改属性绑定模式（勿用 x:Name）；SettingsWindow Debug Tab 位置修正（第 9 个，非 last）；版本示例全量 0.5.x
 **2026-10-20** — 大文件拆分阶段 3（完成）：`MainWindowViewModel.cs`（3201 行）→ 主干 1352 行 + 5 个 partial
   - **切分**（纯移动，零行为变化）：`MainWindowViewModel.Password.cs`（326 行，会话密码字段/`GetSessionPassword` 周边 + `UpdatePasswordStatus`/`EnterPasswordAsync`/`TryEnsureArchivePasswordAsync`）、`.Preview.cs`（463 行，`OpenEntryWithDefaultAppAsync`/`TryDeleteTempDir` + `ShowPreviewAsync`）、`.Navigation.cs`（495 行，导航历史/树过滤/`GoUp`/`PopulateEntries`/`FindNode`）、`.Extract.cs`（452 行，`ExtractArchive`/`ExtractSelected*`/`OpenExtractedFolderAsync` + `TestEntry`/`ExtractTo`/`SmartExtract`/`TestArchive`）、`.Compress.cs`（243 行，`NewArchive`/`DragInCompressAsync`/`ExecuteCompressFromSettings` + `AddFiles`/`AddFilesToArchiveAsync`/`DeleteFiles`）；主干保留字段/属性/本地化/`LoadArchiveAsync`/设置与杂项命令/`FilterMatchModeInfo` 类。
   - **完整性校验**：新旧非空行逐行排序比对，除 5 个 partial 类的闭合括号外**完全一致**（零内容丢失）。
