@@ -102,6 +102,56 @@ public static class TextEncodingDetector
         return Encoding.GetEncoding(cp).GetString(data);
     }
 
+    /// <summary>
+    /// 解码「无编码标志的自由文本」（典型场景：ZIP EOCD 注释）。
+    /// 与 <see cref="DecodeText(byte[], int)"/> 的区别：回退链**不依赖宿主 locale** ——
+    /// 严格 UTF-8 失败后直接按 GB18030（GBK 超集）解码，宿主 ANSI 仅作最后兜底。
+    /// 原因：ZIP 注释没有 encoding flag 字段，中文工具历史上一律写 CP936；
+    /// 而 <c>CultureInfo.CurrentCulture.TextInfo.ANSICodePage</c> 在非中文系统（en-US = 1252）
+    /// 会把同一批 GBK 字节解成乱码（如「欢迎使用本压缩包」→「»¶Ó­Ê¹ÓÃ±¾Ñ¹Ëõ°ü」）。
+    /// </summary>
+    /// <param name="data">原始字节（可含 BOM）。</param>
+    /// <returns>解码后的文本。</returns>
+    public static string DecodeComment(byte[] data)
+    {
+        if (data.Length == 0) return string.Empty;
+
+        // 1. UTF-8 BOM → 按 UTF-8 解码（去 BOM）
+        if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
+            return new UTF8Encoding(false).GetString(data, 3, data.Length - 3);
+
+        // 2. 严格 UTF-8：现代工具/规范写法的注释
+        try
+        {
+            return new UTF8Encoding(false, true).GetString(data);
+        }
+        catch (DecoderFallbackException)
+        {
+            CoreLog.Trace("TextEncodingDetector.DecodeComment: not valid UTF-8, trying GB18030");
+        }
+
+        // 3. GB18030（54936，GBK 超集）：中文工具写注释的事实标准，与宿主 locale 无关。
+        //    必须用**异常回退**（严格）解码来验证：GB18030 的默认解码器会把非法/截断序列
+        //    静默替换成 '?'（不是 U+FFFD），靠检查替换字符无法区分「真 GB18030」与「西文被误读」。
+        Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+        try
+        {
+            var strictGb18030 = Encoding.GetEncoding(
+                54936, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback);
+            var gb18030Text = strictGb18030.GetString(data);
+            CoreLog.Trace("TextEncodingDetector.DecodeComment: decoded as GB18030");
+            return gb18030Text;
+        }
+        catch (DecoderFallbackException)
+        {
+            CoreLog.Trace("TextEncodingDetector.DecodeComment: not valid GB18030, falling back to host ANSI");
+        }
+
+        // 4. 最后兜底：宿主 ANSI 代码页（保持旧行为，仅在字节不是合法 GB18030 时使用）
+        int cp = System.Globalization.CultureInfo.CurrentCulture.TextInfo.ANSICodePage;
+        return Encoding.GetEncoding(cp).GetString(data);
+    }
+
     /// <summary>Ude 检测编码名与置信度。空数据返回 (null, 0)。</summary>
     public static (string? Name, double Confidence) DetectEncoding(byte[] data)
     {

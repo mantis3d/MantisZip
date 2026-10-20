@@ -2433,6 +2433,15 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.2 (2026-10-20) ZIP 注释解码不再依赖宿主 locale + copy-mode 注释字节透传
+  - **缺陷 1（用户可见乱码）**：`ZipCommentHelper.ReadCommentFromStream`（`ZipCommentHelper.cs:148`）走 `TextEncodingDetector.DecodeText`，其回退代码页取自 `CultureInfo.CurrentCulture.TextInfo.ANSICodePage` —— 中文 Windows（936）正常，en-US（1252）把 GBK 注释解成 `»¶Ó­Ê¹ÓÃ±¾Ñ¹Ëõ°ü`。修复：新增 `TextEncodingDetector.DecodeComment(byte[])`，回退链 BOM → **严格 UTF-8** → **严格 GB18030** → 宿主 ANSI（最后兜底），注释改走它。
+  - **关键坑（首版实测翻车）**：GB18030 的**默认**解码器把非法/截断序列静默替换成 `?`（**不是** U+FFFD），因此靠 `text.Contains('\uFFFD')` 判断「是否真的是 GB18030」失效 —— `café` 的 cp1252 字节 `63 61 66 E9` 会被解成 `caf?` 而非退回 ANSI。必须用 `Encoding.GetEncoding(54936, EncoderFallback.ExceptionFallback, DecoderFallback.ExceptionFallback)` 严格解码，靠 `DecoderFallbackException` 判定。
+  - **缺陷 2（注释数据损坏，比乱码严重）**：`ZipBinaryRewriter.ReadEocd` 用 `Encoding.UTF8.GetString`（静态实例是**替换回退、永不抛异常**）+ `Encoding.Default` 兜底（.NET Core 恒为 UTF-8，非系统 ANSI）→ 整个 `catch (DecoderFallbackException)` 是**死代码**，GBK 注释被解成 U+FFFD，再经 `WriteEocd` 以 UTF-8 重编码写回，**copy-mode 重写（删除/重命名/移动条目）后注释原始字节永久丢失**。修复：`ReadEocd` 返回 `byte[]? commentBytes` 原始字节、`WriteEocd` 改收字节（仅显式传入 `comment` 时才 UTF-8 编码），两条链路同步（单源 `:333/:455`、多源 `:607/:739`）。
+  - **测试（+7 Core）**：`DecodeComment` 6 条 —— GBK 解中文、**en-US culture 下仍解中文**、UTF-8 BOM 去 BOM、纯 ASCII 不变、GB18030 四字节序列（`中文€𝄞`）、cp1252 西文不被误判为 GB18030（护栏）；`RewriteAsync_PreservesGbkCommentBytes_ByteExact` 用字节级相等锁定 copy-mode 注释透传。
+  - **测试侧脚手架反转**：`MainWindowViewModelCommentTests.LoadArchive_WithGbkComment_DecodesCorrectly` 从「固定 `zh-CN`」（`9ac51c0` 的临时收口）改为**故意固定 `en-US`** —— 生产代码若回退到宿主 ANSI，该用例在任何机器上都会失败，不再依赖跑测机器是中文环境。
+  - **验证（按 CI 原样三步、仓库根、整个 sln）**：restore / build / test 均 exit 0；Core **717 通过 / 1 跳过 / 718 总计**，Avalonia **306 通过 / 3 跳过 / 309 总计**，0 失败。
+  - **未做（Phase 2，待定）**：`AppSettings.FallbackCodePage` + `TextEncodingDetector.Initialize()` 注入，让文本预览的「系统 ANSI」可配置（默认行为不变）；计划见 `.omo/plans/进行中/text-fallback-encoding-policy.md`。
+
 #### v0.5.2 (2026-10-20) CI 补齐 Avalonia 测试项目，修复 gbk 编码注册的测试顺序依赖
   - **CI 缺口**：`MantisZip.sln` 只含 `tests/MantisZip.Tests`，而 `tests/MantisZip.UI.Avalonia.Tests`（xunit v3，309 条）只存在于磁盘 —— 查 `MantisZip.sln` 历史确认**从未被加入过**。CI 的 `dotnet restore/build/test` 均在仓库根目录执行，因此 Avalonia 测试**从未在 CI 上跑过**。修复：`dotnet sln add tests\MantisZip.UI.Avalonia.Tests\... --solution-folder tests`（复用已有 `tests` 解决方案文件夹），`ci.yml` 无需改动。
   - **补跑后暴露的语料缺失**：干净检出下 `MantisZip.UI.Avalonia.Tests.WholeArchiveErrorLocalizerTests` 3 条失败（`Actual: 找不到文件：...corrupt-01-truncated-tail.zip`）。根因是 `.gitignore` 的构建产物通配 `*.zip` 误吞了 `tests/corpus/corrupt-archives/` 下 **19 个 zip 语料**（同目录 48 个 `.7z/.tar.gz/.rar` 等均已入库，`README.txt` 明确该目录为入库测试语料）。修复：`.gitignore` 增加 `!tests/corpus/**/*.zip` 例外并补入 19 个语料（合计约 300 KB）。
