@@ -103,10 +103,19 @@ Program.Main
 | 启动方式 | key | zh-CN 文案 | 备注 |
 |---|---|---|---|
 | （无参普通启动） | `Status_Starting` | 正在启动… | **新增 key**，三语成对添加（zh-CN / en / zh-TW） |
-| `--compress` / `--compress-separate` / `--compress-combined` | `App_CompressCollecting` | 正在收集文件... | 现有 key |
-| `--compress-quick` | `Cli_QuickCompress` 相关或 `Status_Compressing`（实施时按现有 key 就近选） | 正在压缩... | 现有 key |
-| `--extract*` | `Progress_Title_Extract` 或 `Status_OpeningArchive`（实施时定） | 正在解压... | 现有 key |
-| `--open` / `--open-dispatch` | `Status_OpeningArchive` | 正在打开压缩包… | 现有 key |
+| `--compress` / `--compress-separate` / `--compress-combined` | `App_CompressCollecting` | 正在收集文件... | 现有 key（实施后保持；IPC 收集期总数未知，加数字反而误导） |
+| `--compress-quick` 多文件 | `Status_CompressingBatchFmt`（**新增 key**） | 正在压缩 {0} 个文件… | 用户拍板：多文件带数量 |
+| `--compress-quick` 单文件 | `Progress_Title_Compress` | 正在压缩... | 用户拍板：单文件忽略不带名 |
+| `--extract*` 单文件 | `Status_ExtractingFmt`（**新增 key**） | 正在解压 {0} | 用户拍板：带文件名 |
+| `--extract*` 多文件 | `Status_ExtractingBatchFmt`（**新增 key**） | 正在解压 {0} 个压缩包… | 用户拍板：带数量（启动时 count 已知） |
+| `--open` / `--open-dispatch` 单文件 | `Status_OpeningArchiveFmt`（**新增 key**） | 正在打开压缩包 {0} | 用户拍板：带文件名 |
+| `--open` / `--open-dispatch` 无效路径 | `Status_OpeningArchive` | 正在打开压缩包… | 现有 key（回退） |
+
+> **实施后补充（动态文案）**：key 选择落地为 `Program.SplashTextSpec` 纯函数（internal 返回
+> `(Key, Args)`，格式化由 `Main` 处 `LocalizationManager.T(spec.Key, spec.Args)` 统一收口——
+> 测试与语言解耦）；路径过滤与 CLI 路由同逻辑（`File.Exists`），全无效回退静态。
+> 绘制侧加 `DT_END_ELLIPSIS`（量宽/绘制两处 fmt），超长文件名在居中内容右界截断「…」。
+> 单测 `SplashTextSpecTests` 19 条全过；三语 key 集手工校验 1267/1267/1267。
 
 #### CollectingWindow 去留
 

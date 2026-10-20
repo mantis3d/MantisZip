@@ -1,5 +1,9 @@
 ﻿{
   "Status_Starting": "Starting…",
+  "Status_OpeningArchiveFmt": "Opening {0}",
+  "Status_ExtractingFmt": "Extracting {0}",
+  "Status_ExtractingBatchFmt": "Extracting {0} archive(s)…",
+  "Status_CompressingBatchFmt": "Compressing {0} file(s)…",
   "Progress_WriteFailed_Fmt": "{0} file(s) failed to write to {1}",
   "Status_OperationFailed": "Operation failed",
   "Progress_FailedBreakdown_Fmt": "{0} failed: {1}",

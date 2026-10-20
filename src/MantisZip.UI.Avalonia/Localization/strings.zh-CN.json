@@ -1,5 +1,9 @@
 ﻿{
   "Status_Starting": "正在启动…",
+  "Status_OpeningArchiveFmt": "正在打开压缩包 {0}",
+  "Status_ExtractingFmt": "正在解压 {0}",
+  "Status_ExtractingBatchFmt": "正在解压 {0} 个压缩包…",
+  "Status_CompressingBatchFmt": "正在压缩 {0} 个文件…",
   "Progress_WriteFailed_Fmt": "有 {0} 个文件未能写入到 {1}",
   "Status_OperationFailed": "操作失败",
   "Progress_FailedBreakdown_Fmt": "共 {0} 个失败：{1}",

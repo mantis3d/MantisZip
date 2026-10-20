@@ -311,6 +311,7 @@ internal static class NativeMethods
     public const uint DT_SINGLELINE = 0x0020;
     public const uint DT_NOPREFIX = 0x0800;
     public const uint DT_CALCRECT = 0x0400;
+    public const uint DT_END_ELLIPSIS = 0x8000;
     public const int TRANSPARENT = 1;
     public const uint WS_VISIBLE = 0x10000000;
     public const uint WS_EX_TOPMOST = 0x00000008;

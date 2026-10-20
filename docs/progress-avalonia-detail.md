@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — Splash 动态文案（单文件带文件名 / 多文件带数量）+ 超长名截断
+  - **分发重构**（`Program.cs`）：`SplashTextKey` 改为 `SplashTextSpec` 纯函数返回 `(Key, Args)`（internal，InternalsVisibleTo 直测），`T()` 格式化统一收口在 `Main` 处——测试与语言解耦。按启动方式选择：`--open`/`--open-dispatch` 单文件带名；`--extract*` 四命令单文件带名、多文件带数量；`--compress-quick` 多文件带数量、单文件静态（用户拍板不带名）；`--compress`/`--compress-separate`/`--compress-combined` 保持静态「正在收集文件」（IPC 收集期总数未知）；路径过滤与 CLI 路由同逻辑（`File.Exists`），无效路径回退静态 key。
+  - **三语 +4 key**（文件头插入，`Status_Starting` 之后）：`Status_OpeningArchiveFmt` / `Status_ExtractingFmt` / `Status_ExtractingBatchFmt` / `Status_CompressingBatchFmt`；手工三语校验 1267/1267/1267 key 全集一致；`SplashTextSpecTests` 19 条全过（含 nonexistent 路径回退 / 全 --extract* 命令分支 / 数量插值 int 型 args[0]），全量 327 总 / 321 过 / 3 跳过 / 3 失败（3 失败同前 = 预存 corpus 缺失，新增失败 0）。
+  - **`DT_END_ELLIPSIS`**（`NativeSplash.cs`）：量宽/绘制两处 `DrawText` fmt 都加（0x8000），draw rc.Right 收束到允许文本宽（居中内容右界）——超长文件名截淡出「…」不溢出 360dp 窗口。
+  - **图标时序修复并入本笔提交**（上轮仅工作区改动未 commit）：`ExtractIconEx` 从运行中 exe 提取 `<ApplicationIcon>` 的调用点前移至 `CreateWindowEx(WS_VISIBLE)` **之前**——首帧 `WM_PAINT` 随 `UpdateWindow` 同步发出、之后无重绘机会，后置提取永远拿到纯文本首帧；附带 `SendSplashLog` 诊断埋点。
+  - **冒烟**：`--open <真实 zip>` 与 `--extract-here <真实 zip>` 两场景探针（`MantisZipNativeSplash` 全枚举）各采得 4/3 个 ~250ms 样本 splash 可见后消失，进程全周期存活；`--extract-here` 实际解压落地成功。动态文案实际渲染内容待 GUI 人工验收（与 splash 视觉清单合并）。
+
 **2026-10-20** — Splash 样式升级：图标左 + 文字右 + Win11 圆角（commit `1c4e214`，用户确认方案）
   - `Paint` 重排：`DT_CALCRECT` 先量文本宽 →（图标 32dp + 间隔 16dp + 文本宽）整体水平/垂直居中，图标 `DrawIconEx` 左置、文字 `DT_LEFT|DT_VCENTER` 右置，缺图标时布局自动退化为纯文本
   - 图标零资产工作：`ExtractIconExW` 直接提取运行中 exe 的 `<ApplicationIcon>` 内嵌资源为 HICON，ThreadProc 一次性缓存 / `DestroyIcon` 释放

@@ -123,6 +123,28 @@ internal static class NativeSplash
             const uint exStyle = NativeMethods.WS_EX_TOOLWINDOW | NativeMethods.WS_EX_TOPMOST | NativeMethods.WS_EX_NOACTIVATE;
             const uint style = NativeMethods.WS_POPUP | NativeMethods.WS_VISIBLE;
 
+            // 应用图标（一次性从运行中的 exe 提取，沿用 <ApplicationIcon> 嵌入资源；失败则 Paint 退化为纯文本）
+            // 必须在创建窗口之前完成——首帧 WM_PAINT 在 CreateWindowEx(WS_VISIBLE)+UpdateWindow 时同步发出，
+            // 若此处 _hIcon 仍为 0 则那一帧就是纯文本，且之后不会再有重绘机会
+            try
+            {
+                var exePath = Environment.ProcessPath;
+                SendSplashLog($"icon path={(exePath?.Length <= 40 ? exePath : "…(" + exePath?.Length + ")")}");
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    var big = new nint[1];
+                    var small = new nint[1];
+                    var n = NativeMethods.ExtractIconEx(exePath, 0, big, small, 1);
+                    SendSplashLog($"ExtractIconEx n={n} big=0x{big[0]:x} small=0x{small[0]:x}");
+                    if (n > 0 && big[0] != nint.Zero)
+                        _hIcon = big[0];
+                }
+            }
+            catch (Exception ex)
+            {
+                SendSplashLog($"icon extract crashed: {ex.Message}");
+            }
+
             var pClassName = Marshal.StringToHGlobalUni(ClassName);
             hwnd = NativeMethods.CreateWindowEx(
                 exStyle, pClassName, nint.Zero, style,
@@ -144,20 +166,6 @@ internal static class NativeSplash
             {
                 var pref = NativeMethods.DWMWCP_ROUND;
                 NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref pref, sizeof(int));
-            }
-            catch { }
-
-            // 应用图标（一次性从运行中的 exe 提取，沿用 <ApplicationIcon> 嵌入资源；失败则 Paint 退化为纯文本）
-            try
-            {
-                var exePath = Environment.ProcessPath;
-                if (!string.IsNullOrEmpty(exePath))
-                {
-                    var big = new nint[1];
-                    var small = new nint[1];
-                    if (NativeMethods.ExtractIconEx(exePath, 0, big, small, 1) > 0 && big[0] != nint.Zero)
-                        _hIcon = big[0];
-                }
             }
             catch { }
 
@@ -259,12 +267,11 @@ internal static class NativeSplash
             int iconSize = (_hIcon != nint.Zero) ? (int)(scale * 32) : 0;
             int gap = (_hIcon != nint.Zero) ? (int)(scale * 16) : 0;
 
-            // 先量文本宽（DRAWTEXT DT_CALCRECT），归出总宽再居中
-            var rcText = new NativeMethods.RECT { Left = 0, Top = 0, Right = 0, Bottom = clientH };
-            var rcCalc = rcText;
-            const uint calcFmt = NativeMethods.DT_LEFT | NativeMethods.DT_CALCRECT | NativeMethods.DT_SINGLELINE | NativeMethods.DT_NOPREFIX;
+            // 先量文本宽（DT_CALCRECT），归出总宽再居中；DT_END_ELLIPSIS 防超长文件名溢出
+            var rcCalc = new NativeMethods.RECT { Left = 0, Top = 0, Right = clientW, Bottom = clientH };
+            const uint calcFmt = NativeMethods.DT_LEFT | NativeMethods.DT_CALCRECT | NativeMethods.DT_SINGLELINE | NativeMethods.DT_NOPREFIX | NativeMethods.DT_END_ELLIPSIS;
             NativeMethods.DrawText(hdc, _text, _text.Length, ref rcCalc, calcFmt);
-            int textW = rcCalc.Right - rcCalc.Left;
+            int textW = Math.Min(clientW - iconSize - gap, rcCalc.Right - rcCalc.Left);
 
             int totalW = iconSize + gap + textW;
             int startX = Math.Max(0, (clientW - totalW) / 2);
@@ -281,10 +288,10 @@ internal static class NativeSplash
             {
                 Left = startX + iconSize + gap,
                 Top = 0,
-                Right = clientW,
+                Right = startX + iconSize + gap + textW, // 允许文本宽 = 量宽，DT_END_ELLIPSIS 在此边界截断
                 Bottom = clientH,
             };
-            const uint fmt = NativeMethods.DT_LEFT | NativeMethods.DT_VCENTER | NativeMethods.DT_SINGLELINE | NativeMethods.DT_NOPREFIX;
+            const uint fmt = NativeMethods.DT_LEFT | NativeMethods.DT_VCENTER | NativeMethods.DT_SINGLELINE | NativeMethods.DT_NOPREFIX | NativeMethods.DT_END_ELLIPSIS;
             NativeMethods.DrawText(hdc, _text, _text.Length, ref rc, fmt);
 
             NativeMethods.SelectObject(hdc, oldFont);
