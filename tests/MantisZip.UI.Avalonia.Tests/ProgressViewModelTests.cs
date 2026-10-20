@@ -230,6 +230,40 @@ public class ProgressViewModelTests
         Assert.True(row.ShowRightRegion);
     }
 
+    // 预测试/收集阶段的非批次上报会先合成一条 IsParallel=false 单行（占索引 0）；
+    // 首个并行批次上报必须清掉它，否则 batch 0 写进只读 IsParallel 的行 → 底纹（批次进度条）/
+    // 序号/N% 全部永久隐藏（看似「第一批次进度条恒 0」），且后续行序号从 2 起。
+    [Fact]
+    public void SetProgress_PreTestSingleRow_ThenParallel_BatchZeroGetsParallelRow()
+    {
+        var vm = new ProgressViewModel();
+        // 1) 大包预测试状态上报（无 BatchIndex / EntryKey）→ 合成单通道行
+        vm.SetProgress(new ArchiveProgress { CurrentFile = "STATUS_TESTING_PARALLEL_DEGREE", PercentComplete = 0 });
+        var single = Assert.Single(vm.ParallelBatchItems);
+        Assert.False(single.IsParallel);
+
+        // 2) batch 1 先到（补洞创建），batch 0 随后
+        vm.SetProgress(new ArchiveProgress
+        {
+            CurrentFile = "b1.txt", BatchIndex = 1, BatchCount = 2,
+            BatchPercentComplete = 40, BatchTotalBytes = 100, BatchProcessedBytes = 40,
+        });
+        vm.SetProgress(new ArchiveProgress
+        {
+            CurrentFile = "b0.txt", BatchIndex = 0, BatchCount = 2,
+            BatchPercentComplete = 25, BatchTotalBytes = 200, BatchProcessedBytes = 50,
+        });
+
+        var rows = vm.ParallelBatchItems;
+        Assert.Equal(2, rows.Count);
+        Assert.All(rows, r => Assert.True(r.IsParallel));   // 无残留非并行单行
+        Assert.Equal(1, rows[0].Index);                     // 序号 1（不是从 2 起）
+        Assert.Equal(2, rows[1].Index);
+        Assert.Equal(25, rows[0].Percent);
+        Assert.Equal("25%", rows[0].PctDetailText);         // 第一行百分比不再被 IsVisible 吞掉
+        Assert.Equal(40, rows[1].Percent);
+    }
+
     [Fact]
     public void SetProgress_Parallel_MarksRowsIsParallel()
     {
