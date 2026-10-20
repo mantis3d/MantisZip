@@ -1,5 +1,7 @@
 # MantisZip — Agent Guide
 
+> 本文件只放**每次 session 必读**的硬性规则与速查。架构细节、契约、历史踩坑、拖拽/预览/Shell 实现见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+
 ## Project overview
 
 基于 Avalonia 的跨平台压缩/解压桌面应用。
@@ -8,419 +10,55 @@
 |------|------|------|
 | `MantisZip.UI.Avalonia` | Avalonia (`net10.0`) | 🟢 主力开发 |
 
-两个共享库：`MantisZip.Core` (class library) + `MantisZip.ShellExt` (COM 组件 class library)。
-
-> **注意**: WPF 版本 (`MantisZip.UI`) 已在迁移完成后删除，仅保留 Avalonia 版本。
+两个共享库：`MantisZip.Core` (class library) + `MantisZip.ShellExt` (COM 组件 class library)。WPF 版本已在迁移完成后删除。
 
 ## Quick start
 
 ```powershell
-# 构建 Avalonia 版（当前主力）
+# 构建 Avalonia 版（主力）
 dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
-# 运行 Avalonia 版（Windows）
+# 运行（Windows）
 dotnet run --project src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
-# Tests（Core 层测试，与 UI 框架无关）
+# Tests
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
-
-# Avalonia 测试
 dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
-## Architecture
+- 产物：`src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe`；`bin/`、`obj/` 已 gitignore
+- **无 CI、无 pre-commit、无 linter**；`tests/` 有 Core 与无头 Avalonia 两个测试项目（非全量覆盖）
+- ShellExt COM 已注册时 Explorer 会锁 Debug DLL → 构建/测试用 `-c Release` 绕开
 
-### 迁移阶段状态
-
-Avalonia 移植 Phases 0–10 已完成，当前处于功能补齐后期：
-
-| Phase | 内容 | 状态 |
-|-------|------|------|
-| 0–9 | 项目骨架·浏览·预览·设置·压缩解压·编辑·样式·交互 | ✅ 已完成 |
-| 10 | WPF 功能补齐（进度条·信息面板·状态栏） | ✅ 已完成 |
-| UI 功能补齐 | 对话框·控件·转换器补齐 | 27/29 ✅（2 项待 GUI 验证） |
-| Shell/COM 集成 | ShellIntegration·ShellExt·文件关联·CLI | ✅ 已完成 |
-| i18n + 清理 | 缺失 key 补齐·空目录清理·版本对齐 | ✅ 已完成 |
-| HTML 预览升级 | 跨平台 WebView + ReverseMarkdown 降级 | 📋 待实施（恢复 WebView 双轨方案） |
-
-### 依赖流向
+## Architecture（速查）
 
 ```
 MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference── MantisZip.ShellExt (COM)
-(net10.0)            │   (net10.0, 主力开发)                  (Explorer.exe 宿主)
-                     │
-                ZipEngine    SevenZipEngine    TarGzEngine
-               (SharpCompress) (SharpSevenZip) (SharpCompress)
+(引擎/解析)          │   (Avalonia MVVM)                     (Explorer.exe 宿主)
 ```
 
-### Engine pattern (strategy + factory)
-
-所有引擎均在 `MantisZip.Core`，与 UI 框架无关：
-
-- `IArchiveEngine` interface: `ListEntriesAsync`, `ExtractAsync`, `CompressAsync`, `TestArchiveAsync`
-- `ArchiveEngineFactory` registers engines in static constructor, dispatches by file extension
-- `SevenZipEngine.CompressAsync` uses `SharpSevenZipCompressor` (7z.dll COM binding)
-- `ArchiveEntryExtractor` (Core/Utils) handles single-entry extraction for preview; only supports Zip and 7z
-
-### Progress reporting
-
-- `ArchiveProgress` (Core/Abstractions/ArchiveEngine.cs): `PercentComplete` (overall, 0–100), `FilePercentComplete` (nullable double, 0–100 for per-file granularity), `FileName` (current file name), `Message`
-- `ZipEngine` reports per-file progress via buffered I/O copy loop with 100ms throttle; reports initial 0% and final 100% for each file
-- `SevenZipEngine.ExtractAsync` and `TarGzEngine.ExtractAsync` report progress only at completion (100%)
-- `SevenZipEngine.CompressAsync` reports progress via `SharpSevenZipCompressor.Compressing` event
-
-### 并行解压架构
-
-ZIP 解压默认并行（`ZipEngine.SupportsParallelExtract = true`）：按文件大小降序 + Round-Robin 分批，**每批次独占一个 SharpCompress archive 实例**（共享实例并发会 `ZlibException`），4MB 缓冲区；`AppSettings.ParallelExtractDegree` 默认 `ProcessorCount`（1 = 串行回退）。`SevenZipEngine`/`TarGzEngine` 不支持；过滤解压（`ExtractEntriesAsync`）仍串行。
-
-> ⚠️ 进度上报禁止在锁内调用 `progress?.Report()`：曾导致 100×1MB 解压从 0.3s 劣化到 8.5s（25x 回退）。
-
-分批算法、锁内拷贝变量、性能数据见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
-
-### 7z 多线程压缩（mt=on）
-
-`SevenZipEngine` 通过 `CustomParameters["mt"]` 启用（`ArchiveOptions.SevenZipMultithreaded`，默认 `true`）；**仅 7z 有效**（ZIP/TAR/GZ 无此参数，`SharpSevenZipCompressor` 也没有 `mt` 属性）。实测 4.63x 加速（100×1MB / 8 核）。
-
-UI 传递链、实测数据与验证用例见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
-
-### ZIP 压缩加速（自适应 / 多线程 / 引擎侧组数）
-
-**三开关 Phase 1 互相独立**（`AppSettings.AdaptiveCompression` / `AdaptiveSmartDetect` / `MultiThreadedCompression`）——2026-10-18 双机实测表明**多线程收益与 CPU 相关**：20 核机上 text/mixed 有 10–20% 收益且压缩率更好（text +15%），8 逻辑核机（i7-3770 4C/8T）上净负收益（text 慢 42%、mixed 慢 37%）。任何一刀切静态策略（无论「MT 依赖自适应」还是「MT 独立」）都只对一半硬件正确 → **Phase 1 不做门控**，最终策略由 Phase 2 **本机基准测试**按机器定夺。双机数据与评审记录见 `.omo/plans/进行中/adaptive-compress-ui-convergence.md`。
-
-**组数已从 UI 移除**：引擎默认 `clamp(CPU 核数, 4, 16)`（下限 4 避开已证实的 deg=2 陷阱；20 核机实测 16 组最优，deg=8 慢 21–30%）。组内线程数 = 核数/组数（方案 C）**未验证**——默认路径下多为 no-op，仅在「核数 > 16」或「文件数 < 组数」时生效，**不得**当性能依据写进文档/发布说明。
-
-**⚠ ZIP 的 MT 路径与上面 7z 的 `mt=on` 是两件事**：ZIP MT 按「纯压缩组（7z Deflate）/ 混合组」分派，用 N 个 `mt=off` 的 7z 压缩器组间并行 + copy-mode 合并（不重压缩）；7z 的 `mt=on` 是 7z.dll 原生线程。两者不可混为一谈。
-
-**隐藏的空转控件（Phase 2 实现后启用）**：
-
-- `魔数检测`（`AdaptiveSmartDetect`）：`ZipEntryClassifier.GetAdaptiveLevel` 只读扩展名，从不读 `FileFormatDetector.Detect` 结果 → UI 已隐藏
-- `自适应规则`（`AdaptiveOverrides`）：`AdaptiveRuleMatcher.ResolveLevel` 无生产调用点，`CompressRequest`/`ArchiveOptions` 无规则字段 → 卡片已隐藏
-- 自定义格式「魔数 hex」：`GetAdaptiveLevel` 只读 `format.Extensions`，不读 `MagicHex` → 输入框已隐藏
-
-### ArchiveItem duality
-
-- **Core**: `MantisZip.Core.Abstractions.ArchiveItem` — engines produce these
-- **Avalonia UI**: `ArchiveItemModel` (Models/) wraps `ArchiveItem` with `IconSource`, display properties, `SizeRatio` (progress bar width), `SortOrder`
-
-### Directory aggregation — ComputeDirectoryStats
-
-`ArchiveEntryLister.ComputeDirectoryStats` (`Core/Services/ArchiveEntryLister.cs`) 是目录聚合的共享契约，返回 `Dictionary<string, DirStats>`，`DirStats(Count, Size, CompressedSize, NewestModified)`：
-
-- **递归子树语义**：每个文件计入其全部祖先目录（`a/b/c.txt` 同时计入 `a` 与 `a/b`），目录大小/压缩后大小 = 子树内所有文件之和
-- `Count` **仅统计文件**（跳过目录条目）
-- `NewestModified` = 子树内最新文件修改时间，`DateTime.MinValue` 文件不参与
-- **消费者**：Avalonia `MainWindowViewModel.PopulateEntries`（基于过滤后的 `filteredSource` 计算，目录行的大小/日期/压缩后大小由聚合填充）
-- **注意**：ResultTreeView 的 `CalculateDescendantStats`（`Services/ResultPreviewService.cs`）是独立的树状聚合，`TotalDescendantCount` 只统计文件节点（不含目录条目）、跳过 `IsFilteredOut` 被过滤项、无压缩后大小/日期 —— 与 `DirStats` 语义不同，勿混用
-
-### Extract path resolution — ExtractPathResolver
-
-`ExtractPathResolver`（`Core/Utils/ExtractPathResolver.cs`）是**预览树与实际解压**输出路径计算的单一事实来源，杜绝两者不一致：
-
-- **核心方法**：`ResolveRelativePath(entryKey, currentFolder, preserveFullPath)`（裁剪当前浏览层前缀 + `FileConflictHelper.SanitizeEntryPath` 防 Zip Slip），另有 `TrimCurrentFolderPrefix` / `ResolveAll` 便捷封装
-- **语义**：`preserveFullPath=false` 且 `currentFolder` 非空时裁剪前缀；前缀不匹配的条目保持原路径；`SanitizeEntryPath` 丢弃 `..`/`.` 段但保留普通目录段（`docs/../../evil.txt` → `docs/evil.txt`；真正的路径逃逸拦截在 `GetSafePath`）
-- **消费者**（必须用同一 resolver，勿另写路径逻辑）：
-  - `SelectedItemsExtractService.ExtractEntriesAsync`（实际解压，经 `pathOverrides` 喂给引擎）
-  - `ResultPreviewService.BuildExtractPreview`（预览树，`preserveFullPath`/`currentFolder` 参数，恶意路径条目逐条跳过以防整树损毁 —— 解压侧保持抛异常整批失败）
-- **入口**：`MainWindowViewModel.ExtractSelectedTo` 把 `CurrentFolder` + 设置传给 `CustomFilePickerDialog.ShowExtractFolderAsync`（→ 预览）与实际解压，输入相同故结果必然一致
-- **文件过滤**：Avalonia 版 `ExtractSettingsWindow` 过滤后，`MainWindowViewModel.ExtractArchive` 在 `FilteredEntryKeys` 非空时改走 `engine.ExtractEntriesAsync` 只解压匹配项；否则保持 `ExtractService.ExtractAsync` 全量
-
-### Smart open path — SmartOpenPathResolver
-
-`SmartOpenPathResolver`（`MantisZip.UI.Avalonia/Services/SmartOpenPathResolver.cs`，移植自 WPF `App.Extract.cs:662-701`）是**解压完成后打开资源管理器文件夹**的智能路径判断，避免用户多点一次：
-
-- **语义**：`GetCommonRootDirectory` 采用 **100% 严格公共根**——仅当所有**非目录**条目共享同一顶层目录时返回该目录（逐条取 `FullPath` 首个 `/` 前段，任一缺 `/` 或不同即返回 null）；**不**复用 Core 的 `ArchiveStructureAnalyzer.HasSingleRootDirectory`（≥60% 阈值，语义不同，会造成与 WPF 行为不一致）
-- **方法**：`ResolveSmartOpenPathAsync(archivePath, dest, password)`（`ListEntriesAsync` → `GetCommonRootDirectory` → `Path.Combine(dest, commonRoot)`，任何异常/空列表兜底返回 dest）
-- **消费者**（3 处接线，全部传本次解压实际使用的密码——加密包解压成功后 `ListEntriesAsync` 同密码必然成功）：
-  - `MainWindowViewModel.OpenExtractedFolderAsync`（选中条目解压后，`ExtractSelectedEntriesCoreAsync` 调用）
-  - `MainWindowViewModel.ExtractArchive`（主对话框全量解压后，按 `OpenFolderAfterExtract` 开关调用——曾因死代码从不打开，已修复）
-  - `DragDropService`（拖拽解压后）
-- **范围边界**：`ExtractArchiveHere`/`ExtractArchiveToName`（应用内）与 WPF 一致不开文件夹；WPF CLI `--extract-here`/`--extract-to-name` 批处理会打开（`App.Extract.cs:614-619`），Avalonia CLI 是否对齐见 `.omo/plans/未开始/cli-extract-open-folder.md`
-
-### UI 模式：MVVM
-
-使用 `CommunityToolkit.Mvvm` 的 `ObservableObject` + source generators (`[ObservableProperty]`, `[RelayCommand]`)：
-
-- **ViewModels**: `MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`, `IconTestViewModel`（图标测试窗口）、`UiTestViewModel`（UI 控件测试窗口）、`MetadataPanelSettingsViewModel`（元数据面板设置窗口）
-- **Services**: `ArchiveService`, `CompressService`, `ExtractService`, `SelectedItemsExtractService`（选择条目解压，消费 `ExtractPathResolver`）、`CompressFlow`（压缩公共流程：BuildRequest/冲突弹窗/暂停，主窗口 VM 与 CLI 共用）、`ExtractFlow`（解压公共流程 + 冲突弹窗）、`DragDropService`（拖拽解压后置流程）+ `OverlayController`（Win32 覆层）+ `CustomOleDragDrop`（自实现 OLE 拖拽，根治光标）+ `DropTargetDetector`（目标目录检测）+ `DragDropItemExpander`（选中目录展开）+ `DragPreviewBitmapBuilder`（拖拽预览位图）、`PasswordService`（密码验证/自动匹配）、`FileFilterHelper`（文件过滤）、`NativeMethods`（Win32 P/Invoke）、`PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树，`BuildExtractPreview` 与解压共用 `ExtractPathResolver` 保证预览=实际）、`MetadataSettingsManager`（元数据面板配置持久化，见 docs/ARCHITECTURE.md）、`MetadataRenderEngine`（元数据渲染引擎，见 docs/ARCHITECTURE.md）、`ShellIntegration`（partial 拆分：`ShellIntegration.cs` + `ShellIntegration.Menu.cs` + `ShellIntegration.Assoc.cs`）
-- **Views**: `MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`, `UiTestWindow.axaml`（UI 控件测试，仅 Debug 显示）
-- **Controls**: `ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`CustomFilePickerDialog`（**统一文件/目录选择器**，新增选择入口必须用它、禁用原生 StorageProvider，见规则 16）、`QuickPathPicker`（自包含路径速选控件，见下方「路径速选子系统」）、`InfoPanel`（元数据信息面板）、`FileFilterEditor`（文件过滤条件编辑器）、`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等）、`QuickPathControl`（路径速选控件）
-- **Converters**: `BrushResourceConverter`（主题色键→画刷）、`GeometryResourceConverter`（资源键→Geometry）
-- **紧凑度模式**: Compact/Normal/Loose 三档，`ApplyCompactness()` 运行时注入 12 个 `DynamicResource`（间距/控件高度/圆角），无需重启
-- **上下文工具栏**: 目录树工具栏（展开/折叠全部+自动展开开关+过滤器+分隔符切换）+ 文件列表工具栏（选择/反选/展平/排序/地址栏），`PathIcon` 矢量按钮
-- 对话框通过 ViewModel 的回调委托（`ShowPasswordDialog`, `ShowExtractSettingsDialog` 等）与 View 解耦
-
-#### 派生属性通知：集中通知模式
-
-当多个计算属性依赖同一组源属性时，**禁止**在每个 `[ObservableProperty]` 字段上逐个标注 `[NotifyPropertyChangedFor]`（容易漏、难维护）。改用 `partial void OnXxxChanged` + 集中通知方法：
-
-```csharp
-// ✅ 正确：集中通知
-[ObservableProperty]
-private bool _optionA;
-
-[ObservableProperty]
-private bool _optionB;
-
-partial void OnOptionAChanged(bool value) => NotifyXxxProperties();
-partial void OnOptionBChanged(bool value) => NotifyXxxProperties();
-
-private void NotifyXxxProperties()
-{
-    OnPropertyChanged(nameof(IsVisibleA));
-    OnPropertyChanged(nameof(IsVisibleB));
-    OnPropertyChanged(nameof(SummaryText));
-}
-
-// ❌ 错误：逐个标注，容易漏
-[ObservableProperty]
-[NotifyPropertyChangedFor(nameof(IsVisibleA))]
-[NotifyPropertyChangedFor(nameof(IsVisibleB))]
-[NotifyPropertyChangedFor(nameof(SummaryText))]
-private bool _optionA;
-```
-
-原则：新增派生属性只需改 `NotifyXxxProperties()` 一处，源字段保持干净。
-
-### 预览子系统
-
-预览在 `PreviewPanel.axaml` + `PreviewViewModel` + `PreviewService`，入口 `ClassifyPreviewByMagicAsync()`（**魔数优先**，扩展名回退）→ `ShowXxx(filePath)`。
-
-新增预览格式必须同步三处：`PreviewType` 枚举、`PreviewCapabilities`（能力查表驱动工具栏按钮，禁止再加 `HasXxxControls` 硬编码）、`MetadataRegistry` 元数据字段。预览路径与实际解压共用 `ExtractPathResolver`（预览=实际）；部分提取走 `ArchiveEntryExtractor.ExtractHeadAsync`/`ExtractHeadTailAsync`（7z 固实自动降级）。
-
-两阶段加载用 `_previewLoadVersion` 防竞态；CSV/SQLite 的 `DataGrid` 必须手动建列（`AutoGenerateColumns` 对 `DataView` 有 bug）。
-
-完整格式清单、信息面板配置系统、PDF/字体/ICO/GIF 实现见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
-
-### 设置系统
-
-`AppSettings` singleton 存在于 `MantisZip.UI.Avalonia/Models/AppSettings.cs`，序列化到 `%LOCALAPPDATA%\MantisZip\settings.json`。
-
-设置包含以下分类：
-- **压缩**: DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipMultithreaded, SevenZipEncryptHeaders
-- **分卷**: SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB
-- **解压**: ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
-- **解压扩展**: EnableDragExtract, ExtractPreserveFullPath
-- **上下文菜单**: EnableCompressMenu, EnableOpenMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu（COM 动态菜单 / 静态级联回退，`EnableCascadingMenu` 已废弃移除）
-- **预览**: EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, ShowPreviewInfoPanel, TextPreviewFontSize, TextPreviewFontFamily, TextEncodingPreference, MaxTablePreviewRows, MaxTablePreviewCols, MaxPreviewFileSize, FontPreviewFontSize, FontPreviewSampleText, FontPreviewEnableLigature, PreviewPosition, InfoPanelOrientation, EnableFormatDetection, PreviewHeadSize
-- **密码管理**: ShowPasswordMatchNotification, PasswordRevealByDefault
-- **外观**: Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）, ProgressContentMode / ProgressInfoDensity / ProgressWindowWidth（进度窗口显示偏好：内容模式 / 信息量分级 / 窗口宽度，关闭时写回）
-- **文件关联（Avalonia 新增）**: AssocZip/7z/Rar/Tar/TarGz/Gz/Iso, CustomAssocExtensions
-- **收藏夹（Avalonia 新增）**: FavoritePaths (List<string>)
-- **调试**: EnableDebugLogging, LogPrivacyMode (off/filename/full)
-- **高级**: SevenZipPath, PreserveDirectoryRoot, CleanTempOnStartup
-
-### Shell integration
-
-`ShellIntegration`（static）写 `HKCU\Software\Classes`，**无需管理员**。`Install()` 优先注册 COM（`MantisZip.ShellExt.comhost.dll`），缺失时回退静态动词；`Uninstall()` 两边都清；`IsInstalled` 先查 COM CLSID。
-
-- **COM 模式**（默认，`EnableDynamicMenu = true`）：`ContextMenuHandler` 实现 `IShellExtInit` + `IContextMenu`，解压组/压缩组两个子菜单；菜单文本从 `HKCU\Software\MantisZip\ContextMenu\Text*` 读取（`ShellExt_*` 8 个 key，缺失回退硬编码中文）
-- **静态级联**（`EnableDynamicMenu = false`）：单个 MantisZip 子菜单，8 个动词各有开关，打开/解压动词用 `AppliesTo` 限定压缩包扩展名
-
-新增菜单项要同时改：`ShellIntegration.Menu.cs`（注册）、`strings.*.json`（`ShellExt_*`，三语）、`WriteMenuTextToRegistry()`（写注册表）。**不要给级联动词设 `CommandFlags=8`**（部分 Windows 会隐藏该项）。
-
-COM handler 细节、图标嵌入与 Win32 绘制见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
-
-### CLI entry points
-
-| Argument | Behavior |
-|---|---|
-| `--install-shell` | Install context menu, then exit |
-| `--uninstall-shell` | Uninstall context menu, then exit |
-| `--compress <paths...>` | Show compress dialog; multi-instance IPC merges paths from multiple Windows shell invocations |
-| `--compress-quick <paths...>` | Direct compress with AppSettings defaults + ProgressWindow, then exit |
-| `--compress-separate <paths...>` | Sequential per-item compress to each item's parent directory + ProgressWindow + IPC merge |
-| `--compress-combined <paths...>` | Combined single archive from all items with common parent name + IPC merge; prompts if cross-drive |
-| `--extract-here <path>` | Direct extract to source directory with AppSettings defaults + ProgressWindow, then exit |
-| `--extract-smart <path>` | Smart extract (auto-detect top-level folder) + ProgressWindow, then exit |
-| `--extract-to-name <path>` | Extract to named folder (archive name without extension) + ProgressWindow, then exit |
-| `--extract <path>` | Direct extract with AppSettings defaults + ProgressWindow, then exit |
-| `--open <path>` | Launch MainWindow and load archive for browsing |
-| `--open-dispatch <path>` | Launch MainWindow and load archive, or dispatch to extract action per `DoubleClickAction` setting (used by file association / shell verb) |
-| `--help`, `-h` | 显示 CLI 帮助（有父控制台时输出到控制台，否则弹窗显示），然后退出 |
-| `--test` | 启动自检：显示启动测试成功弹窗（含版本与安装目录），然后退出 |
-| _(no args)_ | Normal MainWindow launch |
-
-- `App.axaml.cs` `OnFrameworkInitializationCompleted` 中处理所有 CLI 路由
-
-### System icon helper
-
-`IconService` + `IconProvider` uses `SHGetFileInfo` (Windows Shell API) to retrieve 16x16 file type icons by extension. Supports virtual/nonexistent files via `SHGFI_USEFILEATTRIBUTES`. Results cached in `ConcurrentDictionary`. Folder icon support included. Used in file list to show native Windows icons for archive entries.
-
-## 关键注意事项
-
-### 中文 filename encoding (ZIP)
-
-```csharp
-Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
-```
-
-This is set once in `App.InitializeApp()` (WPF) / `App.OnFrameworkInitializationCompleted` (Avalonia). ZIP encoding is handled per-instance via `StringCodec` (no global `ZipStrings.CodePage`). SharpCompress's `ZipArchive` uses `ReaderOptions.ArchiveEncoding` for per-instance encoding settings, respecting the system locale.
-
-### 7z compression uses SharpSevenZip (7z.dll) — no external 7z.exe required
-
-### 7z encrypted preview SUPPORTED
-
-**实际验证通过：** SharpSevenZip 的 `ExtractFile(index, stream)` 在传入正确密码后，对所有 7z 配置均支持单项提取预览：
-- 所有压缩方法（LZMA2 / LZMA / PPMd / BZip2 / Deflate）
-- 固实压缩（Solid）与非固实
-- AES-256 加密
-- 加密文件名（需先传入密码才能列出条目）
-
-`ArchiveEntryExtractor.ExtractSevenZipEntry` 接受 `password` 参数并传递给 `SharpSevenZipExtractor`，与 ZIP 的处理方式一致。代码中不存在 `NotSupportedException`。
-
-⚠ **注意：** "加密文件名"（`EncryptHeaders = true`）的 7z 压缩包，在输入密码前无法读取文件列表（`ArchiveFileData` 会抛出 `SharpSevenZipArchiveException`），UI 需要先弹出密码输入框再尝试列出条目。
-
-### `_currentFormat` classification (previously broken, now fixed)
-
-`_currentFormat` is now derived from the file extension via `GetFormatByExtension()` in `LoadArchiveAsync`, instead of the old buggy `engine.CanHandle()` check that always classified non-ZIP formats as `SevenZip`.
-
-### TarGzEngine metadata (previously broken, now fixed)
-
-- ~~`ListEntriesAsync` sets `LastModified = DateTime.Now` (actual timestamp lost)~~ → now uses `entry.ModTime`
-- ~~`CompressAsync` ignores `ArchiveOptions.CompressionLevel` (uses fixed gzip level 5)~~ → now uses `options.CompressionLevel`
-
-### Password manager — MaxEntries (1000) and auto-try limit (100)
-
-`PasswordManager` has a built-in `MaxEntries = 1000` cap to prevent brute-force abuse. `EntryCount` (public property) reflects current count. `AddPassword` throws `InvalidOperationException` when full. `FindMatchingPasswords(maxResults)` accepts an optional limit. `TryMatchPassword` in `App.Password.cs` uses `maxResults: 100` and exposes `out bool limitReached` — callers show a dialog when the cap is hit.
-
-### Silent catch blocks — all converted to TraceLog
-
-Several `catch { }` blocks existed across the codebase (logging, explorer launch, settings, TarGzEngine). All have been converted to `App.TraceLog()` or `CoreLog.Trace()` so the error path is never lost. Known remaining empty `catch { }` are defensive patterns (registry cleanup, progress window cleanup, log flush best-effort) where logging on failure is meaningless.
-
-### `OpenZipFile` — exception-safe disposal
-
-`ZipEngine.OpenZipFile` now wraps the encoding-detection enumeration (`ZipEntry.Any(...)`) in a try-catch. If the first `ZipFile`'s enumeration throws (corrupted archive), the file handle is disposed before rethrowing.
-
-### `--compress` / `--compress-separate` / `--compress-combined` IPC multi-instance
-
-All three `--compress-*` modes use a `Mutex` + `NamedPipeServerStream` pattern. Windows launches one process per selected file; the first process acts as collector, subsequent instances send their paths via named pipe then exit. 800ms collection window. Only the first instance shows the compress dialog or ProgressWindow.
-
-- `--compress`: Mutex `MantisZipCompressMutex`, pipe `MantisZipCompressPipe`
-- `--compress-separate`: Mutex `MantisZipCompressSeparateMutex`, pipe `MantisZipCompressSeparatePipe`
-- `--compress-combined`: Mutex `MantisZipCompressCombinedMutex`, pipe `MantisZipCompressCombinedPipe`
-
-### "Subfolder display" toggle semantics
-
-The `ShowSubFoldersCheck` checkbox controls whether `FilterFiles` includes nested items. When **checked**, subdirectory contents are also shown in the current view (a flat combined list). Implementation: `FilterFiles` is called, which filters `_allItems` — the checkbox doesn't rebuild the list, it re-filters with the same logic.
-
-### Filter / selection guard
-
-`_isProgrammaticFilter` bool prevents `FilterFiles` (programmatic) from triggering `SelectionChanged` preview. The `SelectionChanged` handler infers the "last clicked item" from `e.AddedItems`/`e.RemovedItems` rather than `SelectedItem`, to support multi-select (Extended mode).
-
-### No CI, no full test suite, no linters
-
-No CI workflows, no pre-commit hooks, no linter/analyzer config. `test_encoding/` is a one-off CLI script for debugging ZIP encoding. `tests/` has a small test project (SmartExtractTests) but no comprehensive suite.
-
-### Smart Extract
-
-`ArchiveStructureAnalyzer` (Core/Utils) analyzes archive structure to determine whether smart extraction should extract directly to the current directory or to a subfolder:
-
-- Scans the top-level entries: if they share a common root folder ≥60% of entries, extract with subfolder; otherwise extract directly
-- Used by `ArchiveEngineFactory.SmartExtractEntriesAsync` which calls the analyzer, then delegates to `ExtractAsync` with the computed target path
-
-Triggered via `--extract-smart` CLI or smart extract context menu item.
-
-## Drag-drop (drag-out to Explorer)
-
-Implements the **7-Zip eager-extraction model**: extract files to temp before `DoDragDrop`, show `ProgressWindow` during extraction + drag.
-
-### Own-window drop protection
-
-`_isOwnDrag` flag prevents `Window_Drop` from reacting to files dragged out of and back into the app window (the temp paths are meaningless for add-to-archive).
-
-### Subdirectory preservation
-
-Uses `ArchiveItem.FullPath` for the output temp path so files from subdirectories retain their relative structure. `ExtractEntryForDragAsync` creates intermediate directories as needed.
-
-### Cancellation
-
-`ProgressWindow` provides cancel via `CancellationToken`. If cancelled before extraction finishes, `DoDragDrop` is skipped entirely.
-
-### Avalonia 实现
-
-已实施**拖拽直接解压**（方案见 [drag-drop-direct-extract.md](.omo/plans/未开始/drag-drop-direct-extract.md)），采用"拖拽即解压到目标目录"的实时模式：
-
-1. `MainWindow.axaml.cs` 文件列表 `PointerPressed` 检测拖拽起点（列标题/空白按下不触发），选中项经 `DragDropItemExpander.ExpandItems` 展开为条目集
-2. `OverlayController`（纯 Win32 独立覆层，`UpdateLayeredWindow` 后台线程渲染）显示三色状态机（检测中/可释放/不可释放）+ 呼吸动画（拖拽预览弹窗 DragPreviewPopup 待实施：`DragPreviewBitmapBuilder` 位图构建与 `OverlayController.SetPreview` 槽位已就绪但无调用者）
-3. `DropTargetDetector` 用 `WindowFromPoint` + ShellWindows 枚举实时检测目标目录（`#32770` 用 `EnumChildWindows`），`IsOverOwnWindow` 用 HWND 比较防止自家窗口误判
-4. 松手后 `DragDropService` 执行后置解压流程（模态进度窗口 + 冲突处理 + 本地化状态消息），完成后清理
-5. **光标方案 C**：`CustomOleDragDrop` 自实现 OLE `IDataObject`/`IDropSource`/`IEnumFORMATETC`（`CustomDataObject`/`CustomDropSource`/`CustomEnumFormatEtc`）替代 Avalonia `DragDrop.DoDragDropAsync`（其 `OleDragSource` 固定返回 `USEDEFAULTCURSORS` 导致禁止光标无法替换）；`GiveFeedback` 返回 S_OK + 直接 `SetCursor`，光标按 overlay 状态（绿/红/金/灰）动态切换，根治光标问题；Esc/多键取消经 OLE `fEscapePressed` 检测
-
-### 拖拽添加（drag-in to archive）
-
-已实施（方案见 [drag-add-overlay.md](.omo/plans/已完成/drag-add-overlay.md)）。与拖拽解压相反方向：从资源管理器拖文件/文件夹到 MantisZip 窗口 → 添加到当前压缩包。三分支拖入行为：
-
-1. **已打开压缩包 + 拖入单个压缩包** → 切换打开
-2. **已打开压缩包 + 拖入文件/文件夹** → `Main_DragAddConfirm` 确认框（复用 `CompressConflict_Add` 标题）→ `MainWindowViewModel.AddFilesToArchiveAsync`（从 `AddFiles()` 抽取的公共方法：引擎获取、密码、`CreateExtractOptions` 冲突处理、`entryBasePath`、进度、刷新）
-3. **未打开压缩包**：拖入压缩包 → 打开；拖入非压缩包 → 打开 `CompressSettingsWindow` 预填源文件
-
-窗口内覆层 `DragAddOverlay`（方案 A：固定显示 `CurrentFolder`，跟随目录行悬停的方案 B 留作后续）：`DragOver`/`DragLeave` 事件驱动，Avalonia 原生 Border 覆层（不用 Win32 `OverlayController`，与拖拽解压的目标在外部 Explorer 窗口不同）；绿色 `#6BD46B` = 可添加「添加到 {CurrentFolder}」，红色 `#F43643` = 格式不支持（`DragEffects.None`）；呼吸动画与拖拽解压完全同参（`DispatcherTimer` 100ms + 正弦 `80+40·sin(tick·π/10)`，alpha 40-120 约 2s 周期，仅背景层 Opacity 呼吸、边框/文字不透明）+ 8px 同色边框 + 白色粗体文字 + ✓/⚠ 状态图标
-
-### Log privacy redaction
-
-`LogRedactor` (Core/Utils) provides centralized path redaction for all log output. Uses `RegexOptions.Compiled` regex with three branches (drive-letter `C:\...`, UNC `\\server\share\...`, and relative `folder\sub\file.ext`), allowing spaces in paths (unlike earlier draft that excluded `\s`).
-
-Four modes controlled by `AppSettings.LogPrivacyMode` (defaults to `"extension"`):
-- **off**: No redaction
-- **filename**: `D:\Photos\private\wedding.jpg` → `wedding.jpg`
-- **extension**: `D:\Photos\private\wedding.jpg` → `[PATH_1]\[FILE_1].jpg` (preserves extension only)
-- **full**: Same → `[PATH_1]` (sequential IDs, same path → same ID, capped at 10000 entries)
-
-**Injection**: 
-- `CoreLog.Initialize(diagnosticsEnabled, privacyMode)` — UI 层在 `OnFrameworkInitializationCompleted` 和 `RefreshDebugLogSettings` 中调用，统一注入诊断开关与脱敏委托。**禁止直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`**，必须走 `Initialize()` 方法
-- `App.Log()`, `App.LogDebug()`, and `LogStartup()` call `LogRedactor.RedactPaths()` directly (they're in UI project and have AppSettings access)
-
-**Help dialog**: the log-privacy help is Markdown-driven — `MarkdownHelpContent(LocalizationManager.T("LogPrivacyHelp_Markdown"))` rendered through the shared `HelpDialog` shell (见规则 17), opened from Settings → Debug tab's `[?]` button, matching the PasswordManager help dialog style.
-
-**Key files**: `Core/Utils/LogRedactor.cs` (framework-agnostic), `UI.Avalonia/Dialogs/MarkdownHelpContent.axaml(.cs)` + `UI.Avalonia/Dialogs/HelpDialog.axaml(.cs)` + `Localization/strings.*.json` 的 `LogPrivacyHelp_Markdown`（Avalonia）。
-
-## Known issues (already fixed)
-
-### Context menu cascade mode — CommandFlags=8 hides items
-
-Setting `ECF_SEPARATORBEFORE` (`CommandFlags=8`) directly on verbs in an `ExtendedSubCommandsKey` cascade submenu causes those verbs to not appear on some Windows versions. Fixed by using explicit separator verbs instead.
-
-### IPC pipe server only accepted one connection
-
-`StartPipeServer` created one `NamedPipeServerStream` and called `WaitForConnectionAsync` once. With 3+ selected files, only 2 processes could communicate — the 3rd+ process's `Connect()` timed out. Fixed by wrapping in a `while (!ct.IsCancellationRequested)` loop creating a new pipe per client.
-
-### `CompressConflictDialog` shown twice on auto-rename
-
-When clicking "自动重命名" in the file conflict dialog, the `Rename` case re-created a new `CompressConflictDialog`. Fixed by capturing `CustomName` from the first dialog and using it directly, skipping the second popup.
+- **引擎**：`IArchiveEngine`（List/Extract/Compress/Test）+ `ArchiveEngineFactory` 按扩展名分发；`ZipEngine` / `SevenZipEngine` / `TarGzEngine` 全在 Core，与 UI 框架无关
+- **UI**：`CommunityToolkit.Mvvm`（`[ObservableProperty]` / `[RelayCommand]`）；ViewModels + Services 分层；对话框经 VM 回调委托与 View 解耦
+- **路径契约**：预览树与实际解压共用 `ExtractPathResolver`（单一事实来源），路径逻辑不得另写
+- **派生属性通知**：多个计算属性依赖同一组源属性时，**禁止**逐字段 `[NotifyPropertyChangedFor]`，用 `partial void OnXxxChanged` → 集中 `NotifyXxxProperties()`
+
+其余（依赖流向、引擎契约、进度上报、并行解压、ZIP 加速、目录聚合、ExtractPathResolver、SmartOpenPathResolver、设置系统、预览子系统、Shell/COM、CLI 路由表、图标服务、开发约束与历史踩坑、拖拽、日志隐私）见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 ## Version bump checklist
 
 When releasing a new version, update the version string in ALL of these locations:
 
-| # | File | Line | Content |
-|---|------|------|---------|
-| 1 | `src/MantisZip.UI.Avalonia/AppConstants.cs` | `public const string Version = "x.y.z"` | Avalonia 版 |
-| 2 | `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` | `<Version>x.y.z</Version>` | Avalonia 版 assembly version |
-| 3 | `docs/PLAN.md` | `**当前版本**: x.y.z` | Plan document header |
-| 4 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` | 顶部版本号（里程碑总览；细节版本号以 `progress-avalonia-detail.md` 为准） |
-| 5 | `installer.iss` | `#define MyAppVersion "x.y.z"` | WebSetup + Offline 安装脚本的**兜底默认值** |
-| 6 | `installer-selfcontained.iss` | `#define MyAppVersion "x.y.z"` | 离线安装脚本的**兜底默认值** |
+| # | File | Content |
+|---|------|---------|
+| 1 | `src/MantisZip.UI.Avalonia/AppConstants.cs` | `public const string Version = "x.y.z"` |
+| 2 | `src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` | `<Version>x.y.z</Version>` |
+| 3 | `docs/PLAN.md` | `**当前版本**: x.y.z` |
+| 4 | `docs/PROGRESS.md` | `**当前版本**: x.y.z` |
+| 5 | `installer.iss` | `#define MyAppVersion "x.y.z"`（兜底默认值） |
+| 6 | `installer-selfcontained.iss` | `#define MyAppVersion "x.y.z"`（兜底默认值） |
 
-**Note:** 两个 `.iss` 文件**不再要求手动改版本号才能发布** —— release workflow（`release.yml` L106 / L128）从 git tag 取版本号，通过 `/dMyAppVersion=$env:VERSION` 在 ISCC 编译期传给两个脚本。两处的 `#define MyAppVersion` 都被 `#ifndef` 包裹，仅作为**本地手工编译安装包时的兜底默认值**。
-
-但仍**建议随 checklist 一并更新**，原因：
-
-- 兜底值一旦滞后（如实际 `0.5.1`、脚本仍写 `0.4.4`），本地 `ISCC installer.iss` 打出的包会带着错误版本号，且**不会有任何编译报错** —— 属静默错误，只有用户拿到包才发现
-- 两个脚本的兜底值**可能各自漂移**（本次即发现 `installer-selfcontained.iss` 长期未随 `installer.iss` 一起更新），列进 checklist 能保证两处一起看
-- 成本极低：各改 1 行
-
-> 历史教训：2026-10-01 升 v0.5.1 时两个 `.iss` 的兜底值仍停在 `0.4.4`，说明"非发布阻塞"容易演变成"长期遗忘"。故列入 checklist，但**不作为发布门禁**。
-
-> 改完 6 处后跑 `mantiszip_version`（DSH 本地插件工具，只读）核对一致性，它会同时报出两处 `.iss` 兜底值是否漂移；工具不可用时逐处人工比对。
-
-## Build output
-
-```powershell
-# Avalonia（主力）
-src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe
-```
-
-Build artifacts (bin/, obj/) are gitignored.
+- 两个 `.iss` 的版本由 release workflow 从 git tag 经 `/dMyAppVersion=` 传入，`#define` 仅作本地手工编译兜底；**仍建议同步**，否则静默打出错误版本号且无编译报错
+- 改完 6 处跑 `mantiszip_version`（DSH 只读工具）核对；不可用时逐处人工比对
 
 ## 每次 session 自动执行规则（必需）
 
@@ -436,130 +74,83 @@ Build artifacts (bin/, obj/) are gitignored.
 
 ### 规则 1：Plan 变更同步
 
-新增计划文本需要放在 `.omo/plans/未开始` 内，格式与同目录计划相同
+新增计划文本需要放在 `.omo/plans/未开始` 内，格式与同目录计划相同。
 每当新增或修改 `.omo/plans/` 内的计划文件时，**必须同步更新** `docs/PLAN.md`：
+
 - 新增计划 → 在 PLAN.md 对应优先级区域（P2/P3/待实现）添加一行 `| 任务 | 说明 |` 引用新计划，保持与已存在行格式一致
 - 修改计划 → 更新 PLAN.md 中对应任务的说明、优先级或状态
-- 执行计划 → 若计划文档不在 `.omo\plans\进行中` 内，先将对应计划移入 `.omo\plans\进行中` 目录再执行。
-- 计划完成 → 将条目从 PLAN.md 移至 PROGRESS.md 的 【历史设计方案索引】 章节。先将对应计划移入 `.omo\plans\已完成` 中。
+- 执行计划 → 若计划文档不在 `.omo\plans\进行中` 内，先将对应计划移入 `.omo\plans\进行中` 目录再执行
+- 计划完成 → 将条目从 PLAN.md 移至 PROGRESS.md 的【历史设计方案索引】章节；先将对应计划移入 `.omo\plans\已完成` 中
 
 ### 规则 2：版本号变更
+
 - 只有在用户明确说明变更版本号时才会变更，不要未经用户允许擅自变更版本号。如果你觉得应该变更版本号，需要向用户询问。
 - 当变更版本号时，需遵循 Version bump checklist 的部分全部更新。
 
 ### 规则 3：提交前更新进度文档（里程碑 + 细节双轨）
 
-在每次执行 `git commit` 之前（也就是在 commit 相关的操作中），**必须先更新**进度文档。
-
-进度文档采用「里程碑 + 细节」双轨结构：
+在每次执行 `git commit` 之前，**必须先更新**进度文档：
 
 - **里程碑**（`docs/PROGRESS.md`）— 仅记录新功能上线、架构级变更、重大 bug 修复：
-  - **Avalonia 版**（`### MantisZip.UI.Avalonia（主力版）`）— 按月分组（`#### 2026-08`），条目格式 `- **08-19** — 标题`（同月多条按从新到旧排列）
-  - **共享层**（`### 共享层（Core / ShellExt / 构建）`）— 按版本分组（`#### v0.5.0`），条目格式同上
+  - Avalonia 版（`### MantisZip.UI.Avalonia（主力版）`）按月分组（`#### 2026-08`），条目格式 `- **08-19** — 标题`（同月从新到旧）
+  - 共享层（`### 共享层（Core / ShellExt / 构建）`）按版本分组（`#### v0.5.0`），条目格式同上
 - **细节**（`docs/progress-avalonia-detail.md`）— 逐条详细变更（小 bugfix / i18n / 样式 / 测试 / 计划类）：
-  - Avalonia + 共享层细节 → `progress-avalonia-detail.md`，Avalonia 以日期为标识（`**2026-07-16**`）、共享层以版本号为标识（`#### v0.x.x (2026-07-16)`）
-  - 多条同一日期时按时间从晚到早排列（同一日期下最新的在最上方）
-
-通用规则：
-- 条目排序均是 **从新到旧**
-- 里程碑与细节同步追加：一次变更若属里程碑级，在 PROGRESS.md 对应月份/版本下加一行，同时其详细内容追加到细节文档
-- 如果本次变更属于某个已有规划任务，在该任务后标注进度
-- 如果变更涉及多个领域（例如 Core 引擎变更），在对应文档下各加一条
+  - Avalonia 以日期为标识（`**2026-07-16**`）、共享层以版本号为标识（`#### v0.x.x (2026-07-16)`）
+  - 同一日期多条按从晚到早排列（最新的在最上方）
+- 一次变更若属里程碑级，PROGRESS 加一行 + 细节文档同步追加；涉及多个领域（如 Core）在各对应文档各加一条；属于已有规划任务的标注进度
 
 ### 规则 4：新 UI 控件必须应用主题样式
 
-新增任何 UI 控件，**必须显式设置主题样式键**，禁止使用系统默认颜色：
+新增任何 UI 控件，**必须显式设置主题样式键**，禁止系统默认颜色：
 
-#### Avalonia
-- `Background` 绑定 `"{DynamicResource ThemeSurfaceBgBrush}"` 或对应语义色
-- `Foreground` 绑定 `"{DynamicResource ThemeTextPrimaryBrush}"` 或 `ThemeTextSecondaryBrush`
-- `BorderBrush` 绑定 `"{DynamicResource ThemeBorderBrush}"` 或 `ThemeBorderLightBrush`
-- 按钮用 `ThemeButtonBgBrush` / `ThemeButtonHoverBrush` / `ThemeButtonPressedBrush`
-- **Avalonia 资源键名均以 `Brush` 结尾**（`ThemeWindowBgBrush` 而非 `Theme_WindowBg`）
-- 如果新增控件类型在主题文件中尚无对应资源，需在 `ThemeLight.axaml` 和 `ThemeDark.axaml` 中成对添加
+- `Background` → `ThemeSurfaceBgBrush`（或对应语义色）；`Foreground` → `ThemeTextPrimaryBrush` / `ThemeTextSecondaryBrush`；`BorderBrush` → `ThemeBorderBrush` / `ThemeBorderLightBrush`；按钮 → `ThemeButtonBgBrush` / `ThemeButtonHoverBrush` / `ThemeButtonPressedBrush`
+- **Avalonia 资源键名均以 `Brush` 结尾**（`ThemeWindowBgBrush`，不是 `Theme_WindowBg`）；新控件类型无对应资源时在 `ThemeLight.axaml` + `ThemeDark.axaml` **成对添加**
+- **优先挂全局 Classes**（定义于 `App.axaml`，勿重复设置尺寸/圆角/边框）：
 
-#### Avalonia 全局类样式（App.axaml 已定义，直接挂 Classes 即可）
+| 类名 | 适用控件 | 效果 |
+|------|---------|------|
+| `ToolbarButton` | `Button` / `ToggleButton` | 高 `ControlHeightLg`、Padding `8,2`、背景 `ThemeHeaderBgBrush` |
+| `ToolbarIcon` | `Button` / `ToggleButton` | 方形紧凑（`ControlHeightSm` / Padding 6），常组合 `Classes="ToolbarButton ToolbarIcon"` |
+| `ToolbarButtonIcon` | `TextBlock` | FontSize 20、水平居中（按钮图标字符） |
+| `ToolbarButtonLabel` | `TextBlock` | FontSize 13、水平居中（按钮文字） |
+| `compactTab` | `TabItem` | Padding `8,6`、MinHeight 36、FontSize 18 |
+| `ToggleIconBox` | `Border` | 16×16、圆角 3、边框 1.5、背景过渡（菜单切换指示） |
 
-以下类样式定义于 `App.axaml` 全局层，新增控件时**优先用 `Classes` 挂载**，禁止手动重复设置这些属性（尺寸/圆角/边框等已由全局样式统一）：
-
-| 类名 | 适用控件 | 效果 | 典型用途 |
-|------|---------|------|---------|
-| `ToolbarButton` | `Button` / `ToggleButton` | 高 `ControlHeightLg`、Padding `8,2`、背景 `ThemeHeaderBgBrush` | 带文字标签的工具栏按钮 |
-| `ToolbarIcon` | `Button` / `ToggleButton` | 方形紧凑（宽高 `ControlHeightSm`、Padding 6），常与 `ToolbarButton` 组合（`Classes="ToolbarButton ToolbarIcon"`） | 树/文件列表工具栏的矢量图标按钮 |
-| `ToolbarButtonIcon` | `TextBlock` | FontSize 20、水平居中 | 工具栏按钮内的图标字符 |
-| `ToolbarButtonLabel` | `TextBlock` | FontSize 13、水平居中 | 工具栏按钮的文字标签 |
-| `compactTab` | `TabItem` | Padding `8,6`、MinHeight 36、FontSize 18 | 设置/对话框窗口的紧凑 tab 头 |
-| `ToggleIconBox` | `Border` | 16×16、圆角 3、边框 1.5、背景过渡动画 | 菜单切换指示图标（见下） |
-
-**ToggleIconBox 切换图标**：开关/切换类菜单项的指示图标，用法：
-- `Background` 绑定 `{Binding <bool>, Converter={StaticResource BoolToToggleBgBrushConverter}}`（true → `ThemeToggleBrush` 强调色底，false → `Transparent` 空心）
-- 内部放 10×10 `PathIcon`，`Foreground` 用 `ThemeTextPrimaryBrush`
-- 菜单项中放在 `MenuItem.Icon` 槽位（Fluent 主题 `SharedSizeGroup="MenuItemIcon"` 自动共享列宽对齐，`FluentMenuItemIconTheme` 将 Icon 槽位内容限制在 16×16，故 ToggleIconBox 必须为 16×16），**Header 直接用文本绑定**
-- code-behind 动态构建时 `Classes = { "ToggleIconBox" }` 同样生效（继承全局样式）
-
-**PathIcon 注意**：Avalonia 的 PathIcon **不继承父控件 Foreground**，必须显式设置（App.axaml 用 `ToggleButton:checked PathIcon` 等选择器直接命中）。
-
-**TextBlock 注意**：全局 `TextBlock` 样式**故意不设 Foreground**（继承父控件，避免把 emoji 压成单色）——新增 TextBlock 时除非有明确理由，不要显式设置 Foreground。
-
-#### 通用约束
-- 不设置 `Height` 固定值除非有充分理由（已有统一高度可按需复用）
-- **迁移期特别注意**：在 Avalonia 中新增控件时，优先使用 Avalonia 的资源键名（以 `Brush` 结尾）；不要混用 WPF 风格的下划线资源键名
-
-示例 — Avalonia：
-```xml
-<!-- ✅ 正确：Avalonia 主题绑定 -->
-<TextBox Name="MyTextBox" Width="200"
-         Background="{DynamicResource ThemeSurfaceBgBrush}"
-         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-         BorderBrush="{DynamicResource ThemeBorderBrush}"/>
-```
+- **`PathIcon` 不继承父控件 Foreground**，必须显式设置；全局 `TextBlock` 样式**故意不设 Foreground**（继承父控件避免 emoji 压成单色），除非有明确理由不要显式设置
+- 不设置固定 `Height` 除非有充分理由；`ToggleIconBox` / 菜单图标槽位的详细用法见 ARCHITECTURE
 
 ### 规则 5：紧凑度模式资源键名约定
 
-紧凑度模式提供三档间距/控件高度，通过 `{DynamicResource}` 引用。**注意 double 与 Thickness 的类型差异**：
+紧凑度模式三档间距/控件高度均通过 `{DynamicResource}` 引用。**注意 double 与 Thickness 的类型差异**：
 
-| 用途 | 资源键名 | C# 类型 | 适用属性 |
-|------|---------|---------|---------|
+| 用途 | 资源键名 | 类型 | 适用属性 |
+|------|---------|------|---------|
 | 间距（数字） | `SpacingXxs` / `Xs` / `Sm` / `Md` / `Lg` / `Xl` | `double` | `Spacing` |
 | 间距（厚度） | `SpacingXxsThk` / `XsThk` / `SmThk` / `MdThk` / `LgThk` / `XlThk` | `Thickness` | `Margin` / `Padding` |
 | 控件高度 | `ControlHeightSm` / `ControlHeight` / `ControlHeightMd` / `ControlHeightLg` / `ControlHeightXl` / `ControlHeightXxl` | `double` | `Height` / `MinHeight` / `MaxHeight` |
-| 圆角 | `BorderRadius` | `CornerRadius`（由 `ApplyCompactness()` 运行时注入） | `CornerRadius` |
-| 对话框内边距 | `DialogPadding` | `Thickness` | `Padding`（对话框级别） |
+| 圆角 | `BorderRadius` | `CornerRadius` | `CornerRadius` |
+| 对话框内边距 | `DialogPadding` | `Thickness` | `Padding`（对话框级） |
 
-**核心规则**：
-- `Margin`/`Padding` **必须使用** `SpacingXxxThk` 后缀变体（因为 `DynamicResource` 无法隐式将 `double` 转换为 `Thickness`）
-- `Spacing` 属性必须使用无后缀的 `SpacingXxx`（`double` 类型）
-- 新增控件时，不要硬编码间距/高度/圆角数值，优先使用这些 `{DynamicResource}` 引用
-- 所有资源由 `App.axaml.cs` 的 `ApplyCompactness()` 在启动时注入三档数值，运行时切换无需重启
+- `Margin`/`Padding` **必须用** `SpacingXxxThk` 后缀变体（`DynamicResource` 无法隐式 double→Thickness）；`Spacing` 用无后缀版本
+- 禁止硬编码间距/高度/圆角；全部由 `App.axaml.cs` 的 `ApplyCompactness()` 注入，运行时切换无需重启
 
 ### 规则 6：开关控制面板区域时统一隐藏（方案 A）
 
-当需要用一个 CheckBox/开关来控制一组控件（过滤条件、加密选项等）的可用性时，**统一使用隐藏（IsVisible）而非禁用（IsEnabled）**：
+用一个 CheckBox/开关控制一组控件（过滤条件、加密选项等）可用性时，**统一用隐藏（`IsVisible`）而非禁用（`IsEnabled`）**：关闭 → 整块内容从视觉树移除、不占布局；打开 → 正常显示。**例外**需在评审时说明理由。
 
-- **开关关闭 → 内容隐藏**：整个内容区域从视觉树中移除（`IsVisible="False"`），不占布局空间
-- **开关打开 → 内容显示**：正常显示所有控件
-- **例外**：如果保持内容可见有确凿的用户体验理由，需在 PR/代码评审时说明
-
-**实现方式**：将受控内容包裹在一个命名容器（`StackPanel`/`Border`）中，在 switch 事件中切换容器的 `IsVisible`。
-
-**参考实现**：
-- `Controls/FileFilterEditor.axaml` — `FilterContentPanel` + `SyncControlStates()`
-- `Dialogs/CompressSettingsWindow.axaml`（Password Tab）— `IsVisible="{Binding Encrypt}"`
-
-**不推荐**的方案 B（逐个设置 `IsEnabled = false`）已废弃，新增面板无需再实现。
+实现：把受控内容包进命名容器（`StackPanel`/`Border`），在开关事件里切 `IsVisible`。参考：`Controls/FileFilterEditor.axaml`（`FilterContentPanel` + `SyncControlStates()`）、`Dialogs/CompressSettingsWindow.axaml`（`IsVisible="{Binding Encrypt}"`）。逐个 `IsEnabled = false` 的方案 B 已废弃。
 
 ### 规则 7：列表/树形/表格控件必须使用紧凑度感知的行高
 
-新增任何 `ListBox`、`DataGrid`、`TreeView`、`ItemsControl` 等列表类控件时，**必须设置行高/项最小高度为紧凑度资源键**，禁止使用固定数值：
+新增 `ListBox` / `DataGrid` / `TreeView` / `ItemsControl` 等列表类控件时，**必须**设置行高/项最小高度为紧凑度资源键，禁止固定数值：
 
-| 控件类型 | 属性 | 推荐资源键 | 三档值 |
-|---------|------|-----------|-------|
-| `ListBox` | `ListBox.ItemContainerTheme` → `Setter Property="MinHeight"` | `ControlHeightMd` | 28/32/38 |
+| 控件类型 | 属性 | 资源键 | 三档值 |
+|---------|------|-------|-------|
+| `ListBox` | `ItemContainerTheme` → `Setter MinHeight` | `ControlHeightMd` | 28/32/38 |
 | `DataGrid` | `RowHeight` | `ControlHeightMd` | 28/32/38 |
-| `TreeView` | `Style Selector="TreeViewItem"` → `Setter Property="MinHeight"` | `ControlHeightSm` | 22/26/30 |
+| `TreeView` | `Style TreeViewItem` → `Setter MinHeight` | `ControlHeightSm` | 22/26/30 |
 | `ItemsControl` | 项模板最外层容器 `MinHeight` | `ControlHeightSm` | 22/26/30 |
 
-**示例 — ListBox：**
 ```xml
 <ListBox ItemsSource="{Binding ...}">
   <ListBox.ItemContainerTheme>
@@ -567,39 +158,21 @@ Build artifacts (bin/, obj/) are gitignored.
       <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
     </ControlTheme>
   </ListBox.ItemContainerTheme>
-  ...
 </ListBox>
 ```
 
-**示例 — DataGrid：**
-```xml
-<DataGrid ItemsSource="{Binding ...}"
-          RowHeight="{DynamicResource ControlHeightMd}" ... />
-```
-
-**示例 — TreeView：**
-```xml
-<TreeView ItemsSource="{Binding ...}">
-  <TreeView.Styles>
-    <Style Selector="TreeViewItem">
-      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
-    </Style>
-  </TreeView.Styles>
-</TreeView>
-```
-
-**例外**：非数据行类列表（如 WrapPanel 标签云、图标画廊等不受紧凑度影响的控件）可豁免。
+**例外**：非数据行类列表（WrapPanel 标签云、图标画廊等）豁免。其余控件示例见 ARCHITECTURE。
 
 ### 规则 8：新增图标必须注册到 IconTestViewModel
 
-在 `src/MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml` 中添加新的 `Geometry` 图标资源后，**必须同步**在 `src/MantisZip.UI.Avalonia/ViewModels/IconTestViewModel.cs` 的 `LoadAllIcons()` 方法中添加对应的 `Add()` 调用，否则图标测试窗口不会显示该图标。
+在 `src/MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml` 添加新的 `Geometry` 图标资源后，**必须同步**在 `src/MantisZip.UI.Avalonia/ViewModels/IconTestViewModel.cs` 的 `LoadAllIcons()` 中添加对应 `Add()` 调用，否则图标测试窗口不显示该图标。
 
 ### 规则 9：Windows 环境下禁止 Unix 风格 shell 命令
 
-开发环境为 **Windows + PowerShell 7**（pwsh）。所有 shell 命令必须使用 PowerShell 语法，禁止 Unix 风格命令（`grep`/`cat`/`ls`/`rm`/`cp`/`mv`/`which` 等），否则会报"无法识别"错误。
+开发环境为 **Windows + PowerShell 7**（pwsh）。所有 shell 命令必须用 PowerShell 语法，禁止 `grep`/`cat`/`ls`/`rm`/`cp`/`mv`/`which` 等 Unix 风格命令。
 
-- **搜索任务优先使用内置工具**（`grep`/`glob`/`ast_grep_search`/`codegraph`），这些工具跨平台，不依赖 shell 命令
-- **必须用 shell 命令时**，使用 PowerShell 原生 cmdlet 或已安装的 `rg`（ripgrep，scoop 安装）：
+- **搜索优先用内置工具**（`grep`/`glob`/`ast_grep_search`/`codegraph`），跨平台且不依赖 shell
+- 必须用 shell 时，用 PowerShell 原生 cmdlet 或已安装的 `rg`：
 
 | Unix 习惯 | Windows 正确写法 |
 |-----------|-----------------|
@@ -612,13 +185,13 @@ Build artifacts (bin/, obj/) are gitignored.
 | `mv a b` | `Move-Item a b` |
 | `head` / `tail` | `Get-Content -Head 5` / `-Tail 5` |
 
-- 不确定某命令在 Windows 上是否存在时，先 `Get-Command` 验证再执行
+- 不确定命令是否存在时先 `Get-Command` 验证
 
 ### 规则 10：提交信息必须使用 conventional commits 风格
 
-提交信息遵循仓库既有风格：`<type>(<scope>): 中文描述`，`type` 使用 `feat`/`fix`/`docs`/`refactor`/`test`/`chore` 等，`scope` 标明影响项目（`core`/`avalonia`/`shell` 等，可组合如 `core,avalonia`）。
+`<type>(<scope>): 中文描述`，`type` 用 `feat`/`fix`/`docs`/`refactor`/`test`/`chore` 等，`scope` 标明影响项目（`core`/`avalonia`/`shell` 等，可组合）。
 
-示例（来自仓库 git log）：
+示例：
 - `feat(avalonia): 文件选择器地址栏新增收藏当前路径入口`
 - `fix(core,avalonia): 拖拽/右键解压流程统一`
 - `docs: AGENTS.md 新增 ComputeDirectoryStats 目录聚合契约说明`
@@ -629,118 +202,59 @@ WPF 版本已在迁移完成后删除。所有新功能仅在 `MantisZip.UI.Aval
 
 ### 规则 12：修改后必须构建验证
 
-完成任何代码修改后，必须运行对应项目的 `dotnet build` 验证编译通过（测试项目改动另跑 `dotnet test`）：
+完成任何代码修改后，必须运行对应项目的 `dotnet build` 验证（测试项目改动另跑 `dotnet test`）：
 
 ```powershell
-# Avalonia 版（主力）
 dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
-
-# Core 层（仅当修改了 Core）
-dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-
-# 测试
+dotnet build src\MantisZip.Core\MantisZip.Core.csproj            # 仅当修改 Core
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
-优先用 DSH 本地插件工具 `mantiszip_verify`（`target`：avalonia/core/shell/tests/ui-tests/solution；`action`：build/test）：它把 MSBuild 输出压成「文件:行:列 + 错误码」，比原始日志省几十倍上下文。**工具不可用时**（未装插件、换 profile、非 DSH 环境）回退到上面的 `dotnet build` / `dotnet test`，判定标准不变。
-
-只有构建通过（工具返回 `ok=true`，或回退命令 exit 0）后，任务才算完成。
+优先用 DSH 本地插件工具 `mantiszip_verify`（`target`：avalonia/core/shell/tests/ui-tests/solution；`action`：build/test），它把 MSBuild 输出压成「文件:行:列 + 错误码」。**工具不可用时**回退到上面的命令，判定标准不变。只有构建通过（`ok=true` 或 exit 0）任务才算完成。
 
 ### 规则 13：新增 UI 文案必须走本地化（禁止硬编码）
 
-新增任何用户可见字符串（中文或英文）时，**禁止**在 `.cs` / `.axaml` 中直接写死，必须通过本地化机制：
+新增任何用户可见字符串（中文或英文），**禁止**在 `.cs` / `.axaml` 中写死：
 
-- **C# 代码**：`LocalizationManager.T("Key")`；带占位符用 `T("Key", arg1, arg2)`（`{0}` 格式）
-- **XAML 静态文案**：绑定到 ViewModel 属性或 `LocalizedStrings[Key]`（字典索引器绑定需要 VM 实现 `LocalizedStrings` 字典并在 `OnCultureChanged` 中刷新）
-- **Window/UserControl code-behind（DataContext=self）**：暴露 `public string XxxText => LocalizationManager.T("Key")` 属性并绑定，同时加 `x:CompileBindings="False"`
-- **新增 key 必须成对添加**到 `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json`、`strings.en.json` 与 `strings.zh-TW.json`（三语文件 key 集必须完全同步，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 会校验）；插入到文件头 `{` 之后（key 不排序），维持 UTF-8 无 BOM + CRLF + 2 空格缩进
-- **XAML 用 `LocalizedStrings[Key]` 绑定的 key 必须额外登记**到 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组（`ViewModels/MainWindowViewModel.cs`，约 line 203 起的 `new[] { ... }`）。`LocalizedStrings` 字典**不是全量加载** JSON，而是由该显式数组构建——漏登记会导致菜单/工具栏文字空白（图标仍在），构建不会报错。新增 XAML 绑定 key 后必须同步补进此数组
-- 完成后自检：`dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 无新增错误，并扫描确认无遗漏硬编码
-- **改完文案必须跑 `mantiszip_i18n`**（DSH 本地插件工具）：校验三语 key 集合、`{0}` 占位符、重复 key、空值。工具不可用时手工比对三份文件——注意现有测试只校验解析后的 key 集合，**测不出重复 key**（重复定义会被 JSON 解析折叠，后面的覆盖前面的）
+- **C#**：`LocalizationManager.T("Key")`；占位符用 `T("Key", arg1, arg2)`（`{0}` 格式）
+- **XAML 静态文案**：绑定 VM 属性或 `LocalizedStrings[Key]`（字典索引器绑定需 VM 实现 `LocalizedStrings` 并在 `OnCultureChanged` 刷新）
+- **Window/UserControl code-behind（DataContext=self）**：暴露 `public string XxxText => LocalizationManager.T("Key")` 并绑定，同时加 `x:CompileBindings="False"`
+- **新增 key 必须成对添加**到 `strings.zh-CN.json`、`strings.en.json`、`strings.zh-TW.json`（三语 key 集必须完全同步，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 校验）；插入到文件头 `{` 之后（不排序），保持 UTF-8 无 BOM + CRLF + 2 空格缩进
+- **XAML `LocalizedStrings[Key]` 绑定的 key 必须登记**到 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组（约 line 203 起的 `new[] { ... }`）。该字典**不是全量加载** JSON——漏登记会导致菜单/工具栏文字空白（图标仍在）且构建不报错
+- 完成后 `dotnet build` 无新增错误，并扫描确认无遗漏硬编码
+- **改完文案必须跑 `mantiszip_i18n`**：校验三语 key 集合、`{0}` 占位符、重复 key、空值。工具不可用时手工比对三份文件——现有测试只校验解析后的 key 集合，**测不出重复 key**（JSON 解析会折叠）
 
-**豁免**（须在代码注释中注明原因）：
-- 开发者诊断工具（如 `IconTestWindow` 的图标元数据、调试菜单 `TestWindow_Click` 的测试内容）
-- 启发式匹配逻辑（如 `message.Contains("密码")` 检测加密异常、`Contains("标题")` 检测文档大纲）
-- 内容数据（字体预览示例文本）与语言本族原生名（如「中文」）
-- `App.DebugLog` 日志与仅作控制流用的异常消息（非用户可见）
+**豁免**（须在代码注释中注明原因）：开发者诊断工具、启发式匹配逻辑（`message.Contains("密码")` 等）、内容数据与语言本族原生名、`App.DebugLog` 日志与仅作控制流用的异常消息。
 
 ### 规则 14：新增 AXAML 控件必须添加中文注释
 
-新增任何 `.axaml` 文件（Controls/、Dialogs/、Views/ 目录下）时，**必须为所有主要控件/区域添加中文注释**，便于用户排查 UI 问题：
-
-#### 注释规范
-- **格式**：`<!-- 注释内容 -->` XML 注释
-- **语言**：中文
-- **位置**：每个主要控件/区域上方
-- **内容**：说明该控件/区域的用途、功能、关键属性含义
-
-#### 注释范围（必须覆盖）
-- 窗口/用户控件的根容器和主布局
-- 每个功能分区（TabControl 的 TabItem、GroupBox、分隔区域等）
-- 数据绑定控件（说明绑定目标和关键属性）
-- 转换器（说明转换逻辑）
-- 覆层/弹窗（说明显示条件和用途）
-- 工具栏按钮（说明功能）
-- 菜单项（说明功能）
-
-#### 注释示例
-```xml
-<!-- 文件名标签：显示当前需要输入密码的压缩包名称 -->
-<TextBlock x:Name="FileNameText" FontWeight="Bold" FontSize="14" />
-
-<!-- 密码输入框 + 显示/隐藏切换按钮 -->
-<Grid ColumnDefinitions="*,Auto">
-  <TextBox x:Name="PasswordBox" PasswordChar="●" />
-  <Button Grid.Column="1" x:Name="PwdRevealBtn" Click="OnRevealToggle" />
-</Grid>
-
-<!-- 扩展保存选项区域：永久保存、自动生成匹配规则、描述、匹配规则 -->
-<StackPanel x:Name="SaveOptionsPanel" Spacing="{DynamicResource SpacingSm}">
-  <!-- 永久保存到密码库复选框 -->
-  <CheckBox x:Name="SavePermanentlyCheck" />
-  <!-- 自动生成匹配规则复选框：根据文件名自动生成 glob/regex 规则 -->
-  <CheckBox x:Name="AutoGenerateRulesCheck" />
-</StackPanel>
-```
-
-#### 验证
-完成注释后，运行 `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 确保无编译错误。
+新增任何 `.axaml` 文件（Controls/、Dialogs/、Views/ 下）时，**必须为主要控件/区域加中文 `<!-- -->` 注释**，说明用途/功能/关键属性；覆盖：根容器与主布局、每个功能分区、数据绑定控件、转换器、覆层/弹窗、工具栏按钮、菜单项。完成后 `dotnet build` 验证。注释示例见 ARCHITECTURE。
 
 ### 规则 15：CoreLog 初始化必须走 Initialize() 方法
 
-Core 层 `CoreLog` 的诊断开关与脱敏委托**必须**通过 `CoreLog.Initialize()` 统一注入，**禁止**直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`：
+Core 层 `CoreLog` 的诊断开关与脱敏委托**必须**经 `CoreLog.Initialize()` 统一注入，**禁止**直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`：
 
 ```csharp
-// ✅ 正确：一行调用，注入诊断开关 + 路径脱敏
+// ✅
 CoreLog.Initialize(appSettings.EnableDebugLogging, appSettings.LogPrivacyMode);
 
-// ❌ 错误：直接设置属性，分散且容易遗漏脱敏委托
+// ❌ 分散且容易遗漏脱敏委托
 CoreLog.DiagnosticsEnabled = appSettings.EnableDebugLogging;
 CoreLog.RedactOverride = msg => LogRedactor.RedactPaths(msg, ...);
 ```
 
-**注入时机**（两处）：
-1. `OnFrameworkInitializationCompleted` — 启动时首次注入
-2. `RefreshDebugLogSettings` — SettingsWindow 保存设置后同步刷新
-
-**原因**：Core 层无法引用 AppSettings（依赖倒置），若不通过 `Initialize()` 注入，`CoreLog.Trace`/`Info`/`Error` 写入的日志不会被脱敏，导致完整文件路径泄露到 debug.log。
+注入时机两处：`OnFrameworkInitializationCompleted`（启动首次）+ `RefreshDebugLogSettings`（设置保存后）。原因：Core 无法引用 AppSettings（依赖倒置），绕过 `Initialize()` 会让 `CoreLog` 日志不脱敏、完整路径泄露到 debug.log。
 
 ### 规则 16：文件/目录选择必须使用 CustomFilePickerDialog（禁用原生 StorageProvider）
 
-**核心禁令**：任何新增或修改的文件/目录选择入口，**禁止**使用 Avalonia 原生 `StorageProvider` 选择对话框。
+**核心禁令**：任何文件/目录选择入口，**禁止**使用 Avalonia 原生 `StorageProvider` 对话框。
 
-被禁用的 API（经 `TopLevel.GetTopLevel(x).StorageProvider` 调用）：
+被禁用 API（经 `TopLevel.GetTopLevel(x).StorageProvider`）：`OpenFilePickerAsync`、`SaveFilePickerAsync`、`OpenFolderPickerAsync`、`FilePicker*Options`、`FilePickerFileType`、`IStorageFile`/`IStorageItem` + `TryGetLocalPath()`。
 
-| 类别 | API |
-|------|-----|
-| 选择对话框 | `OpenFilePickerAsync`、`SaveFilePickerAsync`、`OpenFolderPickerAsync` |
-| 选项/类型 | `FilePickerOpenOptions`、`FilePickerSaveOptions`、`FolderPickerOpenOptions`、`FilePickerFileType` |
-| 原生路径提取 | `IStorageFile`/`IStorageItem` + `TryGetLocalPath()`（自定义选择器直接返回本地路径字符串，不需要） |
+> 唯一豁免：`CustomFilePickerDialog.SystemBrowse_Click` 内的原生调用（用户主动点「系统浏览」的降级逃生通道）。**不得新增其他豁免点。**
 
-> 唯一豁免：`CustomFilePickerDialog.SystemBrowse_Click` 内的原生调用。那是用户主动点击「系统浏览」按钮的降级逃生通道，属有意保留。**不得新增其他豁免点。**
-
-#### 模式选择表（`CustomFilePickerDialog` 静态入口）
+模式选择表（`CustomFilePickerDialog` 静态入口）：
 
 | 场景 | 入口 |
 |------|------|
@@ -748,37 +262,31 @@ CoreLog.RedactOverride = msg => LogRedactor.RedactPaths(msg, ...);
 | 保存单个文件 | `ShowSaveFileAsync(owner, initialPath, defaultExtension, fileTypes, suggestedFileName)` |
 | 打开单个文件 | `ShowOpenFileAsync(owner, initialPath, fileExtensions, fileTypes)` |
 | 选文件**或**文件夹（多选累积） | `ShowOpenItemsAsync(owner, initialPath)` → `IReadOnlyList<string>?` |
-| **解压目标目录**（带解压路径 + 冲突预览） | `ShowExtractFolderAsync(owner, entries, initialPath, currentFolder, preserveFullPath)` |
+| **解压目标目录**（带路径 + 冲突预览） | `ShowExtractFolderAsync(owner, entries, initialPath, currentFolder, preserveFullPath)` |
 
-新增选择入口前先在表里找最贴切的模式；表里没有合适的，说明 `CustomFilePickerDialog` 需要先扩展，而不是退回原生对话框。
+- **解压场景首选 `ShowExtractFolderAsync`**，且**必须实参 `currentFolder` + `preserveFullPath`**（取自 `MainWindowViewModel.CurrentFolder` 与 `AppSettings.ExtractPreserveFullPath`）——漏传会导致预览树与实际解压路径不一致
+- 限定扩展名用 `fileTypes: [new FileTypeOption(标签, 模式数组)]`；`Patterns` 空数组 = 不过滤；支持 `"*.json"` / `".json"` / `"json"` 三种写法；**不要**改 `MatchesFileFilter` 的 `SelectedIndex` 硬编码
+- 文件类型标签走 `LocalizationManager.T()`（规则 13）
+- `initialPath` 传上下文目录（压缩包所在目录等）；`ResolveInitialPath` 按 `AppSettings.DefaultPathOrder` 解析，目标目录不存在安全（回退到最近存在父目录）
+- 表里没有合适模式 → 先扩展 `CustomFilePickerDialog`，不得退回原生对话框
 
-#### 关键约束
-
-- **解压场景首选 `ShowExtractFolderAsync`**，且**必须实参 `currentFolder` + `preserveFullPath`**（取自 `MainWindowViewModel.CurrentFolder` 与 `AppSettings.ExtractPreserveFullPath`）。漏传会导致预览树与实际解压输出路径不一致，详见上文「Extract path resolution — ExtractPathResolver」。
-- **需要限定扩展名时**用 `fileTypes: [new FileTypeOption(标签, 模式数组)]`；`Patterns` 为空数组 = 不过滤（仅 `OpenFile` 模式有意义）。模式支持 `"*.json"` / `".json"` / `"json"` 三种写法（内部经 `NormalizeExtension` 归一化）。**不要**去改 `MatchesFileFilter` 里的 `SelectedIndex` 硬编码。
-- **文件类型标签走 `LocalizationManager.T()`**（规则 13）；新 key 必须三语成对添加。
-- **`initialPath` 传上下文相关目录**（压缩包所在目录、压缩包同级同名文件夹等）。`ResolveInitialPath` 按 `AppSettings.DefaultPathOrder` 解析，**目标目录不存在是安全的** —— 会自动回退到最近的已存在父目录，真正创建仍由业务流程负责。
-- 允许同时选文件与文件夹时用 `ShowOpenItemsAsync`（原生 `OpenFilePickerAsync` 做不到这点）。
-
-#### 新增/修改后必须自查
+新增/修改后自查：
 
 ```powershell
 # 期望：仅 CustomFilePickerDialog.axaml.cs 内 SystemBrowse_Click 的 3 处命中
 git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -- 'src/*.cs'
 ```
 
-出现 `SystemBrowse_Click` 以外的命中即视为违规，必须改用自定义选择器。历史迁移记录见 `docs/progress-avalonia-detail.md` 的 `2026-09-30` 条目（4 处调用点：拖拽解压兜底、添加文件、密码导出、密码导入）。
-
 ### 规则 17：帮助/介绍弹窗必须复用 HelpDialog 外壳
 
-**核心禁令**：任何新增的用户可见帮助/介绍弹窗，**必须**复用统一外壳 `Dialogs/HelpDialog.axaml`，**禁止**另建一次性 `Window` 帮助对话框。
+**核心禁令**：任何用户可见帮助/介绍弹窗**必须**复用 `Dialogs/HelpDialog.axaml`，**禁止**另建一次性 `Window`。
 
-- **外壳**：`new HelpDialog(title, content, closeText?)` —— `title` 为窗口标题（走 `LocalizationManager.T()`，规则 13）、`content` 为内容 `UserControl`、`closeText` 可选（默认 `MsgBox_Close`）；原对话框的窗口尺寸经对象初始化器在构造后补设（`{ Width = ..., Height = ... }`）
-- **内容**（两种，任选）：① **Markdown 驱动（当前唯一在用的方式，推荐）**——`new MarkdownHelpContent(LocalizationManager.T("Xxx_Markdown"))`，把本地化 Markdown 经 `Services/MarkdownPreviewBuilder`（Markdig AST → 原生控件树）渲染（支持标题/列表/**表格**/代码块/引用块/粗斜体；段落为 `SelectableTextBlock`，文本可选中复制）；正文只维护三语 Markdown 键，无需改 XAML。② **手写卡片式**——自建 `UserControl`（根 `x:CompileBindings="False"` + `ScrollViewer` 包裹内容；代码后置用 `=> LocalizationManager.T("key")` 只读属性 + 构造函数末尾 `DataContext = this`），仅当 Markdown 表达不了时使用。
-- **⚠️ `x:Class` 类型必须有公共无参构造**：Avalonia XAML 编译器要求（否则 `AVLN3000: Unable to find public constructor`）；带参构造 + `public Xxx() : this(defaults) { }` 兜底。**增量构建会掩盖该错**——只在运行期表现为大面积 `XamlLoadException: No precompiled XAML found`，务必用 `--no-incremental` 验证。
-- **原因（根因回归防护）**：`HelpDialog` 在构造函数内、`DataContext = this` **之前**完成 title/content 赋值且属性只读 —— 绑定在 attach 后求值时值已就绪；若另建一次性 Window、或在构造**之后**再赋值属性（无变更通知），绑定不刷新，整窗静默空白（曾实际发生）
-- **已迁移消费者（全部 Markdown 驱动）**：压缩加速帮助（三语 `AdaptiveHelp_Markdown`）、并行解压帮助（`ParallelHelp_Markdown`）、密码管理器帮助（`PasswordHelp_Markdown`，含 Glob/Regex 表格）、日志隐私帮助（`LogPrivacyHelp_Markdown`）
-- **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/HelpDialogRenderTests.cs`（无头 Avalonia，验证 ContentPresenter 注入内容引用相等 + 内容真实渲染 + 三语 Markdown key 存在）
+- 外壳：`new HelpDialog(title, content, closeText?)`（`title` 走 `LocalizationManager.T()`；尺寸经对象初始化器补设）
+- 内容优先 **Markdown 驱动**：`new MarkdownHelpContent(LocalizationManager.T("Xxx_Markdown"))`（Markdig AST → 原生控件树，支持表格、可选中复制）；仅在 Markdown 表达不了时用手写 `UserControl`
+- **⚠️ `x:Class` 类型必须有公共无参构造**（`AVLN3000`）；带参构造加 `public Xxx() : this(defaults) { }`。增量构建会掩盖该错，务必 `--no-incremental` 验证
+- **原因**：`HelpDialog` 在构造函数内、`DataContext = this` 之前完成 title/content 赋值且只读；另建 Window 或构造后再赋值（无变更通知）会导致整窗静默空白（曾实际发生）
+- 已迁移消费者：压缩加速 / 并行解压 / 密码管理器 / 日志隐私帮助（四个 `*_Markdown` 三语 key）
+- 回归测试：`tests/MantisZip.UI.Avalonia.Tests/HelpDialogRenderTests.cs`
 
 ### 规则 18：计划完成后必须确认 RELEASE_NOTES 更新范围
 
@@ -787,13 +295,11 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 **核心判据：RELEASE_NOTES 只记录已发布版本之间的用户可见差异**（上一个 tag → 本次发布）。
 
 - **同周期内引入并修复的问题不进发布说明**：功能本身是本版本新增、其 bug 也在本版本内修掉（从未有用户拿到带该 bug 的版本）→ 不写「修复」条目，只记入 `docs/progress-avalonia-detail.md` 与计划归档
-- **「修复」条目仅限**：上一版本已发布、用户实际可能遇到的问题（如 v0.5.2 用户升级到 v0.5.3 能感知到的变化）
+- **「修复」条目仅限**：上一版本已发布、用户实际可能遇到的问题
 - **性能类改动**归入「性能 / Performance」节按收益描述，不要写成「修复 XXX」；同一功能的多项子改进合并为一条带 ①② 的条目
 - **格式与既有章节一致**：`### 文件说明 / File Description`（中英各一段）+ `### 更新内容 / Changelog`（分类加粗小标题 `**中文 / English**`，每条先中文后英文、`**功能名** — 说明`）
 - 更新后同步 `docs/PROGRESS.md` 与 `docs/progress-avalonia-detail.md`（规则 3）
 
 ## 未来工作
-
-### 待实施计划
 
 见 [docs/PLAN.md](docs/PLAN.md) 和 `.omo/plans/` 下的设计文档。

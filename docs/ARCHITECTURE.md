@@ -440,3 +440,379 @@ Menu items with individual toggles:
 | 8 | 解压到…… — Extract to… | EnableExtractToMenu | `--extract` |
 
 Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons via `GetMenuIconPath()` (static cascade mode only; COM mode uses embedded .ico resources) — maps each verb to `Resources\MenuIcons\*.ico` in the output dir (Open/ExtractHere/ExtractSmart/ExtractToNamed/ExtractTo/CompressSeparate/CompressCombined/CompressDialog), returns null if the file is missing.
+
+## 实现细节补充（自 AGENTS.md 迁出，2026-10-20）
+
+> AGENTS.md 受工作区指令 64KB 预算限制，以下小节从 AGENTS.md 迁出；AGENTS.md 只保留摘要与硬性规则，细节以本文为准。
+
+### 依赖流向
+
+```
+MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference── MantisZip.ShellExt (COM)
+(net10.0)            │   (net10.0, 主力开发)                  (Explorer.exe 宿主)
+                     │
+                ZipEngine    SevenZipEngine    TarGzEngine
+               (SharpCompress) (SharpSevenZip) (SharpCompress)
+```
+
+### Engine pattern（策略 + 工厂）
+
+所有引擎均在 `MantisZip.Core`，与 UI 框架无关：
+
+- `IArchiveEngine` interface：`ListEntriesAsync`, `ExtractAsync`, `CompressAsync`, `TestArchiveAsync`
+- `ArchiveEngineFactory` 静态构造注册引擎，按文件扩展名分发
+- `SevenZipEngine.CompressAsync` 使用 `SharpSevenZipCompressor`（7z.dll COM 绑定）
+- `ArchiveEntryExtractor`（Core/Utils）处理预览用单项提取；支持 Zip 与 7z
+
+### 进度上报契约
+
+- `ArchiveProgress`（Core/Abstractions/ArchiveEngine.cs）：`PercentComplete`（总体 0–100）、`FilePercentComplete`（可空 double，单文件 0–100）、`FileName`（当前文件）、`Message`
+- `ZipEngine` 经缓冲 I/O 拷贝循环逐文件上报（100ms 节流），每个文件起始报 0%、结束报 100%
+- `SevenZipEngine.ExtractAsync` / `TarGzEngine.ExtractAsync` 仅在完成时上报 100%
+- `SevenZipEngine.CompressAsync` 经 `SharpSevenZipCompressor.Compressing` 事件上报
+
+### ZIP 压缩加速（自适应 / 多线程 / 引擎侧组数）
+
+**三开关 Phase 1 互相独立**（`AppSettings.AdaptiveCompression` / `AdaptiveSmartDetect` / `MultiThreadedCompression`）——2026-10-18 双机实测表明**多线程收益与 CPU 相关**：20 核机上 text/mixed 有 10–20% 收益且压缩率更好（text +15%），8 逻辑核机（i7-3770 4C/8T）上净负收益（text 慢 42%、mixed 慢 37%）。任何一刀切静态策略（无论「MT 依赖自适应」还是「MT 独立」）都只对一半硬件正确 → **Phase 1 不做门控**，最终策略由 Phase 2 **本机基准测试**按机器定夺。双机数据与评审记录见 `.omo/plans/进行中/adaptive-compress-ui-convergence.md`。
+
+**组数已从 UI 移除**：引擎默认 `clamp(CPU 核数, 4, 16)`（下限 4 避开已证实的 deg=2 陷阱；20 核机实测 16 组最优，deg=8 慢 21–30%）。组内线程数 = 核数/组数（方案 C）**未验证**——默认路径下多为 no-op，仅在「核数 > 16」或「文件数 < 组数」时生效，**不得**当性能依据写进文档/发布说明。
+
+**⚠ ZIP 的 MT 路径与 7z 的 `mt=on` 是两件事**：ZIP MT 按「纯压缩组（7z Deflate）/ 混合组」分派，用 N 个 `mt=off` 的 7z 压缩器组间并行 + copy-mode 合并（不重压缩）；7z 的 `mt=on` 是 7z.dll 原生线程。两者不可混为一谈。
+
+**隐藏的空转控件（Phase 2 实现后启用）**：
+
+- `魔数检测`（`AdaptiveSmartDetect`）：`ZipEntryClassifier.GetAdaptiveLevel` 只读扩展名，从不读 `FileFormatDetector.Detect` 结果 → UI 已隐藏
+- `自适应规则`（`AdaptiveOverrides`）：`AdaptiveRuleMatcher.ResolveLevel` 无生产调用点，`CompressRequest`/`ArchiveOptions` 无规则字段 → 卡片已隐藏
+- 自定义格式「魔数 hex」：`GetAdaptiveLevel` 只读 `format.Extensions`，不读 `MagicHex` → 输入框已隐藏
+
+### ArchiveItem duality
+
+- **Core**：`MantisZip.Core.Abstractions.ArchiveItem` — 引擎产出
+- **Avalonia UI**：`ArchiveItemModel`（Models/）包装 `ArchiveItem`，附加 `IconSource`、显示属性、`SizeRatio`（进度条宽度）、`SortOrder`
+
+### 目录聚合 — ComputeDirectoryStats
+
+`ArchiveEntryLister.ComputeDirectoryStats`（`Core/Services/ArchiveEntryLister.cs`）是目录聚合的共享契约，返回 `Dictionary<string, DirStats>`，`DirStats(Count, Size, CompressedSize, NewestModified)`：
+
+- **递归子树语义**：每个文件计入其全部祖先目录（`a/b/c.txt` 同时计入 `a` 与 `a/b`），目录大小/压缩后大小 = 子树内所有文件之和
+- `Count` **仅统计文件**（跳过目录条目）
+- `NewestModified` = 子树内最新文件修改时间，`DateTime.MinValue` 文件不参与
+- **消费者**：Avalonia `MainWindowViewModel.PopulateEntries`（基于过滤后的 `filteredSource` 计算，目录行的大小/日期/压缩后大小由聚合填充）
+- **注意**：ResultTreeView 的 `CalculateDescendantStats`（`Services/ResultPreviewService.cs`）是独立的树状聚合，`TotalDescendantCount` 只统计文件节点（不含目录条目）、跳过 `IsFilteredOut` 被过滤项、无压缩后大小/日期 —— 与 `DirStats` 语义不同，勿混用
+
+### 解压路径解析 — ExtractPathResolver
+
+`ExtractPathResolver`（`Core/Utils/ExtractPathResolver.cs`）是**预览树与实际解压**输出路径计算的单一事实来源，杜绝两者不一致：
+
+- **核心方法**：`ResolveRelativePath(entryKey, currentFolder, preserveFullPath)`（裁剪当前浏览层前缀 + `FileConflictHelper.SanitizeEntryPath` 防 Zip Slip），另有 `TrimCurrentFolderPrefix` / `ResolveAll` 便捷封装
+- **语义**：`preserveFullPath=false` 且 `currentFolder` 非空时裁剪前缀；前缀不匹配的条目保持原路径；`SanitizeEntryPath` 丢弃 `..`/`.` 段但保留普通目录段（`docs/../../evil.txt` → `docs/evil.txt`；真正的路径逃逸拦截在 `GetSafePath`）
+- **消费者**（必须用同一 resolver，勿另写路径逻辑）：
+  - `SelectedItemsExtractService.ExtractEntriesAsync`（实际解压，经 `pathOverrides` 喂给引擎）
+  - `ResultPreviewService.BuildExtractPreview`（预览树，`preserveFullPath`/`currentFolder` 参数，恶意路径条目逐条跳过以防整树损毁 —— 解压侧保持抛异常整批失败）
+- **入口**：`MainWindowViewModel.ExtractSelectedTo` 把 `CurrentFolder` + 设置传给 `CustomFilePickerDialog.ShowExtractFolderAsync`（→ 预览）与实际解压，输入相同故结果必然一致
+- **文件过滤**：Avalonia 版 `ExtractSettingsWindow` 过滤后，`MainWindowViewModel.ExtractArchive` 在 `FilteredEntryKeys` 非空时改走 `engine.ExtractEntriesAsync` 只解压匹配项；否则保持 `ExtractService.ExtractAsync` 全量
+
+### 智能打开路径 — SmartOpenPathResolver
+
+`SmartOpenPathResolver`（`MantisZip.UI.Avalonia/Services/SmartOpenPathResolver.cs`，移植自 WPF `App.Extract.cs:662-701`）是**解压完成后打开资源管理器文件夹**的智能路径判断，避免用户多点一次：
+
+- **语义**：`GetCommonRootDirectory` 采用 **100% 严格公共根**——仅当所有**非目录**条目共享同一顶层目录时返回该目录（逐条取 `FullPath` 首个 `/` 前段，任一缺 `/` 或不同即返回 null）；**不**复用 Core 的 `ArchiveStructureAnalyzer.HasSingleRootDirectory`（≥60% 阈值，语义不同，会造成与 WPF 行为不一致）
+- **方法**：`ResolveSmartOpenPathAsync(archivePath, dest, password)`（`ListEntriesAsync` → `GetCommonRootDirectory` → `Path.Combine(dest, commonRoot)`，任何异常/空列表兜底返回 dest）
+- **消费者**（3 处接线，全部传本次解压实际使用的密码——加密包解压成功后 `ListEntriesAsync` 同密码必然成功）：
+  - `MainWindowViewModel.OpenExtractedFolderAsync`（选中条目解压后，`ExtractSelectedEntriesCoreAsync` 调用）
+  - `MainWindowViewModel.ExtractArchive`（主对话框全量解压后，按 `OpenFolderAfterExtract` 开关调用——曾因死代码从不打开，已修复）
+  - `DragDropService`（拖拽解压后）
+- **范围边界**：`ExtractArchiveHere`/`ExtractArchiveToName`（应用内）与 WPF 一致不开文件夹；WPF CLI `--extract-here`/`--extract-to-name` 批处理会打开（`App.Extract.cs:614-619`），Avalonia CLI 是否对齐见 `.omo/plans/未开始/cli-extract-open-folder.md`
+
+### UI 模式：MVVM
+
+使用 `CommunityToolkit.Mvvm` 的 `ObservableObject` + source generators（`[ObservableProperty]`, `[RelayCommand]`）：
+
+- **ViewModels**：`MainWindowViewModel`, `PreviewViewModel`, `ProgressViewModel`, `CompressSettingsViewModel`, `ExtractSettingsViewModel`, `SettingsWindowViewModel`, `IconTestViewModel`（图标测试窗口）、`UiTestViewModel`（UI 控件测试窗口）、`MetadataPanelSettingsViewModel`（元数据面板设置窗口）
+- **Services**：`ArchiveService`, `CompressService`, `ExtractService`, `SelectedItemsExtractService`（选择条目解压，消费 `ExtractPathResolver`）、`CompressFlow`（压缩公共流程：BuildRequest/冲突弹窗/暂停，主窗口 VM 与 CLI 共用）、`ExtractFlow`（解压公共流程 + 冲突弹窗）、`DragDropService`（拖拽解压后置流程）+ `OverlayController`（Win32 覆层）+ `CustomOleDragDrop`（自实现 OLE 拖拽，根治光标）+ `DropTargetDetector`（目标目录检测）+ `DragDropItemExpander`（选中目录展开）+ `DragPreviewBitmapBuilder`（拖拽预览位图）、`PasswordService`（密码验证/自动匹配）、`FileFilterHelper`（文件过滤）、`NativeMethods`（Win32 P/Invoke）、`PreviewService`, `IconService`, `LocalizationManager`, `CompressionOptionData`（选项数据源）、`GifDecoder`（自实现 GIF 解码）、`IcoParser`（ICO 多帧解析）、`MarkdownPreviewBuilder`（Markdig AST→控件树）、`ResultPreviewService`（结果预览树，`BuildExtractPreview` 与解压共用 `ExtractPathResolver` 保证预览=实际）、`MetadataSettingsManager`（元数据面板配置持久化）、`MetadataRenderEngine`（元数据渲染引擎）、`ShellIntegration`（partial 拆分：`ShellIntegration.cs` + `ShellIntegration.Menu.cs` + `ShellIntegration.Assoc.cs`）
+- **Views**：`MainWindow.axaml`, `PreviewPanel.axaml` (UserControl), `SettingsWindow.axaml`, `UiTestWindow.axaml`（UI 控件测试，仅 Debug 显示）
+- **Controls**：`ResultTreeView`（结果预览可复用控件，Compact/Full 模式、截断/过滤/冲突高亮）、`CustomFilePickerDialog`（**统一文件/目录选择器**，新增选择入口必须用它、禁用原生 StorageProvider，见 AGENTS 规则 16）、`QuickPathPicker`（自包含路径速选控件）、`InfoPanel`（元数据信息面板）、`FileFilterEditor`（文件过滤条件编辑器）、`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等）、`QuickPathControl`（路径速选控件）
+- **Converters**：`BrushResourceConverter`（主题色键→画刷）、`GeometryResourceConverter`（资源键→Geometry）
+- **紧凑度模式**：Compact/Normal/Loose 三档，`ApplyCompactness()` 运行时注入 12 个 `DynamicResource`（间距/控件高度/圆角），无需重启
+- **上下文工具栏**：目录树工具栏（展开/折叠全部+自动展开开关+过滤器+分隔符切换）+ 文件列表工具栏（选择/反选/展平/排序/地址栏），`PathIcon` 矢量按钮
+- 对话框通过 ViewModel 的回调委托（`ShowPasswordDialog`, `ShowExtractSettingsDialog` 等）与 View 解耦
+
+#### 派生属性通知：集中通知模式
+
+当多个计算属性依赖同一组源属性时，**禁止**在每个 `[ObservableProperty]` 字段上逐个标注 `[NotifyPropertyChangedFor]`（容易漏、难维护）。改用 `partial void OnXxxChanged` + 集中通知方法：
+
+```csharp
+// ✅ 正确：集中通知
+[ObservableProperty]
+private bool _optionA;
+
+[ObservableProperty]
+private bool _optionB;
+
+partial void OnOptionAChanged(bool value) => NotifyXxxProperties();
+partial void OnOptionBChanged(bool value) => NotifyXxxProperties();
+
+private void NotifyXxxProperties()
+{
+    OnPropertyChanged(nameof(IsVisibleA));
+    OnPropertyChanged(nameof(IsVisibleB));
+    OnPropertyChanged(nameof(SummaryText));
+}
+
+// ❌ 错误：逐个标注，容易漏
+[ObservableProperty]
+[NotifyPropertyChangedFor(nameof(IsVisibleA))]
+[NotifyPropertyChangedFor(nameof(IsVisibleB))]
+[NotifyPropertyChangedFor(nameof(SummaryText))]
+private bool _optionA;
+```
+
+原则：新增派生属性只需改 `NotifyXxxProperties()` 一处，源字段保持干净。
+
+### 设置系统（AppSettings 分类）
+
+`AppSettings` singleton 存在于 `MantisZip.UI.Avalonia/Models/AppSettings.cs`，序列化到 `%LOCALAPPDATA%\MantisZip\settings.json`（进程级缓存，见 `Load()`/`Save()` 静态缓存）。
+
+设置包含以下分类：
+- **压缩**：DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), CloseAfterCompress, KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipMultithreaded, SevenZipEncryptHeaders
+- **分卷**：SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB
+- **解压**：ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
+- **解压扩展**：EnableDragExtract, ExtractPreserveFullPath
+- **上下文菜单**：EnableCompressMenu, EnableOpenMenu, ShowMenuIcons, EnableSmartExtractMenu, EnableExtractHereMenu, EnableExtractToNamedMenu, EnableExtractToMenu, EnableCompressSeparate, EnableCompressCombined, EnableDynamicMenu（COM 动态菜单 / 静态级联回退，`EnableCascadingMenu` 已废弃移除）
+- **预览**：EnableImagePreview, EnableTextPreview, MaxTextPreviewBytes, ShowPreviewPanel, ShowPreviewInfoPanel, TextPreviewFontSize, TextPreviewFontFamily, TextEncodingPreference, MaxTablePreviewRows, MaxTablePreviewCols, MaxPreviewFileSize, FontPreviewFontSize, FontPreviewSampleText, FontPreviewEnableLigature, PreviewPosition, InfoPanelOrientation, EnableFormatDetection, PreviewHeadSize
+- **密码管理**：ShowPasswordMatchNotification, PasswordRevealByDefault
+- **外观**：Theme (Light/Dark), MaxRecentFiles, AppFontFamily, CompactnessMode (Compact/Normal/Loose), Language, ShowProgressBars, SeparateDirBaseline, AutoExpandTreeToCurrent（目录树自动展开）, ProgressContentMode / ProgressInfoDensity / ProgressWindowWidth（进度窗口显示偏好：内容模式 / 信息量分级 / 窗口宽度，关闭时写回）
+- **文件关联（Avalonia 新增）**：AssocZip/7z/Rar/Tar/TarGz/Gz/Iso, CustomAssocExtensions
+- **收藏夹（Avalonia 新增）**：FavoritePaths (List<string>)
+- **调试**：EnableDebugLogging, LogPrivacyMode (off/filename/extension/full)
+- **高级**：SevenZipPath, PreserveDirectoryRoot, CleanTempOnStartup
+
+### 预览子系统开发约定
+
+预览在 `PreviewPanel.axaml` + `PreviewViewModel` + `PreviewService`，入口 `ClassifyPreviewByMagicAsync()`（**魔数优先**，扩展名回退）→ `ShowXxx(filePath)`。
+
+新增预览格式必须同步三处：`PreviewType` 枚举、`PreviewCapabilities`（能力查表驱动工具栏按钮，禁止再加 `HasXxxControls` 硬编码）、`MetadataRegistry` 元数据字段。预览路径与实际解压共用 `ExtractPathResolver`（预览=实际）；部分提取走 `ArchiveEntryExtractor.ExtractHeadAsync`/`ExtractHeadTailAsync`（7z 固实自动降级）。
+
+两阶段加载用 `_previewLoadVersion` 防竞态；CSV/SQLite 的 `DataGrid` 必须手动建列（`AutoGenerateColumns` 对 `DataView` 有 bug）。
+
+完整格式清单、能力注册表、信息面板配置系统、PDF/字体/ICO/GIF 实现见上文「预览子系统」。
+
+### CLI entry points
+
+| Argument | Behavior |
+|---|---|
+| `--install-shell` | Install context menu, then exit |
+| `--uninstall-shell` | Uninstall context menu, then exit |
+| `--compress <paths...>` | Show compress dialog; multi-instance IPC merges paths from multiple Windows shell invocations |
+| `--compress-quick <paths...>` | Direct compress with AppSettings defaults + ProgressWindow, then exit |
+| `--compress-separate <paths...>` | Sequential per-item compress to each item's parent directory + ProgressWindow + IPC merge |
+| `--compress-combined <paths...>` | Combined single archive from all items with common parent name + IPC merge; prompts if cross-drive |
+| `--extract-here <path>` | Direct extract to source directory with AppSettings defaults + ProgressWindow, then exit |
+| `--extract-smart <path>` | Smart extract (auto-detect top-level folder) + ProgressWindow, then exit |
+| `--extract-to-name <path>` | Extract to named folder (archive name without extension) + ProgressWindow, then exit |
+| `--extract <path>` | Direct extract with AppSettings defaults + ProgressWindow, then exit |
+| `--open <path>` | Launch MainWindow and load archive for browsing |
+| `--open-dispatch <path>` | Launch MainWindow and load archive, or dispatch to extract action per `DoubleClickAction` setting (used by file association / shell verb) |
+| `--help`, `-h` | 显示 CLI 帮助（有父控制台时输出到控制台，否则弹窗显示），然后退出 |
+| `--test` | 启动自检：显示启动测试成功弹窗（含版本与安装目录），然后退出 |
+| _(no args)_ | Normal MainWindow launch |
+
+- `App.axaml.cs` `OnFrameworkInitializationCompleted` 中处理所有 CLI 路由
+
+### System icon helper
+
+`IconService` + `IconProvider` 使用 `SHGetFileInfo`（Windows Shell API）按扩展名取 16×16 文件类型图标；`SHGFI_USEFILEATTRIBUTES` 支持虚拟/不存在的文件；结果缓存于 `ConcurrentDictionary`；含文件夹图标。用于文件列表显示原生 Windows 图标。
+
+### 开发约束与历史踩坑
+
+#### 中文 filename encoding (ZIP)
+
+```csharp
+Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+```
+
+在 `App.OnFrameworkInitializationCompleted`（Avalonia）设置一次。ZIP 编码按实例经 `StringCodec` 处理（无全局 `ZipStrings.CodePage`）；SharpCompress 的 `ZipArchive` 用 `ReaderOptions.ArchiveEncoding` 按实例配置，尊重系统区域。
+
+#### 7z compression uses SharpSevenZip (7z.dll) — no external 7z.exe required
+
+#### 7z encrypted preview SUPPORTED
+
+**实际验证通过**：SharpSevenZip 的 `ExtractFile(index, stream)` 在传入正确密码后，对所有 7z 配置均支持单项提取预览：
+
+- 所有压缩方法（LZMA2 / LZMA / PPMd / BZip2 / Deflate）
+- 固实压缩（Solid）与非固实
+- AES-256 加密
+- 加密文件名（需先传入密码才能列出条目）
+
+`ArchiveEntryExtractor.ExtractSevenZipEntry` 接受 `password` 参数并传递给 `SharpSevenZipExtractor`，与 ZIP 处理方式一致。代码中不存在 `NotSupportedException`。
+
+⚠ **注意**："加密文件名"（`EncryptHeaders = true`）的 7z 压缩包，在输入密码前无法读取文件列表（`ArchiveFileData` 会抛 `SharpSevenZipArchiveException`），UI 需先弹密码框再尝试列条目。
+
+#### `_currentFormat` classification（曾损坏，已修复）
+
+`_currentFormat` 现由 `LoadArchiveAsync` 中的 `GetFormatByExtension()` 按扩展名推导，替代旧的 `engine.CanHandle()` 判断（会把所有非 ZIP 格式误判为 `SevenZip`）。
+
+#### TarGzEngine metadata（曾损坏，已修复）
+
+- ~~`ListEntriesAsync` 把 `LastModified` 设为 `DateTime.Now`（丢失真实时间）~~ → 现用 `entry.ModTime`
+- ~~`CompressAsync` 忽略 `ArchiveOptions.CompressionLevel`（固定 gzip level 5）~~ → 现用 `options.CompressionLevel`
+
+#### Password manager — MaxEntries (1000) and auto-try limit (100)
+
+`PasswordManager` 内置 `MaxEntries = 1000` 上限防暴力破解；`EntryCount` 反映当前数量；满时 `AddPassword` 抛 `InvalidOperationException`；`FindMatchingPasswords(maxResults)` 支持可选上限；`TryMatchPassword` 使用 `maxResults: 100` 并经 `out bool limitReached` 暴露命中上限，调用方据此弹窗。
+
+#### Silent catch blocks — all converted to TraceLog
+
+历史上的 `catch { }`（日志、explorer 启动、设置、TarGzEngine）已全部转为 `App.TraceLog()` 或 `CoreLog.Trace()`，错误路径不丢失。仅保留防御性空 catch（注册表清理、进度窗口清理、日志 flush 尽力而为）。
+
+#### `OpenZipFile` — exception-safe disposal
+
+`ZipEngine.OpenZipFile` 把编码探测枚举（`ZipEntry.Any(...)`）包在 try-catch 中：首个 `ZipFile` 枚举抛异常（损坏包）时先释放文件句柄再重抛。
+
+#### `--compress` / `--compress-separate` / `--compress-combined` IPC multi-instance
+
+三种 `--compress-*` 均用 `Mutex` + `NamedPipeServerStream`：Windows 为每个选中文件启动一个进程，首进程作为收集者，其余经命名管道发送路径后退出；收集窗口 800ms；仅首实例显示压缩对话框或 ProgressWindow。
+
+- `--compress`：Mutex `MantisZipCompressMutex`，pipe `MantisZipCompressPipe`
+- `--compress-separate`：Mutex `MantisZipCompressSeparateMutex`，pipe `MantisZipCompressSeparatePipe`
+- `--compress-combined`：Mutex `MantisZipCompressCombinedMutex`，pipe `MantisZipCompressCombinedPipe`
+
+#### "Subfolder display" toggle semantics
+
+`ShowSubFoldersCheck` 控制 `FilterFiles` 是否包含嵌套项：**勾选**时子目录内容也平铺显示在当前视图。实现上不重建列表，而是以同一逻辑重新过滤 `_allItems`。
+
+#### Filter / selection guard
+
+`_isProgrammaticFilter` 阻止程序化 `FilterFiles` 触发 `SelectionChanged` 预览。`SelectionChanged` 从 `e.AddedItems`/`e.RemovedItems` 推断「最后点击项」而非 `SelectedItem`，以支持多选（Extended 模式）。
+
+#### No CI, no full test suite, no linters
+
+无 CI workflow、无 pre-commit hook、无 linter/analyzer 配置。`test_encoding/` 是一次性 ZIP 编码调试脚本。`tests/` 有 Core 与无头 Avalonia 两个测试项目，非全量覆盖。
+
+#### Smart Extract
+
+`ArchiveStructureAnalyzer`（Core/Utils）分析压缩包结构，决定智能解压直接解到当前目录还是子目录：
+
+- 扫描顶层条目：若 ≥60% 共享同一根目录 → 带子目录解压；否则直接解压
+- 由 `ArchiveEngineFactory.SmartExtractEntriesAsync` 调用分析器后带计算出的目标路径委托 `ExtractAsync`
+
+触发入口：`--extract-smart` CLI 或右键「智能解压」。
+
+### UI 样式与注释约定（细节）
+
+#### ToggleIconBox 切换图标
+
+开关/切换类菜单项的指示图标：
+
+- `Background` 绑定 `{Binding <bool>, Converter={StaticResource BoolToToggleBgBrushConverter}}`（true → `ThemeToggleBrush` 强调色底，false → `Transparent` 空心）
+- 内部放 10×10 `PathIcon`，`Foreground` 用 `ThemeTextPrimaryBrush`
+- 菜单项中放在 `MenuItem.Icon` 槽位（Fluent 主题 `SharedSizeGroup="MenuItemIcon"` 自动共享列宽对齐，`FluentMenuItemIconTheme` 将 Icon 槽位内容限制在 16×16，故 ToggleIconBox 必须为 16×16），**Header 直接用文本绑定**
+- code-behind 动态构建时 `Classes = { "ToggleIconBox" }` 同样生效（继承全局样式）
+
+#### 列表控件行高示例
+
+```xml
+<!-- DataGrid -->
+<DataGrid ItemsSource="{Binding ...}" RowHeight="{DynamicResource ControlHeightMd}" ... />
+
+<!-- TreeView -->
+<TreeView ItemsSource="{Binding ...}">
+  <TreeView.Styles>
+    <Style Selector="TreeViewItem">
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+    </Style>
+  </TreeView.Styles>
+</TreeView>
+```
+
+#### AXAML 中文注释示例
+
+```xml
+<!-- 文件名标签：显示当前需要输入密码的压缩包名称 -->
+<TextBlock x:Name="FileNameText" FontWeight="Bold" FontSize="14" />
+
+<!-- 密码输入框 + 显示/隐藏切换按钮 -->
+<Grid ColumnDefinitions="*,Auto">
+  <TextBox x:Name="PasswordBox" PasswordChar="●" />
+  <Button Grid.Column="1" x:Name="PwdRevealBtn" Click="OnRevealToggle" />
+</Grid>
+
+<!-- 扩展保存选项区域：永久保存、自动生成匹配规则、描述、匹配规则 -->
+<StackPanel x:Name="SaveOptionsPanel" Spacing="{DynamicResource SpacingSm}">
+  <!-- 永久保存到密码库复选框 -->
+  <CheckBox x:Name="SavePermanentlyCheck" />
+  <!-- 自动生成匹配规则复选框：根据文件名自动生成 glob/regex 规则 -->
+  <CheckBox x:Name="AutoGenerateRulesCheck" />
+</StackPanel>
+```
+
+#### Shell 新增菜单项同步清单
+
+新增菜单项要同时改三处：`ShellIntegration.Menu.cs`（注册）、`strings.*.json`（`ShellExt_*` 三语）、`WriteMenuTextToRegistry()`（写注册表）。**不要给级联动词设 `CommandFlags=8`**（部分 Windows 会隐藏该项，见「已修复问题」）。
+
+### 拖拽（drag-out 解压 / drag-in 添加）
+
+#### drag-out（拖到资源管理器）— 7-Zip eager-extraction 模型
+
+拖出前先解压到临时目录再 `DoDragDrop`，解压 + 拖拽期间显示 `ProgressWindow`。
+
+- **自家窗口防误判**：`_isOwnDrag` 标记阻止 `Window_Drop` 响应「拖出后又拖回」的临时路径（对 add-to-archive 无意义）
+- **子目录保留**：输出临时路径使用 `ArchiveItem.FullPath`，保留相对结构；`ExtractEntryForDragAsync` 按需建中间目录
+- **取消**：`ProgressWindow` 经 `CancellationToken` 取消；解压未完成则整体跳过 `DoDragDrop`
+
+**Avalonia 实现**（方案见 [drag-drop-direct-extract.md](.omo/plans/未开始/drag-drop-direct-extract.md)），「拖拽即解压到目标目录」实时模式：
+
+1. `MainWindow.axaml.cs` 文件列表 `PointerPressed` 检测拖拽起点（列标题/空白按下不触发），选中项经 `DragDropItemExpander.ExpandItems` 展开为条目集
+2. `OverlayController`（纯 Win32 独立覆层，`UpdateLayeredWindow` 后台线程渲染）显示三色状态机（检测中/可释放/不可释放）+ 呼吸动画（拖拽预览弹窗 DragPreviewPopup 待实施：`DragPreviewBitmapBuilder` 位图构建与 `OverlayController.SetPreview` 槽位已就绪但无调用者）
+3. `DropTargetDetector` 用 `WindowFromPoint` + ShellWindows 枚举实时检测目标目录（`#32770` 用 `EnumChildWindows`），`IsOverOwnWindow` 用 HWND 比较防止自家窗口误判
+4. 松手后 `DragDropService` 执行后置解压流程（模态进度窗口 + 冲突处理 + 本地化状态消息），完成后清理
+5. **光标方案 C**：`CustomOleDragDrop` 自实现 OLE `IDataObject`/`IDropSource`/`IEnumFORMATETC`（`CustomDataObject`/`CustomDropSource`/`CustomEnumFormatEtc`）替代 Avalonia `DragDrop.DoDragDropAsync`（其 `OleDragSource` 固定返回 `USEDEFAULTCURSORS` 导致禁止光标无法替换）；`GiveFeedback` 返回 S_OK + 直接 `SetCursor`，光标按 overlay 状态（绿/红/金/灰）动态切换，根治光标问题；Esc/多键取消经 OLE `fEscapePressed` 检测
+
+#### drag-in（拖入窗口添加到压缩包）
+
+已实施（方案见 [drag-add-overlay.md](.omo/plans/已完成/drag-add-overlay.md)）。三分支：
+
+1. **已打开压缩包 + 拖入单个压缩包** → 切换打开
+2. **已打开压缩包 + 拖入文件/文件夹** → `Main_DragAddConfirm` 确认框（复用 `CompressConflict_Add` 标题）→ `MainWindowViewModel.AddFilesToArchiveAsync`（从 `AddFiles()` 抽取的公共方法：引擎获取、密码、`CreateExtractOptions` 冲突处理、`entryBasePath`、进度、刷新）
+3. **未打开压缩包**：拖入压缩包 → 打开；拖入非压缩包 → 打开 `CompressSettingsWindow` 预填源文件
+
+窗口内覆层 `DragAddOverlay`（方案 A：固定显示 `CurrentFolder`，跟随目录行悬停的方案 B 留作后续）：`DragOver`/`DragLeave` 事件驱动，Avalonia 原生 Border 覆层（不用 Win32 `OverlayController`，与拖拽解压的目标在外部 Explorer 窗口不同）；绿色 `#6BD46B` = 可添加「添加到 {CurrentFolder}」，红色 `#F43643` = 格式不支持（`DragEffects.None`）；呼吸动画与拖拽解压完全同参（`DispatcherTimer` 100ms + 正弦 `80+40·sin(tick·π/10)`，alpha 40-120 约 2s 周期，仅背景层 Opacity 呼吸、边框/文字不透明）+ 8px 同色边框 + 白色粗体文字 + ✓/⚠ 状态图标
+
+### 日志隐私脱敏
+
+`LogRedactor`（Core/Utils）为全部日志输出提供集中式路径脱敏。`RegexOptions.Compiled` 正则三分支（盘符 `C:\...`、UNC `\\server\share\...`、相对 `folder\sub\file.ext`），允许路径含空格（早期草稿排除 `\s` 是错的）。
+
+四种模式由 `AppSettings.LogPrivacyMode` 控制（默认 `"extension"`）：
+
+- **off**：不脱敏
+- **filename**：`D:\Photos\private\wedding.jpg` → `wedding.jpg`
+- **extension**：`D:\Photos\private\wedding.jpg` → `[PATH_1]\[FILE_1].jpg`（仅保留扩展名）
+- **full**：同上 → `[PATH_1]`（顺序 ID，同路径同 ID，上限 10000 条）
+
+**注入**：
+
+- `CoreLog.Initialize(diagnosticsEnabled, privacyMode)` — UI 层在 `OnFrameworkInitializationCompleted` 和 `RefreshDebugLogSettings` 调用，统一注入诊断开关与脱敏委托。**禁止直接设置 `CoreLog.DiagnosticsEnabled` 或 `CoreLog.RedactOverride`**
+- `App.Log()` / `App.LogDebug()` / `LogStartup()` 在 UI 项目内直接调用 `LogRedactor.RedactPaths()`
+
+**帮助弹窗**：日志隐私帮助为 Markdown 驱动（`LogPrivacyHelp_Markdown` → `MarkdownHelpContent` → `HelpDialog`），位于设置 → 调试页 `[?]` 按钮。
+
+**关键文件**：`Core/Utils/LogRedactor.cs`（框架无关）、`UI.Avalonia/Dialogs/MarkdownHelpContent.axaml(.cs)`、`UI.Avalonia/Dialogs/HelpDialog.axaml(.cs)`、三语 `LogPrivacyHelp_Markdown`。
+
+### 历史归档
+
+#### 迁移阶段状态（截至 2026-10，历史）
+
+| Phase | 内容 | 状态 |
+|-------|------|------|
+| 0–9 | 项目骨架·浏览·预览·设置·压缩解压·编辑·样式·交互 | ✅ 已完成 |
+| 10 | WPF 功能补齐（进度条·信息面板·状态栏） | ✅ 已完成 |
+| UI 功能补齐 | 对话框·控件·转换器补齐 | 27/29 ✅（2 项待 GUI 验证） |
+| Shell/COM 集成 | ShellIntegration·ShellExt·文件关联·CLI | ✅ 已完成 |
+| i18n + 清理 | 缺失 key 补齐·空目录清理·版本对齐 | ✅ 已完成 |
+| HTML 预览升级 | 跨平台 WebView + ReverseMarkdown 降级 | 📋 待实施 |
+
+#### 已修复问题（历史记录）
+
+- **级联菜单 `CommandFlags=8` 隐藏项**：在 `ExtendedSubCommandsKey` 级联子菜单的动词上直接设 `ECF_SEPARATORBEFORE`（`CommandFlags=8`）会让这些项在部分 Windows 版本不显示；改用显式分隔符动词解决
+- **IPC 管道只接受一个连接**：`StartPipeServer` 原先只创建一个 `NamedPipeServerStream` 并 `WaitForConnectionAsync` 一次，选中 3+ 文件时第 3+ 个进程 `Connect()` 超时；改为 `while (!ct.IsCancellationRequested)` 循环、每客户端新建管道
+- **自动重命名时 `CompressConflictDialog` 弹两次**：点击「自动重命名」时 `Rename` 分支重建了 `CompressConflictDialog`；改为捕获首个对话框的 `CustomName` 直接使用，跳过第二次弹窗

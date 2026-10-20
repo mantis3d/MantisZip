@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — AGENTS.md 瘦身（800 → 305 行 / 62.4KB → 21.5KB，架构细节迁入 ARCHITECTURE.md）
+  - **动因**：AGENTS.md 已达 **62,367 字节 = 64KB 工作区指令预算的 95%**（ARCHITECTURE.md 早已有「自 AGENTS.md 迁出（2026-10-18）」节，但当时只加新文未删原文，两边重复）；且最重要的规则 0–18 排在文件后半段，长文档存在注意力稀释 / lost-in-the-middle 风险。
+  - **迁出**（→ `docs/ARCHITECTURE.md` 新增「实现细节补充（自 AGENTS.md 迁出，2026-10-20）」）：依赖流向、Engine pattern、进度上报契约、ZIP 压缩加速、ArchiveItem duality、ComputeDirectoryStats、ExtractPathResolver、SmartOpenPathResolver、MVVM + 派生属性集中通知、设置系统分类清单、预览子系统开发约定、CLI entry points 路由表、System icon helper、开发约束与历史踩坑（13 小节）、拖拽（drag-out / drag-in）、日志隐私脱敏、UI 样式与注释细节（ToggleIconBox 用法 / DataGrid·TreeView 行高示例 / AXAML 注释示例 / Shell 菜单项同步清单）、历史归档（迁移阶段状态表 + 已修复问题）。
+  - **删除重复**：AGENTS 中与 ARCHITECTURE 已存在且更详细的并行解压 / 7z MT / 预览 / Shell 四段原文。
+  - **规则区压缩**：规则 4/5/7/14/16/17 去掉示例与历史案例（示例移 ARCHITECTURE），**18 条规则全部保留、语义不变**。
+  - **保留**：Project overview、Quick start（并入 Build output + 无 CI / COM 锁提示）、Architecture 速查（约 10 行）、Version bump checklist、规则 0–18、未来工作。
+  - **验证**：AGENTS.md **305 行 / 21,461 字节（预算 32.7%）**；逐一核对 32 个关键标识符（ComputeDirectoryStats / ExtractPathResolver / SmartOpenPathResolver / LogRedactor / CommandFlags=8 / NamedPipeServerStream 等）均已存在于 ARCHITECTURE.md，无内容丢失；纯文档改动，无需构建。
+
 **2026-10-20** — 版本号升级 v0.5.3（6 处同步）+ RELEASE_NOTES 新建 v0.5.3 章节
   - **6 处版本同步**（AGENTS「Version bump checklist」）：`AppConstants.Version`、`MantisZip.UI.Avalonia.csproj <Version>`、`installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值、`docs/PLAN.md` 与 `docs/PROGRESS.md` 当前版本，全部 `0.5.2` → `0.5.3`。`docs/PROGRESS.md` 的「发布日期」字段自 0.5.1 起一直为占位值（历次升级均未改动，不在 checklist 内），本次保持不动。
   - **RELEASE_NOTES.md**：文件顶部新建 `## v0.5.3` 章节（与既有版本同构：文件说明中英 / 更新内容），两节内容——「启动画面 / Splash Screen」（原生启动画面、图标与动态文案、Win11 圆角）、「性能 / Performance」（主题重复加载消除 ~100ms、AppSettings 进程级缓存，合并为一条带 ①② 的启动速度优化）；文件名全部换成 0.5.3。
