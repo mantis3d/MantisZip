@@ -2,7 +2,7 @@
 
 > 将 MantisZip 发布到 Windows Package Manager (winget) 社区仓库。
 > **状态**: 📋 待执行 | **任务**: [⬜⬜⬜⬜⬜⬜] (0/6)
-> 创建日期：2026-07-10
+> 创建日期：2026-07-10 | 修正日期：2026-10-20（WebView2 依赖已于 v0.4.5 移除；CI token 改用环境变量传递；版本示例刷新）
 
 ## 动机
 
@@ -29,7 +29,7 @@ winget 提交需要选一个安装程序 URL。MantisZip 有两个版本：
 
 | 版本 | 文件 | 优点 | 缺点 |
 |------|------|------|------|
-| **WebSetup（框架依赖）** | `MantisZip-{version}-Setup-WebSetup.exe` | 体积小 (~3MB) | 需安装 .NET 10 Runtime + WebView2 —— 静默安装链可能超时 |
+| **WebSetup（框架依赖）** | `MantisZip-{version}-Setup-WebSetup.exe` | 体积小 (~3MB) | 需下载 .NET 10 Runtime（v0.4.5 起已不依赖 WebView2）——运行时缺失时安装器会弹自定义确认框并在线下载（`installer.iss` 的 `NextButtonClick`），`/SILENT` 静默链可能阻塞 |
 | **Offline（自包含）** 🔸 | `MantisZip-{version}-Setup-Offline.exe` | 自带 .NET 10，不依赖额外运行时下载 | 体积大 (~60MB) |
 
 **推荐用 Offline（自包含）版本**，因为 winget 验证环境不一定有 .NET 10 Runtime，自包含版通过率更高。
@@ -40,9 +40,9 @@ winget 提交需要选一个安装程序 URL。MantisZip 有两个版本：
 
 - [ ] **1. 创建 GitHub classic PAT**
   - GitHub → Settings → Developer settings → Personal access tokens → Tokens (classic)
-  - 勾选 `public_repo` 权限
-  - 将 token 添加到仓库 Secrets：`Settings → Secrets and variables → Actions`，命名为 `WINGETCREATE_TOKEN`
-  - 注意：fine-grained token 对 `wingetcreate submit` 无效
+  - 勾选 `public_repo` 权限；可选加 `delete_repo`（提交失败时 wingetcreate 自动删除临时 fork）
+  - 将 token 添加到仓库 Secrets：`Settings → Secrets and variables → Actions`，命名为 `WINGETCREATE_TOKEN`（Phase 2 的 CI job 经 `WINGET_CREATE_GITHUB_TOKEN` 环境变量引用它）
+  - 注意：fine-grained token 对 `wingetcreate submit` 无效（GitHub 平台层拦截，[winget-create#595](https://github.com/microsoft/winget-create/issues/595) 跟踪中）
 
 - [ ] **2. 生成 winget 清单文件**
 
@@ -52,14 +52,16 @@ winget 提交需要选一个安装程序 URL。MantisZip 有两个版本：
   # 安装 wingetcreate
   winget install wingetcreate
 
-  # 生成清单（替换版本号）
-  wingetcreate new "https://github.com/mantis3d/MantisZip/releases/download/v0.4.4/MantisZip-0.4.4-Setup-Offline.exe"
+  # 生成清单（版本号随 tag 变化，执行时以最新 tag 为准）
+  wingetcreate new "https://github.com/mantis3d/MantisZip/releases/download/v0.5.3/MantisZip-0.5.3-Setup-Offline.exe"
   ```
+
+  > ⚠️ wingetcreate 独立版（aka.ms 下载）依赖 .NET 6 Runtime + VC++ 运行库：GitHub `windows-latest` runner 已自带，本地手动执行时需自行确认。
 
   这会以交互方式提示输入元数据，完成后生成 3 个 YAML 文件：
 
   ```
-  manifests/m/MantisZip/MantisZip/0.4.4/
+  manifests/m/MantisZip/MantisZip/0.5.3/
   ├── MantisZip.yaml                # 版本文件
   ├── MantisZip.installer.yaml      # 安装器信息
   └── MantisZip.locale.en-US.yaml   # 本地化信息
@@ -81,14 +83,14 @@ winget 提交需要选一个安装程序 URL。MantisZip 有两个版本：
 - [ ] **3. 验证清单**
 
   ```powershell
-  winget validate --manifest manifests/m/MantisZip/MantisZip/0.4.4/
+  winget validate --manifest manifests/m/MantisZip/MantisZip/0.5.3/
   ```
 
 - [ ] **4. 提交 PR 到 microsoft/winget-pkgs**
 
   ```powershell
   # 方案 A：用 wingetcreate 自动提交
-  wingetcreate submit manifests/m/MantisZip/MantisZip/0.4.4/ --token <你的PAT>
+  wingetcreate submit manifests/m/MantisZip/MantisZip/0.5.3/ --token <你的PAT>
 
   # 方案 B：手动 fork + PR
   # fork https://github.com/microsoft/winget-pkgs
@@ -130,7 +132,9 @@ winget 提交需要选一个安装程序 URL。MantisZip 有两个版本：
       - name: Submit update to winget-pkgs
         shell: pwsh
         env:
-          GITHUB_TOKEN: ${{ secrets.WINGETCREATE_TOKEN }}
+          # 官方推荐的 CI 传递方式（wingetcreate 自动读取该环境变量；
+          # --token 参数可能把 token 记入日志，故不使用）
+          WINGET_CREATE_GITHUB_TOKEN: ${{ secrets.WINGETCREATE_TOKEN }}
         run: |
           $version = "${{ steps.version.outputs.VERSION }}"
           $url = "https://github.com/mantis3d/MantisZip/releases/download/v$version/MantisZip-$version-Setup-Offline.exe"
@@ -138,7 +142,7 @@ winget 提交需要选一个安装程序 URL。MantisZip 有两个版本：
             --version $version `
             --urls $url `
             --submit `
-            --token $env:GITHUB_TOKEN
+            --no-open
   ```
 
   之后每次推送 `v*` tag，CI 会自动：
