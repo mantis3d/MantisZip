@@ -88,6 +88,20 @@ internal static class NativeMethods
         uint fdwCharSet, uint fdwOutputPrecision, uint fdwClipPrecision,
         uint fdwQuality, uint fdwPitchAndFamily, string lpszFace);
 
+    // ── NativeSplash 图标 + Win11 圆角 ──
+
+    [DllImport("shell32.dll", EntryPoint = "ExtractIconExW", CharSet = CharSet.Unicode)]
+    public static extern uint ExtractIconEx(string lpszFile, int nIconIndex, nint[] phiconLarge, nint[] phiconSmall, uint nIcons);
+
+    [DllImport("user32.dll")]
+    public static extern bool DrawIconEx(nint hdc, int xLeft, int yTop, nint hIcon, int cxWidth, int cyHeight, uint istepIfAniCur, nint hbrFlickerFreeDraw, uint diFlags);
+
+    // DestroyIcon 已存在（Cursor API 段）——勿重复声明
+
+    // DPI：DWMWA_WINDOW_CORNER_PREFERENCE = 33，DWMWCP_ROUND = 2（Win10 无此属性，调用失败静默忽略）
+    [DllImport("dwmapi.dll")]
+    public static extern int DwmSetWindowAttribute(nint hwnd, uint attribute, ref int value, int size);
+
     [DllImport("user32.dll")]
     public static extern bool IntersectRect(out RECT lprcDst, ref RECT lprcSrc1, ref RECT lprcSrc2);
 
@@ -311,6 +325,9 @@ internal static class NativeMethods
     public const uint FW_SEMIBOLD = 600;
     public const uint FW_NORMAL = 400;
     public const uint DEFAULT_PITCH = 0;
+    public const uint DI_NORMAL = 0x0003;
+    public const uint DWMWA_WINDOW_CORNER_PREFERENCE = 33;
+    public const int DWMWCP_ROUND = 2;
 
     // Virtual screen bounds (works across all monitors)
     public const int SM_XVIRTUALSCREEN = 76;

@@ -22,6 +22,7 @@ internal static class NativeSplash
     private static readonly object Sync = new();
     private static Thread? _thread;
     private static nint _hwnd;
+    private static nint _hIcon;
     private static string _text = string.Empty;
     private static bool _dark;
     private static int _paintedAt;
@@ -138,6 +139,28 @@ internal static class NativeSplash
             NativeMethods.ShowWindow(hwnd, NativeMethods.SW_SHOWNOACTIVATE); // 不抢焦点
             NativeMethods.UpdateWindow(hwnd);
 
+            // Win11 圆角（DWMWCP_ROUND；Win10 无此属性 → 失败静默忽略，回退直角）
+            try
+            {
+                var pref = NativeMethods.DWMWCP_ROUND;
+                NativeMethods.DwmSetWindowAttribute(hwnd, NativeMethods.DWMWA_WINDOW_CORNER_PREFERENCE, ref pref, sizeof(int));
+            }
+            catch { }
+
+            // 应用图标（一次性从运行中的 exe 提取，沿用 <ApplicationIcon> 嵌入资源；失败则 Paint 退化为纯文本）
+            try
+            {
+                var exePath = Environment.ProcessPath;
+                if (!string.IsNullOrEmpty(exePath))
+                {
+                    var big = new nint[1];
+                    var small = new nint[1];
+                    if (NativeMethods.ExtractIconEx(exePath, 0, big, small, 1) > 0 && big[0] != nint.Zero)
+                        _hIcon = big[0];
+                }
+            }
+            catch { }
+
             if (_closePending) // Hide() 在窗口显示前就调用的抖动窗口场景
             {
                 NativeMethods.DestroyWindow(hwnd);
@@ -158,6 +181,7 @@ internal static class NativeSplash
         }
         finally
         {
+            if (_hIcon != nint.Zero) { NativeMethods.DestroyIcon(_hIcon); _hIcon = nint.Zero; }
             _hwnd = nint.Zero;
             lock (Sync) { _thread = null; }
         }
@@ -216,7 +240,8 @@ internal static class NativeSplash
 
             var dpi = NativeMethods.GetDpiForSystem();
             if (dpi <= 0) dpi = 96;
-            int fontHeight = -(int)((dpi / 96.0) * 22);
+            var scale = dpi / 96.0;
+            int fontHeight = -(int)(scale * 18);
 
             // Microsoft YaHei UI：简中系统默认 UI 字体，同时完整渲染拉丁字符
             var font = NativeMethods.CreateFont(
@@ -227,8 +252,39 @@ internal static class NativeSplash
                 "Microsoft YaHei UI");
             var oldFont = NativeMethods.SelectObject(hdc, font);
 
-            var rc = ps.rcPaint;
-            const uint fmt = NativeMethods.DT_CENTER | NativeMethods.DT_VCENTER | NativeMethods.DT_SINGLELINE | NativeMethods.DT_NOPREFIX;
+            int clientW = ps.rcPaint.Right - ps.rcPaint.Left;
+            int clientH = ps.rcPaint.Bottom - ps.rcPaint.Top;
+
+            // 图标尺寸（DPI 缩放；缺图标时按 0 处理 → 布局退化为纯文本）
+            int iconSize = (_hIcon != nint.Zero) ? (int)(scale * 32) : 0;
+            int gap = (_hIcon != nint.Zero) ? (int)(scale * 16) : 0;
+
+            // 先量文本宽（DRAWTEXT DT_CALCRECT），归出总宽再居中
+            var rcText = new NativeMethods.RECT { Left = 0, Top = 0, Right = 0, Bottom = clientH };
+            var rcCalc = rcText;
+            const uint calcFmt = NativeMethods.DT_LEFT | NativeMethods.DT_CALCRECT | NativeMethods.DT_SINGLELINE | NativeMethods.DT_NOPREFIX;
+            NativeMethods.DrawText(hdc, _text, _text.Length, ref rcCalc, calcFmt);
+            int textW = rcCalc.Right - rcCalc.Left;
+
+            int totalW = iconSize + gap + textW;
+            int startX = Math.Max(0, (clientW - totalW) / 2);
+            int centerY = clientH / 2;
+
+            // 图标左（垂直居中）
+            if (_hIcon != nint.Zero)
+            {
+                NativeMethods.DrawIconEx(hdc, startX, centerY - iconSize / 2, _hIcon, iconSize, iconSize, 0, nint.Zero, NativeMethods.DI_NORMAL);
+            }
+
+            // 文字右（左对齐 + 垂直居中）
+            var rc = new NativeMethods.RECT
+            {
+                Left = startX + iconSize + gap,
+                Top = 0,
+                Right = clientW,
+                Bottom = clientH,
+            };
+            const uint fmt = NativeMethods.DT_LEFT | NativeMethods.DT_VCENTER | NativeMethods.DT_SINGLELINE | NativeMethods.DT_NOPREFIX;
             NativeMethods.DrawText(hdc, _text, _text.Length, ref rc, fmt);
 
             NativeMethods.SelectObject(hdc, oldFont);
