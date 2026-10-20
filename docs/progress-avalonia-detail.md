@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 原生 Win32 启动 Splash 实施完成（`startup-native-splash.md` 归档，commit `c5fd2df`）
+  - **新增** `Services/NativeSplash.cs`：独立后台线程（`IsBackground = true` 保进程可退出）+ 全独立消息泵（`GetMessage` 阻塞泵、0 CPU 待机）+ GDI 文本绘制（灰度配色规避 BGR 序歧义、Microsoft YaHei UI 22dp、DPI 缩放）+ `MinShowMs=300` 最短显示防闪烁（等待在 splash 泵线程，不阻塞 UI）+ `OperatingSystem.IsWindows()` 跨平台护栏 + 全 try-catch 静默降级；WS_EX_TOOLWINDOW/TOPMOST/NOACTIVATE——不抢焦点、不进任务栏。
+  - **服务**（`Program.Main`）：非 UI 命令秒退（`--install-shell`/`--uninstall-shell`/`--install-assoc`/`--uninstall-assoc`/`--help`/`-h`/`--test`）不显示；其 余（无参 + 全 CLI 慢路径）显示——文案按 `AppSettings.Language` 重载 `LocalizationManager` + 启动方式映射 key（`Status_Starting` 新增三语「正在启动…」/深色据 `Theme`）。
+  - **接线**（`App.axaml.cs`）：8 类终端窗口统一 `NativeSplash.Hook(window)` → `Opened` 时 `Hide()`（无参/`--open`/`--open-dispatch` open+fallback/default 三分支/`--extract` ExtractSettingsWindow/`ProgressWindow` ×3/`--compress` CompressSettingsWindow/`Progress_Batch_Title`/`CompressProgress`）；`CollectingWindow` 保留为降级兜底（无删除）。
+  - **P/Invoke 增量**（`Services/NativeMethods.cs`）：PostMessageW/GetMessage/PostQuitMessage/GetClientRect/FillRect/SetProcessDpiAwarenessContext/GetDpiForSystem/SetTextColor/CreateFontW + 若干常量；`WNDCLASSEX` 两 string 字段改 `nint` 并删 `CharSet.Unicode`（见教训）。
+  - **调试踩坑实录**（对后续任何 Win32 窗口类实现都适用）：① `RegisterClassEx` 默认解析为 ANSI 版 → 用 Unicode 名称查找失败 `1407 ERROR_CANNOT_FIND_WND_CLASS`；② 给 `WNDCLASSEX` struct 加 `CharSet.Unicode` + `GetClassInfoEx`（string 字段 ref-marshaling 指针被 native 填写后 CLR 以垃圾指针释放）→ **`ntdll 0xC0000374 HEAP_CORRUPTION` 静默退进程（无 debug.log 无 lifecycle，靠 Windows Application Error 事件 1026 定位）**；③ **终版方案**：类名 `Marshal.StringToHGlobalUni` → nint 指针传入 `WNDCLASSEX.lpszClassName` / `CreateWindowEx.lpClassName`（创建后即可 Free），彻底绕开壳 marshaling 不确定性——**一次通过且稳定**。
+  - **冒烟实测**：splash 窗口 `MantisZipNativeSplash` 全枚举可见（~196ms 出现）；无参冷启动 splash → 主窗 Opened → splash ~1.2s 自动消失；`--test` 路径确认无 splash（skip 生效）；进程 4s 存活 + debug.log 无 ERROR 行。
+  - **文档同步**：计划归档；GUI 手动验收清单（焦点/任务栏/DPI/CLI `--compress`/`--open` 全链路/语言切换）已列出待人工。
+
 **2026-10-19** — 启动优化三期完成：AppSettings 进程级缓存（`startup-appsettings-cache.md` 归档）
   - **实现**（`Models/AppSettings.cs:271+`，commit `a96db21`）：`Load()`/`Save()` 静态缓存（lock + `_cached`，72 处调用点零改造）——cache 每进程只读盘一次；`Save()` 落盘成功后把被保存实例写回缓存（外部可见值与内存一致）；损坏文件异常分支不缓存（下次重试）、文件不存在缓存默认值、Save 失败不动缓存；`ResetCacheForTests()` internal 测试钩子（沿 `StartupTimer.ResetForTest` 的 InternalsVisibleTo 惯例）。
   - **TDD**：新增 `AppSettingsCacheTests` 2 条（Load 同实例 / Reset 后新实例+镜像值）先败后成；全量 `-c Release` **308 总 / 301 过 / 3 跳过 / 4 失败**（4 失败全部为预存 corpus 语料缺失的 `WholeArchiveErrorLocalizerTests`，**新增失败 = 0**）；`--test` 冒烟无 ERROR。

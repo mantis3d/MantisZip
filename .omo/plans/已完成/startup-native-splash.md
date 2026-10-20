@@ -149,6 +149,16 @@ Program.Main
    全程无 >500ms 的完全无反馈期
 3. `--open <大压缩包>` 冷启动：splash → MainWindow + 加载遮罩，无缝衔接
 4. `--install-shell` / `--help` 等非 UI 命令：无 splash，秒退行为与现状一致
+
+## 实施结果（2026-10-20 回填）
+
+**状态**： ✅ 核心已实施并冒烟验证（commit `c5fd2df`）
+
+- **交付**：`Services/NativeSplash.cs`（独立后台线程 + 独立消息泵 + GDI 绘制 + `OperatingSystem.IsWindows()` 跨平台护栏 + 静默降级 try-catch）、`NativeMethods.cs` 新增 8 个 P/Invoke（PostMessage/GetMessage/PostQuitMessage/GetClientRect/FillRect/SetProcessDpiAwarenessContext/GetDpiForSystem/SetTextColor/CreateFont）+ 新常量、`Program.Main` 非 UI 命令判定（`--install-shell/--uninstall-shell/--install-assoc/--uninstall-assoc/--help/-h/--test` 秒退不显示）+ 扩展名判定 + 启动 splash（文字按 Language + 启动方式 key 选，主题色据 `AppSettings.Theme`）、`App.axaml.cs` 8 类终端窗口统一 `NativeSplash.Hook(window)`（ epidemiology per 表：无参/`--open`/`--open-dispatch` 3 分支/default/`--extract`/`--extract-here`/`--compress`/`--compress-*-`...）、新 `Status_Starting` key 三语成对添加
+- **冒烟实测（Release 构建）**：`--test` 不显示 splash（skip 路径算定）；无参冷启动：splash `MantisZipNativeSplash` 顶层出现 **196ms**（<500ms 门控 ✓）→ 主窗出现 → **~1.2s 时熄灭**（Opened 钩子 + MinShowMs 300ms 抑制闪烁）→ 进程稳定存活 ✓
+- **调试教训（重要！）**：① `NativeMethods.RegisterClassEx` 默认路径解析到 `RegisterClassExA`—— 用 `Sprite` 注册的类与 CreateWindowExW 查找不匹配，`lastErr=1407 ERROR_CANNOT_FIND_WND_CLASS`；② **带 `CharSet.Unicode` 的 string 字段 struct + `GetClassInfoEx`（读出 LPWSTR 的 ref-marshaling 时释放垃圾指针）→ `ntdll 0xC0000374 HEAP_CORRUPTION` 静默退进程（无 debug.log 无 lifecycle）**——共复查 5 次 WER 才定位；③ **最终可靠方案 = 全部窗口名以 `Marshal.StringToHGlobalUni` 生成 nint 指针传入**（WNDCLASSEX.lpszClassName / CreateWindowEx.lpClassName 类型改 `nint`，彻底绕开 C# string 壳的 marshaling 不确定性——同样正确适用于自定义 Win32 窗口类场景）
+- **GUI 手动验收清单（待做）**：焦点不抢（焦点直达真实窗口）/任务栏不显示/`--compress <目录>` 全链路 /`--open <压缩包>` 全链路/最短显示时长/150-200% DPI 清晰/语言切换后 splash 文案
+- **对已有沉浸式的全部承接**：无参数启动 → splash「正在启动…」；CLI 慢路径逐场景 key 对应；关闭时机在该 CLI 自有「终端窗口」出现时（CollectingWindow 保留为降级兜底）
 5. splash 不抢焦点（焦点直达真实窗口）、不进任务栏、不闪烁（最短显示时长生效）
 6. 高 DPI（150%/200%）下 splash 尺寸/文字清晰
 7. `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 通过
