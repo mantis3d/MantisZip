@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-17  
+**最后更新**: 2026-10-20  
 **当前版本**: 0.5.2
 
 ---
@@ -66,6 +66,7 @@
 | **P2** | ~~密码错误 vs 文件损坏精准分类~~ | [password-error-classification.md](.omo/plans/已完成/password-error-classification.md) | ✅已完 | 3-4h | ✅ 已完成：`PasswordVerificationResult` 四态 + `PasswordVerifyInfo` + `TryMatchPasswordEx` 按 HRESULT/异常类型分类，损坏文件不再误报"密码错误"，密码库匹配遇损坏立即停止 |
 | **P2** | NuGet 依赖升级（Markdig/SharpCompress/SkiaSharp/Svg.Skia） | [nuget-dependency-upgrade.md](.omo/plans/未开始/nuget-dependency-upgrade.md) | 🟡中 | 3-5h | 四库落后较多需升级：Markdig 0.40→1.3（P1 立即可做）、SharpCompress 0.48→0.50（P2 需验证 API）、SkiaSharp 3.x→4.x + Svg.Skia 2.x→5.x（P3 等上游适配）；影响 new-format-support/compression-performance/preview-extended-formats/cross-platform-port 等计划 |
 | **P2** | 自研 ZIP 引擎（Per-entry 压缩 + 多线程） | [custom-zip-engine.md](.omo/plans/未开始/custom-zip-engine.md) | 🟡中 | 5-6天 | Per-entry 压缩级别/方法控制（产品卖点）+ 多线程并行压缩；纯 .NET 实现（DeflateStream），零外部依赖；支持 AES-256 加密；后续可开源为独立库 ZipPerEntry |
+| **P2** | 文本/ZIP 注释回退编码策略（非中文 locale GBK 乱码 + copy-mode 注释损坏） | [text-fallback-encoding-policy.md](.omo/plans/进行中/text-fallback-encoding-policy.md) | 🟡中 | 4-6h | 🟡 **Phase 1（A1+A3）已实施 2026-10-20**，Phase 2（可配置回退代码页）待定。原立项背景：CI（en-US runner）暴露 `ZipCommentHelper` 回退代码页取 `CultureInfo.CurrentCulture.TextInfo.ANSICodePage`（en-US=1252）→ GBK 注释乱码 `»¶Ó­Ê¹ÓÃ±¾Ñ¹Ëõ°ü`；同时发现 `ZipBinaryRewriter.ReadEocd` 用 `Encoding.UTF8.GetString`（**不抛异常**，`catch` 为死代码）+ `Encoding.Default`（.NET Core 恒 UTF-8）→ copy-mode 重写把 GBK 注释写成 U+FFFD，属**数据损坏**。已实施：①注释新增 `DecodeComment`（严格 UTF-8 → **严格 GB18030** → 宿主 ANSI，GB18030 必须用异常回退——其默认解码器把截断序列静默换成 `?` 而非 U+FFFD）；②`ReadEocd`/`WriteEocd` 改**字节透传**；③测试侧 `zh-CN` pin 反转为**故意 en-US**。验证 Core 717/1skip/0fail、Avalonia 306/3skip/0fail。否决全局候选打分（Western 文本 `café` 类字节被 GBK 解成 CJK 且无 U+FFFD，无法可靠区分） |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **P2** | 跨平台移植（macOS / Linux） | [cross-platform-port.md](.omo/plans/未开始/cross-platform-port.md) | 🟡中大 | 6-8周 | ✅ WPF→Avalonia 迁移已完成（Phases 0-10）；实施计划含 Phase 0 基础设施（CI+路径适配）→ Phase 1 引擎适配（7z/RAR 跨平台）→ Phase 2 UI 适配（macOS/Linux 专项）→ Phase 3 打磨发布；需要决策：7z 压缩策略（禁用/p7zip CLI）、拖拽解压降级、右键菜单取舍 |
 
