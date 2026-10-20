@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 大文件拆分阶段 2：`ZipEngine.cs`（4428 行）→ 主干 193 行 + 4 个 partial
+  - **切分**（纯移动，零行为变化）：`ZipEngine.Open.cs`（238 行，`OpenArchiveWithEncodingFallback` + 编码探测 `ResolveFileNameEncoding`/`ZipHasUtf8Flag`/`LooksLikeValidCjk`）、`ZipEngine.Extract.cs`（1494 行，`ExtractAsync` 串行/并行 + `ExtractEntriesAsync` 串行/并行 + `MonotonicProgress`）、`ZipEngine.Compress.cs`（676 行，`CompressAsync` + `CleanupSplitFiles` + `MapCompressionLevelToS7Z`/`MapZipMethodToS7Z`）、`ZipEngine.CompressGroup.cs`（1923 行，`AddToArchiveAsync`/`DeleteEntriesAsync`/`ReadFileWithRetry`/`SplitCompressGroup`/多线程资格判定/`CompressGroupWithSevenZip`/`ResolveParallelCompressDegree`/CRC 校验辅助）；主干保留类声明/`CopyBufferSize`/`CanHandle`/`CanAdd`/`CanDelete`/`SupportsParallelExtract`/`ListEntriesAsync`/`TestArchiveAsync`。
+  - **行数守恒**：4428 旧行 = 4524 新行 − 4×24 行 partial 头部，零内容丢失；`public class ZipEngine` 改 `public partial class ZipEngine`。
+  - **并行解压锁竞争雷区**（曾有 25x 退化事故）原样搬动，未触碰内部逻辑。
+  - **验证**：Core 构建 0 警告 0 错误、UI 构建 0 警告 0 错误；Core 测试 **747 总 / 744 过 / 3 跳过 / 0 失败**。
+
 **2026-10-20** — 大文件拆分阶段 1：`App.axaml.cs`（2507 行）→ 主干 600 行 + 4 个 partial
   - **切分**（纯移动，零行为变化）：`App.Theming.cs`（263 行，Theme/Font/Compactness 的 Apply/Refresh）、`App.CliExtract.cs`（937 行，`ResolveCliPassword` → `RunCliDirectExtractBatchAsync` 解压族）、`App.CliInfra.cs`（286 行，`HandleShellCommand`/`IsDirectoryWritable`/`IsElevated`/`RestartAsAdmin`/`HandleElevationAsync`/`StartPipeServer`/`SendPathsThroughPipe`）、`App.CliCompress.cs`（565 行，`HandleCompress*` → `CompressWithProgress` → `FindCommonParent`/`IsDriveRoot`）；主干保留字段/`Initialize`/`OnFrameworkInitializationCompleted`/CLI 帮助与 `--test`/7z.dll 解析/DebugLog。
   - **行数守恒**：2507 旧行 = 2651 新行 − 4×36 行 partial 头部（using 块 + namespace + 类声明），零内容丢失。
