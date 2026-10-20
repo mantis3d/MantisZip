@@ -15,6 +15,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MantisZip.ShellExt", "src\M
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MantisZip.UI.Avalonia", "src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj", "{6734921C-82C4-4432-9DC4-0E7C09C1945A}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "MantisZip.UI.Avalonia.Tests", "tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj", "{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -73,6 +75,18 @@ Global
 		{6734921C-82C4-4432-9DC4-0E7C09C1945A}.Release|x64.Build.0 = Release|Any CPU
 		{6734921C-82C4-4432-9DC4-0E7C09C1945A}.Release|x86.ActiveCfg = Release|Any CPU
 		{6734921C-82C4-4432-9DC4-0E7C09C1945A}.Release|x86.Build.0 = Release|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Debug|x64.ActiveCfg = Debug|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Debug|x64.Build.0 = Debug|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Debug|x86.ActiveCfg = Debug|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Debug|x86.Build.0 = Debug|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Release|x64.ActiveCfg = Release|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Release|x64.Build.0 = Release|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Release|x86.ActiveCfg = Release|Any CPU
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F}.Release|x86.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -82,5 +96,6 @@ Global
 		{83680512-FFDC-4128-AF41-AB1DD4C06F48} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 		{8C98FFE3-31AC-4D29-8371-D955FD427D39} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
 		{6734921C-82C4-4432-9DC4-0E7C09C1945A} = {827E0CD3-B72D-47B6-A68D-7590B98EB39B}
+		{EC228936-0282-434E-8F2B-9DA3CBDB4D6F} = {0AB3BF05-4346-4AA6-1389-037BE0695223}
 	EndGlobalSection
 EndGlobal

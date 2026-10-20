@@ -47,6 +47,9 @@ packages/
 Thumbs.db
 # Build artifacts
 *.zip
+# 例外：测试语料必须入库（上面的 *.zip 是构建产物通配，曾误吞 19 个 zip 语料，
+# 导致 CI 上 WholeArchiveErrorLocalizerTests 3 条用例因文件缺失而失败）
+!tests/corpus/**/*.zip
 
 # Agent temp files
 .omo/tmp_*

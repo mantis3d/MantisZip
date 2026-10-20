@@ -2433,6 +2433,13 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.2 (2026-10-20) CI 补齐 Avalonia 测试项目，修复 gbk 编码注册的测试顺序依赖
+  - **CI 缺口**：`MantisZip.sln` 只含 `tests/MantisZip.Tests`，而 `tests/MantisZip.UI.Avalonia.Tests`（xunit v3，309 条）只存在于磁盘 —— 查 `MantisZip.sln` 历史确认**从未被加入过**。CI 的 `dotnet restore/build/test` 均在仓库根目录执行，因此 Avalonia 测试**从未在 CI 上跑过**。修复：`dotnet sln add tests\MantisZip.UI.Avalonia.Tests\... --solution-folder tests`（复用已有 `tests` 解决方案文件夹），`ci.yml` 无需改动。
+  - **补跑后暴露的语料缺失**：干净检出下 `MantisZip.UI.Avalonia.Tests.WholeArchiveErrorLocalizerTests` 3 条失败（`Actual: 找不到文件：...corrupt-01-truncated-tail.zip`）。根因是 `.gitignore` 的构建产物通配 `*.zip` 误吞了 `tests/corpus/corrupt-archives/` 下 **19 个 zip 语料**（同目录 48 个 `.7z/.tar.gz/.rar` 等均已入库，`README.txt` 明确该目录为入库测试语料）。修复：`.gitignore` 增加 `!tests/corpus/**/*.zip` 例外并补入 19 个语料（合计约 300 KB）。
+  - **gbk 编码顺序依赖**：`ZipBinaryRewriterMultiSourceTests` 自身不注册 `CodePagesEncodingProvider`，依赖其它测试类构造函数里的零散注册「顺带」生效；而 `ZipBinaryRewriter.ReadCentralDirectory`（`ZipBinaryRewriter.cs:201`）直接 `Encoding.GetEncoding("gbk")` → xUnit 并行调度顺序一变即抛 `ArgumentException: 'gbk' is not a supported encoding name`（CI 上 6 条失败；单类隔离跑稳定复现 8 条）。修复：新增 `tests/MantisZip.Tests/TestAssemblySetup.cs`，用 `[ModuleInitializer]` 在程序集加载期注册，彻底消除顺序依赖。生产侧无改动（`App.axaml.cs:62` 本就在启动时注册）。
+  - **验证（模拟 CI：干净 worktree + `ci.yml` 原命令 + `CI=true`）**：restore/build 0 错误；`dotnet test --no-restore -c Release --filter "FullyQualifiedName!~SevenZipEngine"` → **MantisZip.Tests 710 通过 / 1 跳过** + **UI.Avalonia.Tests 306 通过 / 3 跳过**，合计 **1016 通过 / 4 跳过 / 0 失败**，退出码 0；连跑 3 次全绿。
+  - **注**：`MantisZip.UI.Avalonia.Tests` 的 `SourceArchiveValidationTests` / `WholeArchiveErrorLocalizerTests` 依赖 `tests/corpus` 真实语料，语料缺失时表现为**失败而非跳过**——本次通过补语料解决，未加 skip 分支。
+
 #### v0.5.2 (2026-10-20) 修复 CI 上两处测试失败：MT 进度断言竞态 + 磁盘类型检测环境假设
   - **失败 1 `ZipEngineTests.CompressAsync_MultiThreaded_ReportsProgress`（期望 100，实际 99.599999999999994）**：根因在测试侧——用 `Progress<T>` 收集进度，无 `SynchronizationContext` 时回调投递到线程池，**既不保证顺序也不保证 `CompressAsync` 返回前全部送达**，「取最后一条」本身就是竞态。99.6 可精确反推：合并适配器 `groupEndPercent(95) + 5 × 0.92 = 99.6`，即 `ZipBinaryRewriter` 的 92% 中间报告（`ZipEngine.cs:2049-2053`）晚于终态 100（`ZipEngine.cs:2090`）到达。修复：改用同文件已有的 `SyncProgress<T>`（同步回调；兄弟测试 `CompressAsync_MultiThreaded_MirrorPhase_AdvancesOverallProgress` 早前即为此引入），断言不变。
   - **失败 2 `DiskTypeDetectorTests.GetDiskType_LocalFixedDrive_DetectsSsdOrHdd`（返回 Unknown）**：GitHub Actions 临时卷不支持 `IOCTL_STORAGE_QUERY_PROPERTY(SeekPenalty)`，`DiskTypeDetector.QuerySeekPenalty` 对此合法返回 `Unknown`（`ParallelDegreeResolver.cs:122-124` 已有保守兜底），测试却把「本机固定盘必检出」当硬约束。修复：Windows 上 `Unknown` 时直接返回并注明云 CI 属预期降级，否则断言 `Ssd/Hdd`。**生产代码未改**。
