@@ -222,6 +222,7 @@ public partial class App : Application
             {
                 // No args: normal UI startup
                 desktop.MainWindow = new MainWindow();
+                Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口首帧关 splash
             }
             else
             {
@@ -234,6 +235,7 @@ public partial class App : Application
                     case "--open":
                         // Open archive in MainWindow
                         desktop.MainWindow = new MainWindow();
+                        Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash（加载遮罩 B 接管后续反馈）
                         if (!string.IsNullOrEmpty(path) && File.Exists(path))
                         {
                             var mainWindow = (MainWindow)desktop.MainWindow;
@@ -260,6 +262,7 @@ public partial class App : Application
                                     break;
                                 default: // "open"
                                     desktop.MainWindow = new MainWindow();
+                                    Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash
                                     var mainWindow = (MainWindow)desktop.MainWindow;
                                     mainWindow.LoadArchiveOnStartup(path);
                                     break;
@@ -268,6 +271,7 @@ public partial class App : Application
                         else
                         {
                             desktop.MainWindow = new MainWindow();
+                            Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash
                         }
                         break;
 
@@ -365,6 +369,7 @@ public partial class App : Application
                         // Unknown args: just show UI
                         DebugLog($"警告: 无法识别的命令行参数 '{command}'。使用 --help 查看可用命令。");
                         desktop.MainWindow = new MainWindow();
+                        Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash
                         break;
                 }
             }
@@ -1126,6 +1131,7 @@ public partial class App : Application
             // 窗口秒现后由窗口自身在 Loaded 逐包后台校验（ListEntriesAsync 只读头部索引），
             // 行内徽标实时回写 ✓/🔒/⚠️；预览树跟随选中行，损坏/需密码包显示对应占位。
             var dialog = new ExtractSettingsWindow(existing);
+            Services.NativeSplash.Hook(dialog); // startup-native-splash：终端窗口出现即关 splash
 
             // CLI 模式没有主窗口，无法用 ShowDialog(owner)，改用非模态 Show + Closed 事件等待结果。
             // 同时必须把 ShutdownMode 改为 OnExplicitShutdown：默认 OnLastWindowClose 会在弹窗
@@ -1185,6 +1191,7 @@ public partial class App : Application
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Title_Extract"));
+        Services.NativeSplash.Hook(progressWindow); // startup-native-splash：进度窗即终端窗口
         progressWindow.InitCancellation();
         progressWindow.Show();
         desktop.MainWindow = progressWindow;
@@ -1351,6 +1358,7 @@ public partial class App : Application
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Title_Extract"));
+        Services.NativeSplash.Hook(progressWindow); // startup-native-splash：进度窗即终端窗口
         progressWindow.InitCancellation();
         progressWindow.Show();
         desktop.MainWindow = progressWindow;
@@ -1539,6 +1547,7 @@ public partial class App : Application
         desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
 
         var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Title_Extract"));
+        Services.NativeSplash.Hook(progressWindow); // startup-native-splash：进度窗即终端窗口
         progressWindow.InitCancellation();
         progressWindow.Show();
         desktop.MainWindow = progressWindow;
@@ -2035,6 +2044,7 @@ public partial class App : Application
     private static async Task ShowCompressDialogAndRun(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
     {
         var dlg = new CompressSettingsWindow(paths);
+        Services.NativeSplash.Hook(dlg); // startup-native-splash：终端窗口出现即关 splash
 
         // 压缩流程是否已接管（接管后由 CompressWithProgress 负责退出进程，这里不再退出）
         bool compressStarted = false;
@@ -2156,6 +2166,7 @@ public partial class App : Application
 
         // 立即显示进度窗口，避免 IPC 收集期间用户无反馈（对齐 WPF HandleCompressSeparate）
         var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Batch_Title"));
+        Services.NativeSplash.Hook(progressWindow); // startup-native-splash：进度窗即终端窗口
         progressWindow.InitCancellation();
         progressWindow.Show();
         desktop.MainWindow = progressWindow;
@@ -2339,6 +2350,7 @@ public partial class App : Application
         }
 
         var progressWindow = existingWindow ?? new ProgressWindow(title);
+        Services.NativeSplash.Hook(progressWindow); // startup-native-splash：进度窗即终端窗口
         // Task 6: 压缩流程标记 → 详细面板显示「压缩通道」说明行（Store 类文件不占通道）
         progressWindow.IsCompressFlow = true;
         if (existingWindow == null)

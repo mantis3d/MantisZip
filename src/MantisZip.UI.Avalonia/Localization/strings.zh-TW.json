@@ -1,4 +1,5 @@
 {
+  "Status_Starting": "正在啟動…",
   "Progress_WriteFailed_Fmt": "有 {0} 個檔案未能寫入到 {1}",
   "Status_OperationFailed": "操作失敗",
   "Progress_FailedBreakdown_Fmt": "共 {0} 個失敗：{1}",

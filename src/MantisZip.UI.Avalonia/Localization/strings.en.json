@@ -1,4 +1,5 @@
 ﻿{
+  "Status_Starting": "Starting…",
   "Progress_WriteFailed_Fmt": "{0} file(s) failed to write to {1}",
   "Status_OperationFailed": "Operation failed",
   "Progress_FailedBreakdown_Fmt": "{0} failed: {1}",

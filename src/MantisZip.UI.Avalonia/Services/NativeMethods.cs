@@ -53,6 +53,41 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern int GetSystemMetrics(int nIndex);
 
+    // ── NativeSplash（startup-native-splash 计划）──
+
+    [DllImport("user32.dll", SetLastError = true, EntryPoint = "PostMessageW")]
+    public static extern bool PostMessage(nint hWnd, uint Msg, nint wParam, nint lParam);
+
+    [DllImport("user32.dll")]
+    public static extern int GetMessage(out MSG lpMsg, nint hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
+
+    [DllImport("user32.dll")]
+    public static extern void PostQuitMessage(int nExitCode);
+
+    [DllImport("user32.dll")]
+    public static extern bool GetClientRect(nint hWnd, out RECT lpRect);
+
+    [DllImport("user32.dll")]
+    public static extern int FillRect(nint hDC, ref RECT lprc, nint hbr);
+
+    // DPI 上下文值：-4 = PER_MONITOR_AWARE_V2（重复调用失败无碍，仅首个生效方有效）
+    [DllImport("user32.dll")]
+    public static extern bool SetProcessDpiAwarenessContext(nint value);
+
+    [DllImport("user32.dll")]
+    public static extern int GetDpiForSystem();
+
+    // ── gdi32（splash 文本绘制）──
+
+    [DllImport("gdi32.dll")]
+    public static extern uint SetTextColor(nint hdc, uint color);
+
+    [DllImport("gdi32.dll", EntryPoint = "CreateFontW", CharSet = CharSet.Unicode)]
+    public static extern nint CreateFont(int nHeight, int nWidth, int nEscapement, int nOrientation,
+        uint fnWeight, uint fdwItalic, uint fdwUnderline, uint fdwStrikeOut,
+        uint fdwCharSet, uint fdwOutputPrecision, uint fdwClipPrecision,
+        uint fdwQuality, uint fdwPitchAndFamily, string lpszFace);
+
     [DllImport("user32.dll")]
     public static extern bool IntersectRect(out RECT lprcDst, ref RECT lprcSrc1, ref RECT lprcSrc2);
 
@@ -83,14 +118,16 @@ internal static class NativeMethods
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool ShowWindow(nint hWnd, int nCmdShow);
 
-    [DllImport("user32.dll", SetLastError = true, EntryPoint = "CreateWindowExW")]
+    // 显式 W（A/W 不一致会导致 CreateWindowExW 找不到类，lastErr=1407）
+    // lpszClassName 经全局指针传入（nint），绕开 C# string marshaling 不确定性
+    [DllImport("user32.dll", SetLastError = true, EntryPoint = "RegisterClassExW")]
+    public static extern ushort RegisterClassEx(ref WNDCLASSEX lpwcx);
+
+    [DllImport("user32.dll", EntryPoint = "CreateWindowExW")]
     public static extern nint CreateWindowEx(
-        uint dwExStyle, string lpClassName, string lpWindowName,
+        uint dwExStyle, nint lpClassName, nint lpWindowName,
         uint dwStyle, int x, int y, int nWidth, int nHeight,
         nint hWndParent, nint hMenu, nint hInstance, nint lpParam);
-
-    [DllImport("user32.dll", SetLastError = true)]
-    public static extern ushort RegisterClassEx(ref WNDCLASSEX lpwcx);
 
     [DllImport("user32.dll", SetLastError = true)]
     public static extern bool DestroyWindow(nint hWnd);
@@ -250,10 +287,30 @@ internal static class NativeMethods
     public const uint SRCCOPY = 0x00CC0020;
     public const uint WM_DESTROY = 0x0002;
     public const uint WM_PAINT = 0x000F;
+    public const uint WM_CLOSE = 0x0010;
+    public const uint WM_QUIT = 0x0012;
     public const uint WM_NCCALCSIZE = 0x0083;
     public const uint WM_NCHITTEST = 0x0084;
     public const uint DT_LEFT = 0x0000;
+    public const uint DT_CENTER = 0x0001;
+    public const uint DT_VCENTER = 0x0004;
+    public const uint DT_SINGLELINE = 0x0020;
+    public const uint DT_NOPREFIX = 0x0800;
     public const int TRANSPARENT = 1;
+    public const uint WS_VISIBLE = 0x10000000;
+    public const uint WS_EX_TOPMOST = 0x00000008;
+    public const uint CS_HREDRAW = 0x0002;
+    public const uint CS_VREDRAW = 0x0001;
+    public const int SW_SHOWNOACTIVATE = 4;
+    public const uint PM_REMOVE = 1;
+    public const int SM_CXSCREEN = 0;
+    public const int SM_CYSCREEN = 1;
+    public const uint IDC_ARROW = 32512;
+    public const uint DEFAULT_CHARSET = 1;
+    public const uint CLEARTYPE_QUALITY = 5;
+    public const uint FW_SEMIBOLD = 600;
+    public const uint FW_NORMAL = 400;
+    public const uint DEFAULT_PITCH = 0;
 
     // Virtual screen bounds (works across all monitors)
     public const int SM_XVIRTUALSCREEN = 76;
@@ -319,8 +376,8 @@ internal static class NativeMethods
         public nint hIcon;
         public nint hCursor;
         public nint hbrBackground;
-        public string? lpszMenuName;
-        public string lpszClassName;
+        public nint lpszMenuName;
+        public nint lpszClassName;
         public nint hIconSm;
     }
 
