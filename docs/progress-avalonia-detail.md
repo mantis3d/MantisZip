@@ -6,6 +6,10 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 版本号升级 v0.5.3（6 处同步）+ RELEASE_NOTES 新建 v0.5.3 章节
+  - **6 处版本同步**（AGENTS「Version bump checklist」）：`AppConstants.Version`、`MantisZip.UI.Avalonia.csproj <Version>`、`installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值、`docs/PLAN.md` 与 `docs/PROGRESS.md` 当前版本，全部 `0.5.2` → `0.5.3`。`docs/PROGRESS.md` 的「发布日期」字段自 0.5.1 起一直为占位值（历次升级均未改动，不在 checklist 内），本次保持不动。
+  - **RELEASE_NOTES.md**：文件顶部新建 `## v0.5.3` 章节（与既有版本同构：文件说明中英 / 更新内容），三节内容——「启动画面 / Splash Screen」（原生启动画面、图标 + 动态文案、Win11 圆角）、「启动速度 / Faster Startup」（ApplyTheme 重复加载修复 ~100ms、AppSettings 进程级缓存）、「修复 / Fixes」（splash 后主窗口被既有窗口遮挡）；文件名全部换成 0.5.3。
+
 **2026-10-20** — Splash 修复：主窗口启动后被既有窗口糊住（前台激活时序）
   - **现象（用户报告）**：splash 消失后主窗留在 z-order 后层，被启动前最大化的其他应用完全遮挡；所有启动方式（双击 exe / CLI / 右键）均复现，splash 之前无此问题，任务栏可拉起。
   - **根因链**：Windows 把「进程启动后第一个可见窗口」的前台激活机会给了 splash，但 splash 是 `WS_EX_NOACTIVATE`（不抢键盘焦点的设计初衷）不接激活；splash 销毁时系统把前台回落给既有前台窗口；Avalonia `Window.Show()` 只显示不 `SetForegroundWindow`——主窗因此无前台。**探针取证**：启动后前台窗口仍是环境窗口（pid=36400），`MantisZip` 主窗 `isfg=False`、可见、未最小化，与假设完全吻合。

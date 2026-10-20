@@ -3,7 +3,7 @@
 
 #define MyAppName "MantisZip"
 #ifndef MyAppVersion
-#define MyAppVersion "0.5.2"
+#define MyAppVersion "0.5.3"
 #endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/mantis3d/MantisZip"
