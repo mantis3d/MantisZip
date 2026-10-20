@@ -44,8 +44,7 @@
   "Progress_Tooltip_Ratio": "Ratio",
   "Progress_Stats_TotalSize": "Total size {0}",
   "Progress_Preparing": "Preparing…",
-  "Compress_ParallelDegree": "Parallel compress groups",
-  "Compress_ParallelDegree_Hint": "(N parallel compressors; set to 1 to match Multi-threaded above)",
+  "Compress_MT_BenefitHint": "Gain depends on CPU: strong multi-core CPUs benefit most; on weaker CPUs gains are limited or may even be negative.",
   "Progress_Mode_Label": "Show:",
   "Progress_Mode_Simple": "Simple",
   "Progress_Mode_Detailed": "Detailed",
@@ -889,7 +888,7 @@
   "Settings_AdaptiveSmartDetect": "Magic Number Detection",
   "Settings_AdaptiveSmartDetect_Desc": "Sample and detect magic numbers in large files for more accurate format identification. Slightly reduces compression speed.",
   "Settings_MultiThreadedCompression": "Multi-threaded Compression",
-  "Settings_MultiThreadedCompression_Desc": "Use multiple CPU cores to compress files in parallel, significantly improving compression speed. Can be used together with adaptive compression.",
+  "Settings_MultiThreadedCompression_Desc": "Use multiple CPU cores to compress files in parallel for faster compression. Can be used together with adaptive compression.",
   "Settings_AdaptiveMode_Disabled": "Disabled (always use selected level)",
   "Settings_AdaptiveMode_StoreForCompressed": "Auto-downgrade for known formats (recommended)",
   "Settings_AdaptiveMode_SmartDetect": "Smart detection (magic number for large files)",
@@ -1274,6 +1273,6 @@
   "Metadata_Key_IconCount": "Icon Count",
   "Metadata_Key_Encrypted": "Encrypted",
   "AdaptiveHelp_Title": "Compression Speed-up Help",
-  "AdaptiveHelp_Markdown": "Adaptive compression decides automatically whether to compress each file, avoiding wasted CPU on already-compressed data. The three switches below can be combined freely.\n\n## Adaptive Compression\nChooses the compression method by file type. Known compressed formats (JPEG, PNG, MP4, ZIP, and 60+ other extensions) are written as \"Store\" without re-compression — such data has no room left to shrink, so compressing it only wastes CPU and time; all other files are still compressed at your selected level.\n\n## Magic-Number Detection\nAvailable only when Adaptive Compression is on. When enabled, larger files are sampled by their header magic number to determine the real format instead of trusting the file extension — this catches already-compressed files that were renamed. More accurate, at the cost of slightly slower compression.\n\n## Multithreaded Compression\nUses multiple CPU cores to compress in parallel, greatly improving speed for large files or many files (experimental). Can be enabled together with Adaptive Compression.\n\n> **Note**: when both Adaptive Compression and Multithreaded Compression are enabled, your custom rules under \"Adaptive Rules\" do not take effect; to customize the level per format, use the \"Store-only formats\" list instead."
+  "AdaptiveHelp_Markdown": "Adaptive compression decides automatically whether to compress each file, avoiding wasted CPU on already-compressed data. The two switches below can be combined freely.\n\n## Adaptive Compression\nChooses the compression method by file type. Known compressed formats (JPEG, PNG, MP4, ZIP, and 60+ other extensions) are written as \"Store\" without re-compression — such data has no room left to shrink, so compressing it only wastes CPU and time; all other files are still compressed at your selected level.\n\n## Multithreaded Compression\nUses multiple CPU cores to compress in parallel for faster compression, best for large files or many files (experimental). Can be enabled together with Adaptive Compression.\n\n> **Note**: when both Adaptive Compression and Multithreaded Compression are enabled, your custom rules under \"Adaptive Rules\" do not take effect; to customize the level per format, use the \"Store-only formats\" list instead."
 }
 

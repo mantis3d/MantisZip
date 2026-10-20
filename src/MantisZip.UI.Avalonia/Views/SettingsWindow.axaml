@@ -167,6 +167,11 @@
                                      Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="11" TextWrapping="Wrap"/>
                         </StackPanel>
                       </CheckBox>
+
+                      <!-- 常驻科普提示：收益与 CPU 相关（双机实测），常驻显示不绑显隐 -->
+                      <TextBlock Text="{Binding MultiThreadedBenefitHint}" Margin="16,2,0,0"
+                                 FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                 TextWrapping="Wrap" />
                     </StackPanel>
                   </Border>
 
@@ -227,7 +232,7 @@
                     </StackPanel>
                   </Border>
 
-                  <!-- 仅存储格式选择（自适应+多线程同时开启时可见） -->
+                  <!-- 仅存储格式选择（仅自适应开启时可见；2026-10-19 起与多线程解耦） -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}"
                           IsVisible="{Binding IsStoreFormatSectionVisible}">

@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 修复并行解压进度窗口「第一批次进度条恒为 0」（预测试单通道行占用批次索引 0）
+  - **症状**：多线程解压（ZIP ≥1GiB + 智能并行 + 大包预测试开启）时，进度窗口详细面板第一行**没有批次底纹进度条、没有批次序号、没有 `N% (x/y)`**，看起来像「第一批次始终 0%」；其余行序号从 **2** 起
+  - **根因（UI 侧，非引擎）**：解压前 `ParallelDegreeResolver.ResolveAsync` 发出一条无 `BatchIndex`/`EntryKey` 的状态上报（占位文案 `STATUS_TESTING_PARALLEL_DEGREE`），`ProgressViewModel.SetProgress` 走 `UpsertSingleChannelRow` 在集合**索引 0** 合成一条 `IsParallel=false` 的单通道行；随后真正的并行上报带 `BatchIndex=0`，`UpsertParallelBatch` 直接 `_parallelBatchItems[0]` → batch 0 写进这条单通道行。`ParallelBatchProgressItem.IsParallel` 是 `init` 只读，而 `ProgressWindow.axaml` 的批次底纹矩形（右区 `BatchRatio`）、序号 `Index`、`PctDetailText` 全部绑 `IsVisible="{Binding IsParallel}"` → 三者永久隐藏；补洞创建又使后续行序号变为 2..N
+  - **修复**：`UpsertParallelBatch` 入口先调新增的 `RemoveSingleChannelRows()`（倒序移除 `IsParallel=false` 行），再按 `BatchIndex` 补洞建行 → 批次索引与行索引严格对齐（序号 1..N）。`UpsertSingleChannelRow` 仅在「集合内无任何并行行」时创建单行，故清空幂等、不会打乱已建批次行；纯串行流程（无 `BatchIndex` 上报）不受影响
+  - **同源覆盖**：并行压缩的 `FileScanner` 收集阶段同样先发非批次上报 → 首次 N 组并行 batch 0 落在单通道行，本次一并修复
+  - **测试**：新增 `ProgressViewModelTests.SetProgress_PreTestSingleRow_ThenParallel_BatchZeroGetsParallelRow`（预测试上报 → batch 1 → batch 0；断言集合 2 行全为并行行、`Index` 1/2、`rows[0].Percent=25`、`PctDetailText="25%"`）；`ProgressViewModelTests` 单类 75 通过；Avalonia 全量 **306 通过 / 3 跳过 / 0 失败**；`dotnet build src\MantisZip.UI.Avalonia` **0 警告 0 错误**
+  - **引擎侧复核（无改动）**：2026-10-14 `03ea955` 的修复（`BatchProcessedBytes += entryProcessed`）已在 HEAD；用 SharpCompress 0.50.4 探针实测 `entry.WriteToAsync` 对 96MB 条目每 4MB 回调一次、`BytesTransferred` 递增，确认 `entryProcessed` 会正常推进
+  - **GUI 人工验收待做**：≥1GiB ZIP 并行解压，详细面板第 1 行应有底纹进度条 + 序号 1 + 百分比（不再从 2 起）
+
+**2026-10-20** — 修复「未打开压缩包时拖入文件/目录 → 点压缩无反应」+ RELEASE_NOTES 0.5.2 补录
+  - **拖入压缩修复（用户确认的方案 A 最小改动）**：`MainWindow.axaml.cs` `OnWindowDrop` 分支 3b（未打开压缩包 + 拖入非压缩包）只 `new CompressSettingsWindow(paths) → ShowDialog` 即返回、**无任何执行代码**（`2026-08-19 285b586` 引入即如此；对话框内 `StartCompress` 的契约是「Plan 就绪 → CloseAction(true) 关窗」，执行由调用方负责）。修复：`MainWindowViewModel` 新增公开 `DragInCompressAsync(IReadOnlyList<string> droppedPaths)`——复用 `ShowCompressSettingsDialog` 回调与 `ExecuteCompressFromSettings` 私有链路（选项拷贝回传 + `AdoptPlan` → `CompressFlow.BuildRequest` → `RunWithProgress` + 冲突/错误弹窗 + 密码库保存），与 `NewArchive`「新建压缩包」完全同链；分支 3b 改 `await vm.DragInCompressAsync(paths)`。新增回归测试 `DragInCompressWiringTests` 2 条（确认 → 桩 `RunWithProgress` 被调 + `PendingCompressRequest` 非空；取消 → 不执行）。构建 0 错误；`--filter ~DragInCompress` 2 通过；Avalonia 全量 308 总 / 305 过 / 3 跳过 / 3 失败（预存语料缺口）。GUI 人工验收待做：拖文件/拖目录实证压缩包落盘
+  - **RELEASE_NOTES.md 0.5.2 补录**（`v0.5.1..HEAD` 比对漏记内容，用户拍板六组）：① 新增「自适应压缩体系」一步（压缩对话框与设置「加速」选项卡、**多线程压缩**与**自适应压缩**两独立开关、仅存储格式列表可维护）+ 改写「ZIP N 组并行压缩」组数句为**自动按 CPU 核数决策（clamp 4–16，无需手动设置）**（依 `adaptive-compress-ui-convergence.md` Phase 1 文案；该体系从未进过任何 release changelog，为本版最大遗漏）；② 压缩/解压出错信息本地化与分层（含状态行两处卡「正在准备…」修复）；③ 损坏 7z/RAR 误判加密修复；④ 文件关联失效修复系列（RegistryHost/UserChoice/DefaultIcon/自愈/SHChangeNotify/RunOnce）；⑤ CLI 退出路径收口 `AppShutdown`；⑥ 拖入压缩无反应修复（本次）。alpha 分支的 10-19 两条启动优化（ApplyTheme 缓存 / AppSettings 进程级缓存）按拍板**不写入**。小项（i18n 补齐/图标刷新/CoreLog 脱敏等）不写。**自适应条目文案基于 Phase 1 计划、待用户对照另一台机器实际实现核对**
+
 **2026-10-19** — 启动优化三期完成：AppSettings 进程级缓存（`startup-appsettings-cache.md` 归档）
   - **实现**（`Models/AppSettings.cs:271+`，commit `a96db21`）：`Load()`/`Save()` 静态缓存（lock + `_cached`，72 处调用点零改造）——cache 每进程只读盘一次；`Save()` 落盘成功后把被保存实例写回缓存（外部可见值与内存一致）；损坏文件异常分支不缓存（下次重试）、文件不存在缓存默认值、Save 失败不动缓存；`ResetCacheForTests()` internal 测试钩子（沿 `StartupTimer.ResetForTest` 的 InternalsVisibleTo 惯例）。
   - **TDD**：新增 `AppSettingsCacheTests` 2 条（Load 同实例 / Reset 后新实例+镜像值）先败后成；全量 `-c Release` **308 总 / 301 过 / 3 跳过 / 4 失败**（4 失败全部为预存 corpus 语料缺失的 `WholeArchiveErrorLocalizerTests`，**新增失败 = 0**）；`--test` 冒烟无 ERROR。
@@ -32,6 +45,45 @@
   - **方案（用户确认 A+B）**：方案一 ApplyTheme 同主题跳过（`_loadedThemeUri` 初值=LightThemeUri 契约）+ 换肤单 Load + 图标字典缓存复用（`_cachedIconProvider`，`MergedDictionaries[1]` 取法），预期 `Init.Theme` 116ms→个位数 ms、合计 −100ms 量级；方案二 `dotnet-trace` launch 模式 3 次采样定罪 `Avalonia.InitDone` 597ms / `Win.Visible` 316ms 内部构成（JIT/XAML/布局/铁板四分类），R2R 门控预先锁定（JIT 相关 ≥300ms → 登记三期 R2R 试点条目）。任务级 Task 1–6 已写入计划文档；`measure-startup.ps1` 现行聚合约缺 `Init.Theme` 指标，Task 2 补 `ThemeSpan`。
   - **顺序衔接**：与 `large-file-split` 计划任一先行均可行，两序衔接注记已写入计划文档（本计划先行时行号锚点有效，拆分先行时按 `App.Theming.cs` 方法名定位）。
   - **计划库同步**：新建 `.omo/plans/未开始/startup-theme-dedup-trace.md`（设计+任务 2.5-3.5h）；PLAN.md P2 区登记（与 splash 相邻）。
+
+**2026-10-19** — 压缩加速三开关 Phase 1 UI 收敛（删「并行压缩组数」旋钮 + 隐藏三个空转控件）
+  - **背景**：2026-10-16 用户实测「不启用自适应时开启多线程反而有反作用」→ 实测 + 全仓代码审计；2026-10-18 双机复测后改判。Phase 1 目标 = 出一版「UI 不说谎」的可用版本（`.omo/plans/进行中/adaptive-compress-ui-convergence.md`）
+  - **改动 A（删「并行压缩组数」）**：删除 7 个源文件 + `AppSettings.ParallelCompressDegree` + 三语 `Compress_ParallelDegree`/`_Hint`；`rg` 自查 `ParallelDegreeInput|ParallelDegreePanel|ZipMultiThreadCheck_IsCheckedChanged` 均 0 命中；`ArchiveOptions.ParallelCompressDegree` 与 `CompressRequest` 字段**保留**（引擎层输入，`ParallelCompressTests` / `bench-zip-mt.cs` 在用，显式值仍生效）
+  - **引擎侧**：`ResolveParallelCompressDegree` 默认规则 `<=0 → clamp(ProcessorCount, 4, 16)`（原 `ProcessorCount` 无下限，下限 4 避开已证实的 deg=2 陷阱）；`CompressRequest.ParallelCompressDegree` 默认 `ProcessorCount` → `0`；新增 `mt = max(1, 核数/组数)`（方案 C，**标注未验证** —— 默认路径下多为 no-op，不得当性能依据）；同步更新 `ArchiveEngine.cs` / `ZipEngine.cs` 相关 XML 注释
+  - **改动 B 暂缓**：双机实测 MT 收益与 CPU 相关（20 核机有收益 / 8 逻辑核机 i7-3770 净负收益），Phase 1 三开关保持互相独立（无门控代码）；回归护栏 `rg "MultiThreadedCompression\s*&&\s*.*AdaptiveCompression" src` → 0 命中
+  - **隐藏三个空转控件**：魔数检测（设置窗口 `IsSmartDetectVisible` → `false` + 压缩对话框 ZIP 面板 `IsVisible="False"` + getter 恒 `false`）、自适应规则（`IsUserRulesSectionVisible` → `false`）、自定义格式魔数 hex（`MagicHexTextBox` 隐藏 + `MagicHexDisplay` 恒空）；每处加 Phase 2 注释，保留设置字段 / 透传链路 / 三语 key
+  - **before 基线**（本机 16 逻辑核，Task 0 同参数，`.buildout/bench-before-{text,media,mixed}.txt`）：text B `deg=0` 1.90s / `deg=2` 5.02s；mixed B `deg=0` 2.34s / `deg=2` 5.10s → **deg=2 陷阱在本机复现**（慢 2.2–2.6x）
+  - **验证**：Core 0 错 0 警 / 737 通过（3 跳过）；Avalonia 0 错 0 警 / 296 通过（3 跳过，`--no-incremental` 全量重建防 AVLN3000，规则 17）；**构建需 `-p:SkipShellExtCopy=true`**（ShellExt COM 已注册 → Explorer 锁定 `ShellExt.dll`，本机每次构建都会命中；`csproj:86` 自带 `SkipShellExtCopy` 开关）
+
+**2026-10-19（第六次）** — 帮助文本开关数修正 + MT 措辞软化（三语）
+  - **帮助弹窗开关数**：`AdaptiveHelp_Markdown` 开头「下面的三个开关可以独立组合」→「**两个开关**」（魔数检测段落已删，只剩自适应压缩 + 多线程压缩）；三语同步（zh-CN 两个开关 / en two switches / zh-TW 兩個開關）
+  - **措辞冲突软化**（用户确认处理）：① `Settings_MultiThreadedCompression_Desc`「显著提升压缩速度」→「以提升压缩速度」（en: significantly improving → for faster compression；zh-TW: 顯著提升 → 以提升）；② `AdaptiveHelp_Markdown` 多线程段「显著提升速度」→「以提升速度」（en: greatly improving speed → for faster compression；zh-TW: 顯著提升速度 → 以提升速度）。原因：与新加常驻提示「核心数较少时收益有限，甚至可能变慢」并列时自相矛盾
+  - **验证**：三语 JSON 有效、key 集各 **1261** 一致；9 个旧措辞模式全部 0 命中；Core 737 通过 / Avalonia 296 通过
+
+**2026-10-19（第五次）** — 「设置 → 加速」页同步加 MT 收益常驻提示
+  - **背景**：用户要求与压缩对话框一致，「设置 → 加速」页也加常驻科普提示（原只在 ZIP 面板有）
+  - **改动**：`Views/SettingsWindow.axaml` 多线程压缩 CheckBox 下方新增一行常驻灰字（`TextBlock`，`Margin="16,2,0,0"` / FontSize 11 / `ThemeTextSecondaryBrush` / `TextWrapping="Wrap"`）；VM 加 `MultiThreadedBenefitHint` 属性，**复用** `Compress_MT_BenefitHint`（两处共用同一 key，单一事实来源）
+  - **验证**：Core 737 通过 / 0 失败；Avalonia 296 通过 / 0 失败
+  - ⚠ **待用户定**：现有 `Settings_MultiThreadedCompression_Desc` 三语含「显著提升压缩速度」，与新提示「核心数较少时收益有限，甚至可能变慢」措辞冲突 —— 是否将 desc 的「显著提升」软化为「以提升」？
+
+**2026-10-19（第四次）** — 自适应帮助文本删除「魔数检测」段落（三语）
+  - **背景**：`AdaptiveHelp_Markdown`（压缩加速说明弹窗，经 `HelpDialog` → `MarkdownPreviewBuilder` 渲染）中的「## 魔数检测」段落描述了一个**尚未实现**的功能（Phase 2 Task 9 才落地）。2026-10-19 用户要求先删掉，等功能修正后再加回来
+  - **改动**：三语 `AdaptiveHelp_Markdown` 各删 `\n\n## 魔数检测\n<body>\n\n` 整段（zh-CN/en/zh-TW 同步）；删后标题序列从 3 个（自适应压缩 / 魔数检测 / 多线程压缩）变为 2 个（自适应压缩 / 多线程压缩）
+  - **验证**：三语 JSON 有效、key 集各 **1261** 完全一致；`rg` 确认三语 Markdown 均无「魔数检测 / Magic-Number Detection / 魔數檢測」残留
+  - **计划同步**：Task 11 恢复清单补「重新加回该段落」
+
+**2026-10-19（第三次）** — 自适应行为统一：串行路径也读自定义仅存储格式（消除「时灵时不灵」）
+  - **背景**：2026-10-19 用户问「单独启用自适应时压缩是什么样」，核对源码发现不一致 —— `CompressAsync` 串行写入（`ZipEngine.cs:3262`）用 **3 参** `GetAdaptiveLevel`（不传 `MultiThreadedStoreFormatIds`），而 MT 分拣（1899/2930）与 `AddToArchiveAsync`（3795）用 **4 参** → 同一个「自适应压缩」开关，压缩（新建）与添加（已有包）行为不同，用户配的自定义仅存储格式「时灵时不灵」
+  - **改动**：`:3262` 统一为 4 参（传 `options.MultiThreadedStoreFormatIds`），四个调用点同口径，注释同步；`IsStoreFormatSectionVisible` 由 `自适应 && 多线程` 改为 `自适应`（与引擎行为对齐 —— 串行路径现在也读该列表，卡片在 MT 关闭时也显示，消除「卡片隐藏但值生效」）
+  - **零影响验证**：`MultiThreadedStoreFormatIds` 默认为空 → 3 参与 4 参行为完全一致；Task 8 已跑完的 before/after bench 数据**仍然有效**，无需重跑
+  - **验证**：Core 737 通过 / 0 失败；Avalonia 296 通过 / 0 失败；`rg` 确认四个调用点均为 4 参
+
+**2026-10-19（第二次）** — 多线程压缩常驻科普提示提前到 Phase 1（`Compress_MT_BenefitHint`）
+  - **背景**：原计划把该提示归 Phase 2 Task 12（与本机基准测试捆绑）。2026-10-19 评审时用户提出「文本应该有一个类似"高配置cpu收益高"的提示」，经讨论决定**提前到 Phase 1**：提示本身可独立成立（不依赖基准测试），且弱 CPU 用户在 Phase 1 就会遇到「MT 默认开着但可能更慢」的风险窗口，提前保护优于等 Phase 2 捆绑上线
+  - **改动**：新增 1 个三语 key `Compress_MT_BenefitHint`（zh-CN「收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。」/ en「Gain depends on CPU: ...」/ zh-TW「收益與 CPU 設定相關：...」，三语成对插入文件头，规则 13）；ZIP 面板 `ZipMultiThreadCheck` 下方新增一行常驻灰字（`TextBlock`，仿 `ZipMtOverLimitHintText` 样式：FontSize 11 / `Margin="24,2,0,0"` / `ThemeTextSecondaryBrush` / `TextWrapping="Wrap"`），code-behind 加 `BenefitHint` 属性（`LocalizationManager.T("Compress_MT_BenefitHint")`）
+  - **计划同步**：Task 7 改为「Phase 1 新增 1 个三语 key」；Task 12 的「常驻提示」一行标注「Phase 1 已加，不重复」；修订记录加 **E5**；头部状态/日期更新
+  - **原型**：`docs/prototypes/compress-format-options-panel.html` 页首 Phase 横幅补充提示说明 + ZIP 面板加提示行
+  - **验证**：Core 737 通过 / 0 失败；Avalonia 296 通过 / 0 失败；三语 key 集各 **1261** 个完全一致（新增 1 key）；`Compress_MT_BenefitHint` 已在三语文件头确认存在
 
 **2026-10-19** — 大文件 partial 拆分计划立项（core + avalonia 第一梯队 3 文件）
   - **large-file-split.md 新建**（`.omo/plans/未开始/`）：`ZipEngine.cs` 4422 行 / `MainWindowViewModel.cs` 3185 行 / `App.axaml.cs` 2455 行多职责堆叠。形态 A（partial class 分文件，与 `ShellIntegration.*` 惯例一致）纯移动零行为变化：App → 主干 + `App.Theming`/`CliExtract`/`CliCompress`/`CliInfra`，ZipEngine → 主干 + `Open`/`Extract`/`Compress`/`CompressGroup`，MainWindowViewModel → 主干 + `Password`/`Preview`/`Navigation`/`Extract`/`Compress`。设计中已获用户三节批准；不抽服务类（YAGNI）。排除：`PreviewViewModel`（3752 行，等预览 WebView 重构）、第二梯队（SettingsWindowViewModel/ProgressViewModel/MainWindow.axaml.cs）、`SevenZipEngine`/`ContextMenuHandler`。行数统计方法修正：`Measure-Object -Line` 忽略空行少算 ~10%，以 `[IO.File]::ReadAllLines().Count` 为准。

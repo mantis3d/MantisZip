@@ -185,17 +185,17 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsFormatCatalogSectionVisible));
     }
 
-    /// <summary>魔数检测开关是否可见（仅自适应开启时可见）。</summary>
-    public bool IsSmartDetectVisible => AdaptiveCompression;
+    /// <summary>魔数检测开关是否可见 —— Phase 2：实现魔数检测后改回 AdaptiveCompression。</summary>
+    public bool IsSmartDetectVisible => false;
 
     /// <summary>自适应内容区域是否可见（自适应或多线程任一开启）。</summary>
     public bool IsAdaptiveContentVisible => AdaptiveCompression || MultiThreadedCompression;
 
-    /// <summary>仅存储格式选择区域是否可见（自适应+多线程同时开启）。</summary>
-    public bool IsStoreFormatSectionVisible => AdaptiveCompression && MultiThreadedCompression;
+    /// <summary>仅存储格式选择区域是否可见（仅自适应开启；2026-10-19 起与多线程解耦 —— 串行路径也读自定义仅存储格式）。</summary>
+    public bool IsStoreFormatSectionVisible => AdaptiveCompression;
 
-    /// <summary>用户自定义规则区域是否可见（仅自适应开启，多线程关闭）。</summary>
-    public bool IsUserRulesSectionVisible => AdaptiveCompression && !MultiThreadedCompression;
+    /// <summary>用户自定义规则区域是否可见 —— Phase 2：实现自适应规则后改回 AdaptiveCompression && !MultiThreadedCompression。</summary>
+    public bool IsUserRulesSectionVisible => false;
 
     /// <summary>格式目录区域是否可见（仅自适应开启，多线程关闭）。</summary>
     public bool IsFormatCatalogSectionVisible => AdaptiveCompression && !MultiThreadedCompression;
@@ -908,6 +908,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AdaptiveSmartDetectDescText => LocalizationManager.T("Settings_AdaptiveSmartDetect_Desc");
     public string MultiThreadedCompressionText => LocalizationManager.T("Settings_MultiThreadedCompression");
     public string MultiThreadedCompressionDescText => LocalizationManager.T("Settings_MultiThreadedCompression_Desc");
+    /// <summary>多线程压缩常驻科普提示（收益与 CPU 相关，双机实测；常驻显示不绑显隐）。</summary>
+    public string MultiThreadedBenefitHint => LocalizationManager.T("Compress_MT_BenefitHint");
     public string FormatCatalogSectionText => LocalizationManager.T("Settings_FormatCatalog");
     public string StoreFormatSectionText => LocalizationManager.T("Settings_StoreFormat_Section");
     public string StoreFormatDescText => LocalizationManager.T("Settings_StoreFormat_Desc");
@@ -2211,7 +2213,8 @@ public partial class FormatDefinitionViewModel : ObservableObject
     [ObservableProperty] private bool _isBuiltIn = true;
 
     public string ExtensionsDisplay => string.Join(" ", Extensions.Select(e => e));
-    public string MagicHexDisplay => string.IsNullOrEmpty(MagicHex) ? "" : $"[{MagicHex}]";
+    /// <summary>魔数 hex 显示 —— Phase 2 实现魔数检测前恒空（输入框已隐藏）。</summary>
+    public string MagicHexDisplay => "";
 
     /// <summary>将 ViewModel 转换为 FormatDefinition 模型，用于持久化保存。</summary>
     public FormatDefinition ToFormatDefinition() => new()

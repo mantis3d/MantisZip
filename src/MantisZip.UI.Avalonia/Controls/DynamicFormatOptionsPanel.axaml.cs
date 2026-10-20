@@ -58,8 +58,8 @@ public partial class DynamicFormatOptionsPanel : UserControl
     public string SmartDetectLabel => LocalizationManager.T("FormatOptions_ZIP_SmartDetect");
     public string ZipMultiThreadLabel => LocalizationManager.T("FormatOptions_ZIP_MultiThread");
     public string ZipMtOverLimitHint => LocalizationManager.T("FormatOptions_ZIP_MultiThreadOver4Gb");
-    public string ParallelDegreeLabel => LocalizationManager.T("Compress_ParallelDegree");
-    public string ParallelDegreeHint => LocalizationManager.T("Compress_ParallelDegree_Hint");
+    /// <summary>多线程压缩常驻科普提示（收益与 CPU 相关，双机实测；常驻显示，不绑显隐）。</summary>
+    public string BenefitHint => LocalizationManager.T("Compress_MT_BenefitHint");
     public string ZipAdaptiveSectionTitle => LocalizationManager.T("Settings_AdaptiveCompression");
     public string TarGzPlaceholder => LocalizationManager.T("FormatOptions_TarGz_Placeholder");
     public string CustomDictSizeHint => LocalizationManager.T("FormatOptions_7z_DictSize_CustomHint");
@@ -215,16 +215,10 @@ public partial class DynamicFormatOptionsPanel : UserControl
     }
 
     /// <summary>
-    /// 魔数检测。仅对 ZIP 格式有效；非 ZIP 格式返回 false。
+    /// 魔数检测。控件当前隐藏（Phase 2 实现魔数检测后启用），恒返回 false
+    /// —— 避免隐藏期间值继续透传造成「以为生效」。
     /// </summary>
-    public bool AdaptiveSmartDetect
-    {
-        get
-        {
-            if (SelectedFormat != "zip") return false;
-            return SmartDetectCheck.IsChecked == true;
-        }
-    }
+    public bool AdaptiveSmartDetect => false;
 
     /// <summary>
     /// ZIP 多线程压缩。仅对 ZIP 格式有效（非加密 + Deflate 方法）；非 ZIP 格式返回 false。
@@ -238,20 +232,6 @@ public partial class DynamicFormatOptionsPanel : UserControl
             if (_zipMtOverSizeLimit) return false;
             return ZipMultiThreadCheck.IsChecked == true;
         }
-    }
-
-    /// <summary>
-    /// N 组并行压缩目标组数（1..16；仅 ZIP 多线程压缩开启时生效，1 = 串行）。
-    /// 控件未就绪时回退到 <see cref="Environment.ProcessorCount"/>。
-    /// </summary>
-    public int ParallelCompressDegree
-    {
-        get
-        {
-            if (ParallelDegreeInput?.Value is decimal v) return Math.Clamp((int)v, 1, 16);
-            return Environment.ProcessorCount;
-        }
-        set => ParallelDegreeInput.Value = Math.Clamp(value, 1, 16);
     }
 
     // ── Constructor ────────────────────────────────────────────────────────
@@ -307,16 +287,6 @@ public partial class DynamicFormatOptionsPanel : UserControl
     private void MultiThreadCheck_IsCheckedChanged(object? sender, RoutedEventArgs e)
     {
         // 无需联动控件；占位以便未来添加线程数控件时启用/禁用
-    }
-
-    /// <summary>
-    /// ZIP 多线程压缩复选框变更 — 联动「并行压缩组数」面板显隐（规则 6：关闭时整块隐藏）。
-    /// 超 4GB 限制期间强制隐藏组数面板（即使勾选框残留选中状态）。
-    /// </summary>
-    private void ZipMultiThreadCheck_IsCheckedChanged(object? sender, RoutedEventArgs e)
-    {
-        if (ParallelDegreePanel != null)
-            ParallelDegreePanel.IsVisible = !_zipMtOverSizeLimit && ZipMultiThreadCheck.IsChecked == true;
     }
 
     /// <summary>
@@ -381,8 +351,6 @@ public partial class DynamicFormatOptionsPanel : UserControl
 
         _zipMtOverSizeLimit = overLimit;
 
-        if (ZipMultiThreadCheck != null && ParallelDegreePanel != null)
-            ParallelDegreePanel.IsVisible = !overLimit && ZipMultiThreadCheck.IsChecked == true;
         if (ZipMtOverLimitHintText != null)
             ZipMtOverLimitHintText.IsVisible = overLimit;
     }
@@ -417,10 +385,6 @@ public partial class DynamicFormatOptionsPanel : UserControl
         AdaptiveCompressionCheck.IsChecked = s.AdaptiveCompression;
         SmartDetectCheck.IsChecked = s.AdaptiveSmartDetect;
         ZipMultiThreadCheck.IsChecked = s.MultiThreadedCompression;
-        // Task 5 Step 3：并行压缩组数默认值 + 面板初始显隐（与 MT 开关联动）
-        ParallelCompressDegree = s.ParallelCompressDegree;
-        if (ParallelDegreePanel != null)
-            ParallelDegreePanel.IsVisible = s.MultiThreadedCompression;
 
         // 固实块大小：settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
         if (!SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "")
