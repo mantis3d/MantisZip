@@ -8,7 +8,8 @@
 
 **2026-10-20** — 版本号升级 v0.5.3（6 处同步）+ RELEASE_NOTES 新建 v0.5.3 章节
   - **6 处版本同步**（AGENTS「Version bump checklist」）：`AppConstants.Version`、`MantisZip.UI.Avalonia.csproj <Version>`、`installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值、`docs/PLAN.md` 与 `docs/PROGRESS.md` 当前版本，全部 `0.5.2` → `0.5.3`。`docs/PROGRESS.md` 的「发布日期」字段自 0.5.1 起一直为占位值（历次升级均未改动，不在 checklist 内），本次保持不动。
-  - **RELEASE_NOTES.md**：文件顶部新建 `## v0.5.3` 章节（与既有版本同构：文件说明中英 / 更新内容），三节内容——「启动画面 / Splash Screen」（原生启动画面、图标 + 动态文案、Win11 圆角）、「启动速度 / Faster Startup」（ApplyTheme 重复加载修复 ~100ms、AppSettings 进程级缓存）、「修复 / Fixes」（splash 后主窗口被既有窗口遮挡）；文件名全部换成 0.5.3。
+  - **RELEASE_NOTES.md**：文件顶部新建 `## v0.5.3` 章节（与既有版本同构：文件说明中英 / 更新内容），两节内容——「启动画面 / Splash Screen」（原生启动画面、图标与动态文案、Win11 圆角）、「性能 / Performance」（主题重复加载消除 ~100ms、AppSettings 进程级缓存，合并为一条带 ①② 的启动速度优化）；文件名全部换成 0.5.3。
+  - **发布说明口径修正（按用户指正 + 新增 AGENTS 规则 18）**：初稿曾含「修复 / Fixes」节记录「splash 后主窗口被既有窗口遮挡」——该 bug 属 v0.5.3 同周期引入并修复，从未随 v0.5.2 发布，用户不可能感知到，**不属于版本间差异** → 整节删除，仅保留在 detail 与计划归档。规则 18 固化：计划完成时必须向用户确认 RELEASE_NOTES 更新范围；同周期内引入并修复的问题不进发布说明；性能类改动归入「性能 / Performance」按收益描述。
 
 **2026-10-20** — Splash 修复：主窗口启动后被既有窗口糊住（前台激活时序）
   - **现象（用户报告）**：splash 消失后主窗留在 z-order 后层，被启动前最大化的其他应用完全遮挡；所有启动方式（双击 exe / CLI / 右键）均复现，splash 之前无此问题，任务栏可拉起。

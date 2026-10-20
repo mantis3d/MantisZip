@@ -13,22 +13,15 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - 新增**原生启动画面** — 冷启动时在主窗口出现前显示品牌启动画面，覆盖此前「双击后一段时间无任何反馈」的空窗；采用系统原生窗口绘制、不依赖 Avalonia 初始化，低开销且无闪烁（最短显示 300 毫秒，避免一闪而过）；不抢键盘焦点、不进任务栏，关闭后焦点直达主窗口
 - Added a **native startup splash** — a branded splash now appears during cold start before the main window is ready, covering the previous "no feedback after double-click" gap; drawn with a native window, independent of Avalonia initialization, low-overhead and flicker-free (minimum 300 ms display so it never just flashes); it does not steal keyboard focus or appear in the taskbar, and focus lands on the main window when it closes
-- **图标 + 动态文案** — 启动画面左侧显示应用图标（直接取自程序内嵌图标，零额外资源），右侧显示随启动方式变化的状态文案：打开压缩包时显示文件名（如「正在打开压缩包 backup.zip」）、解压单文件时显示文件名、批量处理时显示数量；超长文件名自动以省略号截断；支持高 DPI 缩放
-- **App icon + dynamic status text** — the splash shows the app icon on the left (taken straight from the executable's embedded icon, no extra assets) and a context-aware status text on the right: the file name when opening or extracting a single archive (e.g. "Opening backup.zip"), a count for batch operations; long names are ellipsized; high-DPI aware
-- **Win11 圆角** — 启动画面在 Windows 11 上使用系统圆角，Windows 10 上自动回退为直角
+- **应用图标与动态文案** — 启动画面左侧显示应用图标（取自程序内嵌图标，零额外资源），右侧文案随启动方式变化：打开/解压单个压缩包时显示文件名（如「正在打开压缩包 backup.zip」），批量处理时显示数量；超长文件名以省略号截断；支持高 DPI 缩放
+- **App icon and dynamic status text** — the splash shows the app icon on the left (taken straight from the executable's embedded icon, no extra assets) and a context-aware text on the right: the file name when opening or extracting a single archive (e.g. "Opening backup.zip"), a count for batch operations; long names are ellipsized; high-DPI aware
+- **Windows 11 圆角** — 启动画面在 Windows 11 上使用系统圆角，Windows 10 自动回退为直角
 - **Rounded corners on Windows 11** — the splash uses the system rounded-corner style on Windows 11 and falls back to square corners on Windows 10
 
-**启动速度 / Faster Startup**
+**性能 / Performance**
 
-- **主题重复加载修复** — 应用/切换主题不再重复解析主题字典：同主题直接跳过，图标字典跨主题复用；实测启动节省约 100ms，同时修复旧实现「先清空后加载」在加载失败时导致界面无样式的缺陷
-- **Fixed duplicate theme loading** — applying a theme no longer re-parses the theme dictionaries: the same theme is skipped entirely and the icon dictionary is reused across themes; measured ~100 ms faster startup, and it also fixes the old "clear-then-load" sequence that left the UI unstyled when loading failed
-- **设置读取进程级缓存** — 设置文件的读取改为进程内缓存：冷启动只读盘一次，运行期重开窗口/对话框不再反复读盘反序列化（72 处调用点全部受益）
-- **Process-level settings cache** — settings are now read once per process: the cold start reads from disk a single time, and reopening windows/dialogs at runtime no longer re-reads and re-deserializes the file (benefiting all 72 call sites)
-
-**修复 / Fixes**
-
-- 修复**启动画面消失后主窗口被其他窗口遮挡** — 此前若启动前有一个最大化的窗口，主窗口会在启动画面消失后留在其后方（被完全遮住，只能点任务栏拉起）；现主窗口显示时主动置前并获得焦点，覆盖双击 exe、右键菜单、文件关联等全部启动方式
-- Fixed **the main window being hidden behind other windows after the splash disappeared** — previously, if another window was maximized before launch, the main window stayed behind it after the splash closed (fully covered, only recoverable via the taskbar); the main window now brings itself to the front and takes focus when shown, covering all launch paths (double-click, context menu, file association)
+- **启动速度优化** — ① 主题重复加载消除：应用/切换主题时同主题直接跳过解析、图标字典跨主题复用，实测启动再降约 100ms（同时修复旧实现「先清空后加载」在加载失败时界面无样式的缺陷）；② 设置读取进程级缓存：冷启动只读盘一次，运行期重开窗口/对话框不再反复读盘反序列化，72 处调用点全部受益
+- **Faster startup** — ① eliminated duplicate theme parsing: applying a theme now skips parsing entirely when it is already active, and the icon dictionary is reused across themes, measured ~100 ms faster startup (this also fixes the old "clear-then-load" sequence that left the UI unstyled when loading failed); ② process-level settings cache: the cold start reads from disk a single time, and reopening windows/dialogs at runtime no longer re-reads and re-deserializes the file, benefiting all 72 call sites
 
 
 ## v0.5.2

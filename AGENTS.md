@@ -780,6 +780,18 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 - **已迁移消费者（全部 Markdown 驱动）**：压缩加速帮助（三语 `AdaptiveHelp_Markdown`）、并行解压帮助（`ParallelHelp_Markdown`）、密码管理器帮助（`PasswordHelp_Markdown`，含 Glob/Regex 表格）、日志隐私帮助（`LogPrivacyHelp_Markdown`）
 - **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/HelpDialogRenderTests.cs`（无头 Avalonia，验证 ContentPresenter 注入内容引用相等 + 内容真实渲染 + 三语 Markdown key 存在）
 
+### 规则 18：计划完成后必须确认 RELEASE_NOTES 更新范围
+
+每个计划（新功能 / 修复 / 性能优化）完成时，**必须主动向用户确认**是否需要更新 `RELEASE_NOTES.md` 以及更新范围，不得擅自写入或遗漏。
+
+**核心判据：RELEASE_NOTES 只记录已发布版本之间的用户可见差异**（上一个 tag → 本次发布）。
+
+- **同周期内引入并修复的问题不进发布说明**：功能本身是本版本新增、其 bug 也在本版本内修掉（从未有用户拿到带该 bug 的版本）→ 不写「修复」条目，只记入 `docs/progress-avalonia-detail.md` 与计划归档
+- **「修复」条目仅限**：上一版本已发布、用户实际可能遇到的问题（如 v0.5.2 用户升级到 v0.5.3 能感知到的变化）
+- **性能类改动**归入「性能 / Performance」节按收益描述，不要写成「修复 XXX」；同一功能的多项子改进合并为一条带 ①② 的条目
+- **格式与既有章节一致**：`### 文件说明 / File Description`（中英各一段）+ `### 更新内容 / Changelog`（分类加粗小标题 `**中文 / English**`，每条先中文后英文、`**功能名** — 说明`）
+- 更新后同步 `docs/PROGRESS.md` 与 `docs/progress-avalonia-detail.md`（规则 3）
+
 ## 未来工作
 
 ### 待实施计划
