@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — Splash 样式升级：图标左 + 文字右 + Win11 圆角（commit `1c4e214`，用户确认方案）
+  - `Paint` 重排：`DT_CALCRECT` 先量文本宽 →（图标 32dp + 间隔 16dp + 文本宽）整体水平/垂直居中，图标 `DrawIconEx` 左置、文字 `DT_LEFT|DT_VCENTER` 右置，缺图标时布局自动退化为纯文本
+  - 图标零资产工作：`ExtractIconExW` 直接提取运行中 exe 的 `<ApplicationIcon>` 内嵌资源为 HICON，ThreadProc 一次性缓存 / `DestroyIcon` 释放
+  - Win11 圆角：`DwmSetWindowAttribute(DWMWA_WINDOW_CORNER_PREFERENCE=33, DWMWCP_ROUND=2)`；Win10 无此属性静默回退直角
+  - 字号 22dp→18dp 适配横向布局；冒烟通过（splash 出现、进程稳定）
+
 **2026-10-20** — 原生 Win32 启动 Splash 实施完成（`startup-native-splash.md` 归档，commit `c5fd2df`）
   - **新增** `Services/NativeSplash.cs`：独立后台线程（`IsBackground = true` 保进程可退出）+ 全独立消息泵（`GetMessage` 阻塞泵、0 CPU 待机）+ GDI 文本绘制（灰度配色规避 BGR 序歧义、Microsoft YaHei UI 22dp、DPI 缩放）+ `MinShowMs=300` 最短显示防闪烁（等待在 splash 泵线程，不阻塞 UI）+ `OperatingSystem.IsWindows()` 跨平台护栏 + 全 try-catch 静默降级；WS_EX_TOOLWINDOW/TOPMOST/NOACTIVATE——不抢焦点、不进任务栏。
   - **服务**（`Program.Main`）：非 UI 命令秒退（`--install-shell`/`--uninstall-shell`/`--install-assoc`/`--uninstall-assoc`/`--help`/`-h`/`--test`）不显示；其 余（无参 + 全 CLI 慢路径）显示——文案按 `AppSettings.Language` 重载 `LocalizationManager` + 启动方式映射 key（`Status_Starting` 新增三语「正在启动…」/深色据 `Theme`）。

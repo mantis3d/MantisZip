@@ -159,6 +159,7 @@ Program.Main
 - **调试教训（重要！）**：① `NativeMethods.RegisterClassEx` 默认路径解析到 `RegisterClassExA`—— 用 `Sprite` 注册的类与 CreateWindowExW 查找不匹配，`lastErr=1407 ERROR_CANNOT_FIND_WND_CLASS`；② **带 `CharSet.Unicode` 的 string 字段 struct + `GetClassInfoEx`（读出 LPWSTR 的 ref-marshaling 时释放垃圾指针）→ `ntdll 0xC0000374 HEAP_CORRUPTION` 静默退进程（无 debug.log 无 lifecycle）**——共复查 5 次 WER 才定位；③ **最终可靠方案 = 全部窗口名以 `Marshal.StringToHGlobalUni` 生成 nint 指针传入**（WNDCLASSEX.lpszClassName / CreateWindowEx.lpClassName 类型改 `nint`，彻底绕开 C# string 壳的 marshaling 不确定性——同样正确适用于自定义 Win32 窗口类场景）
 - **GUI 手动验收清单（待做）**：焦点不抢（焦点直达真实窗口）/任务栏不显示/`--compress <目录>` 全链路 /`--open <压缩包>` 全链路/最短显示时长/150-200% DPI 清晰/语言切换后 splash 文案
 - **对已有沉浸式的全部承接**：无参数启动 → splash「正在启动…」；CLI 慢路径逐场景 key 对应；关闭时机在该 CLI 自有「终端窗口」出现时（CollectingWindow 保留为降级兜底）
+- **样式升级（2026-10-20 第二轮，commit `1c4e214`，用户确认「图标左+文字右」）**：① `Paint` 重排为图标左 + 文字右——`DT_CALCRECT` 先量文本宽，`（图标32dp + 间隔16dp + 文本宽）`整体水平居中，图标 DrawIconEx 垂直居中，文字 `DT_LEFT|DT_VCENTER`；② 图标来源 `ExtractIconExW(executablePath, 0, big, small, 1)`——零资产工作（复用 csproj `<ApplicationIcon>Resources\App.ico` 内嵌资源），ThreadProc 一次性提取缓存 `_hIcon`，finally `DestroyIcon` 释放，提取失败 Paint 自动退化为纯文本布局；③ Win11 圆角：`DwmSetWindowAttribute(DWMWA_WINDOW_CORNER_PREFERENCE=33, DWMWCP_ROUND=2)`（Win10 无此属性 → 失败静默直角）；④ 字号从 22dp 调至 18dp 适配横向布局；规律 13 免（图元无文案变更）
 5. splash 不抢焦点（焦点直达真实窗口）、不进任务栏、不闪烁（最短显示时长生效）
 6. 高 DPI（150%/200%）下 splash 尺寸/文字清晰
 7. `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` 通过
