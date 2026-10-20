@@ -2629,6 +2629,22 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 拖入压缩入口：未打开压缩包时从资源管理器拖入文件/目录 → 压缩对话框预填源路径，
+    /// 确认后走与「新建压缩包」完全一致的执行管道（对话框选项拷贝回传 + AdoptPlan +
+    /// CompressFlow 构建请求 + 进度窗口 + 冲突/错误弹窗 + 密码库保存）。
+    /// 回归背景：分支 3b 曾在 ShowDialog 后直接返回，无人执行压缩（点击「压缩」关窗后无任何反应）。
+    /// </summary>
+    public async Task DragInCompressAsync(IReadOnlyList<string> droppedPaths)
+    {
+        if (ShowCompressSettingsDialog == null || RunWithProgress == null) return;
+        var vm = new CompressSettingsViewModel(droppedPaths);
+        var result = await ShowCompressSettingsDialog(vm);
+        if (result != true || vm.SelectedPaths.Count == 0) return;
+
+        await ExecuteCompressFromSettings(vm);
+    }
+
+    /// <summary>
     /// 从 CompressSettingsViewModel 读取设置，构建 CompressRequest 并执行压缩。
     /// Request 构建与冲突处理复用 CompressFlow（与 CLI 右键菜单共用同一流程）。
     /// </summary>

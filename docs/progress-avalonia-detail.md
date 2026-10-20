@@ -6,6 +6,10 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 修复「未打开压缩包时拖入文件/目录 → 点压缩无反应」+ RELEASE_NOTES 0.5.2 补录
+  - **拖入压缩修复（用户确认的方案 A 最小改动）**：`MainWindow.axaml.cs` `OnWindowDrop` 分支 3b（未打开压缩包 + 拖入非压缩包）只 `new CompressSettingsWindow(paths) → ShowDialog` 即返回、**无任何执行代码**（`2026-08-19 285b586` 引入即如此；对话框内 `StartCompress` 的契约是「Plan 就绪 → CloseAction(true) 关窗」，执行由调用方负责）。修复：`MainWindowViewModel` 新增公开 `DragInCompressAsync(IReadOnlyList<string> droppedPaths)`——复用 `ShowCompressSettingsDialog` 回调与 `ExecuteCompressFromSettings` 私有链路（选项拷贝回传 + `AdoptPlan` → `CompressFlow.BuildRequest` → `RunWithProgress` + 冲突/错误弹窗 + 密码库保存），与 `NewArchive`「新建压缩包」完全同链；分支 3b 改 `await vm.DragInCompressAsync(paths)`。新增回归测试 `DragInCompressWiringTests` 2 条（确认 → 桩 `RunWithProgress` 被调 + `PendingCompressRequest` 非空；取消 → 不执行）。构建 0 错误；`--filter ~DragInCompress` 2 通过；Avalonia 全量 308 总 / 305 过 / 3 跳过 / 3 失败（预存语料缺口）。GUI 人工验收待做：拖文件/拖目录实证压缩包落盘
+  - **RELEASE_NOTES.md 0.5.2 补录**（`v0.5.1..HEAD` 比对漏记内容，用户拍板六组）：① 新增「自适应压缩体系」一步（压缩对话框与设置「加速」选项卡、**多线程压缩**与**自适应压缩**两独立开关、仅存储格式列表可维护）+ 改写「ZIP N 组并行压缩」组数句为**自动按 CPU 核数决策（clamp 4–16，无需手动设置）**（依 `adaptive-compress-ui-convergence.md` Phase 1 文案；该体系从未进过任何 release changelog，为本版最大遗漏）；② 压缩/解压出错信息本地化与分层（含状态行两处卡「正在准备…」修复）；③ 损坏 7z/RAR 误判加密修复；④ 文件关联失效修复系列（RegistryHost/UserChoice/DefaultIcon/自愈/SHChangeNotify/RunOnce）；⑤ CLI 退出路径收口 `AppShutdown`；⑥ 拖入压缩无反应修复（本次）。alpha 分支的 10-19 两条启动优化（ApplyTheme 缓存 / AppSettings 进程级缓存）按拍板**不写入**。小项（i18n 补齐/图标刷新/CoreLog 脱敏等）不写。**自适应条目文案基于 Phase 1 计划、待用户对照另一台机器实际实现核对**
+
 **2026-10-19** — 压缩加速三开关 Phase 1 UI 收敛（删「并行压缩组数」旋钮 + 隐藏三个空转控件）
   - **背景**：2026-10-16 用户实测「不启用自适应时开启多线程反而有反作用」→ 实测 + 全仓代码审计；2026-10-18 双机复测后改判。Phase 1 目标 = 出一版「UI 不说谎」的可用版本（`.omo/plans/进行中/adaptive-compress-ui-convergence.md`）
   - **改动 A（删「并行压缩组数」）**：删除 7 个源文件 + `AppSettings.ParallelCompressDegree` + 三语 `Compress_ParallelDegree`/`_Hint`；`rg` 自查 `ParallelDegreeInput|ParallelDegreePanel|ZipMultiThreadCheck_IsCheckedChanged` 均 0 命中；`ArchiveOptions.ParallelCompressDegree` 与 `CompressRequest` 字段**保留**（引擎层输入，`ParallelCompressTests` / `bench-zip-mt.cs` 在用，显式值仍生效）
