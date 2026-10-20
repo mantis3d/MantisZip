@@ -596,7 +596,7 @@ public class SevenZipEngine : IArchiveEngine
                         CoreLog.Info($"ExtractAsync: permission denied for '{fileName}': {uax.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）
-                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = (long)entry.Size, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                     failedEntries++;
                     handledFiles++;
                     processedBytes += entrySize;
@@ -619,7 +619,7 @@ public class SevenZipEngine : IArchiveEngine
                         CoreLog.Info($"ExtractAsync: write failed for '{fileName}': {iox.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）
-                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = (long)entry.Size, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                     failedEntries++;
                     handledFiles++;
                     processedBytes += entrySize;
@@ -924,6 +924,8 @@ public class SevenZipEngine : IArchiveEngine
                             FileTotalBytes = (long)e.Size,
                             PercentComplete = fileEntries.Count > 0 ? (double)idx / fileEntries.Count * 100 : 100,
                             FilePercentComplete = 100,
+                            EntryErrorDetail = ex.Message,
+                            EntryErrorHResult = ex.HResult,
                         });
                     }
                 }
@@ -939,6 +941,8 @@ public class SevenZipEngine : IArchiveEngine
                         EntryFailureReason = FailureReasonMapper.FromException(ce),
                         CurrentFile = currentFile,
                         PercentComplete = 100,
+                        EntryErrorDetail = ce.Message,
+                        EntryErrorHResult = ce.HResult,
                     });
                 }
 
@@ -1131,7 +1135,7 @@ public class SevenZipEngine : IArchiveEngine
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{fileName}': {uax.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）
-                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = (long)entry.Size, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                     failedEntries++;
                     handled++;
                     processedBytes += entrySize;
@@ -1154,7 +1158,7 @@ public class SevenZipEngine : IArchiveEngine
                         CoreLog.Info($"ExtractEntriesAsync: write failed for '{fileName}': {iox.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）
-                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
+                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = (long)entry.Size, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                     failedEntries++;
                     handled++;
                     processedBytes += entrySize;

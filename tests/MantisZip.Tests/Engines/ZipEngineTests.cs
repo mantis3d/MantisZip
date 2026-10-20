@@ -1163,10 +1163,14 @@ public class ZipEngineTests : IDisposable
         var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_progress.zip"));
         var progressItems = new List<ArchiveProgress>();
 
+        // 必须用 SyncProgress（同步回调），不能用 Progress<T>：
+        // Progress<T> 无 SynchronizationContext 时投递到线程池，既不保证顺序也不保证
+        // CompressAsync 返回时已全部送达 —— 曾导致最后一条为合并阶段的 99.6（= 92% 重映射值）
+        // 而非终态 100，CI 上稳定失败（断言「最后一条」本身存在竞态）。
         await _engine.CompressAsync([srcDir], outputPath, new ArchiveOptions
         {
             MultiThreadedCompression = true,
-        }, progress: new Progress<ArchiveProgress>(p => progressItems.Add(p)));
+        }, progress: new SyncProgress<ArchiveProgress>(progressItems.Add));
 
         Assert.True(File.Exists(outputPath));
         Assert.NotEmpty(progressItems);

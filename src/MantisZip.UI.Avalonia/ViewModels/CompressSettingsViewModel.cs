@@ -490,24 +490,6 @@ public partial class CompressSettingsViewModel : ObservableObject
             UpdateCanCompress();
         };
 
-        LocalizedStrings["Compress_ParallelDegree"] = LocalizationManager.T("Compress_ParallelDegree");
-        LocalizedStrings["Compress_ParallelDegree_Hint"] = LocalizationManager.T("Compress_ParallelDegree_Hint");
-
-        // ParallelCompressDegree 针制：1..16
-        _parallelCompressDegree = Math.Clamp(_parallelCompressDegree, 1, 16);
-        PropertyChanged += (_, e) =>
-        {
-            if (e.PropertyName == nameof(ParallelCompressDegree))
-            {
-                int clamped = Math.Clamp(_parallelCompressDegree, 1, 16);
-                if (clamped != _parallelCompressDegree)
-                {
-                    _parallelCompressDegree = clamped;
-                    OnPropertyChanged(nameof(ParallelCompressDegree));
-                }
-            }
-        };
-
         // Populate localized strings
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
         LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
@@ -628,8 +610,6 @@ public partial class CompressSettingsViewModel : ObservableObject
             SevenZipNumFastBytes = settings.SevenZipNumFastBytes;
             SevenZipMatchFinder = settings.SevenZipMatchFinder ?? "";
             SevenZipMultithreaded = settings.SevenZipMultithreaded;
-            // Task 5 Step 3：默认组数取自 AppSettings（与 ParallelExtractDegree 对称）
-            ParallelCompressDegree = settings.ParallelCompressDegree;
             AdaptiveCompression = settings.AdaptiveCompression;
             ZipEncryptionMethod = settings.ZipEncryptionMethod ?? "aes256";
             SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders;

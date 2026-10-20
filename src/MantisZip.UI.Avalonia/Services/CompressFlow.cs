@@ -92,11 +92,10 @@ public static class CompressFlow
             AdaptiveCompression = vm.AdaptiveCompression,
             AdaptiveSmartDetect = vm.AdaptiveSmartDetect,
             MultiThreadedCompression = vm.MultiThreadedCompression,
-            // 多线程模式：传递用户自定义仅存储格式列表
+            // 仅存储格式：自适应开启时传递用户自定义仅存储格式列表（2026-10-19 起与多线程解耦，串行路径也读）
             MultiThreadedStoreFormatIds = new HashSet<string>(
                 AppSettings.Load()?.MultiThreadedStoreFormatIds ?? new List<string>()),
             SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
-            ParallelCompressDegree = vm.ParallelCompressDegree,
             // 输出文件冲突默认策略（本次压缩生效，来自压缩对话框/全局设置）
             ConflictAction = vm.ConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线

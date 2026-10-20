@@ -44,12 +44,21 @@ public class MainWindowViewModelCommentTests
     /// 回归测试：GBK 编码的 ZIP 注释不应乱码（系统 ANSI 回退解码）。
     /// 在真实 ZIP 上重建 EOCD 注释为 GBK 字节，模拟中文 Windows 常见工具生成的 ZIP。
     /// </summary>
+    /// <remarks>
+    /// 本用例把 CurrentCulture 固定为 zh-CN：<see cref="TextEncodingDetector.DecodeText"/> 的回退代码页取自
+    /// <c>CultureInfo.CurrentCulture.TextInfo.ANSICodePage</c>（zh-CN=936 / en-US=1252），
+    /// 若沿用宿主 locale，CI（en-US runner）会把同一批 GBK 字节解成 cp1252 乱码而失败。
+    /// 固定的目的是确定性地测试「系统 ANSI 回退」这一契约，而非依赖跑测机器是中文环境。
+    /// </remarks>
     [AvaloniaFact]
     public async Task LoadArchive_WithGbkComment_DecodesCorrectly()
     {
         var zipPath = Path.Combine(Path.GetTempPath(), $"mantiszip_gbk_comment_test_{Guid.NewGuid():N}.zip");
+        var originalCulture = System.Globalization.CultureInfo.CurrentCulture;
         try
         {
+            // 固定为 zh-CN，使 ANSI 回退代码页恒为 936（GBK），避免依赖跑测机器的系统 locale
+            System.Globalization.CultureInfo.CurrentCulture = new System.Globalization.CultureInfo("zh-CN");
             using (var zip = ZipFile.Open(zipPath, ZipArchiveMode.Create))
             {
                 zip.CreateEntry("hello.txt");
@@ -89,6 +98,7 @@ public class MainWindowViewModelCommentTests
         }
         finally
         {
+            System.Globalization.CultureInfo.CurrentCulture = originalCulture;
             if (File.Exists(zipPath)) File.Delete(zipPath);
         }
     }

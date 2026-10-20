@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using MantisZip.Core.Abstractions;
+using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.Services;
 
@@ -31,8 +32,38 @@ internal static partial class ShellIntegration
 
     private const uint SHCNE_ASSOCCHANGED = 0x08000000;
     private const uint SHCNF_IDLIST = 0x0000;
+
+    /// <summary>
+    /// 测试注入缝：非 null 时 <see cref="NotifyAssocChanged"/> 会先调用它（用于断言"确实通知了 Shell"）。
+    /// 生产路径恒为 null；与 <c>RegistryHost.DeleteInterceptionForTesting</c> 同属"把 Win32 副作用做成可断言"的既有约定。
+    /// </summary>
+    internal static Action? NotifyAssocChangedForTesting;
+
+    /// <summary>
+    /// 通知 Windows Shell「文件关联已变更」，立即刷新文件图标 / "打开方式" 列表 / 上下文菜单缓存。
+    /// 写完 HKCU\Software\Classes 下的关联键后必须调用；否则 Explorer 沿用旧缓存，
+    /// 用户侧表现为"装/卸关联后图标与打开方式列表不刷新"（Task G 之前只有菜单路径调用，关联路径全部漏通知）。
+    /// </summary>
+    internal static void NotifyAssocChanged()
+    {
+        NotifyAssocChangedForTesting?.Invoke();
+        SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
+    }
     private static readonly string[] ArchiveExtensions =
         ArchiveEngineFactory.SupportedExtensions;
+
+    /// <summary>该格式关联是否"未被用户显式禁用"。注意：默认值为 true（并不代表用户主动启用），false 只会由用户主动取消关联的动作产生——自愈判据把 false 视为"显式禁用，不得自愈"。</summary>
+    internal static bool IsAssocEnabledInSettings(AppSettings s, string ext) => ext.ToLowerInvariant() switch
+    {
+        ".zip"    => s.AssocZip,
+        ".7z"     => s.Assoc7z,
+        ".rar"    => s.AssocRar,
+        ".tar"    => s.AssocTar,
+        ".tgz" or ".tar.gz" => s.AssocTarGz,
+        ".gz"     => s.AssocGz,
+        ".iso"    => s.AssocIso,
+        _         => false,
+    };
 
     // Registry key identifiers — must stay as fixed English strings (language-independent)
     private const string CascadeRoot = "MantisZip";
@@ -94,7 +125,7 @@ internal static partial class ShellIntegration
     {
         try
         {
-            using var key = Registry.CurrentUser.OpenSubKey(ContextMenuRegPath);
+            using var key = RegistryHost.Open(ContextMenuRegPath);
             if (key == null) return "not_installed";
             var val = key.GetValue("DynamicMenuStatus") as string;
             return val ?? "unknown";
@@ -109,19 +140,19 @@ internal static partial class ShellIntegration
 
     private static void SetRegistryValue(string subKey, string? valueName, string value)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(subKey);
+        using var key = RegistryHost.Create(subKey);
         key?.SetValue(valueName, value);
     }
 
     private static void SetRegistryDword(string subKey, string valueName, int value)
     {
-        using var key = Registry.CurrentUser.CreateSubKey(subKey);
+        using var key = RegistryHost.Create(subKey);
         key?.SetValue(valueName, value, RegistryValueKind.DWord);
     }
 
     private static void DeleteRegistryKey(string subKey)
     {
-        Registry.CurrentUser.DeleteSubKeyTree(subKey, throwOnMissingSubKey: false);
+        RegistryHost.Delete(subKey);
     }
 
     private static string GetExePath()

@@ -100,9 +100,6 @@ public class AppSettings
     /// <summary>大包预测试：≥1GB 压缩包先测最优线程数（仅智能模式生效）。</summary>
     public bool LargeArchivePreTest { get; set; } = true;
 
-    /// <summary>N 组并行压缩的目标组数，默认 CPU 数；1 = 串行。</summary>
-    public int ParallelCompressDegree { get; set; } = Environment.ProcessorCount;
-
     // ===== 进度窗口 =====
     /// <summary>完成后自动关闭延时（秒，0–60；0 = 立即关闭）。📌/失败/测试流不受此影响（始终留窗）。</summary>
     public int AutoCloseDelaySeconds { get; set; } = 3;

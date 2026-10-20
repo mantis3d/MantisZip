@@ -1,4 +1,17 @@
 ﻿{
+  "Progress_WriteFailed_Fmt": "有 {0} 个文件未能写入到 {1}",
+  "Status_OperationFailed": "操作失败",
+  "Progress_FailedBreakdown_Fmt": "共 {0} 个失败：{1}",
+  "Progress_SkippedBreakdown_Fmt": "共 {0} 个跳过：{1}",
+  "Error_Whole_FileNotFound": "找不到文件：{0}",
+  "Error_Whole_DirectoryNotFound": "找不到目录：{0}",
+  "Error_Whole_UnauthorizedAccess": "拒绝访问：{0}（请检查文件夹权限）",
+  "Error_Whole_FallbackFmt": "操作失败：{0}",
+  "Error_Whole_Corrupted": "文件损坏或格式无效",
+  "Error_Whole_CorruptedOrPassword": "无法读取压缩包：文件可能已损坏，或需要密码",
+  "Error_Hint_DiskFull": "磁盘空间不足，请清理后重试",
+  "Error_Hint_FileInUse": "文件正被其他程序占用，请关闭后重试",
+  "Error_Hint_PathTooLong": "路径过长，请将目标移动到更短的目录",
   "Progress_Failed_EntryFmt": "{0} 解压失败：{1}",
   "Progress_Skipped_EntryFmt": "{0} 未包含进压缩包：{1}",
   "Error_Reason_PermissionDenied": "权限不足",
@@ -31,8 +44,7 @@
   "Progress_Tooltip_Ratio": "压缩率",
   "Progress_Stats_TotalSize": "总大小 {0}",
   "Progress_Preparing": "正在准备…",
-  "Compress_ParallelDegree": "并行压缩组数",
-  "Compress_ParallelDegree_Hint": "（N 个压缩器并行；设为 1 则与上方「多线程压缩」等效）",
+  "Compress_MT_BenefitHint": "收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。",
   "Progress_Mode_Label": "显示：",
   "Progress_Mode_Simple": "简约",
   "Progress_Mode_Detailed": "详细",
@@ -876,7 +888,7 @@
   "Settings_AdaptiveSmartDetect": "魔数检测",
   "Settings_AdaptiveSmartDetect_Desc": "对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度。",
   "Settings_MultiThreadedCompression": "多线程压缩",
-  "Settings_MultiThreadedCompression_Desc": "利用多核 CPU 并行压缩，显著提升压缩速度。可与自适应压缩同时开启。",
+  "Settings_MultiThreadedCompression_Desc": "利用多核 CPU 并行压缩以提升压缩速度。可与自适应压缩同时开启。",
   "Settings_AdaptiveMode_Disabled": "禁用（始终使用选定级别）",
   "Settings_AdaptiveMode_StoreForCompressed": "仅对已知格式自动降级（推荐）",
   "Settings_AdaptiveMode_SmartDetect": "智能检测（大文件魔数识别）",
@@ -1261,7 +1273,7 @@
   "Metadata_Key_IconCount": "图标数量",
   "Metadata_Key_Encrypted": "加密",
   "AdaptiveHelp_Title": "压缩加速说明",
-  "AdaptiveHelp_Markdown": "自适应压缩会根据文件类型自动决定是否压缩，避免对已压缩数据白耗 CPU；下面的三个开关可以独立组合。\n\n## 自适应压缩\n根据文件类型自动决定压缩方式。对已知的已压缩格式（JPEG、PNG、MP4、ZIP 等 60 余种扩展名）直接以「存储」方式写入，不再二次压缩——这类数据已无可压缩空间，再压只会白白消耗 CPU 与时间；其余文件仍按你选定的压缩级别正常压缩。\n\n## 魔数检测\n仅在「自适应压缩」开启时可用。开启后对较大的文件读取文件头魔数（magic number）判断真实格式，而非仅凭扩展名——可以识别被改过扩展名的已压缩文件。判断更准确，代价是略微降低压缩速度。\n\n## 多线程压缩\n利用多核 CPU 并行压缩，显著提升速度，适合大文件或文件数量较多的情况（实验性功能）。可与「自适应压缩」同时开启。\n\n> **提示**：当「自适应压缩」与「多线程压缩」同时开启时，「自适应规则」中的用户自定义规则不生效；如需按格式定制压缩级别，请改用「仅存储格式」列表。"
+  "AdaptiveHelp_Markdown": "自适应压缩会根据文件类型自动决定是否压缩，避免对已压缩数据白耗 CPU；下面的两个开关可以独立组合。\n\n## 自适应压缩\n根据文件类型自动决定压缩方式。对已知的已压缩格式（JPEG、PNG、MP4、ZIP 等 60 余种扩展名）直接以「存储」方式写入，不再二次压缩——这类数据已无可压缩空间，再压只会白白消耗 CPU 与时间；其余文件仍按你选定的压缩级别正常压缩。\n\n## 多线程压缩\n利用多核 CPU 并行压缩以提升速度，适合大文件或文件数量较多的情况（实验性功能）。可与「自适应压缩」同时开启。\n\n> **提示**：当「自适应压缩」与「多线程压缩」同时开启时，「自适应规则」中的用户自定义规则不生效；如需按格式定制压缩级别，请改用「仅存储格式」列表。"
 }
 
 

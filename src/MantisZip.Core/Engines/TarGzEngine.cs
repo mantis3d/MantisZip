@@ -157,7 +157,7 @@ public class TarGzEngine : IArchiveEngine
                         CoreLog.Info($"ExtractAsync: permission denied for '{entryKey}': {uax.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：权限失败 → Failed
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = entry.Size, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                         failedEntries++;
                     }
                     catch (IOException iox)
@@ -166,7 +166,7 @@ public class TarGzEngine : IArchiveEngine
                         CoreLog.Info($"ExtractAsync: write failed for '{entryKey}': {iox.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：IO 写入失败 → Failed
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = entry.Size, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                         failedEntries++;
                     }
                 }
@@ -238,7 +238,7 @@ public class TarGzEngine : IArchiveEngine
                         CoreLog.Info($"ExtractAsync: permission denied for '{outputPath}': {uax.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：权限失败 → Failed
-                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = inputStream.Length, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                         failedEntries = 1;
                     }
                     catch (IOException iox)
@@ -246,7 +246,7 @@ public class TarGzEngine : IArchiveEngine
                         CoreLog.Info($"ExtractAsync: write failed for '{outputPath}': {iox.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：IO 写入失败 → Failed
-                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
+                        progress?.Report(new ArchiveProgress { EntryKey = gzEntryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = inputStream.Length, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                         failedEntries = 1;
                     }
                 }
@@ -734,6 +734,9 @@ public class TarGzEngine : IArchiveEngine
                             CurrentFile = gzKey,
                             PercentComplete = 100,
                             FilePercentComplete = 100,
+                            FileTotalBytes = inputStream.Length,
+                            EntryErrorDetail = ex.Message,
+                            EntryErrorHResult = ex.HResult,
                         });
                     }
                 }
@@ -916,7 +919,7 @@ public class TarGzEngine : IArchiveEngine
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{entryKey}': {uax.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：权限失败 → Failed
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = entry.Size, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                         failedEntries++;
                     }
                     catch (IOException iox)
@@ -925,7 +928,7 @@ public class TarGzEngine : IArchiveEngine
                         CoreLog.Info($"ExtractEntriesAsync: write failed for '{entryKey}': {iox.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：IO 写入失败 → Failed
-                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryKey, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = entry.Size, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                         failedEntries++;
                     }
                 }
@@ -1011,7 +1014,7 @@ public class TarGzEngine : IArchiveEngine
                         CoreLog.Info($"ExtractEntriesAsync: permission denied for '{outputPath}': {uax.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：权限失败 → Failed
-                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = bytesTotal, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                         failedEntries++;
                     }
                     catch (IOException iox)
@@ -1019,7 +1022,7 @@ public class TarGzEngine : IArchiveEngine
                         CoreLog.Info($"ExtractEntriesAsync: write failed for '{outputPath}': {iox.Message}");
                         conflictStats.RecordFailed();
                         // 逐条目状态（D2）：IO 写入失败 → Failed
-                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed });
+                        progress?.Report(new ArchiveProgress { EntryKey = entryName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = bytesTotal, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                         failedEntries++;
                     }
                 }

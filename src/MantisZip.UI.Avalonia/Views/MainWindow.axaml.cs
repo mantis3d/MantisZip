@@ -243,10 +243,9 @@ public partial class MainWindow : Window
                 cvm.AdaptiveCompression = dialog.ViewModel.AdaptiveCompression;
                 // 同一 ZIP 面板（DynamicFormatOptionsPanel）的另两个开关此前漏拷 →
                 // 执行侧 MultiThreadedCompression 恒为 false，引擎永远走串行路径，
-                // 进度窗口「详细」通道 UI 永不出现。此处补齐（含 Task 5 新增的组数）。
+                // 进度窗口「详细」通道 UI 永不出现。此处补齐。
                 cvm.AdaptiveSmartDetect = dialog.ViewModel.AdaptiveSmartDetect;
                 cvm.MultiThreadedCompression = dialog.ViewModel.MultiThreadedCompression;
-                cvm.ParallelCompressDegree = dialog.ViewModel.ParallelCompressDegree;
                 cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
                 // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
                 cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;
@@ -353,6 +352,8 @@ public partial class MainWindow : Window
                 // 主窗口全部解压入口（ExtractArchive/Here/ToName/ExtractTo/SmartExtract）均经本闭包，
                 // 故在此单点接线，避免逐个方法重复分支。
                 var msg = LocalizationManager.T("Status_PasswordCancelled");
+                // 同步进度窗口状态行（否则取消发生在首报前时会停在「正在准备…」）
+                pw.SetStatusMessage(msg);
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);   // 行 Failed 自动压钉 → 等手动关闭
                 vm.StatusMessage = msg;
@@ -362,7 +363,8 @@ public partial class MainWindow : Window
             catch (Exception ex)
             {
                 // 失败：写错误汇总（自动压钉 📌）+ 日志，行标 Failed；关窗决策交给 AutoCloseOrWaitAsync 等待手动关闭
-                pw.SetErrorSummary(ex.Message);
+                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(ex);
+                pw.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 App.DebugLog($"[RunWithProgress] operation failed: {ex}");
                 if (hasFileList)
                     pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
@@ -1336,9 +1338,9 @@ public partial class MainWindow : Window
         }
         else
         {
-            // 分支 3b：拖入非压缩包 → 压缩对话框预填源文件
-            var dialog = new CompressSettingsWindow(paths);
-            await dialog.ShowDialog(this);
+            // 分支 3b：拖入非压缩包 → 压缩对话框预填源文件，确认后走统一压缩管道
+            // （与「新建压缩包」同一执行链：选项回传 + AdoptPlan + 进度窗口 + 冲突弹窗）
+            await vm.DragInCompressAsync(paths);
         }
     }
 

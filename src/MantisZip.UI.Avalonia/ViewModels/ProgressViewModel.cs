@@ -322,6 +322,14 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private bool _hasAnySummary;
 
+    /// <summary>红段 tooltip：逐条目原因 + 异常原文详情（摘要框 hover 查看；无详情时为 null）。</summary>
+    [ObservableProperty]
+    private string? _errorSummaryTooltip;
+
+    /// <summary>黄段 tooltip：逐条目原因 + 异常原文详情（无详情时为 null）。</summary>
+    [ObservableProperty]
+    private string? _skippedSummaryTooltip;
+
     // ════════════════════════════════════════════
     //  解压后置动作开关（spec §11；实例级，仅本次生效，不回写设置，D17）
     // ════════════════════════════════════════════
@@ -830,7 +838,7 @@ public partial class ProgressViewModel : ObservableObject
             UpdateEntryStatus(p.EntryKey,
                 EntryProgressItem.MapEntryStatus(p.EntryStatus.Value), null, p.FileTotalBytes, p.EntryCompressedBytes);
             // T5: 确定性条目结果聚合（红/黄摘要段）——必须在早返回前收集，不落入速度采样路径
-            CollectEntryOutcome(p.EntryKey, p.EntryStatus.Value, p.EntryFailureReason);
+            CollectEntryOutcome(p.EntryKey, p.EntryStatus.Value, p.EntryFailureReason, p.EntryErrorDetail, p.EntryErrorHResult);
             return;
         }
 
@@ -1021,6 +1029,12 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>并行批次行 upsert（BatchIndex 0-based → Index=BatchIndex+1；补洞创建，Percent/DetailText 消费批级字段）。</summary>
     private void UpsertParallelBatch(ArchiveProgress p)
     {
+        // 首个并行批次上报到达前，非批次上报（解压大包预测试状态 / 压缩收集阶段）已合成一条
+        // IsParallel=false 单行并占据集合索引 0。IsParallel 是 init 只读，若不清掉，batch 0 会写进
+        // 这条非并行行 → XAML 里批次底纹（进度条）、序号、N% 均绑 IsVisible=IsParallel → 第一行
+        // 永久无进度条（看似恒 0），且补洞创建使其余行序号从 2 起。故首个并行上报先清空残留单行。
+        RemoveSingleChannelRows();
+
         int idx = p.BatchIndex!.Value;
         while (_parallelBatchItems.Count <= idx)
             _parallelBatchItems.Add(new ParallelBatchProgressItem { Index = _parallelBatchItems.Count + 1, IsParallel = true });
@@ -1049,6 +1063,17 @@ public partial class ProgressViewModel : ObservableObject
         if (p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue)
             row.DetailText = LocalizationManager.T("Progress_Batch_FilesProgress",
                 p.BatchProcessedFiles.Value, p.BatchTotalFiles.Value);
+    }
+
+    /// <summary>移除残留的非并行单行（并行批次接管详细面板时调用，保证 batch 索引与行索引对齐）。
+    /// UpsertSingleChannelRow 仅在「集合内没有任何并行行」时创建单行，故此处移除不会打乱已建批次行。</summary>
+    private void RemoveSingleChannelRows()
+    {
+        for (int i = _parallelBatchItems.Count - 1; i >= 0; i--)
+        {
+            if (!_parallelBatchItems[i].IsParallel)
+                _parallelBatchItems.RemoveAt(i);
+        }
     }
 
     /// <summary>非并行单行 upsert：集合恒保持至多 1 条 IsParallel=false 的行（复用批次行样式，D2/D8）。</summary>
@@ -1508,11 +1533,18 @@ public partial class ProgressViewModel : ObservableObject
     /// Set whole-archive error summary (red segment header, selectable, shown between progress bars and buttons).
     /// Header 恒为红段首行，逐条目红行列在其后。
     /// </summary>
-    public void SetErrorSummary(string message)
+    public void SetErrorSummary(string message, string? detail = null)
     {
         if (string.IsNullOrEmpty(message)) return;
         _wholeArchiveError = message;
+        _wholeArchiveErrorDetail = detail;
         RebuildSummaryTexts();
+        // 状态行切到失败文案：否则引擎在「准备静默期」（首次进度上报前）抛错时，状态行会
+        // 永久停在 BeginPreparing 写入的「正在准备…」（EndPreparing 只在首个 SetProgress 时调用）。
+        // 后续若再走 SetComplete/CompleteWithErrors 会覆盖本文案（如「部分失败但整体完成」）。
+        _isPreparing = false;
+        IsIndeterminate = false;
+        StatusMessage = LocalizationManager.T("Status_OperationFailed");
         // 失败终态：操作已结束，暂停无意义 → 隐藏暂停按钮
         // （批中单项失败走 SetBatchItemStatus/OnHasErrorsChanged，不在这里隐藏——批操作仍在继续）
         IsPauseButtonVisible = false;
@@ -1522,35 +1554,62 @@ public partial class ProgressViewModel : ObservableObject
     //  T5: 确定性条目结果聚合（红/黄摘要段）
     // ════════════════════════════════════════════
 
+    /// <summary>逐条目失败/跳过结果（分类原因 + 可操作提示 + 异常原文，后两者仅供 tooltip）。</summary>
+    private readonly record struct EntryOutcome(EntryFailureReason Reason, string? Hint, string? Detail);
+
     /// <summary>红段：逐条目 Failed（EntryKey 去重，first-wins）。</summary>
-    private readonly Dictionary<string, EntryFailureReason> _failedEntries = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, EntryOutcome> _failedEntries = new(StringComparer.Ordinal);
 
     /// <summary>黄段：压缩端带原因 Skipped（EntryKey 去重，first-wins）。冲突跳过无原因不收集。</summary>
-    private readonly Dictionary<string, EntryFailureReason> _skippedEntries = new(StringComparer.Ordinal);
+    private readonly Dictionary<string, EntryOutcome> _skippedEntries = new(StringComparer.Ordinal);
 
     /// <summary>整包级错误（SetErrorSummary 传入，红段首行）。</summary>
     private string? _wholeArchiveError;
+
+    /// <summary>整包级错误的异常原文详情（tooltip）。</summary>
+    private string? _wholeArchiveErrorDetail;
 
     /// <summary>每个摘要段的最大行数（含溢出行；溢出计数 = 总数 - 已展示）。</summary>
     private const int SummaryMaxLines = 20;
 
     /// <summary>
     /// 收集单条目终态结果：Failed → 红段；Skipped 且带原因 → 黄段。
-    /// EntryKey 去重（first-wins），新条目入表才重建摘要文本。
+    /// EntryKey 去重（first-wins），新条目入表才重建摘要文本；同时把原因/详情写入列表行（D8 tooltip）。
     /// </summary>
-    private void CollectEntryOutcome(string key, ArchiveEntryStatus status, EntryFailureReason? reason)
+    private void CollectEntryOutcome(string key, ArchiveEntryStatus status, EntryFailureReason? reason, string? detail, int? hresult)
     {
+        EntryFailureReason effectiveReason;
         if (status == ArchiveEntryStatus.Failed)
         {
-            if (_failedEntries.TryAdd(key, reason ?? EntryFailureReason.Other))
+            effectiveReason = reason ?? EntryFailureReason.Other;
+            if (_failedEntries.TryAdd(key, new EntryOutcome(effectiveReason, HintFor(effectiveReason, hresult), detail)))
                 RebuildSummaryTexts();
         }
         else if (status == ArchiveEntryStatus.Skipped && reason.HasValue)
         {
-            if (_skippedEntries.TryAdd(key, reason.Value))
+            effectiveReason = reason.Value;
+            if (_skippedEntries.TryAdd(key, new EntryOutcome(effectiveReason, HintFor(effectiveReason, hresult), detail)))
                 RebuildSummaryTexts();
         }
+        else
+        {
+            return; // 非失败/非带原因跳过：不写行 tooltip
+        }
+
+        // D8：列表行 tooltip 数据（Failed / 带原因 Skipped）
+        if (_entryIndex.TryGetValue(key, out var row))
+        {
+            row.FailureReasonText = ReasonText(effectiveReason);
+            row.FailureHint = HintFor(effectiveReason, hresult);
+            row.FailureDetail = detail;
+        }
     }
+
+    /// <summary>IoFailed 且有 HResult 时解析 Win32 可操作提示（磁盘满/占用/路径过长），否则 null。</summary>
+    private static string? HintFor(EntryFailureReason reason, int? hresult) =>
+        reason == EntryFailureReason.IoFailed && hresult.HasValue
+            ? IoErrorHintResolver.FromHResult(hresult.Value)
+            : null;
 
     /// <summary>
     /// 重建红/黄摘要文本与派生标志（HasErrors 仅由红段文本驱动，D4；黄段驱动 HasSkippedEntries）。
@@ -1558,10 +1617,20 @@ public partial class ProgressViewModel : ObservableObject
     /// </summary>
     private void RebuildSummaryTexts()
     {
-        ErrorSummaryText = BuildSummaryText(_wholeArchiveError, _failedEntries,
-            (key, reason) => LocalizationManager.T("Progress_Failed_EntryFmt", key, ReasonText(reason)));
-        SkippedSummaryText = BuildSummaryText(null, _skippedEntries,
-            (key, reason) => LocalizationManager.T("Progress_Skipped_EntryFmt", key, ReasonText(reason)));
+        var failedFormat = new Func<string, EntryOutcome, string>((key, o) =>
+            LocalizationManager.T("Progress_Failed_EntryFmt", key, ReasonText(o.Reason)));
+        var skippedFormat = new Func<string, EntryOutcome, string>((key, o) =>
+            LocalizationManager.T("Progress_Skipped_EntryFmt", key, ReasonText(o.Reason)));
+
+        ErrorSummaryText = BuildSummaryText(_wholeArchiveError,
+            BuildBreakdownLine(_failedEntries, "Progress_FailedBreakdown_Fmt"), _failedEntries, failedFormat);
+        SkippedSummaryText = BuildSummaryText(null,
+            BuildBreakdownLine(_skippedEntries, "Progress_SkippedBreakdown_Fmt"), _skippedEntries, skippedFormat);
+        ErrorSummaryTooltip = BuildSummaryTooltip(_wholeArchiveError, _wholeArchiveErrorDetail,
+            BuildBreakdownLine(_failedEntries, "Progress_FailedBreakdown_Fmt"), _failedEntries, failedFormat);
+        SkippedSummaryTooltip = BuildSummaryTooltip(null, null,
+            BuildBreakdownLine(_skippedEntries, "Progress_SkippedBreakdown_Fmt"), _skippedEntries, skippedFormat);
+
         HasErrors = !string.IsNullOrEmpty(ErrorSummaryText);
         HasSkippedEntries = !string.IsNullOrEmpty(SkippedSummaryText);
         HasAnySummary = HasErrors || HasSkippedEntries;
@@ -1575,26 +1644,74 @@ public partial class ProgressViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 构建单段摘要：header 恒为首行（可空），条目行紧随；每段封顶 <see cref="SummaryMaxLines"/> 行，
-    /// 溢出时追加本地化「…另 N 项」行并截断。
+    /// 构建单段摘要：header（可空）→ 失败原因分布行（可空）→ 条目行；每段封顶
+    /// <see cref="SummaryMaxLines"/> 行，溢出时追加本地化「…另 N 项」行并截断。
     /// </summary>
-    private static string? BuildSummaryText(string? header, Dictionary<string, EntryFailureReason> entries,
-        Func<string, EntryFailureReason, string> format)
+    private static string? BuildSummaryText(string? header, string? breakdown,
+        Dictionary<string, EntryOutcome> entries, Func<string, EntryOutcome, string> format)
     {
         var lines = new List<string>();
         if (!string.IsNullOrEmpty(header)) lines.Add(header!);
+        if (!string.IsNullOrEmpty(breakdown)) lines.Add(breakdown!);
         int shown = 0;
-        foreach (var (key, reason) in entries)
+        foreach (var (key, o) in entries)
         {
             if (lines.Count >= SummaryMaxLines - 1 && shown + 1 < entries.Count)
             {
                 lines.Add(LocalizationManager.T("Progress_ErrorSummary_More", entries.Count - shown));
                 return string.Join("\n", lines);
             }
-            lines.Add(format(key, reason));
+            lines.Add(format(key, o));
             shown++;
         }
         return lines.Count == 0 ? null : string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// 构建单段摘要 tooltip：与 <see cref="BuildSummaryText"/> 同结构（同 20 行封顶），
+    /// 但每行尾附异常原文详情（" —— " 分隔）。无任何详情时返回 null（避免与正文重复）。
+    /// </summary>
+    private static string? BuildSummaryTooltip(string? header, string? headerDetail, string? breakdown,
+        Dictionary<string, EntryOutcome> entries, Func<string, EntryOutcome, string> format)
+    {
+        var hasDetail = !string.IsNullOrEmpty(headerDetail)
+            || entries.Values.Any(o => !string.IsNullOrEmpty(o.Detail) || !string.IsNullOrEmpty(o.Hint));
+        if (!hasDetail) return null;
+
+        var lines = new List<string>();
+        if (!string.IsNullOrEmpty(header))
+            lines.Add(string.IsNullOrEmpty(headerDetail) ? header! : header + "\n" + headerDetail);
+        if (!string.IsNullOrEmpty(breakdown)) lines.Add(breakdown!);
+        int shown = 0;
+        foreach (var (key, o) in entries)
+        {
+            if (lines.Count >= SummaryMaxLines - 1 && shown + 1 < entries.Count)
+            {
+                lines.Add(LocalizationManager.T("Progress_ErrorSummary_More", entries.Count - shown));
+                break;
+            }
+            var line = format(key, o);
+            if (!string.IsNullOrEmpty(o.Hint)) line += " —— " + o.Hint;
+            if (!string.IsNullOrEmpty(o.Detail)) line += " —— " + o.Detail;
+            lines.Add(line);
+            shown++;
+        }
+        return lines.Count == 0 ? null : string.Join("\n", lines);
+    }
+
+    /// <summary>
+    /// 失败原因分布行：如 `共 3 个失败：权限不足 2 · 数据损坏 1`（按数量降序，同数量按枚举序）。
+    /// 无条目时返回 null（纯整包错误不显示分布行）。占 <see cref="SummaryMaxLines"/> 一行配额。
+    /// </summary>
+    private static string? BuildBreakdownLine(Dictionary<string, EntryOutcome> entries, string formatKey)
+    {
+        if (entries.Count == 0) return null;
+        var parts = entries.Values
+            .GroupBy(o => o.Reason)
+            .OrderByDescending(g => g.Count())
+            .ThenBy(g => (int)g.Key)
+            .Select(g => $"{ReasonText(g.Key)} {g.Count()}");
+        return LocalizationManager.T(formatKey, entries.Count, string.Join(" · ", parts));
     }
 
     /// <summary>失败根因 → 本地化文案（Rule 13：禁止硬编码用户可见字符串）。</summary>
@@ -1612,9 +1729,12 @@ public partial class ProgressViewModel : ObservableObject
         _failedEntries.Clear();
         _skippedEntries.Clear();
         _wholeArchiveError = null;
+        _wholeArchiveErrorDetail = null;
         ErrorSummaryText = null;
         SkippedSummaryText = null;
         CombinedSummaryText = null;
+        ErrorSummaryTooltip = null;
+        SkippedSummaryTooltip = null;
         HasErrors = false;
         HasSkippedEntries = false;
         HasAnySummary = false;

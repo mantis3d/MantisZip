@@ -162,8 +162,8 @@ public class ArchiveOptions
     public int ParallelExtractDegree { get; set; } = 0;
 
     /// <summary>
-    /// N 组并行压缩的目标组数。0 = 自动（取 <see cref="Environment.ProcessorCount"/>），上限 16。
-    /// 运行时解析见 ZipEngine 内部；&lt;= 1 时回落标准串行路径。
+    /// N 组并行压缩的目标组数。0 = 引擎默认（<c>clamp(CPU 核数, 4, 16)</c>），
+    /// 显式值上限 16。运行时解析见 ZipEngine 内部；&lt;= 1 时回落标准串行路径。
     /// </summary>
     public int ParallelCompressDegree { get; set; } = 0;
 
@@ -388,6 +388,12 @@ public class ArchiveProgress
 
     /// <summary>失败/带原因跳过的根因类别。仅 EntryStatus=Failed 或压缩端带原因 Skipped 时携带。</summary>
     public EntryFailureReason? EntryFailureReason { get; set; }
+
+    /// <summary>失败/跳过原因的原始异常消息（仅供 UI tooltip；勿展示于摘要正文）。无异常对象时（如条目丢失）为 null。</summary>
+    public string? EntryErrorDetail { get; set; }
+
+    /// <summary>失败/跳过原因异常的 HResult（仅供 UI 解析 Win32 可操作提示，如磁盘满/占用/路径过长）。无异常时为 null。</summary>
+    public int? EntryErrorHResult { get; set; }
 
     /// <summary>整体压缩后字节（后置回填；0 = 未知）。</summary>
     public long TotalCompressedBytes { get; set; }
