@@ -10,7 +10,7 @@
 > - `UpdateAvailableDialog` (Avalonia) — 新版本通知弹窗
 > - AboutWindow 新增「更新」Tab
 > - SettingsWindow Debug Tab 增加自动检查开关
-> - 中英文 localization 字符串
+> - 三语 localization 字符串（zh-CN / en / zh-TW，规则 13）
 > - Core 层单元测试
 >
 > **Estimated Effort**: Medium
@@ -30,20 +30,20 @@
 - **更新策略**: 仅检查 + 通知（发现新版本时提示用户，用户自行决定是否下载）
 - **下载行为**: 点击「下载」按钮打开浏览器到 GitHub Releases 页面
 - **更新通道**: 仅稳定版（忽略 Pre-release）
-- **目标平台**: 仅 Avalonia 版（WPF 废弃前不加）
-- **安装形态**: 安装版 + 便携版都支持（检测到安装模式后行为一致——打开浏览器）
+- **目标平台**: 仅 Avalonia（WPF 版已整体删除，无同步负担）
+- **安装形态**: 安装版 + 便携版都支持（便携模式已实现：`Portable.txt` sentinel，设置存 exe 相邻 `Data/settings.json`；安装版存 `%LOCALAPPDATA%\MantisZip\`。两形态行为一致——打开浏览器，检测逻辑无分支，`LastUpdateCheckTime` 等随 AppSettings 自然落在各自存储位置）
 - **UI 放置**: AboutWindow 新增「更新」Tab（版本状态 + 检查按钮）+ SettingsWindow Debug Tab 加「自动检查更新」开关
 - **检查频率**: 每天最多一次（缓存 LastUpdateCheckTime，同一天内不重复检查）
 - **测试策略**: Core 层 UpdateService 编写单元测试（手动 DelegatingHandler mock，无需额外 mock 库）
 
 ### Research Findings
-- 当前 Avalonia 版本: `0.4.4` (src/MantisZip.UI.Avalonia/AppConstants.cs)
+- 当前 Avalonia 版本: `0.5.3` (src/MantisZip.UI.Avalonia/AppConstants.cs)
 - GitHub 仓库: `mantis3d/MantisZip`
 - Release workflow 通过 `v*` tag 触发，产物: installer + 自包含 installer + 便携 zip
-- AboutWindow 现有 4 个 Tab（关于/作者/依赖库/致谢），code-behind 模式（DataContext = this）
+- AboutWindow 现有 4 个 Tab（关于/作者/依赖库/致谢），code-behind 模式（DataContext = this）；Tab 头为**属性绑定模式**：code-behind 暴露 `AboutTabHeader => LocalizationManager.T("About_Tab_About")`（AboutWindow.axaml.cs:45），axaml `Header="{Binding XxxTabHeader}"`（新增 Tab 勿用 x:Name 设文本）
 - 已有 `OpenUrl` 方法通过 `TopLevel.Launcher.LaunchUriAsync` 打开浏览器
 - AppSettings 存储到 `%LOCALAPPDATA%\MantisZip\settings.json`
-- 本地化使用 `LocalizationManager.T(key)` 模式，字符串在 `strings.zh-CN.json` / `strings.en.json`
+- 本地化使用 `LocalizationManager.T(key)` 模式，字符串在 `strings.zh-CN.json` / `strings.en.json` / `strings.zh-TW.json` **三份文件**；**三语 key 集必须完全同步**（`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 校验），新增 key 插入到文件头 `{` 之后（不排序），保持 UTF-8 无 BOM + CRLF + 2 空格缩进
 - 测试项目使用 xUnit，无 mock 库
 - Core 层无 HTTP 客户端使用先例（但 `System.Net.Http` 是 .NET 10 内置）
 
@@ -92,11 +92,11 @@
 
 ### Must NOT Have (Guardrails)
 - **不实现** 应用内自动下载/安装（仅打开浏览器）
-- **不实现** 便携版独立检测逻辑（Avalonia 尚未实现便携版模式）
+- **不实现** 便携/安装版分支检测逻辑（便携模式已实现且行为一致——两形态都是打开浏览器，`LastUpdateCheckTime` 等随 AppSettings 自然落在适配各自的存储位置）
 - **不实现** Gitee 备用镜像（后续可加）
 - **不实现** DI/IHttpClientFactory（使用静态 HttpClient）
 - **不实现** Pre-release 版本检测
-- **不实现** WPF 版（仅 Avalonia）
+- **不实现** WPF 版（WPF 已整体删除，仅 Avalonia）
 
 ---
 
@@ -131,7 +131,7 @@ Wave 2 (UI — parallel):
 └── Task 6: Add auto-check toggle to SettingsWindow [unspecified-high]
 
 Wave 3 (Localization + Tests — parallel):
-├── Task 7: Add localization strings (zh + en) [writing]
+├── Task 7: Add localization strings (zh-CN + en + zh-TW) [writing]
 ├── Task 8: Write unit tests for UpdateService [quick]
 
 Wave FINAL (Verification — parallel):
@@ -162,7 +162,7 @@ Wave FINAL (Verification — parallel):
   **What to do**:
   - Create `src/MantisZip.Core/Services/UpdateInfo.cs` with `readonly record struct` or simple class
   - Fields:
-    - `LatestVersion` (string) — tag_name without `v` prefix, e.g. `"0.4.5"`
+    - `LatestVersion` (string) — tag_name without `v` prefix, e.g. `"0.5.4"`
     - `DownloadUrl` (string) — URL to GitHub release page: `https://github.com/mantis3d/MantisZip/releases/tag/v{version}`
     - `ReleaseNotesUrl` (string) — same as DownloadUrl (GitHub release page serves as release notes)
     - `ReleaseDate` (DateTime?) — from `published_at` field
@@ -212,10 +212,10 @@ Wave FINAL (Verification — parallel):
   - **Static class** with static `HttpClient` (for socket reuse, best practice)
   - Key method: `Task<UpdateInfo?> CheckForUpdateAsync(string currentVersion, bool includePreRelease = false)`
     - Calls `GET https://api.github.com/repos/mantis3d/MantisZip/releases/latest`
-    - Sets `User-Agent: MantisZip/0.4.4` (GitHub API requires User-Agent)
+    - Sets `User-Agent: MantisZip/{currentVersion}`（动态拼接入参版本号——Core 不能引用 UI 的 `AppConstants`；GitHub API 要求 User-Agent）
     - Sets `Accept: application/vnd.github+json`
     - Parses JSON response with `System.Text.Json`
-    - Checks `prerelease` field — skip if `true` (unless `includePreRelease` is true)
+    - Checks `prerelease` field — skip if `true` (unless `includePreRelease` is true)。注：`/releases/latest` 端点本身已自动排除 prerelease 与 draft，此检查仅作防御性兜底
     - Compares version using `System.Version.Parse(tag_name.TrimStart('v'))` against `currentVersion`
     - Returns `null` if current version >= latest version
     - Returns `UpdateInfo` if latest version > current version
@@ -266,9 +266,9 @@ Wave FINAL (Verification — parallel):
     Tool: Bash (dotnet script)
     Preconditions: UpdateService compiled
     Steps:
-      1. Verify: "0.4.10" > "0.4.4" (using System.Version)
-      2. Verify: "0.4.4" == "0.4.4"
-      3. Verify: "v0.4.5".TrimStart('v') == "0.4.5"
+      1. Verify: "0.5.10" > "0.5.3" (using System.Version)
+      2. Verify: "0.5.3" == "0.5.3"
+      3. Verify: "v0.5.4".TrimStart('v') == "0.5.4"
     Expected Result: Semantic version comparison works correctly
     Evidence: .omo/evidence/task-2-version-compare.txt
 
@@ -399,15 +399,15 @@ Wave FINAL (Verification — parallel):
 
   **What to do**:
   - **A) AboutWindow.axaml**: Add 5th TabItem "更新 / Updates" before `</TabControl>`
-    - Tab header: `x:Name="TabUpdatesHeader"` (text set in code-behind)
+    - Tab header: 跟随现有属性绑定模式——code-behind 暴露 `public string UpdatesTabHeader => LocalizationManager.T("Update_TabName")`，axaml 写 `Header="{Binding UpdatesTabHeader}"`（勿用 x:Name 设文本，现有 4 个 Tab 均为 `AboutTabHeader` 等属性绑定，见 AboutWindow.axaml.cs:45）
     - Content: current version display, status label, "检查更新" button, status text
   - **B) AboutWindow.axaml.cs**: Add:
     - Update status properties (bound or directly set on TextBlocks)
     - `private async Task CheckForUpdateAsync()`:
-      - Check `AppSettings.Instance.EnableAutoUpdateCheck`
+      - Check `AppSettings.Load().EnableAutoUpdateCheck`（现状无 `Instance` 属性，一律走 `Load()` 静态缓存）
       - Call `UpdateService.CheckForUpdateAsync(AppConstants.Version)`
       - If update found and version != LastSkippedVersion: show UpdateAvailableDialog
-      - Save `AppSettings.Instance.LastUpdateCheckTime = DateTime.UtcNow`
+      - Save: `var s = AppSettings.Load(); s.LastUpdateCheckTime = DateTime.UtcNow; s.Save();`（Load() 返回进程级缓存实例，Save() 落盘）
     - `OnCheckUpdatesClick` handler for manual check button
   - **C) App.axaml.cs**: After `desktop.MainWindow = new MainWindow()`:
     - Fire-and-forget: `_ = CheckForUpdatesOnStartupAsync()`
@@ -464,8 +464,8 @@ Wave FINAL (Verification — parallel):
 - [ ] 6. Add auto-update toggle to SettingsWindow
 
   **What to do**:
-  - **A) SettingsWindowViewModel.cs**: Add `EnableAutoUpdateCheck` property bound to `AppSettings.Instance.EnableAutoUpdateCheck`
-  - **B) SettingsWindow.axaml**: In the Debug tab (last tab), find the appropriate section and add a border-group:
+  - **A) SettingsWindowViewModel.cs**: Add `EnableAutoUpdateCheck` property（读写 `AppSettings.Load().EnableAutoUpdateCheck`，保存时 `Save()`，跟随 SettingsWindowViewModel 现有 settings 字段的绑定/保存模式）
+  - **B) SettingsWindow.axaml**: In the Debug tab（`TabDebugHeader`，第 9 个 Tab——注意**不是 last tab**，最后是「高级」Tab）, find the appropriate section and add a border-group:
     - Title: "更新设置" / "Update Settings"
     - CheckBox: "启动时自动检查更新" / "Check for updates on startup"
     - Bound to `{Binding EnableAutoUpdateCheck}`
@@ -507,7 +507,7 @@ Wave FINAL (Verification — parallel):
   - Message: `feat(avalonia): add auto-update toggle to SettingsWindow`
   - Files: `src/MantisZip.UI.Avalonia/Views/SettingsWindow.axaml`, `src/MantisZip.UI.Avalonia/ViewModels/SettingsWindowViewModel.cs`
 
-- [ ] 7. Add localization strings (zh + en)
+- [ ] 7. Add localization strings (zh-CN + en + zh-TW)
 
   **What to do**:
   - Edit `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json`:
@@ -530,7 +530,10 @@ Wave FINAL (Verification — parallel):
       - `"Update_Settings_SectionTitle": "更新设置"`
   - Edit `src/MantisZip.UI.Avalonia/Localization/strings.en.json`:
     - Same keys with English translations
-  - Follow existing JSON formatting (same indentation, no trailing commas)
+  - Edit `src/MantisZip.UI.Avalonia/Localization/strings.zh-TW.json`:
+    - Same keys with Traditional Chinese translations（**规则 13：三语 key 集必须完全同步**，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 把关）
+  - 三份文件共同要求：key 插入到文件头 `{` 之后（不排序）、UTF-8 无 BOM + CRLF + 2 空格缩进、无尾逗号
+  - 完成后运行 DSH 工具 `mantiszip_i18n` 校验（三语 key 集合 / `{0}` 占位符 / 重复 key / 空值）；工具不可用时手工逐处比对
 
   **Must NOT do**:
   - Don't remove or rename existing keys
@@ -555,19 +558,20 @@ Wave FINAL (Verification — parallel):
   **QA Scenarios (MANDATORY):**
 
   ```
-  Scenario: All update keys present in both languages
+  Scenario: All update keys present in all three languages
     Tool: Bash + grep
     Preconditions: Files edited
     Steps:
-      1. For each "Update_" key in strings.zh-CN.json, verify same key exists in strings.en.json
+      1. For each "Update_" key in strings.zh-CN.json, verify same key exists in strings.en.json AND strings.zh-TW.json
       2. Verify JSON is valid (no parse errors)
-    Expected Result: All keys present in both files, valid JSON
+      3. Run mantiszip_i18n tool if available
+    Expected Result: All keys present in all three files, valid JSON
     Evidence: .omo/evidence/task-7-keys.txt
   ```
 
   **Commit**: YES
   - Message: `i18n: add update-related localization strings`
-  - Files: `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json`, `src/MantisZip.UI.Avalonia/Localization/strings.en.json`
+  - Files: `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json`, `src/MantisZip.UI.Avalonia/Localization/strings.en.json`, `src/MantisZip.UI.Avalonia/Localization/strings.zh-TW.json`
 
 - [ ] 8. Write unit tests for UpdateService
 
@@ -581,7 +585,7 @@ Wave FINAL (Verification — parallel):
     5. `CheckForUpdateAsync_HttpClientReturnsSameVersion_ReturnsNull` — mock returns version same as current
     6. `CheckForUpdateAsync_HttpClientThrows_ReturnsNull` — mock throws HttpRequestException
     7. `CheckForUpdateAsync_PreReleaseVersion_ReturnsNull` — mock returns prerelease=true
-    8. `CheckForUpdateAsync_VersionComparison10GreaterThan4` — verify 0.4.10 > 0.4.4
+    8. `CheckForUpdateAsync_VersionComparison_PatchBump` — verify 0.5.10 > 0.5.3（patch 段逐位比较）
   - Create a `MockHttpHandler : DelegatingHandler` helper class that returns canned JSON responses
   - Pass handler to `HttpClient` constructor used by tests (UpdateService must accept HttpClient in constructor or via a test-friendly factory method)
 
@@ -668,7 +672,7 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj               # Expecte
 
 ### Final Checklist
 - [ ] UpdateService correctly parses GitHub API response
-- [ ] Version comparison works: 0.4.3 < 0.4.4 < 0.4.10
+- [ ] Version comparison works: 0.5.3 < 0.5.4 < 0.5.10
 - [ ] Pre-release versions are ignored
 - [ ] Network errors handled gracefully (no crash)
 - [ ] Daily throttle works (cached check within 24h)
