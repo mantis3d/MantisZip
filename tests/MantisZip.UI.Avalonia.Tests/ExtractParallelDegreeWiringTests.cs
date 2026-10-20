@@ -48,9 +48,23 @@ public class ExtractParallelDegreeWiringTests
     private const string ExtractSettingsViewModelRelPath =
         "src/MantisZip.UI.Avalonia/ViewModels/ExtractSettingsViewModel.cs";
 
-    /// <summary>主窗口解压入口 ExtractArchive 所在文件。</summary>
+    /// <summary>主窗口解压入口 ExtractArchive 所在文件（partial 主干）。</summary>
     private const string MainViewModelRelPath =
         "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs";
+
+    /// <summary>
+    /// MainWindowViewModel 的全部 partial 源码（2026-10-20 大文件拆分后：解压族在 .Extract.cs）。
+    /// ⚠ 新增 partial 时须同步追加，否则源码守卫只扫描一部分。
+    /// </summary>
+    private static readonly string[] MainViewModelRelPaths =
+    {
+        MainViewModelRelPath,
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Password.cs",
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Preview.cs",
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Navigation.cs",
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Extract.cs",
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Compress.cs",
+    };
 
     /// <summary>解压设置对话框（线程数 NumericUpDown 绑定）所在文件。</summary>
     private const string ExtractSettingsWindowRelPath =
@@ -197,7 +211,7 @@ public class ExtractParallelDegreeWiringTests
     [Fact]
     public void MainWindowViewModel_ExtractArchive_PassesParallelOverride()
     {
-        var source = ReadSource(MainViewModelRelPath);
+        var source = string.Join("\n", MainViewModelRelPaths.Select(ReadSource));
 
         // 定位 ExtractFlow.ExtractAsync( 调用点并提取实参表
         var callIndex = source.IndexOf("ExtractFlow.ExtractAsync(", StringComparison.Ordinal);

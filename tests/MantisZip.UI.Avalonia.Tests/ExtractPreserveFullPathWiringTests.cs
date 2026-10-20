@@ -35,9 +35,23 @@ public class ExtractPreserveFullPathWiringTests
     // 被测生产源码（相对仓库根，'/' 分隔，读取时替换为平台分隔符）
     // ------------------------------------------------------------------
 
-    /// <summary>核心解压方法 ExtractSelectedEntriesCoreAsync 所在文件。</summary>
+    /// <summary>核心解压方法 ExtractSelectedEntriesCoreAsync 所在文件（partial 主干）。</summary>
     private const string MainViewModelRelPath =
         "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs";
+
+    /// <summary>
+    /// MainWindowViewModel 的全部 partial 源码（2026-10-20 大文件拆分后：解压族在 .Extract.cs）。
+    /// ⚠ 新增 partial 时须同步追加，否则源码守卫只扫描一部分。
+    /// </summary>
+    private static readonly string[] MainViewModelRelPaths =
+    {
+        MainViewModelRelPath,
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Password.cs",
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Preview.cs",
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Navigation.cs",
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Extract.cs",
+        "src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Compress.cs",
+    };
 
     /// <summary>拖拽解压共享调用点所在文件。</summary>
     private const string DragDropServiceRelPath =
@@ -299,10 +313,9 @@ public class ExtractPreserveFullPathWiringTests
 
         var expected = new[]
         {
-            MainViewModelRelPath,
             DragDropServiceRelPath,
             ExtractFlowRelPath,
-        };
+        }.Concat(MainViewModelRelPaths);
         foreach (var rel in expected)
         {
             var path = SourcePath(rel);
@@ -328,7 +341,7 @@ public class ExtractPreserveFullPathWiringTests
     [Fact]
     public void MainWindowViewModel_CoreMethodTakesNullablePreserveFullPathParameter()
     {
-        var source = ReadSource(MainViewModelRelPath);
+        var source = string.Join("\n", MainViewModelRelPaths.Select(ReadSource));
         var methodSpan = ExtractMethodSpan(source, "ExtractSelectedEntriesCoreAsync");
         var normalized = NormalizeWhitespace(methodSpan);
 
@@ -357,7 +370,7 @@ public class ExtractPreserveFullPathWiringTests
     [Fact]
     public void MainWindowViewModel_CoreMethodBodyDoesNotReadSettings()
     {
-        var source = ReadSource(MainViewModelRelPath);
+        var source = string.Join("\n", MainViewModelRelPaths.Select(ReadSource));
         var methodSpan = ExtractMethodSpan(source, "ExtractSelectedEntriesCoreAsync");
         var normalized = NormalizeWhitespace(methodSpan);
 

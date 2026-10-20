@@ -1,6 +1,6 @@
 # 大文件 partial 拆分（App / ZipEngine / MainWindowViewModel）
 
-> **状态**: 📋 待实施 | **创建**: 2026-10-19 | **优先级**: P2 | **预估工时**: 4-6h
+> **状态**: ✅ 已完成（2026-10-20） | **创建**: 2026-10-19 | **优先级**: P2 | **预估工时**: 4-6h
 > **来源**: 2026-10-19 会话讨论——用户提出 `App.axaml.cs` 过长，调查后确认第一梯队 3 文件均需拆分，三节设计已获用户批准（形态 A：partial class 分文件）
 > **决策**: 纯移动、零行为变化；不抽服务类（YAGNI）；`PreviewViewModel` 明确排除（等 HTML WebView 双轨重构一起做）
 
@@ -89,3 +89,22 @@
 - **不拆**：`PreviewViewModel`（3752 行，等 `preview-extended-formats` / HTML WebView 双轨重构时一起模块化）、`SettingsWindowViewModel`/`ProgressViewModel`/`MainWindow.axaml.cs`（第二梯队缓拆）、`SevenZipEngine`/`ContextMenuHandler`（职责单一）、各 `.axaml`
 - **不做**：抽服务类、合并巨方法（`LoadArchiveAsync` 270 行 / `ShowPreviewAsync` 328 行 / `AddToArchiveAsync` 820 行留待后续）、行为变更
 - 两个 `.iss`、版本号无关本计划
+
+## 实施结果（2026-10-20 回填）
+
+**状态**：✅ 三阶段全部完成，纯移动零行为变化。
+
+| 阶段 | 原文件 | 拆分后 | commit |
+|---|---|---|---|
+| 1 | `App.axaml.cs` 2507 行 | 主干 600 + `App.Theming.cs` 263 / `App.CliExtract.cs` 937 / `App.CliInfra.cs` 286 / `App.CliCompress.cs` 565 | `0c42026` |
+| 2 | `ZipEngine.cs` 4428 行 | 主干 193 + `ZipEngine.Open.cs` 238 / `.Extract.cs` 1494 / `.Compress.cs` 676 / `.CompressGroup.cs` 1923 | 见 git log |
+| 3 | `MainWindowViewModel.cs` 3201 行 | 主干 1352 + `.Password.cs` 326 / `.Preview.cs` 463 / `.Navigation.cs` 495 / `.Extract.cs` 452 / `.Compress.cs` 243 | 见 git log |
+
+- **纯度校验**：阶段 1/2 用行数守恒（旧行数 = 新行数 − N×partial 头部）；阶段 3 额外做非空行逐行排序比对，除 5 个 partial 类闭合括号外完全一致。
+- **守卫测试适配**（实施中发现，计划未预见）：拆分导致 3 个源码文本守卫失败——
+  - `AppShutdownWiringTests` 只扫 `App.axaml.cs` → 新增 `AppRelPaths` 数组（测试 1/2/4 遍历全部 partial；测试 3 仍锁主干）；
+  - `ExtractPreserveFullPathWiringTests` / `ExtractParallelDegreeWiringTests` 只扫 `MainWindowViewModel.cs` → 新增 `MainViewModelRelPaths` 并改为拼接源码扫描。
+  - **约定**：新增 partial 必须同步这两个数组。
+- **验证**：Core build 0/0、UI build 0/0；Core 测试 747 总 / 744 过 / 3 跳过 / 0 失败；Avalonia 测试 331 总 / 328 过 / 3 跳过 / 0 失败。
+- **文档**：ARCHITECTURE.md 新增「大文件 partial 布局（2026-10-20）」；AGENTS.md 无 `App.Password.cs`/`App.Extract.cs` 的 Avalonia 引用需改（现存两处均为 WPF 移植来源的历史引用，保留）。
+- **偏差**：行号锚点按当前文件重切（App 2507 / ZipEngine 4428 / MainWindowViewModel 3201，均比立项时多 40–50 行），方法归属按功能家族而非严格行区间，符合计划「实施时以方法完整归属重切」。

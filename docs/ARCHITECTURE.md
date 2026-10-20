@@ -445,6 +445,18 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 
 > AGENTS.md 受工作区指令 64KB 预算限制，以下小节从 AGENTS.md 迁出；AGENTS.md 只保留摘要与硬性规则，细节以本文为准。
 
+### 大文件 partial 布局（2026-10-20）
+
+三个原本 2400–4400 行的类按功能家族拆为 partial（纯移动，零行为变化）；命名沿用 `ShellIntegration.*` 惯例 `<Type>.<功能区>.cs`。
+
+| 类 | 主干 | partial 文件 |
+|---|---|---|
+| `App` | `App.axaml.cs`（字段/初始化/CLI 分派/DebugLog） | `App.Theming.cs`（主题/字体/紧凑度）、`App.CliExtract.cs`、`App.CliCompress.cs`、`App.CliInfra.cs`（shell 命令/提权/IPC） |
+| `ZipEngine` | `ZipEngine.cs`（能力声明/ListEntries/TestArchive） | `ZipEngine.Open.cs`（打开 + 编码探测）、`.Extract.cs`（全量/过滤/并行）、`.Compress.cs`（CompressAsync + 分卷清理）、`.CompressGroup.cs`（增删条目 + 多线程组） |
+| `MainWindowViewModel` | `MainWindowViewModel.cs`（字段/属性/本地化/LoadArchive） | `.Password.cs`、`.Preview.cs`、`.Navigation.cs`、`.Extract.cs`、`.Compress.cs` |
+
+**源码守卫测试注意**：`AppShutdownWiringTests.AppRelPaths` 与 `ExtractPreserveFullPathWiringTests` / `ExtractParallelDegreeWiringTests` 的 `MainViewModelRelPaths` 显式枚举全部 partial；**新增 partial 必须同步追加**，否则守卫只扫描一部分文件。
+
 ### 依赖流向
 
 ```
