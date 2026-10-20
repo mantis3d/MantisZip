@@ -97,7 +97,7 @@ public class PreviewToolbarAction
 ### 工作项
 
 #### 0.1 工具栏容器
-- **文件**: `MainWindow.xaml` + `MainWindow.Preview.cs`
+- **文件**: `MainWindow.axaml` + `MainWindow.Preview.cs`
 - 在预览内容区域顶部添加 `ToolBar` 或自定义工具栏（水平 `StackPanel`）
 - 工具栏通过 `<ContentControl Content="{Binding ...}" />` 或代码动态填充
 - **约束**: 不破坏现有 Grid 行列布局；与 PreviewInfoPanel 保持同级
@@ -129,7 +129,7 @@ public class PreviewToolbarAction
 ### 工作项
 
 #### 1.1 创建格式信息展示容器
-- **文件**: `MainWindow.xaml` — `PreviewInfoPanel` 区域
+- **文件**: `MainWindow.axaml` — `PreviewInfoPanel` 区域
 - 将当前硬编码的图片信息布局改为动态 `ItemsControl` 或 `StackPanel` + 代码填充
 - 每项 = 标签 + 值，自动隐藏值为 null/空的条目
 

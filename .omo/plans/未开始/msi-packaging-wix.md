@@ -47,7 +47,7 @@ MantisZip/
 ├── installer/
 │   └── MantisZip-*.msi    # 构建输出（已 gitignore）
 ├── src/
-│   └── MantisZip.UI/
+│   └── MantisZip.UI.Avalonia/
 │       └── Resources/
 │           └── Icons/
 │               └── app.ico    # 应用图标
@@ -89,12 +89,12 @@ Components.wxs     # heat 自动收集的文件组件（可选）
       <Shortcut Id="StartMenuShortcut"
                 Directory="ProgramMenuFolder"
                 Name="MantisZip"
-                Target="[#MantisZip.UI.exe]"
+                Target="[#MantisZip.UI.Avalonia.exe]"
                 WorkingDirectory="INSTALLDIR" />
       <Shortcut Id="DesktopShortcut"
                 Directory="DesktopFolder"
                 Name="MantisZip"
-                Target="[#MantisZip.UI.exe]"
+                Target="[#MantisZip.UI.Avalonia.exe]"
                 WorkingDirectory="INSTALLDIR" />
       <RemoveFolder Id="RemoveProgramMenuDir" Directory="ProgramMenuFolder" />
       <RegistryValue Root="HKCU" Key="Software\[Manufacturer]\[ProductName]"
@@ -108,7 +108,7 @@ Components.wxs     # heat 自动收集的文件组件（可选）
 
 ```powershell
 # 1. 发布
-dotnet publish src\MantisZip.UI\MantisZip.UI.csproj `
+dotnet publish src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj `
   -c Release -o publish_output `
   --self-contained false
 
@@ -156,7 +156,7 @@ dotnet publish -c Release -o publish_output --self-contained true
 Inno Setup 中的 Setup icon 来自编译时指定的图标文件。WiX 中同样可以在 Package 上指定 Icon：
 
 ```xml
-<Icon Id="app.ico" SourceFile="src/MantisZip.UI/Resources/Icons/app.ico" />
+<Icon Id="app.ico" SourceFile="src/MantisZip.UI.Avalonia/Resources/Icons/app.ico" />
 <Property Id="ARPPRODUCTICON" Value="app.ico" />
 ```
 

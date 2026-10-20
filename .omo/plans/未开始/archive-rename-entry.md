@@ -6,7 +6,7 @@
 
 ## 任务总览
 
-- [ ] **1. UI: 重命名对话框** — RenameEntryDialog.xaml/.cs (TextInput + 验证)
+- [ ] **1. UI: 重命名对话框** — RenameEntryDialog.axaml/.cs (TextInput + 验证)
 - [ ] **2. UI: 右键菜单 + F2 快捷键** — MainWindow 上下文菜单、快捷键、多选保护
 - [ ] **3. Core: ArchiveEntryRename** — 提取→删除→添加 核心逻辑 (Core/Utils)
 - [ ] **4. UI: 移动到…** — 目录选择弹窗 + 移动处理器
@@ -72,7 +72,7 @@ Alternatively: skip the interface method and just check `CanDelete` + `CanAdd` a
 
 **Decision**: Use `CanDelete` + `CanAdd` check at UI level. No interface change needed.
 
-### Task 2: Rename dialog — `RenameEntryDialog.xaml/.cs`
+### Task 2: Rename dialog — `RenameEntryDialog.axaml/.cs`
 
 Simple modal dialog with:
 - Title: "重命名"
@@ -81,11 +81,11 @@ Simple modal dialog with:
 - Input validation: no path separators, no empty
 - OK/Cancel buttons
 
-**Style**: Match existing `PasswordDialog` / `ConflictDialog` visual style (Dark.xaml theme resources).
+**Style**: Match existing `PasswordDialog` / `ConflictDialog` visual style (Dark.axaml theme resources).
 
 ### Task 3: MainWindow rename/move handler — UI wiring
 
-**3a. Context menu items**: Add two items to the DataGrid context menu in `MainWindow.xaml`:
+**3a. Context menu items**: Add two items to the DataGrid context menu in `MainWindow.axaml`:
 
 ```xml
 <MenuItem Header="重命名" Click="FileListCtx_Rename" InputGestureText="F2"/>
@@ -192,7 +192,7 @@ public static class ArchiveEntryRename
 
 ### Task 5: Localization
 
-Add to `Localization/L.cs`:
+Add to `Localization/LocalizationManager.T()`（key 实际存放于 `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json` / `strings.en.json` / `strings.zh-TW.json`）:
 
 | Key | Default (zh-CN) | English |
 |-----|-----------------|---------|
@@ -223,14 +223,14 @@ Add to `Localization/L.cs`:
 
 | File | Change |
 |------|--------|
-| `src/MantisZip.UI/MainWindow.xaml` | Add "重命名" and "移动到…" MenuItems to context menu |
-| `src/MantisZip.UI/MainWindow.Menu.cs` | Add `RenameSelectedEntryAsync`, `MoveSelectedEntryToFolderAsync`, `FileListCtx_Rename`, `FileListCtx_MoveTo`, `FileListGrid_PreviewKeyDown` F2 handler |
-| `src/MantisZip.UI/RenameEntryDialog.xaml` | New file — simple rename dialog |
-| `src/MantisZip.UI/RenameEntryDialog.xaml.cs` | New file — code-behind |
-| `src/MantisZip.UI/MoveToFolderDialog.xaml` | New file — folder tree selection dialog for move |
-| `src/MantisZip.UI/MoveToFolderDialog.xaml.cs` | New file — code-behind |
+| `src/MantisZip.UI.Avalonia/MainWindow.axaml` | Add "重命名" and "移动到…" MenuItems to context menu |
+| `src/MantisZip.UI.Avalonia/MainWindow.Menu.cs` | Add `RenameSelectedEntryAsync`, `MoveSelectedEntryToFolderAsync`, `FileListCtx_Rename`, `FileListCtx_MoveTo`, `FileListGrid_PreviewKeyDown` F2 handler |
+| `src/MantisZip.UI.Avalonia/RenameEntryDialog.axaml` | New file — simple rename dialog |
+| `src/MantisZip.UI.Avalonia/RenameEntryDialog.axaml.cs` | New file — code-behind |
+| `src/MantisZip.UI.Avalonia/MoveToFolderDialog.axaml` | New file — folder tree selection dialog for move |
+| `src/MantisZip.UI.Avalonia/MoveToFolderDialog.axaml.cs` | New file — code-behind |
 | `src/MantisZip.Core/Utils/ArchiveEntryRename.cs` | New file — core rename/move logic |
-| `src/MantisZip.UI/Localization/L.cs` | Add ~18 new string constants |
+| `src/MantisZip.UI.Avalonia/Localization/LocalizationManager.T()` | Add ~18 new string constants |
 
 ## Open Questions
 

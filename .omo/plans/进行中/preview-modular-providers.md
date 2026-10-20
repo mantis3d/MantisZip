@@ -4,14 +4,15 @@
 
 将部分预览格式的"数据读取"实现抽取为独立的类库项目，按需分发和加载。解决预览格式增多后单个安装包体积膨胀的问题。
 
-> **状态**: 📋 待计划 | **阶段**: [⬜⬜⬜⬜] (0/4)
+> **状态**: 🟡 进行中（Task 1/4 完成） | **阶段**: [✅⬜⬜⬜] (1/4)
 > **依赖**: 预览系统稳定后 / 安装包体积接近用户不可接受时启动
+> 进度核实（2026-10-16）：`src/MantisZip.Core/Abstractions/ITableDataProvider.cs` 已存在，`src/MantisZip.Core/Utils/SqliteDataReader.cs:12` 已实现该接口（提交 1cef18f）。但 UI 的 SQLite 预览（`PreviewViewModel.ShowSqlitePreview`）仍直连 `Microsoft.Data.Sqlite`，接口当前零消费者；模块拆分（MantisZip.Preview.* 项目）、反射加载、安装包组件均未做。
 
 ---
 
 ## 任务清单
 
-- [ ] **1. 接口定义** — `ITableDataProvider` 正式纳入 Core 抽象层
+- [x] **1. 接口定义** — `ITableDataProvider` 正式纳入 Core 抽象层
 - [ ] **2. 模块拆分** — SQLite / Office 等格式抽取为独立类库项目
 - [ ] **3. 模块发现与加载** — 主程序启动时自动发现可用模块
 - [ ] **4. 发布与分发** — 模块 NuGet 包 / 独立下载

@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-16** — 计划库审计与重新归类（全量核查 `.omo/plans/未开始/` 38 个设计文档）
+  - **背景**：对照代码库逐条验证 38 个「未开始」计划的真实完成度，纠正文本与实际不符者，并按完成度重新归档（规则 1）
+  - **移入 `已完成/`（2）**：`compression-performance-optimization.md`（ZIP 并行解压 + 7z 多线程 `mt=on` + 4MB 缓冲区全部落地，随 v0.5.0 发布；Task 7 分组并行压缩移交 custom-zip-engine）；`clean-temp-on-startup-avalonia.md`（Avalonia 启动清理消费方，2026-09-27 落地）
+  - **移入 `进行中/`（4）**：`preview-modular-providers.md`（Task 1/4——`Core/Abstractions/ITableDataProvider.cs` + `SqliteDataReader` 已实现但 UI 仍直连 `Microsoft.Data.Sqlite`、接口零消费者）；`floating-preview-panel.md`（Phase 2 四位置停靠切换已实现，Phase 1/3 未做；计划文本原写 0/13 已修正）；`extract-preserve-full-path-toggle.md`（实现随 v0.5.1 发布，残留 3 项人工 GUI 验收 + §10 spec 回写）；`settings-unwired-keys.md`（第 10 项 EnableCascadingMenu 文档闭环，第 5/9 项评估后由用户决策暂缓实施）
+  - **保留 `未开始/`（32）**：文本声称与实际一致；顺带清理多个计划内过时的 WPF 时代文件路径（`src/MantisZip.UI/`→`src/MantisZip.UI.Avalonia/`、`.xaml`→`.axaml`、`L.cs`→`LocalizationManager`、`strings.zh.json`→`strings.zh-CN.json` 等），并为 `startup-native-splash.md` 补状态行
+  - **同步**：本文件 + `PROGRESS.md` 历史设计方案索引（新增 2 条已完成）+ `PLAN.md`（移除 2 条已完成条目、4 条进行中条目路径与说明更新、修正 5 项计划依赖链执行顺序说明）
+
 **2026-10-10** — 音频预览新增 MP3 + FLAC 内嵌封面显示（✅ 已完成，对齐 WPF 版行为）
   - **Core `FlacParser.cs`**：由只读 STREAMINFO 重构为遍历全部元数据块——`ExtractStreamInfo` 保留「首个块载荷 <34 → null」语义，新增 `ExtractPictureBlock`/`TryParsePicturePayload` 提取 PICTURE（type 6）图片数据填入 `CoverArtData`；封面块损坏 → cover 为 null 但解析仍成功；`FileFormatInfo.CoverArtData` 注释补充 FLAC PICTURE 说明
   - **`MetadataRegistry.cs`**：`audio` 类型注册表首项加 `MetadataKeys.Title`（`Metadata_Key_Title` 三语已存在 → 零新增 i18n key）

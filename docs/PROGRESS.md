@@ -180,6 +180,8 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| CleanTempOnStartup 消费方（Avalonia 启动后台清理 `CleanTempOnStartupCore` + `OnFrameworkInitializationCompleted` fire-and-forget，失败仅日志；Core 层 4 处 `%TEMP%\MantisZip` 硬编码覆盖另见 core-temp-root-injectable） | [clean-temp-on-startup-avalonia.md](.omo/plans/已完成/clean-temp-on-startup-avalonia.md) | v0.5.1 |
+| 压缩/解压性能优化（ZIP 并行解压 `SupportsParallelExtract`/`ParallelExtractDegree` + 7z 多线程压缩 `mt=on` 实测 4.63x + 4MB 缓冲区；Task 7 ZIP 分组并行压缩移交 custom-zip-engine） | [compression-performance-optimization.md](.omo/plans/已完成/compression-performance-optimization.md) | v0.5.0 |
 | Avalonia: WPF 差异补齐总表（P0–P2 全部清零：双击行为/删除原包、便携模式（含 Temp 重定向）、文件过滤控件、默认路径优先级、信息面板持久化、智能打开路径（含 `ExtractArchive` 死代码修复）、冲突对话框暂停/取消、密码导入导出、收藏夹、Enable 设置、AllowElevation 等） | [avalonia-wpf-diff-plan.md](.omo/plans/已完成/avalonia-wpf-diff-plan.md) | v0.5.0 |
 | 添加到压缩包重名条目冲突处理（`AddConflictHelper` 条目名级解析、语义方向与解压相反：新数据更新/更大→覆盖；ZIP copy-mode `keepEntryNames` 排除被覆盖条目 + legacy Phase 2 应用解析结果；7z 覆盖经 `ModifyArchive`(index→null) 删除 + `CompressFileDictionary` Append 重加；Avalonia Ask 弹窗复用 ConflictDialog，新标题 key `AddConflict_Title`） | [add-archive-conflict-handling.md](.omo/plans/已完成/add-archive-conflict-handling.md) | v0.5.0 |
 | Avalonia 拖拽添加（`MainWindowViewModel.AddFilesToArchiveAsync` 抽取 + WPF `Window_Drop` 三分支移植：已打开+压缩包→切换打开 / 已打开+文件→确认框→添加到 `CurrentFolder` / 未打开→打开或 `CompressSettingsWindow` 预填 + `DragAddOverlay` 窗口内两色覆层（绿=可添加/红=格式不支持，呼吸动画对齐拖拽解压）+ 文件夹拖入支持） | [drag-add-overlay.md](.omo/plans/已完成/drag-add-overlay.md) | v0.5.0 |

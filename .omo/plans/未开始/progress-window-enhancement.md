@@ -1,5 +1,7 @@
 # ProgressWindow 增强改造 Implementation Plan
 
+> ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Goal:** 增强 ProgressWindow 的显示信息——路径/文件名分离、文件级计数、实时统计栏（已处理/跳过/出错）、批处理每包摘要、并行进度显示、模式切换（简约/详细/列表）、时间估算。
@@ -51,9 +53,9 @@
 
 | 文件 | 状态 | 职责 |
 |------|------|------|
-| `UI/Dialogs/ProgressWindow.xaml` | 修改 | Grid 行调整，新增控件 |
-| `UI/Dialogs/ProgressWindow.xaml.cs` | 修改 | `SetProgress` 调 `ProgressDisplayCalculator` 后赋控件 |
-| `UI/AppPartials/App.Extract.cs` | 修改 | 批处理完成后从 `ExtractResult` 更新统计 |
+| `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml` | 修改 | Grid 行调整，新增控件 |
+| `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml.cs` | 修改 | `SetProgress` 调 `ProgressDisplayCalculator` 后赋控件 |
+| `src/MantisZip.UI.Avalonia/App.axaml.cs` | 修改 | 批处理完成后从 `ExtractResult` 更新统计 |
 
 ---
 
@@ -74,7 +76,7 @@ Wave 2 (UI 层 — 5 任务):
 ├── Task 7: ProgressDisplayCalculator 时间估算 + 并行进度方法
 ├── Task 8: ProgressWindow.cs 代码逻辑（SetProgress + 模式切换 + 时间显示）
 ├── Task 9: ThreadProgressItem/FileInfoItem 模型类（新增）
-└── Task 10: App.Extract.cs 统计更新 + 引擎并行进度上报
+└── Task 10: App.axaml.cs 统计更新 + 引擎并行进度上报
 ```
 
 ---
@@ -376,7 +378,7 @@ Wave 2 (UI 层 — 5 任务):
 - [ ] 6. **ProgressWindow XAML 布局改动 + 双模式切换**
 
   **What to do**:
-  修改 `ProgressWindow.xaml`，采用上下两区域布局，支持独立模式切换：
+  修改 `ProgressWindow.axaml`，采用上下两区域布局，支持独立模式切换：
 
   **布局结构**：
   ```
@@ -878,7 +880,7 @@ Wave 2 (UI 层 — 5 任务):
 - [ ] 9. **ProgressWindow.cs 代码逻辑（SetProgress + 模式切换 + 时间显示）**
 
   **What to do**:
-  修改 `ProgressWindow.xaml.cs`，重构 `SetProgress` 方法，新增模式切换、时间显示、并行进度支持：
+  修改 `ProgressWindow.axaml.cs`，重构 `SetProgress` 方法，新增模式切换、时间显示、并行进度支持：
 
   **9a. 新增字段**：
   ```csharp
@@ -1127,11 +1129,11 @@ Wave 2 (UI 层 — 5 任务):
   **Parallelization**:
   - **Can Run In Parallel**: NO
   - **Parallel Group**: Wave 2 (sequential, after Tasks 6, 7, 8)
-  - **Blocks**: Task 10 (App.Extract.cs needs these methods)
+  - **Blocks**: Task 10 (App.axaml.cs needs these methods)
   - **Blocked By**: Tasks 6, 7, 8
 
   **References**:
-  - `src/MantisZip.UI/Dialogs/ProgressWindow.xaml.cs` — 现有 `SetProgress` 方法
+  - `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml.cs` — 现有 `SetProgress` 方法
   - `src/MantisZip.Core/Utils/ProgressDisplayCalculator.cs` — 新建的工具类
   - `src/MantisZip.Core/Models/ThreadProgressItem.cs` — 新建的模型类
   - `src/MantisZip.Core/Models/FileListItem.cs` — 新建的模型类
@@ -1141,7 +1143,7 @@ Wave 2 (UI 层 — 5 任务):
   Scenario: 编译验证
     Tool: Bash
     Steps:
-      1. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
+      1. dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
     Expected Result: 编译通过
     Evidence: .omo/evidence/task-9-build.txt
 
@@ -1157,14 +1159,14 @@ Wave 2 (UI 层 — 5 任务):
 
   **Commit**: YES (groups with Task 6)
   - Message: `feat(ui): enhance ProgressWindow with mode switching, time display, and parallel progress support`
-  - Files: `ProgressWindow.xaml.cs`
+  - Files: `ProgressWindow.axaml.cs`
 
-- [ ] 10. **App.Extract.cs 统计更新 + 引擎并行进度上报**
+- [ ] 10. **App.axaml.cs 统计更新 + 引擎并行进度上报**
 
   **What to do**:
-  修改 `App.Extract.cs` 和三个引擎，支持并行进度上报和统计更新：
+  修改 `App.axaml.cs` 和三个引擎，支持并行进度上报和统计更新：
 
-  **10a. `App.Extract.cs` — 批处理完成后更新统计**：
+  **10a. `App.axaml.cs` — 批处理完成后更新统计**：
   ```csharp
   // 在批处理循环中，每个压缩包提取完成后
   var extractResult = await engine.ExtractAsync(...);
@@ -1225,9 +1227,9 @@ Wave 2 (UI 层 — 5 任务):
   - **Blocked By**: Tasks 5, 9
 
   **References**:
-  - `src/MantisZip.UI/AppPartials/App.Extract.cs` — 批处理循环
+  - `src/MantisZip.UI.Avalonia/App.axaml.cs` — 批处理循环
   - `src/MantisZip.Core/Engines/ZipEngine.cs` — 并行提取逻辑
-  - `src/MantisZip.UI/Dialogs/ProgressWindow.xaml.cs` — 新增方法
+  - `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml.cs` — 新增方法
 
   **QA Scenarios**:
   ```
@@ -1235,7 +1237,7 @@ Wave 2 (UI 层 — 5 任务):
     Tool: Bash
     Steps:
       1. dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-      2. dotnet build src\MantisZip.UI\MantisZip.UI.csproj
+      2. dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
     Expected Result: 编译通过
     Evidence: .omo/evidence/task-10-build.txt
 
@@ -1251,7 +1253,7 @@ Wave 2 (UI 层 — 5 任务):
 
   **Commit**: YES (groups with Task 6)
   - Message: `feat(ui): enhance ProgressWindow with mode switching, time display, and parallel progress support`
-  - Files: `App.Extract.cs`, `ZipEngine.cs`
+  - Files: `App.axaml.cs`, `ZipEngine.cs`
 
 ---
 
@@ -1289,7 +1291,7 @@ Wave 2 (UI 层 — 5 任务):
 | Step | Message | Scope |
 |------|---------|-------|
 | Wave 1 (after Tasks 1-5) | `feat(core): add skip counting and conflict action callback infrastructure` | ArchiveProgress, ArchiveOptions, ExtractResult, FileConflictHelper, ProgressDisplayCalculator, BatchItem, 3 engines |
-| Wave 2 (after Tasks 6-10) | `feat(ui): enhance ProgressWindow with mode switching, time display, and parallel progress support` | ProgressWindow.xaml, ProgressWindow.xaml.cs, App.Extract.cs, ZipEngine.cs, new model classes |
+| Wave 2 (after Tasks 6-10) | `feat(ui): enhance ProgressWindow with mode switching, time display, and parallel progress support` | ProgressWindow.axaml, ProgressWindow.axaml.cs, App.axaml.cs, ZipEngine.cs, new model classes |
 
 ---
 
@@ -1298,7 +1300,7 @@ Wave 2 (UI 层 — 5 任务):
 ### Verification Commands
 ```bash
 dotnet build src\MantisZip.Core\MantisZip.Core.csproj
-dotnet build src\MantisZip.UI\MantisZip.UI.csproj
+dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 ```
 
