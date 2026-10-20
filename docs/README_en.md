@@ -292,6 +292,14 @@ MantisZip would not exist without the generous contributions of the global open-
 |------|--------|--------|------|
 | [7z.dll](https://www.7-zip.org/) | Native 7z/RAR parsing (SharpSevenZip binding) | GNU LGPL | Distributed with app, dynamically linked |
 
+#### Fonts & Icon Resources
+
+| Resource | Purpose | License | Notes |
+|------|------|--------|------|
+| [Fira Code](https://github.com/tonsky/FiraCode) | Glyph source of file-type icons (zip/gz/tgz/tar/rar/iso/7z .ico) | [SIL OFL 1.1](https://openfontlicense.org/) | Rasterized usage; the font file itself is not distributed with the app |
+
+See [THIRD-PARTY-NOTICES.md](../THIRD-PARTY-NOTICES.md) for the third-party copyright and license summary.
+
 ---
 
 ### 🤖 Intelligent Development Assistance

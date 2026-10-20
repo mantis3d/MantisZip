@@ -342,6 +342,14 @@ MantisZip 的诞生离不开全球开源社区的无私奉献。在此，对本�
 |------|------|--------|------|
 | [7z.dll](https://www.7-zip.org/) | 7z/RAR 原生解析（SharpSevenZip 绑定） | GNU LGPL | 随应用分发，动态链接 |
 
+#### 字体与图标资源
+
+| 资源 | 用途 | 许可证 | 备注 |
+|------|------|--------|------|
+| [Fira Code](https://github.com/tonsky/FiraCode) | 文件图标（zip/gz/tgz/tar/rar/iso/7z .ico）字形来源 | [SIL OFL 1.1](https://openfontlicense.org/) | 栅格化使用，字体文件不随应用分发 |
+
+第三方版权与许可汇总详见 [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md)。
+
 ---
 
 ### 🤖 智能化开发辅助
