@@ -83,6 +83,20 @@ ZIP 解压默认并行（`ZipEngine.SupportsParallelExtract = true`）：按文�
 
 UI 传递链、实测数据与验证用例见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
+### ZIP 压缩加速（自适应 / 多线程 / 引擎侧组数）
+
+**三开关 Phase 1 互相独立**（`AppSettings.AdaptiveCompression` / `AdaptiveSmartDetect` / `MultiThreadedCompression`）——2026-10-18 双机实测表明**多线程收益与 CPU 相关**：20 核机上 text/mixed 有 10–20% 收益且压缩率更好（text +15%），8 逻辑核机（i7-3770 4C/8T）上净负收益（text 慢 42%、mixed 慢 37%）。任何一刀切静态策略（无论「MT 依赖自适应」还是「MT 独立」）都只对一半硬件正确 → **Phase 1 不做门控**，最终策略由 Phase 2 **本机基准测试**按机器定夺。双机数据与评审记录见 `.omo/plans/进行中/adaptive-compress-ui-convergence.md`。
+
+**组数已从 UI 移除**：引擎默认 `clamp(CPU 核数, 4, 16)`（下限 4 避开已证实的 deg=2 陷阱；20 核机实测 16 组最优，deg=8 慢 21–30%）。组内线程数 = 核数/组数（方案 C）**未验证**——默认路径下多为 no-op，仅在「核数 > 16」或「文件数 < 组数」时生效，**不得**当性能依据写进文档/发布说明。
+
+**⚠ ZIP 的 MT 路径与上面 7z 的 `mt=on` 是两件事**：ZIP MT 按「纯压缩组（7z Deflate）/ 混合组」分派，用 N 个 `mt=off` 的 7z 压缩器组间并行 + copy-mode 合并（不重压缩）；7z 的 `mt=on` 是 7z.dll 原生线程。两者不可混为一谈。
+
+**隐藏的空转控件（Phase 2 实现后启用）**：
+
+- `魔数检测`（`AdaptiveSmartDetect`）：`ZipEntryClassifier.GetAdaptiveLevel` 只读扩展名，从不读 `FileFormatDetector.Detect` 结果 → UI 已隐藏
+- `自适应规则`（`AdaptiveOverrides`）：`AdaptiveRuleMatcher.ResolveLevel` 无生产调用点，`CompressRequest`/`ArchiveOptions` 无规则字段 → 卡片已隐藏
+- 自定义格式「魔数 hex」：`GetAdaptiveLevel` 只读 `format.Extensions`，不读 `MagicHex` → 输入框已隐藏
+
 ### ArchiveItem duality
 
 - **Core**: `MantisZip.Core.Abstractions.ArchiveItem` — engines produce these

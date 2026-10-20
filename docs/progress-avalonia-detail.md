@@ -19,6 +19,15 @@
   - **图标时序修复并入本笔提交**（上轮仅工作区改动未 commit）：`ExtractIconEx` 从运行中 exe 提取 `<ApplicationIcon>` 的调用点前移至 `CreateWindowEx(WS_VISIBLE)` **之前**——首帧 `WM_PAINT` 随 `UpdateWindow` 同步发出、之后无重绘机会，后置提取永远拿到纯文本首帧；附带 `SendSplashLog` 诊断埋点。
   - **冒烟**：`--open <真实 zip>` 与 `--extract-here <真实 zip>` 两场景探针（`MantisZipNativeSplash` 全枚举）各采得 4/3 个 ~250ms 样本 splash 可见后消失，进程全周期存活；`--extract-here` 实际解压落地成功。动态文案实际渲染内容待 GUI 人工验收（与 splash 视觉清单合并）。
 
+**2026-10-20** — 修复并行解压进度窗口「第一批次进度条恒为 0」（预测试单通道行占用批次索引 0）
+  - **症状**：多线程解压（ZIP ≥1GiB + 智能并行 + 大包预测试开启）时，进度窗口详细面板第一行**没有批次底纹进度条、没有批次序号、没有 `N% (x/y)`**，看起来像「第一批次始终 0%」；其余行序号从 **2** 起
+  - **根因（UI 侧，非引擎）**：解压前 `ParallelDegreeResolver.ResolveAsync` 发出一条无 `BatchIndex`/`EntryKey` 的状态上报（占位文案 `STATUS_TESTING_PARALLEL_DEGREE`），`ProgressViewModel.SetProgress` 走 `UpsertSingleChannelRow` 在集合**索引 0** 合成一条 `IsParallel=false` 的单通道行；随后真正的并行上报带 `BatchIndex=0`，`UpsertParallelBatch` 直接 `_parallelBatchItems[0]` → batch 0 写进这条单通道行。`ParallelBatchProgressItem.IsParallel` 是 `init` 只读，而 `ProgressWindow.axaml` 的批次底纹矩形（右区 `BatchRatio`）、序号 `Index`、`PctDetailText` 全部绑 `IsVisible="{Binding IsParallel}"` → 三者永久隐藏；补洞创建又使后续行序号变为 2..N
+  - **修复**：`UpsertParallelBatch` 入口先调新增的 `RemoveSingleChannelRows()`（倒序移除 `IsParallel=false` 行），再按 `BatchIndex` 补洞建行 → 批次索引与行索引严格对齐（序号 1..N）。`UpsertSingleChannelRow` 仅在「集合内无任何并行行」时创建单行，故清空幂等、不会打乱已建批次行；纯串行流程（无 `BatchIndex` 上报）不受影响
+  - **同源覆盖**：并行压缩的 `FileScanner` 收集阶段同样先发非批次上报 → 首次 N 组并行 batch 0 落在单通道行，本次一并修复
+  - **测试**：新增 `ProgressViewModelTests.SetProgress_PreTestSingleRow_ThenParallel_BatchZeroGetsParallelRow`（预测试上报 → batch 1 → batch 0；断言集合 2 行全为并行行、`Index` 1/2、`rows[0].Percent=25`、`PctDetailText="25%"`）；`ProgressViewModelTests` 单类 75 通过；Avalonia 全量 **306 通过 / 3 跳过 / 0 失败**；`dotnet build src\MantisZip.UI.Avalonia` **0 警告 0 错误**
+  - **引擎侧复核（无改动）**：2026-10-14 `03ea955` 的修复（`BatchProcessedBytes += entryProcessed`）已在 HEAD；用 SharpCompress 0.50.4 探针实测 `entry.WriteToAsync` 对 96MB 条目每 4MB 回调一次、`BytesTransferred` 递增，确认 `entryProcessed` 会正常推进
+  - **GUI 人工验收待做**：≥1GiB ZIP 并行解压，详细面板第 1 行应有底纹进度条 + 序号 1 + 百分比（不再从 2 起）
+
 **2026-10-20** — Splash 样式升级：图标左 + 文字右 + Win11 圆角（commit `1c4e214`，用户确认方案）
   - `Paint` 重排：`DT_CALCRECT` 先量文本宽 →（图标 32dp + 间隔 16dp + 文本宽）整体水平/垂直居中，图标 `DrawIconEx` 左置、文字 `DT_LEFT|DT_VCENTER` 右置，缺图标时布局自动退化为纯文本
   - 图标零资产工作：`ExtractIconExW` 直接提取运行中 exe 的 `<ApplicationIcon>` 内嵌资源为 HICON，ThreadProc 一次性缓存 / `DestroyIcon` 释放
@@ -33,6 +42,10 @@
   - **调试踩坑实录**（对后续任何 Win32 窗口类实现都适用）：① `RegisterClassEx` 默认解析为 ANSI 版 → 用 Unicode 名称查找失败 `1407 ERROR_CANNOT_FIND_WND_CLASS`；② 给 `WNDCLASSEX` struct 加 `CharSet.Unicode` + `GetClassInfoEx`（string 字段 ref-marshaling 指针被 native 填写后 CLR 以垃圾指针释放）→ **`ntdll 0xC0000374 HEAP_CORRUPTION` 静默退进程（无 debug.log 无 lifecycle，靠 Windows Application Error 事件 1026 定位）**；③ **终版方案**：类名 `Marshal.StringToHGlobalUni` → nint 指针传入 `WNDCLASSEX.lpszClassName` / `CreateWindowEx.lpClassName`（创建后即可 Free），彻底绕开壳 marshaling 不确定性——**一次通过且稳定**。
   - **冒烟实测**：splash 窗口 `MantisZipNativeSplash` 全枚举可见（~196ms 出现）；无参冷启动 splash → 主窗 Opened → splash ~1.2s 自动消失；`--test` 路径确认无 splash（skip 生效）；进程 4s 存活 + debug.log 无 ERROR 行。
   - **文档同步**：计划归档；GUI 手动验收清单（焦点/任务栏/DPI/CLI `--compress`/`--open` 全链路/语言切换）已列出待人工。
+
+**2026-10-20** — 修复「未打开压缩包时拖入文件/目录 → 点压缩无反应」+ RELEASE_NOTES 0.5.2 补录
+  - **拖入压缩修复（用户确认的方案 A 最小改动）**：`MainWindow.axaml.cs` `OnWindowDrop` 分支 3b（未打开压缩包 + 拖入非压缩包）只 `new CompressSettingsWindow(paths) → ShowDialog` 即返回、**无任何执行代码**（`2026-08-19 285b586` 引入即如此；对话框内 `StartCompress` 的契约是「Plan 就绪 → CloseAction(true) 关窗」，执行由调用方负责）。修复：`MainWindowViewModel` 新增公开 `DragInCompressAsync(IReadOnlyList<string> droppedPaths)`——复用 `ShowCompressSettingsDialog` 回调与 `ExecuteCompressFromSettings` 私有链路（选项拷贝回传 + `AdoptPlan` → `CompressFlow.BuildRequest` → `RunWithProgress` + 冲突/错误弹窗 + 密码库保存），与 `NewArchive`「新建压缩包」完全同链；分支 3b 改 `await vm.DragInCompressAsync(paths)`。新增回归测试 `DragInCompressWiringTests` 2 条（确认 → 桩 `RunWithProgress` 被调 + `PendingCompressRequest` 非空；取消 → 不执行）。构建 0 错误；`--filter ~DragInCompress` 2 通过；Avalonia 全量 308 总 / 305 过 / 3 跳过 / 3 失败（预存语料缺口）。GUI 人工验收待做：拖文件/拖目录实证压缩包落盘
+  - **RELEASE_NOTES.md 0.5.2 补录**（`v0.5.1..HEAD` 比对漏记内容，用户拍板六组）：① 新增「自适应压缩体系」一步（压缩对话框与设置「加速」选项卡、**多线程压缩**与**自适应压缩**两独立开关、仅存储格式列表可维护）+ 改写「ZIP N 组并行压缩」组数句为**自动按 CPU 核数决策（clamp 4–16，无需手动设置）**（依 `adaptive-compress-ui-convergence.md` Phase 1 文案；该体系从未进过任何 release changelog，为本版最大遗漏）；② 压缩/解压出错信息本地化与分层（含状态行两处卡「正在准备…」修复）；③ 损坏 7z/RAR 误判加密修复；④ 文件关联失效修复系列（RegistryHost/UserChoice/DefaultIcon/自愈/SHChangeNotify/RunOnce）；⑤ CLI 退出路径收口 `AppShutdown`；⑥ 拖入压缩无反应修复（本次）。alpha 分支的 10-19 两条启动优化（ApplyTheme 缓存 / AppSettings 进程级缓存）按拍板**不写入**。小项（i18n 补齐/图标刷新/CoreLog 脱敏等）不写。**自适应条目文案基于 Phase 1 计划、待用户对照另一台机器实际实现核对**
 
 **2026-10-19** — 启动优化三期完成：AppSettings 进程级缓存（`startup-appsettings-cache.md` 归档）
   - **实现**（`Models/AppSettings.cs:271+`，commit `a96db21`）：`Load()`/`Save()` 静态缓存（lock + `_cached`，72 处调用点零改造）——cache 每进程只读盘一次；`Save()` 落盘成功后把被保存实例写回缓存（外部可见值与内存一致）；损坏文件异常分支不缓存（下次重试）、文件不存在缓存默认值、Save 失败不动缓存；`ResetCacheForTests()` internal 测试钩子（沿 `StartupTimer.ResetForTest` 的 InternalsVisibleTo 惯例）。

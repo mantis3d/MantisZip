@@ -49,8 +49,7 @@
   "Progress_Tooltip_Ratio": "壓縮率",
   "Progress_Stats_TotalSize": "總大小 {0}",
   "Progress_Preparing": "正在準備…",
-  "Compress_ParallelDegree": "並行壓縮組數",
-  "Compress_ParallelDegree_Hint": "（N 個壓縮器並行；設為 1 則與上方「多執行緒壓縮」等效）",
+  "Compress_MT_BenefitHint": "收益與 CPU 設定相關：多核高設定提升明顯；核心數較少時收益有限，甚至可能變慢。",
   "Progress_Mode_Label": "顯示：",
   "Progress_Mode_Simple": "簡約",
   "Progress_Mode_Detailed": "詳細",
@@ -894,7 +893,7 @@
   "Settings_AdaptiveSmartDetect": "魔數檢測",
   "Settings_AdaptiveSmartDetect_Desc": "對大檔案進行魔數取樣檢測，更準確辨識已壓縮格式。會略微降低壓縮速度。",
   "Settings_MultiThreadedCompression": "多執行緒壓縮",
-  "Settings_MultiThreadedCompression_Desc": "利用多核心 CPU 平行壓縮，顯著提升壓縮速度。可與自適應壓縮同時啟用。",
+  "Settings_MultiThreadedCompression_Desc": "利用多核心 CPU 平行壓縮以提升壓縮速度。可與自適應壓縮同時啟用。",
   "Settings_AdaptiveMode_Disabled": "停用（一律使用所選級別）",
   "Settings_AdaptiveMode_StoreForCompressed": "僅對已知格式自動降級（建議）",
   "Settings_AdaptiveMode_SmartDetect": "智慧檢測（大檔案魔數辨識）",
@@ -1279,6 +1278,6 @@
   "Metadata_Key_IconCount": "圖示數量",
   "Metadata_Key_Encrypted": "加密",
   "AdaptiveHelp_Title": "壓縮加速說明",
-  "AdaptiveHelp_Markdown": "自適應壓縮會依檔案類型自動決定是否壓縮，避免對已壓縮資料白耗 CPU；下方三個開關可自由組合。\n\n## 自適應壓縮\n依檔案類型自動決定壓縮方式。對已知的已壓縮格式（JPEG、PNG、MP4、ZIP 等 60 餘種副檔名）直接以「儲存」方式寫入，不再二次壓縮——這類資料已無可壓縮空間，再壓只會白白消耗 CPU 與時間；其餘檔案仍依你選定的壓縮級別正常壓縮。\n\n## 魔數檢測\n僅在「自適應壓縮」開啟時可用。開啟後對較大的檔案讀取檔頭魔數（magic number）判斷真實格式，而非僅憑副檔名——可辨識被改過副檔名的已壓縮檔案。判斷更準確，代價是略微降低壓縮速度。\n\n## 多執行緒壓縮\n使用多核 CPU 並行壓縮，顯著提升速度，適合大檔案或檔案數量較多的情況（實驗性功能）。可與「自適應壓縮」同時開啟。\n\n> **提示**：當「自適應壓縮」與「多執行緒壓縮」同時開啟時，「自適應規則」中的使用者自訂規則不生效；如需依格式自訂壓縮級別，請改用「僅儲存格式」清單。"
+  "AdaptiveHelp_Markdown": "自適應壓縮會依檔案類型自動決定是否壓縮，避免對已壓縮資料白耗 CPU；下方兩個開關可自由組合。\n\n## 自適應壓縮\n依檔案類型自動決定壓縮方式。對已知的已壓縮格式（JPEG、PNG、MP4、ZIP 等 60 餘種副檔名）直接以「儲存」方式寫入，不再二次壓縮——這類資料已無可壓縮空間，再壓只會白白消耗 CPU 與時間；其餘檔案仍依你選定的壓縮級別正常壓縮。## 多執行緒壓縮\n使用多核 CPU 並行壓縮以提升速度，適合大檔案或檔案數量較多的情況（實驗性功能）。可與「自適應壓縮」同時開啟。\n\n> **提示**：當「自適應壓縮」與「多執行緒壓縮」同時開啟時，「自適應規則」中的使用者自訂規則不生效；如需依格式自訂壓縮級別，請改用「僅儲存格式」清單。"
 }
 

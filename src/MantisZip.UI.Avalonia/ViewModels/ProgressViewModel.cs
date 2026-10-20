@@ -1029,6 +1029,12 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>并行批次行 upsert（BatchIndex 0-based → Index=BatchIndex+1；补洞创建，Percent/DetailText 消费批级字段）。</summary>
     private void UpsertParallelBatch(ArchiveProgress p)
     {
+        // 首个并行批次上报到达前，非批次上报（解压大包预测试状态 / 压缩收集阶段）已合成一条
+        // IsParallel=false 单行并占据集合索引 0。IsParallel 是 init 只读，若不清掉，batch 0 会写进
+        // 这条非并行行 → XAML 里批次底纹（进度条）、序号、N% 均绑 IsVisible=IsParallel → 第一行
+        // 永久无进度条（看似恒 0），且补洞创建使其余行序号从 2 起。故首个并行上报先清空残留单行。
+        RemoveSingleChannelRows();
+
         int idx = p.BatchIndex!.Value;
         while (_parallelBatchItems.Count <= idx)
             _parallelBatchItems.Add(new ParallelBatchProgressItem { Index = _parallelBatchItems.Count + 1, IsParallel = true });
@@ -1057,6 +1063,17 @@ public partial class ProgressViewModel : ObservableObject
         if (p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue)
             row.DetailText = LocalizationManager.T("Progress_Batch_FilesProgress",
                 p.BatchProcessedFiles.Value, p.BatchTotalFiles.Value);
+    }
+
+    /// <summary>移除残留的非并行单行（并行批次接管详细面板时调用，保证 batch 索引与行索引对齐）。
+    /// UpsertSingleChannelRow 仅在「集合内没有任何并行行」时创建单行，故此处移除不会打乱已建批次行。</summary>
+    private void RemoveSingleChannelRows()
+    {
+        for (int i = _parallelBatchItems.Count - 1; i >= 0; i--)
+        {
+            if (!_parallelBatchItems[i].IsParallel)
+                _parallelBatchItems.RemoveAt(i);
+        }
     }
 
     /// <summary>非并行单行 upsert：集合恒保持至多 1 条 IsParallel=false 的行（复用批次行样式，D2/D8）。</summary>
