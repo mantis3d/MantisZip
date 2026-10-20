@@ -143,9 +143,10 @@ public static class ZipCommentHelper
         if (trimmed.Length == 0)
             return null;
 
-        // ZIP EOCD 注释无编码标志：UTF-8 BOM → 严格 UTF-8 → 系统 ANSI（GBK 等）回退，
-        // 兼容新旧工具（旧工具多用本地代码页写注释，固定 UTF-8 解码会乱码）
-        return TextEncodingDetector.DecodeText(trimmed);
+        // ZIP EOCD 注释无编码标志：UTF-8 BOM → 严格 UTF-8 → GB18030（GBK 超集）→ 宿主 ANSI 兜底。
+        // 注释必须走 DecodeComment 而非 DecodeText：后者回退到「宿主 ANSI 代码页」，
+        // 非中文 Windows（en-US = 1252）会把中文工具写入的 GBK 注释解成乱码。
+        return TextEncodingDetector.DecodeComment(trimmed);
     }
 
     /// <summary>

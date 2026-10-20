@@ -403,10 +403,35 @@ public class ZipBinaryRewriterTests : IDisposable
         Assert.Equal(originalComment, comment);
     }
 
+    /// <summary>
+    /// 回归：copy-mode 重写（comment 参数为 null = 保留源注释）必须**原样透传注释字节**。
+    /// 旧实现用 <c>Encoding.UTF8.GetString</c>（替换回退、永不抛）读注释，catch 分支是死代码，
+    /// GBK 注释会被解成 U+FFFD 再按 UTF-8 写回 —— 注释永久损坏，无法恢复。
+    /// </summary>
+    [Fact]
+    public async Task RewriteAsync_PreservesGbkCommentBytes_ByteExact()
+    {
+        var archive = CreateStoreZipArchive();
+        var gbkCommentBytes = Encoding.GetEncoding(936).GetBytes("欢迎使用本压缩包");
+        WriteRawCommentBytes(archive, gbkCommentBytes);
+
+        // 前置断言：源注释字节确实写入成功
+        Assert.Equal(gbkCommentBytes, ReadZipCommentBytes(archive));
+
+        var dest = TrackFile(Path.Combine(
+            Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_gbk_comment.zip"));
+
+        await InvokeRewriteAsync(archive, dest, null, null, Encoding.UTF8, comment: null);
+
+        // 1) 字节级相等：无论什么编码，copy-mode 都不得改写注释
+        Assert.Equal(gbkCommentBytes, ReadZipCommentBytes(dest));
+        // 2) 端到端：读回时按 GB18030 解码出原始中文（不依赖宿主 locale）
+        Assert.Equal("欢迎使用本压缩包", ZipCommentHelper.ReadComment(dest));
+    }
+
     // ══════════════════════════════════════════════════════════════════
     // ZipEngine.AddToArchiveAsync copy-mode integration tests
     // ══════════════════════════════════════════════════════════════════
-
     [Fact]
     public async Task AddToArchiveAsync_CopyMode_AddsToExistingZip()
     {
@@ -769,6 +794,63 @@ public class ZipBinaryRewriterTests : IDisposable
     /// <summary>
     /// Read the ZIP EOCD comment from a file by locating the EOCD record.
     /// </summary>
+    /// <summary>读取 ZIP EOCD 注释的**原始字节**（不做任何编码推断）。</summary>
+    private static byte[]? ReadZipCommentBytes(string zipPath)
+    {
+        using var fs = File.OpenRead(zipPath);
+        if (fs.Length < 22) return null;
+
+        long searchStart = Math.Max(0, fs.Length - 65557);
+        fs.Seek(searchStart, SeekOrigin.Begin);
+        var buf = new byte[fs.Length - searchStart];
+        int read = fs.Read(buf, 0, buf.Length);
+        if (read < 22) return null;
+
+        for (int i = read - 22; i >= 0; i--)
+        {
+            if (buf[i] == 0x50 && buf[i + 1] == 0x4B &&
+                buf[i + 2] == 0x05 && buf[i + 3] == 0x06)
+            {
+                int commentLen = buf[i + 20] | (buf[i + 21] << 8);
+                if (commentLen > 0 && i + 22 + commentLen <= buf.Length)
+                {
+                    var result = new byte[commentLen];
+                    Array.Copy(buf, i + 22, result, 0, commentLen);
+                    return result;
+                }
+                return null;
+            }
+        }
+        return null;
+    }
+
+    /// <summary>把 ZIP EOCD 注释替换为指定原始字节（模拟中文工具写入 GBK 注释）。</summary>
+    private static void WriteRawCommentBytes(string zipPath, byte[] commentBytes)
+    {
+        var bytes = File.ReadAllBytes(zipPath);
+        int eocd = -1;
+        for (int i = bytes.Length - 22; i >= Math.Max(0, bytes.Length - 22 - 65535); i--)
+        {
+            if (bytes[i] == 0x50 && bytes[i + 1] == 0x4B &&
+                bytes[i + 2] == 0x05 && bytes[i + 3] == 0x06)
+            {
+                eocd = i;
+                break;
+            }
+        }
+        Assert.True(eocd >= 0, "EOCD 签名未找到");
+
+        var newEocd = new byte[22 + commentBytes.Length];
+        Array.Copy(bytes, eocd, newEocd, 0, 22);
+        newEocd[20] = (byte)(commentBytes.Length & 0xFF);
+        newEocd[21] = (byte)((commentBytes.Length >> 8) & 0xFF);
+        Array.Copy(commentBytes, 0, newEocd, 22, commentBytes.Length);
+
+        var head = new byte[eocd];
+        Array.Copy(bytes, head, eocd);
+        File.WriteAllBytes(zipPath, [.. head, .. newEocd]);
+    }
+
     private static string? ReadZipComment(string zipPath)
     {
         using var fs = File.OpenRead(zipPath);

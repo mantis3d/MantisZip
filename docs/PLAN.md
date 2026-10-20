@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-19  
+**最后更新**: 2026-10-20  
 **当前版本**: 0.5.2
 
 ---
@@ -67,6 +67,7 @@
 | **P2** | 图标主题系统①基础设施（IconView + DrawingImage 迁移） | [icon-theme-infra.md](.omo/plans/未开始/icon-theme-infra.md) | 🟡中 | 14-18h | 📋 2026-10-15 立项、2026-10-19 修订普查（拆分第 1/3）：图标契约 `Geometry`→`DrawingImage`，新增 `IconView`（`Foreground` 继承 + `SourceKey` 订阅刷新）+ 三层字典骨架 + `AppSettings.SelectedIconTheme`；全量 215 处 `PathIcon` 迁移，A 套零视觉差异。规格：[2026-10-15-icon-theme-system-design.md](docs/superpowers/specs/2026-10-15-icon-theme-system-design.md) |
 | **P2** | 图标主题系统②导入包 + 单图标覆盖 + 设置 UI | [icon-theme-packs.md](.omo/plans/未开始/icon-theme-packs.md) | 🟡中 | 16-22h | 📋 2026-10-15 立项（拆分第 2/3）：SVG 图标包（文件夹/ZIP）导入 + 覆盖率校验（结构错误原子拒绝、渐变降级跳过 D-C，第②层）；单图标覆盖（第③层）；设置「外观」Tab 图标风格分区 + `IconManagerWindow`。依赖① |
 | **P3** | 图标主题系统③C/D/E/F/G 内容生产 + IconGen 多套 | [icon-theme-sets.md](.omo/plans/未开始/icon-theme-sets.md) | 🔴高 | 20-30h | 📋 2026-10-15 立项（拆分第 3/3）：IconGen 多套产出；Phosphor Bold/Duotone + 彩色/手绘；6 字典 × 116 键覆盖率契约；G 强调色 DynamicResource 决策门；About 页署名。依赖① |
+| **P2** | 文本/ZIP 注释回退编码策略（非中文 locale GBK 乱码 + copy-mode 注释损坏） | [text-fallback-encoding-policy.md](.omo/plans/进行中/text-fallback-encoding-policy.md) | 🟡中 | 4-6h | 🟡 **Phase 1（A1+A3）已实施 2026-10-20**，Phase 2（可配置回退代码页）待定。原立项背景：CI（en-US runner）暴露 `ZipCommentHelper` 回退代码页取 `CultureInfo.CurrentCulture.TextInfo.ANSICodePage`（en-US=1252）→ GBK 注释乱码 `»¶Ó­Ê¹ÓÃ±¾Ñ¹Ëõ°ü`；同时发现 `ZipBinaryRewriter.ReadEocd` 用 `Encoding.UTF8.GetString`（**不抛异常**，`catch` 为死代码）+ `Encoding.Default`（.NET Core 恒 UTF-8）→ copy-mode 重写把 GBK 注释写成 U+FFFD，属**数据损坏**。已实施：①注释新增 `DecodeComment`（严格 UTF-8 → **严格 GB18030** → 宿主 ANSI，GB18030 必须用异常回退——其默认解码器把截断序列静默换成 `?` 而非 U+FFFD）；②`ReadEocd`/`WriteEocd` 改**字节透传**；③测试侧 `zh-CN` pin 反转为**故意 en-US**。验证 Core 717/1skip/0fail、Avalonia 306/3skip/0fail。否决全局候选打分（Western 文本 `café` 类字节被 GBK 解成 CJK 且无 U+FFFD，无法可靠区分） |
 | **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
 | **P2** | 跨平台移植（macOS / Linux） | [cross-platform-port.md](.omo/plans/未开始/cross-platform-port.md) | 🟡中大 | 6-8周 | ✅ WPF→Avalonia 迁移已完成（Phases 0-10）。剩余 macOS/Linux 移植：Phase 0 CI+路径适配 → Phase 1 引擎适配 → Phase 2 UI 适配 → Phase 3 打磨发布；7z 压缩策略、拖拽降级、右键菜单取舍等决策点见计划文档 |
 

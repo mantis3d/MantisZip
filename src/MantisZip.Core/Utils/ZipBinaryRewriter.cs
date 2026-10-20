@@ -87,10 +87,10 @@ internal static partial class ZipBinaryRewriter
     /// <returns>
     /// A tuple containing: the byte offset of the central directory (<paramref name="cdOffset"/>),
     /// the total number of entries in the central directory (<paramref name="entryCount"/>),
-    /// and the ZIP file comment (<paramref name="comment"/>, <c>null</c> if absent).
+    /// and the ZIP file comment raw bytes (<paramref name="commentBytes"/>, <c>null</c> if absent).
     /// </returns>
     /// <exception cref="ZipCopyModeException">EOCD signature not found, or ZIP64 detected.</exception>
-    internal static (long cdOffset, int entryCount, string? comment) ReadEocd(Stream stream)
+    internal static (long cdOffset, int entryCount, byte[]? commentBytes) ReadEocd(Stream stream)
     {
         // EOCD minimum fixed size is 22 bytes; max comment length is 65535.
         const int EocdFixedSize = 22;
@@ -157,20 +157,18 @@ internal static partial class ZipBinaryRewriter
         }
 
         // ── Comment ──────────────────────────────────────────────────
-        string? comment = null;
+        byte[]? commentBytes = null;
         if (commentLen > 0 && bufOffset + EocdFixedSize + commentLen <= buf.Length)
         {
-            try
-            {
-                comment = Encoding.UTF8.GetString(buf, bufOffset + EocdFixedSize, commentLen);
-            }
-            catch (DecoderFallbackException)
-            {
-                comment = Encoding.Default.GetString(buf, bufOffset + EocdFixedSize, commentLen);
-            }
+            // 注释按原始字节保留，绝不做 decode → encode 往返：
+            // EOCD 没有编码标志字段，GBK 等非 UTF-8 注释一旦被「解码再编码」就会被替换字符破坏。
+            // （旧实现用 Encoding.UTF8.GetString + Encoding.Default 兜底：前者采用替换回退、
+            //   永不抛 DecoderFallbackException，导致 catch 成为死代码，GBK 注释静默变成 U+FFFD。）
+            commentBytes = new byte[commentLen];
+            Array.Copy(buf, bufOffset + EocdFixedSize, commentBytes, 0, commentLen);
         }
 
-        return (cdOffset, entryCount, comment);
+        return (cdOffset, entryCount, commentBytes);
     }
 
     // ────────────────────── Central Directory ────────────────────────
@@ -332,7 +330,7 @@ internal static partial class ZipBinaryRewriter
                 throw new ZipCopyModeException("SFX ZIP not supported by copy-mode");
 
             // ── Parse existing archive ───────────────────────────────
-            var (cdOffset, entryCount, existingComment) = ReadEocd(source);
+            var (cdOffset, entryCount, existingCommentBytes) = ReadEocd(source);
             List<CdEntry> entries = ReadCentralDirectory(source, cdOffset, entryCount, encoding);
 
             CoreLog.Info($"ZipBinaryRewriter: source has {entries.Count} entries");
@@ -451,8 +449,11 @@ internal static partial class ZipBinaryRewriter
             // ══════════════════════════════════════════════════════════
             // Phase 4: Write EOCD
             // ══════════════════════════════════════════════════════════
-            string effectiveComment = comment ?? existingComment ?? string.Empty;
-            WriteEocd(output, centralDirStart, entriesToWrite.Count, effectiveComment);
+            // 注释：显式传入则按 UTF-8 编码（写入侧统一 UTF-8）；否则原样透传源注释字节
+            // （copy-mode 不得 decode/encode 往返，否则非 UTF-8 注释会被替换字符破坏）
+            byte[]? effectiveCommentBytes =
+                comment != null ? Encoding.UTF8.GetBytes(comment) : existingCommentBytes;
+            WriteEocd(output, centralDirStart, entriesToWrite.Count, effectiveCommentBytes);
 
             progress?.Report(new ArchiveProgress
             {
@@ -576,7 +577,7 @@ internal static partial class ZipBinaryRewriter
         int processedEntries = 0;
         long bytesCopied = 0;
         long bytesAdded = 0;
-        string? existingComment = null;
+        byte[]? existingCommentBytes = null;
         int totalEntries;
 
         try
@@ -603,9 +604,9 @@ internal static partial class ZipBinaryRewriter
                         if (magic[0] == 'M' && magic[1] == 'Z')
                             throw new ZipCopyModeException("SFX ZIP not supported by copy-mode");
 
-                        var (cdOffset, srcEntryCount, srcComment) = ReadEocd(source);
+                        var (cdOffset, srcEntryCount, srcCommentBytes) = ReadEocd(source);
                         parsed.Add((source, ReadCentralDirectory(source, cdOffset, srcEntryCount)));
-                        existingComment ??= srcComment;
+                        existingCommentBytes ??= srcCommentBytes;
                     }
                     catch
                     {
@@ -732,8 +733,11 @@ internal static partial class ZipBinaryRewriter
             // Phase 4: Write EOCD
             // ══════════════════════════════════════════════════════════
             // 注释规则：显式传入优先；否则沿用第一个非空源的注释；都没有则空串。
-            string effectiveComment = comment ?? existingComment ?? string.Empty;
-            WriteEocd(output, centralDirStart, entriesToWrite.Count, effectiveComment);
+            // 注释：显式传入则按 UTF-8 编码（写入侧统一 UTF-8）；否则原样透传源注释字节
+            // （copy-mode 不得 decode/encode 往返，否则非 UTF-8 注释会被替换字符破坏）
+            byte[]? effectiveCommentBytes =
+                comment != null ? Encoding.UTF8.GetBytes(comment) : existingCommentBytes;
+            WriteEocd(output, centralDirStart, entriesToWrite.Count, effectiveCommentBytes);
 
             progress?.Report(new ArchiveProgress
             {
@@ -1172,27 +1176,32 @@ internal static partial class ZipBinaryRewriter
     /// <param name="output">Output stream positioned after the last CDFH.</param>
     /// <param name="centralDirOffset">Byte offset of the first CDFH in the output stream.</param>
     /// <param name="entryCount">Total number of entries in the archive.</param>
-    /// <param name="comment">ZIP file comment (UTF-8).</param>
+    /// <param name="commentBytes">ZIP file comment 的**原始字节**（调用方负责编码）。<c>null</c>/空 = 无注释。</param>
     private static void WriteEocd(
         Stream output,
         long centralDirOffset,
         int entryCount,
-        string? comment)
+        byte[]? commentBytes)
     {
         using var writer = new BinaryWriter(output, Encoding.UTF8, leaveOpen: true);
 
         long cdSize = output.Position - centralDirOffset;
 
-        byte[]? commentBytes = null;
         ushort commentLen = 0;
-        if (!string.IsNullOrEmpty(comment))
+        if (commentBytes is { Length: > 0 })
         {
-            commentBytes = Encoding.UTF8.GetBytes(comment);
             if (commentBytes.Length > ushort.MaxValue)
             {
-                Array.Resize(ref commentBytes, ushort.MaxValue);
+                // 超长注释截断（EOCD 注释长度字段为 uint16）
+                var truncated = new byte[ushort.MaxValue];
+                Array.Copy(commentBytes, truncated, ushort.MaxValue);
+                commentBytes = truncated;
             }
             commentLen = (ushort)commentBytes.Length;
+        }
+        else
+        {
+            commentBytes = null;
         }
 
         // EOCD fixed fields (22 bytes)
