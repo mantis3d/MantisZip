@@ -2433,6 +2433,13 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.2 (2026-10-20) 修复 CI 上两处测试失败：MT 进度断言竞态 + 磁盘类型检测环境假设
+  - **失败 1 `ZipEngineTests.CompressAsync_MultiThreaded_ReportsProgress`（期望 100，实际 99.599999999999994）**：根因在测试侧——用 `Progress<T>` 收集进度，无 `SynchronizationContext` 时回调投递到线程池，**既不保证顺序也不保证 `CompressAsync` 返回前全部送达**，「取最后一条」本身就是竞态。99.6 可精确反推：合并适配器 `groupEndPercent(95) + 5 × 0.92 = 99.6`，即 `ZipBinaryRewriter` 的 92% 中间报告（`ZipEngine.cs:2049-2053`）晚于终态 100（`ZipEngine.cs:2090`）到达。修复：改用同文件已有的 `SyncProgress<T>`（同步回调；兄弟测试 `CompressAsync_MultiThreaded_MirrorPhase_AdvancesOverallProgress` 早前即为此引入），断言不变。
+  - **失败 2 `DiskTypeDetectorTests.GetDiskType_LocalFixedDrive_DetectsSsdOrHdd`（返回 Unknown）**：GitHub Actions 临时卷不支持 `IOCTL_STORAGE_QUERY_PROPERTY(SeekPenalty)`，`DiskTypeDetector.QuerySeekPenalty` 对此合法返回 `Unknown`（`ParallelDegreeResolver.cs:122-124` 已有保守兜底），测试却把「本机固定盘必检出」当硬约束。修复：Windows 上 `Unknown` 时直接返回并注明云 CI 属预期降级，否则断言 `Ssd/Hdd`。**生产代码未改**。
+  - **验证**：`dotnet test tests\MantisZip.Tests --configuration Release --filter "FullyQualifiedName!~SevenZipEngine"`（与 CI 同参）→ **710 通过 / 0 失败 / 1 跳过**。本机磁盘检测走「成功」分支，CI 的 `Unknown` 分支无法本地复现（该分支为提前 return，不会产生失败断言）。
+  - **同源隐患（未改）**：`ZipEngineTests.cs:727`、`SevenZipEngineTests.cs:585`、`TarGzEngineTests.cs:173` 仍用 `Progress<T>`，当前 CI 未失败；若日后出现「最后一条不是 100%」偶发失败，属同类问题。
+  - **文档资源**：同步刷新 v0.5.2 截图 `docs/images/version/v0.5.2/CompressSpeedUpSetting.png`、`HelpDialog.png`（仅替换图片，无功能变更）。
+
 #### v0.5.2 (2026-10-15) 修复损坏 ZIP 被静默通过——改用 SharpCompress 官方 CRC 校验路径（ZipEngine）
   - **根因**：`ZipEngine` 的测试与解压（串行/并行/过滤四处）均用 `IArchiveEntry.OpenEntryStream()` 读裸流。SharpCompress 的 `OpenEntryStream()` **不校验 CRC**（实测 0.48.1 / 0.50.4 行为一致，`ReaderFactory` 前向读同样不校验）；代码注释「SharpCompress 在读取完整流时内部会检测 CRC」的假设不成立 → 损坏仅在解码器自身报错（deflate 的 zlib 自检、头部解析）时偶然检出，而「数据被改动但仍可解码」的条目（stored 字节翻转、CRC 字段错）被静默解出且无任何报错。
   - **官方机制**：校验能力只挂在官方高层提取 API——`ZipEntry.Checksum` 返回 `ChecksumDescriptor(Crc32, IsAvailable: true)`，`ChecksumValidationStream` 仅在 `IArchiveEntryExtensions.WriteTo`/`WriteToAsync` 中按 `ExtractionOptions.CheckCrc`（默认 true）包裹；官方 `ZipCrcExtractionTests` 证明 `CheckCrc=true` 抛 `InvalidFormatException`。0.48.1 尚无 `ExtractionOptions.CheckCrc`（该机制为 0.48.1 之后新增）→ 非版本回归，换版本无解。
