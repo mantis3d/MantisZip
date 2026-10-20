@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 大文件拆分阶段 1：`App.axaml.cs`（2507 行）→ 主干 600 行 + 4 个 partial
+  - **切分**（纯移动，零行为变化）：`App.Theming.cs`（263 行，Theme/Font/Compactness 的 Apply/Refresh）、`App.CliExtract.cs`（937 行，`ResolveCliPassword` → `RunCliDirectExtractBatchAsync` 解压族）、`App.CliInfra.cs`（286 行，`HandleShellCommand`/`IsDirectoryWritable`/`IsElevated`/`RestartAsAdmin`/`HandleElevationAsync`/`StartPipeServer`/`SendPathsThroughPipe`）、`App.CliCompress.cs`（565 行，`HandleCompress*` → `CompressWithProgress` → `FindCommonParent`/`IsDriveRoot`）；主干保留字段/`Initialize`/`OnFrameworkInitializationCompleted`/CLI 帮助与 `--test`/7z.dll 解析/DebugLog。
+  - **行数守恒**：2507 旧行 = 2651 新行 − 4×36 行 partial 头部（using 块 + namespace + 类声明），零内容丢失。
+  - **守卫测试适配**：`AppShutdownWiringTests` 新增 `AppRelPaths` 数组（主干 + 4 partial），测试 1/2/4 遍历全部文件（否则测试 4 的 `AppShutdown.Request(` ≥30 下限因只扫主干而失败），测试 3（状态位翻转点晚于 base 调用）仍锁主干；新增 partial 时须同步该数组。
+  - **验证**：`dotnet build -c Release` 0 警告 0 错误；Avalonia 测试 **331 总 / 328 过 / 3 跳过 / 0 失败**。
+
 **2026-10-20** — AGENTS.md 瘦身（800 → 305 行 / 62.4KB → 21.5KB，架构细节迁入 ARCHITECTURE.md）
   - **动因**：AGENTS.md 已达 **62,367 字节 = 64KB 工作区指令预算的 95%**（ARCHITECTURE.md 早已有「自 AGENTS.md 迁出（2026-10-18）」节，但当时只加新文未删原文，两边重复）；且最重要的规则 0–18 排在文件后半段，长文档存在注意力稀释 / lost-in-the-middle 风险。
   - **迁出**（→ `docs/ARCHITECTURE.md` 新增「实现细节补充（自 AGENTS.md 迁出，2026-10-20）」）：依赖流向、Engine pattern、进度上报契约、ZIP 压缩加速、ArchiveItem duality、ComputeDirectoryStats、ExtractPathResolver、SmartOpenPathResolver、MVVM + 派生属性集中通知、设置系统分类清单、预览子系统开发约定、CLI entry points 路由表、System icon helper、开发约束与历史踩坑（13 小节）、拖拽（drag-out / drag-in）、日志隐私脱敏、UI 样式与注释细节（ToggleIconBox 用法 / DataGrid·TreeView 行高示例 / AXAML 注释示例 / Shell 菜单项同步清单）、历史归档（迁移阶段状态表 + 已修复问题）。

@@ -33,8 +33,21 @@ public class AppShutdownWiringTests
     // 被测生产源码（相对仓库根，'/' 分隔，读取时替换为平台分隔符）
     // ------------------------------------------------------------------
 
-    /// <summary>应用退出调用点（CLI 分发与各退出分支）所在文件。</summary>
+    /// <summary>应用退出调用点（CLI 分发与各退出分支）所在文件（partial 主干）。</summary>
     private const string AppRelPath = "src/MantisZip.UI.Avalonia/App.axaml.cs";
+
+    /// <summary>
+    /// App 的全部 partial 源码文件（2026-10-20 大文件拆分后：CLI 解压/压缩/基础设施与主题各自独立）。
+    /// ⚠ 新增 App.*.cs partial 时须同步追加，否则相关守卫只扫描一部分退出调用点。
+    /// </summary>
+    private static readonly string[] AppRelPaths =
+    {
+        AppRelPath,
+        "src/MantisZip.UI.Avalonia/App.Theming.cs",
+        "src/MantisZip.UI.Avalonia/App.CliExtract.cs",
+        "src/MantisZip.UI.Avalonia/App.CliInfra.cs",
+        "src/MantisZip.UI.Avalonia/App.CliCompress.cs",
+    };
 
     /// <summary>主窗口「退出」命令所在文件（唯一一处非 App 的退出调用）。</summary>
     private const string MainViewModelRelPath =
@@ -184,7 +197,7 @@ public class AppShutdownWiringTests
         var root = GetRepoRoot(); // 失败时抛出带 BaseDirectory 的清晰消息
         Assert.True(Directory.Exists(root), $"仓库根不存在: {root}");
 
-        foreach (var rel in new[] { AppRelPath, MainViewModelRelPath })
+        foreach (var rel in AppRelPaths.Append(MainViewModelRelPath))
         {
             var full = SourcePath(rel);
             Assert.True(File.Exists(full), $"被测源码缺失: {full}");
@@ -192,7 +205,7 @@ public class AppShutdownWiringTests
     }
 
     /// <summary>
-    /// 测试 2：App.axaml.cs 与 MainWindowViewModel.cs 中不存在<b>裸</b>
+    /// 测试 2：App 全部 partial 与 MainWindowViewModel.cs 中不存在<b>裸</b>
     /// <c>desktop.Shutdown(</c> 调用 —— 退出必须全部经 AppShutdown.Request（唯一漏斗）。
     ///
     /// 锁定的回归：任何人在 CLI 分发同步段（主循环启动前）重新写回
@@ -202,7 +215,7 @@ public class AppShutdownWiringTests
     [Fact]
     public void NoBareDesktopShutdownCalls_RemainInExitPaths()
     {
-        foreach (var rel in new[] { AppRelPath, MainViewModelRelPath })
+        foreach (var rel in AppRelPaths.Append(MainViewModelRelPath))
         {
             var source = ReadSource(rel);
             var hits = CountTokenInCode(source, "desktop.Shutdown(");
@@ -241,7 +254,7 @@ public class AppShutdownWiringTests
     }
 
     /// <summary>
-    /// 测试 4：App.axaml.cs 内的退出漏斗调用点数量不低于 30 ——
+    /// 测试 4：App 全部 partial 内的退出漏斗调用点合计数量不低于 30 ——
     /// 锁定的回归：有人把收口「改回去一半」（例如整段替换回 desktop.Shutdown()）。
     ///
     /// 为什么不匹固定数字：收口点数量会随 CLI 分支增减而变（当前 39 处），
@@ -251,10 +264,9 @@ public class AppShutdownWiringTests
     [Fact]
     public void AppShutdownRequest_IsUsedThroughoutApp()
     {
-        var source = ReadSource(AppRelPath);
-        var hits = CountTokenInCode(source, "AppShutdown.Request(");
+        var hits = AppRelPaths.Sum(rel => CountTokenInCode(ReadSource(rel), "AppShutdown.Request("));
         Assert.True(hits >= 30,
-            $"{AppRelPath} 中 AppShutdown.Request( 仅出现 {hits} 次（下限 30）；" +
+            $"App 全部 partial 中 AppShutdown.Request( 合计仅出现 {hits} 次（下限 30）；" +
             "退出调用疑似被改回裸 desktop.Shutdown()（见测试 2 与 Services/AppShutdown.cs）。");
     }
 }
