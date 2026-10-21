@@ -22,6 +22,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **启动速度优化** — ① 主题重复加载消除：应用/切换主题时同主题直接跳过解析、图标字典跨主题复用，实测启动再降约 100ms（同时修复旧实现「先清空后加载」在加载失败时界面无样式的缺陷）；② 设置读取进程级缓存：冷启动只读盘一次，运行期重开窗口/对话框不再反复读盘反序列化，72 处调用点全部受益
 - **Faster startup** — ① eliminated duplicate theme parsing: applying a theme now skips parsing entirely when it is already active, and the icon dictionary is reused across themes, measured ~100 ms faster startup (this also fixes the old "clear-then-load" sequence that left the UI unstyled when loading failed); ② process-level settings cache: the cold start reads from disk a single time, and reopening windows/dialogs at runtime no longer re-reads and re-deserializes the file, benefiting all 72 call sites
+- **启动速度再优化（ReadyToRun）** — 发布版启用 ReadyToRun（仅预编译应用主程序集），应用初始化与窗口 XAML 构建更快，实测冷启动缩短约 0.1 秒；安装包体积增加约 4 MB
+- **Faster startup (ReadyToRun)** — release builds now use ReadyToRun (precompiling the app's main assembly only), speeding up app initialization and window XAML construction; measured cold start about 0.1 s faster, with the installer growing by roughly 4 MB
 
 
 ## v0.5.2
