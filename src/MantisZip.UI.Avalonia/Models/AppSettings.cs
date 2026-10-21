@@ -284,7 +284,7 @@ public class AppSettings
                     return defaults;
                 }
                 var json = File.ReadAllText(SettingsFile);
-                var settings = JsonSerializer.Deserialize<AppSettings>(json) ?? CreateWithDefaults();
+                var settings = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings) ?? CreateWithDefaults();
                 // 向后兼容：从旧 AdaptiveCompressionMode 枚举迁移为三个独立开关
                 if (settings.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled)
                 {
@@ -323,7 +323,7 @@ public class AppSettings
         {
             if (!Directory.Exists(SettingsDir))
                 Directory.CreateDirectory(SettingsDir);
-            var json = JsonSerializer.Serialize(this, new JsonSerializerOptions { WriteIndented = true });
+            var json = JsonSerializer.Serialize(this, AppSettingsJsonContext.Default.AppSettings);
             File.WriteAllText(SettingsFile, json);
             // 落盘成功后缓存同步为被保存实例（外部可见值与内存一致）
             lock (SyncRoot)

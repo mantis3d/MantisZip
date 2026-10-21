@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — AppSettings 序列化改用 STJ 源生成（source-gen）
+  - **实现**：新增 `Models/AppSettingsJsonContext.cs`（`[JsonSourceGenerationOptions(WriteIndented = true)]` + `[JsonSerializable(typeof(AppSettings))]`）；`Load()`/`Save()` 改用 context 重载（顺带去掉 `Save()` 每次新建 `JsonSerializerOptions`）。零语义变化，旧 int 字典大小转换器继续生效（`[JsonConverter]` 特性被源生成器支持）。
+  - **测试**：新增 `AppSettingsJsonContextTests` 4 条（嵌套集合/枚举往返、旧 int → `"256m"`、与反射路径输出逐字一致、未知字段忽略）；UI 全量 **335 总 / 332 过 / 3 跳过 / 0 失败**。
+  - **A/B（交错 n=10，基线 = HEAD 独立 worktree Release 构建）**：`Init.Settings` 段中位 **1.7ms → 1.7ms**（无差异）；TOTAL 1420.1 → 1413.5ms（−6.6ms，噪声级）。**门控（≥15ms）未达**——本机 settings.json 体积小，反射元数据构建本就只占 ~1.7ms；立项引用的 60–77ms 混有 IO/环境因素，不能归因于元数据。
+  - **决策**：按计划边界**保留改动**（零风险、为 `selfcontained-size-optimization` 的 Trim/AOT 铺路），**不宣称启动收益**、不写入 RELEASE_NOTES；计划归档。
+
 **2026-10-20** — error-info-enhancement 归档（GUI 验收通过）
   - 用户完成 GUI 人工验收（红段 + 黄段场景），未发现问题；黄段按计划内「黄段验收方法」复现通过。
   - **验证证据**：Core 测试 747/744、Avalonia 331/328 全绿；硬编码扫描 `未能写入到` 0 命中；33 处 `ArchiveEntryStatus.Failed` 逐处核对 `FileTotalBytes`（唯一例外为整包级上报，设计如此）。

@@ -229,6 +229,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| AppSettings 序列化改用 STJ 源生成（`AppSettingsJsonContext` 编译期元数据；4 条兼容测试；A/B `Init.Settings` 1.7→1.7ms 门控未达，保留用于 Trim/AOT 铺路，不宣称启动收益） | [stj-source-gen-appsettings.md](.omo/plans/已完成/stj-source-gen-appsettings.md) | 未发布（2026-10-20） |
 | 压缩/解压出错信息增强（整包错误本地化 + 逐条目 `EntryErrorDetail`/HResult 透传 + 红/黄分层摘要与原因分布 + Win32 错误提示细分；Tooltip 接线守卫测试） | [error-info-enhancement.md](.omo/plans/已完成/error-info-enhancement.md) | 未发布（2026-10-20 验收） |
 | ZIP 损坏检测（CRC 校验）修复（解压/测试改走 SharpCompress 官方 `CheckCrc` 路径；`CrcMismatch` 原因枚举 + 三语文案 + 4 条回归测试；真实损坏样本人工验收通过） | [zip-crc-validation.md](.omo/plans/已完成/zip-crc-validation.md) | 未发布（2026-10-20 验收） |
 | 设置项无消费者修复（10 项排查：7 项接线修复、1 项文档修正、2 项经用户决策暂缓并记录方案；无遗留代码） | [settings-unwired-keys.md](.omo/plans/已完成/settings-unwired-keys.md) | 未发布（2026-10-20 归档） |
