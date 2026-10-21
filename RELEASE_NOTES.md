@@ -26,6 +26,15 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Faster startup (ReadyToRun)** — release builds now use ReadyToRun (precompiling the app's main assembly only), speeding up app initialization and window XAML construction; measured cold start about 0.1 s faster, with the installer growing by roughly 4 MB
 
 
+**压缩加速 / Compression Speed-ups**
+
+- 新增**魔数检测** — 自适应压缩可读取文件头识别真实格式：对改名、无扩展名或扩展名与内容不符的文件（例如 `.dat` 实为 JPEG），识别为已压缩格式时同样按「仅存储」处理，不再二次压缩；仅对 64 KB 以上的大文件生效，会略微增加压缩耗时
+- Added **magic-number detection** — adaptive compression can now read file headers to identify the real format: for renamed files, extension-less files, or files whose extension does not match their content (e.g. a `.dat` that is actually a JPEG), already-compressed content is stored as-is instead of being compressed again; it applies only to files of 64 KB and above, and slightly increases compression time
+- **自定义自适应规则生效** — 「自适应规则」中的用户自定义规则现在对所有格式生效（此前即使启用多线程压缩也不生效），且优先级高于内置的「已压缩格式仅存储」判定；可按格式指定压缩级别（仅存储 / 快速 / 标准 / 最大 / 跟随全局 / 自定义）
+- **Custom adaptive rules now take effect** — rules under "Adaptive Rules" now apply to every format (previously they were ignored even when Multithreaded Compression was enabled) and take priority over the built-in "store already-compressed formats" rule; you can assign a compression level per format (Store / Fast / Normal / Max / follow global / custom)
+- **默认规则集调整** — 默认的「图片类 / 视频类 / 音频类 / 压缩包类」规则不再包含 SVG、TAR、WAV 等未压缩格式（这些格式用 Deflate 压缩仍有明显收益），仅确属已压缩的格式按「仅存储」处理
+- **Adjusted default rule set** — the default "Image / Video / Audio / Archive" rules no longer include uncompressed formats such as SVG, TAR and WAV (Deflate still shrinks them noticeably); only genuinely compressed formats are stored as-is
+
 ## v0.5.2
 
 ### 文件说明 / File Description
