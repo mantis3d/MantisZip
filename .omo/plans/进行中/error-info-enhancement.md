@@ -405,10 +405,10 @@ Wave FINAL
 - 修改: `docs/PLAN.md`（任务行状态/移至 PROGRESS 历史索引，规则 1）
 
 **What to do**:
-- [ ] **先**更新双轨进度文档（规则 3，commit 前置）：里程碑级（契约扩展+三引擎修复）+ 细节级条目，从新到旧
-- [ ] `docs/PLAN.md`：若本计划行仍在「待实现」表，更新状态为已完成并按规则 1 移至 PROGRESS.md 历史索引；计划文件移入 `.omo/plans/已完成/`
-- [ ] conventional commit（规则 10）：`feat(core,avalonia): 压缩/解压出错信息增强（整包错误本地化+条目详情透传+失败原因分布）`
-- [ ] **不推送**（除非用户明确要求）
+- [x] **先**更新双轨进度文档（规则 3）：PROGRESS 里程碑 + detail 条目已同步（commit `a257947f` / `0accf8c4`）
+- [x] `docs/PLAN.md` 状态已更新；**计划文件暂留「进行中」**——任务 9 GUI 人工验收未完成（规则 1 完成后再移入 `.omo/plans/已完成/`）
+- [x] conventional commit 已执行：`feat(core,avalonia): 压缩/解压出错信息增强 Task 1-8（整包错误本地化+条目详情透传+失败原因分布）`（commit `7799e56a`）
+- [x] 未推送
 
 **Must NOT do**:
 - 未经用户明确要求不 commit / 不 push / 不改版本号（规则 2）

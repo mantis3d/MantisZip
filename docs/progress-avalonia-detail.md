@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 进行中计划收尾核对（无代码改动，验收 + 归档 + 状态修正）
+  - **zip-crc-validation → 已完成归档**：`-t:Rebuild` 全量重建后 UI 测试 **331 总 / 328 过 / 3 跳过 / 0 失败**（原计划"待复验"的 30 条 XAML 毒化失败确为增量构建问题）；用户用真实损坏样本手测「测试压缩包」+ 解压**通过**；代码 commit `85668486`，计划文档中"未提交/待复验"已过时并修正。
+  - **settings-unwired-keys → 已完成归档**：10 项排查全部有结论（7 项接线修复、1 项文档修正、2 项经用户决策暂缓且方案/工时已记录），无遗留待实现代码。
+  - **adaptive-compress-ui-convergence Phase 1 验收收尾**：逐项核对通过——`ZipMultiThreadCheck_IsCheckedChanged` 0 命中；`MultiThreadedCompression && AdaptiveCompression` 0 命中（三开关独立）；魔数检测（设置侧 `IsSmartDetectVisible=false` + ZIP 面板 `SmartDetectCheck IsVisible=False`）与自适应规则卡片（`IsUserRulesSectionVisible=false`）均隐藏；自定义格式 magic hex 隐藏且 `MagicHexDisplay=>""`；超 4GB 恢复勾选逻辑在位（`_mtCheckedBeforeLimit`）。状态改为「Phase 1 ✅ / Phase 2 待实施」，仅纯 2–4 物理核机 bench 待测。
+  - **error-info-enhancement**：Task 10 勾选确认（文档 + commit `7799e56a` 已完成）；计划留「进行中」等待任务 9 GUI 人工验收。
+  - **text-fallback-encoding-policy**：Phase 1 自动化验证已全绿（en-US culture pin），仅真机 en-US 人工验证待用户环境；Phase 2 待决策。
+  - **同步**：PLAN.md 移除两份已完成计划行；PROGRESS 历史设计方案索引新增 2 行。
+
 **2026-10-20** — 大文件拆分阶段 3（完成）：`MainWindowViewModel.cs`（3201 行）→ 主干 1352 行 + 5 个 partial
   - **切分**（纯移动，零行为变化）：`MainWindowViewModel.Password.cs`（326 行，会话密码字段/`GetSessionPassword` 周边 + `UpdatePasswordStatus`/`EnterPasswordAsync`/`TryEnsureArchivePasswordAsync`）、`.Preview.cs`（463 行，`OpenEntryWithDefaultAppAsync`/`TryDeleteTempDir` + `ShowPreviewAsync`）、`.Navigation.cs`（495 行，导航历史/树过滤/`GoUp`/`PopulateEntries`/`FindNode`）、`.Extract.cs`（452 行，`ExtractArchive`/`ExtractSelected*`/`OpenExtractedFolderAsync` + `TestEntry`/`ExtractTo`/`SmartExtract`/`TestArchive`）、`.Compress.cs`（243 行，`NewArchive`/`DragInCompressAsync`/`ExecuteCompressFromSettings` + `AddFiles`/`AddFilesToArchiveAsync`/`DeleteFiles`）；主干保留字段/属性/本地化/`LoadArchiveAsync`/设置与杂项命令/`FilterMatchModeInfo` 类。
   - **完整性校验**：新旧非空行逐行排序比对，除 5 个 partial 类的闭合括号外**完全一致**（零内容丢失）。

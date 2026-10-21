@@ -1,6 +1,6 @@
 # 压缩加速三开关 — UI 收敛（Phase 1）+ 魔数检测/自适应规则实现（Phase 2）
 
-> **状态**: 🚧 Phase 1 实施中（Task 1–6 + 常驻提示已落地，Task 8 验证中）| **日期**: 2026-10-16（**2026-10-18 评审修订 + 实测拍板 + 同日双机复测改判**；**2026-10-19 Phase 1 实施：Task 1/2/4/5/6 完成，新增常驻科普提示**）| **优先级**: P1 | **预估工时**: Phase 1 = **4-5h**（组数规则简化为 `clamp(核数,4,16)`，Task 0 双机实跑完成；改动 B 暂缓 → Phase 1 无门控代码）/ Phase 2 = **5-7h**（原 3-4h + Task 12 本机基准测试约 +2-3h）
+> **状态**: 🟢 Phase 1 ✅ 已完成（2026-10-20 验证收尾，仅纯 2–4 物理核机待测）/ Phase 2 待实施 | **日期**: 2026-10-16（**2026-10-18 评审修订 + 实测拍板 + 同日双机复测改判**；**2026-10-19 Phase 1 实施：Task 1/2/4/5/6 完成，新增常驻科普提示**）| **优先级**: P1 | **预估工时**: Phase 1 = **4-5h**（组数规则简化为 `clamp(核数,4,16)`，Task 0 双机实跑完成；改动 B 暂缓 → Phase 1 无门控代码）/ Phase 2 = **5-7h**（原 3-4h + Task 12 本机基准测试约 +2-3h）
 > **来源**: 用户 2026-10-16 提出「压缩有个选项有两个开关『多线程』和『自适应』，测试发现不启用自适应时开启多线程反而有反作用」→ 实测 + 代码审计后扩展为两阶段计划
 > **原型**: [docs/prototypes/compress-format-options-panel.html](../../docs/prototypes/compress-format-options-panel.html)（交互原型，已覆盖两处界面）
 > **评审**: 2026-10-18 逐条核对源码，修正 4 处会直接踩坑的事实错误（A1–A4）、1 处与既有 bench 结论冲突（B1）、若干语义/文档遗漏（C/D 项），详见文末「修订记录」
@@ -293,19 +293,19 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 
 **Phase 1 验收清单**
 
-- [ ] 压缩对话框 ZIP 面板不再出现「并行压缩组数」；勾选多线程时也不再出现
-- [ ] 默认路径速度不低于改前（Task 0/8 before/after：本机 `deg=0` 应与 before 的 `deg=16` 重合，text ≈0.79s / mixed ≈0.97s）
-- [ ] 低核数默认组数无回退（Task 0 Step 3 **8 逻辑核机已测：deg=2 陷阱依旧、无新塌陷**；纯 2–4 物理核仍待做；若回退 → 退化为 `min(核数,16)`）
-- [ ] **三开关互相独立（改动 B 暂缓的 Phase 1 回归护栏）**：关闭「自适应压缩」后，ZIP 面板「多线程压缩」的勾选状态与生效值**均不变**；请求里 `MultiThreadedCompression == AppSettings.MultiThreadedCompression`
-- [ ] **遗留 `settings.json`（`MultiThreadedCompression=true` & `AdaptiveCompression=false`）**：MT 仍勾选且生效，请求里 `MultiThreadedCompression=true`（20 核机实测该组合 text/mixed 更快；弱 CPU 上可能负收益——Phase 1 不干预，Task 12 处理）
-- [ ] `rg -n "MultiThreadedCompression\s*&&\s*.*AdaptiveCompression" src` → 0 命中（防未来误加依赖）
-- [ ] **超 4GB**：MT 勾选框禁用 + 灰字提示显示；退出超限后**恢复原勾选**（`_mtCheckedBeforeLimit` 逻辑），全程无互相覆盖
-- [ ] `rg -n "ZipMultiThreadCheck_IsCheckedChanged" src` → 0 命中（axaml 事件属性与处理器**同时**删除，无 XAML 编译残留）
-- [ ] 设置窗口「加速」页与压缩对话框 ZIP 面板都不再出现「魔数检测」
-- [ ] 设置窗口「加速」页不再出现「自适应规则」卡片
-- [ ] 自定义格式对话框不再出现「魔数 hex」输入框；格式目录列表不再显示 `[hex]`
-- [ ] `settings.json` 旧字段仍可加载（不抛异常、不丢其它设置）
-- [ ] 全量构建 + 测试通过；bench before/after 数据已归档
+- [x] 压缩对话框 ZIP 面板不再出现「并行压缩组数」；勾选多线程时也不再出现
+- [x] 默认路径速度不低于改前（Task 0/8 before/after：本机 `deg=0` 应与 before 的 `deg=16` 重合，text ≈0.79s / mixed ≈0.97s）
+- [ ] 低核数默认组数无回退（8 逻辑核机已测无新塌陷；**纯 2–4 物理核机仍待测**；若回退 → 退化为 `min(核数,16)`）
+- [x] **三开关互相独立（代码级核对，无自动化用例）（改动 B 暂缓的 Phase 1 回归护栏）**：关闭「自适应压缩」后，ZIP 面板「多线程压缩」的勾选状态与生效值**均不变**；请求里 `MultiThreadedCompression == AppSettings.MultiThreadedCompression`
+- [x] **遗留 `settings.json`（`MultiThreadedCompression=true` & `AdaptiveCompression=false`）**：MT 仍勾选且生效，请求里 `MultiThreadedCompression=true`（20 核机实测该组合 text/mixed 更快；弱 CPU 上可能负收益——Phase 1 不干预，Task 12 处理）
+- [x] `rg -n "MultiThreadedCompression\s*&&\s*.*AdaptiveCompression" src` → 0 命中（防未来误加依赖）
+- [x] **超 4GB**：MT 勾选框禁用 + 灰字提示显示；退出超限后**恢复原勾选**（`_mtCheckedBeforeLimit` 逻辑），全程无互相覆盖
+- [x] `rg -n "ZipMultiThreadCheck_IsCheckedChanged" src` → 0 命中（axaml 事件属性与处理器**同时**删除，无 XAML 编译残留）
+- [x] 设置窗口「加速」页与压缩对话框 ZIP 面板都不再出现「魔数检测」
+- [x] 设置窗口「加速」页不再出现「自适应规则」卡片
+- [x] 自定义格式对话框不再出现「魔数 hex」输入框；格式目录列表不再显示 `[hex]`
+- [x] `settings.json` 旧字段仍可加载（不抛异常、不丢其它设置）
+- [x] 全量构建 + 测试通过；bench before/after 数据已归档
 
 ## Phase 2：实现（5-7h，Phase 1 发布后启动；原 3-4h + Task 12 基准测试约 +2-3h）
 

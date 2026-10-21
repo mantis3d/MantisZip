@@ -229,6 +229,8 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| ZIP 损坏检测（CRC 校验）修复（解压/测试改走 SharpCompress 官方 `CheckCrc` 路径；`CrcMismatch` 原因枚举 + 三语文案 + 4 条回归测试；真实损坏样本人工验收通过） | [zip-crc-validation.md](.omo/plans/已完成/zip-crc-validation.md) | 未发布（2026-10-20 验收） |
+| 设置项无消费者修复（10 项排查：7 项接线修复、1 项文档修正、2 项经用户决策暂缓并记录方案；无遗留代码） | [settings-unwired-keys.md](.omo/plans/已完成/settings-unwired-keys.md) | 未发布（2026-10-20 归档） |
 | 大文件 partial 拆分（App / ZipEngine / MainWindowViewModel 三阶段，纯移动零行为变化；3 个源码文本守卫改为枚举全部 partial） | [large-file-split.md](.omo/plans/已完成/large-file-split.md) | 未发布（2026-10-20） |
 | CLI 退出路径崩溃修复（主循环启动前 `desktop.Shutdown()` 收口）：新增 `Services/AppShutdown.cs` 唯一退出漏斗（判据 = `OnFrameworkInitializationCompleted` 是否已返回 → 未返回改 `Dispatcher.UIThread.Post` 延后到主循环首轮泵消息，已返回与直接 `Shutdown()` 逐字相同，零语义变更）+ `App.axaml.cs` 39 处 / `MainWindowViewModel.Exit` 1 处收口（全仓裸 `desktop.Shutdown(` 归零）+ `HandleShellCommand` 保留 `Environment.Exit` + 4 条源码文本级守卫测试（含状态位翻转点顺序断言）+ 3 条漏斗行为单测 + 9 条退出码矩阵取证（全 `ExitCode=0`、stderr 空、`DOMAIN EXCEPTION` 无新增、`startup-trace` 9 条 `reason=app-exit`） | [cli-exit-dispatcher-crash.md](.omo/plans/已完成/cli-exit-dispatcher-crash.md) | 未发布（2026-10-18） |
 | 文件关联失效修复（悬空 UserChoice + 测试污染真实注册表：`RegistryHost` 注册表访问收口层 + 测试沙箱化 + 卸载尽力清理悬空 `UserChoice` + `DefaultIcon` 清理读错子键修正 + 启动自愈重建缺失 ProgId（三条 AND，从不写 `UserChoice`）+ 设置页关联开关立即持久化 + `CleanupOldProgId` 清 `OpenWithProgids` 旧值 + 安装包 `RunOnceId` + `SHChangeNotify` 收口为关联/菜单统一通知） | [file-assoc-persistence-fix.md](.omo/plans/已完成/file-assoc-persistence-fix.md) | 未发布（2026-10-18） |

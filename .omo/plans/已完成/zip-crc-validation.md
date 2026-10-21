@@ -1,6 +1,6 @@
 # ZIP 损坏检测（CRC 校验）修复
 
-> **状态**: 🔄 实施中（代码完成，验收收尾） | **创建**: 2026-10-15 | **优先级**: P1 | **预估工时**: 3-5h
+> **状态**: ✅ 已完成（2026-10-20 验收通过） | **创建**: 2026-10-15 | **优先级**: P1 | **预估工时**: 3-5h
 > **来源**: 用户生成损坏压缩包做测试时发现「CRC 不匹配的 ZIP 测试/解压均不报错」
 >
 > **⚠️ 2026-10-16 修正**：SharpCompress 已由 `0.48.1` 升级至 **`0.50.4`**（`src/MantisZip.Core/MantisZip.Core.csproj`）。下文「0.48.1 尚无 `ExtractionOptions.CheckCrc` API」为立项时（0.48.1）的事实陈述——项目实际已在升级后的 0.50.4 上实施本修复（这也是升级动机之一）。
@@ -61,12 +61,19 @@
 - [x] `dotnet build` Core：0 错误 0 警告
 - [x] 新增测试 4/4 通过（`ZipEngineCrcValidationTests`）
 - [x] 全量 `MantisZip.Tests`：684 通过 / 3 跳过 / 0 失败
-- [ ] 全量 `MantisZip.UI.Avalonia.Tests`：首轮 30 失败均为 `No precompiled XAML found for ResultTreeView`（增量构建毒化，规则 17；与本次改动无关），**待 `-t:Rebuild` 全量重建后复验**
-- [ ] 用真实损坏样本 `corrupt-03-bad-crc.zip` / `corrupt-13-crc-field-flipped.zip` 手测「测试压缩包」+ 解压（UI 层）
+- [x] 全量 `MantisZip.UI.Avalonia.Tests`：`-t:Rebuild` 全量重建后 **331 总 / 328 过 / 3 跳过 / 0 失败**（2026-10-20 复验；首轮 30 失败确为增量构建毒化）
+- [x] 用真实损坏样本手测「测试压缩包」+ 解压（UI 层）：**2026-10-20 用户手动验收通过，未发现问题**
 
 ## 边界
 
 - 不动 `OpenEntryStream()` 的其它用途（压缩端把源条目解到临时目录：`ZipEngine.cs` 2736/3522，非解压流程，本次不纳入）；
 - 不改 7z / tar.gz 的校验（7z 由 7z.dll 校验、gzip CRC 由解压器自检，已正常检出）；
 - 不新增/不改变公开 API 签名；
-- 未提交（提交前需按规则 3 同步 `docs/PROGRESS.md` 与 `docs/progress-avalonia-detail.md`）。
+- 代码已提交（commit `85668486`），进度文档已同步。
+
+## 完成记录（2026-10-20 回填）
+
+- **代码**：commit 85668486（ZipEngine 4 处解压循环 + TestArchiveAsync 改走官方 CheckCrc 路径；CrcMismatch 原因枚举 + 三语文案 + 4 条回归测试）。
+- **自动化验证**：Core 测试通过；UI 测试 -t:Rebuild 后 331 总 / 328 过 / 3 跳过 / 0 失败。
+- **人工验收**：用户用真实损坏样本手测「测试压缩包」与解压，**未发现问题**（2026-10-20）。
+- **说明**：仓库未跟踪损坏语料（corrupt-03-bad-crc.zip 等），故相关回归测试依赖本地语料；缺失时表现为 Skip/环境性失败，与本修复无关。
