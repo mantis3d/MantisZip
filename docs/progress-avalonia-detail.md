@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-21** — 设置页图标与本地化修正（用户反馈「规则编辑/删除按钮看不见图标」）
+  - **根因**：规则列表与格式目录列表的编辑/删除按钮用的是 **字符图标**（U+270F 铅笔 / U+2715 叉），不是矢量资源 —— 在当前字体/主题下渲染不出来（其它用 PathIcon 的按钮正常）。
+  - **修正**：4 个按钮全部改为 PathIcon + 既有矢量资源（IconEdit / IconDelete），Foreground 显式设 ThemeTextPrimaryBrush（规则 4：PathIcon 不继承父 Foreground）；尺寸 15×15，沿用 ToolbarIcon 类与原 ToolTip/Click/Tag 绑定。
+  - **顺带修规则 13 违规**：压缩级别名称（存储/快速/正常/最大/跟随全局/全局±1/自定义/未知）原为**硬编码中文**（规则列表 LevelDisplay + 规则编辑对话框 LevelDisplayMap），现全部走三语 key Settings_AdaptiveRuleLevel_*（10 个 key × 3 语，key 集 1276 三语一致）；对话框的级别映射由 static 字典改为**按调用时解析**的方法（避免运行期切语言后显示旧文案）；自定义 下拉项用无占位符的 Settings_AdaptiveRuleLevel_CustomName，列表显示用带 {0} 的 Settings_AdaptiveRuleLevel_Custom。
+  - **验证**：UI 构建 0 警告 0 错误；全量 Core **766/0 失败**、UI **340/0 失败**。
 **2026-10-21** — 压缩加速 Phase 2 追加：「仅存储格式」并入自适应规则 + 多线程生效提示
   - **背景**：MT 路径由 7z 原生整组单次调用、组内统一用全局级别（ZipEngine.CompressGroup.cs:1589-1592）→ 规则「指定压缩级别」在 MT 路径不生效；「仅存储」判定在 MT 分拣阶段即生效（storeGroup → copy-mode 原样写入）。且 MT 准入有条件（IsMultiThreadedEligible：未加密 / 未分卷 / 条目数 ≤65535 / 体积 <4GB / deflate·deflate64）→ 小目录、加密包、分卷等走串行路径时规则全部生效，故**不按开关禁用编辑**，改为提示 + 行内标记。
   - **引擎简化**：AdaptiveRuleMatcher.ResolveLevel 去掉 customStoreFormatIds 分支；ArchiveOptions/CompressRequest 移除 MultiThreadedStoreFormatIds；ZipEntryClassifier.IsCustomStoreFormat 删除；GUI/CLI 传参清理。
