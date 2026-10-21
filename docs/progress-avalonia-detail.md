@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-21** — 启动优化阶段 1：过滤栏延迟加载（XamlSpan −27ms）
+  - **依据**：MainWindow.axaml 1393 行 / 485 元素，启动时**默认隐藏**的过滤栏（50 元素）与内容区（171 元素）合计 46% 白白膨胀；校准：预览面板延迟（297 元素）历史上整体启动 −9% ⇒ ≈0.4–0.5ms/元素。
+  - **实现**：过滤栏抽出为 Controls/MainFilterBar.axaml + MainFilterBar.axaml.cs（搬入 4 个 picker 处理器与 WritePickerTrace）；NullableLongConverter 局部资源随之迁入；MainWindow.axaml Row2 改为 <ContentControl x:Name="FilterBarHost" />，由 MainWindow.EnsureFilterBar() 在 IsFilterBarVisible 首次为 true 时创建（参照 EnsurePreviewPanel 先例）；新文件根节点显式 x:CompileBindings="False"（Avalonia 12 默认编译绑定，抽出后必须显式声明）。
+  - **测量**：Win.Xaml 段 **363.2 → 335.8ms（−27ms，8 轮中位）**；TOTAL 1653.7 → 1533.2ms（本机噪声较大，以 XamlSpan 为准）。
+  - **测试**：新增 MainFilterBarLazyLoadTests 2 条（默认不创建 / 显示时创建且只创建一次）；UI 全量 **344 通过 / 3 跳过 / 0 失败**。
+  - **后续**：内容区（171 元素，16 个 x:Name）与菜单子项（~170 元素）分阶段推进，**每阶段完成后停下由用户手动验证**；计划 .omo/plans/进行中/startup-ui-lazy-loading.md。
 **2026-10-21** — 修复菜单快捷键失效 + 新增常用快捷键（用户要求）
   - **根因（Avalonia 官方文档实证）**：MenuItem.InputGesture **只显示**快捷键文字、**不处理按键**（"Setting this property does not cause the input gesture to be handled by the menu item, it simply displays the gesture text in the menu"，Avalonia 12.1.2 Avalonia.Controls.xml）。项目此前**全仓无** KeyBindings/InputBindings → 菜单上标注的 5 个快捷键（Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5）**一直是只显示不生效**。
   - **实现**：Views/MainWindow.axaml.cs 新增 RegisterKeyBindings(MainWindowViewModel vm) —— 命令实例直绑到 MainWindow.KeyBindings（Avalonia 12 的 API 名是 KeyBindings，11 版的 InputBindings 已移除；KeyBinding 非 Control，无 DataContext，故不能用 {Binding}）。headless 探针实证 KeyBindings **确实处理按键**（executed=1）。

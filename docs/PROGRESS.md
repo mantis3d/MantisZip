@@ -26,6 +26,7 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-10
+- **10-21** — **启动优化：主窗口 UI 延迟加载（阶段 1 过滤栏）**：`MainWindow.axaml` 485 元素中 221 个（46%）在启动时不可见却照样膨胀；阶段 1 把过滤栏（50 元素）抽出为 `Controls/MainFilterBar.axaml` + `EnsureFilterBar()`（`IsFilterBarVisible` 首次为 true 才创建，参照预览面板延迟先例），`Win.Xaml` 段 **363.2→335.8ms（−27ms）**；新增 `MainFilterBarLazyLoadTests` 2 条，UI 全量 344/0 失败。阶段 2（内容区 171 元素）、阶段 3（菜单子项 ~170 元素）待做，每阶段停下由用户验证
 - **10-21** — **修复菜单快捷键一直「只显示不生效」+ 新增 10 个常用快捷键**：Avalonia 官方文档实证 `MenuItem.InputGesture` 仅显示文字、不处理按键，而项目全仓无 `KeyBindings` → 菜单标注的 5 个快捷键一直无效。现于 `MainWindow.KeyBindings` 统一登记 15 个（命令实例直绑，Avalonia 12 的 API 名是 `KeyBindings`）：Ctrl+O/N/W/E、Ctrl+Shift+L/E/T/A、Ctrl+T、Ctrl+P、Ctrl+Shift+V/I/C、Ctrl+,、F5；菜单项补 `InputGesture` 显示文字。新增 `MainWindowKeyBindingsTests` 2 条锁定；AGENTS 新增规则 10.1（快捷键唯一事实源）。附带结论：菜单子项延迟加载（启动优化线）自此无快捷键风险
 - **10-21** — **设置页图标与本地化修正**：用户反馈规则「编辑/删除」按钮看不见图标 —— 根因是用了字符图标（U+270F/U+2715）而非矢量资源，改为 `PathIcon` + `IconEdit`/`IconDelete`（`Foreground` 显式设色，规则 4）；顺带修规则 13 违规：压缩级别名称原为硬编码中文，现全部走三语 key（10 个 key × 3 语，key 集 1276 三语一致），对话框级别映射改为按调用时解析（支持运行期切语言）
 - **10-21** — **压缩加速 Phase 2 追加：「仅存储格式」并入自适应规则 + 多线程生效提示**：多线程路径由 7z 整组单次调用、组内统一用全局级别 → 规则「指定压缩级别」在 MT 路径不生效（「仅存储」类在 MT 分拣阶段即生效）；且 MT 准入有条件（未加密/未分卷/条目数与体积上限/deflate 方法），小目录等走串行路径时规则全部生效 → 按「提示 + 行内标记」处理而非禁用编辑。**合并**：删除设置页「仅存储格式」控件组，语义统一由规则承担（引擎去掉 `customStoreFormatIds` 分支与 `ArchiveOptions`/`CompressRequest` 字段）；**迁移**：旧「仅存储格式」列表中用户额外添加的 ID → 一条「仅存储格式（迁移）」Store 规则，旧默认规则集 → 新的 6 类默认规则集（补字体/文档，默认行为不变）；**提示**：规则卡片新增多线程警示 + 行内「多线程下不生效」标记；三语帮助与 RELEASE_NOTES 的过时表述同步修正。全量 Core 766/0 失败、UI 340/0 失败
