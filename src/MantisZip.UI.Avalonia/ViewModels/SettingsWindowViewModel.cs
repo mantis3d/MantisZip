@@ -2237,14 +2237,15 @@ public partial class AdaptiveOverrideRuleViewModel : ObservableObject
 
     public string LevelDisplay => Level switch
     {
-        AdaptiveLevel.Store => "存储",
-        AdaptiveLevel.Fast => "快速",
-        AdaptiveLevel.Normal => "正常",
-        AdaptiveLevel.Max => "最大",
-        AdaptiveLevel.Global => "跟随全局",
-        AdaptiveLevel.GlobalPlusOne => "全局+1",
-        AdaptiveLevel.GlobalMinusOne => "全局-1",
-        AdaptiveLevel.Custom => $"自定义({CustomLevel})",
-        _ => "未知"
+        AdaptiveLevel.Store => LocalizationManager.T("Settings_AdaptiveRuleLevel_Store"),
+        AdaptiveLevel.Fast => LocalizationManager.T("Settings_AdaptiveRuleLevel_Fast"),
+        AdaptiveLevel.Normal => LocalizationManager.T("Settings_AdaptiveRuleLevel_Normal"),
+        AdaptiveLevel.Max => LocalizationManager.T("Settings_AdaptiveRuleLevel_Max"),
+        AdaptiveLevel.Global => LocalizationManager.T("Settings_AdaptiveRuleLevel_Global"),
+        AdaptiveLevel.GlobalPlusOne => LocalizationManager.T("Settings_AdaptiveRuleLevel_GlobalPlusOne"),
+        AdaptiveLevel.GlobalMinusOne => LocalizationManager.T("Settings_AdaptiveRuleLevel_GlobalMinusOne"),
+        AdaptiveLevel.Custom => string.Format(
+            LocalizationManager.T("Settings_AdaptiveRuleLevel_Custom"), CustomLevel),
+        _ => LocalizationManager.T("Settings_AdaptiveRuleLevel_Unknown")
     };
 }

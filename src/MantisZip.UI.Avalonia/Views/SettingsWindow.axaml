@@ -214,14 +214,20 @@
                                     <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
                                     <TextBlock Text="{Binding MagicHexDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
                                   </StackPanel>
-                                  <!-- 编辑按钮 -->
-                                  <Button Grid.Column="1" Content="✏" Classes="ToolbarIcon"
+                                  <!-- 编辑按钮（矢量图标：IconEdit） -->
+                                  <Button Grid.Column="1" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="EditCustomFormat_Click"
-                                          ToolTip.Tip="编辑"/>
-                                  <!-- 删除按钮 -->
-                                  <Button Grid.Column="2" Content="✕" Classes="ToolbarIcon"
+                                          ToolTip.Tip="编辑">
+                                    <PathIcon Data="{StaticResource IconEdit}" Width="15" Height="15"
+                                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                  </Button>
+                                  <!-- 删除按钮（矢量图标：IconDelete） -->
+                                  <Button Grid.Column="2" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="DeleteCustomFormat_Click"
-                                          ToolTip.Tip="删除"/>
+                                          ToolTip.Tip="删除">
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15"
+                                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                  </Button>
                                 </Grid>
                               </Border>
                             </DataTemplate>
@@ -269,8 +275,16 @@
                                            Foreground="{DynamicResource ThemeStatusWarningBrush}" FontSize="11"
                                            IsVisible="{Binding ShowMtIneffectiveBadge}"/>
                                 <StackPanel Orientation="Horizontal" Grid.Column="6">
-                                  <Button Content="✏" Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="编辑"/>
-                                  <Button Content="✕" Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="删除"/>
+                                  <!-- 编辑按钮（矢量图标：IconEdit） -->
+                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="编辑">
+                                    <PathIcon Data="{StaticResource IconEdit}" Width="15" Height="15"
+                                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                  </Button>
+                                  <!-- 删除按钮（矢量图标：IconDelete） -->
+                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="删除">
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15"
+                                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                  </Button>
                                 </StackPanel>
                               </Grid>
                             </Border>
