@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 启动打点补充（App.axaml 加载 / 生命周期诊断 / 主窗构造前 JIT 归因）
+  - `App.Initialize` 增加 `App.Initialize.Enter/Exit`：测得 **App.axaml 解析（主题字典 + 85KB AppIcons + Fluent/DataGrid 样式）≈77–81ms**。
+  - `OnFrameworkInitializationCompleted` 增加 `Init.LifetimeDiag.Enter/Exit`：`LifetimeDiagnostics.Install`（含同步写 lifecycle.log）仅 **~4ms**，可排除。
+  - 各 `new MainWindow()` 前增加 `Init.MainWindow.New`：测得 **构造体执行前 ≈80ms（JIT）**——`XamlIlPopulate` 在应用程序集内，为 R2R 提供直接证据。
+  - 打点均为 `StartupTimer` 纯内存 mark（无 I/O），用于后续启动优化测量；常驻保留。
 **2026-10-20** — AppSettings 序列化改用 STJ 源生成（source-gen）
   - **实现**：新增 `Models/AppSettingsJsonContext.cs`（`[JsonSourceGenerationOptions(WriteIndented = true)]` + `[JsonSerializable(typeof(AppSettings))]`）；`Load()`/`Save()` 改用 context 重载（顺带去掉 `Save()` 每次新建 `JsonSerializerOptions`）。零语义变化，旧 int 字典大小转换器继续生效（`[JsonConverter]` 特性被源生成器支持）。
   - **测试**：新增 `AppSettingsJsonContextTests` 4 条（嵌套集合/枚举往返、旧 int → `"256m"`、与反射路径输出逐字一致、未知字段忽略）；UI 全量 **335 总 / 332 过 / 3 跳过 / 0 失败**。
