@@ -154,7 +154,7 @@ private static void AddIconOverrideLayer() { /* 计划 2 实现 */ }
 ```
 
 同时：
-1. 把 `App.axaml:12` 的静态 merge 由 `AppIcons.axaml` 改为 `Icons.A.axaml`（设计期/首帧需要；运行时由 `ApplyTheme` 重建）。
+1. 把 `App.axaml:12` 的静态 merge 由 `AppIcons.axaml` 改为 `Icons.A.axaml`（设计期/首帧需要；运行时由 `ApplyTheme` 重建）。⚠ **启动期解析次数约束见 §4.7 硬约束 1**：静态 merge 与 `ApplyTheme()` 各解析一次 = 多付 33ms，二者必须共用同一 provider 实例或去掉静态 merge。
 2. **删除** `App.axaml.cs:35` 的旧常量 `IconResourcesUri`（唯一引用点在 `App.Theming.cs:77` 的 `_cachedIconProvider ??=` 分支，随缓存改造一并移除），避免死代码 / 双常量漂移。
 3. 计划 1 仅存在 A 套，`iconThemeId == "A"` 时跳过 ② 层（避免同一 provider 重复 Add）；计划 2/3 引入真实主题后才走三层。
 4. **缓存失效归计划 2**：计划 1 只建缓存，不建失效入口。计划 2 新增的 `RefreshIconTheme()` 必须 `_iconThemeProviders.Remove(id)` + 清 `_loadedIconThemeId`，否则第 115 行的双条件早退会直接 return（改包/改覆盖后界面不刷新）。
@@ -191,6 +191,39 @@ private static void AddIconOverrideLayer() { /* 计划 2 实现 */ }
 
 > `Foreground` setter 是 A 套零视觉差异的关键：它与 Fluent `PathIcon` 的 ControlTheme 默认值同 key，且 `Application.Styles` 的 `ToggleButton:checked controls:IconView` 仍能压过它（与现有 `ToggleButton:checked PathIcon` 压过 Fluent PathIcon ControlTheme 同一机制）。
 
+### 4.7 启动性能约束（2026-10-21 增补，基于 2026-10-21 修订版）
+
+本计划是启动路径上唯一有实质风险的改动（`ApplyTheme()` 启动期执行 + 215 处静态图标替换 + 图标字典重解析）。启动优化二期（`startup-theme-dedup`）已建立「同主题早退 + 图标字典缓存」机制，本计划**不得破坏**它——§4.4 note 1-3 已覆盖大部分（双条件早退 / `_iconThemeProviders` 按 id 缓存 / A 时跳过②层），此处只补**尚未覆盖的启动期解析次数**与**量化门控**。
+
+**实测基线（2026-10-21 无头探针）**
+
+| 测量项 | 结果 |
+|---|---|
+| `AppIcons.axaml` 解析（116 Geometry） | **32.9ms**（占启动 `App.Initialize` 78ms 的 42%） |
+| `ThemeLight.axaml` 解析（对照） | 1.8ms |
+| 200× `PathIcon` 实例化 | 33.6ms（冷，含 JIT）；热态 200 个仅 1.2ms → 单实例 ≈0.006ms |
+| 200× `Button`（`Control` 近似 `IconView`） | 7.8ms → 控件级实例化开销可忽略 |
+| 200× `PathIcon` + `GetResourceObservable` | 1.2ms → `SourceKey` 订阅机制本身很便宜 |
+
+**硬约束（实施时必须满足，违反即打回）**
+
+1. **启动期图标字典解析次数 = 1**（与当前基线持平，**不得变成 2**）：§4.4「同时」第 1 条要求 `App.axaml:12` 静态 merge 改挂 `Icons.A.axaml`，而 `ApplyTheme()` 里的 `GetIconThemeProvider("A")` 会**再 `Load` 一次** → 启动多解析 **33ms**。二选一：
+   - (a) **推荐**：`App.axaml` **不再静态 merge 图标字典**——迁移后图标键全为 `DynamicResource`（静态引用已清零，DoD #1），首帧不依赖静态 merge；`ApplyTheme()` 在 `OnFrameworkInitializationCompleted` 内、早于 `MainWindow` 创建 → 首帧不缺资源；
+   - (b) `GetIconThemeProvider("A")` 首次命中时**复用** `App.axaml` 静态 merge 进来的同一 provider 实例（而非重新 `Load`）。
+2. **切主题/切图标主题不得重复解析**：§4.4 note 2 的 `_iconThemeProviders` 按 id 缓存必须真正命中（不得每次 `ApplyTheme` 重新 `Load`），否则每次换肤 +33ms。
+3. **`IconView` 保持轻量**：§4.6 已定 `ControlTheme` 只含 3 个 Setter、**无 `Template` 内容**——不得引入 `TemplatedControl` 模板或每实例可视图；实测 215 个实例的控件级开销 ≤10ms，可接受。
+4. **215 处迁移后 XAML 体积增大** → `Win.Xaml` 段（当前 ~330ms）预期 +5~15ms，属可接受区间。
+
+**验收门控（§7 增补）**
+
+```powershell
+# 交错 A/B（基线 = 迁移前 HEAD 的 Release 构建），n=10
+.\tools\measure-startup.ps1 -ExePath @($baselineExe, $newExe) -Runs 10 -WarmupRuns 1
+```
+
+- 门控：`TOTAL` 中位数劣化 ≤ **20ms**（约 1.5%）且 `Win.Xaml` 段劣化 ≤ 30ms → 通过；
+- 不达门控：优先排查「图标字典重复解析（约束 1/2）」与「`IconView` 引入模板（约束 3）」两项（占预期风险 90%+），而非放宽门控；
+- 迁移是纯 UI 替换，任何启动劣化超门控必须在本计划内解决（不得留待后续计划）。
 ## 5. 任务分解（TDD；每任务一个 commit）
 
 > 规则：每个任务先写失败测试 → 实现 → 测试转绿 → `dotnet build`/`dotnet test` → conventional commit（规则 10）。
@@ -281,6 +314,7 @@ git grep -n '\bBoolToIconConverter\b' -- 'src/*'
 
 - `lsp_diagnostics` 无错误。
 - 手动：浅色/深色/选中态逐一目检（A 套零差异）；`SelectedIconTheme` 改值重启后仍指向 A（唯一可选项）。
+- **启动 A/B 门控**：见 §4.7 —— 迁移前后交错 n=10，TOTAL 中位劣化 ≤ 20ms、Win.Xaml 劣化 ≤ 30ms 方可合入（基线数字见 §4.7 表）。
 
 ## 8. 边界 / 非目标
 
@@ -303,3 +337,5 @@ git grep -n '\bBoolToIconConverter\b' -- 'src/*'
 | 键冲突（AppIcons 与 Icons.A 同名） | 运行时**只** merge Icons.A 三层，绝不 merge AppIcons |
 | `ApplyTheme` 同主题早退吞掉图标主题切换 | 早退条件改双条件（`_loadedThemeUri` + `_loadedIconThemeId`）；T2 覆盖「基础主题不变、仅图标 id 变」路径 |
 | 行号漂移导致漏站 | §3 行号为 2026-10-21 快照；执行时以锚点符号（x:Name、方法名、模式）为准，动手前重新 grep 校准 |
+| **启动劣化**：图标字典在 App.axaml 静态 merge 与 ApplyTheme() 各解析一次 → 启动 +33ms；切主题若未命中缓存 → 每次换肤 +33ms | §4.7 硬约束 1/2：启动解析次数 = 1（去掉静态 merge 或复用同一 provider 实例）+ _iconThemeProviders 缓存必须命中；§7 启动 A/B 门控 |
+| **IconView 控件化开销**：215 个实例若引入模板匹配/可视图 → Win.Xaml（当前 ~330ms）明显劣化 | §4.7 硬约束 3：ControlTheme 仅 3 个 Setter、无 Template；实测控件级开销 ≤10ms |
