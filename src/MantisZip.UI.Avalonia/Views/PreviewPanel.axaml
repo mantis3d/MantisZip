@@ -579,17 +579,23 @@
             <StackPanel Grid.Row="0" Orientation="Horizontal"
                         HorizontalAlignment="Center" Spacing="{DynamicResource SpacingXs}"
                         IsVisible="{Binding HasPptxNavigation}">
-              <Button Content="◀" Command="{Binding PptxPreviousSlideCommand}"
-                      Width="28" Height="26" FontSize="14" Padding="0"
-                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PptxPrev]}" />
+              <Button Command="{Binding PptxPreviousSlideCommand}"
+                      Width="28" Height="26" Padding="0"
+                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PptxPrev]}">
+                <PathIcon Data="{StaticResource IconChevronLeft}" Width="14" Height="14"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+              </Button>
               <TextBlock Text="{Binding PptxCurrentSlide}"
                          VerticalAlignment="Center" />
               <TextBlock Text="/" VerticalAlignment="Center" />
               <TextBlock Text="{Binding PptxTotalSlides}"
                          VerticalAlignment="Center" />
-              <Button Content="▶" Command="{Binding PptxNextSlideCommand}"
-                      Width="28" Height="26" FontSize="14" Padding="0"
-                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PptxNext]}" />
+              <Button Command="{Binding PptxNextSlideCommand}"
+                      Width="28" Height="26" Padding="0"
+                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PptxNext]}">
+                <PathIcon Data="{StaticResource IconChevronRight}" Width="14" Height="14"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+              </Button>
             </StackPanel>
             <!-- 幻灯片 Canvas（固定宽高，超出滚动） -->
             <ScrollViewer Grid.Row="1"
@@ -642,18 +648,24 @@
             <StackPanel Grid.Row="0" Orientation="Horizontal"
                         HorizontalAlignment="Center" Spacing="{DynamicResource SpacingXs}"
                         IsVisible="{Binding HasPdfNavigation}">
-              <Button Content="◀" Command="{Binding PdfPreviousPageCommand}"
-                      Width="28" Height="26" FontSize="14" Padding="0"
-                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PdfPrev]}" />
+              <Button Command="{Binding PdfPreviousPageCommand}"
+                      Width="28" Height="26" Padding="0"
+                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PdfPrev]}">
+                <PathIcon Data="{StaticResource IconChevronLeft}" Width="14" Height="14"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+              </Button>
               <TextBox Text="{Binding PdfCurrentPage}"
                        Width="50" Height="26"
                        HorizontalContentAlignment="Center"
                        VerticalContentAlignment="Center" />
               <TextBlock Text="{Binding PdfPageInfo}"
                          VerticalAlignment="Center" />
-              <Button Content="▶" Command="{Binding PdfNextPageCommand}"
-                      Width="28" Height="26" FontSize="14" Padding="0"
-                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PdfNext]}" />
+              <Button Command="{Binding PdfNextPageCommand}"
+                      Width="28" Height="26" Padding="0"
+                      ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PdfNext]}">
+                <PathIcon Data="{StaticResource IconChevronRight}" Width="14" Height="14"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+              </Button>
             </StackPanel>
             <!-- PDF 页内容（缩放联动 ImagePreview 的 ScrollViewer） -->
             <ScrollViewer Grid.Row="1"

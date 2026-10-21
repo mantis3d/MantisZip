@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-21** — 全项目按钮图标审计：字符图标全部替换为矢量资源
+  - **审计范围**：src 下全部 .axaml，扫描 Button/ToggleButton 的 Content="字面量" 与 TextBlock 的符号字符。
+  - **A 类（按钮用字符当图标，全部修正）**：Views/PreviewPanel.axaml 的 PPTX 翻页（◀/▶）与 PDF 翻页（◀/▶）共 4 个按钮 → 改 PathIcon + 既有矢量资源 IconChevronLeft / IconChevronRight（14×14，Foreground 显式设 ThemeTextPrimaryBrush，规则 4）。复查：全项目按钮内已无字符图标（0 命中）。
+  - **B 类（保留）**：ProgressWindow 的统计 emoji（✅/⏭/❌/⚙）、MatchedPasswordDialog/ProgressWindow 的密码遮罩 ●●●、SettingsWindow 规则行的 → 分隔符、UiTestWindow 的测试窗图标 —— 均为**非按钮**场景；AGENTS 规则 4 明确「全局 TextBlock 样式故意不设 Foreground（避免 emoji 压成单色）」，即彩色 emoji 是刻意选择，本次不动（已列出供复核）。
+  - **验证**：UI 构建 0 警告 0 错误；UI 测试 **340 通过 / 3 跳过 / 0 失败**。
 **2026-10-21** — 设置页图标与本地化修正（用户反馈「规则编辑/删除按钮看不见图标」）
   - **根因**：规则列表与格式目录列表的编辑/删除按钮用的是 **字符图标**（U+270F 铅笔 / U+2715 叉），不是矢量资源 —— 在当前字体/主题下渲染不出来（其它用 PathIcon 的按钮正常）。
   - **修正**：4 个按钮全部改为 PathIcon + 既有矢量资源（IconEdit / IconDelete），Foreground 显式设 ThemeTextPrimaryBrush（规则 4：PathIcon 不继承父 Foreground）；尺寸 15×15，沿用 ToolbarIcon 类与原 ToolTip/Click/Tag 绑定。
