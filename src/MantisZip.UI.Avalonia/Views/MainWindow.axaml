@@ -45,7 +45,7 @@
           </MenuItem.Icon>
         </MenuItem>
         <!-- 打开压缩包所在位置：在资源管理器中定位当前压缩包文件 -->
-        <MenuItem Command="{Binding OpenArchiveLocationCommand}"
+        <MenuItem Command="{Binding OpenArchiveLocationCommand}" InputGesture="Ctrl+Shift+L"
                   IsEnabled="{Binding IsArchiveLoaded}"
                   Header="{Binding LocalizedStrings[Menu_OpenArchiveLocation]}">
           <MenuItem.Icon>
@@ -115,7 +115,7 @@
           </MenuItem.Icon>
         </MenuItem>
         <!-- 解压到此处：直接解压到压缩包所在目录 -->
-        <MenuItem Command="{Binding ExtractArchiveHereCommand}"
+        <MenuItem Command="{Binding ExtractArchiveHereCommand}" InputGesture="Ctrl+Shift+E"
                   IsEnabled="{Binding IsArchiveLoaded}"
                   Header="{Binding LocalizedStrings[Menu_ExtractHere]}">
           <MenuItem.Icon>
@@ -123,7 +123,7 @@
           </MenuItem.Icon>
         </MenuItem>
         <!-- 解压到（压缩包名）：解压到以压缩包名命名的子文件夹 -->
-        <MenuItem Command="{Binding ExtractArchiveToNameCommand}"
+        <MenuItem Command="{Binding ExtractArchiveToNameCommand}" InputGesture="Ctrl+Shift+T"
                   IsEnabled="{Binding IsArchiveLoaded}"
                   Header="{Binding LocalizedStrings[Menu_ExtractToName]}">
           <MenuItem.Icon>
@@ -140,7 +140,7 @@
         </MenuItem>
         <Separator />
         <!-- 添加文件到压缩包 -->
-        <MenuItem Command="{Binding AddFilesCommand}"
+        <MenuItem Command="{Binding AddFilesCommand}" InputGesture="Ctrl+Shift+A"
                   IsEnabled="{Binding IsArchiveLoaded}"
                   Header="{Binding LocalizedStrings[Menu_AddFiles]}">
           <MenuItem.Icon>
@@ -157,7 +157,7 @@
         </MenuItem>
         <Separator />
         <!-- 测试压缩包完整性 -->
-        <MenuItem Command="{Binding TestArchiveCommand}"
+        <MenuItem Command="{Binding TestArchiveCommand}" InputGesture="Ctrl+T"
                   IsEnabled="{Binding IsArchiveLoaded}"
                   Header="{Binding LocalizedStrings[Menu_TestArchive]}">
           <MenuItem.Icon>
@@ -223,7 +223,7 @@
         </MenuItem>
         <Separator />
         <!-- 切换预览面板显示/隐藏 -->
-        <MenuItem Command="{Binding TogglePreviewCommand}"
+        <MenuItem Command="{Binding TogglePreviewCommand}" InputGesture="Ctrl+P"
                   Header="{Binding LocalizedStrings[Menu_ShowPreviewPanel]}">
           <MenuItem.Icon>
             <Border Classes="ToggleIconBox"
@@ -234,7 +234,7 @@
           </MenuItem.Icon>
         </MenuItem>
         <!-- 切换信息面板显示/隐藏（预览区域右侧/下方的元数据面板） -->
-        <MenuItem Command="{Binding ToggleInfoPanelVisibilityCommand}"
+        <MenuItem Command="{Binding ToggleInfoPanelVisibilityCommand}" InputGesture="Ctrl+Shift+I"
                   Header="{Binding LocalizedStrings[Menu_ShowInfoPanel]}">
           <MenuItem.Icon>
             <Border Classes="ToggleIconBox"
@@ -283,7 +283,7 @@
         </MenuItem>
         <Separator />
         <!-- 打开设置窗口：配置压缩/解压/外观/预览等选项 -->
-        <MenuItem Command="{Binding OpenSettingsCommand}"
+        <MenuItem Command="{Binding OpenSettingsCommand}" InputGesture="Ctrl+,"
                   Header="{Binding LocalizedStrings[Menu_Settings]}">
           <MenuItem.Icon>
             <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />

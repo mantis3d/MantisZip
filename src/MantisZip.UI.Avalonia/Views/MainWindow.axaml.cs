@@ -152,6 +152,12 @@ public partial class MainWindow : Window
         };
         DataContext = vm;
 
+        // 全局快捷键（唯一事实源）：MenuItem.InputGesture 只负责「在菜单里显示」快捷键文字
+        // （Avalonia 官方文档：Setting this property does not cause the input gesture to be handled
+        //   by the menu item, it simply displays the gesture text in the menu），
+        // 真正生效的按键绑定必须登记在这里；用命令实例直绑（KeyBinding 非 Control，无 DataContext）。
+        RegisterKeyBindings(vm);
+
         // 条目重填后重应用列排序（进入目录/刷新/过滤后保持排序状态）
         vm.EntriesRefreshed += (_, _) =>
         {
@@ -1186,6 +1192,54 @@ public partial class MainWindow : Window
 
         ApplyCurrentSort();
         UpdateSortArrows();
+    }
+
+    /// <summary>
+    /// 注册全局快捷键（**菜单快捷键的唯一事实源**）。
+    ///
+    /// 背景：Avalonia 的 <c>MenuItem.InputGesture</c> **只显示**快捷键文字、不处理按键
+    /// （官方文档：Setting this property does not cause the input gesture to be handled by the
+    /// menu item, it simply displays the gesture text in the menu）。
+    /// 因此真正生效的按键必须登记在 <see cref="Avalonia.Input.IInputElement.KeyBindings"/>
+    /// （Avalonia 12 的 API 名是 <c>KeyBindings</c>，11 版的 <c>InputBindings</c> 已移除）；
+    /// 此处用命令实例直绑（KeyBinding 不是 Control，拿不到 DataContext）。
+    ///
+    /// 约定：新增菜单快捷键时 ① 在此登记（生效）② 在对应 MenuItem 上写同样的
+    /// <c>InputGesture</c>（菜单里显示）③ 在 AGENTS.md「快捷键」小节同步。
+    /// </summary>
+    private void RegisterKeyBindings(MainWindowViewModel vm)
+    {
+        void Add(Key key, KeyModifiers modifiers, System.Windows.Input.ICommand command)
+        {
+            KeyBindings.Add(new KeyBinding
+            {
+                Gesture = new KeyGesture(key, modifiers),
+                Command = command,
+            });
+        }
+
+        // 文件
+        Add(Key.O, KeyModifiers.Control, vm.OpenArchiveCommand);
+        Add(Key.N, KeyModifiers.Control, vm.NewArchiveCommand);
+        Add(Key.W, KeyModifiers.Control, vm.CloseArchiveCommand);
+        Add(Key.F5, KeyModifiers.None, vm.RefreshArchiveCommand);
+        Add(Key.L, KeyModifiers.Control | KeyModifiers.Shift, vm.OpenArchiveLocationCommand);
+
+        // 编辑
+        Add(Key.E, KeyModifiers.Control, vm.ExtractArchiveCommand);
+        Add(Key.E, KeyModifiers.Control | KeyModifiers.Shift, vm.ExtractArchiveHereCommand);
+        Add(Key.T, KeyModifiers.Control | KeyModifiers.Shift, vm.ExtractArchiveToNameCommand);
+        Add(Key.T, KeyModifiers.Control, vm.TestArchiveCommand);
+        Add(Key.A, KeyModifiers.Control | KeyModifiers.Shift, vm.AddFilesCommand);
+
+        // 视图
+        Add(Key.P, KeyModifiers.Control, vm.TogglePreviewCommand);
+        Add(Key.V, KeyModifiers.Control | KeyModifiers.Shift, vm.CycleViewModeCommand);
+        Add(Key.I, KeyModifiers.Control | KeyModifiers.Shift, vm.ToggleInfoPanelVisibilityCommand);
+        Add(Key.C, KeyModifiers.Control | KeyModifiers.Shift, vm.CopyFilePathCommand);
+
+        // 帮助
+        Add(Key.OemComma, KeyModifiers.Control, vm.OpenSettingsCommand);
     }
 
     /// <summary>

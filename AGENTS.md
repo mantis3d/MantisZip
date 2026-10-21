@@ -196,6 +196,15 @@ When releasing a new version, update the version string in ALL of these location
 - `fix(core,avalonia): 拖拽/右键解压流程统一`
 - `docs: AGENTS.md 新增 ComputeDirectoryStats 目录聚合契约说明`
 
+### 规则 10.1：菜单快捷键的唯一事实源是 `MainWindow.KeyBindings`
+
+Avalonia 的 `MenuItem.InputGesture` **只显示**快捷键文字、**不处理按键**（官方文档：Setting this property does not cause the input gesture to be handled by the menu item, it simply displays the gesture text in the menu）。真正生效的绑定必须登记在 `MainWindow.KeyBindings`（Avalonia 12 的 API 名是 `KeyBindings`；11 版的 `InputBindings` 已移除）。
+
+- **登记处**：`Views/MainWindow.axaml.cs` 的 `RegisterKeyBindings(MainWindowViewModel vm)` —— 用**命令实例直绑**（`KeyBinding` 不是 Control，拿不到 DataContext）
+- **显示处**：对应 `MenuItem` 上写同样的 `InputGesture="Ctrl+…"`（仅供菜单里显示）
+- **新增快捷键三步**：① `RegisterKeyBindings` 登记（生效）② `MenuItem.InputGesture` 写同样文字（显示）③ 更新 `tests/MantisZip.UI.Avalonia.Tests/MainWindowKeyBindingsTests.cs` 的期望清单
+- **不要**在 `MenuItem` 上单独挂 `InputGesture` 就以为快捷键生效了（2026-10-21 修复：5 个原有快捷键一直只显示不生效）
+
 ### 规则 11：新功能只在 Avalonia 开发
 
 WPF 版本已在迁移完成后删除。所有新功能仅在 `MantisZip.UI.Avalonia` 中实现。共享层（`MantisZip.Core`/`MantisZip.ShellExt`）改动需评估兼容性。

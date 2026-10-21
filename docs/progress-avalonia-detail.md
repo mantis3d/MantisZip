@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-21** — 修复菜单快捷键失效 + 新增常用快捷键（用户要求）
+  - **根因（Avalonia 官方文档实证）**：MenuItem.InputGesture **只显示**快捷键文字、**不处理按键**（"Setting this property does not cause the input gesture to be handled by the menu item, it simply displays the gesture text in the menu"，Avalonia 12.1.2 Avalonia.Controls.xml）。项目此前**全仓无** KeyBindings/InputBindings → 菜单上标注的 5 个快捷键（Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5）**一直是只显示不生效**。
+  - **实现**：Views/MainWindow.axaml.cs 新增 RegisterKeyBindings(MainWindowViewModel vm) —— 命令实例直绑到 MainWindow.KeyBindings（Avalonia 12 的 API 名是 KeyBindings，11 版的 InputBindings 已移除；KeyBinding 非 Control，无 DataContext，故不能用 {Binding}）。headless 探针实证 KeyBindings **确实处理按键**（executed=1）。
+  - **快捷键清单（15 个）**：Ctrl+O 打开 / Ctrl+N 新建 / Ctrl+W 关闭 / F5 刷新 / Ctrl+Shift+L 打开所在目录 / Ctrl+E 解压对话框 / Ctrl+Shift+E 原地解压 / Ctrl+Shift+T 解压到同名文件夹 / Ctrl+T 测试压缩包 / Ctrl+Shift+A 添加文件 / Ctrl+P 预览面板 / Ctrl+Shift+V 切换视图 / Ctrl+Shift+I 信息面板 / Ctrl+Shift+C 复制完整路径 / Ctrl+, 设置。菜单项同步补 InputGesture 文字（仅显示）。
+  - **测试**：新增 MainWindowKeyBindingsTests 2 条（15 个手势全部登记且各挂真实命令 / 无重复登记）。
+  - **约定入 AGENTS**：新增「规则 10.1：菜单快捷键的唯一事实源是 MainWindow.KeyBindings」，三步走（登记 → 菜单显示 → 更新测试期望）。
+  - **顺带结论**：菜单**子项**延迟加载（startup 优化线）在快捷键迁到 KeyBindings 后**彻底无风险**（KeyBindings 属窗口，与子项创建时机无关）。
+  - **验证**：UI 构建 0 警告 0 错误；UI 测试 339 通过 / 3 跳过 / 0 失败。
 **2026-10-21** — 全项目按钮图标审计：字符图标全部替换为矢量资源
   - **审计范围**：src 下全部 .axaml，扫描 Button/ToggleButton 的 Content="字面量" 与 TextBlock 的符号字符。
   - **A 类（按钮用字符当图标，全部修正）**：Views/PreviewPanel.axaml 的 PPTX 翻页（◀/▶）与 PDF 翻页（◀/▶）共 4 个按钮 → 改 PathIcon + 既有矢量资源 IconChevronLeft / IconChevronRight（14×14，Foreground 显式设 ThemeTextPrimaryBrush，规则 4）。复查：全项目按钮内已无字符图标（0 命中）。
