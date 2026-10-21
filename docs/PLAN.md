@@ -30,7 +30,6 @@
 | **P2** | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | **P2** | 进度条分段着色（按压缩包状态） | [progress-bar-segments.md](.omo/plans/未开始/progress-bar-segments.md) | 🟡中 | 3-4h | 自定义分段进度条控件替换普通 `ProgressBar`，按批处理项状态着色（红=失败/绿=成功/青=跳过/蓝=进行中），动态预算缝隙 |
 | **P2** | 进度窗口状态行 + 失败明细 + 关闭链统一 + 倒计时 + 解压后置开关 | [progress-window-status-line.md](.omo/plans/未开始/progress-window-status-line.md) | 🟢核心完成 | 12-16h | ✅ 核心实施完成（2026-10-13，Task 1–11），GUI 人工验收待做。内容：状态行下移 + `EntryFailureReason` 三语错误摘要（红/黄分层、可复制）+ 关闭链统一（三条件自动按下 📌）+ 自动关闭倒计时 + 解压后「打开目录/移入回收站」开关。设计拍板（D1–D19）与任务分解详情见计划文档及 spec |
-| **P2** | 压缩/解压出错信息增强（整包错误本地化+详情透传+原因分布） | [error-info-enhancement.md](.omo/plans/进行中/error-info-enhancement.md) | 🟡中 | 10-13h | 🚧 进行中（progress-window-status-line 续作）：整包错误本地化映射、红/黄摘要补失败原因分布行、三引擎 `EntryErrorDetail` 透传 + Win32 错误提示细分。Task 1–8 与任务 11 已实施提交，任务 9 GUI 人工验收待做；修订决策（D2 透传等）详见计划文档 |
 | **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.omo/plans/未开始/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
 | **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.omo/plans/未开始/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
 | **P2** | 文件列表缩略图查看方式 | [file-list-thumbnails.md](.omo/plans/未开始/file-list-thumbnails.md) | 🟡中 | 4-6h | 三种布局模式循环切换（详情/平铺/内容行），内容卡三档（图像缩略图/文字头部预览/系统图标），布局模式持久化 |

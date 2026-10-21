@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — error-info-enhancement 归档（GUI 验收通过）
+  - 用户完成 GUI 人工验收（红段 + 黄段场景），未发现问题；黄段按计划内「黄段验收方法」复现通过。
+  - **验证证据**：Core 测试 747/744、Avalonia 331/328 全绿；硬编码扫描 `未能写入到` 0 命中；33 处 `ArchiveEntryStatus.Failed` 逐处核对 `FileTotalBytes`（唯一例外为整包级上报，设计如此）。
+  - **行为决策**：黄段不自动钉住窗口（D4）保持现状。
+  - **归档**：计划移入 `.omo/plans/已完成/error-info-enhancement.md`；PLAN.md 移除任务行；PROGRESS 历史设计方案索引新增一行。`进行中` 剩余 6 份。
+
 **2026-10-20** — error-info-enhancement 黄段触发条件核查（无代码改动，验收记录补充）
   - **背景**：用户反馈 GUI 验收时只见到红段、未遇到黄段 → 代码核查「黄段何时出现」。
   - **结论**：`ProgressViewModel.CollectEntryOutcome` 仅收集 `Skipped` **且带 `EntryFailureReason`** 的条目进黄段。该组合只由**压缩侧**产生——① ZIP/7z 前置读权限预检 `ReadErrorHandler.FilterUnreadableFiles`（源文件被独占占用/权限不足）；② ZIP `ReadFileWithRetry`、TAR.GZ `TarWriteFileWithRetry` 写入中途读失败。且必须在「处理文件时出错」对话框选**跳过**（重试成功无摘要、中止走红段）。

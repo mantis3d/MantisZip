@@ -1,6 +1,6 @@
 # 压缩/解压出错信息增强（整包错误本地化 + 逐条目详情透传 + 失败原因分布）
 
-> **状态**: 🚧 进行中（2026-10-15 立项；**任务 1–8 已实施**，任务 9 GUI 人工验收待做，任务 10 提交按用户指示）
+> **状态**: ✅ 已完成（2026-10-20 归档）：任务 1–8 已实施（commit `7799e56a`），任务 9 全量验证 + GUI 人工验收通过（含黄段），任务 10 文档与提交已完成
 >
 > **For agentic workers:** 执行时使用 superpowers:subagent-driven-development 或 superpowers:executing-plans。Steps use checkbox (`- [ ]`) syntax for tracking。提交策略：默认**不 commit**；仅当用户明确要求提交时执行收尾任务，且按规则 3 先更新双轨进度文档。
 
@@ -375,10 +375,10 @@ Wave FINAL
 - 无代码改动（验证为主）
 
 **What to do**:
-- [ ] 全量构建 + 测试（见 Verification Strategy 全部命令）
-- [ ] 硬编码扫描：`git grep -n "未能写入到" -- 'src/*.cs'` 无命中
-- [ ] 引擎扫描：`rg -n "ArchiveEntryStatus.Failed" src\MantisZip.Core\Engines` 逐处核对 FileTotalBytes/EntryErrorDetail
-- [ ] GUI 人工验收清单（Windows，需准备测试素材）：
+- [x] 全量构建 + 测试（2026-10-20：Core **747 总 / 744 过 / 3 跳过 / 0 失败**；Avalonia **331 总 / 328 过 / 3 跳过 / 0 失败**）
+- [x] 硬编码扫描：`git grep -n "未能写入到" -- "src/*.cs"` → **0 命中**
+- [x] 引擎扫描：33 处 `ArchiveEntryStatus.Failed` 均带 `FileTotalBytes`（多行上报已逐处核对）；唯一例外 `SevenZipEngine.cs:938` 为**整包级**失败上报（无 EntryKey，走红段整包头），设计如此
+- [x] GUI 人工验收清单（Windows，需准备测试素材）：**2026-10-20 用户验收完成**（红段既有验收通过；黄段按下方方法复现通过；验收结论：未见异常）
   1. **CRC 损坏 ZIP**：解压 → 红段摘要行显示"数据损坏"，tooltip 显示 SharpCompress 原文（含 CRC 字样），条目行 tooltip 同
   2. **只读目标目录**：解压 → "权限不足" + UnauthorizedAccess 本地化整包头（若整包级）+ tooltip 原文
   3. **磁盘满**（可用 subst 小容量 VHD 模拟）：解压 → IoFailed 行 tooltip 追加"磁盘空间不足"hint
@@ -491,3 +491,10 @@ Wave FINAL
 ## 提交策略
 
 默认**不 commit**。任务 1–9 完成且验收通过后向用户汇报；仅当用户明确要求提交时执行任务 10（规则 3 前置 + 规则 10 消息格式 + 不 push）。
+
+## 完成记录（2026-10-20 回填）
+
+- **代码**：Task 1–8 已提交（`7799e56a`），工具提示接线守卫 `0accf8c4`；无验收后返工。
+- **验证**：Core 747/744、Avalonia 331/328 全绿；硬编码扫描 0；引擎 Failed 上报逐处核对 `FileTotalBytes` 完整。
+- **GUI 人工验收**：用户于 2026-10-20 完成红段与黄段场景验收，未发现问题。黄段触发条件与复现步骤见任务 9「黄段验收方法」。
+- **行为决策**：黄段不自动钉住窗口（D4）经用户确认保持现状。

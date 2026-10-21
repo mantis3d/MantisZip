@@ -229,6 +229,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 压缩/解压出错信息增强（整包错误本地化 + 逐条目 `EntryErrorDetail`/HResult 透传 + 红/黄分层摘要与原因分布 + Win32 错误提示细分；Tooltip 接线守卫测试） | [error-info-enhancement.md](.omo/plans/已完成/error-info-enhancement.md) | 未发布（2026-10-20 验收） |
 | ZIP 损坏检测（CRC 校验）修复（解压/测试改走 SharpCompress 官方 `CheckCrc` 路径；`CrcMismatch` 原因枚举 + 三语文案 + 4 条回归测试；真实损坏样本人工验收通过） | [zip-crc-validation.md](.omo/plans/已完成/zip-crc-validation.md) | 未发布（2026-10-20 验收） |
 | 设置项无消费者修复（10 项排查：7 项接线修复、1 项文档修正、2 项经用户决策暂缓并记录方案；无遗留代码） | [settings-unwired-keys.md](.omo/plans/已完成/settings-unwired-keys.md) | 未发布（2026-10-20 归档） |
 | 大文件 partial 拆分（App / ZipEngine / MainWindowViewModel 三阶段，纯移动零行为变化；3 个源码文本守卫改为枚举全部 partial） | [large-file-split.md](.omo/plans/已完成/large-file-split.md) | 未发布（2026-10-20） |
