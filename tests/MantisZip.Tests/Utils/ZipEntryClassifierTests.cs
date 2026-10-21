@@ -4,7 +4,7 @@ using Xunit;
 namespace MantisZip.Tests.Utils;
 
 /// <summary>
-/// ZipEntryClassifier 单元测试 — 覆盖内置已压缩扩展名分类、GetAdaptiveLevel 三开关分流决策。
+/// 自适应压缩判定单元测试 — 覆盖内置已压缩扩展名分类（SSOT）与 ResolveLevel 决策入口。
 /// MultiThreadedStoreFormatIds 用户自定义仅存储格式覆盖逻辑也在此验证。
 /// </summary>
 public class ZipEntryClassifierTests
@@ -76,82 +76,82 @@ public class ZipEntryClassifierTests
 
     #endregion
 
-    #region GetAdaptiveLevel(3 参) — 自适应开关分流
+    #region ResolveLevel(3 参) — 自适应开关分流
 
     [Fact]
-    public void GetAdaptiveLevel_AdaptiveOff_ReturnsUserLevel()
+    public void ResolveLevel_AdaptiveOff_ReturnsUserLevel()
     {
         // 未启用自适应 → 任何文件都用用户级别
-        Assert.Equal(5, ZipEntryClassifier.GetAdaptiveLevel("photo.jpg", 5, adaptive: false));
-        Assert.Equal(9, ZipEntryClassifier.GetAdaptiveLevel("readme.txt", 9, adaptive: false));
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: false));
+        Assert.Equal(9, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 9, adaptiveCompression: false));
     }
 
     [Fact]
-    public void GetAdaptiveLevel_AdaptiveOn_CompressedFile_ReturnsStore()
+    public void ResolveLevel_AdaptiveOn_CompressedFile_ReturnsStore()
     {
-        Assert.Equal(0, ZipEntryClassifier.GetAdaptiveLevel("photo.jpg", 5, adaptive: true));
-        Assert.Equal(0, ZipEntryClassifier.GetAdaptiveLevel("video.mp4", 5, adaptive: true));
+        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: true));
+        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("video.mp4", 5, adaptiveCompression: true));
     }
 
     [Fact]
-    public void GetAdaptiveLevel_AdaptiveOn_TextFile_ReturnsUserLevel()
+    public void ResolveLevel_AdaptiveOn_TextFile_ReturnsUserLevel()
     {
-        Assert.Equal(5, ZipEntryClassifier.GetAdaptiveLevel("readme.txt", 5, adaptive: true));
-        Assert.Equal(7, ZipEntryClassifier.GetAdaptiveLevel("Program.cs", 7, adaptive: true));
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true));
+        Assert.Equal(7, AdaptiveRuleMatcher.ResolveLevel("Program.cs", 7, adaptiveCompression: true));
     }
 
     #endregion
 
-    #region GetAdaptiveLevel(4 参) — MultiThreadedStoreFormatIds 自定义覆盖
+    #region ResolveLevel(4 参) — MultiThreadedStoreFormatIds 自定义覆盖
 
     [Fact]
-    public void GetAdaptiveLevel_AdaptiveOff_IgnoresCustomStoreFormats()
+    public void ResolveLevel_AdaptiveOff_IgnoresCustomStoreFormats()
     {
         // 未启用自适应时，即使指定自定义 Store 格式也忽略
         var custom = new HashSet<string> { "Jpeg" };
-        Assert.Equal(5, ZipEntryClassifier.GetAdaptiveLevel("photo.jpg", 5, adaptive: false, custom));
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: false, customStoreFormatIds: custom));
     }
 
     [Fact]
-    public void GetAdaptiveLevel_CustomStoreFormatId_ReturnsStore()
+    public void ResolveLevel_CustomStoreFormatId_ReturnsStore()
     {
         // 格式目录中非内置已压缩的格式 ID（如 Png 扩展名 .png 虽在内置列表，
         // 用不在 CompressedExtensions 里的格式验证自定义路径生效）
         // 注意：.wav 不在内置已压缩列表，但属于 FormatCatalog 的 Wav 格式
         var custom = new HashSet<string> { "Wav" };
-        Assert.Equal(0, ZipEntryClassifier.GetAdaptiveLevel("sound.wav", 5, adaptive: true, custom));
+        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("sound.wav", 5, adaptiveCompression: true, customStoreFormatIds: custom));
     }
 
     [Fact]
-    public void GetAdaptiveLevel_NonCustomStoreFormatId_ReturnsUserLevel()
+    public void ResolveLevel_NonCustomStoreFormatId_ReturnsUserLevel()
     {
         // 格式 ID 不在自定义列表 → 不 Store
         var custom = new HashSet<string> { "Wav" };
-        Assert.Equal(5, ZipEntryClassifier.GetAdaptiveLevel("readme.txt", 5, adaptive: true, custom));
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true, customStoreFormatIds: custom));
     }
 
     [Fact]
-    public void GetAdaptiveLevel_UnknownFormatId_ReturnsUserLevel()
+    public void ResolveLevel_UnknownFormatId_ReturnsUserLevel()
     {
         // 自定义列表含不存在的格式 ID → 忽略，不 Store
         var custom = new HashSet<string> { "NonExistentFormat" };
-        Assert.Equal(5, ZipEntryClassifier.GetAdaptiveLevel("readme.txt", 5, adaptive: true, custom));
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true, customStoreFormatIds: custom));
     }
 
     [Fact]
-    public void GetAdaptiveLevel_NullCustomStoreFormats_FallsBackToBuiltin()
+    public void ResolveLevel_NullCustomStoreFormats_FallsBackToBuiltin()
     {
         // customStoreFormatIds 为 null → 仅内置已压缩判定生效
-        Assert.Equal(0, ZipEntryClassifier.GetAdaptiveLevel("photo.jpg", 5, adaptive: true, null));
-        Assert.Equal(5, ZipEntryClassifier.GetAdaptiveLevel("readme.txt", 5, adaptive: true, null));
+        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: true, customStoreFormatIds: null));
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true, customStoreFormatIds: null));
     }
 
     [Fact]
-    public void GetAdaptiveLevel_BuiltInTakesPrecedenceOverCustomList()
+    public void ResolveLevel_BuiltInTakesPrecedenceOverCustomList()
     {
         // .jpg 内置已压缩 → Store，即使自定义列表不含它
         var custom = new HashSet<string> { "Wav" };
-        Assert.Equal(0, ZipEntryClassifier.GetAdaptiveLevel("photo.jpg", 5, adaptive: true, custom));
+        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: true, customStoreFormatIds: custom));
     }
 
     #endregion

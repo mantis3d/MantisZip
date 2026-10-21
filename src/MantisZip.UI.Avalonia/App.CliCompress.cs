@@ -193,6 +193,9 @@ public partial class App : Application
             ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
             ErrorResolver = CompressFlow.CreateErrorResolver(),
+            // Phase 2 / Task 10：自适应覆盖规则 + 用户自定义格式（CLI 与 GUI 同口径）
+            AdaptiveOverrides = new List<AdaptiveOverrideRule>(settings.AdaptiveOverrides ?? new List<AdaptiveOverrideRule>()),
+            CustomFormats = new List<FormatDefinition>(settings.CustomFormats ?? new List<FormatDefinition>()),
         };
 
         _ = CompressWithProgress(request, LocalizationManager.T("Cli_QuickCompress"), desktop);
@@ -283,6 +286,9 @@ public partial class App : Application
             ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
             ErrorResolver = CompressFlow.CreateErrorResolver(),
+            // Phase 2 / Task 10：自适应覆盖规则 + 用户自定义格式（CLI 与 GUI 同口径）
+            AdaptiveOverrides = new List<AdaptiveOverrideRule>(settings.AdaptiveOverrides ?? new List<AdaptiveOverrideRule>()),
+            CustomFormats = new List<FormatDefinition>(settings.CustomFormats ?? new List<FormatDefinition>()),
         };
 
         // 标题用批处理专用标题（InitBatchMode 不再覆盖标题，由调用方传入）
@@ -384,6 +390,9 @@ public partial class App : Application
             ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
             ErrorResolver = CompressFlow.CreateErrorResolver(),
+            // Phase 2 / Task 10：自适应覆盖规则 + 用户自定义格式（CLI 与 GUI 同口径）
+            AdaptiveOverrides = new List<AdaptiveOverrideRule>(settings.AdaptiveOverrides ?? new List<AdaptiveOverrideRule>()),
+            CustomFormats = new List<FormatDefinition>(settings.CustomFormats ?? new List<FormatDefinition>()),
         };
 
         await CompressWithProgress(request, LocalizationManager.T("Cli_CombinedCompress"), desktop);

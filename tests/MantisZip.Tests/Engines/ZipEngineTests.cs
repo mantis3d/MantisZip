@@ -1273,8 +1273,10 @@ public class ZipEngineTests : IDisposable
         // 参考产物：MT 路径内部对 compressGroup 执行的同一次 7z 原生压缩
         var (files, _) = FileScanner.CollectFiles([srcDir], null, CancellationToken.None, null);
         var compressGroup = files
-            .Where(f => ZipEntryClassifier.GetAdaptiveLevel(f.FullPath, options.CompressionLevel,
-                          options.AdaptiveCompression, options.MultiThreadedStoreFormatIds) != 0)
+            .Where(f => AdaptiveRuleMatcher.ResolveLevel(f.FullPath, options.CompressionLevel,
+                          options.AdaptiveCompression, options.AdaptiveSmartDetect,
+                          options.AdaptiveOverrides, options.CustomFormats,
+                          options.MultiThreadedStoreFormatIds) != 0)
             .ToList();
         Assert.NotEmpty(compressGroup);
 
@@ -1340,8 +1342,10 @@ public class ZipEngineTests : IDisposable
         // 参考产物：MT 路径内部对 compressGroup 执行的同一次 7z 原生压缩
         var (files, _) = FileScanner.CollectFiles([srcDir], null, CancellationToken.None, null);
         var compressGroup = files
-            .Where(f => ZipEntryClassifier.GetAdaptiveLevel(f.FullPath, options.CompressionLevel,
-                          options.AdaptiveCompression, options.MultiThreadedStoreFormatIds) != 0)
+            .Where(f => AdaptiveRuleMatcher.ResolveLevel(f.FullPath, options.CompressionLevel,
+                          options.AdaptiveCompression, options.AdaptiveSmartDetect,
+                          options.AdaptiveOverrides, options.CustomFormats,
+                          options.MultiThreadedStoreFormatIds) != 0)
             .ToList();
         Assert.NotEmpty(compressGroup);
 
@@ -1410,8 +1414,10 @@ public class ZipEngineTests : IDisposable
         // 参考压缩包：MT 混合流程中对同一 compressGroup 执行的同一份 7z 原始压缩
         var (files, _) = FileScanner.CollectFiles([srcDir], null, CancellationToken.None, null);
         var compressGroup = files
-            .Where(f => ZipEntryClassifier.GetAdaptiveLevel(f.FullPath, options.CompressionLevel,
-                options.AdaptiveCompression, options.MultiThreadedStoreFormatIds) != 0)
+            .Where(f => AdaptiveRuleMatcher.ResolveLevel(f.FullPath, options.CompressionLevel,
+                options.AdaptiveCompression, options.AdaptiveSmartDetect,
+                options.AdaptiveOverrides, options.CustomFormats,
+                options.MultiThreadedStoreFormatIds) != 0)
             .ToList();
         Assert.NotEmpty(compressGroup);
 

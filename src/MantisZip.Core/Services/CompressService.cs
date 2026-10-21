@@ -105,6 +105,12 @@ public class CompressRequest
     /// <summary>多线程模式下用户自定义仅存储格式 ID 列表。</summary>
     public HashSet<string> MultiThreadedStoreFormatIds { get; init; } = new();
 
+    /// <summary>用户自定义自适应覆盖规则（Phase 2 / Task 10）：优先级高于内置已压缩判定</summary>
+    public List<AdaptiveOverrideRule> AdaptiveOverrides { get; init; } = new();
+
+    /// <summary>用户自定义格式定义（供规则按 FormatId 反查扩展名）</summary>
+    public List<FormatDefinition> CustomFormats { get; init; } = new();
+
     /// <summary>ZIP 压缩方法：null/""=默认（Deflate），或 "deflate64" / "bzip2" / "lzma" / "ppmd" / "store"</summary>
     public string? ZipCompressionMethod { get; init; }
 
@@ -481,6 +487,8 @@ public static class CompressService
             AdaptiveSmartDetect = request.AdaptiveSmartDetect,
             MultiThreadedCompression = request.MultiThreadedCompression,
             MultiThreadedStoreFormatIds = request.MultiThreadedStoreFormatIds,
+            AdaptiveOverrides = request.AdaptiveOverrides,
+            CustomFormats = request.CustomFormats,
             ZipCompressionMethod = request.ZipCompressionMethod,
             ZipEncryptionMethod = request.ZipEncryptionMethod,
             SevenZipEncryptHeaders = request.SevenZipEncryptHeaders,

@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-21** — 压缩加速 Phase 2（Task 9-11）：魔数检测 + 自适应规则引擎 + 恢复隐藏 UI
+  - **三项前置拍板（用户）**：SSOT 统一到 ZipEntryClassifier；默认规则集与 SSOT 对齐后激活；魔数阈值取常量 64KB（不加设置项）。
+  - **SSOT 重写**（Core/Utils/ZipEntryClassifier.cs）：IsCompressed(ext) / IsCompressedFormat(FileFormat) / IsCompressedByMagic(path) / IsCustomStoreFormat(...)；扩展名集合修正（svg/	ar 移出——未压缩内容 Deflate 仍有收益）；CompressionCoefficients 退化为仅供压缩率预估。
+  - **魔数检测**：仅文件 ≥64KB（MagicDetectMinBytes）才读前 4KB → FileFormatDetector.Detect → 命中压缩格式集合则 Store；IO 异常（占用/权限/已删除）回落扩展名规则、不中断压缩。
+  - **唯一决策入口**（AdaptiveRuleMatcher.ResolveLevel，新增 customStoreFormatIds）：用户规则 > 自定义仅存储 > SSOT 扩展名 > 魔数；ZipEntryClassifier.GetAdaptiveLevel 两个重载删除（4 个引擎调用点全改走新入口）。链路：ArchiveOptions/CompressRequest += AdaptiveOverrides/CustomFormats，CompressService 映射，GUI（CompressFlow.BuildRequest）与 CLI（App.CliCompress 3 处）均传参；引擎 4 条路径（MT 分拣 / MT 组内 7z / 串行写入 ReadFileWithRetry / AddToArchiveAsync）同口径。
+  - **默认规则集迁移**：AppSettings.AdaptiveOverridesDefaultsVersion；旧持久化的 4 条默认规则（用户未改过）整体替换为对齐版（svg/	ar/wav/	ga/hdr/exr 移出），用户自改规则集原样保留。
+  - **恢复 UI（Task 11）**：设置页魔数检测/自适应规则/格式目录区块随 AdaptiveCompression 显示；ZIP 面板「魔数检测」复选框恢复可见且值贯通到 ArchiveOptions；格式目录魔数 hex 输入框 + [hex] 显示恢复；AdaptiveHelp_Markdown 三语新增「魔数检测」段，并修正「自适应+多线程同开时用户规则不生效」的过时提示（规则现已全路径生效）。
+  - **测试**：Core 新增 AdaptiveCompressionClassificationTests（8 条：SSOT 边界/魔数命中·文本·阈值·读不到/规则优先·禁用·自定义仅存储·魔数开关）；UI 新增 AdaptiveSettingsUiTests（5 条：区块联动/魔数 hex/规则集迁移·保留）。全量 Core **766 通过 / 3 跳过 / 0 失败**、UI **337 通过 / 3 跳过 / 0 失败**；既有 ZipEntryClassifierTests 改指新入口，ZipEngineTests 3 处改用生产同参调用。
+  - **已知边界**：自适应与规则目前**仅 ZIP 路径**生效（7z/TAR.GZ 无逐条目级别接口；ZIP 加密子路径不降级）。
+  - **未做**：Task 12 本机基准测试 UI（含 E4 播种标记）、Task 13 post-C 组数定标（噪声 27% 不足以定标）。
 **2026-10-20** — 启动优化：仅应用程序集 ReadyToRun（R2R）
   - **背景**：启动余量实测发现 `new MainWindow()` 构造体执行前 ~80ms JIT、`Win.Xaml` 含 `XamlIlPopulate` JIT；全量 R2R 实测 TOTAL **1470→820ms（−650ms）** 但发布体积 **+138MB**（188.6→326.6MB），不可接受。
   - **实现**：`MantisZip.UI.Avalonia.csproj` 新增 target `ExcludeNonAppAssembliesFromReadyToRun`（`BeforeTargets="_PrepareForReadyToRunCompilation"`），把 `@(ReferenceCopyLocalPaths)` 中除应用集外的程序集加入 `PublishReadyToRunExclude`。**关键坑**：ExcludeList 按**文件名**（`%(Filename)%(Extension)`）匹配，传 `%(FullPath)` 完全无效。

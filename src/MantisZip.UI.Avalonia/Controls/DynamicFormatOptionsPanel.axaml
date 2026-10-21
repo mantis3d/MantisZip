@@ -68,11 +68,9 @@
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
         <!-- 魔数检测：对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度 -->
-        <!-- Phase 2：实现魔数检测后移除 IsVisible=False -->
         <CheckBox x:Name="SmartDetectCheck"
                   Content="{Binding SmartDetectLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   IsChecked="False"
-                  IsVisible="False"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
         <!-- 多线程压缩：利用多核 CPU 并行压缩，显著提升压缩速度。仅 ZIP 支持 -->

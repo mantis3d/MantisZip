@@ -19,7 +19,7 @@
 | **P1** | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读解锁） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | 🟡中 | 11-16h | 🟡 部分完成（2026-08-20 核实）：Core 侧 TAR 裸格式 / GZip 单文件压缩与文件关联已就绪；UI 压缩格式下拉尚未放开。后续按序增加 BZip2 → XZ → Zstd → Brotli，并解锁 7z.dll 只读格式（详见计划文档） |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P1** | ZIP 多线程压缩方案 D（自适应 + 多线程第四个选项） | [parallel-compress-plan-d.md](.omo/plans/未开始/parallel-compress-plan-d.md) | 🟡中 | 4-5h | 自适应压缩新增"自适应 + 多线程"选项：Store 类直接写入 + 需压缩类 SharpSevenZip mt=on；UI 联动（格式目录/用户规则/多线程提示可见性）；实验性标签 + 帮助弹窗 |
-| **P1** | 压缩加速三开关 UI 收敛（Phase 1 ✅） / 魔数检测+自适应规则（Phase 2 待实施） | [adaptive-compress-ui-convergence.md](.omo/plans/进行中/adaptive-compress-ui-convergence.md) | 🟢 P1完成 | P1 4-5h / P2 5-7h | ✅ 2026-10-20 Phase 1 验收收尾完成：删除「并行压缩组数」旋钮（引擎默认 `clamp(核数,4,16)`）+ 隐藏魔数检测/自适应规则/魔数 hex 三控件 + 常驻 CPU 收益提示；三开关保持独立无门控（rg 校验 0 命中）。**Phase 2（5-7h）待实施**：魔数检测与自适应规则、接回隐藏 UI、Task 12 本机基准测试 |
+| **P1** | 压缩加速三开关 UI 收敛（Phase 1 ✅） / 魔数检测+自适应规则（Phase 2：Task 9-11 ✅） | [adaptive-compress-ui-convergence.md](.omo/plans/进行中/adaptive-compress-ui-convergence.md) | 🟢 P1完成 | P1 4-5h / P2 5-7h | 🟢 2026-10-21 Phase 2 Task 9-11 实施完成：SSOT 统一到 `ZipEntryClassifier`（扩展名集合 + 魔数检测 64KB 阈值）；`AdaptiveRuleMatcher.ResolveLevel` 成为唯一决策入口（规则 > 自定义仅存储 > 扩展名 > 魔数），引擎 4 条路径同口径；默认规则集与 SSOT 对齐（含旧持久化迁移）；恢复 Phase 1 隐藏的魔数检测/自适应规则 UI + 三语帮助段。**未做**：Task 12 本机基准测试 UI、Task 13 组数定标 |
 
 
 | **P2** | ZIP 多线程压缩方案 A（分组并行 + 多级别） | [parallel-compress-plan-a.md](.omo/plans/未开始/parallel-compress-plan-a.md) | 🟡中 | 6-8h | 按级别分组 → 各组独立 ZipWriter 并行 → 合并 ZIP，完整多级别自适应 + 多线程。方案 D 完成后实施 |

@@ -95,6 +95,11 @@ public static class CompressFlow
             // 仅存储格式：自适应开启时传递用户自定义仅存储格式列表（2026-10-19 起与多线程解耦，串行路径也读）
             MultiThreadedStoreFormatIds = new HashSet<string>(
                 AppSettings.Load()?.MultiThreadedStoreFormatIds ?? new List<string>()),
+            // Phase 2 / Task 10：自适应覆盖规则 + 用户自定义格式（规则按 FormatId 反查扩展名）
+            AdaptiveOverrides = new List<AdaptiveOverrideRule>(
+                settings.AdaptiveOverrides ?? new List<AdaptiveOverrideRule>()),
+            CustomFormats = new List<FormatDefinition>(
+                settings.CustomFormats ?? new List<FormatDefinition>()),
             SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
             // 输出文件冲突默认策略（本次压缩生效，来自压缩对话框/全局设置）
             ConflictAction = vm.ConflictAction,

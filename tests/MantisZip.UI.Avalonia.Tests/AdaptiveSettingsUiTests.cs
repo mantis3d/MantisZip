@@ -1,0 +1,104 @@
+using Avalonia.Headless.XUnit;
+using MantisZip.Core.Models;
+using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.ViewModels;
+using Xunit;
+
+namespace MantisZip.UI.Avalonia.Tests;
+
+/// <summary>
+/// Phase 2 / Task 11（恢复 Phase 1 隐藏的 UI）+ Task 10（默认规则集迁移）回归测试：
+/// ① 设置页「魔数检测」「自适应规则」区块随自适应开关联动；
+/// ② 格式目录的魔数 hex 恢复显示；
+/// ③ 旧持久化的默认规则集迁移到与 SSOT 对齐的新默认规则集（用户自改规则集保持原样）。
+/// </summary>
+public class AdaptiveSettingsUiTests
+{
+    [AvaloniaFact]
+    public void SmartDetectAndUserRulesSections_FollowAdaptiveCompressionSwitch()
+    {
+        var vm = new SettingsWindowViewModel();
+
+        vm.AdaptiveCompression = false;
+        Assert.False(vm.IsSmartDetectVisible);
+        Assert.False(vm.IsUserRulesSectionVisible);
+
+        vm.AdaptiveCompression = true;
+        Assert.True(vm.IsSmartDetectVisible);
+        Assert.True(vm.IsUserRulesSectionVisible);
+    }
+
+    [AvaloniaFact]
+    public void FormatCatalogSection_FollowsAdaptiveCompressionSwitch()
+    {
+        var vm = new SettingsWindowViewModel();
+
+        vm.AdaptiveCompression = false;
+        Assert.False(vm.IsFormatCatalogSectionVisible);
+
+        vm.AdaptiveCompression = true;
+        Assert.True(vm.IsFormatCatalogSectionVisible);
+    }
+
+    [Fact]
+    public void MagicHexDisplay_ShowsHexInBrackets()
+    {
+        var vm = new FormatDefinitionViewModel();
+
+        Assert.Equal("", vm.MagicHexDisplay);
+
+        vm.MagicHex = "FFD8FFE0";
+        Assert.Equal("[FFD8FFE0]", vm.MagicHexDisplay);
+    }
+
+    [Fact]
+    public void MigrateAdaptiveOverrides_RewritesLegacyDefaultRuleSet()
+    {
+        // 构造旧版默认规则集（含 svg/tar/wav 等未压缩格式）
+        var settings = new AppSettings
+        {
+            AdaptiveOverridesDefaultsVersion = 0,
+            AdaptiveOverrides = new List<AdaptiveOverrideRule>
+            {
+                new() { Name = "图片类", FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" }, Level = AdaptiveLevel.Store, Enabled = true },
+                new() { Name = "视频类", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
+                new() { Name = "音频类", FormatIds = new() { "Mp3", "Flac", "Wav", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
+                new() { Name = "压缩包类", FormatIds = new() { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
+            },
+        };
+
+        AppSettings.MigrateAdaptiveOverridesDefaults(settings);
+
+        Assert.Equal(1, settings.AdaptiveOverridesDefaultsVersion);
+        var expected = AppSettings.GetDefaultAdaptiveOverrides();
+        Assert.Equal(expected.Count, settings.AdaptiveOverrides.Count);
+        for (var i = 0; i < expected.Count; i++)
+        {
+            Assert.Equal(expected[i].Name, settings.AdaptiveOverrides[i].Name);
+            Assert.Equal(expected[i].FormatIds, settings.AdaptiveOverrides[i].FormatIds);
+        }
+        // 与 SSOT 对齐：未压缩格式不再出现在默认规则里
+        Assert.DoesNotContain("Svg", settings.AdaptiveOverrides.SelectMany(r => r.FormatIds));
+        Assert.DoesNotContain("Tar", settings.AdaptiveOverrides.SelectMany(r => r.FormatIds));
+        Assert.DoesNotContain("Wav", settings.AdaptiveOverrides.SelectMany(r => r.FormatIds));
+    }
+
+    [Fact]
+    public void MigrateAdaptiveOverrides_KeepsUserCustomizedRuleSet()
+    {
+        var settings = new AppSettings
+        {
+            AdaptiveOverridesDefaultsVersion = 0,
+            AdaptiveOverrides = new List<AdaptiveOverrideRule>
+            {
+                new() { Name = "我的规则", FormatIds = new() { "Txt" }, Level = AdaptiveLevel.Custom, CustomLevel = 3, Enabled = true },
+            },
+        };
+
+        AppSettings.MigrateAdaptiveOverridesDefaults(settings);
+
+        Assert.Equal(1, settings.AdaptiveOverridesDefaultsVersion);
+        Assert.Single(settings.AdaptiveOverrides);
+        Assert.Equal("我的规则", settings.AdaptiveOverrides[0].Name);
+    }
+}

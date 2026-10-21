@@ -64,6 +64,12 @@ public class AppSettings
     /// <summary>用户自定义压缩级别覆盖规则。</summary>
     public List<AdaptiveOverrideRule> AdaptiveOverrides { get; set; } = new();
 
+    /// <summary>
+    /// 默认自适应规则集版本（2026-10-20 Phase 2 起）：0 = 旧版默认规则集（含 svg/tar/wav 等未压缩格式），
+    /// 1 = 与 SSOT 对齐后的默认规则集。加载时按版本迁移旧持久化数据。
+    /// </summary>
+    public int AdaptiveOverridesDefaultsVersion { get; set; } = 0;
+
     public string ZipCompressionMethod { get; set; } = "deflate";
     public string ZipEncryptionMethod { get; set; } = "aes256";
     public bool SevenZipEncryptHeaders { get; set; } = true;
@@ -306,6 +312,8 @@ public class AppSettings
                 // 并行解压智能线程数越界 clamp 到 [1,16]（边界情况 #8）
                 settings.SmartSsdDegree = Math.Clamp(settings.SmartSsdDegree, 1, 16);
                 settings.SmartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
+                // Phase 2 / Task 10：旧版默认规则集迁移到与 SSOT 对齐的版本
+                MigrateAdaptiveOverridesDefaults(settings);
                 _cached = settings;
                 return settings;
             }
@@ -357,14 +365,61 @@ public class AppSettings
         return settings;
     }
 
-    /// <summary>返回默认自适应压缩覆盖规则。</summary>
-    private static List<AdaptiveOverrideRule> GetDefaultAdaptiveOverrides() => new()
+    /// <summary>
+    /// 返回默认自适应压缩覆盖规则（**与 SSOT「已压缩」集合对齐** —— Phase 2 / Task 10）。
+    /// 不含未压缩格式：svg（XML 文本）/ tar（未压缩归档）/ wav（PCM）/ tga/hdr/exr（未压缩位图）。
+    /// </summary>
+    internal static List<AdaptiveOverrideRule> GetDefaultAdaptiveOverrides() => new()
     {
-        new() { Name = "图片类", FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "图片类", FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico" }, Level = AdaptiveLevel.Store, Enabled = true },
         new() { Name = "视频类", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "音频类", FormatIds = new() { "Mp3", "Flac", "Wav", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "压缩包类", FormatIds = new() { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "音频类", FormatIds = new() { "Mp3", "Flac", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "压缩包类", FormatIds = new() { "Zip", "SevenZip", "Rar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
     };
+
+    /// <summary>默认规则集版本（与 SSOT 对齐后的版本号）。</summary>
+    private const int CurrentAdaptiveOverridesDefaultsVersion = 1;
+
+    /// <summary>
+    /// 迁移旧持久化的默认规则集 → 与 SSOT 对齐的新默认规则集（Phase 2 / Task 10，评审 C5）。
+    /// 仅当用户规则集仍是**旧版默认规则集**（4 条默认规则、名称与格式 ID 完全一致）时才整体替换；
+    /// 用户自行增删改过的规则集原样保留（只推进版本号）。
+    /// </summary>
+    internal static void MigrateAdaptiveOverridesDefaults(AppSettings settings)
+    {
+        if (settings.AdaptiveOverridesDefaultsVersion >= CurrentAdaptiveOverridesDefaultsVersion)
+            return;
+
+        if (IsLegacyDefaultOverrides(settings.AdaptiveOverrides))
+            settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+
+        settings.AdaptiveOverridesDefaultsVersion = CurrentAdaptiveOverridesDefaultsVersion;
+    }
+
+    /// <summary>判断当前规则集是否仍为旧版默认规则集（名称 + 格式 ID 集合逐一比对）。</summary>
+    private static bool IsLegacyDefaultOverrides(List<AdaptiveOverrideRule>? rules)
+    {
+        if (rules == null || rules.Count != 4) return false;
+
+        // 旧版默认：图片类/视频类/音频类/压缩包类
+        var expected = new (string Name, string[] Formats)[]
+        {
+            ("图片类", new[] { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" }),
+            ("视频类", new[] { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }),
+            ("音频类", new[] { "Mp3", "Flac", "Wav", "Ogg" }),
+            ("压缩包类", new[] { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }),
+        };
+
+        foreach (var (name, formats) in expected)
+        {
+            var rule = rules.FirstOrDefault(r => r.Name == name);
+            if (rule == null) return false;
+            if (rule.FormatIds.Count != formats.Length) return false;
+            if (!formats.All(f => rule.FormatIds.Contains(f))) return false;
+            if (rule.Level != AdaptiveLevel.Store || !rule.Enabled) return false;
+        }
+        return true;
+    }
 
     /// <summary>返回多线程模式默认仅存储格式 ID（内置已压缩格式）。</summary>
     private static List<string> GetDefaultMultiThreadedStoreFormatIds() => new()

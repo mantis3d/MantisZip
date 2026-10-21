@@ -186,7 +186,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     }
 
     /// <summary>魔数检测开关是否可见 —— Phase 2：实现魔数检测后改回 AdaptiveCompression。</summary>
-    public bool IsSmartDetectVisible => false;
+    /// <summary>魔数检测开关是否可见（Phase 2 / Task 11：实现魔数检测后随自适应开关显示）。</summary>
+    public bool IsSmartDetectVisible => AdaptiveCompression;
 
     /// <summary>自适应内容区域是否可见（自适应或多线程任一开启）。</summary>
     public bool IsAdaptiveContentVisible => AdaptiveCompression || MultiThreadedCompression;
@@ -195,10 +196,11 @@ public partial class SettingsWindowViewModel : ObservableObject
     public bool IsStoreFormatSectionVisible => AdaptiveCompression;
 
     /// <summary>用户自定义规则区域是否可见 —— Phase 2：实现自适应规则后改回 AdaptiveCompression && !MultiThreadedCompression。</summary>
-    public bool IsUserRulesSectionVisible => false;
+    /// <summary>用户自定义规则区域是否可见（Phase 2 / Task 11：实现自适应规则后随自适应开关显示；多线程亦生效，故不与多线程互斥）。</summary>
+    public bool IsUserRulesSectionVisible => AdaptiveCompression;
 
     /// <summary>格式目录区域是否可见（仅自适应开启，多线程关闭）。</summary>
-    public bool IsFormatCatalogSectionVisible => AdaptiveCompression && !MultiThreadedCompression;
+    public bool IsFormatCatalogSectionVisible => AdaptiveCompression;
 
     /// <summary>内置格式（只读，供 UI 展示）。</summary>
     public ObservableCollection<FormatDefinitionViewModel> BuiltInFormats { get; } = new();
@@ -2213,8 +2215,8 @@ public partial class FormatDefinitionViewModel : ObservableObject
     [ObservableProperty] private bool _isBuiltIn = true;
 
     public string ExtensionsDisplay => string.Join(" ", Extensions.Select(e => e));
-    /// <summary>魔数 hex 显示 —— Phase 2 实现魔数检测前恒空（输入框已隐藏）。</summary>
-    public string MagicHexDisplay => "";
+    /// <summary>魔数 hex 显示（Phase 2 / Task 11：魔数检测落地后恢复显示）。</summary>
+    public string MagicHexDisplay => string.IsNullOrEmpty(MagicHex) ? "" : $"[{MagicHex}]";
 
     /// <summary>将 ViewModel 转换为 FormatDefinition 模型，用于持久化保存。</summary>
     public FormatDefinition ToFormatDefinition() => new()

@@ -215,10 +215,17 @@ public partial class DynamicFormatOptionsPanel : UserControl
     }
 
     /// <summary>
-    /// 魔数检测。控件当前隐藏（Phase 2 实现魔数检测后启用），恒返回 false
-    /// —— 避免隐藏期间值继续透传造成「以为生效」。
+    /// 魔数检测（Phase 2 / Task 11：魔数检测已实现，控件恢复可见）。
+    /// 仅对 ZIP 格式有效；非 ZIP 格式返回 false。
     /// </summary>
-    public bool AdaptiveSmartDetect => false;
+    public bool AdaptiveSmartDetect
+    {
+        get
+        {
+            if (SelectedFormat != "zip") return false;
+            return SmartDetectCheck.IsChecked == true;
+        }
+    }
 
     /// <summary>
     /// ZIP 多线程压缩。仅对 ZIP 格式有效（非加密 + Deflate 方法）；非 ZIP 格式返回 false。
