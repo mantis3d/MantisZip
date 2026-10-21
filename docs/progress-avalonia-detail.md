@@ -6,6 +6,75 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-21** — 全项目按钮图标审计：字符图标全部替换为矢量资源
+  - **审计范围**：src 下全部 .axaml，扫描 Button/ToggleButton 的 Content="字面量" 与 TextBlock 的符号字符。
+  - **A 类（按钮用字符当图标，全部修正）**：Views/PreviewPanel.axaml 的 PPTX 翻页（◀/▶）与 PDF 翻页（◀/▶）共 4 个按钮 → 改 PathIcon + 既有矢量资源 IconChevronLeft / IconChevronRight（14×14，Foreground 显式设 ThemeTextPrimaryBrush，规则 4）。复查：全项目按钮内已无字符图标（0 命中）。
+  - **B 类（保留）**：ProgressWindow 的统计 emoji（✅/⏭/❌/⚙）、MatchedPasswordDialog/ProgressWindow 的密码遮罩 ●●●、SettingsWindow 规则行的 → 分隔符、UiTestWindow 的测试窗图标 —— 均为**非按钮**场景；AGENTS 规则 4 明确「全局 TextBlock 样式故意不设 Foreground（避免 emoji 压成单色）」，即彩色 emoji 是刻意选择，本次不动（已列出供复核）。
+  - **验证**：UI 构建 0 警告 0 错误；UI 测试 **340 通过 / 3 跳过 / 0 失败**。
+**2026-10-21** — 设置页图标与本地化修正（用户反馈「规则编辑/删除按钮看不见图标」）
+  - **根因**：规则列表与格式目录列表的编辑/删除按钮用的是 **字符图标**（U+270F 铅笔 / U+2715 叉），不是矢量资源 —— 在当前字体/主题下渲染不出来（其它用 PathIcon 的按钮正常）。
+  - **修正**：4 个按钮全部改为 PathIcon + 既有矢量资源（IconEdit / IconDelete），Foreground 显式设 ThemeTextPrimaryBrush（规则 4：PathIcon 不继承父 Foreground）；尺寸 15×15，沿用 ToolbarIcon 类与原 ToolTip/Click/Tag 绑定。
+  - **顺带修规则 13 违规**：压缩级别名称（存储/快速/正常/最大/跟随全局/全局±1/自定义/未知）原为**硬编码中文**（规则列表 LevelDisplay + 规则编辑对话框 LevelDisplayMap），现全部走三语 key Settings_AdaptiveRuleLevel_*（10 个 key × 3 语，key 集 1276 三语一致）；对话框的级别映射由 static 字典改为**按调用时解析**的方法（避免运行期切语言后显示旧文案）；自定义 下拉项用无占位符的 Settings_AdaptiveRuleLevel_CustomName，列表显示用带 {0} 的 Settings_AdaptiveRuleLevel_Custom。
+  - **验证**：UI 构建 0 警告 0 错误；全量 Core **766/0 失败**、UI **340/0 失败**。
+**2026-10-21** — 压缩加速 Phase 2 追加：「仅存储格式」并入自适应规则 + 多线程生效提示
+  - **背景**：MT 路径由 7z 原生整组单次调用、组内统一用全局级别（ZipEngine.CompressGroup.cs:1589-1592）→ 规则「指定压缩级别」在 MT 路径不生效；「仅存储」判定在 MT 分拣阶段即生效（storeGroup → copy-mode 原样写入）。且 MT 准入有条件（IsMultiThreadedEligible：未加密 / 未分卷 / 条目数 ≤65535 / 体积 <4GB / deflate·deflate64）→ 小目录、加密包、分卷等走串行路径时规则全部生效，故**不按开关禁用编辑**，改为提示 + 行内标记。
+  - **引擎简化**：AdaptiveRuleMatcher.ResolveLevel 去掉 customStoreFormatIds 分支；ArchiveOptions/CompressRequest 移除 MultiThreadedStoreFormatIds；ZipEntryClassifier.IsCustomStoreFormat 删除；GUI/CLI 传参清理。
+  - **UI 合并**：设置页「仅存储格式」卡片删除（IsStoreFormatSectionVisible / MultiThreadedStoreFormats / StoreFormatItemViewModel 一并移除）；AppSettings.MultiThreadedStoreFormatIds 保留为只读迁移字段（迁移后清空）。
+  - **迁移**：AdaptiveOverridesDefaultsVersion 迁移两件事 —— 旧版默认规则集（未改过）→ 新 **6 类**默认规则集（图片/视频/音频/压缩包/**字体**/**文档**，后两类来自旧「仅存储格式」默认列表，默认行为不变）；旧「仅存储格式」列表中**用户额外添加**的 ID → 一条「仅存储格式（迁移）」Store 规则。
+  - **提示**：规则卡片顶部多线程警示（多线程开启时显示）+ 行内「多线程下不生效」标记（级别 ≠ 仅存储 时）。
+  - **文案修正**：三语帮助与 RELEASE_NOTES.md v0.5.3 的「自定义规则始终生效」过时表述 → 「Store 类始终生效；指定压缩级别类在多线程路径不生效，串行路径全部生效」。
+  - **测试**：UI 新增 3 条（仅存储 ID 迁移为规则 / 默认规则集 6 类且不含未压缩格式 / 行内标记条件）；Core ZipEntryClassifierTests 改规则等价用例、ZipEngineTests C3 改 Store 规则用例。全量 Core **766/0 失败**、UI **340/0 失败**。
+**2026-10-21** — 压缩加速 Phase 2（Task 9-11）：魔数检测 + 自适应规则引擎 + 恢复隐藏 UI
+  - **三项前置拍板（用户）**：SSOT 统一到 ZipEntryClassifier；默认规则集与 SSOT 对齐后激活；魔数阈值取常量 64KB（不加设置项）。
+  - **SSOT 重写**（Core/Utils/ZipEntryClassifier.cs）：IsCompressed(ext) / IsCompressedFormat(FileFormat) / IsCompressedByMagic(path) / IsCustomStoreFormat(...)；扩展名集合修正（svg/	ar 移出——未压缩内容 Deflate 仍有收益）；CompressionCoefficients 退化为仅供压缩率预估。
+  - **魔数检测**：仅文件 ≥64KB（MagicDetectMinBytes）才读前 4KB → FileFormatDetector.Detect → 命中压缩格式集合则 Store；IO 异常（占用/权限/已删除）回落扩展名规则、不中断压缩。
+  - **唯一决策入口**（AdaptiveRuleMatcher.ResolveLevel，新增 customStoreFormatIds）：用户规则 > 自定义仅存储 > SSOT 扩展名 > 魔数；ZipEntryClassifier.GetAdaptiveLevel 两个重载删除（4 个引擎调用点全改走新入口）。链路：ArchiveOptions/CompressRequest += AdaptiveOverrides/CustomFormats，CompressService 映射，GUI（CompressFlow.BuildRequest）与 CLI（App.CliCompress 3 处）均传参；引擎 4 条路径（MT 分拣 / MT 组内 7z / 串行写入 ReadFileWithRetry / AddToArchiveAsync）同口径。
+  - **默认规则集迁移**：AppSettings.AdaptiveOverridesDefaultsVersion；旧持久化的 4 条默认规则（用户未改过）整体替换为对齐版（svg/	ar/wav/	ga/hdr/exr 移出），用户自改规则集原样保留。
+  - **恢复 UI（Task 11）**：设置页魔数检测/自适应规则/格式目录区块随 AdaptiveCompression 显示；ZIP 面板「魔数检测」复选框恢复可见且值贯通到 ArchiveOptions；格式目录魔数 hex 输入框 + [hex] 显示恢复；AdaptiveHelp_Markdown 三语新增「魔数检测」段，并修正「自适应+多线程同开时用户规则不生效」的过时提示（规则现已全路径生效）。
+  - **测试**：Core 新增 AdaptiveCompressionClassificationTests（8 条：SSOT 边界/魔数命中·文本·阈值·读不到/规则优先·禁用·自定义仅存储·魔数开关）；UI 新增 AdaptiveSettingsUiTests（5 条：区块联动/魔数 hex/规则集迁移·保留）。全量 Core **766 通过 / 3 跳过 / 0 失败**、UI **337 通过 / 3 跳过 / 0 失败**；既有 ZipEntryClassifierTests 改指新入口，ZipEngineTests 3 处改用生产同参调用。
+  - **已知边界**：自适应与规则目前**仅 ZIP 路径**生效（7z/TAR.GZ 无逐条目级别接口；ZIP 加密子路径不降级）。
+  - **未做**：Task 12 本机基准测试 UI（含 E4 播种标记）、Task 13 post-C 组数定标（噪声 27% 不足以定标）。`RELEASE_NOTES.md` v0.5.3 新增「压缩加速 / Compression Speed-ups」节（魔数检测 / 自定义规则生效 / 默认规则集调整，中英成对）。
+**2026-10-20** — 启动优化：仅应用程序集 ReadyToRun（R2R）
+  - **背景**：启动余量实测发现 `new MainWindow()` 构造体执行前 ~80ms JIT、`Win.Xaml` 含 `XamlIlPopulate` JIT；全量 R2R 实测 TOTAL **1470→820ms（−650ms）** 但发布体积 **+138MB**（188.6→326.6MB），不可接受。
+  - **实现**：`MantisZip.UI.Avalonia.csproj` 新增 target `ExcludeNonAppAssembliesFromReadyToRun`（`BeforeTargets="_PrepareForReadyToRunCompilation"`），把 `@(ReferenceCopyLocalPaths)` 中除应用集外的程序集加入 `PublishReadyToRunExclude`。**关键坑**：ExcludeList 按**文件名**（`%(Filename)%(Extension)`）匹配，传 `%(FullPath)` 完全无效。
+  - **体积**：FD 188.6→**192.9MB**、self-contained 265.3→**269.6MB**（均 **+4.3MB**）；`Avalonia.Base.dll` / `System.Private.CoreLib.dll` 保持 IL（268 个程序集被排除）。
+  - **A/B（交错 n=10）**：TOTAL **1473.6→1352.2ms（−126.8ms，10/10 胜）**；`Win.Xaml` 332.6→283.6ms（−50.2ms，10/10 胜）；`Win.Visible` 持平；构造前 JIT 81.2→78.5ms（属 Avalonia `Window` 基类链，应用集 R2R 无法覆盖）。
+  - **发布链路**：`.github/workflows/release.yml` 两个 publish 步骤均新增 `-p:PublishReadyToRun=true`；日常 `dotnet build` 不受影响；self-contained R2R 冒烟启动正常。
+  - **回归**：`dotnet build` 0 警告 0 错误；UI 测试 335/332 通过。`RELEASE_NOTES.md` v0.5.3「性能 / Performance」已补「启动速度再优化（ReadyToRun）」中英条目（−0.1s / 安装包 +4MB）。
+
+**2026-10-20** — 启动打点补充（App.axaml 加载 / 生命周期诊断 / 主窗构造前 JIT 归因）
+  - `App.Initialize` 增加 `App.Initialize.Enter/Exit`：测得 **App.axaml 解析（主题字典 + 85KB AppIcons + Fluent/DataGrid 样式）≈77–81ms**。
+  - `OnFrameworkInitializationCompleted` 增加 `Init.LifetimeDiag.Enter/Exit`：`LifetimeDiagnostics.Install`（含同步写 lifecycle.log）仅 **~4ms**，可排除。
+  - 各 `new MainWindow()` 前增加 `Init.MainWindow.New`：测得 **构造体执行前 ≈80ms（JIT）**——`XamlIlPopulate` 在应用程序集内，为 R2R 提供直接证据。
+  - 打点均为 `StartupTimer` 纯内存 mark（无 I/O），用于后续启动优化测量；常驻保留。
+
+**2026-10-20** — AppSettings 序列化改用 STJ 源生成（source-gen）
+  - **实现**：新增 `Models/AppSettingsJsonContext.cs`（`[JsonSourceGenerationOptions(WriteIndented = true)]` + `[JsonSerializable(typeof(AppSettings))]`）；`Load()`/`Save()` 改用 context 重载（顺带去掉 `Save()` 每次新建 `JsonSerializerOptions`）。零语义变化，旧 int 字典大小转换器继续生效（`[JsonConverter]` 特性被源生成器支持）。
+  - **测试**：新增 `AppSettingsJsonContextTests` 4 条（嵌套集合/枚举往返、旧 int → `"256m"`、与反射路径输出逐字一致、未知字段忽略）；UI 全量 **335 总 / 332 过 / 3 跳过 / 0 失败**。
+  - **A/B（交错 n=10，基线 = HEAD 独立 worktree Release 构建）**：`Init.Settings` 段中位 **1.7ms → 1.7ms**（无差异）；TOTAL 1420.1 → 1413.5ms（−6.6ms，噪声级）。**门控（≥15ms）未达**——本机 settings.json 体积小，反射元数据构建本就只占 ~1.7ms；立项引用的 60–77ms 混有 IO/环境因素，不能归因于元数据。
+  - **决策**：按计划边界**保留改动**（零风险、为 `selfcontained-size-optimization` 的 Trim/AOT 铺路），**不宣称启动收益**；计划归档。**RELEASE_NOTES 不写入**（用户确认：内部实现变化、settings.json 格式不变、无可测量用户可见收益）。
+
+**2026-10-20** — error-info-enhancement 归档（GUI 验收通过）
+  - 用户完成 GUI 人工验收（红段 + 黄段场景），未发现问题；黄段按计划内「黄段验收方法」复现通过。
+  - **验证证据**：Core 测试 747/744、Avalonia 331/328 全绿；硬编码扫描 `未能写入到` 0 命中；33 处 `ArchiveEntryStatus.Failed` 逐处核对 `FileTotalBytes`（唯一例外为整包级上报，设计如此）。
+  - **行为决策**：黄段不自动钉住窗口（D4）保持现状。
+  - **归档**：计划移入 `.omo/plans/已完成/error-info-enhancement.md`；PLAN.md 移除任务行；PROGRESS 历史设计方案索引新增一行。`进行中` 剩余 6 份。
+
+**2026-10-20** — error-info-enhancement 黄段触发条件核查（无代码改动，验收记录补充）
+  - **背景**：用户反馈 GUI 验收时只见到红段、未遇到黄段 → 代码核查「黄段何时出现」。
+  - **结论**：`ProgressViewModel.CollectEntryOutcome` 仅收集 `Skipped` **且带 `EntryFailureReason`** 的条目进黄段。该组合只由**压缩侧**产生——① ZIP/7z 前置读权限预检 `ReadErrorHandler.FilterUnreadableFiles`（源文件被独占占用/权限不足）；② ZIP `ReadFileWithRetry`、TAR.GZ `TarWriteFileWithRetry` 写入中途读失败。且必须在「处理文件时出错」对话框选**跳过**（重试成功无摘要、中止走红段）。
+  - **解压为何永远无黄段**：解压侧所有 `Skipped` 上报均不带原因（冲突跳过/过滤跳过属正常操作），真正失败走 `Failed` → 红段。属设计行为（D5），非缺陷。
+  - **观感限制**：黄段不触发自动钉住（D4，只有红段会 📌）；用户决定保持现状，不改为「黄段也钉住」。
+  - **记录**：计划 Task 9 验收清单第 9 项补充触发条件与复现步骤（PowerShell `FileShare.None` 独占锁定文件 → 压缩该目录 → 弹窗选跳过 → 预期黄段 + 原因分布 + tooltip 原文）。
+
+**2026-10-20** — 进行中计划收尾核对（无代码改动，验收 + 归档 + 状态修正）
+  - **zip-crc-validation → 已完成归档**：`-t:Rebuild` 全量重建后 UI 测试 **331 总 / 328 过 / 3 跳过 / 0 失败**（原计划"待复验"的 30 条 XAML 毒化失败确为增量构建问题）；用户用真实损坏样本手测「测试压缩包」+ 解压**通过**；代码 commit `85668486`，计划文档中"未提交/待复验"已过时并修正。
+  - **settings-unwired-keys → 已完成归档**：10 项排查全部有结论（7 项接线修复、1 项文档修正、2 项经用户决策暂缓且方案/工时已记录），无遗留待实现代码。
+  - **adaptive-compress-ui-convergence Phase 1 验收收尾**：逐项核对通过——`ZipMultiThreadCheck_IsCheckedChanged` 0 命中；`MultiThreadedCompression && AdaptiveCompression` 0 命中（三开关独立）；魔数检测（设置侧 `IsSmartDetectVisible=false` + ZIP 面板 `SmartDetectCheck IsVisible=False`）与自适应规则卡片（`IsUserRulesSectionVisible=false`）均隐藏；自定义格式 magic hex 隐藏且 `MagicHexDisplay=>""`；超 4GB 恢复勾选逻辑在位（`_mtCheckedBeforeLimit`）。状态改为「Phase 1 ✅ / Phase 2 待实施」，仅纯 2–4 物理核机 bench 待测。
+  - **error-info-enhancement**：Task 10 勾选确认（文档 + commit `7799e56a` 已完成）；计划留「进行中」等待任务 9 GUI 人工验收。
+  - **text-fallback-encoding-policy**：Phase 1 自动化验证已全绿（en-US culture pin），仅真机 en-US 人工验证待用户环境；Phase 2 待决策。
+  - **同步**：PLAN.md 移除两份已完成计划行；PROGRESS 历史设计方案索引新增 2 行。
+
 **2026-10-21** — 计划文档复核与拆分（纯 `.md`，无代码变更）
   - **图标主题三计划**：`icon-theme-infra.md`（工时 14-18h→16-20h；`ResolveIconThemeUri` 澄清「导入包不产生 URI」；缓存失效入口归计划 2）、`icon-theme-packs.md`（工时 20-26h；现状表重写、偏差 D-D 解析产物缓存、保留字 id `A`–`G` 拒绝、删当前包立即回退 A、`GetIconThemeProvider` 双来源、`RefreshIconTheme()` 两步缓存失效、新增 `Services/IconThemeBuilder.cs` 与 `Models/IconCatalog.cs` 去重、T2–T8/风险表更新）、`icon-theme-sets.md`（工时 22-32h；E 套彩色源决策门、D 套底块 `#40808080`、Lucide ISC + ~120 Feather 衍生 MIT 双声明、`sources/` vendored 离线、关于页改 `Dialogs/AboutWindow.axaml`、幂等 `git diff` 为空校验）。
   - **规格同步**：`docs/superpowers/specs/2026-10-15-icon-theme-system-design.md` 订正 Lucide 许可与规则编号（文件选择器 15→16，CoreLog 才是 15），新增 §13 复核订正（13.1 事实订正 4 项 / 13.2 决策 S1–S9）。

@@ -18,9 +18,10 @@
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.omo/plans/未开始/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读解锁） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | 🟡中 | 11-16h | 🟡 部分完成（2026-08-20 核实）：Core 侧 TAR 裸格式 / GZip 单文件压缩与文件关联已就绪；UI 压缩格式下拉尚未放开。后续按序增加 BZip2 → XZ → Zstd → Brotli，并解锁 7z.dll 只读格式（详见计划文档） |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
-| **P1** | ZIP 损坏检测（CRC 校验）修复 | [zip-crc-validation.md](.omo/plans/进行中/zip-crc-validation.md) | 🟢低 | 3-5h | 🔄 实施中（2026-10-15）：根因=解压走 `OpenEntryStream()` 裸流绕过 CRC 校验；已改走官方校验路径并新增失败原因枚举 + 三语文案 + 回归测试（Core 684 通过），Avalonia 侧待全量重建复验（详见计划文档） |
 | **P1** | ZIP 多线程压缩方案 D（自适应 + 多线程第四个选项） | [parallel-compress-plan-d.md](.omo/plans/未开始/parallel-compress-plan-d.md) | 🟡中 | 4-5h | 自适应压缩新增"自适应 + 多线程"选项：Store 类直接写入 + 需压缩类 SharpSevenZip mt=on；UI 联动（格式目录/用户规则/多线程提示可见性）；实验性标签 + 帮助弹窗 |
-| **P1** | 压缩加速三开关 UI 收敛（Phase 1）+ 魔数检测/自适应规则实现（Phase 2） | [adaptive-compress-ui-convergence.md](.omo/plans/未开始/adaptive-compress-ui-convergence.md) | 🟡中 | P1 4-5h / P2 5-7h | 2026-10-18 拍板定稿：**Phase 1（4-5h）UI 收敛**——删「并行压缩组数」性能陷阱旋钮（引擎默认组数 `clamp(核数,4,16)`），隐藏魔数检测/自适应规则/魔数 hex 三个空转控件；改动 B（MT 依赖自适应）因双机实测数据矛盾暂缓，三开关保持独立无门控。**Phase 2（5-7h）** 实现魔数检测与自适应规则、接回隐藏 UI，新增 Task 12 本机基准测试（MT 收益按机器实测定夺）；拍板依据详见计划「拍板记录」「修订记录」。 |
+| **P1** | 压缩加速三开关 UI 收敛（Phase 1 ✅） / 魔数检测+自适应规则（Phase 2：Task 9-11 ✅） | [adaptive-compress-ui-convergence.md](.omo/plans/进行中/adaptive-compress-ui-convergence.md) | 🟢 P1完成 | P1 4-5h / P2 5-7h | 🟢 2026-10-21 Phase 2 Task 9-11 实施完成：SSOT 统一到 `ZipEntryClassifier`；`AdaptiveRuleMatcher.ResolveLevel` 唯一决策入口（规则 > SSOT 扩展名 > 魔数）；**「仅存储格式」已并入自适应规则**（控件组删除、旧配置迁移为 Store 规则、默认规则集扩到 6 类）；多线程路径提示 + 行内「多线程下不生效」标记。**未做**：Task 12 本机基准测试 UI、Task 13 组数定标 |
+
+
 | **P2** | ZIP 多线程压缩方案 A（分组并行 + 多级别） | [parallel-compress-plan-a.md](.omo/plans/未开始/parallel-compress-plan-a.md) | 🟡中 | 6-8h | 按级别分组 → 各组独立 ZipWriter 并行 → 合并 ZIP，完整多级别自适应 + 多线程。方案 D 完成后实施 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.omo/plans/未开始/compression-estimator.md) | 🟡中 | 14-18h | 🔶 部分实现（比率表 / 格式目录 / 自适应规则模型已完成，估算器本体未开始）。2026-10-21 拆分：本行 = 压缩前预估（快速查表 / 采样标准 / 可选精确 + 设置窗口面板）；ETA 增强见下一行；自适应已归档 |
 | **P2** | 压缩中 ETA 增强 | [runtime-eta.md](.omo/plans/未开始/runtime-eta.md) | 🟡中 | 5-7h | 🔶 基础 ETA 已实现（EMA 速度 + 单档案剩余 + 暂停冻结）；本计划补先验速度融合（冷启动即有值）、批处理总剩余、估算中/即将完成文案 |
@@ -32,7 +33,6 @@
 | **P2** | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | **P2** | 进度条分段着色（按压缩包状态） | [progress-bar-segments.md](.omo/plans/未开始/progress-bar-segments.md) | 🟡中 | 3-4h | 自定义分段进度条控件替换普通 `ProgressBar`，按批处理项状态着色（红=失败/绿=成功/青=跳过/蓝=进行中），动态预算缝隙 |
 | **P2** | 进度窗口状态行 + 失败明细 + 关闭链统一 + 倒计时 + 解压后置开关 | [progress-window-status-line.md](.omo/plans/未开始/progress-window-status-line.md) | 🟢核心完成 | 12-16h | ✅ 核心实施完成（2026-10-13，Task 1–11），GUI 人工验收待做。内容：状态行下移 + `EntryFailureReason` 三语错误摘要（红/黄分层、可复制）+ 关闭链统一（三条件自动按下 📌）+ 自动关闭倒计时 + 解压后「打开目录/移入回收站」开关。设计拍板（D1–D19）与任务分解详情见计划文档及 spec |
-| **P2** | 压缩/解压出错信息增强（整包错误本地化+详情透传+原因分布） | [error-info-enhancement.md](.omo/plans/进行中/error-info-enhancement.md) | 🟡中 | 10-13h | 🚧 进行中（progress-window-status-line 续作）：整包错误本地化映射、红/黄摘要补失败原因分布行、三引擎 `EntryErrorDetail` 透传 + Win32 错误提示细分。Task 1–8 与任务 11 已实施提交，任务 9 GUI 人工验收待做；修订决策（D2 透传等）详见计划文档 |
 | **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.omo/plans/未开始/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
 | **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.omo/plans/未开始/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
 | **P2** | 文件列表缩略图查看方式 | [file-list-thumbnails.md](.omo/plans/未开始/file-list-thumbnails.md) | 🟡中 | 4-6h | 三种布局模式循环切换（详情/平铺/内容行），内容卡三档（图像缩略图/文字头部预览/系统图标），布局模式持久化 |
@@ -49,7 +49,6 @@
 | **P2** | Core 层临时目录根可注入（便携模式延伸） | [core-temp-root-injectable.md](.omo/plans/未开始/core-temp-root-injectable.md) | 🟡中 | 2-3h | 📋 2026-08-20 立项：Core 层 4 处 `%TEMP%\MantisZip` 硬编码在便携模式下仍写系统 TEMP；方案为 `TempPaths` 静态类注入自定义根，未注入时路径不变（详见计划文档） |
 | **P2** | Avalonia CLI 解压后打开文件夹对齐 WPF | [cli-extract-open-folder.md](.omo/plans/未开始/cli-extract-open-folder.md) | 🟡中 | 2-3h | 📋 2026-08-20 立项：WPF CLI 解压后按 `OpenFolderAfterExtract` 打开目标文件夹，Avalonia CLI 只解压不打开；方案为成功后复用 `SmartOpenPathResolver`，多文件批处理保持不开（实施前需确认 WPF `--extract` 行为） |
 | **P2** | 文本预览语法高亮（Avalonia） | [text-preview-syntax-highlighting.md](.omo/plans/未开始/text-preview-syntax-highlighting.md) | 🟡中 | 4-5h | ✅ 2026-09-21 重写为 Avalonia 版（原 WPF AvalonEdit 方案废弃）：AvaloniaEdit + TextMate（VS Code 语法全集，免自研语法包）替换现有文本预览容器，亮/暗主题联动 + 扩展名→魔数→结构特征三级语言识别 |
-| **P3** | 设置项无消费者修复（密码匹配提示/默认解压位置/级联菜单开关） | [settings-unwired-keys.md](.omo/plans/进行中/settings-unwired-keys.md) | 🟡中 | 3-5h | 📋 2026-09-27 立项：收尾「设置写了没人读」的最后 3 项。①②（密码匹配提示/默认解压位置）已评估、用户决策暂不动（结论见计划文档「评估结论」小节）；③`EnableCascadingMenu` 确认为陈旧描述，仅修正 AGENTS.md、零代码改动并闭环。其余 7 项已于同批修复 |
 | **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.omo/plans/未开始/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
 | **P3** | 压缩包管理器（历史 / 标签 / 目录树筛选） | [archive-manager.md](.omo/plans/未开始/archive-manager.md) | 🟡中 | 2-3天 | 独立窗口记录所有处理过的压缩包：手动标签、智能分组（最近/常用）、目录树筛选、缩略图预览；SQLite 持久化 |
 | **P3** | 原生图标 DLL | [icon-dll.md](.omo/plans/已归档/icon-dll.md) | 🟡中 | 2-3h | ☑️ 2026-08-20 核实：图标已嵌入 `MantisZip.ShellExt.dll` 托管资源、效果已达成；原「.rc 原生资源 DLL」方案不再需要 |

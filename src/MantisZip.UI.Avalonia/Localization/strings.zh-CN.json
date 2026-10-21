@@ -1,5 +1,17 @@
 ﻿{
   "Status_Starting": "正在启动…",
+  "Settings_AdaptiveRuleLevel_Store": "存储",
+  "Settings_AdaptiveRuleLevel_Fast": "快速",
+  "Settings_AdaptiveRuleLevel_Normal": "正常",
+  "Settings_AdaptiveRuleLevel_Max": "最大",
+  "Settings_AdaptiveRuleLevel_Global": "跟随全局",
+  "Settings_AdaptiveRuleLevel_GlobalPlusOne": "全局+1",
+  "Settings_AdaptiveRuleLevel_GlobalMinusOne": "全局-1",
+  "Settings_AdaptiveRuleLevel_Custom": "自定义({0})",
+  "Settings_AdaptiveRuleLevel_CustomName": "自定义",
+  "Settings_AdaptiveRuleLevel_Unknown": "未知",
+  "Settings_AdaptiveOverrides_MtWarning": "> **多线程压缩提示**：多线程路径按分组批量压缩、组内统一使用所选压缩级别，因此规则中「指定压缩级别」在大批量压缩时不生效（「仅存储」类始终生效）。小目录、加密包、分卷等走串行路径时，规则全部生效。",
+  "Settings_AdaptiveOverrides_MtIneffectiveBadge": "多线程下不生效",
   "Status_OpeningArchiveFmt": "正在打开压缩包 {0}",
   "Status_ExtractingFmt": "正在解压 {0}",
   "Status_ExtractingBatchFmt": "正在解压 {0} 个压缩包…",
@@ -900,8 +912,6 @@
   "Settings_AdaptiveMode_MultiThreaded": "自适应 + 多线程",
   "Settings_AdaptiveMode_MultiThreaded_Hint": "需压缩文件将统一使用全局压缩级别，并通过多线程加速",
   "Settings_FormatCatalog": "格式目录",
-  "Settings_StoreFormat_Section": "仅存储格式",
-  "Settings_StoreFormat_Desc": "勾选的格式在多线程压缩时不压缩，直接存储。取消勾选则这些格式也会参与多线程压缩。",
   "Settings_FormatCatalog_BuiltIn": "内置格式（不可删除）",
   "Settings_FormatCatalog_Custom": "自定义格式",
   "Settings_FormatCatalog_AddCustom": "+ 添加自定义格式",
@@ -1278,7 +1288,7 @@
   "Metadata_Key_IconCount": "图标数量",
   "Metadata_Key_Encrypted": "加密",
   "AdaptiveHelp_Title": "压缩加速说明",
-  "AdaptiveHelp_Markdown": "自适应压缩会根据文件类型自动决定是否压缩，避免对已压缩数据白耗 CPU；下面的两个开关可以独立组合。\n\n## 自适应压缩\n根据文件类型自动决定压缩方式。对已知的已压缩格式（JPEG、PNG、MP4、ZIP 等 60 余种扩展名）直接以「存储」方式写入，不再二次压缩——这类数据已无可压缩空间，再压只会白白消耗 CPU 与时间；其余文件仍按你选定的压缩级别正常压缩。\n\n## 多线程压缩\n利用多核 CPU 并行压缩以提升速度，适合大文件或文件数量较多的情况（实验性功能）。可与「自适应压缩」同时开启。\n\n> **提示**：当「自适应压缩」与「多线程压缩」同时开启时，「自适应规则」中的用户自定义规则不生效；如需按格式定制压缩级别，请改用「仅存储格式」列表。"
+  "AdaptiveHelp_Markdown": "自适应压缩会根据文件类型自动决定是否压缩，避免对已压缩数据白耗 CPU；下面的两个开关可以独立组合。\n\n## 自适应压缩\n根据文件类型自动决定压缩方式。对已知的已压缩格式（JPEG、PNG、MP4、ZIP 等 60 余种扩展名）直接以「存储」方式写入，不再二次压缩——这类数据已无可压缩空间，再压只会白白消耗 CPU 与时间；其余文件仍按你选定的压缩级别正常压缩。\n\n## 魔数检测\n对**扩展名不可靠**的文件（改名、无扩展名、扩展名与实际内容不符）读取文件头魔数，识别其真实格式；若识别为已压缩格式（如 JPEG、MP4、ZIP），同样按「仅存储」处理，不做二次压缩。\n\n> **提示**：魔数检测只对**大文件**（64 KB 以上）生效，且需要额外读取文件头，会略微增加压缩耗时；正常命名的照片/视频本来就按扩展名规则「仅存储」，开启与否几乎无差别。\n\n## 多线程压缩\n利用多核 CPU 并行压缩以提升速度，适合大文件或文件数量较多的情况（实验性功能）。可与「自适应压缩」同时开启。\n\n> **提示**：用户自定义规则的优先级高于内置的「已压缩格式仅存储」判定。其中「仅存储」类规则始终生效；「指定压缩级别」类规则在多线程压缩路径下不生效（多线程按分组批量压缩、组内统一使用所选级别），走串行路径时（小目录、加密包、分卷等）全部生效。"
 }
 
 
