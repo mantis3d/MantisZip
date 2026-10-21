@@ -26,6 +26,7 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-10
+- **10-20** — **启动优化五期：仅应用程序集 ReadyToRun（R2R）**：全量 R2R 实测 TOTAL −650ms 但发布体积 +138MB → 改为只交叉编译 `MantisZip.UI.Avalonia.dll`（MSBuild target 在 `_PrepareForReadyToRunCompilation` 前填充 `PublishReadyToRunExclude`，**按文件名匹配**；`%(FullPath)` 不生效）。体积 +4.3MB（FD 188.6→192.9 / SC 265.3→269.6MB），交错 A/B n=10：TOTAL **1473.6→1352.2ms（−126.8ms，10/10 胜）**、`Win.Xaml` 332.6→283.6ms；构造前 80ms JIT 属 Avalonia 框架链，应用集 R2R 无法覆盖。release workflow 两个 publish 步骤已加 `-p:PublishReadyToRun=true`
 - **10-20** — **大文件 partial 拆分完成（App / ZipEngine / MainWindowViewModel 三阶段）**：纯移动零行为变化，三阶段独立 commit + build/test。`App.axaml.cs` 2507 → 主干 600 + Theming/CliExtract/CliCompress/CliInfra 四 partial；`ZipEngine.cs` 4428 → 主干 193 + Open/Extract/Compress/CompressGroup 四 partial（并行解压锁竞争雷区原样搬动）；`MainWindowViewModel.cs` 3201 → 主干 1352 + Password/Preview/Navigation/Extract/Compress 五 partial（非空行逐行比对零丢失）。**实施中发现并修复**：3 个源码文本守卫（`AppShutdownWiringTests` / `ExtractPreserveFullPathWiringTests` / `ExtractParallelDegreeWiringTests`）因只扫主干而失败 → 改为显式枚举全部 partial（新增 partial 须同步数组）。验证：Core/UI 构建 0 警告 0 错误；Core 747/744、Avalonia 331/328 全绿。ARCHITECTURE 新增「大文件 partial 布局」速查
 - **10-20** — **版本号升级 v0.5.3（6 处同步）+ 新增 v0.5.3 发布说明**：`AppConstants.Version` / `csproj <Version>` / `installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值 / `docs/PLAN.md` 与 `docs/PROGRESS.md` 当前版本，全部 0.5.2 → 0.5.3；`RELEASE_NOTES.md` 新建 v0.5.3 章节（文件说明 + 启动画面 / 性能两节，覆盖原生 Win32 splash 及其图标·动态文案·Win11 圆角、启动性能两项（主题重复加载消除 / AppSettings 进程级缓存））。**发布说明口径**（新增 AGENTS 规则 18）：只记录 v0.5.2 → v0.5.3 的用户可见差异——同周期内引入并修复的「splash 后主窗被遮挡」不进发布说明，仅记入 detail 与本计划归档
 - **10-20** — **原生 Win32 启动 Splash 上线**：`NativeSplash` 静态类（独立后台线程 + 全独立消息泵 + GDI 文本绘制 + `OperatingSystem.IsWindows()` 跨平台护栏 + 失败静默降级），覆盖 Avalonia 初始化前的冷启动空窗：无参普通启动 + 全部 CLI 慢路径（文案按 Language+启动方式选 key，新增 `Status_Starting` 三语），非 UI 命令（--install-shell/--help/--test 等秒退）不显示；8 类终端窗口（MainWindow/ProgressWindow/CompressSettingsWindow/ExtractSettingsWindow）统一 `Opened` 挂 `NativeSplash.Hide()`。冒烟实测：splash ~196ms 出现（<500ms 门槛）、~1.2s 熄灭（300ms 最短时长防闪烁）、进程稳定存活。**调试踩坑实录**（归档计划内）：Win32 类名经 C# string struct marshal 有 A/W-1407 与堆崩溃陷阱——最终全部类名 `StringToHGlobalUni` 指针传入才稳定。GUI 手动验收（焦点/DPI/CLI 全链路）待人工
@@ -229,6 +230,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 仅应用程序集 ReadyToRun（`PublishReadyToRun=true` 时排除其余 268 个程序集；体积 +4.3MB，交错 A/B n=10 TOTAL −126.8ms、`Win.Xaml` −50.2ms 10/10 胜；release workflow 已启用） | [r2r-app-assembly.md](.omo/plans/已完成/r2r-app-assembly.md) | 未发布（2026-10-20） |
 | AppSettings 序列化改用 STJ 源生成（`AppSettingsJsonContext` 编译期元数据；4 条兼容测试；A/B `Init.Settings` 1.7→1.7ms 门控未达，保留用于 Trim/AOT 铺路，不宣称启动收益） | [stj-source-gen-appsettings.md](.omo/plans/已完成/stj-source-gen-appsettings.md) | 未发布（2026-10-20） |
 | 压缩/解压出错信息增强（整包错误本地化 + 逐条目 `EntryErrorDetail`/HResult 透传 + 红/黄分层摘要与原因分布 + Win32 错误提示细分；Tooltip 接线守卫测试） | [error-info-enhancement.md](.omo/plans/已完成/error-info-enhancement.md) | 未发布（2026-10-20 验收） |
 | ZIP 损坏检测（CRC 校验）修复（解压/测试改走 SharpCompress 官方 `CheckCrc` 路径；`CrcMismatch` 原因枚举 + 三语文案 + 4 条回归测试；真实损坏样本人工验收通过） | [zip-crc-validation.md](.omo/plans/已完成/zip-crc-validation.md) | 未发布（2026-10-20 验收） |

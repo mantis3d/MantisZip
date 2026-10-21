@@ -118,4 +118,17 @@
     <Exec Command="powershell -ExecutionPolicy Bypass -File &quot;$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1&quot; -PublishDir &quot;$(PublishDir.TrimEnd('\\'))&quot;" Condition="'$(PublishDir)' != '' And Exists('$(MSBuildProjectDirectory)\..\..\scripts\copy-7z-dll.ps1')" IgnoreExitCode="true" />
   </Target>
 
+  <!-- ReadyToRun：发布时仅交叉编译应用程序集，其余程序集保持 IL（体积约 +4-5MB，启动约 -150~200ms）。
+       实测全量 R2R 可 -650ms 但发布体积 +138MB，不采用；详见 .omo/plans/已完成/r2r-app-assembly.md。
+       必须在 _PrepareForReadyToRunCompilation 之前填充排除列表（该 target 体内才计算编译清单）。 -->
+  <Target Name="ExcludeNonAppAssembliesFromReadyToRun"
+          BeforeTargets="_PrepareForReadyToRunCompilation"
+          Condition="'$(PublishReadyToRun)' == 'true'">
+    <ItemGroup>
+      <_AppOnlyR2RExclusions Include="@(ReferenceCopyLocalPaths)"
+                             Condition="'%(Filename)' != 'MantisZip.UI.Avalonia'" />
+      <PublishReadyToRunExclude Include="@(_AppOnlyR2RExclusions->'%(Filename)%(Extension)')" />
+    </ItemGroup>
+  </Target>
+
 </Project>

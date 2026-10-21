@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — 启动优化：仅应用程序集 ReadyToRun（R2R）
+  - **背景**：启动余量实测发现 
+ew MainWindow() 构造体执行前有 ~80ms JIT、Win.Xaml 含 XamlIlPopulate JIT；全量 R2R 实测 TOTAL **1470→820ms（−650ms）** 但发布体积 **+138MB**（188.6→326.6MB），不可接受。
+  - **实现**：MantisZip.UI.Avalonia.csproj 新增 target ExcludeNonAppAssembliesFromReadyToRun（BeforeTargets="_PrepareForReadyToRunCompilation"），把 @(ReferenceCopyLocalPaths) 中除应用集外的程序集加入 PublishReadyToRunExclude。**关键坑**：ExcludeList 按**文件名**（%(Filename)%(Extension)）匹配，传 %(FullPath) 完全无效。
+  - **体积**：FD 188.6→**192.9MB**、self-contained 265.3→**269.6MB**（均 **+4.3MB**）；Avalonia.Base.dll/System.Private.CoreLib.dll 保持 IL（268 个程序集被排除）。
+  - **A/B（交错 n=10）**：TOTAL **1473.6→1352.2ms（−126.8ms，10/10 胜）**；Win.Xaml 332.6→283.6ms（−50.2ms，10/10 胜）；Win.Visible 持平（框架层 JIT 需全量 R2R）；构造前 JIT 81.2→78.5ms（属 Avalonia Window 基类链，应用集 R2R 无法覆盖）。
+  - **发布链路**：.github/workflows/release.yml 两个 publish 步骤均新增 -p:PublishReadyToRun=true；日常 dotnet build 不受影响。self-contained R2R 冒烟启动正常。
+  - **回归**：dotnet build 0 警告 0 错误；UI 测试 335/332 通过。
 **2026-10-20** — 启动打点补充（App.axaml 加载 / 生命周期诊断 / 主窗构造前 JIT 归因）
   - `App.Initialize` 增加 `App.Initialize.Enter/Exit`：测得 **App.axaml 解析（主题字典 + 85KB AppIcons + Fluent/DataGrid 样式）≈77–81ms**。
   - `OnFrameworkInitializationCompleted` 增加 `Init.LifetimeDiag.Enter/Exit`：`LifetimeDiagnostics.Install`（含同步写 lifecycle.log）仅 **~4ms**，可排除。
