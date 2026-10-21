@@ -54,7 +54,10 @@ public partial class App : Application
 
     public override void Initialize()
     {
+        // 启动打点：App.axaml 加载（主题字典 + 85KB 图标字典 + 全局样式）耗时归因
+        Services.StartupTimer.Mark("App.Initialize.Enter");
         AvaloniaXamlLoader.Load(this);
+        Services.StartupTimer.Mark("App.Initialize.Exit");
         // When precompiled XAML is available, AvaloniaXamlLoader uses it.
         // If not available (e.g. after clean build), InitializeComponent() from
         // the source generator handles runtime loading.
@@ -214,13 +217,16 @@ public partial class App : Application
         if (ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop)
         {
             // 进程退出诊断（纯观察）：窗口生命周期 + 僵尸状态 + 异常记录 → %LOCALAPPDATA%\MantisZip\lifecycle.log
+            Services.StartupTimer.Mark("Init.LifetimeDiag.Enter");
             Services.LifetimeDiagnostics.Install(desktop);
+            Services.StartupTimer.Mark("Init.LifetimeDiag.Exit");
 
             var args = Environment.GetCommandLineArgs().Skip(1).ToArray();
 
             if (args.Length == 0)
             {
                 // No args: normal UI startup
+                Services.StartupTimer.Mark("Init.MainWindow.New");
                 desktop.MainWindow = new MainWindow();
                 Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口首帧关 splash
             }
@@ -234,6 +240,7 @@ public partial class App : Application
                 {
                     case "--open":
                         // Open archive in MainWindow
+                        Services.StartupTimer.Mark("Init.MainWindow.New");
                         desktop.MainWindow = new MainWindow();
                         Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash（加载遮罩 B 接管后续反馈）
                         if (!string.IsNullOrEmpty(path) && File.Exists(path))
@@ -261,6 +268,7 @@ public partial class App : Application
                                     _ = RunExtractCliAsync(path, Path.GetDirectoryName(path) ?? ".", args, desktop);
                                     break;
                                 default: // "open"
+                                    Services.StartupTimer.Mark("Init.MainWindow.New");
                                     desktop.MainWindow = new MainWindow();
                                     Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash
                                     var mainWindow = (MainWindow)desktop.MainWindow;
@@ -270,6 +278,7 @@ public partial class App : Application
                         }
                         else
                         {
+                            Services.StartupTimer.Mark("Init.MainWindow.New");
                             desktop.MainWindow = new MainWindow();
                             Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash
                         }
@@ -368,6 +377,7 @@ public partial class App : Application
                     default:
                         // Unknown args: just show UI
                         DebugLog($"警告: 无法识别的命令行参数 '{command}'。使用 --help 查看可用命令。");
+                        Services.StartupTimer.Mark("Init.MainWindow.New");
                         desktop.MainWindow = new MainWindow();
                         Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash
                         break;

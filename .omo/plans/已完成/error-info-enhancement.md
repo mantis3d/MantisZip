@@ -1,6 +1,6 @@
 # 压缩/解压出错信息增强（整包错误本地化 + 逐条目详情透传 + 失败原因分布）
 
-> **状态**: 🚧 进行中（2026-10-15 立项；**任务 1–8 已实施**，任务 9 GUI 人工验收待做，任务 10 提交按用户指示）
+> **状态**: ✅ 已完成（2026-10-20 归档）：任务 1–8 已实施（commit `7799e56a`），任务 9 全量验证 + GUI 人工验收通过（含黄段），任务 10 文档与提交已完成
 >
 > **For agentic workers:** 执行时使用 superpowers:subagent-driven-development 或 superpowers:executing-plans。Steps use checkbox (`- [ ]`) syntax for tracking。提交策略：默认**不 commit**；仅当用户明确要求提交时执行收尾任务，且按规则 3 先更新双轨进度文档。
 
@@ -375,10 +375,10 @@ Wave FINAL
 - 无代码改动（验证为主）
 
 **What to do**:
-- [ ] 全量构建 + 测试（见 Verification Strategy 全部命令）
-- [ ] 硬编码扫描：`git grep -n "未能写入到" -- 'src/*.cs'` 无命中
-- [ ] 引擎扫描：`rg -n "ArchiveEntryStatus.Failed" src\MantisZip.Core\Engines` 逐处核对 FileTotalBytes/EntryErrorDetail
-- [ ] GUI 人工验收清单（Windows，需准备测试素材）：
+- [x] 全量构建 + 测试（2026-10-20：Core **747 总 / 744 过 / 3 跳过 / 0 失败**；Avalonia **331 总 / 328 过 / 3 跳过 / 0 失败**）
+- [x] 硬编码扫描：`git grep -n "未能写入到" -- "src/*.cs"` → **0 命中**
+- [x] 引擎扫描：33 处 `ArchiveEntryStatus.Failed` 均带 `FileTotalBytes`（多行上报已逐处核对）；唯一例外 `SevenZipEngine.cs:938` 为**整包级**失败上报（无 EntryKey，走红段整包头），设计如此
+- [x] GUI 人工验收清单（Windows，需准备测试素材）：**2026-10-20 用户验收完成**（红段既有验收通过；黄段按下方方法复现通过；验收结论：未见异常）
   1. **CRC 损坏 ZIP**：解压 → 红段摘要行显示"数据损坏"，tooltip 显示 SharpCompress 原文（含 CRC 字样），条目行 tooltip 同
   2. **只读目标目录**：解压 → "权限不足" + UnauthorizedAccess 本地化整包头（若整包级）+ tooltip 原文
   3. **磁盘满**（可用 subst 小容量 VHD 模拟）：解压 → IoFailed 行 tooltip 追加"磁盘空间不足"hint
@@ -387,8 +387,27 @@ Wave FINAL
   6. **7z 失败**：同上
   7. **分布行**：≥2 种失败原因混合场景，红段头部出现 `共 N 个失败：A x · B y`
   8. **复制按钮**：复制内容含分布行 + 全部 entry 行
-  9. **黄段**：压缩只读文件 → 跳过原因分布行出现；解压冲突跳过 → 黄段不出现（D5 回归）
+  9. **黄段**（2026-10-20 补充触发条件，见下方「黄段验收方法」）：压缩时源文件不可读 → 弹窗选**跳过** → 黄段出现原因分布行 + 条目行；解压冲突跳过 → 黄段不出现（D5 回归）
   10. **纯整包错误**（打开损坏包）：整包头为本地化文案（zh 环境无英文裸露），tooltip 有原文
+
+
+#### 黄段验收方法（2026-10-20 代码核查 + 复现步骤）
+
+**触发条件**（`ProgressViewModel.CollectEntryOutcome`）：只有 `Skipped` **且带 `EntryFailureReason`** 才进黄段；解压侧 Skipped 一律不带原因（冲突跳过/过滤跳过），因此**解压永远不会出现黄段**（设计如此，不是缺陷）。
+
+黄段的生产者（全部在压缩侧）：
+- ZIP/7z 压缩前置读权限预检 `ReadErrorHandler.FilterUnreadableFiles`（源文件被独占占用/权限不足）；
+- ZIP 写入中途读失败 `ReadFileWithRetry`、TAR.GZ `TarWriteFileWithRetry`。
+
+**且必须在「处理文件时出错」对话框选择「跳过」**：重试成功 → 无摘要；中止 → 整包失败走红段。
+
+**复现步骤**：
+1. 造两个文件（一个待锁、一个正常），用 PowerShell 以 `FileShare.None` 独占锁定其中一个（保持进程存活）；
+2. 在 MantisZip 中压缩该目录 → 弹出「处理文件 … 时出错」；
+3. 选择「跳过」→ 压缩完成；
+4. 预期：进度窗口底部出现**黄色**「跳过 N 项：读取失败」+ 原因分布行，条目行 tooltip 含异常原文；红段不出现。
+
+**已知观感限制**：黄段**不触发自动钉住**（D4，2026-10-20 用户决定保持现状），开启自动关闭时窗口会按倒计时关闭；验收时建议先关闭「完成后自动关闭」或直接点 📌。
 
 **Must NOT do**:
 - 验收发现问题回到对应任务修复，不在本任务直接改代码（除非是一行级 typo）
@@ -405,10 +424,10 @@ Wave FINAL
 - 修改: `docs/PLAN.md`（任务行状态/移至 PROGRESS 历史索引，规则 1）
 
 **What to do**:
-- [ ] **先**更新双轨进度文档（规则 3，commit 前置）：里程碑级（契约扩展+三引擎修复）+ 细节级条目，从新到旧
-- [ ] `docs/PLAN.md`：若本计划行仍在「待实现」表，更新状态为已完成并按规则 1 移至 PROGRESS.md 历史索引；计划文件移入 `.omo/plans/已完成/`
-- [ ] conventional commit（规则 10）：`feat(core,avalonia): 压缩/解压出错信息增强（整包错误本地化+条目详情透传+失败原因分布）`
-- [ ] **不推送**（除非用户明确要求）
+- [x] **先**更新双轨进度文档（规则 3）：PROGRESS 里程碑 + detail 条目已同步（commit `a257947f` / `0accf8c4`）
+- [x] `docs/PLAN.md` 状态已更新；**计划文件暂留「进行中」**——任务 9 GUI 人工验收未完成（规则 1 完成后再移入 `.omo/plans/已完成/`）
+- [x] conventional commit 已执行：`feat(core,avalonia): 压缩/解压出错信息增强 Task 1-8（整包错误本地化+条目详情透传+失败原因分布）`（commit `7799e56a`）
+- [x] 未推送
 
 **Must NOT do**:
 - 未经用户明确要求不 commit / 不 push / 不改版本号（规则 2）
@@ -472,3 +491,10 @@ Wave FINAL
 ## 提交策略
 
 默认**不 commit**。任务 1–9 完成且验收通过后向用户汇报；仅当用户明确要求提交时执行任务 10（规则 3 前置 + 规则 10 消息格式 + 不 push）。
+
+## 完成记录（2026-10-20 回填）
+
+- **代码**：Task 1–8 已提交（`7799e56a`），工具提示接线守卫 `0accf8c4`；无验收后返工。
+- **验证**：Core 747/744、Avalonia 331/328 全绿；硬编码扫描 0；引擎 Failed 上报逐处核对 `FileTotalBytes` 完整。
+- **GUI 人工验收**：用户于 2026-10-20 完成红段与黄段场景验收，未发现问题。黄段触发条件与复现步骤见任务 9「黄段验收方法」。
+- **行为决策**：黄段不自动钉住窗口（D4）经用户确认保持现状。

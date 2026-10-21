@@ -63,6 +63,9 @@ public partial class MainWindow : Window
     /// <summary>覆层呼吸动画 tick 计数（显示时从 0 复位）</summary>
     private int _dragAddOverlayTick;
 
+    /// <summary>过滤栏是否已创建（延迟加载：默认隐藏时不在启动路径实例化）</summary>
+    private bool _filterBarCreated;
+
     public MainWindow()
     {
         Services.StartupTimer.Mark("Win.Ctor.Enter");
@@ -152,6 +155,12 @@ public partial class MainWindow : Window
         };
         DataContext = vm;
 
+        // 全局快捷键（唯一事实源）：MenuItem.InputGesture 只负责「在菜单里显示」快捷键文字
+        // （Avalonia 官方文档：Setting this property does not cause the input gesture to be handled
+        //   by the menu item, it simply displays the gesture text in the menu），
+        // 真正生效的按键绑定必须登记在这里；用命令实例直绑（KeyBinding 非 Control，无 DataContext）。
+        RegisterKeyBindings(vm);
+
         // 条目重填后重应用列排序（进入目录/刷新/过滤后保持排序状态）
         vm.EntriesRefreshed += (_, _) =>
         {
@@ -166,6 +175,11 @@ public partial class MainWindow : Window
             {
                 _previewPanelEnabled = vm.IsPreviewVisible;
                 ApplyPreviewPosition(_lastAppliedPreviewPosition);
+            }
+            // 过滤栏延迟创建：首次显示时才实例化（启动优化：默认隐藏时省 ~50 元素 XAML 膨胀）
+            else if (e.PropertyName == nameof(MainWindowViewModel.IsFilterBarVisible) && vm.IsFilterBarVisible)
+            {
+                EnsureFilterBar();
             }
         };
 
@@ -1189,6 +1203,66 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// 注册全局快捷键（**菜单快捷键的唯一事实源**）。
+    ///
+    /// 背景：Avalonia 的 <c>MenuItem.InputGesture</c> **只显示**快捷键文字、不处理按键
+    /// （官方文档：Setting this property does not cause the input gesture to be handled by the
+    /// menu item, it simply displays the gesture text in the menu）。
+    /// 因此真正生效的按键必须登记在 <see cref="Avalonia.Input.IInputElement.KeyBindings"/>
+    /// （Avalonia 12 的 API 名是 <c>KeyBindings</c>，11 版的 <c>InputBindings</c> 已移除）；
+    /// 此处用命令实例直绑（KeyBinding 不是 Control，拿不到 DataContext）。
+    ///
+    /// 约定：新增菜单快捷键时 ① 在此登记（生效）② 在对应 MenuItem 上写同样的
+    /// <c>InputGesture</c>（菜单里显示）③ 在 AGENTS.md「快捷键」小节同步。
+    /// </summary>
+    private void RegisterKeyBindings(MainWindowViewModel vm)
+    {
+        void Add(Key key, KeyModifiers modifiers, System.Windows.Input.ICommand command)
+        {
+            KeyBindings.Add(new KeyBinding
+            {
+                Gesture = new KeyGesture(key, modifiers),
+                Command = command,
+            });
+        }
+
+        // 文件
+        Add(Key.O, KeyModifiers.Control, vm.OpenArchiveCommand);
+        Add(Key.N, KeyModifiers.Control, vm.NewArchiveCommand);
+        Add(Key.W, KeyModifiers.Control, vm.CloseArchiveCommand);
+        Add(Key.F5, KeyModifiers.None, vm.RefreshArchiveCommand);
+        Add(Key.L, KeyModifiers.Control | KeyModifiers.Shift, vm.OpenArchiveLocationCommand);
+
+        // 编辑
+        Add(Key.E, KeyModifiers.Control, vm.ExtractArchiveCommand);
+        Add(Key.E, KeyModifiers.Control | KeyModifiers.Shift, vm.ExtractArchiveHereCommand);
+        Add(Key.T, KeyModifiers.Control | KeyModifiers.Shift, vm.ExtractArchiveToNameCommand);
+        Add(Key.T, KeyModifiers.Control, vm.TestArchiveCommand);
+        Add(Key.A, KeyModifiers.Control | KeyModifiers.Shift, vm.AddFilesCommand);
+
+        // 视图
+        Add(Key.P, KeyModifiers.Control, vm.TogglePreviewCommand);
+        Add(Key.V, KeyModifiers.Control | KeyModifiers.Shift, vm.CycleViewModeCommand);
+        Add(Key.I, KeyModifiers.Control | KeyModifiers.Shift, vm.ToggleInfoPanelVisibilityCommand);
+        Add(Key.C, KeyModifiers.Control | KeyModifiers.Shift, vm.CopyFilePathCommand);
+
+        // 帮助
+        Add(Key.OemComma, KeyModifiers.Control, vm.OpenSettingsCommand);
+    }
+
+    /// <summary>
+    /// 延迟创建过滤栏（启动优化，2026-10-21）：过滤栏默认隐藏，其 ~50 个元素的 XAML 膨胀
+    /// 在启动路径上毫无意义 → 改为首次显示（<c>IsFilterBarVisible = true</c>）时才实例化
+    /// <see cref="Controls.MainFilterBar"/> 并放入宿主 <c>FilterBarHost</c>。
+    /// </summary>
+    private void EnsureFilterBar()
+    {
+        if (_filterBarCreated) return;
+        _filterBarCreated = true;
+        FilterBarHost.Content = new Controls.MainFilterBar { DataContext = DataContext };
+    }
+
+    /// <summary>
     /// 按当前排序状态重排 CurrentEntries：
     /// - .. 导航行永远置顶（防御性保留，Avalonia 列表暂无导航行）
     /// - SeparateDirBaseline 开启时目录排在文件前
@@ -1436,114 +1510,6 @@ public partial class MainWindow : Window
             [
                 "*.zip", "*.7z", "*.rar", "*.tar", "*.tgz", "*.tar.gz", "*.gz", "*.iso"
             ]);
-    }
-
-    // ── Filter picker buttons (🧪 pick from selected items) ──
-
-    private void PickDateFrom_Click(object? sender, RoutedEventArgs e)
-    {
-        var vm = DataContext as MainWindowViewModel;
-        if (vm == null) return;
-        try
-        {
-            if (vm.SelectedEntries.Count == 0)
-            {
-                WritePickerTrace("PickDateFrom: SelectedEntries is empty");
-                return;
-            }
-            var dates = vm.SelectedEntries
-                .Where(i => i.LastModified > DateTime.MinValue)
-                .Select(i => i.LastModified)
-                .ToList();
-            if (dates.Count == 0)
-            {
-                WritePickerTrace("PickDateFrom: no valid dates, entries=" + vm.SelectedEntries.Count);
-                return;
-            }
-            var minDate = dates.Min();
-            WritePickerTrace($"PickDateFrom: minDate={minDate:O}, picker.IsNull={FilterDateFromPicker == null}");
-            vm.FilterDateFrom = minDate;
-            if (FilterDateFromPicker != null)
-                FilterDateFromPicker.SelectedDate = minDate;
-        }
-        catch (Exception ex)
-        {
-            WritePickerTrace($"PickDateFrom ERROR: {ex}");
-        }
-    }
-
-    private void PickDateTo_Click(object? sender, RoutedEventArgs e)
-    {
-        var vm = DataContext as MainWindowViewModel;
-        if (vm == null) return;
-        try
-        {
-            if (vm.SelectedEntries.Count == 0)
-            {
-                WritePickerTrace("PickDateTo: SelectedEntries is empty");
-                return;
-            }
-            var dates = vm.SelectedEntries
-                .Where(i => i.LastModified > DateTime.MinValue)
-                .Select(i => i.LastModified)
-                .ToList();
-            if (dates.Count == 0)
-            {
-                WritePickerTrace("PickDateTo: no valid dates");
-                return;
-            }
-            var maxDate = dates.Max();
-            vm.FilterDateTo = maxDate;
-            if (FilterDateToPicker != null)
-                FilterDateToPicker.SelectedDate = maxDate;
-        }
-        catch (Exception ex)
-        {
-            WritePickerTrace($"PickDateTo ERROR: {ex}");
-        }
-    }
-
-    private static void WritePickerTrace(string msg)
-    {
-        var logPath = Path.Combine(
-            AppSettings.DataDir, "debug.log");
-        try
-        {
-            var dir = Path.GetDirectoryName(logPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-            File.AppendAllText(logPath, $"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] [PN] {msg}\n");
-        }
-        catch (Exception ex)
-        {
-            System.Diagnostics.Debug.WriteLine($"MainWindow log write failed: {ex.Message}");
-        }
-    }
-
-    private void PickSizeMin_Click(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel vm) return;
-        if (vm.SelectedEntries.Count == 0) return;
-        var sizes = vm.SelectedEntries
-            .Where(i => !i.IsDirectory)
-            .Select(i => i.Size)
-            .ToList();
-        if (sizes.Count == 0) return;
-        vm.FilterSizeMin = sizes.Min();
-        vm.FilterSizeUnit = "B";
-    }
-
-    private void PickSizeMax_Click(object? sender, RoutedEventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel vm) return;
-        if (vm.SelectedEntries.Count == 0) return;
-        var sizes = vm.SelectedEntries
-            .Where(i => !i.IsDirectory)
-            .Select(i => i.Size)
-            .ToList();
-        if (sizes.Count == 0) return;
-        vm.FilterSizeMax = sizes.Max();
-        vm.FilterSizeUnit = "B";
     }
 
     private void AddressBar_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)

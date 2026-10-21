@@ -311,7 +311,7 @@ Manual 表已覆盖的头像 (PNG/JPEG/GIF) 、文档 (PDF) 、压缩包 (ZIP/7z
 > 大文件（>64KB）的场景复用本方案的 `FileFormatDetector` 结果，
 > 映射到 `CompressionCoefficients` 分类（`image_lossy` / `media` / `archive`），
 > 从而自动降级压缩级别。
-> 详见 [`compression-estimator.md` → 自适应压缩级别](compression-estimator.md)。
+> 详见 [`adaptive-compression-level.md` → 遗留缺口](adaptive-compression-level.md)（魔数检测接线由 `adaptive-compress-ui-convergence` Phase 2 承担）。
 
 ---
 

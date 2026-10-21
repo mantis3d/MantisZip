@@ -123,7 +123,7 @@ App.axaml MergedDictionaries:
 - `tools/IconGen`（dev-time 脚本，入仓库可复现）：输入 = 现有几何 / 开源库 SVG / 语义映射表；输出 = `Icons.A.axaml` … `Icons.G.axaml` 六个编译期字典
 - 6 套全量编译进包（~116 键 × 6 ≈ 700 drawings，path 数据合计 < 1MB，无按需加载必要）
 - **覆盖率契约**：IconGen 输出校验对着 `IconTestViewModel` 注册表跑，缺键测试期报警（116 × 6 全存在）
-- 开源库协议：Phosphor MIT / Lucide MIT / Tabler MIT；About 页保留图标库署名
+- 开源库协议：Phosphor **MIT**（Duotone 同许可）/ Lucide **ISC**（另含约 120 个 Feather 衍生图标受 **MIT**，需两份声明）/ Tabler **MIT**；署名三处同步：About 页「致谢」Tab、`THIRD-PARTY-NOTICES.md`、`README.md`（2026-10-21 复核订正：原文误写「Lucide MIT」）
 - 语义映射表键名沿用 `IconPascalCase`，映射不上的键手绘补齐
 
 ## 6. 图标包导入
@@ -154,7 +154,7 @@ manifest 损坏 → 警告 + 按键名约定继续（不阻断）。
 
 ### 6.3 导入数据流
 
-1. 设置 → 外观 → 「导入图标包…」→ `CustomFilePickerDialog`（规则 15：`ShowOpenFileAsync` 限 ZIP 模式 / `ShowOpenItemsAsync` 允许文件夹，**禁用原生 StorageProvider**）
+1. 设置 → 外观 → 「导入图标包…」→ `CustomFilePickerDialog`（规则 16：`ShowOpenFileAsync` 限 ZIP 模式 / `ShowOpenItemsAsync` 允许文件夹，**禁用原生 StorageProvider**）
 2. ZIP → 解压到 `icon-packs/<id>/`（SharpCompress 已有依赖 + `FileConflictHelper.SanitizeEntryPath` 防 Zip Slip）
 3. 解析 SVG：**只提取几何与填充色，不渲染不执行**（`XmlReader` 禁 DTD/实体防 XXE）；`viewBox` 归一化到 24×24
 4. 构建 `DrawingImage`：颜色 → baked 画刷；无色形状 → null 部件（跟随 Foreground）
@@ -171,6 +171,8 @@ manifest 损坏 → 警告 + 按键名约定继续（不阻断）。
 > **2026-10-15 决策补充（渐变降级，D-C，实施计划阶段）**：渐变/图案填充（`linearGradient` / `radialGradient` / `pattern`）属「填充画刷」不兼容 → **跳过该图标 + 计入警告清单（非静默）**，**不阻断整包**；结构性不兼容（上列元素）与解析损坏仍按**原子拒绝**。理由：真实图标包常用渐变，整包拒绝体验过差；且画刷不兼容不宜与元素结构不兼容等同处理。渐变解析支持留作后续小计划，届时取消该降级。（详见 `.omo/plans/未开始/icon-theme-packs.md` 偏差 D-C）
 
 ### 6.5 存储布局（与 settings.json 同目录）
+
+> 根目录一律取 `AppSettings.DataDir`（便携模式为 exe 旁 `Data/`，否则 `%LOCALAPPDATA%\MantisZip`）。**落盘形态以 §13.2 S1（偏差 D-D）为准**：`<id>/Icons.json`、`icon-overrides/IconXxx.json` 为解析产物缓存，非解压内容/原始 SVG。
 
 ```
 %LOCALAPPDATA%\MantisZip\
@@ -211,7 +213,7 @@ manifest 损坏 → 警告 + 按键名约定继续（不阻断）。
 - **规则 4**：控件显式绑定主题资源键（`ThemeSurfaceBgBrush` 等，键名以 `Brush` 结尾）
 - **规则 5**：间距/高度用 `SpacingXxxThk` / `ControlHeight` 动态资源
 - **规则 14**：新 axaml 文件全部主要控件加中文注释
-- **规则 15**：所有选择入口仅 `CustomFilePickerDialog`
+- **规则 16**：所有选择入口仅 `CustomFilePickerDialog`（2026-10-21 复核订正：原文编号 15 已漂移，现 15 = CoreLog、16 = 文件选择）
 
 ## 8. 错误处理
 
@@ -250,7 +252,7 @@ manifest 损坏 → 警告 + 按键名约定继续（不阻断）。
 | 选中态差异 | E/F/G 的 baked 部件在 `ToggleButton:checked` 下**不转白**（保持彩色/渐变）——已批准的接受项；A/C/D 线框/G 线框全保留 |
 | Foreground 继承 | IconView 的 Foreground 注册 `inherits:true`，比 PathIcon「不继承需选择器兜底」更符合直觉；迁移后目检菜单/工具栏默认色 |
 | 迁移面 | ~175 处机械替换是最大工作量项；脚本化 + 迁移前后截图对照控制风险 |
-| 开源依赖 | Phosphor/Lucide/Tabler 均 MIT，仅需署名；映射表需人工校对语义 |
+| 开源依赖 | Phosphor/Tabler 为 MIT、Lucide 为 **ISC + Feather MIT**，均需署名（Lucide 需两份声明）；映射表需人工校对语义 |
 | E 套成本 | 唯一需要全新绘制/找彩色源的套（架构上已由多部件 DrawingImage 吸收） |
 
 ## 11. 未来扩展（非本期）
@@ -263,5 +265,32 @@ manifest 损坏 → 警告 + 按键名约定继续（不阻断）。
 ## 12. 开放问题
 
 无阻塞项。实施计划阶段可再定的细节（不需回访设计）：
-- IconGen 用 PowerShell 还是 C# 控制台（倾向 C#，与仓库技术栈一致、可复用 SVG 解析器代码）
+- IconGen 用 PowerShell 还是 C# 控制台（倾向 C#，与仓库技术栈一致；**若复用解析器须先下沉 `MantisZip.Core`**——`tools/` 工程不得引用 UI 项目，否则拖入 Avalonia）
 - 图标管理器是否复用 `IconTestWindow` 的网格代码（倾向独立窗口，IconTestWindow 维持 Debug-only 职责）
+
+## 13. 2026-10-21 复核订正（实施计划评审后回填）
+
+本节记录对 §6/§7/§8 的事实订正与实施期决策，优先级等同正文（与 `.omo/plans/未开始/icon-theme-{infra,packs,sets}.md` 同步）。
+
+### 13.1 事实订正
+
+| 项 | 原文 | 订正 |
+|----|------|------|
+| Lucide 许可 | MIT（§5、§10） | **ISC** + 约 120 个 Feather 衍生图标 **MIT**（Cole Bemis），需两份声明 |
+| 文件选择规则编号 | 规则 15（§6.3、§7.3） | **规则 16**（现 15 = CoreLog） |
+| 覆盖率契约键数 | 「116 键」 | 注册表实为 **136 条 `Add()`**（19 条重复 + 1 条 null）→ 比对必须 `Distinct()` |
+| 设置页本地化 | XAML `LocalizedStrings[Key]`（§7.3） | `SettingsWindowViewModel` **无**该索引器（用个体属性 + `OnCultureChanged`）；仅 `MainWindowViewModel` 有 |
+
+### 13.2 实施期决策
+
+| # | 决策 |
+|---|------|
+| S1 | **偏差 D-D**：落盘形态由「解压内容 + `IconXxx.svg`」改为**解析产物缓存**（`icon-packs/<id>/Icons.json`、`icon-overrides/IconXxx.json`），避免启动重解析；ZIP 解压目录仅作导入临时目录，结束即删。不做文件监听，外部改 json 不自动生效 |
+| S2 | **内置 id 保留字**：导入包 id 归一化后命中 `A`–`G`（忽略大小写）→ 拒绝导入（否则 `ResolveIconThemeUri` 先匹配内置，包永不可达且 registry 冲突） |
+| S3 | **删包回退**：`IconPackRegistry.Remove(id)` 若 id 为当前 `SelectedIconTheme` → 立即置 `A` 并刷新（不等下次启动） |
+| S4 | **缓存失效**：`RefreshIconTheme()` 必须清 `_iconThemeProviders[id]` + 清 `_loadedIconThemeId`（否则 `ApplyTheme` 双条件早退直接 return） |
+| S5 | **`IconCatalog`**：从 `IconTestViewModel.LoadAllIcons()` 抽出静态去重注册表（`Distinct(ResourceKey)`），图标管理器与覆盖率计算共用；`IconTestViewModel` 改为消费它，规则 8 的「注册即入测试窗口」不变 |
+| S6 | **缩略预览**：非当前包的 4 图标预览由 `IconThemeBuilder` 预构建 `DrawingImage`，不经 `DynamicResource`（查非当前层必空白） |
+| S7 | **D 套底块**：固定中性半透明灰 `#40808080`（黑 @20% 在暗色主题不可见），T3 加 Light/Dark 双主题可见性断言 |
+| S8 | **E 套决策门**：先调研宽松许可彩色源（覆盖 ≥ 90%）；无合适源 → C 几何 + 语义分组固定色板程序化着色，**不手绘 116 个** |
+| S9 | **源 vendored**：`tools/IconGen/sources/**` 全部提交（含 `LICENSE-*.txt`），`Program.cs` 禁止联网，保证离线可复现 |

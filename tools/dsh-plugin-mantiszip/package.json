@@ -1,6 +1,6 @@
 {
   "name": "mantiszip-dsh-plugin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "MantisZip 维护插件：dotnet 构建诊断摘要、三语 key 对齐、版本号 6 处一致性（只读）",

@@ -15,6 +15,9 @@
 ## Quick start
 
 ```powershell
+# 一键自检（版本号 6 处 + 三语 key，不构建，毫秒级）
+pwsh -File scripts\verify-repo.ps1 -Task check
+
 # 构建 Avalonia 版（主力）
 dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
 
@@ -27,8 +30,25 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
 - 产物：`src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe`；`bin/`、`obj/` 已 gitignore
-- **无 CI、无 pre-commit、无 linter**；`tests/` 有 Core 与无头 Avalonia 两个测试项目（非全量覆盖）
+- CI：`.github/workflows/ci.yml`（Windows，`build` + `test`，但 `--filter "FullyQualifiedName!~SevenZipEngine"` 把 7z 相关用例过滤掉了）；**无 pre-commit、无 linter**；`tests/` 有 Core 与无头 Avalonia 两个测试项目（非全量覆盖）
 - ShellExt COM 已注册时 Explorer 会锁 Debug DLL → 构建/测试用 `-c Release` 绕开
+
+## 维护脚本（唯一实现）
+
+`scripts/verify-repo.ps1` 是仓库自检逻辑的**唯一实现**——DSH 插件工具 `mantiszip_*`、未来的 CI 步骤、人工 shell 全部调它，改逻辑只改这一处：
+
+| 命令 | 作用 |
+|------|------|
+| `pwsh -File scripts\verify-repo.ps1 -Task check` | 版本号 6 处 + 三语 key，无构建 |
+| `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` | 构建并把 MSBuild 输出压成「文件:行:列 + 错误码」 |
+| `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` | 跑测试 |
+| `pwsh -File scripts\verify-repo.ps1 -Task i18n` / `-Task version` | 单项检查 |
+| 追加 `-Json` | 机器可读输出（插件内部用） |
+
+- `-Target`：`avalonia`（默认）/ `core` / `shell` / `tests` / `ui-tests` / `solution`
+- `-ExtraArgs <args>` 追加 dotnet 参数（如 `--no-restore`）；参数内含逗号/空格时用 `-ExtraArgsJson '["-c","Release"]'`
+- **退出码 0 = 通过，1 = 有问题** ⇒ CI 可直接用；`-Json` 时 `ok` 字段同义
+- agent 面板里对应工具名：`mantiszip_verify` / `mantiszip_i18n` / `mantiszip_version`（DSH 本地插件 `tools/dsh-plugin-mantiszip`，薄壳而已）
 
 ## Architecture（速查）
 
@@ -58,7 +78,7 @@ When releasing a new version, update the version string in ALL of these location
 | 6 | `installer-selfcontained.iss` | `#define MyAppVersion "x.y.z"`（兜底默认值） |
 
 - 两个 `.iss` 的版本由 release workflow 从 git tag 经 `/dMyAppVersion=` 传入，`#define` 仅作本地手工编译兜底；**仍建议同步**，否则静默打出错误版本号且无编译报错
-- 改完 6 处跑 `mantiszip_version`（DSH 只读工具）核对；不可用时逐处人工比对
+- 改完 6 处必须核对：`pwsh -File scripts\verify-repo.ps1 -Task version`（agent 面板里是 `mantiszip_version`）；脚本不可用时逐处人工比对
 
 ## 每次 session 自动执行规则（必需）
 
@@ -196,13 +216,33 @@ When releasing a new version, update the version string in ALL of these location
 - `fix(core,avalonia): 拖拽/右键解压流程统一`
 - `docs: AGENTS.md 新增 ComputeDirectoryStats 目录聚合契约说明`
 
+### 规则 10.1：菜单快捷键的唯一事实源是 `MainWindow.KeyBindings`
+
+Avalonia 的 `MenuItem.InputGesture` **只显示**快捷键文字、**不处理按键**（官方文档：Setting this property does not cause the input gesture to be handled by the menu item, it simply displays the gesture text in the menu）。真正生效的绑定必须登记在 `MainWindow.KeyBindings`（Avalonia 12 的 API 名是 `KeyBindings`；11 版的 `InputBindings` 已移除）。
+
+- **登记处**：`Views/MainWindow.axaml.cs` 的 `RegisterKeyBindings(MainWindowViewModel vm)` —— 用**命令实例直绑**（`KeyBinding` 不是 Control，拿不到 DataContext）
+- **显示处**：对应 `MenuItem` 上写同样的 `InputGesture="Ctrl+…"`（仅供菜单里显示）
+- **新增快捷键三步**：① `RegisterKeyBindings` 登记（生效）② `MenuItem.InputGesture` 写同样文字（显示）③ 更新 `tests/MantisZip.UI.Avalonia.Tests/MainWindowKeyBindingsTests.cs` 的期望清单
+- **不要**在 `MenuItem` 上单独挂 `InputGesture` 就以为快捷键生效了（2026-10-21 修复：5 个原有快捷键一直只显示不生效）
+
 ### 规则 11：新功能只在 Avalonia 开发
 
 WPF 版本已在迁移完成后删除。所有新功能仅在 `MantisZip.UI.Avalonia` 中实现。共享层（`MantisZip.Core`/`MantisZip.ShellExt`）改动需评估兼容性。
 
 ### 规则 12：修改后必须构建验证
 
-完成任何代码修改后，必须运行对应项目的 `dotnet build` 验证（测试项目改动另跑 `dotnet test`）：
+完成任何代码修改后，必须运行对应项目的构建验证（测试项目改动另跑测试）。**首选维护脚本**（唯一实现，CI/插件/人工共用）：
+
+```powershell
+pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia
+pwsh -File scripts\verify-repo.ps1 -Task build -Target core        # 仅当修改 Core
+pwsh -File scripts\verify-repo.ps1 -Task test  -Target tests
+pwsh -File scripts\verify-repo.ps1 -Task test  -Target ui-tests
+```
+
+它把 MSBuild 输出压成「文件:行:列 + 错误码」，退出码 0 = 通过、1 = 有问题。agent 面板里等价工具是 `mantiszip_verify`（`target`：avalonia/core/shell/tests/ui-tests/solution；`action`：build/test），内部同样调这个脚本。
+
+脚本不可用时回退到原始命令，判定标准不变：
 
 ```powershell
 dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
@@ -211,7 +251,7 @@ dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj
 dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
-优先用 DSH 本地插件工具 `mantiszip_verify`（`target`：avalonia/core/shell/tests/ui-tests/solution；`action`：build/test），它把 MSBuild 输出压成「文件:行:列 + 错误码」。**工具不可用时**回退到上面的命令，判定标准不变。只有构建通过（`ok=true` 或 exit 0）任务才算完成。
+只有构建通过（`ok=true` 或 exit 0）任务才算完成。
 
 ### 规则 13：新增 UI 文案必须走本地化（禁止硬编码）
 
@@ -223,7 +263,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - **新增 key 必须成对添加**到 `strings.zh-CN.json`、`strings.en.json`、`strings.zh-TW.json`（三语 key 集必须完全同步，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 校验）；插入到文件头 `{` 之后（不排序），保持 UTF-8 无 BOM + CRLF + 2 空格缩进
 - **XAML `LocalizedStrings[Key]` 绑定的 key 必须登记**到 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组（约 line 203 起的 `new[] { ... }`）。该字典**不是全量加载** JSON——漏登记会导致菜单/工具栏文字空白（图标仍在）且构建不报错
 - 完成后 `dotnet build` 无新增错误，并扫描确认无遗漏硬编码
-- **改完文案必须跑 `mantiszip_i18n`**：校验三语 key 集合、`{0}` 占位符、重复 key、空值。工具不可用时手工比对三份文件——现有测试只校验解析后的 key 集合，**测不出重复 key**（JSON 解析会折叠）
+- **改完文案必须跑** `pwsh -File scripts\verify-repo.ps1 -Task i18n`（agent 面板里是 `mantiszip_i18n`）：校验三语 key 集合、`{0}` 占位符、重复 key、空值。工具不可用时手工比对三份文件——现有测试只校验解析后的 key 集合，**测不出重复 key**（JSON 解析会折叠）
 
 **豁免**（须在代码注释中注明原因）：开发者诊断工具、启发式匹配逻辑（`message.Contains("密码")` 等）、内容数据与语言本族原生名、`App.DebugLog` 日志与仅作控制流用的异常消息。
 

@@ -55,6 +55,7 @@ jobs:
           --output publish_output
           -p:DebugType=portable
           -p:DebugSymbols=true
+          -p:PublishReadyToRun=true
 
       - name: Publish (self-contained, x64)
         run: >
@@ -64,6 +65,7 @@ jobs:
           --output publish_output_selfcontained
           -p:DebugType=portable
           -p:DebugSymbols=true
+          -p:PublishReadyToRun=true
 
       - name: Verify publish output
         shell: pwsh

@@ -24,18 +24,19 @@ namespace MantisZip.UI.Avalonia.Dialogs
         public string OkText => LocalizationManager.T("MsgBox_Ok");
 
         /// <summary>
-        /// AdaptiveLevel 枚举值到中文显示文本的映射
+        /// AdaptiveLevel 枚举值到本地化显示文本（规则 13：三语 key；按调用时解析，支持运行期切语言）
         /// </summary>
-        private static readonly Dictionary<AdaptiveLevel, string> LevelDisplayMap = new()
+        private static string LevelDisplay(AdaptiveLevel level) => level switch
         {
-            [AdaptiveLevel.Store] = "存储",
-            [AdaptiveLevel.Fast] = "快速",
-            [AdaptiveLevel.Normal] = "正常",
-            [AdaptiveLevel.Max] = "最大",
-            [AdaptiveLevel.Global] = "跟随全局",
-            [AdaptiveLevel.GlobalPlusOne] = "全局+1",
-            [AdaptiveLevel.GlobalMinusOne] = "全局-1",
-            [AdaptiveLevel.Custom] = "自定义",
+            AdaptiveLevel.Store => LocalizationManager.T("Settings_AdaptiveRuleLevel_Store"),
+            AdaptiveLevel.Fast => LocalizationManager.T("Settings_AdaptiveRuleLevel_Fast"),
+            AdaptiveLevel.Normal => LocalizationManager.T("Settings_AdaptiveRuleLevel_Normal"),
+            AdaptiveLevel.Max => LocalizationManager.T("Settings_AdaptiveRuleLevel_Max"),
+            AdaptiveLevel.Global => LocalizationManager.T("Settings_AdaptiveRuleLevel_Global"),
+            AdaptiveLevel.GlobalPlusOne => LocalizationManager.T("Settings_AdaptiveRuleLevel_GlobalPlusOne"),
+            AdaptiveLevel.GlobalMinusOne => LocalizationManager.T("Settings_AdaptiveRuleLevel_GlobalMinusOne"),
+            AdaptiveLevel.Custom => LocalizationManager.T("Settings_AdaptiveRuleLevel_CustomName"),
+            _ => LocalizationManager.T("Settings_AdaptiveRuleLevel_Unknown")
         };
 
         public EditAdaptiveRuleDialog()
@@ -46,7 +47,7 @@ namespace MantisZip.UI.Avalonia.Dialogs
             // 填充压缩级别下拉框
             foreach (var level in Enum.GetValues<AdaptiveLevel>())
             {
-                LevelComboBox.Items.Add(LevelDisplayMap.GetValueOrDefault(level, level.ToString()));
+                LevelComboBox.Items.Add(LevelDisplay(level));
             }
             LevelComboBox.SelectedIndex = 0;
         }

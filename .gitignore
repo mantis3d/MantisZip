@@ -63,3 +63,5 @@ session-*.md
 CLAUDE.md
 # Task 验证用的生成本地产物（语料 / 脚本 / 无头 harness / 输出 zip），体积大且可再生成
 .buildout/
+# һ�����ַ����������⣩
+cs_results.txt

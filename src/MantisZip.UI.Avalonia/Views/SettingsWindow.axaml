@@ -214,14 +214,20 @@
                                     <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
                                     <TextBlock Text="{Binding MagicHexDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
                                   </StackPanel>
-                                  <!-- 编辑按钮 -->
-                                  <Button Grid.Column="1" Content="✏" Classes="ToolbarIcon"
+                                  <!-- 编辑按钮（矢量图标：IconEdit） -->
+                                  <Button Grid.Column="1" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="EditCustomFormat_Click"
-                                          ToolTip.Tip="编辑"/>
-                                  <!-- 删除按钮 -->
-                                  <Button Grid.Column="2" Content="✕" Classes="ToolbarIcon"
+                                          ToolTip.Tip="编辑">
+                                    <PathIcon Data="{StaticResource IconEdit}" Width="15" Height="15"
+                                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                  </Button>
+                                  <!-- 删除按钮（矢量图标：IconDelete） -->
+                                  <Button Grid.Column="2" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="DeleteCustomFormat_Click"
-                                          ToolTip.Tip="删除"/>
+                                          ToolTip.Tip="删除">
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15"
+                                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                  </Button>
                                 </Grid>
                               </Border>
                             </DataTemplate>
@@ -232,29 +238,6 @@
                     </StackPanel>
                   </Border>
 
-                  <!-- 仅存储格式选择（仅自适应开启时可见；2026-10-19 起与多线程解耦） -->
-                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}"
-                          IsVisible="{Binding IsStoreFormatSectionVisible}">
-                    <StackPanel Spacing="{DynamicResource SpacingXs}">
-                      <TextBlock Text="{Binding StoreFormatSectionText}" FontWeight="SemiBold" FontSize="14"
-                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                      <TextBlock Text="{Binding StoreFormatDescText}"
-                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
-                      <ItemsControl ItemsSource="{Binding MultiThreadedStoreFormats}">
-                        <ItemsControl.ItemTemplate>
-                          <DataTemplate x:DataType="vm:StoreFormatItemViewModel">
-                            <CheckBox IsChecked="{Binding IsSelected}" Margin="0,2">
-                              <StackPanel Orientation="Horizontal" Spacing="4">
-                                <TextBlock Text="{Binding DisplayName}" Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
-                                <TextBlock Text="{Binding ExtensionsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-                              </StackPanel>
-                            </CheckBox>
-                          </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                      </ItemsControl>
-                    </StackPanel>
-                  </Border>
 
                   <!-- 自适应规则（仅自适应开启、多线程关闭时可见） -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
@@ -266,20 +249,42 @@
                       <TextBlock Text="{Binding AdaptiveOverridesDescText}"
                                  Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
 
+                      <!-- 多线程压缩提示：MT 路径整组统一压缩级别，规则中「指定压缩级别」不生效 -->
+                      <Border IsVisible="{Binding IsAdaptiveOverridesMtWarningVisible}"
+                              Background="{DynamicResource ThemeSurfaceBgBrush}"
+                              BorderBrush="{DynamicResource ThemeStatusWarningBrush}" BorderThickness="1"
+                              CornerRadius="{DynamicResource BorderRadius}"
+                              Padding="{DynamicResource SpacingSmThk}" Margin="0,4,0,0">
+                        <TextBlock Text="{Binding AdaptiveOverridesMtWarningText}"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" FontSize="12" TextWrapping="Wrap"/>
+                      </Border>
+
                       <!-- 规则列表 -->
                       <ItemsControl ItemsSource="{Binding AdaptiveOverrides}">
                         <ItemsControl.ItemTemplate>
                           <DataTemplate x:DataType="vm:AdaptiveOverrideRuleViewModel">
                             <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
-                              <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto">
+                              <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
                                 <CheckBox IsChecked="{Binding Enabled}" Grid.Column="0" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}" Grid.Column="1" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding FormatIdsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Grid.Column="2" VerticalAlignment="Center" Margin="8,0"/>
                                 <TextBlock Text="→" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Grid.Column="3" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding LevelDisplay}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" Grid.Column="4" VerticalAlignment="Center" Margin="8,0"/>
-                                <StackPanel Orientation="Horizontal" Grid.Column="5">
-                                  <Button Content="✏" Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="编辑"/>
-                                  <Button Content="✕" Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="删除"/>
+                                <!-- 行内标记：多线程路径下「指定压缩级别」不生效 -->
+                                <TextBlock Text="{Binding MtIneffectiveBadgeText}" Grid.Column="5" VerticalAlignment="Center" Margin="0,0,8,0"
+                                           Foreground="{DynamicResource ThemeStatusWarningBrush}" FontSize="11"
+                                           IsVisible="{Binding ShowMtIneffectiveBadge}"/>
+                                <StackPanel Orientation="Horizontal" Grid.Column="6">
+                                  <!-- 编辑按钮（矢量图标：IconEdit） -->
+                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="编辑">
+                                    <PathIcon Data="{StaticResource IconEdit}" Width="15" Height="15"
+                                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                  </Button>
+                                  <!-- 删除按钮（矢量图标：IconDelete） -->
+                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="删除">
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15"
+                                              Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                                  </Button>
                                 </StackPanel>
                               </Grid>
                             </Border>

@@ -18,11 +18,28 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Windows 11 圆角** — 启动画面在 Windows 11 上使用系统圆角，Windows 10 自动回退为直角
 - **Rounded corners on Windows 11** — the splash uses the system rounded-corner style on Windows 11 and falls back to square corners on Windows 10
 
+**交互 / Interactions**
+
+- **菜单快捷键真正生效** — 此前菜单上标注的快捷键（Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5）**只显示文字、按下无反应**（Avalonia 的 `MenuItem.InputGesture` 仅负责显示，不处理按键）；现已全部注册为全局快捷键
+- **Menu shortcuts now actually work** — the shortcuts shown in the menus (Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5) previously only *displayed* their key text and did nothing when pressed (in Avalonia, `MenuItem.InputGesture` is display-only); they are now registered as real global shortcuts
+- **新增常用快捷键** — Ctrl+Shift+L（打开压缩包所在目录）、Ctrl+Shift+E（原地解压）、Ctrl+Shift+T（解压到同名文件夹）、Ctrl+T（测试压缩包完整性）、Ctrl+Shift+A（向压缩包添加文件）、Ctrl+P（显示/隐藏预览面板）、Ctrl+Shift+V（切换文件列表视图）、Ctrl+Shift+I（显示/隐藏信息面板）、Ctrl+Shift+C（复制条目完整路径）、Ctrl+,（设置）
+- **New common shortcuts** — Ctrl+Shift+L (open archive location), Ctrl+Shift+E (extract here), Ctrl+Shift+T (extract to folder of the same name), Ctrl+T (test archive integrity), Ctrl+Shift+A (add files to archive), Ctrl+P (toggle preview panel), Ctrl+Shift+V (cycle file list view), Ctrl+Shift+I (toggle info panel), Ctrl+Shift+C (copy full path of the selected entry), Ctrl+, (settings)
 **性能 / Performance**
 
 - **启动速度优化** — ① 主题重复加载消除：应用/切换主题时同主题直接跳过解析、图标字典跨主题复用，实测启动再降约 100ms（同时修复旧实现「先清空后加载」在加载失败时界面无样式的缺陷）；② 设置读取进程级缓存：冷启动只读盘一次，运行期重开窗口/对话框不再反复读盘反序列化，72 处调用点全部受益
 - **Faster startup** — ① eliminated duplicate theme parsing: applying a theme now skips parsing entirely when it is already active, and the icon dictionary is reused across themes, measured ~100 ms faster startup (this also fixes the old "clear-then-load" sequence that left the UI unstyled when loading failed); ② process-level settings cache: the cold start reads from disk a single time, and reopening windows/dialogs at runtime no longer re-reads and re-deserializes the file, benefiting all 72 call sites
+- **启动速度再优化（ReadyToRun）** — 发布版启用 ReadyToRun（仅预编译应用主程序集），应用初始化与窗口 XAML 构建更快，实测冷启动缩短约 0.1 秒；安装包体积增加约 4 MB
+- **Faster startup (ReadyToRun)** — release builds now use ReadyToRun (precompiling the app's main assembly only), speeding up app initialization and window XAML construction; measured cold start about 0.1 s faster, with the installer growing by roughly 4 MB
 
+
+**压缩加速 / Compression Speed-ups**
+
+- 新增**魔数检测** — 自适应压缩可读取文件头识别真实格式：对改名、无扩展名或扩展名与内容不符的文件（例如 `.dat` 实为 JPEG），识别为已压缩格式时同样按「仅存储」处理，不再二次压缩；仅对 64 KB 以上的大文件生效，会略微增加压缩耗时
+- Added **magic-number detection** — adaptive compression can now read file headers to identify the real format: for renamed files, extension-less files, or files whose extension does not match their content (e.g. a `.dat` that is actually a JPEG), already-compressed content is stored as-is instead of being compressed again; it applies only to files of 64 KB and above, and slightly increases compression time
+- **自定义自适应规则生效** — 「自适应规则」中的用户自定义规则现在对所有格式生效（此前即使启用多线程压缩也不生效），且优先级高于内置的「已压缩格式仅存储」判定；可按格式指定压缩级别（仅存储 / 快速 / 标准 / 最大 / 跟随全局 / 自定义）。**注意**：多线程压缩按分组批量压缩、组内统一使用所选压缩级别，因此规则中「指定压缩级别」在大批量压缩时不生效（「仅存储」类始终生效）；小目录、加密包、分卷等走串行路径时规则全部生效。
+- **Custom adaptive rules now take effect** — rules under "Adaptive Rules" now apply to every format (previously they were ignored even when Multithreaded Compression was enabled) and take priority over the built-in "store already-compressed formats" rule; you can assign a compression level per format (Store / Fast / Normal / Max / follow global / custom). **Note**: the multithreaded path compresses in groups and uses one compression level per group, so rules that specify a compression level do not take effect for large batches ("Store" rules always do); rules work fully when the serial path is used (small folders, encrypted archives, split archives).
+- **默认规则集调整** — 默认的「图片类 / 视频类 / 音频类 / 压缩包类」规则不再包含 SVG、TAR、WAV 等未压缩格式（这些格式用 Deflate 压缩仍有明显收益），仅确属已压缩的格式按「仅存储」处理
+- **Adjusted default rule set** — the default "Image / Video / Audio / Archive" rules no longer include uncompressed formats such as SVG, TAR and WAV (Deflate still shrinks them noticeably); only genuinely compressed formats are stored as-is
 
 ## v0.5.2
 
@@ -40,6 +57,12 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 - 音频预览新增 **MP3 / FLAC 内嵌封面显示** — 直接读取 ID3 标签（MP3）与 PICTURE 块（FLAC）中的内嵌封面图并居中展示；无封面时回退显示标题/艺术家大字
 - Added **embedded cover art display for MP3 / FLAC audio preview** — reads the embedded cover image from the ID3 tag (MP3) and the PICTURE block (FLAC) and shows it centered; falls back to a large title/artist text when no cover is present
 
+**交互 / Interactions**
+
+- **菜单快捷键真正生效** — 此前菜单上标注的快捷键（Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5）**只显示文字、按下无反应**（Avalonia 的 `MenuItem.InputGesture` 仅负责显示，不处理按键）；现已全部注册为全局快捷键
+- **Menu shortcuts now actually work** — the shortcuts shown in the menus (Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5) previously only *displayed* their key text and did nothing when pressed (in Avalonia, `MenuItem.InputGesture` is display-only); they are now registered as real global shortcuts
+- **新增常用快捷键** — Ctrl+Shift+L（打开压缩包所在目录）、Ctrl+Shift+E（原地解压）、Ctrl+Shift+T（解压到同名文件夹）、Ctrl+T（测试压缩包完整性）、Ctrl+Shift+A（向压缩包添加文件）、Ctrl+P（显示/隐藏预览面板）、Ctrl+Shift+V（切换文件列表视图）、Ctrl+Shift+I（显示/隐藏信息面板）、Ctrl+Shift+C（复制条目完整路径）、Ctrl+,（设置）
+- **New common shortcuts** — Ctrl+Shift+L (open archive location), Ctrl+Shift+E (extract here), Ctrl+Shift+T (extract to folder of the same name), Ctrl+T (test archive integrity), Ctrl+Shift+A (add files to archive), Ctrl+P (toggle preview panel), Ctrl+Shift+V (cycle file list view), Ctrl+Shift+I (toggle info panel), Ctrl+Shift+C (copy full path of the selected entry), Ctrl+, (settings)
 **性能 / Performance**
 
 - **自适应压缩体系** — 压缩对话框与设置新增「加速」选项卡，压缩策略收敛为两个独立开关：**多线程压缩**（可压缩文件走 7z 多线程并发压缩；ZIP 场景由 N 组并行管线承接）与**自适应压缩**（已压缩内容自动转为仅存储、不再重复压缩，仅存储作用范围的格式列表可自定义维护）；两个开关可任意组合独立生效
@@ -132,6 +155,12 @@ MantisZip-0.5.1-Setup-WebSetup.exe requires internet during installation. Mantis
 - Added **TGA preview** — decoded via ImageSharp, with a fix for swapped red/blue channels that caused incorrect colors
 - ![TGA 预览](docs/images/version/v0.5.1/TgaPreview.png)
 
+**交互 / Interactions**
+
+- **菜单快捷键真正生效** — 此前菜单上标注的快捷键（Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5）**只显示文字、按下无反应**（Avalonia 的 `MenuItem.InputGesture` 仅负责显示，不处理按键）；现已全部注册为全局快捷键
+- **Menu shortcuts now actually work** — the shortcuts shown in the menus (Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5) previously only *displayed* their key text and did nothing when pressed (in Avalonia, `MenuItem.InputGesture` is display-only); they are now registered as real global shortcuts
+- **新增常用快捷键** — Ctrl+Shift+L（打开压缩包所在目录）、Ctrl+Shift+E（原地解压）、Ctrl+Shift+T（解压到同名文件夹）、Ctrl+T（测试压缩包完整性）、Ctrl+Shift+A（向压缩包添加文件）、Ctrl+P（显示/隐藏预览面板）、Ctrl+Shift+V（切换文件列表视图）、Ctrl+Shift+I（显示/隐藏信息面板）、Ctrl+Shift+C（复制条目完整路径）、Ctrl+,（设置）
+- **New common shortcuts** — Ctrl+Shift+L (open archive location), Ctrl+Shift+E (extract here), Ctrl+Shift+T (extract to folder of the same name), Ctrl+T (test archive integrity), Ctrl+Shift+A (add files to archive), Ctrl+P (toggle preview panel), Ctrl+Shift+V (cycle file list view), Ctrl+Shift+I (toggle info panel), Ctrl+Shift+C (copy full path of the selected entry), Ctrl+, (settings)
 **性能 / Performance**
 
 - **ZIP 并行解压** — 多实例并行 + 批次复用（Round-Robin 分批 + 实例复用），解压缓冲区 256KB → 4MB

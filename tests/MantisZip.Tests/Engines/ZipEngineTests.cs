@@ -4,6 +4,7 @@ using System.Text;
 using ICSharpCode.SharpZipLib.Zip;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Engines;
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using MantisZip.Tests.Fixtures;
 using Xunit;
@@ -1116,7 +1117,11 @@ public class ZipEngineTests : IDisposable
         {
             MultiThreadedCompression = true,
             AdaptiveCompression = true,
-            MultiThreadedStoreFormatIds = new HashSet<string> { "Wav" },
+            // Phase 2 合并：原「仅存储格式」列表已并入自适应规则（Store 类规则在多线程路径同样生效）
+            AdaptiveOverrides = new List<AdaptiveOverrideRule>
+            {
+                new() { Name = "音频", FormatIds = new() { "Wav" }, Level = AdaptiveLevel.Store, Enabled = true },
+            },
         });
 
         // 验证 Store 语义 = Deflate stored-block（SharpCompress level-0）：压缩后 ≈ 原始大小。
@@ -1273,8 +1278,9 @@ public class ZipEngineTests : IDisposable
         // 参考产物：MT 路径内部对 compressGroup 执行的同一次 7z 原生压缩
         var (files, _) = FileScanner.CollectFiles([srcDir], null, CancellationToken.None, null);
         var compressGroup = files
-            .Where(f => ZipEntryClassifier.GetAdaptiveLevel(f.FullPath, options.CompressionLevel,
-                          options.AdaptiveCompression, options.MultiThreadedStoreFormatIds) != 0)
+            .Where(f => AdaptiveRuleMatcher.ResolveLevel(f.FullPath, options.CompressionLevel,
+                          options.AdaptiveCompression, options.AdaptiveSmartDetect,
+                          options.AdaptiveOverrides, options.CustomFormats) != 0)
             .ToList();
         Assert.NotEmpty(compressGroup);
 
@@ -1340,8 +1346,9 @@ public class ZipEngineTests : IDisposable
         // 参考产物：MT 路径内部对 compressGroup 执行的同一次 7z 原生压缩
         var (files, _) = FileScanner.CollectFiles([srcDir], null, CancellationToken.None, null);
         var compressGroup = files
-            .Where(f => ZipEntryClassifier.GetAdaptiveLevel(f.FullPath, options.CompressionLevel,
-                          options.AdaptiveCompression, options.MultiThreadedStoreFormatIds) != 0)
+            .Where(f => AdaptiveRuleMatcher.ResolveLevel(f.FullPath, options.CompressionLevel,
+                          options.AdaptiveCompression, options.AdaptiveSmartDetect,
+                          options.AdaptiveOverrides, options.CustomFormats) != 0)
             .ToList();
         Assert.NotEmpty(compressGroup);
 
@@ -1410,8 +1417,9 @@ public class ZipEngineTests : IDisposable
         // 参考压缩包：MT 混合流程中对同一 compressGroup 执行的同一份 7z 原始压缩
         var (files, _) = FileScanner.CollectFiles([srcDir], null, CancellationToken.None, null);
         var compressGroup = files
-            .Where(f => ZipEntryClassifier.GetAdaptiveLevel(f.FullPath, options.CompressionLevel,
-                options.AdaptiveCompression, options.MultiThreadedStoreFormatIds) != 0)
+            .Where(f => AdaptiveRuleMatcher.ResolveLevel(f.FullPath, options.CompressionLevel,
+                options.AdaptiveCompression, options.AdaptiveSmartDetect,
+                options.AdaptiveOverrides, options.CustomFormats) != 0)
             .ToList();
         Assert.NotEmpty(compressGroup);
 
