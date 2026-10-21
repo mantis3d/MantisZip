@@ -1,29 +1,31 @@
 /**
- * MantisZip 维护插件（DeepSeek Harness / Cordis）。
+ * MantisZip 维护插件（DeepSeek Harness / Cordis）—— 薄壳层。
  *
- * 设计约束：本文件**不导入任何第三方包**，只用 node: 内置模块。
- * 原因是插件通过 profile 目录加载时，Node 对裸包名的解析可能落不到
- * profile 的 node_modules 上；零依赖可以彻底绕开这个解析问题，
- * 同时也不需要构建步骤（纯 ESM，直接 import）。
+ * 设计：所有检查逻辑都在仓库脚本 `scripts/verify-repo.ps1` 里，本文件只负责
+ *   1. 解析参数、校验取值（target / action 组合）；
+ *   2. 用 `-Task <task> -Json` 起一个 pwsh 子进程；
+ *   3. 把脚本吐出的 JSON 原样返回（输出契约逐字段不变），供 render() 渲染。
+ *
+ * 这样 DSH / opencode / Reasonix / CI / 人工 shell 共用同一份实现，换 harness
+ * 不会丢功能；插件本身不导入任何第三方包，只用 node: 内置模块。
  *
  * 三个工具全部只读：
  *   mantiszip_verify   构建/测试并输出紧凑诊断
  *   mantiszip_i18n     三语 key 对齐 + 占位符一致性
  *   mantiszip_version  版本号 6 处一致性
+ *
+ * 环境要求：PowerShell 7（pwsh）。可用 MANTISZIP_PWSH 覆盖可执行文件路径。
  */
 
 import { spawn } from 'node:child_process'
-import { readFile, stat, mkdir } from 'node:fs/promises'
+import { stat } from 'node:fs/promises'
 import path from 'node:path'
 
 export const name = 'mantiszip-tools'
 export const inject = ['tools']
 
-/** 允许出现的 JSON Schema 关键字（与 dsh-tools 的强制子集一致）。 */
-const SCHEMA_KEYWORDS = new Set([
-  'type', 'oneOf', 'properties', 'required', 'additionalProperties', 'items', 'enum', 'const',
-  'description', 'title', 'default', 'examples',
-])
+/** 逻辑实现所在的仓库脚本（相对仓库根目录）。 */
+const SCRIPT_RELATIVE = 'scripts/verify-repo.ps1'
 
 /** 项目别名 → csproj 相对路径；solution 表示整仓。 */
 const TARGETS = {
@@ -35,33 +37,15 @@ const TARGETS = {
   solution: 'MantisZip.sln',
 }
 
-const I18N_FILES = {
-  zhCN: 'strings.zh-CN.json',
-  en: 'strings.en.json',
-  zhTW: 'strings.zh-TW.json',
-}
+/** 脚本 JSON 输出的上限；超过即视为异常，避免把内存撑爆。 */
+const MAX_JSON_BYTES = 4 * 1024 * 1024
 
-/** 版本号 6 处来源。 */
-const VERSION_SOURCES = [
-  { key: 'appConstants', file: 'src/MantisZip.UI.Avalonia/AppConstants.cs', re: /public\s+const\s+string\s+Version\s*=\s*"([^"]+)"/ },
-  { key: 'csproj', file: 'src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj', re: /<Version>([^<]+)<\/Version>/ },
-  { key: 'plan', file: 'docs/PLAN.md', re: /\*\*当前版本\*\*\s*[:：]\s*v?([0-9][0-9A-Za-z.+\-]*)/ },
-  { key: 'progress', file: 'docs/PROGRESS.md', re: /\*\*当前版本\*\*\s*[:：]\s*v?([0-9][0-9A-Za-z.+\-]*)/ },
-  { key: 'installer', file: 'installer.iss', re: /#define\s+MyAppVersion\s+"([^"]+)"/ },
-  { key: 'installerSelfContained', file: 'installer-selfcontained.iss', re: /#define\s+MyAppVersion\s+"([^"]+)"/ },
-]
-
-/** 单次工具调用允许的最大错误/警告条目数。 */
-const MAX_ITEMS = 100
-/** 单次构建允许的最大输出字节（解析是流式的，这里只限制兜底原文）。 */
-const MAX_RAW_BYTES = 256 * 1024
+/** 插件配置（由 cordis.patch.yml 的 config.root 注入），可缺省。 */
+let configuredRoot = ''
 
 // ---------------------------------------------------------------------------
 // 公共工具
 // ---------------------------------------------------------------------------
-
-/** 插件配置（由 cordis.patch.yml 的 config.root 注入），可缺省。 */
-let configuredRoot = ''
 
 /**
  * 解析工作区根目录。优先级：
@@ -121,12 +105,6 @@ async function resolveRoot(rootArg) {
   )
 }
 
-/** 截断过长文本，避免单条诊断撑爆上下文。 */
-function clip(text, limit = 300) {
-  const value = String(text ?? '').trim()
-  return value.length <= limit ? value : `${value.slice(0, limit)}…`
-}
-
 /** 文本内容块。 */
 function text(value) {
   return [{ type: 'text', text: value }]
@@ -137,13 +115,18 @@ function seconds(ms) {
   return `${(ms / 1000).toFixed(1)}s`
 }
 
+/** PowerShell 7 可执行文件；Windows 显式带扩展名，避免解析到别的同名程序。 */
+function powershellPath() {
+  if (process.env.MANTISZIP_PWSH) return process.env.MANTISZIP_PWSH
+  return process.platform === 'win32' ? 'pwsh.exe' : 'pwsh'
+}
+
 /**
- * 运行一个子进程，流式收集 stdout/stderr。
- * 强制英文 UI 便于解析；-nodeReuse:false 避免 MSBuild 节点残留。
+ * 运行一个子进程，收集 stdout/stderr。
  * @param {string} file 可执行文件
  * @param {string[]} args 参数
- * @param {{ cwd: string, env?: Record<string,string>, timeoutMs: number, signal?: AbortSignal }} options
- * @returns {Promise<{ code: number, stdout: string, stderr: string, timedOut: boolean, aborted: boolean, truncated: boolean }>}
+ * @param {{ cwd: string, timeoutMs: number, signal?: AbortSignal }} options
+ * @returns {Promise<{ code: number, stdout: string, stderr: string, timedOut: boolean, aborted: boolean }>}
  */
 function runProcess(file, args, options) {
   return new Promise((resolve, reject) => {
@@ -151,7 +134,6 @@ function runProcess(file, args, options) {
     try {
       child = spawn(file, args, {
         cwd: options.cwd,
-        env: { ...process.env, ...options.env },
         windowsHide: true,
         stdio: ['ignore', 'pipe', 'pipe'],
       })
@@ -162,28 +144,24 @@ function runProcess(file, args, options) {
 
     let stdout = ''
     let stderr = ''
-    let truncated = false
     let timedOut = false
     let aborted = false
     let settled = false
-
-    const append = (target, chunk) => {
-      if (target.length >= MAX_RAW_BYTES) {
-        truncated = true
-        return target
-      }
-      const next = target + chunk
-      if (next.length > MAX_RAW_BYTES) {
-        truncated = true
-        return next.slice(0, MAX_RAW_BYTES)
-      }
-      return next
-    }
+    let overflow = false
 
     child.stdout?.setEncoding('utf8')
     child.stderr?.setEncoding('utf8')
-    child.stdout?.on('data', (chunk) => { stdout = append(stdout, chunk) })
-    child.stderr?.on('data', (chunk) => { stderr = append(stderr, chunk) })
+    child.stdout?.on('data', (chunk) => {
+      if (stdout.length + chunk.length > MAX_JSON_BYTES) {
+        overflow = true
+        return
+      }
+      stdout += chunk
+    })
+    child.stderr?.on('data', (chunk) => {
+      // stderr 只在报错时用于补充上下文，留最后 8 KB 足够。
+      stderr = (stderr + chunk).slice(-8192)
+    })
 
     const timer = setTimeout(() => {
       timedOut = true
@@ -197,99 +175,97 @@ function runProcess(file, args, options) {
     }
     options.signal?.addEventListener('abort', onAbort, { once: true })
 
-    const finish = (code) => {
-      if (settled) return
-      settled = true
+    const cleanup = () => {
       clearTimeout(timer)
       options.signal?.removeEventListener('abort', onAbort)
-      resolve({ code, stdout, stderr, timedOut, aborted, truncated })
     }
 
     child.on('error', (error) => {
       if (settled) return
       settled = true
-      clearTimeout(timer)
-      options.signal?.removeEventListener('abort', onAbort)
+      cleanup()
       reject(error)
     })
-    child.on('close', (code) => finish(code ?? -1))
+    child.on('close', (code) => {
+      if (settled) return
+      settled = true
+      cleanup()
+      if (overflow) {
+        reject(new Error(`维护脚本输出超过 ${MAX_JSON_BYTES} 字节，已中止解析。`))
+        return
+      }
+      resolve({ code: code ?? -1, stdout, stderr, timedOut, aborted })
+    })
   })
+}
+
+/**
+ * 调用仓库脚本并解析其 JSON 输出。
+ * 脚本在 ok=false 时以退出码 1 结束，这是正常结果，不算失败。
+ * @param {string} root 仓库根目录
+ * @param {string[]} taskArgs 追加到脚本命令行的参数（含 -Task）
+ * @param {{ timeoutMs: number, signal?: AbortSignal }} options
+ * @returns {Promise<any>} 脚本输出的 JSON 对象
+ */
+async function runScript(root, taskArgs, options) {
+  const scriptPath = path.join(root, SCRIPT_RELATIVE)
+  try {
+    await stat(scriptPath)
+  } catch {
+    throw new Error(
+      `找不到维护脚本：${scriptPath}。`
+      + '本插件依赖仓库内的 scripts/verify-repo.ps1，请确认仓库版本未被裁剪。',
+    )
+  }
+
+  const argv = ['-NoProfile', '-NoLogo', '-NonInteractive']
+  if (process.platform === 'win32') argv.push('-ExecutionPolicy', 'Bypass')
+  argv.push('-File', scriptPath, '-Json', ...taskArgs)
+
+  const result = await runProcess(powershellPath(), argv, {
+    cwd: root,
+    timeoutMs: options.timeoutMs,
+    signal: options.signal,
+  })
+
+  if (result.aborted) throw new Error('调用被取消，未取得诊断结果。')
+  if (result.timedOut) {
+    throw new Error(`维护脚本执行超时（${seconds(options.timeoutMs)}），已强制终止。`)
+  }
+
+  const raw = result.stdout.trim()
+  if (!raw) {
+    throw new Error(
+      `维护脚本没有输出（exit ${result.code}）。`
+      + (result.stderr ? `\n--- stderr ---\n${result.stderr}` : ''),
+    )
+  }
+
+  let payload
+  try {
+    payload = JSON.parse(raw)
+  } catch {
+    throw new Error(
+      `维护脚本输出不是合法 JSON（exit ${result.code}）。`
+      + `\n--- stdout（前 800 字符）---\n${raw.slice(0, 800)}`
+      + (result.stderr ? `\n--- stderr ---\n${result.stderr}` : ''),
+    )
+  }
+
+  return payload
 }
 
 // ---------------------------------------------------------------------------
 // 工具 1：mantiszip_verify
 // ---------------------------------------------------------------------------
 
-/** MSBuild 诊断行：path(line,col): error CS0000: message [proj] */
-const MSBUILD_FILE_DIAG = /^(?<file>.+?)\((?<line>\d+),(?<column>\d+)\):\s*(?<severity>error|warning)\s+(?<code>[A-Za-z]+[0-9]+)\s*:\s*(?<message>.*)$/
-/** 无文件诊断：error NU1301: message */
-const MSBUILD_BARE_DIAG = /^(?<severity>error|warning)\s+(?<code>[A-Za-z]+[0-9]+)\s*:\s*(?<message>.*)$/
-/** dotnet 自身错误：error: message */
-const DOTNET_BARE_DIAG = /^(?<severity>error|warning)\s*:\s*(?<message>.+)$/
-/** 末尾的 [C:\path\Proj.csproj] 归属标记。 */
-const PROJECT_SUFFIX = /\s*\[[^\]]+\]\s*$/
-
-/**
- * 从输出中抽取诊断条目（去重 + 截断）。
- * @param {string} raw 合并后的输出
- * @returns {{ errors: any[], warnings: any[], errorCount: number, warningCount: number }}
- */
-function parseDiagnostics(raw) {
-  const errors = []
-  const warnings = []
-  const seen = new Set()
-
-  for (const line of raw.split(/\r?\n/)) {
-    const trimmed = line.trim()
-    if (!trimmed) continue
-
-    let severity = ''
-    let file = ''
-    let lineNo = 0
-    let column = 0
-    let code = ''
-    let message = ''
-
-    const withFile = MSBUILD_FILE_DIAG.exec(trimmed)
-    if (withFile?.groups) {
-      severity = withFile.groups.severity
-      file = withFile.groups.file.trim()
-      lineNo = Number(withFile.groups.line)
-      column = Number(withFile.groups.column)
-      code = withFile.groups.code
-      message = withFile.groups.message.replace(PROJECT_SUFFIX, '')
-    } else {
-      const bare = MSBUILD_BARE_DIAG.exec(trimmed) ?? DOTNET_BARE_DIAG.exec(trimmed)
-      if (!bare?.groups) continue
-      severity = bare.groups.severity
-      code = bare.groups.code ?? 'DOTNET'
-      message = (bare.groups.message ?? '').replace(PROJECT_SUFFIX, '')
-    }
-
-    const item = { file, line: lineNo, column, code, message: clip(message) }
-    const signature = `${item.file}|${item.line}|${item.column}|${item.code}|${item.message}`
-    if (seen.has(signature)) continue
-    seen.add(signature)
-
-    if (severity === 'error') errors.push(item)
-    else warnings.push(item)
-  }
-
-  return {
-    errors: errors.slice(0, MAX_ITEMS),
-    warnings: warnings.slice(0, MAX_ITEMS),
-    errorCount: errors.length,
-    warningCount: warnings.length,
-  }
-}
-
 /** 渲染 mantiszip_verify 的结果文本。 */
 function renderVerify(value) {
   const lines = []
-  const head = value.ok
-    ? `✅ ${value.action === 'test' ? '测试' : '构建'}通过：${value.target}（${seconds(value.durationMs)}，${value.warningCount} 警告）`
-    : `❌ ${value.action === 'test' ? '测试' : '构建'}失败：${value.target}（${seconds(value.durationMs)}，${value.errorCount} 错误 / ${value.warningCount} 警告，exit ${value.exitCode}）`
-  lines.push(head)
+  const verb = value.action === 'test' ? '测试' : '构建'
+  lines.push(value.ok
+    ? `✅ ${verb}通过：${value.target}（${seconds(value.durationMs)}，${value.warningCount} 警告）`
+    : `❌ ${verb}失败：${value.target}（${seconds(value.durationMs)}，${value.errorCount} 错误 / ${value.warningCount} 警告，exit ${value.exitCode}）`)
 
   if (value.errors.length) {
     lines.push('', '错误：')
@@ -385,54 +361,28 @@ function verifyTool() {
       const root = await resolveRoot(args.root)
       const target = args.target ?? 'avalonia'
       const action = args.action ?? 'build'
-      const projectPath = TARGETS[target]
-      if (!projectPath) throw new Error(`未知 target "${target}"，可选：${Object.keys(TARGETS).join(' / ')}`)
+      if (!TARGETS[target]) {
+        throw new Error(`未知 target "${target}"，可选：${Object.keys(TARGETS).join(' / ')}`)
+      }
       if (action === 'test' && !target.includes('tests')) {
         throw new Error(`target "${target}" 不是测试项目；test 只对 tests / ui-tests 有意义`)
       }
 
       const timeoutMs = Number.isFinite(args.timeoutMs) && args.timeoutMs > 0 ? args.timeoutMs : 600000
-      const argv = [
-        action,
-        projectPath,
-        '-nologo',
-        '-nodeReuse:false',
-        '-v:m',
-        ...(action === 'build' ? ['-clp:NoSummary'] : []),
-        ...(Array.isArray(args.extraArgs) ? args.extraArgs.filter((item) => typeof item === 'string') : []),
-      ]
+      const extraArgs = Array.isArray(args.extraArgs)
+        ? args.extraArgs.filter((item) => typeof item === 'string')
+        : []
 
-      const startedAt = Date.now()
-      const result = await runProcess('dotnet', argv, {
-        cwd: root,
-        env: {
-          DOTNET_CLI_UI_LANGUAGE: 'en',
-          VSLANG: '1033',
-          DOTNET_NOLOGO: '1',
-          DOTNET_CLI_TELEMETRY_OPTOUT: '1',
-        },
-        timeoutMs,
+      return await runScript(root, [
+        '-Task', action,
+        '-Target', target,
+        '-TimeoutMs', String(timeoutMs),
+        '-ExtraArgsJson', JSON.stringify(extraArgs),
+      ], {
+        // 脚本自己会先超时并返回 timedOut=true，所以给它留出收尾余量。
+        timeoutMs: timeoutMs + 60000,
         signal: exec?.signal,
       })
-      const durationMs = Date.now() - startedAt
-      const parsed = parseDiagnostics(`${result.stdout}\n${result.stderr}`)
-      const ok = result.code === 0 && parsed.errorCount === 0
-
-      return {
-        ok,
-        target,
-        action,
-        exitCode: result.code,
-        durationMs,
-        command: `dotnet ${argv.join(' ')}`,
-        errorCount: parsed.errorCount,
-        warningCount: parsed.warningCount,
-        truncated: result.truncated,
-        timedOut: result.timedOut,
-        aborted: result.aborted,
-        errors: parsed.errors,
-        warnings: parsed.warnings,
-      }
     },
   }
 }
@@ -440,35 +390,6 @@ function verifyTool() {
 // ---------------------------------------------------------------------------
 // 工具 2：mantiszip_i18n
 // ---------------------------------------------------------------------------
-
-/** 读取 JSON 文本并去掉 BOM。 */
-function parseJson(textValue) {
-  return JSON.parse(textValue.replace(/^\uFEFF/, ''))
-}
-
-/** 扫描重复 key（扁平文件，按行首 key 判定）。 */
-function findDuplicateKeys(raw) {
-  const seen = new Map()
-  const duplicates = []
-  const pattern = /^\s*"((?:[^"\\]|\\.)*)"\s*:/gm
-  let match
-  while ((match = pattern.exec(raw)) !== null) {
-    const key = match[1]
-    const count = (seen.get(key) ?? 0) + 1
-    seen.set(key, count)
-    if (count === 2) duplicates.push(key)
-  }
-  return duplicates
-}
-
-/** 提取字符串里的 {0} 类占位符下标集合。 */
-function placeholderIndexes(value) {
-  const indexes = new Set()
-  const pattern = /\{(\d+)/g
-  let match
-  while ((match = pattern.exec(String(value))) !== null) indexes.add(Number(match[1]))
-  return indexes
-}
 
 function renderI18n(value) {
   const lines = []
@@ -557,75 +478,11 @@ function i18nTool() {
     timeoutMs: 60 * 1000,
     async execute(args, exec) {
       const root = await resolveRoot(args.root)
-      const dir = path.resolve(root, args.dir ?? 'src/MantisZip.UI.Avalonia/Localization')
-
-      const loaded = {}
-      for (const [locale, fileName] of Object.entries(I18N_FILES)) {
-        const filePath = path.join(dir, fileName)
-        let raw
-        try {
-          raw = await readFile(filePath, 'utf8')
-        } catch {
-          throw new Error(`读不到语言文件：${filePath}`)
-        }
-        exec?.signal?.throwIfAborted?.()
-        loaded[locale] = { raw, data: parseJson(raw) }
+      const taskArgs = ['-Task', 'i18n']
+      if (typeof args.dir === 'string' && args.dir.trim()) {
+        taskArgs.push('-LocalizationDir', args.dir.trim())
       }
-
-      const keyCounts = Object.fromEntries(
-        Object.entries(loaded).map(([locale, item]) => [locale, Object.keys(item.data).length]),
-      )
-      const baseKeys = Object.keys(loaded.zhCN.data)
-
-      const missing = {}
-      const extra = {}
-      for (const locale of ['en', 'zhTW']) {
-        const keys = new Set(Object.keys(loaded[locale].data))
-        missing[locale] = baseKeys.filter((key) => !keys.has(key))
-        extra[locale] = [...keys].filter((key) => !(key in loaded.zhCN.data))
-      }
-
-      const placeholderMismatch = []
-      for (const locale of ['en', 'zhTW']) {
-        for (const key of baseKeys) {
-          const baseValue = loaded.zhCN.data[key]
-          const targetValue = loaded[locale].data[key]
-          if (typeof baseValue !== 'string' || typeof targetValue !== 'string') continue
-          const expected = [...placeholderIndexes(baseValue)].sort((a, b) => a - b)
-          const actual = [...placeholderIndexes(targetValue)].sort((a, b) => a - b)
-          if (expected.join(',') !== actual.join(',')) {
-            placeholderMismatch.push({ key, locale, expected, actual })
-          }
-        }
-      }
-
-      const duplicates = []
-      for (const [locale, item] of Object.entries(loaded)) {
-        for (const key of findDuplicateKeys(item.raw)) duplicates.push({ locale, key })
-      }
-
-      const emptyValues = []
-      for (const [locale, item] of Object.entries(loaded)) {
-        for (const [key, value] of Object.entries(item.data)) {
-          if (typeof value === 'string' && value.trim() === '') emptyValues.push({ locale, key })
-        }
-      }
-
-      const issueCount = Object.values(missing).reduce((sum, list) => sum + list.length, 0)
-        + Object.values(extra).reduce((sum, list) => sum + list.length, 0)
-        + placeholderMismatch.length
-        + duplicates.length
-
-      return {
-        ok: issueCount === 0,
-        issueCount,
-        keyCounts,
-        missing,
-        extra,
-        placeholderMismatch: placeholderMismatch.slice(0, MAX_ITEMS),
-        duplicates: duplicates.slice(0, MAX_ITEMS),
-        emptyValues: emptyValues.slice(0, MAX_ITEMS),
-      }
+      return await runScript(root, taskArgs, { timeoutMs: 60000, signal: exec?.signal })
     },
   }
 }
@@ -689,34 +546,7 @@ function versionTool() {
     timeoutMs: 30 * 1000,
     async execute(args, exec) {
       const root = await resolveRoot(args.root)
-
-      const versions = {}
-      const missingSources = []
-      for (const source of VERSION_SOURCES) {
-        const filePath = path.join(root, source.file)
-        let raw
-        try {
-          raw = await readFile(filePath, 'utf8')
-        } catch {
-          missingSources.push(`${source.key}（读不到 ${source.file}）`)
-          continue
-        }
-        exec?.signal?.throwIfAborted?.()
-        const match = source.re.exec(raw)
-        if (!match) {
-          missingSources.push(source.key)
-          continue
-        }
-        versions[source.key] = match[1].trim().replace(/[.。,，]$/, '')
-      }
-
-      const unique = [...new Set(Object.values(versions))]
-      return {
-        ok: missingSources.length === 0 && unique.length === 1,
-        versions,
-        unique,
-        missingSources,
-      }
+      return await runScript(root, ['-Task', 'version'], { timeoutMs: 30000, signal: exec?.signal })
     },
   }
 }

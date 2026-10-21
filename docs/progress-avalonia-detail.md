@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-21** — 维护工具下沉：新增 `scripts/verify-repo.ps1`，DSH 插件退化为薄壳
+  - **动机**：`tools/dsh-plugin-mantiszip/index.mjs`（739 行）把「实现」与「DSH 工具声明」焊死 —— 换 harness（opencode / Reasonix）或让 CI 复用都拿不到能力；而 `AGENTS.md` 规则 12 / 13 与 Version bump checklist 把 `mantiszip_*` 写成强制路径，非 DSH 环境下等于规则断档。
+  - **脚本**：新增 `scripts/verify-repo.ps1`（`#Requires -Version 7.0`，约 780 行），5 个 task：`build` / `test` / `i18n` / `version` / `check`（`check` = version + i18n，纯文件校验、秒级）；参数 `-Target`（6 个项目别名）/ `-ExtraArgs` / `-ExtraArgsJson` / `-TimeoutMs` / `-Root` / `-LocalizationDir` / `-Json`；**退出码 0 = 通过、1 = 有问题**，CI 可直接消费。
+  - **子进程坑**：`Start-Process -PassThru -RedirectStandardOutput` 的 `$p.ExitCode` **恒为 `$null`**（`WaitForExit($ms)` / `WaitForExit()` / `Refresh()` 均取不到；实测 `cmd /c exit 3` 打印空）⇒ 改用 `System.Diagnostics.Process` + `ArgumentList` + 双流重定向 + 异步读取 + `WaitForExit($BudgetMs)`；超时 `Kill($true)` 后记 `exitCode=-1`。没有退出码就无法判定 `ok`。
+  - **插件**：`index.mjs` 739 → 约 640 行，只剩参数校验 / `pwsh -File … -Json` 进程编排 / JSON 解析 / `render`；三个工具的 `parameters`、`output.schema`、`description`、`timeoutMs` 与渲染文案**逐字不变**，JSON 边界也全部保留（`version.versions` 只装命中的来源、缺失只进 `missingSources`；`i18n.duplicates`/`emptyValues` 用 `zhCN`/`en`/`zhTW` 原始 key；空值不计入 `issueCount`）。`package.json` 0.1.0 → 0.2.0。
+  - **文档**：`AGENTS.md` Quick start 增加「一键自检」，新增「维护脚本（唯一实现）」段落，规则 12 / 规则 13 / Version bump checklist 三处改为「首选脚本，`mantiszip_*` 为 DSH 内等价工具」；顺带修正「无 CI、无 pre-commit、无 linter」的过期表述（CI 自提交 b06087d 起就存在）。插件 README 重写：分层图（agent → 工具 → 薄壳 → 脚本）、「不经 DSH 直接跑」用法表、沙箱两条限制。
+  - **验证**（真实仓库）：`-Task version` 0.5.3 六处一致；`-Task i18n` 三语 1276 key、0 问题；`-Task check` exit 0；`-Task build -Target avalonia` exit 0 / 0 错误 / 0 警告；`node tools/dsh-plugin-mantiszip/test/self-test.mjs` 四段全绿（含 23.2s 真实构建）。
+  - **负向验证**：临时夹具（假 `MantisZip.sln` + 两份不同版本号 + 缺文件 + 缺/多/重复 key + 占位符错位）跑 `-Task check` 返回 exit 1 并逐条报出，排除「永远绿」的假门禁。
+  - **环境限制（非缺陷）**：DSH workspace-write 沙箱下 `dotnet build` 写 `obj/` 报 `MSB3491 … Access to the path … is denied`，Node 起带管道的子进程报 `spawn EPERM`；脚本/插件在完全权限或 CI 上正常，README 已记录两种现象与绕过方式。
+  - **后续**：CI 接线（`-Task check` + 装 7-Zip 放开 `SevenZipEngine` 过滤）与第 4 层工具（`hygiene` / `docs` / `installer`）不在本期。
 **2026-10-21** — 启动优化阶段 1：过滤栏延迟加载（XamlSpan −27ms）
   - **依据**：MainWindow.axaml 1393 行 / 485 元素，启动时**默认隐藏**的过滤栏（50 元素）与内容区（171 元素）合计 46% 白白膨胀；校准：预览面板延迟（297 元素）历史上整体启动 −9% ⇒ ≈0.4–0.5ms/元素。
   - **实现**：过滤栏抽出为 Controls/MainFilterBar.axaml + MainFilterBar.axaml.cs（搬入 4 个 picker 处理器与 WritePickerTrace）；NullableLongConverter 局部资源随之迁入；MainWindow.axaml Row2 改为 <ContentControl x:Name="FilterBarHost" />，由 MainWindow.EnsureFilterBar() 在 IsFilterBarVisible 首次为 true 时创建（参照 EnsurePreviewPanel 先例）；新文件根节点显式 x:CompileBindings="False"（Avalonia 12 默认编译绑定，抽出后必须显式声明）。

@@ -235,6 +235,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 维护脚本下沉：`scripts/verify-repo.ps1` + DSH 插件薄壳（三个只读工具的逻辑从插件下沉为仓库脚本，5 个 task：`build` / `test` / `i18n` / `version` / `check`；`-Json` + 退出码 0/1 供 CI 与任意 harness 复用；插件 739→640 行退化为 schema / render / 进程编排，JSON 输出契约逐字段不变；负向夹具验证非「永远绿」） | [verify-repo-script-extraction.md](.omo/plans/已完成/verify-repo-script-extraction.md) | 未发布（2026-10-21） |
 | 仅应用程序集 ReadyToRun（`PublishReadyToRun=true` 时排除其余 268 个程序集；体积 +4.3MB，交错 A/B n=10 TOTAL −126.8ms、`Win.Xaml` −50.2ms 10/10 胜；release workflow 已启用） | [r2r-app-assembly.md](.omo/plans/已完成/r2r-app-assembly.md) | 未发布（2026-10-20） |
 | AppSettings 序列化改用 STJ 源生成（`AppSettingsJsonContext` 编译期元数据；4 条兼容测试；A/B `Init.Settings` 1.7→1.7ms 门控未达，保留用于 Trim/AOT 铺路，不宣称启动收益） | [stj-source-gen-appsettings.md](.omo/plans/已完成/stj-source-gen-appsettings.md) | 未发布（2026-10-20） |
 | 压缩/解压出错信息增强（整包错误本地化 + 逐条目 `EntryErrorDetail`/HResult 透传 + 红/黄分层摘要与原因分布 + Win32 错误提示细分；Tooltip 接线守卫测试） | [error-info-enhancement.md](.omo/plans/已完成/error-info-enhancement.md) | 未发布（2026-10-20 验收） |
