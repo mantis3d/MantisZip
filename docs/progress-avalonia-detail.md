@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-21** — 计划文档复核与拆分（纯 `.md`，无代码变更）
+  - **图标主题三计划**：`icon-theme-infra.md`（工时 14-18h→16-20h；`ResolveIconThemeUri` 澄清「导入包不产生 URI」；缓存失效入口归计划 2）、`icon-theme-packs.md`（工时 20-26h；现状表重写、偏差 D-D 解析产物缓存、保留字 id `A`–`G` 拒绝、删当前包立即回退 A、`GetIconThemeProvider` 双来源、`RefreshIconTheme()` 两步缓存失效、新增 `Services/IconThemeBuilder.cs` 与 `Models/IconCatalog.cs` 去重、T2–T8/风险表更新）、`icon-theme-sets.md`（工时 22-32h；E 套彩色源决策门、D 套底块 `#40808080`、Lucide ISC + ~120 Feather 衍生 MIT 双声明、`sources/` vendored 离线、关于页改 `Dialogs/AboutWindow.axaml`、幂等 `git diff` 为空校验）。
+  - **规格同步**：`docs/superpowers/specs/2026-10-15-icon-theme-system-design.md` 订正 Lucide 许可与规则编号（文件选择器 15→16，CoreLog 才是 15），新增 §13 复核订正（13.1 事实订正 4 项 / 13.2 决策 S1–S9）。
+  - **`path-breadcrumb.md`**：评审修订并同步 PLAN.md。
+  - **`compression-estimator.md` 拆分**（原 1299 行混三件事）：该计划文档保留压缩前预估（320 行，工时 4-5h→14-18h）、新建 `runtime-eta.md`（172 行，ETA 增强 5-7h）、自适应部分归档为 `.omo/plans/已完成/adaptive-compression-level.md`（v0.5.2，含订正后的引擎能力矩阵与遗留缺口）。
+  - **事实订正**：删除 WPF 时代行号（`:2002/:1502/:1906`）与伪 API（`RuntimeEstimator`、`Dictionary<(ArchiveFormat,string),double>`、`TarGz` 枚举、`FileFormat.Dic`）；新增耗时模型（`CompressionSpeedModel`）与条目开销模型；采样加 64MB/200 文件硬预算；明确「学习型历史库 / 熵过滤 / 分卷建模」不做；本地化机制订正为构造函数内填 `LocalizedStrings`（该 VM 无 `UpdateLocalizedStrings()`、无 `CultureChanged`）；ETA 部分改为扩展既有 `ProgressSpeedTracker`（`SeedPrior` 融合），而非新建平行类。
+  - **索引同步**：`docs/PLAN.md` 预估行重写 + 新增 ETA 行 + 执行顺序依赖链改指 `runtime-eta`；`docs/PROGRESS.md` 历史设计方案索引新增自适应归档行；`preview-magic-detection.md` 交叉引用改指归档文档。
+  - **验证**：三份文档代码围栏均偶数；旧矛盾表述（`0/5`、`13 个文件`、旧行号）grep 零命中；引用代码行号逐个实测（`_rates:135`、`_sevenZipRates:197`、`GetRate:260`、`GetStoreRate:280`、`ClassifyByExtension:246`、`FormatCatalog:103/115/125`、`DataDir:232`、`UpdateClockFreezeState:1311`）。
+
 **2026-10-20** — 大文件拆分阶段 3（完成）：`MainWindowViewModel.cs`（3201 行）→ 主干 1352 行 + 5 个 partial
   - **切分**（纯移动，零行为变化）：`MainWindowViewModel.Password.cs`（326 行，会话密码字段/`GetSessionPassword` 周边 + `UpdatePasswordStatus`/`EnterPasswordAsync`/`TryEnsureArchivePasswordAsync`）、`.Preview.cs`（463 行，`OpenEntryWithDefaultAppAsync`/`TryDeleteTempDir` + `ShowPreviewAsync`）、`.Navigation.cs`（495 行，导航历史/树过滤/`GoUp`/`PopulateEntries`/`FindNode`）、`.Extract.cs`（452 行，`ExtractArchive`/`ExtractSelected*`/`OpenExtractedFolderAsync` + `TestEntry`/`ExtractTo`/`SmartExtract`/`TestArchive`）、`.Compress.cs`（243 行，`NewArchive`/`DragInCompressAsync`/`ExecuteCompressFromSettings` + `AddFiles`/`AddFilesToArchiveAsync`/`DeleteFiles`）；主干保留字段/属性/本地化/`LoadArchiveAsync`/设置与杂项命令/`FilterMatchModeInfo` 类。
   - **完整性校验**：新旧非空行逐行排序比对，除 5 个 partial 类的闭合括号外**完全一致**（零内容丢失）。
