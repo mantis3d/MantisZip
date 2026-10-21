@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-20** — error-info-enhancement 黄段触发条件核查（无代码改动，验收记录补充）
+  - **背景**：用户反馈 GUI 验收时只见到红段、未遇到黄段 → 代码核查「黄段何时出现」。
+  - **结论**：`ProgressViewModel.CollectEntryOutcome` 仅收集 `Skipped` **且带 `EntryFailureReason`** 的条目进黄段。该组合只由**压缩侧**产生——① ZIP/7z 前置读权限预检 `ReadErrorHandler.FilterUnreadableFiles`（源文件被独占占用/权限不足）；② ZIP `ReadFileWithRetry`、TAR.GZ `TarWriteFileWithRetry` 写入中途读失败。且必须在「处理文件时出错」对话框选**跳过**（重试成功无摘要、中止走红段）。
+  - **解压为何永远无黄段**：解压侧所有 `Skipped` 上报均不带原因（冲突跳过/过滤跳过属正常操作），真正失败走 `Failed` → 红段。属设计行为（D5），非缺陷。
+  - **观感限制**：黄段不触发自动钉住（D4，只有红段会 📌）；用户决定保持现状，不改为「黄段也钉住」。
+  - **记录**：计划 Task 9 验收清单第 9 项补充触发条件与复现步骤（PowerShell `FileShare.None` 独占锁定文件 → 压缩该目录 → 弹窗选跳过 → 预期黄段 + 原因分布 + tooltip 原文）。
+
 **2026-10-20** — 进行中计划收尾核对（无代码改动，验收 + 归档 + 状态修正）
   - **zip-crc-validation → 已完成归档**：`-t:Rebuild` 全量重建后 UI 测试 **331 总 / 328 过 / 3 跳过 / 0 失败**（原计划"待复验"的 30 条 XAML 毒化失败确为增量构建问题）；用户用真实损坏样本手测「测试压缩包」+ 解压**通过**；代码 commit `85668486`，计划文档中"未提交/待复验"已过时并修正。
   - **settings-unwired-keys → 已完成归档**：10 项排查全部有结论（7 项接线修复、1 项文档修正、2 项经用户决策暂缓且方案/工时已记录），无遗留待实现代码。
