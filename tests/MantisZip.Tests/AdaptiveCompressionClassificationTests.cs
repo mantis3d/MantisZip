@@ -144,12 +144,15 @@ public class AdaptiveCompressionClassificationTests : IDisposable
     }
 
     [Fact]
-    public void ResolveLevel_CustomStoreFormat_ReturnsStore()
+    public void ResolveLevel_StoreRule_ReturnsStore()
     {
-        // .exe 不在 SSOT 已压缩集合内，但被用户列入「仅存储格式」→ Store
-        var level = AdaptiveRuleMatcher.ResolveLevel(
-            "a.exe", 6, adaptiveCompression: true,
-            customStoreFormatIds: new HashSet<string> { "Pe" });
+        // .exe 不在 SSOT 已压缩集合内，但规则指定「仅存储」→ Store
+        var rules = new List<AdaptiveOverrideRule>
+        {
+            new() { Name = "可执行文件", FormatIds = new() { "Pe" }, Level = AdaptiveLevel.Store, Enabled = true },
+        };
+
+        var level = AdaptiveRuleMatcher.ResolveLevel("a.exe", 6, adaptiveCompression: true, rules: rules);
 
         Assert.Equal(0, level);
     }

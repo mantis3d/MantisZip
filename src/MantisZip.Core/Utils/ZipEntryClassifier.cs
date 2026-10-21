@@ -114,23 +114,4 @@ internal static class ZipEntryClassifier
         }
     }
 
-    /// <summary>
-    /// 判断扩展名是否命中「用户自定义仅存储格式」列表（经 <see cref="Services.FormatCatalog"/> 查扩展名）。
-    /// </summary>
-    public static bool IsCustomStoreFormat(string? extension, IEnumerable<string>? formatIds,
-        List<Models.FormatDefinition>? customFormats)
-    {
-        if (string.IsNullOrEmpty(extension) || formatIds == null) return false;
-        var ids = formatIds as IList<string> ?? new List<string>(formatIds);
-        if (ids.Count == 0) return false;
-
-        var allFormats = Services.FormatCatalog.GetAll(customFormats);
-        foreach (var formatId in ids)
-        {
-            var format = allFormats.FirstOrDefault(f => f.Id == formatId);
-            if (format != null && format.Extensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
-                return true;
-        }
-        return false;
-    }
 }

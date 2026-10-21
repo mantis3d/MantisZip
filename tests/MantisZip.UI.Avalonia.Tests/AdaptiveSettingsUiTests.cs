@@ -101,4 +101,57 @@ public class AdaptiveSettingsUiTests
         Assert.Single(settings.AdaptiveOverrides);
         Assert.Equal("我的规则", settings.AdaptiveOverrides[0].Name);
     }
+
+    [Fact]
+    public void MigrateAdaptiveOverrides_MigratesCustomStoreOnlyIdsIntoRule()
+    {
+        // 旧「仅存储格式」列表：默认项 + 用户额外添加项 → 只有用户项迁成规则
+        // （注意 Wav/Tar 等本就属于旧默认列表，不算用户自定义项）
+        var defaults = new[] { "Jpeg", "Png", "Mp4" };
+        var settings = new AppSettings
+        {
+            AdaptiveOverridesDefaultsVersion = 0,
+            AdaptiveOverrides = new List<AdaptiveOverrideRule>(),
+            MultiThreadedStoreFormatIds = new List<string>(defaults) { "Txt", "MyFmt" },
+        };
+
+        AppSettings.MigrateAdaptiveOverridesDefaults(settings);
+
+        Assert.Equal(1, settings.AdaptiveOverridesDefaultsVersion);
+        var migrated = Assert.Single(settings.AdaptiveOverrides);
+        Assert.Equal("仅存储格式（迁移）", migrated.Name);
+        Assert.Equal(new[] { "Txt", "MyFmt" }, migrated.FormatIds);
+        Assert.Equal(AdaptiveLevel.Store, migrated.Level);
+        // 旧列表迁移后清空
+        Assert.Empty(settings.MultiThreadedStoreFormatIds);
+    }
+
+    [Fact]
+    public void DefaultRuleSet_CoversSixCategories_AndExcludesUncompressedFormats()
+    {
+        var defaults = AppSettings.GetDefaultAdaptiveOverrides();
+
+        // 六类：图片 / 视频 / 音频 / 压缩包 / 字体 / 文档
+        Assert.Equal(6, defaults.Count);
+        var allIds = defaults.SelectMany(r => r.FormatIds).ToList();
+        Assert.Contains("Jpeg", allIds);
+        Assert.Contains("Ttf", allIds);
+        Assert.Contains("Pdf", allIds);
+        // 未压缩格式不在默认规则里
+        Assert.DoesNotContain("Svg", allIds);
+        Assert.DoesNotContain("Tar", allIds);
+        Assert.DoesNotContain("Wav", allIds);
+    }
+
+    [Fact]
+    public void RuleRow_ShowsMtIneffectiveBadge_OnlyWhenMtOnAndLevelNotStore()
+    {
+        var store = new AdaptiveOverrideRuleViewModel { Level = AdaptiveLevel.Store, IsMultiThreadedEnabled = true };
+        var custom = new AdaptiveOverrideRuleViewModel { Level = AdaptiveLevel.Custom, CustomLevel = 3, IsMultiThreadedEnabled = true };
+        var customNoMt = new AdaptiveOverrideRuleViewModel { Level = AdaptiveLevel.Custom, CustomLevel = 3, IsMultiThreadedEnabled = false };
+
+        Assert.False(store.ShowMtIneffectiveBadge);
+        Assert.True(custom.ShowMtIneffectiveBadge);
+        Assert.False(customNoMt.ShowMtIneffectiveBadge);
+    }
 }

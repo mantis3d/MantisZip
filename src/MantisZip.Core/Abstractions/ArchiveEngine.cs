@@ -190,12 +190,6 @@ public class ArchiveOptions
     public bool MultiThreadedCompression { get; set; }
 
     /// <summary>
-    /// 多线程模式下用户自定义仅存储格式 ID 列表。
-    /// 仅当 <see cref="MultiThreadedCompression"/> 为 true 时生效。
-    /// </summary>
-    public HashSet<string> MultiThreadedStoreFormatIds { get; set; } = new();
-
-    /// <summary>
     /// 用户自定义自适应覆盖规则（adaptive-compress-ui-convergence Phase 2 / Task 10）。
     /// 规则优先级高于内置「已压缩 → Store」判定。
     /// </summary>

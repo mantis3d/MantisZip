@@ -1,3 +1,4 @@
+using MantisZip.Core.Models;
 using MantisZip.Core.Utils;
 using Xunit;
 
@@ -102,56 +103,65 @@ public class ZipEntryClassifierTests
 
     #endregion
 
-    #region ResolveLevel(4 参) — MultiThreadedStoreFormatIds 自定义覆盖
+    #region ResolveLevel — 用户自定义规则（Phase 2 合并：原「仅存储格式」列表已并入规则）
 
     [Fact]
-    public void ResolveLevel_AdaptiveOff_IgnoresCustomStoreFormats()
+    public void ResolveLevel_AdaptiveOff_IgnoresRules()
     {
-        // 未启用自适应时，即使指定自定义 Store 格式也忽略
-        var custom = new HashSet<string> { "Jpeg" };
-        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: false, customStoreFormatIds: custom));
+        // 未启用自适应时，即使命中规则也忽略
+        var rules = new List<AdaptiveOverrideRule>
+        {
+            new() { Name = "图片", FormatIds = new() { "Jpeg" }, Level = AdaptiveLevel.Store, Enabled = true },
+        };
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: false, rules: rules));
     }
 
     [Fact]
-    public void ResolveLevel_CustomStoreFormatId_ReturnsStore()
+    public void ResolveLevel_StoreRule_ReturnsStore()
     {
-        // 格式目录中非内置已压缩的格式 ID（如 Png 扩展名 .png 虽在内置列表，
-        // 用不在 CompressedExtensions 里的格式验证自定义路径生效）
-        // 注意：.wav 不在内置已压缩列表，但属于 FormatCatalog 的 Wav 格式
-        var custom = new HashSet<string> { "Wav" };
-        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("sound.wav", 5, adaptiveCompression: true, customStoreFormatIds: custom));
+        // .wav 不在 SSOT 已压缩集合内，但规则指定「仅存储」→ Store
+        var rules = new List<AdaptiveOverrideRule>
+        {
+            new() { Name = "音频", FormatIds = new() { "Wav" }, Level = AdaptiveLevel.Store, Enabled = true },
+        };
+        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("sound.wav", 5, adaptiveCompression: true, rules: rules));
     }
 
     [Fact]
-    public void ResolveLevel_NonCustomStoreFormatId_ReturnsUserLevel()
+    public void ResolveLevel_NonMatchingRule_ReturnsUserLevel()
     {
-        // 格式 ID 不在自定义列表 → 不 Store
-        var custom = new HashSet<string> { "Wav" };
-        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true, customStoreFormatIds: custom));
+        // 规则命中的格式与文件不符 → 不 Store
+        var rules = new List<AdaptiveOverrideRule>
+        {
+            new() { Name = "音频", FormatIds = new() { "Wav" }, Level = AdaptiveLevel.Store, Enabled = true },
+        };
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true, rules: rules));
     }
 
     [Fact]
-    public void ResolveLevel_UnknownFormatId_ReturnsUserLevel()
+    public void ResolveLevel_UnknownFormatIdRule_ReturnsUserLevel()
     {
-        // 自定义列表含不存在的格式 ID → 忽略，不 Store
-        var custom = new HashSet<string> { "NonExistentFormat" };
-        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true, customStoreFormatIds: custom));
+        // 规则含不存在的格式 ID → 忽略，不 Store
+        var rules = new List<AdaptiveOverrideRule>
+        {
+            new() { Name = "未知", FormatIds = new() { "NonExistentFormat" }, Level = AdaptiveLevel.Store, Enabled = true },
+        };
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true, rules: rules));
     }
 
     [Fact]
-    public void ResolveLevel_NullCustomStoreFormats_FallsBackToBuiltin()
+    public void ResolveLevel_NullRules_FallsBackToBuiltin()
     {
-        // customStoreFormatIds 为 null → 仅内置已压缩判定生效
-        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: true, customStoreFormatIds: null));
-        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true, customStoreFormatIds: null));
+        // rules 为 null → 仅 SSOT 已压缩判定生效
+        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: true, rules: null));
+        Assert.Equal(5, AdaptiveRuleMatcher.ResolveLevel("readme.txt", 5, adaptiveCompression: true, rules: null));
     }
 
     [Fact]
-    public void ResolveLevel_BuiltInTakesPrecedenceOverCustomList()
+    public void ResolveLevel_BuiltInTakesEffectWithoutRules()
     {
-        // .jpg 内置已压缩 → Store，即使自定义列表不含它
-        var custom = new HashSet<string> { "Wav" };
-        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: true, customStoreFormatIds: custom));
+        // .jpg 属 SSOT 已压缩 → Store（无规则时）
+        Assert.Equal(0, AdaptiveRuleMatcher.ResolveLevel("photo.jpg", 5, adaptiveCompression: true));
     }
 
     #endregion

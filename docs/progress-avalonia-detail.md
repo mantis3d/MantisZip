@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-21** — 压缩加速 Phase 2 追加：「仅存储格式」并入自适应规则 + 多线程生效提示
+  - **背景**：MT 路径由 7z 原生整组单次调用、组内统一用全局级别（ZipEngine.CompressGroup.cs:1589-1592）→ 规则「指定压缩级别」在 MT 路径不生效；「仅存储」判定在 MT 分拣阶段即生效（storeGroup → copy-mode 原样写入）。且 MT 准入有条件（IsMultiThreadedEligible：未加密 / 未分卷 / 条目数 ≤65535 / 体积 <4GB / deflate·deflate64）→ 小目录、加密包、分卷等走串行路径时规则全部生效，故**不按开关禁用编辑**，改为提示 + 行内标记。
+  - **引擎简化**：AdaptiveRuleMatcher.ResolveLevel 去掉 customStoreFormatIds 分支；ArchiveOptions/CompressRequest 移除 MultiThreadedStoreFormatIds；ZipEntryClassifier.IsCustomStoreFormat 删除；GUI/CLI 传参清理。
+  - **UI 合并**：设置页「仅存储格式」卡片删除（IsStoreFormatSectionVisible / MultiThreadedStoreFormats / StoreFormatItemViewModel 一并移除）；AppSettings.MultiThreadedStoreFormatIds 保留为只读迁移字段（迁移后清空）。
+  - **迁移**：AdaptiveOverridesDefaultsVersion 迁移两件事 —— 旧版默认规则集（未改过）→ 新 **6 类**默认规则集（图片/视频/音频/压缩包/**字体**/**文档**，后两类来自旧「仅存储格式」默认列表，默认行为不变）；旧「仅存储格式」列表中**用户额外添加**的 ID → 一条「仅存储格式（迁移）」Store 规则。
+  - **提示**：规则卡片顶部多线程警示（多线程开启时显示）+ 行内「多线程下不生效」标记（级别 ≠ 仅存储 时）。
+  - **文案修正**：三语帮助与 RELEASE_NOTES.md v0.5.3 的「自定义规则始终生效」过时表述 → 「Store 类始终生效；指定压缩级别类在多线程路径不生效，串行路径全部生效」。
+  - **测试**：UI 新增 3 条（仅存储 ID 迁移为规则 / 默认规则集 6 类且不含未压缩格式 / 行内标记条件）；Core ZipEntryClassifierTests 改规则等价用例、ZipEngineTests C3 改 Store 规则用例。全量 Core **766/0 失败**、UI **340/0 失败**。
 **2026-10-21** — 压缩加速 Phase 2（Task 9-11）：魔数检测 + 自适应规则引擎 + 恢复隐藏 UI
   - **三项前置拍板（用户）**：SSOT 统一到 ZipEntryClassifier；默认规则集与 SSOT 对齐后激活；魔数阈值取常量 64KB（不加设置项）。
   - **SSOT 重写**（Core/Utils/ZipEntryClassifier.cs）：IsCompressed(ext) / IsCompressedFormat(FileFormat) / IsCompressedByMagic(path) / IsCustomStoreFormat(...)；扩展名集合修正（svg/	ar 移出——未压缩内容 Deflate 仍有收益）；CompressionCoefficients 退化为仅供压缩率预估。

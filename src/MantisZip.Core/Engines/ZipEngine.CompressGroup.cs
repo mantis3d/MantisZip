@@ -422,7 +422,7 @@ public partial class ZipEngine
                             var cg = new List<(string FullPath, string RelativePath)>();
                             foreach (var file in compressFiles)
                             {
-                                var level = AdaptiveRuleMatcher.ResolveLevel(file.FullPath, options.CompressionLevel, options.AdaptiveCompression, options.AdaptiveSmartDetect, options.AdaptiveOverrides, options.CustomFormats, options.MultiThreadedStoreFormatIds);
+                                var level = AdaptiveRuleMatcher.ResolveLevel(file.FullPath, options.CompressionLevel, options.AdaptiveCompression, options.AdaptiveSmartDetect, options.AdaptiveOverrides, options.CustomFormats);
                                 if (level == 0) sg.Add(file);
                                 else cg.Add(file);
                             }
@@ -754,7 +754,7 @@ public partial class ZipEngine
                                 {
                                     // 统一用 4 参重载（传 MultiThreadedStoreFormatIds），与 MT 分拣（CompressAsync/AddToArchiveAsync）
                                     // 及本方法写入阶段同口径；无自定义列表时行为与 3 参完全一致。
-                                    entryLevel = AdaptiveRuleMatcher.ResolveLevel(fullPath, options.CompressionLevel, options.AdaptiveCompression, options.AdaptiveSmartDetect, options.AdaptiveOverrides, options.CustomFormats, options.MultiThreadedStoreFormatIds);
+                                    entryLevel = AdaptiveRuleMatcher.ResolveLevel(fullPath, options.CompressionLevel, options.AdaptiveCompression, options.AdaptiveSmartDetect, options.AdaptiveOverrides, options.CustomFormats);
                                     CoreLog.Trace("ZipEngine.CompressAsync: adaptive entry '{0}' level={1} (global={2}, adaptive={3})",
                                         entryPath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompression);
                                 }
@@ -1289,7 +1289,7 @@ public partial class ZipEngine
                     var method = options.ZipCompressionMethod?.ToLowerInvariant();
                     if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
                     {
-                        entryLevel = AdaptiveRuleMatcher.ResolveLevel(fullPath, options.CompressionLevel, options.AdaptiveCompression, options.AdaptiveSmartDetect, options.AdaptiveOverrides, options.CustomFormats, options.MultiThreadedStoreFormatIds);
+                        entryLevel = AdaptiveRuleMatcher.ResolveLevel(fullPath, options.CompressionLevel, options.AdaptiveCompression, options.AdaptiveSmartDetect, options.AdaptiveOverrides, options.CustomFormats);
                         CoreLog.Trace("ZipEngine.AddToArchiveAsync: adaptive entry '{0}' level={1} (global={2}, adaptive={3})",
                             relativePath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompression);
                     }

@@ -18,7 +18,7 @@ public static class AdaptiveRuleMatcher
     /// <param name="adaptiveSmartDetect">魔数检测开关。</param>
     /// <param name="rules">用户自定义覆盖规则列表，可为 null。</param>
     /// <param name="customFormats">用户自定义格式列表（供规则按 FormatId 查扩展名），可为 null。</param>
-    /// <param name="customStoreFormatIds">用户自定义「仅存储」格式 ID 列表，可为 null。</param>
+
     /// <returns>该文件应使用的压缩级别（0-9）。</returns>
     public static int ResolveLevel(
         string filePath,
@@ -26,8 +26,7 @@ public static class AdaptiveRuleMatcher
         bool adaptiveCompression,
         bool adaptiveSmartDetect = false,
         List<AdaptiveOverrideRule>? rules = null,
-        List<FormatDefinition>? customFormats = null,
-        HashSet<string>? customStoreFormatIds = null)
+        List<FormatDefinition>? customFormats = null)
     {
         CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: file={0}, globalLevel={1}, adaptive={2}, smartDetect={3}, rules={4}",
             filePath, globalLevel, adaptiveCompression, adaptiveSmartDetect, rules?.Count ?? 0);
@@ -61,13 +60,6 @@ public static class AdaptiveRuleMatcher
             }
         }
 
-        // 2. 用户自定义「仅存储格式」列表
-        if (ZipEntryClassifier.IsCustomStoreFormat(ext, customStoreFormatIds, customFormats))
-        {
-            CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: custom store format (ext={0}) → Store", ext);
-            return 0;
-        }
-
         // 3. SSOT：扩展名判定（内容已是压缩格式）
         if (ZipEntryClassifier.IsCompressed(ext))
         {
@@ -75,7 +67,7 @@ public static class AdaptiveRuleMatcher
             return 0;
         }
 
-        // 4. 魔数检测（扩展名骗人 / 无扩展名时的兜底）
+        // 3. 魔数检测（扩展名骗人 / 无扩展名时的兜底）
         if (adaptiveSmartDetect && ZipEntryClassifier.IsCompressedByMagic(filePath))
         {
             CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: magic detected compressed content → Store");

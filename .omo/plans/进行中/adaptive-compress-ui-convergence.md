@@ -1,6 +1,6 @@
 # 压缩加速三开关 — UI 收敛（Phase 1）+ 魔数检测/自适应规则实现（Phase 2）
 
-> **状态**: 🟢 Phase 1 ✅ 完成 / Phase 2 部分完成（2026-10-21：Task 9-11 实施完成；Task 12 本机基准测试 UI、Task 13 组数定标**未做**，待后续） | **日期**: 2026-10-16（**2026-10-18 评审修订 + 实测拍板 + 同日双机复测改判**；**2026-10-19 Phase 1 实施：Task 1/2/4/5/6 完成，新增常驻科普提示**）| **优先级**: P1 | **预估工时**: Phase 1 = **4-5h**（组数规则简化为 `clamp(核数,4,16)`，Task 0 双机实跑完成；改动 B 暂缓 → Phase 1 无门控代码）/ Phase 2 = **5-7h**（原 3-4h + Task 12 本机基准测试约 +2-3h）
+> **状态**: 🟢 Phase 1 ✅ 完成 / Phase 2 部分完成（2026-10-21：Task 9-11 实施完成 + 「仅存储格式」合并进自适应规则 + 多线程提示/标记；Task 12 本机基准测试 UI、Task 13 组数定标**未做**，待后续） | **日期**: 2026-10-16（**2026-10-18 评审修订 + 实测拍板 + 同日双机复测改判**；**2026-10-19 Phase 1 实施：Task 1/2/4/5/6 完成，新增常驻科普提示**）| **优先级**: P1 | **预估工时**: Phase 1 = **4-5h**（组数规则简化为 `clamp(核数,4,16)`，Task 0 双机实跑完成；改动 B 暂缓 → Phase 1 无门控代码）/ Phase 2 = **5-7h**（原 3-4h + Task 12 本机基准测试约 +2-3h）
 > **来源**: 用户 2026-10-16 提出「压缩有个选项有两个开关『多线程』和『自适应』，测试发现不启用自适应时开启多线程反而有反作用」→ 实测 + 代码审计后扩展为两阶段计划
 > **原型**: [docs/prototypes/compress-format-options-panel.html](../../docs/prototypes/compress-format-options-panel.html)（交互原型，已覆盖两处界面）
 > **评审**: 2026-10-18 逐条核对源码，修正 4 处会直接踩坑的事实错误（A1–A4）、1 处与既有 bench 结论冲突（B1）、若干语义/文档遗漏（C/D 项），详见文末「修订记录」
@@ -497,3 +497,17 @@ Task 0 基线复测先在 20 逻辑核机跑完（报告 `.buildout\bench-before
 - Task 12 本机基准测试 UI（设置 → 加速 → 运行本机基准测试）与默认值播种（含 E4「仅在用户从未手动改过时播种」的标记字段）。
 - Task 13 post-C 组数定标（现有 post-C 数据噪声 27%，不足以定标 → 记录「组数不敏感」，保持 `clamp(核数,4,16)`）。
 - `AdaptiveOverridesDefaultsVersion` 迁移只在内存生效（下次保存设置时随 settings.json 落盘）。
+## Phase 2 追加：合并「仅存储格式」+ 多线程提示（2026-10-21，用户拍板）
+
+**背景**：多线程路径由 7z 原生**单次调用整组压缩**、组内统一用全局级别（`ZipEngine.CompressGroup.cs:1589-1592`）→ 规则中「指定压缩级别」在 MT 路径不生效；而「仅存储」判定在 MT 分拣阶段即生效（进 storeGroup → copy-mode 原样写入）。且 MT 路径准入有条件（`IsMultiThreadedEligible`：未加密 / 未分卷 / 条目数 ≤65535 / 体积 <4GB / 方法为 deflate·deflate64），**小目录、加密包、分卷等走串行路径时规则全部生效** —— 故不能按「多线程开关」粗暴禁用级别选择（会过度限制），改为**提示 + 行内标记**。
+
+**三项用户拍板**：① 合并（删「仅存储格式」控件组，功能并入自适应规则）；② 旧配置迁移（仅存储列表 → 一条 Store 规则）+ 默认规则集扩到 6 类以保持默认行为不变；③ 文案修正（RELEASE_NOTES + 三语帮助）必须做。
+
+**实现**
+- **引擎简化**：`AdaptiveRuleMatcher.ResolveLevel` 去掉 `customStoreFormatIds` 分支（仅存储语义统一由规则承担）；`ArchiveOptions`/`CompressRequest` 移除 `MultiThreadedStoreFormatIds`；`ZipEntryClassifier.IsCustomStoreFormat` 删除；GUI/CLI 传参同步清理。
+- **UI 合并**：设置页「仅存储格式」卡片删除（`IsStoreFormatSectionVisible` / `MultiThreadedStoreFormats` / `StoreFormatItemViewModel` 及相关读写一并移除）；`AppSettings.MultiThreadedStoreFormatIds` 保留为**只读迁移字段**（迁移后清空）。
+- **迁移**：`AdaptiveOverridesDefaultsVersion` 迁移做两件事 —— 旧版默认规则集（未改过）→ 新的 **6 类**默认规则集（图片/视频/音频/压缩包/**字体**/**文档**，字体与文档来自旧「仅存储格式」默认列表，保证默认行为不变）；旧「仅存储格式」列表中**用户额外添加**的 ID → 一条「仅存储格式（迁移）」Store 规则（默认项本身已被 SSOT 覆盖，不重复迁移）。
+- **多线程提示**：规则卡片顶部新增警示（多线程开启时显示）+ 规则行内「多线程下不生效」标记（仅当级别 ≠ 仅存储）；不禁止编辑（因串行路径下规则仍生效）。
+- **文案修正**：三语帮助「自定义规则始终生效」的过时提示改为「Store 类始终生效；指定压缩级别类在多线程路径不生效，串行路径全部生效」。
+
+**测试**：UI 新增 3 条（自定义仅存储 ID 迁移为规则 / 默认规则集 6 类且不含未压缩格式 / 行内标记仅在「多线程开 + 级别非 Store」时显示）；Core `ZipEntryClassifierTests` 改为规则等价用例；`ZipEngineTests` C3（MT + 自定义仅存储 → 进 StoreGroup）改为等价的 Store 规则用例。全量 Core **766 通过 / 3 跳过 / 0 失败**、UI **340 通过 / 3 跳过 / 0 失败**。

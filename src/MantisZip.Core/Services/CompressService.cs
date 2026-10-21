@@ -102,8 +102,6 @@ public class CompressRequest
     /// <summary>N 组并行压缩的目标组数，默认值取运行时 CPU 数；1 = 串行。</summary>
     public int ParallelCompressDegree { get; init; } = 0;
 
-    /// <summary>多线程模式下用户自定义仅存储格式 ID 列表。</summary>
-    public HashSet<string> MultiThreadedStoreFormatIds { get; init; } = new();
 
     /// <summary>用户自定义自适应覆盖规则（Phase 2 / Task 10）：优先级高于内置已压缩判定</summary>
     public List<AdaptiveOverrideRule> AdaptiveOverrides { get; init; } = new();
@@ -486,7 +484,6 @@ public static class CompressService
             AdaptiveCompression = request.AdaptiveCompression,
             AdaptiveSmartDetect = request.AdaptiveSmartDetect,
             MultiThreadedCompression = request.MultiThreadedCompression,
-            MultiThreadedStoreFormatIds = request.MultiThreadedStoreFormatIds,
             AdaptiveOverrides = request.AdaptiveOverrides,
             CustomFormats = request.CustomFormats,
             ZipCompressionMethod = request.ZipCompressionMethod,

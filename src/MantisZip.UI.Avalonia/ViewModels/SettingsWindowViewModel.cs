@@ -180,7 +180,6 @@ public partial class SettingsWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(IsSmartDetectVisible));
         OnPropertyChanged(nameof(IsAdaptiveContentVisible));
-        OnPropertyChanged(nameof(IsStoreFormatSectionVisible));
         OnPropertyChanged(nameof(IsUserRulesSectionVisible));
         OnPropertyChanged(nameof(IsFormatCatalogSectionVisible));
     }
@@ -191,9 +190,6 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     /// <summary>自适应内容区域是否可见（自适应或多线程任一开启）。</summary>
     public bool IsAdaptiveContentVisible => AdaptiveCompression || MultiThreadedCompression;
-
-    /// <summary>仅存储格式选择区域是否可见（仅自适应开启；2026-10-19 起与多线程解耦 —— 串行路径也读自定义仅存储格式）。</summary>
-    public bool IsStoreFormatSectionVisible => AdaptiveCompression;
 
     /// <summary>用户自定义规则区域是否可见 —— Phase 2：实现自适应规则后改回 AdaptiveCompression && !MultiThreadedCompression。</summary>
     /// <summary>用户自定义规则区域是否可见（Phase 2 / Task 11：实现自适应规则后随自适应开关显示；多线程亦生效，故不与多线程互斥）。</summary>
@@ -210,9 +206,6 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     /// <summary>用户自定义规则（ObservableCollection for UI binding）。</summary>
     public ObservableCollection<AdaptiveOverrideRuleViewModel> AdaptiveOverrides { get; } = new();
-
-    /// <summary>多线程模式下仅存储格式选择（ObservableCollection for UI binding）。</summary>
-    public ObservableCollection<StoreFormatItemViewModel> MultiThreadedStoreFormats { get; } = new();
 
     [ObservableProperty]
     private string _logPrivacyMode = "extension";
@@ -647,34 +640,10 @@ public partial class SettingsWindowViewModel : ObservableObject
                 Level = rule.Level,
                 Enabled = rule.Enabled,
                 CustomLevel = rule.CustomLevel,
+                // 多线程路径下「指定压缩级别」不生效（整组统一用全局级别），行内加标记提示
+                IsMultiThreadedEnabled = MultiThreadedCompression,
             });
         }
-    }
-
-    private void PopulateMultiThreadedStoreFormats()
-    {
-        MultiThreadedStoreFormats.Clear();
-        var allFormats = FormatCatalog.GetAll(_settings.CustomFormats);
-        var selectedIds = new HashSet<string>(_settings.MultiThreadedStoreFormatIds);
-        foreach (var fmt in allFormats)
-        {
-            MultiThreadedStoreFormats.Add(new StoreFormatItemViewModel
-            {
-                Id = fmt.Id,
-                DisplayName = fmt.DisplayName,
-                Extensions = fmt.Extensions,
-                IsSelected = selectedIds.Contains(fmt.Id),
-            });
-        }
-    }
-
-    /// <summary>将多线程仅存储格式选择同步回 AppSettings。</summary>
-    private void SaveMultiThreadedStoreFormats()
-    {
-        _settings.MultiThreadedStoreFormatIds = MultiThreadedStoreFormats
-            .Where(f => f.IsSelected)
-            .Select(f => f.Id)
-            .ToList();
     }
 
     private void PopulateAssocItems()
@@ -913,13 +882,15 @@ public partial class SettingsWindowViewModel : ObservableObject
     /// <summary>多线程压缩常驻科普提示（收益与 CPU 相关，双机实测；常驻显示不绑显隐）。</summary>
     public string MultiThreadedBenefitHint => LocalizationManager.T("Compress_MT_BenefitHint");
     public string FormatCatalogSectionText => LocalizationManager.T("Settings_FormatCatalog");
-    public string StoreFormatSectionText => LocalizationManager.T("Settings_StoreFormat_Section");
-    public string StoreFormatDescText => LocalizationManager.T("Settings_StoreFormat_Desc");
     public string BuiltInFormatsText => LocalizationManager.T("Settings_FormatCatalog_BuiltIn");
     public string CustomFormatsText => LocalizationManager.T("Settings_FormatCatalog_Custom");
     public string AddCustomFormatText => LocalizationManager.T("Settings_FormatCatalog_AddCustom");
     public string AdaptiveOverridesSectionText => LocalizationManager.T("Settings_AdaptiveOverrides");
     public string AdaptiveOverridesDescText => LocalizationManager.T("Settings_AdaptiveOverrides_Desc");
+    /// <summary>多线程压缩下规则「指定压缩级别」不生效的提示（Phase 2 合并）。</summary>
+    public string AdaptiveOverridesMtWarningText => LocalizationManager.T("Settings_AdaptiveOverrides_MtWarning");
+    /// <summary>多线程压缩开启时，规则卡片显示提示。</summary>
+    public bool IsAdaptiveOverridesMtWarningVisible => MultiThreadedCompression;
     public string AddRuleText => LocalizationManager.T("Settings_AdaptiveOverrides_AddRule");
     public string ResetDefaultsText => LocalizationManager.T("Settings_AdaptiveOverrides_ResetDefaults");
 
@@ -1191,7 +1162,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         _multiThreadedCompression = _settings.MultiThreadedCompression;
         PopulateBuiltInFormats();
         PopulateAdaptiveOverrides();
-        PopulateMultiThreadedStoreFormats();
 
         PopulateComboOptions();
         SetSelectedOptions();
@@ -1507,8 +1477,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(MultiThreadedCompressionText));
         OnPropertyChanged(nameof(MultiThreadedCompressionDescText));
         OnPropertyChanged(nameof(FormatCatalogSectionText));
-        OnPropertyChanged(nameof(StoreFormatSectionText));
-        OnPropertyChanged(nameof(StoreFormatDescText));
         OnPropertyChanged(nameof(BuiltInFormatsText));
         OnPropertyChanged(nameof(CustomFormatsText));
         OnPropertyChanged(nameof(AddCustomFormatText));
@@ -1793,9 +1761,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Default path priority
         _settings.DefaultPathOrder = PathPriorityItems.Select(p => p.Kind).ToList();
         _settings.CustomDefaultPath = CustomPath ?? "";
-
-        // 多线程仅存储格式
-        SaveMultiThreadedStoreFormats();
 
         // 预览运行时配置同步：保存即生效，无需重启（与 App.axaml.cs 启动初始化保持一致）
         PreviewService.EnableFormatDetection = EnableFormatDetection;
@@ -2252,12 +2217,23 @@ public partial class AdaptiveOverrideRuleViewModel : ObservableObject
     partial void OnLevelChanged(AdaptiveLevel value)
     {
         OnPropertyChanged(nameof(LevelDisplay));
+        OnPropertyChanged(nameof(ShowMtIneffectiveBadge));
     }
 
     partial void OnCustomLevelChanged(int? value)
     {
         OnPropertyChanged(nameof(LevelDisplay));
+        OnPropertyChanged(nameof(ShowMtIneffectiveBadge));
     }
+
+    /// <summary>多线程压缩是否开启（由设置页 VM 注入；仅影响提示标记，不改行为）。</summary>
+    public bool IsMultiThreadedEnabled { get; set; }
+
+    /// <summary>是否显示「多线程下不生效」标记：多线程开启且规则级别不是「仅存储」。</summary>
+    public bool ShowMtIneffectiveBadge => IsMultiThreadedEnabled && Level != AdaptiveLevel.Store;
+
+    /// <summary>「多线程下不生效」标记文案。</summary>
+    public string MtIneffectiveBadgeText => LocalizationManager.T("Settings_AdaptiveOverrides_MtIneffectiveBadge");
 
     public string LevelDisplay => Level switch
     {
@@ -2271,18 +2247,4 @@ public partial class AdaptiveOverrideRuleViewModel : ObservableObject
         AdaptiveLevel.Custom => $"自定义({CustomLevel})",
         _ => "未知"
     };
-}
-
-/// <summary>
-/// 多线程模式下仅存储格式选择项 ViewModel。
-/// 用户可勾选/取消格式目录中的格式，控制哪些格式在多线程压缩时走 Store 路径。
-/// </summary>
-public partial class StoreFormatItemViewModel : ObservableObject
-{
-    [ObservableProperty] private string _id = "";
-    [ObservableProperty] private string _displayName = "";
-    [ObservableProperty] private List<string> _extensions = new();
-    [ObservableProperty] private bool _isSelected = true;
-
-    public string ExtensionsDisplay => string.Join(" ", Extensions.Select(e => e));
 }

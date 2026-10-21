@@ -55,7 +55,7 @@ public class AppSettings
     public AdaptiveCompressionMode AdaptiveCompressionMode { get; set; } = AdaptiveCompressionMode.Disabled;
 #pragma warning restore CS0618
 
-    /// <summary>多线程模式下用户自定义仅存储格式 ID 列表（不可删除的唯一规则）。</summary>
+    /// <summary>【已废弃 · Phase 2 合并】多线程模式「仅存储格式」列表 —— 功能已并入「自适应规则」（Store 类规则）。仅保留用于旧配置迁移读取，迁移后清空。</summary>
     public List<string> MultiThreadedStoreFormatIds { get; set; } = new();
 
     /// <summary>用户自定义格式列表。</summary>
@@ -304,11 +304,6 @@ public class AppSettings
                 {
                     settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
                 }
-                // 首次安装时填充默认仅存储格式（多线程模式用）
-                if (settings.MultiThreadedStoreFormatIds.Count == 0)
-                {
-                    settings.MultiThreadedStoreFormatIds = GetDefaultMultiThreadedStoreFormatIds();
-                }
                 // 并行解压智能线程数越界 clamp 到 [1,16]（边界情况 #8）
                 settings.SmartSsdDegree = Math.Clamp(settings.SmartSsdDegree, 1, 16);
                 settings.SmartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
@@ -361,12 +356,12 @@ public class AppSettings
     {
         var settings = new AppSettings();
         settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
-        settings.MultiThreadedStoreFormatIds = GetDefaultMultiThreadedStoreFormatIds();
         return settings;
     }
 
     /// <summary>
-    /// 返回默认自适应压缩覆盖规则（**与 SSOT「已压缩」集合对齐** —— Phase 2 / Task 10）。
+    /// 返回默认自适应压缩覆盖规则（**与 SSOT「已压缩」集合对齐** —— Phase 2 / Task 10 + 合并）。
+    /// 六类：图片 / 视频 / 音频 / 压缩包 / 字体 / 文档（字体与文档来自旧「仅存储格式」默认列表，合并后并入）。
     /// 不含未压缩格式：svg（XML 文本）/ tar（未压缩归档）/ wav（PCM）/ tga/hdr/exr（未压缩位图）。
     /// </summary>
     internal static List<AdaptiveOverrideRule> GetDefaultAdaptiveOverrides() => new()
@@ -375,15 +370,20 @@ public class AppSettings
         new() { Name = "视频类", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
         new() { Name = "音频类", FormatIds = new() { "Mp3", "Flac", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
         new() { Name = "压缩包类", FormatIds = new() { "Zip", "SevenZip", "Rar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "字体类", FormatIds = new() { "Ttf", "Otf", "Woff", "Woff2" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { Name = "文档类", FormatIds = new() { "Pdf", "Docx", "Xlsx", "Pptx", "Epub" }, Level = AdaptiveLevel.Store, Enabled = true },
     };
 
-    /// <summary>默认规则集版本（与 SSOT 对齐后的版本号）。</summary>
+    /// <summary>默认规则集版本（与 SSOT 对齐 + 并入旧「仅存储格式」后的版本号）。</summary>
     private const int CurrentAdaptiveOverridesDefaultsVersion = 1;
 
     /// <summary>
-    /// 迁移旧持久化的默认规则集 → 与 SSOT 对齐的新默认规则集（Phase 2 / Task 10，评审 C5）。
-    /// 仅当用户规则集仍是**旧版默认规则集**（4 条默认规则、名称与格式 ID 完全一致）时才整体替换；
-    /// 用户自行增删改过的规则集原样保留（只推进版本号）。
+    /// 迁移旧持久化数据（Phase 2 / Task 10 + 「仅存储格式」合并）：
+    /// ① 旧版默认规则集（4 条，名称与格式 ID 完全一致）→ 整体替换为新的 6 类默认规则集；
+    ///    用户自行增删改过的规则集原样保留（只推进版本号）。
+    /// ② 旧「仅存储格式」列表中**用户额外添加**的格式 ID（不在旧默认列表内）→ 迁移为一条
+    ///    「仅存储格式（迁移）」规则（Store 级别）；旧默认列表本身已被 SSOT 覆盖，不再重复迁移。
+    /// ③ 迁移后清空旧列表（该功能已并入自适应规则）。
     /// </summary>
     internal static void MigrateAdaptiveOverridesDefaults(AppSettings settings)
     {
@@ -392,6 +392,23 @@ public class AppSettings
 
         if (IsLegacyDefaultOverrides(settings.AdaptiveOverrides))
             settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+
+        // 旧「仅存储格式」列表 → 规则（仅迁移用户额外添加的 ID）
+        var legacyDefaults = GetDefaultMultiThreadedStoreFormatIds();
+        var customStoreIds = (settings.MultiThreadedStoreFormatIds ?? new List<string>())
+            .Where(id => !legacyDefaults.Contains(id))
+            .ToList();
+        if (customStoreIds.Count > 0)
+        {
+            settings.AdaptiveOverrides.Add(new AdaptiveOverrideRule
+            {
+                Name = "仅存储格式（迁移）",
+                FormatIds = customStoreIds,
+                Level = AdaptiveLevel.Store,
+                Enabled = true,
+            });
+        }
+        settings.MultiThreadedStoreFormatIds = new List<string>();
 
         settings.AdaptiveOverridesDefaultsVersion = CurrentAdaptiveOverridesDefaultsVersion;
     }
@@ -421,7 +438,7 @@ public class AppSettings
         return true;
     }
 
-    /// <summary>返回多线程模式默认仅存储格式 ID（内置已压缩格式）。</summary>
+    /// <summary>旧「仅存储格式」默认 ID 列表（内置已压缩格式）—— 仅用于迁移时区分「用户自定义项」。</summary>
     private static List<string> GetDefaultMultiThreadedStoreFormatIds() => new()
     {
         // 图片

@@ -199,7 +199,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                         var compressGroup = new List<(string FullPath, string RelativePath)>();
                         foreach (var file in files)
                         {
-                            var level = AdaptiveRuleMatcher.ResolveLevel(file.FullPath, options.CompressionLevel, options.AdaptiveCompression, options.AdaptiveSmartDetect, options.AdaptiveOverrides, options.CustomFormats, options.MultiThreadedStoreFormatIds);
+                            var level = AdaptiveRuleMatcher.ResolveLevel(file.FullPath, options.CompressionLevel, options.AdaptiveCompression, options.AdaptiveSmartDetect, options.AdaptiveOverrides, options.CustomFormats);
                             if (level == 0) storeGroup.Add(file);
                             else compressGroup.Add(file);
                         }
