@@ -70,3 +70,4 @@ internal partial class AppSettingsJsonContext : JsonSerializerContext { }
 **偏差**
 - 未改其它 `JsonSerializer` 调用点；未做 Trim 配置；未改版本号。
 - 归档时计划从「进行中」直接移入「已完成」——实施已完成，门控未达属**已记录结论**而非遗留工作。
+- **RELEASE_NOTES**：用户确认**不写入**（内部实现变化、settings.json 格式不变、无可测量用户可见收益）。
