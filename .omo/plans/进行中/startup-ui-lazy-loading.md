@@ -9,7 +9,7 @@
 | 阶段 | 内容 | 元素 | 预估 | 状态 |
 |---|---|---|---|---|
 | **1** | **过滤栏延迟**（默认隐藏）→ 抽 `Controls/MainFilterBar.axaml` + `EnsureFilterBar()` | 50 | 20–25ms | ✅ 完成（XamlSpan 363.2 → 335.8ms，−27ms） |
-| **2** | **内容区延迟**（`ArchiveContentGrid` 默认隐藏：目录树 / 文件列表 DataGrid / 地址栏 / 列头） | 171 | 70–90ms | ⏳ 待做 |
+| **2** | **内容区延迟**（`ArchiveContentGrid` 默认隐藏：目录树 / 文件列表 DataGrid / 地址栏 / 列头） | 171 | 70–90ms | ✅ 完成（XamlSpan 338.7 → 230.7ms，**−108ms**） |
 | **3** | **菜单子项延迟**（顶级菜单常驻，子项首次展开时构建） | ~170 | 60–80ms | ⏳ 待做（快捷键已迁到 `MainWindow.KeyBindings`，无风险） |
 
 预计合计 **150–195ms**（当前 TOTAL ~1500ms 的 10–13%）。
@@ -30,8 +30,25 @@
 - **测量**：`XamlSpan` **363.2 → 335.8ms（−27ms，8 轮中位）**；TOTAL 1653.7 → 1533.2ms（环境噪声较大，以 XamlSpan 为准）
 - **验证**：UI 全量 **344 通过 / 3 跳过 / 0 失败**
 
-## 阶段 2 注意事项（内容区）
+## 阶段 2 实施记录（2026-10-21）
 
-- 内容区含 16 个 `x:Name`（`FileListGrid` / `AddressBar` / `TreeSearchBox` / 5 个列头箭头 / 3 个 Splitter / `FolderTreeBorder` / `FileListPanel` / `PreviewPanelHost` / `DragAddOverlay*` 4 个）→ 需统一改为「确保已创建」helper，参照 `EnsurePreviewPanel` 的 null 检查模式
-- `DragDropItemExpander` / 列头右键菜单等 code-behind 路径依赖这些控件
-- 打开压缩包时会多付一次膨胀（用户点「打开」到窗口内容出现之间）→ 需确认 `IsLoading` 遮罩（`MainWindow.axaml` 的加载遮罩）能覆盖这段时间
+- **抽出** `Controls/ArchiveContentView.axaml`（505 行）+ `ArchiveContentView.axaml.cs`（公开具名控件）+ `ArchiveContentView.Events.cs`（随迁事件处理器）
+  - 根 Grid 即拆分前的 `ArchiveContentGrid`（`ColumnDefinitions="1*,5,2.5*,5,3*"` / `RowDefinitions="*,0,0"` 与子元素坐标**原样保留**）→ 布局零变化
+  - 切割范围 = 原 `MainWindow.axaml` 673..1163 行（**按 `<Grid`/`</Grid>` 深度扫描定位**，勿用肉眼下标；文件每改一次行号就漂移）
+  - **⚠️ 编码陷阱**：`git show HEAD:file` 的输出经 PowerShell 5.1 用 `[Console]::OutputEncoding`（OEM 代码页）解码 → **中文注释全部变乱码**，写回 UTF-8 就把文件改坏了。**必须用 `[System.IO.File]::ReadAllLines($path, [System.Text.Encoding]::UTF8)` 读磁盘文件**（显式 UTF-8），写回用 `New-Object System.Text.UTF8Encoding($false)`（无 BOM）+ CRLF；改完立刻校验乱码计数为 0
+  - **⚠️ PowerShell 5.1 保留变量**：`$host` / `$pid` / `$input` 不可赋值（`$host = @(...)` 抛「无法给 Host 赋值」）→ 换名 `$hostLines`
+- **宿主**：`MainWindow.axaml` Row3 保留「空态 Border（`BoolInvertConverter`）+ `<ContentControl x:Name="ArchiveContentHost" />`」；`MainWindow.EnsureArchiveContent()` 在 `IsArchiveLoaded` 首次为 true 时创建（`vm.PropertyChanged` 钩子）
+- **访问器**：`MainWindow` 保留全部业务逻辑，通过 `ArchiveContentGrid` / `FileListGrid` / `PreviewPanelHost` / `DragAddOverlay*` / 5 个列头箭头等**私有属性**转发到视图（属性名加 `Control` 后缀，避免与 XAML 编译器生成的 `x:Name` 字段重名）
+- **启动期恢复动作延后**：`ApplyColumnStates` / `UpdateSortArrows` / `ApplySavedLayout` / `ApplyPreviewLayout` 从构造期挪到 `EnsureArchiveContent()` 内（构造期只保留 `WindowStateManager.Load` 读盘 → `_pendingColumnStates`）
+- **随迁事件**：`ColumnHeaderContextMenu_Opening`（+4 个辅助方法）与 `AddressBar_KeyDown` 迁入视图（依赖列头 PathIcon 几何 / VM 导航）；4 个 DataGrid 事件（`SelectionChanged` / `DoubleTapped` / `KeyDown` / `Sorting`）**保留在 MainWindow**，由 `EnsureArchiveContent()` 手动订阅
+- **拖拽接线迁移**：原构造期 `this.FindControl<DataGrid>("FileListGrid")` 在拆出后取不到（namescope 变更）→ 抽成 `SetupFileListDragDrop()`，在内容区创建时调用
+- **列状态回写保护**：`CaptureColumnStates()` 在内容区未创建时**原样回写**启动时读到的快照（否则空列表会覆盖用户已保存的列宽/显隐）
+- **测试**：`MainArchiveContentLazyLoadTests` 3 条（默认不创建 / 加载后创建且只创建一次 / 视图含关键控件）
+- **测量**（A/B 交错 8 轮 × 3 次，基线 = HEAD `4d2b6417` 的 worktree 发布）：**XamlSpan 338.7→230.7 / 300.4→232.6 / 335.4→258.9ms（−68 ~ −108ms）**；末次 CtorSpan 419.5→323.9ms（−95.6ms）、WinSpan 860.8→795.5ms（−65.3ms）；InitDone 持平（收益全部来自内容区不再膨胀）
+- **验证**：UI 全量通过（`verify-repo.ps1 -Task test -Target ui-tests` ok=true）；`dotnet format analyzers` exit 0；`-Task check` 全过
+
+## 阶段 3 注意事项（菜单子项）
+
+- 菜单子项 ~170 元素：顶级菜单（文件/编辑/视图/工具/帮助）常驻，**子项**在首次展开时构建
+- 需注意 `MenuItem` 的 `Icon` / `InputGesture` 展示与 `SubmenuItems` 的动态挂载
+- 快捷键已迁到 `MainWindow.KeyBindings`（规则 10.1）→ 子项延迟不影响快捷键生效

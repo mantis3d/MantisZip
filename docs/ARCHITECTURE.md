@@ -457,6 +457,27 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 
 **源码守卫测试注意**：`AppShutdownWiringTests.AppRelPaths` 与 `ExtractPreserveFullPathWiringTests` / `ExtractParallelDegreeWiringTests` 的 `MainViewModelRelPaths` 显式枚举全部 partial；**新增 partial 必须同步追加**，否则守卫只扫描一部分文件。
 
+### 主窗口 UI 延迟加载（2026-10-21）
+
+`MainWindow.axaml` 里**启动时不可见**的区块改为按需创建（每块一个 `ContentControl` 宿主 + `EnsureXxx()` 幂等方法）：
+
+| 区块 | 宿主 | 创建时机 | 元素数 |
+|---|---|---|---|
+| 过滤栏 | `FilterBarHost` | `IsFilterBarVisible` 首次为 true | ~50 |
+| 压缩包内容区 | `ArchiveContentHost` | `IsArchiveLoaded` 首次为 true | ~153 |
+| 预览面板 | `PreviewPanelHost` | 首帧后 0.5s 预取 / `PreviewPanelNeeded` 兜底 | ~297 |
+| 菜单子项 | — | 首次展开时构建（阶段 3 待做） | ~170 |
+
+**约定**：
+
+- 抽出为 `UserControl` 后，视图**公开具名控件**（属性名加 `Control` 后缀，**避免与 XAML 编译器为 `x:Name` 生成的字段同名 → CS0102**），`MainWindow` 保留全部业务逻辑并通过这些属性访问
+- 视图根 Grid **沿用原容器**（列/行定义与子元素坐标原样保留）→ 布局零变化
+- 依赖视图内部几何的事件（列头右键菜单、地址栏回车）随视图迁入；仅依赖 VM 的事件留在 `MainWindow` 并在创建时**手动订阅**（XAML `EventName="..."` 在 `UserControl` 里解析不到外部处理器）
+- **namescope 变更**：拆出后 `this.FindControl<T>("X")` 取不到视图内控件 → 改用视图公开属性
+- **状态回写保护**：视图未创建时，依赖视图状态的持久化（如 `CaptureColumnStates`）必须**原样回写**上次读到的快照，否则空值会覆盖用户已保存的设置
+- **启动期恢复动作延后**：列状态 / 排序箭头 / 布局快照 / 预览位置等「读盘 → 应用」动作，改到视图创建时执行（构造期只读盘、只存快照）
+- 切割 `MainWindow.axaml` 时**用 XDocument（`SetLineInfo`）取行号**，勿用肉眼下标（文件每改一次行号即漂移）
+
 ### 依赖流向
 
 ```

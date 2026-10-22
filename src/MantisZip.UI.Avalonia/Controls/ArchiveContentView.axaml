@@ -1,0 +1,502 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+             xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
+             x:Class="MantisZip.UI.Avalonia.Controls.ArchiveContentView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <!-- 压缩包内容区：目录树 / 文件列表 / 预览面板 / 拖拽添加覆层
+       2026-10-21 启动优化：自 MainWindow.axaml 抽出为独立 UserControl，**按需创建**——
+       压缩包未打开时内容区不可见，启动路径无需实例化这 ~153 个元素
+       （由 MainWindow.EnsureArchiveContent() 在 IsArchiveLoaded 首次为 true 时创建）。
+
+       根 Grid 即拆分前的 ArchiveContentGrid（列/行定义与子元素坐标原样保留）→ 布局零变化。 -->
+    <Grid x:Name="ArchiveContentGrid"
+          IsVisible="{Binding IsArchiveLoaded}"
+          ColumnDefinitions="1*,5,2.5*,5,3*"
+          RowDefinitions="*,0,0">
+      <!-- Folder tree panel (col 0) with tree toolbar -->
+      <Border x:Name="FolderTreeBorder"
+              Grid.Column="0"
+              MinWidth="100"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <Grid RowDefinitions="Auto,Auto,Auto,*">
+          <!-- Tree toolbar -->
+          <Border Grid.Row="0"
+                  Padding="4,2"
+                  Background="{DynamicResource ThemeHeaderBgBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExpandAllCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandAll]}">
+                <PathIcon Data="{StaticResource IconArrowExpandAll}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding CollapseAllCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tree_CollapseAll]}">
+                <PathIcon Data="{StaticResource IconArrowCollapseAll}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExpandToCurrentCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tree_ExpandToCurrent]}">
+                <PathIcon Data="{StaticResource IconLocation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <ToggleButton Classes="ToolbarButton ToolbarIcon"
+                            IsChecked="{Binding AutoExpandTree}"
+                            IsEnabled="{Binding IsArchiveLoaded}"
+                            ToolTip.Tip="{Binding LocalizedStrings[Tree_AutoExpand]}">
+                <PathIcon Data="{StaticResource IconLocationCheckmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </ToggleButton>
+            </StackPanel>
+          </Border>
+          <!-- Header -->
+          <TextBlock Grid.Row="1"
+                     Text="{Binding LocalizedStrings[Tree_Browse]}"
+                     Margin="8,4"
+                     FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          <!-- Tree search -->
+          <TextBox Grid.Row="2"
+                   MinHeight="{DynamicResource ControlHeightSm}"
+                   x:Name="TreeSearchBox"
+                   Text="{Binding TreeFilterText}"
+                   PlaceholderText="{Binding LocalizedStrings[Tree_Filter]}"
+                   Margin="4,0,4,2"
+                   Background="{DynamicResource ThemeWindowBgBrush}"
+                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          <!-- TreeView with IsExpanded/IsVisible bindings -->
+          <TreeView Grid.Row="3"
+                    ItemsSource="{Binding FolderTreeItems}"
+                    SelectedItem="{Binding SelectedFolder}"
+                    BorderThickness="0"
+                    Background="Transparent">
+            <TreeView.Styles>
+              <Style Selector="TreeViewItem" x:CompileBindings="False">
+                <Setter Property="IsExpanded" Value="{Binding IsExpanded}" />
+                <Setter Property="IsVisible" Value="{Binding IsVisible}" />
+                <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+              </Style>
+            </TreeView.Styles>
+            <TreeView.ItemTemplate>
+              <TreeDataTemplate ItemsSource="{Binding Children}">
+                <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
+                <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
+                            Margin="4,2"
+                            Background="Transparent">
+                  <PathIcon Data="{StaticResource IconFolder}"
+                            Width="14" Height="14"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding Name}"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </StackPanel>
+              </TreeDataTemplate>
+            </TreeView.ItemTemplate>
+          </TreeView>
+        </Grid>
+      </Border>
+
+      <GridSplitter x:Name="TreeFileSplitter"
+                    Grid.Column="1"
+                    Width="5" />
+
+      <!-- File list panel (col 2) with file list toolbar -->
+      <Grid x:Name="FileListPanel"
+            Grid.Column="2">
+        <Grid RowDefinitions="Auto,Auto,*">
+          <!-- File list toolbar -->
+          <Border Grid.Row="0"
+                  Padding="4,2"
+                  Background="{DynamicResource ThemeHeaderBgBrush}">
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <!-- Navigation group -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding GoRootCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Nav_GoRoot]}">
+                <PathIcon Data="{StaticResource IconHome}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding GoUpCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                       ToolTip.Tip="{Binding LocalizedStrings[Nav_GoUp]}">
+                <PathIcon Data="{StaticResource IconArrowUp}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding GoBackCommand}"
+                      IsEnabled="{Binding CanGoBack}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Nav_GoBack]}">
+                <PathIcon Data="{StaticResource IconChevronLeft}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding GoForwardCommand}"
+                      IsEnabled="{Binding CanGoForward}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Nav_GoForward]}">
+                <PathIcon Data="{StaticResource IconChevronRight}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <!-- Copy name -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding CopyFileNameCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_CopyName]}">
+                <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <!-- View mode toggle -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding CycleViewModeCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_ViewMode]}">
+                <PathIcon Data="{StaticResource IconGrid}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <TextBlock Text="{Binding ViewModeLabel}"
+                         FontSize="10"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center" />
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Select All / Invert -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding SelectAllCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_SelectAll]}">
+                <PathIcon Data="{StaticResource IconSelectAll}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding InvertSelectionCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_InvertSelection]}">
+                <PathIcon Data="{StaticResource IconProhibited}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Extract Selected To... -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExtractSelectedToCommand}"
+                      IsVisible="False"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedTo]}">
+                <PathIcon Data="{StaticResource IconExport}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding ExtractSelectedHereCommand}"
+                      IsVisible="False"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Tooltip_ExtractSelectedHere]}">
+                <PathIcon Data="{StaticResource IconPin}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Refresh -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding RefreshArchiveCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[Toolbar_Refresh]}">
+                <PathIcon Data="{StaticResource IconRefresh}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+
+              <Border Width="1" Height="20" Margin="2,0"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeBorderBrush}" />
+
+              <!-- Flatten toggle (moved from global toolbar) -->
+              <ToggleButton Classes="ToolbarButton ToolbarIcon"
+                            IsChecked="{Binding ShowSubfolders}"
+                            IsEnabled="{Binding IsArchiveLoaded}"
+                            ToolTip.Tip="{Binding LocalizedStrings[Tooltip_Subfolders]}">
+                <PathIcon Data="{StaticResource IconFolder}" Width="13" Height="13" />
+              </ToggleButton>
+            </StackPanel>
+          </Border>
+
+          <!-- Address bar row -->
+          <Border Grid.Row="1"
+                  Padding="6,3"
+                  Background="{DynamicResource ThemeHeaderBgBrush}">
+            <AutoCompleteBox Height="{DynamicResource ControlHeightSm}"
+                             x:Name="AddressBar"
+                             Text="{Binding CurrentFolder}"
+                             ItemsSource="{Binding FolderPaths}"
+                             FilterMode="StartsWith"
+                             PlaceholderText="{Binding LocalizedStrings[Nav_AddressBar]}"
+                             KeyDown="AddressBar_KeyDown"
+                             Background="{DynamicResource ThemeWindowBgBrush}"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+          </Border>
+
+          <!-- DataGrid -->
+          <DataGrid x:Name="FileListGrid"
+                    Grid.Row="2"
+                    ItemsSource="{Binding CurrentEntries}"
+                    SelectedItem="{Binding SelectedEntry}"
+                    AutoGenerateColumns="False"
+                    CanUserSortColumns="True"
+                    CanUserResizeColumns="True"
+                    CanUserReorderColumns="True"
+                    IsReadOnly="True"
+                    RowHeight="{DynamicResource ControlHeightMd}"
+                    >
+            <DataGrid.Styles>
+              <!-- 列标题右键菜单：切换列显隐（菜单项在 Opening 事件中动态构建，见 ColumnHeaderContextMenu_Opening） -->
+              <Style Selector="DataGridColumnHeader">
+                <Setter Property="ContextMenu">
+                  <ContextMenu Opening="ColumnHeaderContextMenu_Opening" />
+                </Setter>
+              </Style>
+            </DataGrid.Styles>
+            <DataGrid.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"
+                          Command="{Binding ExtractArchiveCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedHere]}"
+                          Command="{Binding ExtractSelectedHereCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedTo]}"
+                          Command="{Binding ExtractSelectedToCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_SmartExtract]}"
+                          Command="{Binding SmartExtractCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractTo]}"
+                          Command="{Binding ExtractToCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyName]}"
+                          Command="{Binding CopyFileNameCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyPath]}"
+                          Command="{Binding CopyFilePathCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
+                          Command="{Binding TestEntryCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
+                          Command="{Binding DeleteFilesCommand}" />
+              </ContextMenu>
+            </DataGrid.ContextMenu>
+            <DataGrid.Columns>
+              <DataGridTemplateColumn Header="" Width="22" Tag="Icon">
+                <DataTemplate>
+                  <Image Source="{Binding IconSource}"
+                         Width="16" Height="16"
+                         VerticalAlignment="Center"
+                         HorizontalAlignment="Center" />
+                </DataTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTextColumn SortMemberPath="Name"
+                                  Width="250"
+                                  MinWidth="120"
+                                  MaxWidth="800">
+                <DataGridTextColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" />
+                        <TextBlock x:Name="NameHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTextColumn.Header>
+                <DataGridTextColumn.Binding>
+                  <Binding Path="NameDisplay" />
+                </DataGridTextColumn.Binding>
+              </DataGridTextColumn>
+              <DataGridTemplateColumn SortMemberPath="Size"
+                                      Width="80"
+                                      MinWidth="60"
+                                      MaxWidth="400">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconRuler}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" />
+                        <TextBlock x:Name="SizeHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="SizeRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding SizeDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn SortMemberPath="CompressedSize"
+                                      Width="70"
+                                      MinWidth="60"
+                                      MaxWidth="400">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" />
+                        <TextBlock x:Name="CompressedSizeHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="CompressedSizeRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding CompressedSizeDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn SortMemberPath="RatioSort"
+                                      Width="70"
+                                      MinWidth="60"
+                                      MaxWidth="300">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconDataBarVertical}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" />
+                        <TextBlock x:Name="RatioHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarRatioBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="RatioBarValue" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding RatioDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+              <DataGridTemplateColumn SortMemberPath="LastModified"
+                                      Width="100"
+                                      MinWidth="80"
+                                      MaxWidth="400">
+                <DataGridTemplateColumn.Header>
+                    <StackPanel Orientation="Horizontal" Spacing="3">
+                        <PathIcon Data="{StaticResource IconCalendar}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" />
+                        <TextBlock x:Name="LastModifiedHeaderArrow" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                    </StackPanel>
+                </DataGridTemplateColumn.Header>
+                <DataGridTemplateColumn.CellTemplate>
+                  <DataTemplate>
+                    <Grid>
+                      <Rectangle Fill="{DynamicResource ProgressBarDateBrush}"
+                                 HorizontalAlignment="Left">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="DateRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <TextBlock Text="{Binding LastModifiedDisplay}"
+                                 VerticalAlignment="Center"
+                                 Margin="4,0" />
+                    </Grid>
+                  </DataTemplate>
+                </DataGridTemplateColumn.CellTemplate>
+              </DataGridTemplateColumn>
+            </DataGrid.Columns>
+          </DataGrid>
+        </Grid>
+      </Grid>
+
+      <GridSplitter x:Name="PreviewColSplitter"
+                    Grid.Column="3"
+                    Width="5" />
+
+      <!-- 水平分隔条：位置 1/2/3 时可见（Row 1），Column/ColumnSpan 由 ApplyPreviewPosition 注入 -->
+      <GridSplitter x:Name="PreviewRowSplitter"
+                    Grid.Row="1"
+                    Height="4"
+                    IsVisible="False" />
+
+      <!-- 预览占位 host：真正的 PreviewPanel 由 EnsurePreviewPanel 在首帧后延迟创建并填充（启动提速，
+           把 855 行预览控件树挪出启动关键路径）。IsVisible 绑定 MainWindowViewModel.IsPreviewVisible
+           （菜单勾选态；原面板级绑定经 DataContext=Preview 解析到 PreviewViewModel.IsPreviewVisible，
+           语义不同——原面板内部 Show* 置 true 的内容驱动逻辑保持在面板内部不变）。 -->
+      <ContentControl x:Name="PreviewPanelHost"
+                      Grid.Column="4"
+                      IsVisible="{Binding IsPreviewVisible}">
+        <!-- PreviewPanel 由 code-behind 的 EnsurePreviewPanel 填充 -->
+      </ContentControl>
+
+      <!-- 拖拽添加覆层（DragOver 悬停期间显示：覆盖文件列表列，视觉对齐拖拽解压覆层——
+            状态色背景呼吸透明 alpha 40-120、8px 同色不透明边框、白色粗体文字+阴影、✓/⚠ 状态图标。
+            呼吸由 code-behind DispatcherTimer 驱动，仅背景层 Opacity 呼吸，边框/文字保持不透明） -->
+      <Border x:Name="DragAddOverlay"
+              Grid.Column="2"
+              Grid.Row="0"
+              IsVisible="False"
+              IsHitTestVisible="False"
+              BorderBrush="#6BD46B"
+              BorderThickness="8"
+              ZIndex="10">
+        <Grid>
+          <Border x:Name="DragAddOverlayBg" Background="#6BD46B" />
+          <StackPanel VerticalAlignment="Center"
+                      HorizontalAlignment="Center"
+                      Spacing="{DynamicResource SpacingMd}"
+                      Margin="40,0">
+            <TextBlock x:Name="DragAddOverlayIcon"
+                      Text="&#x2713;"
+                      FontSize="48"
+                      FontWeight="Bold"
+                      Foreground="#90E060"
+                      FontFamily="Segoe UI Symbol"
+                      HorizontalAlignment="Center">
+              <TextBlock.Effect>
+                <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="3" Color="#B0000000" />
+              </TextBlock.Effect>
+            </TextBlock>
+            <TextBlock x:Name="DragAddOverlayText"
+                      FontSize="24"
+                      FontWeight="Bold"
+                      Foreground="White"
+                      TextAlignment="Center"
+                      TextWrapping="Wrap"
+                      MaxWidth="560">
+              <TextBlock.Effect>
+                <DropShadowEffect OffsetX="1" OffsetY="1" BlurRadius="3" Color="#B0000000" />
+              </TextBlock.Effect>
+            </TextBlock>
+          </StackPanel>
+        </Grid>
+      </Border>
+  </Grid>
+</UserControl>

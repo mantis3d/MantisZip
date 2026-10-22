@@ -41,6 +41,18 @@
   - **负向验证**：临时夹具（假 `MantisZip.sln` + 两份不同版本号 + 缺文件 + 缺/多/重复 key + 占位符错位）跑 `-Task check` 返回 exit 1 并逐条报出，排除「永远绿」的假门禁。
   - **环境限制（非缺陷）**：DSH workspace-write 沙箱下 `dotnet build` 写 `obj/` 报 `MSB3491 … Access to the path … is denied`，Node 起带管道的子进程报 `spawn EPERM`；脚本/插件在完全权限或 CI 上正常，README 已记录两种现象与绕过方式。
   - **后续**：CI 接线（`-Task check` + 装 7-Zip 放开 `SevenZipEngine` 过滤）与第 4 层工具（`hygiene` / `docs` / `installer`）不在本期。
+**2026-10-21** — 启动优化阶段 2：压缩包内容区延迟加载（XamlSpan −108ms）
+  - **范围**：MainWindow.axaml 的压缩包内容区（ArchiveContentGrid：目录树 / 文件列表 DataGrid / 地址栏 / 3 个 Splitter / 预览面板宿主 / 拖拽添加覆层，~153 元素）——压缩包未打开时不可见，启动路径不需实例化。
+  - **切割**：用 `git show HEAD:...MainWindow.axaml` + XDocument（`SetLineInfo`）取精确行号，搬走 **671..1158** 行（**勿用肉眼下标**：文件每改一次行号就漂移；PowerShell 5.1 读行号用 `([System.Xml.IXmlLineInfo]$x).LineNumber`，需 `Add-Type -AssemblyName System.Xml.Linq`）。视图根 Grid **即原 ArchiveContentGrid**（ColumnDefinitions="1*,5,2.5*,5,3*" / RowDefinitions="*,0,0" 与子元素坐标原样保留）→ 布局零变化。
+  - **新文件**：Controls/ArchiveContentView.axaml（499 行，根节点 `x:DataType="vm:MainWindowViewModel"`）+ ArchiveContentView.axaml.cs（公开具名控件，属性名统一加 `Control` 后缀——**与 XAML 编译器为 x:Name 生成的字段同名会 CS0102**）+ ArchiveContentView.Events.cs（随迁 ColumnHeaderContextMenu_Opening + 4 个辅助方法、AddressBar_KeyDown）。
+  - **宿主与触发**：MainWindow.axaml Row3 = 空态 Border（`BoolInvertConverter`）+ `<ContentControl x:Name="ArchiveContentHost" />`；`MainWindow.EnsureArchiveContent()` 在 `IsArchiveLoaded` 首次为 true 时创建（vm.PropertyChanged 钩子）；视图根 Grid 保留 `IsVisible="{Binding IsArchiveLoaded}"` → 与空态互斥。
+  - **启动期恢复动作延后**：ApplyColumnStates / UpdateSortArrows / ApplySavedLayout / ApplyPreviewLayout 从构造期挪进 EnsureArchiveContent()（构造期只保留 `WindowStateManager.Load` 读盘 → `_pendingColumnStates`）。
+  - **事件归属**：4 个 DataGrid 事件（SelectionChanged / DoubleTapped / KeyDown / Sorting）**留在 MainWindow**，由 EnsureArchiveContent() 手动订阅；列头右键菜单与地址栏回车依赖视图内部几何 → 随视图迁入。
+  - **两个必踩的坑**：① 拆出后 `this.FindControl<DataGrid>("FileListGrid")` 取不到（namescope 变更）→ 拖拽接线抽成 `SetupFileListDragDrop()`，在内容区创建时调用；② 内容区未创建时 `CaptureColumnStates()` 必须**原样回写**启动时读到的快照，否则空列表会覆盖用户已保存的列宽/显隐（`WindowStateManager.Save` 把 null 归一化成空表）。
+  - **测试**：新增 MainArchiveContentLazyLoadTests 3 条（默认不创建 / 加载后创建且只创建一次 / 视图含 FileListGrid+PreviewPanelHost+FolderTreeBorder+DragAddOverlay）。
+  - **测量**（A/B 交错 8 轮 × 3 次，基线 = HEAD `4d2b6417` 的 worktree 发布）：**XamlSpan −68 ~ −108ms**（338.7→230.7 / 300.4→232.6 / 335.4→258.9ms）；末次 CtorSpan 419.5→323.9ms（−95.6ms）、WinSpan 860.8→795.5ms（−65.3ms）；InitDone 持平（收益全部来自内容区不再膨胀）。TOTAL 噪声大（1450–1900ms 波动）→ 以 XamlSpan 为准。
+  - **验证**：Release 构建 0 警告 0 错误；UI 全量通过（verify-repo -Task test -Target ui-tests ok=true）；`dotnet format analyzers --verify-no-changes --severity warn` exit 0；`-Task check` 全过（版本 6 处 0.5.3 / 三语 1276 key / 4 项规则守卫）。
+  - **后续**：阶段 3（菜单子项 ~170 元素）待做；**每阶段完成后停下由用户手动验证**（目录树 / 文件列表 / 列头菜单 / 排序 / 预览面板位置 / 拖拽添加覆层 / 分栏拖拽 / 列宽持久化）；计划 .omo/plans/进行中/startup-ui-lazy-loading.md。
 **2026-10-21** — 启动优化阶段 1：过滤栏延迟加载（XamlSpan −27ms）
   - **依据**：MainWindow.axaml 1393 行 / 485 元素，启动时**默认隐藏**的过滤栏（50 元素）与内容区（171 元素）合计 46% 白白膨胀；校准：预览面板延迟（297 元素）历史上整体启动 −9% ⇒ ≈0.4–0.5ms/元素。
   - **实现**：过滤栏抽出为 Controls/MainFilterBar.axaml + MainFilterBar.axaml.cs（搬入 4 个 picker 处理器与 WritePickerTrace）；NullableLongConverter 局部资源随之迁入；MainWindow.axaml Row2 改为 <ContentControl x:Name="FilterBarHost" />，由 MainWindow.EnsureFilterBar() 在 IsFilterBarVisible 首次为 true 时创建（参照 EnsurePreviewPanel 先例）；新文件根节点显式 x:CompileBindings="False"（Avalonia 12 默认编译绑定，抽出后必须显式声明）。
