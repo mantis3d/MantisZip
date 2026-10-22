@@ -31,6 +31,9 @@ public partial class ZipEngine
         if (maxParallelism <= 0) maxParallelism = Environment.ProcessorCount;
         if (maxParallelism > 16) maxParallelism = 16;
 
+        // 阶段 1：读取压缩包目录（快检文件数以决定串行/并行，zip 中央目录解析阶段）
+        progress.ReportPhase(ArchivePhase.ReadingArchive);
+
         // 先快速检查文件数量决定是否走并行
         int fileCount;
         using (var quickArchive = OpenArchiveWithEncodingFallback(archivePath, password))
@@ -79,6 +82,9 @@ public partial class ZipEngine
             var conflictStats = new ConflictStatsCounter();
 
             CoreLog.Info($"ExtractAsyncSequential: {entries.Count} entries, {totalBytes} total bytes");
+
+            // 阶段 2：正式解出条目
+            progress.ReportPhase(ArchivePhase.Extracting);
 
             foreach (var entry in allEntries)
             {
@@ -243,6 +249,9 @@ public partial class ZipEngine
                 PercentComplete = 100
             }));
 
+            // 阶段 3：收尾（回填文件时间、汇总冲突统计）
+            progress.ReportPhase(ArchivePhase.Finalizing);
+
             CoreLog.Info($"ExtractAsyncSequential: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
             var seqStats = conflictStats.Snapshot;
             return new ExtractResult
@@ -280,6 +289,9 @@ public partial class ZipEngine
         // 上报顺序可能交错，导致消费端看到进度回退）。专用锁不与 syncLock（字节计数热路径）
         // 共用 —— 禁止在 syncLock 内 Report，避免历史 25x 锁竞争回退（见 AGENTS.md 并行解压架构）。
         progress = progress is null ? null : new MonotonicProgress(progress);
+
+        // 阶段 1：读取压缩包目录（预读全部条目 Key/Size/时间，单线程打开 archive）
+        progress.ReportPhase(ArchivePhase.ReadingArchive);
 
         // 1. 获取所有条目键和文件大小（单线程打开 archive 一次）
         var entryInfos = new List<(string Key, long Size, DateTime? Modified)>();
@@ -346,6 +358,9 @@ public partial class ZipEngine
             .Select((b, idx) => (Index: idx, Items: b))
             .ToList();
         int actualParallelism = nonEmptyBatches.Count;
+
+        // 阶段 2：正式解出条目（分批并行）
+        progress.ReportPhase(ArchivePhase.Extracting);
 
         // 5. 并行解压：每批次一个线程，复用 1 个 archive 实例
         int processedFiles = 0;
@@ -724,6 +739,9 @@ public partial class ZipEngine
             PercentComplete = 100
         }));
 
+        // 阶段 3：收尾（汇总冲突统计）
+        progress.ReportPhase(ArchivePhase.Finalizing);
+
         CoreLog.Info($"ExtractAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         var parStats = conflictStats.Snapshot;
         return new ExtractResult
@@ -755,6 +773,9 @@ public partial class ZipEngine
         int maxParallelism = options?.ParallelExtractDegree ?? 0;
         if (maxParallelism <= 0) maxParallelism = Environment.ProcessorCount;
         if (maxParallelism > 16) maxParallelism = 16;
+
+        // 阶段 1：读取压缩包目录（命中条目预读）
+        progress.ReportPhase(ArchivePhase.ReadingArchive);
 
         // 先快速检查命中文件数决定是否走并行（与 ExtractAsync 决策逻辑一致）
         int fileCount;
@@ -799,6 +820,8 @@ public partial class ZipEngine
         {
             using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
             var entries = archive.Entries.ToList();
+            // 阶段 2：正式解出条目
+            progress.ReportPhase(ArchivePhase.Extracting);
             // entryKeys（来自预览树 FilteredEntryKeys）以 '/' 分隔；SharpCompress 在 Windows 下
             // 可能返回 '\' 分隔的 Key，统一归一化后再匹配（预览 = 实际 的保证）
             var totalBytes = entries.Where(e => entryKeys.Contains(ArchivePath.Normalize(e.Key))).Sum(e => e.Size);
@@ -971,6 +994,9 @@ public partial class ZipEngine
                 PercentComplete = 100
             }));
 
+            // 阶段 3：收尾（汇总冲突统计）
+            progress.ReportPhase(ArchivePhase.Finalizing);
+
             CoreLog.Info($"ExtractEntriesAsyncSequential: done, {processedFiles} files, failedEntries={failedEntries}, {sw.ElapsedMilliseconds}ms");
         }, cancellationToken).ConfigureAwait(false);
 
@@ -999,6 +1025,9 @@ public partial class ZipEngine
 
         // 主进度单调包装：与 ExtractAsyncParallel 相同，根治并行批次快照乱序导致的进度回退
         progress = progress is null ? null : new MonotonicProgress(progress);
+
+        // 阶段 1：读取压缩包目录（预读命中条目 Key/Size/时间）
+        progress.ReportPhase(ArchivePhase.ReadingArchive);
 
         // 1. 预读所有命中条目（单线程打开 archive 一次）：文件（Key/Size/Modified/输出路径）+ 目录 key
         var entryInfos = new List<(string Key, long Size, DateTime? Modified, string OutputPath)>();
@@ -1073,6 +1102,9 @@ public partial class ZipEngine
             .Select((b, idx) => (Index: idx, Items: b))
             .ToList();
         int actualParallelism = nonEmptyBatches.Count;
+
+        // 阶段 2：正式解出条目（分批并行）
+        progress.ReportPhase(ArchivePhase.Extracting);
 
         // 5. 并行解压：每批次一个线程，复用 1 个 archive 实例
         int processedFiles = 0;
@@ -1449,6 +1481,9 @@ public partial class ZipEngine
             CurrentFile = string.Empty,
             PercentComplete = 100
         }));
+
+        // 阶段 3：收尾（汇总冲突统计）
+        progress.ReportPhase(ArchivePhase.Finalizing);
 
         CoreLog.Info($"ExtractEntriesAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         CoreLog.Exit();

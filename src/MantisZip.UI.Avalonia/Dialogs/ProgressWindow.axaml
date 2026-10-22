@@ -1,4 +1,4 @@
-﻿<!-- 进度窗口。
+<!-- 进度窗口。
      高度下限（MinHeight）双机制：XAML 的 100 仅为初始兜底；真实下限由 code-behind
      LayoutUpdated 动态设置为「内容自然高度 + 窗口 chrome」，保证任何状态 UI 不被裁切。 -->
 <Window xmlns="https://github.com/avaloniaui"
@@ -860,11 +860,19 @@
                      Foreground="{DynamicResource ThemeProgressFillBrush}"
                      Background="{DynamicResource ThemeProgressBgBrush}"/>
 
-        <!-- 文件计数（压缩包 N/M；非批次模式为 1/1） -->
-        <TextBlock x:Name="FileCountText"
-                   Text="{Binding FileCountText}"
-                   FontSize="11"
-                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+        <!-- 文件计数行：常规阶段显示「压缩包 N/M」，扫描阶段改为「已发现 N 个文件」（同位置互斥显隐） -->
+        <Grid>
+          <TextBlock x:Name="FileCountText"
+                     Text="{Binding FileCountText}"
+                     IsVisible="{Binding !HasScanCount}"
+                     FontSize="11"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+          <TextBlock x:Name="ScanCountText"
+                     Text="{Binding ScanCountText}"
+                     IsVisible="{Binding HasScanCount}"
+                     FontSize="11" FontWeight="SemiBold"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+        </Grid>
 
         <!-- 时间行：左「已用」由 code-behind DispatcherTimer 每秒刷新，右「剩余」为 ETA（无效时为空） -->
         <Grid ColumnDefinitions="*,Auto">

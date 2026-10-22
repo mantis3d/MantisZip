@@ -337,6 +337,32 @@ public enum EntryFailureReason
 }
 
 /// <summary>
+/// 压缩/解压/测试的操作阶段。引擎在阶段边界主动上报（Progress.Phase），
+/// UI 据此把「状态行」从固定标题改为阶段性文案（状态行只显示阶段名，计数器另有去处）。
+/// 未上报 = null，UI 保持既有行为（窗口标题文案），故新增阶段不影响旧调用方。
+/// </summary>
+public enum ArchivePhase
+{
+    /// <summary>递归扫描源路径、统计文件数与总字节（总进度未知 → UI 走不定进度条）。</summary>
+    Scanning,
+
+    /// <summary>读取压缩包目录/条目列表（解压、测试、追加前的预读；ZIP 中央目录 / 7z 归档头 / tar 头部扫描）。</summary>
+    ReadingArchive,
+
+    /// <summary>写出压缩数据（含加密走 7z 原生、并行分组、分卷写出）。</summary>
+    Compressing,
+
+    /// <summary>把条目解出到磁盘。</summary>
+    Extracting,
+
+    /// <summary>收尾：合并分组/分卷、补写 ZIP 注释、后置回填统计、清理临时文件。</summary>
+    Finalizing,
+
+    /// <summary>校验压缩包完整性（测试 CRC / 归档结构）。</summary>
+    Testing,
+}
+
+/// <summary>
 /// 压缩/解压进度报告
 /// </summary>
 public class ArchiveProgress
@@ -347,6 +373,12 @@ public class ArchiveProgress
     public int TotalFiles { get; set; }
     public int ProcessedFiles { get; set; }
     public double PercentComplete { get; set; }
+
+    /// <summary>
+    /// 本次上报所属的操作阶段。null = 未分类的常规进度上报（UI 保持窗口标题文案）。
+    /// 引擎只在阶段边界上报（带此字段的报告允许其它字段为默认值）。
+    /// </summary>
+    public ArchivePhase? Phase { get; set; }
 
     /// <summary>当前文件的解压/压缩进度 (0–100)，null 表示无此信息。</summary>
     public double? FilePercentComplete { get; set; }
@@ -402,6 +434,16 @@ public class ArchiveProgress
 
     /// <summary>整体压缩后字节（后置回填；0 = 未知）。</summary>
     public long TotalCompressedBytes { get; set; }
+}
+
+/// <summary>
+/// 阶段上报便捷入口：引擎在阶段边界调用一次即可，无需构造完整进度报告。
+/// </summary>
+public static class ArchiveProgressPhaseExtensions
+{
+    /// <summary>上报一个只携带 <see cref="ArchiveProgress.Phase"/> 的进度报告（progress 为 null 时静默跳过）。</summary>
+    public static void ReportPhase(this IProgress<ArchiveProgress>? progress, ArchivePhase phase)
+        => progress?.Report(new ArchiveProgress { Phase = phase });
 }
 
 /// <summary>

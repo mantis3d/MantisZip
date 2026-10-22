@@ -30,6 +30,9 @@ public class TarGzEngine : IArchiveEngine
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}");
         var sw = Stopwatch.StartNew();
 
+        // 阶段 1：读取 tar/gz 头部（TarReader 定位到首个条目）
+        progress.ReportPhase(ArchivePhase.ReadingArchive);
+
         var result = await Task.Run(async () =>
         {
             var ext = Path.GetExtension(archivePath).ToLowerInvariant();
@@ -39,6 +42,9 @@ public class TarGzEngine : IArchiveEngine
             int successCount = 0, failedEntries = 0;
             var conflictStats = new ConflictStatsCounter();
             long bytesTotal = 0; // 链尾最终报告使用；tar 分支=压缩流长度，gz 分支=gz 流长度
+
+            // 阶段 2：正式解出条目
+            progress.ReportPhase(ArchivePhase.Extracting);
 
             if (isTarGz || ext == ".tar")
             {
@@ -266,6 +272,9 @@ public class TarGzEngine : IArchiveEngine
                 ProcessedBytes = bytesTotal
             }));
 
+            // 阶段 3：收尾（汇总冲突统计）
+            progress.ReportPhase(ArchivePhase.Finalizing);
+
             CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
             var tarStats = conflictStats.Snapshot;
             return new ExtractResult { SucceededEntries = successCount, FailedEntries = failedEntries, SkippedEntries = tarStats.Skipped, OverwrittenEntries = tarStats.Overwritten };
@@ -289,8 +298,14 @@ public class TarGzEngine : IArchiveEngine
                 var isTarGz = ext == ".tgz" || outputPath.EndsWith(".tar.gz");
                 CoreLog.Info($"CompressAsync: format=tar.gz={isTarGz}");
 
+                // 阶段 1：扫描源目录
+                progress.ReportPhase(ArchivePhase.Scanning);
+
                 var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
                 CoreLog.Info($"CompressAsync: {files.Count} files to compress");
+
+                // 阶段 2：正式写出 tar/gz
+                progress.ReportPhase(ArchivePhase.Compressing);
 
                 long totalSourceBytes = 0; // 源文件未压缩字节总和（tar 逐文件累加，gz 为单文件大小）
 
@@ -408,6 +423,7 @@ public class TarGzEngine : IArchiveEngine
                 });
 
                 CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
+                progress.ReportPhase(ArchivePhase.Finalizing);
             }
             catch (OperationCanceledException)
             {
@@ -601,6 +617,8 @@ public class TarGzEngine : IArchiveEngine
         if (!string.IsNullOrEmpty(password))
             CoreLog.Info($"WARN: TarGzEngine.TestArchiveAsync: password provided but TAR/GZ format does not support encryption (archive: {archivePath})");
         CoreLog.Info($"TestArchiveAsync: {archivePath}");
+
+        progress.ReportPhase(ArchivePhase.Testing);
 
         try
         {

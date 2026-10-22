@@ -436,6 +436,9 @@ public class SevenZipEngine : IArchiveEngine
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
         var sw = Stopwatch.StartNew();
 
+        // 阶段 1：读取归档头（7z 打开归档并载入条目表）
+        progress.ReportPhase(ArchivePhase.ReadingArchive);
+
         EnsureLibraryPath();
 
         var result = await Task.Run(async () =>
@@ -463,6 +466,9 @@ public class SevenZipEngine : IArchiveEngine
             var reportInterval = TimeSpan.FromMilliseconds(100);
             long totalBytes = allEntries.Where(e => !e.IsDirectory).Sum(e => (long)e.Size);
             long processedBytes = 0;
+
+            // 阶段 2：正式解出条目
+            progress.ReportPhase(ArchivePhase.Extracting);
 
             // 逐条目提取（使用 ExtractFile(index, stream) 支持所有 7z 类型包括 solid 归档）
             for (int i = 0; i < allEntries.Count; i++)
@@ -648,6 +654,9 @@ public class SevenZipEngine : IArchiveEngine
                 ProcessedBytes = totalBytes,
             }));
 
+            // 阶段 3：收尾（汇总冲突统计）
+            progress.ReportPhase(ArchivePhase.Finalizing);
+
             CoreLog.Info($"ExtractAsync: done, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
             var extractStats = conflictStats.Snapshot;
             return new ExtractResult { SucceededEntries = processedFiles, FailedEntries = failedEntries, SkippedEntries = extractStats.Skipped, OverwrittenEntries = extractStats.Overwritten };
@@ -670,6 +679,8 @@ public class SevenZipEngine : IArchiveEngine
         CoreLog.Info($"CompressAsync: [{string.Join("; ", sourcePaths)}] -> {outputPath}, level={options.CompressionLevel}");
         var sw = Stopwatch.StartNew();
 
+        progress.ReportPhase(ArchivePhase.Scanning);
+
         EnsureLibraryPath();
 
         await Task.Run(() =>
@@ -691,6 +702,9 @@ public class SevenZipEngine : IArchiveEngine
 
                 long totalSourceBytes = SumSourceFileSizes(validated);
                 AttachCompressorProgress(compr, progress, totalSourceBytes);
+
+                // 阶段 2：正式压缩（7z 原生单次调用，进度来自压缩器事件）
+                progress.ReportPhase(ArchivePhase.Compressing);
 
                 // 单一目录·无白名单·且无文件被跳过 → 保留 CompressDirectory 的 PreserveDirectoryRoot 语义
                 bool singleDirClean = sourcePaths.Length == 1
@@ -738,6 +752,7 @@ public class SevenZipEngine : IArchiveEngine
                 });
 
                 CoreLog.Info($"CompressAsync: done, {sw.ElapsedMilliseconds}ms");
+                progress.ReportPhase(ArchivePhase.Finalizing);
             }
             catch (OperationCanceledException)
             {
@@ -825,6 +840,8 @@ public class SevenZipEngine : IArchiveEngine
     {
         CoreLog.Entry();
         CoreLog.Info($"TestArchiveAsync: {archivePath}");
+
+        progress.ReportPhase(ArchivePhase.Testing);
 
         EnsureLibraryPath();
 

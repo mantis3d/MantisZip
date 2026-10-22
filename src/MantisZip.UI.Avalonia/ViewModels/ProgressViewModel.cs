@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -812,6 +812,9 @@ public partial class ProgressViewModel : ObservableObject
     public void BeginPreparing()
     {
         _isPreparing = true;
+        // 新一轮操作：阶段与扫描计数归零（上一档案的「正在收尾…」「已发现 N 个」不得残留）
+        _activePhase = null;
+        ScanCountText = null;
         IsIndeterminate = true;
         _preparingText = LocalizationManager.T("Progress_Preparing");
         StatusMessage = _preparingText;
@@ -835,7 +838,56 @@ public partial class ProgressViewModel : ObservableObject
     /// 回退到总进度 PercentComplete，避免长时间僵死在 0%。</summary>
     private bool _hasFilePercent;
 
+    // ════════════════════════════════════════════
+    //  阶段态（引擎上报 ArchivePhase）
+    // ════════════════════════════════════════════
 
+    /// <summary>最近一次引擎上报的阶段（null = 本次操作尚未上报阶段）。</summary>
+    private ArchivePhase? _activePhase;
+
+    /// <summary>扫描阶段「已发现 N 个文件」文案；非扫描阶段为 null（文件计数行回到 N/M）。</summary>
+    [ObservableProperty]
+    private string? _scanCountText;
+
+    /// <summary>扫描计数可见性：与 <see cref="FileCountText"/> 在信息区文件计数行互斥显隐。</summary>
+    public bool HasScanCount => !string.IsNullOrEmpty(ScanCountText);
+
+    partial void OnScanCountTextChanged(string? value) => OnPropertyChanged(nameof(HasScanCount));
+
+    /// <summary>阶段 → 本地化文案 key。</summary>
+    private static string PhaseKey(ArchivePhase phase) => phase switch
+    {
+        ArchivePhase.Scanning => "Progress_Phase_Scanning",
+        ArchivePhase.ReadingArchive => "Progress_Phase_ReadingArchive",
+        ArchivePhase.Compressing => "Progress_Phase_Compressing",
+        ArchivePhase.Extracting => "Progress_Phase_Extracting",
+        ArchivePhase.Finalizing => "Progress_Phase_Finalizing",
+        _ => "Progress_Phase_Testing",
+    };
+
+    /// <summary>
+    /// 应用引擎阶段上报：状态行改为阶段文案（只显示阶段名，计数器另在文件计数行）；
+    /// 扫描阶段额外切不定进度条 + 显示「已发现 N 个文件」。
+    /// 暂停/失败/取消已是更具体的人为状态，阶段上报不得覆盖它们的文案。
+    /// </summary>
+    private void ApplyPhase(ArchivePhase phase)
+    {
+        _activePhase = phase;
+
+        var runningLike = StatusKind is ProgressStatusKind.Preparing or ProgressStatusKind.Running;
+        if (runningLike)
+            StatusMessage = LocalizationManager.T(PhaseKey(phase));
+
+        if (phase == ArchivePhase.Scanning)
+        {
+            if (runningLike) StatusKind = ProgressStatusKind.Running;
+            IsIndeterminate = true;   // 总数未知：进度条滚动而非僵在 0%
+            return;
+        }
+
+        IsIndeterminate = false;
+        ScanCountText = null;
+    }
 
     /// <summary>简约面板「当前文件」进度条取值：有逐文件百分比时用它，否则回退到总进度。</summary>
     public int SimpleFileBarValue => _hasFilePercent ? FilePercentComplete : PercentComplete;
@@ -852,6 +904,13 @@ public partial class ProgressViewModel : ObservableObject
         // 首个上报到达 → 结束准备态（不定进度条恢复确定态）
         EndPreparing();
 
+        // 阶段上报（引擎只在阶段边界带 Phase）：先刷状态行文案，再走常规进度处理
+        if (p.Phase.HasValue)
+        {
+            ApplyPhase(p.Phase.Value);
+            if (p.Phase.Value == ArchivePhase.Scanning)
+                ScanCountText = LocalizationManager.T("Progress_FileCount_Scanning", p.TotalFiles);
+        }
 
         // Task 6: 批次 upsert 必须在早返回【之前】——EntryStatus 上报同样携带批次身份
         // （ZipEngine.cs:3208-3220 的逐条目终态事件带 BatchIndex/BatchCount），
@@ -1511,6 +1570,8 @@ public partial class ProgressViewModel : ObservableObject
         DirName = string.Empty;
         StatusMessage = message;
         IsIndeterminate = false;
+        // 终态：扫描计数让位给最终文件计数（终态文案里已有统计摘要）
+        ScanCountText = null;
         // 已完成（成功）；失败/取消态不被覆盖（失败测试流会 SetErrorSummary→SetComplete 两步走）
         if (StatusKind is not (ProgressStatusKind.Failed or ProgressStatusKind.Cancelled))
             StatusKind = ProgressStatusKind.Completed;

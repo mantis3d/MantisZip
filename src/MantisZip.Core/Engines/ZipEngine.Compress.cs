@@ -30,6 +30,9 @@ public partial class ZipEngine
         // async lambda：N 组并行分支内部需 await Parallel.ForEachAsync / RewriteAsync
         await Task.Run(async () =>
         {
+            // 阶段 1：扫描源目录（总数未知 → UI 显「正在扫描文件…」+ 不定进度条 + 已发现计数）
+            progress.ReportPhase(ArchivePhase.Scanning);
+
             // 收集所有文件（使用 FileScanner 共享工具，边发现边报告进度）
             var (files, totalBytes) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
 
@@ -40,6 +43,9 @@ public partial class ZipEngine
             }
 
             CoreLog.Info($"CompressAsync: {files.Count} files to compress, {totalBytes} bytes total");
+
+            // 阶段 2：正式写出压缩数据
+            progress.ReportPhase(ArchivePhase.Compressing);
 
             long processedBytes = 0;
             int totalFiles = files.Count;
@@ -321,6 +327,9 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                             Interlocked.Add(ref finishedInputBytes, groupTotal);
                                         });
 
+                                    // 阶段 3：合并（静默期较长 → 状态行显「正在收尾…」）
+                                    progress.ReportPhase(ArchivePhase.Finalizing);
+
                                     // ── 合并：N 个 tempZip + Store 条目 → 最终 ZIP（copy-mode，从不解压也从不重压）──
                                     //
                                     // 【必须带 storeGroup】既有单组路径把 Store 条目作为 addEntries 交给
@@ -580,6 +589,9 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                 CoreLog.Error($"CompressAsync failed", ex);
                 throw;
             }
+
+            // 阶段 3：后置回填（读中央目录 → 期间也属收尾，状态行显「正在收尾…」）
+            progress.ReportPhase(ArchivePhase.Finalizing);
 
             // 后置回填（压缩率计划 D2）：成品 ZIP 写出后读中央目录，逐条目回填压缩后大小 + 整体汇总。
             // 仅 ZIP（本引擎）；分卷跳过（不读 .zip.001）；加密包中央目录未加密，无需密码；异常吞掉仅影响展示。

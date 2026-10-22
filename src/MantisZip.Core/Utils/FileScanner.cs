@@ -69,9 +69,14 @@ internal static class FileScanner
         var now = DateTime.Now;
         if (now - lastReportTime >= interval)
         {
+            // 扫描阶段：总数未知 → PercentComplete 恒 0（UI 据 Phase 走不定进度条）；
+            // TotalFiles 承载"已发现"数量（UI 在文件计数行显示，不塞进状态行）。
+            // CurrentFile 只放相对路径本身（不拼中文前缀，规则 13：文案一律走本地化）。
             progress?.Report(new ArchiveProgress
             {
-                CurrentFile = $"正在扫描: {currentFile} ({totalFound} 个文件)",
+                Phase = ArchivePhase.Scanning,
+                CurrentFile = currentFile,
+                TotalFiles = totalFound,
                 PercentComplete = 0,
                 FilePercentComplete = 0
             });
