@@ -1,4 +1,9 @@
 ﻿{
+  "Settings_Tab_Path": "Paths",
+  "Settings_PickerTab_GroupHeader": "File picker panel tab",
+  "Settings_PickerTab_Remember": "Remember the last used tab",
+  "Settings_PickerTab_Fixed": "Fixed tab",
+  "Settings_PickerTab_Hint": "When checked, the file picker's left panel reopens on the tab you last used. Uncheck to always start on the tab selected above.",
   "Status_Starting": "Starting…",
   "Settings_AdaptiveRuleLevel_Store": "Store",
   "Settings_AdaptiveRuleLevel_Fast": "Fast",

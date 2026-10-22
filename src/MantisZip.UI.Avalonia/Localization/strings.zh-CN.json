@@ -1,4 +1,9 @@
 ﻿{
+  "Settings_Tab_Path": "路径",
+  "Settings_PickerTab_GroupHeader": "文件选择器面板标签",
+  "Settings_PickerTab_Remember": "记住上次使用的标签",
+  "Settings_PickerTab_Fixed": "固定标签",
+  "Settings_PickerTab_Hint": "勾选后，文件选择器左侧面板会沿用上次关闭时停留的标签；取消勾选则每次固定使用上方选择的标签。",
   "Status_Starting": "正在启动…",
   "Settings_AdaptiveRuleLevel_Store": "存储",
   "Settings_AdaptiveRuleLevel_Fast": "快速",

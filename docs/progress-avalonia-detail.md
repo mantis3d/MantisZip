@@ -1,10 +1,21 @@
-# MantisZip 开发进度 — Avalonia + 共享层详细变更记录
+﻿# MantisZip 开发进度 — Avalonia + 共享层详细变更记录
 
 > 本文档为 [PROGRESS.md](PROGRESS.md) 的详细变更记录（里程碑总览见 PROGRESS.md），按日期从新到旧排列。
 
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+
+**2026-10-22** — issue #46 反馈处理（一）：文件选择器面板标签可记忆/可固定 + 设置页新增「路径」tab
+  - **来源**：GitHub issue #46（用户把意见写在截图里）。截图无法直接读取 → `web_fetch` 抓页面 HTML、正则提取 `private-user-images` 链接后下载 6 张图再逐张读。
+  - **「面板标签」与「默认路径优先级」是两套东西**（issue 里的困惑正源于此）：`Controls/QuickPathControl` 的四个标签是**来源切换**（收藏/历史/窗口/目录树）；`AppSettings.DefaultPathOrder` + `ResolveInitialPath()` 的优先级链只决定**初始目录**，与面板停在哪个标签无关。
+  - **面板标签记忆**：`AppSettings.PickerSourceTab`（存 `PathTab` 名称，空串=默认）+ `PickerRememberTab`（默认 `true`）；`Controls/QuickPathControl.axaml.cs` 增 `public static PathTab ParseTabOrDefault(string? value)`（空/未知/越界 → `PathTab.Favorites`，与旧行为一致）；`Dialogs/CustomFilePickerDialog` 打开时还原、关闭时**仅在「记住」模式**回写标签（固定模式下不回写，否则策略会被静默降级成记住）。
+  - **设置页新增「路径」tab**：`Settings_Tab_Path`；把「默认路径优先级」整块从「高级」搬入，并在下方加「文件选择器面板标签」块（勾选框 `PickerRememberTab` + 仅在未勾选时可见的 `PickerTabOptions` 下拉，按规则 6 用 `IsVisible` 而非 `IsEnabled`）。ComboBox 沿用 `Option` + `ItemTemplate{Display}` 范式。
+  - **i18n**：三语新增 5 个 `Settings_Tab_Path` / `Settings_PickerTab_*`。
+  - **测试**：新增 `QuickPathTabPersistenceTests.cs`（`ParseTabOrDefault` 12 例）与 `SettingsPickerTabOptionsTests.cs`（下拉 4 项与默认值）。
+  - **验证**：`-Task i18n`、`-Task build -Target avalonia`（0 警告）、`-Task test -Target ui-tests` 全绿。
+  - **发布说明**：按用户要求写入 `RELEASE_NOTES.md` 的 v0.5.3「交互」节。
+  - **遗留**：「最愛」的 ❤ 图标随后续「更换图标库」计划一并处理。
 
 **2026-10-22** — 上一批守卫/CI 提交的收尾修补：门禁补 alpha 分支、兜底按配置取程序集、行尾统一
   - **动机**：评审同步过来的 `4d2b641`（规则守卫 + CI 静态门禁）时实测发现四处会被真实踩到的问题，逐条修掉。

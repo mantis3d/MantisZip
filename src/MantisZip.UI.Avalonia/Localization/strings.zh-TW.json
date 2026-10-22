@@ -1,4 +1,9 @@
 ﻿{
+  "Settings_Tab_Path": "路徑",
+  "Settings_PickerTab_GroupHeader": "檔案選擇器面板標籤",
+  "Settings_PickerTab_Remember": "記住上次使用的標籤",
+  "Settings_PickerTab_Fixed": "固定標籤",
+  "Settings_PickerTab_Hint": "勾選後，檔案選擇器左側面板會沿用上次關閉時停留的標籤；取消勾選則每次固定使用上方選擇的標籤。",
   "Status_Starting": "正在啟動…",
   "Settings_AdaptiveRuleLevel_Store": "儲存",
   "Settings_AdaptiveRuleLevel_Fast": "快速",

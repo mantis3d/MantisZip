@@ -1,4 +1,4 @@
-## v0.5.3
+﻿## v0.5.3
 
 ### 文件说明 / File Description
 
@@ -24,6 +24,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Menu shortcuts now actually work** — the shortcuts shown in the menus (Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5) previously only *displayed* their key text and did nothing when pressed (in Avalonia, `MenuItem.InputGesture` is display-only); they are now registered as real global shortcuts
 - **新增常用快捷键** — Ctrl+Shift+L（打开压缩包所在目录）、Ctrl+Shift+E（原地解压）、Ctrl+Shift+T（解压到同名文件夹）、Ctrl+T（测试压缩包完整性）、Ctrl+Shift+A（向压缩包添加文件）、Ctrl+P（显示/隐藏预览面板）、Ctrl+Shift+V（切换文件列表视图）、Ctrl+Shift+I（显示/隐藏信息面板）、Ctrl+Shift+C（复制条目完整路径）、Ctrl+,（设置）
 - **New common shortcuts** — Ctrl+Shift+L (open archive location), Ctrl+Shift+E (extract here), Ctrl+Shift+T (extract to folder of the same name), Ctrl+T (test archive integrity), Ctrl+Shift+A (add files to archive), Ctrl+P (toggle preview panel), Ctrl+Shift+V (cycle file list view), Ctrl+Shift+I (toggle info panel), Ctrl+Shift+C (copy full path of the selected entry), Ctrl+, (settings)
+- **文件选择器面板标签可记住或固定** — 左侧「路径来源」面板（收藏 / 历史 / 窗口 / 目录树）此前每次打开都回到「收藏」，常用目录每次都要重新点一下；现在默认**记住上次使用的标签**，也可在 设置 → 路径 中改为**固定**某个标签（固定后即使用过程中切换过，下次打开仍回到该标签）。设置里的「默认路径优先级」一并移到「路径」页与它相邻
+- **File picker panel tab can be remembered or pinned** — the source panel on the left of the file picker (Favorites / History / Windows / Folders) used to reset to "Favorites" every time, so frequently used folders had to be re-selected each session; it now **remembers the last used tab** by default, and you can **pin** a specific tab under Settings → Paths (once pinned, the picker always opens on that tab even if you switched tabs during the previous session). The "Default path priority" block moved onto the same Paths page
 **性能 / Performance**
 
 - **启动速度优化** — ① 主题重复加载消除：应用/切换主题时同主题直接跳过解析、图标字典跨主题复用，实测启动再降约 100ms（同时修复旧实现「先清空后加载」在加载失败时界面无样式的缺陷）；② 设置读取进程级缓存：冷启动只读盘一次，运行期重开窗口/对话框不再反复读盘反序列化，72 处调用点全部受益
