@@ -56,6 +56,29 @@ public class ProgressWindowXamlTests
         window.Close();
     }
 
+    /// <summary>
+    /// 终态摘要块（issue #46）：初始空串 → 整块隐藏；VM 进入终态后填充文本 → 绑定驱动可见。
+    /// 同时证明新增块没有破坏 7 行布局。
+    /// </summary>
+    [AvaloniaFact]
+    public void ProgressWindow_CompletionSummary_HiddenUntilTerminal()
+    {
+        var window = new ProgressWindow("test");
+        window.Show();
+
+        var block = window.FindControl<TextBlock>("CompletionSummaryText");
+        Assert.NotNull(block);
+        Assert.False(block!.IsVisible); // 未终态：空串 → 按规则 6 隐藏
+
+        var vm = Assert.IsType<ProgressViewModel>(window.DataContext);
+        vm.SetComplete("done");
+
+        Assert.True(block.IsVisible); // 绑定 HasCompletionSummary 生效
+        Assert.False(string.IsNullOrWhiteSpace(block.Text));
+
+        window.Close();
+    }
+
     /// <summary>spec §11.2: 解压后置开关默认隐藏（能力位 false，压缩/测试流全藏）。</summary>
     [AvaloniaFact]
     public void ProgressWindow_PostExtractToggles_DefaultHidden()

@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.ObjectModel;
 using System.Linq;
 using System.Threading;
@@ -126,7 +126,7 @@ public partial class ProgressViewModel : ObservableObject
         LocalizationManager.CultureChanged += OnCultureChanged;
 
         // T6: 操作计时基线 + 当前文件标签初值 + 集合变更通知（并行批次行 / 条目行）
-        _opStartUtc = DateTime.UtcNow;
+        RestartClock();
         CurrentFileLabel = LocalizationManager.T("Progress_CurrentFileLabel");
         _parallelBatchItems.CollectionChanged += (_, _) =>
         {
@@ -491,6 +491,16 @@ public partial class ProgressViewModel : ObservableObject
     private long _overallCompressedBytes;
     private long _overallTotalBytes;
 
+    // ── 终态摘要（完成/失败/取消后冻结的统计）──
+    /// <summary>终态冻结的最终耗时（null = 进行中/未开始）。冻结后 <see cref="RefreshTimeDisplay"/> 恒显示该值，时间不再增长。</summary>
+    private TimeSpan? _finalElapsed;
+
+    /// <summary>已结束压缩包上报的总字节累计（批量模式在切换档案时结算，见 <see cref="SetCurrentBatchItem"/>）。</summary>
+    private long _finishedArchiveBytes;
+
+    /// <summary>当前压缩包上报的总字节（解压=解压后大小，压缩=原始大小），切换档案时并入 <see cref="_finishedArchiveBytes"/>。</summary>
+    private long _currentArchiveBytes;
+
     /// <summary>整体压缩汇总可用（后置回填 TotalCompressedBytes > 0；仅 ZIP 压缩完成）。</summary>
     public bool HasOverallCompression => _overallCompressedBytes > 0;
 
@@ -585,6 +595,19 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>剩余时间文案（ETA 无效时为空）。</summary>
     [ObservableProperty]
     private string _remainingText = string.Empty;
+
+    /// <summary>
+    /// 终态摘要块（完成/失败/取消时冻结的多行统计：文件数、压缩包数、用时、平均速度、体积/压缩率）。
+    /// 空串 = 尚未进入终态或无可统计内容 → 按规则 6 整块隐藏。
+    /// </summary>
+    [ObservableProperty]
+    private string _completionSummaryText = string.Empty;
+
+    /// <summary>终态摘要块是否可见（有内容才显示）。</summary>
+    public bool HasCompletionSummary => !string.IsNullOrEmpty(CompletionSummaryText);
+
+    partial void OnCompletionSummaryTextChanged(string value) =>
+        OnPropertyChanged(nameof(HasCompletionSummary));
 
     /// <summary>「当前文件」标签（本地化，ctor 初始化）。</summary>
     [ObservableProperty]
@@ -716,7 +739,11 @@ public partial class ProgressViewModel : ObservableObject
     {
         // 进行中/暂停/准备态主动取消 → 图标转「已取消」；已完成/失败后点击「关闭」不改状态
         if (StatusKind is ProgressStatusKind.Preparing or ProgressStatusKind.Running or ProgressStatusKind.Paused)
+        {
             StatusKind = ProgressStatusKind.Cancelled;
+            // 取消同样是终态：冻结已用时间（窗口随即关闭，但失败/保留窗口场景仍有意义）
+            FreezeCompletion();
+        }
         CancelOperation();
         RequestClose?.Invoke();
     }
@@ -808,6 +835,8 @@ public partial class ProgressViewModel : ObservableObject
     /// 回退到总进度 PercentComplete，避免长时间僵死在 0%。</summary>
     private bool _hasFilePercent;
 
+
+
     /// <summary>简约面板「当前文件」进度条取值：有逐文件百分比时用它，否则回退到总进度。</summary>
     public int SimpleFileBarValue => _hasFilePercent ? FilePercentComplete : PercentComplete;
 
@@ -822,6 +851,7 @@ public partial class ProgressViewModel : ObservableObject
     {
         // 首个上报到达 → 结束准备态（不定进度条恢复确定态）
         EndPreparing();
+
 
         // Task 6: 批次 upsert 必须在早返回【之前】——EntryStatus 上报同样携带批次身份
         // （ZipEngine.cs:3208-3220 的逐条目终态事件带 BatchIndex/BatchCount），
@@ -851,8 +881,8 @@ public partial class ProgressViewModel : ObservableObject
         }
 
         // 操作计时基线兜底（ctor/InitBatchMode 已重置，此处防漏）
-        if (_opStartUtc == default)
-            _opStartUtc = DateTime.UtcNow;
+        if (_opStartUtc == default || _finalElapsed != null)
+            RestartClock();
 
         // 路径/文件名分离（剥引擎前缀 + '/' 拆分 → 目录行/文件名行两行显示）
         if (!string.IsNullOrEmpty(p.CurrentFile))
@@ -969,6 +999,8 @@ public partial class ProgressViewModel : ObservableObject
             StatsTotalSizeValue = sizeText;
             StatsTotalSizeText = LocalizationManager.T("Progress_Stats_TotalSize", sizeText);
             StatsProcessedSize = FormatUtil.FormatSize(p.ProcessedBytes);
+            // 终态摘要用：当前压缩包总字节（批量切换时结算，见 SetCurrentBatchItem）
+            _currentArchiveBytes = p.TotalBytes;
         }
 
         // 整体压缩汇总（压缩率计划）：后置回填，仅 ZIP 压缩完成时上报
@@ -1322,10 +1354,30 @@ public partial class ProgressViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 新操作起点：重设计时基线，并清空终态冻结值与统计摘要
+    /// （同一 VM 被下一次操重复用时必须调用，否则会把上一次的终态摘要带过去）。
+    /// </summary>
+    private void RestartClock()
+    {
+        _opStartUtc = DateTime.UtcNow;
+        _finalElapsed = null;
+        _finishedArchiveBytes = 0;
+        _currentArchiveBytes = 0;
+        CompletionSummaryText = string.Empty;
+    }
+
     /// <summary>刷新"已用时"文本（code-behind DispatcherTimer 每 1s 调用；未开始时跳过）。
-    /// 冻结期间（暂停/模态弹窗）不计入已用时间。</summary>
+    /// 冻结期间（暂停/模态弹窗）不计入已用时间；**终态后恒显示冻结的最终耗时**（计时器继续 tick 也不会增长）。</summary>
     public void RefreshTimeDisplay()
     {
+        // 终态：显示冻结值并直接返回（幂等，多次 tick 结果一致）
+        if (_finalElapsed is { } finalElapsed)
+        {
+            ElapsedText = LocalizationManager.T("Progress_Time_Elapsed",
+                ProgressDisplayCalculator.FormatDuration(finalElapsed));
+            return;
+        }
         if (_opStartUtc == default) return;
         var now = DateTime.UtcNow;
         var elapsed = now - _opStartUtc - _clockFrozenTotal;
@@ -1334,6 +1386,102 @@ public partial class ProgressViewModel : ObservableObject
         if (elapsed < TimeSpan.Zero) elapsed = TimeSpan.Zero;
         ElapsedText = LocalizationManager.T("Progress_Time_Elapsed",
             ProgressDisplayCalculator.FormatDuration(elapsed));
+    }
+
+    /// <summary>
+    /// 进入终态：冻结最终耗时并重建统计摘要（完成/失败/取消三条路径共用，幂等）。
+    /// 冻结后 <see cref="RefreshTimeDisplay"/> 不再按现实时间重算，解决「完成后已用时间仍在走」。
+    /// </summary>
+    private void FreezeCompletion()
+    {
+        if (_finalElapsed != null)
+            return; // 幂等：SetComplete → SetErrorSummary 等多次调用只认首次
+
+        if (_opStartUtc != default)
+        {
+            var now = DateTime.UtcNow;
+            var elapsed = now - _opStartUtc - _clockFrozenTotal;
+            if (_clockFrozenSinceUtc is { } frozenSince)
+                elapsed -= now - frozenSince;
+            _finalElapsed = elapsed < TimeSpan.Zero ? TimeSpan.Zero : elapsed;
+        }
+
+        RefreshTimeDisplay();
+        RefreshCompletionSummary();
+    }
+
+    /// <summary>重算终态摘要（仅在已冻结时生效；批次项状态后续变化时调用可保持计数准确）。</summary>
+    private void RefreshCompletionSummary()
+    {
+        if (_finalElapsed == null)
+            return;
+        CompletionSummaryText = BuildCompletionSummary();
+    }
+
+    /// <summary>
+    /// 拼接终态摘要多行文本。每行一个维度，数据不可得的行整行省略（不出现"—"占位）：
+    /// ① 文件数（有跳过/出错才追加该片段）② 压缩包数（解压/生成，批量且有失败时显示成功比）
+    /// ③ 用时 ④ 平均速度（总字节/用时）⑤ 体积（压缩=原始→输出+压缩率；解压=解压后总大小）。
+    /// </summary>
+    private string BuildCompletionSummary()
+    {
+        var lines = new List<string>();
+        var sep = LocalizationManager.T("Progress_Summary_Sep");
+
+        // ① 文件数：优先总数（引擎上报 TotalFiles 时），否则用已处理数
+        if (_statsTotalFiles > 0 || _statsProcessed > 0)
+        {
+            var files = _statsTotalFiles > 0 ? _statsTotalFiles : _statsProcessed;
+            var text = LocalizationManager.T("Progress_Summary_Files", files);
+            if (_statsSkipped > 0) text += sep + LocalizationManager.T("Progress_Stats_Skipped", _statsSkipped);
+            if (_statsFailed > 0) text += sep + LocalizationManager.T("Progress_Stats_Failed", _statsFailed);
+            lines.Add(text);
+        }
+
+        // ② 压缩包数：非批次一律 1 个；批次 = _batchItems 总数，失败项计入失败数
+        var isBatch = _isBatchMode && _batchItems is { Count: > 0 };
+        int archivesTotal = isBatch ? _batchItems!.Count : 1;
+        int archivesFailed = isBatch ? _batchItems!.Count(i => i.Status == BatchItemStatus.Failed) : 0;
+        int archivesOk = Math.Max(0, archivesTotal - archivesFailed);
+        lines.Add(IsCompressFlow
+            ? archivesFailed > 0
+                ? LocalizationManager.T("Progress_Summary_ArchivesCreatedPartial", archivesOk, archivesTotal)
+                : LocalizationManager.T("Progress_Summary_ArchivesCreated", archivesTotal)
+            : archivesFailed > 0
+                ? LocalizationManager.T("Progress_Summary_ArchivesExtractedPartial", archivesOk, archivesTotal)
+                : LocalizationManager.T("Progress_Summary_ArchivesExtracted", archivesTotal));
+
+        // ③ 用时（已冻结）
+        if (_finalElapsed is { } elapsed)
+            lines.Add(LocalizationManager.T("Progress_Summary_Elapsed",
+                ProgressDisplayCalculator.FormatDuration(elapsed)));
+
+        // ④ 平均速度：终态总字节 / 实际耗时（<0.5s 视为过短，不显示虚高值）
+        var totalBytes = _finishedArchiveBytes + _currentArchiveBytes;
+        if (totalBytes > 0 && _finalElapsed is { } elapsedForSpeed && elapsedForSpeed.TotalSeconds > 0.5)
+        {
+            var avg = totalBytes / elapsedForSpeed.TotalSeconds;
+            lines.Add(LocalizationManager.T("Progress_Summary_AvgSpeed", FormatUtil.FormatSize((long)avg)));
+        }
+
+        // ⑤ 体积：压缩侧用后置回填的整体压缩汇总（仅 ZIP 上报，批量多包时跳过以免误导）；
+        //    解压侧 TotalBytes 是解压后大小合计，直接显示为「解压后」。
+        if (IsCompressFlow && _overallCompressedBytes > 0 && _overallTotalBytes > 0 && archivesTotal <= 1)
+        {
+            var ratio = _overallCompressedBytes * 100.0 / Math.Max(1, _overallTotalBytes);
+            lines.Add(LocalizationManager.T("Progress_Summary_Ratio",
+                FormatUtil.FormatSize(_overallTotalBytes),
+                FormatUtil.FormatSize(_overallCompressedBytes),
+                ratio));
+        }
+        else if (totalBytes > 0)
+        {
+            lines.Add(LocalizationManager.T(
+                IsCompressFlow ? "Progress_Summary_Original" : "Progress_Summary_Output",
+                FormatUtil.FormatSize(totalBytes)));
+        }
+
+        return string.Join(Environment.NewLine, lines);
     }
 
     /// <summary>
@@ -1354,6 +1502,8 @@ public partial class ProgressViewModel : ObservableObject
     /// </summary>
     public void SetComplete(string message)
     {
+        // 终态：先冻结最终耗时 + 生成统计摘要（再改文案，保证摘要反映最终计数）
+        FreezeCompletion();
         PercentComplete = 100;
         FilePercentComplete = 100;
         FileName = LocalizationManager.T("Progress_Done");
@@ -1381,7 +1531,7 @@ public partial class ProgressViewModel : ObservableObject
         _currentBatchIndex = -1;
         _lastProgressUpdate = DateTime.MinValue;
         // T6: 重置计时基线与并行批次行（新批次从头计时；上一批次行不得残留）
-        _opStartUtc = DateTime.UtcNow;
+        RestartClock();
         _parallelBatchItems.Clear();
         // T6: 新批次不得继承上一批次的条目行与并行度
         ClearEntryItems();
@@ -1423,6 +1573,10 @@ public partial class ProgressViewModel : ObservableObject
             return;
 
         _currentBatchIndex = index;
+        // 终态摘要：上一个压缩包到此结束，把它上报的总字节结算进累计（新包重新累计；
+        // 放在 Pending 守卫之后，避免同一档案被重复调用时重复计入）
+        _finishedArchiveBytes += _currentArchiveBytes;
+        _currentArchiveBytes = 0;
         _batchItems[index].Status = BatchItemStatus.InProgress;
         _batchItems[index].Progress = 0;
         FileName = _batchItems[index].Name;
@@ -1467,6 +1621,8 @@ public partial class ProgressViewModel : ObservableObject
             if (index == _currentBatchIndex)
                 FilePercentComplete = 100;
         }
+        // 终态摘要：若已冻结（批已结束/失败），批次行状态变化要同步刷新「成功 n / 共 m」
+        RefreshCompletionSummary();
     }
 
     /// <summary>
@@ -1497,6 +1653,8 @@ public partial class ProgressViewModel : ObservableObject
                 _batchItems[i].Progress = 100;
             }
         }
+        // 终态摘要：批收尾后压缩包成功/总数定稿
+        RefreshCompletionSummary();
     }
 
     /// <summary>
@@ -1548,6 +1706,8 @@ public partial class ProgressViewModel : ObservableObject
         // 失败终态：操作已结束，暂停无意义 → 隐藏暂停按钮
         // （批中单项失败走 SetBatchItemStatus/OnHasErrorsChanged，不在这里隐藏——批操作仍在继续）
         IsPauseButtonVisible = false;
+        // 失败也是终态：冻结耗时并给出统计摘要（取消由 Cancel 命令单独冻结）
+        FreezeCompletion();
     }
 
     // ════════════════════════════════════════════

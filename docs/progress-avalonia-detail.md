@@ -6,15 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
-**2026-10-22** — issue #46 反馈处理（一）：文件选择器面板标签可记忆/可固定 + 设置页新增「路径」tab
+**2026-10-22** — issue #46 反馈处理：文件选择器面板标签可记忆/可固定 + 进度窗口完成后停表并给出终态统计
   - **来源**：GitHub issue #46（用户把意见写在截图里）。截图无法直接读取 → `web_fetch` 抓页面 HTML、正则提取 `private-user-images` 链接后下载 6 张图再逐张读。
-  - **「面板标签」与「默认路径优先级」是两套东西**（issue 里的困惑正源于此）：`Controls/QuickPathControl` 的四个标签是**来源切换**（收藏/历史/窗口/目录树）；`AppSettings.DefaultPathOrder` + `ResolveInitialPath()` 的优先级链只决定**初始目录**，与面板停在哪个标签无关。
+  - **「面板标签」与「默认路径优先级」是两套东西**（此前的混淆点）：`Controls/QuickPathControl` 的四个标签是**来源切换**（收藏/历史/窗口/目录树）；`AppSettings.DefaultPathOrder` + `ResolveInitialPath()` 的优先级链只决定**初始目录**，与面板停在哪个标签无关。
   - **面板标签记忆**：`AppSettings.PickerSourceTab`（存 `PathTab` 名称，空串=默认）+ `PickerRememberTab`（默认 `true`）；`Controls/QuickPathControl.axaml.cs` 增 `public static PathTab ParseTabOrDefault(string? value)`（空/未知/越界 → `PathTab.Favorites`，与旧行为一致）；`Dialogs/CustomFilePickerDialog` 打开时还原、关闭时**仅在「记住」模式**回写标签（固定模式下不回写，否则策略会被静默降级成记住）。
   - **设置页新增「路径」tab**：`Settings_Tab_Path`；把「默认路径优先级」整块从「高级」搬入，并在下方加「文件选择器面板标签」块（勾选框 `PickerRememberTab` + 仅在未勾选时可见的 `PickerTabOptions` 下拉，按规则 6 用 `IsVisible` 而非 `IsEnabled`）。ComboBox 沿用 `Option` + `ItemTemplate{Display}` 范式。
-  - **i18n**：三语新增 5 个 `Settings_Tab_Path` / `Settings_PickerTab_*`。
-  - **测试**：新增 `QuickPathTabPersistenceTests.cs`（`ParseTabOrDefault` 12 例）与 `SettingsPickerTabOptionsTests.cs`（下拉 4 项与默认值）。
-  - **验证**：`-Task i18n`、`-Task build -Target avalonia`（0 警告）、`-Task test -Target ui-tests` 全绿。
-  - **发布说明**：按用户要求写入 `RELEASE_NOTES.md` 的 v0.5.3「交互」节。
+  - **完成后不再计时**：`ProgressViewModel` 增 `_finalElapsed`；`SetComplete` / `SetErrorSummary` / `Cancel` 三条终态路径统一调 `FreezeCompletion()`（幂等，多次调用只认首次），`RefreshTimeDisplay()` 命中冻结值后直接返回 → code-behind 的每秒 tick 不再让「已用时间」增长。
+  - **终态统计摘要**：`BuildCompletionSummary()` 逐行拼接「文件数（有跳过/出错才追加该片段）/ 压缩包数（批量部分失败显示「成功 n / 共 m」）/ 用时 / 平均速度 / 体积或压缩率」，数据不可得的行整行省略（不出「—」占位）；渲染在状态行下方新增 `CompletionSummaryText`（`IsVisible="{Binding HasCompletionSummary}"`，空串整块隐藏）；状态行复制按钮改为「状态文案 + 摘要」一并复制，便于抓日志。批量字节累计靠 `SetCurrentBatchItem` 在切换档案时把 `_currentArchiveBytes` 结算进 `_finishedArchiveBytes`（放在 Pending 守卫之后，避免同一档案重复计入）。
+  - **i18n**：三语新增 11 个 `Progress_Summary_*`（含 `_Sep` 分隔符）+ 5 个 `Settings_Tab_Path` / `Settings_PickerTab_*`。
+  - **测试**：`ProgressViewModelTests.cs` 新增 4 例（完成后冻结+摘要至少三行、失败同样冻结、新操作清空终态、批量部分失败摘要出现 `1 / 2`）；新增 `QuickPathTabPersistenceTests.cs`（`ParseTabOrDefault` 12 例）与 `SettingsPickerTabOptionsTests.cs`（下拉 4 项与默认值）。
+  - **验证**：`-Task i18n`（1292 key 一致）、`-Task build -Target avalonia`（0 警告）、`-Task test -Target ui-tests` 全绿。
+  - **发布说明**：按用户要求写入 `RELEASE_NOTES.md` 的 v0.5.3「交互」节，两条（面板标签可记住/可固定、进度窗口停表 + 终态统计），措辞按「本版本改进」而非「修复」——这两项都是本周期新增能力，上一版本用户拿不到带缺陷的版本。
   - **遗留**：「最愛」的 ❤ 图标随后续「更换图标库」计划一并处理。
 
 **2026-10-22** — 上一批守卫/CI 提交的收尾修补：门禁补 alpha 分支、兜底按配置取程序集、行尾统一

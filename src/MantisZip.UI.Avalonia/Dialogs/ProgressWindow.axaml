@@ -1,4 +1,4 @@
-<!-- 进度窗口。
+﻿<!-- 进度窗口。
      高度下限（MinHeight）双机制：XAML 的 100 仅为初始兜底；真实下限由 code-behind
      LayoutUpdated 动态设置为「内容自然高度 + 窗口 chrome」，保证任何状态 UI 不被裁切。 -->
 <Window xmlns="https://github.com/avaloniaui"
@@ -881,8 +881,10 @@
       </StackPanel>
     </Border>
 
-    <!-- ═══ Row 4: 状态行（左侧状态图标 + 可复制只读文本框，20px；位于信息区之后、错误摘要/按钮行之前）═══ -->
-    <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto">
+    <!-- ═══ Row 4: 状态行（左侧状态图标 + 可复制只读文本框，20px；位于信息区之后、错误摘要/按钮行之前）
+         竖直两段：上 = 状态图标 + 状态文本 + 复制按钮；下 = 完成摘要（终态才出现，见 HasCompletionSummary）═══ -->
+    <StackPanel Grid.Row="4" Spacing="{DynamicResource SpacingXxs}">
+    <Grid ColumnDefinitions="Auto,*,Auto">
       <!-- 状态图标：始终存在，随 StatusKind 变化（准备/进行/暂停/完成/失败/取消） -->
       <PathIcon Grid.Column="0"
                 Data="{Binding StatusIconKey, Converter={StaticResource GeometryResource}}"
@@ -919,6 +921,18 @@
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
     </Grid>
+
+      <!-- 完成摘要（终态冻结后填充；空串时整块隐藏，不占布局 —— 规则 6）。
+           每行一个维度：文件数 / 压缩包数 / 用时 / 平均速度 / 体积(或压缩率)。左缩进对齐状态文本（20+8）。 -->
+      <TextBlock x:Name="CompletionSummaryText"
+                 Text="{Binding CompletionSummaryText}"
+                 IsVisible="{Binding HasCompletionSummary}"
+                 Margin="28,0,0,0"
+                 TextWrapping="Wrap"
+                 FontSize="12"
+                 LineHeight="18"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+    </StackPanel>
 
     <!-- ═══ Row 5: 错误摘要（红段=失败 + 黄段=带原因跳过；两段独立显隐；复制按钮聚合两段）═══ -->
     <Grid Grid.Row="5" ColumnDefinitions="*,Auto">
