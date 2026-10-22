@@ -6,6 +6,38 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-22** — issue #46 反馈处理：文件选择器面板标签可记忆/可固定 + 进度窗口完成后停表并给出终态统计
+  - **来源**：GitHub issue #46（用户把意见写在截图里）。截图无法直接读取 → `web_fetch` 抓页面 HTML、正则提取 `private-user-images` 链接后下载 6 张图再逐张读。
+  - **「面板标签」与「默认路径优先级」是两套东西**（此前的混淆点）：`Controls/QuickPathControl` 的四个标签是**来源切换**（收藏/历史/窗口/目录树）；`AppSettings.DefaultPathOrder` + `ResolveInitialPath()` 的优先级链只决定**初始目录**，与面板停在哪个标签无关。
+  - **面板标签记忆**：`AppSettings.PickerSourceTab`（存 `PathTab` 名称，空串=默认）+ `PickerRememberTab`（默认 `true`）；`Controls/QuickPathControl.axaml.cs` 增 `public static PathTab ParseTabOrDefault(string? value)`（空/未知/越界 → `PathTab.Favorites`，与旧行为一致）；`Dialogs/CustomFilePickerDialog` 打开时还原、关闭时**仅在「记住」模式**回写标签（固定模式下不回写，否则策略会被静默降级成记住）。
+  - **设置页新增「路径」tab**：`Settings_Tab_Path`；把「默认路径优先级」整块从「高级」搬入，并在下方加「文件选择器面板标签」块（勾选框 `PickerRememberTab` + 仅在未勾选时可见的 `PickerTabOptions` 下拉，按规则 6 用 `IsVisible` 而非 `IsEnabled`）。ComboBox 沿用 `Option` + `ItemTemplate{Display}` 范式。
+  - **完成后不再计时**：`ProgressViewModel` 增 `_finalElapsed`；`SetComplete` / `SetErrorSummary` / `Cancel` 三条终态路径统一调 `FreezeCompletion()`（幂等，多次调用只认首次），`RefreshTimeDisplay()` 命中冻结值后直接返回 → code-behind 的每秒 tick 不再让「已用时间」增长。
+  - **终态统计摘要**：`BuildCompletionSummary()` 逐行拼接「文件数（有跳过/出错才追加该片段）/ 压缩包数（批量部分失败显示「成功 n / 共 m」）/ 用时 / 平均速度 / 体积或压缩率」，数据不可得的行整行省略（不出「—」占位）；渲染在状态行下方新增 `CompletionSummaryText`（`IsVisible="{Binding HasCompletionSummary}"`，空串整块隐藏）；状态行复制按钮改为「状态文案 + 摘要」一并复制，便于抓日志。批量字节累计靠 `SetCurrentBatchItem` 在切换档案时把 `_currentArchiveBytes` 结算进 `_finishedArchiveBytes`（放在 Pending 守卫之后，避免同一档案重复计入）。
+  - **i18n**：三语新增 11 个 `Progress_Summary_*`（含 `_Sep` 分隔符）+ 5 个 `Settings_Tab_Path` / `Settings_PickerTab_*`。
+  - **测试**：`ProgressViewModelTests.cs` 新增 4 例（完成后冻结+摘要至少三行、失败同样冻结、新操作清空终态、批量部分失败摘要出现 `1 / 2`）；新增 `QuickPathTabPersistenceTests.cs`（`ParseTabOrDefault` 12 例）与 `SettingsPickerTabOptionsTests.cs`（下拉 4 项与默认值）。
+  - **验证**：`-Task i18n`（1292 key 一致）、`-Task build -Target avalonia`（0 警告）、`-Task test -Target ui-tests` 全绿。
+  - **发布说明**：按用户要求写入 `RELEASE_NOTES.md` 的 v0.5.3「交互」节，两条（面板标签可记住/可固定、进度窗口停表 + 终态统计），措辞按「本版本改进」而非「修复」——这两项都是本周期新增能力，上一版本用户拿不到带缺陷的版本。
+  - **zh-TW 分卷术语修正**：`strings.zh-TW.json:373-374` 原「分磁碟區大小」/「不分磁碟區」属概念错位——「磁碟區」是硬碟分割（disk volume），压缩档的 volume 是「卷／分割檔」。按用户选定改为「分割檔大小」/「不分割」（对齐 WinRAR 繁中「切成分割檔，大小」），并同步统一 `Settings_AdaptiveOverrides_MtWarning`（:29）与 `AdaptiveHelp_Markdown`（:1307）说明文字里的「分卷」→「分割檔」。简中/英文不动。
+  - **进度窗口状态行按阶段显示**（同一窗口的第二轮要求：状态行太粗）：Core 新增 `ArchivePhase`（`Scanning` / `ReadingArchive` / `Compressing` / `Extracting` / `Finalizing` / `Testing`，见 `src/MantisZip.Core/Abstractions/ArchiveEngine.cs`）+ `ArchiveProgress.Phase`（可空，null = 旧行为，旧调用方不受影响）+ 扩展方法 `ReportPhase()`。三引擎在阶段边界各报一次：ZIP 压缩覆盖 扫描 / 加密原生 / mt=on 并行 / 逐条目 / 合并 / 后置回填，ZIP 解压覆盖串行与并行两条路径，7z 覆盖压缩/解压/测试，tar.gz 覆盖三条路径（`AddToArchiveAsync` 追加操作暂未上报）。UI 侧 `ProgressViewModel.ApplyPhase()` 把阶段映射成状态行文案（三语 6 个 `Progress_Phase_*`），扫描阶段切不定进度条并在「文件计数」行显示「已发现 N 个文件」（`Progress_FileCount_Scanning`，与 `FileCountText` 互斥显隐）；`BeginPreparing` / `SetComplete` 清空阶段与扫描计数，`StatusKind` 为 `Paused` / `Failed` / `Cancelled` 时阶段文案不覆盖人为状态。
+  - **FileScanner 去硬编码中文**（规则 13）：原先把 `正在扫描: xxx (N 个文件)` 拼进 `CurrentFile`，现改为 `CurrentFile`=相对路径 + `TotalFiles`=已发现数 + `Phase=Scanning`，文案统一由 UI 层本地化。
+  - **测试**：`ProgressViewModelTests.cs` 新增 5 例（阶段改状态行 / 扫描期不定进度条 + 计数 / 离开扫描清计数 / 暂停态不被覆盖 / 终态清扫描计数）。
+  - **未上报阶段的流程（已知留白）**：`CompressService` 的批量/单档分派与 `AddToArchiveAsync` 追加操作不上报阶段，窗口在这些时点仍显示窗口标题文案（不会错，只是不够细）。
+  - **遗留**：「最愛」的 ❤ 图标随后续「更换图标库」计划一并处理。
+
+**2026-10-22** — 上一批守卫/CI 提交的收尾修补：门禁补 alpha 分支、兜底按配置取程序集、行尾统一
+  - **动机**：评审同步过来的 `4d2b641`（规则守卫 + CI 静态门禁）时实测发现四处会被真实踩到的问题，逐条修掉。
+  - **CI 触发分支**：`.github/workflows/ci.yml` 原来只 `on.push/pull_request.branches: [main]`，而日常开发在 `alpha`（`main` 只在发版合并时前进）⇒ 新门禁在 alpha 推送时根本不跑。两条都加上 `alpha`。
+  - **MTP 兜底按配置取程序集**：`scripts/verify-repo.ps1` 新增 `Get-ConfigurationFromArgs`（识别 `-c X` / `--configuration X` / `-c:X` / `--configuration=X` / `-p:Configuration=X`），`Get-TestAssemblyPath` 加 `-Configuration`：传了配置就只在 `bin/<配置>/**` 里找，找不到返回 `$null` 让调用方先按同样参数构建 —— 原实现按 `LastWriteTime` 取最新程序集，`-c Release` 时可能拿旧 Debug 产物直接 `dotnet exec`。
+  - **`target` 不再依赖动态作用域**：`Invoke-VerifyDotnet` 新增 `-TargetName` 参数，结果字段 `target = $TargetName`；原实现读脚本级 `$Target`，靠 PowerShell 动态作用域「碰巧」能拿到，函数一旦被挪动或加 `param($Target)` 就会静默变成空串。4 处调用点（build / test / 兜底 build / 兜底 exec）全部显式传名，兜底前的预构建补 `-AdditionalArgs $ExtraArgs`。
+  - **行尾统一**：新增根目录 `.gitattributes`（`* text=auto eol=crlf`，二进制扩展名列表 `binary`，`*.sh/*.patch/*.diff` 为 `text eol=lf`）。此前 `.editorconfig` 要求 `end_of_line = crlf` 但没有任何执行者，`core.autocrlf=true` 只在本机生效、换人即漂。索引里 732 个文本文件已全是 LF、170 个二进制已标记 `-text`，故加完 `git status` 无大规模重排。
+  - **文档契约漂移**：计划文档里 `-Task check` 的 JSON 形状仍写 `{ok, checks:[{task, ok, …}]}`，实现早已是 `{ok, checks:[{task, result:{…}}]}`（加 guards 后每项结果本身是完整对象，平铺会与 `task` 抢名字）—— 计划文档 `107` / `188` 行同步修正。
+  - **插件文档补第 4 个工具**：`tools/dsh-plugin-mantiszip/README.md` 补 `mantiszip_guards`（对应规则 8 / 10.1 / 13 / 16）、`-Task guards` 用法、`-Root`、`-Task test` 的 MTP 兜底说明（含「传 `-c Release` 时只认该配置产物」），自检段改「5 段」。
+  - **AGENTS.md**：Quick start 补 `.gitattributes` 行尾说明与「CI 触发分支：`main` + `alpha`」。
+  - **自测同步**：`tools/dsh-plugin-mantiszip/test/self-test.mjs` 原来硬断言「注册了 3 个工具」，加 `mantiszip_guards` 后必挂；改为 4 个工具 + guards 段（断言 4 项守卫的 `ok`）。
+  - **验证**：`-Task check` exit 0（版本 6/6 = 0.5.3、三语 1276 key、守卫 4/4）；`-Task build -Target core` exit 0 / 0 错误；`node tools … self-test.mjs` 五段全绿。
+  - **跨机器衔接**：新增 `docs/MAINTENANCE.md`（组成图 / 命令速查 / 脚本七段结构 / 四条守卫的覆盖边界 / CI 五段门禁 / 插件装卸 / 反直觉实现 / 环境坑 / 有意留白），`AGENTS.md` 维护脚本段加一行指针——此前「为什么这么写」只散在 2900 行按日期排的本文里。
+  - **注释纠错**：「找出测试工程生成的可执行程序集」那段注释原本压在 `Get-ConfigurationFromArgs` 头上（实际属于 `Get-TestAssemblyPath`），已归位；`scripts/verify-repo.ps1` 的 `.NOTES` 补 3 条「看起来多余、删掉就复发」的坑（`$p.ExitCode` 恒 `$null` / 兜底按配置取程序集 / `-TargetName` 不用动态作用域），防止下一个 agent 当成冗余重构掉。
+  - **AGENTS.md 规则 13 表述纠错**：原文要求三语 JSON「UTF-8 无 BOM」，但三份文件实测均带 BOM（`EF BB BF`）、`.editorconfig` 也是 `charset = utf-8-bom`；改为「UTF-8 with BOM」并以 `.editorconfig` 为准。
 **2026-10-22** — CI 再补两道门禁：依赖漏洞审计 + 产品代码分析器校验（whitespace/style/覆盖率暂缓）
   - **动机**：v0.5.3 的 CI 只有「静态自检 + build + test」，依赖漏洞与代码分析器没有任何拦截。上一轮因缺 pwsh 7、网络不可达而搁置的三项门禁，环境恢复后逐项实测，能过才接、过不了就说明原因。
   - **依赖漏洞审计**：新增根目录 `Directory.Build.props`，开 `NuGetAudit=true` / `NuGetAuditMode=all`（连传递依赖一起审计）/ `NuGetAuditLevel=low`，本地 `dotnet build` 只告警；CI 的 restore 步骤追加 `-p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904` 把漏洞类警告升为错误（**分号必须写 `%3B`**，直接写 `"NU1901;NU1902"` 会被 MSBuild 当成多个开关并报 `MSB1006: 属性无效`）。实测 `dotnet list package --vulnerable --include-transitive`：五个项目 0 漏洞。

@@ -88,6 +88,7 @@ public partial class ZipEngine : IArchiveEngine
     {
         CoreLog.Entry();
         CoreLog.Info($"TestArchiveAsync: {archivePath}");
+        progress.ReportPhase(ArchivePhase.Testing);
 
         var result = await Task.Run(() =>
         {

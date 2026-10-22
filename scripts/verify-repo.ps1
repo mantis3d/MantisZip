@@ -64,6 +64,24 @@
 .NOTES
     Windows + PowerShell 7 only (see AGENTS.md rule 9). No dependency beyond the
     .NET SDK; nothing here writes to the repository.
+
+    Non-obvious traps (each one looks like dead weight until you remove it and the
+    bug comes back -- docs/MAINTENANCE.md section 7 has the long version):
+
+    1. The dotnet child process uses System.Diagnostics.Process, NOT
+       Start-Process. With Start-Process -PassThru plus a redirected stdout or
+       stderr, $p.ExitCode stays $null forever (WaitForExit($ms), WaitForExit(),
+       Refresh() and Get-Process all fail to fill it; `cmd /c exit 3` prints
+       nothing). Without an exit code there is no way to compute `ok`.
+
+    2. Test fallback picks the assembly for the SAME configuration
+       (Get-TestAssemblyPath -Configuration). Otherwise `-c Release` can exec a
+       stale Debug build and report green while testing old binaries.
+
+    3. Invoke-VerifyDotnet takes -TargetName explicitly instead of reading the
+       script-scope $Target. That worked only by PowerShell dynamic scoping: move
+       the function, or add a parameter of the same name, and `target` silently
+       turns into an empty string.
 #>
 
 [CmdletBinding()]
@@ -308,12 +326,34 @@ function ConvertFrom-BuildOutput {
     return @{ errors = $errors; warnings = $warnings }
 }
 
+# 从 -ExtraArgs 里认出目标配置（-c Release 等）。MTP 兜底要拿「同一配置」的产物，
+# 否则可能 exec 到上一次 Debug 构建留下的旧 dll。
+function Get-ConfigurationFromArgs {
+    param([string[]]$Arguments)
+
+    if (-not $Arguments) { return $null }
+
+    for ($index = 0; $index -lt $Arguments.Count; $index++) {
+        $argument = [string]$Arguments[$index]
+        # 分开写：-c Release / --configuration Release
+        if (($argument -eq '-c' -or $argument -eq '--configuration') -and ($index + 1) -lt $Arguments.Count) {
+            return [string]$Arguments[$index + 1]
+        }
+        # 连写：-c:Release / --configuration=Release / -p:Configuration=Release
+        if ($argument -match '^(?:-c|--configuration)[:=](?<value>.+)$') { return $Matches['value'] }
+        if ($argument -match '^-p:Configuration=(?<value>.+)$') { return $Matches['value'] }
+    }
+
+    return $null
+}
+
 # 找出测试工程生成的可执行程序集（xunit v3 的 MTP 入口就在测试 dll 里）。
 # bin/ 下的 ref/ 目录是引用程序集，不能 exec，必须排除。
 function Get-TestAssemblyPath {
     param(
         [string]$RepoRoot,
-        [string]$ProjectPath
+        [string]$ProjectPath,
+        [string]$Configuration
     )
 
     $projectFull = Join-Path $RepoRoot $ProjectPath
@@ -323,12 +363,22 @@ function Get-TestAssemblyPath {
 
     $candidates = @(
         Get-ChildItem -LiteralPath $binDir -Recurse -Filter "$assemblyName.dll" -File -ErrorAction SilentlyContinue |
-        Where-Object { $_.FullName -notmatch '[\\/]ref[\\/]' } |
-        Sort-Object LastWriteTime -Descending
+        Where-Object { $_.FullName -notmatch '[\\/]ref[\\/]' }
     )
+    if ($candidates.Count -eq 0) { return $null }
 
-    if ($candidates.Count -gt 0) { return $candidates[0].FullName }
-    return $null
+    # 显式配置优先：传了 -c Release 时只认 bin/Release/**，否则 MTP 兜底可能跑到
+    # 上一次 Debug 构建留下的旧程序集上——测试照样「通过」，测的却是旧二进制。
+    # 目标配置还没有产物时返回 $null，让调用方先按同样参数构建再取一次。
+    if (-not [string]::IsNullOrWhiteSpace($Configuration)) {
+        $configurationSegment = "[\\/]$([regex]::Escape($Configuration))[\\/]"
+        $scoped = @($candidates | Where-Object { $_.FullName -match $configurationSegment })
+        if ($scoped.Count -eq 0) { return $null }
+        $candidates = $scoped
+    }
+
+    $newest = $candidates | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    return $newest.FullName
 }
 
 function Invoke-VerifyDotnet {
@@ -338,7 +388,9 @@ function Invoke-VerifyDotnet {
         [string]$ProjectPath,
         [string[]]$AdditionalArgs,
         [int]$BudgetMs,
-        [string[]]$ArgvOverride
+        [string[]]$ArgvOverride,
+        # 结果里回显的 target 别名。显式传参而不是靠动态作用域捕获脚本级 $Target。
+        [string]$TargetName
     )
 
     if ($ArgvOverride) {
@@ -458,7 +510,7 @@ function Invoke-VerifyDotnet {
 
     $payload = [ordered]@{
         ok           = $okValue
-        target       = $Target
+        target       = $TargetName
         action       = $Action
         runner       = $runner
         hostCrashed  = $hostCrashed
@@ -1197,13 +1249,13 @@ $repoRoot = Resolve-RepoRoot -ExplicitRoot $Root
 switch ($Task) {
     'build' {
         $projectPath = $TARGETS[$Target]
-        $result = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'build' -ProjectPath $projectPath -AdditionalArgs $ExtraArgs -BudgetMs $TimeoutMs
+        $result = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'build' -ProjectPath $projectPath -AdditionalArgs $ExtraArgs -BudgetMs $TimeoutMs -TargetName $Target
         if ($Json) { $result | ConvertTo-Json -Depth 8 } else { Format-BuildResult $result }
         exit ([int](-not $result.ok))
     }
     'test' {
         $projectPath = $TARGETS[$Target]
-        $result = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'test' -ProjectPath $projectPath -AdditionalArgs $ExtraArgs -BudgetMs $TimeoutMs
+        $result = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'test' -ProjectPath $projectPath -AdditionalArgs $ExtraArgs -BudgetMs $TimeoutMs -TargetName $Target
 
         # 只有当「dotnet test 失败、没有任何编译诊断、也没有打印过测试汇总行」时才回退：
         # 三者同时成立意味着用例一条都没跑起来（testhost 崩溃 / 宿主进程被受限环境拒绝 /
@@ -1211,14 +1263,19 @@ switch ($Task) {
         # xunit v3 的测试程序集自带 MTP 入口，dotnet exec 直跑不经过 VSTest 宿主，
         # 因此能绕开这类环境限制；正常环境与 CI 上 dotnet test 直接通过，不会走到这里。
         if (-not $result.ok -and [int]$result.errorCount -eq 0 -and -not $result.testsReported) {
-            $assembly = Get-TestAssemblyPath -RepoRoot $repoRoot -ProjectPath $projectPath
+            # 配置取自 -ExtraArgs（-c Release 等）：程序集只认该配置的 bin 目录，
+            # 避免在旧配置的产物上跑出「通过」。
+            $configuration = Get-ConfigurationFromArgs -Arguments $ExtraArgs
+            $assembly = Get-TestAssemblyPath -RepoRoot $repoRoot -ProjectPath $projectPath -Configuration $configuration
             if (-not $assembly) {
-                $build = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'build' -ProjectPath $projectPath -BudgetMs $TimeoutMs
-                if ($build.ok) { $assembly = Get-TestAssemblyPath -RepoRoot $repoRoot -ProjectPath $projectPath }
+                $build = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'build' -ProjectPath $projectPath -AdditionalArgs $ExtraArgs -BudgetMs $TimeoutMs -TargetName $Target
+                if ($build.ok) {
+                    $assembly = Get-TestAssemblyPath -RepoRoot $repoRoot -ProjectPath $projectPath -Configuration $configuration
+                }
             }
 
             if ($assembly) {
-                $fallback = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'test' -ProjectPath $projectPath -ArgvOverride @('exec', $assembly) -BudgetMs $TimeoutMs
+                $fallback = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'test' -ProjectPath $projectPath -ArgvOverride @('exec', $assembly) -BudgetMs $TimeoutMs -TargetName $Target
                 if ($fallback.ok) {
                     $fallback.runner = 'mtp'
                     $fallback.fallbackFrom = 'vstest'

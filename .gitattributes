@@ -1,0 +1,35 @@
+## 行尾与文本归一化（与 .editorconfig 的 end_of_line = crlf 对齐）
+#
+# 开发环境是 Windows（core.autocrlf 视机器而定），这里把规则写进仓库，
+# 换机器 / 换人 / CI 结账时行尾不再漂移：
+#   - 索引里统一存 LF（text=auto），工作区检出 CRLF（eol=crlf）
+#   - 二进制文件显式标记 binary，避免 Git 做行尾转换或文本合并
+
+* text=auto eol=crlf
+
+# ---- 二进制：绝不转换、绝不合并 ----
+*.png   binary
+*.jpg   binary
+*.jpeg  binary
+*.gif   binary
+*.webp  binary
+*.ico   binary
+*.cur   binary
+*.dll   binary
+*.exe   binary
+*.pdb   binary
+*.snk   binary
+*.7z    binary
+*.zip   binary
+*.rar   binary
+*.gz    binary
+*.tar   binary
+*.cache binary
+*.ttf   binary
+*.woff  binary
+*.woff2 binary
+
+# ---- 面向非 Windows 环境的脚本/补丁统一 LF ----
+*.sh    text eol=lf
+*.patch text eol=lf
+*.diff  text eol=lf

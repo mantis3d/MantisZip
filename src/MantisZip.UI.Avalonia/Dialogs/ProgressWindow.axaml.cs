@@ -782,10 +782,13 @@ public partial class ProgressWindow : Window
         }
     }
 
-    /// <summary>状态行复制：复制 StatusMessage 全文，复用既有 ShowCopyFeedback（✓ 翻转 + Toast）。</summary>
+    /// <summary>状态行复制：复制 StatusMessage 全文（附带终态统计摘要，若有），复用既有 ShowCopyFeedback（✓ 翻转 + Toast）。</summary>
     private async void StatusCopyBtn_Click(object? sender, RoutedEventArgs e)
     {
         var text = _vm.StatusMessage;
+        // 终态摘要与状态文案一起复制：用户抓日志/汇报时一行拿到全部统计
+        if (!string.IsNullOrEmpty(_vm.CompletionSummaryText))
+            text = $"{text}{Environment.NewLine}{_vm.CompletionSummaryText}";
         if (string.IsNullOrEmpty(text)) return;
         try
         {

@@ -104,6 +104,18 @@ public partial class QuickPathControl : UserControl
         SetTab(SingleTab.Value);
     }
 
+    /// <summary>
+    /// 还原持久化的来源标签名（<see cref="PathTab"/> 成员名）：空值、未知值、越界数值一律回退
+    /// <see cref="PathTab.Favorites"/>，保证首次启动与旧配置文件的行为与硬编码默认值一致。
+    /// </summary>
+    public static PathTab ParseTabOrDefault(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value)) return PathTab.Favorites;
+        return Enum.TryParse<PathTab>(value, ignoreCase: true, out var tab) && Enum.IsDefined(tab)
+            ? tab
+            : PathTab.Favorites;
+    }
+
     // ── Tab switching ───────────────────────────────────────────────────────
 
     private void FavoritesTab_Click(object? sender, RoutedEventArgs e)

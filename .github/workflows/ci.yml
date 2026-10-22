@@ -2,9 +2,10 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    # alpha 是日常开发分支（main 只在发版合并时前进），两条都要触发门禁。
+    branches: [main, alpha]
   pull_request:
-    branches: [main]
+    branches: [main, alpha]
 
 jobs:
   build:

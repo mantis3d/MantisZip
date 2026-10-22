@@ -4,6 +4,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
+using MantisZip.UI.Avalonia.Controls;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -376,6 +377,11 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _customPath = "";
 
+    // ── 文件选择器面板标签 ──
+    /// <summary>是否记住上次使用的面板标签；false = 固定用 <see cref="SelectedPickerTabOption"/>。</summary>
+    [ObservableProperty]
+    private bool _pickerRememberTab = true;
+
     // ── Language ──
     [ObservableProperty]
     private string _selectedLanguage = "zh";
@@ -698,6 +704,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     public System.Collections.ObjectModel.ObservableCollection<Option> ExtractDestinationOptions { get; } = new();
     [ObservableProperty] private Option? _selectedExtractDestinationOption;
 
+    // 左侧「路径切换面板」固定标签（Value = Controls.PathTab 成员名，与 AppSettings.PickerSourceTab 同构）
+    public System.Collections.ObjectModel.ObservableCollection<Option> PickerTabOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedPickerTabOption;
+
     public System.Collections.ObjectModel.ObservableCollection<Option> FileConflictActionOptions { get; } = new();
     [ObservableProperty] private Option? _selectedFileConflictActionOption;
 
@@ -975,6 +985,12 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string DefaultPathDesktopRow => LocalizationManager.T("Settings_DefaultPath_DesktopRow");
     public string DefaultPathHint => LocalizationManager.T("Settings_DefaultPath_Hint");
 
+    // 文件选择器面板标签（左栏「路径切换面板」的默认标签策略）
+    public string PickerTabGroupHeader => LocalizationManager.T("Settings_PickerTab_GroupHeader");
+    public string PickerTabRememberText => LocalizationManager.T("Settings_PickerTab_Remember");
+    public string PickerTabFixedText => LocalizationManager.T("Settings_PickerTab_Fixed");
+    public string PickerTabHint => LocalizationManager.T("Settings_PickerTab_Hint");
+
     public string DebugText => LocalizationManager.T("Settings_EnableDebugLog");
     public string LogPrivacyModeText => LocalizationManager.T("Settings_Debug_LogPrivacyMode");
     public string LogPrivacyModeOffText => LocalizationManager.T("Settings_Debug_LogPrivacyMode_Off");
@@ -989,6 +1005,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // ── New tab headers ──
     public string TabLanguageHeader => LocalizationManager.T("Settings_Tab_Language");
+    public string TabPathHeader => LocalizationManager.T("Settings_Tab_Path");
     public string TabAppearanceHeader => LocalizationManager.T("Settings_Tab_Appearance");
     public string TabPasswordHeader => LocalizationManager.T("Settings_Tab_Password");
     public string TabFileAssocHeader => LocalizationManager.T("Settings_Tab_FileAssoc");
@@ -1129,6 +1146,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         _customPath = _settings.CustomDefaultPath ?? "";
         ReloadPathPriorityItems();
 
+        // 文件选择器面板标签策略
+        _pickerRememberTab = _settings.PickerRememberTab;
+
     // Language
     _selectedLanguage = _settings.Language;
 
@@ -1212,6 +1232,13 @@ public partial class SettingsWindowViewModel : ObservableObject
         CompactnessModeOptions.Add(new Option(AppearanceCompactnessCompactText, "Compact"));
         CompactnessModeOptions.Add(new Option(AppearanceCompactnessNormalText, "Normal"));
         CompactnessModeOptions.Add(new Option(AppearanceCompactnessLooseText, "Loose"));
+
+        // 左侧路径切换面板的固定标签（值 = PathTab 成员名，与 AppSettings.PickerSourceTab 的持久化字符串一致）
+        PickerTabOptions.Clear();
+        PickerTabOptions.Add(new Option(LocalizationManager.T("QuickPath_TabFavorites"), nameof(PathTab.Favorites)));
+        PickerTabOptions.Add(new Option(LocalizationManager.T("QuickPath_TabHistory"), nameof(PathTab.History)));
+        PickerTabOptions.Add(new Option(LocalizationManager.T("QuickPath_TabWindows"), nameof(PathTab.Windows)));
+        PickerTabOptions.Add(new Option(LocalizationManager.T("QuickPath_TabTree"), nameof(PathTab.Tree)));
 
         SelectedLanguageOptions.Clear();
         SelectedLanguageOptions.Add(new Option("中文", "zh"));
@@ -1345,6 +1372,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedInfoPanelOrientationOption = InfoPanelOrientationOptions.FirstOrDefault(o => o.Value == InfoPanelOrientation);
         SelectedThemeOption = ThemeOptions.FirstOrDefault(o => o.Value == Theme);
         SelectedCompactnessModeOption = CompactnessModeOptions.FirstOrDefault(o => o.Value == CompactnessMode);
+        // 固定标签下拉：优先保留当前已选项（语言切换重建列表时），否则由持久化值还原，空值/未知值落回「收藏」
+        var pickerTabValue = SelectedPickerTabOption?.Value
+                             ?? QuickPathControl.ParseTabOrDefault(_settings.PickerSourceTab).ToString();
+        SelectedPickerTabOption = PickerTabOptions.FirstOrDefault(o => o.Value == pickerTabValue)
+                                  ?? PickerTabOptions.FirstOrDefault();
         SelectedSelectedLanguageOption = SelectedLanguageOptions.FirstOrDefault(o => o.Value == SelectedLanguage);
         SelectedLogPrivacyModeOption = LogPrivacyModeOptions.FirstOrDefault(o => o.Value == LogPrivacyMode);
         SelectedExtractDestinationOption = ExtractDestinationOptions.FirstOrDefault(o => o.Value == ExtractDestination);
@@ -1554,6 +1586,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(DefaultPathGroupHeader));
         OnPropertyChanged(nameof(DefaultPathDesktopRow));
         OnPropertyChanged(nameof(DefaultPathHint));
+        OnPropertyChanged(nameof(PickerTabGroupHeader));
+        OnPropertyChanged(nameof(PickerTabRememberText));
+        OnPropertyChanged(nameof(PickerTabFixedText));
+        OnPropertyChanged(nameof(PickerTabHint));
         // 刷新排序项的名称（本地化文案随语言切换）
         RefreshPathPriorityDisplayNames();
 
@@ -1568,6 +1604,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(LogFilePath));
 
         OnPropertyChanged(nameof(TabLanguageHeader));
+        OnPropertyChanged(nameof(TabPathHeader));
         OnPropertyChanged(nameof(TabAppearanceHeader));
         OnPropertyChanged(nameof(TabPasswordHeader));
         OnPropertyChanged(nameof(TabFileAssocHeader));
@@ -1722,6 +1759,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.PreserveDirectoryRoot = PreserveDirectoryRoot;
         _settings.CleanTempOnStartup = CleanTempOnStartup;
         _settings.AllowElevation = AllowElevation;
+
+        // 文件选择器面板标签：记住模式不覆盖「上次标签」，只有固定模式才写回下拉选择
+        _settings.PickerRememberTab = PickerRememberTab;
+        if (!PickerRememberTab && SelectedPickerTabOption != null)
+            _settings.PickerSourceTab = SelectedPickerTabOption.Value;
 
         // Language
         var languageCode = SelectedSelectedLanguageOption?.Value ?? SelectedLanguage;

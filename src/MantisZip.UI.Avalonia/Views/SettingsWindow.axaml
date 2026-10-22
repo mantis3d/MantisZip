@@ -1474,42 +1474,12 @@
           </StackPanel>
         </ScrollViewer>
       </TabItem>
-      <!-- ═══════ 10. 高级 ═══════ -->
-      <TabItem Header="{Binding TabAdvancedHeader}" Classes="compactTab"
-               controls:TabItemExtensions.TabIcon="IconWrench">
+      <!-- ═══════ 10. 路径 ═══════ -->
+      <!-- 路径设置选项卡：文件选择器的初始路径优先级 + 左侧路径切换面板的标签策略 -->
+      <TabItem Header="{Binding TabPathHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconFolderOpen">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
           <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AdvancedSevenZipPathText}" FontWeight="SemiBold" />
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBox Grid.Column="0"
-                           Text="{Binding SevenZipPath}"
-                           PlaceholderText="{Binding SevenZipPathPlaceholder}"
-                           Margin="0,0,8,0"
-                           Background="{DynamicResource ThemeWindowBgBrush}"
-                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                  <Button Grid.Column="1"
-                          Content="{Binding AdvancedBrowseText}"
-                          Command="{Binding BrowseSevenZipCommand}"
-                          Padding="12,4"
-                          Background="{DynamicResource ThemeButtonBgBrush}"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                </Grid>
-              </StackPanel>
-            </Border>
-
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <CheckBox Content="{Binding AdvancedAllowElevationText}"
-                          IsChecked="{Binding AllowElevation}" />
-              </StackPanel>
-            </Border>
-
             <!-- 默认路径优先级（图片选择器初始路径） -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -1562,6 +1532,75 @@
                            FontSize="11"
                            TextWrapping="Wrap"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              </StackPanel>
+            </Border>
+
+            <!-- 左侧路径切换面板的标签策略：记住上次 / 固定某个标签 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding PickerTabGroupHeader}" FontWeight="SemiBold" />
+                <!-- 勾选 = 每次打开文件选择器沿用上次关闭时的标签 -->
+                <CheckBox Content="{Binding PickerTabRememberText}"
+                          IsChecked="{Binding PickerRememberTab}" />
+                <!-- 取消勾选后才显示「固定标签」下拉（规则 6：用隐藏而非禁用） -->
+                <StackPanel Spacing="{DynamicResource SpacingXs}"
+                            IsVisible="{Binding !PickerRememberTab}">
+                  <TextBlock Text="{Binding PickerTabFixedText}"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <ComboBox ItemsSource="{Binding PickerTabOptions}"
+                            SelectedItem="{Binding SelectedPickerTabOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </StackPanel>
+                <TextBlock Text="{Binding PickerTabHint}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 11. 高级 ═══════ -->
+      <TabItem Header="{Binding TabAdvancedHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconWrench">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding AdvancedSevenZipPathText}" FontWeight="SemiBold" />
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBox Grid.Column="0"
+                           Text="{Binding SevenZipPath}"
+                           PlaceholderText="{Binding SevenZipPathPlaceholder}"
+                           Margin="0,0,8,0"
+                           Background="{DynamicResource ThemeWindowBgBrush}"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  <Button Grid.Column="1"
+                          Content="{Binding AdvancedBrowseText}"
+                          Command="{Binding BrowseSevenZipCommand}"
+                          Padding="12,4"
+                          Background="{DynamicResource ThemeButtonBgBrush}"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                </Grid>
+              </StackPanel>
+            </Border>
+
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <CheckBox Content="{Binding AdvancedAllowElevationText}"
+                          IsChecked="{Binding AllowElevation}" />
               </StackPanel>
             </Border>
 

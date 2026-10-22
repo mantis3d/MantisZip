@@ -1,3 +1,4 @@
+using System.Reflection;
 using Avalonia.Headless.XUnit;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
@@ -1364,5 +1365,168 @@ public class ProgressViewModelTests
         {
             LocalizationManager.CurrentLanguage = original;
         }
+    }
+
+    // ═══ 终态摘要 + 计时冻结（issue #46 反馈：完成后「已用时间」仍在走）═══
+
+    /// <summary>Reflection 读取私有字段 `_finalElapsed`：判断计时是否已冻结（唯一直接证据，文本断言测不出 1s 内差）。</summary>
+    private static TimeSpan? ReadFinalElapsed(ProgressViewModel vm)
+    {
+        var field = typeof(ProgressViewModel)
+            .GetField("_finalElapsed", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+        return (TimeSpan?)field!.GetValue(vm);
+    }
+
+    [Fact]
+    public void SetComplete_FreezesElapsedAndBuildsSummary()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            TotalBytes = 4 * 1024 * 1024,
+            ProcessedBytes = 4 * 1024 * 1024,
+            TotalFiles = 3,
+            ProcessedFiles = 3,
+            PercentComplete = 100,
+        });
+        vm.RefreshTimeDisplay();
+        Assert.Null(ReadFinalElapsed(vm)); // 进行中：未冻结
+
+        vm.SetComplete("done");
+
+        Assert.NotNull(ReadFinalElapsed(vm)); // 完成后：计时基线冻结
+        Assert.True(vm.HasCompletionSummary);
+        var lines = vm.CompletionSummaryText.Split(Environment.NewLine);
+        Assert.True(lines.Length >= 3, $"摘要至少应含 文件数/压缩包数/用时 三行，实际 {lines.Length} 行：{vm.CompletionSummaryText}");
+        Assert.Contains("3", lines[0]); // 文件数行携带计数（文案随语言，数字不变）
+        // 准确值不是 0:00:00（耗时极小也不影响断言：FormatDuration 至少给出 0:00:xx 形式，这里只验稳定性）
+        var frozen = vm.ElapsedText;
+        vm.RefreshTimeDisplay();
+        Assert.Equal(frozen, vm.ElapsedText); // 冻结后重复 tick 结果恒定
+    }
+
+    [Fact]
+    public void SetErrorSummary_AlsoFreezesClock()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetErrorSummary("boom", "detail");
+
+        Assert.NotNull(ReadFinalElapsed(vm));
+        Assert.True(vm.HasCompletionSummary);
+    }
+
+    [Fact]
+    public void NewOperation_ClearsFrozenTerminalState()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetComplete("done");
+        Assert.True(vm.HasCompletionSummary);
+        Assert.NotNull(ReadFinalElapsed(vm));
+
+        // 同一 VM 复用：新进度到达即视为新操作 → 冻结值与摘要清空
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 5, TotalBytes = 100, ProcessedBytes = 5 });
+
+        Assert.Null(ReadFinalElapsed(vm));
+        Assert.False(vm.HasCompletionSummary);
+        Assert.Equal(string.Empty, vm.CompletionSummaryText);
+    }
+
+    [Fact]
+    public void BatchPartialFailure_SummaryShowsSuccessOverTotal()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.zip", "b.zip" });
+        vm.SetCurrentBatchItem(0);
+        vm.SetProgress(new ArchiveProgress { TotalBytes = 1024, ProcessedBytes = 1024, TotalFiles = 1, ProcessedFiles = 1 });
+        vm.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
+        vm.SetCurrentBatchItem(1);
+        vm.UpdateBatchItemStatus(1, BatchItemStatus.Failed, "boom");
+        vm.FinalizeBatch();
+        vm.CompleteWithErrors();
+
+        Assert.True(vm.HasCompletionSummary);
+        // 1 成功 / 2 共 —— 部分失败文案里必须出现该比例（两侧数字与分隔符与语言无关）
+        Assert.Contains("1 / 2", vm.CompletionSummaryText);
+    }
+
+    // ════════════════════════════════════════════
+    //  阶段状态行（ArchiveProgress.Phase）
+    // ════════════════════════════════════════════
+
+    [Fact]
+    public void SetProgress_Phase_UpdatesStatusMessage()
+    {
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Compressing, PercentComplete = 10 });
+
+        // 状态行只放阶段名（用户明确要求不带计数器/文件名）
+        Assert.Equal(LocalizationManager.T("Progress_Phase_Compressing"), vm.StatusMessage);
+        Assert.False(vm.IsIndeterminate);
+        Assert.False(vm.HasScanCount);
+    }
+
+    [Fact]
+    public void SetProgress_ScanningPhase_UsesIndeterminateAndShowsFoundCount()
+    {
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Scanning, TotalFiles = 42 });
+
+        Assert.Equal(LocalizationManager.T("Progress_Phase_Scanning"), vm.StatusMessage);
+        Assert.True(vm.IsIndeterminate);          // 总数未知 → 滚动条
+        Assert.True(vm.HasScanCount);             // 「已发现 N 个文件」占住文件计数行
+        // 文案由本地化格式串填充；无头 [Fact] 里 LocalizationManager 可能尚未加载资源（此时返回 key 本身），
+        // 因此只断言「有内容且与常规文件计数不同」，占位符替换由 -Task i18n 保证
+        Assert.False(string.IsNullOrWhiteSpace(vm.ScanCountText));
+        Assert.NotEqual(vm.ScanCountText, vm.FileCountText);
+    }
+
+    [Fact]
+    public void SetProgress_LeavingScanning_ClearsFoundCount()
+    {
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Scanning, TotalFiles = 7 });
+        Assert.True(vm.HasScanCount);
+
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Compressing, PercentComplete = 1 });
+
+        Assert.False(vm.HasScanCount);
+        Assert.Null(vm.ScanCountText);
+        Assert.False(vm.IsIndeterminate);
+    }
+
+    [Fact]
+    public void SetProgress_Phase_DoesNotOverwritePausedStatus()
+    {
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Compressing, PercentComplete = 20 });
+        vm.StatusKind = ProgressStatusKind.Paused;
+        vm.StatusMessage = "paused-by-user";
+
+        // 暂停期间引擎仍在上报阶段，但「已暂停」是更具体的人为状态，不得被冲掉
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Finalizing, PercentComplete = 21 });
+
+        Assert.Equal("paused-by-user", vm.StatusMessage);
+    }
+
+    [Fact]
+    public void SetComplete_ClearsScanCount()
+    {
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Scanning, TotalFiles = 3 });
+        Assert.True(vm.HasScanCount);
+
+        vm.SetComplete("done");
+
+        Assert.False(vm.HasScanCount);
+        Assert.Null(vm.ScanCountText);
+        Assert.False(vm.IsIndeterminate);
     }
 }

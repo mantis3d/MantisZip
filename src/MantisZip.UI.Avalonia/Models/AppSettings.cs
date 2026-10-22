@@ -231,6 +231,19 @@ public class AppSettings
     public double PickItemsPanelWidth { get; set; }
     /// <summary>ExtractFolder 模式右侧解压预览面板宽度（像素）。0 = 未设置，使用默认宽度 260。</summary>
     public double ExtractFolderPanelWidth { get; set; }
+    /// <summary>
+    /// 左侧「路径切换面板」的标签名（<c>Controls.PathTab</c> 成员名，如 <c>Tree</c>）。
+    /// 语义随 <see cref="PickerRememberTab"/> 变化：记住模式 = 上次关闭选择器时的标签（选择器负责写回）；
+    /// 固定模式 = 设置里选定的固定标签（对话框内手动切换不会被记住）。
+    /// 空值/未知值一律落回「收藏」标签，保证首次使用与旧配置文件行为一致。
+    /// 注意：只影响面板标签，与 <see cref="DefaultPathOrder"/>（初始目录落点）无关。
+    /// </summary>
+    public string PickerSourceTab { get; set; } = "";
+    /// <summary>
+    /// 是否让文件选择器左侧「路径切换面板」记住上次使用的标签。
+    /// true（默认）= 每次打开沿用上次关闭时的标签；false = 固定用 <see cref="PickerSourceTab"/> 指定的标签。
+    /// </summary>
+    public bool PickerRememberTab { get; set; } = true;
 
     // ===== 调试 =====
     public bool EnableDebugLogging { get; set; } = false;

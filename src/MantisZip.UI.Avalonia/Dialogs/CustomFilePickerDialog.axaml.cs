@@ -10,6 +10,7 @@ using Avalonia.Platform.Storage;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Controls;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
@@ -78,6 +79,8 @@ public partial class CustomFilePickerDialog : Window
     private readonly string _extractCurrentFolder;
     // 去 readonly：参数区 CheckBox 勾选变化时需回写本字段（决策 A：仅本次生效，不回写设置）
     private bool _extractPreserveFullPath;
+    // 左侧面板标签是否记住上次（设置项 PickerRememberTab）：false = 固定标签，关闭时不回写
+    private readonly bool _rememberPickerTab;
 
     /// <summary>确定后返回的路径。</summary>
     public string? SelectedPath { get; private set; }
@@ -420,6 +423,13 @@ public partial class CustomFilePickerDialog : Window
 
         // 文件列表是否显示文件（PickFolder/ExtractFolder 只显示目录）
         // 通过过滤实现：见 LoadDirectory
+
+        // 左侧「路径切换面板」标签：记住模式 = 上次关闭时的标签，固定模式 = 设置里选定的标签。
+        // 两者对控件是同一件事（给一个标签），差别只在关闭时是否回写（见 OnClosing）。
+        // 与下方优先级链无关：优先级链只决定 NavigateTo 的落点目录，不决定面板标签。
+        var pickerSettings = AppSettings.Load();
+        _rememberPickerTab = pickerSettings.PickerRememberTab;
+        QuickPath.SelectTab(QuickPathControl.ParseTabOrDefault(pickerSettings.PickerSourceTab));
 
         // 初始目录
         var startDir = ResolveInitialPath(initialPath);
@@ -1339,25 +1349,50 @@ public partial class CustomFilePickerDialog : Window
     }
 
     /// <summary>
-    /// 关闭时保存右栏面板宽度（PickItems / ExtractFolder 模式各自独立记忆）。
+    /// 关闭时保存选择器的界面状态：左侧「路径切换面板」标签（仅记住模式）+ 右栏面板宽度
+    /// （PickItems / ExtractFolder 模式各自独立记忆）。
+    /// 仅在值确有变化时落盘——选择器每次添加文件/目录都会打开，避免无谓写 settings.json。
     /// </summary>
     protected override void OnClosing(WindowClosingEventArgs e)
     {
         base.OnClosing(e);
 
-        // 仅 PickItems / ExtractFolder 模式右栏可见；其余模式右栏 Auto 塌缩，无需保存
-        if (_mode is not (PickerMode.PickItems or PickerMode.ExtractFolder)) return;
-
-        // 取列的实际宽度（拖拽后 rightCol.Width 为像素值，此时等于实际宽度）
-        var rightCol = BrowserGrid.ColumnDefinitions[4];
-        double width = rightCol.Width.IsAbsolute ? rightCol.Width.Value : rightCol.ActualWidth;
-        if (width is < 200 or > 800) return; // 超出面板 Min/Max 约束的宽度不保存（防御）
-
         var settings = AppSettings.Load();
-        if (_mode == PickerMode.PickItems)
-            settings.PickItemsPanelWidth = width;
-        else
-            settings.ExtractFolderPanelWidth = width;
-        settings.Save();
+        var dirty = false;
+
+        // 左侧面板标签：固定模式下对话框内切换只是临时状态，不回写（否则「固定」会退化成「记住」）
+        if (_rememberPickerTab)
+        {
+            var tabName = QuickPath.CurrentTab.ToString();
+            if (!string.Equals(settings.PickerSourceTab, tabName, StringComparison.Ordinal))
+            {
+                settings.PickerSourceTab = tabName;
+                dirty = true;
+            }
+        }
+
+        // 右栏宽度：仅 PickItems / ExtractFolder 模式右栏可见；其余模式右栏 Auto 塌缩，无需保存
+        if (_mode is PickerMode.PickItems or PickerMode.ExtractFolder)
+        {
+            // 取列的实际宽度（拖拽后 rightCol.Width 为像素值，此时等于实际宽度）
+            var rightCol = BrowserGrid.ColumnDefinitions[4];
+            double width = rightCol.Width.IsAbsolute ? rightCol.Width.Value : rightCol.ActualWidth;
+            // 超出面板 Min/Max 约束的宽度不保存（防御）
+            if (width is >= 200 and <= 800)
+            {
+                if (_mode == PickerMode.PickItems && settings.PickItemsPanelWidth != width)
+                {
+                    settings.PickItemsPanelWidth = width;
+                    dirty = true;
+                }
+                else if (_mode == PickerMode.ExtractFolder && settings.ExtractFolderPanelWidth != width)
+                {
+                    settings.ExtractFolderPanelWidth = width;
+                    dirty = true;
+                }
+            }
+        }
+
+        if (dirty) settings.Save();
     }
 }

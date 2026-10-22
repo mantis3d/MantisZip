@@ -770,7 +770,7 @@ public class SevenZipEngineTests : IDisposable
         Assert.Equal(n, reports.Count(p => p.EntryStatus == ArchiveEntryStatus.Skipped));
 
         // 主进度报告（非 EntryStatus 通道）：每个跳过条目一条 + 收尾 → 至少 n 条
-        var main = reports.Where(p => !p.EntryStatus.HasValue).ToList();
+        var main = reports.Where(p => !p.EntryStatus.HasValue && !IsPhaseOnlyReport(p)).ToList();
         Assert.True(main.Count >= n,
             $"连续跳过应逐条刷新主进度，期望 ≥{n} 条常规报告，实际 {main.Count} 条");
 
@@ -786,6 +786,21 @@ public class SevenZipEngineTests : IDisposable
         // 跳过不计入「已处理」：携带 TotalFiles 的主进度报告 ProcessedFiles 恒为 0（无成功条目）
         Assert.All(main.Where(p => p.TotalFiles > 0), p => Assert.Equal(0, p.ProcessedFiles));
     }
+
+    /// <summary>
+    /// 是否为「纯阶段上报」：只带阶段标签、不含进度信息（<c>ArchiveProgress.Phase</c> 有值，
+    /// 而 <c>PercentComplete</c> / <c>ProcessedFiles</c> / <c>ProcessedBytes</c> 均为 0、
+    /// 无条目终态与批次身份）。引擎在阶段边界（ReadingArchive / Extracting / Finalizing）
+    /// 会额外上报这种报告 —— 它是阶段标签而非进度信息，不参与主进度单调性
+    /// （UI 侧 <c>ProgressViewModel.SetProgress</c> 对其早返回，同样不回写主进度）。
+    /// </summary>
+    private static bool IsPhaseOnlyReport(ArchiveProgress p) =>
+        p.PercentComplete == 0
+        && p.ProcessedFiles == 0
+        && p.ProcessedBytes == 0
+        && !p.EntryStatus.HasValue
+        && p.BatchIndex == null
+        && string.IsNullOrEmpty(p.EntryKey);
 }
 
 /// <summary>
