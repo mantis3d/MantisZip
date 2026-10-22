@@ -2,10 +2,14 @@ name: CI
 
 on:
   push:
-    # alpha 是日常开发分支（main 只在发版合并时前进），两条都要触发门禁。
-    branches: [main, alpha]
+    # 分支角色（2026-10-22 明确）：
+    #   alpha = 新功能分支（日常新功能开发）
+    #   beta  = 调试除错分支（缺陷复现 / 修错 / 验证，均要过门禁）
+    #   main  = 发版分支（只在发版合并时前进）
+    # 三条都要触发门禁。
+    branches: [main, alpha, beta]
   pull_request:
-    branches: [main, alpha]
+    branches: [main, alpha, beta]
 
 jobs:
   build:

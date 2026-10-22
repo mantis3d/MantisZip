@@ -6,23 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
-**2026-10-22** — issue #46 反馈处理：文件选择器面板标签可记忆/可固定 + 进度窗口完成后停表并给出终态统计
-  - **来源**：GitHub issue #46（用户把意见写在截图里）。截图无法直接读取 → `web_fetch` 抓页面 HTML、正则提取 `private-user-images` 链接后下载 6 张图再逐张读。
-  - **「面板标签」与「默认路径优先级」是两套东西**（此前的混淆点）：`Controls/QuickPathControl` 的四个标签是**来源切换**（收藏/历史/窗口/目录树）；`AppSettings.DefaultPathOrder` + `ResolveInitialPath()` 的优先级链只决定**初始目录**，与面板停在哪个标签无关。
-  - **面板标签记忆**：`AppSettings.PickerSourceTab`（存 `PathTab` 名称，空串=默认）+ `PickerRememberTab`（默认 `true`）；`Controls/QuickPathControl.axaml.cs` 增 `public static PathTab ParseTabOrDefault(string? value)`（空/未知/越界 → `PathTab.Favorites`，与旧行为一致）；`Dialogs/CustomFilePickerDialog` 打开时还原、关闭时**仅在「记住」模式**回写标签（固定模式下不回写，否则策略会被静默降级成记住）。
-  - **设置页新增「路径」tab**：`Settings_Tab_Path`；把「默认路径优先级」整块从「高级」搬入，并在下方加「文件选择器面板标签」块（勾选框 `PickerRememberTab` + 仅在未勾选时可见的 `PickerTabOptions` 下拉，按规则 6 用 `IsVisible` 而非 `IsEnabled`）。ComboBox 沿用 `Option` + `ItemTemplate{Display}` 范式。
-  - **完成后不再计时**：`ProgressViewModel` 增 `_finalElapsed`；`SetComplete` / `SetErrorSummary` / `Cancel` 三条终态路径统一调 `FreezeCompletion()`（幂等，多次调用只认首次），`RefreshTimeDisplay()` 命中冻结值后直接返回 → code-behind 的每秒 tick 不再让「已用时间」增长。
-  - **终态统计摘要**：`BuildCompletionSummary()` 逐行拼接「文件数（有跳过/出错才追加该片段）/ 压缩包数（批量部分失败显示「成功 n / 共 m」）/ 用时 / 平均速度 / 体积或压缩率」，数据不可得的行整行省略（不出「—」占位）；渲染在状态行下方新增 `CompletionSummaryText`（`IsVisible="{Binding HasCompletionSummary}"`，空串整块隐藏）；状态行复制按钮改为「状态文案 + 摘要」一并复制，便于抓日志。批量字节累计靠 `SetCurrentBatchItem` 在切换档案时把 `_currentArchiveBytes` 结算进 `_finishedArchiveBytes`（放在 Pending 守卫之后，避免同一档案重复计入）。
-  - **i18n**：三语新增 11 个 `Progress_Summary_*`（含 `_Sep` 分隔符）+ 5 个 `Settings_Tab_Path` / `Settings_PickerTab_*`。
-  - **测试**：`ProgressViewModelTests.cs` 新增 4 例（完成后冻结+摘要至少三行、失败同样冻结、新操作清空终态、批量部分失败摘要出现 `1 / 2`）；新增 `QuickPathTabPersistenceTests.cs`（`ParseTabOrDefault` 12 例）与 `SettingsPickerTabOptionsTests.cs`（下拉 4 项与默认值）。
-  - **验证**：`-Task i18n`（1292 key 一致）、`-Task build -Target avalonia`（0 警告）、`-Task test -Target ui-tests` 全绿。
-  - **发布说明**：按用户要求写入 `RELEASE_NOTES.md` 的 v0.5.3「交互」节，两条（面板标签可记住/可固定、进度窗口停表 + 终态统计），措辞按「本版本改进」而非「修复」——这两项都是本周期新增能力，上一版本用户拿不到带缺陷的版本。
-  - **zh-TW 分卷术语修正**：`strings.zh-TW.json:373-374` 原「分磁碟區大小」/「不分磁碟區」属概念错位——「磁碟區」是硬碟分割（disk volume），压缩档的 volume 是「卷／分割檔」。按用户选定改为「分割檔大小」/「不分割」（对齐 WinRAR 繁中「切成分割檔，大小」），并同步统一 `Settings_AdaptiveOverrides_MtWarning`（:29）与 `AdaptiveHelp_Markdown`（:1307）说明文字里的「分卷」→「分割檔」。简中/英文不动。
-  - **进度窗口状态行按阶段显示**（同一窗口的第二轮要求：状态行太粗）：Core 新增 `ArchivePhase`（`Scanning` / `ReadingArchive` / `Compressing` / `Extracting` / `Finalizing` / `Testing`，见 `src/MantisZip.Core/Abstractions/ArchiveEngine.cs`）+ `ArchiveProgress.Phase`（可空，null = 旧行为，旧调用方不受影响）+ 扩展方法 `ReportPhase()`。三引擎在阶段边界各报一次：ZIP 压缩覆盖 扫描 / 加密原生 / mt=on 并行 / 逐条目 / 合并 / 后置回填，ZIP 解压覆盖串行与并行两条路径，7z 覆盖压缩/解压/测试，tar.gz 覆盖三条路径（`AddToArchiveAsync` 追加操作暂未上报）。UI 侧 `ProgressViewModel.ApplyPhase()` 把阶段映射成状态行文案（三语 6 个 `Progress_Phase_*`），扫描阶段切不定进度条并在「文件计数」行显示「已发现 N 个文件」（`Progress_FileCount_Scanning`，与 `FileCountText` 互斥显隐）；`BeginPreparing` / `SetComplete` 清空阶段与扫描计数，`StatusKind` 为 `Paused` / `Failed` / `Cancelled` 时阶段文案不覆盖人为状态。
-  - **FileScanner 去硬编码中文**（规则 13）：原先把 `正在扫描: xxx (N 个文件)` 拼进 `CurrentFile`，现改为 `CurrentFile`=相对路径 + `TotalFiles`=已发现数 + `Phase=Scanning`，文案统一由 UI 层本地化。
-  - **测试**：`ProgressViewModelTests.cs` 新增 5 例（阶段改状态行 / 扫描期不定进度条 + 计数 / 离开扫描清计数 / 暂停态不被覆盖 / 终态清扫描计数）。
-  - **未上报阶段的流程（已知留白）**：`CompressService` 的批量/单档分派与 `AddToArchiveAsync` 追加操作不上报阶段，窗口在这些时点仍显示窗口标题文案（不会错，只是不够细）。
-  - **遗留**：「最愛」的 ❤ 图标随后续「更换图标库」计划一并处理。
+**2026-10-22** — CI 门禁覆盖 beta + 明确三分支角色（用户拍板）
+  - **背景**：本轮全部工作（启动优化三阶段 / 打开压缩包闪退修复 / 进度条与目录条修复 / 「数据条」改名）都在 `beta` 上，而 `ci.yml` 的触发分支只有 `[main, alpha]` → 推送 beta 根本不跑门禁（alpha 上一批加 `alpha` 时就是因为同一类问题被补上的）。
+  - **改动**：`.github/workflows/ci.yml` 的 `push` / `pull_request` 触发分支改为 `[main, alpha, beta]`。
+  - **分支角色（2026-10-22 明确）**：`alpha` = **新功能分支**（日常新功能开发）；`beta` = **调试除错分支**（缺陷复现 / 修错 / 验证）；`main` = **发版分支**（只在发版合并时前进）。三条都要过门禁。
+  - **同步三处**（CI 配置与文档必须一致）：`.github/workflows/ci.yml`、`AGENTS.md`「Quick start」新增「分支角色」条目并改写「CI 触发分支」、`docs/MAINTENANCE.md` 第 5 节「CI 门禁」的触发说明。
+  - **验证**：YAML 结构检查通过（无 TAB、两条 branches 行就位）；`verify-repo -Task check` 全过。
 
 **2026-10-22** — 上一批守卫/CI 提交的收尾修补：门禁补 alpha 分支、兜底按配置取程序集、行尾统一
   - **动机**：评审同步过来的 `4d2b641`（规则守卫 + CI 静态门禁）时实测发现四处会被真实踩到的问题，逐条修掉。
@@ -73,6 +62,24 @@
   - **负向验证**：临时夹具（假 `MantisZip.sln` + 两份不同版本号 + 缺文件 + 缺/多/重复 key + 占位符错位）跑 `-Task check` 返回 exit 1 并逐条报出，排除「永远绿」的假门禁。
   - **环境限制（非缺陷）**：DSH workspace-write 沙箱下 `dotnet build` 写 `obj/` 报 `MSB3491 … Access to the path … is denied`，Node 起带管道的子进程报 `spawn EPERM`；脚本/插件在完全权限或 CI 上正常，README 已记录两种现象与绕过方式。
   - **后续**：CI 接线（`-Task check` + 装 7-Zip 放开 `SevenZipEngine` 过滤）与第 4 层工具（`hygiene` / `docs` / `installer`）不在本期。
+**2026-10-22** — issue #46 反馈处理：文件选择器面板标签可记忆/可固定 + 进度窗口完成后停表并给出终态统计
+  - **来源**：GitHub issue #46（用户把意见写在截图里）。截图无法直接读取 → `web_fetch` 抓页面 HTML、正则提取 `private-user-images` 链接后下载 6 张图再逐张读。
+  - **「面板标签」与「默认路径优先级」是两套东西**（此前的混淆点）：`Controls/QuickPathControl` 的四个标签是**来源切换**（收藏/历史/窗口/目录树）；`AppSettings.DefaultPathOrder` + `ResolveInitialPath()` 的优先级链只决定**初始目录**，与面板停在哪个标签无关。
+  - **面板标签记忆**：`AppSettings.PickerSourceTab`（存 `PathTab` 名称，空串=默认）+ `PickerRememberTab`（默认 `true`）；`Controls/QuickPathControl.axaml.cs` 增 `public static PathTab ParseTabOrDefault(string? value)`（空/未知/越界 → `PathTab.Favorites`，与旧行为一致）；`Dialogs/CustomFilePickerDialog` 打开时还原、关闭时**仅在「记住」模式**回写标签（固定模式下不回写，否则策略会被静默降级成记住）。
+  - **设置页新增「路径」tab**：`Settings_Tab_Path`；把「默认路径优先级」整块从「高级」搬入，并在下方加「文件选择器面板标签」块（勾选框 `PickerRememberTab` + 仅在未勾选时可见的 `PickerTabOptions` 下拉，按规则 6 用 `IsVisible` 而非 `IsEnabled`）。ComboBox 沿用 `Option` + `ItemTemplate{Display}` 范式。
+  - **完成后不再计时**：`ProgressViewModel` 增 `_finalElapsed`；`SetComplete` / `SetErrorSummary` / `Cancel` 三条终态路径统一调 `FreezeCompletion()`（幂等，多次调用只认首次），`RefreshTimeDisplay()` 命中冻结值后直接返回 → code-behind 的每秒 tick 不再让「已用时间」增长。
+  - **终态统计摘要**：`BuildCompletionSummary()` 逐行拼接「文件数（有跳过/出错才追加该片段）/ 压缩包数（批量部分失败显示「成功 n / 共 m」）/ 用时 / 平均速度 / 体积或压缩率」，数据不可得的行整行省略（不出「—」占位）；渲染在状态行下方新增 `CompletionSummaryText`（`IsVisible="{Binding HasCompletionSummary}"`，空串整块隐藏）；状态行复制按钮改为「状态文案 + 摘要」一并复制，便于抓日志。批量字节累计靠 `SetCurrentBatchItem` 在切换档案时把 `_currentArchiveBytes` 结算进 `_finishedArchiveBytes`（放在 Pending 守卫之后，避免同一档案重复计入）。
+  - **i18n**：三语新增 11 个 `Progress_Summary_*`（含 `_Sep` 分隔符）+ 5 个 `Settings_Tab_Path` / `Settings_PickerTab_*`。
+  - **测试**：`ProgressViewModelTests.cs` 新增 4 例（完成后冻结+摘要至少三行、失败同样冻结、新操作清空终态、批量部分失败摘要出现 `1 / 2`）；新增 `QuickPathTabPersistenceTests.cs`（`ParseTabOrDefault` 12 例）与 `SettingsPickerTabOptionsTests.cs`（下拉 4 项与默认值）。
+  - **验证**：`-Task i18n`（1292 key 一致）、`-Task build -Target avalonia`（0 警告）、`-Task test -Target ui-tests` 全绿。
+  - **发布说明**：按用户要求写入 `RELEASE_NOTES.md` 的 v0.5.3「交互」节，两条（面板标签可记住/可固定、进度窗口停表 + 终态统计），措辞按「本版本改进」而非「修复」——这两项都是本周期新增能力，上一版本用户拿不到带缺陷的版本。
+  - **zh-TW 分卷术语修正**：`strings.zh-TW.json:373-374` 原「分磁碟區大小」/「不分磁碟區」属概念错位——「磁碟區」是硬碟分割（disk volume），压缩档的 volume 是「卷／分割檔」。按用户选定改为「分割檔大小」/「不分割」（对齐 WinRAR 繁中「切成分割檔，大小」），并同步统一 `Settings_AdaptiveOverrides_MtWarning`（:29）与 `AdaptiveHelp_Markdown`（:1307）说明文字里的「分卷」→「分割檔」。简中/英文不动。
+  - **进度窗口状态行按阶段显示**（同一窗口的第二轮要求：状态行太粗）：Core 新增 `ArchivePhase`（`Scanning` / `ReadingArchive` / `Compressing` / `Extracting` / `Finalizing` / `Testing`，见 `src/MantisZip.Core/Abstractions/ArchiveEngine.cs`）+ `ArchiveProgress.Phase`（可空，null = 旧行为，旧调用方不受影响）+ 扩展方法 `ReportPhase()`。三引擎在阶段边界各报一次：ZIP 压缩覆盖 扫描 / 加密原生 / mt=on 并行 / 逐条目 / 合并 / 后置回填，ZIP 解压覆盖串行与并行两条路径，7z 覆盖压缩/解压/测试，tar.gz 覆盖三条路径（`AddToArchiveAsync` 追加操作暂未上报）。UI 侧 `ProgressViewModel.ApplyPhase()` 把阶段映射成状态行文案（三语 6 个 `Progress_Phase_*`），扫描阶段切不定进度条并在「文件计数」行显示「已发现 N 个文件」（`Progress_FileCount_Scanning`，与 `FileCountText` 互斥显隐）；`BeginPreparing` / `SetComplete` 清空阶段与扫描计数，`StatusKind` 为 `Paused` / `Failed` / `Cancelled` 时阶段文案不覆盖人为状态。
+  - **FileScanner 去硬编码中文**（规则 13）：原先把 `正在扫描: xxx (N 个文件)` 拼进 `CurrentFile`，现改为 `CurrentFile`=相对路径 + `TotalFiles`=已发现数 + `Phase=Scanning`，文案统一由 UI 层本地化。
+  - **测试**：`ProgressViewModelTests.cs` 新增 5 例（阶段改状态行 / 扫描期不定进度条 + 计数 / 离开扫描清计数 / 暂停态不被覆盖 / 终态清扫描计数）。
+  - **未上报阶段的流程（已知留白）**：`CompressService` 的批量/单档分派与 `AddToArchiveAsync` 追加操作不上报阶段，窗口在这些时点仍显示窗口标题文案（不会错，只是不够细）。
+  - **遗留**：「最愛」的 ❤ 图标随后续「更换图标库」计划一并处理。
+
 **2026-10-22** — 「进度条」菜单项改称「数据条 / Data Bars」（术语纠正，用户拍板）
   - **动机**：文件列表里那两条「每行文字后表示相对占比的彩色横条」此前叫「进度条」，但它表达的是**数据相对占比**、不是任务进度，且与解压/压缩窗口里的真·进度条（`ProgressWindow`）混淆 → 改称「数据条 / 資料條 / Data Bars」。
   - **改动范围**（用户拍板：只改可见文案 + i18n key 名）：
