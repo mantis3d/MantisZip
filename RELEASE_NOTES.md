@@ -30,6 +30,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Faster startup** — ① eliminated duplicate theme parsing: applying a theme now skips parsing entirely when it is already active, and the icon dictionary is reused across themes, measured ~100 ms faster startup (this also fixes the old "clear-then-load" sequence that left the UI unstyled when loading failed); ② process-level settings cache: the cold start reads from disk a single time, and reopening windows/dialogs at runtime no longer re-reads and re-deserializes the file, benefiting all 72 call sites
 - **启动速度再优化（ReadyToRun）** — 发布版启用 ReadyToRun（仅预编译应用主程序集），应用初始化与窗口 XAML 构建更快，实测冷启动缩短约 0.1 秒；安装包体积增加约 4 MB
 - **Faster startup (ReadyToRun)** — release builds now use ReadyToRun (precompiling the app's main assembly only), speeding up app initialization and window XAML construction; measured cold start about 0.1 s faster, with the installer growing by roughly 4 MB
+- **主窗口界面按需加载** — 启动时不再一次性构建全部控件：默认隐藏的过滤栏与整个压缩包内容区（目录树 / 文件列表 / 预览面板 / 拖拽添加覆层）改为首次使用时才创建，实测窗口界面构建阶段缩短约 0.1 秒；打开压缩包时内容区即刻呈现，功能与布局完全不变
+- **Main window UI is now built on demand** — the app no longer constructs every control at launch: the filter bar (hidden by default) and the entire archive content area (folder tree, file list, preview panel, drag-and-drop overlay) are created the first time they are actually needed, measurably shortening the window's UI construction phase by about 0.1 s; the content area appears immediately when an archive is opened, with features and layout unchanged
 
 
 **压缩加速 / Compression Speed-ups**
