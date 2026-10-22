@@ -41,6 +41,18 @@
   - **负向验证**：临时夹具（假 `MantisZip.sln` + 两份不同版本号 + 缺文件 + 缺/多/重复 key + 占位符错位）跑 `-Task check` 返回 exit 1 并逐条报出，排除「永远绿」的假门禁。
   - **环境限制（非缺陷）**：DSH workspace-write 沙箱下 `dotnet build` 写 `obj/` 报 `MSB3491 … Access to the path … is denied`，Node 起带管道的子进程报 `spawn EPERM`；脚本/插件在完全权限或 CI 上正常，README 已记录两种现象与绕过方式。
   - **后续**：CI 接线（`-Task check` + 装 7-Zip 放开 `SevenZipEngine` 过滤）与第 4 层工具（`hygiene` / `docs` / `installer`）不在本期。
+**2026-10-22** — 修复「目录基线」目录条着色未生效（迁移遗留 bug）
+  - **根因**：模型算出的 `UseDirProgressColor`（`item.IsDirectory && SeparateDirBaseline`）与 4 个 `*BarBrushKey`（`SizeBarBrushKey` / `CompressedSizeBarBrushKey` / `RatioBarBrushKey` / `DateBarBrushKey`）**无人使用** → 视图里 4 个进度条 Rectangle 的 `Fill` 是硬编码的单一 `DynamicResource` → **目录的条与文件的条同色**，「目录基线」开关只影响长度基准、不影响颜色。
+  - **WPF 参考实现**（`git show 98ca7d42^:src/MantisZip.UI/MainWindow/MainWindow.xaml` 501-560 行）：大小 / 压缩后大小两列的 Rectangle 挂 `Style` + `DataTrigger`（`UseDirProgressColor == True` → 换 `ProgressBarSizeDirBg` / `ProgressBarCompressedSizeDirBg`）；压缩率 / 时间两列是单色硬编码（无 DataTrigger）。
+  - **修复**（`ArchiveContentView.axaml`）：两列各改为**双 Rectangle 叠加**（文件色 + 目录色），用 `IsVisible="{Binding !UseDirProgressColor}"` / `IsVisible="{Binding UseDirProgressColor}"` 切换 → 保留 `DynamicResource` 随主题联动（不引入 key→brush 转换器，也避免主题切换后颜色过期）。
+  - **测试**（`ProgressBarDirColorTests` 2 条）：
+    ① 运行时级 —— 构建「大小」列的 `CellTemplate` → 两条 Rectangle 的 `IsVisible` 随 `UseDirProgressColor` 互斥；
+    ② 纯文本守卫 —— 两列必须分别用 `ProgressBarSizeBrush`/`ProgressBarSizeDirBrush`、`ProgressBarCompressedSizeBrush`/`ProgressBarCompressedSizeDirBrush` 两个**不同**键（运行时无法断言颜色值：`DynamicResource` 需控件在视觉树内才能解析到 Application 资源，离游离控件拿不到）。
+    - 已红/绿实证：删掉第二个 Rectangle → 运行时用例失败（count 1 ≠ 2）。
+  - **踩坑记录**：
+    - `IDataTemplate.Build(param)` **不会**把 param 设为 DataContext → 必须手动 `root.DataContext = item`，否则模板内绑定不求值（`IsVisible` 恒为默认 true）。
+    - `Avalonia.Controls.Shapes` 与 `System.IO.Path` 同名冲突 → 测试里用 `using IOPath = System.IO.Path;` 别名。
+  - **模型注记**：`ArchiveItemModel` 的 4 个 `*BarBrushKey` 加注记 —— 当前视图未使用（换色走双 Rectangle + IsVisible），勿误以为改这里就能换色。
 **2026-10-22** — 修复「视图 → 进度条」开关按下不刷新（迁移遗留 bug）
   - **现象**：用户实测发现「视图」菜单下「进度条」开关按下后界面不刷新（进度条不出现/不消失）。
   - **根因调查**：

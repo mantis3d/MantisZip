@@ -70,6 +70,10 @@ public partial class ArchiveItemModel : ObservableObject
     private bool _useDirProgressColor;
 
     // Brush key properties for progress bar color switching
+    // 注（2026-10-22）：当前视图**未使用**这些键 —— 目录/文件换色改由
+    // ArchiveContentView 里「双 Rectangle 叠加 + IsVisible="{Binding UseDirProgressColor}"」
+    // 实现（保留 DynamicResource 随主题联动）。此处仅记录各列对应的资源键，
+    // 供将来若改用「key → brush」方案时参考；勿误以为改这里就能换色。
     public string SizeBarBrushKey => UseDirProgressColor ? "ProgressBarSizeDirBrush" : "ProgressBarSizeBrush";
     public string CompressedSizeBarBrushKey => UseDirProgressColor ? "ProgressBarCompressedSizeDirBrush" : "ProgressBarCompressedSizeBrush";
     public string RatioBarBrushKey => "ProgressBarRatioBrush";

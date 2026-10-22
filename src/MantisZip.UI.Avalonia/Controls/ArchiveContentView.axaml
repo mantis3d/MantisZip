@@ -330,8 +330,24 @@
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate>
                     <Grid>
+                      <!-- 进度条底色：文件用淡色、目录用饱和色（目录基线开启时）。
+                           2026-10-22：原为单个 Rectangle 写死 Fill，模型算出的 UseDirProgressColor
+                           无人使用 → 目录条与文件条同色。改为双 Rectangle 叠加 + IsVisible 切换，
+                           保持 DynamicResource 随主题自动切换（不用 key→brush 转换器）。 -->
                       <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
-                                 HorizontalAlignment="Left">
+                                 HorizontalAlignment="Left"
+                                 IsVisible="{Binding !UseDirProgressColor}">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="SizeRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <Rectangle Fill="{DynamicResource ProgressBarSizeDirBrush}"
+                                 HorizontalAlignment="Left"
+                                 IsVisible="{Binding UseDirProgressColor}">
                         <Rectangle.Width>
                           <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                             <Binding Path="SizeRatio" />
@@ -343,6 +359,7 @@
                       <TextBlock Text="{Binding SizeDisplay}"
                                  VerticalAlignment="Center"
                                  Margin="4,0" />
+
                     </Grid>
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
@@ -361,8 +378,21 @@
                 <DataGridTemplateColumn.CellTemplate>
                   <DataTemplate>
                     <Grid>
+                      <!-- 进度条底色：文件淡紫 / 目录饱和紫（同大小列，目录基线开启时切目录色） -->
                       <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
-                                 HorizontalAlignment="Left">
+                                 HorizontalAlignment="Left"
+                                 IsVisible="{Binding !UseDirProgressColor}">
+                        <Rectangle.Width>
+                          <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                            <Binding Path="CompressedSizeRatio" />
+                            <Binding Path="Bounds.Width"
+                                     RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                          </MultiBinding>
+                        </Rectangle.Width>
+                      </Rectangle>
+                      <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeDirBrush}"
+                                 HorizontalAlignment="Left"
+                                 IsVisible="{Binding UseDirProgressColor}">
                         <Rectangle.Width>
                           <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                             <Binding Path="CompressedSizeRatio" />
