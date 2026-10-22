@@ -41,8 +41,17 @@
   - **负向验证**：临时夹具（假 `MantisZip.sln` + 两份不同版本号 + 缺文件 + 缺/多/重复 key + 占位符错位）跑 `-Task check` 返回 exit 1 并逐条报出，排除「永远绿」的假门禁。
   - **环境限制（非缺陷）**：DSH workspace-write 沙箱下 `dotnet build` 写 `obj/` 报 `MSB3491 … Access to the path … is denied`，Node 起带管道的子进程报 `spawn EPERM`；脚本/插件在完全权限或 CI 上正常，README 已记录两种现象与绕过方式。
   - **后续**：CI 接线（`-Task check` + 装 7-Zip 放开 `SevenZipEngine` 过滤）与第 4 层工具（`hygiene` / `docs` / `installer`）不在本期。
+**2026-10-22** — 「进度条」菜单项改称「数据条 / Data Bars」（术语纠正，用户拍板）
+  - **动机**：文件列表里那两条「每行文字后表示相对占比的彩色横条」此前叫「进度条」，但它表达的是**数据相对占比**、不是任务进度，且与解压/压缩窗口里的真·进度条（`ProgressWindow`）混淆 → 改称「数据条 / 資料條 / Data Bars」。
+  - **改动范围**（用户拍板：只改可见文案 + i18n key 名）：
+    - 三语文案：`Menu_ProgressBars` → `Menu_DataBars`；zh-CN「进度条」→「数据条」、zh-TW「進度列」→「資料條」、en「Progress Bars」→「Data Bars」（三语 key 集一致）
+    - 视图绑定 `Controls/Menus/ViewMenuItems.axaml` + `MainWindowViewModel.UpdateLocalizedStrings()` 的 key 登记数组同步改名（规则 13）
+    - **内部标识符保留旧名 + 加注记**：`AppSettings.ShowProgressBars`（settings.json 持久化键，改名会丢老用户设置）、`MainWindowViewModel.ShowProgressBars`、`ArchiveItemModel.ProgressBarEnabled`、13×2 个 `ProgressBar*` 主题资源键（改名漏一个即运行时报 KeyNotFoundException，阶段 2 已踩过同类坑）
+    - 注释/文档术语：src 内涉及该横条的注释、RELEASE_NOTES 的两条修复说明、ARCHITECTURE 现状描述 → 改为「数据条」；**真·进度条**（解压/压缩窗口、批进度条、轨道对比度等）表述保持不变
+  - **术语对照**：ARCHITECTURE 新增「术语：数据条（Data Bars）≠ 进度条（Progress Bar）」小节（含为何代码名不改的理由表）
+  - **验证**：`-Task i18n` 三语 key 集一致；UI 全量测试通过；构建 0 错 0 警
 **2026-10-22** — 修复「目录基线」目录条着色未生效（迁移遗留 bug）
-  - **根因**：模型算出的 `UseDirProgressColor`（`item.IsDirectory && SeparateDirBaseline`）与 4 个 `*BarBrushKey`（`SizeBarBrushKey` / `CompressedSizeBarBrushKey` / `RatioBarBrushKey` / `DateBarBrushKey`）**无人使用** → 视图里 4 个进度条 Rectangle 的 `Fill` 是硬编码的单一 `DynamicResource` → **目录的条与文件的条同色**，「目录基线」开关只影响长度基准、不影响颜色。
+  - **根因**：模型算出的 `UseDirProgressColor`（`item.IsDirectory && SeparateDirBaseline`）与 4 个 `*BarBrushKey`（`SizeBarBrushKey` / `CompressedSizeBarBrushKey` / `RatioBarBrushKey` / `DateBarBrushKey`）**无人使用** → 视图里 4 个数据条 Rectangle 的 `Fill` 是硬编码的单一 `DynamicResource` → **目录的条与文件的条同色**，「目录基线」开关只影响长度基准、不影响颜色。
   - **WPF 参考实现**（`git show 98ca7d42^:src/MantisZip.UI/MainWindow/MainWindow.xaml` 501-560 行）：大小 / 压缩后大小两列的 Rectangle 挂 `Style` + `DataTrigger`（`UseDirProgressColor == True` → 换 `ProgressBarSizeDirBg` / `ProgressBarCompressedSizeDirBg`）；压缩率 / 时间两列是单色硬编码（无 DataTrigger）。
   - **修复**（`ArchiveContentView.axaml`）：两列各改为**双 Rectangle 叠加**（文件色 + 目录色），用 `IsVisible="{Binding !UseDirProgressColor}"` / `IsVisible="{Binding UseDirProgressColor}"` 切换 → 保留 `DynamicResource` 随主题联动（不引入 key→brush 转换器，也避免主题切换后颜色过期）。
   - **测试**（`ProgressBarDirColorTests` 2 条）：
@@ -54,7 +63,7 @@
     - `Avalonia.Controls.Shapes` 与 `System.IO.Path` 同名冲突 → 测试里用 `using IOPath = System.IO.Path;` 别名。
   - **模型注记**：`ArchiveItemModel` 的 4 个 `*BarBrushKey` 加注记 —— 当前视图未使用（换色走双 Rectangle + IsVisible），勿误以为改这里就能换色。
   - **RELEASE_NOTES**：经用户拍板，按规则 18 口径（属「上一版本已发布、用户可遇到」的问题）写入 `RELEASE_NOTES.md` 的 v0.5.3 新增「修复 / Fixes」节 —— 含「进度条开关失效」与「目录条底色不可区分」两条（中英各一）。
-**2026-10-22** — 修复「视图 → 进度条」开关按下不刷新（迁移遗留 bug）
+**2026-10-22** — 修复「视图 → 数据条」开关按下不刷新（迁移遗留 bug）
   - **现象**：用户实测发现「视图」菜单下「进度条」开关按下后界面不刷新（进度条不出现/不消失）。
   - **根因调查**：
     - `ToggleProgressBars()` 只做三件事：翻转 `ShowProgressBars`、写设置、给 `CurrentEntries` 逐条设 `item.ProgressBarEnabled`。

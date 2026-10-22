@@ -225,8 +225,8 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 清零所有条目的进度条比例（关闭「进度条」开关时调用）。
-    /// 进度条 Rectangle 的宽度绑定这些比例 → 归零即隐藏（等价 WPF 版切换开关后
+    /// 清零所有条目的数据条比例（关闭「数据条」开关时调用）。
+    /// 数据条 Rectangle 的宽度绑定这些比例 → 归零即隐藏（等价 WPF 版切换开关后
     /// 重填当前目录、比例归零的效果，但保留当前条目与选中项）。
     /// </summary>
     private void ClearProgressBarRatios()
@@ -241,7 +241,7 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 计算所有条目的进度条比例值（相对大小、压缩比、日期分布等）。
+    /// 计算所有条目的数据条比例值（相对大小、压缩比、日期分布等）。
     /// 基准语义与 WPF 版 FilterFiles 对齐：
     /// - 目录独立基准开：文件组、目录组各自取组内最大值做基准，两组各有满格代表；
     /// - 关：全部条目（含目录）统一取最大值做基准。

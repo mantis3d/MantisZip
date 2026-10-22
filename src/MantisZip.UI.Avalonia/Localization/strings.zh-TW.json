@@ -1,4 +1,4 @@
-﻿{
+{
   "Status_Starting": "正在啟動…",
   "Settings_AdaptiveRuleLevel_Store": "儲存",
   "Settings_AdaptiveRuleLevel_Fast": "快速",
@@ -592,7 +592,7 @@
   "Menu_NewArchive": "新增壓縮檔",
   "Menu_OpenArchive": "開啟壓縮檔",
   "Menu_PasswordManager": "密碼管理員",
-  "Menu_ProgressBars": "進度列",
+  "Menu_DataBars": "資料條",
   "Menu_Refresh": "重新整理",
   "Menu_SepDirBaseline": "目錄獨立基準",
   "Menu_Settings": "設定",

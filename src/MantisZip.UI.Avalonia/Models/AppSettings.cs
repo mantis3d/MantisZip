@@ -179,6 +179,12 @@ public class AppSettings
     public string AppFontFamily { get; set; } = "";
     public string CompactnessMode { get; set; } = "Normal";
     public string Language { get; set; } = "zh";
+    /// <summary>
+    /// 是否显示文件列表里的**数据条**（每行文字后那条表示相对占比的彩色横条）。
+    /// 2026-10-22：用户界面文案已从「进度条」改名为「数据条 / Data Bars」（该横条表达的是
+    /// 数据相对占比，不是任务进度）；**属性名保持不变** —— 它是 settings.json 的持久化键，
+    /// 改名会导致老用户的设置读不到。
+    /// </summary>
     public bool ShowProgressBars { get; set; } = true;
     /// <summary>进度窗口内容模式持久化（"simple"/"detailed"/"list"；默认 "detailed"）。</summary>
     public string ProgressContentMode { get; set; } = "detailed";

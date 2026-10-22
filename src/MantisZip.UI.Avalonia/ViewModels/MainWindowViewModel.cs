@@ -243,7 +243,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
             "Menu_Toolbar",
-            "Menu_ProgressBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation", "Menu_ShowInfoPanel",
+            "Menu_DataBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation", "Menu_ShowInfoPanel",
             "Menu_ShowPreviewPanel", "Menu_SaveLayout",
             "Filter_Search", "Filter_Exclude", "Filter_DateFrom", "Filter_DateTo",
             "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders", "Filter_ClearAll",
@@ -490,6 +490,11 @@ public partial class MainWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _isStatusBarVisible = true;
 
+    /// <summary>
+    /// 是否显示文件列表的**数据条**（每行文字后那条表示相对占比的彩色横条）。
+    /// 2026-10-22：用户界面文案已由「进度条」改名为「数据条 / Data Bars」；
+    /// 属性名保持不变（对应 settings.json 的持久化键，改名会丢老用户设置）。
+    /// </summary>
     [ObservableProperty]
     private bool _showProgressBars = true;
 
@@ -1277,8 +1282,8 @@ public partial class MainWindowViewModel : ObservableObject
         _appSettings.ShowProgressBars = ShowProgressBars;
         SaveSetting(s => s.ShowProgressBars = ShowProgressBars);
 
-        // 刷新进度条显示：开启 → 重算比例；关闭 → 比例清零。
-        // 进度条 Rectangle 的宽度绑定这些比例（SizeRatio / CompressedSizeRatio /
+        // 刷新数据条显示：开启 → 重算比例；关闭 → 比例清零。
+        // 数据条 Rectangle 的宽度绑定这些比例（SizeRatio / CompressedSizeRatio /
         // DateRatio / RatioBarValue）→ 归零即隐藏、重算即显示。
         // 等价 WPF 版 ToggleProgressBars_Click 里的 FilterFiles(_currentFolder)
         // （重填条目 → 比例归零/重算），但这里保留当前条目与选中项，不重建集合。
@@ -1287,7 +1292,7 @@ public partial class MainWindowViewModel : ObservableObject
         else
             ClearProgressBarRatios();
 
-        // 同步每个条目的进度条开关（与 PopulateEntries 中的赋值保持一致）
+        // 同步每个条目的数据条开关（与 PopulateEntries 中的赋值保持一致）
         foreach (var item in CurrentEntries)
         {
             item.ProgressBarEnabled = ShowProgressBars;

@@ -5,7 +5,7 @@
              x:Class="MantisZip.UI.Avalonia.Controls.Menus.ViewMenuItems"
              x:DataType="vm:MainWindowViewModel">
 
-  <!-- 视图菜单子项：主题 / 进度条 / 目录基线 / 预览面板 / 信息面板 / 保存布局
+  <!-- 视图菜单子项：主题 / 数据条 / 目录基线 / 预览面板 / 信息面板 / 保存布局
        2026-10-22 启动优化阶段 3：自 MainWindow.axaml 抽出为独立视图，**首次展开该菜单时才创建**
        （顶级菜单项常驻，子项不在启动路径实例化）。
        ⚠️ 随迁局部资源：{StaticResource} 的查找作用域只到本视图 → 本文件用到的
@@ -26,10 +26,10 @@
     </MenuItem.Icon>
   </MenuItem>
   <Separator />
-  <!-- 切换进度条显示：文件列表中的压缩比进度条 -->
+  <!-- 切换数据条显示：文件列表中的相对占比条 -->
   <MenuItem Command="{Binding ToggleProgressBarsCommand}"
             IsEnabled="{Binding IsArchiveLoaded}"
-            Header="{Binding LocalizedStrings[Menu_ProgressBars]}">
+            Header="{Binding LocalizedStrings[Menu_DataBars]}">
     <MenuItem.Icon>
       <Border Classes="ToggleIconBox"
               Background="{Binding ShowProgressBars, Converter={StaticResource BoolToToggleBgBrushConverter}}">

@@ -153,7 +153,10 @@
   <!-- 进度条轨道：与 ThemeSplitterBg(#FFE0E0E0) 拉开对比（#C8 vs #E0 单通道差 24≥16），否则 0% 时进度条不可见 -->
   <SolidColorBrush x:Key="ThemeProgressBgBrush" Color="#FFC8C8C8" />
 
-  <!-- Progress bar colors -->
+  <!-- 数据条颜色（用户界面称「数据条 / Data Bars」；2026-10-22 由「进度条」改名）。
+       键名保持 ProgressBar* 不变：这些是主题资源键，重命名需同步改两个主题文件与视图，
+       漏改一个即运行时报 KeyNotFoundException（阶段 2 曾踩过同类坑）。
+       勿与「进度条」混淆：本组是文件列表里表示**相对占比**的横条，不是任务进度。 -->
   <Color x:Key="ProgressBarSizeColor">#FFE0E7FF</Color>
   <Color x:Key="ProgressBarSizeDirColor">#FFA3B8FF</Color>
   <Color x:Key="ProgressBarCompressedSizeColor">#FFE8E0FF</Color>

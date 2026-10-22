@@ -63,6 +63,9 @@ public partial class ArchiveItemModel : ObservableObject
     [ObservableProperty]
     private double _ratioBarValue;
 
+    /// <summary>
+    /// 该条目的**数据条**是否启用（用户界面称「数据条 / Data Bars」；2026-10-22 由「进度条」改名）。
+    /// </summary>
     [ObservableProperty]
     private bool _progressBarEnabled = true;
 

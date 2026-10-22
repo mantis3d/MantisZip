@@ -1,4 +1,4 @@
-﻿{
+{
   "Status_Starting": "正在启动…",
   "Settings_AdaptiveRuleLevel_Store": "存储",
   "Settings_AdaptiveRuleLevel_Fast": "快速",
@@ -592,7 +592,7 @@
   "Menu_NewArchive": "新建压缩包",
   "Menu_OpenArchive": "打开压缩包",
   "Menu_PasswordManager": "密码管理器",
-  "Menu_ProgressBars": "进度条",
+  "Menu_DataBars": "数据条",
   "Menu_Refresh": "刷新",
   "Menu_SepDirBaseline": "目录独立基准",
   "Menu_Settings": "设置",

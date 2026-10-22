@@ -1,4 +1,4 @@
-﻿{
+{
   "Status_Starting": "Starting…",
   "Settings_AdaptiveRuleLevel_Store": "Store",
   "Settings_AdaptiveRuleLevel_Fast": "Fast",
@@ -592,7 +592,7 @@
   "Menu_NewArchive": "New Archive",
   "Menu_OpenArchive": "Open Archive",
   "Menu_PasswordManager": "Password Manager",
-  "Menu_ProgressBars": "Progress Bars",
+  "Menu_DataBars": "Data Bars",
   "Menu_Refresh": "Refresh",
   "Menu_SepDirBaseline": "Separate Dir Baseline",
   "Menu_Settings": "Settings",

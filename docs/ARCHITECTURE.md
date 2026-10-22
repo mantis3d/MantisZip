@@ -530,7 +530,22 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 ### ArchiveItem duality
 
 - **Core**：`MantisZip.Core.Abstractions.ArchiveItem` — 引擎产出
-- **Avalonia UI**：`ArchiveItemModel`（Models/）包装 `ArchiveItem`，附加 `IconSource`、显示属性、`SizeRatio`（进度条宽度）、`SortOrder`
+- **Avalonia UI**：`ArchiveItemModel`（Models/）包装 `ArchiveItem`，附加 `IconSource`、显示属性、`SizeRatio`（数据条宽度）、`SortOrder`
+
+### 术语：数据条（Data Bars）≠ 进度条（Progress Bar）
+
+2026-10-22 起，用户界面把文件列表里那两条「每行文字后表示相对占比的彩色横条」改称
+**数据条 / 資料條 / Data Bars**（菜单项：视图 → 数据条）。它表达的是**数据的相对占比**
+（大小 / 压缩后大小 / 压缩率 / 修改时间四列，长度 = 该条目在当前列表中的占比），**不是任务进度**。
+
+| 概念 | 界面名称 | 代码里的名字 |
+|---|---|---|
+| 文件列表占比条 | **数据条 / Data Bars** | `ShowProgressBars` / `ProgressBarEnabled` / `ProgressBar*Brush`（**沿用旧名**） |
+| 解压/压缩窗口的百分比进度 | 进度条（不变） | `ProgressWindow` / `ThemeProgressBgBrush` 等 |
+
+**为何代码名不改**：`AppSettings.ShowProgressBars` 是 settings.json 的**持久化键**（改名 → 老用户设置读不到）；
+`ProgressBar*` 主题资源键共 13 个 × 2 主题（改名 → 漏改一个即运行时报 `KeyNotFoundException`）。
+两者均已在代码注释里注明「= 界面上的数据条」。i18n key 已同步改为 `Menu_DataBars`。
 
 ### 目录聚合 — ComputeDirectoryStats
 
