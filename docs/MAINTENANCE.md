@@ -1,0 +1,149 @@
+# MantisZip 工程化维护手册
+
+> 本文件回答「这套门禁是谁、为什么这么写、要怎么改、改完怎么验证」。
+> **规则**看 [AGENTS.md](../AGENTS.md)，**应用架构**看 [ARCHITECTURE.md](ARCHITECTURE.md)，**逐日变更史**看 [progress-avalonia-detail.md](progress-avalonia-detail.md)。
+> 换机器 / 换 agent 接手时，先读这里，再读 AGENTS.md。
+
+---
+
+## 1. 一张图看清组成部分
+
+```
+              ┌──────────────────────────────────────────────┐
+   agent ────▶│ DSH 插件 tools/dsh-plugin-mantiszip/index.mjs│  薄壳：校验参数→起进程→解析 JSON→渲染
+              └───────────────────┬──────────────────────────┘
+                                  │ pwsh -File … -Json
+   人 / CI ───────────────────────▼──────────────────────────┐
+                                  │                          │
+                    ┌─────────────┴─────────────┐            │
+                    │ scripts/verify-repo.ps1  │◀── 唯一实现 │
+                    └─────────────┬─────────────┘            │
+                                  │ dotnet build / test      │
+                                  ▼                          │
+                        MSBuild / 测试宿主 / 仓库文件          │
+```
+
+- **唯一实现**：`scripts/verify-repo.ps1`。所有校验逻辑只能写在这里，插件与 CI 都是调用方。
+- **DSH 插件**：`tools/dsh-plugin-mantiszip/`，把脚本包成 `mantiszip_verify` / `mantiszip_i18n` / `mantiszip_version` / `mantiszip_guards` 四个工具。
+- **CI**：`.github/workflows/ci.yml`，同样是调脚本（外加 NuGet 审计、分析器、build、test）。
+- 结论：**换 harness 只丢插件层**（4 个工具名），脚本与 CI 不动；人类只需要 `pwsh`。
+
+## 2. 我要做什么 → 跑哪条命令
+
+| 场景 | 命令 |
+|------|------|
+| 提交前快速自检（不构建，毫秒级） | `pwsh -File scripts\verify-repo.ps1 -Task check` |
+| 改完代码构建验证（规则 12） | `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` |
+| 跑测试 | `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` |
+| 改了 UI 文案（规则 13） | `pwsh -File scripts\verify-repo.ps1 -Task i18n` |
+| 发版改版本号（6 处） | `pwsh -File scripts\verify-repo.ps1 -Task version` |
+| 改了快捷键 / 图标 / 文件选择器 | `pwsh -File scripts\verify-repo.ps1 -Task guards` |
+| 要机器可读结果 | 任意命令追加 `-Json` |
+| 改了脚本本身 | `node tools\dsh-plugin-mantiszip\test\self-test.mjs` |
+
+退出码 **0 = 通过，1 = 有问题**，CI 直接消费。
+
+## 3. `scripts/verify-repo.ps1` 结构
+
+约 1300 行，分七段（每段以 `# ---` 横幅分隔）：
+
+| 段 | 内容 |
+|----|------|
+| 参数与常量 | `-Task` / `-Target` / `-ExtraArgs(Json)` / `-TimeoutMs` / `-Root` / `-LocalizationDir` / `-Json`；`$TARGETS` 6 个别名、`$I18N_FILES`、`$VERSION_SOURCES` 6 处、诊断正则 |
+| 通用工具 | `Clip-Text`、`Format-Seconds`、`Resolve-RepoRoot`、`Read-TextFile`、`Read-AsyncText` |
+| build / test | `ConvertFrom-BuildOutput`（解析诊断）、`Get-ConfigurationFromArgs`、`Get-TestAssemblyPath`、`Invoke-VerifyDotnet`（起子进程）、`Format-BuildResult` |
+| i18n | `Get-PlaceholderIndexes`、`Test-I18n`、`Format-I18nResult` |
+| version | `Test-VersionConsistency`、`Format-VersionResult` |
+| guards | `Test-GuardKeyBindings` / `Test-GuardI18nBindings` / `Test-GuardFilePicker` / `Test-GuardIcons`、`Test-Guards`、`Format-GuardsResult` |
+| 入口 | `switch ($Task)`，每支 `exit ([int](-not $ok))` |
+
+`-Task check` = `version` + `i18n` + `guards`，纯文件校验，不构建。JSON 形状是
+`{ ok, checks: [ { task, result: {…} } ] }` —— 每项结果是完整对象，不平铺（避免与 `task` 字段抢名字）。
+
+## 4. 四条规则守卫（`-Task guards`）
+
+把 AGENTS.md 里本可机器校验的人工自查变成门禁：
+
+| 守卫 | 规则 | 校验内容 |
+|------|------|---------|
+| keybindings | 10.1 | `MainWindow.axaml` 的 `InputGesture` ↔ `MainWindow.axaml.cs` 的 `RegisterKeyBindings` ↔ `MainWindowKeyBindingsTests` 期望清单，三方一致（`Ctrl+,` 与 `Ctrl+OemComma` 归一化） |
+| i18n-bindings | 13 | XAML `LocalizedStrings[Key]` 的 key 必须登记在 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组，且该 key 必须存在于三语 JSON（**双向**） |
+| filepicker | 16 | `OpenFilePickerAsync` / `SaveFilePickerAsync` / `OpenFolderPickerAsync` 只允许命中 `CustomFilePickerDialog.SystemBrowse_Click` |
+| icons | 8 | `AppIcons.axaml` 的 `x:Key` 必须在 `IconTestViewModel.LoadAllIcons()` 有对应 `Add()` |
+
+**已知覆盖边界**（别误以为全查了）：
+
+- filepicker 守卫只认上述 3 个 API，规则 16 还禁 `FilePickerFileType` / `IStorageFile` / `TryGetLocalPath()`，这些目前靠人工评审。
+- i18n-bindings 只比 `MainWindowViewModel` 的字典（它不是全量加载 JSON），各对话框/面板自持字典的 key 不在范围内。
+- guards 是文本级扫描，**跨文件重命名、条件编译、多行拼接**都可能漏。
+
+## 5. CI 门禁（`.github/workflows/ci.yml`，共 7 步）
+
+触发：`push` / `pull_request` 到 **`main` 和 `alpha`**（`alpha` 是日常开发分支，`main` 只在发版合并时前进）。
+
+| 步骤 | 防什么 |
+|------|--------|
+| `-Task version` | 版本号 6 处漂移（AppConstants / csproj / PLAN / PROGRESS / 两个 .iss） |
+| `-Task i18n` | 三语 key 缺失/多余/占位符不一致/重复 key |
+| `-Task guards` | 上面四条规则 |
+| `dotnet restore -p:WarningsAsErrors=NU1901%3B…` | 已知漏洞依赖（`Directory.Build.props` 开 `NuGetAuditMode=all`，本地只告警） |
+| `dotnet format … analyzers --verify-no-changes --severity warn --include src\…` | 产品代码分析器告警（**只圈 `src/`**，tests 存量 xUnit 告警另议） |
+| `dotnet build --no-restore -c Release` + `dotnet test …` | 真正编译与用例 |
+
+**已知缺口**：test 带 `--filter "FullyQualifiedName!~SevenZipEngine"`，29 条 7z 用例在 CI 里永不运行（CI 没装 7-Zip）。要补的话：加 choco/7-Zip 安装步骤再删过滤器。
+
+## 6. DSH 插件（`tools/dsh-plugin-mantiszip/`）
+
+```powershell
+pwsh -File tools\dsh-plugin-mantiszip\install.ps1              # 装到 desktop profile
+pwsh -File tools\dsh-plugin-mantiszip\install.ps1 -Profile web # 或指定 profile
+pwsh -File tools\dsh-plugin-mantiszip\uninstall.ps1            # 卸载（只移除自己的联接与 patch 段）
+node tools\dsh-plugin-mantiszip\test\self-test.mjs             # 五段自检（含一次真实构建）
+node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
+```
+
+- **改校验逻辑**：只改 `scripts/verify-repo.ps1`，插件不用动。
+- **改工具声明**（参数、schema、渲染文案）：改 `index.mjs`，**装完/改完要完全退出并重开 DSH**（profile 只在启动时组合；`cordis.patch.yml` 没变就不用重装）。
+- 新增工具时记得同步 `test/self-test.mjs` 里「注册了 N 个工具」的断言——它硬编码数量，加工具不更新会直接挂（2026-10-22 踩过）。
+- 插件是零依赖纯 ESM（理由见插件 README），工具定义只能写 dsh-tools 接受的 JSON Schema 子集。
+
+## 7. 反直觉实现（改动前务必先读）
+
+这几处写法**看起来多余，删掉就会复发**，注释也写在代码里：
+
+1. **子进程用 `System.Diagnostics.Process`，不用 `Start-Process`**：`Start-Process -PassThru -RedirectStandardOutput/-RedirectStandardError` 时 `$p.ExitCode` **恒为 `$null`**（`WaitForExit($ms)` / `WaitForExit()` / `Refresh()` / `Get-Process` 都取不到；实测 `cmd /c exit 3` 打印空）。没有退出码就无法判定 `ok`，所以走 `ProcessStartInfo` + `ArgumentList` + 异步读流 + `WaitForExit($BudgetMs)`。
+2. **MTP 兜底按配置取程序集**：`Get-TestAssemblyPath -Configuration` 只认 `bin/<配置>/**`，找不到返回 `$null` 让调用方先构建。否则 `-c Release` 时会拿旧 Debug 产物去 `dotnet exec`，测试照样「通过」，测的却是旧二进制。
+3. **`target` 字段显式传参（`-TargetName`）**：旧实现靠 PowerShell 动态作用域捕获脚本级 `$Target`，函数一挪或加同名 `param` 就静默变空串。
+4. **MTP 兜底不追加任何 dotnet/MSBuild 参数**：`dotnet exec <assembly>` 之后的参数交给测试程序集自己解析，`-nologo` / `-c Release` 会被 xunit 当未知选项。
+5. **兜底的触发条件必须三条同时成立**：失败 + 0 条编译诊断 + 输出里没有 `Passed!`/`Failed!`/`Total: N` 汇总行。少任何一条都会掩盖真实失败（编译错误或用例失败不触发）。
+
+## 8. 环境坑（跨机器复现过的）
+
+| 现象 | 原因 / 解法 |
+|------|------------|
+| `dotnet restore` 报「无法获取 NuGetScratch 锁定文件访问权限 → 无法对 NuGet.Config 进行操作」 | 不是 ACL，是 IDE/MSBuild 常驻节点持锁：`dotnet build-server shutdown` 后立刻恢复。`NUGET_SCRATCH` 对 SDK 10.0.400 无效 |
+| `dotnet test` 抛 `Win32Exception (5): 拒绝访问`（`DefaultEngineInvoker.SetParentProcessExitCallback`） | VSTest testhost 打不开父进程句柄 → 走 `-Task test` 的 MTP 兜底（`dotnet exec`）。**不是沙箱专属，用户本机同样复现** |
+| CI 里写 `WarningsAsErrors=NU1901;NU1902` 报 `MSB1006: 属性无效` | 分号会被 MSBuild 当多开关，必须写 `%3B` |
+| `MSB4018/MSB3491 ... Access to the path 'obj\…' is denied` | DSH workspace-write 沙箱不给子目录写权限，只影响当前 shell；用 `danger-full-access` 或让用户提权 |
+| node 子进程 `spawn EPERM` | 沙箱禁止具名管道；同样只在受限沙箱里出现 |
+| git 报 `LF will be replaced by CRLF` | 仓库统一 CRLF：索引 LF / 工作区 CRLF（`.gitattributes` + `.editorconfig`）。新增二进制记得加进 `.gitattributes` 的 `binary` 组 |
+| 三份 `strings.*.json` 带 BOM | 与 `.editorconfig` 的 `[*.json] charset = utf-8-bom` 一致，**不要**改成无 BOM（规则 13 已在 2026-10-22 改为「UTF-8 with BOM」，此前写的「无 BOM」是过期表述） |
+
+## 9. 还没做的（有意留白，不是忘了）
+
+- **7-Zip 用例**：CI 装 7-Zip 后去掉 `SevenZipEngine` 过滤。
+- **whitespace / style 门禁**：存量约 704 处 / 90 文件（单行 XML 注释被要求拆行）、40 处 IMPORTS 顺序，需要一次性全仓重排的独立提交。
+- **覆盖率**：VSTest 走 `--collect` 不通，MTP 要给测试项目加 `Microsoft.Testing.Extensions.CodeCoverage`，涉及测试依赖决策。
+- **Dependabot**：`NuGet` + `github-actions` 两条生态。
+- **ISCC 干跑**：PR 上编译安装脚本，防 `installer.iss` 语法错误到发版才暴露。
+
+## 10. 相关文件
+
+| 文件 | 作用 |
+|------|------|
+| [AGENTS.md](../AGENTS.md) | 每次 session 必读的硬性规则与速查 |
+| [scripts/verify-repo.ps1](../scripts/verify-repo.ps1) | 自检逻辑唯一实现 |
+| [tools/dsh-plugin-mantiszip/README.md](../tools/dsh-plugin-mantiszip/README.md) | 插件安装、工具 schema、沙箱限制 |
+| [.github/workflows/ci.yml](../.github/workflows/ci.yml) | CI 门禁 |
+| [.editorconfig](../.editorconfig) / [.gitattributes](../.gitattributes) / [Directory.Build.props](../Directory.Build.props) | 风格基线 / 行尾 / NuGet 审计 |
+| [progress-avalonia-detail.md](progress-avalonia-detail.md) | 逐日变更与当时的排障记录（找「为什么」的第二落点） |

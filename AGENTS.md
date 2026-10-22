@@ -53,6 +53,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - **退出码 0 = 通过，1 = 有问题** ⇒ CI 可直接用；`-Json` 时 `ok` 字段同义
 - `-Task test` 有一条**兜底**：`dotnet test` 失败且没有解析到任何编译诊断（= 测试根本没跑起来，如 VSTest testhost 在受限环境里无法打开父进程句柄）时，自动改用 `dotnet exec <测试程序集>` 直跑 xunit v3 的 MTP 入口，绕开 testhost；JSON 里 `runner` 为 `mtp`、`fallbackFrom` 为 `vstest`。编译错误或真实用例失败**不会**触发兜底
 - agent 面板里对应工具名：`mantiszip_verify` / `mantiszip_i18n` / `mantiszip_version` / `mantiszip_guards`（DSH 本地插件 `tools/dsh-plugin-mantiszip`，薄壳而已）
+- **换机器 / 换 agent 接手，或要改这套门禁时，先读 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)**：组成图、每个 task 干什么、四条守卫的覆盖边界、CI 七步门禁、反直觉实现（删掉会复发的写法）、环境坑、有意留白
 
 ## Architecture（速查）
 
@@ -264,7 +265,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - **C#**：`LocalizationManager.T("Key")`；占位符用 `T("Key", arg1, arg2)`（`{0}` 格式）
 - **XAML 静态文案**：绑定 VM 属性或 `LocalizedStrings[Key]`（字典索引器绑定需 VM 实现 `LocalizedStrings` 并在 `OnCultureChanged` 刷新）
 - **Window/UserControl code-behind（DataContext=self）**：暴露 `public string XxxText => LocalizationManager.T("Key")` 并绑定，同时加 `x:CompileBindings="False"`
-- **新增 key 必须成对添加**到 `strings.zh-CN.json`、`strings.en.json`、`strings.zh-TW.json`（三语 key 集必须完全同步，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 校验）；插入到文件头 `{` 之后（不排序），保持 UTF-8 无 BOM + CRLF + 2 空格缩进
+- **新增 key 必须成对添加**到 `strings.zh-CN.json`、`strings.en.json`、`strings.zh-TW.json`（三语 key 集必须完全同步，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 校验）；插入到文件头 `{` 之后（不排序），保持 **UTF-8 with BOM** + CRLF + 2 空格缩进（三份文件现状即带 BOM，`.editorconfig` 的 `[*.json] charset = utf-8-bom` 为准；改成无 BOM 会与既有文件不一致）
 - **XAML `LocalizedStrings[Key]` 绑定的 key 必须登记**到 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组（约 line 203 起的 `new[] { ... }`）。该字典**不是全量加载** JSON——漏登记会导致菜单/工具栏文字空白（图标仍在）且构建不报错
 - 完成后 `dotnet build` 无新增错误，并扫描确认无遗漏硬编码
 - **改完文案必须跑** `pwsh -File scripts\verify-repo.ps1 -Task i18n`（agent 面板里是 `mantiszip_i18n`）：校验三语 key 集合、`{0}` 占位符、重复 key、空值。工具不可用时手工比对三份文件——现有测试只校验解析后的 key 集合，**测不出重复 key**（JSON 解析会折叠）

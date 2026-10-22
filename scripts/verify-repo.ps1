@@ -64,6 +64,24 @@
 .NOTES
     Windows + PowerShell 7 only (see AGENTS.md rule 9). No dependency beyond the
     .NET SDK; nothing here writes to the repository.
+
+    Non-obvious traps (each one looks like dead weight until you remove it and the
+    bug comes back -- docs/MAINTENANCE.md section 7 has the long version):
+
+    1. The dotnet child process uses System.Diagnostics.Process, NOT
+       Start-Process. With Start-Process -PassThru plus a redirected stdout or
+       stderr, $p.ExitCode stays $null forever (WaitForExit($ms), WaitForExit(),
+       Refresh() and Get-Process all fail to fill it; `cmd /c exit 3` prints
+       nothing). Without an exit code there is no way to compute `ok`.
+
+    2. Test fallback picks the assembly for the SAME configuration
+       (Get-TestAssemblyPath -Configuration). Otherwise `-c Release` can exec a
+       stale Debug build and report green while testing old binaries.
+
+    3. Invoke-VerifyDotnet takes -TargetName explicitly instead of reading the
+       script-scope $Target. That worked only by PowerShell dynamic scoping: move
+       the function, or add a parameter of the same name, and `target` silently
+       turns into an empty string.
 #>
 
 [CmdletBinding()]
@@ -308,8 +326,8 @@ function ConvertFrom-BuildOutput {
     return @{ errors = $errors; warnings = $warnings }
 }
 
-# 找出测试工程生成的可执行程序集（xunit v3 的 MTP 入口就在测试 dll 里）。
-# bin/ 下的 ref/ 目录是引用程序集，不能 exec，必须排除。
+# 从 -ExtraArgs 里认出目标配置（-c Release 等）。MTP 兜底要拿「同一配置」的产物，
+# 否则可能 exec 到上一次 Debug 构建留下的旧 dll。
 function Get-ConfigurationFromArgs {
     param([string[]]$Arguments)
 
@@ -329,6 +347,8 @@ function Get-ConfigurationFromArgs {
     return $null
 }
 
+# 找出测试工程生成的可执行程序集（xunit v3 的 MTP 入口就在测试 dll 里）。
+# bin/ 下的 ref/ 目录是引用程序集，不能 exec，必须排除。
 function Get-TestAssemblyPath {
     param(
         [string]$RepoRoot,

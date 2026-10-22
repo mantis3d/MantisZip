@@ -17,6 +17,9 @@
   - **AGENTS.md**：Quick start 补 `.gitattributes` 行尾说明与「CI 触发分支：`main` + `alpha`」。
   - **自测同步**：`tools/dsh-plugin-mantiszip/test/self-test.mjs` 原来硬断言「注册了 3 个工具」，加 `mantiszip_guards` 后必挂；改为 4 个工具 + guards 段（断言 4 项守卫的 `ok`）。
   - **验证**：`-Task check` exit 0（版本 6/6 = 0.5.3、三语 1276 key、守卫 4/4）；`-Task build -Target core` exit 0 / 0 错误；`node tools … self-test.mjs` 五段全绿。
+  - **跨机器衔接**：新增 `docs/MAINTENANCE.md`（组成图 / 命令速查 / 脚本七段结构 / 四条守卫的覆盖边界 / CI 五段门禁 / 插件装卸 / 反直觉实现 / 环境坑 / 有意留白），`AGENTS.md` 维护脚本段加一行指针——此前「为什么这么写」只散在 2900 行按日期排的本文里。
+  - **注释纠错**：「找出测试工程生成的可执行程序集」那段注释原本压在 `Get-ConfigurationFromArgs` 头上（实际属于 `Get-TestAssemblyPath`），已归位；`scripts/verify-repo.ps1` 的 `.NOTES` 补 3 条「看起来多余、删掉就复发」的坑（`$p.ExitCode` 恒 `$null` / 兜底按配置取程序集 / `-TargetName` 不用动态作用域），防止下一个 agent 当成冗余重构掉。
+  - **AGENTS.md 规则 13 表述纠错**：原文要求三语 JSON「UTF-8 无 BOM」，但三份文件实测均带 BOM（`EF BB BF`）、`.editorconfig` 也是 `charset = utf-8-bom`；改为「UTF-8 with BOM」并以 `.editorconfig` 为准。
 **2026-10-22** — CI 再补两道门禁：依赖漏洞审计 + 产品代码分析器校验（whitespace/style/覆盖率暂缓）
   - **动机**：v0.5.3 的 CI 只有「静态自检 + build + test」，依赖漏洞与代码分析器没有任何拦截。上一轮因缺 pwsh 7、网络不可达而搁置的三项门禁，环境恢复后逐项实测，能过才接、过不了就说明原因。
   - **依赖漏洞审计**：新增根目录 `Directory.Build.props`，开 `NuGetAudit=true` / `NuGetAuditMode=all`（连传递依赖一起审计）/ `NuGetAuditLevel=low`，本地 `dotnet build` 只告警；CI 的 restore 步骤追加 `-p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904` 把漏洞类警告升为错误（**分号必须写 `%3B`**，直接写 `"NU1901;NU1902"` 会被 MSBuild 当成多个开关并报 `MSB1006: 属性无效`）。实测 `dotnet list package --vulnerable --include-transitive`：五个项目 0 漏洞。
