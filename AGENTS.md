@@ -31,7 +31,8 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 
 - 产物：`src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe`；`bin/`、`obj/` 已 gitignore
 - CI：`.github/workflows/ci.yml`（Windows，先跑 `version` / `i18n` / `guards` 三项静态自检，再「依赖漏洞审计 restore → 产品代码分析器门禁 → build → test」，但 `--filter "FullyQualifiedName!~SevenZipEngine"` 把 7z 相关用例过滤掉了）；**无 pre-commit**；`tests/` 有 Core 与无头 Avalonia 两个测试项目（非全量覆盖）
-- 漏洞审计与代码风格：根目录 `Directory.Build.props` 开 `NuGetAuditMode=all`（本地只告警，CI 把 NU1901~NU1904 升为错误，分号要写 `%3B`）；`.editorconfig` 提供风格基线，CI 只对 `src/` 跑 `dotnet format analyzers --verify-no-changes --severity warn`（**whitespace/style 暂不设门禁**——存量 700+/40 处待重排）
+- 漏洞审计与代码风格：根目录 `Directory.Build.props` 开 `NuGetAuditMode=all`（本地只告警，CI 把 NU1901~NU1904 升为错误，分号要写 `%3B`）；`.editorconfig` 提供风格基线，CI 只对 `src/` 跑 `dotnet format analyzers --verify-no-changes --severity warn`（**whitespace/style 暂不设门禁**——存量 700+/40 处待重排）；`.gitattributes` 锁定行尾（索引 LF / 工作区 CRLF，二进制不转换），新文件不必手工调行尾
+- CI 触发分支：`main` + `alpha`（`alpha` 是日常开发分支，`main` 只在发版合并时前进）
 - ShellExt COM 已注册时 Explorer 会锁 Debug DLL → 构建/测试用 `-c Release` 绕开
 
 ## 维护脚本（唯一实现）

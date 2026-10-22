@@ -2,9 +2,9 @@
  * mantiszip-dsh-plugin 自检脚本（不依赖 DSH 运行时）。
  *
  * 校验三件事：
- *   1. 模块导出契约：name / inject / apply 能注册出 3 个工具；
+ *   1. 模块导出契约：name / inject / apply 能注册出 4 个工具；
  *   2. 工具声明符合 dsh-tools 的 JSON Schema 子集（否则注册会抛 UNSUPPORTED_SCHEMA）；
- *   3. 三个工具在真实仓库上跑通，返回值的字段与 output.schema 对齐。
+ *   3. 四个工具在真实仓库上跑通，返回值的字段与 output.schema 对齐。
  *
  * 用法：
  *   node tools/dsh-plugin-mantiszip/test/self-test.mjs            # 含一次 dotnet build
@@ -114,7 +114,7 @@ check('导出 inject = [tools]', Array.isArray(module.inject) && module.inject.i
 check('导出 apply 函数', typeof module.apply === 'function')
 
 module.apply(ctx)
-check('注册了 3 个工具', registered.length === 3, `实际 ${registered.length}`)
+check('注册了 4 个工具', registered.length === 4, `实际 ${registered.length}`)
 const names = registered.map((item) => item.name)
 check('工具名符合 mantiszip_*', names.every((item) => item.startsWith('mantiszip_')))
 check('工具名不重复', new Set(names).size === names.length)
@@ -163,10 +163,29 @@ console.log('\n[3] mantiszip_i18n')
   }
 }
 
+console.log('\n[4] mantiszip_guards')
+{
+  const definition = byName.mantiszip_guards
+  const value = await definition.execute({ root: repoRoot }, exec)
+  const problems = validateValue(definition.output.schema, value, 'value')
+  check('返回值字段合法', problems.length === 0, problems.join('; '))
+  check('四项守卫全部通过', value.ok === true,
+    `failed=${value.failedCount} / ${
+      (value.guards ?? []).filter((guard) => !guard.ok).map((guard) => guard.id).join(', ')}`)
+  console.log(`     → guards=${value.guards?.length ?? 0} failed=${value.failedCount}`)
+  const blocks = definition.output.render({}, value)
+  check('render 返回 text 块', Array.isArray(blocks) && blocks.every((block) => block?.type === 'text'))
+  if (Array.isArray(value.guards)) {
+    for (const guard of value.guards) {
+      check(`守卫 ${guard.id} 通过`, guard.ok === true, (guard.issues ?? []).slice(0, 3).join(' | '))
+    }
+  }
+}
+
 if (skipBuild) {
-  console.log('\n[4] mantiszip_verify  — 已按 --skip-build 跳过')
+  console.log('\n[5] mantiszip_verify  — 已按 --skip-build 跳过')
 } else {
-  console.log('\n[4] mantiszip_verify（dotnet build avalonia，可能耗时数十秒）')
+  console.log('\n[5] mantiszip_verify（dotnet build avalonia，可能耗时数十秒）')
   const definition = byName.mantiszip_verify
   const startedAt = Date.now()
   const value = await definition.execute({ root: repoRoot, target: 'avalonia' }, exec)

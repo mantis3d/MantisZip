@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-22** — 上一批守卫/CI 提交的收尾修补：门禁补 alpha 分支、兜底按配置取程序集、行尾统一
+  - **动机**：评审同步过来的 `4d2b641`（规则守卫 + CI 静态门禁）时实测发现四处会被真实踩到的问题，逐条修掉。
+  - **CI 触发分支**：`.github/workflows/ci.yml` 原来只 `on.push/pull_request.branches: [main]`，而日常开发在 `alpha`（`main` 只在发版合并时前进）⇒ 新门禁在 alpha 推送时根本不跑。两条都加上 `alpha`。
+  - **MTP 兜底按配置取程序集**：`scripts/verify-repo.ps1` 新增 `Get-ConfigurationFromArgs`（识别 `-c X` / `--configuration X` / `-c:X` / `--configuration=X` / `-p:Configuration=X`），`Get-TestAssemblyPath` 加 `-Configuration`：传了配置就只在 `bin/<配置>/**` 里找，找不到返回 `$null` 让调用方先按同样参数构建 —— 原实现按 `LastWriteTime` 取最新程序集，`-c Release` 时可能拿旧 Debug 产物直接 `dotnet exec`。
+  - **`target` 不再依赖动态作用域**：`Invoke-VerifyDotnet` 新增 `-TargetName` 参数，结果字段 `target = $TargetName`；原实现读脚本级 `$Target`，靠 PowerShell 动态作用域「碰巧」能拿到，函数一旦被挪动或加 `param($Target)` 就会静默变成空串。4 处调用点（build / test / 兜底 build / 兜底 exec）全部显式传名，兜底前的预构建补 `-AdditionalArgs $ExtraArgs`。
+  - **行尾统一**：新增根目录 `.gitattributes`（`* text=auto eol=crlf`，二进制扩展名列表 `binary`，`*.sh/*.patch/*.diff` 为 `text eol=lf`）。此前 `.editorconfig` 要求 `end_of_line = crlf` 但没有任何执行者，`core.autocrlf=true` 只在本机生效、换人即漂。索引里 732 个文本文件已全是 LF、170 个二进制已标记 `-text`，故加完 `git status` 无大规模重排。
+  - **文档契约漂移**：计划文档里 `-Task check` 的 JSON 形状仍写 `{ok, checks:[{task, ok, …}]}`，实现早已是 `{ok, checks:[{task, result:{…}}]}`（加 guards 后每项结果本身是完整对象，平铺会与 `task` 抢名字）—— 计划文档 `107` / `188` 行同步修正。
+  - **插件文档补第 4 个工具**：`tools/dsh-plugin-mantiszip/README.md` 补 `mantiszip_guards`（对应规则 8 / 10.1 / 13 / 16）、`-Task guards` 用法、`-Root`、`-Task test` 的 MTP 兜底说明（含「传 `-c Release` 时只认该配置产物」），自检段改「5 段」。
+  - **AGENTS.md**：Quick start 补 `.gitattributes` 行尾说明与「CI 触发分支：`main` + `alpha`」。
+  - **自测同步**：`tools/dsh-plugin-mantiszip/test/self-test.mjs` 原来硬断言「注册了 3 个工具」，加 `mantiszip_guards` 后必挂；改为 4 个工具 + guards 段（断言 4 项守卫的 `ok`）。
+  - **验证**：`-Task check` exit 0（版本 6/6 = 0.5.3、三语 1276 key、守卫 4/4）；`-Task build -Target core` exit 0 / 0 错误；`node tools … self-test.mjs` 五段全绿。
 **2026-10-22** — CI 再补两道门禁：依赖漏洞审计 + 产品代码分析器校验（whitespace/style/覆盖率暂缓）
   - **动机**：v0.5.3 的 CI 只有「静态自检 + build + test」，依赖漏洞与代码分析器没有任何拦截。上一轮因缺 pwsh 7、网络不可达而搁置的三项门禁，环境恢复后逐项实测，能过才接、过不了就说明原因。
   - **依赖漏洞审计**：新增根目录 `Directory.Build.props`，开 `NuGetAudit=true` / `NuGetAuditMode=all`（连传递依赖一起审计）/ `NuGetAuditLevel=low`，本地 `dotnet build` 只告警；CI 的 restore 步骤追加 `-p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904` 把漏洞类警告升为错误（**分号必须写 `%3B`**，直接写 `"NU1901;NU1902"` 会被 MSBuild 当成多个开关并报 `MSB1006: 属性无效`）。实测 `dotnet list package --vulnerable --include-transitive`：五个项目 0 漏洞。

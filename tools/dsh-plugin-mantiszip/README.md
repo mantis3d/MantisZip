@@ -1,14 +1,15 @@
 # mantiszip-dsh-plugin
 
-MantisZip 专用的 DeepSeek Harness（DSH）本地插件，给 agent 加三个**只读**维护工具：
+MantisZip 专用的 DeepSeek Harness（DSH）本地插件，给 agent 加四个**只读**维护工具：
 
 | 工具 | 作用 | 对应仓库规则 |
 | --- | --- | --- |
 | `mantiszip_verify` | 跑 `dotnet build` / `dotnet test`，把 MSBuild 输出压成「文件:行:列 + 错误码 + 首条信息」 | 规则 12（改完必须构建验证） |
 | `mantiszip_i18n` | 三语 key 集合对齐、`{0}` 占位符对齐、重复 key、空值 | 规则 13（三语文件 key 必须同步） |
 | `mantiszip_version` | 版本号 6 处取值一致性（AppConstants / csproj / PLAN / PROGRESS / 两个 .iss） | Version bump checklist |
+| `mantiszip_guards` | 代码规则守卫：快捷键登记（10.1）/ XAML 本地化 key 登记（13）/ 禁用原生 StorageProvider（16）/ 图标注册（8） | 规则 8、10.1、13、16 |
 
-三个工具都**不会修改任何文件**；只读检查，改文件仍由 agent 走常规编辑流程。
+四个工具都**不会修改任何文件**；只读检查，改文件仍由 agent 走常规编辑流程。
 
 ## 实现分层：薄壳 + 仓库脚本
 
@@ -18,8 +19,9 @@ MantisZip 专用的 DeepSeek Harness（DSH）本地插件，给 agent 加三个*
 agent / CI / 人
       │
       ├── mantiszip_verify  ─┐
-      ├── mantiszip_i18n    ─┼─→ index.mjs（薄壳：校验参数 → 起 pwsh → 解析 JSON → 渲染）
-      └── mantiszip_version ─┘              │
+      ├── mantiszip_i18n    ─┤
+      ├── mantiszip_version ─┼─→ index.mjs（薄壳：校验参数 → 起 pwsh → 解析 JSON → 渲染）
+      └── mantiszip_guards  ─┘              │
                                             ▼
                               scripts/verify-repo.ps1（唯一实现）
 ```
@@ -31,12 +33,16 @@ agent / CI / 人
 ## 不经 DSH 直接跑
 
 ```powershell
-# 纯文件检查（版本号 + 三语 key），无构建，毫秒级
+# 纯文件检查（版本号 + 三语 key + 规则守卫），无构建，毫秒级
 pwsh -File scripts\verify-repo.ps1 -Task check
 
 # 构建诊断（人名可直接读，不必看 MSBuild 原始输出）
 pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia
 pwsh -File scripts\verify-repo.ps1 -Task test  -Target ui-tests
+
+# 单项检查
+pwsh -File scripts\verify-repo.ps1 -Task guards
+pwsh -File scripts\verify-repo.ps1 -Task i18n
 
 # 机器可读
 pwsh -File scripts\verify-repo.ps1 -Task check -Json
@@ -47,6 +53,7 @@ pwsh -File scripts\verify-repo.ps1 -Task check -Json
 - `-TimeoutMs`：dotnet 子进程预算，超时即杀进程树并报 `timedOut`
 - `-Root`：仓库根；省略时先看脚本自身所在目录的上级（`scripts/..`），再向上找 `MantisZip.sln`
 - **退出码 0 = 通过，1 = 有问题** ⇒ CI 可以直接 `run: pwsh -File scripts/verify-repo.ps1 -Task check`
+- `-Task test` 有 MTP 兜底：`dotnet test` 失败且「0 条编译诊断 + 输出里没有测试汇总行」时（= 用例一条都没跑起来），自动 `dotnet exec <测试程序集>` 直跑 xunit v3 的 MTP 入口；传了 `-c Release` 时只认该配置的 bin 产物，不会退到旧 Debug 程序集。用例真失败或编译报错不触发兜底
 
 ## 为什么是「零依赖纯 ESM」
 
@@ -91,7 +98,7 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs
 node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 ```
 
-自检覆盖：模块导出契约（`name` / `inject` / `apply`）、JSON Schema 子集合法性、返回值与 `output.schema` 的字段对齐、三个工具在真实仓库上的运行结果（构建段实际走「插件 → pwsh → 脚本 → dotnet」全链路）。
+自检覆盖 5 段：模块导出契约（`name` / `inject` / `apply`）、JSON Schema 子集合法性、返回值与 `output.schema` 的字段对齐，以及 `version` / `i18n` / `guards` / `verify` 四个工具在真实仓库上的运行结果（构建段实际走「插件 → pwsh → 脚本 → dotnet」全链路）。
 
 ## 沙箱注意
 
@@ -124,5 +131,5 @@ tools/dsh-plugin-mantiszip/
 └── README.md
 
 scripts/
-└── verify-repo.ps1    # 唯一实现：build / test / i18n / version / check（-Json 供插件调用）
+└── verify-repo.ps1    # 唯一实现：build / test / i18n / version / guards / check（-Json 供插件调用）
 ```

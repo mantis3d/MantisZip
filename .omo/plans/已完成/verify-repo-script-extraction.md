@@ -104,7 +104,7 @@
 
 - [x] **Step 1: 两种输出**
 
-默认人读（与现有 `render*` 文案一致，✅/❌ 开头 + 明细）；`-Json` 输出单文档 JSON（字段名与 `output.schema` 完全对齐）。`-Task check` 的人读输出为 version / i18n 两段拼接，JSON 为 `{ok, checks:[{task,ok,...}]}`。
+默认人读（与现有 `render*` 文案一致，✅/❌ 开头 + 明细）；`-Json` 输出单文档 JSON（字段名与 `output.schema` 完全对齐）。`-Task check` 的人读输出为 version / i18n / guards 三段拼接，JSON 为 `{ok, checks:[{task, result:{...}}]}`（每项包一层 `result`，插件不消费 `check`）。
 
 - [x] **Step 2: 退出码**
 
@@ -185,7 +185,7 @@ MSBuild 正则与解析、i18n 判定、version 正则（全部下沉到脚本�
 | 计划 | 实际 | 原因 |
 |---|---|---|
 | Task 2 Step 1 用 `Start-Process -PassThru -RedirectStandardOutput` | 用 `System.Diagnostics.Process` + `ProcessStartInfo.ArgumentList` | `Start-Process` 带重定向时 `$p.ExitCode` **恒为 `$null`**（`WaitForExit($ms)` / `WaitForExit()` / `Refresh()` 均取不到；实测 `cmd /c exit 3` 打印空），拿不到退出码就无法判定 `ok` |
-| Task 5 `-Task check` 的 JSON 形状 `{ok, checks:[{task,ok,…}]}` | 保持该形状 | 插件不消费 `check`，仅供 CI/人工 |
+| Task 5 `-Task check` 的 JSON 形状 `{ok, checks:[{task,ok,…}]}` | 改为 `{ok, checks:[{task, result:{…}}]}` | 后续加 `guards` 后每项结果本身是完整对象，平铺会与 `task` 字段抢名字；插件不消费 `check`，仅供 CI/人工 |
 | Task 6 Step 3 命令行含 `-Root <root>` | 改为进程 `cwd = root`，不传 `-Root` | 少一处引号/空格转义风险；脚本 `Resolve-RepoRoot` 优先看 `$PSScriptRoot` 上级，天然命中仓库 |
 
 验证方式：真实仓库 `-Task version`（0.5.3 六处一致）、`-Task i18n`（1276 key、0 问题）、`-Task check`（exit 0）、`-Task build -Target avalonia`（exit 0 / 0 错误 / 0 警告）；`node tools/dsh-plugin-mantiszip/test/self-test.mjs` 四段全绿（含 23.2s 真实构建）；负向夹具（版本号不一致 + 缺文件 + 缺/多/重复 key + 占位符错位）返回 exit 1 并逐条报出。
