@@ -119,6 +119,42 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// <summary>过滤后需实际解压的条目 key 列表（由 View 从对话框回传；null = 未启用过滤，全量解压）。</summary>
     public List<string>? FilteredEntryKeys { get; set; }
 
+    /// <summary>
+    /// 接管另一个（对话框里的）ViewModel 的全部**执行侧**设置。
+    /// <para>
+    /// 与压缩侧同构：对话框是独立 ViewModel，关窗后必须有人把执行侧字段搬回主窗口的执行 VM。
+    /// 原先这段是 <c>Views/MainWindow.axaml.cs</c> 里手写的逐属性清单（压缩侧同样写法已漏过三次：
+    /// 多线程/并行度恒 false、分卷大小恒 0、文件冲突策略恒「每次询问」），故此处同样收敛到一处并配漂移守卫测试
+    /// （<c>tests/.../ExtractSettingsDialogCopyTests.cs</c>）：新增执行侧字段忘记拷贝会红。
+    /// </para>
+    /// <para>
+    /// 不在本方法内的两项：<see cref="FilteredEntryKeys"/> 由 View 从过滤编辑器取（调用方单独赋值），
+    /// <see cref="ShowUnlockDialog"/> / <see cref="FilterProvider"/> / <see cref="BrowseFolder"/> 等委托属 View 注入。
+    /// </para>
+    /// </summary>
+    /// <param name="source">对话框（或任意来源）的 ViewModel，不能是自己。</param>
+    public void CopyExecutionSettingsFrom(ExtractSettingsViewModel source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (ReferenceEquals(source, this)) return;
+
+        // ① 目标目录与同名冲突策略
+        DestinationPath = source.DestinationPath;
+        ConflictAction = source.ConflictAction;
+
+        // ② 完成后动作
+        OpenFolderAfterExtract = source.OpenFolderAfterExtract;
+        DeleteArchiveAfterExtract = source.DeleteArchiveAfterExtract;
+
+        // ③ 并行解压快照（初值读设置、本次解压生效、不回写设置 —— 与 BuildParallelSettings 同口径）
+        EnableParallelExtract = source.EnableParallelExtract;
+        SmartParallelDegree = source.SmartParallelDegree;
+        SmartSsdDegree = source.SmartSsdDegree;
+        SmartHddDegree = source.SmartHddDegree;
+        ManualParallelDegree = source.ManualParallelDegree;
+        LargeArchivePreTest = source.LargeArchivePreTest;
+    }
+
     // ── Preview tree ──
 
     /// <summary>预览树的根节点。</summary>

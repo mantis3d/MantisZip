@@ -234,18 +234,9 @@ public partial class MainWindow : Window
             var result = await dialog.ShowDialog<bool>(this);
             if (result)
             {
-                evm.DestinationPath = dialog.ViewModel.DestinationPath;
-                evm.ConflictAction = dialog.ViewModel.ConflictAction;
-                evm.OpenFolderAfterExtract = dialog.ViewModel.OpenFolderAfterExtract;
-                // 并行解压：对话框快照回传（初值读设置、本次解压生效、不回写设置）
-                evm.EnableParallelExtract = dialog.ViewModel.EnableParallelExtract;
-                evm.SmartParallelDegree = dialog.ViewModel.SmartParallelDegree;
-                evm.SmartSsdDegree = dialog.ViewModel.SmartSsdDegree;
-                evm.SmartHddDegree = dialog.ViewModel.SmartHddDegree;
-                evm.ManualParallelDegree = dialog.ViewModel.ManualParallelDegree;
-                evm.LargeArchivePreTest = dialog.ViewModel.LargeArchivePreTest;
-                // 解压后移入回收站：默认值来自全局设置，勾选仅本次解压生效（不写回 AppSettings）
-                evm.DeleteArchiveAfterExtract = dialog.ViewModel.DeleteArchiveAfterExtract;
+                // 执行侧设置整体接管（单一入口，与压缩侧同构）；历史教训见 CopyExecutionSettingsFrom 的 XML 注释
+                evm.CopyExecutionSettingsFrom(dialog.ViewModel);
+
                 // 文件过滤：仅当启用过滤且有条目时，将匹配条目 key 回传，供实际解压只解压匹配项
                 evm.FilteredEntryKeys = dialog.GetFilteredEntryKeys();
             }
@@ -261,46 +252,11 @@ public partial class MainWindow : Window
             var result = await dialog.ShowDialog<bool>(this);
             if (result)
             {
-                // 复制 SelectedPaths：对话框有自己的 ViewModel，用户添加的文件仅存在 dialog.ViewModel 中
-                cvm.SelectedPaths.Clear();
-                foreach (var p in dialog.ViewModel.SelectedPaths)
-                    cvm.SelectedPaths.Add(p);
-
-                cvm.DefaultFormat = dialog.ViewModel.DefaultFormat;
-                cvm.CompressionLevel = dialog.ViewModel.CompressionLevel;
-                cvm.OutputMode = dialog.ViewModel.OutputMode;
-                cvm.OutputPath = dialog.ViewModel.OutputPath;
-                cvm.Password = dialog.ViewModel.Password;
-                cvm.Encrypt = dialog.ViewModel.Encrypt;
-                cvm.IsPasswordLibraryMode = dialog.ViewModel.IsPasswordLibraryMode;
-                cvm.SelectedPasswordEntry = dialog.ViewModel.SelectedPasswordEntry;
-                cvm.Comment = dialog.ViewModel.Comment;
-                cvm.CommentDistribution = dialog.ViewModel.CommentDistribution;
+                // 执行侧设置整体接管（单一入口）；历史上逐属性手抄漏过 ConflictAction / SplitSize /
+                // MultiThreadedCompression 等，见 CopyExecutionSettingsFrom 的 XML 注释
+                cvm.CopyExecutionSettingsFrom(dialog.ViewModel);
+                // 过滤条件由 View 从 FileFilterEditor 读出，不在 ViewModel 的可拷贝字段内
                 cvm.FileFilter = dialog.GetFilter();
-                // Separate 模式：保留源文件扩展名选项（此前漏拷导致 cvm 恒用 settings 默认值）
-                cvm.KeepOriginalExtension = dialog.ViewModel.KeepOriginalExtension;
-
-                // 高级格式选项（仅本次压缩生效，来源为对话框面板快照，不再经 AppSettings 中转）
-                cvm.FileNameEncoding = dialog.ViewModel.FileNameEncoding;
-                cvm.ZipCompressionMethod = dialog.ViewModel.ZipCompressionMethod;
-                cvm.ZipEncryptionMethod = dialog.ViewModel.ZipEncryptionMethod;
-                cvm.SevenZipCompressionMethod = dialog.ViewModel.SevenZipCompressionMethod;
-                cvm.SevenZipSolid = dialog.ViewModel.SevenZipSolid;
-                cvm.SevenZipSolidBlockSize = dialog.ViewModel.SevenZipSolidBlockSize;
-                cvm.SevenZipDictionarySize = dialog.ViewModel.SevenZipDictionarySize;
-                cvm.SevenZipNumFastBytes = dialog.ViewModel.SevenZipNumFastBytes;
-                cvm.SevenZipMatchFinder = dialog.ViewModel.SevenZipMatchFinder;
-                cvm.SevenZipMultithreaded = dialog.ViewModel.SevenZipMultithreaded;
-                cvm.AdaptiveCompression = dialog.ViewModel.AdaptiveCompression;
-                // 同一 ZIP 面板（DynamicFormatOptionsPanel）的另两个开关此前漏拷 →
-                // 执行侧 MultiThreadedCompression 恒为 false，引擎永远走串行路径，
-                // 进度窗口「详细」通道 UI 永不出现。此处补齐。
-                cvm.AdaptiveSmartDetect = dialog.ViewModel.AdaptiveSmartDetect;
-                cvm.MultiThreadedCompression = dialog.ViewModel.MultiThreadedCompression;
-                cvm.SevenZipEncryptHeaders = dialog.ViewModel.SevenZipEncryptHeaders;
-                // 分卷设置（同样仅本次生效；此前未复制导致 cvm.SplitSize 恒为 0，对话框分卷选择丢失）
-                cvm.SelectedSplitSizeOption = dialog.ViewModel.SelectedSplitSizeOption;
-                cvm.CustomSplitSizeText = dialog.ViewModel.CustomSplitSizeText;
 
                 // 接管 B 数据集：对话框 VM 构建的过滤后压缩计划（含每源输出路径 + 匹配文件白名单）。
                 // 必须最后执行 —— 前面 SelectedPaths 拷贝会触发无参重建，AdoptPlan 使在途重建过期，

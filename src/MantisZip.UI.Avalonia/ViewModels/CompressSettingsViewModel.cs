@@ -423,6 +423,75 @@ public partial class CompressSettingsViewModel : ObservableObject
         UpdateCanCompress();
     }
 
+    /// <summary>
+    /// 接管另一个（对话框里的）ViewModel 的全部**执行侧**设置。
+    /// <para>
+    /// 背景：此前由 <c>Views/MainWindow.axaml.cs</c> 手写逐属性拷贝，已经漏过三次 ——
+    /// <c>MultiThreadedCompression</c> / <c>AdaptiveSmartDetect</c> 恒 false、分卷大小恒 0、
+    /// 文件冲突策略恒「每次询问」（用户选了自动重命名照样弹窗）、密码库勾选与规则丢失。
+    /// 这类漏拷不报编译错，只能在运行期被发现，因此把清单集中到本方法，
+    /// 由 <c>tests/.../CompressSettingsDialogCopyTests.cs</c> 反射式守卫：新增可执行字段忘记拷贝会红。
+    /// </para>
+    /// <para>
+    /// 不在本方法内拷贝的两项：<see cref="FileFilter"/> 由 View 从 FileFilterEditor 读取；
+    /// <see cref="Plan"/> 必须在拷贝完源路径之后由调用方 <see cref="AdoptPlan"/> 最后接管（顺序有语义）。
+    /// </para>
+    /// </summary>
+    /// <param name="source">对话框（或任意来源）的 ViewModel，不能是自己。</param>
+    public void CopyExecutionSettingsFrom(CompressSettingsViewModel source)
+    {
+        ArgumentNullException.ThrowIfNull(source);
+        if (ReferenceEquals(source, this)) return;
+
+        // ① 源路径集合（会触发预览重建；调用方随后 AdoptPlan 作废在途重建）
+        SelectedPaths.Clear();
+        foreach (var p in source.SelectedPaths)
+            SelectedPaths.Add(p);
+
+        // ② 输出：格式/级别/输出方式/输出路径/保留扩展名
+        DefaultFormat = source.DefaultFormat;
+        CompressionLevel = source.CompressionLevel;
+        OutputMode = source.OutputMode;
+        OutputPath = source.OutputPath;
+        KeepOriginalExtension = source.KeepOriginalExtension;
+
+        // ③ 密码与加密（含「压缩后保存到密码库」，执行侧直接读这三个字段）
+        Password = source.Password;
+        Encrypt = source.Encrypt;
+        IsPasswordLibraryMode = source.IsPasswordLibraryMode;
+        SelectedPasswordEntry = source.SelectedPasswordEntry;
+        SaveToLibrary = source.SaveToLibrary;
+        RulesText = source.RulesText;
+        PasswordDescription = source.PasswordDescription;
+
+        // ④ 压缩包注释
+        Comment = source.Comment;
+        CommentDistribution = source.CommentDistribution;
+
+        // ⑤ 输出文件冲突策略（执行侧 CompressFlow.BuildRequest 读 vm.ConflictAction）
+        ConflictAction = source.ConflictAction;
+
+        // ⑥ 格式/引擎高级选项
+        FileNameEncoding = source.FileNameEncoding;
+        ZipCompressionMethod = source.ZipCompressionMethod;
+        ZipEncryptionMethod = source.ZipEncryptionMethod;
+        SevenZipCompressionMethod = source.SevenZipCompressionMethod;
+        SevenZipSolid = source.SevenZipSolid;
+        SevenZipSolidBlockSize = source.SevenZipSolidBlockSize;
+        SevenZipDictionarySize = source.SevenZipDictionarySize;
+        SevenZipNumFastBytes = source.SevenZipNumFastBytes;
+        SevenZipMatchFinder = source.SevenZipMatchFinder;
+        SevenZipMultithreaded = source.SevenZipMultithreaded;
+        SevenZipEncryptHeaders = source.SevenZipEncryptHeaders;
+        AdaptiveCompression = source.AdaptiveCompression;
+        AdaptiveSmartDetect = source.AdaptiveSmartDetect;
+        MultiThreadedCompression = source.MultiThreadedCompression;
+
+        // ⑦ 分卷（SelectedSplitSizeOption 同步回 SplitSize 字符串）
+        SelectedSplitSizeOption = source.SelectedSplitSizeOption;
+        CustomSplitSizeText = source.CustomSplitSizeText;
+    }
+
     private static string FilterSignature(FileFilterCriteria? f)
     {
         if (f == null || !f.IsActive) return string.Empty;

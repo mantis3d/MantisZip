@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-22** — 修复：压缩设置对话框的「文件冲突策略」等执行侧设置不生效（拷贝清单漂移）
+  - **症状**（用户 m00576）：「压缩窗口的文件冲突选项似乎不起作用」。复现形态：在对话框里选「自动重命名 / 覆盖 / 跳过」，点开始后仍然弹「目标文件 xxx.zip 已存在」，必须再选一次。
+  - **排查与被排除的假设**：① 下拉→VM 绑定（无头 `[AvaloniaFact]` 实测 `SelectedIndex=skip` 后 `vm.ConflictAction=="skip"`，正常）；② `CompressSettingsViewModel.ConflictAction` ↔ `SelectedConflictActionOption` 双向同步（`partial void OnXxxChanged`，正常）；③ `CompressFlow.MapDefaultConflictAction` 的四种映射（overwrite/rename/skip/add，正常）；④ `CompressService` 的 ResolveConflict / CanAdd 分支（`CanAdd` 决定 add 是否可用，正常）；⑤ 用户日志 `%LOCALAPPDATA%\MantisZip\debug.log` 里同一路径出现过 `conflict resolution for …: Overwrite` / `Rename` —— 说明 Core 侧映射本身没问题，问题只可能出在「对话框 VM → 执行 VM」之间。
+  - **根因**：`Views/MainWindow.axaml.cs` 的 `ShowCompressSettingsDialog` 里，对话框是**另一个全新的 `CompressSettingsViewModel`**，关窗后靠手写逐属性清单拷回执行侧 VM，**这份清单里没有 `ConflictAction`** ⇒ `cvm.ConflictAction` 仍是设置里的默认值 `"ask"` ⇒ 永远弹询问框。同一份清单还漏了 `SaveToLibrary` / `RulesText` / `PasswordDescription`（密码库勾选与规则一起丢）。这是该清单第三次漏项（前两次：`MultiThreadedCompression`/`AdaptiveSmartDetect`/`ParallelCompressDegree` 恒 false、分卷大小恒 0），代码里已有两处注释承认过同类问题。
+  - **修法（用户拍板方案 B：收敛拷贝 + 守卫）**：① `ViewModels/CompressSettingsViewModel.cs` 新增 `public void CopyExecutionSettingsFrom(CompressSettingsViewModel source)`，把七组执行侧设置（源路径 / 输出 / 密码加密含保存到库 / 注释 / 冲突策略 / 格式与引擎选项 / 分卷）集中到一处，XML 注释记录三次漏拷历史与「`FileFilter` 由 View 读、`AdoptPlan` 必须最后调用」的留白；② `MainWindow.axaml.cs` 的 30 行手抄清单整体换成 `cvm.CopyExecutionSettingsFrom(dialog.ViewModel)` + `cvm.FileFilter = dialog.GetFilter()` + `cvm.AdoptPlan(...)`；③ 新增 `tests/…/CompressSettingsDialogCopyTests.cs` 反射式漂移守卫：枚举 VM 全部可写属性，必须落在 `Covered`（逐个赋特定值，拷贝后断言相等）或 `Excluded`（必须写理由）之一，新增可写属性两处都没登记即红。
+  - **解压侧同步收敛**（用户拍板「现在一并收敛」）：「解压设置对话框（`MainWindow.axaml.cs:225-253`）→ 执行 VM」是同一结构，清单目前完整但同样无守卫 → 照本方案加 `ExtractSettingsViewModel.CopyExecutionSettingsFrom`（目标目录 / 冲突策略 / 完成后动作 / 并行快照共 10 个执行侧字段），`MainWindow` 侧 12 行手抄清单换成一行拷贝 + `FilteredEntryKeys`，并新增 `ExtractSettingsDialogCopyTests`（同样的分类守卫 + 逐属性拷贝断言）。解压侧**无用户可见行为变化**，故 `RELEASE_NOTES.md` 不另立条目（规则 18）。
+  - **测试**：`CompressSettingsDialogCopyTests` 两例（分类守卫 + 逐属性拷贝断言，后者要求至少 20 个属性得到有效验证，避免测试值与默认值撞车后形同虚设）；既有 `CompressConflictDefaultActionTests`（skip/rename/overwrite/add + 弹窗选择 + 计划路径）继续覆盖 Core 侧映射。
+  - **验证**：`-Task build -Target avalonia` 0 警告；`-Task test -Target ui-tests` 全绿；`-Task i18n` / `-Task guards` 无新增问题（本轮无文案变更）。
+  - **发布说明**：`ConflictAction` 漏拷在 0.5.2 已发布版本里存在，按规则 18 属于「上一版本已发布、用户实际可能遇到」→ 已在 `RELEASE_NOTES.md` v0.5.3 补「修复」条目。
+
 **2026-10-22** — 修复：完成后计时仍被重置（迟到批次回调）；终态隐藏瞬时速度；新增「压缩后大小」
   - **症状**（用户第二轮实测）：① 压缩完成后「已用时间」不是停住，而是又归零重算（上一轮修好的是 `SetProgress` 迟到上报那条路径，还有第二条）；② 完成后瞬时速度僵在最后一帧；③ 希望补上「压缩后大小」。
   - **根因（竞态，非漏写）**：批处理回调 `SetCurrentBatchItem` 经 `Dispatcher.UIThread.Post(..., DispatcherPriority.Background)` 投递，而终态 `SetComplete` 由操作闭包在 UI 线程**直接**执行（Normal 优先级）⇒ 队尾那条 `SetCurrentBatchItem` 一定排在冻结之后才跑。它会调用 `BeginPreparing()`，而上一轮我把「新操作」语义放在这里（`if (_finalElapsed != null) RestartClock()`），于是刚冻结的耗时被打回 0、终态统计被清空。**任何「以 BeginPreparing 当新操作信号」的写法都不成立**：这条路径在终态之后本来就会到达。

@@ -53,6 +53,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 
 **修复 / Fixes**
 
+- **压缩设置里的「文件冲突」选项现在真正生效** — 在压缩对话框里选「自动重命名 / 覆盖 / 跳过」后，此前仍会弹「目标文件 xxx.zip 已存在」再问一次，选的策略形同虚设；同一处遗漏还让「压缩后保存到密码库」的勾选、规则与密码描述在关窗后丢失。现已修正：对话框的全部执行设置在开始前统一接管，冲突策略、密码库相关选项与规则都按所见执行
+- **The "file conflict" option in the compress dialog now really applies** — picking "Auto-rename / Overwrite / Skip" in the compress dialog used to still prompt "target file xxx.zip already exists" and ask again, so the chosen policy had no effect; the same gap also dropped the "save password to library" checkbox, its rules and the password description when the dialog closed. All execution settings are now taken over in one place before the run starts, so the conflict policy, password-library options and rules behave exactly as shown
 - **「数据条」开关现在生效** — 「视图」菜单下的「数据条」开关此前按下后没有任何变化（数据条既不出现也不消失）：切换时只翻转了内部状态，却未重算或清零各条目决定数据条长度的比例值。现已修正：开启时重算比例、关闭时清零比例，并且不会重建文件列表、不会丢失当前选中项
 - **The "Data Bars" switch now works** — the switch under the View menu previously had no effect at all (the bars neither appeared nor disappeared): toggling it only flipped an internal flag without recomputing or clearing the per-entry ratios that determine the bar length. It now recomputes the ratios when switched on and clears them when switched off, without rebuilding the file list or losing the current selection
 - **目录行的数据条底色可区分** — 开启「目录基线」后，目录行与文件行的底色此前完全相同（无法区分目录与文件）：从 WPF 迁移到 Avalonia 时丢失了按目录/文件切换底色的逻辑。现已修正：大小与压缩后大小两列中，目录行使用更饱和的底色、文件行保持淡色，并随浅色/深色主题自动适配

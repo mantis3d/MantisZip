@@ -140,9 +140,9 @@ public class ExtractParallelDegreeWiringTests
     }
 
     /// <summary>
-    /// 测试 2：MainWindow.axaml.cs 的 ShowExtractSettingsDialog 回调在 result=true
-    /// 回传块中必须包含 evm.EnableParallelExtract = dialog.ViewModel.EnableParallelExtract
-    /// （以及其余并行字段的回传）。
+    /// 测试 2：MainWindow.axaml.cs 的 ShowExtractSettingsDialog 回调必须把对话框 VM 的执行侧设置
+    /// 回传给 evm（2026-10-22 起经 <c>ExtractSettingsViewModel.CopyExecutionSettingsFrom</c> 单一入口），
+    /// 且该入口确实拷贝了并行快照字段。
     ///
     /// 锁定的回归：回传块曾只拷贝 DestinationPath/ConflictAction/OpenFolderAfterExtract/
     /// FilteredEntryKeys 四项，唯独漏掉线程数——对话框里的并行选择从未进入 evm。
@@ -150,15 +150,19 @@ public class ExtractParallelDegreeWiringTests
     [Fact]
     public void MainWindow_DialogCallback_ReturnsParallelOverride()
     {
+        // 2026-10-22：回传块由「逐属性手抄」收敛为单一入口 ExtractSettingsViewModel.CopyExecutionSettingsFrom
+        // （压缩侧同款手抄清单已漏过三次：多线程/并行度、分卷大小、文件冲突策略；解压侧一并收敛）。
+        // 因此本守卫改为锁「两段式」：① MainWindow 回调确实调用收敛入口；② 收敛入口里确实拷贝并行快照字段。
         var source = ReadSource(MainWindowRelPath);
         var normalized = NormalizeWhitespace(source);
 
-        Assert.Contains(
-            "evm.EnableParallelExtract = dialog.ViewModel.EnableParallelExtract",
-            normalized);
-        Assert.Contains(
-            "evm.ManualParallelDegree = dialog.ViewModel.ManualParallelDegree",
-            normalized);
+        Assert.Contains("evm.CopyExecutionSettingsFrom(dialog.ViewModel)", normalized);
+
+        var vmSource = NormalizeWhitespace(ReadSource(ExtractSettingsViewModelRelPath));
+        Assert.Contains("public void CopyExecutionSettingsFrom(ExtractSettingsViewModel source)", vmSource);
+        Assert.Contains("EnableParallelExtract = source.EnableParallelExtract", vmSource);
+        Assert.Contains("ManualParallelDegree = source.ManualParallelDegree", vmSource);
+        Assert.Contains("LargeArchivePreTest = source.LargeArchivePreTest", vmSource);
     }
 
     /// <summary>
