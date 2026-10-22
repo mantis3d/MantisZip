@@ -1505,18 +1505,6 @@ public partial class MainWindow : Window
             ]);
     }
 
-
-    private async void RecentFileMenuItem_Click(object? sender, RoutedEventArgs e)
-    {
-        if (sender is MenuItem mi && mi.DataContext is string filePath)
-        {
-            if (DataContext is MainWindowViewModel vm && vm.OpenRecentFileCommand.CanExecute(filePath))
-            {
-                vm.OpenRecentFileCommand.Execute(filePath);
-            }
-        }
-    }
-
     /// <summary>
     /// 文件列表「拖出」（拖拽解压）的事件接线。
     /// 2026-10-21 启动优化：内容区延迟创建 → 拖拽接线随内容区创建时进行（构造期不再查找控件）。

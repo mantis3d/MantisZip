@@ -1468,6 +1468,32 @@ public class ProgressViewModelTests
         Assert.False(vm.HasScanCount);
     }
 
+    /// <summary>
+    /// 纯阶段上报（只带 Phase、无任何进度信息）**不得回写主进度**。
+    /// 2026-10-22 合并 alpha 的阶段上报后暴露：引擎在阶段边界（ReadingArchive / Extracting /
+    /// Finalizing）会额外上报一条 PercentComplete=0 的报告，若 UI 照单全收，
+    /// 解压末尾的「正在收尾…」会把已到 100% 的主进度打回 0% → 用户看到进度条倒退
+    /// （与 2026-10-13「主进度单调不减」的修复意图冲突）。
+    /// </summary>
+    [Fact]
+    public void SetProgress_PhaseOnly_DoesNotRewindMainProgress()
+    {
+        var vm = new ProgressViewModel();
+        vm.BeginPreparing();
+
+        // 先把主进度推到 100%
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 100, ProcessedFiles = 5, TotalFiles = 5 });
+        Assert.Equal(100, vm.PercentComplete);
+
+        // 纯阶段上报（引擎 ReportPhase 的形态：只有 Phase，其余为默认）
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Finalizing });
+
+        // 主进度不得被阶段上报改写
+        Assert.Equal(100, vm.PercentComplete);
+        // 状态行仍应切到阶段文案
+        Assert.Equal(LocalizationManager.T("Progress_Phase_Finalizing"), vm.StatusMessage);
+    }
+
     [Fact]
     public void SetProgress_ScanningPhase_UsesIndeterminateAndShowsFoundCount()
     {
