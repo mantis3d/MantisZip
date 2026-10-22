@@ -15,7 +15,7 @@
 ## Quick start
 
 ```powershell
-# 一键自检（版本号 6 处 + 三语 key，不构建，毫秒级）
+# 一键自检（版本号 6 处 + 三语 key + 规则守卫，不构建，毫秒级）
 pwsh -File scripts\verify-repo.ps1 -Task check
 
 # 构建 Avalonia 版（主力）
@@ -30,7 +30,8 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 ```
 
 - 产物：`src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe`；`bin/`、`obj/` 已 gitignore
-- CI：`.github/workflows/ci.yml`（Windows，`build` + `test`，但 `--filter "FullyQualifiedName!~SevenZipEngine"` 把 7z 相关用例过滤掉了）；**无 pre-commit、无 linter**；`tests/` 有 Core 与无头 Avalonia 两个测试项目（非全量覆盖）
+- CI：`.github/workflows/ci.yml`（Windows，先跑 `version` / `i18n` / `guards` 三项静态自检，再「依赖漏洞审计 restore → 产品代码分析器门禁 → build → test」，但 `--filter "FullyQualifiedName!~SevenZipEngine"` 把 7z 相关用例过滤掉了）；**无 pre-commit**；`tests/` 有 Core 与无头 Avalonia 两个测试项目（非全量覆盖）
+- 漏洞审计与代码风格：根目录 `Directory.Build.props` 开 `NuGetAuditMode=all`（本地只告警，CI 把 NU1901~NU1904 升为错误，分号要写 `%3B`）；`.editorconfig` 提供风格基线，CI 只对 `src/` 跑 `dotnet format analyzers --verify-no-changes --severity warn`（**whitespace/style 暂不设门禁**——存量 700+/40 处待重排）
 - ShellExt COM 已注册时 Explorer 会锁 Debug DLL → 构建/测试用 `-c Release` 绕开
 
 ## 维护脚本（唯一实现）
@@ -39,16 +40,18 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 
 | 命令 | 作用 |
 |------|------|
-| `pwsh -File scripts\verify-repo.ps1 -Task check` | 版本号 6 处 + 三语 key，无构建 |
-| `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` | 构建并把 MSBuild 输出压成「文件:行:列 + 错误码」 |
+| `pwsh -File scripts\verify-repo.ps1 -Task check` | 版本号 6 处 + 三语 key + 规则守卫，无构建 |
+| `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` | 构建并把 MSBuild 输出压成「文件:行:列 + 错误码」（项目级诊断无行列号时只显示 csproj 路径，如 restore/NU1301 失败） |
 | `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` | 跑测试 |
 | `pwsh -File scripts\verify-repo.ps1 -Task i18n` / `-Task version` | 单项检查 |
+| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8） |
 | 追加 `-Json` | 机器可读输出（插件内部用） |
 
 - `-Target`：`avalonia`（默认）/ `core` / `shell` / `tests` / `ui-tests` / `solution`
 - `-ExtraArgs <args>` 追加 dotnet 参数（如 `--no-restore`）；参数内含逗号/空格时用 `-ExtraArgsJson '["-c","Release"]'`
 - **退出码 0 = 通过，1 = 有问题** ⇒ CI 可直接用；`-Json` 时 `ok` 字段同义
-- agent 面板里对应工具名：`mantiszip_verify` / `mantiszip_i18n` / `mantiszip_version`（DSH 本地插件 `tools/dsh-plugin-mantiszip`，薄壳而已）
+- `-Task test` 有一条**兜底**：`dotnet test` 失败且没有解析到任何编译诊断（= 测试根本没跑起来，如 VSTest testhost 在受限环境里无法打开父进程句柄）时，自动改用 `dotnet exec <测试程序集>` 直跑 xunit v3 的 MTP 入口，绕开 testhost；JSON 里 `runner` 为 `mtp`、`fallbackFrom` 为 `vstest`。编译错误或真实用例失败**不会**触发兜底
+- agent 面板里对应工具名：`mantiszip_verify` / `mantiszip_i18n` / `mantiszip_version` / `mantiszip_guards`（DSH 本地插件 `tools/dsh-plugin-mantiszip`，薄壳而已）
 
 ## Architecture（速查）
 

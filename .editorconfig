@@ -1,0 +1,73 @@
+# MantisZip 仓库统一编码/格式约定（规则工具链的唯一配置源）
+# 只描述「既有事实」，不引入新风格；dotnet format / IDE / 编辑器共享本文件。
+root = true
+
+[*]
+# 全仓现状：CRLF + 无行尾空白（Markdown 除外，见下）
+end_of_line = crlf
+insert_final_newline = true
+trim_trailing_whitespace = true
+indent_style = space
+
+[*.cs]
+indent_size = 4
+charset = utf-8
+# using 指令：System 在前，其余按字母序（与现有 .cs 文件一致）
+dotnet_sort_system_directives_first = true
+dotnet_separate_import_directive_groups = false
+# 以下均为 silent/suggestion：只给 IDE 提示，不改变编译告警
+csharp_new_line_before_open_brace = all
+csharp_new_line_before_else = true
+csharp_new_line_before_catch = true
+csharp_new_line_before_finally = true
+csharp_new_line_before_members_in_object_initializers = true
+csharp_new_line_before_members_in_anonymous_types = true
+csharp_indent_case_contents = true
+csharp_indent_switch_labels = true
+csharp_space_after_cast = false
+csharp_space_after_keywords_in_control_flow_statements = true
+csharp_prefer_braces = when_multiline:suggestion
+csharp_style_var_for_built_in_types = false:suggestion
+csharp_style_var_when_type_is_apparent = true:suggestion
+csharp_style_var_elsewhere = false:suggestion
+csharp_style_expression_bodied_methods = when_on_single_line:suggestion
+csharp_style_namespace_declarations = file_scoped:silent
+csharp_using_directive_placement = outside_namespace:suggestion
+dotnet_style_qualification_for_field = false:suggestion
+dotnet_style_qualification_for_property = false:suggestion
+dotnet_style_qualification_for_method = false:suggestion
+dotnet_style_qualification_for_event = false:suggestion
+dotnet_style_predefined_type_for_locals_parameters_members = true:suggestion
+dotnet_style_predefined_type_for_member_access = true:suggestion
+dotnet_style_readonly_field = true:suggestion
+# 可空性：项目已启用 nullable，显式表达意图
+dotnet_style_null_propagation = true:suggestion
+csharp_style_implicit_object_creation_when_type_is_apparent = false:suggestion
+# 命名：私有字段统一 _camelCase（与现有 ViewModel/Service 一致）
+dotnet_naming_rule.private_fields_underscore.severity = suggestion
+dotnet_naming_rule.private_fields_underscore.symbols = private_fields
+dotnet_naming_rule.private_fields_underscore.style = underscore_camel
+dotnet_naming_symbols.private_fields.applicable_kinds = field
+dotnet_naming_symbols.private_fields.applicable_accessibilities = private
+dotnet_naming_style.underscore_camel.capitalization = camel_case
+dotnet_naming_style.underscore_camel.required_prefix = _
+
+[*.{axaml,xaml}]
+indent_size = 4
+charset = utf-8
+
+[*.json]
+indent_size = 2
+# 三语文件现状：UTF-8 with BOM（verify-repo.ps1 的 Test-I18n 也按带 BOM 读取）
+charset = utf-8-bom
+
+[*.{md,markdown}]
+indent_size = 2
+# Markdown 行尾两个空格是换行语义，不能裁掉
+trim_trailing_whitespace = false
+
+[*.{yml,yaml,ps1,psm1,iss,mjs,js}]
+indent_size = 2
+
+[*.ps1]
+indent_size = 4

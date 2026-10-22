@@ -167,6 +167,9 @@
 
 按版本分组，每组按日期从新到旧排列。
 
+#### v0.5.3
+- **10-21** — 工程化自检落地（构建）：`scripts/verify-repo.ps1` 新增 `-Task guards`（把 AGENTS.md 里可机器校验的四条规则固化为守卫：快捷键登记 10.1 / XAML 本地化 key 登记 13 / 禁用原生 StorageProvider 16 / 图标注册 8），并入 `-Task check`（仍是毫秒级纯文件校验）；CI 增加 version / i18n / guards 三步静态门禁（失败即红，build+test 逻辑不动）；DSH 插件新增第 4 个工具 `mantiszip_guards`。同时 `-Task test` 增加 xunit MTP 兜底：`dotnet test` 失败且无编译诊断、无测试汇总行（= 用例一条都没跑起来，如受限环境里 testhost 无法打开父进程句柄）时，自动改用 `dotnet exec <测试程序集>` 直跑 xunit v3 的 MTP 入口（JSON `runner: mtp`），用例真失败不触发。顺带修掉两处存量守卫违规：`MainWindowViewModel` keys 数组里的死 key `Status_ArchiveStats`（三语都不存在）与 `AppIcons` 的 `IconHtml` 未注册到图标测试窗口
+
 #### v0.5.2
 - **10-15** — 修复损坏 ZIP 被静默通过（Core）：测试/解压此前经 `IArchiveEntry.OpenEntryStream()` 读裸流（SharpCompress 不校验 CRC），「数据被改动但仍可解码」的损坏条目（stored 字节翻转 / CRC 字段错）被静默解出且无报错；改用官方校验路径 `WriteTo`/`WriteToAsync` + `ExtractionOptions.CheckCrc=true`（`TestArchiveAsync` + 串行/并行/过滤共四处解压循环），CRC 不符抛 `InvalidFormatException` → 逐条目 `Failed` 上报、不中止整批 + 删除已写出损坏文件（`TryDeleteCorruptOutput`）；新增 `EntryFailureReason.CrcMismatch` + `FailureReasonMapper`（消息含 CRC）；官方路径自带目录 / `IsCrcAvailable` / WinZip AES AE-2 边界跳过，不误报。新增 `ZipEngineCrcValidationTests`（4 条）；Core 全量 684 通过 / 0 失败 / 3 跳过
 

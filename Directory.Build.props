@@ -1,0 +1,16 @@
+<Project>
+
+  <!--
+    NuGet 依赖漏洞审计（全仓生效，无需逐 csproj 配置）：
+    - NuGetAudit=true：还原时检查已知漏洞（SDK 默认开启，这里显式声明防误关）
+    - NuGetAuditMode=all：连传递依赖一起审计（默认只查直接引用）
+    - NuGetAuditLevel=low：低危也要报（默认只报 moderate 及以上）
+    CI 的 restore 步骤把 NU1901~NU1904 升级为错误，本地构建仅报警告。
+  -->
+  <PropertyGroup>
+    <NuGetAudit>true</NuGetAudit>
+    <NuGetAuditMode>all</NuGetAuditMode>
+    <NuGetAuditLevel>low</NuGetAuditLevel>
+  </PropertyGroup>
+
+</Project>

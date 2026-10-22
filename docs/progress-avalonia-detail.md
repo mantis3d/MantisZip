@@ -6,6 +6,27 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-22** — CI 再补两道门禁：依赖漏洞审计 + 产品代码分析器校验（whitespace/style/覆盖率暂缓）
+  - **动机**：v0.5.3 的 CI 只有「静态自检 + build + test」，依赖漏洞与代码分析器没有任何拦截。上一轮因缺 pwsh 7、网络不可达而搁置的三项门禁，环境恢复后逐项实测，能过才接、过不了就说明原因。
+  - **依赖漏洞审计**：新增根目录 `Directory.Build.props`，开 `NuGetAudit=true` / `NuGetAuditMode=all`（连传递依赖一起审计）/ `NuGetAuditLevel=low`，本地 `dotnet build` 只告警；CI 的 restore 步骤追加 `-p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904` 把漏洞类警告升为错误（**分号必须写 `%3B`**，直接写 `"NU1901;NU1902"` 会被 MSBuild 当成多个开关并报 `MSB1006: 属性无效`）。实测 `dotnet list package --vulnerable --include-transitive`：五个项目 0 漏洞。
+  - **分析器门禁**：CI 新增 `dotnet format MantisZip.sln analyzers --verify-no-changes --no-restore --severity warn --include src\MantisZip.Core src\MantisZip.UI.Avalonia src\MantisZip.ShellExt`，实测 exit 0（产品代码 0 发现）。只圈 `src/` 是因为 `tests/` 存量有 25 条 xUnit 分析器告警（xUnit1051 ×21、xUnit2012 ×2、xUnit2013、xUnit2031），属测试可读性问题，单独处理更划算。
+  - **暂不设门禁的三项（均有实测数字）**：① whitespace —— 存量 **704 处 / 90 个文件**，主要是单行 XML 文档注释被格式化器要求拆成多行（如 `ArchiveEngine.cs` 的 `/// <summary>异常信息</summary>`），需要一次性全仓重排；② style —— 存量 **40 处 IMPORTS**（`SharpSevenZip` 排在 `MantisZip.Core` 之前，与 `dotnet_sort_system_directives_first` 期望的顺序冲突）；③ 覆盖率 —— 本机 `dotnet test` 的 VSTest testhost 在 `DefaultEngineInvoker.SetParentProcessExitCallback` 抛 `Win32Exception (5): 拒绝访问`（**非沙箱专属，用户本机同样复现**，故 `-Task test` 的 MTP 兜底实际已是主路径），`--collect:"XPlat Code Coverage"` 走不通；MTP 覆盖率要给测试项目加 `Microsoft.Testing.Extensions.CodeCoverage`，涉及测试项目依赖，留待单独决策。
+  - **环境排障记录**：`dotnet restore` 报「无法获取 NuGetScratch 锁定文件访问权限 → 无法对 NuGet.Config 进行操作」时，不是 ACL 问题（文件可独占打开、目录可写），而是 IDE/MSBuild 常驻节点持有锁：`dotnet build-server shutdown` 后 restore 立刻恢复；`NUGET_SCRATCH` 环境变量对 SDK 10.0.400 无效，别指望换目录绕开。
+  - **验证**（pwsh 7.6.7）：`-Task version`（6/6 = 0.5.3）、`-Task i18n`（1276 key）、`-Task guards`（4/4）全部 exit 0；`-Task test -Target ui-tests` 经 MTP 兜底 **Total 347 / Failed 0 / Skipped 3**；`dotnet build -c Release` 全解决方案 **0 错误 / 26 警告（全部 xUnit 分析器，tests 内）**；新增的两条 CI 命令本地逐条复跑 exit 0。
+**2026-10-21** — 工程化自检：AGENTS 规则守卫 + CI 静态门禁 + 测试 MTP 兜底
+  - **动机**：AGENTS.md 的 18 条规则里有 4 条本可机器校验（10.1 快捷键登记 / 13 XAML 本地化 key 登记 / 16 禁用原生 StorageProvider / 8 图标注册），此前只靠人肉评审；CI 也只跑 build + test，版本号与三语 key 漂移要等发版才暴露。
+  - **`-Task guards`（scripts/verify-repo.ps1）**：四项守卫，`-Json` 输出 `checks[]`，并入 `-Task check`（version + i18n + guards，仍是毫秒级纯文件校验）。
+    - 规则 10.1 三方比对：`MainWindow.axaml` 的 `InputGesture` 清单 ↔ `MainWindow.axaml.cs` 的 `RegisterKeyBindings` 登记 ↔ `MainWindowKeyBindingsTests` 期望清单（`Ctrl+,` 与 `Ctrl+OemComma`、大小写做归一化后比较）。
+    - 规则 13 双向校验：XAML 里 `LocalizedStrings[Key]` 的 key 必须在 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组登记；keys 数组里的 key 又必须出现在三语 JSON。**各对话框/面板自持字典的 key 不在比对范围** —— MainWindowViewModel 的字典不是全量加载 JSON，误报 103 条已排除。
+    - 规则 16：`OpenFilePickerAsync` / `SaveFilePickerAsync` / `OpenFolderPickerAsync` 只允许命中 `CustomFilePickerDialog.SystemBrowse_Click`（唯一豁免点）。
+    - 规则 8：`AppIcons.axaml` 的 `x:Key` 必须在 `IconTestViewModel.LoadAllIcons()` 有对应 `Add()`。
+  - **顺带修掉两处存量违规**：`Status_ArchiveStats`（keys 数组登记了、三语都没有 → 死 key，删除）；`IconHtml`（图标资源存在、图标测试窗口漏注册 → 补 `Add`）。
+  - **诊断解析补上项目级形状**：`<path>.csproj : error NU1301: …`（restore / NuGet 失败）以前落不进任何规则，构建实际失败却报「0 错误 / 0 警告」；新增 `$RE_PROJ_DIAG` 正则，输出位置分「(项目级) / 文件 / 文件(行,列)」三档，插件 `renderVerify` 同步用 `whereOf()` 保持一致。
+  - **CI（.github/workflows/ci.yml）**：新增「静态自检」步骤，依次跑 `-Task version` / `i18n` / `guards`，任一非 0 即红；build / test 两步逻辑不动。
+  - **测试 MTP 兜底**：`-Task test` 仅在「失败 + 0 条编译诊断 + 输出里没有 `Passed!`/`Failed!`/`Total: N` 汇总行」三者同时成立时才回退 —— 这三条同时成立 = 用例一条都没跑起来（VSTest testhost 崩溃 / 宿主进程被受限环境拒绝 / 输出整段为空）。兜底用 `dotnet exec <测试程序集>` 直跑 xunit v3 自带的 MTP 入口，完全不经过 testhost；命中时 JSON `runner: mtp` + `fallbackFrom: vstest`，人类可读输出加一行说明并附「输出尾部」自证跑了多少用例。编译错误（`errorCount > 0`）与真实用例失败（有汇总行）不触发兜底，不会掩盖失败。
+  - **插件**：`tools/dsh-plugin-mantiszip/index.mjs` 新增 `mantiszip_guards`（薄壳，参数 `root` / `localizationDir`）；`mantiszip_verify` 的 `output.schema` 补上 `runner` / `hostCrashed` / `testsReported` / `tail` 等新字段（schema 是 `additionalProperties: false`），`renderVerify` 同步渲染兜底说明与输出尾部；`node --check` 通过。
+  - **未落地（环境所限，非缺陷）**：本机只有 Windows PowerShell 5.1（无 pwsh 7），且 HTTPS 被掐断（`api.nuget.org` / `aka.ms` / `github.com` 的 TLS 握手全部失败、winget 源不可用、`dotnet tool install` 装不上），因此 `dotnet format` 门禁、coverlet 覆盖率、NuGet 漏洞扫描三项未接入。`.editorconfig` 已按既有风格加入，供后续有 SDK 与网络的环境直接启用。
+  - **验证**：`-Task guards` 4/4 通过；`-Task check` exit 0（版本 6/6 = 0.5.3、三语 1276 key）；`-Task test -Target ui-tests` 由 MTP 兜底跑出 **Total 347 / Failed 0 / Skipped 3**（直接 `dotnet exec` 复核同值）。
 **2026-10-20** — 计划文档校准：winget-publishing / preview-quick-modes / auto-update 三份计划按 v0.5.3 现状修正
   - **winget-publishing**：删除 WebView2 过时引用（WebSetup 风险改为 .NET 10 运行时下载提示）；CI 片段改用 `WINGET_CREATE_GITHUB_TOKEN` 环境变量防 token 泄露；Task 1 补 `delete_repo` 可选权限说明与 fine-grained PAT 限制（winget-create#595）；版本示例 0.4.4 → 0.5.3
   - **preview-quick-modes**：关联计划状态定稿（html-preview-webview-fallback 已完成 / preview-extended-formats 进行中）；GIF 统一为 AnimatedImage 命名（GIF/Animated WebP/APNG）；字幕格式标注「未支持待补」；HTML 双轨已落地说明（NativeWebView 主轨 + ReverseMarkdown 降级）；`AppSettings.Instance` → `AppSettings.Load()`；缩略图冗余章节收敛为指向三个独立计划的引用；PLAN.md 对应登记说明同步

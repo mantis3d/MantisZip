@@ -18,8 +18,31 @@ jobs:
         with:
           dotnet-version: 10.0.x
 
-      - name: Restore dependencies
-        run: dotnet restore
+      # 静态自检：不依赖构建产物，失败即快速反馈（退出码 0=通过，1=有问题）。
+      # 三项逻辑的唯一实现在 scripts/verify-repo.ps1，本地/CI/agent 插件共用。
+      - name: Verify version consistency
+        run: pwsh -File scripts/verify-repo.ps1 -Task version
+
+      - name: Verify i18n key sets
+        run: pwsh -File scripts/verify-repo.ps1 -Task i18n
+
+      - name: Verify code rules (keybindings / i18n bindings / file picker / icons)
+        run: pwsh -File scripts/verify-repo.ps1 -Task guards
+
+      # 依赖漏洞审计：Directory.Build.props 已开 NuGetAuditMode=all，
+      # 这里把漏洞类警告（NU1901~NU1904）升级为错误，出现已知漏洞即失败。
+      # 分号必须写成 %3B，否则 MSBuild 会把后半段当成别的开关（MSB1006）。
+      - name: Restore dependencies (fail on known vulnerabilities)
+        run: >
+          dotnet restore
+          -p:WarningsAsErrors=NU1901%3BNU1902%3BNU1903%3BNU1904
+
+      # 代码分析器门禁：只校验产品代码（tests 存量的 xUnit 分析器告警另议）。
+      # 不做 whitespace/style 校验——存量有 700+/40 处待重排，需要单独一次性格式提交。
+      - name: Verify code analyzers (src only)
+        run: >
+          dotnet format MantisZip.sln analyzers --verify-no-changes --no-restore --severity warn
+          --include src\MantisZip.Core src\MantisZip.UI.Avalonia src\MantisZip.ShellExt
 
       - name: Build
         run: dotnet build --no-restore --configuration Release

@@ -12,10 +12,17 @@
 
     Tasks:
         build    dotnet build <target>, parse errors/warnings
-        test     dotnet test  <target>, parse errors/warnings
+        test     dotnet test  <target>, parse errors/warnings. When the VSTest
+                 testhost process crashes (restricted environments where it may
+                 not open a handle to its parent process), the script falls back
+                 to `dotnet exec <test assembly>` and runs the xunit v3 MTP entry
+                 point directly, which needs no testhost.
         i18n     compare strings.zh-CN / strings.en / strings.zh-TW
         version  compare the 6 version locations listed in AGENTS.md
         check    version + i18n (pure file checks, no build, ~instant)
+        guards   machine-checkable AGENTS.md rules: keybinding registration
+                 (rule 10.1), main-window localization keys (rule 13),
+                 StorageProvider ban (rule 16), icon registry (rule 8)
 
     Output:
         default   human readable Chinese text (matches the old tool output)
@@ -61,7 +68,7 @@
 
 [CmdletBinding()]
 param(
-    [ValidateSet('build', 'test', 'i18n', 'version', 'check')]
+    [ValidateSet('build', 'test', 'i18n', 'version', 'check', 'guards')]
     [string]$Task = 'check',
 
     [ValidateSet('avalonia', 'core', 'shell', 'tests', 'ui-tests', 'solution')]
@@ -133,7 +140,18 @@ $RE_FILE_DIAG = [regex]'^(?<file>.+?)\((?<line>\d+),(?<column>\d+)\):\s*(?<sever
 $RE_BARE_DIAG = [regex]'^(?<severity>error|warning)\s+(?<code>[A-Za-z]+[0-9]+)\s*:\s*(?<message>.*)$'
 $RE_DOTNET_BARE = [regex]'^(?<severity>error|warning)\s*:\s*(?<message>.+)$'
 $RE_PROJ_SUFFIX = [regex]'\s*\[[^\]]+\]\s*$'
+# 项目级诊断（无行列号）：`C:\...\App.csproj : error NU1301: ...`；restore / NuGet 失败专属形状。
+$RE_PROJ_DIAG = [regex]'^(?<file>.+?)\s*:\s+(?<severity>error|warning)\s+(?<code>[A-Za-z]+[0-9]+)\s*:\s*(?<message>.*)$'
 $RE_JSON_KEY = [regex]'(?m)^\s*"((?:[^"\\]|\\.)*)"\s*:'
+
+# VSTest testhost 进程崩溃的特征串。命中说明测试根本没跑起来（例如受限环境下
+# testhost 无法 OpenProcess 打开父进程句柄 → Win32Exception 5 / 访问被拒绝），
+# 此时才回退到 dotnet exec 直跑测试程序集。
+$RE_TESTHOST_CRASH = [regex]'(?i)(testhost[^\r\n]{0,80}(crash|exited|exit code)|测试宿主[^\r\n]{0,40}(崩溃|退出)|Win32Exception|Failed to connect to the test host|无法创建测试宿主|Test Run Aborted)'
+
+# VSTest 只会在测试真正跑起来后打印带计数的汇总行（Passed! / Failed! / Total: N）。
+# 没有汇总行 ⇒ 用例一条都没执行，才值得用 MTP 兜底重跑；用例真的失败时必须保留原结果。
+$RE_TEST_SUMMARY = [regex]'(?i)(Passed!\s+-|Failed!\s+-|测试运行成功|Total:\s*\d+,\s*(Errors|Failed)|总计:\s*\d+)'
 
 # ---------------------------------------------------------------------------
 # Small helpers
@@ -243,6 +261,18 @@ function ConvertFrom-BuildOutput {
             $message = $match.Groups['message'].Value.Trim()
         }
         else {
+            # 项目级诊断没有行列号：`<path>.csproj : error NU1301: ...`（restore / NuGet 失败
+            # 都是这个形状）。以前这条落不到任何规则里，restore 失败会显示成「0 错误」。
+            $match = $RE_PROJ_DIAG.Match($line)
+            if ($match.Success) {
+                $file = $match.Groups['file'].Value.Trim()
+                $severity = $match.Groups['severity'].Value
+                $code = $match.Groups['code'].Value
+                $message = $match.Groups['message'].Value.Trim()
+            }
+        }
+
+        if ([string]::IsNullOrEmpty($severity)) {
             $match = $RE_BARE_DIAG.Match($line)
             if ($match.Success) {
                 $severity = $match.Groups['severity'].Value
@@ -278,18 +308,50 @@ function ConvertFrom-BuildOutput {
     return @{ errors = $errors; warnings = $warnings }
 }
 
+# 找出测试工程生成的可执行程序集（xunit v3 的 MTP 入口就在测试 dll 里）。
+# bin/ 下的 ref/ 目录是引用程序集，不能 exec，必须排除。
+function Get-TestAssemblyPath {
+    param(
+        [string]$RepoRoot,
+        [string]$ProjectPath
+    )
+
+    $projectFull = Join-Path $RepoRoot $ProjectPath
+    $assemblyName = [System.IO.Path]::GetFileNameWithoutExtension($projectFull)
+    $binDir = Join-Path (Split-Path -Parent $projectFull) 'bin'
+    if (-not (Test-Path -LiteralPath $binDir)) { return $null }
+
+    $candidates = @(
+        Get-ChildItem -LiteralPath $binDir -Recurse -Filter "$assemblyName.dll" -File -ErrorAction SilentlyContinue |
+        Where-Object { $_.FullName -notmatch '[\\/]ref[\\/]' } |
+        Sort-Object LastWriteTime -Descending
+    )
+
+    if ($candidates.Count -gt 0) { return $candidates[0].FullName }
+    return $null
+}
+
 function Invoke-VerifyDotnet {
     param(
         [string]$RepoRoot,
         [string]$Action,
         [string]$ProjectPath,
         [string[]]$AdditionalArgs,
-        [int]$BudgetMs
+        [int]$BudgetMs,
+        [string[]]$ArgvOverride
     )
 
-    $argv = @($Action, $ProjectPath, '-nologo', '-nodeReuse:false', '-v:m')
-    if ($Action -eq 'build') { $argv += '-clp:NoSummary' }
-    if ($AdditionalArgs) { $argv += $AdditionalArgs }
+    if ($ArgvOverride) {
+        # MTP 兜底：dotnet exec <测试程序集> 直接把命令行交给测试程序集自己解析，
+        # 因此不能追加 -nologo 之类的 MSBuild 参数，也不能追加 -c Release 之类的
+        # dotnet 参数（会被 xunit 当成未知选项）；配置由程序集所在 bin 目录决定。
+        $argv = @($ArgvOverride)
+    }
+    else {
+        $argv = @($Action, $ProjectPath, '-nologo', '-nodeReuse:false', '-v:m')
+        if ($Action -eq 'build') { $argv += '-clp:NoSummary' }
+        if ($AdditionalArgs) { $argv += $AdditionalArgs }
+    }
 
     $truncated = $false
     $stdoutText = ''
@@ -375,10 +437,32 @@ function Invoke-VerifyDotnet {
     $errors = $parsed.errors
     $warnings = $parsed.warnings
 
+    $okValue = ($exitCode -eq 0 -and $errors.Count -eq 0)
+    $runner = if ($ArgvOverride) { 'mtp' } else { 'vstest' }
+
+    $hostCrashed = $false
+    $testsReported = $false
+    if ($Action -eq 'test' -and -not $ArgvOverride) {
+        $probe = $stdoutText + "`n" + $stderrText
+        $hostCrashed = $RE_TESTHOST_CRASH.IsMatch($probe)
+        $testsReported = $RE_TEST_SUMMARY.IsMatch($probe)
+    }
+
+    # 测试失败时 dotnet test 往往不产生 file(line,col) 诊断，错误列表会是空的；
+    # 保留输出尾部，让「哪些用例失败 / 为什么跑不起来」至少看得见。走 MTP 兜底时
+    # 无论成败都保留尾部 —— 那一行 "Total: N, Failed: 0" 是唯一能自证跑过多少用例的东西。
+    $tail = @()
+    if ($Action -eq 'test' -and (-not $okValue -or $ArgvOverride)) {
+        $tail = @($allLines | Select-Object -Last 20 | ForEach-Object { Clip-Text $_ 200 })
+    }
+
     $payload = [ordered]@{
-        ok           = ($exitCode -eq 0 -and $errors.Count -eq 0)
+        ok           = $okValue
         target       = $Target
         action       = $Action
+        runner       = $runner
+        hostCrashed  = $hostCrashed
+        testsReported = $testsReported
         exitCode     = $exitCode
         durationMs   = [int]$stopwatch.Elapsed.TotalMilliseconds
         command      = 'dotnet ' + ($argv -join ' ')
@@ -389,6 +473,7 @@ function Invoke-VerifyDotnet {
         aborted      = $false
         errors       = @($errors | Select-Object -First $MAX_ITEMS)
         warnings     = @($warnings | Select-Object -First $MAX_ITEMS)
+        tail         = @($tail)
     }
 
     return $payload
@@ -408,11 +493,15 @@ function Format-BuildResult {
         $lines.Add("❌ ${verb}失败：$($Result.target)（${seconds}s，$($Result.errorCount) 错误 / $($Result.warningCount) 警告，exit $($Result.exitCode)）")
     }
 
+    if ($Result.runner -eq 'mtp') {
+        $lines.Add('ℹ️ VSTest testhost 不可用，已回退 dotnet exec 直跑测试程序集（xunit MTP）。')
+    }
+
     if (@($Result.errors).Count -gt 0) {
         $lines.Add('')
         $lines.Add('错误：')
         foreach ($entry in $Result.errors) {
-            $where = if ($entry.file) { "$($entry.file)($($entry.line),$($entry.column))" } else { '(项目级)' }
+            $where = if (-not $entry.file) { '(项目级)' } elseif ($null -eq $entry.line) { $entry.file } else { "$($entry.file)($($entry.line),$($entry.column))" }
             $label = if ($entry.code) { "$($entry.code): " } else { '' }
             $lines.Add("- $where $label$(Clip-Text $entry.message 300)")
         }
@@ -426,7 +515,7 @@ function Format-BuildResult {
         $shown = 0
         foreach ($entry in $Result.warnings) {
             if ($shown -ge 10) { break }
-            $where = if ($entry.file) { "$($entry.file)($($entry.line),$($entry.column))" } else { '(项目级)' }
+            $where = if (-not $entry.file) { '(项目级)' } elseif ($null -eq $entry.line) { $entry.file } else { "$($entry.file)($($entry.line),$($entry.column))" }
             $label = if ($entry.code) { "$($entry.code): " } else { '' }
             $lines.Add("- $where $label$(Clip-Text $entry.message 300)")
             $shown++
@@ -434,6 +523,12 @@ function Format-BuildResult {
         if ([int]$Result.warningCount -gt $shown) {
             $lines.Add("- …共 $($Result.warningCount) 条警告")
         }
+    }
+
+    if (@($Result.tail).Count -gt 0) {
+        $lines.Add('')
+        $lines.Add('输出尾部：')
+        foreach ($entry in $Result.tail) { $lines.Add("- $entry") }
     }
 
     if ($Result.timedOut) {
@@ -738,6 +833,362 @@ function Format-VersionResult {
 }
 
 # ---------------------------------------------------------------------------
+# guards: 可机器验证的 AGENTS.md 规则子集（规则 8 / 10.1 / 13 / 16）
+#
+# 这些规则此前只有「人肉自查」或「构建不报错」兜底，踩过坑：
+#   - 规则 10.1：MenuItem.InputGesture 只显示不生效（2026-10-21 修复 5 个）
+#   - 规则 13：keys 数组漏登记 → 菜单文字空白，构建不报错
+#   - 规则 16：StorageProvider 原生对话框必须走 CustomFilePickerDialog
+#   - 规则 8：新增 AppIcons.axaml 图标必须登记到 IconTestViewModel
+# ---------------------------------------------------------------------------
+
+$GUARD_FILES = [ordered]@{
+    keyBindingsCode = 'src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs'
+    keyBindingsXaml = 'src/MantisZip.UI.Avalonia/Views/MainWindow.axaml'
+    keyBindingsTest = 'tests/MantisZip.UI.Avalonia.Tests/MainWindowKeyBindingsTests.cs'
+    mainWindowXaml  = 'src/MantisZip.UI.Avalonia/Views/MainWindow.axaml'
+    filterBarXaml   = 'src/MantisZip.UI.Avalonia/Controls/MainFilterBar.axaml'
+    mainViewModel   = 'src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs'
+    appIcons        = 'src/MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml'
+    iconTestVm      = 'src/MantisZip.UI.Avalonia/ViewModels/IconTestViewModel.cs'
+    filePicker      = 'src/MantisZip.UI.Avalonia/Dialogs/CustomFilePickerDialog.axaml.cs'
+    sourceDir       = 'src'
+}
+
+# 登记形态两种都覆盖：KeyModifiers.Control 与 KeyModifiers.Control | KeyModifiers.Shift
+$RE_KEYBINDING_ADD = [regex]::new('Add\(\s*Key\.(\w+)\s*,\s*(?<mods>[^,]+?)\s*,\s*[\w.()]+\s*\)')
+$RE_INPUT_GESTURE = [regex]::new('InputGesture="([^"]+)"')
+$RE_LOCALIZED_BINDING = [regex]::new('LocalizedStrings\[([^\]]+)\]')
+$RE_QUOTED_STRING = [regex]::new('"((?:[^"\\]|\\.)+)"')
+$RE_FILE_PICKER_API = [regex]::new('\b(OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync)\s*\(')
+$RE_APP_ICON_KEY = [regex]::new('x:Key="([^"]+)"')
+$RE_ICON_RESOURCE_REF = [regex]::new('"Icon[A-Z][A-Za-z0-9]*"')
+$RE_SIGNED_METHOD = [regex]::new('(?m)^[ \t]*(?:private|protected|public|internal)[^\r\n;=]*?\b([A-Za-z_]\w*)\s*\(')
+
+# 文件选择对话框的唯一豁免入口（规则 16）
+$FILE_PICKER_WHITELIST_METHOD = 'SystemBrowse_Click'
+
+function Get-LineNumber {
+    param([string]$Text, [int]$Index)
+    if ($Index -le 0) { return 1 }
+    return ($Text.Substring(0, $Index) -split "`r?`n").Count
+}
+
+function ConvertTo-KeyGestureText {
+    param([string]$KeyName, [string]$Modifiers)
+    # 与 Avalonia KeyGesture.ToString() 的修饰键顺序一致：Ctrl+Shift+Alt+Win
+    $parts = [System.Collections.Generic.List[string]]::new()
+    if ($Modifiers -match '(?i)\bControl\b') { $parts.Add('Ctrl') }
+    if ($Modifiers -match '(?i)\bShift\b') { $parts.Add('Shift') }
+    if ($Modifiers -match '(?i)\bAlt\b') { $parts.Add('Alt') }
+    if ($Modifiers -match '(?i)\b(?:Meta|Win)\b') { $parts.Add('Win') }
+    $parts.Add($KeyName)
+    return ($parts -join '+')
+}
+
+function ConvertTo-CanonicalGesture {
+    param([string]$Raw)
+    # 菜单里把逗号键写作 "Ctrl+,，KeyGesture.ToString() 是 "Ctrl+OemComma"
+    $value = $Raw.Trim()
+    if ($value.EndsWith(',')) {
+        $value = $value.Substring(0, $value.Length - 1) + 'OemComma'
+    }
+    return $value
+}
+
+function Get-KeyBindingGestureList {
+    param([string]$Code)
+    $list = [System.Collections.Generic.List[string]]::new()
+    foreach ($match in $RE_KEYBINDING_ADD.Matches($Code)) {
+        $list.Add((ConvertTo-KeyGestureText -KeyName $match.Groups[1].Value -Modifiers $match.Groups[2].Value))
+    }
+    return @($list)
+}
+
+function Get-XamlInputGestureList {
+    param([string]$Xaml)
+    $list = [System.Collections.Generic.List[string]]::new()
+    foreach ($match in $RE_INPUT_GESTURE.Matches($Xaml)) {
+        $list.Add((ConvertTo-CanonicalGesture $match.Groups[1].Value))
+    }
+    return @($list)
+}
+
+function Get-ExpectedGestureList {
+    param([string]$TestCode)
+    $block = [regex]::Match($TestCode, 'string\[\] expected\s*=\s*\{(?<body>.*?)\}\s*;', 'Singleline')
+    if (-not $block.Success) { return @() }
+    $list = [System.Collections.Generic.List[string]]::new()
+    foreach ($match in $RE_QUOTED_STRING.Matches($block.Groups['body'].Value)) {
+        $value = $match.Groups[1].Value
+        # 只收手势样式（英文/数字/+），中文注释或说明自然排除
+        if ($value -notmatch '^[A-Za-z0-9+]+$') { continue }
+        $list.Add($value)
+    }
+    return @($list)
+}
+
+function Get-RegisteredViewModelKeys {
+    param([string]$Code)
+    $block = [regex]::Match($Code, 'var keys = new\[\]\s*\{(?<body>.*?)\};', 'Singleline')
+    if (-not $block.Success) { return @() }
+    $list = [System.Collections.Generic.List[string]]::new()
+    foreach ($match in $RE_QUOTED_STRING.Matches($block.Groups['body'].Value)) {
+        $list.Add($match.Groups[1].Value)
+    }
+    return @($list)
+}
+
+function Get-JsonKeySet {
+    param([string]$RepoRoot, [string]$RelativeDir)
+    $directory = if ([System.IO.Path]::IsPathRooted($RelativeDir)) { $RelativeDir } else { Join-Path $RepoRoot $RelativeDir }
+    $path = Join-Path $directory $I18N_FILES['zhCN']
+    $raw = [System.IO.File]::ReadAllText($path)
+    if ($raw.Length -gt 0 -and $raw[0] -eq [char]0xFEFF) { $raw = $raw.Substring(1) }
+    $data = $raw | ConvertFrom-Json -AsHashtable
+    return @($data.Keys)
+}
+
+function Get-EnclosingMethodName {
+    param([string]$Text, [int]$TargetLine)
+    $current = $null
+    foreach ($match in $RE_SIGNED_METHOD.Matches($Text)) {
+        $line = Get-LineNumber -Text $Text -Index $match.Index
+        if ($line -gt $TargetLine) { break }
+        $current = $match.Groups[1].Value
+    }
+    return $current
+}
+
+function New-GuardResult {
+    param([string]$Id, [string]$Title, [bool]$Ok, $Issues, $Details)
+    return [ordered]@{
+        id      = $Id
+        title   = $Title
+        ok      = $Ok
+        issues  = @($Issues)
+        details = $Details
+    }
+}
+
+# 规则 10.1：菜单显示的手势必须真的登记在 MainWindow.KeyBindings 上
+function Test-GuardKeyBindings {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $code = Read-TextFile (Join-Path $RepoRoot $GUARD_FILES.keyBindingsCode)
+    $xaml = Read-TextFile (Join-Path $RepoRoot $GUARD_FILES.keyBindingsXaml)
+    $test = Read-TextFile (Join-Path $RepoRoot $GUARD_FILES.keyBindingsTest)
+
+    if ($null -eq $code -or $null -eq $xaml -or $null -eq $test) {
+        $issues.Add('读不到快捷键相关文件（MainWindow.axaml.cs / MainWindow.axaml / MainWindowKeyBindingsTests.cs）')
+        return New-GuardResult -Id 'keybindings' -Title '快捷键登记（规则 10.1）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    $registered = Get-KeyBindingGestureList $code
+    $shown = Get-XamlInputGestureList $xaml
+    $expected = Get-ExpectedGestureList $test
+
+    foreach ($gesture in ($shown | Sort-Object -Unique)) {
+        if ($registered -notcontains $gesture) {
+            $issues.Add("菜单 InputGesture 显示 $gesture，但 MainWindow.KeyBindings 未登记 → 只显示不生效")
+        }
+    }
+    foreach ($gesture in ($expected | Sort-Object -Unique)) {
+        if ($registered -notcontains $gesture) {
+            $issues.Add("测试期望 $gesture，但 MainWindow.KeyBindings 未登记")
+        }
+    }
+    foreach ($gesture in ($registered | Sort-Object -Unique)) {
+        if ($expected -notcontains $gesture) {
+            $issues.Add("KeyBindings 已登记 $gesture，但 MainWindowKeyBindingsTests 期望清单未同步")
+        }
+    }
+    if ($registered.Count -ne ($registered | Sort-Object -Unique).Count) {
+        $issues.Add('KeyBindings 存在重复的手势登记')
+    }
+
+    return New-GuardResult -Id 'keybindings' -Title '快捷键登记（规则 10.1）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            registered    = @($registered | Sort-Object -Unique)
+            shownInMenu   = @($shown | Sort-Object -Unique)
+            expectedTests = @($expected | Sort-Object -Unique)
+        })
+}
+
+# 规则 13：主窗口 XAML 绑定的 LocalizedStrings key 必须登记且三语有文案
+function Test-GuardI18nBindings {
+    param([string]$RepoRoot, [string]$RelativeLocalizationDir)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $bound = [System.Collections.Generic.List[string]]::new()
+
+    foreach ($relative in @($GUARD_FILES.mainWindowXaml, $GUARD_FILES.filterBarXaml)) {
+        $text = Read-TextFile (Join-Path $RepoRoot $relative)
+        if ($null -eq $text) {
+            $issues.Add("读不到 $relative")
+            continue
+        }
+        foreach ($match in $RE_LOCALIZED_BINDING.Matches($text)) {
+            $key = $match.Groups[1].Value.Trim()
+            if (-not $bound.Contains($key)) { $bound.Add($key) }
+        }
+    }
+
+    $viewModel = Read-TextFile (Join-Path $RepoRoot $GUARD_FILES.mainViewModel)
+    if ($null -eq $viewModel) {
+        $issues.Add("读不到 $($GUARD_FILES.mainViewModel)")
+        return New-GuardResult -Id 'i18n-bindings' -Title '主窗口绑定 key 登记（规则 13）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    $registered = Get-RegisteredViewModelKeys $viewModel
+    $jsonKeys = Get-JsonKeySet -RepoRoot $RepoRoot -RelativeDir $RelativeLocalizationDir
+
+    foreach ($key in ($bound | Sort-Object)) {
+        if ($registered -notcontains $key) {
+            $issues.Add("$GUARD_FILES.mainWindowXaml 绑定 $key，但 UpdateLocalizedStrings() keys 数组未登记 → 运行时文字空白且构建不报错")
+        }
+    }
+    foreach ($key in ($registered | Sort-Object)) {
+        if ($jsonKeys -notcontains $key) {
+            $issues.Add("UpdateLocalizedStrings() 登记 $key，但三语 JSON 缺少该 key")
+        }
+    }
+
+    return New-GuardResult -Id 'i18n-bindings' -Title '主窗口绑定 key 登记（规则 13）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            boundCount      = $bound.Count
+            registeredCount = $registered.Count
+            jsonKeyCount    = $jsonKeys.Count
+        })
+}
+
+# 规则 16：禁止原生 StorageProvider，唯一豁免 CustomFilePickerDialog.SystemBrowse_Click
+function Test-GuardFilePicker {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $sourceDir = Join-Path $RepoRoot $GUARD_FILES.sourceDir
+    if (-not (Test-Path -LiteralPath $sourceDir)) {
+        $issues.Add("读不到源码目录：$($GUARD_FILES.sourceDir)")
+        return New-GuardResult -Id 'filepicker' -Title '文件选择器入口（规则 16）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    $hitCount = 0
+    $allowedCount = 0
+
+    $files = Get-ChildItem -LiteralPath $sourceDir -Recurse -Filter *.cs -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+
+    foreach ($file in $files) {
+        $text = [System.IO.File]::ReadAllText($file.FullName)
+        if ($text.IndexOf('PickerAsync', [System.StringComparison]::Ordinal) -lt 0) { continue }
+
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+        foreach ($match in $RE_FILE_PICKER_API.Matches($text)) {
+            $hitCount++
+            $api = $match.Groups[1].Value
+            $line = Get-LineNumber -Text $text -Index $match.Index
+
+            if ($relative -ne $GUARD_FILES.filePicker) {
+                $issues.Add("$relative`:$line 调用 $api（原生 StorageProvider 已禁用，改用 CustomFilePickerDialog）")
+                continue
+            }
+
+            $method = Get-EnclosingMethodName -Text $text -TargetLine $line
+            if ($method -ne $FILE_PICKER_WHITELIST_METHOD) {
+                $issues.Add("$relative`:$line 在 $method 中调用 $api（唯一豁免点是 $FILE_PICKER_WHITELIST_METHOD 的降级通道）")
+                continue
+            }
+            $allowedCount++
+        }
+    }
+
+    return New-GuardResult -Id 'filepicker' -Title '文件选择器入口（规则 16）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            hits    = $hitCount
+            allowed = $allowedCount
+        })
+}
+
+# 规则 8：AppIcons.axaml 定义的图标必须登记到 IconTestViewModel
+function Test-GuardIcons {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $icons = Read-TextFile (Join-Path $RepoRoot $GUARD_FILES.appIcons)
+    $testVm = Read-TextFile (Join-Path $RepoRoot $GUARD_FILES.iconTestVm)
+
+    if ($null -eq $icons -or $null -eq $testVm) {
+        $issues.Add('读不到图标文件（AppIcons.axaml / IconTestViewModel.cs）')
+        return New-GuardResult -Id 'icons' -Title '图标登记（规则 8）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    $defined = @($RE_APP_ICON_KEY.Matches($icons) | ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+    $registered = @($RE_ICON_RESOURCE_REF.Matches($testVm) | ForEach-Object { $_.Value.Trim('"') } | Sort-Object -Unique)
+
+    foreach ($key in $defined) {
+        if ($registered -notcontains $key) {
+            $issues.Add("$key 在 AppIcons.axaml 定义，但 IconTestViewModel.LoadAllIcons() 未登记")
+        }
+    }
+    foreach ($key in $registered) {
+        if ($defined -notcontains $key) {
+            $issues.Add("IconTestViewModel 引用 $key，但 AppIcons.axaml 未定义")
+        }
+    }
+
+    return New-GuardResult -Id 'icons' -Title '图标登记（规则 8）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            definedCount    = $defined.Count
+            registeredCount = $registered.Count
+        })
+}
+
+function Test-Guards {
+    param([string]$RepoRoot, [string]$RelativeLocalizationDir)
+
+    $guards = [System.Collections.Generic.List[object]]::new()
+    $guards.Add((Test-GuardKeyBindings -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardI18nBindings -RepoRoot $RepoRoot -RelativeLocalizationDir $RelativeLocalizationDir))
+    $guards.Add((Test-GuardFilePicker -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardIcons -RepoRoot $RepoRoot))
+
+    $failed = @($guards | Where-Object { -not $_.ok })
+    return [ordered]@{
+        ok          = ($failed.Count -eq 0)
+        guards      = @($guards)
+        failedCount = $failed.Count
+    }
+}
+
+function Format-GuardsResult {
+    param($Result)
+
+    $lines = [System.Collections.Generic.List[string]]::new()
+    $guards = @($Result.guards)
+    $failed = @($guards | Where-Object { -not $_.ok })
+
+    if ($Result.ok) {
+        $lines.Add("✅ 规则守卫全部通过（$($guards.Count) 项）")
+    }
+    else {
+        $lines.Add("❌ 规则守卫发现 $($Result.failedCount) 项失败（共 $($guards.Count) 项）")
+    }
+
+    foreach ($guard in $guards) {
+        $lines.Add('')
+        if ($guard.ok) {
+            $lines.Add("### ✅ $($guard.title)")
+        }
+        else {
+            $lines.Add("### ❌ $($guard.title)")
+            foreach ($issue in $guard.issues) {
+                $lines.Add("- $issue")
+            }
+        }
+    }
+
+    return ($lines -join "`n")
+}
+
+# ---------------------------------------------------------------------------
 # main
 # ---------------------------------------------------------------------------
 
@@ -753,6 +1204,36 @@ switch ($Task) {
     'test' {
         $projectPath = $TARGETS[$Target]
         $result = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'test' -ProjectPath $projectPath -AdditionalArgs $ExtraArgs -BudgetMs $TimeoutMs
+
+        # 只有当「dotnet test 失败、没有任何编译诊断、也没有打印过测试汇总行」时才回退：
+        # 三者同时成立意味着用例一条都没跑起来（testhost 崩溃 / 宿主进程被受限环境拒绝 /
+        # 输出整段为空），而不是源码编译错误（errorCount > 0）或用例真的失败（有汇总行）。
+        # xunit v3 的测试程序集自带 MTP 入口，dotnet exec 直跑不经过 VSTest 宿主，
+        # 因此能绕开这类环境限制；正常环境与 CI 上 dotnet test 直接通过，不会走到这里。
+        if (-not $result.ok -and [int]$result.errorCount -eq 0 -and -not $result.testsReported) {
+            $assembly = Get-TestAssemblyPath -RepoRoot $repoRoot -ProjectPath $projectPath
+            if (-not $assembly) {
+                $build = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'build' -ProjectPath $projectPath -BudgetMs $TimeoutMs
+                if ($build.ok) { $assembly = Get-TestAssemblyPath -RepoRoot $repoRoot -ProjectPath $projectPath }
+            }
+
+            if ($assembly) {
+                $fallback = Invoke-VerifyDotnet -RepoRoot $repoRoot -Action 'test' -ProjectPath $projectPath -ArgvOverride @('exec', $assembly) -BudgetMs $TimeoutMs
+                if ($fallback.ok) {
+                    $fallback.runner = 'mtp'
+                    $fallback.fallbackFrom = 'vstest'
+                    $fallback.primaryExitCode = $result.exitCode
+                    $result = $fallback
+                }
+                else {
+                    $result.mtpFallback = [ordered]@{
+                        exitCode = $fallback.exitCode
+                        tail     = @($fallback.tail)
+                    }
+                }
+            }
+        }
+
         if ($Json) { $result | ConvertTo-Json -Depth 8 } else { Format-BuildResult $result }
         exit ([int](-not $result.ok))
     }
@@ -766,10 +1247,16 @@ switch ($Task) {
         if ($Json) { $result | ConvertTo-Json -Depth 8 } else { Format-VersionResult $result }
         exit ([int](-not $result.ok))
     }
+    'guards' {
+        $result = Test-Guards -RepoRoot $repoRoot -RelativeLocalizationDir $LocalizationDir
+        if ($Json) { $result | ConvertTo-Json -Depth 10 } else { Format-GuardsResult $result }
+        exit ([int](-not $result.ok))
+    }
     'check' {
         $versionResult = Test-VersionConsistency -RepoRoot $repoRoot
         $i18nResult = Test-I18n -RepoRoot $repoRoot -RelativeDir $LocalizationDir
-        $ok = ($versionResult.ok -and $i18nResult.ok)
+        $guardsResult = Test-Guards -RepoRoot $repoRoot -RelativeLocalizationDir $LocalizationDir
+        $ok = ($versionResult.ok -and $i18nResult.ok -and $guardsResult.ok)
 
         if ($Json) {
             [ordered]@{
@@ -777,6 +1264,7 @@ switch ($Task) {
                 checks = @(
                     [ordered]@{ task = 'version'; result = $versionResult }
                     [ordered]@{ task = 'i18n'; result = $i18nResult }
+                    [ordered]@{ task = 'guards'; result = $guardsResult }
                 )
             } | ConvertTo-Json -Depth 10
         }
@@ -784,6 +1272,8 @@ switch ($Task) {
             Format-VersionResult $versionResult
             ''
             Format-I18nResult $i18nResult
+            ''
+            Format-GuardsResult $guardsResult
         }
 
         exit ([int](-not $ok))

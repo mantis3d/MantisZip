@@ -373,6 +373,8 @@ public partial class IconTestViewModel : ObservableObject
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon（取消收藏，FavoriteManagerWindow 删除）");
         Add("资源库", "星标", null, "IconStar", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "星形图标（备用，收藏相关 UI 已改用 Bookmark 系列）");
+        Add("资源库", "HTML", null, "IconHtml", IconStatus.Defined,
+            "Resources/Icons/AppIcons.axaml", "自绘 <> 尖括号图标（tab 图标，设置-预览-HTML）");
 
         // 更新统计
         TotalCount = Icons.Count;

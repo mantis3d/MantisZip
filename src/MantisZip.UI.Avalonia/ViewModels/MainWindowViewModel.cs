@@ -249,7 +249,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders", "Filter_ClearAll",
             "Filter_PickDateFrom", "Filter_PickDateTo", "Filter_PickSizeMin", "Filter_PickSizeMax",
             "Filter_MatchModeSubstring", "Filter_MatchModeWildcard",
-            "Status_Selected", "Status_ArchiveStats",
+            "Status_Selected",
             "Tree_Browse",
             "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified", "DataGrid_Ratio",
             "App_Title",

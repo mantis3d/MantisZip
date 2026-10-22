@@ -9,10 +9,11 @@
  * 这样 DSH / opencode / Reasonix / CI / 人工 shell 共用同一份实现，换 harness
  * 不会丢功能；插件本身不导入任何第三方包，只用 node: 内置模块。
  *
- * 三个工具全部只读：
+ * 四个工具全部只读：
  *   mantiszip_verify   构建/测试并输出紧凑诊断
  *   mantiszip_i18n     三语 key 对齐 + 占位符一致性
  *   mantiszip_version  版本号 6 处一致性
+ *   mantiszip_guards   代码规则守卫（快捷键登记 / i18n 绑定登记 / 文件选择器 / 图标登记）
  *
  * 环境要求：PowerShell 7（pwsh）。可用 MANTISZIP_PWSH 覆盖可执行文件路径。
  */
@@ -259,6 +260,13 @@ async function runScript(root, taskArgs, options) {
 // 工具 1：mantiszip_verify
 // ---------------------------------------------------------------------------
 
+/** 诊断位置：项目级（无文件）/ 文件（无行列号，如 restore 失败）/ 文件(行,列)。 */
+function whereOf(item) {
+  if (!item.file) return '(项目级)'
+  if (item.line === null || item.line === undefined) return item.file
+  return `${item.file}(${item.line},${item.column})`
+}
+
 /** 渲染 mantiszip_verify 的结果文本。 */
 function renderVerify(value) {
   const lines = []
@@ -267,11 +275,14 @@ function renderVerify(value) {
     ? `✅ ${verb}通过：${value.target}（${seconds(value.durationMs)}，${value.warningCount} 警告）`
     : `❌ ${verb}失败：${value.target}（${seconds(value.durationMs)}，${value.errorCount} 错误 / ${value.warningCount} 警告，exit ${value.exitCode}）`)
 
+  if (value.runner === 'mtp') {
+    lines.push('ℹ️ VSTest testhost 不可用，已回退 dotnet exec 直跑测试程序集（xunit MTP）。')
+  }
+
   if (value.errors.length) {
     lines.push('', '错误：')
     for (const item of value.errors) {
-      const where = item.file ? `${item.file}(${item.line},${item.column})` : '(项目级)'
-      lines.push(`- ${where} ${item.code}: ${item.message}`)
+      lines.push(`- ${whereOf(item)} ${item.code}: ${item.message}`)
     }
     if (value.errorCount > value.errors.length) {
       lines.push(`- …已省略 ${value.errorCount - value.errors.length} 条`)
@@ -281,8 +292,7 @@ function renderVerify(value) {
   if (value.warnings.length) {
     lines.push('', '警告：')
     for (const item of value.warnings.slice(0, 10)) {
-      const where = item.file ? `${item.file}(${item.line},${item.column})` : '(项目级)'
-      lines.push(`- ${where} ${item.code}: ${item.message}`)
+      lines.push(`- ${whereOf(item)} ${item.code}: ${item.message}`)
     }
     if (value.warningCount > 10) lines.push(`- …共 ${value.warningCount} 条警告`)
   }
@@ -290,6 +300,11 @@ function renderVerify(value) {
   if (value.timedOut) lines.push('', '⚠️ 构建超时，已强制终止（可调大 timeoutMs 或减少项目范围）。')
   if (value.aborted) lines.push('', '⚠️ 调用被取消。')
   if (value.truncated) lines.push('', '⚠️ 输出过长已截断，诊断可能不完整。')
+
+  if (Array.isArray(value.tail) && value.tail.length) {
+    lines.push('', '输出尾部：')
+    for (const item of value.tail) lines.push(`- ${item}`)
+  }
 
   return lines.join('\n')
 }
@@ -337,6 +352,9 @@ function verifyTool() {
           ok: { type: 'boolean' },
           target: { type: 'string' },
           action: { type: 'string' },
+          runner: { type: 'string' },
+          hostCrashed: { type: 'boolean' },
+          testsReported: { type: 'boolean' },
           exitCode: { type: 'integer' },
           durationMs: { type: 'integer' },
           command: { type: 'string' },
@@ -347,11 +365,15 @@ function verifyTool() {
           aborted: { type: 'boolean' },
           errors: { type: 'array', items: { type: 'object' } },
           warnings: { type: 'array', items: { type: 'object' } },
+          tail: { type: 'array', items: { type: 'string' } },
+          fallbackFrom: { type: 'string' },
+          primaryExitCode: { type: 'integer' },
+          mtpFallback: { type: 'object' },
         },
         required: [
-          'ok', 'target', 'action', 'exitCode', 'durationMs', 'command',
-          'errorCount', 'warningCount', 'truncated', 'timedOut', 'aborted',
-          'errors', 'warnings',
+          'ok', 'target', 'action', 'runner', 'hostCrashed', 'testsReported', 'exitCode',
+          'durationMs', 'command', 'errorCount', 'warningCount', 'truncated', 'timedOut',
+          'aborted', 'errors', 'warnings', 'tail',
         ],
       },
       render: (_args, value) => text(renderVerify(value)),
@@ -552,11 +574,76 @@ function versionTool() {
 }
 
 // ---------------------------------------------------------------------------
+// 工具 4：mantiszip_guards
+// ---------------------------------------------------------------------------
+
+function renderGuards(value) {
+  const guards = Array.isArray(value.guards) ? value.guards : []
+  const lines = []
+  lines.push(value.ok
+    ? `✅ 规则守卫全部通过（${guards.length} 项）`
+    : `❌ 规则守卫失败 ${value.failedCount} 项（共 ${guards.length} 项）`)
+
+  for (const guard of guards) {
+    lines.push('')
+    if (guard.ok) {
+      lines.push(`### ✅ ${guard.title}`)
+      continue
+    }
+    lines.push(`### ❌ ${guard.title}`)
+    const issues = Array.isArray(guard.issues) ? guard.issues : []
+    for (const issue of issues.slice(0, 20)) lines.push(`- ${issue}`)
+    if (issues.length > 20) lines.push(`- …共 ${issues.length} 条`)
+  }
+
+  return lines.join('\n')
+}
+
+function guardsTool() {
+  return {
+    name: 'mantiszip_guards',
+    description:
+      '运行 MantisZip 的代码规则守卫：① 菜单 InputGesture 是否真的登记在 MainWindow.KeyBindings（规则 10.1）'
+      + '② 主窗口 LocalizedStrings 绑定 key 是否登记到 UpdateLocalizedStrings() 且三语齐全（规则 13）'
+      + '③ 是否绕过 CustomFilePickerDialog 直接调原生 StorageProvider（规则 16）'
+      + '④ AppIcons.axaml 图标是否登记到 IconTestViewModel（规则 8）。只读，不会修改任何文件。',
+    parameters: {
+      type: 'object',
+      additionalProperties: false,
+      properties: {
+        root: {
+          type: 'string',
+          description: '仓库根目录；默认取当前工作目录。',
+        },
+      },
+    },
+    output: {
+      schema: {
+        type: 'object',
+        additionalProperties: false,
+        properties: {
+          ok: { type: 'boolean' },
+          failedCount: { type: 'integer' },
+          guards: { type: 'array', items: { type: 'object' } },
+        },
+        required: ['ok', 'failedCount', 'guards'],
+      },
+      render: (_args, value) => text(renderGuards(value)),
+    },
+    timeoutMs: 60 * 1000,
+    async execute(args, exec) {
+      const root = await resolveRoot(args.root)
+      return await runScript(root, ['-Task', 'guards'], { timeoutMs: 60000, signal: exec?.signal })
+    },
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 入口
 // ---------------------------------------------------------------------------
 
 /**
- * 注册三个只读维护工具。
+ * 注册四个只读维护工具。
  * @param {any} ctx Cordis 上下文（需注入 tools 服务）
  * @param {{ root?: string } | undefined} config 部署配置；root 指向仓库绝对路径
  */
@@ -566,4 +653,5 @@ export function apply(ctx, config) {
   ctx.tools.register(verifyTool())
   ctx.tools.register(i18nTool())
   ctx.tools.register(versionTool())
+  ctx.tools.register(guardsTool())
 }
