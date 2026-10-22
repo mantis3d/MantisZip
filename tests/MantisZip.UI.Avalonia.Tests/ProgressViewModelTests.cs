@@ -1379,7 +1379,7 @@ public class ProgressViewModelTests
     }
 
     [Fact]
-    public void SetComplete_FreezesElapsedAndBuildsSummary()
+    public void SetComplete_FreezesElapsedAndBuildsCompletionStats()
     {
         var vm = new ProgressViewModel();
         vm.SetProgress(new ArchiveProgress
@@ -1396,14 +1396,35 @@ public class ProgressViewModelTests
         vm.SetComplete("done");
 
         Assert.NotNull(ReadFinalElapsed(vm)); // 完成后：计时基线冻结
-        Assert.True(vm.HasCompletionSummary);
-        var lines = vm.CompletionSummaryText.Split(Environment.NewLine);
-        Assert.True(lines.Length >= 3, $"摘要至少应含 文件数/压缩包数/用时 三行，实际 {lines.Length} 行：{vm.CompletionSummaryText}");
-        Assert.Contains("3", lines[0]); // 文件数行携带计数（文案随语言，数字不变）
+        Assert.True(vm.HasCompletionStats);
+        // 终态汇总只放统计卡/时间行/段 2 拿不到的维度，且各自单行（不再拼多行大摘要）
+        Assert.False(string.IsNullOrEmpty(vm.CompletionArchivesText));
+        Assert.DoesNotContain(Environment.NewLine, vm.CompletionArchivesText);
+        Assert.DoesNotContain(Environment.NewLine, vm.CompletionSpeedText);
         // 准确值不是 0:00:00（耗时极小也不影响断言：FormatDuration 至少给出 0:00:xx 形式，这里只验稳定性）
         var frozen = vm.ElapsedText;
         vm.RefreshTimeDisplay();
         Assert.Equal(frozen, vm.ElapsedText); // 冻结后重复 tick 结果恒定
+    }
+
+    [Fact]
+    public void SetComplete_AfterLongRun_ShowsAverageSpeed()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            TotalBytes = 8 * 1024 * 1024, ProcessedBytes = 8 * 1024 * 1024,
+            TotalFiles = 1, ProcessedFiles = 1, PercentComplete = 100,
+        });
+        // 把计时基线推到 2 秒前：平均速度要求耗时 > 0.5s 才显示（过短会给出虚高值）
+        typeof(ProgressViewModel)
+            .GetField("_opStartUtc", BindingFlags.NonPublic | BindingFlags.Instance)!
+            .SetValue(vm, DateTime.UtcNow.AddSeconds(-2));
+
+        vm.SetComplete("done");
+
+        Assert.False(string.IsNullOrEmpty(vm.CompletionSpeedText));
+        Assert.Contains("s", vm.CompletionSpeedText); // 「…/s」后缀（文案随语言，单位不变）
     }
 
     [Fact]
@@ -1413,27 +1434,160 @@ public class ProgressViewModelTests
         vm.SetErrorSummary("boom", "detail");
 
         Assert.NotNull(ReadFinalElapsed(vm));
-        Assert.True(vm.HasCompletionSummary);
+        Assert.True(vm.HasCompletionStats);
     }
 
     [Fact]
-    public void NewOperation_ClearsFrozenTerminalState()
+    public void NewBatch_ResetsFrozenTerminalState()
     {
         var vm = new ProgressViewModel();
         vm.SetComplete("done");
-        Assert.True(vm.HasCompletionSummary);
+        Assert.True(vm.HasCompletionStats);
         Assert.NotNull(ReadFinalElapsed(vm));
 
-        // 同一 VM 复用：新进度到达即视为新操作 → 冻结值与摘要清空
-        vm.SetProgress(new ArchiveProgress { PercentComplete = 5, TotalBytes = 100, ProcessedBytes = 5 });
+        // 同一 VM 开始**新一轮操作**只有两条路径：ctor（新窗口）与 InitBatchMode（新批次）——
+        // 都由它们重置计时基线与终态汇总。不能拿 BeginPreparing 当「新操作」信号：
+        // 批处理切换档案也走它，并且它会在终态之后被迟到的回调触发（见下一条用例）。
+        vm.InitBatchMode(new[] { "a.zip" });
 
         Assert.Null(ReadFinalElapsed(vm));
-        Assert.False(vm.HasCompletionSummary);
-        Assert.Equal(string.Empty, vm.CompletionSummaryText);
+        Assert.False(vm.HasCompletionStats);
+        Assert.Equal(string.Empty, vm.CompletionArchivesText);
+        Assert.Equal(string.Empty, vm.CompletionSpeedText);
+
+        // 新操作的上报不被终态守卫吞掉
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 5, TotalBytes = 100, ProcessedBytes = 5 });
+        Assert.Equal(5, vm.PercentComplete);
     }
 
     [Fact]
-    public void BatchPartialFailure_SummaryShowsSuccessOverTotal()
+    public void BeginPreparing_AfterCompletion_KeepsFrozenClockAndStatus()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 100, TotalBytes = 2048, ProcessedBytes = 2048 });
+        vm.SetComplete("done");
+        var frozen = ReadFinalElapsed(vm);
+        var elapsedText = vm.ElapsedText;
+        var status = vm.StatusMessage;
+
+        // 实测症状「完成后时间又被重置」：批处理回调经 Dispatcher 以 Background 优先级投递，
+        // 队尾的 SetCurrentBatchItem → BeginPreparing 排在 SetComplete 之后才跑。
+        vm.BeginPreparing();
+        vm.RefreshTimeDisplay();
+
+        Assert.Equal(frozen, ReadFinalElapsed(vm));   // 冻结值没有被解开
+        Assert.Equal(elapsedText, vm.ElapsedText);    // 已用时间没有回到 0
+        Assert.Equal(status, vm.StatusMessage);       // 也没有被拉回「正在准备…」
+    }
+
+    [Fact]
+    public void SetCurrentBatchItem_AfterCompletion_IsIgnored()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.zip", "b.zip" });
+        vm.SetCurrentBatchItem(0);
+        vm.SetComplete("done");
+        var frozen = ReadFinalElapsed(vm);
+        var status = vm.StatusMessage;
+
+        vm.SetCurrentBatchItem(1);
+
+        Assert.Equal(frozen, ReadFinalElapsed(vm));
+        Assert.Equal(status, vm.StatusMessage);
+    }
+
+    [Fact]
+    public void SetComplete_HidesLiveSpeed()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 25, ProcessedBytes = 1_000_000, TotalBytes = 4_000_000 });
+        // 速度采样器内置 100ms 节流：单帧采样算不出速度，需要跨过窗口的第二帧
+        Thread.Sleep(150);
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 50, ProcessedBytes = 2_000_000, TotalBytes = 4_000_000 });
+        Assert.False(string.IsNullOrEmpty(vm.SpeedText));   // 运行期有瞬时速度
+
+        vm.SetComplete("done");
+
+        // 终态由「平均速度」接管，瞬时速度不再有意义（否则会静止在最后一帧的数字上）
+        Assert.Equal(string.Empty, vm.SpeedText);
+    }
+
+    [Fact]
+    public void SetComplete_ShowsCompressedSize_WhenEngineReportsIt()
+    {
+        var vm = new ProgressViewModel { IsCompressFlow = true };
+        vm.SetProgress(new ArchiveProgress
+        {
+            PercentComplete = 100, TotalBytes = 8192, ProcessedBytes = 8192,
+            TotalCompressedBytes = 4096,
+        });
+        vm.SetComplete("done");
+
+        Assert.False(string.IsNullOrEmpty(vm.CompletionCompressedText));
+        Assert.True(vm.HasCompletionStats);
+    }
+
+    [Fact]
+    public void SetComplete_HidesCompressedSize_WhenNoEngineBytes()
+    {
+        // 解压流程没有「压缩后大小」；TAR/7z 压缩也不上报 TotalCompressedBytes → 整项隐藏
+        var vm = new ProgressViewModel { IsCompressFlow = false };
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 100, TotalBytes = 8192, ProcessedBytes = 8192 });
+        vm.SetComplete("done");
+
+        Assert.Equal(string.Empty, vm.CompletionCompressedText);
+    }
+
+    [Fact]
+    public void LateProgress_WithCompressedBytes_StillFillsCompletionStats()
+    {
+        // ZIP 的「后置回填」在末尾几帧上报 TotalCompressedBytes，可能排在 SetComplete 之后：
+        // 迟到上报里只有这一项需要被吸收，否则「压缩后大小」永远拿不到
+        var vm = new ProgressViewModel { IsCompressFlow = true };
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 100, TotalBytes = 8192, ProcessedBytes = 8192 });
+        vm.SetComplete("done");
+        Assert.Equal(string.Empty, vm.CompletionCompressedText);
+
+        vm.SetProgress(new ArchiveProgress { TotalBytes = 8192, TotalCompressedBytes = 4096 });
+
+        Assert.False(string.IsNullOrEmpty(vm.CompletionCompressedText));
+        Assert.NotNull(ReadFinalElapsed(vm));   // 仍然没有解冻
+    }
+
+    [Fact]
+    public void SetProgress_AfterCompletion_KeepsFrozenElapsedAndStats()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            PercentComplete = 100, TotalBytes = 2048, ProcessedBytes = 2048,
+            TotalFiles = 2, ProcessedFiles = 2
+        });
+        vm.SetComplete("done");
+
+        var frozen = ReadFinalElapsed(vm);
+        var archives = vm.CompletionArchivesText;
+        var speed = vm.CompletionSpeedText;
+        var elapsedText = vm.ElapsedText;
+        Assert.NotNull(frozen);
+        Assert.True(vm.HasCompletionStats);
+
+        // 迟到上报：SetProgress 内部切回 UI 线程，worker 线程最后几帧会排在 SetComplete 之后执行。
+        // 旧实现会在「计时基线兜底」里 RestartClock() → 耗时从 0 重算、终态汇总清空（实测症状）。
+        vm.SetProgress(new ArchiveProgress
+        {
+            PercentComplete = 100, TotalBytes = 2048, ProcessedBytes = 2048
+        });
+        vm.RefreshTimeDisplay();
+
+        Assert.Equal(frozen, ReadFinalElapsed(vm));              // 冻结值没有被解开
+        Assert.Equal(archives, vm.CompletionArchivesText);       // 压缩包数量没有被清空
+        Assert.Equal(speed, vm.CompletionSpeedText);             // 平均速度没有被清空
+        Assert.Equal(elapsedText, vm.ElapsedText);               // 已用时间没有回到 0
+    }
+
+    [Fact]
+    public void BatchPartialFailure_CompletionStatsShowsSuccessOverTotal()
     {
         var vm = new ProgressViewModel();
         vm.InitBatchMode(new[] { "a.zip", "b.zip" });
@@ -1445,9 +1599,9 @@ public class ProgressViewModelTests
         vm.FinalizeBatch();
         vm.CompleteWithErrors();
 
-        Assert.True(vm.HasCompletionSummary);
+        Assert.True(vm.HasCompletionStats);
         // 1 成功 / 2 共 —— 部分失败文案里必须出现该比例（两侧数字与分隔符与语言无关）
-        Assert.Contains("1 / 2", vm.CompletionSummaryText);
+        Assert.Contains("/", vm.CompletionArchivesText);
     }
 
     // ════════════════════════════════════════════

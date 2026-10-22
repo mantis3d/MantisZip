@@ -6,6 +6,23 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-22** — 修复：完成后计时仍被重置（迟到批次回调）；终态隐藏瞬时速度；新增「压缩后大小」
+  - **症状**（用户第二轮实测）：① 压缩完成后「已用时间」不是停住，而是又归零重算（上一轮修好的是 `SetProgress` 迟到上报那条路径，还有第二条）；② 完成后瞬时速度僵在最后一帧；③ 希望补上「压缩后大小」。
+  - **根因（竞态，非漏写）**：批处理回调 `SetCurrentBatchItem` 经 `Dispatcher.UIThread.Post(..., DispatcherPriority.Background)` 投递，而终态 `SetComplete` 由操作闭包在 UI 线程**直接**执行（Normal 优先级）⇒ 队尾那条 `SetCurrentBatchItem` 一定排在冻结之后才跑。它会调用 `BeginPreparing()`，而上一轮我把「新操作」语义放在这里（`if (_finalElapsed != null) RestartClock()`），于是刚冻结的耗时被打回 0、终态统计被清空。**任何「以 BeginPreparing 当新操作信号」的写法都不成立**：这条路径在终态之后本来就会到达。
+  - **修法**：① `BeginPreparing()` 删掉重置，并在终态后直接 `return`（既不解冻，也不把状态行拉回「正在准备…」）；② 「新操作」重置只保留 `ctor` / `InitBatchMode`（并注释说明为什么不能挂在 `BeginPreparing` 上）；③ `SetCurrentBatchItem` 终态后整体丢弃；④ `SetProgress` 的终态分支只吸收 `TotalCompressedBytes`（ZIP 的「后置回填」也在末尾几帧上报，全丢就拿不到压缩后大小），其余照旧丢弃；⑤ `FreezeCompletion()` 清空 `SpeedText` —— 瞬时速度只在运行期有意义，终态由平均速度接管（段 2 的 ⚡ 与中档单行的速度随之隐藏）；⑥ 新增 `CompletionCompressedText` + 三语 key `Progress_Summary_CompressedSize`（解压与非 ZIP 压缩不上报该字节 → 整项隐藏），段 3 统计卡与中档单行各显示一项，状态行复制按钮一并复制；⑦ 顺带删掉因此不再使用的 6 个旧摘要 key（`Progress_Summary_Files/Sep/Elapsed/Ratio/Original/Output`）。
+  - **测试**：`NewOperation_ClearsFrozenTerminalState` 改名 `NewBatch_ResetsFrozenTerminalState`（改用 `InitBatchMode` 宣告新操作）；新增 `BeginPreparing_AfterCompletion_KeepsFrozenClockAndStatus`、`SetCurrentBatchItem_AfterCompletion_IsIgnored`、`SetComplete_HidesLiveSpeed`（速度采样器 100ms 节流，需跨窗口两帧才有速度）、`SetComplete_ShowsCompressedSize_WhenEngineReportsIt`、`SetComplete_HidesCompressedSize_WhenNoEngineBytes`、`LateProgress_WithCompressedBytes_StillFillsCompletionStats`。
+  - **验证**：`-Task i18n` 1294 key 三语一致；`-Task build -Target avalonia` 0 警告；`-Task test -Target ui-tests` 全绿（394 例）。
+  - **发布说明**：并入 v0.5.3 既有条目措辞（「瞬时速度让位于平均速度」「ZIP 压缩显示压缩后大小」），不另立「修复」条目（功能与本轮修复同属未发布的 0.5.3）。
+
+**2026-10-22** — 修复：进度窗口完成后计时器「从 0 重置」且终态统计摘要消失
+  - **症状**（用户实测 0.5.3 beta 构建）：操作完成后「已用时间」不是停表，而是归零重新计时；状态行下方的完成摘要也不出现。用户怀疑是 alpha→beta 合并导致。
+  - **合并无辜**：`ProgressWindow.axaml` 的终态统计块与 `ProgressWindow.axaml.cs` 的复制拼接都完好，`FreezeCompletion()` / `RefreshTimeDisplay()` 冻结分支也在。问题出在**我自己**写的守卫条件上。
+  - **根因**：`ProgressViewModel.SetProgress` 的「计时基线兜底」写成了 `if (_opStartUtc == default || _finalElapsed != null) RestartClock();`，而 `RestartClock()` 一次做三件事：`_opStartUtc = DateTime.UtcNow`、`_finalElapsed = null`、清空终态统计文本。`SetProgress` 是「Safe to call from any thread」→ 内部切回 UI 线程，worker 线程最后几帧上报会排在 `SetComplete` / `SetErrorSummary` / `Cancel` **之后**执行 ⇒ 终态刚冻结就被这条迟到上报解开：耗时归零重算 + 统计清空。两个症状同源。
+  - **修法**：① `SetProgress` 开头加终态守卫 `if (_finalElapsed != null) return;` —— 终态黏滞，迟到上报整体丢弃（也不再回写 100% 的主进度）；② 兜底条件回归 `if (_opStartUtc == default) RestartClock();`，并注释「绝不能带 `_finalElapsed != null`」防止下次被当成冗余加回去；③ 「新操作」改由 `BeginPreparing()` 宣告：仅当上一轮已终结（`_finalElapsed != null`）才 `RestartClock()`，批处理中途切换档案时 `_finalElapsed` 为 null 故不重置，整批仍共用一个计时基线。
+  - **测试**：`NewOperation_ClearsFrozenTerminalState` 改用 `BeginPreparing()` 当新操作信号（原用例把错误语义写死了）；新增 `SetProgress_AfterCompletion_KeepsFrozenElapsedAndSummary`（模拟迟到上报后断言冻结值、终态统计、已用时间三者都不变）。红绿实证：只 stash 掉 ViewModel 修复重跑，两条用例 2/2 失败；恢复后 2/2 通过。
+  - **验证**：`-Task build -Target avalonia` 0 警告；`-Task i18n` 1299 key 三语一致；`-Task test -Target ui-tests` 全绿。
+  - **发布说明**：停表与终态摘要是本版本（0.5.3）新增能力、缺陷也在本版本内修掉，按规则 18 不进 `RELEASE_NOTES.md`（没有用户拿到过带该缺陷的发布版）。
+
 **2026-10-22** — CI 门禁覆盖 beta + 明确三分支角色（用户拍板）
   - **背景**：本轮全部工作（启动优化三阶段 / 打开压缩包闪退修复 / 进度条与目录条修复 / 「数据条」改名）都在 `beta` 上，而 `ci.yml` 的触发分支只有 `[main, alpha]` → 推送 beta 根本不跑门禁（alpha 上一批加 `alpha` 时就是因为同一类问题被补上的）。
   - **改动**：`.github/workflows/ci.yml` 的 `push` / `pull_request` 触发分支改为 `[main, alpha, beta]`。
@@ -68,9 +85,9 @@
   - **面板标签记忆**：`AppSettings.PickerSourceTab`（存 `PathTab` 名称，空串=默认）+ `PickerRememberTab`（默认 `true`）；`Controls/QuickPathControl.axaml.cs` 增 `public static PathTab ParseTabOrDefault(string? value)`（空/未知/越界 → `PathTab.Favorites`，与旧行为一致）；`Dialogs/CustomFilePickerDialog` 打开时还原、关闭时**仅在「记住」模式**回写标签（固定模式下不回写，否则策略会被静默降级成记住）。
   - **设置页新增「路径」tab**：`Settings_Tab_Path`；把「默认路径优先级」整块从「高级」搬入，并在下方加「文件选择器面板标签」块（勾选框 `PickerRememberTab` + 仅在未勾选时可见的 `PickerTabOptions` 下拉，按规则 6 用 `IsVisible` 而非 `IsEnabled`）。ComboBox 沿用 `Option` + `ItemTemplate{Display}` 范式。
   - **完成后不再计时**：`ProgressViewModel` 增 `_finalElapsed`；`SetComplete` / `SetErrorSummary` / `Cancel` 三条终态路径统一调 `FreezeCompletion()`（幂等，多次调用只认首次），`RefreshTimeDisplay()` 命中冻结值后直接返回 → code-behind 的每秒 tick 不再让「已用时间」增长。
-  - **终态统计摘要**：`BuildCompletionSummary()` 逐行拼接「文件数（有跳过/出错才追加该片段）/ 压缩包数（批量部分失败显示「成功 n / 共 m」）/ 用时 / 平均速度 / 体积或压缩率」，数据不可得的行整行省略（不出「—」占位）；渲染在状态行下方新增 `CompletionSummaryText`（`IsVisible="{Binding HasCompletionSummary}"`，空串整块隐藏）；状态行复制按钮改为「状态文案 + 摘要」一并复制，便于抓日志。批量字节累计靠 `SetCurrentBatchItem` 在切换档案时把 `_currentArchiveBytes` 结算进 `_finishedArchiveBytes`（放在 Pending 守卫之后，避免同一档案重复计入）。
-  - **i18n**：三语新增 11 个 `Progress_Summary_*`（含 `_Sep` 分隔符）+ 5 个 `Settings_Tab_Path` / `Settings_PickerTab_*`。
-  - **测试**：`ProgressViewModelTests.cs` 新增 4 例（完成后冻结+摘要至少三行、失败同样冻结、新操作清空终态、批量部分失败摘要出现 `1 / 2`）；新增 `QuickPathTabPersistenceTests.cs`（`ParseTabOrDefault` 12 例）与 `SettingsPickerTabOptionsTests.cs`（下拉 4 项与默认值）。
+  - **终态统计并入信息区**（用户实测后改版）：最初是状态行下方另起一块多行摘要（`CompletionSummaryText`），用户实测反馈「跟 StatsCardsPanel 里显示的内容有重叠」，改为不再另立区块、直接扩展现有信息区——完整密度档在 `StatsCardsPanel` 末尾新增「压缩包数量 / 平均速度」两张卡（段 3，`IsVisible="{Binding HasCompletionStats}"`），中档在单行末尾追加同两项（中档没有卡片），段 2 的通道元信息同时补上实时速度块（`HasLiveSpeed`）。只补统计卡、时间行、通道元信息拿不到的维度——文件数、用时、体积/压缩率已被它们覆盖，终态不再复写。VM 侧 `HasCompletionSummary`/`CompletionSummaryText` 随之更名为 `HasCompletionStats`/`CompletionArchivesText` + `CompletionSpeedText`，`BuildCompletionSummary()` 收窄为 `BuildCompletionArchivesText()`（非批次恒 1；批次部分失败显示「成功 n / 共 m」）；Row 4 恢复为单行状态行，窗口不再因终态额外长高。批量字节累计靠 `SetCurrentBatchItem` 在切换档案时把 `_currentArchiveBytes` 结算进 `_finishedArchiveBytes`（放在 Pending 守卫之后，避免同一档案重复计入）；状态行复制按钮改为「状态文案 + 终态统计」一并复制，便于抓日志。
+  - **i18n**：终态只保留 5 个 `Progress_Summary_*`（`_ArchivesCreated` / `_ArchivesCreatedPartial` / `_ArchivesExtracted` / `_ArchivesExtractedPartial` / `_AvgSpeed`），原 `_Files` / `_Sep` / `_Elapsed` / `_Ratio` / `_Original` / `_Output` 随多行摘要一起删除（避免死键）；另有 5 个 `Settings_Tab_Path` / `Settings_PickerTab_*`。
+  - **测试**：`ProgressViewModelTests.cs` 新增 6 例（完成后冻结 + 终态统计非空、耗时 >0.5s 时出现平均速度、失败同样冻结、新操作清空终态、迟到上报不覆盖冻结值与统计、批量部分失败统计出现比例）；XAML 级 `ProgressWindow_TerminalStats_AppearInInfoArea` 断言中档两项初始隐藏、终态可见，且旧的多行摘要块已移除；另有 `QuickPathTabPersistenceTests.cs`（`ParseTabOrDefault` 12 例）与 `SettingsPickerTabOptionsTests.cs`（下拉 4 项与默认值）。
   - **验证**：`-Task i18n`（1292 key 一致）、`-Task build -Target avalonia`（0 警告）、`-Task test -Target ui-tests` 全绿。
   - **发布说明**：按用户要求写入 `RELEASE_NOTES.md` 的 v0.5.3「交互」节，两条（面板标签可记住/可固定、进度窗口停表 + 终态统计），措辞按「本版本改进」而非「修复」——这两项都是本周期新增能力，上一版本用户拿不到带缺陷的版本。
   - **zh-TW 分卷术语修正**：`strings.zh-TW.json:373-374` 原「分磁碟區大小」/「不分磁碟區」属概念错位——「磁碟區」是硬碟分割（disk volume），压缩档的 volume 是「卷／分割檔」。按用户选定改为「分割檔大小」/「不分割」（对齐 WinRAR 繁中「切成分割檔，大小」），并同步统一 `Settings_AdaptiveOverrides_MtWarning`（:29）与 `AdaptiveHelp_Markdown`（:1307）说明文字里的「分卷」→「分割檔」。简中/英文不动。

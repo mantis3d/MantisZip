@@ -57,24 +57,40 @@ public class ProgressWindowXamlTests
     }
 
     /// <summary>
-    /// 终态摘要块（issue #46）：初始空串 → 整块隐藏；VM 进入终态后填充文本 → 绑定驱动可见。
-    /// 同时证明新增块没有破坏 7 行布局。
+    /// 终态汇总（issue #46）：不再有独立的多行摘要块，改为「压缩包数量 / 平均速度」并入信息区——
+    /// 完整档进统计卡、中档进单行。初始为空串 → 按规则 6 隐藏；进入终态后绑定驱动可见。
+    /// 同时证明 Row 4 已恢复为单行状态行、7 行布局未变。
     /// </summary>
     [AvaloniaFact]
-    public void ProgressWindow_CompletionSummary_HiddenUntilTerminal()
+    public void ProgressWindow_TerminalStats_AppearInInfoArea()
     {
         var window = new ProgressWindow("test");
         window.Show();
 
-        var block = window.FindControl<TextBlock>("CompletionSummaryText");
-        Assert.NotNull(block);
-        Assert.False(block!.IsVisible); // 未终态：空串 → 按规则 6 隐藏
+        var archives = window.FindControl<TextBlock>("MediumCompletionArchives");
+        var speed = window.FindControl<TextBlock>("MediumCompletionSpeed");
+        var compressed = window.FindControl<TextBlock>("MediumCompletionCompressed");
+        Assert.NotNull(archives);
+        Assert.NotNull(speed);
+        Assert.NotNull(compressed);
+        Assert.False(archives!.IsVisible); // 未终态：空串 → 隐藏
+        Assert.False(speed!.IsVisible);
+        Assert.False(compressed!.IsVisible);
+
+        // 旧的多行摘要块应已移除（避免「卡片已有 + 底部又列一遍」的重复）
+        Assert.Null(window.FindControl<TextBlock>("CompletionSummaryText"));
 
         var vm = Assert.IsType<ProgressViewModel>(window.DataContext);
+        vm.SetProgress(new ArchiveProgress
+        {
+            PercentComplete = 100, TotalBytes = 4096, ProcessedBytes = 4096,
+            TotalFiles = 1, ProcessedFiles = 1
+        });
         vm.SetComplete("done");
 
-        Assert.True(block.IsVisible); // 绑定 HasCompletionSummary 生效
-        Assert.False(string.IsNullOrWhiteSpace(block.Text));
+        Assert.True(archives.IsVisible); // 压缩包数量行：恒有
+        Assert.False(string.IsNullOrWhiteSpace(archives.Text));
+        Assert.False(compressed.IsVisible); // 未上报压缩后字节 → 该项隐藏
 
         window.Close();
     }

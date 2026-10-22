@@ -776,10 +776,26 @@
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource ThemeProgressFillBrush}"/>
               </StackPanel>
-              <!-- 分隔符（仅并行与压缩汇总都在时显示） -->
+              <!-- 分隔符（并行度与右侧任一元信息都在时显示） -->
               <TextBlock Text="·" FontSize="11"
                          VerticalAlignment="Center"
                          IsVisible="{Binding ShowChannelMetaSeparator}"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+              <!-- 实时速度（EMA 平滑；2026-10-22 补：「完整」档此前没有任何速度显示，只有中档单行有） -->
+              <StackPanel Orientation="Horizontal"
+                          Spacing="{DynamicResource SpacingXxs}"
+                          IsVisible="{Binding HasLiveSpeed}">
+                <TextBlock Text="⚡" FontSize="14"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+                <TextBlock Text="{Binding SpeedText}" FontSize="13" FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+              </StackPanel>
+              <!-- 分隔符（速度与压缩汇总都在时显示） -->
+              <TextBlock Text="·" FontSize="11"
+                         VerticalAlignment="Center"
+                         IsVisible="{Binding ShowSpeedMetaSeparator}"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
               <!-- 整体压缩汇总（仅 ZIP 压缩完成后显示；格式 A：输出大小 (率%)） -->
               <StackPanel Orientation="Horizontal"
@@ -794,6 +810,49 @@
                 <TextBlock Text="{Binding OverallCompressionText}" FontSize="13" FontWeight="SemiBold"
                            VerticalAlignment="Center"
                            Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+              </StackPanel>
+            </StackPanel>
+
+            <!-- 段 3：终态汇总（完成/失败/取消后才出现，规则 6 整行隐藏）。
+                 只放统计卡 / 时间行 / 段 2 拿不到的维度：压缩包数量 + 平均速度。
+                 文件数看卡 1、用时看时间行、体积与压缩率看段 2 —— 刻意不重复（用户实测反馈重叠）。 -->
+            <StackPanel Orientation="Horizontal"
+                        Spacing="{DynamicResource SpacingLg}"
+                        HorizontalAlignment="Center"
+                        Margin="0,8,0,0"
+                        IsVisible="{Binding HasCompletionStats}">
+              <!-- 压缩包数量（生成 N 个 / 解压 N 个；批量有失败时显示 成功/总数） -->
+              <StackPanel Orientation="Horizontal"
+                          Spacing="{DynamicResource SpacingXxs}"
+                          IsVisible="{Binding CompletionArchivesText, Converter={StaticResource StringNotEmpty}}">
+                <TextBlock Text="📦" FontSize="14"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                <TextBlock Text="{Binding CompletionArchivesText}" FontSize="13" FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+              </StackPanel>
+              <!-- 平均速度（终态总字节 / 实际耗时；耗时过短或字节未知时整项隐藏） -->
+              <StackPanel Orientation="Horizontal"
+                          Spacing="{DynamicResource SpacingXxs}"
+                          IsVisible="{Binding CompletionSpeedText, Converter={StaticResource StringNotEmpty}}">
+                <TextBlock Text="⚡" FontSize="14"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+                <TextBlock Text="{Binding CompletionSpeedText}" FontSize="13" FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+              </StackPanel>
+              <!-- 压缩后大小（仅 ZIP 压缩能后置回填 TotalCompressedBytes；其它引擎整项隐藏） -->
+              <StackPanel Orientation="Horizontal"
+                          Spacing="{DynamicResource SpacingXxs}"
+                          IsVisible="{Binding CompletionCompressedText, Converter={StaticResource StringNotEmpty}}">
+                <TextBlock Text="📉" FontSize="14"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                <TextBlock Text="{Binding CompletionCompressedText}" FontSize="13" FontWeight="SemiBold"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
               </StackPanel>
             </StackPanel>
 
@@ -838,6 +897,25 @@
                        VerticalAlignment="Center"
                        Foreground="{DynamicResource ThemeProgressFillBrush}"/>
           </StackPanel>
+          <!-- 终态汇总（「中」档没有统计卡，所以压缩包数量/平均速度在这里补上；终态才出现） -->
+          <TextBlock x:Name="MediumCompletionArchives"
+                     Text="{Binding CompletionArchivesText}"
+                     IsVisible="{Binding CompletionArchivesText, Converter={StaticResource StringNotEmpty}}"
+                     FontSize="12" FontWeight="SemiBold"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+          <TextBlock x:Name="MediumCompletionSpeed"
+                     Text="{Binding CompletionSpeedText}"
+                     IsVisible="{Binding CompletionSpeedText, Converter={StaticResource StringNotEmpty}}"
+                     FontSize="12" FontWeight="SemiBold"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+          <TextBlock x:Name="MediumCompletionCompressed"
+                     Text="{Binding CompletionCompressedText}"
+                     IsVisible="{Binding CompletionCompressedText, Converter={StaticResource StringNotEmpty}}"
+                     FontSize="12" FontWeight="SemiBold"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
         </StackPanel>
 
         <!-- 总体进度标签行：左批次档案序号（"N / M"，非批次为空）+ 右总体百分比 -->
@@ -890,9 +968,8 @@
     </Border>
 
     <!-- ═══ Row 4: 状态行（左侧状态图标 + 可复制只读文本框，20px；位于信息区之后、错误摘要/按钮行之前）
-         竖直两段：上 = 状态图标 + 状态文本 + 复制按钮；下 = 完成摘要（终态才出现，见 HasCompletionSummary）═══ -->
-    <StackPanel Grid.Row="4" Spacing="{DynamicResource SpacingXxs}">
-    <Grid ColumnDefinitions="Auto,*,Auto">
+         终态统计不在这里 —— 已并入信息区（完整档段 3 / 中档单行末尾），避免与统计卡重复显示 ═══ -->
+    <Grid Grid.Row="4" ColumnDefinitions="Auto,*,Auto">
       <!-- 状态图标：始终存在，随 StatusKind 变化（准备/进行/暂停/完成/失败/取消） -->
       <PathIcon Grid.Column="0"
                 Data="{Binding StatusIconKey, Converter={StaticResource GeometryResource}}"
@@ -929,18 +1006,6 @@
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
     </Grid>
-
-      <!-- 完成摘要（终态冻结后填充；空串时整块隐藏，不占布局 —— 规则 6）。
-           每行一个维度：文件数 / 压缩包数 / 用时 / 平均速度 / 体积(或压缩率)。左缩进对齐状态文本（20+8）。 -->
-      <TextBlock x:Name="CompletionSummaryText"
-                 Text="{Binding CompletionSummaryText}"
-                 IsVisible="{Binding HasCompletionSummary}"
-                 Margin="28,0,0,0"
-                 TextWrapping="Wrap"
-                 FontSize="12"
-                 LineHeight="18"
-                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-    </StackPanel>
 
     <!-- ═══ Row 5: 错误摘要（红段=失败 + 黄段=带原因跳过；两段独立显隐；复制按钮聚合两段）═══ -->
     <Grid Grid.Row="5" ColumnDefinitions="*,Auto">
