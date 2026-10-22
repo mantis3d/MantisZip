@@ -41,6 +41,20 @@
   - **负向验证**：临时夹具（假 `MantisZip.sln` + 两份不同版本号 + 缺文件 + 缺/多/重复 key + 占位符错位）跑 `-Task check` 返回 exit 1 并逐条报出，排除「永远绿」的假门禁。
   - **环境限制（非缺陷）**：DSH workspace-write 沙箱下 `dotnet build` 写 `obj/` 报 `MSB3491 … Access to the path … is denied`，Node 起带管道的子进程报 `spawn EPERM`；脚本/插件在完全权限或 CI 上正常，README 已记录两种现象与绕过方式。
   - **后续**：CI 接线（`-Task check` + 装 7-Zip 放开 `SevenZipEngine` 过滤）与第 4 层工具（`hygiene` / `docs` / `installer`）不在本期。
+**2026-10-22** — 修复「视图 → 进度条」开关按下不刷新（迁移遗留 bug）
+  - **现象**：用户实测发现「视图」菜单下「进度条」开关按下后界面不刷新（进度条不出现/不消失）。
+  - **根因调查**：
+    - `ToggleProgressBars()` 只做三件事：翻转 `ShowProgressBars`、写设置、给 `CurrentEntries` 逐条设 `item.ProgressBarEnabled`。
+    - 但 `ProgressBarEnabled` 在 Avalonia 视图里**无人绑定**（死属性）→ 写了没人读。
+    - 进度条的实际显示由**比例值**决定：4 个列的 `Rectangle.Width` 绑定 `MultiBinding(SizeRatio/CompressedSizeRatio/DateRatio/RatioBarValue × 列宽)`。
+    - 比例值只在 `PopulateEntries` 里、且 `ShowProgressBars == true` 时经 `ComputeProgressBarRatios()` 计算 → **切换开关不重算、也不清零** → 显示不变（关闭后旧比例仍在，条依旧显示；开启后比例为 0，条不出现）。
+  - **WPF 参考实现**（`git show 98ca7d42^:src/MantisZip.UI/MainWindow/MainWindow.xaml` / `MainWindow.Menu.cs`）：`ToggleProgressBars_Click` 在保存设置后调用 `FilterFiles(_currentFolder)` **重填当前目录** → 条目重建、比例按新状态归零/重算；WPF 模板本身也**没有** `ProgressBarEnabled` 的显隐绑定（条靠比例值 0 隐藏）→ Avalonia 版缺的是「重填/重算」这一步。
+  - **修复**（`MainWindowViewModel` + `MainWindowViewModel.Navigation.cs`）：
+    - 新增 `ClearProgressBarRatios()`：把 `SizeRatio` / `CompressedSizeRatio` / `DateRatio` / `RatioBarValue` 全清零（→ Rectangle 宽度 0 → 条隐藏）
+    - `ToggleProgressBars()`：开启 → `ComputeProgressBarRatios()`（重算 → 条显示）；关闭 → `ClearProgressBarRatios()`；并同步每条的 `ProgressBarEnabled`
+    - **保留当前条目与选中项**（不重建集合）—— 比 WPF 的重填体验更好，且避免闪烁
+  - **测试**：`ProgressBarToggleTests` 1 条（真实临时 zip：开启时比例 > 0 → 关闭时四项比例全为 0 → 再开启时比例重算 > 0），已红/绿实证。
+  - **顺带发现（同族遗留，暂未修）**：模型里 `SizeBarBrushKey` / `CompressedSizeBarBrushKey` / `RatioBarBrushKey` / `DateBarBrushKey` 四个属性**同样无人使用** → 「目录基线」开关的**目录条着色**在 Avalonia 版未生效（WPF 用 `Style`+`DataTrigger` 按 `UseDirProgressColor` 切 `ProgressBarSizeDirBg` 等，迁移时丢成硬编码 `Fill="{DynamicResource ProgressBarSizeBrush}"`）。
 **2026-10-22** — 启动优化阶段 3：菜单子项延迟加载（XamlSpan −40ms，另有 TestMenu 分离 −18.7ms）
   - **先实测**：临时把 `<Menu>` 子项全删（只留 5 个空顶级菜单）发布对比 → 菜单子项总成本 **≈44ms**（XamlSpan 239.7→195.9ms，6 轮交错）。
   - **3a TestMenu 分离（−18.7ms）**：原先内联在 `MainWindow.axaml` 的 28 个诊断子项，Release 构建虽 `IsVisible=false`（`AppConstants.ShowTestMenu` 是**编译期常量** false）但**仍被实例化** → 抽出 `Controls/Menus/TestMenuView.axaml`（UserControl，Content = 该 MenuItem），`TestWindow_Click` 随之迁入（dialog owner 改用 `TopLevel.GetTopLevel(this)`），`MainWindow` 仅在 `#if DEBUG` 创建并挂入（同时消除 CS0162 不可达告警）。测量：XamlSpan **238.4 → 219.7ms（−18.7ms，6/6 轮胜）**。

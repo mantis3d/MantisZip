@@ -1276,7 +1276,18 @@ public partial class MainWindowViewModel : ObservableObject
         ShowProgressBars = !ShowProgressBars;
         _appSettings.ShowProgressBars = ShowProgressBars;
         SaveSetting(s => s.ShowProgressBars = ShowProgressBars);
-        // Update ProgressBarEnabled on all current items
+
+        // 刷新进度条显示：开启 → 重算比例；关闭 → 比例清零。
+        // 进度条 Rectangle 的宽度绑定这些比例（SizeRatio / CompressedSizeRatio /
+        // DateRatio / RatioBarValue）→ 归零即隐藏、重算即显示。
+        // 等价 WPF 版 ToggleProgressBars_Click 里的 FilterFiles(_currentFolder)
+        // （重填条目 → 比例归零/重算），但这里保留当前条目与选中项，不重建集合。
+        if (ShowProgressBars)
+            ComputeProgressBarRatios();
+        else
+            ClearProgressBarRatios();
+
+        // 同步每个条目的进度条开关（与 PopulateEntries 中的赋值保持一致）
         foreach (var item in CurrentEntries)
         {
             item.ProgressBarEnabled = ShowProgressBars;
