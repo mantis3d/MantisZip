@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-23** — 计划归档同步：PLAN 已完成条目移出 + 索引补齐 + 两份计划归位（纯 `.md`，无代码变更）
+  - **触发**（用户 m00001）：「看看 PLAN.md 里面提到的计划，完成情况与文档记录是否符合，已完成的按规则处理」。逐条核对 PLAN.md 的 21 行条目 → 6 行已完成的仍留在「待实现设计方案」、1 行文档链接指向 `未开始/`（死链）、1 行计划已完成但仍挂在「进行中」。
+  - **PLAN.md**：删除 6 行已完成条目（Avalonia UI 功能补齐、进度窗口状态行、启动优化二期 theme trace、启动优化三期 AppSettings 缓存、原生 Win32 Splash、原生图标 DLL）；Office 图片预览 / result-preview-panel ①② 三行改写为「已完成计划内的遗留子项」；文本预览语法高亮行的 `✅` 改为「计划文档已重写，代码尚未实施」（实测 csproj 无 AvaloniaEdit/TextMate）；新增 P2 行指向移回未开始的 unify-file-filter-data。
+  - **PROGRESS.md【历史设计方案索引】**：补 8 行（startup-ui-lazy-loading / startup-native-splash / startup-theme-dedup-trace / startup-appsettings-cache / avalonia-ui-feature-parity / html-preview-webview-fallback / Avalonia 移植 Phase 0–9 合并行 / Office 行补「图片预览子项未实施」），并修复两条失效相对路径（`../.omo/...`、`../进行中/...`）→ 索引 101 行 0 死链。
+  - **计划文件归位**：`startup-ui-lazy-loading.md` 进行中 → 已完成（头部改 ✅ 并补「完成结论」：三阶段累计 XamlSpan −155~−195 ms，产物 MainFilterBar / ArchiveContentView / Menus/*MenuItems / Menus/TestMenuView）；`unify-file-filter-data.md` 已完成 → 未开始（头部仍是「📋 新计划｜设计中」，实际 `SearchFilters` 仍在用 → 属 WPF 期产物，按规则 11 需转 Avalonia 后实施）。
+  - **核实口径**：完成度判断不采信计划文档自述，一律「PLAN.md 说明列 + PROGRESS 里程碑 + 代码实证」三源交叉（计划正文头部普遍没有可机读的状态字段）。
+  - **第二轮：进行中计划核查**（用户 m00178）：6 份全部核对，无一份完全完成——`adaptive-compress-ui-convergence` 11/14（剩 Task 12/13 系用户 10-21 拍板暂缓）、`floating-preview-panel` 4/13（Phase 1/3 未做，全仓无 Floating/Docking 文件）、`new-format-support` 仅 tar.gz 可压缩（`ArchiveFormatValues = ["zip","7z","tar.gz"]`，Phase 2–6 未做）、`preview-extended-formats` 3.5/6、`preview-modular-providers` 1/4（`ITableDataProvider` 零消费者且计划仍是 WPF 架构）、`text-fallback-encoding-policy` Phase 1 完成 / Phase 2 待决策。结论：进行中状态与实际一致，无虚报完成；仅 PLAN.md 对 new-format-support 的措辞偏乐观（待后续修正）。
+  - **验证**：`pwsh -File scripts\verify-repo.ps1 -Task check` 全过（版本 6 处 0.5.3 / 三语 1294 key / 4 项规则守卫）。
+  - **发布说明**：纯文档归档，无用户可见变化 → `RELEASE_NOTES.md` 不更新（规则 18）。
+
 **2026-10-22** — 修复：压缩设置对话框的「文件冲突策略」等执行侧设置不生效（拷贝清单漂移）
   - **症状**（用户 m00576）：「压缩窗口的文件冲突选项似乎不起作用」。复现形态：在对话框里选「自动重命名 / 覆盖 / 跳过」，点开始后仍然弹「目标文件 xxx.zip 已存在」，必须再选一次。
   - **排查与被排除的假设**：① 下拉→VM 绑定（无头 `[AvaloniaFact]` 实测 `SelectedIndex=skip` 后 `vm.ConflictAction=="skip"`，正常）；② `CompressSettingsViewModel.ConflictAction` ↔ `SelectedConflictActionOption` 双向同步（`partial void OnXxxChanged`，正常）；③ `CompressFlow.MapDefaultConflictAction` 的四种映射（overwrite/rename/skip/add，正常）；④ `CompressService` 的 ResolveConflict / CanAdd 分支（`CanAdd` 决定 add 是否可用，正常）；⑤ 用户日志 `%LOCALAPPDATA%\MantisZip\debug.log` 里同一路径出现过 `conflict resolution for …: Overwrite` / `Rename` —— 说明 Core 侧映射本身没问题，问题只可能出在「对话框 VM → 执行 VM」之间。
@@ -177,13 +187,13 @@
   - **测试**：新增 MainArchiveContentLazyLoadTests 3 条（默认不创建 / 加载后创建且只创建一次 / 视图含 FileListGrid+PreviewPanelHost+FolderTreeBorder+DragAddOverlay）。
   - **测量**（A/B 交错 8 轮 × 3 次，基线 = HEAD `4d2b6417` 的 worktree 发布）：**XamlSpan −68 ~ −108ms**（338.7→230.7 / 300.4→232.6 / 335.4→258.9ms）；末次 CtorSpan 419.5→323.9ms（−95.6ms）、WinSpan 860.8→795.5ms（−65.3ms）；InitDone 持平（收益全部来自内容区不再膨胀）。TOTAL 噪声大（1450–1900ms 波动）→ 以 XamlSpan 为准。
   - **验证**：Release 构建 0 警告 0 错误；UI 全量通过（verify-repo -Task test -Target ui-tests ok=true）；`dotnet format analyzers --verify-no-changes --severity warn` exit 0；`-Task check` 全过（版本 6 处 0.5.3 / 三语 1276 key / 4 项规则守卫）。
-  - **后续**：阶段 3（菜单子项 ~170 元素）待做；**每阶段完成后停下由用户手动验证**（目录树 / 文件列表 / 列头菜单 / 排序 / 预览面板位置 / 拖拽添加覆层 / 分栏拖拽 / 列宽持久化）；计划 .omo/plans/进行中/startup-ui-lazy-loading.md。
+  - **后续**：阶段 3（菜单子项 ~170 元素）待做；**每阶段完成后停下由用户手动验证**（目录树 / 文件列表 / 列头菜单 / 排序 / 预览面板位置 / 拖拽添加覆层 / 分栏拖拽 / 列宽持久化）；计划 .omo/plans/已完成/startup-ui-lazy-loading.md（已归档）。
 **2026-10-21** — 启动优化阶段 1：过滤栏延迟加载（XamlSpan −27ms）
   - **依据**：MainWindow.axaml 1393 行 / 485 元素，启动时**默认隐藏**的过滤栏（50 元素）与内容区（171 元素）合计 46% 白白膨胀；校准：预览面板延迟（297 元素）历史上整体启动 −9% ⇒ ≈0.4–0.5ms/元素。
   - **实现**：过滤栏抽出为 Controls/MainFilterBar.axaml + MainFilterBar.axaml.cs（搬入 4 个 picker 处理器与 WritePickerTrace）；NullableLongConverter 局部资源随之迁入；MainWindow.axaml Row2 改为 <ContentControl x:Name="FilterBarHost" />，由 MainWindow.EnsureFilterBar() 在 IsFilterBarVisible 首次为 true 时创建（参照 EnsurePreviewPanel 先例）；新文件根节点显式 x:CompileBindings="False"（Avalonia 12 默认编译绑定，抽出后必须显式声明）。
   - **测量**：Win.Xaml 段 **363.2 → 335.8ms（−27ms，8 轮中位）**；TOTAL 1653.7 → 1533.2ms（本机噪声较大，以 XamlSpan 为准）。
   - **测试**：新增 MainFilterBarLazyLoadTests 2 条（默认不创建 / 显示时创建且只创建一次）；UI 全量 **344 通过 / 3 跳过 / 0 失败**。
-  - **后续**：内容区（171 元素，16 个 x:Name）与菜单子项（~170 元素）分阶段推进，**每阶段完成后停下由用户手动验证**；计划 .omo/plans/进行中/startup-ui-lazy-loading.md。
+  - **后续**：内容区（171 元素，16 个 x:Name）与菜单子项（~170 元素）分阶段推进，**每阶段完成后停下由用户手动验证**；计划 .omo/plans/已完成/startup-ui-lazy-loading.md（已归档）。
 **2026-10-21** — 修复菜单快捷键失效 + 新增常用快捷键（用户要求）
   - **根因（Avalonia 官方文档实证）**：MenuItem.InputGesture **只显示**快捷键文字、**不处理按键**（"Setting this property does not cause the input gesture to be handled by the menu item, it simply displays the gesture text in the menu"，Avalonia 12.1.2 Avalonia.Controls.xml）。项目此前**全仓无** KeyBindings/InputBindings → 菜单上标注的 5 个快捷键（Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5）**一直是只显示不生效**。
   - **实现**：Views/MainWindow.axaml.cs 新增 RegisterKeyBindings(MainWindowViewModel vm) —— 命令实例直绑到 MainWindow.KeyBindings（Avalonia 12 的 API 名是 KeyBindings，11 版的 InputBindings 已移除；KeyBinding 非 Control，无 DataContext，故不能用 {Binding}）。headless 探针实证 KeyBindings **确实处理按键**（executed=1）。
