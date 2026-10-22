@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-21  
+**最后更新**: 2026-10-22  
 **当前版本**: 0.5.3
 
 ---
@@ -15,6 +15,7 @@
 
 | 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
 |--------|------|----------|:----:|:--------:|------|
+| **P2** | 插件生态（.mp 市场 + 宿主安装器/运行时） | [plugin-ecosystem.md](.omo/plans/未开始/plugin-ecosystem.md) | 🔴高 | 44-64h | 📋 待拍板（2026-10-22）：Publisher 产包/校验已独立实现（47+8 测试通过），宿主侧安装/加载/市场为 0；待定：`MantisZip.PluginKit` 是否并入主仓、插件跑子进程还是宿主内、市场索引静态 JSON 还是 VPS |
 | **P1** | Win11 一级右键菜单 | [win11-first-level-menu.md](.omo/plans/未开始/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
 | **P1** | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读解锁） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | 🟡中 | 11-16h | 🟡 部分完成（2026-08-20 核实）：Core 侧 TAR 裸格式 / GZip 单文件压缩与文件关联已就绪；UI 压缩格式下拉尚未放开。后续按序增加 BZip2 → XZ → Zstd → Brotli，并解锁 7z.dll 只读格式（详见计划文档） |
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
