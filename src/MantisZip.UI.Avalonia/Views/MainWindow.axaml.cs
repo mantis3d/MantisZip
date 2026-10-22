@@ -66,6 +66,12 @@ public partial class MainWindow : Window
     /// <summary>过滤栏是否已创建（延迟加载：默认隐藏时不在启动路径实例化）</summary>
     private bool _filterBarCreated;
 
+    /// <summary>四个顶级菜单的子项是否已创建（延迟加载：首次交互时创建）</summary>
+    private bool _fileMenuItemsCreated;
+    private bool _editMenuItemsCreated;
+    private bool _viewMenuItemsCreated;
+    private bool _toolsMenuItemsCreated;
+
     /// <summary>压缩包内容区是否已创建（延迟加载：2026-10-21 启动优化）</summary>
     private bool _archiveContentCreated;
 
@@ -88,9 +94,6 @@ public partial class MainWindow : Window
             Interval = TimeSpan.FromMilliseconds(100)
         };
         _dragAddOverlayTimer.Tick += OnDragAddOverlayTimerTick;
-
-        // 测试菜单仅 Debug 构建显示（Release 自动隐藏）
-        TestMenu.IsVisible = AppConstants.ShowTestMenu;
 
         // 窗口图标：从嵌入资源加载（与 WPF 版 Icon="/Resources/App.ico" 一致）
         try
@@ -160,6 +163,29 @@ public partial class MainWindow : Window
             await dialog.ShowDialog<bool>(this);
         };
         DataContext = vm;
+
+        // 菜单子项延迟创建（2026-10-22 启动优化阶段 3）：
+        // 文件/编辑/视图/工具四个顶级菜单的子项（共 25 项 + 图标）已抽到
+        // Controls/Menus/*MenuItems.axaml → 启动路径不再实例化这批元素。
+        // 触发时机：鼠标悬停到该顶级菜单（PointerEnteredItem，提前构建，点击时已就绪）
+        // 或键盘展开时（SubmenuOpened 兜底）。
+        HookLazyMenu(FileMenuItem, EnsureFileMenuItems);
+        HookLazyMenu(EditMenuItem, EnsureEditMenuItems);
+        HookLazyMenu(ViewMenuItem, EnsureViewMenuItems);
+        HookLazyMenu(ToolsMenuItem, EnsureToolsMenuItems);
+
+        // 测试菜单：Debug 构建显示，Release 自动隐藏。
+        // 2026-10-22 启动优化阶段 3：整块菜单（含 28 个子项与图标）已抽到
+        // Controls/Menus/TestMenuView.axaml → Release 构建**完全不加载**这批元素
+        // （原先即使菜单不可见也会被实例化，白付启动成本）。
+        // 用 #if DEBUG 包裹：Release 下连这段代码都不编译（避免 CS0162 不可达告警）。
+#if DEBUG
+        if (AppConstants.ShowTestMenu)
+        {
+            var testMenuView = new Controls.Menus.TestMenuView { DataContext = vm };
+            MainMenu.Items.Add(testMenuView.CreateMenuItem());
+        }
+#endif
 
         // 全局快捷键（唯一事实源）：MenuItem.InputGesture 只负责「在菜单里显示」快捷键文字
         // （Avalonia 官方文档：Setting this property does not cause the input gesture to be handled
@@ -1153,6 +1179,71 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// 菜单子项延迟创建（2026-10-22 启动优化阶段 3）。
+    ///
+    /// 顶级菜单项常驻（用户一眼能看到「文件/编辑/视图/工具」），其**子项**改为首次交互时才创建：
+    /// ① <c>PointerEnteredItem</c>：鼠标悬停到该顶级菜单时预构建（点击展开时已就绪，无空白帧）；
+    /// ② <c>SubmenuOpened</c>：键盘展开时兜底构建。
+    ///
+    /// 子项来自独立的 <c>StackPanel</c> 视图（<c>Controls/Menus/*MenuItems.axaml</c>），
+    /// 创建后把其 <c>Children</c> 搬进顶级 <see cref="MenuItem"/> 的 <c>Items</c>。
+    /// </summary>
+    private void HookLazyMenu(MenuItem menuItem, Action ensure)
+    {
+        if (menuItem == null) return;
+        menuItem.PointerEnteredItem += (_, _) => ensure();
+        menuItem.SubmenuOpened += (_, _) => ensure();
+    }
+
+    /// <summary>把子项视图的子元素搬进目标菜单项（幂等：只搬一次）。</summary>
+    private static void AttachMenuItems(MenuItem menuItem, Panel view, object? dataContext)
+    {
+        foreach (var child in view.Children.ToList())
+        {
+            view.Children.Remove(child);
+            // 显式绑定 DataContext：脱离原父级后继承链会断（菜单项从菜单树继承 VM）
+            child.DataContext = dataContext;
+            menuItem.Items.Add(child);
+        }
+    }
+
+    /// <summary>文件菜单子项：首次交互时创建并挂入。</summary>
+    internal void EnsureFileMenuItems()
+    {
+        if (_fileMenuItemsCreated) return;
+        _fileMenuItemsCreated = true;
+        var view = new Controls.Menus.FileMenuItems { DataContext = DataContext };
+        AttachMenuItems(FileMenuItem, view, DataContext);
+    }
+
+    /// <summary>编辑菜单子项：首次交互时创建并挂入。</summary>
+    internal void EnsureEditMenuItems()
+    {
+        if (_editMenuItemsCreated) return;
+        _editMenuItemsCreated = true;
+        var view = new Controls.Menus.EditMenuItems { DataContext = DataContext };
+        AttachMenuItems(EditMenuItem, view, DataContext);
+    }
+
+    /// <summary>视图菜单子项：首次交互时创建并挂入。</summary>
+    internal void EnsureViewMenuItems()
+    {
+        if (_viewMenuItemsCreated) return;
+        _viewMenuItemsCreated = true;
+        var view = new Controls.Menus.ViewMenuItems { DataContext = DataContext };
+        AttachMenuItems(ViewMenuItem, view, DataContext);
+    }
+
+    /// <summary>工具菜单子项：首次交互时创建并挂入。</summary>
+    internal void EnsureToolsMenuItems()
+    {
+        if (_toolsMenuItemsCreated) return;
+        _toolsMenuItemsCreated = true;
+        var view = new Controls.Menus.ToolsMenuItems { DataContext = DataContext };
+        AttachMenuItems(ToolsMenuItem, view, DataContext);
+    }
+
+    /// <summary>
     /// 过滤栏延迟创建：过滤栏默认隐藏，其 ~50 个元素的 XAML 膨胀
     /// 在启动路径上毫无意义 → 改为首次显示（<c>IsFilterBarVisible = true</c>）时才实例化
     /// <see cref="Controls.MainFilterBar"/> 并放入宿主 <c>FilterBarHost</c>。
@@ -1423,62 +1514,6 @@ public partial class MainWindow : Window
             {
                 vm.OpenRecentFileCommand.Execute(filePath);
             }
-        }
-    }
-
-    private async void TestWindow_Click(object? sender, RoutedEventArgs e)
-    {
-        if (sender is not MenuItem mi || mi.Tag is not string tag)
-            return;
-
-        // AppMessageBox uses static Show() — handle separately
-        if (tag == "AppMessageBox")
-        {
-            await AppMessageBox.Show("这是一个测试消息框\n可用于测试消息弹窗的显示效果。",
-                "测试", MessageBoxButton.OKCancel, MessageBoxImage.Information, this);
-            return;
-        }
-
-        Window? window = tag switch
-        {
-            "IconTestWindow" => new Dialogs.IconTestWindow(),
-            "UiTestWindow" => new Views.UiTestWindow(),
-            "AboutWindow" => new AboutWindow(),
-            "SettingsWindow" => new Views.SettingsWindow(),
-            "PasswordManagerWindow" => new PasswordManagerWindow(),
-            "DonationDialog" => new DonationDialog(),
-            "LogPrivacyHelpDialog" => new HelpDialog(
-                LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Title"),
-                new MarkdownHelpContent(LocalizationManager.T("LogPrivacyHelp_Markdown")),
-                LocalizationManager.T("Settings_Debug_LogPrivacyHelp_Close"))
-            { Width = 520, Height = 500 },
-            "PasswordHelpDialog" => new HelpDialog(
-                LocalizationManager.T("PwdHelp_Title"),
-                new MarkdownHelpContent(LocalizationManager.T("PasswordHelp_Markdown")),
-                LocalizationManager.T("PwdHelp_Close"))
-            { Width = 560, Height = 500 },
-            "CommentDialog" => new CommentDialog(),
-            "PasswordEditDialog" => new PasswordEditDialog(),
-            "PasswordDialog" => new PasswordDialog("test.7z"),
-            "ProgressWindow" => new ProgressWindow("测试进度窗口"),
-            "ErrorDialog" => new ErrorDialog(new FileErrorInfo { FilePath = @"C:\test\test.zip", ErrorMessage = "这是一个测试错误信息\n可用于测试错误对话框的显示效果。" }),
-            "CompressSettingsWindow" => new CompressSettingsWindow(),
-            "ExtractSettingsWindow" => new ExtractSettingsWindow(),
-            "CompressConflictDialog" => new CompressConflictDialog(@"C:\test\file.txt", "file.txt"),
-            "ConflictDialog" => new ConflictDialog(new FileConflictInfo { FilePath = @"C:\existing\file.txt" }),
-            "MatchedPasswordDialog" => new MatchedPasswordDialog(new PasswordEntry { Description = "测试密码", Patterns = { "*.zip" }, Password = "test123" }, "test.zip"),
-            "ElevationDialog" => new ElevationDialog(new[] { @"C:\Protected\Dir" }),
-            "ElevationFailedDialog" => new ElevationFailedDialog(new[] { @"C:\Protected\Dir" }),
-            "ElevationInfoDialog" => new ElevationInfoDialog(new[] { @"C:\Protected\Dir" }),
-            "AddFavoriteDialog" => new AddFavoriteDialog(),
-            "FavoriteManagerWindow" => new FavoriteManagerWindow(),
-            "ArchiveCommentDialog" => new ArchiveCommentDialog(@"C:\test.zip", ArchiveFormat.Zip, "测试注释"),
-            _ => null
-        };
-
-        if (window != null)
-        {
-            await window.ShowDialog(this);
         }
     }
 

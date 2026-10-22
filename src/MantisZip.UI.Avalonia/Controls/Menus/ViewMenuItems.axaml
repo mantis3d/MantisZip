@@ -1,0 +1,96 @@
+<StackPanel xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+             x:Class="MantisZip.UI.Avalonia.Controls.Menus.ViewMenuItems"
+             x:DataType="vm:MainWindowViewModel">
+
+  <!-- 视图菜单子项：主题 / 进度条 / 目录基线 / 预览面板 / 信息面板 / 保存布局
+       2026-10-22 启动优化阶段 3：自 MainWindow.axaml 抽出为独立视图，**首次展开该菜单时才创建**
+       （顶级菜单项常驻，子项不在启动路径实例化）。
+       ⚠️ 随迁局部资源：{StaticResource} 的查找作用域只到本视图 → 本文件用到的
+       转换器必须声明在自己的 <StackPanel.Resources> 里（否则运行时 KeyNotFoundException）。 -->
+  <StackPanel.Resources>
+    <conv:BoolToToggleBgBrushConverter x:Key="BoolToToggleBgBrushConverter" />
+  </StackPanel.Resources>
+
+  <!-- 切换主题：亮色/暗色/跟随系统 -->
+  <MenuItem Command="{Binding ToggleThemeCommand}"
+            Header="{Binding LocalizedStrings[Menu_ToggleTheme]}">
+    <MenuItem.Icon>
+      <Border Classes="ToggleIconBox"
+              Background="{Binding IsDarkTheme, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+        <PathIcon Data="{StaticResource IconMoon}" Width="10" Height="10"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Border>
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
+  <!-- 切换进度条显示：文件列表中的压缩比进度条 -->
+  <MenuItem Command="{Binding ToggleProgressBarsCommand}"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_ProgressBars]}">
+    <MenuItem.Icon>
+      <Border Classes="ToggleIconBox"
+              Background="{Binding ShowProgressBars, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+        <PathIcon Data="{StaticResource IconDataBarVertical}" Width="10" Height="10"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Border>
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 目录大小基线：目录行大小基于子树还是当前层 -->
+  <MenuItem Command="{Binding ToggleSepDirBaselineCommand}"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_SepDirBaseline]}">
+    <MenuItem.Icon>
+      <Border Classes="ToggleIconBox"
+              Background="{Binding SeparateDirBaseline, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+        <PathIcon Data="{StaticResource IconFolder}" Width="10" Height="10"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Border>
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
+  <!-- 切换预览面板显示/隐藏 -->
+  <MenuItem Command="{Binding TogglePreviewCommand}" InputGesture="Ctrl+P"
+            Header="{Binding LocalizedStrings[Menu_ShowPreviewPanel]}">
+    <MenuItem.Icon>
+      <Border Classes="ToggleIconBox"
+              Background="{Binding IsPreviewVisible, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+        <PathIcon Data="{StaticResource IconEye}" Width="10" Height="10"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Border>
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 切换信息面板显示/隐藏（预览区域右侧/下方的元数据面板） -->
+  <MenuItem Command="{Binding ToggleInfoPanelVisibilityCommand}" InputGesture="Ctrl+Shift+I"
+            Header="{Binding LocalizedStrings[Menu_ShowInfoPanel]}">
+    <MenuItem.Icon>
+      <Border Classes="ToggleIconBox"
+              Background="{Binding Preview.ShowInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+        <PathIcon Data="{StaticResource IconPanelRight}" Width="10" Height="10"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Border>
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 切换信息面板方向：右侧/下方 -->
+  <MenuItem Command="{Binding ToggleInfoPanelOrientationCommand}"
+            Header="{Binding LocalizedStrings[Menu_InfoPanelOrientation]}">
+    <MenuItem.Icon>
+      <Border Classes="ToggleIconBox"
+              Background="{Binding Preview.IsHorizontalInfoPanel, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+        <PathIcon Data="{StaticResource IconOrientation}" Width="10" Height="10"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Border>
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
+  <!-- 保存当前布局（窗口大小、分割器位置等） -->
+  <MenuItem Command="{Binding SaveLayoutCommand}"
+            Header="{Binding LocalizedStrings[Menu_SaveLayout]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconSave}" Width="14" Height="14"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+</StackPanel>

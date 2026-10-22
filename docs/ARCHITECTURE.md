@@ -465,8 +465,16 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 |---|---|---|---|
 | 过滤栏 | `FilterBarHost` | `IsFilterBarVisible` 首次为 true | ~50 |
 | 压缩包内容区 | `ArchiveContentHost` | `IsArchiveLoaded` 首次为 true | ~153 |
-| 预览面板 | `PreviewPanelHost` | 首帧后 0.5s 预取 / `PreviewPanelNeeded` 兜底 | ~297 |
-| 菜单子项 | — | 首次展开时构建（阶段 3 待做） | ~170 |
+| 预览面板 | `PreviewPanelHost` | 内容区创建后 / 首帧后 0.5s 预取 / `PreviewPanelNeeded` 兜底 | ~297 |
+| 菜单子项 | —（顶级菜单项常驻） | 悬停 `PointerEnteredItem` 预构建 / `SubmenuOpened` 兜底 | ~100 |
+| 诊断菜单（TestMenu） | — | 仅 `#if DEBUG` 创建（Release 完全不加载） | ~100 |
+
+**菜单子项延迟的特殊约定**：
+
+- 顶级菜单项留在 `MainWindow.axaml`（用户一眼能看到），其子项抽到 `Controls/Menus/*MenuItems.axaml`（根 `StackPanel` + `x:Class` → `Children` 可枚举，便于搬运）
+- `AttachMenuItems()` 把视图 `Children` 搬进 `MenuItem.Items`，**必须显式设 `DataContext`**（控件脱离原父级后继承链断裂，否则绑定全失效）
+- XAML 事件处理器（如 `RecentFileMenuItem_Click`）必须**随视图迁入**——XAML 事件在声明它的类中解析
+- 顶级菜单项的 `Header` 绑定仍留在 `MainWindow.axaml`（顶级项本身未搬走）
 
 **约定**：
 

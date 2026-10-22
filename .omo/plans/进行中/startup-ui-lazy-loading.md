@@ -10,7 +10,7 @@
 |---|---|---|---|---|
 | **1** | **过滤栏延迟**（默认隐藏）→ 抽 `Controls/MainFilterBar.axaml` + `EnsureFilterBar()` | 50 | 20–25ms | ✅ 完成（XamlSpan 363.2 → 335.8ms，−27ms） |
 | **2** | **内容区延迟**（`ArchiveContentGrid` 默认隐藏：目录树 / 文件列表 DataGrid / 地址栏 / 列头） | 171 | 70–90ms | ✅ 完成（XamlSpan 338.7 → 230.7ms，**−108ms**） |
-| **3** | **菜单子项延迟**（顶级菜单常驻，子项首次展开时构建） | ~170 | 60–80ms | ⏳ 待做（快捷键已迁到 `MainWindow.KeyBindings`，无风险） |
+| **3** | **菜单子项延迟**（顶级菜单常驻，子项首次展开时构建） | ~170 | 60–80ms | ✅ 完成（XamlSpan −40ms；另含 TestMenu 分离 −18.7ms） |
 
 预计合计 **150–195ms**（当前 TOTAL ~1500ms 的 10–13%）。
 
@@ -47,8 +47,27 @@
 - **测量**（A/B 交错 8 轮 × 3 次，基线 = HEAD `4d2b6417` 的 worktree 发布）：**XamlSpan 338.7→230.7 / 300.4→232.6 / 335.4→258.9ms（−68 ~ −108ms）**；末次 CtorSpan 419.5→323.9ms（−95.6ms）、WinSpan 860.8→795.5ms（−65.3ms）；InitDone 持平（收益全部来自内容区不再膨胀）
 - **验证**：UI 全量通过（`verify-repo.ps1 -Task test -Target ui-tests` ok=true）；`dotnet format analyzers` exit 0；`-Task check` 全过
 
-## 阶段 3 注意事项（菜单子项）
+## 阶段 3 实施记录（2026-10-22）
 
-- 菜单子项 ~170 元素：顶级菜单（文件/编辑/视图/工具/帮助）常驻，**子项**在首次展开时构建
-- 需注意 `MenuItem` 的 `Icon` / `InputGesture` 展示与 `SubmenuItems` 的动态挂载
-- 快捷键已迁到 `MainWindow.KeyBindings`（规则 10.1）→ 子项延迟不影响快捷键生效
+- **先实测再动手**：临时把 `<Menu>` 子项全删（只留 5 个空顶级菜单）发布对比 → 菜单子项总成本 **≈44ms**（XamlSpan 239.7→195.9ms，6 轮交错）
+- **3a. TestMenu 分离**（诊断菜单，Release 白建 28 项）：
+  - 原先内联在 `MainWindow.axaml` 的 `<Menu>` 里，Release 构建虽 `IsVisible=false`（`AppConstants.ShowTestMenu` 为编译期常量 false），**28 个子项与图标仍被实例化**
+  - 抽出 `Controls/Menus/TestMenuView.axaml`（UserControl，Content = 该 MenuItem）+ `TestWindow_Click` 随之迁入（owner 改用 `TopLevel.GetTopLevel(this)`）
+  - `MainWindow` 仅在 `#if DEBUG` 时创建并挂入菜单 → Release **完全不加载**这批元素（也消除了 CS0162 不可达告警）
+  - 测量：XamlSpan **238.4 → 219.7ms（−18.7ms，6/6 轮胜）**
+- **3b. 四个顶级菜单子项懒加载**（文件/编辑/视图/工具，共 25 项 + 图标）：
+  - 各自抽出 `Controls/Menus/{File,Edit,View,Tools}MenuItems.axaml`（根 `StackPanel` + `x:Class`，可枚举 `Children` 便于搬运）
+  - `MainWindow` 里对应顶级 `MenuItem` 变为空壳（`x:Name`）+ `HookLazyMenu(menuItem, ensure)`：挂 `PointerEnteredItem`（悬停预构建，点击时已就绪）+ `SubmenuOpened`（键盘展开兜底）
+  - `AttachMenuItems()` 把视图 `Children` 搬进 `MenuItem.Items`，并**显式设 `DataContext`**（脱离原父级后继承链会断）
+  - `RecentFileMenuItem_Click` 随文件菜单视图迁入（XAML 事件处理器必须在声明它的类中）
+  - **局部资源随迁**：`ViewMenuItems` 用到的 `BoolToToggleBgBrushConverter` 原声明在 `MainWindow.Window.Resources` → 一并搬进该视图的 `<StackPanel.Resources>`，并从 `MainWindow.Resources` 移除（守卫测试已能抓住这类遗漏，见阶段 2 教训）
+  - 测量：XamlSpan **276.5 → 236.5ms（−40ms，6/6 轮胜；该轮机器整体变慢，InitDone 537→680，用同轮相对值比较）**
+- **测试**：`MainMenuLazyLoadTests` 3 条（默认不创建 / 幂等 / 搬运后 DataContext 仍是 VM）；守卫测试扩展 `MenuViews_ReferencedStaticResources_AreResolvable`（4 个菜单视图的 StaticResource 可解析性，红/绿实证）
+- **GUI 冒烟**：`--open <zip>` 启动 → GBK 文件名包 / AES 加密包均进程存活、标题正确、事件日志无 `.NET Runtime 1026`
+- **累计（相对计划起点 `4d2b6417`）**：XamlSpan 约 **−155 ~ −195ms**（阶段 1 −27 / 阶段 2 −68~−108 / 3a −18.7 / 3b −40）
+
+## 后续（阶段 3 之后）
+
+- **自包含体积优化**：R2R 已占 +4.3MB（FD 188.6→192.9 / SC 265.3→269.6MB），需与体积目标一并平衡
+- **分支合并**：用户指示「先把当前计划完成再合并分支」；阶段 3 完成后计划即收尾 → 可进入合并
+- **v0.5.3 打 tag**：尚未打 tag，RELEASE_NOTES 已含启动优化条目

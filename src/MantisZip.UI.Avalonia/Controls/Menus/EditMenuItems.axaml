@@ -1,0 +1,89 @@
+<StackPanel xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+             x:Class="MantisZip.UI.Avalonia.Controls.Menus.EditMenuItems"
+             x:DataType="vm:MainWindowViewModel">
+
+  <!-- 编辑菜单子项：解压 / 原地解压 / 解压到同名文件夹 / 智能解压 / 添加 / 删除 / 测试 / 注释 / 新建
+       2026-10-22 启动优化阶段 3：自 MainWindow.axaml 抽出为独立视图，**首次展开该菜单时才创建**
+       （顶级菜单项常驻，子项不在启动路径实例化）。
+       ⚠️ 随迁局部资源：{StaticResource} 的查找作用域只到本视图 → 本文件用到的
+       转换器必须声明在自己的 <StackPanel.Resources> 里（否则运行时 KeyNotFoundException）。 -->
+  <!-- 解压到...：弹出解压设置对话框，选择目标路径和选项 -->
+  <MenuItem Command="{Binding ExtractArchiveCommand}" InputGesture="Ctrl+E"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_ExtractArchive]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconExport}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 解压到此处：直接解压到压缩包所在目录 -->
+  <MenuItem Command="{Binding ExtractArchiveHereCommand}" InputGesture="Ctrl+Shift+E"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_ExtractHere]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconPin}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 解压到（压缩包名）：解压到以压缩包名命名的子文件夹 -->
+  <MenuItem Command="{Binding ExtractArchiveToNameCommand}" InputGesture="Ctrl+Shift+T"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_ExtractToName]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 智能解压：自动判断是否有公共根目录，决定解压方式 -->
+  <MenuItem Command="{Binding SmartExtractCommand}"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_SmartExtract]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconWand}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
+  <!-- 添加文件到压缩包 -->
+  <MenuItem Command="{Binding AddFilesCommand}" InputGesture="Ctrl+Shift+A"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_AddFiles]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 从压缩包删除文件 -->
+  <MenuItem Command="{Binding DeleteFilesCommand}"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_DeleteFiles]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconDismiss}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
+  <!-- 测试压缩包完整性 -->
+  <MenuItem Command="{Binding TestArchiveCommand}" InputGesture="Ctrl+T"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_TestArchive]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconCheckmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
+  <!-- 编辑压缩包注释（仅 ZIP 支持） -->
+  <MenuItem Command="{Binding EditCommentCommand}"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_ArchiveComment]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
+  <!-- 新建压缩包：打开压缩设置窗口 -->
+  <MenuItem Command="{Binding NewArchiveCommand}" InputGesture="Ctrl+N"
+            Header="{Binding LocalizedStrings[Menu_NewArchive]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconNewFile}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+
+</StackPanel>

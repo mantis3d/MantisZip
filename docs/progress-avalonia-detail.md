@@ -41,6 +41,19 @@
   - **负向验证**：临时夹具（假 `MantisZip.sln` + 两份不同版本号 + 缺文件 + 缺/多/重复 key + 占位符错位）跑 `-Task check` 返回 exit 1 并逐条报出，排除「永远绿」的假门禁。
   - **环境限制（非缺陷）**：DSH workspace-write 沙箱下 `dotnet build` 写 `obj/` 报 `MSB3491 … Access to the path … is denied`，Node 起带管道的子进程报 `spawn EPERM`；脚本/插件在完全权限或 CI 上正常，README 已记录两种现象与绕过方式。
   - **后续**：CI 接线（`-Task check` + 装 7-Zip 放开 `SevenZipEngine` 过滤）与第 4 层工具（`hygiene` / `docs` / `installer`）不在本期。
+**2026-10-22** — 启动优化阶段 3：菜单子项延迟加载（XamlSpan −40ms，另有 TestMenu 分离 −18.7ms）
+  - **先实测**：临时把 `<Menu>` 子项全删（只留 5 个空顶级菜单）发布对比 → 菜单子项总成本 **≈44ms**（XamlSpan 239.7→195.9ms，6 轮交错）。
+  - **3a TestMenu 分离（−18.7ms）**：原先内联在 `MainWindow.axaml` 的 28 个诊断子项，Release 构建虽 `IsVisible=false`（`AppConstants.ShowTestMenu` 是**编译期常量** false）但**仍被实例化** → 抽出 `Controls/Menus/TestMenuView.axaml`（UserControl，Content = 该 MenuItem），`TestWindow_Click` 随之迁入（dialog owner 改用 `TopLevel.GetTopLevel(this)`），`MainWindow` 仅在 `#if DEBUG` 创建并挂入（同时消除 CS0162 不可达告警）。测量：XamlSpan **238.4 → 219.7ms（−18.7ms，6/6 轮胜）**。
+  - **3b 四个顶级菜单子项懒加载（−40ms）**：
+    - 文件/编辑/视图/工具共 25 项各自抽出 `Controls/Menus/{File,Edit,View,Tools}MenuItems.axaml`（根 `StackPanel` + `x:Class` → 可枚举 `Children` 便于搬运）
+    - `MainWindow` 里对应顶级 `MenuItem` 变空壳（`x:Name`）+ `HookLazyMenu(menuItem, ensure)`：挂 `PointerEnteredItem`（鼠标悬停预构建，点击展开时已就绪、无空白帧）+ `SubmenuOpened`（键盘展开兜底）
+    - `AttachMenuItems()` 把视图 `Children` 搬进 `MenuItem.Items`，并**显式设 `DataContext`**（脱离原父级后继承链断裂，否则菜单项绑定全失效）
+    - `RecentFileMenuItem_Click` 随文件菜单视图迁入（XAML 事件处理器必须在声明它的类中）
+    - **局部资源随迁**：`ViewMenuItems` 用到的 `BoolToToggleBgBrushConverter` 原声明在 `MainWindow.Window.Resources` → 搬进该视图 `<StackPanel.Resources>`，并从 `MainWindow.Resources` 移除（阶段 2 教训的直接应用）
+    - 测量：XamlSpan **276.5 → 236.5ms（−40ms，6/6 轮胜；该轮机器整体变慢，InitDone 537→680，用同轮相对值比较）**
+  - **测试**：`MainMenuLazyLoadTests` 3 条（默认不创建 / 幂等 / 搬运后 DataContext 仍是 VM）；守卫测试扩展 `MenuViews_ReferencedStaticResources_AreResolvable`（4 个菜单视图的 StaticResource 可解析性，已红/绿实证：移除 `BoolToToggleBgBrushConverter` → 守卫报错）。
+  - **GUI 冒烟**：`--open <zip>` 启动 → GBK 文件名包 / AES 加密包均进程存活、标题正确、事件日志无 `.NET Runtime 1026`。
+  - **累计（相对计划起点 `4d2b6417`）**：XamlSpan 约 **−155 ~ −195ms**（阶段 1 −27 / 阶段 2 −68~−108 / 3a −18.7 / 3b −40）。
 **2026-10-22** — 修复「打开压缩包即闪退」：拆出内容区漏搬窗口局部静态资源
   - **现象**：用户反馈打开压缩包瞬间闪退；应用无异常日志（GUI 子系统无 stderr）→ 查 **Windows 事件日志** `.NET Runtime / 1026`（未处理异常）拿到完整堆栈。
   - **堆栈**：`KeyNotFoundException: Static resource 'RatioToWidthConverter' not found` → `StaticResourceExtension.ProvideValue` → `ArchiveContentView.XamlClosure_2.Build_3`（ArchiveContentView.axaml:327）→ `DataGridTemplateColumn.GenerateElement` → `DataGrid.PopulateCellContent` → `DataGrid.GenerateRow`（**渲染首行**时才构建 CellTemplate）。

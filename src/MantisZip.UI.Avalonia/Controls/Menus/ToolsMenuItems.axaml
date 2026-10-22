@@ -1,0 +1,35 @@
+<StackPanel xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+             x:Class="MantisZip.UI.Avalonia.Controls.Menus.ToolsMenuItems"
+             x:DataType="vm:MainWindowViewModel">
+
+  <!-- 工具菜单子项：密码管理器 / 收藏管理器 / 设置
+       2026-10-22 启动优化阶段 3：自 MainWindow.axaml 抽出为独立视图，**首次展开该菜单时才创建**
+       （顶级菜单项常驻，子项不在启动路径实例化）。
+       ⚠️ 随迁局部资源：{StaticResource} 的查找作用域只到本视图 → 本文件用到的
+       转换器必须声明在自己的 <StackPanel.Resources> 里（否则运行时 KeyNotFoundException）。 -->
+  <!-- 密码管理器：管理已保存的压缩包密码，支持导入导出 -->
+  <MenuItem Command="{Binding OpenPasswordManagerCommand}"
+            Header="{Binding LocalizedStrings[Menu_PasswordManager]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconKeyMultiple}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 收藏夹管理：管理常用路径收藏，支持添加/编辑/删除/排序 -->
+  <MenuItem Command="{Binding OpenFavoritesManagerCommand}"
+            Header="{Binding LocalizedStrings[FavMgr_OpenManager]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconBookmarkMultiple}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
+  <!-- 打开设置窗口：配置压缩/解压/外观/预览等选项 -->
+  <MenuItem Command="{Binding OpenSettingsCommand}" InputGesture="Ctrl+,"
+            Header="{Binding LocalizedStrings[Menu_Settings]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+</StackPanel>

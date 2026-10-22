@@ -126,7 +126,7 @@ public class MainArchiveContentLazyLoadTests
     }
 
     /// <summary>
-    /// **静态资源可解析性守卫**（2026-10-21 崩溃修复）：
+    /// **静态资源可解析性守卫**（2026-10-21 崩溃修复 / 2026-10-22 菜单视图扩展）：
     /// 拆出 UserControl 时，DataGrid 列的 CellTemplate 引用了原声明在
     /// <c>MainWindow.axaml</c> 的 <c>Window.Resources</c> 里的 <c>RatioToWidthConverter</c>；
     /// 静态资源查找作用域只到本视图 → 真正生成行时抛
@@ -136,6 +136,9 @@ public class MainArchiveContentLazyLoadTests
     /// headless 下又无法驱动 DataGrid 虚拟化行生成 → 改为纯文本守卫：
     /// 「视图引用的每个 StaticResource key，必须能在【视图局部资源】或【应用级资源】中找到」。
     /// 应用级资源 = App.axaml + 主题字典（ThemeLight/ThemeDark）+ 图标字典（AppIcons）。
+    ///
+    /// 同一守卫覆盖阶段 3 抽出的 4 个菜单视图（如 ViewMenuItems 的
+    /// <c>BoolToToggleBgBrushConverter</c> —— 它原声明在 MainWindow 的 Window.Resources）。
     /// </summary>
     [Fact]
     public void ArchiveContentView_ReferencedStaticResources_AreResolvable()
@@ -171,10 +174,44 @@ public class MainArchiveContentLazyLoadTests
             $"MainWindow.axaml 引用的静态资源无法解析：{string.Join(", ", missing)}");
     }
 
+    /// <summary>
+    /// 同款守卫覆盖**阶段 3 抽出的 4 个菜单视图**（File/Edit/View/Tools MenuItems）：
+    /// 它们的 <c>{StaticResource}</c> 查找作用域只到各自视图 → 局部资源必须随迁
+    /// （如 ViewMenuItems 的 <c>BoolToToggleBgBrushConverter</c>）。
+    /// </summary>
+    [Fact]
+    public void MenuViews_ReferencedStaticResources_AreResolvable()
+    {
+        var appKeys = AppLevelResourceKeys();
+        var problems = new List<string>();
+
+        foreach (var rel in MenuViewRelPaths)
+        {
+            var localKeys = LocalResourceKeys(rel, "StackPanel.Resources");
+            var missing = ReferencedStaticResources(rel)
+                .Where(key => !localKeys.Contains(key) && !appKeys.Contains(key))
+                .ToList();
+            if (missing.Count > 0)
+                problems.Add($"{Path.GetFileName(rel)}: {string.Join(", ", missing)}");
+        }
+
+        Assert.True(problems.Count == 0,
+            $"菜单视图引用的静态资源无法解析：{string.Join(" | ", problems)}");
+    }
+
     // ── 辅助 ──
 
     private const string ViewAxamlRelPath = "src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml";
     private const string MainWindowAxamlRelPath = "src/MantisZip.UI.Avalonia/Views/MainWindow.axaml";
+
+    /// <summary>阶段 3 抽出的菜单视图（局部资源作用域各自独立）。</summary>
+    private static readonly string[] MenuViewRelPaths =
+    {
+        "src/MantisZip.UI.Avalonia/Controls/Menus/FileMenuItems.axaml",
+        "src/MantisZip.UI.Avalonia/Controls/Menus/EditMenuItems.axaml",
+        "src/MantisZip.UI.Avalonia/Controls/Menus/ViewMenuItems.axaml",
+        "src/MantisZip.UI.Avalonia/Controls/Menus/ToolsMenuItems.axaml",
+    };
 
     /// <summary>应用级资源字典（App.axaml 内联 + 主题 + 图标）里声明的全部 x:Key。</summary>
     private static HashSet<string> AppLevelResourceKeys()

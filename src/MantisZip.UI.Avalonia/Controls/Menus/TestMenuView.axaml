@@ -1,0 +1,202 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+             x:Class="MantisZip.UI.Avalonia.Controls.Menus.TestMenuView"
+             x:DataType="vm:MainWindowViewModel">
+
+  <!-- 开发者诊断菜单（图标测试 / UI 测试 / 各对话框直达）
+       2026-10-22 启动优化阶段 3：原先内联在 MainWindow.axaml 的 <Menu> 里，
+       即使 Release 构建中 AppConstants.ShowTestMenu=false（菜单不可见），
+       这 28 个子项及其图标仍会被实例化 → 白付启动成本。
+       抽到独立视图后，仅在 ShowTestMenu 为 true 时才创建并挂进菜单。 -->
+  <MenuItem x:Name="TestMenuRoot">
+    <MenuItem.Header>
+      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+        <PathIcon Data="{StaticResource IconEyedropper}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        <TextBlock Text="{Binding LocalizedStrings[Menu_Test]}" />
+      </StackPanel>
+    </MenuItem.Header>
+    <!-- 图标测试窗口：查看所有图标资源及其状态 -->
+    <MenuItem Click="TestWindow_Click" Tag="IconTestWindow"
+              Header="{Binding LocalizedStrings[Main_IconTestTitle]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- UI 控件测试窗口：查看所有控件样式变体 -->
+    <MenuItem Click="TestWindow_Click" Tag="UiTestWindow"
+              Header="{Binding LocalizedStrings[Main_UiTestTitle]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <Separator />
+    <!-- 关于窗口测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="AboutWindow"
+              Header="{Binding LocalizedStrings[Test_AboutWindow]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 设置窗口测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="SettingsWindow"
+              Header="{Binding LocalizedStrings[Test_SettingsWindow]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 密码管理器窗口测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="PasswordManagerWindow"
+              Header="{Binding LocalizedStrings[Test_PasswordManager]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconKey}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 捐赠对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="DonationDialog"
+              Header="{Binding LocalizedStrings[Test_DonationDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <Separator />
+    <!-- 日志隐私帮助对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="LogPrivacyHelpDialog"
+              Header="{Binding LocalizedStrings[Test_LogPrivacyHelp]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconLockClosed}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 密码帮助对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="PasswordHelpDialog"
+              Header="{Binding LocalizedStrings[Test_PasswordHelp]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconQuestion}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <Separator />
+    <!-- 注释对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="CommentDialog"
+              Header="{Binding LocalizedStrings[Test_CommentDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 密码编辑对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="PasswordEditDialog"
+              Header="{Binding LocalizedStrings[Test_PasswordEditDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconEdit}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 密码输入对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="PasswordDialog"
+              Header="{Binding LocalizedStrings[Test_PasswordDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconShieldLock}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <Separator />
+    <!-- 进度窗口测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="ProgressWindow"
+              Header="{Binding LocalizedStrings[Test_ProgressWindow]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconTimer}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 错误对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="ErrorDialog"
+              Header="{Binding LocalizedStrings[Test_ErrorDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconWarning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <Separator />
+    <!-- 压缩设置窗口测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="CompressSettingsWindow"
+              Header="{Binding LocalizedStrings[Test_CompressSettings]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconCompress}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 解压设置窗口测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="ExtractSettingsWindow"
+              Header="{Binding LocalizedStrings[Test_ExtractSettings]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconCompress}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 压缩冲突对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="CompressConflictDialog"
+              Header="{Binding LocalizedStrings[Test_CompressConflict]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 解压冲突对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="ConflictDialog"
+              Header="{Binding LocalizedStrings[Test_ConflictDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconLightning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 匹配密码对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="MatchedPasswordDialog"
+              Header="{Binding LocalizedStrings[Test_MatchedPassword]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconLockOpen}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <Separator />
+    <!-- 提权对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="ElevationDialog"
+              Header="{Binding LocalizedStrings[Test_ElevationDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconShieldLock}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 提权失败对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="ElevationFailedDialog"
+              Header="{Binding LocalizedStrings[Test_ElevationFailedDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconWarning}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 提权信息对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="ElevationInfoDialog"
+              Header="{Binding LocalizedStrings[Test_ElevationInfoDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <Separator />
+    <!-- 添加收藏夹对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="AddFavoriteDialog"
+              Header="{Binding LocalizedStrings[Test_AddFavoriteDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconBookmarkAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 收藏夹管理窗口测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="FavoriteManagerWindow"
+              Header="{Binding LocalizedStrings[Test_FavoriteManagerWindow]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 压缩包注释对话框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="ArchiveCommentDialog"
+              Header="{Binding LocalizedStrings[Test_ArchiveCommentDialog]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+    <!-- 自定义消息框测试 -->
+    <MenuItem Click="TestWindow_Click" Tag="AppMessageBox"
+              Header="{Binding LocalizedStrings[Test_AppMessageBox]}">
+      <MenuItem.Icon>
+        <PathIcon Data="{StaticResource IconChat}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </MenuItem.Icon>
+    </MenuItem>
+  </MenuItem>
+</UserControl>

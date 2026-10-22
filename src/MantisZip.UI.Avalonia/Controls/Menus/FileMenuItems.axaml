@@ -1,0 +1,79 @@
+<StackPanel xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+             x:Class="MantisZip.UI.Avalonia.Controls.Menus.FileMenuItems"
+             x:DataType="vm:MainWindowViewModel">
+
+  <!-- 文件菜单子项：打开 / 打开所在位置 / 关闭 / 最近文件 / 清除最近 / 刷新 / 退出
+       2026-10-22 启动优化阶段 3：自 MainWindow.axaml 抽出为独立视图，**首次展开该菜单时才创建**
+       （顶级菜单项常驻，子项不在启动路径实例化）。
+       ⚠️ 随迁局部资源：{StaticResource} 的查找作用域只到本视图 → 本文件用到的
+       转换器必须声明在自己的 <StackPanel.Resources> 里（否则运行时 KeyNotFoundException）。 -->
+  <!-- 打开压缩包：选择文件并加载到主窗口浏览 -->
+  <MenuItem Command="{Binding OpenArchiveCommand}" InputGesture="Ctrl+O"
+            Header="{Binding LocalizedStrings[Menu_OpenArchive]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 打开压缩包所在位置：在资源管理器中定位当前压缩包文件 -->
+  <MenuItem Command="{Binding OpenArchiveLocationCommand}" InputGesture="Ctrl+Shift+L"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_OpenArchiveLocation]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconLocate}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 关闭压缩包：卸载当前压缩包，返回初始状态 -->
+  <MenuItem Command="{Binding CloseArchiveCommand}" InputGesture="Ctrl+W"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_CloseArchive]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 最近文件：显示最近打开过的压缩包列表，点击可快速打开 -->
+  <MenuItem ItemsSource="{Binding RecentFiles}"
+            IsEnabled="{Binding RecentFiles.Count}"
+            Header="{Binding LocalizedStrings[Main_RecentFiles]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+    <MenuItem.ItemTemplate>
+      <DataTemplate>
+        <MenuItem Click="RecentFileMenuItem_Click"
+                  CommandParameter="{Binding .}"
+                  Header="{Binding .}">
+          <MenuItem.Icon>
+            <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          </MenuItem.Icon>
+        </MenuItem>
+      </DataTemplate>
+    </MenuItem.ItemTemplate>
+  </MenuItem>
+  <Separator />
+  <!-- 清除最近文件列表 -->
+  <MenuItem Command="{Binding ClearRecentFilesCommand}"
+            Header="{Binding LocalizedStrings[Main_ClearRecentFiles]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <!-- 刷新当前压缩包：重新读取文件列表 -->
+  <MenuItem Command="{Binding RefreshArchiveCommand}" InputGesture="F5"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_Refresh]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
+  <!-- 退出应用 -->
+  <MenuItem Command="{Binding ExitCommand}"
+            Header="{Binding LocalizedStrings[Menu_Exit]}">
+    <MenuItem.Icon>
+      <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </MenuItem.Icon>
+  </MenuItem>
+</StackPanel>
