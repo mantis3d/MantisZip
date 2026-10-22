@@ -53,6 +53,7 @@
     - `IDataTemplate.Build(param)` **不会**把 param 设为 DataContext → 必须手动 `root.DataContext = item`，否则模板内绑定不求值（`IsVisible` 恒为默认 true）。
     - `Avalonia.Controls.Shapes` 与 `System.IO.Path` 同名冲突 → 测试里用 `using IOPath = System.IO.Path;` 别名。
   - **模型注记**：`ArchiveItemModel` 的 4 个 `*BarBrushKey` 加注记 —— 当前视图未使用（换色走双 Rectangle + IsVisible），勿误以为改这里就能换色。
+  - **RELEASE_NOTES**：经用户拍板，按规则 18 口径（属「上一版本已发布、用户可遇到」的问题）写入 `RELEASE_NOTES.md` 的 v0.5.3 新增「修复 / Fixes」节 —— 含「进度条开关失效」与「目录条底色不可区分」两条（中英各一）。
 **2026-10-22** — 修复「视图 → 进度条」开关按下不刷新（迁移遗留 bug）
   - **现象**：用户实测发现「视图」菜单下「进度条」开关按下后界面不刷新（进度条不出现/不消失）。
   - **根因调查**：

@@ -43,6 +43,13 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **默认规则集调整** — 默认的「图片类 / 视频类 / 音频类 / 压缩包类」规则不再包含 SVG、TAR、WAV 等未压缩格式（这些格式用 Deflate 压缩仍有明显收益），仅确属已压缩的格式按「仅存储」处理
 - **Adjusted default rule set** — the default "Image / Video / Audio / Archive" rules no longer include uncompressed formats such as SVG, TAR and WAV (Deflate still shrinks them noticeably); only genuinely compressed formats are stored as-is
 
+**修复 / Fixes**
+
+- **「进度条」开关现在生效** — 「视图」菜单下的「进度条」开关此前按下后没有任何变化（进度条既不出现也不消失）：切换时只翻转了内部状态，却未重算或清零各条目决定进度条长度的比例值。现已修正：开启时重算比例、关闭时清零比例，并且不会重建文件列表、不会丢失当前选中项
+- **The "Progress Bars" switch now works** — the switch under the View menu previously had no effect at all (the bars neither appeared nor disappeared): toggling it only flipped an internal flag without recomputing or clearing the per-entry ratios that determine the bar length. It now recomputes the ratios when switched on and clears them when switched off, without rebuilding the file list or losing the current selection
+- **目录行的进度条底色可区分** — 开启「目录基线」后，目录行与文件行的底色此前完全相同（无法区分目录与文件）：从 WPF 迁移到 Avalonia 时丢失了按目录/文件切换底色的逻辑。现已修正：大小与压缩后大小两列中，目录行使用更饱和的底色、文件行保持淡色，并随浅色/深色主题自动适配
+- **Directory rows are now colored differently** — with "Separate directory baseline" enabled, directory rows used exactly the same bar color as file rows, so the two were indistinguishable: the WPF color-switching logic was lost during the Avalonia port. In the size and compressed-size columns, directory rows now use a more saturated shade while file rows keep the light shade, following the light/dark theme automatically
+
 ## v0.5.2
 
 ### 文件说明 / File Description
