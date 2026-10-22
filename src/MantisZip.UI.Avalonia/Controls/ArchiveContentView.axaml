@@ -2,8 +2,17 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
+             xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
              x:Class="MantisZip.UI.Avalonia.Controls.ArchiveContentView"
              x:DataType="vm:MainWindowViewModel">
+
+  <!-- 视图局部资源：随内容区一并迁入（原声明在 MainWindow.axaml 的 Window.Resources，
+       拆出后静态资源查找作用域只到本视图 → 缺失会导致 DataGrid 行渲染时
+       KeyNotFoundException: Static resource 'RatioToWidthConverter' not found）。
+       规则：拆出 UserControl 时，凡是被搬走的 XAML 引用到的局部资源必须一并搬过来。 -->
+  <UserControl.Resources>
+    <conv:RatioToWidthConverter x:Key="RatioToWidthConverter" />
+  </UserControl.Resources>
 
   <!-- 压缩包内容区：目录树 / 文件列表 / 预览面板 / 拖拽添加覆层
        2026-10-21 启动优化：自 MainWindow.axaml 抽出为独立 UserControl，**按需创建**——

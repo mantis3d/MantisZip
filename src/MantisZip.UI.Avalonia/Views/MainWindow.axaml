@@ -20,8 +20,6 @@
   <Window.Resources>
     <conv:FileSizeConverter x:Key="FileSizeConverter" />
     <conv:BoolInvertConverter x:Key="BoolInvertConverter" />
-    <conv:NullableLongConverter x:Key="NullableLongConverter" />
-    <conv:RatioToWidthConverter x:Key="RatioToWidthConverter" />
     <conv:BoolToToggleBgBrushConverter x:Key="BoolToToggleBgBrushConverter" />
   </Window.Resources>
 

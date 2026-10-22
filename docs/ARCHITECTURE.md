@@ -476,6 +476,7 @@ Open and Extract verbs use `AppliesTo` filter (archive extensions only). Icons v
 - **namescope 变更**：拆出后 `this.FindControl<T>("X")` 取不到视图内控件 → 改用视图公开属性
 - **状态回写保护**：视图未创建时，依赖视图状态的持久化（如 `CaptureColumnStates`）必须**原样回写**上次读到的快照，否则空值会覆盖用户已保存的设置
 - **启动期恢复动作延后**：列状态 / 排序箭头 / 布局快照 / 预览位置等「读盘 → 应用」动作，改到视图创建时执行（构造期只读盘、只存快照）
+- **⚠️ 局部资源必须随视图搬走**：`{StaticResource X}` 的查找作用域只到**声明它的那个资源字典**。原声明在 `MainWindow.axaml` 的 `<Window.Resources>`（窗口局部资源）里的转换器，随 XAML 拆到 `UserControl` 后**必须一并搬进 `<UserControl.Resources>`**——否则只在**真正渲染出该控件/模板**时抛 `KeyNotFoundException`（典型：DataGrid 列的 `CellTemplate` 只在生成首行时构建，空集合永不构建 → 打开压缩包才崩）
 - 切割 `MainWindow.axaml` 时**用 XDocument（`SetLineInfo`）取行号**，勿用肉眼下标（文件每改一次行号即漂移）
 
 ### 依赖流向

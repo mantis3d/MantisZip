@@ -41,6 +41,16 @@
   - **负向验证**：临时夹具（假 `MantisZip.sln` + 两份不同版本号 + 缺文件 + 缺/多/重复 key + 占位符错位）跑 `-Task check` 返回 exit 1 并逐条报出，排除「永远绿」的假门禁。
   - **环境限制（非缺陷）**：DSH workspace-write 沙箱下 `dotnet build` 写 `obj/` 报 `MSB3491 … Access to the path … is denied`，Node 起带管道的子进程报 `spawn EPERM`；脚本/插件在完全权限或 CI 上正常，README 已记录两种现象与绕过方式。
   - **后续**：CI 接线（`-Task check` + 装 7-Zip 放开 `SevenZipEngine` 过滤）与第 4 层工具（`hygiene` / `docs` / `installer`）不在本期。
+**2026-10-22** — 修复「打开压缩包即闪退」：拆出内容区漏搬窗口局部静态资源
+  - **现象**：用户反馈打开压缩包瞬间闪退；应用无异常日志（GUI 子系统无 stderr）→ 查 **Windows 事件日志** `.NET Runtime / 1026`（未处理异常）拿到完整堆栈。
+  - **堆栈**：`KeyNotFoundException: Static resource 'RatioToWidthConverter' not found` → `StaticResourceExtension.ProvideValue` → `ArchiveContentView.XamlClosure_2.Build_3`（ArchiveContentView.axaml:327）→ `DataGridTemplateColumn.GenerateElement` → `DataGrid.PopulateCellContent` → `DataGrid.GenerateRow`（**渲染首行**时才构建 CellTemplate）。
+  - **根因**：`RatioToWidthConverter` 原声明在 `MainWindow.axaml` 的 `<Window.Resources>`（**窗口局部资源**）；内容区拆成 `UserControl` 后静态资源查找作用域只到本视图 → 宽度/压缩率/压缩后大小等 4 列的 CellTemplate 全部取不到该转换器。空集合时 CellTemplate 永不构建 → **只在真实打开压缩包时崩**，测试环境全绿。
+  - **修复**：`RatioToWidthConverter` 随视图迁入 `ArchiveContentView.axaml` 的 `<UserControl.Resources>`（与阶段 1 把 `NullableLongConverter` 迁入 `MainFilterBar` 同法）；同时清掉 `MainWindow.Resources` 里已无人引用的 `NullableLongConverter` / `RatioToWidthConverter`（`FileSizeConverter` / `BoolInvertConverter` / `BoolToToggleBgBrushConverter` 仍被 MainWindow 自身引用 → 保留）。
+  - **新增守卫 2 条**（`MainArchiveContentLazyLoadTests`）：
+    ① `ArchiveContentView_ColumnTemplates_Build_WithoutMissingStaticResource` —— **运行时级**：遍历各列 `CellTemplate` 逐个 `Build(item)`；headless 下 DataGrid 因测试宿主未加载主题而无模板、不生成行，直接构建模板可复现**同一条 XAML 构建路径**（已红/绿实证：缺资源 → 4 列抛同一 `KeyNotFoundException`）。
+    ② `ArchiveContentView_ReferencedStaticResources_AreResolvable` / `MainWindow_ReferencedStaticResources_AreResolvable` —— **纯文本**：XAML 引用的每个 `{StaticResource key}` 必须在【本文件局部资源】或【应用级资源（App.axaml + ThemeLight/ThemeDark + AppIcons）】中；缺任一即失败（覆盖非模板引用的 key）。
+  - **教训**：① 拆 UserControl 时**凡被搬走的 XAML 引用到的局部资源必须一并搬走**；② 「只测创建视图」抓不到只在渲染期暴露的缺失资源 → 需要能触发模板构建的用例；③ headless 测试宿主未加载任何主题（`TestAppBuilder` 只 `UseSkia` + `UseHeadless`）→ DataGrid 无模板、不生成行，测试里不要指望虚拟化行生成。
+  - **验证**：Release 构建 0 错 0 警；UI 全量 + Core 全量测试通过；`dotnet format analyzers` 与 `-Task check` 全过。
 **2026-10-21** — 启动优化阶段 2：压缩包内容区延迟加载（XamlSpan −108ms）
   - **范围**：MainWindow.axaml 的压缩包内容区（ArchiveContentGrid：目录树 / 文件列表 DataGrid / 地址栏 / 3 个 Splitter / 预览面板宿主 / 拖拽添加覆层，~153 元素）——压缩包未打开时不可见，启动路径不需实例化。
   - **切割**：用 `git show HEAD:...MainWindow.axaml` + XDocument（`SetLineInfo`）取精确行号，搬走 **671..1158** 行（**勿用肉眼下标**：文件每改一次行号就漂移；PowerShell 5.1 读行号用 `([System.Xml.IXmlLineInfo]$x).LineNumber`，需 `Add-Type -AssemblyName System.Xml.Linq`）。视图根 Grid **即原 ArchiveContentGrid**（ColumnDefinitions="1*,5,2.5*,5,3*" / RowDefinitions="*,0,0" 与子元素坐标原样保留）→ 布局零变化。
