@@ -212,6 +212,23 @@
   - **修正**：4 个按钮全部改为 PathIcon + 既有矢量资源（IconEdit / IconDelete），Foreground 显式设 ThemeTextPrimaryBrush（规则 4：PathIcon 不继承父 Foreground）；尺寸 15×15，沿用 ToolbarIcon 类与原 ToolTip/Click/Tag 绑定。
   - **顺带修规则 13 违规**：压缩级别名称（存储/快速/正常/最大/跟随全局/全局±1/自定义/未知）原为**硬编码中文**（规则列表 LevelDisplay + 规则编辑对话框 LevelDisplayMap），现全部走三语 key Settings_AdaptiveRuleLevel_*（10 个 key × 3 语，key 集 1276 三语一致）；对话框的级别映射由 static 字典改为**按调用时解析**的方法（避免运行期切语言后显示旧文案）；自定义 下拉项用无占位符的 Settings_AdaptiveRuleLevel_CustomName，列表显示用带 {0} 的 Settings_AdaptiveRuleLevel_Custom。
   - **验证**：UI 构建 0 警告 0 错误；全量 Core **766/0 失败**、UI **340/0 失败**。
+**2026-10-23** — 压缩加速执行链二轮复核：Deflate64 串行必失败 / MT 中文名编码 / 被占用文件硬失败
+  - **Deflate64**：实测 `ZipCompressionMethod="deflate64"` + `MultiThreadedCompression=false` 必然抛 `InvalidFormatException: Invalid compression method: Deflate64`（SharpCompress ZipWriter 无 method 9 映射）。修复：`IsMultiThreadedEligible` 对 Deflate64 放行（即使 MT 关闭），`CompressGroupWithSevenZip` 新增 `mtOverride`，强制 `mt=1`；全部条目 Store 时回落串行但改用 `CompressionType.None` writer（无 Deflate64 数据）。
+  - **文件名编码**：实测 MT 路径 7z 按系统 ANSI 写名（中文 Windows：GBK/bit0），默认 UTF-8 选项被忽略；混合包中 7z 条目 GBK 与 Store 条目 UTF-8 并存。修复：MT/加密 7z 压缩器统一 `CustomParameters["cu"]="on"`（UTF-8/bit11）；`FileNameEncoding="gbk"` 时 MT 回落串行（7z 无法可靠写 GBK）。
+  - **不可读源文件**：实测 MT 遇到被独占的文件整次失败，而串行可通过 `ErrorResolver` 跳过。修复：MT 入口用 `ReadErrorHandler.FilterUnreadableFiles`（SharedReadStream + ErrorResolver）预检并上报 Skipped；镜像/Store 合并改用 `SharedReadStream.OpenRead`。
+  - **性能**：`FormatCatalog.GetById/GetByExtension` 改用内置格式字典索引，避免自适应规则逐文件调用时 `GetAll()` 反复复制内置列表。
+  - **测试**：新增 `CompressAsync_Deflate64_WithoutMultiThreaded_ProducesMethod9`、`CompressAsync_Deflate64_AdaptiveAllStore_WritesStoreEntries`、MT/加密中文名编码 3 条、MT 跳过不可读文件 1 条；Core **786/789（3 跳过）**、UI **403/406（3 跳过）** 全绿。
+  - **未修待决定**：Deflate64 + 分卷、加密 Add 硬编码 Deflate、单组 MT 混合进度跳变、静默失效开关组合、MT 临时空间 2×、重复相对路径覆盖、ZIP32 头开销、自定义格式 ID 秒级冲突（详见计划 2026-10-23 二轮节）。
+**2026-10-23** — 压缩加速计划复核补漏：自定义魔数接线 + ZIP 面板联动 + MT 提示实时刷新 + CLI 自适应开关
+  - **背景**：逐条核对 `adaptive-compress-ui-convergence` 完成度，发现 2 处计划内收尾遗漏（死字段、默认组数单测）与 4 处「标记完成但实际不生效」的缺口。
+  - **自定义 MagicHex 接线（问题 #5）**：此前 `FormatDefinition.MagicHex` 只有 UI 读写、引擎从不消费，Phase 2 恢复输入框后成为「可见的骗人 UI」。现 `ZipEntryClassifier` 新增 `TryReadHead` / `MatchCustomFormatByMagic` / `HeadStartsWithMagic`（支持空格/中划线/冒号/`0x` 前缀，非法值按未命中）；`AdaptiveRuleMatcher.ResolveLevel` 在魔数阶段先匹配自定义格式魔数并查引用该 FormatId 的用户规则，未命中再走内置「已压缩」判定；读头只做一次（原路径会重复读）。
+  - **ZIP 面板魔数联动**：`SmartDetectCheck` 随 `AdaptiveCompressionCheck` 整块显隐（规则 6），`AdaptiveSmartDetect` getter 在自适应关闭时恒 false；避免「勾了却没效果」。
+  - **MT 提示实时刷新**：`NotifyAdaptiveProperties()` 补 `IsAdaptiveOverridesMtWarningVisible`；`AdaptiveOverrideRuleViewModel.IsMultiThreadedEnabled` 改 `[ObservableProperty]` 并通知 `ShowMtIneffectiveBadge`；MT 开关变更刷新全部规则行，新增规则带当前 MT 状态。
+  - **CLI 生效**：`App.CliCompress` 3 处 `CompressRequest` 补 `AdaptiveCompression`/`AdaptiveSmartDetect`/`MultiThreadedCompression`——此前只传规则而开关默认 false，CLI 实际不应用规则。
+  - **收尾**：删 `CompressSettingsViewModel._parallelCompressDegree` 死字段（并清理 `CompressSettingsDialogCopyTests` 的 Excluded 残留项）；补 `ResolveParallelCompressDegreeTests`（0/负数 → `clamp(ProcessorCount,4,16)`、显式 1..16、>16 钳制）。
+  - **文案/注释**：三语帮助「两个开关」→「三个开关」；`RELEASE_NOTES.md` v0.5.3 补「移除并行压缩组数」「仅存储格式并入规则」；`ARCHITECTURE.md` ZIP 压缩加速节按 Phase 2 重写；清理 `ZipEngine.CompressGroup` 旧 3/4 参注释、`AdaptiveRuleMatcher` 摘要、`CompressService.ParallelCompressDegree` 注释、`SettingsWindowViewModel` 重复 summary、`AddCustomFormatDialog` 占位注释、`ZipEntryClassifierTests`/`ZipEngineTests` 旧概念命名。
+  - **例外记录**：默认「图片类」规则仍含 `Bmp`（2026-10-21 拍板保留旧默认行为），与 SSOT「BMP 未压缩」判定不一致 → 不改默认输出，已在 `ZipEntryClassifier` 注释与本计划「已知边界」记录。
+  - **验证**：Core/Avalonia 构建通过（仅 NuGet 网络警告）；Core **780 通过 / 3 跳过 / 0 失败**（总 783）、UI **403 通过 / 3 跳过 / 0 失败**（总 406）；新增用例见计划 2026-10-23 节。
 **2026-10-21** — 压缩加速 Phase 2 追加：「仅存储格式」并入自适应规则 + 多线程生效提示
   - **背景**：MT 路径由 7z 原生整组单次调用、组内统一用全局级别（ZipEngine.CompressGroup.cs:1589-1592）→ 规则「指定压缩级别」在 MT 路径不生效；「仅存储」判定在 MT 分拣阶段即生效（storeGroup → copy-mode 原样写入）。且 MT 准入有条件（IsMultiThreadedEligible：未加密 / 未分卷 / 条目数 ≤65535 / 体积 <4GB / deflate·deflate64）→ 小目录、加密包、分卷等走串行路径时规则全部生效，故**不按开关禁用编辑**，改为提示 + 行内标记。
   - **引擎简化**：AdaptiveRuleMatcher.ResolveLevel 去掉 customStoreFormatIds 分支；ArchiveOptions/CompressRequest 移除 MultiThreadedStoreFormatIds；ZipEntryClassifier.IsCustomStoreFormat 删除；GUI/CLI 传参清理。
@@ -222,12 +239,12 @@
   - **测试**：UI 新增 3 条（仅存储 ID 迁移为规则 / 默认规则集 6 类且不含未压缩格式 / 行内标记条件）；Core ZipEntryClassifierTests 改规则等价用例、ZipEngineTests C3 改 Store 规则用例。全量 Core **766/0 失败**、UI **340/0 失败**。
 **2026-10-21** — 压缩加速 Phase 2（Task 9-11）：魔数检测 + 自适应规则引擎 + 恢复隐藏 UI
   - **三项前置拍板（用户）**：SSOT 统一到 ZipEntryClassifier；默认规则集与 SSOT 对齐后激活；魔数阈值取常量 64KB（不加设置项）。
-  - **SSOT 重写**（Core/Utils/ZipEntryClassifier.cs）：IsCompressed(ext) / IsCompressedFormat(FileFormat) / IsCompressedByMagic(path) / IsCustomStoreFormat(...)；扩展名集合修正（svg/	ar 移出——未压缩内容 Deflate 仍有收益）；CompressionCoefficients 退化为仅供压缩率预估。
+  - **SSOT 重写**（Core/Utils/ZipEntryClassifier.cs）：IsCompressed(ext) / IsCompressedFormat(FileFormat) / IsCompressedByMagic(path) / IsCustomStoreFormat(...)；扩展名集合修正（svg/tar 移出——未压缩内容 Deflate 仍有收益）；CompressionCoefficients 退化为仅供压缩率预估。**（同日追加节已删除 `IsCustomStoreFormat` 与 `customStoreFormatIds`；2026-10-23 又补 `TryReadHead` / `MatchCustomFormatByMagic` 接自定义 MagicHex。）**
   - **魔数检测**：仅文件 ≥64KB（MagicDetectMinBytes）才读前 4KB → FileFormatDetector.Detect → 命中压缩格式集合则 Store；IO 异常（占用/权限/已删除）回落扩展名规则、不中断压缩。
-  - **唯一决策入口**（AdaptiveRuleMatcher.ResolveLevel，新增 customStoreFormatIds）：用户规则 > 自定义仅存储 > SSOT 扩展名 > 魔数；ZipEntryClassifier.GetAdaptiveLevel 两个重载删除（4 个引擎调用点全改走新入口）。链路：ArchiveOptions/CompressRequest += AdaptiveOverrides/CustomFormats，CompressService 映射，GUI（CompressFlow.BuildRequest）与 CLI（App.CliCompress 3 处）均传参；引擎 4 条路径（MT 分拣 / MT 组内 7z / 串行写入 ReadFileWithRetry / AddToArchiveAsync）同口径。
-  - **默认规则集迁移**：AppSettings.AdaptiveOverridesDefaultsVersion；旧持久化的 4 条默认规则（用户未改过）整体替换为对齐版（svg/	ar/wav/	ga/hdr/exr 移出），用户自改规则集原样保留。
-  - **恢复 UI（Task 11）**：设置页魔数检测/自适应规则/格式目录区块随 AdaptiveCompression 显示；ZIP 面板「魔数检测」复选框恢复可见且值贯通到 ArchiveOptions；格式目录魔数 hex 输入框 + [hex] 显示恢复；AdaptiveHelp_Markdown 三语新增「魔数检测」段，并修正「自适应+多线程同开时用户规则不生效」的过时提示（规则现已全路径生效）。
-  - **测试**：Core 新增 AdaptiveCompressionClassificationTests（8 条：SSOT 边界/魔数命中·文本·阈值·读不到/规则优先·禁用·自定义仅存储·魔数开关）；UI 新增 AdaptiveSettingsUiTests（5 条：区块联动/魔数 hex/规则集迁移·保留）。全量 Core **766 通过 / 3 跳过 / 0 失败**、UI **337 通过 / 3 跳过 / 0 失败**；既有 ZipEntryClassifierTests 改指新入口，ZipEngineTests 3 处改用生产同参调用。
+  - **唯一决策入口**（AdaptiveRuleMatcher.ResolveLevel，新增 customStoreFormatIds）：用户规则 > 自定义仅存储 > SSOT 扩展名 > 魔数；ZipEntryClassifier.GetAdaptiveLevel 两个重载删除（4 个引擎调用点全改走新入口）。链路：ArchiveOptions/CompressRequest += AdaptiveOverrides/CustomFormats，CompressService 映射，GUI（CompressFlow.BuildRequest）与 CLI（App.CliCompress 3 处）均传参；引擎 4 条路径（MT 分拣 / MT 组内 7z / 串行写入 ReadFileWithRetry / AddToArchiveAsync）同口径。**（同日追加节把优先级改为「规则 > SSOT 扩展名 > 魔数」；2026-10-23 起 CLI 同时传三开关，规则在 CLI 才真正生效。）**
+  - **默认规则集迁移**：AppSettings.AdaptiveOverridesDefaultsVersion；旧持久化的 4 条默认规则（用户未改过）整体替换为对齐版（svg/tar/wav/tga/hdr/exr 移出），用户自改规则集原样保留。
+  - **恢复 UI（Task 11）**：设置页魔数检测/自适应规则/格式目录区块随 AdaptiveCompression 显示；ZIP 面板「魔数检测」复选框恢复可见且值贯通到 ArchiveOptions；格式目录魔数 hex 输入框 + [hex] 显示恢复；AdaptiveHelp_Markdown 三语新增「魔数检测」段，并修正「自适应+多线程同开时用户规则不生效」的过时提示（规则现已全路径生效）。**（2026-10-23 补：ZIP 面板魔数随自适应显隐、帮助改「三个开关」、MagicHex 真正接入引擎。）**
+  - **测试**：Core 新增 AdaptiveCompressionClassificationTests（8 条：SSOT 边界/魔数命中·文本·阈值·读不到/规则优先·禁用·自定义仅存储·魔数开关）；UI 新增 AdaptiveSettingsUiTests（5 条：区块联动/魔数 hex/规则集迁移·保留）。当时全量 Core **766 通过 / 3 跳过 / 0 失败**、UI **337 通过 / 3 跳过 / 0 失败**（2026-10-23 复核：UI 406 总 / 403 过 / 3 跳过 / 0 失败）；既有 ZipEntryClassifierTests 改指新入口，ZipEngineTests 3 处改用生产同参调用。
   - **已知边界**：自适应与规则目前**仅 ZIP 路径**生效（7z/TAR.GZ 无逐条目级别接口；ZIP 加密子路径不降级）。
   - **未做**：Task 12 本机基准测试 UI（含 E4 播种标记）、Task 13 post-C 组数定标（噪声 27% 不足以定标）。`RELEASE_NOTES.md` v0.5.3 新增「压缩加速 / Compression Speed-ups」节（魔数检测 / 自定义规则生效 / 默认规则集调整，中英成对）。
 **2026-10-20** — 启动优化：仅应用程序集 ReadyToRun（R2R）

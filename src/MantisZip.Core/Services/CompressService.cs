@@ -99,7 +99,7 @@ public class CompressRequest
     /// <summary>多线程压缩：可压缩文件走 SharpSevenZip mt=on。</summary>
     public bool MultiThreadedCompression { get; init; }
 
-    /// <summary>N 组并行压缩的目标组数，默认值取运行时 CPU 数；1 = 串行。</summary>
+    /// <summary>N 组并行压缩的目标组数；0 = 引擎默认 <c>clamp(CPU 核数, 4, 16)</c>，显式 1..16 照旧生效。</summary>
     public int ParallelCompressDegree { get; init; } = 0;
 
 

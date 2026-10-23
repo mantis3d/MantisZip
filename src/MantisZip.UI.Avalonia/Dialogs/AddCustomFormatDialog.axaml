@@ -21,7 +21,8 @@
              Background="{DynamicResource ThemeSurfaceBgBrush}"
              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
              BorderBrush="{DynamicResource ThemeBorderBrush}" />
-    <!-- 魔数 hex 输入框（可选）—— Phase 2：实现魔数检测后移除 IsVisible=False -->
+    <!-- 魔数 hex 输入框（可选）—— 供魔数检测识别「扩展名骗人/无扩展名」的文件，
+         命中后按引用该格式的自适应规则决定压缩级别（Phase 2 / 2026-10-23 接线） -->
     <TextBox x:Name="MagicHexTextBox"
              PlaceholderText="魔数 hex（可选）/ Magic hex (optional)"
              Background="{DynamicResource ThemeSurfaceBgBrush}"

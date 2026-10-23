@@ -175,7 +175,11 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     partial void OnAdaptiveCompressionChanged(bool value) => NotifyAdaptiveProperties();
     partial void OnAdaptiveSmartDetectChanged(bool value) => NotifyAdaptiveProperties();
-    partial void OnMultiThreadedCompressionChanged(bool value) => NotifyAdaptiveProperties();
+    partial void OnMultiThreadedCompressionChanged(bool value)
+    {
+        NotifyAdaptiveProperties();
+        RefreshAdaptiveRulesMtState();
+    }
 
     private void NotifyAdaptiveProperties()
     {
@@ -183,20 +187,27 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(IsAdaptiveContentVisible));
         OnPropertyChanged(nameof(IsUserRulesSectionVisible));
         OnPropertyChanged(nameof(IsFormatCatalogSectionVisible));
+        // 多线程提示随开关实时显隐（此前漏通知，勾选/取消后要重开窗口才正确）
+        OnPropertyChanged(nameof(IsAdaptiveOverridesMtWarningVisible));
     }
 
-    /// <summary>魔数检测开关是否可见 —— Phase 2：实现魔数检测后改回 AdaptiveCompression。</summary>
-    /// <summary>魔数检测开关是否可见（Phase 2 / Task 11：实现魔数检测后随自适应开关显示）。</summary>
+    /// <summary>规则行内「多线程下不生效」标记随多线程开关实时刷新。</summary>
+    private void RefreshAdaptiveRulesMtState()
+    {
+        foreach (var rule in AdaptiveOverrides)
+            rule.IsMultiThreadedEnabled = MultiThreadedCompression;
+    }
+
+    /// <summary>魔数检测开关是否可见（Phase 2 / Task 11：随自适应开关显示）。</summary>
     public bool IsSmartDetectVisible => AdaptiveCompression;
 
     /// <summary>自适应内容区域是否可见（自适应或多线程任一开启）。</summary>
     public bool IsAdaptiveContentVisible => AdaptiveCompression || MultiThreadedCompression;
 
-    /// <summary>用户自定义规则区域是否可见 —— Phase 2：实现自适应规则后改回 AdaptiveCompression && !MultiThreadedCompression。</summary>
-    /// <summary>用户自定义规则区域是否可见（Phase 2 / Task 11：实现自适应规则后随自适应开关显示；多线程亦生效，故不与多线程互斥）。</summary>
+    /// <summary>用户自定义规则区域是否可见（Phase 2 / Task 11：随自适应开关显示；多线程下规则同样生效，故不与多线程互斥）。</summary>
     public bool IsUserRulesSectionVisible => AdaptiveCompression;
 
-    /// <summary>格式目录区域是否可见（仅自适应开启，多线程关闭）。</summary>
+    /// <summary>格式目录区域是否可见（Phase 2 / Task 11：随自适应开关显示）。</summary>
     public bool IsFormatCatalogSectionVisible => AdaptiveCompression;
 
     /// <summary>内置格式（只读，供 UI 展示）。</summary>
@@ -2175,6 +2186,7 @@ public partial class SettingsWindowViewModel : ObservableObject
                 Level = dialog.SelectedLevel,
                 FormatIds = dialog.SelectedFormatIds,
                 Enabled = true,
+                IsMultiThreadedEnabled = MultiThreadedCompression,
             });
         }
     }
@@ -2268,8 +2280,11 @@ public partial class AdaptiveOverrideRuleViewModel : ObservableObject
         OnPropertyChanged(nameof(ShowMtIneffectiveBadge));
     }
 
-    /// <summary>多线程压缩是否开启（由设置页 VM 注入；仅影响提示标记，不改行为）。</summary>
-    public bool IsMultiThreadedEnabled { get; set; }
+    /// <summary>多线程压缩是否开启（由设置页 VM 注入并随开关实时刷新；仅影响提示标记，不改行为）。</summary>
+    [ObservableProperty] private bool _isMultiThreadedEnabled;
+
+    partial void OnIsMultiThreadedEnabledChanged(bool value)
+        => OnPropertyChanged(nameof(ShowMtIneffectiveBadge));
 
     /// <summary>是否显示「多线程下不生效」标记：多线程开启且规则级别不是「仅存储」。</summary>
     public bool ShowMtIneffectiveBadge => IsMultiThreadedEnabled && Level != AdaptiveLevel.Store;

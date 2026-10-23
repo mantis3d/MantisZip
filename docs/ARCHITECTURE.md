@@ -515,17 +515,25 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 
 ### ZIP 压缩加速（自适应 / 多线程 / 引擎侧组数）
 
-**三开关 Phase 1 互相独立**（`AppSettings.AdaptiveCompression` / `AdaptiveSmartDetect` / `MultiThreadedCompression`）——2026-10-18 双机实测表明**多线程收益与 CPU 相关**：20 核机上 text/mixed 有 10–20% 收益且压缩率更好（text +15%），8 逻辑核机（i7-3770 4C/8T）上净负收益（text 慢 42%、mixed 慢 37%）。任何一刀切静态策略（无论「MT 依赖自适应」还是「MT 独立」）都只对一半硬件正确 → **Phase 1 不做门控**，最终策略由 Phase 2 **本机基准测试**按机器定夺。双机数据与评审记录见 `.omo/plans/进行中/adaptive-compress-ui-convergence.md`。
+**三开关互相独立**（`AppSettings.AdaptiveCompression` / `AdaptiveSmartDetect` / `MultiThreadedCompression`）——2026-10-18 双机实测表明**多线程收益与 CPU 相关**：20 核机上 text/mixed 有 10–20% 收益且压缩率更好（text +15%），8 逻辑核机（i7-3770 4C/8T）上净负收益（text 慢 42%、mixed 慢 37%）。任何一刀切静态策略都只对一半硬件正确 → 不做硬门控，UI 用常驻提示说明收益与 CPU 相关。**Phase 2 的 Task 12（本机基准测试）与 Task 13（post-C 组数定标）未做**，最终策略仍待后续；双机数据与评审记录见 `.omo/plans/进行中/adaptive-compress-ui-convergence.md`。
 
 **组数已从 UI 移除**：引擎默认 `clamp(CPU 核数, 4, 16)`（下限 4 避开已证实的 deg=2 陷阱；20 核机实测 16 组最优，deg=8 慢 21–30%）。组内线程数 = 核数/组数（方案 C）**未验证**——默认路径下多为 no-op，仅在「核数 > 16」或「文件数 < 组数」时生效，**不得**当性能依据写进文档/发布说明。
 
 **⚠ ZIP 的 MT 路径与 7z 的 `mt=on` 是两件事**：ZIP MT 按「纯压缩组（7z Deflate）/ 混合组」分派，用 N 个 `mt=off` 的 7z 压缩器组间并行 + copy-mode 合并（不重压缩）；7z 的 `mt=on` 是 7z.dll 原生线程。两者不可混为一谈。
 
-**隐藏的空转控件（Phase 2 实现后启用）**：
+**决策链（Phase 2 / Task 9-11）**
 
-- `魔数检测`（`AdaptiveSmartDetect`）：`ZipEntryClassifier.GetAdaptiveLevel` 只读扩展名，从不读 `FileFormatDetector.Detect` 结果 → UI 已隐藏
-- `自适应规则`（`AdaptiveOverrides`）：`AdaptiveRuleMatcher.ResolveLevel` 无生产调用点，`CompressRequest`/`ArchiveOptions` 无规则字段 → 卡片已隐藏
-- 自定义格式「魔数 hex」：`GetAdaptiveLevel` 只读 `format.Extensions`，不读 `MagicHex` → 输入框已隐藏
+- **唯一入口**：`AdaptiveRuleMatcher.ResolveLevel(filePath, globalLevel, adaptiveCompression, adaptiveSmartDetect, rules, customFormats)`。优先级：**用户规则（扩展名）> SSOT 扩展名 > 魔数 > 全局级别**；引擎 4 条路径（MT 分拣 / MT 组内 7z / 串行写入 / `AddToArchiveAsync`）全部走它，禁止另起一套判定（历史事故：分拣说 Store、写入却 Deflate）。
+- **SSOT**：`ZipEntryClassifier` 提供 `IsCompressed(ext)` / `IsCompressedFormat(FileFormat)` / `IsCompressedByMagic(path)` / `TryReadHead` / `MatchCustomFormatByMagic`；`CompressedExtensions` 是扩展名侧唯一事实源，`CompressionCoefficients` 只做压缩率预估。
+- **魔数检测**：仅文件 ≥ 64KB（`MagicDetectMinBytes`）才读前 4KB；先按自定义格式 `MagicHex` 匹配（命中后查引用该 FormatId 的用户规则），再按 `FileFormatDetector.Detect` 判断是否为内置「已压缩」格式；任何 IO 异常都回落扩展名规则，不中断压缩。
+- **规则生效范围**：仅 ZIP 路径；ZIP 加密子路径跳过逐条目降级。MT 路径下只有「仅存储」类规则全程生效，「指定压缩级别」类只对串行路径生效（设置页有提示 + 行内标记）。
+- **UI 现状**：设置页「自适应规则」「格式目录」「魔数检测」随自适应开关显示；ZIP 面板魔数检测随自适应开关显隐；「并行压缩组数」与「仅存储格式」控件已删除，`MultiThreadedStoreFormatIds` 仅作迁移字段。
+- **默认规则集**：6 类（图片/视频/音频/压缩包/字体/文档），迁移入口 `AppSettings.AdaptiveOverridesDefaultsVersion`；旧「仅存储格式」用户额外项迁移成一条 Store 规则。⚠ 图片类仍含 `Bmp`（旧默认行为保留），与 SSOT「BMP 未压缩」判定不一致，属已记录例外。
+- **7z 路径准入**：`IsMultiThreadedEligible` 在两种情况下返回 true —— ① 用户开启 `MultiThreadedCompression`；② 压缩方法为 **Deflate64**（SharpCompress `ZipWriter` 无法写 method 9，必须由 7z 产出，此时 `mt=1` 单线程）。加密、分卷、ZIP32 上限仍是硬前置条件；分卷 + Deflate64 尚无 7z 分卷路径（会回落到不支持 method 9 的串行 writer）。
+- **文件名编码**：MT / 加密 ZIP 走 7z，统一 `CustomParameters["cu"]="on"` 强制 UTF-8 条目名（bit 11）；用户显式选 GBK 时 MT 回落串行（7z 无法可靠产出 GBK）。否则 7z 会按系统 ANSI 写名，与 Store 条目的 UTF-8 混用。
+- **不可读源文件**：MT 镜像/Store 合并不走 `ReadFileWithRetry`，入口先用 `ReadErrorHandler.FilterUnreadableFiles`（`SharedReadStream` + `ErrorResolver`）预检并上报 Skipped；镜像与 Store 合并均用 `SharedReadStream.OpenRead`，避免被编辑器持有的文件让整次 MT 压缩失败。
+- **临时空间**：MT 路径在系统临时目录做「源镜像 + 每组 temp zip + 最终包」，峰值约为输入 + 输出（甚至 2× 输入）；大目录需确保系统盘有足够空间。串行路径直接写输出，无此开销。
+- **已知 UX 边界**：单组 MT 混合场景的合并进度仍是重写器固定百分比（可能从组阶段跳到 92%）；加密/分卷/非 Deflate/GBK 会让自适应或 MT 部分失效但 UI 无提示。
 
 ### ArchiveItem duality
 

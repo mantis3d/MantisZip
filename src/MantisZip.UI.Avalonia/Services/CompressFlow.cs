@@ -92,8 +92,8 @@ public static class CompressFlow
             AdaptiveCompression = vm.AdaptiveCompression,
             AdaptiveSmartDetect = vm.AdaptiveSmartDetect,
             MultiThreadedCompression = vm.MultiThreadedCompression,
-            // 仅存储格式：自适应开启时传递用户自定义仅存储格式列表（2026-10-19 起与多线程解耦，串行路径也读）
-            // Phase 2 / Task 10：自适应覆盖规则 + 用户自定义格式（规则按 FormatId 反查扩展名）
+            // Phase 2 / Task 10 + 2026-10-21 合并：自适应覆盖规则 + 用户自定义格式
+            // （规则按 FormatId 反查扩展名；原「仅存储格式」列表已并入规则，不再单独传递）
             AdaptiveOverrides = new List<AdaptiveOverrideRule>(
                 settings.AdaptiveOverrides ?? new List<AdaptiveOverrideRule>()),
             CustomFormats = new List<FormatDefinition>(

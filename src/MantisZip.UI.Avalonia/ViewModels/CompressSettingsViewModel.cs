@@ -206,10 +206,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>ZIP 多线程压缩。启用时利用多核 CPU 并行压缩已分组的文件。</summary>
     public bool MultiThreadedCompression { get; set; }
 
-    /// <summary>N 组并行压缩的目标组数。</summary>
-    [ObservableProperty]
-    private int _parallelCompressDegree = Environment.ProcessorCount;
-
     // ── 分卷 ──
 
     /// <summary>分卷大小选项（共享数据源）。</summary>

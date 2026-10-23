@@ -1,8 +1,8 @@
 # 压缩加速三开关 — UI 收敛（Phase 1）+ 魔数检测/自适应规则实现（Phase 2）
 
-> **状态**: 🟢 Phase 1 ✅ 完成 / Phase 2 部分完成（2026-10-21：Task 9-11 实施完成 + 「仅存储格式」合并进自适应规则 + 多线程提示/标记；Task 12 本机基准测试 UI、Task 13 组数定标**未做**，待后续） | **日期**: 2026-10-16（**2026-10-18 评审修订 + 实测拍板 + 同日双机复测改判**；**2026-10-19 Phase 1 实施：Task 1/2/4/5/6 完成，新增常驻科普提示**）| **优先级**: P1 | **预估工时**: Phase 1 = **4-5h**（组数规则简化为 `clamp(核数,4,16)`，Task 0 双机实跑完成；改动 B 暂缓 → Phase 1 无门控代码）/ Phase 2 = **5-7h**（原 3-4h + Task 12 本机基准测试约 +2-3h）
+> **状态**: 🟢 Phase 1 功能完成（死字段/单测/文档收尾已于 2026-10-23 补齐）/ Phase 2 部分完成（2026-10-21：Task 9-11 实施完成 + 「仅存储格式」合并进自适应规则 + 多线程提示/标记；**2026-10-23 复核补漏**：自定义 `MagicHex` 接线、ZIP 面板魔数联动、MT 提示实时刷新、CLI 自适应开关、帮助文案「三个开关」；Task 12 本机基准测试 UI、Task 13 组数定标**未做**，待后续） | **日期**: 2026-10-16（**2026-10-18 评审修订 + 实测拍板 + 同日双机复测改判**；**2026-10-19 Phase 1 实施：Task 1/2/4/5/6 完成，新增常驻科普提示**）| **优先级**: P1 | **预估工时**: Phase 1 = **4-5h**（组数规则简化为 `clamp(核数,4,16)`，Task 0 双机实跑完成；改动 B 暂缓 → Phase 1 无门控代码）/ Phase 2 = **5-7h**（原 3-4h + Task 12 本机基准测试约 +2-3h）
 > **来源**: 用户 2026-10-16 提出「压缩有个选项有两个开关『多线程』和『自适应』，测试发现不启用自适应时开启多线程反而有反作用」→ 实测 + 代码审计后扩展为两阶段计划
-> **原型**: [docs/prototypes/compress-format-options-panel.html](../../docs/prototypes/compress-format-options-panel.html)（交互原型，已覆盖两处界面）
+> **原型**: [docs/prototypes/compress-format-options-panel.html](../../../docs/prototypes/compress-format-options-panel.html)（交互原型，已覆盖两处界面）
 > **评审**: 2026-10-18 逐条核对源码，修正 4 处会直接踩坑的事实错误（A1–A4）、1 处与既有 bench 结论冲突（B1）、若干语义/文档遗漏（C/D 项），详见文末「修订记录」
 > **实测拍板（2026-10-18）**: Task 0 基线复测已实跑（20 逻辑核机 + 8 逻辑核机双机对照，报告 `.buildout\bench-before-*.txt` / `bench-retest-8lp-*.txt`）→ 引擎默认组数 `clamp(核数,4,16)`、方案 C 保留但标注「未验证」；**改动 B（MT 依赖自适应）暂缓拍板**——20 核机上「仅 MT」有真实收益、8 逻辑核机上「仅 MT」净负收益（用户原始观察在弱 CPU 上复现），任何一刀切静态策略均片面 → Phase 1 维持三开关独立（无门控代码），最终策略待 Phase 2「本机基准测试」按机器定夺；详见文末「拍板记录」
 
@@ -54,7 +54,7 @@
 
     `--degrees` 扫描各组数（`0` = 引擎默认，改动前 = `ProcessorCount`，改动后 = Task 2 的新默认规则 —— 便于 before/after 直接对齐「默认路径」）；`--profile` 取 `text` / `media` / `mixed`；`--report` 出 UTF-8 完整报告（终端可能乱码），`--json` 出结构化结果。
 
-    **执行环境记录（2026-10-18 实跑）**：本机 **20 逻辑核**（与脚本头部记录的 2026-10-04 旧 bench 同环境）、`dotnet 10.0.402`、语料为脚本默认合成集（文本 200×250KB / 媒体 100×500KB）、`--reps 3`。⚠ 计划后文出现的「16 核 / avgCores ≈12」是 2026-10-16 的测量值，本机复现不了；Task 0 只判定**相对快慢**（deg=1 单组 `mt=on` vs 2–8 组），该判定与核数无关。另注：本机 `--degrees 0` 后（Task 2 完成后）为 `clamp(20,2,8)=8` 组 × `mt=20/8=2`。
+    **执行环境记录（2026-10-18 实跑）**：本机 **20 逻辑核**（与脚本头部记录的 2026-10-04 旧 bench 同环境）、`dotnet 10.0.402`、语料为脚本默认合成集（文本 200×250KB / 媒体 100×500KB）、`--reps 3`。⚠ 计划后文出现的「16 核 / avgCores ≈12」是 2026-10-16 的测量值，本机复现不了；Task 0 只判定**相对快慢**（deg=1 单组 `mt=on` vs 2–8 组），该判定与核数无关。另注：本机 `--degrees 0` 后（Task 2 完成后）为 `clamp(20,4,16)=16` 组 × `mt=max(1,20/16)=1`（`clamp(核数,2,8)` 是当时待验证的候选，已在 Step 2 否决）。
     Expected: 报告给出各 degree 的墙钟秒数与 CPU 占用；与 2026-10-16 的 5.47s / 1.64s 量级对齐（同机同语料）。
 
 - [x] **Step 2: 判定并定调（2026-10-18 完成）**
@@ -163,7 +163,7 @@
 |------|------|
 | `Controls/DynamicFormatOptionsPanel.axaml` | 删 `ParallelDegreePanel`（:96-116，标签 + `ParallelDegreeInput` + 灰色提示），**以及 `ZipMultiThreadCheck` 上的 `IsCheckedChanged="ZipMultiThreadCheck_IsCheckedChanged"`（:80）** —— 该处理器的唯一作用是联动组数面板显隐；改动 B 暂缓（Phase 1 无门控）后它没有任何用途（**不是**「留给 Task 3 复用」） |
 | `Controls/DynamicFormatOptionsPanel.axaml.cs` | 删 `ParallelDegreeLabel`/`ParallelDegreeHint`（:61-62）、`ParallelCompressDegree` 属性（:247-255）、**`ZipMultiThreadCheck_IsCheckedChanged` 整个处理器**（:312-320，连同 XML 注释）、`UpdateTotalSourceSize` 里的面板显隐 2 行（:384-385）、`LoadDefaults` 里的组数播种与面板显隐（:420-423）、面板相关 XML 注释（:93-95）。**保留** `_mtCheckedBeforeLimit`（:41）与 `UpdateTotalSourceSize` 其余逻辑（ZIP32 4GB 门控仍需要它） |
-| `ViewModels/CompressSettingsViewModel.cs` | 删 `_parallelCompressDegree`（:209-211）、钳制 handler（:496-509）、设置默认值播种（:631-632）、`LocalizedStrings` 2 行（:493-494） |
+| `ViewModels/CompressSettingsViewModel.cs` | 删 `_parallelCompressDegree`（:209-211，**2026-10-23 补删：首轮遗漏**）、钳制 handler（:496-509）、设置默认值播种（:631-632）、`LocalizedStrings` 2 行（:493-494） |
 | `Dialogs/CompressSettingsWindow.axaml.cs` | 删 `ParallelCompressDegree` 快照（:276-277，含注释） |
 | `Views/MainWindow.axaml.cs` | 删 `cvm.ParallelCompressDegree = dialog.ViewModel.ParallelCompressDegree`（:249） |
 | `Services/CompressFlow.cs` | 删 `ParallelCompressDegree = vm.ParallelCompressDegree`（:99） |
@@ -172,9 +172,9 @@
 
 > **保留** `ArchiveOptions.ParallelCompressDegree`（`Core/Abstractions/ArchiveEngine.cs:168`）与 `CompressRequest.ParallelCompressDegree`（`Core/Services/CompressService.cs:103`，默认值改 `0` 见 Task 2）—— 引擎层输入，`tests/MantisZip.Tests/Engines/ParallelCompressTests.cs`（显式 3/1）与 `scripts/bench-zip-mt.cs` 仍在使用，**显式值仍照旧生效**。
 >
-> **连带（评审 D4）**：Task 2 改了默认规则后，`ArchiveEngine.cs:164-167` 与 `ZipEngine.cs:4342-4345` 的 XML 注释（「0 = 取 ProcessorCount」）必须一并更新，否则又是一处静默漂移点。
+> **连带（评审 D4）**：Task 2 改了默认规则后，`ArchiveEngine.cs:164-167` 与 `ZipEngine.CompressGroup.cs:1843-1846` 的 XML 注释（「0 = 取 ProcessorCount」）必须一并更新，否则又是一处静默漂移点（**2026-10-20 `ZipEngine.cs` 已拆分为 partial，行号以 `ZipEngine.CompressGroup.cs` 为准**）。
 >
-> **自查**：`rg -n "ParallelDegreeInput|ParallelDegreePanel" src`、`rg -n "ParallelCompressDegree" src/MantisZip.UI.Avalonia`、`rg -n "ZipMultiThreadCheck_IsCheckedChanged" src` 均应为 0 命中（Core 侧仅引擎/请求字段）。
+> **自查**：`rg -n "ParallelDegreeInput|ParallelDegreePanel" src`、`rg -n "ParallelCompressDegree|_parallelCompressDegree" src/MantisZip.UI.Avalonia`、`rg -n "ZipMultiThreadCheck_IsCheckedChanged" src` 均应为 0 命中（Core 侧仅引擎/请求字段）。⚠ 首轮自查只搜 `ParallelCompressDegree`，漏掉了字段名 `_parallelCompressDegree`，已于 2026-10-23 补删。
 
 ### Task 2 — 引擎侧：默认组数 `clamp(核数,4,16)` + 方案 C（并行度解耦，未验证）
 
@@ -184,10 +184,10 @@
 
 | 文件 | 改动 |
 |------|------|
-| `Core/Engines/ZipEngine.cs:4346` `ResolveParallelCompressDegree` | 默认规则 `<=0 → clamp(ProcessorCount, 4, 16)`（原为 `ProcessorCount` 无上下限）；**显式正数 1..16 仍照旧生效**（保 `degree=1` 回退语义，bench 脚本与测试依赖） |
+| `Core/Engines/ZipEngine.CompressGroup.cs:1847` `ResolveParallelCompressDegree` | 默认规则 `<=0 → clamp(ProcessorCount, 4, 16)`（原为 `ProcessorCount` 无上下限）；**显式正数 1..16 仍照旧生效**（保 `degree=1` 回退语义，bench 脚本与测试依赖） |
 | `Core/Services/CompressService.cs:103` | `CompressRequest.ParallelCompressDegree` 默认 `ProcessorCount` → `0`（统一走引擎默认规则，避免请求层/引擎层各有一套默认值） |
-| `Core/Engines/ZipEngine.cs:4103` ⚠ **未验证** | `compr.CustomParameters["mt"] = batchIndex.HasValue ? Math.Max(1, Environment.ProcessorCount / Math.Max(1, batchCount ?? 1)).ToString() : "on";`（方案 C：组内线程数 = 核数/组数） |
-| `ArchiveEngine.cs:164-167` / `ZipEngine.cs:4342-4345` | 同步更新 XML 注释为新语义（「0 = 引擎默认 = `clamp(核数,4,16)`」） |
+| `Core/Engines/ZipEngine.CompressGroup.cs:1601` ⚠ **未验证** | `compr.CustomParameters["mt"] = batchIndex.HasValue ? Math.Max(1, Environment.ProcessorCount / Math.Max(1, batchCount ?? 1)).ToString() : "on";`（方案 C：组内线程数 = 核数/组数） |
+| `ArchiveEngine.cs:164-167` / `ZipEngine.CompressGroup.cs:1843-1846` | 同步更新 XML 注释为新语义（「0 = 引擎默认 = `clamp(核数,4,16)`」） |
 
 **依据（Task 0 实测，本机 20 核）**：`deg=16`（16 组 × `mt=off` = 16 线程）为最优（text 0.79s / mixed 0.97s）；`deg=8` 慢 21–30%（text 0.96 / mixed 1.26）；`deg=2` 最差（text 3.07 / mixed 3.59）；`deg=1`（单组 `mt=on`）在 text 上慢 ~1.8x；`deg=0`（现默认 = cap 16）≈ `deg=16` → **定调 `clamp(核数,4,16)` 后本机默认路径不变，删旋钮本身即纯收益**。
 
@@ -200,9 +200,9 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 
 若验证显示无收益，方案 C 可原样保留（无害 no-op）或删除，但**不得**作为性能依据写进文档 / 发布说明。
 
-**公式正确性（评审补充已核对）**：两处调用点传入的 `batchCount` 是**实际组数** `groups.Count`（`ZipEngine.cs:2015` / `:3046`），且为整除（向下取整），故 `组数 × mt` 不会超过核数、不会过度订阅；`Math.Max(1, …)` 兜底「组数 > 核数」的配置（显式 degree、或核数很少）。
+**公式正确性（评审补充已核对）**：两处调用点传入的 `batchCount` 是**实际组数** `groups.Count`（`ZipEngine.Compress.cs:324` / `ZipEngine.CompressGroup.cs:541`），且为整除（向下取整），故 `组数 × mt` 不会超过核数、不会过度订阅；`Math.Max(1, …)` 兜底「组数 > 核数」的配置（显式 degree、或核数很少）。
 
-**测试**：`ParallelCompressTests` 使用显式 1/3/4 → 不受影响；已核对**无**测试断言 `ResolveParallelCompressDegree(0)` → 补一条 `ResolveParallelCompressDegree_Zero_UsesEngineDefault`，断言 `clamp(ProcessorCount,4,16)`（本机 20 → 16），把默认语义钉住。
+**测试**：`ParallelCompressTests` 使用显式 1/3/4 → 不受影响；已核对**无**测试断言 `ResolveParallelCompressDegree(0)` → 补一组 `ResolveParallelCompressDegreeTests`（**2026-10-23 已补**：0/负数 → `clamp(ProcessorCount,4,16)`；显式 1..16 原样；>16 钳制到 16），把默认语义钉住。
 
 ### Task 3 — 改动 B 暂缓（2026-10-18 双机数据后改判）：Phase 1 三开关保持独立
 
@@ -273,14 +273,14 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 
 - **Phase 1 新增 1 个三语 key**：`Compress_MT_BenefitHint`（ZIP 面板「多线程压缩」下方的**常驻科普提示**：「收益与 CPU 配置相关：多核高配置提升明显；核心数较少时收益有限，甚至可能变慢。」）。理由：提示本身可独立成立（不依赖基准测试），且弱 CPU 用户在 **Phase 1** 就会遇到「MT 默认开着但可能更慢」的风险窗口，提前保护优于等 Phase 2 与基准测试捆绑上线（2026-10-19 用户决策提前）。改动 B 暂缓后，「MT 依赖自适应」的说明行仍不需要。Task 12 的常驻提示与此**为同一行**（Phase 2 不再新增）。
 - 删除三语 key `Compress_ParallelDegree` / `Compress_ParallelDegree_Hint`（Task 1）。
-- **`AGENTS.md`（评审 A4，原指令不成立）**：AGENTS.md **没有**「加速」段落，也**从未提及**「并行压缩组数」→ 原指令「改写加速段落 + 删除组数描述（含 `DynamicFormatOptionsPanel` 的 7z 面板说明）」全部作废。实际动作：
+- **`AGENTS.md` / `docs/ARCHITECTURE.md`（评审 A4，原指令不成立）**：AGENTS.md **没有**「加速」段落，也**从未提及**「并行压缩组数」→ 原指令「改写加速段落 + 删除组数描述（含 `DynamicFormatOptionsPanel` 的 7z 面板说明）」全部作废。实际动作：
   - **不要动** `AGENTS.md:117-124`（「7z 多线程压缩（mt=on）」讲的是 `SevenZipMultithreaded`，与本次删除无关）
-  - `AGENTS.md:174` Controls 列表行（`DynamicFormatOptionsPanel`（压缩格式动态选项，7z 固实块等））保持准确，无需改
-  - **新增一小节**（建议放在「7z 多线程压缩（mt=on）」之后）：「ZIP 压缩加速（自适应 / 多线程 / 引擎侧组数）」——写明：三开关 Phase 1 **互相独立**（MT 与自适应无门控依赖；2026-10-18 双机实测表明 MT 收益与 CPU 相关——强 CPU 有收益、弱 CPU 可能负收益，最终策略待 Phase 2 本机基准测试，可附双机数据）；组数已从 UI 移除（引擎默认 `clamp(核数,4,16)`，「组内线程数 = 核数/组数」未验证）；魔数检测与自适应规则 UI 暂隐藏（Phase 2 实现）。同时点明 **ZIP 的 MT 路径与 7z 的 `mt=on` 是两件事**（前者按「纯压缩组 / 混合组」分派并用 `mt=off` 的 N 组并行，后者是 7z.dll 原生线程），避免读者把本节与上面那节混为一谈
-- `RELEASE_NOTES.md:19`（v0.5.2 宣传点含「可设置并行压缩组数」）→ 下一版 notes 必须写明：**移除组数旋钮**（引擎自动 `clamp(核数,4,16)`）；**不要**写「多线程依赖自适应」（该改动已暂缓，Phase 1 无门控）；可补实测结论（ZIP 多线程收益与 CPU 相关：20 核机 text/mixed 有 10–20% 收益且压缩率更好，8 逻辑核机净负收益，Phase 2 将以本机基准测试适配；对已压缩数据无增益）。
-- `docs/prototypes/compress-format-options-panel.html` → 页首加 Phase 标注（Phase 1 隐藏项 / Phase 2 恢复项），避免原型与实际不符。
-- `docs/PLAN.md` 本计划行补「2026-10-18 评审修订」要点。
-- `docs/progress-avalonia-detail.md` 记录本次变更（规则 3）。
+  - `AGENTS.md` 的 Controls 列表行保持准确，无需改
+  - **新增小节**「ZIP 压缩加速（自适应 / 多线程 / 引擎侧组数）」：Phase 1 时放在 AGENTS.md，**2026-10-20 已迁入 `docs/ARCHITECTURE.md:516`**（AGENTS.md 速查段只留指路）。内容要求：三开关 Phase 1 **互相独立**（无门控）；组数已从 UI 移除（引擎默认 `clamp(核数,4,16)`，「组内线程数 = 核数/组数」未验证）；点明 **ZIP 的 MT 路径与 7z 的 `mt=on` 是两件事**。**Phase 2 结束后必须改写该节**（2026-10-23 已改写：魔数检测/规则 SSOT/仅存储合并/Task 12/13 未做）
+- `RELEASE_NOTES.md` → v0.5.3「压缩加速」节需写明用户可见变化（**2026-10-23 已补**）：**移除「并行压缩组数」旋钮**（引擎自动 `clamp(核数,4,16)`）、**「仅存储格式」列表并入自适应规则**（旧列表自动迁移）；**不要**写「多线程依赖自适应」（该改动已暂缓）。实测结论（MT 收益与 CPU 相关：20 核机 text/mixed 有 10–20% 收益且压缩率更好，8 逻辑核机净负收益；对已压缩数据无增益）保留为提示文案依据。
+- `docs/prototypes/compress-format-options-panel.html` → 页首 Phase 标注（**2026-10-23 更新**：Phase 1 隐藏项已恢复、Phase 2 已落地；下方演示的「取消自适应 → MT 置灰」为已否决方案，仅历史参考）。
+- `docs/PLAN.md` 本计划行补「2026-10-18 评审修订」要点（2026-10-23 已同步状态列与未做项）。
+- `docs/progress-avalonia-detail.md` / `docs/PROGRESS.md` 记录本次变更（规则 3，2026-10-23 已补复核条目）。
 
 ### Task 8 — 验证
 
@@ -289,7 +289,8 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 - `dotnet test tests\MantisZip.Tests\MantisZip.Tests.csproj`（Task 2 的引擎改动 + 新增默认值单测必须全绿）
 - `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj`（**注意规则 17**：XAML 改动需 `--no-incremental` 全量重建，增量构建会掩盖 `AVLN3000`）
 - **after 对照 bench（评审 B1）**：代码改动后按 Task 0 完全相同参数复跑（`--profile text/media/mixed --degrees 0,1,2,4,8,16 --reps 3 --report .buildout\bench-after-*.txt --json .buildout\bench-after-*.json`）。**预期**：本机 `--degrees 0`（新默认 = `clamp(20,4,16)` = 16 组）应与 before 的 `deg=16` 列重合（text B ≈0.79s / mixed ≈0.97s / media ≈0.27s）；偏差 >10% 视为噪声或实现有误，需复跑确认。
-- ~~同步更新引用了被删成员的测试（`CompressSettingsViewModelTests` 等）~~ → **已核对：无任何测试引用** `ParallelCompressDegree` / `Compress_ParallelDegree` / `SmartDetectCheck`，也无断言 `ResolveParallelCompressDegree(0)`；改为补 Task 2 列出的新单测（Task 3 无代码改动 → 无新单测）。
+- ~~同步更新引用了被删成员的测试（`CompressSettingsViewModelTests` 等）~~ → **已核对：无任何测试引用** `Compress_ParallelDegree` / `SmartDetectCheck`，也无断言 `ResolveParallelCompressDegree(0)`；改为补 Task 2 列出的新单测（Task 3 无代码改动 → 无新单测）。⚠ **2026-10-23 更正**：`CompressSettingsDialogCopyTests` 的 Excluded 注册表曾引用残留死字段 `ParallelCompressDegree`（首轮自查漏网），已随死字段删除一起清理。
+- **2026-10-23 复核补验**：Core 构建 0 警告、Avalonia 构建 0 错误（1 条 NuGet 网络警告）；Core 测试全绿、UI 测试 **403 通过 / 3 跳过 / 0 失败**（新增 `MtWarningAndRuleBadge_UpdateLiveWhenMultiThreadedToggled`、`ResolveParallelCompressDegreeTests`、自定义 `MagicHex` 用例）。
 
 **Phase 1 验收清单**
 
@@ -301,9 +302,9 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 - [x] `rg -n "MultiThreadedCompression\s*&&\s*.*AdaptiveCompression" src` → 0 命中（防未来误加依赖）
 - [x] **超 4GB**：MT 勾选框禁用 + 灰字提示显示；退出超限后**恢复原勾选**（`_mtCheckedBeforeLimit` 逻辑），全程无互相覆盖
 - [x] `rg -n "ZipMultiThreadCheck_IsCheckedChanged" src` → 0 命中（axaml 事件属性与处理器**同时**删除，无 XAML 编译残留）
-- [x] 设置窗口「加速」页与压缩对话框 ZIP 面板都不再出现「魔数检测」
-- [x] 设置窗口「加速」页不再出现「自适应规则」卡片
-- [x] 自定义格式对话框不再出现「魔数 hex」输入框；格式目录列表不再显示 `[hex]`
+- [x]（Phase 1 历史，Phase 2 已恢复）设置窗口「加速」页与压缩对话框 ZIP 面板曾不再出现「魔数检测」——现均恢复；ZIP 面板魔数仅在自适应开启时显示（2026-10-23 补）
+- [x]（Phase 1 历史，Phase 2 已恢复）设置窗口「加速」页曾不再出现「自适应规则」卡片——现随自适应开启显示，并带多线程提示/行内标记
+- [x]（Phase 1 历史，Phase 2 已恢复）自定义格式对话框曾不再出现「魔数 hex」输入框——现已恢复并**接入引擎判定**（2026-10-23 补）
 - [x] `settings.json` 旧字段仍可加载（不抛异常、不丢其它设置）
 - [x] 全量构建 + 测试通过；bench before/after 数据已归档
 
@@ -311,10 +312,10 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 
 ### Task 9 — 实现魔数检测
 
-- `Core/Utils/ZipEntryClassifier.cs`：新增 `FileFormat` → 「已压缩」集合映射；`GetAdaptiveLevel` 增 `smartDetect` 形参。⚠ **实际有两个重载**（3 参 :57 / 4 参 :73）→ 统一为 5 参（`filePath, userLevel, adaptive, smartDetect, customStoreFormatIds`），删除或收敛 3 参重载（Core 内 4 个调用点，无测试引用）。
-- 头部读取：**先按扩展名判定，仅「可压缩」且文件 ≥ 阈值时才读头**（分拣是**单线程预扫**（`ZipEngine.cs:1899` / `:2930`），万级文件串行多出万次 open/seek 会明显拖慢）；`>= 64B` 即可满足 `FileFormatDetector.Detect` 的最低要求，取 4KB；**任何 IO 异常 → 视为未命中并回落扩展名规则**，不得因源文件被占用而中断压缩。写法参照 `ArchiveEngineFactory.GetEngineByMagic`（`ArchiveEngine.cs:586-606`）。
-- 接线 4 个调用点：`ZipEngine.cs` 1899 / 2930 / 3262 / 3795（传 `options.AdaptiveSmartDetect`）。注：3262/3795 的 `adaptive` 传的是字面量 `true`，外层已有 `options.AdaptiveCompression &&` 守卫（**不是 bug**，勿顺手改语义）。**2026-10-19 统一**：3262（串行写入）已由 3 参改 4 参（传 `MultiThreadedStoreFormatIds`），与 MT 分拣及 `AddToArchiveAsync`（3795）同口径 —— 单独启用自适应时自定义仅存储格式同样生效，不再「时灵时不灵」。
-- **一致性（评审）**：MT 分拣（1899/2930，4 参）+ 写入（3260/3795）+ 单组串行路径必须同口径 —— `ZipEngine.cs:3782-3788` 的注释记录过「分拣说 Store、写入却 Deflate」的事故。
+- `Core/Utils/ZipEntryClassifier.cs`：新增 `FileFormat` → 「已压缩」集合映射；`GetAdaptiveLevel` 增 `smartDetect` 形参。⚠ **实际有两个重载**（3 参 / 4 参）→ **最终落地改为删除两个重载**，4 个引擎调用点全部走 `AdaptiveRuleMatcher.ResolveLevel`（6 参：`filePath, globalLevel, adaptiveCompression, adaptiveSmartDetect, rules, customFormats`）；原文的「统一为 5 参 + `customStoreFormatIds`」已被同日追加节删除，勿再按此实施。
+- 头部读取：**先按扩展名判定，仅「可压缩」且文件 ≥ 阈值时才读头**（分拣是**单线程预扫**，万级文件串行多出万次 open/seek 会明显拖慢）；`>= 64B` 即可满足 `FileFormatDetector.Detect` 的最低要求，取 4KB；**任何 IO 异常 → 视为未命中并回落扩展名规则**，不得因源文件被占用而中断压缩。写法参照 `ArchiveEngineFactory.GetEngineByMagic`（`ArchiveEngine.cs:586-606`）。
+- 接线 4 个调用点：以下行号是 **2026-10-20 `ZipEngine.cs` 拆分前** 的编号，现分布在 `ZipEngine.Compress.cs` / `ZipEngine.CompressGroup.cs`（MT 分拣 / MT 组内 / 串行写入 / `AddToArchiveAsync`），已全部改走 `AdaptiveRuleMatcher.ResolveLevel`。原文的「3 参/4 参 + `MultiThreadedStoreFormatIds`」口径已被同日追加节合并删除，仅作历史记录。
+- **一致性（评审）**：MT 分拣 + 写入 + 单组串行路径必须同口径 —— 该事故（分拣说 Store、写入却 Deflate）的教训保留；现行实现统一走 `ResolveLevel`。
 - **待定项**（启动 Phase 2 时拍板）：
   1. 「已压缩」集合边界 —— `Pe`（exe/dll 其实可压）、`Sqlite`、`Svg`、`Tar`（未压缩归档）是否计入？
   2. 「大文件」阈值：常量（如 64KB）还是新设置项？
@@ -334,18 +335,19 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 
 「Phase 2 恢复清单」（Task 4/5/6 的 `false` 门控逐条改回，并接上真实实现）：
 
-| 位置 | 恢复动作 |
-|------|----------|
-| `SettingsWindowViewModel.IsSmartDetectVisible`（:189） | `false` → `AdaptiveCompression` |
-| `DynamicFormatOptionsPanel.axaml` `SmartDetectCheck`（:71） | 移除 `IsVisible="False"` 与占位注释 |
-| `DynamicFormatOptionsPanel.AdaptiveSmartDetect` getter（:220） | 恒 `false` → 读控件 |
-| `SettingsWindowViewModel.IsUserRulesSectionVisible`（:198） | `false` → `AdaptiveCompression && !MultiThreadedCompression` |
-| `AddCustomFormatDialog.axaml` `MagicHexTextBox`（:25） | 移除 `IsVisible="False"` |
-| `SettingsWindowViewModel.MagicHexDisplay`（:2214） | `""` → `[hex]` 显示 |
-| 自适应帮助文本 `AdaptiveHelp_Markdown`（三语） | **重新加回「## 魔数检测」段落**（2026-10-19 实施时先行删除，等 Task 9 功能落地后恢复原文） |
-| 设置窗口「加速」页 魔数检测 的「自适应关闭时禁用」联动（原「改动 C」） | 重新加回 |
+| 位置 | 恢复动作 | 实际落地（2026-10-23 核对） |
+|------|----------|--------------------------|
+| `SettingsWindowViewModel.IsSmartDetectVisible` | `false` → `AdaptiveCompression` | ✅ 一致 |
+| `DynamicFormatOptionsPanel.axaml` `SmartDetectCheck` | 移除 `IsVisible="False"` 与占位注释 | ✅ 一致；**2026-10-23 补**：随自适应开关整块显隐（规则 6），不再常驻可勾 |
+| `DynamicFormatOptionsPanel.AdaptiveSmartDetect` getter | 恒 `false` → 读控件 | ✅ 读控件；**2026-10-23 补**：自适应关闭时恒 `false`，不透传无效值 |
+| `SettingsWindowViewModel.IsUserRulesSectionVisible` | `false` → `AdaptiveCompression && !MultiThreadedCompression` | ⚠ **改为 `AdaptiveCompression`**：规则在 MT 路径下也生效（Store 类全程生效、级别类靠提示标记说明），不再与 MT 互斥 |
+| `SettingsWindowViewModel.IsFormatCatalogSectionVisible` | （补充项）Phase 1 为 `AdaptiveCompression && !MultiThreadedCompression` | ✅ 改为 `AdaptiveCompression`（随追加合并解耦 MT） |
+| `AddCustomFormatDialog.axaml` `MagicHexTextBox` | 移除 `IsVisible="False"` | ✅ 恢复；**2026-10-23 补**：MagicHex 已真正接入引擎（问题 #5 闭环） |
+| `SettingsWindowViewModel.MagicHexDisplay` | `""` → `[hex]` 显示 | ✅ 一致 |
+| 自适应帮助文本 `AdaptiveHelp_Markdown`（三语） | **重新加回「## 魔数检测」段落** | ✅ 已加；**2026-10-23 补**：开头「两个开关」改回「三个开关」（三语） |
+| 设置窗口「加速」页 魔数检测 的「自适应关闭时禁用」联动（原「改动 C」） | 重新加回 | ✅ 实际用「隐藏」实现（规则 6：隐藏而非禁用）；ZIP 面板同样联动（2026-10-23 补） |
 
-> **不适用**：「MT 依赖自适应压缩」（原 Task 3）已于 2026-10-18 **暂缓**（双机数据矛盾），Phase 1/2 均不引入硬门控 —— 三开关保持互相独立；MT 收益适配改由 **Task 12 基准测试**（软提示 + 默认值建议）承担。设置窗口 `SaveChanges` 的 `AdaptiveSmartDetect` 写回（:1644）在 Phase 1 未改动 → 无需恢复动作。
+> **不适用**：「MT 依赖自适应压缩」（原 Task 3）已于 2026-10-18 **暂缓**（双机数据矛盾），Phase 1/2 均不引入硬门控 —— 三开关保持互相独立；MT 收益适配改由 **Task 12 基准测试**（软提示 + 默认值建议）承担。设置窗口 `SaveChanges` 的 `AdaptiveSmartDetect` 写回在 Phase 1 未改动 → 无需恢复动作。
 
 ### Task 12（新增 · 2026-10-18 双机复测后追加）— 本机基准测试 + MT 收益适配
 
@@ -439,7 +441,7 @@ dotnet run scripts\bench-zip-mt.cs -- --corpus <大文件目录> --degrees 0,1 -
 | E4 | Task 12「默认值播种」会覆盖用户手动选择：`ratio<0.95 → MT 默认不勾选（无论 AppSettings 旧值）` 与「用户改动后仍直存直用」并存 → 用户手动勾上 MT 并保存后，**下次打开对话框又被改回未勾选**（循环），且无提示（计划明确不在对话框叠加提示） | **Phase 2 开工前须定**（不阻塞 Phase 1）：建议 (a) 播种仅在「用户从未手动改过」时生效（需「用户已表态」标记 —— 即被拒绝的意图/生效值二分，或新增 `MultiThreadedManualSet` 字段）；或 (b) 播种覆盖时在对话框显示灰字说明原因。当前按原设计保留，留待 Task 12 细化 |
 | E5 | 常驻科普提示（Task 12 的 `Compress_MT_BenefitHint`）与基准测试捆绑 → 弱 CPU 用户在 Phase 1 期间无保护 | **2026-10-19 用户决策提前到 Phase 1**：提示独立成立、成本极低（1 个三语 key + 1 行 TextBlock），ZIP 面板「多线程压缩」下方常驻灰字。Task 12 保留该提示（Phase 1 已加，不重复），仅新增基准测试入口 |
 | E6 | 压缩（`CompressAsync`）串行写入用 3 参 `GetAdaptiveLevel`、添加（`AddToArchiveAsync`）用 4 参 → 同一「自适应压缩」开关在两个入口行为不一致（自定义仅存储格式时灵时不灵） | **2026-10-19 用户决策统一**：3262 改 4 参（传 `MultiThreadedStoreFormatIds`），四个调用点同口径；`IsStoreFormatSectionVisible` 由 `自适应 && 多线程` 改为 `自适应`（与引擎行为对齐，消除「卡片隐藏但值生效」）。对默认配置（无自定义列表）零影响，bench before/after 数据仍有效 |
-| E7 | 常驻科普提示只在压缩对话框 ZIP 面板有，「设置 → 加速」页（全局默认 MT 开关）没有 → 弱 CPU 用户在设置页看不到风险提示 | **2026-10-19 用户决策**：设置页同步加同一行常驻灰字，复用 `Compress_MT_BenefitHint`（单一事实来源）。~~连带发现的 desc 措辞冲突待定~~ → **已处理**：`Settings_MultiThreadedCompression_Desc` 与 `AdaptiveHelp_Markdown` 多线程段的「显著提升」全部软化为「以提升」（三语）；`AdaptiveHelp_Markdown` 开头「三个开关」同步改为「两个开关」（魔数段已删） |
+| E7 | 常驻科普提示只在压缩对话框 ZIP 面板有，「设置 → 加速」页（全局默认 MT 开关）没有 → 弱 CPU 用户在设置页看不到风险提示 | **2026-10-19 用户决策**：设置页同步加同一行常驻灰字，复用 `Compress_MT_BenefitHint`（单一事实来源）。~~连带发现的 desc 措辞冲突待定~~ → **已处理**：`Settings_MultiThreadedCompression_Desc` 与 `AdaptiveHelp_Markdown` 多线程段的「显著提升」全部软化为「以提升」（三语）；`AdaptiveHelp_Markdown` 开头「三个开关」同步改为「两个开关」（魔数段已删）；**Phase 2 恢复魔数段后已于 2026-10-23 改回「三个开关」** |
 | E8 | 用户实测提问「16 线程会不会偏多、要不要加手动线程数」→ 追查发现 `clamp(核数,4,16)` 定调基于**方案 C 之前**数据，C 之后最优组数应更小；且「线程数旋钮」= 已删除的「并行压缩组数」 | **2026-10-19 用户决策：留到 Phase 2 一起改**（收益未坐实、Task 12 基准测试是正解、避免两套定标机制）→ 新增 **Task 13（post-C 组数定标）**，并在 Task 2 定调 / 拍板记录 #2 加「前提：C 之前数据」标注。**不加任何用户可见旋钮** |
 
 ## 拍板记录（2026-10-18 实测后 · 同日双机复测修订）
@@ -468,35 +470,43 @@ Task 0 基线复测先在 20 逻辑核机跑完（报告 `.buildout\bench-before
 3. **魔数阈值取常量 64KB**（不新增设置项）；魔数只对「扩展名不可靠/无扩展名」的文件生效。
 
 **Task 9 — 魔数检测**
-- `ZipEntryClassifier` 重写为 SSOT 原语：`IsCompressed(ext)` / `IsCompressedFormat(FileFormat)` / `IsCompressedByMagic(path)` / `IsCustomStoreFormat(...)`。
+- `ZipEntryClassifier` 重写为 SSOT 原语：`IsCompressed(ext)` / `IsCompressedFormat(FileFormat)` / `IsCompressedByMagic(path)`（⚠ 首版还含 `IsCustomStoreFormat(...)`，已在同日「仅存储格式合并」追加节删除）。
 - 魔数检测：仅当**文件 ≥ 64KB**（`MagicDetectMinBytes`）才读前 4KB → `FileFormatDetector.Detect` → 命中「已压缩格式集合」则 Store；任何 IO 异常（占用/权限/已删除）→ 回落扩展名规则，**不中断压缩**。
 - 扩展名集合修正：`svg`/`tar` 移出（未压缩内容）；`wav` 本就不在集合内。
+- **2026-10-23 补漏（问题 #5）**：自定义格式的 `FormatDefinition.MagicHex` 真正接入判定——`TryReadHead` 一次读头，先按自定义格式魔数（支持空格/中划线/冒号/`0x` 前缀）命中并继续查引用该格式 ID 的用户规则，未命中再走内置「已压缩」魔数判定。
+- 已知例外：默认「图片类」规则仍包含 `Bmp`（2026-10-21 合并时保留旧默认行为），因此默认配置下 BMP 实际走 Store；这是规则层兼容选择，不是 SSOT 判定。
 
 **Task 10 — 自适应规则引擎**
-- `AdaptiveRuleMatcher.ResolveLevel` 成为**唯一决策入口**（规则 > 自定义仅存储格式 > SSOT 扩展名 > 魔数），新增 `customStoreFormatIds` 参数；`ZipEntryClassifier.GetAdaptiveLevel` 两个重载**删除**（3 参无引用；4 参的 4 个引擎调用点全部改走新入口）。
-- 链路打通：`ArchiveOptions` += `AdaptiveOverrides` / `CustomFormats`；`CompressRequest` += 同两项并由 `CompressService` 映射；GUI（`CompressFlow.BuildRequest`）与 CLI（`App.CliCompress` 3 处）均传入设置中的规则与自定义格式。
+- `AdaptiveRuleMatcher.ResolveLevel` 成为**唯一决策入口**。优先级最终为：**用户规则（扩展名）> SSOT 扩展名 > 魔数（自定义格式规则 / 内置已压缩）> 全局级别**；⚠ 首版含「自定义仅存储格式 > SSOT 扩展名」与 `customStoreFormatIds` 参数，已在同日追加节删除（仅存储语义由规则承担）。
+- `ZipEntryClassifier.GetAdaptiveLevel` 两个重载**删除**（3 参无引用；4 参的 4 个引擎调用点全部改走新入口）。
+- 链路打通：`ArchiveOptions` += `AdaptiveOverrides` / `CustomFormats`；`CompressRequest` += 同两项并由 `CompressService` 映射；GUI（`CompressFlow.BuildRequest`）与 CLI（`App.CliCompress` 3 处）均传入设置中的规则与自定义格式。**2026-10-23 补**：CLI 同时传入 `AdaptiveCompression` / `AdaptiveSmartDetect` / `MultiThreadedCompression`——此前只传规则而开关保持默认 `false`，CLI 实际不生效。
 - 引擎 4 条路径同口径（MT 分拣 / MT 组内 7z / 串行写入 `ReadFileWithRetry` / `AddToArchiveAsync`）——消除「分拣说 Store、写入却 Deflate」的历史不一致。
 - 默认规则集迁移：新增 `AppSettings.AdaptiveOverridesDefaultsVersion`；旧持久化的 4 条默认规则（用户未改过）整体替换为对齐版，用户自改的规则集原样保留。
 
 **Task 11 — 恢复 Phase 1 隐藏的 UI**
-- `SettingsWindowViewModel.IsSmartDetectVisible` / `IsUserRulesSectionVisible` / `IsFormatCatalogSectionVisible` 恒 `false` → 随 `AdaptiveCompression` 显示。
-- `DynamicFormatOptionsPanel`：ZIP 面板「魔数检测」复选框恢复可见；`AdaptiveSmartDetect` getter 由恒 `false` 改为读控件（值经 `CompressSettingsWindow` → `CompressSettingsViewModel` → `CompressFlow` → `ArchiveOptions` 贯通）。
-- `AddCustomFormatDialog` 魔数 hex 输入框恢复可见；`FormatDefinitionViewModel.MagicHexDisplay` 恢复 `[hex]` 显示。
-- 帮助文本 `AdaptiveHelp_Markdown`（三语）新增「## 魔数检测 / Magic-number detection / 魔數偵測」段，并**修正已过时的提示**（原文说「自适应+多线程同开时用户规则不生效」——规则现已全路径生效）。
+- `SettingsWindowViewModel.IsSmartDetectVisible` / `IsUserRulesSectionVisible` / `IsFormatCatalogSectionVisible` → 随 `AdaptiveCompression` 显示（⚠ 首版写「恒 `false`」不准确：`IsFormatCatalogSectionVisible` 在 Phase 1 实际是 `AdaptiveCompression && !MultiThreadedCompression`）。
+- `DynamicFormatOptionsPanel`：ZIP 面板「魔数检测」复选框恢复可见；`AdaptiveSmartDetect` getter 由恒 `false` 改为读控件（值经 `CompressSettingsWindow` → `CompressSettingsViewModel` → `CompressFlow` → `ArchiveOptions` 贯通）。**2026-10-23 补**：该复选框随「自适应压缩」开关整块显隐，自适应关闭时 getter 恒 `false`。
+- `AddCustomFormatDialog` 魔数 hex 输入框恢复可见；`FormatDefinitionViewModel.MagicHexDisplay` 恢复 `[hex]` 显示；**2026-10-23 补**：MagicHex 已真正接入引擎（见 Task 9）。
+- 帮助文本 `AdaptiveHelp_Markdown`（三语）新增「## 魔数检测 / Magic-number detection / 魔數偵測」段，并**修正已过时的提示**（原文说「自适应+多线程同开时用户规则不生效」——规则现已全路径生效）；**2026-10-23 补**：开头「两个开关」改回「三个开关」。
+- **2026-10-23 补**：多线程提示/行内标记随 MT 开关实时刷新（此前漏通知，需重开设置窗口才正确）；新增规则也会带上当前 MT 状态。
 
 **测试**
-- Core 新增 `AdaptiveCompressionClassificationTests`（SSOT 边界 / 魔数检测命中·文本·阈值·读不到 / 规则优先·禁用规则·自定义仅存储格式·魔数开关）——随全量 **766 通过 / 3 跳过 / 0 失败**。
-- UI 新增 `AdaptiveSettingsUiTests`（区块随自适应联动 / 魔数 hex 显示 / 旧默认规则集迁移 / 自定义规则集保留）——随全量 **337 通过 / 3 跳过 / 0 失败**。
+- Core 新增 `AdaptiveCompressionClassificationTests`（SSOT 边界 / 魔数检测命中·文本·阈值·读不到 / 规则优先·禁用规则·Store 规则·魔数开关 / **自定义 MagicHex 命中规则与回落**）——2026-10-23 全量通过。
+- UI 新增 `AdaptiveSettingsUiTests`（区块随自适应联动 / 魔数 hex 显示 / 旧默认规则集迁移 / 自定义规则集保留 / **MT 提示与行内标记实时刷新**）——2026-10-23 全量 **403 通过 / 3 跳过 / 0 失败**。
+- 新增 `ResolveParallelCompressDegreeTests`（0/负数默认值、显式 1..16、>16 钳制）。
 - 既有 `ZipEntryClassifierTests` 改指新入口（`ResolveLevel`），`ZipEngineTests` 3 处分拣模拟改用与生产同参的调用。
 
 **已知边界（如实记录）**
 - 自适应与规则目前**仅 ZIP 路径生效**（7z / TAR.GZ 引擎无逐条目级别接口）；ZIP 的「加密」子路径也不做逐条目降级（`options.Encrypt` 时跳过）。
 - 魔数检测只对 ≥64KB 的文件生效，且需额外读头，略有耗时。
+- 默认「图片类」规则保留 `Bmp`（见 Task 9 例外说明）。
+- MT 路径下只有「仅存储」类规则全程生效；「指定压缩级别」类只对串行路径生效（UI 已提示 + 行内标记）。
 
 **未做**
 - Task 12 本机基准测试 UI（设置 → 加速 → 运行本机基准测试）与默认值播种（含 E4「仅在用户从未手动改过时播种」的标记字段）。
-- Task 13 post-C 组数定标（现有 post-C 数据噪声 27%，不足以定标 → 记录「组数不敏感」，保持 `clamp(核数,4,16)`）。
+- Task 13 post-C 组数定标（**干净复测未做**；现有 post-C 数据噪声 27%，不足以定标 → 暂保持 `clamp(核数,4,16)`，**不得**据此宣称「组数不敏感」）。
 - `AdaptiveOverridesDefaultsVersion` 迁移只在内存生效（下次保存设置时随 settings.json 落盘）。
+
 ## Phase 2 追加：合并「仅存储格式」+ 多线程提示（2026-10-21，用户拍板）
 
 **背景**：多线程路径由 7z 原生**单次调用整组压缩**、组内统一用全局级别（`ZipEngine.CompressGroup.cs:1589-1592`）→ 规则中「指定压缩级别」在 MT 路径不生效；而「仅存储」判定在 MT 分拣阶段即生效（进 storeGroup → copy-mode 原样写入）。且 MT 路径准入有条件（`IsMultiThreadedEligible`：未加密 / 未分卷 / 条目数 ≤65535 / 体积 <4GB / 方法为 deflate·deflate64），**小目录、加密包、分卷等走串行路径时规则全部生效** —— 故不能按「多线程开关」粗暴禁用级别选择（会过度限制），改为**提示 + 行内标记**。
@@ -511,3 +521,47 @@ Task 0 基线复测先在 20 逻辑核机跑完（报告 `.buildout\bench-before
 - **文案修正**：三语帮助「自定义规则始终生效」的过时提示改为「Store 类始终生效；指定压缩级别类在多线程路径不生效，串行路径全部生效」。
 
 **测试**：UI 新增 3 条（自定义仅存储 ID 迁移为规则 / 默认规则集 6 类且不含未压缩格式 / 行内标记仅在「多线程开 + 级别非 Store」时显示）；Core `ZipEntryClassifierTests` 改为规则等价用例；`ZipEngineTests` C3（MT + 自定义仅存储 → 进 StoreGroup）改为等价的 Store 规则用例。全量 Core **766 通过 / 3 跳过 / 0 失败**、UI **340 通过 / 3 跳过 / 0 失败**。
+
+## 2026-10-23 复核与补漏（用户拍板「全部含功能补漏」）
+
+**背景**：逐条对照工作区代码复核本计划完成度，发现 2 处计划内收尾遗漏、4 处「标记完成但实际不生效」的功能缺口，以及 10+ 处文档与代码漂移。本节记录本轮处理结果。
+
+**代码补漏**
+- **自定义 `MagicHex` 接线（问题 #5）**：`ZipEntryClassifier` 新增 `TryReadHead` / `MatchCustomFormatByMagic` / `HeadStartsWithMagic`；`AdaptiveRuleMatcher.ResolveLevel` 在魔数阶段先匹配自定义格式魔数并查引用该 FormatId 的用户规则，未命中再走内置「已压缩」判定。读头只做一次（原 `IsCompressedByMagic` 会重复读）。
+- **ZIP 面板魔数联动**：`SmartDetectCheck` 随「自适应压缩」开关整块显隐（规则 6）；`AdaptiveSmartDetect` getter 在自适应关闭时恒 `false`，不再透传无效值。
+- **MT 提示实时刷新**：`NotifyAdaptiveProperties()` 补通知 `IsAdaptiveOverridesMtWarningVisible`；`AdaptiveOverrideRuleViewModel.IsMultiThreadedEnabled` 改为 `[ObservableProperty]` 并在变更时通知 `ShowMtIneffectiveBadge`；设置页 MT 开关变更时刷新全部规则行；新增规则也带当前 MT 状态。
+- **CLI 生效**：`App.CliCompress` 3 处 `CompressRequest` 补 `AdaptiveCompression` / `AdaptiveSmartDetect` / `MultiThreadedCompression`（此前只传规则，开关默认 false → 规则等于没生效）。
+- **收尾遗漏**：删除 `CompressSettingsViewModel._parallelCompressDegree` 死字段（并清理 `CompressSettingsDialogCopyTests` 的残留登记）；补 `ResolveParallelCompressDegreeTests`（0/负数默认值、显式 1..16、>16 钳制）。
+- **注释清理**：`ZipEngine.CompressGroup` 两处「3 参/4 参重载 + `MultiThreadedStoreFormatIds`」旧注释、`AdaptiveRuleMatcher` 类摘要、`CompressService.ParallelCompressDegree` 注释、`SettingsWindowViewModel` 重复 `<summary>`、`AddCustomFormatDialog` 占位注释、`ZipEntryClassifierTests`/`ZipEngineTests` 旧概念命名。
+
+**文案修正**
+- 三语 `AdaptiveHelp_Markdown` 开头「两个开关」→「三个开关」（魔数检测已恢复）。
+- `RELEASE_NOTES.md` v0.5.3「压缩加速」节补「移除并行压缩组数旋钮」「仅存储格式并入自适应规则」两条用户可见变化。
+
+**验证**
+- `verify-repo.ps1 -Task build -Target core` → 0 警告；`-Target avalonia` → 0 错误（仅 NuGet 网络警告）。
+- `verify-repo.ps1 -Task test -Target tests` → **786 通过 / 3 跳过 / 0 失败**（总 789）；`-Target ui-tests` → **403 通过 / 3 跳过 / 0 失败**（总 406）。新增用例：`ResolveParallelCompressDegreeTests`（7）、自定义 MagicHex（2 + Theory 4）、MT 提示实时刷新（1）、MT/加密中文名编码（3）、MT 不可读文件 Skip（1）、Deflate64 串行/全 Store（2）。
+
+**仍留待后续**
+- Task 12 本机基准测试 UI、Task 13 post-C 组数定标（未做，保持现状）。
+- 默认「图片类」规则含 `Bmp`（与 SSOT 注释不一致）——按 2026-10-21 用户拍板保留默认行为，已在代码注释与本计划「已知边界」记录，不改默认输出。
+- 纯 2–4 物理核机 bench 仍未测。
+
+## 2026-10-23 二轮复核：压缩加速执行链（用户追问「有没有别的问题」）
+
+**已修复（含回归测试）**
+- **Deflate64 关闭多线程时必失败**：SharpCompress `ZipWriter` 无法写 method 9（实测 `InvalidFormatException`）。现 Deflate64 即使 `MultiThreadedCompression=false` 也走 7z 路径（`mt=1` 单线程，不违反开关语义）；自适应「全部 Store」时改用 None writer（没有 Deflate64 数据可写）。`CompressGroupWithSevenZip` 新增 `mtOverride` 参数。
+- **多线程/加密 ZIP 中文文件名编码错误**：7z 默认按系统 ANSI 写名（中文 Windows 为 GBK 且不置 bit 11），而 Store 条目按 UTF-8 写 → 同一包混用两种编码；默认「UTF-8」选项被静默忽略，非中文区域会乱码。现 MT 与加密路径均强制 7z `-mcu=on`（UTF-8/bit 11）；用户显式选 GBK 时 MT 回落串行（7z 无法可靠产出 GBK），保留用户选择。
+- **MT 遇被占用文件直接失败**：MT 镜像/Store 合并原用 `FileShare.Read` 且不走 `ErrorResolver`，编辑器持有写锁时整次压缩失败（串行会弹「重试/跳过/中止」）。现 MT 入口先用 `ReadErrorHandler.FilterUnreadableFiles`（SharedReadStream + ErrorResolver）预检并上报 Skipped；镜像与 Store 合并改用 `SharedReadStream.OpenRead`。
+- **自适应规则热路径分配**：`FormatCatalog.GetById/GetByExtension` 每次调用都 `GetAll()` 复制内置列表（默认 6 规则 × 30+ ID / 文件）。改为内置格式字典索引，自定义格式仍线性扫描；行为不变。
+
+**仍存在、待决定（本轮未改）**
+- **Deflate64 + 分卷（非加密）仍会失败**：MT 路径不支持分卷，回落串行 ZipWriter 无法写 method 9。建议 UI 禁用该组合或补 7z 分卷路径。
+- **`AddToArchiveAsync` 加密分支硬编码 Deflate**：`CompressionMethod.Deflate` 忽略用户选择的 ZIP 方法（加密 Add 场景）。
+- **单组 MT 混合场景进度跳变**：`RewriteAsync` 固定 92/94/97/100 直接转发，组阶段结束（如 50%）会跳到 92%；N 组分支已重映射，单组分支未做。
+- **静默失效的开关组合**：加密/分卷/非 Deflate 方法/GBK 会让自适应或 MT 部分/全部失效，UI 仍可勾选且无提示（仅 4GB 提示）。
+- **MT 临时空间约 2× 输入**：镜像目录 + 每组 temp zip + 最终包都在系统临时目录，未检查剩余空间/未提示。
+- **重复相对路径**：两个同名源目录/文件的相对路径相同时，MT 镜像会覆盖（串行会写出重复条目），属数据丢失边缘场景，建议检测到重复即回落串行。
+- **单组 MT 条目完成顺序**：`FileCompressionFinished` 无文件名，按 FIFO 出队上报 `EntryKey`；7z mt=on 完成顺序若非输入序会标错条目（仅 UI 状态，不影响产物）。
+- **ZIP32 上限只按输入字节**：未计条目头/中央目录开销，接近 4GB + 大量条目时可能被 7z 升为 ZIP64，copy-mode 会拒绝。
+- **自定义格式 ID 冲突**：`AddCustomFormat` 用秒级时间戳生成 ID，同一秒添加两个格式会撞 ID，规则/魔数引用歧义。

@@ -6,7 +6,7 @@ namespace MantisZip.Tests.Utils;
 
 /// <summary>
 /// 自适应压缩判定单元测试 — 覆盖内置已压缩扩展名分类（SSOT）与 ResolveLevel 决策入口。
-/// MultiThreadedStoreFormatIds 用户自定义仅存储格式覆盖逻辑也在此验证。
+/// 「仅存储格式」已并入自适应规则（Phase 2 合并），自定义 Store 规则覆盖逻辑也在此验证。
 /// </summary>
 public class ZipEntryClassifierTests
 {

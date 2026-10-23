@@ -11,9 +11,20 @@ public static class FormatCatalog
 {
     private static readonly List<FormatDefinition> _builtInFormats = new();
 
+    // 内置格式索引：GetById/GetByExtension 在自适应规则的逐文件热路径上被调用，
+    // 原先每次调用 GetAll() 都会复制一份内置列表（默认 6 条规则 × 30+ 格式 ID / 文件）。
+    private static readonly Dictionary<string, FormatDefinition> _builtInById = new(StringComparer.Ordinal);
+    private static readonly Dictionary<string, FormatDefinition> _builtInByExtension = new(StringComparer.OrdinalIgnoreCase);
+
     static FormatCatalog()
     {
         InitializeBuiltInFormats();
+        foreach (var format in _builtInFormats)
+        {
+            _builtInById.TryAdd(format.Id, format);
+            foreach (var ext in format.Extensions)
+                _builtInByExtension.TryAdd(ext, format);
+        }
     }
 
     private static void InitializeBuiltInFormats()
@@ -114,8 +125,14 @@ public static class FormatCatalog
     /// <returns>匹配的格式定义，未找到返回 null。</returns>
     public static FormatDefinition? GetById(string id, List<FormatDefinition>? customFormats = null)
     {
-        var all = GetAll(customFormats);
-        return all.FirstOrDefault(f => f!.Id == id, null);
+        if (_builtInById.TryGetValue(id, out var builtIn)) return builtIn;
+        if (customFormats != null)
+        {
+            foreach (var format in customFormats)
+                if (!format.IsBuiltIn && string.Equals(format.Id, id, StringComparison.Ordinal))
+                    return format;
+        }
+        return null;
     }
 
     /// <summary>按扩展名获取格式。</summary>
@@ -124,7 +141,13 @@ public static class FormatCatalog
     /// <returns>匹配的格式定义，未找到返回 null。</returns>
     public static FormatDefinition? GetByExtension(string extension, List<FormatDefinition>? customFormats = null)
     {
-        var all = GetAll(customFormats);
-        return all.FirstOrDefault(f => f!.Extensions.Contains(extension, StringComparer.OrdinalIgnoreCase), null);
+        if (_builtInByExtension.TryGetValue(extension, out var builtIn)) return builtIn;
+        if (customFormats != null)
+        {
+            foreach (var format in customFormats)
+                if (!format.IsBuiltIn && format.Extensions.Contains(extension, StringComparer.OrdinalIgnoreCase))
+                    return format;
+        }
+        return null;
     }
 }

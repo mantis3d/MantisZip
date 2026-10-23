@@ -65,9 +65,11 @@
         <CheckBox x:Name="AdaptiveCompressionCheck"
                   Content="{Binding AdaptiveCompressionLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   IsChecked="False"
+                  IsCheckedChanged="AdaptiveCompressionCheck_IsCheckedChanged"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-        <!-- 魔数检测：对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度 -->
+        <!-- 魔数检测：对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度；
+             仅自适应开启时可见（引擎在自适应关闭时会直接忽略该开关，规则 6：隐藏而非禁用） -->
         <CheckBox x:Name="SmartDetectCheck"
                   Content="{Binding SmartDetectLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   IsChecked="False"

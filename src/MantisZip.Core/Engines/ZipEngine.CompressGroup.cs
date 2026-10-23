@@ -349,6 +349,10 @@ public partial class ZipEngine
                             DirectoryStructure = true,
                         };
 
+                        // 同 CompressAsync 加密路径：默认/UTF-8 强制 UTF-8 条目名；显式 GBK 保留系统 ANSI。
+                        if (!string.Equals(options.FileNameEncoding, "gbk", StringComparison.OrdinalIgnoreCase))
+                            s7zCompressor.CustomParameters["cu"] = "on";
+
                         // 所有文件在同⼀临时目录下，计算 commonRoot 以保留相对路径结构
                         var commonRoot = tempDir.Length;
                         if (!tempDir.EndsWith(Path.DirectorySeparatorChar.ToString()))
@@ -451,7 +455,9 @@ public partial class ZipEngine
                             // ── N 组并行分支（AddToArchiveAsync 接入 N 组，与 CompressAsync 同构）──
                             // 复用既有回退判定（IsMultiThreadedEligible 已在上方完成）；
                             // 此处仅追加「组数」维度：分组后有效组 < 2 则走下方既有单组路径。
-                            int degree = ResolveParallelCompressDegree(options.ParallelCompressDegree);
+                            int degree = options.MultiThreadedCompression
+                                ? ResolveParallelCompressDegree(options.ParallelCompressDegree)
+                                : 1;
                             var groups = SplitCompressGroup(compressGroup, degree);
 
                             // ── 闸门：copy-mode 承载能力 ──
@@ -538,7 +544,7 @@ public partial class ZipEngine
                                             await Task.Run(() => CompressGroupWithSevenZip(
                                                 groups[i], tempZips[i], options, adapter,
                                                 0, groupTotal, groups[i].Count, 0,
-                                                i, groups.Count, ref localLastReport), ct);
+                                                i, groups.Count, null, ref localLastReport), ct);
 
                                             // 该组完成：把它的输入字节并入全局已完成基数
                                             Interlocked.Add(ref finishedInputBytes, groupTotal);
@@ -555,7 +561,7 @@ public partial class ZipEngine
                                         {
                                             cancellationToken.ThrowIfCancellationRequested();
                                             // 必须保持打开直到 RewriteAsync 完成（ZipBinaryRewriter 契约），故不能 using
-                                            var storeStream = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                            var storeStream = SharedReadStream.OpenRead(fullPath);
                                             ngStoreStreams.Add(storeStream);
                                             storeEntries.Add(new NewEntry(
                                                 // 条目名编码固定 UTF-8：与 7z 产物保持一致（混用编码会破坏条目名）
@@ -638,7 +644,8 @@ public partial class ZipEngine
                                     CoreLog.Trace($"[TRACE]   CompressGroup entry: FullPath={fp} → RelativePath={rp}");
 
                                 CoreLog.Info($"AddToArchiveAsync: MultiThreaded mode — {storeGroup.Count} store, {compressGroup.Count} compress via 7z mt=on");
-                                CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, compressProcessed, compressTotalBytes, compressFiles.Count, mtProcessedFiles, null, null, ref lastReportTime);
+                                CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, compressProcessed, compressTotalBytes, compressFiles.Count, mtProcessedFiles, null, null,
+                                    options.MultiThreadedCompression ? null : "1", ref lastReportTime);
                                 compressProcessed = compressTotalBytes;
 
                                 // fsOut 是 File.Create 出来的空文件；ZIP 内容完全来自 7z，必须先释放句柄
@@ -657,7 +664,7 @@ public partial class ZipEngine
                                     foreach (var (fullPath, relativePath) in storeGroup)
                                     {
                                         cancellationToken.ThrowIfCancellationRequested();
-                                        var storeStream = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                        var storeStream = SharedReadStream.OpenRead(fullPath);
                                         storeStreams.Add(storeStream);
                                         storeEntries.Add(new NewEntry(
                                             EntryName: ArchivePath.Normalize(relativePath),
@@ -720,7 +727,7 @@ public partial class ZipEngine
                                     CompressionLevel = 0, // Store
                                 };
                                 using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
-                                using (var fsInput = File.OpenRead(fullPath))
+                                using (var fsInput = SharedReadStream.OpenRead(fullPath))
                                 {
                                     var buffer = new byte[CopyBufferSize];
                                     long totalRead = 0;
@@ -752,8 +759,9 @@ public partial class ZipEngine
                                 var method = options.ZipCompressionMethod?.ToLowerInvariant();
                                 if (string.IsNullOrEmpty(method) || method == "deflate" || method == "deflate64")
                                 {
-                                    // 统一用 4 参重载（传 MultiThreadedStoreFormatIds），与 MT 分拣（CompressAsync/AddToArchiveAsync）
-                                    // 及本方法写入阶段同口径；无自定义列表时行为与 3 参完全一致。
+                                    // 统一走 AdaptiveRuleMatcher.ResolveLevel（规则 > SSOT 扩展名 > 魔数），
+                                    // 与 MT 分拣（CompressAsync/AddToArchiveAsync）及本方法写入阶段同口径，
+                                    // 避免「分拣说 Store、写入却 Deflate」。
                                     entryLevel = AdaptiveRuleMatcher.ResolveLevel(fullPath, options.CompressionLevel, options.AdaptiveCompression, options.AdaptiveSmartDetect, options.AdaptiveOverrides, options.CustomFormats);
                                     CoreLog.Trace("ZipEngine.CompressAsync: adaptive entry '{0}' level={1} (global={2}, adaptive={3})",
                                         entryPath, entryLevel ?? options.CompressionLevel, options.CompressionLevel, options.AdaptiveCompression);
@@ -770,7 +778,7 @@ public partial class ZipEngine
                             };
 
                             using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
-                            using (var fsInput = File.OpenRead(fullPath))
+                            using (var fsInput = SharedReadStream.OpenRead(fullPath))
                             {
                                 var buffer = new byte[CopyBufferSize];
                                 long totalRead = 0;
@@ -1183,7 +1191,7 @@ public partial class ZipEngine
                             };
 
                             using (var entryStream = zipWriter.WriteToStream(entryPath, entryOptions))
-                            using (var fsInput = File.OpenRead(fullPath))
+                            using (var fsInput = SharedReadStream.OpenRead(fullPath))
                             {
                                 var buffer = new byte[CopyBufferSize];
                                 long totalRead = 0;
@@ -1276,13 +1284,10 @@ public partial class ZipEngine
             {
                 var fi = new FileInfo(fullPath);
                 // 自适应压缩：已压缩文件自动 Store（仅 Deflate/Deflate64 归档适用）。
-                // 必须用 4 参重载（传入 MultiThreadedStoreFormatIds）而非 3 参：
-                //   · 3 参仅查内置已压缩扩展名列表；4 参额外合并 MultiThreadedStoreFormatIds 自定义列表。
-                //   · MT 模式的分拣（storeGroup/compressGroup 分流）在 ZIP 条目级别用 4 参判定；
-                //     若此处写入阶段用 3 参重算，自定义列表命中的文件（如 .wav）会被降级重算为
-                //     level>0 → 实际 Deflate 压缩 —— 分拣说 Store、写入却 Deflate，自打脸。
-                //   · 非 MT 的普通自适应路径同样经此方法，4 参在无自定义列表时行为与 3 参完全一致，
-                //     故统一用 4 参无副作用。
+                // 必须与 MT 分拣（storeGroup/compressGroup 分流）走同一入口
+                // AdaptiveRuleMatcher.ResolveLevel（用户规则 > SSOT 扩展名 > 魔数）：
+                // 若写入阶段用另一套判定重算，规则命中 Store 的文件会被重算成 level>0 →
+                // 实际 Deflate 压缩 —— 分拣说 Store、写入却 Deflate，自打脸。
                 int? entryLevel = null;
                 if (options != null && options.AdaptiveCompression && !options.Encrypt)
                 {
@@ -1438,11 +1443,15 @@ public partial class ZipEngine
     }
 
     /// <summary>
-    /// MultiThreaded（7z mt=on）路径<b>前置</b>准入判定，由 <c>CompressAsync</c> 与
-    /// <c>AddToArchiveAsync</c> 共用，避免两处准入条件漂移。只检查与分组/压缩方法无关的硬性条件：
-    /// 开关本身、加密、分卷、ZIP32 规模上限。
+    /// 是否走 7z 压缩路径的前置准入判定，由 <c>CompressAsync</c> 与
+    /// <c>AddToArchiveAsync</c> 共用，避免两处准入条件漂移。
     /// <para>
-    /// 压缩方法（Deflate64 等）不在此处判定：7z 产物只有在<b>混合场景</b>下才会经过
+    /// 两种情况进入：① 用户开启 <c>MultiThreadedCompression</c>；② 压缩方法为 Deflate64
+    /// （SharpCompress ZipWriter 无法写 method 9，必须由 7z 产出；此时用 <c>mt=1</c> 单线程，
+    /// 不违反多线程开关语义）。加密、分卷、ZIP32 规模上限仍是硬性前置条件。
+    /// </para>
+    /// <para>
+    /// 其余压缩方法不在此处判定：7z 产物只有在<b>混合场景</b>下才会经过
     /// <see cref="ZipBinaryRewriter"/> copy-mode 重写，全可压缩场景直接 <c>File.Move</c>。
     /// 因此方法判定必须等分组完成后由 <see cref="CanCopyModeRewrite"/> 负责，
     /// 否则会误伤「Deflate64 + 全可压缩」这类本可正常走 7z 的组合。
@@ -1451,15 +1460,30 @@ public partial class ZipEngine
     /// <param name="options">压缩选项。</param>
     /// <param name="totalEntryCount">本次压缩将产生的文件条目总数（含 Store 组）。</param>
     /// <param name="totalSize">全部待压缩字节总和。</param>
-    /// <returns>true 表示允许进入 7z mt=on 路径；false 表示应回落到标准串行路径。</returns>
+    /// <returns>true 表示允许走 7z 路径；false 表示应回落到标准串行路径。</returns>
     private static bool IsMultiThreadedEligible(ArchiveOptions options, int totalEntryCount, long totalSize)
     {
-        if (!options.MultiThreadedCompression)
+        // Deflate64：SharpCompress ZipWriter 无法写出（method 9 无映射，抛 InvalidFormatException），
+        // 即使用户关闭多线程也必须走 7z —— 此时以 mt=1 单线程调用，不违反开关语义。
+        bool needsSevenZipForDeflate64 =
+            string.Equals(options.ZipCompressionMethod, "deflate64", StringComparison.OrdinalIgnoreCase);
+
+        if (!options.MultiThreadedCompression && !needsSevenZipForDeflate64)
             return false;
 
         // 加密包由 SharpCompress ZipWriter 负责 AES，7z 阶段无法接管
         if (options.Encrypt && !string.IsNullOrEmpty(options.Password))
             return false;
+
+        // 用户显式选择 GBK 文件名编码 → 回落串行：7z 只能按系统 ANSI / UTF-8 写名，
+        // 无法可靠产出 GBK；硬走 MT 会让「文件名编码 = GBK」选项静默失效。
+        // 例外：Deflate64 回到串行必然抛 InvalidFormatException，只能走 7z（UTF-8 名）。
+        if (!needsSevenZipForDeflate64 &&
+            string.Equals(options.FileNameEncoding, "gbk", StringComparison.OrdinalIgnoreCase))
+        {
+            CoreLog.Info("ZipEngine: MultiThreaded skipped — GBK filename encoding is handled by the serial path");
+            return false;
+        }
 
         // 分卷依赖 SplitOutputStream 包装，MT 路径不参与
         if (options.SplitSize > 0)
@@ -1570,6 +1594,7 @@ public partial class ZipEngine
     /// <param name="totalBytes">全部文件总字节数（全局进度分母）。</param>
     /// <param name="totalFiles">全部文件总数。</param>
     /// <param name="storeProcessedFiles">StoreGroup 已处理文件数（全局进度基线）。</param>
+    /// <param name="mtOverride">7z <c>mt</c> 覆盖值（如 Deflate64 回落单线程时传 "1"）；null = 按组数/单组自动。</param>
     /// <param name="lastReportTime">上次进度报告时间（节流用，引用传递）。</param>
     internal static void CompressGroupWithSevenZip(
         List<(string FullPath, string RelativePath)> files,
@@ -1582,6 +1607,7 @@ public partial class ZipEngine
         int storeProcessedFiles,
         int? batchIndex,          // 组索引；null = 旧单组路径
         int? batchCount,          // 有效组数
+        string? mtOverride,       // null = 自动；"1" = 强制单线程（Deflate64 串行兼容路径）
         ref DateTime lastReportTime)
     {
         SevenZipEngine.EnsureLibraryPath();
@@ -1598,9 +1624,16 @@ public partial class ZipEngine
         // 旧单组路径保持 mt=on（= 全部核）。
         // ⚠ 未验证：默认路径下多为 no-op（核数 ≤ 16 且组数 = 核数时 mt=1）；
         //   收益仅可能出现在「核数 > 16」或「文件数 < 组数」场景，不得当性能依据。
-        compr.CustomParameters["mt"] = batchIndex.HasValue
-            ? Math.Max(1, Environment.ProcessorCount / Math.Max(1, batchCount ?? 1)).ToString()
-            : "on";
+        compr.CustomParameters["mt"] = mtOverride
+            ?? (batchIndex.HasValue
+                ? Math.Max(1, Environment.ProcessorCount / Math.Max(1, batchCount ?? 1)).ToString()
+                : "on");
+
+        // 强制 7z 以 UTF-8 写 ZIP 条目名（对应 7z 的 -mcu=on）。
+        // 7z 默认按系统 ANSI 代码页写名（中文 Windows 上是 GBK、且不置 bit 11），
+        // 而 store 条目由 ZipBinaryRewriter 按 UTF-8 写入 → 同一压缩包内混用两种编码，
+        // 非中文区域会把中文名解码成乱码。此处统一为 UTF-8，与 rewriter / ZipWriter 口径一致。
+        compr.CustomParameters["cu"] = "on";
 
         // 处理 ZIP 压缩方法
 compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
@@ -1752,7 +1785,7 @@ compr.CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                 try { fileLen = new FileInfo(fullPath).Length; } catch { /* 读不到大小则按 0 处理 */ }
                 long copied = 0;
 
-                using (var src = new FileStream(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read))
+                using (var src = SharedReadStream.OpenRead(fullPath))
                 using (var dst = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None))
                 {
                     int read;

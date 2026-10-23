@@ -153,7 +153,7 @@ public class CompressGroupBatchIdentityTests : IDisposable
             files, outZip,
             new ArchiveOptions { CompressionLevel = 5 },
             inline, 0, total, files.Count, 0,
-            2, 3, ref lastReport);
+            2, 3, null, ref lastReport);
 
         // 组身份必须原样透传到进度上报
         Assert.Contains("2/3", seen.Keys);
@@ -175,7 +175,7 @@ public class CompressGroupBatchIdentityTests : IDisposable
             files, outZip,
             new ArchiveOptions { CompressionLevel = 5 },
             inline, 0, total, files.Count, 0,
-            null, null, ref lastReport);
+            null, null, null, ref lastReport);
 
         Assert.NotEmpty(reports);
         Assert.All(reports, r =>
@@ -209,7 +209,7 @@ public class CompressGroupBatchIdentityTests : IDisposable
             compressible, legacyZip,
             new ArchiveOptions { CompressionLevel = 5 },
             null, 0, total, compressible.Count, 0,
-            null, null, ref t1);
+            null, null, null, ref t1);
 
         var groupZip = Path.Combine(_dir, "group_mt_off.zip");
         var t2 = DateTime.Now;
@@ -217,7 +217,7 @@ public class CompressGroupBatchIdentityTests : IDisposable
             compressible, groupZip,
             new ArchiveOptions { CompressionLevel = 5 },
             null, 0, total, compressible.Count, 0,
-            0, 1, ref t2);
+            0, 1, null, ref t2);
 
         // 两条路径都必须产出结构完整、可读的 ZIP —— 确认 mt=off 不会让 7z 产出畸形包
         using (var za = System.IO.Compression.ZipFile.OpenRead(groupZip))
@@ -579,5 +579,45 @@ public class NGroupCompressTests : IDisposable
         {
             try { File.Delete(archive); } catch { /* best-effort */ }
         }
+    }
+}
+
+/// <summary>
+/// 引擎默认组数解析（adaptive-compress-ui-convergence Task 2）：
+/// 0/负数 → <c>clamp(ProcessorCount, 4, 16)</c>；显式 1..16 照旧生效；&gt;16 钳制到 16。
+/// </summary>
+public class ResolveParallelCompressDegreeTests
+{
+    [Fact]
+    public void Zero_UsesEngineDefault_ClampedTo4To16()
+    {
+        Assert.Equal(
+            Math.Clamp(Environment.ProcessorCount, 4, 16),
+            ZipEngine.ResolveParallelCompressDegree(0));
+    }
+
+    [Fact]
+    public void Negative_UsesEngineDefault_Too()
+    {
+        Assert.Equal(
+            Math.Clamp(Environment.ProcessorCount, 4, 16),
+            ZipEngine.ResolveParallelCompressDegree(-1));
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(2)]
+    [InlineData(4)]
+    [InlineData(8)]
+    [InlineData(16)]
+    public void ExplicitPositiveValue_IsKept(int degree)
+    {
+        Assert.Equal(degree, ZipEngine.ResolveParallelCompressDegree(degree));
+    }
+
+    [Fact]
+    public void Above16_ClampsTo16()
+    {
+        Assert.Equal(16, ZipEngine.ResolveParallelCompressDegree(64));
     }
 }

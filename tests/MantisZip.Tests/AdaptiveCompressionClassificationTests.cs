@@ -171,4 +171,64 @@ public class AdaptiveCompressionClassificationTests : IDisposable
         Assert.Equal(6, withoutDetect);
         Assert.Equal(0, withDetect);
     }
+
+    // ── ④ 自定义格式 MagicHex（问题 #5：自定义魔数必须生效）──
+
+    [Fact]
+    public void CustomFormatMagicHex_MatchesRule_ForRenamedFile()
+    {
+        // 自定义格式：扩展名 .tst、魔数 4D 5A（MZ）；文件被改名成 .dat
+        var path = Path.Combine(_dir, "renamed.dat");
+        var data = new byte[100 * 1024];
+        data[0] = 0x4D; data[1] = 0x5A;
+        File.WriteAllBytes(path, data);
+
+        var customFormats = new List<FormatDefinition>
+        {
+            new() { Id = "Custom_Test", DisplayName = "测试格式", Extensions = new() { ".tst" }, MagicHex = "4D 5A", IsBuiltIn = false },
+        };
+        var rules = new List<AdaptiveOverrideRule>
+        {
+            new() { Name = "测试格式仅存储", FormatIds = new() { "Custom_Test" }, Level = AdaptiveLevel.Store, Enabled = true },
+        };
+
+        var level = AdaptiveRuleMatcher.ResolveLevel(
+            path, 6, adaptiveCompression: true, adaptiveSmartDetect: true,
+            rules: rules, customFormats: customFormats);
+
+        Assert.Equal(0, level);
+    }
+
+    [Fact]
+    public void CustomFormatMagicHex_WithoutMatchingRule_FallsBackToGlobal()
+    {
+        var path = Path.Combine(_dir, "renamed2.dat");
+        var data = new byte[100 * 1024];
+        data[0] = 0x4D; data[1] = 0x5A;
+        File.WriteAllBytes(path, data);
+
+        var customFormats = new List<FormatDefinition>
+        {
+            new() { Id = "Custom_Test", DisplayName = "测试格式", Extensions = new() { ".tst" }, MagicHex = "4D5A", IsBuiltIn = false },
+        };
+
+        // 魔数命中自定义格式，但没有引用它的规则 → 回落全局级别（PE 不是「已压缩」格式）
+        var level = AdaptiveRuleMatcher.ResolveLevel(
+            path, 6, adaptiveCompression: true, adaptiveSmartDetect: true,
+            rules: new List<AdaptiveOverrideRule>(), customFormats: customFormats);
+
+        Assert.Equal(6, level);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData("4D5")]      // 奇数长度
+    [InlineData("ZZZZ")]     // 非法 hex
+    [InlineData("0x4D 5A")]  // 0x 前缀 + 空格
+    public void HeadStartsWithMagic_HandlesMalformedInput(string magicHex)
+    {
+        var head = new byte[] { 0x4D, 0x5A, 0x00, 0x00 };
+        var matched = ZipEntryClassifier.HeadStartsWithMagic(head, magicHex);
+        Assert.Equal(magicHex == "0x4D 5A", matched);
+    }
 }

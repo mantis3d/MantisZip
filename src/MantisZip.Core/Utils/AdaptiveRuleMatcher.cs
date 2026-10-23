@@ -4,8 +4,10 @@ using MantisZip.Core.Services;
 namespace MantisZip.Core.Utils;
 
 /// <summary>
-/// 自适应压缩规则匹配器。
-/// 优先级：用户自定义规则 → 内置分类（ClassifyByExtension）。
+/// 自适应压缩规则匹配器（Phase 2 / Task 10，唯一决策入口）。
+/// 优先级：用户规则（扩展名）→ SSOT 已压缩扩展名 → 魔数（自定义格式命中后查用户规则，
+/// 其次内置已压缩格式）→ 全局压缩级别。
+/// 分拣路径与写入路径必须走同一入口，避免「分拣说 Store、写入却 Deflate」。
 /// </summary>
 public static class AdaptiveRuleMatcher
 {
@@ -17,8 +19,7 @@ public static class AdaptiveRuleMatcher
     /// <param name="adaptiveCompression">自适应压缩开关。</param>
     /// <param name="adaptiveSmartDetect">魔数检测开关。</param>
     /// <param name="rules">用户自定义覆盖规则列表，可为 null。</param>
-    /// <param name="customFormats">用户自定义格式列表（供规则按 FormatId 查扩展名），可为 null。</param>
-
+    /// <param name="customFormats">用户自定义格式列表（供规则按 FormatId 查扩展名，以及魔数检测按 MagicHex 识别格式），可为 null。</param>
     /// <returns>该文件应使用的压缩级别（0-9）。</returns>
     public static int ResolveLevel(
         string filePath,
@@ -60,18 +61,40 @@ public static class AdaptiveRuleMatcher
             }
         }
 
-        // 3. SSOT：扩展名判定（内容已是压缩格式）
+        // 2. SSOT：扩展名判定（内容已是压缩格式）
         if (ZipEntryClassifier.IsCompressed(ext))
         {
             CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: compressed extension (ext={0}) → Store", ext);
             return 0;
         }
 
-        // 3. 魔数检测（扩展名骗人 / 无扩展名时的兜底）
-        if (adaptiveSmartDetect && ZipEntryClassifier.IsCompressedByMagic(filePath))
+        // 3. 魔数检测（扩展名骗人 / 无扩展名时的兜底；只读一次头供两条判定共用）
+        //    3a. 自定义格式魔数命中 → 继续查引用该格式 ID 的用户规则（实现 #5：自定义魔数生效）
+        //    3b. 内置魔数判定为已压缩格式 → Store
+        if (adaptiveSmartDetect && ZipEntryClassifier.TryReadHead(filePath, out var head, out var headLength))
         {
-            CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: magic detected compressed content → Store");
-            return 0;
+            var magicSpan = head.AsSpan(0, headLength);
+
+            var customFormatId = ZipEntryClassifier.MatchCustomFormatByMagic(magicSpan, customFormats);
+            if (customFormatId != null && rules != null)
+            {
+                foreach (var rule in rules)
+                {
+                    if (!rule.Enabled) continue;
+                    if (!rule.FormatIds.Contains(customFormatId)) continue;
+
+                    var resolved = ResolveAdaptiveLevel(rule.Level, rule.CustomLevel, globalLevel);
+                    CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: custom magic '{0}' matched rule '{1}' → {2}",
+                        customFormatId, rule.Name, resolved);
+                    return resolved;
+                }
+            }
+
+            if (ZipEntryClassifier.IsCompressedFormat(FileFormatDetector.Detect(head, headLength)))
+            {
+                CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: magic detected compressed content → Store");
+                return 0;
+            }
         }
 
         CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: → globalLevel={0}", globalLevel);

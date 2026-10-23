@@ -217,13 +217,14 @@ public partial class DynamicFormatOptionsPanel : UserControl
     /// <summary>
     /// 魔数检测（Phase 2 / Task 11：魔数检测已实现，控件恢复可见）。
     /// 仅对 ZIP 格式有效；非 ZIP 格式返回 false。
+    /// 自适应关闭时恒返回 false（控件同时隐藏），避免把无效开关透传给引擎。
     /// </summary>
     public bool AdaptiveSmartDetect
     {
         get
         {
             if (SelectedFormat != "zip") return false;
-            return SmartDetectCheck.IsChecked == true;
+            return AdaptiveCompressionCheck.IsChecked == true && SmartDetectCheck.IsChecked == true;
         }
     }
 
@@ -286,6 +287,19 @@ public partial class DynamicFormatOptionsPanel : UserControl
         bool isCustom = SolidBlockSizeCombo?.SelectedItem is ComboBoxItem item && item.Tag as string == "-1";
         CustomSolidSizePanel.IsVisible = isCustom && SolidCheck.IsChecked == true;
     }
+
+    /// <summary>
+    /// 魔数检测复选框可见性 = 自适应压缩开启（规则 6：隐藏而非禁用）。
+    /// 引擎在自适应关闭时直接忽略魔数检测，隐藏可避免「勾了却没效果」。
+    /// </summary>
+    private void UpdateSmartDetectVisibility()
+    {
+        if (SmartDetectCheck == null || AdaptiveCompressionCheck == null) return;
+        SmartDetectCheck.IsVisible = AdaptiveCompressionCheck.IsChecked == true;
+    }
+
+    private void AdaptiveCompressionCheck_IsCheckedChanged(object? sender, RoutedEventArgs e)
+        => UpdateSmartDetectVisibility();
 
     /// <summary>
     /// 多线程压缩复选框变更 — 当前无联动控件（仅影响引擎侧 mt=on 参数），
@@ -392,6 +406,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
         AdaptiveCompressionCheck.IsChecked = s.AdaptiveCompression;
         SmartDetectCheck.IsChecked = s.AdaptiveSmartDetect;
         ZipMultiThreadCheck.IsChecked = s.MultiThreadedCompression;
+        UpdateSmartDetectVisibility();
 
         // 固实块大小：settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
         if (!SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "")
@@ -466,6 +481,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
         {
             case "zip":
                 ZipPanel.IsVisible = true;
+                UpdateSmartDetectVisibility();
                 break;
             case "7z":
                 SevenZPanel.IsVisible = true;
