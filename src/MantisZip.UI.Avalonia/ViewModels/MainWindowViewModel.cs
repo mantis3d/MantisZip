@@ -169,6 +169,13 @@ public partial class MainWindowViewModel : ObservableObject
     public Action<int, BatchItemStatus>? BatchStatusReporter { get; set; }
 
     /// <summary>
+    /// 由 View 设置的批处理输出路径上报回调（索引 + 冲突解决后的最终输出路径）。
+    /// 操作闭包内可将其作为 onItemOutputPath 传给引擎：自动重命名/手输包名后，
+    /// 进度窗口顶部的「压缩包列表」据此把旧包名改成实际写出的包名。
+    /// </summary>
+    public Action<int, string>? BatchOutputPathReporter { get; set; }
+
+    /// <summary>
     /// 由 View 设置的文件选择回调。返回选中的文件路径列表，取消返回 null。
     /// </summary>
     public Func<Task<IReadOnlyList<string>?>>? GetOpenFilePaths { get; set; }

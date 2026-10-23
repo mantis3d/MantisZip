@@ -437,6 +437,15 @@ public partial class ProgressWindow : Window
     }
 
     /// <summary>
+    /// 改写指定批处理行的名称（冲突选「自动重命名」或用户手输包名后，实际包名与计划名不同）。
+    /// Safe to call from any thread.
+    /// </summary>
+    public void UpdateBatchItemName(int index, string outputPath)
+    {
+        DispatchIfNeeded(() => _vm.UpdateBatchItemName(index, outputPath), DispatcherPriority.Background);
+    }
+
+    /// <summary>
     /// Called when batch completes with errors. Shows success/failure summary.
     /// Safe to call from any thread.
     /// </summary>

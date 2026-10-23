@@ -322,6 +322,9 @@ public partial class MainWindow : Window
                 pw.UpdateBatchItemStatus(index, status);
             };
 
+            // 批处理输出路径上报：冲突解决后（自动重命名/手输包名）把列表里的旧包名换成实际包名
+            vm.BatchOutputPathReporter = (index, outputPath) => pw.UpdateBatchItemName(index, outputPath);
+
             try
             {
                 pw.Show();
@@ -381,6 +384,7 @@ public partial class MainWindow : Window
             finally
             {
                 vm.BatchStatusReporter = null;
+                vm.BatchOutputPathReporter = null;
             }
         };
 

@@ -195,13 +195,18 @@ public static class CompressService
     /// <param name="conflictResolver">文件冲突回调，null 表示直接覆盖</param>
     /// <param name="progress">整体进度报告</param>
     /// <param name="ct">取消令牌</param>
+    /// <param name="onItemStatus">逐项状态回调（批处理列表状态）</param>
+    /// <param name="onItemOutputPath">冲突解决后的最终输出路径回调（索引, 绝对路径）。
+    /// 「自动重命名」或用户在冲突对话框里改了包名时，实际输出路径与计划路径不同，
+    /// UI 需要据此把批处理列表里的旧包名换成新包名；覆盖/追加时传回的路径与计划一致。</param>
     /// <returns>压缩结果统计</returns>
     public static async Task<CompressResult> CompressAsync(
         CompressRequest request,
         CompressConflictResolver? conflictResolver,
         IProgress<ArchiveProgress> progress,
         CancellationToken ct,
-        Action<int, BatchItemStatus>? onItemStatus = null)
+        Action<int, BatchItemStatus>? onItemStatus = null,
+        Action<int, string>? onItemOutputPath = null)
     {
         ArgumentNullException.ThrowIfNull(request);
         ArgumentNullException.ThrowIfNull(progress);
@@ -210,9 +215,9 @@ public static class CompressService
 
         return request.Mode switch
         {
-            CompressOutputMode.Separate => await CompressSeparateAsync(request, conflictResolver, progress, ct, onItemStatus),
-            CompressOutputMode.Manual => await CompressSingleAsync(request, conflictResolver, progress, ct),
-            CompressOutputMode.Combined => await CompressSingleAsync(request, conflictResolver, progress, ct),
+            CompressOutputMode.Separate => await CompressSeparateAsync(request, conflictResolver, progress, ct, onItemStatus, onItemOutputPath),
+            CompressOutputMode.Manual => await CompressSingleAsync(request, conflictResolver, progress, ct, onItemOutputPath),
+            CompressOutputMode.Combined => await CompressSingleAsync(request, conflictResolver, progress, ct, onItemOutputPath),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Mode), request.Mode, null)
         };
     }
@@ -227,7 +232,8 @@ public static class CompressService
         CompressConflictResolver? conflictResolver,
         IProgress<ArchiveProgress> progress,
         CancellationToken ct,
-        Action<int, BatchItemStatus>? onItemStatus = null)
+        Action<int, BatchItemStatus>? onItemStatus = null,
+        Action<int, string>? onItemOutputPath = null)
     {
         int succeeded = 0, failed = 0, skipped = 0;
 
@@ -288,6 +294,10 @@ public static class CompressService
             // 通知 UI 当前批处理项开始（必须在实际压缩前调用）
             onItemStatus?.Invoke(i, BatchItemStatus.InProgress);
 
+            // 冲突解决后回报最终输出路径：自动重命名/手输包名时实际路径与计划路径不同，
+            // UI 批次列表据此把旧包名换成新包名（覆盖/追加时两者一致，回调仍照发）
+            onItemOutputPath?.Invoke(i, outputPath);
+
             // 5. 注释分配
             var comment = GetCommentForIndex(request, i);
 
@@ -334,7 +344,8 @@ public static class CompressService
         CompressRequest request,
         CompressConflictResolver? conflictResolver,
         IProgress<ArchiveProgress> progress,
-        CancellationToken ct)
+        CancellationToken ct,
+        Action<int, string>? onItemOutputPath = null)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -362,6 +373,9 @@ public static class CompressService
             engine = ArchiveEngineFactory.GetEngineByExtension(resolvedOutputPath, new ZipEngine());
             CoreLog.Info($"CompressService: renamed to: {resolvedOutputPath}");
         }
+
+        // 冲突解决后回报最终输出路径（批量列表只有一行，索引恒为 0）
+        onItemOutputPath?.Invoke(0, resolvedOutputPath);
 
         var comment = GetCommentForIndex(request, 0);
         bool isAdd = resolution.Action == CompressConflictAction.Add;

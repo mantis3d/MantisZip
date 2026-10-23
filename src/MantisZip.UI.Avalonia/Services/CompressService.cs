@@ -25,13 +25,17 @@ public class AvaloniaCompressService
     /// When null, existing files are silently overwritten.</param>
     /// <param name="onItemStatus">Optional callback for per-item status updates (Separate mode batch list).
     /// Invoked from a background thread with the item index and its status.</param>
+    /// <param name="onItemOutputPath">Optional callback invoked right after the file-conflict decision,
+    /// carrying the resolved output archive path. Auto-rename (or a user-typed name) makes the real
+    /// path differ from the planned one, so the batch list can relabel the row.</param>
     /// <returns>A <see cref="CompressResult"/> with success/failure/skip counts.</returns>
     public async Task<CompressResult> CompressAsync(
         CompressRequest request,
         IProgress<ArchiveProgress>? progress = null,
         CancellationToken ct = default,
         CompressConflictResolver? conflictResolver = null,
-        Action<int, BatchItemStatus>? onItemStatus = null)
+        Action<int, BatchItemStatus>? onItemStatus = null,
+        Action<int, string>? onItemOutputPath = null)
     {
         ArgumentNullException.ThrowIfNull(request);
 
@@ -39,7 +43,7 @@ public class AvaloniaCompressService
         var innerProgress = progress ?? new Progress<ArchiveProgress>();
 
         return await MantisZip.Core.Services.CompressService.CompressAsync(
-            request, conflictResolver, innerProgress, ct, onItemStatus);
+            request, conflictResolver, innerProgress, ct, onItemStatus, onItemOutputPath);
     }
 
     /// <summary>

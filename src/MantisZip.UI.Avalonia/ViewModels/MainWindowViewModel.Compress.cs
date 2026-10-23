@@ -82,7 +82,8 @@ public partial class MainWindowViewModel : ObservableObject
                             return (Core.Abstractions.CompressConflictAction.Overwrite, null, false);
                         return await ShowCompressConflictDialog(info);
                     }, request.ConflictAction),
-                    onItemStatus: BatchStatusReporter);
+                    onItemStatus: BatchStatusReporter,
+                    onItemOutputPath: BatchOutputPathReporter);
             });
 
         if (completed)

@@ -462,6 +462,11 @@ public partial class App : Application
                         // 逐项状态更新驱动批处理文件列表（对齐 WPF CompressAsync onItemStatus 接线）
                         progressWindow.SetCurrentBatchItem(index);
                         progressWindow.UpdateBatchItemStatus(index, status);
+                    },
+                    onItemOutputPath: (index, outputPath) =>
+                    {
+                        // 冲突解决后（自动重命名/手输包名）把列表里的旧包名换成实际包名
+                        progressWindow.UpdateBatchItemName(index, outputPath);
                     });
                 progressWindow.FinalizeBatch();
 

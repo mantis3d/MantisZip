@@ -1722,6 +1722,28 @@ public partial class ProgressViewModel : ObservableObject
     }
 
     /// <summary>
+    /// 冲突解决后改写批处理行的名称（自动重命名 / 用户在冲突对话框里改了包名）。
+    /// 只换显示名与完整路径，不动状态、进度与统计。
+    /// Safe to call from any thread.
+    /// </summary>
+    /// <param name="index">批处理项索引</param>
+    /// <param name="outputPath">实际写出的压缩包绝对路径</param>
+    public void UpdateBatchItemName(int index, string outputPath)
+    {
+        if (_batchItems == null || index < 0 || index >= _batchItems.Count)
+            return;
+        if (string.IsNullOrWhiteSpace(outputPath))
+            return;
+
+        var item = _batchItems[index];
+        item.Name = System.IO.Path.GetFileName(outputPath);
+        item.FullPath = outputPath;
+        // 正在压缩的就是本行时，同步信息区显示的文件名（否则停留在重命名前的旧名）
+        if (index == _currentBatchIndex)
+            FileName = item.Name;
+    }
+
+    /// <summary>
     /// Update the status of a specific batch item.
     /// Safe to call from any thread.
     /// </summary>

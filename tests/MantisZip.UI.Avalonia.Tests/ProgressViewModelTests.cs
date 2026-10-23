@@ -13,6 +13,50 @@ namespace MantisZip.UI.Avalonia.Tests;
 public class ProgressViewModelTests
 {
     [Fact]
+    public void UpdateBatchItemName_ReplacesPlannedNameWithResolvedArchive()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { @"C:\out\a.zip", @"C:\out\b.zip" });
+        Assert.NotNull(vm.BatchItems);
+
+        var changed = new List<string?>();
+        vm.BatchItems![1].PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+
+        vm.UpdateBatchItemName(1, @"C:\out\a (2).zip");
+
+        // 列表行名与完整路径都换成实际写出的包（BatchItem.Name 必须带通知，否则列表不刷新）
+        Assert.Equal("a (2).zip", vm.BatchItems![1].Name);
+        Assert.Equal(@"C:\out\a (2).zip", vm.BatchItems![1].FullPath);
+        Assert.Contains(nameof(BatchItem.Name), changed);
+    }
+
+    [Fact]
+    public void UpdateBatchItemName_CurrentItem_AlsoUpdatesInfoAreaFileName()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { @"C:\out\a.zip" });
+        vm.SetCurrentBatchItem(0);
+        Assert.Equal("a.zip", vm.FileName);
+
+        vm.UpdateBatchItemName(0, @"C:\out\a (2).zip");
+
+        Assert.Equal("a (2).zip", vm.FileName);
+    }
+
+    [Fact]
+    public void UpdateBatchItemName_OutOfRangeOrEmpty_IsIgnored()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { @"C:\out\a.zip" });
+
+        vm.UpdateBatchItemName(5, @"C:\out\x.zip");
+        vm.UpdateBatchItemName(0, "   ");
+
+        Assert.Equal("a.zip", vm.BatchItems![0].Name);
+        Assert.Equal(@"C:\out\a.zip", vm.BatchItems![0].FullPath);
+    }
+
+    [Fact]
     public void Constructor_Defaults()
     {
         var vm = new ProgressViewModel();

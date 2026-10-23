@@ -27,8 +27,11 @@ public enum BatchPasswordState
 /// </summary>
 public class BatchItem : INotifyPropertyChanged
 {
-    /// <summary>显示名称（如文件名或任务名）</summary>
-    public string Name { get; set; } = string.Empty;
+    private string _name = string.Empty;
+
+    /// <summary>显示名称（如文件名或任务名）。
+    /// 必须带通知：压缩冲突选「自动重命名」后，Core 回报最终输出路径，UI 据此改写本行名称。</summary>
+    public string Name { get => _name; set => Set(ref _name, value); }
 
     /// <summary>完整路径</summary>
     public string? FullPath { get; set; }

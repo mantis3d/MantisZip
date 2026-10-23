@@ -155,4 +155,47 @@ public sealed class CompressConflictDefaultActionTests : IDisposable
         Assert.Equal(1, result.Succeeded);
         Assert.Equal(0, result.Skipped);
     }
+
+    /// <summary>
+    /// 「自动重命名」后必须回报实际写出的路径：进度窗口顶部的「压缩包列表」
+    /// 用它把登录时计划里的旧包名换成真实包名（用户反馈压缩包列表仍显示重命名前的名字）。
+    /// </summary>
+    [Fact]
+    public async Task Rename_ReportsResolvedOutputPath()
+    {
+        var (source, output, _) = Arrange();
+        var request = BuildManualRequest(source, output, "rename");
+
+        var reported = new System.Collections.Generic.List<(int Index, string Path)>();
+        var result = await new AvaloniaCompressService().CompressAsync(
+            request, null, CancellationToken.None,
+            CompressFlow.CreateResolver(_ => throw new InvalidOperationException("rename 策略不应弹窗"), "rename"),
+            onItemOutputPath: (index, path) => reported.Add((index, path)));
+
+        Assert.Equal(1, result.Succeeded);
+        var (index, resolved) = Assert.Single(reported);
+        Assert.Equal(0, index);
+        // 实际写出的包名与计划名不同，且文件确实存在于回报的路径上
+        Assert.False(string.Equals(output, resolved, StringComparison.OrdinalIgnoreCase));
+        Assert.False(string.Equals(Path.GetFileName(output), Path.GetFileName(resolved), StringComparison.OrdinalIgnoreCase));
+        Assert.True(File.Exists(resolved));
+    }
+
+    /// <summary>覆盖策略下路径不变，回调仍应照发（UI 侧无需分支判断）。</summary>
+    [Fact]
+    public async Task Overwrite_ReportsUnchangedOutputPath()
+    {
+        var (source, output, _) = Arrange();
+        var request = BuildManualRequest(source, output, "overwrite");
+
+        var reported = new System.Collections.Generic.List<(int Index, string Path)>();
+        await new AvaloniaCompressService().CompressAsync(
+            request, null, CancellationToken.None,
+            CompressFlow.CreateResolver(_ => throw new InvalidOperationException("overwrite 策略不应弹窗"), "overwrite"),
+            onItemOutputPath: (index, path) => reported.Add((index, path)));
+
+        var (index, resolved) = Assert.Single(reported);
+        Assert.Equal(0, index);
+        Assert.Equal(output, resolved, ignoreCase: true);
+    }
 }
