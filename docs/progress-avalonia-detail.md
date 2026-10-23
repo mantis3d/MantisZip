@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-23** — 改进：文件选择器目录树的盘符改用系统真实图标，并显示卷标
+  - **需求**（用户 m01438）：「目录树的磁盘显示为磁盘的图标……目录树的磁盘显示卷标（如果存在）」。
+  - **现状问题**：`src/MantisZip.UI.Avalonia/Controls/QuickPathControl.axaml.cs` 的 `LoadTreeRoots()` 给每个盘符节点套的是**文件夹图标**（`IconService.GetFolderIcon()`），名字是裸盘符 `C:`，既不体现驱动器类型、也拿不到卷标。
+  - **修法**：① `src/MantisZip.UI.Avalonia/Models/Win32IconProvider.cs` 的 `GetIconFromShell` 增加 `bool useFileAttributes = true` 参数，并新增 `GetDriveIcon(string rootPath)` —— 取盘符图标**必须去掉** `SHGFI_USEFILEATTRIBUTES`（带该 flag 时 Shell 只按文件属性蒙版返回通用图标，磁盘无扩展名会退化成文件夹图标），结果按 `__drive__{root}` 缓存；② `src/MantisZip.UI.Avalonia/Services/IconService.cs` 新增 `GetDriveIcon` 封装，非 Windows 平台返回 null；③ `QuickPathControl.LoadTreeRoots` 重写：新增 `EnumerateReadyDrives`（`IsReady` 抛异常的盘跳过）、`GetDriveLetter`、`GetVolumeLabelSafe`（空卡槽 / 无权限 / BitLocker 锁定 / 网络盘掉线一律按无卷标）、`FormatDriveName`、`DriveTypeNameKey`、`BuildDriveSignature`，显示名统一为「卷标 (X:)」，无卷标时按驱动器类型兜底「本地磁盘 / 可移动磁盘 / 网络驱动器 / 光盘 / RAM 磁盘 / 磁盘」；④ `Controls/QuickPathControl.axaml` 的 `TreeDataTemplate` 改为「真实图标优先 + `IconKey` 矢量兜底」（与列表模板同构），`DirectoryTreeNode` 新增 `IconKey` / `IsNullIcon`，子目录节点补 `IconKey = "IconFolder"`；⑤ 切到「目录树」标签时重扫盘符（U 盘热插拔无需重开选择器），但 `BuildDriveSignature()` 与上次相同则**跳过重建**，避免把用户已展开的层级折叠回去；⑥ 手写 `IconDrive` 几何（`Resources/Icons/AppIcons.axaml`）作非 Windows 兜底，并按规则 8 在 `ViewModels/IconTestViewModel.cs` 注册；⑦ 三语各新增 6 个 `QuickPath_Drive_*` key（规则 13）。
+  - **遗留**：网络驱动器若在枚举后掉线，`SHGetFileInfo` 取图标可能阻塞 UI 线程（只对 `IsReady` 为 true 的盘取，且结果缓存，未做异步化）。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/QuickPathDriveLabelTests.cs`（6 例：有卷标拼接、卷标去空白、无卷标按类型兜底、盘符去尾分隔符、六种驱动器类型映射到六个不同 key、系统盘卷标读取不抛异常）。断言不锁具体文案（无头环境 `LocalizationManager` 可能未初始化）。
+  - **验证**：`-Task i18n` 1300 key 三语一致；`-Task build -Target avalonia` 0 警告；`-Task test -Target ui-tests` 全绿；`-Task guards` 4/4；`-Task check` 版本 0.5.3 六处一致。
+  - **发布说明**：属 0.5.3 未发布期间的用户可见改进，已按用户确认写入 `RELEASE_NOTES.md` v0.5.3「交互 / Interactions」节（中英各一条，位于繁中分卷术语条目之后）。
+
 **2026-10-23** — 改进：自动重命名后，进度窗口「压缩包列表」显示实际的包名
   - **症状**（用户 m01097 / m01171）：「选择自动重命名的话，压缩包列表还是显示的重命名之前的压缩包名」，指进度窗口顶部「压缩包列表」里那一行（不是底部信息区的文件名）。
   - **根因**：重命名发生在 Core（`src/MantisZip.Core/Services/CompressService.cs` 里 `CompressOutputMode.Separate` 逐项与 `CompressSingleAsync` 单包两条路径各自算 `ComputeRenamedPath`），算完只写日志 `renamed to: …`，**没有把最终路径回传给 UI**；而 `BatchItem.Name` 是 `ProgressViewModel.InitBatchMode` 用计划路径的 `Path.GetFileName` 一次性填的、且属性无变更通知 ⇒ 列表永远停在计划名。

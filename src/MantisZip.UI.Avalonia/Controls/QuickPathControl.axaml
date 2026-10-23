@@ -186,10 +186,20 @@
                             ItemsSource="{Binding Children}">
             <!-- Background=Transparent：让整行参与命中测试，点击行内任意位置均可选中 -->
             <Grid ColumnDefinitions="18,*" Background="Transparent">
+              <!-- 真实图标优先：盘符取系统驱动器图标（硬盘/可移动盘/光驱/网络盘各不相同），
+                   子目录取系统文件夹图标；取不到时回退到矢量 IconKey（IconDrive / IconFolder） -->
               <Image Source="{Binding Icon}"
                      Width="16"
                      Height="16"
-                     VerticalAlignment="Center" />
+                     VerticalAlignment="Center"
+                     IsVisible="{Binding !IsNullIcon}" />
+              <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
+                        Width="16"
+                        Height="16"
+                        VerticalAlignment="Center"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        IsVisible="{Binding IsNullIcon}" />
+              <!-- 节点显示名：盘符为「卷标 (X:)」，目录为文件夹名 -->
               <TextBlock Grid.Column="1"
                          Text="{Binding Name}"
                          VerticalAlignment="Center"

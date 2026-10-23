@@ -209,6 +209,8 @@ public partial class IconTestViewModel : ObservableObject
             "Models/PreviewTreeNode.cs:50", "PreviewTreeNode.IconKey 返回 IconWarning");
         Add("文件列表", "根目录", null, "IconFolder", IconStatus.Converted,
             "Services/ResultPreviewService.cs:30", "根节点自动通过 IconKey 获取 IconFolder");
+        Add("文件列表", "磁盘（驱动器）", null, "IconDrive", IconStatus.Converted,
+            "Controls/QuickPathControl.axaml", "目录树盘符；Windows 优先真实系统图标，非 Windows 用本矢量兜底");
 
         // ═══════════════════════════════════════════════════════════
         // 7. 搜索过滤栏图标（MainWindow.axaml — 已替换为 PathIcon）

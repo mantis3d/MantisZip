@@ -47,6 +47,21 @@ internal static class IconService
     }
 
     /// <summary>
+    /// Get the native icon of a drive root (e.g. <c>C:\</c>) so hard disks, removable
+    /// disks, network drives and optical drives look like they do in Explorer.
+    /// Windows only — returns null on other platforms, where the caller falls back to
+    /// the vector <c>IconDrive</c> resource.
+    /// </summary>
+    /// <param name="rootPath">驱动器根路径（如 <c>C:\</c>）</param>
+    public static Bitmap? GetDriveIcon(string rootPath)
+    {
+        if (!Win32IconProvider.IsSupported)
+            return null;
+
+        return Win32IconProvider.GetDriveIcon(rootPath);
+    }
+
+    /// <summary>
     /// Clear all icon caches.
     /// </summary>
     public static void ClearCache()

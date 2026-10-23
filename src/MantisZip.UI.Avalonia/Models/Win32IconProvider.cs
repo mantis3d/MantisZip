@@ -86,6 +86,30 @@ internal static class Win32IconProvider
     }
 
     /// <summary>
+    /// Get the real shell icon of a drive root (e.g. <c>C:\</c>).
+    /// 硬盘 / 可移动磁盘 / 网络驱动器 / 光驱 由系统自动区分，与资源管理器一致。
+    /// Results are cached per root path.
+    /// </summary>
+    /// <param name="rootPath">驱动器根路径（如 <c>C:\</c>）</param>
+    public static Bitmap? GetDriveIcon(string rootPath)
+    {
+        if (!_isWindows || string.IsNullOrEmpty(rootPath))
+            return null;
+
+        var key = "__drive__" + rootPath;
+        if (_cache.TryGetValue(key, out var cached))
+            return cached;
+
+        // 必须去掉 SHGFI_USEFILEATTRIBUTES：带该 flag 时 Shell 只按「文件名/属性」蒙版返回
+        // 通用图标，磁盘（无扩展名）会退化成文件夹图标，拿不到各类驱动器各自的真实图标。
+        var icon = GetIconFromShell(rootPath, 0, useFileAttributes: false);
+        if (icon != null)
+            _cache[key] = icon;
+
+        return icon;
+    }
+
+    /// <summary>
     /// Clear the icon cache.
     /// </summary>
     public static void ClearCache() => _cache.Clear();
@@ -101,10 +125,13 @@ internal static class Win32IconProvider
         return GetIconFromShell("folder", FILE_ATTRIBUTE_DIRECTORY | FILE_ATTRIBUTE_NORMAL);
     }
 
-    private static Bitmap? GetIconFromShell(string path, uint attributes)
+    private static Bitmap? GetIconFromShell(string path, uint attributes, bool useFileAttributes = true)
     {
         var shfi = new SHFILEINFO();
-        var flags = SHGFI_ICON | SHGFI_USEFILEATTRIBUTES | SHGFI_SMALLICON;
+        var flags = SHGFI_ICON | SHGFI_SMALLICON;
+        // 虚拟文件（不存在的文件名/扩展名）必须带 SHGFI_USEFILEATTRIBUTES，磁盘等真实路径则不能带
+        if (useFileAttributes)
+            flags |= SHGFI_USEFILEATTRIBUTES;
 
         var result = SHGetFileInfo(path, attributes, ref shfi, (uint)Marshal.SizeOf(shfi), flags);
         if (result == IntPtr.Zero || shfi.hIcon == IntPtr.Zero)

@@ -35,6 +35,9 @@ public partial class QuickPathControl : UserControl
     /// <summary>目录树根节点（盘符列表）。</summary>
     private readonly ObservableCollection<DirectoryTreeNode> _treeRoots = new();
 
+    /// <summary>上一次构建盘符根节点时的「盘符 + 卷标」签名，用于判断是否需要重建（没变化就不重建，保住展开状态）。</summary>
+    private string _treeRootSignature = string.Empty;
+
     /// <summary>搜索框非空时的聚合过滤结果缓存（用于快速重建）。</summary>
     private List<QuickPathItem> _favorites = new();
     private List<QuickPathItem> _history = new();
@@ -51,7 +54,7 @@ public partial class QuickPathControl : UserControl
         ToolTip.SetTip(WindowsTab, LocalizationManager.T("QuickPath_TabWindows"));
         ToolTip.SetTip(TreeTab, LocalizationManager.T("QuickPath_TabTree"));
 
-        LoadTreeRoots();
+        LoadTreeRoots(force: true);
         DirTree.ItemsSource = _treeRoots;
         // 惰性加载：展开节点时才枚举子目录
         DirTree.AddHandler(TreeViewItem.ExpandedEvent, DirTree_Expanded);
@@ -150,6 +153,11 @@ public partial class QuickPathControl : UserControl
         if (tab == PathTab.Windows)
             LoadWindowsSource();
 
+        // 切到目录树时重扫盘符（U 盘热插拔 / 新挂载无需重开选择器）；
+        // 盘符与卷标都没变化时 LoadTreeRoots 会直接跳过，避免把已展开的树折叠回去
+        if (tab == PathTab.Tree)
+            LoadTreeRoots();
+
         // 内容区可见性：目录树 Tab 显示 TreeView，其余显示 ListBox
         PathList.IsVisible = tab != PathTab.Tree;
         DirTree.IsVisible = tab == PathTab.Tree;
@@ -234,24 +242,33 @@ public partial class QuickPathControl : UserControl
     // ── Directory tree (Tree tab) ───────────────────────────────────────────
 
     /// <summary>
-    /// 加载目录树根节点：所有可读盘符（平铺，无「此电脑」虚拟根）。
+    /// 加载（或按需重建）目录树根节点：所有就绪盘符（平铺，无「此电脑」虚拟根）。
+    /// 显示名为「卷标 (X:)」，无卷标时按驱动器类型兜底；
+    /// 图标优先取系统真实驱动器图标（硬盘 / 可移动盘 / 网络盘 / 光驱自动区分），
+    /// 非 Windows 平台回退到矢量 <c>IconDrive</c>。
     /// 每个盘符预置占位子节点，使展开箭头可见。
     /// </summary>
-    private void LoadTreeRoots()
+    /// <param name="force">true = 无条件重建；false = 仅在盘符集合或卷标变化时重建</param>
+    private void LoadTreeRoots(bool force = false)
     {
         try
         {
-            var folderIcon = IconService.GetFolderIcon();
+            var signature = BuildDriveSignature();
+            if (!force && signature == _treeRootSignature && _treeRoots.Count > 0)
+                return; // 盘符没变化：保留用户已展开的层级
+            _treeRootSignature = signature;
+
             _treeRoots.Clear();
-            foreach (var drive in DriveInfo.GetDrives())
+            foreach (var drive in EnumerateReadyDrives())
             {
-                if (!drive.IsReady) continue;
                 var root = drive.RootDirectory.FullName; // "C:\"
                 var node = new DirectoryTreeNode
                 {
-                    Name = root.TrimEnd('\\', '/'),
+                    Name = FormatDriveName(GetVolumeLabelSafe(drive), GetDriveLetter(root), drive.DriveType),
                     FullPath = root,
-                    Icon = folderIcon
+                    // Windows 上是资源管理器里那颗真实盘图标；其它平台为 null → 用 IconKey 矢量兜底
+                    Icon = IconService.GetDriveIcon(root),
+                    IconKey = "IconDrive"
                 };
                 // 预置占位子节点 → 显示展开箭头
                 node.Children.Add(new DirectoryTreeNode { IsPlaceholder = true });
@@ -262,6 +279,75 @@ public partial class QuickPathControl : UserControl
         {
             System.Diagnostics.Debug.WriteLine($"[QuickPathControl] LoadTreeRoots failed: {ex.Message}");
         }
+    }
+
+    /// <summary>枚举当前就绪的驱动器（未就绪 / 探测抛异常的一律跳过）。</summary>
+    private static IEnumerable<DriveInfo> EnumerateReadyDrives()
+    {
+        foreach (var drive in DriveInfo.GetDrives())
+        {
+            bool ready;
+            try { ready = drive.IsReady; }
+            catch { ready = false; }
+            if (ready) yield return drive;
+        }
+    }
+
+    /// <summary>盘符字母：<c>C:\</c> → <c>C:</c>。</summary>
+    public static string GetDriveLetter(string rootPath) => rootPath.TrimEnd('\\', '/');
+
+    /// <summary>
+    /// 安全读取卷标：空卡槽、无权限、BitLocker 锁定、网络盘掉线都会抛异常，一律按「无卷标」处理。
+    /// </summary>
+    public static string? GetVolumeLabelSafe(DriveInfo drive)
+    {
+        try
+        {
+            var label = drive.VolumeLabel;
+            return string.IsNullOrWhiteSpace(label) ? null : label.Trim();
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 盘符显示名（资源管理器风格）：有卷标 → 「系统 (C:)」；
+    /// 无卷标 → 按驱动器类型兜底「本地磁盘 (C:)」「可移动磁盘 (E:)」「网络驱动器 (Z:)」「光盘 (D:)」。
+    /// </summary>
+    /// <param name="volumeLabel">卷标，null/空白表示无卷标</param>
+    /// <param name="driveLetter">盘符（已带冒号，如 <c>C:</c>）</param>
+    /// <param name="driveType">驱动器类型，决定无卷标时的兜底名称</param>
+    public static string FormatDriveName(string? volumeLabel, string driveLetter, DriveType driveType)
+    {
+        var name = string.IsNullOrWhiteSpace(volumeLabel)
+            ? LocalizationManager.T(DriveTypeNameKey(driveType))
+            : volumeLabel.Trim();
+        return $"{name} ({driveLetter})";
+    }
+
+    /// <summary>驱动器类型 → 无卷标时兜底名称的本地化 key（规则 13：文案不得硬编码）。</summary>
+    public static string DriveTypeNameKey(DriveType driveType) => driveType switch
+    {
+        DriveType.Fixed => "QuickPath_Drive_Fixed",
+        DriveType.Removable => "QuickPath_Drive_Removable",
+        DriveType.Network => "QuickPath_Drive_Network",
+        DriveType.CDRom => "QuickPath_Drive_Optical",
+        DriveType.Ram => "QuickPath_Drive_Ram",
+        _ => "QuickPath_Drive_Generic"
+    };
+
+    /// <summary>「盘符 + 卷标」签名，用于判断根节点是否需要重建。</summary>
+    private static string BuildDriveSignature()
+    {
+        var parts = new List<string>();
+        foreach (var drive in EnumerateReadyDrives())
+        {
+            var root = drive.RootDirectory.FullName;
+            parts.Add(root + "|" + (GetVolumeLabelSafe(drive) ?? string.Empty));
+        }
+        return string.Join("\n", parts);
     }
 
     /// <summary>
@@ -296,7 +382,8 @@ public partial class QuickPathControl : UserControl
                 {
                     Name = Path.GetFileName(dir),
                     FullPath = dir,
-                    Icon = folderIcon
+                    Icon = folderIcon,
+                    IconKey = "IconFolder"
                 };
                 // 预置占位子节点 → 下一层展开箭头可见
                 child.Children.Add(new DirectoryTreeNode { IsPlaceholder = true });
@@ -449,7 +536,15 @@ public class DirectoryTreeNode
 {
     public string Name { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
+
+    /// <summary>真实文件系统图标（文件夹图标 / 盘符图标）。null 时回退 <see cref="IconKey"/> 矢量图标。</summary>
     public Bitmap? Icon { get; set; }
+
+    /// <summary>矢量兜底图标的资源 key（如 <c>IconDrive</c> / <c>IconFolder</c>），仅在 <see cref="Icon"/> 为 null 时显示。</summary>
+    public string? IconKey { get; set; }
+
+    /// <summary>是否没有真实图标（决定矢量兜底是否可见）。</summary>
+    public bool IsNullIcon => Icon == null;
 
     /// <summary>子目录（展开时异步填充）。</summary>
     public ObservableCollection<DirectoryTreeNode> Children { get; } = new();
