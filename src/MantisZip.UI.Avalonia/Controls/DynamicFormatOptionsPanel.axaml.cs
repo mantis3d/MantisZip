@@ -217,13 +217,14 @@ public partial class DynamicFormatOptionsPanel : UserControl
     /// <summary>
     /// 魔数检测（Phase 2 / Task 11：魔数检测已实现，控件恢复可见）。
     /// 仅对 ZIP 格式有效；非 ZIP 格式返回 false。
+    /// 自适应关闭时恒返回 false（控件同时隐藏），避免把无效开关透传给引擎。
     /// </summary>
     public bool AdaptiveSmartDetect
     {
         get
         {
             if (SelectedFormat != "zip") return false;
-            return SmartDetectCheck.IsChecked == true;
+            return AdaptiveCompressionCheck.IsChecked == true && SmartDetectCheck.IsChecked == true;
         }
     }
 
@@ -285,6 +286,70 @@ public partial class DynamicFormatOptionsPanel : UserControl
         if (CustomSolidSizePanel == null) return;
         bool isCustom = SolidBlockSizeCombo?.SelectedItem is ComboBoxItem item && item.Tag as string == "-1";
         CustomSolidSizePanel.IsVisible = isCustom && SolidCheck.IsChecked == true;
+    }
+
+    /// <summary>
+    /// 魔数检测复选框可见性 = 自适应压缩开启（规则 6：隐藏而非禁用）。
+    /// 引擎在自适应关闭时直接忽略魔数检测，隐藏可避免「勾了却没效果」。
+    /// </summary>
+    private void UpdateSmartDetectVisibility()
+    {
+        if (SmartDetectCheck == null || AdaptiveCompressionCheck == null) return;
+        SmartDetectCheck.IsVisible = AdaptiveCompressionCheck.IsChecked == true;
+    }
+
+    private void AdaptiveCompressionCheck_IsCheckedChanged(object? sender, RoutedEventArgs e)
+        => UpdateSmartDetectVisibility();
+
+    private bool _contextEncrypt;
+    private bool _contextSplit;
+
+    /// <summary>
+    /// 由压缩设置窗口注入「加密 / 分卷」上下文：这两项会让自适应或多线程静默失效，
+    /// 面板据此显示原因，避免用户勾了开关却没有效果。
+    /// </summary>
+    public void UpdateCompressionContext(bool encrypt, bool split)
+    {
+        _contextEncrypt = encrypt;
+        _contextSplit = split;
+        RefreshAvailabilityHint();
+    }
+
+    private void ZipEncodingOrMethod_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        => RefreshAvailabilityHint();
+
+    /// <summary>刷新「自适应/多线程不生效」提示（空列表则隐藏）。</summary>
+    private void RefreshAvailabilityHint()
+    {
+        if (ZipAvailabilityHint == null) return;
+
+        if (SelectedFormat?.ToLowerInvariant() != "zip")
+        {
+            ZipAvailabilityHint.IsVisible = false;
+            return;
+        }
+
+        var reasons = new List<string>();
+        if (_contextEncrypt)
+        {
+            reasons.Add(LocalizationManager.T("FormatOptions_ZIP_EncryptNoAdaptiveMt"));
+        }
+        else
+        {
+            var method = (ZipMethodCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
+            bool adaptiveSupported = string.IsNullOrEmpty(method) || method is "deflate" or "deflate64";
+            if (!adaptiveSupported)
+                reasons.Add(LocalizationManager.T("FormatOptions_ZIP_MethodNoAdaptive"));
+            if (_contextSplit)
+                reasons.Add(LocalizationManager.T("FormatOptions_ZIP_SplitNoMt"));
+
+            var encoding = (EncodingCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
+            if (string.Equals(encoding, "gbk", StringComparison.OrdinalIgnoreCase))
+                reasons.Add(LocalizationManager.T("FormatOptions_ZIP_GbkNoMt"));
+        }
+
+        ZipAvailabilityHint.Text = string.Join(" ", reasons);
+        ZipAvailabilityHint.IsVisible = reasons.Count > 0;
     }
 
     /// <summary>
@@ -392,6 +457,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
         AdaptiveCompressionCheck.IsChecked = s.AdaptiveCompression;
         SmartDetectCheck.IsChecked = s.AdaptiveSmartDetect;
         ZipMultiThreadCheck.IsChecked = s.MultiThreadedCompression;
+        UpdateSmartDetectVisibility();
 
         // 固实块大小：settings 值不在预设 tag 中（如 "4096m" 自定义值）→ 回退选「自定义」并回填 MB 数字
         if (!SelectComboByTag(SolidBlockSizeCombo, s.SevenZipSolidBlockSize ?? "")
@@ -466,6 +532,8 @@ public partial class DynamicFormatOptionsPanel : UserControl
         {
             case "zip":
                 ZipPanel.IsVisible = true;
+                UpdateSmartDetectVisibility();
+                RefreshAvailabilityHint();
                 break;
             case "7z":
                 SevenZPanel.IsVisible = true;

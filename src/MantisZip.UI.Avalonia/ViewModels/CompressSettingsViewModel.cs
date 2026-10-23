@@ -206,10 +206,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>ZIP 多线程压缩。启用时利用多核 CPU 并行压缩已分组的文件。</summary>
     public bool MultiThreadedCompression { get; set; }
 
-    /// <summary>N 组并行压缩的目标组数。</summary>
-    [ObservableProperty]
-    private int _parallelCompressDegree = Environment.ProcessorCount;
-
     // ── 分卷 ──
 
     /// <summary>分卷大小选项（共享数据源）。</summary>
@@ -1319,6 +1315,19 @@ public partial class CompressSettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task StartCompress()
     {
+        // Deflate64 只能由 7z 写出；分卷 + 非加密会回落到不支持 method 9 的串行 writer。
+        // 引擎侧无可靠 7z 分卷路径，故在 UI 先拦下并给出明确原因。
+        if (!Encrypt
+            && SplitSize > 0
+            && string.Equals(ZipCompressionMethod, "deflate64", StringComparison.OrdinalIgnoreCase))
+        {
+            if (ShowMessage != null)
+                await ShowMessage(
+                    LocalizationManager.T("Compress_Deflate64Split_Unsupported"),
+                    LocalizationManager.T("Compress_Title"));
+            return;
+        }
+
         // Validate passwords match if encrypting
         if (Encrypt && !PasswordsMatch)
         {

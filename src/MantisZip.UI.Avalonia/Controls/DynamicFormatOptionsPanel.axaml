@@ -31,6 +31,7 @@
           <ComboBox x:Name="EncodingCombo"
                     Grid.Column="1"
                     Height="24"
+                    SelectionChanged="ZipEncodingOrMethod_SelectionChanged"
                     Background="{DynamicResource ThemeComboBoxBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
@@ -49,6 +50,7 @@
           <ComboBox x:Name="ZipMethodCombo"
                     Grid.Column="1"
                     Height="24"
+                    SelectionChanged="ZipEncodingOrMethod_SelectionChanged"
                     Background="{DynamicResource ThemeComboBoxBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
@@ -65,9 +67,11 @@
         <CheckBox x:Name="AdaptiveCompressionCheck"
                   Content="{Binding AdaptiveCompressionLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   IsChecked="False"
+                  IsCheckedChanged="AdaptiveCompressionCheck_IsCheckedChanged"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-        <!-- 魔数检测：对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度 -->
+        <!-- 魔数检测：对大文件进行魔数采样检测，更准确识别已压缩格式。会略微降低压缩速度；
+             仅自适应开启时可见（引擎在自适应关闭时会直接忽略该开关，规则 6：隐藏而非禁用） -->
         <CheckBox x:Name="SmartDetectCheck"
                   Content="{Binding SmartDetectLabel, RelativeSource={RelativeSource AncestorType=UserControl}}"
                   IsChecked="False"
@@ -95,6 +99,14 @@
                    FontSize="11"
                    Margin="24,2,0,0"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+        <!-- 自适应/多线程不生效说明：加密、分卷、非 Deflate 方法、GBK 编码等组合下动态显示 -->
+        <TextBlock x:Name="ZipAvailabilityHint"
+                   IsVisible="False"
+                   TextWrapping="Wrap"
+                   FontSize="11"
+                   Margin="24,2,0,0"
+                   Foreground="{DynamicResource ThemeStatusWarningBrush}" />
       </StackPanel>
 
       <!-- ═══════ 7z 选项面板 ═══════ -->

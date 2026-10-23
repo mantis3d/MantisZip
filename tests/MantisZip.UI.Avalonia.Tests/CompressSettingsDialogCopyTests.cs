@@ -88,7 +88,6 @@ public class CompressSettingsDialogCopyTests
         ["CommentAllSame"] = "注释分布单选辅助（写 CommentDistribution）",
         ["CommentFirstOnly"] = "注释分布单选辅助（写 CommentDistribution）",
         ["CommentPerLine"] = "注释分布单选辅助（写 CommentDistribution）",
-        ["ParallelCompressDegree"] = "已废弃旋钮：Core 侧不再由 UI 赋值，残留死字段",
         ["PreviewRoot"] = "预览 UI 状态",
         ["PreviewCompactMode"] = "预览 UI 状态",
         ["ShowFilteredGhosts"] = "预览 UI 状态",

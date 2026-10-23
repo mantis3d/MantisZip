@@ -31,6 +31,16 @@
   - **验证**：`-Task build -Target core` 0 警告；`-Task build -Target avalonia` 0 警告；`-Task test -Target tests` 与 `-Task test -Target ui-tests` 全绿；`-Task check` 版本 0.5.3 六处一致、三语 1294 key、规则守卫 4/4（本轮无新增文案）。
   - **发布说明**：属 0.5.3 未发布期间的自包含改进，按规则 18 经用户确认后并入 `RELEASE_NOTES.md` v0.5.3「交互」节既有「文件冲突选项现在真正生效」的中英条目（追加一句「列表跟随实际包名」），不另立独立条目。
 
+**2026-10-23** — 计划归档同步：PLAN 已完成条目移出 + 索引补齐 + 两份计划归位（纯 `.md`，无代码变更）
+  - **触发**（用户 m00001）：「看看 PLAN.md 里面提到的计划，完成情况与文档记录是否符合，已完成的按规则处理」。逐条核对 PLAN.md 的 21 行条目 → 6 行已完成的仍留在「待实现设计方案」、1 行文档链接指向 `未开始/`（死链）、1 行计划已完成但仍挂在「进行中」。
+  - **PLAN.md**：删除 6 行已完成条目（Avalonia UI 功能补齐、进度窗口状态行、启动优化二期 theme trace、启动优化三期 AppSettings 缓存、原生 Win32 Splash、原生图标 DLL）；Office 图片预览 / result-preview-panel ①② 三行改写为「已完成计划内的遗留子项」；文本预览语法高亮行的 `✅` 改为「计划文档已重写，代码尚未实施」（实测 csproj 无 AvaloniaEdit/TextMate）；新增 P2 行指向移回未开始的 unify-file-filter-data。
+  - **PROGRESS.md【历史设计方案索引】**：补 8 行（startup-ui-lazy-loading / startup-native-splash / startup-theme-dedup-trace / startup-appsettings-cache / avalonia-ui-feature-parity / html-preview-webview-fallback / Avalonia 移植 Phase 0–9 合并行 / Office 行补「图片预览子项未实施」），并修复两条失效相对路径（`../.omo/...`、`../进行中/...`）→ 索引 101 行 0 死链。
+  - **计划文件归位**：`startup-ui-lazy-loading.md` 进行中 → 已完成（头部改 ✅ 并补「完成结论」：三阶段累计 XamlSpan −155~−195 ms，产物 MainFilterBar / ArchiveContentView / Menus/*MenuItems / Menus/TestMenuView）；`unify-file-filter-data.md` 已完成 → 未开始（头部仍是「📋 新计划｜设计中」，实际 `SearchFilters` 仍在用 → 属 WPF 期产物，按规则 11 需转 Avalonia 后实施）。
+  - **核实口径**：完成度判断不采信计划文档自述，一律「PLAN.md 说明列 + PROGRESS 里程碑 + 代码实证」三源交叉（计划正文头部普遍没有可机读的状态字段）。
+  - **第二轮：进行中计划核查**（用户 m00178）：6 份全部核对，无一份完全完成——`adaptive-compress-ui-convergence` 11/14（剩 Task 12/13 系用户 10-21 拍板暂缓）、`floating-preview-panel` 4/13（Phase 1/3 未做，全仓无 Floating/Docking 文件）、`new-format-support` 仅 tar.gz 可压缩（`ArchiveFormatValues = ["zip","7z","tar.gz"]`，Phase 2–6 未做）、`preview-extended-formats` 3.5/6、`preview-modular-providers` 1/4（`ITableDataProvider` 零消费者且计划仍是 WPF 架构）、`text-fallback-encoding-policy` Phase 1 完成 / Phase 2 待决策。结论：进行中状态与实际一致，无虚报完成；仅 PLAN.md 对 new-format-support 的措辞偏乐观（待后续修正）。
+  - **验证**：`pwsh -File scripts\verify-repo.ps1 -Task check` 全过（版本 6 处 0.5.3 / 三语 1294 key / 4 项规则守卫）。
+  - **发布说明**：纯文档归档，无用户可见变化 → `RELEASE_NOTES.md` 不更新（规则 18）。
+
 **2026-10-22** — 修复：压缩设置对话框的「文件冲突策略」等执行侧设置不生效（拷贝清单漂移）
   - **症状**（用户 m00576）：「压缩窗口的文件冲突选项似乎不起作用」。复现形态：在对话框里选「自动重命名 / 覆盖 / 跳过」，点开始后仍然弹「目标文件 xxx.zip 已存在」，必须再选一次。
   - **排查与被排除的假设**：① 下拉→VM 绑定（无头 `[AvaloniaFact]` 实测 `SelectedIndex=skip` 后 `vm.ConflictAction=="skip"`，正常）；② `CompressSettingsViewModel.ConflictAction` ↔ `SelectedConflictActionOption` 双向同步（`partial void OnXxxChanged`，正常）；③ `CompressFlow.MapDefaultConflictAction` 的四种映射（overwrite/rename/skip/add，正常）；④ `CompressService` 的 ResolveConflict / CanAdd 分支（`CanAdd` 决定 add 是否可用，正常）；⑤ 用户日志 `%LOCALAPPDATA%\MantisZip\debug.log` 里同一路径出现过 `conflict resolution for …: Overwrite` / `Rename` —— 说明 Core 侧映射本身没问题，问题只可能出在「对话框 VM → 执行 VM」之间。
@@ -202,13 +212,13 @@
   - **测试**：新增 MainArchiveContentLazyLoadTests 3 条（默认不创建 / 加载后创建且只创建一次 / 视图含 FileListGrid+PreviewPanelHost+FolderTreeBorder+DragAddOverlay）。
   - **测量**（A/B 交错 8 轮 × 3 次，基线 = HEAD `4d2b6417` 的 worktree 发布）：**XamlSpan −68 ~ −108ms**（338.7→230.7 / 300.4→232.6 / 335.4→258.9ms）；末次 CtorSpan 419.5→323.9ms（−95.6ms）、WinSpan 860.8→795.5ms（−65.3ms）；InitDone 持平（收益全部来自内容区不再膨胀）。TOTAL 噪声大（1450–1900ms 波动）→ 以 XamlSpan 为准。
   - **验证**：Release 构建 0 警告 0 错误；UI 全量通过（verify-repo -Task test -Target ui-tests ok=true）；`dotnet format analyzers --verify-no-changes --severity warn` exit 0；`-Task check` 全过（版本 6 处 0.5.3 / 三语 1276 key / 4 项规则守卫）。
-  - **后续**：阶段 3（菜单子项 ~170 元素）待做；**每阶段完成后停下由用户手动验证**（目录树 / 文件列表 / 列头菜单 / 排序 / 预览面板位置 / 拖拽添加覆层 / 分栏拖拽 / 列宽持久化）；计划 .omo/plans/进行中/startup-ui-lazy-loading.md。
+  - **后续**：阶段 3（菜单子项 ~170 元素）待做；**每阶段完成后停下由用户手动验证**（目录树 / 文件列表 / 列头菜单 / 排序 / 预览面板位置 / 拖拽添加覆层 / 分栏拖拽 / 列宽持久化）；计划 .omo/plans/已完成/startup-ui-lazy-loading.md（已归档）。
 **2026-10-21** — 启动优化阶段 1：过滤栏延迟加载（XamlSpan −27ms）
   - **依据**：MainWindow.axaml 1393 行 / 485 元素，启动时**默认隐藏**的过滤栏（50 元素）与内容区（171 元素）合计 46% 白白膨胀；校准：预览面板延迟（297 元素）历史上整体启动 −9% ⇒ ≈0.4–0.5ms/元素。
   - **实现**：过滤栏抽出为 Controls/MainFilterBar.axaml + MainFilterBar.axaml.cs（搬入 4 个 picker 处理器与 WritePickerTrace）；NullableLongConverter 局部资源随之迁入；MainWindow.axaml Row2 改为 <ContentControl x:Name="FilterBarHost" />，由 MainWindow.EnsureFilterBar() 在 IsFilterBarVisible 首次为 true 时创建（参照 EnsurePreviewPanel 先例）；新文件根节点显式 x:CompileBindings="False"（Avalonia 12 默认编译绑定，抽出后必须显式声明）。
   - **测量**：Win.Xaml 段 **363.2 → 335.8ms（−27ms，8 轮中位）**；TOTAL 1653.7 → 1533.2ms（本机噪声较大，以 XamlSpan 为准）。
   - **测试**：新增 MainFilterBarLazyLoadTests 2 条（默认不创建 / 显示时创建且只创建一次）；UI 全量 **344 通过 / 3 跳过 / 0 失败**。
-  - **后续**：内容区（171 元素，16 个 x:Name）与菜单子项（~170 元素）分阶段推进，**每阶段完成后停下由用户手动验证**；计划 .omo/plans/进行中/startup-ui-lazy-loading.md。
+  - **后续**：内容区（171 元素，16 个 x:Name）与菜单子项（~170 元素）分阶段推进，**每阶段完成后停下由用户手动验证**；计划 .omo/plans/已完成/startup-ui-lazy-loading.md（已归档）。
 **2026-10-21** — 修复菜单快捷键失效 + 新增常用快捷键（用户要求）
   - **根因（Avalonia 官方文档实证）**：MenuItem.InputGesture **只显示**快捷键文字、**不处理按键**（"Setting this property does not cause the input gesture to be handled by the menu item, it simply displays the gesture text in the menu"，Avalonia 12.1.2 Avalonia.Controls.xml）。项目此前**全仓无** KeyBindings/InputBindings → 菜单上标注的 5 个快捷键（Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5）**一直是只显示不生效**。
   - **实现**：Views/MainWindow.axaml.cs 新增 RegisterKeyBindings(MainWindowViewModel vm) —— 命令实例直绑到 MainWindow.KeyBindings（Avalonia 12 的 API 名是 KeyBindings，11 版的 InputBindings 已移除；KeyBinding 非 Control，无 DataContext，故不能用 {Binding}）。headless 探针实证 KeyBindings **确实处理按键**（executed=1）。
@@ -227,6 +237,28 @@
   - **修正**：4 个按钮全部改为 PathIcon + 既有矢量资源（IconEdit / IconDelete），Foreground 显式设 ThemeTextPrimaryBrush（规则 4：PathIcon 不继承父 Foreground）；尺寸 15×15，沿用 ToolbarIcon 类与原 ToolTip/Click/Tag 绑定。
   - **顺带修规则 13 违规**：压缩级别名称（存储/快速/正常/最大/跟随全局/全局±1/自定义/未知）原为**硬编码中文**（规则列表 LevelDisplay + 规则编辑对话框 LevelDisplayMap），现全部走三语 key Settings_AdaptiveRuleLevel_*（10 个 key × 3 语，key 集 1276 三语一致）；对话框的级别映射由 static 字典改为**按调用时解析**的方法（避免运行期切语言后显示旧文案）；自定义 下拉项用无占位符的 Settings_AdaptiveRuleLevel_CustomName，列表显示用带 {0} 的 Settings_AdaptiveRuleLevel_Custom。
   - **验证**：UI 构建 0 警告 0 错误；全量 Core **766/0 失败**、UI **340/0 失败**。
+**2026-10-23** — 压缩加速执行链二轮复核：Deflate64 串行必失败 / MT 中文名编码 / 被占用文件硬失败
+  - **Deflate64**：实测 `ZipCompressionMethod="deflate64"` + `MultiThreadedCompression=false` 必然抛 `InvalidFormatException: Invalid compression method: Deflate64`（SharpCompress ZipWriter 无 method 9 映射）。修复：`IsMultiThreadedEligible` 对 Deflate64 放行（即使 MT 关闭），`CompressGroupWithSevenZip` 新增 `mtOverride`，强制 `mt=1`；全部条目 Store 时回落串行但改用 `CompressionType.None` writer（无 Deflate64 数据）。
+  - **文件名编码**：实测 MT 路径 7z 按系统 ANSI 写名（中文 Windows：GBK/bit0），默认 UTF-8 选项被忽略；混合包中 7z 条目 GBK 与 Store 条目 UTF-8 并存。修复：MT/加密 7z 压缩器统一 `CustomParameters["cu"]="on"`（UTF-8/bit11）；`FileNameEncoding="gbk"` 时 MT 回落串行（7z 无法可靠写 GBK）。
+  - **不可读源文件**：实测 MT 遇到被独占的文件整次失败，而串行可通过 `ErrorResolver` 跳过。修复：MT 入口用 `ReadErrorHandler.FilterUnreadableFiles`（SharedReadStream + ErrorResolver）预检并上报 Skipped；镜像/Store 合并改用 `SharedReadStream.OpenRead`。
+  - **性能**：`FormatCatalog.GetById/GetByExtension` 改用内置格式字典索引，避免自适应规则逐文件调用时 `GetAll()` 反复复制内置列表。
+  - **追加路径（同日第二轮）**：加密 Add 曾硬编码 `Aes256 + Deflate` → 改为与 CompressAsync 同源 `MapZipEncryptionMethod` / `MapZipMethodToS7Z`；新文件被占用时按 `ErrorResolver` 跳过（`ReadErrorHandler.FilterUnreadableFiles`），不再让 `File.Copy` 整次失败。
+  - **Deflate64 + 分卷**：UI 在 `StartCompress` 拦截并三语提示（`Compress_Deflate64Split_Unsupported`），避免落到必失败的串行 writer。
+  - **单组 MT 混合进度**：`CompressAsync` / `AddToArchiveAsync` 的合并阶段改为与 N 组一致，把 `RewriteAsync` 固定百分比映射到 `[组阶段终点, 100]`。
+  - **UI 动态提示**：`DynamicFormatOptionsPanel` 新增 `ZipAvailabilityHint`，加密 / 分卷 / 非 Deflate / GBK 时显示「自适应/多线程不生效」原因（三语 4 个 key），由 `CompressSettingsWindow` 注入上下文。
+  - **健壮性**：`IsMultiThreadedEligible` 增加系统临时盘 ≥2× 输入预检；`CompressAsync` 检测重复相对路径时回落串行（避免 MT 镜像覆盖丢文件）。
+  - **测试**：新增 Deflate64 串行/全 Store、MT/加密中文名编码、MT/Add 不可读文件、加密 Add 方法、单组 MT 进度、重复相对路径等 10 条；Core **790/793（3 跳过）**、UI **403/406（3 跳过）** 全绿。
+  - **未修待决定**：Deflate64 + 分卷直接走 Core API、单组 MT 条目状态 FIFO、ZIP32 头开销、自定义格式 ID 秒级冲突、临时盘不可指定（详见计划 2026-10-23 二轮节）。
+**2026-10-23** — 压缩加速计划复核补漏：自定义魔数接线 + ZIP 面板联动 + MT 提示实时刷新 + CLI 自适应开关
+  - **背景**：逐条核对 `adaptive-compress-ui-convergence` 完成度，发现 2 处计划内收尾遗漏（死字段、默认组数单测）与 4 处「标记完成但实际不生效」的缺口。
+  - **自定义 MagicHex 接线（问题 #5）**：此前 `FormatDefinition.MagicHex` 只有 UI 读写、引擎从不消费，Phase 2 恢复输入框后成为「可见的骗人 UI」。现 `ZipEntryClassifier` 新增 `TryReadHead` / `MatchCustomFormatByMagic` / `HeadStartsWithMagic`（支持空格/中划线/冒号/`0x` 前缀，非法值按未命中）；`AdaptiveRuleMatcher.ResolveLevel` 在魔数阶段先匹配自定义格式魔数并查引用该 FormatId 的用户规则，未命中再走内置「已压缩」判定；读头只做一次（原路径会重复读）。
+  - **ZIP 面板魔数联动**：`SmartDetectCheck` 随 `AdaptiveCompressionCheck` 整块显隐（规则 6），`AdaptiveSmartDetect` getter 在自适应关闭时恒 false；避免「勾了却没效果」。
+  - **MT 提示实时刷新**：`NotifyAdaptiveProperties()` 补 `IsAdaptiveOverridesMtWarningVisible`；`AdaptiveOverrideRuleViewModel.IsMultiThreadedEnabled` 改 `[ObservableProperty]` 并通知 `ShowMtIneffectiveBadge`；MT 开关变更刷新全部规则行，新增规则带当前 MT 状态。
+  - **CLI 生效**：`App.CliCompress` 3 处 `CompressRequest` 补 `AdaptiveCompression`/`AdaptiveSmartDetect`/`MultiThreadedCompression`——此前只传规则而开关默认 false，CLI 实际不应用规则。
+  - **收尾**：删 `CompressSettingsViewModel._parallelCompressDegree` 死字段（并清理 `CompressSettingsDialogCopyTests` 的 Excluded 残留项）；补 `ResolveParallelCompressDegreeTests`（0/负数 → `clamp(ProcessorCount,4,16)`、显式 1..16、>16 钳制）。
+  - **文案/注释**：三语帮助「两个开关」→「三个开关」；`RELEASE_NOTES.md` v0.5.3 补「移除并行压缩组数」「仅存储格式并入规则」；`ARCHITECTURE.md` ZIP 压缩加速节按 Phase 2 重写；清理 `ZipEngine.CompressGroup` 旧 3/4 参注释、`AdaptiveRuleMatcher` 摘要、`CompressService.ParallelCompressDegree` 注释、`SettingsWindowViewModel` 重复 summary、`AddCustomFormatDialog` 占位注释、`ZipEntryClassifierTests`/`ZipEngineTests` 旧概念命名。
+  - **例外记录**：默认「图片类」规则仍含 `Bmp`（2026-10-21 拍板保留旧默认行为），与 SSOT「BMP 未压缩」判定不一致 → 不改默认输出，已在 `ZipEntryClassifier` 注释与本计划「已知边界」记录。
+  - **验证**：Core/Avalonia 构建通过（仅 NuGet 网络警告）；Core **780 通过 / 3 跳过 / 0 失败**（总 783）、UI **403 通过 / 3 跳过 / 0 失败**（总 406）；新增用例见计划 2026-10-23 节。
 **2026-10-21** — 压缩加速 Phase 2 追加：「仅存储格式」并入自适应规则 + 多线程生效提示
   - **背景**：MT 路径由 7z 原生整组单次调用、组内统一用全局级别（ZipEngine.CompressGroup.cs:1589-1592）→ 规则「指定压缩级别」在 MT 路径不生效；「仅存储」判定在 MT 分拣阶段即生效（storeGroup → copy-mode 原样写入）。且 MT 准入有条件（IsMultiThreadedEligible：未加密 / 未分卷 / 条目数 ≤65535 / 体积 <4GB / deflate·deflate64）→ 小目录、加密包、分卷等走串行路径时规则全部生效，故**不按开关禁用编辑**，改为提示 + 行内标记。
   - **引擎简化**：AdaptiveRuleMatcher.ResolveLevel 去掉 customStoreFormatIds 分支；ArchiveOptions/CompressRequest 移除 MultiThreadedStoreFormatIds；ZipEntryClassifier.IsCustomStoreFormat 删除；GUI/CLI 传参清理。
@@ -237,12 +269,12 @@
   - **测试**：UI 新增 3 条（仅存储 ID 迁移为规则 / 默认规则集 6 类且不含未压缩格式 / 行内标记条件）；Core ZipEntryClassifierTests 改规则等价用例、ZipEngineTests C3 改 Store 规则用例。全量 Core **766/0 失败**、UI **340/0 失败**。
 **2026-10-21** — 压缩加速 Phase 2（Task 9-11）：魔数检测 + 自适应规则引擎 + 恢复隐藏 UI
   - **三项前置拍板（用户）**：SSOT 统一到 ZipEntryClassifier；默认规则集与 SSOT 对齐后激活；魔数阈值取常量 64KB（不加设置项）。
-  - **SSOT 重写**（Core/Utils/ZipEntryClassifier.cs）：IsCompressed(ext) / IsCompressedFormat(FileFormat) / IsCompressedByMagic(path) / IsCustomStoreFormat(...)；扩展名集合修正（svg/	ar 移出——未压缩内容 Deflate 仍有收益）；CompressionCoefficients 退化为仅供压缩率预估。
+  - **SSOT 重写**（Core/Utils/ZipEntryClassifier.cs）：IsCompressed(ext) / IsCompressedFormat(FileFormat) / IsCompressedByMagic(path) / IsCustomStoreFormat(...)；扩展名集合修正（svg/tar 移出——未压缩内容 Deflate 仍有收益）；CompressionCoefficients 退化为仅供压缩率预估。**（同日追加节已删除 `IsCustomStoreFormat` 与 `customStoreFormatIds`；2026-10-23 又补 `TryReadHead` / `MatchCustomFormatByMagic` 接自定义 MagicHex。）**
   - **魔数检测**：仅文件 ≥64KB（MagicDetectMinBytes）才读前 4KB → FileFormatDetector.Detect → 命中压缩格式集合则 Store；IO 异常（占用/权限/已删除）回落扩展名规则、不中断压缩。
-  - **唯一决策入口**（AdaptiveRuleMatcher.ResolveLevel，新增 customStoreFormatIds）：用户规则 > 自定义仅存储 > SSOT 扩展名 > 魔数；ZipEntryClassifier.GetAdaptiveLevel 两个重载删除（4 个引擎调用点全改走新入口）。链路：ArchiveOptions/CompressRequest += AdaptiveOverrides/CustomFormats，CompressService 映射，GUI（CompressFlow.BuildRequest）与 CLI（App.CliCompress 3 处）均传参；引擎 4 条路径（MT 分拣 / MT 组内 7z / 串行写入 ReadFileWithRetry / AddToArchiveAsync）同口径。
-  - **默认规则集迁移**：AppSettings.AdaptiveOverridesDefaultsVersion；旧持久化的 4 条默认规则（用户未改过）整体替换为对齐版（svg/	ar/wav/	ga/hdr/exr 移出），用户自改规则集原样保留。
-  - **恢复 UI（Task 11）**：设置页魔数检测/自适应规则/格式目录区块随 AdaptiveCompression 显示；ZIP 面板「魔数检测」复选框恢复可见且值贯通到 ArchiveOptions；格式目录魔数 hex 输入框 + [hex] 显示恢复；AdaptiveHelp_Markdown 三语新增「魔数检测」段，并修正「自适应+多线程同开时用户规则不生效」的过时提示（规则现已全路径生效）。
-  - **测试**：Core 新增 AdaptiveCompressionClassificationTests（8 条：SSOT 边界/魔数命中·文本·阈值·读不到/规则优先·禁用·自定义仅存储·魔数开关）；UI 新增 AdaptiveSettingsUiTests（5 条：区块联动/魔数 hex/规则集迁移·保留）。全量 Core **766 通过 / 3 跳过 / 0 失败**、UI **337 通过 / 3 跳过 / 0 失败**；既有 ZipEntryClassifierTests 改指新入口，ZipEngineTests 3 处改用生产同参调用。
+  - **唯一决策入口**（AdaptiveRuleMatcher.ResolveLevel，新增 customStoreFormatIds）：用户规则 > 自定义仅存储 > SSOT 扩展名 > 魔数；ZipEntryClassifier.GetAdaptiveLevel 两个重载删除（4 个引擎调用点全改走新入口）。链路：ArchiveOptions/CompressRequest += AdaptiveOverrides/CustomFormats，CompressService 映射，GUI（CompressFlow.BuildRequest）与 CLI（App.CliCompress 3 处）均传参；引擎 4 条路径（MT 分拣 / MT 组内 7z / 串行写入 ReadFileWithRetry / AddToArchiveAsync）同口径。**（同日追加节把优先级改为「规则 > SSOT 扩展名 > 魔数」；2026-10-23 起 CLI 同时传三开关，规则在 CLI 才真正生效。）**
+  - **默认规则集迁移**：AppSettings.AdaptiveOverridesDefaultsVersion；旧持久化的 4 条默认规则（用户未改过）整体替换为对齐版（svg/tar/wav/tga/hdr/exr 移出），用户自改规则集原样保留。
+  - **恢复 UI（Task 11）**：设置页魔数检测/自适应规则/格式目录区块随 AdaptiveCompression 显示；ZIP 面板「魔数检测」复选框恢复可见且值贯通到 ArchiveOptions；格式目录魔数 hex 输入框 + [hex] 显示恢复；AdaptiveHelp_Markdown 三语新增「魔数检测」段，并修正「自适应+多线程同开时用户规则不生效」的过时提示（规则现已全路径生效）。**（2026-10-23 补：ZIP 面板魔数随自适应显隐、帮助改「三个开关」、MagicHex 真正接入引擎。）**
+  - **测试**：Core 新增 AdaptiveCompressionClassificationTests（8 条：SSOT 边界/魔数命中·文本·阈值·读不到/规则优先·禁用·自定义仅存储·魔数开关）；UI 新增 AdaptiveSettingsUiTests（5 条：区块联动/魔数 hex/规则集迁移·保留）。当时全量 Core **766 通过 / 3 跳过 / 0 失败**、UI **337 通过 / 3 跳过 / 0 失败**（2026-10-23 复核：UI 406 总 / 403 过 / 3 跳过 / 0 失败）；既有 ZipEntryClassifierTests 改指新入口，ZipEngineTests 3 处改用生产同参调用。
   - **已知边界**：自适应与规则目前**仅 ZIP 路径**生效（7z/TAR.GZ 无逐条目级别接口；ZIP 加密子路径不降级）。
   - **未做**：Task 12 本机基准测试 UI（含 E4 播种标记）、Task 13 post-C 组数定标（噪声 27% 不足以定标）。`RELEASE_NOTES.md` v0.5.3 新增「压缩加速 / Compression Speed-ups」节（魔数检测 / 自定义规则生效 / 默认规则集调整，中英成对）。
 **2026-10-20** — 启动优化：仅应用程序集 ReadyToRun（R2R）

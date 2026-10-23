@@ -193,7 +193,11 @@ public partial class App : Application
             ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
             ErrorResolver = CompressFlow.CreateErrorResolver(),
-            // Phase 2 / Task 10：自适应覆盖规则 + 用户自定义格式（CLI 与 GUI 同口径）
+            // Phase 2 / Task 10：自适应三开关 + 覆盖规则 + 用户自定义格式（CLI 与 GUI 同口径）
+            // 注意：只传规则而不传 AdaptiveCompression 时 ResolveLevel 会直接返回全局级别，规则等于没生效。
+            AdaptiveCompression = settings.AdaptiveCompression,
+            AdaptiveSmartDetect = settings.AdaptiveSmartDetect,
+            MultiThreadedCompression = settings.MultiThreadedCompression,
             AdaptiveOverrides = new List<AdaptiveOverrideRule>(settings.AdaptiveOverrides ?? new List<AdaptiveOverrideRule>()),
             CustomFormats = new List<FormatDefinition>(settings.CustomFormats ?? new List<FormatDefinition>()),
         };
@@ -286,7 +290,11 @@ public partial class App : Application
             ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
             ErrorResolver = CompressFlow.CreateErrorResolver(),
-            // Phase 2 / Task 10：自适应覆盖规则 + 用户自定义格式（CLI 与 GUI 同口径）
+            // Phase 2 / Task 10：自适应三开关 + 覆盖规则 + 用户自定义格式（CLI 与 GUI 同口径）
+            // 注意：只传规则而不传 AdaptiveCompression 时 ResolveLevel 会直接返回全局级别，规则等于没生效。
+            AdaptiveCompression = settings.AdaptiveCompression,
+            AdaptiveSmartDetect = settings.AdaptiveSmartDetect,
+            MultiThreadedCompression = settings.MultiThreadedCompression,
             AdaptiveOverrides = new List<AdaptiveOverrideRule>(settings.AdaptiveOverrides ?? new List<AdaptiveOverrideRule>()),
             CustomFormats = new List<FormatDefinition>(settings.CustomFormats ?? new List<FormatDefinition>()),
         };
@@ -390,7 +398,11 @@ public partial class App : Application
             ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
             ErrorResolver = CompressFlow.CreateErrorResolver(),
-            // Phase 2 / Task 10：自适应覆盖规则 + 用户自定义格式（CLI 与 GUI 同口径）
+            // Phase 2 / Task 10：自适应三开关 + 覆盖规则 + 用户自定义格式（CLI 与 GUI 同口径）
+            // 注意：只传规则而不传 AdaptiveCompression 时 ResolveLevel 会直接返回全局级别，规则等于没生效。
+            AdaptiveCompression = settings.AdaptiveCompression,
+            AdaptiveSmartDetect = settings.AdaptiveSmartDetect,
+            MultiThreadedCompression = settings.MultiThreadedCompression,
             AdaptiveOverrides = new List<AdaptiveOverrideRule>(settings.AdaptiveOverrides ?? new List<AdaptiveOverrideRule>()),
             CustomFormats = new List<FormatDefinition>(settings.CustomFormats ?? new List<FormatDefinition>()),
         };

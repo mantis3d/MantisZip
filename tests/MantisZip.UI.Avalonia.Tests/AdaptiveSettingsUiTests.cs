@@ -154,4 +154,24 @@ public class AdaptiveSettingsUiTests
         Assert.True(custom.ShowMtIneffectiveBadge);
         Assert.False(customNoMt.ShowMtIneffectiveBadge);
     }
+
+    [AvaloniaFact]
+    public void MtWarningAndRuleBadge_UpdateLiveWhenMultiThreadedToggled()
+    {
+        var vm = new SettingsWindowViewModel { AdaptiveCompression = true };
+        // 先归零，确保下面 true 一定会触发变更通知（本机 settings.json 可能已为 true）
+        vm.MultiThreadedCompression = false;
+        vm.AdaptiveOverrides.Clear();
+        vm.AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel { Level = AdaptiveLevel.Custom, CustomLevel = 3 });
+        vm.AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel { Level = AdaptiveLevel.Store });
+
+        vm.MultiThreadedCompression = true;
+        Assert.True(vm.IsAdaptiveOverridesMtWarningVisible);
+        Assert.True(vm.AdaptiveOverrides[0].ShowMtIneffectiveBadge);
+        Assert.False(vm.AdaptiveOverrides[1].ShowMtIneffectiveBadge); // Store 类始终生效
+
+        vm.MultiThreadedCompression = false;
+        Assert.False(vm.IsAdaptiveOverridesMtWarningVisible);
+        Assert.False(vm.AdaptiveOverrides[0].ShowMtIneffectiveBadge);
+    }
 }

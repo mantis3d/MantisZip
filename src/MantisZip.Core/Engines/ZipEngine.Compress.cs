@@ -70,13 +70,7 @@ public partial class ZipEngine
                     SevenZipEngine.EnsureLibraryPath();
 
 var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
-                    var zipEncrypt = options.ZipEncryptionMethod?.ToLowerInvariant() switch
-                    {
-                        "zipcrypto" => ZipEncryptionMethod.ZipCrypto,
-                        "aes128" => ZipEncryptionMethod.Aes128,
-                        "aes192" => ZipEncryptionMethod.Aes192,
-                        _ => ZipEncryptionMethod.Aes256,
-                    };
+                    var zipEncrypt = MapZipEncryptionMethod(options.ZipEncryptionMethod);
 
                     var s7zCompressor = new SharpSevenZipCompressor
                     {
@@ -87,6 +81,11 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                         IncludeEmptyDirectories = true,
                         DirectoryStructure = true,
                     };
+
+                    // 与 MT 路径一致：7z 默认按系统 ANSI 写 ZIP 条目名（中文 Windows 上为 GBK/bit0），
+                    // 会让默认 UTF-8 选择静默失效；显式 GBK 则保留 7z 的系统 ANSI 行为。
+                    if (!string.Equals(options.FileNameEncoding, "gbk", StringComparison.OrdinalIgnoreCase))
+                        s7zCompressor.CustomParameters["cu"] = "on";
 
                     if (options.SplitSize > 0)
                         s7zCompressor.VolumeSize = options.SplitSize;
@@ -199,8 +198,39 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                     // 压缩（历史双重压缩 bug：mt=on 的并行成果 100% 丢弃，且 CompressionLevel=null
                     // 使最终压缩级别与用户设置脱钩）。
                     // 分卷（SplitSize > 0）依赖 SplitOutputStream 包装，MT 路径不参与。
-                    if (IsMultiThreadedEligible(options, files.Count, totalBytes))
+                    // Deflate64 且全部条目 Store 时无处可压，会回落到串行 ZipWriter；
+                    // 但 ZipWriter 连 Store 条目也无法用 Deflate64 writer 构造（method 9 无映射），
+                    // 故此处标记改用 None writer —— 反正没有任何 Deflate64 压缩数据需要写。
+                    bool deflate64StoreOnly = false;
+
+                    // MT 镜像按相对路径落盘：两个源目录/文件产生相同相对路径时后一个会覆盖前一个
+                    // （串行路径允许重复条目）。检测到重复即回落串行，避免静默丢数据。
+                    bool hasDuplicateEntryNames =
+                        files.Select(f => ArchivePath.Normalize(f.RelativePath))
+                             .Distinct(StringComparer.OrdinalIgnoreCase)
+                             .Count() != files.Count;
+                    if (hasDuplicateEntryNames)
+                        CoreLog.Info("CompressAsync: MultiThreaded skipped — duplicate relative entry names present");
+
+                    if (!hasDuplicateEntryNames && IsMultiThreadedEligible(options, files.Count, totalBytes))
                     {
+                        // MT 的镜像拷贝 / Store 合并不走 ReadFileWithRetry，无法逐文件弹「重试/跳过/中止」，
+                        // 且镜像用 FileShare.Read 比串行 SharedReadStream 更严格 —— 源文件被编辑器占用时
+                        // 会直接让整次压缩失败（串行则会弹窗并跳过）。这里先按串行同款语义做一次可读性
+                        // 预检：不可读文件经 ErrorResolver 处理后剔除，并上报 Skipped。
+                        var readablePaths = ReadErrorHandler.FilterUnreadableFiles(
+                            files.Select(f => f.FullPath), options, cancellationToken,
+                            ReadErrorHandler.CreateSkippedReporter(progress, sourcePaths));
+                        if (readablePaths.Count != files.Count)
+                        {
+                            int removed = files.Count - readablePaths.Count;
+                            var readableSet = new HashSet<string>(readablePaths, StringComparer.OrdinalIgnoreCase);
+                            files = files.Where(f => readableSet.Contains(f.FullPath)).ToList();
+                            totalFiles = files.Count;
+                            totalBytes = files.Sum(f => SafeFileSize(f.FullPath));
+                            CoreLog.Info($"CompressAsync: MT pre-check removed {removed} unreadable file(s), {files.Count} left");
+                        }
+
                         var storeGroup = new List<(string FullPath, string RelativePath)>();
                         var compressGroup = new List<(string FullPath, string RelativePath)>();
                         foreach (var file in files)
@@ -216,6 +246,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                         // 回落到标准串行路径（ReadFileWithRetry 内部同样应用自适应分类）。
                         if (compressGroup.Count == 0)
                         {
+                            deflate64StoreOnly = string.Equals(options.ZipCompressionMethod, "deflate64", StringComparison.OrdinalIgnoreCase);
                             CoreLog.Info("CompressAsync: MultiThreaded skipped — no compressible entries, using serial path");
                         }
                         else if (storeGroup.Count > 0 && !CanCopyModeRewrite(options.ZipCompressionMethod))
@@ -230,7 +261,11 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                             // ── N 组并行分支 ──
                             // 复用既有回退判定（IsMultiThreadedEligible 的 7 条已完成）；
                             // 此处仅追加「组数」维度：分组后有效组 < 2 则走下方既有单组路径。
-                            int degree = ResolveParallelCompressDegree(options.ParallelCompressDegree);
+                            // Deflate64 兜底路径可能是在 MT 关闭时进入的（7z 是唯一能写 method 9 的路径），
+                            // 此时强制 1 组，避免把「关闭多线程」的用户意外带回 N 组并行。
+                            int degree = options.MultiThreadedCompression
+                                ? ResolveParallelCompressDegree(options.ParallelCompressDegree)
+                                : 1;
                             var groups = SplitCompressGroup(compressGroup, degree);
 
                             // ── 闸门：copy-mode 承载能力 ──
@@ -321,7 +356,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                             await Task.Run(() => CompressGroupWithSevenZip(
                                                 groups[i], tempZips[i], options, adapter,
                                                 0, groupTotal, groups[i].Count, 0,
-                                                i, groups.Count, ref localLastReport), ct);
+                                                i, groups.Count, null, ref localLastReport), ct);
 
                                             // 该组完成：把它的输入字节并入全局已完成基数
                                             Interlocked.Add(ref finishedInputBytes, groupTotal);
@@ -343,7 +378,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                         {
                                             cancellationToken.ThrowIfCancellationRequested();
                                             // 必须保持打开直到 RewriteAsync 完成（ZipBinaryRewriter 契约）
-                                            var storeStream = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                            var storeStream = SharedReadStream.OpenRead(fullPath);
                                             storeStreams.Add(storeStream);
                                             storeEntries.Add(new NewEntry(
                                                 // 条目名编码固定 UTF-8：与 7z 产物保持一致（混用编码会破坏条目名）
@@ -424,7 +459,8 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                             try
                             {
                                 CoreLog.Info($"CompressAsync: MultiThreaded mode — {storeGroup.Count} store, {compressGroup.Count} compress via 7z mt=on");
-                                CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, 0, totalBytes, totalFiles, 0, null, null, ref lastReportTime);
+                                CompressGroupWithSevenZip(compressGroup, tempZip, options, progress, 0, totalBytes, totalFiles, 0, null, null,
+                                    options.MultiThreadedCompression ? null : "1", ref lastReportTime);
 
                                 if (storeGroup.Count == 0)
                                 {
@@ -443,7 +479,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                         foreach (var (fullPath, relativePath) in storeGroup)
                                         {
                                             cancellationToken.ThrowIfCancellationRequested();
-                                            var storeStream = File.Open(fullPath, FileMode.Open, FileAccess.Read, FileShare.Read);
+                                            var storeStream = SharedReadStream.OpenRead(fullPath);
                                             storeStreams.Add(storeStream);
                                             storeEntries.Add(new NewEntry(
                                                 EntryName: ArchivePath.Normalize(relativePath),
@@ -453,6 +489,27 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                                 Store: true));
                                         }
 
+                                        // 合并阶段进度：重写器固定 92/94/97/100 且无字节信息，
+                                        // 直接转发会从组阶段终点（可能仅 50%）瞬间跳到 92%。
+                                        // 与 N 组分支一致，线性重映射到 [组阶段终点, 100]。
+                                        double groupEndPercent = totalBytes > 0
+                                            ? Math.Min(95.0, compressGroup.Sum(f => SafeFileSize(f.FullPath)) * 100.0 / totalBytes)
+                                            : 0.0;
+                                        var mergeAdapter = new InlineProgress<ArchiveProgress>(raw =>
+                                        {
+                                            double p = Math.Clamp(raw.PercentComplete, 0, 100);
+                                            double pct = groupEndPercent + (100.0 - groupEndPercent) * (p / 100.0);
+                                            progress?.Report(new ArchiveProgress
+                                            {
+                                                PercentComplete = pct,
+                                                ProcessedBytes = (long)(totalBytes * pct / 100.0),
+                                                TotalBytes = totalBytes,
+                                                CurrentFile = string.Empty,
+                                                EntryKey = raw.EntryKey,
+                                                EntryStatus = raw.EntryStatus,
+                                            });
+                                        });
+
                                         // 条目名编码固定 UTF-8：与 7z 产物保持一致（混用编码会破坏条目名）
                                         ZipBinaryRewriter.RewriteAsync(
                                                 sourcePath: tempZip,
@@ -461,7 +518,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                                 addEntries: storeEntries,
                                                 encoding: Encoding.UTF8,
                                                 comment: options.Comment,
-                                                progress: progress,
+                                                progress: mergeAdapter,
                                                 cancellationToken: cancellationToken)
                                             .GetAwaiter().GetResult();
 
@@ -507,7 +564,15 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                         }
                     }
 
-                    using var zipWriter = new ZipWriter(fsOut, writerOptions);
+                    var activeWriterOptions = deflate64StoreOnly
+                        ? new ZipWriterOptions(CompressionType.None)
+                        {
+                            CompressionLevel = 0,
+                            ArchiveComment = options.Comment ?? "",
+                            ArchiveEncoding = writerOptions.ArchiveEncoding,
+                        }
+                        : writerOptions;
+                    using var zipWriter = new ZipWriter(fsOut, activeWriterOptions);
 
                     long skippedBytes = 0; // 因读取失败被跳过文件的字节：仅用于推进总进度；不计入 ProcessedFiles，也不污染压缩率
                     foreach (var (fullPath, relativePath) in files)
@@ -670,6 +735,18 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
         9 => SharpSevenZip.CompressionLevel.Ultra,
         _ => SharpSevenZip.CompressionLevel.Normal,
     };
+
+    /// <summary>
+    /// 把用户选择的 ZIP 加密方式映射为 SharpSevenZip <see cref="ZipEncryptionMethod"/>。
+    /// </summary>
+    private static ZipEncryptionMethod MapZipEncryptionMethod(string? zipEncryptionMethod) =>
+        zipEncryptionMethod?.ToLowerInvariant() switch
+        {
+            "zipcrypto" => ZipEncryptionMethod.ZipCrypto,
+            "aes128" => ZipEncryptionMethod.Aes128,
+            "aes192" => ZipEncryptionMethod.Aes192,
+            _ => ZipEncryptionMethod.Aes256,
+        };
 
     /// <summary>
     /// 把用户选择的 ZIP 压缩方法映射为 SharpSevenZip <see cref="CompressionMethod"/>。

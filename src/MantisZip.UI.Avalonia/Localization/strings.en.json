@@ -67,6 +67,10 @@
   "Status_TestingParallelDegree": "Testing optimal thread count...",
   "Extract_ParallelDegreeAutoHint": "0=auto (smart/settings), 1=serial, 2-16=threads",
   "FormatOptions_ZIP_MultiThreadOver4Gb": "Multi-threaded compression is unavailable when the total size exceeds 4GB (ZIP32 per-archive limit) and will fall back to single-threaded. This limitation will be addressed in a future version.",
+  "FormatOptions_ZIP_EncryptNoAdaptiveMt": "Encrypted compression uses a single 7z call; adaptive and multithreaded compression do not apply.",
+  "FormatOptions_ZIP_MethodNoAdaptive": "The selected compression method does not support adaptive/store-only (Deflate / Deflate64 only).",
+  "FormatOptions_ZIP_SplitNoMt": "Split archives use serial writing; multithreaded compression does not apply.",
+  "FormatOptions_ZIP_GbkNoMt": "Multithreaded compression does not apply with GBK file-name encoding (falls back to serial).",
   "Progress_Tooltip_Progress": "Progress",
   "Progress_Tooltip_Bytes": "Bytes",
   "Progress_Tooltip_Ratio": "Ratio",
@@ -209,6 +213,7 @@
   "Preview_ArchiveCommentTitle": "Archive Comment",
   "Compress_Preparing": "Preparing...",
   "Compress_PrepareFailed": "Failed to prepare compression. Please try again.",
+  "Compress_Deflate64Split_Unsupported": "Deflate64 does not support split archives. Use Deflate or turn off splitting.",
   "Settings_Advanced_OpenLog": "Open log file",
   "Menu_Tools": "Tools",
   "Settings_Preview_ShowInfoPanel": "Show Info Panel",
@@ -1312,6 +1317,6 @@
   "Metadata_Key_IconCount": "Icon Count",
   "Metadata_Key_Encrypted": "Encrypted",
   "AdaptiveHelp_Title": "Compression Speed-up Help",
-  "AdaptiveHelp_Markdown": "Adaptive compression decides automatically whether to compress each file, avoiding wasted CPU on already-compressed data. The two switches below can be combined freely.\n\n## Adaptive Compression\nChooses the compression method by file type. Known compressed formats (JPEG, PNG, MP4, ZIP, and 60+ other extensions) are written as \"Store\" without re-compression — such data has no room left to shrink, so compressing it only wastes CPU and time; all other files are still compressed at your selected level.\n\n## Magic-number detection\nFor files whose **extension is unreliable** (renamed, no extension, or the extension does not match the actual content), MantisZip reads the file header to identify the real format; if it turns out to be an already-compressed format (e.g. JPEG, MP4, ZIP), the file is stored as-is instead of being compressed again.\n\n> **Tip**: magic-number detection only applies to **large files** (64 KB and above) and requires an extra header read, so it slightly increases compression time. For normally named photos/videos the extension rule already stores them, so enabling it rarely changes anything.\n\n## Multithreaded Compression\nUses multiple CPU cores to compress in parallel for faster compression, best for large files or many files (experimental). Can be enabled together with Adaptive Compression.\n\n> **Note**: your custom rules take priority over the built-in \"already-compressed formats are stored\" rule. \"Store\" rules always take effect; rules that specify a compression level do not take effect on the multithreaded path (groups are compressed in batches with one level per group), but they work fully on the serial path (small folders, encrypted archives, split archives)."
+  "AdaptiveHelp_Markdown": "Adaptive compression decides automatically whether to compress each file, avoiding wasted CPU on already-compressed data. The three switches below can be combined freely.\n\n## Adaptive Compression\nChooses the compression method by file type. Known compressed formats (JPEG, PNG, MP4, ZIP, and 60+ other extensions) are written as \"Store\" without re-compression — such data has no room left to shrink, so compressing it only wastes CPU and time; all other files are still compressed at your selected level.\n\n## Magic-number detection\nFor files whose **extension is unreliable** (renamed, no extension, or the extension does not match the actual content), MantisZip reads the file header to identify the real format; if it turns out to be an already-compressed format (e.g. JPEG, MP4, ZIP), the file is stored as-is instead of being compressed again.\n\n> **Tip**: magic-number detection only applies to **large files** (64 KB and above) and requires an extra header read, so it slightly increases compression time. For normally named photos/videos the extension rule already stores them, so enabling it rarely changes anything.\n\n## Multithreaded Compression\nUses multiple CPU cores to compress in parallel for faster compression, best for large files or many files (experimental). Can be enabled together with Adaptive Compression.\n\n> **Note**: your custom rules take priority over the built-in \"already-compressed formats are stored\" rule. \"Store\" rules always take effect; rules that specify a compression level do not take effect on the multithreaded path (groups are compressed in batches with one level per group), but they work fully on the serial path (small folders, encrypted archives, split archives)."
 }
 
