@@ -301,6 +301,57 @@ public partial class DynamicFormatOptionsPanel : UserControl
     private void AdaptiveCompressionCheck_IsCheckedChanged(object? sender, RoutedEventArgs e)
         => UpdateSmartDetectVisibility();
 
+    private bool _contextEncrypt;
+    private bool _contextSplit;
+
+    /// <summary>
+    /// 由压缩设置窗口注入「加密 / 分卷」上下文：这两项会让自适应或多线程静默失效，
+    /// 面板据此显示原因，避免用户勾了开关却没有效果。
+    /// </summary>
+    public void UpdateCompressionContext(bool encrypt, bool split)
+    {
+        _contextEncrypt = encrypt;
+        _contextSplit = split;
+        RefreshAvailabilityHint();
+    }
+
+    private void ZipEncodingOrMethod_SelectionChanged(object? sender, SelectionChangedEventArgs e)
+        => RefreshAvailabilityHint();
+
+    /// <summary>刷新「自适应/多线程不生效」提示（空列表则隐藏）。</summary>
+    private void RefreshAvailabilityHint()
+    {
+        if (ZipAvailabilityHint == null) return;
+
+        if (SelectedFormat?.ToLowerInvariant() != "zip")
+        {
+            ZipAvailabilityHint.IsVisible = false;
+            return;
+        }
+
+        var reasons = new List<string>();
+        if (_contextEncrypt)
+        {
+            reasons.Add(LocalizationManager.T("FormatOptions_ZIP_EncryptNoAdaptiveMt"));
+        }
+        else
+        {
+            var method = (ZipMethodCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
+            bool adaptiveSupported = string.IsNullOrEmpty(method) || method is "deflate" or "deflate64";
+            if (!adaptiveSupported)
+                reasons.Add(LocalizationManager.T("FormatOptions_ZIP_MethodNoAdaptive"));
+            if (_contextSplit)
+                reasons.Add(LocalizationManager.T("FormatOptions_ZIP_SplitNoMt"));
+
+            var encoding = (EncodingCombo?.SelectedItem as ComboBoxItem)?.Tag as string;
+            if (string.Equals(encoding, "gbk", StringComparison.OrdinalIgnoreCase))
+                reasons.Add(LocalizationManager.T("FormatOptions_ZIP_GbkNoMt"));
+        }
+
+        ZipAvailabilityHint.Text = string.Join(" ", reasons);
+        ZipAvailabilityHint.IsVisible = reasons.Count > 0;
+    }
+
     /// <summary>
     /// 多线程压缩复选框变更 — 当前无联动控件（仅影响引擎侧 mt=on 参数），
     /// 保留事件以便后续扩展（如线程数选择）。
@@ -482,6 +533,7 @@ public partial class DynamicFormatOptionsPanel : UserControl
             case "zip":
                 ZipPanel.IsVisible = true;
                 UpdateSmartDetectVisibility();
+                RefreshAvailabilityHint();
                 break;
             case "7z":
                 SevenZPanel.IsVisible = true;

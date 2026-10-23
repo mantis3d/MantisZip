@@ -111,6 +111,23 @@ public partial class ZipEngine
                 return;
             }
 
+            // 追加源文件随后用 File.Copy 进临时目录，同样无法逐文件弹重试/跳过；
+            // 与压缩/加密路径一致，先按 SharedReadStream + ErrorResolver 预检，
+            // 被占用的新文件按用户选择剔除并上报 Skipped，而不是整次 Add 失败。
+            var readableAddPaths = ReadErrorHandler.FilterUnreadableFiles(
+                resolvedFiles.Select(f => f.FullPath), options, cancellationToken,
+                ReadErrorHandler.CreateSkippedReporter(progress, sourcePaths));
+            if (readableAddPaths.Count != resolvedFiles.Count)
+            {
+                var readableSet = new HashSet<string>(readableAddPaths, StringComparer.OrdinalIgnoreCase);
+                resolvedFiles = resolvedFiles.Where(f => readableSet.Contains(f.FullPath)).ToList();
+                if (resolvedFiles.Count == 0)
+                {
+                    CoreLog.Info("AddToArchiveAsync: all new files unreadable/skipped");
+                    return;
+                }
+            }
+
             long newTotalBytes = resolvedFiles.Sum(f => new FileInfo(f.FullPath).Length);
             // 总工作量 = 提取旧条目字节 + 压缩全部字节
             long workTotal = oldTotalBytes + oldTotalBytes + newTotalBytes;
@@ -342,8 +359,10 @@ public partial class ZipEngine
                         var s7zCompressor = new SharpSevenZipCompressor
                         {
                             ArchiveFormat = OutArchiveFormat.Zip,
-                            ZipEncryptionMethod = ZipEncryptionMethod.Aes256,
-                            CompressionMethod = CompressionMethod.Deflate,
+                            // 与 CompressAsync 加密路径同源：尊重用户选择的加密方式与压缩方法
+                            // （此前硬编码 Aes256 + Deflate，加密追加时用户选择被静默忽略）
+                            ZipEncryptionMethod = MapZipEncryptionMethod(options.ZipEncryptionMethod),
+                            CompressionMethod = MapZipMethodToS7Z(options.ZipCompressionMethod),
                             CompressionLevel = MapCompressionLevelToS7Z(options.CompressionLevel),
                             IncludeEmptyDirectories = true,
                             DirectoryStructure = true,
@@ -674,6 +693,26 @@ public partial class ZipEngine
                                             Store: true));
                                     }
 
+                                    // 同 CompressAsync 单组 MT：合并阶段固定 92..100 直接转发会跳变，
+                                    // 线性重映射到 [组阶段终点, 100]。
+                                    double groupEndPercent = compressTotalBytes > 0
+                                        ? Math.Min(95.0, compressGroup.Sum(f => SafeFileSize(f.FullPath)) * 100.0 / compressTotalBytes)
+                                        : 0.0;
+                                    var mergeAdapter = new InlineProgress<ArchiveProgress>(raw =>
+                                    {
+                                        double p = Math.Clamp(raw.PercentComplete, 0, 100);
+                                        double pct = groupEndPercent + (100.0 - groupEndPercent) * (p / 100.0);
+                                        progress?.Report(new ArchiveProgress
+                                        {
+                                            PercentComplete = pct,
+                                            ProcessedBytes = (long)(compressTotalBytes * pct / 100.0),
+                                            TotalBytes = compressTotalBytes,
+                                            CurrentFile = string.Empty,
+                                            EntryKey = raw.EntryKey,
+                                            EntryStatus = raw.EntryStatus,
+                                        });
+                                    });
+
                                     // 条目名编码固定 UTF-8：与 7z 产物保持一致（混用编码会破坏条目名）
                                     ZipBinaryRewriter.RewriteAsync(
                                         sourcePath: tempZip,
@@ -682,7 +721,7 @@ public partial class ZipEngine
                                         addEntries: storeEntries,
                                         encoding: Encoding.UTF8,
                                         comment: options.Comment,
-                                        progress: progress,
+                                        progress: mergeAdapter,
                                         cancellationToken: cancellationToken)
                                         .GetAwaiter().GetResult();
                                 }
@@ -1507,6 +1546,32 @@ public partial class ZipEngine
         {
             CoreLog.Info($"ZipEngine: MultiThreaded skipped — total size {totalSize} exceeds ZIP32 limit ({MaxZip32Size})");
             return false;
+        }
+
+        // 临时空间预检：MT 需要「源镜像 + 每组 temp zip + 最终包」，峰值约 2× 输入。
+        // 空间不足时回落串行（串行直接写输出，不占系统临时盘）。
+        // Deflate64 无法回落（串行 writer 写不了 method 9），只能继续 7z 路径。
+        if (!needsSevenZipForDeflate64)
+        {
+            try
+            {
+                var tempRoot = Path.GetPathRoot(Path.GetTempPath());
+                if (!string.IsNullOrEmpty(tempRoot))
+                {
+                    long required = totalSize > long.MaxValue / 2 ? long.MaxValue : totalSize * 2;
+                    long available = new DriveInfo(tempRoot).AvailableFreeSpace;
+                    if (available < required)
+                    {
+                        CoreLog.Info($"ZipEngine: MultiThreaded skipped — temp drive {tempRoot} has {available} bytes free, needs ~{required}");
+                        return false;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                // 盘符/权限异常不应阻断压缩：放行，让实际写入阶段决定
+                CoreLog.Trace("ZipEngine: temp space pre-check skipped: {0}", ex.Message);
+            }
         }
 
         return true;

@@ -540,7 +540,7 @@ Task 0 基线复测先在 20 逻辑核机跑完（报告 `.buildout\bench-before
 
 **验证**
 - `verify-repo.ps1 -Task build -Target core` → 0 警告；`-Target avalonia` → 0 错误（仅 NuGet 网络警告）。
-- `verify-repo.ps1 -Task test -Target tests` → **786 通过 / 3 跳过 / 0 失败**（总 789）；`-Target ui-tests` → **403 通过 / 3 跳过 / 0 失败**（总 406）。新增用例：`ResolveParallelCompressDegreeTests`（7）、自定义 MagicHex（2 + Theory 4）、MT 提示实时刷新（1）、MT/加密中文名编码（3）、MT 不可读文件 Skip（1）、Deflate64 串行/全 Store（2）。
+- `verify-repo.ps1 -Task test -Target tests` → **790 通过 / 3 跳过 / 0 失败**（总 793）；`-Target ui-tests` → **403 通过 / 3 跳过 / 0 失败**（总 406）。新增用例：`ResolveParallelCompressDegreeTests`（7）、自定义 MagicHex（2 + Theory 4）、MT 提示实时刷新（1）、MT/加密中文名编码（3）、MT 不可读文件 Skip（1）、Deflate64 串行/全 Store（2）、加密 Add 方法（1）、单组 MT 进度（1）、Add 不可读文件（1）、重复相对路径（1）。
 
 **仍留待后续**
 - Task 12 本机基准测试 UI、Task 13 post-C 组数定标（未做，保持现状）。
@@ -555,13 +555,18 @@ Task 0 基线复测先在 20 逻辑核机跑完（报告 `.buildout\bench-before
 - **MT 遇被占用文件直接失败**：MT 镜像/Store 合并原用 `FileShare.Read` 且不走 `ErrorResolver`，编辑器持有写锁时整次压缩失败（串行会弹「重试/跳过/中止」）。现 MT 入口先用 `ReadErrorHandler.FilterUnreadableFiles`（SharedReadStream + ErrorResolver）预检并上报 Skipped；镜像与 Store 合并改用 `SharedReadStream.OpenRead`。
 - **自适应规则热路径分配**：`FormatCatalog.GetById/GetByExtension` 每次调用都 `GetAll()` 复制内置列表（默认 6 规则 × 30+ ID / 文件）。改为内置格式字典索引，自定义格式仍线性扫描；行为不变。
 
-**仍存在、待决定（本轮未改）**
-- **Deflate64 + 分卷（非加密）仍会失败**：MT 路径不支持分卷，回落串行 ZipWriter 无法写 method 9。建议 UI 禁用该组合或补 7z 分卷路径。
-- **`AddToArchiveAsync` 加密分支硬编码 Deflate**：`CompressionMethod.Deflate` 忽略用户选择的 ZIP 方法（加密 Add 场景）。
-- **单组 MT 混合场景进度跳变**：`RewriteAsync` 固定 92/94/97/100 直接转发，组阶段结束（如 50%）会跳到 92%；N 组分支已重映射，单组分支未做。
-- **静默失效的开关组合**：加密/分卷/非 Deflate 方法/GBK 会让自适应或 MT 部分/全部失效，UI 仍可勾选且无提示（仅 4GB 提示）。
-- **MT 临时空间约 2× 输入**：镜像目录 + 每组 temp zip + 最终包都在系统临时目录，未检查剩余空间/未提示。
-- **重复相对路径**：两个同名源目录/文件的相对路径相同时，MT 镜像会覆盖（串行会写出重复条目），属数据丢失边缘场景，建议检测到重复即回落串行。
+**第二轮追加修复（2026-10-23 同日）**
+- **`AddToArchiveAsync` 加密分支硬编码 Aes256 + Deflate** → 改为与 `CompressAsync` 同源映射 `MapZipEncryptionMethod` / `MapZipMethodToS7Z`，用户选择不再被忽略（新增加密 Add 方法回归测试）。
+- **Deflate64 + 分卷（非加密）**：在 `CompressSettingsViewModel.StartCompress` 先拦截并提示（新增三语 `Compress_Deflate64Split_Unsupported`），避免落到必失败的串行 writer。⚠ 直接调用 Core API 仍无 7z 分卷路径。
+- **单组 MT 混合场景进度跳变**：`CompressAsync` / `AddToArchiveAsync` 的单组混合合并阶段改为与 N 组一致，把 `RewriteAsync` 的固定百分比线性重映射到 `[组阶段终点, 100]`；新增进度单调性/跳变上限测试。
+- **静默失效的开关组合**：ZIP 面板新增动态提示（`ZipAvailabilityHint`）——加密、分卷、非 Deflate 方法、GBK 编码分别显示原因；新增三语 4 个 key。
+- **MT 临时空间预检**：`IsMultiThreadedEligible` 检查系统临时盘可用空间是否 ≥ 2× 输入，不足则回落串行（Deflate64 无串行回退，故跳过该检查）。
+- **重复相对路径**：`CompressAsync` 检测归一化条目名重复时回落串行，避免 MT 镜像覆盖导致静默丢文件；新增回归测试。
+- **`AddToArchiveAsync` 新增源文件预检**：新文件被占用时按 `ErrorResolver` 跳过并上报 Skipped，不再让 `File.Copy` 整次失败；新增回归测试。
+
+**仍存在、待决定**
+- **Deflate64 + 分卷直接走 Core API**：UI 已拦截，但 CLI/第三方直接调 `CompressOptions` 仍可能落串行 writer 失败；彻底解决需 7z 分卷路径。
 - **单组 MT 条目完成顺序**：`FileCompressionFinished` 无文件名，按 FIFO 出队上报 `EntryKey`；7z mt=on 完成顺序若非输入序会标错条目（仅 UI 状态，不影响产物）。
 - **ZIP32 上限只按输入字节**：未计条目头/中央目录开销，接近 4GB + 大量条目时可能被 7z 升为 ZIP64，copy-mode 会拒绝。
 - **自定义格式 ID 冲突**：`AddCustomFormat` 用秒级时间戳生成 ID，同一秒添加两个格式会撞 ID，规则/魔数引用歧义。
+- **MT 临时盘选择**：预检只判断可用空间，仍固定用系统临时目录；用户无法指定临时盘（磁盘紧张时只能关 MT）。

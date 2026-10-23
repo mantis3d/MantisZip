@@ -578,6 +578,78 @@ public class ZipEngineTests : IDisposable
         Assert.Contains(entries, e => e.Name == "新增文件.txt");
     }
 
+    /// <summary>
+    /// 回归：加密追加路径曾硬编码 Aes256 + Deflate，忽略用户选择的 ZIP 方法与加密方式。
+    /// 现应与 CompressAsync 加密路径同源，按 options 映射。
+    /// </summary>
+    [Fact]
+    public async Task AddToArchiveAsync_Encrypted_HonorsZipCompressionMethod()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var dir = Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(dir);
+        TrackDir(dir);
+        var archive = TrackFile(Path.Combine(dir, "enc.zip"));
+        var baseFile = Path.Combine(dir, "base.txt");
+        await File.WriteAllTextAsync(baseFile, new string('A', 64 * 1024));
+        await _engine.CompressAsync([baseFile], archive, new ArchiveOptions { CompressionLevel = 5 });
+
+        var added = Path.Combine(dir, "added.txt");
+        await File.WriteAllTextAsync(added, new string('B', 64 * 1024));
+        await _engine.AddToArchiveAsync(archive, [added], new ArchiveOptions
+        {
+            CompressionLevel = 5,
+            Encrypt = true,
+            Password = "pw123",
+            ZipCompressionMethod = "bzip2",
+            // 用 ZipCrypto：AES 会把 CDFH method 置为 99，无法直接断言实际压缩方法
+            ZipEncryptionMethod = "zipcrypto",
+        });
+
+        var methods = ReadEntryMethods(archive);
+        Assert.NotEmpty(methods);
+        foreach (var (name, info) in methods)
+            Assert.True(info.Method == 12, // bzip2
+                $"'{name}' 的 method={info.Method}，应为 12（加密追加不应硬编码 Deflate）");
+    }
+
+    /// <summary>
+    /// 追加路径的源文件预检：被占用文件应按 ErrorResolver 跳过，而不是让 File.Copy 整次失败。
+    /// </summary>
+    [Fact]
+    public async Task AddToArchiveAsync_UnreadableNewFile_RespectsErrorResolverSkip()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString());
+        Directory.CreateDirectory(dir);
+        TrackDir(dir);
+        var archive = TrackFile(Path.Combine(dir, "base.zip"));
+        var baseFile = Path.Combine(dir, "base.txt");
+        await File.WriteAllTextAsync(baseFile, "base");
+        await _engine.CompressAsync([baseFile], archive, new ArchiveOptions { CompressionLevel = 5 });
+
+        var ok = Path.Combine(dir, "ok.txt");
+        var locked = Path.Combine(dir, "locked.txt");
+        await File.WriteAllTextAsync(ok, "ok");
+        await File.WriteAllTextAsync(locked, "locked");
+
+        int resolverCalls = 0;
+        using (new FileStream(locked, FileMode.Open, FileAccess.ReadWrite, FileShare.None))
+        {
+            await _engine.AddToArchiveAsync(archive, [ok, locked], new ArchiveOptions
+            {
+                CompressionLevel = 5,
+                ErrorResolver = _ => { resolverCalls++; return FileErrorAction.Skip; },
+            });
+        }
+
+        Assert.Equal(1, resolverCalls);
+        using var za = System.IO.Compression.ZipFile.OpenRead(archive);
+        var names = za.Entries.Select(e => e.FullName).ToList();
+        Assert.Contains("ok.txt", names);
+        Assert.DoesNotContain("locked.txt", names);
+    }
+
     // ===== 删除路径的编码回归锁 =====
 
     /// <summary>
@@ -1876,6 +1948,80 @@ public class ZipEngineTests : IDisposable
         Assert.NotEmpty(entries);
         foreach (var (_, info) in entries)
             Assert.Equal((ushort)0, info.Method); // 全 Store
+    }
+
+    /// <summary>
+    /// 单组 MT 混合场景（1 个可压缩 + 多个 Store）：合并阶段进度曾直接转发
+    /// RewriteAsync 的固定百分比，从组阶段终点跳到 92。修复后与 N 组分支一样线性重映射。
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_MultiThreaded_SingleGroupMixed_ProgressDoesNotJump()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var srcDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        Directory.CreateDirectory(srcDir);
+        await File.WriteAllTextAsync(Path.Combine(srcDir, "big.txt"), new string('T', 300_000));
+        for (int i = 0; i < 8; i++)
+        {
+            var data = new byte[100_000];
+            data[0] = 0xFF; data[1] = 0xD8; data[2] = 0xFF; data[3] = 0xE0;
+            data[^1] = (byte)i;
+            await File.WriteAllBytesAsync(Path.Combine(srcDir, $"p{i}.jpg"), data);
+        }
+        var outputPath = TrackFile(Path.Combine(Path.GetTempPath(), "MantisZipTest", $"{Guid.NewGuid()}_mt_progress.zip"));
+
+        var reports = new List<double>();
+        var progress = new SyncProgress<ArchiveProgress>(p =>
+        {
+            if (p.PercentComplete > 0) reports.Add(p.PercentComplete);
+        });
+
+        await _engine.CompressAsync([srcDir], outputPath, new ArchiveOptions
+        {
+            CompressionLevel = 5,
+            AdaptiveCompression = true,
+            MultiThreadedCompression = true,
+            ParallelCompressDegree = 1, // 强制单组路径
+        }, progress);
+
+        Assert.NotEmpty(reports);
+        double maxJump = 0;
+        for (int i = 1; i < reports.Count; i++)
+        {
+            Assert.True(reports[i] >= reports[i - 1] - 0.01,
+                $"进度回退：{reports[i - 1]:F1}% → {reports[i]:F1}%");
+            maxJump = Math.Max(maxJump, reports[i] - reports[i - 1]);
+        }
+        Assert.True(maxJump < 40, $"单组 MT 合并阶段出现 {maxJump:F1}% 的进度跳变");
+    }
+
+    /// <summary>
+    /// 两个源目录同名（根不同、目录名相同）会产生重复相对路径；MT 镜像会覆盖其中一个。
+    /// 修复后检测到重复即回落串行，两个条目都必须保留。
+    /// </summary>
+    [Fact]
+    public async Task CompressAsync_MultiThreaded_DuplicateRelativePaths_FallsBackToSerial()
+    {
+        var root = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        var a = Path.Combine(root, "x", "shared");
+        var b = Path.Combine(root, "y", "shared");
+        Directory.CreateDirectory(a);
+        Directory.CreateDirectory(b);
+        await File.WriteAllTextAsync(Path.Combine(a, "dup.txt"), "AAAA");
+        await File.WriteAllTextAsync(Path.Combine(b, "dup.txt"), "BBBB");
+        var outputPath = TrackFile(Path.Combine(root, "dup.zip"));
+
+        await _engine.CompressAsync([a, b], outputPath, new ArchiveOptions
+        {
+            CompressionLevel = 5,
+            MultiThreadedCompression = true,
+            AdaptiveCompression = false,
+        });
+
+        using var za = System.IO.Compression.ZipFile.OpenRead(outputPath);
+        var entries = za.Entries.Where(e => e.FullName.EndsWith("dup.txt")).ToList();
+        Assert.Equal(2, entries.Count); // 串行路径保留重复条目；MT 镜像会只剩 1 个
     }
 
     // ===== MT 路径不可读文件（2026-10-23 回归）=====

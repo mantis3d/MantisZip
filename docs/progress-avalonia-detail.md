@@ -217,8 +217,13 @@
   - **文件名编码**：实测 MT 路径 7z 按系统 ANSI 写名（中文 Windows：GBK/bit0），默认 UTF-8 选项被忽略；混合包中 7z 条目 GBK 与 Store 条目 UTF-8 并存。修复：MT/加密 7z 压缩器统一 `CustomParameters["cu"]="on"`（UTF-8/bit11）；`FileNameEncoding="gbk"` 时 MT 回落串行（7z 无法可靠写 GBK）。
   - **不可读源文件**：实测 MT 遇到被独占的文件整次失败，而串行可通过 `ErrorResolver` 跳过。修复：MT 入口用 `ReadErrorHandler.FilterUnreadableFiles`（SharedReadStream + ErrorResolver）预检并上报 Skipped；镜像/Store 合并改用 `SharedReadStream.OpenRead`。
   - **性能**：`FormatCatalog.GetById/GetByExtension` 改用内置格式字典索引，避免自适应规则逐文件调用时 `GetAll()` 反复复制内置列表。
-  - **测试**：新增 `CompressAsync_Deflate64_WithoutMultiThreaded_ProducesMethod9`、`CompressAsync_Deflate64_AdaptiveAllStore_WritesStoreEntries`、MT/加密中文名编码 3 条、MT 跳过不可读文件 1 条；Core **786/789（3 跳过）**、UI **403/406（3 跳过）** 全绿。
-  - **未修待决定**：Deflate64 + 分卷、加密 Add 硬编码 Deflate、单组 MT 混合进度跳变、静默失效开关组合、MT 临时空间 2×、重复相对路径覆盖、ZIP32 头开销、自定义格式 ID 秒级冲突（详见计划 2026-10-23 二轮节）。
+  - **追加路径（同日第二轮）**：加密 Add 曾硬编码 `Aes256 + Deflate` → 改为与 CompressAsync 同源 `MapZipEncryptionMethod` / `MapZipMethodToS7Z`；新文件被占用时按 `ErrorResolver` 跳过（`ReadErrorHandler.FilterUnreadableFiles`），不再让 `File.Copy` 整次失败。
+  - **Deflate64 + 分卷**：UI 在 `StartCompress` 拦截并三语提示（`Compress_Deflate64Split_Unsupported`），避免落到必失败的串行 writer。
+  - **单组 MT 混合进度**：`CompressAsync` / `AddToArchiveAsync` 的合并阶段改为与 N 组一致，把 `RewriteAsync` 固定百分比映射到 `[组阶段终点, 100]`。
+  - **UI 动态提示**：`DynamicFormatOptionsPanel` 新增 `ZipAvailabilityHint`，加密 / 分卷 / 非 Deflate / GBK 时显示「自适应/多线程不生效」原因（三语 4 个 key），由 `CompressSettingsWindow` 注入上下文。
+  - **健壮性**：`IsMultiThreadedEligible` 增加系统临时盘 ≥2× 输入预检；`CompressAsync` 检测重复相对路径时回落串行（避免 MT 镜像覆盖丢文件）。
+  - **测试**：新增 Deflate64 串行/全 Store、MT/加密中文名编码、MT/Add 不可读文件、加密 Add 方法、单组 MT 进度、重复相对路径等 10 条；Core **790/793（3 跳过）**、UI **403/406（3 跳过）** 全绿。
+  - **未修待决定**：Deflate64 + 分卷直接走 Core API、单组 MT 条目状态 FIFO、ZIP32 头开销、自定义格式 ID 秒级冲突、临时盘不可指定（详见计划 2026-10-23 二轮节）。
 **2026-10-23** — 压缩加速计划复核补漏：自定义魔数接线 + ZIP 面板联动 + MT 提示实时刷新 + CLI 自适应开关
   - **背景**：逐条核对 `adaptive-compress-ui-convergence` 完成度，发现 2 处计划内收尾遗漏（死字段、默认组数单测）与 4 处「标记完成但实际不生效」的缺口。
   - **自定义 MagicHex 接线（问题 #5）**：此前 `FormatDefinition.MagicHex` 只有 UI 读写、引擎从不消费，Phase 2 恢复输入框后成为「可见的骗人 UI」。现 `ZipEntryClassifier` 新增 `TryReadHead` / `MatchCustomFormatByMagic` / `HeadStartsWithMagic`（支持空格/中划线/冒号/`0x` 前缀，非法值按未命中）；`AdaptiveRuleMatcher.ResolveLevel` 在魔数阶段先匹配自定义格式魔数并查引用该 FormatId 的用户规则，未命中再走内置「已压缩」判定；读头只做一次（原路径会重复读）。

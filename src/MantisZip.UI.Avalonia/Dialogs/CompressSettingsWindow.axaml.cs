@@ -153,6 +153,7 @@ DataContext = ViewModel;
         AdjustWindowPosition();
         FormatOptionsPanel.LoadDefaults();
         LoadSplitSizeFromSettings();
+        UpdateFormatAvailabilityHints();
     }
 
     private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -311,6 +312,11 @@ DataContext = ViewModel;
             case nameof(ViewModel.Encrypt):
                 // 切换加密时密码区域展开/折叠，等布局完成后再检查位置
                 Dispatcher.UIThread.Post(AdjustWindowPosition, DispatcherPriority.Background);
+                UpdateFormatAvailabilityHints();
+                break;
+            case nameof(ViewModel.SelectedSplitSizeOption):
+            case nameof(ViewModel.CustomSplitSizeText):
+                UpdateFormatAvailabilityHints();
                 break;
             case nameof(ViewModel.PreviewRoot):
                 // 预览树重建后，把本次待压缩的单包大小推给格式选项面板，驱动 ZIP 多线程 4GB 限制
@@ -322,6 +328,12 @@ DataContext = ViewModel;
                 break;
         }
     }
+
+    /// <summary>
+    /// 把「加密 / 分卷」上下文注入格式面板，用于显示自适应/多线程不生效的原因。
+    /// </summary>
+    private void UpdateFormatAvailabilityHints()
+        => FormatOptionsPanel.UpdateCompressionContext(ViewModel.Encrypt, ViewModel.SplitSize > 0);
 
     /// <summary>
     /// 根据预览树更新 ZIP 多线程选项可用性。

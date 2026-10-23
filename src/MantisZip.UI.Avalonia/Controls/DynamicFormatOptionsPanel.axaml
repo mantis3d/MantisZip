@@ -31,6 +31,7 @@
           <ComboBox x:Name="EncodingCombo"
                     Grid.Column="1"
                     Height="24"
+                    SelectionChanged="ZipEncodingOrMethod_SelectionChanged"
                     Background="{DynamicResource ThemeComboBoxBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
@@ -49,6 +50,7 @@
           <ComboBox x:Name="ZipMethodCombo"
                     Grid.Column="1"
                     Height="24"
+                    SelectionChanged="ZipEncodingOrMethod_SelectionChanged"
                     Background="{DynamicResource ThemeComboBoxBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeComboBoxBorderBrush}" />
@@ -97,6 +99,14 @@
                    FontSize="11"
                    Margin="24,2,0,0"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+        <!-- 自适应/多线程不生效说明：加密、分卷、非 Deflate 方法、GBK 编码等组合下动态显示 -->
+        <TextBlock x:Name="ZipAvailabilityHint"
+                   IsVisible="False"
+                   TextWrapping="Wrap"
+                   FontSize="11"
+                   Margin="24,2,0,0"
+                   Foreground="{DynamicResource ThemeStatusWarningBrush}" />
       </StackPanel>
 
       <!-- ═══════ 7z 选项面板 ═══════ -->

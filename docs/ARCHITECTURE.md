@@ -532,8 +532,10 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 - **7z 路径准入**：`IsMultiThreadedEligible` 在两种情况下返回 true —— ① 用户开启 `MultiThreadedCompression`；② 压缩方法为 **Deflate64**（SharpCompress `ZipWriter` 无法写 method 9，必须由 7z 产出，此时 `mt=1` 单线程）。加密、分卷、ZIP32 上限仍是硬前置条件；分卷 + Deflate64 尚无 7z 分卷路径（会回落到不支持 method 9 的串行 writer）。
 - **文件名编码**：MT / 加密 ZIP 走 7z，统一 `CustomParameters["cu"]="on"` 强制 UTF-8 条目名（bit 11）；用户显式选 GBK 时 MT 回落串行（7z 无法可靠产出 GBK）。否则 7z 会按系统 ANSI 写名，与 Store 条目的 UTF-8 混用。
 - **不可读源文件**：MT 镜像/Store 合并不走 `ReadFileWithRetry`，入口先用 `ReadErrorHandler.FilterUnreadableFiles`（`SharedReadStream` + `ErrorResolver`）预检并上报 Skipped；镜像与 Store 合并均用 `SharedReadStream.OpenRead`，避免被编辑器持有的文件让整次 MT 压缩失败。
-- **临时空间**：MT 路径在系统临时目录做「源镜像 + 每组 temp zip + 最终包」，峰值约为输入 + 输出（甚至 2× 输入）；大目录需确保系统盘有足够空间。串行路径直接写输出，无此开销。
-- **已知 UX 边界**：单组 MT 混合场景的合并进度仍是重写器固定百分比（可能从组阶段跳到 92%）；加密/分卷/非 Deflate/GBK 会让自适应或 MT 部分失效但 UI 无提示。
+- **临时空间**：MT 路径在系统临时目录做「源镜像 + 每组 temp zip + 最终包」，峰值约为输入 + 输出（甚至 2× 输入）；`IsMultiThreadedEligible` 会预检临时盘可用空间（<2× 输入回落串行），但**不能指定临时盘**。串行路径直接写输出，无此开销。
+- **重复相对路径**：MT 镜像按相对路径落盘，重复会被覆盖；`CompressAsync` 检测到归一化条目名重复时回落串行，保留重复条目。
+- **进度**：N 组与单组 MT 的合并阶段都把 `ZipBinaryRewriter` 的固定百分比线性映射到 `[组阶段终点, 100]`，避免跳到 92%；`FileCompressionFinished` 无文件名，条目 `Completed` 状态仍按 FIFO 近似（仅 UI 状态）。
+- **UI 提示**：ZIP 面板的 `ZipAvailabilityHint` 会按加密 / 分卷 / 非 Deflate / GBK 显示「自适应/多线程不生效」原因；`CompressSettingsViewModel.StartCompress` 拦截 Deflate64 + 分卷（Core API 直接调用仍无 7z 分卷路径）。
 
 ### ArchiveItem duality
 
