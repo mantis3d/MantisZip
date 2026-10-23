@@ -591,24 +591,17 @@ public partial class ZipEngine
                                                 Store: true));
                                         }
 
-                                        // 合并阶段进度：重写器只上报固定的 92/94/97/100、无字节信息。
-                                        // 直接转发会与组阶段的字节加权百分比打架，故线性重映射到
-                                        // [组阶段终点, 100]：既单调不回退，也让长合并阶段仍有进度反馈。
+                                        // 合并阶段进度：重写器带字节进度时按字节重映射到
+                                        // [组阶段终点, 100]，并透传文件名 / 条目状态；
+                                        // 追加流程没有整体文件计数，故 totalFiles 传 0（不报计数）。
                                         double ngGroupEnd = Math.Min(95.0, ngCompressBytes * 100.0 / compressTotalBytes);
-                                        var mergeAdapter = new InlineProgress<ArchiveProgress>(raw =>
-                                        {
-                                            double p = Math.Clamp(raw.PercentComplete, 0, 100);
-                                            double pct = ngGroupEnd + (100.0 - ngGroupEnd) * (p / 100.0);
-                                            progress?.Report(new ArchiveProgress
-                                            {
-                                                PercentComplete = pct,
-                                                ProcessedBytes = (long)(compressTotalBytes * pct / 100.0),
-                                                TotalBytes = compressTotalBytes,
-                                                CurrentFile = string.Empty,
-                                                EntryKey = raw.EntryKey,
-                                                EntryStatus = raw.EntryStatus,
-                                            });
-                                        });
+                                        var mergeAdapter = CreateMergeProgressAdapter(
+                                            progress,
+                                            ngGroupEnd,
+                                            compressTotalBytes,
+                                            storeGroup.Select(s => ArchivePath.Normalize(s.RelativePath)).ToArray(),
+                                            0,
+                                            0);
 
                                         await ZipBinaryRewriter.RewriteAsync(
                                             sourcePaths: tempZips.Where(File.Exists).ToArray(),
@@ -694,24 +687,17 @@ public partial class ZipEngine
                                     }
 
                                     // 同 CompressAsync 单组 MT：合并阶段固定 92..100 直接转发会跳变，
-                                    // 线性重映射到 [组阶段终点, 100]。
+                                    // 线性重映射到 [组阶段终点, 100]（按重写器的字节进度）。
                                     double groupEndPercent = compressTotalBytes > 0
                                         ? Math.Min(95.0, compressGroup.Sum(f => SafeFileSize(f.FullPath)) * 100.0 / compressTotalBytes)
                                         : 0.0;
-                                    var mergeAdapter = new InlineProgress<ArchiveProgress>(raw =>
-                                    {
-                                        double p = Math.Clamp(raw.PercentComplete, 0, 100);
-                                        double pct = groupEndPercent + (100.0 - groupEndPercent) * (p / 100.0);
-                                        progress?.Report(new ArchiveProgress
-                                        {
-                                            PercentComplete = pct,
-                                            ProcessedBytes = (long)(compressTotalBytes * pct / 100.0),
-                                            TotalBytes = compressTotalBytes,
-                                            CurrentFile = string.Empty,
-                                            EntryKey = raw.EntryKey,
-                                            EntryStatus = raw.EntryStatus,
-                                        });
-                                    });
+                                    var mergeAdapter = CreateMergeProgressAdapter(
+                                        progress,
+                                        groupEndPercent,
+                                        compressTotalBytes,
+                                        storeGroup.Select(s => ArchivePath.Normalize(s.RelativePath)).ToArray(),
+                                        0,
+                                        0);
 
                                     // 条目名编码固定 UTF-8：与 7z 产物保持一致（混用编码会破坏条目名）
                                     ZipBinaryRewriter.RewriteAsync(

@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-23** — 改进：自适应 + 多线程压缩时，「仅存储」文件在合并阶段也上报文件名与进度
+  - **症状**（用户实测）：「少量普通文件 + 大量 jpg」开自适应与多线程压缩时，普通文件阶段进度与文件名都正常；进入 jpg 的仅存储阶段后进度条几乎不动、文件名停在最后一个普通文件、统计卡「已处理 N/M」也冻住。
+  - **根因（三处）**：① `src/MantisZip.Core/Engines/ZipEngine.Compress.cs` 合并阶段的两个 `mergeAdapter`（N 组路径与单组 7z 路径）都写死 `CurrentFile = string.Empty`，而 UI 的 `SetProgress` 只在 `CurrentFile` 非空时更新文件名 ⇒ 名字停在上一个文件；② 同一 adapter 只透传百分比/`EntryKey`，**不报 `ProcessedFiles`/`TotalFiles`**，重写器也不报 ⇒ 计数冻结；③ `src/MantisZip.Core/Utils/ZipBinaryRewriter.cs` 其实逐条目在上报，但条目名带硬编码中文前缀（`"复制: "` / `"压缩: "`，违反规则 13），且百分比按**条目数**加权（`entryWeight = 90/totalEntries`）而非按字节 ⇒ 大文件时进度条只能「按文件跳」。
+  - **修法**：① 重写器新增私有 `MergeProgressState`（跨条目累计 `BytesDone`，`TotalBytes` = 保留条目压缩后大小 + 新增条目原始大小），`CopyEntryAsync`/`CopyStreamRangeAsync`/`CompressNewEntry` 全部改为上报**裸条目名** + `ProcessedBytes/TotalBytes`；新增条目写完立刻补报 `EntryStatus = Completed`（条目行实时变绿）；三处收尾阶段的伪文件名（「正在写入中央目录…」等）改为空串（收尾没有「当前文件」，文案本该由 UI 阶段显示）。② `src/MantisZip.Core/Engines/ZipEngine.cs` 新增 `CreateMergeProgressAdapter(...)`：按 `ProcessedBytes/TotalBytes` 把合并阶段映射到 `[组阶段终点, 100]`（单调不回退；无字节的收尾上报沿用上次进度），**透传文件名**（无文件名的上报沿用上一个名字），并用「重写器对 Store 条目报的 Completed」推进 `ProcessedFiles`。③ 四处合并点（`ZipEngine.Compress.cs` N 组与单组、`ZipEngine.CompressGroup.cs` 追加文件的 N 组与单组）统一改用该适配器；追加流程没有整体文件计数，`totalFiles` 传 0 即不报计数。
+  - **测试**：新增 `tests/MantisZip.Tests/Utils/ZipBinaryRewriterProgressTests.cs` 4 例 —— 重写器上报裸条目名（不含 `复制:`/`压缩:`）且字节进度单调、末条覆盖全部字节、Store 条目有 Completed 事件；合并适配器按字节映射百分比（20% + 80×0.5 = 60%）并透传文件名/计数；非 Store 条目的 Completed 不计入文件数；**端到端**（2 个 txt + 6 个 jpg，自适应+多线程）断言合并阶段出现 jpg 文件名且 `ProcessedFiles > 2`、产物 8 条目齐全。
+  - **验证**：`-Task build -Target core` / `-Target avalonia` 均 0 警告；`-Task test -Target tests` 与 `-Target ui-tests` 全绿；`-Task check` 版本 0.5.3 六处一致；`-Task guards` 4/4。
+  - **发布说明**：属 0.5.3 未发布期间的自包含改进（同周期引入、同周期修掉），已按规则 18 经用户确认写入 `RELEASE_NOTES.md` v0.5.3「修复 / Fixes」节（中英各一条）。
+
 **2026-10-23** — 修复：主窗口目录树根节点（压缩包本身）误用文件夹图标
   - **症状**（用户）：「主窗口目录树那里，根节点是压缩包本身，但是图标是文件夹图标」。
   - **根因**：`src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml` 的 `TreeDataTemplate` 把 `PathIcon` 的 `Data` 写死为 `{StaticResource IconFolder}`，不看节点类型 ⇒ 根节点（`ArchiveTreeBuilder.BuildTree` 返回的 `FolderNode`，`FullPath` 为空、Name 为压缩包名）与所有子目录共用文件夹图标。节点模型 `src/MantisZip.Core/Services/ArchiveTreeBuilder.cs` 的 `FolderNode.Icon` 其实早已区分（根 = 📦 / 目录 = 📁），只是没被绑定。
@@ -2796,6 +2804,12 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.3 (2026-10-23) 合并阶段（copy-mode 重写）上报文件名 + 字节进度
+  - **动机**：压缩「自适应 + 多线程」时，判为仅存储的文件在最终合并阶段没有任何进度上报（引擎侧详见 Avalonia 分区同日条目），根因之一是 `ZipBinaryRewriter` 的进度字段不完整/不可直接使用。
+  - **`ZipBinaryRewriter.cs` 改动**：新增私有 `MergeProgressState`（`BytesDone` / `TotalBytes`），单源与多源两个 `RewriteAsync` 各自计算「待移动字节」= 保留条目 `CompressedSize` 之和 + 新增条目 `Size` 之和；`CopyEntryAsync` → `CopyStreamRangeAsync`、`CompressNewEntry` 全链路传入并逐 chunk 累加；进度上报从「`CurrentFile = "复制: " + name` / `"压缩: " + name`」改为**裸条目名**（规则 13），并带上 `ProcessedBytes` / `TotalBytes`；新增条目写完即补报 `EntryStatus = Completed`（供 UI 条目行实时更新）；三处收尾伪文件名（「正在写入中央目录…」/「正在写入目录结束标记…」/「正在保存到磁盘…」）改为空串 —— 收尾阶段没有「当前文件」，这类文案应属于 UI 的阶段显示（这些字符串此前只会出现在直接转发原始进度的调用方，且是硬编码中文/繁中/英文皆不适用）。
+  - **兼容性**：`RewriteAsync` 的两个公开重载签名不变（`NewEntry`、`RewriteResult` 亦不变），故既有调用方（`AddToArchiveAsync` / `DeleteEntriesAsync` 的 copy-mode 快路径，及 `ZipBinaryRewriterTests` 的反射调用）零改动；`ZipEngine.cs` 新增的 `CreateMergeProgressAdapter` 为 private static，仅引擎内部使用。
+  - **验证**：`-Task build -Target core` 0 警告；`-Task test -Target tests` 全绿（含新增 `ZipBinaryRewriterProgressTests` 4 例，其中端到端用例真实跑自适应+多线程压缩 2 txt + 6 jpg）。
 
 #### v0.5.2 (2026-10-20) ZIP 注释解码不再依赖宿主 locale + copy-mode 注释字节透传
   - **缺陷 1（用户可见乱码）**：`ZipCommentHelper.ReadCommentFromStream`（`ZipCommentHelper.cs:148`）走 `TextEncodingDetector.DecodeText`，其回退代码页取自 `CultureInfo.CurrentCulture.TextInfo.ANSICodePage` —— 中文 Windows（936）正常，en-US（1252）把 GBK 注释解成 `»¶Ó­Ê¹ÓÃ±¾Ñ¹Ëõ°ü`。修复：新增 `TextEncodingDetector.DecodeComment(byte[])`，回退链 BOM → **严格 UTF-8** → **严格 GB18030** → 宿主 ANSI（最后兜底），注释改走它。

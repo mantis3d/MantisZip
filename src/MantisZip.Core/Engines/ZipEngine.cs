@@ -191,4 +191,76 @@ public partial class ZipEngine : IArchiveEngine
         CoreLog.Exit();
         return result;
     }
+
+    /// <summary>
+    /// 合并（copy-mode 重写）阶段的进度适配器：把重写器的**字节**进度映射到
+    /// 「组阶段终点 → 100」区间，同时透传当前文件名、条目状态与文件计数。
+    /// <para>
+    /// 背景：合并阶段此前把 <c>CurrentFile</c> 清空、也不报 <c>ProcessedFiles</c>，
+    /// 于是「自适应把大量 jpg 判为仅存储」时，用户只看到最后一个普通文件的名字一直挂着、
+    /// 进度条几乎不动。重写器本身逐条目上报，这里把它接回全局口径。
+    /// </para>
+    /// </summary>
+    /// <param name="progress">外层进度上报（全局百分比 / 全局字节口径）</param>
+    /// <param name="groupEndPercent">组阶段结束时的全局百分比（合并阶段起点）</param>
+    /// <param name="displayTotalBytes">外层展示用总字节（喂统计卡与速度，不能用合并字节冒充）</param>
+    /// <param name="storeKeys">Store 条目名集合：重写器每写完一个条目报 Completed，据此推进文件计数</param>
+    /// <param name="baseProcessedFiles">进入合并阶段前已统计的文件数（≤0 时不报文件计数）</param>
+    /// <param name="totalFiles">本次操作总文件数（≤0 时不报文件计数）</param>
+    private static IProgress<ArchiveProgress> CreateMergeProgressAdapter(
+        IProgress<ArchiveProgress>? progress,
+        double groupEndPercent,
+        long displayTotalBytes,
+        IReadOnlyCollection<string> storeKeys,
+        int baseProcessedFiles,
+        int totalFiles)
+    {
+        var storeSet = new HashSet<string>(storeKeys, StringComparer.OrdinalIgnoreCase);
+        int storeDone = 0;
+        double lastFrac = 0;
+        string? lastName = null;   // 无文件名的收尾类上报沿用上一个名字，避免下游把它当成「无文件」
+
+        return new InlineProgress<ArchiveProgress>(raw =>
+        {
+            // Store 条目写完 → 文件计数向前走一格（重写器在条目结束时上报 Completed）
+            if (raw.EntryStatus == ArchiveEntryStatus.Completed
+                && !string.IsNullOrEmpty(raw.EntryKey)
+                && storeSet.Contains(raw.EntryKey))
+            {
+                storeDone++;
+            }
+
+            if (!string.IsNullOrEmpty(raw.CurrentFile))
+                lastName = raw.CurrentFile;
+
+            // 优先按字节推进；重写器未带字节（收尾类上报）时保持上一次进度，绝不回退
+            double frac = raw.TotalBytes > 0
+                ? Math.Clamp((double)raw.ProcessedBytes / raw.TotalBytes, 0, 1)
+                : Math.Clamp(raw.PercentComplete, 0, 100) / 100.0;
+            if (frac < lastFrac) frac = lastFrac;
+            lastFrac = frac;
+
+            double pct = Math.Min(100.0, groupEndPercent + (100.0 - groupEndPercent) * frac);
+
+            var report = new ArchiveProgress
+            {
+                PercentComplete = pct,
+                ProcessedBytes = (long)(displayTotalBytes * pct / 100.0),
+                TotalBytes = displayTotalBytes,
+                CurrentFile = lastName ?? string.Empty,
+                FilePercentComplete = raw.FilePercentComplete,
+                FileTotalBytes = raw.FileTotalBytes,
+                EntryKey = raw.EntryKey,
+                EntryStatus = raw.EntryStatus,
+            };
+
+            if (totalFiles > 0)
+            {
+                report.TotalFiles = totalFiles;
+                report.ProcessedFiles = Math.Min(totalFiles, Math.Max(0, baseProcessedFiles) + storeDone);
+            }
+
+            progress?.Report(report);
+        });
+    }
 }

@@ -78,6 +78,20 @@ internal static partial class ZipBinaryRewriter
 {
     private const int CopyBufferSize = 4194304;
 
+    /// <summary>
+    /// 合并（copy-mode 重写）阶段的进度状态：跨条目累计「已移动字节」，供按字节的上报使用。
+    /// 条目数加权只在条目大小相近时才近似正确；大幅自适应 Store（大量照片/视频）时
+    /// 必须按字节上报，调用方才能把合并阶段映射成平滑的百分比。
+    /// </summary>
+    private sealed class MergeProgressState
+    {
+        /// <summary>已移动字节（复制既有条目 + 写入新增条目）。</summary>
+        public long BytesDone;
+
+        /// <summary>本次重写预计要移动的总字节（≤0 时按 1 处理，避免除零）。</summary>
+        public long TotalBytes = 1;
+    }
+
     // ────────────────────────────── EOCD ──────────────────────────────
 
     /// <summary>
@@ -353,6 +367,14 @@ internal static partial class ZipBinaryRewriter
             long bytesCopied = 0;
             long bytesAdded = 0;
 
+            // 合并阶段的字节基准：保留条目按压缩后大小、新增条目按原始大小累计
+            var mergeState = new MergeProgressState
+            {
+                TotalBytes = Math.Max(1,
+                    entries.Where(e => keepAll || keepSet.Contains(e.FileName)).Sum(e => e.CompressedSize)
+                    + (addEntries?.Sum(e => e.Size) ?? 0))
+            };
+
             // ═══════════════════════════════════════════════════════════
             // Phase 1: Copy kept entries (binary copy-mode)
             // ═══════════════════════════════════════════════════════════
@@ -370,7 +392,7 @@ internal static partial class ZipBinaryRewriter
                 double entryWeight = 90.0 / totalEntries;
 
                 bytesCopied += await CopyEntryAsync(source, output, entry,
-                    entriesToWrite, basePct, entryWeight, progress, cancellationToken);
+                    entriesToWrite, basePct, entryWeight, progress, cancellationToken, mergeState);
                 processedEntries++;
             }
 
@@ -393,7 +415,7 @@ internal static partial class ZipBinaryRewriter
                     // Compress and write the new entry's LFH + data (streaming with progress)
         var (lfhBytes, compressedSize, crc32) =
                             CompressNewEntry(output, newEntry, encoding,
-                                basePct, entryWeight, progress, cancellationToken);
+                                basePct, entryWeight, progress, cancellationToken, mergeState);
                     ushort lfhInfoFlags = BitConverter.ToUInt16(lfhBytes, 6);
 
                     bytesAdded += lfhBytes.Length + compressedSize;
@@ -431,7 +453,7 @@ internal static partial class ZipBinaryRewriter
             // ══════════════════════════════════════════════════════════
             progress?.Report(new ArchiveProgress
             {
-                CurrentFile = "正在写入中央目录...",
+                CurrentFile = string.Empty,   // 收尾阶段无「当前文件」，提示语不自造（规则 13）
                 PercentComplete = 92,
                 FilePercentComplete = 100
             });
@@ -441,7 +463,7 @@ internal static partial class ZipBinaryRewriter
 
             progress?.Report(new ArchiveProgress
             {
-                CurrentFile = "正在写入目录结束标记...",
+                CurrentFile = string.Empty,   // 收尾阶段无「当前文件」
                 PercentComplete = 94,
                 FilePercentComplete = 100
             });
@@ -457,7 +479,7 @@ internal static partial class ZipBinaryRewriter
 
             progress?.Report(new ArchiveProgress
             {
-                CurrentFile = "正在保存到磁盘...",
+                CurrentFile = string.Empty,   // 收尾阶段无「当前文件」
                 PercentComplete = 97,
                 FilePercentComplete = 100
             });
@@ -579,6 +601,8 @@ internal static partial class ZipBinaryRewriter
         long bytesAdded = 0;
         byte[]? existingCommentBytes = null;
         int totalEntries;
+        // 跨 Phase 1/2 共用的合并字节进度（TotalBytes 在解析完源后填充）
+        var mergeState = new MergeProgressState();
 
         try
         {
@@ -630,6 +654,13 @@ internal static partial class ZipBinaryRewriter
                                    + (addEntries?.Count ?? 0);
                 if (totalEntries == 0) totalEntries = 1; // avoid division by zero
 
+                // 合并阶段的字节基准（与单源重载同口径：复制按压缩后大小、新增按原始大小）
+                mergeState.TotalBytes = Math.Max(1,
+                    parsed.Sum(p => p.Entries
+                        .Where(e => keepAll || keepSet.Contains(e.FileName))
+                        .Sum(e => e.CompressedSize))
+                    + (addEntries?.Sum(e => e.Size) ?? 0));
+
                 // ── Open output (write to .tmp for atomic replace) ───────
                 output = File.Create(tempDestPath);
 
@@ -650,7 +681,7 @@ internal static partial class ZipBinaryRewriter
                         double entryWeight = 90.0 / totalEntries;
 
                         bytesCopied += await CopyEntryAsync(source, output, entry,
-                            entriesToWrite, basePct, entryWeight, progress, cancellationToken);
+                            entriesToWrite, basePct, entryWeight, progress, cancellationToken, mergeState);
                         processedEntries++;
                     }
                 }
@@ -677,7 +708,7 @@ internal static partial class ZipBinaryRewriter
                     // Compress and write the new entry's LFH + data (streaming with progress)
                     var (lfhBytes, compressedSize, crc32) =
                         CompressNewEntry(output, newEntry, encoding,
-                            basePct, entryWeight, progress, cancellationToken);
+                            basePct, entryWeight, progress, cancellationToken, mergeState);
 
                     bytesAdded += lfhBytes.Length + compressedSize;
 
@@ -714,7 +745,7 @@ internal static partial class ZipBinaryRewriter
             // ══════════════════════════════════════════════════════════
             progress?.Report(new ArchiveProgress
             {
-                CurrentFile = "正在写入中央目录...",
+                CurrentFile = string.Empty,   // 收尾阶段无「当前文件」，提示语不自造（规则 13）
                 PercentComplete = 92,
                 FilePercentComplete = 100
             });
@@ -724,7 +755,7 @@ internal static partial class ZipBinaryRewriter
 
             progress?.Report(new ArchiveProgress
             {
-                CurrentFile = "正在写入目录结束标记...",
+                CurrentFile = string.Empty,   // 收尾阶段无「当前文件」
                 PercentComplete = 94,
                 FilePercentComplete = 100
             });
@@ -741,7 +772,7 @@ internal static partial class ZipBinaryRewriter
 
             progress?.Report(new ArchiveProgress
             {
-                CurrentFile = "正在保存到磁盘...",
+                CurrentFile = string.Empty,   // 收尾阶段无「当前文件」
                 PercentComplete = 97,
                 FilePercentComplete = 100
             });
@@ -814,6 +845,7 @@ internal static partial class ZipBinaryRewriter
     /// <param name="entryWeight">Overall progress percentage weight of this entry.</param>
     /// <param name="progress">Optional progress reporter.</param>
     /// <param name="cancellationToken">Cancellation token.</param>
+    /// <param name="merge">合并阶段的字节级进度状态（跨条目累计）。</param>
     /// <returns>Bytes written for this entry (LFH header + compressed data).</returns>
     /// <exception cref="ZipCopyModeException">
     /// Thrown when the entry uses an unsupported compression method, is encrypted,
@@ -827,7 +859,8 @@ internal static partial class ZipBinaryRewriter
         double basePct,
         double entryWeight,
         IProgress<ArchiveProgress>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        MergeProgressState merge)
     {
         // ── Copy-mode validation ─────────────────────────────
         if (entry.CompressionMethod != 0 && entry.CompressionMethod != 8 && entry.CompressionMethod != 9)
@@ -872,7 +905,7 @@ internal static partial class ZipBinaryRewriter
         await CopyStreamRangeAsync(
             source, output, entry.CompressedSize,
             entry.FileName, basePct, entryWeight,
-            progress, cancellationToken);
+            progress, cancellationToken, merge);
 
         // If bit 3 was cleared in the LFH rewrite, propagate the flag change
         // to the CDFH so it matches the LFH (no data descriptor present).
@@ -992,7 +1025,8 @@ internal static partial class ZipBinaryRewriter
         Stream output, in NewEntry entry, Encoding encoding,
         double basePercent, double entryWeight,
         IProgress<ArchiveProgress>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        MergeProgressState merge)
     {
         var lastReportTime = DateTime.Now;
         var reportInterval = TimeSpan.FromMilliseconds(100);
@@ -1030,6 +1064,7 @@ internal static partial class ZipBinaryRewriter
 
                 sink.Write(buffer, 0, read);
                 totalRead += read;
+                merge.BytesDone += read;
 
                 var now = DateTime.Now;
                 if (now - lastReportTime >= reportInterval || totalRead >= entry.Size)
@@ -1037,9 +1072,12 @@ internal static partial class ZipBinaryRewriter
                     var filePct = entry.Size > 0 ? (double)totalRead / entry.Size * 100 : 100;
                     progress?.Report(new ArchiveProgress
                     {
-                        CurrentFile = "压缩: " + entry.EntryName,
+                        // 裸条目名（不带「压缩: 」前缀，规则 13）
+                        CurrentFile = entry.EntryName,
                         PercentComplete = Math.Min(90.0, basePercent + totalRead * entryWeight / Math.Max(entry.Size, 1)),
-                        FilePercentComplete = filePct
+                        FilePercentComplete = filePct,
+                        ProcessedBytes = merge.BytesDone,
+                        TotalBytes = merge.TotalBytes
                     });
                     lastReportTime = now;
                 }
@@ -1090,6 +1128,14 @@ internal static partial class ZipBinaryRewriter
         // ── Write to output ───────────────────────────────────────────
         output.Write(lfh, 0, lfh.Length);
         output.Write(compressed, 0, compressed.Length);
+
+        // 条目写完 → 立刻回报终态（进度窗口的条目行能实时变绿，不必等整个合并结束）
+        progress?.Report(new ArchiveProgress
+        {
+            EntryKey = entry.EntryName,
+            EntryStatus = ArchiveEntryStatus.Completed,
+            FileTotalBytes = entry.Size
+        });
 
         return (lfh, compressedSize, crc32);
     }
@@ -1254,7 +1300,8 @@ internal static partial class ZipBinaryRewriter
         double basePercent,
         double entryWeight,
         IProgress<ArchiveProgress>? progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        MergeProgressState merge)
     {
         byte[] buffer = new byte[CopyBufferSize];
         long remaining = count;
@@ -1275,6 +1322,7 @@ internal static partial class ZipBinaryRewriter
                 .ConfigureAwait(false);
             remaining -= read;
             totalRead += read;
+            merge.BytesDone += read;
 
             var now = DateTime.Now;
             if (now - lastReportTime >= reportInterval || remaining == 0)
@@ -1282,9 +1330,13 @@ internal static partial class ZipBinaryRewriter
                 var filePct = count > 0 ? (double)totalRead / count * 100 : 100;
                 progress?.Report(new ArchiveProgress
                 {
-                    CurrentFile = "复制: " + entryName,
+                    // 裸条目名（不带「复制: 」前缀，规则 13：文案一律由 UI 层本地化）
+                    CurrentFile = entryName,
                     PercentComplete = Math.Min(90.0, basePercent + totalRead * entryWeight / Math.Max(count, 1)),
-                    FilePercentComplete = filePct
+                    FilePercentComplete = filePct,
+                    // 合并阶段的字节级进度：调用方据此把「组阶段终点 → 100」按真实字节映射
+                    ProcessedBytes = merge.BytesDone,
+                    TotalBytes = merge.TotalBytes
                 });
                 lastReportTime = now;
             }

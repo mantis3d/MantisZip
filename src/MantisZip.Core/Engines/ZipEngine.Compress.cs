@@ -394,20 +394,15 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                         // 组阶段才停在 ~10%，突然跳到 92%。故线性重映射到 [组阶段终点, 100]：
                                         // 既单调不回退，也让长合并阶段仍有进度反馈。
                                         double groupEndPercent = Math.Min(95.0, compressTotalBytes * 100.0 / globalTotal);
-                                        var mergeAdapter = new InlineProgress<ArchiveProgress>(raw =>
-                                        {
-                                            double p = Math.Clamp(raw.PercentComplete, 0, 100);
-                                            double pct = groupEndPercent + (100.0 - groupEndPercent) * (p / 100.0);
-                                            progress?.Report(new ArchiveProgress
-                                            {
-                                                PercentComplete = pct,
-                                                ProcessedBytes = (long)(globalTotal * pct / 100.0),
-                                                TotalBytes = globalTotal,
-                                                CurrentFile = string.Empty,
-                                                EntryKey = raw.EntryKey,
-                                                EntryStatus = raw.EntryStatus,
-                                            });
-                                        });
+                                        // 合并阶段的文件名 / 条目状态 / 文件计数统一由适配器透传，
+                                        // 否则「大量 jpg 仅存储」时名字会停在最后一个普通文件上。
+                                        var mergeAdapter = CreateMergeProgressAdapter(
+                                            progress,
+                                            groupEndPercent,
+                                            globalTotal,
+                                            storeGroup.Select(s => ArchivePath.Normalize(s.RelativePath)).ToArray(),
+                                            Math.Max(0, totalFiles - storeGroup.Count),
+                                            totalFiles);
 
                                         await ZipBinaryRewriter.RewriteAsync(
                                             sourcePaths: tempZips.Where(File.Exists).ToArray(),
@@ -495,20 +490,13 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                         double groupEndPercent = totalBytes > 0
                                             ? Math.Min(95.0, compressGroup.Sum(f => SafeFileSize(f.FullPath)) * 100.0 / totalBytes)
                                             : 0.0;
-                                        var mergeAdapter = new InlineProgress<ArchiveProgress>(raw =>
-                                        {
-                                            double p = Math.Clamp(raw.PercentComplete, 0, 100);
-                                            double pct = groupEndPercent + (100.0 - groupEndPercent) * (p / 100.0);
-                                            progress?.Report(new ArchiveProgress
-                                            {
-                                                PercentComplete = pct,
-                                                ProcessedBytes = (long)(totalBytes * pct / 100.0),
-                                                TotalBytes = totalBytes,
-                                                CurrentFile = string.Empty,
-                                                EntryKey = raw.EntryKey,
-                                                EntryStatus = raw.EntryStatus,
-                                            });
-                                        });
+                                        var mergeAdapter = CreateMergeProgressAdapter(
+                                            progress,
+                                            groupEndPercent,
+                                            totalBytes,
+                                            storeGroup.Select(s => ArchivePath.Normalize(s.RelativePath)).ToArray(),
+                                            Math.Max(0, totalFiles - storeGroup.Count),
+                                            totalFiles);
 
                                         // 条目名编码固定 UTF-8：与 7z 产物保持一致（混用编码会破坏条目名）
                                         ZipBinaryRewriter.RewriteAsync(
