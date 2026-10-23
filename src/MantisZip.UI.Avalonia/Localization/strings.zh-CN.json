@@ -402,6 +402,7 @@
   "Compress_OutputPathInvalid": "输出路径无效",
   "Compress_FilteredAllSkipped": "所有源文件均被过滤条件排除，无法创建压缩包。\n请检查过滤设置后重试。",
   "Compress_Password": "密码",
+  "Compress_PasswordRequired": "加密压缩需要输入密码，或从密码库选择一条。",
   "Compress_PasswordPlaceholder": "输入密码",
   "Compress_Pwd_AutoRules": "自动生成规则",
   "Compress_Pwd_ConfirmPwd": "确认新密码",

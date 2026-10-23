@@ -402,6 +402,7 @@
   "Compress_OutputPathInvalid": "Output path invalid",
   "Compress_FilteredAllSkipped": "All source files are excluded by the filter. No archive can be created.\nPlease check your filter settings.",
   "Compress_Password": "Password",
+  "Compress_PasswordRequired": "Encryption requires a password, or select one from the password library.",
   "Compress_PasswordPlaceholder": "Enter password",
   "Compress_Pwd_AutoRules": "Auto-generate rules",
   "Compress_Pwd_ConfirmPwd": "Confirm new password",

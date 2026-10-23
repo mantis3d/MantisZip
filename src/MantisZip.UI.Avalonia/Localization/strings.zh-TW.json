@@ -402,6 +402,7 @@
   "Compress_OutputPathInvalid": "輸出路徑無效",
   "Compress_FilteredAllSkipped": "所有來源檔案均被過濾條件排除，無法建立壓縮檔。\n請檢查過濾設定後重試。",
   "Compress_Password": "密碼",
+  "Compress_PasswordRequired": "加密壓縮需要輸入密碼，或從密碼庫選擇一筆。",
   "Compress_PasswordPlaceholder": "輸入密碼",
   "Compress_Pwd_AutoRules": "自動產生規則",
   "Compress_Pwd_ConfirmPwd": "確認新密碼",
