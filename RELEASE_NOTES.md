@@ -63,6 +63,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Multithreaded compression failed entirely when a source file was in use** — the serial path used to offer Retry / Skip / Abort, but with multithreading enabled a single locked file aborted the whole run. The multithreaded path now runs the same readability pre-check and can skip unreadable files instead of failing everything
 - **加密追加压缩包时忽略所选的压缩方法与加密方式** — 向已有加密 ZIP 追加文件时，此前无论选 LZMA / BZip2 / Deflate64 或哪种加密方式，都会按 Deflate + AES-256 重写。现在与普通加密压缩一致，按设置生效
 - **Adding to an encrypted archive ignored the chosen method and encryption** — appending to an existing encrypted ZIP used to rewrite everything as Deflate + AES-256 regardless of the selected method or encryption type. It now honors the settings, matching normal encrypted compression
+- **加密压缩时空密码会静默生成未加密包** — 勾选加密但密码和确认都为空（或密码库未选中条目）时，此前仍会继续压缩，实际写出的是未加密 ZIP，与界面显示不符。现在会提示「加密压缩需要输入密码，或从密码库选择一条」并阻止压缩
+- **Empty password silently produced an unencrypted archive** — with encryption checked but both password fields empty (or no library entry selected), compression used to continue and write an unencrypted ZIP despite the UI showing encryption. It now asks for a password and refuses to start
 - **多线程压缩的进度条可能从中间值直接跳到 92%** — 单组多线程混合压缩在合并阶段直接转发重写器的固定百分比，进度会突然跳变；现在与多组模式一致，平滑映射到结束
 - **The progress bar could jump straight to 92% in multithreaded compression** — the single-group mixed path forwarded the rewriter's fixed percentages directly during the merge stage, causing a sudden jump; it now maps smoothly to completion like the multi-group path
 - **多线程压缩遇到重名条目会静默丢文件** — 两个同名源目录/文件的相对路径相同时，多线程镜像会覆盖其中一个；现在检测到重复条目即自动回落串行，两个条目都会保留。临时盘空间不足时也会自动回落串行，避免压缩中途因空间耗尽失败
