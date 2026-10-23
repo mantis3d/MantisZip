@@ -99,7 +99,7 @@ public class PreviewTreeNode : FolderNode
     public bool IsDirectoryNode => IsDirectory || Children.Count > 0 || string.IsNullOrEmpty(FullPath);
 
     /// <summary>图标资源键（IconEmptyFolder / IconFolder / IconDocument / IconWarning / IconArchive），用于 PathIcon 绑定。</summary>
-    public string? IconKey
+    public override string? IconKey
     {
         get
         {

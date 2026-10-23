@@ -96,7 +96,8 @@
                 <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}"
                             Margin="4,2"
                             Background="Transparent">
-                  <PathIcon Data="{StaticResource IconFolder}"
+                  <!-- 图标按节点类型区分：根节点是压缩包本身（IconArchive），其余目录为 IconFolder -->
+                  <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
                             Width="14" Height="14"
                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                   <TextBlock Text="{Binding Name}"

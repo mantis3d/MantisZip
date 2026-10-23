@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-23** — 修复：主窗口目录树根节点（压缩包本身）误用文件夹图标
+  - **症状**（用户）：「主窗口目录树那里，根节点是压缩包本身，但是图标是文件夹图标」。
+  - **根因**：`src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml` 的 `TreeDataTemplate` 把 `PathIcon` 的 `Data` 写死为 `{StaticResource IconFolder}`，不看节点类型 ⇒ 根节点（`ArchiveTreeBuilder.BuildTree` 返回的 `FolderNode`，`FullPath` 为空、Name 为压缩包名）与所有子目录共用文件夹图标。节点模型 `src/MantisZip.Core/Services/ArchiveTreeBuilder.cs` 的 `FolderNode.Icon` 其实早已区分（根 = 📦 / 目录 = 📁），只是没被绑定。
+  - **修法**：① `FolderNode` 新增 `public virtual string? IconKey => string.IsNullOrEmpty(FullPath) ? "IconArchive" : "IconFolder";`（与既有 `Icon` emoji 语义一致，供 `GeometryResourceConverter` 绑定）；② `PreviewTreeNode.IconKey`（原本隐藏基类同名成员）改为 `override`，避免 CS0108；③ `ArchiveContentView.axaml` 的目录树图标改为 `{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}`，图标复用预览树压缩包节点用的 `IconArchive` 资源。
+  - **测试**：新增 `tests/MantisZip.Tests/ArchiveTreeBuilderIconTests.cs`（3 例：根节点 `IconKey`=IconArchive 且 `FullPath` 为空、目录子节点=IconFolder、多层推断目录仍为 IconFolder）。
+  - **验证**：`-Task build -Target core` / `-Target avalonia` 均 0 警告；`-Task test -Target tests` / `-Target ui-tests` 全绿；`-Task check` 版本六处一致；`-Task guards` 4/4。
+  - **发布说明**：图标错误在 0.5.2 已发布版本中同样存在（属用户可见差异），已按规则 18 询问用户后写入 `RELEASE_NOTES.md` v0.5.3「修复 / Fixes」节。
+
 **2026-10-23** — 改进：文件选择器目录树的盘符改用系统真实图标，并显示卷标
   - **需求**（用户 m01438）：「目录树的磁盘显示为磁盘的图标……目录树的磁盘显示卷标（如果存在）」。
   - **现状问题**：`src/MantisZip.UI.Avalonia/Controls/QuickPathControl.axaml.cs` 的 `LoadTreeRoots()` 给每个盘符节点套的是**文件夹图标**（`IconService.GetFolderIcon()`），名字是裸盘符 `C:`，既不体现驱动器类型、也拿不到卷标。

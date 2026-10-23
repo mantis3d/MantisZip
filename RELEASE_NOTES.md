@@ -61,6 +61,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **The "Data Bars" switch now works** — the switch under the View menu previously had no effect at all (the bars neither appeared nor disappeared): toggling it only flipped an internal flag without recomputing or clearing the per-entry ratios that determine the bar length. It now recomputes the ratios when switched on and clears them when switched off, without rebuilding the file list or losing the current selection
 - **目录行的数据条底色可区分** — 开启「目录基线」后，目录行与文件行的底色此前完全相同（无法区分目录与文件）：从 WPF 迁移到 Avalonia 时丢失了按目录/文件切换底色的逻辑。现已修正：大小与压缩后大小两列中，目录行使用更饱和的底色、文件行保持淡色，并随浅色/深色主题自动适配
 - **Directory rows are now colored differently** — with "Separate directory baseline" enabled, directory rows used exactly the same bar color as file rows, so the two were indistinguishable: the WPF color-switching logic was lost during the Avalonia port. In the size and compressed-size columns, directory rows now use a more saturated shade while file rows keep the light shade, following the light/dark theme automatically
+- **主窗口目录树的压缩包根节点改用压缩包图标** — 左侧目录树的最顶层是压缩包本身，此前与普通目录一样顶着文件夹图标；现在根节点显示与预览树一致的压缩包图标，子目录仍是文件夹图标
+- **The archive root in the main window tree now uses the archive icon** — the top node of the folder tree is the archive itself but used to wear the same folder icon as ordinary directories; it now shows the archive icon (the one the preview tree already uses), while subdirectories keep the folder icon
 
 ## v0.5.2
 

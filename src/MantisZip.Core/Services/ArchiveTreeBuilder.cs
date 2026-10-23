@@ -11,6 +11,14 @@ public class FolderNode : INotifyPropertyChanged
     public string Name { get; set; } = string.Empty;
     public string FullPath { get; set; } = string.Empty;
     public string Icon => string.IsNullOrEmpty(FullPath) ? "📦" : "📁";
+
+    /// <summary>
+    /// 图标资源键：根节点（<see cref="FullPath"/> 为空 = 压缩包本身）返回 <c>IconArchive</c>，
+    /// 其余目录返回 <c>IconFolder</c>。与 <see cref="Icon"/> 的语义一致，
+    /// 供 Avalonia 侧经 <c>GeometryResourceConverter</c> 绑定到 <c>PathIcon</c>。
+    /// </summary>
+    public virtual string? IconKey => string.IsNullOrEmpty(FullPath) ? "IconArchive" : "IconFolder";
+
     public List<FolderNode> Children { get; set; } = new();
 
     private bool _isExpanded;
