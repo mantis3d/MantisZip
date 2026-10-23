@@ -216,6 +216,24 @@ public class CompressSettingsViewModelTests
     }
 
     [Fact]
+    public async Task StartCompressCommand_WithEncryptAndEmptyPassword_ShowsMessageAndDoesNotClose()
+    {
+        var vm = new CompressSettingsViewModel(Array.Empty<string>());
+        vm.Encrypt = true;
+        vm.Password = "";
+        vm.ConfirmPassword = "";
+        string? shown = null;
+        var closeCalled = false;
+        vm.ShowMessage = (message, _) => { shown = message; return Task.CompletedTask; };
+        vm.CloseAction = async (result) => { closeCalled = true; await Task.CompletedTask; };
+
+        await vm.StartCompressCommand.ExecuteAsync(null);
+
+        Assert.False(closeCalled);
+        Assert.False(string.IsNullOrEmpty(shown));
+    }
+
+    [Fact]
     public async Task StartCompressCommand_WithoutEncrypt_CallsCloseAction()
     {
         // 用有源路径构造（无源时 CanExecute 禁用按钮，StartCompress 不会执行；

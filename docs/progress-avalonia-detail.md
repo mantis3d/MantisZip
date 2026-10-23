@@ -247,6 +247,7 @@
   - **单组 MT 混合进度**：`CompressAsync` / `AddToArchiveAsync` 的合并阶段改为与 N 组一致，把 `RewriteAsync` 固定百分比映射到 `[组阶段终点, 100]`。
   - **UI 动态提示**：`DynamicFormatOptionsPanel` 新增 `ZipAvailabilityHint`，加密 / 分卷 / 非 Deflate / GBK 时显示「自适应/多线程不生效」原因（三语 4 个 key），由 `CompressSettingsWindow` 注入上下文。
   - **健壮性**：`IsMultiThreadedEligible` 增加系统临时盘 ≥2× 输入预检；`CompressAsync` 检测重复相对路径时回落串行（避免 MT 镜像覆盖丢文件）。
+  - **空密码缺陷**：加密压缩时密码/确认均为空（或密码库未选中）会继续压缩，实际写出**未加密** ZIP。`CompressSettingsViewModel.StartCompress` 现校验 `GetActivePassword()`，为空则弹三语 `Compress_PasswordRequired` 并阻止；`docs/manual-test-checklist.md` 同步把该项从「已知缺陷」改为必测验收项，并补入本轮压缩加速手工测试清单。
   - **测试**：新增 Deflate64 串行/全 Store、MT/加密中文名编码、MT/Add 不可读文件、加密 Add 方法、单组 MT 进度、重复相对路径等 10 条；Core **790/793（3 跳过）**、UI **403/406（3 跳过）** 全绿。
   - **未修待决定**：Deflate64 + 分卷直接走 Core API、单组 MT 条目状态 FIFO、ZIP32 头开销、自定义格式 ID 秒级冲突、临时盘不可指定（详见计划 2026-10-23 二轮节）。
 **2026-10-23** — 压缩加速计划复核补漏：自定义魔数接线 + ZIP 面板联动 + MT 提示实时刷新 + CLI 自适应开关

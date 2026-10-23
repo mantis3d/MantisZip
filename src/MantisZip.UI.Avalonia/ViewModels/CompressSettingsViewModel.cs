@@ -1328,6 +1328,17 @@ public partial class CompressSettingsViewModel : ObservableObject
             return;
         }
 
+        // 加密压缩必须有密码（手动输入或密码库选中条目）；否则引擎会按「未加密」写出，
+        // 与 UI 勾选状态不符（历史缺陷：空密码 + 空确认会静默生成未加密包）。
+        if (Encrypt && string.IsNullOrEmpty(GetActivePassword()))
+        {
+            if (ShowMessage != null)
+                await ShowMessage(
+                    LocalizationManager.T("Compress_PasswordRequired"),
+                    LocalizationManager.T("Compress_Title"));
+            return;
+        }
+
         // Validate passwords match if encrypting
         if (Encrypt && !PasswordsMatch)
         {
