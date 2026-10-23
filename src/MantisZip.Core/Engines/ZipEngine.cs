@@ -219,6 +219,8 @@ public partial class ZipEngine : IArchiveEngine
         int storeDone = 0;
         double lastFrac = 0;
         string? lastName = null;   // 无文件名的收尾类上报沿用上一个名字，避免下游把它当成「无文件」
+        long lastMergeDone = 0;    // 合并字节（原始口径），喂详细面板右区的「已写/总量」
+        long lastMergeTotal = 0;
 
         return new InlineProgress<ArchiveProgress>(raw =>
         {
@@ -232,6 +234,12 @@ public partial class ZipEngine : IArchiveEngine
 
             if (!string.IsNullOrEmpty(raw.CurrentFile))
                 lastName = raw.CurrentFile;
+
+            if (raw.TotalBytes > 0)
+            {
+                lastMergeDone = Math.Min(raw.ProcessedBytes, raw.TotalBytes);
+                lastMergeTotal = raw.TotalBytes;
+            }
 
             // 优先按字节推进；重写器未带字节（收尾类上报）时保持上一次进度，绝不回退
             double frac = raw.TotalBytes > 0
@@ -252,6 +260,9 @@ public partial class ZipEngine : IArchiveEngine
                 FileTotalBytes = raw.FileTotalBytes,
                 EntryKey = raw.EntryKey,
                 EntryStatus = raw.EntryStatus,
+                // 详细面板右区「已写/总量」用合并字节口径（与顶层百分比同一进度来源）
+                BatchProcessedBytes = lastMergeDone,
+                BatchTotalBytes = lastMergeTotal,
             };
 
             if (totalFiles > 0)

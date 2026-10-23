@@ -171,6 +171,9 @@ public class ZipBinaryRewriterProgressTests : IDisposable
         Assert.Equal(60.0, first.PercentComplete, 3);            // 20 + 80*0.5
         Assert.Equal(2, first.ProcessedFiles);
         Assert.Equal(4, first.TotalFiles);
+        // 详细面板右区「已写/总量」用合并字节口径
+        Assert.Equal(50, first.BatchProcessedBytes);
+        Assert.Equal(100, first.BatchTotalBytes);
 
         var afterEntry = reports[^1];
         Assert.Equal(3, afterEntry.ProcessedFiles);              // 2 基础 + 1 个 Store 条目

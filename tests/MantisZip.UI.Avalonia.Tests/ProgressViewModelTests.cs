@@ -1753,4 +1753,121 @@ public class ProgressViewModelTests
         Assert.Null(vm.ScanCountText);
         Assert.False(vm.IsIndeterminate);
     }
+
+    // ════════════════════════════════════════════
+    //  详细面板「当前文件」行（独立控件，始终显示）
+    // ════════════════════════════════════════════
+
+    [Fact]
+    public void SetProgress_MergePhase_FillsDetailCurrentFileRow()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.zip" });
+
+        // 引擎在合并前上报 Finalizing 阶段
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Finalizing });
+
+        // 合并阶段的上报：带当前写入的文件名 + 文件进度 + 合并字节
+        vm.SetProgress(new ArchiveProgress
+        {
+            PercentComplete = 60,
+            CurrentFile = "photos/big.png",
+            FilePercentComplete = 40,
+            FileTotalBytes = 1024,
+            BatchProcessedBytes = 300,
+            BatchTotalBytes = 1000,
+        });
+
+        Assert.Equal("big.png", vm.FileName);              // 详细面板那行显示当前写入的文件
+        Assert.Equal(0.4, vm.CurrentFileRatio, 3);         // 文件底纹按该文件进度
+        Assert.Contains("300", vm.DetailFileInfoText);     // 右侧「已写 / 总量」
+        Assert.Contains("1000", vm.DetailFileInfoText);
+    }
+
+    [Fact]
+    public void SetProgress_CompressPhase_DetailRowShowsCurrentFileSize()
+    {
+        var vm = new ProgressViewModel();
+
+        vm.SetProgress(new ArchiveProgress
+        {
+            Phase = ArchivePhase.Compressing,
+            CurrentFile = "docs/a.txt",
+            FilePercentComplete = 10,
+            FileTotalBytes = 2 * 1024,
+        });
+
+        Assert.Equal("a.txt", vm.FileName);
+        Assert.Equal(0.1, vm.CurrentFileRatio, 3);
+        Assert.False(string.IsNullOrEmpty(vm.DetailFileInfoText));
+        Assert.DoesNotContain("/", vm.DetailFileInfoText);   // 非合并阶段只显示文件大小
+    }
+
+    [Fact]
+    public void SetProgress_ParallelBatches_HeaderShowsGroupCount()
+    {
+        var vm = new ProgressViewModel();
+        vm.IsCompressFlow = true;
+        vm.InitBatchMode(new[] { "a.zip" });
+
+        vm.SetProgress(new ArchiveProgress { BatchIndex = 0, BatchCount = 3, BatchPercentComplete = 30, PercentComplete = 10 });
+        vm.SetProgress(new ArchiveProgress { BatchIndex = 2, BatchCount = 3, BatchPercentComplete = 5, PercentComplete = 12 });
+
+        // 「压缩通道 · 3 组并行」：组数取自 BatchIndex 最大值 + 1（引擎只给索引）
+        Assert.Contains("3", vm.CompressChannelsHeaderText);
+        Assert.True(vm.ShowCompressChannelHint);   // 压缩流程 + 有并行通道 → 标题可见
+    }
+
+    [Fact]
+    public void SetProgress_MergePhase_ShowsStoreSectionHeader()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.zip" });
+
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Finalizing });
+        Assert.False(vm.ShowStoreSectionHeader);   // 仅 Finalizing 还不足以判定「写出仅存储文件」
+
+        vm.SetProgress(new ArchiveProgress
+        {
+            PercentComplete = 70, CurrentFile = "photos/a.png",
+            BatchProcessedBytes = 10, BatchTotalBytes = 100
+        });
+
+        Assert.True(vm.ShowStoreSectionHeader);
+        Assert.False(string.IsNullOrEmpty(vm.StoreSectionHeaderText));
+    }
+
+    [Fact]
+    public void InitBatchMode_ResetsChannelSectionState()
+    {
+        var vm = new ProgressViewModel();
+        vm.IsCompressFlow = true;
+        vm.InitBatchMode(new[] { "a.zip" });
+        vm.SetProgress(new ArchiveProgress { BatchIndex = 1, BatchCount = 2, BatchPercentComplete = 40, PercentComplete = 10 });
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Finalizing });
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 70, BatchProcessedBytes = 10, BatchTotalBytes = 100 });
+        Assert.True(vm.ShowStoreSectionHeader);
+
+        // 新批次不得继承上一轮的组数与「存储文件」标题
+        vm.InitBatchMode(new[] { "b.zip" });
+
+        Assert.False(vm.ShowStoreSectionHeader);
+        Assert.DoesNotContain("2", vm.CompressChannelsHeaderText);
+    }
+
+    [Fact]
+    public void SetProgress_DetailRow_KeepsLastFileNameAtCompletion()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress
+        {
+            PercentComplete = 90, CurrentFile = "photos/big.png", FilePercentComplete = 90,
+            BatchProcessedBytes = 900, BatchTotalBytes = 1000
+        });
+
+        // 终态上报不带文件名：那一行保留最后写入的文件名与最终字节
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 100, BatchProcessedBytes = 1000, BatchTotalBytes = 1000 });
+
+        Assert.Equal("big.png", vm.FileName);
+    }
 }

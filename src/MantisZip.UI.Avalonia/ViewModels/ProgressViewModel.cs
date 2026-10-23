@@ -128,6 +128,8 @@ public partial class ProgressViewModel : ObservableObject
         // T6: 操作计时基线 + 当前文件标签初值 + 集合变更通知（并行批次行 / 条目行）
         RestartClock();
         CurrentFileLabel = LocalizationManager.T("Progress_CurrentFileLabel");
+        StoreSectionHeaderText = LocalizationManager.T("Progress_Section_StoreFiles");
+        UpdateChannelHeaderText();
         _parallelBatchItems.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(HasParallelBatches));
@@ -217,6 +219,8 @@ public partial class ProgressViewModel : ObservableObject
 
         // 「当前文件」标签 + 已用时间
         CurrentFileLabel = LocalizationManager.T("Progress_CurrentFileLabel");
+        StoreSectionHeaderText = LocalizationManager.T("Progress_Section_StoreFiles");
+        UpdateChannelHeaderText();
         RefreshTimeDisplay();
 
         // 速度（按上次采样值重格式化）
@@ -277,6 +281,34 @@ public partial class ProgressViewModel : ObservableObject
 
     [ObservableProperty]
     private int _filePercentComplete;
+
+    /// <summary>当前文件进度比例（0–1），供详细面板「当前文件」行的文件底纹使用。</summary>
+    public double CurrentFileRatio => Math.Clamp(FilePercentComplete, 0, 100) / 100.0;
+
+    /// <summary>
+    /// 详细面板「当前文件」行右侧信息：合并/写入阶段显示「已写 / 总量」，其余阶段显示当前文件大小。
+    /// 该行独立于并行通道行、始终存在，解决「所有通道完成后详细面板不再变化」的问题。
+    /// </summary>
+    [ObservableProperty]
+    private string _detailFileInfoText = string.Empty;
+
+    /// <summary>详细面板「压缩通道」小标题（含「N 组并行」，组数来自引擎 BatchCount）。</summary>
+    [ObservableProperty]
+    private string _compressChannelsHeaderText = string.Empty;
+
+    /// <summary>详细面板「存储文件」小标题文案（仅「写出仅存储文件」阶段可见）。</summary>
+    [ObservableProperty]
+    private string _storeSectionHeaderText = string.Empty;
+
+    /// <summary>
+    /// 是否处于「写出仅存储文件」阶段（Finalizing 且已收到合并字节）：
+    /// 决定「存储文件」小标题是否出现，以及该行左侧「当前文件」标签是否让位给这个小标题。
+    /// </summary>
+    [ObservableProperty]
+    private bool _showStoreSectionHeader;
+
+    /// <summary>引擎上报的并行组数（BatchCount），用于「压缩通道 · N 组并行」标题。</summary>
+    private int _channelGroupCount;
 
     [ObservableProperty]
     private string? _fileName;
@@ -944,7 +976,13 @@ public partial class ProgressViewModel : ObservableObject
         && p.ProcessedBytes == 0
         && !p.EntryStatus.HasValue
         && p.BatchIndex == null
-        && string.IsNullOrEmpty(p.EntryKey);
+        && string.IsNullOrEmpty(p.EntryKey)
+        // 带当前文件名 / 文件大小 / 文件进度的上报不算「纯阶段上报」：
+        // 引擎首个 0% 但已能显示文件名的上报必须继续走常规处理，否则文件名被丢弃
+        //（详细面板「当前文件」行与简约面板都依赖它）。
+        && string.IsNullOrEmpty(p.CurrentFile)
+        && p.FileTotalBytes == 0
+        && p.FilePercentComplete == null;
 
     /// <summary>
     /// 简约面板「当前文件」进度条取值：有逐文件百分比时用它，否则回退到总进度。
@@ -952,7 +990,11 @@ public partial class ProgressViewModel : ObservableObject
     public int SimpleFileBarValue => _hasFilePercent ? FilePercentComplete : PercentComplete;
 
     partial void OnPercentCompleteChanged(int value) => OnPropertyChanged(nameof(SimpleFileBarValue));
-    partial void OnFilePercentCompleteChanged(int value) => OnPropertyChanged(nameof(SimpleFileBarValue));
+    partial void OnFilePercentCompleteChanged(int value)
+    {
+        OnPropertyChanged(nameof(SimpleFileBarValue));
+        OnPropertyChanged(nameof(CurrentFileRatio));
+    }
 
     /// <summary>
     /// Update all progress-bound properties from an <see cref="ArchiveProgress"/> report.
@@ -1065,6 +1107,19 @@ public partial class ProgressViewModel : ObservableObject
             _hasFilePercent = false;
         }
         OnPropertyChanged(nameof(SimpleFileBarValue));
+
+        // 详细面板「当前文件」行右侧信息：
+        // 合并/写入阶段（Finalizing）显示合并字节的「已写 / 总量」，其余阶段显示当前文件大小。
+        if (_activePhase == ArchivePhase.Finalizing && p.BatchTotalBytes > 0)
+        {
+            DetailFileInfoText = $"{FormatUtil.FormatSize(p.BatchProcessedBytes)} / {FormatUtil.FormatSize(p.BatchTotalBytes)}";
+            // 该阶段即「写出仅存储文件」：顶部通道行不再变化，下方换成「存储文件」小标题 + 该行
+            ShowStoreSectionHeader = true;
+        }
+        else if (p.FileTotalBytes > 0)
+        {
+            DetailFileInfoText = FormatUtil.FormatSize(p.FileTotalBytes);
+        }
 
         // File count + 批次档案序号（"2 / 5"）
         if (_isBatchMode && _batchItems != null && _batchItems.Count > 0)
@@ -1207,6 +1262,13 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>并行批次行 upsert（BatchIndex 0-based → Index=BatchIndex+1；补洞创建，Percent/DetailText 消费批级字段）。</summary>
     private void UpsertParallelBatch(ArchiveProgress p)
     {
+        // 记录并行组数：用于详细面板「压缩通道 · N 组并行」小标题（引擎只给 BatchIndex，不给总数）
+        if (p.BatchIndex!.Value + 1 > _channelGroupCount)
+        {
+            _channelGroupCount = p.BatchIndex.Value + 1;
+            UpdateChannelHeaderText();
+        }
+
         // 首个并行批次上报到达前，非批次上报（解压大包预测试状态 / 压缩收集阶段）已合成一条
         // IsParallel=false 单行并占据集合索引 0。IsParallel 是 init 只读，若不清掉，batch 0 会写进
         // 这条非并行行 → XAML 里批次底纹（进度条）、序号、N% 均绑 IsVisible=IsParallel → 第一行
@@ -1241,6 +1303,28 @@ public partial class ProgressViewModel : ObservableObject
         if (p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue)
             row.DetailText = LocalizationManager.T("Progress_Batch_FilesProgress",
                 p.BatchProcessedFiles.Value, p.BatchTotalFiles.Value);
+    }
+
+    /// <summary>
+    /// 复位详细面板的分区状态：并行组数归零、「存储文件」小标题隐藏
+    /// （新批次 / 新档案不得继承上一轮的通道数与写出阶段标记）。
+    /// </summary>
+    private void ResetChannelSectionState()
+    {
+        _channelGroupCount = 0;
+        ShowStoreSectionHeader = false;
+        UpdateChannelHeaderText();
+    }
+
+    /// <summary>
+    /// 刷新详细面板「压缩通道」小标题：组数已知（≥2）时附「N 组并行」，否则只显示标题。
+    /// </summary>
+    private void UpdateChannelHeaderText()
+    {
+        var title = LocalizationManager.T("Progress_Section_CompressChannels");
+        CompressChannelsHeaderText = _channelGroupCount > 1
+            ? $"{title} · {LocalizationManager.T("Progress_Section_CompressChannelsGroups", _channelGroupCount)}"
+            : title;
     }
 
     /// <summary>移除残留的非并行单行（并行批次接管详细面板时调用，保证 batch 索引与行索引对齐）。
@@ -1654,6 +1738,7 @@ public partial class ProgressViewModel : ObservableObject
         // T6: 重置计时基线与并行批次行（新批次从头计时；上一批次行不得残留）
         RestartClock();
         _parallelBatchItems.Clear();
+        ResetChannelSectionState();
         // T6: 新批次不得继承上一批次的条目行与并行度
         ClearEntryItems();
         ParallelDegree = null;
@@ -1713,6 +1798,7 @@ public partial class ProgressViewModel : ObservableObject
         _speedTracker.OnArchiveSwitch(0, DateTime.UtcNow);
         // 并行批次行随档案切换清空（新档案重新上报 BatchIndex）
         _parallelBatchItems.Clear();
+        ResetChannelSectionState();
         // T6: 归档切换后条目行必须为空（新档案的逐条目事件/播种重建行，绝不继承上一档案）
         ClearEntryItems();
         // 目录行残留清理（新档案的 DirName 由下次 SetProgress 填充）

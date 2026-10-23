@@ -33,6 +33,10 @@
     <converters:RatioToWidthConverter x:Key="RatioToWidthConverter"/>
     <!-- 三行统计卡动态 — 画刷：—/空 → 灰 secondary，真实值 → ConverterParameter 强调色（D3） -->
     <converters:DashBrushConverter x:Key="DashBrush"/>
+    <!-- bool 取反（详细面板：显示「存储文件」分区标题时隐藏该行左侧的「当前文件」标签）。
+         与 RatioToWidthConverter 同理：该键此前只在 MainWindow / CompressSettingsWindow 局部定义，
+         本窗口作用域内引用不到会运行期解析失败，必须在此补齐。 -->
+    <converters:BoolInvertConverter x:Key="BoolInvertConverter"/>
   </Window.Resources>
 
   <!-- 根容器：7 行布局（原型对齐后结构）。
@@ -368,11 +372,13 @@
             Padding="{DynamicResource SpacingXxsThk}"
             VerticalAlignment="Top">
       <StackPanel Spacing="{DynamicResource SpacingXxs}">
-        <!-- 压缩通道说明：仅压缩流程且有并行通道时可见（ShowCompressChannelHint，D8）；解压/非并行单行保持隐藏 -->
-        <TextBlock Text="{Binding LocalizedStrings[Progress_CompressChannelHint]}"
+        <!-- 分区标题「压缩通道 · N 组并行」：仅压缩流程且有并行通道时可见（ShowCompressChannelHint，D8）；
+             解压 / 非并行单行保持隐藏。原来那句长解释改挂 ToolTip，省一行高度但不丢信息。 -->
+        <TextBlock Text="{Binding CompressChannelsHeaderText}"
                    IsVisible="{Binding ShowCompressChannelHint}"
+                   ToolTip.Tip="{Binding LocalizedStrings[Progress_CompressChannelHint]}"
                    FontSize="10"
-                   TextWrapping="Wrap"
+                   FontWeight="SemiBold"
                    Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
         <ItemsControl ItemsSource="{Binding ParallelBatchItems}">
           <ItemsControl.ItemTemplate>
@@ -456,6 +462,58 @@
             </DataTemplate>
           </ItemsControl.ItemTemplate>
         </ItemsControl>
+
+        <!-- 分区 2：写出仅存储文件（上方细分割线把「压缩通道」与本节分开）。
+             这一行独立于并行通道行、始终显示（用户反馈：通道全部完成后详细面板不再变化，
+             只剩底部总进度条在走）。外观刻意与通道行区分：细分隔线 + 无批次底纹/序号。 -->
+        <Border x:Name="DetailedCurrentFileRow"
+                BorderThickness="0,1,0,0"
+                BorderBrush="{DynamicResource ThemeBorderLightBrush}"
+                Padding="{DynamicResource SpacingXxsThk}"
+                Margin="0,2,0,0">
+          <StackPanel Spacing="{DynamicResource SpacingXxs}">
+            <!-- 分区标题「存储文件」：仅在写出仅存储文件阶段出现（ShowStoreSectionHeader）；
+                 出现时下面那行不再显示「当前文件」标签（标题已表明这是什么） -->
+            <TextBlock Text="{Binding StoreSectionHeaderText}"
+                       IsVisible="{Binding ShowStoreSectionHeader}"
+                       FontSize="10"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <Grid ColumnDefinitions="Auto,*,Auto"
+                  ColumnSpacing="{DynamicResource SpacingXs}">
+              <!-- 左：标签「当前文件」（非写出阶段显示；与简约面板同一份本地化文案） -->
+              <TextBlock Grid.Column="0"
+                         Text="{Binding CurrentFileLabel}"
+                         IsVisible="{Binding ShowStoreSectionHeader, Converter={StaticResource BoolInvertConverter}}"
+                         FontSize="10"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <!-- 中：文件名 + 该文件字节进度底纹（宽度 = CurrentFileRatio × 本格宽） -->
+              <Grid Grid.Column="1" ClipToBounds="True">
+                <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
+                           HorizontalAlignment="Left">
+                  <Rectangle.Width>
+                    <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                      <Binding Path="CurrentFileRatio" />
+                      <Binding Path="Bounds.Width" RelativeSource="{RelativeSource AncestorType=Grid}" />
+                    </MultiBinding>
+                  </Rectangle.Width>
+                </Rectangle>
+                <TextBlock Text="{Binding FileName}"
+                           FontSize="11" VerticalAlignment="Center"
+                           TextTrimming="CharacterEllipsis"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Grid>
+              <!-- 右：字节信息（写出阶段「已写 / 总量」，其余阶段当前文件大小；空=隐藏，规则 6） -->
+              <TextBlock Grid.Column="2"
+                         Text="{Binding DetailFileInfoText}"
+                         IsVisible="{Binding DetailFileInfoText, Converter={StaticResource StringNotEmpty}}"
+                         FontSize="10" VerticalAlignment="Center"
+                         FontFeatures="+tnum"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            </Grid>
+          </StackPanel>
+        </Border>
       </StackPanel>
     </Border>
 
