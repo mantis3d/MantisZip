@@ -32,8 +32,8 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - 产物：`src/MantisZip.UI.Avalonia/bin/Debug/net10.0/MantisZip.UI.Avalonia.exe`；`bin/`、`obj/` 已 gitignore
 - CI：`.github/workflows/ci.yml`（Windows，先跑 `version` / `i18n` / `guards` 三项静态自检，再「依赖漏洞审计 restore → 产品代码分析器门禁 → build → test」，但 `--filter "FullyQualifiedName!~SevenZipEngine"` 把 7z 相关用例过滤掉了）；**无 pre-commit**；`tests/` 有 Core 与无头 Avalonia 两个测试项目（非全量覆盖）
 - 漏洞审计与代码风格：根目录 `Directory.Build.props` 开 `NuGetAuditMode=all`（本地只告警，CI 把 NU1901~NU1904 升为错误，分号要写 `%3B`）；`.editorconfig` 提供风格基线，CI 只对 `src/` 跑 `dotnet format analyzers --verify-no-changes --severity warn`（**whitespace/style 暂不设门禁**——存量 700+/40 处待重排）；`.gitattributes` 锁定行尾（索引 LF / 工作区 CRLF，二进制不转换），新文件不必手工调行尾
-- **分支角色**（2026-10-22 明确）：`alpha` = **新功能分支**（日常新功能开发）；`beta` = **调试除错分支**（缺陷复现 / 修错 / 验证）；`main` = **发版分支**（只在发版合并时前进）
-- CI 触发分支：`main` + `alpha` + `beta`（三条都要过门禁；新功能在 `alpha`、除错在 `beta`，CI 配置与本节必须同步）
+- **分支角色**（2026-10-22 明确）：`alpha` = **新功能分支**（日常新功能开发）；`beta` = **调试除错分支**（缺陷复现 / 修错 / 验证）；`main` = **发版分支**（只在发版合并时前进）；`plans` = **计划分支**（只写计划与文档，不改产品代码——见规则 19）
+- CI 触发分支：`main` + `alpha` + `beta`（三条都要过门禁；新功能在 `alpha`、除错在 `beta`，CI 配置与本节必须同步）；`plans` 不在 CI 触发列表内（不产生产品代码，无需门禁）
 - ShellExt COM 已注册时 Explorer 会锁 Debug DLL → 构建/测试用 `-c Release` 绕开
 
 ## 维护脚本（唯一实现）
@@ -345,6 +345,18 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 - **性能类改动**归入「性能 / Performance」节按收益描述，不要写成「修复 XXX」；同一功能的多项子改进合并为一条带 ①② 的条目
 - **格式与既有章节一致**：`### 文件说明 / File Description`（中英各一段）+ `### 更新内容 / Changelog`（分类加粗小标题 `**中文 / English**`，每条先中文后英文、`**功能名** — 说明`）
 - 更新后同步 `docs/PROGRESS.md` 与 `docs/progress-avalonia-detail.md`（规则 3）
+
+### 规则 19：`plans` 分支只制定计划，不改产品代码
+
+`plans` 分支是**计划分支**：只写计划、改文档、做优先级与方案讨论，不承载产品代码改动。
+
+- **默认禁止**在 `plans` 分支上修改 `src/`、`tests/` 下的任何文件
+- **可在 `plans` 分支改**：`docs/`、`.omo/plans/`、`AGENTS.md`、`CLAUDE.md`、`RELEASE_NOTES.md` 等文档；以及不参与产品构建与 CI 门禁的**只读勘察 / 评审辅助脚本**（如 `scripts/render-icon-montage.ps1`）——它们服务于「把计划写清楚」，不是产品功能
+- **把代码改动放对分支**：新功能 → `alpha`；缺陷复现 / 修错 / 验证 → `beta`；发版 → `main`
+- **用户在 `plans` 分支上要求改代码时，必须先停下来问**，给出两个选项、**不许替用户默认选**：
+  1. **忘记切分支**（最常见）→ 建议先 `git switch alpha`（或 `beta`）再动手，等用户确认
+  2. **确实要在 `plans` 分支改**（临时验证思路、只为计划服务的一次性试验）→ 得到明确确认后再改，并在回复与提交信息里注明「在 plans 分支改代码」及其原因
+- 提问模板：「当前在 `plans`（计划）分支，你要改的是 `src/…` 下的代码。是忘记切到 `alpha` / `beta`，还是确实要在 `plans` 分支改？」
 
 ## 未来工作
 

@@ -6,6 +6,8 @@ on:
     #   alpha = 新功能分支（日常新功能开发）
     #   beta  = 调试除错分支（缺陷复现 / 修错 / 验证，均要过门禁）
     #   main  = 发版分支（只在发版合并时前进）
+    #   plans = 计划分支（只写计划与文档、不改产品代码，故不在下方触发列表内；
+    #           见 AGENTS.md 规则 19）
     # 三条都要触发门禁。
     branches: [main, alpha, beta]
   pull_request:

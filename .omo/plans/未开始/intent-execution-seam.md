@@ -55,7 +55,7 @@
 - **G2** 消灭漏接续：执行器作为**必填构造依赖**注入窗口，"忘写接续"变成编译错误。
 - **G3** 消灭静默：确认动作变成事务，失败必须返回非空 reason 并留在窗口；`Rejected` 无无参构造。
 - **G4** 消灭入口差异：密码库保存、历史记录、冲突/错误解析全部下沉到唯一执行器。
-- **G5** 防退化：AGENTS.md 新增规则 19 + `verify-repo.ps1 -Task guards` 新增 `dialog-seam` 守卫 + 架构测试。
+- **G5** 防退化：AGENTS.md 新增规则 20 + `verify-repo.ps1 -Task guards` 新增 `dialog-seam` 守卫 + 架构测试。
 
 ### 非目标
 
@@ -182,7 +182,7 @@ public interface ICompressSession { Task<CompressOutcome> RunAsync(CompressSetti
 - [ ] **T15** E 类：`Services/CompressFlow.cs:131-143` 去同步阻塞。改为 `await Dispatcher.UIThread.InvokeAsync(...)` 全 async 化；`ErrorDialog.ResultAction` 改为 `ShowDialog<ErrorDialogResult>(owner)` 返回值，删属性读。
 - [ ] **T16** F 类：`Services/PasswordRetryLoop.cs:144`、`App.CliCompress.cs:155`、`App.CliExtract.cs:353` 统一走新契约。
 - [ ] **T17** `scripts/verify-repo.ps1` 新增 `-Task guards` 第 5 条守卫 `dialog-seam`（实现要点见 §6.1），并同步 `docs/MAINTENANCE.md`（该文档明确要求"要改这套门禁先读"+ 记录反直觉实现与覆盖边界）。
-- [ ] **T18** AGENTS.md 新增规则 19（草案见 §6.3），并在「维护脚本」表格补 `dialog-seam` 一行。
+- [ ] **T18** AGENTS.md 新增规则 20（草案见 §6.3），并在「维护脚本」表格补 `dialog-seam` 一行。
 
 ---
 
@@ -211,9 +211,9 @@ public interface ICompressSession { Task<CompressOutcome> RunAsync(CompressSetti
 | `CompressSettingsDialogCopyTests` / `ExtractSettingsDialogCopyTests`（改口径） | 随 `CopyExecutionSettingsFrom` 退休，改为 DTO 完整性断言 |
 | `HelpDialogRenderTests` / `MainWindowKeyBindingsTests` | 不动，作为回归 |
 
-### 6.3 AGENTS.md 规则 19 草案
+### 6.3 AGENTS.md 规则 20 草案
 
-> **规则 19：意图-执行接缝（禁止把执行责任留给调用方）**
+> **规则 20：意图-执行接缝（禁止把执行责任留给调用方）**
 > ① 一个用户意图只能有一个执行器（服务层单点）。发起侧（窗口/菜单/拖拽/CLI/托盘）只许"收集参数 + 交棒"，禁止自己拼请求、自己开进度窗口、自己决定进程退出。
 > ② 设置类对话框必须**注入执行器**并在确认事务内发起执行。禁止用 `Func<bool,Task>? CloseAction` + 公开可变 VM 属性回传载荷；确认产物必须是不可变 DTO（`required` + NRT）。
 > ③ 确认是一次事务：校验 → 产出 → 成功才关窗；失败必须 `Rejected(reason)` 留窗提示。**禁止任何无用户可见反馈的 return**（Debug 下 `Debug.Fail`）。
@@ -351,7 +351,7 @@ pwsh -File scripts\verify-repo.ps1 -Task guards      # 含新 dialog-seam
 | 5 Whys / blameless postmortem（产出"缺陷类"而非"修这一处"） | §2 七次事故清单 |
 | Architecture Fitness Function（Neal Ford《Building Evolutionary Architectures》） | §6.1 `dialog-seam` 守卫四条检查 |
 | FMEA 五列：失效模式 / 影响 / 成因 / 预防 / 探测（IEC 60812） | 附录 A 分级表 |
-| ADR（Architecture Decision Record）+ policy-as-code | §6.3 AGENTS 规则 19 + `scripts/verify-repo.ps1 -Task guards` |
+| ADR（Architecture Decision Record）+ policy-as-code | §6.3 AGENTS 规则 20 + `scripts/verify-repo.ps1 -Task guards` |
 
 ### 12.5 耦合分级对照（before / after）
 
