@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-24** — 计划：新增「意图-执行接缝收口」设计文档（对话框接缝类缺陷根治，待实施）
+  - **背景**：压缩设置窗口 4 个入口（主窗口「新建压缩包」/ 拖入非压缩包 / Explorer 右键 CLI / 测试菜单）弹出后外观一致但行为不同，点「压缩」后静默关窗、无进度无提示。同类缺陷自 `285b586` 起已发生 **7 次**：压缩侧逐属性手抄漏 3 次（多线程/并行度恒 `false`、分卷大小恒 `0`、冲突策略恒「每次询问」）、拖入分支无人接续（修于 `eaebcf60`）、CLI `request == null` 时 `desktop.Shutdown()` 静默退出（修于 `c76c3af9`）、解压 CLI 多包 `FilteredEntryKeys` 恒 `null` 致过滤静默失效、密码库「保存到密码库」仅在主窗口入口生效（右键菜单勾了不保存，仍未修）。两次逐点修复均未拦住下一次。
+  - **根因**：窗口对外契约只有 `ShowDialog<bool>` 的一个 bool，执行载荷（路径集合 / 格式 / 压缩级别 / 分卷 / 密码 / 冲突策略 / 过滤条件，以及必须与当前输入同版本的 `CompressPlan`）走公开可变 `ViewModel` 旁路，调用方需按固定顺序搬运 14 段属性；漏搬运、换顺序、覆盖 `CloseAction` 三者均不报错。结论：**只要执行侧参数还需要沿接缝"搬运"一次，就一定会漏**。
+  - **方案**（设计文档：`.omo/plans/未开始/intent-execution-seam.md`）：① 设置窗口注入唯一执行器 `ICompressSession`，漏接续从"静默失效"变**编译错误**；② 确认动作返回 `ConfirmOutcome<CompressSettings>`（`Confirmed` / `Rejected(reason)` / `Cancelled`），静默 `return` 变"必须给非空理由"；③ 不可变 DTO 取代属性补读，`AdoptPlan` 的顺序契约消失；④ `IProgressPresenter` 收口压缩/解压两套进度实现；⑤ `CopyExecutionSettingsFrom` 及其两份反射守卫测试**退休**（反射只能事后兜底，漏了第七次 `FilteredEntryKeys`）。
+  - **范围与决策**：全仓 68 处 `ShowDialog` / `Show()` 分级清账（A 类设置窗口族 9 入口为核心，B 类静态工厂 DTO 为形态参照），分三波 T1–T18；同步新增 AGENTS.md 规则 19 与 `guards` 第 5 条 `dialog-seam`（4 条源码检查）。三条决策已定：走 **`beta`** 分支、`CompressSettings` **不**与 Core `CompressRequest` 合并、C 类纯提示窗口**仅登记不强制改** API。
+  - **状态**：📋 待实施（18-24h），设计提案已同步 GitHub issue [#47](https://github.com/mantis3d/MantisZip/issues/47)。
+
 **2026-10-23** — 改进：自适应 + 多线程压缩时，「仅存储」文件在合并阶段也上报文件名与进度
   - **症状**（用户实测）：「少量普通文件 + 大量 jpg」开自适应与多线程压缩时，普通文件阶段进度与文件名都正常；进入 jpg 的仅存储阶段后进度条几乎不动、文件名停在最后一个普通文件、统计卡「已处理 N/M」也冻住。
   - **根因（三处）**：① `src/MantisZip.Core/Engines/ZipEngine.Compress.cs` 合并阶段的两个 `mergeAdapter`（N 组路径与单组 7z 路径）都写死 `CurrentFile = string.Empty`，而 UI 的 `SetProgress` 只在 `CurrentFile` 非空时更新文件名 ⇒ 名字停在上一个文件；② 同一 adapter 只透传百分比/`EntryKey`，**不报 `ProcessedFiles`/`TotalFiles`**，重写器也不报 ⇒ 计数冻结；③ `src/MantisZip.Core/Utils/ZipBinaryRewriter.cs` 其实逐条目在上报，但条目名带硬编码中文前缀（`"复制: "` / `"压缩: "`，违反规则 13），且百分比按**条目数**加权（`entryWeight = 90/totalEntries`）而非按字节 ⇒ 大文件时进度条只能「按文件跳」。
