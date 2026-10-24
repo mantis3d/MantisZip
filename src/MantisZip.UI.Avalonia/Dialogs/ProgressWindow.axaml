@@ -386,7 +386,7 @@
               <!-- 通道行：左区（单文件域）+ 右区（批次域：底纹/序号/合并百分比/信息列/ToolTip）。
                    行高 = 10–11px 信息文字 + 紧凑度内边距（Border Padding=SpacingXxsThk，随三档呼吸）；
                    不设固定 MinHeight（否则看起来像按大号字体设高）。规则 7 例外：本行为紧凑多字段信息通道行。 -->
-              <Border Padding="{DynamicResource SpacingXxsThk}">
+              <Border Padding="{DynamicResource SpacingXssThk}">
               <Grid ColumnDefinitions="*,Auto"
                     ColumnSpacing="{DynamicResource SpacingXs}">
                 <!-- 左区：单文件域（目录中间省略 | 文件名恒完整+文件底纹 | 文件大小） -->
@@ -467,6 +467,7 @@
              这一行独立于并行通道行、始终显示（用户反馈：通道全部完成后详细面板不再变化，
              只剩底部总进度条在走）。外观刻意与通道行区分：细分隔线 + 无批次底纹/序号。 -->
         <Border x:Name="DetailedCurrentFileRow"
+                IsVisible="{Binding ShowCompressChannelHint}"
                 BorderThickness="0,1,0,0"
                 BorderBrush="{DynamicResource ThemeBorderLightBrush}"
                 Padding="{DynamicResource SpacingXxsThk}"
