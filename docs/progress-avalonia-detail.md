@@ -6,6 +6,22 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-24** — 发布说明：v0.5.3 `RELEASE_NOTES.md` 补 3 条条目 + 7 处截图占位，并删除 v0.5.2 节误插入的重复段
+  - **补录范围**（经用户确认，m00266）：A-1「自适应规则编辑 / 删除图标不可见 + 压缩级别名称未本地化」（`2760f245`，2026-10-21）、A-2「视图 → 进度条改称数据条」（`81d86ba2`，2026-10-22）、A-3「压缩设置说明为什么不生效 + Deflate64 分卷前置拦截」（`0fd2e84c`，2026-10-23）。PPTX / PDF 预览翻页按钮改矢量图标（`2d4ebfb1`）经用户定为**不写入**。
+  - **删除重复段**：v0.5.2 节原 103–108 行的「**交互 / Interactions**」+ 菜单快捷键 4 条，是 `cd1d4444`（2026-10-21）误插入已发布章节的内容（与 v0.5.3 节 24–27 行完全重复），已整段删除；顺带补上 v0.5.3「性能 / Performance」小节标题前缺失的空行 —— 否则 markdown 会把该标题当成上一条列表项的续行。
+  - **截图占位**：按 v0.5.2 既有写法先把 7 行 `- ![说明](docs/images/version/v0.5.3/xxx.png)` 写进正文（`SplashScreen` / `ProgressFinalStats` / `ProgressPhaseStatus` / `QuickPathDriveLabels` / `CompressSpeedUpSetting` / `DirectoryBaselineBars` / `ProgressDetailSections`），用户截好图按同名放入目录即可直接显示；该目录当前只有 `.gitkeep` 占位文件。
+  - **文本精简**（2026-10-25，用户要求「能合并的尽量合并，一条一两句话」）：v0.5.3 节 44 组中英条目合并为 20 组 —— 启动画面 3→1（合入图标 / 动态文案 / Win11 圆角）、交互 7→6（终态统计 + 状态行合成「进度窗口」一条、两图并列）、性能 3→1（①②③④）、压缩加速 5→3（自适应规则生效 + 界面收敛 + 默认规则集合成「规则体系收敛」）、修复 12→9（数据条开关 + 目录底色合并、设置页两处合并）；截图行随合并重新归位，用户补的 `DataBarName.png` 挂在「进度条 → 数据条」改名条目下。
+  - **截图补齐**（2026-10-25）：8 张图全部到位并逐一核对引用与文件名一致 —— `SplashScreen` / `ProgressFinalStats` / `ProgressPhaseStatus` / `QuickPathDriveLabels` / `CompressSpeedUpSetting` / `DirectoryBaselineBars` / `ProgressDetailSections` + 用户补的 `DataBarName`；临时占位文件 `.gitkeep` 已由用户删除。
+  - **未做**：构建验证 —— 当前 shell 仍无 `src` / `.git` 写权限（`Access to the path ... is denied`），`dotnet build` 与 `git commit` 需在权限恢复后补；本次改动为纯文档，不涉及代码。
+
+**2026-10-24** — 修复：设置页三个单行文字按钮误用 `ToolbarButton`，高度翻倍且文字顶在上半部
+  - **症状**（用户 m00071）：设置 →「加速」页的「添加自定义格式」，以及「自适应规则」区的「添加规则」「恢复默认」，按钮高度约等于两行文字，但文字只有一行且贴着按钮顶部，下半部整块空白。
+  - **根因**：这三处都写了 `Classes="ToolbarButton"`。该类定义于 `src/MantisZip.UI.Avalonia/App.axaml:155`，是给工具栏「图标 + 文字」两行内容准备的：`Height = ControlHeightLg`（紧凑 / 标准 / 宽松 = 42 / 48 / 54，见 `src/MantisZip.UI.Avalonia/App.Theming.cs:202-204`）+ `Padding="8,2"`，内容按 `StackPanel` 纵向堆叠图标与标签。单个字符串 `Content` 撑不满这个固定高度，于是只占上半部、下半部留白 —— 看上去就是「文字顶端对齐的空胖按钮」。
+  - **修法**：`src/MantisZip.UI.Avalonia/Views/SettingsWindow.axaml` 去掉这三处 `Classes="ToolbarButton"`，改为普通 `Button` + `Padding="12,4"`（与同页「文件关联」的「添加」按钮一致），并按规则 14 补中文注释说明「ToolbarButton 是两行工具栏按钮，单行文字勿用」。
+  - **排查范围**：`SettingsWindow.axaml` 内已无 `Classes="ToolbarButton"`；`Dialogs/ExtractSettingsWindow.axaml:86` 的同类用法是图标 + 文字横排、文字显式 `VerticalAlignment="Center"`，显示正常，不动；`Views/UiTestWindow.axaml:63` 是样式演示窗口，保留。
+  - **验证**：⏳ 待补 —— 当前会话 shell 只有仓库根目录可写（`src` / `tests` / `docs` / `.git` 均 Access denied），`dotnet build` 报 `MSB4018 ... Access to the path ... is denied`，构建验证需在写权限恢复后补跑 `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia`。
+  - **发布说明**：该高度问题自 2026-09-17（`61bc1bab`）起就存在，v0.5.2 用户可见，按规则 18 经用户确认后写入 `RELEASE_NOTES.md` v0.5.3「修复 / Fixes」节（中英各一条）。
+
 **2026-10-24** — 计划：新增「意图-执行接缝收口」设计文档（对话框接缝类缺陷根治，待实施）
   - **背景**：压缩设置窗口 4 个入口（主窗口「新建压缩包」/ 拖入非压缩包 / Explorer 右键 CLI / 测试菜单）弹出后外观一致但行为不同，点「压缩」后静默关窗、无进度无提示。同类缺陷自 `285b586` 起已发生 **7 次**：压缩侧逐属性手抄漏 3 次（多线程/并行度恒 `false`、分卷大小恒 `0`、冲突策略恒「每次询问」）、拖入分支无人接续（修于 `eaebcf60`）、CLI `request == null` 时 `desktop.Shutdown()` 静默退出（修于 `c76c3af9`）、解压 CLI 多包 `FilteredEntryKeys` 恒 `null` 致过滤静默失效、密码库「保存到密码库」仅在主窗口入口生效（右键菜单勾了不保存，仍未修）。两次逐点修复均未拦住下一次。
   - **根因**：窗口对外契约只有 `ShowDialog<bool>` 的一个 bool，执行载荷（路径集合 / 格式 / 压缩级别 / 分卷 / 密码 / 冲突策略 / 过滤条件，以及必须与当前输入同版本的 `CompressPlan`）走公开可变 `ViewModel` 旁路，调用方需按固定顺序搬运 14 段属性；漏搬运、换顺序、覆盖 `CloseAction` 三者均不报错。结论：**只要执行侧参数还需要沿接缝"搬运"一次，就一定会漏**。
