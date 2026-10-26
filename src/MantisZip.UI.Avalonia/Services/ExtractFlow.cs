@@ -292,50 +292,36 @@ public static class ExtractFlow
             var freezePw = ProgressWindow.CurrentVisible;
             freezePw?.BeginModalFreeze();
 
-            var result = await Dispatcher.UIThread.InvokeAsync(async () =>
+            // 确认即载荷：对话框关闭时一次性交出完整决策（按钮 + 自定义名 + 应用到全部 + 暂停/取消整轮），
+            // 这里只做「载荷 → 结果」映射，不再逐字段回读窗口属性（漏读一项就静默失效）。
+            var outcome = await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var dlg = new ConflictDialog(info, titleKey);
                 // 优先使用当前可见的进度窗口作为 owner（主窗口解压时居中于进度窗口），
                 // 回退到传入的 owner（CLI 场景显式传入 ProgressWindow）
                 var dialogOwner = ProgressWindow.CurrentVisible ?? owner;
                 await dlg.ShowDialog(dialogOwner);
-
-                // 暂停：收起对话框，返回暂停标志由外层处理
-                if (dlg.IsPaused)
-                {
-                    return (Action: FileConflictAction.Overwrite, IsPaused: true, IsCancelled: false, ApplyAll: false);
-                }
-
-                // 取消整个操作
-                if (dlg.CancelOperation)
-                {
-                    return (Action: FileConflictAction.Overwrite, IsPaused: false, IsCancelled: true, ApplyAll: false);
-                }
-
-                if (dlg.ResultAction == FileConflictAction.Rename && !string.IsNullOrEmpty(dlg.CustomName))
-                    info.CustomName = dlg.CustomName;
-
-                return (Action: dlg.ResultAction, IsPaused: false, IsCancelled: false, ApplyAll: dlg.ApplyToAll);
+                return await dlg.Completion;
             });
 
-            if (result.IsCancelled)
+            // 取消整个操作
+            if (outcome.IsCancelled)
             {
                 freezePw?.EndModalFreeze();
                 throw new OperationCanceledException("用户取消整个解压操作");
             }
 
-            if (result.IsPaused)
+            if (outcome.IsPaused)
             {
-                // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标，
-                // 在 UI 线程调用 PauseFromConflict 进入暂停态，然后在后台线程等待暂停事件
-                // （不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）。
+                // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标：
+                // 在 UI 线程进入暂停态，再异步等待暂停事件（不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）
                 var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
                 if (pw != null)
                 {
                     await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
                     // IsPaused 已为 true → 此刻解除模态冻结由暂停态无缝接续（冻结不断档）
                     freezePw?.EndModalFreeze();
-                    pw.PauseEvent.Wait(pw.CancellationToken);
+                    await ProgressPauseGate.WaitForResumeAsync(pw);
                 }
                 else
                 {
@@ -344,8 +330,12 @@ public static class ExtractFlow
                 continue; // 恢复后重新弹窗
             }
 
+            // Rename 时把用户自定义名写回 info（解压侧契约：调用方据此计算落地文件名）
+            if (outcome.Action == FileConflictAction.Rename && !string.IsNullOrEmpty(outcome.CustomName))
+                info.CustomName = outcome.CustomName;
+
             freezePw?.EndModalFreeze();
-            return (result.Action, result.ApplyAll);
+            return (outcome.Action, outcome.ApplyToAll);
         }
     }
 

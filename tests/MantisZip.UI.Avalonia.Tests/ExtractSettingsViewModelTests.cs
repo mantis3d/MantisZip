@@ -57,7 +57,7 @@ public class ExtractSettingsViewModelTests
     {
         var vm = new ExtractSettingsViewModel(Array.Empty<string>());
         var closeCalled = false;
-        vm.CloseAction = async (result) => { closeCalled = true; await Task.CompletedTask; };
+        vm.ConfirmCompleted += _ => closeCalled = true;
         await vm.ExtractCommand.ExecuteAsync(null);
         Assert.False(closeCalled);
     }
@@ -66,21 +66,21 @@ public class ExtractSettingsViewModelTests
     public async Task ExtractCommand_WithValidDestination_CallsClose()
     {
         var vm = new ExtractSettingsViewModel(new[] { "test.zip" });
-        var closeResult = false;
-        vm.CloseAction = async (result) => { closeResult = result; await Task.CompletedTask; };
+        ConfirmOutcome<ExtractSettings>? outcome = null;
+        vm.ConfirmCompleted += o => outcome = o;
         vm.DestinationPath = @"C:\out";
         await vm.ExtractCommand.ExecuteAsync(null);
-        Assert.True(closeResult);
+        Assert.IsType<Confirmed<ExtractSettings>>(outcome);
     }
 
     [Fact]
     public async Task CancelCommand_CallsCloseWithFalse()
     {
         var vm = new ExtractSettingsViewModel(new[] { "test.zip" });
-        var closeResult = true;
-        vm.CloseAction = async (result) => { closeResult = result; await Task.CompletedTask; };
+        ConfirmOutcome<ExtractSettings>? outcome = null;
+        vm.ConfirmCompleted += o => outcome = o;
         await vm.CancelCommand.ExecuteAsync(null);
-        Assert.False(closeResult);
+        Assert.IsType<Cancelled<ExtractSettings>>(outcome);
     }
 
     [Fact]

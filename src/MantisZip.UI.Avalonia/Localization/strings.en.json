@@ -1,4 +1,12 @@
 ﻿{
+  "Settings_Window_NoExecutor": "The settings dialog has no executor and cannot start.",
+  "Error_Extract_DestinationInvalid": "The destination folder is invalid. Please choose a usable folder.",
+  "Error_Extract_NoEntries": "There is no archive to extract.",
+  "Error_Extract_FilterNotReady": "The filter result is not ready yet. Please try again in a moment.",
+  "Error_Extract_ArchiveNotFound": "Archive not found: {0}",
+  "Error_Extract_DestinationNotWritable": "Cannot write to the destination folder: {0}",
+  "Compress_NoSources": "There are no source files or folders to compress yet.",
+  "Compress_PasswordMismatch": "The two passwords do not match.",
   "IconTest_TabList": "Icon List",
   "IconTest_TabMatrix": "Size Matrix",
   "IconTest_MatrixTitle": "Three Sizes × Dual Themes",

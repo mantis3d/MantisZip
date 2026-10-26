@@ -136,14 +136,19 @@ public static class PasswordRetryLoop
             {
                 var dialog = new PasswordDialog(Path.GetFileName(archivePath));
                 if (dialogOwner != null)
-                    return await dialog.ShowDialog<bool>(dialogOwner) ? dialog.Password : null;
+                {
+                    await dialog.ShowDialog(dialogOwner);
+                }
+                else
+                {
+                    // 无可用 owner（无头/纯后台调用）：非模态显示，仍等关闭；
+                    // 载荷通道与模态路径完全一致（不再「非模态就读属性、模态就看 bool」）。
+                    dialog.Show();
+                }
 
-                // 无可用 owner（无头/纯后台调用）：非模态显示并等关闭，行为等价于模态取消路径
-                var closed = new TaskCompletionSource();
-                dialog.Closed += (_, _) => closed.TrySetResult();
-                dialog.Show();
-                await closed.Task;
-                return dialog.Password;
+                // 确认即载荷：关窗后一次性拿到全部输入，不再回读 dialog.Password
+                var outcome = await dialog.Completion;
+                return outcome.Password;
             });
         }
         finally

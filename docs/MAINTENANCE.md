@@ -60,7 +60,7 @@
 `-Task check` = `version` + `i18n` + `guards`，纯文件校验，不构建。JSON 形状是
 `{ ok, checks: [ { task, result: {…} } ] }` —— 每项结果是完整对象，不平铺（避免与 `task` 字段抢名字）。
 
-## 4. 四条规则守卫（`-Task guards`）
+## 4. 五条规则守卫（`-Task guards`）
 
 把 AGENTS.md 里本可机器校验的人工自查变成门禁：
 
@@ -70,11 +70,14 @@
 | i18n-bindings | 13 | XAML `LocalizedStrings[Key]` 的 key 必须登记在 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组，且该 key 必须存在于三语 JSON（**双向**） |
 | filepicker | 16 | `OpenFilePickerAsync` / `SaveFilePickerAsync` / `OpenFolderPickerAsync` 只允许命中 `CustomFilePickerDialog.SystemBrowse_Click` |
 | icons | 8 | `AppIcons.axaml` 的 `x:Key` 必须在 `IconTestViewModel.LoadAllIcons()` 有对应 `Add()` |
+| dialog-seam | 20 | ① `new (Compress\|Extract)SettingsWindow(` 的文件与处数必须与 `$DIALOG_SEAM_REGISTRY` 一致（**正反双向**：没登记即失败，登记了却找不到也失败）② 非注释行出现 `CloseAction` / `DialogResult` 即失败 ③ `new (Compress\|Extract)Request` 只允许在 `src/MantisZip.UI.Avalonia/Services/`、`App.CliCompress.cs`、`App.CliExtract.cs` ④ 两个设置窗口构造函数必须含 `ICompressSession` / `IExtractSession` 形参 |
 
 **已知覆盖边界**（别误以为全查了）：
 
 - filepicker 守卫只认上述 3 个 API，规则 16 还禁 `FilePickerFileType` / `IStorageFile` / `TryGetLocalPath()`，这些目前靠人工评审。
 - i18n-bindings 只比 `MainWindowViewModel` 的字典（它不是全量加载 JSON），各对话框/面板自持字典的 key 不在范围内。
+- dialog-seam 是**文本级**检查：注释按行首 `//` 或 ` *` 放行（追述历史写法可以，真用不行）；`CloseAction` 出现在字符串字面量里会被判失败；它查不出「确认了但载荷少一个字段」这种语义缺口（那要靠载荷测试，见 `ExtractSettingsSeamTests`）。
+- dialog-seam 的白名单把 CLI 直通路径（`--compress-quick/-separate/-combined`）算作合法请求构造点：那三条**没有确认对话框**，本来就该直接驱动执行器；改它们时要同步改 `$DIALOG_SEAM_REQUEST_ALLOWED` 与 AGENTS.md 规则 20。
 - guards 是文本级扫描，**跨文件重命名、条件编译、多行拼接**都可能漏。
 
 ## 5. CI 门禁（`.github/workflows/ci.yml`，共 7 步）
@@ -86,7 +89,7 @@
 |------|--------|
 | `-Task version` | 版本号 6 处漂移（AppConstants / csproj / PLAN / PROGRESS / 两个 .iss） |
 | `-Task i18n` | 三语 key 缺失/多余/占位符不一致/重复 key |
-| `-Task guards` | 上面四条规则 |
+| `-Task guards` | 上面五条规则 |
 | `dotnet restore -p:WarningsAsErrors=NU1901%3B…` | 已知漏洞依赖（`Directory.Build.props` 开 `NuGetAuditMode=all`，本地只告警） |
 | `dotnet format … analyzers --verify-no-changes --severity warn --include src\…` | 产品代码分析器告警（**只圈 `src/`**，tests 存量 xUnit 告警另议） |
 | `dotnet build --no-restore -c Release` + `dotnet test …` | 真正编译与用例 |

@@ -35,19 +35,18 @@
 
 ---
 
-## S 档 —— 本轮必做（约 26-35h，≈ 三到四天满负荷）
+## S 档 —— 本轮必做（约 14-21h，≈ 两天满负荷）
 
-> **执行顺序（2026-10-24 讨论定，2026-10-26 按完成情况更新）**：~~图标~~（已完成）→ 接缝 → 预览 → 自动更新。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。三批改动**互不重叠**（接缝碰压缩/解压入口；预览碰取数层；自动更新碰新 Tab），因此这个顺序不需要任何返工代价。
+> **执行顺序（2026-10-24 讨论定，2026-10-26 按完成情况更新）**：~~图标~~（已完成）→ ~~接缝~~（已完成）→ 预览 → 自动更新。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。
 >
-> 已完成并归档：⚡ 插队项「删除压缩包内目录静默无效」（2026-10-26，随 v0.5.3）、S 档「图标归一化」（2026-10-26，随 v0.5.3）—— 详见 [PROGRESS.md 历史设计方案索引](PROGRESS.md)。
+> 已完成并归档：⚡ 插队项「删除压缩包内目录静默无效」（2026-10-26，随 v0.5.3）、S 档「图标归一化」（2026-10-26，随 v0.5.3）、S 档「意图-执行接缝收口（含波次 3 全仓清账）」（2026-10-26，随 v0.5.3）—— 详见 [PROGRESS.md 历史设计方案索引](PROGRESS.md)。
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 意图-执行接缝收口（波次 1+2） | [intent-execution-seam.md](.omo/plans/进行中/intent-execution-seam.md) | 🔴高 | 12-14h | 📋 2026-10-24 立项定案。**同族事故已 7 次**（压缩侧逐属性手抄漏 3 次 / 拖入分支无人接续 / CLI 静默 `Shutdown` / 解压 CLI `FilteredEntryKeys` 恒 null / 密码库保存仅主窗口生效）。方案＝设置窗口**注入唯一执行器**（漏接续变编译错误）+ 确认事务（`Rejected(reason)` 替代静默 return）+ 不可变 DTO + `IProgressPresenter` 收口两套进度实现。**本轮只做波次 1+2**：压缩 4 入口 → 解压 5 入口；波次 3（全仓 `ShowDialog` 清账）见 A 档。同步新增 AGENTS 规则 20 与 `guards` 第 5 条 `dialog-seam`；`CopyExecutionSettingsFrom` 及两份反射守卫测试退休 |
 | 预览取数层内存优先（切片 1+2+4） | [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) | 🟡中 | 12-17h | 📋 2026-10-24 立项。现状：**每次预览都先把整条目解压到 `%TEMP%\MantisZip\Preview\` 再从磁盘读回**（固定文件名、每次预览前清空整个目录）；文本类写盘只为读 1MB；便携模式往 U 盘写；敏感文件明文落 TEMP。本批＝文本/CSV/Markdown/代码/日志走内存 + 图片 `SKBitmap.Decode(Stream)` + PDF `PdfDocument.Open(Stream)` + head 读取改真流式（Zip 不再整条目解压进内存）+ 临时文件按条目命名 + head LRU + >15MB 的 head-only 部分预览。**明确保留落盘**：HTML→WebView（`NativeWebView` 不支持 `data:` URI）、打开方式（外部程序要路径）、字体（`FontParser` 要文件名）。注：15MB 上限本身可在设置里调大，故切片 4 收窄为**文本/PDF/Office 的部分预览**（图片必须完整字节，无部分可言）。Office（切片 3）见 A 档 |
 | 自动更新检测 | [auto-update.md](.omo/plans/未开始/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查 + AboutWindow「更新」Tab + `UpdateAvailableDialog` + 设置开关 + 单元测试。**面向公开用户后这从「加分项」变「基础设施」**：没有它，每个修复都到不了用户手上 |
 
-> 本轮验收口径：公众能感知到的三件事同时改善——**预览不再先落盘（且大文件不再一律被拒）**、**设置不再被静默丢弃**、**安装完会自己知道有新版本**。（图标归一化已于 2026-10-26 完成，随 v0.5.3 验证）
+> 本轮验收口径：公众能感知到的两件事同时改善——**预览不再先落盘（且大文件不再一律被拒）**、**安装完会自己知道有新版本**。（图标归一化、意图-执行接缝均已于 2026-10-26 完成，随 v0.5.3 验证）
 
 ---
 
@@ -55,7 +54,6 @@
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 意图-执行接缝（波次 3：全仓清账） | [intent-execution-seam.md](.omo/plans/进行中/intent-execution-seam.md) | 🔴高 | 8-10h | 全仓 `ShowDialog` 收敛到统一入口（实测 `src/**/*.cs` 当前 53 处，计划文档记 68 处，**开工前先对齐口径**），并清掉波次 1/2 遗留的旁路 |
 | 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。📋 2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） |
 | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **6-8h**（原估 3-4h） | 右键重命名(F2)/移动到…。7-Zip / WinRAR 都有，公开用户会问。**工时按 6-8h 重估**：实现是全量重写包，必须先写临时包再原子替换 + 校验，否则一次失败就是毁包 |
 | 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。**单独排在 A 档的理由**：三者都是「本来就在解析完整文档」，省下的只是落盘，用户感知最弱，且逐库确认 Stream 支持最费时 |
@@ -158,7 +156,7 @@
 ## 依赖链与联动
 
 ```
-intent-execution-seam（S）── 软前置 ──▶ 所有「新增 UI 入口」类计划
+intent-execution-seam（S，已完成 2026-10-26）── 软前置 ──▶ 所有「新增 UI 入口」类计划
                                     （embedded-file-picker / archive-rename-entry 等先做它可省返工）
 
 icon-normalization（S，已完成 2026-10-26）──── 前置 ──▶ icon-theme-infra（冻结）──▶ packs ──▶ sets

@@ -6,8 +6,26 @@ using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Views;
 
+/// <summary>
+/// 密码对话框的确认载荷：一次关闭即交出全部输入。<c>Password == null</c> 表示取消/空密码。
+/// 调用方只读 <see cref="PasswordDialog.Completion"/>，不再「先看 bool 再回读窗口属性」。
+/// </summary>
+public readonly record struct PasswordDialogOutcome(
+    string? Password,
+    bool RememberInSession,
+    bool SavePermanently,
+    string? Description,
+    IReadOnlyList<string> Patterns);
+
 public partial class PasswordDialog : Window
 {
+    private readonly TaskCompletionSource<PasswordDialogOutcome> _completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private PasswordDialogOutcome? _outcome;
+
+    /// <summary>关窗即完成的确认载荷（模态 ShowDialog 与非模态 Show 两条路径共用）。</summary>
+    public Task<PasswordDialogOutcome> Completion => _completion.Task;
+
     public string? Password { get; private set; }
     public bool RememberInSession { get; private set; } = true;
     public bool SavePermanently { get; private set; }
@@ -156,16 +174,26 @@ public partial class PasswordDialog : Window
         if (string.IsNullOrEmpty(Password))
         {
             Password = null;
+            _outcome = new PasswordDialogOutcome(null, RememberInSession, SavePermanently, Description, Patterns);
             Close(false);
             return;
         }
 
+        _outcome = new PasswordDialogOutcome(Password, RememberInSession, SavePermanently, Description, Patterns);
         Close(true);
     }
 
     private void OnCancelClick(object? sender, RoutedEventArgs e)
     {
         Password = null;
+        _outcome = new PasswordDialogOutcome(null, RememberInSession, SavePermanently: false, Description: null, Patterns: Array.Empty<string>());
         Close(false);
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        // 兜底：非按钮关闭（X / Alt+F4）也给出完整载荷——等价于「取消」，绝不让调用方读到 null
+        _completion.TrySetResult(_outcome ?? new PasswordDialogOutcome(null, RememberInSession, false, null, Array.Empty<string>()));
+        base.OnClosed(e);
     }
 }

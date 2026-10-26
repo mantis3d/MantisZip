@@ -1,4 +1,12 @@
 ﻿{
+  "Settings_Window_NoExecutor": "設定視窗缺少執行器，無法開始。",
+  "Error_Extract_DestinationInvalid": "目標資料夾無效，請選擇一個可用的資料夾。",
+  "Error_Extract_NoEntries": "沒有可解壓縮的壓縮檔。",
+  "Error_Extract_FilterNotReady": "篩選結果尚未就緒，請稍後再試。",
+  "Error_Extract_ArchiveNotFound": "找不到壓縮檔：{0}",
+  "Error_Extract_DestinationNotWritable": "無法寫入目標資料夾：{0}",
+  "Compress_NoSources": "還沒有新增要壓縮的來源檔案或資料夾。",
+  "Compress_PasswordMismatch": "兩次輸入的密碼不一致。",
   "IconTest_TabList": "圖示清單",
   "IconTest_TabMatrix": "尺寸矩陣",
   "IconTest_MatrixTitle": "三檔尺寸 × 雙主題矩陣",

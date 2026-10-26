@@ -46,7 +46,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 | `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` | 构建并把 MSBuild 输出压成「文件:行:列 + 错误码」（项目级诊断无行列号时只显示 csproj 路径，如 restore/NU1301 失败） |
 | `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` | 跑测试 |
 | `pwsh -File scripts\verify-repo.ps1 -Task i18n` / `-Task version` | 单项检查 |
-| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8） |
+| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8）/ 意图-执行接缝（规则 20） |
 | 追加 `-Json` | 机器可读输出（插件内部用） |
 
 - `-Target`：`avalonia`（默认）/ `core` / `shell` / `tests` / `ui-tests` / `solution`
@@ -54,7 +54,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - **退出码 0 = 通过，1 = 有问题** ⇒ CI 可直接用；`-Json` 时 `ok` 字段同义
 - `-Task test` 有一条**兜底**：`dotnet test` 失败且没有解析到任何编译诊断（= 测试根本没跑起来，如 VSTest testhost 在受限环境里无法打开父进程句柄）时，自动改用 `dotnet exec <测试程序集>` 直跑 xunit v3 的 MTP 入口，绕开 testhost；JSON 里 `runner` 为 `mtp`、`fallbackFrom` 为 `vstest`。编译错误或真实用例失败**不会**触发兜底
 - agent 面板里对应工具名：`mantiszip_verify` / `mantiszip_i18n` / `mantiszip_version` / `mantiszip_guards`（DSH 本地插件 `tools/dsh-plugin-mantiszip`，薄壳而已）
-- **换机器 / 换 agent 接手，或要改这套门禁时，先读 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)**：组成图、每个 task 干什么、四条守卫的覆盖边界、CI 七步门禁、反直觉实现（删掉会复发的写法）、环境坑、有意留白
+- **换机器 / 换 agent 接手，或要改这套门禁时，先读 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)**：组成图、每个 task 干什么、五条守卫的覆盖边界、CI 七步门禁、反直觉实现（删掉会复发的写法）、环境坑、有意留白
 
 ## Architecture（速查）
 
@@ -357,6 +357,30 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
   1. **忘记切分支**（最常见）→ 建议先 `git switch alpha`（或 `beta`）再动手，等用户确认
   2. **确实要在 `plans` 分支改**（临时验证思路、只为计划服务的一次性试验）→ 得到明确确认后再改，并在回复与提交信息里注明「在 plans 分支改代码」及其原因
 - 提问模板：「当前在 `plans`（计划）分支，你要改的是 `src/…` 下的代码。是忘记切到 `alpha` / `beta`，还是确实要在 `plans` 分支改？」
+
+### 规则 20：意图与执行之间只走契约
+
+设置窗口点了「确认」、世界却没反应——这类 bug 编译器不管、运行时不报、测试不覆盖，症状恒定是**界面一切正常，点下去什么也没发生**。所以接缝上只许传契约：确认自带载荷、执行只吃不可变载荷、结局必须能显示、进度只经一个 presenter。
+
+- **设置/确认窗口的唯一出口是 `ConfirmOutcome<T>`**：`Confirmed<T>(value)`（载荷已完整）/ `Rejected<T>(reason)`（`reason` 必须非空且**已本地化**，窗口保持打开并把原因显示给用户）/ `Cancelled<T>`（关窗、Esc、「取消」，不弹任何提示）。**禁止** `ShowDialog<bool>` 之后回读窗口状态：`CopyExecutionSettingsFrom` / `GetFilter` / `GetFilteredEntryKeys` / `GetPlanForExecution` 这类方法**只要被调用方调用就是违规**——它们存在就是在给「搬运参数」留后门。
+
+```csharp
+// ❌ 关窗 + 补读：bool 只表示「点了确认」，真参数在窗口公开属性上另取，漏一项就静默失效
+if (await dlg.ShowDialog<bool>(owner)) { vm.CopyExecutionSettingsFrom(dlg.ViewModel); vm.FileFilter = dlg.GetFilter(); }
+
+// ✅ 确认即载荷：窗口在确认事务内一次产出快照，执行器拿到的就是用户确认的那一刻
+switch (await ViewModel.TryConfirmAsync())
+{
+    case Confirmed<CompressSettings> c: Close(); await _session.RunAsync(c.Value, _ctx); break;
+    case Rejected<CompressSettings> r: await ShowMessage(r.Reason); break;   // 留窗，原因必须让用户看见
+    case Cancelled<CompressSettings>: break;                                 // 不弹任何提示
+}
+```
+
+- **执行只接受不可变载荷**：执行器签名固定为 `Task<XxxOutcome> RunAsync(<XxxSettings>, <XxxRunContext>, CancellationToken = default)`（`ICompressSession` / `IExtractSession`）。`CompressSettings` / `ExtractSettings` 是 `sealed record` + 只读集合：**不许**出现 `Window` / `Presenter` / `Visibility` 之类宿主或呈现概念，也**不许**当作可变回传通道；`CompressRunContext` / `ExtractRunContext` 只装宿主差异（`Owner` / `Presenter` / `ExitPolicy` / `DisplayPaths`），**不许**装业务数据（目标路径、密码、冲突策略等随载荷走）。
+- **结局只有四种**：`Completed` / `Cancelled` / `Failed(reason)` / `NotStarted(reason)`（`RunOutcomeState` 枚举 + `CompressOutcome` / `ExtractOutcome` 的静态工厂，不是 bool）。`Failed` / `NotStarted` 的原因必须非空（`OutcomeReasonGuard` 抛 `ArgumentException` + `Debug.Fail` 兜底）；`NotStarted` 的调用方**必须把原因展示给用户**——静默失败是本规则要消灭的头号缺陷。`Cancelled` 不弹提示；`Failed` 的错误已由 presenter 展示，调用方不得重复弹窗。
+- **进度呈现只经 `IProgressPresenter`**：进度窗口生命周期（建窗 → 配置 → 显示 → 收尾 → 自动关闭）只在 presenter 实现里写一次，`Task<bool> RunAsync(ProgressRunRequest)` 是唯一入口（`true` = 跑完、`false` = 用户取消）。契约里**不许**出现「是否压缩」「是否 CLI」这类分支：宿主差异用 `ExitPolicy` / `DisplayPaths` / `Owner` / `ConfigureWindow` / `OnCompleted` 表达。presenter 里**不许**弹 `AppMessageBox`、**不许**自造用户文案（标题、说明行、完成文案都由调用方给出且已本地化）。
+- **守卫**：`pwsh -File scripts\verify-repo.ps1 -Task guards` 的 `dialog-seam` 检查四类 —— ① `new (Compress|Extract)SettingsWindow(` 的文件与处数必须与脚本里的登记表一致（**双向**：未登记即失败，登记了却找不到也失败）；② 非注释行出现 `CloseAction` / `DialogResult` 双轨回传**命中即失败**；③ `new (Compress|Extract)Request` 只允许出现在 `Services/` 与 CLI 直通路径（`App.CliCompress.cs` / `App.CliExtract.cs`）；④ 设置窗口构造函数必须含 session 形参（`ICompressSession` / `IExtractSession`）。**违规时先改设计，不要改守卫**；确需改守卫，必须同时更新 `docs/MAINTENANCE.md` 与本节。
 
 ## 未来工作
 

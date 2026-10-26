@@ -125,6 +125,10 @@ public partial class MainWindow : Window
         var vm = new MainWindowViewModel();
         // 主 VM 构造（内含 PreviewViewModel 构造）
         Services.StartupTimer.Mark("Win.VM");
+
+        // 桌面进度呈现器：压缩/解压/测试统一经它开窗、收尾（窗口生命周期只写一次）。
+        // 状态栏回写端口只服务「密码重试被取消」这类跨层提示，presenter 本身不碰 ViewModel。
+        var progressPresenter = new MainWindowProgressPresenter(message => vm.StatusMessage = message);
         vm.GetOpenFilePath = OpenFileDialogAsync;
         vm.SaveLayoutAction = SaveLayout;
         vm.ShowSettingsWindow = async () =>
@@ -222,48 +226,88 @@ public partial class MainWindow : Window
 
         // ── Phase 3: Wire up ViewModel dialog callbacks ──
 
-        vm.ShowExtractSettingsDialog = async (evm) =>
+        vm.ShowExtractSettingsDialog = async (archivePaths) =>
         {
-            var dialog = new ExtractSettingsWindow(evm.ArchivePaths);
+            // 桌面宿主差异：Owner = 主窗口（冲突/错误弹窗的属主）、Presenter = 桌面实现、
+            // 不接管进程退出（GUI 里解压结束只关进度窗）。
+            var session = new ExtractSession();
+            var context = new ExtractRunContext(
+                Owner: this,
+                Presenter: progressPresenter,
+                ExitPolicy: ExitPolicy.None,
+                DisplayPaths: archivePaths);
 
-            // Pass archive entries for preview tree
+            // 设置窗口注入执行器与宿主差异：窗口自己产出 ConfirmOutcome 载荷，
+            // 调用方不再 ShowDialog<bool> 之后回读 ViewModel / FileFilter / 过滤集合。
+            var dialog = new ExtractSettingsWindow(session, context, archivePaths);
+
+            // 本会话已缓存的口令随首包回填：确认事务会把它冻结进载荷，
+            // 解压会话据此按「只使用提供的密码」策略执行（与原 ExtractFlow 传参路径等价）。
+            if (archivePaths.Count > 0)
+                dialog.SetKnownPassword(vm.GetSessionPassword(archivePaths[0]));
+
+            // 首包条目已在内存：跳过重复读取，过滤统计与冲突预览立即就绪。
             var allItems = vm.GetAllRawItems();
             if (allItems.Count > 0)
                 dialog.SetEntries(allItems);
 
-            var result = await dialog.ShowDialog<bool>(this);
-            if (result)
-            {
-                // 执行侧设置整体接管（单一入口，与压缩侧同构）；历史教训见 CopyExecutionSettingsFrom 的 XML 注释
-                evm.CopyExecutionSettingsFrom(dialog.ViewModel);
+            var confirmation = await dialog.ShowDialog<ConfirmOutcome<ExtractSettings>>(this);
+            if (confirmation is not Confirmed<ExtractSettings> confirmed)
+                return;   // 取消 / 点 X：静默收场，不弹任何提示
 
-                // 文件过滤：仅当启用过滤且有条目时，将匹配条目 key 回传，供实际解压只解压匹配项
-                evm.FilteredEntryKeys = dialog.GetFilteredEntryKeys();
+            var outcome = await dialog.RunConfirmedAsync(confirmed.Value);
+            if (outcome.IsCompleted)
+            {
+                vm.StatusMessage = LocalizationManager.T("Status_ExtractComplete");
             }
-            return result;
+            else if (outcome.IsFailed)
+            {
+                // 错误摘要已由 presenter 写进进度窗（并等用户确认关闭），这里只留结论，不重复弹窗。
+                vm.StatusMessage = outcome.Reason;
+            }
+            else if (outcome.IsNotStarted)
+            {
+                // NotStarted 没有进度窗可承载原因：必须显式展示，不许静默退出。
+                await AppMessageBox.Show(outcome.Reason, LocalizationManager.T("Progress_Title_Extract"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning, this);
+            }
         };
 
         vm.ShowExtractFolderPicker = (entries, initialPath, currentFolder, preserveFullPath) =>
             CustomFilePickerDialog.ShowExtractFolderAsync(this, entries, initialPath, currentFolder, preserveFullPath);
 
-        vm.ShowCompressSettingsDialog = async (cvm) =>
+        vm.ShowCompressSettingsDialog = async (sourcePaths) =>
         {
-            var dialog = new CompressSettingsWindow(cvm.SelectedPaths);
-            var result = await dialog.ShowDialog<bool>(this);
-            if (result)
-            {
-                // 执行侧设置整体接管（单一入口）；历史上逐属性手抄漏过 ConflictAction / SplitSize /
-                // MultiThreadedCompression 等，见 CopyExecutionSettingsFrom 的 XML 注释
-                cvm.CopyExecutionSettingsFrom(dialog.ViewModel);
-                // 过滤条件由 View 从 FileFilterEditor 读出，不在 ViewModel 的可拷贝字段内
-                cvm.FileFilter = dialog.GetFilter();
+            // 桌面宿主差异：Owner = 主窗口（冲突/错误弹窗的属主）、Presenter = 桌面实现、
+            // 不接管进程退出（GUI 里压缩结束只关进度窗）。
+            var session = new CompressSession();
+            var context = new CompressRunContext(
+                Owner: this,
+                Presenter: progressPresenter,
+                ExitPolicy: ExitPolicy.None,
+                IsCompressFlow: true);
 
-                // 接管 B 数据集：对话框 VM 构建的过滤后压缩计划（含每源输出路径 + 匹配文件白名单）。
-                // 必须最后执行 —— 前面 SelectedPaths 拷贝会触发无参重建，AdoptPlan 使在途重建过期，
-                // 确保执行侧消费的是对话框内用户所见的一致结果（预览 = 实际）。
-                cvm.AdoptPlan(dialog.ViewModel.GetPlanForExecution());
+            var dialog = new CompressSettingsWindow(session, context, sourcePaths);
+            var confirmation = await dialog.ShowDialog<ConfirmOutcome<CompressSettings>>(this);
+            if (confirmation is not Confirmed<CompressSettings> confirmed)
+                return;   // 取消 / 点 X：静默收场，不弹任何提示
+
+            var outcome = await dialog.RunConfirmedAsync(confirmed.Value);
+            if (outcome.IsCompleted)
+            {
+                vm.StatusMessage = LocalizationManager.T("Status_Compressed");
             }
-            return result;
+            else if (outcome.IsFailed)
+            {
+                // 错误摘要已由 presenter 写进进度窗（并等用户确认关闭），这里只留结论，不重复弹窗。
+                vm.StatusMessage = outcome.Reason;
+            }
+            else if (outcome.IsNotStarted)
+            {
+                // NotStarted 没有进度窗可承载原因：必须显式展示，不许静默退出。
+                await AppMessageBox.Show(outcome.Reason, LocalizationManager.T("Compress_Title"),
+                    MessageBoxButton.OK, MessageBoxImage.Warning, this);
+            }
         };
 
         vm.ShowPasswordManager = async () =>
@@ -292,98 +336,50 @@ public partial class MainWindow : Window
 
         vm.RunWithProgress = async (title, filePaths, operation) =>
         {
-            var pw = new ProgressWindow(title);
-            pw.InitCancellation();
-            // Task 6: 压缩流程标记（供压缩通道说明行显示；解压流程保持 false）
-            pw.IsCompressFlow = vm.PendingCompressFlow;
-            vm.PendingCompressFlow = false;
-            // Task 6: 测试流标记（自动按下 📌，完成后不自动关闭）与完成回调/最近窗口回读通道
-            pw.IsTestFlow = vm.PendingTestFlow;
-            vm.PendingTestFlow = false;
-            // 操作说明行（删除等整包重写操作交代真实影响面；压缩/解压不置位）
+            // 一次性状态仍留在 VM 上（解压/测试/删除/添加四条旧路径尚未接线），在这里读掉后
+            // 只以通用呈现字段交给 presenter —— presenter 不再认识 Pending* 侧通道。
             var operationNote = vm.PendingOperationNote;
             vm.PendingOperationNote = null;
-            if (operationNote is not null)
-                pw.SetOperationNote(operationNote);
             var onCompleted = vm.PendingCompletedCallback;
             vm.PendingCompletedCallback = null;
-            vm.LastProgressWindow = pw;
-            // spec §11.2: 解压后置开关能力位 + 初值（仅解压入口置位 → 压缩/测试流两开关隐藏）
             var postActions = vm.PendingExtractPostActions;
             vm.PendingExtractPostActions = null;
-            if (postActions is { } pa)
-                pw.SetExtractPostActions(pa.OpenFolder, pa.DeleteArchive, pa.OpenFolderSeed);
-            // 列表播种：压缩流程枚举全量条目（后台；失败/取消/超阈值放弃，终态 upsert 兜底）
-            var seedRequest = vm.PendingCompressRequest;
-            vm.PendingCompressRequest = null;
-            if (seedRequest is not null)
-                CompressFlow.TrySeedEntryItemsInBackground(pw, seedRequest, pw.CancellationToken);
-            var hasFileList = filePaths is { Count: > 0 };
-
-            // 批处理状态上报：操作闭包内经 BatchStatusReporter 传给引擎 onItemStatus
-            vm.BatchStatusReporter = (index, status) =>
-            {
-                pw.SetCurrentBatchItem(index);
-                pw.UpdateBatchItemStatus(index, status);
-            };
-
-            // 批处理输出路径上报：冲突解决后（自动重命名/手输包名）把列表里的旧包名换成实际包名
-            vm.BatchOutputPathReporter = (index, outputPath) => pw.UpdateBatchItemName(index, outputPath);
+            var isTestFlow = vm.PendingTestFlow;
+            vm.PendingTestFlow = false;
 
             try
             {
-                pw.Show();
-                if (hasFileList)
+                return await progressPresenter.RunAsync(new ProgressRunRequest
                 {
-                    pw.InitBatchMode(filePaths!);
-                    pw.SetCurrentBatchItem(0);
-                }
-
-                var progress = pw.CreatePauseAwareProgress(
-                    ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p)));
-                await operation(progress, pw.CancellationToken);
-
-                if (hasFileList)
-                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
-
-                // 成功：完成回调（测试流结果通道）优先，否则默认完成态；
-                // 再尊重 📌 KeepOpenOnComplete 统一走 AutoCloseOrWaitAsync（延迟来自设置，Task 6）
-                if (onCompleted is not null)
-                    onCompleted(pw);
-                else
-                    pw.SetComplete(LocalizationManager.T("Cli_StatusDone"));
-                await pw.AutoCloseOrWaitAsync(() => pw.Close());
-                return true;
-            }
-            catch (OperationCanceledException)
-            {
-                // D13：取消不是错误 → 立即关闭（不写错误汇总、不压钉）
-                pw.Close();
-                return false;
-            }
-            catch (PasswordRetryCancelledException)
-            {
-                // 用户在密码弹窗点取消：行标记「已取消 - 需要密码」并在状态栏提示。
-                // 主窗口全部解压入口（ExtractArchive/Here/ToName/ExtractTo/SmartExtract）均经本闭包，
-                // 故在此单点接线，避免逐个方法重复分支。
-                var msg = LocalizationManager.T("Status_PasswordCancelled");
-                // 同步进度窗口状态行（否则取消发生在首报前时会停在「正在准备…」）
-                pw.SetStatusMessage(msg);
-                if (hasFileList)
-                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);   // 行 Failed 自动压钉 → 等手动关闭
-                vm.StatusMessage = msg;
-                await pw.AutoCloseOrWaitAsync(() => pw.Close());   // 📌 已由行 Failed 压下 → 等手动关闭
-                return false;
+                    Title = title,
+                    DisplayPaths = filePaths,
+                    OperationNote = operationNote,
+                    Operation = operation,
+                    OnCompleted = onCompleted,
+                    ConfigureWindow = window =>
+                    {
+                        // Task 6: 测试流标记（自动按下 📌，完成后不自动关闭）
+                        window.IsTestFlow = isTestFlow;
+                        vm.LastProgressWindow = window;
+                        // spec §11.2: 解压后置开关能力位 + 初值（仅解压入口置位 → 压缩/测试流两开关隐藏）
+                        if (postActions is { } pa)
+                            window.SetExtractPostActions(pa.OpenFolder, pa.DeleteArchive, pa.OpenFolderSeed);
+                        // 批处理状态上报：操作闭包内经 BatchStatusReporter 传给引擎 onItemStatus
+                        vm.BatchStatusReporter = (index, status) =>
+                        {
+                            window.SetCurrentBatchItem(index);
+                            window.UpdateBatchItemStatus(index, status);
+                        };
+                        // 批处理输出路径上报：冲突解决后（自动重命名/手输包名）把列表里的旧包名换成实际包名
+                        vm.BatchOutputPathReporter = (index, outputPath) => window.UpdateBatchItemName(index, outputPath);
+                    },
+                });
             }
             catch (Exception ex)
             {
-                // 失败：写错误汇总（自动压钉 📌）+ 日志，行标 Failed；关窗决策交给 AutoCloseOrWaitAsync 等待手动关闭
-                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(ex);
-                pw.SetErrorSummary(wholeErrorText, wholeErrorDetail);
+                // 旧契约以 false 表达「未完成」：presenter 已把错误摘要写进窗口并等用户关闭，
+                // 这里保留返回值语义，让既有解压/测试/删除调用方继续走「未完成」分支。
                 App.DebugLog($"[RunWithProgress] operation failed: {ex}");
-                if (hasFileList)
-                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
-                await pw.AutoCloseOrWaitAsync(() => pw.Close());   // SetErrorSummary 已自动压钉 → 等手动关闭
                 return false;
             }
             finally

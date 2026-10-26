@@ -160,32 +160,32 @@ public interface ICompressSession { Task<CompressOutcome> RunAsync(CompressSetti
 
 ### 波 1：压缩（6-8h）
 
-- [ ] **T1** 新增 `Models/ConfirmOutcome.cs`（三态 + `Rejected` 非空 reason 校验 + `Debug.Fail`）。
-- [ ] **T2** 新增 `Models/CompressSettings.cs`（`sealed record`，`required` 全字段），迁移 `CompressSettingsViewModel` 的执行侧属性为 DTO 构造来源；`CompressSettingsViewModel.TryConfirmAsync()` 落地（内部 `Validate()` → `EnsurePlanReadyAsync()` → 快照）。
+- [x] **T1** 新增 `Models/ConfirmOutcome.cs`（三态 + `Rejected` 非空 reason 校验 + `Debug.Fail`）。
+- [x] **T2** 新增 `Models/CompressSettings.cs`（`sealed record`，`required` 全字段），迁移 `CompressSettingsViewModel` 的执行侧属性为 DTO 构造来源；`CompressSettingsViewModel.TryConfirmAsync()` 落地（内部 `Validate()` → `EnsurePlanReadyAsync()` → 快照）。
   - 验收：`SelectedPaths` 空 / 输出路径非法 / Plan 构建失败 / deflate64+分卷未加密 / 空密码 / 两次密码不一致 —— 6 种失败态全部返回 `Rejected(非空 reason)`。
-- [ ] **T3** 新增 `Services/CompressSession.cs` + `ICompressSession`（吸收 `ExecuteCompressFromSettings` 全部业务步骤与 CLI 的 `CompressWithProgress` 流程），密码库保存段整体迁入。
-- [ ] **T4** 新增 `Services/IProgressPresenter` + `MainWindowProgressPresenter` / `CliProgressPresenter`；`RunWithProgress` 与 `CompressWithProgress` 收口到同一契约。
+- [x] **T3** 新增 `Services/CompressSession.cs` + `ICompressSession`（吸收 `ExecuteCompressFromSettings` 全部业务步骤与 CLI 的 `CompressWithProgress` 流程），密码库保存段整体迁入。
+- [x] **T4** 新增 `Services/IProgressPresenter` + `MainWindowProgressPresenter` / `CliProgressPresenter`；`RunWithProgress` 与 `CompressWithProgress` 收口到同一契约。
   - 注意：`RunWithProgress` 同时服务解压/测试流程，抽象必须保持通用，不得烤入压缩语义。
-- [ ] **T5** `CompressSettingsWindow` 改造：构造函数注入 `ICompressSession` + `CompressRunContext`；删除 `CloseAction` 公开属性（VM 侧同步删）；`SnapshotFormatOptionsToViewModel()` 与 `GetFilter()` 并入事务内部，公开面收缩到 `ViewModel` + `ShowMessage` 注入。
-- [ ] **T6** 四处入口改接：`MainWindowViewModel.Compress.cs:25-34`、`:42-50`、`App.CliCompress.cs:102-157`、`Controls/Menus/TestMenuView.axaml.cs:81`；删除 `ShowCompressSettingsDialog` / `ExecuteCompressFromSettings` 与 `App.CliCompress.cs:118` 的 `CloseAction` 覆盖。
-- [ ] **T7** i18n：新增 `Compress_PasswordMismatch`（三语成对，UTF-8 BOM + CRLF），必要时 `Compress_NoSources`。
+- [x] **T5** `CompressSettingsWindow` 改造：构造函数注入 `ICompressSession` + `CompressRunContext`；删除 `CloseAction` 公开属性（VM 侧同步删）；`SnapshotFormatOptionsToViewModel()` 与 `GetFilter()` 并入事务内部，公开面收缩到 `ViewModel` + `ShowMessage` 注入。
+- [x] **T6** 四处入口改接：`MainWindowViewModel.Compress.cs:25-34`、`:42-50`、`App.CliCompress.cs:102-157`、`Controls/Menus/TestMenuView.axaml.cs:81`；删除 `ShowCompressSettingsDialog` / `ExecuteCompressFromSettings` 与 `App.CliCompress.cs:118` 的 `CloseAction` 覆盖。
+- [x] **T7** i18n：新增 `Compress_PasswordMismatch`（三语成对，UTF-8 BOM + CRLF），必要时 `Compress_NoSources`。
 
 ### 波 2：解压（5-6h）
 
-- [ ] **T8** 新增 `Models/ExtractSettings.cs`；`ExtractSettingsViewModel.TryConfirmAsync()` 落地（含 `FilteredEntryKeys` 收进 DTO，从"调用方单独赋值"变成"事务内必产出"）。
-- [ ] **T9** 新增 `Services/ExtractSession.cs` + `IExtractSession`（吸收 `MainWindowViewModel.Extract.cs:30/312` 与 `App.CliExtract.cs` 批处理两条链）。
-- [ ] **T10** `ExtractSettingsWindow` 改造：注入 `IExtractSession` + `ExtractRunContext`；删除 `CloseAction` 与 `DialogResult` 双轨（`App.CliExtract.cs:352` 的非模态等待改用窗口的 `Task` 完成信号）。
-- [ ] **T11** 五处入口改接：`MainWindowViewModel.Extract.cs:30`、`:312`、`Views/MainWindow.axaml.cs:225-244`、`App.CliExtract.cs:342-374`、`TestMenuView.axaml.cs:82`。
-- [ ] **T12** 退休 `CopyExecutionSettingsFrom`（压缩/解压两侧）、`GetFilter()`、`GetFilteredEntryKeys()`、`GetPlanForExecution()` 的公开外泄用法；两份反射守卫测试改口径（见 §6）。
+- [x] **T8** 新增 `Models/ExtractSettings.cs`；`ExtractSettingsViewModel.TryConfirmAsync()` 落地（含 `FilteredEntryKeys` 收进 DTO，从"调用方单独赋值"变成"事务内必产出"）。
+- [x] **T9** 新增 `Services/ExtractSession.cs` + `IExtractSession`（吸收 `MainWindowViewModel.Extract.cs:30/312` 与 `App.CliExtract.cs` 批处理两条链）。
+- [x] **T10** `ExtractSettingsWindow` 改造：注入 `IExtractSession` + `ExtractRunContext`；删除 `CloseAction` 与 `DialogResult` 双轨（`App.CliExtract.cs:352` 的非模态等待改用窗口的 `Task` 完成信号）。
+- [x] **T11** 五处入口改接：`MainWindowViewModel.Extract.cs:30`、`:312`、`Views/MainWindow.axaml.cs:225-244`、`App.CliExtract.cs:342-374`、`TestMenuView.axaml.cs:82`。
+- [x] **T12** 退休 `CopyExecutionSettingsFrom`（压缩/解压两侧）、`GetFilter()`、`GetFilteredEntryKeys()`、`GetPlanForExecution()` 的公开外泄用法；两份反射守卫测试改口径（见 §6）。
 
 ### 波 3：全仓清账 + 规则化（7-9h）
 
 - [x] **T13** 逐点判定附录 A 的 68 处命中，产出**逐点判定表**回填本附录（A 改 / B 参照 / C 登记 / D 安全 / E 单独治 / F 随 A）。判定标准：①是否携带载荷 ②失败是否静默 ③是否存在属性补读。
-- [ ] **T14** C 类（纯提示/帮助/管理器）统一为无返回值 API（`Task ShowAsync(...)`）—— 消除"有个 bool 但没人该看"的误导性契约。
-- [ ] **T15** E 类：`Services/CompressFlow.cs:131-143` 去同步阻塞。改为 `await Dispatcher.UIThread.InvokeAsync(...)` 全 async 化；`ErrorDialog.ResultAction` 改为 `ShowDialog<ErrorDialogResult>(owner)` 返回值，删属性读。
-- [ ] **T16** F 类：`Services/PasswordRetryLoop.cs:144`、`App.CliCompress.cs:155`、`App.CliExtract.cs:353` 统一走新契约。
-- [ ] **T17** `scripts/verify-repo.ps1` 新增 `-Task guards` 第 5 条守卫 `dialog-seam`（实现要点见 §6.1），并同步 `docs/MAINTENANCE.md`（该文档明确要求"要改这套门禁先读"+ 记录反直觉实现与覆盖边界）。
-- [ ] **T18** AGENTS.md 新增规则 20（草案见 §6.3），并在「维护脚本」表格补 `dialog-seam` 一行。
+- [ ] **T14** C 类（纯提示/帮助/管理器）统一为无返回值 API（`Task ShowAsync(...)`）—— 消除"有个 bool 但没人该看"的误导性契约。（**T13 裁定**：本波只登记、只禁新增，不批量改造存量 C 类；§6 的「只登记只禁新增」边界已写入附录 A 与 MAINTENANCE.md，新代码注入 C 类形态由 code review 拦截）
+- [x] **T15** E 类：`Services/CompressFlow.cs:131-143` 去同步阻塞。改为 `await Dispatcher.UIThread.InvokeAsync(...)` 全 async 化；`ErrorDialog.ResultAction` 改为 `ShowDialog<ErrorDialogResult>(owner)` 返回值，删属性读。
+- [x] **T16** F 类：`Services/PasswordRetryLoop.cs:144`、`App.CliCompress.cs:155`、`App.CliExtract.cs:353` 统一走新契约。
+- [x] **T17** `scripts/verify-repo.ps1` 新增 `-Task guards` 第 5 条守卫 `dialog-seam`（实现要点见 §6.1），并同步 `docs/MAINTENANCE.md`（该文档明确要求"要改这套门禁先读"+ 记录反直觉实现与覆盖边界）。
+- [x] **T18** AGENTS.md 新增规则 20（草案见 §6.3），并在「维护脚本」表格补 `dialog-seam` 一行。
 
 ---
 
@@ -197,7 +197,7 @@ public interface ICompressSession { Task<CompressOutcome> RunAsync(CompressSetti
 |---|---|---|
 | 1 | `new (Compress\|Extract)SettingsWindow(` 必须出现在登记表 | 9 处入口 + UI 测试 |
 | 2 | `Func<bool, ?Task>? CloseAction` / `DialogResult` 双轨 → **命中即失败** | 全部退休后应为 0 |
-| 3 | `new CompressRequest` / `new ExtractRequest` 只许出现在 `Services/*Flow.cs` | `CompressFlow.cs`、`ExtractFlow.cs` |
+| 3 | `new CompressRequest` / `new ExtractRequest` 只许出现在执行器与 `Services/*Flow.cs` | `CompressSession.cs`、`ExtractSession.cs`、`CompressFlow.cs`、`ExtractFlow.cs`（执行器本就要建请求，只列 `*Flow.cs` 会误报） |
 | 4 | 设置窗口构造函数必须含 `ICompressSession`/`IExtractSession` 形参 | — |
 
 输出格式与现有守卫一致：`文件:行 + 违例类型`，退出码 1 = 有问题。
@@ -508,3 +508,26 @@ pwsh -File scripts\verify-repo.ps1 -Task guards      # 含新 dialog-seam
 | 3 | 进度窗 / 拖放覆盖层等非模态 `Show()` | 采「守卫只看 `ShowDialog`」口径 | 12 条移出 C 类，单列「守卫范围外：非模态辅助窗」一节且不进基线；C 基线 27→**15**，附录并注明「守卫的 C 类检查只针对 `ShowDialog`，非模态辅助窗不在扫描范围内」 |
 
 裁定后的最终分布：**A 2 / B 16 / C 15 / D 8 / E 3 / F 4 = 48 条（逐点判定表）+ 12 条（守卫范围外）= 60 处**。
+
+
+## 实施记录（2026-10-26）
+
+四批并行落地，每批之间由父 agent 统一构建；分支按头部「分支调整」在 `alpha` 上做。
+
+| 批次 | 任务 | 交付物 |
+|---|---|---|
+| 1 | T1 / T4（契约）+ T13（审计） | `Models/ConfirmOutcome.cs` / `Models/RunOutcome.cs` / `Models/CompressRunContext.cs` / `Models/ExtractRunContext.cs` / `Services/IProgressPresenter.cs`；附录 A 60 处逐点判定 |
+| 2 | T2/T3（压缩核心）+ T8/T9（解压核心） | `Models/CompressSettings.cs`、`Models/ExtractSettings.cs`、`Services/CompressSession.cs`、`Services/ExtractSession.cs`、两侧 `TryConfirmAsync`；7 条三语 key |
+| 3 | T4 实现 + T5/T6（压缩接线）+ T18 | `Services/MainWindowProgressPresenter.cs`、`Services/CliProgressPresenter.cs`；压缩四条入口改接；AGENTS.md 规则 20 |
+| 4 | T10/T11/T12（解压接线）+ T15/T16（波次 3 代码）+ T17 | `Dialogs/ExtractSettingsWindow` 注入 session；解压五处入口改接；同步阻塞全消；`dialog-seam` 守卫 + `docs/MAINTENANCE.md` |
+
+**与计划的偏差（均有理由）**
+
+1. **`RunOutcome` 用「enum + 静态工厂」而非四个子记录**：`== CompressOutcome.Completed` / `.State` / `IsFailed` 仍可编译，调用点更短；计划 §4.2 的 `switch` 子记录形态不采用。
+2. **`ExitPolicy` 一律传 `None` + 调用方显式 `AppShutdown`**：`ShutdownAfterRun` 会在 session 的 `finally` 里先退出进程，`NotStarted` 的原因提示框根本来不及显示，与规则 20「NotStarted 必须展示原因」冲突。
+3. **暂停信号用 `Services/ProgressPauseGate.cs` 过渡**：`ProgressViewModel` 的暂停是 `ManualResetEventSlim`，全仓没有 async API；闸门只是把等待移出 UI 线程（消除「暂停后进度窗点不动」的真死锁），彻底方案要给 `ProgressViewModel` 加 TCS 暂停信号——**留作后续小计划**，落地后闸门整体删除。
+4. **`dialog-seam` 的请求白名单含 CLI 直通路径**：`--compress-quick/-separate/-combined` 没有确认对话框，本来就该直接构造请求；只列 `Services/` 会误报，只列 `*Flow.cs` 会误报执行器（`CompressSession.BuildRequest`）。
+5. **T14（C 类批量改造）不做**：T13 裁定「只登记、只禁新增」，存量 15 条留着由评审拦截新增。
+6. **`ExtractTo` 现在也遵守过滤集合**（旧实现直调 `ExtractService` 忽略过滤）——「预览 = 实际」更一致，属行为收敛。
+
+**验证（Release）**：`-Task build -Target avalonia` 0 警告；`-Task test -Target ui-tests` 430 用例全过（`-2` 来自删除的 `CompressSettingsDialogCopyTests`，其守卫对象已消失）；`-Task test -Target tests` 825 用例全过；`-Task check` 版本 6 处 + 三语 1329 key + 守卫 **5 项**（新增 `dialog-seam`）全绿。`dialog-seam` 做过红绿验证：临时探针文件同时触发「未登记构造点 / CloseAction / new CompressRequest」三类失败，删探针后转绿。

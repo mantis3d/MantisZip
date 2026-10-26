@@ -67,9 +67,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<Core.PasswordEntry, string, Task>? ShowMatchedPasswordDialog { get; set; }
 
     /// <summary>
-    /// 解压设置对话框回调。传入 ExtractSettingsViewModel，返回 true=确认，false=取消。
+    /// 解压设置对话框回调。参数为待解压的压缩包路径；确认后的执行由回调内部完成
+    /// （设置窗口产出 <see cref="Models.ConfirmOutcome{T}"/> 载荷 → 注入的解压会话执行 → 结局分支），
+    /// 命令本身不再回读对话框状态。
     /// </summary>
-    public Func<ExtractSettingsViewModel, Task<bool?>>? ShowExtractSettingsDialog { get; set; }
+    public Func<IReadOnlyList<string>, Task>? ShowExtractSettingsDialog { get; set; }
 
     /// <summary>
     /// 解压目标文件夹选择回调。传入待解压条目、初始路径、当前浏览目录（压缩包内）与保留完整路径设置，
@@ -78,9 +80,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<ExtractPickResult?>>? ShowExtractFolderPicker { get; set; }
 
     /// <summary>
-    /// 压缩设置对话框回调。传入 CompressSettingsViewModel，返回 true=确认，false=取消。
+    /// 压缩设置对话框回调。参数为预填的源路径；确认后的执行由回调内部完成
+    /// （设置窗口产出 <see cref="Models.ConfirmOutcome{T}"/> 载荷 → 会话执行 → 结局分支），
+    /// 命令本身不再回读对话框状态。
     /// </summary>
-    public Func<CompressSettingsViewModel, Task<bool?>>? ShowCompressSettingsDialog { get; set; }
+    public Func<IReadOnlyList<string>, Task>? ShowCompressSettingsDialog { get; set; }
 
     /// <summary>
     /// 压缩冲突对话框回调。从后台线程调用，返回用户选择的冲突处理方式。
@@ -137,18 +141,6 @@ public partial class MainWindowViewModel : ObservableObject
     /// filePaths 非空时显示批处理文件列表（始终可见，单文件也显示）。
     /// </summary>
     public Func<string, IReadOnlyList<string>?, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
-
-    /// <summary>
-    /// Task 6：下一次 <see cref="RunWithProgress"/> 为压缩流程（MainWindow.axaml.cs 的闭包读取后立即复位）。
-    /// 供进度窗口显示「压缩通道」说明行；解压入口不置位。
-    /// </summary>
-    public bool PendingCompressFlow { get; set; }
-
-    /// <summary>
-    /// 压缩侧「列表」播种：下一次 <see cref="RunWithProgress"/> 为压缩流程时，用它枚举全量条目播种
-    /// （MainWindow.axaml.cs 读取后立即复位）。非压缩入口保持 null。
-    /// </summary>
-    public CompressRequest? PendingCompressRequest { get; set; }
 
     /// <summary>
     /// 下一次 <see cref="RunWithProgress"/> 的操作说明行文案（读取后立即复位，null = 不显示）。

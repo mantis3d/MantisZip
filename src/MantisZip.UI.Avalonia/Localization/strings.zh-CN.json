@@ -1,4 +1,12 @@
 ﻿{
+  "Settings_Window_NoExecutor": "设置窗口缺少执行器，无法开始。",
+  "Error_Extract_DestinationInvalid": "目标目录无效，请选择一个可用的文件夹。",
+  "Error_Extract_NoEntries": "没有可解压的压缩包。",
+  "Error_Extract_FilterNotReady": "过滤结果尚未就绪，请稍候再试。",
+  "Error_Extract_ArchiveNotFound": "找不到压缩包：{0}",
+  "Error_Extract_DestinationNotWritable": "无法写入目标目录：{0}",
+  "Compress_NoSources": "还没有添加要压缩的源文件或文件夹。",
+  "Compress_PasswordMismatch": "两次输入的密码不一致。",
   "IconTest_TabList": "图标列表",
   "IconTest_TabMatrix": "尺寸矩阵",
   "IconTest_MatrixTitle": "三档尺寸 × 双主题矩阵",

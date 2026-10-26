@@ -5,6 +5,7 @@ using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.Views;
 
@@ -60,6 +61,14 @@ public partial class TestMenuView : UserControl
             return;
         }
 
+        // 设置窗口属于「确认即载荷」入口：由诊断菜单直接注入会话与上下文，
+        // 与主窗口/CLI 走同一条链路，而不是 new 出裸窗口再让调用方回读状态。
+        if (tag is "CompressSettingsWindow" or "ExtractSettingsWindow")
+        {
+            await ShowSettingsEntryAsync(tag, owner);
+            return;
+        }
+
         Window? window = tag switch
         {
             "IconTestWindow" => new Dialogs.IconTestWindow(),
@@ -83,8 +92,6 @@ public partial class TestMenuView : UserControl
             "PasswordDialog" => new PasswordDialog("test.7z"),
             "ProgressWindow" => new ProgressWindow("测试进度窗口"),
             "ErrorDialog" => new ErrorDialog(new FileErrorInfo { FilePath = @"C:\test\test.zip", ErrorMessage = "这是一个测试错误信息\n可用于测试错误对话框的显示效果。" }),
-            "CompressSettingsWindow" => new CompressSettingsWindow(),
-            "ExtractSettingsWindow" => new ExtractSettingsWindow(),
             "CompressConflictDialog" => new CompressConflictDialog(@"C:\test\file.txt", "file.txt"),
             "ConflictDialog" => new ConflictDialog(new FileConflictInfo { FilePath = @"C:\existing\file.txt" }),
             "MatchedPasswordDialog" => new MatchedPasswordDialog(new PasswordEntry { Description = "测试密码", Patterns = { "*.zip" }, Password = "test123" }, "test.zip"),
@@ -109,6 +116,69 @@ public partial class TestMenuView : UserControl
         }
 
         await window.ShowDialog(owner);
+    }
+
+    /// <summary>
+    /// 打开设置窗口并执行确认结果（诊断入口与主窗口共用同一条「确认即载荷 → 会话 → 结局」链路）。
+    /// 取不到宿主窗口时降级为非模态 <see cref="Window.Show"/>：诊断菜单只验证界面，不真正执行。
+    /// </summary>
+    private static async Task ShowSettingsEntryAsync(string tag, Window? owner)
+    {
+        if (tag == "CompressSettingsWindow")
+        {
+            var session = new CompressSession();
+            var context = new CompressRunContext(
+                Owner: owner,
+                Presenter: new MainWindowProgressPresenter(),
+                ExitPolicy: ExitPolicy.None,
+                IsCompressFlow: true);
+            var dialog = new CompressSettingsWindow(session, context, Array.Empty<string>());
+            if (owner is null)
+            {
+                dialog.Show();
+                return;
+            }
+
+            var confirmation = await dialog.ShowDialog<ConfirmOutcome<CompressSettings>>(owner);
+            if (confirmation is not Confirmed<CompressSettings> confirmed)
+                return;
+
+            var outcome = await dialog.RunConfirmedAsync(confirmed.Value);
+            await ReportNotStartedAsync(outcome, owner, LocalizationManager.T("Compress_Title"));
+            return;
+        }
+
+        var extractSession = new ExtractSession();
+        var extractContext = new ExtractRunContext(
+            Owner: owner,
+            Presenter: new MainWindowProgressPresenter(),
+            ExitPolicy: ExitPolicy.None);
+        var extractDialog = new ExtractSettingsWindow(extractSession, extractContext, Array.Empty<string>());
+        if (owner is null)
+        {
+            extractDialog.Show();
+            return;
+        }
+
+        var extractConfirmation = await extractDialog.ShowDialog<ConfirmOutcome<ExtractSettings>>(owner);
+        if (extractConfirmation is not Confirmed<ExtractSettings> extractConfirmed)
+            return;
+
+        var extractOutcome = await extractDialog.RunConfirmedAsync(extractConfirmed.Value);
+        await ReportNotStartedAsync(extractOutcome, owner, LocalizationManager.T("Progress_Title_Extract"));
+    }
+
+    /// <summary>
+    /// 结局展示：<c>NotStarted</c> 没有进度窗承载原因，必须显式提示；
+    /// <c>Failed</c> 的错误摘要已由进度呈现器展示，不重复弹窗；取消静默。
+    /// </summary>
+    private static async Task ReportNotStartedAsync(RunOutcome outcome, Window owner, string title)
+    {
+        if (outcome.IsNotStarted)
+        {
+            await AppMessageBox.Show(outcome.Reason, title,
+                MessageBoxButton.OK, MessageBoxImage.Warning, owner);
+        }
     }
 
     /// <summary>
