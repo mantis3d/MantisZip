@@ -142,7 +142,7 @@ When releasing a new version, update the version string in ALL of these location
 | `compactTab` | `TabItem` | Padding `8,6`、MinHeight 36、FontSize 18 |
 | `ToggleIconBox` | `Border` | 16×16、圆角 3、边框 1.5、背景过渡（菜单切换指示） |
 
-- **`PathIcon` 不继承父控件 Foreground**，必须显式设置；全局 `TextBlock` 样式**故意不设 Foreground**（继承父控件避免 emoji 压成单色），除非有明确理由不要显式设置
+- **`PathIcon` 的 `Foreground` 必须显式给**：Avalonia 12 的 `IconElement.ForegroundProperty` 元数据是 `Inherits = true`，但实测工具栏 / 小按钮里的 `PathIcon` 仍取不到父控件的语义画刷（深色主题下呈默认黑、几乎不可见），所以一律按「显式设置」执行。**统一入口**：工具栏类图标挂 `Classes="ToolbarButtonIcon"`，命中 `App.axaml` 的 `PathIcon.ToolbarButtonIcon` 样式；该样式**必须写在 `ToggleButton:checked PathIcon` 之前**（Avalonia 无 CSS specificity、同名属性按定义顺序后者覆盖，放后面会把选中态的白图标覆盖成 Primary）。全局 `TextBlock` 样式**故意不设 Foreground**（继承父控件避免 emoji 压成单色），除非有明确理由不要显式设置
 - 不设置固定 `Height` 除非有充分理由；`ToggleIconBox` / 菜单图标槽位的详细用法见 ARCHITECTURE
 
 ### 规则 5：紧凑度模式资源键名约定

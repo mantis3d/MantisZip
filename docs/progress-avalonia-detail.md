@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 文档：规则 4 修订、删除目录计划 T5 闭环、新计划「树视图切换按钮选中态背景」
+  - **规则 4 修订（`AGENTS.md`）**：原话「`PathIcon` 不继承父控件 Foreground」与 Avalonia 12.1.2 的实际元数据不符（反射显示 `IconElement.ForegroundProperty.Inherits = true`），但实测工具栏/小按钮里的 `PathIcon` 仍取不到父控件的语义画刷（深色主题下呈默认黑、几乎不可见）。故改写为「元数据虽 `Inherits = true`，仍一律按**显式设置**执行」，并写清统一入口：工具栏类图标挂 `Classes="ToolbarButtonIcon"` → 命中 `App.axaml` 的 `PathIcon.ToolbarButtonIcon` 样式，该样式**必须写在 `ToggleButton:checked PathIcon` 之前**（否则会覆盖选中态白图标）。
+  - **`RELEASE_NOTES.md`**：v0.5.3 新增 **界面 / UI** 节 4 条（117 图标统一 Fluent 24 网格、尺寸与前景色统一、图标测试窗尺寸矩阵页），按规则 18 经用户确认范围后写入。
+  - **删除目录计划 T5 闭环**：依据用户 2026-10-26 真机验证（「测试基本成功」，以及由真机删除流程才暴露的「刷新慢 1-2 秒」反馈）把 T5 标 `[x]` 并注明依据，该计划全部任务关闭。
+  - **新计划**：[toggle-selected-contrast.md](.omo/plans/未开始/toggle-selected-contrast.md)（1-2h，🟢低）登记进 `docs/PLAN.md` B 档 —— `ResultTreeView` 的「紧凑」「筛选」两个 ToggleButton 本地写死 `Background`/`BorderBrush`，局部值优先级高于样式 setter ⇒ 压掉 `ToggleButton:checked` 的强调色背景，选中时变成浅灰底 + 白图标；修法为删掉本地覆盖（与 `MainFilterBar`、`ArchiveContentView` 的同类按钮对齐）。
+  - **状态**：✅
+
 **2026-10-26** — 修复：「测试」菜单的诊断窗口全部打不开（owner 取不到主窗口）
   - **背景**：用户实测 Debug 构建里「测试」菜单 28 个诊断窗口点了没有任何反应。该菜单只在 Debug 出现（`AppConstants.ShowTestMenu` 仅 `#if DEBUG` 为 true），Release/发布版不受影响，故不进 `RELEASE_NOTES.md`（规则 18：同周期内引入并修复、从未发布给用户的问题只记细节文档）。
   - **根因**：`TestMenuView.CreateMenuItem()` 用 `Content = null` 把根 `MenuItem` 从视图上摘下，而视图自身从不进可视树（`MainWindow.axaml.cs` 只把 `CreateMenuItem()` 的结果塞进 `MainMenu.Items`，`testMenuView` 是局部变量）。2026-10-22 启动优化阶段 3（提交 `86e5139a`）把点击处理从 `MainWindow` 迁进该视图时，owner 写成 `TopLevel.GetTopLevel(this) as Window` ⇒ 恒为 `null`，而结尾是 `if (window != null && owner != null)` ⇒ 28 项全部静默跳过。`git log -S "Content = null"` / `-S "TopLevel.GetTopLevel(this)"` / `--diff-filter=A` 三方确认引入点就是 `86e5139a`（此前处理器在 `MainWindow` 里，`this` 就是主窗口）。

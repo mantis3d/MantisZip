@@ -94,6 +94,7 @@
 | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 文件选择器去弹窗化（内嵌控件） | [embedded-file-picker.md](.omo/plans/未开始/embedded-file-picker.md) | 🟡中 | 1-2天 | 📋 2026-10-08 立项：把文件/目录选择器内嵌进压缩/解压设置窗。三步走：先抽纯控件再分别接入；不动 `CustomFilePickerDialog` 静态入口与系统浏览豁免。**与接缝计划有交集，排在接缝之后做可省一次返工** |
+| 树视图切换按钮选中态背景对比度 | [toggle-selected-contrast.md](.omo/plans/未开始/toggle-selected-contrast.md) | 🟢低 | 1-2h | `ResultTreeView` 的紧凑/筛选 ToggleButton 本地写死 `Background` 压掉 `:checked` 强调色背景，选中时变成浅灰底 + 白图标（2026-10-26 图标归一化验收时发现，改前即如此） |
 
 ---
 

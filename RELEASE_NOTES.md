@@ -34,6 +34,15 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Traditional Chinese split-size wording corrected** — the compression settings labeled the archive split size with "磁碟區", which actually means a disk volume/partition rather than an archive volume; it now reads "**分割檔大小 / 不分割**" following common Taiwan usage (matching WinRAR's Traditional Chinese "切成分割檔，大小"), and the adaptive / multithreaded compression help text was aligned to the same wording
 - **文件选择器目录树显示真实盘符图标与卷标** — 目录树里的磁盘此前一律用文件夹图标、名字只有裸盘符（`C:`）；现在改用资源管理器里的真实驱动器图标（硬盘 / 可移动磁盘 / 光驱 / 网络驱动器各不相同），名称显示为「卷标 (X:)」，没有卷标的盘按类型兜底（本地磁盘 / 可移动磁盘 / 网络驱动器 / 光盘）；U 盘热插拔后切到「目录树」标签即可看到新盘，已展开的层级不会被折叠
 - **File picker tree shows real drive icons and volume labels** — drives in the folder tree used to all wear the folder icon with a bare letter (`C:`); they now use the real Explorer drive icons (hard disk / removable / optical / network all differ) and are labeled "Volume Label (X:)", falling back to the drive type when a volume has no label (Local Disk / Removable Disk / Network Drive / Optical Disc); drive changes such as plugging in a USB stick show up when switching back to the Folders tab, without collapsing the levels you already expanded
+**界面 / UI**
+
+- **图标统一到 Fluent 24 网格** — 界面上的 117 个图标里有 49 个是从别的图标体系带过来的（字体字形坐标系，渲染出来比旁边明显更粗更黑）或手绘杂线；现已按 **Fluent 24 Regular** 统一重画这 50 个（连同 `IconOrientation` 的语义修正：原来画成「图像裂开/禁用」样，现在是表示面板方向的双向箭头；磁力链改为链环、HTML 预览改为代码括号），其余图标不动、资源键名一个没改，界面上的引用零改动
+- **Icons unified to the Fluent 24 grid** — of the 117 UI icons, 49 came from other icon systems (font-glyph coordinates, rendering visibly bolder and darker than their neighbours) or were hand-drawn scribbles; 50 of them are now redrawn from **Fluent 24 Regular** (including a semantic fix for `IconOrientation`, which used to look like a broken/disabled image and is now a two-way arrow for panel direction, the magnet link becoming a chain link, and the HTML preview a code bracket), with the rest untouched and not a single resource key renamed, so no call site changed
+- **图标显示尺寸与前景色统一** — 图标尺寸此前 14/15/16px 混用，现在统一 16px（21 个界面文件共 109 处）；工具栏与小按钮里缺少前景色的图标现在跟随主题文字色（深色主题下不再出现看不见的黑图标），选中态仍为白色
+- **Icon sizes and foregrounds unified** — icon sizes used to mix 14/15/16 px and are now uniformly 16 px (109 sites across 21 files); icons in toolbars and small buttons that had no foreground color now follow the theme's text color (no more invisible black icons on dark themes), while the checked state stays white
+- **图标测试窗口新增尺寸矩阵页** — 「测试 → 图标测试」多了第二页：117 个图标 × 16/22/28 三档尺寸 × 浅色/深色背景块并排对照，一屏就能看出每个图标在两种主题、三种显示尺寸下是否协调
+- **Icon test window gains a size matrix page** — Test → Icon Test now has a second tab: all 117 icons × three sizes (16/22/28) × light and dark background blocks side by side, so one screen shows whether every icon holds up across both themes and all display sizes
+
 **性能 / Performance**
 
 - **启动速度优化** — ① 主题重复加载消除：应用/切换主题时同主题直接跳过解析、图标字典跨主题复用，实测启动再降约 100ms（同时修复旧实现「先清空后加载」在加载失败时界面无样式的缺陷）；② 设置读取进程级缓存：冷启动只读盘一次，运行期重开窗口/对话框不再反复读盘反序列化，72 处调用点全部受益
