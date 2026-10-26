@@ -182,7 +182,7 @@
 
 ## TODOs
 
-- [ ] **T1. Core：统一「条目或其后代」匹配谓词**
+- [x] **T1. Core：统一「条目或其后代」匹配谓词**
 
   **What to do**：
   - 在 `src/MantisZip.Core/Utils/ArchivePathExtensions.cs` 的 `ArchivePath` 中新增：
@@ -206,7 +206,7 @@
 
   **Commit**：`fix(core): 删除条目匹配支持目录通配（条目或其后代）`
 
-- [ ] **T2. Core：零命中报错 + legacy 校验集合归一化**
+- [x] **T2. Core：零命中报错 + legacy 校验集合归一化**
 
   **What to do**：
   - **新增异常类型** `src/MantisZip.Core/Abstractions/ArchiveEntryNotFoundException.cs`：
@@ -234,7 +234,7 @@
 
   **Commit**：`fix(core): 删除零命中改为抛 ArchiveEntryNotFoundException，legacy 校验集合归一化`
 
-- [ ] **T3. UI：删除前二次确认 + 能力门禁 + 进度窗说明行**
+- [x] **T3. UI：删除前二次确认 + 能力门禁 + 进度窗说明行**
 
   **What to do**：
 
@@ -267,7 +267,7 @@
 
   **Commit**：`fix(avalonia): 删除前二次确认、按格式能力门禁删除入口、进度窗显示删除总量`
 
-- [ ] **T4. 测试：目录与静默成功回归**
+- [x] **T4. 测试：目录与静默成功回归**
 
   **What to do**：
   - 新增 `tests/MantisZip.Tests/Engines/ZipEngineDeleteDirectoryTests.cs`：
@@ -299,7 +299,7 @@
 
   **Commit**：无（手工验证，结论写入 T6 文档）
 
-- [ ] **T6. 文档同步 + 计划归档**
+- [x] **T6. 文档同步 + 计划归档**
 
   **开工前动作（规则 1）**：把本文件从 `.omo/plans/未开始/` 移入 `.omo/plans/进行中/`。
 
@@ -310,6 +310,46 @@
   - 在 `intent-execution-seam.md` 的「已知同类事故」处登记一行（仅引用，不并入波次）
 
   **Commit**：`docs: 删除目录修复的进度与发布说明同步`
+
+---
+
+## 实施记录（2026-10-26）
+
+**代码落地位置**
+
+| 层 | 文件 | 改动 |
+|---|---|---|
+| Core | `src/MantisZip.Core/Utils/ArchivePathExtensions.cs` | 新增 `MatchesEntryOrDescendant(entryName, target)`：自写去尾斜杠循环（**不复用** `TrimEndSeparator`，其对 `"a/"`/`"ab/"` 因 `path.Length > 3` 守卫失效）+ 忽略大小写 + 边界判 `/` |
+| Core | `src/MantisZip.Core/Abstractions/ArchiveEntryNotFoundException.cs` | 新建：`sealed class … : FileNotFoundException`，带 `EntryPath` |
+| Core | `src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs` | copy-mode 先校验再重写（零命中删临时包 + 抛错）；legacy 校验集合改用谓词；两路保留集均用谓词 |
+| Core | `src/MantisZip.Core/Engines/SevenZipEngine.cs` | 空列表早退；零命中在**建临时目录之前**抛错（不再整包解压重打包）；保留集用谓词 |
+| Core | `src/MantisZip.Core/Abstractions/ArchiveEngine.cs` | `DeleteEntriesAsync` 的 `<exception>` 文档改指新类型 |
+| UI | `src/MantisZip.UI.Avalonia/Services/WholeArchiveErrorLocalizer.cs` | 在 `case FileNotFoundException` **之前**加专属 case |
+| UI | `src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Compress.cs` | `CanDelete` 门禁 + 二次确认 + `PendingOperationNote` + `GetDeleteTargetStats` |
+| UI | `src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs` | 新增 `CanDeleteEntries`（能力位）+ `PendingOperationNote` + 两处通知 |
+| UI | `src/MantisZip.UI.Avalonia/ViewModels/ProgressViewModel.cs` | `OperationNoteText` / `ShowOperationNote` / `SetOperationNote` |
+| UI | `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml(.cs)` | Row 4 状态区包成 StackPanel，状态行下方加说明行 + `SetOperationNote` |
+| UI | `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs` | `RunWithProgress` 读出并复位 `PendingOperationNote` |
+| UI | `Views/MainWindow.axaml` / `Controls/Menus/EditMenuItems.axaml` / `Controls/ArchiveContentView.axaml` | 三处删除入口 `IsEnabled` 改绑 `CanDeleteEntries`（右键菜单原无门禁） |
+| i18n | `Localization/strings.{zh-CN,en,zh-TW}.json` | 新增 `Confirm_DeleteDirectoryFmt` / `Confirm_DeleteFileFmt` / `Error_Delete_EntryNotFound` / `Progress_DeleteNoteFmt`（1313 key 三语一致） |
+| 测试 | `tests/MantisZip.Tests/Engines/ZipEngineDeleteDirectoryTests.cs`（新建） | 9 例 zip（显式/隐式/混合/大小写/前缀边界/不存在/部分不存在/加密）+ 2 例 7z |
+| 测试 | `tests/MantisZip.Tests/Utils/ArchivePathTests.cs` | `MatchesEntryOrDescendant` 14 条 `[Theory]`（含 `("a/","a")`、`("ab/","ab")`、`("ab/a.txt","a")` 边界） |
+| 测试 | `Engines/ZipEngineDeleteTests.cs` / `Utils/ZipBinaryRewriterTests.cs` | 两处 `Assert.ThrowsAsync<FileNotFoundException>` 精确类型断言改为新类型 + 断言 `EntryPath` 与可赋值性 |
+
+**与计划的偏差（3 处，均为实现细节）**
+
+1. 进度窗说明行**没有**放进 `DetailedPanel`（原计划的仿照点）：那里 `IsVisible="{Binding IsDetailedMode}"`，只在详细模式可见；改放 Row 4 状态行正下方（状态区包成竖向 `StackPanel`），两种显示模式都能看到。
+2. `GetDeleteTargetStats` 的目录口径取 `ComputeDirectoryStats(_allRawItems)`（**未过滤**原始条目），与 VM 里目录行 `Size` 用的过滤后口径**故意不同**：确认框承诺的是「这个目录里到底有多少东西」，不能因为用户开了搜索/过滤而少算。
+3. T3 原文「不支持则 `StatusMessage` 提示并返回（不弹进度窗）」——实现改为**入口禁用**（三处 `IsEnabled="{Binding CanDeleteEntries}"`）+ 命令内静默 `return` 兜底。理由：只读格式下按钮本就不该可点，正常路径到不了提示分支；加状态栏提示反而多一条「点不到但可能闪一下」的假反馈。
+
+**验证**
+
+- `-Task build -Target core`：0 警告 0 错误
+- `-Task build -Target avalonia`：Debug 因 Explorer 锁定 `MantisZip.ShellExt.dll`（COM 已注册，既有环境问题）失败 → 按仓库约定改 `-c Release` 后 **0 警告 0 错误**
+- `-Task test -Target tests`：全绿；新增/相关用例单独跑 **25 通过**（14 谓词 + 9 zip + 2 7z）
+- `-Task test -Target ui-tests`：全绿（28 条均为既有 xUnit 分析器警告）
+- `-Task i18n`：1313 key 三语一致
+- **T5 手工回归未做**（需要在 Windows 桌面跑真机界面），清单见 T5
 
 ---
 
