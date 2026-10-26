@@ -7,16 +7,49 @@
 **Deliverables**：
 
 - Core：统一的「条目或其后代」匹配谓词，Zip（copy-mode + legacy）与 7z 三处调用点共用
-- Core：删除零命中 → `FileNotFoundException`（消灭静默成功）
-- UI：删除前二次确认（含条目数量）、`CanDelete` 能力门禁（TAR/GZ）
-- 测试：目录递归删除（显式目录条目 / 隐式目录两种构包）、混合、不存在、加密、7z 各一例
-- 文档：`docs/PLAN.md` 行、`docs/PROGRESS.md` + 细节文档、`RELEASE_NOTES.md`（按规则 18 确认范围）
+- Core：删除零命中 → `ArchiveEntryNotFoundException`（`FileNotFoundException` 派生，带 `EntryPath`），消灭静默成功
+- UI：删除前二次确认（显示文件数 + 总大小）、`CanDelete` 能力门禁（TAR/GZ）、进度窗「正在删除 N 个文件（共 x GB）」说明行
+- 测试：目录递归删除（显式目录条目 / 隐式目录两种构包）、混合、不存在（zip + 7z）、加密、大小写各一例
+- 文档：`docs/PLAN.md` 行、`docs/PROGRESS.md` + 细节文档、`RELEASE_NOTES.md`（v0.5.3 修复节）
 
-**Estimated Effort**：4-6h（Core 谓词与校验 ~1.5h、UI ~1h、测试 ~1.5-2h、文档与手工回归 ~1h）
+**Estimated Effort**：6-8h（Core 谓词与校验 ~2h、UI 确认 + 说明行 ~1.5h、测试 ~2-2.5h、文档与手工回归 ~1.5h）
 
 **Parallel Execution**：T1/T2（Core）与 T3（UI 门禁与确认框）可并行；T4 依赖 T1/T2 落地；T5/T6 串行收尾。
 
-**Critical Path**：`T1 → T2 → T4 → T5 → T6`
+**Critical Path**：`T1 → T2 → T4 → T5 → T6`。T3 虽无硬依赖，**但建议排在 T2 之后**——确认文案要承诺「连同其下所有条目一起删」，语义得先定死，否则文案与实现会各走一步。
+
+---
+
+## 评审修正记录（2026-10-26）
+
+首版计划（2026-10-25）经逐条比对源码复审，事实基础全部成立（复现结论、三层根因、同族问题清单均无误）。以下 6 处是复审补充的缺口，已全部并入本版：
+
+| # | 缺口 | 修正 |
+|---|---|---|
+| 1 | 零命中报错文案**到不了用户眼前**：`FileNotFoundException` 经 `WholeArchiveErrorLocalizer.cs:38-39` 被映射成 `Error_Whole_FileNotFound` =「找不到文件：{0}」，异常自带的中文消息被丢弃 | 新增 Core 异常类型 + 新三语 key，并在 localizer 里**前置**专属 case（见 T2） |
+| 2 | `ArchivePath.TrimEndSeparator` 有 `path.Length > 3` 守卫（`ArchivePathExtensions.cs:23`），`"a/"`、`"ab/"` 这类短名**不会被去尾斜杠**；T1 验收只测了 `"a"` | 谓词**自己实现**去尾斜杠循环，不复用 `TrimEndSeparator`；验收补 `"a/"` / `"ab/"` / `"a/b/"` |
+| 3 | 确认框控件未点名，且「显示将删除条目数」无数据来源 | 点名 `AppMessageBox.Show(...)`；数据取**未过滤**的 `_allRawItems` + `DirStats`（见 T3） |
+| 4 | 7z 用例进不了 CI 门禁：`ci.yml` 用 `--filter "FullyQualifiedName!~SevenZipEngine"` | T4 标注「7z 用例只本地跑」，CI 只兜 zip |
+| 5 | T2 改了 7z 抛错，但 T4 没列 7z「不存在条目」用例 | T4 增一例 7z 不存在条目 |
+| 6 | 漏了规则 1 的起步动作：执行前要把计划移入 `.omo/plans/进行中` | T6 起始动作补上，且**开工前**就要移 |
+
+另有一条「比原计划写的更糟」的实证，原文未写：
+
+- **7z 零命中不是「删包」，而是把整包解压 + 原样重打包**：[SevenZipEngine.cs:1250-1256](../../src/MantisZip.Core/Engines/SevenZipEngine.cs#L1250-L1256) 只在 `keepEntries.Count == 0`（真的全删）时删包文件；零命中此时 `keepEntries` 等于全部条目，走的是重写路径 ⇒ 用户侧可感知为**耗时陡增 + 属性/时间戳丢失风险**。这条要进发布说明（见文末「发布说明口径」）。
+
+### 决策记录（2026-10-26 与用户确认）
+
+| 议题 | 结论 |
+|---|---|
+| 范围 | **只做本条**（S 档另 4 项不算插队，按原顺序） |
+| 分支 | 在 `alpha` 上改，随 0.5.3 发布（不走 `beta`：`beta` 落后 alpha 9 个源文件，合并成本大于收益） |
+| 零命中文案 | 新增三语 key「压缩包中不存在条目：{0}」，不复用「找不到文件：{0}」 |
+| 确认框 | `AppMessageBox` + 显示「该目录下 N 个文件（共 x GB）」 |
+| 进度窗 | **只加一行说明文字**，不把批处理列表从 1 行改成 N 行（引擎是整包重写，无逐条目回调，N 行只能是假进度） |
+| 发布说明 | 7z「整包解压重打」一并写进 v0.5.3 修复节 |
+| 零命中异常 | **方案 A**：新增 `ArchiveEntryNotFoundException`，localizer 前置专属 case（否决「嗅探异常消息前缀」的 B 方案） |
+| 计数口径 | 「N 个文件」**只计文件**、不含空目录条目；要精确条目数需多一次 O(n) 前缀扫描，不值 |
+| 大小写法 | `FormatUtil.FormatSize` 自动单位，文案用「共 {1}」不带死单位（不写「x GB」） |
 
 ---
 
@@ -55,16 +88,16 @@
 
 #### 同族问题（一并处理，否则下次换个格式又复发）
 
-- **7z 同样中招，且更糟**：[SevenZipEngine.cs:1239-1247](../../src/MantisZip.Core/Engines/SevenZipEngine.cs#L1239-L1247) 用**大小写敏感** `HashSet`（Zip 侧是 `OrdinalIgnoreCase`），同样无存在性校验，`keepEntries.Count == 0` 时直接删包（[:1250-1256](../../src/MantisZip.Core/Engines/SevenZipEngine.cs#L1250-L1256)）。
+- **7z 同样中招，且更糟**：[SevenZipEngine.cs:1239-1247](../../src/MantisZip.Core/Engines/SevenZipEngine.cs#L1239-L1247) 用**大小写敏感** `HashSet`（Zip 侧是 `OrdinalIgnoreCase`），同样无存在性校验；零命中时不是「删包」而是**整包解压 + 原样重打包**（`keepEntries.Count == 0` 才删包，[:1250-1256](../../src/MantisZip.Core/Engines/SevenZipEngine.cs#L1250-L1256)）⇒ 又慢又可能丢属性。
 - **legacy 校验集合本身也没归一化**：`entryNameSet` 由原始 `entry.Key` 构建、却用 `normalized` 去 `Contains`（[:1004-1013](../../src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs#L1004-L1013)）⇒ 包内条目名含 `\` 或尾斜杠差异时会误报「条目不存在」。
 - **TAR/GZ 直接抛 `NotSupportedException`**（[TarGzEngine.cs:574-586](../../src/MantisZip.Core/Engines/TarGzEngine.cs#L574-L586)），而 `CanDelete`（[ZipEngine.cs:30](../../src/MantisZip.Core/Engines/ZipEngine.cs#L30)、[SevenZipEngine.cs:422](../../src/MantisZip.Core/Engines/SevenZipEngine.cs#L422)）在 UI 里**一处未用** ⇒ 删除按钮在 tar 上照样可点，点了才报错。
-- **删除无二次确认**：`Status_ConfirmDelete` 已注册文案（[MainWindowViewModel.cs:274](../../src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs#L274)）但无人使用，而删除动作是**整包重写**（copy-mode 重写全部保留条目，legacy 解压再重压），误删不可逆。
+- **删除无二次确认**：`Status_ConfirmDelete` 已注册文案（[MainWindowViewModel.cs:274](../../src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs#L274)）但无人使用，而删除动作是**整包重写**，误删不可逆。
 
 #### 入口与现有覆盖
 
 - 三个入口都指向同一个命令：工具栏（[MainWindow.axaml:151-159](../../src/MantisZip.UI.Avalonia/Views/MainWindow.axaml#L151-L159)，`IsEnabled="{Binding IsArchiveLoaded}"`）、编辑菜单（[EditMenuItems.axaml:55](../../src/MantisZip.UI.Avalonia/Controls/Menus/EditMenuItems.axaml#L55)）、列表右键菜单（[ArchiveContentView.axaml:292](../../src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml#L292)）。
-- 命令体：[MainWindowViewModel.Compress.cs:213-242](../../src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Compress.cs#L213-L242)，`entryPath = SelectedEntry.FullPath ?? SelectedEntry.Name`，只传**一条**路径给 `RunWithProgress` ⇒ 进度窗口的批处理列表永远只有 1 行（即使实际删 300 个条目）。
-- 现有测试 [ZipEngineDeleteTests.cs](../../tests/MantisZip.Tests/Engines/ZipEngineDeleteTests.cs) 10 例全绿（实测 274ms），但**没有一例针对目录**——这就是它没被拦住的原因。
+- 命令体：[MainWindowViewModel.Compress.cs:213-242](../../src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Compress.cs#L213-L242)，`entryPath = SelectedEntry.FullPath ?? SelectedEntry.Name`，只传**一条**路径给 `RunWithProgress` ⇒ 进度窗口的批处理列表永远只有 1 行。
+- 现有测试 [ZipEngineDeleteTests.cs](../../tests/MantisZip.Tests/Engines/ZipEngineDeleteTests.cs) 10 例全绿，但**没有一例针对目录**——这就是它没被拦住的原因。
 
 ---
 
@@ -76,24 +109,26 @@
 
 ### Concrete Deliverables
 
-1. `ArchivePath`（或 `ArchiveEntryLister`）新增统一谓词：条目名 == 目标、或 == 目标 + `/`、或 `StartsWith(目标 + "/")`（大小写不敏感，两侧先 `Normalize` 且目标去尾斜杠）。
+1. `ArchivePath`（`src/MantisZip.Core/Utils/ArchivePathExtensions.cs`）新增统一谓词：
+   `public static bool MatchesEntryOrDescendant(string entryName, string target)`——命中条件为 `entryName == target`、`entryName == target + "/"`、`entryName.StartsWith(target + "/")`，大小写不敏感。
 2. Zip copy-mode（`keepSet`）、Zip legacy（`keepNames` + 存在性校验）、7z（`deletedSet`）三处改用该谓词。
-3. copy-mode 与 7z：命中条目数为 0 → `FileNotFoundException`，消息沿用 legacy 的中文文案。
+3. 零命中 → 抛 `ArchiveEntryNotFoundException`（`FileNotFoundException` 派生，携带 `EntryPath`），并在用户可见文案走新三语 key。
 4. legacy 的 `entryNameSet` 修正为归一化集合（消除误报）。
-5. UI：删除前弹确认（复用 `Status_ConfirmDelete`，显示将被删除的条目数）；`engine.CanDelete(_currentFormat)` 为 false 时按钮/菜单项禁用。
-6. 测试：目录递归、隐式目录、混合、不存在、加密、7z、大小写差异各一例。
+5. UI：删除前 `AppMessageBox` 二次确认（显示目标路径 + 该目录下文件数 + 总大小）；`engine.CanDelete(_currentFormat)` 为 false 时按钮/菜单项禁用；进度窗显示一行「正在删除 N 个文件（共 x GB）」。
+6. 测试：目录递归、隐式目录、混合、不存在（zip + 7z）、加密、大小写差异各一例。
+7. 文档：PROGRESS / 细节文档 / RELEASE_NOTES v0.5.3 修复节 / PLAN.md 行移除。
 
 ### Definition of Done
 
-- `pwsh -File scripts\verify-repo.ps1 -Task build -Target core` 与 `-Target avalonia` 均 0 警告、退出码 0。
+- `pwsh -File scripts\verify-repo.ps1 -Task build -Target core` 与 `-Target avalonia` 均**退出码 0 且无新增警告**（规则 12 的判据是 exit 0；存量存在 CS8604/CS0618 等既有告警，不要求清零）。
 - `-Task test -Target tests` 全绿，且新增用例覆盖上面 7 种场景。
-- 手工回归：对含 `sub/a.txt`、`sub/b.txt`、`root.txt` 的 zip 删除 `sub` → 列表里 `sub` 消失、包内只剩 `root.txt`、包可通过「测试压缩包」自检；对 tar 点删除 → 按钮禁用（或明确提示），不再走到异常。
-- `verify-repo -Task check` 三项全绿（版本号 / 三语 key / 守卫）。
+- 手工回归：对含 `sub/a.txt`、`sub/b.txt`、`root.txt` 的 zip 删除 `sub` → 确认框显示「2 个文件（共 xx KB）」→ 确认后列表里 `sub` 消失、包内只剩 `root.txt`、包可通过「测试压缩包」自检；对 tar 点删除 → 按钮禁用（或明确提示），不再走到异常。
+- `verify-repo -Task check` 三项全绿（版本号 / 三语 key / 守卫）；`-Task i18n` 全绿。
 
 ### Must Have
 
 - 目录删除的**递归语义**（用户确认）。
-- **零命中必报错**，且报错信息包含用户看到的路径。
+- **零命中必报错**，且报错信息包含用户看到的路径（**必须真的显示在 UI 上**，见 T2 的 localizer 前置 case）。
 - Zip 与 7z **同源实现**（同一个谓词，不允许各写一份）。
 - 大小写不敏感的匹配（沿用 Zip 侧现状，7z 一并对齐）。
 
@@ -102,8 +137,9 @@
 - 不做「删除目录条目但保留子条目」的部分语义。
 - 不改压缩/解压流程、不改 `ArchiveEntryLister` 的目录展示逻辑（尾斜杠形态保持现状）。
 - 不为删除引入新依赖或新引擎路径（copy-mode 与 legacy 两条既有路径保留）。
+- **不把进度窗批处理列表从 1 行改成 N 行**（引擎整包重写、无逐条目回调，N 行只能是假进度；用一行说明文字替代，见 T3）。
 - 不在本计划里顺手改「添加文件」「重命名条目」等相邻功能。
-- 不在 `plans` 分支改 `src/`、`tests/`（规则 19）。
+- **不在 `plans` 分支改 `src/`、`tests/`**（规则 19）——本计划在 `alpha` 上执行。
 
 ---
 
@@ -111,9 +147,9 @@
 
 ### Test Decision
 
-- **Core 单测（必须）**：`tests/MantisZip.Tests/Engines/ZipEngineDeleteTests.cs` 扩写或新增 `ZipEngineDeleteDirectoryTests.cs`；7z 用例加入 `SevenZipEngineTests.cs` 同族分区。
-- **UI 层（不写自动化测试）**：`CanDelete` 门禁与确认框属视图逻辑，靠手工回归 + 代码评审；理由：现有 `MainWindowViewModel` 测试没有对话框交互基建，为两处判断搭夹具不划算。
-- **不需要新增引擎契约**：`IArchiveEngine.DeleteEntriesAsync` 签名不变（语义收紧，不新增 API）。
+- **Core 单测（必须）**：扩写或新增 `tests/MantisZip.Tests/Engines/ZipEngineDeleteDirectoryTests.cs`；7z 用例加入 `SevenZipEngineTests.cs`（**注意：CI 用 `--filter "FullyQualifiedName!~SevenZipEngine"` 过滤，7z 用例只能在本地跑**，见 `.github/workflows/ci.yml`）。
+- **UI 层（不写自动化测试）**：`CanDelete` 门禁、确认框、说明行属视图逻辑，靠手工回归 + 代码评审；理由：现有 `MainWindowViewModel` 测试没有对话框交互基建，为两处判断搭夹具不划算。
+- **不需要新增引擎契约方法**：`IArchiveEngine.DeleteEntriesAsync` 签名不变（语义收紧，只新增一个派生异常类型）。
 
 ### QA Policy
 
@@ -127,7 +163,7 @@
 
 ### Waves
 
-- **Wave 1（并行）**：T1 谓词 + T2 校验（Core，同一 commit 亦可）／T3 UI 确认与门禁
+- **Wave 1（并行）**：T1 谓词 + T2 校验（Core，同一 commit 亦可）／T3 UI 确认与门禁与说明行
 - **Wave 2**：T4 测试扩写（依赖 T1/T2 落地）
 - **Wave 3（串行收尾）**：T5 手工回归 → T6 文档同步与计划归档
 
@@ -137,7 +173,7 @@
 |---|---|---|
 | T1 | 无 | T2、T4 |
 | T2 | T1 | T4 |
-| T3 | 无 | 无（可与 T1/T2 并行） |
+| T3 | 无（**建议排 T2 之后**，文案依赖语义定死） | 无 |
 | T4 | T1、T2 | T5 |
 | T5 | T4 | T6 |
 | T6 | T5 | — |
@@ -150,10 +186,12 @@
 
   **What to do**：
   - 在 `src/MantisZip.Core/Utils/ArchivePathExtensions.cs` 的 `ArchivePath` 中新增：
-    `public static bool MatchesEntryOrDescendant(string entryName, string target)`，实现要点：
-    - 两侧先 `Normalize`（`\`→`/`），`target` 再用 `TrimEndSeparator` 去尾斜杠（注意 `TrimEndSeparator` 对长度 ≤3 的路径保留原状，对条目路径够用但要验证 `"a"` 这种单段名不被误伤）
-    - 命中条件：`entryName == target`（大小写不敏感）或 `entryName == target + "/"` 或 `entryName.StartsWith(target + "/")`
-    - `target` 为空/空白时返回 false（防止误删全包）
+    `public static bool MatchesEntryOrDescendant(string entryName, string target)`
+  - 实现要点：
+    - 两侧先 `Normalize`（`\`→`/`）
+    - **`target` 的去尾斜杠要自己写循环**，不要复用 `TrimEndSeparator`——后者有 `path.Length > 3` 守卫（[ArchivePathExtensions.cs:23](../../src/MantisZip.Core/Utils/ArchivePathExtensions.cs#L23)），`"a/"`（长度 2）与 `"ab/"`（长度 3）会原样保留，导致 `"a/"` 删除时前缀匹配失效
+    - 命中条件：`entryName == target`（`OrdinalIgnoreCase`）或 `entryName == target + "/"` 或 `entryName.StartsWith(target + "/", OrdinalIgnoreCase)`
+    - 去尾斜杠后 `target` 为空/空白 → 返回 `false`（防止误删全包）
   - 三处调用点改用该谓词：[ZipEngine.CompressGroup.cs:888](../../src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs#L888)（`deletedSet`）、[:908](../../src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs#L908)（`deletedNormalized`）、[:1004-1013](../../src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs#L1004-L1013)（legacy 校验与 `keepNames`）、[SevenZipEngine.cs:1239-1247](../../src/MantisZip.Core/Engines/SevenZipEngine.cs#L1239-L1247)
   - 7z 侧顺带把 `HashSet` 的比较器改成 `OrdinalIgnoreCase`（或直接改用谓词，不再建集合）
 
@@ -161,7 +199,8 @@
 
   **Recommended Agent Profile**：Core / 引擎方向，熟悉 SharpCompress 与 zip 条目命名。
 
-  **Acceptance Criteria**：`MatchesEntryOrDescendant("sub/a.txt","sub")==true`、`("sub/","sub")==true`、`("subway.txt","sub")==false`、`("SUB/A.TXT","sub")==true`、`("a.txt","")==false`。
+  **Acceptance Criteria**：
+  `MatchesEntryOrDescendant("sub/a.txt","sub")==true`、`("sub/","sub")==true`、`("subway.txt","sub")==false`、`("SUB/A.TXT","sub")==true`、`("a.txt","")==false`，以及**短名带斜杠**：`("a/","a")==true`、`("ab/","ab")==true`、`("a/b/","a/b")==true`。
 
   **QA Scenarios**：对含 `sub/`、`sub/a.txt`、`subway.txt` 的包执行删除 `sub` → 结果只剩 `subway.txt`。
 
@@ -170,37 +209,63 @@
 - [ ] **T2. Core：零命中报错 + legacy 校验集合归一化**
 
   **What to do**：
-  - copy-mode：构造 `keepSet` 时统计命中数；命中 0 → `throw new FileNotFoundException($"压缩包中不存在条目: {entryPaths[0]}", entryPaths[0])`（与 legacy 文案一致），并在抛前清理 `tempArchiveFast`
+  - **新增异常类型** `src/MantisZip.Core/Abstractions/ArchiveEntryNotFoundException.cs`：
+    `public sealed class ArchiveEntryNotFoundException : FileNotFoundException`，构造 `(string entryPath)`，暴露 `public string EntryPath { get; }`，`FileName = entryPath`。
+    理由：`WholeArchiveErrorLocalizer` 用 `case FileNotFoundException fnf` 兜住所有 FileNotFound（[WholeArchiveErrorLocalizer.cs:38-39](../../src/MantisZip.UI.Avalonia/Services/WholeArchiveErrorLocalizer.cs#L38-L39)），只有派生类型 + **前置 case** 才能给出专属文案；派生类型仍满足 `IArchiveEngine.DeleteEntriesAsync` 文档里的 `<exception cref="FileNotFoundException">` 契约。
+  - **localizer 前置 case**（`WholeArchiveErrorLocalizer.cs` 的 `Map`）：在 `case FileNotFoundException` **之前**插入
+    `case ArchiveEntryNotFoundException aen: return (LocalizationManager.T("Error_Delete_EntryNotFound", aen.EntryPath), aen.Message);`
+    —— switch 分支顺序敏感，插在后面永远命中不到。
+  - copy-mode：构造 `keepSet` 时统计命中数；命中 0 → `throw new ArchiveEntryNotFoundException(entryPaths[0])`，并在抛前清理 `tempArchiveFast`
   - legacy：`entryNameSet` 改为归一化集合（`select Normalize` + `OrdinalIgnoreCase`），避免 `Contains` 误报
-  - 7z：命中 0（`keepEntries.Count == allEntries.Count`）→ 同样抛 `FileNotFoundException`；注意**不要**动 `keepEntries.Count == 0` 那条「全删则删包」的分支
-  - 在多目标删除（`entryPaths.Length > 1`）时，只要有一条未命中就抛错并指明是哪条
+  - 7z：命中 0（`keepEntries.Count == allEntries.Count`）→ 抛同一异常；注意**不要**动 `keepEntries.Count == 0` 那条「全删则删包」的分支
+  - 多目标删除（`entryPaths.Length > 1`）时，只要有一条未命中就抛错并指明是哪条
 
-  **Must NOT do**：不要把「全部条目都被删除」这条既有分支改成异常（那是合法路径：删空后移除包文件）。
+  **Must NOT do**：不要把「全部条目都被删除」这条既有分支改成异常（那是合法路径：删空后移除包文件）。不要在新异常里重新拼中文消息给 UI 直接显示——消息仍由 localizer + 三语 key 决定。
 
   **Recommended Agent Profile**：同 T1。
 
-  **Acceptance Criteria**：删除不存在的条目 → `FileNotFoundException`；删除存在的目录 → 成功且子条目一并消失；删除空列表 → 静默返回（既有行为不变）。
+  **Acceptance Criteria**：删除不存在的条目 → `ArchiveEntryNotFoundException`；删除存在的目录 → 成功且子条目一并消失；删除空列表 → 静默返回（既有行为不变）。
+
+  **回归影响（必须一起改）**：下面两处用 `Assert.ThrowsAsync<FileNotFoundException>` 做**精确类型**断言，改抛派生类型后会变红，需同步改为 `ArchiveEntryNotFoundException`：
+  - [ZipEngineDeleteTests.cs:65-69](../../tests/MantisZip.Tests/Engines/ZipEngineDeleteTests.cs#L65-L69)
+  - [ZipBinaryRewriterTests.cs:770-774](../../tests/MantisZip.Tests/Utils/ZipBinaryRewriterTests.cs#L770-L774)
 
   **QA Scenarios**：`DeleteEntriesAsync(["nope"])` 必须抛异常且**不能改动原包**（对比 md5）。
 
-  **Commit**：`fix(core): 删除零命中改为报错，legacy 校验集合归一化`
+  **Commit**：`fix(core): 删除零命中改为抛 ArchiveEntryNotFoundException，legacy 校验集合归一化`
 
-- [ ] **T3. UI：删除前二次确认 + 能力门禁**
+- [ ] **T3. UI：删除前二次确认 + 能力门禁 + 进度窗说明行**
 
   **What to do**：
-  - [MainWindowViewModel.Compress.cs:213-242](../../src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Compress.cs#L213-L242) 的 `DeleteFiles`：
-    - 进入前判断 `engine.CanDelete(_currentFormat)`，不支持则 `StatusMessage` 提示并返回（不弹进度窗）
-    - 用已注册的 `Status_ConfirmDelete` 文案弹确认框，消息里带上「将删除该目录及其下所有条目」（目录时）
-  - 视图层门禁：工具栏按钮（[MainWindow.axaml:151-159](../../src/MantisZip.UI.Avalonia/Views/MainWindow.axaml#L151-L159)）、编辑菜单（[EditMenuItems.axaml:55](../../src/MantisZip.UI.Avalonia/Controls/Menus/EditMenuItems.axaml#L55)）、右键菜单（[ArchiveContentView.axaml:292](../../src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml#L292)）的 `IsEnabled` 增加「当前格式支持删除」
-  - 新增 VM 属性（如 `CanDeleteEntries`）在切换包/格式/选中项时刷新；新增 i18n key 三语成对添加（规则 13），并登记到 `UpdateLocalizedStrings()` 的 keys 数组
 
-  **Must NOT do**：不要用原生对话框；不要为了「显示将删除多少条」去预扫描整个包（大包会卡；目录数量用 `ComputeDirectoryStats` 已有的聚合数即可，或干脆只显示路径）。
+  a) **能力门禁**（[MainWindowViewModel.Compress.cs:213-242](../../src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Compress.cs#L213-L242) 的 `DeleteFiles`）：
+  - 进入前判断 `engine.CanDelete(_currentFormat)`，不支持则 `StatusMessage` 提示并返回（不弹进度窗）
+  - 视图层：工具栏按钮（[MainWindow.axaml:151-159](../../src/MantisZip.UI.Avalonia/Views/MainWindow.axaml#L151-L159)）、编辑菜单（[EditMenuItems.axaml:55](../../src/MantisZip.UI.Avalonia/Controls/Menus/EditMenuItems.axaml#L55)）、右键菜单（[ArchiveContentView.axaml:292](../../src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml#L292)）的 `IsEnabled` 追加「当前格式支持删除」；新增 VM 属性（如 `CanDeleteEntries`）在切换包/格式/选中项时刷新
 
-  **Recommended Agent Profile**：Avalonia / MVVM 方向，熟悉 `LocalizationManager` 与 `CustomFilePickerDialog` 之外的 `ConfirmDialog` 族。
+  b) **确认框**：`AppMessageBox.Show(message, title, MessageBoxButton.YesNo, MessageBoxImage.Warning)`（[AppMessageBox.axaml.cs:154-156](../../src/MantisZip.UI.Avalonia/Dialogs/AppMessageBox.axaml.cs#L154-L156) 有 4 参重载，会自动找活跃窗口作 owner）。用户点「否」直接返回，不进进度窗。
+  - 文案（三语）：
+    - 目录：`Confirm_DeleteDirectoryFmt` =「将删除该目录及其下 {0} 个文件（共 {1}），此操作不可撤销。」/ en / zh-TW
+    - 文件：复用已注册的 `Status_ConfirmDelete`，或新增 `Confirm_DeleteFileFmt`（保持对称，推荐后者）
+  - **数据来源必须是未过滤的全量条目**：`_allRawItems`（[MainWindowViewModel.Navigation.cs:126](../../src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Navigation.cs#L126)）而非 `GetFilteredSource()`。原因：删除谓词作用在整包上，**不受过滤条件影响**；用过滤后的数据算会少报。
+    - 文件数：`ArchiveEntryLister.ComputeDirectoryStats(allRawItems)` 的 `DirStats.Count`（只计文件，不含目录条目本身，与文案「N 个文件」措辞一致）
+    - 总大小：目录行 `ArchiveItemModel.Size` **已经是子树和**（[MainWindowViewModel.Navigation.cs:154-158](../../src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Navigation.cs#L154-L158) 用 `dirStats[FullPath]` 赋值），文件行直接用 `SelectedEntry.Size`
+    - 实现建议：`PopulateEntries` 里已有 `dirStats` 局部变量，顺手存到字段 `_dirStats`（同一份字典，零额外枚举）；格式化用 `FormatUtil.FormatSize`
+  - **不需要**登记 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组——那段只服务 XAML `LocalizedStrings[Key]` 绑定；本处走 VM 里直接 `LocalizationManager.T()`
 
-  **Acceptance Criteria**：tar 包上删除按钮禁用；zip 目录删除会先确认再执行；确认文案三语齐全。
+  c) **进度窗说明行**（替代「N 行列表」）：
+  - 仿既有「压缩通道」说明行范式：`ProgressViewModel.ShowCompressChannelHint`（[ProgressViewModel.cs:520](../../src/MantisZip.UI.Avalonia/ViewModels/ProgressViewModel.cs#L520)）+ [ProgressWindow.axaml:375-380](../../src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml#L375-L380)
+  - 新增：`ProgressViewModel.OperationNoteText`（string）+ `ShowOperationNote`（bool）；`ProgressWindow.SetOperationNote(string)` 走 `DispatchIfNeeded`（与 `SetCurrentBatchItem` 同风格）
+  - VM 侧加 `PendingOperationNote`（string?），`MainWindow.axaml.cs` 的 `RunWithProgress` 闭包读出后 `pw.SetOperationNote(...)`，读完立即复位（与 `PendingCompressFlow` 同范式，[MainWindow.axaml.cs:298-299](../../src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs#L298-L299)）
+  - 文案 key `Progress_DeleteNoteFmt` =「正在删除 {0} 个文件（共 {1}）…」
+  - 说明行只描述「总量」，**不要**去驱动批处理行的状态机（那是整包重写，没有逐条进度）
 
-  **Commit**：`fix(avalonia): 删除前二次确认并按格式能力门禁删除入口`
+  **Must NOT do**：不要用原生对话框（规则 16）；不要为了「显示将删除多少条」去预扫描整个包或解压（用内存里已有的 `_allRawItems` + `DirStats` 即可）；不要改 `RunWithProgress` 的签名。
+
+  **Recommended Agent Profile**：Avalonia / MVVM 方向，熟悉 `LocalizationManager`、`AppMessageBox`、`ProgressViewModel` 的状态机与 `DispatcherPriority` 派发习惯。
+
+  **Acceptance Criteria**：tar 包上删除按钮禁用；zip 目录删除会先弹确认且文案含文件数与大小；确认后进度窗顶部出现「正在删除 N 个文件（共 x GB）」；三语文案齐全。
+
+  **Commit**：`fix(avalonia): 删除前二次确认、按格式能力门禁删除入口、进度窗显示删除总量`
 
 - [ ] **T4. 测试：目录与静默成功回归**
 
@@ -209,44 +274,60 @@
     1. 显式目录条目（含 `sub/`）+ 子文件 → 删 `sub` 后子条目全消失、`subway.txt` 保留
     2. 隐式目录（只有 `sub/a.txt`，无 `sub/` 条目）→ 同样删干净
     3. 混合：同时删一个文件与一个目录
-    4. 不存在条目 → 抛 `FileNotFoundException` 且原包未被修改（字节比较）
+    4. 不存在条目 → 抛 `ArchiveEntryNotFoundException` 且原包未被修改（字节比较）
     5. 加密包目录删除（走 copy-mode 还是 legacy 取决于加密，两路都要能过）
     6. 大小写：包内 `SUB/A.TXT`，删 `sub` → 命中
-  - `SevenZipEngineTests.cs` 增一例 7z 目录删除
-  - 既有的 `DeleteEntriesAsync_NonExistentEntry_ThrowsFileNotFoundException` 要确认仍然通过（它走的是 legacy 还是 copy-mode 需实测，若走 copy-mode 则由 T2 兜住）
+  - 谓词边界用例（可放 `tests/MantisZip.Tests/Utils/`）：`("a/","a")`、`("ab/","ab")`、`("a/b/","a/b")`、`("a.txt","")`
+  - `SevenZipEngineTests.cs` 增两例：7z 目录删除、**7z 删除不存在条目 → `ArchiveEntryNotFoundException`**
+  - 既有的 `DeleteEntriesAsync_NonExistentEntry_ThrowsFileNotFoundException` 与 `ZipBinaryRewriterTests` 同族断言按 T2 改为新类型
 
   **Must NOT do**：不要 mock 引擎；不要只用空目录条目做断言（必须验证子文件消失）。
+
+  **Known limitation**：`SevenZipEngine` 相关用例**不在 CI 门禁内**（`ci.yml` 的 `--filter "FullyQualifiedName!~SevenZipEngine"`），只能在本地跑并通过 T5 记录结论。
 
   **Recommended Agent Profile**：测试方向，熟悉 xunit v3 与仓库既有引擎测试的临时目录约定。
 
   **Acceptance Criteria**：新增用例全绿；`-Task test -Target tests` 整体全绿；刻意把 T1 谓词改回精确匹配时这些用例必须变红（自检测试有效性）。
 
-  **Commit**：`test(core): 补删除目录与零命中回归用例`
+  **Commit**：`test(core): 补删除目录、零命中与谓词边界回归用例`
 
 - [ ] **T5. 手工回归（Windows 桌面）**
 
-  **What to do**：用真实包跑一遍：①目录删除（含多层嵌套）②文件删除（回归）③加密包目录删除 ④7z 目录删除 ⑤tar 上按钮禁用 ⑥删除后立刻「测试压缩包」自检 ⑦删除最后一个条目 → 包被移除的既有行为。截图/录屏留档（现生成现看）。
+  **What to do**：用真实包跑一遍：①目录删除（含多层嵌套）②文件删除（回归）③加密包目录删除 ④7z 目录删除 ⑤7z 删除不存在条目（观察是否立刻报错而不重打包）⑥tar 上按钮禁用 ⑦确认框数字与大小是否准确（含**开启过滤器**后仍显示全量）⑧删除后立刻「测试压缩包」自检 ⑨删除最后一个条目 → 包被移除的既有行为。截图/录屏留档（现生成现看）。
 
-  **Acceptance Criteria**：七个场景全部符合预期；`%TEMP%\MantisZip\DeleteTemp` 无残留目录。
+  **Acceptance Criteria**：九个场景全部符合预期；`%TEMP%\MantisZip\DeleteTemp` 无残留目录。
 
   **Commit**：无（手工验证，结论写入 T6 文档）
 
 - [ ] **T6. 文档同步 + 计划归档**
 
-  **What to do**：
+  **开工前动作（规则 1）**：把本文件从 `.omo/plans/未开始/` 移入 `.omo/plans/进行中/`。
+
+  **完成后动作**：
   - 规则 3：`docs/PROGRESS.md` 加里程碑行 + `docs/progress-avalonia-detail.md` 加细节条目
-  - 规则 18：向用户确认 `RELEASE_NOTES.md` 是否收录（判据：0.5.3 已发布 → 该 bug 在已发布版本中存在，属用户可见差异，**应**收；若本次修复随 0.5.4 发布则写在 0.5.4 的「修复」节）
-  - 规则 1：计划文件移入 `.omo/plans/已完成/`，`docs/PLAN.md` 行移除
+  - 规则 18：`RELEASE_NOTES.md` 的 **v0.5.3「修复」节**补两条（口径见下节）
+  - 规则 1：计划文件移入 `.omo/plans/已完成/`，`docs/PLAN.md` 的 S 档行移除
   - 在 `intent-execution-seam.md` 的「已知同类事故」处登记一行（仅引用，不并入波次）
 
   **Commit**：`docs: 删除目录修复的进度与发布说明同步`
 
 ---
 
+## 发布说明口径（规则 18）
+
+**事实核对**：`git tag` 只到 `v0.5.2`（2026-10-20），无 `v0.5.3`；`release.yml` 由 tag 触发 ⇒ **0.5.3 尚未发布**。而 `v0.5.2` 的 `ZipEngine.cs` 已含同一段 copy-mode 删除且零命中不校验 ⇒ 该静默成功**在已发布版本中就存在**。
+
+结论：属于「上一个已发布 tag → 本次发布」的用户可见差异，**应**写进 v0.5.3 的「修复」节。两条：
+
+1. **压缩包内删除目录现在真的会删掉**（此前静默成功、报 100% 但条目仍在；现在零命中会明确报「压缩包中不存在条目」）
+2. **7z 包删除不存在的条目不再整包解压重打包**（此前会白跑一遍重写，耗时陡增且有属性丢失风险；现在立即报错）
+
+---
+
 ## Rollback
 
-- 引擎改动集中在 `ArchivePath` 的一个新方法与三个调用点，`git revert` 单个 commit 即回到原状。
-- 若「零命中报错」在某些真实包上误报（例如包内条目名含异常编码），降级方案：把校验降为 `CoreLog.Warn` + 状态栏提示，而不是吞掉——但**不允许**退回「静默成功」。
+- 引擎改动集中在 `ArchivePath` 的一个新方法 + 三个调用点 + 一个新异常类型，`git revert` 单个 commit 即回到原状。
+- 若「零命中报错」在某些真实包上误报（例如包内条目名含异常编码），**降级方案**：把校验降为 `CoreLog.Warn` + 状态栏提示（仍是可见反馈），而**不允许**退回「静默成功」。注意这与 Must Have「零命中必报错」相冲突——它是**最后手段**，动用前必须先复现并确认是真实包缺陷，而不是匹配逻辑写错。
 
 ---
 

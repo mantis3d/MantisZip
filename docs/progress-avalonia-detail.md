@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 计划：删除压缩包内目录缺陷（插队项）复审定案，补 6 处缺口、6 项决策、工时重估 6-8h
+  - **背景**：`docs/PLAN.md` 的 ⚡ 插队项 [delete-directory-entries.md](.omo/plans/未开始/delete-directory-entries.md) 首版定于 2026-10-25（用户实测「删单个文件有效、删目录没反应」）。本轮逐条比对源码复审，三层根因（列表目录行不带尾斜杠 / 匹配无递归语义 / copy-mode 不校验存在性）与同族问题清单全部成立，但挖出 6 处落地缺口。
+  - **6 处缺口**：① 零命中报错文案到不了 UI —— `WholeArchiveErrorLocalizer.cs:38-39` 把 `FileNotFoundException` 统一吞成「找不到文件：{0}」，异常自带消息被丢弃；② `ArchivePath.TrimEndSeparator` 有 `path.Length > 3` 守卫（`ArchivePathExtensions.cs:23`），`"a/"`、`"ab/"` 不会被去尾斜杠，而原验收只测 `"a"`；③ 确认框控件未点名，且「显示条目数」无数据来源（`ArchiveItem` 无子项计数）；④ 7z 用例进不了 CI 门禁（`.github/workflows/ci.yml` 的 `--filter "FullyQualifiedName!~SevenZipEngine"`）；⑤ T4 缺 7z「不存在条目」用例；⑥ 漏了规则 1 的「开工前移入 `.omo/plans/进行中`」。
+  - **补充实证**：7z 零命中不是「删包」而是**整包解压 + 原样重打包**（`SevenZipEngine.cs:1250-1256` 仅 `keepEntries.Count == 0` 才删包文件）⇒ 用户侧可感知为耗时陡增 + 属性/时间戳丢失风险，必须进发布说明。
+  - **6 项决策**（2026-10-26 与用户确认）：① 只做本条插队项；② 在 `alpha` 上改、随 0.5.3 发（不走 `beta`：beta 落后 alpha 9 个源文件）；③ 零命中用新三语 key「压缩包中不存在条目：{0}」，不复用「找不到文件」；④ 确认框 `AppMessageBox` 显示「N 个文件 + 总大小」，数据取**未过滤**的 `_allRawItems`；⑤ 进度窗只加一行说明、**不做 N 行假进度**（引擎是整包重写、无逐条目回调）；⑥ 7z 整包重打写进 v0.5.3 修复节。另定三件：零命中采用**方案 A**（新增 `ArchiveEntryNotFoundException : FileNotFoundException` + localizer 前置专属 case，否决「嗅探异常消息前缀」）；「N 个文件」**只计文件**、不含空目录条目；大小用 `FormatUtil.FormatSize` 自动单位，文案不带死单位。
+  - **工时与路径**：4-6h → **6-8h**；Critical Path `T1→T2→T4→T5→T6`，T3 建议排在 T2 之后（确认文案要承诺「连同子条目一起删」，语义须先定死）。
+  - **状态**：📋 计划已订正（仍在 `.omo/plans/未开始`），先 commit 本轮文档改动，再移入 `进行中` 按 T1–T6 实施。
+
 **2026-10-24** — 计划：计划库按「面向公开用户 + 少而稳」重排，新增图标归一化与预览取数层两份计划
   - **背景**：`docs/PLAN.md` 沿用 P1–P4 优先级，但四个档位的判据（重要性 / 依赖 / 实施难度）混在一起，且数量的 55 行里有 4 行是已废弃方案、2 行是已完成计划的遗留子项、「进行中」6 条有 3 条实为半途（`preview-modular-providers` 接口零消费者）。用户给出四条约束（面向公开用户 / 跨平台只是「想想」/ 图标不是卖点但用户反馈太丑要折中 / 策略「少而稳」）后按新判据整表重写。
   - **重排结论**：`S 档`（本轮必做，约 38-51h）= 图标归一化 10-14h → 意图-执行接缝波次 1+2 12-14h → 预览取数层内存优先（切片 1+2+4）12-17h → auto-update 4-6h；`A 档`（约 60h，两轮的量）收接缝波次 3、path-breadcrumb、archive-rename-entry（工时按实测重估 6-8h）、预览切片 3（Office）、selfcontained 体积（目标由「20-25MB」改写为现实区间 60-90MB）、winget 与小活清仓 8 项（约 25h）；`B 档` 排队不排期；`冻结`与`候选删除`单列，删除项按用户要求**不归档**、只从表里移走。
