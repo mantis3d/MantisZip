@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 清理：删除遗留的按钮对齐探针测试（main 的 `ui-tests` 自 2026-10-24 起无法编译）
+  - **问题**：`tests/MantisZip.UI.Avalonia.Tests/ZzProbeButtonAlignTests.cs` 由 main 上的 `e45c3a71`（2026-10-24 23:08「fix Detail Padding And Button」）带入，文件里写的是 xUnit **v2** 的 `using Xunit.Abstractions;` + `ITestOutputHelper`，而测试项目是 xUnit **v3**（`Xunit.Abstractions` 已移除，`ITestOutputHelper` 位于 `Xunit` 命名空间）⇒ `CS0234` / `CS0246`，整个 `tests/MantisZip.UI.Avalonia.Tests` 直接编译不过。该文件只存在于 main，`beta` 侧一直没有它，所以 `beta` 的 `ui-tests` 始终正常；把 beta 合并回 main（`b380dc53`）后跑验证才暴露出来 —— 属于 main 上**既有的**断点，不是合并引入的。
+  - **处理**（用户选 A：删除）：整文件删除。它是纯诊断探针 —— 只有若干 `_out.WriteLine` 打印按钮 / `ContentPresenter` / `TextBlock` 的 `Bounds` 与对齐属性，**没有任何断言**（永远「通过」），而它当年要定位的按钮高度问题已在 `e45c3a71` 修掉（见下方 2026-10-24 那条记录）。
+  - **验证**：删除后 `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` 全绿（28 条存量警告）；`-Task test -Target tests`（Core）全绿；`build -Target avalonia` 0 警告。
+
 **2026-10-26** — 修复：压缩流程不显示「并行度」
   - **症状**（用户）：「压缩的时候开启并行也不显示『并行度』卡片」。
   - **根因**：`ProgressViewModel.ParallelDegree` 只有两个写入点 —— 解压流程 `ExtractFlow` → `ProgressWindow.SetParallelDegree`（`Dialogs/ProgressWindow.axaml.cs` 的 `DispatchIfNeeded(() => _vm.ParallelDegree = degree, DispatcherPriority.Background)`），压缩路径从未赋值；`HasParallelDegree => _parallelDegree is >= 2`，于是「完整」档段 2 与「标准」档单行里的并行度恒隐藏（该项在 0.5.2 起就只服务并行解压）。
