@@ -35,20 +35,19 @@
 
 ---
 
-## S 档 —— 本轮必做（约 36-49h，≈ 一周满负荷）
+## S 档 —— 本轮必做（约 26-35h，≈ 三到四天满负荷）
 
-> **执行顺序已定（2026-10-24 讨论）**：图标 → 接缝 → 预览 → 自动更新。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。三批改动**互不重叠**（图标只碰 `AppIcons.axaml`；接缝碰压缩/解压入口；预览碰取数层），因此这个顺序不需要任何返工代价。
+> **执行顺序（2026-10-24 讨论定，2026-10-26 按完成情况更新）**：~~图标~~（已完成）→ 接缝 → 预览 → 自动更新。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。三批改动**互不重叠**（接缝碰压缩/解压入口；预览碰取数层；自动更新碰新 Tab），因此这个顺序不需要任何返工代价。
 >
-> 原排在第一行的 ⚡ 插队项「删除压缩包内目录静默无效」已于 2026-10-26 修复完成，随 v0.5.3 发布，归档见 [PROGRESS.md 历史设计方案索引](PROGRESS.md)。
+> 已完成并归档：⚡ 插队项「删除压缩包内目录静默无效」（2026-10-26，随 v0.5.3）、S 档「图标归一化」（2026-10-26，随 v0.5.3）—— 详见 [PROGRESS.md 历史设计方案索引](PROGRESS.md)。
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 图标归一化（消除「图标太丑」） | [icon-normalization.md](.omo/plans/未开始/icon-normalization.md) | 🟡中 | 10-14h | 📋 2026-10-24 立项。实测 117 个图标混了**三套坐标系**：68 个 24 网格 Fluent 向量 / **38 个图标字体字形（笔画明显更粗）** / 11 个手绘简化——三族并排就是用户反馈的「丑」。方案＝只把 49 个异类换成同族 24 Regular 路径 + 收敛 14px 发虚位 + 修 3 个语义错图标，**只改 `AppIcons.axaml` 一个文件、键名全不变、不引入主题系统**。评审工具 `scripts/render-icon-montage.ps1` 已就位（`-Check` 可作机器判据）。**明确不做** `icon-theme` ①②③（继续冻结） |
 | 意图-执行接缝收口（波次 1+2） | [intent-execution-seam.md](.omo/plans/未开始/intent-execution-seam.md) | 🔴高 | 12-14h | 📋 2026-10-24 立项定案。**同族事故已 7 次**（压缩侧逐属性手抄漏 3 次 / 拖入分支无人接续 / CLI 静默 `Shutdown` / 解压 CLI `FilteredEntryKeys` 恒 null / 密码库保存仅主窗口生效）。方案＝设置窗口**注入唯一执行器**（漏接续变编译错误）+ 确认事务（`Rejected(reason)` 替代静默 return）+ 不可变 DTO + `IProgressPresenter` 收口两套进度实现。**本轮只做波次 1+2**：压缩 4 入口 → 解压 5 入口；波次 3（全仓 `ShowDialog` 清账）见 A 档。同步新增 AGENTS 规则 20 与 `guards` 第 5 条 `dialog-seam`；`CopyExecutionSettingsFrom` 及两份反射守卫测试退休 |
 | 预览取数层内存优先（切片 1+2+4） | [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) | 🟡中 | 12-17h | 📋 2026-10-24 立项。现状：**每次预览都先把整条目解压到 `%TEMP%\MantisZip\Preview\` 再从磁盘读回**（固定文件名、每次预览前清空整个目录）；文本类写盘只为读 1MB；便携模式往 U 盘写；敏感文件明文落 TEMP。本批＝文本/CSV/Markdown/代码/日志走内存 + 图片 `SKBitmap.Decode(Stream)` + PDF `PdfDocument.Open(Stream)` + head 读取改真流式（Zip 不再整条目解压进内存）+ 临时文件按条目命名 + head LRU + >15MB 的 head-only 部分预览。**明确保留落盘**：HTML→WebView（`NativeWebView` 不支持 `data:` URI）、打开方式（外部程序要路径）、字体（`FontParser` 要文件名）。注：15MB 上限本身可在设置里调大，故切片 4 收窄为**文本/PDF/Office 的部分预览**（图片必须完整字节，无部分可言）。Office（切片 3）见 A 档 |
 | 自动更新检测 | [auto-update.md](.omo/plans/未开始/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查 + AboutWindow「更新」Tab + `UpdateAvailableDialog` + 设置开关 + 单元测试。**面向公开用户后这从「加分项」变「基础设施」**：没有它，每个修复都到不了用户手上 |
 
-> 本轮验收口径：公众能感知到的四件事同时改善——**图标不再是粗细混排**、**预览不再先落盘（且大文件不再一律被拒）**、**设置不再被静默丢弃**、**安装完会自己知道有新版本**。
+> 本轮验收口径：公众能感知到的三件事同时改善——**预览不再先落盘（且大文件不再一律被拒）**、**设置不再被静默丢弃**、**安装完会自己知道有新版本**。（图标归一化已于 2026-10-26 完成，随 v0.5.3 验证）
 
 ---
 
@@ -162,7 +161,7 @@
 intent-execution-seam（S）── 软前置 ──▶ 所有「新增 UI 入口」类计划
                                     （embedded-file-picker / archive-rename-entry 等先做它可省返工）
 
-icon-normalization（S）──── 前置 ──▶ icon-theme-infra（冻结）──▶ packs ──▶ sets
+icon-normalization（S，已完成 2026-10-26）──── 前置 ──▶ icon-theme-infra（冻结）──▶ packs ──▶ sets
 
 parallel-compress-plan-d ── 前置 ──▶ parallel-compress-plan-a
 

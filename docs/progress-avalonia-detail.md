@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 计划：图标统一到 Fluent 24 Regular 网格（50 条重画 + 尺寸/前景色收敛 + 测试窗矩阵页）
+  - **背景**：`docs/PLAN.md` 的 S 档计划项 `icon-normalization`。审计脚本 `scripts/render-icon-montage.ps1 -Check` 当时报「117 个图标里 49 个不在 24 网格」。设计、映射表与实施记录见 [icon-normalization.md](.omo/plans/已完成/icon-normalization.md)。
+  - **根因**：38 个图标来自别的坐标系（字体字形 1000/2048 em，渲染出来比邻座明显更粗更黑）、11 个是手绘杂线；`IconOrientation` 几何虽在网格但语义错（画成「图裂/禁用」样）；显示尺寸混用 14/15/16px；`PathIcon` 缺统一前景色来源。
+  - **修法（数据）**：从 npm `@fluentui/svg-icons@1.1.344` 取 24/Regular（本机 `raw.githubusercontent.com`／`github.com` 不可达、`registry.npmjs.org` 可达，一次性提取与转换脚本放 `$env:TEMP` 未入库），用 WPF `Geometry.Parse` + `PathGeometry` 把上游压缩相对坐标转成绝对命令，转换前后包围盒差 ≤0.02 才采用；**整行替换 50 条 `<Geometry>`，键名/顺序/分区注释全不动**（`IconTestViewModel.LoadAllIcons()` 与 224 处 `PathIcon` 引用零改动）。语义修正：`IconOrientation`→`arrow_bidirectional_left_right`、`IconMagnet`→`link`（上游无 magnet，该键服务「种子 Torrent」Tab）、`IconHtml`→`code`、`IconArrowEnter`→`arrow_enter_left`、`IconChevronDownUp` 与 `IconChevronUpDown` 保留双键指向同一路径（不动调用点）。
+  - **修法（尺寸/前景）**：21 个 axaml 的 14/15px 图标统一 16px（**109 处**，含跨行标签；`UiTestWindow` 演示档位、受父容器物理限制的 10/11/12/13px 站点刻意保留并注明理由）；`App.axaml:135-140` 新增 `PathIcon.ToolbarButtonIcon` 样式，**必须写在 `ToggleButton:checked PathIcon` 之前**（Avalonia 无 CSS specificity，同名属性按定义顺序后者覆盖，放后面会把选中态白图标覆盖成 Primary）；三个 Toggle 图标改挂该 class（不写本地色，否则同样压掉选中态）；`CustomFilePickerDialog` 3 处、`SettingsWindow` 2 处按上下文显式补 `Foreground`。
+  - **矩阵页 + 审计脚本**：`IconTestWindow` 加 `TabControl` 第二页 —— 117 个图标 × 16/22/28 三档 × 浅/深**背景块**（每块用嵌套 `ResourceInclude` 合并 `ThemeLight.axaml` / `ThemeDark.axaml`，块内一律 `DynamicResource`，零硬编码颜色），8 个三语 key；`scripts/render-icon-montage.ps1` 的分类判据由「路径里最大数字 > 26 即 B + 长小数指纹」重写为**真实渲染包围盒**（`Geometry.Parse(...).Bounds` 落在 `[-2,26]` 即 A），因为旧判据对压缩相对坐标必然误判（`.86` 拼成 86、`1.65.5` 拼成 65.5），还把上游合法圆弧半径 `A59` 当越界。
+  - **与计划的偏差**：49 → **50** 条（`IconOrientation` 语义修正）；尺寸实际还含 15px 两处；矩阵页是「浅/深背景块」而非计划写的「两种前景」；审计脚本判据被重写（不重写则新数据永远过不了 `-Check`）。
+  - **验证**：`render-icon-montage.ps1 -Check` = 117 A / 0 B / 0 C、退出码 0，拼版 PNG 目视 117 个粗细一致；`-Task build -Target avalonia -c Release` 0 警告；`-Task test` Core / ui-tests 全绿（新增 `IconTestWindowMatrixTests`：矩阵页浅深两块都在 + 可见图标尺寸恰为 `{16,22,28}`）；`-Task check` = 1321 key 三语一致 + 守卫 4/4；浅色/深色真机截图工具栏图标均清晰、选中态仍为白图标。
+  - **状态**：T0–T6 完成，计划已归档；`RELEASE_NOTES.md` 的写入范围待确认（规则 18）。附注：反射发现 Avalonia 12.1.2 `IconElement.ForegroundProperty.Inherits = true`，与 AGENTS.md 规则 4「`PathIcon` 不继承父控件 `Foreground`」表述不符，建议复核后修订。
+
 **2026-10-26** — 修复：压缩包内删除目录静默无效（递归匹配 + 零命中报错 + 二次确认 + 格式能力门禁）
   - **背景**：用户实测「压缩包里删单个文件有效、删目录没反应」——点确定后进度条走满并显示「删除完成」，刷新一看目录和子文件全都还在。按 `docs/PLAN.md` 的 ⚡ 插队项立项，设计与评审记录见 [delete-directory-entries.md](.omo/plans/已完成/delete-directory-entries.md)。
   - **根因（三层，缺一都修不好）**：① 名称对不上 —— 列表里目录行的 `FullPath` **不带尾斜杠**（`ArchiveEntryLister` 生成 `sub`），而包内条目是 `sub/`，`ArchivePath.Normalize` 只把 `\` 换成 `/`、不去尾斜杠，精确相等匹配**一条都不中**；② 无递归语义 —— 即便传 `sub/`，逐条目精确比较也只删掉目录条目本身（实测 4 条→3 条，子文件全留）；③ copy-mode 快路径不校验存在性（legacy 路径有 `FileNotFoundException` 校验），零命中照样走到收尾、按 100% 报成功。同族问题：7z 用大小写敏感 `HashSet` 且不校验，零命中不是删包而是**整包解压 + 原样重打包**（只在新包条目为 0 时才删包）——用户侧表现为耗时陡增 + 属性/时间戳丢失风险；TAR/GZ 走默认 `CanDelete => false` 抛 `NotSupportedException`，但 UI 三处删除入口一处都没用 `CanDelete`。
