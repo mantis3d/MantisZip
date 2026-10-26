@@ -1,6 +1,7 @@
 # 意图-执行接缝收口（消灭「点了没反应」类 bug）
 
-> **状态**: 📋 待实施 | **创建**: 2026-10-24 | **优先级**: P1 | **预估工时**: 18-24h（三波）
+> **状态**: 🚧 进行中（2026-10-26 开工，波 1–3 分批评审）| **创建**: 2026-10-24 | **优先级**: P1 | **预估工时**: 18-24h（三波）
+> **实施分支（2026-10-26 调整）**: `alpha` —— §11 决策 1 原定 `beta`（除错分支），但 `beta` 已落后 `alpha` 大量提交（图标归一化、删除目录修复、选中态修复等），切回 `beta` 会丢掉这些基线，故沿用 2026-10-26 删除目录计划同款理由改在 `alpha` 上做。
 > **来源**: 拖入文件点「压缩」无反应（`eaebcf60`）后续追问 —— 用户提出「窗口不该知道自己从哪个途径弹出然后做出不同行为」，要求一个彻底杜绝同类问题的规则而非单点修复。
 > **已定案**（用户 2026-10-24 拍板）：主形态=① 窗口注入执行器；范围=③ 含全仓 `ShowDialog` 清账；规则形态=① AGENTS.md 新增规则 + 守卫脚本；`CopyExecutionSettingsFrom` 去留=**退休**（见 §4.6）。
 > **跟踪**: GitHub issue [#47](https://github.com/mantis3d/MantisZip/issues/47) —「[设计提案] 收口对话框接缝」，正文为本计划摘要 + 全文折叠。
@@ -179,7 +180,7 @@ public interface ICompressSession { Task<CompressOutcome> RunAsync(CompressSetti
 
 ### 波 3：全仓清账 + 规则化（7-9h）
 
-- [ ] **T13** 逐点判定附录 A 的 68 处命中，产出**逐点判定表**回填本附录（A 改 / B 参照 / C 登记 / D 安全 / E 单独治 / F 随 A）。判定标准：①是否携带载荷 ②失败是否静默 ③是否存在属性补读。
+- [x] **T13** 逐点判定附录 A 的 68 处命中，产出**逐点判定表**回填本附录（A 改 / B 参照 / C 登记 / D 安全 / E 单独治 / F 随 A）。判定标准：①是否携带载荷 ②失败是否静默 ③是否存在属性补读。
 - [ ] **T14** C 类（纯提示/帮助/管理器）统一为无返回值 API（`Task ShowAsync(...)`）—— 消除"有个 bool 但没人该看"的误导性契约。
 - [ ] **T15** E 类：`Services/CompressFlow.cs:131-143` 去同步阻塞。改为 `await Dispatcher.UIThread.InvokeAsync(...)` 全 async 化；`ErrorDialog.ResultAction` 改为 `ShowDialog<ErrorDialogResult>(owner)` 返回值，删属性读。
 - [ ] **T16** F 类：`Services/PasswordRetryLoop.cs:144`、`App.CliCompress.cs:155`、`App.CliExtract.cs:353` 统一走新契约。
@@ -380,30 +381,130 @@ pwsh -File scripts\verify-repo.ps1 -Task guards      # 含新 dialog-seam
 
 ---
 
-## 附录 A：68 处 `ShowDialog` / `Show()` 命中分级（初版，T13 逐点回填）
+## 附录 A：`ShowDialog` / `Show()` 逐点判定（T13 回填，2026-10-26）
 
-> 计数含注释行，实际调用点约 60。判定标准：①是否携带载荷 ②失败是否静默 ③是否存在属性补读。
+> **以 2026-10-26 实测为准**：分支 `alpha`，扫描范围 `src/**/*.cs`，内置 grep 分别扫 `ShowDialog` 与 `\.Show\(`。
+> 原始匹配 **69 行**（`ShowDialog` 49 + `.Show()` 20），剔除 **9 行注释**（`App.CliExtract.cs:345`、`Dialogs/CompressSettingsWindow.axaml.cs:17`、`Dialogs/AppMessageBox.axaml.cs:152`、`:224`、`Dialogs/EditAdaptiveRuleDialog.axaml.cs:56`、`ViewModels/MainWindowViewModel.Compress.cs:40`、`Dialogs/ExtractSettingsWindow.axaml.cs:17`、`:29`、`Dialogs/ProgressWindow.axaml.cs:29`）与 1 处非窗口静态辅助调用（`Program.cs:24` `NativeSplash.Show(...)`，带参重载）后，**真实窗口调用点 60 处**：`ShowDialog` 41 + `Show()` 19。
+> `Show()` 19 处拆解：**3 处携带载荷**（F 类）+ **1 处 Debug 无 owner 降级**（`TestMenuView.axaml.cs:107`，D 类）+ **3 处 `App.CliInfra.cs` 无 owner 降级**（与同点 `ShowDialog` 计为同一提示接缝，C 类）+ **12 处非模态辅助窗**（本节末「守卫范围外」清单）。
+> **守卫范围**：`dialog-seam` 的 C 类检查**只针对 `ShowDialog`**；非模态辅助窗（进度窗 / 拖放覆盖层 / 帮助窗 / 消息框无 owner 兜底）不在扫描范围内，仅在附录登记、不设基线。
+> 已核对：全部 `Show()` 接收者均为 `Window` 派生类（`ProgressWindow` / `CollectingWindow` / `HelpDialog` / 各 `*Dialog` / 匿名 `Window`），**不存在非 Window 控件的 `.Show()`**；仓库已无 WinForms `MessageBox.Show`，消息框统一走 `AppMessageBox.Show(...)`（带参重载，不命中 `\.Show\(`）。
+> 判定判据：①是否携带执行载荷 ②失败是否静默 ③是否存在属性补读。下表路径均相对 `src/MantisZip.UI.Avalonia/`，行号即当前工作区行号。
+> 本文两张表：**逐点判定表（48 条）** + **守卫范围外清单（12 条）**，合计 60 处。
 
-**A 类 —— 设置窗口族，本计划核心改造对象（9 入口 + 2 接线块）**
+| 判定 | 含义 | 数量 | 处置 |
+|---|---|---|---|
+| A | 必须改造（带执行载荷 / 失败静默） | 2 | T9–T12 |
+| B | 只读参照（有返回值 + 就地消费，无跨层搬运） | 16 | 不改，作为目标形态参照 |
+| C | 纯提示/帮助/管理器（`ShowDialog` 形态） | 15 | 决策 3：只登记、只禁新增 |
+| D | 安全（await 消费 / Debug 专用诊断） | 8 | 仅登记 |
+| E | 单独治（阻断式 / 属性回读） | 3 | T15 |
+| F | 随 A 一起改（载荷经窗口属性补读） | 4 | T16 |
+| — | 守卫范围外（非模态辅助窗，非 `ShowDialog`） | 12 | 仅登记，不进 C 基线 |
+| **合计** | — | **60** | — |
 
-`ViewModels/MainWindowViewModel.Compress.cs:25-34`（NewArchive）、`:42-50`（DragInCompressAsync）、`App.CliCompress.cs:155`（`dlg.Show()`）、`Controls/Menus/TestMenuView.axaml.cs:81`；`ViewModels/MainWindowViewModel.Extract.cs:30`、`:312`、`Views/MainWindow.axaml.cs:234`、`App.CliExtract.cs:353`、`Controls/Menus/TestMenuView.axaml.cs:82`；接线块 `Views/MainWindow.axaml.cs:225-244`、`:249-267`
+| 文件:行 | 调用形态 | 判定 | 依据 |
+|---|---|---|---|
+| `Views/MainWindow.axaml.cs:234` | `await dialog.ShowDialog<bool>(this)` | A | ①解压设置窗：确认后经 `CopyExecutionSettingsFrom(dialog.ViewModel)` + `GetFilteredEntryKeys()` 补读 ②`result==false` 直接返回、无反馈 ③补读 2 处 |
+| `Views/MainWindow.axaml.cs:252` | `await dialog.ShowDialog<bool>(this)` | A | ①压缩设置窗：`CopyExecutionSettingsFrom` + `GetFilter()` + `AdoptPlan(GetPlanForExecution())` 三处补读 ②取消静默 ③补读 3 处 |
+| `App.CliCompress.cs:155` | `dlg.Show()` | F | ①非模态设置窗：`ViewModel.CloseAction` 被整体覆盖（类型学③），窗内 `BuildRequest(vm)` 直读 VM ②`request==null` 已补提示 ③属性读经 VM 外泄 → 随 A（T16） |
+| `App.CliExtract.cs:353` | `dialog.Show()` | F | ①非模态 + `Closed` 事件读 `DialogResult`，随后补读 `ViewModel.DestinationPath/ConflictAction/FilteredEntryKeys/MatchedPasswords` ②`dest` 空则直接 `Shutdown`（无反馈）③补读 4 处 → 随 A |
+| `Services/PasswordRetryLoop.cs:139` | `await dialog.ShowDialog<bool>(dialogOwner) ? dialog.Password : null` | F | ①密码载荷经 `dialog.Password` **属性补读**，正是类型学②载荷旁路 ②取消返回 null 由外层重试消化 ③补读 1 处；与同方法 `:144` 同族同判（§5 T16，父 agent 2026-10-26 裁定） |
+| `Services/PasswordRetryLoop.cs:144` | `dialog.Show()` | F | ①无 owner 退化路径：非模态 + 等 `Closed` ②密码错/取消由外层循环处理 ③`dialog.Password` 补读 → 随 A |
+| `Services/CompressFlow.cs:141` | `dlg.ShowDialog(owner).GetAwaiter().GetResult()` | E | ①错误决策载荷 ②`InvokeAsync(...).Result` + 同步阻塞（类型学⑦）③`dlg.ResultAction` / `ApplyToAll` 补读 → T15 |
+| `Services/CompressFlow.cs:280` | `await dlg.ShowDialog(dialogOwner)` | E | ①冲突决策载荷 ③`IsPaused`/`CancelOperation`/`ResultAction`/`CustomName`/`ApplyToAll` 五处属性回读 → 与 T15 同改法 |
+| `Services/ExtractFlow.cs:301` | `await dlg.ShowDialog(dialogOwner)` | E | ①冲突决策载荷 ③同上五处属性回读（含 `info.CustomName` 回写）→ 初版记 D「待核」，核定为 E |
+| `Views/MainWindow.axaml.cs:142` | `await dialog.ShowDialog<bool>(this)` | B | ①密码载荷但不外泄 ③补读 `Password`/`RememberInSession`/`SavePermanently`/`Description`/`Patterns`，**就地**封装为 `PasswordDialogResponse` |
+| `Views/MainWindow.axaml.cs:419` | `await dialog.ShowDialog<bool>(this)` | B | ③补读 `dialog.Comment`，就地转 `string?` 返回 |
+| `Controls/FileFilterEditor.axaml.cs:682` | `await dialog.ShowDialog<bool?>(window)` | B | ③补读 `InputText`（重命名预设），就地 `RenamePresetRequested` |
+| `Controls/FileFilterEditor.axaml.cs:710` | `await dialog.ShowDialog<bool?>(window)` | B | ③补读 `InputText` 作为方法返回值 |
+| `Dialogs/CustomFilePickerDialog.axaml.cs:217` | `await dialog.ShowDialog(owner)`（bool 弃用） | B | ③补读 `SelectedPath`+`SelectedPreserveFullPath` → 不可变 `ExtractPickResult`；②空串按取消处理 |
+| `Dialogs/CustomFilePickerDialog.axaml.cs:231` | `await dialog.ShowDialog<bool>(owner)` | B | ③补读 `SelectedPaths` → `IReadOnlyList<string>?` |
+| `Dialogs/CustomFilePickerDialog.axaml.cs:244` | `await dialog.ShowDialog(owner)` | B | ③补读 `SelectedPath` → `string?`（私有工厂 `ShowInternal`） |
+| `Dialogs/CustomFilePickerDialog.axaml.cs:1131` | `if (await dialog.ShowDialog<bool>(this))` | B | ③补读 `FavoriteName`/`FavoritePath`，就地 `FavoritePathManager.Add` |
+| `Dialogs/FavoriteManagerWindow.axaml.cs:105` | `if (await dialog.ShowDialog<bool>(this))` | B | ③补读 `FavoriteName`/`FavoritePath`，就地 Add + 重载列表 |
+| `Dialogs/FavoriteManagerWindow.axaml.cs:118` | `if (await dialog.ShowDialog<bool>(this))` | B | ③同上，就地 `FavoritePathManager.Update` |
+| `Dialogs/ExtractSettingsWindow.axaml.cs:93` | `await pwdDialog.ShowDialog<bool>(this)` | B | ③补读 5 个密码属性 → `PasswordDialogResponse`（与 `MainWindow.axaml.cs:142` 同构） |
+| `ViewModels/SettingsWindowViewModel.cs:462` | `await dlg.ShowDialog<bool?>(ownerWindow)` | B | ③补读 `Extension` 就地写入设置；②无 owner 时提前 return（有 `DebugLog`） |
+| `ViewModels/SettingsWindowViewModel.cs:2137` | `await dialog.ShowDialog<bool?>(...)` | B | ③补读 `FormatName`/`ExtensionsRaw`/`MagicHex` 就地建 `FormatDefinitionViewModel` |
+| `ViewModels/SettingsWindowViewModel.cs:2158` | `await dialog.ShowDialog<bool?>(...)` | B | ③同上，就地回填 `fmt` |
+| `ViewModels/SettingsWindowViewModel.cs:2180` | `await dialog.ShowDialog<bool?>(...)` | B | ③补读 `RuleName`/`SelectedLevel`/`SelectedFormatIds` 就地建规则 VM |
+| `ViewModels/SettingsWindowViewModel.cs:2201` | `await dialog.ShowDialog<bool?>(...)` | B | ③同上，就地回填 `rule` |
+| `Controls/Menus/TestMenuView.axaml.cs:107` | `window.Show()` | D | 无 owner 时降级为非模态（注释明示「不静默丢弃」）；Debug 专用诊断，无载荷/无补读。**若将来把诊断窗纳入守卫，则升 A** |
+| `Controls/Menus/TestMenuView.axaml.cs:111` | `await window.ShowDialog(owner)` | D | ②Debug 专用诊断菜单**单点分发**：28 个窗口共用一个 `TestWindow_Click` + tag switch，无载荷/无补读。已核实 `TestMenuView.axaml:116/123` 的「压缩设置 / 解压设置」两项同挂 `TestWindow_Click`、同样落入该 switch → 与其余项**走同一处 `:111` 分发**，故它们是 **A 类入口（宿主只是 Debug 菜单）**，接线时同样必须改成新契约，不得因「只是诊断项」放过。**若将来把诊断窗纳入守卫，则升 A** |
+| `App.CliInfra.cs:196` | `result = await elevationDlg.ShowDialog<bool?>(owner)` | D | ②结果决定是否提权重启；③无补读 |
+| `App.CliInfra.cs:203` | `await ... ShowDialog<bool?>(tempOwner)` | D | CLI 无主窗时临时 owner；同上 |
+| `Dialogs/AppMessageBox.axaml.cs:161` | `return await dialog.ShowDialog<MessageBoxResult>(owner)` | D | 结果作为值返回调用方；③无补读 |
+| `Dialogs/AppMessageBox.axaml.cs:167` | `return await dialog.ShowDialog<MessageBoxResult>(activeWindow)` | D | 同上（活跃窗兜底） |
+| `Dialogs/AppMessageBox.axaml.cs:186` | `await dialog.ShowDialog<MessageBoxResult>(owner)`（丢弃） | D | ②「打开日志目录」动作在窗内执行，结果无人需要 |
+| `Dialogs/AppMessageBox.axaml.cs:193` | `await dialog.ShowDialog<MessageBoxResult>(activeWindow)`（丢弃） | D | 同上 |
+| `Views/MainWindow.axaml.cs:133` | `await dialog.ShowDialog(this)` | C | 设置窗自行保存，无返回值/无补读 |
+| `Views/MainWindow.axaml.cs:163` | `await dialog.ShowDialog<bool>(this)` | C | 已匹配密码查看窗，bool 被丢弃 |
+| `Views/MainWindow.axaml.cs:272` | `await dialog.ShowDialog(this)` | C | 密码管理器 |
+| `Views/MainWindow.axaml.cs:278` | `await dialog.ShowDialog(this)` | C | 关于窗 |
+| `Views/MainWindow.axaml.cs:284` | `await dialog.ShowDialog(this)` | C | 赞助窗 |
+| `Views/MainWindow.axaml.cs:290` | `await dialog.ShowDialog(this)` | C | 收藏管理器 |
+| `Views/SettingsWindow.axaml.cs:31` | `dlg.ShowDialog(this)`（未 await） | C | 并行解压帮助窗 |
+| `Views/SettingsWindow.axaml.cs:132` | `dialog.ShowDialog(this)`（未 await） | C | 自适应规则帮助窗 |
+| `Dialogs/PasswordManagerWindow.axaml.cs:428` | `dialog.ShowDialog(this)`（未 await） | C | 密码帮助窗；即发即忘，结果无人消费 |
+| `App.CliInfra.cs:172` | `await dlg.ShowDialog<bool?>(owner)` | C | 已提权仍失败提示窗，结果丢弃 |
+| `App.CliInfra.cs:174` | `dlg.Show()` | C | 同上，无 owner 兜底（同一提示接缝的降级形态，并入该文件基线计数） |
+| `App.CliInfra.cs:185` | `await infoDlg.ShowDialog<bool?>(owner)` | C | 不允许提权时的说明窗，结果丢弃 |
+| `App.CliInfra.cs:187` | `infoDlg.Show()` | C | 同上，无 owner 兜底（同一接缝的降级形态） |
+| `App.CliInfra.cs:218` | `await infoDlg.ShowDialog<bool?>(owner)` | C | 用户拒绝提权后的说明窗，结果丢弃 |
+| `App.CliInfra.cs:220` | `infoDlg.Show()` | C | 同上，无 owner 兜底（同一接缝的降级形态） |
 
-**B 类 —— 已封装为 DTO 工厂（安全，作为目标形态参照，不改）**
+### 守卫范围外：非模态辅助窗（12 条，不进 C 基线）
 
-`Dialogs/CustomFilePickerDialog.axaml.cs:217`、`:231`、`:244`、`:1131`（5 个静态入口内部 discard bool，但工厂返回 `ExtractPickResult` / 路径列表）；`Views/MainWindow.axaml.cs:142`（PasswordDialog → 构造 `PasswordDialogResponse`）；`:414`（CommentDialog → `dialog.Comment`）
+> 这些是**非对话框**的辅助窗：用 `Show()` 独立挂在窗口之外显示，无返回值、无 owner 接管、无属性补读，也没有「失败静默」语义（进度由窗内状态呈现、覆盖层只服务拖放命中判定、帮助窗纯阅读）。
+> `dialog-seam` 守卫的扫描对象是 `ShowDialog`，**本清单不参与 C 类基线**，仅登记以免下次扫描把它们误判为「新增 C 类」。
 
-**C 类 —— 纯提示/帮助/管理器/进度窗口（无载荷；默认结果无人关心；按 T14 决定是否统一 API）**
+| 文件:行 | 形态 | 说明 |
+|---|---|---|
+| `Views/MainWindow.axaml.cs:335` | `pw.Show()` | 压缩/解压进度窗（异常由 `catch` → `SetErrorSummary` 呈现，不走弹窗） |
+| `Views/MainWindow.axaml.cs:1578` | `overlayWin.Show()` | 拖放隐形覆盖层（1×1 辅助窗，只做命中判定） |
+| `App.CliCompress.cs:63` | `collectingWindow.Show()` | 「正在收集文件」纯文字等待窗 |
+| `App.CliCompress.cs:236` | `progressWindow.Show()` | 批处理进度窗（IPC 收集期） |
+| `App.CliCompress.cs:438` | `progressWindow.Show()` | 压缩进度窗 |
+| `App.CliExtract.cs:405` | `progressWindow.Show()` | CLI 单包解压进度窗 |
+| `App.CliExtract.cs:572` | `progressWindow.Show()` | CLI 多包解压进度窗 |
+| `App.CliExtract.cs:761` | `progressWindow.Show()` | CLI 直解批处理进度窗 |
+| `Services/ExtractFlow.cs:94` | `pw.Show()` | 选中条目解压进度窗 |
+| `Dialogs/AppMessageBox.axaml.cs:170` | `dialog.Show()` | 无 owner 兜底，直接返回 `MessageBoxResult.None` |
+| `Dialogs/AppMessageBox.axaml.cs:197` | `dialog.Show()` | 同上（`ShowWithAction` 兜底） |
+| `ViewModels/SettingsWindowViewModel.cs:2052` | `dialog.Show()` | 日志隐私帮助窗（纯阅读） |
 
-`Views/MainWindow.axaml.cs:133`、`:163`、`:272`、`:278`、`:284`、`:290`、`:330`、`:1573`；`Views/SettingsWindow.axaml.cs:31`、`:132`；`Dialogs/PasswordManagerWindow.axaml.cs:428`；`ViewModels/SettingsWindowViewModel.cs:2052`；`Dialogs/AppMessageBox.axaml.cs:170`、`:197`；`Services/ExtractFlow.cs:94`；`App.CliCompress.cs:63`、`:236`、`:438`；`App.CliExtract.cs:405`、`:572`、`:761`；`App.CliInfra.cs:172`、`:174`、`:185`、`:187`、`:218`、`:220`；`Controls/Menus/TestMenuView.axaml.cs:97`
+### C 类存量基线（守卫白名单，**15 条 / 4 文件**）
 
-**D 类 —— 有返回值且已被消费（安全，仅登记）**
+> 用途：`dialog-seam` 守卫对 C 类只拦「新增」，这是**存量豁免基线**，核对口径为「当前条数 ≤ 基线条数」。
+> 计数单位是**提示接缝**：同一提示窗的 `ShowDialog` 形态与其无 owner 降级 `Show()` 形态算一处（如 `App.CliInfra.cs` 的 172/174 为同一接缝）。守卫实际只扫 `ShowDialog`（其中 C 类 12 条），3 处降级 `Show()` 一并计入基线以免下次扫描时漏判。
 
-`Dialogs/AppMessageBox.axaml.cs:161`、`:167`、`:186`、`:193`；`App.CliInfra.cs:196`、`:203`；`Controls/FileFilterEditor.axaml.cs:682`、`:710`；`Dialogs/FavoriteManagerWindow.axaml.cs:105`、`:118`；`Dialogs/ExtractSettingsWindow.axaml.cs:93`；`ViewModels/SettingsWindowViewModel.cs:462`、`:2137`、`:2158`、`:2180`、`:2201`；`Services/PasswordRetryLoop.cs:139`；`Services/ExtractFlow.cs:301`（待核：密码弹窗结果取法）
+| 文件（相对 `src/MantisZip.UI.Avalonia/`） | 条数 | 命中行 |
+|---|---|---|
+| `Views/MainWindow.axaml.cs` | 6 | 133、163、272、278、284、290 |
+| `App.CliInfra.cs` | 6 | 172/174、185/187、218/220（3 处接缝 × 2 形态） |
+| `Views/SettingsWindow.axaml.cs` | 2 | 31、132 |
+| `Dialogs/PasswordManagerWindow.axaml.cs` | 1 | 428 |
+| **合计** | **15** | 守卫扫描内 12 条 + 降级 `Show` 3 条 |
 
-**E 类 —— 阻断式接缝（T15 单独治）**
+### 与初版清单的差异
 
-`Services/CompressFlow.cs:131-143`（双 sync-over-async + `dlg.ResultAction` 属性读）、`:280`（`CompressConflictDialog` 属性读，与 E 同族）
+1. **计数口径**：初版「68 处」含注释行与 `MessageBox` 噪音，且沿用了 WPF 时代命名。现仓库已无原生 `MessageBox`，消息框统一为 `AppMessageBox.Show(...)`（带参 → 不命中 `.Show()` 正则），故噪音源消失。2026-10-26 实测原始匹配 69 行、真实调用点 **60 处**（`ShowDialog` 41 + `Show()` 19）；另剔除 1 处非窗口的静态辅助调用 `Program.cs:24` `NativeSplash.Show(...)`（带参重载，不是 `Window.Show`）。
+2. **初版 A 类中的「入口」不是命中点**：`ViewModels/MainWindowViewModel.Compress.cs:25-34`（`NewArchive`）、`:42-50`（`DragInCompressAsync`）、`ViewModels/MainWindowViewModel.Extract.cs:30`（`ExtractArchive`）、`:312`（`ExtractTo`）经 `ShowCompressSettingsDialog` / `ShowExtractSettingsDialog` 委托转发，真实 `ShowDialog` 在 `Views/MainWindow.axaml.cs:234/252`。它们仍在 T11 入口清单内，但**不构成 `ShowDialog` 命中**，已从本表移出；其「委托返回后补读 `vm` 属性」（`Compress.cs:31/47`、`Extract.cs:32/34-40/317/323`）属类型学②载荷旁路，由 T12 处理。
+3. **`Controls/Menus/TestMenuView.axaml.cs` 结构变了**：初版记 `:81`/`:82`（压缩/解压设置窗两处 A）+ `:97`（C）；现为**单点分发**——`:111` 一次 `ShowDialog(owner)` 覆盖全部 28 个诊断窗口，`:107` 无 owner 时降级 `Show()`，两者统一归 **D**（Debug 专用）。
+4. **行号漂移**（均已按当前工作区核对）：`Views/MainWindow.axaml.cs:414→419`（CommentDialog）、`:330→335`（ProgressWindow）、`:1573→1578`（拖放覆盖层）、`:234`/`:252` 未变；`Services/CompressFlow.cs:131-143→:141`；`App.CliCompress.cs:155`、`App.CliExtract.cs:353` 未变。
+5. **判定调整（10 处 D→B + 1 处 D→F）**：初版把「有返回值且已被消费」一律记 D；按判据③复核后，其中 10 处同时存在**属性补读**（执行/持久化载荷从窗口公开属性取出），应归 B：`SettingsWindowViewModel.cs:462/2137/2158/2180/2201`、`FileFilterEditor.axaml.cs:682/710`、`FavoriteManagerWindow.axaml.cs:105/118`、`ExtractSettingsWindow.axaml.cs:93`。另有 `PasswordRetryLoop.cs:139` 先复核为 B、再经父 agent 裁定改判 **F**（与同方法 `:144` 同族，见末节裁定 1）。D 类从初版 17 处降到 **8 处**。
+6. **`Services/ExtractFlow.cs:301` 定级**：初版记 D「待核」；实测为 `await dlg.ShowDialog(...)` 后五处属性回读（`IsPaused`/`CancelOperation`/`ResultAction`/`CustomName`/`ApplyToAll`）+ 模态冻结，与 `CompressFlow.cs:280` 完全同族 → 归 **E**，T15 一并改。
+7. **初版未列、本次补登两处**：`ViewModels/SettingsWindowViewModel.cs:2052`（`OpenLogPrivacyHelp` 的非模态 `Show()`，按裁定 3 归「守卫范围外」）；`Dialogs/PasswordManagerWindow.axaml.cs:428`（**未 await** 的即发即忘帮助窗，C——它连 Task 都没人持有，守卫按「无返回值 `ShowDialog` 调用」识别）。
+8. **F 类口径收紧（4 处）**：初版 F 列三处非模态 `Show()`，既与 A 类重复计数（`App.CliCompress.cs:155`、`App.CliExtract.cs:353` 同时出现在 A 与 F），又漏了 `PasswordRetryLoop.cs:139`。本次每处**只归一类**：A 只保留两处模态 `ShowDialog`（`Views/MainWindow.axaml.cs:234`、`:252`）；F = `App.CliCompress.cs:155`、`App.CliExtract.cs:353`、`Services/PasswordRetryLoop.cs:139`、`:144`（非模态设置/密码窗，载荷经窗口属性取出，随 T16 与新契约一并改）。
 
-**F 类 —— 非模态 `Show()` + 属性读（随 A 统一）**
+### 父 agent 裁定（2026-10-26）
 
-`App.CliCompress.cs:155`、`App.CliExtract.cs:353`、`Services/PasswordRetryLoop.cs:144`
+三条争议由父 agent 拍板，附录已按裁定修正：
+
+| # | 条目 | 裁定 | 理由与落地 |
+|---|---|---|---|
+| 1 | `Services/PasswordRetryLoop.cs:139` | B → **F** | `await ShowDialog<bool>` 后从 `dialog.Password` 属性补读载荷，正是子类②「载荷旁路」；且 `:144` 已在 §5 T16 列为 F，两者必须同族同判。已移入 F 块 → B 17→16、F 3→4 |
+| 2 | `Controls/Menus/TestMenuView.axaml.cs:107`／`:111` | 维持 **D** | Debug 专用、Release 不可达；依据列已加「若将来把诊断窗纳入守卫，则升 A」。核实结论：`:111` 的单点分发**包含**「压缩设置 / 解压设置」两个诊断项（`TestMenuView.axaml:116/123` 同挂 `TestWindow_Click`、落入同一 tag switch）→ 二者属 **A 类入口**（宿主只是 Debug 菜单），接线时同样必须改成新契约 |
+| 3 | 进度窗 / 拖放覆盖层等非模态 `Show()` | 采「守卫只看 `ShowDialog`」口径 | 12 条移出 C 类，单列「守卫范围外：非模态辅助窗」一节且不进基线；C 基线 27→**15**，附录并注明「守卫的 C 类检查只针对 `ShowDialog`，非模态辅助窗不在扫描范围内」 |
+
+裁定后的最终分布：**A 2 / B 16 / C 15 / D 8 / E 3 / F 4 = 48 条（逐点判定表）+ 12 条（守卫范围外）= 60 处**。

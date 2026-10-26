@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 计划：意图-执行接缝开工（契约层落地 + 全仓 ShowDialog 审计定稿）
+  - **背景**：`docs/PLAN.md` S 档第二项 [intent-execution-seam.md](.omo/plans/进行中/intent-execution-seam.md)（三波 18 任务）。核心缺陷是「设置窗口把用户意图回传给调用方」：调用方 `ShowDialog` 后要用 `CopyExecutionSettingsFrom` / `GetFilter` / `GetFilteredEntryKeys` / `GetPlanForExecution` 四个方法**回读**窗口里的可变状态，其中 `AdoptPlan` 还带「必须最后执行」的时序约束（Connascence of Execution），忘记执行就读到过期的计划。同类事故已在本仓发生七次（详见计划 §2）。
+  - **分支调整**：计划 §11 决策 1 原定在 `beta` 做，因 `beta` 已落后 `alpha` 大量提交（图标归一化、删除目录修复、选中态修复均只在 `alpha`），改在 `alpha` 上执行，已写进计划头部。
+  - **契约层（T1 + T4）**：新增 5 个文件、零改既有文件 —— `Models/ConfirmOutcome.cs`（`Confirmed<T>` / `Rejected<T>(Reason)` / `Cancelled<T>`，Reason 由 `OutcomeReasonGuard` 保证非空）、`Models/RunOutcome.cs`（`RunOutcomeState` 四态 + `CompressOutcome` / `ExtractOutcome`，`Failed` / `NotStarted` 走同一非空守卫，造不出「失败没原因」）、`Models/CompressRunContext.cs`（含 `ExitPolicy{None,ShutdownAfterRun}`，**刻意无默认值**让 CLI 必须显式声明退出策略）、`Models/ExtractRunContext.cs`（比压缩侧少 `IsCompressFlow` / `IsTestFlow`，让「解压没有压缩流程开关」成为编译期事实）、`Services/IProgressPresenter.cs`（`ActiveWindow` + `Task<bool> RunAsync(ProgressRunRequest)`；返回 bool 只表达「跑完 / 被取消」，失败原因归调用方，避免 presenter 自造文案或挂异常供回读）。
+  - **审计（T13）**：全仓 60 处 `ShowDialog` / `.Show()` 命中（41 + 19，已剔除注释与 `NativeSplash.Show` 这类静态辅助调用），分级 **A 2 / B 16 / C 15 / D 8 / E 3 / F 4 = 48**，另 12 条非模态辅助窗登记为「守卫范围外」；C 类基线收敛到 **15 条 / 4 文件**，守卫只检查 `ShowDialog`。附录 A 由「初版」改写为「逐点判定」，计划 410 → 510 行。审计同时核实：`TestMenuView.axaml:116/123` 的「压缩设置 / 解压设置」与其余 26 个诊断窗同挂 `TestWindow_Click` 单点分发，属 **A 类入口**，接线时须一并改。
+  - **状态**：🚧 进行中（波 1 压缩侧、波 2 解压侧核心层并行进行中）
+
 **2026-10-26** — 修复：切换按钮选中态背景改用主题强调色（含 QuickPathControl / ProgressWindow 同型问题）
   - **背景**：`docs/PLAN.md` B 档计划 [toggle-selected-contrast.md](.omo/plans/已完成/toggle-selected-contrast.md)（1-2h，🟢低）。图标归一化验收时在真机发现 `ResultTreeView` 的「紧凑模式」「显示筛选条件」两个 ToggleButton 选中时背景不变色、图标却被置白，浅色主题下呈浅灰底 + 白图标。**改动前就存在**，不是图标归一化引入的。
   - **根因**：`Controls/ResultTreeView.axaml` 的 `CompactToggle`（:27-36）与 `FilterToggle`（:60-68）本地写死 `Background="{DynamicResource ThemeButtonBgBrush}"` + `BorderBrush`；Avalonia 属性优先级是**局部值 > 样式 setter** ⇒ 压掉 `App.axaml:131-134` 的 `ToggleButton:checked`（`ThemeAccentBrush`），而 `App.axaml:146-148` 的 `ToggleButton:checked PathIcon` 把图标置白 ⇒ 对比度不足。

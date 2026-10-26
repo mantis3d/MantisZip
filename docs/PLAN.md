@@ -43,7 +43,7 @@
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 意图-执行接缝收口（波次 1+2） | [intent-execution-seam.md](.omo/plans/未开始/intent-execution-seam.md) | 🔴高 | 12-14h | 📋 2026-10-24 立项定案。**同族事故已 7 次**（压缩侧逐属性手抄漏 3 次 / 拖入分支无人接续 / CLI 静默 `Shutdown` / 解压 CLI `FilteredEntryKeys` 恒 null / 密码库保存仅主窗口生效）。方案＝设置窗口**注入唯一执行器**（漏接续变编译错误）+ 确认事务（`Rejected(reason)` 替代静默 return）+ 不可变 DTO + `IProgressPresenter` 收口两套进度实现。**本轮只做波次 1+2**：压缩 4 入口 → 解压 5 入口；波次 3（全仓 `ShowDialog` 清账）见 A 档。同步新增 AGENTS 规则 20 与 `guards` 第 5 条 `dialog-seam`；`CopyExecutionSettingsFrom` 及两份反射守卫测试退休 |
+| 意图-执行接缝收口（波次 1+2） | [intent-execution-seam.md](.omo/plans/进行中/intent-execution-seam.md) | 🔴高 | 12-14h | 📋 2026-10-24 立项定案。**同族事故已 7 次**（压缩侧逐属性手抄漏 3 次 / 拖入分支无人接续 / CLI 静默 `Shutdown` / 解压 CLI `FilteredEntryKeys` 恒 null / 密码库保存仅主窗口生效）。方案＝设置窗口**注入唯一执行器**（漏接续变编译错误）+ 确认事务（`Rejected(reason)` 替代静默 return）+ 不可变 DTO + `IProgressPresenter` 收口两套进度实现。**本轮只做波次 1+2**：压缩 4 入口 → 解压 5 入口；波次 3（全仓 `ShowDialog` 清账）见 A 档。同步新增 AGENTS 规则 20 与 `guards` 第 5 条 `dialog-seam`；`CopyExecutionSettingsFrom` 及两份反射守卫测试退休 |
 | 预览取数层内存优先（切片 1+2+4） | [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) | 🟡中 | 12-17h | 📋 2026-10-24 立项。现状：**每次预览都先把整条目解压到 `%TEMP%\MantisZip\Preview\` 再从磁盘读回**（固定文件名、每次预览前清空整个目录）；文本类写盘只为读 1MB；便携模式往 U 盘写；敏感文件明文落 TEMP。本批＝文本/CSV/Markdown/代码/日志走内存 + 图片 `SKBitmap.Decode(Stream)` + PDF `PdfDocument.Open(Stream)` + head 读取改真流式（Zip 不再整条目解压进内存）+ 临时文件按条目命名 + head LRU + >15MB 的 head-only 部分预览。**明确保留落盘**：HTML→WebView（`NativeWebView` 不支持 `data:` URI）、打开方式（外部程序要路径）、字体（`FontParser` 要文件名）。注：15MB 上限本身可在设置里调大，故切片 4 收窄为**文本/PDF/Office 的部分预览**（图片必须完整字节，无部分可言）。Office（切片 3）见 A 档 |
 | 自动更新检测 | [auto-update.md](.omo/plans/未开始/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查 + AboutWindow「更新」Tab + `UpdateAvailableDialog` + 设置开关 + 单元测试。**面向公开用户后这从「加分项」变「基础设施」**：没有它，每个修复都到不了用户手上 |
 
@@ -55,7 +55,7 @@
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 意图-执行接缝（波次 3：全仓清账） | [intent-execution-seam.md](.omo/plans/未开始/intent-execution-seam.md) | 🔴高 | 8-10h | 全仓 `ShowDialog` 收敛到统一入口（实测 `src/**/*.cs` 当前 53 处，计划文档记 68 处，**开工前先对齐口径**），并清掉波次 1/2 遗留的旁路 |
+| 意图-执行接缝（波次 3：全仓清账） | [intent-execution-seam.md](.omo/plans/进行中/intent-execution-seam.md) | 🔴高 | 8-10h | 全仓 `ShowDialog` 收敛到统一入口（实测 `src/**/*.cs` 当前 53 处，计划文档记 68 处，**开工前先对齐口径**），并清掉波次 1/2 遗留的旁路 |
 | 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。📋 2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） |
 | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **6-8h**（原估 3-4h） | 右键重命名(F2)/移动到…。7-Zip / WinRAR 都有，公开用户会问。**工时按 6-8h 重估**：实现是全量重写包，必须先写临时包再原子替换 + 校验，否则一次失败就是毁包 |
 | 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。**单独排在 A 档的理由**：三者都是「本来就在解析完整文档」，省下的只是落盘，用户感知最弱，且逐库确认 Stream 支持最费时 |
