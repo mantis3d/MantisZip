@@ -42,6 +42,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Icon sizes and foregrounds unified** — icon sizes used to mix 14/15/16 px and are now uniformly 16 px (109 sites across 21 files); icons in toolbars and small buttons that had no foreground color now follow the theme's text color (no more invisible black icons on dark themes), while the checked state stays white
 - **图标测试窗口新增尺寸矩阵页** — 「测试 → 图标测试」多了第二页：117 个图标 × 16/22/28 三档尺寸 × 浅色/深色背景块并排对照，一屏就能看出每个图标在两种主题、三种显示尺寸下是否协调
 - **Icon test window gains a size matrix page** — Test → Icon Test now has a second tab: all 117 icons × three sizes (16/22/28) × light and dark background blocks side by side, so one screen shows whether every icon holds up across both themes and all display sizes
+- **切换按钮选中态改用主题强调色** — 结果树视图的「紧凑模式」「显示筛选条件」、路径栏的四个路径标签、进度窗口底部的三个开关，选中时背景此前不变色（是浅灰底 + 白图标，浅色主题下几乎看不清）；现在统一使用主题强调色背景 + 白色图标，未选中态观感不变，浅色/深色主题都清晰
+- **Toggle buttons now show the accent color when checked** — the result tree's compact-mode and filter toggles, the four path tabs in the path bar, and the three toggles at the bottom of the progress window used to keep their neutral background when checked (light grey with a white icon, barely legible on light themes); they now use the theme's accent background with a white icon, with the unchecked look unchanged and both themes rendering clearly
 
 **性能 / Performance**
 

@@ -11,11 +11,12 @@
   - **根因**：`Controls/ResultTreeView.axaml` 的 `CompactToggle`（:27-36）与 `FilterToggle`（:60-68）本地写死 `Background="{DynamicResource ThemeButtonBgBrush}"` + `BorderBrush`；Avalonia 属性优先级是**局部值 > 样式 setter** ⇒ 压掉 `App.axaml:131-134` 的 `ToggleButton:checked`（`ThemeAccentBrush`），而 `App.axaml:146-148` 的 `ToggleButton:checked PathIcon` 把图标置白 ⇒ 对比度不足。
   - **修法**：删掉本地 `Background` / `BorderBrush`（不改成别的颜色 —— 同样会压掉强调色），让 `:checked` 生效；未选中态观感不变（基础样式 `App.axaml:107-122` 本身就用 `ThemeButtonBgBrush`）。全仓同型排查把另外 3 处一并修掉：`Dialogs/ProgressWindow.axaml` 的 `KeepOpenToggle` / `OpenFolderToggle` / `DeleteArchiveToggle`（保留 `BorderThickness="1"`）、`Controls/QuickPathControl.axaml` 四个路径标签（另把内部 `PathIcon` 的本地 `Foreground` 换成 `Classes="ToolbarButtonIcon"`，否则同样压掉选中态白色）、`Controls/ArchiveContentView.axaml` 的 `AutoExpandTree` 图标同改。`App.axaml:135-145` 两段过时注释同步成新规则 4 口径。改后全仓「`ToggleButton` 带本地 `ThemeButtonBgBrush` 背景」与「`ToggleButton` 内 `PathIcon` 带本地 `Foreground`」两类命中均为 **0**。
   - **验证**：`-Task build -Target avalonia`（Release）✅ 20.2s / 0 警告；`-Task test -Target ui-tests`（Release）✅ 34.4s（28 条既有 xUnit1051 / xUnit2012 警告，无新增）。真机双主题目视（Release 版 + GDI 截屏）：浅色 `crop-tabs.png`（QuickPathControl「收藏」= 强调蓝底 + 白图标，其余中性底 + 深图标）、`crop-rtv2.png`（`CompactToggle` 默认选中 = 强调蓝底 + 白菱形）；深色 `dark-tabs.png`、`dark-rtv-toggles.png`、`dark-progress-toggles2.png`（进度窗「打开目录」= 强调蓝底 + 白文件夹，另两个深灰底 + 亮图标）。临时改过 `settings.json` 的 `Theme=Dark` / `AutoCloseDelaySeconds=60`，拍完已还原为 `System` / `3`。
+  - **RELEASE_NOTES**：按规则 18 先向用户确认，确认后写入 v0.5.3「界面 / UI」一条（中英各一段，覆盖结果树 / 路径标签 / 进度窗三类开关）。
   - **状态**：✅
 
 **2026-10-26** — 文档：规则 4 修订、删除目录计划 T5 闭环、新计划「树视图切换按钮选中态背景」
   - **规则 4 修订（`AGENTS.md`）**：原话「`PathIcon` 不继承父控件 Foreground」与 Avalonia 12.1.2 的实际元数据不符（反射显示 `IconElement.ForegroundProperty.Inherits = true`），但实测工具栏/小按钮里的 `PathIcon` 仍取不到父控件的语义画刷（深色主题下呈默认黑、几乎不可见）。故改写为「元数据虽 `Inherits = true`，仍一律按**显式设置**执行」，并写清统一入口：工具栏类图标挂 `Classes="ToolbarButtonIcon"` → 命中 `App.axaml` 的 `PathIcon.ToolbarButtonIcon` 样式，该样式**必须写在 `ToggleButton:checked PathIcon` 之前**（否则会覆盖选中态白图标）。
-  - **`RELEASE_NOTES.md`**：v0.5.3 新增 **界面 / UI** 节 4 条（117 图标统一 Fluent 24 网格、尺寸与前景色统一、图标测试窗尺寸矩阵页），按规则 18 经用户确认范围后写入。
+  - **`RELEASE_NOTES.md`**：v0.5.3 新增 **界面 / UI** 节 4 条（117 图标统一 Fluent 24 网格、尺寸与前景色统一、图标测试窗尺寸矩阵页），按规则 18 经用户确认范围后写入（同日晚些时候再补「切换按钮选中态」一条，该节共 5 条）。
   - **删除目录计划 T5 闭环**：依据用户 2026-10-26 真机验证（「测试基本成功」，以及由真机删除流程才暴露的「刷新慢 1-2 秒」反馈）把 T5 标 `[x]` 并注明依据，该计划全部任务关闭。
   - **新计划**：[toggle-selected-contrast.md](.omo/plans/已完成/toggle-selected-contrast.md)（1-2h，🟢低）登记进 `docs/PLAN.md` B 档 —— `ResultTreeView` 的「紧凑」「筛选」两个 ToggleButton 本地写死 `Background`/`BorderBrush`，局部值优先级高于样式 setter ⇒ 压掉 `ToggleButton:checked` 的强调色背景，选中时变成浅灰底 + 白图标；修法为删掉本地覆盖（与 `MainFilterBar`、`ArchiveContentView` 的同类按钮对齐）。
   - **状态**：✅
