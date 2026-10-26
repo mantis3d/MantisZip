@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-23  
+**最后更新**: 2026-10-24  
 **当前版本**: 0.5.3
 
 ---
@@ -23,6 +23,7 @@
 | **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
 | **P1** | ZIP 多线程压缩方案 D（自适应 + 多线程第四个选项） | [parallel-compress-plan-d.md](.omo/plans/未开始/parallel-compress-plan-d.md) | 🟡中 | 4-5h | 自适应压缩新增"自适应 + 多线程"选项：Store 类直接写入 + 需压缩类 SharpSevenZip mt=on；UI 联动（格式目录/用户规则/多线程提示可见性）；实验性标签 + 帮助弹窗 |
 | **P1** | 压缩加速三开关 UI 收敛（Phase 1 ✅） / 魔数检测+自适应规则（Phase 2 主体 ✅） | [adaptive-compress-ui-convergence.md](.omo/plans/进行中/adaptive-compress-ui-convergence.md) | 🟢 P1 完成 | P1 4-5h / P2 5-7h | 🟢 2026-10-21 Phase 2 Task 9-11 实施完成：SSOT 统一到 `ZipEntryClassifier`；`AdaptiveRuleMatcher.ResolveLevel` 唯一决策入口（规则 > SSOT 扩展名 > 魔数）；**「仅存储格式」已并入自适应规则**（控件组删除、旧配置迁移为 Store 规则、默认规则集扩到 6 类）；多线程路径提示 + 行内「多线程下不生效」标记。**2026-10-23 复核补漏**：自定义 `MagicHex` 接线、ZIP 面板魔数联动、MT 提示实时刷新、CLI 自适应开关、帮助文案「三个开关」、死字段/单测/过期注释清理。**未做**：Task 12 本机基准测试 UI、Task 13 组数定标 |
+| **P1** | 意图-执行接缝收口（消灭「点了没反应」类 bug） | [intent-execution-seam.md](.omo/plans/未开始/intent-execution-seam.md) | 🔴高 | 18-24h | 📋 2026-10-24 立项、已定案待实施：同族事故已 **7 次**（压缩侧逐属性手抄漏 3 次 / 拖入分支无人接续 / CLI 静默 `Shutdown` / 解压 CLI `FilteredEntryKeys` 恒 null / 密码库保存在且仅主窗口入口生效）。方案＝设置窗口**注入唯一执行器**（漏接续变编译错误）+ 确认事务（`Rejected(reason)` 替代静默 return）+ 不可变 DTO（消除属性补读）+ `IProgressPresenter` 收口两套进度实现。按波落地：压缩 4 入口 → 解压 5 入口 → 全仓 68 处 `ShowDialog` 清账；同时新增 AGENTS.md 规则 19 与 `guards` 第 5 条 `dialog-seam` 守卫。**`CopyExecutionSettingsFrom` 及其两份反射守卫测试退休** |
 | **P2** | ZIP 多线程压缩方案 A（分组并行 + 多级别） | [parallel-compress-plan-a.md](.omo/plans/未开始/parallel-compress-plan-a.md) | 🟡中 | 6-8h | 按级别分组 → 各组独立 ZipWriter 并行 → 合并 ZIP，完整多级别自适应 + 多线程。方案 D 完成后实施 |
 | **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.omo/plans/未开始/compression-estimator.md) | 🟡中 | 14-18h | 🔶 部分实现（比率表 / 格式目录 / 自适应规则模型已完成，估算器本体未开始）。2026-10-21 拆分：本行 = 压缩前预估（快速查表 / 采样标准 / 可选精确 + 设置窗口面板）；ETA 增强见下一行；自适应已归档 |
 | **P2** | 压缩中 ETA 增强 | [runtime-eta.md](.omo/plans/未开始/runtime-eta.md) | 🟡中 | 5-7h | 🔶 基础 ETA 已实现（EMA 速度 + 单档案剩余 + 暂停冻结）；本计划补先验速度融合（冷启动即有值）、批处理总剩余、估算中/即将完成文案 |

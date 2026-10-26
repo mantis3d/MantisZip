@@ -34,6 +34,13 @@
   - **验证**：avalonia 构建 0 警告（Debug 产物被运行中的 exe 占用，改用 `-c Release` 验证）；`ui-tests` 全绿（28 条存量警告）；`i18n` 1313 key 三语一致；`check` / `guards` 通过。
   - **发布说明**：按规则 18 并入 `RELEASE_NOTES.md` v0.5.3「交互」既有「统计卡新增已压缩 / 仅存储」条目（中英各补一句）。
 
+**2026-10-24** — 计划：新增「意图-执行接缝收口」设计文档（对话框接缝类缺陷根治，待实施）
+  - **背景**：压缩设置窗口 4 个入口（主窗口「新建压缩包」/ 拖入非压缩包 / Explorer 右键 CLI / 测试菜单）弹出后外观一致但行为不同，点「压缩」后静默关窗、无进度无提示。同类缺陷自 `285b586` 起已发生 **7 次**：压缩侧逐属性手抄漏 3 次（多线程/并行度恒 `false`、分卷大小恒 `0`、冲突策略恒「每次询问」）、拖入分支无人接续（修于 `eaebcf60`）、CLI `request == null` 时 `desktop.Shutdown()` 静默退出（修于 `c76c3af9`）、解压 CLI 多包 `FilteredEntryKeys` 恒 `null` 致过滤静默失效、密码库「保存到密码库」仅在主窗口入口生效（右键菜单勾了不保存，仍未修）。两次逐点修复均未拦住下一次。
+  - **根因**：窗口对外契约只有 `ShowDialog<bool>` 的一个 bool，执行载荷（路径集合 / 格式 / 压缩级别 / 分卷 / 密码 / 冲突策略 / 过滤条件，以及必须与当前输入同版本的 `CompressPlan`）走公开可变 `ViewModel` 旁路，调用方需按固定顺序搬运 14 段属性；漏搬运、换顺序、覆盖 `CloseAction` 三者均不报错。结论：**只要执行侧参数还需要沿接缝"搬运"一次，就一定会漏**。
+  - **方案**（设计文档：`.omo/plans/未开始/intent-execution-seam.md`）：① 设置窗口注入唯一执行器 `ICompressSession`，漏接续从"静默失效"变**编译错误**；② 确认动作返回 `ConfirmOutcome<CompressSettings>`（`Confirmed` / `Rejected(reason)` / `Cancelled`），静默 `return` 变"必须给非空理由"；③ 不可变 DTO 取代属性补读，`AdoptPlan` 的顺序契约消失；④ `IProgressPresenter` 收口压缩/解压两套进度实现；⑤ `CopyExecutionSettingsFrom` 及其两份反射守卫测试**退休**（反射只能事后兜底，漏了第七次 `FilteredEntryKeys`）。
+  - **范围与决策**：全仓 68 处 `ShowDialog` / `Show()` 分级清账（A 类设置窗口族 9 入口为核心，B 类静态工厂 DTO 为形态参照），分三波 T1–T18；同步新增 AGENTS.md 规则 19 与 `guards` 第 5 条 `dialog-seam`（4 条源码检查）。三条决策已定：走 **`beta`** 分支、`CompressSettings` **不**与 Core `CompressRequest` 合并、C 类纯提示窗口**仅登记不强制改** API。
+  - **状态**：📋 待实施（18-24h），设计提案已同步 GitHub issue [#47](https://github.com/mantis3d/MantisZip/issues/47)。
+
 **2026-10-23** — 新增：统计卡增加「已压缩 / 仅存储」（自适应分类构成）
   - **需求**（用户）：统计卡一行原本只有「已处理」「总大小」，自适应压缩时看不出多少文件真的被压缩、多少只是存储。
   - **口径（用户拍板）**：**构成口径**（本次有多少文件需要压缩 / 仅存储），不随进度变化；进度仍由「已处理」卡承担。显示条件：只有引擎真的上报了分类结果才出现（即 ZIP + 自适应）；7z / TAR.GZ / 加密 ZIP / 关闭自适应时两张卡整卡隐藏（规则 6）。布局按用户选择保持**单行**（7 张卡在 800 宽下可容纳，窄窗会横向裁剪，用户已知悉）。

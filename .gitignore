@@ -68,3 +68,6 @@ cs_results.txt
 
 # archify 架构图产物（单文件交互 HTML + 浏览器证据截图，约 1.4MB，改图后可依据 candidate.json 重新生成）
 .archify/
+
+# .omo/tmp/ —— 临时草稿区（发布 issue / 拼装长文本用；shell 沙箱对 .omo 只读，内容由文件工具写入，勿入库）
+.omo/tmp/
