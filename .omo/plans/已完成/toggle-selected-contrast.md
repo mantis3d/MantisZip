@@ -1,6 +1,6 @@
 # 树视图切换按钮选中态背景对比度修正
 
-> **状态**: 📋 待定（2026-10-26 立项）| **阶段**: [⬜⬜⬜⬜⬜] (0/5)
+> **状态**: ✅ 已完成（2026-10-26）| **阶段**: [✅✅✅✅✅] (5/5)
 > **前置依赖**: 无。与 2026-10-26 完成的图标归一化相邻（是那次验收时发现的），但不依赖其任何代码。
 
 ## TL;DR
@@ -119,6 +119,31 @@ pwsh -File scripts\verify-repo.ps1 -Task check
 - **需要留意的点**：若某套主题没定义 `ToggleButton:checked` 背景，会退化为系统默认色 —— 本仓只有 `ThemeLight` / `ThemeDark` 两套，且 `App.axaml` 的 `:checked` 用 `DynamicResource`，两套都覆盖。
 
 ---
+
+## 实施记录（2026-10-26）
+
+### 代码落地
+
+| 文件 | 改动 |
+|------|------|
+| `src/MantisZip.UI.Avalonia/Controls/ResultTreeView.axaml` | `CompactToggle`（原 :27-36）、`FilterToggle`（原 :60-68）删除本地 `Background` / `BorderBrush`，各加中文注释（计划项，原样落地） |
+| `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml` | 同型问题：`KeepOpenToggle` :1138、`OpenFolderToggle` :1149、`DeleteArchiveToggle` :1161 删除本地 `Background` / `BorderBrush`（保留 `BorderThickness="1"`） |
+| `src/MantisZip.UI.Avalonia/Controls/QuickPathControl.axaml` | 同型问题：`FavoritesTab` / `HistoryTab` / `WindowsTab` / `TreeTab` 删除本地 `Background` / `Foreground` / `BorderBrush`；内部 4 个 `PathIcon` 的本地 `Foreground` 换成 `Classes="ToolbarButtonIcon"`（本地 `Foreground` 同样会压掉 checked 白色） |
+| `src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml` | 同型问题：`AutoExpandTree` ToggleButton 内的 `PathIcon` 去本地 `Foreground` → `Classes="ToolbarButtonIcon"` |
+| `src/MantisZip.UI.Avalonia/App.axaml` | 仅注释：:135-137 / :141-145 两段过时说明（「PathIcon 不继承父控件 Foreground」）改成与修订后规则 4 一致的表述；**样式定义与顺序未动** |
+
+### 与计划的偏差
+
+- **范围扩大**：计划只写 `ResultTreeView` 两处，T2 排查发现 `ProgressWindow`（3 个）与 `QuickPathControl`（4 个标签）是同一病根（本地 `Background` 压掉 `:checked`），一并修掉 —— 否则「全仓同型排查」这条验收无法通过。
+- **图标本地 `Foreground`**：`QuickPathControl` / `ArchiveContentView` 的 ToggleButton 内 `PathIcon` 写成 `Classes="ToolbarButtonIcon"` 而不是「显式设置主题画刷」，因为显式色会压掉 `ToggleButton:checked PathIcon` 的白色。
+
+### 验证
+
+- 同型排查（改后）：`ToggleButton` 标签内带 `Background="{DynamicResource ThemeButtonBgBrush}"` → **0 命中**；ToggleButton 内 `PathIcon` 带本地 `Foreground` → **0 命中**。
+- 构建 `-Task build -Target avalonia`（Release）→ ✅ 20.2s / 0 警告。
+- 测试 `-Task test -Target ui-tests`（Release）→ ✅ 34.4s / 28 条既有 xUnit1051 / xUnit2012 警告，无新增；`-Task check` ✅。
+- 真机双主题目视（Release 版 + 用户桌面）：浅色见 QuickPathControl「收藏」标签（`crop-tabs.png`）与 `ResultTreeView` 的 `CompactToggle`（`crop-rtv2.png`）；深色见 `dark-tabs.png` / `dark-rtv-toggles.png` / `dark-progress-toggles2.png`（进度窗「打开目录」）。三处宿主选中态均为强调蓝底 + 白图标，未选中态与原观感一致。
+- 现场已清理：临时改的 `%LOCALAPPDATA%\MantisZip\settings.json`（`Theme=Dark` / `AutoCloseDelaySeconds=60`）已还原为 `System` / `3`，进程已退出。
 
 ## 决策记录
 

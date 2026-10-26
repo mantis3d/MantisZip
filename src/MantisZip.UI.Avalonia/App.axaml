@@ -132,16 +132,16 @@
       <Setter Property="Background" Value="{DynamicResource ThemeAccentBrush}" />
       <Setter Property="Foreground" Value="White" />
     </Style>
-    <!-- PathIcon 工具栏图标（挂 Classes="ToolbarButtonIcon"）：PathIcon 不继承父控件 Foreground（规则 4）。
+    <!-- PathIcon 工具栏图标（挂 Classes="ToolbarButtonIcon"）：Foreground 必须显式给（规则 4）——
+         元数据上 Inherits = true，但实测工具栏/小按钮里的 PathIcon 取不到父控件的语义画刷。
          颜色与 TextBlock.ToolbarButtonIcon 保持一致。⚠ 本样式必须写在下方 "ToggleButton:checked PathIcon" 之前：
          Avalonia 同名属性按样式定义顺序后者覆盖前者，这样选中态 ToggleButton 里的图标才仍是白色。 -->
     <Style Selector="PathIcon.ToolbarButtonIcon">
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
     <!--
-      PathIcon in Avalonia does NOT inherit Foreground from parent controls,
-      so we must target it directly. This selector covers all PathIcon children
-      (including those nested in StackPanel) via descendant combinator.
+      PathIcon 的 Foreground 需显式设置（规则 4）：元数据虽是 Inherits = true，但实测拿不到父控件画刷。
+      这里用后代选择器覆盖所有状态下的 PathIcon 子项（含 StackPanel 内嵌套的）；选中态强制白色。
     -->
     <Style Selector="ToggleButton:checked PathIcon">
       <Setter Property="Foreground" Value="White" />

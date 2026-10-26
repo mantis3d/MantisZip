@@ -1134,38 +1134,36 @@
       </Grid.ColumnDefinitions>
       <!-- Column 0 左侧簇：保持打开 + 解压后置开关（📁 打开目录 / 🗑 移回收站） -->
       <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
-        <!-- 保持打开切换按钮（完成后不自动关闭） -->
+        <!-- 保持打开切换按钮（完成后不自动关闭）。
+             ⚠ 不写本地 Background/BorderBrush：局部值会压掉 `ToggleButton:checked` 的强调色背景，
+             选中态只剩白图标贴在普通按钮底色上（浅色主题几乎看不见）。 -->
         <ToggleButton x:Name="KeepOpenToggle"
                       Height="{DynamicResource ControlHeightLg}" Width="44"
                       IsChecked="{Binding KeepOpenOnComplete}"
                       ToolTip.Tip="{Binding LocalizedStrings[Progress_KeepOpen]}"
                       VerticalAlignment="Center"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}"
                       BorderThickness="1">
           <PathIcon Classes="ToolbarButtonIcon" Data="{StaticResource IconPin}" Width="16" Height="16" />
         </ToggleButton>
-        <!-- 解压后打开目标目录（实例级；IsVisible 由能力位驱动 → 压缩/测试流隐藏，规则 6） -->
+        <!-- 解压后打开目标目录（实例级；IsVisible 由能力位驱动 → 压缩/测试流隐藏，规则 6）。
+             同上：背景交给主题 `ToggleButton:checked`，不写本地值。 -->
         <ToggleButton x:Name="OpenFolderToggle"
                       IsChecked="{Binding OpenFolderAfterExtract}"
                       IsVisible="{Binding ShowOpenFolderToggle}"
                       Height="{DynamicResource ControlHeightLg}" Width="44"
                       ToolTip.Tip="{Binding LocalizedStrings[Settings_Extract_OpenFolderAfter]}"
                       VerticalAlignment="Center"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}"
                       BorderThickness="1">
           <PathIcon Classes="ToolbarButtonIcon" Data="{StaticResource IconFolder}" Width="16" Height="16" />
         </ToggleButton>
-        <!-- 解压后把原压缩包移入回收站（同上） -->
+        <!-- 解压后把原压缩包移入回收站（同上）。
+             同上：背景交给主题 `ToggleButton:checked`，不写本地值。 -->
         <ToggleButton x:Name="DeleteArchiveToggle"
                       IsChecked="{Binding DeleteArchiveAfterExtract}"
                       IsVisible="{Binding ShowDeleteArchiveToggle}"
                       Height="{DynamicResource ControlHeightLg}" Width="44"
                       ToolTip.Tip="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
                       VerticalAlignment="Center"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}"
                       BorderThickness="1">
           <PathIcon Classes="ToolbarButtonIcon" Data="{StaticResource IconDelete}" Width="16" Height="16" />
         </ToggleButton>

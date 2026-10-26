@@ -23,14 +23,14 @@
             Padding="8,4"
             Background="{DynamicResource ThemeHeaderBgBrush}">
       <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-        <!-- 精简/完整模式切换：切换树形视图的显示密度 -->
+        <!-- 精简/完整模式切换：切换树形视图的显示密度。
+             ⚠ 这里**不写**本地 Background/BorderBrush：局部值优先级高于样式 setter，
+             会把 App.axaml 里 `ToggleButton:checked` 的强调色背景压掉，选中态只剩白图标（浅色主题看不见）。 -->
         <ToggleButton x:Name="CompactToggle"
                       IsChecked="{Binding CompactMode, RelativeSource={RelativeSource AncestorType=UserControl}}"
                       Width="28" Height="{DynamicResource ControlHeightXs}"
                       FontSize="12"
                       Padding="4,0"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}"
                       IsCheckedChanged="OnCompactToggleChanged">
           <PathIcon Data="{StaticResource IconChevronDownUp}" Width="16" Height="16" Classes="ToolbarButtonIcon" />
         </ToggleButton>
@@ -56,13 +56,12 @@
                 Click="OnLocateClick">
           <PathIcon Data="{StaticResource IconLocation}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
-        <!-- 过滤切换：显示/隐藏被过滤的灰显节点 -->
+        <!-- 过滤切换：显示/隐藏被过滤的灰显节点。
+             同 CompactToggle：不写本地 Background/BorderBrush，交给 `ToggleButton:checked` 的强调色。 -->
         <ToggleButton x:Name="FilterToggle"
                       IsChecked="{Binding ShowFilteredGhosts, RelativeSource={RelativeSource AncestorType=UserControl}, Mode=TwoWay}"
                       Width="28" Height="{DynamicResource ControlHeightXs}"
                       Padding="2,0"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}"
                       IsCheckedChanged="OnFilterToggleChanged">
           <PathIcon Data="{StaticResource IconFilter}" Width="16" Height="16" Classes="ToolbarButtonIcon" />
         </ToggleButton>

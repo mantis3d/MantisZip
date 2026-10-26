@@ -57,7 +57,8 @@
                             IsChecked="{Binding AutoExpandTree}"
                             IsEnabled="{Binding IsArchiveLoaded}"
                             ToolTip.Tip="{Binding LocalizedStrings[Tree_AutoExpand]}">
-                <PathIcon Data="{StaticResource IconLocationCheckmark}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                <!-- 图标不写本地 Foreground（会压掉选中态白色），挂全局 class 统一取色 -->
+                <PathIcon Data="{StaticResource IconLocationCheckmark}" Width="16" Height="16" Classes="ToolbarButtonIcon" />
               </ToggleButton>
             </StackPanel>
           </Border>
