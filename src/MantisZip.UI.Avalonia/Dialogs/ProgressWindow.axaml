@@ -489,13 +489,14 @@
                          FontSize="10"
                          VerticalAlignment="Center"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              <!-- 中：文件名 + 该文件字节进度底纹（宽度 = CurrentFileRatio × 本格宽） -->
+              <!-- 中：文件名 + 底纹（宽度 = DetailRowRatio × 本格宽）。
+                   普通阶段按当前文件进度；写出仅存储文件阶段改用整个阶段的字节进度（否则底纹只会 0→100 跳） -->
               <Grid Grid.Column="1" ClipToBounds="True">
                 <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
                            HorizontalAlignment="Left">
                   <Rectangle.Width>
                     <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
-                      <Binding Path="CurrentFileRatio" />
+                      <Binding Path="DetailRowRatio" />
                       <Binding Path="Bounds.Width" RelativeSource="{RelativeSource AncestorType=Grid}" />
                     </MultiBinding>
                   </Rectangle.Width>
@@ -668,10 +669,69 @@
           <!-- 竖排两段：段 1 文件统计卡行 + 段 2 并行度后置元素（并行度非文件统计，移出卡片行） -->
           <StackPanel Orientation="Vertical">
 
-            <!-- 段 1：文件统计卡行（5 张三行卡；并行度不在此行——非文件统计，见段 2） -->
+            <!-- 段 1：文件统计卡行（9 张三行卡：扫描 / 压缩包 / 已处理 / 已压缩 / 仅存储 / 跳过 / 出错 / 已覆盖 / 总大小，
+                 按上报情况显隐；并行度不在此行——非文件统计，见段 2） -->
             <StackPanel Orientation="Horizontal"
                         Spacing="{DynamicResource SpacingLg}"
                         HorizontalAlignment="Center">
+
+              <!-- 卡 -1：扫描（🔍；扫描阶段其它卡都还没有数据，这张卡正好填住卡片行，
+                   否则完整档扫描时卡片区只剩一块空底色）— 三行同构：图标+标题 / 已发现文件数 / 已扫描大小 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding HasScanCount}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="🔍" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+                  <TextBlock Text="{Binding ScanCardLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：已发现文件数（数量行，与其它卡同构） -->
+                <TextBlock Text="{Binding ScanCardCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                <!-- 行 3：已扫描大小（— 灰 / 真实值强调色，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding ScanCardSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding ScanCardSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeTextPrimaryBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 0：压缩包（📦；"压缩包 1/1" 原为进度条下方独立一行，完整档挪进卡片与其它统计并列）
+                   — 三行同构：图标+标题 / 当前档案序号（数量行） / 档案总数（"共 N 个"；压缩包无尺寸可报，这一行放总数） -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding HasStatsArchive}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="📦" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                  <TextBlock Text="{Binding StatsArchiveLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：当前档案序号（正在处理第几个，与其它卡的「数量」行同构） -->
+                <TextBlock Text="{Binding StatsArchiveCurrent}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
+                <!-- 行 3：档案总数（"共 N 个"，灰显次级色，与其它卡「文件大小」行同位） -->
+                <TextBlock Text="{Binding StatsArchiveTotal}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+              </StackPanel>
 
               <!-- 卡 1：已处理（✅；引擎上报后才出现）— 三行：图标+标题横排 / 文件数量 / 文件大小（未上报字节时 — 灰显）；MinWidth 锁定卡宽防止文字长度变化导致相邻卡跳动 -->
               <StackPanel Spacing="{DynamicResource SpacingXxs}"
@@ -699,6 +759,64 @@
                            FontSize="13"
                            HorizontalAlignment="Center"
                            Foreground="{Binding StatsProcessedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeStatusSuccessBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 1b：已压缩（🗜；仅「自适应 ZIP」上报分类构成时出现）— 三行同构：图标+标题 / 文件数量 / 文件大小
+                   口径 = 构成（本次有多少文件需要压缩），不随进度变化，进度由「已处理」卡承担 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsCompressedText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="🗜" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                  <TextBlock Text="{Binding StatsCompressedLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：文件数量（构成口径） -->
+                <TextBlock Text="{Binding StatsCompressedCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
+                <!-- 行 3：文件大小合计（— 灰 / 真实值绿，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsCompressedSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsCompressedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeStatusSuccessBrush}"/>
+              </StackPanel>
+
+              <!-- 卡 1c：仅存储（📄；仅「自适应 ZIP」上报分类构成时出现）— 三行同构
+                   口径 = 构成（内容已是压缩格式、直接存储的文件），与「已压缩」互补 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding StatsStoreOnlyText, Converter={StaticResource StringNotEmpty}}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="📄" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                  <TextBlock Text="{Binding StatsStoreOnlyLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：文件数量（构成口径） -->
+                <TextBlock Text="{Binding StatsStoreOnlyCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                <!-- 行 3：文件大小合计（— 灰 / 真实值灰蓝，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsStoreOnlySize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsStoreOnlySize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeTextSecondaryBrush}"/>
               </StackPanel>
 
               <!-- 卡 2：跳过（⏭；引擎上报过冲突统计才出现）— 三行：图标+标题 / 文件数量 / 文件大小（终态累加值，无字节 — 灰显）；MinWidth 防跳动 -->
@@ -977,11 +1095,22 @@
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
         </StackPanel>
 
-        <!-- 总体进度标签行：左批次档案序号（"N / M"，非批次为空）+ 右总体百分比 -->
+        <!-- 总体进度标签行：左「压缩包 N/M」（少/中档；完整档已并入统计卡「压缩包」）或扫描态「已发现 N 个文件」，
+             右总体百分比 —— 两者原各占一行且一左一右，合并成一行省一行高度 -->
         <Grid ColumnDefinitions="*,Auto">
-          <TextBlock Text="{Binding BatchArchiveIndexText}"
-                     IsVisible="{Binding BatchArchiveIndexText, Converter={StaticResource StringNotEmpty}}"
+          <TextBlock x:Name="FileCountText"
+                     Grid.Column="0"
+                     Text="{Binding FileCountText}"
+                     IsVisible="{Binding ShowFileCountInLabelRow}"
                      FontSize="11"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+          <TextBlock x:Name="ScanCountText"
+                     Grid.Column="0"
+                     Text="{Binding ScanCountText}"
+                     IsVisible="{Binding ShowScanCountInLabelRow}"
+                     FontSize="11" FontWeight="SemiBold"
+                     VerticalAlignment="Center"
                      Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
           <TextBlock Grid.Column="1"
                      Text="{Binding PercentComplete, StringFormat=\{0\}%}"
@@ -996,20 +1125,6 @@
                      Height="{DynamicResource ControlHeightMd}"
                      Foreground="{DynamicResource ThemeProgressFillBrush}"
                      Background="{DynamicResource ThemeProgressBgBrush}"/>
-
-        <!-- 文件计数行：常规阶段显示「压缩包 N/M」，扫描阶段改为「已发现 N 个文件」（同位置互斥显隐） -->
-        <Grid>
-          <TextBlock x:Name="FileCountText"
-                     Text="{Binding FileCountText}"
-                     IsVisible="{Binding !HasScanCount}"
-                     FontSize="11"
-                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-          <TextBlock x:Name="ScanCountText"
-                     Text="{Binding ScanCountText}"
-                     IsVisible="{Binding HasScanCount}"
-                     FontSize="11" FontWeight="SemiBold"
-                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
-        </Grid>
 
         <!-- 时间行：左「已用」由 code-behind DispatcherTimer 每秒刷新，右「剩余」为 ETA（无效时为空） -->
         <Grid ColumnDefinitions="*,Auto">

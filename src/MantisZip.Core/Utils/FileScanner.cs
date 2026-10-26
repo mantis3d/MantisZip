@@ -48,7 +48,7 @@ internal static class FileScanner
                     try { totalBytes += new FileInfo(file).Length; } catch { /* 跳过无法读取的文件 */ }
 
                     // 每 100ms 报告进度
-                    ReportScanProgress(progress, relativePath, files.Count, ref lastReportTime, reportInterval);
+                    ReportScanProgress(progress, relativePath, files.Count, totalBytes, ref lastReportTime, reportInterval);
                 }
             }
             else if (File.Exists(sourcePath))
@@ -64,19 +64,21 @@ internal static class FileScanner
         return (files, totalBytes);
     }
 
-    private static void ReportScanProgress(IProgress<ArchiveProgress>? progress, string currentFile, int totalFound, ref DateTime lastReportTime, TimeSpan interval)
+    private static void ReportScanProgress(IProgress<ArchiveProgress>? progress, string currentFile, int totalFound, long scannedBytes, ref DateTime lastReportTime, TimeSpan interval)
     {
         var now = DateTime.Now;
         if (now - lastReportTime >= interval)
         {
             // 扫描阶段：总数未知 → PercentComplete 恒 0（UI 据 Phase 走不定进度条）；
-            // TotalFiles 承载"已发现"数量（UI 在文件计数行显示，不塞进状态行）。
+            // TotalFiles 承载"已发现"数量，ScannedBytes 承载已发现文件的尺寸合计
+            // （UI 在「扫描」统计卡里显示，不塞进状态行）。
             // CurrentFile 只放相对路径本身（不拼中文前缀，规则 13：文案一律走本地化）。
             progress?.Report(new ArchiveProgress
             {
                 Phase = ArchivePhase.Scanning,
                 CurrentFile = currentFile,
                 TotalFiles = totalFound,
+                ScannedBytes = scannedBytes,
                 PercentComplete = 0,
                 FilePercentComplete = 0
             });

@@ -258,6 +258,17 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                         {
                             fsOut.Dispose(); // 与加密路径同理：改由 7z + 二进制改写直接产出 outputPath
 
+                            // 自适应分类结果（构成口径）：本档案「已压缩 / 仅存储」的文件数与输入字节合计，
+                            // 供进度窗口统计卡显示。多线程路径在扫描后即完成分类，故这里是最终构成，
+                            // 不随压缩进度变化（进度由「已处理」卡承担）。
+                            progress?.Report(new ArchiveProgress
+                            {
+                                CompressedFiles = compressGroup.Count,
+                                CompressedBytes = compressGroup.Sum(f => SafeFileSize(f.FullPath)),
+                                StoreOnlyFiles = storeGroup.Count,
+                                StoreOnlyBytes = storeGroup.Sum(f => SafeFileSize(f.FullPath)),
+                            });
+
                             // ── N 组并行分支 ──
                             // 复用既有回退判定（IsMultiThreadedEligible 的 7 条已完成）；
                             // 此处仅追加「组数」维度：分组后有效组 < 2 则走下方既有单组路径。
@@ -563,6 +574,41 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                     using var zipWriter = new ZipWriter(fsOut, activeWriterOptions);
 
                     long skippedBytes = 0; // 因读取失败被跳过文件的字节：仅用于推进总进度；不计入 ProcessedFiles，也不污染压缩率
+
+                    // 自适应分类结果（构成口径）：串行路径逐文件分类，边跑边累计；
+                    // 仅「自适应开 + 未加密 + Deflate/Deflate64」才有分类（与 ReadFileWithRetry 的判定同源），
+                    // 否则不上报（null）→ 统计卡自动隐藏。
+                    bool classifyComposition = options.AdaptiveCompression && !options.Encrypt
+                        && (string.IsNullOrEmpty(options.ZipCompressionMethod)
+                            || options.ZipCompressionMethod.Equals("deflate", StringComparison.OrdinalIgnoreCase)
+                            || options.ZipCompressionMethod.Equals("deflate64", StringComparison.OrdinalIgnoreCase));
+                    int compFiles = 0, storeFiles = 0;
+                    long compBytes = 0, storeBytes = 0;
+
+                    // 先整体分类一遍并立刻上报：串行路径逐文件分类要等第一个 100ms 节流才上报，
+                    // 用户会以为「仅存储」卡要等存储阶段才出现（实测反馈）。预分类后两张卡从第一帧就在，
+                    // 与多线程路径（扫描后即上报）口径一致；后续逐文件累计会在节流上报里继续修正。
+                    if (classifyComposition)
+                    {
+                        foreach (var (fullPath, _) in files)
+                        {
+                            var level = AdaptiveRuleMatcher.ResolveLevel(fullPath, options.CompressionLevel,
+                                options.AdaptiveCompression, options.AdaptiveSmartDetect,
+                                options.AdaptiveOverrides, options.CustomFormats);
+                            var size = SafeFileSize(fullPath);
+                            if (level == 0) { storeFiles++; storeBytes += size; }
+                            else { compFiles++; compBytes += size; }
+                        }
+
+                        progress?.Report(new ArchiveProgress
+                        {
+                            CompressedFiles = compFiles,
+                            CompressedBytes = compBytes,
+                            StoreOnlyFiles = storeFiles,
+                            StoreOnlyBytes = storeBytes,
+                        });
+                    }
+
                     foreach (var (fullPath, relativePath) in files)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
@@ -617,10 +663,37 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                 FileTotalBytes = SafeFileSize(fullPath),
                                 BatchProcessedBytes = processedBytes,
                                 BatchTotalBytes = totalBytes,
-                                CompressionRatio = TryStreamOutputRatio(fsOut, processedBytes)
+                                CompressionRatio = TryStreamOutputRatio(fsOut, processedBytes),
+                                // 自适应分类结果（构成口径）：逐文件累计，随进度增长（串行路径无法预知分类）
+                                CompressedFiles = classifyComposition ? compFiles : null,
+                                CompressedBytes = classifyComposition ? compBytes : null,
+                                StoreOnlyFiles = classifyComposition ? storeFiles : null,
+                                StoreOnlyBytes = classifyComposition ? storeBytes : null,
                             });
                             lastReportTime = now;
                         }
+                    }
+
+                    // 自适应分类结果收尾上报（构成口径）：少量文件可能从未触发过 100ms 节流上报，
+                    // 这里补一次，保证「已压缩 / 仅存储」统计卡在任何规模下都有数据。
+                    // 必须同时带上当前进度字段：否则 UI 会把 PercentComplete=0 当成一次进度上报，
+                    // 把已经走到 100% 的进度条拉回 0。
+                    if (classifyComposition)
+                    {
+                        progress?.Report(new ArchiveProgress
+                        {
+                            PercentComplete = totalBytes > 0
+                                ? Math.Min((double)processedBytes / totalBytes * 100, 100)
+                                : 100,
+                            ProcessedBytes = processedBytes,
+                            TotalBytes = totalBytes,
+                            TotalFiles = totalFiles,
+                            ProcessedFiles = processedFiles,
+                            CompressedFiles = compFiles,
+                            CompressedBytes = compBytes,
+                            StoreOnlyFiles = storeFiles,
+                            StoreOnlyBytes = storeBytes,
+                        });
                     }
                 }
             }

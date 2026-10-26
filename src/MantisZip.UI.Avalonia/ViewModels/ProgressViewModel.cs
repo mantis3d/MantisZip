@@ -165,7 +165,6 @@ public partial class ProgressViewModel : ObservableObject
         s["Progress_Time_Elapsed"] = LocalizationManager.T("Progress_Time_Elapsed");
         s["Progress_Time_Remaining"] = LocalizationManager.T("Progress_Time_Remaining");
         s["Progress_CurrentFileLabel"] = LocalizationManager.T("Progress_CurrentFileLabel");
-        s["Progress_Batch_ArchiveOf"] = LocalizationManager.T("Progress_Batch_ArchiveOf");
         s["Progress_Batch_FilesProgress"] = LocalizationManager.T("Progress_Batch_FilesProgress");
         s["Progress_Batch_Pwd_Matching"] = LocalizationManager.T("Progress_Batch_Pwd_Matching");
         s["Progress_Batch_Pwd_MatchedTip"] = LocalizationManager.T("Progress_Batch_Pwd_MatchedTip");
@@ -233,14 +232,9 @@ public partial class ProgressViewModel : ObservableObject
                 ProgressDisplayCalculator.FormatDuration(TimeSpan.FromSeconds(eta)))
             : string.Empty;
 
-        // 文件计数 + 批次档案序号
+        // 文件计数 + 统计卡「压缩包」文案（少/中档显示在进度标签行，完整档显示统计卡）
         if (_lastFileCountTotal > 0)
-        {
-            FileCountText = LocalizationManager.T("Progress_FileCount", _lastFileCountCurrent, _lastFileCountTotal);
-            BatchArchiveIndexText = _lastFileCountIsBatch
-                ? LocalizationManager.T("Progress_Batch_ArchiveOf", _lastFileCountCurrent, _lastFileCountTotal)
-                : string.Empty;
-        }
+            UpdateFileCountText(_lastFileCountCurrent, _lastFileCountTotal, _lastFileCountIsBatch);
 
         // 统计栏（含计数的格式串）——按缓存计数重渲；空值不重渲（避免把未上报的项填成 0）
         if (_statsTotalFiles > 0)
@@ -260,6 +254,15 @@ public partial class ProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(StatsFailedLabel));
         OnPropertyChanged(nameof(StatsOverwrittenLabel));
         OnPropertyChanged(nameof(StatsTotalSizeLabel));
+        OnPropertyChanged(nameof(StatsCompressedLabel));
+        OnPropertyChanged(nameof(StatsStoreOnlyLabel));
+        OnPropertyChanged(nameof(StatsArchiveLabel));
+        OnPropertyChanged(nameof(ScanCardLabel));
+        // 已压缩 / 仅存储的完整文案随语言切换重新格式化（仅在有数据时重写，避免把未上报的卡显示出来）
+        if (!string.IsNullOrEmpty(StatsCompressedText))
+            StatsCompressedText = LocalizationManager.T("Progress_Stats_CompressedFiles", _statsCompressedFiles);
+        if (!string.IsNullOrEmpty(StatsStoreOnlyText))
+            StatsStoreOnlyText = LocalizationManager.T("Progress_Stats_StoreOnlyFiles", _statsStoreOnlyFiles);
 
         // 批处理计数文案（BatchCountText 等）
         NotifyBatchProperties();
@@ -284,6 +287,19 @@ public partial class ProgressViewModel : ObservableObject
 
     /// <summary>当前文件进度比例（0–1），供详细面板「当前文件」行的文件底纹使用。</summary>
     public double CurrentFileRatio => Math.Clamp(FilePercentComplete, 0, 100) / 100.0;
+
+    /// <summary>写出仅存储文件阶段的字节进度（已写 / 总量）。</summary>
+    private long _storePhaseDoneBytes;
+    private long _storePhaseTotalBytes;
+
+    /// <summary>
+    /// 详细面板底部那一行的底纹比例：写出仅存储文件阶段用**整个阶段**的字节进度
+    /// （已写 / 总量），其余阶段用当前文件进度。
+    /// 单个存储文件几乎是一次拷贝完成，按文件进度算的底纹只会 0→100 跳、看起来不动（用户实测反馈）。
+    /// </summary>
+    public double DetailRowRatio => ShowStoreSectionHeader && _storePhaseTotalBytes > 0
+        ? Math.Clamp((double)_storePhaseDoneBytes / _storePhaseTotalBytes, 0.0, 1.0)
+        : CurrentFileRatio;
 
     /// <summary>
     /// 详细面板「当前文件」行右侧信息：合并/写入阶段显示「已写 / 总量」，其余阶段显示当前文件大小。
@@ -604,6 +620,28 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private string _statsTotalCount = "—";
 
+    /// <summary>统计栏/统计卡：已压缩（自适应分类结果，构成口径；引擎未上报时为空 → 整卡隐藏）。</summary>
+    [ObservableProperty]
+    private string _statsCompressedText = string.Empty;
+
+    /// <summary>统计栏/统计卡：仅存储（自适应分类结果，构成口径；引擎未上报时为空 → 整卡隐藏）。</summary>
+    [ObservableProperty]
+    private string _statsStoreOnlyText = string.Empty;
+
+    /// <summary>统计卡行 3（已压缩卡）：分类为「需要压缩」的文件输入字节合计；默认 "—" 占位。</summary>
+    [ObservableProperty]
+    private string _statsCompressedSize = "—";
+
+    /// <summary>统计卡行 3（仅存储卡）：分类为「仅存储」的文件输入字节合计；默认 "—" 占位。</summary>
+    [ObservableProperty]
+    private string _statsStoreOnlySize = "—";
+
+    /// <summary>统计卡行 2（已压缩卡）：文件数（构成口径）。</summary>
+    private long _statsCompressedFiles;
+
+    /// <summary>统计卡行 2（仅存储卡）：文件数（构成口径）。</summary>
+    private long _statsStoreOnlyFiles;
+
     /// <summary>统计卡行 3（跳过）：终态字节累加值（FileTotalBytes 事件优先 ↘ 播种行 Size 回退；从未累加到字节保持 "—"，D2 注 2/D4）。</summary>
     [ObservableProperty]
     private string _statsSkippedSize = "—";
@@ -678,9 +716,25 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private string _currentFileLabel = string.Empty;
 
-    /// <summary>批次档案序号（如 "2 / 5"；非批次为空）。</summary>
-    [ObservableProperty]
-    private string _batchArchiveIndexText = string.Empty;
+    /// <summary>统计卡「压缩包」标题（本地化，语言切换时重算）。</summary>
+    public string StatsArchiveLabel => LocalizationManager.T("Progress_Stats_Archive");
+
+    /// <summary>统计卡「压缩包」第二行：当前档案序号（与其它卡的「数量」行同构；未上报时为空）。</summary>
+    public string StatsArchiveCurrent => _lastFileCountTotal > 0
+        ? _lastFileCountCurrent.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        : string.Empty;
+
+    /// <summary>统计卡「压缩包」第三行：档案总数（"共 5 个"）。压缩包本身没有尺寸可报，这一行改放总数。</summary>
+    public string StatsArchiveTotal => _lastFileCountTotal > 0
+        ? LocalizationManager.T("Progress_Stats_ArchiveTotal", _lastFileCountTotal)
+        : string.Empty;
+
+    /// <summary>统计卡「压缩包」是否出现（引擎报过文件计数之后才有值）。</summary>
+    public bool HasStatsArchive => _lastFileCountTotal > 0;
+
+    /// <summary>「压缩包 N/M」是否显示在总体进度标签行（与百分比同一行）：仅「少/中」档且未进入扫描阶段时显示；
+    /// 「完整」档由统计卡「压缩包」承担，避免同一信息出现两次。</summary>
+    public bool ShowFileCountInLabelRow => !IsFullDensity && !HasScanCount;
 
     /// <summary>派生显示属性集中通知（AGENTS.md 派生属性通知模式，禁逐字段 NotifyPropertyChangedFor）。
     /// 新增派生属性只改这一处。</summary>
@@ -694,8 +748,23 @@ public partial class ProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(IsMinimalDensity));
         OnPropertyChanged(nameof(IsMediumDensity));
         OnPropertyChanged(nameof(IsFullDensity));
+        OnPropertyChanged(nameof(ShowFileCountInLabelRow));
+        OnPropertyChanged(nameof(ShowScanCountInLabelRow));
         NotifyChannelMetaVisibility();
         NotifyChannelProperties();
+    }
+
+    /// <summary>刷新「压缩包 N/M」：进度标签行文案（少/中档）与统计卡「压缩包」（完整档）共用同一份数据，
+    /// 一处赋值两处绑定，避免两条文案不同步。</summary>
+    private void UpdateFileCountText(int current, int total, bool isBatch)
+    {
+        _lastFileCountCurrent = current;
+        _lastFileCountTotal = total;
+        _lastFileCountIsBatch = isBatch;
+        FileCountText = LocalizationManager.T("Progress_FileCount", current, total);
+        OnPropertyChanged(nameof(StatsArchiveCurrent));
+        OnPropertyChanged(nameof(StatsArchiveTotal));
+        OnPropertyChanged(nameof(HasStatsArchive));
     }
 
     /// <summary>通道派生属性集中通知（P1）：CollectionChanged 与 NotifyDisplayProperties 均调用本方法，
@@ -726,6 +795,18 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>统计卡短标签（总大小，从格式化文案剥离占位符得到；与其余短标签一样不随属性变更通知）。</summary>
     public string StatsTotalSizeLabel => LocalizationManager.T("Progress_Stats_TotalSize", string.Empty).Trim();
 
+    /// <summary>统计卡短标签（已压缩，自适应分类构成）。</summary>
+    public string StatsCompressedLabel => LocalizationManager.T("Progress_Stats_CompressedFiles", string.Empty).Trim();
+
+    /// <summary>统计卡短标签（仅存储，自适应分类构成）。</summary>
+    public string StatsStoreOnlyLabel => LocalizationManager.T("Progress_Stats_StoreOnlyFiles", string.Empty).Trim();
+
+    /// <summary>统计卡行 2（已压缩卡）：文件数（构成口径）。</summary>
+    public string StatsCompressedCount => _statsCompressedFiles.ToString();
+
+    /// <summary>统计卡行 2（仅存储卡）：文件数（构成口径）。</summary>
+    public string StatsStoreOnlyCount => _statsStoreOnlyFiles.ToString();
+
     /// <summary>统计卡行 2（已处理）：已处理文件数纯计数（方案 A 去分母——分母与总大小卡行 2 StatsTotalCount 同源重复，比例由总进度条承担；中等档 StatsProcessedText 保留 N/M 分数）。</summary>
     public string StatsProcessedCount => _statsProcessed.ToString();
 
@@ -746,6 +827,8 @@ public partial class ProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(StatsSkippedCount));
         OnPropertyChanged(nameof(StatsFailedCount));
         OnPropertyChanged(nameof(StatsOverwrittenCount));
+        OnPropertyChanged(nameof(StatsCompressedCount));
+        OnPropertyChanged(nameof(StatsStoreOnlyCount));
     }
 
     /// <summary>批处理列表是否至少有一项（Row 0 计数文案的显隐守卫；无批次时隐藏计数而非整区，列表区始终显示）。</summary>
@@ -891,10 +974,27 @@ public partial class ProgressViewModel : ObservableObject
         // 新一轮操作：阶段与扫描计数归零（上一档案的「正在收尾…」「已发现 N 个」不得残留）
         _activePhase = null;
         ScanCountText = null;
+        // 自适应分类构成（已压缩 / 仅存储）属于「当前档案」，新档案/新操作先清空，等引擎重新上报
+        ResetCompositionStats();
         IsIndeterminate = true;
         _preparingText = LocalizationManager.T("Progress_Preparing");
         StatusMessage = _preparingText;
         StatusKind = ProgressStatusKind.Preparing;
+    }
+
+    /// <summary>
+    /// 清空自适应分类构成（已压缩 / 仅存储）—— 属于「当前档案」的统计，
+    /// 换档案或开始新操作时必须清空，等引擎重新上报（未上报的格式保持两张卡隐藏）。
+    /// </summary>
+    private void ResetCompositionStats()
+    {
+        _statsCompressedFiles = 0;
+        _statsStoreOnlyFiles = 0;
+        StatsCompressedText = string.Empty;
+        StatsStoreOnlyText = string.Empty;
+        StatsCompressedSize = "—";
+        StatsStoreOnlySize = "—";
+        NotifyStatsProperties();
     }
 
     /// <summary>结束准备态：不定进度条恢复确定态，准备文案让位给真实状态（若已被其它状态覆盖则不动）。</summary>
@@ -925,10 +1025,37 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private string? _scanCountText;
 
+    /// <summary>扫描阶段已发现文件数（统计卡「扫描」第二行）。</summary>
+    private int _scanFoundFiles;
+
+    /// <summary>扫描阶段已发现文件的尺寸合计（统计卡「扫描」第三行）。</summary>
+    private long _scanScannedBytes;
+
     /// <summary>扫描计数可见性：与 <see cref="FileCountText"/> 在信息区文件计数行互斥显隐。</summary>
     public bool HasScanCount => !string.IsNullOrEmpty(ScanCountText);
 
-    partial void OnScanCountTextChanged(string? value) => OnPropertyChanged(nameof(HasScanCount));
+    /// <summary>统计卡「扫描」标题（本地化，语言切换时重算）。</summary>
+    public string ScanCardLabel => LocalizationManager.T("Progress_Stats_Scanning");
+
+    /// <summary>统计卡「扫描」第二行：已发现文件数（数量行，与其它卡同构）。</summary>
+    public string ScanCardCount => _scanFoundFiles > 0
+        ? _scanFoundFiles.ToString(System.Globalization.CultureInfo.InvariantCulture)
+        : string.Empty;
+
+    /// <summary>统计卡「扫描」第三行：已扫描大小（引擎未携带字节时显示破折号）。</summary>
+    public string ScanCardSize => _scanScannedBytes > 0 ? FormatUtil.FormatSize(_scanScannedBytes) : "—";
+
+    /// <summary>扫描文案是否显示在总体进度标签行：仅「少/中」档（「完整」档由统计卡「扫描」承担，避免重复）。</summary>
+    public bool ShowScanCountInLabelRow => HasScanCount && !IsFullDensity;
+
+    partial void OnScanCountTextChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasScanCount));
+        OnPropertyChanged(nameof(ShowFileCountInLabelRow));
+        OnPropertyChanged(nameof(ShowScanCountInLabelRow));
+        OnPropertyChanged(nameof(ScanCardCount));
+        OnPropertyChanged(nameof(ScanCardSize));
+    }
 
     /// <summary>阶段 → 本地化文案 key。</summary>
     private static string PhaseKey(ArchivePhase phase) => phase switch
@@ -963,6 +1090,38 @@ public partial class ProgressViewModel : ObservableObject
 
         IsIndeterminate = false;
         ScanCountText = null;
+        // 扫描阶段的计数/字节只属于扫描阶段，离开时归零，避免下一个档案的「扫描」卡先闪旧值
+        _scanFoundFiles = 0;
+        _scanScannedBytes = 0;
+    }
+
+    /// <summary>
+    /// 是否为「纯构成上报」：只携带自适应分类计数（已压缩 / 仅存储），不含任何进度字段。
+    /// 这类上报只刷新统计卡，不参与主进度 / 速度 / ETA / 字节计算（否则 0% 会把进度条拉回）。
+    /// </summary>
+    private static bool IsCompositionOnlyReport(ArchiveProgress p) =>
+        (p.CompressedFiles.HasValue || p.StoreOnlyFiles.HasValue)
+        && p.PercentComplete == 0
+        && p.ProcessedFiles == 0
+        && p.ProcessedBytes == 0
+        && p.TotalFiles == 0
+        && string.IsNullOrEmpty(p.CurrentFile)
+        && !p.EntryStatus.HasValue
+        && p.BatchIndex == null;
+
+    /// <summary>
+    /// 应用自适应分类构成（已压缩 / 仅存储）到统计卡：文件数 + 输入字节合计。
+    /// 引擎只在自适应 ZIP 上报；未上报的格式保持空串 → 两张卡整卡隐藏（规则 6）。
+    /// </summary>
+    private void ApplyCompositionStats(ArchiveProgress p)
+    {
+        if (p.CompressedFiles.HasValue) _statsCompressedFiles = p.CompressedFiles.Value;
+        if (p.StoreOnlyFiles.HasValue) _statsStoreOnlyFiles = p.StoreOnlyFiles.Value;
+        if (p.CompressedBytes.HasValue) StatsCompressedSize = FormatUtil.FormatSize(p.CompressedBytes.Value);
+        if (p.StoreOnlyBytes.HasValue) StatsStoreOnlySize = FormatUtil.FormatSize(p.StoreOnlyBytes.Value);
+        StatsCompressedText = LocalizationManager.T("Progress_Stats_CompressedFiles", _statsCompressedFiles);
+        StatsStoreOnlyText = LocalizationManager.T("Progress_Stats_StoreOnlyFiles", _statsStoreOnlyFiles);
+        NotifyStatsProperties();
     }
 
     /// <summary>
@@ -982,7 +1141,10 @@ public partial class ProgressViewModel : ObservableObject
         //（详细面板「当前文件」行与简约面板都依赖它）。
         && string.IsNullOrEmpty(p.CurrentFile)
         && p.FileTotalBytes == 0
-        && p.FilePercentComplete == null;
+        && p.FilePercentComplete == null
+        // 自适应分类结果（已压缩 / 仅存储）也是有效数据：只带分类计数的上报必须走常规处理
+        && p.CompressedFiles == null
+        && p.StoreOnlyFiles == null;
 
     /// <summary>
     /// 简约面板「当前文件」进度条取值：有逐文件百分比时用它，否则回退到总进度。
@@ -994,7 +1156,12 @@ public partial class ProgressViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(SimpleFileBarValue));
         OnPropertyChanged(nameof(CurrentFileRatio));
+        OnPropertyChanged(nameof(DetailRowRatio));
     }
+
+    // 「存储文件」标题出现/消失时，那一行的底纹数据源在「阶段字节进度」与「文件进度」之间切换
+    partial void OnShowStoreSectionHeaderChanged(bool value)
+        => OnPropertyChanged(nameof(DetailRowRatio));
 
     /// <summary>
     /// Update all progress-bound properties from an <see cref="ArchiveProgress"/> report.
@@ -1031,7 +1198,15 @@ public partial class ProgressViewModel : ObservableObject
         {
             ApplyPhase(p.Phase.Value);
             if (p.Phase.Value == ArchivePhase.Scanning)
+            {
+                // 统计卡「扫描」两行：已发现数量 + 已扫描大小（引擎按 100ms 节流上报，字节随扫描增长）
+                _scanFoundFiles = p.TotalFiles;
+                _scanScannedBytes = p.ScannedBytes ?? 0;
                 ScanCountText = LocalizationManager.T("Progress_FileCount_Scanning", p.TotalFiles);
+                // 数量不变时 ScanCountText 不变、不会触发 OnScanCountTextChanged，这里显式刷新第三行
+                OnPropertyChanged(nameof(ScanCardCount));
+                OnPropertyChanged(nameof(ScanCardSize));
+            }
 
             // 纯阶段上报只携带阶段标签（不携带任何进度信息）→ **不得回写主进度**。
             // 否则解压末尾的「正在收尾…」会把已到 100% 的主进度打回 0%，
@@ -1056,6 +1231,15 @@ public partial class ProgressViewModel : ObservableObject
                 EntryProgressItem.MapEntryStatus(p.EntryStatus.Value), null, p.FileTotalBytes, p.EntryCompressedBytes);
             // T5: 确定性条目结果聚合（红/黄摘要段）——必须在早返回前收集，不落入速度采样路径
             CollectEntryOutcome(p.EntryKey, p.EntryStatus.Value, p.EntryFailureReason, p.EntryErrorDetail, p.EntryErrorHResult);
+            return;
+        }
+
+        // 纯构成上报（只有自适应分类计数，无任何进度字段）：只刷新「已压缩 / 仅存储」统计卡。
+        // 这类上报会在压缩开始前（多线程扫描完即分类）到达，若走常规流程会以 PercentComplete=0
+        // 覆盖主进度，故在进度计算前独立处理并早返回。
+        if (IsCompositionOnlyReport(p))
+        {
+            ApplyCompositionStats(p);
             return;
         }
 
@@ -1115,32 +1299,28 @@ public partial class ProgressViewModel : ObservableObject
             DetailFileInfoText = $"{FormatUtil.FormatSize(p.BatchProcessedBytes)} / {FormatUtil.FormatSize(p.BatchTotalBytes)}";
             // 该阶段即「写出仅存储文件」：顶部通道行不再变化，下方换成「存储文件」小标题 + 该行
             ShowStoreSectionHeader = true;
+            // 底纹改用整个存储阶段的字节进度（按单文件进度算会 0→100 跳、看起来不动）
+            _storePhaseDoneBytes = Math.Min(p.BatchProcessedBytes, p.BatchTotalBytes);
+            _storePhaseTotalBytes = p.BatchTotalBytes;
+            OnPropertyChanged(nameof(DetailRowRatio));
         }
         else if (p.FileTotalBytes > 0)
         {
             DetailFileInfoText = FormatUtil.FormatSize(p.FileTotalBytes);
         }
 
-        // File count + 批次档案序号（"2 / 5"）
+        // 文件计数 + 统计卡「压缩包」（"压缩包 2/5"）：批次按档案推进，单档固定 1/1
         if (_isBatchMode && _batchItems != null && _batchItems.Count > 0)
         {
             int current = _currentBatchIndex >= 0
                 ? Math.Min(_currentBatchIndex + 1, _batchItems.Count)
                 : Math.Min((int)p.PercentComplete / 100 * _batchItems.Count, _batchItems.Count);
             if (current < 1) current = 1;
-            FileCountText = LocalizationManager.T("Progress_FileCount", current, _batchItems.Count);
-            BatchArchiveIndexText = LocalizationManager.T("Progress_Batch_ArchiveOf", current, _batchItems.Count);
-            _lastFileCountCurrent = current;
-            _lastFileCountTotal = _batchItems.Count;
-            _lastFileCountIsBatch = true;
+            UpdateFileCountText(current, _batchItems.Count, isBatch: true);
         }
         else
         {
-            FileCountText = LocalizationManager.T("Progress_FileCount", 1, 1);
-            BatchArchiveIndexText = string.Empty;
-            _lastFileCountCurrent = 1;
-            _lastFileCountTotal = 1;
-            _lastFileCountIsBatch = false;
+            UpdateFileCountText(1, 1, isBatch: false);
         }
 
         // 速度采样（EMA 平滑；tracker 内置 100ms 节流）→ 速度文案
@@ -1204,6 +1384,11 @@ public partial class ProgressViewModel : ObservableObject
             // 终态摘要用：当前压缩包总字节（批量切换时结算，见 SetCurrentBatchItem）
             _currentArchiveBytes = p.TotalBytes;
         }
+
+        // 自适应分类结果（构成口径）：已压缩 / 仅存储。引擎仅在「自适应 ZIP」上报，
+        // 未上报的格式（7z / TAR.GZ / 加密 ZIP / 关闭自适应）保持空串 → 两张卡整卡隐藏（规则 6）。
+        if (p.CompressedFiles.HasValue || p.StoreOnlyFiles.HasValue)
+            ApplyCompositionStats(p);
 
         // 整体压缩汇总（压缩率计划）：后置回填，仅 ZIP 压缩完成时上报
         if (p.TotalCompressedBytes > 0)
@@ -1269,6 +1454,12 @@ public partial class ProgressViewModel : ObservableObject
             UpdateChannelHeaderText();
         }
 
+        // 压缩流程的「并行度」= 实际并行分组数（引擎按 CPU 核数决定，可能与设置里的值不同）。
+        // 此前只有解压经 ExtractFlow.SetParallelDegree 赋值，压缩即使开了多线程也从不显示并行度。
+        // 解压流程的并行度由外部显式设置，这里不覆盖（IsCompressFlow 为 false 时跳过）。
+        if (IsCompressFlow && _channelGroupCount >= 2 && ParallelDegree != _channelGroupCount)
+            ParallelDegree = _channelGroupCount;
+
         // 首个并行批次上报到达前，非批次上报（解压大包预测试状态 / 压缩收集阶段）已合成一条
         // IsParallel=false 单行并占据集合索引 0。IsParallel 是 init 只读，若不清掉，batch 0 会写进
         // 这条非并行行 → XAML 里批次底纹（进度条）、序号、N% 均绑 IsVisible=IsParallel → 第一行
@@ -1313,6 +1504,9 @@ public partial class ProgressViewModel : ObservableObject
     {
         _channelGroupCount = 0;
         ShowStoreSectionHeader = false;
+        _storePhaseDoneBytes = 0;
+        _storePhaseTotalBytes = 0;
+        OnPropertyChanged(nameof(DetailRowRatio));
         UpdateChannelHeaderText();
     }
 
