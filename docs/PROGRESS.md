@@ -7,7 +7,7 @@
 - **技术栈**: .NET 10 + Avalonia 12 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.5.3
+- **当前版本**: 0.5.4
 - **发布日期**: 2026-07-22
 
 ## 变更记录结构
@@ -182,8 +182,10 @@
 
 按版本分组，每组按日期从新到旧排列。
 
-#### v0.5.3
+#### v0.5.4
 - **10-26** — 删除条目的匹配语义改为「条目或其后代」+ 零命中报错（Core）：`ArchivePath` 新增 `MatchesEntryOrDescendant`（去尾斜杠 + 忽略大小写 + `/` 边界，`"a"` 不再吃掉 `"ab/a.txt"`）；`ZipEngine` copy-mode 改为先校验后重写（零命中删掉临时包再抛错，不再产出半成品）、legacy 校验集合归一化后走同一谓词；`SevenZipEngine` 零命中在建临时目录**之前**抛出（此前会白跑一遍整包解压 + 重打包）；新增 `ArchiveEntryNotFoundException : FileNotFoundException`（带 `EntryPath`）替代裸 `FileNotFoundException`，既有 catch 与契约不受影响
+
+#### v0.5.3
 - **10-21** — 工程化自检落地（构建）：`scripts/verify-repo.ps1` 新增 `-Task guards`（把 AGENTS.md 里可机器校验的四条规则固化为守卫：快捷键登记 10.1 / XAML 本地化 key 登记 13 / 禁用原生 StorageProvider 16 / 图标注册 8），并入 `-Task check`（仍是毫秒级纯文件校验）；CI 增加 version / i18n / guards 三步静态门禁（失败即红，build+test 逻辑不动）；DSH 插件新增第 4 个工具 `mantiszip_guards`。同时 `-Task test` 增加 xunit MTP 兜底：`dotnet test` 失败且无编译诊断、无测试汇总行（= 用例一条都没跑起来，如受限环境里 testhost 无法打开父进程句柄）时，自动改用 `dotnet exec <测试程序集>` 直跑 xunit v3 的 MTP 入口（JSON `runner: mtp`），用例真失败不触发。顺带修掉两处存量守卫违规：`MainWindowViewModel` keys 数组里的死 key `Status_ArchiveStats`（三语都不存在）与 `AppIcons` 的 `IconHtml` 未注册到图标测试窗口
 
 #### v0.5.2
@@ -254,11 +256,11 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
-| 意图-执行接缝收口（确认即载荷 / 执行只吃不可变载荷 / 四态结局 / 单一进度 presenter）：新增 `ConfirmOutcome` / `RunOutcome` / `CompressRunContext` / `ExtractRunContext` / `IProgressPresenter` 契约层，唯一执行器 `CompressSession` / `ExtractSession`，两个 presenter 实现；压缩四入口 + 解压五入口改接，删除 8 条回读后门；`verify-repo.ps1` 第 5 条 `dialog-seam` 守卫 + AGENTS.md 规则 20） | [intent-execution-seam.md](.omo/plans/已完成/intent-execution-seam.md) | 未发布（2026-10-26 归档，随 v0.5.3） |
+| 意图-执行接缝收口（确认即载荷 / 执行只吃不可变载荷 / 四态结局 / 单一进度 presenter）：新增 `ConfirmOutcome` / `RunOutcome` / `CompressRunContext` / `ExtractRunContext` / `IProgressPresenter` 契约层，唯一执行器 `CompressSession` / `ExtractSession`，两个 presenter 实现；压缩四入口 + 解压五入口改接，删除 8 条回读后门；`verify-repo.ps1` 第 5 条 `dialog-seam` 守卫 + AGENTS.md 规则 20） | [intent-execution-seam.md](.omo/plans/已完成/intent-execution-seam.md) | 未发布（2026-10-26 归档，随 v0.5.4） |
 | 启动优化：主窗口 UI 延迟加载（过滤栏 50 元素 / 内容区 171 元素 / 菜单子项 ~170 元素三段延迟创建，累计 XamlSpan 约 −155~−195ms；产物 `Controls/MainFilterBar.axaml`、`Controls/ArchiveContentView.axaml`、`Controls/Menus/*MenuItems.axaml`、`Controls/Menus/TestMenuView.axaml`；三阶段均「只创建不改变」+ 局部资源随迁 + 静态资源守卫测试） | [startup-ui-lazy-loading.md](.omo/plans/已完成/startup-ui-lazy-loading.md) | 未发布（2026-10-21 实施，2026-10-22 归档） |
-| 图标归一化（117 个图标统一到 Fluent 24 Regular 网格：38 个异坐标系 + 11 个手绘重画，键名零改动；显示尺寸 14/15px 收敛到 16px 共 109 处；新增 `PathIcon.ToolbarButtonIcon` 前景色样式；`IconTestWindow` 三档尺寸 × 浅/深背景块矩阵页 + 无头回归；顺带把 `render-icon-montage.ps1` 判据从「最大数字」改为真实渲染包围盒） | [icon-normalization.md](.omo/plans/已完成/icon-normalization.md) | 未发布（2026-10-26 归档，随 v0.5.3） |
-| 压缩包内删除目录修复（递归删除 + 零命中报错，插队项）：`ArchivePath.MatchesEntryOrDescendant` 统一 Zip(copy-mode/legacy)/7z 三处匹配；新增 `ArchiveEntryNotFoundException` 消灭静默成功；UI 二次确认 + `CanDeleteEntries` 能力门禁 + 进度窗说明行；25 条新回归测试 | [delete-directory-entries.md](.omo/plans/已完成/delete-directory-entries.md) | 未发布（2026-10-26 归档，随 v0.5.3） |
-| 树视图切换按钮选中态背景对比度（`ResultTreeView` 的紧凑/筛选 ± `ProgressWindow` 三个 ± `QuickPathControl` 四个路径标签共 9 个 ToggleButton 删除本地 `Background`/`BorderBrush`，让 `App.axaml` 的 `ToggleButton:checked` 强调色生效——局部值优先级高于样式 setter，此前被压成浅灰底 + 白图标；按钮内 `PathIcon` 改挂 `Classes="ToolbarButtonIcon"` 以免本地 `Foreground` 压掉选中态白色；双主题真机截图取证） | [toggle-selected-contrast.md](.omo/plans/已完成/toggle-selected-contrast.md) | 未发布（2026-10-26 归档，随 v0.5.3） |
+| 图标归一化（117 个图标统一到 Fluent 24 Regular 网格：38 个异坐标系 + 11 个手绘重画，键名零改动；显示尺寸 14/15px 收敛到 16px 共 109 处；新增 `PathIcon.ToolbarButtonIcon` 前景色样式；`IconTestWindow` 三档尺寸 × 浅/深背景块矩阵页 + 无头回归；顺带把 `render-icon-montage.ps1` 判据从「最大数字」改为真实渲染包围盒） | [icon-normalization.md](.omo/plans/已完成/icon-normalization.md) | 未发布（2026-10-26 归档，随 v0.5.4） |
+| 压缩包内删除目录修复（递归删除 + 零命中报错，插队项）：`ArchivePath.MatchesEntryOrDescendant` 统一 Zip(copy-mode/legacy)/7z 三处匹配；新增 `ArchiveEntryNotFoundException` 消灭静默成功；UI 二次确认 + `CanDeleteEntries` 能力门禁 + 进度窗说明行；25 条新回归测试 | [delete-directory-entries.md](.omo/plans/已完成/delete-directory-entries.md) | 未发布（2026-10-26 归档，随 v0.5.4） |
+| 树视图切换按钮选中态背景对比度（`ResultTreeView` 的紧凑/筛选 ± `ProgressWindow` 三个 ± `QuickPathControl` 四个路径标签共 9 个 ToggleButton 删除本地 `Background`/`BorderBrush`，让 `App.axaml` 的 `ToggleButton:checked` 强调色生效——局部值优先级高于样式 setter，此前被压成浅灰底 + 白图标；按钮内 `PathIcon` 改挂 `Classes="ToolbarButtonIcon"` 以免本地 `Foreground` 压掉选中态白色；双主题真机截图取证） | [toggle-selected-contrast.md](.omo/plans/已完成/toggle-selected-contrast.md) | 未发布（2026-10-26 归档，随 v0.5.4） |
 | 维护脚本下沉：`scripts/verify-repo.ps1` + DSH 插件薄壳（三个只读工具的逻辑从插件下沉为仓库脚本，5 个 task：`build` / `test` / `i18n` / `version` / `check`；`-Json` + 退出码 0/1 供 CI 与任意 harness 复用；插件 739→640 行退化为 schema / render / 进程编排，JSON 输出契约逐字段不变；负向夹具验证非「永远绿」） | [verify-repo-script-extraction.md](.omo/plans/已完成/verify-repo-script-extraction.md) | 未发布（2026-10-21） |
 | 仅应用程序集 ReadyToRun（`PublishReadyToRun=true` 时排除其余 268 个程序集；体积 +4.3MB，交错 A/B n=10 TOTAL −126.8ms、`Win.Xaml` −50.2ms 10/10 胜；release workflow 已启用） | [r2r-app-assembly.md](.omo/plans/已完成/r2r-app-assembly.md) | 未发布（2026-10-20） |
 | AppSettings 序列化改用 STJ 源生成（`AppSettingsJsonContext` 编译期元数据；4 条兼容测试；A/B `Init.Settings` 1.7→1.7ms 门控未达，保留用于 Trim/AOT 铺路，不宣称启动收益） | [stj-source-gen-appsettings.md](.omo/plans/已完成/stj-source-gen-appsettings.md) | 未发布（2026-10-20） |
