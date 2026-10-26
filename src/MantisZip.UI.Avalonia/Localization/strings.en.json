@@ -1,4 +1,12 @@
 ﻿{
+  "IconTest_TabList": "Icon List",
+  "IconTest_TabMatrix": "Size Matrix",
+  "IconTest_MatrixTitle": "Three Sizes × Dual Themes",
+  "IconTest_MatrixHint": "Each icon is rendered at 16 / 22 / 28 px twice: on the light block (left, dark icon on white) and on the dark block (right, light icon on dark), for manual acceptance of clarity and contrast.",
+  "IconTest_SizeLabel": "Size (16 / 22 / 28 px)",
+  "IconTest_LightLabel": "Light",
+  "IconTest_DarkLabel": "Dark",
+  "IconTest_MatrixCountFmt": "{0} icon(s)",
   "Confirm_DeleteDirectoryFmt": "This will delete folder \"{0}\" and the {1} file(s) inside it ({2}). This cannot be undone.",
   "Confirm_DeleteFileFmt": "This will delete \"{0}\" ({1}). This cannot be undone.",
   "Error_Delete_EntryNotFound": "Entry not found in archive: {0}",

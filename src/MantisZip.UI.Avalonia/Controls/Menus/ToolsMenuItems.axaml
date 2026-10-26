@@ -14,14 +14,14 @@
   <MenuItem Command="{Binding OpenPasswordManagerCommand}"
             Header="{Binding LocalizedStrings[Menu_PasswordManager]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconKeyMultiple}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconKeyMultiple}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>
   <!-- 收藏夹管理：管理常用路径收藏，支持添加/编辑/删除/排序 -->
   <MenuItem Command="{Binding OpenFavoritesManagerCommand}"
             Header="{Binding LocalizedStrings[FavMgr_OpenManager]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconBookmarkMultiple}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconBookmarkMultiple}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>
   <Separator />
@@ -29,7 +29,7 @@
   <MenuItem Command="{Binding OpenSettingsCommand}" InputGesture="Ctrl+,"
             Header="{Binding LocalizedStrings[Menu_Settings]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconSettings}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>
 </StackPanel>

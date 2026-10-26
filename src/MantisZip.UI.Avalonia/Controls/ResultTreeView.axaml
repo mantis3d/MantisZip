@@ -32,7 +32,7 @@
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                       IsCheckedChanged="OnCompactToggleChanged">
-          <PathIcon Data="{StaticResource IconChevronDownUp}" Width="14" Height="14" />
+          <PathIcon Data="{StaticResource IconChevronDownUp}" Width="16" Height="16" Classes="ToolbarButtonIcon" />
         </ToggleButton>
         <!-- 全部展开按钮：递归展开所有树节点 -->
         <Button x:Name="ExpandAllButton"
@@ -43,7 +43,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 Click="OnExpandAllClick">
-          <PathIcon Data="{StaticResource IconArrowExpandAll}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <PathIcon Data="{StaticResource IconArrowExpandAll}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
         <!-- 定位按钮：在树中定位到当前选中项（当前禁用，预留功能） -->
         <Button x:Name="LocateButton"
@@ -54,7 +54,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}"
                 Click="OnLocateClick">
-          <PathIcon Data="{StaticResource IconLocation}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+          <PathIcon Data="{StaticResource IconLocation}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
         <!-- 过滤切换：显示/隐藏被过滤的灰显节点 -->
         <ToggleButton x:Name="FilterToggle"
@@ -64,7 +64,7 @@
                       Background="{DynamicResource ThemeButtonBgBrush}"
                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                       IsCheckedChanged="OnFilterToggleChanged">
-          <PathIcon Data="{StaticResource IconFilter}" Width="14" Height="14" />
+          <PathIcon Data="{StaticResource IconFilter}" Width="16" Height="16" Classes="ToolbarButtonIcon" />
         </ToggleButton>
         <!-- 摘要文本：显示文件数、总大小等统计信息 -->
         <TextBlock x:Name="SummaryTextBlock"
@@ -123,7 +123,7 @@
                           Opacity="{Binding TextOpacity}">
                 <!-- 文件夹/文件/警告图标：通过 GeometryResourceConverter 从资源键获取 Geometry -->
                 <PathIcon Data="{Binding IconKey, Converter={StaticResource GeometryResourceConverter}}"
-                          Width="14" Height="14"
+                          Width="16" Height="16"
                           VerticalAlignment="Center"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           Opacity="{Binding IsEmptyDirectory, Converter={StaticResource BoolToEmptyDirOpacityConverter}}" />

@@ -26,8 +26,8 @@
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}">
         <PathIcon Data="{StaticResource IconBookmark}"
-                  Width="14"
-                  Height="14"
+                  Width="16"
+                  Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </ToggleButton>
       <!-- 历史标签：显示最近访问的路径列表 -->
@@ -40,8 +40,8 @@
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}">
         <PathIcon Data="{StaticResource IconHistory}"
-                  Width="14"
-                  Height="14"
+                  Width="16"
+                  Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </ToggleButton>
       <!-- 窗口标签：显示当前打开的资源管理器窗口路径 -->
@@ -54,8 +54,8 @@
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}">
         <PathIcon Data="{StaticResource IconLightning}"
-                  Width="14"
-                  Height="14"
+                  Width="16"
+                  Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </ToggleButton>
       <!-- 目录树标签：显示文件系统目录树 -->
@@ -68,8 +68,8 @@
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}">
         <PathIcon Data="{StaticResource IconFolder}"
-                  Width="14"
-                  Height="14"
+                  Width="16"
+                  Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </ToggleButton>
       <!-- 搜索框：过滤当前标签页下的路径列表 -->

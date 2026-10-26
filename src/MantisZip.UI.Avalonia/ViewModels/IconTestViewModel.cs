@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Linq;
 using CommunityToolkit.Mvvm.ComponentModel;
 using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.ViewModels;
 
@@ -25,9 +26,56 @@ public partial class IconTestViewModel : ObservableObject
     [ObservableProperty]
     private int _pendingCount;
 
+    // ── 三档尺寸 × 双主题矩阵页（由窗口的第二个页签使用） ──
+
+    /// <summary>
+    /// 矩阵页数据源：按 ResourceKey 去重后的图标列表。
+    /// LoadAllIcons() 里同一几何会被多处复用（如 IconFolder 出现 7 次），矩阵页只需每个图标渲染一次；
+    /// 无 ResourceKey 的条目没有可渲染的 PathIcon，直接排除。去重后共 117 个图标。
+    /// </summary>
+    public IReadOnlyList<IconTestItem> MatrixIcons { get; }
+
+    /// <summary>矩阵页图标总数（供页头「共 N 个图标」文案使用，验收标准为 117）。</summary>
+    public int MatrixIconCount => MatrixIcons.Count;
+
+    // ── 本地化文案（规则 13：新增用户可见文案禁止硬编码，统一走 LocalizationManager） ──
+
+    /// <summary>页签一标题：图标列表。</summary>
+    public string TabListTitle => LocalizationManager.T("IconTest_TabList");
+
+    /// <summary>页签二标题：尺寸矩阵。</summary>
+    public string TabMatrixTitle => LocalizationManager.T("IconTest_TabMatrix");
+
+    /// <summary>矩阵页标题。</summary>
+    public string MatrixTitle => LocalizationManager.T("IconTest_MatrixTitle");
+
+    /// <summary>矩阵页说明（描述浅色块 / 深色块与三档尺寸的含义）。</summary>
+    public string MatrixHint => LocalizationManager.T("IconTest_MatrixHint");
+
+    /// <summary>尺寸图例前缀文字。</summary>
+    public string SizeLabel => LocalizationManager.T("IconTest_SizeLabel");
+
+    /// <summary>浅色背景块图例文字。</summary>
+    public string LightLabel => LocalizationManager.T("IconTest_LightLabel");
+
+    /// <summary>深色背景块图例文字。</summary>
+    public string DarkLabel => LocalizationManager.T("IconTest_DarkLabel");
+
+    /// <summary>矩阵页图标总数文案（含 {0} 占位符）。</summary>
+    public string MatrixCountText => LocalizationManager.T("IconTest_MatrixCountFmt", MatrixIconCount);
+
     public IconTestViewModel()
     {
         LoadAllIcons();
+
+        // 矩阵页数据源：图标清单在构造期一次性加载完毕，这里同步做去重投影即可（无需变更通知）。
+        // - 同一 ResourceKey 会被多个语义条目复用，矩阵只需渲染一次
+        // - ResourceKey 为空的条目没有几何可用，跳过
+        MatrixIcons = Icons
+            .Where(i => !string.IsNullOrWhiteSpace(i.ResourceKey))
+            .GroupBy(i => i.ResourceKey!, StringComparer.Ordinal)
+            .Select(g => g.First())
+            .ToList();
     }
 
     partial void OnFilterTextChanged(string value)

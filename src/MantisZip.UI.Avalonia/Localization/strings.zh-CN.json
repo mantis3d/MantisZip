@@ -1,4 +1,12 @@
 ﻿{
+  "IconTest_TabList": "图标列表",
+  "IconTest_TabMatrix": "尺寸矩阵",
+  "IconTest_MatrixTitle": "三档尺寸 × 双主题矩阵",
+  "IconTest_MatrixHint": "每个图标按 16 / 22 / 28 px 三档尺寸各渲染一次：左侧色块为浅色背景（白底深色图标），右侧色块为深色背景（深底浅色图标），用于人工验收清晰度与对比度。",
+  "IconTest_SizeLabel": "尺寸（16 / 22 / 28 px）",
+  "IconTest_LightLabel": "浅色",
+  "IconTest_DarkLabel": "深色",
+  "IconTest_MatrixCountFmt": "共 {0} 个图标",
   "Confirm_DeleteDirectoryFmt": "将删除目录「{0}」及其下 {1} 个文件（共 {2}），此操作不可撤销。",
   "Confirm_DeleteFileFmt": "将删除「{0}」（{1}），此操作不可撤销。",
   "Error_Delete_EntryNotFound": "压缩包中不存在条目：{0}",

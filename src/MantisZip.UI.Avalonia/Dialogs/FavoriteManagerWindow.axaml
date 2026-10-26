@@ -62,7 +62,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <PathIcon Data="{StaticResource IconBookmarkAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconBookmarkAdd}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding AddText}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
@@ -75,7 +75,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <PathIcon Data="{StaticResource IconBookmark}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconBookmark}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding EditText}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
@@ -88,7 +88,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <PathIcon Data="{StaticResource IconBookmarkOff}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconBookmarkOff}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding DeleteText}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
@@ -101,7 +101,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <PathIcon Data="{StaticResource IconArrowUp}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconArrowUp}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding MoveUpText}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>
@@ -114,7 +114,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <StackPanel Orientation="Horizontal" Spacing="6">
-            <PathIcon Data="{StaticResource IconArrowDown}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconArrowDown}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock Text="{Binding MoveDownText}" VerticalAlignment="Center" />
           </StackPanel>
         </Button>

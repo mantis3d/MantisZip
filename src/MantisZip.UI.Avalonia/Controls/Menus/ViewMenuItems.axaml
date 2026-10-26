@@ -89,7 +89,7 @@
   <MenuItem Command="{Binding SaveLayoutCommand}"
             Header="{Binding LocalizedStrings[Menu_SaveLayout]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconSave}" Width="14" Height="14"
+      <PathIcon Data="{StaticResource IconSave}" Width="16" Height="16"
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>

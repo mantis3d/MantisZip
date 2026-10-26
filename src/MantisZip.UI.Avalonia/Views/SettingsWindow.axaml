@@ -218,14 +218,14 @@
                                   <Button Grid.Column="1" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="EditCustomFormat_Click"
                                           ToolTip.Tip="编辑">
-                                    <PathIcon Data="{StaticResource IconEdit}" Width="15" Height="15"
+                                    <PathIcon Data="{StaticResource IconEdit}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                   <!-- 删除按钮（矢量图标：IconDelete） -->
                                   <Button Grid.Column="2" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="DeleteCustomFormat_Click"
                                           ToolTip.Tip="删除">
-                                    <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15"
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                 </Grid>
@@ -277,12 +277,12 @@
                                 <StackPanel Orientation="Horizontal" Grid.Column="6">
                                   <!-- 编辑按钮（矢量图标：IconEdit） -->
                                   <Button Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="编辑">
-                                    <PathIcon Data="{StaticResource IconEdit}" Width="15" Height="15"
+                                    <PathIcon Data="{StaticResource IconEdit}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                   <!-- 删除按钮（矢量图标：IconDelete） -->
                                   <Button Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="删除">
-                                    <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15"
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                 </StackPanel>
@@ -1173,7 +1173,7 @@
                                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                                                       ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).MetadataMoveUpTooltip}"
                                                       Click="OnPreviewFieldMoveUp">
-                                                <PathIcon Data="{StaticResource IconArrowUp}" Width="10" Height="10" />
+                                                <PathIcon Data="{StaticResource IconArrowUp}" Width="10" Height="10" Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                                               </Button>
                                               <Button Width="16" Height="16" Padding="0"
                                                       BorderThickness="1"
@@ -1182,7 +1182,7 @@
                                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                                                       ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).MetadataMoveDownTooltip}"
                                                       Click="OnPreviewFieldMoveDown">
-                                                <PathIcon Data="{StaticResource IconArrowDown}" Width="10" Height="10" />
+                                                <PathIcon Data="{StaticResource IconArrowDown}" Width="10" Height="10" Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                                               </Button>
                                             </StackPanel>
                                           </StackPanel>
@@ -1385,7 +1385,7 @@
                             <TextBlock Text="{Binding CurrentHandler}" FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center" />
                             <Button Width="28" Height="28" Command="{Binding DeleteCommand}" IsVisible="{Binding IsCustom}" Background="{DynamicResource ThemeButtonBgBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" Padding="4"
                                     ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).AssocDeleteTooltip}">
-                                <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                                <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                               </Button>
                           </StackPanel>
                         </Grid>
