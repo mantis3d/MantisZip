@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 记录：评估后放弃「真暂停」（需要先改引擎线程模型）
+  - **需求**：用户指出「暂停就是要暂停整个压缩或者解压动作」，而当时的暂停按钮只冻结「已用时间」显示，进度条与文件处理都继续（Core 里 `rg "Pause"` 零命中，`ProgressViewModel.PauseEvent` 只被冲突框暂停分支等待）。
+  - **曾实现并已回滚的方案**（完整备份：`%TEMP%\mantiszip-pause-revert-20261026\`，含 `tracked-changes.patch` 与 4 个新文件）：`ArchiveOptions.PauseEvent` / `CompressRequest.PauseEvent`（`ManualResetEventSlim?`）+ `PauseGate.WaitIfPaused`（统一阻塞点）+ `PauseAwareStream`（写流装饰器，按 4 MB 块暂停）；安全点覆盖 ZIP 解压 4 条条目循环与 4 处写文件、ZIP 压缩串行主循环 / 两个 store 组循环 / 7z 组调用 / 逐文件循环、TAR.GZ 8 处、7z 3 处；UI 侧暂停期间速度与剩余时间显示「—」、`PauseFromConflict` 补 `StatusKind = Paused`、冲突框暂停后取消最小化并 `Activate()` 进度窗口。当时 core / avalonia 构建 0 警告、新增 11 例测试全绿。
+  - **为什么回滚**（用户实测：按暂停后「像卡死、不能恢复」，连「继续」都点不了）：暂停闸门是**同步阻塞**的，而串行解压 / 压缩的 `await` 续体跑在 **UI 线程**上 —— Core 几乎没有 `ConfigureAwait(false)`，`ExtractFlow` / `AvaloniaCompressService` 也是直接 `await` 引擎 ⇒ 按暂停等于阻塞 UI 线程，窗口不重绘、按钮点不动。
+  - **结论**：保持现有行为（暂停只冻结「已用时间」，不做真暂停）。真暂停的前置条件是把引擎移出 UI 线程（在 `ExtractService` / `AvaloniaCompressService` 里用 `Task.Run` 包一层，并复核进度上报、`onItemStatus` / `onItemOutputPath`、冲突与密码弹窗回调的线程封送），属独立一轮改造，不放进 0.5.3 收尾。
+  - **未改动**：`RELEASE_NOTES.md` 未写入（功能未落地，不进发布说明）；`docs/PROGRESS.md` 未加条目（无上线内容）。
 **2026-10-26** — 修复：冲突提示链路的卡死风险 + 新增出厂即开的冲突证据链日志（`conflict.log`）
   - **问题**（用户报告，无法复现）：多线程解压时出现「文件已存在」冲突提示，关掉一个后整个解压卡住不动 —— 进度不前进、也没有新提示。用户怀疑还有第二个冲突框没显示出来（可能被进度窗口挡住）。
   - **排查结论**（4 个并行 subagent + 本机日志取证）：
