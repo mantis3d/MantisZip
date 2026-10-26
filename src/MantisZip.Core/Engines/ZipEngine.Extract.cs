@@ -403,16 +403,8 @@ public partial class ZipEngine
                 }
                 else
                 {
-                    await conflictGate.WaitAsync(ct);
-                    try
-                    {
-                        resolvedPath = await FileConflictHelper.ResolvePathAsync(
-                            outputPath, options, entryModified, entrySize);
-                    }
-                    finally
-                    {
-                        conflictGate.Release();
-                    }
+                    resolvedPath = await ResolveConflictWithGateAsync(
+                        conflictGate, outputPath, options, entryModified, entrySize, batchIndex, entryKey, ct);
                 }
 
                 if (resolvedPath == null)
@@ -742,6 +734,8 @@ public partial class ZipEngine
         // 阶段 3：收尾（汇总冲突统计）
         progress.ReportPhase(ArchivePhase.Finalizing);
 
+        CoreLog.ConflictTrace("extract-parallel-done files={0} bytes={1} ms={2} failed={3}",
+            processedFiles, processedBytes, sw.ElapsedMilliseconds, failedEntries);
         CoreLog.Info($"ExtractAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         var parStats = conflictStats.Snapshot;
         return new ExtractResult
@@ -1144,16 +1138,8 @@ public partial class ZipEngine
                 }
                 else
                 {
-                    await conflictGate.WaitAsync(ct);
-                    try
-                    {
-                        resolvedPath = await FileConflictHelper.ResolvePathAsync(
-                            outputPath, options, entryModified, entrySize);
-                    }
-                    finally
-                    {
-                        conflictGate.Release();
-                    }
+                    resolvedPath = await ResolveConflictWithGateAsync(
+                        conflictGate, outputPath, options, entryModified, entrySize, batchIndex, entryKey, ct);
                 }
 
                 if (resolvedPath == null)
@@ -1485,8 +1471,56 @@ public partial class ZipEngine
         // 阶段 3：收尾（汇总冲突统计）
         progress.ReportPhase(ArchivePhase.Finalizing);
 
+        CoreLog.ConflictTrace("extract-entries-parallel-done files={0} bytes={1} ms={2} failed={3}",
+            processedFiles, processedBytes, sw.ElapsedMilliseconds, failedEntries);
         CoreLog.Info($"ExtractEntriesAsyncParallel: done, {processedFiles} files, {processedBytes} bytes, {sw.ElapsedMilliseconds}ms, failedEntries={failedEntries}");
         CoreLog.Exit();
+    }
+
+    /// <summary>
+    /// 冲突决策（Ask 弹窗经 <paramref name="conflictGate"/> 全局串行）+ conflict.log 诊断。
+    /// <para>
+    /// 诊断意义（排查「关闭一个冲突提示后整包卡住」）：有 <c>gate-wait</c> 无 <c>gate-acquired</c>
+    /// = 前一个冲突还没决策完；有 <c>gate-acquired</c> 无 <c>decision</c> = 卡在弹窗或暂停等待里。
+    /// 日志走 <see cref="CoreLog.ConflictTrace"/>，RELEASE 也写、不受调试日志开关门控。
+    /// </para>
+    /// </summary>
+    private static async Task<string?> ResolveConflictWithGateAsync(
+        SemaphoreSlim conflictGate,
+        string outputPath,
+        ArchiveOptions? options,
+        DateTime? entryModified,
+        long? entrySize,
+        int batchIndex,
+        string entryKey,
+        CancellationToken ct)
+    {
+        var waitStartTicks = Environment.TickCount64;
+        CoreLog.ConflictTrace("gate-wait thread={0} batch={1} file='{2}'",
+            Environment.CurrentManagedThreadId, batchIndex, entryKey);
+        await conflictGate.WaitAsync(ct);
+        try
+        {
+            CoreLog.ConflictTrace("gate-acquired thread={0} batch={1} waitMs={2} file='{3}'",
+                Environment.CurrentManagedThreadId, batchIndex,
+                Environment.TickCount64 - waitStartTicks, entryKey);
+            var decisionStartTicks = Environment.TickCount64;
+            var resolved = await FileConflictHelper.ResolvePathAsync(
+                outputPath, options, entryModified, entrySize);
+            CoreLog.ConflictTrace("decision thread={0} batch={1} result={2} elapsedMs={3} file='{4}'",
+                Environment.CurrentManagedThreadId, batchIndex,
+                resolved == null ? "skip"
+                    : string.Equals(resolved, outputPath, StringComparison.OrdinalIgnoreCase) ? "overwrite"
+                    : "renamed",
+                Environment.TickCount64 - decisionStartTicks, entryKey);
+            return resolved;
+        }
+        finally
+        {
+            conflictGate.Release();
+            CoreLog.ConflictTrace("gate-released thread={0} batch={1} file='{2}'",
+                Environment.CurrentManagedThreadId, batchIndex, entryKey);
+        }
     }
 
     /// <summary>

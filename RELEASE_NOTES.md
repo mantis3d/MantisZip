@@ -73,6 +73,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Archive root node icon in the tree** — the top node now shows the archive icon (matching the preview tree) while subdirectories keep the folder icon
 - **设置页两处显示问题** — 「添加自定义格式」「添加规则」「恢复默认」误用工具栏按钮样式，单行文字顶在上半部，已改回普通按钮；自适应规则的编辑 / 删除按钮此前是渲染不出的字符图标（空白方块），已换成矢量图标，硬编码中文的压缩级别名称也已三语本地化
 - **Two display issues in Settings** — "Add custom format", "Add rule" and "Restore defaults" mistakenly used the toolbar button style (tall, text stuck at the top) and are ordinary buttons now; the adaptive-rule edit / delete buttons were glyphs the font cannot render (blank squares) and are now vector icons, with the hard-coded Chinese level names localized in all three languages
+- **冲突提示不再可能把解压 / 压缩卡住** — 取消或异常关闭冲突框后，进度窗口的计时不会再永久停走；压缩时「文件无法打开」的错误弹窗不再因 UI 线程互相等待而死锁；找不到进度窗口时不再无延迟重复弹出同一个冲突框（解压按覆盖、压缩按跳过继续）。同时新增 `conflict.log` 诊断日志（默认开启、路径已脱敏），万一再遇到卡死可直接看出是卡在冲突闸门、弹窗还是等待暂停
+- **Conflict prompts can no longer hang a run** — cancelling or erroring out of a conflict dialog no longer leaves the progress timer frozen; the compress-side "file could not be opened" dialog no longer deadlocks by waiting on the UI thread; and when no progress window is available the same dialog is no longer re-shown in a tight loop (extraction continues with overwrite, compression with skip). A new `conflict.log` diagnostic (on by default, paths redacted) makes any future hang immediately attributable to the conflict gate, the dialog or the pause wait
 
 ## v0.5.2
 

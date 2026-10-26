@@ -288,64 +288,82 @@ public static class ExtractFlow
         // 循环重入：暂停后恢复时重新弹窗（对齐 WPF App.xaml.cs ConflictResolver）
         while (true)
         {
-            // 冲突弹窗是模态等待：期间已用时间冻结（每次重入都配对 Begin/End，防计数泄漏）
+            // 冲突弹窗是模态等待：期间已用时间冻结。
+            // try/finally 保证任何出口（正常返回 / 取消抛异常 / 恢复后 continue）都结算冻结计数，
+            // 否则 _modalFreezeCount 泄漏会让已用时间永久停走。
             var freezePw = ProgressWindow.CurrentVisible;
             freezePw?.BeginModalFreeze();
-
-            var result = await Dispatcher.UIThread.InvokeAsync(async () =>
+            try
             {
-                var dlg = new ConflictDialog(info, titleKey);
-                // 优先使用当前可见的进度窗口作为 owner（主窗口解压时居中于进度窗口），
-                // 回退到传入的 owner（CLI 场景显式传入 ProgressWindow）
-                var dialogOwner = ProgressWindow.CurrentVisible ?? owner;
-                await dlg.ShowDialog(dialogOwner);
+                // 诊断（conflict.log，RELEASE 也写）：弹窗开始/返回，用于区分「卡在弹窗」与「卡在闸门」
+                CoreLog.ConflictTrace("dialog-open owner={0} pwVisible={1} file='{2}'",
+                    owner.GetType().Name, freezePw != null, info.FilePath);
 
-                // 暂停：收起对话框，返回暂停标志由外层处理
-                if (dlg.IsPaused)
+                var result = await Dispatcher.UIThread.InvokeAsync(async () =>
                 {
-                    return (Action: FileConflictAction.Overwrite, IsPaused: true, IsCancelled: false, ApplyAll: false);
-                }
+                    var dlg = new ConflictDialog(info, titleKey);
+                    // 优先使用当前可见的进度窗口作为 owner（主窗口解压时居中于进度窗口），
+                    // 回退到传入的 owner（CLI 场景显式传入 ProgressWindow）
+                    var dialogOwner = ProgressWindow.CurrentVisible ?? owner;
+                    await dlg.ShowDialog(dialogOwner);
 
-                // 取消整个操作
-                if (dlg.CancelOperation)
+                    // 暂停：收起对话框，返回暂停标志由外层处理
+                    if (dlg.IsPaused)
+                    {
+                        return (Action: FileConflictAction.Overwrite, IsPaused: true, IsCancelled: false, ApplyAll: false);
+                    }
+
+                    // 取消整个操作
+                    if (dlg.CancelOperation)
+                    {
+                        return (Action: FileConflictAction.Overwrite, IsPaused: false, IsCancelled: true, ApplyAll: false);
+                    }
+
+                    if (dlg.ResultAction == FileConflictAction.Rename && !string.IsNullOrEmpty(dlg.CustomName))
+                        info.CustomName = dlg.CustomName;
+
+                    return (Action: dlg.ResultAction, IsPaused: false, IsCancelled: false, ApplyAll: dlg.ApplyToAll);
+                });
+
+                CoreLog.ConflictTrace("dialog-returned action={0} paused={1} cancelled={2} applyAll={3} file='{4}'",
+                    result.Action, result.IsPaused, result.IsCancelled, result.ApplyAll, info.FilePath);
+
+                if (result.IsCancelled)
+                    throw new OperationCanceledException("用户取消整个解压操作");
+
+                if (result.IsPaused)
                 {
-                    return (Action: FileConflictAction.Overwrite, IsPaused: false, IsCancelled: true, ApplyAll: false);
-                }
+                    // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标，
+                    // 在 UI 线程调用 PauseFromConflict 进入暂停态，然后在后台线程等待暂停事件
+                    // （不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）。
+                    var pw = freezePw ?? owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
+                    if (pw == null)
+                    {
+                        // 无进度窗口可暂停：绝不能 continue —— 否则会无延迟地无限重弹同一对话框，
+                        // 表现为「框关不掉 / 一直在闪 / 像卡死」。按覆盖继续并留证据。
+                        CoreLog.ConflictTrace("pause-without-progress-window -> fallback overwrite file='{0}'",
+                            info.FilePath);
+                        return (FileConflictAction.Overwrite, false);
+                    }
 
-                if (dlg.ResultAction == FileConflictAction.Rename && !string.IsNullOrEmpty(dlg.CustomName))
-                    info.CustomName = dlg.CustomName;
-
-                return (Action: dlg.ResultAction, IsPaused: false, IsCancelled: false, ApplyAll: dlg.ApplyToAll);
-            });
-
-            if (result.IsCancelled)
-            {
-                freezePw?.EndModalFreeze();
-                throw new OperationCanceledException("用户取消整个解压操作");
-            }
-
-            if (result.IsPaused)
-            {
-                // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标，
-                // 在 UI 线程调用 PauseFromConflict 进入暂停态，然后在后台线程等待暂停事件
-                // （不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）。
-                var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
-                if (pw != null)
-                {
                     await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
                     // IsPaused 已为 true → 此刻解除模态冻结由暂停态无缝接续（冻结不断档）
                     freezePw?.EndModalFreeze();
-                    pw.PauseEvent.Wait(pw.CancellationToken);
-                }
-                else
-                {
-                    freezePw?.EndModalFreeze();   // 无进度窗口可暂停也要结算冻结，防计数泄漏
-                }
-                continue; // 恢复后重新弹窗
-            }
+                    freezePw = null; // 已结算，finally 不再重复扣减
 
-            freezePw?.EndModalFreeze();
-            return (result.Action, result.ApplyAll);
+                    CoreLog.ConflictTrace("pause-wait-begin file='{0}'", info.FilePath);
+                    pw.PauseEvent.Wait(pw.CancellationToken);
+                    CoreLog.ConflictTrace("pause-wait-exit cancelled={0} file='{1}'",
+                        pw.CancellationToken.IsCancellationRequested, info.FilePath);
+                    continue; // 恢复后重新弹窗
+                }
+
+                return (result.Action, result.ApplyAll);
+            }
+            finally
+            {
+                freezePw?.EndModalFreeze();
+            }
         }
     }
 

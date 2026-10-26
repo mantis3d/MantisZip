@@ -6,6 +6,23 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 修复：冲突提示链路的卡死风险 + 新增出厂即开的冲突证据链日志（`conflict.log`）
+  - **问题**（用户报告，无法复现）：多线程解压时出现「文件已存在」冲突提示，关掉一个后整个解压卡住不动 —— 进度不前进、也没有新提示。用户怀疑还有第二个冲突框没显示出来（可能被进度窗口挡住）。
+  - **排查结论**（4 个并行 subagent + 本机日志取证）：
+    - 「第二个框被进度窗口挡住」在架构上**不成立**：并行解压的冲突决策由 `SemaphoreSlim(1,1)` 全局串行（`ZipEngine.Extract` 的 `conflictGate`），同一时刻只可能有一个冲突框；且 Avalonia 模态子窗会把落在 owner 上的点击转发给子窗。
+    - 唯一能让整包「永久冻结」的分支是冲突框里的**「暂停」**：worker 在 `PauseEvent.Wait(CancellationToken)` 无超时阻塞，且**仍持有冲突闸门** ⇒ 其余 worker 全堵在 `WaitAsync`、进度冻结、无新提示、无报错。用户拍板**本轮不改暂停**（保留现状，后续单独讨论）。
+    - 另查出两处真缺陷：`ExtractFlow` / `CompressFlow` 的模态冻结计数没有 `try/finally`（取消 / 异常路径漏 `EndModalFreeze` ⇒ `_modalFreezeCount` 泄漏、计时永久冻结）；`CompressFlow.CreateErrorResolver` 在 UI 线程 `ShowDialog(owner).GetAwaiter().GetResult()` 再套外层 `.Result` ⇒ 真死锁。
+    - 还有一处死循环：`pw == null` 时暂停分支 `continue` 且无延迟 ⇒ 同一对话框无限重弹（看起来像「框关不掉 / 一直闪」）。
+  - **修复**：
+    1. 冻结计数改 `try/finally`：`ExtractFlow.ShowConflictDialogAsync` / `CompressFlow.ShowConflictDialogAsync` 的循环体包进 `try`，`finally` 统一 `EndModalFreeze()`；暂停分支在等待前先显式结算并把局部变量置空，`finally` 不重复扣减。
+    2. `CompressFlow.CreateErrorResolver` 改为 `Dispatcher.UIThread.InvokeAsync(async () => await dlg.ShowDialog(owner))`，只在后台线程 `GetAwaiter().GetResult()`，UI 线程全程 `await`。
+    3. 新增 `CoreLog.ConflictTrace`：写 `%LOCALAPPDATA%\MantisZip\conflict.log`（2 MB 轮转、**不受 `DiagnosticsEnabled` 门控**、RELEASE 也写、复用 `RedactOverride` 脱敏）。插桩点：`ZipEngine.Extract.ResolveConflictWithGateAsync`（`gate-wait` / `gate-acquired waitMs` / `decision result elapsedMs` / `gate-released`）、两条并行路径收尾、`SelectedItemsExtractService` 的 resolver（`resolver-enter` / `resolver-returned` / `resolver-memo`）、`ExtractFlow` / `CompressFlow` 的弹窗前后与暂停等待、`ConflictDialog` / `CompressConflictDialog` 的 `dialog-created` / `dialog-shown`（含 `active` / `bounds` / `owner` / `topmost` / `taskbar`）/ `dialog-result` / `dialog-closing-without-button`。
+    4. `pw == null` 不再 `continue`：解压回退「覆盖」、压缩回退「跳过」（`CompressConflictAction.Cancel` 在压缩侧 = 单项跳过），并记一条 trace。
+  - **测试**：新增 `tests/MantisZip.Tests/Utils/CoreLogConflictTraceTests.cs` 3 例 —— `DiagnosticsEnabled = false` 时仍写入、格式化重载参数替换、`RedactOverride` 生效；日志路径指向临时目录并在 `Dispose` 恢复进程级静态状态。
+  - **验证**：`build -Target avalonia -c Release` 0 警告；`test -Target tests` 全绿（2 条存量警告）；`test -Target ui-tests` 全绿（28 条存量警告）；`i18n` 1314 key 三语一致；`check` / `guards` 通过。
+  - **发布说明**：写入 `RELEASE_NOTES.md` v0.5.3「修复 / Fixes」中英各一条（冲突提示不再可能卡住 + 新增 `conflict.log`）。
+  - **未列入本轮**（已记录，待排期）：暂停加固（置前激活 / 醒目状态行 / 释放闸门 / 有界等待）；4 个主窗口解压入口未传 `options` 导致冲突一律静默覆盖；`applyToAll` / `chosenAction` 写入顺序竞态；取消只抛异常、不 `cts.Cancel()`。
+
 **2026-10-26** — 清理：删除遗留的按钮对齐探针测试（main 的 `ui-tests` 自 2026-10-24 起无法编译）
   - **问题**：`tests/MantisZip.UI.Avalonia.Tests/ZzProbeButtonAlignTests.cs` 由 main 上的 `e45c3a71`（2026-10-24 23:08「fix Detail Padding And Button」）带入，文件里写的是 xUnit **v2** 的 `using Xunit.Abstractions;` + `ITestOutputHelper`，而测试项目是 xUnit **v3**（`Xunit.Abstractions` 已移除，`ITestOutputHelper` 位于 `Xunit` 命名空间）⇒ `CS0234` / `CS0246`，整个 `tests/MantisZip.UI.Avalonia.Tests` 直接编译不过。该文件只存在于 main，`beta` 侧一直没有它，所以 `beta` 的 `ui-tests` 始终正常；把 beta 合并回 main（`b380dc53`）后跑验证才暴露出来 —— 属于 main 上**既有的**断点，不是合并引入的。
   - **处理**（用户选 A：删除）：整文件删除。它是纯诊断探针 —— 只有若干 `_out.WriteLine` 打印按钮 / `ContentPresenter` / `TextBlock` 的 `Bounds` 与对齐属性，**没有任何断言**（永远「通过」），而它当年要定位的按钮高度问题已在 `e45c3a71` 修掉（见下方 2026-10-24 那条记录）。
