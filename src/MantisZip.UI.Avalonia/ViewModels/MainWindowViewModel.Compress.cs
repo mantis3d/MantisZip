@@ -245,7 +245,20 @@ public partial class MainWindowViewModel : ObservableObject
         // 删除是整包重写、引擎无逐条目回调：进度窗用一行说明代替 N 行假进度（见计划决策记录）。
         PendingOperationNote = LocalizationManager.T("Progress_DeleteNoteFmt", fileCount, sizeText);
 
-        var completed = await RunWithProgress(
+        // 完成即刷新列表：RunWithProgress 并非操作一结束就返回——它还要等「完成态 → 自动关闭
+        // 倒计时（默认 3 秒）→ 关窗」才返回。若等到返回后再刷新，用户在整个读秒期间看到的都是
+        // 删除前的旧列表（本次修复实测反馈的「完成后一两秒才刷新」）。改在完成回调里刷新，
+        // 进度窗显示「删除完成」的同时主窗口列表已在重读。
+        // 注意：一旦占用 PendingCompletedCallback，进度窗的完成态就由本回调负责写入，
+        // 默认那条 SetComplete(Cli_StatusDone) 不会再执行。
+        PendingCompletedCallback = pw =>
+        {
+            StatusMessage = LocalizationManager.T("Status_DeleteComplete");
+            pw.SetComplete(LocalizationManager.T("Status_DeleteComplete"));
+            _ = RefreshArchiveAfterDeleteAsync();
+        };
+
+        await RunWithProgress(
             LocalizationManager.T("Status_DeletingFiles"),
             new[] { deleteEntryPath },
             async (progress, ct) =>
@@ -255,11 +268,22 @@ public partial class MainWindowViewModel : ObservableObject
                 await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { deleteEntryPath }, password, progress, ct,
                     new ArchiveOptions { FileNameEncoding = AppSettings.Load().ZipEncoding });
             });
+    }
 
-        if (completed)
+    /// <summary>
+    /// 删除完成后的列表刷新（由进度窗完成回调以 fire-and-forget 方式发起）。
+    /// 异常必须在这里吞掉：没有 await 的 Task 抛异常会变成未观察异常，而此刻用户已经在看
+    /// 进度窗的完成态，列表刷新失败不该再打断他；写日志留痕即可。
+    /// </summary>
+    private async Task RefreshArchiveAfterDeleteAsync()
+    {
+        try
         {
-            StatusMessage = LocalizationManager.T("Status_DeleteComplete");
             await RefreshArchive();
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[DeleteFiles] 删除后刷新列表失败：{ex}");
         }
     }
 

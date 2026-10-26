@@ -350,6 +350,7 @@
 - `-Task test -Target ui-tests`：全绿（28 条均为既有 xUnit 分析器警告）
 - `-Task i18n`：1313 key 三语一致
 - **T5 手工回归未做**（需要在 Windows 桌面跑真机界面），清单见 T5
+- **实施后追加（同日，用户真机验收反馈）**：删除完成 → 列表刷新之间有 1-2 秒空窗。原因不是缺陷而是链路顺序——刷新写在 `RunWithProgress` 返回之后，而它要等「完成态 → 自动关闭倒计时（默认 3 秒）→ 关窗」；`RefreshArchive` 本身是全量重列条目。改为在 `PendingCompletedCallback` 里刷新（回调内 `pw.SetComplete(删除完成)` + 置状态栏 + fire-and-forget 刷新，异常在私有方法内吞掉写 `App.DebugLog`），进度窗读秒时列表已就绪。复验：avalonia Release 构建 0 警告、ui-tests 全绿。
 
 ---
 
