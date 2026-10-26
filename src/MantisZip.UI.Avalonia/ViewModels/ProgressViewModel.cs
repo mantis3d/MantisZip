@@ -1410,8 +1410,10 @@ public partial class ProgressViewModel : ObservableObject
             UpdateBatchItemStats(p);
 
             var now = DateTime.UtcNow;
-            if (p.PercentComplete >= 100 || p.PercentComplete <= 0 ||
-                (now - _lastProgressUpdate) >= ProgressThrottle)
+            // 只在「完成」或节流到期时写行百分比。此前的 `PercentComplete <= 0` 分支会把行
+            // 无条件拉回 0%：引擎每包结束都会连发几条 0% 收尾帧，导致批次行底纹先退再补，
+            // 视觉上像「完成后不是 100%」的抖动。0% 帧没有信息量（行初值就是 0），不再写。
+            if (p.PercentComplete >= 100 || (p.PercentComplete > 0 && (now - _lastProgressUpdate) >= ProgressThrottle))
             {
                 _batchItems[_currentBatchIndex].Progress = p.PercentComplete;
                 _lastProgressUpdate = now;
@@ -1471,7 +1473,11 @@ public partial class ProgressViewModel : ObservableObject
             _parallelBatchItems.Add(new ParallelBatchProgressItem { Index = _parallelBatchItems.Count + 1, IsParallel = true });
 
         var row = _parallelBatchItems[idx];
-        row.Percent = Math.Clamp(p.BatchPercentComplete ?? p.PercentComplete, 0, 100);
+        var percent = Math.Clamp(p.BatchPercentComplete ?? p.PercentComplete, 0, 100);
+        // 已完成的行不再回退：收尾帧可能带更低的百分比或新的文件名，会把「通道已完成」改回文件名
+        if (row.Percent >= 100 && percent < 100)
+            return;
+        row.Percent = percent;
         row.BatchRatio = Math.Clamp(row.Percent / 100.0, 0.0, 1.0);   // 右区批次底纹
         // Task 6: 当前文件字节进度 0..1 → 驱动文件名格底纹宽度（MultiBinding）
         row.FileRatio = Math.Clamp((p.FilePercentComplete ?? 0) / 100.0, 0.0, 1.0);
@@ -1492,8 +1498,57 @@ public partial class ProgressViewModel : ObservableObject
         // T7: 状态色随完成度切换（BrushResourceConverter 消费 StatusBrushName → 批次进度条前景）
         row.StatusBrushName = row.Percent >= 100 ? "ThemeStatusSuccessBrush" : "ThemeProgressFillBrush";
         if (p.BatchProcessedFiles.HasValue && p.BatchTotalFiles.HasValue)
+        {
+            // 记下计数：终态收尾时据此把右区重建成「100% (n/n)」（见 FinalizeChannelRows）
+            row.ProcessedFiles = p.BatchProcessedFiles.Value;
+            row.TotalFiles = p.BatchTotalFiles.Value;
             row.DetailText = LocalizationManager.T("Progress_Batch_FilesProgress",
                 p.BatchProcessedFiles.Value, p.BatchTotalFiles.Value);
+        }
+        // 本组到 100% 就地收尾这一行（引擎每组结束时补一条 100% 帧）——不必等整包结束，
+        // 否则所有通道行会「一起完成」，看起来像卡住。
+        if (row.Percent >= 100)
+            MarkChannelRowComplete(row);
+    }
+
+    /// <summary>
+    /// 操作成功结束时兜底收尾详细面板的通道行（正常情况下每组结束时已各自收尾，见
+    /// <see cref="MarkChannelRowComplete"/>）：把仍停在中途的行一并置满。
+    /// 失败 / 取消不走这里（保留各行停住的位置，方便判断卡在哪一组）。
+    /// </summary>
+    private void FinalizeChannelRows()
+    {
+        foreach (var row in _parallelBatchItems)
+            MarkChannelRowComplete(row);
+
+        // 「存储文件」分区标题只属于写出阶段，终态不再显示（下面那行会显示「已完成」）
+        ShowStoreSectionHeader = false;
+    }
+
+    /// <summary>
+    /// 把一条通道行标记为完成：100% / 底纹铺满 / 成功色，左区由文件名改显示「通道已完成」。
+    /// 由两处调用：① <see cref="UpsertParallelBatch"/> 里本组到 100% 时立即收尾自己那一行
+    /// （引擎每组结束会补一条 100% 帧）；② <see cref="FinalizeChannelRows"/> 整包结束时兜底。
+    /// 非并行合成单行（<c>IsParallel == false</c>）不动右区百分比 —— 对它无意义（规则 6）。
+    /// </summary>
+    private void MarkChannelRowComplete(ParallelBatchProgressItem row)
+    {
+        row.Percent = 100;
+        row.BatchRatio = 1.0;
+        row.FileRatio = 1.0;
+        row.StatusBrushName = "ThemeStatusSuccessBrush";
+        if (row.IsParallel)
+        {
+            row.PctDetailText = row.ProcessedFiles >= 0 && row.TotalFiles >= 0
+                ? $"100% ({row.ProcessedFiles}/{row.TotalFiles})"
+                : "100%";
+        }
+
+        // 完成后没有「当前文件」：左区改显示「通道已完成」，避免停留在最后一个文件名
+        row.CurrentFile = string.Empty;
+        row.DirectoryText = string.Empty;
+        row.FileNameText = LocalizationManager.T("Progress_Channel_Done");
+        row.FileSizeText = string.Empty;
     }
 
     /// <summary>
@@ -1912,7 +1967,12 @@ public partial class ProgressViewModel : ObservableObject
         ScanCountText = null;
         // 已完成（成功）；失败/取消态不被覆盖（失败测试流会 SetErrorSummary→SetComplete 两步走）
         if (StatusKind is not (ProgressStatusKind.Failed or ProgressStatusKind.Cancelled))
+        {
             StatusKind = ProgressStatusKind.Completed;
+            // 成功终态：详细面板通道行收尾（置 100% + 清残留文件名）。
+            // 失败/取消时保留各通道停住的位置，便于判断卡在哪一组。
+            FinalizeChannelRows();
+        }
         // 终态：操作已结束，暂停无意义 → 隐藏暂停按钮
         IsPauseButtonVisible = false;
     }
@@ -2051,6 +2111,18 @@ public partial class ProgressViewModel : ObservableObject
         }
         // 终态摘要：若已冻结（批已结束/失败），批次行状态变化要同步刷新「成功 n / 共 m」
         RefreshCompletionStats();
+    }
+
+    /// <summary>
+    /// 失败收尾：把**当前**批次行标 Failed（GUI 闭包此前硬编码 0 号行，多包批处理里会把
+    /// 第一个包误标失败、真正的失败行还停在 InProgress）。无批次行时静默返回。
+    /// </summary>
+    public void FailCurrentBatchItem(string? errorMessage = null)
+    {
+        if (_batchItems is not { Count: > 0 })
+            return;
+        var index = _currentBatchIndex >= 0 && _currentBatchIndex < _batchItems.Count ? _currentBatchIndex : 0;
+        UpdateBatchItemStatus(index, BatchItemStatus.Failed, errorMessage);
     }
 
     /// <summary>

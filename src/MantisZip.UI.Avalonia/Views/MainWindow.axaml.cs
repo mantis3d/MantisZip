@@ -338,8 +338,11 @@ public partial class MainWindow : Window
                     ProgressViewModel.CreateBackgroundProgress(pw, p => pw.SetProgress(p)));
                 await operation(progress, pw.CancellationToken);
 
+                // 成功收尾：整批逐行置完成。此前只硬编码 `UpdateBatchItemStatus(0, Completed)`，
+                // 多包批处理里除第一个包以外的行会停在最后一次上报的百分比（98% 之类），
+                // 且残留包名/底纹，看起来像「批次完成没有更新界面」。
                 if (hasFileList)
-                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
+                    pw.FinalizeBatch();
 
                 // 成功：完成回调（测试流结果通道）优先，否则默认完成态；
                 // 再尊重 📌 KeepOpenOnComplete 统一走 AutoCloseOrWaitAsync（延迟来自设置，Task 6）
@@ -365,7 +368,7 @@ public partial class MainWindow : Window
                 // 同步进度窗口状态行（否则取消发生在首报前时会停在「正在准备…」）
                 pw.SetStatusMessage(msg);
                 if (hasFileList)
-                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed, msg);   // 行 Failed 自动压钉 → 等手动关闭
+                    pw.FailCurrentBatchItem(msg);   // 行 Failed 自动压钉 → 等手动关闭
                 vm.StatusMessage = msg;
                 await pw.AutoCloseOrWaitAsync(() => pw.Close());   // 📌 已由行 Failed 压下 → 等手动关闭
                 return false;
@@ -377,7 +380,7 @@ public partial class MainWindow : Window
                 pw.SetErrorSummary(wholeErrorText, wholeErrorDetail);
                 App.DebugLog($"[RunWithProgress] operation failed: {ex}");
                 if (hasFileList)
-                    pw.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
+                    pw.FailCurrentBatchItem();
                 await pw.AutoCloseOrWaitAsync(() => pw.Close());   // SetErrorSummary 已自动压钉 → 等手动关闭
                 return false;
             }

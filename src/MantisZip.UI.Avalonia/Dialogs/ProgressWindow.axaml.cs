@@ -463,6 +463,12 @@ public partial class ProgressWindow : Window
         DispatchIfNeeded(() => _vm.FinalizeBatch(), DispatcherPriority.Background);
     }
 
+    /// <summary>失败收尾：把**当前**批次行标 Failed（多包批处理里不能硬编码 0 号行）。</summary>
+    public void FailCurrentBatchItem(string? errorMessage = null)
+    {
+        DispatchIfNeeded(() => _vm.FailCurrentBatchItem(errorMessage), DispatcherPriority.Background);
+    }
+
     // ════════════════════════════════════════════
     //  Batch Password Badge（行内密码徽标）
     // ════════════════════════════════════════════

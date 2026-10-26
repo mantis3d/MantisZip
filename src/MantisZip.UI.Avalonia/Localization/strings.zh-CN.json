@@ -740,6 +740,7 @@
   "Progress_Button_Pause": "暂停",
   "Progress_Button_Resume": "继续",
   "Progress_Done": "完成",
+  "Progress_Channel_Done": "通道已完成",
   "Progress_FileCount": "压缩包 {0}/{1}",
   "Progress_KeepOpen": "完成后不关闭窗口",
   "Progress_MatchingPassword": "正在尝试匹配密码...",

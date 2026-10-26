@@ -740,6 +740,7 @@
   "Progress_Button_Pause": "Pause",
   "Progress_Button_Resume": "Resume",
   "Progress_Done": "Done",
+  "Progress_Channel_Done": "Channel done",
   "Progress_FileCount": "Archive {0}/{1}",
   "Progress_KeepOpen": "Keep open on complete",
   "Progress_MatchingPassword": "Matching password rules...",

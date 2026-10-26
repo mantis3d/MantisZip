@@ -369,6 +369,19 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                                                 0, groupTotal, groups[i].Count, 0,
                                                 i, groups.Count, null, ref localLastReport), ct);
 
+                                            // 该组完成：补一条 100% 帧，让 UI 的通道行在**本组结束的瞬间**收尾。
+                                            // 7z 的 FileCompressionFinished 上报有 100ms 节流（最后一两个文件的
+                                            // 完成事件可能被丢掉），没有这条帧时通道行会停在 98.x%，直到整包结束
+                                            // 才被统一置满 —— 用户看到的就是「所有通道一起完成，像卡住了」。
+                                            adapter.Report(new ArchiveProgress
+                                            {
+                                                PercentComplete = 100,
+                                                ProcessedBytes = groupTotal,
+                                                TotalFiles = groups[i].Count,
+                                                ProcessedFiles = groups[i].Count,
+                                                CurrentFile = string.Empty,
+                                            });
+
                                             // 该组完成：把它的输入字节并入全局已完成基数
                                             Interlocked.Add(ref finishedInputBytes, groupTotal);
                                         });

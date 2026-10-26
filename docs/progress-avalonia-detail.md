@@ -6,6 +6,18 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 修复：进度窗口「完成后界面不更新」（通道行停在 98% / 最后一个文件名；批次列表只收尾 0 号行）
+  - **症状**（用户实测，压缩单个目录基本每次必现）：「完整」档详细面板的并行通道行，完成后右侧百分比停在 98% 左右、底纹没铺满，左区仍显示最后一个文件名。
+  - **根因**：通道行的 `Percent` 来自引擎的「组」上报（`UpsertParallelBatch` 里 `p.BatchPercentComplete ?? p.PercentComplete`），而每组结束时引擎会连发若干 `PercentComplete = 0` 的收尾帧且**不带 `BatchIndex`**（进不了 `UpsertParallelBatch`）⇒ 最后一组的最后一条组上报往往停在 98.x%；同时 `SetComplete` 完全不碰 `_parallelBatchItems`（只改主进度与 `FileName`）⇒ 通道行既不置 100% 也不清文件名。
+  - **修法**：`UpsertParallelBatch` 记下每组最近一次的 `BatchProcessedFiles` / `BatchTotalFiles`（`Models/ParallelBatchProgressItem.cs` 新增两个普通属性，不参与绑定）；新增 `ProgressViewModel.FinalizeChannelRows()` —— 逐行 `Percent = 100` / `BatchRatio = 1` / `FileRatio = 1` / `StatusBrushName = ThemeStatusSuccessBrush`，并行行按记录的计数把右区重建成 `100% (n/n)`，清空 `CurrentFile` / `DirectoryText` / `FileNameText` / `FileSizeText`，并隐藏「存储文件」分区标题；由 `SetComplete` 在**成功终态**调用（失败 / 取消保留各行停住的位置，便于判断卡在哪一组）。
+  - **测试**：`tests/MantisZip.UI.Avalonia.Tests/ProgressViewModelTests.cs` +3 例 —— 两组停在 98% / 97% 且带文件名 → `SetComplete` 后逐行 100%、右区 `100% (12/12)` / `100% (8/9)`、文件名清空、`ShowStoreSectionHeader` 关闭；失败终态保留 42% 与文件名；非并行合成单行只清文件名、右区仍为空。
+  - **验证**：avalonia Release 构建 0 警告；`test -Target tests`（2 条存量警告）与 `test -Target ui-tests` 全绿；`i18n` 1314 key、`check` 0.5.3 六处、`guards` 4/4。
+  - **批次列表侧的同类缺口**：GUI 的 `RunWithProgress` **从不调用** `FinalizeBatch()`（只有 CLI 的 `App.CliCompress` / `App.CliExtract` 调），成功收尾只硬编码 `UpdateBatchItemStatus(0, BatchItemStatus.Completed)` ⇒ 多包批处理里末包行停在 `InProgress` + 97%；失败 / 密码取消分支同样只动 0 号行，会把第一个包误标失败。
+  - **修法（批次列表）**：成功收尾改调 `pw.FinalizeBatch()`（整批 `InProgress` → `Completed` + 100%，并刷新「成功 n / 共 m」）；失败 / 密码取消改调新增的 `ProgressWindow.FailCurrentBatchItem(...)`（VM 侧按 `_currentBatchIndex` 定位，无批次行静默返回）；`SetProgress` 的批次行写入去掉 `PercentComplete <= 0` 的无条件分支 —— 引擎每包结束会连发 0% 收尾帧，原逻辑把行拉回 0% 再补 100%，视觉上就是「完成后先退再补」。
+  - **测试（批次列表）**：再 +3 例 —— `FinalizeBatch` 整批置完成、0% 收尾帧不回退行百分比、`FailCurrentBatchItem` 标当前行而非 0 号行。
+  - **追加（用户第二轮实测反馈「所有通道一起完成，还是像卡住」）**：统一收尾仍然要等整包结束才发生，逐组完成时看不出进展。改为**每组完成即各自收尾** —— `src/MantisZip.Core/Engines/ZipEngine.Compress.cs` 的 N 组路径在该组 `CompressGroupWithSevenZip` 返回后补一条 `PercentComplete = 100` 的组帧（7z 的 `FileCompressionFinished` 上报有 100 ms 节流，最后一两个文件的完成事件会被丢掉，通道行因此停在 98.x%）；UI 侧抽出 `MarkChannelRowComplete(row)`（`Percent = 100` / 底纹铺满 / 成功色 / 右区重建 `100% (n/n)` / 左区改显示「通道已完成」），由 `UpsertParallelBatch` 在本组到 100% 时**就地**调用，`FinalizeChannelRows` 只在整包结束时兜底；已完成的行加不回退守卫（迟到的低百分比帧不会把「通道已完成」改回文件名）。
+  - **新增 i18n key**：`Progress_Channel_Done`（通道已完成 / Channel done / 通道已完成），1314 → 1315。
+  - **测试（逐组收尾）**：`tests/MantisZip.Tests/Engines/ParallelCompressTests.cs` +1 例（degree=3 时**每个**出现的 `BatchIndex` 都收到过 `BatchPercentComplete == 100` 帧）；`ProgressViewModelTests` +1 例（第 0 组到 100% 时只有该行收尾、另一组仍 40% 与文件名；随后喂 50% 帧不回退）。
 **2026-10-26** — 记录：评估后放弃「真暂停」（需要先改引擎线程模型）
   - **需求**：用户指出「暂停就是要暂停整个压缩或者解压动作」，而当时的暂停按钮只冻结「已用时间」显示，进度条与文件处理都继续（Core 里 `rg "Pause"` 零命中，`ProgressViewModel.PauseEvent` 只被冲突框暂停分支等待）。
   - **曾实现并已回滚的方案**（完整备份：`%TEMP%\mantiszip-pause-revert-20261026\`，含 `tracked-changes.patch` 与 4 个新文件）：`ArchiveOptions.PauseEvent` / `CompressRequest.PauseEvent`（`ManualResetEventSlim?`）+ `PauseGate.WaitIfPaused`（统一阻塞点）+ `PauseAwareStream`（写流装饰器，按 4 MB 块暂停）；安全点覆盖 ZIP 解压 4 条条目循环与 4 处写文件、ZIP 压缩串行主循环 / 两个 store 组循环 / 7z 组调用 / 逐文件循环、TAR.GZ 8 处、7z 3 处；UI 侧暂停期间速度与剩余时间显示「—」、`PauseFromConflict` 补 `StatusKind = Paused`、冲突框暂停后取消最小化并 `Activate()` 进度窗口。当时 core / avalonia 构建 0 警告、新增 11 例测试全绿。
