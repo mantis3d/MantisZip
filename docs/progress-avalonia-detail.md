@@ -6,6 +6,45 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 修复：压缩流程不显示「并行度」
+  - **症状**（用户）：「压缩的时候开启并行也不显示『并行度』卡片」。
+  - **根因**：`ProgressViewModel.ParallelDegree` 只有两个写入点 —— 解压流程 `ExtractFlow` → `ProgressWindow.SetParallelDegree`（`Dialogs/ProgressWindow.axaml.cs` 的 `DispatchIfNeeded(() => _vm.ParallelDegree = degree, DispatcherPriority.Background)`），压缩路径从未赋值；`HasParallelDegree => _parallelDegree is >= 2`，于是「完整」档段 2 与「标准」档单行里的并行度恒隐藏（该项在 0.5.2 起就只服务并行解压）。
+  - **修法**：`UpsertParallelBatch`（并行批次上报入口）在记录组数后追加：`if (IsCompressFlow && _channelGroupCount >= 2 && ParallelDegree != _channelGroupCount) ParallelDegree = _channelGroupCount;` —— 压缩的并行度取**实际并行分组数**（`BatchIndex` 最大值 +1，与详细面板「压缩通道 · N 组并行」同一口径；引擎按 CPU 核数决定组数，可能与设置值不同）。用 `IsCompressFlow` 守卫，解压流程的并行度仍由 `ExtractFlow` 显式设置、不被批次上报覆盖。
+  - **测试**：`ProgressViewModelTests` 2 例 —— `CompressFlow_ParallelGroups_SetParallelDegree`（压缩流程先 1 组时 `HasParallelDegree == false`，出现第 3 组后 `ParallelDegree == 3`）；`ExtractFlow_ParallelDegree_IsNotOverwrittenByBatchReports`（解压流程显式设 4，收到 2 个批次上报后仍为 4）。
+  - **验证**：avalonia 构建 0 警告（`-c Release`，Debug 产物被运行中的 exe 占用）；`ui-tests` 全绿；`i18n` 1314 key 三语一致；`guards` 通过。
+
+**2026-10-26** — 改进：进度窗口新增「扫描」统计卡
+  - **需求**（用户）：「扫描阶段 在 「完整」档 里面没有了是吗？要不也加入状态卡片里呢？你觉得跟并行度他们放在一行是否合适？」——核查后确认扫描文案没丢（`ScanCountText`「已发现 N 个文件」在合并后位于百分比行左侧、三档都显示），真正的问题是扫描阶段**所有**统计卡都还没有数据，`StatsCardsPanel` 只剩一块空底色。
+  - **方案（用户拍板）**：① 做成「扫描」卡放卡片行最左（不塞进段 2 的单行指标：那里是总大小 / 速度 / 并行度，与卡片行语义不同，且扫描文案较长）；② 第三行显示**已扫描大小**，由 Core 新增可空字段提供。
+  - **数据源（Core）**：`ArchiveProgress` 新增 `public long? ScannedBytes { get; set; }`（null = 引擎未上报，UI 第三行显示「—」）；`FileScanner.ReportScanProgress` 签名加 `long scannedBytes`，调用处传累计 `totalBytes`，上报体带 `ScannedBytes`——数量与字节同一帧，避免卡片两行不同步。
+  - **UI**：`ProgressViewModel` 新增 `ScanCardLabel`（`Progress_Stats_Scanning`）、`ScanCardCount`（已发现文件数，未上报时为空串）、`ScanCardSize`（`FormatUtil.FormatSize`，无字节时 "—"）、`ShowScanCountInLabelRow => HasScanCount && !IsFullDensity`；`SetProgress` 的 `Scanning` 分支改为块（写 `_scanFoundFiles` / `_scanScannedBytes`，数量不变时 `ScanCountText` 不会变化、故显式通知两个卡属性）；`ApplyPhase` 离开扫描阶段时把两个字段归零（否则下一个档案会先闪旧值）；`OnScanCountTextChanged` 通知三个卡片属性。`ProgressWindow.axaml` 段 1 最左插入「卡 -1 扫描」（🔍 `ThemeProgressFillBrush` + 三行同构：图标+标题 / 已发现文件数 / 已扫描大小走 `DashBrush`，`IsVisible="{Binding HasScanCount}"`，`MinWidth="80"`），标签行 `ScanCountText` 的 `IsVisible` 由 `HasScanCount` 改为 `ShowScanCountInLabelRow`（完整档由卡片承担、不再重复）。
+  - **i18n**：新增 `Progress_Stats_Scanning`（扫描中 / Scanning / 掃描中），1313 → 1314 key，插在 `Progress_Stats_Archive` 之前；三份文件 BOM + CRLF 保持。
+  - **测试**：`tests/MantisZip.Tests/Utils/FileScannerScanProgressTests.cs` 3 例（`ReportScanProgress` 上报 `Phase=Scanning` + `TotalFiles` + `ScannedBytes` 且刷新节流基准；100ms 内第二次调用被节流；`CollectFiles` 累计字节等于文件尺寸之和）——小目录真实扫描常常不足 100ms、拿不到任何扫描帧，故对上报方法用反射做确定性测试；`ProgressViewModelTests` 3 例（数量与字节、未上报字节回落 "—"、少 / 中档走标签行且离开扫描阶段清空）+ 属性名锁例补 `ScanCardLabel` / `ScanCardCount` / `ScanCardSize` / `ShowScanCountInLabelRow`。
+  - **验证**：avalonia 构建 0 警告（Debug 产物被运行中的 exe 占用，改用 `-c Release`）；`tests` / `ui-tests` 全绿；`i18n` 1314 key 三语一致；`check` / `guards` 通过。
+  - **发布说明**：按规则 18 并入 `RELEASE_NOTES.md` v0.5.3「交互」既有「统计卡新增已压缩 / 仅存储」条目（中英各补一句）。
+
+**2026-10-26** — 改进：进度窗口「压缩包 N/M」并入统计卡行
+  - **需求**（用户）：「左下角有个『压缩包 1/1』的独占一行，它应该跟 已处理 那些放在一起」；实测后又追加两点：「状态卡片是三行的，正好是用来显示当前处理数量和总数的，所以你那个显示成 1/1 是不对的」以及「标准和精简里面，这个『压缩包 1/1』和百分比各占一行，两者又一左一右，合并成一行是不是更好？」
+  - **方案（「完整」档）**：做成与既有卡同构的三行卡（📦 压缩包 / **当前序号** / **共 N 个**），放在「已处理」卡左边 —— 行 2 是数量行（与其它卡同构），行 3 在其它卡放文件大小，压缩包无尺寸可报，改放总数。第一版把 "1/1" 挤在行 2、行 3 放破折号，被用户驳回后改为当前数 / 总数分两行。
+  - **方案（「标准」/「精简」档）**：「压缩包 N/M」原在总进度条下方独占一行，百分比又在上方一行右对齐，两行一左一右；现合并为同一行（左计数 / 右百分比），扫描阶段左侧同格位改显示「已发现 N 个文件」（互斥显隐）。`ShowFileCountInLabelRow => !IsFullDensity && !HasScanCount`：完整档由统计卡承担，行内计数隐藏，避免同一信息出现两次。
+  - **去重复**：总体进度标签行左侧原有 `BatchArchiveIndexText`（`Progress_Batch_ArchiveOf` = "{0} / {1}"）与卡片是同一件事，XAML 元素 / VM 属性 / 两处赋值 / `LocalizedStrings` 登记一并删除（JSON key 保留，暂无绑定）。
+  - **实现**：`ProgressViewModel` 新增 `StatsArchiveLabel`、`StatsArchiveCurrent`（`_lastFileCountCurrent`，未上报时为空）、`StatsArchiveTotal`（`Progress_Stats_ArchiveTotal` 带总数）、`HasStatsArchive`（卡片显隐）与 `ShowFileCountInLabelRow`；`UpdateFileCountText(current, total, isBatch)` 一处赋值同时刷新 `FileCountText` 与三个卡片属性（语言切换路径同样复用，避免两条文案不同步）。`ProgressWindow.axaml` 卡 0 的行 2 / 行 3 改绑新属性、`IsVisible` 改绑 `HasStatsArchive`；`FileCountText` / `ScanCountText` 移进总体进度标签行 `Grid` 第 0 列，原独立计数行整块删除。
+  - **i18n**：`Progress_Stats_Archive` 由「压缩包 {0}」改为纯标题「压缩包」/「Archive」/「壓縮包」，新增 `Progress_Stats_ArchiveTotal`（共 {0} 个 / of {0} / 共 {0} 個），1311 → 1313 key，三份文件 BOM + CRLF 保持。
+  - **测试**：`ProgressViewModelTests` 3 例（完整档：`StatsArchiveCurrent == "2"`、`StatsArchiveTotal` 含总数、标签行计数隐藏；少 / 中档：标签行显示 "2/2"、卡片隐藏；首个文件计数上报前 `HasStatsArchive == false` 且两属性为空；扫描阶段隐藏标签行计数）+ 属性名锁例改为锁 `StatsArchiveLabel` / `StatsArchiveCurrent` / `StatsArchiveTotal` / `HasStatsArchive` / `ShowFileCountInLabelRow`（`ProgressWindow` 用 `x:CompileBindings=False`，属性名写错不会构建失败）。
+  - **验证**：avalonia 构建 0 警告（Debug 产物被运行中的 exe 占用，改用 `-c Release` 验证）；`ui-tests` 全绿（28 条存量警告）；`i18n` 1313 key 三语一致；`check` / `guards` 通过。
+  - **发布说明**：按规则 18 并入 `RELEASE_NOTES.md` v0.5.3「交互」既有「统计卡新增已压缩 / 仅存储」条目（中英各补一句）。
+
+**2026-10-23** — 新增：统计卡增加「已压缩 / 仅存储」（自适应分类构成）
+  - **需求**（用户）：统计卡一行原本只有「已处理」「总大小」，自适应压缩时看不出多少文件真的被压缩、多少只是存储。
+  - **口径（用户拍板）**：**构成口径**（本次有多少文件需要压缩 / 仅存储），不随进度变化；进度仍由「已处理」卡承担。显示条件：只有引擎真的上报了分类结果才出现（即 ZIP + 自适应）；7z / TAR.GZ / 加密 ZIP / 关闭自适应时两张卡整卡隐藏（规则 6）。布局按用户选择保持**单行**（7 张卡在 800 宽下可容纳，窄窗会横向裁剪，用户已知悉）。
+  - **数据源（Core）**：`ArchiveProgress` 新增 4 个可空字段 `CompressedFiles` / `CompressedBytes` / `StoreOnlyFiles` / `StoreOnlyBytes`（null = 未上报）。① ZIP 多线程路径（`ZipEngine.Compress.cs`）在扫描后完成 `storeGroup` / `compressGroup` 分类，进入 MT 分支时一次性上报两组文件数与输入字节；② ZIP 串行路径逐文件调用 `AdaptiveRuleMatcher.ResolveLevel`，`ReadFileWithRetry` 新增 `out bool storeOnly`（`entryLevel == 0`）回传判定，边跑边累计并在 100ms 节流上报里携带，循环结束后再补一次收尾上报（少量文件可能从未触发节流）——该收尾上报**必须同时带进度字段**，否则 0% 会把已到 100% 的进度条拉回。
+  - **UI**：`ProgressViewModel` 新增 `StatsCompressedText/Label/Count/Size` 与 `StatsStoreOnlyText/Label/Count/Size`（三行同构：图标+标题 / 文件数量 / 文件大小），`ApplyCompositionStats` 统一写入；新增 `IsCompositionOnlyReport` 早返回分支（纯构成上报只刷新统计卡，不参与主进度/速度/ETA）；`BeginPreparing` 调 `ResetCompositionStats` 清空（构成属于「当前档案」）。`ProgressWindow.axaml` 在「已处理」卡后插入「卡 1b 已压缩 🗜」「卡 1c 仅存储 📄」，三行结构与既有卡一致，大小行同样用 `DashBrush`（"—" 灰显）。新增三语 key `Progress_Stats_CompressedFiles` / `Progress_Stats_StoreOnlyFiles`（1309 → 1311；注意 `Progress_Stats_Compressed` 已被「整体压缩汇总」占用，不能复用）。
+  - **测试**：`tests/MantisZip.Tests/Engines/CompressCompositionStatsTests.cs` 2 例（自适应 + 多线程压 2 txt + 3 png → 上报 2/3 且字节之和等于输入总量；关闭自适应 → 完全不上报）；`ProgressViewModelTests` 3 例（两卡显示与数值、非自适应保持隐藏、`BeginPreparing` 复位）。
+  - **验证**：core / avalonia 构建 0 警告；`tests` / `ui-tests` 全绿；`i18n` 1311 key 三语一致；`check` 版本六处一致；`guards` 4/4。
+  - **发布说明**：已按规则 18 经用户确认写入 `RELEASE_NOTES.md` v0.5.3「交互 / Interactions」节（中英各一条）。
+  - **实测返工（同日，用户反馈两处）**：① **「仅存储」卡出现太晚** —— 多线程路径扫描后即上报（探针确认早于第一帧进度），但**串行回落路径**（临时空间不足 / 重复相对路径等）是逐文件累计、要等第一个 100ms 节流才带构成，看起来「存储开始才出现」。改为串行路径**先整体预分类一遍并立刻上报**（与 MT 同口径），并把 `ReadFileWithRetry` 的 `out bool storeOnly` 去掉（预分类后不再逐文件累计）。② **「存储文件」行的底纹不随存储增长** —— 该底纹此前绑 `CurrentFileRatio`（单个文件的进度），而存储拷贝几乎一次读完，底纹只会在 0→100 之间跳。新增 `DetailRowRatio`：写出阶段（`ShowStoreSectionHeader`）用**整个阶段**的字节进度（`BatchProcessedBytes / BatchTotalBytes`，写入 `_storePhaseDoneBytes/_storePhaseTotalBytes`，`ResetChannelSectionState` 归零），其余阶段仍用当前文件进度；XAML 底纹改绑该属性。
+  - **测试（返工后）**：`CompressCompositionTimingTests` 2 例（Theory：多线程 / 串行均断言「构成上报早于第一帧压缩进度」且首帧值已是 2/6）；`ProgressViewModelTests` 再补 2 例（写出阶段 `DetailRowRatio` = 阶段字节进度 0.25 而非单文件 0.05；压缩阶段跟随文件进度）。
+
 **2026-10-23** — 改进：自适应 + 多线程压缩时，「仅存储」文件在合并阶段也上报文件名与进度
   - **症状**（用户实测）：「少量普通文件 + 大量 jpg」开自适应与多线程压缩时，普通文件阶段进度与文件名都正常；进入 jpg 的仅存储阶段后进度条几乎不动、文件名停在最后一个普通文件、统计卡「已处理 N/M」也冻住。
   - **根因（三处）**：① `src/MantisZip.Core/Engines/ZipEngine.Compress.cs` 合并阶段的两个 `mergeAdapter`（N 组路径与单组 7z 路径）都写死 `CurrentFile = string.Empty`，而 UI 的 `SetProgress` 只在 `CurrentFile` 非空时更新文件名 ⇒ 名字停在上一个文件；② 同一 adapter 只透传百分比/`EntryKey`，**不报 `ProcessedFiles`/`TotalFiles`**，重写器也不报 ⇒ 计数冻结；③ `src/MantisZip.Core/Utils/ZipBinaryRewriter.cs` 其实逐条目在上报，但条目名带硬编码中文前缀（`"复制: "` / `"压缩: "`，违反规则 13），且百分比按**条目数**加权（`entryWeight = 90/totalEntries`）而非按字节 ⇒ 大文件时进度条只能「按文件跳」。
