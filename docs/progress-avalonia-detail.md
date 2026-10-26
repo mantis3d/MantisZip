@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-26** — 修复：「测试」菜单的诊断窗口全部打不开（owner 取不到主窗口）
+  - **背景**：用户实测 Debug 构建里「测试」菜单 28 个诊断窗口点了没有任何反应。该菜单只在 Debug 出现（`AppConstants.ShowTestMenu` 仅 `#if DEBUG` 为 true），Release/发布版不受影响，故不进 `RELEASE_NOTES.md`（规则 18：同周期内引入并修复、从未发布给用户的问题只记细节文档）。
+  - **根因**：`TestMenuView.CreateMenuItem()` 用 `Content = null` 把根 `MenuItem` 从视图上摘下，而视图自身从不进可视树（`MainWindow.axaml.cs` 只把 `CreateMenuItem()` 的结果塞进 `MainMenu.Items`，`testMenuView` 是局部变量）。2026-10-22 启动优化阶段 3（提交 `86e5139a`）把点击处理从 `MainWindow` 迁进该视图时，owner 写成 `TopLevel.GetTopLevel(this) as Window` ⇒ 恒为 `null`，而结尾是 `if (window != null && owner != null)` ⇒ 28 项全部静默跳过。`git log -S "Content = null"` / `-S "TopLevel.GetTopLevel(this)"` / `--diff-filter=A` 三方确认引入点就是 `86e5139a`（此前处理器在 `MainWindow` 里，`this` 就是主窗口）。
+  - **修法**：抽出 `internal static Window? ResolveOwner(MenuItem, Control)`，解析顺序 = 菜单项的 `TopLevel` → 沿**逻辑父级**回溯找 `Window`（子项真机点击时身处弹出层，可视父级不是 `Window`，只查 `TopLevel` 会漏）→ 本视图的 `TopLevel` → 本视图逻辑父级；结尾改为「无 window 直接 return / 无 owner 降级 `Show()` / 否则 `ShowDialog(owner)`」，不再静默丢弃 —— 诊断菜单的意义就是点了必须有反应。
+  - **回归测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/TestMenuViewClickTests.cs` 两例：① 复刻真实结构（`MenuItem` 挂在窗口里的 `Menu` 上、视图已分离）断言 `ResolveOwner` 返回承载窗口，并先断言「视图自身取不到 `TopLevel`」以锁住陷阱，子菜单展开后再断言一次；② 菜单尚未挂进窗口时返回 `null`（保证处理器走 `Show()` 降级）。**红绿都验过**：把 `ResolveOwner` 临时改回只看 `view` ⇒ 用例立刻变红，恢复后转绿。
+  - **状态**：✅ 修复 + 回归守卫完成。
+
 **2026-10-26** — 计划：图标统一到 Fluent 24 Regular 网格（50 条重画 + 尺寸/前景色收敛 + 测试窗矩阵页）
   - **背景**：`docs/PLAN.md` 的 S 档计划项 `icon-normalization`。审计脚本 `scripts/render-icon-montage.ps1 -Check` 当时报「117 个图标里 49 个不在 24 网格」。设计、映射表与实施记录见 [icon-normalization.md](.omo/plans/已完成/icon-normalization.md)。
   - **根因**：38 个图标来自别的坐标系（字体字形 1000/2048 em，渲染出来比邻座明显更粗更黑）、11 个是手绘杂线；`IconOrientation` 几何虽在网格但语义错（画成「图裂/禁用」样）；显示尺寸混用 14/15/16px；`PathIcon` 缺统一前景色来源。

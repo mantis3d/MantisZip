@@ -1,5 +1,6 @@
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.LogicalTree;
 using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
@@ -44,8 +45,12 @@ public partial class TestMenuView : UserControl
         if (sender is not MenuItem mi || mi.Tag is not string tag)
             return;
 
-        // 对话框 owner：优先取所属窗口（主窗口），headless/无窗口时退化为 null
-        var owner = TopLevel.GetTopLevel(this) as Window;
+        // 对话框 owner：**必须优先从被点击的 MenuItem 取**（取不到再退回本视图）。
+        // 2026-10-26 修复（86e5139a 引入的遗留缺陷）：CreateMenuItem() 会把 TestMenuRoot 从本视图
+        // 摘下（Content = null），而 TestMenuView 自身从未进入任何可视树 → `TopLevel.GetTopLevel(this)`
+        // 恒为 null，于是 `owner != null` 这道判据对 28 个诊断窗口全部静默跳过，
+        // 表现为「测试菜单里的窗口都打不开」。MenuItem 本身挂在主菜单上，从它取得到 MainWindow。
+        var owner = ResolveOwner(mi, this);
 
         // AppMessageBox uses static Show() — handle separately
         if (tag == "AppMessageBox")
@@ -92,9 +97,49 @@ public partial class TestMenuView : UserControl
             _ => null
         };
 
-        if (window != null && owner != null)
+        // 取不到 owner（headless / 无主窗口）时**降级为 Show()**，不再静默丢弃 ——
+        // 诊断菜单的意义就是「点了要有反应」，静默失败会再次掩盖真实缺陷。
+        if (window is null)
+            return;
+
+        if (owner is null)
         {
-            await window.ShowDialog(owner);
+            window.Show();
+            return;
         }
+
+        await window.ShowDialog(owner);
+    }
+
+    /// <summary>
+    /// 解析对话框 owner：优先从被点击的 <see cref="MenuItem"/> 取所属窗口（它挂在主窗口的
+    /// <c>Menu</c> 上），取不到再退回本视图。
+    ///
+    /// ⚠ 顺序不能反：本视图经 <see cref="CreateMenuItem"/> 交出内容后从未进入任何可视树，
+    /// 只看 <c>this</c> 会恒为 <c>null</c> —— 正是 2026-10-22 引入、2026-10-26 修复的回归根因。
+    ///
+    /// 子菜单项的真实可视父级是 <c>PopupRoot</c>（弹出层，不是 <see cref="Window"/>），
+    /// 所以只靠 <c>TopLevel.GetTopLevel</c> 仍可能取不到窗口 —— 再沿逻辑父级回溯一层兜底：
+    /// 子项 → 根「测试」菜单项 → 主菜单 → 主窗口。
+    /// internal 以便回归测试直接断言解析结果（比驱动真实点击更稳定）。
+    /// </summary>
+    internal static Window? ResolveOwner(MenuItem menuItem, Control view)
+        => TopLevel.GetTopLevel(menuItem) as Window
+           ?? FindOwnerWindow(menuItem)
+           ?? TopLevel.GetTopLevel(view) as Window
+           ?? FindOwnerWindow(view);
+
+    /// <summary>沿逻辑父级向上找第一个 <see cref="Window"/>（弹出层里的菜单项只能这样回溯）。</summary>
+    private static Window? FindOwnerWindow(ILogical? node)
+    {
+        while (node is not null)
+        {
+            if (node is Window window)
+                return window;
+
+            node = node.LogicalParent;
+        }
+
+        return null;
     }
 }
