@@ -1035,20 +1035,29 @@
                 Width="20" Height="20"
                 VerticalAlignment="Center"
                 Margin="0,0,8,0" />
-      <!-- 状态行文本框：只读可选中，文案随暂停/恢复/完成变化（原 Row 3 TextBlock 下移并升级） -->
-      <TextBox x:Name="StatusLineBox"
-               Grid.Column="1"
-               Text="{Binding StatusMessage}"
-               IsReadOnly="True"
-               TextWrapping="Wrap"
-               FontSize="20"
-               FontWeight="SemiBold"
-               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-               Background="Transparent"
-               BorderThickness="0"
-               Padding="0"
-               VerticalAlignment="Center"
-               IsTabStop="False" />
+      <!-- 状态区（垂直）：状态行文本框 + 其下的操作说明行 -->
+      <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="{DynamicResource SpacingXxs}">
+        <!-- 状态行文本框：只读可选中，文案随暂停/恢复/完成变化（原 Row 3 TextBlock 下移并升级） -->
+        <TextBox x:Name="StatusLineBox"
+                 Text="{Binding StatusMessage}"
+                 IsReadOnly="True"
+                 TextWrapping="Wrap"
+                 FontSize="20"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0"
+                 VerticalAlignment="Center"
+                 IsTabStop="False" />
+        <!-- 操作说明行：整包重写类操作（如删除）没有逐条目进度回调，用一行真实影响面
+             代替 N 行假进度；空文案时整行隐藏（ShowOperationNote，规则 6） -->
+        <TextBlock Text="{Binding OperationNoteText}"
+                   IsVisible="{Binding ShowOperationNote}"
+                   TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+      </StackPanel>
       <!-- 状态行复制按钮：复制 StatusMessage 全文，复用 ShowCopyFeedback（PathIcon 必须直接作 Content） -->
       <Button x:Name="StatusCopyBtn"
               Grid.Column="2"

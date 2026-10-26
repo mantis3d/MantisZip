@@ -290,7 +290,8 @@
                           Command="{Binding TestEntryCommand}" />
                 <Separator />
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
-                          Command="{Binding DeleteFilesCommand}" />
+                          Command="{Binding DeleteFilesCommand}"
+                          IsEnabled="{Binding CanDeleteEntries}" />
               </ContextMenu>
             </DataGrid.ContextMenu>
             <DataGrid.Columns>

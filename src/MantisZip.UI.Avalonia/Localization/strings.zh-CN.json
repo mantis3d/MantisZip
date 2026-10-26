@@ -1,4 +1,8 @@
 ﻿{
+  "Confirm_DeleteDirectoryFmt": "将删除目录「{0}」及其下 {1} 个文件（共 {2}），此操作不可撤销。",
+  "Confirm_DeleteFileFmt": "将删除「{0}」（{1}），此操作不可撤销。",
+  "Error_Delete_EntryNotFound": "压缩包中不存在条目：{0}",
+  "Progress_DeleteNoteFmt": "正在删除 {0} 个文件（共 {1}）",
   "Progress_Summary_ArchivesCreated": "生成 {0} 个压缩包",
   "Progress_Summary_ArchivesCreatedPartial": "成功生成 {0} / {1} 个压缩包",
   "Progress_Summary_ArchivesExtracted": "解压 {0} 个压缩包",

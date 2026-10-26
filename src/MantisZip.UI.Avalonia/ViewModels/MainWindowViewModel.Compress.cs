@@ -221,7 +221,29 @@ public partial class MainWindowViewModel : ObservableObject
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
         if (engine == null) return;
 
+        // 只读格式（tar/gz…）不支持删除：入口按钮已按 CanDeleteEntries 禁用，这里再兜底一次，
+        // 防止命令经快捷键 / 自动化等路径绕过按钮状态被触发。
+        if (!engine.CanDelete(_currentFormat)) return;
+
+        // 删除目录带递归语义（引擎按「条目本身 + 其下全部子条目」匹配），故确认框必须先把影响面
+        // 算清楚：只写「删除此项？」会让用户以为只删掉一个空目录行。
+        var (fileCount, totalSize) = GetDeleteTargetStats(SelectedEntry);
+        var sizeText = FormatUtil.FormatSize(totalSize);
+        var confirmMessage = SelectedEntry.IsDirectory
+            ? LocalizationManager.T("Confirm_DeleteDirectoryFmt", deleteEntryPath, fileCount, sizeText)
+            : LocalizationManager.T("Confirm_DeleteFileFmt", deleteEntryPath, sizeText);
+
+        var confirm = await AppMessageBox.Show(
+            confirmMessage,
+            LocalizationManager.T("App_ConfirmTitle"),
+            MessageBoxButton.YesNo,
+            MessageBoxImage.Warning);
+        if (confirm != MessageBoxResult.Yes) return;
+
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
+
+        // 删除是整包重写、引擎无逐条目回调：进度窗用一行说明代替 N 行假进度（见计划决策记录）。
+        PendingOperationNote = LocalizationManager.T("Progress_DeleteNoteFmt", fileCount, sizeText);
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_DeletingFiles"),
@@ -239,6 +261,23 @@ public partial class MainWindowViewModel : ObservableObject
             StatusMessage = LocalizationManager.T("Status_DeleteComplete");
             await RefreshArchive();
         }
+    }
+
+    /// <summary>
+    /// 计算删除目标的影响面（文件数 + 总大小），供确认框与进度窗说明行使用。
+    /// 目录只统计其下文件（不含目录条目本身与空目录），口径与
+    /// <see cref="ArchiveEntryLister.ComputeDirectoryStats"/> 的 Count 一致；
+    /// 数据源取未过滤的原始条目列表，避免受当前搜索/过滤条件影响。
+    /// </summary>
+    private (int FileCount, long TotalSize) GetDeleteTargetStats(ArchiveItemModel entry)
+    {
+        if (!entry.IsDirectory) return (1, entry.Size);
+
+        var path = entry.FullPath ?? entry.Name;
+        if (string.IsNullOrEmpty(path)) return (0, 0L);
+
+        var dirStats = ArchiveEntryLister.ComputeDirectoryStats(_allRawItems ?? Array.Empty<ArchiveItem>());
+        return dirStats.TryGetValue(path, out var stat) ? (stat.Count, stat.Size) : (0, 0L);
     }
 
 }

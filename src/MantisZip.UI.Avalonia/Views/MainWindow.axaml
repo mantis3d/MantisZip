@@ -150,7 +150,7 @@
         </Button>
         <Button Classes="ToolbarButton"
                 Command="{Binding DeleteFilesCommand}"
-                IsEnabled="{Binding IsArchiveLoaded}"
+                IsEnabled="{Binding CanDeleteEntries}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_DeleteFiles]}">
           <StackPanel >
             <PathIcon Data="{StaticResource IconDismiss}" Classes="ToolbarButtonIcon" Width="22" Height="22" />

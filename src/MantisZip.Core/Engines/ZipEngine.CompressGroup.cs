@@ -885,7 +885,6 @@ public partial class ZipEngine
 
         await Task.Run(async () =>
         {
-            var deletedSet = new HashSet<string>(entryPaths.Select(p => ArchivePath.Normalize(p)), StringComparer.OrdinalIgnoreCase);
             if (entryPaths.Length == 0)
             {
                 CoreLog.Info("DeleteEntriesAsync: no entries to delete");
@@ -904,18 +903,31 @@ public partial class ZipEngine
                     // 删除会整包重写，此处若猜错编码会把存活的条目降级成乱码。
                     var encoding = ResolveFileNameEncoding(options?.FileNameEncoding, archivePath);
 
-                    // Build keep set: all entries NOT in entryPaths
-                    var deletedNormalized = new HashSet<string>(entryPaths.Select(p => ArchivePath.Normalize(p)), StringComparer.OrdinalIgnoreCase);
+                    // Build keep set: 所有未被 entryPaths 命中的条目。
+                    // 命中语义统一走 ArchivePath.MatchesEntryOrDescendant —— 目标是目录时必须连带其下所有条目。
                     var keepSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                    var allEntryNames = new List<string>();
 
                     using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
                     {
                         foreach (var entry in archive.Entries)
-                        {
-                            var name = entry.Key ?? string.Empty;
-                            if (!deletedNormalized.Contains(ArchivePath.Normalize(name)))
-                                keepSet.Add(name);
-                        }
+                            allEntryNames.Add(entry.Key ?? string.Empty);
+                    }
+
+                    // 零命中必须报错：这条快路径从不校验存在性，静默返回会让用户看到「删除完成」而包内一字未动。
+                    var missingEntry = entryPaths.FirstOrDefault(
+                        t => !allEntryNames.Any(n => ArchivePath.MatchesEntryOrDescendant(n, t)));
+                    if (missingEntry != null)
+                    {
+                        CoreLog.Error($"DeleteEntriesAsync: entry not found: {missingEntry}");
+                        try { if (File.Exists(tempArchiveFast)) File.Delete(tempArchiveFast); } catch (Exception ex) { CoreLog.Trace("ZipEngine: failed to delete temp archive: {0}", ex.Message); }
+                        throw new ArchiveEntryNotFoundException(missingEntry);
+                    }
+
+                    foreach (var name in allEntryNames)
+                    {
+                        if (!entryPaths.Any(t => ArchivePath.MatchesEntryOrDescendant(name, t)))
+                            keepSet.Add(name);
                     }
 
                     if (keepSet.Count == 0)
@@ -1000,24 +1012,21 @@ public partial class ZipEngine
                         allNames.Add(name);
                     }
 
-                    // 验证要删除的条目都存在
-                    var entryNameSet = new HashSet<string>(allNames);
+                    // 验证要删除的条目都存在（目录目标只要命中其下任一条目即视为存在）
                     foreach (var entryPath in entryPaths)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var normalized = ArchivePath.Normalize(entryPath);
-                        if (!entryNameSet.Contains(normalized))
+                        if (!allNames.Any(n => ArchivePath.MatchesEntryOrDescendant(n, entryPath)))
                         {
                             CoreLog.Error($"DeleteEntriesAsync: entry not found: {entryPath}");
-                            throw new FileNotFoundException($"压缩包中不存在条目: {entryPath}", entryPath);
+                            throw new ArchiveEntryNotFoundException(entryPath);
                         }
                     }
 
                     foreach (var name in allNames)
                     {
                         cancellationToken.ThrowIfCancellationRequested();
-                        var normalized = ArchivePath.Normalize(name);
-                        if (!deletedSet.Contains(normalized))
+                        if (!entryPaths.Any(t => ArchivePath.MatchesEntryOrDescendant(name, t)))
                         {
                             keepNames.Add(name);
                         }

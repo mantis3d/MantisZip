@@ -1,4 +1,8 @@
 ﻿{
+  "Confirm_DeleteDirectoryFmt": "This will delete folder \"{0}\" and the {1} file(s) inside it ({2}). This cannot be undone.",
+  "Confirm_DeleteFileFmt": "This will delete \"{0}\" ({1}). This cannot be undone.",
+  "Error_Delete_EntryNotFound": "Entry not found in archive: {0}",
+  "Progress_DeleteNoteFmt": "Deleting {0} file(s) ({1})",
   "Progress_Summary_ArchivesCreated": "{0} archive(s) created",
   "Progress_Summary_ArchivesCreatedPartial": "{0} of {1} archives created",
   "Progress_Summary_ArchivesExtracted": "{0} archive(s) extracted",

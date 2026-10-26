@@ -464,6 +464,23 @@ public partial class ProgressViewModel : ObservableObject
         if (value) KeepOpenOnComplete = true;
     }
 
+    /// <summary>
+    /// 操作说明行文案（如「正在删除 3 个文件（共 1.2 MB）」）。
+    /// 用于「整包重写、无逐条目回调」的操作（删除）：N 行文件列表只能是假进度，故用一行真实影响面代替。
+    /// 空值 → 整行隐藏（规则 6），压缩/解压流程不设置本属性，行为不变。
+    /// </summary>
+    [ObservableProperty]
+    private string? _operationNoteText;
+
+    /// <summary>说明行是否可见（有文案才显示）。</summary>
+    public bool ShowOperationNote => !string.IsNullOrEmpty(OperationNoteText);
+
+    partial void OnOperationNoteTextChanged(string? value)
+        => OnPropertyChanged(nameof(ShowOperationNote));
+
+    /// <summary>设置操作说明行文案（null/空 = 隐藏）。须在窗口显示前或 UI 线程调用。</summary>
+    public void SetOperationNote(string? text) => OperationNoteText = text;
+
     // ════════════════════════════════════════════
     //  T6: 显示模式 / 统计 / 时间 / 速度 / 并行批次
     // ════════════════════════════════════════════

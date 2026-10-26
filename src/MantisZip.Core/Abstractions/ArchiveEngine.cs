@@ -528,7 +528,9 @@ public class ExtractResult
         /// 决定存活条目重写时的文件名编码。传 null 时引擎按包内 bit 11 推断
         /// （调用方应尽量透传用户的编码设置，避免把存活条目降级成乱码）。
         /// </param>
-        /// <exception cref="FileNotFoundException">条目在压缩包中不存在</exception>
+        /// <exception cref="ArchiveEntryNotFoundException">
+        /// 目标条目在压缩包中一个都匹配不到（派生自 <see cref="FileNotFoundException"/>，只捕获基类也不会漏）
+        /// </exception>
         /// <exception cref="NotSupportedException">此格式不支持删除操作</exception>
         Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null);
 

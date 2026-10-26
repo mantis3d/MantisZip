@@ -150,6 +150,13 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public CompressRequest? PendingCompressRequest { get; set; }
 
+    /// <summary>
+    /// 下一次 <see cref="RunWithProgress"/> 的操作说明行文案（读取后立即复位，null = 不显示）。
+    /// 用于「整包重写、无逐条目回调」的操作（如删除）：进度窗显示一行真实影响面，
+    /// 而不是播种 N 行永远停在 ⏳ 的假进度。
+    /// </summary>
+    public string? PendingOperationNote { get; set; }
+
     /// <summary>测试流标记：传给进度窗口自动按下 📌（D10 触发点 3，完成后不自动关闭）。</summary>
     public bool PendingTestFlow { get; set; }
 
@@ -339,10 +346,25 @@ public partial class MainWindowViewModel : ObservableObject
     {
         // 同步预览面板当前压缩包路径，供「输入密码」按钮的 CanExecute 判断使用
         Preview.CurrentPreviewFilePath = value;
+        // 换包后引擎能力位可能变化（zip ↔ tar），一并刷新删除入口可用性
+        OnPropertyChanged(nameof(CanDeleteEntries));
     }
 
     [ObservableProperty]
     private bool _isArchiveLoaded;
+
+    /// <summary>
+    /// 当前压缩包是否支持删除条目（TAR/GZ 等只读格式为 false）。
+    /// 三处删除入口（工具栏 / 编辑菜单 / 右键菜单）据此禁用，
+    /// 避免用户点了才吃 <c>NotSupportedException</c>。
+    /// </summary>
+    public bool CanDeleteEntries =>
+        IsArchiveLoaded
+        && CurrentArchivePath != null
+        && (ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath)?.CanDelete(_currentFormat) ?? false);
+
+    // 能力位随「压缩包加载状态」刷新（格式 `_currentFormat` 在 RefreshArchive 中先于本字段赋值）
+    partial void OnIsArchiveLoadedChanged(bool value) => OnPropertyChanged(nameof(CanDeleteEntries));
 
     [ObservableProperty]
     private bool _isLoading;

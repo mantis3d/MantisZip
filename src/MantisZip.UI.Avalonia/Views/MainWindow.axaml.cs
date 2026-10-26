@@ -300,6 +300,11 @@ public partial class MainWindow : Window
             // Task 6: 测试流标记（自动按下 📌，完成后不自动关闭）与完成回调/最近窗口回读通道
             pw.IsTestFlow = vm.PendingTestFlow;
             vm.PendingTestFlow = false;
+            // 操作说明行（删除等整包重写操作交代真实影响面；压缩/解压不置位）
+            var operationNote = vm.PendingOperationNote;
+            vm.PendingOperationNote = null;
+            if (operationNote is not null)
+                pw.SetOperationNote(operationNote);
             var onCompleted = vm.PendingCompletedCallback;
             vm.PendingCompletedCallback = null;
             vm.LastProgressWindow = pw;

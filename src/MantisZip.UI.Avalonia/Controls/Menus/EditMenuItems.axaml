@@ -53,7 +53,7 @@
   </MenuItem>
   <!-- 从压缩包删除文件 -->
   <MenuItem Command="{Binding DeleteFilesCommand}"
-            IsEnabled="{Binding IsArchiveLoaded}"
+            IsEnabled="{Binding CanDeleteEntries}"
             Header="{Binding LocalizedStrings[Menu_DeleteFiles]}">
     <MenuItem.Icon>
       <PathIcon Data="{StaticResource IconDismiss}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />

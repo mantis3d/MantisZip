@@ -260,6 +260,15 @@ public partial class ProgressWindow : Window
         if (!string.IsNullOrEmpty(message)) _vm.StatusMessage = message;
     }
 
+    /// <summary>
+    /// 设置操作说明行（状态行下方一行小字，如「正在删除 3 个文件（共 1.2 MB）」）。
+    /// 供整包重写类操作（删除）交代真实影响面；null/空 = 整行隐藏。
+    /// </summary>
+    public void SetOperationNote(string? text)
+    {
+        _vm.SetOperationNote(text);
+    }
+
     // ════════════════════════════════════════════
     //  Auto-close / Manual Close
     // ════════════════════════════════════════════
