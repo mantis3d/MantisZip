@@ -297,6 +297,8 @@
 
   **What to do**：用真实包跑一遍：①目录删除（含多层嵌套）②文件删除（回归）③加密包目录删除 ④7z 目录删除 ⑤7z 删除不存在条目（观察是否立刻报错而不重打包）⑥tar 上按钮禁用 ⑦确认框数字与大小是否准确（含**开启过滤器**后仍显示全量）⑧删除后立刻「测试压缩包」自检 ⑨删除最后一个条目 → 包被移除的既有行为。截图/录屏留档（现生成现看）。
 
+  **补充（同日，自动化替身）**：九个场景里七个不依赖点击，已用一次性探针测试（Release，8 例 / 596ms 全过）跑完 —— ①多层级嵌套、③加密包 `test123`、④7z 多层目录、⑤7z 不存在条目（抛 `ArchiveEntryNotFoundException` + 包字节不变 + `%TEMP%\MantisZip\DeleteTemp` 无新增目录 + 耗时 < 2s，证明未走整包重打包）、⑥能力位（`zip`/`7z` = true，`tar`/`tar.gz`/`tgz`/`gz`/`rar`/`iso` = false）、⑦`ComputeDirectoryStats` 的「N 个文件 / 共 x」只计文件且含嵌套与空文件、⑧删除后 `TestArchiveAsync` 通过（加密 ZIP 与 7z）、⑨删空即删包（ZIP copy-mode `ZipEngine.CompressGroup.cs:933-938` 与 7z `SevenZipEngine.cs:1273-1276` 行为一致）。其中 ⑧⑨ 原本零覆盖，已固化为 `tests/MantisZip.Tests/Engines/ZipEngineDeleteDirectoryTests.cs` 的 3 个正式用例（`DeletingLastEntry_RemovesArchive` 为 Theory，含 zip/7z 两分支）。**剩余人工项**：⑥ tar 包上删除入口是否置灰、⑦ 开启过滤器后确认框数字是否为全量（两者逻辑层已由自动化覆盖，差的是绑定与视觉）。
+
   **Acceptance Criteria**：九个场景全部符合预期；`%TEMP%\MantisZip\DeleteTemp` 无残留目录。
 
   **Commit**：无（手工验证，结论写入 T6 文档）

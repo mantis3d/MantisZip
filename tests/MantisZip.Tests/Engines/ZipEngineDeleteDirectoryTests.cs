@@ -260,4 +260,82 @@ public class ZipEngineDeleteDirectoryTests : IDisposable
         Assert.Equal("src/nope", ex.EntryPath);
         Assert.Equal(before, await File.ReadAllBytesAsync(archive));
     }
+
+    // ===== 删除后压缩包仍是健康包 / 删空即删包 =====
+
+    /// <summary>
+    /// 删除目录后包必须仍能通过自检：copy-mode 是「重写中央目录 + 拷贝数据区」，
+    /// 少写/多写一条偏移都会让包进入「能列出、解不出」的状态，只有自检能发现。
+    /// </summary>
+    [Fact]
+    public async Task DirectoryDelete_ThenArchiveStillPassesSelfTest()
+    {
+        var archive = CreateZip([
+            ("docs/a.txt", "A"),
+            ("docs/b.txt", "B"),
+            ("keep.txt", "K"),
+        ]);
+
+        await _engine.DeleteEntriesAsync(archive, ["docs"]);
+
+        Assert.Equal(["keep.txt"], await ListPathsAsync(archive));
+        Assert.True(await _engine.TestArchiveAsync(archive), "删除后自检应通过");
+    }
+
+    [Fact]
+    public async Task SevenZip_DirectoryDelete_ThenArchiveStillPassesSelfTest()
+    {
+        if (!Is7zDllAvailable()) return;
+
+        var root = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        var src = Path.Combine(root, "src");
+        Directory.CreateDirectory(Path.Combine(src, "docs", "deep"));
+        await File.WriteAllTextAsync(Path.Combine(src, "docs", "a.txt"), "A");
+        await File.WriteAllTextAsync(Path.Combine(src, "docs", "deep", "b.txt"), "B");
+        await File.WriteAllTextAsync(Path.Combine(src, "keep.txt"), "K");
+        var archive = Path.Combine(root, "selftest.7z");
+
+        var engine = new SevenZipEngine();
+        await engine.CompressAsync([src], archive, new ArchiveOptions { SevenZipMultithreaded = false });
+        await engine.DeleteEntriesAsync(archive, ["src/docs"], password: null, progress: null,
+            cancellationToken: CancellationToken.None,
+            options: new ArchiveOptions { SevenZipMultithreaded = false });
+
+        Assert.True(await engine.TestArchiveAsync(archive), "7z 删除后自检应通过");
+    }
+
+    /// <summary>
+    /// 删掉包内最后一个条目时，既有行为是**直接删除压缩包**（ZIP copy-mode 与 7z 两条路径一致），
+    /// 而不是留一个 0 条目的空包。此处锁定该行为，避免日后改写成留空包却不通知调用方。
+    /// </summary>
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public async Task DeletingLastEntry_RemovesArchive(bool sevenZip)
+    {
+        if (sevenZip && !Is7zDllAvailable()) return;
+
+        string archive;
+        if (sevenZip)
+        {
+            var root = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+            var src = Path.Combine(root, "only");
+            Directory.CreateDirectory(src);
+            await File.WriteAllTextAsync(Path.Combine(src, "a.txt"), "A");
+            archive = Path.Combine(root, "only.7z");
+
+            var engine = new SevenZipEngine();
+            await engine.CompressAsync([src], archive, new ArchiveOptions { SevenZipMultithreaded = false });
+            await engine.DeleteEntriesAsync(archive, ["only"], password: null, progress: null,
+                cancellationToken: CancellationToken.None,
+                options: new ArchiveOptions { SevenZipMultithreaded = false });
+        }
+        else
+        {
+            archive = CreateZip([("docs/a.txt", "A")]);
+            await _engine.DeleteEntriesAsync(archive, ["docs"]);
+        }
+
+        Assert.False(File.Exists(archive), "删掉最后一个条目后应删除压缩包本身");
+    }
 }
