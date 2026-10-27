@@ -112,6 +112,9 @@ Get-Content .buildout\logs\ci.log | Select-String '  Failed MantisZip|Test Run F
 
 日志行前缀是 `build` + `UNKNOWN STEP` + ISO 时间戳，用 `-replace '^build\tUNKNOWN STEP\t\S+Z '` 剥掉即成人话。作业页详情与 annotations **不含**用例名（只有构建告警），必须走上面这条日志路径。
 
+> 顺带（本沙箱专属，非仓库问题）：`git push` 会因 GCM 的 prompt 脚本起 `sh.exe` 失败而崩成 `couldn't create signal pipe, Win32 error 5` → `fatal: could not read Username for 'https://github.com'`。绕过写法：取到 PAT 后用一次性 header 推 ——
+> `git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic <base64('x-access-token:'+PAT)>" push origin <branch>`（base64 由 `[Convert]::ToBase64String` 现算，PAT 不落盘、不写进仓库配置）。
+
 已知两类失败，判据不同，处置也不同：
 
 | 类型 | 判据 | 处置 |
