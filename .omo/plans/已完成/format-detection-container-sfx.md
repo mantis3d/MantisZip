@@ -211,7 +211,7 @@ public static bool TryDetectEmbeddedContainer(string filePath, out ContainerForm
 - [x] 推送 alpha 后 CI 绿（run 40543162892，4m11s）
 - [x] `gh` 回复 #54 / #36 并给出关闭判定；未覆盖项已进 `docs/KNOWN_ISSUES.md`
 - [x] 规则 3：`docs/PROGRESS.md` + `docs/progress-avalonia-detail.md` 已更新
-- [ ] 规则 18：向用户确认 `RELEASE_NOTES.md` 更新范围
+- [x] 规则 18：向用户确认 `RELEASE_NOTES.md` 更新范围（已写入 v0.5.4「修复 / Fixes」段）
 
 ## 实施结果（2026-10-27 完成）
 

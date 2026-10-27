@@ -16,6 +16,7 @@
   - **范围控制（不抢用户默认程序）**：`SupportedExtensions` 加 `.jar/.war/.ear/.apk`（能打开），但 `ShellIntegration.ArchiveExtensions` 改为**显式 8 项常量**，关联 / 右键菜单 / 设置页三者行为零变化；守卫测试改名 `IsAssocEnabledInSettings_CoversAssociatedExtensions` 并加反向断言。留给将来：**KI-006**。
   - **测试**：新增 `tests\MantisZip.UI.Avalonia.Tests\FormatDetectionContainerTests.cs`（27 例：容器识别、jar/war/ear/apk 引擎路由、真 ODF 不误伤、SFX 三夹具、`.exe` 路由 7z、未知扩展名负样本、关联负向守卫）。放 UI 测试项目而非 Core 测试项目的理由：Core 是 xUnit v2 本机跑不了（KI-002）。
   - **验证**：Core / Avalonia 构建 0 警告 0 错误；UI 全量 478 例全绿（3 既有 skip）；`-Task check` exit 0；真夹具 `app.jar` → `Zip/Zip` + `ZipEngine`、`real-pe-sfx.exe` → `Unknown/Pe` + `SevenZipEngine`。
+  - **收尾**：CI run `40543162892` 全绿（4m11s）；`gh` 在 #54 / #36 留言说明根因与改法并按 `stateReason=completed` 关闭；**RELEASE_NOTES**：用户确认写入 v0.5.4「修复 / Fixes」段（jar/war/ear/apk 与自解压 exe 各一条中英对照，注明未注册关联），beta 那三条修复按用户决定留在 v0.5.3 段不动。
 
 **2026-10-27** — 合并：beta 的缺陷修复并入 alpha（11 处冲突按「留 alpha 契约 + 拿 beta 诊断与收尾」取舍）
   - **背景**（用户指派的合并请求）：beta 是调试除错分支，攒了 10 条提交（#52 的 7z.dll 加载顺序、进度窗口完成后界面不更新、冲突提示链路加固 + `conflict.log`、压缩流程并行度、扫描统计卡、压缩包 N/M 卡、「真暂停」评估结论、探针测试清理、v0.5.3 发布说明等）；alpha 同期前进了 25 条提交（意图-执行接缝收口、图标归一化、删除目录修复等）。两边都改过的文件 18 个，git 报冲突 11 个。
