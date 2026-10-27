@@ -2901,6 +2901,13 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.4 (2026-10-27) 计划立项：压缩包内重命名推倒重写（S 档）+ 编辑操作序列（A 档）
+  - **触发**：用户问「为什么不能像文件管理器那样先改一堆、最后一起保存」。核对后发现现状是**每一次编辑都整包写盘**——ZIP 的添加与删除各自都是整包 copy-mode 复制（`src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs:136-222`、`:894-979`），7z 删除更是全量解压 + 重打包（`src/MantisZip.Core/Engines/SevenZipEngine.cs:1281-1345`，且固定 `CompressionLevel.Normal`）。
+  - **`archive-rename-entry.md` 推倒重写（S 档 8-10h）**：旧方案「提取→删除→添加」有四条硬伤——改一个名字要重写三遍整包、7z 会静默把用户压缩等级重置成 `Normal`、加密包改名会变明文、三步之间没有原子性。新方案：给 `src/MantisZip.Core/Utils/ZipBinaryRewriter.cs:314` 的 `RewriteAsync` 加 `renameMap`，只改 LFH/CD 里的名字字节、压缩数据原样搬运（**零重压缩**）；新名不可被归档编码无损表示或遇 ZIP64 时抛 `ZipCopyModeException` 回退 legacy，**不静默降级成乱码**。7z 用 `ModifyArchive` 就地删 + 单条追加（`:1509-1511` 已验证 index 删除有效）；tar.gz 明确不支持。新增 `IArchiveEngine.CanRename` / `RenameEntriesAsync`（与 `CanAdd`/`CanDelete` 同型：`src/MantisZip.Core/Abstractions/ArchiveEngine.cs:540`/`:545`）。UI：右键菜单插在 `src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml:293` 的「删除」之前，F2 走 `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs:1007` 的 `RegisterKeyBindings`，并按规则 10.1 同步菜单 `InputGesture` 与 `tests/MantisZip.UI.Avalonia.Tests/MainWindowKeyBindingsTests.cs`。
+  - **新增 `archive-edit-operation-sequence.md`（A 档 12-16h）**：暂存区 = 内存 `PendingOp` 队列 + 对原始条目快照做**纯函数投影**得到虚拟视图（撤销/重做天然免费），提交时一次性下发 `ArchiveBatchPlan{Deletes,Renames,Adds}`（新接口 `ApplyBatchAsync`，默认抛，与 `CanAdd`/`CanDelete` 同型）：ZIP 一次 `RewriteAsync` 同时承载 keep + rename + add，7z 一次 `ModifyArchive` 删完再追加。口径（用户 2026-10-27 拍板）：只限当前打开的那个包、未提交切包/关窗三选（应用/丢弃/取消）、加密包新增条目沿用原包加密、可选提交前备份原包（默认关）。P2/P3（拖拽移动、逐步 undo/redo、另存为新包）进 B 档 8-12h。
+  - **`docs/PLAN.md` 同步**：S 档工时 14-21h → 24-33h 并新增重命名行、执行顺序追加「重命名排最后（它就是 A 档暂存区的地基）」、验收口径由「两件事」改「三件事」；A 档 60h → 66h，旧 6-8h 重命名行原位替换为 12-16h 暂存区行；B 档新增增强行；依赖链新增 `archive-rename-entry（S）── renameMap / RenameEntriesAsync ──▶ archive-edit-operation-sequence（A）`，并修掉两处「重命名依赖进度窗口增强」的过时说法。
+  - **状态**：📋 计划已落盘（未开始实施）。
+
 #### v0.5.4 (2026-10-27) 安装包统一产品身份 + 旧版迁移桥（issue #45）
   - **背景**：issue #45 报「安装新版的时候，旧版卸载不干净导致出问题」，用户截图是 .NET apphost 的「You must install or update .NET to run this application」——说明 `{app}` 里的 `runtimeconfig.json` 与磁盘上实际存在的运行时文件不匹配。
   - **根因**：两个 Inno 变体（`installer.iss` 框架依赖 / `installer-selfcontained.iss` 自包含）各自声明**不同 AppId**（`{F7A3C8E1-…}` / `{963001F3-…}`），却共用 `DefaultDirName={autopf}\MantisZip`。Inno 按 AppId 判定产品身份 ⇒ 装另一变体时既不卸旧版，也不知道目录里还有另一个产品；两套 `unins000.*` 记录的删除清单指向同一批文件 ⇒ 卸载任一条都会删掉另一套正在使用的文件，`[UninstallRun]` 钩子（依赖 `MantisZip.UI.Avalonia.exe` 存在）也随之静默失败。旧脚本注释「different AppId … so both installers can coexist」的前提在「同名同目录同 exe」下根本不成立——当年 `.omo/plans/已完成/self-contained-installer.md:35` 的立项依据写反了。

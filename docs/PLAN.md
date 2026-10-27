@@ -36,9 +36,9 @@
 
 ---
 
-## S 档 —— 本轮必做（约 14-21h，≈ 两天满负荷）
+## S 档 —— 本轮必做（约 24-33h，≈ 三天满负荷）
 
-> **执行顺序（2026-10-24 讨论定，2026-10-26 按完成情况更新）**：~~图标~~（已完成）→ ~~接缝~~（已完成）→ 预览 → 自动更新。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。
+> **执行顺序（2026-10-24 讨论定，2026-10-26 / 10-27 按完成情况更新）**：~~图标~~（已完成）→ ~~接缝~~（已完成）→ 预览 → 自动更新 → 重命名（引擎级）。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。重命名排最后，是因为它就是 A 档「暂存区」的地基，紧邻 A 档开工能省一次返工。
 >
 > 已完成并归档：⚡ 插队项「删除压缩包内目录静默无效」（2026-10-26，随 v0.5.4）、S 档「图标归一化」（2026-10-26，随 v0.5.4）、S 档「意图-执行接缝收口（含波次 3 全仓清账）」（2026-10-26，随 v0.5.4）、⚡ 插队项「安装器产品身份统一 + 旧版迁移桥」（2026-10-27，随 v0.5.4，issue #45）—— 详见 [PROGRESS.md 历史设计方案索引](PROGRESS.md)。
 
@@ -46,17 +46,18 @@
 |---|---|:--:|:--:|---|
 | 预览取数层内存优先（切片 1+2+4） | [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) | 🟡中 | 12-17h | 📋 2026-10-24 立项。现状：**每次预览都先把整条目解压到 `%TEMP%\MantisZip\Preview\` 再从磁盘读回**（固定文件名、每次预览前清空整个目录）；文本类写盘只为读 1MB；便携模式往 U 盘写；敏感文件明文落 TEMP。本批＝文本/CSV/Markdown/代码/日志走内存 + 图片 `SKBitmap.Decode(Stream)` + PDF `PdfDocument.Open(Stream)` + head 读取改真流式（Zip 不再整条目解压进内存）+ 临时文件按条目命名 + head LRU + >15MB 的 head-only 部分预览。**明确保留落盘**：HTML→WebView（`NativeWebView` 不支持 `data:` URI）、打开方式（外部程序要路径）、字体（`FontParser` 要文件名）。注：15MB 上限本身可在设置里调大，故切片 4 收窄为**文本/PDF/Office 的部分预览**（图片必须完整字节，无部分可言）。Office（切片 3）见 A 档 |
 | 自动更新检测 | [auto-update.md](.omo/plans/未开始/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查 + AboutWindow「更新」Tab + `UpdateAvailableDialog` + 设置开关 + 单元测试。**面向公开用户后这从「加分项」变「基础设施」**：没有它，每个修复都到不了用户手上 |
+| 压缩包内重命名条目（引擎级，零重压缩） | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **8-10h** | 📋 2026-10-27 推倒重写（旧方案 6-8h 作废）：旧路线「提取→删除→添加」= 改一个名字要整包重写**三遍**（ZIP 的添加/删除各自都是整包 copy-mode 复制），7z 还会把用户压缩等级重置成 `Normal`，加密包改名会变明文。新方案 ZIP 走 copy-mode **只改名字字节、压缩数据原样搬运**，7z 走 `ModifyArchive` 就地删 + 单条追加，tar.gz 明确不支持。F2 + 右键菜单，目录改名一并做。**它是 A 档「压缩包编辑操作序列」的地基** |
 
-> 本轮验收口径：公众能感知到的两件事同时改善——**预览不再先落盘（且大文件不再一律被拒）**、**安装完会自己知道有新版本**。（图标归一化、意图-执行接缝均已于 2026-10-26 完成，随 v0.5.4 验证）
+> 本轮验收口径：公众能感知到的三件事同时改善——**预览不再先落盘（且大文件不再一律被拒）**、**安装完会自己知道有新版本**、**能在压缩包里直接改名（F2，且不重新压缩整包）**。（图标归一化、意图-执行接缝均已于 2026-10-26 完成，随 v0.5.4 验证）
 
 ---
 
-## A 档 —— 下一轮（约 60h，是「接下来两轮」的量，不是一轮）
+## A 档 —— 下一轮（约 66h，是「接下来两轮」的量，不是一轮）
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
 | 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。📋 2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） |
-| 压缩包内重命名/移动条目 | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **6-8h**（原估 3-4h） | 右键重命名(F2)/移动到…。7-Zip / WinRAR 都有，公开用户会问。**工时按 6-8h 重估**：实现是全量重写包，必须先写临时包再原子替换 + 校验，否则一次失败就是毁包 |
+| 压缩包编辑操作序列（暂存区 + 批量提交） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | **12-16h** | 删除/重命名先进内存队列，文件列表立刻反映结果（虚拟视图），点「应用」或关窗时**一次性**提交：ZIP 一次 `RewriteAsync`、7z 一次 `ModifyArchive` + 追加。**现状是每次编辑都整包重写**——删 20 个文件 = 20 次整包复制/重打包（7z 删除更是全量解压 + 重打包，还会把压缩等级重置成 `Normal`）。口径已定（2026-10-27）：只限当前打开的包、未提交切包/关窗三选（应用/丢弃/取消）、加密包沿用原加密、可选提交前备份原包（默认关）。**硬依赖 S 档「重命名」先落地** |
 | 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。**单独排在 A 档的理由**：三者都是「本来就在解析完整文档」，省下的只是落盘，用户感知最弱，且逐库确认 Stream 支持最费时 |
 | 自包含体积优化（第一步） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 📋 **目标已改写**：原「降至 20–25MB」与现有依赖（SkiaSharp / ImageSharp / OpenXml / Sqlite / PdfPig / WebView）矛盾，激进修剪会打穿预览。改为**第一步只做测量基线 + 验证保守修剪可行性**，目标区间 60–90MB。若确认只发 SelfContained 包，这一步的收益优先级上调 |
 | Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化。公开用户的分发入口，1-2h 的性价比极高 |
@@ -93,6 +94,8 @@
 | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 文件选择器去弹窗化（内嵌控件） | [embedded-file-picker.md](.omo/plans/未开始/embedded-file-picker.md) | 🟡中 | 1-2天 | 📋 2026-10-08 立项：把文件/目录选择器内嵌进压缩/解压设置窗。三步走：先抽纯控件再分别接入；不动 `CustomFilePickerDialog` 静态入口与系统浏览豁免。**与接缝计划有交集，排在接缝之后做可省一次返工** |
+
+| 编辑操作序列增强（拖拽移动 / 逐步撤销重做 / 另存为新包） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | 8-12h | A 档「暂存区」落地后的 P2/P3：重命名/移动到… 也入队、条目拖到目录树节点即入队、队列级 undo/redo（P1 只有整队丢弃）、提交目标改成「另存为新包」而不是覆盖原包 |
 
 ---
 
@@ -158,7 +161,9 @@
 
 ```
 intent-execution-seam（S，已完成 2026-10-26）── 软前置 ──▶ 所有「新增 UI 入口」类计划
-                                    （embedded-file-picker / archive-rename-entry 等先做它可省返工）
+                                    （embedded-file-picker 等先做它可省返工）
+
+archive-rename-entry（S）── renameMap / RenameEntriesAsync ──▶ archive-edit-operation-sequence（A，暂存区）
 
 icon-normalization（S，已完成 2026-10-26）──── 前置 ──▶ icon-theme-infra（冻结）──▶ packs ──▶ sets
 
@@ -176,7 +181,7 @@ NuGet 升级（SharpCompress ≥0.49.0）── 联动 ──▶ selfcontained-s
 补充说明：
 
 - `cross-platform-port` 已冻结。**唯一保留的纪律**：新增代码不要加深 Win32 耦合（新增平台相关调用时，优先走已有抽象或加一层接口）。
-- `archive-rename-entry` / `rar-compression` 为软依赖，进度窗口增强会自动改善其体验。
+- `rar-compression` 为软依赖，进度窗口增强会自动改善其体验。`archive-rename-entry` 已不再依赖进度窗口增强（2026-10-27 重写后只需一次 `RunWithProgress`）。
 
 ---
 

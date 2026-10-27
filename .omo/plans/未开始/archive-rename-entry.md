@@ -1,240 +1,168 @@
-# Work Plan: Rename Entries Inside Archive
+# Work Plan: 压缩包内重命名（引擎级 copy-mode，零重压缩）
 
-> **Status**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜⬜] (0/6)
-> **预估工时**: 🟡中 (3-4h)
-> **前置依赖**: 无硬依赖。若 `progress-window-enhancement` 先行实施，重命名流程的 ProgressWindow（提取→删除→添加三阶段）将自动获得路径分离、统计栏、模式切换等增强。
+> **Status**: 📋 待开始 | **阶段**: [⬜⬜⬜⬜⬜⬜] (0/6)
+> **预估工时**: 🟡中 **8-10h**
+> **档位**: **S 档**（2026-10-27 从 A 档上移）
+> **前置依赖**: 无硬依赖。本计划的 rewriter rename 通道是 A 档 `archive-edit-operation-sequence.md`（暂存区）的**地基**——先做本计划，暂存区能少一半工作量。
+
+## 为什么推倒重写（旧版方案作废）
+
+本文件旧版（2026-10 初稿，3-4h → 6-8h）的方案是 `ArchiveEntryRename`：**提取到 TEMP → `DeleteEntriesAsync` → `AddToArchiveAsync`**。逐行读引擎后确认四条硬伤：
+
+1. **一次改名 = 3 次整包写盘**。ZIP 的添加与删除**各自都是整包 copy-mode 复制**（`src\MantisZip.Core\Engines\ZipEngine.CompressGroup.cs:136-222`、`:894-979`），为了换一个文件名要把 4 GB 的包重写三遍。
+2. **7z 会静默改掉用户的压缩等级**。7z 删除路径是全量解压 + `SharpSevenZipCompressor` 重打包，且固定 `CompressionLevel.Normal`（`src\MantisZip.Core\Engines\SevenZipEngine.cs:1336-1345`）⇒ 改名反而把包压得更差或更大。
+3. **加密包会掉链子**。旧计划写「重新添加时放弃加密」，等于改名就把条目变成明文，不可接受。
+4. **三步之间没有原子性**。任何一步失败就留下「旧条目已删、新条目没加」的破损包；而这个操作改的是用户唯一的原件。
+
+新方案目标：**ZIP 零重压缩**（copy-mode 只改名字字节，压缩数据原样搬运）；**7z 只碰被改条目**（`ModifyArchive` 就地删 + 单条追加）。
 
 ## 任务总览
 
-- [ ] **1. UI: 重命名对话框** — RenameEntryDialog.axaml/.cs (TextInput + 验证)
-- [ ] **2. UI: 右键菜单 + F2 快捷键** — MainWindow 上下文菜单、快捷键、多选保护
-- [ ] **3. Core: ArchiveEntryRename** — 提取→删除→添加 核心逻辑 (Core/Utils)
-- [ ] **4. UI: 移动到…** — 目录选择弹窗 + 移动处理器
-- [ ] **5. 本地化** — 中英文字符串 (~18 条)
-- [ ] **6. 验证** — 构建 + ZIP/7z 重命名 + TarGz 不支持 + 冲突提示
+- [ ] **1. Core: `ZipBinaryRewriter` rename 通道**（`renameMap` 参数 + LFH/CD 名字改写）
+- [ ] **2. Core: `IArchiveEngine.RenameEntriesAsync` + `CanRename`**（默认抛 / 默认 false，与 `CanAdd`/`CanDelete` 同型）
+- [ ] **3. Core: `ZipEngine` / `SevenZipEngine` 实现；`TarGzEngine` 明确拒绝**
+- [ ] **4. UI: 重命名对话框 + 右键菜单 + F2**
+- [ ] **5. 本地化（三语）**
+- [ ] **6. 测试 + 文档 + 构建/CI 验证**
 
-## Objective
+## 现状事实（2026-10-27 逐文件核准）
 
-Add the ability to rename files/folders inside an existing archive without needing to recreate it from scratch.
-
-**Core principle**: No in-place rename. The operation is: **extract entry to temp → delete old entry → add back with new name**. If that means recompression, so be it — the user has explicitly OK'd this tradeoff.
+| 位置 | 事实 |
+|---|---|
+| `src\MantisZip.Core\Utils\ZipBinaryRewriter.cs:314` | `RewriteAsync(string sourcePath, string destPath, HashSet<string>? keepEntryNames, List<NewEntry>? addEntries, Encoding encoding, string? comment = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default)` —— **没有 rename 通道**（全文 `Rename` 零命中） |
+| 同文件 `:201` / `:854` / `:935` / `:1167` | `ReadCentralDirectory` / `CopyEntryAsync` / `ReadAndMaybeRewriteLfh` / `WriteCentralDirectory` —— 名字字节的读写全在这四处 |
+| 同文件 `CdEntry` | `internal readonly record struct CdEntry(…, byte[]? RawFileNameBytes = null)` —— 原名字节透传（防止「解码→重编码」损坏老包） |
+| `ZipEngine.CompressGroup.cs:1576-1605`、`:482-483` | copy-mode 只承载 method 0/8/9；不承载则回落 legacy 全解全压 |
+| 同文件 `:222` / `:979` | 两条 legacy 回退分支（`copy-mode not available, falling back to legacy path`） |
+| `src\MantisZip.Core\Engines\SevenZipEngine.cs:1509-1511` | `delCompr.ModifyArchive(archivePath, deleteIndexes, password)` —— 注释写明探针已验证「index→null 删除有效」 |
+| 同文件 `:1416` | 添加走 `CompressionMode.Append`（就地追加，便宜） |
+| `src\MantisZip.Core\Engines\TarGzEngine.cs:574` / `:595` | `DeleteEntriesAsync` / `AddToArchiveAsync` 均 `NotSupportedException` |
+| `src\MantisZip.Core\Abstractions\ArchiveEngine.cs:540` / `:545` | `CanAdd` / `CanDelete` 接口默认 `false`——新方法照这个形状加 |
+| `src\MantisZip.UI.Avalonia\Controls\ArchiveContentView.axaml:272-296` | 文件列表右键菜单；`Ctx_Delete` 在 `:293-295`（`DeleteFilesCommand` + `IsEnabled="{Binding CanDeleteEntries}"`） |
+| `src\MantisZip.UI.Avalonia\Views\MainWindow.axaml.cs:1007` | `RegisterKeyBindings(MainWindowViewModel vm)` —— 快捷键唯一事实源（规则 10.1） |
+| `src\MantisZip.UI.Avalonia\ViewModels\MainWindowViewModel.Compress.cs:100` | `DeleteFiles`：确认框 → `PendingOperationNote`（`:133`）→ `RunWithProgress` → `engine.DeleteEntriesAsync(...)`（`:155`）——重命名照这个骨架写 |
 
 ## Approach
 
-### Core insight: rename and move are the same operation
+### 引擎分工
 
-In archives, an entry's `FullPath` IS its name (e.g. `dir1/file.txt`). Renaming a filename and moving it to a different directory differ only in which part of the path changes:
+| 格式 | 实现 | 代价 |
+|---|---|---|
+| ZIP | 一次 `RewriteAsync`，加 `renameMap`：保留条目按压缩字节原样复制，只把 LFH + CD 里的名字替换 | O(整包复制)，**零重解压/零重压缩** |
+| 7z | 单条提取到 `%TEMP%\MantisZip\Rename\{guid}` → `ModifyArchive` 就地删旧索引 → 按新名追加 | O(1 条数据) + 一次结构重写 |
+| tar.gz | `CanRename` = false，菜单灰化 + 提示 | — |
 
-| Operation | Old | New |
-|-----------|-----|-----|
-| Rename file | `dir1/old.txt` | `dir1/new.txt` |
-| Move file | `dir1/file.txt` | `dir2/file.txt` |
-| Rename + move | `dir1/old.txt` | `dir2/new.txt` |
-
-All three are implemented identically: **change the entry path → extract → delete → add back**.
-
-### Mechanism
-
-Since `IArchiveEngine` already has `ExtractAsync` (via `ArchiveEntryExtractor`), `DeleteEntriesAsync`, and `AddToArchiveAsync`, rename/move can be implemented at a higher level without modifying the engine interface:
-
-1. Extract the single entry to `%TEMP%\MantisZip\Rename\{guid}\`
-2. Call `DeleteEntriesAsync` to remove the old entry
-3. Call `AddToArchiveAsync` to add the temp file with the new path
-4. Clean up temp
-5. Reload the archive
-
-## Requirements
-
-| Aspect | Value |
-|--------|-------|
-| **UI entry (rename)** | Right-click menu "重命名" + F2 key (single file only, not multi-select) |
-| **UI entry (move)** | Right-click menu "移动到…" → shows folder tree dialog (single file only) |
-| **Input (rename)** | Simple rename dialog (textbox + OK/Cancel) |
-| **Input (move)** | Folder selection dialog (reuse existing folder tree or `Ookii.Dialogs` VistaFolderBrowser) |
-| **Format support** | Zip ✅ (delete+add both supported), 7z ✅ (same), TarGz ❌ (delete throws `NotSupportedException`) |
-| **Password** | Reuse `_currentPassword` for extract and delete; drop encryption on re-add (simplest approach) |
-| **Directory rename** | Rename the folder entry; all nested children already deleted and re-added by `DeleteEntriesAsync` + `AddToArchiveAsync` recursively — **Phase 2** |
-| **Conflict** | Warn if new name already exists in archive |
-| **Progress** | `ProgressWindow` with extract phase + delete phase + add phase |
-| **Post-action** | Refresh file list, restore current folder |
-
-## Tasks
-
-### Task 1: IArchiveEngine.CanRename — Interface default method
-
-Add a `CanRename(ArchiveFormat)` virtual method to `IArchiveEngine` (default `false`).
-
-- `ZipEngine`: override → `true`
-- `SevenZipEngine`: override → `true`
-- `TarGzEngine`: override → `false`
-
-Alternatively: skip the interface method and just check `CanDelete` + `CanAdd` at the UI level, since rename reuses both. Simpler and avoids interface churn.
-
-**Decision**: Use `CanDelete` + `CanAdd` check at UI level. No interface change needed.
-
-### Task 2: Rename dialog — `RenameEntryDialog.axaml/.cs`
-
-Simple modal dialog with:
-- Title: "重命名"
-- Current name displayed (read-only)
-- New name textbox (pre-filled with current name, extension highlighted)
-- Input validation: no path separators, no empty
-- OK/Cancel buttons
-
-**Style**: Match existing `PasswordDialog` / `ConflictDialog` visual style (Dark.axaml theme resources).
-
-### Task 3: MainWindow rename/move handler — UI wiring
-
-**3a. Context menu items**: Add two items to the DataGrid context menu in `MainWindow.axaml`:
-
-```xml
-<MenuItem Header="重命名" Click="FileListCtx_Rename" InputGestureText="F2"/>
-<MenuItem Header="移动到…" Click="FileListCtx_MoveTo"/>
-<Separator/>
-<!-- existing items below -->
-```
-
-Position after Delete, before the existing separators.
-
-**3b. Rename handler**: `RenameSelectedEntryAsync()` in `MainWindow.Menu.cs`.
-
-Flow:
-```
-User clicks "重命名" (or presses F2)
-  ↓
-RenameEntryDialog shows with current filename (extension highlighted)
-  ↓
-User enters new name, clicks OK
-  ↓
-Validate: no empty, no '/' in new name
-  ↓
-Build new FullPath: replace filename portion while keeping directory prefix
-  ↓
-Check: does new FullPath already exist in _allItems?
-  ├─ Yes → warning dialog "目标已存在，是否覆盖？"
-  └─ No → proceed
-  ↓
-ArchiveEntryRename.RenameEntryAsync(...) with ProgressWindow
-  ↓
-Cleanup temp → reload archive
-```
-
-**3c. Move handler**: `MoveSelectedEntryToFolderAsync()`.
-
-Flow:
-```
-User clicks "移动到…"
-  ↓
-Show folder selection: build dialog showing archive's directory tree
-  (reuse _treeNodes or simple ListBox of folder paths)
-  ↓
-User selects target folder (or types new folder name with auto-creation)
-  ↓
-Build new FullPath: target_dir + original_filename
-  ↓
-Same conflict check as rename
-  ↓
-ArchiveEntryRename.RenameEntryAsync(...) with ProgressWindow
-  ↓
-Reload archive
-```
-
-**3d. Disable for multi-select**: `ContextMenuOpening` event to disable both "重命名" and "移动到…" when != 1 item selected.
-
-**3e. F2 keyboard shortcut**: `FileListGrid_PreviewKeyDown` handler (same place as Delete key).
-
-**3f. Directory rename/move (Phase 2)**: For directory entries, recursively process all children. Requires listing all entries starting with `dirPath/`, then for each: extract → delete → add with updated path prefix.
-
-### Task 4: Core rename logic — `ArchiveEntryRename` (Core/Utils)
-
-Utility class (not on engine interface) to encapsulate the extract-delete-add sequence:
+### Core API
 
 ```csharp
-public static class ArchiveEntryRename
-{
-    /// <summary>
-    /// 在压缩包内重命名一个条目。实际操作为：提取到临时目录 → 删除旧条目 → 添加新条目。
-    /// </summary>
-    public static async Task RenameEntryAsync(
-        IArchiveEngine engine,
-        string archivePath,
-        ArchiveFormat format,
-        string oldEntryPath,
-        string newEntryPath,
-        string? password,
-        IProgress<ArchiveProgress>? progress,
-        CancellationToken ct)
-    {
-        // 1. Extract to temp dir
-        // 2. Delete old entry
-        // 3. Add temp file with new entry path
-        // 4. Cleanup
-    }
+// src/MantisZip.Core/Abstractions/ArchiveEngine.cs（与 CanAdd(:540)/CanDelete(:545) 同型）
+bool CanRename(ArchiveFormat format) => false;
 
-    /// <summary>
-    /// 重命名目录（递归重命名其下所有条目）。
-    /// </summary>
-    public static async Task RenameDirectoryAsync(
-        IArchiveEngine engine,
-        string archivePath,
-        ArchiveFormat format,
-        string oldDirPath,
-        string newDirPath,
-        IReadOnlyList<ArchiveItem> allItems,
-        string? password,
-        IProgress<ArchiveProgress>? progress,
-        CancellationToken ct)
-    {
-        // Phase 2
-    }
-}
+Task RenameEntriesAsync(
+    string archivePath,
+    IReadOnlyList<(string OldPath, string NewPath)> renames,
+    string? password = null,
+    IProgress<ArchiveProgress>? progress = null,
+    CancellationToken cancellationToken = default,
+    ArchiveOptions? options = null) => throw new NotSupportedException("…该格式不支持重命名");
 ```
 
-### Task 5: Localization
+- 一个方法带**列表**而不是单条：目录改名要一次改 N 个后代条目，单独删改会让中间态暴露给其它读者。
+- 先写 `{archive}.tmp` 再原子替换（`File.Move(src, dst, overwrite: true)`），失败保留原件。
 
-Add to `Localization/LocalizationManager.T()`（key 实际存放于 `src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json` / `strings.en.json` / `strings.zh-TW.json`）:
+### ZIP：给 rewriter 加 renameMap
 
-| Key | Default (zh-CN) | English |
-|-----|-----------------|---------|
-| `Main_Ctx_Rename` | "重命名" | "Rename" |
-| `Main_RenameTitle` | "重命名" | "Rename" |
-| `Main_RenamePrompt` | "新名称：" | "New name:" |
-| `Main_Rename_StatusExtracting` | "正在提取…" | "Extracting…" |
-| `Main_Rename_StatusDeleting` | "正在删除…" | "Deleting…" |
-| `Main_Rename_StatusAdding` | "正在添加…" | "Adding…" |
-| `Main_Rename_Done` | "重命名完成" | "Rename complete" |
-| `Main_Rename_ConflictTitle` | "名称冲突" | "Name conflict" |
-| `Main_Rename_ConflictMsg` | "压缩包中已存在「{0}」，是否覆盖？" | "An entry named '{0}' already exists. Overwrite?" |
-| `Main_Rename_InvalidName` | "名称不能包含 / 或为空" | "Name cannot contain / or be empty" |
-| `Main_Rename_MultiSelect` | "请只选择一个文件" | "Please select a single file" |
-| `Main_Rename_NotSupported` | "此压缩格式不支持重命名" | "This archive format does not support renaming" |
+签名末尾追加可选参数（三处现有调用点全部兼容）：
 
-### Task 6: Verification
+```csharp
+public static Task<RewriteResult> RewriteAsync(
+    string sourcePath, string destPath,
+    HashSet<string>? keepEntryNames, List<NewEntry>? addEntries,
+    Encoding encoding, string? comment = null,
+    IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default,
+    IReadOnlyDictionary<string, string>? renameMap = null)   // 旧名 → 新名
+```
 
-1. Build passes (0 errors)
-2. Manual test: open a ZIP, right-click file → rename → verify archive is updated
-3. Manual test: rename a file in a 7z archive
-4. Manual test: F2 shortcut on a selected file
-5. Manual test: rename a file to a name that already exists → conflict warning
-6. Manual test: rename on TarGz → "不支持" message
-7. Manual test: multi-select → "重命名" disabled/greyed
+三处改写点：
+
+1. `ReadAndMaybeRewriteLfh`（`:935`）：命中 renameMap 时把新名编码成字节写回 LFH，并让 `CopyEntryAsync` 重算后续偏移。
+2. `WriteCentralDirectory`（`:1167`）：命中的 CD 条目用新名字节替换 `RawFileNameBytes`（**同时**决定是否翻转 UTF-8 标志位）。
+3. `RewriteResult` 增加 `EntriesRenamed`，供进度与日志。
+
+硬约束：
+
+- `keepEntryNames` 语义不变（仍按**旧名**判定保留），renameMap 只影响保留条目的名字。
+- 新名必须能被调用方传入的 `encoding` 无损表示；不能表示、或字数超 `0xFFFF`、或必须翻转 UTF-8 标志位而原包其它条目编码不一致 ⇒ **抛 `ZipCopyModeException`**，由引擎回退 legacy（此时进度文案写「需要完整重写压缩包」）。**绝不静默降级成乱码**。
+- ZIP64：`ReadEocd` 已经会抛 `ZipCopyModeException` ⇒ 自动走 legacy，无需额外分支。
+
+### 7z
+
+1. `ListEntriesAsync` 拿全量，定位旧名 index（目录则匹配全部后代，用 `ArchivePath.MatchesEntryOrDescendant`）。
+2. 只把**被改条目**提取到 TEMP（不是整包）。
+3. `ModifyArchive(archivePath, deleteIndexes, password)` 一次删完（index 从大到小）。
+4. `CompressFileDictionary` + `CompressionMode.Append` 以新名追加。
+5. 若归档为加密（`ArchiveItem.IsEncrypted` / 头部加密），**必须**有密码；无密码 ⇒ 拒绝并提示（口径同用户拍板：沿用原包加密，不落明文）。
+
+### UI（Avalonia）
+
+- 右键菜单：在 `ArchiveContentView.axaml:293` 的 `Ctx_Delete` 之前插入
+  `MenuItem Header="{Binding LocalizedStrings[Ctx_Rename]}" Command="{Binding RenameEntryCommand}" IsEnabled="{Binding CanRenameEntries}"`。
+- 快捷键（规则 10.1 三步）：`RegisterKeyBindings` 加 `Add(Key.F2, KeyModifiers.None, vm.RenameEntryCommand)`；同处 `MenuItem` 写 `InputGesture="F2"`（显示用）；更新 `tests\MantisZip.UI.Avalonia.Tests\MainWindowKeyBindingsTests.cs` 期望清单。
+- 对话框：新建 `src\MantisZip.UI.Avalonia\Dialogs\RenameEntryDialog.axaml(.cs)`，照 `Dialogs/PasswordDialog.axaml` 的形状（标题 + 只读原名 + 输入框 + 内联校验提示 + 确定/取消）；打开时**只选中主文件名、保留扩展名**（与资源管理器一致）。按规则 14 写中文注释、规则 4 用主题资源、规则 5 间距用 `SpacingXxxThk`。
+- 校验：空、含 `/` 或 `\`、含控制字符 → 内联提示不提交；与同目录已有条目重名 → 走冲突确认（覆盖或改名）。
+- VM：`MainWindowViewModel.Compress.cs` 增 `RenameEntry`（`[RelayCommand]`），骨架照 `DeleteFiles`（`:100`）：取选中项 → 弹对话框 → `PendingOperationNote` → `RunWithProgress(() => engine.RenameEntriesAsync(...))` → 刷新并回到原目录。
+- 多选 / 不支持格式：`CanRenameEntries` = 单选 && `_engine.CanRename(_currentFormat)`。
+- **范围边界（S 档不扩散）**：「重命名」只改**同一目录内的文件名**；「移动到其它目录」属于 A 档暂存区的拖拽/移动到…，本计划不做。
+
+### 测试
+
+- `tests\MantisZip.Tests\Utils\ZipBinaryRewriterRenameTests.cs`（新）
+  - 改名后 `CompressedSize` / `Crc32` / 压缩字节**与原条目一致**（证明零重压缩）
+  - 目录条目改名（名字以 `/` 结尾）
+  - 非 UTF-8 归档的旧名字节保持原样；新名不可表示时抛 `ZipCopyModeException`
+  - 同时「改名 + 删除 + 新增」三种 op 一次提交
+- `tests\MantisZip.Tests\Engines\ZipEngineRenameTests.cs` / `SevenZipEngineRenameTests.cs`（新）
+- `tests\MantisZip.UI.Avalonia.Tests\RenameEntryDialogTests.cs`（新，校验规则 + 扩展名选中逻辑）；`MainWindowKeyBindingsTests` 更新
+- **本地限制**：Core 测试项目是 xUnit v2，本机 VSTest 起不来（`docs\KNOWN_ISSUES.md` KI-002）⇒ 本地只能编译 + 跑 UI 测试（`dotnet exec`），Core 用例以 CI 为准。
+
+## 风险
+
+| 风险 | 对策 |
+|---|---|
+| 改 `RewriteAsync` 波及既有添加/删除路径（4 处调用点：`ZipEngine.CompressGroup.cs:178`、`:606`、`:703`、`:941`） | 新参数默认 `null`，先只加参数跑一遍回归；再补「既有无 rename、行为逐字节一致」的测试（对比 fixture 哈希） |
+| 名字重编码破坏老包 | 沿用 `CdEntry.RawFileNameBytes` 透传；只有在命中 renameMap 的条目才重新编码 |
+| 7z 追加可能改变该条目的压缩方法/等级 | 计划内**接受**（SharpSevenZip 不提供逐条目控制），进度文案不承诺「保持原压缩率」 |
+| ZIP64 / 不承载 method → legacy 慢路径 | 提交前预判并明说「需要完整重写，较慢」 |
+| 源码文本守卫测试连坐（`ExtractParallelDegreeWiringTests` 等按源码文本断言调用路径） | 改动调用点时同步改守卫，或让守卫指向新的单一入口 |
+
+## Definition of Done
+
+- [ ] `dotnet build` 0 error；`pwsh -File scripts\verify-repo.ps1 -Task check` exit 0
+- [ ] CI 绿（Core 用例在 CI 跑；本地只保证编译 + UI 用例）
+- [ ] ZIP 改名后 `CompressedSize` / `Crc32` 与原条目一致
+- [ ] 7z 改名可用；tar.gz 菜单灰化且有说明
+- [ ] F2 生效、不与已有快捷键冲突，`MainWindowKeyBindingsTests` 同步
+- [ ] 三语文案齐全（`verify-repo.ps1 -Task i18n` 通过）
+- [ ] `docs\PROGRESS.md` + `docs\progress-avalonia-detail.md` 更新；RELEASE_NOTES 按规则 18 与用户确认
 
 ## File Changes Summary
 
-| File | Change |
-|------|--------|
-| `src/MantisZip.UI.Avalonia/MainWindow.axaml` | Add "重命名" and "移动到…" MenuItems to context menu |
-| `src/MantisZip.UI.Avalonia/MainWindow.Menu.cs` | Add `RenameSelectedEntryAsync`, `MoveSelectedEntryToFolderAsync`, `FileListCtx_Rename`, `FileListCtx_MoveTo`, `FileListGrid_PreviewKeyDown` F2 handler |
-| `src/MantisZip.UI.Avalonia/RenameEntryDialog.axaml` | New file — simple rename dialog |
-| `src/MantisZip.UI.Avalonia/RenameEntryDialog.axaml.cs` | New file — code-behind |
-| `src/MantisZip.UI.Avalonia/MoveToFolderDialog.axaml` | New file — folder tree selection dialog for move |
-| `src/MantisZip.UI.Avalonia/MoveToFolderDialog.axaml.cs` | New file — code-behind |
-| `src/MantisZip.Core/Utils/ArchiveEntryRename.cs` | New file — core rename/move logic |
-| `src/MantisZip.UI.Avalonia/Localization/LocalizationManager.T()` | Add ~18 new string constants |
+| 文件 | 变更 |
+|---|---|
+| `src\MantisZip.Core\Utils\ZipBinaryRewriter.cs` | `RewriteAsync` 加 `renameMap` 参数；LFH/CD 名字改写；`RewriteResult.EntriesRenamed` |
+| `src\MantisZip.Core\Abstractions\ArchiveEngine.cs` | 新增 `CanRename`、`RenameEntriesAsync`（默认实现） |
+| `src\MantisZip.Core\Engines\ZipEngine.CompressGroup.cs` | 实现 `RenameEntriesAsync`（一次 `RewriteAsync` + 原子替换） |
+| `src\MantisZip.Core\Engines\SevenZipEngine.cs` | 实现 `RenameEntriesAsync`（提取单条 + `ModifyArchive` + 追加） |
+| `src\MantisZip.Core\Engines\TarGzEngine.cs` | `CanRename` 保持 false；`RenameEntriesAsync` 抛带说明的 `NotSupportedException` |
+| `src\MantisZip.UI.Avalonia\Dialogs\RenameEntryDialog.axaml(.cs)` | 新增对话框 |
+| `src\MantisZip.UI.Avalonia\ViewModels\MainWindowViewModel.Compress.cs` | `RenameEntry` 命令 + `CanRenameEntries` |
+| `src\MantisZip.UI.Avalonia\Controls\ArchiveContentView.axaml` | 右键菜单加「重命名」 |
+| `src\MantisZip.UI.Avalonia\Views\MainWindow.axaml.cs` | `RegisterKeyBindings` 加 F2 |
+| `src\MantisZip.UI.Avalonia\Localization\strings.{zh-CN,en,zh-TW}.json` | 新增 key（三语同步） |
+| `tests/MantisZip.Tests/Utils/ZipBinaryRewriterRenameTests.cs` 等 | 新增测试 |
 
 ## Open Questions
 
-1. **Password handling**: When re-adding the file, should we preserve the original encryption? Simplest: no encryption on re-add (use current `ArchiveOptions` defaults). User can re-encrypt via re-compress.
-2. **Directory rename/move (Phase 2)**: For directory entries, recursively rename all children. Requires listing all entries starting with `dirPath/`, then for each: extract → delete → add with updated path.
-3. **Drag-drop move between tree folders (Phase 3)**: Drag file list entries onto TreeView folders. Same extract-delete-add under the hood, but triggered via drag-drop instead of dialog.
-4. **In-place ZIP rename for same-length names**: Nice-to-have optimization for Phase 2. Same-length in-place rename avoids recompression entirely. Implement as fast-path check in `ArchiveEntryRename.RenameEntryAsync`.
+1. **目录改名是否也在 S 档做**：目录条目 + 全部后代改名，成本只多约 0.5h（renameMap 天然支持批量），**建议一起做**。
+2. **重命名后是否记住滚动位置/当前目录**：建议回到原目录、选中改后的条目。
+3. **旧版计划里的「同长度名字 in-place 改名」优化**：已被本方案消解（现在**默认**就是原地改名字节，不限长度）。
