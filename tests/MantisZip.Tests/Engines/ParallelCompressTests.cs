@@ -331,6 +331,47 @@ public class NGroupCompressTests : IDisposable
             $"应有 ≥2 个不同通道，实际仅 [{string.Join(", ", seen.Keys.Select(k => k.Index))}]");
     }
 
+    /// <summary>
+    /// 每个并行组结束时必须补一条 <c>BatchPercentComplete == 100</c> 的帧。
+    /// 7z 的 FileCompressionFinished 上报有 100ms 节流，最后一两个文件的完成事件可能被丢掉，
+    /// 没有这条帧时 UI 的通道行会停在 98.x%，直到整包结束才被统一置满 ——
+    /// 用户看到的就是「所有通道一起完成，像卡住了」。
+    /// </summary>
+    [Fact]
+    public async Task Degree3_CompressAsync_ReportsCompletionForEveryGroup()
+    {
+        await WriteBinFilesAsync(9);
+
+        var outZip = Path.Combine(_dir, "groupdone.zip");
+        var seen = new System.Collections.Concurrent.ConcurrentDictionary<int, byte>();
+        var completed = new System.Collections.Concurrent.ConcurrentDictionary<int, byte>();
+
+        var progress = new InlineProgress<ArchiveProgress>(p =>
+        {
+            if (p.BatchIndex is not int bi)
+                return;
+
+            seen[bi] = 0;
+            if (p.BatchPercentComplete >= 100)
+                completed[bi] = 0;
+        });
+
+        await new ZipEngine().CompressAsync(
+            Directory.GetFiles(_dir, "*.bin"), outZip,
+            new ArchiveOptions
+            {
+                CompressionLevel = 5,
+                MultiThreadedCompression = true,
+                ParallelCompressDegree = 3,
+            },
+            progress);
+
+        Assert.True(seen.Count >= 2, $"应有 ≥2 个通道，实际 [{string.Join(", ", seen.Keys)}]");
+        Assert.Equal(
+            seen.Keys.OrderBy(i => i).ToArray(),
+            completed.Keys.OrderBy(i => i).ToArray());
+    }
+
     [Fact]
     public async Task Degree3_OutputIsValidAndByteIdenticalToSource()
     {

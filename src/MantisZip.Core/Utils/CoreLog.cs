@@ -8,8 +8,12 @@ namespace MantisZip.Core.Utils;
 /// Logger for MantisZip.Core.
 /// Info/Error/Entry/Exit are [Conditional("DEBUG")] — compiled away in RELEASE builds.
 /// Trace is active in all builds.
-/// All methods are gated by DiagnosticsEnabled (set from AppSettings.EnableDebugLogging at startup).
+/// Info/Error/Entry/Exit/Trace are gated by DiagnosticsEnabled (set from AppSettings.EnableDebugLogging at startup).
 /// Output goes to %LOCALAPPDATA%\MantisZip\debug.log with timestamps.
+/// <para>
+/// 例外：<see cref="ConflictTrace"/> 不受 DiagnosticsEnabled 门控、RELEASE 也写入，
+/// 单独落到 %LOCALAPPDATA%\MantisZip\conflict.log（冲突弹窗卡死是偶发问题，需要出厂即开的最小证据链）。
+/// </para>
 /// </summary>
 internal static class CoreLog
 {
@@ -105,26 +109,7 @@ internal static class CoreLog
         if (!DiagnosticsEnabled) return;
 
         // 应用脱敏（由 UI 层注入，null=不脱敏）
-        var finalMsg = RedactOverride?.Invoke(msg) ?? msg;
-
-        try
-        {
-            var dir = Path.GetDirectoryName(LogPath);
-            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-                Directory.CreateDirectory(dir);
-            lock (_lock)
-            {
-                RotateIfNeeded();
-                using var stream = new FileStream(LogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
-                using var writer = new StreamWriter(stream);
-                writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}");
-                writer.Flush();
-            }
-        }
-        catch (Exception logEx)
-        {
-            Debug.WriteLine($"CoreLog.Trace write failed: {logEx.Message}");
-        }
+        WriteTo(LogPath, MaxLogSize, RedactOverride?.Invoke(msg) ?? msg);
     }
 
     internal static void Trace(string fmt, params object[] args)
@@ -133,22 +118,79 @@ internal static class CoreLog
     }
 
     /// <summary>
+    /// 冲突决策链路追踪：DEBUG 和 RELEASE 都写入，且**不受 <see cref="DiagnosticsEnabled"/> 门控**。
+    /// <para>
+    /// 单独写入 %LOCALAPPDATA%\MantisZip\conflict.log（2 MB 轮转），与 debug.log 分离：
+    /// 「解压/压缩卡在冲突提示」是偶发问题，用户通常没开调试日志，需要一条出厂即开的证据链，
+    /// 一次复现就能判断是卡在等对话框、卡在冲突闸门，还是根本没进入冲突链路。
+    /// </para>
+    /// 与 <see cref="Trace"/> 一样应用 <see cref="RedactOverride"/> 脱敏（不泄露完整路径）。
+    /// </summary>
+    internal static void ConflictTrace(string msg)
+    {
+        WriteTo(ConflictLogPath, MaxConflictLogSize, RedactOverride?.Invoke(msg) ?? msg);
+    }
+
+    /// <summary>格式化版 <see cref="ConflictTrace(string)"/>（参数允许为 null，脱敏后再写入）。</summary>
+    internal static void ConflictTrace(string fmt, params object?[] args)
+    {
+        ConflictTrace(string.Format(fmt, args));
+    }
+
+    /// <summary>
+    /// 冲突日志路径。默认 %LOCALAPPDATA%\MantisZip\conflict.log；
+    /// 测试可覆盖为临时目录（进程级设置，测试类内串行使用）。
+    /// </summary>
+    internal static string ConflictLogPath { get; set; } = Path.Combine(
+        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
+        "MantisZip", "conflict.log");
+
+    /// <summary>
     /// 日志文件大小上限（10 MB）。超过时自动轮转。
     /// </summary>
     private const long MaxLogSize = 10L * 1024 * 1024;
 
-    private static void RotateIfNeeded()
+    /// <summary>冲突日志文件大小上限（2 MB）。冲突证据链体积小，轮转更积极。</summary>
+    private const long MaxConflictLogSize = 2L * 1024 * 1024;
+
+    private static void RotateIfNeeded(string path, long maxSize)
     {
         try
         {
-            var fileInfo = new FileInfo(LogPath);
-            if (fileInfo.Exists && fileInfo.Length > MaxLogSize)
+            var fileInfo = new FileInfo(path);
+            if (fileInfo.Exists && fileInfo.Length > maxSize)
             {
-                var backupPath = LogPath + "." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak";
-                File.Move(LogPath, backupPath);
+                var backupPath = path + "." + DateTime.Now.ToString("yyyyMMddHHmmss") + ".bak";
+                File.Move(path, backupPath);
             }
         }
         catch { /* 轮转失败不影响继续写入 */ }
+    }
+
+    /// <summary>
+    /// 写入指定日志文件（自动建目录、超限轮转）。调用方负责脱敏与门控。
+    /// </summary>
+    private static void WriteTo(string path, long maxSize, string finalMsg)
+    {
+        try
+        {
+            var dir = Path.GetDirectoryName(path);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
+            lock (_lock)
+            {
+                RotateIfNeeded(path, maxSize);
+                using var stream = new FileStream(path, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
+                using var writer = new StreamWriter(stream);
+                writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}");
+                writer.Flush();
+            }
+        }
+        catch (Exception logEx)
+        {
+            Debug.WriteLine($"CoreLog.WriteTo({Path.GetFileName(path)}) failed: {logEx.Message}");
+        }
     }
 
     private static void Write(string msg)
@@ -157,28 +199,7 @@ internal static class CoreLog
             return;
 
         // 应用脱敏（由 UI 层注入，null=不脱敏）
-        var finalMsg = RedactOverride?.Invoke(msg) ?? msg;
-
-        var dir = Path.GetDirectoryName(LogPath);
-        if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
-            Directory.CreateDirectory(dir);
-
-        lock (_lock)
-        {
-            try
-            {
-                RotateIfNeeded();
-                using var stream = new FileStream(LogPath, FileMode.Append, FileAccess.Write, FileShare.ReadWrite);
-                using var writer = new StreamWriter(stream);
-                writer.WriteLine($"[{DateTime.Now:yyyy-MM-dd HH:mm:ss.fff}] {finalMsg}");
-                writer.Flush();
-            }
-            catch (Exception logEx)
-            {
-                Debug.WriteLine($"CoreLog.Write failed: {logEx.Message}");
-            }
-        }
-
+        WriteTo(LogPath, MaxLogSize, RedactOverride?.Invoke(msg) ?? msg);
     }
 
     private static string TrimPath(string? path)

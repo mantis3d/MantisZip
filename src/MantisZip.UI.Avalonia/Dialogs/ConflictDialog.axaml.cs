@@ -21,6 +21,8 @@ public partial class ConflictDialog : Window
     private bool _isPaused;
     private bool _cancelOperation;
     private string _titleKey = "Conflict_Title";
+    /// <summary>当前冲突文件名（仅文件名，诊断日志用；不含路径）。</summary>
+    private string _fileName = string.Empty;
 
     /// <summary>用户选择的处理方式</summary>
     public FileConflictAction ResultAction => _resultCaptured ? _capturedAction : FileConflictAction.Overwrite;
@@ -65,10 +67,22 @@ public partial class ConflictDialog : Window
         if (!string.IsNullOrEmpty(titleKey))
             _titleKey = titleKey;
 
+        _fileName = Path.GetFileName(info.FilePath);
+
         InitializeComponent();
         DataContext = this;
 
         Services.LifetimeDiagnostics.Log($"ConflictDialog OPEN file='{Path.GetFileName(info.FilePath)}' existing={info.ExistingSize} entry={info.EntrySize}");
+        CoreLog.ConflictTrace("dialog-created file='{0}' existing={1} entry={2}", _fileName, info.ExistingSize, info.EntrySize);
+
+        // 诊断：窗口真正显示后的可见性快照（是否激活 / 位置 / owner / 置顶 / 任务栏）。
+        // 用于排查「冲突框弹了但被挡住或未激活」——conflict.log 与 lifecycle.log 各留一份。
+        this.Opened += (_, _) =>
+        {
+            Services.LifetimeDiagnostics.Log($"ConflictDialog SHOWN active={IsActive} bounds={Bounds} owner={Owner?.GetType().Name} topmost={Topmost} taskbar={ShowInTaskbar}");
+            CoreLog.ConflictTrace("dialog-shown active={0} bounds={1} owner={2} topmost={3} taskbar={4} file='{5}'",
+                IsActive, Bounds, Owner?.GetType().Name, Topmost, ShowInTaskbar, _fileName);
+        };
 
         HeaderText.Text = string.Format(LocalizationManager.T("Conflict_Header"), $"\"{Path.GetFileName(info.FilePath)}\"");
 
@@ -85,6 +99,7 @@ public partial class ConflictDialog : Window
             {
                 // 诊断：非按钮路径关闭（Alt+F4/系统/程序化 Close）——默认按覆盖捕获
                 Services.LifetimeDiagnostics.Log($"ConflictDialog CLOSING without button (default Overwrite captured) file='{Path.GetFileName(info.FilePath)}' stack:\n{Environment.StackTrace}");
+                CoreLog.ConflictTrace("dialog-closing-without-button (default Overwrite) file='{0}'", _fileName);
                 CaptureResult(FileConflictAction.Overwrite, false, null);
             }
         };
@@ -122,6 +137,8 @@ public partial class ConflictDialog : Window
 
     private void CaptureResult(FileConflictAction action, bool applyToAll, string? customName)
     {
+        CoreLog.ConflictTrace("dialog-result action={0} applyAll={1} custom='{2}' file='{3}'",
+            action, applyToAll, customName, _fileName);
         _capturedAction = action;
         _capturedApplyToAll = applyToAll;
         _capturedCustomName = customName;

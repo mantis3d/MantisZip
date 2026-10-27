@@ -163,6 +163,10 @@ public partial class App : Application
         // 三档间距数值
         static double GetSpacing(string key, CompactnessMode m) => (key, m) switch
         {
+            ("SpacingXss", CompactnessMode.Compact) => -2,
+            ("SpacingXss", CompactnessMode.Normal) => 0,
+            ("SpacingXss", CompactnessMode.Loose) => 2,
+
             ("SpacingXxs", CompactnessMode.Compact) => 2,
             ("SpacingXxs", CompactnessMode.Normal) => 4,
             ("SpacingXxs", CompactnessMode.Loose) => 6,
@@ -216,7 +220,7 @@ public partial class App : Application
 
         var keys = new[]
         {
-            "SpacingXxs", "SpacingXs", "SpacingSm", "SpacingMd", "SpacingLg", "SpacingXl",
+            "SpacingXss","SpacingXxs", "SpacingXs", "SpacingSm", "SpacingMd", "SpacingLg", "SpacingXl",
             "ControlHeightSm", "ControlHeightMd", "ControlHeightLg", "ControlMinHeight",
         };
 
@@ -228,7 +232,7 @@ public partial class App : Application
         Resources["BorderRadius"] = new CornerRadius(GetSpacing("BorderRadius", mode));
         Resources["DialogPadding"] = new Thickness(GetSpacing("DialogPadding", mode));
         // Thickness variants of spacing keys (for Margin / Padding)
-        foreach (var k in new[] { "SpacingXxs", "SpacingXs", "SpacingSm", "SpacingMd", "SpacingLg", "SpacingXl" })
+        foreach (var k in new[] { "SpacingXss","SpacingXss","SpacingXxs", "SpacingXs", "SpacingSm", "SpacingMd", "SpacingLg", "SpacingXl" })
             Resources[k + "Thk"] = new Thickness(GetSpacing(k, mode));
 
         // TextControlPadding: use smaller horizontal padding (SpacingXxs) and

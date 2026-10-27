@@ -1739,6 +1739,194 @@ public class ProgressViewModelTests
         Assert.Equal("paused-by-user", vm.StatusMessage);
     }
 
+    // ════════════════════════════════════════════
+    //  统计卡：已压缩 / 仅存储（自适应分类构成）
+    // ════════════════════════════════════════════
+
+    [Fact]
+    public void SetProgress_CompositionStats_ShowsCompressedAndStoreOnlyCards()
+    {
+        var vm = new ProgressViewModel();
+
+        vm.SetProgress(new ArchiveProgress
+        {
+            CompressedFiles = 2, CompressedBytes = 2 * 1024,
+            StoreOnlyFiles = 6, StoreOnlyBytes = 6 * 1024,
+        });
+
+        // 两张卡：完整文案非空 = 卡片可见；行 2 文件数；行 3 文件大小
+        Assert.False(string.IsNullOrEmpty(vm.StatsCompressedText));
+        Assert.False(string.IsNullOrEmpty(vm.StatsStoreOnlyText));
+        Assert.Equal("2", vm.StatsCompressedCount);
+        Assert.Equal("6", vm.StatsStoreOnlyCount);
+        Assert.NotEqual("—", vm.StatsCompressedSize);
+        Assert.NotEqual("—", vm.StatsStoreOnlySize);
+        Assert.False(string.IsNullOrEmpty(vm.StatsCompressedLabel));
+        Assert.False(string.IsNullOrEmpty(vm.StatsStoreOnlyLabel));
+    }
+
+    [Fact]
+    public void SetProgress_WithoutComposition_HidesCompositionCards()
+    {
+        var vm = new ProgressViewModel();
+
+        // 非自适应路径（7z / TAR / 关闭自适应）不上报 → 两张卡保持隐藏
+        vm.SetProgress(new ArchiveProgress { TotalFiles = 3, ProcessedFiles = 1, TotalBytes = 1000, ProcessedBytes = 400 });
+
+        Assert.True(string.IsNullOrEmpty(vm.StatsCompressedText));
+        Assert.True(string.IsNullOrEmpty(vm.StatsStoreOnlyText));
+    }
+
+    [Fact]
+    public void BeginPreparing_ResetsCompositionStats()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { CompressedFiles = 2, CompressedBytes = 100, StoreOnlyFiles = 6, StoreOnlyBytes = 300 });
+        Assert.False(string.IsNullOrEmpty(vm.StatsCompressedText));
+
+        // 新档案 / 新操作：构成属于「当前档案」，必须清空等引擎重新上报
+        vm.BeginPreparing();
+
+        Assert.True(string.IsNullOrEmpty(vm.StatsCompressedText));
+        Assert.True(string.IsNullOrEmpty(vm.StatsStoreOnlyText));
+        Assert.Equal("0", vm.StatsCompressedCount);
+        Assert.Equal("0", vm.StatsStoreOnlyCount);
+        Assert.Equal("—", vm.StatsCompressedSize);
+        Assert.Equal("—", vm.StatsStoreOnlySize);
+    }
+
+    [Fact]
+    public void SetProgress_StorePhase_DetailRowRatioFollowsStageBytes()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Finalizing });
+
+        // 写出仅存储文件阶段：底纹按整个阶段的字节进度（250/1000），而不是单文件的 5%
+        vm.SetProgress(new ArchiveProgress
+        {
+            PercentComplete = 60, CurrentFile = "photos/a.png", FilePercentComplete = 5,
+            BatchProcessedBytes = 250, BatchTotalBytes = 1000,
+        });
+
+        Assert.True(vm.ShowStoreSectionHeader);
+        Assert.Equal(0.25, vm.DetailRowRatio, 3);
+    }
+
+    [Fact]
+    public void SetProgress_CompressPhase_DetailRowRatioFollowsCurrentFile()
+    {
+        var vm = new ProgressViewModel();
+        vm.SetProgress(new ArchiveProgress { CurrentFile = "docs/a.txt", FilePercentComplete = 40 });
+
+        Assert.False(vm.ShowStoreSectionHeader);
+        Assert.Equal(0.4, vm.DetailRowRatio, 3);
+    }
+
+    [Fact]
+    public void CompositionStatsCardProperties_ExistForXamlBindings()
+    {
+        // ProgressWindow 用 x:CompileBindings=False，属性名写错不会构建失败 —— 这里显式锁名。
+        var type = typeof(ProgressViewModel);
+        foreach (var name in new[]
+                 {
+                     "StatsCompressedText", "StatsCompressedLabel", "StatsCompressedCount", "StatsCompressedSize",
+                     "StatsStoreOnlyText", "StatsStoreOnlyLabel", "StatsStoreOnlyCount", "StatsStoreOnlySize",
+                     // 「压缩包」统计卡（原进度条下方独立行，完整档并入卡片行）
+                     "StatsArchiveLabel", "StatsArchiveCurrent", "StatsArchiveTotal", "HasStatsArchive",
+                     "ShowFileCountInLabelRow",
+                     // 「扫描」统计卡（扫描阶段其它卡都还没数据，这张卡填住卡片行）
+                     "ScanCardLabel", "ScanCardCount", "ScanCardSize", "ShowScanCountInLabelRow",
+                 })
+        {
+            Assert.NotNull(type.GetProperty(name));
+        }
+    }
+
+    [Fact]
+    public void StatsArchiveCard_ShowsCurrentAndTotalRows_AndLabelRowIsMutuallyExclusive()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.zip", "b.zip" });
+        vm.SetCurrentBatchItem(1);
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 10, ProcessedFiles = 1, TotalFiles = 4 });
+
+        // 完整档：统计卡「压缩包」与其它卡并列，进度标签行不再重复「压缩包 2/2」
+        vm.InfoDensity = ProgressInfoDensity.Full;
+        Assert.False(vm.ShowFileCountInLabelRow);
+        Assert.True(vm.HasStatsArchive);
+        // 行 2 = 当前档案序号（纯数字，与其它卡的「数量」行同构），行 3 = 档案总数（"共 N 个"）
+        Assert.Equal("2", vm.StatsArchiveCurrent);
+        Assert.Equal(LocalizationManager.T("Progress_Stats_ArchiveTotal", 2), vm.StatsArchiveTotal);
+        Assert.Contains("2", vm.StatsArchiveTotal, StringComparison.Ordinal);
+
+        // 少/中档：卡片区整体隐藏，同一份信息合并进进度标签行（与百分比同一行）
+        vm.InfoDensity = ProgressInfoDensity.Medium;
+        Assert.True(vm.ShowFileCountInLabelRow);
+        Assert.Contains("2/2", vm.FileCountText, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void StatsArchiveCard_HiddenBeforeFirstFileCountReport()
+    {
+        var vm = new ProgressViewModel();
+        Assert.False(vm.HasStatsArchive);
+        Assert.Equal(string.Empty, vm.StatsArchiveCurrent);
+        Assert.Equal(string.Empty, vm.StatsArchiveTotal);
+    }
+
+    [Fact]
+    public void ShowFileCountInLabelRow_HiddenWhileScanning()
+    {
+        var vm = new ProgressViewModel();
+        vm.InfoDensity = ProgressInfoDensity.Medium;
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Scanning, TotalFiles = 3 });
+
+        Assert.True(vm.HasScanCount);
+        Assert.False(vm.ShowFileCountInLabelRow);
+    }
+
+    [Fact]
+    public void ScanCard_ShowsFoundCountAndScannedBytes_DuringScanning()
+    {
+        var vm = new ProgressViewModel();
+        vm.InfoDensity = ProgressInfoDensity.Full;
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Scanning, TotalFiles = 12, ScannedBytes = 3_000_000 });
+
+        Assert.True(vm.HasScanCount);
+        Assert.Equal(LocalizationManager.T("Progress_Stats_Scanning"), vm.ScanCardLabel);
+        // 行 2 = 已发现文件数（与其它卡的「数量」行同构），行 3 = 已扫描字节
+        Assert.Equal("12", vm.ScanCardCount);
+        Assert.NotEqual("—", vm.ScanCardSize);
+        // 完整档：卡片已承担扫描信息，进度标签行不再重复「已发现 12 个文件」
+        Assert.False(vm.ShowScanCountInLabelRow);
+    }
+
+    [Fact]
+    public void ScanCard_FallsBackToDash_WhenEngineDoesNotReportBytes()
+    {
+        var vm = new ProgressViewModel();
+        vm.InfoDensity = ProgressInfoDensity.Full;
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Scanning, TotalFiles = 5 });
+
+        Assert.Equal("5", vm.ScanCardCount);
+        Assert.Equal("—", vm.ScanCardSize);
+    }
+
+    [Fact]
+    public void ScanCard_LabelRowUsedInCompactDensities_AndClearedWhenPhaseLeavesScanning()
+    {
+        var vm = new ProgressViewModel();
+        vm.InfoDensity = ProgressInfoDensity.Medium;
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Scanning, TotalFiles = 7, ScannedBytes = 1024 });
+        // 少/中档没有卡片区，同一份信息回到进度标签行
+        Assert.True(vm.ShowScanCountInLabelRow);
+
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Compressing, PercentComplete = 5, TotalFiles = 7 });
+        Assert.False(vm.HasScanCount);
+        Assert.Equal(string.Empty, vm.ScanCardCount);
+        Assert.Equal("—", vm.ScanCardSize);
+    }
+
     [Fact]
     public void SetComplete_ClearsScanCount()
     {
@@ -1819,6 +2007,37 @@ public class ProgressViewModelTests
     }
 
     [Fact]
+    public void CompressFlow_ParallelGroups_SetParallelDegree()
+    {
+        var vm = new ProgressViewModel();
+        vm.IsCompressFlow = true;
+        vm.InitBatchMode(new[] { "a.zip" });
+
+        vm.SetProgress(new ArchiveProgress { BatchIndex = 0, BatchCount = 3, BatchPercentComplete = 10, PercentComplete = 5 });
+        // 只有 1 组上报时还谈不上并行度（HasParallelDegree 要求 ≥ 2）
+        Assert.False(vm.HasParallelDegree);
+
+        vm.SetProgress(new ArchiveProgress { BatchIndex = 2, BatchCount = 3, BatchPercentComplete = 10, PercentComplete = 8 });
+        // 压缩流程的并行度 = 实际并行分组数（引擎按 CPU 核数决定，可能与设置值不同）
+        Assert.True(vm.HasParallelDegree);
+        Assert.Equal(3, vm.ParallelDegree);
+    }
+
+    [Fact]
+    public void ExtractFlow_ParallelDegree_IsNotOverwrittenByBatchReports()
+    {
+        var vm = new ProgressViewModel();
+        vm.IsCompressFlow = false;   // 解压流程：并行度由 ExtractFlow.SetParallelDegree 显式设置
+        vm.InitBatchMode(new[] { "a.7z" });
+        vm.ParallelDegree = 4;
+
+        vm.SetProgress(new ArchiveProgress { BatchIndex = 0, BatchCount = 2, BatchPercentComplete = 10, PercentComplete = 5 });
+        vm.SetProgress(new ArchiveProgress { BatchIndex = 1, BatchCount = 2, BatchPercentComplete = 20, PercentComplete = 9 });
+
+        Assert.Equal(4, vm.ParallelDegree);
+    }
+
+    [Fact]
     public void SetProgress_MergePhase_ShowsStoreSectionHeader()
     {
         var vm = new ProgressViewModel();
@@ -1869,5 +2088,189 @@ public class ProgressViewModelTests
         vm.SetProgress(new ArchiveProgress { PercentComplete = 100, BatchProcessedBytes = 1000, BatchTotalBytes = 1000 });
 
         Assert.Equal("big.png", vm.FileName);
+    }
+
+    [Fact]
+    public void SetComplete_FinalizesParallelChannelRows()
+    {
+        var vm = new ProgressViewModel();
+        vm.IsCompressFlow = true;
+        vm.InitBatchMode(new[] { "a.zip" });
+
+        // 引擎最后一条「组」上报停在 98% / 97%（收尾帧 PercentComplete=0 且不带 BatchIndex，进不了并行行）
+        vm.SetProgress(new ArchiveProgress
+        {
+            BatchIndex = 0, BatchCount = 2, BatchPercentComplete = 98, PercentComplete = 60,
+            CurrentFile = "photos/a.png", BatchProcessedFiles = 12, BatchTotalFiles = 12,
+        });
+        vm.SetProgress(new ArchiveProgress
+        {
+            BatchIndex = 1, BatchCount = 2, BatchPercentComplete = 97, PercentComplete = 61,
+            CurrentFile = "photos/b.png", BatchProcessedFiles = 8, BatchTotalFiles = 9,
+        });
+        vm.SetProgress(new ArchiveProgress { Phase = ArchivePhase.Finalizing, PercentComplete = 70, BatchProcessedBytes = 10, BatchTotalBytes = 100 });
+        Assert.True(vm.ShowStoreSectionHeader);
+
+        var rows = vm.ParallelBatchItems;
+        Assert.Equal(2, rows.Count);
+        Assert.True(rows[0].Percent < 100);
+        Assert.Equal("photos/a.png", rows[0].CurrentFile);
+
+        vm.SetComplete("done");
+
+        // 完成后通道行不再停在 98% / 最后一个文件名
+        Assert.All(rows, r => Assert.Equal(100, r.Percent));
+        Assert.All(rows, r => Assert.Equal(1.0, r.BatchRatio));
+        Assert.All(rows, r => Assert.Equal(1.0, r.FileRatio));
+        Assert.All(rows, r => Assert.Equal("ThemeStatusSuccessBrush", r.StatusBrushName));
+        Assert.All(rows, r => Assert.Equal(string.Empty, r.CurrentFile));
+        // 左区由文件名改显示「通道已完成」，避免停在最后一个文件名上
+        Assert.All(rows, r => Assert.Equal(LocalizationManager.T("Progress_Channel_Done"), r.FileNameText));
+        Assert.All(rows, r => Assert.Equal(string.Empty, r.FileSizeText));
+        // 右区百分比用该组最后一次上报的计数重建（不能只是把 98% 改成 100%）
+        Assert.Equal("100% (12/12)", rows[0].PctDetailText);
+        Assert.Equal("100% (8/9)", rows[1].PctDetailText);
+        // 「存储文件」标题只属于写出阶段，终态不再显示
+        Assert.False(vm.ShowStoreSectionHeader);
+    }
+
+    [Fact]
+    public void SetComplete_FailedFlow_KeepsChannelRowsWhereTheyStopped()
+    {
+        var vm = new ProgressViewModel();
+        vm.IsCompressFlow = true;
+        vm.InitBatchMode(new[] { "a.zip" });
+        vm.SetProgress(new ArchiveProgress
+        {
+            BatchIndex = 0, BatchCount = 2, BatchPercentComplete = 42, PercentComplete = 30,
+            CurrentFile = "photos/broken.png",
+        });
+
+        // 失败终态：保留各通道停住的位置，便于判断卡在哪一组（不强行置 100%）
+        vm.StatusKind = ProgressStatusKind.Failed;
+        vm.SetComplete("failed");
+
+        var row = Assert.Single(vm.ParallelBatchItems);
+        Assert.Equal(42, row.Percent);
+        Assert.Equal("photos/broken.png", row.CurrentFile);
+    }
+
+    [Fact]
+    public void SetComplete_SingleChannelRow_ClearsFileNameButKeepsPctDetailEmpty()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.7z" });
+
+        // 无 BatchIndex → 合成单行（IsParallel=false），右区百分比对它无意义
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 55, CurrentFile = "dir/only.txt", FilePercentComplete = 55 });
+        var row = Assert.Single(vm.ParallelBatchItems);
+        Assert.False(row.IsParallel);
+
+        vm.SetComplete("done");
+
+        Assert.Equal(100, row.Percent);
+        Assert.Equal(string.Empty, row.CurrentFile);
+        Assert.Equal(string.Empty, row.PctDetailText);
+    }
+
+    [Fact]
+    public void SetProgress_GroupReachingHundred_PerRowCompletion_WithoutWaitingForWholeRun()
+    {
+        var vm = new ProgressViewModel();
+        vm.IsCompressFlow = true;
+        vm.InitBatchMode(new[] { "a.zip" });
+
+        vm.SetProgress(new ArchiveProgress
+        {
+            BatchIndex = 0, BatchCount = 2, BatchPercentComplete = 60, PercentComplete = 30,
+            CurrentFile = "photos/a.png", BatchProcessedFiles = 6, BatchTotalFiles = 12,
+        });
+        vm.SetProgress(new ArchiveProgress
+        {
+            BatchIndex = 1, BatchCount = 2, BatchPercentComplete = 40, PercentComplete = 31,
+            CurrentFile = "photos/b.png", BatchProcessedFiles = 4, BatchTotalFiles = 9,
+        });
+
+        var rows = vm.ParallelBatchItems;
+        Assert.Equal(2, rows.Count);
+
+        // 第 0 组先跑完（引擎每组结束补一条 100% 帧）：只有它自己收尾，另一组照旧
+        vm.SetProgress(new ArchiveProgress
+        {
+            BatchIndex = 0, BatchCount = 2, BatchPercentComplete = 100, PercentComplete = 55,
+            CurrentFile = string.Empty, BatchProcessedFiles = 12, BatchTotalFiles = 12,
+        });
+
+        Assert.Equal(100, rows[0].Percent);
+        Assert.Equal(1.0, rows[0].BatchRatio);
+        Assert.Equal("ThemeStatusSuccessBrush", rows[0].StatusBrushName);
+        Assert.Equal("100% (12/12)", rows[0].PctDetailText);
+        Assert.Equal(LocalizationManager.T("Progress_Channel_Done"), rows[0].FileNameText);
+        Assert.Equal(string.Empty, rows[0].CurrentFile);
+
+        // 另一组仍未完成：保持原样，不能跟着一起变 100%
+        Assert.Equal(40, rows[1].Percent);
+        Assert.Equal("b.png", rows[1].FileNameText);
+        Assert.Equal("ThemeProgressFillBrush", rows[1].StatusBrushName);
+
+        // 迟到的低百分比帧不得把已完成的行拉回中途（否则「通道已完成」又变回文件名）
+        vm.SetProgress(new ArchiveProgress
+        {
+            BatchIndex = 0, BatchCount = 2, BatchPercentComplete = 50, PercentComplete = 56,
+            CurrentFile = "photos/a.png",
+        });
+        Assert.Equal(100, rows[0].Percent);
+        Assert.Equal(LocalizationManager.T("Progress_Channel_Done"), rows[0].FileNameText);
+    }
+
+    [Fact]
+    public void FinalizeBatch_MarksAllInProgressRowsCompleted()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.zip", "b.zip" });
+        vm.SetCurrentBatchItem(0);
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 98 });
+        vm.SetCurrentBatchItem(1);
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 97 });
+
+        // 末包不触发 SetCurrentBatchItem 切换 → 这一行仍停在 InProgress / 97%
+        Assert.Equal(BatchItemStatus.InProgress, vm.BatchItems![1].Status);
+
+        // GUI 收尾（此前只硬编码 0 号行）：整批逐行置完成
+        vm.FinalizeBatch();
+
+        Assert.All(vm.BatchItems!, r => Assert.Equal(BatchItemStatus.Completed, r.Status));
+        Assert.All(vm.BatchItems!, r => Assert.Equal(100, r.Progress));
+    }
+
+    [Fact]
+    public void SetProgress_ZeroPercentFrame_DoesNotRewindBatchRow()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.zip" });
+        vm.SetCurrentBatchItem(0);
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 55 });
+        Assert.Equal(55, vm.BatchItems![0].Progress);
+
+        // 引擎每包结束会连发几条 0% 收尾帧：不得把批次行拉回 0%（否则完成后先退再补）
+        vm.SetProgress(new ArchiveProgress { PercentComplete = 0 });
+
+        Assert.Equal(55, vm.BatchItems![0].Progress);
+    }
+
+    [Fact]
+    public void FailCurrentBatchItem_MarksCurrentRowNotFirst()
+    {
+        var vm = new ProgressViewModel();
+        vm.InitBatchMode(new[] { "a.zip", "b.zip" });
+        vm.SetCurrentBatchItem(1);
+
+        vm.FailCurrentBatchItem("boom");
+
+        // 多包批处理：失败行是「当前行」，0 号行不该被误标
+        Assert.Equal(BatchItemStatus.Pending, vm.BatchItems![0].Status);
+        Assert.Equal(BatchItemStatus.Failed, vm.BatchItems![1].Status);
+        Assert.Equal("boom", vm.BatchItems![1].ErrorMessage);
+        Assert.True(vm.KeepOpenOnComplete);   // 行 Failed 自动压钉
     }
 }

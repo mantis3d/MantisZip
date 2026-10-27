@@ -233,7 +233,8 @@
                             </DataTemplate>
                           </ItemsControl.ItemTemplate>
                         </ItemsControl>
-                        <Button Content="{Binding AddCustomFormatText}" Command="{Binding AddCustomFormatCommand}" CommandParameter="{Binding #SettingsWin}" Classes="ToolbarButton" HorizontalAlignment="Left"/>
+                        <!-- 添加自定义格式：普通按钮（单行文字；ToolbarButton 是「图标+文字」两行工具栏按钮，高 ControlHeightLg，会把单行文字顶到上半部） -->
+                        <Button Content="{Binding AddCustomFormatText}" Command="{Binding AddCustomFormatCommand}" CommandParameter="{Binding #SettingsWin}" Padding="12,4" HorizontalAlignment="Left"/>
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -292,9 +293,10 @@
                         </ItemsControl.ItemTemplate>
                       </ItemsControl>
 
+                      <!-- 规则操作按钮：普通按钮（单行文字，勿用 ToolbarButton——见上） -->
                       <StackPanel Orientation="Horizontal" Spacing="8">
-                        <Button Content="{Binding AddRuleText}" Command="{Binding AddRuleCommand}" CommandParameter="{Binding #SettingsWin}" Classes="ToolbarButton"/>
-                        <Button Content="{Binding ResetDefaultsText}" Command="{Binding ResetDefaultsCommand}" Classes="ToolbarButton"/>
+                        <Button Content="{Binding AddRuleText}" Command="{Binding AddRuleCommand}" CommandParameter="{Binding #SettingsWin}" Padding="12,4"/>
+                        <Button Content="{Binding ResetDefaultsText}" Command="{Binding ResetDefaultsCommand}" Padding="12,4"/>
                       </StackPanel>
                     </StackPanel>
                   </Border>

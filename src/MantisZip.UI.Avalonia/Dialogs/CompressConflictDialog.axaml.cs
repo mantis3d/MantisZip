@@ -72,6 +72,14 @@ public partial class CompressConflictDialog : Window
         InitializeComponent();
         DataContext = this;
 
+        // 诊断：窗口真正显示后的可见性快照（是否激活 / 位置 / owner / 置顶 / 任务栏），
+        // 与解压侧 ConflictDialog 对称，写入 conflict.log。
+        this.Opened += (_, _) =>
+        {
+            CoreLog.ConflictTrace("compress-dialog-shown active={0} bounds={1} owner={2} topmost={3} taskbar={4} file='{5}'",
+                IsActive, Bounds, Owner?.GetType().Name, Topmost, ShowInTaskbar, Path.GetFileName(filePath));
+        };
+
         HeaderText.Text = string.Format(LocalizationManager.T("CompressConflict_Header"), $"\"{Path.GetFileName(filePath)}\"");
 
         // Enable Add button based on engine capability
@@ -122,6 +130,7 @@ public partial class CompressConflictDialog : Window
 
     private void CaptureResult(CompressConflictAction action, string? customName)
     {
+        CoreLog.ConflictTrace("compress-dialog-result action={0} applyAll={1} custom='{2}'", action, ApplyAllCheck.IsChecked == true, customName);
         _capturedAction = action;
         _capturedApplyToAll = ApplyAllCheck.IsChecked == true;
         _capturedCustomName = customName;

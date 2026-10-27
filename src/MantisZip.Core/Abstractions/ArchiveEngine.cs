@@ -394,6 +394,26 @@ public class ArchiveProgress
     public long? FailedFiles { get; set; }
     public long? OverwrittenFiles { get; set; }
 
+    /// <summary>
+    /// 自适应分类结果（**构成口径**，不是进度）：需要压缩的文件数。null = 本报告未携带
+    /// （非自适应路径：7z / TAR.GZ / 加密 ZIP / 关闭自适应），UI 据此隐藏「已压缩」统计卡。
+    /// 多线程路径在扫描后即完成分类，故该值在一次操作内是最终构成、不随进度变化。
+    /// </summary>
+    public int? CompressedFiles { get; set; }
+
+    /// <summary>自适应分类结果（构成口径）：需要压缩的文件输入字节合计。null = 未携带。</summary>
+    public long? CompressedBytes { get; set; }
+
+    /// <summary>自适应分类结果（构成口径）：仅存储（内容已是压缩格式）的文件数。null = 未携带，UI 隐藏「仅存储」统计卡。</summary>
+    public int? StoreOnlyFiles { get; set; }
+
+    /// <summary>自适应分类结果（构成口径）：仅存储文件的输入字节合计。null = 未携带。</summary>
+    public long? StoreOnlyBytes { get; set; }
+
+    /// <summary>扫描阶段已累计的字节数（已发现文件的尺寸合计，随扫描增长）。
+    /// 仅 <see cref="ArchivePhase.Scanning"/> 上报携带；null = 未携带（UI 第三行显示「—」）。</summary>
+    public long? ScannedBytes { get; set; }
+
     /// <summary>ZIP 并行批次进度（0-100）。仅并行批次报告携带，供批次详细行 Percent。非并行为 null。</summary>
     public double? BatchPercentComplete { get; set; }
 
