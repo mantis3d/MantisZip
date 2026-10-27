@@ -2901,6 +2901,16 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.4 (2026-10-27) GBK 代码页注册收口到 Core（`ZipEngine` 静态构造器 + UI 测试程序集 ModuleInitializer）
+  - **现象**：CI run #231（alpha `173084c3`）UI 测试程序集 430 条里 2 条失败，其一为 `WholeArchiveErrorLocalizerTests.ToUserText_SharpCompressArchiveException_LocalizesToCorrupted`：`Expected: "文件损坏或格式无效"` / `Actual: "操作失败：'gbk' is not a supported encoding name…"`。同提交本机全量 430 条全绿 ⇒ CI 环境特有。
+  - **根因**：`2026-10-20` 那次「gbk 编码注册的测试顺序依赖」只在 `tests/MantisZip.Tests/TestAssemblySetup.cs`（Core 测试程序集）补了 `[ModuleInitializer]`，**UI 测试程序集从未补**——它靠 `tests/MantisZip.UI.Avalonia.Tests/MainWindowViewModelCommentTests.cs` 构造函数与 `src/MantisZip.UI.Avalonia/App.axaml.cs` 的零散注册「顺带」生效。CI 上该用例在 4.53s 就被调度、此前无人注册 ⇒ `ZipEngine.Open.cs` 的 `Encoding.GetEncoding("gbk")` 抛 `ArgumentException`，`WholeArchiveErrorLocalizer` 把它归入「操作失败」，损坏包误报成工具故障。
+  - **修复①（产品侧，Core 自注册）**：`src/MantisZip.Core/Engines/ZipEngine.Open.cs` 类顶部新增
+    `static ZipEngine() => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);`
+    覆盖引擎内三处 GBK 使用（打开旧式中文 ZIP 的 `OpenWithGbk`、文件名编码推断 `ResolveFileNameEncoding`、经 `ZipBinaryRewriter` 的中央目录重写），并删除原本塞在 `OpenWithGbk()` 局部函数里的注册。口径与 `Core/Utils/TorrentParser.cs`、`Core/Utils/TextEncodingDetector.cs` 一致：**Core 自己负责，不依赖宿主（App / 测试宿主 / 未来的 CLI）先注册过**；注册幂等。
+  - **修复②（测试侧，补齐缺口）**：新增 `tests/MantisZip.UI.Avalonia.Tests/TestAssemblySetup.cs`（`[ModuleInitializer]` 注册 `CodePagesEncodingProvider`），与 Core 测试程序集同构，把顺序依赖从整个 UI 程序集里彻底消除。
+  - **验证**：隔离单跑该用例 `dotnet exec <测试 DLL> -method "*ToUserText_SharpCompressArchiveException_LocalizesToCorrupted"` → 修复前 `Failed: 1`（Actual 与 CI 逐字一致），修复后 `Total: 1, Failed: 0, Time: 0.439s`；UI 全量 430 通过 / 0 失败 / 3 跳过。
+  - **同批 CI 失败另一条（未修，上游）**：`ResultTreeViewFilterTests.TogglingCompactMode_KeepsFilterApplied` 的 `[Test Case Cleanup Failure]`——`InvalidOperationException: The calling thread cannot access this object…` at `AvaloniaHeadlessPlatform.Initialize → AppBuilder.SetupUnsafe → HeadlessUnitTestSession.EnsureIsolatedApplication`，属 `AvaloniaUI/Avalonia#22021`（headless session 重建期 `s_uiThread` 认领竞态，仍 open）与 `#21467`（testhost 死锁）已知缺陷；`tests/MantisZip.UI.Avalonia.Tests/TestParallelization.cs` 已有 `DisableTestParallelization` 仍会触发，测试内无自有后台线程（`Task.Run`/`Timer`/`async void`/`ConfigureAwait(false)` 零命中）⇒ 只能等上游或改隔离级别，暂不改代码。
+
 #### v0.5.3 (2026-10-23) 合并阶段（copy-mode 重写）上报文件名 + 字节进度
   - **动机**：压缩「自适应 + 多线程」时，判为仅存储的文件在最终合并阶段没有任何进度上报（引擎侧详见 Avalonia 分区同日条目），根因之一是 `ZipBinaryRewriter` 的进度字段不完整/不可直接使用。
   - **`ZipBinaryRewriter.cs` 改动**：新增私有 `MergeProgressState`（`BytesDone` / `TotalBytes`），单源与多源两个 `RewriteAsync` 各自计算「待移动字节」= 保留条目 `CompressedSize` 之和 + 新增条目 `Size` 之和；`CopyEntryAsync` → `CopyStreamRangeAsync`、`CompressNewEntry` 全链路传入并逐 chunk 累加；进度上报从「`CurrentFile = "复制: " + name` / `"压缩: " + name`」改为**裸条目名**（规则 13），并带上 `ProcessedBytes` / `TotalBytes`；新增条目写完即补报 `EntryStatus = Completed`（供 UI 条目行实时更新）；三处收尾伪文件名（「正在写入中央目录…」/「正在写入目录结束标记…」/「正在保存到磁盘…」）改为空串 —— 收尾阶段没有「当前文件」，这类文案应属于 UI 的阶段显示（这些字符串此前只会出现在直接转发原始进度的调用方，且是硬编码中文/繁中/英文皆不适用）。

@@ -183,6 +183,7 @@
 按版本分组，每组按日期从新到旧排列。
 
 #### v0.5.4
+- **10-27** — GBK 代码页注册收口（Core）：`ZipEngine` 新增静态构造器自注册 `CodePagesEncodingProvider`，覆盖打开旧式中文 ZIP / 文件名编码推断 / 中央目录重写三处 GBK 使用，不再依赖宿主先注册（此前 CI 上 `WholeArchiveErrorLocalizerTests` 因无人注册抛 `ArgumentException: 'gbk' is not a supported encoding name`，把「文件损坏」误报成「操作失败」）；同时给 `tests/MantisZip.UI.Avalonia.Tests` 补 `TestAssemblySetup.cs`（`[ModuleInitializer]`），补齐 2026-10-20 只覆盖 Core 测试程序集的缺口
 - **10-26** — 删除条目的匹配语义改为「条目或其后代」+ 零命中报错（Core）：`ArchivePath` 新增 `MatchesEntryOrDescendant`（去尾斜杠 + 忽略大小写 + `/` 边界，`"a"` 不再吃掉 `"ab/a.txt"`）；`ZipEngine` copy-mode 改为先校验后重写（零命中删掉临时包再抛错，不再产出半成品）、legacy 校验集合归一化后走同一谓词；`SevenZipEngine` 零命中在建临时目录**之前**抛出（此前会白跑一遍整包解压 + 重打包）；新增 `ArchiveEntryNotFoundException : FileNotFoundException`（带 `EntryPath`）替代裸 `FileNotFoundException`，既有 catch 与契约不受影响
 
 #### v0.5.3
