@@ -74,6 +74,10 @@ public class PasswordService
             }
             else if (engine is SevenZipEngine)
             {
+                // 本方法是 CLI 解压流程中最先触达 SharpSevenZip 的地点之一（早于引擎方法入口的
+                // EnsureLibraryPath）：必须先把 7z.dll 路径配好，否则会按默认探测路径加载库、
+                // 之后引擎再设用户配置的路径即抛 SharpSevenZipLibraryException（issue #52）
+                SevenZipEngine.EnsureLibraryPath();
                 using var extractor = new SharpSevenZipExtractor(archivePath, password);
                 var afd = extractor.ArchiveFileData;
                 var encrypted = afd.Where(e => !e.IsDirectory && e.Encrypted).ToList();
@@ -120,6 +124,8 @@ public class PasswordService
             }
             if (engine is SevenZipEngine)
             {
+                // 同 QuickVerifyPassword：先配库路径再构造 extractor（issue #52）
+                SevenZipEngine.EnsureLibraryPath();
                 // 与 SevenZipEngine/ArchiveEntryExtractor 一致：无密码走无密码构造函数，避免 null 传入（CS8604）
                 using var extractor = string.IsNullOrEmpty(password)
                     ? new SharpSevenZipExtractor(archivePath)

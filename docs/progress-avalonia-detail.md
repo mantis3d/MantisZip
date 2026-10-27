@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-27** — 修复：issue #52 右键「原地解压 / 解压到目录」报 7z.dll 无法加载（库路径被默认探测路径抢先占用）
+  - **症状**（用户报告 + 本机 `debug.log` 取证一致）：未手动指定 7z.dll 路径时，资源管理器右键「原地解压」「解压到目录」弹「操作失败：Can not load 7-zip library or internal COM error! Message: can not change the library path while the library "C:\Program Files\MantisZip\x64\7z.dll" is being used.」，而「智能原地解压」正常。
+  - **根因**：SharpSevenZipLibraryManager 是**进程级单例** —— 库一旦被 `LoadLibrary` 加载，`SetLibraryPath` 只接受「与已加载路径相同」的值，否则抛 `SharpSevenZipLibraryException`。`App.CliExtract.cs:142` 的 `ResolveCliPassword` → `PasswordService.HasEncryptedEntries` 直接 `new SharpSevenZipExtractor`（**不经过** `SevenZipEngine.EnsureLibraryPath`），先把默认探测路径 `<exe>\x64\7z.dll` 的库加载了；随后 `ExtractAsync` 入口的 `EnsureLibraryPath` 才去设用户路径 ⇒ 路径不同 ⇒ 抛错。智能解压先走 `ListEntriesAsync`（入口即 `EnsureLibraryPath`），路径在首次加载前就设好，故不报错。
+  - **修法（三层）**：① `SevenZipEngine.ConfigureLibraryPathEarly()` —— 进程启动即把用户路径交给 SharpSevenZip（`App.axaml.cs` 在注册 `SevenZipDllResolveCallback` 之前调用；只在该文件存在时设置，不弹回调框）；② 抽出 `SetLibraryPathSafe()`，`EnsureLibraryPath` 的两处 `SetLibraryPath` 均经它并捕获 `SharpSevenZipLibraryException`（`CoreLog` 记「already in use, keep loaded library」并置位，避免每次操作重抛、整会话失效）；③ `PasswordService`（`QuickVerifyPassword` / `HasEncryptedEntries`）与 `ArchiveEntryExtractor`（三处直连构造）前补 `EnsureLibraryPath()`，不再依赖启动时序。
+  - **文案**：新增 i18n key `Error_Whole_SevenZipLibrary`（三语），`WholeArchiveErrorLocalizer` 增加 `SharpSevenZipLibraryException` 分支，不再把英文 COM 原文直出给用户。
+  - **验证**：库级 before/after harness（`.buildout/mz52-harness`，`AssemblyName=MantisZip.Tests` 借 Core 的 IVT 访问 internal）四组对照 —— 修复前 Core + 原始时序 ⇒ 抛 issue 原文那条 `SharpSevenZipLibraryException`、解出 0 文件；修复后 + 同序 ⇒ 静默沿用已加载库、解出 18/18；修复后 + 启动序 ⇒ 模块路径证据显示加载的正是自定义 `7z.dll`（默认位置放伪 dll 时**同样**成功，证明 early 配置真正生效）。`build -Target avalonia` / `-Target core` 0 警告；`test -Target tests` / `-Target ui-tests` 全绿（449 passed / 0 failed / 3 skipped）；`i18n` 1316 key 三语一致。
+  - **未做（已记录）**：GUI 右键全流程需在真实桌面手工回归（agent shell 无法建窗）；「设置里改 7z.dll 路径需重启生效」本轮只写 `debug.log`，未加 UI 提示；`ResetLibraryPath()` 仍是死代码（库已加载后改路径本质无效），留给以后做「免重启换库」。
+
 **2026-10-26** — 修复：进度窗口「完成后界面不更新」（通道行停在 98% / 最后一个文件名；批次列表只收尾 0 号行）
   - **症状**（用户实测，压缩单个目录基本每次必现）：「完整」档详细面板的并行通道行，完成后右侧百分比停在 98% 左右、底纹没铺满，左区仍显示最后一个文件名。
   - **根因**：通道行的 `Percent` 来自引擎的「组」上报（`UpsertParallelBatch` 里 `p.BatchPercentComplete ?? p.PercentComplete`），而每组结束时引擎会连发若干 `PercentComplete = 0` 的收尾帧且**不带 `BatchIndex`**（进不了 `UpsertParallelBatch`）⇒ 最后一组的最后一条组上报往往停在 98.x%；同时 `SetComplete` 完全不碰 `_parallelBatchItems`（只改主进度与 `FileName`）⇒ 通道行既不置 100% 也不清文件名。

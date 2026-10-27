@@ -53,6 +53,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 
 **修复 / Fixes**
 
+- **右键「原地解压 / 解压到目录」不再报 7z.dll 无法加载**（#52）— 指定过 7z.dll 路径、或安装目录与默认探测位置不同时，这两个入口会弹「Can not load 7-zip library … can not change the library path while the library "…\x64\7z.dll" is being used.」，而「智能原地解压」却正常；现在启动时就把 7z.dll 路径交给解压库，库已被占用时静默沿用已加载的库（仅在 `debug.log` 留一行记录），三个入口均可正常解压
+- **Right-click "Extract here / Extract to folder" no longer fails to load 7z.dll** (#52) — with a configured 7z.dll path, or when the install directory differs from the default probe location, these two entries raised "Can not load 7-zip library … can not change the library path while the library … is being used" while "Smart extract here" worked; the path is now handed to the extraction library at startup and an already-loaded library is reused silently (logged once in `debug.log`), so all three entries extract normally
 - **压缩对话框的执行设置现在真正生效** — 选「自动重命名 / 覆盖 / 跳过」后不再重复追问，密码库选项与规则也不再关窗后丢失；自动重命名时进度窗口的包名与最终文件一致
 - **Compress dialog settings now really apply** — "Auto-rename / Overwrite / Skip" is no longer asked twice, password-library options and rules survive the dialog, and the progress window shows the actual renamed archive
 - **Deflate64 关闭多线程时失败** — 此前必然报「Invalid compression method: Deflate64」，现自动改走 7z 写入；所有文件本就无需压缩时直接以「存储」写出

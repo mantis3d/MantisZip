@@ -1,4 +1,5 @@
 ﻿{
+  "Error_Whole_SevenZipLibrary": "7z 引擎載入失敗：無法使用 7z.dll，請檢查設定中的「7z.dll 路徑」。",
   "Progress_Summary_ArchivesCreated": "產生 {0} 個壓縮檔",
   "Progress_Summary_ArchivesCreatedPartial": "成功產生 {0} / {1} 個壓縮檔",
   "Progress_Summary_ArchivesExtracted": "解壓縮 {0} 個壓縮檔",

@@ -1,4 +1,5 @@
 ﻿{
+  "Error_Whole_SevenZipLibrary": "7z 引擎加载失败：无法使用 7z.dll，请检查设置中的「7z.dll 路径」。",
   "Progress_Summary_ArchivesCreated": "生成 {0} 个压缩包",
   "Progress_Summary_ArchivesCreatedPartial": "成功生成 {0} / {1} 个压缩包",
   "Progress_Summary_ArchivesExtracted": "解压 {0} 个压缩包",

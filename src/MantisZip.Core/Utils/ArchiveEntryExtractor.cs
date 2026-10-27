@@ -116,6 +116,9 @@ public static class ArchiveEntryExtractor
 
         // 最终路径安全检查：规范化后验证无路径穿越
         ValidateOutputPath(outputPath);
+        // 先确保 7z.dll 路径已配置：本工具类可能在引擎方法入口之前就触达 SharpSevenZip
+        // （库是进程级单例，加载后无法换路径 → issue #52）
+        SevenZipEngine.EnsureLibraryPath();
         using var extractor = string.IsNullOrEmpty(password)
             ? new SharpSevenZipExtractor(archivePath)
             : new SharpSevenZipExtractor(archivePath, password);
@@ -237,6 +240,8 @@ public static class ArchiveEntryExtractor
                 case ArchiveFormat.SevenZip:
                 case ArchiveFormat.Rar:
                 case ArchiveFormat.Iso:
+                    // 构造 extractor 前先配库路径（issue #52）
+                    SevenZipEngine.EnsureLibraryPath();
                     using (var extractor = string.IsNullOrEmpty(password)
                         ? new SharpSevenZipExtractor(archivePath)
                         : new SharpSevenZipExtractor(archivePath, password))
@@ -423,6 +428,8 @@ public static class ArchiveEntryExtractor
             case ArchiveFormat.Rar:
             case ArchiveFormat.Iso:
             {
+                // 构造 extractor 前先配库路径（issue #52）
+                SevenZipEngine.EnsureLibraryPath();
                 using var extractor = string.IsNullOrEmpty(password)
                     ? new SharpSevenZipExtractor(archivePath)
                     : new SharpSevenZipExtractor(archivePath, password);

@@ -1,4 +1,5 @@
 ﻿{
+  "Error_Whole_SevenZipLibrary": "7z engine failed to load: cannot use 7z.dll. Check the \"7z.dll Path\" setting.",
   "Progress_Summary_ArchivesCreated": "{0} archive(s) created",
   "Progress_Summary_ArchivesCreatedPartial": "{0} of {1} archives created",
   "Progress_Summary_ArchivesExtracted": "{0} archive(s) extracted",
