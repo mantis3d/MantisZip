@@ -166,6 +166,7 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 | node 子进程 `spawn EPERM` | 沙箱禁止具名管道；同样只在受限沙箱里出现 |
 | git 报 `LF will be replaced by CRLF` | 仓库统一 CRLF：索引 LF / 工作区 CRLF（`.gitattributes` + `.editorconfig`）。新增二进制记得加进 `.gitattributes` 的 `binary` 组 |
 | 三份 `strings.*.json` 带 BOM | 与 `.editorconfig` 的 `[*.json] charset = utf-8-bom` 一致，**不要**改成无 BOM（规则 13 已在 2026-10-22 改为「UTF-8 with BOM」，此前写的「无 BOM」是过期表述） |
+| 改了 `installer*.iss` 本机却没法验证 | 本机没有 ISCC（Inno Setup 编译器），`ci.yml` 也**不编译**安装包——只有 `release.yml` 打 tag 时才 `choco install innosetup` 后编译。所以 `.iss` 的语法/API 错误只能等首次发版暴露；改完至少要人工核对结构（`[Code]` 的 `begin`/`end` 计数、`[CustomMessages]` 中英成对、两个脚本的 AppId 保持一致），必要时在 beta 上推一个测试 tag 验证 |
 
 ## 9. 还没做的（有意留白，不是忘了）
 

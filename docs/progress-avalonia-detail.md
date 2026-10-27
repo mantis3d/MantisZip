@@ -2901,6 +2901,16 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.4 (2026-10-27) 安装包统一产品身份 + 旧版迁移桥（issue #45）
+  - **背景**：issue #45 报「安装新版的时候，旧版卸载不干净导致出问题」，用户截图是 .NET apphost 的「You must install or update .NET to run this application」——说明 `{app}` 里的 `runtimeconfig.json` 与磁盘上实际存在的运行时文件不匹配。
+  - **根因**：两个 Inno 变体（`installer.iss` 框架依赖 / `installer-selfcontained.iss` 自包含）各自声明**不同 AppId**（`{F7A3C8E1-…}` / `{963001F3-…}`），却共用 `DefaultDirName={autopf}\MantisZip`。Inno 按 AppId 判定产品身份 ⇒ 装另一变体时既不卸旧版，也不知道目录里还有另一个产品；两套 `unins000.*` 记录的删除清单指向同一批文件 ⇒ 卸载任一条都会删掉另一套正在使用的文件，`[UninstallRun]` 钩子（依赖 `MantisZip.UI.Avalonia.exe` 存在）也随之静默失败。旧脚本注释「different AppId … so both installers can coexist」的前提在「同名同目录同 exe」下根本不成立——当年 `.omo/plans/已完成/self-contained-installer.md:35` 的立项依据写反了。
+  - **改动**（两个脚本对称）：① AppId 统一为 `{F7A3C8E1-2D4B-4A9F-9C6E-8B5D7A3F2E1C}`（保留主下载路径 WebSetup 的身份，存量用户升级零摩擦）；② 共用 `SetupMutex=MantisZipSetupMutex`；③ `PrepareToInstall` 迁移桥（`RemoveLegacyInstallation`：HKLM64/HKLM32/HKCU 三处查旧身份 `{963001F3-…}_is1` → 应用在跑先询问并 `taskkill /T /F` → 追加 `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART` 执行 → `WaitForLegacyKeyGone(60000)` 每 500ms 轮询 → 成功后清 `FirstRunShell`/`FirstRunAssoc`；失败返回本地化错误文本中止安装）；④ `[InstallDelete]` 只清已知跨变体运行时残留（`hostfxr.dll`/`hostpolicy.dll`/`coreclr.dll`/`clrjit.dll`/`mscordaccore*.dll`/`System.Private.CoreLib.dll`/`createdump.exe`/`unins*`），不碰用户自建文件；⑤ `CurStepChanged` 写 `install-manifest.json`（`variant`/`version`/`installedAt`/`appId`）+ `HKLM\Software\MantisZip` 的 `InstalledVariant`/`InstalledVersion`；⑥ `CurUninstallStepChanged` 询问是否同时删 `%LOCALAPPDATA%\MantisZip`（默认「否」，`UninstallSilent` 时不询问）+ 无论选择都清 `HKCU\Software\MantisZip` 首次运行标记；⑦ WebSetup 的 `IDNO`（跳过运行时下载）改为二次确认 `SkipRuntimeConfirmMsg`（提示 `Setup-Offline.exe` 已自带运行时）。
+  - **为什么不看卸载器退出码**：Inno 卸载器会先把自己复制到临时目录再退出，主进程退出码不可信，成功判据只能是「卸载注册表键消失」。
+  - **未做的事**：没有把 `%LOCALAPPDATA%\MantisZip` 做成 `[UninstallDelete]` 静态项（那样卸载静默模式也会删设置），改为运行期 `MsgBox` 询问。
+  - **验证**：`pwsh -File scripts\verify-repo.ps1 -Task check` → exit 0（版本 0.5.4 六处一致 / 1329 个三语 key / 守卫 5/5）；两脚本 `begin`/`end` 计数与基线逐块核对无缺口、无 U+FFFD 替换字符。本机无 ISCC（`release.yml:79` 用 `choco install innosetup`，`:108` 才编译）且 CI 不编译安装包 ⇒ `.iss` 语法只能等 release workflow 首次编译确认。
+  - **代价**：两个变体不再（假）共存——换变体变成一次正常升级（Offline→WebSetup 会明确要求装 .NET）。
+  - **状态**：✅ 已完成（脚本语法待 release workflow 首次编译验证）。
+
 #### v0.5.4 (2026-10-27) 新增「已知未修问题登记簿」`docs/KNOWN_ISSUES.md`（AGENTS.md 规则 21）
   - **动机**：这批 CI 排查里冒出好几条「已经查清、但这次不修」的问题——Avalonia 无头竞态在等上游 `#22021`、Core 测试本地跑不了、24 项 SkiaSharp 过时 API、29 条 7z 用例被过滤器吞掉。它们既不是计划（说不出方案与工时，也未必该做），又不能只在对话里说一句就算完——三个月后没人知道它存在，更没人知道当初为什么决定不动。
   - **新增 `docs/KNOWN_ISSUES.md`**：三条硬纪律（发现当天登记 / 修掉必须回填 commit 并移入文末档案区、**不删行** / 计划完成时扫一遍「等计划 X」条目）+ 登记三要素（现象与证据 / 阻塞类型五选一：等上游·等计划·缺决策·成本超阈值·无法复现 / **可判定**的复评条件）。种子条目 5 条：KI-001 Avalonia 无头跨线程竞态（等上游）、KI-002 Core 测试本地跑不了且 `-Task test -Target tests` 假绿（实测：`✅ 测试通过：tests（0.4s）` 而实际 0 条用例）、KI-003 SkiaSharp CS0618、KI-004 `PreviewWebViewLazyInitTests` 固定临时目录、KI-005 7z 用例被 `--filter` 永久过滤。
