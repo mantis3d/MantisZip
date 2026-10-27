@@ -208,8 +208,8 @@ public static bool TryDetectEmbeddedContainer(string filePath, out ContainerForm
 - [x] 自解压 exe 能打开并解压（单测 + 路由到 `SevenZipEngine`）
 - [x] `.exe` 未进任何文件关联；`.jar` 未抢默认程序（守卫测试通过）
 - [x] `pwsh -File scripts\verify-repo.ps1 -Task check` exit 0；Core / Avalonia 构建零错误
-- [ ] 推送 alpha 后 CI 绿
-- [ ] `gh` 回复 #54 / #36 并给出关闭判定；未覆盖项已进 `docs/KNOWN_ISSUES.md`
+- [x] 推送 alpha 后 CI 绿（run 40543162892，4m11s）
+- [x] `gh` 回复 #54 / #36 并给出关闭判定；未覆盖项已进 `docs/KNOWN_ISSUES.md`
 - [x] 规则 3：`docs/PROGRESS.md` + `docs/progress-avalonia-detail.md` 已更新
 - [ ] 规则 18：向用户确认 `RELEASE_NOTES.md` 更新范围
 
