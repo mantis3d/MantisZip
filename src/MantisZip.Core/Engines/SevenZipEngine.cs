@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using SharpSevenZip;
 using SharpSevenZip.EventArguments;
+using SharpSevenZip.Exceptions;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 
@@ -100,6 +101,59 @@ public class SevenZipEngine : IArchiveEngine
     }
 
     /// <summary>
+    /// 进程启动时**提前**把 7z.dll 路径交给 SharpSevenZip（不探测、不弹回调对话框）。
+    /// <para>
+    /// 为什么必须提前：SharpSevenZipLibraryManager 是进程级单例，库一旦被 LoadLibrary 加载，
+    /// <c>SetLibraryPath</c> 就只接受「与已加载路径相同」的值，否则抛
+    /// <see cref="SharpSevenZipLibraryException"/>（"can not change the library path while the
+    /// library ... is being used"）。若某个不经过 <see cref="EnsureLibraryPath"/> 的触达点
+    /// （如 CLI 解压前的密码探测）先按 SharpSevenZip 默认探测路径加载了库，之后引擎再设
+    /// 用户配置的路径就会失败 —— 即 issue #52（右键「原地解压」报错）。
+    /// </para>
+    /// 路径不存在时静默返回，仍由 <see cref="EnsureLibraryPath"/> 懒执行 + 回调对话框兜底。
+    /// </summary>
+    internal static void ConfigureLibraryPathEarly()
+    {
+        if (_libraryPathInitialized) return;
+        lock (_libraryLock)
+        {
+            if (_libraryPathInitialized) return;
+            if (!File.Exists(SevenZipDllPath)) return;
+
+            SetLibraryPathSafe(SevenZipDllPath, "early");
+            _libraryPathInitialized = true;
+        }
+    }
+
+    /// <summary>
+    /// 设置 SharpSevenZip 的库路径，异常不外抛、统一记日志。
+    /// <para>
+    /// SharpSevenZip 2.0.45 没有 <c>TrySetLibraryPath</c>，库已被其它路径加载时只能靠异常识别；
+    /// 此时**沿用已加载的库**（它本身可用）而不是让每次操作都重抛 —— 否则整个进程会话的
+    /// 7z/RAR/ISO 操作全部失败。
+    /// </para>
+    /// </summary>
+    /// <param name="path">要设置的 7z.dll 路径。</param>
+    /// <param name="source">来源标记，仅用于日志区分（early / configured / user callback）。</param>
+    private static void SetLibraryPathSafe(string path, string source)
+    {
+        try
+        {
+            SharpSevenZipBase.SetLibraryPath(path);
+            CoreLog.Info($"SevenZipEngine: 7z.dll path set ({source}): {path}");
+        }
+        catch (SharpSevenZipLibraryException ex)
+        {
+            CoreLog.Info($"SevenZipEngine: 7z.dll already in use, keep loaded library " +
+                         $"(ignored {source} path '{path}'): {ex.Message}");
+        }
+        catch (Exception ex)
+        {
+            CoreLog.Info($"SevenZipEngine: failed to set 7z.dll path ({source} '{path}'): {ex.Message}");
+        }
+    }
+
+    /// <summary>
     /// 确保 SharpSevenZipLibraryManager 已配置 7z.dll 路径（线程安全，只执行一次）。
     /// </summary>
     internal static void EnsureLibraryPath()
@@ -111,8 +165,7 @@ public class SevenZipEngine : IArchiveEngine
 
             if (File.Exists(SevenZipDllPath))
             {
-                SharpSevenZipBase.SetLibraryPath(SevenZipDllPath);
-                CoreLog.Info($"SevenZipEngine: 7z.dll path set: {SevenZipDllPath}");
+                SetLibraryPathSafe(SevenZipDllPath, "configured");
                 _libraryPathInitialized = true;
                 return;
             }
@@ -128,8 +181,7 @@ public class SevenZipEngine : IArchiveEngine
                     if (!string.IsNullOrEmpty(userPath) && File.Exists(userPath))
                     {
                         SevenZipDllPath = userPath;
-                        SharpSevenZipBase.SetLibraryPath(userPath);
-                        CoreLog.Info($"SevenZipEngine: 7z.dll path set via user callback: {userPath}");
+                        SetLibraryPathSafe(userPath, "user callback");
                         _libraryPathInitialized = true;
                         return;
                     }

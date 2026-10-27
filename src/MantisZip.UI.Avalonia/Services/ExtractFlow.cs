@@ -288,12 +288,17 @@ public static class ExtractFlow
         // 循环重入：暂停后恢复时重新弹窗（对齐 WPF App.xaml.cs ConflictResolver）
         while (true)
         {
-            // 冲突弹窗是模态等待：期间已用时间冻结（每次重入都配对 Begin/End，防计数泄漏）
+            // 冲突弹窗是模态等待：期间已用时间冻结。
+            // try/finally 保证任何出口（正常返回 / 取消抛异常 / 恢复后 continue）都结算冻结计数，
+            // 否则 _modalFreezeCount 泄漏会让已用时间永久停走。
             var freezePw = ProgressWindow.CurrentVisible;
             freezePw?.BeginModalFreeze();
-
             // 确认即载荷：对话框关闭时一次性交出完整决策（按钮 + 自定义名 + 应用到全部 + 暂停/取消整轮），
             // 这里只做「载荷 → 结果」映射，不再逐字段回读窗口属性（漏读一项就静默失效）。
+            // 诊断（conflict.log，RELEASE 也写）：弹窗开始/返回，用于区分「卡在弹窗」与「卡在闸门」
+            CoreLog.ConflictTrace("dialog-open owner={0} pwVisible={1} file='{2}'",
+                owner.GetType().Name, freezePw != null, info.FilePath);
+
             var outcome = await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var dlg = new ConflictDialog(info, titleKey);
@@ -303,6 +308,9 @@ public static class ExtractFlow
                 await dlg.ShowDialog(dialogOwner);
                 return await dlg.Completion;
             });
+
+            CoreLog.ConflictTrace("dialog-returned action={0} paused={1} cancelled={2} applyAll={3} file='{4}'",
+                outcome.Action, outcome.IsPaused, outcome.IsCancelled, outcome.ApplyToAll, info.FilePath);
 
             // 取消整个操作
             if (outcome.IsCancelled)
@@ -315,18 +323,23 @@ public static class ExtractFlow
             {
                 // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标：
                 // 在 UI 线程进入暂停态，再异步等待暂停事件（不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）
-                var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
-                if (pw != null)
+                var pw = freezePw ?? owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
+                if (pw == null)
                 {
-                    await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
-                    // IsPaused 已为 true → 此刻解除模态冻结由暂停态无缝接续（冻结不断档）
+                    // 无进度窗口可暂停：绝不能 continue —— 否则会无延迟地无限重弹同一对话框，
+                    // 表现为「框关不掉 / 一直在闪 / 像卡死」。按覆盖继续并留证据。
+                    CoreLog.ConflictTrace("pause-without-progress-window -> fallback overwrite file='{0}'",
+                        info.FilePath);
                     freezePw?.EndModalFreeze();
-                    await ProgressPauseGate.WaitForResumeAsync(pw);
+                    return (FileConflictAction.Overwrite, false);
                 }
-                else
-                {
-                    freezePw?.EndModalFreeze();   // 无进度窗口可暂停也要结算冻结，防计数泄漏
-                }
+
+                await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
+                // IsPaused 已为 true → 此刻解除模态冻结由暂停态无缝接续（冻结不断档）
+                freezePw?.EndModalFreeze();
+                CoreLog.ConflictTrace("pause-wait-begin file='{0}'", info.FilePath);
+                await ProgressPauseGate.WaitForResumeAsync(pw);
+                CoreLog.ConflictTrace("pause-wait-exit file='{0}'", info.FilePath);
                 continue; // 恢复后重新弹窗
             }
 

@@ -146,6 +146,11 @@ public partial class App : Application
             DebugLog($"OnFrameworkInitializationCompleted: failed to apply SevenZipPath setting: {sevenZipInitEx.Message}");
         }
 
+        // 立即把 7z.dll 路径交给 SharpSevenZip：库是进程级单例，一旦被加载就无法再换路径。
+        // 必须早于任何 SharpSevenZip 触达点（如右键解压前的密码探测），否则会先按默认探测路径
+        // 加载库、后续再设用户配置的路径即抛 SharpSevenZipLibraryException（issue #52）。
+        SevenZipEngine.ConfigureLibraryPathEarly();
+
         // 注册 7z.dll 解析回调 — 默认位置找不到时弹出对话框让用户手动指定
         SevenZipEngine.SevenZipDllResolveCallback = ResolveSevenZipDllViaDialog;
         Services.StartupTimer.Mark("Init.SevenZip");

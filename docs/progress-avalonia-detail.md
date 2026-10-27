@@ -6,6 +6,25 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-27** — 合并：beta 的缺陷修复并入 alpha（11 处冲突按「留 alpha 契约 + 拿 beta 诊断与收尾」取舍）
+  - **背景**（用户指派的合并请求）：beta 是调试除错分支，攒了 10 条提交（#52 的 7z.dll 加载顺序、进度窗口完成后界面不更新、冲突提示链路加固 + `conflict.log`、压缩流程并行度、扫描统计卡、压缩包 N/M 卡、「真暂停」评估结论、探针测试清理、v0.5.3 发布说明等）；alpha 同期前进了 25 条提交（意图-执行接缝收口、图标归一化、删除目录修复等）。两边都改过的文件 18 个，git 报冲突 11 个。
+  - **取舍原则**：alpha 已按规则 20 把「开窗 + 回读」换成载荷化契约（`ConfirmOutcome` / `RunOutcome` / 单一进度 presenter），因此冲突处**一律保留 alpha 的结构**，把 beta 的诊断插桩与批次收尾行为移植进去，避免把已被删除的回传后门（`ResultAction` / `ApplyToAll` / `CloseAction` / `DialogResult`）复活。
+  - **资源**：三份 `strings.{zh-CN,en,zh-TW}.json` 两边都在 `{` 后插了新 key（alpha 20 条 + beta 的 `Error_Whole_SevenZipLibrary`），两句都留 ⇒ 三份各 1336 key、BOM 与 CRLF 不变。
+  - **`Services/CompressFlow.cs` / `Services/ExtractFlow.cs`**：保留 alpha 的契约版（`CompressConflictDialogOutcome(Action, CustomName, ApplyToAll, IsPaused, IsCancelled)` / `FileConflictDialogOutcome` + `await dlg.Completion`），把 beta 的 `CoreLog.ConflictTrace("compress-dialog-open" / "dialog-returned" / "pause-wait-begin|exit")` 逐点移植；保留 beta 的「拿不到进度窗口就别 `continue`」防死循环分支（解压按覆盖、压缩按跳过）；过时的「try/finally 保证」注释改成「每个出口显式 `EndModalFreeze`」。
+  - **`Dialogs/ConflictDialog.axaml.cs` / `Dialogs/CompressConflictDialog.axaml.cs`**：取 beta 的 `ConflictTrace` 调用 + alpha 的 `_outcome = new XxxOutcome(...)`；beta 侧 `_capturedAction` / `_capturedApplyToAll` / `_capturedCustomName` / `_resultCaptured` 字段在合并后已不存在，保留会编译失败。
+  - **`Views/MainWindow.axaml.cs`**：保留 alpha 的 `progressPresenter.RunAsync(new ProgressRunRequest{...})` 单一路径，删掉 beta 的内联窗口生命周期（那段引用 `pw` 变量，alpha 里已无该变量）；异常分支同样保留 alpha（空），因为收尾已下沉到 presenter。文件 1753 → 1702 行。
+  - **`Services/MainWindowProgressPresenter.cs`（本次唯一需要「双写」的地方）**：把 beta 的批次收尾修复下沉进 presenter —— 成功路径 `UpdateBatchItemStatus(0, Completed)` → `window.FinalizeBatch()`（多包批处理逐行收尾，不再只收第 0 行）；密码取消路径 `UpdateBatchItemStatus(0, Failed, msg)` → `window.FailCurrentBatchItem(msg)`（标在真正出错的那行）；异常路径 `UpdateBatchItemStatus(0, Failed)` → `window.FailCurrentBatchItem()`（异常仍 rethrow，保持 alpha 契约）。同时删掉已无用的 `using MantisZip.UI.Avalonia.Models;`。
+  - **三份文档冲突**：`RELEASE_NOTES.md` 保留两边条目（beta 的统计卡两条、#52 两条、冲突链路与「完成后不再像没跑完」两条），不重复第二个 `**修复 / Fixes**` 标题；`docs/PROGRESS.md` 保留两边 10-26 里程碑；本文件按日期重排（10-27 → 10-26 → 10-24）。
+  - **验证**：`$env:AVALONIA_TELEMETRY_OPTOUT='1'` + `-c Release --no-restore -m:1 -nodeReuse:false` 构建 `src/MantisZip.Core`（0 警告）与 `src/MantisZip.UI.Avalonia`（0 警告 0 错误）；UI 测试程序集 `dotnet exec` 全绿；Core 测试项目是 xUnit v2，本机 VSTest 不可用，只能编译通过 + 等 CI。
+
+**2026-10-27** — 修复：issue #52 右键「原地解压 / 解压到目录」报 7z.dll 无法加载（库路径被默认探测路径抢先占用）
+  - **症状**（用户报告 + 本机 `debug.log` 取证一致）：未手动指定 7z.dll 路径时，资源管理器右键「原地解压」「解压到目录」弹「操作失败：Can not load 7-zip library or internal COM error! Message: can not change the library path while the library "C:\Program Files\MantisZip\x64\7z.dll" is being used.」，而「智能原地解压」正常。
+  - **根因**：SharpSevenZipLibraryManager 是**进程级单例** —— 库一旦被 `LoadLibrary` 加载，`SetLibraryPath` 只接受「与已加载路径相同」的值，否则抛 `SharpSevenZipLibraryException`。`App.CliExtract.cs:142` 的 `ResolveCliPassword` → `PasswordService.HasEncryptedEntries` 直接 `new SharpSevenZipExtractor`（**不经过** `SevenZipEngine.EnsureLibraryPath`），先把默认探测路径 `<exe>\x64\7z.dll` 的库加载了；随后 `ExtractAsync` 入口的 `EnsureLibraryPath` 才去设用户路径 ⇒ 路径不同 ⇒ 抛错。智能解压先走 `ListEntriesAsync`（入口即 `EnsureLibraryPath`），路径在首次加载前就设好，故不报错。
+  - **修法（三层）**：① `SevenZipEngine.ConfigureLibraryPathEarly()` —— 进程启动即把用户路径交给 SharpSevenZip（`App.axaml.cs` 在注册 `SevenZipDllResolveCallback` 之前调用；只在该文件存在时设置，不弹回调框）；② 抽出 `SetLibraryPathSafe()`，`EnsureLibraryPath` 的两处 `SetLibraryPath` 均经它并捕获 `SharpSevenZipLibraryException`（`CoreLog` 记「already in use, keep loaded library」并置位，避免每次操作重抛、整会话失效）；③ `PasswordService`（`QuickVerifyPassword` / `HasEncryptedEntries`）与 `ArchiveEntryExtractor`（三处直连构造）前补 `EnsureLibraryPath()`，不再依赖启动时序。
+  - **文案**：新增 i18n key `Error_Whole_SevenZipLibrary`（三语），`WholeArchiveErrorLocalizer` 增加 `SharpSevenZipLibraryException` 分支，不再把英文 COM 原文直出给用户。
+  - **验证**：库级 before/after harness（`.buildout/mz52-harness`，`AssemblyName=MantisZip.Tests` 借 Core 的 IVT 访问 internal）四组对照 —— 修复前 Core + 原始时序 ⇒ 抛 issue 原文那条 `SharpSevenZipLibraryException`、解出 0 文件；修复后 + 同序 ⇒ 静默沿用已加载库、解出 18/18；修复后 + 启动序 ⇒ 模块路径证据显示加载的正是自定义 `7z.dll`（默认位置放伪 dll 时**同样**成功，证明 early 配置真正生效）。`build -Target avalonia` / `-Target core` 0 警告；`test -Target tests` / `-Target ui-tests` 全绿（449 passed / 0 failed / 3 skipped）；`i18n` 1316 key 三语一致。
+  - **未做（已记录）**：GUI 右键全流程需在真实桌面手工回归（agent shell 无法建窗）；「设置里改 7z.dll 路径需重启生效」本轮只写 `debug.log`，未加 UI 提示；`ResetLibraryPath()` 仍是死代码（库已加载后改路径本质无效），留给以后做「免重启换库」。
+
 **2026-10-26** — 架构：意图-执行接缝收口（确认即载荷 + 不可变载荷 + 四态结局 + 单一进度 presenter）
   - **背景**：`docs/PLAN.md` S 档第二项 [intent-execution-seam.md](.omo/plans/已完成/intent-execution-seam.md)（三波 18 任务）。要消灭的缺陷类型是「设置窗口点了确认、世界却没反应」——编译器不管、运行时不报、测试不覆盖，症状恒定是界面一切正常、点下去什么也没发生。同族事故本仓已发生七次（详见计划 §2）。
   - **诊断**：全仓 60 处「开窗 + 回读」接缝（`ShowDialog` 41 / `.Show()` 19，剔除 9 行注释；已无 WinForms `MessageBox.Show`），逐点判定为 A 2 / B 16 / C 15 / D 8 / E 3 / F 4 = 48 条，另 12 条属「非模态辅助窗」不计入守卫基线。C 类基线收敛为 15 条 / 4 文件。
@@ -75,6 +94,76 @@
   - **工时与路径**：4-6h → **6-8h**；Critical Path `T1→T2→T4→T5→T6`，T3 建议排在 T2 之后（确认文案要承诺「连同子条目一起删」，语义须先定死）。
   - **状态**：📋 计划已订正（仍在 `.omo/plans/未开始`），先 commit 本轮文档改动，再移入 `进行中` 按 T1–T6 实施。
 
+**2026-10-26** — 修复：进度窗口「完成后界面不更新」（通道行停在 98% / 最后一个文件名；批次列表只收尾 0 号行）
+  - **症状**（用户实测，压缩单个目录基本每次必现）：「完整」档详细面板的并行通道行，完成后右侧百分比停在 98% 左右、底纹没铺满，左区仍显示最后一个文件名。
+  - **根因**：通道行的 `Percent` 来自引擎的「组」上报（`UpsertParallelBatch` 里 `p.BatchPercentComplete ?? p.PercentComplete`），而每组结束时引擎会连发若干 `PercentComplete = 0` 的收尾帧且**不带 `BatchIndex`**（进不了 `UpsertParallelBatch`）⇒ 最后一组的最后一条组上报往往停在 98.x%；同时 `SetComplete` 完全不碰 `_parallelBatchItems`（只改主进度与 `FileName`）⇒ 通道行既不置 100% 也不清文件名。
+  - **修法**：`UpsertParallelBatch` 记下每组最近一次的 `BatchProcessedFiles` / `BatchTotalFiles`（`Models/ParallelBatchProgressItem.cs` 新增两个普通属性，不参与绑定）；新增 `ProgressViewModel.FinalizeChannelRows()` —— 逐行 `Percent = 100` / `BatchRatio = 1` / `FileRatio = 1` / `StatusBrushName = ThemeStatusSuccessBrush`，并行行按记录的计数把右区重建成 `100% (n/n)`，清空 `CurrentFile` / `DirectoryText` / `FileNameText` / `FileSizeText`，并隐藏「存储文件」分区标题；由 `SetComplete` 在**成功终态**调用（失败 / 取消保留各行停住的位置，便于判断卡在哪一组）。
+  - **测试**：`tests/MantisZip.UI.Avalonia.Tests/ProgressViewModelTests.cs` +3 例 —— 两组停在 98% / 97% 且带文件名 → `SetComplete` 后逐行 100%、右区 `100% (12/12)` / `100% (8/9)`、文件名清空、`ShowStoreSectionHeader` 关闭；失败终态保留 42% 与文件名；非并行合成单行只清文件名、右区仍为空。
+  - **验证**：avalonia Release 构建 0 警告；`test -Target tests`（2 条存量警告）与 `test -Target ui-tests` 全绿；`i18n` 1314 key、`check` 0.5.3 六处、`guards` 4/4。
+  - **批次列表侧的同类缺口**：GUI 的 `RunWithProgress` **从不调用** `FinalizeBatch()`（只有 CLI 的 `App.CliCompress` / `App.CliExtract` 调），成功收尾只硬编码 `UpdateBatchItemStatus(0, BatchItemStatus.Completed)` ⇒ 多包批处理里末包行停在 `InProgress` + 97%；失败 / 密码取消分支同样只动 0 号行，会把第一个包误标失败。
+  - **修法（批次列表）**：成功收尾改调 `pw.FinalizeBatch()`（整批 `InProgress` → `Completed` + 100%，并刷新「成功 n / 共 m」）；失败 / 密码取消改调新增的 `ProgressWindow.FailCurrentBatchItem(...)`（VM 侧按 `_currentBatchIndex` 定位，无批次行静默返回）；`SetProgress` 的批次行写入去掉 `PercentComplete <= 0` 的无条件分支 —— 引擎每包结束会连发 0% 收尾帧，原逻辑把行拉回 0% 再补 100%，视觉上就是「完成后先退再补」。
+  - **测试（批次列表）**：再 +3 例 —— `FinalizeBatch` 整批置完成、0% 收尾帧不回退行百分比、`FailCurrentBatchItem` 标当前行而非 0 号行。
+  - **追加（用户第二轮实测反馈「所有通道一起完成，还是像卡住」）**：统一收尾仍然要等整包结束才发生，逐组完成时看不出进展。改为**每组完成即各自收尾** —— `src/MantisZip.Core/Engines/ZipEngine.Compress.cs` 的 N 组路径在该组 `CompressGroupWithSevenZip` 返回后补一条 `PercentComplete = 100` 的组帧（7z 的 `FileCompressionFinished` 上报有 100 ms 节流，最后一两个文件的完成事件会被丢掉，通道行因此停在 98.x%）；UI 侧抽出 `MarkChannelRowComplete(row)`（`Percent = 100` / 底纹铺满 / 成功色 / 右区重建 `100% (n/n)` / 左区改显示「通道已完成」），由 `UpsertParallelBatch` 在本组到 100% 时**就地**调用，`FinalizeChannelRows` 只在整包结束时兜底；已完成的行加不回退守卫（迟到的低百分比帧不会把「通道已完成」改回文件名）。
+  - **新增 i18n key**：`Progress_Channel_Done`（通道已完成 / Channel done / 通道已完成），1314 → 1315。
+  - **测试（逐组收尾）**：`tests/MantisZip.Tests/Engines/ParallelCompressTests.cs` +1 例（degree=3 时**每个**出现的 `BatchIndex` 都收到过 `BatchPercentComplete == 100` 帧）；`ProgressViewModelTests` +1 例（第 0 组到 100% 时只有该行收尾、另一组仍 40% 与文件名；随后喂 50% 帧不回退）。
+
+**2026-10-26** — 记录：评估后放弃「真暂停」（需要先改引擎线程模型）
+  - **需求**：用户指出「暂停就是要暂停整个压缩或者解压动作」，而当时的暂停按钮只冻结「已用时间」显示，进度条与文件处理都继续（Core 里 `rg "Pause"` 零命中，`ProgressViewModel.PauseEvent` 只被冲突框暂停分支等待）。
+  - **曾实现并已回滚的方案**（完整备份：`%TEMP%\mantiszip-pause-revert-20261026\`，含 `tracked-changes.patch` 与 4 个新文件）：`ArchiveOptions.PauseEvent` / `CompressRequest.PauseEvent`（`ManualResetEventSlim?`）+ `PauseGate.WaitIfPaused`（统一阻塞点）+ `PauseAwareStream`（写流装饰器，按 4 MB 块暂停）；安全点覆盖 ZIP 解压 4 条条目循环与 4 处写文件、ZIP 压缩串行主循环 / 两个 store 组循环 / 7z 组调用 / 逐文件循环、TAR.GZ 8 处、7z 3 处；UI 侧暂停期间速度与剩余时间显示「—」、`PauseFromConflict` 补 `StatusKind = Paused`、冲突框暂停后取消最小化并 `Activate()` 进度窗口。当时 core / avalonia 构建 0 警告、新增 11 例测试全绿。
+  - **为什么回滚**（用户实测：按暂停后「像卡死、不能恢复」，连「继续」都点不了）：暂停闸门是**同步阻塞**的，而串行解压 / 压缩的 `await` 续体跑在 **UI 线程**上 —— Core 几乎没有 `ConfigureAwait(false)`，`ExtractFlow` / `AvaloniaCompressService` 也是直接 `await` 引擎 ⇒ 按暂停等于阻塞 UI 线程，窗口不重绘、按钮点不动。
+  - **结论**：保持现有行为（暂停只冻结「已用时间」，不做真暂停）。真暂停的前置条件是把引擎移出 UI 线程（在 `ExtractService` / `AvaloniaCompressService` 里用 `Task.Run` 包一层，并复核进度上报、`onItemStatus` / `onItemOutputPath`、冲突与密码弹窗回调的线程封送），属独立一轮改造，不放进 0.5.3 收尾。
+  - **未改动**：`RELEASE_NOTES.md` 未写入（功能未落地，不进发布说明）；`docs/PROGRESS.md` 未加条目（无上线内容）。
+
+**2026-10-26** — 修复：冲突提示链路的卡死风险 + 新增出厂即开的冲突证据链日志（`conflict.log`）
+  - **问题**（用户报告，无法复现）：多线程解压时出现「文件已存在」冲突提示，关掉一个后整个解压卡住不动 —— 进度不前进、也没有新提示。用户怀疑还有第二个冲突框没显示出来（可能被进度窗口挡住）。
+  - **排查结论**（4 个并行 subagent + 本机日志取证）：
+    - 「第二个框被进度窗口挡住」在架构上**不成立**：并行解压的冲突决策由 `SemaphoreSlim(1,1)` 全局串行（`ZipEngine.Extract` 的 `conflictGate`），同一时刻只可能有一个冲突框；且 Avalonia 模态子窗会把落在 owner 上的点击转发给子窗。
+    - 唯一能让整包「永久冻结」的分支是冲突框里的**「暂停」**：worker 在 `PauseEvent.Wait(CancellationToken)` 无超时阻塞，且**仍持有冲突闸门** ⇒ 其余 worker 全堵在 `WaitAsync`、进度冻结、无新提示、无报错。用户拍板**本轮不改暂停**（保留现状，后续单独讨论）。
+    - 另查出两处真缺陷：`ExtractFlow` / `CompressFlow` 的模态冻结计数没有 `try/finally`（取消 / 异常路径漏 `EndModalFreeze` ⇒ `_modalFreezeCount` 泄漏、计时永久冻结）；`CompressFlow.CreateErrorResolver` 在 UI 线程 `ShowDialog(owner).GetAwaiter().GetResult()` 再套外层 `.Result` ⇒ 真死锁。
+    - 还有一处死循环：`pw == null` 时暂停分支 `continue` 且无延迟 ⇒ 同一对话框无限重弹（看起来像「框关不掉 / 一直闪」）。
+  - **修复**：
+    1. 冻结计数改 `try/finally`：`ExtractFlow.ShowConflictDialogAsync` / `CompressFlow.ShowConflictDialogAsync` 的循环体包进 `try`，`finally` 统一 `EndModalFreeze()`；暂停分支在等待前先显式结算并把局部变量置空，`finally` 不重复扣减。
+    2. `CompressFlow.CreateErrorResolver` 改为 `Dispatcher.UIThread.InvokeAsync(async () => await dlg.ShowDialog(owner))`，只在后台线程 `GetAwaiter().GetResult()`，UI 线程全程 `await`。
+    3. 新增 `CoreLog.ConflictTrace`：写 `%LOCALAPPDATA%\MantisZip\conflict.log`（2 MB 轮转、**不受 `DiagnosticsEnabled` 门控**、RELEASE 也写、复用 `RedactOverride` 脱敏）。插桩点：`ZipEngine.Extract.ResolveConflictWithGateAsync`（`gate-wait` / `gate-acquired waitMs` / `decision result elapsedMs` / `gate-released`）、两条并行路径收尾、`SelectedItemsExtractService` 的 resolver（`resolver-enter` / `resolver-returned` / `resolver-memo`）、`ExtractFlow` / `CompressFlow` 的弹窗前后与暂停等待、`ConflictDialog` / `CompressConflictDialog` 的 `dialog-created` / `dialog-shown`（含 `active` / `bounds` / `owner` / `topmost` / `taskbar`）/ `dialog-result` / `dialog-closing-without-button`。
+    4. `pw == null` 不再 `continue`：解压回退「覆盖」、压缩回退「跳过」（`CompressConflictAction.Cancel` 在压缩侧 = 单项跳过），并记一条 trace。
+  - **测试**：新增 `tests/MantisZip.Tests/Utils/CoreLogConflictTraceTests.cs` 3 例 —— `DiagnosticsEnabled = false` 时仍写入、格式化重载参数替换、`RedactOverride` 生效；日志路径指向临时目录并在 `Dispose` 恢复进程级静态状态。
+  - **验证**：`build -Target avalonia -c Release` 0 警告；`test -Target tests` 全绿（2 条存量警告）；`test -Target ui-tests` 全绿（28 条存量警告）；`i18n` 1314 key 三语一致；`check` / `guards` 通过。
+  - **发布说明**：写入 `RELEASE_NOTES.md` v0.5.3「修复 / Fixes」中英各一条（冲突提示不再可能卡住 + 新增 `conflict.log`）。
+  - **未列入本轮**（已记录，待排期）：暂停加固（置前激活 / 醒目状态行 / 释放闸门 / 有界等待）；4 个主窗口解压入口未传 `options` 导致冲突一律静默覆盖；`applyToAll` / `chosenAction` 写入顺序竞态；取消只抛异常、不 `cts.Cancel()`。
+
+**2026-10-26** — 清理：删除遗留的按钮对齐探针测试（main 的 `ui-tests` 自 2026-10-24 起无法编译）
+  - **问题**：`tests/MantisZip.UI.Avalonia.Tests/ZzProbeButtonAlignTests.cs` 由 main 上的 `e45c3a71`（2026-10-24 23:08「fix Detail Padding And Button」）带入，文件里写的是 xUnit **v2** 的 `using Xunit.Abstractions;` + `ITestOutputHelper`，而测试项目是 xUnit **v3**（`Xunit.Abstractions` 已移除，`ITestOutputHelper` 位于 `Xunit` 命名空间）⇒ `CS0234` / `CS0246`，整个 `tests/MantisZip.UI.Avalonia.Tests` 直接编译不过。该文件只存在于 main，`beta` 侧一直没有它，所以 `beta` 的 `ui-tests` 始终正常；把 beta 合并回 main（`b380dc53`）后跑验证才暴露出来 —— 属于 main 上**既有的**断点，不是合并引入的。
+  - **处理**（用户选 A：删除）：整文件删除。它是纯诊断探针 —— 只有若干 `_out.WriteLine` 打印按钮 / `ContentPresenter` / `TextBlock` 的 `Bounds` 与对齐属性，**没有任何断言**（永远「通过」），而它当年要定位的按钮高度问题已在 `e45c3a71` 修掉（见下方 2026-10-24 那条记录）。
+  - **验证**：删除后 `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` 全绿（28 条存量警告）；`-Task test -Target tests`（Core）全绿；`build -Target avalonia` 0 警告。
+
+**2026-10-26** — 修复：压缩流程不显示「并行度」
+  - **症状**（用户）：「压缩的时候开启并行也不显示『并行度』卡片」。
+  - **根因**：`ProgressViewModel.ParallelDegree` 只有两个写入点 —— 解压流程 `ExtractFlow` → `ProgressWindow.SetParallelDegree`（`Dialogs/ProgressWindow.axaml.cs` 的 `DispatchIfNeeded(() => _vm.ParallelDegree = degree, DispatcherPriority.Background)`），压缩路径从未赋值；`HasParallelDegree => _parallelDegree is >= 2`，于是「完整」档段 2 与「标准」档单行里的并行度恒隐藏（该项在 0.5.2 起就只服务并行解压）。
+  - **修法**：`UpsertParallelBatch`（并行批次上报入口）在记录组数后追加：`if (IsCompressFlow && _channelGroupCount >= 2 && ParallelDegree != _channelGroupCount) ParallelDegree = _channelGroupCount;` —— 压缩的并行度取**实际并行分组数**（`BatchIndex` 最大值 +1，与详细面板「压缩通道 · N 组并行」同一口径；引擎按 CPU 核数决定组数，可能与设置值不同）。用 `IsCompressFlow` 守卫，解压流程的并行度仍由 `ExtractFlow` 显式设置、不被批次上报覆盖。
+  - **测试**：`ProgressViewModelTests` 2 例 —— `CompressFlow_ParallelGroups_SetParallelDegree`（压缩流程先 1 组时 `HasParallelDegree == false`，出现第 3 组后 `ParallelDegree == 3`）；`ExtractFlow_ParallelDegree_IsNotOverwrittenByBatchReports`（解压流程显式设 4，收到 2 个批次上报后仍为 4）。
+  - **验证**：avalonia 构建 0 警告（`-c Release`，Debug 产物被运行中的 exe 占用）；`ui-tests` 全绿；`i18n` 1314 key 三语一致；`guards` 通过。
+
+**2026-10-26** — 改进：进度窗口新增「扫描」统计卡
+  - **需求**（用户）：「扫描阶段 在 「完整」档 里面没有了是吗？要不也加入状态卡片里呢？你觉得跟并行度他们放在一行是否合适？」——核查后确认扫描文案没丢（`ScanCountText`「已发现 N 个文件」在合并后位于百分比行左侧、三档都显示），真正的问题是扫描阶段**所有**统计卡都还没有数据，`StatsCardsPanel` 只剩一块空底色。
+  - **方案（用户拍板）**：① 做成「扫描」卡放卡片行最左（不塞进段 2 的单行指标：那里是总大小 / 速度 / 并行度，与卡片行语义不同，且扫描文案较长）；② 第三行显示**已扫描大小**，由 Core 新增可空字段提供。
+  - **数据源（Core）**：`ArchiveProgress` 新增 `public long? ScannedBytes { get; set; }`（null = 引擎未上报，UI 第三行显示「—」）；`FileScanner.ReportScanProgress` 签名加 `long scannedBytes`，调用处传累计 `totalBytes`，上报体带 `ScannedBytes`——数量与字节同一帧，避免卡片两行不同步。
+  - **UI**：`ProgressViewModel` 新增 `ScanCardLabel`（`Progress_Stats_Scanning`）、`ScanCardCount`（已发现文件数，未上报时为空串）、`ScanCardSize`（`FormatUtil.FormatSize`，无字节时 "—"）、`ShowScanCountInLabelRow => HasScanCount && !IsFullDensity`；`SetProgress` 的 `Scanning` 分支改为块（写 `_scanFoundFiles` / `_scanScannedBytes`，数量不变时 `ScanCountText` 不会变化、故显式通知两个卡属性）；`ApplyPhase` 离开扫描阶段时把两个字段归零（否则下一个档案会先闪旧值）；`OnScanCountTextChanged` 通知三个卡片属性。`ProgressWindow.axaml` 段 1 最左插入「卡 -1 扫描」（🔍 `ThemeProgressFillBrush` + 三行同构：图标+标题 / 已发现文件数 / 已扫描大小走 `DashBrush`，`IsVisible="{Binding HasScanCount}"`，`MinWidth="80"`），标签行 `ScanCountText` 的 `IsVisible` 由 `HasScanCount` 改为 `ShowScanCountInLabelRow`（完整档由卡片承担、不再重复）。
+  - **i18n**：新增 `Progress_Stats_Scanning`（扫描中 / Scanning / 掃描中），1313 → 1314 key，插在 `Progress_Stats_Archive` 之前；三份文件 BOM + CRLF 保持。
+  - **测试**：`tests/MantisZip.Tests/Utils/FileScannerScanProgressTests.cs` 3 例（`ReportScanProgress` 上报 `Phase=Scanning` + `TotalFiles` + `ScannedBytes` 且刷新节流基准；100ms 内第二次调用被节流；`CollectFiles` 累计字节等于文件尺寸之和）——小目录真实扫描常常不足 100ms、拿不到任何扫描帧，故对上报方法用反射做确定性测试；`ProgressViewModelTests` 3 例（数量与字节、未上报字节回落 "—"、少 / 中档走标签行且离开扫描阶段清空）+ 属性名锁例补 `ScanCardLabel` / `ScanCardCount` / `ScanCardSize` / `ShowScanCountInLabelRow`。
+  - **验证**：avalonia 构建 0 警告（Debug 产物被运行中的 exe 占用，改用 `-c Release`）；`tests` / `ui-tests` 全绿；`i18n` 1314 key 三语一致；`check` / `guards` 通过。
+  - **发布说明**：按规则 18 并入 `RELEASE_NOTES.md` v0.5.3「交互」既有「统计卡新增已压缩 / 仅存储」条目（中英各补一句）。
+
+**2026-10-26** — 改进：进度窗口「压缩包 N/M」并入统计卡行
+  - **需求**（用户）：「左下角有个『压缩包 1/1』的独占一行，它应该跟 已处理 那些放在一起」；实测后又追加两点：「状态卡片是三行的，正好是用来显示当前处理数量和总数的，所以你那个显示成 1/1 是不对的」以及「标准和精简里面，这个『压缩包 1/1』和百分比各占一行，两者又一左一右，合并成一行是不是更好？」
+  - **方案（「完整」档）**：做成与既有卡同构的三行卡（📦 压缩包 / **当前序号** / **共 N 个**），放在「已处理」卡左边 —— 行 2 是数量行（与其它卡同构），行 3 在其它卡放文件大小，压缩包无尺寸可报，改放总数。第一版把 "1/1" 挤在行 2、行 3 放破折号，被用户驳回后改为当前数 / 总数分两行。
+  - **方案（「标准」/「精简」档）**：「压缩包 N/M」原在总进度条下方独占一行，百分比又在上方一行右对齐，两行一左一右；现合并为同一行（左计数 / 右百分比），扫描阶段左侧同格位改显示「已发现 N 个文件」（互斥显隐）。`ShowFileCountInLabelRow => !IsFullDensity && !HasScanCount`：完整档由统计卡承担，行内计数隐藏，避免同一信息出现两次。
+  - **去重复**：总体进度标签行左侧原有 `BatchArchiveIndexText`（`Progress_Batch_ArchiveOf` = "{0} / {1}"）与卡片是同一件事，XAML 元素 / VM 属性 / 两处赋值 / `LocalizedStrings` 登记一并删除（JSON key 保留，暂无绑定）。
+  - **实现**：`ProgressViewModel` 新增 `StatsArchiveLabel`、`StatsArchiveCurrent`（`_lastFileCountCurrent`，未上报时为空）、`StatsArchiveTotal`（`Progress_Stats_ArchiveTotal` 带总数）、`HasStatsArchive`（卡片显隐）与 `ShowFileCountInLabelRow`；`UpdateFileCountText(current, total, isBatch)` 一处赋值同时刷新 `FileCountText` 与三个卡片属性（语言切换路径同样复用，避免两条文案不同步）。`ProgressWindow.axaml` 卡 0 的行 2 / 行 3 改绑新属性、`IsVisible` 改绑 `HasStatsArchive`；`FileCountText` / `ScanCountText` 移进总体进度标签行 `Grid` 第 0 列，原独立计数行整块删除。
+  - **i18n**：`Progress_Stats_Archive` 由「压缩包 {0}」改为纯标题「压缩包」/「Archive」/「壓縮包」，新增 `Progress_Stats_ArchiveTotal`（共 {0} 个 / of {0} / 共 {0} 個），1311 → 1313 key，三份文件 BOM + CRLF 保持。
+  - **测试**：`ProgressViewModelTests` 3 例（完整档：`StatsArchiveCurrent == "2"`、`StatsArchiveTotal` 含总数、标签行计数隐藏；少 / 中档：标签行显示 "2/2"、卡片隐藏；首个文件计数上报前 `HasStatsArchive == false` 且两属性为空；扫描阶段隐藏标签行计数）+ 属性名锁例改为锁 `StatsArchiveLabel` / `StatsArchiveCurrent` / `StatsArchiveTotal` / `HasStatsArchive` / `ShowFileCountInLabelRow`（`ProgressWindow` 用 `x:CompileBindings=False`，属性名写错不会构建失败）。
+  - **验证**：avalonia 构建 0 警告（Debug 产物被运行中的 exe 占用，改用 `-c Release` 验证）；`ui-tests` 全绿（28 条存量警告）；`i18n` 1313 key 三语一致；`check` / `guards` 通过。
+  - **发布说明**：按规则 18 并入 `RELEASE_NOTES.md` v0.5.3「交互」既有「统计卡新增已压缩 / 仅存储」条目（中英各补一句）。
+
 **2026-10-24** — 计划：计划库按「面向公开用户 + 少而稳」重排，新增图标归一化与预览取数层两份计划
   - **背景**：`docs/PLAN.md` 沿用 P1–P4 优先级，但四个档位的判据（重要性 / 依赖 / 实施难度）混在一起，且数量的 55 行里有 4 行是已废弃方案、2 行是已完成计划的遗留子项、「进行中」6 条有 3 条实为半途（`preview-modular-providers` 接口零消费者）。用户给出四条约束（面向公开用户 / 跨平台只是「想想」/ 图标不是卖点但用户反馈太丑要折中 / 策略「少而稳」）后按新判据整表重写。
   - **重排结论**：`S 档`（本轮必做，约 38-51h）= 图标归一化 10-14h → 意图-执行接缝波次 1+2 12-14h → 预览取数层内存优先（切片 1+2+4）12-17h → auto-update 4-6h；`A 档`（约 60h，两轮的量）收接缝波次 3、path-breadcrumb、archive-rename-entry（工时按实测重估 6-8h）、预览切片 3（Office）、selfcontained 体积（目标由「20-25MB」改写为现实区间 60-90MB）、winget 与小活清仓 8 项（约 25h）；`B 档` 排队不排期；`冻结`与`候选删除`单列，删除项按用户要求**不归档**、只从表里移走。
@@ -90,12 +179,39 @@
   - **订正落点**：[icon-theme-infra.md](.omo/plans/未开始/icon-theme-infra.md) 22-28h（新增 T0 重普查、T9b `verify-repo.ps1` 第五条图标引用守卫、`IconThemeAssembler` 纯函数装配 + 首帧断言、`MeasureOverride` 尺寸兜底 + 等比缩放、ControlTheme 外置 `IconViewStyles.axaml`）；[icon-theme-packs.md](.omo/plans/未开始/icon-theme-packs.md) 26-34h（新增偏差 D-E：`stroke` → `GeometryDrawing.Pen`，并要求计划 1 的 `Render` 透传 Pen 与 `DrawingGroup.Opacity/Transform/ClipGeometry`；Zip Slip 改「净化后 `GetSafePath` 复核，逃逸即整包拒绝」；UI 不新增 SharpCompress，解 ZIP 用 in-box `ZipFile`；`IconCatalog` 提前到 T2 且同 commit 改 `GUARD_FILES`；启动预算实测）；[icon-theme-sets.md](.omo/plans/未开始/icon-theme-sets.md) 24-34h（G 改运行时烘焙 + 缓存键含主题变体、D 部件数放宽为 ≥1、`mapping.json` 改 `{"icons":{…}}` 包裹、署名须同步 `AboutWindowViewModel` + 三语 key、T5 排在 `IconCatalog` 之后、归一化下沉 Core 并断言逐字符相等、新增 §10 决策记录）。三份计划 DoD 均补规则 18 与守卫项，`docs/PLAN.md` P2①/P2②/P3③ 三行同步。
   - **状态**：📋 计划文档已订正（仍在 `.omo/plans/未开始`）；实施前先跑计划 1 的 T0 重普查，再按「① → ②parser/IconCatalog/守卫 → ③ 与 ② 剩余并行」顺序推进。
 
+**2026-10-24** — 发布说明：v0.5.3 `RELEASE_NOTES.md` 补 3 条条目 + 7 处截图占位，并删除 v0.5.2 节误插入的重复段
+  - **补录范围**（经用户确认，m00266）：A-1「自适应规则编辑 / 删除图标不可见 + 压缩级别名称未本地化」（`2760f245`，2026-10-21）、A-2「视图 → 进度条改称数据条」（`81d86ba2`，2026-10-22）、A-3「压缩设置说明为什么不生效 + Deflate64 分卷前置拦截」（`0fd2e84c`，2026-10-23）。PPTX / PDF 预览翻页按钮改矢量图标（`2d4ebfb1`）经用户定为**不写入**。
+  - **删除重复段**：v0.5.2 节原 103–108 行的「**交互 / Interactions**」+ 菜单快捷键 4 条，是 `cd1d4444`（2026-10-21）误插入已发布章节的内容（与 v0.5.3 节 24–27 行完全重复），已整段删除；顺带补上 v0.5.3「性能 / Performance」小节标题前缺失的空行 —— 否则 markdown 会把该标题当成上一条列表项的续行。
+  - **截图占位**：按 v0.5.2 既有写法先把 7 行 `- ![说明](docs/images/version/v0.5.3/xxx.png)` 写进正文（`SplashScreen` / `ProgressFinalStats` / `ProgressPhaseStatus` / `QuickPathDriveLabels` / `CompressSpeedUpSetting` / `DirectoryBaselineBars` / `ProgressDetailSections`），用户截好图按同名放入目录即可直接显示；该目录当前只有 `.gitkeep` 占位文件。
+  - **文本精简**（2026-10-25，用户要求「能合并的尽量合并，一条一两句话」）：v0.5.3 节 44 组中英条目合并为 20 组 —— 启动画面 3→1（合入图标 / 动态文案 / Win11 圆角）、交互 7→6（终态统计 + 状态行合成「进度窗口」一条、两图并列）、性能 3→1（①②③④）、压缩加速 5→3（自适应规则生效 + 界面收敛 + 默认规则集合成「规则体系收敛」）、修复 12→9（数据条开关 + 目录底色合并、设置页两处合并）；截图行随合并重新归位，用户补的 `DataBarName.png` 挂在「进度条 → 数据条」改名条目下。
+  - **截图补齐**（2026-10-25）：8 张图全部到位并逐一核对引用与文件名一致 —— `SplashScreen` / `ProgressFinalStats` / `ProgressPhaseStatus` / `QuickPathDriveLabels` / `CompressSpeedUpSetting` / `DirectoryBaselineBars` / `ProgressDetailSections` + 用户补的 `DataBarName`；临时占位文件 `.gitkeep` 已由用户删除。
+  - **未做**：构建验证 —— 当前 shell 仍无 `src` / `.git` 写权限（`Access to the path ... is denied`），`dotnet build` 与 `git commit` 需在权限恢复后补；本次改动为纯文档，不涉及代码。
+
+**2026-10-24** — 修复：设置页三个单行文字按钮误用 `ToolbarButton`，高度翻倍且文字顶在上半部
+  - **症状**（用户 m00071）：设置 →「加速」页的「添加自定义格式」，以及「自适应规则」区的「添加规则」「恢复默认」，按钮高度约等于两行文字，但文字只有一行且贴着按钮顶部，下半部整块空白。
+  - **根因**：这三处都写了 `Classes="ToolbarButton"`。该类定义于 `src/MantisZip.UI.Avalonia/App.axaml:155`，是给工具栏「图标 + 文字」两行内容准备的：`Height = ControlHeightLg`（紧凑 / 标准 / 宽松 = 42 / 48 / 54，见 `src/MantisZip.UI.Avalonia/App.Theming.cs:202-204`）+ `Padding="8,2"`，内容按 `StackPanel` 纵向堆叠图标与标签。单个字符串 `Content` 撑不满这个固定高度，于是只占上半部、下半部留白 —— 看上去就是「文字顶端对齐的空胖按钮」。
+  - **修法**：`src/MantisZip.UI.Avalonia/Views/SettingsWindow.axaml` 去掉这三处 `Classes="ToolbarButton"`，改为普通 `Button` + `Padding="12,4"`（与同页「文件关联」的「添加」按钮一致），并按规则 14 补中文注释说明「ToolbarButton 是两行工具栏按钮，单行文字勿用」。
+  - **排查范围**：`SettingsWindow.axaml` 内已无 `Classes="ToolbarButton"`；`Dialogs/ExtractSettingsWindow.axaml:86` 的同类用法是图标 + 文字横排、文字显式 `VerticalAlignment="Center"`，显示正常，不动；`Views/UiTestWindow.axaml:63` 是样式演示窗口，保留。
+  - **验证**：⏳ 待补 —— 当前会话 shell 只有仓库根目录可写（`src` / `tests` / `docs` / `.git` 均 Access denied），`dotnet build` 报 `MSB4018 ... Access to the path ... is denied`，构建验证需在写权限恢复后补跑 `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia`。
+  - **发布说明**：该高度问题自 2026-09-17（`61bc1bab`）起就存在，v0.5.2 用户可见，按规则 18 经用户确认后写入 `RELEASE_NOTES.md` v0.5.3「修复 / Fixes」节（中英各一条）。
+
 **2026-10-24** — 计划：新增「意图-执行接缝收口」设计文档（对话框接缝类缺陷根治，待实施）
   - **背景**：压缩设置窗口 4 个入口（主窗口「新建压缩包」/ 拖入非压缩包 / Explorer 右键 CLI / 测试菜单）弹出后外观一致但行为不同，点「压缩」后静默关窗、无进度无提示。同类缺陷自 `285b586` 起已发生 **7 次**：压缩侧逐属性手抄漏 3 次（多线程/并行度恒 `false`、分卷大小恒 `0`、冲突策略恒「每次询问」）、拖入分支无人接续（修于 `eaebcf60`）、CLI `request == null` 时 `desktop.Shutdown()` 静默退出（修于 `c76c3af9`）、解压 CLI 多包 `FilteredEntryKeys` 恒 `null` 致过滤静默失效、密码库「保存到密码库」仅在主窗口入口生效（右键菜单勾了不保存，仍未修）。两次逐点修复均未拦住下一次。
   - **根因**：窗口对外契约只有 `ShowDialog<bool>` 的一个 bool，执行载荷（路径集合 / 格式 / 压缩级别 / 分卷 / 密码 / 冲突策略 / 过滤条件，以及必须与当前输入同版本的 `CompressPlan`）走公开可变 `ViewModel` 旁路，调用方需按固定顺序搬运 14 段属性；漏搬运、换顺序、覆盖 `CloseAction` 三者均不报错。结论：**只要执行侧参数还需要沿接缝"搬运"一次，就一定会漏**。
   - **方案**（设计文档：`.omo/plans/已完成/intent-execution-seam.md`）：① 设置窗口注入唯一执行器 `ICompressSession`，漏接续从"静默失效"变**编译错误**；② 确认动作返回 `ConfirmOutcome<CompressSettings>`（`Confirmed` / `Rejected(reason)` / `Cancelled`），静默 `return` 变"必须给非空理由"；③ 不可变 DTO 取代属性补读，`AdoptPlan` 的顺序契约消失；④ `IProgressPresenter` 收口压缩/解压两套进度实现；⑤ `CopyExecutionSettingsFrom` 及其两份反射守卫测试**退休**（反射只能事后兜底，漏了第七次 `FilteredEntryKeys`）。
   - **范围与决策**：全仓 68 处 `ShowDialog` / `Show()` 分级清账（A 类设置窗口族 9 入口为核心，B 类静态工厂 DTO 为形态参照），分三波 T1–T18；同步新增 AGENTS.md 规则 19 与 `guards` 第 5 条 `dialog-seam`（4 条源码检查）。三条决策已定：走 **`beta`** 分支、`CompressSettings` **不**与 Core `CompressRequest` 合并、C 类纯提示窗口**仅登记不强制改** API。
   - **状态**：📋 待实施（18-24h），设计提案已同步 GitHub issue [#47](https://github.com/mantis3d/MantisZip/issues/47)。
+
+**2026-10-23** — 新增：统计卡增加「已压缩 / 仅存储」（自适应分类构成）
+  - **需求**（用户）：统计卡一行原本只有「已处理」「总大小」，自适应压缩时看不出多少文件真的被压缩、多少只是存储。
+  - **口径（用户拍板）**：**构成口径**（本次有多少文件需要压缩 / 仅存储），不随进度变化；进度仍由「已处理」卡承担。显示条件：只有引擎真的上报了分类结果才出现（即 ZIP + 自适应）；7z / TAR.GZ / 加密 ZIP / 关闭自适应时两张卡整卡隐藏（规则 6）。布局按用户选择保持**单行**（7 张卡在 800 宽下可容纳，窄窗会横向裁剪，用户已知悉）。
+  - **数据源（Core）**：`ArchiveProgress` 新增 4 个可空字段 `CompressedFiles` / `CompressedBytes` / `StoreOnlyFiles` / `StoreOnlyBytes`（null = 未上报）。① ZIP 多线程路径（`ZipEngine.Compress.cs`）在扫描后完成 `storeGroup` / `compressGroup` 分类，进入 MT 分支时一次性上报两组文件数与输入字节；② ZIP 串行路径逐文件调用 `AdaptiveRuleMatcher.ResolveLevel`，`ReadFileWithRetry` 新增 `out bool storeOnly`（`entryLevel == 0`）回传判定，边跑边累计并在 100ms 节流上报里携带，循环结束后再补一次收尾上报（少量文件可能从未触发节流）——该收尾上报**必须同时带进度字段**，否则 0% 会把已到 100% 的进度条拉回。
+  - **UI**：`ProgressViewModel` 新增 `StatsCompressedText/Label/Count/Size` 与 `StatsStoreOnlyText/Label/Count/Size`（三行同构：图标+标题 / 文件数量 / 文件大小），`ApplyCompositionStats` 统一写入；新增 `IsCompositionOnlyReport` 早返回分支（纯构成上报只刷新统计卡，不参与主进度/速度/ETA）；`BeginPreparing` 调 `ResetCompositionStats` 清空（构成属于「当前档案」）。`ProgressWindow.axaml` 在「已处理」卡后插入「卡 1b 已压缩 🗜」「卡 1c 仅存储 📄」，三行结构与既有卡一致，大小行同样用 `DashBrush`（"—" 灰显）。新增三语 key `Progress_Stats_CompressedFiles` / `Progress_Stats_StoreOnlyFiles`（1309 → 1311；注意 `Progress_Stats_Compressed` 已被「整体压缩汇总」占用，不能复用）。
+  - **测试**：`tests/MantisZip.Tests/Engines/CompressCompositionStatsTests.cs` 2 例（自适应 + 多线程压 2 txt + 3 png → 上报 2/3 且字节之和等于输入总量；关闭自适应 → 完全不上报）；`ProgressViewModelTests` 3 例（两卡显示与数值、非自适应保持隐藏、`BeginPreparing` 复位）。
+  - **验证**：core / avalonia 构建 0 警告；`tests` / `ui-tests` 全绿；`i18n` 1311 key 三语一致；`check` 版本六处一致；`guards` 4/4。
+  - **发布说明**：已按规则 18 经用户确认写入 `RELEASE_NOTES.md` v0.5.3「交互 / Interactions」节（中英各一条）。
+  - **实测返工（同日，用户反馈两处）**：① **「仅存储」卡出现太晚** —— 多线程路径扫描后即上报（探针确认早于第一帧进度），但**串行回落路径**（临时空间不足 / 重复相对路径等）是逐文件累计、要等第一个 100ms 节流才带构成，看起来「存储开始才出现」。改为串行路径**先整体预分类一遍并立刻上报**（与 MT 同口径），并把 `ReadFileWithRetry` 的 `out bool storeOnly` 去掉（预分类后不再逐文件累计）。② **「存储文件」行的底纹不随存储增长** —— 该底纹此前绑 `CurrentFileRatio`（单个文件的进度），而存储拷贝几乎一次读完，底纹只会在 0→100 之间跳。新增 `DetailRowRatio`：写出阶段（`ShowStoreSectionHeader`）用**整个阶段**的字节进度（`BatchProcessedBytes / BatchTotalBytes`，写入 `_storePhaseDoneBytes/_storePhaseTotalBytes`，`ResetChannelSectionState` 归零），其余阶段仍用当前文件进度；XAML 底纹改绑该属性。
+  - **测试（返工后）**：`CompressCompositionTimingTests` 2 例（Theory：多线程 / 串行均断言「构成上报早于第一帧压缩进度」且首帧值已是 2/6）；`ProgressViewModelTests` 再补 2 例（写出阶段 `DetailRowRatio` = 阶段字节进度 0.25 而非单文件 0.05；压缩阶段跟随文件进度）。
 
 **2026-10-23** — 改进：自适应 + 多线程压缩时，「仅存储」文件在合并阶段也上报文件名与进度
   - **症状**（用户实测）：「少量普通文件 + 大量 jpg」开自适应与多线程压缩时，普通文件阶段进度与文件名都正常；进入 jpg 的仅存储阶段后进度条几乎不动、文件名停在最后一个普通文件、统计卡「已处理 N/M」也冻住。

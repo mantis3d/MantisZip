@@ -52,6 +52,9 @@ public static class CompressFlow
             // ArchiveEngine.cs:78），引擎在读文件的后台线程上同步调用，这里无法 await。
             // 因此把「弹窗 + 等用户选择」整段封送回 UI 线程，且只在**调用方后台线程**上同步等待；
             // 弹窗内部已走 await 链（ShowDialog → Completion），UI 线程内不再 sync-over-async。
+            // 注意：UI 线程上必须 await —— 不能写成 dlg.ShowDialog(owner).GetAwaiter().GetResult()，
+            // 那样会在 UI 线程上同步阻塞调度器，模态对话框永远无法显示/关闭（真死锁，历史缺陷）。
+            // 调用方是引擎后台线程，外层 GetAwaiter().GetResult() 只阻塞后台线程，安全。
             var result = Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var dlg = new ErrorDialog(info);
@@ -60,11 +63,15 @@ public static class CompressFlow
                 {
                     // 极端边缘情况：无可用父窗口（非桌面模式），无法弹窗，返回默认中止
                     System.Diagnostics.Debug.WriteLine("ErrorDialog skipped: no owner window available");
+                    CoreLog.ConflictTrace("error-dialog-skipped no-owner file='{0}'", info.FilePath);
                     return new ErrorDialogOutcome(FileErrorAction.Abort, ApplyToAll: false);
                 }
-
+                CoreLog.ConflictTrace("error-dialog-open file='{0}'", info.FilePath);
                 await dlg.ShowDialog(owner);
-                return await dlg.Completion;
+                var outcome = await dlg.Completion;
+                CoreLog.ConflictTrace("error-dialog-returned action={0} applyAll={1} file='{2}'",
+                    outcome.Action, outcome.ApplyToAll, info.FilePath);
+                return outcome;
             }).GetAwaiter().GetResult();
 
             if (result.ApplyToAll)
@@ -192,12 +199,17 @@ public static class CompressFlow
         // 循环重入：暂停后恢复时重新弹窗（对齐 WPF AppPartials/App.Compress.cs CompressConflictResolver）
         while (true)
         {
-            // 冲突弹窗是模态等待：期间已用时间冻结（每次重入都配对 Begin/End，防计数泄漏）
+            // 冲突弹窗是模态等待：期间已用时间冻结。
+            // 每个出口（正常返回 / 取消抛异常 / 无进度窗口时降级返回 / 恢复后 continue）都显式结算
+            // EndModalFreeze，否则 _modalFreezeCount 泄漏会让已用时间永久停走。
             var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
             pw?.BeginModalFreeze();
-
             // 确认即载荷：对话框关闭时一次性交出完整决策（按钮 + 自定义名 + 应用到全部 + 暂停/取消整轮），
             // 这里只做「载荷 → Core 动作」映射，不再逐字段回读窗口属性（漏读一项就静默失效）。
+            // 诊断（conflict.log，RELEASE 也写）：弹窗开始 / 返回，便于用户报「点了没反应」时定位卡在哪一步。
+            CoreLog.ConflictTrace("compress-dialog-open owner={0} pwVisible={1} file='{2}'",
+                owner.GetType().Name, pw != null, info.OutputPath);
+
             var outcome = await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var dlg = new CompressConflictDialog(info.OutputPath, info.SuggestedName, info.CanAdd);
@@ -207,6 +219,9 @@ public static class CompressFlow
                 await dlg.ShowDialog(dialogOwner);
                 return await dlg.Completion;
             });
+
+            CoreLog.ConflictTrace("compress-dialog-returned action={0} paused={1} cancelled={2} applyAll={3} file='{4}'",
+                outcome.Action, outcome.IsPaused, outcome.IsCancelled, outcome.ApplyToAll, info.OutputPath);
 
             // "取消操作"按钮：终止整个压缩（对齐解压侧 Ask 弹窗"取消整个操作"抛
             // OperationCanceledException 的语义；Core 收到后取消剩余任务）
@@ -219,13 +234,21 @@ public static class CompressFlow
             // 暂停：收起对话框，进入进度窗口暂停态，恢复后重新弹窗处理同一个冲突
             if (outcome.IsPaused)
             {
-                if (pw != null)
+                if (pw == null)
                 {
-                    await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
-                    // IsPaused 已为 true → 解除模态冻结后由暂停态无缝接续冻结
-                    pw.EndModalFreeze();
-                    await ProgressPauseGate.WaitForResumeAsync(pw);
+                    // 无进度窗口可暂停：不能 continue（否则无延迟无限重弹同一对话框，表现为卡死）。
+                    // 按「跳过该文件」继续（Cancel 在 Core 压缩侧 = 单项跳过，非终止压缩）。
+                    CoreLog.ConflictTrace("compress-pause-without-progress-window -> fallback cancel(skip) file='{0}'",
+                        info.OutputPath);
+                    return (MantisZip.Core.Abstractions.CompressConflictAction.Cancel, null, false);
                 }
+
+                await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
+                // IsPaused 已为 true → 解除模态冻结后由暂停态无缝接续冻结
+                pw.EndModalFreeze();
+                CoreLog.ConflictTrace("compress-pause-wait-begin file='{0}'", info.OutputPath);
+                await ProgressPauseGate.WaitForResumeAsync(pw);
+                CoreLog.ConflictTrace("compress-pause-wait-exit file='{0}'", info.OutputPath);
                 continue; // 恢复后重新弹窗
             }
 

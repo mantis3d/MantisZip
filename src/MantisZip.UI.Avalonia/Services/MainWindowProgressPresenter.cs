@@ -1,7 +1,6 @@
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
 using MantisZip.UI.Avalonia.Dialogs;
-using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Services;
@@ -72,10 +71,11 @@ public sealed class MainWindowProgressPresenter : IProgressPresenter
                 ProgressViewModel.CreateBackgroundProgress(window, p => window.SetProgress(p)));
             await request.Operation(progress, window.CancellationToken);
 
-            // 成功：先给首行收尾，再交给调用方的完成回调（测试流结果通道 / 删除后刷新），
-            // 没有回调时写默认完成文案；随后统一尊重 📌 的自动关闭倒计时。
+            // 成功：整批逐行收尾（只给第 0 行收尾会让多包批处理里其余行停在最后一次上报的
+            // 百分比并残留包名/底纹，看起来像「批次完成没有更新界面」），再交给调用方的完成回调
+            // （测试流结果通道 / 删除后刷新）；没有回调时写默认完成文案；随后统一尊重 📌 的自动关闭倒计时。
             if (hasFileList)
-                window.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
+                window.FinalizeBatch();
             if (request.OnCompleted is not null)
                 request.OnCompleted(window);
             else
@@ -95,8 +95,8 @@ public sealed class MainWindowProgressPresenter : IProgressPresenter
             // 与旧 RunWithProgress 的呈现逐字对齐（行 Failed 会自动压钉等手动关闭）。
             var message = LocalizationManager.T("Status_PasswordCancelled");
             window.SetStatusMessage(message);
-            if (hasFileList)
-                window.UpdateBatchItemStatus(0, BatchItemStatus.Failed, message);
+            // 当前批次行（不是硬编码第 0 行）置 Failed：失败行自动压钉等手动关闭
+            window.FailCurrentBatchItem(message);
             _statusMessageSink?.Invoke(message);
             await window.AutoCloseOrWaitAsync(() => window.Close());
             return false;
@@ -108,8 +108,8 @@ public sealed class MainWindowProgressPresenter : IProgressPresenter
             var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(ex);
             window.SetErrorSummary(wholeErrorText, wholeErrorDetail);
             App.DebugLog($"[ProgressPresenter] operation failed: {ex}");
-            if (hasFileList)
-                window.UpdateBatchItemStatus(0, BatchItemStatus.Failed);
+            // 当前批次行置 Failed（自动压钉）：整包失败时用户能看出是哪一行没跑完
+            window.FailCurrentBatchItem();
             await window.AutoCloseOrWaitAsync(() => window.Close());
             throw;
         }

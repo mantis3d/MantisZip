@@ -145,9 +145,16 @@ public sealed class SelectedItemsExtractService
             ConflictResolverAsync = async info =>
             {
                 if (applyToAll && chosenAction.HasValue)
+                {
+                    // 诊断（conflict.log）：命中「应用到全部」记忆，本次不弹窗
+                    CoreLog.ConflictTrace("resolver-memo action={0} file='{1}'", chosenAction.Value, info.FilePath);
                     return chosenAction.Value;
+                }
 
+                CoreLog.ConflictTrace("resolver-enter file='{0}'", info.FilePath);
                 var (resultAction, applyAll) = await conflictDialog(info);
+                CoreLog.ConflictTrace("resolver-returned action={0} applyAll={1} file='{2}'",
+                    resultAction, applyAll, info.FilePath);
 
                 if (applyAll)
                 {

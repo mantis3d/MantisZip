@@ -71,6 +71,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Progress window** — the timer freezes at the final duration, live speed gives way to the average, and the archive count ("n of m" when a batch has failures), average speed and compressed size join the info area; the status line follows the engine phase (scan / read / compress / extract / finalize / verify), with a scrolling bar and "N files found" while scanning
 - ![进度窗口完成后的终态统计（冻结耗时 + 平均速度 + 压缩包数量）](docs/images/version/v0.5.3/ProgressFinalStats.png)
 - ![进度窗口状态行按阶段显示（扫描阶段显示已发现文件数）](docs/images/version/v0.5.3/ProgressPhaseStatus.png)
+- **进度窗口统计卡新增「已压缩 / 仅存储」** — 开启自适应压缩时，此前只能看到「已处理 / 总大小」，看不出多少文件真的被压缩、多少只是按原样存储；现在多出两张卡，分别显示这次有多少文件需要压缩、多少是仅存储，各带文件数量与文件大小合计（按扫描后的分类结果统计，不随进度变化；未开启自适应或 7z / TAR.GZ 等不做分类的格式不会出现这两张卡）；「压缩包 N/M」也并入统计卡行 ——「完整」档显示为一张「压缩包」卡（当前序号 / 共 N 个），「标准」和「精简」档则与百分比合并到同一行（此前该计数与百分比一左一右各占一行）；扫描阶段新增一张「扫描」卡，显示已发现文件数与已扫描大小（此前扫描时整排卡片都是空的，只剩一块底色）；压缩时也会显示「并行度」，按实际并行分组数计（此前该值只有解压流程会填，压缩开了多线程也看不到）
+- **Progress window stats now split compressed vs stored-as-is** — with adaptive compression on, the stats area used to show only "processed / total size", hiding how many files were actually compressed and how many were merely stored; two new cards now report the count and total size of each group (based on the classification result after scanning, so they do not change with progress; they stay hidden when adaptive compression is off or for formats that do not classify, such as 7z / TAR.GZ); the "archive n of m" counter joins the stat cards as well — in the detailed layout it becomes an "archive" card (current index over the total), while the standard and compact layouts merge it onto the same line as the percentage (previously the counter and the percentage each had a line of their own); a "scanning" card now reports the files found so far and their total size while the archive is still being scanned (that card row used to be blank at this stage); the parallel-degree readout now also appears for compression, based on the actual number of parallel groups (previously only the extraction flow filled it in, so enabling multithreaded compression showed no degree at all)
 - **繁体中文「分卷大小」术语修正** — 「分磁碟區大小」把压缩包分卷误译成磁盘区，改为繁中常用的「分割檔大小 / 不分割」
 - **Traditional Chinese split-size wording** — "磁碟區" (disk volume) is now "分割檔大小 / 不分割", matching common Taiwan usage
 - **「视图 → 进度条」改称「数据条」** — 该开关画的是按大小 / 压缩后大小生成的条形，旧名容易被当成操作进度；仅改名，功能与已保存的开关状态不变
@@ -110,6 +112,8 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **7z 包删除不存在的条目不再白跑一遍** — 在 7z 压缩包里删除一个不存在的条目时，此前会把整个包解压到临时目录再原样重新打包（大包上白等几十秒到几分钟，还有条目属性与时间戳丢失的风险）；现在在动手之前就报错
 - **Deleting a missing entry from a 7z archive no longer rewrites the whole archive** — it used to extract the entire archive to a temp folder and repack it unchanged (tens of seconds to minutes on large archives, with a risk of losing entry attributes and timestamps); it now fails fast before doing any work
 
+- **右键「原地解压 / 解压到目录」不再报 7z.dll 无法加载**（#52）— 指定过 7z.dll 路径、或安装目录与默认探测位置不同时，这两个入口会弹「Can not load 7-zip library … can not change the library path while the library "…\x64\7z.dll" is being used.」，而「智能原地解压」却正常；现在启动时就把 7z.dll 路径交给解压库，库已被占用时静默沿用已加载的库（仅在 `debug.log` 留一行记录），三个入口均可正常解压
+- **Right-click "Extract here / Extract to folder" no longer fails to load 7z.dll** (#52) — with a configured 7z.dll path, or when the install directory differs from the default probe location, these two entries raised "Can not load 7-zip library … can not change the library path while the library … is being used" while "Smart extract here" worked; the path is now handed to the extraction library at startup and an already-loaded library is reused silently (logged once in `debug.log`), so all three entries extract normally
 - **压缩对话框的执行设置现在真正生效** — 选「自动重命名 / 覆盖 / 跳过」后不再重复追问，密码库选项与规则也不再关窗后丢失；自动重命名时进度窗口的包名与最终文件一致
 - **Compress dialog settings now really apply** — "Auto-rename / Overwrite / Skip" is no longer asked twice, password-library options and rules survive the dialog, and the progress window shows the actual renamed archive
 - **Deflate64 关闭多线程时失败** — 此前必然报「Invalid compression method: Deflate64」，现自动改走 7z 写入；所有文件本就无需压缩时直接以「存储」写出
@@ -130,6 +134,10 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Archive root node icon in the tree** — the top node now shows the archive icon (matching the preview tree) while subdirectories keep the folder icon
 - **设置页两处显示问题** — 「添加自定义格式」「添加规则」「恢复默认」误用工具栏按钮样式，单行文字顶在上半部，已改回普通按钮；自适应规则的编辑 / 删除按钮此前是渲染不出的字符图标（空白方块），已换成矢量图标，硬编码中文的压缩级别名称也已三语本地化
 - **Two display issues in Settings** — "Add custom format", "Add rule" and "Restore defaults" mistakenly used the toolbar button style (tall, text stuck at the top) and are ordinary buttons now; the adaptive-rule edit / delete buttons were glyphs the font cannot render (blank squares) and are now vector icons, with the hard-coded Chinese level names localized in all three languages
+- **冲突提示不再可能把解压 / 压缩卡住** — 取消或异常关闭冲突框后，进度窗口的计时不会再永久停走；压缩时「文件无法打开」的错误弹窗不再因 UI 线程互相等待而死锁；找不到进度窗口时不再无延迟重复弹出同一个冲突框（解压按覆盖、压缩按跳过继续）。同时新增 `conflict.log` 诊断日志（默认开启、路径已脱敏），万一再遇到卡死可直接看出是卡在冲突闸门、弹窗还是等待暂停
+- **进度窗口完成后不再「看起来没跑完」** — 多线程压缩的并行通道行**每组跑完就各自收尾**（不必等整包结束）：到 100%、底纹铺满、左区把文件名换成「通道已完成」；压缩包列表也不再只收尾第一行，整批逐行置完成，失败时标在真正出错的那一行。顺带修掉引擎每包结束时 0% 收尾帧把行百分比短暂拉回 0 的抖动
+- **Finished runs no longer look unfinished** — the per-channel rows of a multithreaded compression now finish **as soon as their own group is done** rather than all at once at the end: each reaches 100%, fills its bar and replaces the file name with "Channel done". The archive list now completes every row instead of only the first one, and marks the row that actually failed. Also fixes a flicker where the engine's trailing 0% frames briefly pulled a row's percentage back to zero
+- **Conflict prompts can no longer hang a run** — cancelling or erroring out of a conflict dialog no longer leaves the progress timer frozen; the compress-side "file could not be opened" dialog no longer deadlocks by waiting on the UI thread; and when no progress window is available the same dialog is no longer re-shown in a tight loop (extraction continues with overwrite, compression with skip). A new `conflict.log` diagnostic (on by default, paths redacted) makes any future hang immediately attributable to the conflict gate, the dialog or the pause wait
 
 ## v0.5.2
 
@@ -147,12 +155,6 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 - 音频预览新增 **MP3 / FLAC 内嵌封面显示** — 直接读取 ID3 标签（MP3）与 PICTURE 块（FLAC）中的内嵌封面图并居中展示；无封面时回退显示标题/艺术家大字
 - Added **embedded cover art display for MP3 / FLAC audio preview** — reads the embedded cover image from the ID3 tag (MP3) and the PICTURE block (FLAC) and shows it centered; falls back to a large title/artist text when no cover is present
 
-**交互 / Interactions**
-
-- **菜单快捷键真正生效** — 此前菜单上标注的快捷键（Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5）**只显示文字、按下无反应**（Avalonia 的 `MenuItem.InputGesture` 仅负责显示，不处理按键）；现已全部注册为全局快捷键
-- **Menu shortcuts now actually work** — the shortcuts shown in the menus (Ctrl+O / Ctrl+N / Ctrl+W / Ctrl+E / F5) previously only *displayed* their key text and did nothing when pressed (in Avalonia, `MenuItem.InputGesture` is display-only); they are now registered as real global shortcuts
-- **新增常用快捷键** — Ctrl+Shift+L（打开压缩包所在目录）、Ctrl+Shift+E（原地解压）、Ctrl+Shift+T（解压到同名文件夹）、Ctrl+T（测试压缩包完整性）、Ctrl+Shift+A（向压缩包添加文件）、Ctrl+P（显示/隐藏预览面板）、Ctrl+Shift+V（切换文件列表视图）、Ctrl+Shift+I（显示/隐藏信息面板）、Ctrl+Shift+C（复制条目完整路径）、Ctrl+,（设置）
-- **New common shortcuts** — Ctrl+Shift+L (open archive location), Ctrl+Shift+E (extract here), Ctrl+Shift+T (extract to folder of the same name), Ctrl+T (test archive integrity), Ctrl+Shift+A (add files to archive), Ctrl+P (toggle preview panel), Ctrl+Shift+V (cycle file list view), Ctrl+Shift+I (toggle info panel), Ctrl+Shift+C (copy full path of the selected entry), Ctrl+, (settings)
 **性能 / Performance**
 
 - **自适应压缩体系** — 压缩对话框与设置新增「加速」选项卡，压缩策略收敛为两个独立开关：**多线程压缩**（可压缩文件走 7z 多线程并发压缩；ZIP 场景由 N 组并行管线承接）与**自适应压缩**（已压缩内容自动转为仅存储、不再重复压缩，仅存储作用范围的格式列表可自定义维护）；两个开关可任意组合独立生效

@@ -71,6 +71,11 @@ public static class WholeArchiveErrorLocalizer
             case SharpSevenZipArchiveException:
                 return (LocalizationManager.T("Error_Whole_CorruptedOrPassword"), ex.Message);
 
+            // SharpSevenZip 库加载失败（找不到 7z.dll，或库已被别的路径加载而无法切换）→ 明确指向
+            // 7z.dll，避免把英文 "Can not load 7-zip library or internal COM error!" 直接抛给用户
+            case SharpSevenZipLibraryException:
+                return (LocalizationManager.T("Error_Whole_SevenZipLibrary"), ex.Message);
+
             // Core 对「加密包无密码」抛 InvalidOperationException（消息含「加密」/encrypted）：
             // 映射到干净本地化文案。不改 Core 消息本身——其为中英双语且被密码分类启发式
             // （PasswordService.ClassifyGenericException 查 "password"/"encrypted"）依赖。

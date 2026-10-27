@@ -64,4 +64,13 @@ public partial class ParallelBatchProgressItem : ObservableObject
     /// <summary>右区：ToolTip 文本（VM 拼好，\n 分隔；null = 无 ToolTip）。</summary>
     [ObservableProperty]
     private string? _tooltipText;
+
+    /// <summary>
+    /// 该组最近一次上报的「已处理文件数」（收尾时重建 <see cref="PctDetailText"/> 用；-1 = 从未上报）。
+    /// 只由 VM 读写，不参与绑定，故用普通属性。
+    /// </summary>
+    public long ProcessedFiles { get; set; } = -1;
+
+    /// <summary>该组最近一次上报的「总文件数」（-1 = 从未上报）。</summary>
+    public long TotalFiles { get; set; } = -1;
 }
