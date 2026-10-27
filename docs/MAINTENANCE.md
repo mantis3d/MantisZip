@@ -185,3 +185,4 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) | CI 门禁 |
 | [.editorconfig](../.editorconfig) / [.gitattributes](../.gitattributes) / [Directory.Build.props](../Directory.Build.props) | 风格基线 / 行尾 / NuGet 审计 |
 | [progress-avalonia-detail.md](progress-avalonia-detail.md) | 逐日变更与当时的排障记录（找「为什么」的第二落点） |
+| [KNOWN_ISSUES.md](KNOWN_ISSUES.md) | 已知未修问题登记簿（规则 21）：等上游 / 等计划 / 缺决策的条目与复评条件；发版前扫一遍 |

@@ -382,6 +382,15 @@ switch (await ViewModel.TryConfirmAsync())
 - **进度呈现只经 `IProgressPresenter`**：进度窗口生命周期（建窗 → 配置 → 显示 → 收尾 → 自动关闭）只在 presenter 实现里写一次，`Task<bool> RunAsync(ProgressRunRequest)` 是唯一入口（`true` = 跑完、`false` = 用户取消）。契约里**不许**出现「是否压缩」「是否 CLI」这类分支：宿主差异用 `ExitPolicy` / `DisplayPaths` / `Owner` / `ConfigureWindow` / `OnCompleted` 表达。presenter 里**不许**弹 `AppMessageBox`、**不许**自造用户文案（标题、说明行、完成文案都由调用方给出且已本地化）。
 - **守卫**：`pwsh -File scripts\verify-repo.ps1 -Task guards` 的 `dialog-seam` 检查四类 —— ① `new (Compress|Extract)SettingsWindow(` 的文件与处数必须与脚本里的登记表一致（**双向**：未登记即失败，登记了却找不到也失败）；② 非注释行出现 `CloseAction` / `DialogResult` 双轨回传**命中即失败**；③ `new (Compress|Extract)Request` 只允许出现在 `Services/` 与 CLI 直通路径（`App.CliCompress.cs` / `App.CliExtract.cs`）；④ 设置窗口构造函数必须含 session 形参（`ICompressSession` / `IExtractSession`）。**违规时先改设计，不要改守卫**；确需改守卫，必须同时更新 `docs/MAINTENANCE.md` 与本节。
 
+### 规则 21：发现「这次不修」的问题必须登记到 `docs/KNOWN_ISSUES.md`
+
+发现一个已知问题但本次决定不修（等上游修复、等某个计划完成、缺决策、成本超阈值、本机无法复现），**必须**当天在 [docs/KNOWN_ISSUES.md](docs/KNOWN_ISSUES.md) 立一条 `KI-nnn`。只在对话里说一句等于没记 —— 三个月后没人知道它存在、更没人知道为什么没修。
+
+- **登记三要素**（缺一条就别登）：现象 + 证据（CI run 号 / 异常栈 / `文件:行`）、阻塞类型（等上游 / 等计划 / 缺决策 / 成本超阈值 / 无法复现，五选一）、**可判定**的复评条件（「等 Avalonia 发布含 #22021 修复的版本」，不是「以后再优化」）
+- **修掉必须回填**：状态改 `已修`、写 commit、把条目移入文末「档案区」。**不要删行** —— 下次撞到同一个栈，要靠它判断「上次怎么处理的、为什么决定不动」
+- **计划完成时扫一遍**：凡是阻塞类型为「等计划 X」的条目，X 完成当天一并复评（与规则 1 的计划归档同一个动作里做）
+- **边界**：说得清「做什么、多大、值不值得」的属于计划 → `docs/PLAN.md` / `.omo/plans/`，不进登记簿；用户能感知的限制由发版时从登记簿翻译进 `README.md` 的「已知问题」，**README 只做出出口，不做台账**
+
 ## 未来工作
 
 见 [docs/PLAN.md](docs/PLAN.md) 和 `.omo/plans/` 下的设计文档。

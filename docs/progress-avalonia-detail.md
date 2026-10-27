@@ -2901,6 +2901,13 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.4 (2026-10-27) 新增「已知未修问题登记簿」`docs/KNOWN_ISSUES.md`（AGENTS.md 规则 21）
+  - **动机**：这批 CI 排查里冒出好几条「已经查清、但这次不修」的问题——Avalonia 无头竞态在等上游 `#22021`、Core 测试本地跑不了、24 项 SkiaSharp 过时 API、29 条 7z 用例被过滤器吞掉。它们既不是计划（说不出方案与工时，也未必该做），又不能只在对话里说一句就算完——三个月后没人知道它存在，更没人知道当初为什么决定不动。
+  - **新增 `docs/KNOWN_ISSUES.md`**：三条硬纪律（发现当天登记 / 修掉必须回填 commit 并移入文末档案区、**不删行** / 计划完成时扫一遍「等计划 X」条目）+ 登记三要素（现象与证据 / 阻塞类型五选一：等上游·等计划·缺决策·成本超阈值·无法复现 / **可判定**的复评条件）。种子条目 5 条：KI-001 Avalonia 无头跨线程竞态（等上游）、KI-002 Core 测试本地跑不了且 `-Task test -Target tests` 假绿（实测：`✅ 测试通过：tests（0.4s）` 而实际 0 条用例）、KI-003 SkiaSharp CS0618、KI-004 `PreviewWebViewLazyInitTests` 固定临时目录、KI-005 7z 用例被 `--filter` 永久过滤。
+  - **边界（避免变成第二个 PLAN.md）**：说得出「做什么、多大、值不值得」的属于计划 → `docs/PLAN.md` / `.omo/plans/`；用户可感知的限制由发版时翻译进 `README.md` 的「已知问题」，README 只做出出口不做台账；`docs/MAINTENANCE.md` §9 的「有意留白」保持原样。
+  - **入口**：`AGENTS.md` 新增规则 21（现有 0–20，挂在规则 20 之后）；`docs/PLAN.md` 的「补充约定」加一行指过去；`docs/MAINTENANCE.md` §10 相关文件表加一行。
+  - **状态**：✅ 已完成（纯文档/流程，无产品代码改动）。
+
 #### v0.5.4 (2026-10-27) 文档：CI 失败判定流程沉淀进 `docs/MAINTENANCE.md` §5.1
   - **动机**：这回定位 run #231 的成本几乎全花在「怎么把失败用例名拿到手」上——作业页详情与 annotations 只有构建告警、没有用例名，必须走 `gh run view --log-failed`；而 gh 未登录、GCM 里的 PAT 要用 `git credential-manager get`（且**必须带 username**，`git credential fill` 不带时返回空）才取得到、下载日志还会因 run-log 缓存目录被拒而失败。这些一次性摸索下次不该重来。
   - **新增 `docs/MAINTENANCE.md` §5.1「CI 红了怎么判」**：① 取 PAT + `$env:LocalAppData` 重定向 + `--log-failed` 的命令配方与日志前缀剥离方法；② 两类已见失败的判据表——A 用例顺序依赖（GBK 已收口到 `ZipEngine` 静态构造器，给出「新增走 `GetEncoding("gbk"/936)` 的 Core 路径必须自己注册」的防复发口径）、B Avalonia 无头竞态（`[Test Case Cleanup Failure]` + `The calling thread cannot access this object`，处置是 `gh run rerun <id> --failed`，**不要顺着随机受害用例名改被测代码**）；③ 重跑判定（还红在同一处才算回归）、一次红挂多条可能是连带污染、频率基线约 5 次 1 次与升级路径（等上游 `#22021` 补丁 / 评审 `AvaloniaTestIsolationLevel.PerAssembly`）；④ 新增 UI 测试不得扩大竞态窗口（`Task.Run` / `async void` / `DispatcherTimer` / `ConfigureAwait(false)` / 后台线程碰 `Dispatcher.UIThread`）；⑤ `main` / `alpha` 均无分支保护（无 required status checks）⇒ 红 CI 拦不住 push 与打 tag，发版前必须人工确认目标 commit 真绿。
