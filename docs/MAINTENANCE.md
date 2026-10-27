@@ -115,12 +115,13 @@ Get-Content .buildout\logs\ci.log | Select-String '  Failed MantisZip|Test Run F
 > 顺带（本沙箱专属，非仓库问题）：`git push` 会因 GCM 的 prompt 脚本起 `sh.exe` 失败而崩成 `couldn't create signal pipe, Win32 error 5` → `fatal: could not read Username for 'https://github.com'`。绕过写法：取到 PAT 后用一次性 header 推 ——
 > `git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic <base64('x-access-token:'+PAT)>" push origin <branch>`（base64 由 `[Convert]::ToBase64String` 现算，PAT 不落盘、不写进仓库配置）。
 
-已知两类失败，判据不同，处置也不同：
+已知三类失败，判据不同，处置也不同：
 
 | 类型 | 判据 | 处置 |
 |------|------|------|
 | **A. 用例顺序依赖（已根治，防复发）** | 断言失败，`Actual` 里出现 `'gbk' is not a supported encoding name` | 结构上已不可能复发：`ZipEngine` 静态构造器自注册 GBK（`src/MantisZip.Core/Engines/ZipEngine.Open.cs` 类顶部）+ 两个测试程序集各一个 `TestAssemblySetup.cs`（`[ModuleInitializer]`）。**新增任何走 `Encoding.GetEncoding("gbk"/936)` 的 Core 路径，要么复用已注册的类，要么在该类静态构造器里注册**，不要再依赖「谁先跑谁注册」 |
 | **B. Avalonia 无头测试竞态（上游缺陷，决定「不动」）** | `[Test Case Cleanup Failure]` + `InvalidOperationException: The calling thread cannot access this object`，栈在 `AvaloniaHeadlessPlatform.Initialize → AppBuilder.SetupUnsafe → HeadlessUnitTestSession.EnsureIsolatedApplication` | **重跑**：`gh run rerun <run-id> --failed`（不要用空提交触发重跑，会污染提交历史）。受害用例是随机的（2026-10-26 挑中 `ResultTreeViewFilterTests.TogglingCompactMode_KeepsFilterApplied`），别顺着用例名去改被测代码 |
+| **C. 取消类用例靠墙钟竞速（已根治，防复发）** | 断言失败，`Assert.ThrowsAny() Failure: No exception was thrown`，且被测用例里用 `CancelAfter(<毫秒>)` 或 `Thread.Sleep` 来制造「取消 / 超时」 | 已改成事件驱动（`tests/MantisZip.Tests/Engines/ParallelExtractTests.cs`：等首个条目 `Completed` 再取消，另加一条「token 预先 Cancel」兜底）。**新增取消类用例不要用 `CancelAfter` / `Sleep` 抢时间窗**：Windows 定时器精度约 15 ms，快机器上任务可能先跑完再收到取消请求；触发点必须由被测代码的执行进度决定 |
 
 - B 的上游：`AvaloniaUI/Avalonia#22021`（session 重建期 `s_uiThread` 认领竞态，仍 open）、`#21467`（testhost 死锁）。本仓库 `tests/MantisZip.UI.Avalonia.Tests/TestParallelization.cs` 已有 `DisableTestParallelization = true` 仍会触发，测试内也无自有后台线程 —— 属 session 重建内部竞态。
 - **重跑后还红在同一处**（尤其是断言失败）→ 才当回归查。

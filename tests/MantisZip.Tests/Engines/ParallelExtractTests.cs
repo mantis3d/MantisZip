@@ -48,6 +48,27 @@ public class ParallelExtractTests : IDisposable
         public List<ArchiveProgress> Items => _items.ToList();
     }
 
+    /// <summary>
+    /// 进度驱动取消器：收到第一条 <see cref="ArchiveEntryStatus.Completed"/> 就取消。
+    /// 由解压工作线程同步调用（不走 <c>System.Progress&lt;T&gt;</c> 的异步派发），
+    /// 因此取消请求必然落在解压进行中，不依赖任何时间窗口。
+    /// </summary>
+    private sealed class CancelOnFirstCompletedProgress : IProgress<ArchiveProgress>
+    {
+        private readonly CancellationTokenSource _cts;
+        private int _cancelRequested;
+
+        public CancelOnFirstCompletedProgress(CancellationTokenSource cts) => _cts = cts;
+
+        public void Report(ArchiveProgress value)
+        {
+            if (value.EntryStatus != ArchiveEntryStatus.Completed) return;
+            // 并行解压会从多个工作线程并发 Report，Interlocked 保证只取消一次
+            if (Interlocked.Exchange(ref _cancelRequested, 1) != 0) return;
+            _cts.Cancel();
+        }
+    }
+
     [Fact]
     public async Task ExtractAsync_ParallelMode_ProducesSameResultAsSequential()
     {
@@ -88,6 +109,14 @@ public class ParallelExtractTests : IDisposable
         }
     }
 
+    /// <summary>
+    /// 取消必须真的打断解压过程——用「首个条目完成」这个真实事件触发取消，而不是 <c>CancelAfter</c> 的墙钟竞速。
+    /// <para>
+    /// 反面教材（2026-10-27 CI run 40440152537 假红）：原先用 <c>cts.CancelAfter(1)</c>，而 Windows 定时器精度约 15 ms，
+    /// 50 个小文件在快机器上可能先解压完再收到取消请求，引擎于是正常返回，用例报「No exception was thrown」。
+    /// 取消点必须由被测代码的执行进度决定，不能由墙钟决定。
+    /// </para>
+    /// </summary>
     [Fact]
     public async Task ExtractAsync_ParallelWithCancellation_ThrowsOperationCanceled()
     {
@@ -95,14 +124,34 @@ public class ParallelExtractTests : IDisposable
         var destDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
         Directory.CreateDirectory(destDir);
 
-        var cts = new CancellationTokenSource();
-        cts.CancelAfter(1); // 极短时间后取消
+        using var cts = new CancellationTokenSource();
+        // 首个条目写完就取消：此刻剩余条目尚未处理，引擎下一轮取消检查必然命中
+        var cancelOnFirstCompleted = new CancelOnFirstCompletedProgress(cts);
 
         var options = new ArchiveOptions { ParallelExtractDegree = 4 };
 
-        // TaskCanceledException 继承自 OperationCanceledException，用 IsAssignableFrom 验证
+        // TaskCanceledException 继承自 OperationCanceledException，用 ThrowsAny 验证
         await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
-            _engine.ExtractAsync(archive, destDir, options: options, cancellationToken: cts.Token));
+            _engine.ExtractAsync(archive, destDir, progress: cancelOnFirstCompleted, cancellationToken: cts.Token, options: options));
+    }
+
+    /// <summary>
+    /// 入口即取消：解压循环第一轮就必须命中取消检查，该用例零时序依赖，是上一条的确定性兜底。
+    /// </summary>
+    [Fact]
+    public async Task ExtractAsync_PreCancelledToken_ThrowsOperationCanceled()
+    {
+        var archive = TrackFile(ArchiveFixtures.CreateMultiFileZipArchive(5));
+        var destDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString("N")));
+        Directory.CreateDirectory(destDir);
+
+        using var cts = new CancellationTokenSource();
+        cts.Cancel();
+
+        var options = new ArchiveOptions { ParallelExtractDegree = 4 };
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            _engine.ExtractAsync(archive, destDir, cancellationToken: cts.Token, options: options));
     }
 
     [Fact]
