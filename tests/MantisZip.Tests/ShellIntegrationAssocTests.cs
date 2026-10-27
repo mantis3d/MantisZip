@@ -500,10 +500,12 @@ public class ShellIntegrationAssocTests : IDisposable
     }
 
     [Fact]
-    public void IsAssocEnabledInSettings_CoversSupportedExtensions()
+    public void IsAssocEnabledInSettings_CoversAssociatedExtensions()
     {
-        // 防未来新增格式导致自愈被静默关闭：ArchiveEngineFactory.SupportedExtensions 中每个扩展名
-        // 都必须命中显式分支，不得落进 `_ => false` 默认分支。
+        // 防未来新增格式导致自愈被静默关闭：**参与文件关联**的每个扩展名都必须命中显式分支，
+        // 不得落进 `_ => false` 默认分支。
+        // 注意（issue #54）：SupportedExtensions 现在比关联名单多 4 个（.jar/.war/.ear/.apk），
+        // 它们能打开但不参与关联，因此不要求对应的 Assoc 开关。
         var s = new AppSettings
         {
             AssocZip = true,
@@ -514,7 +516,7 @@ public class ShellIntegrationAssocTests : IDisposable
             AssocGz = true,
             AssocIso = true,
         };
-        foreach (var ext in ArchiveEngineFactory.SupportedExtensions)   // [".zip",".7z",".rar",".tar",".tgz",".tar.gz",".gz",".iso"]
+        foreach (var ext in ShellIntegration.AssociatedExtensions)   // [".zip",".7z",".rar",".tar",".tgz",".tar.gz",".gz",".iso"]
         {
             Assert.True(ShellIntegration.IsAssocEnabledInSettings(s, ext),
                 $"{ext} 落入了 `_ => false` 默认分支：未来新增格式会让自愈被静默关闭");
@@ -523,6 +525,15 @@ public class ShellIntegrationAssocTests : IDisposable
         // 反向哨兵：防上一条断言因实现恒真而假通过
         Assert.False(ShellIntegration.IsAssocEnabledInSettings(s, ".not-a-real-ext"));
         Assert.False(ShellIntegration.IsAssocEnabledInSettings(new AppSettings { AssocTarGz = false }, ".tgz"));
+
+        // 硬约束（issue #54）：jar/war/ear/apk 能打开，但**不参与**文件关联 —— 不去抢用户已有的默认程序。
+        // 若将来要把它们纳入关联，必须同时加 AppSettings 开关 + 设置页条目，并改本断言。
+        foreach (var ext in new[] { ".jar", ".war", ".ear", ".apk" })
+        {
+            Assert.Contains(ext, ArchiveEngineFactory.SupportedExtensions);
+            Assert.DoesNotContain(ext, ShellIntegration.AssociatedExtensions);
+            Assert.False(ShellIntegration.IsAssocEnabledInSettings(s, ext));
+        }
     }
 
     // ──────────────────────────────────────────────

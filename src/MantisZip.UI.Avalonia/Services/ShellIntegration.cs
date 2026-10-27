@@ -49,8 +49,22 @@ internal static partial class ShellIntegration
         NotifyAssocChangedForTesting?.Invoke();
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
     }
+    /// <summary>
+    /// 参与**文件关联**的扩展名（单一事实源）。
+    /// </summary>
+    /// <remarks>
+    /// 2026-10-27（issue #54 / 计划 <c>format-detection-container-sfx</c>）起，这里**故意**不再直接等于
+    /// <see cref="ArchiveEngineFactory.SupportedExtensions"/>：
+    /// 后者新增了 <c>.jar / .war / .ear / .apk</c>（能打开、能解压），但它们**暂不注册文件关联**
+    /// （用户的 `.jar` 可能被 JDK / IDE 关联，我们不去抢默认程序）。
+    /// 想把这 4 个纳入关联 = 新增 4 个 <see cref="AppSettings"/> 开关 + 设置页条目 + 本数组，
+    /// 见 <c>docs/KNOWN_ISSUES.md</c> 的 KI-006。
+    /// </remarks>
     private static readonly string[] ArchiveExtensions =
-        ArchiveEngineFactory.SupportedExtensions;
+        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso"];
+
+    /// <summary>参与文件关联的扩展名（测试用只读视图；理由见 <see cref="ArchiveExtensions"/> 的注释）。</summary>
+    internal static IReadOnlyList<string> AssociatedExtensions => ArchiveExtensions;
 
     /// <summary>该格式关联是否"未被用户显式禁用"。注意：默认值为 true（并不代表用户主动启用），false 只会由用户主动取消关联的动作产生——自愈判据把 false 视为"显式禁用，不得自愈"。</summary>
     internal static bool IsAssocEnabledInSettings(AppSettings s, string ext) => ext.ToLowerInvariant() switch

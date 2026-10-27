@@ -29,6 +29,7 @@
 | **KI-003** | 24 项 SkiaSharp 4.x CS0618 deprecation | 技术债 | 成本超阈值 | 下次动 `IconProvider` / `IcoParser` / `PreviewViewModel` 时顺带清 | 阻塞中 |
 | **KI-004** | UI 测试用固定临时目录（非 GUID） | 测试卫生 | 成本超阈值 | 下次改这两个用例时顺带改；或出现「残留文件导致红」的实例 | 阻塞中 |
 | **KI-005** | 29 条 7z 用例被 CI 过滤、永不运行 | 覆盖缺口 | 等计划（CI 环境） | CI 装上 7-Zip 并去掉 `SevenZipEngine` 过滤 | 阻塞中 |
+| **KI-006** | `.jar/.war/.ear/.apk` 能打开但**不参与文件关联**（也不进右键菜单/设置页关联列表） | 功能留白 | 缺决策 + 成本 | 用户反馈「想在资源管理器里双击/右键打开 jar」时；或做「关联格式可勾选」设置项时 | 阻塞中 |
 
 ---
 
@@ -80,6 +81,18 @@
 - **为什么现在不修**：**等计划（CI 环境）**。需要 runner 装 7-Zip 或随仓库带 native 二进制，属 CI 环境改动 + 需要评估二进制分发，不是代码问题。
 - **复评条件**：CI 装上 7-Zip（或改走自带 native 依赖）后去掉过滤，并把本条移到档案区。
 - **关联**：[MAINTENANCE.md §9](MAINTENANCE.md) 的「7-Zip 用例」留白项。
+- **状态**：阻塞中
+
+---
+
+## KI-006 `.jar/.war/.ear/.apk` 能打开但不参与文件关联
+
+- **发现**：2026-10-27（实现 issue #54 时决定的范围收窄）
+- **现象**：这 4 个扩展名已进 `ArchiveEngineFactory.SupportedExtensions`（拖入、打开对话框、命令行都能打开），但**没有**注册文件关联，也不进右键菜单与设置页的关联列表；资源管理器里双击 `.jar` 仍交给用户原有的程序（通常是 JDK / IDE）。
+- **证据**：`src\MantisZip.UI.Avalonia\Services\ShellIntegration.cs` 的 `ArchiveExtensions` 是**显式 8 项常量**（`.zip/.7z/.rar/.tar/.tgz/.tar.gz/.gz/.iso`），不再等于 `SupportedExtensions`；守卫测试 `tests\MantisZip.Tests\ShellIntegrationAssocTests.cs` 的 `IsAssocEnabledInSettings_CoversAssociatedExtensions` 反向断言这 4 个不在关联名单里。
+- **为什么现在不修**：**缺决策 + 成本**。纳入关联 = 新增 4 个 `AppSettings` 开关（`AssocJar` 等）+ `IsAssocEnabledInSettings`/`GetProgId`/设置页 `AssocItems` 三处 switch + 三语文案，还要回答「该不该抢用户已有的 `.jar` 默认程序」这个产品问题（`.jar` 与 `.zip` 不同：它常常已经被 JDK 绑走，误抢会打断 `java -jar` 的使用习惯）。
+- **复评条件**：用户反馈「希望双击/右键用 MantisZip 打开 jar」时；或做「关联格式可勾选」这类通用设置项时一并纳入。
+- **关联**：`.omo/plans/已完成/format-detection-container-sfx.md` 的「与计划的偏差 2」。
 - **状态**：阻塞中
 
 ---

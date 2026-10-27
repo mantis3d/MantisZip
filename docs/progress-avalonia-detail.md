@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-27** — 压缩包识别分层（容器 / 子类型）+ 自解压 exe 支持（issue #54 / #36）
+  - **背景**：#54「不支持 .jar 文件解压」（war/ear/apk 同理）、#36「自解压 exe 不能打开」。两者根因完全不同。
+  - **jar 链路实证**（一次性探针，修前）：`FileFormatDetector.Detect(app.jar)` = **`Odt`**；`ArchiveEngineFactory.GetEngineByExtension(app.jar)` = **null** ⇒ UI 走 `Status_UnsupportedFormat`（「不支持的文件格式: .jar」）。误判源在 `DetectZipSubtype`：凡见 `META-INF/` 条目就无条件 `return FileFormat.Odt`，而 jar 规范首条目正是 `META-INF/MANIFEST.MF`；第 3 层 `MapFileFormatToArchiveFormat` 只认 5 种 zip 子类型，`Odt` 落 `_ => null` ⇒「识别得越细越打不开」。
+  - **重构**：新增 `Utils/FormatDetection.cs`（`ContainerFormat` + `FormatDetection(Container, Subtype)`）与 `FileFormatDetector.DetectContainer`（只跑魔数 if 链，`PK` 立即返回）/ `DetectFormat`；`ArchiveEngineFactory` 新增 `MapContainerToArchiveFormat`（恒等映射 7→6）并让 `GetEngineByMagic` 只读容器。选引擎只看容器，预览器与「内容已压缩」判定才看子类型。
+  - **收紧 `META-INF/`**：只有 `META-INF/manifest.xml` 才进 ODF 细分（读不出 mime 仍兜底 Odt），其余 `META-INF/` 条目继续扫下一个；真 ODF 有 `Detect_RealOpenDocumentText_StillReportsOdt` 回归。
+  - **顺带修掉死代码**：`DetectZipSubtype` 的推进 `pos += 头部 + 名字 + extra` 漏掉压缩数据区，实际只能看见**第一个**条目 —— ODF 的 `manifest.xml` 排在 `mimetype` 之后 ⇒ `Odt/Ods/Odp` 对真实文件一直是死的。改为按 `compressedSize` 精确跳过 + 失配时向前搜索下一个 `PK\x03\x04`。
+  - **SFX（#36）**：新增 `Utils/SfxProbe.cs` —— 仅「扩展名未命中 + 头 `MZ`」时，先扫已读的 4KB 头部（小 SFX 整个落在头窗内）、再读尾部 8KB 找 zip/7z/RAR 签名（**不认** 2 字节的 `1F 8B`），命中即路由 `SevenZipEngine`（7z.dll 按签名搜索内嵌包；实测 `ExtractAsync → Succeeded=3, Failed=0`）。**不能**路由 `ZipEngine`：SharpCompress 对 SFX zip 静默返回 0 条。`.exe` 绝不登记关联。
+  - **范围控制（不抢用户默认程序）**：`SupportedExtensions` 加 `.jar/.war/.ear/.apk`（能打开），但 `ShellIntegration.ArchiveExtensions` 改为**显式 8 项常量**，关联 / 右键菜单 / 设置页三者行为零变化；守卫测试改名 `IsAssocEnabledInSettings_CoversAssociatedExtensions` 并加反向断言。留给将来：**KI-006**。
+  - **测试**：新增 `tests\MantisZip.UI.Avalonia.Tests\FormatDetectionContainerTests.cs`（27 例：容器识别、jar/war/ear/apk 引擎路由、真 ODF 不误伤、SFX 三夹具、`.exe` 路由 7z、未知扩展名负样本、关联负向守卫）。放 UI 测试项目而非 Core 测试项目的理由：Core 是 xUnit v2 本机跑不了（KI-002）。
+  - **验证**：Core / Avalonia 构建 0 警告 0 错误；UI 全量 478 例全绿（3 既有 skip）；`-Task check` exit 0；真夹具 `app.jar` → `Zip/Zip` + `ZipEngine`、`real-pe-sfx.exe` → `Unknown/Pe` + `SevenZipEngine`。
+
 **2026-10-27** — 合并：beta 的缺陷修复并入 alpha（11 处冲突按「留 alpha 契约 + 拿 beta 诊断与收尾」取舍）
   - **背景**（用户指派的合并请求）：beta 是调试除错分支，攒了 10 条提交（#52 的 7z.dll 加载顺序、进度窗口完成后界面不更新、冲突提示链路加固 + `conflict.log`、压缩流程并行度、扫描统计卡、压缩包 N/M 卡、「真暂停」评估结论、探针测试清理、v0.5.3 发布说明等）；alpha 同期前进了 25 条提交（意图-执行接缝收口、图标归一化、删除目录修复等）。两边都改过的文件 18 个，git 报冲突 11 个。
   - **取舍原则**：alpha 已按规则 20 把「开窗 + 回读」换成载荷化契约（`ConfirmOutcome` / `RunOutcome` / 单一进度 presenter），因此冲突处**一律保留 alpha 的结构**，把 beta 的诊断插桩与批次收尾行为移植进去，避免把已被删除的回传后门（`ResultAction` / `ApplyToAll` / `CloseAction` / `DialogResult`）复活。

@@ -1460,9 +1460,11 @@ public partial class MainWindow : Window
         return await CustomFilePickerDialog.ShowOpenFileAsync(
             this,
             initialPath: contextPath,
+            // 过滤模式从引擎工厂的单一事实源派生：早先这里硬编码 8 项，
+            // 新增 .jar/.war/.ear/.apk（issue #54）时很容易漏同步。
             fileExtensions:
             [
-                "*.zip", "*.7z", "*.rar", "*.tar", "*.tgz", "*.tar.gz", "*.gz", "*.iso"
+                .. ArchiveEngineFactory.SupportedExtensions.Select(e => "*" + e)
             ]);
     }
 

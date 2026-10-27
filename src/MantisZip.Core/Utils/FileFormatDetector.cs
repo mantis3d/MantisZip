@@ -500,6 +500,60 @@ public static class FileFormatDetector
     }
 
     /// <summary>
+    /// 只做「容器级」魔数判定：回答「这是什么压缩包容器」，**不**做 zip 子类型细分。
+    /// </summary>
+    /// <remarks>
+    /// 需要选引擎 / 判断「能不能当压缩包打开」时**必须**用本方法，不要用 <see cref="Detect"/> 的结果去映射引擎
+    /// —— jar 的首条目是 <c>META-INF/MANIFEST.MF</c>，一旦被子类型逻辑判成 ODT，就没有任何引擎能接（issue #54）。
+    /// <para>
+    /// TAR / ISO 目前只有扩展名识别（没有稳定魔数分支），本方法不猜它们。
+    /// </para>
+    /// </remarks>
+    public static ContainerFormat DetectContainer(byte[] head, int length)
+    {
+        if (head == null || length < 2)
+            return ContainerFormat.Unknown;
+
+        // ZIP：本地文件头 PK\x03\x04 / 空归档 PK\x05\x06 / 分卷 PK\x07\x08
+        if (length >= 4 && head[0] == 0x50 && head[1] == 0x4B &&
+            ((head[2] == 0x03 && head[3] == 0x04) ||
+             (head[2] == 0x05 && head[3] == 0x06) ||
+             (head[2] == 0x07 && head[3] == 0x08)))
+        {
+            return ContainerFormat.Zip;
+        }
+
+        // 7z: 37 7A BC AF 27 1C
+        if (length >= 6 &&
+            head[0] == 0x37 && head[1] == 0x7A && head[2] == 0xBC &&
+            head[3] == 0xAF && head[4] == 0x27 && head[5] == 0x1C)
+        {
+            return ContainerFormat.SevenZip;
+        }
+
+        // RAR: 52 61 72 21 1A 07 00（1.5/2.x/3.x）或 ...07 01 00（5.x）
+        if (length >= 7 &&
+            head[0] == 0x52 && head[1] == 0x61 && head[2] == 0x72 && head[3] == 0x21 &&
+            head[4] == 0x1A && head[5] == 0x07 &&
+            (head[6] == 0x00 || (length >= 8 && head[6] == 0x01 && head[7] == 0x00)))
+        {
+            return ContainerFormat.Rar;
+        }
+
+        // GZip: 1F 8B
+        if (head[0] == 0x1F && head[1] == 0x8B)
+            return ContainerFormat.GZip;
+
+        return ContainerFormat.Unknown;
+    }
+
+    /// <summary>
+    /// 容器 + 子类型一次给全：容器走便宜的 <see cref="DetectContainer"/>，子类型沿用 <see cref="Detect"/> 的完整逻辑。
+    /// </summary>
+    public static FormatDetection DetectFormat(byte[] head, int length, byte[]? tail = null)
+        => new(DetectContainer(head, length), Detect(head, length, tail));
+
+    /// <summary>
     /// ZIP 子类型检测：在 PK\x03\x04 头部中扫描已知文件名以区分 DOCX/XLSX/PPTX/EPUB/ODT/ODS/ODP 等。
     /// 支持 Store 和 Deflate 压缩条目的内容读取以进行精确子类型判定。
     /// </summary>
@@ -511,11 +565,11 @@ public static class FileFormatDetector
         while (pos + LocalHeaderSize + 2 <= length)
         {
             // Validate local file header signature
-            if (head[pos] != 0x50 || head[pos + 1] != 0x4B ||
-                head[pos + 2] != 0x03 || head[pos + 3] != 0x04)
+            if (!IsLocalHeader(head, pos, length))
                 break;
 
             int compressionMethod = head[pos + 8] | (head[pos + 9] << 8); // 0=Store, 8=Deflate
+            int compressedSize = BitConverter.ToInt32(head, pos + 18);
             int nameLen = head[pos + 26] | (head[pos + 27] << 8);
             int extraLen = head[pos + 28] | (head[pos + 29] << 8);
             int fileNameStart = pos + LocalHeaderSize;
@@ -547,7 +601,6 @@ public static class FileFormatDetector
                     }
                     else if (compressionMethod == 8)
                     {
-                        int compressedSize = BitConverter.ToInt32(head, pos + 18);
                         if (dataStart + compressedSize <= length && compressedSize > 0)
                         {
                             content = DecompressDeflateBlock(head, dataStart, compressedSize);
@@ -566,46 +619,78 @@ public static class FileFormatDetector
                     }
                     return FileFormat.OfficeOpenXml; // generic OOXML fallback
                 }
-                else if (fileName.StartsWith("META-INF/", StringComparison.OrdinalIgnoreCase))
+                else if (fileName.Equals("META-INF/manifest.xml", StringComparison.OrdinalIgnoreCase))
                 {
                     // OpenDocument format — check manifest.xml for ODT/ODS/ODP
-                    if (fileName.Equals("META-INF/manifest.xml", StringComparison.OrdinalIgnoreCase))
+                    string? content = null;
+                    if (compressionMethod == 0 && dataStart < length)
                     {
-                        string? content = null;
-                        if (compressionMethod == 0 && dataStart < length)
+                        int remaining = length - dataStart;
+                        content = Encoding.UTF8.GetString(head, dataStart, Math.Min(remaining, 800));
+                    }
+                    else if (compressionMethod == 8)
+                    {
+                        if (dataStart + compressedSize <= length && compressedSize > 0)
                         {
-                            int remaining = length - dataStart;
-                            content = Encoding.UTF8.GetString(head, dataStart, Math.Min(remaining, 800));
-                        }
-                        else if (compressionMethod == 8)
-                        {
-                            int compressedSize = BitConverter.ToInt32(head, pos + 18);
-                            if (dataStart + compressedSize <= length && compressedSize > 0)
-                            {
-                                content = DecompressDeflateBlock(head, dataStart, compressedSize);
-                            }
-                        }
-
-                        if (content != null)
-                        {
-                            if (content.Contains("application/vnd.oasis.opendocument.text", StringComparison.Ordinal))
-                                return FileFormat.Odt;
-                            if (content.Contains("application/vnd.oasis.opendocument.spreadsheet", StringComparison.Ordinal))
-                                return FileFormat.Ods;
-                            if (content.Contains("application/vnd.oasis.opendocument.presentation", StringComparison.Ordinal))
-                                return FileFormat.Odp;
+                            content = DecompressDeflateBlock(head, dataStart, compressedSize);
                         }
                     }
-                    // If we see any META-INF/ entry, it's an OpenDocument format
+
+                    if (content != null)
+                    {
+                        if (content.Contains("application/vnd.oasis.opendocument.text", StringComparison.Ordinal))
+                            return FileFormat.Odt;
+                        if (content.Contains("application/vnd.oasis.opendocument.spreadsheet", StringComparison.Ordinal))
+                            return FileFormat.Ods;
+                        if (content.Contains("application/vnd.oasis.opendocument.presentation", StringComparison.Ordinal))
+                            return FileFormat.Odp;
+                    }
+
+                    // manifest.xml 存在但内容读不出 → 仍按 ODT 兜底（保守：真有 manifest.xml 的 zip 极少不是 ODF）
                     return FileFormat.Odt;
+                }
+                else if (fileName.StartsWith("META-INF/", StringComparison.OrdinalIgnoreCase))
+                {
+                    // jar / war / ear / apk 的 META-INF/MANIFEST.MF、META-INF/services/… 等等。
+                    // 「有 META-INF 目录」不是 OpenDocument 的标志（jar 规范首条目就是 META-INF/MANIFEST.MF，
+                    // 见 issue #54）——这里**必须**继续扫下一个条目，不能 return Odt。
                 }
             }
 
-            pos += totalEntry;
-            if (totalEntry == 0) break;
+            // 跳到下一个本地文件头：旧的 `pos += 头部+名字+extra` 漏掉了压缩数据区，
+            // 导致只能看到**第一个**条目（ODF 的 mimetype 排第一 ⇒ manifest.xml 永远扫不到，
+            // ODT/ODS/ODP 识别实际是死的；jar 的 MANIFEST.MF 排第一 ⇒ 又误判成 ODT，issue #54）。
+            int searchFrom = pos + totalEntry + Math.Max(compressedSize, 1);
+            if (searchFrom <= pos || searchFrom >= length)
+                break;
+
+            int nextPos = FindLocalHeader(head, length, searchFrom);
+            if (nextPos < 0)
+                break;
+            pos = nextPos;
         }
 
         return FileFormat.Zip; // regular ZIP
+    }
+
+    /// <summary>该偏移处是否是 ZIP 本地文件头（<c>PK\x03\x04</c>）且头部字段可读。</summary>
+    private static bool IsLocalHeader(byte[] buffer, int pos, int length)
+        => pos >= 0 && pos + 30 <= length
+           && buffer[pos] == 0x50 && buffer[pos + 1] == 0x4B
+           && buffer[pos + 2] == 0x03 && buffer[pos + 3] == 0x04;
+
+    /// <summary>从 <paramref name="from"/> 起找下一个 ZIP 本地文件头。</summary>
+    private static int FindLocalHeader(byte[] buffer, int length, int from)
+    {
+        for (int i = Math.Max(0, from); i + 30 <= length; i++)
+        {
+            if (buffer[i] == 0x50 && buffer[i + 1] == 0x4B
+                && buffer[i + 2] == 0x03 && buffer[i + 3] == 0x04)
+            {
+                return i;
+            }
+        }
+        return -1;
     }
 
     /// <summary>
