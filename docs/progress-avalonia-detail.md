@@ -2901,6 +2901,12 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.4 (2026-10-27) 文档：CI 失败判定流程沉淀进 `docs/MAINTENANCE.md` §5.1
+  - **动机**：这回定位 run #231 的成本几乎全花在「怎么把失败用例名拿到手」上——作业页详情与 annotations 只有构建告警、没有用例名，必须走 `gh run view --log-failed`；而 gh 未登录、GCM 里的 PAT 要用 `git credential-manager get`（且**必须带 username**，`git credential fill` 不带时返回空）才取得到、下载日志还会因 run-log 缓存目录被拒而失败。这些一次性摸索下次不该重来。
+  - **新增 `docs/MAINTENANCE.md` §5.1「CI 红了怎么判」**：① 取 PAT + `$env:LocalAppData` 重定向 + `--log-failed` 的命令配方与日志前缀剥离方法；② 两类已见失败的判据表——A 用例顺序依赖（GBK 已收口到 `ZipEngine` 静态构造器，给出「新增走 `GetEncoding("gbk"/936)` 的 Core 路径必须自己注册」的防复发口径）、B Avalonia 无头竞态（`[Test Case Cleanup Failure]` + `The calling thread cannot access this object`，处置是 `gh run rerun <id> --failed`，**不要顺着随机受害用例名改被测代码**）；③ 重跑判定（还红在同一处才算回归）、一次红挂多条可能是连带污染、频率基线约 5 次 1 次与升级路径（等上游 `#22021` 补丁 / 评审 `AvaloniaTestIsolationLevel.PerAssembly`）；④ 新增 UI 测试不得扩大竞态窗口（`Task.Run` / `async void` / `DispatcherTimer` / `ConfigureAwait(false)` / 后台线程碰 `Dispatcher.UIThread`）；⑤ `main` / `alpha` 均无分支保护（无 required status checks）⇒ 红 CI 拦不住 push 与打 tag，发版前必须人工确认目标 commit 真绿。
+  - **入口**：`AGENTS.md` 的 CI 条目补一句指向 §5.1，保证换 session / 换 agent 时先看到判定流程而不是从零摸索。
+  - **状态**：✅ 已完成（纯文档，无产品代码改动）。
+
 #### v0.5.4 (2026-10-27) GBK 代码页注册收口到 Core（`ZipEngine` 静态构造器 + UI 测试程序集 ModuleInitializer）
   - **现象**：CI run #231（alpha `173084c3`）UI 测试程序集 430 条里 2 条失败，其一为 `WholeArchiveErrorLocalizerTests.ToUserText_SharpCompressArchiveException_LocalizesToCorrupted`：`Expected: "文件损坏或格式无效"` / `Actual: "操作失败：'gbk' is not a supported encoding name…"`。同提交本机全量 430 条全绿 ⇒ CI 环境特有。
   - **根因**：`2026-10-20` 那次「gbk 编码注册的测试顺序依赖」只在 `tests/MantisZip.Tests/TestAssemblySetup.cs`（Core 测试程序集）补了 `[ModuleInitializer]`，**UI 测试程序集从未补**——它靠 `tests/MantisZip.UI.Avalonia.Tests/MainWindowViewModelCommentTests.cs` 构造函数与 `src/MantisZip.UI.Avalonia/App.axaml.cs` 的零散注册「顺带」生效。CI 上该用例在 4.53s 就被调度、此前无人注册 ⇒ `ZipEngine.Open.cs` 的 `Encoding.GetEncoding("gbk")` 抛 `ArgumentException`，`WholeArchiveErrorLocalizer` 把它归入「操作失败」，损坏包误报成工具故障。

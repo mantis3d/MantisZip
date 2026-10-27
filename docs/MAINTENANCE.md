@@ -96,6 +96,36 @@
 
 **已知缺口**：test 带 `--filter "FullyQualifiedName!~SevenZipEngine"`，29 条 7z 用例在 CI 里永不运行（CI 没装 7-Zip）。要补的话：加 choco/7-Zip 安装步骤再删过滤器。
 
+### 5.1 CI 红了怎么判（2026-10-27 定）
+
+**先看栈，再决定「改代码」还是「重跑」。** 拉失败作业日志：
+
+```powershell
+# PAT 在 GCM 凭据里（注意必须带 username，`git credential fill` 不带时返回空）
+$cred = ("protocol=https`nhost=github.com`nusername=mantis3d`n`n" | git credential-manager get)
+$env:GH_TOKEN = (($cred | Select-String '^password=') -replace '^password=','')
+$env:LocalAppData = 'F:\Github\MantisZip\.buildout\ghcache'   # 必须：否则 gh 写 run-log 缓存目录被拒
+gh run list --repo mantis3d/MantisZip --branch alpha --limit 5
+gh run view <run-id> --repo mantis3d/MantisZip --log-failed *> .buildout\logs\ci.log
+Get-Content .buildout\logs\ci.log | Select-String '  Failed MantisZip|Test Run Failed|Total tests:'
+```
+
+日志行前缀是 `build` + `UNKNOWN STEP` + ISO 时间戳，用 `-replace '^build\tUNKNOWN STEP\t\S+Z '` 剥掉即成人话。作业页详情与 annotations **不含**用例名（只有构建告警），必须走上面这条日志路径。
+
+已知两类失败，判据不同，处置也不同：
+
+| 类型 | 判据 | 处置 |
+|------|------|------|
+| **A. 用例顺序依赖（已根治，防复发）** | 断言失败，`Actual` 里出现 `'gbk' is not a supported encoding name` | 结构上已不可能复发：`ZipEngine` 静态构造器自注册 GBK（`src/MantisZip.Core/Engines/ZipEngine.Open.cs` 类顶部）+ 两个测试程序集各一个 `TestAssemblySetup.cs`（`[ModuleInitializer]`）。**新增任何走 `Encoding.GetEncoding("gbk"/936)` 的 Core 路径，要么复用已注册的类，要么在该类静态构造器里注册**，不要再依赖「谁先跑谁注册」 |
+| **B. Avalonia 无头测试竞态（上游缺陷，决定「不动」）** | `[Test Case Cleanup Failure]` + `InvalidOperationException: The calling thread cannot access this object`，栈在 `AvaloniaHeadlessPlatform.Initialize → AppBuilder.SetupUnsafe → HeadlessUnitTestSession.EnsureIsolatedApplication` | **重跑**：`gh run rerun <run-id> --failed`（不要用空提交触发重跑，会污染提交历史）。受害用例是随机的（2026-10-26 挑中 `ResultTreeViewFilterTests.TogglingCompactMode_KeepsFilterApplied`），别顺着用例名去改被测代码 |
+
+- B 的上游：`AvaloniaUI/Avalonia#22021`（session 重建期 `s_uiThread` 认领竞态，仍 open）、`#21467`（testhost 死锁）。本仓库 `tests/MantisZip.UI.Avalonia.Tests/TestParallelization.cs` 已有 `DisableTestParallelization = true` 仍会触发，测试内也无自有后台线程 —— 属 session 重建内部竞态。
+- **重跑后还红在同一处**（尤其是断言失败）→ 才当回归查。
+- **一次红里挂多条**、其中一条是 B 的栈 → 整批可能是连带污染，先整批重跑，别逐条查。
+- **频率基线**：2026-10 约 5 次 run 出现 1 次。若变成每 2~3 次必红，改走 ② 等上游补丁后升级 Avalonia（`Avalonia.Headless.XUnit` 须与 UI 项目主版本一致），或 ③ 评估 `AvaloniaTestIsolationLevel.PerAssembly`（整程序集共用一个 `Application`，会漏状态、有假绿风险，需单独评审）。
+- **新增 UI 测试不要扩大 B 的窗口**：`Task.Run` / `async void` / `DispatcherTimer` / `ConfigureAwait(false)` / 从后台线程碰 `Dispatcher.UIThread`，都会让竞态更容易命中。
+- **发版前必须真绿**：`main` / `alpha` 都没有分支保护（无 required status checks），红 CI 拦不住 push 也拦不住打 tag —— 「红着发版」全靠自觉，发版前确认目标 commit 结论为 success。
+
 ## 6. DSH 插件（`tools/dsh-plugin-mantiszip/`）
 
 ```powershell
