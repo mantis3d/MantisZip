@@ -2909,6 +2909,7 @@
   - **未做的事**：没有把 `%LOCALAPPDATA%\MantisZip` 做成 `[UninstallDelete]` 静态项（那样卸载静默模式也会删设置），改为运行期 `MsgBox` 询问。
   - **验证**：`pwsh -File scripts\verify-repo.ps1 -Task check` → exit 0（版本 0.5.4 六处一致 / 1329 个三语 key / 守卫 5/5）；两脚本 `begin`/`end` 计数与基线逐块核对无缺口、无 U+FFFD 替换字符。本机无 ISCC（`release.yml:79` 用 `choco install innosetup`，`:108` 才编译）且 CI 不编译安装包 ⇒ `.iss` 语法只能等 release workflow 首次编译确认。
   - **代价**：两个变体不再（假）共存——换变体变成一次正常升级（Offline→WebSetup 会明确要求装 .NET）。
+  - **RELEASE_NOTES**：`RELEASE_NOTES.md` 的 v0.5.4 新增「**安装包 / Installers**」节三条——两变体同一产品（换变体=正常升级、旧 Offline 条目自动收起）、卸载可选删个人设置（默认否）、WebSetup 跳过运行时二次确认（默认否）。面向从 v0.5.2 升级的用户交代行为变化，避免「怎么突然少了一条安装记录」的困惑。
   - **状态**：✅ 已完成（脚本语法待 release workflow 首次编译验证）。
 
 #### v0.5.4 (2026-10-27) 新增「已知未修问题登记簿」`docs/KNOWN_ISSUES.md`（AGENTS.md 规则 21）

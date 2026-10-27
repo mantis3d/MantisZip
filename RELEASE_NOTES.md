@@ -32,6 +32,15 @@ MantisZip-0.5.4-Setup-WebSetup.exe requires internet during installation. Mantis
 - **压缩 / 解压设置窗口点「确认」后可能毫无反应** — 点「确认」后什么都没发生、也没有任何提示（例如还没添加要压缩的文件、两次输入的密码不一致、解压的过滤预览尚未算完）。原因是窗口把自己的状态放在公开属性上，由调用方在关窗后**逐项补读**，任何一项没搬到就静默失效。现在「确认」时一次性交出完整设置：参数不再有遗漏的可能，校验不通过会把原因直接显示在窗口里，而不是无声返回
 - **Confirming the compress / extract dialog could silently do nothing** — pressing "Confirm" sometimes produced no window, no action and no message (for example with no source files added, with two mismatched password fields, or while the extract filter preview was still being computed). The dialog kept its state in public properties that the caller had to **copy item by item** after the window closed, so any missed item failed silently. Confirming now hands over the complete settings in one transaction, so nothing can be left behind, and a failed validation shows its reason right in the dialog instead of returning silently
 
+**安装包 / Installers**
+
+- **两个安装包现在是同一个产品，换变体变成一次正常升级** — 此前 Setup-WebSetup 与 Setup-Offline 用了两个不同的安装身份却写进同一个安装目录，装另一个变体时不会先卸掉旧版：同一台机器会留下两条同名的「应用和功能」条目、两套卸载程序互相删除对方正在用的文件，卸载后外壳扩展与文件关联的注册表项还会残留（极端情况下双击图标直接弹「You must install or update .NET」）。现在两者统一为一个产品身份：安装前会自动静默卸载旧版，只有卸载时才做的清理（外壳扩展、文件关联）不会再被跳过；已经装过旧 Offline 版的机器首次安装新版时会自动收起那条旧条目，不需要手动卸载。注意：两个变体现在**不能再同时安装**（此前只是假共存）
+- **Both installers are now one product, so switching variants is a normal upgrade** — the WebSetup and Offline packages used two different installer identities while writing into the same install folder, so installing the other variant never removed the old one: two identically named entries under "Apps & features", two uninstallers deleting files the other one was using, and leftover shell-extension/file-association registry keys after uninstalling (in the worst case double-clicking the icon showed "You must install or update .NET"). Both variants now share one product identity: the previous version is silently uninstalled first, uninstall-only cleanup (shell extension, file associations) can no longer be skipped, and machines that already installed the old Offline build have that entry folded away automatically on the first install of the new one, with no manual uninstall needed. Note: the two variants can no longer be installed side by side (previously they only pretended to coexist)
+- **卸载时可以选择同时删除个人设置** — 卸载时如果存在个人设置目录会询问一次，默认「否」；无论是否删除，注册表里的首次运行标记都会被清理，下次安装是干净状态
+- **Uninstall can optionally remove your personal settings** — if a settings folder exists, uninstall asks once (default "No"); the first-run markers in the registry are cleared either way, so the next install starts clean
+- **WebSetup 里跳过运行时下载要再确认一次** — 选择不下载 .NET 10 运行时会第二次确认（默认按钮是「否」），并提示离线安装包已自带运行时，避免装完双击打不开
+- **Skipping the runtime download in WebSetup now asks again** — choosing not to download the .NET 10 runtime triggers a second confirmation (defaulting to "No") that points out the offline package bundles the runtime, so an install cannot silently end up unable to start
+
 ## v0.5.3
 
 ### 文件说明 / File Description
