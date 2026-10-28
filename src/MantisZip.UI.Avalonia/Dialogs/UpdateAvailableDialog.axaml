@@ -11,7 +11,10 @@
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="{DynamicResource DialogPadding}">
 
-  <!-- 根布局：标题 → 版本对比 → 发布日期 → 更新说明（Markdown 滚动区）→ 按钮行（全部主题/紧凑度资源键） -->
+  <!-- 根布局：标题 → 版本对比 → 发布日期 → 按钮行 → 更新说明（Markdown 滚动区）
+       ⚠ 按钮行放在更新说明**之前**：正文可能很长（限高 220 后内部滚动，窗口本身不滚动），
+       但把唯一的主操作压在正文下面时，正文一长就要先滚到底才点得到（2026-10-28 用户反馈）。
+       现在「下载 / 稍后提醒 / 不再提示此版本」紧跟版本信息，一眼可见。 -->
   <StackPanel Spacing="{DynamicResource SpacingMd}">
 
     <!-- 标题行：发现新版本（窗口标题栏与正文主标题同文案，正文这里只出现一次） -->
@@ -33,6 +36,41 @@
                IsVisible="{Binding HasPublishDate}"
                FontSize="12"
                Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+    <!-- 按钮行：下载（强调色，同关于窗口关闭按钮配色）/ 稍后提醒 / 不再提示此版本 -->
+    <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="{DynamicResource SpacingSm}">
+
+      <!-- 下载：调用方据此打开下载页；回车默认触发 -->
+      <Button Content="{Binding DownloadText}"
+              Click="OnDownloadClick"
+              IsDefault="True"
+              MinWidth="80"
+              Height="{DynamicResource ControlHeight}"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White"
+              BorderThickness="0" />
+
+      <!-- 稍后提醒：本次不处理，按所设频率再询问；Esc 关闭等同此选项 -->
+      <Button Content="{Binding RemindLaterText}"
+              Click="OnRemindLaterClick"
+              IsCancel="True"
+              MinWidth="80"
+              Height="{DynamicResource ControlHeight}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+
+      <!-- 不再提示此版本：把当前版本记为已跳过（调用方持久化） -->
+      <Button Content="{Binding SkipVersionText}"
+              Click="OnSkipVersionClick"
+              MinWidth="80"
+              Height="{DynamicResource ControlHeight}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </StackPanel>
 
     <!-- 更新说明区：小标题 + Markdown 正文（GitHub release body），限高滚动，超长不撑爆窗口 -->
     <StackPanel Spacing="{DynamicResource SpacingXs}">
@@ -58,41 +96,6 @@
                  FontSize="12"
                  TextWrapping="Wrap"
                  Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-    </StackPanel>
-
-    <!-- 按钮行：下载（强调色，同关于窗口关闭按钮配色）/ 稍后提醒 / 不再提示此版本 -->
-    <StackPanel Orientation="Horizontal"
-                HorizontalAlignment="Right"
-                Spacing="{DynamicResource SpacingSm}">
-
-      <!-- 下载：调用方据此打开下载页；回车默认触发 -->
-      <Button Content="{Binding DownloadText}"
-              Click="OnDownloadClick"
-              IsDefault="True"
-              MinWidth="80"
-              Height="{DynamicResource ControlHeight}"
-              Background="{DynamicResource ThemeAccentBrush}"
-              Foreground="White"
-              BorderThickness="0" />
-
-      <!-- 稍后提醒：本次不处理，24h 后再询问；Esc 关闭等同此选项 -->
-      <Button Content="{Binding RemindLaterText}"
-              Click="OnRemindLaterClick"
-              IsCancel="True"
-              MinWidth="80"
-              Height="{DynamicResource ControlHeight}"
-              Background="{DynamicResource ThemeButtonBgBrush}"
-              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}" />
-
-      <!-- 不再提示此版本：把当前版本记为已跳过（调用方持久化） -->
-      <Button Content="{Binding SkipVersionText}"
-              Click="OnSkipVersionClick"
-              MinWidth="80"
-              Height="{DynamicResource ControlHeight}"
-              Background="{DynamicResource ThemeButtonBgBrush}"
-              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}" />
     </StackPanel>
   </StackPanel>
 </Window>

@@ -82,6 +82,18 @@ public class UpdateAvailableDialogTests
             Assert.True(dialog.HasReleaseNotes);
             Assert.False(dialog.HasNoReleaseNotes);
 
+            // 按钮行必须在更新说明**上方**：正文一长，主操作压在下面就得先滚到底才点得到
+            var downloadButton = dialog.GetVisualDescendants().OfType<Button>()
+                .First(b => (b.Content as string) == LocalizationManager.T("Update_Download"));
+            var notesHost = dialog.FindControl<ContentControl>("NotesHost");
+            Assert.NotNull(notesHost);
+
+            var buttonTop = downloadButton.TranslatePoint(default, dialog)!.Value.Y;
+            var notesTop = notesHost!.TranslatePoint(default, dialog)!.Value.Y;
+            Assert.True(
+                buttonTop < notesTop,
+                $"「下载」按钮应在更新说明上方（button.Y={buttonTop:F1}，notes.Y={notesTop:F1}）");
+
             dialog.Close();
         }
         finally
