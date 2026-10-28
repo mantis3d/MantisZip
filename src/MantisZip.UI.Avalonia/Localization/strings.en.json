@@ -1,4 +1,9 @@
 ﻿{
+"Settings_Tab_Appearance_General": "Appearance",
+"Settings_Tab_Appearance_Progress": "Progress window",
+"Settings_Progress_AutoCloseDelay_Help": "Applies only when the progress window is not pinned (📌) and no error occurred; 0 closes immediately after completion.",
+"Settings_Progress_PinByDefault": "Pin progress window by default (📌)",
+"Settings_Progress_PinByDefault_Help": "When enabled, the progress window opens pinned: completing or failing will not close it automatically — close it manually.",
   "Update_TabName": "Updates",
   "Update_CurrentVersion": "Current version",
   "Update_CheckNow": "Check for updates",
@@ -895,7 +900,6 @@
   "Settings_Assoc_UserCustom": "User-defined",
 
   "Settings_Cancel": "Cancel",
-  "Settings_Compress_CloseAfterDone": "Close dialog after compress",
   "Settings_Compress_KeepExt": "Keep original extension",
   "Settings_Compress_PreserveRoot": "Preserve directory root",
   "Settings_CompressionLevel": "Compression Level",

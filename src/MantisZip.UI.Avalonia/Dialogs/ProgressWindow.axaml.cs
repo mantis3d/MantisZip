@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -60,6 +61,10 @@ public partial class ProgressWindow : Window
         var displaySettings = AppSettings.Load();
         _vm.ContentMode = ProgressDisplayModeParser.ParseContentMode(displaySettings.ProgressContentMode);
         _vm.InfoDensity = ProgressDisplayModeParser.ParseDensity(displaySettings.ProgressInfoDensity);
+
+        // 图钉初始状态（设置 → 外观 → 进度窗口 →「默认钉住」）。
+        // 这里只写初始值：失败 / 测试流 / 批处理行失败的自动压钉在 VM 内单向生效，不受本项影响。
+        _vm.KeepOpenOnComplete = displaySettings.ProgressPinByDefault;
 
         // 应用上次持久化的窗口宽度（非法值回落 XAML 默认 800；XAML MinWidth=500 兜底）
         var savedWidth = displaySettings.ProgressWindowWidth;
@@ -275,58 +280,80 @@ public partial class ProgressWindow : Window
 
     /// <summary>
     /// After completion, wait for auto-close or manual close.
-    /// If KeepOpenOnComplete is set during countdown, switches to manual wait.
+    /// 两种等待态可互相切换：📌 钉住（等手动关）⇄ 倒计时（到点自动关）。
+    /// 状态由 KeepOpenOnComplete 驱动，因此两处等待都必须可被打断——否则「手动等待中解钉」会一直干等，
+    /// 按钮状态与实际行为脱节（D11）。
     /// 延迟秒数来自设置 AppSettings.AutoCloseDelaySeconds（Task 6：统一关窗职责，调用方不再传魔法数字）。
     /// Task 10：延时等待期间在按钮行显示倒计时，支持行内临时修改（实例级，不回写设置）。
     /// </summary>
     public async Task AutoCloseOrWaitAsync(Action closeAction)
     {
-        if (_vm.KeepOpenOnComplete)
+        while (true)
         {
-            await WaitForManualCloseAsync();
-            closeAction();
-            return;
-        }
-
-        // 倒计时初值已在 OnOpened 初始化（窗口打开即显示、可提前编辑，此处不再重置）
-        if (_countdownRemainingMs <= 0)
-        {
-            closeAction();
-            return;
-        }
-
-        _vm.AutoCloseCountdownVisible = true;
-        try
-        {
-            int lastShownSecs = -1;
-            while (_countdownRemainingMs > 0)
+            // ① 钉住态：无限期等手动关闭；期间解钉 → 回到倒计时（用剩余毫秒继续，不重置为全值）
+            if (_vm.KeepOpenOnComplete)
             {
-                await Task.Delay(100);
-                // D11：倒计时中按下 📌 → 立即转手动等待（按钮状态 = 实际行为）
-                if (_vm.KeepOpenOnComplete)
+                if (await WaitForManualCloseAsync() == ManualWaitExit.Closed)
                 {
-                    await WaitForManualCloseAsync();
                     closeAction();
                     return;
                 }
-                // §10.4：行内编辑期间时间冻结（不回写文本，避免覆盖用户输入）
-                if (_countdownEditing)
-                    continue;
+                continue;
+            }
 
-                _countdownRemainingMs -= 100;
-                int secs = (_countdownRemainingMs + 999) / 1000;   // 向上取整 → 首显满值
-                if (secs != lastShownSecs)
+            // 倒计时初值已在 OnOpened 初始化（窗口打开即显示、可提前编辑，此处不再重置）
+            if (_countdownRemainingMs <= 0)
+            {
+                closeAction();
+                return;
+            }
+
+            // ② 倒计时态：到点关窗；期间压钉 → 回到手动等待
+            _vm.AutoCloseCountdownVisible = true;
+            var pinnedDuringCountdown = false;
+            try
+            {
+                int lastShownSecs = -1;
+                while (_countdownRemainingMs > 0)
                 {
-                    lastShownSecs = secs;
-                    UpdateCountdownText(secs);
+                    await Task.Delay(100);
+                    // D11：倒计时中按下 📌 → 立即转手动等待（按钮状态 = 实际行为）
+                    if (_vm.KeepOpenOnComplete)
+                    {
+                        pinnedDuringCountdown = true;
+                        break;
+                    }
+                    // §10.4：行内编辑期间时间冻结（不回写文本，避免覆盖用户输入）
+                    if (_countdownEditing)
+                        continue;
+
+                    _countdownRemainingMs -= 100;
+                    int secs = (_countdownRemainingMs + 999) / 1000;   // 向上取整 → 首显满值
+                    if (secs != lastShownSecs)
+                    {
+                        lastShownSecs = secs;
+                        UpdateCountdownText(secs);
+                    }
                 }
             }
-            closeAction();
+            finally
+            {
+                _vm.AutoCloseCountdownVisible = false;
+            }
+
+            if (!pinnedDuringCountdown)
+            {
+                closeAction();
+                return;
+            }
         }
-        finally
-        {
-            _vm.AutoCloseCountdownVisible = false;
-        }
+    }
+
+    /// <summary>手动等待的结束原因：窗口被关闭 / 用户解钉（应回到倒计时）。</summary>
+    private enum ManualWaitExit
+    {
+        Closed,
+        Unpinned,
     }
 
     /// <summary>倒计时编辑态（仅 UI 线程访问）：编辑期间冻结倒数与文本回写（§10.4）。</summary>
@@ -387,25 +414,41 @@ public partial class ProgressWindow : Window
     }
 
     /// <summary>
-    /// Wait for the user to manually close the window.
+    /// 钉住态下的等待：窗口被关闭 或 用户解钉（📌 取消）都会立刻返回。
+    /// 旧实现只等 Closed，导致「手动等待中解钉」不会恢复倒计时（D11：按钮状态 ≠ 实际行为）。
     /// </summary>
-    private async Task WaitForManualCloseAsync()
+    private async Task<ManualWaitExit> WaitForManualCloseAsync()
     {
         if (!IsVisible)
-            return;
+            return ManualWaitExit.Closed;
 
-        var closed = new ManualResetEventSlim(false);
-        EventHandler handler = null!;
-        handler = (_, _) => { closed.Set(); Closed -= handler; };
-        Closed += handler;
+        var gate = new ManualResetEventSlim(false);
+        var closedFired = false;
+        EventHandler onClosed = (_, _) =>
+        {
+            closedFired = true;
+            gate.Set();
+        };
+        void onVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ProgressViewModel.KeepOpenOnComplete) && !_vm.KeepOpenOnComplete)
+                gate.Set();
+        }
+
+        Closed += onClosed;
+        _vm.PropertyChanged += onVmPropertyChanged;
         try
         {
-            await Task.Run(() => closed.Wait());
+            await Task.Run(() => gate.Wait());
         }
         finally
         {
-            Closed -= handler;
+            Closed -= onClosed;
+            _vm.PropertyChanged -= onVmPropertyChanged;
+            gate.Dispose();
         }
+
+        return closedFired ? ManualWaitExit.Closed : ManualWaitExit.Unpinned;
     }
 
     // ════════════════════════════════════════════

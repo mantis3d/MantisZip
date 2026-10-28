@@ -103,9 +103,6 @@ public partial class SettingsWindowViewModel : ObservableObject
     private int _updateFrequencyIndex = 2;
 
     [ObservableProperty]
-    private bool _closeAfterCompress;
-
-    [ObservableProperty]
     private bool _keepOriginalExtension;
 
     // ── Compression advanced ──
@@ -413,6 +410,10 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private int _autoCloseDelaySeconds = 3;
+
+    /// <summary>进度窗口默认钉住（📌）：true = 一打开就钉住，完成/出错都等手动关。</summary>
+    [ObservableProperty]
+    private bool _progressPinByDefault;
 
     [ObservableProperty]
     private string _appFontFamily = "";
@@ -880,7 +881,6 @@ public partial class SettingsWindowViewModel : ObservableObject
     // Compress strings
     public string DefaultFormatText => LocalizationManager.T("Settings_DefaultFormat");
     public string CompressionLevelText => LocalizationManager.T("Settings_CompressionLevel");
-    public string CloseAfterCompressText => LocalizationManager.T("Settings_Compress_CloseAfterDone");
     public string KeepOriginalExtensionText => LocalizationManager.T("Settings_Compress_KeepExt");
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
     public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
@@ -1041,6 +1041,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string TabLanguageHeader => LocalizationManager.T("Settings_Tab_Language");
     public string TabPathHeader => LocalizationManager.T("Settings_Tab_Path");
     public string TabAppearanceHeader => LocalizationManager.T("Settings_Tab_Appearance");
+    /// <summary>「外观」页内的「外观」子页签（主题/紧凑度/最近文件/应用字体）。</summary>
+    public string TabAppearanceGeneralHeader => LocalizationManager.T("Settings_Tab_Appearance_General");
+    /// <summary>「外观」页内的「进度窗口」子页签（自动关闭延时/默认钉住）。</summary>
+    public string TabAppearanceProgressHeader => LocalizationManager.T("Settings_Tab_Appearance_Progress");
     public string TabPasswordHeader => LocalizationManager.T("Settings_Tab_Password");
     public string TabFileAssocHeader => LocalizationManager.T("Settings_Tab_FileAssoc");
 
@@ -1064,6 +1068,12 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AppearanceThemeDarkText => LocalizationManager.T("Settings_Appearance_Theme_Dark");
     public string AppearanceMaxRecentFilesText => LocalizationManager.T("Settings_Appearance_MaxRecentFiles");
     public string AppearanceAutoCloseDelayText => LocalizationManager.T("Settings_ProgressAutoCloseDelay");
+    /// <summary>延时的补充说明：钉住/失败时不走倒计时。</summary>
+    public string AppearanceAutoCloseDelayHelpText => LocalizationManager.T("Settings_Progress_AutoCloseDelay_Help");
+    /// <summary>「默认钉住进度窗口」勾选框标签。</summary>
+    public string ProgressPinByDefaultText => LocalizationManager.T("Settings_Progress_PinByDefault");
+    /// <summary>「默认钉住进度窗口」勾选框说明。</summary>
+    public string ProgressPinByDefaultHelpText => LocalizationManager.T("Settings_Progress_PinByDefault_Help");
     public string AppearanceAppFontFamilyText => LocalizationManager.T("Settings_Appearance_AppFontFamily");
     public string AppearanceCompactnessText => LocalizationManager.T("Settings_Appearance_Compactness");
     public string AppearanceCompactnessCompactText => LocalizationManager.T("Settings_Appearance_Compactness_Compact");
@@ -1125,7 +1135,6 @@ public partial class SettingsWindowViewModel : ObservableObject
             UpdateCheckFrequencyNames.Parse(_settings.UpdateCheckFrequency));
 
         // Compress (additional)
-        _closeAfterCompress = _settings.CloseAfterCompress;
         _keepOriginalExtension = _settings.KeepOriginalExtension;
         _compressFileConflictAction = _settings.CompressFileConflictAction;
 
@@ -1200,6 +1209,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _appFontFamily = _settings.AppFontFamily;
         _compactnessMode = _settings.CompactnessMode;
         _autoCloseDelaySeconds = _settings.AutoCloseDelaySeconds;
+        _progressPinByDefault = _settings.ProgressPinByDefault;
 
         // Password
         _showPasswordMatchNotification = _settings.ShowPasswordMatchNotification;
@@ -1525,7 +1535,6 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         OnPropertyChanged(nameof(DefaultFormatText));
         OnPropertyChanged(nameof(CompressionLevelText));
-        OnPropertyChanged(nameof(CloseAfterCompressText));
         OnPropertyChanged(nameof(KeepOriginalExtensionText));
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
         OnPropertyChanged(nameof(CompressOptionsText));
@@ -1660,6 +1669,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AppearanceAppFontFamilyText));
         OnPropertyChanged(nameof(AppearanceMaxRecentFilesText));
         OnPropertyChanged(nameof(AppearanceAutoCloseDelayText));
+        OnPropertyChanged(nameof(AppearanceAutoCloseDelayHelpText));
+        OnPropertyChanged(nameof(ProgressPinByDefaultText));
+        OnPropertyChanged(nameof(ProgressPinByDefaultHelpText));
+        OnPropertyChanged(nameof(TabAppearanceGeneralHeader));
+        OnPropertyChanged(nameof(TabAppearanceProgressHeader));
         OnPropertyChanged(nameof(AppearanceCompactnessText));
         OnPropertyChanged(nameof(AppearanceCompactnessCompactText));
         OnPropertyChanged(nameof(AppearanceCompactnessNormalText));
@@ -1687,7 +1701,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compress
         _settings.DefaultFormat = SelectedDefaultFormatOption?.Value ?? DefaultFormat;
         _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
-        _settings.CloseAfterCompress = CloseAfterCompress;
         _settings.KeepOriginalExtension = KeepOriginalExtension;
         _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
 
@@ -1825,6 +1838,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.AppFontFamily = SelectedAppFontFamilyOption?.Value ?? AppFontFamily;
         _settings.CompactnessMode = SelectedCompactnessModeOption?.Value ?? CompactnessMode;
         _settings.AutoCloseDelaySeconds = Math.Clamp(AutoCloseDelaySeconds, 0, 60);
+        _settings.ProgressPinByDefault = ProgressPinByDefault;
 
         // Password
         _settings.ShowPasswordMatchNotification = ShowPasswordMatchNotification;

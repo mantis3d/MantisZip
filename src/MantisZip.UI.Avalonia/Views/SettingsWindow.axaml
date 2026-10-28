@@ -78,8 +78,6 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding CompressOptionsText}" FontWeight="SemiBold" />
-                      <CheckBox Content="{Binding CloseAfterCompressText}"
-                                IsChecked="{Binding CloseAfterCompress}" />
                       <CheckBox Content="{Binding KeepOriginalExtensionText}"
                                 IsChecked="{Binding KeepOriginalExtension}" />
                       <CheckBox Content="{Binding PreserveDirectoryRootText}"
@@ -679,85 +677,123 @@
         </Grid>
       </TabItem>
 
-      <!-- 外观设置选项卡：主题、紧凑度、最近文件数、界面字体 -->
+      <!-- 外观设置选项卡：两层子页签 —— 「外观」（主题/紧凑度/最近文件数/应用字体）+「进度窗口」（自动关闭延时/默认钉住） -->
       <TabItem Header="{Binding TabAppearanceHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconPaintBrush">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceThemeText}" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding ThemeOptions}"
-                          SelectedItem="{Binding SelectedThemeOption}"
-                          Width="200" HorizontalAlignment="Left">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock Text="{Binding Display}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </StackPanel>
-            </Border>
+        <Grid>
+          <TabControl TabStripPlacement="Top"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <!-- 外观 General：视觉相关的四项 -->
+            <TabItem Header="{Binding TabAppearanceGeneralHeader}" Classes="compactTab"
+                     controls:TabItemExtensions.TabIcon="IconPaintBrush">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+                  <!-- 主题（跟随系统/浅色/深色） -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceThemeText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding ThemeOptions}"
+                                SelectedItem="{Binding SelectedThemeOption}"
+                                Width="200" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
 
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceCompactnessText}" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding CompactnessModeOptions}"
-                          SelectedItem="{Binding SelectedCompactnessModeOption}"
-                          Width="200" HorizontalAlignment="Left">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock Text="{Binding Display}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </StackPanel>
-            </Border>
+                  <!-- 紧凑度：三档间距/控件高度 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceCompactnessText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding CompactnessModeOptions}"
+                                SelectedItem="{Binding SelectedCompactnessModeOption}"
+                                Width="200" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
 
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceMaxRecentFilesText}" FontWeight="SemiBold" />
-                <TextBox Text="{Binding MaxRecentFiles}"
-                         Width="120" HorizontalAlignment="Left"
-                         Background="{DynamicResource ThemeWindowBgBrush}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
-              </StackPanel>
-            </Border>
+                  <!-- 最近文件列表的最大条目数 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceMaxRecentFilesText}" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding MaxRecentFiles}"
+                               Width="120" HorizontalAlignment="Left"
+                               Background="{DynamicResource ThemeWindowBgBrush}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                    </StackPanel>
+                  </Border>
 
-            <!-- 进度窗口：完成后自动关闭延时（秒，0–60，0 = 立即关闭；📌/失败/测试流始终留窗） -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceAutoCloseDelayText}" FontWeight="SemiBold" />
-                <TextBox Text="{Binding AutoCloseDelaySeconds}"
-                         Width="120" HorizontalAlignment="Left"
-                         Background="{DynamicResource ThemeWindowBgBrush}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
-              </StackPanel>
-            </Border>
+                  <!-- 应用字体：仅影响界面文本，不影响归档文件名 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceAppFontFamilyText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding AppFontFamilyOptions}"
+                                SelectedItem="{Binding SelectedAppFontFamilyOption}"
+                                Width="240" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
 
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceAppFontFamilyText}" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding AppFontFamilyOptions}"
-                          SelectedItem="{Binding SelectedAppFontFamilyOption}"
-                          Width="240" HorizontalAlignment="Left">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock Text="{Binding Display}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </ScrollViewer>
+            <!-- 进度窗口 Progress：完成后的停留行为（自动关闭延时 + 默认钉住） -->
+            <TabItem Header="{Binding TabAppearanceProgressHeader}" Classes="compactTab"
+                     controls:TabItemExtensions.TabIcon="IconTimer">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+                  <!-- 完成后自动关闭延时（秒，0–60，0 = 立即关闭）；钉住/失败/测试流不走倒计时 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceAutoCloseDelayText}" FontWeight="SemiBold" />
+                      <TextBox Text="{Binding AutoCloseDelaySeconds}"
+                               Width="120" HorizontalAlignment="Left"
+                               Background="{DynamicResource ThemeWindowBgBrush}"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      <!-- 说明：仅未钉住且未出错时生效（钉住时仍可编辑，只提示不生效） -->
+                      <TextBlock Text="{Binding AppearanceAutoCloseDelayHelpText}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 默认钉住：勾上后进度窗口打开即 📌，完成/出错都等手动关闭 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <CheckBox Content="{Binding ProgressPinByDefaultText}"
+                                IsChecked="{Binding ProgressPinByDefault}" />
+                      <TextBlock Text="{Binding ProgressPinByDefaultHelpText}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+          </TabControl>
+        </Grid>
       </TabItem>
 
       <!-- 预览设置选项卡：包含通用/图片/文本/字体/种子/可执行文件/数据表格/元数据面板子选项卡 -->

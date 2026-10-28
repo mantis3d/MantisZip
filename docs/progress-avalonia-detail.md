@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 修复：删除「压缩完成后关闭对话框」死开关，新增「外观 → 进度窗口」子页签（默认钉住 📌）
+  - **症状**：设置窗口「压缩 → 通用 → 压缩选项」里的「压缩完成后关闭对话框」勾选框，勾不勾都没反应 —— 压缩完成后进度窗口该怎么关还怎么关。
+  - **根因**：`AppSettings.CloseAfterCompress` 从 v0.2.0（`4d43cb9c`）引入起就没接过线：全仓仅 5 处引用（XAML 2 + VM 3 + 设置模型 1），**运行时零消费者**。真正决定关窗的是 `AutoCloseDelaySeconds`（完成后自动关闭延时）+ 📌 `KeepOpenOnComplete`（失败 / 测试流 / 批处理行失败会自动压钉）。两个选项外观相同、一个生效一个不生效，用户无从分辨。
+  - **修法（五项）**：① 删掉该勾选框及全部绑定（`SettingsWindow.axaml` 控件、VM 的 `CloseAfterCompressText` / 载入 / 通知 / 保存四处、`AppSettings.CloseAfterCompress`、三语 key `Settings_Compress_CloseAfterDone`、`docs/ARCHITECTURE.md` 设置清单里那一项）；② 「外观」页改两层子页签：`外观`（主题 / 紧凑度 / 最近文件数 / 应用字体）+ 新增 `进度窗口`（自动关闭延时 + 默认钉住），延时只挪位置，存储与 VM 不动；③ 新增 `AppSettings.ProgressPinByDefault`（默认 false），由 `ProgressWindow` 构造函数写入 `_vm.KeepOpenOnComplete` 初始值 —— VM 自身仍不读 `AppSettings`（保持 `new ProgressViewModel()` 单测确定性），7 个 `new ProgressWindow(...)` 创建点一处都不用改；④ 钉住状态下延时框仍可编辑，只加一行说明「仅未钉住且未出错时生效」；⑤ **顺手修行为了缺口**：`WaitForManualCloseAsync` 原本只等 `Closed` 事件，导致「手动等待中解钉」不会恢复倒计时（D11：按钮状态 ≠ 实际行为），现改为同时等 `Closed` 与 `KeepOpenOnComplete` 变 false，`AutoCloseOrWaitAsync` 相应改成「钉住 ⇄ 倒计时」可来回切换的循环。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/ProgressWindowPinTests.cs` 8 例 —— 死字段反射确认消失、新字段默认 false、VM 默认不钉住、压钉隐藏倒计时、窗口按设置应用初始钉住、**解钉后恢复倒计时并关窗**（把 `_countdownRemainingMs` 压到 300ms 的端到端回归）、设置窗口源码守卫（无 `CloseAfterCompress`、有双子页签与三个新绑定）、三语 key 存在性。
+  - **验证**：avalonia Release 构建 0 警告 0 错误；UI 测试程序集 548 例全绿（3 Skip）；`-Task check` 0.5.4 六处一致 + 三语 1365 key + 五条守卫全绿；`-Task i18n` 通过。
+
 **2026-10-28** — 修复：便携版升级后设置丢失（便携包预置 settings.json + 读坏静默回落）
   - **症状**（issue #64 报告者）：把 `Data\*` 从 0.5.2 复制到 0.5.3 后设置全没了；报告者补充「印像中 0.5.1 到 0.5.2 也是，每次升级都要重设设置」。维护者本地反复测试无法复现（自己的 settings.json 由 0.5.3 自己写出，不触发下述两条）。
   - **根因（两条，第一条是主因、第二条是放大器）**：① `.github/workflows/release.yml` 的 `New-PortableZip([string]$Src, ...)` 每次都把 `installer/prebuilt/settings.json` 复制成 `$Src\Data\settings.json`（并做 `__LANG__`/`__THEME__` 替换 —— 占位符早就不存在，属死代码）⇒ 用户按「解压到同一目录覆盖」升级时，包里那份默认设置把用户设置冲掉；安装版由 `installer.iss` 的 `if not FileExists(SettingsFile) then ... else 记日志保留用户设置` 保护，所以只有便携 zip 受影响。② `AppSettings.Load()` 的 `catch { return new AppSettings(); }` 把任何反序列化/迁移异常静默吞成「全部默认值」，不留日志、不留备份，随后任一次 `Save()` 的 `File.WriteAllText` 直接覆盖原文件 ⇒ 用户侧不可逆，且事后没有任何证据。

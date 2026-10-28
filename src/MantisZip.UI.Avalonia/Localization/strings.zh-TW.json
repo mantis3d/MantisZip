@@ -1,4 +1,9 @@
 ﻿{
+"Settings_Tab_Appearance_General": "外觀",
+"Settings_Tab_Appearance_Progress": "進度視窗",
+"Settings_Progress_AutoCloseDelay_Help": "僅在進度視窗未釘住（📌）且未發生錯誤時生效；0 表示完成後立即關閉。",
+"Settings_Progress_PinByDefault": "預設釘住進度視窗（📌）",
+"Settings_Progress_PinByDefault_Help": "勾選後進度視窗一開啟就是釘住狀態：完成或發生錯誤都不會自動關閉，需要手動關閉。",
   "Update_TabName": "更新",
   "Update_CurrentVersion": "目前版本",
   "Update_CheckNow": "檢查更新",
@@ -895,7 +900,6 @@
   "Settings_Assoc_UserCustom": "使用者自定",
 
   "Settings_Cancel": "取消",
-  "Settings_Compress_CloseAfterDone": "壓縮完成後關閉對話框",
   "Settings_Compress_KeepExt": "保留原檔案副檔名",
   "Settings_Compress_PreserveRoot": "壓縮資料夾時保留外層目錄",
   "Settings_CompressionLevel": "壓縮層級",

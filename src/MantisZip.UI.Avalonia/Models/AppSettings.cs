@@ -17,7 +17,6 @@ public class AppSettings
     // ===== 压缩 =====
     public string DefaultFormat { get; set; } = "zip";
     public int DefaultLevel { get; set; } = 5;
-    public bool CloseAfterCompress { get; set; } = true;
     public bool KeepOriginalExtension { get; set; } = false;
     public string ZipEncoding { get; set; } = "utf-8";
     public string SevenZipCompressionMethod { get; set; } = "LZMA2";
@@ -110,6 +109,12 @@ public class AppSettings
     // ===== 进度窗口 =====
     /// <summary>完成后自动关闭延时（秒，0–60；0 = 立即关闭）。📌/失败/测试流不受此影响（始终留窗）。</summary>
     public int AutoCloseDelaySeconds { get; set; } = 3;
+
+    /// <summary>
+    /// 进度窗口默认是否钉住（📌）：true = 一打开就钉住，完成/出错都等手动关闭。
+    /// 由 <c>ProgressWindow</c> 构造时写入 VM 初始值；失败/测试流/批处理行失败的自动压钉是单向的，不受本项影响。
+    /// </summary>
+    public bool ProgressPinByDefault { get; set; } = false;
 
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
