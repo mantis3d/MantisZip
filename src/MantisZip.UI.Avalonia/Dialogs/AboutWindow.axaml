@@ -475,10 +475,28 @@
                     Padding="{DynamicResource SpacingMdThk}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
 
-                <!-- 最新版本号行 -->
-                <TextBlock Text="{Binding UpdateLatestVersionText}"
-                           FontSize="14" FontWeight="Bold"
-                           Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                <!-- 版本行 + 下载按钮同一行：更新说明可能很长，把唯一的操作按钮放在详情区顶部，
+                     用户不用拉到最底下才找得到（2026-10-28 用户反馈调整） -->
+                <Grid ColumnDefinitions="*,Auto"
+                      ColumnSpacing="{DynamicResource SpacingSm}">
+
+                  <!-- 最新版本号（左） -->
+                  <TextBlock Text="{Binding UpdateLatestVersionText}"
+                             VerticalAlignment="Center"
+                             TextWrapping="Wrap"
+                             FontSize="14" FontWeight="Bold"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+                  <!-- 打开发布页按钮（右）：应用内不下载，交给系统浏览器（不写本地 Padding，见上方按钮注释） -->
+                  <Button Grid.Column="1"
+                          Content="{Binding UpdateDownloadText}"
+                          Click="OnOpenReleasePageClick"
+                          VerticalAlignment="Center"
+                          Height="{DynamicResource ControlHeight}"
+                          Background="{DynamicResource ThemeAccentBrush}"
+                          Foreground="White"
+                          BorderThickness="0" />
+                </Grid>
 
                 <!-- 发布日期行（接口未给出日期时文本为空串） -->
                 <TextBlock Text="{Binding UpdatePublishDateText}"
@@ -501,15 +519,6 @@
                         CornerRadius="{DynamicResource BorderRadius}">
                   <ContentControl x:Name="NotesHost" />
                 </Border>
-
-                <!-- 打开发布页按钮：应用内不下载，交给系统浏览器（同样不写本地 Padding，见上方按钮注释） -->
-                <Button Content="{Binding UpdateDownloadText}"
-                        Click="OnOpenReleasePageClick"
-                        HorizontalAlignment="Left"
-                        Height="{DynamicResource ControlHeight}"
-                        Background="{DynamicResource ThemeAccentBrush}"
-                        Foreground="White"
-                        BorderThickness="0" />
               </StackPanel>
             </Border>
           </StackPanel>

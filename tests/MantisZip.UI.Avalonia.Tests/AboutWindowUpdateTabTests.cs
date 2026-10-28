@@ -199,6 +199,25 @@ public class AboutWindowUpdateTabTests
                 // Markdown 的列表项也要真的渲染成控件（不是把原文当一行纯文本塞进去）
                 Assert.Contains("第一处修复", rendered);
 
+                // 「下载」按钮必须在更新说明**上方**：更新说明可能很长，操作按钮放底部
+                // 就得先滚到底才看得见（2026-10-28 用户反馈的排版问题）。
+                var downloadButton = tabs.GetVisualDescendants().OfType<Button>()
+                    .First(b => (b.Content as string) == LocalizationManager.T("Update_Download"));
+                var versionText = tabs.GetVisualDescendants().OfType<TextBlock>()
+                    .First(t => t.Text == window.UpdateLatestVersionText);
+                var notesBorder = notesHost.GetVisualAncestors().OfType<Border>().First();
+
+                var downloadTop = downloadButton.TranslatePoint(default, window)!.Value.Y;
+                var notesTop = notesBorder.TranslatePoint(default, window)!.Value.Y;
+                var versionCenter = versionText.TranslatePoint(default, window)!.Value.Y + (versionText.Bounds.Height / 2);
+                var downloadCenter = downloadButton.TranslatePoint(default, window)!.Value.Y + (downloadButton.Bounds.Height / 2);
+
+                Assert.True(
+                    downloadTop < notesTop,
+                    $"「下载」按钮应在更新说明上方（download.Y={downloadTop:F1}，notes.Y={notesTop:F1}）");
+                // 与「最新版本」同一行：两者垂直中心对齐（允许布局取整的 2px 误差）
+                Assert.InRange(Math.Abs(downloadCenter - versionCenter), 0, 2);
+
                 window.Close();
             }
             finally
