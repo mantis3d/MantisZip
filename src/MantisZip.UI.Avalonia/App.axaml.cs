@@ -435,7 +435,13 @@ public partial class App : Application
                 if (!UpdateService.ShouldCheck(settings.LastUpdateCheckTime, DateTime.UtcNow))
                     return;
 
-                var info = await UpdateService.CheckForUpdateAsync(AppConstants.Version);
+                // 调试夹具：Debug 构建可用 %LOCALAPPDATA%\MantisZip\fake-current-version.txt 覆盖比较基准
+                //（本地开发版永远比线上正式版新，「发现新版本」在开发者机器上本来走不到）
+                var checkVersion = Services.DebugUpdateVersion.Effective;
+                if (!string.Equals(checkVersion, AppConstants.Version, StringComparison.Ordinal))
+                    DebugLog($"[UpdateCheck] 使用调试假版本参与比较：{checkVersion}（真实 {AppConstants.Version}）");
+
+                var info = await UpdateService.CheckForUpdateAsync(checkVersion);
 
                 // 无更新 / 网络失败：记录检查时间后静默返回。
                 // 记录时间是必要的——否则 ShouldCheck 的 24h 节流永远不生效，每次启动都会重复请求。

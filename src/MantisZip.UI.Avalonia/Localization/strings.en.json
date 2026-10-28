@@ -17,6 +17,7 @@
   "Update_PublishDate": "Published {0}",
   "Update_Settings_AutoCheck": "Check for updates on startup",
   "Update_Settings_SectionTitle": "Update settings",
+"Update_DebugFakeVersionFmt": " (debug: real version {0})",
   "Preview_PartialText": "Showing the first {0:F1} MB of {1:F1} MB",
   "Settings_Window_NoExecutor": "The settings dialog has no executor and cannot start.",
   "Error_Extract_DestinationInvalid": "The destination folder is invalid. Please choose a usable folder.",

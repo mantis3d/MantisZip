@@ -93,8 +93,20 @@ public partial class AboutWindow : Window, INotifyPropertyChanged
     /// <summary>「打开下载页」按钮文字。</summary>
     public string UpdateDownloadText => LocalizationManager.T("Update_Download");
 
-    /// <summary>当前版本行（只读，取 AppConstants.Version）。</summary>
-    public string UpdateCurrentVersionText => LocalizationManager.T("Update_CurrentVersion") + " " + AppConstants.Version;
+    /// <summary>当前版本行（只读；参与比较的版本，Debug 下可能被调试夹具覆盖）。</summary>
+    public string UpdateCurrentVersionText
+    {
+        get
+        {
+            // 版本号取「实际参与比较的版本」：Debug 下可能被 fake-current-version.txt 覆盖，
+            // 覆盖时追加一句真实版本，免得看到「0.0.1 发现新版本 v0.5.3」误以为版本号坏了。
+            var effective = DebugUpdateVersion.Effective;
+            var text = LocalizationManager.T("Update_CurrentVersion") + " " + effective;
+            return DebugUpdateVersion.IsOverridden
+                ? text + LocalizationManager.T("Update_DebugFakeVersionFmt", AppConstants.Version)
+                : text;
+        }
+    }
 
     /// <summary>最近一次检查发现的新版本；null = 尚未检查或已是最新（供「打开下载页」使用）。</summary>
     private UpdateInfo? _latest;
@@ -272,7 +284,8 @@ public partial class AboutWindow : Window, INotifyPropertyChanged
             _latest = null;
             ShowLatestVersion = false;
 
-            var info = await UpdateService.CheckForUpdateAsync(AppConstants.Version);
+            // 与启动检查共用同一解析器：Debug 下允许 fake-current-version.txt 覆盖比较基准
+            var info = await UpdateService.CheckForUpdateAsync(DebugUpdateVersion.Effective);
 
             // 不论结果都记录本次检查时间：与设置页 / 启动检查共用同一节流字段（24h）
             var settings = AppSettings.Load();
