@@ -1,4 +1,5 @@
 ﻿{
+  "Preview_PartialText": "Showing the first {0:F1} MB of {1:F1} MB",
   "Settings_Window_NoExecutor": "The settings dialog has no executor and cannot start.",
   "Error_Extract_DestinationInvalid": "The destination folder is invalid. Please choose a usable folder.",
   "Error_Extract_NoEntries": "There is no archive to extract.",

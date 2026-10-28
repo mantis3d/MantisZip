@@ -1077,10 +1077,19 @@ var secureHtml = InjectCspMeta(html, csp);
         return meta + html;
     }
 
-    /// <summary>显示文本预览。</summary>
+    /// <summary>显示文本预览（路径版：回落与既有调用方使用，内部转调内存版）。</summary>
     public void ShowText(string filePath)
+        => ShowText(File.ReadAllBytes(filePath), Path.GetFileName(filePath));
+
+    /// <summary>
+    /// 显示文本预览（内存版，路径版保留给回落）：字节直接用，BOM/编码探测逻辑与路径版完全一致。
+    /// </summary>
+    /// <param name="bytes">条目完整字节（不做截断）。</param>
+    /// <param name="entryName">条目名，仅用于日志定位。</param>
+    public void ShowText(byte[] bytes, string entryName)
     {
-        _textPreviewBytes = File.ReadAllBytes(filePath);
+        App.DebugLog($"[PRV] ShowText(bytes): {entryName}, {bytes.Length} bytes");
+        _textPreviewBytes = bytes;
         var (text, _) = DecodePreviewBytes();
         TextContent = text;
         PreviewType = PreviewType.Text;
@@ -1140,12 +1149,19 @@ var secureHtml = InjectCspMeta(html, csp);
         UpdateCommonMetadata(archiveName, string.Empty, string.Empty, string.Empty, string.Empty);
     }
 
-    /// <summary>
-    /// 显示 CSV 表格预览。
-    /// </summary>
+    /// <summary>显示 CSV 表格预览（路径版：回落与既有调用方使用，内部转调内存版）。</summary>
     public void ShowCsv(string filePath)
+        => ShowCsv(File.ReadAllBytes(filePath), Path.GetFileName(filePath));
+
+    /// <summary>
+    /// 显示 CSV 表格预览（内存版，路径版保留给回落）：字节直接解码建表，逻辑与路径版一致。
+    /// </summary>
+    /// <param name="bytes">条目完整字节（不做截断）。</param>
+    /// <param name="entryName">条目名，仅用于日志定位。</param>
+    public void ShowCsv(byte[] bytes, string entryName)
     {
-        _textPreviewBytes = File.ReadAllBytes(filePath);
+        App.DebugLog($"[PRV] ShowCsv(bytes): {entryName}, {bytes.Length} bytes");
+        _textPreviewBytes = bytes;
         var (text, _) = DecodePreviewBytes();
         RebuildCsv(text);
         PreviewType = PreviewType.Csv;
@@ -1217,58 +1233,109 @@ var secureHtml = InjectCspMeta(html, csp);
 
     // ── Image ──
 
-    /// 显示图片预览。
+    /// <summary>
+    /// 显示图片预览（路径版）：调用方已落盘，或字节版返回 <c>false</c> 后回落再走这里。
     /// </summary>
     public void ShowImage(string filePath)
     {
         App.DebugLog($"[IMG] ShowImage: {filePath}");
         App.DebugLog($"[IMG] Before: PreviewType={PreviewType}, PreviewImage={(PreviewImage != null ? $"w{ImageWidth}xh{ImageHeight}" : "null")}");
 
-        // AVIF 使用 ImageSharp 解码（SkiaSharp 对 AVIF 解码支持有限）
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
+        using var fs = File.OpenRead(filePath);
+        ShowImageCore(fs, ext, filePath);
+    }
+
+    /// <summary>
+    /// 显示图片预览（内存版，路径版保留给回落）：不落盘，字节流直接交给解码器。
+    /// </summary>
+    /// <param name="bytes">条目完整字节。</param>
+    /// <param name="entryName">条目名（取扩展名判类型）。</param>
+    /// <returns>
+    /// <c>true</c> = 已渲染；<c>false</c> = 本类型不能走内存
+    /// （ICO / GIF / APNG / SVG / TGA / AVIF / 多帧动画 WebP），调用方必须回落到路径版。
+    /// </returns>
+    public bool ShowImage(byte[] bytes, string entryName)
+    {
+        var ext = Path.GetExtension(entryName).ToLowerInvariant();
+        if (PreviewService.RequiresRealPathForImage(ext))
+        {
+            App.DebugLog($"[IMG] ShowImage(bytes) skipped: {ext} requires a real path");
+            return false;
+        }
+
+        App.DebugLog($"[IMG] ShowImage(bytes): {entryName}, {bytes.Length} bytes");
+        using var ms = new MemoryStream(bytes, writable: false);
+        return ShowImageCore(ms, ext, filePath: null);
+    }
+
+    /// <summary>
+    /// 图片解码核心（路径版 / 内存版共用）。
+    ///
+    /// <para>
+    /// 同一个 <paramref name="seekable"/> 会被 SKCodec 探测、位图构造、<c>DecodeToWidth</c>
+    /// 多次消费——**每个消费者前都必须显式复位 <c>Position = 0</c>**；
+    /// 漏一次的症状是「第一次能看、之后全黑」。
+    /// </para>
+    /// </summary>
+    /// <param name="seekable">可 seek 的内容流（FileStream 或零拷贝 MemoryStream）。</param>
+    /// <param name="ext">小写扩展名。</param>
+    /// <param name="filePath">真实文件路径；内存版传 <c>null</c>（需要路径的回落分支改为返回 <c>false</c>）。</param>
+    /// <returns><c>false</c> = 本类型必须落盘，调用方回落路径版。</returns>
+    private bool ShowImageCore(Stream seekable, string ext, string? filePath)
+    {
+        // AVIF 使用 ImageSharp 解码（SkiaSharp 对 AVIF 解码支持有限）
         if (ext.Equals(".avif", StringComparison.OrdinalIgnoreCase))
         {
+            if (filePath == null) return false;
             ShowAvifImage(filePath);
-            return;
+            return true;
         }
 
         // TGA 使用 ImageSharp 解码（SkiaSharp 对 TGA 解码支持有限，特别是 RLE 压缩）
         if (ext.Equals(".tga", StringComparison.OrdinalIgnoreCase))
         {
+            if (filePath == null) return false;
             ShowTgaImage(filePath);
-            return;
+            return true;
         }
 
         // 解码尺寸策略：DecodeToWidth 会无条件把位图缩放到目标宽度（小图也会被放大），
         // 因此先经 SKCodec 读头部拿真实宽度，仅当宽 > 1920 时才降采样；小图原生解码保持清晰度，
         // 与 WPF 版 ShowImage 的 DecodePixelWidth 门槛语义一致。
         global::Avalonia.Media.Imaging.Bitmap bitmap;
-        using (var fs = File.OpenRead(filePath))
+        using (var skStream = new SKManagedStream(seekable, disposeManagedStream: false))
+        using (var codec = SKCodec.Create(skStream))
         {
-            using var skStream = new SKManagedStream(fs, disposeManagedStream: false);
-            using var codec = SKCodec.Create(skStream);
             if (codec == null || codec.Info.Width <= 0)
             {
                 // codec 无法解析时退回原生解码路径（解码失败由上层异常处理）
-                fs.Position = 0;
-                bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
+                // 复位点 ①：codec 探测已消费过流头，位图构造必须从头读
+                seekable.Position = 0;
+                bitmap = new global::Avalonia.Media.Imaging.Bitmap(seekable);
             }
             else if (codec.FrameCount > 1)
             {
                 // 动画（当前为 Animated WebP；GIF 由分类直接走 ShowGif 不经此路径）：
-                // 复用通用动画预览——播放/暂停/帧导航 + 透明棋盘格（Task 2 已注册能力）
+                // 复用通用动画预览——播放/暂停/帧导航 + 透明棋盘格（Task 2 已注册能力）。
+                // ShowGif 依赖 GifDecoder/ApngDecoder 的 path 版，内存版只能让调用方回落。
+                if (filePath == null)
+                    return false;
+
                 ShowGif(filePath);
-                return;
+                return true;
             }
             else if (codec.Info.Width > 1920)
             {
-                fs.Position = 0;
-                bitmap = global::Avalonia.Media.Imaging.Bitmap.DecodeToWidth(fs, 1920);
+                // 复位点 ②：codec 探测后流位置不在开头，DecodeToWidth 必须从头读
+                seekable.Position = 0;
+                bitmap = global::Avalonia.Media.Imaging.Bitmap.DecodeToWidth(seekable, 1920);
             }
             else
             {
-                fs.Position = 0;
-                bitmap = new global::Avalonia.Media.Imaging.Bitmap(fs);
+                // 复位点 ③：同上，原生解码从头读
+                seekable.Position = 0;
+                bitmap = new global::Avalonia.Media.Imaging.Bitmap(seekable);
             }
         }
         App.DebugLog($"[IMG] Bitmap loaded: {bitmap.PixelSize.Width}x{bitmap.PixelSize.Height}, dpi={bitmap.Dpi.X}x{bitmap.Dpi.Y}");
@@ -1297,6 +1364,7 @@ var formatValues = new Dictionary<string, string?>
         };
         MetadataHelper.RenderFormatToViewModel(this, formatValues, "image");
         App.DebugLog($"[IMG] ShowImage done: PreviewType={PreviewType}, Zoom={ZoomLevel}, IsToolbarVisible={IsToolbarVisible}");
+        return true;
     }
 
     /// <summary>
@@ -1906,9 +1974,13 @@ var formatValues = new Dictionary<string, string?>
             using var typeface = SkiaSharp.SKTypeface.FromStream(memStream);
             if (typeface != null)
             {
+                using var font = new SkiaSharp.SKFont(typeface, FontSize);
+
                 // ── 检测字体是否支持 CJK 字符 ──
+                // 注：SKTypeface.GetGlyphs 在 SkiaSharp 4.x 已标记 Obsolete（CS0618），
+                // 改用 SKFont.GetGlyphs（与后续 MeasureText / DrawText 共用同一个 SKFont）。
                 var testChars = "中天国汉字";
-                var testGlyphs = typeface.GetGlyphs(testChars.AsSpan());
+                var testGlyphs = font.GetGlyphs(testChars.AsSpan());
                 bool supportsCjk = testGlyphs.Any(g => g != 0);
 
                 if (!supportsCjk)
@@ -1941,7 +2013,7 @@ var formatValues = new Dictionary<string, string?>
 
                 var textColor = isDark ? SkiaSharp.SKColors.White : SkiaSharp.SKColors.Black;
 
-                using var font = new SkiaSharp.SKFont(typeface, FontSize);
+                // SKFont 已在块首创建（CJK 探测复用同一个实例）
                 using var paint = new SkiaSharp.SKPaint
                 {
                     Color = textColor,
@@ -2927,8 +2999,8 @@ var formatValues = new Dictionary<string, string?>
     }
 
     /// <summary>
-    /// 显示 PDF 预览：PdfPig 解析元数据 + SkiaSharp 逐页位图渲染。
-    /// 渲染在后台线程进行，避免阻塞 UI。
+    /// 显示 PDF 预览（路径版）：调用方已落盘，或字节版打开失败后回落再走这里。
+    /// PdfPig 解析元数据 + SkiaSharp 逐页位图渲染。渲染在后台线程进行，避免阻塞 UI。
     /// </summary>
     public async Task ShowPdfAsync(string filePath)
     {
@@ -2947,54 +3019,111 @@ var formatValues = new Dictionary<string, string?>
             _pdfDocument?.Dispose();
             _pdfDocument = null;
 
-            (PdfDocument doc, int totalPages, float renderScale) = await Task.Run(() =>
-            {
-                var d = PdfDocument.Open(filePath, SkiaRenderingParsingOptions.Instance);
-                d.AddSkiaPageFactory();
+            var opened = await Task.Run(
+                () => OpenPdfDocument(() => PdfDocument.Open(filePath, SkiaRenderingParsingOptions.Instance)));
 
-                // 获取第 1 页实际尺寸，计算合适的渲染缩放比例
-                float scale = 1.0f;
-                try
-                {
-                    var page = d.GetPage(1);
-                    float pw = (float)page.Width;
-                    float ph = (float)page.Height;
-                    const float maxW = 1920f, maxH = 1080f;
-                    if (pw > maxW || ph > maxH)
-                        scale = Math.Min(maxW / pw, maxH / ph);
-                }
-                catch { /* 尺寸获取失败，用默认 1.0 */ }
-
-                return (d, d.NumberOfPages, scale);
-            });
-
-            _pdfDocument = doc;
-            _pdfTotalPages = totalPages;
-            _pdfRenderScale = renderScale;
-            PdfPageInfo = $"1 / {_pdfTotalPages}";
-
-            await LoadPdfPageAsync(1);
-
-            // 渲染完成，一次性设置 UI 状态
-            PreviewType = PreviewType.Pdf;
-            IsPreviewVisible = true;
-            IsToolbarVisible = false;
-            PreviewHeaderText = $"PDF {info.AdditionalInfo ?? ""}";
-            var pdfFormatValues = new Dictionary<string, string?>();
-            if (info.Title != null) pdfFormatValues[MetadataKeys.Title] = info.Title;
-            if (info.Author != null) pdfFormatValues[MetadataKeys.Author] = info.Author;
-            if (info.Subject != null) pdfFormatValues[MetadataKeys.Subject] = info.Subject;
-            if (info.PageCount.HasValue) pdfFormatValues[MetadataKeys.PageCount] = info.PageCount.Value.ToString();
-            pdfFormatValues[MetadataKeys.Encrypted] = info.IsEncrypted == true ? LocalizationManager.T("MsgBox_Yes") : LocalizationManager.T("MsgBox_No");
-            if (info.CreationDate.HasValue) pdfFormatValues[MetadataKeys.CreatedDate] = info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm");
-            if (info.ModifiedDate.HasValue) pdfFormatValues[MetadataKeys.DocModifiedDate] = info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm");
-            MetadataHelper.RenderFormatToViewModel(this, pdfFormatValues, "pdf");
+            await ApplyPdfDocumentAsync(opened, info);
         }
         catch (Exception ex)
         {
             App.DebugLog($"[PDF] Failed to open or render PDF: {ex.Message}");
             ShowUnsupported(LocalizationManager.T("Preview_PdfOpenFailed"));
         }
+    }
+
+    /// <summary>
+    /// 显示 PDF 预览（内存版，路径版保留给回落）：字节直接交给 PdfPig，不落盘、不占文件句柄。
+    /// </summary>
+    /// <param name="bytes">PDF 条目完整字节。</param>
+    /// <param name="entryName">条目名（取扩展名）。</param>
+    public async Task ShowPdfAsync(byte[] bytes, string entryName)
+    {
+        App.DebugLog($"[PDF] ShowPdfAsync(bytes): {entryName}, {bytes.Length} bytes");
+
+        var info = PdfParser.Parse(bytes, Path.GetExtension(entryName));
+        if (info == null)
+        {
+            ShowUnsupported(LocalizationManager.T("Preview_PdfParseFailed"));
+            return;
+        }
+
+        try
+        {
+            _pdfDocument?.Dispose();
+            _pdfDocument = null;
+
+            var opened = await Task.Run(() => OpenPdfDocument(() =>
+                // 关键：必须用 PdfDocument.Open(byte[], ParsingOptions) —— PdfPig 内部自建 MemoryStream
+                // 并由文档自己持有；**不能**在本方法内 using 一个 MemoryStream 再 Open(Stream)，
+                // 那样离开 using 后翻页必抛 ObjectDisposedException（PdfPig 要求调用方管理流生命周期）。
+                PdfDocument.Open(bytes, SkiaRenderingParsingOptions.Instance)));
+
+            await ApplyPdfDocumentAsync(opened, info);
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[PDF] Failed to open or render PDF from memory ({entryName}): {ex.Message}");
+            ShowUnsupported(LocalizationManager.T("Preview_PdfOpenFailed"));
+        }
+    }
+
+    /// <summary>
+    /// PDF 打开结果：文档实例 + 总页数 + 首屏渲染缩放（后台线程产出，交回 UI 线程消费）。
+    /// </summary>
+    private readonly record struct PdfOpenResult(PdfDocument Document, int TotalPages, float RenderScale);
+
+    /// <summary>
+    /// 打开 PdfPig 文档、注册 Skia 页工厂并计算首屏渲染缩放（后台线程调用）。
+    /// 打开方式由 <paramref name="open"/> 决定：路径版走 <c>PdfDocument.Open(string, …)</c>，
+    /// 内存版走 <c>PdfDocument.Open(byte[], …)</c>；其余逻辑完全共用。
+    /// </summary>
+    private static PdfOpenResult OpenPdfDocument(Func<PdfDocument> open)
+    {
+        var d = open();
+        d.AddSkiaPageFactory();
+
+        // 获取第 1 页实际尺寸，计算合适的渲染缩放比例
+        float scale = 1.0f;
+        try
+        {
+            var page = d.GetPage(1);
+            float pw = (float)page.Width;
+            float ph = (float)page.Height;
+            const float maxW = 1920f, maxH = 1080f;
+            if (pw > maxW || ph > maxH)
+                scale = Math.Min(maxW / pw, maxH / ph);
+        }
+        catch { /* 尺寸获取失败，用默认 1.0 */ }
+
+        return new PdfOpenResult(d, d.NumberOfPages, scale);
+    }
+
+    /// <summary>
+    /// 装载已打开的 PDF、渲染第一页并设置 UI 状态（路径版 / 内存版共用）。
+    /// </summary>
+    private async Task ApplyPdfDocumentAsync(PdfOpenResult opened, FileFormatInfo info)
+    {
+        _pdfDocument = opened.Document;
+        _pdfTotalPages = opened.TotalPages;
+        _pdfRenderScale = opened.RenderScale;
+        PdfPageInfo = $"1 / {_pdfTotalPages}";
+
+        await LoadPdfPageAsync(1);
+
+        // 渲染完成，一次性设置 UI 状态
+        PreviewType = PreviewType.Pdf;
+        IsPreviewVisible = true;
+        IsToolbarVisible = false;
+        PreviewHeaderText = $"PDF {info.AdditionalInfo ?? ""}";
+        var pdfFormatValues = new Dictionary<string, string?>();
+        if (info.Title != null) pdfFormatValues[MetadataKeys.Title] = info.Title;
+        if (info.Author != null) pdfFormatValues[MetadataKeys.Author] = info.Author;
+        if (info.Subject != null) pdfFormatValues[MetadataKeys.Subject] = info.Subject;
+        if (info.PageCount.HasValue) pdfFormatValues[MetadataKeys.PageCount] = info.PageCount.Value.ToString();
+        pdfFormatValues[MetadataKeys.Encrypted] = info.IsEncrypted == true ? LocalizationManager.T("MsgBox_Yes") : LocalizationManager.T("MsgBox_No");
+        if (info.CreationDate.HasValue) pdfFormatValues[MetadataKeys.CreatedDate] = info.CreationDate.Value.ToString("yyyy-MM-dd HH:mm");
+        if (info.ModifiedDate.HasValue) pdfFormatValues[MetadataKeys.DocModifiedDate] = info.ModifiedDate.Value.ToString("yyyy-MM-dd HH:mm");
+        MetadataHelper.RenderFormatToViewModel(this, pdfFormatValues, "pdf");
     }
 
     private async Task LoadPdfPageAsync(int pageNumber)
@@ -3206,14 +3335,20 @@ var formatValues = new Dictionary<string, string?>
         }
     }
 
-    /// <summary>
-    /// 显示 Markdown 预览（Markdig AST → Avalonia 控件树）。
-    /// 使用 <see cref="MarkdownPreviewBuilder"/> 将 Markdown 转换为纯控件树，
-    /// 替代原有的 Markdig → HTML → WebView2 管线。
-    /// </summary>
+    /// <summary>显示 Markdown 预览（路径版：回落与既有调用方使用，内部转调内存版）。</summary>
     public void ShowMarkdownPreview(string filePath)
+        => ShowMarkdownPreview(File.ReadAllBytes(filePath), Path.GetFileName(filePath));
+
+    /// <summary>
+    /// 显示 Markdown 预览（内存版，路径版保留给回落）：字节直接解码后走同一套
+    /// <see cref="MarkdownPreviewBuilder"/> 控件树构建路径，不落盘。
+    /// </summary>
+    /// <param name="bytes">条目完整字节（不做截断）。</param>
+    /// <param name="entryName">条目名，仅用于日志定位。</param>
+    public void ShowMarkdownPreview(byte[] bytes, string entryName)
     {
-        _textPreviewBytes = File.ReadAllBytes(filePath);
+        App.DebugLog($"[PRV] ShowMarkdownPreview(bytes): {entryName}, {bytes.Length} bytes");
+        _textPreviewBytes = bytes;
         var (markdown, _) = DecodePreviewBytes();
         RebuildMarkdown(markdown);
         OnPropertyChanged(nameof(CurrentDetectedEncodingName));
