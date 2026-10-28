@@ -41,6 +41,16 @@ public partial class App : Application
     private const string CompressSeparatePipeName = "MantisZipCompressSeparatePipe";
     private const string CompressCombinedMutexName = "MantisZipCompressCombinedMutex";
     private const string CompressCombinedPipeName = "MantisZipCompressCombinedPipe";
+    // 解压族：多选时 Explorer 可能逐项启动进程（静态层叠兜底菜单只带 %1），
+    // 每个动词各自一组互斥量/管道名，互不干扰
+    private const string ExtractMutexName = "MantisZipExtractMutex";
+    private const string ExtractPipeName = "MantisZipExtractPipe";
+    private const string ExtractHereMutexName = "MantisZipExtractHereMutex";
+    private const string ExtractHerePipeName = "MantisZipExtractHerePipe";
+    private const string ExtractToNameMutexName = "MantisZipExtractToNameMutex";
+    private const string ExtractToNamePipeName = "MantisZipExtractToNamePipe";
+    private const string ExtractSmartMutexName = "MantisZipExtractSmartMutex";
+    private const string ExtractSmartPipeName = "MantisZipExtractSmartPipe";
 
     // ── 主题字典缓存（startup-theme-dedup-trace：消除启动期 ApplyTheme 双重加载）──
 
@@ -291,54 +301,26 @@ public partial class App : Application
 
                     case "--extract":
                         // 弹出解压设置窗口（对齐 WPF HandleExtractBatch mode=extract）：
-                        // 用户选择目标路径 / 冲突策略 / 过滤条件后批处理解压，取消则退出
-                        _ = RunExtractDialogCliAsync(cmdPaths.ToList(), desktop);
+                        // 用户选择目标路径 / 冲突策略 / 过滤条件后批处理解压，取消则退出。
+                        // 多选时 Explorer 可能逐项启动进程（静态层叠兜底菜单只带 %1），
+                        // 先做 IPC 合并，保证只弹一个设置窗。
+                        HandleExtract(cmdPaths.ToList(), desktop);
                         break;
 
                     case "--extract-here":
                         // Extract to each archive's directory (压缩包所在目录), not the process working directory
-                        // 单文件走原流程（含提权预检）；多文件走批处理（ShellExt 多选时一次传入全部路径）
-                        {
-                            var herePaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
-                            if (herePaths.Count == 0)
-                                AppShutdown.Request(desktop.Shutdown);
-                            else if (herePaths.Count == 1)
-                                _ = RunExtractCliAsync(herePaths[0], Path.GetDirectoryName(herePaths[0]) ?? ".", args, desktop);
-                            else
-                                _ = RunCliDirectExtractBatchAsync(herePaths, "here", desktop);
-                        }
+                        // 多选时同样先做 IPC 合并，再按最终数量走单文件流程或批处理
+                        HandleDirectExtract(cmdPaths.ToList(), "here", args, desktop);
                         break;
 
                     case "--extract-to-name":
                         // Extract to subfolder named after archive (no extension)
-                        {
-                            var toNamePaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
-                            if (toNamePaths.Count == 0)
-                                AppShutdown.Request(desktop.Shutdown);
-                            else if (toNamePaths.Count == 1)
-                            {
-                                var toNameTarget = Path.Combine(
-                                    Path.GetDirectoryName(toNamePaths[0]) ?? ".",
-                                    GetArchiveBaseName(toNamePaths[0]));
-                                Directory.CreateDirectory(toNameTarget);
-                                _ = RunExtractCliAsync(toNamePaths[0], toNameTarget, args, desktop);
-                            }
-                            else
-                                _ = RunCliDirectExtractBatchAsync(toNamePaths, "toname", desktop);
-                        }
+                        HandleDirectExtract(cmdPaths.ToList(), "toname", args, desktop);
                         break;
 
                     case "--extract-smart":
                         // Smart extract: analyze archive structure and choose extraction mode
-                        {
-                            var smartPaths = cmdPaths.Where(p => !string.IsNullOrEmpty(p) && File.Exists(p)).ToList();
-                            if (smartPaths.Count == 0)
-                                AppShutdown.Request(desktop.Shutdown);
-                            else if (smartPaths.Count == 1)
-                                _ = RunExtractSmartCliAsync(smartPaths[0], args, desktop);
-                            else
-                                _ = RunCliDirectExtractBatchAsync(smartPaths, "smart", desktop);
-                        }
+                        HandleDirectExtract(cmdPaths.ToList(), "smart", args, desktop);
                         break;
 
                     case "--compress":

@@ -81,7 +81,7 @@ public class SplashTextSpecTests : IDisposable
     }
 
     [Fact]
-    public void ExtractSingleExistingFile_UsesExtractingFmtWithFileName()
+    public void ExtractSingleExistingFile_UsesNeutralTextWithoutFileName()
     {
         var zip = Path.Combine(_dir, "demo-single.zip");
         File.WriteAllText(zip, "stub");
@@ -89,10 +89,34 @@ public class SplashTextSpecTests : IDisposable
         foreach (var cmd in new[] { "--extract", "--extract-here", "--extract-to-name", "--extract-smart" })
         {
             var (key, args) = Program.SplashTextSpec([cmd, zip]);
-            Assert.Equal("Status_ExtractingFmt", key);
-            Assert.Single(args);
-            Assert.Equal(Path.GetFileName(zip), args[0]);
+
+            // 静态层叠菜单逐项启动进程：本进程只有 1 个路径，但后续进程会经 IPC 合并进来，
+            // 带文件名会显示成「其中一个包」的名字（用户实测反馈）→ 启动期只显示中性文案
+            Assert.Equal("Status_Extracting", key);
+            Assert.Empty(args);
         }
+    }
+
+    [Fact]
+    public void CollectedSplashText_SinglePath_CarriesFileName()
+    {
+        var (key, args) = App.CollectedSplashTextSpec([@"C:\tmp\only-one.zip"]);
+
+        // 收集完成后只剩一个包：把文件名补回来（启动期不知道总数，这时才确定）
+        Assert.Equal("Status_ExtractingFmt", key);
+        Assert.Single(args);
+        Assert.Equal("only-one.zip", args[0]);
+    }
+
+    [Fact]
+    public void CollectedSplashText_MultiplePaths_CarriesCount()
+    {
+        var (key, args) = App.CollectedSplashTextSpec(
+            [@"C:\tmp\a.zip", @"C:\tmp\b.zip", @"C:\tmp\c.zip", @"C:\tmp\d.zip"]);
+
+        Assert.Equal("Status_ExtractingBatchFmt", key);
+        Assert.Single(args);
+        Assert.Equal(4, args[0]);
     }
 
     [Fact]
@@ -113,12 +137,13 @@ public class SplashTextSpecTests : IDisposable
     }
 
     [Fact]
-    public void ExtractWithNoValidPaths_UsesBatchFmtWithZero()
+    public void ExtractWithNoValidPaths_UsesNeutralText()
     {
         var (key, args) = Program.SplashTextSpec(["--extract", "ghost.zip"]);
 
-        Assert.Equal("Status_ExtractingBatchFmt", key);
-        Assert.Equal(0, args[0]);
+        // 无有效路径 → HandleExtract 直接退出；启动期同样只给中性文案（不再报「0 个」）
+        Assert.Equal("Status_Extracting", key);
+        Assert.Empty(args);
     }
 
     [Fact]

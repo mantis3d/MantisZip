@@ -77,6 +77,10 @@ internal static class NativeMethods
     [DllImport("user32.dll")]
     public static extern bool PostMessage(nint hWnd, uint Msg, nint wParam, nint lParam);
 
+    /// <summary>让窗口重绘（跨线程调用安全；splash 文案中途更新用）。</summary>
+    [DllImport("user32.dll")]
+    public static extern bool InvalidateRect(nint hWnd, nint lpRect, bool bErase);
+
     [DllImport("user32.dll")]
     public static extern int GetMessage(out MSG lpMsg, nint hWnd, uint wMsgFilterMin, uint wMsgFilterMax);
 

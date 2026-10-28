@@ -56,7 +56,10 @@ sealed class Program
 
     /// <summary>
     /// Splash 文案 spec 按启动方式选择（计划文档「splash 文案选择」；除新增 Fmt key 外全部为现有 key）：
-    /// 单文件场景带文件名、多文件场景带参数——全部为显示期一次性静态字符串，无中途更新需求。
+    /// 单文件场景带文件名、多文件场景带参数。
+    /// 例外（解压族）：静态层叠菜单是逐项启动进程的，本进程命令行里只有 1 个路径，
+    /// 真实总数要等 IPC 收集完成才知道 → 这里只显示中性文案，
+    /// 收集结束后由 App.CliExtract 的 UpdateSplashForCollectedPaths 更新成「正在解压 N 个压缩包…」。
     /// 纯函数返回 (key, 插值参数)，格式化由调用处 LocalizationManager.T 统一完成（便于测试与语言解耦）。
     /// </summary>
     internal static (string Key, object?[] Args) SplashTextSpec(string[] args)
@@ -78,9 +81,10 @@ sealed class Program
             case "--extract-here":
             case "--extract-to-name":
             case "--extract-smart":
-                if (paths.Length == 1)
-                    return ("Status_ExtractingFmt", [Path.GetFileName(paths[0])]);
-                return ("Status_ExtractingBatchFmt", [paths.Length]);
+                // 1 个路径也可能还有后到进程要合并进来，带文件名会显示成「其中一个包」的名字
+                if (paths.Length > 1)
+                    return ("Status_ExtractingBatchFmt", [paths.Length]);
+                return ("Status_Extracting", []);
 
             case "--compress-quick":
                 if (paths.Length > 1)

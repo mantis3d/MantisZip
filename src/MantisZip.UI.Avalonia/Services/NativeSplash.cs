@@ -57,6 +57,25 @@ internal static class NativeSplash
     }
 
     /// <summary>
+    /// 更新 splash 文案（幂等；未显示或已关闭时 no-op）。
+    /// 用途：IPC 多实例收集路径时，启动阶段只知道本进程的一个路径，收集完成后才能拿到真实总数
+    /// （见 App.CliExtract 的收集回调），此时改文案并让 splash 线程重绘即可。
+    /// </summary>
+    internal static void UpdateText(string text)
+    {
+        if (!OperatingSystem.IsWindows()) return; // 跨平台安全护栏
+        nint hwnd;
+        lock (Sync)
+        {
+            if (_thread is null) return; // 从未显示或已关闭
+            _text = text;
+            hwnd = _hwnd;
+        }
+        if (hwnd != nint.Zero)
+            NativeMethods.InvalidateRect(hwnd, nint.Zero, true); // 异步投递 WM_PAINT，跨线程安全
+    }
+
+    /// <summary>
     /// 关闭 splash（幂等）。PostMessage(WM_CLOSE) 是异步投递，实际销毁发生在 splash 消息泵线程；
     /// 若 splash 尚未显示完成，_closePending 保证窗口不悬置。最短显示时长在 splash 线程里等待。
     /// </summary>
@@ -312,15 +331,15 @@ internal static class NativeSplash
             // 图标尺寸（DPI 缩放；缺图标时按 0 处理 → 布局退化为纯文本）
             int iconSize = (_hIcon != nint.Zero) ? (int)(scale * 32) : 0;
             int gap = (_hIcon != nint.Zero) ? (int)(scale * 16) : 0;
+            int padX = (int)(scale * 16); // 左右最小留白：长文件名不再顶到窗口边缘
 
             // 先量文本宽（DT_CALCRECT），归出总宽再居中；DT_END_ELLIPSIS 防超长文件名溢出
-            var rcCalc = new NativeMethods.RECT { Left = 0, Top = 0, Right = clientW, Bottom = clientH };
+            int availW = Math.Max(0, clientW - padX * 2 - iconSize - gap);
+            var rcCalc = new NativeMethods.RECT { Left = 0, Top = 0, Right = availW, Bottom = clientH };
             const uint calcFmt = NativeMethods.DT_LEFT | NativeMethods.DT_CALCRECT | NativeMethods.DT_SINGLELINE | NativeMethods.DT_NOPREFIX | NativeMethods.DT_END_ELLIPSIS;
             NativeMethods.DrawText(hdc, _text, _text.Length, ref rcCalc, calcFmt);
-            int textW = Math.Min(clientW - iconSize - gap, rcCalc.Right - rcCalc.Left);
 
-            int totalW = iconSize + gap + textW;
-            int startX = Math.Max(0, (clientW - totalW) / 2);
+            var (startX, textW) = ComputeHorizontalLayout(clientW, iconSize, gap, rcCalc.Right - rcCalc.Left, padX);
             int centerY = clientH / 2;
 
             // 图标左（垂直居中）
@@ -348,5 +367,22 @@ internal static class NativeSplash
             NativeMethods.EndPaint(hwnd, ref ps);
         }
         _paintedAt = Environment.TickCount;
+    }
+
+    /// <summary>
+    /// splash 内容的水平布局（纯函数，便于测试）：图标 + 间隔 + 文本整体居中，
+    /// 但两侧至少保留 <paramref name="padX"/> 空白 —— 长文件名不再顶到窗口边缘（用户反馈「挤满整个宽度」）。
+    /// 文本宽度上限 = 客户区宽度 − 两侧留白 − 图标 − 间隔；超出部分由 DT_END_ELLIPSIS 截断。
+    /// </summary>
+    /// <returns>内容起始 X（图标左边缘）与实际可用文本宽度</returns>
+    internal static (int StartX, int TextWidth) ComputeHorizontalLayout(
+        int clientW, int iconSize, int gap, int measuredTextW, int padX)
+    {
+        var avail = Math.Max(0, clientW - padX * 2 - iconSize - gap);
+        var textW = Math.Min(avail, Math.Max(0, measuredTextW));
+        var totalW = iconSize + gap + textW;
+        // 居中，但绝不越过左右留白（文本很长时 startX 会被夹到 padX）
+        var startX = Math.Max(padX, (clientW - totalW) / 2);
+        return (startX, textW);
     }
 }

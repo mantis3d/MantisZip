@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 修复：多选压缩包右键「解压到……」为每个包各开一个窗口
+  - **症状**（用户实测）：资源管理器多选 4 个压缩包 → 右键「解压到……」→ 弹出 4 个「解压设置」窗，每个窗一个包；同一台机器稍后再测却只弹一个窗。
+  - **根因（两套右键菜单）**：项目同时有动态 COM 菜单（`*\shellex\ContextMenuHandlers\MantisZip` → comhost.dll，多选时一次把全部路径交给一个进程）与静态层叠菜单（`ExtendedSubCommandsKey`，动词命令只带 `%1`，Explorer 会为每个选中项各启动一个进程）。`ShellIntegration.Install` 启用动态菜单时只写 `DynamicMenuStatus=pending`、**不装**层叠菜单；随后 `CheckComStatus()` 在 Explorer 尚未加载 comhost.dll 时**装层叠菜单兜底**，状态仍停在 `pending`。而 `pending` 下 COM 处理器只插一条灰色占位分隔符（`src/MantisZip.ShellExt/ContextMenuHandler.cs` 的 `QueryContextMenu`），用户实际点到的是层叠菜单 ⇒ 逐项 `%1` ⇒ N 进程 / N 窗。等 Explorer 真正加载 comhost.dll、`CheckComStatus()` 把状态提升为 `active` 并卸载层叠菜单后，多选恢复正常，所以「无法复现」。现场证据：`%LOCALAPPDATA%\MantisZip\ShellExt\log.txt` 里 `10:06:31 status=pending, inserting separator as placeholder` 之后是 4 个单包进程（且**没有** `InvokeCommand: starting process:` 行 —— 不是 ShellExt 启动的），而 `10:22` 的三条 `starting process` 每条都带 4 个路径。
+  - **修法（应用侧兜底）**：静态菜单的动词永远只能带一个 `%1`，改不了，只能在 App 侧合并多实例。新增 `App.CliInfra.RunWithPathCollector(...)`（互斥量 + 命名管道 + 可选收集期窗口），把「首实例收路径 / 后到实例塞路径后退出」抽成一份；解压族四个动词全部接入 —— `--extract`（`HandleExtract`，800 ms 静默窗 + 「正在收集文件…」提示窗，收集完弹**一个**设置窗加载全部包）、`--extract-here` / `--extract-to-name` / `--extract-smart`（`HandleDirectExtract`，400 ms 静默窗、不显示提示窗，按最终数量走单文件流程或批处理）。收集采用**静默窗口 + 有上限续期**（每收到新路径再等 400/800 ms，总上限 +600 ms）：单文件时不会明显变慢，后到的进程也不会被丢掉（否则那个包会静默消失）。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/PathCollectorPipeTests.cs`（进程内起 `StartPipeServer`，两次 `SendPathsThroughPipe` 验证合并、去重、丢弃不存在的路径）。
+  - **验证**：avalonia Release 构建 0 警告；`test -Target tests`（2 条存量警告）与 `test -Target ui-tests`（28 条存量警告）全绿。
+  - **追加（用户实测）**：多选解压合并成功后，splash 显示的仍是「其中一个压缩包的名字」——启动期文案由 `Program.SplashTextSpec` 按本进程命令行决定，而静态层叠菜单是逐项启动进程的，首实例只有 1 个路径、并不知道后面还有几个；现改为启动期中性文案（复用 `Status_Extracting`「正在解压...」），收集结束后由新增的 `App.CollectedSplashTextSpec` + `NativeSplash.UpdateText`（改 `_text` 后 `InvalidateRect` 重绘，跨线程安全）更新为「正在解压 N 个压缩包…」，只收到 1 个则补回文件名（`Status_ExtractingFmt`）。测试：`SplashTextSpecTests` 覆盖启动期中性文案 + 收集后 1 个 / N 个两种 spec。
+  - **追加（用户实测）**：文件名较长时文本会顶到 splash 左右边缘（「挤满整个宽度」）→ 布局加左右最小留白 `padX = 16 × DPI`；绘制里的算术抽成纯函数 `NativeSplash.ComputeHorizontalLayout(clientW, iconSize, gap, measuredTextW, padX)`（文本宽度上限 = 客户区 − 两侧留白 − 图标 − 间隔，超出由 `DT_END_ELLIPSIS` 截断，整体仍居中但绝不越过留白），无头环境可测。测试：`NativeSplashLayoutTests` 5 例（短文本居中、长文本两侧留白、无图标退化、过窄夹到 0、三条不变量 Theory）。
+  - **未做**：`CheckComStatus` 的兜底策略未改（兜底时状态仍是 `pending`，两套菜单外观仍不一致）；真实桌面右键多选回归需手工验证。
+
 **2026-10-27** — 修复：issue #52 右键「原地解压 / 解压到目录」报 7z.dll 无法加载（库路径被默认探测路径抢先占用）
   - **症状**（用户报告 + 本机 `debug.log` 取证一致）：未手动指定 7z.dll 路径时，资源管理器右键「原地解压」「解压到目录」弹「操作失败：Can not load 7-zip library or internal COM error! Message: can not change the library path while the library "C:\Program Files\MantisZip\x64\7z.dll" is being used.」，而「智能原地解压」正常。
   - **根因**：SharpSevenZipLibraryManager 是**进程级单例** —— 库一旦被 `LoadLibrary` 加载，`SetLibraryPath` 只接受「与已加载路径相同」的值，否则抛 `SharpSevenZipLibraryException`。`App.CliExtract.cs:142` 的 `ResolveCliPassword` → `PasswordService.HasEncryptedEntries` 直接 `new SharpSevenZipExtractor`（**不经过** `SevenZipEngine.EnsureLibraryPath`），先把默认探测路径 `<exe>\x64\7z.dll` 的库加载了；随后 `ExtractAsync` 入口的 `EnsureLibraryPath` 才去设用户路径 ⇒ 路径不同 ⇒ 抛错。智能解压先走 `ListEntriesAsync`（入口即 `EnsureLibraryPath`），路径在首次加载前就设好，故不报错。
