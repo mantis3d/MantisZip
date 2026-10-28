@@ -1,4 +1,6 @@
+using System;
 using System.IO;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using MantisZip.Core.Utils;
@@ -18,26 +20,29 @@ public enum CompressConflictAction
     Cancel
 }
 
+/// <summary>
+/// 压缩冲突对话框的确认载荷：一次关闭即交出完整决策（按钮 + 自定义名 + 应用到全部 + 暂停/取消整轮），
+/// 调用方只读 <see cref="CompressConflictDialog.Completion"/>，不再逐个回读窗口属性。
+/// </summary>
+public readonly record struct CompressConflictDialogOutcome(
+    CompressConflictAction Action,
+    string? CustomName,
+    bool ApplyToAll,
+    bool IsPaused,
+    bool IsCancelled);
+
 public partial class CompressConflictDialog : Window
 {
-    private CompressConflictAction _capturedAction;
-    private bool _capturedApplyToAll;
-    private string? _capturedCustomName;
-    private bool _resultCaptured;
-    private bool _isPaused;
-    private bool _cancelOperation;
+    /// <summary>未点按钮关闭（X / Alt+F4）时的载荷：取消本次压缩（旧 ResultAction 默认值为 Cancel）。</summary>
+    private static readonly CompressConflictDialogOutcome DefaultOutcome =
+        new(CompressConflictAction.Cancel, null, false, IsPaused: false, IsCancelled: false);
 
-    /// <summary>用户选择的处理方式</summary>
-    public CompressConflictAction ResultAction => _resultCaptured ? _capturedAction : CompressConflictAction.Cancel;
-    /// <summary>用户输入的自定义文件名</summary>
-    public string? CustomName => _resultCaptured ? _capturedCustomName : RenameTextBox.Text;
-    /// <summary>用户是否勾选了"应用到全部"</summary>
-    public bool ApplyToAll => _resultCaptured && _capturedApplyToAll;
+    private readonly TaskCompletionSource<CompressConflictDialogOutcome> _completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private CompressConflictDialogOutcome? _outcome;
 
-    /// <summary>用户是否点击了"暂停"按钮</summary>
-    public bool IsPaused => _isPaused;
-    /// <summary>用户是否点击了"取消整个操作"按钮</summary>
-    public bool CancelOperation => _cancelOperation;
+    /// <summary>关窗即完成的确认载荷（模态 ShowDialog 与非模态 Show 两条路径共用）。</summary>
+    public Task<CompressConflictDialogOutcome> Completion => _completion.Task;
 
     // ── Localized string properties (bound via DataContext=self) ──
     public string WinTitle => LocalizationManager.T("CompressConflict_Title");
@@ -128,13 +133,19 @@ public partial class CompressConflictDialog : Window
         TargetPathBlock.Text = LocalizationManager.T("CompressConflict_PathLabel") + filePath;
     }
 
+    protected override void OnClosed(EventArgs e)
+    {
+        // 兜底：非按钮关闭也给出完整载荷，绝不让调用方读到 null
+        _completion.TrySetResult(_outcome ?? DefaultOutcome);
+        base.OnClosed(e);
+    }
+
     private void CaptureResult(CompressConflictAction action, string? customName)
     {
-        CoreLog.ConflictTrace("compress-dialog-result action={0} applyAll={1} custom='{2}'", action, ApplyAllCheck.IsChecked == true, customName);
-        _capturedAction = action;
-        _capturedApplyToAll = ApplyAllCheck.IsChecked == true;
-        _capturedCustomName = customName;
-        _resultCaptured = true;
+        CoreLog.ConflictTrace("compress-dialog-result action={0} applyAll={1} custom='{2}'",
+            action, ApplyAllCheck.IsChecked == true, customName);
+        _outcome = new CompressConflictDialogOutcome(action, customName, ApplyAllCheck.IsChecked == true,
+            IsPaused: false, IsCancelled: false);
     }
 
     private void Overwrite_Click(object? sender, RoutedEventArgs e)
@@ -163,14 +174,15 @@ public partial class CompressConflictDialog : Window
 
     private void Pause_Click(object? sender, RoutedEventArgs e)
     {
-        _isPaused = true;
+        _outcome = new CompressConflictDialogOutcome(CompressConflictAction.Cancel, null, false,
+            IsPaused: true, IsCancelled: false);
         Close(false);
     }
 
     private void CancelOperation_Click(object? sender, RoutedEventArgs e)
     {
-        _cancelOperation = true;
-        CaptureResult(CompressConflictAction.Cancel, RenameTextBox.Text);
+        _outcome = new CompressConflictDialogOutcome(CompressConflictAction.Cancel, null, false,
+            IsPaused: false, IsCancelled: true);
         Close(false);
     }
 }

@@ -1,0 +1,11 @@
+自动更新检测 · 静态自检（版本 / 三语 / 守卫）记录
+日期：2026-10-28
+
+命令：pwsh -File scripts\verify-repo.ps1 -Task check
+结果：
+✅ 版本号一致：0.5.4（6 处）
+✅ 三语一致：1355 个 key
+✅ 规则守卫全部通过（5 项）：快捷键登记 / 主窗口绑定 key / 文件选择器入口 / 图标登记 / 意图-执行接缝
+
+dialog-seam 守卫确认：新增 UpdateAvailableDialog 走「public Task<Choice> Completion」+ TrySetResult，
+未使用 DialogResult / CloseAction，符合规则 20。

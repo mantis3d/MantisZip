@@ -548,7 +548,9 @@ public class ExtractResult
         /// 决定存活条目重写时的文件名编码。传 null 时引擎按包内 bit 11 推断
         /// （调用方应尽量透传用户的编码设置，避免把存活条目降级成乱码）。
         /// </param>
-        /// <exception cref="FileNotFoundException">条目在压缩包中不存在</exception>
+        /// <exception cref="ArchiveEntryNotFoundException">
+        /// 目标条目在压缩包中一个都匹配不到（派生自 <see cref="FileNotFoundException"/>，只捕获基类也不会漏）
+        /// </exception>
         /// <exception cref="NotSupportedException">此格式不支持删除操作</exception>
         Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null);
 
@@ -574,10 +576,16 @@ public class ExtractResult
 public static class ArchiveEngineFactory
 {
     /// <summary>
-    /// 支持的档案文件扩展名（单一数据源）。
+    /// 支持的档案文件扩展名（单一数据源）：能否**打开**看这里。
     /// </summary>
+    /// <remarks>
+    /// `.jar / .war / .ear / .apk` 本质是 ZIP（issue #54），能打开也能解压。
+    /// 注意：本数组**不等于**文件关联名单 —— 关联见 <c>ShellIntegration.ArchiveExtensions</c>，
+    /// 那 4 个新扩展名暂不注册关联（不抢默认程序，见 `.omo/plans/未开始/format-detection-container-sfx.md`）。
+    /// </remarks>
     public static readonly string[] SupportedExtensions =
-        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso"];
+        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso",
+         ".jar", ".war", ".ear", ".apk"];
 
     private static readonly List<IArchiveEngine> _engines = new();
 
@@ -611,6 +619,10 @@ public static class ArchiveEngineFactory
             ".tar" or ".tgz" or ".gz" => ArchiveFormat.Tar,
             ".rar" => ArchiveFormat.Rar,
             ".iso" => ArchiveFormat.Iso,
+            // jar/war/ear/apk 就是 ZIP（issue #54）
+            ".jar" or ".war" or ".ear" or ".apk" => ArchiveFormat.Zip,
+            // ⚠️ 默认分支是**载荷**：魔数兜底路径依赖「未知扩展名 → Zip」来决定能否 seed 条目、
+            // 能否追加（见 ExtractFlow.CanSeedEntries / CompressService）。不要改成 null。
             _ => ArchiveFormat.Zip
         };
     }
@@ -625,6 +637,8 @@ public static class ArchiveEngineFactory
             ".tar" or ".tgz" or ".gz" => GetEngine(ArchiveFormat.Tar),
             ".rar" => GetEngine(ArchiveFormat.Rar),
             ".iso" => GetEngine(ArchiveFormat.Iso),
+            // jar/war/ear/apk 就是 ZIP（issue #54）
+            ".jar" or ".war" or ".ear" or ".apk" => GetEngine(ArchiveFormat.Zip),
             _ => null
         };
 
@@ -661,9 +675,23 @@ public static class ArchiveEngineFactory
             int read = fs.Read(head, 0, headSize);
             if (read == 0) return null;
 
-            var format = FileFormatDetector.Detect(head, read);
-            var archiveFormat = MapFileFormatToArchiveFormat(format);
-            return archiveFormat != null ? GetEngine(archiveFormat.Value) : null;
+            // 只判**容器**，不判子类型（issue #54：jar 的首条目 META-INF/MANIFEST.MF 会被子类型逻辑
+            // 判成 ODT，而 ODT 没有引擎 —— 这就是「识别得越细越打不开」）。
+            var container = FileFormatDetector.DetectContainer(head, read);
+            var archiveFormat = MapContainerToArchiveFormat(container);
+            if (archiveFormat != null)
+                return GetEngine(archiveFormat.Value);
+
+            // 自解压包（SFX）：MZ 桩之后挂着 zip/7z/rar（issue #36）。
+            // 交给 SevenZipEngine —— 7z.dll 会自己按签名搜索内嵌包；
+            // 绝不能交给 ZipEngine（SharpCompress 对 SFX zip 静默返回 0 个条目，比报错更糟）。
+            if (SfxProbe.TryDetectEmbeddedContainer(filePath, head, read, out _))
+            {
+                CoreLog.Info($"ArchiveEngineFactory: SFX detected, routing to SevenZipEngine: {filePath}");
+                return GetEngine(ArchiveFormat.SevenZip);
+            }
+
+            return null;
         }
         catch (Exception ex)
         {
@@ -673,20 +701,23 @@ public static class ArchiveEngineFactory
     }
 
     /// <summary>
-    /// 将魔数检测的 FileFormat 映射到 ArchiveFormat。
-    /// 返回 null 表示该格式无对应引擎（非档案格式）。
+    /// 将魔数检测出的**容器**映射到 <see cref="ArchiveFormat"/>。
     /// </summary>
-    private static ArchiveFormat? MapFileFormatToArchiveFormat(FileFormat format)
+    /// <remarks>
+    /// 这是恒等映射（7 个容器 → 6 个可执行格式，GZip 落到 Tar 的引擎），**有意不掺子类型**：
+    /// 任何「识别得更细 ⇒ 反倒没有引擎」的写法都会让文件打不开（issue #54 的教训）。
+    /// 返回 null 表示不是已知压缩包容器。
+    /// </remarks>
+    private static ArchiveFormat? MapContainerToArchiveFormat(ContainerFormat container)
     {
-        return format switch
+        return container switch
         {
-            FileFormat.Zip or FileFormat.Docx or FileFormat.Xlsx
-                or FileFormat.Pptx or FileFormat.Epub => ArchiveFormat.Zip,
-            FileFormat.SevenZip => ArchiveFormat.SevenZip,
-            FileFormat.Rar => ArchiveFormat.Rar,
-            FileFormat.Tar => ArchiveFormat.Tar,
-            FileFormat.Gz => ArchiveFormat.GZip,
-            FileFormat.Iso => ArchiveFormat.Iso,
+            ContainerFormat.Zip => ArchiveFormat.Zip,
+            ContainerFormat.SevenZip => ArchiveFormat.SevenZip,
+            ContainerFormat.Rar => ArchiveFormat.Rar,
+            ContainerFormat.Tar => ArchiveFormat.Tar,
+            ContainerFormat.GZip => ArchiveFormat.GZip,
+            ContainerFormat.Iso => ArchiveFormat.Iso,
             _ => null
         };
     }

@@ -27,44 +27,9 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (CurrentArchivePath == null || ShowExtractSettingsDialog == null) return;
 
-        var vm = new ExtractSettingsViewModel(new[] { CurrentArchivePath });
-        var result = await ShowExtractSettingsDialog(vm);
-        if (result != true) return;
-
-        var dest = vm.DestinationPath;
-        var openFolder = vm.OpenFolderAfterExtract;
-
-        if (RunWithProgress == null) return;
-
-        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
-        var filteredKeys = vm.FilteredEntryKeys;
-
-        // spec §11.2: 解压流程 → 两开关可见；对话框流程把「打开文件夹」选择作种子（D17 实例级）
-        PendingExtractPostActions = (true, true, vm.OpenFolderAfterExtract);
-
-        var completed = await RunWithProgress(
-            LocalizationManager.T("Status_Extracting"),
-            new[] { CurrentArchivePath! },
-            async (progress, ct) =>
-            {
-                // 统一解压执行入口（冲突策略/过滤/全量分支）——与 CLI 弹窗批处理共用 ExtractFlow
-                await ExtractFlow.ExtractAsync(
-                    CurrentArchivePath, dest, vm.ConflictAction, filteredKeys, password,
-                    ShowExtractFileConflictDialogAsync, progress, ct,
-                    vm.BuildParallelSettings());
-            });
-
-        if (completed)
-        {
-            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            // D19: 后置动作读进度窗口开关最终值（倒计时内可改），回退弹窗选择
-            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!,
-                LastProgressWindow?.DeleteArchiveAfterExtractValue ?? vm.DeleteArchiveAfterExtract);
-            if (LastProgressWindow?.OpenFolderAfterExtractValue ?? openFolder)
-            {
-                await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
-            }
-        }
+        // 确认即载荷：目标目录、冲突策略、过滤集合、完成动作都由设置窗口在确认事务里冻结，
+        // 并由回调内的解压会话执行；本命令不再回读对话框状态、也不再自己跑进度。
+        await ShowExtractSettingsDialog(new[] { CurrentArchivePath });
     }
 
     [RelayCommand]
@@ -309,42 +274,9 @@ public partial class MainWindowViewModel : ObservableObject
     {
         if (CurrentArchivePath == null || ShowExtractSettingsDialog == null) return;
 
-        var vm = new ExtractSettingsViewModel(new[] { CurrentArchivePath });
-        vm.DestinationPath = Path.Combine(
-            Path.GetDirectoryName(CurrentArchivePath) ?? ".",
-            Path.GetFileNameWithoutExtension(CurrentArchivePath));
-        var result = await ShowExtractSettingsDialog(vm);
-        if (result != true) return;
-
-        _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
-        if (RunWithProgress == null) return;
-
-        // spec §11.2: 解压流程 → 两开关可见；对话框流程把「打开文件夹」选择作种子
-        PendingExtractPostActions = (true, true, vm.OpenFolderAfterExtract);
-
-        var completed = await RunWithProgress(
-            LocalizationManager.T("Status_Extracting"),
-            new[] { CurrentArchivePath! },
-            async (progress, ct) =>
-            {
-                // 列表模式播种：列出全部条目（Pending），解压中逐条目状态驱动列表
-                ExtractFlow.TrySeedEntryItemsInBackground(
-                    ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
-                await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, vm.DestinationPath, password, progress, ct);
-            });
-
-        if (completed)
-        {
-            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
-            // D19: 后置动作读进度窗口开关最终值，回退弹窗选择
-            App.TryDeleteArchiveAfterExtract(CurrentArchivePath!,
-                LastProgressWindow?.DeleteArchiveAfterExtractValue ?? vm.DeleteArchiveAfterExtract);
-            if (LastProgressWindow?.OpenFolderAfterExtractValue ?? vm.OpenFolderAfterExtract)
-            {
-                await OpenExtractedFolderAsync(vm.DestinationPath, CurrentArchivePath!, password);
-            }
-        }
+        // 默认目标目录（压缩包所在目录 / 包名）由 ExtractSettingsViewModel 构造时按同一规则预填，
+        // 故这里不再单独算一遍；执行同样由回调内的解压会话按载荷负责。
+        await ShowExtractSettingsDialog(new[] { CurrentArchivePath });
     }
 
     [RelayCommand]

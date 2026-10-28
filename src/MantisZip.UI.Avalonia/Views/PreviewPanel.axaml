@@ -48,17 +48,17 @@
           <Button Command="{Binding ZoomOutCommand}"
                   Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_ZoomOut]}">
-            <PathIcon Data="{StaticResource IconSubtract}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconSubtract}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding ZoomInCommand}"
                   Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_ZoomIn]}">
-            <PathIcon Data="{StaticResource IconAdd}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconAdd}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding ZoomFitCommand}"
                   Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_ZoomFit]}">
-            <PathIcon Data="{StaticResource IconArrowFitIn}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconArrowFitIn}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
 
@@ -68,12 +68,12 @@
           <Button Command="{Binding DecreaseFontSizeCommand}"
                   Width="36" Height="{DynamicResource ControlHeight}" Padding="0"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_FontDecrease]}">
-            <PathIcon Data="{StaticResource IconFontDecrease}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconFontDecrease}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding IncreaseFontSizeCommand}"
                   Width="36" Height="{DynamicResource ControlHeight}" Padding="0"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_FontIncrease]}">
-            <PathIcon Data="{StaticResource IconFontIncrease}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconFontIncrease}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
 
@@ -112,17 +112,17 @@
           <Button Command="{Binding PreviousGifFrameCommand}"
                   Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_GifPrev]}">
-            <PathIcon Data="{StaticResource IconPrevious}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconPrevious}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding PlayPauseGifCommand}"
                   Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_GifPlayPause]}">
-            <PathIcon Data="{StaticResource IconPlay}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconPlay}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Command="{Binding NextGifFrameCommand}"
                   Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_GifNext]}">
-            <PathIcon Data="{StaticResource IconNext}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconNext}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <TextBox Text="{Binding CurrentFrame}"
                    Width="36" Height="26"
@@ -140,13 +140,13 @@
           <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   Command="{Binding ToggleTransparencyBgCommand}"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_TransparencyBg]}">
-            <PathIcon Data="{StaticResource IconGrid}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconGrid}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
           <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   Command="{Binding ToggleFlattenAlphaCommand}"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_FlattenAlpha]}"
                   IsVisible="{Binding HasFlattenAlphaControls}">
-            <PathIcon Data="{StaticResource IconPaintBrush}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconPaintBrush}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
 
@@ -156,7 +156,7 @@
           <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   Command="{Binding ToggleIcoFlattenAlphaCommand}"
                   ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_IcoFlattenAlpha]}">
-            <PathIcon Data="{StaticResource IconPaintBrush}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconPaintBrush}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
 
@@ -184,7 +184,7 @@
           <Button Width="32" Height="{DynamicResource ControlHeight}" Padding="0"
                   Command="{Binding OpenMetadataSettingsCommand}"
                    ToolTip.Tip="{Binding MetadataSettingsTooltip}">
-            <PathIcon Data="{StaticResource IconSettings}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconSettings}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </Button>
         </StackPanel>
       </StackPanel>
@@ -582,7 +582,7 @@
               <Button Command="{Binding PptxPreviousSlideCommand}"
                       Width="28" Height="26" Padding="0"
                       ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PptxPrev]}">
-                <PathIcon Data="{StaticResource IconChevronLeft}" Width="14" Height="14"
+                <PathIcon Data="{StaticResource IconChevronLeft}" Width="16" Height="16"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
               </Button>
               <TextBlock Text="{Binding PptxCurrentSlide}"
@@ -593,7 +593,7 @@
               <Button Command="{Binding PptxNextSlideCommand}"
                       Width="28" Height="26" Padding="0"
                       ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PptxNext]}">
-                <PathIcon Data="{StaticResource IconChevronRight}" Width="14" Height="14"
+                <PathIcon Data="{StaticResource IconChevronRight}" Width="16" Height="16"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
               </Button>
             </StackPanel>
@@ -651,7 +651,7 @@
               <Button Command="{Binding PdfPreviousPageCommand}"
                       Width="28" Height="26" Padding="0"
                       ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PdfPrev]}">
-                <PathIcon Data="{StaticResource IconChevronLeft}" Width="14" Height="14"
+                <PathIcon Data="{StaticResource IconChevronLeft}" Width="16" Height="16"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
               </Button>
               <TextBox Text="{Binding PdfCurrentPage}"
@@ -663,7 +663,7 @@
               <Button Command="{Binding PdfNextPageCommand}"
                       Width="28" Height="26" Padding="0"
                       ToolTip.Tip="{Binding LocalizedStrings[Preview_Tooltip_PdfNext]}">
-                <PathIcon Data="{StaticResource IconChevronRight}" Width="14" Height="14"
+                <PathIcon Data="{StaticResource IconChevronRight}" Width="16" Height="16"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
               </Button>
             </StackPanel>

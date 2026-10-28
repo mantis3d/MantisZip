@@ -14,19 +14,44 @@ using MantisZip.UI.Avalonia.ViewModels;
 namespace MantisZip.UI.Avalonia.Dialogs;
 
 /// <summary>
-/// 压缩设置窗口。通过 ShowDialog 返回 bool 结果，
-/// 调用方在结果为 true 后读取 ViewModel 的属性构造 CompressRequest。
+/// 压缩设置窗口。确认即事务：点「开始压缩」后由
+/// <see cref="CompressSettingsViewModel.TryConfirmAsync"/> 一次产出
+/// <see cref="ConfirmOutcome{T}"/>，窗口只负责把三态翻译成窗口动作（拒绝留窗显示原因、
+/// 确认/取消关窗），并把已确认的载荷交给注入的 <see cref="ICompressSession"/> 执行。
 /// </summary>
 public partial class CompressSettingsWindow : Window
 {
     private bool _loaded;
-    /// <summary>
-    /// ViewModel，公开属性供调用方关闭后读取。
-    /// </summary>
-    public CompressSettingsViewModel ViewModel { get; }
+
+    /// <summary>注入的执行器；设计时窗口（无参构造）没有它，也就不能真正开始压缩。</summary>
+    private readonly ICompressSession? _session;
+
+    /// <summary>注入的运行上下文（宿主差异：Owner / Presenter / 退出策略）。</summary>
+    private readonly CompressRunContext? _context;
+
+    /// <summary>非模态 Show（CLI 无属主窗口）时的确认结果通道：窗口关闭即完成。</summary>
+    private readonly TaskCompletionSource<ConfirmOutcome<CompressSettings>> _completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+    /// <summary>本次关窗携带的确认结果；null 表示用户直接按 X 关闭（视为取消）。</summary>
+    private ConfirmOutcome<CompressSettings>? _closedOutcome;
 
     /// <summary>
-    /// 设计时需要的无参构造函数。不要直接使用，调用 <see cref="CompressSettingsWindow(IReadOnlyList{string})"/>。
+    /// 窗口自身的 ViewModel（仅窗口内部使用）。接缝规则 20：生产调用方不得回读窗口/VM 构造请求——
+    /// 载荷在确认事务（<see cref="CompressSettingsViewModel.TryConfirmAsync"/>）里一次冻结。
+    /// 测试需要它时走 <see cref="Window.DataContext"/>（构造函数里就是 DataContext = ViewModel）。
+    /// </summary>
+    private CompressSettingsViewModel ViewModel { get; }
+
+    /// <summary>
+    /// 非模态 <see cref="Window.Show"/> 时的确认结果。CLI 没有属主窗口，无法用 ShowDialog，
+    /// 只能 Show + 等关窗；关窗即完成，用户按 X 视为取消。
+    /// </summary>
+    public Task<ConfirmOutcome<CompressSettings>> Completion => _completion.Task;
+
+    /// <summary>
+    /// 设计时/诊断菜单用的无参构造：只装配界面，不注入执行器，因此不能执行压缩。
+    /// Avalonia 的 x:Class 也要求公共无参构造存在。
     /// </summary>
     public CompressSettingsWindow()
     {
@@ -34,10 +59,27 @@ public partial class CompressSettingsWindow : Window
         ViewModel = new CompressSettingsViewModel(Array.Empty<string>());
         DataContext = ViewModel;
         SubscribeViewModel();
+        Closed += OnClosed;
     }
 
-    public CompressSettingsWindow(IReadOnlyList<string> sourcePaths)
+    /// <summary>
+    /// 生产构造：执行器与运行上下文由宿主注入。
+    /// 之所以做成必填依赖，是为了让「设置窗口自己就能执行」在类型上成立——
+    /// 调用方再也拿不到「ShowDialog&lt;bool&gt; 之后再回读窗口状态」这条后门。
+    /// </summary>
+    /// <param name="session">唯一执行器。</param>
+    /// <param name="context">宿主差异（Owner / Presenter / 退出策略）。</param>
+    /// <param name="sourcePaths">预填的源路径（新建为空、拖入为拖拽项、CLI 为命令行参数）。</param>
+    public CompressSettingsWindow(
+        ICompressSession session,
+        CompressRunContext context,
+        IReadOnlyList<string> sourcePaths)
     {
+        ArgumentNullException.ThrowIfNull(session);
+        ArgumentNullException.ThrowIfNull(context);
+        _session = session;
+        _context = context;
+
         InitializeComponent();
 
         ViewModel = new CompressSettingsViewModel(sourcePaths);
@@ -63,20 +105,18 @@ public partial class CompressSettingsWindow : Window
             return await CustomFilePickerDialog.ShowOpenItemsAsync(this, initialPath: contextPath);
         };
 
-        // 设置关闭回调
-        ViewModel.CloseAction = async (result) =>
+        // 高级格式面板与文件过滤器都只存在于窗口/控件里：确认事务开始前必须先把它们抓进 VM，
+        // 否则冻结载荷里会是构造时的旧值或空过滤器（预览=实际的守卫从这里开始）。
+        ViewModel.CaptureFormatOptions = () =>
         {
-            if (result)
-            {
-                // 关闭前将 DynamicFormatOptionsPanel 当前值快照到 ViewModel，
-                // 供压缩流程读取本次对话框设置的高级选项（仅本次压缩生效，不写回 AppSettings）
-                SnapshotFormatOptionsToViewModel();
-            }
-            Close(result);
-            await Task.CompletedTask;
+            SnapshotFormatOptionsToViewModel();
+            ViewModel.FileFilter = GetFilter();
         };
 
-DataContext = ViewModel;
+        // 确认事务的三种结局 → 窗口动作。拒绝留窗（原因弹在窗口上），确认/取消关窗。
+        ViewModel.ConfirmCompleted += OnConfirmCompleted;
+
+        DataContext = ViewModel;
         SubscribeViewModel();
 
         // 浏览回调：保存文件对话框（带格式联动），选中后将完整路径拆为目录+文件名填入。
@@ -92,6 +132,55 @@ DataContext = ViewModel;
         InitFileFilter();
 
         Loaded += OnLoaded;
+        Closed += OnClosed;
+    }
+
+    /// <summary>
+    /// 用注入的执行器跑一次已确认的压缩载荷。
+    /// 放在窗口上是因为 session/context 是它的构造依赖——宿主只需要分支处理
+    /// <see cref="CompressOutcome"/> 四态，不必再自己拼请求或再弹一次错误。
+    /// </summary>
+    /// <param name="settings">确认事务冻结下来的载荷。</param>
+    /// <returns>压缩结局。</returns>
+    public Task<CompressOutcome> RunConfirmedAsync(CompressSettings settings)
+    {
+        ArgumentNullException.ThrowIfNull(settings);
+        if (_session is null || _context is null)
+        {
+            // 设计时窗口没有执行器：明确回报「未开始」而不是抛异常，调用方据此展示原因。
+            return Task.FromResult(
+                CompressOutcome.NotStarted(LocalizationManager.T("Settings_Window_NoExecutor")));
+        }
+
+        return _session.RunAsync(settings, _context);
+    }
+
+    /// <summary>
+    /// 把确认结局翻译成窗口动作：拒绝留窗、确认/取消关窗；关窗携带的结果供
+    /// <see cref="Completion"/> 与 <c>ShowDialog&lt;ConfirmOutcome&lt;…&gt;&gt;</c> 读取。
+    /// </summary>
+    private void OnConfirmCompleted(ConfirmOutcome<CompressSettings> outcome)
+    {
+        switch (outcome)
+        {
+            case Rejected<CompressSettings> rejected:
+                // 拒绝必须留在窗口并显示原因：静默关窗会让用户以为压缩开始了。
+                if (ViewModel.ShowMessage != null)
+                    _ = ViewModel.ShowMessage(rejected.Reason, LocalizationManager.T("Compress_Title"));
+                return;
+
+            default:
+                _closedOutcome = outcome;
+                Close(outcome);
+                return;
+        }
+    }
+
+    /// <summary>关窗统一出口：解除订阅并把确认结果（缺省 = 取消）交给等待方。</summary>
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        ViewModel.ConfirmCompleted -= OnConfirmCompleted;
+        _completion.TrySetResult(_closedOutcome ?? new Cancelled<CompressSettings>());
     }
 
     /// <summary>
@@ -129,8 +218,9 @@ DataContext = ViewModel;
 
     /// <summary>
     /// 获取当前文件过滤条件。返回 null 表示不过滤。
+    /// 只服务于确认事务内部的快照（过滤控件属于窗口，不属于载荷），因此不对外公开。
     /// </summary>
-    public FileFilterCriteria? GetFilter()
+    private FileFilterCriteria? GetFilter()
     {
         if (FileFilterControl == null) return null;
         if (!FileFilterControl.IsFilterEnabled) return null;
@@ -256,11 +346,11 @@ DataContext = ViewModel;
     }
 
     /// <summary>
-    /// 将 DynamicFormatOptionsPanel 的当前值快照到 ViewModel，供压缩流程读取。
-    /// 在关闭前调用；不再写回 AppSettings，避免污染设置窗口的全局默认值。
-    /// 公开供 CLI 入口（App.axaml.cs 覆盖 CloseAction 后）显式调用。
+    /// 将 DynamicFormatOptionsPanel 的当前值快照到 ViewModel，供确认事务的载荷冻结读取。
+    /// 由窗口注入到 <see cref="CompressSettingsViewModel.CaptureFormatOptions"/>，在确认前调用；
+    /// 不再写回 AppSettings，避免污染设置窗口的全局默认值。
     /// </summary>
-    public void SnapshotFormatOptionsToViewModel()
+    private void SnapshotFormatOptionsToViewModel()
     {
         ViewModel.FileNameEncoding = FormatOptionsPanel.FileNameEncoding ?? "utf-8";
         ViewModel.ZipCompressionMethod = FormatOptionsPanel.ZipCompressionMethod ?? "deflate";

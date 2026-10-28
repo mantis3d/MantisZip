@@ -14,7 +14,6 @@ using MantisZip.Core.Services;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
-using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Services;
 
@@ -24,91 +23,12 @@ namespace MantisZip.UI.Avalonia.Services;
 /// 历史背景：WPF 时代主窗口（code-behind）与 CLI（App）各自实现了一套压缩流程，
 /// Avalonia 移植时继承了这个分裂，导致 CLI 侧曾出现「硬编码 Manual 模式」「不处理文件冲突」
 /// 等与主窗口行为不一致的 bug。本类将可共享部分抽取为单一事实来源：
-/// - <see cref="BuildRequest"/>：CompressSettingsViewModel → CompressRequest（含文件过滤）
+/// - <see cref="CreateErrorResolver"/>：源文件读取错误 resolver（同步契约 + UI 线程封送）
 /// - <see cref="CreateResolver"/>：冲突处理 resolver（弹窗回调注入 + ApplyToAll 记忆）
 /// - <see cref="ShowConflictDialogAsync"/>：CompressConflictDialog 弹窗 + 结果映射（无状态）
 /// </summary>
 public static class CompressFlow
 {
-    /// <summary>
-    /// 从 CompressSettingsViewModel 构建 CompressRequest。
-    /// 消费预览构建时缓存的 B 数据集（CompressPlan）：源路径保持目录粒度，过滤由每项 IncludedFiles
-    /// 白名单表达，输出路径取自 B —— 执行侧不再重新计算路径、不再重新过滤，预览 = 实际。
-    /// B 为空（无源/路径无效/构建未完成）或过滤激活且全部无匹配时返回 null，由调用方决定提示/退出。
-    /// </summary>
-    public static CompressRequest? BuildRequest(CompressSettingsViewModel vm)
-    {
-        var plan = vm.GetPlanForExecution();
-        if (plan == null || plan.Items.Count == 0)
-            return null;
-
-        // 过滤激活时（B 中任何一项带 IncludedFiles）丢弃无匹配项的源；全部无匹配 → null
-        var items = plan.Items;
-        bool filterActive = items.Any(i => i.IncludedFiles != null);
-        if (filterActive)
-        {
-            items = items.Where(i => i.IncludedFiles is { Count: > 0 }).ToList();
-            if (items.Count == 0)
-                return null;
-        }
-
-        var settings = AppSettings.Load();
-        var result = new CompressRequest
-        {
-            // 目录粒度源（过滤语义在白名单中表达，不再扁平化为文件列表）
-            SourcePaths = items.Select(i => i.SourcePath).ToList(),
-            // B 数据集原样传入：CompressService 逐项消费 OutputArchivePath + IncludedFiles
-            Plan = new CompressPlan(plan.Mode, plan.OutputPath, items),
-            Mode = vm.OutputMode,
-            Format = vm.DefaultFormat,
-            CompressionLevel = vm.CompressionLevel,
-            Password = vm.GetActivePassword(),
-            Encrypt = vm.Encrypt,
-            Comment = vm.Comment,
-            CommentDistribution = vm.CommentDistribution,
-            OutputPath = vm.OutputMode switch
-            {
-                CompressOutputMode.Manual => vm.OutputPath,
-                CompressOutputMode.Separate => null,
-                CompressOutputMode.Combined => vm.OutputPath,
-                _ => null,
-            },
-            SplitSize = vm.SplitSize,
-            PreserveDirectoryRoot = settings.PreserveDirectoryRoot,
-            // 从对话框 ViewModel 读取（对话框可能已修改，不再经 AppSettings 中转）
-            KeepOriginalExtension = vm.KeepOriginalExtension,
-            // 高级格式选项从对话框 ViewModel 读取（仅本次压缩生效），不再从 AppSettings 中转
-            FileNameEncoding = vm.FileNameEncoding,
-            ZipCompressionMethod = vm.ZipCompressionMethod,
-            ZipEncryptionMethod = vm.ZipEncryptionMethod,
-            SevenZipCompressionMethod = vm.SevenZipCompressionMethod,
-            SevenZipSolid = vm.SevenZipSolid,
-            SevenZipSolidBlockSize = vm.SevenZipSolidBlockSize,
-            SevenZipDictionarySize = vm.SevenZipDictionarySize,
-            SevenZipNumFastBytes = vm.SevenZipNumFastBytes,
-            SevenZipMatchFinder = vm.SevenZipMatchFinder,
-            SevenZipMultithreaded = vm.SevenZipMultithreaded,
-            // 自适应压缩：三个独立开关，全部从对话框读取（per-operation override，不污染全局设置）
-            AdaptiveCompression = vm.AdaptiveCompression,
-            AdaptiveSmartDetect = vm.AdaptiveSmartDetect,
-            MultiThreadedCompression = vm.MultiThreadedCompression,
-            // Phase 2 / Task 10 + 2026-10-21 合并：自适应覆盖规则 + 用户自定义格式
-            // （规则按 FormatId 反查扩展名；原「仅存储格式」列表已并入规则，不再单独传递）
-            AdaptiveOverrides = new List<AdaptiveOverrideRule>(
-                settings.AdaptiveOverrides ?? new List<AdaptiveOverrideRule>()),
-            CustomFormats = new List<FormatDefinition>(
-                settings.CustomFormats ?? new List<FormatDefinition>()),
-            SevenZipEncryptHeaders = vm.SevenZipEncryptHeaders,
-            // 输出文件冲突默认策略（本次压缩生效，来自压缩对话框/全局设置）
-            ConflictAction = vm.ConflictAction,
-            // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止），补上 Avalonia 迁移时遗漏的接线
-            ErrorResolver = CreateErrorResolver(),
-        };
-
-        CoreLog.Trace("CompressFlow.BuildRequest: adaptive={0}, smartDetect={1}, multiThreaded={2}, vm.AdaptiveCompression={3}",
-            result.AdaptiveCompression, result.AdaptiveSmartDetect, result.MultiThreadedCompression, vm.AdaptiveCompression);
-        return result;
-    }
 
     /// <summary>
     /// 创建源文件读取错误 resolver（文件被占用等）。
@@ -127,7 +47,11 @@ public static class CompressFlow
             if (applyToAll && chosenAction.HasValue)
                 return chosenAction.Value;
 
-            // 封送回 UI 线程弹窗并等待用户选择。
+            // 同步 API 边界：Core 的 ErrorResolver 契约是同步委托
+            // （ArchiveOptions.ErrorResolver = Func<FileErrorInfo, FileErrorAction>，见
+            // ArchiveEngine.cs:78），引擎在读文件的后台线程上同步调用，这里无法 await。
+            // 因此把「弹窗 + 等用户选择」整段封送回 UI 线程，且只在**调用方后台线程**上同步等待；
+            // 弹窗内部已走 await 链（ShowDialog → Completion），UI 线程内不再 sync-over-async。
             // 注意：UI 线程上必须 await —— 不能写成 dlg.ShowDialog(owner).GetAwaiter().GetResult()，
             // 那样会在 UI 线程上同步阻塞调度器，模态对话框永远无法显示/关闭（真死锁，历史缺陷）。
             // 调用方是引擎后台线程，外层 GetAwaiter().GetResult() 只阻塞后台线程，安全。
@@ -140,16 +64,17 @@ public static class CompressFlow
                     // 极端边缘情况：无可用父窗口（非桌面模式），无法弹窗，返回默认中止
                     System.Diagnostics.Debug.WriteLine("ErrorDialog skipped: no owner window available");
                     CoreLog.ConflictTrace("error-dialog-skipped no-owner file='{0}'", info.FilePath);
-                    return (Action: FileErrorAction.Abort, All: false);
+                    return new ErrorDialogOutcome(FileErrorAction.Abort, ApplyToAll: false);
                 }
                 CoreLog.ConflictTrace("error-dialog-open file='{0}'", info.FilePath);
                 await dlg.ShowDialog(owner);
+                var outcome = await dlg.Completion;
                 CoreLog.ConflictTrace("error-dialog-returned action={0} applyAll={1} file='{2}'",
-                    dlg.ResultAction, dlg.ApplyToAll, info.FilePath);
-                return (Action: dlg.ResultAction, All: dlg.ApplyToAll);
+                    outcome.Action, outcome.ApplyToAll, info.FilePath);
+                return outcome;
             }).GetAwaiter().GetResult();
 
-            if (result.All)
+            if (result.ApplyToAll)
             {
                 applyToAll = true;
                 chosenAction = result.Action;
@@ -275,102 +200,74 @@ public static class CompressFlow
         while (true)
         {
             // 冲突弹窗是模态等待：期间已用时间冻结。
-            // try/finally 保证任何出口（正常返回 / 取消抛异常 / 恢复后 continue）都结算冻结计数，
-            // 否则 _modalFreezeCount 泄漏会让已用时间永久停走。
+            // 每个出口（正常返回 / 取消抛异常 / 无进度窗口时降级返回 / 恢复后 continue）都显式结算
+            // EndModalFreeze，否则 _modalFreezeCount 泄漏会让已用时间永久停走。
             var pw = owner as ProgressWindow ?? ProgressWindow.CurrentVisible;
             pw?.BeginModalFreeze();
-            try
+            // 确认即载荷：对话框关闭时一次性交出完整决策（按钮 + 自定义名 + 应用到全部 + 暂停/取消整轮），
+            // 这里只做「载荷 → Core 动作」映射，不再逐字段回读窗口属性（漏读一项就静默失效）。
+            // 诊断（conflict.log，RELEASE 也写）：弹窗开始 / 返回，便于用户报「点了没反应」时定位卡在哪一步。
+            CoreLog.ConflictTrace("compress-dialog-open owner={0} pwVisible={1} file='{2}'",
+                owner.GetType().Name, pw != null, info.OutputPath);
+
+            var outcome = await Dispatcher.UIThread.InvokeAsync(async () =>
             {
-                // 诊断（conflict.log，RELEASE 也写）：弹窗开始/返回
-                CoreLog.ConflictTrace("compress-dialog-open owner={0} pwVisible={1} file='{2}'",
-                    owner.GetType().Name, pw != null, info.OutputPath);
+                var dlg = new CompressConflictDialog(info.OutputPath, info.SuggestedName, info.CanAdd);
+                // 优先使用当前可见的进度窗口作为 owner（主窗口压缩时居中于进度窗口），
+                // 回退到传入的 owner（CLI 场景显式传入 ProgressWindow）
+                var dialogOwner = ProgressWindow.CurrentVisible ?? owner;
+                await dlg.ShowDialog(dialogOwner);
+                return await dlg.Completion;
+            });
 
-                var result = await Dispatcher.UIThread.InvokeAsync(async () =>
-                {
-                    var dlg = new CompressConflictDialog(info.OutputPath, info.SuggestedName, info.CanAdd);
-                    // 优先使用当前可见的进度窗口作为 owner（主窗口压缩时居中于进度窗口），
-                    // 回退到传入的 owner（CLI 场景显式传入 ProgressWindow）
-                    var dialogOwner = ProgressWindow.CurrentVisible ?? owner;
-                    await dlg.ShowDialog(dialogOwner);
+            CoreLog.ConflictTrace("compress-dialog-returned action={0} paused={1} cancelled={2} applyAll={3} file='{4}'",
+                outcome.Action, outcome.IsPaused, outcome.IsCancelled, outcome.ApplyToAll, info.OutputPath);
 
-                    // 暂停：收起对话框，返回暂停标志由外层处理
-                    if (dlg.IsPaused)
-                    {
-                        return (Action: MantisZip.Core.Abstractions.CompressConflictAction.Cancel, CustomName: (string?)null, IsPaused: true, IsCancelled: false, ApplyAll: false);
-                    }
-
-                    // "取消操作"按钮：终止整个压缩（对齐解压侧 Ask 弹窗"取消整个操作"抛
-                    // OperationCanceledException 的语义；Core 收到后取消剩余任务）
-                    if (dlg.CancelOperation)
-                    {
-                        return (Action: MantisZip.Core.Abstractions.CompressConflictAction.Cancel, CustomName: (string?)null, IsPaused: false, IsCancelled: true, ApplyAll: false);
-                    }
-
-                    MantisZip.Core.Abstractions.CompressConflictAction resultAction;
-                    string? customName = null;
-                    switch (dlg.ResultAction)
-                    {
-                        case Dialogs.CompressConflictAction.Overwrite:
-                            resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Overwrite;
-                            break;
-                        case Dialogs.CompressConflictAction.Add:
-                            resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Add;
-                            break;
-                        case Dialogs.CompressConflictAction.Rename:
-                            resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Rename;
-                            customName = dlg.CustomName;
-                            break;
-                        case Dialogs.CompressConflictAction.Skip:
-                        case Dialogs.CompressConflictAction.Cancel:
-                        default:
-                            resultAction = MantisZip.Core.Abstractions.CompressConflictAction.Cancel;
-                            break;
-                    }
-
-                    return (Action: resultAction, CustomName: customName, IsPaused: false, IsCancelled: false, ApplyAll: dlg.ApplyToAll);
-                });
-
-                CoreLog.ConflictTrace("compress-dialog-returned action={0} paused={1} cancelled={2} applyAll={3} file='{4}'",
-                    result.Action, result.IsPaused, result.IsCancelled, result.ApplyAll, info.OutputPath);
-
-                if (result.IsCancelled)
-                    throw new OperationCanceledException("压缩被用户取消");
-
-                if (result.IsPaused)
-                {
-                    // 从 owner（CLI 直接传 ProgressWindow）或当前打开的进度窗口中找到目标，
-                    // 在 UI 线程调用 PauseFromConflict 进入暂停态，然后在后台线程等待暂停事件
-                    // （不阻塞 UI 线程，用户可在进度窗口点击"继续"恢复）。
-                    if (pw == null)
-                    {
-                        // 无进度窗口可暂停：不能 continue（否则无延迟无限重弹同一对话框，表现为卡死）。
-                        // 按「跳过该文件」继续（Cancel 在 Core 压缩侧 = 单项跳过，非终止压缩）。
-                        CoreLog.ConflictTrace("compress-pause-without-progress-window -> fallback cancel(skip) file='{0}'",
-                            info.OutputPath);
-                        return (MantisZip.Core.Abstractions.CompressConflictAction.Cancel, null, false);
-                    }
-
-                    var pauseTarget = pw;
-                    await Dispatcher.UIThread.InvokeAsync(() => pauseTarget.PauseFromConflict());
-                    // IsPaused 已为 true → 解除模态冻结后由暂停态无缝接续冻结
-                    pw.EndModalFreeze();
-                    pw = null; // 已结算，finally 不再重复扣减
-
-                    CoreLog.ConflictTrace("compress-pause-wait-begin file='{0}'", info.OutputPath);
-                    pauseTarget.PauseEvent.Wait(pauseTarget.CancellationToken);
-                    CoreLog.ConflictTrace("compress-pause-wait-exit cancelled={0} file='{1}'",
-                        pauseTarget.CancellationToken.IsCancellationRequested, info.OutputPath);
-                    continue; // 恢复后重新弹窗
-                }
-
-                return (result.Action, result.CustomName, result.ApplyAll);
-            }
-            finally
+            // "取消操作"按钮：终止整个压缩（对齐解压侧 Ask 弹窗"取消整个操作"抛
+            // OperationCanceledException 的语义；Core 收到后取消剩余任务）
+            if (outcome.IsCancelled)
             {
                 pw?.EndModalFreeze();
+                throw new OperationCanceledException("压缩被用户取消");
             }
+
+            // 暂停：收起对话框，进入进度窗口暂停态，恢复后重新弹窗处理同一个冲突
+            if (outcome.IsPaused)
+            {
+                if (pw == null)
+                {
+                    // 无进度窗口可暂停：不能 continue（否则无延迟无限重弹同一对话框，表现为卡死）。
+                    // 按「跳过该文件」继续（Cancel 在 Core 压缩侧 = 单项跳过，非终止压缩）。
+                    CoreLog.ConflictTrace("compress-pause-without-progress-window -> fallback cancel(skip) file='{0}'",
+                        info.OutputPath);
+                    return (MantisZip.Core.Abstractions.CompressConflictAction.Cancel, null, false);
+                }
+
+                await Dispatcher.UIThread.InvokeAsync(() => pw.PauseFromConflict());
+                // IsPaused 已为 true → 解除模态冻结后由暂停态无缝接续冻结
+                pw.EndModalFreeze();
+                CoreLog.ConflictTrace("compress-pause-wait-begin file='{0}'", info.OutputPath);
+                await ProgressPauseGate.WaitForResumeAsync(pw);
+                CoreLog.ConflictTrace("compress-pause-wait-exit file='{0}'", info.OutputPath);
+                continue; // 恢复后重新弹窗
+            }
+
+            pw?.EndModalFreeze();
+            return (MapConflictAction(outcome.Action),
+                outcome.Action == Dialogs.CompressConflictAction.Rename ? outcome.CustomName : null,
+                outcome.ApplyToAll);
         }
     }
+
+    /// <summary>对话框侧的压缩冲突按钮 → Core 冲突动作（Skip/Cancel 均落为 Cancel，与旧 switch 一致）。</summary>
+    private static MantisZip.Core.Abstractions.CompressConflictAction MapConflictAction(Dialogs.CompressConflictAction action)
+        => action switch
+        {
+            Dialogs.CompressConflictAction.Overwrite => MantisZip.Core.Abstractions.CompressConflictAction.Overwrite,
+            Dialogs.CompressConflictAction.Add => MantisZip.Core.Abstractions.CompressConflictAction.Add,
+            Dialogs.CompressConflictAction.Rename => MantisZip.Core.Abstractions.CompressConflictAction.Rename,
+            _ => MantisZip.Core.Abstractions.CompressConflictAction.Cancel,
+        };
 
     /// <summary>
     /// 压缩成功后把输出目录写入路径历史（<see cref="PathHistoryManager"/>，

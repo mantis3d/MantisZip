@@ -19,7 +19,7 @@
   </Window.Resources>
 
   <DockPanel Margin="{DynamicResource SpacingMdThk}">
-    <!-- 顶部工具栏：统计信息 + 搜索框 + 关闭按钮 -->
+    <!-- 顶部工具栏：统计信息 + 搜索框 + 关闭按钮（两页共用，不随页签切换） -->
     <Border DockPanel.Dock="Top"
             Padding="0,0,0,8">
       <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto">
@@ -40,7 +40,7 @@
           </Border>
         </StackPanel>
 
-        <!-- 搜索框：支持按图标名称、资源键、使用位置筛选 -->
+        <!-- 搜索框：支持按图标名称、资源键、使用位置筛选（仅作用于「图标列表」页） -->
         <TextBox Grid.Column="1"
                  Text="{Binding FilterText}"
                  PlaceholderText="搜索图标名称、资源键、位置…"
@@ -63,75 +63,299 @@
       </Grid>
     </Border>
 
-    <!-- 主体区域：图标列表 DataGrid -->
-    <DataGrid x:Name="IconGrid"
-              x:DataType="models:IconTestItem"
-              AutoGenerateColumns="False"
-              IsReadOnly="True"
-              GridLinesVisibility="Horizontal"
-              BorderBrush="{DynamicResource ThemeBorderBrush}"
-              BorderThickness="1"
-              Background="{DynamicResource ThemeSurfaceBgBrush}"
-              RowBackground="{DynamicResource ThemeSurfaceBgBrush}"
-              SelectionMode="Single"
-              FontSize="12">
-      <DataGrid.Columns>
-        <!-- 图标列：并排显示 emoji 和 PathIcon -->
-        <DataGridTemplateColumn Header="图标" Width="80">
-          <DataTemplate DataType="models:IconTestItem">
-            <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
-              <!-- Emoji 显示：当 EmojiChar 不为空时可见 -->
-              <TextBlock Text="{Binding EmojiChar}"
-                         FontSize="18"
+    <!-- 主体区域：两页签（图标列表 / 三档尺寸 × 双主题矩阵） -->
+    <TabControl>
+      <!-- 页签一：图标列表（现有 DataGrid，保留搜索过滤与明细列） -->
+      <TabItem Header="{Binding TabListTitle}">
+        <!-- 图标列表 DataGrid -->
+        <DataGrid x:Name="IconGrid"
+                  x:DataType="models:IconTestItem"
+                  AutoGenerateColumns="False"
+                  IsReadOnly="True"
+                  GridLinesVisibility="Horizontal"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}"
+                  RowBackground="{DynamicResource ThemeSurfaceBgBrush}"
+                  SelectionMode="Single"
+                  FontSize="12">
+          <DataGrid.Columns>
+            <!-- 图标列：并排显示 emoji 和 PathIcon -->
+            <DataGridTemplateColumn Header="图标" Width="80">
+              <DataTemplate DataType="models:IconTestItem">
+                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" VerticalAlignment="Center" Spacing="4">
+                  <!-- Emoji 显示：当 EmojiChar 不为空时可见 -->
+                  <TextBlock Text="{Binding EmojiChar}"
+                             FontSize="18"
+                             VerticalAlignment="Center"
+                             IsVisible="{Binding EmojiChar, Converter={StaticResource StringNotEmptyConverter}}" />
+                  <!-- PathIcon 显示：当 ResourceKey 不为空时可见，通过转换器解析资源键 -->
+                  <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
+                            Width="18" Height="18"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                            IsVisible="{Binding ResourceKey, Converter={StaticResource StringNotEmptyConverter}}" />
+                </StackPanel>
+              </DataTemplate>
+            </DataGridTemplateColumn>
+
+            <!-- 分类列 -->
+            <DataGridTextColumn Header="分类"
+                                Binding="{Binding Category}"
+                                Width="70" />
+
+            <!-- 语义名称列 -->
+            <DataGridTextColumn Header="语义名称"
+                                Binding="{Binding SemanticName}"
+                                Width="120" />
+
+            <!-- PathIcon 资源键列：使用只读 TextBox 支持复制 -->
+            <DataGridTemplateColumn Header="PathIcon 资源键" Width="130">
+              <DataTemplate DataType="models:IconTestItem">
+                <TextBox Text="{Binding ResourceKey}"
+                         IsReadOnly="True"
+                         Background="Transparent"
+                         FontSize="12"
+                         Margin="0" Padding="0"
+                         BorderThickness="0"
+                         VerticalAlignment="Center" />
+              </DataTemplate>
+            </DataGridTemplateColumn>
+
+            <!-- 状态列：显示替换状态（已替换/待替换/不适用） -->
+            <DataGridTextColumn Header="状态"
+                                Binding="{Binding StatusText}"
+                                Width="90" />
+
+            <!-- 使用位置列：显示图标在代码中的使用位置（简短路径） -->
+            <DataGridTextColumn Header="使用位置"
+                                Binding="{Binding ShortLocation}"
+                                Width="170" />
+
+            <!-- 备注列：自动填充剩余宽度 -->
+            <DataGridTextColumn Header="备注"
+                                Binding="{Binding Notes}"
+                                 Width="*" />
+          </DataGrid.Columns>
+        </DataGrid>
+      </TabItem>
+
+      <!-- 页签二：三档尺寸（16 / 22 / 28 px）× 双主题（浅色 / 深色）矩阵，供人工验收清晰度 -->
+      <TabItem Header="{Binding TabMatrixTitle}">
+        <DockPanel Margin="{DynamicResource SpacingSmThk}">
+          <!-- 页头：标题 + 说明 + 图例（尺寸档位 / 浅色块 / 深色块 / 去重后的图标总数） -->
+          <StackPanel DockPanel.Dock="Top" Spacing="{DynamicResource SpacingXs}">
+            <!-- 标题与说明文案均来自三语本地化资源（规则 13） -->
+            <TextBlock Text="{Binding MatrixTitle}"
+                       FontSize="14"
+                       FontWeight="SemiBold"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding MatrixHint}"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingSm}" VerticalAlignment="Center">
+              <!-- 尺寸档位图例：文案含三档像素值（16 / 22 / 28 px），来自本地化资源 -->
+              <TextBlock Text="{Binding SizeLabel}"
+                         FontSize="11"
                          VerticalAlignment="Center"
-                         IsVisible="{Binding EmojiChar, Converter={StaticResource StringNotEmptyConverter}}" />
-              <!-- PathIcon 显示：当 ResourceKey 不为空时可见，通过转换器解析资源键 -->
-              <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
-                        Width="18" Height="18"
-                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                        IsVisible="{Binding ResourceKey, Converter={StaticResource StringNotEmptyConverter}}" />
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <!--
+                浅色图例块：在局部资源作用域内合并 ThemeLight.axaml，使作用域内的
+                Theme*Brush 固定取浅色主题值（与本窗口当前生效的亮/暗主题无关），
+                从而保证「浅色背景块」在任何主题下都是白底深色图标。
+              -->
+              <StackPanel VerticalAlignment="Center">
+                <StackPanel.Resources>
+                  <ResourceDictionary>
+                    <ResourceDictionary.MergedDictionaries>
+                      <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml" />
+                    </ResourceDictionary.MergedDictionaries>
+                  </ResourceDictionary>
+                </StackPanel.Resources>
+                <!-- 浅色背景色块：背景取浅色主题表面色，文字取浅色主题主文字色 -->
+                <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                        Padding="{DynamicResource SpacingXsThk}"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="1">
+                  <TextBlock Text="{Binding LightLabel}"
+                             FontSize="11"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </Border>
+              </StackPanel>
+              <!-- 深色图例块：作用域内合并 ThemeDark.axaml，固定为深色主题值（深底浅色图标） -->
+              <StackPanel VerticalAlignment="Center">
+                <StackPanel.Resources>
+                  <ResourceDictionary>
+                    <ResourceDictionary.MergedDictionaries>
+                      <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Themes/ThemeDark.axaml" />
+                    </ResourceDictionary.MergedDictionaries>
+                  </ResourceDictionary>
+                </StackPanel.Resources>
+                <!-- 深色背景色块：背景取深色主题表面色，文字取深色主题主文字色 -->
+                <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                        Padding="{DynamicResource SpacingXsThk}"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
+                        BorderThickness="1">
+                  <TextBlock Text="{Binding DarkLabel}"
+                             FontSize="11"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </Border>
+              </StackPanel>
+              <!-- 去重后的图标总数（验收用：计划要求 117 个图标齐全） -->
+              <TextBlock Text="{Binding MatrixCountText}"
+                         FontSize="11"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
             </StackPanel>
-          </DataTemplate>
-        </DataGridTemplateColumn>
+          </StackPanel>
 
-        <!-- 分类列 -->
-        <DataGridTextColumn Header="分类"
-                            Binding="{Binding Category}"
-                            Width="70" />
+          <!--
+            图标矩阵列表：每项渲染「名称 + 资源键 + 浅色块 + 深色块」，
+            每块内按 16 / 22 / 28 三档尺寸各渲染一次同一几何。
+            用 ListBox（自带虚拟化）而非 ItemsControl，避免 117 项 × 6 个 PathIcon 一次性实例化。
+          -->
+          <ListBox ItemsSource="{Binding MatrixIcons}"
+                   Background="{DynamicResource ThemeSurfaceBgBrush}"
+                   BorderBrush="{DynamicResource ThemeBorderBrush}"
+                   BorderThickness="1">
+            <!-- 列表项容器：紧凑度感知行高（规则 7），内容整行拉伸 -->
+            <ListBox.ItemContainerTheme>
+              <ControlTheme TargetType="ListBoxItem">
+                <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
+                <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+                <Setter Property="Background" Value="Transparent" />
+              </ControlTheme>
+            </ListBox.ItemContainerTheme>
+            <ListBox.ItemTemplate>
+              <DataTemplate x:DataType="models:IconTestItem">
+                <!-- 单个图标的矩阵样本：行头（语义名称 + 资源键）+ 并排的浅色 / 深色色块 -->
+                <StackPanel>
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+                    <!-- 语义名称：主文字色 -->
+                    <TextBlock Text="{Binding SemanticName}"
+                               FontSize="12"
+                               FontWeight="SemiBold"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <!-- 资源键：次要文字色，便于对照 AppIcons.axaml -->
+                    <TextBlock Text="{Binding ResourceKey}"
+                               FontSize="10"
+                               VerticalAlignment="Bottom"
+                               TextTrimming="CharacterEllipsis"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  </StackPanel>
 
-        <!-- 语义名称列 -->
-        <DataGridTextColumn Header="语义名称"
-                            Binding="{Binding SemanticName}"
-                            Width="120" />
+                  <!-- 两主题色块并排：左浅色、右深色（顺序与页头图例一致） -->
+                  <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+                    <!-- 浅色背景块：局部作用域固定浅色主题资源 -->
+                    <StackPanel>
+                      <StackPanel.Resources>
+                        <ResourceDictionary>
+                          <ResourceDictionary.MergedDictionaries>
+                            <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml" />
+                          </ResourceDictionary.MergedDictionaries>
+                        </ResourceDictionary>
+                      </StackPanel.Resources>
+                      <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                              Padding="{DynamicResource SpacingXsThk}"
+                              BorderBrush="{DynamicResource ThemeBorderBrush}"
+                              BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                          <!-- 16 px 档：同一几何按 16 像素渲染，数字为尺寸标注（语言无关，无需本地化） -->
+                          <StackPanel VerticalAlignment="Bottom" Margin="{DynamicResource SpacingXxsThk}">
+                            <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
+                                      Width="16" Height="16"
+                                      HorizontalAlignment="Center"
+                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                            <TextBlock Text="16"
+                                       FontSize="9"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <!-- 22 px 档 -->
+                          <StackPanel VerticalAlignment="Bottom" Margin="{DynamicResource SpacingXxsThk}">
+                            <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
+                                      Width="22" Height="22"
+                                      HorizontalAlignment="Center"
+                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                            <TextBlock Text="22"
+                                       FontSize="9"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <!-- 28 px 档 -->
+                          <StackPanel VerticalAlignment="Bottom" Margin="{DynamicResource SpacingXxsThk}">
+                            <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
+                                      Width="28" Height="28"
+                                      HorizontalAlignment="Center"
+                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                            <TextBlock Text="28"
+                                       FontSize="9"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
 
-        <!-- PathIcon 资源键列：使用只读 TextBox 支持复制 -->
-        <DataGridTemplateColumn Header="PathIcon 资源键" Width="130">
-          <DataTemplate DataType="models:IconTestItem">
-            <TextBox Text="{Binding ResourceKey}"
-                     IsReadOnly="True"
-                     Background="Transparent"
-                     FontSize="12"
-                     Margin="0" Padding="0"
-                     BorderThickness="0"
-                     VerticalAlignment="Center" />
-          </DataTemplate>
-        </DataGridTemplateColumn>
-
-        <!-- 状态列：显示替换状态（已替换/待替换/不适用） -->
-        <DataGridTextColumn Header="状态"
-                            Binding="{Binding StatusText}"
-                            Width="90" />
-
-        <!-- 使用位置列：显示图标在代码中的使用位置（简短路径） -->
-        <DataGridTextColumn Header="使用位置"
-                            Binding="{Binding ShortLocation}"
-                            Width="170" />
-
-        <!-- 备注列：自动填充剩余宽度 -->
-        <DataGridTextColumn Header="备注"
-                            Binding="{Binding Notes}"
-                             Width="*" />
-      </DataGrid.Columns>
-    </DataGrid>
+                    <!-- 深色背景块：局部作用域固定深色主题资源（同一组 16 / 22 / 28 档） -->
+                    <StackPanel>
+                      <StackPanel.Resources>
+                        <ResourceDictionary>
+                          <ResourceDictionary.MergedDictionaries>
+                            <ResourceInclude Source="avares://MantisZip.UI.Avalonia/Themes/ThemeDark.axaml" />
+                          </ResourceDictionary.MergedDictionaries>
+                        </ResourceDictionary>
+                      </StackPanel.Resources>
+                      <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                              Padding="{DynamicResource SpacingXsThk}"
+                              BorderBrush="{DynamicResource ThemeBorderBrush}"
+                              BorderThickness="1">
+                        <StackPanel Orientation="Horizontal">
+                          <!-- 16 px 档 -->
+                          <StackPanel VerticalAlignment="Bottom" Margin="{DynamicResource SpacingXxsThk}">
+                            <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
+                                      Width="16" Height="16"
+                                      HorizontalAlignment="Center"
+                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                            <TextBlock Text="16"
+                                       FontSize="9"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <!-- 22 px 档 -->
+                          <StackPanel VerticalAlignment="Bottom" Margin="{DynamicResource SpacingXxsThk}">
+                            <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
+                                      Width="22" Height="22"
+                                      HorizontalAlignment="Center"
+                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                            <TextBlock Text="22"
+                                       FontSize="9"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <!-- 28 px 档 -->
+                          <StackPanel VerticalAlignment="Bottom" Margin="{DynamicResource SpacingXxsThk}">
+                            <PathIcon Data="{Binding ResourceKey, Converter={StaticResource GeometryResourceConverter}}"
+                                      Width="28" Height="28"
+                                      HorizontalAlignment="Center"
+                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                            <TextBlock Text="28"
+                                       FontSize="9"
+                                       HorizontalAlignment="Center"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                        </StackPanel>
+                      </Border>
+                    </StackPanel>
+                  </StackPanel>
+                </StackPanel>
+              </DataTemplate>
+            </ListBox.ItemTemplate>
+          </ListBox>
+        </DockPanel>
+      </TabItem>
+    </TabControl>
   </DockPanel>
 </Window>

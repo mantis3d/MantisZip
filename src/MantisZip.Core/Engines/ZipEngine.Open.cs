@@ -22,6 +22,20 @@ namespace MantisZip.Core.Engines;
 public partial class ZipEngine
 {
     /// <summary>
+    /// 静态初始化：注册 GBK（CP936）代码页提供程序。
+    ///
+    /// .NET Core+ 默认不含 GBK 等代码页，未注册时 <c>Encoding.GetEncoding("gbk")</c> 直接抛
+    /// <c>ArgumentException: 'gbk' is not a supported encoding name</c>。本引擎有 3 处会用到 GBK
+    /// （打开旧式中文 ZIP、文件名编码推断、中央目录重写），异常逃到 UI 就显示成
+    /// 「操作失败：'gbk' is not a supported encoding name」这种天书，把「编码探测」误导成工具故障。
+    ///
+    /// 因此由 Core 自己负责（与 <c>TorrentParser</c> / <c>TextEncodingDetector</c> 一致），
+    /// 不依赖宿主（App / 测试宿主 / 未来的 CLI）先注册过；注册幂等，重复调用无副作用。
+    /// </summary>
+    static ZipEngine()
+        => Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
+
+    /// <summary>
     /// 使用 SharpCompress 打开 ZIP 文件，自动检测编码（UTF-8 → GBK 回退）。
     /// SharpCompress 每实例设置编码，无全局副作用。
     /// 
@@ -38,6 +52,7 @@ public partial class ZipEngine
         {
             fs.Dispose();
             var fs2 = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+            // GBK 代码页已由本类静态构造器提前注册（见类顶部），此处直接取用
             var gbkOptions = new ReaderOptions
             {
                 Password = password ?? string.Empty,

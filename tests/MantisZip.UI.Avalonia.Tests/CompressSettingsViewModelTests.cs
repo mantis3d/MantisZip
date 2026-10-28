@@ -210,7 +210,7 @@ public class CompressSettingsViewModelTests
         vm.Password = "abc";
         vm.ConfirmPassword = "xyz";
         var closeCalled = false;
-        vm.CloseAction = async (result) => { closeCalled = true; await Task.CompletedTask; };
+        vm.ConfirmCompleted += _ => closeCalled = true;
         await vm.StartCompressCommand.ExecuteAsync(null);
         Assert.False(closeCalled);
     }
@@ -225,7 +225,7 @@ public class CompressSettingsViewModelTests
         string? shown = null;
         var closeCalled = false;
         vm.ShowMessage = (message, _) => { shown = message; return Task.CompletedTask; };
-        vm.CloseAction = async (result) => { closeCalled = true; await Task.CompletedTask; };
+        vm.ConfirmCompleted += _ => closeCalled = true;
 
         await vm.StartCompressCommand.ExecuteAsync(null);
 
@@ -234,19 +234,19 @@ public class CompressSettingsViewModelTests
     }
 
     [Fact]
-    public async Task StartCompressCommand_WithoutEncrypt_CallsCloseAction()
+    public async Task StartCompressCommand_WithoutEncrypt_RaisesConfirmCompleted()
     {
         // 用有源路径构造（无源时 CanExecute 禁用按钮，StartCompress 不会执行；
-        // 新实现里 EnsurePlanReadyAsync 对空源返回 false，也不应触发 CloseAction）
+        // 新实现里 EnsurePlanReadyAsync 对空源返回 false，也不应触发确认事务）
         var dir = Path.Combine(Path.GetTempPath(), "MantisZipTest_" + Guid.NewGuid().ToString("N"));
         Directory.CreateDirectory(dir);
         try
         {
             var vm = new CompressSettingsViewModel(new[] { dir });
-            var closeCalled = false;
-            vm.CloseAction = async (result) => { closeCalled = true; await Task.CompletedTask; };
+            ConfirmOutcome<CompressSettings>? outcome = null;
+            vm.ConfirmCompleted += o => outcome = o;
             await vm.StartCompressCommand.ExecuteAsync(null);
-            Assert.True(closeCalled);
+            Assert.IsType<Confirmed<CompressSettings>>(outcome);
         }
         finally
         {
@@ -255,12 +255,12 @@ public class CompressSettingsViewModelTests
     }
 
     [Fact]
-    public async Task CancelCommand_CallsCloseActionWithFalse()
+    public async Task CancelCommand_RaisesCancelledOutcome()
     {
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        var closeResult = true;
-        vm.CloseAction = async (result) => { closeResult = result; await Task.CompletedTask; };
+        ConfirmOutcome<CompressSettings>? outcome = null;
+        vm.ConfirmCompleted += o => outcome = o;
         await vm.CancelCommand.ExecuteAsync(null);
-        Assert.False(closeResult);
+        Assert.IsType<Cancelled<CompressSettings>>(outcome);
     }
 }

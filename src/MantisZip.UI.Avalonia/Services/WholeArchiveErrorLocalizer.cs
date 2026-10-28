@@ -1,3 +1,4 @@
+using MantisZip.Core.Abstractions;
 using SharpCompress.Common;
 using SharpSevenZip.Exceptions;
 
@@ -34,6 +35,12 @@ public static class WholeArchiveErrorLocalizer
     {
         switch (ex)
         {
+            // 删除目标在包内一个都匹配不到。必须排在 FileNotFoundException 基类 case **之前**：
+            // 基类分支会把所有「找不到」统一成 Error_Whole_FileNotFound，异常自带的
+            // 「压缩包中不存在条目」消息根本到不了用户眼前。
+            case ArchiveEntryNotFoundException aen:
+                return (LocalizationManager.T("Error_Delete_EntryNotFound", aen.EntryPath), aen.Message);
+
             // FileNotFoundException.FileName 缺失时（少见）落到 default 兜底
             case FileNotFoundException fnf when !string.IsNullOrEmpty(fnf.FileName):
                 return (LocalizationManager.T("Error_Whole_FileNotFound", fnf.FileName), fnf.Message);

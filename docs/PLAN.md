@@ -1,123 +1,211 @@
 # MantisZip — 开发计划
 
-> 未来待开发功能规划。已实现功能请见 [docs/PROGRESS.md](docs/PROGRESS.md)，技术架构请见 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)。
+> 未来待开发功能规划。已实现的功能见 [docs/PROGRESS.md](PROGRESS.md)，技术架构见 [docs/ARCHITECTURE.md](ARCHITECTURE.md)，每项计划的完整设计见 `.omo/plans/`。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-24  
-**当前版本**: 0.5.3
+**最后更新**: 2026-10-25  
+**当前版本**: 0.5.4
 
 ---
 
+## 这份文档怎么读
 
-## 待实现设计方案
+> **2026-10-24 结构重构**：原 P1–P4 优先级分档废弃。原因有两个：① 旧 P1 里混着「已做完主体只剩尾巴」和「该砍」的计划，读起来像全部要做；② 旧 P4 里混进了「已完成计划的遗留子项」，两者性质不同。现在按**「现在做，还是不做」**分档，每档只有一个含义。
 
-以下功能已有独立方案设计文档（`.omo/plans/`），按优先级排序。
+| 档位 | 含义 | 承诺 |
+|:--:|---|---|
+| **S** | 本轮（迭代 1）就做 | 已排期，做完就发版 |
+| **A** | 下一轮（迭代 2–3） | 已排期，但可以滚动调整 |
+| **B** | 有价值，排队 | **不排期**，有空档再取 |
+| **进行中** | 主体做过、还差一截 | 需要单独决定「继续做完」还是「冻结」 |
+| **已冻结** | 想做，但现在不投入 | 附**解冻条件**，条件不满足不讨论 |
+| **候选删除** | 建议从计划库移除 | 等你确认后我才移动计划文件 |
 
-| 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |
-|--------|------|----------|:----:|:--------:|------|
-| **P1** | 自动更新检测 | [auto-update.md](.omo/plans/未开始/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查、AboutWindow 更新 Tab、UpdateAvailableDialog、设置开关、单元测试 |
-| **P1** | 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口/QuickPathPicker/CustomFilePickerDialog）统一改造为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段；导航事件仍由宿主处理，第一版不做分隔符同级目录下拉（📋 2026-10-21 修订：按代码核对修正行号/行为描述——`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） |
-| **P1** | Office 图片预览（已完成计划内的遗留子项） | [office-content-preview-avalonia.md](.omo/plans/已完成/office-content-preview-avalonia.md#office-图片预览) | 🟢低-🟡中 | 2-10h | 📋 所属计划 `office-content-preview-avalonia` 已于 v0.5.0 完成（DOCX/XLSX/PPTX 内容预览），本行只跟踪其文末「Office 图片预览」未实现子项，尚未开工（全仓无图片提取代码）。三方案渐进：A=PPTX 图片（~50行，复用 Canvas）、B=+DOCX 行内图片（~150行）、C=浮动定位（不推荐）。待决定实施方案 |
-| **P1** | 快速预览与渐进式加载 | [preview-quick-modes.md](.omo/plans/未开始/preview-quick-modes.md) | 🟡中 | ~25h | 三种预览模式（快速/渐进/完整），叠加在已实施的两阶段加载（Phase 2）之上。**Avalonia-only（规则 11）**；已按 2026-10-20 修正版校准（设置项复用现有字段、DBF/字幕等 Unsupported 格式降级前置、GIF→AnimatedImage、ICO→IcoGallery、HTML WebView 双轨已落地、文件列表缩略图已独立成 `file-list-thumbnails.md`） |
-| **P1** | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读解锁） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | 🟡中 | 11-16h | 🟡 部分完成（2026-08-20 核实）：Core 侧 TAR 裸格式 / GZip 单文件压缩与文件关联已就绪；UI 压缩格式下拉尚未放开。后续按序增加 BZip2 → XZ → Zstd → Brotli，并解锁 7z.dll 只读格式（详见计划文档） |
-| **P1** | 自包含体积优化（Avalonia 迁移后） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 三步渐进：InvariantGlobalization → 保守修剪 → 激进修剪，目标降至 20–25 MB |
-| **P1** | ZIP 多线程压缩方案 D（自适应 + 多线程第四个选项） | [parallel-compress-plan-d.md](.omo/plans/未开始/parallel-compress-plan-d.md) | 🟡中 | 4-5h | 自适应压缩新增"自适应 + 多线程"选项：Store 类直接写入 + 需压缩类 SharpSevenZip mt=on；UI 联动（格式目录/用户规则/多线程提示可见性）；实验性标签 + 帮助弹窗 |
-| **P1** | 压缩加速三开关 UI 收敛（Phase 1 ✅） / 魔数检测+自适应规则（Phase 2 主体 ✅） | [adaptive-compress-ui-convergence.md](.omo/plans/进行中/adaptive-compress-ui-convergence.md) | 🟢 P1 完成 | P1 4-5h / P2 5-7h | 🟢 2026-10-21 Phase 2 Task 9-11 实施完成：SSOT 统一到 `ZipEntryClassifier`；`AdaptiveRuleMatcher.ResolveLevel` 唯一决策入口（规则 > SSOT 扩展名 > 魔数）；**「仅存储格式」已并入自适应规则**（控件组删除、旧配置迁移为 Store 规则、默认规则集扩到 6 类）；多线程路径提示 + 行内「多线程下不生效」标记。**2026-10-23 复核补漏**：自定义 `MagicHex` 接线、ZIP 面板魔数联动、MT 提示实时刷新、CLI 自适应开关、帮助文案「三个开关」、死字段/单测/过期注释清理。**未做**：Task 12 本机基准测试 UI、Task 13 组数定标 |
-| **P1** | 意图-执行接缝收口（消灭「点了没反应」类 bug） | [intent-execution-seam.md](.omo/plans/未开始/intent-execution-seam.md) | 🔴高 | 18-24h | 📋 2026-10-24 立项、已定案待实施：同族事故已 **7 次**（压缩侧逐属性手抄漏 3 次 / 拖入分支无人接续 / CLI 静默 `Shutdown` / 解压 CLI `FilteredEntryKeys` 恒 null / 密码库保存在且仅主窗口入口生效）。方案＝设置窗口**注入唯一执行器**（漏接续变编译错误）+ 确认事务（`Rejected(reason)` 替代静默 return）+ 不可变 DTO（消除属性补读）+ `IProgressPresenter` 收口两套进度实现。按波落地：压缩 4 入口 → 解压 5 入口 → 全仓 68 处 `ShowDialog` 清账；同时新增 AGENTS.md 规则 19 与 `guards` 第 5 条 `dialog-seam` 守卫。**`CopyExecutionSettingsFrom` 及其两份反射守卫测试退休** |
-| **P2** | ZIP 多线程压缩方案 A（分组并行 + 多级别） | [parallel-compress-plan-a.md](.omo/plans/未开始/parallel-compress-plan-a.md) | 🟡中 | 6-8h | 按级别分组 → 各组独立 ZipWriter 并行 → 合并 ZIP，完整多级别自适应 + 多线程。方案 D 完成后实施 |
-| **P2** | 压缩预估 (Compression Estimator) | [compression-estimator.md](.omo/plans/未开始/compression-estimator.md) | 🟡中 | 14-18h | 🔶 部分实现（比率表 / 格式目录 / 自适应规则模型已完成，估算器本体未开始）。2026-10-21 拆分：本行 = 压缩前预估（快速查表 / 采样标准 / 可选精确 + 设置窗口面板）；ETA 增强见下一行；自适应已归档 |
-| **P2** | 压缩中 ETA 增强 | [runtime-eta.md](.omo/plans/未开始/runtime-eta.md) | 🟡中 | 5-7h | 🔶 基础 ETA 已实现（EMA 速度 + 单档案剩余 + 暂停冻结）；本计划补先验速度融合（冷启动即有值）、批处理总剩余、估算中/即将完成文案 |
-| **P2** | Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化 |
-| **P2** | MSI 安装包 (WiX) | [msi-packaging-wix.md](.omo/plans/未开始/msi-packaging-wix.md) | 🟡中 | 2-3h | Inno Setup → WiX MSI 迁移 |
-| **P2** | 图标主题系统①基础设施（IconView + DrawingImage 迁移） | [icon-theme-infra.md](.omo/plans/未开始/icon-theme-infra.md) | 🟡中 | 16-20h | 📋 2026-10-15 立项、2026-10-19 修订普查、2026-10-21 二次修订（拆分第 1/3）：图标契约 `Geometry`→`DrawingImage`，新增 `IconView`（`SourceKey` 订阅刷新；前景色经 ControlTheme 对齐 Fluent `PathIcon` 默认值）+ 三层字典骨架（按主题 id 缓存 provider，早退条件含图标主题）+ `AppSettings.SelectedIconTheme`；全量 215 处 `PathIcon` 迁移（含 `.cs` 侧 12 组动态站点），A 套零视觉差异。**含启动性能约束（§4.7：启动期图标字典解析次数必须 = 1，静态 merge 与 ApplyTheme 不得各解析一次；迁移前后启动 A/B 门控 TOTAL 劣化 ≤ 20ms）**。规格：[2026-10-15-icon-theme-system-design.md](docs/superpowers/specs/2026-10-15-icon-theme-system-design.md) |
-| **P2** | 图标主题系统②导入包 + 单图标覆盖 + 设置 UI | [icon-theme-packs.md](.omo/plans/未开始/icon-theme-packs.md) | 🟡中 | 20-26h | 📋 2026-10-15 立项（拆分第 2/3）、2026-10-21 复核修订：SVG 图标包（文件夹/ZIP）导入 + 覆盖率校验（结构错误原子拒绝、渐变降级跳过 D-C，第②层）；单图标覆盖（第③层）；设置「外观」Tab 图标风格分区 + `IconManagerWindow`。复核新增：内置 id `A`–`G` 保留字拒绝、删当前选中包即时回退 A、`GetIconThemeProvider` 双来源 + provider/`_loadedIconThemeId` 缓存失效、非选中包缩略预览走 `IconThemeBuilder`、`IconCatalog` 去重（注册表 136 条→116 键）、落盘形态偏差 D-D。依赖① |
-| **P3** | 图标主题系统③C/D/E/F/G 内容生产 + IconGen 多套 | [icon-theme-sets.md](.omo/plans/未开始/icon-theme-sets.md) | 🔴高 | 22-32h | 📋 2026-10-15 立项（拆分第 3/3）、2026-10-21 复核修订：IconGen 多套产出（离线、sources vendored）；Phosphor Bold/Duotone + E 套彩色源决策门（兜底 C 几何程序化着色）；6 字典 × 116 键覆盖率契约（`Distinct`）；G 强调色 DynamicResource 决策门；D 底块改中性半透明灰（暗色可见）；署名三处（AboutWindow「致谢」Tab / THIRD-PARTY-NOTICES / README），Lucide 为 **ISC + Feather MIT** 双声明。依赖① |
-| **P2** | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理） |
-| **P2** | 压缩包内重命名/移动条目 | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | 3-4h | 右键重命名(F2)/移动到… |
-| **P2** | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
-| **P2** | 文件过滤与文件列表筛选数据统一 | [unify-file-filter-data.md](.omo/plans/未开始/unify-file-filter-data.md) | 🟡中 | 8-12h | 📋 2026-10-20 核对：计划文档为 WPF 期产物（Task 4/5 直指 WPF `MainWindow.xaml`），实施前须按规则 11 转 Avalonia。目标：`FileFilterCriteria` 扩展 `TextSearch`/`ExcludeText`/`TextMatchMode`，删除 `SearchFilters`+`ArchiveFilter.ApplyFilters()`（现 `MainWindowViewModel.Navigation.cs:309` 仍在用旧模型），筛选栏加预设下拉 / 扩展名 Tag 选择器 /「以当前过滤解压」 |
-| **P2** | 插件生态（.mp 市场 + 宿主安装器/运行时） | [plugin-ecosystem.md](.omo/plans/未开始/plugin-ecosystem.md) | 🔴高 | 44-64h | 📋 待拍板（2026-10-22）：Publisher 产包/校验已独立实现（47+8 测试通过），宿主侧安装/加载/市场为 0；待定：`MantisZip.PluginKit` 是否并入主仓、插件跑子进程还是宿主内、市场索引静态 JSON 还是 VPS |
-| **P2** | Win11 一级右键菜单 | [win11-first-level-menu.md](.omo/plans/未开始/win11-first-level-menu.md) | 🔴高 | 1-2周 | IExplorerCommand 实现，HKLM 提权注册，双接口共存 |
-| **P2** | 进度条分段着色（按压缩包状态） | [progress-bar-segments.md](.omo/plans/未开始/progress-bar-segments.md) | 🟡中 | 3-4h | 自定义分段进度条控件替换普通 `ProgressBar`，按批处理项状态着色（红=失败/绿=成功/青=跳过/蓝=进行中），动态预算缝隙 |
-| **P2** | 压缩文件名后缀模板 | [filename-suffix-template.md](.omo/plans/未开始/filename-suffix-template.md) | 🟢低 | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符替换，防同名覆盖 |
-| **P2** | 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.omo/plans/未开始/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API(通用) 两层提取嵌入缩略图；完成后可扩展文件列表缩略图模式 |
-| **P2** | 文件列表缩略图查看方式 | [file-list-thumbnails.md](.omo/plans/未开始/file-list-thumbnails.md) | 🟡中 | 4-6h | 三种布局模式循环切换（详情/平铺/内容行），内容卡三档（图像缩略图/文字头部预览/系统图标），布局模式持久化 |
-| **P2** | 骨架态实时进度计数器 | [skeleton-progress-counter.md](.omo/plans/未开始/skeleton-progress-counter.md) | 🟡中 | 3-4h | 骨架加载期间每 0.5s 更新目录节点的文件数/大小（如「加载中 1637 个文件，2.45GB」） |
-| **P2** | 预览"显示内容"开关 | [preview-show-content-toggle.md](.omo/plans/未开始/preview-show-content-toggle.md) | 🟡中 | 2-3h | 压缩/解压预览树新增「显示内容」开关：关闭后只显示骨架、内容彻底隐藏不可展开，并跳过磁盘递归扫描（大型源目录预览加速）；状态持久化，摘要栏隐藏时显示输出路径 |
-| **P2** | 文件选择器去弹窗化（CustomFilePickerControl 内嵌） | [embedded-file-picker.md](.omo/plans/未开始/embedded-file-picker.md) | 🟡中 | 1-2天 | 📋 2026-10-08 立项：把文件/目录选择器内嵌进压缩/解压设置窗（PickItems 简单模式默认、高级开关可选、Tab 重排、解压窗对称、拖拽兜底统一走 ExtractSettingsWindow）。三步走：先抽纯控件再分别接入；不动 CustomFilePickerDialog 静态入口与系统浏览豁免 |
-| **P2** | 扩展预览格式支持 | [preview-extended-formats.md](.omo/plans/进行中/preview-extended-formats.md) | 🟡中 | ~25h | 🟡 部分完成（3.5/6 阶段）：工具栏+信息面板、快速出货格式（Torrent/PE/PDF/SQLite/ISO 等）、SVG/字体/ICO/Office、MKV/WebM 元数据、部分提取基础设施均已就绪；LNK/DBF/EPUB/字幕/STL 与 Magick.NET/LibVLC 插件化待做（分阶段明细见计划文档） |
-| **P2** | 浮动/停靠预览面板 | [floating-preview-panel.md](.omo/plans/进行中/floating-preview-panel.md) | 🟡中 | 8-10h | 🟡 部分完成（2026-10-16 核实）：四位置停靠切换已在 Avalonia 落地（右侧/下方可持久化）；浮动独立窗口（Phase 1）与拖拽分离+边缘吸附（Phase 3）未做 |
-| **P2** | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.omo/plans/未开始/extract-journal-undo.md) | 🟡中 | 3-4h | 解压记录 + 一键回滚 |
-| **P2** | Core 层临时目录根可注入（便携模式延伸） | [core-temp-root-injectable.md](.omo/plans/未开始/core-temp-root-injectable.md) | 🟡中 | 2-3h | 📋 2026-08-20 立项：Core 层 4 处 `%TEMP%\MantisZip` 硬编码在便携模式下仍写系统 TEMP；方案为 `TempPaths` 静态类注入自定义根，未注入时路径不变（详见计划文档） |
-| **P2** | Avalonia CLI 解压后打开文件夹对齐 WPF | [cli-extract-open-folder.md](.omo/plans/未开始/cli-extract-open-folder.md) | 🟡中 | 2-3h | 📋 2026-08-20 立项：WPF CLI 解压后按 `OpenFolderAfterExtract` 打开目标文件夹，Avalonia CLI 只解压不打开；方案为成功后复用 `SmartOpenPathResolver`，多文件批处理保持不开（实施前需确认 WPF `--extract` 行为） |
-| **P2** | 文本预览语法高亮（Avalonia） | [text-preview-syntax-highlighting.md](.omo/plans/未开始/text-preview-syntax-highlighting.md) | 🟡中 | 4-5h | 📋 2026-09-21 计划文档已重写为 Avalonia 版（原 WPF AvalonEdit 方案废弃），**代码尚未实施**（csproj 无 AvaloniaEdit/TextMate 引用）：AvaloniaEdit + TextMate（VS Code 语法全集，免自研语法包）替换现有文本预览容器，亮/暗主题联动 + 扩展名→魔数→结构特征三级语言识别 |
-| **P3** | 压缩包对比 (Archive Diff) | [archive-diff.md](.omo/plans/未开始/archive-diff.md) | 🟡中 | 3-4h | 压缩包文件级差异对比 |
-| **P3** | 压缩包管理器（历史 / 标签 / 目录树筛选） | [archive-manager.md](.omo/plans/未开始/archive-manager.md) | 🟡中 | 2-3天 | 独立窗口记录所有处理过的压缩包：手动标签、智能分组（最近/常用）、目录树筛选、缩略图预览；SQLite 持久化 |
-| **P3** | 可插拔预览模块体系 | [preview-modular-providers.md](.omo/plans/进行中/preview-modular-providers.md) | 🟡中 | 3-4h | 🟡 部分完成（2026-10-16 核实，Task 1/4）：`ITableDataProvider` 已纳入 Core 抽象层（`SqliteDataReader` 实现，提交 1cef18f），但 UI SQLite 预览仍直连 `Microsoft.Data.Sqlite`、接口零消费者；模块拆分/反射加载/安装包组件未做 |
-| **P3** | 文件列表自定义列 | [custom-columns.md](.omo/plans/未开始/custom-columns.md) | 🟡中 | 4-6h | 可自定义显示文件元数据列（文档标题、图片尺寸等） |
-| **P3** | 冻结列（水平滚动时列固定） | [frozen-column.md](.omo/plans/未开始/frozen-column.md) | 🟢低 | 1-2h | 右键列标题冻结/取消冻结，分隔线，设置持久化 |
-| **P3** | ICO 文件自身图标显示 | [ico-file-icon-extract.md](.omo/plans/未开始/ico-file-icon-extract.md) | 🟢低 | 2-3h | ico 文件列表显示自身嵌入图标 |
-| **P3** | 右键菜单目录结构预览 | [context-menu-tree-preview.md](.omo/plans/未开始/context-menu-tree-preview.md) | 🔴高 | 6-8h | COM 菜单中展示压缩包顶层文件树 |
-| **P4** | 解压多压缩包按来源目录分组（已完成计划内的遗留子项） | [result-preview-panel.md](.omo/plans/已完成/result-preview-panel.md) | 🟡中 | 2-4h | 所属计划 `result-preview-panel` 已完成（v0.4.5），本行只跟踪其文末「未实现项（后续可做）①」：当前多压缩包条目合并平铺，改为按来源目录分组 + 压缩包壳节点 |
-| **P4** | 结果预览截断占位符点击展开（已完成计划内的遗留子项） | [result-preview-panel.md](.omo/plans/已完成/result-preview-panel.md) | 🟢低 | 1-2h | 所属计划 `result-preview-panel` 已完成（v0.4.5），本行只跟踪其文末「未实现项（后续可做）②」：当前截断为静态"…"文本，改为点击就地展开完整子节点 |
-| **P4** | 自研 ZIP 引擎（Per-entry 压缩 + 多线程） | [custom-zip-engine.md](.omo/plans/未开始/custom-zip-engine.md) | 🟡中 | 5-6天 | Per-entry 压缩级别/方法控制（产品卖点）+ 多线程并行压缩；纯 .NET 实现（DeflateStream），零外部依赖；支持 AES-256 加密；后续可开源为独立库 ZipPerEntry |
-| **P4** | 文本/ZIP 注释回退编码策略（非中文 locale GBK 乱码 + copy-mode 注释损坏） | [text-fallback-encoding-policy.md](.omo/plans/进行中/text-fallback-encoding-policy.md) | 🟡中 | 4-6h | 🟡 **Phase 1（A1+A3）已实施 2026-10-20**，Phase 2（可配置回退代码页）待定。原立项背景：CI（en-US runner）暴露 `ZipCommentHelper` 回退代码页取 `CultureInfo.CurrentCulture.TextInfo.ANSICodePage`（en-US=1252）→ GBK 注释乱码 `»¶Ó­Ê¹ÓÃ±¾Ñ¹Ëõ°ü`；同时发现 `ZipBinaryRewriter.ReadEocd` 用 `Encoding.UTF8.GetString`（**不抛异常**，`catch` 为死代码）+ `Encoding.Default`（.NET Core 恒 UTF-8）→ copy-mode 重写把 GBK 注释写成 U+FFFD，属**数据损坏**。已实施：①注释新增 `DecodeComment`（严格 UTF-8 → **严格 GB18030** → 宿主 ANSI，GB18030 必须用异常回退——其默认解码器把截断序列静默换成 `?` 而非 U+FFFD）；②`ReadEocd`/`WriteEocd` 改**字节透传**；③测试侧 `zh-CN` pin 反转为**故意 en-US**。验证 Core 717/1skip/0fail、Avalonia 306/3skip/0fail。否决全局候选打分（Western 文本 `café` 类字节被 GBK 解成 CJK 且无 U+FFFD，无法可靠区分） |
-| **P4** | 外部工具视频元数据 | — | 🟢低 | 2-3h | ffprobe 集成 |
-| **P4** | 跨平台移植（macOS / Linux） | [cross-platform-port.md](.omo/plans/未开始/cross-platform-port.md) | 🟡中大 | 6-8周 | ✅ WPF→Avalonia 迁移已完成（Phases 0-10）。剩余 macOS/Linux 移植：Phase 0 CI+路径适配 → Phase 1 引擎适配 → Phase 2 UI 适配 → Phase 3 打磨发布；7z 压缩策略、拖拽降级、右键菜单取舍等决策点见计划文档 |
+分档判据（按此顺序）：
 
-> **执行顺序**（3 项计划有依赖链）：`nuget-dependency-upgrade`（SharpCompress ≥0.49.0）→ `compression-estimator`（依赖升级后的 per-entry 级别/多实例并行；`compression-performance-optimization` 已于 v0.5.0 完成、`progress-window-enhancement` 已完成）→ `progress-bar-segments`（在进度窗口重构后的布局上替换 SegmentProgressBar）。压缩中 ETA 增强已独立为 `runtime-eta`（先验速度来自 `compression-estimator` 的快速预估，无先验时行为与现状一致，零返工）。额外受影响计划：`cross-platform-port`（依赖 SharpCompress 升级后跨平台验证）、`selfcontained-size-optimization`（TrimmerRootAssembly 需随升级更新）、`context-menu-tree-preview`（SharpCompress API 升级后需验证条目列出兼容性）。`archive-rename-entry`/`rar-compression`/`startup-native-splash` 为软依赖，ProgressWindow 增强会自动改善体验。
+1. **用户可感知频率** — 每天用的路径 ≫ 一周一次 ≫ 一辈子一次
+2. **杠杆** — 做完能让后续 N 个计划变便宜或变安全
+3. **风险方向** — 削减「点了没反应」类失信 bug 优先于增加功能面
+4. **不可逆成本** — 重构面积 × 回归风险 ÷ 可用时间
 
+补充约定：
+
+- **每行的「设计文档」链接是唯一事实源**，本表的说明只记录「要不要做、做到哪了」，不复制实施细节。
+- 当前策略是 **「面向公开用户 + 少而稳」**（2026-10-24 确认）：宁可少做，不做半成品；可感知的「丑/慢/点了没反应」优先于功能数量。
+- **已知但这次不修的问题不在这里**：进 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)（规则 21）。本文件只装「要不要做」的决定；说得出方案与工时的才算计划，只是「知道它有问题、现在不动」的进登记簿。
 
 ---
 
+## S 档 —— 本轮必做（✅ 已全部完成，2026-10-28）
 
-## 已废弃方案
-
-| 优先级 | 功能 | 设计文档 | 难度 | 预估工时 | 说明 |废弃原因 |
-|--------|------|----------|:----:|:--------:|------|------|
-| **P3** | VirtualFileDataObject | [virtual-file-data-object.md](.omo/plans/已归档/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥 | 跨平台移植（Avalonia）后不再依赖 WPF OLE 桥，无 OLE CF_HDROP bug，VFDO 无存在必要 |
-| **P4** | 拖拽提取目标检测 | [drag-drop-marker-target.md](.omo/plans/已归档/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录 | 被 [drag-drop-direct-extract.md](.omo/plans/已完成/drag-drop-direct-extract.md) 取代——WindowFromPoint+ShellWindows 更直接可靠 |
-| **P3** | 预览格式识别（旧方案） | [preview-format-detection.old.md](.omo/plans/已归档/preview-format-detection.old.md) | 🟡中 | — | 预览格式识别旧设计 | 已拆分为 [preview-extended-formats.md](.omo/plans/进行中/preview-extended-formats.md) + [preview-magic-detection.md](.omo/plans/已完成/preview-magic-detection.md) |
-| **P3** | Office 内容预览（WPF 版） | [office-content-preview.md](.omo/plans/已归档/office-content-preview.md) | 🟡中 | — | WPF 版 Mammoth→HTML→WebView2 方案 | 被 [office-content-preview-avalonia.md](.omo/plans/已完成/office-content-preview-avalonia.md)（Avalonia 版）取代 |
-| **P3** | 资源管理器式路径切换弹窗 | [explorer-path-switcher.md](.omo/plans/已归档/explorer-path-switcher.md) | 🟡中 | — | WPF 时代 Ctrl+G 路径速选弹窗 | 被 QuickPathControl 系列演进取代（[quickpath-unified.md](.omo/plans/已归档/quickpath-unified.md) → [quickpath-control-redesign.md](.omo/plans/已归档/quickpath-control-redesign.md) → CustomFilePickerDialog） |
-| **P3** | QuickPathControl 原始组件计划（WPF 版） | [quick-path-control.md](.omo/plans/已归档/quick-path-control.md) | 🟡中 | — | WPF 版路径速选控件原始设计 | 被 [quickpath-unified.md](.omo/plans/已归档/quickpath-unified.md) → [quickpath-control-redesign.md](.omo/plans/已归档/quickpath-control-redesign.md) → CustomFilePickerDialog 演进取代 |
-
----
-
-## 跨平台移植影响分析（已完成，仅供参考）
-
-> ⚠️ WPF→Avalonia 迁移已于 2026-08 完成（Phases 0-10），以下为迁移前的兼容性评估（2026-07-22），保留供参考。
+> **执行顺序（2026-10-24 讨论定，2026-10-26 / 10-27 / 10-28 按完成情况更新）**：~~图标~~（已完成）→ ~~接缝~~（已完成）→ ~~预览~~（已完成）→ ~~自动更新~~（已完成）。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。「压缩包内重命名」原排在最后，2026-10-28 已移回 A 档——它是 A 档「暂存区」的地基，与 A 档相邻做完能省一次返工，不必占本轮 S 档窗口。
 >
-> 跨平台（macOS / Linux）实施计划见 [.omo/plans/未开始/cross-platform-port.md](../.omo/plans/未开始/cross-platform-port.md)。
+> 已完成并归档：⚡ 插队项「删除压缩包内目录静默无效」（2026-10-26，随 v0.5.4）、S 档「图标归一化」（2026-10-26，随 v0.5.4）、S 档「意图-执行接缝收口（含波次 3 全仓清账）」（2026-10-26，随 v0.5.4）、S 档「预览取数层内存优先（切片 1+2+4）」（2026-10-28，随 v0.5.4）、S 档「自动更新检测」（2026-10-28，随 v0.5.4）、⚡ 插队项「安装器产品身份统一 + 旧版迁移桥」（2026-10-27，随 v0.5.4，issue #45）、⚡ 插队项「压缩包识别分层（容器 / 子类型）+ 自解压 exe 支持」（2026-10-27，随 v0.5.4，issue #54 / #36）—— 详见 [PROGRESS.md 历史设计方案索引](PROGRESS.md)。
 
-跨平台移植（WPF→Avalonia + 砍 ShellExt）对现有计划的影响分三类：
+> S 档所有条目均已落地并归档（见上），本节不再保留待办表格。
 
-| 影响等级 | 数量 | 含义 |
-|---------|:----:|------|
-| 🟢 无影响 | 3 | Core 层纯 C# 逻辑，开箱即用 |
-| 🟡 需调整 | 20 | Core 逻辑可复用，UI 层（XAML/控件）需移植到 Avalonia |
-| 🔴 冲突 | 9 | 依赖 COM/注册表/Shell API/WPF 独占控件，需完全重写或平台替代方案 |
+> 本轮验收口径（✅ 已达成）：公众能感知到的一件事——**安装完会自己知道有新版本**。（「压缩包内重命名」已于 2026-10-28 移回 A 档，与「暂存区」相邻做；图标归一化、意图-执行接缝于 2026-10-26、预览取数层内存优先于 2026-10-28 完成，随 v0.5.4 验证）
 
-### 🟢 无影响（3 个）
+---
 
-`preview-modular-providers.md`、`selfcontained-size-optimization.md`、`winget-publishing.md`
+## A 档 —— 下一轮（约 61-74h，分两个阶段交付；不是一轮，是「接下来的两轮半」）
 
-### 🟡 需调整 — Core 可复用，UI 需移植（18 个）
+> **为什么这样切（2026-10-28 定）**：A1 把「重命名」和「暂存区」放一起，是因为它们改的是**同一批引擎文件**（`src/MantisZip.Core/Utils/ZipBinaryRewriter.cs`、`src/MantisZip.Core/Abstractions/ArchiveEngine.cs`、`ZipEngine.*`、`SevenZipEngine.cs`），都要处理 copy-mode 偏移重算、加密包不落明文、失败不破坏原件——分两次做等于同一批代码开两次刀、跑两轮全量回归。A2 前期是「每天看得见的体验 + 体积」，末尾用「小活清仓」当缓冲池（进度紧就砍尾部）。
 
-`archive-diff.md`、`archive-rename-entry.md`、`auto-update.md`、`compress-preset.md`、`compression-estimator.md`、`custom-columns.md`、`extract-journal-undo.md`、`filename-suffix-template.md`、`font-preview-ligature.md`、`ico-file-icon-extract.md`、`metadata-panel-configurable.md`、`new-format-support.md`、`office-content-preview-avalonia.md`、`preview-quick-modes.md`、`progress-window-enhancement.md`、`avalonia-ui-feature-parity.md`、`avalonia-wpf-diff-plan.md`、`外部工具视频元数据（无计划文件）`
+### 阶段 A1 —— 压缩包内编辑（约 21-28h，做完可独立发版）
 
-### 🔴 冲突 — 需完全重写或废弃（9 个）
+| 功能 | 设计文档 | 难度 | 工时 | 说明 |
+|---|---|:--:|:--:|---|
+| 压缩包内重命名条目（引擎级，零重压缩） | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **8-10h** | 📋 2026-10-27 推倒重写（旧方案 6-8h 作废），2026-10-28 从 S 档移回 A 档。旧路线「提取→删除→添加」= 改一个名字要整包重写**三遍**（ZIP 添加/删除各自都是整包 copy-mode），7z 还会把用户压缩等级重置成 `Normal`，加密包改名会变明文。新方案 ZIP 走 copy-mode **只改名字字节、压缩数据原样搬运**，7z 走 `ModifyArchive` 就地删 + 单条追加，tar.gz 明确不支持。F2 + 右键菜单，目录改名一并做。它是 A 档「暂存区」的地基，**A1 第一项** |
+| 压缩包编辑操作序列（暂存区 + 批量提交） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | **12-16h** | 删除/重命名先进内存队列，文件列表立刻反映结果（虚拟视图），点「应用」或关窗时**一次性**提交：ZIP 一次 `RewriteAsync`、7z 一次 `ModifyArchive` + 追加。**现状是每次编辑都整包重写**——删 20 个文件 = 20 次整包复制/重打包（7z 删除更是全量解压 + 重打包，还会把压缩等级重置成 `Normal`）。口径已定（2026-10-27）：只限当前打开的包、未提交切包/关窗三选（应用/丢弃/取消）、加密包沿用原加密、可选提交前备份原包（默认关）。**A1 第二项，与「重命名」同批完成**（硬依赖它的 rewriter rename 通道） |
+| Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化。公开用户的分发入口，1-2h 的性价比极高 **A1 收尾，纯发布操作** |
 
-`drag-drop-direct-extract.md`（Win32 Shell API，**已完成**）、`embedded-thumbnail-preview.md`（Shell 缩略图 API）、`frozen-column.md`（DataGrid 冻结列）、`icon-dll.md`（原生资源 DLL）、`msi-packaging-wix.md`（Windows Installer）、`rar-compression.md`（Windows 外置 rar.exe）、`win11-first-level-menu.md`（COM IExplorerCommand）、`context-menu-tree-preview.md`（COM HMENU）
+> **A1 验收口径**：改一个名字、或一次删/改 20 个条目，都不再让整包反复重写；ZIP 走 copy-mode 只改名字节、压缩数据原样搬运，7z 只碰被改条目，加密包改名不掉明文，tar.gz 明确报不支持；winget 能装。
 
-### 关键发现
+### 阶段 A2 —— 导航、瘦身与小活（约 40-46h）
 
-1. **🔴 的共性**：全部依赖 Windows Shell API（COM/注册表/P/Invoke/Shell32）或 WPF 独占控件/DataGrid 特定行为。跨平台后这些功能要么砍掉（COM 右键菜单、UAC 提权），要么需要 OS 级不同实现（Linux `.desktop` actions / macOS `NSExtension`）。
-2. **🟡 的规律一致**：Core 层的解析器/算法/模型全是纯 C# 可复用，只有 UI 渲染层（WPF XAML + 控件）需要移植到 Avalonia 等价物。
-3. **🟢 的 3 个计划**：基本是纯工具代码（正则、IO、字节操作）或发布配置，开箱即跨平台。
-4. **最值得跨平台前实现的计划**：优先完成 🟢/🟡 计划（已有 `file-filter-feature.md` 等完成先例），积累跨平台经验后再攻坚 🔴 计划。
-5. **Core 层遗留问题**：`PasswordManager`（DPAPI → 已实现 `AesGcmDataProtector` 抽象）和 `SevenZipEngine`（7z.dll Windows-only）已在跨平台准备中。
+> **内部顺序**：先做三条主线（约 15-21h，可独立发一版），再跑「小活清仓」批次（25h，缓冲池）。
 
-*此文档将随开发进度持续更新*
+| 功能 | 设计文档 | 难度 | 工时 | 说明 |
+|---|---|:--:|:--:|---|
+| 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。📋 2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） **A2 第一项** |
+| 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/进行中/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。**单独排在 A 档的理由**：三者都是「本来就在解析完整文档」，省下的只是落盘，用户感知最弱，且逐库确认 Stream 支持最费时 |
+| 自包含体积优化（第一步） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 📋 **目标已改写**：原「降至 20–25MB」与现有依赖（SkiaSharp / ImageSharp / OpenXml / Sqlite / PdfPig / WebView）矛盾，激进修剪会打穿预览。改为**第一步只做测量基线 + 验证保守修剪可行性**，目标区间 60–90MB。若确认只发 SelfContained 包，这一步的收益优先级上调 |
 
+### 小活清仓（A2 阶段末尾，批量 8 项，合计约 25h，可裁剪）
 
+> 都是 2–4h 的「便宜、感知明确」项，攒成一批做完，避免它们长期占着队列。
+
+| 功能 | 设计文档 | 工时 | 说明 |
+|---|---|:--:|---|
+| 进度条分段着色 | [progress-bar-segments.md](.omo/plans/未开始/progress-bar-segments.md) | 3-4h | 按批处理项状态着色（红=失败/绿=成功/青=跳过/蓝=进行中），动态预算缝隙 |
+| 压缩文件名后缀模板 | [filename-suffix-template.md](.omo/plans/未开始/filename-suffix-template.md) | 2-3h | `{date}`/`{datetime}`/`{seq}` 占位符，防同名覆盖 |
+| 预览「显示内容」开关 | [preview-show-content-toggle.md](.omo/plans/未开始/preview-show-content-toggle.md) | 2-3h | 关闭后只显示骨架、跳过磁盘递归扫描（大型源目录预览加速） |
+| 骨架态实时进度计数器 | [skeleton-progress-counter.md](.omo/plans/未开始/skeleton-progress-counter.md) | 3-4h | 骨架期每 0.5s 更新目录节点文件数/大小 |
+| ICO 文件自身图标显示 | [ico-file-icon-extract.md](.omo/plans/未开始/ico-file-icon-extract.md) | 2-3h | ico 文件在列表显示自身嵌入图标 |
+| Core 临时目录根可注入 | [core-temp-root-injectable.md](.omo/plans/未开始/core-temp-root-injectable.md) | 2-3h | Core 层 4 处 `%TEMP%\MantisZip` 硬编码在便携模式仍写系统 TEMP；方案为 `TempPaths` 注入，未注入时行为不变 |
+| CLI 解压后打开文件夹对齐 | [cli-extract-open-folder.md](.omo/plans/未开始/cli-extract-open-folder.md) | 2-3h | CLI 解压成功后复用 `SmartOpenPathResolver`；多文件批处理保持不开 |
+| 提取日志与解压「后悔药」 | [extract-journal-undo.md](.omo/plans/未开始/extract-journal-undo.md) | 3-4h | 解压记录 + 一键回滚 |
+
+---
+
+## B 档 —— 有价值，排队（不排期）
+
+| 功能 | 设计文档 | 难度 | 工时 | 说明 |
+|---|---|:--:|:--:|---|
+| ZIP 多线程压缩方案 D（自适应 + 多线程） | [parallel-compress-plan-d.md](.omo/plans/未开始/parallel-compress-plan-d.md) | 🟡中 | 4-5h | 收口已做完 80% 的压缩加速叙事。**半成品选项比没有选项更糟**（用户会以为没生效），建议在 S 档之后尽早取 |
+| ZIP 多线程压缩方案 A（分组并行 + 多级别） | [parallel-compress-plan-a.md](.omo/plans/未开始/parallel-compress-plan-a.md) | 🟡中 | 6-8h | 按级别分组 → 各组独立 ZipWriter 并行 → 合并。**依赖方案 D 完成** |
+| 压缩预估（Compression Estimator） | [compression-estimator.md](.omo/plans/未开始/compression-estimator.md) | 🟡中 | 14-18h | 🔶 比率表/格式目录/自适应规则模型已完成，**估算器本体未开始**（`grep Estimator` 命中 0）。含压缩前查表/采样标准/可选精确预估 |
+| 压缩中 ETA 增强 | [runtime-eta.md](.omo/plans/未开始/runtime-eta.md) | 🟡中 | 5-7h | 🔶 基础 ETA 已实现（EMA 速度 + 单档案剩余 + 暂停冻结）；本计划补先验速度融合、批处理总剩余、收尾文案 |
+| 文本预览语法高亮 | [text-preview-syntax-highlighting.md](.omo/plans/未开始/text-preview-syntax-highlighting.md) | 🟡中 | 4-5h | 📋 计划已重写为 Avalonia 版（原 AvalonEdit 方案废弃），**代码未实施**（csproj 无 AvaloniaEdit/TextMate）。AvaloniaEdit + TextMate + 三级语言识别 |
+| 文件列表缩略图查看方式 | [file-list-thumbnails.md](.omo/plans/未开始/file-list-thumbnails.md) | 🟡中 | 4-6h | 三种布局循环切换（详情/平铺/内容行）+ 内容卡三档 + 持久化。**「现代感」最大来源**，复用现有 PreviewService |
+| 嵌入缩略图预览 | [embedded-thumbnail-preview.md](.omo/plans/未开始/embedded-thumbnail-preview.md) | 🟢低 | 2-3天 | MetadataExtractor(RAW) + Shell API 两层提取嵌入缩略图；它是上面「文件列表缩略图」的进一步扩展，**建议拆开做** |
+| 文件过滤与文件列表筛选数据统一 | [unify-file-filter-data.md](.omo/plans/未开始/unify-file-filter-data.md) | 🟡中 | 8-12h | 📋 计划文档是 WPF 期产物，实施前须按规则 11 转 Avalonia。目标：`FileFilterCriteria` 扩展 `TextSearch`/`ExcludeText`/`TextMatchMode`，删除 `SearchFilters` + `ArchiveFilter.ApplyFilters()`（`MainWindowViewModel.Navigation.cs:309` 仍在用旧模型） |
+| RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
+| 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
+| 文件选择器去弹窗化（内嵌控件） | [embedded-file-picker.md](.omo/plans/未开始/embedded-file-picker.md) | 🟡中 | 1-2天 | 📋 2026-10-08 立项：把文件/目录选择器内嵌进压缩/解压设置窗。三步走：先抽纯控件再分别接入；不动 `CustomFilePickerDialog` 静态入口与系统浏览豁免。**与接缝计划有交集，排在接缝之后做可省一次返工** |
+
+| 编辑操作序列增强（拖拽移动 / 逐步撤销重做 / 另存为新包） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | 8-12h | A 档「暂存区」落地后的 P2/P3：重命名/移动到… 也入队、条目拖到目录树节点即入队、队列级 undo/redo（P1 只有整队丢弃）、提交目标改成「另存为新包」而不是覆盖原包 |
+
+---
+
+## 进行中 —— 6 条半途计划（需决定「继续做完」还是「冻结」）
+
+> 这 6 项主体已落地，剩下的尾巴性质不同，**不适合当新计划排队**。建议逐条拍板，别让它们长期挂在中间状态。
+
+| 功能 | 设计文档 | 已做 | 剩余 | 我的建议 |
+|---|---|---|:--:|---|
+| 压缩加速三开关 UI 收敛 + 魔数检测/自适应规则 | [adaptive-compress-ui-convergence.md](.omo/plans/进行中/adaptive-compress-ui-convergence.md) | Phase 1 ✅ / Phase 2 主体 ✅（Task 9-11；SSOT 统一到 `ZipEntryClassifier`、`AdaptiveRuleMatcher.ResolveLevel` 唯一决策入口、仅存储格式并入规则、MT 提示、CLI 开关） | Task 12 本机基准测试 UI、Task 13 组数定标 | **收尾**（1-2h）：不补就是文档里长期留个「P1 完成但没做完」 |
+| 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | Core 侧 TAR 裸格式 / GZip 单文件压缩 + 文件关联已就绪 | UI 压缩格式下拉未放开；BZip2→XZ→Zstd→Brotli；7z.dll 只读格式 | **只做前半**：UI 下拉放开 + 7z.dll 只读解锁（读取做稳）；BZip2/XZ/Zstd **创建**无限期延后 |
+| 扩展预览格式支持 | [preview-extended-formats.md](.omo/plans/进行中/preview-extended-formats.md) | 3.5/6 阶段（工具栏+信息面板、Torrent/PE/PDF/SQLite/ISO、SVG/字体/ICO/Office、MKV/WebM 元数据） | LNK/DBF/EPUB/字幕/STL；Magick.NET/LibVLC 插件化 | **冻结剩余部分**：已有预览深度已超出用户预期，插件化是成本黑洞 |
+| 浮动/停靠预览面板 | [floating-preview-panel.md](.omo/plans/进行中/floating-preview-panel.md) | 四位置停靠切换已落地（右侧/下方可持久化） | 浮动独立窗口（Phase 1）、拖拽分离+边缘吸附（Phase 3） | **冻结**：停靠已覆盖 90% 场景 |
+| 可插拔预览模块体系 | [preview-modular-providers.md](.omo/plans/进行中/preview-modular-providers.md) | Task 1/4：`ITableDataProvider` 已入 Core 抽象层（`SqliteDataReader` 实现，提交 `1cef18f`） | 接口**零消费者**，UI SQLite 预览仍直连 `Microsoft.Data.Sqlite` | **并入或删除**：见「候选删除」 |
+| 文本/ZIP 注释回退编码策略 | [text-fallback-encoding-policy.md](.omo/plans/进行中/text-fallback-encoding-policy.md) | Phase 1（A1+A3）✅ 2026-10-20：`DecodeComment` 严格 UTF-8 → 严格 GB18030 → 宿主 ANSI；`ReadEocd`/`WriteEocd` 改字节透传；CI 侧 `zh-CN` pin 转为故意 en-US | Phase 2（可配置回退代码页）待定 | **冻结 Phase 2**：等真实用户报告再定，当前实现已覆盖主场景 |
+
+---
+
+## 已冻结 —— 暂不投入（附解冻条件）
+
+| 功能 | 设计文档 | 原估工时 | 冻结原因 | 解冻条件 |
+|---|---|:--:|---|---|
+| 图标主题系统①基础设施（IconView + DrawingImage 迁移） | [icon-theme-infra.md](.omo/plans/未开始/icon-theme-infra.md) | 22-28h | **A 套零视觉差异**——纯契约迁移（`Geometry`→`DrawingImage`），用户看不到任何变化 | 出现「必须支持外部图标包」的真实需求；且先完成 `icon-normalization` |
+| 图标主题系统②导入包 + 单图标覆盖 + 设置 UI | [icon-theme-packs.md](.omo/plans/未开始/icon-theme-packs.md) | 26-34h | 依赖①；且「导入第三方图标包」不是当前目标用户群的需求 | ① 完成且有用户提交图标包 |
+| 图标主题系统③C/D/E/F/G 内容生产 + IconGen 多套 | [icon-theme-sets.md](.omo/plans/未开始/icon-theme-sets.md) | 24-34h | 要产出 6 套图标资产；单人工具做「图标市场」是审美项目不是产品项目 | ② 完成且确认要做多主题 |
+| 快速预览与渐进式加载（三种预览模式） | [preview-quick-modes.md](.omo/plans/未开始/preview-quick-modes.md) | ~25h | 预览体系已经很深，三模式是「复杂大于收益」。其「§3.3 提取策略：内存 vs 硬盘」子项已**单独立项**为 [preview-memory-first.md](.omo/plans/进行中/preview-memory-first.md) 并进 S 档 | 若解冻，**只做「快速模式」最小版**（渐进渲染部分，取数层已由 preview-memory-first 承担） |
+| 自研 ZIP 引擎（Per-entry + AES-256） | [custom-zip-engine.md](.omo/plans/未开始/custom-zip-engine.md) | 5-6天 | 零依赖自研 ZIP+AES 是高风险区（项目刚吃过 copy-mode 注释损坏的亏）；per-entry 能力应优先用现有依赖实现 | 现有依赖确实做不到 per-entry 级别控制时 |
+| 插件生态（.mp 市场 + 宿主安装器/运行时） | [plugin-ecosystem.md](.omo/plans/未开始/plugin-ecosystem.md) | 44-64h | Publisher 侧已独立实现（47+8 测试通过），**宿主侧为 0**；无用户基数支撑市场 | 有第三方明确要做插件 |
+| 跨平台移植（macOS / Linux） | [cross-platform-port.md](.omo/plans/未开始/cross-platform-port.md) | 6-8周 | 📋 **2026-10-24 确认：暂不投入（「想想」）**。这是战略选择不是功能。WPF→Avalonia 迁移已完成，剩余为 macOS/Linux 适配 | 决策上要做跨平台时，**先花 1 天做可移植性体检**（Win32 依赖隔离成接口 + linux CI 只跑 Core 测试），再决定是否投 8 周 |
+| Win11 一级右键菜单 | [win11-first-level-menu.md](.omo/plans/未开始/win11-first-level-menu.md) | 1-2周 | 需 MSIX sparse package + 签名，**成本被低估**；现有 Inno 安装的右键菜单已可用 | 打包链路支持 MSIX 签名后 |
+| 压缩包管理器（历史/标签/目录树） | [archive-manager.md](.omo/plans/未开始/archive-manager.md) | 2-3天 | SQLite 持久化 + 独立窗口，收益可疑（解压软件不需要「资料库」） | 有用户明确要求历史管理 |
+
+---
+
+## 候选删除 —— 建议从计划库移除（待确认）
+
+> 我建议把这 6 项从计划库移除（5 项来自「未开始」，1 项来自「进行中」）。**确认后我再执行**：把计划文件移到 `.omo/plans/已归档/`，并迁入本文档末尾的「已归档方案」表。在此之前链接保持不变。
+
+| 功能 | 设计文档 | 工时 | 删除理由 |
+|---|---|:--:|---|
+| MSI 安装包（WiX） | [msi-packaging-wix.md](.omo/plans/未开始/msi-packaging-wix.md) | 2-3h | Inno 安装包已满足需求；MSI 只对域环境批量部署有意义 |
+| 压缩包对比（Archive Diff） | [archive-diff.md](.omo/plans/未开始/archive-diff.md) | 3-4h | 无用户需求证据；同类工具也没这个功能 |
+| 文件列表自定义列 | [custom-columns.md](.omo/plans/未开始/custom-columns.md) | 4-6h | 元数据列（文档标题/图片尺寸）价值低，且与缩略图方案重叠 |
+| 冻结列 | [frozen-column.md](.omo/plans/未开始/frozen-column.md) | 1-2h | DataGrid 冻结列在窄窗口才有意义，投入产出比过低 |
+| 可插拔预览模块体系 | [preview-modular-providers.md](.omo/plans/进行中/preview-modular-providers.md) | 3-4h | 接口零消费者（`ITableDataProvider` 只有 `SqliteDataReader` 一个实现且 UI 不调）。**建议并入 `preview-extended-formats` 或直接删** |
+| 右键菜单目录结构预览 | [context-menu-tree-preview.md](.omo/plans/未开始/context-menu-tree-preview.md) | 6-8h | COM 菜单里画文件树，🔴高难度 / 低收益；且与跨平台方向冲突 |
+
+---
+
+## 已完成计划内的遗留子项
+
+> 这些不是新计划，是已完成计划文末的「未实现项」。单独列出来，避免它们跟着旧 P4 一起被误当成待开发功能。
+
+| 功能 | 来源计划 | 工时 | 说明 |
+|---|---|:--:|---|
+| Office 图片预览 | [office-content-preview-avalonia.md](.omo/plans/已完成/office-content-preview-avalonia.md) | 2-10h | 所属计划已于 v0.5.0 完成（DOCX/XLSX/PPTX 内容预览），仅其文末图片子项未做（全仓无图片提取代码）。三方案渐进：**A = PPTX 图片（~50 行，复用 Canvas，建议只做这个）**；B = +DOCX 行内图片（~150 行）；C = 浮动定位（不推荐） |
+| 解压多压缩包按来源目录分组 | [result-preview-panel.md](.omo/plans/已完成/result-preview-panel.md) | 2-4h | 所属计划已完成（v0.4.5）。当前多压缩包条目合并平铺 → 改为按来源目录分组 + 压缩包壳节点 |
+| 结果预览截断占位符点击展开 | [result-preview-panel.md](.omo/plans/已完成/result-preview-panel.md) | 1-2h | 所属计划已完成（v0.4.5）。当前截断为静态「…」文本 → 点击就地展开完整子节点 |
+
+---
+
+## 依赖链与联动
+
+```
+intent-execution-seam（S，已完成 2026-10-26）── 软前置 ──▶ 所有「新增 UI 入口」类计划
+                                    （embedded-file-picker 等先做它可省返工）
+
+archive-rename-entry（S）── renameMap / RenameEntriesAsync ──▶ archive-edit-operation-sequence（A，暂存区）
+
+icon-normalization（S，已完成 2026-10-26）──── 前置 ──▶ icon-theme-infra（冻结）──▶ packs ──▶ sets
+
+parallel-compress-plan-d ── 前置 ──▶ parallel-compress-plan-a
+
+compression-estimator ── 可选前置 ──▶ runtime-eta（无先验时行为与现状一致，零返工）
+
+preview-memory-first（S）── 取数层复用 ──▶ file-list-thumbnails（缩略图复用同一 head 缓存）
+
+parallel-compress-plan-d ── 布局前提 ──▶ progress-bar-segments（分段进度条在进度窗口重构后的布局上）
+
+NuGet 升级（SharpCompress ≥0.49.0）── 联动 ──▶ selfcontained-size-optimization（TrimmerRootAssembly 需随升级更新）
+```
+
+补充说明：
+
+- `cross-platform-port` 已冻结。**唯一保留的纪律**：新增代码不要加深 Win32 耦合（新增平台相关调用时，优先走已有抽象或加一层接口）。
+- `rar-compression` 为软依赖，进度窗口增强会自动改善其体验。`archive-rename-entry` 已不再依赖进度窗口增强（2026-10-27 重写后只需一次 `RunWithProgress`）。
+
+---
+
+## 已归档方案
+
+| 功能 | 设计文档 | 难度 | 工时 | 说明 | 废弃原因 |
+|---|---|:--:|:--:|---|---|
+| VirtualFileDataObject | [virtual-file-data-object.md](.omo/plans/已归档/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥 | 迁移 Avalonia 后不再依赖 WPF OLE 桥，VFDO 无存在必要 |
+| 拖拽提取目标检测 | [drag-drop-marker-target.md](.omo/plans/已归档/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录 | 被 [drag-drop-direct-extract.md](.omo/plans/已完成/drag-drop-direct-extract.md) 取代 |
+| 预览格式识别（旧方案） | [preview-format-detection.old.md](.omo/plans/已归档/preview-format-detection.old.md) | 🟡中 | — | 预览格式识别旧设计 | 已拆分为 [preview-extended-formats.md](.omo/plans/进行中/preview-extended-formats.md) + [preview-magic-detection.md](.omo/plans/已完成/preview-magic-detection.md) |
+| Office 内容预览（WPF 版） | [office-content-preview.md](.omo/plans/已归档/office-content-preview.md) | 🟡中 | — | WPF 版 Mammoth→HTML→WebView2 方案 | 被 [office-content-preview-avalonia.md](.omo/plans/已完成/office-content-preview-avalonia.md) 取代 |
+| 资源管理器式路径切换弹窗 | [explorer-path-switcher.md](.omo/plans/已归档/explorer-path-switcher.md) | 🟡中 | — | WPF 时代 Ctrl+G 路径速选弹窗 | 被 QuickPathControl 系列演进取代（CustomFilePickerDialog） |
+| QuickPathControl 原始组件计划（WPF 版） | [quick-path-control.md](.omo/plans/已归档/quick-path-control.md) | 🟡中 | — | WPF 版路径速选控件原始设计 | 同上，被后续演进取代 |
+
+---
+
+*此文档将随开发进度持续更新。*

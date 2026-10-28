@@ -67,9 +67,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<Core.PasswordEntry, string, Task>? ShowMatchedPasswordDialog { get; set; }
 
     /// <summary>
-    /// 解压设置对话框回调。传入 ExtractSettingsViewModel，返回 true=确认，false=取消。
+    /// 解压设置对话框回调。参数为待解压的压缩包路径；确认后的执行由回调内部完成
+    /// （设置窗口产出 <see cref="Models.ConfirmOutcome{T}"/> 载荷 → 注入的解压会话执行 → 结局分支），
+    /// 命令本身不再回读对话框状态。
     /// </summary>
-    public Func<ExtractSettingsViewModel, Task<bool?>>? ShowExtractSettingsDialog { get; set; }
+    public Func<IReadOnlyList<string>, Task>? ShowExtractSettingsDialog { get; set; }
 
     /// <summary>
     /// 解压目标文件夹选择回调。传入待解压条目、初始路径、当前浏览目录（压缩包内）与保留完整路径设置，
@@ -78,9 +80,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<ExtractPickResult?>>? ShowExtractFolderPicker { get; set; }
 
     /// <summary>
-    /// 压缩设置对话框回调。传入 CompressSettingsViewModel，返回 true=确认，false=取消。
+    /// 压缩设置对话框回调。参数为预填的源路径；确认后的执行由回调内部完成
+    /// （设置窗口产出 <see cref="Models.ConfirmOutcome{T}"/> 载荷 → 会话执行 → 结局分支），
+    /// 命令本身不再回读对话框状态。
     /// </summary>
-    public Func<CompressSettingsViewModel, Task<bool?>>? ShowCompressSettingsDialog { get; set; }
+    public Func<IReadOnlyList<string>, Task>? ShowCompressSettingsDialog { get; set; }
 
     /// <summary>
     /// 压缩冲突对话框回调。从后台线程调用，返回用户选择的冲突处理方式。
@@ -139,16 +143,11 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<string, IReadOnlyList<string>?, Func<IProgress<ArchiveProgress>, CancellationToken, Task>, Task<bool>>? RunWithProgress { get; set; }
 
     /// <summary>
-    /// Task 6：下一次 <see cref="RunWithProgress"/> 为压缩流程（MainWindow.axaml.cs 的闭包读取后立即复位）。
-    /// 供进度窗口显示「压缩通道」说明行；解压入口不置位。
+    /// 下一次 <see cref="RunWithProgress"/> 的操作说明行文案（读取后立即复位，null = 不显示）。
+    /// 用于「整包重写、无逐条目回调」的操作（如删除）：进度窗显示一行真实影响面，
+    /// 而不是播种 N 行永远停在 ⏳ 的假进度。
     /// </summary>
-    public bool PendingCompressFlow { get; set; }
-
-    /// <summary>
-    /// 压缩侧「列表」播种：下一次 <see cref="RunWithProgress"/> 为压缩流程时，用它枚举全量条目播种
-    /// （MainWindow.axaml.cs 读取后立即复位）。非压缩入口保持 null。
-    /// </summary>
-    public CompressRequest? PendingCompressRequest { get; set; }
+    public string? PendingOperationNote { get; set; }
 
     /// <summary>测试流标记：传给进度窗口自动按下 📌（D10 触发点 3，完成后不自动关闭）。</summary>
     public bool PendingTestFlow { get; set; }
@@ -339,10 +338,25 @@ public partial class MainWindowViewModel : ObservableObject
     {
         // 同步预览面板当前压缩包路径，供「输入密码」按钮的 CanExecute 判断使用
         Preview.CurrentPreviewFilePath = value;
+        // 换包后引擎能力位可能变化（zip ↔ tar），一并刷新删除入口可用性
+        OnPropertyChanged(nameof(CanDeleteEntries));
     }
 
     [ObservableProperty]
     private bool _isArchiveLoaded;
+
+    /// <summary>
+    /// 当前压缩包是否支持删除条目（TAR/GZ 等只读格式为 false）。
+    /// 三处删除入口（工具栏 / 编辑菜单 / 右键菜单）据此禁用，
+    /// 避免用户点了才吃 <c>NotSupportedException</c>。
+    /// </summary>
+    public bool CanDeleteEntries =>
+        IsArchiveLoaded
+        && CurrentArchivePath != null
+        && (ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath)?.CanDelete(_currentFormat) ?? false);
+
+    // 能力位随「压缩包加载状态」刷新（格式 `_currentFormat` 在 RefreshArchive 中先于本字段赋值）
+    partial void OnIsArchiveLoadedChanged(bool value) => OnPropertyChanged(nameof(CanDeleteEntries));
 
     [ObservableProperty]
     private bool _isLoading;

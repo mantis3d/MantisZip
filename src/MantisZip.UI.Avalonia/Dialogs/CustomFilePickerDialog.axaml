@@ -31,8 +31,8 @@
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
         <PathIcon Data="{StaticResource IconChevronLeft}"
-                  Width="14"
-                  Height="14"
+                  Width="16"
+                  Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
       <!-- 前进按钮 -->
@@ -46,8 +46,8 @@
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
         <PathIcon Data="{StaticResource IconChevronRight}"
-                  Width="14"
-                  Height="14"
+                  Width="16"
+                  Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
       <!-- 向上一级目录按钮 -->
@@ -61,8 +61,8 @@
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
         <PathIcon Data="{StaticResource IconArrowUp}"
-                  Width="14"
-                  Height="14"
+                  Width="16"
+                  Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
       <!-- 系统浏览按钮（打开系统文件夹选择器） -->
@@ -76,8 +76,8 @@
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
         <PathIcon Data="{StaticResource IconFolder}"
-                  Width="14"
-                  Height="14"
+                  Width="16"
+                  Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
       <!-- 路径输入框（支持自动补全） -->
@@ -100,8 +100,8 @@
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}">
         <PathIcon Data="{StaticResource IconBookmarkAdd}"
-                  Width="14"
-                  Height="14"
+                  Width="16"
+                  Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
     </Grid>
@@ -267,7 +267,7 @@
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                   BorderBrush="{DynamicResource ThemeBorderBrush}">
             <StackPanel Orientation="Horizontal" Spacing="4">
-              <PathIcon Data="{StaticResource IconAdd}" Width="16" Height="16" VerticalAlignment="Center" />
+              <PathIcon Data="{StaticResource IconAdd}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock x:Name="AddSelectedButtonText" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
@@ -280,7 +280,7 @@
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                   BorderBrush="{DynamicResource ThemeBorderBrush}">
             <StackPanel Orientation="Horizontal" Spacing="4">
-              <PathIcon Data="{StaticResource IconSubtract}" Width="16" Height="16" VerticalAlignment="Center" />
+              <PathIcon Data="{StaticResource IconSubtract}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
               <TextBlock x:Name="RemoveSelectedButtonText" VerticalAlignment="Center" />
             </StackPanel>
           </Button>
@@ -303,7 +303,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <StackPanel Orientation="Horizontal" Spacing="4">
-            <PathIcon Data="{StaticResource IconDismiss}" Width="16" Height="16" VerticalAlignment="Center" />
+            <PathIcon Data="{StaticResource IconDismiss}" Width="16" Height="16" VerticalAlignment="Center" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
             <TextBlock x:Name="ClearAccumulatedButtonText" VerticalAlignment="Center" />
           </StackPanel>
         </Button>

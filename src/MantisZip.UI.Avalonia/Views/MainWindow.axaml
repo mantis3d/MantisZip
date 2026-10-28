@@ -54,14 +54,14 @@
         <MenuItem Command="{Binding OpenAboutCommand}"
                   Header="{Binding LocalizedStrings[Menu_About]}">
           <MenuItem.Icon>
-            <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconInfo}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
         <!-- 捐赠：支持项目开发 -->
         <MenuItem Command="{Binding OpenDonateCommand}"
                   Header="{Binding LocalizedStrings[Menu_Donate]}">
           <MenuItem.Icon>
-            <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconHeart}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
@@ -150,7 +150,7 @@
         </Button>
         <Button Classes="ToolbarButton"
                 Command="{Binding DeleteFilesCommand}"
-                IsEnabled="{Binding IsArchiveLoaded}"
+                IsEnabled="{Binding CanDeleteEntries}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_DeleteFiles]}">
           <StackPanel >
             <PathIcon Data="{StaticResource IconDismiss}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
@@ -261,7 +261,7 @@
                     IsVisible="{Binding HasPasswordStatus}"
                     Margin="0,0,8,0">
           <PathIcon Data="{Binding PasswordStatusIcon}"
-                    Width="14" Height="14"
+                    Width="16" Height="16"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock Text="{Binding PasswordStatusMessage}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"

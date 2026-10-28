@@ -16,61 +16,51 @@
           Grid.Row="0"
           ColumnDefinitions="Auto,Auto,Auto,Auto,*"
           ColumnSpacing="{DynamicResource SpacingXxs}">
-      <!-- 收藏标签：显示用户收藏的路径列表 -->
+      <!-- 收藏标签：显示用户收藏的路径列表。
+           ⚠ 四个标签都不写本地 Background/BorderBrush/Foreground：局部值会压掉 `ToggleButton:checked`
+           的强调色背景与白图标，当前页就看不出来了；图标改挂 Classes="ToolbarButtonIcon"。 -->
       <ToggleButton x:Name="FavoritesTab"
                     IsChecked="True"
                     MinHeight="{DynamicResource ControlHeightSm}"
                     Padding="{DynamicResource SpacingXsThk}"
-                    Click="FavoritesTab_Click"
-                    Background="{DynamicResource ThemeButtonBgBrush}"
-                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    Click="FavoritesTab_Click">
         <PathIcon Data="{StaticResource IconBookmark}"
-                  Width="14"
-                  Height="14"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  Width="16"
+                  Height="16"
+                  Classes="ToolbarButtonIcon" />
       </ToggleButton>
       <!-- 历史标签：显示最近访问的路径列表 -->
       <ToggleButton Grid.Column="1"
                     x:Name="HistoryTab"
                     MinHeight="{DynamicResource ControlHeightSm}"
                     Padding="{DynamicResource SpacingXsThk}"
-                    Click="HistoryTab_Click"
-                    Background="{DynamicResource ThemeButtonBgBrush}"
-                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    Click="HistoryTab_Click">
         <PathIcon Data="{StaticResource IconHistory}"
-                  Width="14"
-                  Height="14"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  Width="16"
+                  Height="16"
+                  Classes="ToolbarButtonIcon" />
       </ToggleButton>
       <!-- 窗口标签：显示当前打开的资源管理器窗口路径 -->
       <ToggleButton Grid.Column="2"
                     x:Name="WindowsTab"
                     MinHeight="{DynamicResource ControlHeightSm}"
                     Padding="{DynamicResource SpacingXsThk}"
-                    Click="WindowsTab_Click"
-                    Background="{DynamicResource ThemeButtonBgBrush}"
-                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    Click="WindowsTab_Click">
         <PathIcon Data="{StaticResource IconLightning}"
-                  Width="14"
-                  Height="14"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  Width="16"
+                  Height="16"
+                  Classes="ToolbarButtonIcon" />
       </ToggleButton>
       <!-- 目录树标签：显示文件系统目录树 -->
       <ToggleButton Grid.Column="3"
                     x:Name="TreeTab"
                     MinHeight="{DynamicResource ControlHeightSm}"
                     Padding="{DynamicResource SpacingXsThk}"
-                    Click="TreeTab_Click"
-                    Background="{DynamicResource ThemeButtonBgBrush}"
-                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    Click="TreeTab_Click">
         <PathIcon Data="{StaticResource IconFolder}"
-                  Width="14"
-                  Height="14"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  Width="16"
+                  Height="16"
+                  Classes="ToolbarButtonIcon" />
       </ToggleButton>
       <!-- 搜索框：过滤当前标签页下的路径列表 -->
       <TextBox Grid.Column="4"

@@ -771,8 +771,13 @@ public class ZipBinaryRewriterTests : IDisposable
     {
         var archive = TrackFile(ArchiveFixtures.CreateZipArchive());
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() =>
+        // copy-mode 零命中必须显式报错（原来静默成功并报 100%）：
+        // 抛派生自 FileNotFoundException 的 ArchiveEntryNotFoundException
+        var ex = await Assert.ThrowsAsync<ArchiveEntryNotFoundException>(() =>
             _engine.DeleteEntriesAsync(archive, ["nonexistent.txt"]));
+
+        Assert.Equal("nonexistent.txt", ex.EntryPath);
+        Assert.IsAssignableFrom<FileNotFoundException>(ex);
     }
 
     [Fact]

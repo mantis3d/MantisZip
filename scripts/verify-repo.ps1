@@ -917,6 +917,40 @@ $RE_APP_ICON_KEY = [regex]::new('x:Key="([^"]+)"')
 $RE_ICON_RESOURCE_REF = [regex]::new('"Icon[A-Z][A-Za-z0-9]*"')
 $RE_SIGNED_METHOD = [regex]::new('(?m)^[ \t]*(?:private|protected|public|internal)[^\r\n;=]*?\b([A-Za-z_]\w*)\s*\(')
 
+# ---------------------------------------------------------------------------
+# 规则 20：意图与执行之间只走契约（dialog-seam 守卫）
+# 登记的是「文件 + 构造处数」而不是行号——行号每批改动都在漂，登记表要能活过重构。
+# ---------------------------------------------------------------------------
+$DIALOG_SEAM_REGISTRY = [ordered]@{
+    'src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs'             = 2
+    'src/MantisZip.UI.Avalonia/App.CliCompress.cs'                    = 1
+    'src/MantisZip.UI.Avalonia/App.CliExtract.cs'                     = 1
+    'src/MantisZip.UI.Avalonia/Controls/Menus/TestMenuView.axaml.cs'  = 2
+}
+
+# 设置窗口构造函数必须声明执行器形参（注入而非自己 new）
+$DIALOG_SEAM_REQUIRED_WINDOWS = @(
+    [ordered]@{
+        file           = 'src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml.cs'
+        sessionName    = 'ICompressSession'
+        sessionPattern = [regex]::new('ICompressSession\s+\w+')
+    }
+    [ordered]@{
+        file           = 'src/MantisZip.UI.Avalonia/Dialogs/ExtractSettingsWindow.axaml.cs'
+        sessionName    = 'IExtractSession'
+        sessionPattern = [regex]::new('IExtractSession\s+\w+')
+    }
+)
+
+$RE_SETTING_WINDOW_CTOR = [regex]::new('\bnew\s+(?:Compress|Extract)SettingsWindow\s*\(')
+$RE_LEGACY_SEAM = [regex]::new('\b(CloseAction|DialogResult)\b')
+$RE_REQUEST_CTOR = [regex]::new('\bnew\s+(?:Compress|Extract)Request\b')
+$DIALOG_SEAM_REQUEST_ALLOWED = @(
+    'src/MantisZip.UI.Avalonia/Services/'
+    'src/MantisZip.UI.Avalonia/App.CliCompress.cs'
+    'src/MantisZip.UI.Avalonia/App.CliExtract.cs'
+)
+
 # 文件选择对话框的唯一豁免入口（规则 16）
 $FILE_PICKER_WHITELIST_METHOD = 'SystemBrowse_Click'
 
@@ -1193,6 +1227,102 @@ function Test-GuardIcons {
         })
 }
 
+# 规则 20：设置窗口 ↔ 执行器之间的接缝只许走契约（ConfirmOutcome / Settings 载荷 / RunContext）
+# 四类检查对应 AGENTS.md 规则 20 的五条：构造点登记、双轨回传、请求构造、执行器注入。
+function Test-GuardDialogSeam {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $sourceDir = Join-Path $RepoRoot $GUARD_FILES.sourceDir
+    if (-not (Test-Path -LiteralPath $sourceDir)) {
+        $issues.Add("读不到源码目录：$($GUARD_FILES.sourceDir)")
+        return New-GuardResult -Id 'dialogseam' -Title '意图-执行接缝（规则 20）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    $files = Get-ChildItem -LiteralPath $sourceDir -Recurse -Filter *.cs -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+
+    $ctorCounts = @{}
+    $requestCount = 0
+    $legacyCount = 0
+
+    foreach ($file in $files) {
+        $text = [System.IO.File]::ReadAllText($file.FullName)
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+
+        # ① 设置窗口构造点必须先登记（登记「文件 + 处数」，行号会漂移）
+        $ctorHits = 0
+        foreach ($match in $RE_SETTING_WINDOW_CTOR.Matches($text)) {
+            $ctorHits++
+            if (-not $DIALOG_SEAM_REGISTRY.Contains($relative)) {
+                $line = Get-LineNumber -Text $text -Index $match.Index
+                $issues.Add("$relative`:$line 构造设置窗口，但该文件不在 dialog-seam 登记表（新入口请先确认它确实需要自己建窗，再登记）")
+            }
+            else {
+                $ctorCounts[$relative] = $ctorHits
+            }
+        }
+
+        # ② 双轨回传（CloseAction / DialogResult）禁止出现；注释里追述历史写法不算
+        $offset = 0
+        foreach ($raw in ($text -split "(?<=\n)")) {
+            $lineText = $raw.TrimEnd("`r", "`n")
+            $lineStart = $offset
+            $offset += $raw.Length
+            if ($lineText.TrimStart().StartsWith('//')) { continue }
+            if ($lineText -match '^\s*\*') { continue }
+            foreach ($match in $RE_LEGACY_SEAM.Matches($lineText)) {
+                $legacyCount++
+                if ($legacyCount -le 20) {
+                    $line = Get-LineNumber -Text $text -Index ($lineStart + $match.Index)
+                    $issues.Add("$relative`:$line 仍在用 $($match.Groups[1].Value)（双轨回传已废弃：确认请交出 ConfirmOutcome<T> 载荷）")
+                }
+            }
+        }
+
+        # ③ 归档请求只许在执行器与 CLI 直通路径里构造，界面层不许自己拼
+        foreach ($match in $RE_REQUEST_CTOR.Matches($text)) {
+            $requestCount++
+            $allowed = $false
+            foreach ($prefix in $DIALOG_SEAM_REQUEST_ALLOWED) {
+                if ($relative -like "$prefix*") { $allowed = $true; break }
+            }
+            if (-not $allowed) {
+                $line = Get-LineNumber -Text $text -Index $match.Index
+                $issues.Add("$relative`:$line 构造归档请求（只许出现在执行器与 CLI 直通路径：压缩/解压经 RunAsync 载荷）")
+            }
+        }
+    }
+
+    # 登记表反向核对：登记了却没找到对应处数 = 登记表过期，或入口被悄悄删掉
+    foreach ($relative in $DIALOG_SEAM_REGISTRY.Keys) {
+        $expected = $DIALOG_SEAM_REGISTRY[$relative]
+        $actual = if ($ctorCounts.ContainsKey($relative)) { $ctorCounts[$relative] } else { 0 }
+        if ($actual -ne $expected) {
+            $issues.Add("$relative 登记 $expected 处设置窗口构造点，实际 $actual 处（改入口时同步更新登记表）")
+        }
+    }
+
+    # ④ 两个设置窗口必须收执行器形参（注入，不许自己 new）
+    foreach ($window in $DIALOG_SEAM_REQUIRED_WINDOWS) {
+        $path = Join-Path $RepoRoot $window.file
+        if (-not (Test-Path -LiteralPath $path)) {
+            $issues.Add("读不到 $($window.file)")
+            continue
+        }
+        $windowText = [System.IO.File]::ReadAllText($path)
+        if (-not $window.sessionPattern.IsMatch($windowText)) {
+            $issues.Add("$($window.file) 的构造函数缺少 $($window.sessionName) 形参（规则 20：设置窗口必须注入执行器）")
+        }
+    }
+
+    return New-GuardResult -Id 'dialogseam' -Title '意图-执行接缝（规则 20）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            registeredWindows = $ctorCounts.Count
+            requests          = $requestCount
+            legacyUses        = $legacyCount
+        })
+}
+
 function Test-Guards {
     param([string]$RepoRoot, [string]$RelativeLocalizationDir)
 
@@ -1201,6 +1331,7 @@ function Test-Guards {
     $guards.Add((Test-GuardI18nBindings -RepoRoot $RepoRoot -RelativeLocalizationDir $RelativeLocalizationDir))
     $guards.Add((Test-GuardFilePicker -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardIcons -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardDialogSeam -RepoRoot $RepoRoot))
 
     $failed = @($guards | Where-Object { -not $_.ok })
     return [ordered]@{

@@ -33,7 +33,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <PathIcon Data="{StaticResource IconBookmark}"
-                    Width="14" Height="14"
+                    Width="16" Height="16"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
         <!-- 🕐 历史按钮：打开最近使用路径弹出面板 -->
@@ -46,7 +46,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <PathIcon Data="{StaticResource IconHistory}"
-                    Width="14" Height="14"
+                    Width="16" Height="16"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
         <!-- 🪟 窗口按钮：打开当前打开的资源管理器窗口路径弹出面板 -->
@@ -59,7 +59,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <PathIcon Data="{StaticResource IconLightning}"
-                    Width="14" Height="14"
+                    Width="16" Height="16"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
         <!-- 📁 浏览按钮：打开系统文件夹选择对话框 -->
@@ -72,7 +72,7 @@
                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                 BorderBrush="{DynamicResource ThemeBorderBrush}">
           <PathIcon Data="{StaticResource IconFolder}"
-                    Width="14" Height="14"
+                    Width="16" Height="16"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
         </Button>
       </Grid>

@@ -202,7 +202,7 @@
                       </ScaleTransform>
                     </Button.RenderTransform>
                     <StackPanel Orientation="Horizontal" Spacing="2">
-                      <PathIcon Data="{StaticResource IconKey}" Width="12" Height="12"
+                      <PathIcon Data="{StaticResource IconKey}" Width="16" Height="16"
                                 Foreground="{DynamicResource ThemeStatusSuccessBrush}"/>
                       <TextBlock Text="●●●●" FontSize="11"
                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
@@ -230,7 +230,7 @@
                                     BorderBrush="{DynamicResource ThemeBorderBrush}">
                               <PathIcon x:Name="PwdFlyoutEyeIcon"
                                         Data="{StaticResource IconEye}"
-                                        Width="14" Height="14"
+                                        Width="16" Height="16"
                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
                             </Button>
                             <!-- 复制：恒复制明文 MatchedPassword -->
@@ -241,7 +241,7 @@
                                     Background="{DynamicResource ThemeButtonBgBrush}"
                                     BorderThickness="1"
                                     BorderBrush="{DynamicResource ThemeBorderBrush}">
-                              <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
+                              <PathIcon Data="{StaticResource IconCopy}" Width="16" Height="16"
                                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
                             </Button>
                           </Grid>
@@ -1151,20 +1151,29 @@
                 Width="20" Height="20"
                 VerticalAlignment="Center"
                 Margin="0,0,8,0" />
-      <!-- 状态行文本框：只读可选中，文案随暂停/恢复/完成变化（原 Row 3 TextBlock 下移并升级） -->
-      <TextBox x:Name="StatusLineBox"
-               Grid.Column="1"
-               Text="{Binding StatusMessage}"
-               IsReadOnly="True"
-               TextWrapping="Wrap"
-               FontSize="20"
-               FontWeight="SemiBold"
-               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-               Background="Transparent"
-               BorderThickness="0"
-               Padding="0"
-               VerticalAlignment="Center"
-               IsTabStop="False" />
+      <!-- 状态区（垂直）：状态行文本框 + 其下的操作说明行 -->
+      <StackPanel Grid.Column="1" VerticalAlignment="Center" Spacing="{DynamicResource SpacingXxs}">
+        <!-- 状态行文本框：只读可选中，文案随暂停/恢复/完成变化（原 Row 3 TextBlock 下移并升级） -->
+        <TextBox x:Name="StatusLineBox"
+                 Text="{Binding StatusMessage}"
+                 IsReadOnly="True"
+                 TextWrapping="Wrap"
+                 FontSize="20"
+                 FontWeight="SemiBold"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="0"
+                 VerticalAlignment="Center"
+                 IsTabStop="False" />
+        <!-- 操作说明行：整包重写类操作（如删除）没有逐条目进度回调，用一行真实影响面
+             代替 N 行假进度；空文案时整行隐藏（ShowOperationNote，规则 6） -->
+        <TextBlock Text="{Binding OperationNoteText}"
+                   IsVisible="{Binding ShowOperationNote}"
+                   TextWrapping="Wrap"
+                   FontSize="12"
+                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+      </StackPanel>
       <!-- 状态行复制按钮：复制 StatusMessage 全文，复用 ShowCopyFeedback（PathIcon 必须直接作 Content） -->
       <Button x:Name="StatusCopyBtn"
               Grid.Column="2"
@@ -1176,7 +1185,7 @@
               Padding="6,2"
               VerticalAlignment="Center"
               Margin="6,0,0,0">
-        <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
+        <PathIcon Data="{StaticResource IconCopy}" Width="16" Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
     </Grid>
@@ -1225,7 +1234,7 @@
               Padding="6,2"
               VerticalAlignment="Top"
               Margin="6,0,0,0">
-        <PathIcon Data="{StaticResource IconCopy}" Width="14" Height="14"
+        <PathIcon Data="{StaticResource IconCopy}" Width="16" Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
     </Grid>
@@ -1241,40 +1250,38 @@
       </Grid.ColumnDefinitions>
       <!-- Column 0 左侧簇：保持打开 + 解压后置开关（📁 打开目录 / 🗑 移回收站） -->
       <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
-        <!-- 保持打开切换按钮（完成后不自动关闭） -->
+        <!-- 保持打开切换按钮（完成后不自动关闭）。
+             ⚠ 不写本地 Background/BorderBrush：局部值会压掉 `ToggleButton:checked` 的强调色背景，
+             选中态只剩白图标贴在普通按钮底色上（浅色主题几乎看不见）。 -->
         <ToggleButton x:Name="KeepOpenToggle"
                       Height="{DynamicResource ControlHeightLg}" Width="44"
                       IsChecked="{Binding KeepOpenOnComplete}"
                       ToolTip.Tip="{Binding LocalizedStrings[Progress_KeepOpen]}"
                       VerticalAlignment="Center"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}"
                       BorderThickness="1">
-          <PathIcon Data="{StaticResource IconPin}" Width="16" Height="16" />
+          <PathIcon Classes="ToolbarButtonIcon" Data="{StaticResource IconPin}" Width="16" Height="16" />
         </ToggleButton>
-        <!-- 解压后打开目标目录（实例级；IsVisible 由能力位驱动 → 压缩/测试流隐藏，规则 6） -->
+        <!-- 解压后打开目标目录（实例级；IsVisible 由能力位驱动 → 压缩/测试流隐藏，规则 6）。
+             同上：背景交给主题 `ToggleButton:checked`，不写本地值。 -->
         <ToggleButton x:Name="OpenFolderToggle"
                       IsChecked="{Binding OpenFolderAfterExtract}"
                       IsVisible="{Binding ShowOpenFolderToggle}"
                       Height="{DynamicResource ControlHeightLg}" Width="44"
                       ToolTip.Tip="{Binding LocalizedStrings[Settings_Extract_OpenFolderAfter]}"
                       VerticalAlignment="Center"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}"
                       BorderThickness="1">
-          <PathIcon Data="{StaticResource IconFolder}" Width="16" Height="16" />
+          <PathIcon Classes="ToolbarButtonIcon" Data="{StaticResource IconFolder}" Width="16" Height="16" />
         </ToggleButton>
-        <!-- 解压后把原压缩包移入回收站（同上） -->
+        <!-- 解压后把原压缩包移入回收站（同上）。
+             同上：背景交给主题 `ToggleButton:checked`，不写本地值。 -->
         <ToggleButton x:Name="DeleteArchiveToggle"
                       IsChecked="{Binding DeleteArchiveAfterExtract}"
                       IsVisible="{Binding ShowDeleteArchiveToggle}"
                       Height="{DynamicResource ControlHeightLg}" Width="44"
                       ToolTip.Tip="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
                       VerticalAlignment="Center"
-                      Background="{DynamicResource ThemeButtonBgBrush}"
-                      BorderBrush="{DynamicResource ThemeBorderBrush}"
                       BorderThickness="1">
-          <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16" />
+          <PathIcon Classes="ToolbarButtonIcon" Data="{StaticResource IconDelete}" Width="16" Height="16" />
         </ToggleButton>
       </StackPanel>
       <!-- 倒计时组：自动关闭剩余秒数（仅延时等待期显示；行内可临时改，实例级不回写设置，spec §10.3/§10.4） -->
@@ -1308,7 +1315,8 @@
               BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1">
         <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-          <PathIcon x:Name="PauseButtonIcon" Data="{StaticResource IconPause}" Width="14" Height="14" />
+          <PathIcon x:Name="PauseButtonIcon" Data="{StaticResource IconPause}" Width="16" Height="16"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock x:Name="PauseButtonText" Text="{Binding LocalizedStrings[Progress_Button_Pause]}" />
         </StackPanel>
       </Button>
@@ -1322,7 +1330,8 @@
               BorderBrush="{DynamicResource ThemeBorderBrush}"
               BorderThickness="1">
         <StackPanel Orientation="Horizontal" Spacing="4" HorizontalAlignment="Center" VerticalAlignment="Center">
-          <PathIcon x:Name="CancelButtonIcon" Data="{StaticResource IconDismiss}" Width="14" Height="14" />
+          <PathIcon x:Name="CancelButtonIcon" Data="{StaticResource IconDismiss}" Width="16" Height="16"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock x:Name="CancelButtonText" Text="{Binding LocalizedStrings[Progress_Cancel]}" />
         </StackPanel>
       </Button>

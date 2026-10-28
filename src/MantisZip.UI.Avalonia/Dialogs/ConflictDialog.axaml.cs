@@ -1,5 +1,7 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading.Tasks;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
 using MantisZip.Core.Abstractions;
@@ -12,29 +14,32 @@ namespace MantisZip.UI.Avalonia.Dialogs;
 /// 文件冲突对话框：覆盖 / 重命名 / 跳过 / 取消，支持"应用到全部"。
 /// 显示磁盘文件与压缩包文件的对比信息。
 /// </summary>
+/// <summary>
+/// 解压冲突对话框的确认载荷：一次关闭即交出完整决策（按钮 + 自定义名 + 应用到全部 + 暂停/取消整轮），
+/// 调用方只读 <see cref="ConflictDialog.Completion"/>，不再逐个回读窗口属性。
+/// </summary>
+public readonly record struct FileConflictDialogOutcome(
+    FileConflictAction Action,
+    bool ApplyToAll,
+    string? CustomName,
+    bool IsPaused,
+    bool IsCancelled);
+
 public partial class ConflictDialog : Window
 {
-    private FileConflictAction _capturedAction;
-    private bool _capturedApplyToAll;
-    private string? _capturedCustomName;
-    private bool _resultCaptured;
-    private bool _isPaused;
-    private bool _cancelOperation;
+    /// <summary>未点按钮关闭（X / Alt+F4）时的载荷：按覆盖继续（旧 ResultAction 默认值为 Overwrite）。</summary>
+    private static readonly FileConflictDialogOutcome DefaultOutcome =
+        new(FileConflictAction.Overwrite, false, null, IsPaused: false, IsCancelled: false);
+
+    private readonly TaskCompletionSource<FileConflictDialogOutcome> _completion =
+        new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private FileConflictDialogOutcome? _outcome;
     private string _titleKey = "Conflict_Title";
     /// <summary>当前冲突文件名（仅文件名，诊断日志用；不含路径）。</summary>
     private string _fileName = string.Empty;
 
-    /// <summary>用户选择的处理方式</summary>
-    public FileConflictAction ResultAction => _resultCaptured ? _capturedAction : FileConflictAction.Overwrite;
-    /// <summary>用户是否勾选了"应用到全部"</summary>
-    public bool ApplyToAll => _resultCaptured && _capturedApplyToAll;
-    /// <summary>用户输入的自定义文件名</summary>
-    public string? CustomName => _resultCaptured ? _capturedCustomName : RenameTextBox.Text;
-
-    /// <summary>用户是否点击了"暂停"按钮</summary>
-    public bool IsPaused => _isPaused;
-    /// <summary>用户是否点击了"取消"（取消整个操作）按钮</summary>
-    public bool CancelOperation => _cancelOperation;
+    /// <summary>关窗即完成的确认载荷（模态 ShowDialog 与非模态 Show 两条路径共用）。</summary>
+    public Task<FileConflictDialogOutcome> Completion => _completion.Task;
 
     // ── Localized string properties ──
     public string WinTitle => LocalizationManager.T(_titleKey);
@@ -95,7 +100,7 @@ public partial class ConflictDialog : Window
         // 窗口关闭时如果未通过按钮关闭（例如 Alt+F4），捕获当前快照
         this.Closing += (_, _) =>
         {
-            if (!_resultCaptured)
+            if (_outcome == null)
             {
                 // 诊断：非按钮路径关闭（Alt+F4/系统/程序化 Close）——默认按覆盖捕获
                 Services.LifetimeDiagnostics.Log($"ConflictDialog CLOSING without button (default Overwrite captured) file='{Path.GetFileName(info.FilePath)}' stack:\n{Environment.StackTrace}");
@@ -135,14 +140,18 @@ public partial class ConflictDialog : Window
         CompareResultText.Text = string.Join("  |  ", parts);
     }
 
+    protected override void OnClosed(EventArgs e)
+    {
+        // 兜底：非按钮关闭也给出完整载荷，绝不让调用方读到 null
+        _completion.TrySetResult(_outcome ?? DefaultOutcome);
+        base.OnClosed(e);
+    }
+
     private void CaptureResult(FileConflictAction action, bool applyToAll, string? customName)
     {
         CoreLog.ConflictTrace("dialog-result action={0} applyAll={1} custom='{2}' file='{3}'",
             action, applyToAll, customName, _fileName);
-        _capturedAction = action;
-        _capturedApplyToAll = applyToAll;
-        _capturedCustomName = customName;
-        _resultCaptured = true;
+        _outcome = new FileConflictDialogOutcome(action, applyToAll, customName, IsPaused: false, IsCancelled: false);
     }
 
     private void Overwrite_Click(object? sender, RoutedEventArgs e)
@@ -184,15 +193,16 @@ public partial class ConflictDialog : Window
     private void Pause_Click(object? sender, RoutedEventArgs e)
     {
         Services.LifetimeDiagnostics.Log("ConflictDialog btn=Pause");
-        _isPaused = true;
+        _outcome = new FileConflictDialogOutcome(FileConflictAction.Overwrite, false, null,
+            IsPaused: true, IsCancelled: false);
         Close(false);
     }
 
     private void CancelOperation_Click(object? sender, RoutedEventArgs e)
     {
         Services.LifetimeDiagnostics.Log("ConflictDialog btn=CancelOperation");
-        _cancelOperation = true;
-        CaptureResult(FileConflictAction.Overwrite, false, null);
+        _outcome = new FileConflictDialogOutcome(FileConflictAction.Overwrite, false, null,
+            IsPaused: false, IsCancelled: true);
         Close(false);
     }
 }

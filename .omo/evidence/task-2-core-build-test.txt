@@ -1,0 +1,18 @@
+自动更新检测 · T1/T2（Core 层 + 单测）验证记录
+日期：2026-10-28
+
+命令：pwsh -File scripts\verify-repo.ps1 -Task build -Target core
+结果：✅ 构建通过：core（0 警告）
+
+命令：pwsh -File scripts\verify-repo.ps1 -Task test -Target tests -ExtraArgsJson '["-c","Release"]'
+结果：已通过! - 失败: 0，通过: 882，已跳过: 3，总计: 885
+基线（开工前）：874 通过 / 3 跳过；新增 8 个 UpdateServiceTests 用例
+
+新增文件：
+- src/MantisZip.Core/Services/UpdateInfo.cs
+- src/MantisZip.Core/Services/UpdateService.cs
+- tests/MantisZip.Tests/Services/UpdateServiceTests.cs
+
+约束核对：JSON 解析用 JsonDocument 手写（无反射式 JsonSerializer.Deserialize<T>），
+满足裁剪/AOT 分析器门禁（IL2026/IL3050 不触发）。
+分析器：dotnet format analyzers --verify-no-changes --include src\MantisZip.Core → exit 0

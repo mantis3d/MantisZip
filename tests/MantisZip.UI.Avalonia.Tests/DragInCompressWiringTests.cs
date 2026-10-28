@@ -1,7 +1,6 @@
 using System.Collections.Generic;
 using System.IO;
 using Avalonia.Headless.XUnit;
-using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
 using Xunit;
 
@@ -10,6 +9,10 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// <summary>
 /// 拖入压缩回归测试：未打开压缩包时拖入文件/目录 → 压缩对话框确认后必须走到压缩执行管道。
 /// 回归背景：分支 3b 曾在 ShowDialog 后直接返回，无人执行压缩（点击「压缩」关窗后无任何反应）。
+/// <para>
+/// 接缝改造（2026-10-26）：执行已下沉到设置窗口的确认事务（<c>ConfirmOutcome</c> → 压缩会话），
+/// VM 侧的回归点变成「拖入路径必须原样到达回调」+「VM 不得自己另跑一遍执行」。
+/// </para>
 /// </summary>
 public class DragInCompressWiringTests
 {
@@ -24,36 +27,29 @@ public class DragInCompressWiringTests
         try
         {
             var vm = new MainWindowViewModel();
-            CompressSettingsViewModel? passedToDialog = null;
-            vm.ShowCompressSettingsDialog = async cvm =>
+            IReadOnlyList<string>? passedSources = null;
+            vm.ShowCompressSettingsDialog = async sourcePaths =>
             {
-                passedToDialog = cvm;
-                // 等价于真实对话框「点压缩」前的守卫：等预览构建（B 数据集）就绪
-                var deadline = DateTime.UtcNow + TimeSpan.FromSeconds(10);
-                while (cvm.GetPlanForExecution() == null && DateTime.UtcNow < deadline)
-                    await Task.Delay(50);
-                return true; // 用户在压缩对话框点了「压缩」
+                // 等价于真实对话框：调用方把拖入路径交给设置窗口，由窗口在确认事务里执行。
+                passedSources = sourcePaths;
+                await Task.CompletedTask;
             };
 
             bool progressRan = false;
-            IReadOnlyList<string>? targetPaths = null;
             vm.RunWithProgress = (title, filePaths, operation) =>
             {
                 progressRan = true;
-                targetPaths = filePaths;
-                return Task.FromResult(true); // 不真正执行压缩，仅验证管道被调用
+                return Task.FromResult(true); // VM 若自己跑执行管道会命中这里
             };
 
             await vm.DragInCompressAsync(new List<string> { dir });
 
-            // 1. 拖入路径必须预填进对话框 VM（分支 3b 的预期行为）
-            Assert.NotNull(passedToDialog);
-            Assert.Contains(dir, passedToDialog!.SelectedPaths);
+            // 1. 拖入路径必须原样到达压缩对话框（分支 3b 的预期行为）
+            Assert.NotNull(passedSources);
+            Assert.Contains(dir, passedSources!);
 
-            // 2. 对话框确认后必须执行压缩管道（进度窗口回调被调用，请求非空）
-            Assert.True(progressRan, "对话框确认后应进入压缩执行管道（RunWithProgress）");
-            Assert.NotNull(vm.PendingCompressRequest);
-            Assert.NotEmpty(targetPaths!);
+            // 2. 执行只发生一次，且在设置窗口回调内部：VM 不得再自行进入执行管道
+            Assert.False(progressRan, "压缩执行已下沉到设置窗口的确认事务，VM 不应再自行执行");
         }
         finally
         {
@@ -73,10 +69,12 @@ public class DragInCompressWiringTests
         try
         {
             var vm = new MainWindowViewModel();
-            vm.ShowCompressSettingsDialog = async cvm =>
+            IReadOnlyList<string>? passedSources = null;
+            vm.ShowCompressSettingsDialog = async sourcePaths =>
             {
+                // 用户在对话框点了「取消」：窗口静默关窗，回调直接返回（不产生载荷、不执行）。
+                passedSources = sourcePaths;
                 await Task.CompletedTask;
-                return false; // 用户点了「取消」
             };
 
             bool progressRan = false;
@@ -88,8 +86,8 @@ public class DragInCompressWiringTests
 
             await vm.DragInCompressAsync(new List<string> { dir });
 
+            Assert.NotNull(passedSources);
             Assert.False(progressRan, "对话框取消后不应执行压缩");
-            Assert.Null(vm.PendingCompressRequest);
         }
         finally
         {
