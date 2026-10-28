@@ -12,6 +12,7 @@
   - **修法（应用侧兜底）**：静态菜单的动词永远只能带一个 `%1`，改不了，只能在 App 侧合并多实例。新增 `App.CliInfra.RunWithPathCollector(...)`（互斥量 + 命名管道 + 可选收集期窗口），把「首实例收路径 / 后到实例塞路径后退出」抽成一份；解压族四个动词全部接入 —— `--extract`（`HandleExtract`，800 ms 静默窗 + 「正在收集文件…」提示窗，收集完弹**一个**设置窗加载全部包）、`--extract-here` / `--extract-to-name` / `--extract-smart`（`HandleDirectExtract`，400 ms 静默窗、不显示提示窗，按最终数量走单文件流程或批处理）。收集采用**静默窗口 + 有上限续期**（每收到新路径再等 400/800 ms，总上限 +600 ms）：单文件时不会明显变慢，后到的进程也不会被丢掉（否则那个包会静默消失）。
   - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/PathCollectorPipeTests.cs`（进程内起 `StartPipeServer`，两次 `SendPathsThroughPipe` 验证合并、去重、丢弃不存在的路径）。
   - **验证**：avalonia Release 构建 0 警告；`test -Target tests`（2 条存量警告）与 `test -Target ui-tests`（28 条存量警告）全绿。
+  - **追加（用户实测）**：多选解压合并成功后，splash 显示的仍是「其中一个压缩包的名字」——启动期文案由 `Program.SplashTextSpec` 按本进程命令行决定，而静态层叠菜单是逐项启动进程的，首实例只有 1 个路径、并不知道后面还有几个；现改为启动期中性文案（复用 `Status_Extracting`「正在解压...」），收集结束后由新增的 `App.CollectedSplashTextSpec` + `NativeSplash.UpdateText`（改 `_text` 后 `InvalidateRect` 重绘，跨线程安全）更新为「正在解压 N 个压缩包…」，只收到 1 个则补回文件名（`Status_ExtractingFmt`）。测试：`SplashTextSpecTests` 覆盖启动期中性文案 + 收集后 1 个 / N 个两种 spec。
   - **未做**：`CheckComStatus` 的兜底策略未改（兜底时状态仍是 `pending`，两套菜单外观仍不一致）；真实桌面右键多选回归需手工验证。
 
 **2026-10-27** — 修复：issue #52 右键「原地解压 / 解压到目录」报 7z.dll 无法加载（库路径被默认探测路径抢先占用）

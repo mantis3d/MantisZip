@@ -350,6 +350,7 @@ public partial class App : Application
             TimeSpan.FromMilliseconds(800),
             (allPaths, collectingWindow) =>
             {
+                UpdateSplashForCollectedPaths(allPaths);
                 collectingWindow?.Close();
                 _ = RunExtractDialogCliAsync(allPaths, desktop);
             },
@@ -391,6 +392,8 @@ public partial class App : Application
             TimeSpan.FromMilliseconds(400),
             (allPaths, _collectingWindow) =>
             {
+                UpdateSplashForCollectedPaths(allPaths);
+
                 if (allPaths.Count == 1)
                 {
                     RunSingleDirectExtract(allPaths[0], mode, args, desktop);
@@ -400,6 +403,24 @@ public partial class App : Application
                 _ = RunCliDirectExtractBatchAsync(allPaths, mode, desktop);
             });
     }
+
+    /// <summary>
+    /// 收集结束后刷新 splash 文案：启动阶段只知道本进程命令行里的那一个路径（静态层叠菜单逐项启动进程），
+    /// 合并完成后才拿到真实总数 —— 单个显示「正在解压 &lt;文件名&gt;」，多个显示「正在解压 N 个压缩包…」。
+    /// </summary>
+    private static void UpdateSplashForCollectedPaths(IReadOnlyList<string> allPaths)
+    {
+        var (key, specArgs) = CollectedSplashTextSpec(allPaths);
+        NativeSplash.UpdateText(LocalizationManager.T(key, specArgs));
+    }
+
+    /// <summary>
+    /// 收集完成后的 splash 文案 spec（纯函数，便于测试）：单个带文件名、多个带总数。
+    /// </summary>
+    internal static (string Key, object?[] Args) CollectedSplashTextSpec(IReadOnlyList<string> allPaths)
+        => allPaths.Count == 1
+            ? ("Status_ExtractingFmt", [Path.GetFileName(allPaths[0])])
+            : ("Status_ExtractingBatchFmt", [allPaths.Count]);
 
     /// <summary>单文件直接解压（保持 IPC 合并前的原行为，含提权预检）。</summary>
     private static void RunSingleDirectExtract(

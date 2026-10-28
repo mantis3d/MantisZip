@@ -57,6 +57,25 @@ internal static class NativeSplash
     }
 
     /// <summary>
+    /// 更新 splash 文案（幂等；未显示或已关闭时 no-op）。
+    /// 用途：IPC 多实例收集路径时，启动阶段只知道本进程的一个路径，收集完成后才能拿到真实总数
+    /// （见 App.CliExtract 的收集回调），此时改文案并让 splash 线程重绘即可。
+    /// </summary>
+    internal static void UpdateText(string text)
+    {
+        if (!OperatingSystem.IsWindows()) return; // 跨平台安全护栏
+        nint hwnd;
+        lock (Sync)
+        {
+            if (_thread is null) return; // 从未显示或已关闭
+            _text = text;
+            hwnd = _hwnd;
+        }
+        if (hwnd != nint.Zero)
+            NativeMethods.InvalidateRect(hwnd, nint.Zero, true); // 异步投递 WM_PAINT，跨线程安全
+    }
+
+    /// <summary>
     /// 关闭 splash（幂等）。PostMessage(WM_CLOSE) 是异步投递，实际销毁发生在 splash 消息泵线程；
     /// 若 splash 尚未显示完成，_closePending 保证窗口不悬置。最短显示时长在 splash 线程里等待。
     /// </summary>
