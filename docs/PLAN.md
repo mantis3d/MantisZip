@@ -36,32 +36,45 @@
 
 ---
 
-## S 档 —— 本轮必做（约 12-16h，≈ 一天半满负荷）
+## S 档 —— 本轮必做（约 4-6h，≈ 半天）
 
-> **执行顺序（2026-10-24 讨论定，2026-10-26 / 10-27 / 10-28 按完成情况更新）**：~~图标~~（已完成）→ ~~接缝~~（已完成）→ ~~预览~~（已完成）→ 自动更新 → 重命名（引擎级）。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。重命名排最后，是因为它就是 A 档「暂存区」的地基，紧邻 A 档开工能省一次返工。
+> **执行顺序（2026-10-24 讨论定，2026-10-26 / 10-27 / 10-28 按完成情况更新）**：~~图标~~（已完成）→ ~~接缝~~（已完成）→ ~~预览~~（已完成）→ 自动更新。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。「压缩包内重命名」原排在最后，2026-10-28 已移回 A 档——它是 A 档「暂存区」的地基，与 A 档相邻做完能省一次返工，不必占本轮 S 档窗口。
 >
 > 已完成并归档：⚡ 插队项「删除压缩包内目录静默无效」（2026-10-26，随 v0.5.4）、S 档「图标归一化」（2026-10-26，随 v0.5.4）、S 档「意图-执行接缝收口（含波次 3 全仓清账）」（2026-10-26，随 v0.5.4）、S 档「预览取数层内存优先（切片 1+2+4）」（2026-10-28，随 v0.5.4）、⚡ 插队项「安装器产品身份统一 + 旧版迁移桥」（2026-10-27，随 v0.5.4，issue #45）、⚡ 插队项「压缩包识别分层（容器 / 子类型）+ 自解压 exe 支持」（2026-10-27，随 v0.5.4，issue #54 / #36）—— 详见 [PROGRESS.md 历史设计方案索引](PROGRESS.md)。
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
 | 自动更新检测 | [auto-update.md](.omo/plans/未开始/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查 + AboutWindow「更新」Tab + `UpdateAvailableDialog` + 设置开关 + 单元测试。**面向公开用户后这从「加分项」变「基础设施」**：没有它，每个修复都到不了用户手上 |
-| 压缩包内重命名条目（引擎级，零重压缩） | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **8-10h** | 📋 2026-10-27 推倒重写（旧方案 6-8h 作废）：旧路线「提取→删除→添加」= 改一个名字要整包重写**三遍**（ZIP 的添加/删除各自都是整包 copy-mode 复制），7z 还会把用户压缩等级重置成 `Normal`，加密包改名会变明文。新方案 ZIP 走 copy-mode **只改名字字节、压缩数据原样搬运**，7z 走 `ModifyArchive` 就地删 + 单条追加，tar.gz 明确不支持。F2 + 右键菜单，目录改名一并做。**它是 A 档「压缩包编辑操作序列」的地基** |
 
-> 本轮验收口径：公众能感知到的两件事同时改善——**安装完会自己知道有新版本**、**能在压缩包里直接改名（F2，且不重新压缩整包）**。（图标归一化、意图-执行接缝均已于 2026-10-26 完成、预览取数层内存优先于 2026-10-28 完成，随 v0.5.4 验证）
+> 本轮验收口径：公众能感知到的一件事——**安装完会自己知道有新版本**。（「压缩包内重命名」已于 2026-10-28 移回 A 档，与「暂存区」相邻做；图标归一化、意图-执行接缝于 2026-10-26、预览取数层内存优先于 2026-10-28 完成，随 v0.5.4 验证）
 
 ---
 
-## A 档 —— 下一轮（约 66h，是「接下来两轮」的量，不是一轮）
+## A 档 —— 下一轮（约 61-74h，分两个阶段交付；不是一轮，是「接下来的两轮半」）
+
+> **为什么这样切（2026-10-28 定）**：A1 把「重命名」和「暂存区」放一起，是因为它们改的是**同一批引擎文件**（`src/MantisZip.Core/Utils/ZipBinaryRewriter.cs`、`src/MantisZip.Core/Abstractions/ArchiveEngine.cs`、`ZipEngine.*`、`SevenZipEngine.cs`），都要处理 copy-mode 偏移重算、加密包不落明文、失败不破坏原件——分两次做等于同一批代码开两次刀、跑两轮全量回归。A2 前期是「每天看得见的体验 + 体积」，末尾用「小活清仓」当缓冲池（进度紧就砍尾部）。
+
+### 阶段 A1 —— 压缩包内编辑（约 21-28h，做完可独立发版）
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。📋 2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） |
-| 压缩包编辑操作序列（暂存区 + 批量提交） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | **12-16h** | 删除/重命名先进内存队列，文件列表立刻反映结果（虚拟视图），点「应用」或关窗时**一次性**提交：ZIP 一次 `RewriteAsync`、7z 一次 `ModifyArchive` + 追加。**现状是每次编辑都整包重写**——删 20 个文件 = 20 次整包复制/重打包（7z 删除更是全量解压 + 重打包，还会把压缩等级重置成 `Normal`）。口径已定（2026-10-27）：只限当前打开的包、未提交切包/关窗三选（应用/丢弃/取消）、加密包沿用原加密、可选提交前备份原包（默认关）。**硬依赖 S 档「重命名」先落地** |
+| 压缩包内重命名条目（引擎级，零重压缩） | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **8-10h** | 📋 2026-10-27 推倒重写（旧方案 6-8h 作废），2026-10-28 从 S 档移回 A 档。旧路线「提取→删除→添加」= 改一个名字要整包重写**三遍**（ZIP 添加/删除各自都是整包 copy-mode），7z 还会把用户压缩等级重置成 `Normal`，加密包改名会变明文。新方案 ZIP 走 copy-mode **只改名字字节、压缩数据原样搬运**，7z 走 `ModifyArchive` 就地删 + 单条追加，tar.gz 明确不支持。F2 + 右键菜单，目录改名一并做。它是 A 档「暂存区」的地基，**A1 第一项** |
+| 压缩包编辑操作序列（暂存区 + 批量提交） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | **12-16h** | 删除/重命名先进内存队列，文件列表立刻反映结果（虚拟视图），点「应用」或关窗时**一次性**提交：ZIP 一次 `RewriteAsync`、7z 一次 `ModifyArchive` + 追加。**现状是每次编辑都整包重写**——删 20 个文件 = 20 次整包复制/重打包（7z 删除更是全量解压 + 重打包，还会把压缩等级重置成 `Normal`）。口径已定（2026-10-27）：只限当前打开的包、未提交切包/关窗三选（应用/丢弃/取消）、加密包沿用原加密、可选提交前备份原包（默认关）。**A1 第二项，与「重命名」同批完成**（硬依赖它的 rewriter rename 通道） |
+| Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化。公开用户的分发入口，1-2h 的性价比极高 **A1 收尾，纯发布操作** |
+
+> **A1 验收口径**：改一个名字、或一次删/改 20 个条目，都不再让整包反复重写；ZIP 走 copy-mode 只改名字节、压缩数据原样搬运，7z 只碰被改条目，加密包改名不掉明文，tar.gz 明确报不支持；winget 能装。
+
+### 阶段 A2 —— 导航、瘦身与小活（约 40-46h）
+
+> **内部顺序**：先做三条主线（约 15-21h，可独立发一版），再跑「小活清仓」批次（25h，缓冲池）。
+
+| 功能 | 设计文档 | 难度 | 工时 | 说明 |
+|---|---|:--:|:--:|---|
+| 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。📋 2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） **A2 第一项** |
 | 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/进行中/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。**单独排在 A 档的理由**：三者都是「本来就在解析完整文档」，省下的只是落盘，用户感知最弱，且逐库确认 Stream 支持最费时 |
 | 自包含体积优化（第一步） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 📋 **目标已改写**：原「降至 20–25MB」与现有依赖（SkiaSharp / ImageSharp / OpenXml / Sqlite / PdfPig / WebView）矛盾，激进修剪会打穿预览。改为**第一步只做测量基线 + 验证保守修剪可行性**，目标区间 60–90MB。若确认只发 SelfContained 包，这一步的收益优先级上调 |
-| Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化。公开用户的分发入口，1-2h 的性价比极高 |
 
-### A 档 · 小活清仓（批量 8 项，合计约 25h）
+### 小活清仓（A2 阶段末尾，批量 8 项，合计约 25h，可裁剪）
 
 > 都是 2–4h 的「便宜、感知明确」项，攒成一批做完，避免它们长期占着队列。
 

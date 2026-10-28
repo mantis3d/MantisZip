@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 计划调整：压缩包内重命名从 S 档移回 A 档，A 档拆为两个交付阶段
+  - **背景**：S 档最后一项「压缩包内重命名（引擎级）」原计划紧邻 A 档开工，2026-10-28 讨论后改为**直接并入 A 档**——它是 A 档「暂存区」的地基，两者改的是同一批引擎文件（`ZipBinaryRewriter.cs` / `ArchiveEngine.cs` / `ZipEngine.*` / `SevenZipEngine.cs`），分两次做等于同一批代码开两次刀、跑两轮全量回归，且 API 边界（单次 rename vs 批量原子提交）容易先定错再返工。
+  - **调整**：`docs/PLAN.md` 删掉 S 档该行（S 档剩「自动更新检测」4-6h，验收口径从两件事改一件事），A 档在「面包屑」行后新增该行。A 档按「同源引擎改动」切成两个阶段——**阶段 A1 压缩包内编辑**（重命名 8-10h + 暂存区 12-16h + Winget 1-2h ≈ 21-28h，可独立发版）与**阶段 A2 导航、瘦身与小活**（面包屑 6-8h + 预览切片 3 Office 5-7h + 自包含体积第一步 4-6h ≈ 15-21h 主线，末尾 25h「小活清仓」批次当缓冲池，进度紧可裁尾部）。A 档总工时按项目重算为 **61-74h**（原标题 74-76h 只加了重命名的 8-10h、未减掉已被 S 档吃掉的项，偏高）。
+  - **连带修正**：`archive-rename-entry.md` 档位行改 A 档、范围边界去掉「S 档不扩散」措辞；`archive-edit-operation-sequence.md` 的 P2 表不再称重命名为「S 档」；本文档 2026-10-27 那条立项标题补注「2026-10-28 已移回 A 档」。
+  - **状态**：📋 计划文档已调整，未开工。执行顺序不变：先做完 S 档「自动更新检测」，再进 A1。
+
 **2026-10-28** — 计划：预览取数层内存优先（批次 A = 切片 1+2+4）
   - **背景**：预览一次就把整个条目解到 `%TEMP%\MantisZip\Preview\preview{ext}` 再读回，临时文件名固定、且**每次预览前清空整个 Preview 目录**（两个预览互相踩）；文本 >1MB 直接「文件过大」、非文本 >15MB 也直接拒绝，用户看不到内容只能先解压。目标是「能进内存的进内存、进不了的才落盘」，并把大文本从「拒绝」改成「部分预览」。
   - **根因（三处结构性浪费）**：① `ArchiveEntryExtractor.ExtractZipHeadToMemory` 用 `entry.WriteTo(ms)` 把**整条**解到内存再截断 —— 取 4KB 魔数等于把 2GB 条目读进内存；② 取数在 `Switch previewType` **之前**执行，任何类型都先落盘，图片/PDF 本来只吃内存里的流；③ 临时文件名 `preview{ext}` 固定 + 每次清空目录 ⇒ 同时看两个文件必然互相删除。
@@ -3039,7 +3045,7 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
-#### v0.5.4 (2026-10-27) 计划立项：压缩包内重命名推倒重写（S 档）+ 编辑操作序列（A 档）
+#### v0.5.4 (2026-10-27) 计划立项：压缩包内重命名推倒重写（S 档；2026-10-28 已移回 A 档）+ 编辑操作序列（A 档）
   - **触发**：用户问「为什么不能像文件管理器那样先改一堆、最后一起保存」。核对后发现现状是**每一次编辑都整包写盘**——ZIP 的添加与删除各自都是整包 copy-mode 复制（`src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs:136-222`、`:894-979`），7z 删除更是全量解压 + 重打包（`src/MantisZip.Core/Engines/SevenZipEngine.cs:1281-1345`，且固定 `CompressionLevel.Normal`）。
   - **`archive-rename-entry.md` 推倒重写（S 档 8-10h）**：旧方案「提取→删除→添加」有四条硬伤——改一个名字要重写三遍整包、7z 会静默把用户压缩等级重置成 `Normal`、加密包改名会变明文、三步之间没有原子性。新方案：给 `src/MantisZip.Core/Utils/ZipBinaryRewriter.cs:314` 的 `RewriteAsync` 加 `renameMap`，只改 LFH/CD 里的名字字节、压缩数据原样搬运（**零重压缩**）；新名不可被归档编码无损表示或遇 ZIP64 时抛 `ZipCopyModeException` 回退 legacy，**不静默降级成乱码**。7z 用 `ModifyArchive` 就地删 + 单条追加（`:1509-1511` 已验证 index 删除有效）；tar.gz 明确不支持。新增 `IArchiveEngine.CanRename` / `RenameEntriesAsync`（与 `CanAdd`/`CanDelete` 同型：`src/MantisZip.Core/Abstractions/ArchiveEngine.cs:540`/`:545`）。UI：右键菜单插在 `src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml:293` 的「删除」之前，F2 走 `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs:1007` 的 `RegisterKeyBindings`，并按规则 10.1 同步菜单 `InputGesture` 与 `tests/MantisZip.UI.Avalonia.Tests/MainWindowKeyBindingsTests.cs`。
   - **新增 `archive-edit-operation-sequence.md`（A 档 12-16h）**：暂存区 = 内存 `PendingOp` 队列 + 对原始条目快照做**纯函数投影**得到虚拟视图（撤销/重做天然免费），提交时一次性下发 `ArchiveBatchPlan{Deletes,Renames,Adds}`（新接口 `ApplyBatchAsync`，默认抛，与 `CanAdd`/`CanDelete` 同型）：ZIP 一次 `RewriteAsync` 同时承载 keep + rename + add，7z 一次 `ModifyArchive` 删完再追加。口径（用户 2026-10-27 拍板）：只限当前打开的那个包、未提交切包/关窗三选（应用/丢弃/取消）、加密包新增条目沿用原包加密、可选提交前备份原包（默认关）。P2/P3（拖拽移动、逐步 undo/redo、另存为新包）进 B 档 8-12h。

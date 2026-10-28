@@ -2,7 +2,7 @@
 
 > **Status**: 📋 待开始 | **阶段**: [⬜⬜⬜⬜⬜⬜] (0/6)
 > **预估工时**: 🟡中 **8-10h**
-> **档位**: **S 档**（2026-10-27 从 A 档上移）
+> **档位**: **A 档**（2026-10-27 曾上移到 S 档 → 2026-10-28 移回 A 档：它是 A 档「暂存区」的地基，与暂存区相邻做完能省一次引擎返工，也不必占本轮 S 档窗口）
 > **前置依赖**: 无硬依赖。本计划的 rewriter rename 通道是 A 档 `archive-edit-operation-sequence.md`（暂存区）的**地基**——先做本计划，暂存区能少一半工作量。
 
 ## 为什么推倒重写（旧版方案作废）
@@ -112,7 +112,7 @@ public static Task<RewriteResult> RewriteAsync(
 - 校验：空、含 `/` 或 `\`、含控制字符 → 内联提示不提交；与同目录已有条目重名 → 走冲突确认（覆盖或改名）。
 - VM：`MainWindowViewModel.Compress.cs` 增 `RenameEntry`（`[RelayCommand]`），骨架照 `DeleteFiles`（`:100`）：取选中项 → 弹对话框 → `PendingOperationNote` → `RunWithProgress(() => engine.RenameEntriesAsync(...))` → 刷新并回到原目录。
 - 多选 / 不支持格式：`CanRenameEntries` = 单选 && `_engine.CanRename(_currentFormat)`。
-- **范围边界（S 档不扩散）**：「重命名」只改**同一目录内的文件名**；「移动到其它目录」属于 A 档暂存区的拖拽/移动到…，本计划不做。
+- **范围边界（不做移动）**：「重命名」只改**同一目录内的文件名**；「移动到其它目录」属于 A 档暂存区的拖拽/移动到…，本计划不做。
 
 ### 测试
 
