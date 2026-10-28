@@ -46,7 +46,16 @@
   <sys:Double x:Key="ControlHeightXxl">54</sys:Double>
   <sys:Double x:Key="ControlMinHeight">40</sys:Double>
   <sys:Double x:Key="BorderRadius">6</sys:Double>
-  <sys:Double x:Key="DialogPadding">16</sys:Double>
+  <!-- 对话框级内边距：类型必须是 Thickness（消费方都绑到 Padding）；
+       App.Theming.ApplyCompactness 会在启动时按紧凑度覆盖同键，这里给主题的静态兜底值。 -->
+  <Thickness x:Key="DialogPadding">16</Thickness>
+  <!-- 间距的 Thickness 变体（Margin/Padding 用；DynamicResource 无法隐式 double→Thickness） -->
+  <Thickness x:Key="SpacingXxsThk">4</Thickness>
+  <Thickness x:Key="SpacingXsThk">8</Thickness>
+  <Thickness x:Key="SpacingSmThk">12</Thickness>
+  <Thickness x:Key="SpacingMdThk">16</Thickness>
+  <Thickness x:Key="SpacingLgThk">24</Thickness>
+  <Thickness x:Key="SpacingXlThk">32</Thickness>
 
   <!-- SolidColorBrush resources -->
   <SolidColorBrush x:Key="ThemeWindowBgBrush" Color="{StaticResource ThemeWindowBg}" />

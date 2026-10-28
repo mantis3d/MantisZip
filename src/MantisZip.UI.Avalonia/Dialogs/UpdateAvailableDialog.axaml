@@ -61,7 +61,6 @@
               IsDefault="True"
               MinWidth="80"
               Height="{DynamicResource ControlHeight}"
-              Padding="{DynamicResource SpacingSmThk}"
               Background="{DynamicResource ThemeAccentBrush}"
               Foreground="White"
               BorderThickness="0" />
@@ -72,7 +71,6 @@
               IsCancel="True"
               MinWidth="80"
               Height="{DynamicResource ControlHeight}"
-              Padding="{DynamicResource SpacingSmThk}"
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}" />
@@ -82,7 +80,6 @@
               Click="OnSkipVersionClick"
               MinWidth="80"
               Height="{DynamicResource ControlHeight}"
-              Padding="{DynamicResource SpacingSmThk}"
               Background="{DynamicResource ThemeButtonBgBrush}"
               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
               BorderBrush="{DynamicResource ThemeBorderBrush}" />

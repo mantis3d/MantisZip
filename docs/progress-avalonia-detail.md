@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 调试夹具：Debug 版可用「假当前版本」验证更新提示链路；修复提示框按钮无文字
+  - **背景**：开发者本地的版本号永远高于线上最新版，`UpdateService` 的「发现新版本」这条链路在开发机上永远走不到，只能靠改 `AppConstants.Version`（会弄红 `-Task version` 的六处校验）或伪造远端响应。用户要求「Debug 加一个假版本开关，检测更新时用手动设置的假版本号覆盖本地真实版本」，于是做成开关文件而不是改版本号。
+  - **修法（调试夹具）**：新增 `src/MantisZip.UI.Avalonia/Services/DebugUpdateVersion.cs`（`internal static`）：`Effective` 在 Debug 下读 `Path.Combine(AppSettings.DataDir, "fake-current-version.txt")`，内容经 `Version.TryParse` 通过才采用（非法内容只记日志、回退真实版本）；Release 分支整段编译掉、恒返回 `AppConstants.Version`。`IsOverridden` 供「关于」窗口显示「（调试：真实版本 0.5.4）」提示，避免把「0.0.1 发现新版 v0.5.3」误读成版本号坏了。两处检查调用点（`App.axaml.cs` 启动检查、`AboutWindow.axaml.cs` 手动检查）都改用 `Effective`，仍走真实 GitHub API。文件位置随便携模式变（普通模式 `%LOCALAPPDATA%\MantisZip\`，便携模式 `exe 旁 Data\`）。
+  - **缺陷（真机验收发现）**：用户按夹具验证时弹窗正常出现，但**三个按钮只有色块、没有文字**。根因不是绑定断了——探针显示 `Button.Content` 与内部 `TextBlock.Text` 都是「下载 / 稍后提醒 / 不再提示此版本」，而是按钮本地写了 `Padding="{DynamicResource SpacingSmThk}"`（`12,12,12,12`），而 `Height="{DynamicResource ControlHeight}"` 只有 28——文字区被压到 4px，视觉上等同于无文字。
+  - **修法（缺陷）**：三个按钮去掉本地 `Padding`，回到全局 `Button` 样式的 `8,4`；`Height`/`MinWidth` 保持不变。顺带修正两处资源类型问题（都由测试暴露）：①`Themes/ThemeLight.axaml` / `ThemeDark.axaml` 的 `DialogPadding` 原本声明为 `sys:Double`，而消费方全部绑到 `Padding`（需要 `Thickness`）——生产环境靠 `App.Theming.ApplyCompactness` 启动时覆盖成 `Thickness` 才没炸，任何「主题已加载但紧凑度还没注入」的路径都会 `InvalidCastException`；已改为 `<Thickness x:Key="DialogPadding">16</Thickness>`；②两份主题补上 `SpacingXxsThk … SpacingXlThk` 的 `Thickness` 变体（此前只在运行时由 `App.Theming` 注入，静态资源字典里缺，规则 5 却按「已存在」引用）。
+  - **回归测试**：新建 `tests/MantisZip.UI.Avalonia.Tests/UpdateAvailableDialogTests.cs`，两例——①`Buttons_HaveVisibleText_WithEnoughVerticalRoom`：并入 `ThemeLight.axaml`（否则 `ControlHeight`/`SpacingSmThk` 都解析不到、按钮靠 auto 高撑开，断言永远绿——第一版就踩了这个坑），断言每个按钮 `Content` 非空、内部 `TextBlock` 有文字、且 `Bounds.Height - Padding.Top - Padding.Bottom >= 8`；②`Completion_ReturnsRemindLater_WhenClosedWithoutClickingButtons`：关窗（X/Esc）时 `Completion` 必须完成且为 `RemindLater`，否则调用方永久挂起。红绿验证：把旧的 `Padding="{DynamicResource SpacingSmThk}"` 加回三个按钮 → 测试报「按钮「下载」可用高度只有 4.0px（Bounds=28.0，Padding 上下=12.0+12.0）」，移除后转绿。
+  - **验证**：Debug 构建 0 警告、Release 构建 0 警告、`-Task test -Target ui-tests` 全绿、`-Task test -Target tests` 全绿、`-Task check` 0.5.4 六处 + 三语 1356 key + 五项守卫；真机截图确认三按钮文字恢复。
+  - **状态**：✅ 已落地（调试夹具 + 缺陷修复 + 回归测试）。RELEASE_NOTES 不改：提示对话框本身是本版本新增，其 bug 也在本版本内修掉，按规则 18 判据不进发布说明。
+  - **备注（构建坑）**：用备份文件还原源码后 `LastWriteTime` 会被还原成旧值，MSBuild 判定无需重编，测试会拿旧程序集跑出「假绿/假红」——还原后必须 touch 文件再构建（本次踩过，全量跑才暴露）。
+
 **2026-10-28** — 计划：自动更新检测（S 档收尾）
   - **背景**：此前应用完全不知道自己是不是最新版，用户只能定期去 Releases 页看。S 档计划 `auto-update`（4-6h）要求「发现新版本 → 提示 → 交系统浏览器下载」，明确**不做**应用内下载安装、不做 Gitee 镜像、不引入 DI / `IHttpClientFactory`、不处理 pre-release。
   - **根因（为什么以前不做）**：三条约束卡着——① 仓库开了裁剪/AOT 分析器门禁，反射式 `JsonSerializer.Deserialize<T>` 会报 IL2026/IL3050，必须先有手写解析方案；② 网络请求必须全程可失败静默，不能拖慢启动（曾经有过「启动时同步等网络」类问题）；③ 弹窗必须能被 X/Esc 关掉且不留下挂起的 `await`。
