@@ -11,40 +11,50 @@
         Background="{DynamicResource ThemeWindowBgBrush}"
         Padding="{DynamicResource DialogPadding}">
 
-  <!-- 根布局：标题 → 版本摘要 → 版本/日期 → 更新说明 → 按钮行（全部主题/紧凑度资源键） -->
+  <!-- 根布局：标题 → 版本对比 → 发布日期 → 更新说明（Markdown 滚动区）→ 按钮行（全部主题/紧凑度资源键） -->
   <StackPanel Spacing="{DynamicResource SpacingMd}">
 
-    <!-- 标题行：发现新版本 -->
+    <!-- 标题行：发现新版本（窗口标题栏与正文主标题同文案，正文这里只出现一次） -->
     <TextBlock Text="{Binding DialogTitleText}"
                FontSize="16"
                FontWeight="Bold"
                TextWrapping="Wrap"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-    <!-- 主提示：发现新版本 v{0}（版本号由 UpdateInfo 提供） -->
-    <TextBlock Text="{Binding SummaryText}"
+    <!-- 版本对比行：当前版本 → 最新版本。
+         原来「发现新版本 vX」与「最新版本 vX」两行说的是同一件事，合并成这一行 -->
+    <TextBlock Text="{Binding VersionCompareText}"
                FontSize="13"
                TextWrapping="Wrap"
                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-    <!-- 版本信息区：最新版本号 + 发布日期（无日期时该行隐藏） -->
-    <StackPanel Spacing="{DynamicResource SpacingXs}">
-      <TextBlock Text="{Binding NewVersionText}"
-                 FontSize="13"
-                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-      <TextBlock Text="{Binding PublishDateText}"
-                 IsVisible="{Binding HasPublishDate}"
-                 FontSize="13"
-                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-    </StackPanel>
+    <!-- 发布日期行（接口未给出日期时整行隐藏） -->
+    <TextBlock Text="{Binding PublishDateText}"
+               IsVisible="{Binding HasPublishDate}"
+               FontSize="12"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
 
-    <!-- 更新说明区：接口不返回说明正文，直接展示发布页地址（不额外联网） -->
+    <!-- 更新说明区：小标题 + Markdown 正文（GitHub release body），限高滚动，超长不撑爆窗口 -->
     <StackPanel Spacing="{DynamicResource SpacingXs}">
       <TextBlock Text="{Binding ReleaseNotesLabelText}"
                  FontSize="13"
                  FontWeight="Bold"
                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+      <!-- Markdown 正文宿主：Markdig AST → 原生控件（标题/列表/表格/代码块；图片与链接只显示 URL，不联网） -->
+      <Border IsVisible="{Binding HasReleaseNotes}"
+              MaxHeight="220"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="{DynamicResource BorderRadius}">
+        <!-- 内容由代码后置塞入 new MarkdownHelpContent(markdown)，这里只留宿主槽位 -->
+        <ContentControl x:Name="NotesHost" />
+      </Border>
+
+      <!-- 回退：接口没有 body 时显示发布页地址（纯文本，不额外联网） -->
       <TextBlock Text="{Binding ReleaseNotesText}"
+                 IsVisible="{Binding HasNoReleaseNotes}"
                  FontSize="12"
                  TextWrapping="Wrap"
                  Foreground="{DynamicResource ThemeTextSecondaryBrush}" />

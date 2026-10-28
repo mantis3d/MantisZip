@@ -448,12 +448,13 @@
                        FontSize="13"
                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
 
-            <!-- 手动检查按钮：高度/内边距/配色全部走紧凑度与主题资源键 -->
+            <!-- 手动检查按钮：高度/配色走紧凑度与主题资源键。
+                 ⚠ 不要在这里写本地 Padding：ControlHeight=28 时 SpacingXsThk(8,8,8,8) 只剩 12px 文字区，
+                 14px 字号会被裁掉（与「更新提示对话框」同一个缺陷）。用全局 Button 样式的 Padding="8,4"。 -->
             <Button Content="{Binding UpdateCheckNowText}"
                     Click="OnCheckUpdateClick"
                     HorizontalAlignment="Left"
                     Height="{DynamicResource ControlHeight}"
-                    Padding="{DynamicResource SpacingXsThk}"
                     Background="{DynamicResource ThemeButtonBgBrush}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
@@ -484,12 +485,11 @@
                            FontSize="13"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
 
-                <!-- 打开发布页按钮：应用内不下载，交给系统浏览器 -->
+                <!-- 打开发布页按钮：应用内不下载，交给系统浏览器（同样不写本地 Padding，见上方按钮注释） -->
                 <Button Content="{Binding UpdateDownloadText}"
                         Click="OnOpenReleasePageClick"
                         HorizontalAlignment="Left"
                         Height="{DynamicResource ControlHeight}"
-                        Padding="{DynamicResource SpacingXsThk}"
                         Background="{DynamicResource ThemeAccentBrush}"
                         Foreground="White"
                         BorderThickness="0" />

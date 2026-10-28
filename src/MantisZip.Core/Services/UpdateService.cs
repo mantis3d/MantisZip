@@ -29,8 +29,20 @@ public static class UpdateService
     /// <summary>HTTP 超时秒数：GitHub 不可达时不应拖慢启动流程。</summary>
     private const int RequestTimeoutSeconds = 5;
 
-    /// <summary>两次自动检查之间的最小间隔（24 小时）。</summary>
-    private static readonly TimeSpan CheckInterval = TimeSpan.FromHours(24);
+    /// <summary><see cref="UpdateCheckFrequency.Daily"/> 档的最小检查间隔（24 小时）。</summary>
+    private static readonly TimeSpan DailyCheckInterval = TimeSpan.FromHours(24);
+
+    /// <summary><see cref="UpdateCheckFrequency.Weekly"/> 档的最小检查间隔（7 天）。</summary>
+    private static readonly TimeSpan WeeklyCheckInterval = TimeSpan.FromDays(7);
+
+    /// <summary>
+    /// 发布说明正文的最大保留长度。
+    /// <para>
+    /// GitHub 的 release body 没有长度限制，而这段文本最终要进 UI 渲染（更新提示窗 / 关于窗）：
+    /// 异常大的响应会明显拖慢界面，因此在解析处直接截断。
+    /// </para>
+    /// </summary>
+    private const int MaxReleaseNotesLength = 20000;
 
     /// <summary>
     /// 共享的静态 <see cref="HttpClient"/>：复用 socket / 连接池，避免每次检查都新建。
@@ -95,13 +107,28 @@ public static class UpdateService
     }
 
     /// <summary>
-    /// 判断距上次检查是否已经超过 24 小时（两个时间都应是 UTC）。
+    /// 按设置里选定的频率判断这次是否应该发起自动检查（两个时间都应是 UTC）。
     /// </summary>
+    /// <param name="frequency">用户选择的检查频率。</param>
     /// <param name="lastCheckTime">上次检查时间；<c>null</c> 表示从未检查过。</param>
     /// <param name="nowUtc">当前 UTC 时间（由调用方传入，便于测试）。</param>
-    /// <returns>从未检查过或间隔 ≥ 24 小时返回 <c>true</c>，否则 <c>false</c>。</returns>
-    public static bool ShouldCheck(DateTime? lastCheckTime, DateTime nowUtc)
-        => lastCheckTime is null || nowUtc - lastCheckTime.Value >= CheckInterval;
+    /// <returns>本次应检查返回 <c>true</c>，否则 <c>false</c>。</returns>
+    public static bool ShouldCheck(UpdateCheckFrequency frequency, DateTime? lastCheckTime, DateTime nowUtc)
+        => frequency switch
+        {
+            UpdateCheckFrequency.Never => false,
+            UpdateCheckFrequency.EveryStartup => true,
+            UpdateCheckFrequency.Daily => IsIntervalElapsed(lastCheckTime, nowUtc, DailyCheckInterval),
+            UpdateCheckFrequency.Weekly => IsIntervalElapsed(lastCheckTime, nowUtc, WeeklyCheckInterval),
+            // 防御性兜底：枚举越界值（例如将来新增档位、旧程序读到新配置）按 Daily 处理，绝不抛异常
+            _ => IsIntervalElapsed(lastCheckTime, nowUtc, DailyCheckInterval),
+        };
+
+    /// <summary>
+    /// 从未检查过，或距上次检查已满 <paramref name="interval"/> 时返回 <c>true</c>。
+    /// </summary>
+    private static bool IsIntervalElapsed(DateTime? lastCheckTime, DateTime nowUtc, TimeSpan interval)
+        => lastCheckTime is null || nowUtc - lastCheckTime.Value >= interval;
 
     /// <summary>
     /// 测试专用：替换静态 <see cref="HttpClient"/> 使用的 handler。
@@ -165,7 +192,26 @@ public static class UpdateService
             LatestVersion: latestVersion,
             DownloadUrl: releaseUrl,
             ReleaseNotesUrl: releaseUrl,
-            ReleaseDate: ParsePublishedAt(root));
+            ReleaseDate: ParsePublishedAt(root),
+            ReleaseNotes: ParseReleaseNotes(root));
+    }
+
+    /// <summary>
+    /// 读取 <c>body</c>（发布说明的 Markdown 原文）并裁掉首尾空白。
+    /// 字段缺失或不是字符串时返回空串；超过 <see cref="MaxReleaseNotesLength"/> 字符时截断。
+    /// </summary>
+    private static string ParseReleaseNotes(JsonElement root)
+    {
+        if (!root.TryGetProperty("body", out var element)
+            || element.ValueKind != JsonValueKind.String)
+        {
+            return string.Empty;
+        }
+
+        var notes = element.GetString()?.Trim() ?? string.Empty;
+        return notes.Length > MaxReleaseNotesLength
+            ? notes[..MaxReleaseNotesLength]
+            : notes;
     }
 
     /// <summary>

@@ -11,11 +11,17 @@ namespace MantisZip.Core.Services;
 /// <param name="DownloadUrl">发布页地址（浏览器打开后由用户自行下载）。</param>
 /// <param name="ReleaseNotesUrl">发布说明地址（GitHub 上发布页即说明页，故与 <paramref name="DownloadUrl"/> 相同）。</param>
 /// <param name="ReleaseDate">发布日期（UTC）；接口未给出或无法解析时为 <c>null</c>。</param>
+/// <param name="ReleaseNotes">
+/// 发布说明正文：GitHub release <c>body</c> 字段的 Markdown 原文。
+/// 接口未给出该字段、字段为 <c>null</c> 或为空时是空串；
+/// 长度已在解析处（<see cref="UpdateService"/>）截断，最长 20000 字符。
+/// </param>
 public readonly record struct UpdateInfo(
     string LatestVersion,
     string DownloadUrl,
     string ReleaseNotesUrl,
-    DateTime? ReleaseDate)
+    DateTime? ReleaseDate,
+    string ReleaseNotes = "")
 {
     /// <summary>
     /// 发布日期显示文本（<c>yyyy-MM-dd</c>）。无发布日期时返回空字符串，由调用方决定是否隐藏该行。

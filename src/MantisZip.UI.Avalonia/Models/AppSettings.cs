@@ -250,8 +250,11 @@ public class AppSettings
     public string LogPrivacyMode { get; set; } = "extension";
 
     // ===== 自动更新 =====
-    /// <summary>启动时是否自动检查更新（默认开启）。</summary>
-    public bool EnableAutoUpdateCheck { get; set; } = true;
+    /// <summary>
+    /// 自动检查更新的频率。存字符串（JSON 里可读、可手改），取值见
+    /// <see cref="UpdateCheckFrequencyNames"/>；无法识别时按「每天」处理。
+    /// </summary>
+    public string UpdateCheckFrequency { get; set; } = "Daily";
 
     /// <summary>上次检查更新的时间（UTC）。JSON 走默认 ISO-8601 序列化，不需要自定义 converter。</summary>
     public DateTime? LastUpdateCheckTime { get; set; }

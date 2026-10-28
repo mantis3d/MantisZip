@@ -95,9 +95,12 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _enableDebugLogging;
 
-    /// <summary>启动时是否自动检查更新（自动更新检测；与 EnableDebugLogging 同为源生成属性风格）。</summary>
+    /// <summary>
+    /// 自动检查更新的频率下拉框选中项（0=关闭 / 1=每次启动 / 2=每天 / 3=每周）。
+    /// 存下标而不是枚举，是为了让 ComboBox 只用 SelectedIndex 绑定，不需要 ItemTemplate/转换器。
+    /// </summary>
     [ObservableProperty]
-    private bool _enableAutoUpdateCheck;
+    private int _updateFrequencyIndex = 2;
 
     [ObservableProperty]
     private bool _closeAfterCompress;
@@ -1018,9 +1021,21 @@ public partial class SettingsWindowViewModel : ObservableObject
         AppSettings.DataDir, "debug.log");
     public string OpenLogFolderText => LocalizationManager.T("Settings_Advanced_OpenLog");
 
-    // ── 自动更新（Debug 页内的「更新设置」卡片）──
+    // ── 自动更新（独立「更新」页签）──
     public string UpdateSettingsSectionTitle => LocalizationManager.T("Update_Settings_SectionTitle");
-    public string AutoUpdateCheckText => LocalizationManager.T("Update_Settings_AutoCheck");
+    public string UpdateFrequencyLabelText => LocalizationManager.T("Update_Settings_Frequency");
+
+    /// <summary>下拉框选项文案（顺序必须与 <see cref="UpdateCheckFrequencyNames.Ordered"/> 一致）。</summary>
+    public IReadOnlyList<string> UpdateFrequencyOptions => new[]
+    {
+        LocalizationManager.T("Update_Freq_Never"),
+        LocalizationManager.T("Update_Freq_Startup"),
+        LocalizationManager.T("Update_Freq_Daily"),
+        LocalizationManager.T("Update_Freq_Weekly"),
+    };
+
+    /// <summary>「更新」页签标题（与「关于 → 更新」页签同名，用户一眼能对上）。</summary>
+    public string TabUpdateHeader => LocalizationManager.T("Update_TabName");
 
     // ── New tab headers ──
     public string TabLanguageHeader => LocalizationManager.T("Settings_Tab_Language");
@@ -1106,7 +1121,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         _logPrivacyMode = _settings.LogPrivacyMode;
 
         // 自动更新
-        _enableAutoUpdateCheck = _settings.EnableAutoUpdateCheck;
+        _updateFrequencyIndex = UpdateCheckFrequencyNames.ToIndex(
+            UpdateCheckFrequencyNames.Parse(_settings.UpdateCheckFrequency));
 
         // Compress (additional)
         _closeAfterCompress = _settings.CloseAfterCompress;
@@ -1501,9 +1517,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordOptionsSectionText));
         OnPropertyChanged(nameof(AssocSectionText));
         OnPropertyChanged(nameof(DebugSectionText));
-        // 自动更新卡片文案（Debug 页内）
+        // 自动更新页签文案
         OnPropertyChanged(nameof(UpdateSettingsSectionTitle));
-        OnPropertyChanged(nameof(AutoUpdateCheckText));
+        OnPropertyChanged(nameof(UpdateFrequencyLabelText));
+        OnPropertyChanged(nameof(UpdateFrequencyOptions));
+        OnPropertyChanged(nameof(TabUpdateHeader));
 
         OnPropertyChanged(nameof(DefaultFormatText));
         OnPropertyChanged(nameof(CompressionLevelText));
@@ -1749,8 +1767,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.EnableDebugLogging = EnableDebugLogging;
         _settings.LogPrivacyMode = SelectedLogPrivacyModeOption?.Value ?? LogPrivacyMode;
 
-        // 自动更新
-        _settings.EnableAutoUpdateCheck = EnableAutoUpdateCheck;
+        // 自动更新（下拉框下标 → 持久化字符串）
+        _settings.UpdateCheckFrequency = UpdateCheckFrequencyNames.ToSetting(
+            UpdateCheckFrequencyNames.FromIndex(UpdateFrequencyIndex));
 
         // Extract
         _settings.ExtractDestination = SelectedExtractDestinationOption?.Value ?? ExtractDestination;

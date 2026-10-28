@@ -430,9 +430,14 @@ public partial class App : Application
                 await Task.Delay(TimeSpan.FromSeconds(2));
 
                 var settings = AppSettings.Load();
-                if (!settings.EnableAutoUpdateCheck)
+
+                // 频率由设置页「更新」页签决定：关闭 / 每次启动 / 每天 / 每周
+                var frequency = Models.UpdateCheckFrequencyNames.Parse(settings.UpdateCheckFrequency);
+
+                // 「关闭」= 完全不自动检查（连请求都不发，也不写检查时间，用户再次打开后能立刻检查）
+                if (frequency == UpdateCheckFrequency.Never)
                     return;
-                if (!UpdateService.ShouldCheck(settings.LastUpdateCheckTime, DateTime.UtcNow))
+                if (!UpdateService.ShouldCheck(frequency, settings.LastUpdateCheckTime, DateTime.UtcNow))
                     return;
 
                 // 调试夹具：Debug 构建可用 %LOCALAPPDATA%\MantisZip\fake-current-version.txt 覆盖比较基准
@@ -444,7 +449,7 @@ public partial class App : Application
                 var info = await UpdateService.CheckForUpdateAsync(checkVersion);
 
                 // 无更新 / 网络失败：记录检查时间后静默返回。
-                // 记录时间是必要的——否则 ShouldCheck 的 24h 节流永远不生效，每次启动都会重复请求。
+                // 记录时间是必要的——否则按频率的节流永远不生效，每次启动都会重复请求。
                 if (info is not { } update)
                 {
                     settings.LastUpdateCheckTime = DateTime.UtcNow;

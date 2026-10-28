@@ -36,14 +36,18 @@ public partial class UpdateAvailableDialog : Window
 
     // ── 只读文案（DataContext = this；x:CompileBindings="False" 走反射绑定）──
 
-    /// <summary>窗口标题 / 对话框标题「发现新版本」。</summary>
+    /// <summary>主提示「发现新版本」。</summary>
     public string DialogTitleText => LocalizationManager.T("Update_DialogTitle");
 
-    /// <summary>主提示「发现新版本 v{0}」。</summary>
-    public string SummaryText { get; }
-
-    /// <summary>「最新版本 vX.Y.Z」行。</summary>
-    public string NewVersionText { get; }
+    /// <summary>
+    /// 版本对比行「当前版本 X → 最新版本 Y」。
+    /// <para>
+    /// 旧版把「发现新版本 vX」和「最新版本 vX」分成两行，信息完全重复；
+    /// 现在合并成一行，并把「当前版本」也带上，用户才知道差在哪。
+    /// 当前版本取 <see cref="DebugUpdateVersion.Effective"/>（Debug 下可能被调试夹具覆盖）。
+    /// </para>
+    /// </summary>
+    public string VersionCompareText { get; }
 
     /// <summary>「发布于 yyyy-MM-dd」行；无发布日期时为空串。</summary>
     public string PublishDateText { get; }
@@ -55,8 +59,20 @@ public partial class UpdateAvailableDialog : Window
     public string ReleaseNotesLabelText => LocalizationManager.T("Update_ReleaseNotes");
 
     /// <summary>
-    /// 更新说明正文：<see cref="UpdateInfo"/> 不携带说明正文，这里直接给出发布页地址，
-    /// 不在对话框里额外发网络请求。
+    /// 发布说明正文（GitHub release body 的 Markdown 原文）。
+    /// 由 <see cref="MarkdownHelpContent"/> 渲染进 <c>NotesHost</c>，不走数据绑定。
+    /// </summary>
+    public string ReleaseNotesMarkdown { get; }
+
+    /// <summary>接口带回了说明正文时显示 Markdown 区。</summary>
+    public bool HasReleaseNotes => !string.IsNullOrWhiteSpace(ReleaseNotesMarkdown);
+
+    /// <summary>说明正文缺失时的回退文案（发布页地址），避免该区域整块空白。</summary>
+    public bool HasNoReleaseNotes => !HasReleaseNotes;
+
+    /// <summary>
+    /// 回退用的发布页地址：接口没给 body 时直接展示它，
+    /// 由用户在浏览器里看全文（对话框自身不发网络请求）。
     /// </summary>
     public string ReleaseNotesText { get; }
 
@@ -83,17 +99,36 @@ public partial class UpdateAvailableDialog : Window
         var releaseNotesUrl = info.ReleaseNotesUrl ?? string.Empty;
 
         // 只读文案必须在 DataContext = this 之前算好：窗口显示后没有变更通知机制
-        SummaryText = LocalizationManager.T("Update_NewVersionAvailable", latestVersion);
-        NewVersionText = LocalizationManager.T("Update_NewVersion") + " " + latestVersion;
+        var currentVersion = DebugUpdateVersion.Effective;
+        var versionCompare = LocalizationManager.T(
+            "Update_VersionCompare",
+            currentVersion,
+            latestVersion);
+        // Debug 下「当前版本」可能被调试夹具覆盖（见 Services/DebugUpdateVersion.cs）。
+        // 不补这句话，测试时会看到「当前版本 0.0.1→ 最新版本 0.5.3」而误以为版本号坏了。
+        if (DebugUpdateVersion.IsOverridden)
+        {
+            versionCompare += LocalizationManager.T("Update_DebugFakeVersionFmt", AppConstants.Version);
+        }
+
+        VersionCompareText = versionCompare;
         PublishDateText = string.IsNullOrEmpty(info.PublishDateDisplay)
             ? string.Empty
             : LocalizationManager.T("Update_PublishDate", info.PublishDateDisplay);
+        ReleaseNotesMarkdown = info.ReleaseNotes ?? string.Empty;
         // 没有发布页地址时退回「下载」文案，避免该区域出现空白
         ReleaseNotesText = releaseNotesUrl.Length > 0
             ? releaseNotesUrl
             : LocalizationManager.T("Update_Download");
 
         InitializeComponent();
+
+        // Markdown 正文直接塞进宿主：MarkdownPreviewBuilder 产出原生控件树，不需要绑定/转换器
+        if (HasReleaseNotes)
+        {
+            NotesHost.Content = new MarkdownHelpContent(ReleaseNotesMarkdown);
+        }
+
         DataContext = this;
     }
 

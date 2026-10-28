@@ -14,27 +14,83 @@ namespace MantisZip.Tests.Services;
 [Collection("UpdateServiceSerial")]
 public class UpdateServiceTests
 {
-    // ── 24 小时节流 ──
+    // ── 检查频率 ──
 
     [Fact]
-    public void ShouldCheck_Within24Hours_ReturnsFalse()
+    public void ShouldCheck_Never_ReturnsFalse_EvenWhenNeverChecked()
     {
         var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
-        Assert.False(UpdateService.ShouldCheck(now.AddHours(-23), now));
+        Assert.False(UpdateService.ShouldCheck(UpdateCheckFrequency.Never, null, now));
     }
 
     [Fact]
-    public void ShouldCheck_Over24Hours_ReturnsTrue()
+    public void ShouldCheck_Never_ReturnsFalse_EvenWhenLongOverdue()
     {
         var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
-        Assert.True(UpdateService.ShouldCheck(now.AddHours(-25), now));
+        Assert.False(UpdateService.ShouldCheck(UpdateCheckFrequency.Never, now.AddDays(-365), now));
     }
 
     [Fact]
-    public void ShouldCheck_NeverChecked_ReturnsTrue()
+    public void ShouldCheck_EveryStartup_ReturnsTrue_EvenAfterJustChecked()
     {
         var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
-        Assert.True(UpdateService.ShouldCheck(null, now));
+
+        // 每次启动都检查：刚检查过也要检查；从未检查过当然也检查
+        Assert.True(UpdateService.ShouldCheck(UpdateCheckFrequency.EveryStartup, now.AddMinutes(-1), now));
+        Assert.True(UpdateService.ShouldCheck(UpdateCheckFrequency.EveryStartup, null, now));
+    }
+
+    [Fact]
+    public void ShouldCheck_Daily_NeverChecked_ReturnsTrue()
+    {
+        var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
+        Assert.True(UpdateService.ShouldCheck(UpdateCheckFrequency.Daily, null, now));
+    }
+
+    [Fact]
+    public void ShouldCheck_Daily_23h59m_ReturnsFalse()
+    {
+        var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
+        Assert.False(UpdateService.ShouldCheck(UpdateCheckFrequency.Daily, now.AddHours(-23).AddMinutes(-59), now));
+    }
+
+    [Fact]
+    public void ShouldCheck_Daily_Exactly24h_ReturnsTrue()
+    {
+        var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
+        Assert.True(UpdateService.ShouldCheck(UpdateCheckFrequency.Daily, now.AddHours(-24), now));
+    }
+
+    [Fact]
+    public void ShouldCheck_Weekly_NeverChecked_ReturnsTrue()
+    {
+        var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
+        Assert.True(UpdateService.ShouldCheck(UpdateCheckFrequency.Weekly, null, now));
+    }
+
+    [Fact]
+    public void ShouldCheck_Weekly_6d23h_ReturnsFalse()
+    {
+        var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
+        Assert.False(UpdateService.ShouldCheck(UpdateCheckFrequency.Weekly, now.AddDays(-6).AddHours(-23), now));
+    }
+
+    [Fact]
+    public void ShouldCheck_Weekly_Exactly7d_ReturnsTrue()
+    {
+        var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
+        Assert.True(UpdateService.ShouldCheck(UpdateCheckFrequency.Weekly, now.AddDays(-7), now));
+    }
+
+    [Fact]
+    public void ShouldCheck_UndefinedFrequency_FallsBackToDaily()
+    {
+        var now = new DateTime(2026, 10, 28, 12, 0, 0, DateTimeKind.Utc);
+
+        // 枚举越界值（如将来新增档位被旧程序读到）按 Daily 处理，且绝不抛异常
+        var undefined = (UpdateCheckFrequency)42;
+        Assert.False(UpdateService.ShouldCheck(undefined, now.AddHours(-23).AddMinutes(-59), now));
+        Assert.True(UpdateService.ShouldCheck(undefined, now.AddHours(-24), now));
     }
 
     // ── GitHub API 解析 ──
@@ -69,12 +125,93 @@ public class UpdateServiceTests
             Assert.Equal(new DateTime(2026, 10, 1, 8, 0, 0, DateTimeKind.Utc), update.ReleaseDate);
             Assert.Equal(DateTimeKind.Utc, update.ReleaseDate.GetValueOrDefault().Kind);
             Assert.Equal("2026-10-01", update.PublishDateDisplay);
+            // 响应里没有 body 字段时发布说明为空串（新增参数必须向后兼容）
+            Assert.Equal(string.Empty, update.ReleaseNotes);
 
             // 请求本身也应是 GitHub 期望的形状（URL / 方法 / 必需请求头）
             Assert.Equal(HttpMethod.Get, method);
             Assert.Equal("https://api.github.com/repos/mantis3d/MantisZip/releases/latest", requestUri?.ToString());
             Assert.Equal("MantisZip/0.5.4", userAgent);
             Assert.Equal("application/vnd.github+json", accept);
+        }
+        finally
+        {
+            UpdateService.SetTestHandler(null);
+        }
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_BodyPresent_ReturnsTrimmedMarkdown()
+    {
+        const string markdown = "## 修复\n\n- 条目一";
+        try
+        {
+            // body 带首尾空白：解析处 Trim，值应与去掉空白后的原文完全一致
+            UpdateService.SetTestHandler(
+                new StubHandler(_ => JsonResponse(
+                    BuildReleaseJson("v0.5.5", bodyJson: JsonStringLiteral($"\n  {markdown}  \n")))));
+            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+
+            Assert.True(info.HasValue);
+            Assert.Equal(markdown, info.GetValueOrDefault().ReleaseNotes);
+        }
+        finally
+        {
+            UpdateService.SetTestHandler(null);
+        }
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_BodyMissing_ReturnsEmpty()
+    {
+        try
+        {
+            UpdateService.SetTestHandler(
+                new StubHandler(_ => JsonResponse(BuildReleaseJson("v0.5.5"))));
+            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+
+            Assert.True(info.HasValue);
+            Assert.Equal(string.Empty, info.GetValueOrDefault().ReleaseNotes);
+        }
+        finally
+        {
+            UpdateService.SetTestHandler(null);
+        }
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_BodyNull_ReturnsEmpty()
+    {
+        try
+        {
+            UpdateService.SetTestHandler(
+                new StubHandler(_ => JsonResponse(BuildReleaseJson("v0.5.5", bodyJson: "null"))));
+            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+
+            Assert.True(info.HasValue);
+            Assert.Equal(string.Empty, info.GetValueOrDefault().ReleaseNotes);
+        }
+        finally
+        {
+            UpdateService.SetTestHandler(null);
+        }
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_BodyTooLong_IsTruncatedTo20000()
+    {
+        var oversized = new string('x', 20050);
+        try
+        {
+            UpdateService.SetTestHandler(
+                new StubHandler(_ => JsonResponse(
+                    BuildReleaseJson("v0.5.5", bodyJson: JsonStringLiteral(oversized)))));
+            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+
+            Assert.True(info.HasValue);
+            var notes = info.GetValueOrDefault().ReleaseNotes;
+            Assert.Equal(20000, notes.Length);
+            Assert.Equal(new string('x', 20000), notes);
         }
         finally
         {
@@ -185,15 +322,30 @@ public class UpdateServiceTests
             Content = new StringContent(json, Encoding.UTF8, "application/json"),
         };
 
+    /// <summary>把文本编码成 JSON 字符串字面量（只处理测试用到的转义）。</summary>
+    private static string JsonStringLiteral(string value)
+        => "\"" + value
+            .Replace("\\", "\\\\", StringComparison.Ordinal)
+            .Replace("\"", "\\\"", StringComparison.Ordinal)
+            .Replace("\n", "\\n", StringComparison.Ordinal)
+            .Replace("\r", "\\r", StringComparison.Ordinal)
+            .Replace("\t", "\\t", StringComparison.Ordinal) + "\"";
+
     /// <summary>
     /// 构造贴近 GitHub <c>releases/latest</c> 真实形状的 JSON（只保留服务读取的字段）。
     /// </summary>
+    /// <param name="bodyJson">
+    /// <c>body</c> 字段的 JSON 片段：<c>null</c> = 整个字段缺失；<c>"null"</c> = 字段为 JSON null；
+    /// 字符串字面量 = 真实正文。
+    /// </param>
     private static string BuildReleaseJson(
         string tagName,
         bool prerelease = false,
-        string? publishedAt = "2026-10-01T08:00:00Z")
+        string? publishedAt = "2026-10-01T08:00:00Z",
+        string? bodyJson = null)
     {
         var publishedValue = publishedAt is null ? "null" : $"\"{publishedAt}\"";
+        var bodyLine = bodyJson is null ? string.Empty : $"\n  \"body\": {bodyJson},";
         return $$"""
             {
               "url": "https://api.github.com/repos/mantis3d/MantisZip/releases/1",
@@ -201,7 +353,7 @@ public class UpdateServiceTests
               "tag_name": "{{tagName}}",
               "name": "MantisZip {{tagName}}",
               "draft": false,
-              "prerelease": {{(prerelease ? "true" : "false")}},
+              "prerelease": {{(prerelease ? "true" : "false")}},{{bodyLine}}
               "created_at": "2026-10-01T07:00:00Z",
               "published_at": {{publishedValue}}
             }

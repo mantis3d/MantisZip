@@ -1428,14 +1428,7 @@
               </StackPanel>
             </Border>
 
-            <!-- 自动更新：启动时是否检查新版本（Debug Tab 内，随其它开发者选项一起） -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding UpdateSettingsSectionTitle}" FontWeight="SemiBold" />
-                <CheckBox Content="{Binding AutoUpdateCheckText}" IsChecked="{Binding EnableAutoUpdateCheck}" />
-              </StackPanel>
-            </Border>
+            <!-- 自动更新已移至独立「更新」页签（原先藏在调试页，普通用户找不到） -->
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -1636,6 +1629,30 @@
                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
                 <CheckBox Content="{Binding AdvancedCleanOnStartupText}"
                           IsChecked="{Binding CleanTempOnStartup}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 更新 ═══════ -->
+      <!-- 自动更新检测的开关与频率：与「关于 → 更新」页签同名同语义，放在设置里用户才找得到 -->
+      <TabItem Header="{Binding TabUpdateHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconArrowCircleDown">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <!-- 卡片标题：更新设置 -->
+                <TextBlock Text="{Binding UpdateSettingsSectionTitle}" FontWeight="SemiBold" />
+                <!-- 检查频率：关闭 / 每次启动 / 每天 / 每周（关闭即「从不自动检查」） -->
+                <TextBlock Text="{Binding UpdateFrequencyLabelText}" FontSize="13"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <ComboBox ItemsSource="{Binding UpdateFrequencyOptions}"
+                          SelectedIndex="{Binding UpdateFrequencyIndex}"
+                          Width="240"
+                          HorizontalAlignment="Left" />
               </StackPanel>
             </Border>
           </StackPanel>
