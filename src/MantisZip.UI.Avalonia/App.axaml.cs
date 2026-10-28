@@ -446,19 +446,21 @@ public partial class App : Application
                 if (!string.Equals(checkVersion, AppConstants.Version, StringComparison.Ordinal))
                     DebugLog($"[UpdateCheck] 使用调试假版本参与比较：{checkVersion}（真实 {AppConstants.Version}）");
 
-                var info = await UpdateService.CheckForUpdateAsync(checkVersion);
+                var result = await UpdateService.CheckForUpdateAsync(checkVersion);
 
-                // 无更新 / 网络失败：记录检查时间后静默返回。
-                // 记录时间是必要的——否则按频率的节流永远不生效，每次启动都会重复请求。
-                if (info is not { } update)
+                // 失败与「已是最新」是两种完全不同的结局（KI-008）：启动检查保持静默不打扰用户，
+                // 但必须留一条诊断线索，否则「更新提示从来没出现」将无从排查。
+                // 失败时不写检查时间 —— 让下次启动重试（一次 5s 超时的后台请求，代价可接受）。
+                if (result.IsFailed)
                 {
-                    settings.LastUpdateCheckTime = DateTime.UtcNow;
-                    settings.Save();
+                    DebugLog($"[UpdateCheck] 检查失败：{result.Reason}");
                     return;
                 }
 
-                // 用户点过「不再提示此版本」：同样静默，但仍记录检查时间
-                if (string.Equals(update.LatestVersion, settings.LastSkippedVersion, StringComparison.Ordinal))
+                // 无更新 / 用户已跳过此版本：记录检查时间后静默返回。
+                // 记录时间是必要的——否则按频率的节流永远不生效，每次启动都会重复请求。
+                if (result.Update is not { } update
+                    || string.Equals(update.LatestVersion, settings.LastSkippedVersion, StringComparison.Ordinal))
                 {
                     settings.LastUpdateCheckTime = DateTime.UtcNow;
                     settings.Save();

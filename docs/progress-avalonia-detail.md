@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 修复：更新检查无法区分「无更新 / 失败」（KI-008 关闭）
+  - **现象**：「关于 → 更新」页签点「检查更新」，断网 / DNS 失败 / 超时时显示「已是最新版本」——在最该报警的时候给了最误导的答案（用户 m03285 要求「至少要拆成无更新 / 失败两种」）。
+  - **根因**：`UpdateService.CheckForUpdateAsync` 契约是 `Task<UpdateInfo?>`，「已是最新」「HTTP 非 2xx」「网络异常」「5s 超时」四种结局全部塌缩成 `null`，调用方无从区分；`AboutWindow` 只能把 `null` 映射成 `Update_UpToDate`。
+  - **修法**：`src/MantisZip.Core/Services/UpdateCheckResult.cs` 新增三态（`UpdateCheckStatus.UpToDate / UpdateAvailable / Failed`）+ `UpdateInfo? Update` + 必非空 `Reason`，构造器私有、静态工厂 `UpToDate()/Available(update)/Failed(reason)` 守住不变量（空原因直接抛 `ArgumentException`）。`CheckForUpdateAsync` 改返回 `Task<UpdateCheckResult>`：**HTTP 404 单独归「暂无正式发布 = 已是最新」**，其余非 2xx / 超时 / 取消 / 响应格式异常一律 `Failed` 并带上原因。
+  - **UI 分支**：`Dialogs/AboutWindow.axaml.cs` 按 `result.Status` 三分支——有新版填详情；`Failed` 显示「检查更新失败」并只写 debug.log；`UpToDate` 显示「已是最新」。**失败时不再写 `LastUpdateCheckTime`**，用户再点一次就是真重试（否则会被节流挡住、看起来像按钮没反应）。`App.axaml.cs` 启动检查仍静默，但失败写 debug.log、同样不写检查时间（下次启动重试）。
+  - **回归测试**：`tests/MantisZip.Tests/Services/UpdateServiceTests.cs` 新增 7 例（5xx→Failed、404→UpToDate、坏 JSON、缺 `tag_name`、取消、`Failed("")` 抛异常、工厂不变量），并把旧的三处 `Assert.False(info.HasValue)` 按语义拆成 UpToDate / Failed；`tests/MantisZip.UI.Avalonia.Tests/AboutWindowUpdateTabTests.cs` 新增 `UpdateTab_WhenCheckFails_ShowsFailureInsteadOfUpToDate`（用 `UpdateService.SetTestHandler` 注入必失败的 `DelegatingHandler`）。
+  - **红绿验证**：把 `AboutWindow` 的 `Failed` 分支临时改成 `when false`（落到「已是最新」）⇒ 该测试变红；恢复后转绿。
+  - **顺带**：`src/MantisZip.Core/MantisZip.Core.csproj` 补 `InternalsVisibleTo("MantisZip.UI.Avalonia.Tests")`，让 UI 测试能替身化网络层（此前只对 `MantisZip.Tests` 开放）。
+  - **状态**：✅ KI-008 已关闭（`docs/KNOWN_ISSUES.md` 索引行 + 正文回填 + 档案区条目）。
+
 **2026-10-28** — 更新机制按用户反馈改四处：文案去重、检查频率可配、更新说明走 Markdown、关于窗按钮修复
   - **背景**：自动更新检测上线当天用户真机验收，提出四点——①「发现新版本」和「最新版本」是不是重复了；②设置里能不能关闭自动检查或配置检查周期；③更新说明能不能抓 GitHub 发布说明并用 Markdown 展示；④关于窗口的「检查更新」按钮也没有文字。
   - **①文案去重**：原来窗口标题、正文大标题、`SummaryText`（"发现新版本 v{0}"）、`NewVersionText`（"最新版本 …"）**四层都在说同一件事**。改为一行 `Update_VersionCompare`（"当前版本 X → 最新版本 Y"），Debug 夹具生效时追加 `Update_DebugFakeVersionFmt`（"（调试：真实版本 X）"），避免测试时把 `0.0.1` 误读成版本号坏了。

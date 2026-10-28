@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Net;
 using System.Net.Http;
 using System.Text.Json;
 using MantisZip.Core.Utils;
@@ -59,12 +60,17 @@ public static class UpdateService
     /// </summary>
     /// <param name="currentVersion">当前版本号（如 <c>0.5.4</c>，也接受带 <c>v</c> 前缀）。</param>
     /// <param name="repository">GitHub 仓库，格式 <c>owner/name</c>。</param>
-    /// <param name="cancellationToken">取消令牌；取消时返回 <c>null</c>，不抛出异常。</param>
+    /// <param name="cancellationToken">取消令牌；取消按失败处理（原因写进 <see cref="UpdateCheckResult.Reason"/>）。</param>
     /// <returns>
-    /// 仅当最新正式版严格大于当前版本时返回 <see cref="UpdateInfo"/>；
-    /// 已是最新、无正式发布、版本号无法解析、网络失败、超时、取消均返回 <c>null</c>。
+    /// 三态结局：<see cref="UpdateCheckStatus.UpdateAvailable"/>（附 <see cref="UpdateInfo"/>）、
+    /// <see cref="UpdateCheckStatus.UpToDate"/>（已是最新 / 暂无正式发布 / 最新版是预发布）、
+    /// <see cref="UpdateCheckStatus.Failed"/>（网络不可达 / 超时 / HTTP 错误 / 响应格式异常 / 取消）。
+    /// <para>
+    /// 本方法**不抛异常**：自动更新检查失败不能影响主流程，失败原因通过返回值交给调用方，
+    /// 由调用方决定是静默（启动检查）还是提示用户（关于窗手动检查）。
+    /// </para>
     /// </returns>
-    public static async Task<UpdateInfo?> CheckForUpdateAsync(
+    public static async Task<UpdateCheckResult> CheckForUpdateAsync(
         string currentVersion,
         string repository = "mantis3d/MantisZip",
         CancellationToken cancellationToken = default)
@@ -75,7 +81,7 @@ public static class UpdateService
             if (!TryParseVersion(currentVersion, out var current))
             {
                 CoreLog.Info($"[UpdateService] 当前版本号无法解析：{currentVersion}");
-                return null;
+                return UpdateCheckResult.Failed($"当前版本号无法解析：{currentVersion}");
             }
 
             using var request = new HttpRequestMessage(
@@ -89,20 +95,33 @@ public static class UpdateService
             using var response = await _client.SendAsync(request, cancellationToken);
             if (!response.IsSuccessStatusCode)
             {
-                // 404（仓库无 release）等 HTTP 错误按「无更新」处理，不视为异常
+                // 404 = 仓库还没有任何正式发布 ⇒ 语义上是「没有可更新的版本」，不是失败；
+                // 其余（401/403 限流、5xx 服务端故障）都是真失败，必须与「已是最新」区分开。
+                if (response.StatusCode == HttpStatusCode.NotFound)
+                {
+                    CoreLog.Info("[UpdateService] GitHub 返回 404（暂无正式发布）");
+                    return UpdateCheckResult.UpToDate();
+                }
+
                 CoreLog.Info($"[UpdateService] GitHub 返回 HTTP {(int)response.StatusCode}");
-                return null;
+                return UpdateCheckResult.Failed(
+                    $"GitHub 返回 HTTP {(int)response.StatusCode} {response.ReasonPhrase}");
             }
 
             var json = await response.Content.ReadAsStringAsync(cancellationToken);
             return ParseLatestRelease(json, current, repository);
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            CoreLog.Info("[UpdateService] 检查更新已取消");
+            return UpdateCheckResult.Failed("检查更新已取消");
+        }
         catch (Exception ex)
         {
-            // 网络 / 超时 / 取消 / JSON 结构异常一律兜底：自动更新检查失败不能影响主流程。
+            // 网络 / 超时 / JSON 结构异常一律兜底：自动更新检查失败不能影响主流程。
             // 注意：这里不写空 catch，诊断日志是排查「检查更新没反应」的唯一线索。
             CoreLog.Info($"[UpdateService] 检查更新失败：{ex.GetType().Name} {ex.Message}");
-            return null;
+            return UpdateCheckResult.Failed($"{ex.GetType().Name}: {ex.Message}");
         }
     }
 
@@ -147,16 +166,17 @@ public static class UpdateService
 
     /// <summary>
     /// 解析 <c>releases/latest</c> 的 JSON 响应。
-    /// 结构不合法、tag 无法解析、预发布、版本不新于当前版本时返回 <c>null</c>。
+    /// 结构不合法、tag 无法解析时返回「失败」（响应异常要能让用户知道）；
+    /// 预发布、版本不新于当前版本时返回「已是最新」。
     /// </summary>
-    private static UpdateInfo? ParseLatestRelease(string json, Version current, string repository)
+    private static UpdateCheckResult ParseLatestRelease(string json, Version current, string repository)
     {
         using var document = JsonDocument.Parse(json);
         var root = document.RootElement;
         if (root.ValueKind != JsonValueKind.Object)
         {
             CoreLog.Info("[UpdateService] 响应根节点不是 JSON 对象");
-            return null;
+            return UpdateCheckResult.Failed("响应不是 JSON 对象");
         }
 
         // /releases/latest 本身已排除 pre-release 与 draft；这里再兜底一次，
@@ -165,14 +185,14 @@ public static class UpdateService
             && prerelease.ValueKind == JsonValueKind.True)
         {
             CoreLog.Info("[UpdateService] 最新发布被标记为预发布，忽略");
-            return null;
+            return UpdateCheckResult.UpToDate();
         }
 
         if (!root.TryGetProperty("tag_name", out var tagElement)
             || tagElement.ValueKind != JsonValueKind.String)
         {
             CoreLog.Info("[UpdateService] 响应缺少 tag_name");
-            return null;
+            return UpdateCheckResult.Failed("响应缺少 tag_name");
         }
 
         var rawTag = tagElement.GetString();
@@ -180,20 +200,20 @@ public static class UpdateService
         if (!TryParseVersion(latestVersion, out var latest))
         {
             CoreLog.Info($"[UpdateService] 发布 tag 无法解析：{rawTag}");
-            return null;
+            return UpdateCheckResult.Failed($"发布 tag 无法解析：{rawTag}");
         }
 
         // 逐段数值比较（0.5.10 > 0.5.3）：相等或更旧都不提示
         if (latest.CompareTo(current) <= 0)
-            return null;
+            return UpdateCheckResult.UpToDate();
 
         var releaseUrl = $"{GitHubWebBase}/{repository}/releases/tag/v{latestVersion}";
-        return new UpdateInfo(
+        return UpdateCheckResult.Available(new UpdateInfo(
             LatestVersion: latestVersion,
             DownloadUrl: releaseUrl,
             ReleaseNotesUrl: releaseUrl,
             ReleaseDate: ParsePublishedAt(root),
-            ReleaseNotes: ParseReleaseNotes(root));
+            ReleaseNotes: ParseReleaseNotes(root)));
     }
 
     /// <summary>

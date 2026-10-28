@@ -4,10 +4,13 @@ using global::Avalonia.Themes.Fluent;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
+using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml.Styling;
 using global::Avalonia.Threading;
 using Avalonia.VisualTree;
+using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.Services;
 using Xunit;
 
 namespace MantisZip.UI.Avalonia.Tests;
@@ -76,6 +79,82 @@ public class AboutWindowUpdateTabTests
             app.Resources.MergedDictionaries.Remove(theme);
             app.Styles.Remove(fluent);
         }
+    }
+
+    /// <summary>
+    /// KI-008 的回归点：检查**失败**时必须显示「检查更新失败」，不能显示「已是最新版本」。
+    /// <para>
+    /// 改造前 <see cref="UpdateService.CheckForUpdateAsync"/> 把「无更新 / 网络失败 / 超时」全塌缩成
+    /// <c>null</c>，所以断网时「关于 → 更新」给出的答案是「已是最新」——在最该报警的时候给了
+    /// 最误导的答案。三态改造后这里锁住 UI 侧的分支。
+    /// </para>
+    /// </summary>
+    [AvaloniaFact]
+    public async Task UpdateTab_WhenCheckFails_ShowsFailureInsteadOfUpToDate()
+    {
+        var theme = new ResourceInclude(new Uri("avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml"))
+        {
+            Source = new Uri("avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml"),
+        };
+        var app = Application.Current!;
+        app.Resources.MergedDictionaries.Add(theme);
+        var fluent = new FluentTheme();
+        app.Styles.Add(fluent);
+        try
+        {
+            // 让网络层必定失败（Core 的 internal 测试钩子，见 MantisZip.Core.csproj 的 InternalsVisibleTo）
+            UpdateService.SetTestHandler(new FailingHandler());
+            try
+            {
+                var window = new AboutWindow();
+                window.Show();
+                PumpLayout(window);
+
+                var tabs = window.GetVisualDescendants().OfType<TabControl>().First();
+                tabs.SelectedIndex = 4;
+                PumpLayout(window);
+
+                var checkButton = tabs.GetVisualDescendants().OfType<Button>()
+                    .First(b => (b.Content as string)?.Contains("检查") == true);
+                checkButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                // 处理器是 async void：轮询等它把状态写出来（无头环境没有真实网络，几次调度即完成）
+                for (var i = 0; i < 100 && window.UpdateStatusText == LocalizationManager.T("Update_Checking"); i++)
+                {
+                    Dispatcher.UIThread.RunJobs();
+                    await Task.Delay(10);
+                }
+                Dispatcher.UIThread.RunJobs();
+
+                Assert.Equal(LocalizationManager.T("Update_CheckFailed"), window.UpdateStatusText);
+                Assert.NotEqual(LocalizationManager.T("Update_UpToDate"), window.UpdateStatusText);
+                window.Close();
+            }
+            finally
+            {
+                UpdateService.SetTestHandler(null);
+            }
+        }
+        finally
+        {
+            app.Resources.MergedDictionaries.Remove(theme);
+            app.Styles.Remove(fluent);
+        }
+    }
+
+    /// <summary>必定抛异常的 HTTP 桩：模拟断网 / 超时。</summary>
+    private sealed class FailingHandler : DelegatingHandler
+    {
+        public FailingHandler()
+        {
+            // 不挂 InnerHandler 时默认实现会抛 InvalidOperationException；本桩完全重写 SendAsync、永不真发包
+            InnerHandler = new HttpClientHandler();
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+            => throw new HttpRequestException("模拟断网");
     }
 
     /// <summary>

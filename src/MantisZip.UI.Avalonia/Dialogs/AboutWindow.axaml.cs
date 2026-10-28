@@ -285,30 +285,46 @@ public partial class AboutWindow : Window, INotifyPropertyChanged
             ShowLatestVersion = false;
 
             // 与启动检查共用同一解析器：Debug 下允许 fake-current-version.txt 覆盖比较基准
-            var info = await UpdateService.CheckForUpdateAsync(DebugUpdateVersion.Effective);
+            var result = await UpdateService.CheckForUpdateAsync(DebugUpdateVersion.Effective);
 
-            // 不论结果都记录本次检查时间：与设置页 / 启动检查共用同一节流字段（24h）
-            var settings = AppSettings.Load();
-            settings.LastUpdateCheckTime = DateTime.UtcNow;
-            settings.Save();
-            RefreshUpdateLastCheckText();
-
-            if (info is { } update)
+            // 成功（无论有无新版本）才记录检查时间：失败时让用户再点一次就能真的重试，
+            // 而不是被节流挡住、看起来像「按钮没反应」（KI-008 的另一面）。
+            if (!result.IsFailed)
             {
-                var latestVersion = update.LatestVersion ?? string.Empty;
-                _latest = update;
-                UpdateLatestVersionText = LocalizationManager.T("Update_NewVersion") + " " + latestVersion;
-                // 接口未给发布日期时该行为空串（不显示任何文字）
-                UpdatePublishDateText = string.IsNullOrEmpty(update.PublishDateDisplay)
-                    ? string.Empty
-                    : LocalizationManager.T("Update_PublishDate", update.PublishDateDisplay);
-                ShowLatestVersion = true;
-                SetUpdateStatus(LocalizationManager.T("Update_NewVersionAvailable", latestVersion));
+                var settings = AppSettings.Load();
+                settings.LastUpdateCheckTime = DateTime.UtcNow;
+                settings.Save();
+                RefreshUpdateLastCheckText();
             }
-            else
+
+            switch (result.Status)
             {
-                // Core 对「已是最新 / 网络失败 / 超时 / 取消」统一返回 null，UI 无法区分 → 按「已是最新」呈现
-                SetUpdateStatus(LocalizationManager.T("Update_UpToDate"));
+                case UpdateCheckStatus.UpdateAvailable when result.Update is { } update:
+                    var latestVersion = update.LatestVersion ?? string.Empty;
+                    _latest = update;
+                    UpdateLatestVersionText = LocalizationManager.T("Update_NewVersion") + " " + latestVersion;
+                    // 接口未给发布日期时该行为空串（不显示任何文字）
+                    UpdatePublishDateText = string.IsNullOrEmpty(update.PublishDateDisplay)
+                        ? string.Empty
+                        : LocalizationManager.T("Update_PublishDate", update.PublishDateDisplay);
+                    ShowLatestVersion = true;
+                    SetUpdateStatus(LocalizationManager.T("Update_NewVersionAvailable", latestVersion));
+                    break;
+
+                case UpdateCheckStatus.Failed:
+                    // 断网 / 超时 / 服务端异常：必须与「已是最新」区分开，
+                    // 否则用户会以为真的没有新版（KI-008 的原始现象）
+                    App.DebugLog($"[AboutWindow] 检查更新失败：{result.Reason}");
+                    _latest = null;
+                    ShowLatestVersion = false;
+                    SetUpdateStatus(LocalizationManager.T("Update_CheckFailed"));
+                    break;
+
+                default:
+                    _latest = null;
+                    ShowLatestVersion = false;
+                    SetUpdateStatus(LocalizationManager.T("Update_UpToDate"));
+                    break;
             }
         }
         catch (Exception ex)

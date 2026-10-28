@@ -115,10 +115,10 @@ public class UpdateServiceTests
         try
         {
             UpdateService.SetTestHandler(handler);
-            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
 
-            Assert.True(info.HasValue);
-            var update = info.GetValueOrDefault();
+            Assert.Equal(UpdateCheckStatus.UpdateAvailable, result.Status);
+            var update = result.Update.GetValueOrDefault();
             Assert.Equal("0.5.5", update.LatestVersion);
             Assert.Equal("https://github.com/mantis3d/MantisZip/releases/tag/v0.5.5", update.DownloadUrl);
             Assert.Equal(update.DownloadUrl, update.ReleaseNotesUrl);
@@ -150,10 +150,10 @@ public class UpdateServiceTests
             UpdateService.SetTestHandler(
                 new StubHandler(_ => JsonResponse(
                     BuildReleaseJson("v0.5.5", bodyJson: JsonStringLiteral($"\n  {markdown}  \n")))));
-            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
 
-            Assert.True(info.HasValue);
-            Assert.Equal(markdown, info.GetValueOrDefault().ReleaseNotes);
+            Assert.Equal(UpdateCheckStatus.UpdateAvailable, result.Status);
+            Assert.Equal(markdown, result.Update.GetValueOrDefault().ReleaseNotes);
         }
         finally
         {
@@ -168,10 +168,10 @@ public class UpdateServiceTests
         {
             UpdateService.SetTestHandler(
                 new StubHandler(_ => JsonResponse(BuildReleaseJson("v0.5.5"))));
-            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
 
-            Assert.True(info.HasValue);
-            Assert.Equal(string.Empty, info.GetValueOrDefault().ReleaseNotes);
+            Assert.Equal(UpdateCheckStatus.UpdateAvailable, result.Status);
+            Assert.Equal(string.Empty, result.Update.GetValueOrDefault().ReleaseNotes);
         }
         finally
         {
@@ -186,10 +186,10 @@ public class UpdateServiceTests
         {
             UpdateService.SetTestHandler(
                 new StubHandler(_ => JsonResponse(BuildReleaseJson("v0.5.5", bodyJson: "null"))));
-            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
 
-            Assert.True(info.HasValue);
-            Assert.Equal(string.Empty, info.GetValueOrDefault().ReleaseNotes);
+            Assert.Equal(UpdateCheckStatus.UpdateAvailable, result.Status);
+            Assert.Equal(string.Empty, result.Update.GetValueOrDefault().ReleaseNotes);
         }
         finally
         {
@@ -206,10 +206,10 @@ public class UpdateServiceTests
             UpdateService.SetTestHandler(
                 new StubHandler(_ => JsonResponse(
                     BuildReleaseJson("v0.5.5", bodyJson: JsonStringLiteral(oversized)))));
-            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
 
-            Assert.True(info.HasValue);
-            var notes = info.GetValueOrDefault().ReleaseNotes;
+            Assert.Equal(UpdateCheckStatus.UpdateAvailable, result.Status);
+            var notes = result.Update.GetValueOrDefault().ReleaseNotes;
             Assert.Equal(20000, notes.Length);
             Assert.Equal(new string('x', 20000), notes);
         }
@@ -220,15 +220,15 @@ public class UpdateServiceTests
     }
 
     [Fact]
-    public async Task CheckForUpdateAsync_SameVersion_ReturnsNull()
+    public async Task CheckForUpdateAsync_SameVersion_ReturnsUpToDate()
     {
         try
         {
             UpdateService.SetTestHandler(
                 new StubHandler(_ => JsonResponse(BuildReleaseJson("v0.5.4"))));
-            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
 
-            Assert.False(info.HasValue);
+            Assert.Equal(UpdateCheckStatus.UpToDate, result.Status);
         }
         finally
         {
@@ -237,16 +237,17 @@ public class UpdateServiceTests
     }
 
     [Fact]
-    public async Task CheckForUpdateAsync_HttpThrows_ReturnsNull()
+    public async Task CheckForUpdateAsync_HttpThrows_ReturnsFailed()
     {
         try
         {
             // 模拟网络不可达：客户端内部会把它变成 faulted task，服务必须吞掉
             UpdateService.SetTestHandler(
                 new StubHandler(_ => throw new HttpRequestException("模拟网络不可达")));
-            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
 
-            Assert.False(info.HasValue);
+            Assert.Equal(UpdateCheckStatus.Failed, result.Status);
+            Assert.NotEmpty(result.Reason);
         }
         finally
         {
@@ -255,15 +256,15 @@ public class UpdateServiceTests
     }
 
     [Fact]
-    public async Task CheckForUpdateAsync_PreRelease_ReturnsNull()
+    public async Task CheckForUpdateAsync_PreRelease_ReturnsUpToDate()
     {
         try
         {
             UpdateService.SetTestHandler(
                 new StubHandler(_ => JsonResponse(BuildReleaseJson("v0.5.5", prerelease: true))));
-            var info = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
 
-            Assert.False(info.HasValue);
+            Assert.Equal(UpdateCheckStatus.UpToDate, result.Status);
         }
         finally
         {
@@ -278,16 +279,136 @@ public class UpdateServiceTests
         {
             UpdateService.SetTestHandler(
                 new StubHandler(_ => JsonResponse(BuildReleaseJson("v0.5.10"))));
-            var info = await UpdateService.CheckForUpdateAsync("0.5.3", cancellationToken: CancellationToken.None);
+            var result = await UpdateService.CheckForUpdateAsync("0.5.3", cancellationToken: CancellationToken.None);
 
             // 字符串比较会得出 "0.5.10" < "0.5.3"，这里必须按数值逐段比较
-            Assert.True(info.HasValue);
-            Assert.Equal("0.5.10", info.GetValueOrDefault().LatestVersion);
+            Assert.Equal(UpdateCheckStatus.UpdateAvailable, result.Status);
+            Assert.Equal("0.5.10", result.Update.GetValueOrDefault().LatestVersion);
         }
         finally
         {
             UpdateService.SetTestHandler(null);
         }
+    }
+
+    // ── 失败路径（KI-008：必须与「已是最新」区分开）──
+
+    [Fact]
+    public async Task CheckForUpdateAsync_HttpServerError_ReturnsFailed()
+    {
+        try
+        {
+            // 5xx 是服务端故障，绝不能当成「已是最新」——那正是 KI-008 的核心误导
+            UpdateService.SetTestHandler(
+                new StubHandler(_ => JsonResponse("{}", HttpStatusCode.InternalServerError)));
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+
+            Assert.Equal(UpdateCheckStatus.Failed, result.Status);
+            Assert.Contains("500", result.Reason, StringComparison.Ordinal);
+            Assert.Null(result.Update);
+        }
+        finally
+        {
+            UpdateService.SetTestHandler(null);
+        }
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_HttpNotFound_ReturnsUpToDate()
+    {
+        try
+        {
+            // 404 = 仓库还没有任何正式发布，语义上是「没有可更新的版本」，不是失败
+            UpdateService.SetTestHandler(
+                new StubHandler(_ => JsonResponse("{}", HttpStatusCode.NotFound)));
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+
+            Assert.Equal(UpdateCheckStatus.UpToDate, result.Status);
+            Assert.Null(result.Update);
+        }
+        finally
+        {
+            UpdateService.SetTestHandler(null);
+        }
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_MalformedJson_ReturnsFailed()
+    {
+        try
+        {
+            UpdateService.SetTestHandler(new StubHandler(_ => JsonResponse("not-json")));
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+
+            Assert.Equal(UpdateCheckStatus.Failed, result.Status);
+            Assert.NotEmpty(result.Reason);
+        }
+        finally
+        {
+            UpdateService.SetTestHandler(null);
+        }
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_MissingTagName_ReturnsFailed()
+    {
+        try
+        {
+            UpdateService.SetTestHandler(new StubHandler(_ => JsonResponse("{\"prerelease\": false}")));
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: CancellationToken.None);
+
+            Assert.Equal(UpdateCheckStatus.Failed, result.Status);
+            Assert.Contains("tag_name", result.Reason, StringComparison.Ordinal);
+        }
+        finally
+        {
+            UpdateService.SetTestHandler(null);
+        }
+    }
+
+    [Fact]
+    public async Task CheckForUpdateAsync_Cancelled_ReturnsFailed()
+    {
+        try
+        {
+            UpdateService.SetTestHandler(
+                new StubHandler(_ => throw new OperationCanceledException("模拟用户取消")));
+            using var cts = new CancellationTokenSource();
+            await cts.CancelAsync();
+
+            var result = await UpdateService.CheckForUpdateAsync("0.5.4", cancellationToken: cts.Token);
+
+            Assert.Equal(UpdateCheckStatus.Failed, result.Status);
+            Assert.Contains("取消", result.Reason, StringComparison.Ordinal);
+        }
+        finally
+        {
+            UpdateService.SetTestHandler(null);
+        }
+    }
+
+    [Fact]
+    public void UpdateCheckResult_Failed_RequiresNonEmptyReason()
+    {
+        // 造不出「失败没原因」：空原因会让「为什么没查到更新」重新变成黑箱
+        Assert.Throws<ArgumentException>(() => UpdateCheckResult.Failed(""));
+        Assert.Throws<ArgumentException>(() => UpdateCheckResult.Failed("   "));
+        Assert.Equal("boom", UpdateCheckResult.Failed("boom").Reason);
+    }
+
+    [Fact]
+    public void UpdateCheckResult_Factories_KeepStatusInvariants()
+    {
+        Assert.True(UpdateCheckResult.UpToDate().IsUpToDate);
+        Assert.Null(UpdateCheckResult.UpToDate().Update);
+
+        var info = new UpdateInfo("1.0.0", "u", "u", null);
+        var available = UpdateCheckResult.Available(info);
+        Assert.True(available.IsUpdateAvailable);
+        Assert.Equal("1.0.0", available.Update.GetValueOrDefault().LatestVersion);
+        Assert.Equal(string.Empty, available.Reason);
+
+        Assert.True(UpdateCheckResult.Failed("x").IsFailed);
     }
 
     // ── 测试替身与数据构造 ──
