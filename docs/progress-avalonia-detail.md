@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 修复：设置窗口语言页「翻译贡献者」恒为空（`languages.json` 大小写），语言名统一为「简体中文」
+  - **症状**（用户实测）：设置窗口「语言」页切换语言时，下拉框下方那条「翻译贡献者: …」只显示冒号，后面什么都没有。
+  - **根因**：`LocalizationManager.LoadLanguageMetadata()` 用 `JsonSerializer.Deserialize<Dictionary<string, LanguageMetadata>>(json)` **默认选项**反序列化 `Resources/languages.json`。json 的键名是全小写（`name` / `translator`），目标属性是 PascalCase，而 `System.Text.Json` 默认**区分大小写** ⇒ 解析不抛异常、`Count > 0` 也成立（于是走了「读成功了」分支），但 `Name` / `Translator` 全是空串。另外 `LanguageTranslatorText` 取的是**已生效语言**（`CurrentLanguageCode`）的译者，而 `OnCultureChanged` 才刷新 ⇒ 切换下拉时那一行也不跟着变。
+  - **修法（四项）**：① 抽出 `LocalizationManager.ParseLanguageMetadata(string json)`（`internal`，便于单测），显式 `PropertyNameCaseInsensitive = true`，并在 XML 注释里写明这类「反序列化成功但字段全空」的静默坑；② 语言下拉改由 `languages.json` 驱动（`DisplayName` + `ToSettingsCode(FromSettingsCode(code))`），删掉 VM 里硬编码的「中文 / 繁體中文 / English」三条，语言名从此只有一处事实源；③ `LanguageTranslatorText` 改为取**当前所选**语言的译者（`SelectedSelectedLanguageOption`，未选时回落 `SelectedLanguage`），并新增 `OnSelectedSelectedLanguageOptionChanged` 通知 ⇒ 换下拉即见「要换成谁翻的版本」；④ `languages.json` 的 `zh.name` 与三语 `Menu_LangChinese` 统一改为「简体中文」（菜单里仍显示「中文」而设置里显示「简体中文」的割裂一并消掉）。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/LanguageMetadataTests.cs` 6 例 —— 小写键能绑定出非空 name/translator、`zh` 映射成 `zh-CN`、仓库 `languages.json` 三语 translator 非空且中文名为「简体中文」、输出目录加载后 `AvailableLanguages` 无空串（这条在修复前必红）、下拉选项来自 json 且 Value 是持久化代码、**翻译贡献者文案跟随所选语言且三档互不相同**。
+  - **验证**：avalonia Release 构建 0 警告 0 错误；UI 测试程序集 **554 例全绿**（3 Skip，新增 6 例）；`-Task i18n` 1365 key 三语一致；`-Task check` 五条守卫全绿。
+
 **2026-10-28** — 修复：删除「压缩完成后关闭对话框」死开关，新增「外观 → 进度窗口」子页签（默认钉住 📌）
   - **症状**：设置窗口「压缩 → 通用 → 压缩选项」里的「压缩完成后关闭对话框」勾选框，勾不勾都没反应 —— 压缩完成后进度窗口该怎么关还怎么关。
   - **根因**：`AppSettings.CloseAfterCompress` 从 v0.2.0（`4d43cb9c`）引入起就没接过线：全仓仅 5 处引用（XAML 2 + VM 3 + 设置模型 1），**运行时零消费者**。真正决定关窗的是 `AutoCloseDelaySeconds`（完成后自动关闭延时）+ 📌 `KeepOpenOnComplete`（失败 / 测试流 / 批处理行失败会自动压钉）。两个选项外观相同、一个生效一个不生效，用户无从分辨。

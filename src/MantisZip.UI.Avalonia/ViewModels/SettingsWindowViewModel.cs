@@ -1050,16 +1050,36 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // ── Language strings ──
     public string LanguageText => LocalizationManager.T("Settings_Language");
+
+    /// <summary>
+    /// 语言页下方的「翻译贡献者」一行：显示**下拉当前所选**语言的译者（而不是已生效语言），
+    /// 这样切换下拉即可先看到「要换成谁翻的版本」，点「确定」才真正生效。
+    /// </summary>
     public string LanguageTranslatorText
     {
         get
         {
+            var code = LanguageInfoCode(SelectedSelectedLanguageOption?.Value ?? SelectedLanguage);
             var translator = LocalizationManager.AvailableLanguages
-                .FirstOrDefault(l => l.Code == LocalizationManager.CurrentLanguageCode)?
+                .FirstOrDefault(l => string.Equals(l.Code, code, StringComparison.OrdinalIgnoreCase))?
                 .TranslatorText ?? string.Empty;
             return LocalizationManager.T("Settings_Language_Translator", translator);
         }
     }
+
+    /// <summary>
+    /// AppSettings 的语言代码（<c>zh</c> / <c>zh-TW</c> / <c>en</c>）→
+    /// <see cref="LocalizationManager.LanguageInfo.Code"/>（<c>zh-CN</c> / <c>zh-TW</c> / <c>en</c>）。
+    /// </summary>
+    private static string LanguageInfoCode(string? settingsCode) => settingsCode switch
+    {
+        "zh-TW" => "zh-TW",
+        "en" => "en",
+        _ => "zh-CN",
+    };
+
+    partial void OnSelectedSelectedLanguageOptionChanged(Option? value)
+        => OnPropertyChanged(nameof(LanguageTranslatorText));
 
     // ── Appearance strings ──
     public string AppearanceThemeText => LocalizationManager.T("Settings_Appearance_Theme");
@@ -1289,10 +1309,15 @@ public partial class SettingsWindowViewModel : ObservableObject
         PickerTabOptions.Add(new Option(LocalizationManager.T("QuickPath_TabTree"), nameof(PathTab.Tree)));
 
         SelectedLanguageOptions.Clear();
-        SelectedLanguageOptions.Add(new Option("中文", "zh"));
-        // 语言名显示其本族原生名（豁免本地化，与「中文」/「English」一致）
-        SelectedLanguageOptions.Add(new Option("繁體中文", "zh-TW"));
-        SelectedLanguageOptions.Add(new Option("English", "en"));
+        // 语言名显示其本族原生名（豁免本地化，如「简体中文」/「繁體中文」/「English」），
+        // 唯一事实源是 Resources/languages.json 的 name 字段；Value 仍用 AppSettings 的持久化代码
+        // （zh / zh-TW / en），保证既有 settings.json 里的 Language 值能对上。
+        foreach (var info in LocalizationManager.AvailableLanguages)
+        {
+            var display = string.IsNullOrWhiteSpace(info.DisplayName) ? info.Code : info.DisplayName;
+            var value = LocalizationManager.ToSettingsCode(LocalizationManager.FromSettingsCode(info.Code));
+            SelectedLanguageOptions.Add(new Option(display, value));
+        }
 
         LogPrivacyModeOptions.Clear();
         LogPrivacyModeOptions.Add(new Option(LogPrivacyModeOffText, "off"));
