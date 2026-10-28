@@ -10,8 +10,8 @@
   - **症状**（用户实测）：「外观 → 进度窗口 → 完成后自动关闭延时」是个普通输入框，可以输入任意字符，敲进去之后控件下方出现一条红色报错文本。
   - **根因**：这些输入框都是普通 `TextBox` 直绑 `int` / `long` 属性（`AutoCloseDelaySeconds`、`MaxRecentFiles`、`MaxTablePreviewRows`、`MaxTablePreviewCols`、`DoubleClickOpenThresholdMB`、元数据面板的 `Row` / `Order`）。用户输入非数字时绑定转换失败，Avalonia 默认 `DataValidationErrors` 模板就在控件下方渲染转换异常文本（红色）。同一个坑在设置窗口有 7 处，只是延时那格最容易被随手乱敲。
   - **修法**：数字项统一改用 `NumericUpDown Classes="intOnly"`（该样式早已在 `App.axaml` 里定义：`ParsingNumberStyle=Integer` + `FormatString={}{0:0}`，用于并行线程数），并补上各自合理区间 —— 延时 `0..60`（与保存时的 `Math.Clamp(…, 0, 60)` 对齐）、最近文件数 `1..100`、表格预览行 `1..5000` / 列 `1..500`、双击阈值 MB `0..102400`、元数据 `Row`/`Order` 只限 `≥0`。元数据行因为多了微调按钮，列宽 80 → 90。非法输入从此进不了绑定，红色文本不再出现。
-  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/SettingsNumericInputTests.cs` 2 例 —— ① 源码守卫：`SettingsWindow.axaml` 里这 7 个属性**只能**用 `Value="{Binding X"`（禁止退回 `Text="{Binding X}"`），且必须挂 `.intOnly`；② 行为：`NumericUpDown` 被塞进 `"abc"` 时 `DataValidationErrors.GetHasErrors` 为 false、值仍落在合法区间，塞 `"15"` 能正常解析回 15。
-  - **验证**：avalonia Release 构建 0 警告 0 错误；UI 测试程序集 **556 例全绿**（3 Skip，新增 2 例）；`-Task check` 五条守卫全绿。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/SettingsNumericInputTests.cs` 3 例 —— ① 源码守卫：`SettingsWindow.axaml` 里这 7 个属性**只能**用 `Value="{Binding X"`（禁止退回 `Text="{Binding X}"`），且必须挂 `.intOnly`；② 行为：`NumericUpDown` 被塞进 `"abc"` 时 `DataValidationErrors.GetHasErrors` 为 false、值仍落在合法区间，塞 `"15"` 能正常解析回 15；③ `decimal?` 与 `long` 双向绑定可用（双击阈值走的是 `long`，靠 Avalonia 隐式数值转换）。
+  - **验证**：avalonia Release 构建 0 警告 0 错误；UI 测试程序集 **557 例全绿**（3 Skip，新增 3 例）；`-Task check` 五条守卫全绿。
 
 **2026-10-28** — 修复：设置窗口语言页「翻译贡献者」恒为空（`languages.json` 大小写），语言名统一为「简体中文」
   - **症状**（用户实测）：设置窗口「语言」页切换语言时，下拉框下方那条「翻译贡献者: …」只显示冒号，后面什么都没有。

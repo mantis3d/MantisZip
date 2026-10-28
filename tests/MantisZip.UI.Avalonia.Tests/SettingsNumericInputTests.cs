@@ -1,3 +1,4 @@
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.Threading;
@@ -75,6 +76,58 @@ public class SettingsNumericInputTests
         Assert.Equal(15, up.Value);
 
         host.Close();
+    }
+
+    /// <summary>
+    /// NumericUpDown 的 <c>Value</c> 是 <c>decimal?</c>，而设置项里有 <c>long</c>（双击阈值字节数）。
+    /// 双向绑定靠 Avalonia 的隐式数值转换，这条用例把「decimal? ↔ long」钉死，避免哪天静默失灵。
+    /// </summary>
+    [AvaloniaFact]
+    public void NumericUpDown_TwoWayBinding_ToLongProperty_Works()
+    {
+        var vm = new LongHolder { Bytes = 1024 * 1024 };
+        var up = new NumericUpDown
+        {
+            ParsingNumberStyle = System.Globalization.NumberStyles.Integer,
+            Minimum = 0,
+            DataContext = vm,
+        };
+        up.Bind(NumericUpDown.ValueProperty,
+            new global::Avalonia.Data.Binding(nameof(LongHolder.Bytes)) { Mode = global::Avalonia.Data.BindingMode.TwoWay });
+
+        var host = new Window { Content = up };
+        host.Show();
+        Dispatcher.UIThread.RunJobs();
+
+        // 控件 → 模型
+        up.Value = 42;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(42L, vm.Bytes);
+
+        // 模型 → 控件
+        vm.Bytes = 7L;
+        Dispatcher.UIThread.RunJobs();
+        Assert.Equal(7m, up.Value);
+
+        host.Close();
+    }
+
+    /// <summary>绑定时用的最小可观察对象（只测绑定转换，不需要 AvaloniaProperty）。</summary>
+    private sealed class LongHolder : System.ComponentModel.INotifyPropertyChanged
+    {
+        private long _bytes;
+
+        public event System.ComponentModel.PropertyChangedEventHandler? PropertyChanged;
+
+        public long Bytes
+        {
+            get => _bytes;
+            set
+            {
+                _bytes = value;
+                PropertyChanged?.Invoke(this, new System.ComponentModel.PropertyChangedEventArgs(nameof(Bytes)));
+            }
+        }
     }
 
     private static string ReadRepoFile(string relativePath)
