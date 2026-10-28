@@ -47,10 +47,16 @@ jobs:
           Write-Host "publish_output exists: $(Test-Path publish_output)"
           Write-Host "publish_output_selfcontained exists: $(Test-Path publish_output_selfcontained)"
 
+      # 注意：这两个 publish 步骤**不能**加 --no-restore。
+      # PublishReadyToRun 要求在 restore 阶段就带上 RID 与 PublishReadyToRun=true，才会拉取
+      # runtime pack（Microsoft.NETCore.App.Runtime.win-x64）；而上面的 dotnet restore 是
+      # 框架无关的朴素还原，拿不到该 pack —— 直接 --no-restore 会让 publish 报
+      # NETSDK1094（Unable to optimize assemblies for performance: a valid runtime package was not found）。
+      # 故让 publish 自己按实际参数还原一次（约 +10s）。
       - name: Publish (framework-dependent, x64)
         run: >
           dotnet publish src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
-          --no-restore --configuration Release
+          --configuration Release
           --runtime win-x64
           --output publish_output
           -p:DebugType=portable
@@ -60,7 +66,7 @@ jobs:
       - name: Publish (self-contained, x64)
         run: >
           dotnet publish src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj
-          --no-restore --configuration Release
+          --configuration Release
           --runtime win-x64 --self-contained
           --output publish_output_selfcontained
           -p:DebugType=portable
