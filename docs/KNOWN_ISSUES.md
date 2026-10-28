@@ -32,6 +32,7 @@
 | **KI-006** | `.jar/.war/.ear/.apk` 能打开但**不参与文件关联**（也不进右键菜单/设置页关联列表） | 功能留白 | 缺决策 + 成本 | 用户反馈「想在资源管理器里双击/右键打开 jar」时；或做「关联格式可勾选」设置项时 | 阻塞中 |
 | **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 交互 / 文案 | 缺决策 | 已修复（三态契约，2026-10-28） | 已修复 |
+| **KI-009** | 5 个 AppSettings 死开关（存了值、有 UI、无消费者） | 技术债 / 死代码 | 缺决策 | 决定这 5 项的去留（接线 / 删属性 / 删 UI）时；守卫豁免表已按名登记，修一个删一行 | 阻塞中 |
 
 ---
 
@@ -120,6 +121,16 @@
 
 ---
 
+## KI-009 5 个 `AppSettings` 死开关（存了值、有 UI、无运行时消费者）
+
+- **发现**：2026-10-28（写规则 23 的 `settingswiring` 守卫时全量扫出）
+- **现象**：`src\MantisZip.UI.Avalonia\Models\AppSettings.cs` 有 112 个 public 属性，其中 5 个「有持久化、设置窗口有读写、但 `src/` 里没有任何运行时消费者」——用户改了它、重启后还是它，但程序行为完全不变：`ExtractDestination`、`EnableExtractMenu`、`EnableQuickCompress`、`ShowPasswordMatchNotification`、`FavoritePaths`。（同期修掉的那个「压缩完成后关闭对话框」也是同一类，已删除。）
+- **证据**：`pwsh -File scripts\verify-repo.ps1 -Task guards` 的 `settingswiring` 守卫原本对这 5 项判红；豁免表 `$SETTINGS_WIRING_EXEMPT`（`scripts\verify-repo.ps1:946-952`）逐条记了原因，例如 `ExtractDestination` 的注释写明「解压目标实际由 `CustomFilePickerDialog` 的初始路径决定」，`FavoritePaths` 的注释写明「收藏路径实际走 Core 的 `FavoritePathManager`」。
+- **为什么现在不修**：**缺决策**。每一项都要先回答「这项设置还要不要」：要 → 补运行时消费者（`ExtractDestination` 需接进解压流程、`EnableExtractMenu`/`EnableQuickCompress` 需补菜单项）；不要 → 删属性 + 删设置窗口 UI + 删三语 key（与 2026-10-28 删「压缩完成后关闭对话框」是同一套动作，但删 5 项涉及设置页三处）。这不是技术难，是产品取舍。
+- **复评条件**：① 决定这 5 项去留时；② 或下次改设置窗口/解压流程时顺带清理（修掉一个必须从豁免表删一行，守卫会反向核对）。
+- **关联**：`AGENTS.md` 规则 23「设置项」一行；`scripts\verify-repo.ps1` 的 `Test-GuardSettingsWiring`。
+
+- **状态**：阻塞中
 ## 档案区（已修 / 不会修）
 
 > 修掉或决定放弃的条目移到这里，**保留 commit 或理由**。不要删行 —— 下次撞到同一个栈，靠这里判断「上次怎么处理的」。

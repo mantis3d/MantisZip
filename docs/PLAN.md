@@ -48,7 +48,7 @@
 
 ---
 
-## A 档 —— 下一轮（约 61-74h，分两个阶段交付；不是一轮，是「接下来的两轮半」）
+## A 档 —— 下一轮（约 71-88h，分两个阶段交付；不是一轮，是「接下来的两轮半」）
 
 > **为什么这样切（2026-10-28 定）**：A1 把「重命名」和「暂存区」放一起，是因为它们改的是**同一批引擎文件**（`src/MantisZip.Core/Utils/ZipBinaryRewriter.cs`、`src/MantisZip.Core/Abstractions/ArchiveEngine.cs`、`ZipEngine.*`、`SevenZipEngine.cs`），都要处理 copy-mode 偏移重算、加密包不落明文、失败不破坏原件——分两次做等于同一批代码开两次刀、跑两轮全量回归。A2 前期是「每天看得见的体验 + 体积」，末尾用「小活清仓」当缓冲池（进度紧就砍尾部）。
 
@@ -62,15 +62,17 @@
 
 > **A1 验收口径**：改一个名字、或一次删/改 20 个条目，都不再让整包反复重写；ZIP 走 copy-mode 只改名字节、压缩数据原样搬运，7z 只碰被改条目，加密包改名不掉明文，tar.gz 明确报不支持；winget 能装。
 
-### 阶段 A2 —— 导航、瘦身与小活（约 40-46h）
+### 阶段 A2 —— 导航、瘦身与小活（约 50-60h）
 
-> **内部顺序**：先做三条主线（约 15-21h，可独立发一版），再跑「小活清仓」批次（25h，缓冲池）。
+> **内部顺序**：先做四条主线（约 25-35h，可独立发一版），再跑「小活清仓」批次（25h，缓冲池）。
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
 | 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。📋 2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） **A2 第一项** |
 | 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/进行中/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。**单独排在 A 档的理由**：三者都是「本来就在解析完整文档」，省下的只是落盘，用户感知最弱，且逐库确认 Stream 支持最费时 |
 | 自包含体积优化（第一步） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 📋 **目标已改写**：原「降至 20–25MB」与现有依赖（SkiaSharp / ImageSharp / OpenXml / Sqlite / PdfPig / WebView）矛盾，激进修剪会打穿预览。改为**第一步只做测量基线 + 验证保守修剪可行性**，目标区间 60–90MB。若确认只发 SelfContained 包，这一步的收益优先级上调 |
+| AXAML 编译期绑定（渐进式开启 x:CompileBindings） | [axaml-compiled-bindings.md](.omo/plans/未开始/axaml-compiled-bindings.md) | 🟡中 | **10-14h** | 现状 **50 个 .axaml，只有 1 个开编译绑定、13 个有 x:DataType** ⇒ 属性名写错 / 类型不匹配全部只在运行期表现为「没值」「红字校验文本」「永远默认值」。渐进三批推进（已有 x:DataType 的 13 个先试水 → 补类型 → 主力窗口 + 门禁），LocalizedStrings[Key] 等表达力不足处保留运行时绑定并登记原因。配 -Task guards 第 9 条 compilebindings（只约束新增与已迁移文件，存量不判红），收益是「接线错了构建就报错」 |
+
 
 ### 小活清仓（A2 阶段末尾，批量 8 项，合计约 25h，可裁剪）
 
