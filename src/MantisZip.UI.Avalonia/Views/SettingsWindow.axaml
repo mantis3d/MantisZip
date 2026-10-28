@@ -554,11 +554,15 @@
                 <Grid ColumnDefinitions="Auto,*">
                   <TextBlock Text="{Binding ExtractDoubleClickThresholdText}"
                              VerticalAlignment="Center" Margin="0,0,8,0" />
-                  <TextBox Grid.Column="1" Text="{Binding DoubleClickOpenThresholdMB}"
-                           Width="80" HorizontalAlignment="Left"
-                           Background="{DynamicResource ThemeWindowBgBrush}"
-                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  <!-- 阈值单位 MB，整数输入用 NumericUpDown（避免 TextBox 绑 long 时敲字母产生红色校验文本） -->
+                  <NumericUpDown Classes="intOnly"
+                                 Grid.Column="1"
+                                 Minimum="0" Maximum="102400" Increment="1"
+                                 Value="{Binding DoubleClickOpenThresholdMB, Mode=TwoWay}"
+                                 Width="120" HorizontalAlignment="Left"
+                                 Background="{DynamicResource ThemeWindowBgBrush}"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
                 </Grid>
               </StackPanel>
             </Border>
@@ -728,11 +732,14 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding AppearanceMaxRecentFilesText}" FontWeight="SemiBold" />
-                      <TextBox Text="{Binding MaxRecentFiles}"
-                               Width="120" HorizontalAlignment="Left"
-                               Background="{DynamicResource ThemeWindowBgBrush}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      <!-- 整数输入用 NumericUpDown（避免 TextBox 绑 int 时敲字母产生红色校验文本） -->
+                      <NumericUpDown Classes="intOnly"
+                                     Minimum="1" Maximum="100" Increment="1"
+                                     Value="{Binding MaxRecentFiles, Mode=TwoWay}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Background="{DynamicResource ThemeWindowBgBrush}"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
                     </StackPanel>
                   </Border>
 
@@ -766,11 +773,15 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding AppearanceAutoCloseDelayText}" FontWeight="SemiBold" />
-                      <TextBox Text="{Binding AutoCloseDelaySeconds}"
-                               Width="120" HorizontalAlignment="Left"
-                               Background="{DynamicResource ThemeWindowBgBrush}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      <!-- 整数输入用 NumericUpDown（.intOnly 见 App.axaml）：普通 TextBox 绑 int 时，
+                           用户敲字母会让绑定转换失败，Avalonia 默认模板在下方渲染一条红色报错文本。 -->
+                      <NumericUpDown Classes="intOnly"
+                                     Minimum="0" Maximum="60" Increment="1"
+                                     Value="{Binding AutoCloseDelaySeconds, Mode=TwoWay}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Background="{DynamicResource ThemeWindowBgBrush}"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
                       <!-- 说明：仅未钉住且未出错时生效（钉住时仍可编辑，只提示不生效） -->
                       <TextBlock Text="{Binding AppearanceAutoCloseDelayHelpText}"
                                  TextWrapping="Wrap"
@@ -1064,11 +1075,14 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewTableMaxRowsText}" FontWeight="SemiBold" />
-                      <TextBox Text="{Binding MaxTablePreviewRows}"
-                               Width="120" HorizontalAlignment="Left"
-                               Background="{DynamicResource ThemeWindowBgBrush}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      <!-- 整数输入用 NumericUpDown（避免 TextBox 绑 int 时敲字母产生红色校验文本） -->
+                      <NumericUpDown Classes="intOnly"
+                                     Minimum="1" Maximum="5000" Increment="1"
+                                     Value="{Binding MaxTablePreviewRows, Mode=TwoWay}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Background="{DynamicResource ThemeWindowBgBrush}"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
                     </StackPanel>
                   </Border>
 
@@ -1076,11 +1090,14 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewTableMaxColsText}" FontWeight="SemiBold" />
-                      <TextBox Text="{Binding MaxTablePreviewCols}"
-                               Width="120" HorizontalAlignment="Left"
-                               Background="{DynamicResource ThemeWindowBgBrush}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      <!-- 整数输入用 NumericUpDown（避免 TextBox 绑 int 时敲字母产生红色校验文本） -->
+                      <NumericUpDown Classes="intOnly"
+                                     Minimum="1" Maximum="500" Increment="1"
+                                     Value="{Binding MaxTablePreviewCols, Mode=TwoWay}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Background="{DynamicResource ThemeWindowBgBrush}"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
                     </StackPanel>
                   </Border>
                 </StackPanel>
@@ -1117,7 +1134,7 @@
                 <ScrollViewer Grid.Row="2" Background="{DynamicResource ThemeWindowBgBrush}">
                   <StackPanel>
                     <!-- Header -->
-                    <Grid ColumnDefinitions="*,80,80,110" Margin="4,4,4,2">
+                    <Grid ColumnDefinitions="*,90,90,110" Margin="4,4,4,2">
                     <TextBlock Grid.Column="0" Text="{Binding MetadataPanelSettings.ColumnFieldText}" FontWeight="SemiBold" FontSize="11"
                                Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                     <TextBlock Grid.Column="1" Text="{Binding MetadataPanelSettings.ColumnRowText}" FontWeight="SemiBold" FontSize="11"
@@ -1134,27 +1151,31 @@
                         <DataTemplate>
                           <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1"
                                   Padding="4,4">
-                            <Grid ColumnDefinitions="*,80,80,130">
+                            <Grid ColumnDefinitions="*,90,90,130">
                               <!-- Field name -->
                               <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
                                          VerticalAlignment="Center"
                                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-                              <!-- Row -->
-                              <TextBox Grid.Column="1" Text="{Binding Row}"
-                                       Width="50" HorizontalContentAlignment="Center"
-                                       Background="{DynamicResource ThemeWindowBgBrush}"
-                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
-                                       Height="24" HorizontalAlignment="Center" />
+                              <!-- Row：整数输入用 NumericUpDown（TextBox 绑 int 时敲字母会出红色校验文本） -->
+                              <NumericUpDown Classes="intOnly"
+                                             Grid.Column="1"
+                                             Minimum="0" Increment="1"
+                                             Value="{Binding Row, Mode=TwoWay}"
+                                             Width="64" Height="26" HorizontalAlignment="Center"
+                                             Background="{DynamicResource ThemeWindowBgBrush}"
+                                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                             BorderBrush="{DynamicResource ThemeBorderBrush}" />
 
-                              <!-- Order -->
-                              <TextBox Grid.Column="2" Text="{Binding Order}"
-                                       Width="50" HorizontalContentAlignment="Center"
-                                       Background="{DynamicResource ThemeWindowBgBrush}"
-                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
-                                       Height="24" HorizontalAlignment="Center" />
+                              <!-- Order：同上 -->
+                              <NumericUpDown Classes="intOnly"
+                                             Grid.Column="2"
+                                             Minimum="0" Increment="1"
+                                             Value="{Binding Order, Mode=TwoWay}"
+                                             Width="64" Height="26" HorizontalAlignment="Center"
+                                             Background="{DynamicResource ThemeWindowBgBrush}"
+                                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                             BorderBrush="{DynamicResource ThemeBorderBrush}" />
 
                               <!-- Position -->
                               <ComboBox Grid.Column="3" ItemsSource="{Binding PositionOptions}"
