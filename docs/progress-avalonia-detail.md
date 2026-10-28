@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 更新机制按用户反馈改四处：文案去重、检查频率可配、更新说明走 Markdown、关于窗按钮修复
+  - **背景**：自动更新检测上线当天用户真机验收，提出四点——①「发现新版本」和「最新版本」是不是重复了；②设置里能不能关闭自动检查或配置检查周期；③更新说明能不能抓 GitHub 发布说明并用 Markdown 展示；④关于窗口的「检查更新」按钮也没有文字。
+  - **①文案去重**：原来窗口标题、正文大标题、`SummaryText`（"发现新版本 v{0}"）、`NewVersionText`（"最新版本 …"）**四层都在说同一件事**。改为一行 `Update_VersionCompare`（"当前版本 X → 最新版本 Y"），Debug 夹具生效时追加 `Update_DebugFakeVersionFmt`（"（调试：真实版本 X）"），避免测试时把 `0.0.1` 误读成版本号坏了。
+  - **②检查频率可配**：Core 新增 `src/MantisZip.Core/Services/UpdateCheckFrequency.cs`（`Never` / `EveryStartup` / `Daily` / `Weekly`），`UpdateService.ShouldCheck(frequency, lastCheckTime, nowUtc)` 取代原来写死的 24h（越界枚举按 `Daily` 兜底、`Never` 恒 false）。设置项原先藏在**「调试」页签**里，现提升为独立的「更新」页签 + 下拉（关闭 / 每次启动 / 每天 / 每周）。`AppSettings.EnableAutoUpdateCheck`（bool）换成 `UpdateCheckFrequency`（字符串存枚举名：设置文件可读可手改、改枚举顺序也不会读歪；v0.5.4 未发布故不留迁移）。选 `Never` 时**连 `LastUpdateCheckTime` 都不写**，用户重新打开后能立刻检查。
+  - **③更新说明走 Markdown**：`UpdateInfo` 追加 `ReleaseNotes`，`UpdateService.ParseLatestRelease` 解析 release `body`（Trim 后截断 20000 字符）；对话框内嵌 `MarkdownHelpContent`（外包 `Border MaxHeight=220`，可滚动），接口没给 body 时回退显示发布页地址。安全点：`MarkdownPreviewBuilder` 对图片/链接只渲染 URL 文本、**不联网、无点击跳转**，外部内容进对话框不会拉远程资源。
+  - **④关于窗按钮**：「检查更新」「打开发布页」两个按钮本地写了 `Padding="{DynamicResource SpacingXsThk}"`（8,8,8,8）而高度只有 `ControlHeight`=28 ⇒ 只剩 12px 文字区，与前一版提示框按钮同一缺陷。删掉本地 `Padding`，回到全局 `Button` 样式的 `8,4`。
+  - **顺带修（同型资源缺陷）**：`ThemeLight.axaml` / `ThemeDark.axaml` 的 `BorderRadius` 也声明成 `<sys:Double>`，改为 `<CornerRadius>`。这两处此前只因 `App.Theming.ApplyCompactness()` 运行时覆盖同键才没炸；测试并入主题资源后立刻抛 `InvalidCastException`。
+  - **测试**：`tests/MantisZip.UI.Avalonia.Tests/UpdateAvailableDialogTests.cs` 扩到 4 例（版本对比行同时含当前与最新、Markdown 正文渲染出标题与列表项、无 body 回退 URL、按钮几何）；新增 `tests/MantisZip.UI.Avalonia.Tests/AboutWindowUpdateTabTests.cs`（关于窗 5 个页签、切到更新页后可见按钮文字非空且「高度 − 上下内边距 ≥ 8px」）。踩坑三条已写进用例注释：①测试命名空间 `MantisZip.UI.Avalonia.Tests` 让 `Avalonia.` 前缀先命中 `MantisZip.UI.Avalonia`，新增 using 必须写 `global::Avalonia.…`；②切页签后内容控件下一轮布局才排布，要跑几轮 `Measure`/`Arrange`/`UpdateLayout`/`RunJobs`，否则拿到 `Bounds=0`；③隐藏详情块里的按钮 `Bounds` 恒为 0，几何断言必须按 `IsEffectivelyVisible` 过滤。
+  - **验证**：Release 构建 0 警告；Core tests **893 通过 / 3 跳过**；ui-tests Release 全绿；`-Task check` = 0.5.4 六处 + 三语 **1361** key + 守卫 **5/5**。真机截图确认提示框为「当前版本 0.0.1 → 最新版本 0.5.3（调试：真实版本 0.5.4）/ 发布于 2026-10-28 / 更新说明（Markdown 正文可滚动）/ 下载 · 稍后提醒 · 不再提示此版本」。
+
 **2026-10-28** — 调试夹具：Debug 版可用「假当前版本」验证更新提示链路；修复提示框按钮无文字
   - **背景**：开发者本地的版本号永远高于线上最新版，`UpdateService` 的「发现新版本」这条链路在开发机上永远走不到，只能靠改 `AppConstants.Version`（会弄红 `-Task version` 的六处校验）或伪造远端响应。用户要求「Debug 加一个假版本开关，检测更新时用手动设置的假版本号覆盖本地真实版本」，于是做成开关文件而不是改版本号。
   - **修法（调试夹具）**：新增 `src/MantisZip.UI.Avalonia/Services/DebugUpdateVersion.cs`（`internal static`）：`Effective` 在 Debug 下读 `Path.Combine(AppSettings.DataDir, "fake-current-version.txt")`，内容经 `Version.TryParse` 通过才采用（非法内容只记日志、回退真实版本）；Release 分支整段编译掉、恒返回 `AppConstants.Version`。`IsOverridden` 供「关于」窗口显示「（调试：真实版本 0.5.4）」提示，避免把「0.0.1 发现新版 v0.5.3」误读成版本号坏了。两处检查调用点（`App.axaml.cs` 启动检查、`AboutWindow.axaml.cs` 手动检查）都改用 `Effective`，仍走真实 GitHub API。文件位置随便携模式变（普通模式 `%LOCALAPPDATA%\MantisZip\`，便携模式 `exe 旁 Data\`）。

@@ -154,6 +154,7 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 3. **`target` 字段显式传参（`-TargetName`）**：旧实现靠 PowerShell 动态作用域捕获脚本级 `$Target`，函数一挪或加同名 `param` 就静默变空串。
 4. **MTP 兜底不追加任何 dotnet/MSBuild 参数**：`dotnet exec <assembly>` 之后的参数交给测试程序集自己解析，`-nologo` / `-c Release` 会被 xunit 当未知选项。
 5. **兜底的触发条件必须三条同时成立**：失败 + 0 条编译诊断 + 输出里没有 `Passed!`/`Failed!`/`Total: N` 汇总行。少任何一条都会掩盖真实失败（编译错误或用例失败不触发）。
+6. **主题资源里的 `Thickness` / `CornerRadius` 必须声明成对应类型，不能图省事写成 `<sys:Double>`**：`ThemeLight.axaml` / `ThemeDark.axaml` 里 `DialogPadding`、`BorderRadius` 都曾声明为 `sys:Double`，生产环境只因 `App.Theming.ApplyCompactness()` 启动时用 `Resources["DialogPadding"] = new Thickness(...)`、`Resources["BorderRadius"] = new CornerRadius(...)` 覆盖同键才没炸。任何在 `ApplyCompactness()` **之前**用这两个键的地方（典型是无头测试手工并入主题字典）会直接抛 `InvalidCastException: Unable to cast object of type 'System.Double' to type 'Avalonia.Thickness'`。同理 `SpacingXxsThk`…`SpacingXlThk` 六个变体必须真的以 `<Thickness>` 存在于静态字典（运行时注入只覆盖启动之后）。
 
 ## 8. 环境坑（跨机器复现过的）
 
@@ -167,6 +168,8 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 | git 报 `LF will be replaced by CRLF` | 仓库统一 CRLF：索引 LF / 工作区 CRLF（`.gitattributes` + `.editorconfig`）。新增二进制记得加进 `.gitattributes` 的 `binary` 组 |
 | 三份 `strings.*.json` 带 BOM | 与 `.editorconfig` 的 `[*.json] charset = utf-8-bom` 一致，**不要**改成无 BOM（规则 13 已在 2026-10-22 改为「UTF-8 with BOM」，此前写的「无 BOM」是过期表述） |
 | 改了 `installer*.iss` 本机却没法验证 | 本机没有 ISCC（Inno Setup 编译器），`ci.yml` 也**不编译**安装包——只有 `release.yml` 打 tag 时才 `choco install innosetup` 后编译。所以 `.iss` 的语法/API 错误只能等首次发版暴露；改完至少要人工核对结构（`[Code]` 的 `begin`/`end` 计数、`[CustomMessages]` 中英成对、两个脚本的 AppId 保持一致），必要时在 beta 上推一个测试 tag 验证 |
+| 测试里写 `Avalonia.Themes.Fluent.FluentTheme` 报 `CS0234: 命名空间"MantisZip.UI.Avalonia"中不存在类型或命名空间名"Themes"` | 命名空间遮蔽：测试命名空间是 `MantisZip.UI.Avalonia.Tests`，简单名 `Avalonia` 会先解析成 `MantisZip.UI.Avalonia`。新增 `using` 必须写成 `global::Avalonia.Themes.Fluent;`（`Avalonia.Controls.Documents.Run` 同理） |
+| 无头测试里改 `TabControl.SelectedIndex` 后拿到的控件 `Bounds` 全是 0 | 页签内容控件在下一轮布局/调度才生成并排布：要循环 `Measure` → `Arrange` → `UpdateLayout()` → `Dispatcher.UIThread.RunJobs()` 数轮。另外被隐藏的分区（`IsEffectivelyVisible == false`，例如「还没有检查结果」时的详情块）里的按钮 `Bounds` 恒为 0，几何断言必须按**有效可见性**过滤，不能用 `IsVisible` |
 
 ## 9. 还没做的（有意留白，不是忘了）
 
