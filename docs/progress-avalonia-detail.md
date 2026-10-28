@@ -13,6 +13,7 @@
   - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/PathCollectorPipeTests.cs`（进程内起 `StartPipeServer`，两次 `SendPathsThroughPipe` 验证合并、去重、丢弃不存在的路径）。
   - **验证**：avalonia Release 构建 0 警告；`test -Target tests`（2 条存量警告）与 `test -Target ui-tests`（28 条存量警告）全绿。
   - **追加（用户实测）**：多选解压合并成功后，splash 显示的仍是「其中一个压缩包的名字」——启动期文案由 `Program.SplashTextSpec` 按本进程命令行决定，而静态层叠菜单是逐项启动进程的，首实例只有 1 个路径、并不知道后面还有几个；现改为启动期中性文案（复用 `Status_Extracting`「正在解压...」），收集结束后由新增的 `App.CollectedSplashTextSpec` + `NativeSplash.UpdateText`（改 `_text` 后 `InvalidateRect` 重绘，跨线程安全）更新为「正在解压 N 个压缩包…」，只收到 1 个则补回文件名（`Status_ExtractingFmt`）。测试：`SplashTextSpecTests` 覆盖启动期中性文案 + 收集后 1 个 / N 个两种 spec。
+  - **追加（用户实测）**：文件名较长时文本会顶到 splash 左右边缘（「挤满整个宽度」）→ 布局加左右最小留白 `padX = 16 × DPI`；绘制里的算术抽成纯函数 `NativeSplash.ComputeHorizontalLayout(clientW, iconSize, gap, measuredTextW, padX)`（文本宽度上限 = 客户区 − 两侧留白 − 图标 − 间隔，超出由 `DT_END_ELLIPSIS` 截断，整体仍居中但绝不越过留白），无头环境可测。测试：`NativeSplashLayoutTests` 5 例（短文本居中、长文本两侧留白、无图标退化、过窄夹到 0、三条不变量 Theory）。
   - **未做**：`CheckComStatus` 的兜底策略未改（兜底时状态仍是 `pending`，两套菜单外观仍不一致）；真实桌面右键多选回归需手工验证。
 
 **2026-10-27** — 修复：issue #52 右键「原地解压 / 解压到目录」报 7z.dll 无法加载（库路径被默认探测路径抢先占用）
