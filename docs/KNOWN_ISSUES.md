@@ -31,6 +31,7 @@
 | **KI-005** | 29 条 7z 用例被 CI 过滤、永不运行 | 覆盖缺口 | 等计划（CI 环境） | CI 装上 7-Zip 并去掉 `SevenZipEngine` 过滤 | 阻塞中 |
 | **KI-006** | `.jar/.war/.ear/.apk` 能打开但**不参与文件关联**（也不进右键菜单/设置页关联列表） | 功能留白 | 缺决策 + 成本 | 用户反馈「想在资源管理器里双击/右键打开 jar」时；或做「关联格式可勾选」设置项时 | 阻塞中 |
 | **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
+| **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 交互 / 文案 | 缺决策 | 决定是否让 `UpdateService` 区分「无更新 / 请求失败」两种结局时 | 阻塞中 |
 
 ---
 
@@ -103,7 +104,17 @@
 - **证据**：`src\MantisZip.Core\Utils\PdfParser.cs:64` 的 `ParseFromSeekable` 是**头尾双向扫描**（与 `PreviewViewModel.ShowPdfAsync` 一样依赖 xref/trailer 在文件**末尾**）⇒ 只给前 N 字节的截断数据解析不出任何页；`PreviewViewModel` 的 PDF 分支本来就只 `LoadPdfPageAsync(1)`（只渲染首页）。计划里曾设想「PDF 也走 head-only 部分预览」，实测后判定**不可行且是回归**（本来就不受 15MB 限制，加拒绝等于把能看的 PDF 变成不能看）。
 - **为什么现在不修**：**成本超阈值 + 上游限制**。要真做到部分预览，得让 PdfPig 支持「从截断流式数据增量解析」或提供随机访问的异步加载器；当前的绕法是内存映射（`MemoryMappedFile`）+ PdfPig 随机访问流，改动面横跨 Core 解析层与三处调用点，而收益只对超大 PDF 成立。
 - **复评条件**：① PdfPig 发布支持截断/随机访问流解析的版本（升级时复评）；② 或用户反馈「预览 >100MB 的 PDF 卡顿 / `%TEMP%` 被涨满」——届时优先做内存映射而不是 head-only。
-- **关联**：`.omo/plans/进行中/preview-memory-first.md` 的 T10（PDF 一项已判定「一行不改」）。
+- **关联**：`.omo/plans/已完成/preview-memory-first.md` 的 T10（PDF 一项已判定「一行不改」）。
+- **状态**：阻塞中
+
+## KI-008 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」
+
+- **发现**：2026-10-28（实现 `auto-update` 计划 T5 时）
+- **现象**：「关于 → 更新」页签点「检查更新」，在**完全断网 / GitHub 被墙 / DNS 失败 / 超时**时显示「已是最新版本」。用户会误以为确实是新版，而实际上是没连上。启动时的后台检查不受影响（它本来就静默）。
+- **证据**：`src/MantisZip.Core/Services/UpdateService.cs:55` 的 `CheckForUpdateAsync` 契约是 `Task<UpdateInfo?>`——「已是最新」「HTTP 非 2xx」「网络异常」「5s 超时」四种情况**全部返回 null**（见 `:103` 起的异常分支与 `GitHubApiBase` 请求），调用方无从区分。`src/MantisZip.UI.Avalonia/Dialogs/AboutWindow.axaml.cs` 的 `CheckForUpdate` 因此把 null 一律映射成 `Update_UpToDate`，代码注释里已写明这是已知妥协。
+- **为什么现在不修**：**缺决策**。修法有三条路：①把契约改成 `UpdateCheckResult(UpdateInfo? Update, bool Failed, string? Reason)`（改 Core 公共 API + 8 个单测 + 两个调用点，最干净）；②`CheckForUpdateAsync` 失败时抛异常、由调用方 catch（与现有「异常一律返 null」的设计相反）；③UI 侧再加一次「轻量连通性探测」（多打一次网络，语义还是靠猜）。选哪条取决于「检查更新失败要不要给用户明确提示」这个交互决定，属计划外的新决策。
+- **复评条件**：① 决定「检查更新失败」是否要单独提示文案时；② 或用户反馈「明明有新版却提示已是最新」时（此时优先走方案①）。
+- **关联**：`.omo/plans/已完成/auto-update.md` T5 的已知妥协说明。
 - **状态**：阻塞中
 
 ---

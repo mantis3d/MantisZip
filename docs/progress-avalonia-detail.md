@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 计划：自动更新检测（S 档收尾）
+  - **背景**：此前应用完全不知道自己是不是最新版，用户只能定期去 Releases 页看。S 档计划 `auto-update`（4-6h）要求「发现新版本 → 提示 → 交系统浏览器下载」，明确**不做**应用内下载安装、不做 Gitee 镜像、不引入 DI / `IHttpClientFactory`、不处理 pre-release。
+  - **根因（为什么以前不做）**：三条约束卡着——① 仓库开了裁剪/AOT 分析器门禁，反射式 `JsonSerializer.Deserialize<T>` 会报 IL2026/IL3050，必须先有手写解析方案；② 网络请求必须全程可失败静默，不能拖慢启动（曾经有过「启动时同步等网络」类问题）；③ 弹窗必须能被 X/Esc 关掉且不留下挂起的 `await`。
+  - **修法（Core）**：`Services/UpdateInfo.cs`（`readonly record struct` + `PublishDateDisplay`）；`Services/UpdateService.cs` 用**静态共享 `HttpClient`**（5 秒超时）+ `JsonDocument` 手写解析 GitHub `releases/latest`，`System.Version` 只比前三段（`1.2 == 1.2.0`、`0.5.10 > 0.5.3`），`ShouldCheck` 做 24 小时节流，`internal SetTestHandler` 供测试注入 `HttpMessageHandler`；任何异常 `CoreLog.Info` 后返回 null。
+  - **修法（设置）**：`AppSettings` 加 `EnableAutoUpdateCheck`（默认 true）/ `LastUpdateCheckTime` / `LastSkippedVersion`（`AppSettingsJsonContext` 是源生成，无需改）；SettingsWindow 的 Debug 页签加开关，走 `{DynamicResource}` 与规则 4/14。
+  - **修法（启动路径）**：`App.TryScheduleStartupUpdateCheck` 只在显示主窗口的 5 个 GUI 分支调用（CLI 不调度），`Task.Run` + 2 秒延迟 → `AppSettings.Load()` → 开关/节流判断 → `CheckForUpdateAsync` → 命中新版本才 `Dispatcher.UIThread.Post` 弹 `UpdateAvailableDialog`。**三种不弹的情况（无更新 / 网络失败 / 命中跳过版本）都要写 `LastUpdateCheckTime`**，否则 24h 节流永不生效、每次启动都重复请求（计划未写，实现时补）。
+  - **修法（UI）**：`AboutWindow` 新增第 5 个「更新」页签（当前版本 / 上次检查 / 检查按钮 / 状态文本 / 新版本详情 + 打开发布页）；窗口类改为 `INotifyPropertyChanged` 驱动动态文本（事件声明为 `public new event`，基类 `AvaloniaObject.PropertyChanged` 是另一套事件，直接覆盖会 CS0108）；`UpdateAvailableDialog` 用 `TaskCompletionSource<UpdatePromptChoice>` + `OnClosed` 兜底 `RemindLater` + 公共无参构造（AVLN3000）。
+  - **与计划的偏差**：①补了 2 个计划外的三语 key（`Update_NeverChecked` / `Update_PublishDate`）；②处理器名 `OnCheckUpdatesClick` → `OnCheckUpdateClick`；③`CheckForUpdateAsync` 三态塌缩导致断网时关于窗显示「已是最新版本」，按规则 21 登记 **KI-008** 而没在本计划内解决（要先定交互决策）；④启动检查补了「失败也记时间」这一节流细节。
+  - **验证**：Core `-Task test` **882 通过 / 3 跳过**（基线 874，+8 例）；Release 构建 **0 警告**；`ui-tests` **38.7s 全绿**（28 条警告与基线一致）；`-Task check` 版本 0.5.4 六处 / 三语 **1355** key / 守卫 **5/5**（dialog-seam 确认新对话框未用 `DialogResult`/`CloseAction`）；新增 `UpdateUiTests` 3 例（关于窗 5 页签 / 关窗即 RemindLater / 无参构造可用）单独跑 3/3。
+  - **状态**：✅ 已完成并归档（随 v0.5.4）。真机目视（有新版弹窗、四种状态文案）留待用户；`KI-008` 待决策。
+
 **2026-10-28** — 计划调整：压缩包内重命名从 S 档移回 A 档，A 档拆为两个交付阶段
   - **背景**：S 档最后一项「压缩包内重命名（引擎级）」原计划紧邻 A 档开工，2026-10-28 讨论后改为**直接并入 A 档**——它是 A 档「暂存区」的地基，两者改的是同一批引擎文件（`ZipBinaryRewriter.cs` / `ArchiveEngine.cs` / `ZipEngine.*` / `SevenZipEngine.cs`），分两次做等于同一批代码开两次刀、跑两轮全量回归，且 API 边界（单次 rename vs 批量原子提交）容易先定错再返工。
   - **调整**：`docs/PLAN.md` 删掉 S 档该行（S 档剩「自动更新检测」4-6h，验收口径从两件事改一件事），A 档在「面包屑」行后新增该行。A 档按「同源引擎改动」切成两个阶段——**阶段 A1 压缩包内编辑**（重命名 8-10h + 暂存区 12-16h + Winget 1-2h ≈ 21-28h，可独立发版）与**阶段 A2 导航、瘦身与小活**（面包屑 6-8h + 预览切片 3 Office 5-7h + 自包含体积第一步 4-6h ≈ 15-21h 主线，末尾 25h「小活清仓」批次当缓冲池，进度紧可裁尾部）。A 档总工时按项目重算为 **61-74h**（原标题 74-76h 只加了重命名的 8-10h、未减掉已被 S 档吃掉的项，偏高）。
