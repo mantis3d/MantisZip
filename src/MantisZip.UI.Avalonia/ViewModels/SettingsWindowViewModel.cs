@@ -95,6 +95,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _enableDebugLogging;
 
+    /// <summary>启动时是否自动检查更新（自动更新检测；与 EnableDebugLogging 同为源生成属性风格）。</summary>
+    [ObservableProperty]
+    private bool _enableAutoUpdateCheck;
+
     [ObservableProperty]
     private bool _closeAfterCompress;
 
@@ -1014,6 +1018,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         AppSettings.DataDir, "debug.log");
     public string OpenLogFolderText => LocalizationManager.T("Settings_Advanced_OpenLog");
 
+    // ── 自动更新（Debug 页内的「更新设置」卡片）──
+    public string UpdateSettingsSectionTitle => LocalizationManager.T("Update_Settings_SectionTitle");
+    public string AutoUpdateCheckText => LocalizationManager.T("Update_Settings_AutoCheck");
+
     // ── New tab headers ──
     public string TabLanguageHeader => LocalizationManager.T("Settings_Tab_Language");
     public string TabPathHeader => LocalizationManager.T("Settings_Tab_Path");
@@ -1096,6 +1104,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Debug
         _enableDebugLogging = _settings.EnableDebugLogging;
         _logPrivacyMode = _settings.LogPrivacyMode;
+
+        // 自动更新
+        _enableAutoUpdateCheck = _settings.EnableAutoUpdateCheck;
 
         // Compress (additional)
         _closeAfterCompress = _settings.CloseAfterCompress;
@@ -1490,6 +1501,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordOptionsSectionText));
         OnPropertyChanged(nameof(AssocSectionText));
         OnPropertyChanged(nameof(DebugSectionText));
+        // 自动更新卡片文案（Debug 页内）
+        OnPropertyChanged(nameof(UpdateSettingsSectionTitle));
+        OnPropertyChanged(nameof(AutoUpdateCheckText));
 
         OnPropertyChanged(nameof(DefaultFormatText));
         OnPropertyChanged(nameof(CompressionLevelText));
@@ -1734,6 +1748,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Debug
         _settings.EnableDebugLogging = EnableDebugLogging;
         _settings.LogPrivacyMode = SelectedLogPrivacyModeOption?.Value ?? LogPrivacyMode;
+
+        // 自动更新
+        _settings.EnableAutoUpdateCheck = EnableAutoUpdateCheck;
 
         // Extract
         _settings.ExtractDestination = SelectedExtractDestinationOption?.Value ?? ExtractDestination;

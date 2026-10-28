@@ -249,6 +249,16 @@ public class AppSettings
     public bool EnableDebugLogging { get; set; } = false;
     public string LogPrivacyMode { get; set; } = "extension";
 
+    // ===== 自动更新 =====
+    /// <summary>启动时是否自动检查更新（默认开启）。</summary>
+    public bool EnableAutoUpdateCheck { get; set; } = true;
+
+    /// <summary>上次检查更新的时间（UTC）。JSON 走默认 ISO-8601 序列化，不需要自定义 converter。</summary>
+    public DateTime? LastUpdateCheckTime { get; set; }
+
+    /// <summary>用户选择「不再提示此版本」时记录的版本号。</summary>
+    public string? LastSkippedVersion { get; set; }
+
     // ===== 持久化 =====
     /// <summary>便携模式：exe 同级存在 Portable.txt 时启用，设置路径重定向到 exe 旁 Data/ 目录。</summary>
     public static bool IsPortableMode { get; private set; }

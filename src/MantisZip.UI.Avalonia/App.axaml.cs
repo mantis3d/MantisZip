@@ -234,6 +234,7 @@ public partial class App : Application
                 Services.StartupTimer.Mark("Init.MainWindow.New");
                 desktop.MainWindow = new MainWindow();
                 Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口首帧关 splash
+                TryScheduleStartupUpdateCheck(desktop.MainWindow!); // 启动时后台检查更新（GUI 启动，CLI 分支不调度）
             }
             else
             {
@@ -248,6 +249,7 @@ public partial class App : Application
                         Services.StartupTimer.Mark("Init.MainWindow.New");
                         desktop.MainWindow = new MainWindow();
                         Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash（加载遮罩 B 接管后续反馈）
+                        TryScheduleStartupUpdateCheck(desktop.MainWindow!); // 启动时后台检查更新（GUI 启动，CLI 分支不调度）
                         if (!string.IsNullOrEmpty(path) && File.Exists(path))
                         {
                             var mainWindow = (MainWindow)desktop.MainWindow;
@@ -276,6 +278,7 @@ public partial class App : Application
                                     Services.StartupTimer.Mark("Init.MainWindow.New");
                                     desktop.MainWindow = new MainWindow();
                                     Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash
+                                    TryScheduleStartupUpdateCheck(desktop.MainWindow!); // 启动时后台检查更新（GUI 启动，CLI 分支不调度）
                                     var mainWindow = (MainWindow)desktop.MainWindow;
                                     mainWindow.LoadArchiveOnStartup(path);
                                     break;
@@ -286,6 +289,7 @@ public partial class App : Application
                             Services.StartupTimer.Mark("Init.MainWindow.New");
                             desktop.MainWindow = new MainWindow();
                             Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash
+                            TryScheduleStartupUpdateCheck(desktop.MainWindow!); // 启动时后台检查更新（GUI 启动，CLI 分支不调度）
                         }
                         break;
 
@@ -385,6 +389,7 @@ public partial class App : Application
                         Services.StartupTimer.Mark("Init.MainWindow.New");
                         desktop.MainWindow = new MainWindow();
                         Services.NativeSplash.Hook(desktop.MainWindow); // startup-native-splash：主窗口关 splash
+                        TryScheduleStartupUpdateCheck(desktop.MainWindow!); // 启动时后台检查更新（GUI 启动，CLI 分支不调度）
                         break;
                 }
             }
@@ -394,6 +399,108 @@ public partial class App : Application
 
         // 主循环启动窗口结束：此后 AppShutdown.Request 与直接 Shutdown 等价（见 Services/AppShutdown.cs）
         AppShutdown.MarkFrameworkInitCompleted();
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  启动时后台检查更新（2026-10-28 新增）
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>启动检查是否已调度过（多条 GUI 启动分支都会调用，只允许调度一次）。</summary>
+    private static bool _updateCheckScheduled;
+
+    /// <summary>
+    /// 启动时后台检查更新：延迟 2s 让主窗口先完成首帧，再在后台线程请求 GitHub，
+    /// 命中新版本则回到 UI 线程弹「发现新版本」对话框。
+    /// <para>
+    /// 只在真正显示主窗口的 GUI 启动分支调用；CLI 分支（--extract / --compress / --test 等）不调度。
+    /// 全程静默：任何异常只写 debug.log，绝不弹错误框、绝不阻断启动。
+    /// </para>
+    /// </summary>
+    private static void TryScheduleStartupUpdateCheck(Window owner)
+    {
+        if (_updateCheckScheduled)
+            return;
+        _updateCheckScheduled = true;
+
+        _ = Task.Run(async () =>
+        {
+            try
+            {
+                // 主窗口首帧优先：更新检查不抢启动带宽
+                await Task.Delay(TimeSpan.FromSeconds(2));
+
+                var settings = AppSettings.Load();
+                if (!settings.EnableAutoUpdateCheck)
+                    return;
+                if (!UpdateService.ShouldCheck(settings.LastUpdateCheckTime, DateTime.UtcNow))
+                    return;
+
+                var info = await UpdateService.CheckForUpdateAsync(AppConstants.Version);
+
+                // 无更新 / 网络失败：记录检查时间后静默返回。
+                // 记录时间是必要的——否则 ShouldCheck 的 24h 节流永远不生效，每次启动都会重复请求。
+                if (info is not { } update)
+                {
+                    settings.LastUpdateCheckTime = DateTime.UtcNow;
+                    settings.Save();
+                    return;
+                }
+
+                // 用户点过「不再提示此版本」：同样静默，但仍记录检查时间
+                if (string.Equals(update.LatestVersion, settings.LastSkippedVersion, StringComparison.Ordinal))
+                {
+                    settings.LastUpdateCheckTime = DateTime.UtcNow;
+                    settings.Save();
+                    return;
+                }
+
+                // 弹窗只能在 UI 线程；Post 的 lambda 等价 async void，故同样整段 try/catch
+                Dispatcher.UIThread.Post(async () =>
+                {
+                    try
+                    {
+                        var dlg = new UpdateAvailableDialog(update);
+                        await dlg.ShowDialog(owner);
+                        var choice = await dlg.Completion;
+
+                        // 无论用户选什么都记录本次检查时间（RemindLater 即 24h 后再问）
+                        settings.LastUpdateCheckTime = DateTime.UtcNow;
+                        settings.Save();
+
+                        switch (choice)
+                        {
+                            case UpdatePromptChoice.Download:
+                                // 不在应用内下载：交给系统浏览器打开发布页
+                                var launcher = TopLevel.GetTopLevel(owner)?.Launcher;
+                                if (launcher != null &&
+                                    Uri.TryCreate(update.DownloadUrl, UriKind.Absolute, out var uri))
+                                {
+                                    await launcher.LaunchUriAsync(uri);
+                                }
+                                break;
+
+                            case UpdatePromptChoice.SkipVersion:
+                                // 记住被跳过的版本：下次检查命中同一版本时不再打扰
+                                settings.LastSkippedVersion = update.LatestVersion;
+                                settings.Save();
+                                break;
+
+                            default: // RemindLater：什么都不做，仅已更新的检查时间生效
+                                break;
+                        }
+                    }
+                    catch (Exception ex)
+                    {
+                        DebugLog($"TryScheduleStartupUpdateCheck: dialog failed: {ex.GetType().Name} {ex.Message}");
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                // 静默失败：缺网络 / GitHub 限流 / 设置读写失败都不该打扰用户
+                DebugLog($"TryScheduleStartupUpdateCheck failed: {ex.GetType().Name} {ex.Message}");
+            }
+        });
     }
 
     // ════════════════════════════════════════════════════════════════

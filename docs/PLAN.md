@@ -44,7 +44,7 @@
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 自动更新检测 | [auto-update.md](.omo/plans/未开始/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查 + AboutWindow「更新」Tab + `UpdateAvailableDialog` + 设置开关 + 单元测试。**面向公开用户后这从「加分项」变「基础设施」**：没有它，每个修复都到不了用户手上 |
+| 自动更新检测 | [auto-update.md](.omo/plans/进行中/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查 + AboutWindow「更新」Tab + `UpdateAvailableDialog` + 设置开关 + 单元测试。**面向公开用户后这从「加分项」变「基础设施」**：没有它，每个修复都到不了用户手上。🚧 2026-10-28 开工 |
 
 > 本轮验收口径：公众能感知到的一件事——**安装完会自己知道有新版本**。（「压缩包内重命名」已于 2026-10-28 移回 A 档，与「暂存区」相邻做；图标归一化、意图-执行接缝于 2026-10-26、预览取数层内存优先于 2026-10-28 完成，随 v0.5.4 验证）
 

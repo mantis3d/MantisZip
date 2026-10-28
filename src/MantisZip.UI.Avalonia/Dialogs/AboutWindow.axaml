@@ -429,6 +429,76 @@
         </ScrollViewer>
       </TabItem>
 
+      <!-- 选项卡 5：更新（自动更新检测，2026-10-28 新增） -->
+      <TabItem Header="{Binding UpdatesTabHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconArrowCircleDown">
+        <!-- 更新页布局：沿用「关于」页的 ScrollViewer + 主题外边距 + StackPanel（窄窗口可滚动） -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Margin="{DynamicResource SpacingMdThk}"
+                      Spacing="{DynamicResource SpacingSm}">
+
+            <!-- 当前版本：只读显示 AppConstants.Version -->
+            <TextBlock Text="{Binding UpdateCurrentVersionText}"
+                       FontSize="14" FontWeight="Bold"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+            <!-- 上次检查时间（本地时间；从未检查时显示「从未检查」） -->
+            <TextBlock Text="{Binding UpdateLastCheckText}"
+                       FontSize="13"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+            <!-- 手动检查按钮：高度/内边距/配色全部走紧凑度与主题资源键 -->
+            <Button Content="{Binding UpdateCheckNowText}"
+                    Click="OnCheckUpdateClick"
+                    HorizontalAlignment="Left"
+                    Height="{DynamicResource ControlHeight}"
+                    Padding="{DynamicResource SpacingXsThk}"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+
+            <!-- 检查状态文本：正在检查 / 已是最新 / 发现新版本 / 检查失败，无状态时整块隐藏 -->
+            <TextBlock Text="{Binding UpdateStatusText}"
+                       IsVisible="{Binding HasUpdateStatus}"
+                       TextWrapping="Wrap"
+                       FontSize="13"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+            <!-- 新版本详情区：仅发现新版本时显示（版本号 / 发布日期 / 打开发布页） -->
+            <Border IsVisible="{Binding ShowLatestVersion}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}"
+                    Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+
+                <!-- 最新版本号行 -->
+                <TextBlock Text="{Binding UpdateLatestVersionText}"
+                           FontSize="14" FontWeight="Bold"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+                <!-- 发布日期行（接口未给出日期时文本为空串） -->
+                <TextBlock Text="{Binding UpdatePublishDateText}"
+                           FontSize="13"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+                <!-- 打开发布页按钮：应用内不下载，交给系统浏览器 -->
+                <Button Content="{Binding UpdateDownloadText}"
+                        Click="OnOpenReleasePageClick"
+                        HorizontalAlignment="Left"
+                        Height="{DynamicResource ControlHeight}"
+                        Padding="{DynamicResource SpacingXsThk}"
+                        Background="{DynamicResource ThemeAccentBrush}"
+                        Foreground="White"
+                        BorderThickness="0" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
     </TabControl>
   </DockPanel>
 </Window>

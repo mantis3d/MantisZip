@@ -1428,6 +1428,15 @@
               </StackPanel>
             </Border>
 
+            <!-- 自动更新：启动时是否检查新版本（Debug Tab 内，随其它开发者选项一起） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding UpdateSettingsSectionTitle}" FontWeight="SemiBold" />
+                <CheckBox Content="{Binding AutoUpdateCheckText}" IsChecked="{Binding EnableAutoUpdateCheck}" />
+              </StackPanel>
+            </Border>
+
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">

@@ -1,0 +1,91 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.UpdateAvailableDialog"
+        x:CompileBindings="False"
+        Title="{Binding DialogTitleText}"
+        Width="480"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource DialogPadding}">
+
+  <!-- 根布局：标题 → 版本摘要 → 版本/日期 → 更新说明 → 按钮行（全部主题/紧凑度资源键） -->
+  <StackPanel Spacing="{DynamicResource SpacingMd}">
+
+    <!-- 标题行：发现新版本 -->
+    <TextBlock Text="{Binding DialogTitleText}"
+               FontSize="16"
+               FontWeight="Bold"
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- 主提示：发现新版本 v{0}（版本号由 UpdateInfo 提供） -->
+    <TextBlock Text="{Binding SummaryText}"
+               FontSize="13"
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- 版本信息区：最新版本号 + 发布日期（无日期时该行隐藏） -->
+    <StackPanel Spacing="{DynamicResource SpacingXs}">
+      <TextBlock Text="{Binding NewVersionText}"
+                 FontSize="13"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <TextBlock Text="{Binding PublishDateText}"
+                 IsVisible="{Binding HasPublishDate}"
+                 FontSize="13"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+    </StackPanel>
+
+    <!-- 更新说明区：接口不返回说明正文，直接展示发布页地址（不额外联网） -->
+    <StackPanel Spacing="{DynamicResource SpacingXs}">
+      <TextBlock Text="{Binding ReleaseNotesLabelText}"
+                 FontSize="13"
+                 FontWeight="Bold"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <TextBlock Text="{Binding ReleaseNotesText}"
+                 FontSize="12"
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+    </StackPanel>
+
+    <!-- 按钮行：下载（强调色，同关于窗口关闭按钮配色）/ 稍后提醒 / 不再提示此版本 -->
+    <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="{DynamicResource SpacingSm}">
+
+      <!-- 下载：调用方据此打开下载页；回车默认触发 -->
+      <Button Content="{Binding DownloadText}"
+              Click="OnDownloadClick"
+              IsDefault="True"
+              MinWidth="80"
+              Height="{DynamicResource ControlHeight}"
+              Padding="{DynamicResource SpacingSmThk}"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White"
+              BorderThickness="0" />
+
+      <!-- 稍后提醒：本次不处理，24h 后再询问；Esc 关闭等同此选项 -->
+      <Button Content="{Binding RemindLaterText}"
+              Click="OnRemindLaterClick"
+              IsCancel="True"
+              MinWidth="80"
+              Height="{DynamicResource ControlHeight}"
+              Padding="{DynamicResource SpacingSmThk}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+
+      <!-- 不再提示此版本：把当前版本记为已跳过（调用方持久化） -->
+      <Button Content="{Binding SkipVersionText}"
+              Click="OnSkipVersionClick"
+              MinWidth="80"
+              Height="{DynamicResource ControlHeight}"
+              Padding="{DynamicResource SpacingSmThk}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </StackPanel>
+  </StackPanel>
+</Window>
