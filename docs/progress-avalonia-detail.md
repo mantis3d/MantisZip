@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 修复：便携版升级后设置丢失（便携包预置 settings.json + 读坏静默回落）
+  - **症状**（issue #64 报告者）：把 `Data\*` 从 0.5.2 复制到 0.5.3 后设置全没了；报告者补充「印像中 0.5.1 到 0.5.2 也是，每次升级都要重设设置」。维护者本地反复测试无法复现（自己的 settings.json 由 0.5.3 自己写出，不触发下述两条）。
+  - **根因（两条，第一条是主因、第二条是放大器）**：① `.github/workflows/release.yml` 的 `New-PortableZip([string]$Src, ...)` 每次都把 `installer/prebuilt/settings.json` 复制成 `$Src\Data\settings.json`（并做 `__LANG__`/`__THEME__` 替换 —— 占位符早就不存在，属死代码）⇒ 用户按「解压到同一目录覆盖」升级时，包里那份默认设置把用户设置冲掉；安装版由 `installer.iss` 的 `if not FileExists(SettingsFile) then ... else 记日志保留用户设置` 保护，所以只有便携 zip 受影响。② `AppSettings.Load()` 的 `catch { return new AppSettings(); }` 把任何反序列化/迁移异常静默吞成「全部默认值」，不留日志、不留备份，随后任一次 `Save()` 的 `File.WriteAllText` 直接覆盖原文件 ⇒ 用户侧不可逆，且事后没有任何证据。
+  - **修法（四项）**：① `release.yml` 删掉预置 settings.json 那段，只保留 `Portable.txt` 与 `x64\7z.dll`（应用首次运行自动生成默认设置）；② `AppSettings` 拆出 `LoadCore(string)` / `TryReadSettings(...)` / `ApplyMigrations(...)`：读失败时把坏文件 `File.Move` 成 `settings.json.bad-yyyyMMddHHmmss` 留证，再尝试 `settings.json.bak`，仍失败才回落默认值，并把「便携/安装 + 留证文件名 + 是否从备份恢复 + 异常信息」写进 `lifecycle.log`（`services/LifetimeDiagnostics`，失败不影响回落）；③ `Save()` 改为 `SaveTo(file)`：「先写 `.tmp` → 把上一版 `File.Copy` 成 `.bak` → `File.Move(temp, file, overwrite)`」，失败清理临时文件；④ 新增 `IsUnreadableFile(file)` 守卫，避免把「刚判定为损坏、改名留证又失败」的文件当作上一版复制成 `.bak`，把唯一可用备份冲掉。
+  - **测试**：`tests/MantisZip.UI.Avalonia.Tests/AppSettingsResilienceTests.cs` 8 例（旧 `AdaptiveCompressionMode=3` 迁移成三开关并归零旧枚举、坏 JSON 返回错误、留证改名保留内容、坏主文件 + 好备份恢复且不缓存、无备份回落默认、缺失文件可缓存、原子写并保留上一版 `.bak`、坏文件不当备份）。
+  - **验证**：avalonia Release 构建 0 警告；`-Task test -Target tests`（2 条存量警告）与 `-Task test -Target ui-tests` 全绿；`i18n` 1316 key、`check` 0.5.3 六处、`guards` 4/4。
+  - **备注**：便携版首启主题由预置文件的 `Light` 改为代码默认的跟随系统（用户拍板接受，不再引入 `settings.default.json` 机制）；安装版行为未改。
 **2026-10-28** — 修复：多选压缩包右键「解压到……」为每个包各开一个窗口
   - **症状**（用户实测）：资源管理器多选 4 个压缩包 → 右键「解压到……」→ 弹出 4 个「解压设置」窗，每个窗一个包；同一台机器稍后再测却只弹一个窗。
   - **根因（两套右键菜单）**：项目同时有动态 COM 菜单（`*\shellex\ContextMenuHandlers\MantisZip` → comhost.dll，多选时一次把全部路径交给一个进程）与静态层叠菜单（`ExtendedSubCommandsKey`，动词命令只带 `%1`，Explorer 会为每个选中项各启动一个进程）。`ShellIntegration.Install` 启用动态菜单时只写 `DynamicMenuStatus=pending`、**不装**层叠菜单；随后 `CheckComStatus()` 在 Explorer 尚未加载 comhost.dll 时**装层叠菜单兜底**，状态仍停在 `pending`。而 `pending` 下 COM 处理器只插一条灰色占位分隔符（`src/MantisZip.ShellExt/ContextMenuHandler.cs` 的 `QueryContextMenu`），用户实际点到的是层叠菜单 ⇒ 逐项 `%1` ⇒ N 进程 / N 窗。等 Explorer 真正加载 comhost.dll、`CheckComStatus()` 把状态提升为 `active` 并卸载层叠菜单后，多选恢复正常，所以「无法复现」。现场证据：`%LOCALAPPDATA%\MantisZip\ShellExt\log.txt` 里 `10:06:31 status=pending, inserting separator as placeholder` 之后是 4 个单包进程（且**没有** `InvokeCommand: starting process:` 行 —— 不是 ShellExt 启动的），而 `10:22` 的三条 `starting process` 每条都带 4 个路径。

@@ -1,3 +1,18 @@
+## v0.5.4
+
+### 文件说明 / File Description
+
+MantisZip-0.5.4-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.4-Setup-Offline.exe 是离线安装包。MantisZip-0.5.4-Portable.zip 是便携版，解压即用。MantisZip-0.5.4-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.4-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.4-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.4-Portable.zip is the portable version, extract and run. MantisZip-0.5.4-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+
+### 更新内容 / Changelog
+
+**修复 / Fixes**
+
+- **便携版升级不再丢设置** — 此前便携版压缩包里自带一份默认设置，把它解压覆盖旧目录升级时会把你的设置冲成默认值（安装版一直不受影响）；此外设置文件一旦读不出来，会被静默换成默认值并当场覆盖原文件，事后无从恢复。现在便携包不再预置设置文件、首次运行自动生成；设置文件读坏时先改名为 `settings.json.bad-<时间>` 留证，再尝试从 `settings.json.bak` 恢复，保存时也会保留上一版备份，全过程记入 `lifecycle.log`
+- **Portable upgrades keep your settings** — the portable zip used to ship a default settings file, so extracting it over an existing folder wiped your settings (the installer build was never affected); worse, an unreadable settings file was silently replaced with defaults and the original overwritten, leaving no way back. The portable zip no longer pre-seeds settings (they are generated on first run); an unreadable settings file is first renamed to `settings.json.bad-<time>` for evidence, then `settings.json.bak` is tried, and saving now keeps the previous copy as a backup — all recorded in `lifecycle.log`
 ## v0.5.3
 
 ### 文件说明 / File Description
