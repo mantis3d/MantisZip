@@ -3,6 +3,7 @@
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
         xmlns:services="clr-namespace:MantisZip.UI.Avalonia.Services"
         xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+        xmlns:behaviors="clr-namespace:MantisZip.UI.Avalonia.Behaviors"
         xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
         xmlns:local="clr-namespace:MantisZip.UI.Avalonia.Views"
         x:Class="MantisZip.UI.Avalonia.Views.SettingsWindow"
@@ -1133,8 +1134,8 @@
                 <!-- Field list -->
                 <ScrollViewer Grid.Row="2" Background="{DynamicResource ThemeWindowBgBrush}">
                   <StackPanel>
-                    <!-- Header -->
-                    <Grid ColumnDefinitions="*,90,90,110" Margin="4,4,4,2">
+                    <!-- Header（列宽与下方数据行保持一致） -->
+                    <Grid ColumnDefinitions="*,80,80,130" Margin="4,4,4,2">
                     <TextBlock Grid.Column="0" Text="{Binding MetadataPanelSettings.ColumnFieldText}" FontWeight="SemiBold" FontSize="11"
                                Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                     <TextBlock Grid.Column="1" Text="{Binding MetadataPanelSettings.ColumnRowText}" FontWeight="SemiBold" FontSize="11"
@@ -1151,31 +1152,31 @@
                         <DataTemplate>
                           <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="0,0,0,1"
                                   Padding="4,4">
-                            <Grid ColumnDefinitions="*,90,90,130">
+                            <Grid ColumnDefinitions="*,80,80,130">
                               <!-- Field name -->
                               <TextBlock Grid.Column="0" Text="{Binding DisplayName}"
                                          VerticalAlignment="Center"
                                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-                              <!-- Row：整数输入用 NumericUpDown（TextBox 绑 int 时敲字母会出红色校验文本） -->
-                              <NumericUpDown Classes="intOnly"
-                                             Grid.Column="1"
-                                             Minimum="0" Increment="1"
-                                             Value="{Binding Row, Mode=TwoWay}"
-                                             Width="64" Height="26" HorizontalAlignment="Center"
-                                             Background="{DynamicResource ThemeWindowBgBrush}"
-                                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                              <!-- Row：普通 TextBox + NumericInput 行为（保持输入框外观，无上下调值按钮） -->
+                              <TextBox Grid.Column="1"
+                                       behaviors:NumericInput.Enabled="True"
+                                       behaviors:NumericInput.Minimum="0"
+                                       Text="{Binding Row, Mode=TwoWay}"
+                                       Width="64" Height="26" HorizontalAlignment="Center"
+                                       Background="{DynamicResource ThemeWindowBgBrush}"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
 
                               <!-- Order：同上 -->
-                              <NumericUpDown Classes="intOnly"
-                                             Grid.Column="2"
-                                             Minimum="0" Increment="1"
-                                             Value="{Binding Order, Mode=TwoWay}"
-                                             Width="64" Height="26" HorizontalAlignment="Center"
-                                             Background="{DynamicResource ThemeWindowBgBrush}"
-                                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                              <TextBox Grid.Column="2"
+                                       behaviors:NumericInput.Enabled="True"
+                                       behaviors:NumericInput.Minimum="0"
+                                       Text="{Binding Order, Mode=TwoWay}"
+                                       Width="64" Height="26" HorizontalAlignment="Center"
+                                       Background="{DynamicResource ThemeWindowBgBrush}"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
 
                               <!-- Position -->
                               <ComboBox Grid.Column="3" ItemsSource="{Binding PositionOptions}"

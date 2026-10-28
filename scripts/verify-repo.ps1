@@ -885,13 +885,16 @@ function Format-VersionResult {
 }
 
 # ---------------------------------------------------------------------------
-# guards: 可机器验证的 AGENTS.md 规则子集（规则 8 / 10.1 / 13 / 16）
+# guards: 可机器验证的 AGENTS.md 规则子集（规则 8 / 10.1 / 13 / 16 / 20 / 22 / 23）
 #
 # 这些规则此前只有「人肉自查」或「构建不报错」兜底，踩过坑：
 #   - 规则 10.1：MenuItem.InputGesture 只显示不生效（2026-10-21 修复 5 个）
 #   - 规则 13：keys 数组漏登记 → 菜单文字空白，构建不报错
 #   - 规则 16：StorageProvider 原生对话框必须走 CustomFilePickerDialog
 #   - 规则 8：新增 AppIcons.axaml 图标必须登记到 IconTestViewModel
+#   - 规则 20：意图-执行只走契约（设置窗口构造点登记 / 双轨回传 / 执行器注入）
+#   - 规则 22：数字输入不得裸绑（2026-10-28 TextBox 直绑 int → 红色校验文本）
+#   - 规则 23：反序列化必须显式 options；AppSettings 不得有死开关
 # ---------------------------------------------------------------------------
 
 $GUARD_FILES = [ordered]@{
@@ -916,6 +919,39 @@ $RE_FILE_PICKER_API = [regex]::new('\b(OpenFilePickerAsync|SaveFilePickerAsync|O
 $RE_APP_ICON_KEY = [regex]::new('x:Key="([^"]+)"')
 $RE_ICON_RESOURCE_REF = [regex]::new('"Icon[A-Z][A-Za-z0-9]*"')
 $RE_SIGNED_METHOD = [regex]::new('(?m)^[ \t]*(?:private|protected|public|internal)[^\r\n;=]*?\b([A-Za-z_]\w*)\s*\(')
+
+# ---------------------------------------------------------------------------
+# 静默失败面三个守卫（2026-10-28 新增）：这三条对应三次真实事故
+#   ① 规则 22：TextBox 直绑整数属性 → 敲字母后 Avalonia 渲染红色转换异常文本
+#      （2026-10-28 设置窗口 7 处；2026-10-12 同类事故是 NumericUpDown 能输入小数）
+#   ② 规则 23：JsonSerializer.Deserialize 用裸默认 options → 键名大小写不匹配时
+#      「反序列化成功但字段全空」（2026-10-28 语言页翻译贡献者恒为空）
+#   ③ 规则 23：AppSettings 写了属性但全仓无消费者 → 死开关
+#      （CloseAfterCompress 从 v0.2.0 一直存着但没人读，2026-10-28 才发现）
+# ---------------------------------------------------------------------------
+$GUARD_UI_DIR = 'src/MantisZip.UI.Avalonia'
+$GUARD_SETTINGS_FILE = 'src/MantisZip.UI.Avalonia/Models/AppSettings.cs'
+$GUARD_SETTINGS_VM = 'src/MantisZip.UI.Avalonia/ViewModels/SettingsWindowViewModel.cs'
+
+# 整数型属性 → 必须挂在受控控件上（NumericUpDown.intOnly 或 TextBox + NumericInput）
+$NUMERIC_TYPES = @('int', 'long', 'short', 'byte', 'double', 'decimal', 'float')
+# 这些类型可以小数，NumericUpDown 不强求 intOnly
+$INTEGRAL_TYPES = @('int', 'long', 'short', 'byte')
+$RE_NUMERIC_PROP = [regex]::new('(?m)^[ \t]*(?:public|internal|protected)\s+(?<type>int|long|short|byte|double|decimal|float)\??\s+(?<name>\w+)\s*(?:\{|=>)')
+$RE_UI_ELEMENT = [regex]::new('<(?<tag>TextBox|NumericUpDown)\b(?<attrs>(?:[^<>]|"[^"]*")*)>', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+$RE_TEXT_BINDING = [regex]::new('Text\s*=\s*"\{Binding\s+(?:Path\s*=\s*)?(?<prop>\w+)')
+$RE_VALUE_BINDING = [regex]::new('Value\s*=\s*"\{Binding\s+(?:Path\s*=\s*)?(?<prop>\w+)')
+$RE_JSON_DESERIALIZE = [regex]::new('\bJsonSerializer\s*\.\s*Deserialize(?:<[^<>()]*>)?\s*\(')
+
+# 已知死开关豁免表：属性名 → 原因（KI-009）。修掉一个就从这里删一行。
+$SETTINGS_WIRING_EXEMPT = [ordered]@{
+    ExtractDestination          = 'KI-009：只在设置窗口 VM 读写，解压目标实际由 CustomFilePickerDialog 的初始路径决定'
+    EnableExtractMenu           = 'KI-009：src/ 里只有声明，疑似 WPF 时代菜单开关'
+    EnableQuickCompress         = 'KI-009：src/ 里只有声明，疑似 WPF 时代菜单开关'
+    ShowPasswordMatchNotification = 'KI-009：只有设置窗口 UI 与读写，无运行时消费者'
+    FavoritePaths               = 'KI-009：只有声明与测试；收藏路径实际走 Core 的 FavoritePathManager'
+    CustomAssocExtensions       = '非死开关：消费者在设置窗口 VM 自身（增删自定义扩展名关联），不属于运行时业务路径'
+}
 
 # ---------------------------------------------------------------------------
 # 规则 20：意图与执行之间只走契约（dialog-seam 守卫）
@@ -1323,6 +1359,204 @@ function Test-GuardDialogSeam {
         })
 }
 
+# 规则 22：控件形态必须与绑定类型匹配（数字输入不得裸绑）
+# 事故 1（2026-10-28）：设置窗口 7 个 TextBox 直绑 int/long → 敲字母后 Avalonia 渲染红色转换异常文本
+# 事故 2（2026-10-12）：整数型 NumericUpDown 默认 ParsingNumberStyle=Any → 能输入 8.5，写回 int 才截断
+function Test-GuardNumericBinding {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $uiDir = Join-Path $RepoRoot $GUARD_UI_DIR
+    if (-not (Test-Path -LiteralPath $uiDir)) {
+        $issues.Add("读不到 UI 目录：$GUARD_UI_DIR")
+        return New-GuardResult -Id 'numericbinding' -Title '数字输入受控（规则 22）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    $numeric = @{}
+    $csFiles = Get-ChildItem -LiteralPath $uiDir -Recurse -Filter *.cs -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+    foreach ($file in $csFiles) {
+        $text = [System.IO.File]::ReadAllText($file.FullName)
+        foreach ($match in $RE_NUMERIC_PROP.Matches($text)) {
+            $numeric[$match.Groups['name'].Value] = $match.Groups['type'].Value
+        }
+    }
+
+    $axamlFiles = Get-ChildItem -LiteralPath $uiDir -Recurse -Filter *.axaml -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+    $checked = 0
+
+    foreach ($file in $axamlFiles) {
+        $text = [System.IO.File]::ReadAllText($file.FullName)
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+
+        foreach ($match in $RE_UI_ELEMENT.Matches($text)) {
+            $tag = $match.Groups['tag'].Value
+            $attrs = $match.Groups['attrs'].Value
+            $line = Get-LineNumber -Text $text -Index $match.Index
+
+            if ($tag -eq 'TextBox') {
+                $binding = $RE_TEXT_BINDING.Match($attrs)
+                if (-not $binding.Success) { continue }
+                $prop = $binding.Groups['prop'].Value
+                if (-not $numeric.ContainsKey($prop)) { continue }
+                $checked++
+
+                # 受控形态：挂 NumericInput；或显示型（转换器）、只读展示
+                if ($attrs -match 'NumericInput\.Enabled\s*=\s*"True"') { continue }
+                if ($attrs -match 'Converter\s*=') { continue }
+                if ($attrs -match 'IsReadOnly\s*=\s*"True"') { continue }
+                if ($attrs -match 'IsEnabled\s*=\s*"False"') { continue }
+
+                $issues.Add("$relative`:$line TextBox 直绑数字属性 $prop（$($numeric[$prop])）—— 敲非数字会渲染红色校验文本；改 NumericUpDown Classes='intOnly' 或挂 behaviors:NumericInput")
+                continue
+            }
+
+            # NumericUpDown 绑整数属性必须挂 intOnly（否则能输入小数）
+            $valueBinding = $RE_VALUE_BINDING.Match($attrs)
+            if (-not $valueBinding.Success) { continue }
+            $prop = $valueBinding.Groups['prop'].Value
+            if (-not $numeric.ContainsKey($prop)) { continue }
+            if ($INTEGRAL_TYPES -notcontains $numeric[$prop]) { continue }
+            $checked++
+
+            if ($attrs -match 'Classes\s*=\s*"[^"]*\bintOnly\b') { continue }
+            $issues.Add("$relative`:$line NumericUpDown 绑整数属性 $prop 缺 Classes='intOnly'（默认 ParsingNumberStyle=Any 允许输入小数）")
+        }
+    }
+
+    return New-GuardResult -Id 'numericbinding' -Title '数字输入受控（规则 22）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            numericProperties = $numeric.Count
+            checkedBindings   = $checked
+        })
+}
+
+# 规则 23：反序列化必须显式给 options（裸默认 options 在键名大小写不匹配时静默返回空对象）
+function Get-JsonDeserializeArgCount {
+    param([string]$Text, [int]$OpenParenIndex)
+
+    $depth = 0
+    $commas = 0
+    for ($i = $OpenParenIndex; $i -lt $Text.Length; $i++) {
+        $ch = $Text[$i]
+        if ($ch -eq '(') { $depth++; continue }
+        if ($ch -eq ')') {
+            $depth--
+            if ($depth -eq 0) { break }
+            continue
+        }
+        if ($ch -eq ',' -and $depth -eq 1) { $commas++ }
+    }
+    return ($commas + 1)
+}
+
+function Test-GuardJsonOptions {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $files = Get-ChildItem -LiteralPath (Join-Path $RepoRoot $GUARD_FILES.sourceDir) -Recurse -Filter *.cs -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+
+    $total = 0
+    $offenders = 0
+
+    foreach ($file in $files) {
+        $text = [System.IO.File]::ReadAllText($file.FullName)
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+        if ($relative.StartsWith('tests/')) { continue }
+
+        foreach ($match in $RE_JSON_DESERIALIZE.Matches($text)) {
+            $line = Get-LineNumber -Text $text -Index $match.Index
+            $lineStart = $text.LastIndexOf("`n", [Math]::Max($match.Index - 1, 0))
+            $prefix = if ($lineStart -ge 0) { $text.Substring($lineStart + 1, $match.Index - $lineStart - 1) } else { $text.Substring(0, $match.Index) }
+            $trimmed = $prefix.TrimStart()
+            if ($trimmed.StartsWith('//') -or $trimmed.StartsWith('*') -or $trimmed.StartsWith('///')) { continue }
+
+            $total++
+            $argCount = Get-JsonDeserializeArgCount -Text $text -OpenParenIndex ($match.Index + $match.Length - 1)
+            if ($argCount -le 1) {
+                $offenders++
+                if ($offenders -le 20) {
+                    $issues.Add("$relative`:$line JsonSerializer.Deserialize 用了裸默认 options（键名大小写不匹配时会静默返回空对象）→ 传 JsonDefaults.CaseInsensitive")
+                }
+            }
+        }
+    }
+
+    return New-GuardResult -Id 'jsonoptions' -Title '反序列化显式 options（规则 23）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            deserializeCalls = $total
+            bareOptionsCalls = $offenders
+        })
+}
+
+# 规则 23：AppSettings 的每个属性都必须有运行时消费者，否则就是「死开关」
+# 事故：CloseAfterCompress 从 v0.2.0 一直存着但全仓没人读，2026-10-28 才发现（已删）
+function Test-GuardSettingsWiring {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $settingsPath = Join-Path $RepoRoot $GUARD_SETTINGS_FILE
+    if (-not (Test-Path -LiteralPath $settingsPath)) {
+        $issues.Add("读不到 $GUARD_SETTINGS_FILE")
+        return New-GuardResult -Id 'settingswiring' -Title '设置项接线（规则 23）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    $settingsText = [System.IO.File]::ReadAllText($settingsPath)
+    $properties = @([regex]::Matches($settingsText, '(?m)^[ \t]*public\s+[\w\.\?<>\[\],\s]+\s+(\w+)\s*\{\s*get') |
+            ForEach-Object { $_.Groups[1].Value } | Sort-Object -Unique)
+
+    # 「消费者」= 除 AppSettings.cs 自身声明行、除设置窗口 VM 之外，任何 src 代码里的引用；
+    # AppSettings.cs 内部的迁移/归一化代码算消费者（否则 MultiThreadedStoreFormatIds 之类会误报）。
+    $consumers = [System.Collections.Generic.List[string]]::new()
+    $files = Get-ChildItem -LiteralPath (Join-Path $RepoRoot $GUARD_FILES.sourceDir) -Recurse -Filter *.cs -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+    foreach ($file in $files) {
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+        if ($relative -eq $GUARD_SETTINGS_FILE) { continue }
+        if ($relative -eq $GUARD_SETTINGS_VM) { continue }
+        $consumers.Add([System.IO.File]::ReadAllText($file.FullName))
+    }
+
+    $dead = [System.Collections.Generic.List[string]]::new()
+    foreach ($property in $properties) {
+        $pattern = "\b$([regex]::Escape($property))\b"
+        $wired = $false
+
+        foreach ($text in $consumers) {
+            if ($text -match $pattern) { $wired = $true; break }
+        }
+        # 自身文件里出现 2 次以上（声明 + 逻辑引用）也算接上了
+        if (-not $wired) {
+            $selfHits = ([regex]::Matches($settingsText, $pattern)).Count
+            if ($selfHits -ge 2) { $wired = $true }
+        }
+
+        if (-not $wired) { $dead.Add($property) }
+    }
+
+    $unexpected = [System.Collections.Generic.List[string]]::new()
+    foreach ($property in $dead) {
+        if ($SETTINGS_WIRING_EXEMPT.Contains($property)) { continue }
+        $unexpected.Add($property)
+        $issues.Add("AppSettings.$property 有持久化与设置窗口读写，但 src/ 里没有任何运行时消费者（死开关）→ 删掉它，或先登记到 `$SETTINGS_WIRING_EXEMPT + docs/KNOWN_ISSUES.md 的 KI-009")
+    }
+    # 反向核对：豁免表里的属性如果已经接上或被删，就把豁免删掉（保持表诚实）
+    foreach ($property in $SETTINGS_WIRING_EXEMPT.Keys) {
+        if (-not ($properties -contains $property)) {
+            $issues.Add("豁免表里的 AppSettings.$property 已不存在，请从 SETTINGS_WIRING_EXEMPT 删除（保持豁免表诚实）")
+        }
+        elseif ($dead -notcontains $property) {
+            $issues.Add("豁免表里的 AppSettings.$property 现在已有运行时消费者，请从 SETTINGS_WIRING_EXEMPT 删除")
+        }
+    }
+
+    return New-GuardResult -Id 'settingswiring' -Title '设置项接线（规则 23）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            settingsProperties = $properties.Count
+            deadSwitches       = $dead.Count
+            exempted           = $SETTINGS_WIRING_EXEMPT.Count
+        })
+}
+
 function Test-Guards {
     param([string]$RepoRoot, [string]$RelativeLocalizationDir)
 
@@ -1332,6 +1566,9 @@ function Test-Guards {
     $guards.Add((Test-GuardFilePicker -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardIcons -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardDialogSeam -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardNumericBinding -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardJsonOptions -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardSettingsWiring -RepoRoot $RepoRoot))
 
     $failed = @($guards | Where-Object { -not $_.ok })
     return [ordered]@{

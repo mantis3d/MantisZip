@@ -35,7 +35,7 @@ public static class MetadataSettingsManager
             }
 
             var json = File.ReadAllText(SettingsFile);
-            _cached = JsonSerializer.Deserialize<MetadataPanelSettings>(json) ?? new MetadataPanelSettings();
+            _cached = JsonSerializer.Deserialize<MetadataPanelSettings>(json, JsonDefaults.CaseInsensitive) ?? new MetadataPanelSettings();
             InitializeDefaultConfig(_cached);
             return _cached;
         }

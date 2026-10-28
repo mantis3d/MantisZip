@@ -1,5 +1,6 @@
 using System.Globalization;
 using System.Text.Json;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Services;
 
@@ -82,7 +83,7 @@ public static class LocalizationManager
         if (File.Exists(path))
         {
             var json = File.ReadAllText(path);
-            _strings = JsonSerializer.Deserialize<Dictionary<string, string>>(json)
+            _strings = JsonSerializer.Deserialize<Dictionary<string, string>>(json, JsonDefaults.CaseInsensitive)
                        ?? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         }
         else
@@ -161,8 +162,8 @@ public static class LocalizationManager
     /// 解析 <c>Resources/languages.json</c>（<c>{ "zh": { "name": …, "translator": … } }</c>）。
     /// </summary>
     /// <remarks>
-    /// 必须显式开 <see cref="JsonSerializerOptions.PropertyNameCaseInsensitive"/>：json 的键名是全小写
-    /// （<c>name</c> / <c>translator</c>），而 <see cref="LanguageMetadata"/> 的属性是 PascalCase；
+    /// 必须走 <see cref="JsonDefaults.CaseInsensitive"/>（等价于显式开 <see cref="JsonSerializerOptions.PropertyNameCaseInsensitive"/>）：
+    /// json 的键名是全小写（<c>name</c> / <c>translator</c>），而 <see cref="LanguageMetadata"/> 的属性是 PascalCase；
     /// 默认区分大小写时反序列化**不会**报错，但两个字段全是空串，于是设置窗口语言页那条
     /// 「翻译贡献者: {}」只显示冒号（2026-10-28 修复的真实症状）。
     /// </remarks>
@@ -170,7 +171,7 @@ public static class LocalizationManager
     {
         var metadata = JsonSerializer.Deserialize<Dictionary<string, LanguageMetadata>>(
             json,
-            new JsonSerializerOptions { PropertyNameCaseInsensitive = true });
+            JsonDefaults.CaseInsensitive);
 
         var result = new List<LanguageInfo>();
         if (metadata is null) return result;

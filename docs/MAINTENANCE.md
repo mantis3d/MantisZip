@@ -60,7 +60,7 @@
 `-Task check` = `version` + `i18n` + `guards`，纯文件校验，不构建。JSON 形状是
 `{ ok, checks: [ { task, result: {…} } ] }` —— 每项结果是完整对象，不平铺（避免与 `task` 字段抢名字）。
 
-## 4. 五条规则守卫（`-Task guards`）
+## 4. 八条规则守卫（`-Task guards`）
 
 把 AGENTS.md 里本可机器校验的人工自查变成门禁：
 
@@ -71,6 +71,9 @@
 | filepicker | 16 | `OpenFilePickerAsync` / `SaveFilePickerAsync` / `OpenFolderPickerAsync` 只允许命中 `CustomFilePickerDialog.SystemBrowse_Click` |
 | icons | 8 | `AppIcons.axaml` 的 `x:Key` 必须在 `IconTestViewModel.LoadAllIcons()` 有对应 `Add()` |
 | dialog-seam | 20 | ① `new (Compress\|Extract)SettingsWindow(` 的文件与处数必须与 `$DIALOG_SEAM_REGISTRY` 一致（**正反双向**：没登记即失败，登记了却找不到也失败）② 非注释行出现 `CloseAction` / `DialogResult` 即失败 ③ `new (Compress\|Extract)Request` 只允许在 `src/MantisZip.UI.Avalonia/Services/`、`App.CliCompress.cs`、`App.CliExtract.cs` ④ 两个设置窗口构造函数必须含 `ICompressSession` / `IExtractSession` 形参 |
+| numericbinding | 22 | 扫全部 `.axaml`：`TextBox` 的 `Text` 绑到数字型属性却没挂 `behaviors:NumericInput.Enabled="True"`（且非只读、无 `Converter`、非禁用）即失败；整数型 `NumericUpDown` 绑 `int/long/short/byte` 却缺 `Classes="intOnly"` 也失败。**事故**：2026-10-28 设置窗口 7 处 `TextBox` 直绑 `int` → 敲字母渲染红色转换异常文本；2026-10-12 同类事故是 `NumericUpDown` 能输入小数 |
+| jsonoptions | 23 | `src/` 下（不含 `tests/`）单参数 `JsonSerializer.Deserialize<T>(json)` 即失败 —— 默认 options 区分大小写，键名不匹配时**反序列化「成功」但字段全空**。**事故**：2026-10-28 语言页「翻译贡献者」恒为空（`languages.json` 小写键） |
+| settingswiring | 23 | `AppSettings` 每个 public 属性必须在 `src/` 里有运行时消费者（排除设置窗口 VM 自身的读写、允许自身文件内的迁移逻辑）；否则视为**死开关**。豁免表 `$SETTINGS_WIRING_EXEMPT` 每项带原因并**双向核对**（属性删了/接上了都必须从表里删行）。**事故**：`CloseAfterCompress` 从 v0.2.0 存到 2026-10-28，全仓没人读 |
 
 **已知覆盖边界**（别误以为全查了）：
 
@@ -79,6 +82,9 @@
 - dialog-seam 是**文本级**检查：注释按行首 `//` 或 ` *` 放行（追述历史写法可以，真用不行）；`CloseAction` 出现在字符串字面量里会被判失败；它查不出「确认了但载荷少一个字段」这种语义缺口（那要靠载荷测试，见 `ExtractSettingsSeamTests`）。
 - dialog-seam 的白名单把 CLI 直通路径（`--compress-quick/-separate/-combined`）算作合法请求构造点：那三条**没有确认对话框**，本来就该直接驱动执行器；改它们时要同步改 `$DIALOG_SEAM_REQUEST_ALLOWED` 与 AGENTS.md 规则 20。
 - guards 是文本级扫描，**跨文件重命名、条件编译、多行拼接**都可能漏。
+- numericbinding 靠「属性名在 UI 项目里声明为数字类型」推断：属性名重名（不同 VM 各有一个 `Size`）时会按最后一个声明算；`TextBox` 绑的是 `string` 而 VM 内部再 parse 的写法它看不见（那类写法本身也该改）。
+- jsonoptions 只查单参数形态；`JsonSerializer.Deserialize(json, new JsonSerializerOptions())` 这种「显式传了个默认 options」它抓不到（靠评审：要传 `JsonDefaults.CaseInsensitive`）。
+- settingswiring 的「消费者」是文本出现次数：只要属性名在别的文件里出现过就算接上，所以「读了但读了不用」查不出来；豁免表 `$SETTINGS_WIRING_EXEMPT` 是唯一的人工闸口，新增豁免必须在 reason 里写清原因并同步 `docs/KNOWN_ISSUES.md`。
 
 ## 5. CI 门禁（`.github/workflows/ci.yml`，共 7 步）
 
@@ -89,7 +95,7 @@
 |------|--------|
 | `-Task version` | 版本号 6 处漂移（AppConstants / csproj / PLAN / PROGRESS / 两个 .iss） |
 | `-Task i18n` | 三语 key 缺失/多余/占位符不一致/重复 key |
-| `-Task guards` | 上面五条规则 |
+| `-Task guards` | 上面八条规则 |
 | `dotnet restore -p:WarningsAsErrors=NU1901%3B…` | 已知漏洞依赖（`Directory.Build.props` 开 `NuGetAuditMode=all`，本地只告警） |
 | `dotnet format … analyzers --verify-no-changes --severity warn --include src\…` | 产品代码分析器告警（**只圈 `src/`**，tests 存量 xUnit 告警另议） |
 | `dotnet build --no-restore -c Release` + `dotnet test …` | 真正编译与用例 |

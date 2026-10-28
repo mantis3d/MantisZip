@@ -74,7 +74,7 @@ public static class PathHistoryManager
             try
             {
                 if (!File.Exists(FilePath)) { _entries = new List<PathHistoryEntry>(); return; }
-                var data = JsonSerializer.Deserialize<PathHistoryData>(File.ReadAllText(FilePath));
+                var data = JsonSerializer.Deserialize<PathHistoryData>(File.ReadAllText(FilePath), JsonDefaults.CaseInsensitive);
                 _entries = data?.Entries ?? new List<PathHistoryEntry>();
             }
             catch { _entries = new List<PathHistoryEntry>(); }

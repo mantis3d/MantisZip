@@ -46,7 +46,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 | `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` | 构建并把 MSBuild 输出压成「文件:行:列 + 错误码」（项目级诊断无行列号时只显示 csproj 路径，如 restore/NU1301 失败） |
 | `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` | 跑测试 |
 | `pwsh -File scripts\verify-repo.ps1 -Task i18n` / `-Task version` | 单项检查 |
-| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8）/ 意图-执行接缝（规则 20） |
+| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8）/ 意图-执行接缝（规则 20）/ 数字输入受控（规则 22）/ 反序列化显式 options（规则 23）/ 设置项接线（规则 23） |
 | 追加 `-Json` | 机器可读输出（插件内部用） |
 
 - `-Target`：`avalonia`（默认）/ `core` / `shell` / `tests` / `ui-tests` / `solution`
@@ -390,6 +390,35 @@ switch (await ViewModel.TryConfirmAsync())
 - **修掉必须回填**：状态改 `已修`、写 commit、把条目移入文末「档案区」。**不要删行** —— 下次撞到同一个栈，要靠它判断「上次怎么处理的、为什么决定不动」
 - **计划完成时扫一遍**：凡是阻塞类型为「等计划 X」的条目，X 完成当天一并复评（与规则 1 的计划归档同一个动作里做）
 - **边界**：说得清「做什么、多大、值不值得」的属于计划 → `docs/PLAN.md` / `.omo/plans/`，不进登记簿；用户能感知的限制由发版时从登记簿翻译进 `README.md` 的「已知问题」，**README 只做出出口，不做台账**
+
+### 规则 22：数字输入必须用受控控件，不得裸绑数字属性
+
+**核心禁令**：`TextBox` 的 `Text` 不得直接绑定 `int` / `long` / `short` / `byte` / `double` / `decimal` / `float` 属性 —— 用户敲非数字字符时绑定转换失败，Avalonia 默认模板会在控件下方渲染**红色校验异常文本**（2026-10-28 设置窗口 7 处，用户可见）。
+
+按需求三选一：
+
+| 需求 | 写法 |
+|------|------|
+| 需要上下调值、可接受箭头按钮 | `<NumericUpDown Classes="intOnly" Minimum="…" Maximum="…" Value="{Binding X, Mode=TwoWay}" />` |
+| 外观要像普通输入框（紧凑单元格、表格内） | `<TextBox behaviors:NumericInput.Enabled="True" behaviors:NumericInput.Minimum="0" Text="{Binding X}" />` |
+| 纯展示 | `TextBlock` + 格式化（不要放输入框） |
+
+- 整数型 `NumericUpDown` **必须**挂 `Classes="intOnly"`（默认 `ParsingNumberStyle=Any` 会放过小数，2026-10-12 事故）
+- 可复用行为：`src/MantisZip.UI.Avalonia/Behaviors/NumericInput.cs`（按键级拒绝非数字、粘贴清洗、失焦 clamp/还原）
+- **守卫**：`-Task guards` 的 `numericbinding` —— 扫全部 `.axaml`，`TextBox` 绑数字属性却没挂 `NumericInput.Enabled="True"`（且非只读、无转换器）即失败；整数型 `NumericUpDown` 缺 `intOnly` 也失败
+
+### 规则 23：新写的绑定 / 反序列化 / 设置项，必须「接线错了就失败得响」
+
+这条是总纲，覆盖一条贯穿三类事故的失败模式：**构建与 CI 全绿、运行期静默失败，只有用户看得见**。
+
+| 面 | 静默失败的样子 | 必须怎么做 |
+|----|----------------|-----------|
+| 数据绑定 | 属性名打错/类型不匹配 → 静默无值或红色校验文本 | 优先写编译期能校验的绑定（`x:CompileBindings` + `x:DataType`，见 `.omo/plans/` 的编译绑定计划）；运行时绑定只用于确实表达不了的位置 |
+| 反序列化 | 键名大小写不匹配 → `Deserialize` 返回成功但字段全空 | **禁止**裸 `JsonSerializer.Deserialize<T>(json)`，一律传 `JsonDefaults.CaseInsensitive`（`src/MantisZip.Core/Utils/JsonDefaults.cs`）或源生成上下文 |
+| 设置项 | 存了、有 UI、但没有任何运行时消费者（死开关） | 新增 `AppSettings` 属性时**同一次提交内**接上运行时消费者；需要留白先登记 `docs/KNOWN_ISSUES.md` 并加入守卫豁免表 |
+
+- **守卫**：`-Task guards` 的 `jsonoptions`（单参数 `Deserialize` 即失败）与 `settingswiring`（`AppSettings` 属性在 `src/` 无消费者即失败；豁免表 `$SETTINGS_WIRING_EXEMPT` 带原因，修掉一个必须删一行，双向核对）
+- **守卫只增有事故的**：每条守卫必须对应一次真实发生过的事故（写进 `docs/MAINTENANCE.md` §4 的表格），不要为「理论上可能」写规则，否则门禁会膨胀到没人维护
 
 ## 未来工作
 

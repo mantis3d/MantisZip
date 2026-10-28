@@ -108,7 +108,7 @@ public class PasswordManager
                 // Format 1: 明文 JSON（v0.x 早期版本）
                 if (trimmed.StartsWith("{") || trimmed.StartsWith("["))
                 {
-                    _data = JsonSerializer.Deserialize<PasswordData>(raw) ?? new PasswordData();
+                    _data = JsonSerializer.Deserialize<PasswordData>(raw, JsonDefaults.CaseInsensitive) ?? new PasswordData();
                     CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (plaintext, will migrate on save)");
                 }
                 // Format 2: AES-GCM 加密（当前版本）
@@ -118,7 +118,7 @@ public class PasswordManager
                     var ciphertext = Convert.FromBase64String(base64);
                     var decrypted = Protector.Unprotect(ciphertext);
                     var json = Encoding.UTF8.GetString(decrypted);
-                    _data = JsonSerializer.Deserialize<PasswordData>(json) ?? new PasswordData();
+                    _data = JsonSerializer.Deserialize<PasswordData>(json, JsonDefaults.CaseInsensitive) ?? new PasswordData();
                     CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (AES-GCM encrypted)");
                 }
                 // Format 3: 旧 DPAPI 加密格式（v0.3.x）— 自动迁移到 AES-GCM
@@ -167,7 +167,7 @@ public class PasswordManager
             var ciphertext = Convert.FromBase64String(raw);
             var decrypted = ProtectedData.Unprotect(ciphertext, null, DataProtectionScope.CurrentUser);
             var json = Encoding.UTF8.GetString(decrypted);
-            _data = JsonSerializer.Deserialize<PasswordData>(json) ?? new PasswordData();
+            _data = JsonSerializer.Deserialize<PasswordData>(json, JsonDefaults.CaseInsensitive) ?? new PasswordData();
             CoreLog.Info($"PasswordManager.Load: loaded {_data.Passwords.Count} entries (DPAPI encrypted), migrating to AES-GCM");
 
             // 备份旧 DPAPI 文件
@@ -396,7 +396,7 @@ public class PasswordManager
     /// </summary>
     public void ImportFromJson(string json)
     {
-        var imported = JsonSerializer.Deserialize<PasswordData>(json) ?? new PasswordData();
+        var imported = JsonSerializer.Deserialize<PasswordData>(json, JsonDefaults.CaseInsensitive) ?? new PasswordData();
         if (_data.Passwords.Count + imported.Passwords.Count > MaxEntries)
             throw new InvalidOperationException($"Import would exceed password library limit ({MaxEntries})");
         _data.Passwords.AddRange(imported.Passwords);

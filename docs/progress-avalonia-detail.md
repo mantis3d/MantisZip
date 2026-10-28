@@ -6,6 +6,21 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-28** — 计划立项：AXAML 编译绑定（A 档 10-14h）+ 登记 5 个死开关（KI-009）
+  - **触发**：同一天处理「数字输入框乱敲字符弹红字」时发现，这类问题的共同点是**绑定只在运行时校验**——写错属性名、类型不匹配、构造函数换了名字，构建与 CI 全绿，只在用户面前炸。
+  - **实测现状**：`src/MantisZip.UI.Avalonia` 共 50 个 `.axaml`，显式 `x:CompileBindings="True"` 仅 1 个、显式 `False` 1 个、声明 `x:DataType` 仅 13 个 ⇒ 绝大多数是反射绑定。
+  - **新增计划** `.omo/plans/未开始/axaml-compiled-bindings.md`：渐进式三批推进（B1 先把已有 `x:DataType` 的 13 个文件打开编译绑定；B2 逐页补类型；B3 主力窗口 + 门禁），守住「行为零变化、每文件实机验证、不追求 100%」三条口径；四类难点逐条给对策（`LocalizedStrings[Key]` 字典索引器改用 `ReflectionBinding` 或整文件显式 `False` 并注释原因、`DataTemplate` 补 `x:DataType`、`$parent`/`RelativeSource`/`ElementName` 保留反射、`DataContext = this` 自绑定如 `HelpDialog` 单独处理）；并规划第 9 条守卫 `compilebindings`——**只约束新增与已迁移文件**，存量只统计不判红。
+  - **`docs/PLAN.md`**：A 档工时 `约 61-74h` → `约 71-88h`，A2 阶段 `约 40-46h` → `约 50-60h`，A2 主线由三条改四条、`约 15-21h` → `约 25-35h`，并在 A2 主线表插入指向该计划的行（10-14h）。
+  - **`docs/KNOWN_ISSUES.md`**：新增 **KI-009**，登记 `AppSettings` 里 5 个有持久化、有设置窗口读写、但 `src/` 下零运行时消费者的死开关（`ExtractDestination`、`EnableExtractMenu`、`EnableQuickCompress`、`ShowPasswordMatchNotification`、`FavoritePaths`），阻塞类型「缺决策」，复评条件与守卫豁免表挂钩（决定去留时；修一个就删一行豁免）。
+**2026-10-28** — 加固：新增「数字输入受控」与「反序列化 / 设置项接线」三条规则守卫（规则 22 / 23）
+  - **触发**：用户问「Avalonia 有没有自带能限制的数字输入框？没有的话能不能做一个可复用的，并写进 AGENTS.md，避免同样问题再发生」，随后又追问「你觉得是否需要再往某个方面扩展一下」。核对后确认同一个失败模式已经三次咬人：`TextBox` 直绑 `int` 敲字母出红字、`languages.json` 大小写不匹配导致字段全空、`AppSettings` 存了值却无消费者（死开关）——三者**构建、CI、测试全绿，只有用户看得见**。
+  - **量化现状**（2026-10-28 实测）：`src/MantisZip.UI.Avalonia` 共 **50** 个 `.axaml`，显式 `x:CompileBindings="True"` 仅 **1** 个、显式 `False` 1 个、声明 `x:DataType` 仅 **13** 个；`src/` 下 `JsonSerializer.Deserialize` 约 **15** 处（多为裸默认 options）；`AppSettings` 有 **112** 个 public 属性，按「排除自身与设置窗口 VM 后 `src/` 零引用」扫出 5 个真死开关。
+  - **新增可复用行为** `src/MantisZip.UI.Avalonia/Behaviors/NumericInput.cs`：附加属性 `Enabled` / `Minimum` / `Maximum`，四项保证 —— `TextInput` 阶段拒绝非数字（`Minimum < 0` 时允许开头一个 `-`）、`TextChanged` 清洗粘贴进来的非法字符、`LostFocus` 按边界 clamp 且空串时还原上一个合法值、控件回收时靠 `ConditionalWeakTable` 自动释放状态。选型因此变成三选一：需要箭头用 `NumericUpDown Classes="intOnly"`、要普通输入框外观用 `TextBox + behaviors:NumericInput`、纯展示用 `TextBlock`。
+  - **首个使用者**：`Views/SettingsWindow.axaml` 元数据面板的 `Row` / `Order` 从 `NumericUpDown`（64px 单元格里塞上下箭头挤）改回 `TextBox + behaviors:NumericInput`，列宽 `*,90,90,110` → `*,80,80,130`；`Views/UiTestWindow.axaml(.cs)` 的演示顺带改用该行为，删掉当年「业务代码如需复用建议抽成附加行为」的临时代码 —— 那条注释里的建议正是本次落地的东西。
+  - **新增三条守卫**（`scripts/verify-repo.ps1`，守卫总数 5 → **8**）：`numericbinding`（扫全部 `.axaml`：数字属性若用 `Text="{Binding X}"` 必须挂 `NumericInput.Enabled="True"` 且非只读/无转换器；整数型 `NumericUpDown` 必须挂 `intOnly`）、`jsonoptions`（`src/` 下单参数 `JsonSerializer.Deserialize` 即失败）、`settingswiring`（`AppSettings` 每个 public 属性必须在 `src/` 有消费者，未接上的必须落在带原因的豁免表里，且豁免表**反向核对**）。
+  - **规则同步**：`AGENTS.md` 新增规则 22（数字输入三选一）与规则 23（总纲：绑定优先编译期校验、反序列化禁止裸 `Deserialize`、新设置项必须同提交内接消费者；守卫只增「有真实事故的」）；`docs/MAINTENANCE.md` §4 由「五条规则守卫」改为「八条」并逐条记事故，「已知覆盖边界」补三条（属性重名误判、显式传默认 options 抓不到、消费者只看文本出现次数）。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/NumericInputBehaviorTests.cs` 6 例（挂接即清洗非法字符、失焦 clamp 上界/下界、空串还原上一合法值、负号仅在 `Minimum < 0` 时保留、关闭后不再干预）；`SettingsNumericInputTests` 更新为按两类受控写法分别断言（`Row`/`Order` 走行为、其余走 `NumericUpDown`）。
+  - **验证**：`-Task check` 8 条守卫全绿；`-Task build -Target avalonia` 0 警告 0 错误、`-Target core` 0 警告 0 错误；UI 测试程序集 **566 例全绿**（3 Skip）。
 **2026-10-28** — 修复：设置窗口数字输入框可敲任意字符并弹红色校验文本
   - **症状**（用户实测）：「外观 → 进度窗口 → 完成后自动关闭延时」是个普通输入框，可以输入任意字符，敲进去之后控件下方出现一条红色报错文本。
   - **根因**：这些输入框都是普通 `TextBox` 直绑 `int` / `long` 属性（`AutoCloseDelaySeconds`、`MaxRecentFiles`、`MaxTablePreviewRows`、`MaxTablePreviewCols`、`DoubleClickOpenThresholdMB`、元数据面板的 `Row` / `Order`）。用户输入非数字时绑定转换失败，Avalonia 默认 `DataValidationErrors` 模板就在控件下方渲染转换异常文本（红色）。同一个坑在设置窗口有 7 处，只是延时那格最容易被随手乱敲。
@@ -3125,6 +3140,12 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.4 (2026-10-28) 反序列化统一传「大小写宽容」options（新增 `JsonDefaults`）
+  - **触发**：2026-10-28 语言页「翻译贡献者」恒为空 ——— `LocalizationManager` 用单参数 `JsonSerializer.Deserialize` 读 `languages.json`，键名全小写、属性 PascalCase，`System.Text.Json` 默认区分大小写 ⇒ 反序列化「成功」但 `Name` / `Translator` 全空。同一类隐患在 `src/` 下约 15 处。
+  - **修法**：新增 `src/MantisZip.Core/Utils/JsonDefaults.cs`（`public static readonly JsonSerializerOptions CaseInsensitive = new() { PropertyNameCaseInsensitive = true }`），XML 注释写清「为什么必须显式传」「为什么键名大小写要宽容」「边界（只解决大小写，不解决键名完全不同）」；把 10 处裸调用改为显式传入 —— `Core/Services/RecentFileManager.cs`、`Core/Utils/FavoritePathManager.cs`、`Core/Utils/PasswordManager.cs`（4 处）、`Core/Utils/PathHistoryManager.cs`、`UI.Avalonia/Models/RecentFilesManager.cs`、`UI.Avalonia/Models/WindowStateManager.cs`、`UI.Avalonia/Services/MetadataSettingsManager.cs`、`UI.Avalonia/Services/LocalizationManager.cs`（strings 与 languages 两处）、`UI.Avalonia/Dialogs/PasswordManagerWindow.axaml.cs`。源生成上下文（`AppSettingsJsonContext`）与已有显式 options 的位置（`LayoutStateManager`）保持不动。
+  - **守卫**：`scripts/verify-repo.ps1` 的 `jsonoptions` —— `src/` 下（跳过 `tests/` 与注释行）出现单参数 `JsonSerializer.Deserialize` 即失败，参数个数由 `Get-JsonDeserializeArgCount` 数顶层逗号得出。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/JsonDefaultsTests.cs`（小写键能绑定出非空字段、单参数重载会丢字段的对照断言、仓库内不再有裸调用）。
+  - **验证**：`-Task build -Target core` 与 `-Target avalonia` 各 0 警告 0 错误；UI 测试程序集 566 例全绿。
 #### v0.5.4 (2026-10-27) 计划立项：压缩包内重命名推倒重写（S 档；2026-10-28 已移回 A 档）+ 编辑操作序列（A 档）
   - **触发**：用户问「为什么不能像文件管理器那样先改一堆、最后一起保存」。核对后发现现状是**每一次编辑都整包写盘**——ZIP 的添加与删除各自都是整包 copy-mode 复制（`src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs:136-222`、`:894-979`），7z 删除更是全量解压 + 重打包（`src/MantisZip.Core/Engines/SevenZipEngine.cs:1281-1345`，且固定 `CompressionLevel.Normal`）。
   - **`archive-rename-entry.md` 推倒重写（S 档 8-10h）**：旧方案「提取→删除→添加」有四条硬伤——改一个名字要重写三遍整包、7z 会静默把用户压缩等级重置成 `Normal`、加密包改名会变明文、三步之间没有原子性。新方案：给 `src/MantisZip.Core/Utils/ZipBinaryRewriter.cs:314` 的 `RewriteAsync` 加 `renameMap`，只改 LFH/CD 里的名字字节、压缩数据原样搬运（**零重压缩**）；新名不可被归档编码无损表示或遇 ZIP64 时抛 `ZipCopyModeException` 回退 legacy，**不静默降级成乱码**。7z 用 `ModifyArchive` 就地删 + 单条追加（`:1509-1511` 已验证 index 删除有效）；tar.gz 明确不支持。新增 `IArchiveEngine.CanRename` / `RenameEntriesAsync`（与 `CanAdd`/`CanDelete` 同型：`src/MantisZip.Core/Abstractions/ArchiveEngine.cs:540`/`:545`）。UI：右键菜单插在 `src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml:293` 的「删除」之前，F2 走 `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs:1007` 的 `RegisterKeyBindings`，并按规则 10.1 同步菜单 `InputGesture` 与 `tests/MantisZip.UI.Avalonia.Tests/MainWindowKeyBindingsTests.cs`。

@@ -11,35 +11,54 @@ namespace MantisZip.UI.Avalonia.Tests;
 ///
 /// 背景（2026-10-28 报告）：自动关闭延时原本是普通 <c>TextBox</c> 直绑 <c>int</c>，用户敲
 /// 任意字符 → 绑定转换失败 → Avalonia 默认 DataValidationErrors 模板在控件下方渲染一条**红色报错文本**。
-/// 现在所有数字项统一用 <c>NumericUpDown Classes="intOnly"</c>（只解析整数，非法输入不进入绑定）。
-/// 本测试同时盯住「源码不再退回 TextBox」和「NumericUpDown 本身不产生校验错误」两件事。
+/// 现在数字项按规则 22 分两种受控写法：需要上下调值的用 <c>NumericUpDown Classes="intOnly"</c>，
+/// 需要保持普通输入框外观（紧凑表格单元格）的用 <c>TextBox + behaviors:NumericInput</c>。
+/// 本测试盯住三件事：源码里不存在「裸 TextBox 直绑数字」、两种写法都按属性落位、
+/// 以及控件本身不产生校验错误。
 /// </summary>
 public class SettingsNumericInputTests
 {
-    /// <summary>设置窗口里直绑 int / long 的属性名（改绑定方式时同步这里）。</summary>
-    private static readonly string[] NumericProperties =
+    /// <summary>用 <c>NumericUpDown Classes="intOnly"</c>（带上下调值按钮）的属性名。</summary>
+    private static readonly string[] NumericUpDownProperties =
     [
         "AutoCloseDelaySeconds",
         "MaxRecentFiles",
         "MaxTablePreviewRows",
         "MaxTablePreviewCols",
         "DoubleClickOpenThresholdMB",
+    ];
+
+    /// <summary>用 <c>TextBox + behaviors:NumericInput</c>（保持输入框外观）的属性名。</summary>
+    private static readonly string[] BehaviorTextBoxProperties =
+    [
         "Row",
         "Order",
     ];
 
     [AvaloniaFact]
-    public void SettingsWindow_NumericSettings_BindThroughNumericUpDown()
+    public void SettingsWindow_NumericSettings_UseControlledInputs()
     {
         var xaml = ReadRepoFile("src/MantisZip.UI.Avalonia/Views/SettingsWindow.axaml");
 
-        foreach (var property in NumericProperties)
+        // 规则 22 禁令：任何数字属性都不许再用裸 TextBox 直绑（「裸」= 没有挂 NumericInput 行为）
+        foreach (var property in NumericUpDownProperties.Concat(BehaviorTextBoxProperties))
         {
             Assert.DoesNotContain($"Text=\"{{Binding {property}}}\"", xaml);
+        }
 
-            // delay / 数字项必须出现 Value="{Binding 属性" 的写法（TextBox 用 Text=，NumericUpDown 用 Value=）
+        // 需要调值按钮的项走 NumericUpDown + Value 绑定
+        foreach (var property in NumericUpDownProperties)
+        {
             Assert.Contains($"Value=\"{{Binding {property}", xaml);
         }
+
+        // 表格单元格里的 Row / Order 走 TextBox + NumericInput 行为（无箭头，外观与相邻单元格一致）
+        foreach (var property in BehaviorTextBoxProperties)
+        {
+            Assert.Contains($"Text=\"{{Binding {property}, Mode=TwoWay}}\"", xaml);
+        }
+
+        Assert.Contains("behaviors:NumericInput.Enabled=\"True\"", xaml);
 
         // 整数解析样式靠 .intOnly（见 App.axaml），漏挂会让 NumericUpDown 接受小数并显示 8.5
         Assert.Contains("NumericUpDown Classes=\"intOnly\"", xaml);

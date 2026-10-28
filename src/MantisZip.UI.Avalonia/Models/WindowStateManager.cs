@@ -2,6 +2,7 @@ using System.IO;
 using System.Text.Json;
 using Avalonia;
 using Avalonia.Controls;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Models;
 
@@ -38,7 +39,7 @@ internal static class WindowStateManager
         try
         {
             var json = File.ReadAllText(ConfigFile);
-            var snapshot = JsonSerializer.Deserialize<WindowStateSnapshot>(json);
+            var snapshot = JsonSerializer.Deserialize<WindowStateSnapshot>(json, JsonDefaults.CaseInsensitive);
             if (snapshot == null)
                 return null;
 
