@@ -485,6 +485,23 @@
                            FontSize="13"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
 
+                <!-- 更新说明：小标题 + Markdown 正文，接口带回 release body 时才显示整块。
+                     正文由 code-behind 塞进 NotesHost（Markdown 无法用字符串绑定表达），
+                     与「发现新版本」对话框同源、同渲染方式；高度封顶后内部自行滚动。 -->
+                <TextBlock Text="{Binding ReleaseNotesLabelText}"
+                           IsVisible="{Binding ShowReleaseNotes}"
+                           FontSize="13" FontWeight="Bold"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+                <Border IsVisible="{Binding ShowReleaseNotes}"
+                        MaxHeight="260"
+                        Background="{DynamicResource ThemeWindowBgBrush}"
+                        BorderBrush="{DynamicResource ThemeBorderLightBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{DynamicResource BorderRadius}">
+                  <ContentControl x:Name="NotesHost" />
+                </Border>
+
                 <!-- 打开发布页按钮：应用内不下载，交给系统浏览器（同样不写本地 Padding，见上方按钮注释） -->
                 <Button Content="{Binding UpdateDownloadText}"
                         Click="OnOpenReleasePageClick"

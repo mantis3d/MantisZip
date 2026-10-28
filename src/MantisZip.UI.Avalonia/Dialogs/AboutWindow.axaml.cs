@@ -161,6 +161,24 @@ public partial class AboutWindow : Window, INotifyPropertyChanged
         private set => SetField(ref _updatePublishDateText, value);
     }
 
+    /// <summary>「更新说明」小标题。</summary>
+    public string ReleaseNotesLabelText => LocalizationManager.T("Update_ReleaseNotes");
+
+    private bool _showReleaseNotes;
+
+    /// <summary>
+    /// 是否显示更新说明区：接口带回 body 时才有内容。
+    /// <para>
+    /// 说明正文用 <see cref="MarkdownHelpContent"/> 渲染成原生控件树后塞进 <c>NotesHost</c>，
+    /// 不走数据绑定（Markdown 无法用字符串绑定表达）——与「发现新版本」对话框同一套实现。
+    /// </para>
+    /// </summary>
+    public bool ShowReleaseNotes
+    {
+        get => _showReleaseNotes;
+        private set => SetField(ref _showReleaseNotes, value);
+    }
+
     // Dependency purposes (About → Dependencies tab)
     public string AboutDepAvalonia => LocalizationManager.T("About_Dep_Avalonia");
     public string AboutDepWebView => LocalizationManager.T("About_Dep_WebView");
@@ -283,6 +301,7 @@ public partial class AboutWindow : Window, INotifyPropertyChanged
             SetUpdateStatus(LocalizationManager.T("Update_Checking"));
             _latest = null;
             ShowLatestVersion = false;
+            ClearReleaseNotes();
 
             // 与启动检查共用同一解析器：Debug 下允许 fake-current-version.txt 覆盖比较基准
             var result = await UpdateService.CheckForUpdateAsync(DebugUpdateVersion.Effective);
@@ -307,6 +326,9 @@ public partial class AboutWindow : Window, INotifyPropertyChanged
                     UpdatePublishDateText = string.IsNullOrEmpty(update.PublishDateDisplay)
                         ? string.Empty
                         : LocalizationManager.T("Update_PublishDate", update.PublishDateDisplay);
+                    // 更新说明（GitHub release body 的 Markdown 原文）：与提示对话框同源、同渲染方式。
+                    // 正文缺失时整块隐藏，不回退显示 URL（这一页本来就有「打开发布页」按钮）。
+                    ShowReleaseNotesNow(update.ReleaseNotes);
                     ShowLatestVersion = true;
                     SetUpdateStatus(LocalizationManager.T("Update_NewVersionAvailable", latestVersion));
                     break;
@@ -317,12 +339,14 @@ public partial class AboutWindow : Window, INotifyPropertyChanged
                     App.DebugLog($"[AboutWindow] 检查更新失败：{result.Reason}");
                     _latest = null;
                     ShowLatestVersion = false;
+                    ClearReleaseNotes();
                     SetUpdateStatus(LocalizationManager.T("Update_CheckFailed"));
                     break;
 
                 default:
                     _latest = null;
                     ShowLatestVersion = false;
+                    ClearReleaseNotes();
                     SetUpdateStatus(LocalizationManager.T("Update_UpToDate"));
                     break;
             }
@@ -332,8 +356,34 @@ public partial class AboutWindow : Window, INotifyPropertyChanged
             App.DebugLog($"[AboutWindow] CheckForUpdate failed: {ex.GetType().Name} {ex.Message}");
             _latest = null;
             ShowLatestVersion = false;
+            ClearReleaseNotes();
             SetUpdateStatus(LocalizationManager.T("Update_CheckFailed"));
         }
+    }
+
+    /// <summary>
+    /// 渲染并显示更新说明：Markdown 由 <see cref="MarkdownHelpContent"/> 转成原生控件树，
+    /// 直接塞进 <c>NotesHost</c>（不走绑定）。
+    /// </summary>
+    private void ShowReleaseNotesNow(string? markdown)
+    {
+        if (string.IsNullOrWhiteSpace(markdown))
+        {
+            ClearReleaseNotes();
+            return;
+        }
+
+        NotesHost.Content = new MarkdownHelpContent(markdown);
+        ShowReleaseNotes = true;
+    }
+
+    /// <summary>清空更新说明区（换成本次检查没有正文 / 失败 / 已是最新时调用）。</summary>
+    private void ClearReleaseNotes()
+    {
+        // 先断掉旧控件再隐藏：MarkdownHelpContent 里可能有 SelectableTextBlock 选中态，
+        // 留着旧内容会在下次检查成功的瞬间闪一下上一个版本的说明。
+        NotesHost.Content = null;
+        ShowReleaseNotes = false;
     }
 
     /// <summary>「打开下载页」按钮：把最近一次检查得到的下载地址交给系统浏览器（复用 OpenUrl）。</summary>

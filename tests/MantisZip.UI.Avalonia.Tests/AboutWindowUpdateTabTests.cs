@@ -3,6 +3,7 @@
 using global::Avalonia.Themes.Fluent;
 using Avalonia;
 using Avalonia.Controls;
+using global::Avalonia.Controls.Documents;
 using Avalonia.Headless.XUnit;
 using Avalonia.Interactivity;
 using Avalonia.Markup.Xaml.Styling;
@@ -11,6 +12,7 @@ using Avalonia.VisualTree;
 using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Services;
+using System.Text;
 using Xunit;
 
 namespace MantisZip.UI.Avalonia.Tests;
@@ -142,6 +144,116 @@ public class AboutWindowUpdateTabTests
         }
     }
 
+    /// <summary>
+    /// 「关于 → 更新」也要显示更新内容：接口带回 release body 时，详情区里必须出现渲染后的
+    /// Markdown 正文（而不是只给一个「打开发布页」链接）。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task UpdateTab_WhenCheckFindsNewVersion_ShowsReleaseNotes()
+    {
+        var theme = new ResourceInclude(new Uri("avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml"))
+        {
+            Source = new Uri("avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml"),
+        };
+        var app = Application.Current!;
+        app.Resources.MergedDictionaries.Add(theme);
+        var fluent = new FluentTheme();
+        app.Styles.Add(fluent);
+        try
+        {
+            // 远高于真实版本（0.5.4），保证判定为「有新版本」；body 里放一个独一无二的标记
+            UpdateService.SetTestHandler(new FixedReleaseHandler(ReleaseJsonWithMarker));
+            try
+            {
+                var window = new AboutWindow();
+                window.Show();
+                PumpLayout(window);
+
+                var tabs = window.GetVisualDescendants().OfType<TabControl>().First();
+                tabs.SelectedIndex = 4;
+                PumpLayout(window);
+
+                var checkButton = tabs.GetVisualDescendants().OfType<Button>()
+                    .First(b => (b.Content as string)?.Contains("检查") == true);
+                checkButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+
+                for (var i = 0; i < 100 && window.UpdateStatusText == LocalizationManager.T("Update_Checking"); i++)
+                {
+                    Dispatcher.UIThread.RunJobs();
+                    await Task.Delay(10);
+                }
+                Dispatcher.UIThread.RunJobs();
+                PumpLayout(window);
+
+                // 版本行/详情区先成立，再验证正文真的进了 NotesHost（不是只有开关为 true）
+                Assert.Contains("9.9.9", window.UpdateLatestVersionText);
+                Assert.True(window.ShowLatestVersion, "发现新版本时详情区应显示");
+                Assert.True(window.ShowReleaseNotes, "接口带回 body 时应显示更新说明区");
+
+                var notesHost = window.FindControl<ContentControl>("NotesHost");
+                Assert.NotNull(notesHost);
+                Assert.NotNull(notesHost!.Content);
+
+                var rendered = CollectText(notesHost);
+                Assert.Contains(ReleaseNotesMarker, rendered);
+                // Markdown 的列表项也要真的渲染成控件（不是把原文当一行纯文本塞进去）
+                Assert.Contains("第一处修复", rendered);
+
+                window.Close();
+            }
+            finally
+            {
+                UpdateService.SetTestHandler(null);
+            }
+        }
+        finally
+        {
+            app.Resources.MergedDictionaries.Remove(theme);
+            app.Styles.Remove(fluent);
+        }
+    }
+
+    /// <summary>更新说明里的唯一标记，用来区分「渲染了正文」与「渲染了别的字符串」。</summary>
+    private const string ReleaseNotesMarker = "RELEASE-NOTES-MARKER";
+
+    private const string ReleaseJsonWithMarker = """
+        {
+          "prerelease": false,
+          "tag_name": "v9.9.9",
+          "published_at": "2026-01-02T03:04:05Z",
+          "body": "## 修复内容\n\n- 第一处修复 RELEASE-NOTES-MARKER\n- 第二处修复\n"
+        }
+        """;
+
+    /// <summary>
+    /// 收集一段可视子树里的全部文字：<see cref="TextBlock.Text"/> 与 <c>Inlines</c> 里的 Run
+    /// （MarkdownPreviewBuilder 写的是 Run，只看 Text 会误判为空）。
+    /// </summary>
+    private static string CollectText(Visual root)
+    {
+        var builder = new StringBuilder();
+        foreach (var textBlock in root.GetVisualDescendants().OfType<TextBlock>())
+        {
+            if (!string.IsNullOrEmpty(textBlock.Text))
+            {
+                builder.Append(textBlock.Text);
+            }
+
+            if (textBlock.Inlines is { } inlines)
+            {
+                foreach (var run in inlines.OfType<Run>())
+                {
+                    if (!string.IsNullOrEmpty(run.Text))
+                    {
+                        builder.Append(run.Text);
+                    }
+                }
+            }
+        }
+
+        return builder.ToString();
+    }
+
     /// <summary>必定抛异常的 HTTP 桩：模拟断网 / 超时。</summary>
     private sealed class FailingHandler : DelegatingHandler
     {
@@ -155,6 +267,23 @@ public class AboutWindowUpdateTabTests
             HttpRequestMessage request,
             CancellationToken cancellationToken)
             => throw new HttpRequestException("模拟断网");
+    }
+
+    /// <summary>返回固定 JSON 的 HTTP 桩：模拟「GitHub 上确实有更高版本」。</summary>
+    private sealed class FixedReleaseHandler(string json) : DelegatingHandler
+    {
+        public FixedReleaseHandler()
+            : this(string.Empty)
+        {
+        }
+
+        protected override Task<HttpResponseMessage> SendAsync(
+            HttpRequestMessage request,
+            CancellationToken cancellationToken)
+            => Task.FromResult(new HttpResponseMessage(System.Net.HttpStatusCode.OK)
+            {
+                Content = new StringContent(json, Encoding.UTF8, "application/json"),
+            });
     }
 
     /// <summary>
