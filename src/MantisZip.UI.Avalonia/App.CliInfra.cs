@@ -226,7 +226,106 @@ public partial class App : Application
     //  IPC helpers (NamedPipe multi-instance)
     // ════════════════════════════════════════════════════════════════
 
-    private static void StartPipeServer(List<string> allPaths, CancellationToken ct, string pipeName, ManualResetEventSlim readyEvent)
+    /// <summary>
+    /// 多实例路径收集：首个实例用命名管道接收其它实例传来的路径，等待
+    /// <paramref name="collectDelay"/> 后把合并结果交给 <paramref name="onCollected"/>；
+    /// 后到实例把路径塞进管道后立即退出。非 Windows 直接执行回调。
+    /// </summary>
+    /// <remarks>
+    /// 背景：Explorer 多选时，静态层叠兜底菜单的动词只带 <c>%1</c>，会为每个选中项各启动一个
+    /// 进程（COM 动态菜单才一次带全部路径）。解压族全部动词都靠这里把多进程合并成一个窗口。
+    /// </remarks>
+    /// <param name="myPaths">本实例收到的路径（已过滤存在性）。</param>
+    /// <param name="desktop">应用生命周期（用于设置 MainWindow / 退出）。</param>
+    /// <param name="mutexName">该动词专属的互斥量名，不同动词互不干扰。</param>
+    /// <param name="pipeName">该动词专属的管道名。</param>
+    /// <param name="collectDelay">等待后续实例的时长；弹设置窗的流程可长一些，直接开始的流程应短一些。</param>
+    /// <param name="onCollected">收集结束后的执行体；第二个参数是收集期窗口（没建则为 null），
+    /// 调用方负责关闭它。</param>
+    /// <param name="createCollectingWindow">收集期是否显示提示窗；返回 null 表示不显示。</param>
+    internal static void RunWithPathCollector(
+        List<string> myPaths,
+        IClassicDesktopStyleApplicationLifetime desktop,
+        string mutexName,
+        string pipeName,
+        TimeSpan collectDelay,
+        Action<List<string>, Window?> onCollected,
+        Func<Window>? createCollectingWindow = null)
+    {
+        if (!OperatingSystem.IsWindows())
+        {
+            // 非 Windows 没有命名管道多实例合并，直接执行
+            Dispatcher.UIThread.Post(() => onCollected(myPaths, null));
+            return;
+        }
+
+        var mutex = new Mutex(true, mutexName, out bool firstInstance);
+        if (!firstInstance)
+        {
+            // 后到实例：把路径交给首实例后退出，避免多开窗口
+            SendPathsThroughPipe(myPaths, pipeName);
+            mutex.Dispose();
+            AppShutdown.Request(desktop.Shutdown);
+            return;
+        }
+
+        var allPaths = new List<string>(myPaths);
+        var cts = new CancellationTokenSource();
+        var pipeReady = new ManualResetEventSlim(false);
+
+        Window? collectingWindow = null;
+        if (createCollectingWindow != null)
+        {
+            collectingWindow = createCollectingWindow();
+            collectingWindow.Show();
+            desktop.MainWindow = collectingWindow;
+        }
+
+        StartPipeServer(allPaths, cts.Token, pipeName, pipeReady);
+        pipeReady.Wait(3000);
+
+        // 静默窗口 + 有上限的续期：单文件时只等一个 collectDelay（不拖慢单击解压），
+        // 多选时只要还有新路径陆续到达就继续等，避免后到的进程被丢掉（其压缩包会静默消失）
+        _ = Task.Run(() =>
+        {
+            var stopwatch = Stopwatch.StartNew();
+            var maxWait = collectDelay + TimeSpan.FromMilliseconds(600);
+            var lastCount = SnapshotCount(allPaths);
+            while (true)
+            {
+                Thread.Sleep(collectDelay);
+                var count = SnapshotCount(allPaths);
+                if (count == lastCount || stopwatch.Elapsed >= maxWait)
+                    break;
+                lastCount = count;
+            }
+
+            cts.Cancel();
+            mutex.Dispose();
+            Dispatcher.UIThread.Post(() =>
+            {
+                try
+                {
+                    onCollected(allPaths, collectingWindow);
+                }
+                catch (Exception ex)
+                {
+                    Debug.WriteLine($"RunWithPathCollector ({pipeName}): onCollected failed: {ex.Message}");
+                    AppShutdown.Request(desktop.Shutdown);
+                }
+            });
+        });
+    }
+
+    private static int SnapshotCount(List<string> allPaths)
+    {
+        lock (allPaths)
+        {
+            return allPaths.Count;
+        }
+    }
+
+    internal static void StartPipeServer(List<string> allPaths, CancellationToken ct, string pipeName, ManualResetEventSlim readyEvent)
     {
         Task.Run(async () =>
         {
@@ -266,7 +365,7 @@ public partial class App : Application
         });
     }
 
-    private static void SendPathsThroughPipe(List<string> paths, string pipeName)
+    internal static void SendPathsThroughPipe(List<string> paths, string pipeName)
     {
         try
         {

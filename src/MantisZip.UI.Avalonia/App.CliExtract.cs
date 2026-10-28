@@ -318,6 +318,118 @@ public partial class App : Application
             AppShutdown.Request(desktop.Shutdown);
     }
 
+    // ════════════════════════════════════════════════════════════════
+    //  解压族入口：IPC 多实例合并（多选时 Explorer 可能逐项启动进程）
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// <c>--extract</c> 入口：先把多个实例传来的路径合并，再弹一个设置窗加载全部压缩包。
+    /// </summary>
+    /// <remarks>
+    /// 为什么需要：Explorer 多选时，静态层叠兜底菜单的动词只带 <c>%1</c>，会为每个选中项各启动
+    /// 一个进程；不合并就会出现「N 个包 = N 个设置窗 + N 个进度窗」。COM 动态菜单一次带全部
+    /// 路径，走这里等于零成本（首实例收集 800ms 后照常弹窗）。
+    /// </remarks>
+    private static void HandleExtract(List<string> paths, IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var myPaths = paths
+            .Where(p => !string.IsNullOrEmpty(p) && (File.Exists(p) || Directory.Exists(p)))
+            .ToList();
+        if (myPaths.Count == 0)
+        {
+            AppShutdown.Request(desktop.Shutdown);
+            return;
+        }
+
+        // 收集期提示窗是唯一窗口：OnLastWindowClose 会在它关闭的瞬间退出进程，
+        // 导致后续设置窗来不及出现，故提前改成显式退出
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        RunWithPathCollector(
+            myPaths, desktop, ExtractMutexName, ExtractPipeName,
+            TimeSpan.FromMilliseconds(800),
+            (allPaths, collectingWindow) =>
+            {
+                collectingWindow?.Close();
+                _ = RunExtractDialogCliAsync(allPaths, desktop);
+            },
+            () => new CollectingWindow());
+    }
+
+    /// <summary>
+    /// <c>--extract-here</c> / <c>--extract-to-name</c> / <c>--extract-smart</c> 入口：
+    /// 同样先合并多实例路径，再按最终数量决定走单文件流程（含提权预检）还是批处理。
+    /// </summary>
+    private static void HandleDirectExtract(
+        List<string> paths,
+        string mode,
+        string[] args,
+        IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        var myPaths = paths
+            .Where(p => !string.IsNullOrEmpty(p) && File.Exists(p))
+            .ToList();
+        if (myPaths.Count == 0)
+        {
+            AppShutdown.Request(desktop.Shutdown);
+            return;
+        }
+
+        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
+        var (mutexName, pipeName) = mode switch
+        {
+            "toname" => (ExtractToNameMutexName, ExtractToNamePipeName),
+            "smart" => (ExtractSmartMutexName, ExtractSmartPipeName),
+            _ => (ExtractHereMutexName, ExtractHerePipeName),
+        };
+
+        // 这三个动词直接开始解压、没有设置窗：收集期不显示提示窗，等待也短一些，
+        // 避免单击右键解压时出现明显延迟
+        RunWithPathCollector(
+            myPaths, desktop, mutexName, pipeName,
+            TimeSpan.FromMilliseconds(400),
+            (allPaths, _collectingWindow) =>
+            {
+                if (allPaths.Count == 1)
+                {
+                    RunSingleDirectExtract(allPaths[0], mode, args, desktop);
+                    return;
+                }
+
+                _ = RunCliDirectExtractBatchAsync(allPaths, mode, desktop);
+            });
+    }
+
+    /// <summary>单文件直接解压（保持 IPC 合并前的原行为，含提权预检）。</summary>
+    private static void RunSingleDirectExtract(
+        string archivePath,
+        string mode,
+        string[] args,
+        IClassicDesktopStyleApplicationLifetime desktop)
+    {
+        switch (mode)
+        {
+            case "toname":
+                {
+                    var target = Path.Combine(
+                        Path.GetDirectoryName(archivePath) ?? ".",
+                        GetArchiveBaseName(archivePath));
+                    Directory.CreateDirectory(target);
+                    _ = RunExtractCliAsync(archivePath, target, args, desktop);
+                    break;
+                }
+
+            case "smart":
+                _ = RunExtractSmartCliAsync(archivePath, args, desktop);
+                break;
+
+            default:
+                _ = RunExtractCliAsync(archivePath, Path.GetDirectoryName(archivePath) ?? ".", args, desktop);
+                break;
+        }
+    }
+
     /// <summary>
     /// CLI --extract 弹窗解压入口（对齐 WPF HandleExtractBatch mode=extract）：
     /// 弹出 ExtractSettingsWindow 让用户选择目标路径 / 冲突策略 / 过滤条件，
