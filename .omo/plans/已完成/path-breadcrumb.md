@@ -280,3 +280,5 @@ public class PathBreadcrumb : UserControl
 - **编辑态高度跳动**：`EditBox` 固定 `Height=20`/`MinHeight=0`/`Padding=0`，并加 `AutoCompleteBox /template/ TextBox` 样式（透明底、无边框、`MinHeight=0`），使编辑态与浏览态外壳同高（实测都 30px）。
 - **候选下拉点击无效**：`DropDownOpened` 时把 `PointerPressed` 挂到 `Popup.Child`（类型是 `Border`），从 `e.Source` 向上找 `ListBoxItem` 提交；**不能**在 `SelectionChanged` 里提交（打字时控件会自动选中首候选 → 输到一半就跳走），也**不能**用 `PointerReleased`（按下即关下拉）。同时关闭 `IsTextCompletionEnabled`（默认开启会写乱输入串），并把「焦点在 `PopupRoot`」视为仍在本控件内。
 - **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbSuggestionClickTests.cs`（挂 Fluent 主题 + `ThemeLight.axaml`，从 `Popup.Child` 取候选项后 `RaiseEvent(PointerPressed)`）。
+
+- **2026-10-29 第三轮（真机）**：候选刷新延后后下拉不再自动打开 → 刷新完显式 `IsDropDownOpen`；主窗口地址栏 `ControlHeightSm` → `ControlHeightMd`；编辑态预填末尾分隔符（Disk `\` / Virtual `/`）且光标置末尾（不再全选）。

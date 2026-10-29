@@ -180,6 +180,7 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 | 无头截图里 `PathIcon` / `Shapes.Path` 不出现，但 `Border`、`TextBlock` 正常 | 本仓库无头环境 `window.CaptureRenderedFrame()` **不渲染几何图形**（用同屏红块 + ABC + 蓝路径验证过）。面包屑根图标「缺失」曾因此被误判为缺陷；图标/图形类视觉取证必须用真机 `CopyFromScreen` |
 | `AutoCompleteBox` 打字时自动选中首个候选，`SelectedItem` 在输入过程中就被设上 | 「选中即提交」不能写 `SelectionChanged`（会输到一半自动导航）；提交挂 `Popup.Child` 的 `PointerPressed`（下拉在按下瞬间就关，`PointerReleased` 收不到）；并关掉 `IsTextCompletionEnabled`（默认 `true`，会把候选剩余部分写进 `Text`，与「每次 `TextChanged` 重建 `ItemsSource`」叠加会写乱输入串） |
 | `AutoCompleteBox` 相关界面偶发 `ArgumentOutOfRangeException: Index was out of range`（`ItemsSourceView.GetAt` ← `SelectedItems.GetEnumerator`） | 在 `TextChanged` 里同步替换 `ItemsSource`，与 AutoCompleteBox 自己「关下拉 + 写回 `SelectedItem`」撞车。修法：候选刷新延后到 `DispatcherPriority.Background`（带代次号），换 `ItemsSource` 前先 `SelectedItem = null` |
+| `AutoCompleteBox` 打字后下拉不再弹出（延后刷新 `ItemsSource` 之后） | 候选刷新被 `Dispatcher.Post` 到 `Background`，控件自己那次 `TextUpdated` 已经关掉下拉。修法：刷新完显式 `IsDropDownOpen = 有候选 && 仍在编辑 && 文本非空` |
 
 ## 9. 还没做的（有意留白，不是忘了）
 

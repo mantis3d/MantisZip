@@ -185,4 +185,47 @@ public class PathBreadcrumbTests
 
         window.Close();
     }
+    [AvaloniaTheory]
+    [InlineData(@"C:\Users", @"C:\Users\")]
+    [InlineData(@"C:\Users\", @"C:\Users\")]
+    [InlineData(@"E:\", @"E:\")]
+    public void EnterEditMode_PrefillsTrailingSeparator_Disk(string path, string expected)
+    {
+        var (window, crumb) = ShowCrumb(path);
+        var edit = crumb.FindControl<AutoCompleteBox>("EditBox")!;
+
+        crumb.EnterEditMode();
+
+        // 地址栏的常见用法是从当前目录往子目录钻，进编辑态就带好分隔符，省一次手敲
+        Assert.Equal(expected, edit.Text);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void EnterEditMode_PrefillsTrailingSlash_Virtual()
+    {
+        var (window, crumb) = ShowCrumb("docs/images", BreadcrumbPathKind.Virtual);
+        var edit = crumb.FindControl<AutoCompleteBox>("EditBox")!;
+
+        crumb.EnterEditMode();
+
+        Assert.Equal("docs/images/", edit.Text);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void EnterEditMode_EmptyPath_StaysEmpty()
+    {
+        var (window, crumb) = ShowCrumb(string.Empty);
+        var edit = crumb.FindControl<AutoCompleteBox>("EditBox")!;
+
+        crumb.EnterEditMode();
+
+        // 空路径不预填分隔符，否则会凭空造出一个「根」提示
+        Assert.Equal(string.Empty, edit.Text);
+
+        window.Close();
+    }
 }

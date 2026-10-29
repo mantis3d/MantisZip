@@ -150,7 +150,9 @@ public partial class PathBreadcrumb : UserControl
         if (_isEditing) return;
         _isEditing = true;
         PseudoClasses.Set(":editing", true);
-        EditBox.Text = Path ?? string.Empty;
+        // 编辑态预填「当前路径 + 分隔符」：绝大多数输入是要进子目录，
+        // 光标停在末尾，直接敲子目录名即可（要整条替换就 Ctrl+A）。
+        EditBox.Text = BuildEditInitialText(Path);
         _text = EditBox.Text ?? string.Empty;
         UpdateEditSuggestions();
         SegmentsPanel.IsVisible = false;
@@ -186,8 +188,21 @@ public partial class PathBreadcrumb : UserControl
         inner.KeyDown += EditBox_KeyDown;
 
         inner.Focus();
-        inner.SelectAll();
+        // 光标停在末尾（不是全选）：配合 EnterEditMode 预填的分隔符，直接打字就是进子目录
+        inner.CaretIndex = inner.Text?.Length ?? 0;
         return true;
+    }
+
+    /// <summary>
+    /// 编辑态的初始文本：当前路径 + 末尾分隔符（已有则不重复加）。
+    /// 地址栏的实际用法是「从当前目录往子目录钻」，预填分隔符能省掉每次手敲一个反斜杠。
+    /// </summary>
+    private string BuildEditInitialText(string? path)
+    {
+        var text = path ?? string.Empty;
+        if (text.Length == 0) return text;
+        if (text.EndsWith('\\') || text.EndsWith('/')) return text;
+        return text + (PathKind == BreadcrumbPathKind.Virtual ? "/" : "\\");
     }
 
     /// <summary>退出编辑态（不导航）。宿主的 Popup 打开前调用，避免失焦还原与 Popup 焦点竞争。</summary>
@@ -312,7 +327,11 @@ public partial class PathBreadcrumb : UserControl
         {
             var items = EditCompletionProvider(EditBox.Text) ?? Enumerable.Empty<string>();
             EditBox.SelectedItem = null;
-            EditBox.ItemsSource = items.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            var list = items.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            EditBox.ItemsSource = list;
+            // 候选刷新被延后到 Background，控件自己那次 TextUpdated 早已走完（下拉也随之关掉），
+            // 所以这里要显式重新打开下拉，否则「打字有候选」只在第一下有效。
+            EditBox.IsDropDownOpen = _isEditing && list.Count > 0 && !string.IsNullOrEmpty(EditBox.Text);
         }
         catch
         {
