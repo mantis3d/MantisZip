@@ -21,7 +21,9 @@
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
       <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
-      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
+      <!-- 高度由控件自己决定（ControlHeightMd）：宿主一律不写 Height / MinHeight。
+           要调整面包屑高度就改这一处，不要回到各处宿主去覆盖。 -->
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
     <!-- 悬停：底色再深一档，给出「可点」的暗示 -->

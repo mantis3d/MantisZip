@@ -13,7 +13,6 @@
                                PathKind="Disk"
                                Path="{Binding #RootControl.Path, Mode=OneWay}"
                                FilterMode="Contains"
-                               MinHeight="{DynamicResource ControlHeightMd}"
                                EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
 
       <!-- Row 1: 快速操作按钮栏（收藏/历史/窗口/浏览） -->

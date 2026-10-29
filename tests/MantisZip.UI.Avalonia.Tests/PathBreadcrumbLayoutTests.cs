@@ -24,6 +24,10 @@ public class PathBreadcrumbLayoutTests
         var (window, crumb) = Show(@"C:\Users\Admin");
 
         var browse = crumb.Bounds.Height;
+        // 高度由控件自己决定（ControlHeightMd = 32），宿主不写 Height/MinHeight；
+        // 宿主若写了 Height 就是覆盖，等于把「一处改」又散回各处。
+        Assert.Equal(32, browse, 1);
+
         crumb.EnterEditMode();
         Pump(window);
         var editing = crumb.Bounds.Height;

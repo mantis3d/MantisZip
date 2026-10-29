@@ -85,7 +85,6 @@
                                x:Name="PathCrumbs"
                                PathKind="Disk"
                                FilterMode="Contains"
-                               MinHeight="{DynamicResource ControlHeightSm}"
                                EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
       <!-- 添加收藏按钮 -->
       <Button Grid.Column="5"

@@ -238,7 +238,7 @@
           <Border Grid.Row="1"
                   Padding="6,3"
                   Background="{DynamicResource ThemeHeaderBgBrush}">
-            <controls:PathBreadcrumb Height="{DynamicResource ControlHeightMd}"
+            <controls:PathBreadcrumb
                                      x:Name="AddressBar"
                                      PathKind="Virtual"
                                      Path="{Binding CurrentFolder, Mode=OneWay}"
