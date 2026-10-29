@@ -178,6 +178,7 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 | 无头测试里改 `TabControl.SelectedIndex` 后拿到的控件 `Bounds` 全是 0 | 页签内容控件在下一轮布局/调度才生成并排布：要循环 `Measure` → `Arrange` → `UpdateLayout()` → `Dispatcher.UIThread.RunJobs()` 数轮。另外被隐藏的分区（`IsEffectivelyVisible == false`，例如「还没有检查结果」时的详情块）里的按钮 `Bounds` 恒为 0，几何断言必须按**有效可见性**过滤，不能用 `IsVisible` |
 | `AutoCompleteBox` 里打字没反应（`IsFocused=true` 却收不到字符） | `AutoCompleteBox` 自身不处理文本输入：`Focus()` 它只会把焦点给容器，模板里的 `TextBox` 从未聚焦。必须 `ApplyTemplate()` 后取内部 `TextBox` 再 `Focus()`。另外 **Esc 会被 `AutoCompleteBox` 吞掉**（关自己的下拉），Enter/Esc 处理要挂到内部 `TextBox` 的 `KeyDown`，挂在容器上收不到 |
 | 无头截图里 `PathIcon` / `Shapes.Path` 不出现，但 `Border`、`TextBlock` 正常 | 本仓库无头环境 `window.CaptureRenderedFrame()` **不渲染几何图形**（用同屏红块 + ABC + 蓝路径验证过）。面包屑根图标「缺失」曾因此被误判为缺陷；图标/图形类视觉取证必须用真机 `CopyFromScreen` |
+| `AutoCompleteBox` 打字时自动选中首个候选，`SelectedItem` 在输入过程中就被设上 | 「选中即提交」不能写 `SelectionChanged`（会输到一半自动导航）；提交挂 `Popup.Child` 的 `PointerPressed`（下拉在按下瞬间就关，`PointerReleased` 收不到）；并关掉 `IsTextCompletionEnabled`（默认 `true`，会把候选剩余部分写进 `Text`，与「每次 `TextChanged` 重建 `ItemsSource`」叠加会写乱输入串） |
 
 ## 9. 还没做的（有意留白，不是忘了）
 

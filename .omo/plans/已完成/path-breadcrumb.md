@@ -275,3 +275,8 @@ public class PathBreadcrumb : UserControl
 5. **修「编辑态打字没反应」**：`EditBox.Focus()` 只聚焦 `AutoCompleteBox` 容器，内部 `TextBox` 从未拿到焦点；改为 `ApplyTemplate()` 后取内部 `TextBox` `Focus() + SelectAll()`，Enter/Esc 也改挂内部 `TextBox`（`AutoCompleteBox` 会吞 Esc）。
 
 验证：`PathBreadcrumbTests` 7 例 + 新增 `PathBreadcrumbHitTestTests` 2 例（真实指针命中）；Release 构建 0 警告、ui-tests 全绿、`-Task check` 8 项守卫全绿；真机 4 张取证。
+### 实施后修正 2（2026-10-29，真机反馈：高度跳动 + 候选下拉点击）
+
+- **编辑态高度跳动**：`EditBox` 固定 `Height=20`/`MinHeight=0`/`Padding=0`，并加 `AutoCompleteBox /template/ TextBox` 样式（透明底、无边框、`MinHeight=0`），使编辑态与浏览态外壳同高（实测都 30px）。
+- **候选下拉点击无效**：`DropDownOpened` 时把 `PointerPressed` 挂到 `Popup.Child`（类型是 `Border`），从 `e.Source` 向上找 `ListBoxItem` 提交；**不能**在 `SelectionChanged` 里提交（打字时控件会自动选中首候选 → 输到一半就跳走），也**不能**用 `PointerReleased`（按下即关下拉）。同时关闭 `IsTextCompletionEnabled`（默认开启会写乱输入串），并把「焦点在 `PopupRoot`」视为仍在本控件内。
+- **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbSuggestionClickTests.cs`（挂 Fluent 主题 + `ThemeLight.axaml`，从 `Popup.Child` 取候选项后 `RaiseEvent(PointerPressed)`）。

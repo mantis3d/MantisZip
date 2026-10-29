@@ -52,6 +52,13 @@ public partial class PathBreadcrumb : UserControl
 
     private bool _isEditing;
     private string _text = string.Empty;
+
+    /// <summary>
+    /// 用户是否刚从下拉候选里挑了一项：挑完 <see cref="AutoCompleteBox"/> 会关下拉，
+    /// 关下拉那一刻再提交导航，避免「点了没反应」。
+    /// </summary>
+
+    /// <summary>下拉候选列表的点击是否已挂接（模板就绪后才能挂，故用标志防重复挂）。</summary>
     private bool _cultureSubscribed;
     private TopLevel? _topLevel;
 
@@ -114,6 +121,12 @@ public partial class PathBreadcrumb : UserControl
         if (Design.IsDesignMode) return;
 
         EditBox.FilterMode = FilterMode;
+        // 关闭「内联补全」（默认开启）：它会在每次按键后把候选剩余部分直接写进 Text，
+        // 而本控件每次 TextChanged 都会重建 ItemsSource，两者叠加会把输入串写成 E:E:\AEW\ 这种鬼样子。
+        // 地址栏只需要下拉候选，不需要行内补全。
+        EditBox.IsTextCompletionEnabled = false;
+        // 候选列表是 Popup 里的独立子树：指针事件要挂到它的内容根上，见 AttachDropDownClickHandler
+        EditBox.DropDownOpened += (_, _) => AttachDropDownClickHandler();
         EditBox.TextChanged += (_, _) =>
         {
             _text = EditBox.Text ?? string.Empty;
@@ -205,6 +218,10 @@ public partial class PathBreadcrumb : UserControl
         else if (change.Property == FilterModeProperty)
         {
             EditBox.FilterMode = FilterMode;
+        // 关闭「内联补全」（默认开启）：它会在每次按键后把候选剩余部分直接写进 Text，
+        // 而本控件每次 TextChanged 都会重建 ItemsSource，两者叠加会把输入串写成 E:E:\AEW\ 这种鬼样子。
+        // 地址栏只需要下拉候选，不需要行内补全。
+        EditBox.IsTextCompletionEnabled = false;
         }
     }
 
@@ -541,6 +558,35 @@ public partial class PathBreadcrumb : UserControl
         }
     }
 
+    /// <summary>
+    /// 给下拉候选列表挂「点击即提交」：候选项在 Popup 里，默认点它只把文本填进去（还要再按一次 Enter），
+    /// 而地址栏的手感是「点一下就去那儿」。
+    /// 用 PointerPressed 而不是 SelectionChanged：AutoCompleteBox 在打字时会**自动把首个候选设为 SelectedItem**，
+    /// 若在 SelectionChanged 里提交，输到一半就会被"自动导航"（实测输入 E: 就跳走）。
+    /// </summary>
+    private void AttachDropDownClickHandler()
+    {
+        if (EditBox.GetVisualDescendants().OfType<Popup>().FirstOrDefault()?.Child is not Control popupRoot) return;
+
+        popupRoot.AddHandler(
+            PointerPressedEvent,
+            OnDropDownItemPointerPressed,
+            global::Avalonia.Interactivity.RoutingStrategies.Bubble,
+            handledEventsToo: true);
+    }
+
+    /// <summary>候选列表按下即提交（下拉在按下瞬间就会关闭，所以不能用 Released）。</summary>
+    private void OnDropDownItemPointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (!_isEditing) return;
+
+        var item = (e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault();
+        if (item?.DataContext is not string picked || string.IsNullOrWhiteSpace(picked)) return;
+
+        e.Handled = true;
+        CloseEdit();
+        NavigateRequested?.Invoke(this, picked.Trim());
+    }
     private void EditBox_KeyDown(object? sender, KeyEventArgs e)
     {
         if (e.Key == Key.Enter)
@@ -557,6 +603,7 @@ public partial class PathBreadcrumb : UserControl
         }
     }
 
+    /// </summary>
     private void EditBox_LostFocus(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
     {
         // 失焦即还原浏览态（不导航）；宿主 Popup 打开前应显式 CloseEdit，避免竞争。
@@ -568,10 +615,18 @@ public partial class PathBreadcrumb : UserControl
             () =>
             {
                 if (!_isEditing) return;
+
+                // 下拉候选列表在 Popup 里，点它时焦点会短暂离开本控件子树；此时若直接 CloseEdit，
+                // EditBox 被隐藏 → 下拉被关掉 → 那一次点击就丢了（「候选列表点了没反应」）。
+        
                 var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
-                if (focused is Visual v && (v == this || v == EditBox || EditBox.IsVisualAncestorOf(v)))
+                if (focused is Visual v)
                 {
-                    return;
+                    if (v == this || v == EditBox || EditBox.IsVisualAncestorOf(v)) return;
+
+                    // 下拉候选在 Popup（独立 PopupRoot）里，点候选时焦点会跑到 PopupRoot 下的 ListBoxItem；
+                    // 这同样属于「仍在本控件内」，不能当成失焦退出编辑态，否则下拉会被关掉、那一次点击就丢了。
+                    if (global::Avalonia.Controls.TopLevel.GetTopLevel(v) is global::Avalonia.Controls.Primitives.PopupRoot) return;
                 }
 
                 CloseEdit();

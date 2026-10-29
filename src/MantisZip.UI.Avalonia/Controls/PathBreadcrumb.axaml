@@ -28,7 +28,17 @@
     <Style Selector="UserControl:editing Border.crumbShell">
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
     </Style>
-    <!-- 段按钮：紧凑外观，靠悬停色区分可点击 -->
+    <!-- 编辑态：AutoCompleteBox 内部的 TextBox 也要去掉自己的边框/底色/内边距，
+         否则外壳里会再套一个圆角输入框（双层边框），且其最小高度会把外壳撑高 -->
+    <Style Selector="AutoCompleteBox /template/ TextBox">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>    <!-- 段按钮：紧凑外观，靠悬停色区分可点击 -->
     <Style Selector="Button.crumb">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />
@@ -127,10 +137,16 @@
                  PointerPressed="EmptyHint_PointerPressed" />
 
       <!-- 编辑态：AutoCompleteBox（MinimumPrefixLength 固定 0，补全源由宿主注入） -->
+      <!-- 编辑态高度锁死为 20（与浏览态段按钮同高）：否则 AutoCompleteBox 的默认最小高度会把外壳撑高，
+           进/出编辑态时整行高度变化 → 下方内容整体跳动 -->
       <AutoCompleteBox x:Name="EditBox"
                        IsVisible="False"
                        MinimumPrefixLength="0"
                        FontSize="12"
+                       Height="20"
+                       MinHeight="0"
+                       Padding="0"
+                       VerticalAlignment="Center"
                        Background="Transparent"
                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                        BorderThickness="0"
