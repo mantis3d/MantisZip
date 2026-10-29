@@ -21,22 +21,28 @@ public static class ArchiveFormatHelper
         ArchiveEngineFactory.GetFormatByExtension(path);
 
     /// <summary>
-    /// 「打开压缩包」对话框的筛选模式：内置扩展名 + 分卷首卷（<c>*.001</c>）+ 用户在
-    /// 设置 →「文件类型关联」里自定义的扩展名。
+    /// 「打开压缩包」对话框的筛选模式 —— 由设置里「文件类型关联」列表的**右列**（打开展示）派生。
     /// </summary>
-    /// <param name="customExtensions">
-    /// 自定义扩展名（来自 <c>AppSettings.CustomAssocExtensions</c>，形如 <c>.xyz</c>）；
-    /// 大小写、前导点由本方法归一化，非法项忽略。
+    /// <remarks>
+    /// 单一事实源：<see cref="ArchiveExtensionCatalog"/>（有哪些格式）+ <see cref="AssocPreferences.GetOpenDialogExtensions"/>
+    /// （用户勾了哪些）。没勾的格式不会出现在筛选里，但仍可通过拖拽 / 命令行 / 双击打开；
+    /// 对话框下拉里始终有「所有文件」兜底。
+    /// </remarks>
+    public static IReadOnlyList<string> BuildOpenDialogPatterns(AppSettings settings)
+        => BuildOpenDialogPatterns(AssocPreferences.GetOpenDialogExtensions(settings));
+
+    /// <summary>
+    /// 按给定扩展名列表构造筛选模式（供设置未就绪的调用点与测试使用；<c>null</c> = 目录默认值）。
+    /// </summary>
+    /// <param name="extensions">
+    /// 要显示的扩展名（形如 <c>.xyz</c> 或 <c>xyz</c>）；大小写、前导点由本方法归一化，非法项忽略。
     /// </param>
-    public static IReadOnlyList<string> BuildOpenDialogPatterns(IEnumerable<string>? customExtensions = null)
+    public static IReadOnlyList<string> BuildOpenDialogPatterns(IEnumerable<string>? extensions = null)
     {
-        var patterns = new List<string>(ArchiveEngineFactory.SupportedExtensions.Select(ext => "*" + ext));
-        patterns.AddRange(ArchiveVolumeSet.VolumeFilterPatterns);
+        var source = extensions ?? ArchiveExtensionCatalog.DefaultOpenDialogExtensions;
+        var patterns = new List<string>();
 
-        if (customExtensions is null)
-            return patterns;
-
-        foreach (var raw in customExtensions)
+        foreach (var raw in source)
         {
             if (NormalizeCustomExtension(raw) is not { } ext)
                 continue;
@@ -44,6 +50,21 @@ public static class ArchiveFormatHelper
             var pattern = "*" + ext;
             if (!patterns.Contains(pattern, StringComparer.OrdinalIgnoreCase))
                 patterns.Add(pattern);
+        }
+
+        // 分卷首卷恒可见：`.001` 属于「分卷」而不是某个具体格式，用户把它从筛选里去掉的话
+        // 分卷包就再也选不到了，代价大于收益。
+        foreach (var pattern in ArchiveVolumeSet.VolumeFilterPatterns)
+        {
+            if (!patterns.Contains(pattern, StringComparer.OrdinalIgnoreCase))
+                patterns.Add(pattern);
+        }
+
+        // 设置被清空时不至于只剩「所有文件」。
+        if (patterns.Count == 0)
+        {
+            foreach (var ext in ArchiveExtensionCatalog.EngineExtensions)
+                patterns.Add("*" + ext);
         }
 
         return patterns;

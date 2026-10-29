@@ -50,6 +50,20 @@ public class ShellIntegrationAssocTests : IDisposable
         ShellIntegration.UninstallAssociationForExtension(ext);
     }
 
+    /// <summary>
+    /// 显式关联集合（默认值去掉指定扩展名）—— 2026-10-29 起关联状态由
+    /// <see cref="AppSettings.AssocExtensions"/> 集合决定，老的 <c>AssocZip=false</c> 开关只剩迁移用途。
+    /// </summary>
+    private static AppSettings AssocSettingsWithout(params string[] excluded)
+        => new()
+        {
+            AssocExtensions =
+            [
+                .. MantisZip.Core.Utils.ArchiveExtensionCatalog.DefaultAssocExtensions
+                    .Where(e => !excluded.Contains(e, StringComparer.OrdinalIgnoreCase)),
+            ],
+        };
+
     // ──────────────────────────────────────────────
     // InstallAssociationForExtension
     // ──────────────────────────────────────────────
@@ -447,7 +461,7 @@ public class ShellIntegrationAssocTests : IDisposable
     public void SelfHeal_DoesNotHeal_WhenNoRegistryTrace()
     {
         // 无注册表痕迹 → 不自愈
-        var s = new AppSettings { AssocZip = false };
+        var s = AssocSettingsWithout(".zip");
         ShellIntegration.SelfHealAssociations(s);
         using var chk = RegistryHost.Open(@"Software\Classes\MantisZip.Zip");
         Assert.Null(chk);
@@ -461,7 +475,7 @@ public class ShellIntegrationAssocTests : IDisposable
         {
             using (var uc = RegistryHost.Create(@"Software\Microsoft\Windows\CurrentVersion\Explorer\FileExts\.zip\UserChoice"))
                 uc.SetValue("Progid", "MantisZip.Zip");
-            var s = new AppSettings { AssocZip = false };
+            var s = AssocSettingsWithout(".zip");
             ShellIntegration.SelfHealAssociations(s);
             using var chk = RegistryHost.Open(@"Software\Classes\MantisZip.Zip");
             Assert.Null(chk);
@@ -502,37 +516,47 @@ public class ShellIntegrationAssocTests : IDisposable
     [Fact]
     public void IsAssocEnabledInSettings_CoversAssociatedExtensions()
     {
-        // 防未来新增格式导致自愈被静默关闭：**参与文件关联**的每个扩展名都必须命中显式分支，
-        // 不得落进 `_ => false` 默认分支。
-        // 注意（issue #54）：SupportedExtensions 现在比关联名单多 4 个（.jar/.war/.ear/.apk），
-        // 它们能打开但不参与关联，因此不要求对应的 Assoc 开关。
-        var s = new AppSettings
+        // 2026-10-29 起关联名单由 ArchiveExtensionCatalog 派生，用户的两个集合（关联 / 打开对话框筛选）
+        // 才是运行时事实源：集合里有的就算启用，没有的就算未启用，不再有「落进默认分支恒 false」的问题。
+        foreach (var ext in ShellIntegration.AssociatedExtensions)
         {
-            AssocZip = true,
-            Assoc7z = true,
-            AssocRar = true,
-            AssocTar = true,
-            AssocTarGz = true,
-            AssocGz = true,
-            AssocIso = true,
-        };
-        foreach (var ext in ShellIntegration.AssociatedExtensions)   // [".zip",".7z",".rar",".tar",".tgz",".tar.gz",".gz",".iso"]
-        {
-            Assert.True(ShellIntegration.IsAssocEnabledInSettings(s, ext),
-                $"{ext} 落入了 `_ => false` 默认分支：未来新增格式会让自愈被静默关闭");
+            Assert.Contains(ext, MantisZip.Core.Utils.ArchiveExtensionCatalog.All.Select(i => i.Extension));
         }
 
-        // 反向哨兵：防上一条断言因实现恒真而假通过
-        Assert.False(ShellIntegration.IsAssocEnabledInSettings(s, ".not-a-real-ext"));
-        Assert.False(ShellIntegration.IsAssocEnabledInSettings(new AppSettings { AssocTarGz = false }, ".tgz"));
-
-        // 硬约束（issue #54）：jar/war/ear/apk 能打开，但**不参与**文件关联 —— 不去抢用户已有的默认程序。
-        // 若将来要把它们纳入关联，必须同时加 AppSettings 开关 + 设置页条目，并改本断言。
-        foreach (var ext in new[] { ".jar", ".war", ".ear", ".apk" })
+        var all = new AppSettings
         {
-            Assert.Contains(ext, ArchiveEngineFactory.SupportedExtensions);
-            Assert.DoesNotContain(ext, ShellIntegration.AssociatedExtensions);
-            Assert.False(ShellIntegration.IsAssocEnabledInSettings(s, ext));
+            AssocExtensions = [.. ShellIntegration.AssociatedExtensions],
+        };
+
+        // 哨兵：集合里有的全部启用
+        foreach (var ext in ShellIntegration.AssociatedExtensions)
+        {
+            Assert.True(ShellIntegration.IsAssocEnabledInSettings(all, ext), $"{ext} 应命中已勾选的关联集合");
+        }
+
+        // 反向哨兵：未知扩展名 / 被移出集合的扩展名必须为 false
+        Assert.False(ShellIntegration.IsAssocEnabledInSettings(all, ".not-a-real-ext"));
+
+        var withoutTgz = new AppSettings
+        {
+            AssocExtensions = [.. ShellIntegration.AssociatedExtensions.Where(e => e is not (".tgz" or ".tar.gz"))],
+        };
+        Assert.False(ShellIntegration.IsAssocEnabledInSettings(withoutTgz, ".tgz"));
+        Assert.False(ShellIntegration.IsAssocEnabledInSettings(withoutTgz, ".tar.gz"));
+
+        // 默认值（issue #54 / #70）：jar/war/ear/apk 能打开但默认**不抢**关联；.001 分卷同理。
+        var defaults = new AppSettings { AssocExtensions = null };
+        foreach (var ext in new[] { ".jar", ".war", ".ear", ".apk", ".001" })
+        {
+            Assert.Contains(ext, ArchiveEngineFactory.SupportedExtensions.Concat([".001"]));
+            Assert.False(ShellIntegration.IsAssocEnabledInSettings(defaults, ext),
+                $"{ext} 默认不应抢占用户已有的默认程序");
+        }
+
+        // 但用户勾上之后就必须生效（设置页右列/左列都是显式集合）
+        foreach (var ext in new[] { ".jar", ".war", ".ear", ".apk", ".001" })
+        {
+            Assert.True(ShellIntegration.IsAssocEnabledInSettings(all, ext));
         }
     }
 

@@ -21,6 +21,20 @@ namespace MantisZip.UI.Avalonia.ViewModels
             set { _isEnabled = value; OnPropertyChanged(); }
         }
 
+        /// <summary>
+        /// 是否出现在「打开压缩包」对话框的筛选里。
+        /// </summary>
+        /// <remarks>
+        /// 与 <see cref="IsEnabled"/> 是两个独立开关：那一列决定资源管理器里双击 / 图标归谁，
+        /// 这一列只影响应用内打开对话框的默认筛选（拖拽 / 命令行 / 双击不受影响）。
+        /// </remarks>
+        private bool _isOpenDialogVisible = true;
+        public bool IsOpenDialogVisible
+        {
+            get => _isOpenDialogVisible;
+            set { _isOpenDialogVisible = value; OnPropertyChanged(); }
+        }
+
         private string _currentHandler = "";
         public string CurrentHandler
         {

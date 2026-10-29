@@ -419,22 +419,12 @@ internal static partial class ShellIntegration
     /// <summary>
     /// 返回扩展名对应的图标文件绝对路径。
     /// 图标文件位于输出目录的 Resources\Icons\ 下。
-    /// 如果图标文件不存在，返回 null。
+    /// 未知格式（自定义扩展名 / <c>.jar/.war/.ear/.apk</c> / <c>.001</c> 分卷）统一用 <c>custom.ico</c>；
+    /// 图标文件不存在时返回 null（调用方回落成软件自身图标）。
     /// </summary>
     private static string? GetIconPath(string extension)
     {
-        var iconName = extension.ToLowerInvariant() switch
-        {
-            ".zip" => "zip.ico",
-            ".7z" => "sevenz.ico",
-            ".rar" => "rar.ico",
-            ".tar" => "tar.ico",
-            ".tgz" or ".tar.gz" => "targz.ico",
-            ".gz" => "gz.ico",
-            ".iso" => "iso.ico",
-            _ => null,
-        };
-        if (iconName == null) return null;
+        var iconName = GetIconFileName(extension);
 
         var baseDir = Path.GetDirectoryName(GetExePath());
         if (baseDir == null) return null;
@@ -442,6 +432,20 @@ internal static partial class ShellIntegration
         var iconPath = Path.Combine(baseDir, "Resources", "Icons", iconName);
         return File.Exists(iconPath) ? iconPath : null;
     }
+
+    /// <summary>扩展名 → 图标文件名（<c>Resources\Icons</c> 下的名字）。未知格式一律 <c>custom.ico</c>。</summary>
+    internal static string GetIconFileName(string extension) => extension.ToLowerInvariant() switch
+    {
+        ".zip" => "zip.ico",
+        ".7z" => "sevenz.ico",
+        ".rar" => "rar.ico",
+        ".tar" => "tar.ico",
+        ".tgz" or ".tar.gz" => "targz.ico",
+        ".gz" => "gz.ico",
+        ".iso" => "iso.ico",
+        // 2026-10-29：自定义扩展名关联后显示的是空图标（落到了 exe 图标位），改用专用的 custom.ico
+        _ => "custom.ico",
+    };
 
     /// <summary>从图标注册表值中提取文件路径：去掉引号与 ",0" / ",1" 索引后缀。</summary>
     private static string TrimIconIndex(string rawValue)

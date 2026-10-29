@@ -1465,7 +1465,7 @@ public partial class MainWindow : Window
             // 分卷集只认第一卷、故补 *.001（issue #70③）；设置 →「文件类型关联」里的自定义扩展名也一并纳入。
             fileExtensions:
             [
-                .. ArchiveFormatHelper.BuildOpenDialogPatterns(AppSettings.Load().CustomAssocExtensions)
+                .. ArchiveFormatHelper.BuildOpenDialogPatterns(AppSettings.Load())
             ]);
     }
 

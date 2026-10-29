@@ -203,6 +203,7 @@ public class AppSettings
     public bool AutoExpandTreeToCurrent { get; set; } = false;
 
     // ===== 文件关联 =====
+    // 旧的逐格式开关：仅用于把老配置迁移进 AssocExtensions，新代码不再读写它们。
     public bool AssocZip { get; set; } = true;
     public bool Assoc7z { get; set; } = true;
     public bool AssocRar { get; set; } = true;
@@ -210,7 +211,24 @@ public class AppSettings
     public bool AssocTarGz { get; set; } = true;
     public bool AssocGz { get; set; } = true;
     public bool AssocIso { get; set; } = false;
+
+    /// <summary>用户添加的自定义扩展名（设置页里除内置格式之外的那些行，上限 20）。</summary>
     public List<string> CustomAssocExtensions { get; set; } = new();
+
+    /// <summary>
+    /// 已注册文件关联的扩展名集合（null = 老配置尚未迁移，取 <see cref="ArchiveExtensionCatalog.DefaultAssocExtensions"/>）。
+    /// </summary>
+    /// <remarks>
+    /// 与 <see cref="OpenDialogExtensions"/> 是两个独立开关：这一项决定资源管理器里双击 / 图标归谁，
+    /// 那一项只决定应用内「打开压缩包」对话框默认显示什么。
+    /// </remarks>
+    public List<string>? AssocExtensions { get; set; }
+
+    /// <summary>
+    /// 「打开压缩包」对话框筛选里显示的扩展名集合（null = 全部显示，即老配置的默认行为）。
+    /// </summary>
+    /// <remarks>取消勾选只影响对话框的默认筛选；拖拽 / 命令行 / 双击仍然能打开该格式。</remarks>
+    public List<string>? OpenDialogExtensions { get; set; }
 
     // ===== 收藏夹 =====
     public List<string> FavoritePaths { get; set; } = new();
@@ -428,6 +446,15 @@ public class AppSettings
         settings.SmartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
         // Phase 2 / Task 10：旧版默认规则集迁移到与 SSOT 对齐的版本
         MigrateAdaptiveOverridesDefaults(settings);
+        // 文件关联：老的 7 个布尔开关 → 扩展名集合（只迁移一次，之后一律以集合为准）
+        settings.AssocExtensions = settings.AssocExtensions is null
+            ? AssocPreferences.MigrateLegacyFlags(settings)
+            : AssocPreferences.Normalize(settings.AssocExtensions);
+        settings.CustomAssocExtensions = AssocPreferences.Normalize(settings.CustomAssocExtensions);
+        if (settings.OpenDialogExtensions is not null)
+        {
+            settings.OpenDialogExtensions = AssocPreferences.Normalize(settings.OpenDialogExtensions);
+        }
     }
 
     /// <summary>
