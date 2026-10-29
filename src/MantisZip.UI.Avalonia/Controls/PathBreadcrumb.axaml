@@ -119,7 +119,7 @@
 
   <!-- 外壳 Border：可见的导航栏容器 -->
   <Border x:Name="Shell" Classes="crumbShell">
-    <Grid RowDefinitions="Auto" ClipToBounds="True">
+    <Grid RowDefinitions="Auto" MinHeight="20" ClipToBounds="True">
       <!-- 点击承接层：全宽透明层，专收「末尾空白区」与「磁盘空路径整行」的点击（段按钮在其上层优先命中） -->
       <Border x:Name="BlankClickTarget"
               Background="Transparent"
@@ -132,11 +132,13 @@
                   VerticalAlignment="Center"
                   Spacing="{DynamicResource SpacingXxs}" />
 
-      <!-- 浏览态空位：PathKind=Disk 且 Path 为空时显示占位文案，整行可点进编辑态 -->
+      <!-- 浏览态空位：PathKind=Disk 且 Path 为空时显示占位文案，整行可点进编辑态。
+           注意不能带上下 Margin：占位文案（17px）+ 上下 8px 会把内层撑到 33px，
+           而编辑态只有 20px → 进出编辑态高度差 13px，整行跳动。 -->
       <TextBlock x:Name="EmptyHint"
                  IsVisible="False"
                  VerticalAlignment="Center"
-                 Margin="{DynamicResource SpacingXsThk}"
+                 Margin="2,0,0,0"
                  FontSize="12"
                  Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                  Cursor="Ibeam"

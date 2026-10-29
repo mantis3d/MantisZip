@@ -284,3 +284,4 @@ public class PathBreadcrumb : UserControl
 - **2026-10-29 第三轮（真机）**：候选刷新延后后下拉不再自动打开 → 刷新完显式 `IsDropDownOpen`；主窗口地址栏 `ControlHeightSm` → `ControlHeightMd`；编辑态预填末尾分隔符（Disk `\` / Virtual `/`）且光标置末尾（不再全选）。
 
 - **2026-10-29 第四轮（真机）**：设置 → 路径面板里地址栏与卡片同色看不出边界 → 外壳底色 ThemeSurfaceBgBrush → ThemeHeaderBgBrush，边框 ThemeBorderLightBrush → ThemeBorderBrush，hover 加深、编辑态换 surface 底。
+- **2026-10-29 第五轮（真机）**：进出编辑态整行高度跳 13px → 外壳高度由内容决定（段 20 / 空路径占位 17+8+8=33 / 编辑框 20）。修法：内层 `Grid` 钉 `MinHeight=20`、`EmptyHint` 去掉上下 Margin。三处宿主实测浏览态与编辑态均为 30px；回归用例 `PathBreadcrumbLayoutTests`（红：`Expected 42 / Actual 30`）。

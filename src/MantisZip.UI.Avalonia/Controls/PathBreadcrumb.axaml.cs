@@ -236,10 +236,6 @@ public partial class PathBreadcrumb : UserControl
         else if (change.Property == FilterModeProperty)
         {
             EditBox.FilterMode = FilterMode;
-        // 关闭「内联补全」（默认开启）：它会在每次按键后把候选剩余部分直接写进 Text，
-        // 而本控件每次 TextChanged 都会重建 ItemsSource，两者叠加会把输入串写成 E:E:\AEW\ 这种鬼样子。
-        // 地址栏只需要下拉候选，不需要行内补全。
-        EditBox.IsTextCompletionEnabled = false;
         }
     }
 
@@ -258,6 +254,7 @@ public partial class PathBreadcrumb : UserControl
         _topLevel = TopLevel.GetTopLevel(this);
         _topLevel?.AddHandler(KeyDownEvent, OnTopLevelKeyDown, global::Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
+
 
     private void OnTopLevelKeyDown(object? sender, KeyEventArgs e)
     {
