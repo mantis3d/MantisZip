@@ -176,6 +176,8 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 | 改了 `installer*.iss` 本机却没法验证 | 本机没有 ISCC（Inno Setup 编译器），`ci.yml` 也**不编译**安装包——只有 `release.yml` 打 tag 时才 `choco install innosetup` 后编译。所以 `.iss` 的语法/API 错误只能等首次发版暴露；改完至少要人工核对结构（`[Code]` 的 `begin`/`end` 计数、`[CustomMessages]` 中英成对、两个脚本的 AppId 保持一致），必要时在 beta 上推一个测试 tag 验证 |
 | 测试里写 `Avalonia.Themes.Fluent.FluentTheme` 报 `CS0234: 命名空间"MantisZip.UI.Avalonia"中不存在类型或命名空间名"Themes"` | 命名空间遮蔽：测试命名空间是 `MantisZip.UI.Avalonia.Tests`，简单名 `Avalonia` 会先解析成 `MantisZip.UI.Avalonia`。新增 `using` 必须写成 `global::Avalonia.Themes.Fluent;`（`Avalonia.Controls.Documents.Run` 同理） |
 | 无头测试里改 `TabControl.SelectedIndex` 后拿到的控件 `Bounds` 全是 0 | 页签内容控件在下一轮布局/调度才生成并排布：要循环 `Measure` → `Arrange` → `UpdateLayout()` → `Dispatcher.UIThread.RunJobs()` 数轮。另外被隐藏的分区（`IsEffectivelyVisible == false`，例如「还没有检查结果」时的详情块）里的按钮 `Bounds` 恒为 0，几何断言必须按**有效可见性**过滤，不能用 `IsVisible` |
+| `AutoCompleteBox` 里打字没反应（`IsFocused=true` 却收不到字符） | `AutoCompleteBox` 自身不处理文本输入：`Focus()` 它只会把焦点给容器，模板里的 `TextBox` 从未聚焦。必须 `ApplyTemplate()` 后取内部 `TextBox` 再 `Focus()`。另外 **Esc 会被 `AutoCompleteBox` 吞掉**（关自己的下拉），Enter/Esc 处理要挂到内部 `TextBox` 的 `KeyDown`，挂在容器上收不到 |
+| 无头截图里 `PathIcon` / `Shapes.Path` 不出现，但 `Border`、`TextBlock` 正常 | 本仓库无头环境 `window.CaptureRenderedFrame()` **不渲染几何图形**（用同屏红块 + ABC + 蓝路径验证过）。面包屑根图标「缺失」曾因此被误判为缺陷；图标/图形类视觉取证必须用真机 `CopyFromScreen` |
 
 ## 9. 还没做的（有意留白，不是忘了）
 

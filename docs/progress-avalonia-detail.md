@@ -17,6 +17,14 @@
   - **测试**：`tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbTests.cs` 6 个 `[AvaloniaFact]`（Virtual 分段与末段加粗、Disk 盘符不可点、空 Disk 显示占位、点中间段上抛 `NavigateRequested("C:\Users")`、9 段折叠为 6 段、编辑态 Enter 上抛 / Esc 不上抛）。踩坑两处：取末段要排除 `crumbSep` 分隔符；虚拟根图标/前景色必须用 `TryFindResource`（`FindResource` 在资源未加载时返回 `UnsetValueType`，强转抛 `InvalidCastException`）。
   - **验证**：Release 构建 0 警告；ui-tests 全绿；`-Task check` 版本 0.5.5 六处 / 三语 1364 key / 8 项守卫全绿；真机打开 `CustomFilePickerDialog` 取证显示 `E: › AI › IndexTTS2-SonicVale` 三段。
   - **状态**：代码与自动化验证完成；段点击导航一致性、`TryConfirmFile` 回车直确认、QuickPathPicker 四宿主、亮暗主题 × 三档紧凑度、切语言刷新等**真机冒烟项**列在计划末「未做」。
+  - **实施后追加（同日，按真机反馈修正五点）**：
+    - **末段改为可点进编辑**：原来只有「点末尾空白 / `Ctrl+L`」能进编辑态，路径一长末尾就没有空白，等于没有入口；现在末段（当前目录，加粗）是按钮，单击进编辑态并全选文本，且**不再上抛 `NavigateRequested`**（不导航到自己）。
+    - **盘符段改为可点**：上抛 `C:\`（带尾分隔符）而不是 `C:`——后者是「驱动器相对路径」，下游 `CoerceToDirectory` 会解析成该盘当前目录，这才是当初判它「不可点」的真正原因。UNC 根仍不可点。
+    - **外壳可见**：加 `Border.crumbShell`（`ThemeSurfaceBgBrush` 底 + `ThemeBorderLightBrush` 边框 + `BorderRadius` + `SpacingXxsThk` 内边距），hover 边框升 `ThemeBorderBrush`，编辑态经 `:editing` 伪类换 `ThemeAccentBrush`——此前透明底与窗口背景融为一体，用户看不出这里是导航栏。
+    - **分隔符换真图标**：`TextBlock "›"` → `PathIcon`（`IconChevronRight`，12×12，`ThemeTextSecondaryBrush`），资源未加载时退化回字形；段按钮内边距 `4` → `2,0`。
+    - **修掉「编辑态打字没反应」真 bug**：`AutoCompleteBox` 自身不接收文本，`EditBox.Focus()` 只把焦点交给容器，模板里的 `TextBox` 从未聚焦（无头诊断 `focusedElement=AutoCompleteBox`、真机输入 `zzz` 文本不变）。改为 `ApplyTemplate()` 后取内部 `TextBox` `Focus() + SelectAll()`（模板未就绪时 `Dispatcher.Post` 重试）；Enter/Esc 改挂内部 `TextBox` 的 `KeyDown`，因为 `AutoCompleteBox` 会吞掉 Esc。
+    - **回归**：`PathBreadcrumbTests` 扩到 7 例（末段可点进编辑、盘符上抛 `C:\`），新增 `PathBreadcrumbHitTestTests` 2 例（用真实指针坐标点段按钮，防被 `BlankClickTarget` 抢走）；真机取证 4 张（默认外壳 / 编辑态打字替换 / Esc 还原 / 点盘符到 `E:\` 与点中间段到 `E:\AI`）。
+    - **教训**：无头 `CaptureRenderedFrame()` 不渲染几何图形（`PathIcon`、`Shapes.Path` 都不出现），面包屑图标「缺失」曾因此误判；视觉取证一律走真机 `CopyFromScreen`。
 **2026-10-29** — 原型：文件选择器去弹窗化（内嵌 CustomFilePickerControl）交互原型
   - **产物**：`docs/prototypes/embedded-file-picker.html`（1383 行 / 约 65 KB，单文件、无依赖、纯静态）。三个入口可切换：压缩设置 / 解压设置 / 选择要解压的文件；深浅双主题；URL 参数可钉死任意状态（`?scenario=…&tab=…&mode=…&nav=…&pickdir=…&qptab=…&qpq=…&preserve=0&theme=…`）。
   - **覆盖的计划点**：①选择器内嵌进设置窗口（不再弹第二个窗）②去掉右侧累积面板、改为下方「已选」列表双向同步 ③左侧 QuickPathControl（收藏/历史/窗口/目录树 + 搜索）④压缩窗 Tab 顺序「输出设置 → 添加文件 → 压缩设置 → 文件过滤」⑤解压窗「添加压缩包 / 输出设置 / 解压设置」⑥解压对象 = 压缩包，`选择要解压的文件` 页按条目解压 ⑦输出设置页内嵌目录浏览。

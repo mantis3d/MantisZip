@@ -8,6 +8,7 @@ using Avalonia.Data;
 using Avalonia.Input;
 using Avalonia.Layout;
 using Avalonia.Media;
+using Avalonia.VisualTree;
 using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Controls;
@@ -18,12 +19,12 @@ public enum BreadcrumbPathKind
     /// <summary>压缩包内虚拟路径：空串 = 根，段路径用 <c>/</c> 拼接。</summary>
     Virtual,
 
-    /// <summary>磁盘路径：段路径用 <c>\</c> 拼接，首段（盘符 / UNC 根）不可点击。</summary>
+    /// <summary>磁盘路径：段路径用 <c>\</c> 拼接；盘符段可点（上抛 <c>C:\</c>），UNC 根不可点。</summary>
     Disk,
 }
 
 /// <summary>
-/// 面包屑地址栏控件：浏览态显示可点击的路径分段，点末尾空白 / <c>Ctrl+L</c> 进编辑态（AutoCompleteBox）。
+/// 面包屑地址栏控件：浏览态显示可点击的路径分段（祖先段=导航、末段=进编辑态），点末尾空白 / <c>Ctrl+L</c> 也进编辑态。
 /// <para>
 /// 控件**不导航**：段点击与编辑态 Enter 只上抛 <see cref="NavigateRequested"/>，由宿主决定导航动作，
 /// 保持宿主既有导航逻辑（<c>NavigateToFolderPath</c> / <c>NavigateTo</c> / <c>CoerceToDirectory</c>）为单一事实来源。
@@ -123,18 +124,54 @@ public partial class PathBreadcrumb : UserControl
         AddHandler(KeyDownEvent, OnControlKeyDown, global::Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
 
-    /// <summary>进入编辑态（宿主窗口级 Ctrl+L 调用；也可由控件内部点击 / 快捷键触发）。</summary>
+    /// <summary>
+    /// 进入编辑态（点末段 / 点末尾空白 / 宿主窗口级 <c>Ctrl+L</c> 三条入口共用）。
+    /// 焦点必须落在 <see cref="AutoCompleteBox"/> 内部的 <c>TextBox</c> 上——
+    /// <see cref="AutoCompleteBox"/> 自身不处理文本输入，只 Focus 它会导致「看着能输、打字没反应」。
+    /// </summary>
     public void EnterEditMode()
     {
         if (_isEditing) return;
         _isEditing = true;
+        PseudoClasses.Set(":editing", true);
         EditBox.Text = Path ?? string.Empty;
         _text = EditBox.Text ?? string.Empty;
         UpdateEditSuggestions();
         SegmentsPanel.IsVisible = false;
         EmptyHint.IsVisible = false;
         EditBox.IsVisible = true;
-        EditBox.Focus();
+        FocusEditTextBox();
+    }
+
+    /// <summary>把焦点交给编辑框内部的 TextBox 并全选（直接打字即替换，不用先删）。</summary>
+    private void FocusEditTextBox()
+    {
+        // 首次显示时模板可能尚未实例化：先 ApplyTemplate，再取内部 TextBox
+        EditBox.ApplyTemplate();
+        if (TryFocusInnerTextBox()) return;
+
+        // 仍取不到（布局尚未发生）→ 下一轮布局后再试一次
+        global::Avalonia.Threading.Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (_isEditing) TryFocusInnerTextBox();
+            },
+            global::Avalonia.Threading.DispatcherPriority.Loaded);
+    }
+
+    private bool TryFocusInnerTextBox()
+    {
+        var inner = EditBox.GetVisualDescendants().OfType<TextBox>().FirstOrDefault();
+        if (inner is null) return false;
+
+        // Enter / Esc 直接挂在内部 TextBox 上：AutoCompleteBox 会自己吞掉 Esc（关闭下拉），
+        // 冒泡到 EditBox 的 KeyDown 收不到，必须在内层处理。
+        inner.KeyDown -= EditBox_KeyDown;
+        inner.KeyDown += EditBox_KeyDown;
+
+        inner.Focus();
+        inner.SelectAll();
+        return true;
     }
 
     /// <summary>退出编辑态（不导航）。宿主的 Popup 打开前调用，避免失焦还原与 Popup 焦点竞争。</summary>
@@ -142,6 +179,7 @@ public partial class PathBreadcrumb : UserControl
     {
         if (!_isEditing) return;
         _isEditing = false;
+        PseudoClasses.Set(":editing", false);
         EditBox.IsVisible = false;
         SegmentsPanel.IsVisible = true;
         // 文本回到 Path：编辑态未提交的输入不再作为「当前文本」（与旧 AutoCompleteBox 在导航后回填一致）
@@ -275,15 +313,23 @@ public partial class PathBreadcrumb : UserControl
             // 末段之后不画分隔符
             if (i < segments.Count - 1)
             {
-                SegmentsPanel.Children.Add(new TextBlock
-                {
-                    Text = "›",
-                    Classes = { "crumbSep" },
-                });
+                SegmentsPanel.Children.Add(CreateSeparator());
             }
         }
 
         ApplyLocalizedPlaceholder();
+    }
+
+    /// <summary>段间分隔符：优先用真图标（<c>IconChevronRight</c>），资源未加载时退化为 <c>›</c> 字形。</summary>
+    private Control CreateSeparator()
+    {
+        var data = this.TryFindResource("IconChevronRight", out var res) ? res as Geometry : null;
+        if (data is null)
+        {
+            return new TextBlock { Text = "›", Classes = { "crumbSep" } };
+        }
+
+        return new PathIcon { Data = data, Classes = { "crumbSep" } };
     }
 
     private Control BuildSegmentView(Segment seg)
@@ -324,10 +370,23 @@ public partial class PathBreadcrumb : UserControl
             return host;
         }
 
-        // 末段：加粗展示，不点击
-        if (seg.IsCurrent || !seg.IsClickable)
+        // 末段（当前目录）：可点击——点它进编辑态，而不是「导航到自己」
+        if (seg.IsCurrent)
         {
-            var label = new TextBlock { Text = seg.Label, Classes = { "crumbCurrent" } };
+            var current = new Button { Content = seg.Label, Classes = { "crumbCurrent" } };
+            ToolTip.SetTip(current, seg.Tooltip);
+            current.Click += (_, e) =>
+            {
+                EnterEditMode();
+                e.Handled = true;
+            };
+            return current;
+        }
+
+        // 不可点段（UNC 根 / 相对路径首段）：纯文本展示
+        if (!seg.IsClickable)
+        {
+            var label = new TextBlock { Text = seg.Label, Classes = { "crumbStatic" } };
             if (seg.Tooltip.Length > 0) ToolTip.SetTip(label, seg.Tooltip);
             return label;
         }
@@ -343,7 +402,7 @@ public partial class PathBreadcrumb : UserControl
     }
 
     /// <summary>
-    /// 按路径类型切段。<c>Virtual</c>：<c>/</c> 分隔，根段 = 📦；<c>Disk</c>：<c>\</c> 分隔，首段（盘符 / UNC 根）不可点击。
+    /// 按路径类型切段。<c>Virtual</c>：<c>/</c> 分隔，根段 = 📦；<c>Disk</c>：<c>\</c> 分隔，盘符段可点（上抛 <c>C:\</c>）、UNC 根不可点。
     /// 段数超过 <paramref name="maxSegments"/> 时折叠中间段为单个省略号段。
     /// </summary>
     private static List<Segment> BuildSegments(string path, BreadcrumbPathKind kind, int maxSegments, string? archiveRootTooltipKey)
@@ -403,7 +462,17 @@ public partial class PathBreadcrumb : UserControl
         if (pieces.Length == 0) return list;
 
         var cur2 = pieces[0];
-        list.Add(new Segment(cur2, cur2, false, false, false, false, cur2));
+        // 盘符可点：上抛「C:\」而不是「C:」——后者是驱动器相对路径，下游会解析成该盘的当前目录
+        var isDrive = cur2.Length == 2 && char.IsLetter(cur2[0]) && cur2[1] == ':';
+        var driveTarget = cur2 + "\\";
+        list.Add(new Segment(
+            cur2,
+            isDrive ? driveTarget : cur2,
+            isDrive,
+            false,
+            false,
+            false,
+            isDrive ? driveTarget : cur2));
 
         for (var i = 1; i < pieces.Length; i++)
         {
@@ -434,7 +503,7 @@ public partial class PathBreadcrumb : UserControl
         return result;
     }
 
-    /// <summary>把「末段」标记为当前目录（加粗 + 不可点击）。</summary>
+    /// <summary>把「末段」标记为当前目录（加粗 + 点击进编辑态，而不是导航到自己）。</summary>
     private static List<Segment> MarkCurrent(List<Segment> segments)
     {
         if (segments.Count == 0) return segments;
@@ -490,7 +559,23 @@ public partial class PathBreadcrumb : UserControl
 
     private void EditBox_LostFocus(object? sender, global::Avalonia.Interactivity.RoutedEventArgs e)
     {
-        // 失焦即还原浏览态（不导航）；宿主 Popup 打开前应显式 CloseEdit，避免竞争
-        if (_isEditing) CloseEdit();
+        // 失焦即还原浏览态（不导航）；宿主 Popup 打开前应显式 CloseEdit，避免竞争。
+        // 注意：编辑时焦点在 AutoCompleteBox 内部的 TextBox 上，从 EditBox 视角看也是一次「失焦」，
+        // 所以延后一拍再判断焦点是否仍在本控件子树内，否则一进编辑态就会自己关掉。
+        if (!_isEditing) return;
+
+        global::Avalonia.Threading.Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (!_isEditing) return;
+                var focused = TopLevel.GetTopLevel(this)?.FocusManager?.GetFocusedElement();
+                if (focused is Visual v && (v == this || v == EditBox || EditBox.IsVisualAncestorOf(v)))
+                {
+                    return;
+                }
+
+                CloseEdit();
+            },
+            global::Avalonia.Threading.DispatcherPriority.Input);
     }
 }

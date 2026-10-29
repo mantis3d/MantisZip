@@ -68,26 +68,50 @@ public class PathBreadcrumbTests
 
         Assert.Equal(new[] { "<root>", "docs", "images", "2026" }, SegmentTexts(crumb));
 
-        // 末段是当前目录：TextBlock（不可点）而不是 Button
+        // 末段是当前目录：Button（可点 → 进编辑态），带 crumbCurrent 加粗样式
         var host = crumb.FindControl<StackPanel>("SegmentsPanel")!;
-        var last = host.Children.OfType<TextBlock>().Last(tb => !tb.Classes.Contains("crumbSep"));
-        Assert.Equal("2026", last.Text);
+        var last = host.Children.OfType<Button>().Last();
+        Assert.Equal("2026", last.Content);
         Assert.Contains("crumbCurrent", last.Classes);
 
         window.Close();
     }
 
     [AvaloniaFact]
-    public void DiskPath_BuildsDriveRootPlusSegments_DriveRootIsNotClickable()
+    public void ClickingCurrentSegment_EntersEditMode_InsteadOfNavigating()
+    {
+        var (window, crumb) = ShowCrumb(@"C:\Users\Admin");
+        string? navigated = null;
+        crumb.NavigateRequested += (_, p) => navigated = p;
+
+        var host = crumb.FindControl<StackPanel>("SegmentsPanel")!;
+        var current = host.Children.OfType<Button>().Last();
+        current.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        window.UpdateLayout();
+
+        Assert.True(crumb.IsEditing);
+        Assert.Null(navigated);
+        Assert.True(crumb.FindControl<AutoCompleteBox>("EditBox")!.IsVisible);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void DiskPath_DriveRootIsClickable_AndRaisesDriveRootPath()
     {
         var (window, crumb) = ShowCrumb(@"C:\Users\Admin");
 
         Assert.Equal(new[] { "C:", "Users", "Admin" }, SegmentTexts(crumb));
 
-        // 盘符根段不可点击 → 渲染为 TextBlock
+        // 盘符段可点，且上抛「C:\」而不是「C:」（后者是驱动器相对路径）
         var host = crumb.FindControl<StackPanel>("SegmentsPanel")!;
-        var first = host.Children[0];
-        Assert.IsType<TextBlock>(first);
+        var drive = Assert.IsType<Button>(host.Children[0]);
+        Assert.Equal("C:", drive.Content);
+
+        string? navigated = null;
+        crumb.NavigateRequested += (_, p) => navigated = p;
+        drive.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
+        Assert.Equal(@"C:\", navigated);
 
         window.Close();
     }

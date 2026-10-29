@@ -265,3 +265,13 @@ public class PathBreadcrumb : UserControl
 - 真机取证：Release 版打开 `CustomFilePickerDialog`（Ctrl+O），地址栏显示 `E: › AI › IndexTTS2-SonicVale` 三段，分隔符与段样式正确，路径行颜色与「文件名」等 chrome 标签一致。
 
 **未做（留待真机冒烟）**：三处段点击导航一致性、`TryConfirmFile` 回车直确认、QuickPathPicker 四个宿主、亮暗主题 × 三档紧凑度、切语言后 ToolTip/占位刷新。
+
+## 实施后修正（2026-10-29，真机反馈）
+
+1. **末段可点进编辑**：末段（当前目录）由 `TextBlock` 改为 `Button.crumbCurrent`，单击 `EnterEditMode()`，不上抛 `NavigateRequested`。理由：编辑入口原本只藏在路径末尾空白处，路径一长就没有可点区域。
+2. **盘符段可点**：`BuildSegments` 的盘符段 `IsClickable = true`，上抛 `C:\`（带尾分隔符）。原设计「盘符不可点」的真正原因是 `C:` 是驱动器相对路径，上抛会被下游解析成该盘当前目录；UNC 根维持不可点。
+3. **外壳可见**：新增 `Border.crumbShell`（surface 底 + `ThemeBorderLightBrush` 边框 + 圆角 + 内边距），`:pointerover` 提亮、`:editing` 换强调色边框。
+4. **分隔符换图标**：`TextBlock "›"` → `PathIcon`（`IconChevronRight` 12×12，`ThemeTextSecondaryBrush`），资源缺失时退化回字形。
+5. **修「编辑态打字没反应」**：`EditBox.Focus()` 只聚焦 `AutoCompleteBox` 容器，内部 `TextBox` 从未拿到焦点；改为 `ApplyTemplate()` 后取内部 `TextBox` `Focus() + SelectAll()`，Enter/Esc 也改挂内部 `TextBox`（`AutoCompleteBox` 会吞 Esc）。
+
+验证：`PathBreadcrumbTests` 7 例 + 新增 `PathBreadcrumbHitTestTests` 2 例（真实指针命中）；Release 构建 0 警告、ui-tests 全绿、`-Task check` 8 项守卫全绿；真机 4 张取证。
