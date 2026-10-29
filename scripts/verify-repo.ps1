@@ -950,7 +950,6 @@ $SETTINGS_WIRING_EXEMPT = [ordered]@{
     EnableQuickCompress         = 'KI-009：src/ 里只有声明，疑似 WPF 时代菜单开关'
     ShowPasswordMatchNotification = 'KI-009：只有设置窗口 UI 与读写，无运行时消费者'
     FavoritePaths               = 'KI-009：只有声明与测试；收藏路径实际走 Core 的 FavoritePathManager'
-    CustomAssocExtensions       = '非死开关：消费者在设置窗口 VM 自身（增删自定义扩展名关联），不属于运行时业务路径'
 }
 
 # ---------------------------------------------------------------------------
