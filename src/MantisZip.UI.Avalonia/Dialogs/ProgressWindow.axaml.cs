@@ -44,6 +44,13 @@ public partial class ProgressWindow : Window
     private readonly DispatcherTimer _elapsedTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
     /// <summary>
+    /// 钉住态等待的心跳复查间隔（毫秒）。
+    /// 为什么需要：关闭 / 解钉事件可能在订阅之前就已经发过（见 <see cref="WaitForManualCloseAsync"/>），
+    /// 只等事件会永久挂住；定时复查 IsVisible 与 KeepOpenOnComplete 才能兜住丢失的唤醒。
+    /// </summary>
+    private const int ManualWaitHeartbeatMs = 250;
+
+    /// <summary>
     /// 当前可见的进度窗口；无则为 null。
     /// 冲突对话框点击"暂停"时由 ExtractFlow/CompressFlow 通过此属性找到进度窗口，
     /// 调用 <see cref="PauseFromConflict"/> 进入暂停态（对齐 WPF App.xaml.cs ConflictResolver）。
@@ -416,39 +423,64 @@ public partial class ProgressWindow : Window
     /// <summary>
     /// 钉住态下的等待：窗口被关闭 或 用户解钉（📌 取消）都会立刻返回。
     /// 旧实现只等 Closed，导致「手动等待中解钉」不会恢复倒计时（D11：按钮状态 ≠ 实际行为）。
+    ///
+    /// 2026-10-29 修（issue #66「新建压缩包按钮用一次就永久灰」排查）：
+    /// 旧实现是「先查 <see cref="Window.IsVisible"/> → 再订阅 Closed → 阻塞等信号量」，
+    /// 三步之间若窗口已被关闭 / 已被解钉，事件早就发过了，后订阅的我们永远等不到 ——
+    /// 于是 <c>gate.Wait()</c> 永久阻塞，调用链（进度呈现器 → 会话 → 命令）永不返回，
+    /// 用户看到的就是按钮永久灰化、只能重启。
+    /// 现在改成：**先订阅、再复查**，并加 250ms 心跳兜底（事件丢失 / 宿主直接收起窗口都能发现）；
+    /// 同时不再用 <c>Task.Run + ManualResetEventSlim</c> 阻塞线程池线程。
     /// </summary>
     private async Task<ManualWaitExit> WaitForManualCloseAsync()
     {
-        if (!IsVisible)
-            return ManualWaitExit.Closed;
-
-        var gate = new ManualResetEventSlim(false);
-        var closedFired = false;
-        EventHandler onClosed = (_, _) =>
-        {
-            closedFired = true;
-            gate.Set();
-        };
+        var exit = new TaskCompletionSource<ManualWaitExit>(TaskCreationOptions.RunContinuationsAsynchronously);
+        EventHandler onClosed = (_, _) => exit.TrySetResult(ManualWaitExit.Closed);
         void onVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
         {
             if (e.PropertyName == nameof(ProgressViewModel.KeepOpenOnComplete) && !_vm.KeepOpenOnComplete)
-                gate.Set();
+                exit.TrySetResult(ManualWaitExit.Unpinned);
         }
 
+        // 顺序不能反：先订阅、再复查。旧实现先复查后订阅，中间的空档会丢事件。
         Closed += onClosed;
         _vm.PropertyChanged += onVmPropertyChanged;
         try
         {
-            await Task.Run(() => gate.Wait());
+            if (!IsVisible)
+                return ManualWaitExit.Closed;
+            if (!_vm.KeepOpenOnComplete)
+                return ManualWaitExit.Unpinned;
+
+            LifetimeDiagnostics.Log($"progress-wait-manual begin title='{Title}'");
+            while (true)
+            {
+                var finished = await Task.WhenAny(exit.Task, Task.Delay(ManualWaitHeartbeatMs));
+                if (ReferenceEquals(finished, exit.Task))
+                {
+                    var reason = await exit.Task;
+                    LifetimeDiagnostics.Log($"progress-wait-manual exit reason={reason} title='{Title}'");
+                    return reason;
+                }
+
+                // 心跳复查：兜住「事件已在订阅前发生」与「窗口被宿主收起但没走 Closed」两种情况。
+                if (!IsVisible)
+                {
+                    LifetimeDiagnostics.Log($"progress-wait-manual exit reason=invisible title='{Title}'");
+                    return ManualWaitExit.Closed;
+                }
+                if (!_vm.KeepOpenOnComplete)
+                {
+                    LifetimeDiagnostics.Log($"progress-wait-manual exit reason=unpinned-heartbeat title='{Title}'");
+                    return ManualWaitExit.Unpinned;
+                }
+            }
         }
         finally
         {
             Closed -= onClosed;
             _vm.PropertyChanged -= onVmPropertyChanged;
-            gate.Dispose();
         }
-
-        return closedFired ? ManualWaitExit.Closed : ManualWaitExit.Unpinned;
     }
 
     // ════════════════════════════════════════════

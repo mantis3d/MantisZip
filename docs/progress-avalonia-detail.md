@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-29** — 修复：工具栏「新建压缩包」用一次后永久灰化（issue #66，进度窗口收尾等待的竞态）
+  - **症状**：压缩跑过一轮之后，主工具栏「新建压缩包」按钮变灰、点了没反应，只有关掉应用重开才恢复；用户报告「不是每次都出现」。
+  - **根因**：按钮本身没有 `IsEnabled` 绑定（`Views/MainWindow.axaml:97` 只绑 `Command="{Binding NewArchiveCommand}"`），灰度完全来自 `[RelayCommand]` 生成的 `AsyncRelayCommand` —— CommunityToolkit.Mvvm 默认 `AllowConcurrentExecutions = false`，委托执行期间 `CanExecute` 恒为 false。所以「永久灰」等价于「某一轮压缩的 `Task` 永远没有完成」。用探针排除两种可能：委托抛异常时 `CanExecute` 会复位（命令不会卡灰），窗口模态也不会让命令卡灰；只有「任务永不完成」才会。顺着链路（命令 → `ShowCompressSettingsDialog` → `CompressSession.RunAsync` → `MainWindowProgressPresenter.RunAsync` → `ProgressWindow.AutoCloseOrWaitAsync`）定位到 `Dialogs/ProgressWindow.axaml.cs` 的 `WaitForManualCloseAsync()`：旧实现是「先查 `IsVisible` → 再订阅 `Closed` → `await Task.Run(() => gate.Wait())`」，检查与订阅之间存在窗口期 —— 取消收尾、密码取消、自动关窗都可能在同一条链上把窗口关掉，`Closed` 事件一旦在订阅前发过，`gate` 就永不被 Set，线程池线程永久阻塞 ⇒ 呈现器拿到 `false` 之前先卡死 ⇒ 会话 → 命令整条链停住 ⇒ 按钮永久灰。
+  - **修法**（`Dialogs/ProgressWindow.axaml.cs`）：改成 `TaskCompletionSource<ManualWaitExit>` + `Task.WhenAny`，**先订阅事件、再复查状态**，并加 250 ms 心跳兜底（`ManualWaitHeartbeatMs`）—— 每拍复查 `IsVisible` 与 `KeepOpenOnComplete`，把「事件已错过」「窗口被宿主收起」两类丢失唤醒都兜住；不再占用线程池线程阻塞等待。退出原因区分 `Closed` / `Unpinned` / `invisible` / `unpinned-heartbeat`。
+  - **诊断**：同一条链补 `lifecycle.log` 打点 —— `progress-wait-manual begin/exit reason=…`（`ProgressWindow`）与 `progress-run begin title=… paths=…` / `progress-run end result=completed|cancelled|password-cancelled|failed title=…`（`Services/MainWindowProgressPresenter.cs`）。下次再卡，日志里只有 `begin` 没有 `end` 即可直接判定「卡在收尾等待」，不必再靠猜。
+  - **测试**：`tests/MantisZip.UI.Avalonia.Tests/ProgressWindowPinTests.cs` 新增 `ManualWait_ReturnsWhenWindowBecomesInvisible` —— 钉住等待开始后把窗口 `Hide()`（不发 `Closed`），断言 4 秒内完成收尾；旧实现必然超时。
+  - **验证**：`-Task build -Target avalonia -c Release` 0 警告；`-Task test -Target tests`（Release）通过、2 条存量警告；`-Task test -Target ui-tests`（Release）通过。Debug 构建因资源管理器 / Adobe Substance 3D Painter 占用 `bin\Debug\net10.0\MantisZip.ShellExt.dll`（MSB3027/MSB3021）无法进行，按既有做法改用 Release。
+  - **顺带**：同日的「压缩任务队列」计划 `.omo/plans/未开始/compress-job-queue.md`（46-66h，P0 串行队列 4-6h 能彻底消灭这条路径）已登记进 `docs/PLAN.md` B 档；按用户意见本轮不做队列，只修竞态。
 **2026-10-28** — 计划立项：AXAML 编译绑定（A 档 10-14h）+ 登记 5 个死开关（KI-009）
   - **触发**：同一天处理「数字输入框乱敲字符弹红字」时发现，这类问题的共同点是**绑定只在运行时校验**——写错属性名、类型不匹配、构造函数换了名字，构建与 CI 全绿，只在用户面前炸。
   - **实测现状**：`src/MantisZip.UI.Avalonia` 共 50 个 `.axaml`，显式 `x:CompileBindings="True"` 仅 1 个、显式 `False` 1 个、声明 `x:DataType` 仅 13 个 ⇒ 绝大多数是反射绑定。
