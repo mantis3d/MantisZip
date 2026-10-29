@@ -8,24 +8,29 @@
     面包屑地址栏：浏览态（路径分段按钮，可逐段点击直达）与编辑态（AutoCompleteBox）互斥显示。
     - 本控件不导航：段点击 / 末段点击（进编辑态）/ 编辑态 Enter 只上抛 NavigateRequested，由宿主决定导航
     - Path 为 OneWay（宿主→控件），控件从不回写，从根上消除双向绑定环
-    - 外层 Border 提供可见的「输入框」外观：surface 底 + 细边框，hover 提亮，编辑态换强调色边框
+    - 外层 Border 提供可见的「输入框」外观：header 底（比 surface 卡片暗一档，白底卡片上也看得见）+ 边框，
+      hover 加深底色，编辑态换 surface 底 + 强调色边框
   -->
   <UserControl.Styles>
-    <!-- 外壳：让用户一眼看出这里是导航栏（否则透明底与窗口背景融为一体） -->
+    <!-- 外壳：让用户一眼看出这里是导航栏。
+         底色用 ThemeHeaderBgBrush 而不是 ThemeSurfaceBgBrush —— 后者与设置页的卡片底同色（都是 #FFFFFF），
+         嵌在卡片里就完全看不出来了；header 色比 surface 暗一档，白底卡片和窗口底上都成立 -->
     <Style Selector="Border.crumbShell">
-      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderLightBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
       <Setter Property="BorderThickness" Value="1" />
       <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
       <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
       <Setter Property="MinHeight" Value="{DynamicResource ControlHeightSm}" />
       <Setter Property="VerticalAlignment" Value="Center" />
     </Style>
+    <!-- 悬停：底色再深一档，给出「可点」的暗示 -->
     <Style Selector="Border.crumbShell:pointerover">
-      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
     </Style>
-    <!-- 编辑态：边框换强调色，与「输入框聚焦」同一语义 -->
+    <!-- 编辑态：换回 surface 底（像输入框）+ 强调色边框，与「输入框聚焦」同一语义 -->
     <Style Selector="UserControl:editing Border.crumbShell">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
     </Style>
     <!-- 编辑态：AutoCompleteBox 内部的 TextBox 也要去掉自己的边框/底色/内边距，
@@ -38,7 +43,8 @@
       <Setter Property="VerticalAlignment" Value="Center" />
       <Setter Property="VerticalContentAlignment" Value="Center" />
       <Setter Property="FontSize" Value="12" />
-    </Style>    <!-- 段按钮：紧凑外观，靠悬停色区分可点击 -->
+    </Style>
+    <!-- 段按钮：紧凑外观，靠悬停色区分可点击 -->
     <Style Selector="Button.crumb">
       <Setter Property="Background" Value="Transparent" />
       <Setter Property="BorderThickness" Value="0" />

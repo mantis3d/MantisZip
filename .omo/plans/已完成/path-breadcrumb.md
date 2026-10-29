@@ -282,3 +282,5 @@ public class PathBreadcrumb : UserControl
 - **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbSuggestionClickTests.cs`（挂 Fluent 主题 + `ThemeLight.axaml`，从 `Popup.Child` 取候选项后 `RaiseEvent(PointerPressed)`）。
 
 - **2026-10-29 第三轮（真机）**：候选刷新延后后下拉不再自动打开 → 刷新完显式 `IsDropDownOpen`；主窗口地址栏 `ControlHeightSm` → `ControlHeightMd`；编辑态预填末尾分隔符（Disk `\` / Virtual `/`）且光标置末尾（不再全选）。
+
+- **2026-10-29 第四轮（真机）**：设置 → 路径面板里地址栏与卡片同色看不出边界 → 外壳底色 ThemeSurfaceBgBrush → ThemeHeaderBgBrush，边框 ThemeBorderLightBrush → ThemeBorderBrush，hover 加深、编辑态换 surface 底。
