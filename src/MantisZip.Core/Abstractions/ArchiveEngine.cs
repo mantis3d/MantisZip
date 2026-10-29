@@ -576,16 +576,17 @@ public class ExtractResult
 public static class ArchiveEngineFactory
 {
     /// <summary>
-    /// 支持的档案文件扩展名（单一数据源）：能否**打开**看这里。
+    /// 支持的档案文件扩展名：能否**打开**看这里。
     /// </summary>
     /// <remarks>
-    /// `.jar / .war / .ear / .apk` 本质是 ZIP（issue #54），能打开也能解压。
-    /// 注意：本数组**不等于**文件关联名单 —— 关联见 <c>ShellIntegration.ArchiveExtensions</c>，
-    /// 那 4 个新扩展名暂不注册关联（不抢默认程序，见 `.omo/plans/未开始/format-detection-container-sfx.md`）。
+    /// 内容来自 <see cref="ArchiveExtensionCatalog.EngineExtensions"/>（单一事实源）：
+    /// 加格式只改目录一处，设置页列表、文件关联默认值、打开对话框筛选会一起跟上。
+    /// `.jar / .war / .ear / .apk` 本质是 ZIP（issue #54），能打开也能解压；
+    /// 是否**注册文件关联**是另一件事，见 <c>ShellIntegration.ArchiveExtensions</c>
+    /// （默认不抢默认程序，见 `.omo/plans/未开始/format-detection-container-sfx.md`）。
     /// </remarks>
     public static readonly string[] SupportedExtensions =
-        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso",
-         ".jar", ".war", ".ear", ".apk"];
+        [.. ArchiveExtensionCatalog.EngineExtensions];
 
     private static readonly List<IArchiveEngine> _engines = new();
 
