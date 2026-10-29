@@ -2,8 +2,9 @@
 
 > **状态**: 📋 待实施 | **创建**: 2026-10-08 | **档位**: **A 档 · v0.5.5**（2026-10-29 升入 A 档；原「接缝之后做」的前提已于 2026-10-26 满足） | **预估工时**: 1-2 天
 > **来源**: 主窗口/压缩/解压三处选择器弹窗交互优化讨论
-> **原型**: `docs/prototypes/compress-embedded-picker.html`
+> **原型**: `docs/prototypes/embedded-file-picker.html`（完整交互版，2026-10-29 新增：三种入口 + 简单/高级 + 双主题 + **输出设置放首屏** + **右侧预览树随选择实时变化**）、`docs/prototypes/compress-embedded-picker.html`（早期压缩窗局部版）
 > **当前核实**: `CustomFilePickerDialog`（`Dialogs/CustomFilePickerDialog.axaml(.cs)`）承担全部选择逻辑，经静态入口 `ShowOpenItemsAsync`/`ShowExtractFolderAsync`/`ShowSaveFileAsync`/`ShowFolderAsync` 被 6+ 处调用，全部为模态弹窗
+> **输出目录手势（2026-10-29 原型确认）**：单击目录行＝选中为目标（行高亮 + 写该字段），双击＝进入；↑ / 面包屑 / 收藏只切换浏览位置、不改目标。**不提供「使用当前目录」按钮** —— 目标字段必须独立于浏览位置（AppSettings.ExtractDestination 的 last 会记住上次目标，跟随浏览会把它冲掉）。压缩窗「输出目录」同此手势，两个窗口一套操作。**文件夹模式只列目录**：文件行不出现（选了也没意义），只在列表下方留一行「本目录下另有 N 个文件」的灰色提示，用于确认「是不是这个目录」；目标目录尚不存在时（解压的常见情况）提示追加「（尚不存在，确定时新建）」。**输出设置页也带左侧 QuickPathControl**（收藏 chips + 目录树 + 面包屑 + ↑ / 🏠）——「选文件」与「选目录」用同一套导航控件，只是列表内容与选择语义不同，避免同一个窗口里两套左右布局。**原型按 `Controls/QuickPathControl.axaml` 1:1 还原**：Row0 = 4 个方形 ToggleButton（收藏书签 / 历史 / 窗口 / 目录树，选中＝强调色底 + 白图标）+ 搜索框（`*` 占满剩余宽度，**目录树 Tab 下隐藏**）；Row1 = 两行式列表（名称 + 灰色完整路径，`MaxWidth` 截断）或盘符树（「本地磁盘 (C:)」+ 惰性展开）。搜索框输入时**跨收藏/历史/窗口三来源聚合过滤**并在行尾显示来源标签（⭐/🕐/🪟），与控件里的 `ShowSourceTag` 行为一致。
 
 ## 背景
 
