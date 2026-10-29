@@ -97,6 +97,60 @@ public sealed class PathBreadcrumbSuggestionClickTests
         }
     }
 
+    /// <summary>
+    /// 下拉打开期间连续改文本不抛异常（冒烟）。
+    /// 注意：这条**不能**复现真机那次崩溃——无头环境没有真实的指针/选择适配器路径，
+    /// 把候选刷新改回同步也照样绿（已实测）。真机崩溃（2026-10-29）的真实栈是：
+    /// AutoCompleteBox.PopulateDropDown → CloseDropDown → 把 SelectedItem 写回选择模型
+    /// → 我们在 TextChanged 里同步换掉 ItemsSource → 选择模型残留旧索引 → ItemsSourceView.GetAt 越界
+    /// （System.ArgumentOutOfRangeException）。修法是把候选刷新延后到 Background 优先级；
+    /// 该修法的证据是真机压测（连续三轮快速输入 + Esc + 点候选，进程不退出）与事件日志无新条目。
+    /// </summary>
+    [AvaloniaFact]
+    public void TypingWhileDropDownOpen_DoesNotThrow()
+    {
+        var app = Application.Current!;
+        var fluent = new global::Avalonia.Themes.Fluent.FluentTheme();
+        app.Styles.Add(fluent);
+        var themeResources = new ResourceInclude(new Uri("avares://MantisZip.UI.Avalonia/"))
+        {
+            Source = new Uri("avares://MantisZip.UI.Avalonia/Themes/ThemeLight.axaml"),
+        };
+        app.Resources.MergedDictionaries.Add(themeResources);
+
+        try
+        {
+            var crumb = new PathBreadcrumb
+            {
+                PathKind = BreadcrumbPathKind.Disk,
+                Path = @"C:\Users",
+                EditCompletionProvider = _ => Suggestions,
+            };
+
+            var window = new Window { Content = crumb, Width = 600, Height = 240 };
+            window.Show();
+            window.UpdateLayout();
+
+            crumb.EnterEditMode();
+            var editBox = crumb.FindControl<AutoCompleteBox>("EditBox");
+            Assert.NotNull(editBox);
+
+            editBox!.IsDropDownOpen = true;
+            foreach (var text in new[] { "C:", @"C:\U", @"C:\Users", @"C:\Users\" })
+            {
+                editBox.Text = text;
+                Pump(window);
+            }
+
+            Assert.True(crumb.IsEditing);
+        }
+        finally
+        {
+            app.Styles.Remove(fluent);
+            app.Resources.MergedDictionaries.Remove(themeResources);
+        }
+    }
+
     /// <summary>跑几轮布局与消息泵，让下拉 Popup 完成实例化与打开。</summary>
     private static void Pump(Window window)
     {

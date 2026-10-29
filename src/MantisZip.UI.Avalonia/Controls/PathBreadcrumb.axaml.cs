@@ -51,6 +51,9 @@ public partial class PathBreadcrumb : UserControl
             nameof(FilterMode), defaultValue: AutoCompleteFilterMode.StartsWith);
 
     private bool _isEditing;
+
+    /// <summary>候选刷新代次：延后刷新时用它丢弃过期请求。</summary>
+    private int _suggestionVersion;
     private string _text = string.Empty;
 
     /// <summary>
@@ -130,7 +133,7 @@ public partial class PathBreadcrumb : UserControl
         EditBox.TextChanged += (_, _) =>
         {
             _text = EditBox.Text ?? string.Empty;
-            UpdateEditSuggestions();
+            ScheduleSuggestionUpdate();
         };
 
         // 控件自身 KeyDown 兜底响应 Ctrl+L（宿主窗口级快捷键另行调用 EnterEditMode）
@@ -278,6 +281,25 @@ public partial class PathBreadcrumb : UserControl
             : string.Empty;
     }
 
+    /// <summary>
+    /// 延后一拍再刷新候选。
+    /// **不能**在 TextChanged 里同步替换 ItemsSource：AutoCompleteBox 在 TextUpdated 内部会先
+    /// PopulateDropDown → CloseDropDown → 把 SelectedItem 写回选择模型；此时我们把 ItemsSource 换掉，
+    /// 选择模型里残留的旧索引就会在 GetAt 时越界——真机崩过一次
+    /// （System.ArgumentOutOfRangeException at ItemsSourceView`1.GetAt ← SelectedItems.GetEnumerator）。
+    /// </summary>
+    private void ScheduleSuggestionUpdate()
+    {
+        var version = ++_suggestionVersion;
+        global::Avalonia.Threading.Dispatcher.UIThread.Post(
+            () =>
+            {
+                if (version != _suggestionVersion || !_isEditing) return;
+                UpdateEditSuggestions();
+            },
+            global::Avalonia.Threading.DispatcherPriority.Background);
+    }
+
     private void UpdateEditSuggestions()
     {
         if (EditCompletionProvider is null)
@@ -289,6 +311,7 @@ public partial class PathBreadcrumb : UserControl
         try
         {
             var items = EditCompletionProvider(EditBox.Text) ?? Enumerable.Empty<string>();
+            EditBox.SelectedItem = null;
             EditBox.ItemsSource = items.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         }
         catch
