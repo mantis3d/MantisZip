@@ -627,8 +627,24 @@ public static class ArchiveEngineFactory
         };
     }
 
+    /// <summary>
+    /// 分卷集的锚点路径（issue #70①）：传入 <c>.002</c> 之后的任意一卷都回到 <c>.001</c>；
+    /// 首卷缺失时返回原路径，让上游按「文件不存在 / 打不开」处理，而不是静默换一个包。
+    /// </summary>
+    public static string ResolveVolumeAnchor(string filePath)
+        => ArchiveVolumeSet.FindFirstVolume(filePath) ?? filePath;
+
     public static IArchiveEngine? GetEngineByExtension(string filePath)
     {
+        // 分卷集（issue #70①）：7z / zip / rar 的多卷只有第一卷带完整头部，SharpCompress 不支持多卷
+        // （.zip.001 会抛 "Failed to locate the Zip Header"）；7z.dll 原生支持，故一律交给 SevenZipEngine。
+        if (ArchiveVolumeSet.TryGetVolumeBase(filePath, out var volumeBase, out _)
+            && GetFormatByExtension(volumeBase) is ArchiveFormat.Zip or ArchiveFormat.SevenZip or ArchiveFormat.Rar)
+        {
+            CoreLog.Info($"ArchiveEngineFactory.GetEngineByExtension: 分卷 {filePath} -> SevenZipEngine");
+            return GetEngine(ArchiveFormat.SevenZip);
+        }
+
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         var engine = ext switch
         {

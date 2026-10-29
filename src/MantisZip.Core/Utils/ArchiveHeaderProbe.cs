@@ -1,5 +1,3 @@
-using System.Text.RegularExpressions;
-
 namespace MantisZip.Core.Utils;
 
 /// <summary>
@@ -40,8 +38,8 @@ public static class ArchiveHeaderProbe
     private static readonly byte[] Rar4Magic = [0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00];
     private static readonly byte[] Rar5Magic = [0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x01, 0x00];
 
-    /// <summary>数字分卷后缀 .001-.999（7z -v / zip -v 产生的首卷命名）。</summary>
-    private static readonly Regex VolumeSuffixRegex = new(@"\.(\d{3})$", RegexOptions.Compiled);
+    /// <summary>next-header 参与 CRC 校验的字节上限；超过则跳过该校验（超大头部不值得为探测读一遍）。</summary>
+    private const int MaxProbeHeaderSize = 4 * 1024 * 1024;
 
     /// <summary>
     /// 探测指定文件的头部结构。
@@ -112,7 +110,62 @@ public static class ArchiveHeaderProbe
         if (end > EffectiveVolumeLength(filePath))
             return HeaderStructure.Broken;
 
+        // next-header 自身的 CRC（stored = h[28..32)）：上面只校验了 StartHeader（前 32 字节）与越界，
+        // 头所在卷的内容被改动而长度不变时仍会判 Intact —— 7z.dll 对这种包抛的正是
+        // 「Is it encrypted and a wrong password was provided?」，于是损坏包被当成加密包弹密码框（issue #69）。
+        // CRC 覆盖的是**存储态**字节（加密头的密文同样参与），故加密包仍会通过。
+        if (size > 0 && size <= MaxProbeHeaderSize)
+        {
+            if (!TryReadVirtualRange(filePath, 32UL + offset, (int)size, out var headerBytes))
+                return HeaderStructure.Broken; // 头区读不全 = 卷缺失或截断
+
+            if (Crc32(headerBytes, 0, headerBytes.Length) != BitConverter.ToUInt32(h, 28))
+                return HeaderStructure.Broken;
+        }
+
         return HeaderStructure.Intact;
+    }
+
+    /// <summary>
+    /// 按**虚拟偏移**跨卷读取：分卷集被当作一条连续字节流，<paramref name="start"/> 可大于单卷长度。
+    /// </summary>
+    private static bool TryReadVirtualRange(string filePath, ulong start, int count, out byte[] buffer)
+    {
+        buffer = new byte[count];
+        var volumes = ArchiveVolumeSet.EnumerateVolumes(filePath);
+        if (volumes.Count == 0)
+            return false;
+
+        var written = 0;
+        var virtualStart = start;
+        foreach (var volume in volumes)
+        {
+            var length = (ulong)new FileInfo(volume).Length;
+            if (virtualStart >= length)
+            {
+                virtualStart -= length;
+                continue;
+            }
+
+            using var fs = File.OpenRead(volume);
+            fs.Seek((long)virtualStart, SeekOrigin.Begin);
+            var want = (int)Math.Min((ulong)(count - written), length - virtualStart);
+            var read = 0;
+            while (read < want)
+            {
+                var n = fs.Read(buffer, written + read, want - read);
+                if (n <= 0)
+                    break;
+                read += n;
+            }
+
+            written += read;
+            virtualStart = 0;
+            if (written == count)
+                return true;
+        }
+
+        return written == count;
     }
 
     /// <summary>
@@ -122,23 +175,13 @@ public static class ArchiveHeaderProbe
     private static ulong EffectiveVolumeLength(string filePath)
     {
         var selfLength = (ulong)new FileInfo(filePath).Length;
-
-        var m = VolumeSuffixRegex.Match(filePath);
-        if (!m.Success)
+        if (!ArchiveVolumeSet.HasVolumeSuffix(filePath))
             return selfLength;
 
-        var baseName = filePath[..^m.Length];
-        if (!File.Exists(baseName + ".001"))
-            return selfLength; // 非分卷命名 → 按单文件
-
         ulong total = 0;
-        for (var i = 1; i <= 999; i++)
-        {
-            var part = $"{baseName}.{i:D3}";
-            if (!File.Exists(part))
-                break;
-            total += (ulong)new FileInfo(part).Length;
-        }
+        foreach (var volume in ArchiveVolumeSet.EnumerateVolumes(filePath))
+            total += (ulong)new FileInfo(volume).Length;
+
         return total > 0 ? total : selfLength;
     }
 
