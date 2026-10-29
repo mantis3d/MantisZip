@@ -107,6 +107,7 @@ When releasing a new version, update the version string in ALL of these location
 - 修改计划 → 更新 PLAN.md 中对应任务的说明、优先级或状态
 - 执行计划 → 若计划文档不在 `.omo\plans\进行中` 内，先将对应计划移入 `.omo\plans\进行中` 目录再执行
 - 计划完成 → 将条目从 PLAN.md 移至 PROGRESS.md 的【历史设计方案索引】章节；先将对应计划移入 `.omo\plans\已完成` 中
+- **阶段开工前核对版本号**（2026-10-29 起）：A 档按版本阶段交付（`### 阶段 v0.5.x`）。动手前先看 `src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version` 是否等于该阶段版本号；**不一致就停下来问用户**「是否先升版本」，不擅自改（规则 2）。阶段做完 = 发版打 tag → 计划归档 → 与用户讨论从 B 档择优补下一阶段
 
 ### 规则 2：版本号变更
 

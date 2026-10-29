@@ -1,6 +1,6 @@
 # 文件选择器去弹窗化 — CustomFilePickerControl 内嵌改造
 
-> **状态**: 📋 待实施 | **创建**: 2026-10-08 | **优先级**: P2 | **预估工时**: 1-2 天
+> **状态**: 📋 待实施 | **创建**: 2026-10-08 | **档位**: **A 档 · v0.5.5**（2026-10-29 升入 A 档；原「接缝之后做」的前提已于 2026-10-26 满足） | **预估工时**: 1-2 天
 > **来源**: 主窗口/压缩/解压三处选择器弹窗交互优化讨论
 > **原型**: `docs/prototypes/compress-embedded-picker.html`
 > **当前核实**: `CustomFilePickerDialog`（`Dialogs/CustomFilePickerDialog.axaml(.cs)`）承担全部选择逻辑，经静态入口 `ShowOpenItemsAsync`/`ShowExtractFolderAsync`/`ShowSaveFileAsync`/`ShowFolderAsync` 被 6+ 处调用，全部为模态弹窗

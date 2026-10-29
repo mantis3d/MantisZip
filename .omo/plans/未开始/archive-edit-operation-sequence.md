@@ -2,7 +2,7 @@
 
 > **Status**: 📋 待开始 | **阶段**: [⬜⬜⬜⬜⬜⬜] (0/6)
 > **预估工时**: 🟡中 **12-16h**（A 档 P1 最小可用）；P2/P3 增强 **8-12h**（B 档，不排期）
-> **档位**: **A 档**（P1）；P2/P3 进 B 档
+> **档位**: **B 档**（2026-10-29 用户调研后从 A 档降级，P1 与 P2/P3 一并排队；与 `archive-rename-entry.md` **同批做**——先有 rewriter 的 rename 通道，本计划能少一半工作量）
 > **前置依赖**: **硬依赖 `archive-rename-entry.md`（S 档）**——它先把 `ZipBinaryRewriter` 的 rename 通道和 `IArchiveEngine.RenameEntriesAsync` 做出来，本计划直接复用，否则这里要重做一遍同样的地基。
 
 ## Problem

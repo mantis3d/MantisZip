@@ -1,6 +1,7 @@
 # 面包屑地址栏（PathBreadcrumb）改造
 
 > **状态**: 📋 计划中（待实施）
+> **档位**: **A 档 · v0.5.5 第一项**（2026-10-29 定为文件选择与导航阶段的首项：与内嵌选择器共用同一批回归面，一次跑完省一次全量验证）
 > **范围**: Avalonia 版三处地址栏统一改造（主窗口 / QuickPathPicker / CustomFilePickerDialog）
 > **修订**: 2026-10-21 — 按代码事实核对修正行号与行为描述（`TryConfirmFile` 无模式判断、`PathAutoComplete.Text` 实际 3 处直接同步）；`Path` 定为 StyledProperty + OneWay；补磁盘空路径态、`Breadcrumb_EditPlaceholder` 与三语同步；QuickPathPicker 恢复 4 宿主回归范围
 

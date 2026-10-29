@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **档位**: **A 档 · v0.5.6**（2026-10-29 从「小活清仓」提到 A 档：骨架期的数字在动，直接决定打开大包时的第一印象）
+
 ## TL;DR
 
 > **Quick Summary**: 骨架加载期间，目录节点的统计区域（原本显示文件数/大小的地方）目前显示静态「加载中」。本计划改为**每 0.5s 更新一次实时进度**（如「加载中 1637 个文件，2.45GB」），让用户看到加载在推进。
