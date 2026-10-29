@@ -8,16 +8,13 @@
           RowSpacing="{DynamicResource SpacingXxs}">
 
       <!-- Row 0: 路径输入框（AutoCompleteBox，支持历史记录自动补全） -->
-      <AutoCompleteBox x:Name="PathInput"
-                       Grid.Row="0"
-                       MinHeight="{DynamicResource ControlHeightMd}"
-                       FilterMode="Contains"
-                       MinimumPrefixLength="0"
-                       TextChanged="PathInput_TextChanged"
-                       KeyDown="PathInput_KeyDown"
-                       Background="{DynamicResource ThemeSurfaceBgBrush}"
-                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <controls:PathBreadcrumb x:Name="Breadcrumb"
+                               Grid.Row="0"
+                               PathKind="Disk"
+                               Path="{Binding #RootControl.Path, Mode=OneWay}"
+                               FilterMode="Contains"
+                               MinHeight="{DynamicResource ControlHeightMd}"
+                               EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
 
       <!-- Row 1: 快速操作按钮栏（收藏/历史/窗口/浏览） -->
       <Grid Grid.Row="1"

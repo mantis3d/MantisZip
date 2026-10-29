@@ -60,11 +60,11 @@
 >
 > **为什么这样切**：同一批文件只开一次刀。v0.5.5 三项都动 `CustomFilePickerDialog` / `QuickPathPicker` / 三处地址栏，一次跑完省一次全量回归；编辑器（重命名 + 暂存区）已降 B 档，等它被选中时再与 `ZipBinaryRewriter` 同批做。
 
-### 阶段 v0.5.5 —— 文件选择与导航（约 14-24h，做完可独立发版）
+### 阶段 v0.5.5 —— 文件选择与导航（约 8-16h，面包屑已完成，剩内嵌选择器）
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty + OneWay；QuickPathPicker 4 宿主纳入回归）。接缝改造后它的头号风险（逐字符回写 Path）已降级为「按钮可用性 / 实时提示」。**本阶段第一项** |
+| ✅ 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/已完成/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty + OneWay；QuickPathPicker 4 宿主纳入回归）。接缝改造后它的头号风险（逐字符回写 Path）已降级为「按钮可用性 / 实时提示」。**2026-10-29 已完成并归档**（三处接入 + 6 个无头用例；真机冒烟项见计划末「未做」） |
 | 文件选择器去弹窗化（内嵌控件） | [embedded-file-picker.md](.omo/plans/未开始/embedded-file-picker.md) | 🟡中 | 8-16h | 把文件/目录选择器内嵌进压缩/解压设置窗：先抽纯控件再分别接入，不动 `CustomFilePickerDialog` 静态入口与「系统浏览」豁免。原注「与接缝计划有交集，排在接缝之后做可省返工」——接缝已于 2026-10-26 完成，前提满足 |
 
 > **v0.5.5 验收口径**：三处地址栏都能像资源管理器一样点段跳转、Ctrl+L 编辑；压缩/解压设置窗不再弹模态选择器，选完当场回填；窗口缩放与深浅主题下都不丢焦点、不串路径。

@@ -81,15 +81,12 @@
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
       <!-- 路径输入框（支持自动补全） -->
-      <AutoCompleteBox Grid.Column="4"
-                       x:Name="PathAutoComplete"
-                       MinHeight="{DynamicResource ControlHeightSm}"
-                       FilterMode="Contains"
-                       MinimumPrefixLength="0"
-                       KeyDown="PathAutoComplete_KeyDown"
-                       Background="{DynamicResource ThemeSurfaceBgBrush}"
-                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+      <controls:PathBreadcrumb Grid.Column="4"
+                               x:Name="PathCrumbs"
+                               PathKind="Disk"
+                               FilterMode="Contains"
+                               MinHeight="{DynamicResource ControlHeightSm}"
+                               EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
       <!-- 添加收藏按钮 -->
       <Button Grid.Column="5"
               x:Name="AddFavoriteButton"

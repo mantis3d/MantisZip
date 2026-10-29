@@ -1,4 +1,6 @@
+using System.Collections.Generic;
 using Avalonia.Controls;
+using MantisZip.UI.Avalonia.ViewModels;
 
 namespace MantisZip.UI.Avalonia.Controls;
 
@@ -20,6 +22,13 @@ public partial class ArchiveContentView : UserControl
     public ArchiveContentView()
     {
         InitializeComponent();
+
+        // 面包屑地址栏：段点击 / 编辑态 Enter → 宿主导航（保持 NavigateToFolderPath 为单一事实来源）；
+        // 补全源用内存里的全量目录集合 FolderPaths（含 "" 根），无需枚举文件系统。
+        AddressBar.NavigateRequested += (_, path) =>
+            (DataContext as MainWindowViewModel)?.NavigateToFolderPath(path ?? string.Empty);
+        AddressBar.EditCompletionProvider = _ =>
+            (IEnumerable<string>?)(DataContext as MainWindowViewModel)?.FolderPaths ?? System.Array.Empty<string>();
     }
 
     // ── 具名控件（x:Name 生成字段为 private，这里公开只读入口）──

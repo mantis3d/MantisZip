@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-29** — 功能：面包屑地址栏（PathBreadcrumb，v0.5.5 第一项）
+  - **背景**：三处路径输入框各自实现（主窗口 `AddressBar` 与 QuickPathPicker / CustomFilePickerDialog 的 `AutoCompleteBox`），行为不一致：主窗口按 Enter 才跳转、编辑器里看不见层级、长路径整串显示、`Ctrl+L` 无处可挂。
+  - **控件**：新建 `src/MantisZip.UI.Avalonia/Controls/PathBreadcrumb.axaml(.cs)`（95 + 496 行）。单行 Grid 四层：全宽透明 `BlankClickTarget`（承接末尾空白点击，段按钮在其上层优先命中）、`SegmentsPanel`（段按钮 / 末段加粗 / `›` 分隔 / `…` 折叠）、`EmptyHint`（磁盘空路径占位，整行可点进编辑）、`EditBox`（`AutoCompleteBox`，`MinimumPrefixLength=0`，补全源由宿主注入）。浏览/编辑双态互斥，`ClipToBounds` 裁剪超长段，每段 ToolTip 保完整路径。
+  - **契约**：`Path` 是 `StyledProperty` 且**默认 OneWay**（控件从不回写，跳转只经 `NavigateRequested`，避免绑定环）；`PathKind`（Virtual / Disk）、`FilterMode`、`MaxSegments=6`、`ArchiveRootTooltipKey`、`EditPlaceholderKey`、`EditCompletionProvider` 由宿主注入；`Text` 复刻旧 `AutoCompleteBox.Text` 语义（编辑态取编辑框文本），供「保存」模式取文件名回落。
+  - **路径解析**：Virtual 以 `/` 切段、根段为 📦 且可点回根；Disk 首段（盘符 / UNC 根）不可点，其余段可点；UNC 前两段合为整体根；非绝对路径退化为首段不可点 + 其余可点；段数 > `MaxSegments` 时保留首段与末尾 `MaxSegments-2` 段、中间折成一个 `…`（点击忽略）。
+  - **三处接入**：①主窗口 `ArchiveContentView`（Virtual + `CurrentFolder` 单向绑定 + `NavigateToFolderPath` + `FolderPaths` 补全），删除 `AddressBar_KeyDown`；②`QuickPathPicker`（Disk + `#RootControl.Path` 单向绑定 + 历史/父目录前缀补全 + `CoerceToDirectory` + `PathHistoryManager.Record`），删除 `InitAutoComplete`/`PathInput_TextChanged`/`PathInput_KeyDown` 与全部 `PathInput.Text` 赋值，4 处浮层入口前 `CloseEdit()`；③`CustomFilePickerDialog`（Disk），`NavigateRequested` **逐字照抄**原 `PathAutoComplete_KeyDown` 分支（`Directory.Exists`→`NavigateTo` / `File.Exists`→`TryConfirmFile`，**无模式门**），并把 `GetSaveFileName()` 的回落也改成 `PathCrumbs.Text`（计划漏列的第 4 处）。
+  - **Ctrl+L**：控件在 `OnAttachedToVisualTree` 时挂到 TopLevel 的**隧道**阶段监听 `KeyDown`，因此窗口内任意焦点位置都能直达地址栏，宿主无需逐个窗口接线；`DetachedFromVisualTree` 退订（含 `LocalizationManager.CultureChanged`）。
+  - **i18n**：新增 `Breadcrumb_ArchiveRoot`（虚拟根 ToolTip）/ `Breadcrumb_EditPlaceholder`（编辑态与空磁盘占位）三语；删除 `Nav_AddressBar` / `Picker_AddressPlaceholder` / `QuickPath_SelectFolder`；`MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组同步移除 `Nav_AddressBar`（否则规则 13 守卫报「登记了但三语缺 key」）。
+  - **测试**：`tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbTests.cs` 6 个 `[AvaloniaFact]`（Virtual 分段与末段加粗、Disk 盘符不可点、空 Disk 显示占位、点中间段上抛 `NavigateRequested("C:\Users")`、9 段折叠为 6 段、编辑态 Enter 上抛 / Esc 不上抛）。踩坑两处：取末段要排除 `crumbSep` 分隔符；虚拟根图标/前景色必须用 `TryFindResource`（`FindResource` 在资源未加载时返回 `UnsetValueType`，强转抛 `InvalidCastException`）。
+  - **验证**：Release 构建 0 警告；ui-tests 全绿；`-Task check` 版本 0.5.5 六处 / 三语 1364 key / 8 项守卫全绿；真机打开 `CustomFilePickerDialog` 取证显示 `E: › AI › IndexTTS2-SonicVale` 三段。
+  - **状态**：代码与自动化验证完成；段点击导航一致性、`TryConfirmFile` 回车直确认、QuickPathPicker 四宿主、亮暗主题 × 三档紧凑度、切语言刷新等**真机冒烟项**列在计划末「未做」。
 **2026-10-29** — 原型：文件选择器去弹窗化（内嵌 CustomFilePickerControl）交互原型
   - **产物**：`docs/prototypes/embedded-file-picker.html`（1383 行 / 约 65 KB，单文件、无依赖、纯静态）。三个入口可切换：压缩设置 / 解压设置 / 选择要解压的文件；深浅双主题；URL 参数可钉死任意状态（`?scenario=…&tab=…&mode=…&nav=…&pickdir=…&qptab=…&qpq=…&preserve=0&theme=…`）。
   - **覆盖的计划点**：①选择器内嵌进设置窗口（不再弹第二个窗）②去掉右侧累积面板、改为下方「已选」列表双向同步 ③左侧 QuickPathControl（收藏/历史/窗口/目录树 + 搜索）④压缩窗 Tab 顺序「输出设置 → 添加文件 → 压缩设置 → 文件过滤」⑤解压窗「添加压缩包 / 输出设置 / 解压设置」⑥解压对象 = 压缩包，`选择要解压的文件` 页按条目解压 ⑦输出设置页内嵌目录浏览。

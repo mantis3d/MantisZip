@@ -436,7 +436,7 @@ public partial class CustomFilePickerDialog : Window
         NavigateTo(startDir);
 
         // 地址栏补全/历史
-        InitPathAutoComplete();
+        InitBreadcrumb();
     }
 
     // ── File name + File type row ──────────────────────────────────────────
@@ -631,62 +631,58 @@ public partial class CustomFilePickerDialog : Window
 
     // ── Address bar ────────────────────────────────────────────────────────
 
-    private void InitPathAutoComplete()
+    private void InitBreadcrumb()
     {
-        PathAutoComplete.PlaceholderText = LocalizationManager.T("Picker_AddressPlaceholder");
-
-        // 历史建议（来自 PathHistoryManager，Core 持久化）
-        PathAutoComplete.ItemsSource = PathHistoryManager.GetRecent(50).Select(h => h.Path).ToList();
-
-        // 输入时实时补全：父目录枚举 + 历史
-        PathAutoComplete.TextChanged += (_, _) =>
+        // 编辑态补全：历史匹配 + 父目录下以输入为前缀的子目录（与原 AutoCompleteBox 行为一致）
+        PathCrumbs.EditCompletionProvider = text =>
         {
-            var text = PathAutoComplete.Text ?? string.Empty;
-            if (text.Length < 2) return;
-
+            var t = (text ?? string.Empty).Trim();
             var suggestions = new List<string>();
-            // 历史中匹配的
-            suggestions.AddRange(PathHistoryManager.GetRecent(50)
-                .Select(h => h.Path)
-                .Where(p => p.Contains(text, StringComparison.OrdinalIgnoreCase))
-                .Take(10));
-            // 文件系统枚举：父目录下以输入为前缀的目录
-            try
+
+            if (t.Length >= 2)
             {
-                var parent = Path.GetDirectoryName(text.TrimEnd('\\', '/'));
-                if (!string.IsNullOrEmpty(parent) && Directory.Exists(parent))
+                suggestions.AddRange(PathHistoryManager.GetRecent(50)
+                    .Select(h => h.Path)
+                    .Where(p => p.Contains(t, StringComparison.OrdinalIgnoreCase))
+                    .Take(10));
+
+                try
                 {
-                    var prefix = Path.GetFileName(text.TrimEnd('\\', '/'));
-                    suggestions.AddRange(Directory.EnumerateDirectories(parent, (prefix + "*"), SearchOption.TopDirectoryOnly)
-                        .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
-                        .Take(20));
+                    var parent = Path.GetDirectoryName(t.TrimEnd('\\', '/'));
+                    if (!string.IsNullOrEmpty(parent) && Directory.Exists(parent))
+                    {
+                        var prefix = Path.GetFileName(t.TrimEnd('\\', '/'));
+                        suggestions.AddRange(Directory.EnumerateDirectories(parent, prefix + "*", SearchOption.TopDirectoryOnly)
+                            .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
+                            .Take(20));
+                    }
+                }
+                catch
+                {
+                    // 非法路径等，忽略
                 }
             }
-            catch
+            else
             {
-                // 非法路径等，忽略
+                suggestions.AddRange(PathHistoryManager.GetRecent(50).Select(h => h.Path).Take(50));
             }
 
-            PathAutoComplete.ItemsSource = suggestions.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            return suggestions.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         };
-    }
 
-    private void PathAutoComplete_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
+        // 段点击 / 编辑态 Enter：严格照抄原 PathAutoComplete_KeyDown 分支（含 Trim，且**不加模式门**）
+        PathCrumbs.NavigateRequested += (_, raw) =>
         {
-            var text = PathAutoComplete.Text?.Trim() ?? string.Empty;
+            var text = (raw ?? string.Empty).Trim();
             if (Directory.Exists(text))
             {
                 NavigateTo(text);
-                e.Handled = true;
             }
             else if (File.Exists(text))
             {
                 TryConfirmFile(text);
-                e.Handled = true;
             }
-        }
+        };
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────
@@ -704,7 +700,7 @@ public partial class CustomFilePickerDialog : Window
         _currentDir = dir;
 
         CurrentPathText.Text = dir;
-        PathAutoComplete.Text = dir;
+        PathCrumbs.Path = dir;
         PathHistoryManager.Record(dir);
 
         LoadDirectory(dir);
@@ -721,7 +717,7 @@ public partial class CustomFilePickerDialog : Window
             _forwardStack.Add(_currentDir);
         _currentDir = dir;
         CurrentPathText.Text = dir;
-        PathAutoComplete.Text = dir;
+        PathCrumbs.Path = dir;
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
         UpdateFavoriteButtonState();
@@ -736,7 +732,7 @@ public partial class CustomFilePickerDialog : Window
             _backStack.Add(_currentDir);
         _currentDir = dir;
         CurrentPathText.Text = dir;
-        PathAutoComplete.Text = dir;
+        PathCrumbs.Path = dir;
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
         UpdateFavoriteButtonState();
@@ -1263,7 +1259,7 @@ public partial class CustomFilePickerDialog : Window
         // 优先浏览区选中的文件，其次地址栏输入的最后一段
         if (FileList.SelectedItem is FileBrowserItem { IsDirectory: false } item)
             return item.DisplayName;
-        var text = PathAutoComplete.Text?.Trim() ?? string.Empty;
+        var text = PathCrumbs.Text?.Trim() ?? string.Empty;
         if (string.IsNullOrEmpty(text)) return string.Empty;
         var name = Path.GetFileName(text.TrimEnd('\\', '/'));
         // 如果输入的是已有目录路径，则不是文件名

@@ -1353,6 +1353,30 @@
               </StackPanel>
             </Border>
 
+            <!-- PathBreadcrumb -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingSm}">
+                <TextBlock Text="PathBreadcrumb — 面包屑地址栏（段点击直达 / 点末尾空白或 Ctrl+L 进编辑态 / 超长自动折叠）"
+                           FontSize="13" FontWeight="SemiBold" />
+                <!-- 虚拟路径（压缩包内）：根段为 📦 -->
+                <controls:PathBreadcrumb PathKind="Virtual"
+                                         Path="docs/images/2026"
+                                         Height="{DynamicResource ControlHeightSm}"
+                                         ArchiveRootTooltipKey="Breadcrumb_ArchiveRoot"
+                                         EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
+                <!-- 磁盘路径：与上方 QuickPathPicker 共用同一 Path，验证双向联动 -->
+                <controls:PathBreadcrumb PathKind="Disk"
+                                         Path="{Binding QuickPath, Mode=OneWay}"
+                                         Height="{DynamicResource ControlHeightSm}"
+                                         EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
+                <!-- 磁盘空路径：显示占位文案，整行可点进编辑态 -->
+                <controls:PathBreadcrumb PathKind="Disk"
+                                         Path=""
+                                         Height="{DynamicResource ControlHeightSm}"
+                                         EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
+              </StackPanel>
+            </Border>
             <!-- FileFilterEditor -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingMdThk}">

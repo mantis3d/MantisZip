@@ -1,0 +1,95 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+             x:Class="MantisZip.UI.Avalonia.Controls.PathBreadcrumb"
+             x:Name="RootControl"
+             ClipToBounds="True">
+  <!--
+    面包屑地址栏：浏览态（路径分段按钮，可逐段点击直达）与编辑态（AutoCompleteBox）互斥显示。
+    - 本控件不导航：段点击 / 编辑态 Enter 只上抛 NavigateRequested，由宿主决定导航（保持宿主导航逻辑单一事实来源）
+    - Path 为 OneWay（宿主→控件），控件从不回写，从根上消除双向绑定环
+  -->
+  <UserControl.Styles>
+    <!-- 段按钮：紧凑外观，靠悬停色区分可点击 -->
+    <Style Selector="Button.crumb">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+      <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
+      <Setter Property="MinHeight" Value="20" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.crumb:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <Style Selector="Button.crumb:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <!-- 末段（当前目录）：加粗 + 强调色，不可点击 -->
+    <Style Selector="TextBlock.crumbCurrent">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="{DynamicResource SpacingXxsThk}" />
+    </Style>
+    <!-- 分隔符 › -->
+    <Style Selector="TextBlock.crumbSep">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="1,0" />
+    </Style>
+    <!-- 折叠省略号：仅展示 + ToolTip，不导航 -->
+    <Style Selector="TextBlock.crumbEllipsis">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="{DynamicResource SpacingXxsThk}" />
+    </Style>
+    <!-- 根段（盘符 / UNC 根 / 压缩包根图标）：不可点击 -->
+    <Style Selector="StackPanel.crumbRoot">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="{DynamicResource SpacingXxsThk}" />
+    </Style>
+  </UserControl.Styles>
+
+  <Grid RowDefinitions="Auto" ClipToBounds="True">
+    <!-- 点击承接层：全宽透明层，专收「末尾空白区」与「磁盘空路径整行」的点击（段按钮在其上层优先命中） -->
+    <Border x:Name="BlankClickTarget"
+            Background="Transparent"
+            Cursor="Ibeam"
+            PointerPressed="BlankClickTarget_PointerPressed" />
+
+    <!-- 浏览态：段列表（超长靠 ClipToBounds 裁剪，完整路径由各段 ToolTip 保底） -->
+    <StackPanel x:Name="SegmentsPanel"
+                Orientation="Horizontal"
+                VerticalAlignment="Center"
+                Spacing="{DynamicResource SpacingXxs}"
+                Margin="{DynamicResource SpacingXxsThk}" />
+
+    <!-- 浏览态空位：PathKind=Disk 且 Path 为空时显示占位文案，整行可点进编辑态 -->
+    <TextBlock x:Name="EmptyHint"
+               IsVisible="False"
+               VerticalAlignment="Center"
+               Margin="{DynamicResource SpacingXsThk}"
+               FontSize="12"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+               Cursor="Ibeam"
+               PointerPressed="EmptyHint_PointerPressed" />
+
+    <!-- 编辑态：AutoCompleteBox（MinimumPrefixLength 固定 0，补全源由宿主注入） -->
+    <AutoCompleteBox x:Name="EditBox"
+                     IsVisible="False"
+                     MinimumPrefixLength="0"
+                     FontSize="12"
+                     Background="{DynamicResource ThemeSurfaceBgBrush}"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     BorderBrush="{DynamicResource ThemeBorderBrush}"
+                     KeyDown="EditBox_KeyDown"
+                     LostFocus="EditBox_LostFocus" />
+  </Grid>
+</UserControl>

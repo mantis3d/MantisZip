@@ -225,12 +225,43 @@ public class PathBreadcrumb : UserControl
 
 ## 验收标准
 
-- [ ] 三处地址栏段点击导航与树/列表/前进后退结果一致（同一导航入口）
-- [ ] 编辑态：Enter 导航、ESC/失焦还原、补全可用（文本响应式）、`Ctrl+L`（窗口任意焦点位置）直达
-- [ ] **行为不变**：CustomFilePickerDialog 任意模式下地址栏输入已存在文件路径 Enter → `TryConfirmFile` 直接确认（与改造前 `PathAutoComplete_KeyDown` 完全一致，不加模式门）
-- [ ] QuickPathPicker 的 4 个宿主（压缩设置 / 解压设置 / 设置窗口 / UiTestWindow）路径选择、Enter 提交、历史记录均正常
-- [ ] 磁盘空路径：`QuickPathPicker.Path` 为空时显示占位文案，点击整行可进编辑态
-- [ ] 虚拟路径根段 📦 点击回根；磁盘根段（盘符/UNC）不可点
-- [ ] 长路径折叠 `…` 正常（点击忽略、ToolTip 显示完整路径）；超长单段被裁剪不溢出
-- [ ] 亮暗主题 + Compact/Normal/Loose 三档紧凑度均正常；运行中切换语言后 ToolTip/占位文案同步刷新
-- [ ] `dotnet build` 0 错误、Avalonia 测试全绿、`mantiszip_i18n` 三语校验通过
+- [ ] 三处地址栏段点击导航与树/列表/前进后退结果一致（同一导航入口）——代码已接线（三处都走 `NavigateRequested`），**待真机逐处点一遍**
+- [x] 编辑态：Enter 导航、ESC/失焦还原、补全可用（文本响应式）、`Ctrl+L`（窗口任意焦点位置）直达 —— Enter/ESC 有无头用例；`Ctrl+L` 是窗口级隧道监听（一处接线服务全部宿主）
+- [ ] **行为不变**：CustomFilePickerDialog 任意模式下地址栏输入已存在文件路径 Enter → `TryConfirmFile` 直接确认（与改造前 `PathAutoComplete_KeyDown` 完全一致，不加模式门）——代码逐字照抄原分支，**待真机确认**
+- [ ] QuickPathPicker 的 4 个宿主（压缩设置 / 解压设置 / 设置窗口 / UiTestWindow）路径选择、Enter 提交、历史记录均正常 —— **待真机确认**
+- [x] 磁盘空路径：`QuickPathPicker.Path` 为空时显示占位文案，点击整行可进编辑态 —— 无头用例断言 `EmptyHint` 可见
+- [x] 虚拟路径根段 📦 点击回根；磁盘根段（盘符/UNC）不可点 —— 无头用例断言段元素类型（TextBlock = 不可点）
+- [x] 长路径折叠 `…` 正常（点击忽略、ToolTip 显示完整路径）；超长单段被裁剪不溢出 —— 9 段折叠为 6 段有无头用例；裁剪靠 `ClipToBounds`
+- [ ] 亮暗主题 + Compact/Normal/Loose 三档紧凑度均正常；运行中切换语言后 ToolTip/占位文案同步刷新 —— **待真机确认**
+- [x] `dotnet build` 0 错误、Avalonia 测试全绿、`mantiszip_i18n` 三语校验通过
+
+## 实施记录（2026-10-29）
+
+**代码落地**
+
+| 文件 | 变更 |
+|---|---|
+| `src/MantisZip.UI.Avalonia/Controls/PathBreadcrumb.axaml` | 新建（95 行）：单行 Grid + 四层（`BlankClickTarget` 全宽透明承接空白点击 / `SegmentsPanel` / `EmptyHint` / `EditBox`）+ 六个局部样式（`Button.crumb`、`:pointerover`、`crumbCurrent`、`crumbSep`、`crumbEllipsis`、`crumbRoot`） |
+| `src/MantisZip.UI.Avalonia/Controls/PathBreadcrumb.axaml.cs` | 新建（496 行）：`BreadcrumbPathKind` 枚举、`Path`/`PathKind`/`FilterMode` 三个 StyledProperty（`Path` 默认 OneWay）、`EditCompletionProvider`/`MaxSegments=6`/`ArchiveRootTooltipKey`/`EditPlaceholderKey`、`NavigateRequested`/`EnumerationRequested`（后者预留未接）、`Text`、`EnterEditMode()`/`CloseEdit()`、`BuildSegments`（Virtual/Disk/UNC/相对路径）、`Fold`、`MarkCurrent`、窗口级 Ctrl+L 隧道监听 + `CultureChanged` 订阅（`DetachedFromVisualTree` 全部退订） |
+| `Controls/ArchiveContentView.axaml(.cs)`、`ArchiveContentView.Events.cs` | `AddressBar` 换 `PathBreadcrumb`（Virtual + `CurrentFolder` 单向绑定 + `ArchiveRootTooltipKey`）；接 `NavigateRequested` → `NavigateToFolderPath`、`EditCompletionProvider` → `FolderPaths`；删 `AddressBar_KeyDown` |
+| `Controls/QuickPathPicker.axaml(.cs)` | Row 0 换 `PathBreadcrumb`（Disk + `#RootControl.Path` 单向绑定）；删 `InitAutoComplete`/`PathInput_TextChanged`/`PathInput_KeyDown` 与全部 `PathInput.Text` 赋值；新增 `InitBreadcrumb()`（历史 + 父目录前缀补全、空串守卫、`CoerceToDirectory`、`PathHistoryManager.Record`）；4 处浮层入口前 `Breadcrumb.CloseEdit()` |
+| `Dialogs/CustomFilePickerDialog.axaml(.cs)` | 列 4 换 `PathBreadcrumb`（Disk）；`InitPathAutoComplete` → `InitBreadcrumb`，`NavigateRequested` **逐字照抄**原 `PathAutoComplete_KeyDown` 分支（`Directory.Exists`→`NavigateTo` / `File.Exists`→`TryConfirmFile`，无模式门）；3 处 `PathAutoComplete.Text = dir` → `PathCrumbs.Path = dir`；`GetSaveFileName()` 回落改 `PathCrumbs.Text` |
+| `Views/UiTestWindow.axaml` | 「自定义控件」页签新增 PathBreadcrumb 卡片（Virtual `docs/images/2026`、Disk 绑 `QuickPath`、Disk 空串三态） |
+| `Localization/strings.{zh-CN,en,zh-TW}.json` | 新增 `Breadcrumb_ArchiveRoot`、`Breadcrumb_EditPlaceholder`；删除 `Nav_AddressBar`、`Picker_AddressPlaceholder`、`QuickPath_SelectFolder`（1364 key） |
+| `ViewModels/MainWindowViewModel.cs` | `UpdateLocalizedStrings()` 的 keys 数组移除 `Nav_AddressBar`（新 key 走控件内 `LocalizationManager.T()`，不进 XAML 绑定数组） |
+| `tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbTests.cs` | 新建（6 个 `[AvaloniaFact]`）：Virtual 分段与末段加粗、Disk 盘符段不可点、空 Disk 显示 `EmptyHint`、点中间段上抛 `NavigateRequested("C:\Users")`、9 段折叠为 6 段、编辑态 Enter 上抛 / Esc 不上抛 |
+
+**与计划的偏差**
+
+1. `EnumerationRequested` 事件按计划预留但**第一版不接**（`#pragma warning disable CS0067`），避免无消费者的半成品接线。
+2. `CustomFilePickerDialog` 的 `GetSaveFileName()` 也用了旧 `PathAutoComplete.Text`（计划只列了 3 处赋值），一并改为 `PathCrumbs.Text` —— 否则「保存」模式拿不到用户刚输入的路径。
+3. 资源查找从 `FindResource` 改为 `TryFindResource`（虚拟根图标 / 前景色）：无头测试与设计器里资源未加载时 `FindResource` 返回 `UnsetValueType`，强转会抛 `InvalidCastException`。
+
+**验证**
+
+- `-Task build -Target avalonia -c Release`：0 警告。
+- `-Task test -Target ui-tests -c Release`：全绿（含新增 6 例）。
+- `-Task check`：版本 0.5.5 六处一致、三语 1364 key、8 项守卫全绿（含规则 13 的 key 登记校验——移除 `Nav_AddressBar` 后才通过）。
+- 真机取证：Release 版打开 `CustomFilePickerDialog`（Ctrl+O），地址栏显示 `E: › AI › IndexTTS2-SonicVale` 三段，分隔符与段样式正确，路径行颜色与「文件名」等 chrome 标签一致。
+
+**未做（留待真机冒烟）**：三处段点击导航一致性、`TryConfirmFile` 回车直确认、QuickPathPicker 四个宿主、亮暗主题 × 三档紧凑度、切语言后 ToolTip/占位刷新。

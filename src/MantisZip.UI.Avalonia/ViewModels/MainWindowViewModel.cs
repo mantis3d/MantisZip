@@ -281,7 +281,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_Password",
             "Menu_Test",
             "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_AutoExpand", "Tree_Filter",
-            "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_AddressBar", "Nav_GoUp",
+            "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_GoUp",
             "Toolbar_CopyName", "Toolbar_Refresh",
             "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode",
             "ViewMode_All", "ViewMode_Files", "ViewMode_Dirs",

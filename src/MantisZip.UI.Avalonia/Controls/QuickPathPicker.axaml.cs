@@ -59,8 +59,8 @@ public partial class QuickPathPicker : UserControl
         WinControl.SingleTab = PathTab.Windows;
         WinControl.ApplySingleTabMode();
 
-        // 地址框补全
-        InitAutoComplete();
+        // 面包屑地址栏（段点击 / 编辑态 Enter → 宿主归一化 + 记录历史）
+        InitBreadcrumb();
 
         // 手动 light-dismiss：点击控件外任意处先关全部浮层
         AddHandler(PointerPressedEvent,
@@ -74,12 +74,8 @@ public partial class QuickPathPicker : UserControl
         base.OnPropertyChanged(change);
         if (change.Property == PathProperty)
         {
-            var v = change.GetNewValue<string>() ?? string.Empty;
-            if (!string.Equals(PathInput.Text, v, StringComparison.Ordinal))
-            {
-                PathInput.Text = v;
-                SyncQuickPathControl();
-            }
+            // 面包屑自己订阅 Path（OneWay）刷新分段；这里只同步左侧速选面板的当前路径
+            SyncQuickPathControl();
         }
     }
 
@@ -91,85 +87,78 @@ public partial class QuickPathPicker : UserControl
         WinControl.SetCurrentPath(dir);
     }
 
-    // ── Row 0: AutoCompleteBox ─────────────────────────────────────────────
+    // ── Row 0: 面包屑地址栏 ─────────────────────────────────────────────────
 
-    private void InitAutoComplete()
+    private void InitBreadcrumb()
     {
-        PathInput.PlaceholderText = LocalizationManager.T("QuickPath_SelectFolder");
-
-        // 历史建议（来自 PathHistoryManager，Core 持久化）
-        PathInput.ItemsSource = PathHistoryManager.GetRecent(50).Select(h => h.Path).ToList();
-
-        PathInput.TextChanged += (_, _) =>
+        // 编辑态补全：历史匹配 + 父目录下以输入为前缀的子目录（与原 AutoCompleteBox 行为一致）
+        Breadcrumb.EditCompletionProvider = text =>
         {
-            var text = PathInput.Text ?? string.Empty;
-            if (text.Length < 2) return;
-
+            var t = (text ?? string.Empty).Trim();
             var suggestions = new List<string>();
-            // 历史匹配
-            suggestions.AddRange(PathHistoryManager.GetRecent(50)
-                .Select(h => h.Path)
-                .Where(p => p.Contains(text, StringComparison.OrdinalIgnoreCase))
-                .Take(10));
-            // 文件系统枚举：父目录下以输入为前缀的目录
-            try
+
+            if (t.Length >= 2)
             {
-                var parent = System.IO.Path.GetDirectoryName(text.TrimEnd('\\', '/'));
-                if (!string.IsNullOrEmpty(parent) && Directory.Exists(parent))
+                suggestions.AddRange(PathHistoryManager.GetRecent(50)
+                    .Select(h => h.Path)
+                    .Where(p => p.Contains(t, StringComparison.OrdinalIgnoreCase))
+                    .Take(10));
+
+                try
                 {
-                    var prefix = System.IO.Path.GetFileName(text.TrimEnd('\\', '/'));
-                    suggestions.AddRange(Directory.EnumerateDirectories(parent, (prefix + "*"), SearchOption.TopDirectoryOnly)
-                        .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
-                        .Take(20));
+                    var parent = System.IO.Path.GetDirectoryName(t.TrimEnd('\\', '/'));
+                    if (!string.IsNullOrEmpty(parent) && Directory.Exists(parent))
+                    {
+                        var prefix = System.IO.Path.GetFileName(t.TrimEnd('\\', '/'));
+                        suggestions.AddRange(Directory.EnumerateDirectories(parent, prefix + "*", SearchOption.TopDirectoryOnly)
+                            .OrderBy(d => d, StringComparer.OrdinalIgnoreCase)
+                            .Take(20));
+                    }
+                }
+                catch
+                {
+                    // 非法路径等，忽略
                 }
             }
-            catch
+            else
             {
-                // 非法路径等，忽略
+                // 空文本时给历史记录（等价于旧 ItemsSource 初值）
+                suggestions.AddRange(PathHistoryManager.GetRecent(50).Select(h => h.Path).Take(50));
             }
 
-            PathInput.ItemsSource = suggestions.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+            return suggestions.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+        };
+
+        // 段点击 / 编辑态 Enter：空串守卫 → 归一化为目录 → 记录历史（对齐原 Enter 行为）
+        Breadcrumb.NavigateRequested += (_, raw) =>
+        {
+            var text = (raw ?? string.Empty).Trim();
+            if (string.IsNullOrEmpty(text)) return;
+
+            Path = CoerceToDirectory(text);
+            SyncQuickPathControl();
+            PathHistoryManager.Record(Path);
         };
     }
-
-    private void PathInput_TextChanged(object? sender, TextChangedEventArgs e)
-    {
-        var text = PathInput.Text ?? string.Empty;
-        if (!string.Equals(Path, text, StringComparison.Ordinal))
-            Path = text;
-    }
-
-    private void PathInput_KeyDown(object? sender, KeyEventArgs e)
-    {
-        if (e.Key == Key.Enter)
-        {
-            var text = PathInput.Text?.Trim() ?? string.Empty;
-            if (!string.IsNullOrEmpty(text))
-            {
-                Path = CoerceToDirectory(text);
-                PathInput.Text = Path;
-                SyncQuickPathControl();
-                PathHistoryManager.Record(Path);
-            }
-        }
-    }
-
     // ── Row 快捷按钮 ────────────────────────────────────────────────────────
 
     private void QuickFavButton_Click(object? sender, RoutedEventArgs e)
     {
+        Breadcrumb.CloseEdit();
         CloseAllPopups();
         FavPopup.IsOpen = true;
     }
 
     private void QuickHistButton_Click(object? sender, RoutedEventArgs e)
     {
+        Breadcrumb.CloseEdit();
         CloseAllPopups();
         HistPopup.IsOpen = true;
     }
 
     private void QuickWinButton_Click(object? sender, RoutedEventArgs e)
     {
+        Breadcrumb.CloseEdit();
         CloseAllPopups();
         WinPopup.IsOpen = true;
     }
@@ -178,7 +167,6 @@ public partial class QuickPathPicker : UserControl
     {
         if (string.IsNullOrEmpty(path)) return;
         Path = CoerceToDirectory(path);
-        PathInput.Text = Path;
         FavPopup.IsOpen = false;
     }
 
@@ -186,7 +174,6 @@ public partial class QuickPathPicker : UserControl
     {
         if (string.IsNullOrEmpty(path)) return;
         Path = CoerceToDirectory(path);
-        PathInput.Text = Path;
         HistPopup.IsOpen = false;
     }
 
@@ -194,7 +181,6 @@ public partial class QuickPathPicker : UserControl
     {
         if (string.IsNullOrEmpty(path)) return;
         Path = CoerceToDirectory(path);
-        PathInput.Text = Path;
         WinPopup.IsOpen = false;
     }
 
@@ -202,6 +188,7 @@ public partial class QuickPathPicker : UserControl
 
     private async void QuickBrowseButton_Click(object? sender, RoutedEventArgs e)
     {
+        Breadcrumb.CloseEdit();
         CloseAllPopups();
 
         var owner = TopLevel.GetTopLevel(this) as Window;
@@ -212,8 +199,7 @@ public partial class QuickPathPicker : UserControl
         if (!string.IsNullOrEmpty(picked))
         {
             Path = CoerceToDirectory(picked);
-            PathInput.Text = Path;
-            SyncQuickPathControl();
+                SyncQuickPathControl();
             PathHistoryManager.Record(Path);
         }
     }

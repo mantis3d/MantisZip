@@ -3,6 +3,7 @@
              xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
+             xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
              x:Class="MantisZip.UI.Avalonia.Controls.ArchiveContentView"
              x:DataType="vm:MainWindowViewModel">
 
@@ -237,16 +238,13 @@
           <Border Grid.Row="1"
                   Padding="6,3"
                   Background="{DynamicResource ThemeHeaderBgBrush}">
-            <AutoCompleteBox Height="{DynamicResource ControlHeightSm}"
-                             x:Name="AddressBar"
-                             Text="{Binding CurrentFolder}"
-                             ItemsSource="{Binding FolderPaths}"
-                             FilterMode="StartsWith"
-                             PlaceholderText="{Binding LocalizedStrings[Nav_AddressBar]}"
-                             KeyDown="AddressBar_KeyDown"
-                             Background="{DynamicResource ThemeWindowBgBrush}"
-                             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+            <controls:PathBreadcrumb Height="{DynamicResource ControlHeightSm}"
+                                     x:Name="AddressBar"
+                                     PathKind="Virtual"
+                                     Path="{Binding CurrentFolder, Mode=OneWay}"
+                                     FilterMode="StartsWith"
+                                     ArchiveRootTooltipKey="Breadcrumb_ArchiveRoot"
+                                     EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
           </Border>
 
           <!-- DataGrid -->

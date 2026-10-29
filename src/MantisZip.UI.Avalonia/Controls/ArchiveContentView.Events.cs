@@ -19,18 +19,6 @@ namespace MantisZip.UI.Avalonia.Controls;
 
 public partial class ArchiveContentView
 {
-    private void AddressBar_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)
-    {
-        if (e.Key == global::Avalonia.Input.Key.Enter)
-        {
-            if (sender is AutoCompleteBox box)
-            {
-                var vm = DataContext as MainWindowViewModel;
-                vm?.NavigateToFolderPath(box.Text ?? "");
-            }
-            e.Handled = true;
-        }
-    }
 
     private void ColumnHeaderContextMenu_Opening(object? sender, CancelEventArgs e)
     {
