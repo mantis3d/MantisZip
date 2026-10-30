@@ -330,6 +330,12 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_Source_MultiFilterHint",
             "Extract_UnlockButton",
             "Extract_PickerAdvancedMode",
+            "Extract_EntrySelectionTab",
+            "Extract_EntrySelectionHint",
+            "Extract_EntrySelectAll",
+            "Extract_EntrySelectFilesOnly",
+            "Extract_EntryClearAll",
+            "Extract_ExtractPreserveFullPath",
             "Settings_ExtractTab_Parallel",
             "Settings_EnableParallelExtract",
             "Settings_SmartSsdLabel",
@@ -1193,8 +1199,9 @@ public partial class ExtractSettingsViewModel : ObservableObject
             ConflictAction = ConflictAction,
             FilteredEntryKeys = filteredEntryKeys,
             // 设置对话框只解整包或过滤集合；勾选条目由预览树入口另行构造载荷（T11）。
-            SelectedEntries = null,
-            CurrentFolder = null,
+            // 条目选择模式（v0.5.5 第三步后半）：勾选的条目直接作为载荷，未勾选的不解压。
+            SelectedEntries = IsEntrySelectionMode ? BuildSelectedEntries() : null,
+            CurrentFolder = IsEntrySelectionMode ? _entryCurrentFolder : null,
             Password = _knownPassword,
             MatchedPasswords = _matchedPasswords.Count > 0
                 ? new Dictionary<string, string>(_matchedPasswords, StringComparer.OrdinalIgnoreCase)
@@ -1204,7 +1211,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
             OpenFolderAfterExtract = OpenFolderAfterExtract,
             DeleteArchiveAfterExtract = DeleteArchiveAfterExtract,
             // 路径契约的执行输入：路径归属由 ExtractPathResolver 决定，这里只记录当前设置值。
-            PreserveFullPath = appSettings.ExtractPreserveFullPath,
+            // 条目选择模式下用该页的勾选值；其余模式沿用全局设置。
+            PreserveFullPath = IsEntrySelectionMode ? PreserveFullPathOption : appSettings.ExtractPreserveFullPath,
             // 本次解压的并行度快照（对话框内改动本次生效、不回写全局设置）。
             ParallelOverride = BuildParallelSettings(),
         };

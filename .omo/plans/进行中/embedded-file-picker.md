@@ -135,3 +135,11 @@
 - 用户拍板范围：只记尺寸（含分栏宽度），**不记位置**（多显示器拔插后位置还原容易把窗口放到屏幕外）。
 - 落地：新增 `Services/WindowPlacement.cs`（非法值回落、合法值不小于 `MinWidth/MinHeight`），`AppSettings` 加 9 个几何字段（默认值与 XAML 一致），四个窗口「构造器恢复 + 关闭写回」；主窗口仍走 `WindowStateManager`，注释里写明避免两个事实源。
 - 真机验证：压缩窗拖到 950×700 关闭 → `settings.json` 写 `CompressWindowWidth=934`/`Height=661` → 重开回到 950×700；新增 `WindowPlacementTests` 15 例。
+
+### 第三步·后一半（已完成，2026-10-30）
+
+- `Dialogs/ExtractSettingsWindow.axaml(.cs)`：新增 `EntrySelectionTab`（默认隐藏，条目模式下显示并默认选中、同时隐藏 `AddArchivesTab`），构造器加 `entrySelectionMode` / `entryCurrentFolder` / `entryPreserveFullPath`，新增静态入口 `ShowEntrySelectionAsync(...)`（窗口自己执行，规则 20）。
+- `ViewModels/ExtractSettingsViewModel.EntrySelection.cs`（新）+ `Models/ExtractEntrySelectionRow.cs`（新）：条目勾选行、全选/只选文件/清空、已选摘要、保留完整路径；载荷 `SelectedEntries` / `CurrentFolder` / `PreserveFullPath` 按模式取值。
+- 入口改接：`ViewModels/MainWindowViewModel.Extract.cs` 的 `ExtractSelectedTo` 改用 `ShowExtractEntryPicker`（带回话密码、不再回读窗口、不再走 `ExtractFlow`）；`Services/DragDropService.cs` 兜底分支改同一入口 + 新增 `Services/DragDropExtractPostActions.cs`（拖拽不删原包）。
+- 与计划的偏差：①拖拽兜底与右键共用同一静态入口（计划只说「实例化 ExtractSettingsWindow」）；②`DragDropExtractPostActions` 是新文件（计划没点名）；③`dialog-seam` 登记表新增窗口自身工厂一行。
+- 测试：`tests/MantisZip.UI.Avalonia.Tests/ExtractEntrySelectionTests.cs` 2 例。

@@ -1,4 +1,10 @@
 ﻿{
+  "Extract_EntrySelectionTab": "Select files to extract",
+  "Extract_EntrySelectionHint": "Check the entries to extract; unchecked ones are skipped.",
+  "Extract_EntrySelectAll": "Select all",
+  "Extract_EntryClearAll": "Clear",
+  "Extract_EntrySelectFilesOnly": "Files only",
+  "Extract_ExtractPreserveFullPath": "Keep full paths",
   "Extract_PickerAdvancedMode": "Advanced mode",
   "Extract_TabOutput": "Output",
   "Extract_TabAddArchives": "Add Archives",

@@ -12,6 +12,15 @@
   - **修法**：新增 `Services/WindowPlacement.cs`（`Apply` / `ApplyLeftColumn` / `Capture` / `CaptureLeftColumn` / `IsUsable`）—— 非法值（0、负数、NaN、∞）一律回落 XAML 默认，合法值不小于 `MinWidth` / `MinHeight`；`AppSettings` 加 9 个几何字段（默认值与 XAML 一致：压缩窗 1080×860/620、解压窗 1180×760/620、选择器宽 1100、设置窗 900×640），并在注释里写明「主窗口不在此列，避免两个事实源」；四个窗口在构造器里恢复、关闭时写回（`CompressSettingsWindow` / `ExtractSettingsWindow` 的 `OnClosed`、`SettingsWindow` 的 `Closed`、`CustomFilePickerDialog` 的 `OnClosing`，选择器高度按模式固定故不存）。
   - **验证**：真机把压缩窗拖到 950×700 关闭 → `settings.json` 写入 `CompressWindowWidth=934`（客户区）/`Height=661` → 重新打开窗口回到 950×700；新增 `tests/MantisZip.UI.Avalonia.Tests/WindowPlacementTests.cs` 15 例（非法值回落、`MinWidth` 夹取、分栏宽度往返、星号列回落、传错控件安静降级）。
   - **状态**：已完成并提交。
+**2026-10-30** — 功能：解压「选择要解压的文件」页（v0.5.5 第三步后半）
+  - **背景**：右键「解压到…」与拖拽兜底原来弹 `CustomFilePickerDialog` 的 ExtractFolder 模式，只能选目标目录，不能改勾选条目；而计划要求这两个入口改为设置窗的条目选择页。
+  - **关键发现**：执行链本来就支持「只解压指定条目」——`Models/ExtractSettings.cs` 早有 `SelectedEntries` 且 `Services/ExtractSession.cs` 的 `useSelectedEntries` 分支直接调 `SelectedItemsExtractService`，所以只缺交互页，不必动 Core/服务层。
+  - **窗口**：`Dialogs/ExtractSettingsWindow` 新增 `EntrySelectionTab`（默认隐藏；条目模式显示并默认选中、同时隐藏「添加压缩包」页），构造器加 `entrySelectionMode` / `entryCurrentFolder` / `entryPreserveFullPath`，并新增静态入口 `ShowEntrySelectionAsync(...)` —— 窗口自己执行，符合规则 20「确认即载荷 + 唯一执行器」。
+  - **VM**：新增 partial 文件 `ViewModels/ExtractSettingsViewModel.EntrySelection.cs` 与 `Models/ExtractEntrySelectionRow.cs`（`IsSelected` 是通知属性，普通自动属性不会让行模板重绘）；载荷里 `SelectedEntries` / `CurrentFolder` / `PreserveFullPath` 按模式取值（原来写死 `null` / 全局设置）。
+  - **两个入口**：右键「解压到」改走 `ShowExtractEntryPicker` 回调（带回话密码），拖拽兜底就地建 `ExtractSession(postActions: DragDropExtractPostActions)` + `MainWindowProgressPresenter` + `ExtractRunContext`；`DragDropExtractPostActions.DeleteArchive` 有意留空 = 拖拽解压不删原包（原 `allowDeleteArchive:false` 的语义改由 postActions 表达）。
+  - **守卫**：`dialog-seam` 第 4 类把窗口自身的工厂方法也当成「建窗点」，已按守卫口径登记 `Dialogs/ExtractSettingsWindow.axaml.cs = 1`。
+  - **验证**：Release 0 警告；ui-tests 56.4s、tests 12.2s 全绿；`-Task check` 0.5.5 / 1406 key / 8 守卫；新增 `ExtractEntrySelectionTests` 2 例（条目页显隐与默认选中、载荷只含勾选项）。
+  - **状态**：代码与自动化验证完成；真机冒烟（两条入口的弹窗落页、勾选生效、进度窗、拖拽无删包开关）待用户确认。
 **2026-10-30** — 功能：设置窗内嵌文件选择器（v0.5.5 第二项）
   - **背景**：压缩设置窗的「添加文件」与解压设置窗的「添加压缩包」原先弹 `CustomFilePickerDialog` 模态窗，选完再返回设置窗；用户希望「去弹窗化」，把选择器直接嵌进设置窗页签（`docs/prototypes/embedded-file-picker.html` 原型已定交互）。
   - **第一步（纯重构，`cf4b159a`）**：`Dialogs/CustomFilePickerDialog.axaml` 的 Row 0~3 全部视觉内容抽成 `Controls/CustomFilePickerControl.axaml`（459 行）+ `.axaml.cs`（1280 行）；模态壳只剩标题栏 / 确定取消 / 系统浏览豁免（56+329 行），5 个静态入口与 `PickerMode` / `ExtractPickResult` / `PickerOptionItem` 契约不变。49 个方法体里 30 个逐字相同，其余 13 条非机械改动逐项登记在计划「实施记录」。

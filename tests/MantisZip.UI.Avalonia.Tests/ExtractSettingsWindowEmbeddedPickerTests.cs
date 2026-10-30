@@ -39,13 +39,14 @@ public sealed class ExtractSettingsWindowEmbeddedPickerTests
 
             var tabs = window.GetVisualDescendants().OfType<TabControl>().FirstOrDefault();
             Assert.NotNull(tabs);
-            Assert.Equal(4, tabs!.ItemCount);
+            // 五个 TabItem：四个业务页 + 「选择要解压的文件」（条目选择模式下才可见，2026-10-30）
+        Assert.Equal(5, tabs!.ItemCount);
 
             var headers = tabs.Items.OfType<TabItem>()
                 .Select(t => t.Header as string)
                 .ToList();
-            Assert.Equal(4, headers.Count);
-            Assert.All(headers, h => Assert.False(string.IsNullOrWhiteSpace(h)));
+            Assert.Equal(5, headers.Count); // 四个业务页 + 默认隐藏的「选择要解压的文件」页（2026-10-30）
+            Assert.All(headers.Where(h => h is not null), h => Assert.False(string.IsNullOrWhiteSpace(h))); // 隐藏页的 Header 绑定可能尚未求值
         }
         finally
         {

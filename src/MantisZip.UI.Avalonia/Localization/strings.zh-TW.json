@@ -1,4 +1,10 @@
 ﻿{
+  "Extract_EntrySelectionTab": "選擇要解壓縮的檔案",
+  "Extract_EntrySelectionHint": "勾選要解壓縮的項目；未勾選的不會解壓縮。",
+  "Extract_EntrySelectAll": "全選",
+  "Extract_EntryClearAll": "清除",
+  "Extract_EntrySelectFilesOnly": "只選檔案",
+  "Extract_ExtractPreserveFullPath": "保留完整路徑",
   "Extract_PickerAdvancedMode": "進階模式",
   "Extract_TabOutput": "輸出設定",
   "Extract_TabAddArchives": "新增壓縮檔",

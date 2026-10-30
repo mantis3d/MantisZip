@@ -84,17 +84,15 @@ internal class DragDropService
             var initialPath = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(_archivePath));
 
             App.DebugLog("[DragDropService] DetectTargetDirectory returned null, showing custom extract folder picker...");
-            var pick = await CustomFilePickerDialog.ShowExtractFolderAsync(
-                _ownerWindow, itemsToExtract, initialPath,
-                _currentFolder, _settings.ExtractPreserveFullPath);
-            if (pick is null || string.IsNullOrEmpty(pick.DestPath))
-            {
-                App.DebugLog("[DragDropService] User cancelled extract folder picker");
-                return;
-            }
-            targetDir = pick.DestPath;
-            preserveFullPath = pick.PreserveFullPath;
-            App.DebugLog($"[DragDropService] User picked folder: {pick.DestPath}");
+            // 条目选择模式（v0.5.5 第三步后半）：拖拽兜底改弹解压设置窗的「选择要解压的文件」页，
+            // 窗口自己执行（确认即载荷 + 唯一执行器）；拖拽入口的收尾动作固定不删原包。
+            var session = new ExtractSession(postActions: new DragDropExtractPostActions());
+            var presenter = new MainWindowProgressPresenter();
+            var context = new ExtractRunContext(Owner: _ownerWindow, Presenter: presenter, ExitPolicy.None);
+            await ExtractSettingsWindow.ShowEntrySelectionAsync(
+                _ownerWindow, session, context, new[] { _archivePath }, itemsToExtract,
+                initialPath, _currentFolder, _settings.ExtractPreserveFullPath, _password);
+            return;
         }
 
         // 5. 统一走 ExtractFlow.RunSelectedItemsExtractionAsync（与右键「解压选中项到」完全同一流程）：

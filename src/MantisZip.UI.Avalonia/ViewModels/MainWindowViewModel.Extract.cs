@@ -149,7 +149,7 @@ public partial class MainWindowViewModel : ObservableObject
     [RelayCommand]
     private async Task ExtractSelectedTo()
     {
-        if (CurrentArchivePath == null || ShowExtractFolderPicker == null) return;
+        if (CurrentArchivePath == null || ShowExtractEntryPicker == null) return;
         if (!EnsureArchiveAvailable()) return;
         if (SelectedEntries.Count == 0 && SelectedEntry == null) return;
 
@@ -161,10 +161,18 @@ public partial class MainWindowViewModel : ObservableObject
         var defaultDest = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
 
         var settings = AppSettings.Load();
-        var pick = await ShowExtractFolderPicker(entries, defaultDest, CurrentFolder ?? "", settings.ExtractPreserveFullPath);
-        if (pick is null || string.IsNullOrEmpty(pick.DestPath)) return;
-
-        await ExtractSelectedEntriesCoreAsync(entries, pick.DestPath, pick.PreserveFullPath);
+        // 条目选择模式（v0.5.5 第三步后半）：对话框自己就是执行入口（确认即载荷 + 唯一执行器），
+        // 这里只负责把「本次触发的条目」和默认目标交出去，不再回读窗口、也不再走 ExtractFlow。
+        var password = _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var knownPassword)
+            ? knownPassword
+            : null;
+        var handled = await ShowExtractEntryPicker(entries, defaultDest, CurrentFolder ?? "", settings.ExtractPreserveFullPath, password);
+        if (handled)
+        {
+            StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+            // 源包可能被收尾动作移入回收站，立刻同步开包状态
+            SyncArchiveStateAfterExtract();
+        }
     }
 
     /// <summary>

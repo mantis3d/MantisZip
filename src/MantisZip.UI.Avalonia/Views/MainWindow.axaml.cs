@@ -275,8 +275,22 @@ public partial class MainWindow : Window
             }
         };
 
-        vm.ShowExtractFolderPicker = (entries, initialPath, currentFolder, preserveFullPath) =>
-            CustomFilePickerDialog.ShowExtractFolderAsync(this, entries, initialPath, currentFolder, preserveFullPath);
+        // 条目选择模式（v0.5.5 第三步后半）：弹解压设置窗的「选择要解压的文件」页，
+        // 窗口自己执行（确认即载荷 + 唯一执行器），返回值只表示「已确认」还是「取消」。
+        vm.ShowExtractEntryPicker = async (entries, initialPath, currentFolder, preserveFullPath, password) =>
+        {
+            var session = new ExtractSession();
+            var presenter = new MainWindowProgressPresenter();
+            var context = new ExtractRunContext(Owner: this, Presenter: presenter, ExitPolicy.None);
+            return await ExtractSettingsWindow.ShowEntrySelectionAsync(
+                this, session, context,
+                new[] { vm.CurrentArchivePath! },
+                entries,
+                initialPath ?? string.Empty,
+                currentFolder,
+                preserveFullPath,
+                password);
+        };
 
         vm.ShowCompressSettingsDialog = async (sourcePaths) =>
         {

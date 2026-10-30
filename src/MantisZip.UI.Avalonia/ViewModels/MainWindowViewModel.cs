@@ -77,7 +77,8 @@ public partial class MainWindowViewModel : ObservableObject
     /// 解压目标文件夹选择回调。传入待解压条目、初始路径、当前浏览目录（压缩包内）与保留完整路径设置，
     /// 返回所选结果（目标目录 <c>DestPath</c> + 对话框内「保留完整路径」勾选值 <c>PreserveFullPath</c>），取消返回 null。
     /// </summary>
-    public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<ExtractPickResult?>>? ShowExtractFolderPicker { get; set; }
+    /// <summary>条目选择入口（右键「解压到」/ 拖拽兜底）：返回 true = 已确认并执行，false = 用户取消。</summary>
+    public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, string?, Task<bool>>? ShowExtractEntryPicker { get; set; }
 
     /// <summary>
     /// 压缩设置对话框回调。参数为预填的源路径；确认后的执行由回调内部完成

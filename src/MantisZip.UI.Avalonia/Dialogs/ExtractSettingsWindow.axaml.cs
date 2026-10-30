@@ -109,15 +109,50 @@ public partial class ExtractSettingsWindow : Window
         IExtractSession session,
         ExtractRunContext context,
         IReadOnlyList<string> archivePaths,
-        bool hideAddArchivesTab)
+        bool hideAddArchivesTab = false,
+        bool entrySelectionMode = false,
+        string? entryCurrentFolder = null,
+        bool entryPreserveFullPath = true)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(context);
         _session = session;
         _context = context;
 
-        ViewModel = Initialize(archivePaths, hideAddArchivesTab);
+        ViewModel = Initialize(archivePaths, hideAddArchivesTab, entrySelectionMode, entryCurrentFolder, entryPreserveFullPath);
         SubscribeViewModel();
+    }
+
+    /// <summary>
+    /// 「选择要解压的文件」入口（v0.5.5 第三步后半）：右键「解压到」与拖拽兜底共用。
+    /// 窗口自己就是执行入口（确认即载荷 + 唯一执行器），返回 true 表示已确认并执行（含用户取消 → false）。
+    /// </summary>
+    public static async Task<bool> ShowEntrySelectionAsync(
+        Window owner,
+        IExtractSession session,
+        ExtractRunContext context,
+        IReadOnlyList<string> archivePaths,
+        IReadOnlyList<ArchiveItem> entries,
+        string initialDestination,
+        string? currentFolder,
+        bool preserveFullPath,
+        string? password)
+    {
+        var dialog = new ExtractSettingsWindow(
+            session, context, archivePaths,
+            hideAddArchivesTab: true,
+            entrySelectionMode: true,
+            entryCurrentFolder: currentFolder,
+            entryPreserveFullPath: preserveFullPath);
+
+        if (!string.IsNullOrWhiteSpace(initialDestination))
+            dialog.ViewModel.DestinationPath = initialDestination;
+        if (!string.IsNullOrEmpty(password))
+            dialog.ViewModel.SetKnownPassword(password);
+        dialog.SetEntries(entries);
+
+        var outcome = await dialog.ShowDialog<ConfirmOutcome<ExtractSettings>>(owner);
+        return outcome is Confirmed<ExtractSettings>;
     }
 
     /// <summary>
@@ -215,7 +250,7 @@ public partial class ExtractSettingsWindow : Window
     /// </summary>
     /// <param name="archivePaths">待解压的压缩包路径（设计时为空）。</param>
     /// <param name="hideAddArchivesTab">是否隐藏「添加压缩包」选项卡。</param>
-    private ExtractSettingsViewModel Initialize(IReadOnlyList<string> archivePaths, bool hideAddArchivesTab)
+    private ExtractSettingsViewModel Initialize(IReadOnlyList<string> archivePaths, bool hideAddArchivesTab, bool entrySelectionMode = false, string? entryCurrentFolder = null, bool entryPreserveFullPath = true)
     {
         InitializeComponent();
 
@@ -226,6 +261,14 @@ public partial class ExtractSettingsWindow : Window
         // 「添加压缩包」页按场景显隐（拖拽 / 「解压到」等已由入口确定压缩包时隐藏）
         AddArchivesTab.IsVisible = !hideAddArchivesTab;
 
+        // 条目选择模式（右键「解压到」/ 拖拽兜底）：隐藏加包页，改显「选择要解压的文件」页并默认选中它
+        EntrySelectionTab.IsVisible = entrySelectionMode;
+        if (entrySelectionMode)
+        {
+            AddArchivesTab.IsVisible = false;
+            ViewModel.InitializeEntrySelection(Array.Empty<ArchiveItem>(), entryCurrentFolder, entryPreserveFullPath);
+            EntrySelectionTab.IsSelected = true;
+        }
         // 恢复上次关闭时保存的窗口尺寸与左侧设置列宽度（2026-10-30）
         ApplyPersistedGeometry();
 

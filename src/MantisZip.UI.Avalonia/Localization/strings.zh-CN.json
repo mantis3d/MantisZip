@@ -1,4 +1,10 @@
 ﻿{
+  "Extract_EntrySelectionTab": "选择要解压的文件",
+  "Extract_EntrySelectionHint": "勾选要解压的条目；未勾选的不会解压。",
+  "Extract_EntrySelectAll": "全选",
+  "Extract_EntryClearAll": "清空",
+  "Extract_EntrySelectFilesOnly": "只选文件",
+  "Extract_ExtractPreserveFullPath": "保留完整路径",
   "Extract_PickerAdvancedMode": "高级模式",
   "Extract_TabOutput": "输出设置",
   "Extract_TabAddArchives": "添加压缩包",
