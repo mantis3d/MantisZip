@@ -344,6 +344,8 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 - **「修复」条目仅限**：上一版本已发布、用户实际可能遇到的问题
 - **性能类改动**归入「性能 / Performance」节按收益描述，不要写成「修复 XXX」；同一功能的多项子改进合并为一条带 ①② 的条目
 - **格式与既有章节一致**：`### 文件说明 / File Description`（中英各一段）+ `### 更新内容 / Changelog`（分类加粗小标题 `**中文 / English**`，每条先中文后英文、`**功能名** — 说明`）
+- **篇幅：每条只写一到两句**（中文一到两句，英文镜像同长度）。只留「用户看到的变化 + 关键数字 / 开关位置」，不写根因推演、实现细节、架构选择与旁支说明——那些归 `docs/progress-avalonia-detail.md`。判断标准：一条读下来不超过两个句号 / 两个句点；超了就删「此前为什么这样」那半句，不要靠加括号往里塞
+- **每条独立成行**，条目之间一个空行；截图占位（`- ![说明](docs/images/version/vX.Y.Z/Name.png)`）紧跟在对应条目之后
 - 更新后同步 `docs/PROGRESS.md` 与 `docs/progress-avalonia-detail.md`（规则 3）
 
 ### 规则 19：`plans` 分支只制定计划，不改产品代码
