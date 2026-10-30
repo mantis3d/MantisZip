@@ -1,3 +1,23 @@
+## v0.5.5
+
+### 文件说明 / File Description
+
+MantisZip-0.5.5-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.5-Setup-Offline.exe 是离线安装包。MantisZip-0.5.5-Portable.zip 是便携版，解压即用。MantisZip-0.5.5-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.5-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.5-Portable.zip is the portable version, extract and run. MantisZip-0.5.5-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **地址栏改成资源管理器式面包屑** — 主窗口压缩包内的路径栏、文件选择器的地址栏、快速路径栏三处现在统一为分段面包屑（`E: › AI › IndexTTS2-SonicVale`），点任意祖先段直接跳转；点当前段或末尾空白进入编辑（`Ctrl+L` 也可以），`Enter` 提交、`Esc` 或点别处还原。盘符段可点回盘根 `E:\`；分隔符换成箭头图标；进入编辑时自动在末尾补上 `\`（压缩包内路径补 `/`），直接敲子目录名就行，不用先自己打分隔符；输入时弹出的候选路径点一下即跳转。编辑态与浏览态高度一致（此前进出编辑态整行会跳 13px），地址栏也有了底色与边框，浅色/深色主题下都能看出这是一块可输入的导航区
+- **Address bars became Explorer-style breadcrumbs** — the in-archive path bar, the file picker's address bar and the quick-path bar are now one segmented breadcrumb (`E: › AI › IndexTTS2-SonicVale`); click any ancestor segment to jump, click the current segment or the empty space after it to edit (`Ctrl+L` works too), with `Enter` to submit and `Esc` or clicking elsewhere to revert. The drive segment now jumps back to the drive root `E:\`, separators are arrow icons, entering edit mode pre-fills the trailing `\` (or `/` inside an archive) so you can type a subfolder name straight away, and clicking a path suggestion navigates immediately. Edit and browse modes are exactly the same height now (previously the whole row jumped 13 px), and the bar has its own background and border so it reads as an input field in both themes
+- **设置窗口里选文件/目录不再弹窗** — 压缩设置窗改为六个页签（输出设置 / 添加文件 / 压缩设置 / 密码 / 注释 / 文件过滤），解压设置窗改为四个页签（输出设置 / 添加压缩包 / 文件过滤 / 加速）；「添加文件」「输出目录」「添加压缩包」「解压到」都直接内嵌选择器，不再弹一个模态窗口选完再回来。单击条目＝选中（文件和文件夹都可以），双击文件夹＝进入，两侧的已选清单与选择器实时同步；「高级模式」开关可切成跨目录累积勾选，切回简单模式则只保留当前目录的选中项。文件列表会随窗口高度弹性撑满，已选清单固定高度贴在下方
+- **No more modal pickers inside the settings windows** — the compression window now has six tabs (output, add files, compression, password, comment, file filter) and the extraction window four (output, add archives, file filter, speed-up); adding files, choosing the output folder, adding archives and choosing the extraction folder all use an embedded picker instead of a modal dialog you had to dismiss first. A single click selects an entry (files and folders alike), double-clicking a folder enters it, and the "selected" list on either side stays in sync with the picker; an "advanced mode" switch turns selection into a cross-folder accumulation, and switching back keeps only what is selected in the current folder. The file list stretches with the window height while the selected list keeps a fixed height at the bottom
+- **记住窗口尺寸** — 压缩设置窗、解压设置窗、文件选择器和设置窗口的尺寸现在会被记住（含两个设置窗的左右分栏宽度），下次打开回到上次拖动后的大小。只记尺寸不记位置：笔记本拔掉外接屏后把窗口还原到已不存在的坐标，很容易整窗跑到屏幕外；保存的尺寸不合法（0、负数、异常值）时一律回落到默认大小
+- **Window sizes are remembered** — the compression window, the extraction window, the file picker and the settings window now remember their size (including the left/right split width of the two settings windows), so they reopen at the size you last dragged them to. Size only, not position: after unplugging an external monitor, restoring a window to coordinates that no longer exist easily pushes it off-screen; and invalid saved sizes (zero, negative, garbage) always fall back to the default
+
 ## v0.5.4
 
 ### 文件说明 / File Description
