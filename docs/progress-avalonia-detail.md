@@ -12,16 +12,17 @@
   - **修法**：新增 `Services/WindowPlacement.cs`（`Apply` / `ApplyLeftColumn` / `Capture` / `CaptureLeftColumn` / `IsUsable`）—— 非法值（0、负数、NaN、∞）一律回落 XAML 默认，合法值不小于 `MinWidth` / `MinHeight`；`AppSettings` 加 9 个几何字段（默认值与 XAML 一致：压缩窗 1080×860/620、解压窗 1180×760/620、选择器宽 1100、设置窗 900×640），并在注释里写明「主窗口不在此列，避免两个事实源」；四个窗口在构造器里恢复、关闭时写回（`CompressSettingsWindow` / `ExtractSettingsWindow` 的 `OnClosed`、`SettingsWindow` 的 `Closed`、`CustomFilePickerDialog` 的 `OnClosing`，选择器高度按模式固定故不存）。
   - **验证**：真机把压缩窗拖到 950×700 关闭 → `settings.json` 写入 `CompressWindowWidth=934`（客户区）/`Height=661` → 重新打开窗口回到 950×700；新增 `tests/MantisZip.UI.Avalonia.Tests/WindowPlacementTests.cs` 15 例（非法值回落、`MinWidth` 夹取、分栏宽度往返、星号列回落、传错控件安静降级）。
   - **状态**：已完成并提交。
-**2026-10-30** — 功能：解压「选择要解压的文件」页（v0.5.5 第三步后半）
-  - **背景**：右键「解压到…」与拖拽兜底原来弹 `CustomFilePickerDialog` 的 ExtractFolder 模式，只能选目标目录，不能改勾选条目；而计划要求这两个入口改为设置窗的条目选择页。
-  - **关键发现**：执行链本来就支持「只解压指定条目」——`Models/ExtractSettings.cs` 早有 `SelectedEntries` 且 `Services/ExtractSession.cs` 的 `useSelectedEntries` 分支直接调 `SelectedItemsExtractService`，所以只缺交互页，不必动 Core/服务层。
-  - **窗口**：`Dialogs/ExtractSettingsWindow` 新增 `EntrySelectionTab`（默认隐藏；条目模式显示并默认选中、同时隐藏「添加压缩包」页），构造器加 `entrySelectionMode` / `entryCurrentFolder` / `entryPreserveFullPath`，并新增静态入口 `ShowEntrySelectionAsync(...)` —— 窗口自己执行，符合规则 20「确认即载荷 + 唯一执行器」。
-  - **VM**：新增 partial 文件 `ViewModels/ExtractSettingsViewModel.EntrySelection.cs` 与 `Models/ExtractEntrySelectionRow.cs`（`IsSelected` 是通知属性，普通自动属性不会让行模板重绘）；载荷里 `SelectedEntries` / `CurrentFolder` / `PreserveFullPath` 按模式取值（原来写死 `null` / 全局设置）。
-  - **两个入口**：右键「解压到」改走 `ShowExtractEntryPicker` 回调（带回话密码），拖拽兜底就地建 `ExtractSession(postActions: DragDropExtractPostActions)` + `MainWindowProgressPresenter` + `ExtractRunContext`；`DragDropExtractPostActions.DeleteArchive` 有意留空 = 拖拽解压不删原包（原 `allowDeleteArchive:false` 的语义改由 postActions 表达）。
-  - **守卫**：`dialog-seam` 第 4 类把窗口自身的工厂方法也当成「建窗点」，已按守卫口径登记 `Dialogs/ExtractSettingsWindow.axaml.cs = 1`。
-  - **验证**：Release 0 警告；ui-tests 56.4s、tests 12.2s 全绿；`-Task check` 0.5.5 / 1406 key / 8 守卫；新增 `ExtractEntrySelectionTests` 2 例（条目页显隐与默认选中、载荷只含勾选项）。
-  - **状态**：代码与自动化验证完成；真机冒烟（两条入口的弹窗落页、勾选生效、进度窗、拖拽无删包开关）待用户确认。
-  - **实施后追加（同日，用户反馈两处高度与按钮）**：
+**2026-10-30** — 功能：解压「解压选中项到 / 拖拽兜底」改用解压设置窗（v0.5.5 第三步后半）
+  - **背景**：右键「解压到…」与拖拽兜底原来弹 `CustomFilePickerDialog` 的 ExtractFolder 模式，只能选目标目录，不能改勾选条目。
+  - **关键发现**：执行链本来就支持「只解压指定条目」——`Models/ExtractSettings.cs` 早有 `SelectedEntries`，`Services/ExtractSession.cs` 的 `useSelectedEntries` 分支直接调 `SelectedItemsExtractService`，所以只缺「把触发条目带进载荷」这一层，不必动 Core/服务层。
+  - **先做过又砍掉的一版**：曾加过「选择要解压的文件」条目页（`EntrySelectionTab` + `ExtractSettingsViewModel.EntrySelection.cs` + `ExtractEntrySelectionRow`），用户问「有必要加这个面板吗」后定案砍掉 —— 该页独有能力只有「在这一次里还能改勾选」，而目标目录/冲突/并行/过滤普通解压窗就有，且它引入一个模式（`IsEntrySelectionMode`），每个改动都要考虑两种形态（上一轮两个 bug 即由此而来）。最终只保留「预置选中集」这一层。
+  - **窗口**：`Dialogs/ExtractSettingsWindow` 页签仍是 4 个；新增静态入口 `ShowWithPresetSelectionAsync(owner, session, context, archivePaths, entries, presetSelectedEntries, initialDestination, currentFolder, password)` —— 建窗（`hideAddArchivesTab: true`）→ 设目标目录/已知口令 → 写 `ViewModel.PresetSelectedEntries` / `PresetCurrentFolder` → `SetEntries(整包条目)` → `ShowDialog<ConfirmOutcome<ExtractSettings>>` → 确认后由窗口 `RunConfirmedAsync` 自己执行（规则 20「确认即载荷 + 唯一执行器」），返回「是否跑完」。
+  - **VM**：`ViewModels/ExtractSettingsViewModel.cs` 加 `PresetSelectedEntries` / `PresetCurrentFolder` 两个入口预置属性，载荷里 `SelectedEntries` / `CurrentFolder` 取它们、`PreserveFullPath` 仍取全局设置。
+  - **两个入口**：右键「解压到」走 `ShowExtractEntryPicker` 回调（整包条目给预览/过滤统计，触发条目写进载荷；带回话密码）；拖拽兜底就地建 `ExtractSession(postActions: DragDropExtractPostActions)` + `MainWindowProgressPresenter` + `ExtractRunContext`；`DragDropExtractPostActions.DeleteArchive` 有意留空 = 拖拽解压不删原包。
+  - **守卫**：`dialog-seam` 第 4 类把窗口自身的工厂方法也当「建窗点」，已按口径登记 `Dialogs/ExtractSettingsWindow.axaml.cs = 1`。
+  - **验证**：Release `--no-incremental` 0 警告；ui-tests 41.6s、tests 13.3s 全绿；`-Task check` 0.5.5 / 1400 key / 8 守卫。真机（`smoke.zip` 4 条目，右键 `root.txt` →「解压选中项到…」）：弹窗 3 页签（输出设置/文件过滤/加速）、预览树列出全部 4 项、目标默认 `…\smoke`；点「解压」后**只解出 `root.txt`**、状态栏「解压完成」、进程存活。
+  - **修掉的一个真缺陷**：第一版静态入口只 `return outcome is Confirmed<…>` 而**没有执行会话**，导致「点解压后什么都不发生、目标目录不生成」（当时误判为崩溃，查事件日志无记录才发现是漏了 `RunConfirmedAsync`）。
+  - **状态**：代码、自动化验证与「解压到」真机路径均已通过；拖拽兜底与后置动作待用户冒烟。
     - 「已选压缩包」框 180 → 240、「已选源文件」框 180 → 240（用户反馈"只能看见一行""有点矮"）。
     - 解压窗「移除所选」「手动解锁」两个按钮去掉 `Classes="ToolbarButton"`（高 `ControlHeightLg`，与标题行不齐），改显式 `MinHeight="{DynamicResource ControlHeightSm}"` + `Padding="8,0"` + 三色；解锁按钮补 `IsVisible="{Binding CanUnlockSelected}"` —— 它原来没有可见性绑定，在固定高度框里始终占一行，是列表被挤扁的主因。
     - 顺带修 `ExtractSettingsWindow.axaml` 里插入条目页时造成的 `</TabItem>` 与 `<TabItem x:Name="AddArchivesTab"` 同行粘连、以及「选项卡 2」注释错位。

@@ -109,50 +109,60 @@ public partial class ExtractSettingsWindow : Window
         IExtractSession session,
         ExtractRunContext context,
         IReadOnlyList<string> archivePaths,
-        bool hideAddArchivesTab = false,
-        bool entrySelectionMode = false,
-        string? entryCurrentFolder = null,
-        bool entryPreserveFullPath = true)
+        bool hideAddArchivesTab = false)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(context);
         _session = session;
         _context = context;
 
-        ViewModel = Initialize(archivePaths, hideAddArchivesTab, entrySelectionMode, entryCurrentFolder, entryPreserveFullPath);
+        ViewModel = Initialize(archivePaths, hideAddArchivesTab);
         SubscribeViewModel();
     }
 
     /// <summary>
-    /// 「选择要解压的文件」入口（v0.5.5 第三步后半）：右键「解压到」与拖拽兜底共用。
-    /// 窗口自己就是执行入口（确认即载荷 + 唯一执行器），返回 true 表示已确认并执行（含用户取消 → false）。
+    /// 「解压选中项到」/ 拖拽兜底入口（v0.5.5 第三步后半）：窗口自己就是执行入口
+    /// （确认即载荷 + 唯一执行器），返回 true 表示已确认并执行（用户取消 → false）。
+    /// <para>
+    /// 勾选范围不由窗口改：本次要解压的条目由宿主在打开前定好，这里只把它写进载荷
+    /// （<c>SelectedEntries</c>），窗口内仍可选目标目录、冲突策略、过滤与并行度。
+    /// 2026-10-30 决定：不做「选择要解压的文件」页签 —— 该流程在右键/拖拽时已把子集定好，
+    /// 页签只多一个模式与一份状态，收益不足。
+    /// </para>
     /// </summary>
-    public static async Task<bool> ShowEntrySelectionAsync(
+    /// <param name="entries">整包条目（仅用于预览树与过滤统计）。</param>
+    /// <param name="presetSelectedEntries">本次实际解压的条目（写进载荷 SelectedEntries）。</param>
+    /// <param name="currentFolder">压缩包内当前目录（写进载荷 CurrentFolder，供路径归属计算）。</param>
+    public static async Task<bool> ShowWithPresetSelectionAsync(
         Window owner,
         IExtractSession session,
         ExtractRunContext context,
         IReadOnlyList<string> archivePaths,
         IReadOnlyList<ArchiveItem> entries,
+        IReadOnlyList<ArchiveItem> presetSelectedEntries,
         string initialDestination,
         string? currentFolder,
-        bool preserveFullPath,
         string? password)
     {
         var dialog = new ExtractSettingsWindow(
             session, context, archivePaths,
-            hideAddArchivesTab: true,
-            entrySelectionMode: true,
-            entryCurrentFolder: currentFolder,
-            entryPreserveFullPath: preserveFullPath);
+            hideAddArchivesTab: true);
 
         if (!string.IsNullOrWhiteSpace(initialDestination))
             dialog.ViewModel.DestinationPath = initialDestination;
         if (!string.IsNullOrEmpty(password))
             dialog.ViewModel.SetKnownPassword(password);
+        dialog.ViewModel.PresetSelectedEntries = presetSelectedEntries;
+        dialog.ViewModel.PresetCurrentFolder = currentFolder;
         dialog.SetEntries(entries);
 
-        var outcome = await dialog.ShowDialog<ConfirmOutcome<ExtractSettings>>(owner);
-        return outcome is Confirmed<ExtractSettings>;
+        var confirmation = await dialog.ShowDialog<ConfirmOutcome<ExtractSettings>>(owner);
+        if (confirmation is not Confirmed<ExtractSettings> confirmed)
+            return false;
+
+        // 窗口自己执行载荷：调用方只拿「有没有跑完」，不再自己拼执行链
+        var outcome = await dialog.RunConfirmedAsync(confirmed.Value);
+        return outcome.IsCompleted;
     }
 
     /// <summary>
@@ -250,7 +260,7 @@ public partial class ExtractSettingsWindow : Window
     /// </summary>
     /// <param name="archivePaths">待解压的压缩包路径（设计时为空）。</param>
     /// <param name="hideAddArchivesTab">是否隐藏「添加压缩包」选项卡。</param>
-    private ExtractSettingsViewModel Initialize(IReadOnlyList<string> archivePaths, bool hideAddArchivesTab, bool entrySelectionMode = false, string? entryCurrentFolder = null, bool entryPreserveFullPath = true)
+    private ExtractSettingsViewModel Initialize(IReadOnlyList<string> archivePaths, bool hideAddArchivesTab)
     {
         InitializeComponent();
 
@@ -261,14 +271,7 @@ public partial class ExtractSettingsWindow : Window
         // 「添加压缩包」页按场景显隐（拖拽 / 「解压到」等已由入口确定压缩包时隐藏）
         AddArchivesTab.IsVisible = !hideAddArchivesTab;
 
-        // 条目选择模式（右键「解压到」/ 拖拽兜底）：隐藏加包页，改显「选择要解压的文件」页并默认选中它
-        EntrySelectionTab.IsVisible = entrySelectionMode;
-        if (entrySelectionMode)
-        {
-            AddArchivesTab.IsVisible = false;
-            ViewModel.InitializeEntrySelection(Array.Empty<ArchiveItem>(), entryCurrentFolder, entryPreserveFullPath);
-            EntrySelectionTab.IsSelected = true;
-        }
+
         // 恢复上次关闭时保存的窗口尺寸与左侧设置列宽度（2026-10-30）
         ApplyPersistedGeometry();
 

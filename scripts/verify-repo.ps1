@@ -961,7 +961,7 @@ $DIALOG_SEAM_REGISTRY = [ordered]@{
     'src/MantisZip.UI.Avalonia/App.CliCompress.cs'                    = 1
     'src/MantisZip.UI.Avalonia/App.CliExtract.cs'                     = 1
     'src/MantisZip.UI.Avalonia/Controls/Menus/TestMenuView.axaml.cs'  = 2
-    # 窗口自身的静态入口 ShowEntrySelectionAsync 在类内部建窗（v0.5.5 第三步后半，2026-10-30）
+    # 窗口自身的静态入口 ShowWithPresetSelectionAsync 在类内部建窗（v0.5.5 第三步后半，2026-10-30）
     'src/MantisZip.UI.Avalonia/Dialogs/ExtractSettingsWindow.axaml.cs' = 1
 }
 

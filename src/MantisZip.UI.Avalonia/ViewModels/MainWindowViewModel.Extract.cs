@@ -166,7 +166,9 @@ public partial class MainWindowViewModel : ObservableObject
         var password = _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var knownPassword)
             ? knownPassword
             : null;
-        var handled = await ShowExtractEntryPicker(entries, defaultDest, CurrentFolder ?? "", settings.ExtractPreserveFullPath, password);
+        // 整包条目给预览/过滤统计，真正解压的是本次选中的子集
+        var allEntries = _allRawItems ?? entries;
+        var handled = await ShowExtractEntryPicker(allEntries, entries, defaultDest, CurrentFolder ?? "", password);
         if (handled)
         {
             StatusMessage = LocalizationManager.T("Status_ExtractComplete");

@@ -89,9 +89,10 @@ internal class DragDropService
             var session = new ExtractSession(postActions: new DragDropExtractPostActions());
             var presenter = new MainWindowProgressPresenter();
             var context = new ExtractRunContext(Owner: _ownerWindow, Presenter: presenter, ExitPolicy.None);
-            await ExtractSettingsWindow.ShowEntrySelectionAsync(
-                _ownerWindow, session, context, new[] { _archivePath }, itemsToExtract,
-                initialPath, _currentFolder, _settings.ExtractPreserveFullPath, _password);
+            await ExtractSettingsWindow.ShowWithPresetSelectionAsync(
+                _ownerWindow, session, context, new[] { _archivePath },
+                allItems, itemsToExtract,
+                initialPath, _currentFolder, _password);
             return;
         }
 
