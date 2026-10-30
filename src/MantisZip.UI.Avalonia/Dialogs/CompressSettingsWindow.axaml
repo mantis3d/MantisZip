@@ -7,8 +7,8 @@
           Title="{Binding WindowTitle}"
           Width="1080"
           MinWidth="900"
-          MinHeight="500"
-          SizeToContent="Height"
+          MinHeight="600"
+          Height="860"
           WindowStartupLocation="CenterOwner"
           CanResize="True"
           Background="{DynamicResource ThemeWindowBgBrush}">
@@ -42,97 +42,115 @@
       <TabItem Header="{Binding LocalizedStrings[Compress_TabOutput]}"
                 Classes="compactTab"
                 controls:TabItemExtensions.TabIcon="IconSettings">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
-                      TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
-          <StackPanel Spacing="{DynamicResource SpacingSm}"
-                      Margin="0,8,0,0">
+        <!-- 本页用弹性行：输出目录选择器吃掉剩余高度，其它分组按内容高度贴顶。
+             窗口拉高时只有浏览区变高，上下两端始终对齐（2026-10-30 用户反馈）。
+             第 2 行高度绑定 VM.OutputPickerRowHeight：手动模式 = * ，其余模式 = 0，
+             这样「分别/合并」模式隐藏输出目录分组时不会留一块空洞。 -->
+        <Grid Margin="0,8,0,0"
+              Background="{DynamicResource ThemeWindowBgBrush}"
+              TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <Grid.RowDefinitions>
+            <RowDefinition Height="Auto" />  <!-- 输出模式 -->
+            <RowDefinition Height="{Binding OutputPickerRowHeight}" />  <!-- 输出目录（手动模式才占位） -->
+            <RowDefinition Height="Auto" />  <!-- 输出文件名 -->
+            <RowDefinition Height="Auto" />  <!-- 文件冲突策略 -->
+          </Grid.RowDefinitions>
 
-            <!-- 分组：输出模式（三个互斥单选，绑定 VM 的 IsManualMode/IsSeparateMode/IsCombinedMode） -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding LocalizedStrings[Compress_OutputMode]}"
-                           FontWeight="SemiBold" />
-                <!-- 手动指定输出路径 -->
-                <RadioButton GroupName="CompressOutputMode"
-                             IsChecked="{Binding IsManualMode}"
-                             Content="{Binding LocalizedStrings[Compress_OutputMode_Manual]}" />
-                <!-- 分别压缩到各自目录（每源自成包） -->
-                <RadioButton GroupName="CompressOutputMode"
-                             IsChecked="{Binding IsSeparateMode}"
-                             Content="{Binding LocalizedStrings[Compress_OutputMode_Separate]}" />
-                <!-- 合并压缩到同一个压缩包 -->
-                <RadioButton GroupName="CompressOutputMode"
-                             IsChecked="{Binding IsCombinedMode}"
-                             Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
-              </StackPanel>
-            </Border>
+          <!-- 分组：输出模式（三个互斥单选，绑定 VM 的 IsManualMode/IsSeparateMode/IsCombinedMode） -->
+          <Border Grid.Row="0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <StackPanel Spacing="{DynamicResource SpacingXs}">
+              <TextBlock Text="{Binding LocalizedStrings[Compress_OutputMode]}"
+                         FontWeight="SemiBold" />
+              <!-- 手动指定输出路径 -->
+              <RadioButton GroupName="CompressOutputMode"
+                           IsChecked="{Binding IsManualMode}"
+                           Content="{Binding LocalizedStrings[Compress_OutputMode_Manual]}" />
+              <!-- 分别压缩到各自目录（每源自成包） -->
+              <RadioButton GroupName="CompressOutputMode"
+                           IsChecked="{Binding IsSeparateMode}"
+                           Content="{Binding LocalizedStrings[Compress_OutputMode_Separate]}" />
+              <!-- 合并压缩到同一个压缩包 -->
+              <RadioButton GroupName="CompressOutputMode"
+                           IsChecked="{Binding IsCombinedMode}"
+                           Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
+            </StackPanel>
+          </Border>
 
-            <!-- 分组：输出目录（内嵌目录选择器，仅手动模式可见；分别/合并模式路径自动计算） -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}"
-                    IsVisible="{Binding IsQuickPathVisible}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding LocalizedStrings[Compress_OutputPath]}"
-                           FontWeight="SemiBold" />
-                <!-- 内嵌目录选择器：Mode=PickFolder（只取目录、不显示文件名区），
-                     IsSimpleMode=True（当前目录即结果、无复选框）。
-                     PathChanged → 代码后台写回 ViewModel.OutputDirectory。
-                     高度必须显式给：控件内部 Grid 的 * 行放在 StackPanel 里会被压成 0，
-                     故这里给定固定视口高度（选择器需要一块可浏览的区域）。 -->
-                <controls:CustomFilePickerControl x:Name="OutputPicker"
-                                                  Mode="PickFolder"
-                                                  IsSimpleMode="True"
-                                                  Height="260"
-                                                  PathChanged="OnOutputPickerPathChanged" HideAccumulatedPanel="True" />
-              </StackPanel>
-            </Border>
+          <!-- 分组：输出目录（内嵌目录选择器，仅手动模式可见；分别/合并模式路径自动计算）。
+               高度交给 Grid 的 * 行：标题 Auto + 选择器 * ，不再写死 Height="260"。 -->
+          <Border Grid.Row="1"
+                  Margin="0,8,0,0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}"
+                  IsVisible="{Binding IsQuickPathVisible}">
+            <Grid RowDefinitions="Auto,*">
+              <TextBlock Grid.Row="0"
+                         Text="{Binding LocalizedStrings[Compress_OutputPath]}"
+                         FontWeight="SemiBold" />
+              <!-- 内嵌目录选择器：Mode=PickFolder（只取目录、不显示文件名区），
+                   IsSimpleMode=True（当前目录即结果、无复选框）。
+                   PathChanged → 代码后台写回 ViewModel.OutputDirectory。
+                   MinHeight 只是「窗口被压得很矮时的下限」，正常高度由 * 行决定。 -->
+              <controls:CustomFilePickerControl Grid.Row="1"
+                                                x:Name="OutputPicker"
+                                                Mode="PickFolder"
+                                                IsSimpleMode="True"
+                                                MinHeight="200"
+                                                Margin="0,6,0,0"
+                                                PathChanged="OnOutputPickerPathChanged" HideAccumulatedPanel="True" />
+            </Grid>
+          </Border>
 
-            <!-- 分组：输出文件名 + 扩展名（仅手动/合并模式可见；扩展名跟随所选格式） -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}"
-                    IsVisible="{Binding IsFileNameSectionVisible}">
-              <Grid ColumnDefinitions="80,*,Auto">
-                <TextBlock Grid.Column="0"
-                           Text="{Binding LocalizedStrings[Compress_OutputFileName]}"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                <TextBox Grid.Column="1"
-                         Text="{Binding OutputFileName}"
-                         IsReadOnly="{Binding IsOutputPathReadOnly}"
-                         MinHeight="{DynamicResource ControlHeightSm}"
-                         Background="{DynamicResource ThemeSurfaceBgBrush}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                <TextBlock Grid.Column="2"
-                           Text="{Binding OutputExtensionLabel}"
-                           Margin="6,0,0,0"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              </Grid>
-            </Border>
+          <!-- 分组：输出文件名 + 扩展名（仅手动/合并模式可见；扩展名跟随所选格式） -->
+          <Border Grid.Row="2"
+                  Margin="0,8,0,0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}"
+                  IsVisible="{Binding IsFileNameSectionVisible}">
+            <Grid ColumnDefinitions="80,*,Auto">
+              <TextBlock Grid.Column="0"
+                         Text="{Binding LocalizedStrings[Compress_OutputFileName]}"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBox Grid.Column="1"
+                       Text="{Binding OutputFileName}"
+                       IsReadOnly="{Binding IsOutputPathReadOnly}"
+                       MinHeight="{DynamicResource ControlHeightSm}"
+                       Background="{DynamicResource ThemeSurfaceBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              <TextBlock Grid.Column="2"
+                         Text="{Binding OutputExtensionLabel}"
+                         Margin="6,0,0,0"
+                         VerticalAlignment="Center"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            </Grid>
+          </Border>
 
-            <!-- 分组：文件冲突策略（本次压缩遇到同名文件时的处理方式，覆盖/追加/自动重命名/跳过） -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <!-- 标签：文件存在时： -->
-                <TextBlock Text="{Binding LocalizedStrings[Compress_WhenFileExists]}"
-                           FontWeight="SemiBold" />
-                <!-- 冲突策略下拉：每次询问 / 覆盖 / 追加 / 自动重命名 / 跳过 -->
-                <ComboBox x:Name="ConflictActionCombo"
-                          ItemsSource="{Binding ConflictActionOptions}"
-                          SelectedItem="{Binding SelectedConflictActionOption}"
-                          DisplayMemberBinding="{Binding Display}"
-                          Width="240" HorizontalAlignment="Left" />
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </ScrollViewer>
+          <!-- 分组：文件冲突策略（本次压缩遇到同名文件时的处理方式，覆盖/追加/自动重命名/跳过） -->
+          <Border Grid.Row="3"
+                  Margin="0,8,0,0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <StackPanel Spacing="{DynamicResource SpacingXs}">
+              <!-- 标签：文件存在时： -->
+              <TextBlock Text="{Binding LocalizedStrings[Compress_WhenFileExists]}"
+                         FontWeight="SemiBold" />
+              <!-- 冲突策略下拉：每次询问 / 覆盖 / 追加 / 自动重命名 / 跳过 -->
+              <ComboBox x:Name="ConflictActionCombo"
+                        ItemsSource="{Binding ConflictActionOptions}"
+                        SelectedItem="{Binding SelectedConflictActionOption}"
+                        DisplayMemberBinding="{Binding Display}"
+                        Width="240" HorizontalAlignment="Left" />
+            </StackPanel>
+          </Border>
+        </Grid>
       </TabItem>
 
       <!-- ═══════════════════════════════════════════════════════════════

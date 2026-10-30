@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Controls;
 using System.Collections.Specialized;
 using System.IO;
 using System.Threading;
@@ -74,6 +75,14 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>内嵌 QuickPathControl 仅在 Manual 模式下可见（Separate/Combined 自动计算路径）。</summary>
     public bool IsQuickPathVisible => OutputMode == CompressOutputMode.Manual;
+
+    /// <summary>
+    /// 「输出目录」分组所在网格行的高度：手动模式给 <c>*</c>（内嵌目录选择器吃掉剩余高度，
+    /// 窗口拉高时浏览区跟着变高）；分别/合并模式下分组本身隐藏，行高给 0，避免留一块空洞
+    /// （2026-10-30 用户反馈「压缩的输出页高度不是弹性的」）。
+    /// </summary>
+    public GridLength OutputPickerRowHeight =>
+        IsQuickPathVisible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
 
     /// <summary>输出文件扩展名标签（跟随格式）。</summary>
     public string OutputExtensionLabel => GetFormatExtension();
@@ -841,6 +850,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsBrowseButtonVisible));
         OnPropertyChanged(nameof(IsFileNameSectionVisible));
         OnPropertyChanged(nameof(IsQuickPathVisible));
+        OnPropertyChanged(nameof(OutputPickerRowHeight));
         OnPropertyChanged(nameof(OutputPathLabel));
         OnPropertyChanged(nameof(IsManualMode));
         OnPropertyChanged(nameof(IsSeparateMode));

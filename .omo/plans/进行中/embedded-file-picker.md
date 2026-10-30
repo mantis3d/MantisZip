@@ -121,7 +121,7 @@
 4. `TryConfirmFile` 改成 `ConfirmRequested` 事件（控件不直接弹窗）。
 5. **新增 `HideAccumulatedPanel` 与 PickItems 扩展名白名单**：内嵌时宿主自己已有「已选」清单，控件内累积面板再显示一遍会重复且把文件列表挤成几十像素；解压窗「添加压缩包」只该列压缩包，故 `MatchesFileFilter` 在 PickItems 模式下按宿主给的 `fileExtensions` 过滤（扩展名清单取 Core 的 `ArchiveExtensionCatalog.EngineExtensions`，不硬编码）。
 
-6. **「添加目录」与「列表弹性高度」按真机反馈改口径**（2026-10-30）：①交互统一成「单击条目＝选中（文件/目录都算）、双击目录＝进入」，两种模式一致，高级模式只多复选框与跨目录累积（原计划是「简单模式只能选文件，目录要切高级模式」）；②压缩窗「添加文件」与解压窗「添加压缩包」页改成 `*,Auto,Auto` 弹性网格——选择器吃掉剩余高度、已选清单固定 180px 贴底（原计划没规定高度策略，实测写死 300 + `MinHeight/MaxHeight` 会上下不齐、窗口变高也不撑）。解压窗同时补了与压缩窗对称的「高级模式」开关（`Extract_PickerAdvancedMode`，三语 1388 → 1389）。
+6. **「添加目录」与「列表弹性高度」按真机反馈改口径**（2026-10-30）：①交互统一成「单击条目＝选中（文件/目录都算）、双击目录＝进入」，两种模式一致，高级模式只多复选框与跨目录累积（原计划是「简单模式只能选文件，目录要切高级模式」）；②压缩窗「输出设置」与「添加文件」、解压窗「添加压缩包」页改成弹性网格——选择器吃掉剩余高度、已选清单固定 180px 贴底（原计划没规定高度策略，实测写死 300 + `MinHeight/MaxHeight` 会上下不齐、窗口变高也不撑）。解压窗同时补了与压缩窗对称的「高级模式」开关（`Extract_PickerAdvancedMode`，三语 1388 → 1389）。
 
 ### 顺带修的五个真 bug（2026-10-30）
 1. `CompressSettingsWindow.axaml` 用了 WPF 的 `Checked` / `Unchecked`（Avalonia 的 CheckBox 没有这两个事件）⇒ `AVLN2000`，而**增量构建把它吞成「0 警告」**，只有 `--no-incremental` 重建或跑测试（`XamlLoadException: No precompiled XAML found`）才暴露；改 `IsCheckedChanged`。
