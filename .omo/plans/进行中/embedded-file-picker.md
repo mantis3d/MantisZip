@@ -61,7 +61,7 @@
 - `Views/MainWindow.axaml.cs`（场景 2 调用点）
 - `Services/DragDropService.cs`（场景 3 调用点）
 - 本地化三语 key（`strings.zh-CN.json` / `strings.en.json` / `strings.zh-TW.json`）+ `MainWindowViewModel.UpdateLocalizedStrings` 登记
-- `AGENTS.md` 规则 15 模式选择表新增「内嵌选择」行
+- `AGENTS.md` 规则 16（文件/目录选择）模式选择表新增「设置窗内嵌选择」行 —— 规则编号在 2026-10 的规则增补中已从 15 变成 16，本轮已按 16 落地
 
 ### 验证
 
@@ -74,3 +74,55 @@
 - 本计划不动 `CustomFilePickerDialog` 的系统浏览逃生通道（规则 15 唯一豁免）
 - CLI 路径不变；`--compress` IPC 等不受影响
 - 不改 `ResultTreeView` / `QuickPathControl` / `ExtractPathResolver` 契约
+## 实施记录（2026-10-30）
+
+### 第一步：抽取控件（已完成，commit `cf4b159a`）
+
+- 新增 `src/MantisZip.UI.Avalonia/Controls/CustomFilePickerControl.axaml`（459 行）+ `.axaml.cs`（1280 行）：地址行（`Grid.addrRow` + `PathBreadcrumb`）、浏览器区（左 QuickPathControl + 右列表）、文件名区、选项行全部搬入。
+- `Dialogs/CustomFilePickerDialog.axaml` 缩到 56 行、`.axaml.cs` 缩到 329 行（只剩 `PickerMode` / `FileBrowserItem` / `FileTypeOption` 三个类型、5 个静态入口、确定/取消、`SystemBrowse_Click` 的系统浏览豁免、4 个测试透传成员）。
+- 13 条非机械改动：系统浏览原生调用留在壳层（控件只抛 `SystemBrowseRequested`）；`Ok_Click` 拆成控件 `TryConfirm()` + 壳层写回；`TryConfirmFile` → `ConfirmRequested` 事件；`OnClosing` → `PersistUiState()`；`_mode` → `Mode`；`GetSaveFileName` 私有转公开；`AddFavorite_Click` 用 `OwnerWindow`。
+- 保真审计：49 个方法体中 30 个逐字相同，其余全属上述归类；XAML 428 vs 430 行除注释外逐字相同。
+- 附带修改：`tests/MantisZip.UI.Avalonia.Tests/PickerOptionsRegionLayoutTests.cs` 的源码断言路径改指 `Controls/CustomFilePickerControl.axaml`；`Dialogs/PickerOptionItem.cs` 注释同步。
+
+### 控件能力增强（已完成，commit `3a730678` / `5a427311`）
+
+- `IsSimpleMode` 从「摆设」变成真生效：`CanCheck` 随模式变、切目录清空选择、列表选中即累积（`SyncAccumulatedFromListSelection`）。
+- 新增 `public void SetSelectedPaths(IEnumerable<string>?)`：宿主把「已选」列表回填给控件（删除已选项后同步）。
+- 新增 `public event EventHandler<string>? PathChanged`：内嵌宿主据此回填「输出目录」。
+- 新增 `_syncingSelection` 防抖，避免「控件选中 → 宿主重建列表 → 列表 SelectedItems 变更 → 又回灌控件」的死循环。
+
+### 与计划的偏差
+
+1. **没有实现「按目录缓存选中」的 `Dictionary<string, List<string>>`**：简单模式的定义是「当前目录的选中项就是结果」，切目录即清空（避免用户看不见的旧选择混进结果）；高级模式才跨目录累积，用单一 `_accumulatedPaths` 列表 + `IsSelected` 标记实现，等价且少一层字典。
+2. **`IsSimpleMode` 默认 `false`**：模态壳层（`CustomFilePickerDialog`）显式设 `false` 保持原有「复选框 + 跨目录累积」行为；内嵌宿主按需设 `true`。
+3. **新增 `PathChanged` 事件**（计划未列）：输出目录回填需要，否则宿主只能轮询。
+4. **`TryConfirmFile` 改为 `ConfirmRequested` 事件**：控件不再直接弹窗，由宿主决定是否走「确认选中文件」语义。
+### 第二步：压缩设置窗接入（已完成）
+
+- `Dialogs/CompressSettingsWindow.axaml` 整文件重写为 6 Tab：**输出设置**（`Compress_TabOutput`，输出模式 3 个 RadioButton + `OutputPicker`（`Mode="PickFolder"` `IsSimpleMode="True"`）+ 文件名 + 冲突策略）、**添加文件**（`Compress_TabAddFiles`，`SourcePicker`（`Mode="PickItems"`）+ 高级模式开关 + 已选源文件列表 + 移除按钮）、**压缩设置**（`Compress_TabCompress`，格式/级别 + `DynamicFormatOptionsPanel` + 分卷）、**密码**、**注释**、**文件过滤**。右侧预览树 / 分割器 / 底部按钮原样保留。
+- 双向同步只用一个闸门 `private bool _syncingSelection`（code-behind）：`InitializePickers` / `OnSourcePickerSelectionChanged` / `SyncPickerFromSelection` 都是「置 true → 干活 → finally 复位」，事件处理首行 `if (_syncingSelection) return;`。选择器 → VM 用 `SelectedPaths.ToList()` 整体重建（不逐项 diff）；VM → 选择器在 `RemoveSelected_Click` 后调 `SetSelectedPaths`；初始化也在闸门内，否则 `SourcePicker.Initialize(preselected:)` 抛出的 `SelectionChanged` 会立刻把 VM 清空重建一次。
+- 删除的成员：VM 的 `BrowseOutput` / `PickFiles` 两个 `Func` 与 `BrowseOutputPath` / `AddFiles` 两个命令；code-behind 的 `BrowseOutputPathAsync(Window?, string?)`、两处回调赋值、`OutputPathPicker.BrowseAction`；XAML 的 `QuickPathPicker x:Name="OutputPathPicker"` 与 `Command="{Binding AddFilesCommand}"` 按钮。
+- 连带删测试：`tests/MantisZip.UI.Avalonia.Tests/CompressSettingsViewModelTests.cs` 的 `BrowseOutputCommand_CallsCallback`（它断言的回调与命令已不存在；`git grep BrowseOutput` 现只剩 code-behind 一行注释）。
+- 新增 5 个 key（已合并进三份 JSON，1376 → 1381）：`Compress_TabOutput` / `Compress_TabAddFiles` / `Compress_TabCompress` / `Compress_PickerAdvancedMode` / `Compress_SelectedSources`。
+
+### 第三步·前一半：解压设置窗接入（已完成）
+
+- `Dialogs/ExtractSettingsWindow.axaml` 重写为 4 页签：输出设置（目标目录 `DestinationPicker` PickFolder + 冲突处理 + 两个后置动作）/ 添加压缩包（`ArchivePicker` PickItems + 已选压缩包列表 + 移除所选）/ 文件过滤 / 并行解压（原「加速」）。
+- `Dialogs/ExtractSettingsWindow.axaml.cs`：`_pickersReady` 与 `_syncingArchiveSelection` 双闸；`OnArchivePickerSelectionChanged` 只追加不重建 `SourceArchiveItem`；`SyncArchivePickerFromSourceItems()` 在 `Initialize` 之后回填；`CollapsePickerAccumulatedPanel()` 折叠控件内累积面板。
+- `ViewModels/ExtractSettingsViewModel.cs`：新增 `AddSourceArchives(IEnumerable<string>)` / `RemoveSourceArchives(...)` / `RemoveSelectedSourceArchiveCommand` 与 `HasNoSourceArchives` / `HasMultipleArchives`。
+- 新增 7 个 key（已合并进三份 JSON，1381 → 1388）：`Extract_TabOutput` / `Extract_TabAddArchives` / `Extract_SelectedArchives` / `Extract_RemoveSelected` / `Extract_OutputPickerHint` / `Extract_AddArchivesPickerHint` / `Extract_AddArchivesEmptyHint`。
+- **未做（第三步后半）**：「选择要解压的文件」条目页、`SelectedEntryKeys`、拖拽与「解压到」场景第二页签接线。
+
+### 与计划的偏差（累计 5 条）
+
+1. 未做「按目录缓存选中」字典：简单模式 = 当前目录选中即结果、切目录清空；高级模式才跨目录累积。
+2. `IsSimpleMode` 默认 false，模态壳层显式设 false（模态对话框保持原复选框 + 跨目录累积行为）。
+3. 新增 `PathChanged` 事件（宿主回填目录）。
+4. `TryConfirmFile` 改成 `ConfirmRequested` 事件（控件不直接弹窗）。
+5. **新增 `HideAccumulatedPanel` 与 PickItems 扩展名白名单**：内嵌时宿主自己已有「已选」清单，控件内累积面板再显示一遍会重复且把文件列表挤成几十像素；解压窗「添加压缩包」只该列压缩包，故 `MatchesFileFilter` 在 PickItems 模式下按宿主给的 `fileExtensions` 过滤（扩展名清单取 Core 的 `ArchiveExtensionCatalog.EngineExtensions`，不硬编码）。
+
+### 顺带修的三个真 bug（2026-10-30）
+
+1. `CompressSettingsWindow.axaml` 用了 WPF 的 `Checked` / `Unchecked`（Avalonia 的 CheckBox 没有这两个事件）⇒ `AVLN2000`，而**增量构建把它吞成「0 警告」**，只有 `--no-incremental` 重建或跑测试（`XamlLoadException: No precompiled XAML found`）才暴露；改 `IsCheckedChanged`。
+2. `CustomFilePickerControl.Initialize` 先写预选路径再 `NavigateTo`，而简单模式的 `NavigateTo` 会清空累积选择 ⇒ 构造时传入的源文件被抹掉；加 `_initializing` 闸。
+3. `FileBrowserItem.CanCheck` 是普通自动属性（类继承 `ObservableObject` 却没走 `SetProperty`），行模板 `IsVisible="{Binding CanCheck}"` 不重算 ⇒ 勾了「高级模式」看不到复选框；改成会通知的属性。

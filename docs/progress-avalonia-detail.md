@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-30** — 功能：设置窗内嵌文件选择器（v0.5.5 第二项）
+  - **背景**：压缩设置窗的「添加文件」与解压设置窗的「添加压缩包」原先弹 `CustomFilePickerDialog` 模态窗，选完再返回设置窗；用户希望「去弹窗化」，把选择器直接嵌进设置窗页签（`docs/prototypes/embedded-file-picker.html` 原型已定交互）。
+  - **第一步（纯重构，`cf4b159a`）**：`Dialogs/CustomFilePickerDialog.axaml` 的 Row 0~3 全部视觉内容抽成 `Controls/CustomFilePickerControl.axaml`（459 行）+ `.axaml.cs`（1280 行）；模态壳只剩标题栏 / 确定取消 / 系统浏览豁免（56+329 行），5 个静态入口与 `PickerMode` / `ExtractPickResult` / `PickerOptionItem` 契约不变。49 个方法体里 30 个逐字相同，其余 13 条非机械改动逐项登记在计划「实施记录」。
+  - **控件能力（`3a730678` / `5a427311` / 本轮）**：`IsSimpleMode`（简单模式：当前目录选中即结果、切目录清空、无复选框；高级模式：跨目录累积 + 复选框）、`SetSelectedPaths()` 宿主回填、`PathChanged` 事件、`HideAccumulatedPanel`（宿主自己有「已选」清单时收起控件内累积面板，否则文件列表被挤成几十像素）、PickItems 扩展名白名单（宿主传 `fileExtensions`，解压窗传 `ArchiveExtensionCatalog.EngineExtensions`，只列压缩包）。
+  - **第二步（压缩窗）**：`CompressSettingsWindow.axaml` 整文件重写为 6 页签（输出设置 / 添加文件 / 压缩设置 / 密码 / 注释 / 文件过滤），内嵌 `OutputPicker`(PickFolder) 与 `SourcePicker`(PickItems)；删掉 `BrowseOutput` / `PickFiles` 两个回调与 `BrowseOutputPath` / `AddFiles` 两个命令；`_syncingSelection` 单闸门（初始化也在闸门内，否则 `Initialize(preselected:)` 抛的 `SelectionChanged` 会把 VM 清空重建）。窗口 950→1080、左列 500→620（六页签单行需要）。
+  - **第三步·前一半（解压窗）**：`ExtractSettingsWindow.axaml` 重写为 4 页签（输出设置 / 添加压缩包 / 文件过滤 / 加速），内嵌 `DestinationPicker` 与 `ArchivePicker`；VM 新增 `AddSourceArchives` / `RemoveSourceArchives` / `RemoveSelectedSourceArchiveCommand` 与 `HasNoSourceArchives` / `HasMultipleArchives`，只增删不重建 `SourceArchiveItem`。
+  - **顺带修的三个真 bug**：①`CompressSettingsWindow.axaml` 用了 WPF 的 `Checked`/`Unchecked`（Avalonia 无此事件）⇒ `AVLN2000`，而**增量构建把它吞成「0 警告」**，只有 `--no-incremental` 重建或跑测试（`XamlLoadException: No precompiled XAML found`）才暴露；改 `IsCheckedChanged`。②`CustomFilePickerControl.Initialize` 先写预选路径再 `NavigateTo`，而简单模式的 `NavigateTo` 会清空累积选择 ⇒ 构造时传入的源文件被抹掉；加 `_initializing` 闸。③`FileBrowserItem.CanCheck` 是普通自动属性（类继承 `ObservableObject` 却没走 `SetProperty`），行模板 `IsVisible="{Binding CanCheck}"` 不重算 ⇒ 勾了「高级模式」看不到复选框；改成会通知的属性。
+  - **验证**：Release 构建 0 警告（`--no-incremental` 也验过）；`-Task test -Target ui-tests` 41.5s / `tests` 12.7s 全绿；新增 `CompressSettingsWindowEmbeddedPickerTests`（4 例：六页签、两个 picker 模式与高级模式开关、预选源文件同时到达 picker 与 VM、PickItems 扩展名白名单只列压缩包）；`-Task check` = 0.5.5 六处 / 三语 1388 key / 8 守卫。真机（`--compress` / `--extract`）逐页签截图确认：压缩窗六页签单行、添加文件页全宽列表 + 高级模式复选框 + 已选同步；解压窗四页签、添加压缩包页只列 `.zip`。
+  - **状态**：压缩窗与解压窗主体已可用；**第三步后半（「选择要解压的文件」条目页 + `SelectedEntryKeys` + 拖拽/「解压到」场景接线）未做**，计划仍在 `.omo/plans/进行中/`。
+
+
 **2026-10-30** — 计划调整：压缩任务队列进 v0.5.8，小活清仓后移 v0.5.9
   - **背景**：合并 `beta` 后带进新计划 `compress-job-queue.md`（压缩任务队列，46-66h）。用户拍板把它拆开占 v0.5.8，原 v0.5.8 的「小活清仓」后移一版。
   - **为什么这个顺序**：①v0.5.7 要做 AXAML 编译绑定迁移（现状 51 个 `.axaml` 里 0 个开 `x:CompileBindings`），队列窗是**新增**窗口，排在它之后就能一开始就写 `x:CompileBindings="True"`，不添新债；②v0.5.5 的 picker 改压缩设置窗**内部**，队列 P0 改 `Views/MainWindow.axaml.cs:295` 的**调用点**（`await dialog.RunConfirmedAsync(...)` → 入队即返回），隔两个版本做不会互相干扰。
