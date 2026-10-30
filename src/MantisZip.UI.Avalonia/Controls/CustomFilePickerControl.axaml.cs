@@ -35,10 +35,25 @@ public partial class CustomFilePickerControl : UserControl
     public PickerMode Mode { get; set; } = PickerMode.PickFolder;
 
     /// <summary>
-    /// 简单模式（默认 <c>true</c>）。第二步用于控制参数项（复选框）显隐与跨目录选择记忆；
-    /// 本次仅保证属性存在且不改变任何既有行为。
+    /// 简单模式（默认 <c>true</c>）：不显示复选框，当前目录里选中的项就是结果，
+    /// 切换目录即清空已选（覆盖语义）。<c>false</c> = 高级模式：复选框 + 跨目录累积。
     /// </summary>
-    public bool IsSimpleMode { get; set; } = true;
+    /// <remarks>
+    /// 设置窗口内嵌使用时默认简单模式；高级模式给「一次挑多个目录里的文件」用。
+    /// 切换时会就地刷新已加载列表的复选框列，并（切回简单时）把已选同步到列表选中态。
+    /// </remarks>
+    public bool IsSimpleMode
+    {
+        get => _isSimpleMode;
+        set
+        {
+            if (_isSimpleMode == value) return;
+            _isSimpleMode = value;
+            ApplySimpleModeToItems();
+        }
+    }
+
+    private bool _isSimpleMode = true;
 
     // ── Initialize 注入的调用参数（宿主每个实例写一次） ──────────────────
 
@@ -786,6 +801,12 @@ public partial class CustomFilePickerControl : UserControl
         }
         _currentDir = dir;
 
+        // 简单模式：切换目录即清空已选（「当前目录选中项 = 结果」的覆盖语义）
+        if (_isSimpleMode && Mode == PickerMode.PickItems)
+        {
+            ClearAccumulatedSelection();
+        }
+
         CurrentPathText.Text = dir;
         PathCrumbs.Path = dir;
         PathHistoryManager.Record(dir);
@@ -842,6 +863,12 @@ public partial class CustomFilePickerControl : UserControl
     private readonly ObservableCollection<AccumulatedPathItem> _accumulatedItems = new();
 
     private readonly List<string> _accumulatedPaths = new();
+
+    /// <summary>
+    /// 同步保护：宿主回填 / 简单模式列表选中态同步时置 true，避免
+    /// <see cref="FileList_SelectionChanged"/> 与 <c>IsSelected</c> 订阅互相回推造成抖动。
+    /// </summary>
+    private bool _syncingSelection;
 
     private void LoadDirectory(string dir)
     {
@@ -920,7 +947,7 @@ public partial class CustomFilePickerControl : UserControl
             SizeText = string.Empty,
             ModifiedText = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
             ShowSubText = false,
-            CanCheck = Mode == PickerMode.PickItems
+            CanCheck = Mode == PickerMode.PickItems && !_isSimpleMode
         };
         SubscribeIsSelected(item);
         item.IsSelected = _accumulatedPaths.Contains(path, StringComparer.OrdinalIgnoreCase);
@@ -940,7 +967,7 @@ public partial class CustomFilePickerControl : UserControl
             SizeText = FormatUtil.FormatSize(info.Length),
             ModifiedText = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
             ShowSubText = false,
-            CanCheck = Mode == PickerMode.PickItems
+            CanCheck = Mode == PickerMode.PickItems && !_isSimpleMode
         };
         SubscribeIsSelected(item);
         item.IsSelected = _accumulatedPaths.Contains(path, StringComparer.OrdinalIgnoreCase);
@@ -957,6 +984,8 @@ public partial class CustomFilePickerControl : UserControl
         {
             if (e.PropertyName == nameof(FileBrowserItem.IsSelected))
             {
+                // 宿主回填 / 简单模式同步期间不回推，否则会与列表选中态互相触发
+                if (_syncingSelection) return;
                 ToggleAccumulated(item.FullPath, item.IsSelected);
             }
         };
@@ -1002,6 +1031,8 @@ public partial class CustomFilePickerControl : UserControl
         // PickItems：仅刷新批量按钮计数（Extended 多选）
         if (Mode == PickerMode.PickItems)
         {
+            // 简单模式没有复选框：列表里选中的文件就是结果（Shift/Ctrl 由 ListBox 自身处理）
+            if (_isSimpleMode) SyncAccumulatedFromListSelection();
             UpdatePickPanel();
             return;
         }
@@ -1130,15 +1161,122 @@ public partial class CustomFilePickerControl : UserControl
     }
 
     /// <summary>清空全部累积。</summary>
-    private void ClearAccumulated_Click(object? sender, RoutedEventArgs e)
+    private void ClearAccumulated_Click(object? sender, RoutedEventArgs e) => ClearAccumulatedSelection();
+
+    /// <summary>
+    /// 清空已选（累积集合 + 列表勾选/选中态 + 右侧面板）。
+    /// 简单模式切目录、以及宿主外部回填时都走这里，保证三处状态一致。
+    /// </summary>
+    private void ClearAccumulatedSelection()
     {
-        _accumulatedPaths.Clear();
-        foreach (var item in _fileItems)
+        _syncingSelection = true;
+        try
         {
-            item.IsSelected = false;
+            _accumulatedPaths.Clear();
+            foreach (var item in _fileItems)
+            {
+                item.IsSelected = false;
+            }
+            FileList.SelectedItems?.Clear();
+        }
+        finally
+        {
+            _syncingSelection = false;
         }
         UpdatePickPanel();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 宿主回填已选项（压缩窗的「已选源文件」↔ 选择器双向同步用）。
+    /// 会同步复选框与（简单模式下的）列表选中态，并触发 <see cref="SelectionChanged"/>。
+    /// </summary>
+    public void SetSelectedPaths(IEnumerable<string>? paths)
+    {
+        _syncingSelection = true;
+        try
+        {
+            _accumulatedPaths.Clear();
+            if (paths is not null)
+            {
+                foreach (var p in paths)
+                {
+                    if (string.IsNullOrWhiteSpace(p)) continue;
+                    if (!_accumulatedPaths.Contains(p, StringComparer.OrdinalIgnoreCase))
+                        _accumulatedPaths.Add(p);
+                }
+            }
+            foreach (var item in _fileItems)
+            {
+                item.IsSelected = _accumulatedPaths.Contains(item.FullPath, StringComparer.OrdinalIgnoreCase);
+            }
+            if (_isSimpleMode) SyncListSelectionFromAccumulatedCore();
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+        UpdatePickPanel();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>切换简单/高级时就地刷新已加载列表的复选框列；切回简单模式时把已选同步到列表选中态。</summary>
+    private void ApplySimpleModeToItems()
+    {
+        _syncingSelection = true;
+        try
+        {
+            foreach (var item in _fileItems)
+            {
+                item.CanCheck = Mode == PickerMode.PickItems && !_isSimpleMode;
+                item.IsSelected = _accumulatedPaths.Contains(item.FullPath, StringComparer.OrdinalIgnoreCase);
+            }
+            if (_isSimpleMode) SyncListSelectionFromAccumulatedCore();
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+        UpdatePickPanel();
+    }
+
+    /// <summary>简单模式：列表里选中的文件就是结果（Shift/Ctrl 由 ListBox 自身处理，目录不计）。</summary>
+    private void SyncAccumulatedFromListSelection()
+    {
+        if (_syncingSelection) return;
+        var selected = (FileList.SelectedItems ?? Array.Empty<object>())
+            .OfType<FileBrowserItem>()
+            .Where(i => !i.IsDirectory)
+            .Select(i => i.FullPath)
+            .ToList();
+        _syncingSelection = true;
+        try
+        {
+            _accumulatedPaths.Clear();
+            _accumulatedPaths.AddRange(selected);
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+        UpdatePickPanel();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 把已选集合回显到列表选中态（宿主回填、切回简单模式时用）。
+    /// 调用方需已置 <see cref="_syncingSelection"/>，否则会与选择变化互相触发。
+    /// </summary>
+    private void SyncListSelectionFromAccumulatedCore()
+    {
+        if (FileList.SelectedItems is not { } selectedItems) return;
+        selectedItems.Clear();
+        foreach (var item in _fileItems)
+        {
+            if (item.IsDirectory) continue;
+            if (_accumulatedPaths.Contains(item.FullPath, StringComparer.OrdinalIgnoreCase))
+                selectedItems.Add(item);
+        }
     }
 
     /// <summary>刷新右侧累积面板：标题计数、累积列表、批量按钮计数、空占位。</summary>

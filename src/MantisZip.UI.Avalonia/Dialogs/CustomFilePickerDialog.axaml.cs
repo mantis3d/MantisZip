@@ -209,6 +209,9 @@ public partial class CustomFilePickerDialog : Window
 
         // 选择器初始化（等价于原对话框构造函数内的全部初始化副作用）
         Picker.Mode = mode;
+        // 模态对话框保持既有交互：PickItems 显示复选框、跨目录累积（= 高级模式）。
+        // 简单模式只给设置窗内嵌场景用（点选即结果、切目录清空）。
+        Picker.IsSimpleMode = false;
         Picker.Initialize(
             initialPath: initialPath,
             entries: entries,
