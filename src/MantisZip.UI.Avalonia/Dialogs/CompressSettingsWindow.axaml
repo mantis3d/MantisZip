@@ -424,6 +424,16 @@
                 </StackPanel>
               </Border>
 
+              <!-- 分组：完成后行为（打开输出目录并选中产物；初值来自设置 → 压缩 → 常规，进度窗口底部还能临时改） -->
+              <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}">
+                <CheckBox IsChecked="{Binding OpenFolderAfterCompress}">
+                  <TextBlock Text="{Binding LocalizedStrings[Compress_OpenFolderAfter]}"
+                              TextWrapping="Wrap" />
+                </CheckBox>
+              </Border>
+
               <!-- 分组：密码库保存设置（始终可见） -->
               <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
                       BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"

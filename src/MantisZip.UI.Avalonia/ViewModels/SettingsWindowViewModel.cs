@@ -105,6 +105,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _keepOriginalExtension;
 
+    /// <summary>压缩完成后打开输出所在目录（与解压端 <see cref="OpenFolderAfterExtract"/> 对称）。</summary>
+    [ObservableProperty]
+    private bool _openFolderAfterCompress;
+
     // ── Compression advanced ──
     [ObservableProperty]
     private string _sevenZipCompressionMethod = "LZMA2";
@@ -915,6 +919,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string CompressionLevelText => LocalizationManager.T("Settings_CompressionLevel");
     public string KeepOriginalExtensionText => LocalizationManager.T("Settings_Compress_KeepExt");
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
+    public string CompressOpenFolderAfterText => LocalizationManager.T("Settings_Compress_OpenFolderAfter");
     public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
     public string CompressConflictActionText => LocalizationManager.T("Settings_Compress_ConflictAction");
     public string ZipDefaultOptionsText => LocalizationManager.T("Settings_Zip_DefaultOptions");
@@ -1198,6 +1203,7 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         // Compress (additional)
         _keepOriginalExtension = _settings.KeepOriginalExtension;
+        _openFolderAfterCompress = _settings.OpenFolderAfterCompress;
         _compressFileConflictAction = _settings.CompressFileConflictAction;
 
         // Compression advanced
@@ -1604,6 +1610,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CompressionLevelText));
         OnPropertyChanged(nameof(KeepOriginalExtensionText));
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
+        OnPropertyChanged(nameof(CompressOpenFolderAfterText));
         OnPropertyChanged(nameof(CompressOptionsText));
         OnPropertyChanged(nameof(CompressConflictActionText));
         OnPropertyChanged(nameof(ZipDefaultOptionsText));
@@ -1778,6 +1785,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.DefaultFormat = SelectedDefaultFormatOption?.Value ?? DefaultFormat;
         _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
         _settings.KeepOriginalExtension = KeepOriginalExtension;
+        _settings.OpenFolderAfterCompress = OpenFolderAfterCompress;
         _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
 
         // Adaptive Compression (三个独立开关)

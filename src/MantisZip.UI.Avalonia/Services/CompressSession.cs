@@ -76,6 +76,13 @@ public sealed class CompressSession : ICompressSession
     private readonly Func<AppSettings> _loadSettings;
 
     /// <summary>
+    /// 「压缩完成后打开输出目录」端口：<see langword="null"/> = 该宿主没有这个能力
+    /// （CLI 弹窗流程、测试流程），进度窗口底部开关与收尾打开一并隐藏 / 跳过。
+    /// 能力靠构造注入表达，不给上下文加「是不是 CLI」这类宿主身份布尔。
+    /// </summary>
+    private readonly Func<IReadOnlyList<string>, Task>? _openOutputFolder;
+
+    /// <summary>
     /// 创建会话。
     /// </summary>
     /// <param name="compressAsync">压缩引擎调用端口；为 <see langword="null"/> 时走默认实现。</param>
@@ -85,6 +92,7 @@ public sealed class CompressSession : ICompressSession
     /// <param name="updatePassword">密码库更新端口；为 <see langword="null"/> 时写真实密码库。</param>
     /// <param name="markPasswordUsed">密码库标记已使用端口；为 <see langword="null"/> 时写真实密码库。</param>
     /// <param name="loadSettings">应用设置加载端口；为 <see langword="null"/> 时读真实设置。</param>
+    /// <param name="openOutputFolder">成功后打开输出目录的端口；为 <see langword="null"/> 表示该宿主没有这个能力（CLI / 测试流程）。</param>
     public CompressSession(
         Func<
             CompressRequest,
@@ -99,7 +107,8 @@ public sealed class CompressSession : ICompressSession
         Action<string, string, IReadOnlyList<string>>? addPassword = null,
         Action<string, string, string, IReadOnlyList<string>>? updatePassword = null,
         Action<string>? markPasswordUsed = null,
-        Func<AppSettings>? loadSettings = null)
+        Func<AppSettings>? loadSettings = null,
+        Func<IReadOnlyList<string>, Task>? openOutputFolder = null)
     {
         _compressAsync = compressAsync ?? ((request, progress, ct, conflictResolver, onItemStatus, onItemOutputPath) =>
             DefaultCompressAsync(request, progress, ct, conflictResolver, onItemStatus, onItemOutputPath));
@@ -111,6 +120,7 @@ public sealed class CompressSession : ICompressSession
             PasswordManager.Instance.UpdatePassword(id, password, description, new List<string>(patterns)));
         _markPasswordUsed = markPasswordUsed ?? (id => PasswordManager.Instance.MarkUsed(id));
         _loadSettings = loadSettings ?? (() => AppSettings.Load());
+        _openOutputFolder = openOutputFolder;
     }
 
     /// <inheritdoc />
@@ -145,6 +155,8 @@ public sealed class CompressSession : ICompressSession
                 : AvaloniaCompressService.GetOutputPaths(request);
 
             bool completed;
+            // 进度窗口底部开关的实时值（窗口关掉后回读；未显示开关时为 null → 回落到设置）。
+            bool? finalOpenFolder = null;
             try
             {
                 completed = await context.Presenter.RunAsync(new ProgressRunRequest
@@ -162,6 +174,10 @@ public sealed class CompressSession : ICompressSession
                         // 枚举全量条目；现在由会话在窗口 Show 之前直接把请求递过去。
                         if (context.IsCompressFlow)
                             CompressFlow.TrySeedEntryItemsInBackground(progressWindow, request, progressWindow.CancellationToken);
+
+                        // 「压缩完成后打开目录」开关：只有宿主注入了打开能力才显示（CLI / 测试流程没有）。
+                        if (_openOutputFolder is not null)
+                            progressWindow.SetCompressPostActions(openFolder: true, openFolderSeed: settings.OpenFolderAfterCompress);
                     },
                     Operation = async (progress, runToken) =>
                     {
@@ -183,6 +199,9 @@ public sealed class CompressSession : ICompressSession
                                 }
                             },
                             (index, outputPath) => context.Presenter.ActiveWindow?.UpdateBatchItemName(index, outputPath));
+
+                        // ⑥b 压缩结束后立刻回读窗口底部开关（presenter 随后会关窗，关掉就读不到了）。
+                        finalOpenFolder = context.Presenter.ActiveWindow?.OpenFolderAfterCompressValue;
                     },
                 });
             }
@@ -205,6 +224,10 @@ public sealed class CompressSession : ICompressSession
             // ⑨ 成功侧收尾（顺序与原实现一致：先写路径历史，再写密码库）。
             _recordOutputHistory(request);
             WritePasswordToLibrary(settings);
+
+            // ⑨b 打开输出所在目录并选中产物：宿主注入了能力才做，开关以进度窗口上的实时值为准。
+            if (_openOutputFolder is not null && (finalOpenFolder ?? settings.OpenFolderAfterCompress))
+                await _openOutputFolder(displayPaths);
 
             return CompressOutcome.Completed;
         }

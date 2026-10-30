@@ -1261,13 +1261,14 @@
                       BorderThickness="1">
           <PathIcon Classes="ToolbarButtonIcon" Data="{StaticResource IconPin}" Width="16" Height="16" />
         </ToggleButton>
-        <!-- 解压后打开目标目录（实例级；IsVisible 由能力位驱动 → 压缩/测试流隐藏，规则 6）。
+        <!-- 完成后打开目标目录（解压 / 压缩共用同一个开关，实例级；IsVisible 由能力位驱动 → 测试/CLI 隐藏，规则 6）。
+             说明文案由 OpenFolderToggleTipText 按流程切换（压缩说「压缩后」，解压说「解压后」）。
              同上：背景交给主题 `ToggleButton:checked`，不写本地值。 -->
         <ToggleButton x:Name="OpenFolderToggle"
                       IsChecked="{Binding OpenFolderAfterExtract}"
                       IsVisible="{Binding ShowOpenFolderToggle}"
                       Height="{DynamicResource ControlHeightLg}" Width="44"
-                      ToolTip.Tip="{Binding LocalizedStrings[Settings_Extract_OpenFolderAfter]}"
+                      ToolTip.Tip="{Binding OpenFolderToggleTipText}"
                       VerticalAlignment="Center"
                       BorderThickness="1">
           <PathIcon Classes="ToolbarButtonIcon" Data="{StaticResource IconFolder}" Width="16" Height="16" />

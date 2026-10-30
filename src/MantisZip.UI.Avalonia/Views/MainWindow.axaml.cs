@@ -281,8 +281,8 @@ public partial class MainWindow : Window
         vm.ShowCompressSettingsDialog = async (sourcePaths) =>
         {
             // 桌面宿主差异：Owner = 主窗口（冲突/错误弹窗的属主）、Presenter = 桌面实现、
-            // 不接管进程退出（GUI 里压缩结束只关进度窗）。
-            var session = new CompressSession();
+            // 不接管进程退出（GUI 里压缩结束只关进度窗）；只有桌面宿主有「打开输出目录」的能力。
+            var session = new CompressSession(openOutputFolder: CompressFlow.OpenOutputFolderAsync);
             var context = new CompressRunContext(
                 Owner: this,
                 Presenter: progressPresenter,

@@ -84,6 +84,12 @@ public class AppSettings
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
     public bool OpenFolderAfterExtract { get; set; } = false;
+    /// <summary>
+    /// 压缩完成后打开输出所在目录并选中产物。
+    /// 与 <see cref="OpenFolderAfterExtract"/> 对称：设置页给默认值，压缩对话框给本次运行初值，
+    /// 进度窗口底部还能临时改（实例级，不回写设置）。
+    /// </summary>
+    public bool OpenFolderAfterCompress { get; set; } = false;
     public bool ExtractPreserveFullPath { get; set; } = false;
     /// <summary>
     /// 并行解压线程数（1 = 串行，>1 = 并行线程数）。

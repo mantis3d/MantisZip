@@ -170,6 +170,7 @@ public sealed record CompressPasswordWriteback(
 /// <param name="ConflictAction">目标已存在时的冲突动作（ask/overwrite/add/rename/skip）。</param>
 /// <param name="Filter">确认时生效的文件过滤器条件；<c>null</c> 表示未启用过滤。</param>
 /// <param name="Plan">逐源执行计划，含「过滤后实际归档文件白名单」。</param>
+/// <param name="OpenFolderAfterCompress">本次压缩成功后是否打开输出所在目录并选中产物（进度窗口底部的开关可覆盖）。</param>
 public sealed record CompressSettings(
     IReadOnlyList<CompressSourceEntry> Sources,
     CompressOutputMode OutputMode,
@@ -187,4 +188,5 @@ public sealed record CompressSettings(
     int ParallelDegree,
     string? ConflictAction,
     FileFilterCriteria? Filter,
-    IReadOnlyList<CompressPlanEntry> Plan);
+    IReadOnlyList<CompressPlanEntry> Plan,
+    bool OpenFolderAfterCompress = false);

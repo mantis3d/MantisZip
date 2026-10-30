@@ -914,6 +914,8 @@
   "Settings_Cancel": "Cancel",
   "Settings_Compress_KeepExt": "Keep original extension",
   "Settings_Compress_PreserveRoot": "Preserve directory root",
+  "Settings_Compress_OpenFolderAfter": "Open the output folder and select the archive after compressing",
+  "Compress_OpenFolderAfter": "Open output folder after compressing",
   "Settings_CompressionLevel": "Compression Level",
   "Settings_Compress_Tab_General": "General",
   "Settings_Compress_Tab_Adaptive": "Speed Up",

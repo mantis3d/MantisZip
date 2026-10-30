@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-30** — 新增：压缩端「完成后打开输出目录」（与解压端对称，三层入口）
+  - **需求**：解压端早就有「解压完成后打开目标目录」，压缩端一直没有。用户要求补齐，并拍板三点 —— 打开时**顺带选中刚压出来的包**、多包（`CompressOutputMode.Separate`）模式**只开一次**（用第一个输出）、进度窗口底部**也要有**实时开关。
+  - **结构差异（为什么不是照抄解压端）**：解压有「无对话框直达」的入口，所以解压端要在会话里补一次无对话框开关；压缩的所有 GUI 入口都先弹 `CompressSettingsWindow`，不需要那半层。真正要补的是三层入口 —— 设置页默认值、对话框每-run 初值、进度窗口实时开关 —— 加上成功后的收尾动作。
+  - **修法**：① `AppSettings.OpenFolderAfterCompress`（默认 `false`）+ 设置页「压缩 → 常规 → 压缩选项」复选框，`SettingsWindowViewModel` 按同型补齐属性 / ctor 镜像 / `Save()` 落盘 / 文化切换通知四处。② `CompressSettings` 记录末尾追加 `bool OpenFolderAfterCompress = false`（带默认值，既有构造点零改动）+ 压缩设置对话框独立分组 + `CompressSettingsViewModel` 镜像与 `BuildSettings()` 透传（不回写设置）。③ 进度窗口底部复用解压端同一个开关：`ProgressViewModel` 新增 `OpenFolderToggleTipText`（按流程取 `Compress_OpenFolderAfter` / `Settings_Extract_OpenFolderAfter`）、`SetCompressPostActions(openFolder, openFolderSeed)` 与私有的 `SetOpenFolderToggleFlow`（解压侧 `SetExtractPostActions` 开头先复位流程标记），`ProgressWindow` 转发 `SetCompressPostActions` / `OpenFolderAfterCompressValue`，XAML tooltip 改绑 `OpenFolderToggleTipText`。④ 收尾：`CompressSession(..., Func<IReadOnlyList<string>, Task>? openOutputFolder = null)` 构造注入能力（null = 该宿主没有这个能力），`ConfigureWindow` 只在有能力的宿主上显示开关并把设置值作为种子，`Operation` 结束时捕获 `OpenFolderAfterCompressValue`（presenter 随后关窗就读不到），成功后 `await _openOutputFolder(displayPaths)`，位置在 `_recordOutputHistory` 与 `WritePasswordToLibrary` 之后。GUI 注入 `CompressFlow.OpenOutputFolderAsync`（Windows 走 `explorer.exe /select,"<产物>"`，其它平台打开目录，异常只记 `App.DebugLog`）；CLI 右键弹窗（`App.CliCompress.cs:107`）与测试流程（`Controls/Menus/TestMenuView.axaml.cs:129`）保持 `new CompressSession()` ⇒ 开关不显示、也不会弹资源管理器。遵守 `CompressRunContext` 的三条禁令：不加「是不是 CLI」这类宿主身份布尔、不塞业务数据、不加可变回传通道。
+  - **本地化**：新增 `Settings_Compress_OpenFolderAfter` / `Compress_OpenFolderAfter` 两个 key，三份 `strings.*.json` 插在 `"Settings_Compress_PreserveRoot"` 之后并保持 UTF-8 with BOM。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/CompressOpenFolderAfterTests.cs` 8 例 —— 设置记录默认不开、压缩流程显示压缩文案、解压流程切回解压文案、无能力位隐藏开关、会话按开关调用打开端口（拿到 `displayPaths`）、关闭时不调用、无能力时即使开着也不调用、空路径不抛。
+  - **验证**：avalonia（Release）0 警告；`tests`（2 条存量警告）与 `ui-tests`（0 警告）全绿；`i18n` 1388 key 三语一致；`check` 0.5.4 六处；`guards` 8/8。
+  - **边界**：多包模式只开一次（第一个输出）；`Separate` 产物分散在不同目录时也只开第一个；打开失败只写日志不弹错。
+
 **2026-10-30** — 修复：打开中的压缩包被删除 / 被替换后状态残留（解压删源包、外部删除、同名替换）
   - **症状**：打开一个压缩包 → 解压并勾选「解压完成后删除压缩包」→ 解压完成后包被送进回收站，主窗口仍显示「已打开这个包」，条目树、预览、标题全在；此后解压 / 添加文件 / 删除条目 / 刷新都作用在一个不存在的路径上（`ExtractService` 抛「Archive file not found」，部分入口的 catch 只写 `App.DebugLog` 后静默返回 false）。用户补充：包被别的软件删除 / 杀毒隔离 / 网盘同步搬走时同样会停在这个状态。
   - **根因**：删除是「解压收尾动作」——`App.TryDeleteArchiveAfterExtract`（`App.CliExtract.cs`）只把文件送回收站，不通知任何 UI；全仓没有 `FileSystemWatcher`；于是 `CurrentArchivePath` / `Entries` / `IsArchiveLoaded` 全留在内存里，界面在说谎。而且判定只靠「路径存在」不够：同名文件被换成另一个包时路径依旧存在，继续编辑会写坏别人或静默失效。

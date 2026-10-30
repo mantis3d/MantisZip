@@ -296,6 +296,51 @@ public static class CompressFlow
         }
     }
 
+    /// <summary>
+    /// 压缩成功后打开输出所在目录并选中产物（「压缩完成后打开目标目录」的宿主实现）。
+    /// 多包模式（Separate）只开一次，用第一个输出；Windows 用 <c>explorer.exe /select</c> 定位到文件，
+    /// 其它平台退化为打开目录。失败只记日志，绝不影响压缩结果本身。
+    /// </summary>
+    /// <param name="outputPaths">本次产出的压缩包路径（进度窗口显示的那一组）。</param>
+    public static Task OpenOutputFolderAsync(IReadOnlyList<string> outputPaths)
+    {
+        try
+        {
+            var target = outputPaths?.FirstOrDefault(path => !string.IsNullOrWhiteSpace(path));
+            if (string.IsNullOrWhiteSpace(target))
+                return Task.CompletedTask;
+
+            if (OperatingSystem.IsWindows())
+            {
+                // /select 只负责在资源管理器里选中，不会自己解压或执行文件。
+                System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                {
+                    FileName = "explorer.exe",
+                    Arguments = $"/select,\"{target}\"",
+                    UseShellExecute = true,
+                })?.Dispose();
+            }
+            else
+            {
+                var dir = Path.GetDirectoryName(target);
+                if (!string.IsNullOrEmpty(dir) && Directory.Exists(dir))
+                {
+                    System.Diagnostics.Process.Start(new System.Diagnostics.ProcessStartInfo
+                    {
+                        FileName = dir,
+                        UseShellExecute = true,
+                    })?.Dispose();
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[CompressFlow] OpenOutputFolder failed: {ex.Message}");
+        }
+
+        return Task.CompletedTask;
+    }
+
     // ════════════════════════════════════════════════════════════════
     //  压缩侧「列表」模式播种（对齐解压侧 ExtractFlow 的做法）
     // ════════════════════════════════════════════════════════════════
