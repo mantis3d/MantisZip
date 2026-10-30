@@ -195,6 +195,16 @@ public partial class ProgressWindow : Window
     /// <summary>「完成后打开目录」开关当前值（消费点在窗口关闭后回读，spec §11.3）。</summary>
     public bool OpenFolderAfterExtractValue => _vm.OpenFolderAfterExtract;
 
+    /// <summary>
+    /// 声明「压缩完成后打开目录」开关（能力位 + 初值）；须在 Show 前调用。
+    /// 宿主没有打开目录的能力（CLI / 测试流程）时不调用 → 开关隐藏。
+    /// </summary>
+    public void SetCompressPostActions(bool openFolder, bool? openFolderSeed = null)
+        => _vm.SetCompressPostActions(openFolder, openFolderSeed);
+
+    /// <summary>「压缩完成后打开目录」开关当前值（压缩会话在收尾时回读）。</summary>
+    public bool OpenFolderAfterCompressValue => _vm.OpenFolderAfterExtract;
+
     /// <summary>「完成后删原包」开关当前值（同上）。</summary>
     public bool DeleteArchiveAfterExtractValue => _vm.DeleteArchiveAfterExtract;
 

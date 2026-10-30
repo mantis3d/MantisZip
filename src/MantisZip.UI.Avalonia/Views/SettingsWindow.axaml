@@ -83,6 +83,9 @@
                                 IsChecked="{Binding KeepOriginalExtension}" />
                       <CheckBox Content="{Binding PreserveDirectoryRootText}"
                                 IsChecked="{Binding PreserveDirectoryRoot}" />
+                      <!-- 压缩完成后打开输出目录（与解压端「解压后打开目标目录」对称；对话框可临时改，进度窗口底部也能改） -->
+                      <CheckBox Content="{Binding CompressOpenFolderAfterText}"
+                                IsChecked="{Binding OpenFolderAfterCompress}" />
                     </StackPanel>
                   </Border>
 

@@ -123,6 +123,10 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private bool _keepOriginalExtension;
 
+    /// <summary>本次压缩成功后打开输出所在目录并选中产物（初值镜像设置，不回写；进度窗口底部还能临时改）。</summary>
+    [ObservableProperty]
+    private bool _openFolderAfterCompress;
+
     /// <summary>当前格式是否为 ZIP。</summary>
     public bool IsZipFormat => DefaultFormat == "zip";
 
@@ -549,6 +553,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_Start"] = LocalizationManager.T("Compress_Start");
         LocalizedStrings["Compress_Cancel"] = LocalizationManager.T("Compress_Cancel");
         LocalizedStrings["Compress_WhenFileExists"] = LocalizationManager.T("Compress_WhenFileExists");
+        LocalizedStrings["Compress_OpenFolderAfter"] = LocalizationManager.T("Compress_OpenFolderAfter");
 
         // 初始化压缩级别下拉选项（共享数据源，本地化 Display）
         CompressionLevelOptions = CompressionOptionData.LevelOptions
@@ -603,6 +608,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         {
             var settings = AppSettings.Load();
             KeepOriginalExtension = settings.KeepOriginalExtension;
+            OpenFolderAfterCompress = settings.OpenFolderAfterCompress;
             FileNameEncoding = settings.ZipEncoding ?? "utf-8";
             ZipCompressionMethod = settings.ZipCompressionMethod ?? "deflate";
             SevenZipCompressionMethod = settings.SevenZipCompressionMethod ?? "LZMA2";
@@ -1454,7 +1460,8 @@ public partial class CompressSettingsViewModel : ObservableObject
             ParallelDegree: 0,
             ConflictAction: ConflictAction,
             Filter: FileFilter,
-            Plan: planEntries);
+            Plan: planEntries,
+            OpenFolderAfterCompress: OpenFolderAfterCompress);
     }
 
     /// <summary>

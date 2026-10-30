@@ -54,6 +54,7 @@
             <RowDefinition Height="{Binding OutputPickerRowHeight}" />  <!-- 输出目录（手动模式才占位） -->
             <RowDefinition Height="Auto" />  <!-- 输出文件名 -->
             <RowDefinition Height="Auto" />  <!-- 文件冲突策略 -->
+            <RowDefinition Height="Auto" />  <!-- 完成后行为（自动打开输出目录） -->
           </Grid.RowDefinitions>
 
           <!-- 分组：输出模式（三个互斥单选，绑定 VM 的 IsManualMode/IsSeparateMode/IsCombinedMode） -->
@@ -149,6 +150,19 @@
                         DisplayMemberBinding="{Binding Display}"
                         Width="240" HorizontalAlignment="Left" />
             </StackPanel>
+          </Border>
+
+          <!-- 分组：完成后行为（压缩成功后自动打开输出目录并选中产物；初值来自「设置 → 压缩 → 压缩选项」，
+               进度窗口底部还能临时改。2026-10-30 从 beta 合并进来，放在输出相关选项旁边而不是密码页） -->
+          <Border Grid.Row="4"
+                  Margin="0,8,0,0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <CheckBox IsChecked="{Binding OpenFolderAfterCompress}">
+              <TextBlock Text="{Binding LocalizedStrings[Compress_OpenFolderAfter]}"
+                         TextWrapping="Wrap" />
+            </CheckBox>
           </Border>
         </Grid>
       </TabItem>
