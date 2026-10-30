@@ -329,6 +329,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_AddArchivesEmptyHint",
             "Extract_Source_MultiFilterHint",
             "Extract_UnlockButton",
+            "Extract_PickerAdvancedMode",
             "Settings_ExtractTab_Parallel",
             "Settings_EnableParallelExtract",
             "Settings_SmartSsdLabel",

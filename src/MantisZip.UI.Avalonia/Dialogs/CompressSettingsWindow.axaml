@@ -144,84 +144,98 @@
       <TabItem Header="{Binding LocalizedStrings[Compress_TabAddFiles]}"
                 Classes="compactTab"
                 controls:TabItemExtensions.TabIcon="IconFolderAdd">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
-                      TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
-          <StackPanel Spacing="{DynamicResource SpacingSm}"
-                      Margin="0,8,0,0">
+        <!-- 本页用弹性行：选择器吃掉剩余高度、已选清单固定 180px 贴底，整页不套滚动条。
+             窗口变高时只有文件列表变高，上下两端始终对齐（2026-10-30 用户反馈）。 -->
+        <Grid RowDefinitions="*,Auto,Auto"
+              Margin="0,8,0,0"
+              Background="{DynamicResource ThemeWindowBgBrush}">
 
-            <!-- 内嵌源文件选择器：PickItems（可跨文件/目录多选）。
-                 SelectionChanged → 代码后台用 SelectedPaths 重建 ViewModel.SelectedPaths。
-                 高度显式给定，理由同上：选择器内部的 * 行需要一块可浏览区域。 -->
+          <!-- 内嵌源文件选择器：PickItems（可跨文件/目录多选）。
+               SelectionChanged → 代码后台用 SelectedPaths 重建 ViewModel.SelectedPaths。
+               高度交给 Grid 的 * 行：不写死，窗口越高列表越长。 -->
+          <Border Grid.Row="0"
+                  MinHeight="240"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}"
+                  Padding="{DynamicResource SpacingXxsThk}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
             <controls:CustomFilePickerControl x:Name="SourcePicker"
                                               Mode="PickItems"
                                               IsSimpleMode="True"
-                                              Height="300"
                                               SelectionChanged="OnSourcePickerSelectionChanged" HideAccumulatedPanel="True" />
+          </Border>
 
-            <!-- 高级模式开关：关闭 = 简单模式（当前目录选中即结果、切目录清空）；
-                 打开 = 跨目录累积（每个条目显示复选框，可多次添加后统一确认） -->
-            <CheckBox x:Name="AdvancedModeCheck"
-                      Content="{Binding LocalizedStrings[Compress_PickerAdvancedMode]}"
-                      IsCheckedChanged="OnAdvancedModeChanged" />
+          <!-- 高级模式开关：关闭 = 简单模式（当前目录选中即结果、切目录清空）；
+               打开 = 跨目录累积（每个条目显示复选框，可多次添加后统一确认） -->
+          <CheckBox x:Name="AdvancedModeCheck"
+                    Grid.Row="1"
+                    Margin="0,8,0,0"
+                    Content="{Binding LocalizedStrings[Compress_PickerAdvancedMode]}"
+                    IsCheckedChanged="OnAdvancedModeChanged" />
 
-            <!-- 分组：已选源文件（与上方选择器双向同步的最终清单） -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <!-- 标题 + 移除按钮：移除后回填选择器（保持两边一致） -->
-                <Grid ColumnDefinitions="*,Auto">
-                  <TextBlock Grid.Column="0"
-                             Text="{Binding LocalizedStrings[Compress_SelectedSources]}"
-                             FontWeight="SemiBold"
-                             VerticalAlignment="Center" />
-                  <Button Grid.Column="1"
-                          Content="{Binding LocalizedStrings[Compress_Remove]}"
-                          MinHeight="{DynamicResource ControlHeightSm}"
-                          Padding="8,0"
-                          Click="RemoveSelected_Click"
-                          Background="{DynamicResource ThemeButtonBgBrush}"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                </Grid>
-                <!-- 源文件列表：支持多选，显示路径，工具提示显示完整路径 -->
-                <ListBox x:Name="SourceFilesList"
-                         SelectionMode="Multiple"
-                         ItemsSource="{Binding SelectedPaths}"
-                         MinHeight="160" MaxHeight="240"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}"
-                         Background="{DynamicResource ThemeSurfaceBgBrush}">
-                  <ListBox.ItemContainerTheme>
-                    <ControlTheme TargetType="ListBoxItem">
-                      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
-                      <Setter Property="Background" Value="Transparent" />
-                      <Style Selector="^:pointerover">
-                        <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
-                      </Style>
-                      <Style Selector="^:selected">
-                        <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
-                      </Style>
-                      <Style Selector="^:selected:focus">
-                        <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
-                      </Style>
-                    </ControlTheme>
-                  </ListBox.ItemContainerTheme>
-                  <ListBox.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock Text="{Binding}"
-                                 TextTrimming="CharacterEllipsis"
-                                 ToolTip.Tip="{Binding}" />
-                    </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-                <!-- 选中文件摘要信息（数量、总大小等） -->
-                <TextBlock Text="{Binding SelectedPathsSummary}"
-                           FontSize="12"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </ScrollViewer>
+          <!-- 分组：已选源文件（与上方选择器双向同步的最终清单）。固定 180px：内容多时内部滚动 -->
+          <Border Grid.Row="2"
+                  Height="180"
+                  Margin="0,8,0,0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <Grid RowDefinitions="Auto,*,Auto">
+              <!-- 标题 + 移除按钮：移除后回填选择器（保持两边一致） -->
+              <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding LocalizedStrings[Compress_SelectedSources]}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Content="{Binding LocalizedStrings[Compress_Remove]}"
+                        MinHeight="{DynamicResource ControlHeightSm}"
+                        Padding="8,0"
+                        Click="RemoveSelected_Click"
+                        Background="{DynamicResource ThemeButtonBgBrush}"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              </Grid>
+              <!-- 源文件列表：支持多选，显示路径，工具提示显示完整路径 -->
+              <ListBox x:Name="SourceFilesList"
+                       Grid.Row="1"
+                       Margin="0,6,0,0"
+                       SelectionMode="Multiple"
+                       ItemsSource="{Binding SelectedPaths}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                       Background="{DynamicResource ThemeSurfaceBgBrush}">
+                <ListBox.ItemContainerTheme>
+                  <ControlTheme TargetType="ListBoxItem">
+                    <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                    <Setter Property="Background" Value="Transparent" />
+                    <Style Selector="^:pointerover">
+                      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                    </Style>
+                    <Style Selector="^:selected">
+                      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                    </Style>
+                    <Style Selector="^:selected:focus">
+                      <Setter Property="Background" Value="{DynamicResource ThemeListSelectedBrush}" />
+                    </Style>
+                  </ControlTheme>
+                </ListBox.ItemContainerTheme>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding}"
+                               TextTrimming="CharacterEllipsis"
+                               ToolTip.Tip="{Binding}" />
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+              <!-- 选中文件摘要信息（数量、总大小等） -->
+              <TextBlock Grid.Row="2"
+                         Margin="0,6,0,0"
+                         Text="{Binding SelectedPathsSummary}"
+                         FontSize="12"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+            </Grid>
+          </Border>
+        </Grid>
       </TabItem>
 
       <!-- ═══════════════════════════════════════════════════════════════

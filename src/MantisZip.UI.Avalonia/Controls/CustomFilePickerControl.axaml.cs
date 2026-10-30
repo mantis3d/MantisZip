@@ -5,6 +5,7 @@ using Avalonia.Input;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -1092,6 +1093,7 @@ public partial class CustomFilePickerControl : UserControl
         {
             // 简单模式没有复选框：列表里选中的文件就是结果（Shift/Ctrl 由 ListBox 自身处理）
             if (_isSimpleMode) SyncAccumulatedFromListSelection();
+            else MarkListSelectionAsChecked();
             UpdatePickPanel();
             return;
         }
@@ -1109,17 +1111,31 @@ public partial class CustomFilePickerControl : UserControl
         }
     }
 
+    /// <summary>
+    /// 取「当前行」：多选模式下 <see cref="ListBox.SelectedItem"/> 可能为空（选择集在 SelectedItems），
+    /// 故先看 SelectedItem，再退回选择集首项。双击/Enter 都走这里。
+    /// </summary>
+    private FileBrowserItem? GetCurrentItem()
+    {
+        if (FileList.SelectedItem is FileBrowserItem single) return single;
+        return (FileList.SelectedItems ?? Array.Empty<object>()).OfType<FileBrowserItem>().FirstOrDefault();
+    }
     private void FileList_DoubleTapped(object? sender, TappedEventArgs e)
     {
-        if (FileList.SelectedItem is not FileBrowserItem item) return;
+        // 双击的行以事件源为准：多选模式下 SelectedItem 未必等于刚点的行（2026-10-30 实测
+        // 双击目录不进入，就是因为 SelectedItem 为空）。
+        var item = (e.Source as Visual)?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext as FileBrowserItem
+                   ?? GetCurrentItem();
+        if (item is null) return;
         if (item.IsDirectory)
         {
             NavigateTo(item.FullPath);
         }
         else if (Mode == PickerMode.PickItems)
         {
-            // 双击文件：切换勾选累积（IsSelected setter 经订阅累积），不关闭
-            item.IsSelected = !item.IsSelected;
+            // 高级模式双击文件：切换勾选累积（IsSelected setter 经订阅累积），不关闭。
+            // 简单模式单击即选中，双击不再改勾选，避免「点两下反而取消」。
+            if (!_isSimpleMode) item.IsSelected = !item.IsSelected;
         }
         else if (Mode == PickerMode.SaveFile)
         {
@@ -1136,14 +1152,14 @@ public partial class CustomFilePickerControl : UserControl
     {
         if (e.Key == Key.Enter)
         {
-            if (FileList.SelectedItem is FileBrowserItem item)
+            if (GetCurrentItem() is { } item)
             {
                 if (item.IsDirectory)
                     NavigateTo(item.FullPath);
                 else if (Mode == PickerMode.PickItems)
                 {
-                    // PickItems：Enter 切换勾选（同双击），不关闭
-                    item.IsSelected = !item.IsSelected;
+                    // 高级模式：Enter 切换勾选（同双击），不关闭；简单模式由选中态决定结果
+                    if (!_isSimpleMode) item.IsSelected = !item.IsSelected;
                 }
                 else if (Mode == PickerMode.SaveFile)
                     SyncFileNameBox(item.DisplayName); // 保存模式 Enter 文件 → 填入文件名
@@ -1339,12 +1355,36 @@ public partial class CustomFilePickerControl : UserControl
     }
 
     /// <summary>简单模式：列表里选中的文件就是结果（Shift/Ctrl 由 ListBox 自身处理，目录不计）。</summary>
+    /// <summary>
+    /// 高级模式：把列表当前选中行标成「已勾选」（不反向取消）。
+    /// 统一交互语义（2026-10-30）：两种模式都是「单击行＝选中、双击目录＝进入」，
+    /// 高级模式多出的只是复选框能跨目录累积、点复选框才是取消。
+    /// </summary>
+    private void MarkListSelectionAsChecked()
+    {
+        if (_syncingSelection) return;
+        _syncingSelection = true;
+        try
+        {
+            foreach (var item in (FileList.SelectedItems ?? Array.Empty<object>()).OfType<FileBrowserItem>())
+            {
+                item.IsSelected = true;
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+        UpdatePickPanel();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
     private void SyncAccumulatedFromListSelection()
     {
         if (_syncingSelection) return;
+        // 目录也算结果（2026-10-30：简单模式单击目录即选中该目录，双击才进入；
+        // 之前这里过滤掉目录，导致「添加文件」页在简单模式下根本选不到文件夹）。
         var selected = (FileList.SelectedItems ?? Array.Empty<object>())
             .OfType<FileBrowserItem>()
-            .Where(i => !i.IsDirectory)
             .Select(i => i.FullPath)
             .ToList();
         _syncingSelection = true;

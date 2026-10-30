@@ -100,7 +100,7 @@
                Header="{Binding LocalizedStrings[Extract_TabAddArchives]}"
                Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconArchiveMultiple">
-        <Grid RowDefinitions="Auto,*,Auto"
+        <Grid RowDefinitions="Auto,*,Auto,Auto"
               Margin="0,8,0,0">
           <!-- 使用说明：点选即追加到下方列表，取消勾选不会移除（移除只走下方列表） -->
           <TextBlock Grid.Row="0"
@@ -112,6 +112,7 @@
 
           <!-- 内嵌文件选择器：压缩包扩展名取自 ArchiveExtensionCatalog（不在此硬编码清单） -->
           <Border Grid.Row="1"
+                  MinHeight="240"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="4" Padding="8"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -120,15 +121,22 @@
                                               IsSimpleMode="True" HideAccumulatedPanel="True" />
           </Border>
 
+          <!-- 高级模式开关：关闭 = 单击即追加、切目录清空；打开 = 跨目录累积（每个条目显示复选框） -->
+          <CheckBox x:Name="AdvancedModeCheck"
+                    Grid.Row="2"
+                    Margin="0,8,0,0"
+                    Content="{Binding LocalizedStrings[Extract_PickerAdvancedMode]}"
+                    IsCheckedChanged="OnAdvancedModeChanged" />
+
           <!-- 已选压缩包：行对象由 ViewModel 持有（状态/进度），选择器只增删、不重建 -->
-          <Border Grid.Row="2"
-                  Margin="0,12,0,0"
+          <Border Grid.Row="3"
+                  Height="180"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="4" Padding="12"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
-            <StackPanel Spacing="8">
+            <Grid RowDefinitions="Auto,*,Auto,Auto,Auto">
               <!-- 标题 + 移除所选 -->
-              <Grid ColumnDefinitions="*,Auto">
+              <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
                 <TextBlock Grid.Column="0"
                            Text="{Binding LocalizedStrings[Extract_SelectedArchives]}"
                            FontWeight="SemiBold"
@@ -140,9 +148,7 @@
               </Grid>
 
               <ListBox x:Name="FileListBox"
-                       MinHeight="120"
-                       MaxHeight="180"
-                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                       Grid.Row="1"
                        ItemsSource="{Binding SourceItems}"
                        SelectedItem="{Binding SelectedSourceItem}">
                 <ListBox.ItemContainerTheme>
@@ -171,22 +177,22 @@
               </ListBox>
 
               <!-- 空态提示：一个压缩包都没有时显示 -->
-              <TextBlock Text="{Binding LocalizedStrings[Extract_AddArchivesEmptyHint]}"
+              <TextBlock Grid.Row="2"
                          FontSize="11"
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                          IsVisible="{Binding HasNoSourceArchives}" />
 
               <!-- 多包场景提示：过滤/预览统计语义绑定首包 -->
-              <TextBlock Text="{Binding LocalizedStrings[Extract_Source_MultiFilterHint]}"
+              <TextBlock Grid.Row="3"
                          FontSize="11"
                          TextWrapping="Wrap"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                          IsVisible="{Binding HasMultipleArchives}" />
 
               <!-- 手动解锁按钮：选中锁定/加密未匹配行时出现 -->
-              <Button Command="{Binding UnlockSelectedCommand}"
-                      IsVisible="{Binding CanUnlockSelected}"
+              <Button Grid.Row="4"
+                      Command="{Binding UnlockSelectedCommand}"
                       HorizontalAlignment="Left"
                       Classes="ToolbarButton">
                 <StackPanel Orientation="Horizontal" Spacing="6">
@@ -197,7 +203,7 @@
                              VerticalAlignment="Center" />
                 </StackPanel>
               </Button>
-            </StackPanel>
+            </Grid>
           </Border>
         </Grid>
       </TabItem>
