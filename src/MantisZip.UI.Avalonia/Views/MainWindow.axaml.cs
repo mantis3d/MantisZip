@@ -259,6 +259,8 @@ public partial class MainWindow : Window
             if (outcome.IsCompleted)
             {
                 vm.StatusMessage = LocalizationManager.T("Status_ExtractComplete");
+                // 勾了「解压完成后删除压缩包」时源包已不在：立刻关包，避免界面停在已删除的包上
+                vm.SyncArchiveStateAfterExtract();
             }
             else if (outcome.IsFailed)
             {

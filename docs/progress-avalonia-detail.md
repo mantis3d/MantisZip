@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-30** — 修复：打开中的压缩包被删除 / 被替换后状态残留（解压删源包、外部删除、同名替换）
+  - **症状**：打开一个压缩包 → 解压并勾选「解压完成后删除压缩包」→ 解压完成后包被送进回收站，主窗口仍显示「已打开这个包」，条目树、预览、标题全在；此后解压 / 添加文件 / 删除条目 / 刷新都作用在一个不存在的路径上（`ExtractService` 抛「Archive file not found」，部分入口的 catch 只写 `App.DebugLog` 后静默返回 false）。用户补充：包被别的软件删除 / 杀毒隔离 / 网盘同步搬走时同样会停在这个状态。
+  - **根因**：删除是「解压收尾动作」——`App.TryDeleteArchiveAfterExtract`（`App.CliExtract.cs`）只把文件送回收站，不通知任何 UI；全仓没有 `FileSystemWatcher`；于是 `CurrentArchivePath` / `Entries` / `IsArchiveLoaded` 全留在内存里，界面在说谎。而且判定只靠「路径存在」不够：同名文件被换成另一个包时路径依旧存在，继续编辑会写坏别人或静默失效。
+  - **修法**：① 新增 `src/MantisZip.UI.Avalonia/Services/ArchiveFileGuard.cs` —— `ArchiveAvailability { Unknown, Available, Missing, Replaced }`；`TryCreate` 取「压缩包 + 分卷集（`ArchiveVolumeSet.EnumerateVolumes`）」快照（长度 + `LastWriteTimeUtc` + 卷数），`FileSystemWatcher` 监听所在目录并按本包文件名 / 分卷前缀过滤，事件去抖 250 ms 后复查；UNC、目录不存在或 watcher 创建失败降级为 2 秒 `DispatcherTimer` 轮询；`Check()` 三态判定 —— 卷数变少或文件消失 = `Missing`，卷数变多、长度或修改时间变化 = `Replaced`；状态变化写 `lifecycle.log`（`archive-guard changed state=…`）。② `MainWindowViewModel` 新增 `ArchiveAvailability` + `AttachArchiveGuard`（`LoadArchiveAsync` 成功后）/ `DetachArchiveGuard`（`ClearArchiveInternal`，换包与关包都走）/ `EnsureArchiveAvailable()` / `SyncArchiveStateAfterExtract()` / `CloseArchiveAfterRemoval()` + 两个 `RelayCommand`（`ReopenUnavailableArchive` / `DismissUnavailableArchive`）；`CanDeleteEntries` 追加 `!IsArchiveUnavailable`。③ `Views/MainWindow.axaml` 内容区顶部新增只读横幅（`IsArchiveUnavailable` 时显示，警告图标 + `Main_ArchiveMissing_*` / `Main_ArchiveReplaced_*` 文案 + 重新打开 / 关闭两个按钮），条目树仍可滚动查看。④ 入口守卫：解压族 4 个命令、选中项 2 个、测试 2 个、`AddFiles` / `DeleteFiles` / `RefreshArchive` 开头统一 `if (!EnsureArchiveAvailable()) return;`。⑤ 自己删包：`MainWindowViewModel.Extract.cs` 四处 `TryDeleteArchiveAfterExtract` 之后、以及 `Views/MainWindow.axaml.cs` 的 `ShowExtractSettingsDialog` 闭包 `outcome.IsCompleted` 分支，都调 `SyncArchiveStateAfterExtract()` —— 源包不在了就关包并写状态「压缩包已移入回收站，已关闭」。
+  - **i18n**：新增 9 个 key（`Main_ArchiveMissing_Title` / `_Detail`、`Main_ArchiveReplaced_Title` / `_Detail`、`Main_ArchiveUnavailable_Reload` / `_Close`、`Status_ArchiveMissing` / `Status_ArchiveReplaced` / `Status_ArchiveMovedToRecycleBin`），三语同步，1377 → 1386；`Main_ArchiveUnavailable_*` 两个按钮文案登记进 `UpdateLocalizedStrings()` 的 keys 数组。
+  - **测试**：`tests/MantisZip.UI.Avalonia.Tests/ArchiveFileGuardTests.cs` 10 例 —— 不存在路径返回 null、完好文件 Available、删除后 Missing 且只通知一次、同名重写变 Replaced、分卷缺卷 Missing、Dispose 后不再上报、VM 横幅属性与文案、`EnsureArchiveAvailable` 拦截、`SyncArchiveStateAfterExtract` 源包消失时自动关包。
+  - **验证**：`build -Target avalonia -c Release` 0 警告；`tests`（2 条存量警告）与 `ui-tests`（0 警告）全绿；`i18n` 1386 key 三语一致；`check` 0.5.4 六处；`guards` 8/8。
+  - **边界**：分卷包按「整套卷」判定（缺任一卷即 Missing）；网络路径用轮询，最坏 2 秒才更新；改名 / 移动到同目录外按 Missing 处理（重新打开即可）。
+
+
 **2026-10-29** — 改进：文件关联 / 「打开压缩包」筛选改为两列勾选，格式清单收敛到单一事实源，自定义扩展名关联后用专属图标
   - **需求**：用户先问「设置里默认扩展名加上 001，是不是就能跟打开对话框过滤完全一致」，随后选定方案 B（单一事实源）并追加「每个扩展名前面两个勾：一个文件类型关联、一个对话框筛选」，另报「自定义扩展名关联后显示空图标，改用 `Resources/Icons/custom.ico`」。
   - **问题**：两份清单各自维护 —— 打开对话框筛选 = `ArchiveEngineFactory.SupportedExtensions`（13 项硬编码）+ `*.001` + `AppSettings.CustomAssocExtensions`；设置页关联列表 = `ShellIntegration.ArchiveExtensions`（8 项硬编码）+ 7 个 `Assoc*` 布尔开关（`IsAssocEnabledInSettings` 的 switch，默认分支 false）。结果是 `.jar/.war/.ear/.apk` 能打开却不在关联清单（KI-006）、`.iso` 有勾选项、`.001` 只在筛选里、自定义扩展名关联后 `GetIconPath` 命中 `_ => null` 回落到 exe 图标位（视觉上是空白图标）。

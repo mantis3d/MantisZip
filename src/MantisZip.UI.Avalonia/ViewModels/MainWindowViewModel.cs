@@ -260,6 +260,7 @@ public partial class MainWindowViewModel : ObservableObject
             "DataGrid_Name", "DataGrid_Size", "DataGrid_Compressed", "DataGrid_Modified", "DataGrid_Ratio",
             "App_Title",
             "Main_DropHint",
+            "Main_ArchiveUnavailable_Reload", "Main_ArchiveUnavailable_Close",
             "Ctx_Extract", "Ctx_ExtractSelectedHere", "Ctx_ExtractSelectedTo", "Ctx_SmartExtract", "Ctx_ExtractTo",
             "Ctx_CopyName", "Ctx_CopyPath", "Ctx_Test", "Ctx_Delete",
             "Menu_SmartExtract", "Menu_TestArchive", "Menu_AddFiles", "Menu_DeleteFiles", "Menu_ArchiveComment",
@@ -352,11 +353,152 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     public bool CanDeleteEntries =>
         IsArchiveLoaded
+        && !IsArchiveUnavailable
         && CurrentArchivePath != null
         && (ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath)?.CanDelete(_currentFormat) ?? false);
 
     // 能力位随「压缩包加载状态」刷新（格式 `_currentFormat` 在 RefreshArchive 中先于本字段赋值）
     partial void OnIsArchiveLoadedChanged(bool value) => OnPropertyChanged(nameof(CanDeleteEntries));
+
+    // ── 当前压缩包在磁盘上的可用性（打开中被删除 / 被替换） ─────────────────────────────
+    //
+    // 背景（2026-10-30）：解压时勾选「解压完成后删除压缩包」后，主窗口仍保持「压缩包已打开」，
+    // 之后所有读写入口都落到一个已不存在的路径；被别的软件删除、杀毒隔离、网盘同步搬走同理。
+    // 由 ArchiveFileGuard 监视磁盘，这里只负责把状态映射成界面（只读横幅 + 入口拦截）。
+
+    /// <summary>当前压缩包的磁盘可用性（见 <see cref="ArchiveFileGuard"/>）。</summary>
+    [ObservableProperty]
+    private ArchiveAvailability _archiveAvailability = ArchiveAvailability.Available;
+
+    partial void OnArchiveAvailabilityChanged(ArchiveAvailability value) => NotifyArchiveAvailabilityProperties();
+
+    /// <summary>压缩包已不在磁盘上（含被替换）——界面进入只读提示态，所有读写入口预检都会拦下。</summary>
+    public bool IsArchiveUnavailable =>
+        IsArchiveLoaded && ArchiveAvailability is ArchiveAvailability.Missing or ArchiveAvailability.Replaced;
+
+    /// <summary>是「被替换」而不是「被删除」（决定横幅文案）。</summary>
+    public bool IsArchiveReplaced =>
+        IsArchiveLoaded && ArchiveAvailability == ArchiveAvailability.Replaced;
+
+    /// <summary>只读横幅标题。</summary>
+    public string ArchiveAvailabilityTitleText => LocalizationManager.T(
+        IsArchiveReplaced ? "Main_ArchiveReplaced_Title" : "Main_ArchiveMissing_Title");
+
+    /// <summary>只读横幅说明（带当前路径，便于用户确认是哪一个包）。</summary>
+    public string ArchiveAvailabilityDetailText => LocalizationManager.T(
+        IsArchiveReplaced ? "Main_ArchiveReplaced_Detail" : "Main_ArchiveMissing_Detail",
+        CurrentArchivePath ?? string.Empty);
+
+    private void NotifyArchiveAvailabilityProperties()
+    {
+        OnPropertyChanged(nameof(IsArchiveUnavailable));
+        OnPropertyChanged(nameof(IsArchiveReplaced));
+        OnPropertyChanged(nameof(ArchiveAvailabilityTitleText));
+        OnPropertyChanged(nameof(ArchiveAvailabilityDetailText));
+        OnPropertyChanged(nameof(CanDeleteEntries));
+    }
+
+    private ArchiveFileGuard? _archiveGuard;
+
+    /// <summary>为刚打开的压缩包建立磁盘监视（会先释放上一份）。</summary>
+    private void AttachArchiveGuard(string archivePath)
+    {
+        DetachArchiveGuard();
+        ArchiveAvailability = ArchiveAvailability.Available;
+
+        var guard = ArchiveFileGuard.TryCreate(archivePath);
+        if (guard == null)
+            return;
+
+        guard.AvailabilityChanged += OnArchiveGuardAvailabilityChanged;
+        _archiveGuard = guard;
+    }
+
+    private void DetachArchiveGuard()
+    {
+        if (_archiveGuard == null)
+            return;
+
+        _archiveGuard.AvailabilityChanged -= OnArchiveGuardAvailabilityChanged;
+        _archiveGuard.Dispose();
+        _archiveGuard = null;
+    }
+
+    private void OnArchiveGuardAvailabilityChanged(object? sender, ArchiveAvailability availability)
+    {
+        ArchiveAvailability = availability;
+
+        if (availability == ArchiveAvailability.Missing)
+            StatusMessage = LocalizationManager.T("Status_ArchiveMissing");
+        else if (availability == ArchiveAvailability.Replaced)
+            StatusMessage = LocalizationManager.T("Status_ArchiveReplaced");
+    }
+
+    /// <summary>
+    /// 入口守卫：确认当前压缩包仍可操作。返回 false 时已经写好状态提示，调用方直接 return。
+    /// </summary>
+    public bool EnsureArchiveAvailable()
+    {
+        if (!IsArchiveLoaded || CurrentArchivePath == null)
+            return true;
+
+        _archiveGuard?.Check();
+        if (ArchiveAvailability is ArchiveAvailability.Missing or ArchiveAvailability.Replaced)
+            return false;
+
+        // watcher 可能没建起来（分卷被删 / 目录一开始就不存在），这里再兜一次。
+        if (File.Exists(CurrentArchivePath))
+            return true;
+
+        ArchiveAvailability = ArchiveAvailability.Missing;
+        StatusMessage = LocalizationManager.T("Status_ArchiveMissing");
+        return false;
+    }
+
+    /// <summary>
+    /// 解压收尾后核对源包：本次把源包删掉了就直接关闭压缩包，避免界面继续停留在已不存在的包上。
+    /// </summary>
+    public void SyncArchiveStateAfterExtract()
+    {
+        if (!IsArchiveLoaded || CurrentArchivePath == null)
+            return;
+
+        if (File.Exists(CurrentArchivePath))
+        {
+            _archiveGuard?.Check();
+            return;
+        }
+
+        CloseArchiveAfterRemoval();
+    }
+
+    /// <summary>关闭压缩包并提示「已移入回收站」（自己删包这条路径）。</summary>
+    private void CloseArchiveAfterRemoval()
+    {
+        ClearArchiveInternal();
+        Title = LocalizationManager.T("App_Title");
+        StatusMessage = LocalizationManager.T("Status_ArchiveMovedToRecycleBin");
+    }
+
+    /// <summary>只读横幅上的「关闭压缩包」。</summary>
+    [RelayCommand]
+    private void DismissUnavailableArchive() => CloseArchiveAfterRemoval();
+
+    /// <summary>只读横幅上的「重新打开」：文件回得来（回收站还原 / 网盘同步回来）就重载。</summary>
+    [RelayCommand]
+    private async Task ReopenUnavailableArchive()
+    {
+        if (CurrentArchivePath is null)
+            return;
+
+        if (!File.Exists(CurrentArchivePath))
+        {
+            StatusMessage = LocalizationManager.T("Status_ArchiveMissing");
+            return;
+        }
+
+        await LoadArchiveAsync(CurrentArchivePath);
+    }
 
     [ObservableProperty]
     private bool _isLoading;
@@ -1006,6 +1148,8 @@ public partial class MainWindowViewModel : ObservableObject
                 }
 
                 IsArchiveLoaded = true;
+                // 打开成功后开始监视磁盘：包被外部删除 / 替换时界面要立刻知道（issue：解压删源包后状态残留）
+                AttachArchiveGuard(path);
                 RecentFilesManager.AddPath(path);
                 RecentFiles.Clear();
                 foreach (var rp in RecentFilesManager.GetPaths())
@@ -1063,6 +1207,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     private void ClearArchiveInternal()
     {
+        // 关包即停监视（换包时 LoadArchiveAsync 会重新 Attach），并复位可用性
+        DetachArchiveGuard();
+        ArchiveAvailability = ArchiveAvailability.Available;
         Entries.Clear();
         CurrentEntries.Clear();
         CurrentArchivePath = null;
@@ -1153,6 +1300,7 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task RefreshArchive()
     {
         if (CurrentArchivePath == null) return;
+        if (!EnsureArchiveAvailable()) return;
 
         var savedFolder = CurrentFolder;
         var savedEntryName = SelectedEntry?.FullPath;

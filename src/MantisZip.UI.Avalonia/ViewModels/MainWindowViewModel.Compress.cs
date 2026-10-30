@@ -46,6 +46,8 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task AddFiles()
     {
         if (CurrentArchivePath == null || GetOpenFilePaths == null) return;
+        // 源包被删 / 被替换时不弹文件选择器，先让界面说明状态
+        if (!EnsureArchiveAvailable()) return;
 
         var files = await GetOpenFilePaths();
         if (files == null || files.Count == 0) return;
@@ -100,6 +102,7 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task DeleteFiles()
     {
         if (CurrentArchivePath == null || SelectedEntry == null || RunWithProgress == null) return;
+        if (!EnsureArchiveAvailable()) return;
 
         var entryPath = SelectedEntry.FullPath ?? SelectedEntry.Name;
         if (entryPath == null) return;
