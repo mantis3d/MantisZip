@@ -21,6 +21,10 @@
   - **守卫**：`dialog-seam` 第 4 类把窗口自身的工厂方法也当成「建窗点」，已按守卫口径登记 `Dialogs/ExtractSettingsWindow.axaml.cs = 1`。
   - **验证**：Release 0 警告；ui-tests 56.4s、tests 12.2s 全绿；`-Task check` 0.5.5 / 1406 key / 8 守卫；新增 `ExtractEntrySelectionTests` 2 例（条目页显隐与默认选中、载荷只含勾选项）。
   - **状态**：代码与自动化验证完成；真机冒烟（两条入口的弹窗落页、勾选生效、进度窗、拖拽无删包开关）待用户确认。
+  - **实施后追加（同日，用户反馈两处高度与按钮）**：
+    - 「已选压缩包」框 180 → 240、「已选源文件」框 180 → 240（用户反馈"只能看见一行""有点矮"）。
+    - 解压窗「移除所选」「手动解锁」两个按钮去掉 `Classes="ToolbarButton"`（高 `ControlHeightLg`，与标题行不齐），改显式 `MinHeight="{DynamicResource ControlHeightSm}"` + `Padding="8,0"` + 三色；解锁按钮补 `IsVisible="{Binding CanUnlockSelected}"` —— 它原来没有可见性绑定，在固定高度框里始终占一行，是列表被挤扁的主因。
+    - 顺带修 `ExtractSettingsWindow.axaml` 里插入条目页时造成的 `</TabItem>` 与 `<TabItem x:Name="AddArchivesTab"` 同行粘连、以及「选项卡 2」注释错位。
 **2026-10-30** — 功能：设置窗内嵌文件选择器（v0.5.5 第二项）
   - **背景**：压缩设置窗的「添加文件」与解压设置窗的「添加压缩包」原先弹 `CustomFilePickerDialog` 模态窗，选完再返回设置窗；用户希望「去弹窗化」，把选择器直接嵌进设置窗页签（`docs/prototypes/embedded-file-picker.html` 原型已定交互）。
   - **第一步（纯重构，`cf4b159a`）**：`Dialogs/CustomFilePickerDialog.axaml` 的 Row 0~3 全部视觉内容抽成 `Controls/CustomFilePickerControl.axaml`（459 行）+ `.axaml.cs`（1280 行）；模态壳只剩标题栏 / 确定取消 / 系统浏览豁免（56+329 行），5 个静态入口与 `PickerMode` / `ExtractPickResult` / `PickerOptionItem` 契约不变。49 个方法体里 30 个逐字相同，其余 13 条非机械改动逐项登记在计划「实施记录」。

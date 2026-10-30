@@ -207,7 +207,7 @@
 
           <!-- 分组：已选源文件（与上方选择器双向同步的最终清单）。固定 180px：内容多时内部滚动 -->
           <Border Grid.Row="2"
-                  Height="180"
+                  Height="240"
                   Margin="0,8,0,0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"

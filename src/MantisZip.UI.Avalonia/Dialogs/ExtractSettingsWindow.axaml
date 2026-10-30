@@ -95,7 +95,6 @@
         </Grid>
       </TabItem>
 
-      <!-- ══ 选项卡 2：添加压缩包（内嵌 PickItems 选择器 + 下方「已选压缩包」列表，双向同步） ══ -->
         <!-- 「选择要解压的文件」页：仅条目选择模式可见（右键「解压到」/ 拖拽兜底），
              数据源是宿主传入的包内条目，勾选结果进载荷 SelectedEntries。 -->
         <TabItem x:Name="EntrySelectionTab"
@@ -136,7 +135,10 @@
                     <CheckBox Grid.Column="1" Content="{Binding LocalizedStrings[Extract_ExtractPreserveFullPath]}" IsChecked="{Binding PreserveFullPathOption}" />
                 </Grid>
             </Grid>
-        </TabItem>      <TabItem x:Name="AddArchivesTab"
+        </TabItem>
+
+      <!-- ══ 选项卡 2：添加压缩包（内嵌 PickItems 选择器 + 下方「已选压缩包」列表，双向同步） ══ -->
+      <TabItem x:Name="AddArchivesTab"
                Header="{Binding LocalizedStrings[Extract_TabAddArchives]}"
                Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconArchiveMultiple">
@@ -170,7 +172,7 @@
 
           <!-- 已选压缩包：行对象由 ViewModel 持有（状态/进度），选择器只增删、不重建 -->
           <Border Grid.Row="3"
-                  Height="180"
+                  Height="240"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="4" Padding="12"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -182,7 +184,11 @@
                            FontWeight="SemiBold"
                            VerticalAlignment="Center" />
                 <Button Grid.Column="1"
-                        Classes="ToolbarButton"
+                        MinHeight="{DynamicResource ControlHeightSm}"
+                        Padding="8,0"
+                        Background="{DynamicResource ThemeButtonBgBrush}"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                        BorderBrush="{DynamicResource ThemeBorderBrush}"
                         Content="{Binding LocalizedStrings[Extract_RemoveSelected]}"
                         Command="{Binding RemoveSelectedSourceArchiveCommand}" />
               </Grid>
@@ -234,7 +240,12 @@
               <Button Grid.Row="4"
                       Command="{Binding UnlockSelectedCommand}"
                       HorizontalAlignment="Left"
-                      Classes="ToolbarButton">
+                      IsVisible="{Binding CanUnlockSelected}"
+                      MinHeight="{DynamicResource ControlHeightSm}"
+                      Padding="8,0"
+                      Background="{DynamicResource ThemeButtonBgBrush}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
                 <StackPanel Orientation="Horizontal" Spacing="6">
                   <PathIcon Data="{StaticResource IconKey}"
                             Width="16" Height="16"

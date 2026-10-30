@@ -143,3 +143,9 @@
 - 入口改接：`ViewModels/MainWindowViewModel.Extract.cs` 的 `ExtractSelectedTo` 改用 `ShowExtractEntryPicker`（带回话密码、不再回读窗口、不再走 `ExtractFlow`）；`Services/DragDropService.cs` 兜底分支改同一入口 + 新增 `Services/DragDropExtractPostActions.cs`（拖拽不删原包）。
 - 与计划的偏差：①拖拽兜底与右键共用同一静态入口（计划只说「实例化 ExtractSettingsWindow」）；②`DragDropExtractPostActions` 是新文件（计划没点名）；③`dialog-seam` 登记表新增窗口自身工厂一行。
 - 测试：`tests/MantisZip.UI.Avalonia.Tests/ExtractEntrySelectionTests.cs` 2 例。
+
+### 实施后修正（2026-10-30，真机反馈）
+
+- 「已选压缩包」框 180 → 240，「已选源文件」框 180 → 240（用户反馈"只能看见一行""有点矮"）。
+- 解压窗「移除所选」「手动解锁」两个按钮去掉 `Classes="ToolbarButton"`，改显式 `MinHeight=ControlHeightSm` + `Padding=8,0` + 三色；解锁按钮补 `IsVisible="{Binding CanUnlockSelected}"` —— 它原来没有可见性绑定，始终占高，是列表被挤扁的主因。
+- 修 `ExtractSettingsWindow.axaml` 里条目页插入时造成的 `</TabItem><TabItem ...>` 同行粘连与注释错位。
