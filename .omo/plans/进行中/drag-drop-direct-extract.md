@@ -2075,7 +2075,7 @@ PerformDragDrop（自实现 OLE）→ 拖拽中弹窗持续显示 → 松手/取
 |---|---|
 | 分区位置 | 覆盖层已铺满目标窗口 ⇒ 直接把该窗口切成两个投放区（不是主窗口！） |
 | 分区方向 | **设置里可自定义，默认左右** —— 新增 `AppSettings.DragZoneSplitOrientation`（`leftRight` / `topBottom`） |
-| 两区语义 | 一区「保留完整路径」、一区「扁平解压（不保留）」，只影响 `preserveFullPath` |
+| 两区语义 | 一区「保留完整路径」、一区「**相对路径**」，只影响 `preserveFullPath` |
 | 树预览 | **只有悬停区显示**小树 + 冲突标记；另一区压暗，只显示标题 + 结果示例路径 |
 | 默认高亮 | 跟当前设置 `AppSettings.ExtractPreserveFullPath`（平时怎么设，默认就亮哪区） |
 | 桌面目标 | 桌面（Progman / WorkerW）同样按窗口矩形分两半 |
@@ -2103,7 +2103,7 @@ PerformDragDrop（自实现 OLE）→ 拖拽中弹窗持续显示 → 松手/取
 
 ```
 ┌───────────────────────────┬───────────────────────────┐
-│ 保留完整路径                │ 扁平解压（不保留）           │
+│ 保留完整路径                │ 相对路径                    │
 │ D:\Projects\sub\docs\a.txt │ D:\Projects\docs\a.txt     │
 │                           │                           │
 │ ├─ docs/                  │      （压暗，不显示树）      │
@@ -2117,9 +2117,20 @@ PerformDragDrop（自实现 OLE）→ 拖拽中弹窗持续显示 → 松手/取
 
 - 悬停区：Success 绿边框、正常呼吸 alpha，内容 = 标题 + 结果示例路径 + 小树（≤8 行，见上一节）。
 - 非悬停区：呼吸 alpha 降到 40–60（压暗），只显示标题 + 结果示例路径，**不算冲突、不渲染树**。
-- 分隔线 1px，取当前状态色降亮度。
+- 分隔线 1px，取当前状态色降亮度，**只画在内容区**（客户区，从标题栏下沿到窗口底部）；**命中判定仍按整个窗口宽度**的中点算 —— 鼠标停在标题栏 / 地址栏上也算在对应半区，落点照旧取该窗口路径。
 - 长路径按**各区自身宽度**独立缩写（`AbbreviatePath` 阈值按半宽重算），不能两区共用同一阈值。
 - 窗口过窄（例如 < 600px）时，区内只显示标题 + 结果路径 + 一行冲突汇总，不显示行树。
+
+### 细节定稿（2026-10-30 第二轮，逐项已定）
+
+| 细节 | 定稿 |
+|---|---|
+| 分隔线范围 | 视觉只画在**内容区**（客户区），**命中按整个窗口**宽度/高度中点判定（标题栏、地址栏上也算对应区） |
+| 两区标题 | 「保留完整路径」/「**相对路径**」—— 与设置项措辞镜像对应，不加副标题；两区各自的**结果示例路径**才是真正的解释 |
+| 呼吸动画 | 悬停区正常呼吸（40–120），非悬停区**固定压暗**（静态 alpha），跨区时交接，避免两区一起闪 |
+| 扩展位 | 区模型做成「标题 + 一组参数」，现在只放 `preserveFullPath`；将来要放「解压后打开目录」「解压并删除压缩包」等动作时不用重写渲染。**只留结构，不加功能** |
+| 大目标（最大化窗口 / 桌面） | 分区仍按半屏，但**文字与小树靠鼠标所在侧居中**，让视觉重心跟着鼠标走；分隔线位置不动 |
+| 窄窗口降级 | 区宽 < 约 300px（或整窗 < 600px）时区内只显示标题 + 结果示例路径 + 一行冲突汇总，不画行树 |
 
 ### 交互
 
@@ -2138,7 +2149,7 @@ PerformDragDrop（自实现 OLE）→ 拖拽中弹窗持续显示 → 松手/取
 4. `src/MantisZip.UI.Avalonia/Services/OverlayController.cs`：新增 `SplitOrientation`、`SetDropZones(...)`、`HoveredZone` 判定（光标相对窗口矩形中点，按方向取 x 或 y）、双区渲染、每区缓存、非悬停区降 alpha、窄窗口降级。
 5. `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`：拖拽开始时把「展开后的条目 + 当前 `currentFolder` + 分区方向」交给 controller。
 6. `src/MantisZip.UI.Avalonia/Services/DragDropService.cs`：`ExecuteAfterDropAsync(..., bool? preserveFullPathOverride)`，为 null 时回落 `_settings.ExtractPreserveFullPath`，再传给 `RunSelectedItemsExtractionAsync`。
-7. i18n：新增 `DragZone_Flatten`（扁平解压（不保留））、`DragZone_Hint`（在此区松手即按此方式解压）、`Settings_Extract_DragZoneSplit`（拖拽投放区分区方向）、`Settings_Extract_DragZoneSplit_LeftRight`（左右）、`Settings_Extract_DragZoneSplit_TopBottom`（上下）；「保留完整路径」区标题复用既有 `Settings_Extract_PreserveFullPath`。三语同步。
+7. i18n：新增 `DragZone_RelativePath`（相对路径 / Relative path）、`DragZone_Hint`（在此区松手即按此方式解压）、`Settings_Extract_DragZoneSplit`（拖拽投放区分区方向）、`Settings_Extract_DragZoneSplit_LeftRight`（左右）、`Settings_Extract_DragZoneSplit_TopBottom`（上下）；另一区标题复用既有 `Settings_Extract_PreserveFullPath`（保留完整路径）。三语同步。
 8. 测试 `tests/MantisZip.UI.Avalonia.Tests/DragDropZonesTests.cs`：分区方向命中判定（左右 / 上下各 2 例）、两区路径结果差异、默认高亮跟设置、Warning 退回单区、窄窗口降级、缓存命中不重复计算。
 
 ### 风险 / 遗留
