@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-30** — 计划：主窗口列表复选框多选（v0.5.6，`file-list-checkbox-selection.md`）
+  - **背景**：#37 的三点诉求里「与主窗口文件列表统一」只做了一半 —— v0.5.5 统一了交互范式，但主窗口列表本身没有复选框列。现状盘点：`Controls/ArchiveContentView.axaml:251` 的 `DataGrid` 没显式 `SelectionMode`（Avalonia DataGrid 默认 `Extended`，Ctrl/Shift 本来可用），`Views/MainWindow.axaml.cs:1448-1457` 的 `SelectionChanged` 把 `SelectedItems` 灌进 `MainWindowViewModel.SelectedEntries`（`MainWindowViewModel.cs:560`）；复制名称/路径（`:1348`/`:1369`）与「解压选中项到」（`MainWindowViewModel.Extract.cs:225`）已吃多选，**只有 `DeleteFiles`（`MainWindowViewModel.Compress.cs:104-122`）仍看 `SelectedEntry` 单条**。
+  - **为什么值得做**：Ctrl/Shift 需要按键盘，且滚动、切目录、点别处后选择就丢；复选框是「持久累积」语义，这正是 #37 想要的。
+  - **计划要点**：唯一事实源仍是 `SelectedEntries`（勾选只是另一个入口，不新开集合）；`Models/ArchiveItemModel.cs` 加 `[ObservableProperty] bool IsChecked`（现 16 个通知属性里没有它）；`ArchiveContentView.axaml` 在 22px 图标列之前插 30px `DataGridTemplateColumn`，显隐先核实 `DataGridColumn.IsVisible` 是否可绑定、不可绑定就 code-behind 切宽度；勾选与 `SelectedItems` 双向同步走 `_syncingSelection` 闸门（选择器已踩过死循环）；补批量删除（确认框按条数切文案）+ 全选可见/清空/反选 + 状态栏「已选 N 项」；`AppSettings.FileListCheckboxMode` 持久化，**默认关闭**（关闭时行为与今天完全一致）。
+  - **同步**：`docs/PLAN.md` 的 v0.5.6 加一行、阶段工时 9-13h → 17-25h、验收口径补「勾选 3 项删除只弹一次确认」一条。
 **2026-10-30** — 改进：对话框几何记忆（窗口尺寸 + 设置窗分栏宽度）
   - **背景**：用户问「这几个窗口布局现在是持久化的吗？」。盘点结果：主窗口尺寸/位置/列宽已由 `Models/WindowStateManager` 持久化到 `window.json`，进度窗宽度、选择器右栏宽度、选择器左侧标签也已存进 `AppSettings`；但**压缩设置窗 / 解压设置窗 / 模态选择器 / 设置窗**的尺寸与两个设置窗的左右分栏宽度全是 XAML 常量，拖过即丢。
   - **范围（用户拍板）**：只记尺寸（含分栏宽度），**不做位置记忆**（多显示器拔插后位置还原容易把窗口放到屏幕外）。
