@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.UI.Avalonia.Models;
 
@@ -68,7 +69,7 @@ public static class RecentFilesManager
                 return _cache;
             }
             var json = File.ReadAllText(RecentFile);
-            var paths = JsonSerializer.Deserialize<List<string>>(json) ?? new List<string>();
+            var paths = JsonSerializer.Deserialize<List<string>>(json, JsonDefaults.CaseInsensitive) ?? new List<string>();
             // Remove non-existent paths
             paths.RemoveAll(p => !File.Exists(p));
             _cache = paths;

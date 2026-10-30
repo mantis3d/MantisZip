@@ -95,11 +95,19 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _enableDebugLogging;
 
+    /// <summary>
+    /// 自动检查更新的频率下拉框选中项（0=关闭 / 1=每次启动 / 2=每天 / 3=每周）。
+    /// 存下标而不是枚举，是为了让 ComboBox 只用 SelectedIndex 绑定，不需要 ItemTemplate/转换器。
+    /// </summary>
     [ObservableProperty]
-    private bool _closeAfterCompress;
+    private int _updateFrequencyIndex = 2;
 
     [ObservableProperty]
     private bool _keepOriginalExtension;
+
+    /// <summary>压缩完成后打开输出所在目录（与解压端 <see cref="OpenFolderAfterExtract"/> 对称）。</summary>
+    [ObservableProperty]
+    private bool _openFolderAfterCompress;
 
     // ── Compression advanced ──
     [ObservableProperty]
@@ -407,6 +415,10 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private int _autoCloseDelaySeconds = 3;
 
+    /// <summary>进度窗口默认钉住（📌）：true = 一打开就钉住，完成/出错都等手动关。</summary>
+    [ObservableProperty]
+    private bool _progressPinByDefault;
+
     [ObservableProperty]
     private string _appFontFamily = "";
 
@@ -444,6 +456,9 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     // Per-extension assoc items (UI list)
     public System.Collections.ObjectModel.ObservableCollection<FormatAssocItemModel> AssocItems { get; } = new();
+
+    /// <summary>批量改写 <see cref="AssocItems"/> 的勾选时暂时抑制逐项落盘（避免一次操作写 N 次 settings.json）。</summary>
+    private bool _suppressAssocPersist;
 
     [RelayCommand]
     private async Task AddCustomAssoc()
@@ -543,6 +558,9 @@ public partial class SettingsWindowViewModel : ObservableObject
             ".tgz" or ".tar.gz" => LocalizationManager.T("Settings_Assoc_FormatDesc_TarGz"),
             ".gz" => LocalizationManager.T("Settings_Assoc_FormatDesc_Gz"),
             ".iso" => LocalizationManager.T("Settings_Assoc_FormatDesc_Iso"),
+            ".jar" or ".war" or ".ear" => LocalizationManager.T("Settings_Assoc_FormatDesc_Jar"),
+            ".apk" => LocalizationManager.T("Settings_Assoc_FormatDesc_Apk"),
+            ".001" => LocalizationManager.T("Settings_Assoc_FormatDesc_Volume"),
             _ => LocalizationManager.T("Settings_Assoc_UserCustom")
         };
 
@@ -553,64 +571,86 @@ public partial class SettingsWindowViewModel : ObservableObject
             Icon = IconService.GetFileIcon(ext),
             IsCustom = isCustom,
             IsEnabled = IsEnabledFromSettings(ext),
+            IsOpenDialogVisible = IsOpenDialogVisibleFromSettings(ext),
             CurrentHandler = ShellIntegration.GetCurrentHandler(ext)
+        };
+
+        // 勾选即时落盘（不等「保存」按钮）：自愈判据读的就是设置里的集合，
+        // 取消关联后如果不立刻写，下次启动会被 SelfHealAssociations 装回来。
+        item.PropertyChanged += (_, e) =>
+        {
+            if (_suppressAssocPersist) return;
+            if (e.PropertyName is nameof(FormatAssocItemModel.IsEnabled)
+                or nameof(FormatAssocItemModel.IsOpenDialogVisible))
+            {
+                PersistAssocCollections();
+            }
         };
 
         return item;
     }
 
     private bool IsEnabledFromSettings(string ext)
-    {
-        return ext switch
-        {
-            ".zip" => AssocZip,
-            ".7z" => Assoc7z,
-            ".rar" => AssocRar,
-            ".tar" => AssocTar,
-            ".tgz" or ".tar.gz" => AssocTarGz,
-            ".gz" => AssocGz,
-            ".iso" => AssocIso,
-            _ => _settings.CustomAssocExtensions?.Contains(ext) ?? false
-        };
-    }
+        => AssocPreferences.IsAssocEnabled(_settings, ext);
+
+    private bool IsOpenDialogVisibleFromSettings(string ext)
+        => AssocPreferences.IsOpenDialogVisible(_settings, ext);
 
     private void RefreshAssocStatus()
     {
-        foreach (var item in AssocItems)
+        // 期间会逐项写 IsEnabled / IsOpenDialogVisible；这里只是把设置里的值刷回 UI，
+        // 不该反过来再触发落盘（否则保存 → 刷新 → 再保存）。
+        _suppressAssocPersist = true;
+        try
         {
-            item.CurrentHandler = ShellIntegration.GetCurrentHandler(item.Extension);
-            item.IsEnabled = IsEnabledFromSettings(item.Extension);
+            foreach (var item in AssocItems)
+            {
+                item.CurrentHandler = ShellIntegration.GetCurrentHandler(item.Extension);
+                item.IsEnabled = IsEnabledFromSettings(item.Extension);
+                item.IsOpenDialogVisible = IsOpenDialogVisibleFromSettings(item.Extension);
+            }
+        }
+        finally
+        {
+            _suppressAssocPersist = false;
         }
     }
 
     /// <summary>把全部内置格式的关联复选框置为指定状态（不刷新状态、不持久化）。</summary>
     private void SetBuiltInAssocFlags(bool enabled)
     {
-        AssocZip = enabled;
-        Assoc7z = enabled;
-        AssocRar = enabled;
-        AssocTar = enabled;
-        AssocTarGz = enabled;
-        AssocGz = enabled;
-        AssocIso = enabled;
+        _suppressAssocPersist = true;
+        try
+        {
+            foreach (var item in AssocItems)
+            {
+                item.IsEnabled = enabled;
+            }
+        }
+        finally
+        {
+            _suppressAssocPersist = false;
+        }
     }
 
     /// <summary>
-    /// 立即把内置格式关联开关（当前复选框状态）写回 AppSettings 并持久化（不等"保存"按钮）。
+    /// 把「关联」与「打开对话框筛选」两列的当前勾选状态写回 AppSettings 并持久化（不等「保存」按钮）。
+    /// </summary>
+    /// <remarks>
     /// 自愈判据含「该格式未被用户显式禁用」，故取消/卸载关联必须立刻留痕，
     /// 否则下次启动会被 ShellIntegration.SelfHealAssociations 重新装回来。
-    /// </summary>
-    private void PersistAssocFlagsNow()
+    /// </remarks>
+    private void PersistAssocCollections()
     {
-        _settings.AssocZip = AssocZip;
-        _settings.Assoc7z = Assoc7z;
-        _settings.AssocRar = AssocRar;
-        _settings.AssocTar = AssocTar;
-        _settings.AssocTarGz = AssocTarGz;
-        _settings.AssocGz = AssocGz;
-        _settings.AssocIso = AssocIso;
+        _settings.AssocExtensions = AssocPreferences.Normalize(
+            AssocItems.Where(i => i.IsEnabled).Select(i => i.Extension));
+        _settings.OpenDialogExtensions = AssocPreferences.Normalize(
+            AssocItems.Where(i => i.IsOpenDialogVisible).Select(i => i.Extension));
         _settings.Save();
     }
+
+    /// <summary>兼容旧调用名（安装 / 卸载关联后立即落盘）。</summary>
+    private void PersistAssocFlagsNow() => PersistAssocCollections();
 
     private void PopulateBuiltInFormats()
     {
@@ -663,15 +703,17 @@ public partial class SettingsWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 重建「文件关联」列表：行来自 <see cref="MantisZip.Core.Utils.ArchiveExtensionCatalog"/>（格式单一事实源），
+    /// 末尾追加用户自定义扩展名。
+    /// </summary>
     private void PopulateAssocItems()
     {
         AssocItems.Clear();
-        var builtins = new[] { ".zip", ".7z", ".rar", ".tar", ".tar.gz", ".gz", ".iso" };
-        foreach (var ext in builtins)
+
+        foreach (var info in MantisZip.Core.Utils.ArchiveExtensionCatalog.Listed)
         {
-            // normalize .tar.gz -> .tgz for display consistency
-            var displayExt = ext == ".tar.gz" ? ".tgz" : ext;
-            var item = CreateAssocItem(displayExt, isCustom: false);
+            var item = CreateAssocItem(info.Extension, isCustom: false);
             item.DeleteCommand = null;
             AssocItems.Add(item);
         }
@@ -680,6 +722,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             foreach (var c in _settings.CustomAssocExtensions)
             {
+                // 目录里的内置格式已在上面出现过（AddCustomAssoc 也会拒绝重复），这里只补目录外的新扩展名
+                if (MantisZip.Core.Utils.ArchiveExtensionCatalog.Contains(c)) continue;
                 var item = CreateAssocItem(c, isCustom: true);
                 item.DeleteCommand = new RelayCommand(() => DeleteCustomExtension(item));
                 AssocItems.Add(item);
@@ -873,9 +917,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     // Compress strings
     public string DefaultFormatText => LocalizationManager.T("Settings_DefaultFormat");
     public string CompressionLevelText => LocalizationManager.T("Settings_CompressionLevel");
-    public string CloseAfterCompressText => LocalizationManager.T("Settings_Compress_CloseAfterDone");
     public string KeepOriginalExtensionText => LocalizationManager.T("Settings_Compress_KeepExt");
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
+    public string CompressOpenFolderAfterText => LocalizationManager.T("Settings_Compress_OpenFolderAfter");
     public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
     public string CompressConflictActionText => LocalizationManager.T("Settings_Compress_ConflictAction");
     public string ZipDefaultOptionsText => LocalizationManager.T("Settings_Zip_DefaultOptions");
@@ -1014,25 +1058,65 @@ public partial class SettingsWindowViewModel : ObservableObject
         AppSettings.DataDir, "debug.log");
     public string OpenLogFolderText => LocalizationManager.T("Settings_Advanced_OpenLog");
 
+    // ── 自动更新（独立「更新」页签）──
+    public string UpdateSettingsSectionTitle => LocalizationManager.T("Update_Settings_SectionTitle");
+    public string UpdateFrequencyLabelText => LocalizationManager.T("Update_Settings_Frequency");
+
+    /// <summary>下拉框选项文案（顺序必须与 <see cref="UpdateCheckFrequencyNames.Ordered"/> 一致）。</summary>
+    public IReadOnlyList<string> UpdateFrequencyOptions => new[]
+    {
+        LocalizationManager.T("Update_Freq_Never"),
+        LocalizationManager.T("Update_Freq_Startup"),
+        LocalizationManager.T("Update_Freq_Daily"),
+        LocalizationManager.T("Update_Freq_Weekly"),
+    };
+
+    /// <summary>「更新」页签标题（与「关于 → 更新」页签同名，用户一眼能对上）。</summary>
+    public string TabUpdateHeader => LocalizationManager.T("Update_TabName");
+
     // ── New tab headers ──
     public string TabLanguageHeader => LocalizationManager.T("Settings_Tab_Language");
     public string TabPathHeader => LocalizationManager.T("Settings_Tab_Path");
     public string TabAppearanceHeader => LocalizationManager.T("Settings_Tab_Appearance");
+    /// <summary>「外观」页内的「外观」子页签（主题/紧凑度/最近文件/应用字体）。</summary>
+    public string TabAppearanceGeneralHeader => LocalizationManager.T("Settings_Tab_Appearance_General");
+    /// <summary>「外观」页内的「进度窗口」子页签（自动关闭延时/默认钉住）。</summary>
+    public string TabAppearanceProgressHeader => LocalizationManager.T("Settings_Tab_Appearance_Progress");
     public string TabPasswordHeader => LocalizationManager.T("Settings_Tab_Password");
     public string TabFileAssocHeader => LocalizationManager.T("Settings_Tab_FileAssoc");
 
     // ── Language strings ──
     public string LanguageText => LocalizationManager.T("Settings_Language");
+
+    /// <summary>
+    /// 语言页下方的「翻译贡献者」一行：显示**下拉当前所选**语言的译者（而不是已生效语言），
+    /// 这样切换下拉即可先看到「要换成谁翻的版本」，点「确定」才真正生效。
+    /// </summary>
     public string LanguageTranslatorText
     {
         get
         {
+            var code = LanguageInfoCode(SelectedSelectedLanguageOption?.Value ?? SelectedLanguage);
             var translator = LocalizationManager.AvailableLanguages
-                .FirstOrDefault(l => l.Code == LocalizationManager.CurrentLanguageCode)?
+                .FirstOrDefault(l => string.Equals(l.Code, code, StringComparison.OrdinalIgnoreCase))?
                 .TranslatorText ?? string.Empty;
             return LocalizationManager.T("Settings_Language_Translator", translator);
         }
     }
+
+    /// <summary>
+    /// AppSettings 的语言代码（<c>zh</c> / <c>zh-TW</c> / <c>en</c>）→
+    /// <see cref="LocalizationManager.LanguageInfo.Code"/>（<c>zh-CN</c> / <c>zh-TW</c> / <c>en</c>）。
+    /// </summary>
+    private static string LanguageInfoCode(string? settingsCode) => settingsCode switch
+    {
+        "zh-TW" => "zh-TW",
+        "en" => "en",
+        _ => "zh-CN",
+    };
+
+    partial void OnSelectedSelectedLanguageOptionChanged(Option? value)
+        => OnPropertyChanged(nameof(LanguageTranslatorText));
 
     // ── Appearance strings ──
     public string AppearanceThemeText => LocalizationManager.T("Settings_Appearance_Theme");
@@ -1041,6 +1125,12 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AppearanceThemeDarkText => LocalizationManager.T("Settings_Appearance_Theme_Dark");
     public string AppearanceMaxRecentFilesText => LocalizationManager.T("Settings_Appearance_MaxRecentFiles");
     public string AppearanceAutoCloseDelayText => LocalizationManager.T("Settings_ProgressAutoCloseDelay");
+    /// <summary>延时的补充说明：钉住/失败时不走倒计时。</summary>
+    public string AppearanceAutoCloseDelayHelpText => LocalizationManager.T("Settings_Progress_AutoCloseDelay_Help");
+    /// <summary>「默认钉住进度窗口」勾选框标签。</summary>
+    public string ProgressPinByDefaultText => LocalizationManager.T("Settings_Progress_PinByDefault");
+    /// <summary>「默认钉住进度窗口」勾选框说明。</summary>
+    public string ProgressPinByDefaultHelpText => LocalizationManager.T("Settings_Progress_PinByDefault_Help");
     public string AppearanceAppFontFamilyText => LocalizationManager.T("Settings_Appearance_AppFontFamily");
     public string AppearanceCompactnessText => LocalizationManager.T("Settings_Appearance_Compactness");
     public string AppearanceCompactnessCompactText => LocalizationManager.T("Settings_Appearance_Compactness_Compact");
@@ -1058,6 +1148,16 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string FileAssocAddText => LocalizationManager.T("Settings_Assoc_Add");
     public string FileAssocInstallText => LocalizationManager.T("Settings_Assoc_Install");
         public string FileAssocUninstallText => LocalizationManager.T("Settings_Assoc_Uninstall");
+    /// <summary>两列勾选的说明（左列 = 文件关联，右列 = 打开对话框筛选），单独占一行。</summary>
+    public string FileAssocColumnsHintText => LocalizationManager.T("Settings_Assoc_ColumnsHint");
+    public string FileAssocColumnAssocText => LocalizationManager.T("Settings_Assoc_ColumnAssoc");
+    public string FileAssocColumnFilterText => LocalizationManager.T("Settings_Assoc_ColumnFilter");
+    public string FileAssocColumnFormatText => LocalizationManager.T("Settings_Assoc_ColumnFormat");
+    public string FileAssocColumnHandlerText => LocalizationManager.T("Settings_Assoc_ColumnHandler");
+    public string FileAssocAssocTooltipText => LocalizationManager.T("Settings_Assoc_AssocCheckTooltip");
+    public string FileAssocOpenDialogTooltipText => LocalizationManager.T("Settings_Assoc_OpenDialogCheckTooltip");
+    public string FileAssocOpenDialogSelectAllText => LocalizationManager.T("Settings_Assoc_OpenDialogSelectAll");
+    public string FileAssocOpenDialogDeselectAllText => LocalizationManager.T("Settings_Assoc_OpenDialogDeselectAll");
 
     public string SaveText => LocalizationManager.T("Settings_Save");
     public string CancelText => LocalizationManager.T("Settings_Cancel");
@@ -1097,9 +1197,13 @@ public partial class SettingsWindowViewModel : ObservableObject
         _enableDebugLogging = _settings.EnableDebugLogging;
         _logPrivacyMode = _settings.LogPrivacyMode;
 
+        // 自动更新
+        _updateFrequencyIndex = UpdateCheckFrequencyNames.ToIndex(
+            UpdateCheckFrequencyNames.Parse(_settings.UpdateCheckFrequency));
+
         // Compress (additional)
-        _closeAfterCompress = _settings.CloseAfterCompress;
         _keepOriginalExtension = _settings.KeepOriginalExtension;
+        _openFolderAfterCompress = _settings.OpenFolderAfterCompress;
         _compressFileConflictAction = _settings.CompressFileConflictAction;
 
         // Compression advanced
@@ -1173,6 +1277,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _appFontFamily = _settings.AppFontFamily;
         _compactnessMode = _settings.CompactnessMode;
         _autoCloseDelaySeconds = _settings.AutoCloseDelaySeconds;
+        _progressPinByDefault = _settings.ProgressPinByDefault;
 
         // Password
         _showPasswordMatchNotification = _settings.ShowPasswordMatchNotification;
@@ -1252,10 +1357,15 @@ public partial class SettingsWindowViewModel : ObservableObject
         PickerTabOptions.Add(new Option(LocalizationManager.T("QuickPath_TabTree"), nameof(PathTab.Tree)));
 
         SelectedLanguageOptions.Clear();
-        SelectedLanguageOptions.Add(new Option("中文", "zh"));
-        // 语言名显示其本族原生名（豁免本地化，与「中文」/「English」一致）
-        SelectedLanguageOptions.Add(new Option("繁體中文", "zh-TW"));
-        SelectedLanguageOptions.Add(new Option("English", "en"));
+        // 语言名显示其本族原生名（豁免本地化，如「简体中文」/「繁體中文」/「English」），
+        // 唯一事实源是 Resources/languages.json 的 name 字段；Value 仍用 AppSettings 的持久化代码
+        // （zh / zh-TW / en），保证既有 settings.json 里的 Language 值能对上。
+        foreach (var info in LocalizationManager.AvailableLanguages)
+        {
+            var display = string.IsNullOrWhiteSpace(info.DisplayName) ? info.Code : info.DisplayName;
+            var value = LocalizationManager.ToSettingsCode(LocalizationManager.FromSettingsCode(info.Code));
+            SelectedLanguageOptions.Add(new Option(display, value));
+        }
 
         LogPrivacyModeOptions.Clear();
         LogPrivacyModeOptions.Add(new Option(LogPrivacyModeOffText, "off"));
@@ -1490,12 +1600,17 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PasswordOptionsSectionText));
         OnPropertyChanged(nameof(AssocSectionText));
         OnPropertyChanged(nameof(DebugSectionText));
+        // 自动更新页签文案
+        OnPropertyChanged(nameof(UpdateSettingsSectionTitle));
+        OnPropertyChanged(nameof(UpdateFrequencyLabelText));
+        OnPropertyChanged(nameof(UpdateFrequencyOptions));
+        OnPropertyChanged(nameof(TabUpdateHeader));
 
         OnPropertyChanged(nameof(DefaultFormatText));
         OnPropertyChanged(nameof(CompressionLevelText));
-        OnPropertyChanged(nameof(CloseAfterCompressText));
         OnPropertyChanged(nameof(KeepOriginalExtensionText));
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
+        OnPropertyChanged(nameof(CompressOpenFolderAfterText));
         OnPropertyChanged(nameof(CompressOptionsText));
         OnPropertyChanged(nameof(CompressConflictActionText));
         OnPropertyChanged(nameof(ZipDefaultOptionsText));
@@ -1628,6 +1743,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AppearanceAppFontFamilyText));
         OnPropertyChanged(nameof(AppearanceMaxRecentFilesText));
         OnPropertyChanged(nameof(AppearanceAutoCloseDelayText));
+        OnPropertyChanged(nameof(AppearanceAutoCloseDelayHelpText));
+        OnPropertyChanged(nameof(ProgressPinByDefaultText));
+        OnPropertyChanged(nameof(ProgressPinByDefaultHelpText));
+        OnPropertyChanged(nameof(TabAppearanceGeneralHeader));
+        OnPropertyChanged(nameof(TabAppearanceProgressHeader));
         OnPropertyChanged(nameof(AppearanceCompactnessText));
         OnPropertyChanged(nameof(AppearanceCompactnessCompactText));
         OnPropertyChanged(nameof(AppearanceCompactnessNormalText));
@@ -1640,6 +1760,15 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(FileAssocAddText));
         OnPropertyChanged(nameof(FileAssocInstallText));
         OnPropertyChanged(nameof(FileAssocUninstallText));
+        OnPropertyChanged(nameof(FileAssocColumnsHintText));
+        OnPropertyChanged(nameof(FileAssocColumnAssocText));
+        OnPropertyChanged(nameof(FileAssocColumnFilterText));
+        OnPropertyChanged(nameof(FileAssocColumnFormatText));
+        OnPropertyChanged(nameof(FileAssocColumnHandlerText));
+        OnPropertyChanged(nameof(FileAssocAssocTooltipText));
+        OnPropertyChanged(nameof(FileAssocOpenDialogTooltipText));
+        OnPropertyChanged(nameof(FileAssocOpenDialogSelectAllText));
+        OnPropertyChanged(nameof(FileAssocOpenDialogDeselectAllText));
 
         OnPropertyChanged(nameof(SaveText));
         OnPropertyChanged(nameof(CancelText));
@@ -1655,8 +1784,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compress
         _settings.DefaultFormat = SelectedDefaultFormatOption?.Value ?? DefaultFormat;
         _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
-        _settings.CloseAfterCompress = CloseAfterCompress;
         _settings.KeepOriginalExtension = KeepOriginalExtension;
+        _settings.OpenFolderAfterCompress = OpenFolderAfterCompress;
         _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
 
         // Adaptive Compression (三个独立开关)
@@ -1735,6 +1864,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.EnableDebugLogging = EnableDebugLogging;
         _settings.LogPrivacyMode = SelectedLogPrivacyModeOption?.Value ?? LogPrivacyMode;
 
+        // 自动更新（下拉框下标 → 持久化字符串）
+        _settings.UpdateCheckFrequency = UpdateCheckFrequencyNames.ToSetting(
+            UpdateCheckFrequencyNames.FromIndex(UpdateFrequencyIndex));
+
         // Extract
         _settings.ExtractDestination = SelectedExtractDestinationOption?.Value ?? ExtractDestination;
         _settings.FileConflictAction = SelectedFileConflictActionOption?.Value ?? FileConflictAction;
@@ -1789,19 +1922,17 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.AppFontFamily = SelectedAppFontFamilyOption?.Value ?? AppFontFamily;
         _settings.CompactnessMode = SelectedCompactnessModeOption?.Value ?? CompactnessMode;
         _settings.AutoCloseDelaySeconds = Math.Clamp(AutoCloseDelaySeconds, 0, 60);
+        _settings.ProgressPinByDefault = ProgressPinByDefault;
 
         // Password
         _settings.ShowPasswordMatchNotification = ShowPasswordMatchNotification;
         _settings.PasswordRevealByDefault = PasswordRevealByDefault;
 
-        // File Assoc
-        _settings.AssocZip = AssocZip;
-        _settings.Assoc7z = Assoc7z;
-        _settings.AssocRar = AssocRar;
-        _settings.AssocTar = AssocTar;
-        _settings.AssocTarGz = AssocTarGz;
-        _settings.AssocGz = AssocGz;
-        _settings.AssocIso = AssocIso;
+        // File Assoc：两列勾选 → 两个集合（AssocZip/Assoc7z… 只保留给老配置迁移，不再写）
+        _settings.AssocExtensions = AssocPreferences.Normalize(
+            AssocItems.Where(i => i.IsEnabled).Select(i => i.Extension));
+        _settings.OpenDialogExtensions = AssocPreferences.Normalize(
+            AssocItems.Where(i => i.IsOpenDialogVisible).Select(i => i.Extension));
 
         // Persist custom extensions from the AssocItems list
         var customList = AssocItems.Where(i => i.IsCustom).Select(i => i.Extension).ToList();
@@ -2111,22 +2242,61 @@ public partial class SettingsWindowViewModel : ObservableObject
     [RelayCommand]
     private void SelectAllAssoc()
     {
-        AssocZip = true;
-        Assoc7z = true;
-        AssocRar = true;
-        AssocTar = true;
-        AssocTarGz = true;
-        AssocGz = true;
-        AssocIso = true;
+        SetAssocColumnState(enabled: true);
+        PersistAssocCollections();
         RefreshAssocStatus();
     }
 
     [RelayCommand]
     private void DeselectAllAssoc()
     {
-        SetBuiltInAssocFlags(false);
-        PersistAssocFlagsNow();
+        SetAssocColumnState(enabled: false);
+        PersistAssocCollections();
         RefreshAssocStatus();
+    }
+
+    /// <summary>表头「打开对话框筛选」全选。</summary>
+    [RelayCommand]
+    private void SelectAllOpenDialog()
+    {
+        SetOpenDialogColumnState(visible: true);
+        PersistAssocCollections();
+    }
+
+    /// <summary>表头「打开对话框筛选」全不选。</summary>
+    [RelayCommand]
+    private void DeselectAllOpenDialog()
+    {
+        SetOpenDialogColumnState(visible: false);
+        PersistAssocCollections();
+    }
+
+    /// <summary>整列切换「文件关联」勾选（批量，期间抑制逐项落盘）。</summary>
+    private void SetAssocColumnState(bool enabled)
+    {
+        _suppressAssocPersist = true;
+        try
+        {
+            foreach (var item in AssocItems) item.IsEnabled = enabled;
+        }
+        finally
+        {
+            _suppressAssocPersist = false;
+        }
+    }
+
+    /// <summary>整列切换「打开对话框筛选」勾选（批量，期间抑制逐项落盘）。</summary>
+    private void SetOpenDialogColumnState(bool visible)
+    {
+        _suppressAssocPersist = true;
+        try
+        {
+            foreach (var item in AssocItems) item.IsOpenDialogVisible = visible;
+        }
+        finally
+        {
+            _suppressAssocPersist = false;
+        }
     }
 
     [RelayCommand]

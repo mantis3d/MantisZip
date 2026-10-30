@@ -243,25 +243,33 @@ public partial class App : Application
         if (!enabled) return;
         if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath)) return;
 
-        for (int retry = 0; retry < 3; retry++)
+        // 分卷集要整组删（issue #70②）：此前只删传入的那一卷，用户看到的是「.001 没了、.002/.003 还在」。
+        var targets = ArchiveVolumeSet.EnumerateVolumes(archivePath);
+        if (targets.Count == 0)
+            targets = [archivePath];
+
+        foreach (var target in targets)
         {
-            try
+            for (int retry = 0; retry < 3; retry++)
             {
-                FileSystem.DeleteFile(
-                    archivePath,
-                    UIOption.OnlyErrorDialogs,
-                    RecycleOption.SendToRecycleBin);
-                DebugLog($"TryDeleteArchiveAfterExtract: moved '{archivePath}' to recycle bin");
-                return;
-            }
-            catch (Exception ex) when (retry < 2)
-            {
-                DebugLog($"TryDeleteArchiveAfterExtract: attempt {retry + 1} failed for '{archivePath}': {ex.Message}");
-                Thread.Sleep(200);
-            }
-            catch (Exception ex)
-            {
-                DebugLog($"TryDeleteArchiveAfterExtract: failed for '{archivePath}' after 3 attempts: {ex.Message}");
+                try
+                {
+                    FileSystem.DeleteFile(
+                        target,
+                        UIOption.OnlyErrorDialogs,
+                        RecycleOption.SendToRecycleBin);
+                    DebugLog($"TryDeleteArchiveAfterExtract: moved '{target}' to recycle bin ({targets.Count} volume(s))");
+                    break;
+                }
+                catch (Exception ex) when (retry < 2)
+                {
+                    DebugLog($"TryDeleteArchiveAfterExtract: attempt {retry + 1} failed for '{target}': {ex.Message}");
+                    Thread.Sleep(200);
+                }
+                catch (Exception ex)
+                {
+                    DebugLog($"TryDeleteArchiveAfterExtract: failed for '{target}' after 3 attempts: {ex.Message}");
+                }
             }
         }
     }
@@ -472,46 +480,72 @@ public partial class App : Application
             // 立即显示设置窗口，消除弹窗前条目列表读取的空白期：
             // 窗口秒现后由窗口自身在 Loaded 逐包后台校验（ListEntriesAsync 只读头部索引），
             // 行内徽标实时回写 ✓/🔒/⚠️；预览树跟随选中行，损坏/需密码包显示对应占位。
-            var dialog = new ExtractSettingsWindow(existing);
+            //
+            // CLI 宿主差异：无属主窗口（Owner = null，冲突弹窗用 presenter 的活动进度窗）、
+            // 进度走 CLI presenter、退出策略为 None —— ShutdownAfterRun 会在会话 finally 里先
+            // 退出，NotStarted 原因来不及展示；进程退出一律由本方法在结局后显式请求。
+            var session = new ExtractSession(postActions: new CliExtractPostActions());
+            var context = new ExtractRunContext(
+                Owner: null,
+                Presenter: new Services.CliProgressPresenter(),
+                ExitPolicy: ExitPolicy.None,
+                DisplayPaths: existing);
+            var dialog = new ExtractSettingsWindow(session, context, existing);
+
+            // 命令行历史行为：逐包先撞密码库（桌面窗口只复用本会话已缓存的密码）。
+            // 取密策略随载荷冻结进 ExtractSettings.PasswordPolicy，由执行器消费。
+            dialog.SetPasswordPolicy(ExtractPasswordPolicy.FallbackToPasswordLibrary);
+
             Services.NativeSplash.Hook(dialog); // startup-native-splash：终端窗口出现即关 splash
 
-            // CLI 模式没有主窗口，无法用 ShowDialog(owner)，改用非模态 Show + Closed 事件等待结果。
+            // CLI 模式没有主窗口，无法用 ShowDialog(owner)，改用非模态 Show + 窗口的完成信号等待结局。
             // 同时必须把 ShutdownMode 改为 OnExplicitShutdown：默认 OnLastWindowClose 会在弹窗
             // （唯一窗口）关闭瞬间同步触发应用退出，导致确认后的解压 continuation 来不及执行。
-            // 退出时机改由我们显式控制：取消 → 立即退出；确认 → 批处理解压完成后退出。
+            // 退出时机改由我们显式控制：取消 → 立即退出；确认 → 会话语义执行完毕后退出。
             desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
             desktop.MainWindow = dialog;
-            var closeTcs = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
-            dialog.Closed += (_, _) => closeTcs.TrySetResult(dialog.DialogResult == true);
             dialog.Show();
 
-            var ok = await closeTcs.Task;
-            if (!ok)
+            var confirmation = await dialog.Completion;
+            if (confirmation is not Confirmed<ExtractSettings> confirmed)
             {
+                // 取消 / 点 X：静默退出，不弹任何提示。
                 AppShutdown.Request(desktop.Shutdown);
                 return;
             }
 
-            var vm = dialog.ViewModel;
-            var dest = vm.DestinationPath;
-            var conflictAction = vm.ConflictAction;
-            var filteredKeys = vm.FilteredEntryKeys;
-
-            if (string.IsNullOrWhiteSpace(dest))
+            var outcome = await dialog.RunConfirmedAsync(confirmed.Value);
+            if (outcome.IsNotStarted)
             {
-                AppShutdown.Request(desktop.Shutdown);
-                return;
+                // 未开始没有进度窗承载原因：CLI 至少写到 stderr，不许静默消失。
+                Console.Error.WriteLine(outcome.Reason);
             }
 
-            await RunCliExtractBatchWithProgressAsync(
-                existing, dest, conflictAction, filteredKeys, desktop,
-                dialog.ViewModel.MatchedPasswords, dialog.ViewModel.DeleteArchiveAfterExtract);
+            AppShutdown.Request(desktop.Shutdown);
         }
         catch (Exception ex)
         {
             Console.Error.WriteLine($"Extract dialog failed: {ex.Message}");
             AppShutdown.Request(desktop.Shutdown);
         }
+    }
+
+    /// <summary>
+    /// CLI 宿主的「解压后动作」实现：命令行没有可回用的主窗口，
+    /// 因此不提供「解压后打开目录」（也不显示该开关），只保留删包能力。
+    /// </summary>
+    private sealed class CliExtractPostActions : IExtractPostActions
+    {
+        /// <summary>CLI 不提供打开目录的能力位（开关不显示，完成侧动作跳过）。</summary>
+        public bool SupportsOpenFolder => false;
+
+        /// <summary>删包走统一入口（含回收站 / 永久删除的策略）。</summary>
+        public void DeleteArchive(string archivePath, bool enabled)
+            => App.TryDeleteArchiveAfterExtract(archivePath, enabled);
+
+        /// <summary>CLI 无打开目录动作，空实现。</summary>
+        public Task OpenFolderAsync(string destinationPath, string archivePath, string? password)
+            => Task.CompletedTask;
     }
 
     /// <summary>
@@ -681,191 +715,6 @@ public partial class App : Application
         return false;
     }
 
-    /// <summary>
-    /// CLI 弹窗解压确认后的批处理执行：一个进度窗口逐文件解压到统一目标目录。
-    /// 对齐 WPF HandleExtractBatchCore（manual 模式；过滤仅对第一个压缩包生效）。
-    /// 冲突策略来自弹窗选择（Ask 无对话框回调时由 CreateExtractOptions 降级）。
-    /// </summary>
-    private static async Task RunCliExtractBatchWithProgressAsync(
-        List<string> archivePaths,
-        string targetDir,
-        string conflictAction,
-        List<string>? filteredEntryKeys,
-        IClassicDesktopStyleApplicationLifetime desktop,
-        IReadOnlyDictionary<string, string>? matchedPasswords = null,
-        bool deleteAfterExtract = false)
-    {
-        // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
-        // 点击 X 时立即退出进程，后台解压被强杀中断（对齐 WPF 的 OnExplicitShutdown 用法）
-        desktop.ShutdownMode = ShutdownMode.OnExplicitShutdown;
-
-        var progressWindow = new ProgressWindow(LocalizationManager.T("Progress_Title_Extract"));
-        Services.NativeSplash.Hook(progressWindow); // startup-native-splash：进度窗即终端窗口
-        progressWindow.InitCancellation();
-        progressWindow.Show();
-        desktop.MainWindow = progressWindow;
-        progressWindow.InitBatchMode(archivePaths);
-
-        // spec §11.2: CLI 解压 → 只显示「删包」开关；初值取弹窗勾选（deleteAfterExtract）
-        progressWindow.SetExtractPostActions(openFolder: false, deleteArchive: true, openFolderSeed: null, deleteArchiveSeed: deleteAfterExtract);
-
-        // 路径 A（决策 D1）：解压设置窗口已预匹配密码的包，开始解压前整行点亮 🔑●●●● 徽标。
-        // 未预匹配的包留空，轮到该包时由路径 B 逐个点亮。
-        if (matchedPasswords != null)
-        {
-            for (int i = 0; i < archivePaths.Count; i++)
-            {
-                if (!matchedPasswords.TryGetValue(archivePaths[i], out var preUnlocked))
-                    continue;
-                var (rule, desc) = LookupPasswordRuleAndDescription(archivePaths[i], preUnlocked);
-                progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matched, preUnlocked, rule, desc);
-            }
-        }
-
-        var ct = progressWindow.CancellationToken;
-        var doneEvent = new ManualResetEventSlim(false);
-        Exception? captureException = null;
-        bool cancelled = false;
-        var succeededArchives = new List<string>();   // D19: 关窗后按开关最终值统一删包
-
-        _ = Task.Run(async () =>
-        {
-            try
-            {
-                for (int i = 0; i < archivePaths.Count; i++)
-                {
-                    ct.ThrowIfCancellationRequested();
-                    var archivePath = archivePaths[i];
-                    await Dispatcher.UIThread.InvokeAsync(() => progressWindow.SetCurrentBatchItem(i));
-
-                    try
-                    {
-                        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
-                        if (engine == null)
-                        {
-                            await Dispatcher.UIThread.InvokeAsync(() =>
-                                progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
-                                    LocalizationManager.T("Error_UnsupportedArchiveFormat")));
-                            continue;
-                        }
-
-                        // 路径 B（决策 D1）：解析前先亮 🔄 匹配中（密码库逐条尝试可能耗时）；
-                        // 解析完成后再落终态——命中 → 🔑●●●●，无密码包 → 熄灭
-                        progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matching, null, null, null);
-
-                        // 解压设置窗口校验/手动解锁阶段已确定的密码优先复用（免重复验证与弹窗）；
-                        // 未命中再走密码库扫描 + ResolveCliPassword 流程
-                        var password =
-                            matchedPasswords != null && matchedPasswords.TryGetValue(archivePath, out var preUnlocked)
-                                ? preUnlocked
-                                : ResolveCliPassword(archivePath, engine);
-
-                        // 路径 A 未点亮的行在此补亮：轮到该包且解析出密码 → Matched；
-                        // 无密码包（password == null）→ 熄灭残留的 Matching 徽标（决策 D1 路径 B）
-                        if (password != null)
-                        {
-                            var (pRule, pDesc) = LookupPasswordRuleAndDescription(archivePath, password);
-                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.Matched,
-                                password, pRule, pDesc);
-                        }
-                        else
-                        {
-                            progressWindow.SetBatchPasswordState(i, BatchPasswordState.None, null, null, null);
-                        }
-
-                        var progress = progressWindow.CreatePauseAwareProgress(
-                            ProgressWindow.CreateBackgroundProgress(progressWindow));
-
-                        // 统一解压执行入口（与主窗口 ExtractArchive 共用 ExtractFlow）；
-                        // 冲突策略来自弹窗选择；Ask 时弹 ConflictDialog（owner=进度窗口，与主窗口同逻辑）；
-                        // 过滤仅对第一个压缩包生效（对齐 WPF HandleExtractBatchCore：i == 0）
-                        await ExtractFlow.ExtractAsync(
-                            archivePath, targetDir, conflictAction,
-                            i == 0 ? filteredEntryKeys : null,
-                            password,
-                            info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info),
-                            progress, ct);
-
-                        // D19: 删包延后到窗口关闭后（倒计时内用户可切换 🗑 开关），此处仅登记成功项
-                        succeededArchives.Add(archivePath);
-
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Completed));
-                    }
-                    catch (PasswordRetryCancelledException)
-                    {
-                        // 密码弹窗取消：该行标 ✗「已取消 - 需要密码」，批处理继续下一个包（决策 D7）
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed,
-                                LocalizationManager.T("Status_PasswordCancelled")));
-                        continue;
-                    }
-                    catch (OperationCanceledException)
-                    {
-                        throw;
-                    }
-                    catch (Exception ex)
-                    {
-                        await Dispatcher.UIThread.InvokeAsync(() =>
-                            progressWindow.UpdateBatchItemStatus(i, BatchItemStatus.Failed, ex.Message));
-                    }
-                }
-
-                progressWindow.FinalizeBatch();
-                await Dispatcher.UIThread.InvokeAsync(() =>
-                    progressWindow.SetComplete(LocalizationManager.T("Cli_StatusDone")));
-            }
-            catch (OperationCanceledException)
-            {
-                cancelled = true;
-            }
-            catch (Exception ex)
-            {
-                captureException = ex;
-                Console.Error.WriteLine($"Extraction failed: {ex.Message}");
-            }
-            finally
-            {
-                doneEvent.Set();
-            }
-        });
-
-        await Task.Run(() => doneEvent.Wait());
-
-        if (cancelled)
-        {
-            await Dispatcher.UIThread.InvokeAsync(() => progressWindow.Close());
-            AppShutdown.Request(desktop.Shutdown);
-            return;
-        }
-
-        if (captureException != null)
-        {
-            // 失败：标记首项为 Failed（FinalizeBatch 已把 InProgress 置为 Completed，这里覆盖为失败）
-            progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException.Message);
-            await Dispatcher.UIThread.InvokeAsync(() =>
-            {
-                var (wholeErrorText, wholeErrorDetail) = WholeArchiveErrorLocalizer.ToUserText(captureException!);
-                progressWindow.SetErrorSummary(wholeErrorText, wholeErrorDetail);
-                progressWindow.CompleteWithErrors();
-            });
-            await progressWindow.AutoCloseOrWaitAsync(() => progressWindow.Close());
-            AppShutdown.Request(desktop.Shutdown);
-            return;
-        }
-
-        // 成功：自动关闭（延迟来自设置 AutoCloseDelaySeconds）或等待用户手动关闭；关闭时按开关最终值删包再退出（D19）
-        await progressWindow.AutoCloseOrWaitAsync(() =>
-        {
-            foreach (var p in succeededArchives)
-                TryDeleteArchiveAfterExtract(p, progressWindow.DeleteArchiveAfterExtractValue);
-            AppShutdown.Request(desktop.Shutdown);
-        });
-    }
-
-    /// <summary>
-    /// 压缩包基名（不含扩展名），处理 .tar.gz 双扩展名。
-    /// </summary>
     private static string GetArchiveBaseName(string archivePath)
     {
         var name = Path.GetFileNameWithoutExtension(archivePath);
@@ -1045,7 +894,7 @@ public partial class App : Application
 
         if (captureException != null)
         {
-            // 失败：标记首项为 Failed 并显示错误汇总（对齐 RunCliExtractBatchWithProgressAsync）
+            // 失败：标记首项为 Failed 并显示错误汇总（与 ExtractSession 的失败收口一致）
             await Dispatcher.UIThread.InvokeAsync(() =>
             {
                 progressWindow.UpdateBatchItemStatus(0, BatchItemStatus.Failed, captureException!.Message);

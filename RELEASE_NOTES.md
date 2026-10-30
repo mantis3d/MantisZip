@@ -1,3 +1,80 @@
+## v0.5.4
+
+### 文件说明 / File Description
+
+MantisZip-0.5.4-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.4-Setup-Offline.exe 是离线安装包。MantisZip-0.5.4-Portable.zip 是便携版，解压即用。MantisZip-0.5.4-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.4-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.4-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.4-Portable.zip is the portable version, extract and run. MantisZip-0.5.4-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **图标显示尺寸与前景色统一** — 图标尺寸此前 14/15/16px 混用，现在统一为 16px；工具栏与小按钮里缺少前景色的图标现在跟随主题文字色，深色主题下不再出现看不见的黑图标。
+- **Icon sizes and foregrounds unified** — icon sizes are now uniformly 16 px instead of mixing 14/15/16 px, and icons that had no foreground color follow the theme's text color, so dark themes no longer show invisible black icons.
+- **切换按钮选中态改用主题强调色** — 结果树的「紧凑模式」「显示筛选条件」、路径栏四个标签、进度窗口底部三个开关，选中时改为强调色背景 + 白色图标，浅色主题下不再看不清。
+- **Toggle buttons use the accent color when checked** — the result tree toggles, the four path bar tabs and the three progress window switches now use an accent background with a white icon, staying legible on light themes.
+- ![切换按钮选中态：结果树「紧凑模式 / 显示筛选条件」、路径栏四个标签、进度窗口底部三个开关](docs/images/version/v0.5.4/ToggleAccentStates.png)
+- **预览不再先写临时文件** — 文本、代码、日志、CSV、Markdown、图片与 PDF 预览改为在内存里取数解码，不再把条目解到 `%TEMP%` 再读回来；顺带修掉「同时预览两个文件会互相删掉临时文件」，敏感文件也不再往 TEMP 留明文。
+- **Preview no longer writes a temporary file first** — text, code, log, CSV, Markdown, image and PDF previews now decode in memory instead of extracting each entry to `%TEMP%` and reading it back; this also fixes two previews at once deleting each other's temp file, and sensitive files leave no plaintext behind.
+- **大文本不再一律被拒** — 超过 1MB 的文本、CSV、Markdown 改为显示前 1MB，并在状态栏标注「仅显示前 0.9 MB（全文 20.0 MB）」，超过 256MB 才整体拒绝。
+- **Large text files are no longer rejected outright** — text, CSV and Markdown files over 1MB now show the first 1MB with a hint like "showing the first 0.9 MB of 20.0 MB", and are only refused above 256MB.
+- ![大文本部分预览：状态栏标注「仅显示前 0.9 MB（全文 20.0 MB）」](docs/images/version/v0.5.4/PreviewPartialText.png)
+- **自动更新检测** — 启动后延迟 2 秒在后台静默检查新版本，频率可在「设置 → 更新」选「关闭 / 每次启动 / 每天 / 每周」（默认每天）；只有发现新版本才提示，可下载（交给浏览器打开发布页）、稍后提醒或跳过此版本。
+- **Automatic update checks** — a background check runs 2 seconds after startup; the frequency is set under Settings → Updates (off / every startup / daily / weekly, default daily), and only a newer release prompts you to download, be reminded later or skip that version.
+- ![发现新版本时的提示窗口（下载 / 稍后提醒 / 不再提示此版本）](docs/images/version/v0.5.4/UpdateAvailableDialog.png)
+- **「关于」窗口新增「更新」页签** — 显示当前版本、上次检查时间与「检查更新」按钮；发现新版本时在同一页显示版本号、发布日期、更新说明（Markdown 渲染）和「打开发布页」。
+- **New "Updates" tab in the About window** — shows the current version, the last check time and a "Check for updates" button; when a newer release exists, its version, publish date, release notes (rendered as Markdown) and an "Open release page" button appear right there.
+- ![「关于」窗口的「更新」页签（当前版本、上次检查时间、检查更新按钮）](docs/images/version/v0.5.4/AboutUpdatesTab.png)
+- **文件关联与「打开压缩包」筛选分两列勾选** — 「设置 → 文件类型关联」里每个格式前面有两个互不影响的勾选：左边是文件关联，右边是打开对话框的筛选。清单补全到全部可识别格式（含 `.jar` `.war` `.ear` `.apk` 与 `.001`），新增项默认不勾关联，自定义扩展名也有了图标（`custom.ico`）。
+- **File associations and the "open archive" filter are now two separate columns** — each format has an independent file-association checkbox on the left and an open-dialog filter checkbox on the right. The list now covers every recognizable format (`.jar`, `.war`, `.ear`, `.apk`, `.001` included), new entries stay unassociated by default, and custom extensions get an icon (`custom.ico`).
+- ![设置 → 文件类型关联：两列勾选 + 完整表头 + 自定义扩展名图标](docs/images/version/v0.5.4/FileAssocTwoColumns.png)
+- **压缩完成后可自动打开输出目录** — 可在压缩设置对话框、进度窗口底部或「设置 → 压缩 → 压缩选项」（默认值，默认关闭）里开启；压缩成功后打开输出目录并选中新压缩包，一次压出多个包时只打开第一个。
+- **Open the output folder automatically after compressing** — enable it in the compress settings dialog, at the bottom of the progress window, or as a default under Settings → Compression → Compress options (off by default). A successful run then opens the output folder with the new archive selected — only the first output when several are produced.
+- ![压缩设置对话框「常规」页签的「压缩完成后打开输出目录」勾选（进度窗口底部也有同名开关）](docs/images/version/v0.5.4/CompressOpenFolderAfter.png)
+
+**修复 / Fixes**
+
+- **打开中的压缩包被删掉 / 被替换后不再「假装还打开着」** — 解压删源包、被别的软件删除或被同名文件替换后，主窗口此前仍显示已打开，后续操作全落到不存在的路径。现在会盯着压缩包状态（分卷按整套看），发现异常时在内容区顶部显示只读提示（可重新打开或关闭），这期间的读写操作会先被拦下并说明原因。
+- **An open archive that gets deleted or replaced no longer stays "open"** — after a delete-after-extraction, an external delete or a same-name replacement, the main window kept showing it as open and later operations hit a dead path. It is now watched on disk (the whole volume set for split archives): a read-only banner appears at the top with reopen/close, and reads or writes are blocked with an explanation.
+- ![压缩包在磁盘上消失 / 被替换后，内容区顶部的只读提示横幅](docs/images/version/v0.5.4/ArchiveUnavailableBanner.png)
+- **压缩包内删除目录现在真的会删掉** — 此前选中文件夹删除会静默「成功」却一条都没删（列表路径不带结尾 `/`、条目带 `/`，逐条精确比较全不匹配）；现在按「该条目或该文件夹下全部条目」匹配，未命中时报「压缩包中不存在条目」，只读格式禁用删除入口，删除后立即刷新列表。
+- **Deleting a folder inside an archive now really deletes it** — deleting a selected folder used to report success while nothing was removed, because listed paths have no trailing `/` but entries do. It now matches "this entry or anything under it", reports "Entry not found in archive" when nothing matches, disables read-only formats and refreshes the list immediately.
+- **7z 包删除不存在的条目不再白跑一遍** — 此前会把整个包解压到临时目录再原样重新打包（大包要等几十秒到几分钟）；现在动手之前就报错。
+- **Deleting a missing entry from a 7z archive no longer rewrites the whole archive** — it used to extract the entire archive and repack it unchanged (tens of seconds to minutes on large archives); it now fails fast before doing any work.
+- **`.jar`、`.war`、`.ear`、`.apk` 现在能当压缩包打开** — 此前这些文件被误判成 OpenDocument 而报「不支持的文件格式」，现在识别分「容器 / 子类型」两层，打开时只读容器。这几种格式不注册文件关联，拖进窗口或在「打开方式」里选 MantisZip 即可。
+- **`.jar`, `.war`, `.ear` and `.apk` can now be opened as archives** — they used to be detected as OpenDocument and rejected as an unsupported format; detection now has a container layer and a subtype layer, and opening reads only the container. These formats get no file association — drag them in, or pick MantisZip under "Open with".
+- **自解压 exe 现在能打开** — 显式打开 `.exe` 时会先看文件头、再在尾部 8 KB 里找 zip / 7z / RAR 签名，命中就交给 7z 引擎；`.exe` 不注册文件关联，资源管理器里双击可执行文件的语义不变。
+- **Self-extracting executables can now be opened** — an explicitly opened `.exe` has its head checked and the last 8 KB searched for a zip / 7z / RAR signature, and a hit goes to the 7z engine. `.exe` gets no file association, so double-clicking an executable in Explorer behaves exactly as before.
+- **进度窗口暂停后「继续」按钮点不动** — 这几处对话框曾在引擎线程上同步等待界面线程，而进度链本身就在界面线程上跑，两边互相等成死锁；现在统一投递到界面线程异步等待，暂停/继续、冲突选择、错误重试都能正常收尾。
+- **Paused progress window could not be resumed** — those dialogs waited synchronously on the UI thread from an engine thread while the progress chain already ran on the UI thread, deadlocking both sides. They now post to the UI thread and await asynchronously, so pause/resume, conflict choices and retries all finish cleanly.
+- **压缩 / 解压设置窗口点「确认」后可能毫无反应** — 原因是窗口把状态放在公开属性上、由调用方关窗后逐项补读，漏一项就静默失效；现在「确认」时一次性交出完整设置，校验不通过会把原因直接显示在窗口里。
+- **Confirming the compress / extract dialog could silently do nothing** — the caller had to copy the dialog's state item by item after it closed, so any missed item failed silently. Confirming now hands over the complete settings in one transaction, and a failed validation shows its reason in the dialog.
+- **便携版升级不再丢设置** — 便携包不再预置设置文件（首次运行生成），解压覆盖旧目录升级不会再冲成默认值；设置文件读坏时先改名 `settings.json.bad-<时间>` 留证、再尝试从 `.bak` 恢复，保存时也保留上一版备份，全过程记入 `lifecycle.log`。
+- **Portable upgrades keep your settings** — the portable zip no longer pre-seeds a settings file, so extracting it over an old folder no longer wipes your settings. A broken file is renamed to `settings.json.bad-<time>` for evidence, `.bak` is tried, saving keeps the previous copy, and it is all recorded in `lifecycle.log`.
+- **数字输入框不再被乱敲出红字** — 自动关闭延时、最近文件数、表格预览行列数、双击打开阈值改为受控输入：只接受整数、拒收非数字与脏粘贴、失焦按上下限纠正，非法内容根本进不去。
+- **Numeric fields no longer accept arbitrary text** — the auto-close delay, recent-file count, table preview rows/columns and double-click threshold now use controlled inputs that accept integers only, reject non-digits and dirty pastes, and clamp to the allowed range on blur.
+- **「压缩完成后关闭对话框」这个无效开关已删除** — 它自 v0.2.0 起只把值存进设置文件、没有任何代码读取；真正决定自动关窗的是「设置 → 外观 → 进度窗口」的延时和进度窗口右上角的图钉。
+- **Removed the no-op "Close dialog after compress" switch** — since v0.2.0 it only stored a value that nothing read; what actually decides the auto-close is the delay under Settings → Appearance → Progress window plus the pin button in the progress window.
+- **新增「外观 → 进度窗口」页签，可设默认钉住** — 外观页拆出子页签，放自动关闭默认时长和新选项「进度窗口默认钉住」（默认关）；开启后每个进度窗口一打开就处于钉住状态、等你手动关，出错时仍然自动钉住。
+- **New "Appearance → Progress window" tab with default pinning** — the Appearance page gains a sub-tab holding the default auto-close delay and a "pin progress windows by default" option (off). When enabled every progress window starts pinned and waits for you, while failures still pin automatically.
+- ![设置 → 外观 → 进度窗口：自动关闭时长与「默认钉住」开关](docs/images/version/v0.5.4/ProgressWindowPinnedSetting.png)
+- **设置窗口语言页的「翻译贡献者」不再是空的** — 语言元数据改用大小写宽容读取，并显示**当前所选**语言的译者（切换下拉立即跟着变）；语言名统一为「简体中文」。
+- **The translator line on the language page is no longer empty** — language metadata is now read case-insensitively and shows the contributor of the **selected** language (updating as you change the dropdown); the Chinese language name is consistently "简体中文".
+- **压缩跑完后「新建压缩包」按钮不再可能变灰不动** — 等待手动关窗时，若窗口正好在「检查是否已关」与「订阅关闭事件」之间被关掉，等待就永不返回、整条调用链卡住；现在先订阅再复查并加定时兜底，链路也写入 `lifecycle.log`。
+- **The "New archive" button can no longer stay greyed out after a run** — the wait for a manual close could miss the close event and never return, leaving the whole call chain stalled. It now subscribes first, re-checks afterwards and has a periodic fallback, and the chain is written to `lifecycle.log`.
+- **分卷压缩包能用了** — `.zip.001` / `.7z.001` / `.rar.001` 现在能直接打开、列目录、解压，点任意一卷都从 `.001` 读起，勾选删源包时整套一起删，筛选里也能选到 `*.001`。末卷损坏不再被误判成「加密包」，打开对话框的筛选还会带上自定义扩展名。
+- **Split archives now work** — `.zip.001` / `.7z.001` / `.rar.001` sets open, list and extract, any volume starts from `.001`, delete-after-extraction removes the whole set, and the filter offers `*.001`. A damaged last volume is no longer mistaken for an encrypted archive, and the filter includes your custom extensions.
+
+**安装包 / Installers**
+
+- **两个安装包现在是同一个产品，换变体变成一次正常升级** — 此前两个变体身份不同却写进同一目录，会留下两条「应用和功能」条目、两个卸载程序互删正在使用的文件、卸载后外壳扩展与关联残留；现在统一为一个产品身份，安装前静默卸载旧版，旧 Offline 条目首次安装新版时自动收起。注意两个变体现在不能再同时安装。
+- **Both installers are now one product, so switching variants is a normal upgrade** — the variants had different installer identities while writing to the same folder, leaving duplicate "Apps & features" entries, uninstallers deleting each other's files and leftover registry keys. They now share one identity, the previous version is silently uninstalled first, and the variants can no longer be installed side by side.
+- **卸载时可以选择同时删除个人设置** — 存在个人设置目录时卸载会询问一次（默认「否」）；无论是否删除，注册表里的首次运行标记都会清理，下次安装是干净状态。
+- **Uninstall can optionally remove your personal settings** — if a settings folder exists, uninstall asks once (default "No"); the first-run markers in the registry are cleared either way, so the next install starts clean.
+- **WebSetup 里跳过运行时下载要再确认一次** — 选择不下载 .NET 10 运行时会二次确认（默认「否」）并提示离线安装包已自带运行时，避免装完双击打不开。
+- **Skipping the runtime download in WebSetup now asks again** — choosing not to download the .NET 10 runtime triggers a second confirmation (defaulting to "No") pointing out that the offline package bundles it, so an install cannot silently end up unable to start.
+
 ## v0.5.3
 
 ### 文件说明 / File Description
@@ -51,7 +128,23 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **会说明「为什么不生效」** — ZIP 面板下方新增动态原因：加密、分卷、GBK 编码或非 Deflate / Deflate64 方法导致自适应 / 多线程失效时直接写明原因；Deflate64 + 分卷此前会跑到中途失败，现在开始前就拦下并提示改用 Deflate 或关闭分卷
 - **The dialog explains when an option has no effect** — a note under the ZIP options names the reason when encryption, splitting, GBK encoding or a non-Deflate / Deflate64 method turns adaptive or multithreaded compression off; Deflate64 with splitting, which used to fail mid-run, is now blocked up front with a clear message
 
+**界面 / UI**
+
+- **图标统一到 Fluent 24 网格** — 界面上的 117 个图标里有 49 个是从别的图标体系带过来的（字体字形坐标系，渲染出来比旁边明显更粗更黑）或手绘杂线；现已按 **Fluent 24 Regular** 统一重画这 50 个（连同 `IconOrientation` 的语义修正：原来画成「图像裂开/禁用」样，现在是表示面板方向的双向箭头；磁力链改为链环、HTML 预览改为代码括号），其余图标不动、资源键名一个没改，界面上的引用零改动
+- **Icons unified to the Fluent 24 grid** — of the 117 UI icons, 49 came from other icon systems (font-glyph coordinates, rendering visibly bolder and darker than their neighbours) or were hand-drawn scribbles; 50 of them are now redrawn from **Fluent 24 Regular** (including a semantic fix for `IconOrientation`, which used to look like a broken/disabled image and is now a two-way arrow for panel direction, the magnet link becoming a chain link, and the HTML preview a code bracket), with the rest untouched and not a single resource key renamed, so no call site changed
+- **图标显示尺寸与前景色统一** — 图标尺寸此前 14/15/16px 混用，现在统一 16px（21 个界面文件共 109 处）；工具栏与小按钮里缺少前景色的图标现在跟随主题文字色（深色主题下不再出现看不见的黑图标），选中态仍为白色
+- **Icon sizes and foregrounds unified** — icon sizes used to mix 14/15/16 px and are now uniformly 16 px (109 sites across 21 files); icons in toolbars and small buttons that had no foreground color now follow the theme's text color (no more invisible black icons on dark themes), while the checked state stays white
+- **图标测试窗口新增尺寸矩阵页** — 「测试 → 图标测试」多了第二页：117 个图标 × 16/22/28 三档尺寸 × 浅色/深色背景块并排对照，一屏就能看出每个图标在两种主题、三种显示尺寸下是否协调
+- **Icon test window gains a size matrix page** — Test → Icon Test now has a second tab: all 117 icons × three sizes (16/22/28) × light and dark background blocks side by side, so one screen shows whether every icon holds up across both themes and all display sizes
+- **切换按钮选中态改用主题强调色** — 结果树视图的「紧凑模式」「显示筛选条件」、路径栏的四个路径标签、进度窗口底部的三个开关，选中时背景此前不变色（是浅灰底 + 白图标，浅色主题下几乎看不清）；现在统一使用主题强调色背景 + 白色图标，未选中态观感不变，浅色/深色主题都清晰
+- **Toggle buttons now show the accent color when checked** — the result tree's compact-mode and filter toggles, the four path tabs in the path bar, and the three toggles at the bottom of the progress window used to keep their neutral background when checked (light grey with a white icon, barely legible on light themes); they now use the theme's accent background with a white icon, with the unchecked look unchanged and both themes rendering clearly
+
 **修复 / Fixes**
+
+- **压缩包内删除目录现在真的会删掉** — 在压缩包里选中一个文件夹删除时，此前会静默「成功」：进度条走到 100%、状态显示「删除完成」，刷新后发现文件夹和里面的文件一个都没少。原因是列表里文件夹的路径不带结尾的 `/`、而压缩包内的条目带 `/`，逐条精确比较一条都对不上，快路径又不校验命中。现在删除按「该条目 或 该文件夹下的全部条目」匹配（结尾有没有 `/` 都行、不区分大小写，`a` 也不会误伤 `ab` 文件夹），一个都没命中时明确报「压缩包中不存在条目」而不再假装成功；只读格式（如 tar.gz）直接禁用删除入口，删除前还会先确认「其下 N 个文件（共 x MB）」；删除一完成文件列表就刷新，不用等进度窗口自动关闭的读秒走完
+- **Deleting a folder inside an archive now really deletes it** — deleting a selected folder used to silently "succeed": the progress bar reached 100% and the status line said "Delete complete", yet after refreshing the folder and every file inside were still there. The listed folder path has no trailing `/` while archive entries do, so the entry-by-entry exact comparison matched nothing, and the fast path never validated a hit. Deletion now matches "this entry or anything under that folder" (trailing `/` optional, case-insensitive, and `a` no longer touches an `ab` folder), reports "Entry not found in archive" when nothing matches instead of pretending success, disables the delete entry points for read-only formats (e.g. tar.gz), and asks for confirmation showing "the N file(s) inside it (x MB)" first; the file list now refreshes the moment the deletion finishes instead of waiting for the progress window's auto-close countdown
+- **7z 包删除不存在的条目不再白跑一遍** — 在 7z 压缩包里删除一个不存在的条目时，此前会把整个包解压到临时目录再原样重新打包（大包上白等几十秒到几分钟，还有条目属性与时间戳丢失的风险）；现在在动手之前就报错
+- **Deleting a missing entry from a 7z archive no longer rewrites the whole archive** — it used to extract the entire archive to a temp folder and repack it unchanged (tens of seconds to minutes on large archives, with a risk of losing entry attributes and timestamps); it now fails fast before doing any work
 
 - **右键「原地解压 / 解压到目录」不再报 7z.dll 无法加载**（#52）— 指定过 7z.dll 路径、或安装目录与默认探测位置不同时，这两个入口会弹「Can not load 7-zip library … can not change the library path while the library "…\x64\7z.dll" is being used.」，而「智能原地解压」却正常；现在启动时就把 7z.dll 路径交给解压库，库已被占用时静默沿用已加载的库（仅在 `debug.log` 留一行记录），三个入口均可正常解压
 - **Right-click "Extract here / Extract to folder" no longer fails to load 7z.dll** (#52) — with a configured 7z.dll path, or when the install directory differs from the default probe location, these two entries raised "Can not load 7-zip library … can not change the library path while the library … is being used" while "Smart extract here" worked; the path is now handed to the extraction library at startup and an already-loaded library is reused silently (logged once in `debug.log`), so all three entries extract normally
@@ -79,8 +172,6 @@ MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. Mantis
 - **进度窗口完成后不再「看起来没跑完」** — 多线程压缩的并行通道行**每组跑完就各自收尾**（不必等整包结束）：到 100%、底纹铺满、左区把文件名换成「通道已完成」；压缩包列表也不再只收尾第一行，整批逐行置完成，失败时标在真正出错的那一行。顺带修掉引擎每包结束时 0% 收尾帧把行百分比短暂拉回 0 的抖动
 - **Finished runs no longer look unfinished** — the per-channel rows of a multithreaded compression now finish **as soon as their own group is done** rather than all at once at the end: each reaches 100%, fills its bar and replaces the file name with "Channel done". The archive list now completes every row instead of only the first one, and marks the row that actually failed. Also fixes a flicker where the engine's trailing 0% frames briefly pulled a row's percentage back to zero
 - **Conflict prompts can no longer hang a run** — cancelling or erroring out of a conflict dialog no longer leaves the progress timer frozen; the compress-side "file could not be opened" dialog no longer deadlocks by waiting on the UI thread; and when no progress window is available the same dialog is no longer re-shown in a tight loop (extraction continues with overwrite, compression with skip). A new `conflict.log` diagnostic (on by default, paths redacted) makes any future hang immediately attributable to the conflict gate, the dialog or the pause wait
-- **多选压缩包右键解压不再为每个包各开一个窗口** — 资源管理器里多选多个压缩包右键「解压到……」（以及「原地解压」「解压到目录名」「智能原地解压」）时，此前会为每个包各开一个设置窗 / 进度窗；现在由一个窗口加载全部包，按批次处理；启动时的 splash 也按真实总数显示「正在解压 N 个压缩包…」，不再显示其中一个包的名字
-- **Multi-select extraction opens a single window** — selecting several archives in Explorer and choosing "Extract to…" (or "Extract here", "Extract to folder name", "Smart extract here") used to open one settings / progress window per archive; a single window now loads all of them and processes them as one batch, and the startup splash reports the real count ("extracting N archives…") instead of the name of one of them
 
 ## v0.5.2
 
@@ -141,7 +232,23 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 - ![帮助弹窗 Markdown 渲染效果](docs/images/version/v0.5.2/HelpDialog.png)
 
 
+**界面 / UI**
+
+- **图标统一到 Fluent 24 网格** — 界面上的 117 个图标里有 49 个是从别的图标体系带过来的（字体字形坐标系，渲染出来比旁边明显更粗更黑）或手绘杂线；现已按 **Fluent 24 Regular** 统一重画这 50 个（连同 `IconOrientation` 的语义修正：原来画成「图像裂开/禁用」样，现在是表示面板方向的双向箭头；磁力链改为链环、HTML 预览改为代码括号），其余图标不动、资源键名一个没改，界面上的引用零改动
+- **Icons unified to the Fluent 24 grid** — of the 117 UI icons, 49 came from other icon systems (font-glyph coordinates, rendering visibly bolder and darker than their neighbours) or were hand-drawn scribbles; 50 of them are now redrawn from **Fluent 24 Regular** (including a semantic fix for `IconOrientation`, which used to look like a broken/disabled image and is now a two-way arrow for panel direction, the magnet link becoming a chain link, and the HTML preview a code bracket), with the rest untouched and not a single resource key renamed, so no call site changed
+- **图标显示尺寸与前景色统一** — 图标尺寸此前 14/15/16px 混用，现在统一 16px（21 个界面文件共 109 处）；工具栏与小按钮里缺少前景色的图标现在跟随主题文字色（深色主题下不再出现看不见的黑图标），选中态仍为白色
+- **Icon sizes and foregrounds unified** — icon sizes used to mix 14/15/16 px and are now uniformly 16 px (109 sites across 21 files); icons in toolbars and small buttons that had no foreground color now follow the theme's text color (no more invisible black icons on dark themes), while the checked state stays white
+- **图标测试窗口新增尺寸矩阵页** — 「测试 → 图标测试」多了第二页：117 个图标 × 16/22/28 三档尺寸 × 浅色/深色背景块并排对照，一屏就能看出每个图标在两种主题、三种显示尺寸下是否协调
+- **Icon test window gains a size matrix page** — Test → Icon Test now has a second tab: all 117 icons × three sizes (16/22/28) × light and dark background blocks side by side, so one screen shows whether every icon holds up across both themes and all display sizes
+- **切换按钮选中态改用主题强调色** — 结果树视图的「紧凑模式」「显示筛选条件」、路径栏的四个路径标签、进度窗口底部的三个开关，选中时背景此前不变色（是浅灰底 + 白图标，浅色主题下几乎看不清）；现在统一使用主题强调色背景 + 白色图标，未选中态观感不变，浅色/深色主题都清晰
+- **Toggle buttons now show the accent color when checked** — the result tree's compact-mode and filter toggles, the four path tabs in the path bar, and the three toggles at the bottom of the progress window used to keep their neutral background when checked (light grey with a white icon, barely legible on light themes); they now use the theme's accent background with a white icon, with the unchecked look unchanged and both themes rendering clearly
+
 **修复 / Fixes**
+
+- **压缩包内删除目录现在真的会删掉** — 在压缩包里选中一个文件夹删除时，此前会静默「成功」：进度条走到 100%、状态显示「删除完成」，刷新后发现文件夹和里面的文件一个都没少。原因是列表里文件夹的路径不带结尾的 `/`、而压缩包内的条目带 `/`，逐条精确比较一条都对不上，快路径又不校验命中。现在删除按「该条目 或 该文件夹下的全部条目」匹配（结尾有没有 `/` 都行、不区分大小写，`a` 也不会误伤 `ab` 文件夹），一个都没命中时明确报「压缩包中不存在条目」而不再假装成功；只读格式（如 tar.gz）直接禁用删除入口，删除前还会先确认「其下 N 个文件（共 x MB）」；删除一完成文件列表就刷新，不用等进度窗口自动关闭的读秒走完
+- **Deleting a folder inside an archive now really deletes it** — deleting a selected folder used to silently "succeed": the progress bar reached 100% and the status line said "Delete complete", yet after refreshing the folder and every file inside were still there. The listed folder path has no trailing `/` while archive entries do, so the entry-by-entry exact comparison matched nothing, and the fast path never validated a hit. Deletion now matches "this entry or anything under that folder" (trailing `/` optional, case-insensitive, and `a` no longer touches an `ab` folder), reports "Entry not found in archive" when nothing matches instead of pretending success, disables the delete entry points for read-only formats (e.g. tar.gz), and asks for confirmation showing "the N file(s) inside it (x MB)" first; the file list now refreshes the moment the deletion finishes instead of waiting for the progress window's auto-close countdown
+- **7z 包删除不存在的条目不再白跑一遍** — 在 7z 压缩包里删除一个不存在的条目时，此前会把整个包解压到临时目录再原样重新打包（大包上白等几十秒到几分钟，还有条目属性与时间戳丢失的风险）；现在在动手之前就报错
+- **Deleting a missing entry from a 7z archive no longer rewrites the whole archive** — it used to extract the entire archive to a temp folder and repack it unchanged (tens of seconds to minutes on large archives, with a risk of losing entry attributes and timestamps); it now fails fast before doing any work
 
 - 修复**预览窗格宽度缩水** — 拖动分隔条调整预览面板尺寸后，重新打开应用时面板会缩回最小；原因是尺寸记忆只记录了固定像素值，未保存过布局时拖出的是比例（Star）尺寸而被丢弃。现同时记录像素与比例两种尺寸并持久化，恢复后比例尺寸随窗口缩放、像素尺寸保持固定
 - Fixed **the preview pane shrinking to its minimum width** — after resizing the preview panel by dragging the splitter, reopening the app collapsed it back to the minimum; the cause was that the size memory only stored fixed pixel values and discarded the proportional (Star) size produced when no layout had been saved yet. It now records and persists both pixel and proportional sizes; on restore, proportional sizes scale with the window while pixel sizes stay fixed
@@ -222,7 +329,23 @@ MantisZip-0.5.1-Setup-WebSetup.exe requires internet during installation. Mantis
 - 新增**繁体中文（zh-TW）** 语言支持
 - Added **Traditional Chinese (zh-TW)** language support
 
+**界面 / UI**
+
+- **图标统一到 Fluent 24 网格** — 界面上的 117 个图标里有 49 个是从别的图标体系带过来的（字体字形坐标系，渲染出来比旁边明显更粗更黑）或手绘杂线；现已按 **Fluent 24 Regular** 统一重画这 50 个（连同 `IconOrientation` 的语义修正：原来画成「图像裂开/禁用」样，现在是表示面板方向的双向箭头；磁力链改为链环、HTML 预览改为代码括号），其余图标不动、资源键名一个没改，界面上的引用零改动
+- **Icons unified to the Fluent 24 grid** — of the 117 UI icons, 49 came from other icon systems (font-glyph coordinates, rendering visibly bolder and darker than their neighbours) or were hand-drawn scribbles; 50 of them are now redrawn from **Fluent 24 Regular** (including a semantic fix for `IconOrientation`, which used to look like a broken/disabled image and is now a two-way arrow for panel direction, the magnet link becoming a chain link, and the HTML preview a code bracket), with the rest untouched and not a single resource key renamed, so no call site changed
+- **图标显示尺寸与前景色统一** — 图标尺寸此前 14/15/16px 混用，现在统一 16px（21 个界面文件共 109 处）；工具栏与小按钮里缺少前景色的图标现在跟随主题文字色（深色主题下不再出现看不见的黑图标），选中态仍为白色
+- **Icon sizes and foregrounds unified** — icon sizes used to mix 14/15/16 px and are now uniformly 16 px (109 sites across 21 files); icons in toolbars and small buttons that had no foreground color now follow the theme's text color (no more invisible black icons on dark themes), while the checked state stays white
+- **图标测试窗口新增尺寸矩阵页** — 「测试 → 图标测试」多了第二页：117 个图标 × 16/22/28 三档尺寸 × 浅色/深色背景块并排对照，一屏就能看出每个图标在两种主题、三种显示尺寸下是否协调
+- **Icon test window gains a size matrix page** — Test → Icon Test now has a second tab: all 117 icons × three sizes (16/22/28) × light and dark background blocks side by side, so one screen shows whether every icon holds up across both themes and all display sizes
+- **切换按钮选中态改用主题强调色** — 结果树视图的「紧凑模式」「显示筛选条件」、路径栏的四个路径标签、进度窗口底部的三个开关，选中时背景此前不变色（是浅灰底 + 白图标，浅色主题下几乎看不清）；现在统一使用主题强调色背景 + 白色图标，未选中态观感不变，浅色/深色主题都清晰
+- **Toggle buttons now show the accent color when checked** — the result tree's compact-mode and filter toggles, the four path tabs in the path bar, and the three toggles at the bottom of the progress window used to keep their neutral background when checked (light grey with a white icon, barely legible on light themes); they now use the theme's accent background with a white icon, with the unchecked look unchanged and both themes rendering clearly
+
 **修复 / Fixes**
+
+- **压缩包内删除目录现在真的会删掉** — 在压缩包里选中一个文件夹删除时，此前会静默「成功」：进度条走到 100%、状态显示「删除完成」，刷新后发现文件夹和里面的文件一个都没少。原因是列表里文件夹的路径不带结尾的 `/`、而压缩包内的条目带 `/`，逐条精确比较一条都对不上，快路径又不校验命中。现在删除按「该条目 或 该文件夹下的全部条目」匹配（结尾有没有 `/` 都行、不区分大小写，`a` 也不会误伤 `ab` 文件夹），一个都没命中时明确报「压缩包中不存在条目」而不再假装成功；只读格式（如 tar.gz）直接禁用删除入口，删除前还会先确认「其下 N 个文件（共 x MB）」；删除一完成文件列表就刷新，不用等进度窗口自动关闭的读秒走完
+- **Deleting a folder inside an archive now really deletes it** — deleting a selected folder used to silently "succeed": the progress bar reached 100% and the status line said "Delete complete", yet after refreshing the folder and every file inside were still there. The listed folder path has no trailing `/` while archive entries do, so the entry-by-entry exact comparison matched nothing, and the fast path never validated a hit. Deletion now matches "this entry or anything under that folder" (trailing `/` optional, case-insensitive, and `a` no longer touches an `ab` folder), reports "Entry not found in archive" when nothing matches instead of pretending success, disables the delete entry points for read-only formats (e.g. tar.gz), and asks for confirmation showing "the N file(s) inside it (x MB)" first; the file list now refreshes the moment the deletion finishes instead of waiting for the progress window's auto-close countdown
+- **7z 包删除不存在的条目不再白跑一遍** — 在 7z 压缩包里删除一个不存在的条目时，此前会把整个包解压到临时目录再原样重新打包（大包上白等几十秒到几分钟，还有条目属性与时间戳丢失的风险）；现在在动手之前就报错
+- **Deleting a missing entry from a 7z archive no longer rewrites the whole archive** — it used to extract the entire archive to a temp folder and repack it unchanged (tens of seconds to minutes on large archives, with a risk of losing entry attributes and timestamps); it now fails fast before doing any work
 
 - 修复**拖拽添加中文文件到压缩包后文件名乱码** — 底层 ZIP 重写器写入 UTF-8 文件名时未置 UTF-8 标志（bit 11），违反 ZIP 规范（APPNOTE 6.4.4），导致 7-Zip / WinRAR / 资源管理器 / unzip 等外部工具按 CP437 解码显示乱码。因应用内读取有编码回退启发式兜底，故仅在外部工具中显现
 - Fixed **garbled file names when drag-and-dropping Chinese-named files into an archive** — the ZIP rewriter wrote UTF-8 file names without the UTF-8 flag (bit 11), violating the ZIP spec (APPNOTE 6.4.4), so external tools (7-Zip / WinRAR / Explorer / unzip) decoded them as CP437 and showed mojibake. The bug stayed invisible inside the app because its reader falls back with an encoding heuristic

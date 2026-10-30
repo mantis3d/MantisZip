@@ -60,7 +60,7 @@
 `-Task check` = `version` + `i18n` + `guards`，纯文件校验，不构建。JSON 形状是
 `{ ok, checks: [ { task, result: {…} } ] }` —— 每项结果是完整对象，不平铺（避免与 `task` 字段抢名字）。
 
-## 4. 四条规则守卫（`-Task guards`）
+## 4. 八条规则守卫（`-Task guards`）
 
 把 AGENTS.md 里本可机器校验的人工自查变成门禁：
 
@@ -70,12 +70,21 @@
 | i18n-bindings | 13 | XAML `LocalizedStrings[Key]` 的 key 必须登记在 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组，且该 key 必须存在于三语 JSON（**双向**） |
 | filepicker | 16 | `OpenFilePickerAsync` / `SaveFilePickerAsync` / `OpenFolderPickerAsync` 只允许命中 `CustomFilePickerDialog.SystemBrowse_Click` |
 | icons | 8 | `AppIcons.axaml` 的 `x:Key` 必须在 `IconTestViewModel.LoadAllIcons()` 有对应 `Add()` |
+| dialog-seam | 20 | ① `new (Compress\|Extract)SettingsWindow(` 的文件与处数必须与 `$DIALOG_SEAM_REGISTRY` 一致（**正反双向**：没登记即失败，登记了却找不到也失败）② 非注释行出现 `CloseAction` / `DialogResult` 即失败 ③ `new (Compress\|Extract)Request` 只允许在 `src/MantisZip.UI.Avalonia/Services/`、`App.CliCompress.cs`、`App.CliExtract.cs` ④ 两个设置窗口构造函数必须含 `ICompressSession` / `IExtractSession` 形参 |
+| numericbinding | 22 | 扫全部 `.axaml`：`TextBox` 的 `Text` 绑到数字型属性却没挂 `behaviors:NumericInput.Enabled="True"`（且非只读、无 `Converter`、非禁用）即失败；整数型 `NumericUpDown` 绑 `int/long/short/byte` 却缺 `Classes="intOnly"` 也失败。**事故**：2026-10-28 设置窗口 7 处 `TextBox` 直绑 `int` → 敲字母渲染红色转换异常文本；2026-10-12 同类事故是 `NumericUpDown` 能输入小数 |
+| jsonoptions | 23 | `src/` 下（不含 `tests/`）单参数 `JsonSerializer.Deserialize<T>(json)` 即失败 —— 默认 options 区分大小写，键名不匹配时**反序列化「成功」但字段全空**。**事故**：2026-10-28 语言页「翻译贡献者」恒为空（`languages.json` 小写键） |
+| settingswiring | 23 | `AppSettings` 每个 public 属性必须在 `src/` 里有运行时消费者（排除设置窗口 VM 自身的读写、允许自身文件内的迁移逻辑）；否则视为**死开关**。豁免表 `$SETTINGS_WIRING_EXEMPT` 每项带原因并**双向核对**（属性删了/接上了都必须从表里删行）。**事故**：`CloseAfterCompress` 从 v0.2.0 存到 2026-10-28，全仓没人读 |
 
 **已知覆盖边界**（别误以为全查了）：
 
 - filepicker 守卫只认上述 3 个 API，规则 16 还禁 `FilePickerFileType` / `IStorageFile` / `TryGetLocalPath()`，这些目前靠人工评审。
 - i18n-bindings 只比 `MainWindowViewModel` 的字典（它不是全量加载 JSON），各对话框/面板自持字典的 key 不在范围内。
+- dialog-seam 是**文本级**检查：注释按行首 `//` 或 ` *` 放行（追述历史写法可以，真用不行）；`CloseAction` 出现在字符串字面量里会被判失败；它查不出「确认了但载荷少一个字段」这种语义缺口（那要靠载荷测试，见 `ExtractSettingsSeamTests`）。
+- dialog-seam 的白名单把 CLI 直通路径（`--compress-quick/-separate/-combined`）算作合法请求构造点：那三条**没有确认对话框**，本来就该直接驱动执行器；改它们时要同步改 `$DIALOG_SEAM_REQUEST_ALLOWED` 与 AGENTS.md 规则 20。
 - guards 是文本级扫描，**跨文件重命名、条件编译、多行拼接**都可能漏。
+- numericbinding 靠「属性名在 UI 项目里声明为数字类型」推断：属性名重名（不同 VM 各有一个 `Size`）时会按最后一个声明算；`TextBox` 绑的是 `string` 而 VM 内部再 parse 的写法它看不见（那类写法本身也该改）。
+- jsonoptions 只查单参数形态；`JsonSerializer.Deserialize(json, new JsonSerializerOptions())` 这种「显式传了个默认 options」它抓不到（靠评审：要传 `JsonDefaults.CaseInsensitive`）。
+- settingswiring 的「消费者」是文本出现次数：只要属性名在别的文件里出现过就算接上，所以「读了但读了不用」查不出来；豁免表 `$SETTINGS_WIRING_EXEMPT` 是唯一的人工闸口，新增豁免必须在 reason 里写清原因并同步 `docs/KNOWN_ISSUES.md`。
 
 ## 5. CI 门禁（`.github/workflows/ci.yml`，共 7 步）
 
@@ -86,12 +95,46 @@
 |------|--------|
 | `-Task version` | 版本号 6 处漂移（AppConstants / csproj / PLAN / PROGRESS / 两个 .iss） |
 | `-Task i18n` | 三语 key 缺失/多余/占位符不一致/重复 key |
-| `-Task guards` | 上面四条规则 |
+| `-Task guards` | 上面八条规则 |
 | `dotnet restore -p:WarningsAsErrors=NU1901%3B…` | 已知漏洞依赖（`Directory.Build.props` 开 `NuGetAuditMode=all`，本地只告警） |
 | `dotnet format … analyzers --verify-no-changes --severity warn --include src\…` | 产品代码分析器告警（**只圈 `src/`**，tests 存量 xUnit 告警另议） |
 | `dotnet build --no-restore -c Release` + `dotnet test …` | 真正编译与用例 |
 
 **已知缺口**：test 带 `--filter "FullyQualifiedName!~SevenZipEngine"`，29 条 7z 用例在 CI 里永不运行（CI 没装 7-Zip）。要补的话：加 choco/7-Zip 安装步骤再删过滤器。
+
+### 5.1 CI 红了怎么判（2026-10-27 定）
+
+**先看栈，再决定「改代码」还是「重跑」。** 拉失败作业日志：
+
+```powershell
+# PAT 在 GCM 凭据里（注意必须带 username，`git credential fill` 不带时返回空）
+$cred = ("protocol=https`nhost=github.com`nusername=mantis3d`n`n" | git credential-manager get)
+$env:GH_TOKEN = (($cred | Select-String '^password=') -replace '^password=','')
+$env:LocalAppData = 'F:\Github\MantisZip\.buildout\ghcache'   # 必须：否则 gh 写 run-log 缓存目录被拒
+gh run list --repo mantis3d/MantisZip --branch alpha --limit 5
+gh run view <run-id> --repo mantis3d/MantisZip --log-failed *> .buildout\logs\ci.log
+Get-Content .buildout\logs\ci.log | Select-String '  Failed MantisZip|Test Run Failed|Total tests:'
+```
+
+日志行前缀是 `build` + `UNKNOWN STEP` + ISO 时间戳，用 `-replace '^build\tUNKNOWN STEP\t\S+Z '` 剥掉即成人话。作业页详情与 annotations **不含**用例名（只有构建告警），必须走上面这条日志路径。
+
+> 顺带（本沙箱专属，非仓库问题）：`git push` 会因 GCM 的 prompt 脚本起 `sh.exe` 失败而崩成 `couldn't create signal pipe, Win32 error 5` → `fatal: could not read Username for 'https://github.com'`。绕过写法：取到 PAT 后用一次性 header 推 ——
+> `git -c "http.https://github.com/.extraheader=AUTHORIZATION: basic <base64('x-access-token:'+PAT)>" push origin <branch>`（base64 由 `[Convert]::ToBase64String` 现算，PAT 不落盘、不写进仓库配置）。
+
+已知三类失败，判据不同，处置也不同：
+
+| 类型 | 判据 | 处置 |
+|------|------|------|
+| **A. 用例顺序依赖（已根治，防复发）** | 断言失败，`Actual` 里出现 `'gbk' is not a supported encoding name` | 结构上已不可能复发：`ZipEngine` 静态构造器自注册 GBK（`src/MantisZip.Core/Engines/ZipEngine.Open.cs` 类顶部）+ 两个测试程序集各一个 `TestAssemblySetup.cs`（`[ModuleInitializer]`）。**新增任何走 `Encoding.GetEncoding("gbk"/936)` 的 Core 路径，要么复用已注册的类，要么在该类静态构造器里注册**，不要再依赖「谁先跑谁注册」 |
+| **B. Avalonia 无头测试竞态（上游缺陷，决定「不动」）** | `[Test Case Cleanup Failure]` + `InvalidOperationException: The calling thread cannot access this object`，栈在 `AvaloniaHeadlessPlatform.Initialize → AppBuilder.SetupUnsafe → HeadlessUnitTestSession.EnsureIsolatedApplication` | **重跑**：`gh run rerun <run-id> --failed`（不要用空提交触发重跑，会污染提交历史）。受害用例是随机的（2026-10-26 挑中 `ResultTreeViewFilterTests.TogglingCompactMode_KeepsFilterApplied`），别顺着用例名去改被测代码 |
+| **C. 取消类用例靠墙钟竞速（已根治，防复发）** | 断言失败，`Assert.ThrowsAny() Failure: No exception was thrown`，且被测用例里用 `CancelAfter(<毫秒>)` 或 `Thread.Sleep` 来制造「取消 / 超时」 | 已改成事件驱动（`tests/MantisZip.Tests/Engines/ParallelExtractTests.cs`：等首个条目 `Completed` 再取消，另加一条「token 预先 Cancel」兜底）。**新增取消类用例不要用 `CancelAfter` / `Sleep` 抢时间窗**：Windows 定时器精度约 15 ms，快机器上任务可能先跑完再收到取消请求；触发点必须由被测代码的执行进度决定 |
+
+- B 的上游：`AvaloniaUI/Avalonia#22021`（session 重建期 `s_uiThread` 认领竞态，仍 open）、`#21467`（testhost 死锁）。本仓库 `tests/MantisZip.UI.Avalonia.Tests/TestParallelization.cs` 已有 `DisableTestParallelization = true` 仍会触发，测试内也无自有后台线程 —— 属 session 重建内部竞态。
+- **重跑后还红在同一处**（尤其是断言失败）→ 才当回归查。
+- **一次红里挂多条**、其中一条是 B 的栈 → 整批可能是连带污染，先整批重跑，别逐条查。
+- **频率基线**：2026-10 约 5 次 run 出现 1 次。若变成每 2~3 次必红，改走 ② 等上游补丁后升级 Avalonia（`Avalonia.Headless.XUnit` 须与 UI 项目主版本一致），或 ③ 评估 `AvaloniaTestIsolationLevel.PerAssembly`（整程序集共用一个 `Application`，会漏状态、有假绿风险，需单独评审）。
+- **新增 UI 测试不要扩大 B 的窗口**：`Task.Run` / `async void` / `DispatcherTimer` / `ConfigureAwait(false)` / 从后台线程碰 `Dispatcher.UIThread`，都会让竞态更容易命中。
+- **发版前必须真绿**：`main` / `alpha` 都没有分支保护（无 required status checks），红 CI 拦不住 push 也拦不住打 tag —— 「红着发版」全靠自觉，发版前确认目标 commit 结论为 success。
 
 ## 6. DSH 插件（`tools/dsh-plugin-mantiszip/`）
 
@@ -117,6 +160,7 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 3. **`target` 字段显式传参（`-TargetName`）**：旧实现靠 PowerShell 动态作用域捕获脚本级 `$Target`，函数一挪或加同名 `param` 就静默变空串。
 4. **MTP 兜底不追加任何 dotnet/MSBuild 参数**：`dotnet exec <assembly>` 之后的参数交给测试程序集自己解析，`-nologo` / `-c Release` 会被 xunit 当未知选项。
 5. **兜底的触发条件必须三条同时成立**：失败 + 0 条编译诊断 + 输出里没有 `Passed!`/`Failed!`/`Total: N` 汇总行。少任何一条都会掩盖真实失败（编译错误或用例失败不触发）。
+6. **主题资源里的 `Thickness` / `CornerRadius` 必须声明成对应类型，不能图省事写成 `<sys:Double>`**：`ThemeLight.axaml` / `ThemeDark.axaml` 里 `DialogPadding`、`BorderRadius` 都曾声明为 `sys:Double`，生产环境只因 `App.Theming.ApplyCompactness()` 启动时用 `Resources["DialogPadding"] = new Thickness(...)`、`Resources["BorderRadius"] = new CornerRadius(...)` 覆盖同键才没炸。任何在 `ApplyCompactness()` **之前**用这两个键的地方（典型是无头测试手工并入主题字典）会直接抛 `InvalidCastException: Unable to cast object of type 'System.Double' to type 'Avalonia.Thickness'`。同理 `SpacingXxsThk`…`SpacingXlThk` 六个变体必须真的以 `<Thickness>` 存在于静态字典（运行时注入只覆盖启动之后）。
 
 ## 8. 环境坑（跨机器复现过的）
 
@@ -129,6 +173,9 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 | node 子进程 `spawn EPERM` | 沙箱禁止具名管道；同样只在受限沙箱里出现 |
 | git 报 `LF will be replaced by CRLF` | 仓库统一 CRLF：索引 LF / 工作区 CRLF（`.gitattributes` + `.editorconfig`）。新增二进制记得加进 `.gitattributes` 的 `binary` 组 |
 | 三份 `strings.*.json` 带 BOM | 与 `.editorconfig` 的 `[*.json] charset = utf-8-bom` 一致，**不要**改成无 BOM（规则 13 已在 2026-10-22 改为「UTF-8 with BOM」，此前写的「无 BOM」是过期表述） |
+| 改了 `installer*.iss` 本机却没法验证 | 本机没有 ISCC（Inno Setup 编译器），`ci.yml` 也**不编译**安装包——只有 `release.yml` 打 tag 时才 `choco install innosetup` 后编译。所以 `.iss` 的语法/API 错误只能等首次发版暴露；改完至少要人工核对结构（`[Code]` 的 `begin`/`end` 计数、`[CustomMessages]` 中英成对、两个脚本的 AppId 保持一致），必要时在 beta 上推一个测试 tag 验证 |
+| 测试里写 `Avalonia.Themes.Fluent.FluentTheme` 报 `CS0234: 命名空间"MantisZip.UI.Avalonia"中不存在类型或命名空间名"Themes"` | 命名空间遮蔽：测试命名空间是 `MantisZip.UI.Avalonia.Tests`，简单名 `Avalonia` 会先解析成 `MantisZip.UI.Avalonia`。新增 `using` 必须写成 `global::Avalonia.Themes.Fluent;`（`Avalonia.Controls.Documents.Run` 同理） |
+| 无头测试里改 `TabControl.SelectedIndex` 后拿到的控件 `Bounds` 全是 0 | 页签内容控件在下一轮布局/调度才生成并排布：要循环 `Measure` → `Arrange` → `UpdateLayout()` → `Dispatcher.UIThread.RunJobs()` 数轮。另外被隐藏的分区（`IsEffectivelyVisible == false`，例如「还没有检查结果」时的详情块）里的按钮 `Bounds` 恒为 0，几何断言必须按**有效可见性**过滤，不能用 `IsVisible` |
 
 ## 9. 还没做的（有意留白，不是忘了）
 
@@ -148,3 +195,4 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 | [.github/workflows/ci.yml](../.github/workflows/ci.yml) | CI 门禁 |
 | [.editorconfig](../.editorconfig) / [.gitattributes](../.gitattributes) / [Directory.Build.props](../Directory.Build.props) | 风格基线 / 行尾 / NuGet 审计 |
 | [progress-avalonia-detail.md](progress-avalonia-detail.md) | 逐日变更与当时的排障记录（找「为什么」的第二落点） |
+| [KNOWN_ISSUES.md](KNOWN_ISSUES.md) | 已知未修问题登记簿（规则 21）：等上游 / 等计划 / 缺决策的条目与复评条件；发版前扫一遍 |

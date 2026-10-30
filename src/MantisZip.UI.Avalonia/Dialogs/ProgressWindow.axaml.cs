@@ -1,5 +1,6 @@
 using System;
 using System.Collections.ObjectModel;
+using System.ComponentModel;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -43,6 +44,13 @@ public partial class ProgressWindow : Window
     private readonly DispatcherTimer _elapsedTimer = new() { Interval = TimeSpan.FromSeconds(1) };
 
     /// <summary>
+    /// 钉住态等待的心跳复查间隔（毫秒）。
+    /// 为什么需要：关闭 / 解钉事件可能在订阅之前就已经发过（见 <see cref="WaitForManualCloseAsync"/>），
+    /// 只等事件会永久挂住；定时复查 IsVisible 与 KeepOpenOnComplete 才能兜住丢失的唤醒。
+    /// </summary>
+    private const int ManualWaitHeartbeatMs = 250;
+
+    /// <summary>
     /// 当前可见的进度窗口；无则为 null。
     /// 冲突对话框点击"暂停"时由 ExtractFlow/CompressFlow 通过此属性找到进度窗口，
     /// 调用 <see cref="PauseFromConflict"/> 进入暂停态（对齐 WPF App.xaml.cs ConflictResolver）。
@@ -60,6 +68,10 @@ public partial class ProgressWindow : Window
         var displaySettings = AppSettings.Load();
         _vm.ContentMode = ProgressDisplayModeParser.ParseContentMode(displaySettings.ProgressContentMode);
         _vm.InfoDensity = ProgressDisplayModeParser.ParseDensity(displaySettings.ProgressInfoDensity);
+
+        // 图钉初始状态（设置 → 外观 → 进度窗口 →「默认钉住」）。
+        // 这里只写初始值：失败 / 测试流 / 批处理行失败的自动压钉在 VM 内单向生效，不受本项影响。
+        _vm.KeepOpenOnComplete = displaySettings.ProgressPinByDefault;
 
         // 应用上次持久化的窗口宽度（非法值回落 XAML 默认 800；XAML MinWidth=500 兜底）
         var savedWidth = displaySettings.ProgressWindowWidth;
@@ -183,6 +195,16 @@ public partial class ProgressWindow : Window
     /// <summary>「完成后打开目录」开关当前值（消费点在窗口关闭后回读，spec §11.3）。</summary>
     public bool OpenFolderAfterExtractValue => _vm.OpenFolderAfterExtract;
 
+    /// <summary>
+    /// 声明「压缩完成后打开目录」开关（能力位 + 初值）；须在 Show 前调用。
+    /// 宿主没有打开目录的能力（CLI / 测试流程）时不调用 → 开关隐藏。
+    /// </summary>
+    public void SetCompressPostActions(bool openFolder, bool? openFolderSeed = null)
+        => _vm.SetCompressPostActions(openFolder, openFolderSeed);
+
+    /// <summary>「压缩完成后打开目录」开关当前值（压缩会话在收尾时回读）。</summary>
+    public bool OpenFolderAfterCompressValue => _vm.OpenFolderAfterExtract;
+
     /// <summary>「完成后删原包」开关当前值（同上）。</summary>
     public bool DeleteArchiveAfterExtractValue => _vm.DeleteArchiveAfterExtract;
 
@@ -260,64 +282,95 @@ public partial class ProgressWindow : Window
         if (!string.IsNullOrEmpty(message)) _vm.StatusMessage = message;
     }
 
+    /// <summary>
+    /// 设置操作说明行（状态行下方一行小字，如「正在删除 3 个文件（共 1.2 MB）」）。
+    /// 供整包重写类操作（删除）交代真实影响面；null/空 = 整行隐藏。
+    /// </summary>
+    public void SetOperationNote(string? text)
+    {
+        _vm.SetOperationNote(text);
+    }
+
     // ════════════════════════════════════════════
     //  Auto-close / Manual Close
     // ════════════════════════════════════════════
 
     /// <summary>
     /// After completion, wait for auto-close or manual close.
-    /// If KeepOpenOnComplete is set during countdown, switches to manual wait.
+    /// 两种等待态可互相切换：📌 钉住（等手动关）⇄ 倒计时（到点自动关）。
+    /// 状态由 KeepOpenOnComplete 驱动，因此两处等待都必须可被打断——否则「手动等待中解钉」会一直干等，
+    /// 按钮状态与实际行为脱节（D11）。
     /// 延迟秒数来自设置 AppSettings.AutoCloseDelaySeconds（Task 6：统一关窗职责，调用方不再传魔法数字）。
     /// Task 10：延时等待期间在按钮行显示倒计时，支持行内临时修改（实例级，不回写设置）。
     /// </summary>
     public async Task AutoCloseOrWaitAsync(Action closeAction)
     {
-        if (_vm.KeepOpenOnComplete)
+        while (true)
         {
-            await WaitForManualCloseAsync();
-            closeAction();
-            return;
-        }
-
-        // 倒计时初值已在 OnOpened 初始化（窗口打开即显示、可提前编辑，此处不再重置）
-        if (_countdownRemainingMs <= 0)
-        {
-            closeAction();
-            return;
-        }
-
-        _vm.AutoCloseCountdownVisible = true;
-        try
-        {
-            int lastShownSecs = -1;
-            while (_countdownRemainingMs > 0)
+            // ① 钉住态：无限期等手动关闭；期间解钉 → 回到倒计时（用剩余毫秒继续，不重置为全值）
+            if (_vm.KeepOpenOnComplete)
             {
-                await Task.Delay(100);
-                // D11：倒计时中按下 📌 → 立即转手动等待（按钮状态 = 实际行为）
-                if (_vm.KeepOpenOnComplete)
+                if (await WaitForManualCloseAsync() == ManualWaitExit.Closed)
                 {
-                    await WaitForManualCloseAsync();
                     closeAction();
                     return;
                 }
-                // §10.4：行内编辑期间时间冻结（不回写文本，避免覆盖用户输入）
-                if (_countdownEditing)
-                    continue;
+                continue;
+            }
 
-                _countdownRemainingMs -= 100;
-                int secs = (_countdownRemainingMs + 999) / 1000;   // 向上取整 → 首显满值
-                if (secs != lastShownSecs)
+            // 倒计时初值已在 OnOpened 初始化（窗口打开即显示、可提前编辑，此处不再重置）
+            if (_countdownRemainingMs <= 0)
+            {
+                closeAction();
+                return;
+            }
+
+            // ② 倒计时态：到点关窗；期间压钉 → 回到手动等待
+            _vm.AutoCloseCountdownVisible = true;
+            var pinnedDuringCountdown = false;
+            try
+            {
+                int lastShownSecs = -1;
+                while (_countdownRemainingMs > 0)
                 {
-                    lastShownSecs = secs;
-                    UpdateCountdownText(secs);
+                    await Task.Delay(100);
+                    // D11：倒计时中按下 📌 → 立即转手动等待（按钮状态 = 实际行为）
+                    if (_vm.KeepOpenOnComplete)
+                    {
+                        pinnedDuringCountdown = true;
+                        break;
+                    }
+                    // §10.4：行内编辑期间时间冻结（不回写文本，避免覆盖用户输入）
+                    if (_countdownEditing)
+                        continue;
+
+                    _countdownRemainingMs -= 100;
+                    int secs = (_countdownRemainingMs + 999) / 1000;   // 向上取整 → 首显满值
+                    if (secs != lastShownSecs)
+                    {
+                        lastShownSecs = secs;
+                        UpdateCountdownText(secs);
+                    }
                 }
             }
-            closeAction();
+            finally
+            {
+                _vm.AutoCloseCountdownVisible = false;
+            }
+
+            if (!pinnedDuringCountdown)
+            {
+                closeAction();
+                return;
+            }
         }
-        finally
-        {
-            _vm.AutoCloseCountdownVisible = false;
-        }
+    }
+
+    /// <summary>手动等待的结束原因：窗口被关闭 / 用户解钉（应回到倒计时）。</summary>
+    private enum ManualWaitExit
+    {
+        Closed,
+        Unpinned,
     }
 
     /// <summary>倒计时编辑态（仅 UI 线程访问）：编辑期间冻结倒数与文本回写（§10.4）。</summary>
@@ -378,24 +431,65 @@ public partial class ProgressWindow : Window
     }
 
     /// <summary>
-    /// Wait for the user to manually close the window.
+    /// 钉住态下的等待：窗口被关闭 或 用户解钉（📌 取消）都会立刻返回。
+    /// 旧实现只等 Closed，导致「手动等待中解钉」不会恢复倒计时（D11：按钮状态 ≠ 实际行为）。
+    ///
+    /// 2026-10-29 修（issue #66「新建压缩包按钮用一次就永久灰」排查）：
+    /// 旧实现是「先查 <see cref="Window.IsVisible"/> → 再订阅 Closed → 阻塞等信号量」，
+    /// 三步之间若窗口已被关闭 / 已被解钉，事件早就发过了，后订阅的我们永远等不到 ——
+    /// 于是 <c>gate.Wait()</c> 永久阻塞，调用链（进度呈现器 → 会话 → 命令）永不返回，
+    /// 用户看到的就是按钮永久灰化、只能重启。
+    /// 现在改成：**先订阅、再复查**，并加 250ms 心跳兜底（事件丢失 / 宿主直接收起窗口都能发现）；
+    /// 同时不再用 <c>Task.Run + ManualResetEventSlim</c> 阻塞线程池线程。
     /// </summary>
-    private async Task WaitForManualCloseAsync()
+    private async Task<ManualWaitExit> WaitForManualCloseAsync()
     {
-        if (!IsVisible)
-            return;
+        var exit = new TaskCompletionSource<ManualWaitExit>(TaskCreationOptions.RunContinuationsAsynchronously);
+        EventHandler onClosed = (_, _) => exit.TrySetResult(ManualWaitExit.Closed);
+        void onVmPropertyChanged(object? sender, PropertyChangedEventArgs e)
+        {
+            if (e.PropertyName == nameof(ProgressViewModel.KeepOpenOnComplete) && !_vm.KeepOpenOnComplete)
+                exit.TrySetResult(ManualWaitExit.Unpinned);
+        }
 
-        var closed = new ManualResetEventSlim(false);
-        EventHandler handler = null!;
-        handler = (_, _) => { closed.Set(); Closed -= handler; };
-        Closed += handler;
+        // 顺序不能反：先订阅、再复查。旧实现先复查后订阅，中间的空档会丢事件。
+        Closed += onClosed;
+        _vm.PropertyChanged += onVmPropertyChanged;
         try
         {
-            await Task.Run(() => closed.Wait());
+            if (!IsVisible)
+                return ManualWaitExit.Closed;
+            if (!_vm.KeepOpenOnComplete)
+                return ManualWaitExit.Unpinned;
+
+            LifetimeDiagnostics.Log($"progress-wait-manual begin title='{Title}'");
+            while (true)
+            {
+                var finished = await Task.WhenAny(exit.Task, Task.Delay(ManualWaitHeartbeatMs));
+                if (ReferenceEquals(finished, exit.Task))
+                {
+                    var reason = await exit.Task;
+                    LifetimeDiagnostics.Log($"progress-wait-manual exit reason={reason} title='{Title}'");
+                    return reason;
+                }
+
+                // 心跳复查：兜住「事件已在订阅前发生」与「窗口被宿主收起但没走 Closed」两种情况。
+                if (!IsVisible)
+                {
+                    LifetimeDiagnostics.Log($"progress-wait-manual exit reason=invisible title='{Title}'");
+                    return ManualWaitExit.Closed;
+                }
+                if (!_vm.KeepOpenOnComplete)
+                {
+                    LifetimeDiagnostics.Log($"progress-wait-manual exit reason=unpinned-heartbeat title='{Title}'");
+                    return ManualWaitExit.Unpinned;
+                }
+            }
         }
         finally
         {
-            Closed -= handler;
+            Closed -= onClosed;
+            _vm.PropertyChanged -= onVmPropertyChanged;
         }
     }
 

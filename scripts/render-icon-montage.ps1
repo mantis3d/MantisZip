@@ -7,14 +7,14 @@
     全部 UI 图标都通过资源键（{StaticResource IconXxx}）引用，因此只要这一个文件统一，
     全仓 220+ 处 PathIcon 自动跟着统一。
 
-    脚本按**坐标网格**把图标分成三族，直接标出"混进来的非同族图标"：
+    脚本按**渲染包围盒**把图标分成三族，直接标出"混进来的非同族图标"：
 
-        A = 24 网格（Fluent 系）—— 最大坐标 ≤26 且带大量高精度小数。这是期望值。
-        B = 字体字形（1000/2048 em）—— 最大坐标 >26，典型值 876/976。
+        A = 包围盒落在 24 网格内（Fluent 24 Regular 期望值）。
+        B = 包围盒超出 24 网格 ⇒ 别的坐标系（图标字体字形按 1000/2048 em 设计，坐标能到 800+）。
             这类图标是从图标字体里抠出来的字形，笔画比 A 粗，混排时明显"更黑更大"。
-        C = 手绘/低精度 —— 最大坐标 ≤26 但几乎没有小数位，通常是手工简化或从截图描的。
+        C = 解析失败 / 空路径 —— 路径数据写错，渲染时会静默消失。
 
-    判据是启发式的，只用来快速定位候选，最终是否"同族"仍要人眼看图。
+    判据是启发式的，只用来快速定位候选，最终是否"同族"仍要人眼看图（`-Check` 只保证"没混进别的坐标系"和"没有解析错误"）。
 
 .PARAMETER OutputPath
     输出 PNG 路径。默认写到系统临时目录 mantiszip-icon-montage.png（不污染仓库）。
@@ -70,20 +70,37 @@ if (-not (Test-Path $iconFile)) {
 }
 
 # ── 解析图标集合 + 网格分族 ─────────────────────────────────────────────────
+# 判据用「实际渲染包围盒」而不是「路径字符串里最大的数字」：
+#   A = 包围盒落在 24 网格内（Fluent 24 Regular 期望值）
+#   B = 包围盒超出 24 网格 ⇒ 别的坐标系（图标字体字形按 1000/2048 em 设计，坐标能到 800+）
+#   C = 解析失败 / 空路径
+# 为什么不看「字符串里的最大数字」：圆弧半径、`A59 59` 这种上游数据会让朴素取最大值误判，
+# 而 `.59.59` 这类连写小数还会被数字正则拼成 59；包围盒是渲染时真正生效的几何量。
+Add-Type -AssemblyName PresentationCore
+
 $entries = foreach ($line in (Select-String -Path $iconFile -Pattern 'x:Key="(Icon[^"]+)"')) {
     $key = [regex]::Match($line.Line, 'x:Key="(Icon[^"]+)"').Groups[1].Value
     $data = [regex]::Match($line.Line, '>([^<]*)</Geometry>').Groups[1].Value
     if (-not $data) { continue }
 
-    $numbers = [regex]::Matches($data, '-?\d+(\.\d+)?') | ForEach-Object { [double]$_.Value }
-    $maxCoord = if ($numbers.Count) { ($numbers | Measure-Object -Maximum).Maximum } else { 0 }
-    $longDecimals = ([regex]::Matches($data, '\.\d{3,}')).Count
+    $group = 'C'
+    $boundsText = 'parse-error'
+    try {
+        $bounds = [System.Windows.Media.Geometry]::Parse($data).Bounds
+        if (-not $bounds.IsEmpty -and $bounds.Width -gt 0 -and $bounds.Height -gt 0) {
+            $boundsText = '{0:N1},{1:N1}-{2:N1},{3:N1}' -f $bounds.Left, $bounds.Top, $bounds.Right, $bounds.Bottom
+            $outOfGrid = $bounds.Right -gt 26 -or $bounds.Bottom -gt 26 -or $bounds.Left -lt -2 -or $bounds.Top -lt -2
+            $group = if ($outOfGrid) { 'B' } else { 'A' }
+        }
+    } catch {
+        $group = 'C'
+    }
 
     [pscustomobject]@{
-        Key   = $key
-        Data  = $data
-        Max   = [math]::Round($maxCoord, 1)
-        Group = if ($maxCoord -le 26 -and $longDecimals -ge 3) { 'A' } elseif ($maxCoord -gt 26) { 'B' } else { 'C' }
+        Key    = $key
+        Data   = $data
+        Bounds = $boundsText
+        Group  = $group
     }
 }
 
@@ -99,28 +116,28 @@ $groupC = @($entries | Where-Object Group -eq 'C')
 Write-Host ''
 Write-Host "图标总数：$($entries.Count)" -ForegroundColor Cyan
 Write-Host ("  A 24 网格（Fluent 系，期望值）: {0,3}" -f $groupA.Count) -ForegroundColor Green
-Write-Host ("  B 字体字形（笔画偏粗）       : {0,3}" -f $groupB.Count) -ForegroundColor DarkYellow
-Write-Host ("  C 手绘/低精度               : {0,3}" -f $groupC.Count) -ForegroundColor Red
+Write-Host ("  B 别的坐标系（越界）         : {0,3}" -f $groupB.Count) -ForegroundColor DarkYellow
+Write-Host ("  C 解析失败 / 空路径          : {0,3}" -f $groupC.Count) -ForegroundColor Red
 
 foreach ($g in @(
-        @{ Name = 'B（字体字形）'; Items = $groupB; Color = 'DarkYellow' }
-        @{ Name = 'C（手绘/低精度）'; Items = $groupC; Color = 'Red' }
+        @{ Name = 'B（别的坐标系）'; Items = $groupB; Color = 'DarkYellow' }
+        @{ Name = 'C（解析失败）'; Items = $groupC; Color = 'Red' }
     )) {
     if ($g.Items.Count -eq 0) { continue }
     Write-Host ''
     Write-Host "$($g.Name) 组明细（建议替换为同族 24 网格图标）：" -ForegroundColor $g.Color
     foreach ($item in $g.Items) {
-        Write-Host ("    {0,-22} max={1,-7} len={2}" -f $item.Key, $item.Max, $item.Data.Length)
+        Write-Host ("    {0,-22} bounds={1,-20} len={2}" -f $item.Key, $item.Bounds, $item.Data.Length)
     }
 }
 
 if ($Check) {
     Write-Host ''
     if (($groupB.Count + $groupC.Count) -eq 0) {
-        Write-Host '✔ 全部图标都在 24 网格内' -ForegroundColor Green
+        Write-Host '✔ 全部图标包围盒都在 24 网格内' -ForegroundColor Green
         exit 0
     }
-    Write-Host ("✘ 有 {0} 个图标不在 24 网格内" -f ($groupB.Count + $groupC.Count)) -ForegroundColor Red
+    Write-Host ("✘ 有 {0} 个图标包围盒不在 24 网格内" -f ($groupB.Count + $groupC.Count)) -ForegroundColor Red
     exit 1
 }
 
@@ -150,7 +167,7 @@ $flowDirection = [System.Windows.FlowDirection]::LeftToRight
 
 # 图例：让 PNG 自己能说清三色含义
 $legend = New-Object System.Windows.Media.FormattedText(
-    ("绿 = 24 网格（{0}）   橙 = 字体字形（{1}）   红 = 手绘/低精度（{2}）   共 {3} 个图标" -f $groupA.Count, $groupB.Count, $groupC.Count, $entries.Count),
+    ("绿 = 24 网格（{0}）   橙 = 别的坐标系（{1}）   红 = 解析失败（{2}）   共 {3} 个图标" -f $groupA.Count, $groupB.Count, $groupC.Count, $entries.Count),
     $culture, $flowDirection, $typeface, 12.0, $ink, 1.0)
 $dc.DrawText($legend, (New-Object System.Windows.Point 8, 6))
 

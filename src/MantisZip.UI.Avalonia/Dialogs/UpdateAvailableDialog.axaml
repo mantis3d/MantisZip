@@ -1,0 +1,101 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.UpdateAvailableDialog"
+        x:CompileBindings="False"
+        Title="{Binding DialogTitleText}"
+        Width="480"
+        SizeToContent="Height"
+        CanResize="False"
+        WindowStartupLocation="CenterOwner"
+        ShowInTaskbar="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource DialogPadding}">
+
+  <!-- 根布局：标题 → 版本对比 → 发布日期 → 按钮行 → 更新说明（Markdown 滚动区）
+       ⚠ 按钮行放在更新说明**之前**：正文可能很长（限高 220 后内部滚动，窗口本身不滚动），
+       但把唯一的主操作压在正文下面时，正文一长就要先滚到底才点得到（2026-10-28 用户反馈）。
+       现在「下载 / 稍后提醒 / 不再提示此版本」紧跟版本信息，一眼可见。 -->
+  <StackPanel Spacing="{DynamicResource SpacingMd}">
+
+    <!-- 标题行：发现新版本（窗口标题栏与正文主标题同文案，正文这里只出现一次） -->
+    <TextBlock Text="{Binding DialogTitleText}"
+               FontSize="16"
+               FontWeight="Bold"
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- 版本对比行：当前版本 → 最新版本。
+         原来「发现新版本 vX」与「最新版本 vX」两行说的是同一件事，合并成这一行 -->
+    <TextBlock Text="{Binding VersionCompareText}"
+               FontSize="13"
+               TextWrapping="Wrap"
+               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+    <!-- 发布日期行（接口未给出日期时整行隐藏） -->
+    <TextBlock Text="{Binding PublishDateText}"
+               IsVisible="{Binding HasPublishDate}"
+               FontSize="12"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+    <!-- 按钮行：下载（强调色，同关于窗口关闭按钮配色）/ 稍后提醒 / 不再提示此版本 -->
+    <StackPanel Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="{DynamicResource SpacingSm}">
+
+      <!-- 下载：调用方据此打开下载页；回车默认触发 -->
+      <Button Content="{Binding DownloadText}"
+              Click="OnDownloadClick"
+              IsDefault="True"
+              MinWidth="80"
+              Height="{DynamicResource ControlHeight}"
+              Background="{DynamicResource ThemeAccentBrush}"
+              Foreground="White"
+              BorderThickness="0" />
+
+      <!-- 稍后提醒：本次不处理，按所设频率再询问；Esc 关闭等同此选项 -->
+      <Button Content="{Binding RemindLaterText}"
+              Click="OnRemindLaterClick"
+              IsCancel="True"
+              MinWidth="80"
+              Height="{DynamicResource ControlHeight}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+
+      <!-- 不再提示此版本：把当前版本记为已跳过（调用方持久化） -->
+      <Button Content="{Binding SkipVersionText}"
+              Click="OnSkipVersionClick"
+              MinWidth="80"
+              Height="{DynamicResource ControlHeight}"
+              Background="{DynamicResource ThemeButtonBgBrush}"
+              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}" />
+    </StackPanel>
+
+    <!-- 更新说明区：小标题 + Markdown 正文（GitHub release body），限高滚动，超长不撑爆窗口 -->
+    <StackPanel Spacing="{DynamicResource SpacingXs}">
+      <TextBlock Text="{Binding ReleaseNotesLabelText}"
+                 FontSize="13"
+                 FontWeight="Bold"
+                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+      <!-- Markdown 正文宿主：Markdig AST → 原生控件（标题/列表/表格/代码块；图片与链接只显示 URL，不联网） -->
+      <Border IsVisible="{Binding HasReleaseNotes}"
+              MaxHeight="220"
+              Background="{DynamicResource ThemeSurfaceBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1"
+              CornerRadius="{DynamicResource BorderRadius}">
+        <!-- 内容由代码后置塞入 new MarkdownHelpContent(markdown)，这里只留宿主槽位 -->
+        <ContentControl x:Name="NotesHost" />
+      </Border>
+
+      <!-- 回退：接口没有 body 时显示发布页地址（纯文本，不额外联网） -->
+      <TextBlock Text="{Binding ReleaseNotesText}"
+                 IsVisible="{Binding HasNoReleaseNotes}"
+                 FontSize="12"
+                 TextWrapping="Wrap"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+    </StackPanel>
+  </StackPanel>
+</Window>

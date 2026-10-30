@@ -61,7 +61,7 @@
                                   Background="Transparent">
                         <!-- 状态图标 -->
                         <PathIcon Data="{Binding StatusIconKey, Converter={StaticResource GeometryResourceConverter}}"
-                                  Width="14" Height="14"
+                                  Width="16" Height="16"
                                   VerticalAlignment="Center"
                                   Foreground="{Binding StatusForegroundKey, Converter={StaticResource NodeForegroundConverter}}" />
                         <!-- 显示名称 -->
@@ -86,7 +86,7 @@
                         Classes="ToolbarButton">
                   <StackPanel Orientation="Horizontal" Spacing="6">
                     <PathIcon Data="{StaticResource IconKey}"
-                              Width="14" Height="14"
+                              Width="16" Height="16"
                               Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                     <TextBlock Text="{Binding LocalizedStrings[Extract_UnlockButton]}"
                                VerticalAlignment="Center" />

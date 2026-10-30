@@ -14,7 +14,7 @@
   <MenuItem Command="{Binding OpenArchiveCommand}" InputGesture="Ctrl+O"
             Header="{Binding LocalizedStrings[Menu_OpenArchive]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconFolder}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconFolder}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>
   <!-- 打开压缩包所在位置：在资源管理器中定位当前压缩包文件 -->
@@ -22,7 +22,7 @@
             IsEnabled="{Binding IsArchiveLoaded}"
             Header="{Binding LocalizedStrings[Menu_OpenArchiveLocation]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconLocate}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconLocate}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>
   <!-- 关闭压缩包：卸载当前压缩包，返回初始状态 -->
@@ -30,7 +30,7 @@
             IsEnabled="{Binding IsArchiveLoaded}"
             Header="{Binding LocalizedStrings[Menu_CloseArchive]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconSignOut}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>
   <!-- 最近文件：显示最近打开过的压缩包列表，点击可快速打开 -->
@@ -38,7 +38,7 @@
             IsEnabled="{Binding RecentFiles.Count}"
             Header="{Binding LocalizedStrings[Main_RecentFiles]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconHistory}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
     <MenuItem.ItemTemplate>
       <DataTemplate>
@@ -46,7 +46,7 @@
                   CommandParameter="{Binding .}"
                   Header="{Binding .}">
           <MenuItem.Icon>
-            <PathIcon Data="{StaticResource IconHistory}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconHistory}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
       </DataTemplate>
@@ -57,7 +57,7 @@
   <MenuItem Command="{Binding ClearRecentFilesCommand}"
             Header="{Binding LocalizedStrings[Main_ClearRecentFiles]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>
   <!-- 刷新当前压缩包：重新读取文件列表 -->
@@ -65,7 +65,7 @@
             IsEnabled="{Binding IsArchiveLoaded}"
             Header="{Binding LocalizedStrings[Menu_Refresh]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconRefresh}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconRefresh}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>
   <Separator />
@@ -73,7 +73,7 @@
   <MenuItem Command="{Binding ExitCommand}"
             Header="{Binding LocalizedStrings[Menu_Exit]}">
     <MenuItem.Icon>
-      <PathIcon Data="{StaticResource IconSignOut}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      <PathIcon Data="{StaticResource IconSignOut}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
     </MenuItem.Icon>
   </MenuItem>
 </StackPanel>

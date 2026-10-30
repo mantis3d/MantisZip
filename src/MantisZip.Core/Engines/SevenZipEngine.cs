@@ -473,6 +473,14 @@ public class SevenZipEngine : IArchiveEngine
 
     public bool CanDelete(ArchiveFormat format) => format == ArchiveFormat.SevenZip;
 
+    /// <summary>
+    /// 分卷集的锚点路径（issue #70①）：7z.dll 只认第一卷 —— 中间卷没有完整头部与卷间链接，
+    /// 传入 <c>.002</c> 之后的卷会直接打不开。非分卷路径原样返回。
+    /// </summary>
+    private static string AnchorVolumeSet(string archivePath)
+        => ArchiveVolumeSet.FindFirstVolume(archivePath) ?? archivePath;
+
+
     #endregion
 
     #region ExtractAsync（SharpSevenZipExtractor）
@@ -485,6 +493,7 @@ public class SevenZipEngine : IArchiveEngine
         ArchiveOptions? options = null)
     {
         CoreLog.Entry();
+        archivePath = AnchorVolumeSet(archivePath);
         CoreLog.Info($"ExtractAsync: {archivePath} -> {destinationPath}, password={(password != null ? "***" : "null")}");
         var sw = Stopwatch.StartNew();
 
@@ -830,6 +839,7 @@ public class SevenZipEngine : IArchiveEngine
         CancellationToken cancellationToken = default)
     {
         CoreLog.Entry();
+        archivePath = AnchorVolumeSet(archivePath);
         CoreLog.Info($"ListEntriesAsync: {archivePath}");
         var sw = Stopwatch.StartNew();
 
@@ -891,6 +901,7 @@ public class SevenZipEngine : IArchiveEngine
         CancellationToken cancellationToken = default)
     {
         CoreLog.Entry();
+        archivePath = AnchorVolumeSet(archivePath);
         CoreLog.Info($"TestArchiveAsync: {archivePath}");
 
         progress.ReportPhase(ArchivePhase.Testing);
@@ -1044,6 +1055,7 @@ public class SevenZipEngine : IArchiveEngine
         IReadOnlyDictionary<string, string>? outputPathOverrides = null)
     {
         CoreLog.Entry();
+        archivePath = AnchorVolumeSet(archivePath);
         CoreLog.Info($"ExtractEntriesAsync: {archivePath}, {entryKeys.Count} entries -> {destinationPath}");
         var sw = Stopwatch.StartNew();
 
@@ -1275,6 +1287,10 @@ public class SevenZipEngine : IArchiveEngine
         ArchiveOptions? options = null)
     {
         CoreLog.Entry();
+        archivePath = AnchorVolumeSet(archivePath);
+        // 分卷集只能读：重建全部卷超出「增删条目」的范围（issue #70①），明确报错而不是写坏分卷。
+        if (ArchiveVolumeSet.HasVolumeSuffix(archivePath))
+            throw new NotSupportedException("分卷压缩包不支持增删文件，请解压后重新压缩");
         CoreLog.Info($"DeleteEntriesAsync: {archivePath}, entries=[{string.Join("; ", entryPaths)}]");
         var sw = Stopwatch.StartNew();
 
@@ -1282,21 +1298,44 @@ public class SevenZipEngine : IArchiveEngine
 
         await Task.Run(() =>
         {
+            if (entryPaths.Length == 0)
+            {
+                CoreLog.Info("DeleteEntriesAsync: no entries to delete");
+                return;
+            }
+
             // 1. 列出所有条目，排除要删除项
             var keepEntries = new List<(string path, bool isDir, long size)>();
+            string? missingEntry = null;
             using (var extractor = string.IsNullOrEmpty(password)
                        ? new SharpSevenZipExtractor(archivePath)
                        : new SharpSevenZipExtractor(archivePath, password))
             {
-                var deletedSet = new HashSet<string>(entryPaths.Select(p => ArchivePath.Normalize(p)));
-                foreach (var entry in extractor.ArchiveFileData)
+                // 目录目标要连带其下所有后代，命中语义与 Zip 侧同源（ArchivePath.MatchesEntryOrDescendant）。
+                var allNames = extractor.ArchiveFileData.Select(e => e.FileName).ToList();
+
+                // 零命中必须报错，且要在建临时目录之前抛出：
+                // 此前零命中会落到「解压保留项 + 原样重打包」分支，白跑一遍整包重写（耗时陡增、可能丢属性）。
+                missingEntry = entryPaths.FirstOrDefault(
+                    t => !allNames.Any(n => ArchivePath.MatchesEntryOrDescendant(n, t)));
+
+                if (missingEntry == null)
                 {
-                    var normalized = ArchivePath.Normalize(entry.FileName);
-                    if (!deletedSet.Contains(normalized))
+                    foreach (var entry in extractor.ArchiveFileData)
                     {
-                        keepEntries.Add((normalized, entry.IsDirectory, entry.IsDirectory ? 0 : (long)entry.Size));
+                        var normalized = ArchivePath.Normalize(entry.FileName);
+                        if (!entryPaths.Any(t => ArchivePath.MatchesEntryOrDescendant(normalized, t)))
+                        {
+                            keepEntries.Add((normalized, entry.IsDirectory, entry.IsDirectory ? 0 : (long)entry.Size));
+                        }
                     }
                 }
+            }
+
+            if (missingEntry != null)
+            {
+                CoreLog.Error($"DeleteEntriesAsync: entry not found: {missingEntry}");
+                throw new ArchiveEntryNotFoundException(missingEntry);
             }
 
             if (keepEntries.Count == 0)
@@ -1433,6 +1472,10 @@ public class SevenZipEngine : IArchiveEngine
         string? entryBasePath = null)
     {
         CoreLog.Entry();
+        archivePath = AnchorVolumeSet(archivePath);
+        // 分卷集只能读：重建全部卷超出「增删条目」的范围（issue #70①），明确报错而不是写坏分卷。
+        if (ArchiveVolumeSet.HasVolumeSuffix(archivePath))
+            throw new NotSupportedException("分卷压缩包不支持增删文件，请解压后重新压缩");
         CoreLog.Info($"AddToArchiveAsync: {archivePath}, sources=[{string.Join("; ", sourcePaths)}]");
         var sw = Stopwatch.StartNew();
 

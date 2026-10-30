@@ -10,6 +10,7 @@
         xmlns:vm="using:MantisZip.UI.Avalonia.ViewModels"
         xmlns:models="using:MantisZip.UI.Avalonia.Models"
         xmlns:controls="using:MantisZip.UI.Avalonia.Controls"
+        xmlns:behaviors="using:MantisZip.UI.Avalonia.Behaviors"
         xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
         x:DataType="vm:UiTestViewModel"
         Title="UI 控件测试窗口"
@@ -604,11 +605,12 @@
                       <TextBox Text="{Binding SpinnerTextValue}" VerticalAlignment="Stretch" />
                     </ButtonSpinner>
                   </StackPanel>
-                  <!-- 3 TextBox + 数字过滤（code-behind TextInput 拒绝非数字） -->
+                  <!-- 3 TextBox + NumericInput 附加行为（输入层拒绝非数字、失焦 clamp，无调值按钮） -->
                   <StackPanel Width="250" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">
                     <TextBlock FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Text="TextBox + 数字过滤（仅接受 0-9，无调值）" />
                     <TextBox Width="140" Text="{Binding NumericFilterText}"
-                             TextInput="NumericOnlyTextBox_TextInput" />
+                             behaviors:NumericInput.Enabled="True"
+                             behaviors:NumericInput.Minimum="0" />
                   </StackPanel>
                   <!-- 4 ComboBox 预设值：离散选择，规避自由输入 -->
                   <StackPanel Width="250" Margin="0,0,16,12" Spacing="{DynamicResource SpacingXxs}">

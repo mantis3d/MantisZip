@@ -342,7 +342,7 @@ public partial class PasswordManagerWindow : Window
         try
         {
             importedJson = await File.ReadAllTextAsync(filePath);
-            var data = JsonSerializer.Deserialize<PasswordData>(importedJson);
+            var data = JsonSerializer.Deserialize<PasswordData>(importedJson, JsonDefaults.CaseInsensitive);
             entryCount = data?.Passwords?.Count ?? 0;
         }
         catch (Exception ex)

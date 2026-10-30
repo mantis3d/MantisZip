@@ -21,65 +21,101 @@ public static class PdfParser
             var fi = new FileInfo(filePath);
             if (fi.Length < 8) return null;
 
-            // 读取文件头判断 PDF 版本
-            string? pdfVersion = null;
-            string? title = null, author = null, subject = null;
-            int? pageCount = null;
-            bool isEncrypted = false;
-            DateTime? creationDate = null, modifiedDate = null;
-
-            using (var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read))
-            {
-                // 读取前 256KB（元数据字典、Pages 树常在前部）
-                int headLen = (int)Math.Min(256 * 1024, fs.Length);
-                byte[] headBuf = new byte[headLen];
-                fs.ReadExactly(headBuf, 0, headBuf.Length);
-                string headText = System.Text.Encoding.ASCII.GetString(headBuf);
-
-                // PDF 版本
-                var versionMatch = Regex.Match(headText, @"%PDF-(\d+\.\d+)");
-                if (!versionMatch.Success) return null; // 不是 PDF
-                pdfVersion = versionMatch.Groups[1].Value;
-
-                // 读取最后 64KB 扫描 trailer 中的 /Info
-                long tailSize = Math.Min(65536, fs.Length);
-                fs.Seek(-tailSize, SeekOrigin.End);
-                byte[] tailBuf = new byte[tailSize];
-                fs.ReadExactly(tailBuf, 0, tailBuf.Length);
-                string tailText = System.Text.Encoding.ASCII.GetString(tailBuf);
-
-                // 从尾部获取 /Info 字典引用
-                string fullText = headText + "\n" + tailText;
-
-                // 扫描 root 附近的 /Info 引用
-                ExtractMetadata(fullText, out title, out author, out subject,
-                    out creationDate, out modifiedDate, out isEncrypted);
-
-                // 页数需要扫描更多文件内容（Pages 树可能不在头尾）
-                pageCount = FindPageCount(fs);
-            }
-
-            return new FileFormatInfo
-            {
-                Format = FileFormat.Pdf,
-                DisplayName = "PDF 文档",
-                Extension = Path.GetExtension(filePath),
-                FileSize = fi.Length,
-                Title = title,
-                Author = author,
-                Subject = subject,
-                PageCount = pageCount,
-                IsEncrypted = isEncrypted,
-                CreationDate = creationDate,
-                ModifiedDate = modifiedDate,
-                AdditionalInfo = $"PDF {pdfVersion}",
-            };
+            using var fs = new FileStream(filePath, FileMode.Open, FileAccess.Read);
+            return ParseFromSeekable(fs, fi.Length, Path.GetExtension(filePath));
         }
         catch (Exception ex)
         {
             CoreLog.Info($"PdfParser.Parse failed: {ex.Message}");
             return null;
         }
+    }
+
+    /// <summary>
+    /// 解析内存中的 PDF 字节，返回格式信息；解析失败返回 null。
+    /// 与 <see cref="Parse(string)"/> 共用同一套扫描规则（<see cref="ParseFromSeekable"/>），
+    /// 只是数据源从文件换成字节流——供「内存优先」预览路径使用，不产生磁盘写。
+    /// </summary>
+    /// <param name="bytes">PDF 完整字节。</param>
+    /// <param name="extension">原始条目扩展名（仅用于回填 <see cref="FileFormatInfo.Extension"/>）。</param>
+    public static FileFormatInfo? Parse(byte[] bytes, string extension)
+    {
+        try
+        {
+            if (bytes.Length < 8) return null;
+
+            // writable: false 的只读视图，ParseFromSeekable 只读不写
+            using var ms = new MemoryStream(bytes, writable: false);
+            return ParseFromSeekable(ms, bytes.Length, extension);
+        }
+        catch (Exception ex)
+        {
+            CoreLog.Info($"PdfParser.Parse(bytes) failed: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 解析主体：对可 seek 的流做同一套头尾扫描（规则与历史实现逐行一致）。
+    /// </summary>
+    /// <param name="seekable">可 seek 的数据源（文件流或内存流）。</param>
+    /// <param name="knownLength">数据源总长度（调用方已知，免去对 Stream.Length 的依赖）。</param>
+    /// <param name="extension">回填用的扩展名。</param>
+    private static FileFormatInfo? ParseFromSeekable(Stream seekable, long knownLength, string extension)
+    {
+        if (knownLength < 8) return null;
+
+        // 读取文件头判断 PDF 版本
+        string? pdfVersion = null;
+        string? title = null, author = null, subject = null;
+        int? pageCount = null;
+        bool isEncrypted = false;
+        DateTime? creationDate = null, modifiedDate = null;
+
+        // 读取前 256KB（元数据字典、Pages 树常在前部）
+        int headLen = (int)Math.Min(256 * 1024, knownLength);
+        byte[] headBuf = new byte[headLen];
+        seekable.Seek(0, SeekOrigin.Begin);
+        seekable.ReadExactly(headBuf, 0, headBuf.Length);
+        string headText = System.Text.Encoding.ASCII.GetString(headBuf);
+
+        // PDF 版本
+        var versionMatch = Regex.Match(headText, @"%PDF-(\d+\.\d+)");
+        if (!versionMatch.Success) return null; // 不是 PDF
+        pdfVersion = versionMatch.Groups[1].Value;
+
+        // 读取最后 64KB 扫描 trailer 中的 /Info
+        long tailSize = Math.Min(65536, knownLength);
+        seekable.Seek(-tailSize, SeekOrigin.End);
+        byte[] tailBuf = new byte[tailSize];
+        seekable.ReadExactly(tailBuf, 0, tailBuf.Length);
+        string tailText = System.Text.Encoding.ASCII.GetString(tailBuf);
+
+        // 从尾部获取 /Info 字典引用
+        string fullText = headText + "\n" + tailText;
+
+        // 扫描 root 附近的 /Info 引用
+        ExtractMetadata(fullText, out title, out author, out subject,
+            out creationDate, out modifiedDate, out isEncrypted);
+
+        // 页数需要扫描更多文件内容（Pages 树可能不在头尾）
+        pageCount = FindPageCount(seekable, knownLength);
+
+        return new FileFormatInfo
+        {
+            Format = FileFormat.Pdf,
+            DisplayName = "PDF 文档",
+            Extension = extension,
+            FileSize = knownLength,
+            Title = title,
+            Author = author,
+            Subject = subject,
+            PageCount = pageCount,
+            IsEncrypted = isEncrypted,
+            CreationDate = creationDate,
+            ModifiedDate = modifiedDate,
+            AdditionalInfo = $"PDF {pdfVersion}",
+        };
     }
 
     private static void ExtractMetadata(
@@ -127,22 +163,22 @@ public static class PdfParser
 
     /// <summary>
     /// 扫描 /Type /Pages 字典中的 /Count，获取页数。
-    /// 从文件头部和尾部两端分别扫描（各 256KB），覆盖线性化和非线性化 PDF。
+    /// 从数据源头尾两端分别扫描（各 256KB），覆盖线性化和非线性化 PDF。
     /// 避免大文件全部加载。
     /// </summary>
-    private static int? FindPageCount(FileStream fs)
+    private static int? FindPageCount(Stream seekable, long knownLength)
     {
         const int scanSize = 256 * 1024;
 
-        // 从文件头扫描 256KB
-        int? count = ScanForPageCount(fs, 0, scanSize);
+        // 从数据源开头扫描 256KB
+        int? count = ScanForPageCount(seekable, knownLength, 0, scanSize);
         if (count.HasValue) return count;
 
-        // 从文件末尾往前扫描 256KB（线性化 PDF 的 Pages 树通常在末尾）
-        long tailStart = Math.Max(0, fs.Length - scanSize);
+        // 从数据源末尾往前扫描 256KB（线性化 PDF 的 Pages 树通常在末尾）
+        long tailStart = Math.Max(0, knownLength - scanSize);
         if (tailStart > 0)
         {
-            count = ScanForPageCount(fs, tailStart, scanSize);
+            count = ScanForPageCount(seekable, knownLength, tailStart, scanSize);
             if (count.HasValue) return count;
         }
 
@@ -150,16 +186,16 @@ public static class PdfParser
     }
 
     /// <summary>
-    /// 在文件指定位置读取最多 length 字节，查找 /Type /Pages 字典中的 /Count。
+    /// 在数据源指定位置读取最多 length 字节，查找 /Type /Pages 字典中的 /Count。
     /// </summary>
-    private static int? ScanForPageCount(FileStream fs, long position, int length)
+    private static int? ScanForPageCount(Stream seekable, long knownLength, long position, int length)
     {
-        int actualLen = (int)Math.Min(length, fs.Length - position);
+        int actualLen = (int)Math.Min(length, knownLength - position);
         if (actualLen <= 0) return null;
 
         byte[] buffer = new byte[actualLen];
-        fs.Seek(position, SeekOrigin.Begin);
-        int bytesRead = fs.Read(buffer, 0, actualLen);
+        seekable.Seek(position, SeekOrigin.Begin);
+        int bytesRead = seekable.Read(buffer, 0, actualLen);
         if (bytesRead == 0) return null;
 
         string text = System.Text.Encoding.ASCII.GetString(buffer, 0, bytesRead);

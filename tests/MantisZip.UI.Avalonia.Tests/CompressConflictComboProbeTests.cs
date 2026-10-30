@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using Avalonia.VisualTree;
 using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.ViewModels;
 using Xunit;
 
 namespace MantisZip.UI.Avalonia.Tests;
@@ -32,9 +33,12 @@ public sealed class CompressConflictComboProbeTests : IDisposable
         var source = Path.Combine(_dir, "data.txt");
         File.WriteAllText(source, "hello");
 
-        var window = new CompressSettingsWindow([source]);
+        // 探针只验证「下拉 ←→ VM」绑定，与源路径无关：用设计时无参构造（生产构造要求注入执行器）。
+        var window = new CompressSettingsWindow();
 
-        var vm = window.ViewModel;
+        // 窗口的 ViewModel 属性已收窄为 private（接缝规则 20：生产调用方不得回读窗口构造请求）；
+        // 测试走 DataContext —— 窗口构造里就是 `DataContext = ViewModel`，等价且不依赖诊断属性。
+        var vm = Assert.IsType<CompressSettingsViewModel>((object?)window.DataContext);
         try { global::Avalonia.Threading.Dispatcher.UIThread.RunJobs(); } catch { /* 无头环境 Screens 不可用，与断言无关 */ }
         var combo = window.FindControl<ComboBox>("ConflictActionCombo");
         Assert.NotNull(combo);

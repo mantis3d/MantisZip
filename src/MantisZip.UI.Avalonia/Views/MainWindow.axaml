@@ -54,14 +54,14 @@
         <MenuItem Command="{Binding OpenAboutCommand}"
                   Header="{Binding LocalizedStrings[Menu_About]}">
           <MenuItem.Icon>
-            <PathIcon Data="{StaticResource IconInfo}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconInfo}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
         <!-- 捐赠：支持项目开发 -->
         <MenuItem Command="{Binding OpenDonateCommand}"
                   Header="{Binding LocalizedStrings[Menu_Donate]}">
           <MenuItem.Icon>
-            <PathIcon Data="{StaticResource IconHeart}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <PathIcon Data="{StaticResource IconHeart}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           </MenuItem.Icon>
         </MenuItem>
       </MenuItem>
@@ -150,7 +150,7 @@
         </Button>
         <Button Classes="ToolbarButton"
                 Command="{Binding DeleteFilesCommand}"
-                IsEnabled="{Binding IsArchiveLoaded}"
+                IsEnabled="{Binding CanDeleteEntries}"
                 ToolTip.Tip="{Binding LocalizedStrings[Tooltip_DeleteFiles]}">
           <StackPanel >
             <PathIcon Data="{StaticResource IconDismiss}" Classes="ToolbarButtonIcon" Width="22" Height="22" />
@@ -238,6 +238,48 @@
            （2026-10-21 启动优化）。实际控件在 Controls/ArchiveContentView.axaml，
            由 MainWindow.EnsureArchiveContent() 在 IsArchiveLoaded 首次为 true 时创建。 -->
       <ContentControl x:Name="ArchiveContentHost" />
+
+      <!-- 只读提示横幅（压缩包被删除 / 被替换）—— 覆盖在内容区顶部：
+           解压时勾了「删除压缩包」、或包被外部软件删除/覆盖后，条目树仍在内存里但已不可操作，
+           这里保留列表（只读）并给出「重新打开 / 关闭压缩包」两个出口。 -->
+      <Border IsVisible="{Binding IsArchiveUnavailable}"
+              VerticalAlignment="Top"
+              Margin="{DynamicResource SpacingMdThk}"
+              Padding="{DynamicResource SpacingSmThk}"
+              CornerRadius="{DynamicResource BorderRadius}"
+              BorderThickness="1"
+              BorderBrush="{DynamicResource ThemeStatusWarningBrush}"
+              Background="{DynamicResource ThemeSurfaceBgBrush}">
+        <Grid ColumnDefinitions="Auto,*,Auto,Auto">
+          <PathIcon Grid.Column="0"
+                    Data="{StaticResource IconWarning}"
+                    Width="20" Height="20"
+                    VerticalAlignment="Top"
+                    Foreground="{DynamicResource ThemeStatusWarningBrush}" />
+          <StackPanel Grid.Column="1"
+                      Margin="{DynamicResource SpacingSmThk}"
+                      Spacing="{DynamicResource SpacingXxs}">
+            <TextBlock Text="{Binding ArchiveAvailabilityTitleText}"
+                       FontWeight="SemiBold"
+                       FontSize="13"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+            <TextBlock Text="{Binding ArchiveAvailabilityDetailText}"
+                       FontSize="12"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+          </StackPanel>
+          <Button Grid.Column="2"
+                  Classes="ToolbarButton"
+                  Content="{Binding LocalizedStrings[Main_ArchiveUnavailable_Reload]}"
+                  Command="{Binding ReopenUnavailableArchiveCommand}"
+                  Margin="{DynamicResource SpacingXsThk}" />
+          <Button Grid.Column="3"
+                  Classes="ToolbarButton"
+                  Content="{Binding LocalizedStrings[Main_ArchiveUnavailable_Close]}"
+                  Command="{Binding DismissUnavailableArchiveCommand}"
+                  Margin="{DynamicResource SpacingXsThk}" />
+        </Grid>
+      </Border>
     </Grid>
 
     <!-- Status bar (Row 4) -->
@@ -261,7 +303,7 @@
                     IsVisible="{Binding HasPasswordStatus}"
                     Margin="0,0,8,0">
           <PathIcon Data="{Binding PasswordStatusIcon}"
-                    Width="14" Height="14"
+                    Width="16" Height="16"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
           <TextBlock Text="{Binding PasswordStatusMessage}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"

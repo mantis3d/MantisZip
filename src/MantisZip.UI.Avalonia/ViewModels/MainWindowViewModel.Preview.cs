@@ -232,8 +232,13 @@ public partial class MainWindowViewModel : ObservableObject
             }
 
             // ── 预览大小上限检查（仅对需要加载完整内容的格式生效，只读头的格式不受限制）──
-            // 与 WPF 版 MainWindow.Preview.cs 语义一致；文本类格式另有 MaxTextPreviewBytes 上限
-            if (!PreviewService.IsMetadataOnlyExtension(ext) && entry.Size > PreviewService.MaxPreviewFileSize)
+            // 与 WPF 版 MainWindow.Preview.cs 语义一致。
+            // 文本三类（Text / Csv / Markdown）**不看** MaxPreviewFileSize：它们由 CanPreviewPartially 放行到
+            // 「取 head + 部分预览」路径，真正的闸门是 PreviewService.MaxPartialPreviewBytes（256MB 硬上限）。
+            // Html（WebView 无法只渲染前 N 字节）与图片 / 其余格式仍在这里被 15MB 拒绝。
+            if (!PreviewService.IsMetadataOnlyExtension(ext)
+                && !PreviewService.CanPreviewPartially(previewType)
+                && entry.Size > PreviewService.MaxPreviewFileSize)
             {
                 var limitMb = PreviewService.MaxPreviewFileSize / (1024.0 * 1024.0);
                 Preview.ShowUnsupported(LocalizationManager.T(
@@ -242,22 +247,33 @@ public partial class MainWindowViewModel : ObservableObject
                 return;
             }
 
-            // ── Extract to temp (async, slow) ──
-            var tempFile = await PreviewService.ExtractToTempAsync(
-                CurrentArchivePath, entry, _currentFormat, _currentPassword);
-            App.DebugLog($"[PRV] Extracted to: {tempFile}");
+            // ── 取数（async, slow）：文本类走内存 head，Image / Pdf 优先内存、失败回落落盘，其余落盘 ──
+            var content = await PreviewService.LoadPreviewContentAsync(
+                CurrentArchivePath, entry, _currentFormat, previewType, _currentPassword);
+            var memoryBytes = content?.Bytes;
+            App.DebugLog(memoryBytes != null
+                ? $"[PRV] Loaded {memoryBytes.Length} bytes in memory for '{entry.Name}'"
+                : $"[PRV] Extracted to: {content?.TempPath}");
 
-            if (tempFile == null)
+            if (content == null || (content.Bytes == null && content.TempPath == null))
             {
                 Preview.ShowUnsupported(LocalizationManager.T("Status_ExtractFailed"));
                 return;
             }
 
+            // 落盘分支用的临时文件路径；内存版（文本 head / 图片 / PDF）为 null，仅在这些分支不走字节版时使用。
+            // 走到这里时「既无字节又无临时文件」已被上面的空判拦掉，故非空断言是安全的。
+            var tempFile = content.TempPath!;
+
             // Version guard: if user selected another file while extracting, discard
             if (version != _previewLoadVersion)
             {
                 App.DebugLog($"[PRV] Stale preview result discarded (version {version} != {_previewLoadVersion})");
-                try { File.Delete(tempFile); } catch { /* best effort */ }
+                // 只清理落盘产物；内存字节随 GC 回收，没有临时文件可删
+                if (content.TempPath is { } staleTemp)
+                {
+                    try { File.Delete(staleTemp); } catch { /* best effort */ }
+                }
                 return;
             }
 
@@ -271,16 +287,32 @@ public partial class MainWindowViewModel : ObservableObject
                         StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
                         break;
                     }
-                    if (entry.Size > PreviewService.MaxTextPreviewBytes)
+                    // 超过 256MB 硬上限：连部分预览都不做（取数层已保证不落盘）
+                    if (content.ExceedsPartialLimit)
                     {
-                        var txtLimitMb = PreviewService.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                        var partialLimitMb = PreviewService.MaxPartialPreviewBytes / (1024.0 * 1024.0);
                         Preview.ShowUnsupported(LocalizationManager.T(
-                            "Preview_TooLargeText", (double)entry.Size / 1024 / 1024, txtLimitMb));
+                            "Preview_TooLarge", (double)entry.Size / 1024 / 1024, partialLimitMb));
                         StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
                         break;
                     }
-                    Preview.ShowText(tempFile);
-                    StatusMessage = LocalizationManager.T("Preview_Text", entry.DisplayName);
+                    // 文本类优先用内存 head（不落盘）；缺失时回落到临时文件
+                    if (content.Bytes is { } textBytes)
+                    {
+                        Preview.ShowText(textBytes, entry.Name);
+                        // 部分预览：正文照常显示，状态栏只告知「只有前 N MB」
+                        StatusMessage = content.IsPartial
+                            ? LocalizationManager.T(
+                                "Preview_PartialText",
+                                textBytes.LongLength / 1024.0 / 1024.0,
+                                entry.Size / 1024.0 / 1024.0)
+                            : LocalizationManager.T("Preview_Text", entry.DisplayName);
+                    }
+                    else
+                    {
+                        Preview.ShowText(tempFile);
+                        StatusMessage = LocalizationManager.T("Preview_Text", entry.DisplayName);
+                    }
                     break;
                 case PreviewType.Csv:
                     if (!PreviewService.EnableTextPreview)
@@ -289,16 +321,30 @@ public partial class MainWindowViewModel : ObservableObject
                         StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
                         break;
                     }
-                    if (entry.Size > PreviewService.MaxTextPreviewBytes)
+                    // 超过 256MB 硬上限：连部分预览都不做（取数层已保证不落盘）
+                    if (content.ExceedsPartialLimit)
                     {
-                        var txtLimitMb = PreviewService.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                        var partialLimitMb = PreviewService.MaxPartialPreviewBytes / (1024.0 * 1024.0);
                         Preview.ShowUnsupported(LocalizationManager.T(
-                            "Preview_TooLargeText", (double)entry.Size / 1024 / 1024, txtLimitMb));
+                            "Preview_TooLarge", (double)entry.Size / 1024 / 1024, partialLimitMb));
                         StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
                         break;
                     }
-                    Preview.ShowCsv(tempFile);
-                    StatusMessage = LocalizationManager.T("Preview_Csv", entry.DisplayName);
+                    if (content.Bytes is { } csvBytes)
+                    {
+                        Preview.ShowCsv(csvBytes, entry.Name);
+                        StatusMessage = content.IsPartial
+                            ? LocalizationManager.T(
+                                "Preview_PartialText",
+                                csvBytes.LongLength / 1024.0 / 1024.0,
+                                entry.Size / 1024.0 / 1024.0)
+                            : LocalizationManager.T("Preview_Csv", entry.DisplayName);
+                    }
+                    else
+                    {
+                        Preview.ShowCsv(tempFile);
+                        StatusMessage = LocalizationManager.T("Preview_Csv", entry.DisplayName);
+                    }
                     break;
                 case PreviewType.Pe:
                     Preview.ShowPe(tempFile);
@@ -311,17 +357,29 @@ public partial class MainWindowViewModel : ObservableObject
                         StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
                         break;
                     }
-                    var icoExt = Path.GetExtension(tempFile).ToLowerInvariant();
+                    // .ico 判定改从条目名取（内存版没有临时文件名可依赖）
+                    var icoExt = Path.GetExtension(entry.Name).ToLowerInvariant();
                     if (icoExt == ".ico")
                     {
                         Preview.ShowIcoGallery(tempFile);
                         StatusMessage = LocalizationManager.T("Preview_Ico", entry.DisplayName);
+                        break;
                     }
-                    else
+                    // 优先内存解码（不落盘）；字节版返回 false = 本类型只能走路径版，回落落盘
+                    if (content.Bytes is { } imgBytes && Preview.ShowImage(imgBytes, entry.Name))
                     {
-                        Preview.ShowImage(tempFile);
                         StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
+                        break;
                     }
+                    var imagePath = content.TempPath
+                        ?? await PreviewService.ExtractToTempAsync(CurrentArchivePath, entry, _currentFormat, _currentPassword);
+                    if (imagePath == null)
+                    {
+                        Preview.ShowUnsupported(LocalizationManager.T("Status_ExtractFailed"));
+                        break;
+                    }
+                    Preview.ShowImage(imagePath);
+                    StatusMessage = LocalizationManager.T("Preview_Image", entry.DisplayName);
                     break;
                 case PreviewType.AnimatedImage:
                     if (!PreviewService.EnableImagePreview)
@@ -405,7 +463,11 @@ public partial class MainWindowViewModel : ObservableObject
                     StatusMessage = LocalizationManager.T("Preview_Html", entry.DisplayName);
                     break;
                 case PreviewType.Pdf:
-                    await Preview.ShowPdfAsync(tempFile);
+                    // 内存版：字节直接交给 PdfPig（Open(byte[])），不落盘、不占文件句柄
+                    if (content.Bytes is { } pdfBytes)
+                        await Preview.ShowPdfAsync(pdfBytes, entry.Name);
+                    else
+                        await Preview.ShowPdfAsync(tempFile);
                     StatusMessage = LocalizationManager.T("Preview_Pdf", entry.DisplayName);
                     break;
                 case PreviewType.Markdown:
@@ -415,16 +477,30 @@ public partial class MainWindowViewModel : ObservableObject
                         StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
                         break;
                     }
-                    if (entry.Size > PreviewService.MaxTextPreviewBytes)
+                    // 超过 256MB 硬上限：连部分预览都不做（取数层已保证不落盘）
+                    if (content.ExceedsPartialLimit)
                     {
-                        var txtLimitMb = PreviewService.MaxTextPreviewBytes / (1024.0 * 1024.0);
+                        var partialLimitMb = PreviewService.MaxPartialPreviewBytes / (1024.0 * 1024.0);
                         Preview.ShowUnsupported(LocalizationManager.T(
-                            "Preview_TooLargeText", (double)entry.Size / 1024 / 1024, txtLimitMb));
+                            "Preview_TooLarge", (double)entry.Size / 1024 / 1024, partialLimitMb));
                         StatusMessage = LocalizationManager.T("Status_Unsupported", ext);
                         break;
                     }
-                    Preview.ShowMarkdownPreview(tempFile);
-                    StatusMessage = LocalizationManager.T("Preview_Markdown", entry.DisplayName);
+                    if (content.Bytes is { } markdownBytes)
+                    {
+                        Preview.ShowMarkdownPreview(markdownBytes, entry.Name);
+                        StatusMessage = content.IsPartial
+                            ? LocalizationManager.T(
+                                "Preview_PartialText",
+                                markdownBytes.LongLength / 1024.0 / 1024.0,
+                                entry.Size / 1024.0 / 1024.0)
+                            : LocalizationManager.T("Preview_Markdown", entry.DisplayName);
+                    }
+                    else
+                    {
+                        Preview.ShowMarkdownPreview(tempFile);
+                        StatusMessage = LocalizationManager.T("Preview_Markdown", entry.DisplayName);
+                    }
                     break;
                 case PreviewType.NeedsPassword:
                     // 加密文件名压缩包：提示需输入密码

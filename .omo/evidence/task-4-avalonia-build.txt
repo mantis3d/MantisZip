@@ -1,0 +1,10 @@
+自动更新检测 · 合并后构建验证记录
+日期：2026-10-28
+
+命令：pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia -ExtraArgsJson '["-c","Release"]'
+结果：✅ 构建通过：avalonia（7.8s，0 警告）
+
+过程中的一次真实修正：
+首建报 CS0108（AboutWindow.PropertyChanged 隐藏 AvaloniaObject.PropertyChanged），
+改为 public new event PropertyChangedEventHandler? PropertyChanged; 并补 XML 注释
+（基类同名事件是 AvaloniaPropertyChangedEventHandler，用途不同），复建后 0 警告。

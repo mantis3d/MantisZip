@@ -17,7 +17,9 @@ namespace MantisZip.UI.Avalonia.ViewModels;
 
 /// <summary>
 /// 压缩设置对话框的 ViewModel。
-/// 用户选择格式、压缩级别、输出路径、密码和注释，通过 CloseAction 回调返回结果。
+/// 用户选择格式、压缩级别、输出路径、密码和注释；「开始压缩」经
+/// <see cref="TryConfirmAsync"/> 一次产出 <see cref="ConfirmOutcome{T}"/>，
+/// 结果由窗口订阅 <see cref="ConfirmCompleted"/> 处理（拒绝留窗 / 确认关窗 / 取消关窗）。
 /// </summary>
 public partial class CompressSettingsViewModel : ObservableObject
 {
@@ -41,8 +43,20 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>由 View 设置的文件选择回调。返回选择的文件路径列表，取消返回 null。</summary>
     public Func<Task<IReadOnlyList<string>?>>? PickFiles { get; set; }
 
-    /// <summary>由 View 设置的关闭回调。参数 true=确认压缩，false=取消。</summary>
-    public Func<bool, Task>? CloseAction { get; set; }
+    /// <summary>
+    /// 确认事务的结果出口。窗口在构造时订阅，负责把三态翻译成窗口动作
+    /// （<see cref="Rejected{T}"/> 留窗显示原因、<see cref="ConfirmOutcome{T}"/> 的确认/取消关窗）。
+    /// 之所以是事件而不是回调布尔值：bool 只说明「点了开始」，真正的输入还得回读本 ViewModel；
+    /// 事件把载荷一起交出去，调用方就没有回读窗口状态的机会。
+    /// </summary>
+    public event Action<ConfirmOutcome<CompressSettings>>? ConfirmCompleted;
+
+    /// <summary>
+    /// 由 View 注入的「高级格式选项快照」钩子。动态格式面板（<c>FormatOptionsPanel</c>）的值
+    /// 只在窗口里可读，而校验与载荷快照都发生在 VM 内，因此必须在确认事务开始前把它抓进来，
+    /// 否则确认用的还是构造时的旧值。
+    /// </summary>
+    public Action? CaptureFormatOptions { get; set; }
 
     /// <summary>由 View 设置的提示消息回调（弹窗以窗口为 owner）。参数 (消息, 标题)。</summary>
     public Func<string, string, Task>? ShowMessage { get; set; }
@@ -105,6 +119,10 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>Separate 模式下是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）。</summary>
     [ObservableProperty]
     private bool _keepOriginalExtension;
+
+    /// <summary>本次压缩成功后打开输出所在目录并选中产物（初值镜像设置，不回写；进度窗口底部还能临时改）。</summary>
+    [ObservableProperty]
+    private bool _openFolderAfterCompress;
 
     /// <summary>当前格式是否为 ZIP。</summary>
     public bool IsZipFormat => DefaultFormat == "zip";
@@ -396,97 +414,11 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>文件过滤条件（由 View 在对话框关闭时从 FileFilterEditor 获取并设置）。</summary>
     public FileFilterCriteria? FileFilter { get; set; }
 
-    /// <summary>缓存的上一次构建的压缩计划（B 数据集）。由预览构建派生，执行侧只读消费。</summary>
+    /// <summary>
+    /// 缓存的上一次构建的压缩计划（B 数据集）。由预览构建派生；执行侧不再「读计划再搬参数」，
+    /// 而是在确认事务内由 <c>CaptureSettings()</c> 一次快照进不可变载荷 <see cref="CompressSettings"/>。
+    /// </summary>
     public CompressPlan? Plan { get; private set; }
-
-    /// <summary>
-    /// 获取供压缩执行使用的计划（B）。调用方（CompressFlow.BuildRequest / CompressService）只读消费，
-    /// 不重算路径、不重新过滤 —— 预览 = 实际的唯一事实来源。null 表示尚未构建成功或输入无效。
-    /// </summary>
-    public CompressPlan? GetPlanForExecution() => Plan;
-
-    /// <summary>
-    /// 外部接管 B 数据集（对话框 ViewModel → 主窗口 ViewModel 的拷贝路径）。
-    /// 同时使在途重建过期，防止拷贝 SelectedPaths 触发的异步重建覆盖接管结果。
-    /// </summary>
-    public void AdoptPlan(CompressPlan? plan)
-    {
-        _previewBuildVersion++;      // 作废在途重建
-        _previewCts?.Cancel();       // 停止在途枚举
-        InvalidateSourceCache();     // 接管后源集可能已变
-        Plan = plan;
-        IsBuildPending = false;
-        UpdateCanCompress();
-    }
-
-    /// <summary>
-    /// 接管另一个（对话框里的）ViewModel 的全部**执行侧**设置。
-    /// <para>
-    /// 背景：此前由 <c>Views/MainWindow.axaml.cs</c> 手写逐属性拷贝，已经漏过三次 ——
-    /// <c>MultiThreadedCompression</c> / <c>AdaptiveSmartDetect</c> 恒 false、分卷大小恒 0、
-    /// 文件冲突策略恒「每次询问」（用户选了自动重命名照样弹窗）、密码库勾选与规则丢失。
-    /// 这类漏拷不报编译错，只能在运行期被发现，因此把清单集中到本方法，
-    /// 由 <c>tests/.../CompressSettingsDialogCopyTests.cs</c> 反射式守卫：新增可执行字段忘记拷贝会红。
-    /// </para>
-    /// <para>
-    /// 不在本方法内拷贝的两项：<see cref="FileFilter"/> 由 View 从 FileFilterEditor 读取；
-    /// <see cref="Plan"/> 必须在拷贝完源路径之后由调用方 <see cref="AdoptPlan"/> 最后接管（顺序有语义）。
-    /// </para>
-    /// </summary>
-    /// <param name="source">对话框（或任意来源）的 ViewModel，不能是自己。</param>
-    public void CopyExecutionSettingsFrom(CompressSettingsViewModel source)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        if (ReferenceEquals(source, this)) return;
-
-        // ① 源路径集合（会触发预览重建；调用方随后 AdoptPlan 作废在途重建）
-        SelectedPaths.Clear();
-        foreach (var p in source.SelectedPaths)
-            SelectedPaths.Add(p);
-
-        // ② 输出：格式/级别/输出方式/输出路径/保留扩展名
-        DefaultFormat = source.DefaultFormat;
-        CompressionLevel = source.CompressionLevel;
-        OutputMode = source.OutputMode;
-        OutputPath = source.OutputPath;
-        KeepOriginalExtension = source.KeepOriginalExtension;
-
-        // ③ 密码与加密（含「压缩后保存到密码库」，执行侧直接读这三个字段）
-        Password = source.Password;
-        Encrypt = source.Encrypt;
-        IsPasswordLibraryMode = source.IsPasswordLibraryMode;
-        SelectedPasswordEntry = source.SelectedPasswordEntry;
-        SaveToLibrary = source.SaveToLibrary;
-        RulesText = source.RulesText;
-        PasswordDescription = source.PasswordDescription;
-
-        // ④ 压缩包注释
-        Comment = source.Comment;
-        CommentDistribution = source.CommentDistribution;
-
-        // ⑤ 输出文件冲突策略（执行侧 CompressFlow.BuildRequest 读 vm.ConflictAction）
-        ConflictAction = source.ConflictAction;
-
-        // ⑥ 格式/引擎高级选项
-        FileNameEncoding = source.FileNameEncoding;
-        ZipCompressionMethod = source.ZipCompressionMethod;
-        ZipEncryptionMethod = source.ZipEncryptionMethod;
-        SevenZipCompressionMethod = source.SevenZipCompressionMethod;
-        SevenZipSolid = source.SevenZipSolid;
-        SevenZipSolidBlockSize = source.SevenZipSolidBlockSize;
-        SevenZipDictionarySize = source.SevenZipDictionarySize;
-        SevenZipNumFastBytes = source.SevenZipNumFastBytes;
-        SevenZipMatchFinder = source.SevenZipMatchFinder;
-        SevenZipMultithreaded = source.SevenZipMultithreaded;
-        SevenZipEncryptHeaders = source.SevenZipEncryptHeaders;
-        AdaptiveCompression = source.AdaptiveCompression;
-        AdaptiveSmartDetect = source.AdaptiveSmartDetect;
-        MultiThreadedCompression = source.MultiThreadedCompression;
-
-        // ⑦ 分卷（SelectedSplitSizeOption 同步回 SplitSize 字符串）
-        SelectedSplitSizeOption = source.SelectedSplitSizeOption;
-        CustomSplitSizeText = source.CustomSplitSizeText;
-    }
 
     private static string FilterSignature(FileFilterCriteria? f)
     {
@@ -612,6 +544,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_Start"] = LocalizationManager.T("Compress_Start");
         LocalizedStrings["Compress_Cancel"] = LocalizationManager.T("Compress_Cancel");
         LocalizedStrings["Compress_WhenFileExists"] = LocalizationManager.T("Compress_WhenFileExists");
+        LocalizedStrings["Compress_OpenFolderAfter"] = LocalizationManager.T("Compress_OpenFolderAfter");
 
         // 初始化压缩级别下拉选项（共享数据源，本地化 Display）
         CompressionLevelOptions = CompressionOptionData.LevelOptions
@@ -666,6 +599,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         {
             var settings = AppSettings.Load();
             KeepOriginalExtension = settings.KeepOriginalExtension;
+            OpenFolderAfterCompress = settings.OpenFolderAfterCompress;
             FileNameEncoding = settings.ZipEncoding ?? "utf-8";
             ZipCompressionMethod = settings.ZipCompressionMethod ?? "deflate";
             SevenZipCompressionMethod = settings.SevenZipCompressionMethod ?? "LZMA2";
@@ -1315,59 +1249,220 @@ public partial class CompressSettingsViewModel : ObservableObject
     [RelayCommand]
     private async Task StartCompress()
     {
-        // Deflate64 只能由 7z 写出；分卷 + 非加密会回落到不支持 method 9 的串行 writer。
-        // 引擎侧无可靠 7z 分卷路径，故在 UI 先拦下并给出明确原因。
-        if (!Encrypt
-            && SplitSize > 0
-            && string.Equals(ZipCompressionMethod, "deflate64", StringComparison.OrdinalIgnoreCase))
-        {
-            if (ShowMessage != null)
-                await ShowMessage(
-                    LocalizationManager.T("Compress_Deflate64Split_Unsupported"),
-                    LocalizationManager.T("Compress_Title"));
-            return;
-        }
+        // 本方法只做「把确认结果翻译成窗口动作」：校验、等待计划就绪、快照都在
+        // TryConfirmAsync 里一次做完，真正的压缩由宿主按载荷执行（设置窗口不再自带执行逻辑）。
+        var outcome = await TryConfirmAsync();
 
-        // 加密压缩必须有密码（手动输入或密码库选中条目）；否则引擎会按「未加密」写出，
-        // 与 UI 勾选状态不符（历史缺陷：空密码 + 空确认会静默生成未加密包）。
-        if (Encrypt && string.IsNullOrEmpty(GetActivePassword()))
+        switch (outcome)
         {
-            if (ShowMessage != null)
-                await ShowMessage(
-                    LocalizationManager.T("Compress_PasswordRequired"),
-                    LocalizationManager.T("Compress_Title"));
-            return;
-        }
+            case Rejected<CompressSettings> rejected:
+                // 拒绝原因必须让用户看见：现状的「两次密码不一致」分支是静默 return，
+                // 用户点了「开始压缩」却什么都没发生，正是本次收口要消灭的静默失败。
+                if (ShowMessage != null)
+                    await ShowMessage(rejected.Reason, LocalizationManager.T("Compress_Title"));
+                return;
 
-        // Validate passwords match if encrypting
-        if (Encrypt && !PasswordsMatch)
-        {
-            return;
-        }
+            case Cancelled<CompressSettings>:
+                // 等待计划就绪期间用户点了「取消」：窗口已由 Cancel 关闭，这里不再重复关窗。
+                return;
 
-        // 等待 B 数据集就绪（预览=实际 的守卫）：点击后如有在途构建则等待其完成；
-        // 无在途构建且 Plan 无效则补建一次；就绪后才关闭窗口并执行压缩，
-        // 避免「窗口直接关闭却无压缩生成」的静默失败。
+            default:
+                // Confirmed：把载荷交给窗口，由窗口关闭自己并把结果回传给宿主。
+                ConfirmCompleted?.Invoke(outcome);
+                return;
+        }
+    }
+
+    /// <summary>
+    /// 确认本次压缩设置：校验 → 等待（必要时补建）计划就绪 → 把「用户此刻决定的一切」
+    /// 快照成不可变载荷。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <b>为什么确认要返回载荷而不是 bool：</b>旧流程用 <c>CloseAction(true)</c> 表示「确认」，
+    /// 调用方随后还得回读本 ViewModel 的成员才知道要压什么——确认与读值之间隔着一段可变的
+    /// 活对象，窗口一关或用户改一笔，执行内容就与确认时不一致。把结果收成
+    /// <see cref="Confirmed{T}"/> 之后，「确认即事务」：载荷生成的那一刻，输入就固定了。
+    /// </para>
+    /// <para>
+    /// <b>为什么校验不另写一份：</b>这里与 <c>CanExecuteStartCompress</c> 共用同一套判定条件
+    /// （<see cref="ValidateForExecution"/>），避免出现「按钮可点但确认被拒」或反过来的
+    /// 双份规则漂移。本次重构刻意<b>不</b>改动任何一条既有判定条件，只改「谁能读到结果」。
+    /// </para>
+    /// <para>
+    /// <b>为什么可能返回取消：</b>等待计划构建期间用户有真实的取消路径（<c>Cancel</c> 命令会
+    /// 置 <c>_compressCancelled</c> 并关闭窗口）。这条路径必须表达成
+    /// <see cref="Cancelled{T}"/>，而不是「拒绝」（拒绝会把原因显示给用户，取消不该弹任何提示）。
+    /// 除此之外没有其他取消来源，所以取消分支只会出现在「已开始等待」之后。
+    /// </para>
+    /// </remarks>
+    /// <returns>
+    /// <see cref="Confirmed{T}"/> 并携带压缩载荷；<see cref="Rejected{T}"/> 并携带已本地化的
+    /// 用户可见原因；<see cref="Cancelled{T}"/> 表示等待期间用户主动取消。
+    /// </returns>
+    public async Task<ConfirmOutcome<CompressSettings>> TryConfirmAsync()
+    {
+        // ⓪ 动态格式面板的值只有窗口读得到：先把它们抓进 VM，后面的校验与快照才与用户所见一致。
+        CaptureFormatOptions?.Invoke();
+
+        // ① 单一校验谓词：确认与命令可用性用同一套条件（顺序与原 StartCompress 保持一致：
+        //    先引擎能力/密码，再源与输出路径，保证用户先看到最该修的那一条）。
+        var rejection = ValidateForExecution();
+        if (rejection != null)
+            return new Rejected<CompressSettings>(rejection);
+
         IsPreparingCompress = true;
         try
         {
+            // ② 等待 B 数据集就绪（预览=实际的守卫）：点击后如有在途构建则等待其完成；
+            //    无在途构建且 Plan 无效则补建一次；就绪后才允许确认。
             var ready = await EnsurePlanReadyAsync();
-            if (_compressCancelled) return; // 等待期间用户已取消 → 不再启动压缩
-            if (!ready)
-            {
-                // 无法准备（构建失败等）：窗口保持打开并提示，用户可调整后重试
-                await ShowPrepareFailedAsync();
-                return;
-            }
 
-            if (CloseAction != null)
-                await CloseAction(true);
+            // ③ 等待期间用户点了「取消」→ 这次确认作废（窗口已关，不能再启动压缩）。
+            if (_compressCancelled)
+                return new Cancelled<CompressSettings>();
+
+            // ④ 无法准备（构建失败等）：窗口保持打开并给出原因，用户可调整后重试。
+            if (!ready)
+                return new Rejected<CompressSettings>(LocalizationManager.T("Compress_PrepareFailed"));
+
+            // ⑤ 快照：此后执行器只读这份载荷，不再回读本 ViewModel。
+            return new Confirmed<CompressSettings>(CaptureSettings());
         }
         finally
         {
             IsPreparingCompress = false;
             _compressCancelled = false;
         }
+    }
+
+    /// <summary>
+    /// 本次确认的「不执行」原因；<see langword="null"/> 表示可以执行。
+    /// </summary>
+    /// <remarks>
+    /// 逐条对应现状已有的拦截点，判定条件一字未改：
+    /// ① Deflate64 + 分卷 + 非加密（7z 之外没有可靠的 writer）；
+    /// ② 加密但没有可用密码（手动输入与密码库都为空）；
+    /// ③ 两次输入的密码不一致；
+    /// ④ 没有任何源（现状由 <c>CanExecuteStartCompress</c> 挡住按钮）；
+    /// ⑤ 输出路径非法（现状同样只在 CanExecute 里判定）。
+    /// 返回的是「给用户看的原因」，因此文案一律走本地化。
+    /// </remarks>
+    /// <returns>已本地化的拒绝原因；可执行时返回 <see langword="null"/>。</returns>
+    private string? ValidateForExecution()
+    {
+        // ① Deflate64 只能由 7z 写出；分卷 + 非加密会回落到不支持 method 9 的串行 writer。
+        if (!Encrypt
+            && SplitSize > 0
+            && string.Equals(ZipCompressionMethod, "deflate64", StringComparison.OrdinalIgnoreCase))
+        {
+            return LocalizationManager.T("Compress_Deflate64Split_Unsupported");
+        }
+
+        // ② 加密压缩必须有密码（手动输入或密码库选中条目）；否则引擎会按「未加密」写出，
+        //    与 UI 勾选状态不符（历史缺陷：空密码 + 空确认会静默生成未加密包）。
+        if (Encrypt && string.IsNullOrEmpty(GetActivePassword()))
+            return LocalizationManager.T("Compress_PasswordRequired");
+
+        // ③ 两次输入的密码必须一致（现状是静默 return，用户看不到任何反馈）。
+        if (Encrypt && !PasswordsMatch)
+            return LocalizationManager.T("Compress_PasswordMismatch");
+
+        // ④ 没有任何源可压。
+        if (SelectedPaths.Count == 0)
+            return LocalizationManager.T("Compress_NoSources");
+
+        // ⑤ 输出路径非法（Manual 缺路径 / 目录模式目录不可用）。
+        if (!IsOutputPathValid())
+            return LocalizationManager.T("Compress_OutputPathInvalid");
+
+        return null;
+    }
+
+    /// <summary>
+    /// 把确认那一刻的全部执行输入快照成不可变载荷（<see cref="CompressSettings"/>）。
+    /// </summary>
+    /// <remarks>
+    /// 映射逐字段对齐原 <c>CompressFlow.BuildRequest(CompressSettingsViewModel)</c>：源取计划条目
+    /// （目录粒度，过滤语义在 <c>IncludedFiles</c> 白名单里）、密码取
+    /// <see cref="GetActivePassword"/>（库模式下来自选中条目）、格式取
+    /// <see cref="DefaultFormat"/>。集合一律复制成新列表，避免宿主之后对 VM 集合的改动
+    /// 反向影响已确认的载荷。
+    /// </remarks>
+    /// <returns>只读的压缩载荷。</returns>
+    private CompressSettings CaptureSettings()
+    {
+        // 计划已由 EnsurePlanReadyAsync 保证就绪；这里仍做防御性判空，
+        // 万一为空就交出空计划，由执行器按「无可执行条目」处理（不在这里抛异常）。
+        var items = Plan?.Items ?? Array.Empty<CompressPlanItem>();
+
+        // 源清单：同一源在 Combined 模式下可能出现多次（不同过滤），按源去重后保留首次出现的目标路径。
+        var sources = new List<CompressSourceEntry>(items.Count);
+        var seenSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var item in items)
+        {
+            if (!seenSources.Add(item.SourcePath))
+                continue;
+
+            sources.Add(new CompressSourceEntry(item.SourcePath, item.OutputArchivePath));
+        }
+
+        var planEntries = items
+            .Select(item => new CompressPlanEntry(item.SourcePath, item.OutputArchivePath, item.IncludedFiles))
+            .ToList();
+
+        // 密码回写意图：把「写哪一条、写什么描述、匹配哪些规则」一起冻结，
+        // 避免执行期间用户继续编辑描述/规则导致写库内容与确认时不一致。
+        var libraryEntry = IsPasswordLibraryMode ? SelectedPasswordEntry : null;
+        var passwordWriteback = new CompressPasswordWriteback(
+            SaveToLibrary: SaveToLibrary,
+            IsLibraryMode: IsPasswordLibraryMode,
+            LibraryEntryId: libraryEntry?.Id,
+            LibraryEntryPatterns: libraryEntry != null
+                ? new List<string>(libraryEntry.Patterns)
+                : Array.Empty<string>(),
+            LibraryEntryDescription: libraryEntry?.Description,
+            Description: PasswordDescription,
+            RulesText: RulesText);
+
+        var engineOptions = new CompressEngineOptions(
+            ZipCompressionMethod: ZipCompressionMethod,
+            ZipEncryptionMethod: ZipEncryptionMethod,
+            SevenZipCompressionMethod: SevenZipCompressionMethod,
+            SevenZipSolid: SevenZipSolid,
+            SevenZipSolidBlockSize: SevenZipSolidBlockSize,
+            SevenZipDictionarySize: SevenZipDictionarySize,
+            SevenZipNumFastBytes: SevenZipNumFastBytes,
+            SevenZipMatchFinder: SevenZipMatchFinder,
+            SevenZipMultithreaded: SevenZipMultithreaded,
+            SevenZipEncryptHeaders: SevenZipEncryptHeaders,
+            FileNameEncoding: FileNameEncoding,
+            KeepOriginalExtension: KeepOriginalExtension,
+            AdaptiveCompression: AdaptiveCompression,
+            AdaptiveSmartDetect: AdaptiveSmartDetect);
+
+        return new CompressSettings(
+            Sources: sources,
+            OutputMode: OutputMode,
+            Format: DefaultFormat,
+            CompressionLevel: CompressionLevel,
+            EngineOptions: engineOptions,
+            OutputPath: OutputPath,
+            Encrypt: Encrypt,
+            // 密码取「当前生效的密码」：库模式下是选中条目的密码，否则是手输密码。
+            Password: GetActivePassword(),
+            PasswordWriteback: passwordWriteback,
+            Comment: Comment,
+            CommentDistribution: CommentDistribution,
+            SplitSizeBytes: SplitSize,
+            MultiThreaded: MultiThreadedCompression,
+            // 设置对话框目前不暴露并行度，GUI 路径一直是引擎默认值（0 = 由引擎决定）；
+            // 保留字段是为了将来把并行度也纳入确认载荷，避免它继续留在全局设置里。
+            ParallelDegree: 0,
+            ConflictAction: ConflictAction,
+            Filter: FileFilter,
+            Plan: planEntries,
+            OpenFolderAfterCompress: OpenFolderAfterCompress);
     }
 
     /// <summary>
@@ -1399,22 +1494,16 @@ public partial class CompressSettingsViewModel : ObservableObject
         }
     }
 
-    /// <summary>压缩准备失败提示（窗口保持打开，用户可调整后重试）。</summary>
-    private async Task ShowPrepareFailedAsync()
-    {
-        if (ShowMessage != null)
-            await ShowMessage(LocalizationManager.T("Compress_PrepareFailed"), LocalizationManager.T("Compress_Title"));
-    }
-
     [RelayCommand]
-    private async Task Cancel()
+    private Task Cancel()
     {
         // 等待 B 数据集准备期间用户取消：标记取消，StartCompress 恢复执行时不再启动压缩
         if (IsPreparingCompress)
             _compressCancelled = true;
 
-        if (CloseAction != null)
-            await CloseAction(false);
+        // 取消是静默动作：关窗由窗口订阅方处理，不弹任何提示。
+        ConfirmCompleted?.Invoke(new Cancelled<CompressSettings>());
+        return Task.CompletedTask;
     }
 
     // ── Source file management ──

@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.Services;
@@ -49,21 +50,24 @@ internal static partial class ShellIntegration
         NotifyAssocChangedForTesting?.Invoke();
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
     }
+    /// <summary>
+    /// 参与**文件关联**的扩展名候选集（单一事实源：<see cref="ArchiveExtensionCatalog"/>）。
+    /// </summary>
+    /// <remarks>
+    /// 2026-10-29 起由目录派生（此前是写死的 8 项数组）：目录新增格式时，设置页行、默认关联值、
+    /// 「打开压缩包」筛选会一起跟上，不再各自维护一份清单。
+    /// 是否**真的注册**仍由用户逐项勾选决定（<see cref="AssocPreferences.GetAssocExtensions"/>）：
+    /// <c>.jar / .war / .ear / .apk</c> 与 <c>.001</c> 默认不勾，避免抢掉 JDK / APK 安装器 / 非压缩分卷的默认程序（issue #54 / KI-006）。
+    /// </remarks>
     private static readonly string[] ArchiveExtensions =
-        ArchiveEngineFactory.SupportedExtensions;
+        [.. ArchiveExtensionCatalog.All.Select(info => info.Extension)];
+
+    /// <summary>参与文件关联的扩展名（测试用只读视图；理由见 <see cref="ArchiveExtensions"/> 的注释）。</summary>
+    internal static IReadOnlyList<string> AssociatedExtensions => ArchiveExtensions;
 
     /// <summary>该格式关联是否"未被用户显式禁用"。注意：默认值为 true（并不代表用户主动启用），false 只会由用户主动取消关联的动作产生——自愈判据把 false 视为"显式禁用，不得自愈"。</summary>
-    internal static bool IsAssocEnabledInSettings(AppSettings s, string ext) => ext.ToLowerInvariant() switch
-    {
-        ".zip"    => s.AssocZip,
-        ".7z"     => s.Assoc7z,
-        ".rar"    => s.AssocRar,
-        ".tar"    => s.AssocTar,
-        ".tgz" or ".tar.gz" => s.AssocTarGz,
-        ".gz"     => s.AssocGz,
-        ".iso"    => s.AssocIso,
-        _         => false,
-    };
+    internal static bool IsAssocEnabledInSettings(AppSettings s, string ext)
+        => AssocPreferences.IsAssocEnabled(s, ext);
 
     // Registry key identifiers — must stay as fixed English strings (language-independent)
     private const string CascadeRoot = "MantisZip";

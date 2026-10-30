@@ -1,4 +1,5 @@
 using System.Text.Json;
+using MantisZip.Core.Utils;
 
 namespace MantisZip.Core.Services;
 
@@ -31,7 +32,7 @@ public class RecentFileManager
         {
             if (!File.Exists(_filePath)) return;
             var json = File.ReadAllText(_filePath);
-            var entries = JsonSerializer.Deserialize<List<RecentFileEntry>>(json);
+            var entries = JsonSerializer.Deserialize<List<RecentFileEntry>>(json, JsonDefaults.CaseInsensitive);
             if (entries != null)
             {
                 _entries = entries

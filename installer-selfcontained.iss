@@ -5,16 +5,20 @@
 
 #define MyAppName "MantisZip"
 #ifndef MyAppVersion
-#define MyAppVersion "0.5.3"
+#define MyAppVersion "0.5.4"
 #endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/mantis3d/MantisZip"
 #define MyAppExeName "MantisZip.UI.Avalonia.exe"
 
 [Setup]
-; Must use a different AppId from the framework-dependent installer to avoid
-; Windows Installer conflict (both installers can coexist).
-AppId={{963001F3-5748-4834-9489-97D6D00E3917}
+; ONE product, two packagings (issue #45): this AppId is intentionally identical to
+; installer.iss, so Windows treats the framework-dependent and self-contained builds as
+; the same product — installing one removes the other instead of writing on top of it.
+; (The previous script used a different AppId "so both installers can coexist"; since
+; both write to the same {app} folder that coexistence was never real, it only produced
+; two uninstall logs that deleted each other's files.)
+AppId={{F7A3C8E1-2D4B-4A9F-9C6E-8B5D7A3F2E1C}
 AppName={#MyAppName}
 AppVersion={#MyAppVersion}
 AppPublisher={#MyAppPublisher}
@@ -33,6 +37,8 @@ PrivilegesRequired=admin
 ArchitecturesInstallIn64BitMode=x64compatible
 ChangesEnvironment=yes
 CloseApplications=yes
+; Shared with installer.iss — prevents two setups from writing {app} at the same time.
+SetupMutex=MantisZipSetupMutex
 SetupIconFile=src\MantisZip.UI.Avalonia\Resources\App.ico
 
 [Languages]
@@ -50,6 +56,12 @@ english.ShellGroup=System Integration
 english.InstallShell=Add to Windows context menu
 english.AssocGroup=File type associations
 
+; Legacy migration bridge (the old self-contained installer used a different product identity)
+english.LegacyAppRunningMsg=MantisZip is running.%n%nSetup must close it before removing the previous installation. Close it now and continue?
+english.LegacyUninstallFailedMsg=The previous MantisZip installation could not be removed automatically.%n%nPlease uninstall "MantisZip" from Settings → Apps, then run this installer again.
+; Uninstall: optional removal of per-user data
+english.RemoveUserSettingsMsg=Also delete your personal MantisZip settings and recent-file history?%n%nChoose No to keep them (useful if you plan to reinstall).
+
 ; Chinese (Simplified)
 chinese.ConfigPageTitle=安装配置
 chinese.ConfigDesc=选择偏好的外观和系统集成设置
@@ -59,6 +71,12 @@ chinese.ThemeDark=深色主题
 chinese.ShellGroup=系统集成
 chinese.InstallShell=添加到 Windows 右键菜单
 chinese.AssocGroup=文件关联
+
+; 旧版产品身份迁移桥（旧的自包含安装包用了另一个产品身份）
+chinese.LegacyAppRunningMsg=MantisZip 正在运行。%n%n安装程序需要先关闭它，才能移除旧版本。现在关闭并继续吗？
+chinese.LegacyUninstallFailedMsg=无法自动移除上一版 MantisZip。%n%n请先从「设置 → 应用」中卸载 MantisZip，然后重新运行本安装程序。
+; 卸载：是否同时删除个人数据
+chinese.RemoveUserSettingsMsg=是否同时删除 MantisZip 的个人设置与最近文件记录？%n%n选择「否」将保留它们（以后重装可继续使用）。
 
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"
@@ -114,6 +132,12 @@ Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-shell"; Flags: runhi
 Filename: "{app}\{#MyAppExeName}"; Parameters: "--uninstall-assoc"; Flags: runhidden; WorkingDir: "{app}"; RunOnceId: "MnzUninstallAssoc"
 
 [Code]
+const
+  // Product identity — must stay identical to installer.iss (one product, two packagings).
+  MyAppId = '{F7A3C8E1-2D4B-4A9F-9C6E-8B5D7A3F2E1C}';
+  // Identity used by the old self-contained installer; kept only for the migration bridge.
+  LegacySelfContainedKey = 'SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{963001F3-5748-4834-9489-97D6D00E3917}_is1';
+
 var
   // Custom wizard page controls
   WPConfigPage: TWizardPage;
@@ -128,6 +152,9 @@ var
   AssocCheckTarGz: TNewCheckBox;
   AssocCheckGz: TNewCheckBox;
   AssocCheckIso: TNewCheckBox;
+
+// Sleep from kernel32 — used by the legacy migration bridge to poll the uninstall key.
+procedure Sleep(Milliseconds: DWord); external 'Sleep@kernel32.dll stdcall';
 
 // Create the custom configuration wizard page (theme + system integration)
 procedure CreateConfigPage;
@@ -330,6 +357,188 @@ begin
   CreateConfigPage;
 end;
 
+// ============================================================================
+// Legacy product identity migration (issue #45)
+// Before v0.5.4 the self-contained (Offline) installer declared its own AppId, so
+// Windows treated it as a separate product: installing the other variant did not
+// remove it, and both ended up sharing {app} — two uninstall logs for the same files,
+// which then deleted each other's runtimeconfig.json / runtime DLLs. This bridge
+// removes such a leftover installation BEFORE any file is written, so the new install
+// always starts from a clean folder. It is idempotent: with no legacy key present it
+// does nothing.
+// ============================================================================
+
+function LegacyKeyExists: Boolean;
+begin
+  Result := RegKeyExists(HKLM64, LegacySelfContainedKey)
+         or RegKeyExists(HKLM32, LegacySelfContainedKey)
+         or RegKeyExists(HKCU, LegacySelfContainedKey);
+end;
+
+function ReadLegacyUninstallString: String;
+begin
+  if RegQueryStringValue(HKLM64, LegacySelfContainedKey, 'UninstallString', Result) then
+    Exit;
+  if RegQueryStringValue(HKLM32, LegacySelfContainedKey, 'UninstallString', Result) then
+    Exit;
+  if not RegQueryStringValue(HKCU, LegacySelfContainedKey, 'UninstallString', Result) then
+    Result := '';
+end;
+
+// True when the MantisZip UI executable is currently running. Relies on find.exe's exit
+// code (0 = match) so no temp file or text decoding is involved.
+function IsMantisZipRunning: Boolean;
+var
+  ResultCode: Integer;
+begin
+  Result := False;
+  if Exec(ExpandConstant('{cmd}'),
+          '/c tasklist /FI "IMAGENAME eq MantisZip.UI.Avalonia.exe" /NH | find /I "MantisZip.UI.Avalonia.exe" >nul',
+          '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    Result := (ResultCode = 0);
+end;
+
+procedure CloseMantisZip;
+var
+  ResultCode: Integer;
+begin
+  Log('Closing running MantisZip instance before migrating the old installation.');
+  Exec(ExpandConstant('{cmd}'), '/c taskkill /IM MantisZip.UI.Avalonia.exe /T /F',
+       '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
+  Sleep(800);
+end;
+
+// Splits an UninstallString such as  "C:\Program Files\MantisZip\unins000.exe" /foo
+// into the executable path and its parameters.
+procedure SplitLegacyCommandLine(const CommandLine: String; var ExeName, Params: String);
+var
+  S: String;
+  P: Integer;
+begin
+  ExeName := '';
+  Params := '';
+  S := Trim(CommandLine);
+  if S = '' then
+    Exit;
+  if S[1] = '"' then
+  begin
+    Delete(S, 1, 1);
+    P := Pos('"', S);
+    if P > 0 then
+    begin
+      ExeName := Copy(S, 1, P - 1);
+      Params := Trim(Copy(S, P + 1, Length(S) - P));
+    end
+    else
+      ExeName := S;
+  end
+  else
+  begin
+    P := Pos(' ', S);
+    if P > 0 then
+    begin
+      ExeName := Copy(S, 1, P - 1);
+      Params := Trim(Copy(S, P + 1, Length(S) - P));
+    end
+    else
+      ExeName := S;
+  end;
+end;
+
+// Inno's uninstaller may relaunch itself under a temporary name and return at once,
+// so its exit code proves nothing. Wait until the uninstall registry key is gone.
+function WaitForLegacyKeyGone(TimeoutMs: Integer): Boolean;
+var
+  Waited: Integer;
+begin
+  Waited := 0;
+  while (Waited < TimeoutMs) and LegacyKeyExists do
+  begin
+    Sleep(500);
+    Waited := Waited + 500;
+  end;
+  Result := not LegacyKeyExists;
+end;
+
+function RemoveLegacyInstallation(var ErrorMessage: String): Boolean;
+var
+  UninstallString: String;
+  ExeName: String;
+  Params: String;
+  ResultCode: Integer;
+begin
+  Result := True;
+  ErrorMessage := '';
+
+  if not LegacyKeyExists then
+  begin
+    Log('No legacy MantisZip identity found; nothing to migrate.');
+    Exit;
+  end;
+
+  Log('Legacy MantisZip identity found: ' + LegacySelfContainedKey);
+
+  // Files held open by a running app cannot be deleted, and Inno would then schedule
+  // them for deletion at the next reboot — which would delete the NEW files we are
+  // about to write. So the app has to be closed first.
+  if IsMantisZipRunning then
+  begin
+    if MsgBox(CustomMessage('LegacyAppRunningMsg'), mbConfirmation, MB_YESNO) <> IDYES then
+    begin
+      Result := False;
+      ErrorMessage := CustomMessage('LegacyUninstallFailedMsg');
+      Exit;
+    end;
+    CloseMantisZip;
+  end;
+
+  UninstallString := ReadLegacyUninstallString;
+  SplitLegacyCommandLine(UninstallString, ExeName, Params);
+  Log('Legacy uninstall command: ' + UninstallString);
+
+  if ExeName = '' then
+    Log('Legacy entry has no UninstallString; assuming its files are already gone.')
+  else if not FileExists(ExeName) then
+    Log('Legacy uninstaller no longer exists (' + ExeName + '); assuming already gone.')
+  else
+  begin
+    Params := Trim(Params + ' /VERYSILENT /SUPPRESSMSGBOXES /NORESTART');
+    Log('Running legacy uninstaller: ' + ExeName + ' ' + Params);
+    if not Exec(ExeName, Params, '', SW_HIDE, ewWaitUntilTerminated, ResultCode) then
+    begin
+      Log('Failed to launch the legacy uninstaller.');
+      Result := False;
+      ErrorMessage := CustomMessage('LegacyUninstallFailedMsg');
+      Exit;
+    end;
+    Log('Legacy uninstaller exited with code: ' + IntToStr(ResultCode));
+  end;
+
+  if not WaitForLegacyKeyGone(60000) then
+  begin
+    Log('Legacy uninstall registry key is still present; aborting installation.');
+    Result := False;
+    ErrorMessage := CustomMessage('LegacyUninstallFailedMsg');
+    Exit;
+  end;
+
+  // Stale first-run markers would override the choices made in this wizard.
+  RegDeleteValue(HKCU, 'Software\MantisZip', 'FirstRunShell');
+  RegDeleteValue(HKCU, 'Software\MantisZip', 'FirstRunAssoc');
+  Log('Legacy identity migrated successfully.');
+end;
+
+// Runs before any file is copied: old product removed first, new files written second.
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Err: String;
+begin
+  Result := '';
+  NeedsRestart := False;
+  if not RemoveLegacyInstallation(Err) then
+    Result := Err;
+end;
+
 // Write installer settings to AppData after install completes
 procedure CurStepChanged(CurStep: TSetupStep);
 var
@@ -337,6 +546,9 @@ var
   SettingsDir: string;
   SettingsFile: string;
   WindowFile: string;
+  ManifestPath: string;
+  ManifestJson: string;
+  InstalledAt: string;
 begin
   if CurStep = ssPostInstall then
   begin
@@ -396,5 +608,46 @@ begin
     end
     else
       Log('Settings file already exists, preserving existing user settings.');
+
+    // Installation manifest — lets us tell which variant is really on disk without
+    // guessing (issue #45 troubleshooting).
+    InstalledAt := GetDateTimeString('yyyy-mm-dd hh:nn:ss', '-', ':');
+    ManifestJson := '{' +
+      '"variant": "Offline",' +
+      '"version": "{#MyAppVersion}",' +
+      '"installedAt": "' + InstalledAt + '",' +
+      '"appId": "' + MyAppId + '"' +
+      '}';
+    ManifestPath := ExpandConstant('{app}\install-manifest.json');
+    if SaveStringToFile(ManifestPath, ManifestJson, False) then
+      Log('Install manifest written: ' + ManifestPath)
+    else
+      Log('Failed to write install manifest: ' + ManifestPath);
+    RegWriteStringValue(HKLM64, 'Software\MantisZip', 'InstalledVariant', 'Offline');
+    RegWriteStringValue(HKLM64, 'Software\MantisZip', 'InstalledVersion', '{#MyAppVersion}');
+  end;
+end;
+
+// Ask (unless uninstalling silently) whether per-user data should go too, and always
+// clear the first-run markers so a later reinstall starts from a clean slate.
+procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
+var
+  SettingsDir: String;
+begin
+  if CurUninstallStep = usUninstall then
+  begin
+    SettingsDir := ExpandConstant('{localappdata}\MantisZip');
+    if DirExists(SettingsDir) and (not UninstallSilent) then
+    begin
+      if MsgBox(CustomMessage('RemoveUserSettingsMsg'), mbConfirmation,
+                MB_YESNO or MB_DEFBUTTON2) = IDYES then
+      begin
+        Log('Removing per-user settings: ' + SettingsDir);
+        DelTree(SettingsDir, True, True, True);
+      end
+      else
+        Log('Keeping per-user settings: ' + SettingsDir);
+    end;
+    RegDeleteKeyIncludingSubkeys(HKCU, 'Software\MantisZip');
   end;
 end;

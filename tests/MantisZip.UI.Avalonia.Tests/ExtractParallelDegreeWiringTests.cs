@@ -70,6 +70,10 @@ public class ExtractParallelDegreeWiringTests
     private const string ExtractSettingsWindowRelPath =
         "src/MantisZip.UI.Avalonia/Dialogs/ExtractSettingsWindow.axaml";
 
+    /// <summary>解压会话（确认载荷 → ExtractFlow 的唯一执行入口）所在文件。</summary>
+    private const string ExtractSessionRelPath =
+        "src/MantisZip.UI.Avalonia/Services/ExtractSession.cs";
+
     // ==================================================================
     // 共享辅助：仓库根定位 / 源码读取 / 空白归一
     // ==================================================================
@@ -129,6 +133,7 @@ public class ExtractParallelDegreeWiringTests
             ExtractSettingsViewModelRelPath,
             MainViewModelRelPath,
             ExtractSettingsWindowRelPath,
+            ExtractSessionRelPath,
         };
         foreach (var rel in expected)
         {
@@ -140,29 +145,38 @@ public class ExtractParallelDegreeWiringTests
     }
 
     /// <summary>
-    /// 测试 2：MainWindow.axaml.cs 的 ShowExtractSettingsDialog 回调必须把对话框 VM 的执行侧设置
-    /// 回传给 evm（2026-10-22 起经 <c>ExtractSettingsViewModel.CopyExecutionSettingsFrom</c> 单一入口），
-    /// 且该入口确实拷贝了并行快照字段。
+    /// 测试 2：MainWindow.axaml.cs 的 ShowExtractSettingsDialog 回调必须注入执行器并只消费
+    /// <c>ConfirmOutcome&lt;ExtractSettings&gt;</c>（2026-10-26 接缝改造：关窗后回读 VM 的
+    /// <c>CopyExecutionSettingsFrom</c> / <c>GetFilteredEntryKeys</c> / <c>DialogResult</c> 三轨已退休）。
     ///
     /// 锁定的回归：回传块曾只拷贝 DestinationPath/ConflictAction/OpenFolderAfterExtract/
-    /// FilteredEntryKeys 四项，唯独漏掉线程数——对话框里的并行选择从未进入 evm。
+    /// FilteredEntryKeys 四项，唯独漏掉线程数——对话框里的并行选择从未进入执行链。
+    /// 现在并行快照由确认事务一次产出（<c>ParallelOverride = BuildParallelSettings()</c>），
+    /// 回调若退回「ShowDialog&lt;bool&gt; + 补读」形态，本守卫失败。
     /// </summary>
     [Fact]
-    public void MainWindow_DialogCallback_ReturnsParallelOverride()
+    public void MainWindow_DialogCallback_UsesConfirmPayload()
     {
-        // 2026-10-22：回传块由「逐属性手抄」收敛为单一入口 ExtractSettingsViewModel.CopyExecutionSettingsFrom
-        // （压缩侧同款手抄清单已漏过三次：多线程/并行度、分卷大小、文件冲突策略；解压侧一并收敛）。
-        // 因此本守卫改为锁「两段式」：① MainWindow 回调确实调用收敛入口；② 收敛入口里确实拷贝并行快照字段。
         var source = ReadSource(MainWindowRelPath);
         var normalized = NormalizeWhitespace(source);
 
-        Assert.Contains("evm.CopyExecutionSettingsFrom(dialog.ViewModel)", normalized);
+        // ① 执行器 + 宿主上下文注入（会话是唯一执行入口）
+        Assert.Contains("var session = new ExtractSession()", normalized);
+        Assert.Contains("new ExtractRunContext(", normalized);
+        Assert.Contains("new ExtractSettingsWindow(session, context, archivePaths)", normalized);
 
+        // ② 只消费确认载荷：ShowDialog 返回 ConfirmOutcome，确认后由窗口执行
+        Assert.Contains("ShowDialog<ConfirmOutcome<ExtractSettings>>", normalized);
+        Assert.Contains("await dialog.RunConfirmedAsync(confirmed.Value)", normalized);
+
+        // ③ 旧三轨回读通道不得回流
+        Assert.DoesNotContain("CopyExecutionSettingsFrom", normalized);
+        Assert.DoesNotContain("GetFilteredEntryKeys", normalized);
+        Assert.DoesNotContain("DialogResult", normalized);
+
+        // ④ 并行快照在确认事务里产出（DTO 自带，不靠调用方手抄）
         var vmSource = NormalizeWhitespace(ReadSource(ExtractSettingsViewModelRelPath));
-        Assert.Contains("public void CopyExecutionSettingsFrom(ExtractSettingsViewModel source)", vmSource);
-        Assert.Contains("EnableParallelExtract = source.EnableParallelExtract", vmSource);
-        Assert.Contains("ManualParallelDegree = source.ManualParallelDegree", vmSource);
-        Assert.Contains("LargeArchivePreTest = source.LargeArchivePreTest", vmSource);
+        Assert.Contains("ParallelOverride = BuildParallelSettings()", vmSource);
     }
 
     /// <summary>
@@ -203,31 +217,35 @@ public class ExtractParallelDegreeWiringTests
     }
 
     /// <summary>
-    /// 测试 4：MainWindowViewModel.ExtractArchive 的 ExtractFlow.ExtractAsync 调用点
-    /// 实参表必须包含 vm.BuildParallelSettings()（对话框并行快照真正传入公共流程）。
+    /// 测试 4：对话框并行快照真正传入公共流程的唯一通道是
+    /// <c>ExtractSession</c>（确认载荷 → <c>settings.ParallelOverride</c> → <c>ExtractFlow.ExtractAsync(...)</c>）。
     ///
     /// 锁定的回归：调用点漏传快照 → 参数缺省 null → 全部回落 AppSettings，
-    /// 对话框里的并行选择恒无效。回传块修了但调用点没修，缺陷仍然存在。
-    ///
-    /// 为什么限定实参表而非全文：vm 是常见局部变量名，全文匹配可能命中无关文本；
-    /// 提取 ExtractFlow.ExtractAsync( 的圆括号配对实参表后断言，与实参顺序无关。
+    /// 对话框里的并行选择恒无效。2026-10-26 接缝改造后执行下沉到会话，
+    /// MainWindowViewModel 不再自己调 <c>ExtractFlow.ExtractAsync</c>——若它又长出直接调用，
+    /// 等于绕过确认载荷（第二条执行链），本守卫同时把这条死路堵上。
     /// </summary>
     [Fact]
-    public void MainWindowViewModel_ExtractArchive_PassesParallelOverride()
+    public void ExtractSeam_CarriesParallelOverrideIntoSession()
     {
-        var source = string.Join("\n", MainViewModelRelPaths.Select(ReadSource));
+        var sessionSource = NormalizeWhitespace(ReadSource(ExtractSessionRelPath));
 
-        // 定位 ExtractFlow.ExtractAsync( 调用点并提取实参表
-        var callIndex = source.IndexOf("ExtractFlow.ExtractAsync(", StringComparison.Ordinal);
+        // 载荷快照来自确认事务（settings 是 RunAsync 的不可变形参，不读窗口状态）
+        Assert.Contains("var parallelOverride = settings.ParallelOverride", sessionSource);
+
+        // 定位 ExtractFlow.ExtractAsync( 调用点并提取实参表（与实参顺序无关）
+        var callIndex = sessionSource.IndexOf("ExtractFlow.ExtractAsync(", StringComparison.Ordinal);
         Assert.True(callIndex >= 0,
-            "未在 MainWindowViewModel.cs 中找到 ExtractFlow.ExtractAsync( 调用点。" +
+            "未在 ExtractSession.cs 中找到 ExtractFlow.ExtractAsync( 调用点。" +
             "被测源码可能已重构，守卫测试需同步更新。");
-        var openParen = source.IndexOf('(', callIndex);
-        var closeParen = FindMatchingParen(source, openParen);
-        var argumentList = NormalizeWhitespace(
-            source.Substring(openParen + 1, closeParen - openParen - 1));
+        var openParen = sessionSource.IndexOf('(', callIndex);
+        var closeParen = FindMatchingParen(sessionSource, openParen);
+        var argumentList = sessionSource.Substring(openParen + 1, closeParen - openParen - 1);
+        Assert.Contains("parallelOverride", argumentList);
 
-        Assert.Contains("vm.BuildParallelSettings()", argumentList);
+        // MainWindowViewModel 不得自己执行整包解压（唯一执行链是设置窗口 → 会话）
+        var vmSource = NormalizeWhitespace(string.Join("\n", MainViewModelRelPaths.Select(ReadSource)));
+        Assert.DoesNotContain("ExtractFlow.ExtractAsync(", vmSource);
     }
 
     /// <summary>

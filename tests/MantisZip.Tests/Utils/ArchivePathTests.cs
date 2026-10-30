@@ -171,4 +171,30 @@ public class ArchivePathTests
     {
         Assert.Equal("Makefile", ArchivePath.GetFileNameWithoutExtension("Makefile"));
     }
+
+    // ════════════════════════════════════════════════════════════════
+    //  MatchesEntryOrDescendant — 「删除目录」的递归匹配谓词
+    //  回归背景：目录行的 FullPath 不带尾斜杠，而包内条目是 "dir/…"，
+    //  精确比较必然零命中；且不能退化成 StartsWith（ab/ 会被当成 a/ 的后代）。
+    // ════════════════════════════════════════════════════════════════
+
+    [Theory]
+    [InlineData("sub/a.txt", "sub", true)]        // 目录行 FullPath 形态（无尾斜杠）
+    [InlineData("sub/a.txt", "sub/", true)]       // 包内条目形态（带尾斜杠）
+    [InlineData("sub/deep/a.txt", "sub", true)]   // 多级后代
+    [InlineData("sub", "sub", true)]              // 显式目录条目本身
+    [InlineData("sub/", "sub", true)]             // 显式目录条目（带尾斜杠）本身
+    [InlineData("a/", "a", true)]                 // 长度 2：TrimEndSeparator 的 >3 守卫不适用
+    [InlineData("ab/", "ab", true)]               // 长度 3：同上
+    [InlineData("a/b/", "a/b", true)]             // 长度 4：同上
+    [InlineData("SUB/A.TXT", "sub", true)]        // 忽略大小写（与 Normalize / 引擎行为一致）
+    [InlineData("a.txt", "a", false)]             // 名字前缀相同但不是目录
+    [InlineData("ab/a.txt", "a", false)]          // 前缀边界：ab/ 不是 a/ 的后代
+    [InlineData("sub2/a.txt", "sub", false)]      // 同上
+    [InlineData("sub/a.txt", "", false)]          // 空目标一律不匹配（防「删整包」）
+    [InlineData("sub/a.txt", "/", false)]         // 归一化后为空，同上
+    public void MatchesEntryOrDescendant_ReturnsExpected(string entryName, string target, bool expected)
+    {
+        Assert.Equal(expected, ArchivePath.MatchesEntryOrDescendant(entryName, target));
+    }
 }

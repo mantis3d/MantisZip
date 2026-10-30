@@ -3,8 +3,8 @@
 > 未来待开发功能规划。已实现的功能见 [docs/PROGRESS.md](PROGRESS.md)，技术架构见 [docs/ARCHITECTURE.md](ARCHITECTURE.md)，每项计划的完整设计见 `.omo/plans/`。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-25  
-**当前版本**: 0.5.3
+**最后更新**: 2026-10-29  
+**当前版本**: 0.5.4
 
 ---
 
@@ -32,39 +32,49 @@
 
 - **每行的「设计文档」链接是唯一事实源**，本表的说明只记录「要不要做、做到哪了」，不复制实施细节。
 - 当前策略是 **「面向公开用户 + 少而稳」**（2026-10-24 确认）：宁可少做，不做半成品；可感知的「丑/慢/点了没反应」优先于功能数量。
+- **已知但这次不修的问题不在这里**：进 [KNOWN_ISSUES.md](KNOWN_ISSUES.md)（规则 21）。本文件只装「要不要做」的决定；说得出方案与工时的才算计划，只是「知道它有问题、现在不动」的进登记簿。
 
 ---
 
-## S 档 —— 本轮必做（约 42-57h，≈ 一周多满负荷）
+## S 档 —— 本轮必做（✅ 已全部完成，2026-10-28）
 
-> **执行顺序已定（2026-10-24 讨论）**：图标 → 接缝 → 预览 → 自动更新。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。三批改动**互不重叠**（图标只碰 `AppIcons.axaml`；接缝碰压缩/解压入口；预览碰取数层），因此这个顺序不需要任何返工代价。
+> **执行顺序（2026-10-24 讨论定，2026-10-26 / 10-27 / 10-28 按完成情况更新）**：~~图标~~（已完成）→ ~~接缝~~（已完成）→ ~~预览~~（已完成）→ ~~自动更新~~（已完成）。先做「一眼能看出变化 + 零逻辑风险」的，再做「掏返工税」的，最后做「地基先就位才划算」的。「压缩包内重命名」原排在最后，2026-10-28 已移回 A 档——它是 A 档「暂存区」的地基，与 A 档相邻做完能省一次返工，不必占本轮 S 档窗口。
 >
-> **⚡ 插队项（2026-10-25）**：用户实测发现「删除目录静默无效」后新增缺陷项，排在表格第一行。它是唯一一条**功能性 bug**（其余都是改进），改动量也最小（4-6h），建议直接第一个做；若不插队，把它挪到自动更新之后即可，与上面四项同样不冲突。
+> 已完成并归档：⚡ 插队项「删除压缩包内目录静默无效」（2026-10-26，随 v0.5.4）、S 档「图标归一化」（2026-10-26，随 v0.5.4）、S 档「意图-执行接缝收口（含波次 3 全仓清账）」（2026-10-26，随 v0.5.4）、S 档「预览取数层内存优先（切片 1+2+4）」（2026-10-28，随 v0.5.4）、S 档「自动更新检测」（2026-10-28，随 v0.5.4）、⚡ 插队项「安装器产品身份统一 + 旧版迁移桥」（2026-10-27，随 v0.5.4，issue #45）、⚡ 插队项「压缩包识别分层（容器 / 子类型）+ 自解压 exe 支持」（2026-10-27，随 v0.5.4，issue #54 / #36）—— 详见 [PROGRESS.md 历史设计方案索引](PROGRESS.md)。
 
-| 功能 | 设计文档 | 难度 | 工时 | 说明 |
-|---|---|:--:|:--:|---|
-| ⚡ 缺陷：删除压缩包内目录静默无效 | [delete-directory-entries.md](.omo/plans/未开始/delete-directory-entries.md) | 🟢低 | 4-6h | 📋 2026-10-25 用户实测报障。**删单个文件正常、删目录「没反应」**。三层根因：① 列表目录行 `FullPath` 不带尾斜杠（`ArchiveEntryLister.cs:127-131` 生成 `sub`）而包内条目是 `sub/`，`ArchivePath.Normalize` 不去尾斜杠 ⇒ 精确匹配**一条都不中**；② 匹配无递归语义，即使传 `sub/` 也只删目录条目、子文件保留 ⇒ 刷新后目录还在；③ copy-mode 快路径**不校验存在性**（legacy 有校验）⇒ 零命中也报 100% + 「删除完成」，这就是「点了像没反应」的来源（实测：`["sub"]` 零变化、`["sub/"]` 4→3 条）。同族问题一并修：7z 同款且用大小写敏感集合、TAR/GZ 抛 `NotSupportedException` 但 `CanDelete` 在 UI 一处未用、`Status_ConfirmDelete` 文案注册未用（删除是整包重写，无二次确认）。方案＝统一「条目或其后代」谓词（Zip 两路 + 7z 共用）+ 零命中抛错 + 删除前确认与格式门禁 + 7 类回归用例。**与 `intent-execution-seam` 不是同一故障族**（参数没丢，是引擎语义与调用方假设不一致），只在接缝文档登记一行「已知同类事故」 |
-| 图标归一化（消除「图标太丑」） | [icon-normalization.md](.omo/plans/未开始/icon-normalization.md) | 🟡中 | 10-14h | 📋 2026-10-24 立项。实测 117 个图标混了**三套坐标系**：68 个 24 网格 Fluent 向量 / **38 个图标字体字形（笔画明显更粗）** / 11 个手绘简化——三族并排就是用户反馈的「丑」。方案＝只把 49 个异类换成同族 24 Regular 路径 + 收敛 14px 发虚位 + 修 3 个语义错图标，**只改 `AppIcons.axaml` 一个文件、键名全不变、不引入主题系统**。评审工具 `scripts/render-icon-montage.ps1` 已就位（`-Check` 可作机器判据）。**明确不做** `icon-theme` ①②③（继续冻结） |
-| 意图-执行接缝收口（波次 1+2） | [intent-execution-seam.md](.omo/plans/未开始/intent-execution-seam.md) | 🔴高 | 12-14h | 📋 2026-10-24 立项定案。**同族事故已 7 次**（压缩侧逐属性手抄漏 3 次 / 拖入分支无人接续 / CLI 静默 `Shutdown` / 解压 CLI `FilteredEntryKeys` 恒 null / 密码库保存仅主窗口生效）。方案＝设置窗口**注入唯一执行器**（漏接续变编译错误）+ 确认事务（`Rejected(reason)` 替代静默 return）+ 不可变 DTO + `IProgressPresenter` 收口两套进度实现。**本轮只做波次 1+2**：压缩 4 入口 → 解压 5 入口；波次 3（全仓 `ShowDialog` 清账）见 A 档。同步新增 AGENTS 规则 20 与 `guards` 第 5 条 `dialog-seam`；`CopyExecutionSettingsFrom` 及两份反射守卫测试退休 |
-| 预览取数层内存优先（切片 1+2+4） | [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) | 🟡中 | 12-17h | 📋 2026-10-24 立项。现状：**每次预览都先把整条目解压到 `%TEMP%\MantisZip\Preview\` 再从磁盘读回**（固定文件名、每次预览前清空整个目录）；文本类写盘只为读 1MB；便携模式往 U 盘写；敏感文件明文落 TEMP。本批＝文本/CSV/Markdown/代码/日志走内存 + 图片 `SKBitmap.Decode(Stream)` + PDF `PdfDocument.Open(Stream)` + head 读取改真流式（Zip 不再整条目解压进内存）+ 临时文件按条目命名 + head LRU + >15MB 的 head-only 部分预览。**明确保留落盘**：HTML→WebView（`NativeWebView` 不支持 `data:` URI）、打开方式（外部程序要路径）、字体（`FontParser` 要文件名）。注：15MB 上限本身可在设置里调大，故切片 4 收窄为**文本/PDF/Office 的部分预览**（图片必须完整字节，无部分可言）。Office（切片 3）见 A 档 |
-| 自动更新检测 | [auto-update.md](.omo/plans/未开始/auto-update.md) | 🟡中 | 4-6h | GitHub Releases API 版本检查 + AboutWindow「更新」Tab + `UpdateAvailableDialog` + 设置开关 + 单元测试。**面向公开用户后这从「加分项」变「基础设施」**：没有它，每个修复都到不了用户手上 |
+> S 档所有条目均已落地并归档（见上），本节不再保留待办表格。
 
-> 本轮验收口径：公众能感知到的五件事同时改善——**删除目录真的会删掉**（且删不掉时会明说）、**图标不再是粗细混排**、**预览不再先落盘（且大文件不再一律被拒）**、**设置不再被静默丢弃**、**安装完会自己知道有新版本**。
+> 本轮验收口径（✅ 已达成）：公众能感知到的一件事——**安装完会自己知道有新版本**。（「压缩包内重命名」已于 2026-10-28 移回 A 档，与「暂存区」相邻做；图标归一化、意图-执行接缝于 2026-10-26、预览取数层内存优先于 2026-10-28 完成，随 v0.5.4 验证）
 
 ---
 
-## A 档 —— 下一轮（约 60h，是「接下来两轮」的量，不是一轮）
+## A 档 —— 下一轮（约 71-88h，分两个阶段交付；不是一轮，是「接下来的两轮半」）
+
+> **为什么这样切（2026-10-28 定）**：A1 把「重命名」和「暂存区」放一起，是因为它们改的是**同一批引擎文件**（`src/MantisZip.Core/Utils/ZipBinaryRewriter.cs`、`src/MantisZip.Core/Abstractions/ArchiveEngine.cs`、`ZipEngine.*`、`SevenZipEngine.cs`），都要处理 copy-mode 偏移重算、加密包不落明文、失败不破坏原件——分两次做等于同一批代码开两次刀、跑两轮全量回归。A2 前期是「每天看得见的体验 + 体积」，末尾用「小活清仓」当缓冲池（进度紧就砍尾部）。
+
+### 阶段 A1 —— 压缩包内编辑（约 21-28h，做完可独立发版）
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 意图-执行接缝（波次 3：全仓清账） | [intent-execution-seam.md](.omo/plans/未开始/intent-execution-seam.md) | 🔴高 | 8-10h | 全仓 `ShowDialog` 收敛到统一入口（实测 `src/**/*.cs` 当前 53 处，计划文档记 68 处，**开工前先对齐口径**），并清掉波次 1/2 遗留的旁路 |
-| 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。📋 2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） |
-| 压缩包内重命名/移动条目 | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **6-8h**（原估 3-4h） | 右键重命名(F2)/移动到…。7-Zip / WinRAR 都有，公开用户会问。**工时按 6-8h 重估**：实现是全量重写包，必须先写临时包再原子替换 + 校验，否则一次失败就是毁包 |
-| 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。**单独排在 A 档的理由**：三者都是「本来就在解析完整文档」，省下的只是落盘，用户感知最弱，且逐库确认 Stream 支持最费时 |
-| 自包含体积优化（第一步） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 📋 **目标已改写**：原「降至 20–25MB」与现有依赖（SkiaSharp / ImageSharp / OpenXml / Sqlite / PdfPig / WebView）矛盾，激进修剪会打穿预览。改为**第一步只做测量基线 + 验证保守修剪可行性**，目标区间 60–90MB。若确认只发 SelfContained 包，这一步的收益优先级上调 |
-| Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化。公开用户的分发入口，1-2h 的性价比极高 |
+| 压缩包内重命名条目（引擎级，零重压缩） | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **8-10h** | 📋 2026-10-27 推倒重写（旧方案 6-8h 作废），2026-10-28 从 S 档移回 A 档。旧路线「提取→删除→添加」= 改一个名字要整包重写**三遍**（ZIP 添加/删除各自都是整包 copy-mode），7z 还会把用户压缩等级重置成 `Normal`，加密包改名会变明文。新方案 ZIP 走 copy-mode **只改名字字节、压缩数据原样搬运**，7z 走 `ModifyArchive` 就地删 + 单条追加，tar.gz 明确不支持。F2 + 右键菜单，目录改名一并做。它是 A 档「暂存区」的地基，**A1 第一项** |
+| 压缩包编辑操作序列（暂存区 + 批量提交） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | **12-16h** | 删除/重命名先进内存队列，文件列表立刻反映结果（虚拟视图），点「应用」或关窗时**一次性**提交：ZIP 一次 `RewriteAsync`、7z 一次 `ModifyArchive` + 追加。**现状是每次编辑都整包重写**——删 20 个文件 = 20 次整包复制/重打包（7z 删除更是全量解压 + 重打包，还会把压缩等级重置成 `Normal`）。口径已定（2026-10-27）：只限当前打开的包、未提交切包/关窗三选（应用/丢弃/取消）、加密包沿用原加密、可选提交前备份原包（默认关）。**A1 第二项，与「重命名」同批完成**（硬依赖它的 rewriter rename 通道） |
+| Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化。公开用户的分发入口，1-2h 的性价比极高 **A1 收尾，纯发布操作** |
 
-### A 档 · 小活清仓（批量 8 项，合计约 25h）
+> **A1 验收口径**：改一个名字、或一次删/改 20 个条目，都不再让整包反复重写；ZIP 走 copy-mode 只改名字节、压缩数据原样搬运，7z 只碰被改条目，加密包改名不掉明文，tar.gz 明确报不支持；winget 能装。
+
+### 阶段 A2 —— 导航、瘦身与小活（约 50-60h）
+
+> **内部顺序**：先做四条主线（约 25-35h，可独立发一版），再跑「小活清仓」批次（25h，缓冲池）。
+
+| 功能 | 设计文档 | 难度 | 工时 | 说明 |
+|---|---|:--:|:--:|---|
+| 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/未开始/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。📋 2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty+OneWay；补磁盘空路径态与 `Breadcrumb_EditPlaceholder` 三语；QuickPathPicker 4 宿主纳入回归） **A2 第一项** |
+| 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/进行中/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。**单独排在 A 档的理由**：三者都是「本来就在解析完整文档」，省下的只是落盘，用户感知最弱，且逐库确认 Stream 支持最费时 |
+| 自包含体积优化（第一步） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 📋 **目标已改写**：原「降至 20–25MB」与现有依赖（SkiaSharp / ImageSharp / OpenXml / Sqlite / PdfPig / WebView）矛盾，激进修剪会打穿预览。改为**第一步只做测量基线 + 验证保守修剪可行性**，目标区间 60–90MB。若确认只发 SelfContained 包，这一步的收益优先级上调 |
+| AXAML 编译期绑定（渐进式开启 x:CompileBindings） | [axaml-compiled-bindings.md](.omo/plans/未开始/axaml-compiled-bindings.md) | 🟡中 | **10-14h** | 现状 **50 个 .axaml，只有 1 个开编译绑定、13 个有 x:DataType** ⇒ 属性名写错 / 类型不匹配全部只在运行期表现为「没值」「红字校验文本」「永远默认值」。渐进三批推进（已有 x:DataType 的 13 个先试水 → 补类型 → 主力窗口 + 门禁），LocalizedStrings[Key] 等表达力不足处保留运行时绑定并登记原因。配 -Task guards 第 9 条 compilebindings（只约束新增与已迁移文件，存量不判红），收益是「接线错了构建就报错」 |
+
+
+### 小活清仓（A2 阶段末尾，批量 8 项，合计约 25h，可裁剪）
 
 > 都是 2–4h 的「便宜、感知明确」项，攒成一批做完，避免它们长期占着队列。
 
@@ -96,6 +106,8 @@
 | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 文件选择器去弹窗化（内嵌控件） | [embedded-file-picker.md](.omo/plans/未开始/embedded-file-picker.md) | 🟡中 | 1-2天 | 📋 2026-10-08 立项：把文件/目录选择器内嵌进压缩/解压设置窗。三步走：先抽纯控件再分别接入；不动 `CustomFilePickerDialog` 静态入口与系统浏览豁免。**与接缝计划有交集，排在接缝之后做可省一次返工** |
+| 压缩任务队列（TeraCopy 式串行队列 + 常驻队列窗） | [compress-job-queue.md](.omo/plans/未开始/compress-job-queue.md) | 🔴高 | 46-66h | 📋 2026-10-29 立项（用户提 TeraCopy 队列思路后定五条口径：点「开始压缩」入队 / 队列窗常驻 / 跨进程并入同一队列 / 失败继续 / 单任务+整体取消）。**P0 串行队列 4-6h 是 issue #66「新建压缩包按钮永久灰」的根治路径，建议视作插队项单独取**；P1 队列窗 8-12h 可独立发版；P3 引擎后台化与「真暂停」同一前置条件，需打包评估 |
+| 编辑操作序列增强（拖拽移动 / 逐步撤销重做 / 另存为新包） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | 8-12h | A 档「暂存区」落地后的 P2/P3：重命名/移动到… 也入队、条目拖到目录树节点即入队、队列级 undo/redo（P1 只有整队丢弃）、提交目标改成「另存为新包」而不是覆盖原包 |
 
 ---
 
@@ -121,7 +133,7 @@
 | 图标主题系统①基础设施（IconView + DrawingImage 迁移） | [icon-theme-infra.md](.omo/plans/未开始/icon-theme-infra.md) | 22-28h | **A 套零视觉差异**——纯契约迁移（`Geometry`→`DrawingImage`），用户看不到任何变化 | 出现「必须支持外部图标包」的真实需求；且先完成 `icon-normalization` |
 | 图标主题系统②导入包 + 单图标覆盖 + 设置 UI | [icon-theme-packs.md](.omo/plans/未开始/icon-theme-packs.md) | 26-34h | 依赖①；且「导入第三方图标包」不是当前目标用户群的需求 | ① 完成且有用户提交图标包 |
 | 图标主题系统③C/D/E/F/G 内容生产 + IconGen 多套 | [icon-theme-sets.md](.omo/plans/未开始/icon-theme-sets.md) | 24-34h | 要产出 6 套图标资产；单人工具做「图标市场」是审美项目不是产品项目 | ② 完成且确认要做多主题 |
-| 快速预览与渐进式加载（三种预览模式） | [preview-quick-modes.md](.omo/plans/未开始/preview-quick-modes.md) | ~25h | 预览体系已经很深，三模式是「复杂大于收益」。其「§3.3 提取策略：内存 vs 硬盘」子项已**单独立项**为 [preview-memory-first.md](.omo/plans/未开始/preview-memory-first.md) 并进 S 档 | 若解冻，**只做「快速模式」最小版**（渐进渲染部分，取数层已由 preview-memory-first 承担） |
+| 快速预览与渐进式加载（三种预览模式） | [preview-quick-modes.md](.omo/plans/未开始/preview-quick-modes.md) | ~25h | 预览体系已经很深，三模式是「复杂大于收益」。其「§3.3 提取策略：内存 vs 硬盘」子项已**单独立项**为 [preview-memory-first.md](.omo/plans/进行中/preview-memory-first.md) 并进 S 档 | 若解冻，**只做「快速模式」最小版**（渐进渲染部分，取数层已由 preview-memory-first 承担） |
 | 自研 ZIP 引擎（Per-entry + AES-256） | [custom-zip-engine.md](.omo/plans/未开始/custom-zip-engine.md) | 5-6天 | 零依赖自研 ZIP+AES 是高风险区（项目刚吃过 copy-mode 注释损坏的亏）；per-entry 能力应优先用现有依赖实现 | 现有依赖确实做不到 per-entry 级别控制时 |
 | 插件生态（.mp 市场 + 宿主安装器/运行时） | [plugin-ecosystem.md](.omo/plans/未开始/plugin-ecosystem.md) | 44-64h | Publisher 侧已独立实现（47+8 测试通过），**宿主侧为 0**；无用户基数支撑市场 | 有第三方明确要做插件 |
 | 跨平台移植（macOS / Linux） | [cross-platform-port.md](.omo/plans/未开始/cross-platform-port.md) | 6-8周 | 📋 **2026-10-24 确认：暂不投入（「想想」）**。这是战略选择不是功能。WPF→Avalonia 迁移已完成，剩余为 macOS/Linux 适配 | 决策上要做跨平台时，**先花 1 天做可移植性体检**（Win32 依赖隔离成接口 + linux CI 只跑 Core 测试），再决定是否投 8 周 |
@@ -160,10 +172,12 @@
 ## 依赖链与联动
 
 ```
-intent-execution-seam（S）── 软前置 ──▶ 所有「新增 UI 入口」类计划
-                                    （embedded-file-picker / archive-rename-entry 等先做它可省返工）
+intent-execution-seam（S，已完成 2026-10-26）── 软前置 ──▶ 所有「新增 UI 入口」类计划
+                                    （embedded-file-picker 等先做它可省返工）
 
-icon-normalization（S）──── 前置 ──▶ icon-theme-infra（冻结）──▶ packs ──▶ sets
+archive-rename-entry（S）── renameMap / RenameEntriesAsync ──▶ archive-edit-operation-sequence（A，暂存区）
+
+icon-normalization（S，已完成 2026-10-26）──── 前置 ──▶ icon-theme-infra（冻结）──▶ packs ──▶ sets
 
 parallel-compress-plan-d ── 前置 ──▶ parallel-compress-plan-a
 
@@ -179,7 +193,7 @@ NuGet 升级（SharpCompress ≥0.49.0）── 联动 ──▶ selfcontained-s
 补充说明：
 
 - `cross-platform-port` 已冻结。**唯一保留的纪律**：新增代码不要加深 Win32 耦合（新增平台相关调用时，优先走已有抽象或加一层接口）。
-- `archive-rename-entry` / `rar-compression` 为软依赖，进度窗口增强会自动改善其体验。
+- `rar-compression` 为软依赖，进度窗口增强会自动改善其体验。`archive-rename-entry` 已不再依赖进度窗口增强（2026-10-27 重写后只需一次 `RunWithProgress`）。
 
 ---
 

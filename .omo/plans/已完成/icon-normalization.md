@@ -77,11 +77,11 @@
 
 ### Definition of Done
 
-- [ ] `pwsh -File scripts\render-icon-montage.ps1 -Check` 退出码 **0**（B/C 组清零）
-- [ ] `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` 通过
-- [ ] `pwsh -File scripts\verify-repo.ps1 -Task guards` 通过（规则 8 图标登记未破坏）
-- [ ] 浅色 + 深色主题各截一张主窗口工具栏图，肉眼确认无发虚、无低对比、无尺寸跳变
-- [ ] `git grep -c "StreamGeometry\|F0 M"` 无新增异常路径数据（解析错误为 0）
+- [x] `pwsh -File scripts\render-icon-montage.ps1 -Check` 退出码 **0**（B/C 组清零）
+- [x] `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` 通过
+- [x] `pwsh -File scripts\verify-repo.ps1 -Task guards` 通过（规则 8 图标登记未破坏）
+- [x] 浅色 + 深色主题各截一张主窗口工具栏图，肉眼确认无发虚、无低对比、无尺寸跳变
+- [x] `git grep -c "StreamGeometry\|F0 M"` 无新增异常路径数据（解析错误为 0）
 
 ### Must Have
 
@@ -165,7 +165,7 @@ Wave 6（验收）:
 
 ## TODOs
 
-- [ ] **T0. 取得 Fluent 24 Regular 图标源（离线）**
+- [x] **T0. 取得 Fluent 24 Regular 图标源（离线）**
 
   **What to do**:
   - 下载 `microsoft/fluentui-system-icons`（MIT），只取 24px / Regular / Products 或通用分类下的 SVG
@@ -179,7 +179,7 @@ Wave 6（验收）:
   **Acceptance Criteria**:
   - 49 个目标图标名在本地都能找到对应 SVG，缺失的记下来（缺失项在 T1 换近义名）
 
-- [ ] **T1. 生成 49 条映射表并逐条确认**
+- [x] **T1. 生成 49 条映射表并逐条确认**
 
   **What to do**:
   - 按下表逐条确认「旧键 → Fluent 图标名」。**下面这张表是初稿**，遇到语义不合的以「这个键在 UI 里到底表示什么」为准（去 `grep` 调用点文案）
@@ -216,7 +216,7 @@ Wave 6（验收）:
   - 49 条全部有对应 Fluent 名，无「找不到就自己画」
   - 映射表里每条都标注它服务的 UI 位置（工具栏/菜单/进度窗/图标测试窗）
 
-- [ ] **T2. 替换 AppIcons.axaml 中的 49 条 Geometry**
+- [x] **T2. 替换 AppIcons.axaml 中的 49 条 Geometry**
 
   **What to do**:
   - 逐条替换 `<Geometry x:Key="IconXxx">…</Geometry>` 的路径数据
@@ -231,7 +231,7 @@ Wave 6（验收）:
   - `-Check` 报告的 B/C 组数量从 49 降到 0（或仅剩已确认的误判项）
   - 拼版 PNG 中不再出现「明显更粗更黑」的图标
 
-- [ ] **T3. 尺寸档位收敛 + 语义修正**
+- [x] **T3. 尺寸档位收敛 + 语义修正**
 
   **What to do**:
   - 把 14px 的图标显示位统一到 **16px**（`ProgressWindow.axaml:231` 等）；16px 以下的站点全部排查一遍
@@ -243,7 +243,7 @@ Wave 6（验收）:
   - 不改紧凑度资源键的数值（那是 `App.axaml.cs` `ApplyCompactness()` 的职责）
   - 不用固定 Height 强行对齐（规则 4 已禁止无理由固定高度）
 
-- [ ] **T4. PathIcon 前景色收敛**
+- [x] **T4. PathIcon 前景色收敛**
 
   **What to do**:
   - 处置实测的 **32 处**无 `Foreground` 的 `PathIcon`：
@@ -258,17 +258,17 @@ Wave 6（验收）:
   **Acceptance Criteria**:
   - `git grep -c 'PathIcon'` 统计后，未设 Foreground 的站点数为 0，或有注释说明继承来源
 
-- [ ] **T5. IconTestWindow 增加「三档尺寸 × 双主题」矩阵页**
+- [x] **T5. IconTestWindow 增加「三档尺寸 × 双主题」矩阵页**
 
   **What to do**:
-  - 在现有 `IconTestWindow` 增加一个视图：每个图标按 16 / 22 / 28px 三档 × 浅色/深色两种前景各渲染一次
+  - 在现有 `IconTestWindow` 增加一个视图：每个图标按 16 / 22 / 28px 三档，分别渲染在浅色与深色**背景块**上（块内前景随背景反转，模拟真实使用场景）
   - 目的：以后新增图标先在这一页过一遍，一眼看出「粗了/虚了/大小不一」
   - 新增用户可见文案走三语（规则 13），key 插入三份 JSON 头部
 
   **Acceptance Criteria**:
   - 打开图标测试窗口能看到矩阵页，117 个图标齐全（`IconTestViewModel.LoadAllIcons()` 新增项必须同步，规则 8）
 
-- [ ] **T6. 全量验证 + 截图留证**
+- [x] **T6. 全量验证 + 截图留证**
 
   **What to do**:
   - 跑：`verify-repo.ps1 -Task check` / `-Task build -Target avalonia` / `-Task guards` / `-Task i18n`
@@ -279,6 +279,42 @@ Wave 6（验收）:
   **Acceptance Criteria**:
   - 全部门禁通过
   - 前后对比图能明显看出「不再是粗细混排」
+
+---
+
+## 实施记录（2026-10-26）
+
+**映射与数据源**：见附录 A，实际 **50 条**（计划的 49 条 + `IconOrientation`——它几何本来就在 24 网格，属「语义错」（画成图裂/禁用样），按 T3 一并改为 `arrow_bidirectional_left_right`）。源 = npm `@fluentui/svg-icons@1.1.344`（本机 `raw.githubusercontent.com` / `github.com` 均不可达、`registry.npmjs.org` 可达），一次性提取脚本与坐标转换器都放 `$env:TEMP`，**未入库**。
+
+| 位置 | 改动 |
+|---|---|
+| `src/MantisZip.UI.Avalonia/Resources/Icons/AppIcons.axaml` | 50 条 `<Geometry>` **整行**替换（键名/顺序/分区注释全不动），文件仍无 BOM、CRLF |
+| `scripts/render-icon-montage.ps1` | 分类判据改写成**真实渲染包围盒**（`Geometry.Parse(...).Bounds`；A = 落在 `[-2,26]`，B = 越出网格，C = 解析失败/空路径），文案与图例同步 |
+| `src/MantisZip.UI.Avalonia/App.axaml:135-140` | 新增 `PathIcon.ToolbarButtonIcon` 样式；**必须在 `ToggleButton:checked PathIcon` 之前**，否则选中态白色被覆盖 |
+| 21 个 axaml | 14/15px → 16px 共 **109 处**（含跨行标签），`Views/UiTestWindow.axaml` 与刻意保留站点除外 |
+| `ArchiveContentView.axaml:230`、`ResultTreeView.axaml:35/67` | 三个 ToggleButton 图标补 `Classes="ToolbarButtonIcon"`（不写本地 `Foreground`，否则压掉选中态白色） |
+| `CustomFilePickerDialog.axaml:270/283/306`、`SettingsWindow.axaml:1176/1185` | 按上下文显式补 `Foreground`（Primary / Secondary） |
+| `Dialogs/ProgressWindow.axaml` 底部 3 个 Toggle 图标 | 加 class，同上不写本地色 |
+| `Dialogs/IconTestWindow.axaml` + `ViewModels/IconTestViewModel.cs` + 三份 strings | 新增矩阵页（`TabControl` 第二页，117 图标 × 16/22/28 × 浅/深背景块），8 个三语 key |
+| `tests/MantisZip.UI.Avalonia.Tests/IconTestWindowMatrixTests.cs` | 新增回归：矩阵页浅/深两块都在 + 可见图标尺寸恰为 `{16,22,28}` |
+
+**与计划的偏差**
+
+1. 49 → 50 条（`IconOrientation` 语义修正，见上）。
+2. 尺寸：计划只写「14px → 16px」，实测还有 15px 两处（`SettingsWindow.axaml`）一并收敛，共 109 处。
+3. 矩阵页措辞：计划说「浅色/深色两种**前景**」，实现为「浅色/深色**背景块**」（块内前景随背景反转），更贴近真实使用场景。
+4. **审计脚本判据被重写**：旧判据（路径里最大数字 > 26 即 B）对 Fluent 的压缩相对坐标必然误判（`.86` 被拼成 86、`1.65.5` 拼成 65.5），且把上游合法圆弧半径 `A59` 当越界 —— 不重写则新数据永远过不了 `-Check`。
+5. Fluent 缺项兜底：`arrow_enter` → `arrow_enter_left`（24/Regular 无 `arrow_enter`）；`magnet` 上游**完全没有** → 用 `link`（该键服务「种子 Torrent」Tab，磁力链语义）；`html` → `code`。
+
+**验证**
+
+- `scripts/render-icon-montage.ps1 -Check`：117 图标 / A 117 / B 0 / C 0，退出码 0；拼版 PNG 目视 117 个粗细一致、无「更粗更黑」。
+- `-Task build -Target avalonia -c Release` 0 警告；`-Task test -Target tests` / `ui-tests` 全绿；`-Task check` = 1321 key 三语一致 + 守卫 4/4。
+- 真机截图（主窗口工具栏，浅色 / 深色）：两主题图标均清晰、尺寸一致，深色下自动为浅色；选中态（预览）仍是白图标。截图仅现场查看，不落库。
+- 未单独截图：进度窗 / 设置窗（同一套样式与尺寸规则，主窗口已覆盖代表性站点）。
+- 附注（待复核）：反射发现 Avalonia 12.1.2 的 `IconElement.ForegroundProperty.Inherits = true`，与 AGENTS.md 规则 4「`PathIcon` 不继承父控件 `Foreground`」的表述不符；本次未改规则文档，建议实机对比后再修订。
+
+**状态**：T0–T6 全部完成。规则 18 的 `RELEASE_NOTES.md` 写入范围待用户确认。
 
 ---
 
@@ -293,3 +329,64 @@ Wave 6（验收）:
 - `icon-theme-infra`（①）：若将来解冻，本计划产出的「117 键全在 24 网格」正是它的前置条件，**不会返工**（它迁移的是容器契约，不是路径数据）。
 - `icon-theme-packs`（②）`icon-theme-sets`（③）：依赖 ①，与本计划无交集。
 - 解冻条件见 `docs/PLAN.md` 的「已冻结」表。
+
+---
+
+## 附录 A：50 条图标映射表（2026-10-26 实测落地）
+
+源 = `@fluentui/svg-icons` 1.1.344（npm，MIT），只取 `*_24_regular.svg`，用 WPF `Geometry.Parse` + `PathGeometry` 把上游压缩相对坐标转成绝对命令，转换前后包围盒差 ≤0.02 才采用。**键名一个都没改**（`IconTestViewModel.LoadAllIcons()` 与 224 处 `PathIcon` 引用零改动）。
+
+| # | 键（不变） | Fluent 24 Regular 名 | UI 调用点 | 备注 |
+|---|---|---|---|---|
+| 1 | `IconBookmark` | `bookmark` | 3 处（Controls\QuickPathControl.axaml + Controls\QuickPathPicker.axaml） |  |
+| 2 | `IconBookmarkAdd` | `bookmark_add` | 3 处（Controls\Menus\TestMenuView.axaml + Dialogs\CustomFilePickerDialog.axaml） |  |
+| 3 | `IconBookmarkMultiple` | `bookmark_multiple` | 1 处（Controls\Menus\ToolsMenuItems.axaml） |  |
+| 4 | `IconBookmarkOff` | `bookmark_off` | 1 处（Dialogs\FavoriteManagerWindow.axaml） |  |
+| 5 | `IconEye` | `eye` | 11 处（Controls\Menus\ViewMenuItems.axaml + Converters\BoolToIconConverter.cs） | 密码框显隐 |
+| 6 | `IconEyeOff` | `eye_off` | 4 处（Converters\BoolToIconConverter.cs + Dialogs\MatchedPasswordDialog.axaml） | 密码框显隐（与 Eye 等重成对） |
+| 7 | `IconSubtract` | `subtract` | 2 处（Dialogs\CustomFilePickerDialog.axaml + Views\PreviewPanel.axaml） |  |
+| 8 | `IconArrowRight` | `arrow_right` | 2 处（Dialogs\CompressConflictDialog.axaml + Dialogs\ConflictDialog.axaml） |  |
+| 9 | `IconArrowFitIn` | `arrow_fit_in` | 1 处（Views\PreviewPanel.axaml） |  |
+| 10 | `IconFontIncrease` | `font_increase` | 2 处（Views\PreviewPanel.axaml + Views\SettingsWindow.axaml） |  |
+| 11 | `IconFontDecrease` | `font_decrease` | 1 处（Views\PreviewPanel.axaml） |  |
+| 12 | `IconFilter` | `filter` | 3 处（Controls\ResultTreeView.axaml + Dialogs\CompressSettingsWindow.axaml） | 原为实心漏斗 |
+| 13 | `IconArchiveArrowBack` | `archive_arrow_back` | —（资源库/图标测试窗专用） |  |
+| 14 | `IconArchiveMultiple` | `archive_multiple` | —（资源库/图标测试窗专用） |  |
+| 15 | `IconArchiveSettings` | `archive_settings` | —（资源库/图标测试窗专用） |  |
+| 16 | `IconArrowAutofitContent` | `arrow_autofit_content` | —（资源库/图标测试窗专用） |  |
+| 17 | `IconArrowAutofitWidth` | `arrow_autofit_width` | —（资源库/图标测试窗专用） |  |
+| 18 | `IconArrowAutofitWidthDotted` | `arrow_autofit_width_dotted` | —（资源库/图标测试窗专用） |  |
+| 19 | `IconArrowAutofitHeight` | `arrow_autofit_height` | —（资源库/图标测试窗专用） |  |
+| 20 | `IconArrowCollapseAll` | `arrow_collapse_all` | 1 处（Controls\ArchiveContentView.axaml） |  |
+| 21 | `IconArrowExpandAll` | `arrow_expand_all` | 2 处（Controls\ArchiveContentView.axaml + Controls\ResultTreeView.axaml） |  |
+| 22 | `IconArrowMove` | `arrow_move` | —（资源库/图标测试窗专用） |  |
+| 23 | `IconCalendarCheckmark` | `calendar_checkmark` | —（资源库/图标测试窗专用） |  |
+| 24 | `IconChevronUpDown` | `chevron_up_down` | —（资源库/图标测试窗专用） |  |
+| 25 | `IconFolderArrowLeft` | `folder_arrow_left` | —（资源库/图标测试窗专用） |  |
+| 26 | `IconFolderAdd` | `folder_add` | —（资源库/图标测试窗专用） |  |
+| 27 | `IconFolderArrowRight` | `folder_arrow_right` | —（资源库/图标测试窗专用） |  |
+| 28 | `IconFolderMultiple` | `folder_multiple` | —（资源库/图标测试窗专用） |  |
+| 29 | `IconFolderOpen` | `folder_open` | 1 处（Views\SettingsWindow.axaml） |  |
+| 30 | `IconKeyMultiple` | `key_multiple` | 1 处（Controls\Menus\ToolsMenuItems.axaml） |  |
+| 31 | `IconLocationCheckmark` | `location_checkmark` | 1 处（Controls\ArchiveContentView.axaml） |  |
+| 32 | `IconLocationSettings` | `location_settings` | —（资源库/图标测试窗专用） |  |
+| 33 | `IconLockClosedKey` | `lock_closed_key` | —（资源库/图标测试窗专用） |  |
+| 34 | `IconLockMultiple` | `lock_multiple` | —（资源库/图标测试窗专用） |  |
+| 35 | `IconArrowCircleDown` | `arrow_circle_down` | —（资源库/图标测试窗专用） |  |
+| 36 | `IconArrowCircleLeft` | `arrow_circle_left` | —（资源库/图标测试窗专用） |  |
+| 37 | `IconArrowCircleRight` | `arrow_circle_right` | —（资源库/图标测试窗专用） |  |
+| 38 | `IconArrowCircleUp` | `arrow_circle_up` | —（资源库/图标测试窗专用） |  |
+| 39 | `IconArrowExit` | `arrow_exit` | —（资源库/图标测试窗专用） |  |
+| 40 | `IconImport` | `arrow_import` | 1 处（Dialogs\PasswordManagerWindow.axaml） | 原手绘「导入」 |
+| 41 | `IconArrowMoveInward` | `arrow_minimize` | —（资源库/图标测试窗专用） | 原手绘四箭头内收 |
+| 42 | `IconAppsSettings` | `apps_list` | —（资源库/图标测试窗专用） | 原手绘；按「应用列表」语义选 apps_list |
+| 43 | `IconArrowCircleDownUp` | `arrow_swap` | —（资源库/图标测试窗专用） | 原手绘双向箭头 |
+| 44 | `IconFolderHint` | `folder_search` | —（资源库/图标测试窗专用） | 原手绘「文件夹+放大镜」 |
+| 45 | `IconDrive` | `hard_drive` | 3 处（Controls\QuickPathControl.axaml + Controls\QuickPathControl.axaml.cs） | 原手绘方盒 |
+| 46 | `IconChevronDownUp` | `chevron_up_down` | 1 处（Controls\ResultTreeView.axaml） | 与 IconChevronUpDown 同路径（双键保留，零调用点改动） |
+| 47 | `IconArrowEnter` | `arrow_enter_left` | —（资源库/图标测试窗专用） | Fluent 24 Regular 无 arrow_enter，取 arrow_enter_left |
+| 48 | `IconMagnet` | `link` | 1 处（Views\SettingsWindow.axaml） | Fluent 无磁铁图标；调用点是设置页「种子/Torrent」Tab，取 link（磁力链语义） |
+| 49 | `IconHtml` | `code` | 1 处（Views\SettingsWindow.axaml） | 调用点是设置页 HTML 预览 Tab，取 code（</>） |
+| 50 | `IconOrientation` | `arrow_bidirectional_left_right` | 1 处（Controls\Menus\ViewMenuItems.axaml） | 原图形似「图裂/禁用」；调用点是视图菜单「面板方向」 |
+
+「UI 调用点」= `rg` 统计的引用文件数（已排除 `AppIcons.axaml` 与 `IconTestViewModel.cs`）；0 处表示只被资源库与图标测试窗使用，替换不影响界面。

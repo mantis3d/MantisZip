@@ -62,12 +62,16 @@ public class ZipEngineDeleteTests : IDisposable
     }
 
     [Fact]
-    public async Task DeleteEntriesAsync_NonExistentEntry_ThrowsFileNotFoundException()
+    public async Task DeleteEntriesAsync_NonExistentEntry_ThrowsArchiveEntryNotFoundException()
     {
         var archive = TrackFile(ArchiveFixtures.CreateZipArchive());
 
-        await Assert.ThrowsAsync<FileNotFoundException>(() =>
+        var ex = await Assert.ThrowsAsync<ArchiveEntryNotFoundException>(() =>
             _engine.DeleteEntriesAsync(archive, ["nonexistent.txt"]));
+
+        Assert.Equal("nonexistent.txt", ex.EntryPath);
+        // 派生自 FileNotFoundException：只捕获基类的既有消费者不会漏
+        Assert.IsAssignableFrom<FileNotFoundException>(ex);
     }
 
     [Fact]

@@ -429,6 +429,102 @@
         </ScrollViewer>
       </TabItem>
 
+      <!-- 选项卡 5：更新（自动更新检测，2026-10-28 新增） -->
+      <TabItem Header="{Binding UpdatesTabHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconArrowCircleDown">
+        <!-- 更新页布局：沿用「关于」页的 ScrollViewer + 主题外边距 + StackPanel（窄窗口可滚动） -->
+        <ScrollViewer VerticalScrollBarVisibility="Auto"
+                      Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Margin="{DynamicResource SpacingMdThk}"
+                      Spacing="{DynamicResource SpacingSm}">
+
+            <!-- 当前版本：只读显示 AppConstants.Version -->
+            <TextBlock Text="{Binding UpdateCurrentVersionText}"
+                       FontSize="14" FontWeight="Bold"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+            <!-- 上次检查时间（本地时间；从未检查时显示「从未检查」） -->
+            <TextBlock Text="{Binding UpdateLastCheckText}"
+                       FontSize="13"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+            <!-- 手动检查按钮：高度/配色走紧凑度与主题资源键。
+                 ⚠ 不要在这里写本地 Padding：ControlHeight=28 时 SpacingXsThk(8,8,8,8) 只剩 12px 文字区，
+                 14px 字号会被裁掉（与「更新提示对话框」同一个缺陷）。用全局 Button 样式的 Padding="8,4"。 -->
+            <Button Content="{Binding UpdateCheckNowText}"
+                    Click="OnCheckUpdateClick"
+                    HorizontalAlignment="Left"
+                    Height="{DynamicResource ControlHeight}"
+                    Background="{DynamicResource ThemeButtonBgBrush}"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
+
+            <!-- 检查状态文本：正在检查 / 已是最新 / 发现新版本 / 检查失败，无状态时整块隐藏 -->
+            <TextBlock Text="{Binding UpdateStatusText}"
+                       IsVisible="{Binding HasUpdateStatus}"
+                       TextWrapping="Wrap"
+                       FontSize="13"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+            <!-- 新版本详情区：仅发现新版本时显示（版本号 / 发布日期 / 打开发布页） -->
+            <Border IsVisible="{Binding ShowLatestVersion}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}"
+                    Padding="{DynamicResource SpacingMdThk}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+
+                <!-- 版本行 + 下载按钮同一行：更新说明可能很长，把唯一的操作按钮放在详情区顶部，
+                     用户不用拉到最底下才找得到（2026-10-28 用户反馈调整） -->
+                <Grid ColumnDefinitions="*,Auto"
+                      ColumnSpacing="{DynamicResource SpacingSm}">
+
+                  <!-- 最新版本号（左） -->
+                  <TextBlock Text="{Binding UpdateLatestVersionText}"
+                             VerticalAlignment="Center"
+                             TextWrapping="Wrap"
+                             FontSize="14" FontWeight="Bold"
+                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+                  <!-- 打开发布页按钮（右）：应用内不下载，交给系统浏览器（不写本地 Padding，见上方按钮注释） -->
+                  <Button Grid.Column="1"
+                          Content="{Binding UpdateDownloadText}"
+                          Click="OnOpenReleasePageClick"
+                          VerticalAlignment="Center"
+                          Height="{DynamicResource ControlHeight}"
+                          Background="{DynamicResource ThemeAccentBrush}"
+                          Foreground="White"
+                          BorderThickness="0" />
+                </Grid>
+
+                <!-- 发布日期行（接口未给出日期时文本为空串） -->
+                <TextBlock Text="{Binding UpdatePublishDateText}"
+                           FontSize="13"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+                <!-- 更新说明：小标题 + Markdown 正文，接口带回 release body 时才显示整块。
+                     正文由 code-behind 塞进 NotesHost（Markdown 无法用字符串绑定表达），
+                     与「发现新版本」对话框同源、同渲染方式；高度封顶后内部自行滚动。 -->
+                <TextBlock Text="{Binding ReleaseNotesLabelText}"
+                           IsVisible="{Binding ShowReleaseNotes}"
+                           FontSize="13" FontWeight="Bold"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+
+                <Border IsVisible="{Binding ShowReleaseNotes}"
+                        MaxHeight="260"
+                        Background="{DynamicResource ThemeWindowBgBrush}"
+                        BorderBrush="{DynamicResource ThemeBorderLightBrush}"
+                        BorderThickness="1"
+                        CornerRadius="{DynamicResource BorderRadius}">
+                  <ContentControl x:Name="NotesHost" />
+                </Border>
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
     </TabControl>
   </DockPanel>
 </Window>

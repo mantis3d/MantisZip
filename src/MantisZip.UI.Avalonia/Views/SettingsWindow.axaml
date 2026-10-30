@@ -3,6 +3,7 @@
         xmlns:vm="clr-namespace:MantisZip.UI.Avalonia.ViewModels"
         xmlns:services="clr-namespace:MantisZip.UI.Avalonia.Services"
         xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+        xmlns:behaviors="clr-namespace:MantisZip.UI.Avalonia.Behaviors"
         xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
         xmlns:local="clr-namespace:MantisZip.UI.Avalonia.Views"
         x:Class="MantisZip.UI.Avalonia.Views.SettingsWindow"
@@ -78,12 +79,13 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding CompressOptionsText}" FontWeight="SemiBold" />
-                      <CheckBox Content="{Binding CloseAfterCompressText}"
-                                IsChecked="{Binding CloseAfterCompress}" />
                       <CheckBox Content="{Binding KeepOriginalExtensionText}"
                                 IsChecked="{Binding KeepOriginalExtension}" />
                       <CheckBox Content="{Binding PreserveDirectoryRootText}"
                                 IsChecked="{Binding PreserveDirectoryRoot}" />
+                      <!-- 压缩完成后打开输出目录（与解压端「解压后打开目标目录」对称；对话框可临时改，进度窗口底部也能改） -->
+                      <CheckBox Content="{Binding CompressOpenFolderAfterText}"
+                                IsChecked="{Binding OpenFolderAfterCompress}" />
                     </StackPanel>
                   </Border>
 
@@ -218,14 +220,14 @@
                                   <Button Grid.Column="1" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="EditCustomFormat_Click"
                                           ToolTip.Tip="编辑">
-                                    <PathIcon Data="{StaticResource IconEdit}" Width="15" Height="15"
+                                    <PathIcon Data="{StaticResource IconEdit}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                   <!-- 删除按钮（矢量图标：IconDelete） -->
                                   <Button Grid.Column="2" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="DeleteCustomFormat_Click"
                                           ToolTip.Tip="删除">
-                                    <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15"
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                 </Grid>
@@ -278,12 +280,12 @@
                                 <StackPanel Orientation="Horizontal" Grid.Column="6">
                                   <!-- 编辑按钮（矢量图标：IconEdit） -->
                                   <Button Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="编辑">
-                                    <PathIcon Data="{StaticResource IconEdit}" Width="15" Height="15"
+                                    <PathIcon Data="{StaticResource IconEdit}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                   <!-- 删除按钮（矢量图标：IconDelete） -->
                                   <Button Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="删除">
-                                    <PathIcon Data="{StaticResource IconDelete}" Width="15" Height="15"
+                                    <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                 </StackPanel>
@@ -556,11 +558,15 @@
                 <Grid ColumnDefinitions="Auto,*">
                   <TextBlock Text="{Binding ExtractDoubleClickThresholdText}"
                              VerticalAlignment="Center" Margin="0,0,8,0" />
-                  <TextBox Grid.Column="1" Text="{Binding DoubleClickOpenThresholdMB}"
-                           Width="80" HorizontalAlignment="Left"
-                           Background="{DynamicResource ThemeWindowBgBrush}"
-                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                  <!-- 阈值单位 MB，整数输入用 NumericUpDown（避免 TextBox 绑 long 时敲字母产生红色校验文本） -->
+                  <NumericUpDown Classes="intOnly"
+                                 Grid.Column="1"
+                                 Minimum="0" Maximum="102400" Increment="1"
+                                 Value="{Binding DoubleClickOpenThresholdMB, Mode=TwoWay}"
+                                 Width="120" HorizontalAlignment="Left"
+                                 Background="{DynamicResource ThemeWindowBgBrush}"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
                 </Grid>
               </StackPanel>
             </Border>
@@ -679,85 +685,130 @@
         </Grid>
       </TabItem>
 
-      <!-- 外观设置选项卡：主题、紧凑度、最近文件数、界面字体 -->
+      <!-- 外观设置选项卡：两层子页签 —— 「外观」（主题/紧凑度/最近文件数/应用字体）+「进度窗口」（自动关闭延时/默认钉住） -->
       <TabItem Header="{Binding TabAppearanceHeader}" Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconPaintBrush">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
-          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceThemeText}" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding ThemeOptions}"
-                          SelectedItem="{Binding SelectedThemeOption}"
-                          Width="200" HorizontalAlignment="Left">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock Text="{Binding Display}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </StackPanel>
-            </Border>
+        <Grid>
+          <TabControl TabStripPlacement="Top"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}">
+            <!-- 外观 General：视觉相关的四项 -->
+            <TabItem Header="{Binding TabAppearanceGeneralHeader}" Classes="compactTab"
+                     controls:TabItemExtensions.TabIcon="IconPaintBrush">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+                  <!-- 主题（跟随系统/浅色/深色） -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceThemeText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding ThemeOptions}"
+                                SelectedItem="{Binding SelectedThemeOption}"
+                                Width="200" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
 
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceCompactnessText}" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding CompactnessModeOptions}"
-                          SelectedItem="{Binding SelectedCompactnessModeOption}"
-                          Width="200" HorizontalAlignment="Left">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock Text="{Binding Display}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </StackPanel>
-            </Border>
+                  <!-- 紧凑度：三档间距/控件高度 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceCompactnessText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding CompactnessModeOptions}"
+                                SelectedItem="{Binding SelectedCompactnessModeOption}"
+                                Width="200" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
 
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceMaxRecentFilesText}" FontWeight="SemiBold" />
-                <TextBox Text="{Binding MaxRecentFiles}"
-                         Width="120" HorizontalAlignment="Left"
-                         Background="{DynamicResource ThemeWindowBgBrush}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
-              </StackPanel>
-            </Border>
+                  <!-- 最近文件列表的最大条目数 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceMaxRecentFilesText}" FontWeight="SemiBold" />
+                      <!-- 整数输入用 NumericUpDown（避免 TextBox 绑 int 时敲字母产生红色校验文本） -->
+                      <NumericUpDown Classes="intOnly"
+                                     Minimum="1" Maximum="100" Increment="1"
+                                     Value="{Binding MaxRecentFiles, Mode=TwoWay}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Background="{DynamicResource ThemeWindowBgBrush}"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                    </StackPanel>
+                  </Border>
 
-            <!-- 进度窗口：完成后自动关闭延时（秒，0–60，0 = 立即关闭；📌/失败/测试流始终留窗） -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceAutoCloseDelayText}" FontWeight="SemiBold" />
-                <TextBox Text="{Binding AutoCloseDelaySeconds}"
-                         Width="120" HorizontalAlignment="Left"
-                         Background="{DynamicResource ThemeWindowBgBrush}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
-              </StackPanel>
-            </Border>
+                  <!-- 应用字体：仅影响界面文本，不影响归档文件名 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceAppFontFamilyText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding AppFontFamilyOptions}"
+                                SelectedItem="{Binding SelectedAppFontFamilyOption}"
+                                Width="240" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
 
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
-                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding AppearanceAppFontFamilyText}" FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding AppFontFamilyOptions}"
-                          SelectedItem="{Binding SelectedAppFontFamilyOption}"
-                          Width="240" HorizontalAlignment="Left">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock Text="{Binding Display}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </ScrollViewer>
+            <!-- 进度窗口 Progress：完成后的停留行为（自动关闭延时 + 默认钉住） -->
+            <TabItem Header="{Binding TabAppearanceProgressHeader}" Classes="compactTab"
+                     controls:TabItemExtensions.TabIcon="IconTimer">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+                  <!-- 完成后自动关闭延时（秒，0–60，0 = 立即关闭）；钉住/失败/测试流不走倒计时 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding AppearanceAutoCloseDelayText}" FontWeight="SemiBold" />
+                      <!-- 整数输入用 NumericUpDown（.intOnly 见 App.axaml）：普通 TextBox 绑 int 时，
+                           用户敲字母会让绑定转换失败，Avalonia 默认模板在下方渲染一条红色报错文本。 -->
+                      <NumericUpDown Classes="intOnly"
+                                     Minimum="0" Maximum="60" Increment="1"
+                                     Value="{Binding AutoCloseDelaySeconds, Mode=TwoWay}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Background="{DynamicResource ThemeWindowBgBrush}"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      <!-- 说明：仅未钉住且未出错时生效（钉住时仍可编辑，只提示不生效） -->
+                      <TextBlock Text="{Binding AppearanceAutoCloseDelayHelpText}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 默认钉住：勾上后进度窗口打开即 📌，完成/出错都等手动关闭 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <CheckBox Content="{Binding ProgressPinByDefaultText}"
+                                IsChecked="{Binding ProgressPinByDefault}" />
+                      <TextBlock Text="{Binding ProgressPinByDefaultHelpText}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+          </TabControl>
+        </Grid>
       </TabItem>
 
       <!-- 预览设置选项卡：包含通用/图片/文本/字体/种子/可执行文件/数据表格/元数据面板子选项卡 -->
@@ -1028,11 +1079,14 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewTableMaxRowsText}" FontWeight="SemiBold" />
-                      <TextBox Text="{Binding MaxTablePreviewRows}"
-                               Width="120" HorizontalAlignment="Left"
-                               Background="{DynamicResource ThemeWindowBgBrush}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      <!-- 整数输入用 NumericUpDown（避免 TextBox 绑 int 时敲字母产生红色校验文本） -->
+                      <NumericUpDown Classes="intOnly"
+                                     Minimum="1" Maximum="5000" Increment="1"
+                                     Value="{Binding MaxTablePreviewRows, Mode=TwoWay}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Background="{DynamicResource ThemeWindowBgBrush}"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
                     </StackPanel>
                   </Border>
 
@@ -1040,11 +1094,14 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding PreviewTableMaxColsText}" FontWeight="SemiBold" />
-                      <TextBox Text="{Binding MaxTablePreviewCols}"
-                               Width="120" HorizontalAlignment="Left"
-                               Background="{DynamicResource ThemeWindowBgBrush}"
-                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                               BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      <!-- 整数输入用 NumericUpDown（避免 TextBox 绑 int 时敲字母产生红色校验文本） -->
+                      <NumericUpDown Classes="intOnly"
+                                     Minimum="1" Maximum="500" Increment="1"
+                                     Value="{Binding MaxTablePreviewCols, Mode=TwoWay}"
+                                     Width="120" HorizontalAlignment="Left"
+                                     Background="{DynamicResource ThemeWindowBgBrush}"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                     BorderBrush="{DynamicResource ThemeBorderBrush}" />
                     </StackPanel>
                   </Border>
                 </StackPanel>
@@ -1080,8 +1137,8 @@
                 <!-- Field list -->
                 <ScrollViewer Grid.Row="2" Background="{DynamicResource ThemeWindowBgBrush}">
                   <StackPanel>
-                    <!-- Header -->
-                    <Grid ColumnDefinitions="*,80,80,110" Margin="4,4,4,2">
+                    <!-- Header（列宽与下方数据行保持一致） -->
+                    <Grid ColumnDefinitions="*,80,80,130" Margin="4,4,4,2">
                     <TextBlock Grid.Column="0" Text="{Binding MetadataPanelSettings.ColumnFieldText}" FontWeight="SemiBold" FontSize="11"
                                Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                     <TextBlock Grid.Column="1" Text="{Binding MetadataPanelSettings.ColumnRowText}" FontWeight="SemiBold" FontSize="11"
@@ -1104,21 +1161,25 @@
                                          VerticalAlignment="Center"
                                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
 
-                              <!-- Row -->
-                              <TextBox Grid.Column="1" Text="{Binding Row}"
-                                       Width="50" HorizontalContentAlignment="Center"
+                              <!-- Row：普通 TextBox + NumericInput 行为（保持输入框外观，无上下调值按钮） -->
+                              <TextBox Grid.Column="1"
+                                       behaviors:NumericInput.Enabled="True"
+                                       behaviors:NumericInput.Minimum="0"
+                                       Text="{Binding Row, Mode=TwoWay}"
+                                       Width="64" Height="26" HorizontalAlignment="Center"
                                        Background="{DynamicResource ThemeWindowBgBrush}"
                                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
-                                       Height="24" HorizontalAlignment="Center" />
+                                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
 
-                              <!-- Order -->
-                              <TextBox Grid.Column="2" Text="{Binding Order}"
-                                       Width="50" HorizontalContentAlignment="Center"
+                              <!-- Order：同上 -->
+                              <TextBox Grid.Column="2"
+                                       behaviors:NumericInput.Enabled="True"
+                                       behaviors:NumericInput.Minimum="0"
+                                       Text="{Binding Order, Mode=TwoWay}"
+                                       Width="64" Height="26" HorizontalAlignment="Center"
                                        Background="{DynamicResource ThemeWindowBgBrush}"
                                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
-                                       Height="24" HorizontalAlignment="Center" />
+                                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
 
                               <!-- Position -->
                               <ComboBox Grid.Column="3" ItemsSource="{Binding PositionOptions}"
@@ -1175,7 +1236,7 @@
                                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                                                       ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).MetadataMoveUpTooltip}"
                                                       Click="OnPreviewFieldMoveUp">
-                                                <PathIcon Data="{StaticResource IconArrowUp}" Width="10" Height="10" />
+                                                <PathIcon Data="{StaticResource IconArrowUp}" Width="10" Height="10" Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                                               </Button>
                                               <Button Width="16" Height="16" Padding="0"
                                                       BorderThickness="1"
@@ -1184,7 +1245,7 @@
                                                       BorderBrush="{DynamicResource ThemeBorderBrush}"
                                                       ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).MetadataMoveDownTooltip}"
                                                       Click="OnPreviewFieldMoveDown">
-                                                <PathIcon Data="{StaticResource IconArrowDown}" Width="10" Height="10" />
+                                                <PathIcon Data="{StaticResource IconArrowDown}" Width="10" Height="10" Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                                               </Button>
                                             </StackPanel>
                                           </StackPanel>
@@ -1369,37 +1430,90 @@
                            FontSize="12"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                            TextWrapping="Wrap" />
+                <!-- 两列勾选的说明：单独占一行（不塞进表头，避免表头被说明文字挤变形） -->
+                <TextBlock Text="{Binding FileAssocColumnsHintText}"
+                           FontSize="11"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,2,0,0" />
 
-                <!-- Per-extension list -->
-                <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0"
-                              BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
-                  <ItemsControl ItemsSource="{Binding AssocItems}" Margin="4">
-                    <ItemsControl.ItemTemplate>
-                                          <DataTemplate x:DataType="vm:FormatAssocItemModel">
-                        <Grid Margin="4" ColumnDefinitions="Auto,Auto,*,Auto" RowDefinitions="Auto">
-                          <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center" />
-                          <Image Source="{Binding Icon}" Width="16" Height="16" Margin="8,0,0,0" Grid.Column="1" VerticalAlignment="Center" />
-                          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Extension}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Description}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          </StackPanel>
-                          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding CurrentHandler}" FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center" />
-                            <Button Width="28" Height="28" Command="{Binding DeleteCommand}" IsVisible="{Binding IsCustom}" Background="{DynamicResource ThemeButtonBgBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" Padding="4"
-                                    ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).AssocDeleteTooltip}">
-                                <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                              </Button>
-                          </StackPanel>
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
+                <!-- 扩展名表格：真正的列标题（关联 / 筛选 / 格式 / 当前处理程序）+ 可滚动数据行 -->
+                <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                        CornerRadius="4" ClipToBounds="True" Margin="0,8,0,0">
+                  <StackPanel>
+                    <!-- 表头：整条底色 + 下边框；列宽与下面每行严格一致（40 / 40 / 24 / * / Auto） -->
+                    <Border Background="{DynamicResource ThemeHeaderBgBrush}"
+                            BorderBrush="{DynamicResource ThemeBorderBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="4,6">
+                      <Grid ColumnDefinitions="40,40,24,*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding FileAssocColumnAssocText}"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   ToolTip.Tip="{Binding FileAssocAssocTooltipText}" />
+                        <TextBlock Grid.Column="1" Text="{Binding FileAssocColumnFilterText}"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   ToolTip.Tip="{Binding FileAssocOpenDialogTooltipText}" />
+                        <PathIcon Grid.Column="2" Data="{StaticResource IconImage}"
+                                  Width="14" Height="14"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                        <TextBlock Grid.Column="3" Text="{Binding FileAssocColumnFormatText}"
+                                   FontSize="11" FontWeight="SemiBold" Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                        <TextBlock Grid.Column="4" Text="{Binding FileAssocColumnHandlerText}"
+                                   FontSize="11" FontWeight="SemiBold" Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      </Grid>
+                    </Border>
+
+                    <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                      <ItemsControl ItemsSource="{Binding AssocItems}" Margin="4">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:FormatAssocItemModel">
+                            <!-- 列：0 关联勾选 / 1 打开对话框筛选勾选 / 2 图标 / 3 扩展名+说明 / 4 当前处理程序+删除 -->
+                            <Grid Margin="0,2" ColumnDefinitions="40,40,24,*,Auto" RowDefinitions="Auto">
+                              <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center"
+                                        Width="20" Padding="0" HorizontalAlignment="Center"
+                                        ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).FileAssocAssocTooltipText}" />
+                              <CheckBox Grid.Column="1" IsChecked="{Binding IsOpenDialogVisible}" VerticalAlignment="Center"
+                                        Width="20" Padding="0" HorizontalAlignment="Center"
+                                        ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).FileAssocOpenDialogTooltipText}" />
+                              <Image Source="{Binding Icon}" Width="16" Height="16" HorizontalAlignment="Center" Grid.Column="2" VerticalAlignment="Center" />
+                              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding Extension}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Description}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding CurrentHandler}" FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <Button Width="28" Height="28" Command="{Binding DeleteCommand}" IsVisible="{Binding IsCustom}" Background="{DynamicResource ThemeButtonBgBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" Padding="4"
+                                        ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).AssocDeleteTooltip}">
+                                  <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                                </Button>
+                              </StackPanel>
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </StackPanel>
+                </Border>
 
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
                   <Button Content="{Binding FileAssocSelectAllText}" Command="{Binding SelectAllAssocCommand}" Padding="12,4" />
                   <Button Content="{Binding FileAssocDeselectAllText}" Command="{Binding DeselectAllAssocCommand}" Padding="12,4" />
                                     <Button Content="{Binding FileAssocAddText}" Command="{Binding AddCustomAssocCommand}" Padding="12,4" />
+                </StackPanel>
+
+                <!-- 第二列（打开对话框筛选）批量开关：与左列的全选/全不选分开，避免误改文件关联 -->
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                  <Button Content="{Binding FileAssocOpenDialogSelectAllText}" Command="{Binding SelectAllOpenDialogCommand}" Padding="12,4" />
+                  <Button Content="{Binding FileAssocOpenDialogDeselectAllText}" Command="{Binding DeselectAllOpenDialogCommand}" Padding="12,4" />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">
@@ -1427,6 +1541,8 @@
                           IsChecked="{Binding EnableDebugLogging}" />
               </StackPanel>
             </Border>
+
+            <!-- 自动更新已移至独立「更新」页签（原先藏在调试页，普通用户找不到） -->
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -1627,6 +1743,30 @@
                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
                 <CheckBox Content="{Binding AdvancedCleanOnStartupText}"
                           IsChecked="{Binding CleanTempOnStartup}" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════ 更新 ═══════ -->
+      <!-- 自动更新检测的开关与频率：与「关于 → 更新」页签同名同语义，放在设置里用户才找得到 -->
+      <TabItem Header="{Binding TabUpdateHeader}" Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconArrowCircleDown">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+          <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <!-- 卡片标题：更新设置 -->
+                <TextBlock Text="{Binding UpdateSettingsSectionTitle}" FontWeight="SemiBold" />
+                <!-- 检查频率：关闭 / 每次启动 / 每天 / 每周（关闭即「从不自动检查」） -->
+                <TextBlock Text="{Binding UpdateFrequencyLabelText}" FontSize="13"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <ComboBox ItemsSource="{Binding UpdateFrequencyOptions}"
+                          SelectedIndex="{Binding UpdateFrequencyIndex}"
+                          Width="240"
+                          HorizontalAlignment="Left" />
               </StackPanel>
             </Border>
           </StackPanel>

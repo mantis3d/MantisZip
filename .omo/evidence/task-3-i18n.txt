@@ -1,0 +1,9 @@
+自动更新检测 · T7（三语 key）验证记录
+日期：2026-10-28
+
+命令：pwsh -File scripts\verify-repo.ps1 -Task i18n
+结果：✅ 三语一致：1355 个 key（en / zh-TW 无缺失、无多余、占位符一致）
+基线：1337 key；新增 18 个 Update_* key（含计划外补的 Update_NeverChecked / Update_PublishDate）
+
+编码核对：三份 strings.*.json 前 3 字节 EF BB BF（UTF-8 with BOM 保留），
+CRLF 1373/1372/1372，孤立 LF = 0。

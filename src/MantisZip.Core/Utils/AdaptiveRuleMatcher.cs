@@ -90,6 +90,9 @@ public static class AdaptiveRuleMatcher
                 }
             }
 
+            // 用**子类型**判定（而不是容器）：tar 也是容器，但 tar 本身不压缩，
+            // 若「是容器就 Store」会把 .tar 判成已压缩。jar/war/ear/apk 经 2026-10-27 收紧
+            // META-INF 判据后已回落到 FileFormat.Zip，命中下面的「压缩包」分支（issue #54）。
             if (ZipEntryClassifier.IsCompressedFormat(FileFormatDetector.Detect(head, headLength)))
             {
                 CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: magic detected compressed content → Store");

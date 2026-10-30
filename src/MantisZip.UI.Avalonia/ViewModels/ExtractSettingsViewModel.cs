@@ -13,7 +13,9 @@ namespace MantisZip.UI.Avalonia.ViewModels;
 
 /// <summary>
 /// 解压设置对话框的 ViewModel。
-/// 用户选择目标路径、冲突策略和是否打开文件夹，通过 CloseAction 回调返回结果。
+/// 用户选择目标路径、冲突策略和是否打开文件夹；点「开始解压」时由确认事务
+/// （<see cref="TryConfirmAsync"/>）一次性产出 <see cref="ExtractSettings"/> 载荷，
+/// 结局经 <see cref="ConfirmCompleted"/> 交给窗口——拒绝留窗并显示原因，确认/取消关窗。
 /// </summary>
 public partial class ExtractSettingsViewModel : ObservableObject
 {
@@ -29,8 +31,16 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// <summary>由 View 设置的文件夹选择回调。返回选择的路径，取消返回 null。</summary>
     public Func<Task<string?>>? BrowseFolder { get; set; }
 
-    /// <summary>由 View 设置的关闭回调。参数 true=确认解压，false=取消。</summary>
-    public Func<bool, Task>? CloseAction { get; set; }
+    /// <summary>
+    /// 由 View 设置的提示回调（拒绝原因必须让用户看见）：参数为已本地化的文案与对话框标题。
+    /// </summary>
+    public Func<string, string, Task>? ShowMessage { get; set; }
+
+    /// <summary>
+    /// 确认事务的结局出口（确认 / 拒绝 / 取消）：窗口订阅后据此关窗或留窗。
+    /// 与压缩侧 <c>CompressSettingsViewModel.ConfirmCompleted</c> 同款式，替代旧的 <c>CloseAction(bool)</c> 双轨回传。
+    /// </summary>
+    public event Action<ConfirmOutcome<ExtractSettings>>? ConfirmCompleted;
 
     [ObservableProperty]
     private string _destinationPath = string.Empty;
@@ -116,45 +126,6 @@ public partial class ExtractSettingsViewModel : ObservableObject
         ManualDegree = Math.Clamp(ManualParallelDegree, 1, 16)
     };
 
-    /// <summary>过滤后需实际解压的条目 key 列表（由 View 从对话框回传；null = 未启用过滤，全量解压）。</summary>
-    public List<string>? FilteredEntryKeys { get; set; }
-
-    /// <summary>
-    /// 接管另一个（对话框里的）ViewModel 的全部**执行侧**设置。
-    /// <para>
-    /// 与压缩侧同构：对话框是独立 ViewModel，关窗后必须有人把执行侧字段搬回主窗口的执行 VM。
-    /// 原先这段是 <c>Views/MainWindow.axaml.cs</c> 里手写的逐属性清单（压缩侧同样写法已漏过三次：
-    /// 多线程/并行度恒 false、分卷大小恒 0、文件冲突策略恒「每次询问」），故此处同样收敛到一处并配漂移守卫测试
-    /// （<c>tests/.../ExtractSettingsDialogCopyTests.cs</c>）：新增执行侧字段忘记拷贝会红。
-    /// </para>
-    /// <para>
-    /// 不在本方法内的两项：<see cref="FilteredEntryKeys"/> 由 View 从过滤编辑器取（调用方单独赋值），
-    /// <see cref="ShowUnlockDialog"/> / <see cref="FilterProvider"/> / <see cref="BrowseFolder"/> 等委托属 View 注入。
-    /// </para>
-    /// </summary>
-    /// <param name="source">对话框（或任意来源）的 ViewModel，不能是自己。</param>
-    public void CopyExecutionSettingsFrom(ExtractSettingsViewModel source)
-    {
-        ArgumentNullException.ThrowIfNull(source);
-        if (ReferenceEquals(source, this)) return;
-
-        // ① 目标目录与同名冲突策略
-        DestinationPath = source.DestinationPath;
-        ConflictAction = source.ConflictAction;
-
-        // ② 完成后动作
-        OpenFolderAfterExtract = source.OpenFolderAfterExtract;
-        DeleteArchiveAfterExtract = source.DeleteArchiveAfterExtract;
-
-        // ③ 并行解压快照（初值读设置、本次解压生效、不回写设置 —— 与 BuildParallelSettings 同口径）
-        EnableParallelExtract = source.EnableParallelExtract;
-        SmartParallelDegree = source.SmartParallelDegree;
-        SmartSsdDegree = source.SmartSsdDegree;
-        SmartHddDegree = source.SmartHddDegree;
-        ManualParallelDegree = source.ManualParallelDegree;
-        LargeArchivePreTest = source.LargeArchivePreTest;
-    }
-
     // ── Preview tree ──
 
     /// <summary>预览树的根节点。</summary>
@@ -176,7 +147,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// <summary>
     /// 预览树构建是否进行中（无论快慢，构建开始即置位，驱动"开始解压"按钮门禁）。
     /// 与 <see cref="IsPreviewBuilding"/>（仅慢构建 ≥250ms 置位，驱动加载覆层）不同：
-    /// 快构建也会短暂置位，保证过滤结果（FilteredEntryKeys 读取的预览）就绪前无法点击解压。
+    /// 快构建也会短暂置位，保证确认事务取到的过滤集合（条目预览可见部分）就绪前无法点击解压。
     /// </summary>
     [ObservableProperty]
     private bool _isBuildPending;
@@ -220,7 +191,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// </summary>
     private IReadOnlyList<ArchiveItem>? _firstArchiveEntries;
 
-    /// <summary>首包条目只读访问（窗口的过滤统计 / FilteredEntryKeys 计算用）。</summary>
+    /// <summary>首包条目只读访问（窗口的过滤统计与预览灰显用；过滤集合只在确认事务里计算）。</summary>
     public IReadOnlyList<ArchiveItem>? FirstArchiveEntries => _firstArchiveEntries;
 
     /// <summary>是否存在多个源压缩包（驱动「过滤仅对首包生效」提示显隐）。</summary>
@@ -253,11 +224,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
 
     private readonly PasswordService _passwordService = new();
 
-    /// <summary>校验/手动解锁阶段确定的密码（path→pwd）。窗口确认后随结果传出，解压阶段直接复用免弹窗。</summary>
+    /// <summary>已确定的密码字典（只由确认事务整表冻结进载荷，不再对外暴露回读通道）。</summary>
     private readonly Dictionary<string, string> _matchedPasswords = new(StringComparer.OrdinalIgnoreCase);
-
-    /// <summary>已确定的密码字典只读视图（调用方回传解压流程）。</summary>
-    public IReadOnlyDictionary<string, string> MatchedPasswords => _matchedPasswords;
 
     /// <summary>单包/逐包冲突扫描的取消令牌。</summary>
     private CancellationTokenSource? _conflictCts;
@@ -360,7 +328,9 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Settings_SmartHddLabel",
             "Settings_ManualDegreeLabel",
             "Settings_ManualDegreeHint",
-            "Settings_LargeArchivePreTest"
+            "Settings_LargeArchivePreTest",
+            // 「加速」页签底部的「仅对本次解压生效」提示：XAML 早已绑定，此前漏登记 → 一直显示空白
+            "Extract_ParallelNotSavedHint"
         };
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in keys)
@@ -912,8 +882,12 @@ public partial class ExtractSettingsViewModel : ObservableObject
 
     /// <summary>
     /// 基于首包条目计算过滤后的提取 key 列表（提取语义始终绑定首包，与预览展示解耦）。
+    /// <para>
+    /// 只服务确认事务（<see cref="TryConfirmAsync"/>）内部的过滤快照，故为 private：
+    /// 旧的「窗口 GetFilteredEntryKeys 回读」通道已退休，过滤集合只能随载荷交付。
+    /// </para>
     /// </summary>
-    public List<string>? ComputeFilteredEntryKeys(FileFilterCriteria? filter)
+    private List<string>? ComputeFilteredEntryKeys(FileFilterCriteria? filter)
     {
         var entries = _firstArchiveEntries;
         if (filter == null || entries == null || !filter.IsActive) return null;
@@ -943,28 +917,211 @@ public partial class ExtractSettingsViewModel : ObservableObject
 
     private bool CanExecuteExtract()
     {
-        // 预览树构建期间禁用"开始解压"：过滤结果（FilteredEntryKeys 读取的预览树）未就绪时不允许执行
+        // 预览树构建期间禁用"开始解压"：确认事务要用的过滤集合（预览结果）未就绪时不允许执行
         if (IsBuildPending) return false;
         return !string.IsNullOrWhiteSpace(DestinationPath);
     }
 
+    /// <summary>
+    /// 「开始解压」：只把确认事务的结局翻译成窗口动作——校验、等就绪、过滤快照都在
+    /// <see cref="TryConfirmAsync"/> 里一次做完，真正的解压由宿主按载荷执行。
+    /// </summary>
     [RelayCommand(CanExecute = nameof(CanExecuteExtract))]
     private async Task Extract()
     {
-        if (string.IsNullOrWhiteSpace(DestinationPath)) return;
+        var outcome = await TryConfirmAsync();
 
-        // 修复潜伏 bug：CLI 多包路径（App.axaml.cs）读取的 FilteredEntryKeys 此前从未被
-        // 赋值（恒 null），批量解压时过滤条件静默失效。提取语义始终基于首包条目。
-        FilteredEntryKeys = ComputeFilteredEntryKeys(FilterProvider?.Invoke());
+        switch (outcome)
+        {
+            case Rejected<ExtractSettings> rejected:
+                // 拒绝原因必须让用户看见（目标目录无效 / 预览未就绪）：窗口保持打开。
+                if (ShowMessage != null)
+                    await ShowMessage(rejected.Reason, LocalizationManager.T("Progress_Title_Extract"));
+                return;
 
-        if (CloseAction != null)
-            await CloseAction(true);
+            case Cancelled<ExtractSettings>:
+                // 等待期间被取消：窗口已由 Cancel 关闭，这里不再重复关窗、不弹任何提示。
+                return;
+
+            default:
+                // Confirmed：把载荷交给窗口，由窗口关闭自己并把结局回传给宿主。
+                ConfirmCompleted?.Invoke(outcome);
+                return;
+        }
     }
 
     [RelayCommand]
-    private async Task Cancel()
+    private Task Cancel()
     {
-        if (CloseAction != null)
-            await CloseAction(false);
+        // 确认事务可能在等预览就绪：先标记取消，避免恢复执行后把载荷当成确认交出去。
+        _extractCancelled = true;
+
+        // 取消是静默动作：关窗由窗口订阅方处理，不弹任何提示。
+        ConfirmCompleted?.Invoke(new Cancelled<ExtractSettings>());
+        return Task.CompletedTask;
+    }
+
+    /// <summary>用户是否在确认事务等待期间点了「取消」。</summary>
+    private bool _extractCancelled;
+
+    // ════════════════════════════════════════════
+    //  确认事务（T8：意图-执行接缝的「结果即载荷」法则）
+    // ════════════════════════════════════════════
+
+    /// <summary>等预览/条目就绪的最长时间（毫秒）；超时即视为「过滤结果未就绪」，绝不带着未算完的结果开跑。</summary>
+    private const int PreviewReadyTimeoutMs = 10_000;
+
+    /// <summary>等就绪期间的轮询间隔（毫秒）。</summary>
+    private const int PreviewReadyPollMs = 50;
+
+    /// <summary>调用方预置的「已知密码」（会话缓存 / 命令行）；随确认快照进入载荷，不做窗口回读。</summary>
+    private string? _knownPassword;
+
+    /// <summary>
+    /// 预置「已知密码」：由入口在打开对话框前设置（会话内记住的密码），随确认快照进入
+    /// <see cref="ExtractSettings.Password"/>。
+    /// <para>
+    /// 为什么用方法而不是公开属性：密码属于「入口交给对话框的输入」，不是对话框对外暴露的可变状态；
+    /// 写成方法既避免 <c>ExtractSettingsDialogCopyTests</c> 把它当成需要归类的外部回读通道，
+    /// 也让「谁在什么时候写入密码」在调用点上可搜。
+    /// </para>
+    /// </summary>
+    /// <param name="password">入口已确认的密码；无则传 <see langword="null"/>。</param>
+    public void SetKnownPassword(string? password) => _knownPassword = password;
+
+    /// <summary>
+    /// 本次运行的密码策略（载荷字段 <see cref="ExtractSettings.PasswordPolicy"/> 的入口侧输入）。
+    /// 默认「只使用提供的密码」（主窗口路径）；CLI 入口在打开对话框前改成「回退密码库」，
+    /// 因为命令行历史行为就是逐包打密码库，而窗口本身无权决定宿主的取密策略。
+    /// </summary>
+    private ExtractPasswordPolicy _passwordPolicy = ExtractPasswordPolicy.UseProvidedOnly;
+
+    /// <summary>
+    /// 设置本次运行的密码策略：由入口在打开对话框前注入，随确认快照进入载荷。
+    /// </summary>
+    /// <param name="policy">入口选定的取密策略。</param>
+    public void SetPasswordPolicy(ExtractPasswordPolicy policy) => _passwordPolicy = policy;
+
+    /// <summary>
+    /// 确认事务：把「用户点下开始解压」这一刻的决定一次性冻结成 <see cref="ExtractSettings"/>。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 顺序固定为「校验 → 等预览/过滤结果就绪 → 快照」。以前确认流程是「关窗 + 调用方补读」，
+    /// 漏读一项就静默失效（历史事故：CLI 多包的过滤集合恒 null，过滤条件静默不生效）；
+    /// 现在载荷在事务内一次产出，调用方拿到的就是全部，缺项在产出点就炸，而不是在执行段变成
+    /// 「这次解压好像没听我的话」。
+    /// </para>
+    /// <para>
+    /// 校验判定条件与现状完全一致（目标目录非空、压缩包集合非空、预览构建期间不得确认），
+    /// 唯一变化是把原本靠按钮 <c>CanExecute</c> 挡住的「构建中」显式化成带文案的拒绝，
+    /// 避免重复实现同一谓词（计划 §4.1 法则四）。
+    /// </para>
+    /// </remarks>
+    /// <param name="cancellationToken">取消等待预览就绪的令牌；取消时返回 <see cref="Cancelled{T}"/>。</param>
+    /// <returns>
+    /// <see cref="Confirmed{T}"/>（载荷已完整）/ <see cref="Rejected{T}"/>（带本地化原因，调用方必须留窗展示）/
+    /// <see cref="Cancelled{T}"/>（等待期间被取消）。
+    /// </returns>
+    public async Task<ConfirmOutcome<ExtractSettings>> TryConfirmAsync(CancellationToken cancellationToken = default)
+    {
+        // ⓪ 每次事务独立：上一次的取消标记不得污染本次确认
+        _extractCancelled = false;
+
+        // ① 目标目录：与 CanExecuteExtract 同一谓词，空/空白一律不许继续
+        if (string.IsNullOrWhiteSpace(DestinationPath))
+            return new Rejected<ExtractSettings>(LocalizationManager.T("Error_Extract_DestinationInvalid"));
+
+        // ② 压缩包集合：载荷要求非空（对话框入口不会走到这里，守住直接构造 VM 的调用方）
+        if (ArchivePaths.Count == 0 || SelectedPaths.Count == 0)
+            return new Rejected<ExtractSettings>(LocalizationManager.T("Error_Extract_NoEntries"));
+
+        // ③ 等预览树就绪（原实现由按钮 CanExecute 拦住构建期，判定条件不变，只是把结论显式化）
+        if (IsBuildPending || IsListingPending)
+        {
+            var ready = await WaitForPreviewReadyAsync(cancellationToken).ConfigureAwait(true);
+            if (!ready)
+            {
+                if (cancellationToken.IsCancellationRequested)
+                    return new Cancelled<ExtractSettings>();
+
+                // 只有启用过滤时才真正依赖预览结果；未启用过滤时构建中不影响执行，按原语义继续。
+                if (IsFilterActive())
+                    return new Rejected<ExtractSettings>(LocalizationManager.T("Error_Extract_FilterNotReady"));
+            }
+        }
+
+        // ④ 过滤集合：启用过滤则必须在事务内算出来（不再由调用方补读）
+        var filter = FilterProvider?.Invoke();
+        List<string>? filteredEntryKeys = null;
+        if (filter is { IsActive: true })
+        {
+            if (_firstArchiveEntries is null)
+                return new Rejected<ExtractSettings>(LocalizationManager.T("Error_Extract_FilterNotReady"));
+
+            filteredEntryKeys = ComputeFilteredEntryKeys(filter);
+        }
+
+        // ⑤ 一次快照：此后窗口销毁、VM 通道复位都不影响载荷
+        var appSettings = AppSettings.Load();
+        var snapshot = new ExtractSettings
+        {
+            ArchivePaths = SelectedPaths.ToList(),
+            DestinationPath = DestinationPath,
+            ConflictAction = ConflictAction,
+            FilteredEntryKeys = filteredEntryKeys,
+            // 设置对话框只解整包或过滤集合；勾选条目由预览树入口另行构造载荷（T11）。
+            SelectedEntries = null,
+            CurrentFolder = null,
+            Password = _knownPassword,
+            MatchedPasswords = _matchedPasswords.Count > 0
+                ? new Dictionary<string, string>(_matchedPasswords, StringComparer.OrdinalIgnoreCase)
+                : null,
+            // 取密策略由入口注入：主窗口只复用对话框内已校验的密码，CLI 入口才回退密码库。
+            PasswordPolicy = _passwordPolicy,
+            OpenFolderAfterExtract = OpenFolderAfterExtract,
+            DeleteArchiveAfterExtract = DeleteArchiveAfterExtract,
+            // 路径契约的执行输入：路径归属由 ExtractPathResolver 决定，这里只记录当前设置值。
+            PreserveFullPath = appSettings.ExtractPreserveFullPath,
+            // 本次解压的并行度快照（对话框内改动本次生效、不回写全局设置）。
+            ParallelOverride = BuildParallelSettings(),
+        };
+
+        // ⑥ 等待期间用户点了「取消」：不得把载荷当成确认交出去（取消是静默结局，不弹任何提示）。
+        if (_extractCancelled)
+            return new Cancelled<ExtractSettings>();
+
+        return new Confirmed<ExtractSettings>(snapshot);
+    }
+
+    /// <summary>当前是否真的启用了过滤（过滤编辑器关闭或条件为空都算未启用）。</summary>
+    private bool IsFilterActive() => FilterProvider?.Invoke() is { IsActive: true };
+
+    /// <summary>轮询等待预览树 / 条目列表跑完；返回 <see langword="false"/> 表示超时或被取消。</summary>
+    private async Task<bool> WaitForPreviewReadyAsync(CancellationToken cancellationToken)
+    {
+        if (!IsBuildPending && !IsListingPending)
+            return true;
+
+        var deadline = Environment.TickCount64 + PreviewReadyTimeoutMs;
+        while (Environment.TickCount64 < deadline)
+        {
+            if (cancellationToken.IsCancellationRequested)
+                return false;
+
+            try
+            {
+                await Task.Delay(PreviewReadyPollMs, cancellationToken).ConfigureAwait(true);
+            }
+            catch (OperationCanceledException)
+            {
+                return false;
+            }
+
+            if (!IsBuildPending && !IsListingPending)
+                return true;
+        }
+
+        return false;
     }
 }

@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using MantisZip.Core;
@@ -16,7 +17,6 @@ public class AppSettings
     // ===== 压缩 =====
     public string DefaultFormat { get; set; } = "zip";
     public int DefaultLevel { get; set; } = 5;
-    public bool CloseAfterCompress { get; set; } = true;
     public bool KeepOriginalExtension { get; set; } = false;
     public string ZipEncoding { get; set; } = "utf-8";
     public string SevenZipCompressionMethod { get; set; } = "LZMA2";
@@ -84,6 +84,12 @@ public class AppSettings
     public string ExtractDestination { get; set; } = "ask"; // same-dir / desktop / last / ask
     public string FileConflictAction { get; set; } = "ask"; // overwrite / rename / skip / ask
     public bool OpenFolderAfterExtract { get; set; } = false;
+    /// <summary>
+    /// 压缩完成后打开输出所在目录并选中产物。
+    /// 与 <see cref="OpenFolderAfterExtract"/> 对称：设置页给默认值，压缩对话框给本次运行初值，
+    /// 进度窗口底部还能临时改（实例级，不回写设置）。
+    /// </summary>
+    public bool OpenFolderAfterCompress { get; set; } = false;
     public bool ExtractPreserveFullPath { get; set; } = false;
     /// <summary>
     /// 并行解压线程数（1 = 串行，>1 = 并行线程数）。
@@ -109,6 +115,12 @@ public class AppSettings
     // ===== 进度窗口 =====
     /// <summary>完成后自动关闭延时（秒，0–60；0 = 立即关闭）。📌/失败/测试流不受此影响（始终留窗）。</summary>
     public int AutoCloseDelaySeconds { get; set; } = 3;
+
+    /// <summary>
+    /// 进度窗口默认是否钉住（📌）：true = 一打开就钉住，完成/出错都等手动关闭。
+    /// 由 <c>ProgressWindow</c> 构造时写入 VM 初始值；失败/测试流/批处理行失败的自动压钉是单向的，不受本项影响。
+    /// </summary>
+    public bool ProgressPinByDefault { get; set; } = false;
 
     // ===== 交互 =====
     public bool EnableDragExtract { get; set; } = true;
@@ -197,6 +209,7 @@ public class AppSettings
     public bool AutoExpandTreeToCurrent { get; set; } = false;
 
     // ===== 文件关联 =====
+    // 旧的逐格式开关：仅用于把老配置迁移进 AssocExtensions，新代码不再读写它们。
     public bool AssocZip { get; set; } = true;
     public bool Assoc7z { get; set; } = true;
     public bool AssocRar { get; set; } = true;
@@ -204,7 +217,24 @@ public class AppSettings
     public bool AssocTarGz { get; set; } = true;
     public bool AssocGz { get; set; } = true;
     public bool AssocIso { get; set; } = false;
+
+    /// <summary>用户添加的自定义扩展名（设置页里除内置格式之外的那些行，上限 20）。</summary>
     public List<string> CustomAssocExtensions { get; set; } = new();
+
+    /// <summary>
+    /// 已注册文件关联的扩展名集合（null = 老配置尚未迁移，取 <see cref="ArchiveExtensionCatalog.DefaultAssocExtensions"/>）。
+    /// </summary>
+    /// <remarks>
+    /// 与 <see cref="OpenDialogExtensions"/> 是两个独立开关：这一项决定资源管理器里双击 / 图标归谁，
+    /// 那一项只决定应用内「打开压缩包」对话框默认显示什么。
+    /// </remarks>
+    public List<string>? AssocExtensions { get; set; }
+
+    /// <summary>
+    /// 「打开压缩包」对话框筛选里显示的扩展名集合（null = 全部显示，即老配置的默认行为）。
+    /// </summary>
+    /// <remarks>取消勾选只影响对话框的默认筛选；拖拽 / 命令行 / 双击仍然能打开该格式。</remarks>
+    public List<string>? OpenDialogExtensions { get; set; }
 
     // ===== 收藏夹 =====
     public List<string> FavoritePaths { get; set; } = new();
@@ -249,6 +279,19 @@ public class AppSettings
     public bool EnableDebugLogging { get; set; } = false;
     public string LogPrivacyMode { get; set; } = "extension";
 
+    // ===== 自动更新 =====
+    /// <summary>
+    /// 自动检查更新的频率。存字符串（JSON 里可读、可手改），取值见
+    /// <see cref="UpdateCheckFrequencyNames"/>；无法识别时按「每天」处理。
+    /// </summary>
+    public string UpdateCheckFrequency { get; set; } = "Daily";
+
+    /// <summary>上次检查更新的时间（UTC）。JSON 走默认 ISO-8601 序列化，不需要自定义 converter。</summary>
+    public DateTime? LastUpdateCheckTime { get; set; }
+
+    /// <summary>用户选择「不再提示此版本」时记录的版本号。</summary>
+    public string? LastSkippedVersion { get; set; }
+
     // ===== 持久化 =====
     /// <summary>便携模式：exe 同级存在 Portable.txt 时启用，设置路径重定向到 exe 旁 Data/ 目录。</summary>
     public static bool IsPortableMode { get; private set; }
@@ -267,6 +310,15 @@ public class AppSettings
 
     private static readonly string SettingsDir;
     private static readonly string SettingsFile;
+
+    /// <summary>上一版设置副本后缀：每次 <see cref="Save"/> 覆盖前生成，读不出来时可回滚。</summary>
+    private const string BackupSuffix = ".bak";
+
+    /// <summary>损坏设置文件的留证后缀（改名成 settings.json.bad-时间戳）。</summary>
+    private const string QuarantineSuffix = ".bad-";
+
+    /// <summary>写入用的临时文件后缀（写完整再替换，避免半截 JSON）。</summary>
+    private const string TempSuffix = ".tmp";
 
     static AppSettings()
     {
@@ -294,59 +346,203 @@ public class AppSettings
     private static AppSettings? _cached;
     private static readonly object SyncRoot = new();
 
+    /// <summary>
+    /// 最近一次「读不出来」的设置文件路径。用于 <see cref="SaveTo"/> 判断：损坏文件不能被当成
+    /// 「上一版」复制成 .bak，否则会把唯一可用的备份冲掉（改名留证失败、文件被占用时会走到这条）。
+    /// </summary>
+    private static string? _unreadableSettingsFile;
+
     public static AppSettings Load()
     {
         lock (SyncRoot)
         {
             // 缓存命中（startup-appsettings-cache：每进程只读盘一次）
             if (_cached != null) return _cached;
-            try
-            {
-                if (!File.Exists(SettingsFile))
-                {
-                    var defaults = CreateWithDefaults();
-                    _cached = defaults; // 不存在时缓存默认值，避免每次重新生成默认规则表
-                    return defaults;
-                }
-                var json = File.ReadAllText(SettingsFile);
-                var settings = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings) ?? CreateWithDefaults();
-                // 向后兼容：从旧 AdaptiveCompressionMode 枚举迁移为三个独立开关
-                if (settings.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled)
-                {
-                    settings.AdaptiveCompression = true;
-                    settings.AdaptiveSmartDetect = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.SmartDetect;
-                    settings.MultiThreadedCompression = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
-                    settings.AdaptiveCompressionMode = AdaptiveCompressionMode.Disabled;
-                }
-                // 首次安装时填充默认规则
-                if (settings.AdaptiveOverrides.Count == 0)
-                {
-                    settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
-                }
-                // 并行解压智能线程数越界 clamp 到 [1,16]（边界情况 #8）
-                settings.SmartSsdDegree = Math.Clamp(settings.SmartSsdDegree, 1, 16);
-                settings.SmartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
-                // Phase 2 / Task 10：旧版默认规则集迁移到与 SSOT 对齐的版本
-                MigrateAdaptiveOverridesDefaults(settings);
-                _cached = settings;
-                return settings;
-            }
-            catch
-            {
-                // 异常态不缓存：下次 Load 重试读盘，避免把损坏文件态固化
-                return new AppSettings();
-            }
+
+            var (settings, cacheable) = LoadCore(SettingsFile);
+            // 异常态不缓存：下次 Load 重试读盘，避免把损坏文件态固化
+            if (cacheable) _cached = settings;
+            return settings;
         }
     }
 
-    public bool Save()
+    /// <summary>
+    /// 读盘 + 迁移 + 损坏兜底。主文件读不出来时：① 改名留证 ② 尝试 <c>settings.json.bak</c>
+    /// ③ 才回落到默认值，并写一条 lifecycle 日志。
+    /// 之所以要这么做：原先的静默 <c>catch { return new AppSettings(); }</c> 会把「设置整份丢失」
+    /// 变成完全不可诊断的问题（issue #64），用户只会看到「设置没了」而没有任何线索。
+    /// </summary>
+    internal static (AppSettings Settings, bool Cacheable) LoadCore(string settingsFile)
+    {
+        if (!File.Exists(settingsFile))
+        {
+            // 不存在：首次运行/便携包干净解压，属正常路径，缓存默认值避免重复生成默认规则表
+            return (CreateWithDefaults(), true);
+        }
+
+        if (TryReadSettings(settingsFile, out var settings, out var error))
+        {
+            _unreadableSettingsFile = null;
+            return (settings, true);
+        }
+
+        _unreadableSettingsFile = settingsFile;
+        var backupFile = settingsFile + BackupSuffix;
+        var quarantined = QuarantineBrokenFile(settingsFile);
+
+        AppSettings? restored = null;
+        string? backupError = null;
+        if (File.Exists(backupFile) && TryReadSettings(backupFile, out var fromBackup, out backupError))
+        {
+            restored = fromBackup;
+        }
+
+        LogSettingsRecovery(quarantined, error, backupError, restored != null);
+        return (restored ?? new AppSettings(), false);
+    }
+
+    /// <summary>
+    /// 读取并迁移单个设置文件。任何异常都转成 <c>false</c> + 错误摘要，由调用方决定回落策略。
+    /// </summary>
+    internal static bool TryReadSettings(string file, out AppSettings settings, out string? error)
     {
         try
         {
-            if (!Directory.Exists(SettingsDir))
-                Directory.CreateDirectory(SettingsDir);
+            var json = File.ReadAllText(file);
+            var parsed = JsonSerializer.Deserialize(json, AppSettingsJsonContext.Default.AppSettings);
+            if (parsed is null)
+            {
+                settings = new AppSettings();
+                error = "deserialized to null";
+                return false;
+            }
+
+            ApplyMigrations(parsed);
+            settings = parsed;
+            error = null;
+            return true;
+        }
+        catch (Exception ex)
+        {
+            settings = new AppSettings();
+            error = $"{ex.GetType().Name}: {ex.Message}";
+            return false;
+        }
+    }
+
+    /// <summary>读盘后的向后兼容迁移（与文件位置无关，供主文件与 .bak 共用）。</summary>
+    internal static void ApplyMigrations(AppSettings settings)
+    {
+        // 向后兼容：从旧 AdaptiveCompressionMode 枚举迁移为三个独立开关
+        if (settings.AdaptiveCompressionMode != AdaptiveCompressionMode.Disabled)
+        {
+            settings.AdaptiveCompression = true;
+            settings.AdaptiveSmartDetect = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.SmartDetect;
+            settings.MultiThreadedCompression = settings.AdaptiveCompressionMode == AdaptiveCompressionMode.MultiThreaded;
+            settings.AdaptiveCompressionMode = AdaptiveCompressionMode.Disabled;
+        }
+        // 首次安装时填充默认规则（JSON 里写成 null 时同样兜底）
+        settings.AdaptiveOverrides ??= [];
+        if (settings.AdaptiveOverrides.Count == 0)
+        {
+            settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+        }
+        // 并行解压智能线程数越界 clamp 到 [1,16]（边界情况 #8）
+        settings.SmartSsdDegree = Math.Clamp(settings.SmartSsdDegree, 1, 16);
+        settings.SmartHddDegree = Math.Clamp(settings.SmartHddDegree, 1, 16);
+        // Phase 2 / Task 10：旧版默认规则集迁移到与 SSOT 对齐的版本
+        MigrateAdaptiveOverridesDefaults(settings);
+        // 文件关联：老的 7 个布尔开关 → 扩展名集合（只迁移一次，之后一律以集合为准）
+        settings.AssocExtensions = settings.AssocExtensions is null
+            ? AssocPreferences.MigrateLegacyFlags(settings)
+            : AssocPreferences.Normalize(settings.AssocExtensions);
+        settings.CustomAssocExtensions = AssocPreferences.Normalize(settings.CustomAssocExtensions);
+        if (settings.OpenDialogExtensions is not null)
+        {
+            settings.OpenDialogExtensions = AssocPreferences.Normalize(settings.OpenDialogExtensions);
+        }
+    }
+
+    /// <summary>
+    /// 把读不出来的设置文件改名留证（<c>settings.json.bad-yyyyMMddHHmmss</c>），
+    /// 返回新文件名（仅文件名，便于写日志时脱敏）；改名失败返回 null。
+    /// </summary>
+    internal static string? QuarantineBrokenFile(string file)
+    {
+        try
+        {
+            var stamp = DateTime.Now.ToString("yyyyMMddHHmmss", CultureInfo.InvariantCulture);
+            var target = $"{file}{QuarantineSuffix}{stamp}";
+            var candidate = target;
+            for (var i = 2; File.Exists(candidate); i++)
+            {
+                candidate = $"{target}-{i}";
+            }
+
+            File.Move(file, candidate);
+            return Path.GetFileName(candidate);
+        }
+        catch
+        {
+            return null;
+        }
+    }
+
+    /// <summary>把「设置文件读不出来」写进 lifecycle.log（出厂即开、强制文件名脱敏）。</summary>
+    private static void LogSettingsRecovery(string? quarantined, string? error, string? backupError, bool recoveredFromBackup)
+    {
+        try
+        {
+            var msg = $"settings load failed mode={(IsPortableMode ? "portable" : "roaming")}" +
+                      $" quarantined='{quarantined ?? "-"}' recoveredFromBackup={recoveredFromBackup}" +
+                      $" error='{OneLine(error)}'";
+            if (backupError is not null)
+            {
+                msg += $" backupError='{OneLine(backupError)}'";
+            }
+
+            Services.LifetimeDiagnostics.Log(msg);
+        }
+        catch
+        {
+            // 日志失败不得影响设置回落
+        }
+    }
+
+    private static string OneLine(string? text) => (text ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ');
+
+    public bool Save() => SaveTo(SettingsFile);
+
+    /// <summary>
+    /// 写入指定路径（<see cref="Save"/> 走 <c>SettingsFile</c>，测试用其余路径）。
+    /// 覆盖前把上一版留成 <c>settings.json.bak</c>；正文先写 <c>.tmp</c> 再替换，
+    /// 避免进程中途退出留下半截 JSON（半截文件正好会触发上面的「读不出来」分支）。
+    /// </summary>
+    internal bool SaveTo(string file)
+    {
+        var tempFile = file + TempSuffix;
+        try
+        {
+            var dir = Path.GetDirectoryName(file);
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+                Directory.CreateDirectory(dir);
+
             var json = JsonSerializer.Serialize(this, AppSettingsJsonContext.Default.AppSettings);
-            File.WriteAllText(SettingsFile, json);
+            File.WriteAllText(tempFile, json);
+
+            if (File.Exists(file) && !IsUnreadableFile(file))
+            {
+                try
+                {
+                    File.Copy(file, file + BackupSuffix, overwrite: true);
+                }
+                catch
+                {
+                    // 备份失败不阻断保存：备份是回滚便利，不是正确性前提
+                }
+            }
+
+            File.Move(tempFile, file, overwrite: true);
             // 落盘成功后缓存同步为被保存实例（外部可见值与内存一致）
             lock (SyncRoot)
             {
@@ -356,10 +552,28 @@ public class AppSettings
         }
         catch
         {
-            // 失败不动缓存：缓存仍代表最后一次成功落盘值
+            // 失败不动缓存：缓存仍代表最后一次成功落盘值；顺手清掉可能残留的临时文件
+            TryDelete(tempFile);
             return false;
         }
     }
+
+    private static void TryDelete(string file)
+    {
+        try
+        {
+            if (File.Exists(file)) File.Delete(file);
+        }
+        catch
+        {
+            // 临时文件删不掉不影响结果
+        }
+    }
+
+    /// <summary>该路径是否是「刚才读不出来」的那个文件（决定要不要把它当作可回滚的上一版）。</summary>
+    private static bool IsUnreadableFile(string file) =>
+        _unreadableSettingsFile is not null &&
+        string.Equals(_unreadableSettingsFile, file, StringComparison.OrdinalIgnoreCase);
 
     /// <summary>测试钩子：清空进程级缓存（internal，经 InternalsVisibleTo；沿 StartupTimer.ResetForTest 惯例）。</summary>
     internal static void ResetCacheForTests()

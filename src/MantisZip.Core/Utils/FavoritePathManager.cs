@@ -170,7 +170,7 @@ public static class FavoritePathManager
             try
             {
                 if (!File.Exists(FilePath)) { _userFavorites = new List<FavoritePathItem>(); _hiddenSystemKeys = new HashSet<string>(StringComparer.OrdinalIgnoreCase); return; }
-                var data = JsonSerializer.Deserialize<FavoriteData>(File.ReadAllText(FilePath));
+                var data = JsonSerializer.Deserialize<FavoriteData>(File.ReadAllText(FilePath), JsonDefaults.CaseInsensitive);
                 _userFavorites = data?.UserFavorites ?? new List<FavoritePathItem>();
                 _hiddenSystemKeys = new HashSet<string>(data?.HiddenSystemPaths ?? new List<string>(), StringComparer.OrdinalIgnoreCase);
             }

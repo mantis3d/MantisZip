@@ -1,0 +1,12 @@
+自动更新检测 · ui-tests 验证记录
+日期：2026-10-28
+
+命令：pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests -ExtraArgsJson '["-c","Release"]'
+结果：✅ 测试通过：ui-tests（38.7s，28 警告）
+警告基线：28 条（全部为既有 xUnit1051 / xUnit2012，分布于 ExtractConflictMarkerTests、
+CompressConflictDefaultActionTests、WholeArchiveErrorLocalizerTests、CompressPreviewProgressiveTests 等），本次未新增。
+
+新增用例：tests\MantisZip.UI.Avalonia.Tests\UpdateUiTests.cs（3 例，全绿 603ms）
+- AboutWindow_HasFiveTabs_IncludingUpdatesTab
+- UpdateAvailableDialog_ClosingWithoutChoice_ResolvesRemindLater
+- UpdateAvailableDialog_DefaultConstructor_IsUsable

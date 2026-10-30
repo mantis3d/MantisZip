@@ -258,6 +258,8 @@ public partial class ProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(StatsStoreOnlyLabel));
         OnPropertyChanged(nameof(StatsArchiveLabel));
         OnPropertyChanged(nameof(ScanCardLabel));
+        // 「完成后打开目录」开关的说明文案随流程 / 语言切换（压缩说「压缩后」，解压说「解压后」）
+        OnPropertyChanged(nameof(OpenFolderToggleTipText));
         // 已压缩 / 仅存储的完整文案随语言切换重新格式化（仅在有数据时重写，避免把未上报的卡显示出来）
         if (!string.IsNullOrEmpty(StatsCompressedText))
             StatsCompressedText = LocalizationManager.T("Progress_Stats_CompressedFiles", _statsCompressedFiles);
@@ -390,9 +392,16 @@ public partial class ProgressViewModel : ObservableObject
     [ObservableProperty]
     private bool _showDeleteArchiveToggle;
 
-    /// <summary>本次解压完成后打开目标目录（初值镜像设置或对话框选择；不回写设置）。</summary>
+    /// <summary>
+    /// 本次运行结束后打开目标目录（解压 / 压缩共用：解压是目标目录，压缩是输出所在目录）。
+    /// 初值镜像设置或对话框选择；实例级，不回写设置。说明文案由
+    /// <see cref="OpenFolderToggleTipText"/> 按流程切换。
+    /// </summary>
     [ObservableProperty]
     private bool _openFolderAfterExtract;
+
+    /// <summary>「打开目录」开关当前属于哪条流程（true = 压缩流，false = 解压流）；只影响说明文案。</summary>
+    private bool _openFolderToggleIsCompressFlow;
 
     /// <summary>本次解压完成后把原压缩包移入回收站（同上）。</summary>
     [ObservableProperty]
@@ -479,6 +488,23 @@ public partial class ProgressViewModel : ObservableObject
     {
         if (value) KeepOpenOnComplete = true;
     }
+
+    /// <summary>
+    /// 操作说明行文案（如「正在删除 3 个文件（共 1.2 MB）」）。
+    /// 用于「整包重写、无逐条目回调」的操作（删除）：N 行文件列表只能是假进度，故用一行真实影响面代替。
+    /// 空值 → 整行隐藏（规则 6），压缩/解压流程不设置本属性，行为不变。
+    /// </summary>
+    [ObservableProperty]
+    private string? _operationNoteText;
+
+    /// <summary>说明行是否可见（有文案才显示）。</summary>
+    public bool ShowOperationNote => !string.IsNullOrEmpty(OperationNoteText);
+
+    partial void OnOperationNoteTextChanged(string? value)
+        => OnPropertyChanged(nameof(ShowOperationNote));
+
+    /// <summary>设置操作说明行文案（null/空 = 隐藏）。须在窗口显示前或 UI 线程调用。</summary>
+    public void SetOperationNote(string? text) => OperationNoteText = text;
 
     // ════════════════════════════════════════════
     //  T6: 显示模式 / 统计 / 时间 / 速度 / 并行批次
@@ -2407,6 +2433,7 @@ public partial class ProgressViewModel : ObservableObject
     /// </summary>
     public void SetExtractPostActions(bool openFolder, bool deleteArchive, bool? openFolderSeed, bool? deleteArchiveSeed = null)
     {
+        SetOpenFolderToggleFlow(isCompressFlow: false);
         ShowOpenFolderToggle = openFolder;
         ShowDeleteArchiveToggle = deleteArchive;
         if (!openFolder && !deleteArchive) return;   // 能力位关 → 不镜像（保持默认 false）
@@ -2415,6 +2442,34 @@ public partial class ProgressViewModel : ObservableObject
         OpenFolderAfterExtract = openFolderSeed ?? settings.OpenFolderAfterExtract;
         DeleteArchiveAfterExtract = deleteArchiveSeed ?? settings.DeleteArchiveAfterExtract;
     }
+
+    /// <summary>
+    /// 声明「压缩完成后打开目录」开关能力位并镜像初值（与 <see cref="SetExtractPostActions"/> 对称）。
+    /// 能力位为 false 时窗口底部不显示该开关；初值来自设置或压缩对话框，实例级不回写设置。
+    /// </summary>
+    public void SetCompressPostActions(bool openFolder, bool? openFolderSeed = null)
+    {
+        SetOpenFolderToggleFlow(isCompressFlow: true);
+        ShowOpenFolderToggle = openFolder;
+        if (!openFolder) return;
+
+        OpenFolderAfterExtract = openFolderSeed ?? AppSettings.Load().OpenFolderAfterCompress;
+    }
+
+    /// <summary>
+    /// 记录「打开目录」开关属于哪条流程，并刷新它的说明文案：压缩说「压缩后」，解压说「解压后」。
+    /// 开关本身复用 <see cref="OpenFolderAfterExtract"/>（同一语义：本次运行结束后打开目标目录）。
+    /// </summary>
+    private void SetOpenFolderToggleFlow(bool isCompressFlow)
+    {
+        if (_openFolderToggleIsCompressFlow == isCompressFlow) return;
+        _openFolderToggleIsCompressFlow = isCompressFlow;
+        OnPropertyChanged(nameof(OpenFolderToggleTipText));
+    }
+
+    /// <summary>「完成后打开目录」开关的说明文案（压缩 / 解压两套措辞，随流程与文化切换刷新）。</summary>
+    public string OpenFolderToggleTipText => LocalizationManager.T(
+        _openFolderToggleIsCompressFlow ? "Compress_OpenFolderAfter" : "Settings_Extract_OpenFolderAfter");
 
     // ════════════════════════════════════════════
     //  Progress Helpers
