@@ -111,12 +111,13 @@
 
 ---
 
-## 进行中 —— 6 条半途计划（需决定「继续做完」还是「冻结」）
+## 进行中 —— 7 条半途计划（需决定「继续做完」还是「冻结」）
 
-> 这 6 项主体已落地，剩下的尾巴性质不同，**不适合当新计划排队**。建议逐条拍板，别让它们长期挂在中间状态。
+> 这 7 项主体已落地，剩下的尾巴性质不同，**不适合当新计划排队**。建议逐条拍板，别让它们长期挂在中间状态。
 
 | 功能 | 设计文档 | 已做 | 剩余 | 我的建议 |
 |---|---|---|:--:|---|
+| 拖拽直接解压 + 文件树预览弹窗 | [drag-drop-direct-extract.md](.omo/plans/进行中/drag-drop-direct-extract.md) | 主体 Task 1–7 ✅（自实现 OLE 拖拽 `CustomOleDragDrop` + `OverlayController` 三色覆盖层 + 落点检测 + 拖拽后统一走 `ExtractFlow`） | **文件树预览弹窗整体未实施**（`DragPreviewPopup.cs` 不存在、`DragPreviewBitmapBuilder` 零调用者）+ 落点冲突预览（用户明确这是弹窗主要目的之一，形态待讨论）+ Task 8 手工验收 | **继续做完**：原标记「已完成 10/10」与代码不符，2026-10-30 已移回进行中 |
 | 压缩加速三开关 UI 收敛 + 魔数检测/自适应规则 | [adaptive-compress-ui-convergence.md](.omo/plans/进行中/adaptive-compress-ui-convergence.md) | Phase 1 ✅ / Phase 2 主体 ✅（Task 9-11；SSOT 统一到 `ZipEntryClassifier`、`AdaptiveRuleMatcher.ResolveLevel` 唯一决策入口、仅存储格式并入规则、MT 提示、CLI 开关） | Task 12 本机基准测试 UI、Task 13 组数定标 | **收尾**（1-2h）：不补就是文档里长期留个「P1 完成但没做完」 |
 | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | Core 侧 TAR 裸格式 / GZip 单文件压缩 + 文件关联已就绪 | UI 压缩格式下拉未放开；BZip2→XZ→Zstd→Brotli；7z.dll 只读格式 | **只做前半**：UI 下拉放开 + 7z.dll 只读解锁（读取做稳）；BZip2/XZ/Zstd **创建**无限期延后 |
 | 扩展预览格式支持 | [preview-extended-formats.md](.omo/plans/进行中/preview-extended-formats.md) | 3.5/6 阶段（工具栏+信息面板、Torrent/PE/PDF/SQLite/ISO、SVG/字体/ICO/Office、MKV/WebM 元数据） | LNK/DBF/EPUB/字幕/STL；Magick.NET/LibVLC 插件化 | **冻结剩余部分**：已有预览深度已超出用户预期，插件化是成本黑洞 |
@@ -202,7 +203,7 @@ NuGet 升级（SharpCompress ≥0.49.0）── 联动 ──▶ selfcontained-s
 | 功能 | 设计文档 | 难度 | 工时 | 说明 | 废弃原因 |
 |---|---|:--:|:--:|---|---|
 | VirtualFileDataObject | [virtual-file-data-object.md](.omo/plans/已归档/virtual-file-data-object.md) | 🔴高 | 6-8h | COM 原生 IDataObject 替代 WPF OLE 桥 | 迁移 Avalonia 后不再依赖 WPF OLE 桥，VFDO 无存在必要 |
-| 拖拽提取目标检测 | [drag-drop-marker-target.md](.omo/plans/已归档/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录 | 被 [drag-drop-direct-extract.md](.omo/plans/已完成/drag-drop-direct-extract.md) 取代 |
+| 拖拽提取目标检测 | [drag-drop-marker-target.md](.omo/plans/已归档/drag-drop-marker-target.md) | 🟡中 | 1-3h | Marker 文件探测拖放目标目录 | 被 [drag-drop-direct-extract.md](.omo/plans/进行中/drag-drop-direct-extract.md) 取代 |
 | 预览格式识别（旧方案） | [preview-format-detection.old.md](.omo/plans/已归档/preview-format-detection.old.md) | 🟡中 | — | 预览格式识别旧设计 | 已拆分为 [preview-extended-formats.md](.omo/plans/进行中/preview-extended-formats.md) + [preview-magic-detection.md](.omo/plans/已完成/preview-magic-detection.md) |
 | Office 内容预览（WPF 版） | [office-content-preview.md](.omo/plans/已归档/office-content-preview.md) | 🟡中 | — | WPF 版 Mammoth→HTML→WebView2 方案 | 被 [office-content-preview-avalonia.md](.omo/plans/已完成/office-content-preview-avalonia.md) 取代 |
 | 资源管理器式路径切换弹窗 | [explorer-path-switcher.md](.omo/plans/已归档/explorer-path-switcher.md) | 🟡中 | — | WPF 时代 Ctrl+G 路径速选弹窗 | 被 QuickPathControl 系列演进取代（CustomFilePickerDialog） |
