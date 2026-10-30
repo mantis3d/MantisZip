@@ -122,6 +122,12 @@ public partial class CustomFilePickerControl : UserControl
     /// </summary>
     public event EventHandler? SystemBrowseRequested;
 
+    /// <summary>
+    /// 当前浏览目录变化（参数为新的绝对路径）。内嵌到设置窗时，
+    /// 「输出目录 / 解压目标目录」就靠它跟随选择器的导航实时回填。
+    /// </summary>
+    public event EventHandler<string>? PathChanged;
+
     // ── 界面文案（规则 13：全部走 LocalizationManager.T） ─────────────────
 
     public string BackText => LocalizationManager.T("Picker_Back");
@@ -810,6 +816,7 @@ public partial class CustomFilePickerControl : UserControl
         CurrentPathText.Text = dir;
         PathCrumbs.Path = dir;
         PathHistoryManager.Record(dir);
+        PathChanged?.Invoke(this, dir);
 
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
