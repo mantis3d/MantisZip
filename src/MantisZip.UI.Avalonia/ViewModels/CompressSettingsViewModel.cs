@@ -544,6 +544,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_Start"] = LocalizationManager.T("Compress_Start");
         LocalizedStrings["Compress_Cancel"] = LocalizationManager.T("Compress_Cancel");
         LocalizedStrings["Compress_WhenFileExists"] = LocalizationManager.T("Compress_WhenFileExists");
+        LocalizedStrings["Compress_OpenFolderAfter"] = LocalizationManager.T("Compress_OpenFolderAfter");
 
         // 初始化压缩级别下拉选项（共享数据源，本地化 Display）
         CompressionLevelOptions = CompressionOptionData.LevelOptions

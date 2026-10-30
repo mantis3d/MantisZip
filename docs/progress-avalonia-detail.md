@@ -14,6 +14,9 @@
   - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/CompressOpenFolderAfterTests.cs` 8 例 —— 设置记录默认不开、压缩流程显示压缩文案、解压流程切回解压文案、无能力位隐藏开关、会话按开关调用打开端口（拿到 `displayPaths`）、关闭时不调用、无能力时即使开着也不调用、空路径不抛。
   - **验证**：avalonia（Release）0 警告；`tests`（2 条存量警告）与 `ui-tests`（0 警告）全绿；`i18n` 1388 key 三语一致；`check` 0.5.4 六处；`guards` 8/8。
   - **边界**：多包模式只开一次（第一个输出）；`Separate` 产物分散在不同目录时也只开第一个；打开失败只写日志不弹错。
+  - **同日实测反馈（两处缺陷）**：① 勾选被放进压缩对话框的「密码设置」页签，而该页签里的加密内容随 `Encrypt` 隐藏，用户按常规页签翻找不到 —— 移到「常规」页签、「输出模式与路径」分组正下方的独立分组，与输出相关的选项放在一起。② 移好之后勾选框只有一个方框没有文字：`CompressSettingsWindow.axaml` 绑定 `LocalizedStrings[Compress_OpenFolderAfter]`，但 `CompressSettingsViewModel` 构造函数里的本地化注册块（`LocalizedStrings["Key"] = LocalizationManager.T("Key")` 一长串）漏了这一行，字典取不到 key 就渲染空白，构建与测试都不会报错 —— 补上注册行后恢复正常。
+  - **同类既有缺陷（顺带修）**：按同一判据扫全仓 XAML，发现解压对话框「加速」页签底部的提示 `Extract_ParallelNotSavedHint`（「以上选项仅对本次解压生效，不会修改默认设置」）自该页签加入起就没有登记进 `ExtractSettingsViewModel` 的 `keys` 数组，一直显示空白；补登记。
+  - **守卫**：新增 `tests/MantisZip.UI.Avalonia.Tests/LocalizedStringsWiringTests.cs` 3 例 —— ① 前置自检（能从测试输出目录找到仓库根且扫到 >100 条引用，防止扫空集合假通过）；② src 下每个 `.axaml` 里 `LocalizedStrings[Key]` 引用的 key 必须在某个 `.cs` 中以 `"Key"` 字面量出现（即真的被某个 ViewModel 登记进字典）；③ 该 key 必须在三份 `strings.*.json` 里都存在。局限写在文件头：只证明「某处登记过」，不证明登记的正是该 XAML 的 DataContext，也不校验空串（后者归 `-Task i18n`）。
 
 **2026-10-30** — 修复：打开中的压缩包被删除 / 被替换后状态残留（解压删源包、外部删除、同名替换）
   - **症状**：打开一个压缩包 → 解压并勾选「解压完成后删除压缩包」→ 解压完成后包被送进回收站，主窗口仍显示「已打开这个包」，条目树、预览、标题全在；此后解压 / 添加文件 / 删除条目 / 刷新都作用在一个不存在的路径上（`ExtractService` 抛「Archive file not found」，部分入口的 catch 只写 `App.DebugLog` 后静默返回 false）。用户补充：包被别的软件删除 / 杀毒隔离 / 网盘同步搬走时同样会停在这个状态。

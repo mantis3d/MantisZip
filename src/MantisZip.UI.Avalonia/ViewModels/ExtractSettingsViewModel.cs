@@ -328,7 +328,9 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Settings_SmartHddLabel",
             "Settings_ManualDegreeLabel",
             "Settings_ManualDegreeHint",
-            "Settings_LargeArchivePreTest"
+            "Settings_LargeArchivePreTest",
+            // 「加速」页签底部的「仅对本次解压生效」提示：XAML 早已绑定，此前漏登记 → 一直显示空白
+            "Extract_ParallelNotSavedHint"
         };
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in keys)
