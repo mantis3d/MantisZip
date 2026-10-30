@@ -4,7 +4,7 @@
 > **阶段**: [■■■■■■■□□□] (7/10) — 2026-10-30 从 `已完成` 移回 `进行中`（原「10/10 已完成」与代码不符：预览弹窗整段未做，Task 8 手工验收与 5 条 DoD 仍未勾）
 > **分支**: `alpha` / `beta` / `plans`（原 `avalonia-port` 已不存在；代码改动按规则 19 落在 alpha 或 beta）
 > **2026-08-06 补充**: 预览弹窗（DragPreviewPopup）实施设计已确认——独立 Win32 弹窗跟随鼠标（不合成进覆盖层）+ PointerPressed 预取式渲染 + 双阈值降级。待实施，详见文末「预览弹窗实施补充」章节。
-> **2026-10-30 补充**: 用户明确**文件树预览弹窗的主要目的之一就是看落点冲突预览**（拖到某个 Explorer 窗口/桌面时，能看出有多少同名文件会被覆盖/重命名）。硬约束：拖拽期间 UI 线程被 OLE `DoDragDrop` 同步阻塞、`RenderTargetBitmap` 只能在 UI 线程 ⇒ 拖拽中途无法重渲染树位图，冲突标记只能走 GDI 文字（弹窗摘要栏 / 覆盖层），或改成「拖拽启动前按预测落点渲染」。设计待与用户讨论定稿，见文末「落点冲突预览（待设计）」。
+> **2026-10-30 补充**: 用户明确**文件树预览弹窗的主要目的之一就是看落点冲突预览**（拖到某个 Explorer 窗口/桌面时，能看出有多少同名文件会被覆盖/重命名）。硬约束：拖拽期间 UI 线程被 OLE `DoDragDrop` 同步阻塞、`RenderTargetBitmap` 只能在 UI 线程 ⇒ 拖拽中途无法重渲染树位图，冲突标记只能走 GDI 文字（弹窗摘要栏 / 覆盖层），或改成「拖拽启动前按预测落点渲染」。**2026-10-30 已按用户拍板定稿为覆盖层方案**（两层 8 行 + 目标已存在即标红），见文末「落点冲突预览（设计已定稿 2026-10-30，待实施）」。
 
 ---
 
@@ -1999,42 +1999,64 @@ PerformDragDrop（自实现 OLE）→ 拖拽中弹窗持续显示 → 松手/取
 
 ---
 
-## 落点冲突预览（待设计，2026-10-30）
+## 落点冲突预览（设计已定稿 2026-10-30，待实施）
 
-> **状态**: 📝 待讨论 —— 用户已明确这是文件树预览弹窗的主要目的之一，但具体形态尚未定稿。**本节的候选方案只是备选，不是决定**，讨论定稿后再改写。
+> **状态**: 📐 设计已定稿（2026-10-30 用户逐项拍板），**代码未动**。
+> 定稿要点：做在**覆盖层**上（不新建弹窗）；只显示**部分**目录结构（两层、最多 8 行）；只看**直接子目录 / 子文件**是否冲突；性能优先（落点不变不重算、每轮 IO 有预算、慢盘超时降级）。
 
-### 需求表述（用户口径）
+### 用户口径（逐项拍板，2026-10-30）
 
-拖拽文件树预览弹窗，除了「我拖的是什么」，主要目的之一是**看落点冲突**：拖到某个 Explorer 窗口 / 桌面时，能看出这次落下去有多少同名文件、会怎样（覆盖 / 重命名 / 跳过 / 逐个询问）。
+| 决策点 | 结论 |
+|---|---|
+| 显示位置 | **覆盖层**上（拖拽时跟随鼠标的那个框），不做预览弹窗 |
+| 显示范围 | 拖拽内容的目录结构，**两层、最多 8 行**，超出截断为「…另 N 项」 |
+| 判定粒度 | 只看**直接子目录 / 子文件**是否冲突，不递归深挖 |
+| 冲突标记 | **⚠ + 整行变红**；目录行带直接子项冲突计数 `⚠ src/ (3)` |
+| 判定口径 | **目标处已存在就算冲突** —— 文件、同名目录**都算**（同名目录会合并进去，仍标红，用户明确要求「看得更严」）；与设置的冲突策略无关 |
+| 与策略关系 | 不区分 Overwrite / Skip / Rename / Ask，一律按「已存在」标 |
 
-### 现状（代码事实，2026-10-30 核对）
+### 覆盖层形态
 
-- 落点冲突**已经会处理**：`Services/DragDropService.cs:108-113` 统一走 `ExtractFlow.RunSelectedItemsExtractionAsync(..., _settings.FileConflictAction, vm.ShowExtractFileConflictDialogAsync, ...)`，Ask 会弹冲突框，与右键「解压选中项到」同一流程。缺的是**落点前预览**。
-- 拖拽启动前已能拿到展开后的文件列表：`Views/MainWindow.axaml.cs:1562` 的 `DragDropItemExpander.ExpandItems(selectedItems, allItems)`（当前只用于判断空列表，未传给覆盖层/预览）。
-- 落点目录在拖拽中由 `OverlayController` 后台线程每 tick 计算（`ClassifyWindow` → `DropTargetDetector`，覆盖 Explorer / 桌面 / `#32770`）。
-- 可复用的冲突判定件：`MantisZip.Core/Utils/ExtractPathResolver.cs:53` `ResolveAll(...)`（路径唯一事实源）、`Services/ResultPreviewService.cs:659` `ApplyConflictMarkers(...)`、`Controls/ResultTreeView.axaml.cs:642` 的冲突计数、`Models/PreviewTreeNode.cs:111/135` 的警告图标与红色前景、`Converters/PreviewTreeConverters.cs:42`。
-- 预览弹窗本体的未实施状态见「预览弹窗实施补充」章节（`DragPreviewPopup.cs` 不存在、`DragPreviewBitmapBuilder` 零调用者）。
+```
+拖到此处：D:\Projects
+├─ docs/
+│  ├─ ⚠ readme.md
+│  └─ config.json
+├─ ⚠ src/ (3)
+└─ ⚠ notes.txt
+…另 4 项
+```
 
-### 硬约束
+- 第 1 行保持现有「拖到此处：<路径>」（超长仍走 `AbbreviatePath`），下面是树；窗口高度随行数自适应（最多约 9 行 ≈ 150px）。
+- 非冲突行用现有默认文字色；冲突行用覆盖层已有的 Warning 红 `0x004336F4` 且加 `⚠` 前缀。
+- 目录行 `(N)` = 该目录**直接子项**中已存在的数量；单目录预算内没扫完时显示 `(N+)`。
+- 无效落点 / 自家窗口：**不显示树**，维持现有 `DragOverlay_DragToFolder` / `DragOverlay_OwnWindow` / `DragOverlay_NoPath` 文案。
 
-1. **拖拽中途不能重渲染树位图**：`RenderTargetBitmap.Render` 只能在 UI 线程，而 OLE `DoDragDrop` 在拖拽期间同步阻塞 UI 线程。⇒ 树上「把冲突文件标红」在拖拽中做不到；冲突信息只能走 GDI 文字，或把标记提前到拖拽启动前。
-2. **路径口径必须与实际落点一致**：预览若用错 `preserveFullPath` / 目录，会出现「预览说不冲突、实际覆盖了」，比不预览更糟。冲突预览必须走 `ExtractPathResolver`，不得另写路径逻辑（ARCHITECTURE 的路径契约）。
-3. **网络路径 / 大目录**：`File.Exists` 在 UNC 上可能每次数百毫秒，需后台线程 + 目录级去抖 + 数量/耗时上限兜底（超限只显示「统计中/过多」而不是卡住拖拽）。
-4. **文案要跟设置走**：`FileConflictAction` 为 Overwrite / Rename / Skip / Ask 时后果不同，不能一律写「将被覆盖」。
+### 数据来源与判定
 
-### 候选形态（备选，未定稿）
+- 树**结构**取自拖拽启动前已有的 `Views/MainWindow.axaml.cs:1562` `DragDropItemExpander.ExpandItems(selectedItems, allItems)` 结果（现在只用于判空）：启动时折成行模型，**只算一次**，拖拽中不再读写压缩包。
+- **冲突布尔**在落点变化时于后台线程重算：判定「目标目录 + 相对路径」是否已存在；相对路径必须走 `MantisZip.Core/Utils/ExtractPathResolver.cs:53` `ResolveAll(...)` 并与本次 `preserveFullPath` 一致 —— 路径口径不得另写，否则会出现「预览说不冲突、实际覆盖了」（ARCHITECTURE 的路径契约）。
+- 只判定**实际显示的行**（≤8 行）与已展开目录的直接子项计数，不预判未显示的节点。
 
-| 方案 | 形态 | 主要问题 |
+### 性能预算（硬指标）
+
+| 项 | 预算 | 说明 |
 |---|---|---|
-| A. 覆盖层一行摘要 | 覆盖层现有「拖到此处：D:\…」后追加「／12 个同名文件将被覆盖」 | 信息量小；覆盖层文字空间有限（长路径已缩写） |
-| B. 弹窗摘要栏 GDI 实时文字 | 预览弹窗顶部/底部摘要栏写「目标 D:\… ／ 冲突 12 个」 | 树本身不会变红（受约束 1），视觉上"树没标出来"可能让人以为没冲突 |
-| C. 拖拽启动前预渲染多份位图 | 按「常见落点」预渲染？ | 拖拽启动前不知道落点，不可行 |
-| D. 松手后再确认 | 保持现状（Ask 弹框） | 用户明确要的是"落点前"可见 |
+| 重算触发 | 落点路径变化（去抖 150ms） | 落点不变、光标在框内移动 ⇒ 一次都不重算 |
+| 单轮存在性检查 | ≤ 40 次 | 8 行展示 + 每个已展开目录最多 30 个直接子项计数；超出该目录预算则显示 `(N+)` |
+| 慢盘 / 网络路径 | 单轮总超时 500ms | 超时本轮放弃标记：路径行尾加 `(?)`，树照常显示但不标红 —— 宁可「未知」也不能假「无冲突」 |
+| 每 100ms 重绘 | 0 次磁盘 IO | 只绘制缓存的（行文本 + 是否冲突） |
 
-### 待定问题（讨论后回填）
+### 实现清单
 
-- 冲突信息放在覆盖层、弹窗摘要栏，还是两处都有？
-- 是否需要「冲突清单」的可展开视图（显示前 N 个冲突文件名），还是只要数字？
-- `Rename` 模式下是否要显示预计新名（`name (1).ext` 之类）？
-- 落点目录切换时的刷新策略（去抖时长、缓存粒度）？
-- 是否只对「已展开文件数 ≤ N」显示精确数字，超过则只显示「较多」？
+1. `src/MantisZip.UI.Avalonia/Services/OverlayController.cs`：新增行模型（层级 / 名称 / 是否目录 / 是否冲突 / 子项冲突计数），`SetContentTree(...)` 传入结构；渲染从「单行路径（+ 可选预览位图）」扩成「路径行 + ≤8 行树」；窗口尺寸随行数自适应；`RunTrackingLoop` 里目标变化时触发冲突重算（去抖 + 预算 + 超时）。
+2. 新增 `src/MantisZip.UI.Avalonia/Services/DragConflictPreview.cs`（名称待定）：纯逻辑 —— 输入行模型 + 目标目录 + 可注入的文件系统探针与预算参数，输出带标记的行；便于单测，不依赖 Win32。
+3. `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`：把 `expandedItems` 折成行模型，在 `controller.Start()` 之后、`CustomOleDragDrop.PerformDragDrop` 之前调用 `SetContentTree(...)`。
+4. i18n：新增 1 个 key `DragOverlay_MoreItems`（`…另 {0} 项` / `…and {0} more` / zh-TW 同步），紧接 `DragOverlay_NoPath` 之后插入；`(N)` / `(N+)` / `(?)` / `⚠` 均为符号，不建 key。
+5. 测试 `tests/MantisZip.UI.Avalonia.Tests/DragConflictPreviewTests.cs`：8 行截断与「另 N 项」、目录计数与 `(N+)`、预算耗尽不抛、超时降级返回「未知」而不是「无冲突」、两层结构顺序稳定。
+
+### 风险 / 遗留
+
+- 覆盖层变高后可能遮住落点附近的文件名（用户已知悉并接受「够用」）。
+- `(?)` 未知态是否够清楚待实测；若含糊，改成路径行尾文案「冲突未知」（需加 key）。
+- 执行侧与预览解耦：实际落盘仍走 `Services/DragDropService.cs:108-113` → `ExtractFlow.RunSelectedItemsExtractionAsync(...)`（Ask 弹冲突框），本次不改执行语义。
