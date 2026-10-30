@@ -6,6 +6,7 @@
 **最后更新**: 2026-10-29  
 **当前版本**: 0.5.5
 
+
 ---
 
 ## 这份文档怎么读
@@ -110,6 +111,7 @@
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
+| 压缩任务队列（TeraCopy 式串行队列 + 常驻队列窗） | [compress-job-queue.md](.omo/plans/未开始/compress-job-queue.md) | 🔴高 | 46-66h | 📋 2026-10-29 立项（点「开始压缩」入队 / 队列窗常驻 / 跨进程并入同一队列 / 失败继续 / 单任务+整体取消）。**P0 串行队列 4-6h 是 issue #66 的根治路径，建议视作插队项单独取**；P1 队列窗 8-12h 可独立发版；P3 引擎后台化与「真暂停」同一前置条件，需打包评估 |
 | 压缩包内重命名条目（引擎级，零重压缩） | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **8-10h** | 2026-10-28 从 S 档移回 A 档，2026-10-29 降 B 档。ZIP 走 copy-mode **只改名字字节、压缩数据原样搬运**，7z 走 `ModifyArchive` 就地删 + 单条追加，tar.gz 明确不支持。它是「暂存区」的地基，将来与暂存区**同批做** |
 | 压缩包编辑操作序列（暂存区 + 批量提交，含 P2/P3 增强） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | P1 **12-16h**；P2/P3 **8-12h** | 删除/重命名先入内存队列，列表立刻反映（虚拟视图），点「应用」或关窗时**一次性**提交：ZIP 一次 `RewriteAsync`、7z 一次 `ModifyArchive` + 追加（现状每编辑一次就整包重写）。P2/P3 = 拖拽移动/移动到…、队列级 undo/redo、提交目标改为「另存为新包」。**硬依赖上面的重命名提供 rewriter rename 通道** |
 | 自包含体积优化（第一步） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 目标已改写：原「降至 20–25MB」与现有依赖矛盾，激进修剪会打穿预览。第一步只做测量基线 + 验证保守修剪可行性，目标区间 60–90MB。若确认只发 SelfContained 包，优先级上调 |
@@ -122,6 +124,7 @@
 | 文件过滤与文件列表筛选数据统一 | [unify-file-filter-data.md](.omo/plans/未开始/unify-file-filter-data.md) | 🟡中 | 8-12h | 📋 计划文档是 WPF 期产物，实施前须按规则 11 转 Avalonia。目标：`FileFilterCriteria` 扩展 `TextSearch`/`ExcludeText`/`TextMatchMode`，删除 `SearchFilters` + `ArchiveFilter.ApplyFilters()`（`MainWindowViewModel.Navigation.cs:309` 仍在用旧模型） |
 | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
+
 
 ---
 

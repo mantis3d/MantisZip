@@ -576,16 +576,17 @@ public class ExtractResult
 public static class ArchiveEngineFactory
 {
     /// <summary>
-    /// 支持的档案文件扩展名（单一数据源）：能否**打开**看这里。
+    /// 支持的档案文件扩展名：能否**打开**看这里。
     /// </summary>
     /// <remarks>
-    /// `.jar / .war / .ear / .apk` 本质是 ZIP（issue #54），能打开也能解压。
-    /// 注意：本数组**不等于**文件关联名单 —— 关联见 <c>ShellIntegration.ArchiveExtensions</c>，
-    /// 那 4 个新扩展名暂不注册关联（不抢默认程序，见 `.omo/plans/未开始/format-detection-container-sfx.md`）。
+    /// 内容来自 <see cref="ArchiveExtensionCatalog.EngineExtensions"/>（单一事实源）：
+    /// 加格式只改目录一处，设置页列表、文件关联默认值、打开对话框筛选会一起跟上。
+    /// `.jar / .war / .ear / .apk` 本质是 ZIP（issue #54），能打开也能解压；
+    /// 是否**注册文件关联**是另一件事，见 <c>ShellIntegration.ArchiveExtensions</c>
+    /// （默认不抢默认程序，见 `.omo/plans/未开始/format-detection-container-sfx.md`）。
     /// </remarks>
     public static readonly string[] SupportedExtensions =
-        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso",
-         ".jar", ".war", ".ear", ".apk"];
+        [.. ArchiveExtensionCatalog.EngineExtensions];
 
     private static readonly List<IArchiveEngine> _engines = new();
 
@@ -627,8 +628,24 @@ public static class ArchiveEngineFactory
         };
     }
 
+    /// <summary>
+    /// 分卷集的锚点路径（issue #70①）：传入 <c>.002</c> 之后的任意一卷都回到 <c>.001</c>；
+    /// 首卷缺失时返回原路径，让上游按「文件不存在 / 打不开」处理，而不是静默换一个包。
+    /// </summary>
+    public static string ResolveVolumeAnchor(string filePath)
+        => ArchiveVolumeSet.FindFirstVolume(filePath) ?? filePath;
+
     public static IArchiveEngine? GetEngineByExtension(string filePath)
     {
+        // 分卷集（issue #70①）：7z / zip / rar 的多卷只有第一卷带完整头部，SharpCompress 不支持多卷
+        // （.zip.001 会抛 "Failed to locate the Zip Header"）；7z.dll 原生支持，故一律交给 SevenZipEngine。
+        if (ArchiveVolumeSet.TryGetVolumeBase(filePath, out var volumeBase, out _)
+            && GetFormatByExtension(volumeBase) is ArchiveFormat.Zip or ArchiveFormat.SevenZip or ArchiveFormat.Rar)
+        {
+            CoreLog.Info($"ArchiveEngineFactory.GetEngineByExtension: 分卷 {filePath} -> SevenZipEngine");
+            return GetEngine(ArchiveFormat.SevenZip);
+        }
+
         var ext = Path.GetExtension(filePath).ToLowerInvariant();
         var engine = ext switch
         {

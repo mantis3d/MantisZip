@@ -103,6 +103,40 @@ public class ProgressWindowPinTests
     }
 
     /// <summary>
+    /// 回归（issue #66「新建压缩包按钮用一次就永久灰」）：
+    /// 钉住等待期间窗口「不可见了但没走正常关闭事件」时，不能永久等待。
+    ///
+    /// 旧实现是「先查 IsVisible → 再订阅 Closed → 阻塞等信号量」：事件若在订阅之前已经发过
+    /// （或窗口被宿主直接收起而不触发 Closed），等待永不返回 ⇒ 呈现器 → 会话 → 命令整条链卡住
+    /// ⇒ 按钮永久灰化，只能重启。新实现先订阅再复查 + 250ms 心跳兜底，最迟一个心跳周期内返回。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task ManualWait_ReturnsWhenWindowBecomesInvisible()
+    {
+        var window = new ProgressWindow("test");
+        window.Show();
+        var vm = Assert.IsType<ProgressViewModel>(window.DataContext);
+        vm.KeepOpenOnComplete = true;
+
+        var closed = new TaskCompletionSource();
+        var wait = window.AutoCloseOrWaitAsync(() => closed.TrySetResult());
+
+        // 已进入手动等待：窗口仍可见，不应关窗
+        await Task.Delay(150);
+        Assert.False(closed.Task.IsCompleted);
+
+        // 模拟「窗口已不可见但没有触发 Closed」（关闭事件错过 / 宿主收起窗口）
+        window.Hide();
+
+        var finished = await Task.WhenAny(closed.Task, Task.Delay(4000));
+        Assert.Same(closed.Task, finished);
+        Assert.True(closed.Task.IsCompleted, "窗口不可见后应在一个心跳周期内结束等待并收尾");
+
+        await wait;
+        window.Close();
+    }
+
+    /// <summary>
     /// 设置窗口源码守卫：死开关控件已删除，「进度窗口」子页签与「默认钉住」绑定已就位。
     /// （XAML 里删了控件却留下绑定属性/文案，编译期不会报错，只能靠文本守卫兜住。）
     /// </summary>

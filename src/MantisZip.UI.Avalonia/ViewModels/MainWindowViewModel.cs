@@ -780,6 +780,9 @@ public partial class MainWindowViewModel : ObservableObject
 
     public async Task LoadArchiveAsync(string path)
     {
+        // 分卷集只认第一卷（issue #70①）：拖入 .002 / .003 时回退到 .001；找不到首卷则按打不开处理。
+        path = ArchiveEngineFactory.ResolveVolumeAnchor(path);
+
         if (!ArchiveFormatHelper.IsArchiveFile(path))
         {
             StatusMessage = LocalizationManager.T("Status_UnsupportedFormat", Path.GetExtension(path));

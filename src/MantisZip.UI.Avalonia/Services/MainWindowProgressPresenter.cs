@@ -48,6 +48,12 @@ public sealed class MainWindowProgressPresenter : IProgressPresenter
     {
         ArgumentNullException.ThrowIfNull(request);
 
+        // 诊断（lifecycle.log）：一次「起进度 → 收尾」各留一行。
+        // issue #66 的排查经验：卡死时日志里只有 begin 没有配对的 end，就能立刻判定卡在收尾等待，
+        // 而不是去猜「是不是引擎没跑完」。
+        LifetimeDiagnostics.Log($"progress-run begin title='{request.Title}' paths={request.DisplayPaths?.Count ?? 0}");
+        var runResult = "failed";
+
         // 先建窗、先配置、再 Show：配置钩子里可能设置批处理列表/说明行/流程标记，
         // 若在 Show 之后做，窗口首帧会是「未配置」形态并闪烁一次。
         var window = new ProgressWindow(request.Title);
@@ -81,12 +87,14 @@ public sealed class MainWindowProgressPresenter : IProgressPresenter
             else
                 window.SetComplete(LocalizationManager.T("Cli_StatusDone"));
             await window.AutoCloseOrWaitAsync(() => window.Close());
+            runResult = "completed";
             return true;
         }
         catch (OperationCanceledException)
         {
             // 取消不是错误：立即关闭，不写错误汇总、不压钉。
             window.Close();
+            runResult = "cancelled";
             return false;
         }
         catch (PasswordRetryCancelledException)
@@ -99,6 +107,7 @@ public sealed class MainWindowProgressPresenter : IProgressPresenter
             window.FailCurrentBatchItem(message);
             _statusMessageSink?.Invoke(message);
             await window.AutoCloseOrWaitAsync(() => window.Close());
+            runResult = "password-cancelled";
             return false;
         }
         catch (Exception ex)
@@ -117,6 +126,7 @@ public sealed class MainWindowProgressPresenter : IProgressPresenter
         {
             // 收尾后不再暴露窗口：调用方/会话拿到 ActiveWindow 就必须是「正在显示的那一个」。
             ActiveWindow = null;
+            LifetimeDiagnostics.Log($"progress-run end result={runResult} title='{request.Title}'");
         }
     }
 }

@@ -1427,37 +1427,90 @@
                            FontSize="12"
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                            TextWrapping="Wrap" />
+                <!-- 两列勾选的说明：单独占一行（不塞进表头，避免表头被说明文字挤变形） -->
+                <TextBlock Text="{Binding FileAssocColumnsHintText}"
+                           FontSize="11"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           TextWrapping="Wrap"
+                           Margin="0,2,0,0" />
 
-                <!-- Per-extension list -->
-                <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto" Margin="0,8,0,0"
-                              BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1" CornerRadius="4">
-                  <ItemsControl ItemsSource="{Binding AssocItems}" Margin="4">
-                    <ItemsControl.ItemTemplate>
-                                          <DataTemplate x:DataType="vm:FormatAssocItemModel">
-                        <Grid Margin="4" ColumnDefinitions="Auto,Auto,*,Auto" RowDefinitions="Auto">
-                          <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center" />
-                          <Image Source="{Binding Icon}" Width="16" Height="16" Margin="8,0,0,0" Grid.Column="1" VerticalAlignment="Center" />
-                          <StackPanel Grid.Column="2" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding Extension}" FontWeight="SemiBold" />
-                            <TextBlock Text="{Binding Description}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          </StackPanel>
-                          <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center">
-                            <TextBlock Text="{Binding CurrentHandler}" FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center" />
-                            <Button Width="28" Height="28" Command="{Binding DeleteCommand}" IsVisible="{Binding IsCustom}" Background="{DynamicResource ThemeButtonBgBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" Padding="4"
-                                    ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).AssocDeleteTooltip}">
-                                <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                              </Button>
-                          </StackPanel>
-                        </Grid>
-                      </DataTemplate>
-                    </ItemsControl.ItemTemplate>
-                  </ItemsControl>
-                </ScrollViewer>
+                <!-- 扩展名表格：真正的列标题（关联 / 筛选 / 格式 / 当前处理程序）+ 可滚动数据行 -->
+                <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                        CornerRadius="4" ClipToBounds="True" Margin="0,8,0,0">
+                  <StackPanel>
+                    <!-- 表头：整条底色 + 下边框；列宽与下面每行严格一致（40 / 40 / 24 / * / Auto） -->
+                    <Border Background="{DynamicResource ThemeHeaderBgBrush}"
+                            BorderBrush="{DynamicResource ThemeBorderBrush}"
+                            BorderThickness="0,0,0,1"
+                            Padding="4,6">
+                      <Grid ColumnDefinitions="40,40,24,*,Auto">
+                        <TextBlock Grid.Column="0" Text="{Binding FileAssocColumnAssocText}"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   ToolTip.Tip="{Binding FileAssocAssocTooltipText}" />
+                        <TextBlock Grid.Column="1" Text="{Binding FileAssocColumnFilterText}"
+                                   FontSize="11" FontWeight="SemiBold"
+                                   HorizontalAlignment="Center" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                   ToolTip.Tip="{Binding FileAssocOpenDialogTooltipText}" />
+                        <PathIcon Grid.Column="2" Data="{StaticResource IconImage}"
+                                  Width="14" Height="14"
+                                  HorizontalAlignment="Center" VerticalAlignment="Center"
+                                  Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                        <TextBlock Grid.Column="3" Text="{Binding FileAssocColumnFormatText}"
+                                   FontSize="11" FontWeight="SemiBold" Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                        <TextBlock Grid.Column="4" Text="{Binding FileAssocColumnHandlerText}"
+                                   FontSize="11" FontWeight="SemiBold" Margin="8,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      </Grid>
+                    </Border>
+
+                    <ScrollViewer MaxHeight="260" VerticalScrollBarVisibility="Auto">
+                      <ItemsControl ItemsSource="{Binding AssocItems}" Margin="4">
+                        <ItemsControl.ItemTemplate>
+                          <DataTemplate x:DataType="vm:FormatAssocItemModel">
+                            <!-- 列：0 关联勾选 / 1 打开对话框筛选勾选 / 2 图标 / 3 扩展名+说明 / 4 当前处理程序+删除 -->
+                            <Grid Margin="0,2" ColumnDefinitions="40,40,24,*,Auto" RowDefinitions="Auto">
+                              <CheckBox IsChecked="{Binding IsEnabled}" VerticalAlignment="Center"
+                                        Width="20" Padding="0" HorizontalAlignment="Center"
+                                        ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).FileAssocAssocTooltipText}" />
+                              <CheckBox Grid.Column="1" IsChecked="{Binding IsOpenDialogVisible}" VerticalAlignment="Center"
+                                        Width="20" Padding="0" HorizontalAlignment="Center"
+                                        ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).FileAssocOpenDialogTooltipText}" />
+                              <Image Source="{Binding Icon}" Width="16" Height="16" HorizontalAlignment="Center" Grid.Column="2" VerticalAlignment="Center" />
+                              <StackPanel Grid.Column="3" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding Extension}" FontWeight="SemiBold" />
+                                <TextBlock Text="{Binding Description}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                              </StackPanel>
+                              <StackPanel Grid.Column="4" Orientation="Horizontal" Spacing="8" VerticalAlignment="Center" Margin="8,0,0,0">
+                                <TextBlock Text="{Binding CurrentHandler}" FontSize="11" Foreground="{DynamicResource ThemeTextSecondaryBrush}" VerticalAlignment="Center" />
+                                <Button Width="28" Height="28" Command="{Binding DeleteCommand}" IsVisible="{Binding IsCustom}" Background="{DynamicResource ThemeButtonBgBrush}" BorderBrush="{DynamicResource ThemeBorderBrush}" Padding="4"
+                                        ToolTip.Tip="{Binding $parent[Window].((vm:SettingsWindowViewModel)DataContext).AssocDeleteTooltip}">
+                                  <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                                </Button>
+                              </StackPanel>
+                            </Grid>
+                          </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                      </ItemsControl>
+                    </ScrollViewer>
+                  </StackPanel>
+                </Border>
 
                 <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,8,0,0">
                   <Button Content="{Binding FileAssocSelectAllText}" Command="{Binding SelectAllAssocCommand}" Padding="12,4" />
                   <Button Content="{Binding FileAssocDeselectAllText}" Command="{Binding DeselectAllAssocCommand}" Padding="12,4" />
                                     <Button Content="{Binding FileAssocAddText}" Command="{Binding AddCustomAssocCommand}" Padding="12,4" />
+                </StackPanel>
+
+                <!-- 第二列（打开对话框筛选）批量开关：与左列的全选/全不选分开，避免误改文件关联 -->
+                <StackPanel Orientation="Horizontal" Spacing="8" Margin="0,4,0,0">
+                  <Button Content="{Binding FileAssocOpenDialogSelectAllText}" Command="{Binding SelectAllOpenDialogCommand}" Padding="12,4" />
+                  <Button Content="{Binding FileAssocOpenDialogDeselectAllText}" Command="{Binding DeselectAllOpenDialogCommand}" Padding="12,4" />
                 </StackPanel>
 
                 <StackPanel Orientation="Horizontal" HorizontalAlignment="Right" Spacing="8" Margin="0,8,0,0">

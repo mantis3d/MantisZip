@@ -243,25 +243,33 @@ public partial class App : Application
         if (!enabled) return;
         if (string.IsNullOrEmpty(archivePath) || !File.Exists(archivePath)) return;
 
-        for (int retry = 0; retry < 3; retry++)
+        // 分卷集要整组删（issue #70②）：此前只删传入的那一卷，用户看到的是「.001 没了、.002/.003 还在」。
+        var targets = ArchiveVolumeSet.EnumerateVolumes(archivePath);
+        if (targets.Count == 0)
+            targets = [archivePath];
+
+        foreach (var target in targets)
         {
-            try
+            for (int retry = 0; retry < 3; retry++)
             {
-                FileSystem.DeleteFile(
-                    archivePath,
-                    UIOption.OnlyErrorDialogs,
-                    RecycleOption.SendToRecycleBin);
-                DebugLog($"TryDeleteArchiveAfterExtract: moved '{archivePath}' to recycle bin");
-                return;
-            }
-            catch (Exception ex) when (retry < 2)
-            {
-                DebugLog($"TryDeleteArchiveAfterExtract: attempt {retry + 1} failed for '{archivePath}': {ex.Message}");
-                Thread.Sleep(200);
-            }
-            catch (Exception ex)
-            {
-                DebugLog($"TryDeleteArchiveAfterExtract: failed for '{archivePath}' after 3 attempts: {ex.Message}");
+                try
+                {
+                    FileSystem.DeleteFile(
+                        target,
+                        UIOption.OnlyErrorDialogs,
+                        RecycleOption.SendToRecycleBin);
+                    DebugLog($"TryDeleteArchiveAfterExtract: moved '{target}' to recycle bin ({targets.Count} volume(s))");
+                    break;
+                }
+                catch (Exception ex) when (retry < 2)
+                {
+                    DebugLog($"TryDeleteArchiveAfterExtract: attempt {retry + 1} failed for '{target}': {ex.Message}");
+                    Thread.Sleep(200);
+                }
+                catch (Exception ex)
+                {
+                    DebugLog($"TryDeleteArchiveAfterExtract: failed for '{target}' after 3 attempts: {ex.Message}");
+                }
             }
         }
     }

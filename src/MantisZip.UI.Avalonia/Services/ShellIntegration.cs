@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.Services;
@@ -50,34 +51,23 @@ internal static partial class ShellIntegration
         SHChangeNotify(SHCNE_ASSOCCHANGED, SHCNF_IDLIST, IntPtr.Zero, IntPtr.Zero);
     }
     /// <summary>
-    /// 参与**文件关联**的扩展名（单一事实源）。
+    /// 参与**文件关联**的扩展名候选集（单一事实源：<see cref="ArchiveExtensionCatalog"/>）。
     /// </summary>
     /// <remarks>
-    /// 2026-10-27（issue #54 / 计划 <c>format-detection-container-sfx</c>）起，这里**故意**不再直接等于
-    /// <see cref="ArchiveEngineFactory.SupportedExtensions"/>：
-    /// 后者新增了 <c>.jar / .war / .ear / .apk</c>（能打开、能解压），但它们**暂不注册文件关联**
-    /// （用户的 `.jar` 可能被 JDK / IDE 关联，我们不去抢默认程序）。
-    /// 想把这 4 个纳入关联 = 新增 4 个 <see cref="AppSettings"/> 开关 + 设置页条目 + 本数组，
-    /// 见 <c>docs/KNOWN_ISSUES.md</c> 的 KI-006。
+    /// 2026-10-29 起由目录派生（此前是写死的 8 项数组）：目录新增格式时，设置页行、默认关联值、
+    /// 「打开压缩包」筛选会一起跟上，不再各自维护一份清单。
+    /// 是否**真的注册**仍由用户逐项勾选决定（<see cref="AssocPreferences.GetAssocExtensions"/>）：
+    /// <c>.jar / .war / .ear / .apk</c> 与 <c>.001</c> 默认不勾，避免抢掉 JDK / APK 安装器 / 非压缩分卷的默认程序（issue #54 / KI-006）。
     /// </remarks>
     private static readonly string[] ArchiveExtensions =
-        [".zip", ".7z", ".rar", ".tar", ".tgz", ".tar.gz", ".gz", ".iso"];
+        [.. ArchiveExtensionCatalog.All.Select(info => info.Extension)];
 
     /// <summary>参与文件关联的扩展名（测试用只读视图；理由见 <see cref="ArchiveExtensions"/> 的注释）。</summary>
     internal static IReadOnlyList<string> AssociatedExtensions => ArchiveExtensions;
 
     /// <summary>该格式关联是否"未被用户显式禁用"。注意：默认值为 true（并不代表用户主动启用），false 只会由用户主动取消关联的动作产生——自愈判据把 false 视为"显式禁用，不得自愈"。</summary>
-    internal static bool IsAssocEnabledInSettings(AppSettings s, string ext) => ext.ToLowerInvariant() switch
-    {
-        ".zip"    => s.AssocZip,
-        ".7z"     => s.Assoc7z,
-        ".rar"    => s.AssocRar,
-        ".tar"    => s.AssocTar,
-        ".tgz" or ".tar.gz" => s.AssocTarGz,
-        ".gz"     => s.AssocGz,
-        ".iso"    => s.AssocIso,
-        _         => false,
-    };
+    internal static bool IsAssocEnabledInSettings(AppSettings s, string ext)
+        => AssocPreferences.IsAssocEnabled(s, ext);
 
     // Registry key identifiers — must stay as fixed English strings (language-independent)
     private const string CascadeRoot = "MantisZip";

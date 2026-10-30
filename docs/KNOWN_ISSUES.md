@@ -29,7 +29,7 @@
 | **KI-003** | 24 项 SkiaSharp 4.x CS0618 deprecation | 技术债 | 成本超阈值 | 下次动 `IconProvider` / `IcoParser` / `PreviewViewModel` 时顺带清 | 阻塞中 |
 | **KI-004** | UI 测试用固定临时目录（非 GUID） | 测试卫生 | 成本超阈值 | 下次改这两个用例时顺带改；或出现「残留文件导致红」的实例 | 阻塞中 |
 | **KI-005** | 29 条 7z 用例被 CI 过滤、永不运行 | 覆盖缺口 | 等计划（CI 环境） | CI 装上 7-Zip 并去掉 `SevenZipEngine` 过滤 | 阻塞中 |
-| **KI-006** | `.jar/.war/.ear/.apk` 能打开但**不参与文件关联**（也不进右键菜单/设置页关联列表） | 功能留白 | 缺决策 + 成本 | 用户反馈「想在资源管理器里双击/右键打开 jar」时；或做「关联格式可勾选」设置项时 | 阻塞中 |
+| **KI-006** | `.jar/.war/.ear/.apk` 能打开但**不参与文件关联**（也不进右键菜单/设置页关联列表） | 功能留白 | 缺决策 + 成本 | 用户反馈「想在资源管理器里双击/右键打开 jar」时；或做「关联格式可勾选」设置项时 | 已修复（关联格式可勾选，2026-10-29） |
 | **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 交互 / 文案 | 缺决策 | 已修复（三态契约，2026-10-28） | 已修复 |
 | **KI-009** | 5 个 AppSettings 死开关（存了值、有 UI、无消费者） | 技术债 / 死代码 | 缺决策 | 决定这 5 项的去留（接线 / 删属性 / 删 UI）时；守卫豁免表已按名登记，修一个删一行 | 阻塞中 |
@@ -96,7 +96,8 @@
 - **为什么现在不修**：**缺决策 + 成本**。纳入关联 = 新增 4 个 `AppSettings` 开关（`AssocJar` 等）+ `IsAssocEnabledInSettings`/`GetProgId`/设置页 `AssocItems` 三处 switch + 三语文案，还要回答「该不该抢用户已有的 `.jar` 默认程序」这个产品问题（`.jar` 与 `.zip` 不同：它常常已经被 JDK 绑走，误抢会打断 `java -jar` 的使用习惯）。
 - **复评条件**：用户反馈「希望双击/右键用 MantisZip 打开 jar」时；或做「关联格式可勾选」这类通用设置项时一并纳入。
 - **关联**：`.omo/plans/已完成/format-detection-container-sfx.md` 的「与计划的偏差 2」。
-- **状态**：阻塞中
+- **已修复（2026-10-29）**：做「关联格式可勾选」时一并纳入。`src/MantisZip.Core/Utils/ArchiveExtensionCatalog.cs` 成为「哪些扩展名算压缩包」的单一事实源：`.jar/.war/.ear/.apk` 与分卷占位 `.001` 都在设置页逐行显示、**两列勾选**（左列文件关联 / 右列「打开压缩包」筛选），`AssociateByDefault: false` 保证默认仍不抢默认程序（用户想接管时自己勾）。`ShellIntegration.ArchiveExtensions` 改由目录派生（不再是写死 8 项），`IsAssocEnabledInSettings` 改读 `AppSettings.AssocExtensions` 集合，未设值时回落「目录默认值 + 自定义扩展名」。回归测试：`tests/MantisZip.UI.Avalonia.Tests/AssocPreferencesTests.cs`（目录默认值 / 两列互不影响 / `.tgz` 与 `.tar.gz` 互认 / 老布尔迁移）与 `ArchiveOpenDialogPatternTests.SettingsDrivenPatterns_FollowOpenDialogColumn`。
+- **状态**：已修复（2026-10-29，关联格式可勾选）
 
 ## KI-007 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束）
 
