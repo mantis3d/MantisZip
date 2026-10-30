@@ -103,6 +103,22 @@
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
     </Style>
 
+    <!-- 地址栏行按钮（挂 Classes="addrRow" 的 Grid 的直接子 Button 自动套用）：
+         方形按钮 = ControlHeightMd × ControlHeightMd，与 PathBreadcrumb 的固定高度齐平。
+         背景/前景/边框与全局 Button 一致，这里显式写出只为让「地址行按钮」自成一套、
+         将来要改地址行按钮外观时只改这一处。
+         ⚠ 不要在地址行的按钮上再写 Width / MinHeight / Background —— 那等于绕开本样式。 -->
+    <Style Selector="Grid.addrRow > Button">
+      <Setter Property="Width" Value="{DynamicResource ControlHeightMd}" />
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+    </Style>
+
     <!-- ToggleButton -->
     <Style Selector="ToggleButton">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />

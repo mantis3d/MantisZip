@@ -18,18 +18,14 @@
 
     <!-- ═══════ Row 0: 地址栏 + 导航按钮 ═══════ -->
     <Grid Grid.Row="0"
+          Classes="addrRow"
           ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto"
           ColumnSpacing="{DynamicResource SpacingXxs}"
           Margin="0,0,0,8">
       <!-- 后退按钮 -->
       <Button x:Name="BackButton"
-              Width="32"
-              MinHeight="{DynamicResource ControlHeightMd}"
               Click="Back_Click"
-              ToolTip.Tip="{Binding BackText}"
-              Background="{DynamicResource ThemeButtonBgBrush}"
-              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}">
+              ToolTip.Tip="{Binding BackText}">
         <PathIcon Data="{StaticResource IconChevronLeft}"
                   Width="16"
                   Height="16"
@@ -38,13 +34,8 @@
       <!-- 前进按钮 -->
       <Button Grid.Column="1"
               x:Name="ForwardButton"
-              Width="32"
-              MinHeight="{DynamicResource ControlHeightMd}"
               Click="Forward_Click"
-              ToolTip.Tip="{Binding ForwardText}"
-              Background="{DynamicResource ThemeButtonBgBrush}"
-              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}">
+              ToolTip.Tip="{Binding ForwardText}">
         <PathIcon Data="{StaticResource IconChevronRight}"
                   Width="16"
                   Height="16"
@@ -53,13 +44,8 @@
       <!-- 向上一级目录按钮 -->
       <Button Grid.Column="2"
               x:Name="UpButton"
-              Width="32"
-              MinHeight="{DynamicResource ControlHeightMd}"
               Click="Up_Click"
-              ToolTip.Tip="{Binding UpText}"
-              Background="{DynamicResource ThemeButtonBgBrush}"
-              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}">
+              ToolTip.Tip="{Binding UpText}">
         <PathIcon Data="{StaticResource IconArrowUp}"
                   Width="16"
                   Height="16"
@@ -68,13 +54,8 @@
       <!-- 系统浏览按钮（打开系统文件夹选择器） -->
       <Button Grid.Column="3"
               x:Name="SystemBrowseButton"
-              Width="32"
-              MinHeight="{DynamicResource ControlHeightMd}"
               Click="SystemBrowse_Click"
-              ToolTip.Tip="{Binding BrowseSystemTooltip}"
-              Background="{DynamicResource ThemeButtonBgBrush}"
-              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}">
+              ToolTip.Tip="{Binding BrowseSystemTooltip}">
         <PathIcon Data="{StaticResource IconFolder}"
                   Width="16"
                   Height="16"
@@ -89,12 +70,7 @@
       <!-- 添加收藏按钮 -->
       <Button Grid.Column="5"
               x:Name="AddFavoriteButton"
-              Width="32"
-              MinHeight="{DynamicResource ControlHeightMd}"
-              Click="AddFavorite_Click"
-              Background="{DynamicResource ThemeButtonBgBrush}"
-              Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-              BorderBrush="{DynamicResource ThemeBorderBrush}">
+              Click="AddFavorite_Click">
         <PathIcon Data="{StaticResource IconBookmarkAdd}"
                   Width="16"
                   Height="16"
