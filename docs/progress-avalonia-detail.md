@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-30** — 计划调整：压缩任务队列进 v0.5.8，小活清仓后移 v0.5.9
+  - **背景**：合并 `beta` 后带进新计划 `compress-job-queue.md`（压缩任务队列，46-66h）。用户拍板把它拆开占 v0.5.8，原 v0.5.8 的「小活清仓」后移一版。
+  - **为什么这个顺序**：①v0.5.7 要做 AXAML 编译绑定迁移（现状 51 个 `.axaml` 里 0 个开 `x:CompileBindings`），队列窗是**新增**窗口，排在它之后就能一开始就写 `x:CompileBindings="True"`，不添新债；②v0.5.5 的 picker 改压缩设置窗**内部**，队列 P0 改 `Views/MainWindow.axaml.cs:295` 的**调用点**（`await dialog.RunConfirmedAsync(...)` → 入队即返回），隔两个版本做不会互相干扰。
+  - **口径**：v0.5.8 只做 **P0+P1+P2（18-26h，单进程队列）**——串行队列 + 常驻队列窗 + 失败隔离/重试 + 弹窗归属。**跨进程并入同一队列属 P3**（GUI 单实例互斥 + 队列管道协议 + 引擎移出 UI 线程，16-24h），与 P4（持久化）一起留在 B 档。工时紧可把 P2 裁成「只显示失败原因、不做重试」（总 16-22h）。
+  - **P0-a 已无活可干**：计划里「顺带修 `WaitForManualCloseAsync` 竞态」已由 beta `ee7b05ad` 完成（先订阅 + 复查 + `ManualWaitHeartbeatMs = 250` 定时兜底 + `lifecycle.log`），issue #66 因此关闭；队列的动机从「根治按钮灰化」改写为「排队 / 不阻塞 / 失败隔离」。
+  - **同步范围**：`docs/PLAN.md`（v0.5.8 换内容、新建 v0.5.9、B 档队列行改为只剩 P3+P4）、`.omo/plans/未开始/compress-job-queue.md`（档位、工时口径、P0-a 标已完成、Problem 段改写、新增两条硬约束：队列窗必须编译绑定 + 入队只许用 `ConfirmOutcome` 载荷）。
+  - **状态**：仅文档调整，未改代码；v0.5.8 开工前按规则 1 核对 `AppConstants.Version`（届时需先升到 0.5.8）。
+
 **2026-10-29** — 功能：面包屑地址栏（PathBreadcrumb，v0.5.5 第一项）
   - **背景**：三处路径输入框各自实现（主窗口 `AddressBar` 与 QuickPathPicker / CustomFilePickerDialog 的 `AutoCompleteBox`），行为不一致：主窗口按 Enter 才跳转、编辑器里看不见层级、长路径整串显示、`Ctrl+L` 无处可挂。
   - **控件**：新建 `src/MantisZip.UI.Avalonia/Controls/PathBreadcrumb.axaml(.cs)`（95 + 496 行）。单行 Grid 四层：全宽透明 `BlankClickTarget`（承接末尾空白点击，段按钮在其上层优先命中）、`SegmentsPanel`（段按钮 / 末段加粗 / `›` 分隔 / `…` 折叠）、`EmptyHint`（磁盘空路径占位，整行可点进编辑）、`EditBox`（`AutoCompleteBox`，`MinimumPrefixLength=0`，补全源由宿主注入）。浏览/编辑双态互斥，`ClipToBounds` 裁剪超长段，每段 ToolTip 保完整路径。

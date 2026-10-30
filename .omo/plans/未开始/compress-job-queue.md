@@ -1,10 +1,11 @@
 # Work Plan: 压缩任务队列（TeraCopy 式串行队列 + 常驻队列窗）
 
 > **Status**: 📋 待开始 | **阶段**: [⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜⬜] (0/12)
-> **预估工时**: 🔴高 **46-66h**（P0+P1 ≈ 12-18h 就能独立发版，P3 是高风险大头）
-> **档位**: **B 档**（有价值、排队不排期）；但 **P0 建议视作插队项**——它同时修掉 issue #66 那类「按钮点一次就永久灰」
+> **预估工时**: 🔴高 **46-66h**（本阶段只做 **P0+P1+P2 = 18-26h**，可独立发版；P3 是高风险大头）
+> **档位**: **A 档 · v0.5.8**（P0–P2 单进程队列）；**P3 / P4 留在 B 档**（跨进程 + 引擎后台化 + 持久化）。2026-10-30 用户拍板：队列占 v0.5.8，原 v0.5.8 的「小活清仓」后移 v0.5.9
 > **关联规则**: 规则 13（新增文案三语同步）、规则 20（意图-执行接缝：入队只能用设置窗返回的 `ConfirmOutcome<CompressSettings>`，不许弹窗后回读）、规则 3 / 18（进度文档与发布说明）、规则 21（本轮不做的项登记 `KNOWN_ISSUES.md`）、规则 4 / 7 / 14（新增窗口的主题样式、行高与中文注释）
-> **关联 issue**: #66（新建压缩包按钮永久灰）、#55（多选解压开多窗，已修 CLI 侧，本计划覆盖 GUI 侧）
+> **关联 issue**: #66（新建压缩包按钮永久灰，**已由 beta `ee7b05ad` 修复**）、#55（多选解压开多窗，已修 CLI 侧，本计划覆盖 GUI 侧）
+> **硬约束（2026-10-30 补）**: ①`Views/JobQueueWindow.axaml` 从第一天就写 `x:CompileBindings="True"` + `x:DataType`（v0.5.7 刚完成编译绑定迁移，不许添新债），并纳入 `-Task guards` 第 9 条 `compilebindings`；②入队只许用设置窗返回的 `ConfirmOutcome<CompressSettings>` 载荷，**禁止**弹窗后回读属性（规则 20）
 
 ## Problem
 
@@ -15,7 +16,7 @@
 `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml:97` 的按钮只绑 `Command="{Binding NewArchiveCommand}"`，没有 `IsEnabled`；灰化完全来自 `AsyncRelayCommand` 的「执行中禁用」（CommunityToolkit.Mvvm 8.4.2，默认 `AllowConcurrentExecutions = false`）。而 `NewArchive`（`src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Compress.cs:25-32`）await 的是**整轮压缩**（设置窗 + 进度窗 + 收尾）。于是：
 
 - 只要有一个 `await` 没回来，按钮就永久灰，只有重启能恢复 —— 这正是 issue #66「用一次就灰化」。
-- 目前的疑因（未复现确认）：`src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml.cs:420-452` 的 `WaitForManualCloseAsync` 存在 TOCTOU —— `if (!IsVisible) return Closed;` 之后才 `Closed += onClosed;`，窗口若在这两步之间被关掉（取消收尾的 `window.Close()`、自动关窗、密码取消收尾都可能同时在跑），信号量永远不会被 Set，`await Task.Run(() => gate.Wait())` 永不返回。
+- ~~疑因（未复现确认）~~ **已修复（beta `ee7b05ad`，2026-10-30 合并进 alpha）**：`src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml.cs` 的 `WaitForManualCloseAsync` 原先是 `if (!IsVisible) return Closed;` 之后才 `Closed += onClosed;` 的 TOCTOU（窗口在这两步之间被关掉就永不返回），现在改为「先订阅、再复查、`ManualWaitHeartbeatMs = 250` 定时兜底」并写 `lifecycle.log`。⇒ 本计划 **P0-a 已无活可干**，#66 的动机从「根治按钮灰化」改为「排队 / 不阻塞 / 失败隔离」。
 - 2026-10-29 探针实测（临时文件，已删除）：命令委托**抛异常**不会卡禁用（`CanExecute` 已复位）；委托**永不完成**则 `CanExecute` 永久 false。⇒ 灰化 = 「任务没完成」，不是异常、不是模态禁用。
 
 ### 二、想再压一次只能等
@@ -148,7 +149,7 @@ CompressJobQueue
 
 ## 实施步骤
 
-1. **P0-a**：修 `WaitForManualCloseAsync` 竞态（先订阅再复查 + 兜底上限 + 日志），跑 `ui-tests` 全量；单独可提交。
+1. ~~**P0-a**：修 `WaitForManualCloseAsync` 竞态~~ **已完成（beta `ee7b05ad`）**：先订阅 + 复查 + 250ms 定时兜底 + `lifecycle.log`，2026-10-30 已合并进 alpha 并全量验证（build/tests/ui-tests/check 全绿）。
 2. **P0-b**：新增 `src/MantisZip.UI.Avalonia/Services/CompressJobQueue.cs` + `Models/CompressJob.cs`（无 UI，纯调度），配单元测试（串行、失败继续、取消单任务、取消全部、暂停边界）。
 3. **P0-c**：`MainWindowViewModel.Compress.cs` 的 `NewArchive` 改为入队后立即返回；`MainWindow.axaml.cs:279-311` 的 `ShowCompressSettingsDialog` 在确认后入队；队列在 `MainWindowViewModel` 里持有一个实例（P3 再改成 App 级单例）。
 4. **P0-d**：进度窗标题显示「第 N/M 个任务」（新增 i18n key，三语同步）。

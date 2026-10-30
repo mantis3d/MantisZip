@@ -89,9 +89,23 @@
 
 > **v0.5.7 验收口径**：Office 三族预览不再先落盘；迁移过的 axaml 里属性名写错会**构建失败**而不是静默空白。
 
-### 阶段 v0.5.8 —— 小活清仓（约 14-20h，缓冲池，可裁剪）
+### 阶段 v0.5.8 —— 压缩任务队列（P0–P2，约 18-26h）
+
+> TeraCopy 式串行队列：多选/批量压缩不再并发弹多个进度窗，而是一条队列逐个跑；单任务失败不中断整批，失败行显示原因、可单独重试。
+> **只做单进程队列**（GUI 内触发）。跨进程并入同一队列（CLI / 资源管理器右键）属 P3，与「引擎移出 UI 线程」同批，留在 B 档。
+
+| 功能 | 设计文档 | 难度 | 工时 | 说明 |
+|---|---|:--:|:--:|---|
+| P0 串行队列 | [compress-job-queue.md](.omo/plans/未开始/compress-job-queue.md) | 🟡中 | 4-6h | `Models/CompressJob.cs` + `Services/CompressJobQueue.cs`（无 UI 的调度器）+ 入队接缝（`Views/MainWindow.axaml.cs:295` 的 `await dialog.RunConfirmedAsync(...)` 改为入队后立即返回）+ 进度窗标题「第 N/M 个任务」。**入队只许用设置窗返回的 `ConfirmOutcome<CompressSettings>` 载荷**（规则 20，禁止弹窗后回读） |
+| P1 队列窗 | 同上 | 🟡中 | 8-12h | 常驻 `Views/JobQueueWindow.axaml` + `ViewModels/JobQueueViewModel.cs`：任务列表（输出名 / 源数量 / 状态 / 进度 / 取消）+ 底部「暂停全部 / 取消全部 / 清除已完成」。**新窗口必须一开始就 `x:CompileBindings="True"` + `x:DataType`**（v0.5.7 刚迁完编译绑定，不许添新债），并纳入 `-Task guards` 第 9 条 `compilebindings` |
+| P2 失败隔离与弹窗归属 | 同上 | 🟡中 | 6-8h | 失败行显示原因 +「重试」（复制 job 重新入队）；冲突 / 密码弹窗 owner 从 `ProgressWindow.CurrentVisible` 静态单例改为会话级引用 |
+
+> **v0.5.8 验收口径**：多选 3 个源压缩只出现**一条**队列、进度窗标题显示「第 N/M 个任务」；单任务失败时整批继续，队列窗对应行标红并给出原因、可单独重试；压缩入口点「确定」后立即返回，按钮不再等整轮跑完。进度紧就把 P2 裁成「只显示失败原因、不做重试」（约 4h，总 16-22h）。
+
+### 阶段 v0.5.9 —— 小活清仓（约 14-20h，缓冲池，可裁剪）
 
 > 都是 2–4h 的「便宜、感知明确」项，攒成一批做完，避免长期占着队列。骨架计数与 ICO 图标已提到 v0.5.6，本批剩 6 项。
+> 2026-10-30 调整：原定 v0.5.8，因压缩任务队列占用 v0.5.8 而后移一版。**在这版之前不要再往池子里加新的 2–4h 碎片**，否则永远清不完。
 
 | 功能 | 设计文档 | 工时 | 说明 |
 |---|---|:--:|---|
@@ -102,7 +116,7 @@
 | CLI 解压后打开文件夹对齐 | [cli-extract-open-folder.md](.omo/plans/未开始/cli-extract-open-folder.md) | 2-3h | CLI 解压成功后复用 `SmartOpenPathResolver`；多文件批处理保持不开 |
 | 提取日志与解压「后悔药」 | [extract-journal-undo.md](.omo/plans/未开始/extract-journal-undo.md) | 3-4h | 解压记录 + 一键回滚 |
 
-> **v0.5.8 验收口径**：清完这 6 项，B 档里不再有「2–4h 就能做掉」的碎片。进度紧就先发 v0.5.7，把这批推给下一轮。
+> **v0.5.9 验收口径**：清完这 6 项，B 档里不再有「2–4h 就能做掉」的碎片。进度紧就先发 v0.5.8，把这批推给下一轮。
 ---
 
 ## B 档 —— 有价值，排队（不排期）
@@ -111,7 +125,7 @@
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 压缩任务队列（TeraCopy 式串行队列 + 常驻队列窗） | [compress-job-queue.md](.omo/plans/未开始/compress-job-queue.md) | 🔴高 | 46-66h | 📋 2026-10-29 立项（点「开始压缩」入队 / 队列窗常驻 / 跨进程并入同一队列 / 失败继续 / 单任务+整体取消）。**P0 串行队列 4-6h 是 issue #66 的根治路径，建议视作插队项单独取**；P1 队列窗 8-12h 可独立发版；P3 引擎后台化与「真暂停」同一前置条件，需打包评估 |
+| 压缩任务队列 · P3 跨进程 + P4 持久化 | [compress-job-queue.md](.omo/plans/未开始/compress-job-queue.md) | 🔴高 | 28-40h | 2026-10-30 拆分：P0–P2（单进程串行队列 + 队列窗 + 失败隔离）已进 v0.5.8；本行只剩 P3（GUI 单实例互斥 + 队列管道协议 + 引擎移出 UI 线程，与「真暂停」同批）与 P4（队列持久化 / 拖拽重排 / 压缩后校验） |
 | 压缩包内重命名条目（引擎级，零重压缩） | [archive-rename-entry.md](.omo/plans/未开始/archive-rename-entry.md) | 🟡中 | **8-10h** | 2026-10-28 从 S 档移回 A 档，2026-10-29 降 B 档。ZIP 走 copy-mode **只改名字字节、压缩数据原样搬运**，7z 走 `ModifyArchive` 就地删 + 单条追加，tar.gz 明确不支持。它是「暂存区」的地基，将来与暂存区**同批做** |
 | 压缩包编辑操作序列（暂存区 + 批量提交，含 P2/P3 增强） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | P1 **12-16h**；P2/P3 **8-12h** | 删除/重命名先入内存队列，列表立刻反映（虚拟视图），点「应用」或关窗时**一次性**提交：ZIP 一次 `RewriteAsync`、7z 一次 `ModifyArchive` + 追加（现状每编辑一次就整包重写）。P2/P3 = 拖拽移动/移动到…、队列级 undo/redo、提交目标改为「另存为新包」。**硬依赖上面的重命名提供 rewriter rename 通道** |
 | 自包含体积优化（第一步） | [selfcontained-size-optimization.md](.omo/plans/未开始/selfcontained-size-optimization.md) | 🟡中 | 4-6h | 目标已改写：原「降至 20–25MB」与现有依赖矛盾，激进修剪会打穿预览。第一步只做测量基线 + 验证保守修剪可行性，目标区间 60–90MB。若确认只发 SelfContained 包，优先级上调 |
