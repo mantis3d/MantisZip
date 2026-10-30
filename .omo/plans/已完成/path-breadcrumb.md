@@ -285,4 +285,4 @@ public class PathBreadcrumb : UserControl
 
 - **2026-10-29 第四轮（真机）**：设置 → 路径面板里地址栏与卡片同色看不出边界 → 外壳底色 ThemeSurfaceBgBrush → ThemeHeaderBgBrush，边框 ThemeBorderLightBrush → ThemeBorderBrush，hover 加深、编辑态换 surface 底。
 - **2026-10-29 第五轮（真机）**：进出编辑态整行高度跳 13px → 外壳高度由内容决定（段 20 / 空路径占位 17+8+8=33 / 编辑框 20）。修法：内层 `Grid` 钉 `MinHeight=20`、`EmptyHint` 去掉上下 Margin。三处宿主实测浏览态与编辑态均为 30px；回归用例 `PathBreadcrumbLayoutTests`（红：`Expected 42 / Actual 30`）。
-- **2026-10-29 第六轮（用户提问「能不能做成固定高度的可复用面包屑」）**：现状是控件复用、但高度档位散在宿主（4 处）与控件内部（1 处）。改为控件自带 `MinHeight=ControlHeightMd`（32），宿主与演示卡全部删掉 Height/MinHeight；回归用例加「默认高度 = 32」。今后调高度只改 `Controls/PathBreadcrumb.axaml` 一处。
+- **2026-10-29 第六轮（用户提问「能不能做成固定高度的可复用面包屑」）**：现状是控件复用、但高度档位散在宿主（4 处）与控件内部（1 处）。改为控件自带 `MinHeight=ControlHeightMd`（32），宿主与演示卡全部删掉 Height/MinHeight；回归用例加「默认高度 = 32」。今后调高度只改 `Controls/PathBreadcrumb.axaml` 一处。对话框地址行同排的 5 个方形按钮也一并提到 32，整行齐平。
