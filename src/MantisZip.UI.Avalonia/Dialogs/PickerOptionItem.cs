@@ -6,8 +6,8 @@ namespace MantisZip.UI.Avalonia.Dialogs;
 /// 参数区中的单个参数项：只描述「标签 + 值 + 可用性」，**不含任何业务语义**。
 /// </summary>
 /// <remarks>
-/// 渲染层（<c>CustomFilePickerDialog.axaml</c> 的 <c>OptionsItemsControl</c>）只遍历参数注册表
-/// 生成「标签 + 控件」，不认识任何具体 key——因此新增参数只需在对话框里注册一项，
+/// 渲染层（<c>Controls/CustomFilePickerControl.axaml</c> 的 <c>OptionsItemsControl</c>）只遍历参数注册表
+/// 生成「标签 + 控件」，不认识任何具体 key——因此新增参数只需在控件里注册一项，
 /// 无需改动渲染层与布局。
 /// <para>
 /// 派生 <see cref="ObservableObject"/> 而非普通类：当前只有 CheckBox 双向回推
