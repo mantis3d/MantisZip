@@ -23,6 +23,15 @@ public partial class CompressSettingsWindow : Window
 {
     private bool _loaded;
 
+    /// <summary>
+    /// 防回环标志：内嵌选择器与 <see cref="CompressSettingsViewModel.SelectedPaths"/> 互相回填期间置 true。
+    /// 两个方向（选择器 → VM、VM → 选择器）都会触发对方的事件，不设这道闸会无限往返。
+    /// </summary>
+    private bool _syncingSelection;
+
+    /// <summary>「添加文件」Tab 内嵌选择器的初始浏览目录（第一个源路径所在目录，可能为 null）。</summary>
+    private readonly string? _initialSourcePath;
+
     /// <summary>注入的执行器；设计时窗口（无参构造）没有它，也就不能真正开始压缩。</summary>
     private readonly ICompressSession? _session;
 
@@ -84,26 +93,9 @@ public partial class CompressSettingsWindow : Window
 
         ViewModel = new CompressSettingsViewModel(sourcePaths);
 
-        // 设置文件保存浏览回调
-        ViewModel.BrowseOutput = async () =>
-        {
-            // 格式联动：根据当前 DefaultFormat 计算默认扩展名（弹窗内 SaveFile 模式应用）
-            var defaultExt = ViewModel.DefaultFormat switch
-            {
-                "tar.gz" => ".tar.gz",
-                "7z" => ".7z",
-                _ => ".zip"
-            };
-            return await CustomFilePickerDialog.ShowSaveFileAsync(this, initialPath: ViewModel.OutputPath, defaultExtension: defaultExt);
-        };
-
-        // 设置文件/文件夹选择回调
-        ViewModel.PickFiles = async () =>
-        {
-            // 将第一个源路径的目录作为「场景相关路径」传给 picker，作为默认路径优先级链的 context 来源
-            var contextPath = ResolveContextPath(sourcePaths);
-            return await CustomFilePickerDialog.ShowOpenItemsAsync(this, initialPath: contextPath);
-        };
+        // 内嵌选择器的初始浏览目录：取第一个源路径所在目录（场景相关路径），
+        // 供「添加文件」Tab 的 SourcePicker 打开时定位。
+        _initialSourcePath = ResolveContextPath(sourcePaths);
 
         // 高级格式面板与文件过滤器都只存在于窗口/控件里：确认事务开始前必须先把它们抓进 VM，
         // 否则冻结载荷里会是构造时的旧值或空过滤器（预览=实际的守卫从这里开始）。
@@ -118,10 +110,6 @@ public partial class CompressSettingsWindow : Window
 
         DataContext = ViewModel;
         SubscribeViewModel();
-
-        // 浏览回调：保存文件对话框（带格式联动），选中后将完整路径拆为目录+文件名填入。
-        // 返回目录（QuickPathPicker 只收目录）；文件名落在独立 OutputFileName 控件。
-        OutputPathPicker.BrowseAction = BrowseOutputPathAsync;
 
         // 消息提示回调（弹窗以本窗口为 owner）
         ViewModel.ShowMessage = (msg, title) =>
@@ -184,39 +172,6 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
-    /// QuickPathPicker 浏览：打开保存文件对话框（带格式联动），返回目录并拆分写入文件名。
-    /// </summary>
-    private async Task<string?> BrowseOutputPathAsync(Window? owner, string? current)
-    {
-        if (ViewModel.OutputMode != CompressOutputMode.Manual) return null;
-        var defaultExt = ViewModel.DefaultFormat switch
-        {
-            "tar.gz" => ".tar.gz",
-            "7z" => ".7z",
-            _ => ".zip"
-        };
-        var path = await CustomFilePickerDialog.ShowSaveFileAsync(
-            owner ?? this, initialPath: current ?? ViewModel.OutputDirectory, defaultExtension: defaultExt);
-        if (string.IsNullOrEmpty(path)) return null;
-
-        // 拆分完整路径 → 目录 + 文件名
-        var dir = System.IO.Path.GetDirectoryName(path);
-        var name = System.IO.Path.GetFileName(path);
-        foreach (var ext in new[] { ".tar.gz", ".7z", ".zip" })
-        {
-            if (name.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
-            {
-                name = name[..^ext.Length];
-                break;
-            }
-        }
-        if (string.IsNullOrEmpty(dir)) return null;
-        ViewModel.OutputDirectory = dir;
-        ViewModel.OutputFileName = name;
-        return dir;
-    }
-
-    /// <summary>
     /// 获取当前文件过滤条件。返回 null 表示不过滤。
     /// 只服务于确认事务内部的快照（过滤控件属于窗口，不属于载荷），因此不对外公开。
     /// </summary>
@@ -244,6 +199,99 @@ public partial class CompressSettingsWindow : Window
         FormatOptionsPanel.LoadDefaults();
         LoadSplitSizeFromSettings();
         UpdateFormatAvailabilityHints();
+
+        // 选择器初始化放在 Loaded：控件需要真实布局与 DataContext 才能解析默认路径
+        InitializePickers();
+    }
+
+    /// <summary>
+    /// 初始化两个内嵌选择器（<c>OutputPicker</c> / <c>SourcePicker</c>）。
+    /// 初始化期间会触发 <c>SelectionChanged</c>，用防回环标志把事件吃掉——
+    /// 否则「预选源文件」会立刻把 VM 清空重建一遍，白白重建一次预览。
+    /// </summary>
+    private void InitializePickers()
+    {
+        _syncingSelection = true;
+        try
+        {
+            // 输出目录选择器：PickFolder 模式，初始目录取 VM 里已算好的输出目录
+            OutputPicker.Initialize(initialPath: ViewModel.OutputDirectory);
+
+            // 源文件选择器：PickItems 模式，预选 VM 已有的源路径（拖入 / CLI 参数）
+            SourcePicker.Initialize(
+                initialPath: _initialSourcePath,
+                preselected: ViewModel.SelectedPaths.ToList());
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
+
+    /// <summary>
+    /// 输出目录选择器 → ViewModel：目录变化即写回 <see cref="CompressSettingsViewModel.OutputDirectory"/>。
+    /// 这是原 <c>ViewModel.BrowseOutput</c> 回调的替代——控件事件直连，不再经 VM 转一手委托。
+    /// </summary>
+    private void OnOutputPickerPathChanged(object? sender, string path)
+    {
+        if (_syncingSelection) return;
+        if (string.IsNullOrWhiteSpace(path)) return;
+        // 分别/合并模式的路径由 VM 自动计算，选择器此时也不可见，双保险
+        if (ViewModel.OutputMode != CompressOutputMode.Manual) return;
+
+        ViewModel.OutputDirectory = path;
+    }
+
+    /// <summary>
+    /// 源文件选择器 → ViewModel：用选择器的累积列表整体重建 <c>SelectedPaths</c>。
+    /// 逐项 diff 没有意义（列表很小），整体重建能保证顺序与选择器完全一致。
+    /// </summary>
+    private void OnSourcePickerSelectionChanged(object? sender, EventArgs e)
+    {
+        if (_syncingSelection) return;
+
+        _syncingSelection = true;
+        try
+        {
+            var picked = SourcePicker.SelectedPaths.ToList();
+            ViewModel.SelectedPaths.Clear();
+            foreach (var path in picked)
+            {
+                ViewModel.SelectedPaths.Add(path);
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
+
+    /// <summary>
+    /// ViewModel → 选择器：列表里删掉条目后回填，保持两边一致。
+    /// <c>SetSelectedPaths</c> 会再抛一次 <c>SelectionChanged</c>，由防回环标志吃掉。
+    /// </summary>
+    private void SyncPickerFromSelection()
+    {
+        if (_syncingSelection) return;
+
+        _syncingSelection = true;
+        try
+        {
+            SourcePicker.SetSelectedPaths(ViewModel.SelectedPaths);
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+    }
+
+    /// <summary>
+    /// 「高级模式」开关：关闭 = 简单模式（当前目录选中即结果、切目录清空累积）；
+    /// 打开 = 跨目录累积（每条目显示复选框，多次添加后统一确认）。
+    /// </summary>
+    private void OnAdvancedModeChanged(object? sender, RoutedEventArgs e)
+    {
+        SourcePicker.IsSimpleMode = AdvancedModeCheck.IsChecked != true;
     }
 
     private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
@@ -377,15 +425,19 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
-    /// 批量移除选中的源文件。
+    /// 批量移除选中的源文件；删完把结果回填给内嵌选择器（双向同步的另一半）。
     /// </summary>
     private void RemoveSelected_Click(object? sender, RoutedEventArgs e)
     {
         var toRemove = SourceFilesList.SelectedItems?.Cast<string>().ToList() ?? new List<string>();
+        if (toRemove.Count == 0) return;
+
         foreach (var path in toRemove)
         {
             ViewModel.SelectedPaths.Remove(path);
         }
+
+        SyncPickerFromSelection();
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)

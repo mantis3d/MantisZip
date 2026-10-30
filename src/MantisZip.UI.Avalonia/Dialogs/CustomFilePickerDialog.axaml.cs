@@ -36,8 +36,20 @@ public class FileBrowserItem : ObservableObject
     public string SubText { get; set; } = string.Empty;
     public bool ShowSubText { get; set; }
 
-    /// <summary>是否可勾选（PickItems 模式文件+目录可勾选；其他模式 false 隐藏勾选框）。</summary>
-    public bool CanCheck { get; set; }
+    /// <summary>
+    /// 是否可勾选（PickItems 模式文件+目录可勾选；其他模式 false 隐藏勾选框）。
+    ///
+    /// 必须是会发通知的属性：内嵌宿主在列表已渲染之后才切「简单/高级模式」，
+    /// 行模板用 IsVisible="{Binding CanCheck}" 绑它——写普通自动属性时绑定不重算，
+    /// 用户勾了「高级模式」也看不到复选框（2026-10-30 实测踩到）。
+    /// </summary>
+    public bool CanCheck
+    {
+        get => _canCheck;
+        set => SetProperty(ref _canCheck, value);
+    }
+
+    private bool _canCheck;
 
     private bool _isSelected;
 

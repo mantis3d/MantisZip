@@ -5,10 +5,10 @@
          x:Class="MantisZip.UI.Avalonia.Dialogs.ExtractSettingsWindow"
          x:CompileBindings="False"
          Title="{Binding LocalizedStrings[Extract_Title]}"
-         Width="850"
-         MinWidth="700"
-          MinHeight="500"
-         SizeToContent="Height"
+         Width="1180"
+         MinWidth="900"
+         Height="760"
+         MinHeight="560"
          WindowStartupLocation="CenterOwner"
          CanResize="True"
          Background="{DynamicResource ThemeWindowBgBrush}">
@@ -18,124 +18,191 @@
     <conv:NodeForegroundConverter x:Key="NodeForegroundConverter" />
   </Window.Resources>
 
+  <!-- 整窗两行：内容区（*）+ 底部按钮行（Auto）；内嵌选择器需要确定高度，故窗口不再 SizeToContent -->
   <Grid RowDefinitions="*,Auto"
         Margin="16">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="450" MinWidth="400" />
+      <!-- 左：设置选项卡（含内嵌文件选择器，需比旧版更宽） -->
+      <ColumnDefinition Width="620" MinWidth="520" />
       <ColumnDefinition Width="Auto" />
+      <!-- 右：解压预览 -->
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
-    <!-- ═══════ 左侧：设置选项卡 ═══════ -->
+
+    <!-- ═══════ 左侧：设置选项卡（顺序：输出设置 → 添加压缩包 → 文件过滤 → 加速） ═══════ -->
     <TabControl Grid.Column="0" Grid.Row="0"
                 Background="{DynamicResource ThemeWindowBgBrush}"
                 TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
-      <!-- 选项卡 1：常规设置 -->
-      <TabItem Header="{Binding LocalizedStrings[Extract_Title]}"
+
+      <!-- ══ 选项卡 1：输出设置（解压目标 + 冲突处理；目标是解压载荷的一部分） ══ -->
+      <TabItem x:Name="OutputTab"
+               Header="{Binding LocalizedStrings[Extract_TabOutput]}"
                Classes="compactTab"
-               controls:TabItemExtensions.TabIcon="IconSettings">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
-                       TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
-          <StackPanel Spacing="12"
-                       Margin="0,8,0,0">
-            <!-- 源压缩包列表 -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="4" Padding="12"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
-                <TextBlock Text="{Binding LocalizedStrings[Extract_SourceArchives]}"
-                           FontWeight="SemiBold" />
-                <ListBox x:Name="FileListBox"
-                         Height="100"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}"
-                         ItemsSource="{Binding SourceItems}"
-                         SelectedItem="{Binding SelectedSourceItem}">
-                  <ListBox.ItemContainerTheme>
-                    <ControlTheme TargetType="ListBoxItem">
-                      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
-                    </ControlTheme>
-                  </ListBox.ItemContainerTheme>
-                  <ListBox.ItemTemplate>
-                    <DataTemplate>
-                      <StackPanel Orientation="Horizontal"
-                                  Spacing="6"
-                                  Background="Transparent">
-                        <!-- 状态图标 -->
-                        <PathIcon Data="{Binding StatusIconKey, Converter={StaticResource GeometryResourceConverter}}"
-                                  Width="16" Height="16"
-                                  VerticalAlignment="Center"
-                                  Foreground="{Binding StatusForegroundKey, Converter={StaticResource NodeForegroundConverter}}" />
-                        <!-- 显示名称 -->
-                        <TextBlock Text="{Binding DisplayName}"
-                                   VerticalAlignment="Center"
-                                   TextTrimming="CharacterEllipsis"
-                                   ToolTip.Tip="{Binding RowToolTip}" />
-                      </StackPanel>
-                    </DataTemplate>
-                  </ListBox.ItemTemplate>
-                </ListBox>
-                <!-- 多包场景提示：过滤/预览统计语义绑定首包 -->
-                <TextBlock Text="{Binding LocalizedStrings[Extract_Source_MultiFilterHint]}"
-                           FontSize="11"
-                           TextWrapping="Wrap"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                           IsVisible="{Binding HasMultipleArchives}" />
-                <!-- 手动解锁按钮：选中锁定/加密未匹配行时出现 -->
-                <Button Command="{Binding UnlockSelectedCommand}"
-                        IsVisible="{Binding CanUnlockSelected}"
-                        HorizontalAlignment="Left"
-                        Classes="ToolbarButton">
-                  <StackPanel Orientation="Horizontal" Spacing="6">
-                    <PathIcon Data="{StaticResource IconKey}"
-                              Width="16" Height="16"
-                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                    <TextBlock Text="{Binding LocalizedStrings[Extract_UnlockButton]}"
-                               VerticalAlignment="Center" />
-                  </StackPanel>
-                </Button>
-              </StackPanel>
-            </Border>
+               controls:TabItemExtensions.TabIcon="IconFolder">
+        <Grid RowDefinitions="Auto,Auto,*,Auto"
+              Margin="0,8,0,0">
+          <!-- 目标目录标题 -->
+          <TextBlock Grid.Row="0"
+                     Text="{Binding LocalizedStrings[Extract_Destination]}"
+                     FontWeight="SemiBold" />
 
-            <!-- 目标路径 -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="4" Padding="12"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
-                <TextBlock Text="{Binding LocalizedStrings[Extract_Destination]}"
-                           FontWeight="SemiBold" />
-                <!-- 路径输入 + 快速按钮 + 浏览 (QuickPathPicker) -->
-                <controls:QuickPathPicker x:Name="DestinationPicker"
-                                          Path="{Binding DestinationPath}" />
-              </StackPanel>
-            </Border>
-
-            <!-- 冲突处理方式 -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="4" Padding="12"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="8">
-                <TextBlock Text="{Binding LocalizedStrings[Extract_WhenFileExists]}"
-                           FontWeight="SemiBold" />
-                <ComboBox ItemsSource="{Binding ConflictActionOptions}"
-                          SelectedItem="{Binding SelectedConflictActionOption}"
-                          DisplayMemberBinding="{Binding Display}"
-                          HorizontalAlignment="Stretch" />
-                <CheckBox IsChecked="{Binding OpenFolderAfterExtract}">
-                  <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
-                             TextWrapping="Wrap" />
-                </CheckBox>
-
-                <!-- 解压后将原压缩包移入回收站：默认值取自设置窗口同名选项，勾选仅本次解压生效，不写回全局设置 -->
-                <CheckBox IsChecked="{Binding DeleteArchiveAfterExtract}">
-                  <TextBlock Text="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
-                             TextWrapping="Wrap" />
-                </CheckBox>
-              </StackPanel>
-            </Border>
+          <!-- 目标目录可直接编辑；下方选择器切换浏览目录时实时跟随（见 code-behind 的 PathChanged） -->
+          <StackPanel Grid.Row="1" Spacing="4" Margin="0,6,0,8">
+            <TextBox x:Name="DestinationPathBox"
+                     Text="{Binding DestinationPath, Mode=TwoWay}"
+                     PlaceholderText="{Binding LocalizedStrings[Extract_DestinationPlaceholder]}" />
+            <TextBlock Text="{Binding LocalizedStrings[Extract_OutputPickerHint]}"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
           </StackPanel>
-        </ScrollViewer>
+
+          <!-- 内嵌文件夹选择器：只列目录，双击进入；当前浏览目录即解压目标 -->
+          <Border Grid.Row="2"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="4" Padding="8"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <controls:CustomFilePickerControl x:Name="DestinationPicker"
+                                              Mode="PickFolder"
+                                              IsSimpleMode="True" HideAccumulatedPanel="True" />
+          </Border>
+
+          <!-- 冲突处理方式（原「解压」页内容原样搬入输出设置） -->
+          <Border Grid.Row="3"
+                  Margin="0,12,0,0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="4" Padding="12"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <StackPanel Spacing="8">
+              <TextBlock Text="{Binding LocalizedStrings[Extract_WhenFileExists]}"
+                         FontWeight="SemiBold" />
+              <ComboBox ItemsSource="{Binding ConflictActionOptions}"
+                        SelectedItem="{Binding SelectedConflictActionOption}"
+                        DisplayMemberBinding="{Binding Display}"
+                        HorizontalAlignment="Stretch" />
+              <CheckBox IsChecked="{Binding OpenFolderAfterExtract}">
+                <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
+                           TextWrapping="Wrap" />
+              </CheckBox>
+
+              <!-- 解压后将原压缩包移入回收站：默认值取自设置窗口同名选项，勾选仅本次解压生效，不写回全局设置 -->
+              <CheckBox IsChecked="{Binding DeleteArchiveAfterExtract}">
+                <TextBlock Text="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
+                           TextWrapping="Wrap" />
+              </CheckBox>
+            </StackPanel>
+          </Border>
+        </Grid>
       </TabItem>
 
-      <!-- 选项卡 2：文件过滤 -->
+      <!-- ══ 选项卡 2：添加压缩包（内嵌 PickItems 选择器 + 下方「已选压缩包」列表，双向同步） ══ -->
+      <TabItem x:Name="AddArchivesTab"
+               Header="{Binding LocalizedStrings[Extract_TabAddArchives]}"
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconArchiveMultiple">
+        <Grid RowDefinitions="Auto,*,Auto"
+              Margin="0,8,0,0">
+          <!-- 使用说明：点选即追加到下方列表，取消勾选不会移除（移除只走下方列表） -->
+          <TextBlock Grid.Row="0"
+                     Text="{Binding LocalizedStrings[Extract_AddArchivesPickerHint]}"
+                     FontSize="11"
+                     TextWrapping="Wrap"
+                     Margin="0,0,0,8"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+          <!-- 内嵌文件选择器：压缩包扩展名取自 ArchiveExtensionCatalog（不在此硬编码清单） -->
+          <Border Grid.Row="1"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="4" Padding="8"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <controls:CustomFilePickerControl x:Name="ArchivePicker"
+                                              Mode="PickItems"
+                                              IsSimpleMode="True" HideAccumulatedPanel="True" />
+          </Border>
+
+          <!-- 已选压缩包：行对象由 ViewModel 持有（状态/进度），选择器只增删、不重建 -->
+          <Border Grid.Row="2"
+                  Margin="0,12,0,0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="4" Padding="12"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <StackPanel Spacing="8">
+              <!-- 标题 + 移除所选 -->
+              <Grid ColumnDefinitions="*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding LocalizedStrings[Extract_SelectedArchives]}"
+                           FontWeight="SemiBold"
+                           VerticalAlignment="Center" />
+                <Button Grid.Column="1"
+                        Classes="ToolbarButton"
+                        Content="{Binding LocalizedStrings[Extract_RemoveSelected]}"
+                        Command="{Binding RemoveSelectedSourceArchiveCommand}" />
+              </Grid>
+
+              <ListBox x:Name="FileListBox"
+                       MinHeight="120"
+                       MaxHeight="180"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}"
+                       ItemsSource="{Binding SourceItems}"
+                       SelectedItem="{Binding SelectedSourceItem}">
+                <ListBox.ItemContainerTheme>
+                  <ControlTheme TargetType="ListBoxItem">
+                    <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                  </ControlTheme>
+                </ListBox.ItemContainerTheme>
+                <ListBox.ItemTemplate>
+                  <DataTemplate>
+                    <StackPanel Orientation="Horizontal"
+                                Spacing="6"
+                                Background="Transparent">
+                      <!-- 状态图标 -->
+                      <PathIcon Data="{Binding StatusIconKey, Converter={StaticResource GeometryResourceConverter}}"
+                                Width="16" Height="16"
+                                VerticalAlignment="Center"
+                                Foreground="{Binding StatusForegroundKey, Converter={StaticResource NodeForegroundConverter}}" />
+                      <!-- 显示名称 -->
+                      <TextBlock Text="{Binding DisplayName}"
+                                 VerticalAlignment="Center"
+                                 TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding RowToolTip}" />
+                    </StackPanel>
+                  </DataTemplate>
+                </ListBox.ItemTemplate>
+              </ListBox>
+
+              <!-- 空态提示：一个压缩包都没有时显示 -->
+              <TextBlock Text="{Binding LocalizedStrings[Extract_AddArchivesEmptyHint]}"
+                         FontSize="11"
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         IsVisible="{Binding HasNoSourceArchives}" />
+
+              <!-- 多包场景提示：过滤/预览统计语义绑定首包 -->
+              <TextBlock Text="{Binding LocalizedStrings[Extract_Source_MultiFilterHint]}"
+                         FontSize="11"
+                         TextWrapping="Wrap"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         IsVisible="{Binding HasMultipleArchives}" />
+
+              <!-- 手动解锁按钮：选中锁定/加密未匹配行时出现 -->
+              <Button Command="{Binding UnlockSelectedCommand}"
+                      IsVisible="{Binding CanUnlockSelected}"
+                      HorizontalAlignment="Left"
+                      Classes="ToolbarButton">
+                <StackPanel Orientation="Horizontal" Spacing="6">
+                  <PathIcon Data="{StaticResource IconKey}"
+                            Width="16" Height="16"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[Extract_UnlockButton]}"
+                             VerticalAlignment="Center" />
+                </StackPanel>
+              </Button>
+            </StackPanel>
+          </Border>
+        </Grid>
+      </TabItem>
+
+      <!-- ══ 选项卡 3：文件过滤（内容不变） ══ -->
       <TabItem Header="{Binding LocalizedStrings[Extract_TabFilter]}"
                Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconFilter">
@@ -145,7 +212,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- 选项卡 3：加速（并行解压；与设置窗口对称；初值读取设置，本次解压生效不回写） -->
+      <!-- ══ 选项卡 4：加速（并行解压；与设置窗口对称；初值读取设置，本次解压生效不回写） ══ -->
       <TabItem Header="{Binding LocalizedStrings[Settings_ExtractTab_Parallel]}"
                Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconLightning">

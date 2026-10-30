@@ -5,8 +5,8 @@
           x:Class="MantisZip.UI.Avalonia.Dialogs.CompressSettingsWindow"
           x:CompileBindings="False"
           Title="{Binding WindowTitle}"
-          Width="950"
-          MinWidth="700"
+          Width="1080"
+          MinWidth="900"
           MinHeight="500"
           SizeToContent="Height"
           WindowStartupLocation="CenterOwner"
@@ -22,16 +22,24 @@
   <Grid RowDefinitions="*,Auto"
         Margin="16">
     <Grid.ColumnDefinitions>
-      <ColumnDefinition Width="500" MinWidth="400" />  <!-- 左侧设置区域，最小宽度400 -->
+      <ColumnDefinition Width="620" MinWidth="520" />  <!-- 左侧设置区域：六个页签（含图标）单行需要约 620px，最小 520 -->
       <ColumnDefinition Width="Auto" />                <!-- GridSplitter 分割器列 -->
       <ColumnDefinition Width="*" />                   <!-- 右侧预览面板，自适应剩余宽度 -->
     </Grid.ColumnDefinitions>
 
     <!-- ═══════ 左侧：设置 TabControl ═══════ -->
+    <!-- Tab 顺序：输出设置 → 添加文件 → 压缩设置 → 密码 → 注释 → 文件过滤 -->
     <TabControl Grid.Column="0" Grid.Row="0"
                 SelectionChanged="OnTabSelectionChanged">
-      <!-- Tab 1: 常规设置 -->
-      <TabItem Header="{Binding LocalizedStrings[Compress_TabGeneral]}"
+
+      <!-- ═══════════════════════════════════════════════════════════════
+           Tab 1: 输出设置
+             ① 输出模式单选（手动 / 分别 / 合并）
+             ② 输出目录：内嵌 CustomFilePickerControl（PickFolder + 简单模式）
+             ③ 输出文件名 + 扩展名标签（手动/合并模式）
+             ④ 文件冲突策略
+           ═══════════════════════════════════════════════════════════════ -->
+      <TabItem Header="{Binding LocalizedStrings[Compress_TabOutput]}"
                 Classes="compactTab"
                 controls:TabItemExtensions.TabIcon="IconSettings">
         <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
@@ -39,35 +47,150 @@
           <StackPanel Spacing="{DynamicResource SpacingSm}"
                       Margin="0,8,0,0">
 
-            <!-- 分组：源文件列表 -->
+            <!-- 分组：输出模式（三个互斥单选，绑定 VM 的 IsManualMode/IsSeparateMode/IsCombinedMode） -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
                     BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
                     Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <TextBlock Text="{Binding LocalizedStrings[Compress_SourceFiles]}"
-                          FontWeight="SemiBold" />
-                <!-- 操作按钮行：添加文件/移除选中 -->
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                  <Button Content="{Binding LocalizedStrings[Compress_AddItems]}"
-                          Height="26" Padding="8,0"
-                          Command="{Binding AddFilesCommand}"
-                          Background="{DynamicResource ThemeButtonBgBrush}"
-                          Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                  <Button Content="{Binding LocalizedStrings[Compress_Remove]}"
-                          Height="26" Padding="8,0"
+                <TextBlock Text="{Binding LocalizedStrings[Compress_OutputMode]}"
+                           FontWeight="SemiBold" />
+                <!-- 手动指定输出路径 -->
+                <RadioButton GroupName="CompressOutputMode"
+                             IsChecked="{Binding IsManualMode}"
+                             Content="{Binding LocalizedStrings[Compress_OutputMode_Manual]}" />
+                <!-- 分别压缩到各自目录（每源自成包） -->
+                <RadioButton GroupName="CompressOutputMode"
+                             IsChecked="{Binding IsSeparateMode}"
+                             Content="{Binding LocalizedStrings[Compress_OutputMode_Separate]}" />
+                <!-- 合并压缩到同一个压缩包 -->
+                <RadioButton GroupName="CompressOutputMode"
+                             IsChecked="{Binding IsCombinedMode}"
+                             Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
+              </StackPanel>
+            </Border>
+
+            <!-- 分组：输出目录（内嵌目录选择器，仅手动模式可见；分别/合并模式路径自动计算） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}"
+                    IsVisible="{Binding IsQuickPathVisible}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding LocalizedStrings[Compress_OutputPath]}"
+                           FontWeight="SemiBold" />
+                <!-- 内嵌目录选择器：Mode=PickFolder（只取目录、不显示文件名区），
+                     IsSimpleMode=True（当前目录即结果、无复选框）。
+                     PathChanged → 代码后台写回 ViewModel.OutputDirectory。
+                     高度必须显式给：控件内部 Grid 的 * 行放在 StackPanel 里会被压成 0，
+                     故这里给定固定视口高度（选择器需要一块可浏览的区域）。 -->
+                <controls:CustomFilePickerControl x:Name="OutputPicker"
+                                                  Mode="PickFolder"
+                                                  IsSimpleMode="True"
+                                                  Height="260"
+                                                  PathChanged="OnOutputPickerPathChanged" HideAccumulatedPanel="True" />
+              </StackPanel>
+            </Border>
+
+            <!-- 分组：输出文件名 + 扩展名（仅手动/合并模式可见；扩展名跟随所选格式） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}"
+                    IsVisible="{Binding IsFileNameSectionVisible}">
+              <Grid ColumnDefinitions="80,*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding LocalizedStrings[Compress_OutputFileName]}"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <TextBox Grid.Column="1"
+                         Text="{Binding OutputFileName}"
+                         IsReadOnly="{Binding IsOutputPathReadOnly}"
+                         MinHeight="{DynamicResource ControlHeightSm}"
+                         Background="{DynamicResource ThemeSurfaceBgBrush}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                <TextBlock Grid.Column="2"
+                           Text="{Binding OutputExtensionLabel}"
+                           Margin="6,0,0,0"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              </Grid>
+            </Border>
+
+            <!-- 分组：文件冲突策略（本次压缩遇到同名文件时的处理方式，覆盖/追加/自动重命名/跳过） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <!-- 标签：文件存在时： -->
+                <TextBlock Text="{Binding LocalizedStrings[Compress_WhenFileExists]}"
+                           FontWeight="SemiBold" />
+                <!-- 冲突策略下拉：每次询问 / 覆盖 / 追加 / 自动重命名 / 跳过 -->
+                <ComboBox x:Name="ConflictActionCombo"
+                          ItemsSource="{Binding ConflictActionOptions}"
+                          SelectedItem="{Binding SelectedConflictActionOption}"
+                          DisplayMemberBinding="{Binding Display}"
+                          Width="240" HorizontalAlignment="Left" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════════════════════════════════════════════════════════════
+           Tab 2: 添加文件
+             ① 内嵌源文件选择器（PickItems + 简单模式：当前目录选中即结果、切目录清空）
+             ② 「高级模式」开关：勾选后 IsSimpleMode=False（显示复选框、跨目录累积）
+             ③ 已选源文件列表（与选择器双向同步，可批量移除）
+           ═══════════════════════════════════════════════════════════════ -->
+      <TabItem Header="{Binding LocalizedStrings[Compress_TabAddFiles]}"
+                Classes="compactTab"
+                controls:TabItemExtensions.TabIcon="IconFolderAdd">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                      TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <StackPanel Spacing="{DynamicResource SpacingSm}"
+                      Margin="0,8,0,0">
+
+            <!-- 内嵌源文件选择器：PickItems（可跨文件/目录多选）。
+                 SelectionChanged → 代码后台用 SelectedPaths 重建 ViewModel.SelectedPaths。
+                 高度显式给定，理由同上：选择器内部的 * 行需要一块可浏览区域。 -->
+            <controls:CustomFilePickerControl x:Name="SourcePicker"
+                                              Mode="PickItems"
+                                              IsSimpleMode="True"
+                                              Height="300"
+                                              SelectionChanged="OnSourcePickerSelectionChanged" HideAccumulatedPanel="True" />
+
+            <!-- 高级模式开关：关闭 = 简单模式（当前目录选中即结果、切目录清空）；
+                 打开 = 跨目录累积（每个条目显示复选框，可多次添加后统一确认） -->
+            <CheckBox x:Name="AdvancedModeCheck"
+                      Content="{Binding LocalizedStrings[Compress_PickerAdvancedMode]}"
+                      IsCheckedChanged="OnAdvancedModeChanged" />
+
+            <!-- 分组：已选源文件（与上方选择器双向同步的最终清单） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <!-- 标题 + 移除按钮：移除后回填选择器（保持两边一致） -->
+                <Grid ColumnDefinitions="*,Auto">
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding LocalizedStrings[Compress_SelectedSources]}"
+                             FontWeight="SemiBold"
+                             VerticalAlignment="Center" />
+                  <Button Grid.Column="1"
+                          Content="{Binding LocalizedStrings[Compress_Remove]}"
+                          MinHeight="{DynamicResource ControlHeightSm}"
+                          Padding="8,0"
                           Click="RemoveSelected_Click"
                           Background="{DynamicResource ThemeButtonBgBrush}"
                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                </StackPanel>
+                </Grid>
                 <!-- 源文件列表：支持多选，显示路径，工具提示显示完整路径 -->
                 <ListBox x:Name="SourceFilesList"
-                          SelectionMode="Multiple"
-                          ItemsSource="{Binding SelectedPaths}"
-                          MinHeight="160" MaxHeight="240"
-                          BorderBrush="{DynamicResource ThemeBorderBrush}"
-                          Background="{DynamicResource ThemeSurfaceBgBrush}">
+                         SelectionMode="Multiple"
+                         ItemsSource="{Binding SelectedPaths}"
+                         MinHeight="160" MaxHeight="240"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}"
+                         Background="{DynamicResource ThemeSurfaceBgBrush}">
                   <ListBox.ItemContainerTheme>
                     <ControlTheme TargetType="ListBoxItem">
                       <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
@@ -97,6 +220,20 @@
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
               </StackPanel>
             </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ═══════════════════════════════════════════════════════════════
+           Tab 3: 压缩设置（原「常规」的格式/级别 + 原「高级」的格式特定选项与分卷）
+           ═══════════════════════════════════════════════════════════════ -->
+      <TabItem Header="{Binding LocalizedStrings[Compress_TabCompress]}"
+                Classes="compactTab"
+                controls:TabItemExtensions.TabIcon="IconWrench">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                      TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <StackPanel Spacing="{DynamicResource SpacingSm}"
+                      Margin="0,8,0,0">
 
             <!-- 分组：压缩选项（格式、压缩级别） -->
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
@@ -104,120 +241,31 @@
                     Background="{DynamicResource ThemeSurfaceBgBrush}">
               <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding LocalizedStrings[Compress_Archive_Group]}"
-                          FontWeight="SemiBold" />
+                           FontWeight="SemiBold" />
                 <!-- 压缩格式选择：zip/7z/tar.gz -->
-                <Grid Margin="0,6,0,0">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="80" />
-                      <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <Grid Margin="0,6,0,0" ColumnDefinitions="80,*">
                   <TextBlock Grid.Column="0"
-                        Text="{Binding LocalizedStrings[Compress_Format]}"
-                        VerticalAlignment="Center"
-                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                             Text="{Binding LocalizedStrings[Compress_Format]}"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                   <ComboBox Grid.Column="1"
                             ItemsSource="{Binding FormatOptions}"
                             SelectedItem="{Binding DefaultFormat}" />
                 </Grid>
                 <!-- 压缩级别选择：1-9 或 预设选项 -->
-                <Grid Margin="0,6,0,0">
-                    <Grid.ColumnDefinitions>
-                      <ColumnDefinition Width="80" />
-                      <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
+                <Grid Margin="0,6,0,0" ColumnDefinitions="80,*">
                   <TextBlock Grid.Column="0"
-                        Text="{Binding LocalizedStrings[Compress_Level]}"
-                        VerticalAlignment="Center"
-                        Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                             Text="{Binding LocalizedStrings[Compress_Level]}"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                   <ComboBox Grid.Column="1"
                             ItemsSource="{Binding CompressionLevelOptions}"
                             SelectedItem="{Binding SelectedLevelOption}"
                             DisplayMemberBinding="{Binding Display}" />
                 </Grid>
               </StackPanel>
-              </Border>
-
-            <!-- 分组：输出模式与路径 -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-            BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                  Background="{DynamicResource ThemeSurfaceBgBrush}">
-                  <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <!-- 输出模式单选：手动指定路径 / 分别压缩到各自目录 / 合并压缩到同一压缩包 -->
-                <TextBlock Text="{Binding LocalizedStrings[Compress_OutputMode]}"
-                           FontWeight="SemiBold" />
-                <RadioButton GroupName="CompressOutputMode"
-                             IsChecked="{Binding IsManualMode}"
-                             Content="{Binding LocalizedStrings[Compress_OutputMode_Manual]}" />
-                <RadioButton GroupName="CompressOutputMode"
-                             IsChecked="{Binding IsSeparateMode}"
-                             Content="{Binding LocalizedStrings[Compress_OutputMode_Separate]}" />
-                <RadioButton GroupName="CompressOutputMode"
-                             IsChecked="{Binding IsCombinedMode}"
-                             Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
-
-                <!-- 输出路径选择器：仅手动模式可见，包含路径输入、快速按钮、浏览按钮 -->
-                <controls:QuickPathPicker x:Name="OutputPathPicker"
-                                          Path="{Binding OutputDirectory}"
-                                          Margin="0,6,0,0"
-                                          IsVisible="{Binding IsQuickPathVisible}" />
-
-                <!-- 文件名 + 扩展名标签：仅手动模式且非分别压缩时可见 -->
-                <Grid Margin="0,6,0,0"
-                      IsVisible="{Binding IsFileNameSectionVisible}">
-                  <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="80" />
-                    <ColumnDefinition Width="*" />
-                    <ColumnDefinition Width="Auto" />
-                  </Grid.ColumnDefinitions>
-                  <TextBlock Grid.Column="0"
-                             Text="{Binding LocalizedStrings[Compress_OutputFileName]}"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <TextBox Grid.Column="1"
-                           Text="{Binding OutputFileName}"
-                           IsReadOnly="{Binding IsOutputPathReadOnly}"
-                           MinHeight="{DynamicResource ControlHeightSm}"
-                           Background="{DynamicResource ThemeSurfaceBgBrush}"
-                           Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                           BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                  <TextBlock Grid.Column="2"
-                             Text="{Binding OutputExtensionLabel}"
-                             Margin="6,0,0,0"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                </Grid>
-
-              </StackPanel>
             </Border>
 
-            <!-- 分组：文件冲突策略（本次压缩遇到同名文件时的处理方式，覆盖/追加/自动重命名/跳过） -->
-            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
-                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                    Background="{DynamicResource ThemeSurfaceBgBrush}">
-              <StackPanel Spacing="{DynamicResource SpacingXs}">
-                <!-- 标签：文件存在时： -->
-                <TextBlock Text="{Binding LocalizedStrings[Compress_WhenFileExists]}"
-                           FontWeight="SemiBold" />
-                <!-- 冲突策略下拉：每次询问 / 覆盖 / 追加 / 自动重命名 / 跳过 -->
-                <ComboBox x:Name="ConflictActionCombo"
-                          ItemsSource="{Binding ConflictActionOptions}"
-                          SelectedItem="{Binding SelectedConflictActionOption}"
-                          DisplayMemberBinding="{Binding Display}"
-                          Width="240" HorizontalAlignment="Left" />
-              </StackPanel>
-            </Border>
-          </StackPanel>
-        </ScrollViewer>
-      </TabItem>
-
-      <!-- Tab 2: 高级设置（格式特定选项、分卷大小） -->
-      <TabItem Header="{Binding LocalizedStrings[Compress_TabAdvanced]}"
-                Classes="compactTab"
-                controls:TabItemExtensions.TabIcon="IconWrench">
-        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
-                        TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
-          <StackPanel Spacing="{DynamicResource SpacingSm}"
-                        Margin="0,8,0,0">
             <!-- 格式特定高级选项面板：根据选中格式动态显示（7z固实压缩、字典大小等） -->
             <controls:DynamicFormatOptionsPanel x:Name="FormatOptionsPanel"
                                                 SelectedFormat="{Binding DefaultFormat}" />
@@ -255,7 +303,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- Tab 3: 密码设置 -->
+      <!-- Tab 4: 密码设置 -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabPassword]}"
                 Classes="compactTab"
                 controls:TabItemExtensions.TabIcon="IconKey">
@@ -314,7 +362,7 @@
                 <StackPanel Spacing="{DynamicResource SpacingXs}">
                   <TextBlock Text="{Binding LocalizedStrings[Compress_TabPassword]}"
                             FontWeight="SemiBold" />
-                             
+
                   <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingMd}">
                     <RadioButton GroupName="PwdMode"
                                   IsChecked="{Binding IsPasswordLibraryMode}">
@@ -347,6 +395,11 @@
                             MinHeight="100"
                             MaxHeight="200"
                             BorderBrush="{DynamicResource ThemeBorderBrush}">
+                    <ListBox.ItemContainerTheme>
+                      <ControlTheme TargetType="ListBoxItem">
+                        <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+                      </ControlTheme>
+                    </ListBox.ItemContainerTheme>
                     <ListBox.ItemTemplate>
                       <DataTemplate>
                         <StackPanel Background="Transparent">
@@ -479,7 +532,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- Tab 4: 压缩包注释 -->
+      <!-- Tab 5: 压缩包注释 -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabComment]}"
                 Classes="compactTab"
                 controls:TabItemExtensions.TabIcon="IconChat">
@@ -534,7 +587,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- Tab 5: 文件过滤器 -->
+      <!-- Tab 6: 文件过滤器 -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabFilter]}"
                 Classes="compactTab"
                 controls:TabItemExtensions.TabIcon="IconFilter">

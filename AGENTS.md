@@ -315,6 +315,10 @@ CoreLog.RedactOverride = msg => LogRedactor.RedactPaths(msg, ...);
 | 打开单个文件 | `ShowOpenFileAsync(owner, initialPath, fileExtensions, fileTypes)` |
 | 选文件**或**文件夹（多选累积） | `ShowOpenItemsAsync(owner, initialPath)` → `IReadOnlyList<string>?` |
 | **解压目标目录**（带路径 + 冲突预览） | `ShowExtractFolderAsync(owner, entries, initialPath, currentFolder, preserveFullPath)` |
+| **设置窗内嵌选择**（不再弹模态窗） | 直接放 `Controls/CustomFilePickerControl`：`Mode` 选 `PickFolder` / `PickItems`，`IsSimpleMode=true`（无复选框、当前目录选中即结果），宿主接 `SelectionChanged` / `PathChanged` / `ConfirmRequested` |
+  - **内嵌选择器的过滤与累积面板**：`Mode=PickItems` 时传 `fileExtensions`（解压窗传 Core 的 `ArchiveExtensionCatalog.EngineExtensions`）即可只列这些扩展名；宿主自己已有「已选」清单时加 `HideAccumulatedPanel="True"`，否则控件内的累积面板会重复一遍并把文件列表挤成几十像素。
+
+- **设置窗里选文件/目录优先内嵌**（`CustomFilePickerControl`），不要为「设置窗里再弹一个选择器」新增 `ShowXxxAsync` 调用；只有「必须模态拿一个结果再返回」的场景（如 `CustomFilePickerDialog` 自身、`AddFavoriteDialog`）才用静态入口
 
 - **解压场景首选 `ShowExtractFolderAsync`**，且**必须实参 `currentFolder` + `preserveFullPath`**（取自 `MainWindowViewModel.CurrentFolder` 与 `AppSettings.ExtractPreserveFullPath`）——漏传会导致预览树与实际解压路径不一致
 - 限定扩展名用 `fileTypes: [new FileTypeOption(标签, 模式数组)]`；`Patterns` 空数组 = 不过滤；支持 `"*.json"` / `".json"` / `"json"` 三种写法；**不要**改 `MatchesFileFilter` 的 `SelectedIndex` 硬编码

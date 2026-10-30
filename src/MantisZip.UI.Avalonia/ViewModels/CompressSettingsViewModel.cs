@@ -37,12 +37,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         ? LocalizationManager.T("Compress_NItemsSelected", SelectedPaths.Count)
         : LocalizationManager.T("Compress_NoFilesSelected");
 
-    /// <summary>由 View 设置的文件保存选择回调。返回选择的路径，取消返回 null。</summary>
-    public Func<Task<string?>>? BrowseOutput { get; set; }
-
-    /// <summary>由 View 设置的文件选择回调。返回选择的文件路径列表，取消返回 null。</summary>
-    public Func<Task<IReadOnlyList<string>?>>? PickFiles { get; set; }
-
     /// <summary>
     /// 确认事务的结果出口。窗口在构造时订阅，负责把三态翻译成窗口动作
     /// （<see cref="Rejected{T}"/> 留窗显示原因、<see cref="ConfirmOutcome{T}"/> 的确认/取消关窗）。
@@ -484,6 +478,12 @@ public partial class CompressSettingsViewModel : ObservableObject
         };
 
         // Populate localized strings
+        // Tab 标题：输出设置 / 添加文件 / 压缩设置（原「常规」+「高级」合并）
+        LocalizedStrings["Compress_TabOutput"] = LocalizationManager.T("Compress_TabOutput");
+        LocalizedStrings["Compress_TabAddFiles"] = LocalizationManager.T("Compress_TabAddFiles");
+        LocalizedStrings["Compress_TabCompress"] = LocalizationManager.T("Compress_TabCompress");
+        LocalizedStrings["Compress_PickerAdvancedMode"] = LocalizationManager.T("Compress_PickerAdvancedMode");
+        LocalizedStrings["Compress_SelectedSources"] = LocalizationManager.T("Compress_SelectedSources");
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
         LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
         LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");
@@ -1219,17 +1219,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         PasswordSearchText = "";
     }
 
-    [RelayCommand]
-    private async Task BrowseOutputPath()
-    {
-        if (BrowseOutput == null) return;
-        var path = await BrowseOutput();
-        if (!string.IsNullOrEmpty(path))
-        {
-            OutputPath = path;
-        }
-    }
-
     private bool CanExecuteStartCompress()
     {
         // 等待准备期间禁用（防重入：B 就绪前的等待窗口内再点一次）
@@ -1500,21 +1489,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     }
 
     // ── Source file management ──
-
-    [RelayCommand]
-    private async Task AddFiles()
-    {
-        if (PickFiles == null) return;
-        var files = await PickFiles();
-        if (files != null)
-        {
-            foreach (var f in files)
-            {
-                if (!SelectedPaths.Contains(f))
-                    SelectedPaths.Add(f);
-            }
-        }
-    }
 
     [RelayCommand]
     private void RemoveSelected(object? selectedItem)

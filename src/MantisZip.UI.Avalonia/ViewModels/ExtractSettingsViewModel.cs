@@ -320,6 +320,13 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_Start",
             "Extract_Cancel",
             "Extract_TabFilter",
+            "Extract_TabOutput",
+            "Extract_TabAddArchives",
+            "Extract_SelectedArchives",
+            "Extract_AddArchivesPickerHint",
+            "Extract_OutputPickerHint",
+            "Extract_RemoveSelected",
+            "Extract_AddArchivesEmptyHint",
             "Extract_Source_MultiFilterHint",
             "Extract_UnlockButton",
             "Settings_ExtractTab_Parallel",
@@ -338,12 +345,117 @@ public partial class ExtractSettingsViewModel : ObservableObject
         LocalizedStrings = dict;
 
         // 源压缩包行模型（默认全部 Pending；Loaded 后 ValidateAllAsync 逐包校验）
-        foreach (var path in archivePaths)
-            SourceItems.Add(new SourceArchiveItem(path));
+        AddSourceArchives(archivePaths);
 
         // 默认选中首包（列表高亮用，不再驱动预览）；初始 ⏳ 占位由首次合并重建接管
         SelectedSourceItem = SourceItems.FirstOrDefault();
         IsListingPending = SourceItems.Count > 0;
+    }
+
+    // ── 「已选压缩包」的追加 / 移除（内嵌选择器 ↔ 列表双向同步的 ViewModel 侧） ──
+
+    /// <summary>「已选压缩包」列表为空（驱动空态提示显隐）。</summary>
+    public bool HasNoSourceArchives => SourceItems.Count == 0;
+
+    /// <summary>
+    /// 追加压缩包到「已选」列表（内嵌选择器 / 拖拽兜底共用的可复用入口）：
+    /// 按路径去重（忽略大小写）、按传入顺序追加到末尾，**只 Add 新行**——
+    /// 已有 <see cref="SourceArchiveItem"/> 的状态、错误信息与列表进度全部保留，绝不重建。
+    /// </summary>
+    /// <param name="paths">要追加的压缩包路径。</param>
+    public void AddSourceArchives(IEnumerable<string> paths)
+    {
+        ArgumentNullException.ThrowIfNull(paths);
+
+        var added = false;
+        foreach (var path in paths)
+        {
+            if (string.IsNullOrWhiteSpace(path)) continue;
+            if (SourceItems.Any(item => string.Equals(item.Path, path, StringComparison.OrdinalIgnoreCase)))
+                continue;
+
+            SourceItems.Add(new SourceArchiveItem(path));
+            added = true;
+        }
+
+        if (!added) return;
+
+        SyncSelectedPaths();
+        SelectedSourceItem ??= SourceItems[0];
+        // 新行是 Pending：由随后的 ValidateAllAsync 读取条目，读完自己落下 IsListingPending
+        IsListingPending = true;
+        OnPropertyChanged(nameof(HasMultipleArchives));
+        OnPropertyChanged(nameof(HasNoSourceArchives));
+        RebuildMergedPreview();
+    }
+
+    /// <summary>
+    /// 从「已选」列表移除指定行（列表删除按钮 / Delete 键）：只移除这些行对象，**不整表重建**；
+    /// 同时清理该包的条目 / 子树 / 密码缓存，并让 <see cref="SelectedPaths"/> 跟随剩余行。
+    /// </summary>
+    /// <param name="items">要移除的行（不在列表里的行会被忽略）。</param>
+    public void RemoveSourceArchives(IEnumerable<SourceArchiveItem> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+
+        var removed = items.Where(item => item != null && SourceItems.Contains(item)).Distinct().ToList();
+        if (removed.Count == 0) return;
+
+        var firstPathBefore = SourceItems[0].Path;
+
+        foreach (var item in removed)
+            SourceItems.Remove(item);   // 行对象自带状态/进度，绝不整表重建
+
+        var removedPaths = removed
+            .Select(item => item.Path)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+
+        foreach (var path in removedPaths)
+        {
+            _entriesCache.Remove(path);
+            _subTreeCache.Remove(path);
+            _matchedPasswords.Remove(path);
+        }
+
+        // 首包被移除：过滤 / 提取的数据源回退到新的首包（无缓存则等逐包校验回填）
+        if (removedPaths.Contains(firstPathBefore))
+        {
+            _firstArchiveEntries = SourceItems.Count > 0
+                && _entriesCache.TryGetValue(SourceItems[0].Path, out var newFirstEntries)
+                    ? newFirstEntries
+                    : null;
+        }
+
+        SyncSelectedPaths();
+        if (SelectedSourceItem is null || !SourceItems.Contains(SelectedSourceItem))
+            SelectedSourceItem = SourceItems.FirstOrDefault();
+
+        // 剩下还有没校验完的行 → 保持「列表读取中」，避免确认事务提前放行
+        if (!SourceItems.Any(item => item.Status is SourceArchiveStatus.Pending or SourceArchiveStatus.Validating))
+            IsListingPending = false;
+
+        OnPropertyChanged(nameof(HasMultipleArchives));
+        OnPropertyChanged(nameof(HasNoSourceArchives));
+        UpdateCanUnlockSelected();
+        RebuildMergedPreview();
+    }
+
+    /// <summary>列表「移除所选」按钮 / Delete 键：移除当前选中的压缩包行。</summary>
+    [RelayCommand]
+    private void RemoveSelectedSourceArchive()
+    {
+        if (SelectedSourceItem is null) return;
+        RemoveSourceArchives([SelectedSourceItem]);
+    }
+
+    /// <summary>
+    /// 把 <see cref="SelectedPaths"/> 重算成「已选压缩包」的行顺序：
+    /// 它是确认载荷 <c>ExtractSettings.ArchivePaths</c> 的唯一来源，增删后必须跟随。
+    /// </summary>
+    private void SyncSelectedPaths()
+    {
+        SelectedPaths.Clear();
+        SelectedPaths.AddRange(SourceItems.Select(item => item.Path));
     }
 
     /// <summary>冲突策略下拉选项（显示文本 + 存储值）。</summary>
@@ -384,7 +496,16 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// </summary>
     public async Task ValidateAllAsync(CancellationToken ct = default)
     {
-        var pending = SourceItems.Where(i => i.Status == SourceArchiveStatus.Pending).ToList();
+        // 先在调用线程把待校验行翻成 Validating：窗口 Loaded 与「追加压缩包」后都会调用本方法，
+        // 同步占位保证同一行不会被并发读取两次。
+        var pending = new List<SourceArchiveItem>();
+        foreach (var item in SourceItems)
+        {
+            if (item.Status != SourceArchiveStatus.Pending) continue;
+            item.Status = SourceArchiveStatus.Validating;
+            pending.Add(item);
+        }
+
         using var gate = new SemaphoreSlim(3);
         var tasks = pending.Select(item => Task.Run(() => ValidateOneAsync(item, gate, ct), ct));
         await Task.WhenAll(tasks);
@@ -1031,7 +1152,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
             return new Rejected<ExtractSettings>(LocalizationManager.T("Error_Extract_DestinationInvalid"));
 
         // ② 压缩包集合：载荷要求非空（对话框入口不会走到这里，守住直接构造 VM 的调用方）
-        if (ArchivePaths.Count == 0 || SelectedPaths.Count == 0)
+        if (SourceItems.Count == 0 || SelectedPaths.Count == 0)
             return new Rejected<ExtractSettings>(LocalizationManager.T("Error_Extract_NoEntries"));
 
         // ③ 等预览树就绪（原实现由按钮 CanExecute 拦住构建期，判定条件不变，只是把结论显式化）

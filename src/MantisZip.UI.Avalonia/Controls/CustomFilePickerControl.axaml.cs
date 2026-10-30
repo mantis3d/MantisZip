@@ -50,10 +50,32 @@ public partial class CustomFilePickerControl : UserControl
             if (_isSimpleMode == value) return;
             _isSimpleMode = value;
             ApplySimpleModeToItems();
+            ApplyRightPanelVisibility();
         }
     }
 
     private bool _isSimpleMode = true;
+
+    /// <summary>
+    /// 是否隐藏控件内的「已选项目」累积面板（默认 false）。
+    ///
+    /// 设置窗内嵌使用时，宿主自己有一份「已选」清单（压缩窗的「已选源文件」、解压窗的
+    /// 「已选压缩包」），控件再显示一份累积面板就是同一件事说两遍；而且在 620px 宽的内嵌
+    /// 区域里，这 260px 会把文件列表挤到只剩几十像素。因此宿主把它设为 true，由宿主的清单
+    /// 承担「已选」职责——勾选框/单击仍然照常工作，事件照常抛给宿主。
+    /// </summary>
+    public bool HideAccumulatedPanel
+    {
+        get => _hideAccumulatedPanel;
+        set
+        {
+            if (_hideAccumulatedPanel == value) return;
+            _hideAccumulatedPanel = value;
+            ApplyRightPanelVisibility();
+        }
+    }
+
+    private bool _hideAccumulatedPanel;
 
     // ── Initialize 注入的调用参数（宿主每个实例写一次） ──────────────────
 
@@ -61,6 +83,13 @@ public partial class CustomFilePickerControl : UserControl
     private string? _defaultExtension;
     private string? _suggestedFileName;
     private IReadOnlyList<FileTypeOption> _fileTypeOptions = Array.Empty<FileTypeOption>();
+
+    /// <summary>
+    /// PickItems 模式的扩展名白名单（内嵌「添加压缩包」这类场景用）：空 = 不过滤。
+    /// 与 OpenFile 模式的文件类型下拉是两套机制——内嵌选择器没有下拉行，扩展名由宿主在
+    /// <see cref="Initialize"/> 时直接给定（解压窗传 Core 的 ArchiveExtensionCatalog）。
+    /// </summary>
+    private IReadOnlyList<string> _restrictExtensions = Array.Empty<string>();
     private string _extractCurrentFolder = string.Empty;
     // 去 readonly：参数区 CheckBox 勾选变化时需回写本字段（决策 A：仅本次生效，不回写设置）
     private bool _extractPreserveFullPath;
@@ -222,12 +251,17 @@ public partial class CustomFilePickerControl : UserControl
         bool preserveFullPath = true,
         string? suggestedFileName = null)
     {
+        _initializing = true;
+
         _entries = entries;
         _defaultExtension = defaultExtension;
         _suggestedFileName = suggestedFileName;
         _extractCurrentFolder = currentFolder;
         _extractPreserveFullPath = preserveFullPath;
         _fileTypeOptions = BuildFileTypeOptions(Mode, fileExtensions, fileTypes);
+        _restrictExtensions = Mode == PickerMode.PickItems && fileExtensions is { Length: > 0 }
+            ? fileExtensions.Select(NormalizeExtension).Where(e => e != null).Select(e => e!).ToArray()
+            : Array.Empty<string>();
 
         // ── Extract 保留完整路径开关（参数区的一个参数项，仅 ExtractFolder 模式注册）──
         // 注册即触发 ItemsControl 渲染（ObservableCollection 自带 INotifyCollectionChanged），
@@ -326,9 +360,13 @@ public partial class CustomFilePickerControl : UserControl
         // 初始目录
         var startDir = ResolveInitialPath(initialPath);
         NavigateTo(startDir);
+        _initializing = false;
 
         // 地址栏补全/历史
         InitBreadcrumb();
+
+        // 右栏最终显隐（Initialize 开头那段按模式给过默认值，这里按「是否简单模式」再校正一次）
+        ApplyRightPanelVisibility();
     }
 
     // ── 宿主可调用的方法 ─────────────────────────────────────────────────
@@ -807,8 +845,9 @@ public partial class CustomFilePickerControl : UserControl
         }
         _currentDir = dir;
 
-        // 简单模式：切换目录即清空已选（「当前目录选中项 = 结果」的覆盖语义）
-        if (_isSimpleMode && Mode == PickerMode.PickItems)
+        // 简单模式：切换目录即清空已选（「当前目录选中项 = 结果」的覆盖语义）。
+        // 初始化期例外：构造时传入的预选源文件必须在首次 NavigateTo 之后仍然存在。
+        if (_isSimpleMode && Mode == PickerMode.PickItems && !_initializing)
         {
             ClearAccumulatedSelection();
         }
@@ -877,6 +916,12 @@ public partial class CustomFilePickerControl : UserControl
     /// </summary>
     private bool _syncingSelection;
 
+    /// <summary>
+    /// 是否正在 <see cref="Initialize"/> 内。初始化期的 <c>NavigateTo</c> 不允许清空
+    /// 预选累积（简单模式「切目录即重置」只应作用于用户操作，否则构造时传入的预选源文件会被抹掉）。
+    /// </summary>
+    private bool _initializing;
+
     private void LoadDirectory(string dir)
     {
         _fileItems.Clear();
@@ -925,6 +970,13 @@ public partial class CustomFilePickerControl : UserControl
     /// </summary>
     private bool MatchesFileFilter(string filePath)
     {
+        // PickItems（内嵌「添加压缩包」）：只列白名单里的扩展名，其余场景不过滤。
+        if (Mode == PickerMode.PickItems)
+        {
+            return _restrictExtensions.Count == 0
+                || _restrictExtensions.Any(ext => filePath.EndsWith(ext, StringComparison.OrdinalIgnoreCase));
+        }
+
         if (Mode != PickerMode.OpenFile)
             return true;
 
@@ -1228,6 +1280,45 @@ public partial class CustomFilePickerControl : UserControl
     }
 
     /// <summary>切换简单/高级时就地刷新已加载列表的复选框列；切回简单模式时把已选同步到列表选中态。</summary>
+    /// <summary>
+    /// 右栏（累积选择面板 / 解压预览面板）与分隔条的显隐，以及右栏列宽。
+    ///
+    /// 内嵌简单模式下宿主自己已经有一份「已选」清单（压缩窗的「已选源文件」、
+    /// 解压窗的「已选压缩包」），控件内的累积面板再显示一次就是同一件事说两遍，
+    /// 而且它固定占 260px，会把中间的文件列表挤到只剩几十像素宽。
+    /// 因此简单模式隐藏累积面板、把宽度让给列表；切到高级模式（跨目录累积）时再显示。
+    /// </summary>
+    private void ApplyRightPanelVisibility()
+    {
+        var showAccumulated = Mode == PickerMode.PickItems && !_isSimpleMode && !_hideAccumulatedPanel;
+        var showExtractPanel = Mode == PickerMode.ExtractFolder;
+
+        PickItemsPanel.IsVisible = showAccumulated;
+        ExtractFolderPanel.IsVisible = showExtractPanel;
+        RightSplitter.IsVisible = showAccumulated || showExtractPanel;
+
+        var rightCol = BrowserGrid.ColumnDefinitions[4];
+        if (showAccumulated)
+        {
+            var saved = AppSettings.Load().PickItemsPanelWidth;
+            rightCol.Width = new GridLength(saved is >= 200 and <= 800 ? saved : 260);
+            rightCol.MinWidth = 200;
+            rightCol.MaxWidth = 800;
+        }
+        else if (showExtractPanel)
+        {
+            var saved = AppSettings.Load().ExtractFolderPanelWidth;
+            rightCol.Width = new GridLength(saved is >= 200 and <= 800 ? saved : 260);
+            rightCol.MinWidth = 200;
+            rightCol.MaxWidth = 800;
+        }
+        else
+        {
+            rightCol.Width = GridLength.Auto;
+            rightCol.MinWidth = 0;
+            rightCol.MaxWidth = double.PositiveInfinity;
+        }
+    }
     private void ApplySimpleModeToItems()
     {
         _syncingSelection = true;

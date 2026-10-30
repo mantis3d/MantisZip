@@ -188,21 +188,6 @@ public class CompressSettingsViewModelTests
     }
 
     [Fact]
-    public async Task BrowseOutputCommand_CallsCallback()
-    {
-        var vm = new CompressSettingsViewModel(Array.Empty<string>());
-        var called = false;
-        vm.BrowseOutput = () =>
-        {
-            called = true;
-            return Task.FromResult<string?>("C:\\test.zip");
-        };
-        await vm.BrowseOutputPathCommand.ExecuteAsync(null);
-        Assert.True(called);
-        Assert.Equal("C:\\test.zip", vm.OutputPath);
-    }
-
-    [Fact]
     public async Task StartCompressCommand_WithEncryptAndMismatch_DoesNotClose()
     {
         var vm = new CompressSettingsViewModel(Array.Empty<string>());
