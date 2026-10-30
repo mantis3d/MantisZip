@@ -69,6 +69,7 @@ public partial class CompressSettingsWindow : Window
         DataContext = ViewModel;
         SubscribeViewModel();
         Closed += OnClosed;
+        ApplyPersistedGeometry();
     }
 
     /// <summary>
@@ -121,6 +122,7 @@ public partial class CompressSettingsWindow : Window
 
         Loaded += OnLoaded;
         Closed += OnClosed;
+        ApplyPersistedGeometry();
     }
 
     /// <summary>
@@ -165,8 +167,29 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>关窗统一出口：解除订阅并把确认结果（缺省 = 取消）交给等待方。</summary>
+    /// <summary>
+    /// 恢复上次关闭时保存的窗口尺寸与左侧设置列宽度（2026-10-30）。
+    /// 在构造器里应用而不是 OnOpened，是为了避免窗口先按 XAML 默认尺寸显示再跳一下。
+    /// </summary>
+    private void ApplyPersistedGeometry()
+    {
+        var settings = AppSettings.Load();
+        WindowPlacement.Apply(this, settings.CompressWindowWidth, settings.CompressWindowHeight);
+        WindowPlacement.ApplyLeftColumn(RootGrid, settings.CompressWindowLeftColumnWidth, 620);
+    }
+
+    /// <summary>关闭时写回窗口尺寸与左侧设置列宽度（非法值回落 XAML 默认 1080×860 / 620）。</summary>
+    private void PersistGeometry()
+    {
+        var settings = AppSettings.Load();
+        settings.CompressWindowWidth = WindowPlacement.Capture(Width, 1080);
+        settings.CompressWindowHeight = WindowPlacement.Capture(Height, 860);
+        settings.CompressWindowLeftColumnWidth = WindowPlacement.CaptureLeftColumn(RootGrid, 620);
+        settings.Save();
+    }
     private void OnClosed(object? sender, EventArgs e)
     {
+        PersistGeometry();
         ViewModel.ConfirmCompleted -= OnConfirmCompleted;
         _completion.TrySetResult(_closedOutcome ?? new Cancelled<CompressSettings>());
     }

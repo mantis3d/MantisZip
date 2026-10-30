@@ -129,3 +129,9 @@
 3. `FileBrowserItem.CanCheck` 是普通自动属性（类继承 `ObservableObject` 却没走 `SetProperty`），行模板 `IsVisible="{Binding CanCheck}"` 不重算 ⇒ 勾了「高级模式」看不到复选框；改成会通知的属性。
 4. `FileList_DoubleTapped` / `FileList_KeyDown` 用 `FileList.SelectedItem` 取行，但列表是 `SelectionMode="Multiple"`——多选下 `SelectedItem` 可能为空 ⇒ **双击目录不进入**（真机日志证实事件触发、`SelectedItem` 为 null）；改为优先从 `e.Source` 向上找 `ListBoxItem`，退回新增的 `GetCurrentItem()`（`SelectedItem` → `SelectedItems.FirstOrDefault()`）。
 5. 解压窗新 key 漏登记 VM 白名单 ⇒ 「高级模式」复选框**只剩空框没有文字**（`ExtractSettingsViewModel.LocalizedStrings` 是按 keys 数组构建的字典，不是全量加载）；补 `"Extract_PickerAdvancedMode"`，并加用例断言「Content 等于 `T(key)` 且字典收录该 key」。
+
+### 实施后追加 6：对话框几何记忆（2026-10-30，不在原计划内）
+- 用户问「这几个窗口布局现在是持久化的吗？」⇒ 盘点发现主窗口（`WindowStateManager` → `window.json`）、进度窗宽度、选择器右栏宽度/左侧标签已有持久化，而**压缩设置窗 / 解压设置窗 / 模态选择器 / 设置窗**的尺寸与两个设置窗的分栏宽度全是 XAML 常量。
+- 用户拍板范围：只记尺寸（含分栏宽度），**不记位置**（多显示器拔插后位置还原容易把窗口放到屏幕外）。
+- 落地：新增 `Services/WindowPlacement.cs`（非法值回落、合法值不小于 `MinWidth/MinHeight`），`AppSettings` 加 9 个几何字段（默认值与 XAML 一致），四个窗口「构造器恢复 + 关闭写回」；主窗口仍走 `WindowStateManager`，注释里写明避免两个事实源。
+- 真机验证：压缩窗拖到 950×700 关闭 → `settings.json` 写 `CompressWindowWidth=934`/`Height=661` → 重开回到 950×700；新增 `WindowPlacementTests` 15 例。

@@ -215,6 +215,11 @@ public partial class CustomFilePickerDialog : Window
             _ => 420
         };
 
+        // 恢复上次关闭时保存的窗口宽度（2026-10-30）。高度按模式固定，故不持久化。
+        var geometry = Models.AppSettings.Load();
+        if (WindowPlacement.IsUsable(geometry.PickerDialogWidth))
+            Width = Math.Max(geometry.PickerDialogWidth, MinWidth);
+
         // 选择器事件接线：确认上抛 → 本窗口关窗；系统浏览上抛 → 本窗口原生调用
         Picker.ConfirmRequested += Picker_ConfirmRequested;
         Picker.SystemBrowseRequested += SystemBrowse_Click;
@@ -340,5 +345,10 @@ public partial class CustomFilePickerDialog : Window
     {
         base.OnClosing(e);
         Picker.PersistUiState();
+
+        // 记住窗口宽度（高度按模式固定，不存）；非法值回落 XAML 默认 1100
+        var settings = Models.AppSettings.Load();
+        settings.PickerDialogWidth = WindowPlacement.Capture(Width, 1100);
+        settings.Save();
     }
 }

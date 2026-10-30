@@ -19,7 +19,7 @@
   </Window.Resources>
 
   <!-- 整窗两行：内容区（*）+ 底部按钮行（Auto）；内嵌选择器需要确定高度，故窗口不再 SizeToContent -->
-  <Grid RowDefinitions="*,Auto"
+  <Grid x:Name="RootGrid" RowDefinitions="*,Auto"
         Margin="16">
     <Grid.ColumnDefinitions>
       <!-- 左：设置选项卡（含内嵌文件选择器，需比旧版更宽） -->

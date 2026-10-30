@@ -157,8 +157,26 @@ public partial class ExtractSettingsWindow : Window
     }
 
     /// <summary>关窗统一出口：解除订阅并把确认结果（缺省 = 取消）交给等待方。</summary>
+    /// <summary>恢复上次关闭时保存的窗口尺寸与左侧设置列宽度（2026-10-30）。</summary>
+    private void ApplyPersistedGeometry()
+    {
+        var settings = AppSettings.Load();
+        WindowPlacement.Apply(this, settings.ExtractWindowWidth, settings.ExtractWindowHeight);
+        WindowPlacement.ApplyLeftColumn(RootGrid, settings.ExtractWindowLeftColumnWidth, 620);
+    }
+
+    /// <summary>关闭时写回窗口尺寸与左侧设置列宽度（非法值回落 XAML 默认 1180×760 / 620）。</summary>
+    private void PersistGeometry()
+    {
+        var settings = AppSettings.Load();
+        settings.ExtractWindowWidth = WindowPlacement.Capture(Width, 1180);
+        settings.ExtractWindowHeight = WindowPlacement.Capture(Height, 760);
+        settings.ExtractWindowLeftColumnWidth = WindowPlacement.CaptureLeftColumn(RootGrid, 620);
+        settings.Save();
+    }
     private void OnClosed(object? sender, EventArgs e)
     {
+        PersistGeometry();
         ViewModel.ConfirmCompleted -= OnConfirmCompleted;
         _completion.TrySetResult(_closedOutcome ?? new Cancelled<ExtractSettings>());
     }
@@ -207,6 +225,9 @@ public partial class ExtractSettingsWindow : Window
 
         // 「添加压缩包」页按场景显隐（拖拽 / 「解压到」等已由入口确定压缩包时隐藏）
         AddArchivesTab.IsVisible = !hideAddArchivesTab;
+
+        // 恢复上次关闭时保存的窗口尺寸与左侧设置列宽度（2026-10-30）
+        ApplyPersistedGeometry();
 
         // 窗口关闭时取消后台逐包校验 + 冲突扫描，并断开列表回填订阅
         Closed += (_, _) =>

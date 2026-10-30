@@ -19,7 +19,7 @@
   </Window.Resources>
 
   <!-- 主布局：两行（内容区 + 底部按钮），三列（左侧设置TabControl + 中间分割器 + 右侧预览面板） -->
-  <Grid RowDefinitions="*,Auto"
+  <Grid x:Name="RootGrid" RowDefinitions="*,Auto"
         Margin="16">
     <Grid.ColumnDefinitions>
       <ColumnDefinition Width="620" MinWidth="520" />  <!-- 左侧设置区域：六个页签（含图标）单行需要约 620px，最小 520 -->

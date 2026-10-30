@@ -198,6 +198,30 @@ public class AppSettings
     public string ProgressInfoDensity { get; set; } = "medium";
     /// <summary>进度窗口宽度持久化（像素；默认 800，窗口 MinWidth=500 兜底）。</summary>
     public double ProgressWindowWidth { get; set; } = 800;
+
+    // ===== 对话框几何（2026-10-30 新增） =====
+    // 打开时恢复、关闭时写回；非法值（NaN / ∞ / ≤0）由 Services.WindowPlacement 统一回落，
+    // 默认值 = 各窗口 XAML 里的初始尺寸，保证首次运行与老配置行为不变。
+    // 注意：**主窗口不在此列** —— 它的尺寸/位置/最大化与列宽早已由 Models.WindowStateManager
+    // 持久化到 window.json（MainWindow.axaml.cs:112 读、:492 关闭时写），再加一份会出现两个事实源。
+    /// <summary>压缩设置窗宽度（像素；默认 1080）。</summary>
+    public double CompressWindowWidth { get; set; } = 1080;
+    /// <summary>压缩设置窗高度（像素；默认 860）。</summary>
+    public double CompressWindowHeight { get; set; } = 860;
+    /// <summary>压缩设置窗左侧设置列宽度（像素；默认 620，可用 GridSplitter 拖动）。</summary>
+    public double CompressWindowLeftColumnWidth { get; set; } = 620;
+    /// <summary>解压设置窗宽度（像素；默认 1180）。</summary>
+    public double ExtractWindowWidth { get; set; } = 1180;
+    /// <summary>解压设置窗高度（像素；默认 760）。</summary>
+    public double ExtractWindowHeight { get; set; } = 760;
+    /// <summary>解压设置窗左侧设置列宽度（像素；默认 620，可用 GridSplitter 拖动）。</summary>
+    public double ExtractWindowLeftColumnWidth { get; set; } = 620;
+    /// <summary>模态文件选择器宽度（像素；默认 1100）。高度按模式固定（420/500/620），故不持久化。</summary>
+    public double PickerDialogWidth { get; set; } = 1100;
+    /// <summary>设置窗宽度（像素；默认 900）。</summary>
+    public double SettingsWindowWidth { get; set; } = 900;
+    /// <summary>设置窗高度（像素；默认 640）。</summary>
+    public double SettingsWindowHeight { get; set; } = 640;
     public bool SeparateDirBaseline { get; set; } = false;
     /// <summary>目录树：切换目录时自动展开到当前目录并收起其他分支。</summary>
     public bool AutoExpandTreeToCurrent { get; set; } = false;

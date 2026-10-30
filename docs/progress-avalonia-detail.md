@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-30** — 改进：对话框几何记忆（窗口尺寸 + 设置窗分栏宽度）
+  - **背景**：用户问「这几个窗口布局现在是持久化的吗？」。盘点结果：主窗口尺寸/位置/列宽已由 `Models/WindowStateManager` 持久化到 `window.json`，进度窗宽度、选择器右栏宽度、选择器左侧标签也已存进 `AppSettings`；但**压缩设置窗 / 解压设置窗 / 模态选择器 / 设置窗**的尺寸与两个设置窗的左右分栏宽度全是 XAML 常量，拖过即丢。
+  - **范围（用户拍板）**：只记尺寸（含分栏宽度），**不做位置记忆**（多显示器拔插后位置还原容易把窗口放到屏幕外）。
+  - **修法**：新增 `Services/WindowPlacement.cs`（`Apply` / `ApplyLeftColumn` / `Capture` / `CaptureLeftColumn` / `IsUsable`）—— 非法值（0、负数、NaN、∞）一律回落 XAML 默认，合法值不小于 `MinWidth` / `MinHeight`；`AppSettings` 加 9 个几何字段（默认值与 XAML 一致：压缩窗 1080×860/620、解压窗 1180×760/620、选择器宽 1100、设置窗 900×640），并在注释里写明「主窗口不在此列，避免两个事实源」；四个窗口在构造器里恢复、关闭时写回（`CompressSettingsWindow` / `ExtractSettingsWindow` 的 `OnClosed`、`SettingsWindow` 的 `Closed`、`CustomFilePickerDialog` 的 `OnClosing`，选择器高度按模式固定故不存）。
+  - **验证**：真机把压缩窗拖到 950×700 关闭 → `settings.json` 写入 `CompressWindowWidth=934`（客户区）/`Height=661` → 重新打开窗口回到 950×700；新增 `tests/MantisZip.UI.Avalonia.Tests/WindowPlacementTests.cs` 15 例（非法值回落、`MinWidth` 夹取、分栏宽度往返、星号列回落、传错控件安静降级）。
+  - **状态**：已完成并提交。
 **2026-10-30** — 功能：设置窗内嵌文件选择器（v0.5.5 第二项）
   - **背景**：压缩设置窗的「添加文件」与解压设置窗的「添加压缩包」原先弹 `CustomFilePickerDialog` 模态窗，选完再返回设置窗；用户希望「去弹窗化」，把选择器直接嵌进设置窗页签（`docs/prototypes/embedded-file-picker.html` 原型已定交互）。
   - **第一步（纯重构，`cf4b159a`）**：`Dialogs/CustomFilePickerDialog.axaml` 的 Row 0~3 全部视觉内容抽成 `Controls/CustomFilePickerControl.axaml`（459 行）+ `.axaml.cs`（1280 行）；模态壳只剩标题栏 / 确定取消 / 系统浏览豁免（56+329 行），5 个静态入口与 `PickerMode` / `ExtractPickResult` / `PickerOptionItem` 契约不变。49 个方法体里 30 个逐字相同，其余 13 条非机械改动逐项登记在计划「实施记录」。
