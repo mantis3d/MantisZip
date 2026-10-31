@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-31** — 修复：打开对话框「文件类型」下拉文字被裁（issue #68）
+  - **症状**：用户（繁体界面）反馈 `#68`——打开压缩包对话框里「文件类型」下拉最后一字「案」被吃掉，即 `Picker_FileTypeArchive` 的 zh-TW 文案「壓縮檔檔案」。
+  - **根因**：`Controls/CustomFilePickerControl.axaml:373` 把文件名那一行的 Grid 列宽写死成 `ColumnDefinitions="60,*,60,110"`，ComboBox 自己只有 `MinHeight` 没有宽度约束 ⇒ 下拉框恒为 110px。实测（无头渲染 + System.Drawing 字体度量）：「压缩包文件」在 13px 下宽 109px，**只差 1px** 就放不下；「自解压程序 (*.exe)」要 152px、「Self-extracting programs (*.exe)」要 263px ⇒ 字体稍宽（繁体正黑 / 用户字号）或标签变长必然裁字。
+  - **修法**：列宽改为 `Auto`，ComboBox 补 `MinWidth="110"` 保底（避免保存模式里列宽塌到很窄）。两处都在 XAML，未加运行期测量代码。
+  - **验证**：`build -Target avalonia`（Release）0 警告、`guards` 8/8、`ui-tests` 全绿。无头渲染同构布局对照：改前选中「自解压程序 (*.exe)」时 `(*.exe)` 整段被裁，改后宽度 152px 完整显示；改前「压缩包文件」109/110 属临界。
+  - **已知副作用**：`Auto` 只按当前选中项测宽，切换下拉项时该列会轻微横向跳动（110 → 152）；若要彻底平稳需运行期按「最宽项」预置 `MinWidth`，本轮为最小改动未做。
+  - **范围**：issue #68 里同一条评论还报了另外两项 —— ②「WinRAR 分割包被改坏后 `TestArchive` 仍报完好」（`SevenZipEngine.TestArchiveAsync` 走 7z.dll 整包 `Check()`，需 RAR 分卷夹具复现，仓库暂无）；③「打开对话框只显示 `TEST.7z.001`、不显示 `TEST.7z.002`」（`BuildOpenDialogPatterns` 只有 `*.001` 分卷模式，而 `part1.rar`/`part2.rar` 都以 `.rar` 命中）—— 两项本轮按用户意见未动，另行排期。
 **2026-10-31** — 修复：自解压 exe 仍打不开（issue #36 回归，用户实测）
   - **症状**：v0.5.4 已宣称支持自解压 exe，但用户实测 `TestPreview/Test_SFX/Test_7Z_SFX.exe`（138808B）与 `TestPreview/Test_SFX/Test_Rar_SFX.exe`（371187B）都提示「不支持的文件格式: .exe」。
   - **判定**：不是「不支持」，是两个确定性缺陷叠加。夹具事实：7z SFX 的归档签名在偏移 **102075**（PE 各节 raw end = 101888，间隙 187B）；RAR SFX 的 `Rar!` 在偏移 **329216**（正好等于 PE 镜像末尾，间隙 0B，7z CLI 报 `Type = Rar5`）。归档本身完好 —— `7z.exe` 26.02 能正常 `l` 两个文件。

@@ -24,6 +24,10 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Self-extracting exes now open for real** — this corrects the self-extracting support added in v0.5.4: instead of only scanning the last 8 KB, the app locates the embedded archive through the PE layout, so installers made by 7-Zip or WinRAR list, preview and extract correctly, and RAR self-extractors finally show their comment
 
+- **打开对话框的「文件类型」不再裁掉文字** — 「文件类型」下拉原来固定 110px 宽，繁体界面「壓縮檔檔案」的最后一个字会被吃掉；现在宽度跟随内容，各语言都能完整显示
+
+- **The "file type" dropdown in the open dialog no longer clips its text** — the dropdown had a hard-coded 110 px width, so the last character of the Traditional Chinese label was cut off; it now sizes to its content and shows every label in full
+
 ## v0.5.4
 
 ### 文件说明 / File Description
