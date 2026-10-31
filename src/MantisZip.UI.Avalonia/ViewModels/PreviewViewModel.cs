@@ -1232,6 +1232,9 @@ var secureHtml = InjectCspMeta(html, csp);
             [MetadataKeys.Description] = info.AdditionalInfo,
             [MetadataKeys.Architecture] = info.Architecture,
             [MetadataKeys.Subsystem] = info.Subsystem,
+            [MetadataKeys.OriginalFilename] = info.OriginalFilename,
+            [MetadataKeys.Language] = info.Language,
+            [MetadataKeys.LegalCopyright] = info.LegalCopyright,
         };
         MetadataHelper.RenderFormatToViewModel(this, formatValues, "pe");
 

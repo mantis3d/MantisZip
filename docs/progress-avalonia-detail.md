@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-31** — 增强：exe 预览的「程序信息」补四个字段（issue #74 后续）
+  - **触发**：修完标题与 64 位元数据后，用户问「内容面板里东西几乎都清空了，补完后能回来吗」。结论是搬家不算丢失 —— 原 `PreviewPanel.axaml` 里硬编码的 5 行 legacy 键值块已并入右侧元数据面板；用户决定「保持现状，四个都加」。
+  - **新增字段**：文件描述（复用 `AdditionalInfo`）/ 著作权（`LegalCopyright`）/ 原始文件名（`OriginalFilename`）/ 语言（`Language`）。
+  - **Core**：`Core/Utils/FileFormatInfo` 加 `LegalCopyright` / `OriginalFilename` / `Language`；`Core/Utils/PeParser` 的 `FindVersionResourceData` 追加 `out ushort languageId`（资源目录叶子条目的 name/id 即语言 ID），`ParseVersionInfo` 追加 `out originalFilename`（`case "OriginalFilename"`），新增 `ResolveLanguageName(ushort)`（`CultureInfo.GetCultureInfo(id).DisplayName`，未知语言回落 `0x0409` 形式）。
+  - **UI**：`MetadataRegistry` 的 `MetadataKeys` 与 PE 注册表各加三项（原始文件名 / 语言 / 著作权）；`PreviewViewModel.ShowPe` 的 `formatValues` 补三个键。
+  - **i18n**：`Metadata_Key_OriginalFilename` / `Metadata_Key_Language` / `Metadata_Key_LegalCopyright` 三语各加，1396 → **1399** key。
+  - **验证**：探针复测 `7z.exe` / `notepad.exe` / `CalcXP.exe` / `MantisZip.UI.Avalonia.exe`，四个新字段与 `System.Diagnostics.FileVersionInfo` 一致（差异：语言按资源目录原始 lang id 显示为「英语（美国）」，Windows 会按 MUI 显示系统语言；中立资源显示空）；`PeParserTests` 增至 8 例（新增扩展字段与语言派生两例）；core / avalonia（Release）0 警告，`tests` 20.9s 2 条存量警告，`ui-tests` 34.6s 0 警告。
 **2026-10-31** — 修复：exe 预览标题显示临时文件名 + 64 位 exe 元数据全空（issue #74）
   - **症状**：报告者用 `BCompare.exe` 截图：预览面板标题是 `preview_19bc1690cf247236.exe`，与左侧列表的文件名不一致，批注要求「显示相同的名字」或「不要显示 preview_19bcxxxxx」；同时正文只有 公司 / 檔案版本 / 產品版本 三行，Windows 属性面板里的檔案描述、產品名稱、著作權、原始檔名都没有。
   - **根因①（标题）**：`Services/PreviewService` 把预览内容抽取到临时文件 `preview_{StableHash(entry.FullPath)}{ext}`，`MainWindowViewModel.Preview.cs` 的 PE 分支只把**临时路径**传给 `Preview.ShowPe`，而 `ShowPe` 的标题回退顺序是 `ProductName ?? AdditionalInfo ?? Path.GetFileName(filePath)` ⇒ 元数据解析失败时就落到临时文件名上。
@@ -3347,7 +3354,7 @@
   - **PE32+ 偏移**：`Subsystem` `opt+72` → `+68`、`NumberOfRvaAndSizes` `opt+112` → `+108`、DataDirectory 基址 `+116` → `+112`（PE32 分支不变）。错误偏移让资源目录 RVA 恒为 0，版本资源无从读起，子系统还会读到 `SizeOfStackReserve` 低字节。
   - **版本资源块对齐**：`ParseVersionInfo` 三处 `Seek(start + length)` 改为 `Seek(AlignUp(start + length))`（`(pos + 3) & ~3`）。VS_VERSIONINFO 的 `wLength` 不保证 4 的倍数（真实样本 `7z.exe` 的 CompanyName 报 50、实际占 52），直跳会落在填充字节上，后续 String 条目全部解析失败。
   - **验证**：`PeParser` 对 `CalcXP.exe`（x86）/ `7z.exe` / `notepad.exe` / `MantisZip.UI.Avalonia.exe`（x64）的 ProductName、Company、FileVersion、ProductVersion、FileDescription 与 `System.Diagnostics.FileVersionInfo` 一致。新增 `tests/MantisZip.Tests/Utils/PeParserTests.cs` 6 例（PE32/PE32+ 子系统偏移、非 PE 返回 null、未对齐版本块后仍能读到后续键、架构字段）。
-  - **后续可评估**：`FileFormatInfo` 目前没有 LegalCopyright / OriginalFilename / InternalName / Language 字段（`ParseVersionInfo` 解析了 LegalCopyright 却丢弃），要不要在元数据面板里补这些行需另立计划。
+  - **补齐字段（同日后续）**：`FileFormatInfo` 新增 `LegalCopyright` / `OriginalFilename` / `Language`（FileDescription 复用 `AdditionalInfo`）；`FindVersionResourceData` 追加 `out ushort languageId`（资源叶子条目的 name/id），`ParseVersionInfo` 追加 `out originalFilename`，`ResolveLanguageName(ushort)` 用 `CultureInfo.GetCultureInfo(id).DisplayName` 取名、未知回落 `0x0409` 形式。`PeParserTests` 增至 8 例（扩展字段 + 语言派生）。
 #### v0.5.5 (2026-10-31) 分卷集三种命名统一 + 新增 RAR5 块链结构校验
   - **触发**：issue #68 那条「测试 V0.5.4」评论里 ②③ 两项 —— ②「WinRAR 分割包故意改坏，测试压缩包仍报完好」，③「打开对话框只列 `TEST.7z.001`、不列 `TEST.7z.002`」。两项都是 #69 / #70 的既有修复只覆盖了 `.NNN` 命名的残留。
   - **复现夹具**：本机 WinRAR 7.00（`D:\Programmes\Total Commander\TOOLS\Archieve\WinRARx64\Rar.exe`）现造 `.partN.rar` 真分卷（`-v100k -ma5`，4 卷、末卷 94413B）与 5 个变体（中间卷数据翻反 / 末卷头部翻反 / 末卷**尾部**翻反 / 缺末卷 / 中间卷截断）。注意 RAR 7 已移除 `-ma4`、`-vn` 对 RAR5 无效 ⇒ 本机造不出旧式 `.rar/.r00` 与 RAR4 分卷。

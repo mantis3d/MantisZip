@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 
@@ -102,11 +103,12 @@ public static class PeParser
 
             // ── 资源目录遍历：查找 RT_VERSION (ID=16) ──
             byte[]? versionData = null;
+            ushort languageId = 0;
             if (resourceDirRVA != 0)
             {
                 uint? rsrcOffset = ResolveRvaAbsolute(resourceDirRVA, sections);
                 if (rsrcOffset.HasValue)
-                    versionData = FindVersionResourceData(fs, reader, rsrcOffset.Value, resourceDirRVA, sections);
+                    versionData = FindVersionResourceData(fs, reader, rsrcOffset.Value, resourceDirRVA, sections, out languageId);
             }
 
             // ── 解析 VS_VERSIONINFO ──
@@ -116,13 +118,14 @@ public static class PeParser
             string? productVersion = null;
             string? fileDescription = null;
             string? legalCopyright = null;
+            string? originalFilename = null;
 
             if (versionData != null && versionData.Length > 0)
             {
                 using var vms = new MemoryStream(versionData);
                 using var vr = new BinaryReader(vms);
                 ParseVersionInfo(vr, out companyName, out productName, out fileVersion,
-                    out productVersion, out fileDescription, out legalCopyright);
+                    out productVersion, out fileDescription, out legalCopyright, out originalFilename);
             }
 
             // ── 构建 FileFormatInfo ──
@@ -160,6 +163,9 @@ public static class PeParser
                 Architecture = arch,
                 Subsystem = subSys,
                 AdditionalInfo = fileDescription,
+                LegalCopyright = legalCopyright,
+                OriginalFilename = originalFilename,
+                Language = ResolveLanguageName(languageId),
             };
         }
         catch (Exception ex)
@@ -186,10 +192,17 @@ public static class PeParser
     /// <summary>
     /// 在资源目录中查找 RT_VERSION 资源数据。
     /// </summary>
+    /// <param name="languageId">
+    /// 输出：数据条目所在的语言 ID（资源目录叶子的 name/id），如 0x0409 = 英文(美国)。
+    /// 版本资源没有声明语言时返回 0。
+    /// </param>
     private static byte[]? FindVersionResourceData(
         FileStream fs, BinaryReader reader, uint rsrcDirOffset, uint rsrcRVA,
-        List<(uint va, uint vs, uint rawOff, uint rawSize)> sections)
+        List<(uint va, uint vs, uint rawOff, uint rawSize)> sections,
+        out ushort languageId)
     {
+        languageId = 0;
+
         // 1) 在类型目录中找 RT_VERSION (ID=16)
         uint? typeEntryOff = FindResourceDirectoryEntryById(fs, reader, rsrcDirOffset, 16);
         if (typeEntryOff == null) return null;
@@ -212,12 +225,16 @@ public static class PeParser
             if (entryOff == null) return null;
 
             fs.Seek(entryOff.Value, SeekOrigin.Begin);
-            reader.ReadUInt32(); // skip name/id
+            uint nameOrId = reader.ReadUInt32(); // 名字或 ID（叶子层这里就是语言 ID）
             uint dataField = reader.ReadUInt32();
 
             if ((dataField & 0x80000000) == 0)
             {
                 // 数据条目 → 读取 IMAGE_RESOURCE_DATA_ENTRY
+                // 2026-10-31 issue #74：叶子条目的 name/id 即语言 ID，用于推断「语言」字段
+                if ((nameOrId & 0x80000000) == 0)
+                    languageId = (ushort)nameOrId;
+
                 uint? dataEntryAbs = RvaToOffsetInRsrc(rsrcDirOffset, dataField, rsrcRVA, sections);
                 if (dataEntryAbs == null) return null;
 
@@ -242,6 +259,28 @@ public static class PeParser
         }
 
         return null; // 超过最大深度
+    }
+
+    /// <summary>
+    /// 把版本资源语言 ID 转成人可读名称（如 0x0409 → "英文(美国)"）。
+    /// 用 <see cref="CultureInfo.GetCultureInfo(int)"/> 做映射，未安装/未知语言回落 "0x0409"。
+    /// </summary>
+    private static string? ResolveLanguageName(ushort languageId)
+    {
+        if (languageId == 0) return null;
+
+        try
+        {
+            return CultureInfo.GetCultureInfo(languageId).DisplayName;
+        }
+        catch (CultureNotFoundException)
+        {
+            return $"0x{languageId:X4}";
+        }
+        catch (ArgumentException)
+        {
+            return $"0x{languageId:X4}";
+        }
     }
 
     /// <summary>
@@ -300,7 +339,8 @@ public static class PeParser
         BinaryReader reader,
         out string? companyName, out string? productName,
         out string? fileVersion, out string? productVersion,
-        out string? fileDescription, out string? legalCopyright)
+        out string? fileDescription, out string? legalCopyright,
+        out string? originalFilename)
     {
         companyName = null;
         productName = null;
@@ -308,6 +348,7 @@ public static class PeParser
         productVersion = null;
         fileDescription = null;
         legalCopyright = null;
+        originalFilename = null;
 
         try
         {
@@ -393,6 +434,7 @@ public static class PeParser
                                 case "ProductVersion": productVersion ??= strValue; break;
                                 case "FileDescription": fileDescription = strValue; break;
                                 case "LegalCopyright": legalCopyright = strValue; break;
+                                case "OriginalFilename": originalFilename = strValue; break;
                             }
 
                             reader.BaseStream.Seek(AlignUp(strStart + strLength), SeekOrigin.Begin);

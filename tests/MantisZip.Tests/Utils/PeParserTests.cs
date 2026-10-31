@@ -7,7 +7,7 @@ namespace MantisZip.Tests.Utils;
 /// <see cref="PeParser"/> 头部字段与版本资源解析（issue #74 回归）。
 /// 全部用内存构造的最小 PE，不依赖本机文件。
 /// </summary>
-public sealed class PeParserTests
+public sealed class PeParserTests : IDisposable
 {
     private readonly string _dir = Path.Combine(
         Path.GetTempPath(), "MantisZipPeParserTests", Guid.NewGuid().ToString("N"));
@@ -95,6 +95,38 @@ public sealed class PeParserTests
         Assert.NotNull(info);
         Assert.Equal("x64", info!.Architecture);
         Assert.Equal("GUI", info.Subsystem);
+    }
+
+    // ── 版本资源：补的四个字段（原始文件名 / 语言 / 著作权；文件描述走 AdditionalInfo） ──
+
+    [Fact]
+    public void Parse_VersionResource_ReadsExtendedStringFields()
+    {
+        byte[] pe = BuildPeWithVersion(BuildVersionResource());
+
+        var info = PeParser.Parse(Write("version-extended.exe", pe));
+
+        Assert.NotNull(info);
+        // 文件描述（Windows 属性里的「檔案描述」）
+        Assert.Equal("Widget application", info!.AdditionalInfo);
+        // 原始文件名（Windows 属性里的「原始檔名」）
+        Assert.Equal("widget.exe", info.OriginalFilename);
+        // 著作权（Windows 属性里的「著作權」）
+        Assert.Equal("© 2026 Contoso", info.LegalCopyright);
+    }
+
+    [Fact]
+    public void Parse_VersionResource_LanguageDerivedFromResourceLeafId()
+    {
+        // 资源目录叶子 ID = 0x0409（英文-美国），语言名应由该 ID 推断
+        byte[] pe = BuildPeWithVersion(BuildVersionResource());
+
+        var info = PeParser.Parse(Write("version-lang.exe", pe));
+
+        Assert.NotNull(info);
+        Assert.Equal(
+            System.Globalization.CultureInfo.GetCultureInfo(0x0409).DisplayName,
+            info!.Language);
     }
 
     // ── 夹具构造 ──
@@ -266,11 +298,34 @@ public sealed class PeParserTests
         AddUtf16Z(buf, "Widget");
         WriteU16(buf, productStart, (ushort)(buf.Count - productStart));
 
+        // ── 文件描述 / 原始文件名 / 著作权：issue #74 补充的三个字符串字段 ──
+        AddStringEntry(buf, "FileDescription", "Widget application");
+        AddStringEntry(buf, "OriginalFilename", "widget.exe");
+        AddStringEntry(buf, "LegalCopyright", "© 2026 Contoso");
+
         WriteU16(buf, tableStart, (ushort)(buf.Count - tableStart));
         WriteU16(buf, sfiStart, (ushort)(buf.Count - sfiStart));
         WriteU16(buf, rootStart, (ushort)(buf.Count - rootStart));
 
         return buf.ToArray();
+    }
+
+    /// <summary>
+    /// 追加一条 String 条目（key → value）。入口先对齐，wLength 含末尾填充，
+    /// 与真实编译器产物（wLength 不保证是 4 的倍数）混合，用来覆盖对齐逻辑。
+    /// </summary>
+    private static void AddStringEntry(List<byte> buf, string key, string value)
+    {
+        Align4(buf);
+        int start = buf.Count;
+        AddU16(buf, 0);            // wLength（收尾回填）
+        AddU16(buf, 0);            // wValueLength
+        AddU16(buf, 1);            // wType = 文本
+        AddUtf16Z(buf, key);
+        Align4(buf);
+        AddUtf16Z(buf, value);
+        Align4(buf);
+        WriteU16(buf, start, (ushort)(buf.Count - start));
     }
 
     private static void AddU16(List<byte> buf, ushort value)
