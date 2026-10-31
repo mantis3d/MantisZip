@@ -511,8 +511,6 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private string _peSubtitle = string.Empty;
 
-    public ObservableCollection<PeMetadataItem> PeMetadata { get; } = [];
-
     // ── Image ──
 
     [ObservableProperty]
@@ -1205,7 +1203,9 @@ var secureHtml = InjectCspMeta(html, csp);
     /// <summary>
     /// 显示 PE 元数据预览。
     /// </summary>
-    public void ShowPe(string filePath)
+    /// <param name="filePath">已落盘的临时文件路径（仅供解析，绝不显示给用户）。</param>
+    /// <param name="displayTitle">正文标题：压缩包里的条目名，见 issue #74。</param>
+    public void ShowPe(string filePath, string displayTitle)
     {
         var info = PeParser.Parse(filePath);
         if (info == null)
@@ -1214,17 +1214,26 @@ var secureHtml = InjectCspMeta(html, csp);
             return;
         }
 
-        PeTitle = info.ProductName ?? info.AdditionalInfo ?? Path.GetFileName(filePath);
+        // 标题用条目名：此前用 ProductName ?? 文件名，而 filePath 是 preview_<hash>.exe 临时文件，
+        // 用户看到的就是 preview_19bc1690cf247236.exe（issue #74 ①）。
+        PeTitle = string.IsNullOrWhiteSpace(displayTitle) ? Path.GetFileName(filePath) : displayTitle;
         PeSubtitle = LocalizationManager.T("Preview_Pe_Subtitle",
             info.Architecture ?? LocalizationManager.T("Preview_Pe_Unknown"),
             info.Subsystem ?? LocalizationManager.T("Preview_Pe_Unknown"));
-        PeMetadata.Clear();
 
-        AddPeMeta(LocalizationManager.T("Preview_Pe_ProductName"), info.ProductName);
-        AddPeMeta(LocalizationManager.T("Preview_Pe_Company"), info.CompanyName);
-        AddPeMeta(LocalizationManager.T("Preview_Pe_FileVersion"), info.FileVersion);
-        AddPeMeta(LocalizationManager.T("Preview_Pe_ProductVersion"), info.ProductVersion);
-        AddPeMeta(LocalizationManager.T("Preview_Pe_Description"), info.AdditionalInfo);
+        // 字段走标准元数据面板（与其他格式一致）：用户在「元数据面板」设置里可以开关 / 调位置，
+        // 此前 PE 是唯一绕过 RenderFormatToViewModel 的格式，「程序信息」分区永不出现。
+        var formatValues = new Dictionary<string, string?>
+        {
+            [MetadataKeys.ProductName] = info.ProductName,
+            [MetadataKeys.CompanyName] = info.CompanyName,
+            [MetadataKeys.FileVersion] = info.FileVersion,
+            [MetadataKeys.ProductVersion] = info.ProductVersion,
+            [MetadataKeys.Description] = info.AdditionalInfo,
+            [MetadataKeys.Architecture] = info.Architecture,
+            [MetadataKeys.Subsystem] = info.Subsystem,
+        };
+        MetadataHelper.RenderFormatToViewModel(this, formatValues, "pe");
 
         PreviewType = PreviewType.Pe;
         IsPreviewVisible = true;
@@ -3438,7 +3447,6 @@ var formatValues = new Dictionary<string, string?>
         HeaderText = string.Empty;
         PeTitle = string.Empty;
         PeSubtitle = string.Empty;
-        PeMetadata.Clear();
         CsvData = null;
         FormatMetadata.Clear();
         CommonSections.Clear();
@@ -3516,14 +3524,6 @@ var formatValues = new Dictionary<string, string?>
         IsPreviewVisible = true;
     }
 
-    private void AddPeMeta(string key, string? value)
-    {
-        if (!string.IsNullOrEmpty(value))
-        {
-            PeMetadata.Add(new PeMetadataItem { Key = key, Value = value });
-        }
-    }
-
     // ── 预览面板「输入密码」按钮 ──
 
     [RelayCommand(CanExecute = nameof(EnterPasswordCommandCanExecute))]
@@ -3568,15 +3568,6 @@ var formatValues = new Dictionary<string, string?>
     /// <summary>会话级密码缓存，避免重复输入相同压缩包的密码。</summary>
     internal static Dictionary<string, string> SessionPasswordCache { get; } = new();
 
-}
-
-/// <summary>
-/// PE 元数据的键值对模型。
-/// </summary>
-public class PeMetadataItem
-{
-    public string Key { get; set; } = string.Empty;
-    public string Value { get; set; } = string.Empty;
 }
 
 /// <summary>

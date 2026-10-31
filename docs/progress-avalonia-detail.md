@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-31** — 修复：exe 预览标题显示临时文件名 + 64 位 exe 元数据全空（issue #74）
+  - **症状**：报告者用 `BCompare.exe` 截图：预览面板标题是 `preview_19bc1690cf247236.exe`，与左侧列表的文件名不一致，批注要求「显示相同的名字」或「不要显示 preview_19bcxxxxx」；同时正文只有 公司 / 檔案版本 / 產品版本 三行，Windows 属性面板里的檔案描述、產品名稱、著作權、原始檔名都没有。
+  - **根因①（标题）**：`Services/PreviewService` 把预览内容抽取到临时文件 `preview_{StableHash(entry.FullPath)}{ext}`，`MainWindowViewModel.Preview.cs` 的 PE 分支只把**临时路径**传给 `Preview.ShowPe`，而 `ShowPe` 的标题回退顺序是 `ProductName ?? AdditionalInfo ?? Path.GetFileName(filePath)` ⇒ 元数据解析失败时就落到临时文件名上。
+  - **根因②（64 位 exe 信息全空）**：`Core/Utils/PeParser` 的 PE32+ 分支偏移错 4 字节 —— `Subsystem` 读 `opt+72`（应 `+68`）、`NumberOfRvaAndSizes` 读 `opt+112`（应 `+108`）、DataDirectory 基址用 `+116`（应 `+112`），PE32 分支是对的。后果：资源目录 RVA 恒为 0 ⇒ 版本资源读不到（探针里 x64 文件 `rsrcRVA=0`），子系统读到 `SizeOfStackReserve` 低字节（界面显示「Other」）。
+  - **根因③（产品名等键丢失）**：修好偏移后 x64 exe 仍缺 ProductName。用临时 dump 工具逐条打印版本资源发现：`ParseVersionInfo` 用 `start + wLength` 跳块，而 String 条目的 `wLength` 不保证 4 的倍数（`7z.exe` 的 CompanyName 报 50 字节、实际占 52），少跳 2 字节后落在填充区，后续条目全部读成 0 并提前 `break` ⇒ 「产品名称 / 原始文件名 / 著作权」整体丢失，与报告截图缺 產品名稱 完全吻合。改为 `AlignUp(start + length)`（`(pos + 3) & ~3`，String 条目 / StringTable / `StringFileInfo` 三处）。
+  - **根因④（pe 元数据面板从不渲染）**：`ShowPe` 走的是 legacy 通道（`PeMetadata` 集合 + `Preview_Pe_*` 标签），PE 是唯一不调 `MetadataHelper.RenderFormatToViewModel` 的格式 ⇒ 元数据设置里 PE 组的开关是死配置，「程序信息」分区永不出现，`IsFormatPending` 永远停在 true（这也是用户实测「exe 文件不显示元数据面板」的直接原因）。
+  - **修法**：`PeParser` 修两处偏移 + 三处对齐；`ShowPe(string filePath, string displayTitle)` 接收条目名（调用方传 `entry.NameDisplay`），填 `Dictionary<MetadataKeys…>`（ProductName / CompanyName / FileVersion / ProductVersion / Description / Architecture / Subsystem）后走 `RenderFormatToViewModel(this, values, "pe")`；删掉 `PeMetadata` 集合、`AddPeMeta`、`PeMetadataItem` 与 `Views/PreviewPanel.axaml` 里的行列表（正文只剩标题 + 「架构 / 子系统」副标题）；同时清掉 5 个变成死引用的 `Preview_Pe_ProductName/Company/FileVersion/ProductVersion/Description`（三语各删 5 行，1396 key）。
+  - **验证**：修后探针 `CalcXP.exe`（x86）、`7z.exe` / `notepad.exe` / `MantisZip.UI.Avalonia.exe`（x64）五字段与 `System.Diagnostics.FileVersionInfo` 全一致（差异仅 notepad 的 WinBuild 后缀与 7z 的展示串）；无头探针确认 `FormatSections=1`（标题「程序信息」）、`IsFormatPending=false`、标题为条目名。新增 `PeParserTests` 6 例、`PePreviewPanelTests` 2 例；`check`（i18n 1396）/ `guards` 8/8 / core+avalonia（Release）0 警告 / `tests` 7.0s / `ui-tests` 41.0s 全绿。
+  - **已知边界**：语言、著作權、原始檔名、法律商標等 Windows 属性字段尚未纳入（`FileFormatInfo` 无对应字段），需另立一轮决定是否加 `MetadataRegistry` 注册项与三语 key；本机元数据配置若把某字段设成 `contentTop` / `hidden`，用户看到的行数会不同（属既有行为）。
 **2026-10-31** — 修复：分卷文件在「打开压缩包」对话框里显示不全（issue #68 评论 ③ = #70 遗留）
   - **症状**：报告者列表里 `TEST.7z.001` / `TEST_RAR.part1.rar` / `TEST_RAR.part2.rar` 都在，唯独 `TEST.7z.002` 不显示，建议「全部显示完整」。
   - **根因**：`Controls/CustomFilePickerControl.axaml.cs` 的 `MatchesFileFilter` 只把 `Path.GetExtension(filePath)` 与筛选模式的扩展名做**相等**比较；分卷集在筛选模式里只有 `*.001`（`ArchiveVolumeSet.VolumeFilterPatterns`）⇒ `.002` 无任何模式匹配被隐藏。而 `part2.rar` 的扩展名恰好是 `.rar`，撞进 `*.rar` 所以能看见 —— 同一套分卷，两种命名一个只显示首卷、一个全显示。
@@ -3333,6 +3342,12 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.5 (2026-10-31) `PeParser` 修正 PE32+ 可选头偏移与版本资源块对齐
+  - **触发**：issue #74（exe 预览标题是临时文件名 + 信息太少）排查中发现 64 位 exe 的版本资源整体读不到。
+  - **PE32+ 偏移**：`Subsystem` `opt+72` → `+68`、`NumberOfRvaAndSizes` `opt+112` → `+108`、DataDirectory 基址 `+116` → `+112`（PE32 分支不变）。错误偏移让资源目录 RVA 恒为 0，版本资源无从读起，子系统还会读到 `SizeOfStackReserve` 低字节。
+  - **版本资源块对齐**：`ParseVersionInfo` 三处 `Seek(start + length)` 改为 `Seek(AlignUp(start + length))`（`(pos + 3) & ~3`）。VS_VERSIONINFO 的 `wLength` 不保证 4 的倍数（真实样本 `7z.exe` 的 CompanyName 报 50、实际占 52），直跳会落在填充字节上，后续 String 条目全部解析失败。
+  - **验证**：`PeParser` 对 `CalcXP.exe`（x86）/ `7z.exe` / `notepad.exe` / `MantisZip.UI.Avalonia.exe`（x64）的 ProductName、Company、FileVersion、ProductVersion、FileDescription 与 `System.Diagnostics.FileVersionInfo` 一致。新增 `tests/MantisZip.Tests/Utils/PeParserTests.cs` 6 例（PE32/PE32+ 子系统偏移、非 PE 返回 null、未对齐版本块后仍能读到后续键、架构字段）。
+  - **后续可评估**：`FileFormatInfo` 目前没有 LegalCopyright / OriginalFilename / InternalName / Language 字段（`ParseVersionInfo` 解析了 LegalCopyright 却丢弃），要不要在元数据面板里补这些行需另立计划。
 #### v0.5.5 (2026-10-31) 分卷集三种命名统一 + 新增 RAR5 块链结构校验
   - **触发**：issue #68 那条「测试 V0.5.4」评论里 ②③ 两项 —— ②「WinRAR 分割包故意改坏，测试压缩包仍报完好」，③「打开对话框只列 `TEST.7z.001`、不列 `TEST.7z.002`」。两项都是 #69 / #70 的既有修复只覆盖了 `.NNN` 命名的残留。
   - **复现夹具**：本机 WinRAR 7.00（`D:\Programmes\Total Commander\TOOLS\Archieve\WinRARx64\Rar.exe`）现造 `.partN.rar` 真分卷（`-v100k -ma5`，4 卷、末卷 94413B）与 5 个变体（中间卷数据翻反 / 末卷头部翻反 / 末卷**尾部**翻反 / 缺末卷 / 中间卷截断）。注意 RAR 7 已移除 `-ma4`、`-vn` 对 RAR5 无效 ⇒ 本机造不出旧式 `.rar/.r00` 与 RAR4 分卷。

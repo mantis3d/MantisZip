@@ -36,6 +36,10 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Every volume of a set is now listed in the open dialog** — previously `xxx.7z.001` was listed while `xxx.7z.002` was not; now all volumes of the same set show up
 
+- **exe 预览的标题现在用文件名，64 位程序的元数据也回来了** — 此前标题显示的是内部临时文件名（`preview_19bc1690cf247236.exe`），而且 64 位 exe 的「程序信息」整片空白；现在标题就是文件列表里的名字，产品名称、公司、版本等信息统一进右侧元数据面板（可在设置里开关与排序），x86 与 x64 都能读到
+
+- **The exe preview title is now the file name, and 64-bit metadata is back** — the title used to show an internal temp name (`preview_19bc1690cf247236.exe`), and 64-bit executables had a completely empty "program info" panel; now the title is the name from the file list, and product name, company and version go into the right-hand metadata panel (configurable in settings) for both x86 and x64
+
 ## v0.5.4
 
 ### 文件说明 / File Description
