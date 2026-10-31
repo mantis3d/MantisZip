@@ -1,4 +1,5 @@
 using System.Collections.ObjectModel;
+using Avalonia.Controls;
 using System.Collections.Specialized;
 using System.IO;
 using System.Threading;
@@ -37,12 +38,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         ? LocalizationManager.T("Compress_NItemsSelected", SelectedPaths.Count)
         : LocalizationManager.T("Compress_NoFilesSelected");
 
-    /// <summary>由 View 设置的文件保存选择回调。返回选择的路径，取消返回 null。</summary>
-    public Func<Task<string?>>? BrowseOutput { get; set; }
-
-    /// <summary>由 View 设置的文件选择回调。返回选择的文件路径列表，取消返回 null。</summary>
-    public Func<Task<IReadOnlyList<string>?>>? PickFiles { get; set; }
-
     /// <summary>
     /// 确认事务的结果出口。窗口在构造时订阅，负责把三态翻译成窗口动作
     /// （<see cref="Rejected{T}"/> 留窗显示原因、<see cref="ConfirmOutcome{T}"/> 的确认/取消关窗）。
@@ -80,6 +75,14 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>内嵌 QuickPathControl 仅在 Manual 模式下可见（Separate/Combined 自动计算路径）。</summary>
     public bool IsQuickPathVisible => OutputMode == CompressOutputMode.Manual;
+
+    /// <summary>
+    /// 「输出目录」分组所在网格行的高度：手动模式给 <c>*</c>（内嵌目录选择器吃掉剩余高度，
+    /// 窗口拉高时浏览区跟着变高）；分别/合并模式下分组本身隐藏，行高给 0，避免留一块空洞
+    /// （2026-10-30 用户反馈「压缩的输出页高度不是弹性的」）。
+    /// </summary>
+    public GridLength OutputPickerRowHeight =>
+        IsQuickPathVisible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
 
     /// <summary>输出文件扩展名标签（跟随格式）。</summary>
     public string OutputExtensionLabel => GetFormatExtension();
@@ -488,6 +491,12 @@ public partial class CompressSettingsViewModel : ObservableObject
         };
 
         // Populate localized strings
+        // Tab 标题：输出设置 / 添加文件 / 压缩设置（原「常规」+「高级」合并）
+        LocalizedStrings["Compress_TabOutput"] = LocalizationManager.T("Compress_TabOutput");
+        LocalizedStrings["Compress_TabAddFiles"] = LocalizationManager.T("Compress_TabAddFiles");
+        LocalizedStrings["Compress_TabCompress"] = LocalizationManager.T("Compress_TabCompress");
+        LocalizedStrings["Compress_PickerAdvancedMode"] = LocalizationManager.T("Compress_PickerAdvancedMode");
+        LocalizedStrings["Compress_SelectedSources"] = LocalizationManager.T("Compress_SelectedSources");
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
         LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
         LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");
@@ -847,6 +856,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsBrowseButtonVisible));
         OnPropertyChanged(nameof(IsFileNameSectionVisible));
         OnPropertyChanged(nameof(IsQuickPathVisible));
+        OnPropertyChanged(nameof(OutputPickerRowHeight));
         OnPropertyChanged(nameof(OutputPathLabel));
         OnPropertyChanged(nameof(IsManualMode));
         OnPropertyChanged(nameof(IsSeparateMode));
@@ -1225,17 +1235,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         PasswordSearchText = "";
     }
 
-    [RelayCommand]
-    private async Task BrowseOutputPath()
-    {
-        if (BrowseOutput == null) return;
-        var path = await BrowseOutput();
-        if (!string.IsNullOrEmpty(path))
-        {
-            OutputPath = path;
-        }
-    }
-
     private bool CanExecuteStartCompress()
     {
         // 等待准备期间禁用（防重入：B 就绪前的等待窗口内再点一次）
@@ -1507,21 +1506,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     }
 
     // ── Source file management ──
-
-    [RelayCommand]
-    private async Task AddFiles()
-    {
-        if (PickFiles == null) return;
-        var files = await PickFiles();
-        if (files != null)
-        {
-            foreach (var f in files)
-            {
-                if (!SelectedPaths.Contains(f))
-                    SelectedPaths.Add(f);
-            }
-        }
-    }
 
     [RelayCommand]
     private void RemoveSelected(object? selectedItem)
