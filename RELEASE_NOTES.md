@@ -28,6 +28,14 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **The "file type" dropdown in the open dialog no longer clips its text** — the dropdown had a hard-coded 110 px width, so the last character of the Traditional Chinese label was cut off; it now sizes to its content and shows every label in full
 
+- **WinRAR 制作的分卷包能识别了** — WinRAR 7 默认用 `xxx.part1.rar` 命名分卷，此前只认 `xxx.001`，这类包从任意一卷打开都会提示损坏、删除源包也只删一卷；现在三种命名都能识别，任意一卷都能打开整包，测试压缩包也会读完全部卷并报出卷尾被改坏的情况
+
+- **RAR volume sets made by WinRAR are now recognised** — WinRAR 7 defaults to the `xxx.part1.rar` naming, which the app did not understand: opening from any volume reported the set as damaged, and deleting the source removed only one volume. All three naming schemes are recognised now, any volume opens the whole set, and the integrity test reads every volume and reports a damaged tail
+
+- **分卷包的文件列表显示完整了** — 打开对话框里此前会出现 `xxx.7z.001` 有、`xxx.7z.002` 没有的情况；现在同一套分卷的每一卷都会列出
+
+- **Every volume of a set is now listed in the open dialog** — previously `xxx.7z.001` was listed while `xxx.7z.002` was not; now all volumes of the same set show up
+
 ## v0.5.4
 
 ### 文件说明 / File Description

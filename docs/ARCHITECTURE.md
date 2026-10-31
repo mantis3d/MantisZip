@@ -506,6 +506,23 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 - `SevenZipEngine.CompressAsync` 使用 `SharpSevenZipCompressor`（7z.dll COM 绑定）
 - `ArchiveEntryExtractor`（Core/Utils）处理预览用单项提取；支持 Zip 与 7z
 
+### 分卷集命名与结构校验（2026-10-31）
+
+`ArchiveVolumeSet`（Core/Utils）是**分卷命名识别的单一事实源**，三种形态都要认（2026-10-31 由「只认 `.NNN`」扩展而来，issue #68 评论 ②③ / #69 / #70）：
+
+| 形态 | 例子 | 首卷 | 识别要点 |
+|---|---|---|---|
+| 数字后缀 | `pack.7z.001`、`pack.zip.002` | `.001` | 正则 `\.(\d{3})$`，基名剥掉数字后缀 |
+| WinRAR 新式 | `pack.part1.rar`、`pack.part02.rar` | `partN` 里序号最小者 | 正则 `\.part(\d+)\.rar$`，基名补回 `.rar` |
+| WinRAR 旧式 | `pack.rar` + `pack.r00`…`pack.r99` | `pack.rar` 本身 | 正则 `\.r(\d{2})$`，序号按 `N + 2` 归一 |
+
+- **API**：`GetVolumeSetKind` / `TryGetVolumeBase` / `HasVolumeSuffix` / `EnumerateVolumes` / `FindFirstVolume` / `GetVolumeWatchFilter` / `MatchesArchiveExtension`；`VolumeFilterPatterns` 只保留 `["*.001"]`（唯一用途是让 `.001` 出现在「打开压缩包」筛选里）
+- **消费者**：`ArchiveEngineFactory.GetEngineByExtension` 命中分卷命名即路由 `SevenZipEngine`（分卷包只读，增删条目直接抛 `NotSupportedException`）；`ResolveVolumeAnchor` 从任意一卷回退首卷；`ArchiveFileGuard` 用 `GetVolumeWatchFilter` 生成 `FileSystemWatcher` 过滤器（外部删卷 / 替换要能报警）；`CustomFilePickerControl.MatchesFileFilter` 在扩展名相等失败后调 `MatchesArchiveExtension` 回退 —— 所以同一套分卷**每一卷**都会列在打开对话框里（`.part2.rar` 靠 `.rar` 本来就能撞进去，`.7z.002` 必须靠这条回退）
+- **RAR5 结构校验**：`RarHeaderValidator.Validate(path)` 走一遍全部分卷的块链 —— 块头 CRC32（覆盖 `HeaderSize` 字段到头部末尾）、按 `HeaderFlags` 的 `0x0001`/`0x0002` 读 extras/数据区并按 `DataSize` **跳过数据区**、每卷必须以 end-of-archive 块收尾、非末卷 `EndFlags` bit0 = 1（缺卷即 `Broken`）、块越界/截断 `Broken`、≤1KB 全零尾部算填充；头加密或非 RAR5 返回 `Unknown`（只敢断定「坏」，不敢断定「好」）
+- **挂载点只在 `SevenZipEngine.TestArchiveAsync`**（`extractor.Check()` 通过之后）。打开路径的 `ArchiveHeaderProbe.Probe` 仍只看签名，**不要**把结构校验挂进去 —— 那会让有效包在「打开」时被误判「文件损坏」
+- **为什么需要它**：`7z.dll` 的整包 `Check()` 不校验卷尾（末卷 end-of-archive 块头被翻反仍返回 true），而同一份夹具 `7z.exe t` 报 `ERRORS: Headers Error`、`UnRAR.exe t` 报「检测到损坏的文件头」
+- **已知边界**：RAR4 分卷不做块链校验（块结构不同，见 `docs/KNOWN_ISSUES.md` KI-010）；`.partN.rar` 形态但其实是单卷的归档会被认成分卷而禁写增删
+
 ### 进度上报契约
 
 - `ArchiveProgress`（Core/Abstractions/ArchiveEngine.cs）：`PercentComplete`（总体 0–100）、`FilePercentComplete`（可空 double，单文件 0–100）、`FileName`（当前文件）、`Message`

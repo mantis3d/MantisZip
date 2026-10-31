@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-10-31** — 修复：分卷文件在「打开压缩包」对话框里显示不全（issue #68 评论 ③ = #70 遗留）
+  - **症状**：报告者列表里 `TEST.7z.001` / `TEST_RAR.part1.rar` / `TEST_RAR.part2.rar` 都在，唯独 `TEST.7z.002` 不显示，建议「全部显示完整」。
+  - **根因**：`Controls/CustomFilePickerControl.axaml.cs` 的 `MatchesFileFilter` 只把 `Path.GetExtension(filePath)` 与筛选模式的扩展名做**相等**比较；分卷集在筛选模式里只有 `*.001`（`ArchiveVolumeSet.VolumeFilterPatterns`）⇒ `.002` 无任何模式匹配被隐藏。而 `part2.rar` 的扩展名恰好是 `.rar`，撞进 `*.rar` 所以能看见 —— 同一套分卷，两种命名一个只显示首卷、一个全显示。
+  - **修法**：扩展名相等失败后再用 `ArchiveVolumeSet.MatchesArchiveExtension(filePath, normalized)` 判断一次（Core 里分卷命名的单一事实源，能把 `xxx.7z.002` / `xxx.rar.r01` / `xxx.part3.rar` 都归一回 `xxx.7z` / `xxx.rar`）。策略取「同一套分卷全部显示」（报告者建议、用户拍板），不改「只显示首卷」。
+  - **同时**：`Services/ArchiveFileGuard` 的 `FileSystemWatcher` 过滤器改由新增的 `ArchiveVolumeSet.GetVolumeWatchFilter` 给出，`.partN.rar` 分卷被外部删除/替换后能正常报警（此前它自己拼 `<base>.*`，对 `part2` 之后的卷完全漏看）。
+  - **验证**：`build -Target avalonia`（Release）0 警告、`guards` 8/8、`ui-tests` 全绿；分卷行为在 Core 侧由 `ArchiveVolumeSetTests` 的正反例与真分卷端到端验证兜底。
 **2026-10-31** — 修复：打开对话框「文件类型」下拉文字被裁（issue #68）
   - **症状**：用户（繁体界面）反馈 `#68`——打开压缩包对话框里「文件类型」下拉最后一字「案」被吃掉，即 `Picker_FileTypeArchive` 的 zh-TW 文案「壓縮檔檔案」。
   - **根因**：`Controls/CustomFilePickerControl.axaml:373` 把文件名那一行的 Grid 列宽写死成 `ColumnDefinitions="60,*,60,110"`，ComboBox 自己只有 `MinHeight` 没有宽度约束 ⇒ 下拉框恒为 110px。实测（无头渲染 + System.Drawing 字体度量）：「压缩包文件」在 13px 下宽 109px，**只差 1px** 就放不下；「自解压程序 (*.exe)」要 152px、「Self-extracting programs (*.exe)」要 263px ⇒ 字体稍宽（繁体正黑 / 用户字号）或标签变长必然裁字。
@@ -3326,6 +3332,19 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.5 (2026-10-31) 分卷集三种命名统一 + 新增 RAR5 块链结构校验
+  - **触发**：issue #68 那条「测试 V0.5.4」评论里 ②③ 两项 —— ②「WinRAR 分割包故意改坏，测试压缩包仍报完好」，③「打开对话框只列 `TEST.7z.001`、不列 `TEST.7z.002`」。两项都是 #69 / #70 的既有修复只覆盖了 `.NNN` 命名的残留。
+  - **复现夹具**：本机 WinRAR 7.00（`D:\Programmes\Total Commander\TOOLS\Archieve\WinRARx64\Rar.exe`）现造 `.partN.rar` 真分卷（`-v100k -ma5`，4 卷、末卷 94413B）与 5 个变体（中间卷数据翻反 / 末卷头部翻反 / 末卷**尾部**翻反 / 缺末卷 / 中间卷截断）。注意 RAR 7 已移除 `-ma4`、`-vn` 对 RAR5 无效 ⇒ 本机造不出旧式 `.rar/.r00` 与 RAR4 分卷。
+  - **① 命名不在识别范围**：`ArchiveVolumeSet` 原本只认 `\.(\d{3})$`，`rar5set.part2.rar` 完全不被当分卷 ⇒ 引擎不回溯首卷（从 part2 打开 `TestArchive` 必失败，实测既使包完好也是 false）、删源包只删一卷、选择器里 `part2.rar` 因扩展名 `.rar` 撞进列表而 `.7z.002` 被隐藏（`MatchesFileFilter` 只做扩展名相等比较，分卷模式只有 `*.001`）。
+  - **② 漏检根因**：末卷**尾部**（end-of-archive 块头）被翻反时，`7z.dll` 的整包 `Check()` 仍返回 true —— 同机 `7z.exe t` 报 `ERRORS: Headers Error`、`UnRAR.exe t` 报「检测到损坏的文件头」，说明该处 CRC 只由块头自证、7z.dll 不校验卷尾。中间卷数据区翻反、末卷头部翻反都能被 `Check()` 抓到，唯独这个位置漏。
+  - **`src/MantisZip.Core/Utils/ArchiveVolumeSet.cs`（重写）**：新增 `public enum VolumeSetKind { None, Numeric, RarPart, RarOld }`，三种命名的解析由 `GetVolumeSetKind` / `TryGetVolumeBase` 统一（`name.001` 剥数字后缀；`name.partN.rar` → 基名 `name.rar` + 序号 N；`name.r00` → 基名 `name.rar` + 序号 N+2）。`EnumerateVolumes` 按形态枚举（`.r00` 旧式从 `name.rar` 首卷起、`partN` 保留卷号位宽），`FindFirstVolume` 取枚举首项，`HasVolumeSuffix` 同步覆盖三种。新增两个消费者入口：`GetVolumeWatchFilter(path)`（`ArchiveFileGuard` 的 `FileSystemWatcher` 过滤器统一由它给出 —— 数字后缀 `<base>.*`、partN `<root>.part*.rar`、旧式 `<root>.*`）与 `MatchesArchiveExtension(path, ext)`（要求基名以该扩展名结尾，文件选择器据此把同一套分卷全部列出）。`VolumeFilterPatterns` 仍是 `["*.001"]`（只做「让 `.001` 出现在筛选里」这一件事，真实过滤交给上面的匹配方法）。
+  - **`src/MantisZip.Core/Utils/RarHeaderValidator.cs`（新增）**：`public enum RarStructureStatus { Unknown, Intact, Broken }`，`Validate(path)` / `Validate(path, out string? failureReason)` 对整套分卷逐卷走 RAR5 块链 —— 块结构 `CRC32(4B) + HeaderSize(vint) + 头部`，CRC 覆盖「`HeaderSize` 字段起至头部末尾」；按 `HeaderFlags` 的 `0x0001`（extras 区）/`0x0002`（数据区）读出对应变长整数并**按 `DataSize` 跳过数据区**（第一版原型漏跳，把数据当块头、在文件末尾误报 CRC 不符）；每个卷必须以 end-of-archive 块（type 5）收尾，非末卷的 `EndFlags` bit0 必须为 1、末卷必须为 0（不一致 = 缺卷或多卷），块越界/截断一律 `Broken`，≤1KB 的全零尾部算作对齐填充。块类型 4（头加密）直接返回 `Unknown`，非 RAR5 签名返回 `Unknown`，读文件异常也返回 `Unknown` —— 校验器只负责「确定坏」，不敢断定「好」的时候不吭声。
+  - **挂载点**：`SevenZipEngine.TestArchiveAsync` 在 `extractor.Check()` 通过之后才跑结构校验；`Broken` 时置 `valid = false` 并把 `checkError` 设为带原因的 `InvalidDataException`，随后沿用既有失败路径（逐条目试提取 → 一条都没失败时用 `checkError` 报整包失败）。**打开路径刻意不挂**：`ArchiveHeaderProbe.Probe` 仍只看签名，避免把一个有效包在「打开」时误判「文件损坏」弹错。
+  - **UI 侧**：`CustomFilePickerControl.MatchesFileFilter` 在扩展名相等失败后追加一遍 `ArchiveVolumeSet.MatchesArchiveExtension` 回退，`ArchiveFileGuard` 的过滤器改调 `GetVolumeWatchFilter` —— 后者原本自己拼 `Path.GetFileName(volumeBase) + ".*"`，对 `partN` 形态会漏掉后续卷。
+  - **测试**：新建 `tests/MantisZip.Tests/Utils/RarHeaderValidatorTests.cs` 8 例（单卷 / 分卷 / 末卷尾部翻反 / 缺末卷 / 中间卷截断 / 中间卷数据翻反仍 Intact / RAR4 语料 Unknown / 非 RAR 与空串 Unknown）；`ArchiveVolumeSetTests` 追加 7 例（三种命名解析、partN 枚举连续、旧式带首卷、`FindFirstVolume` 从 part3 回 part1、`GetVolumeWatchFilter` 四种形态、`MatchesArchiveExtension` 正反例）；`SplitArchiveTests` 追加 4 例（RAR5 分卷列条目与解压、完好分卷 `TestArchive` 通过、末卷尾部翻反失败、缺末卷失败）。语料新增 `tests/corpus/rar5/`（`valid-rar5.rar` 61780B + `valid-rar5-split.part1..4.rar`，`-v16k`）。
+  - **验证**：Core / Avalonia（Release）0 警告；`tests` 全绿（2 条存量警告）；`guards` 8/8；端到端对 7 个真分卷变体跑 `EnumerateVolumes` / `FindFirstVolume` / `GetEngineByExtension` / `ListEntriesAsync` / `TestArchiveAsync`，判定全部符合预期（完好包从任何一卷打开都能列出 3 条目；末卷尾部翻反、缺末卷、中间卷截断、末卷头部翻反、中间卷数据翻反全部 `TestArchive=False`）。
+  - **边界**：RAR4 分卷不做块链校验（块结构与 RAR5 不同，本机也无 RAR4 分卷生成能力）→ 登记 `KI-010`；`.partN.rar` 形状但其实是单卷的归档会被认成分卷，从而禁止「增删条目」（极少见，暂不特殊处理）。
 
 #### v0.5.5 (2026-10-31) 自解压 exe 探测重写（PE 感知有界扫描）+ 新增 `SevenZipExtractorFactory`
   - **触发**：用户实测两个真实 SFX（7z / WinRAR 制作）仍打不开，v0.5.4 的 SFX 支持在真实样本上等于无效。诊断见 Avalonia 区同日期条目（根因：8KB 尾窗够不着、SharpSevenZip 逐格式试探对大桩 SFX 失效）。
