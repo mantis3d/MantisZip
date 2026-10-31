@@ -7,7 +7,7 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// <summary>
 /// PE 预览的显示接线（issue #74）：标题用条目名、元数据交给标准元数据面板。
 /// </summary>
-public sealed class PePreviewPanelTests
+public sealed class PePreviewPanelTests : IDisposable
 {
     private readonly string _dir = Path.Combine(
         Path.GetTempPath(), "MantisZipPePreviewTests", Guid.NewGuid().ToString("N"));
@@ -38,7 +38,13 @@ public sealed class PePreviewPanelTests
         // 此前标题取 ProductName ?? 文件名，而文件名是预览临时文件 preview_<hash>.exe
         Assert.Equal("BCompare.exe", vm.PeTitle);
         Assert.DoesNotContain("preview_", vm.PeTitle);
-        Assert.Equal("架构: x64 | 子系统: GUI", vm.PeSubtitle);
+        // 正文不再重复显示架构/子系统（两侧重复）：这两项只出现在右侧元数据面板
+        Assert.Null(typeof(PreviewViewModel).GetProperty("PeSubtitle"));
+        Assert.Contains(
+            vm.FormatSections.SelectMany(section => section.Rows)
+                             .Concat(vm.ContentTopItems)
+                             .SelectMany(row => row.Items),
+            item => item.Value?.Contains("x64", StringComparison.Ordinal) == true);
     }
 
     [AvaloniaFact]

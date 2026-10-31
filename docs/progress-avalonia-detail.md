@@ -12,6 +12,7 @@
   - **Core**：`Core/Utils/FileFormatInfo` 加 `LegalCopyright` / `OriginalFilename` / `Language`；`Core/Utils/PeParser` 的 `FindVersionResourceData` 追加 `out ushort languageId`（资源目录叶子条目的 name/id 即语言 ID），`ParseVersionInfo` 追加 `out originalFilename`（`case "OriginalFilename"`），新增 `ResolveLanguageName(ushort)`（`CultureInfo.GetCultureInfo(id).DisplayName`，未知语言回落 `0x0409` 形式）。
   - **UI**：`MetadataRegistry` 的 `MetadataKeys` 与 PE 注册表各加三项（原始文件名 / 语言 / 著作权）；`PreviewViewModel.ShowPe` 的 `formatValues` 补三个键。
   - **i18n**：`Metadata_Key_OriginalFilename` / `Metadata_Key_Language` / `Metadata_Key_LegalCopyright` 三语各加，1396 → **1399** key。
+  - **顺带去重**：正文原本还有一行「架构: x64 | 子系统: GUI」副标题，与面板里的同名两项重复，用户反馈后删掉 —— 正文只剩条目名标题，`PeSubtitle` 属性、`Preview_Pe_Subtitle` / `Preview_Pe_Unknown` 两个 key（三语各删）一并清除，`PePreviewPanelTests` 改为断言正文不再有副标题、架构仍出现在面板。
   - **验证**：探针复测 `7z.exe` / `notepad.exe` / `CalcXP.exe` / `MantisZip.UI.Avalonia.exe`，四个新字段与 `System.Diagnostics.FileVersionInfo` 一致（差异：语言按资源目录原始 lang id 显示为「英语（美国）」，Windows 会按 MUI 显示系统语言；中立资源显示空）；`PeParserTests` 增至 8 例（新增扩展字段与语言派生两例）；core / avalonia（Release）0 警告，`tests` 20.9s 2 条存量警告，`ui-tests` 34.6s 0 警告。
 **2026-10-31** — 修复：exe 预览标题显示临时文件名 + 64 位 exe 元数据全空（issue #74）
   - **症状**：报告者用 `BCompare.exe` 截图：预览面板标题是 `preview_19bc1690cf247236.exe`，与左侧列表的文件名不一致，批注要求「显示相同的名字」或「不要显示 preview_19bcxxxxx」；同时正文只有 公司 / 檔案版本 / 產品版本 三行，Windows 属性面板里的檔案描述、產品名稱、著作權、原始檔名都没有。

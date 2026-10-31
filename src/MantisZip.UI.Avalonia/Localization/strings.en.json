@@ -354,8 +354,6 @@
   "Preview_PdfOpenFailed": "Failed to open PDF file",
   "Preview_PdfParseFailed": "Failed to parse PDF file",
   "Preview_PeFailed": "Failed to parse PE file",
-  "Preview_Pe_Subtitle": "Architecture: {0} | Subsystem: {1}",
-  "Preview_Pe_Unknown": "Unknown",
   "Preview_SqliteFailed": "Failed to read SQLite database: {0}",
   "Preview_SvgParseFailed": "Failed to parse SVG file",
   "Preview_SvgRenderFailed": "Failed to render SVG: {0}",

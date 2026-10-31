@@ -354,8 +354,6 @@
   "Preview_PdfOpenFailed": "無法開啟 PDF 檔案",
   "Preview_PdfParseFailed": "無法解析 PDF 檔案",
   "Preview_PeFailed": "無法解析 PE 檔案",
-  "Preview_Pe_Subtitle": "架構: {0} | 子系統: {1}",
-  "Preview_Pe_Unknown": "不明",
   "Preview_SqliteFailed": "無法讀取 SQLite 資料庫: {0}",
   "Preview_SvgParseFailed": "無法解析 SVG 檔案",
   "Preview_SvgRenderFailed": "SVG 上色失敗: {0}",

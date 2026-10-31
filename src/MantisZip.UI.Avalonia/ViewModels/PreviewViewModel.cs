@@ -508,9 +508,6 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private string _peTitle = string.Empty;
 
-    [ObservableProperty]
-    private string _peSubtitle = string.Empty;
-
     // ── Image ──
 
     [ObservableProperty]
@@ -1217,9 +1214,6 @@ var secureHtml = InjectCspMeta(html, csp);
         // 标题用条目名：此前用 ProductName ?? 文件名，而 filePath 是 preview_<hash>.exe 临时文件，
         // 用户看到的就是 preview_19bc1690cf247236.exe（issue #74 ①）。
         PeTitle = string.IsNullOrWhiteSpace(displayTitle) ? Path.GetFileName(filePath) : displayTitle;
-        PeSubtitle = LocalizationManager.T("Preview_Pe_Subtitle",
-            info.Architecture ?? LocalizationManager.T("Preview_Pe_Unknown"),
-            info.Subsystem ?? LocalizationManager.T("Preview_Pe_Unknown"));
 
         // 字段走标准元数据面板（与其他格式一致）：用户在「元数据面板」设置里可以开关 / 调位置，
         // 此前 PE 是唯一绕过 RenderFormatToViewModel 的格式，「程序信息」分区永不出现。
@@ -3449,7 +3443,6 @@ var formatValues = new Dictionary<string, string?>
         TextContent = string.Empty;
         HeaderText = string.Empty;
         PeTitle = string.Empty;
-        PeSubtitle = string.Empty;
         CsvData = null;
         FormatMetadata.Clear();
         CommonSections.Clear();
