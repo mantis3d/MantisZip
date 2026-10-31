@@ -504,9 +504,7 @@ public class SevenZipEngine : IArchiveEngine
 
         var result = await Task.Run(async () =>
         {
-            using var extractor = string.IsNullOrEmpty(password)
-                ? new SharpSevenZipExtractor(archivePath)
-                : new SharpSevenZipExtractor(archivePath, password);
+            using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
             // 检查是否有加密条目但未提供密码
             bool hasEncrypted = extractor.ArchiveFileData.Any(e => !e.IsDirectory && e.Encrypted);
@@ -847,9 +845,7 @@ public class SevenZipEngine : IArchiveEngine
 
         var result = await Task.Run(() =>
         {
-            using var extractor = string.IsNullOrEmpty(password)
-                ? new SharpSevenZipExtractor(archivePath)
-                : new SharpSevenZipExtractor(archivePath, password);
+            using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
             // 预先确定格式，供 lambda 中使用
             var format = ArchiveEngineFactory.GetFormatByExtension(archivePath);
@@ -912,9 +908,7 @@ public class SevenZipEngine : IArchiveEngine
         {
             try
             {
-                using var extractor = string.IsNullOrEmpty(password)
-                    ? new SharpSevenZipExtractor(archivePath)
-                    : new SharpSevenZipExtractor(archivePath, password);
+                using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
                 // 1. 校验压缩包完整性（7z.dll 的 Check = TestArchive 语义，逐条目解压并校验 CRC）。
                 //    全程订阅 FileExtractionFinished 事件上报实时进度：
@@ -1065,9 +1059,7 @@ public class SevenZipEngine : IArchiveEngine
 
         await Task.Run(async () =>
         {
-            using var extractor = string.IsNullOrEmpty(password)
-                ? new SharpSevenZipExtractor(archivePath)
-                : new SharpSevenZipExtractor(archivePath, password);
+            using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
             var allEntries = extractor.ArchiveFileData.ToList();
             int totalTarget = allEntries.Count(e => !e.IsDirectory && keySet.Contains(ArchivePath.Normalize(e.FileName)));

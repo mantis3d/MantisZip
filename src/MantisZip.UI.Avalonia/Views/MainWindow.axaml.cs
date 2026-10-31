@@ -1462,13 +1462,11 @@ public partial class MainWindow : Window
         return await CustomFilePickerDialog.ShowOpenFileAsync(
             this,
             initialPath: contextPath,
-            // 过滤模式从引擎工厂的单一事实源派生：早先这里硬编码 8 项，
+            // 文件类型下拉项从引擎工厂的单一事实源派生：早先这里硬编码 8 项，
             // 新增 .jar/.war/.ear/.apk（issue #54）时很容易漏同步。
             // 分卷集只认第一卷、故补 *.001（issue #70③）；设置 →「文件类型关联」里的自定义扩展名也一并纳入。
-            fileExtensions:
-            [
-                .. ArchiveFormatHelper.BuildOpenDialogPatterns(AppSettings.Load())
-            ]);
+            // 第三项「自解压程序 (*.exe)」默认不选中（issue #36）：只有要打开 SFX 时才需要列出 exe。
+            fileTypes: [.. ArchiveFormatHelper.BuildOpenDialogFileTypes(AppSettings.Load())]);
     }
 
     /// <summary>

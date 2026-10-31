@@ -4,6 +4,7 @@ using System.IO.Compression;
 using System.Linq;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
+using SharpSevenZip;
 using Xunit;
 
 namespace MantisZip.UI.Avalonia.Tests;
@@ -253,6 +254,112 @@ public sealed class FormatDetectionContainerTests : IDisposable
     }
 
     // ──────────────────────────────────────────────
+    // issue #36 回归：真实大 PE 桩（归档起点超出 8KB 尾窗）
+    // ──────────────────────────────────────────────
+    // 旧实现只扫「头 4KB + 尾 8KB」，而真实 SFX（WinRAR / 7-Zip GUI 生成）的归档紧贴
+    // PE 镜像末尾、起点在几百 KB 处 → 探测恒为 false，用户看到「不支持的文件格式: .exe」。
+    // 下面用带合法节表的 ~128KB 桩复现：归档起点既不在头 16KB 内、也不在尾 8KB 内。
+
+    [Fact]
+    public void SfxProbe_LargePeStubWithZipPayload_DetectsPayloadBeyondTailWindow()
+    {
+        var payload = BuildZip(("big.bin", Incompressible(40_000)));
+        var path = Path.Combine(_dir, "large-zip-sfx.exe");
+        File.WriteAllBytes(path, BuildPeSfx(payload, gapBytes: 187));
+
+        var bytes = File.ReadAllBytes(path);
+        var head = ReadHead(bytes);
+
+        // 前提校验：归档起点确实在旧窗口之外（否则这条测试守不住任何东西）
+        long payloadStart = Array.IndexOf(bytes, (byte)0x50, 100_000);
+        Assert.True(payloadStart > 16 * 1024, $"payload 起点 {payloadStart} 应远离头窗");
+        Assert.True(bytes.Length - payloadStart > SfxProbe.TailWindowBytes,
+            "payload 起点应落在尾窗之外");
+
+        Assert.True(SfxProbe.TryDetectEmbeddedContainer(path, head, head.Length, out var container));
+        Assert.Equal(ContainerFormat.Zip, container);
+        Assert.True(SfxProbe.TryDetectPayload(path, out var kind));
+        Assert.Equal(SfxPayloadKind.Zip, kind);
+    }
+
+    [Fact]
+    public void SfxProbe_LargePeStubWithSevenZipPayload_DetectsSevenZip()
+    {
+        // 7z 签名 + 填充（内容无关紧要，只验证签名定位）
+        var payload = new byte[40_000];
+        new byte[] { 0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C }.CopyTo(payload, 0);
+        var path = Path.Combine(_dir, "large-7z-sfx.exe");
+        File.WriteAllBytes(path, BuildPeSfx(payload, gapBytes: 0));
+
+        Assert.True(SfxProbe.TryDetectPayload(path, out var kind));
+        Assert.Equal(SfxPayloadKind.SevenZip, kind);
+    }
+
+    [Theory]
+    [InlineData(0x00, SfxPayloadKind.Rar4)]
+    [InlineData(0x01, SfxPayloadKind.Rar5)]
+    public void SfxProbe_LargePeStubWithRarPayload_DistinguishesRarVersion(
+        byte versionByte, SfxPayloadKind expected)
+    {
+        // RAR 签名第 7 字节是版本：7z.dll 的 Rar4 / Rar 是两套格式串，传错直接 Invalid archive
+        var payload = new byte[40_000];
+        new byte[] { 0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, versionByte, 0x00 }.CopyTo(payload, 0);
+        var path = Path.Combine(_dir, $"large-rar-sfx-{versionByte}.exe");
+        File.WriteAllBytes(path, BuildPeSfx(payload, gapBytes: 0));
+
+        Assert.True(SfxProbe.TryDetectPayload(path, out var kind));
+        Assert.Equal(expected, kind);
+
+        // 容器层面统一报 Rar（RAR4 / RAR5 是同一容器格式）
+        var head = ReadHead(File.ReadAllBytes(path));
+        Assert.True(SfxProbe.TryDetectEmbeddedContainer(path, head, head.Length, out var container));
+        Assert.Equal(ContainerFormat.Rar, container);
+    }
+
+    [Fact]
+    public void SfxProbe_LargePeStubWithoutPayload_ReturnsFalse()
+    {
+        var path = Path.Combine(_dir, "large-plain.exe");
+        File.WriteAllBytes(path, BuildPeStub(128 * 1024));
+
+        Assert.False(SfxProbe.TryDetectPayload(path, out _));
+    }
+
+    [Fact]
+    public void GetEngineByExtension_LargePeSfx_RoutesToSevenZipEngine()
+    {
+        var path = Path.Combine(_dir, "large-self-extract.exe");
+        File.WriteAllBytes(path, BuildPeSfx(BuildZip(("big.bin", Incompressible(40_000))), gapBytes: 187));
+
+        var engine = ArchiveEngineFactory.GetEngineByExtension(path);
+
+        Assert.NotNull(engine);
+        Assert.Equal("SevenZipEngine", engine!.GetType().Name);
+    }
+
+    [Fact]
+    public void SevenZipExtractorFactory_ResolvesInArchiveFormatForEachSfxPayload()
+    {
+        // 显式传 InArchiveFormat 才能让 7z.dll 跳过「逐格式试探」（大桩 SFX 的失败点）
+        Assert.Equal(InArchiveFormat.Zip, HintFor(BuildSfxPayload(0x50)));
+        Assert.Equal(InArchiveFormat.SevenZip, HintFor(BuildSfxPayload(0x37)));
+        Assert.Equal(InArchiveFormat.Rar4, HintFor(BuildSfxPayload(0x52, rarVersion: 0x00)));
+        Assert.Equal(InArchiveFormat.Rar, HintFor(BuildSfxPayload(0x52, rarVersion: 0x01)));
+
+        // 普通压缩包不介入：仍交给 SharpSevenZip 自动探测
+        var plain = Path.Combine(_dir, "plain.7z");
+        File.WriteAllBytes(plain, BuildPeStub(0));
+        Assert.Null(SevenZipExtractorFactory.TryResolveFormatHint(plain));
+
+        InArchiveFormat? HintFor(byte[] content)
+        {
+            var p = Path.Combine(_dir, $"hint-{Guid.NewGuid():N}.exe");
+            File.WriteAllBytes(p, content);
+            return SevenZipExtractorFactory.TryResolveFormatHint(p);
+        }
+    }
+
+    // ──────────────────────────────────────────────
     // 单一事实源：新扩展名进 SupportedExtensions，但暂不进文件关联
     // ──────────────────────────────────────────────
 
@@ -290,7 +397,8 @@ public sealed class FormatDetectionContainerTests : IDisposable
         {
             foreach (var (name, content) in entries)
             {
-                var entry = za.CreateEntry(name, CompressionLevel.Optimal);
+                // 显式限定：文件顶部 `using SharpSevenZip;` 引入了同名的 CompressionLevel
+                var entry = za.CreateEntry(name, System.IO.Compression.CompressionLevel.Optimal);
                 using var s = entry.Open();
                 s.Write(content, 0, content.Length);
             }
@@ -322,6 +430,87 @@ public sealed class FormatDetectionContainerTests : IDisposable
     /// <summary>模拟 <c>GetEngineByMagic</c> 的读头方式（最多前 4KB）。</summary>
     private static byte[] ReadHead(byte[] content)
         => content.Length <= 4096 ? content : content[..4096];
+
+    /// <summary>
+    /// 造一个带**合法 PE 头 + 单节表**的桩，镜像末尾 = <c>0x400 + rawSize</c>
+    /// （section 的 <c>PointerToRawData</c>=0x400、<c>SizeOfRawData</c>=rawSize）。
+    /// </summary>
+    /// <remarks>
+    /// 真实 SFX 的归档就贴在镜像末尾之后，所以要覆盖「大桩」必须给出可解析的节表——
+    /// 只有 MZ 头（<see cref="BuildSfx"/>）的夹具会让 SfxProbe 退回旧的头/尾窗口，测不出回归。
+    /// </remarks>
+    private static byte[] BuildPeStub(int rawSize)
+    {
+        if (rawSize <= 0)
+            return BuildSfx(null);
+
+        var stub = new byte[0x400 + rawSize];
+        stub[0] = 0x4D; // MZ
+        stub[1] = 0x5A;
+        stub[2] = 0x90;
+        stub[3] = 0x00;
+        WriteInt32(stub, 0x3C, 0x80);        // e_lfanew → PE 头
+
+        // PE\0\0 @ 0x80
+        stub[0x80] = 0x50;
+        stub[0x81] = 0x45;
+        stub[0x82] = 0x00;
+        stub[0x83] = 0x00;
+
+        const int coff = 0x84;               // COFF 头紧随签名
+        WriteInt32(stub, coff + 2, 1);       // NumberOfSections = 1
+        WriteInt32(stub, coff + 16, 0xE0);   // SizeOfOptionalHeader
+
+        int section = coff + 20 + 0xE0;      // 节表 = COFF 头 + 可选头（0x178）
+        WriteInt32(stub, section + 16, rawSize);  // SizeOfRawData
+        WriteInt32(stub, section + 20, 0x400);    // PointerToRawData
+        return stub;
+    }
+
+    /// <summary>造「128KB 大 PE 桩 + gap 字节填充 + 载荷」的自解压文件。</summary>
+    private static byte[] BuildPeSfx(byte[] payload, int gapBytes)
+    {
+        var stub = BuildPeStub(128 * 1024);
+        var result = new byte[stub.Length + gapBytes + payload.Length];
+        Buffer.BlockCopy(stub, 0, result, 0, stub.Length);
+        Buffer.BlockCopy(payload, 0, result, stub.Length + gapBytes, payload.Length);
+        return result;
+    }
+
+    /// <summary>造「大 PE 桩 + 指定签名的 40KB 载荷」，供格式提示映射测试用。</summary>
+    private static byte[] BuildSfxPayload(byte firstByte, byte rarVersion = 0x01)
+    {
+        var payload = new byte[40_000];
+        switch (firstByte)
+        {
+            case 0x50: // PK\x03\x04
+                new byte[] { 0x50, 0x4B, 0x03, 0x04 }.CopyTo(payload, 0);
+                break;
+            case 0x37: // 7z
+                new byte[] { 0x37, 0x7A, 0xBC, 0xAF, 0x27, 0x1C }.CopyTo(payload, 0);
+                break;
+            case 0x52: // Rar!\x1A\x07 + 版本
+                new byte[] { 0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, rarVersion }.CopyTo(payload, 0);
+                break;
+        }
+        return BuildPeSfx(payload, gapBytes: 0);
+    }
+
+    /// <summary>不可压缩的载荷（全零会被 deflate 压到几十字节，就把归档起点塞进尾窗了）。</summary>
+    private static byte[] Incompressible(int size)
+    {
+        var buffer = new byte[size];
+        Random.Shared.NextBytes(buffer);
+        return buffer;
+    }
+
+    private static void WriteInt32(byte[] buffer, int offset, int value)
+    {
+        buffer[offset] = (byte)value;
+        buffer[offset + 1] = (byte)(value >> 8);
+        buffer[offset + 2] = (byte)(value >> 16);
+        buffer[offset + 3] = (byte)(value >> 24);
+    }
 
     private static byte[] Bytes(string text) => System.Text.Encoding.UTF8.GetBytes(text);
 }

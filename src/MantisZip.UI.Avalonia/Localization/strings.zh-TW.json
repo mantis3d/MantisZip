@@ -1,4 +1,4 @@
-﻿{
+{
 "Settings_Tab_Appearance_General": "外觀",
 "Settings_Tab_Appearance_Progress": "進度視窗",
 "Settings_Progress_AutoCloseDelay_Help": "僅在進度視窗未釘住（📌）且未發生錯誤時生效；0 表示完成後立即關閉。",
@@ -1257,6 +1257,7 @@
   "Picker_FileName": "檔案名",
   "Picker_FileType": "檔案類型",
   "Picker_FileTypeArchive": "壓縮檔檔案",
+  "Picker_FileTypeSfxExe": "自解壓程式 (*.exe)",
   "Picker_FileTypeAll": "所有檔案",
   "Picker_PickItemsTitle": "已選項目",
   "Picker_SelectedCount": "已選項目 ({0})",
