@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现的功能见 [docs/PROGRESS.md](PROGRESS.md)，技术架构见 [docs/ARCHITECTURE.md](ARCHITECTURE.md)，每项计划的完整设计见 `.omo/plans/`。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-29  
+**最后更新**: 2026-11-01  
 **当前版本**: 0.5.4
 
 ---
@@ -108,6 +108,7 @@
 | 文件选择器去弹窗化（内嵌控件） | [embedded-file-picker.md](.omo/plans/未开始/embedded-file-picker.md) | 🟡中 | 1-2天 | 📋 2026-10-08 立项：把文件/目录选择器内嵌进压缩/解压设置窗。三步走：先抽纯控件再分别接入；不动 `CustomFilePickerDialog` 静态入口与系统浏览豁免。**与接缝计划有交集，排在接缝之后做可省一次返工** |
 | 压缩任务队列（TeraCopy 式串行队列 + 常驻队列窗） | [compress-job-queue.md](.omo/plans/未开始/compress-job-queue.md) | 🔴高 | 46-66h | 📋 2026-10-29 立项（用户提 TeraCopy 队列思路后定五条口径：点「开始压缩」入队 / 队列窗常驻 / 跨进程并入同一队列 / 失败继续 / 单任务+整体取消）。**P0 串行队列 4-6h 是 issue #66「新建压缩包按钮永久灰」的根治路径，建议视作插队项单独取**；P1 队列窗 8-12h 可独立发版；P3 引擎后台化与「真暂停」同一前置条件，需打包评估 |
 | 编辑操作序列增强（拖拽移动 / 逐步撤销重做 / 另存为新包） | [archive-edit-operation-sequence.md](.omo/plans/未开始/archive-edit-operation-sequence.md) | 🟡中 | 8-12h | A 档「暂存区」落地后的 P2/P3：重命名/移动到… 也入队、条目拖到目录树节点即入队、队列级 undo/redo（P1 只有整队丢弃）、提交目标改成「另存为新包」而不是覆盖原包 |
+| 进度窗口「文件冲突自动处理」控件（TeraCopy 式） | [progress-window-conflict-policy.md](.omo/plans/未开始/progress-window-conflict-policy.md) | 🟡中 | 12-16h | 📋 2026-11-01 立项（用户提 TeraCopy 后定口径：运行中可切换立即生效 / 解压+压缩都要 / 保留 ConflictDialog / 实例级不回写设置）。进度窗口加「冲突时:」下拉，Core 只加一个 `ArchiveOptions.ConflictActionProvider` 动态源；顺带修复 **KI-010**（解压到此处/同名目录/智能解压三条路径恒静默覆盖） |
 
 ---
 

@@ -33,6 +33,7 @@
 | **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 交互 / 文案 | 缺决策 | 已修复（三态契约，2026-10-28） | 已修复 |
 | **KI-009** | 5 个 AppSettings 死开关（存了值、有 UI、无消费者） | 技术债 / 死代码 | 缺决策 | 决定这 5 项的去留（接线 / 删属性 / 删 UI）时；守卫豁免表已按名登记，修一个删一行 | 阻塞中 |
+| **KI-010** | 三条「原地解压」路径不读冲突设置、恒静默覆盖 | 功能一致性 | 等计划 | `progress-window-conflict-policy` 落地（Phase 3 接线并顺带修复）时 | 阻塞中 |
 
 ---
 
@@ -132,6 +133,22 @@
 - **关联**：`AGENTS.md` 规则 23「设置项」一行；`scripts\verify-repo.ps1` 的 `Test-GuardSettingsWiring`。
 
 - **状态**：阻塞中
+
+## KI-010 三条「原地解压」路径不读冲突设置、恒静默覆盖
+
+- **发现**：2026-11-01（勘察「进度窗口冲突策略控件」时全量核对解压入口）
+- **现象**：`ExtractArchiveHere`（解压到此处）、`ExtractArchiveToName`（解压到同名目录）、`SmartExtract`（智能解压）三条入口在进度窗口里跑解压时**完全不看 `AppSettings.FileConflictAction`**：即使用户在设置里选了「询问」，也是静默覆盖磁盘上的同名文件，一个弹窗都不出。
+- **证据**：
+  - `src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Extract.cs:59`（ExtractArchiveHere）、`:104`（ExtractArchiveToName）、`:325`（SmartExtract）均调用 `new ExtractService().ExtractAsync(archivePath, dest, password, progress, ct)`，**不传第 6 个参数 `options`**。
+  - `src/MantisZip.UI.Avalonia/Services/ExtractService.cs:24-25` 注释自述：「`options` … When null, existing files are silently overwritten」。
+  - 引擎侧 `src/MantisZip.Core/Utils/FileConflictHelper.cs:24,72` 对 null options 回落到 `FileConflictAction.Overwrite`。
+  - 对照组：同仓库的对话框解压（`ExtractSession` → `ExtractFlow.ExtractAsync`）与右键/拖拽选中项（`ExtractFlow.RunSelectedItemsExtractionAsync`）都正确读取了设置。
+- **为什么现在不修**：**等计划**。这三条路径的进度窗口正是「文件冲突自动处理控件」要挂的地方；控件要真生效必须把 `ArchiveOptions` 与实时策略源一起传进去，属于 [progress-window-conflict-policy.md](../.omo/plans/未开始/progress-window-conflict-policy.md) Phase 3 的接线动作，单独先改会让同一段代码挨两遍返工。
+- **复评条件**：上述计划 Phase 3 落地当天（接线的同时把本条目置为「已修复」并移入档案区）；若该计划被冻结，则需单独排一个小修（三条路径各补一次 `CreateExtractOptions` + 传 `options`，约 1h）。
+- **关联**：`AGENTS.md` 规则 21；该计划「现状核实 → 入口矩阵」表。
+
+- **状态**：阻塞中
+
 ## 档案区（已修 / 不会修）
 
 > 修掉或决定放弃的条目移到这里，**保留 commit 或理由**。不要删行 —— 下次撞到同一个栈，靠这里判断「上次怎么处理的」。

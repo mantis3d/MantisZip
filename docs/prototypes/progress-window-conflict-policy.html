@@ -1,0 +1,936 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>进度窗口「文件冲突自动处理」控件 原型（TeraCopy 式）</title>
+<style>
+/* 调色板与既有原型一致（暗色） */
+:root {
+  --bg:#1a1a2e; --section:#252540; --item:#3d3d5c; --item-hover:#454570;
+  --accent:#6bd46b; --accent2:#4ecdc4; --text:#eaeaea; --dim:#888; --dimmer:#666;
+  --fill-file:#1E3A5F; --fill-batch:#3D2A5C; --border:#4a4a6a; --border-light:#3a3a55;
+  --blue:#6c9ef8; --warn:#ffd93d; --danger:#ff6b6b;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+       padding:26px 16px 60px; display:flex; flex-direction:column; align-items:center; gap:14px; }
+h1 { font-size:19px; color:var(--accent); text-align:center; }
+.caption { max-width:760px; font-size:12px; color:var(--dim); line-height:1.85; }
+.caption b { color:var(--accent); } .caption .k { color:var(--accent2); }
+
+/* ── 原型辅助控制条 ── */
+.controls { width:820px; max-width:100%; background:var(--section); border:1px solid var(--item);
+            border-radius:8px; padding:10px 14px; font-size:12px;
+            display:flex; gap:8px; align-items:center; flex-wrap:wrap; }
+.ctl-label { color:var(--dimmer); font-size:11px; }
+.btn { padding:4px 12px; border:1px solid transparent; background:var(--item); color:var(--dim);
+       border-radius:5px; font-size:12px; cursor:pointer; transition:all .15s; }
+.btn:hover { background:var(--item-hover); color:var(--text); }
+.btn.on { background:var(--accent); color:var(--bg); font-weight:600; }
+.sep { width:1px; align-self:stretch; background:var(--border); margin:0 2px; }
+.chk { display:flex; align-items:center; gap:5px; color:var(--dim); font-size:12px; cursor:pointer; }
+.hint { color:var(--dimmer); font-size:11px; margin-left:auto; max-width:340px; line-height:1.5; text-align:right; }
+.hint.warn { color:var(--warn); }
+
+/* ── 模拟窗口（宽度可切 800 / 500，贴近真机 ProgressWindow）── */
+.window { width:var(--winW, 800px); max-width:100%; background:var(--section); border:1px solid var(--item);
+          border-radius:10px; overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,.5); transition:width .18s; }
+.titlebar { display:flex; align-items:center; gap:8px; padding:9px 14px; background:var(--item);
+            border-bottom:1px solid var(--border); font-size:13px; font-weight:600; }
+.titlebar .dot { width:10px; height:10px; border-radius:50%; background:var(--dimmer); }
+.titlebar .name { color:var(--dim); font-size:12px; font-weight:400; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.modes { margin-left:auto; display:flex; gap:2px; background:var(--bg); border-radius:5px; padding:2px; flex:none; }
+.modes span { font-size:11px; color:var(--dimmer); padding:2px 9px; border-radius:4px; }
+.modes span.on { background:var(--accent); color:var(--bg); font-weight:600; }
+
+.body { padding:10px; display:flex; flex-direction:column; gap:8px; }
+
+/* 批处理区 */
+.batch-card { background:var(--section); border:1px solid var(--border-light); border-radius:6px; padding:6px 8px 8px; }
+.batch-head { display:flex; justify-content:space-between; font-size:11px; color:var(--dim); margin-bottom:5px; }
+.batch-list { background:var(--bg); border:1px solid var(--border); border-radius:5px; overflow:hidden; }
+.batch-item { display:grid; grid-template-columns:18px 1fr auto 44px; gap:6px; align-items:center;
+              padding:2px 8px; min-height:24px; font-size:12px; }
+.batch-item .st { font-size:11px; text-align:center; }
+.batch-item .nm { white-space:nowrap; overflow:hidden; text-overflow:ellipsis; position:relative; }
+.batch-item .nm .fill { position:absolute; inset:0 auto 0 0; width:100%; background:var(--fill-file); border-radius:2px; opacity:.55; }
+.batch-item .nm span { position:relative; }
+.batch-item .meta { font-size:11px; color:var(--dim); white-space:nowrap; }
+.batch-item .pct { font-size:11px; color:var(--dim); text-align:right; font-variant-numeric:tabular-nums; }
+
+/* 内容模式切换 */
+.mode-row { display:flex; gap:10px; justify-content:center; align-items:center; font-size:11px; color:var(--dim); }
+.mode-row .lab { color:var(--dimmer); }
+.mode-row .radio { display:flex; align-items:center; gap:3px; }
+.mode-row .radio::before { content:""; width:10px; height:10px; border-radius:50%; border:1px solid var(--border); display:inline-block; }
+.mode-row .radio.on::before { background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 2px var(--section); }
+
+/* 简约内容面板 */
+.content { display:flex; flex-direction:column; gap:3px; }
+.content .path { font-size:12px; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.content .fname { font-size:14px; font-weight:600; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.row-between { display:flex; justify-content:space-between; align-items:center; font-size:11px; color:var(--dim); }
+.row-between .v { font-variant-numeric:tabular-nums; }
+.bar { height:7px; background:#1c1c30; border-radius:4px; overflow:hidden; }
+.bar > div { height:100%; width:0; background:var(--accent); transition:width .12s linear; }
+.bar.total { height:9px; }
+
+/* 信息区（密度 + 统计卡 + 总进度 + 时间） */
+.info { background:var(--border); border:1px solid var(--border-light); border-radius:6px; padding:8px; display:flex; flex-direction:column; gap:7px; }
+.density { display:flex; gap:12px; justify-content:center; font-size:11px; color:var(--dim); }
+.density .d { display:flex; align-items:center; gap:3px; }
+.density .d::before { content:""; width:10px; height:10px; border-radius:50%; border:1px solid var(--border); display:inline-block; }
+.density .d.on::before { background:var(--accent); border-color:var(--accent); box-shadow:inset 0 0 0 2px var(--border); }
+.stats { display:flex; gap:18px; justify-content:center; flex-wrap:wrap; background:var(--section); border-radius:5px; padding:6px 8px; }
+.stat { min-width:64px; display:flex; flex-direction:column; align-items:center; gap:1px; }
+.stat .h { font-size:11px; color:var(--dim); }
+.stat .n { font-size:14px; font-weight:600; font-variant-numeric:tabular-nums; }
+.stat .s { font-size:11px; color:var(--dim); font-variant-numeric:tabular-nums; }
+.stat.ok .n, .stat.ok .s { color:var(--accent); }
+.stat.warn .n { color:var(--warn); }
+.stat.err .n { color:var(--danger); }
+.stat.acc .n { color:var(--accent2); }
+
+/* 状态行 */
+.status-row { display:grid; grid-template-columns:20px 1fr auto; gap:8px; align-items:center; }
+.status-icon { font-size:14px; text-align:center; color:var(--dim); }
+.status-icon.running { color:var(--accent2); }
+.status-icon.paused { color:var(--warn); }
+.status-icon.done { color:var(--accent); }
+.status-text { font-size:17px; font-weight:600; color:var(--dim); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.icon-btn { width:26px; height:22px; border:1px solid var(--border); background:var(--item); border-radius:4px;
+            color:var(--dim); font-size:11px; cursor:pointer; }
+.icon-btn:hover { background:var(--item-hover); color:var(--text); }
+
+/* ══════ 本次新增：冲突策略行 ══════ */
+.conflict-row { display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+                border-top:1px dashed var(--border-light); padding-top:7px; }
+.conflict-label { font-size:12px; color:var(--dim); white-space:nowrap; }
+.conflict-select { background:var(--bg); color:var(--text); border:1px solid var(--border);
+                   border-radius:5px; font-size:12px; padding:4px 8px; min-width:150px; cursor:pointer;
+                   font-family:inherit; }
+.conflict-select:hover { border-color:var(--item-hover); }
+.conflict-select:focus { outline:none; border-color:var(--accent2); }
+.conflict-select.changed { border-color:var(--accent2); box-shadow:0 0 0 2px rgba(78,205,196,.18); }
+.conflict-auto { font-size:11px; color:var(--dim); font-variant-numeric:tabular-nums; }
+.conflict-auto b { color:var(--accent2); font-weight:600; }
+.conflict-note { font-size:10px; color:var(--dimmer); }
+/* 底部按钮行形态：更紧凑 */
+.conflict-row.in-bottom { border-top:none; padding-top:0; gap:6px; }
+.conflict-row.in-bottom .conflict-label { font-size:11px; }
+.conflict-row.in-bottom .conflict-select { min-width:120px; font-size:11px; padding:3px 6px; }
+.conflict-row.in-bottom .conflict-note { display:none; }
+/* 信息区首行：左「少/中/完整」，右「冲突时: 下拉」 */
+.info-top { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
+.conflict-row.in-inforow { border-top:none; padding-top:0; gap:6px; margin-left:auto; }
+.conflict-row.in-inforow .conflict-select { min-width:132px; }
+/* 信息区顶部形态 */
+.conflict-row.in-info { border-top:none; padding-top:0; justify-content:center; }
+
+/* 错误摘要 */
+.errors { font-size:12px; color:var(--danger); border-top:1px solid var(--border-light); padding-top:6px; }
+
+/* 底部按钮行 */
+.btn-row { display:flex; align-items:center; gap:6px; border-top:1px solid var(--border); padding-top:8px; }
+.toggles { display:flex; gap:6px; }
+.tg { width:32px; height:26px; border:1px solid var(--border); border-radius:5px; background:var(--item);
+      color:var(--dim); font-size:12px; cursor:pointer; }
+.tg.on { background:var(--accent); color:var(--bg); border-color:var(--accent); }
+.spacer { flex:1; }
+.countdown { font-size:12px; color:var(--dim); margin-right:4px; }
+.big-btn { min-width:74px; height:28px; border:1px solid var(--border); border-radius:5px;
+           background:var(--item); color:var(--text); font-size:12px; cursor:pointer; font-family:inherit; }
+.big-btn:hover { background:var(--item-hover); }
+.big-btn.primary { background:var(--accent); color:var(--bg); border-color:var(--accent); font-weight:600; }
+.big-btn:disabled { opacity:.45; cursor:default; }
+
+/* ── 冲突弹窗（模拟真实 ConflictDialog，居中覆盖）── */
+.overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); display:flex; align-items:center;
+           justify-content:center; z-index:50; }
+.overlay[hidden] { display:none; }
+.dialog { width:560px; max-width:calc(100vw - 32px); background:var(--section); border:1px solid var(--item);
+          border-radius:10px; box-shadow:0 12px 60px rgba(0,0,0,.7); padding:14px; display:flex; flex-direction:column; gap:9px; }
+.dialog-title { font-size:13px; font-weight:600; }
+.compare { display:grid; grid-template-columns:1fr auto 1fr; gap:8px; background:var(--bg); border:1px solid var(--border);
+           border-radius:6px; padding:9px; }
+.compare .side { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.compare .side-title { font-size:11px; font-weight:600; color:var(--dim); }
+.compare .f { font-size:11px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.compare .meta { font-size:10px; color:var(--dim); }
+.compare .meta.hl { color:var(--accent2); }
+.compare .vs { align-self:center; background:var(--accent); color:var(--bg); font-size:10px; font-weight:700;
+               border-radius:9px; padding:3px 6px; }
+.dialog-buttons { display:flex; gap:5px; justify-content:center; flex-wrap:wrap; }
+.dlg-btn { min-width:72px; padding:5px 8px; border:1px solid var(--border); border-radius:5px;
+           background:var(--item); color:var(--text); font-size:12px; cursor:pointer; font-family:inherit;
+           display:flex; flex-direction:column; align-items:center; gap:2px; }
+.dlg-btn:hover { background:var(--item-hover); }
+.dlg-btn .ico { font-size:15px; }
+.dlg-btn .lb { font-size:10px; color:var(--dim); }
+.dlg-btn.on { border-color:var(--accent2); box-shadow:0 0 0 1px var(--accent2); }
+.dialog-rename { display:flex; gap:8px; align-items:center; font-size:12px; color:var(--dim); }
+.dialog-rename input { flex:1; background:var(--bg); border:1px solid var(--border); border-radius:4px;
+                       color:var(--text); font-size:12px; padding:4px 6px; font-family:inherit; }
+.check { display:flex; gap:6px; align-items:center; font-size:12px; color:var(--dim); cursor:pointer; }
+.dialog-footer { display:flex; gap:8px; justify-content:center; border-top:1px solid var(--border); padding-top:8px; }
+
+/* Toast */
+.toast { position:fixed; left:50%; bottom:26px; transform:translateX(-50%) translateY(14px);
+         background:var(--section); border:1px solid var(--accent); color:var(--accent);
+         padding:8px 16px; border-radius:8px; font-size:12px; opacity:0; pointer-events:none;
+         transition:all .2s; z-index:60; box-shadow:0 4px 20px rgba(0,0,0,.5); }
+.toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.toast.info { border-color:var(--accent2); color:var(--accent2); }
+
+/* 看点说明 */
+.legend { width:820px; max-width:100%; font-size:11px; color:var(--dim); line-height:1.95; }
+.legend b { color:var(--accent2); }
+.legend code { background:var(--item); padding:1px 5px; border-radius:3px; color:var(--text); font-size:10px; }
+.legend ol { padding-left:20px; display:flex; flex-direction:column; gap:4px; }
+.legend .warn { color:var(--warn); }
+</style>
+</head>
+<body>
+
+<h1>进度窗口「文件冲突自动处理」控件 — 原型</h1>
+<p class="caption">
+  TeraCopy 式交互：冲突策略常驻进度窗口、运行中可改、改完立即生效。<br>
+  <b>三次点击就能看完核心</b>：① 点「▶ 播放演示」，用默认「每次询问」跑一遍——遇到冲突会弹窗，勾「应用到全部」后<b>下拉同步变成该动作</b>；
+  ② 把下拉改成「跳过 / 覆盖 / 仅覆盖较旧」，后续冲突<b>不再弹窗</b>；③ 切换上方「布局」看三种位置的取舍。
+</p>
+
+<div class="controls">
+  <span class="ctl-label">布局</span>
+  <button class="btn" data-layout="row">独立行（推荐）</button>
+  <button class="btn" data-layout="bottom">底部按钮行</button>
+  <button class="btn on" data-layout="info">信息区同行（新）</button>
+  <div class="sep"></div>
+  <span class="ctl-label">流程</span>
+  <button class="btn on" data-flow="extract">解压（6 档）</button>
+  <button class="btn" data-flow="compress">压缩（5 档）</button>
+  <div class="sep"></div>
+  <label class="chk"><input type="checkbox" id="chkAutoCount" checked> 显示「已自动处理 N 个」</label>
+  <div class="sep"></div>
+  <button class="btn" id="btnWidth">窗口宽度：800（默认）</button>
+  <button class="btn on" id="btnPlay">▶ 播放演示</button>
+  <span class="hint" id="layoutHint"></span>
+</div>
+
+<div class="window" id="win">
+  <div class="titlebar">
+    <span class="dot"></span>
+    <span id="tbTitle">正在解压 36 个文件</span>
+    <span class="name" id="tbName">→ photos/2024-05</span>
+    <div class="modes">
+      <span class="on">简约</span><span>详细</span><span>列表</span>
+    </div>
+  </div>
+
+  <div class="body">
+    <!-- 批处理区 -->
+    <div class="batch-card">
+      <div class="batch-head"><span>压缩包列表</span><span id="batchCount">1 个文件</span></div>
+      <div class="batch-list" id="batchList"></div>
+    </div>
+
+    <!-- 内容模式切换 -->
+    <div class="mode-row">
+      <span class="lab">显示:</span>
+      <span class="radio on">简约</span><span class="radio">详细</span><span class="radio">列表</span>
+    </div>
+
+    <!-- 内容区（简约） -->
+    <div class="content">
+      <div class="path" id="curPath">C:\Users\render\Pictures\photos\2024-05</div>
+      <div class="fname" id="curFile">—</div>
+      <div class="row-between"><span>当前文件</span><span class="v" id="curPct">0%</span></div>
+      <div class="bar"><div id="fileFill"></div></div>
+    </div>
+
+    <!-- 下方信息区 -->
+    <div class="info">
+      <!-- 信息区首行：左「信息量分级」+ 右「冲突策略」（仅 info-row 布局时把冲突控件挂进这里） -->
+      <div class="info-top" id="infoTop">
+        <div class="density" id="densityRow">
+          <span class="d">少</span><span class="d on">中</span><span class="d">完整</span>
+        </div>
+      </div>
+      <div class="stats" id="stats"></div>
+      <div class="row-between">
+        <span id="fileCount">压缩包 1/1</span>
+        <span class="v" id="totalPct">0%</span>
+      </div>
+      <div class="bar total"><div id="totalFill"></div></div>
+      <div class="row-between"><span id="elapsed">已用 00:00</span><span id="eta">剩余 --:--</span></div>
+    </div>
+
+    <!-- 状态行 -->
+    <div class="status-row">
+      <span class="status-icon running" id="statusIcon">⟳</span>
+      <div class="status-text" id="statusText">正在解压…</div>
+      <button class="icon-btn" title="复制状态文本">⧉</button>
+    </div>
+
+    <!-- ═══ 本次新增的冲突策略行（JS 会在三种槽位间移动它）═══ -->
+    <div class="conflict-row" id="conflictRow">
+      <span class="conflict-label" id="conflictLabel">冲突时:</span>
+      <select class="conflict-select" id="policySelect"></select>
+      <span class="conflict-auto" id="autoCount">已自动处理 <b>0</b> 个</span>
+      <span class="conflict-note">运行中切换立即生效</span>
+    </div>
+
+    <!-- 错误摘要（默认隐藏） -->
+    <div class="errors" id="errors" style="display:none"></div>
+
+    <!-- 底部按钮行 -->
+    <div class="btn-row" id="btnRow">
+      <div class="toggles">
+        <button class="tg on" title="完成后保持打开">📌</button>
+        <button class="tg on" title="完成后打开目录">📁</button>
+        <button class="tg" title="完成后删除原包">🗑</button>
+      </div>
+      <div class="spacer"></div>
+      <span class="countdown" id="countdown"></span>
+      <button class="big-btn" id="pauseBtn">暂停</button>
+      <button class="big-btn">取消</button>
+    </div>
+  </div>
+</div>
+
+<!-- 冲突弹窗 -->
+<div class="overlay" id="overlay" hidden>
+  <div class="dialog">
+    <div class="dialog-title" id="dlgTitle">目标位置已存在同名文件，要如何处理？</div>
+    <div class="compare">
+      <div class="side">
+        <div class="side-title">磁盘上</div>
+        <div class="f" id="dlgDiskName">IMG_0004.png</div>
+        <div class="meta" id="dlgDiskMeta">大小 3.2 MB · 2026-05-01 10:24</div>
+      </div>
+      <div class="vs">VS</div>
+      <div class="side">
+        <div class="side-title" id="dlgRightTitle">压缩包内</div>
+        <div class="f" id="dlgEntryName">IMG_0004.png</div>
+        <div class="meta hl" id="dlgEntryMeta">大小 4.1 MB · 2026-06-11 08:03</div>
+      </div>
+    </div>
+    <div class="dialog-buttons" id="dlgButtons"></div>
+    <div class="dialog-rename" id="dlgRenameWrap" hidden>
+      <label>新名称</label>
+      <input id="dlgRename" value="">
+    </div>
+    <label class="check"><input type="checkbox" id="dlgApplyAll"> 应用到全部（后续同类冲突不再询问）</label>
+    <div class="dialog-footer">
+      <button class="big-btn" id="dlgPause">暂停</button>
+      <button class="big-btn" id="dlgCancel">取消整个操作</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<div class="legend">
+  <b>看点</b>
+  <ol>
+    <li><b>下拉是唯一事实源</b>：勾「应用到全部」不是写进看不见的记忆，而是把下拉同步成刚选的动作 —— 用户看得见、也能改回「每次询问」。</li>
+    <li><b>运行中切换立即生效</b>：演示跑到一半直接改下拉，之后遇到的冲突立刻按新策略自动处理，已处理的条目不受影响（对应设计文档 §3.5 不变量）。</li>
+    <li><b>暂停 → 改策略 → 继续</b>：在弹窗里点「暂停」，此时下拉可改；点「继续」后若下拉已是自动策略，<span class="warn">不会再重弹同一个冲突</span>（设计文档 §3.6）。</li>
+    <li><b>「每次询问」行为不变</b>：默认档仍然弹现有 ConflictDialog（覆盖 / 覆盖较旧 / 覆盖较小 / 重命名 / 跳过 + 应用到全部 + 暂停 / 取消）。</li>
+    <li><b>两套档位</b>：解压 6 档含「仅覆盖较旧 / 较小」；压缩 5 档含「追加到已有包」（不支持追加的格式会回退弹窗）。</li>
+    <li><b>布局取舍</b>：独立行不挤按钮行；<b>「信息区同行」— 密度靠左、冲突控件靠右，省一行高度、视觉最整合</b>（代价是「视图密度」与「运行行为」混一行，500px 会折行）；底部行最像 TeraCopy 但在 500px 最小宽度下会挤。</li>
+    <li>视觉按真机语义走：主题画刷（<code>ThemeSurfaceBgBrush</code> / <code>ThemeTextSecondaryBrush</code>）与紧凑度资源键（<code>ControlHeightLg</code> / <code>SpacingSm</code>），不是写死像素。</li>
+  </ol>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════
+//  数据与状态
+// ══════════════════════════════════════════════════════════
+
+// 策略档位（与 AppSettings.FileConflictAction 同一套字符串码）
+const POLICIES = {
+  extract: [
+    { code:'ask',                label:'每次询问' },
+    { code:'overwrite',          label:'覆盖' },
+    { code:'overwrite-if-older', label:'仅覆盖较旧' },
+    { code:'overwrite-if-smaller', label:'仅覆盖较小' },
+    { code:'rename',             label:'自动重命名' },
+    { code:'skip',               label:'跳过' }
+  ],
+  compress: [
+    { code:'ask',       label:'每次询问' },
+    { code:'overwrite', label:'覆盖' },
+    { code:'add',       label:'追加到已有包' },
+    { code:'rename',    label:'自动重命名' },
+    { code:'skip',      label:'跳过' }
+  ]
+};
+
+const DIALOG_BUTTONS = {
+  extract: [
+    { code:'overwrite',          icon:'🔄', label:'覆盖' },
+    { code:'overwrite-if-older', icon:'⏱', label:'覆盖较旧' },
+    { code:'overwrite-if-smaller', icon:'⬇', label:'覆盖较小' },
+    { code:'rename',             icon:'✎',  label:'重命名' },
+    { code:'skip',               icon:'→',  label:'跳过' }
+  ],
+  compress: [
+    { code:'overwrite', icon:'🔄', label:'覆盖' },
+    { code:'add',       icon:'➕', label:'追加' },
+    { code:'rename',    icon:'✎',  label:'重命名' },
+    { code:'skip',      icon:'→',  label:'跳过' }
+  ]
+};
+
+const state = {
+  flow:'extract',
+  layout:'row',
+  width:800,
+  policy:'ask',
+  running:false,
+  paused:false,
+  dialogEvent:null,      // 当前弹窗对应的冲突事件
+  pendingEvent:null,     // 暂停时挂起的冲突事件
+  lastEvent:null,
+  idx:0,
+  events:[],
+  stats:{ processed:0, overwritten:0, skipped:0, added:0, renamed:0 },
+  autoHandled:0,
+  elapsed:0,
+  timer:null,
+  renameArmed:false
+};
+
+// ── 模拟事件 ──────────────────────────────────────────────
+function buildExtractEvents() {
+  const out = [];
+  const exts = ['png','jpg','raw','mp4','mov'];
+  for (let i = 1; i <= 36; i++) {
+    const ext = exts[i % exts.length];
+    const name = `IMG_${String(i).padStart(4,'0')}.${ext}`;
+    // 每 4 个里 1 个冲突（模拟目标目录里已有同名文件）
+    const conflict = (i % 4 === 0);
+    out.push({
+      kind:'file',
+      name,
+      dir: i % 2 ? 'photos/2024-05/' : 'photos/2024-06/',
+      size: (1.2 + (i % 7) * 0.6).toFixed(1) + ' MB',
+      conflict,
+      // 冲突侧对比数据：压缩包内文件是否更新 / 更大
+      entryNewer: (i % 8 === 0),
+      entryBigger: (i % 3 === 0),
+      diskSize: (1.0 + (i % 5) * 0.4).toFixed(1) + ' MB',
+      entrySize: (1.2 + (i % 7) * 0.6).toFixed(1) + ' MB',
+      diskTime: '2026-05-01 10:24',
+      entryTime: (i % 8 === 0) ? '2026-06-11 08:03' : '2026-03-02 17:41'
+    });
+  }
+  return out;
+}
+
+function buildCompressEvents() {
+  const names = ['photos.zip','photos-2024.zip','archive-backup.zip','misc.zip'];
+  return names.map((name, i) => ({
+    kind:'package',
+    name,
+    dir: '输出目录',
+    size: (120 + i * 40) + ' MB',
+    conflict: true,                       // 目标包都存在（演示用）
+    diskSize: (110 + i * 35) + ' MB',
+    entrySize: (120 + i * 40) + ' MB',
+    diskTime: '2026-04-21 09:12',
+    entryTime: '2026-11-01 22:10',
+    entryNewer: true,
+    entryBigger: true
+  }));
+}
+
+// ══════════════════════════════════════════════════════════
+//  DOM 引用
+// ══════════════════════════════════════════════════════════
+const $ = id => document.getElementById(id);
+const win = $('win');
+const conflictRow = $('conflictRow');
+const policySelect = $('policySelect');
+const autoCount = $('autoCount');
+const layoutHint = $('layoutHint');
+const overlay = $('overlay');
+
+// ══════════════════════════════════════════════════════════
+//  布局 / 流程切换
+// ══════════════════════════════════════════════════════════
+function setLayout(layout) {
+  state.layout = layout;
+  conflictRow.classList.remove('in-bottom', 'in-info', 'in-inforow');
+  if (layout === 'row') {
+    $('errors').before(conflictRow);
+    layoutHint.textContent = '推荐：独立一行，不挤底部按钮行，也不打散信息区';
+    layoutHint.className = 'hint';
+  } else if (layout === 'bottom') {
+    conflictRow.classList.add('in-bottom');
+    $('btnRow').querySelector('.spacer').after(conflictRow);
+    layoutHint.textContent = '最像 TeraCopy，但 800px 时已偏挤，最小宽度 500px 会挤压按钮';
+    layoutHint.className = 'hint warn';
+  } else {
+    // 与「少/中/完整」同一行：密度靠左，冲突控件靠右，省一行高度
+    conflictRow.classList.add('in-inforow');
+    $('infoTop').appendChild(conflictRow);
+    layoutHint.textContent = '与「少 / 中 / 完整」同行：省一行高度、视觉最整合；代价是「视图密度」与「运行行为」混在一行，500px 会换行';
+    layoutHint.className = 'hint';
+  }
+  updateNarrow();
+}
+
+function setFlow(flow) {
+  state.flow = flow;
+  $('tbTitle').textContent = flow === 'extract' ? '正在解压 36 个文件' : '正在压缩 4 个包';
+  $('tbName').textContent  = flow === 'extract' ? '→ photos/2024-05' : '→ 输出目录';
+  $('batchCount').textContent = flow === 'extract' ? '1 个文件' : '4 个文件';
+  $('fileCount').textContent = flow === 'extract' ? '压缩包 1/1' : '压缩包 1/4';
+  $('dlgTitle').textContent = flow === 'extract'
+    ? '目标位置已存在同名文件，要如何处理？'
+    : '目标压缩包已存在，要如何处理？';
+  $('dlgRightTitle').textContent = flow === 'extract' ? '压缩包内' : '本次新生成';
+  renderOptions();
+  renderStats();
+  resetDemo();
+}
+
+function renderOptions() {
+  policySelect.innerHTML = '';
+  POLICIES[state.flow].forEach(p => {
+    const o = document.createElement('option');
+    o.value = p.code; o.textContent = p.label;
+    policySelect.appendChild(o);
+  });
+  policySelect.value = state.policy;
+  if (!POLICIES[state.flow].some(p => p.code === state.policy)) {
+    state.policy = 'ask';
+    policySelect.value = 'ask';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  渲染
+// ══════════════════════════════════════════════════════════
+function renderStats() {
+  const s = state.stats;
+  const cards = [];
+  cards.push(`<div class="stat ok"><div class="h">✅ 已处理</div><div class="n">${s.processed}</div><div class="s">—</div></div>`);
+  cards.push(`<div class="stat acc"><div class="h">🔄 已覆盖</div><div class="n">${s.overwritten}</div><div class="s">—</div></div>`);
+  if (state.flow === 'compress')
+    cards.push(`<div class="stat acc"><div class="h">➕ 已追加</div><div class="n">${s.added}</div><div class="s">—</div></div>`);
+  cards.push(`<div class="stat warn"><div class="h">⏭ 跳过</div><div class="n">${s.skipped}</div><div class="s">—</div></div>`);
+  cards.push(`<div class="stat"><div class="h">📏 总大小</div><div class="n">${state.events.length || 36}</div><div class="s">${state.flow === 'extract' ? '3.7 GB' : '640 MB'}</div></div>`);
+  $('stats').innerHTML = cards.join('');
+
+  autoCount.innerHTML = `已自动处理 <b>${state.autoHandled}</b> 个`;
+  autoCount.style.display = $('chkAutoCount').checked ? '' : 'none';
+}
+
+function renderProgress() {
+  const total = state.events.length || 1;
+  const pct = Math.min(100, state.idx / total * 100);
+  $('totalFill').style.width = pct + '%';
+  $('totalPct').textContent = Math.round(pct) + '%';
+  const bf = $('batchFill');
+  if (bf) bf.style.width = pct + '%';
+  const bp = $('batchPct');
+  if (bp) bp.textContent = Math.round(pct) + '%';
+  const mm = String(Math.floor(state.elapsed / 60)).padStart(2,'0');
+  const ss = String(state.elapsed % 60).padStart(2,'0');
+  $('elapsed').textContent = `已用 00:${mm}:${ss}`;
+}
+
+// 批处理列表：解压 = 单个压缩包一行（真实语义：行是「包」不是「文件」）；
+// 压缩 = 每个输出包一行，冲突解决后能看到每行的结局（覆盖 / 追加 / 跳过 / 重命名）。
+function renderBatch() {
+  const list = $('batchList');
+  if (!list) return;
+
+  if (state.flow === 'extract') {
+    list.innerHTML = `<div class="batch-item">
+      <span class="st" id="batchSt">${state.running ? '⟳' : '⏳'}</span>
+      <span class="nm"><span class="fill" id="batchFill"></span><span>photos-backup.zip</span></span>
+      <span class="meta" id="batchMeta">${state.idx > 0 ? '正在处理…' : '等待'}</span>
+      <span class="pct" id="batchPct">0%</span>
+    </div>`;
+    return;
+  }
+
+  list.innerHTML = state.events.map((ev, i) => {
+    const done = i < state.idx;
+    const cur = i === state.idx && state.running;
+    const st = done ? '✅' : cur ? '⟳' : '⏳';
+    const pct = done ? '100%' : cur ? '处理中' : '0%';
+    const meta = done ? (ev._result || '完成') : cur ? '…' : '等待';
+    return `<div class="batch-item"><span class="st">${st}</span><span class="nm"><span>${ev.name}</span></span><span class="meta">${meta}</span><span class="pct">${pct}</span></div>`;
+  }).join('');
+}
+
+function setStatus(text, kind) {
+  $('statusText').textContent = text;
+  const icon = $('statusIcon');
+  icon.className = 'status-icon ' + (kind || 'running');
+  icon.textContent = kind === 'paused' ? '⏸' : kind === 'done' ? '✓' : '⟳';
+}
+
+function setCurrent(ev, pct) {
+  if (!ev) { $('curFile').textContent = '—'; $('curPct').textContent = '0%'; $('fileFill').style.width = '0%'; return; }
+  $('curPath').textContent = state.flow === 'extract'
+    ? 'C:\\Users\\render\\Pictures\\' + ev.dir.replace(/\//g, '\\')
+    : 'C:\\Users\\render\\Documents\\' + ev.dir;
+  $('curFile').textContent = ev.name;
+  $('curPct').textContent = Math.round(pct) + '%';
+  $('fileFill').style.width = pct + '%';
+}
+
+function toast(text, info) {
+  const t = $('toast');
+  t.textContent = text;
+  t.className = 'toast show' + (info ? ' info' : '');
+  clearTimeout(toast._h);
+  toast._h = setTimeout(() => { t.className = 'toast'; }, 2200);
+}
+
+function flashSelect() {
+  policySelect.classList.add('changed');
+  setTimeout(() => policySelect.classList.remove('changed'), 900);
+}
+
+// ══════════════════════════════════════════════════════════
+//  演示主循环
+// ══════════════════════════════════════════════════════════
+function resetDemo() {
+  stopTimer();
+  state.running = false;
+  $('btnPlay').classList.remove('on');
+  state.paused = false;
+  state.dialogEvent = null;
+  state.pendingEvent = null;
+  state.renameArmed = false;
+  state.idx = 0;
+  state.elapsed = 0;
+  state.autoHandled = 0;
+  state.stats = { processed:0, overwritten:0, skipped:0, added:0, renamed:0 };
+  state.events = state.flow === 'extract' ? buildExtractEvents() : buildCompressEvents();
+  $('pauseBtn').textContent = '暂停';
+  setStatus(state.flow === 'extract' ? '正在解压…' : '正在压缩…', 'running');
+  setCurrent(null, 0);
+  overlay.hidden = true;
+  renderStats();
+  renderProgress();
+  renderBatch();
+}
+
+function startDemo() {
+  resetDemo();
+  state.running = true;
+  $('btnPlay').classList.add('on');
+  renderBatch();
+  state.timer = setInterval(tick, 120);
+}
+
+function stopTimer() { if (state.timer) { clearInterval(state.timer); state.timer = null; } }
+
+function tick() {
+  if (!state.running || state.paused || state.dialogEvent) return;
+  state.elapsed++;
+
+  if (state.idx >= state.events.length) {
+    finishDemo();
+    return;
+  }
+
+  const ev = state.events[state.idx];
+  state.lastEvent = ev;
+
+  // 非冲突条目：直接完成
+  if (!ev.conflict) {
+    state.stats.processed++;
+    state.idx++;
+    setCurrent(ev, 100);
+    renderStats(); renderProgress();
+    if (state.flow === 'compress') renderBatch();
+    return;
+  }
+
+  // 冲突条目
+  setCurrent(ev, 60);
+  if (state.policy === 'ask') {
+    openDialog(ev);
+  } else {
+    autoResolve(ev, state.policy, '自动');
+    state.idx++;
+    state.stats.processed++;
+    renderStats(); renderProgress();
+    if (state.flow === 'compress') renderBatch();
+  }
+}
+
+function finishDemo() {
+  stopTimer();
+  state.running = false;
+  $('btnPlay').classList.remove('on');
+  renderBatch();
+  const st = $('batchSt'); if (st) st.textContent = '✅';
+  const meta = $('batchMeta'); if (meta) meta.textContent = `已处理 ${state.stats.processed} · 覆盖 ${state.stats.overwritten} · 跳过 ${state.stats.skipped}`;
+  setStatus(state.flow === 'extract' ? '解压完成' : '压缩完成', 'done');
+  setCurrent(null, 100);
+  $('fileFill').style.width = '100%';
+  $('countdown').textContent = '3 秒后自动关闭';
+  toast('演示结束：统计卡里的「已覆盖 / 跳过」就是自动处理的结果', true);
+}
+
+// ══════════════════════════════════════════════════════════
+//  冲突处理
+// ══════════════════════════════════════════════════════════
+
+// 按策略计算「这个冲突怎么落地」，并累加统计。
+// countAuto = false 表示这是弹窗里的单次选择（不算「自动处理」），只有真正免弹窗的才计数。
+function autoResolve(ev, code, sourceTag, countAuto = true) {
+  let outcome = 'overwrite';
+  if (code === 'skip') {
+    outcome = 'skip';
+  } else if (code === 'rename') {
+    outcome = 'rename';
+  } else if (code === 'overwrite-if-older') {
+    outcome = ev.entryNewer ? 'overwrite' : 'skip';
+  } else if (code === 'overwrite-if-smaller') {
+    outcome = ev.entryBigger ? 'overwrite' : 'skip';
+  } else if (code === 'add') {
+    outcome = 'add';
+  }
+
+  if (outcome === 'overwrite') state.stats.overwritten++;
+  else if (outcome === 'skip') state.stats.skipped++;
+  else if (outcome === 'add') state.stats.added++;
+  else if (outcome === 'rename') state.stats.renamed++;
+
+  // 压缩流：把结局写进批处理行（覆盖 / 追加 / 跳过 / 重命名）
+  ev._result = outcome === 'skip' ? '跳过' : outcome === 'add' ? '追加' : outcome === 'rename' ? '重命名' : '覆盖';
+
+  if (countAuto) state.autoHandled++;
+  const label = (POLICIES[state.flow].find(p => p.code === code) || {}).label || code;
+  const verb = outcome === 'skip' ? '自动跳过' : outcome === 'rename' ? '自动重命名' : outcome === 'add' ? '自动追加' : '自动覆盖';
+  toast(`${sourceTag}：${verb} ${ev.name}（策略：${label}）`, true);
+}
+
+// 打开冲突弹窗（默认「每次询问」路径）
+function openDialog(ev) {
+  state.dialogEvent = ev;
+  state.renameArmed = false;
+  overlay.hidden = false;
+  $('dlgRenameWrap').hidden = true;
+  $('dlgApplyAll').checked = false;
+  $('dlgRename').value = suggestName(ev.name);
+  $('dlgDiskName').textContent = ev.name;
+  $('dlgEntryName').textContent = ev.name;
+  $('dlgDiskMeta').textContent = `大小 ${ev.diskSize || ev.size} · ${ev.diskTime || ''}`;
+  $('dlgEntryMeta').textContent = `大小 ${ev.entrySize || ev.size} · ${ev.entryTime || ''}`;
+
+  const box = $('dlgButtons');
+  box.innerHTML = '';
+  DIALOG_BUTTONS[state.flow].forEach(b => {
+    const el = document.createElement('button');
+    el.className = 'dlg-btn';
+    el.innerHTML = `<span class="ico">${b.icon}</span><span class="lb">${b.label}</span>`;
+    el.onclick = () => chooseDialog(b.code);
+    box.appendChild(el);
+  });
+  setStatus('等待冲突处理…', 'paused');
+}
+
+function suggestName(name) {
+  const dot = name.lastIndexOf('.');
+  if (dot < 0) return name + ' (1)';
+  return name.slice(0, dot) + ' (1)' + name.slice(dot);
+}
+
+function closeDialog() {
+  overlay.hidden = true;
+  state.dialogEvent = null;
+  state.renameArmed = false;
+  if (state.running && !state.paused) setStatus(state.flow === 'extract' ? '正在解压…' : '正在压缩…', 'running');
+}
+
+function chooseDialog(code) {
+  const ev = state.dialogEvent;
+  if (!ev) return;
+
+  // 重命名：第一次点展开输入框，第二次点确认
+  if (code === 'rename' && !state.renameArmed) {
+    state.renameArmed = true;
+    $('dlgRenameWrap').hidden = false;
+    $('dlgRename').focus();
+    $('dlgRename').select();
+    return;
+  }
+
+  // 应用到全部：把下拉同步成该动作（这就是设计里的「单一事实源」）
+  if ($('dlgApplyAll').checked) {
+    state.policy = code;
+    policySelect.value = code;
+    flashSelect();
+    const label = (POLICIES[state.flow].find(p => p.code === code) || {}).label || code;
+    toast(`已应用到全部：下拉已同步为「${label}」，后续冲突不再弹窗`);
+  }
+
+  autoResolve(ev, code, '本次', false);
+  closeDialog();
+  state.idx++;
+  state.stats.processed++;
+  renderStats(); renderProgress();
+  if (state.flow === 'compress') renderBatch();
+}
+
+// 弹窗里的「暂停」：收起弹窗、进入暂停态，此时下拉可改
+function pauseFromDialog() {
+  const ev = state.dialogEvent;
+  closeDialog();
+  state.pendingEvent = ev;
+  state.paused = true;
+  $('pauseBtn').textContent = '继续';
+  setStatus('已暂停（可在进度窗口修改冲突策略）', 'paused');
+  toast('已暂停：改完下拉后点「继续」；若已是自动策略，不会再重弹同一个冲突', true);
+}
+
+function resumeFromPause() {
+  state.paused = false;
+  $('pauseBtn').textContent = '暂停';
+  const ev = state.pendingEvent;
+  state.pendingEvent = null;
+
+  if (!ev) {
+    setStatus(state.flow === 'extract' ? '正在解压…' : '正在压缩…', 'running');
+    return;
+  }
+  // 恢复后先查下拉：已是自动策略 → 直接按新策略处理（不再重弹同一个冲突）
+  if (state.policy === 'ask') {
+    setStatus(state.flow === 'extract' ? '正在解压…' : '正在压缩…', 'running');
+    openDialog(ev);
+  } else {
+    setStatus(state.flow === 'extract' ? '正在解压…' : '正在压缩…', 'running');
+    autoResolve(ev, state.policy, '恢复后');
+    state.idx++;
+    state.stats.processed++;
+    renderStats(); renderProgress();
+    if (state.flow === 'compress') renderBatch();
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  交互绑定
+// ══════════════════════════════════════════════════════════
+document.querySelectorAll('[data-layout]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('[data-layout]').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    setLayout(b.dataset.layout);
+  };
+});
+
+document.querySelectorAll('[data-flow]').forEach(b => {
+  b.onclick = () => {
+    document.querySelectorAll('[data-flow]').forEach(x => x.classList.remove('on'));
+    b.classList.add('on');
+    setFlow(b.dataset.flow);
+  };
+});
+
+policySelect.onchange = () => {
+  state.policy = policySelect.value;
+  flashSelect();
+  const label = (POLICIES[state.flow].find(p => p.code === state.policy) || {}).label || state.policy;
+  toast(`策略已切换为「${label}」——对之后遇到的冲突立即生效`, true);
+
+  // 暂停态下改策略：提示点「继续」即可按新策略处理挂起的冲突
+  if (state.paused && state.pendingEvent) {
+    if (state.policy === 'ask') toast('现在是「每次询问」：继续后会重新弹窗', true);
+    else toast('已是自动策略：点「继续」后不会再重弹这个冲突', true);
+  }
+};
+
+$('chkAutoCount').onchange = () => renderStats();
+
+$('btnPlay').onclick = startDemo;
+
+$('btnWidth').onclick = () => {
+  state.width = state.width === 800 ? 500 : 800;
+  win.style.setProperty('--winW', state.width + 'px');
+  $('btnWidth').textContent = `窗口宽度：${state.width}${state.width === 800 ? '（默认）' : '（最小）'}`;
+  $('btnWidth').classList.toggle('on', state.width === 500);
+  updateNarrow();
+};
+
+$('pauseBtn').onclick = () => {
+  if (state.paused) {
+    resumeFromPause();
+  } else if (state.running) {
+    state.paused = true;
+    $('pauseBtn').textContent = '继续';
+    setStatus('已暂停', 'paused');
+  }
+};
+
+$('dlgPause').onclick = pauseFromDialog;
+
+$('dlgCancel').onclick = () => {
+  closeDialog();
+  stopTimer();
+  state.running = false;
+  setStatus('已取消', 'paused');
+  toast('已取消整个操作（与真实实现一致：取消不弹提示）', true);
+};
+
+function updateNarrow() {
+  const narrow = state.width === 500;
+  win.style.setProperty('--winW', state.width + 'px');
+  if (narrow && state.layout === 'bottom') {
+    layoutHint.textContent = '⚠ 500px 最小宽度下，底部按钮行被挤压 —— 这正是推荐独立行的原因';
+    layoutHint.className = 'hint warn';
+  } else if (narrow && state.layout === 'info') {
+    layoutHint.textContent = '⚠ 500px：密度行与冲突控件会折成两行（仍比独立行省高度）';
+    layoutHint.className = 'hint warn';
+  } else if (narrow) {
+    layoutHint.textContent = '500px 最小宽度：独立行自适应换行，按钮行不受影响';
+    layoutHint.className = 'hint';
+  } else if (state.layout === 'bottom') {
+    layoutHint.textContent = '最像 TeraCopy，但 800px 时已偏挤，最小宽度 500px 会挤压按钮';
+    layoutHint.className = 'hint warn';
+  } else if (state.layout === 'info') {
+    layoutHint.textContent = '与「少 / 中 / 完整」同行：省一行高度、视觉最整合；代价是「视图密度」与「运行行为」混在一行，500px 会换行';
+    layoutHint.className = 'hint';
+  } else {
+    layoutHint.textContent = '推荐：独立一行，不挤底部按钮行，也不打散信息区';
+    layoutHint.className = 'hint';
+  }
+}
+
+// ══════════════════════════════════════════════════════════
+//  初始化：静止在第一帧，等用户点播放
+// ══════════════════════════════════════════════════════════
+state.events = buildExtractEvents();
+setLayout('info');
+renderOptions();
+renderStats();
+renderProgress();
+renderBatch();
+setCurrent({ name:'IMG_0001.png', dir:'photos/2024-05/', size:'3.2 MB' }, 47);
+state.stats.processed = 8;
+state.stats.overwritten = 1;
+state.stats.skipped = 0;
+renderStats();
+$('totalFill').style.width = '31%';
+$('totalPct').textContent = '31%';
+const initFill = $('batchFill'); if (initFill) initFill.style.width = '31%';
+const initPct = $('batchPct'); if (initPct) initPct.textContent = '31%';
+const initMeta = $('batchMeta'); if (initMeta) initMeta.textContent = '正在处理…';
+const initSt = $('batchSt'); if (initSt) initSt.textContent = '⟳';
+$('elapsed').textContent = '已用 00:00:42';
+$('eta').textContent = '剩余 00:01:18';
+setStatus('正在解压…', 'running');
+updateNarrow();
+</script>
+</body>
+</html>

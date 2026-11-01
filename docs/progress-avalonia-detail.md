@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-02** — 计划：进度窗口「文件冲突自动处理」控件（TeraCopy 式）设计立项 + 可交互原型
+  - **需求**：用户提出「模仿 TeraCopy，在 `ProgressWindow.axaml` 里加一个设置文件冲突自动处理的控件」，先讨论再动手。定口径：① 运行中随时切换、立即生效；② 解压 + 压缩都要；③ 保留现有 `ConflictDialog`（默认「询问」仍弹窗）；④ 实例级不回写全局设置；⑤ 布局 = 信息区首行与「少 / 中 / 完整」同排。
+  - **勘察结论**（决定可行性的两条）：① 引擎**每个冲突都重读**一次策略（`Utils/FileConflictHelper.cs:24,72`），所以「运行中改策略、对之后的冲突立即生效」引擎侧天然成立、不用动引擎；② 但策略在进引擎前被 `SelectedItemsExtractService.CreateExtractOptions`（`:127`）烤成 `ArchiveOptions` 快照，进度窗口拿不到引用 —— 只在 XAML 加控件会变成「点了没反应」的死开关（规则 23 事故原型）。解压三引擎全部经 `FileConflictHelper` 这一个决策点；压缩是另一条链（`Core/Services/CompressService.cs:453` 按**输出包**判定一次，枚举是 `Overwrite/Add/Rename/Cancel`），`CompressFlow.CreateResolver`（`:123`）前端可直接挂实时源。
+  - **设计**：Core 只加一个可选 `ArchiveOptions.ConflictActionProvider`（默认 `null`，不传与旧行为逐字节一致）——不用「恒 Ask + resolver 自行决定」，否则每个冲突都要构建 `FileConflictInfo`（含 `GetUniquePath` 目录探测）。解压侧 live 模式 = `Ask` + provider + resolver，**下拉成为唯一事实源**：勾「应用到全部」时把下拉同步成该动作（用户可见可改回），闭包记忆降级为退路。压缩侧 `CreateResolver` 加可选 `livePolicy`，不改 Core。两侧暂停恢复后先查下拉，避免「暂停后改策略再继续又重弹」。能力位与接线同源（不接线就传 `None` 隐藏），杜绝死开关。
+  - **布局定稿（2026-11-02）**：信息区 `Border` 内首行改 `Grid(Auto,*,Auto)`——左「少 / 中 / 完整」、右「冲突时: 下拉」。**不新增 `RowDefinition`**，`RootGrid` 保持 7 行、Toast `RowSpan` 不变（比独立行少改两处、省约 28px 高度）；500px 最小宽度下允许折成两行。信息区底色是 `ThemeSplitterBgBrush`，ComboBox 需显式 `ThemeSurfaceBgBrush` 背景。
+  - **附带发现 → KI-010**：`ExtractArchiveHere` / `ExtractArchiveToName` / `SmartExtract` 三条「原地解压」路径调用 `ExtractService.ExtractAsync` 时不传 `ArchiveOptions`（`ViewModels/MainWindowViewModel.Extract.cs:59,104,325`），引擎回落默认 `Overwrite` —— 即使设置成「询问」也恒静默覆盖，从不读 `AppSettings.FileConflictAction`。已按规则 21 登记 KI-010（阻塞类型「等计划」，复评条件 = 本计划 Phase 3 落地），并由 Phase 3 顺带修复。
+  - **产出**：`.omo/plans/未开始/progress-window-conflict-policy.md`（现状坐标 / 4 条口径 / 数据流 / Core 改动 / 解压+压缩接线 / 入口矩阵 / 12 条手工验收 / 风险表 / 5 阶段任务 / 待确认项）、`docs/prototypes/progress-window-conflict-policy.html`（可交互原型：三种布局可切换、解压 6 档 / 压缩 5 档、弹窗与「应用到全部」联动、运行中切换、暂停改策略、800/500px 宽度对照）、`docs/PLAN.md` B 档登记、`docs/KNOWN_ISSUES.md` KI-010。
+  - **状态**：仅设计阶段，**未改任何产品代码**（在 `plans` 分支完成，遵守规则 19）；开工时切 `alpha`，从 Phase 1（Core `ConflictActionProvider`，约 1h）开始。
+
 **2026-10-30** — 新增：压缩端「完成后打开输出目录」（与解压端对称，三层入口）
   - **需求**：解压端早就有「解压完成后打开目标目录」，压缩端一直没有。用户要求补齐，并拍板三点 —— 打开时**顺带选中刚压出来的包**、多包（`CompressOutputMode.Separate`）模式**只开一次**（用第一个输出）、进度窗口底部**也要有**实时开关。
   - **结构差异（为什么不是照抄解压端）**：解压有「无对话框直达」的入口，所以解压端要在会话里补一次无对话框开关；压缩的所有 GUI 入口都先弹 `CompressSettingsWindow`，不需要那半层。真正要补的是三层入口 —— 设置页默认值、对话框每-run 初值、进度窗口实时开关 —— 加上成功后的收尾动作。
