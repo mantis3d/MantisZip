@@ -3,9 +3,8 @@
 > 未来待开发功能规划。已实现的功能见 [docs/PROGRESS.md](PROGRESS.md)，技术架构见 [docs/ARCHITECTURE.md](ARCHITECTURE.md)，每项计划的完整设计见 `.omo/plans/`。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-10-29  
+**最后更新**: 2026-11-01  
 **当前版本**: 0.5.5
-
 
 ---
 
@@ -139,7 +138,7 @@
 | 文件过滤与文件列表筛选数据统一 | [unify-file-filter-data.md](.omo/plans/未开始/unify-file-filter-data.md) | 🟡中 | 8-12h | 📋 计划文档是 WPF 期产物，实施前须按规则 11 转 Avalonia。目标：`FileFilterCriteria` 扩展 `TextSearch`/`ExcludeText`/`TextMatchMode`，删除 `SearchFilters` + `ArchiveFilter.ApplyFilters()`（`MainWindowViewModel.Navigation.cs:309` 仍在用旧模型） |
 | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
-
+| 进度窗口「文件冲突自动处理」控件（TeraCopy 式） | [progress-window-conflict-policy.md](.omo/plans/未开始/progress-window-conflict-policy.md) | 🟡中 | 12-16h | 📋 2026-11-01 立项（用户提 TeraCopy 后定口径：运行中可切换立即生效 / 解压+压缩都要 / 保留 ConflictDialog / 实例级不回写设置）。进度窗口加「冲突时:」下拉，Core 只加一个 `ArchiveOptions.ConflictActionProvider` 动态源；顺带修复 **KI-010**（解压到此处/同名目录/智能解压三条路径恒静默覆盖） |
 
 ---
 
