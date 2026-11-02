@@ -3,7 +3,7 @@
 > **状态**: 📋 待实施（决策已定，可直接开工）| **创建日期**: 2026-11-01
 > **关联**: GitHub issue #75（`[性能] 解压海量小文件到机械硬盘时速度极慢`）；`docs/KNOWN_ISSUES.md` 无相关条目
 > **前置**: 无（Core 引擎内部改造 + 复用现有进度/冲突契约）
-> **决策来源**: 2026-11-01 与用户讨论 —— 用户最初假设「多线程解压在慢速硬盘反而拖累」，实测证明根因是「solid 归档逐条目提取 → 对文件数二次方」；用户要求先说明用户体验影响（见计划内「体验变化矩阵」），随后指示「写计划，所有决策按照你认为最好的方式来确定」。本计划所有决策由实施者按证据拍板，已逐条记录理由（§6）。第二轮讨论补充：用户指出「覆盖安装」这类场景下默认 `ask` 策略必须仍然提速，据此把冲突询问改为**解压前一次问完**（D4b），并把批量失败回退收紧为**只重试未完成条目**（D6）。
+> **决策来源**: 2026-11-01 与用户讨论 —— 用户最初假设「多线程解压在慢速硬盘反而拖累」，实测证明根因是「solid 归档逐条目提取 → 对文件数二次方」；用户要求先说明用户体验影响（见计划内「体验变化矩阵」），随后指示「写计划，所有决策按照你认为最好的方式来确定」。本计划所有决策由实施者按证据拍板，已逐条记录理由（§6）。第二轮讨论补充：用户指出「覆盖安装」这类场景下默认 `ask` 策略必须仍然提速，据此把冲突询问改为**解压前一次问完**（D4b），并把批量失败回退收紧为**只重试未完成条目**（D6）。第三轮（2026-11-02）拍板：① 接受「冲突询问提前到解压开始前集中问完」；② 改名暂存目录放在**目标目录内**（`.mantiszip-staging-<guid>`）；③ 本次**只优化全量解压**，勾选条目 / 拖拽行走 `ExtractEntriesAsync` 不动。
 
 ## TL;DR
 
@@ -116,6 +116,7 @@ solid 归档把多个文件压进**同一个数据块（folder）**。`IInArchiv
 - ❌ 不改 `ExtractPathResolver` / 预览树路径契约
 - ❌ 不做「小文件聚合写入缓冲」（用户在 issue 里提的第 1 条）—— 实测瓶颈是块解码而不是写放大，聚合写解决不了主因，且会打乱逐文件状态与取消粒度
 - ❌ 不支持 RAR/ISO 的批量优化（RAR 走 7z.dll 但通常单块小、收益不明确；待后续测量再评估）
+- ❌ 不做「勾选条目解压 / 拖拽解压」（`SelectedItemsExtractService` → `ExtractEntriesAsync`）的批量优化 —— 2026-11-02 用户确认本次只做全量解压；那条路径仍逐条目、速度不变，**发版说明必须写明**这个边界
 
 ## 5. 方案
 
@@ -136,6 +137,8 @@ canBulk =
 
 - **允许冲突回调**：`ConflictResolver` / `ConflictResolverAsync` 非 null 时**不退回逐条目**，而是把询问提前到预解析阶段一次问完（§5.3），之后按答复定型分桶。这是本计划的关键决策 —— `AppSettings.FileConflictAction` 的**默认值就是 `"ask"`**（`src\MantisZip.UI.Avalonia\Models\AppSettings.cs:85`，`Models\ExtractSettings.cs:78` 同为 `"ask"`），若「有交互回调就退回逐条目」，默认设置的用户只要目标目录里有同名文件就完全拿不到提速，等于这个优化对主场景无效
 - **`ErrorResolver` 仍排除**：它处理的是「单个文件读写失败」这类运行期错误，批量接口只能整包失败、无法把错误归因到具体条目；这类调用方（需要逐文件错误回调）走原路径
+- **预解析不一定需要 stat**：`ConflictAction == Overwrite` 且 `ConflictResolver` / `ConflictResolverAsync` 都为 null 时，根本不需要知道目标文件是否存在 —— 7z.dll 批量解压本来就是覆盖语义，全部条目直接进 `Direct` 桶，一条 `File.Exists` 都不做
+- **`Ask` 一旦定型就停止询问与 stat**：用户勾「应用到全部」之后，剩余冲突条目按该答复直接分桶，不再弹窗、也不再为「是否存在」逐条 stat（`Overwritten` 计数在 §5.3.2 的批量前复检阶段补记）
 - **选择性解压不经过这条路径**：`ExtractAsync` 只做全量解压；「只解压选中的条目」走 `ExtractEntriesAsync`（`src\MantisZip.Core\Engines\SevenZipEngine.cs:1069` 附近），本计划不改它
 - `ArchiveOptions`（`src\MantisZip.Core\Abstractions\ArchiveEngine.cs:28`）里与本计划相关的是 `ConflictAction` / `ConflictResolver` / `ConflictResolverAsync` / `ErrorResolver`
 - `IsSolid` 由 SharpSevenZip 提供（`IsSevenZipSolid` 已在 `src\MantisZip.Core\Utils\ArchiveEntryExtractor.cs:537` 使用同一属性）
@@ -145,6 +148,9 @@ canBulk =
 
 ```csharp
 // 阶段 2a：预解析（不落盘，快）—— 冲突策略在这里一次性决定，之后不再变
+// ★ 必须上报进度：状态文案「正在检查冲突 N/M」（新 i18n key），每 N 条检查一次 ct；
+//     否则 2 万条目的 stat 在 HDD / UNC 上就是「0% 假死」，与本计划的目标 4 相悖。
+//     Overwrite + 无 resolver 时整段 stat 跳过（快路径，几乎瞬时）
 // ★ 顺序 B（先问后解）：ConflictAction == Ask 时，ResolvePathAsync 会在这一阶段就把
 //     现有 ConflictDialog 弹出来问完（用户可选「应用到全部」），全部答案定型后才开始解压。
 foreach (var entry in allEntries) {
@@ -181,6 +187,13 @@ foreach (var entry in bucket.BigFile.Concat(bucket.Unsafe).Concat(残留)) { …
 ```
 
 **关键点**：三个阶段共用同一批计数器（`processedFiles` / `handledFiles` / `processedBytes` / `conflictStats`），进度百分比与 ETA 不跳变。
+
+#### 5.2.1 暂存目录策略（2026-11-02 拍板：放目标目录内）
+
+- **位置**：`Path.Combine(destinationPath, $".mantiszip-staging-{Guid.NewGuid():N}")` —— 在目标目录内 ⇒ 与最终落点同卷 ⇒ `File.Move` 是元数据 rename，不搬数据；改成目标目录同级会有跨卷与权限两种失败模式
+- **可见性代价**：解压期间用户在 Explorer 里能看到这个点前缀目录。接受（比自解压工具的临时目录更收敛），完成后立即删除
+- **清理必须写死**：`try/finally` 覆盖成功 / 取消 / 异常三条路径；另外每次进入批量段前按前缀 `.mantiszip-staging-*` 顺手清扫上次崩溃残留（只匹配目录、失败只记日志，不打断解压）
+- **降级**：目标目录只读 / 无权限创建暂存目录 ⇒ **改名桶整体退回逐条目**（不报错、不丢文件）；`File.Move` 撞占用 ⇒ 该条目退回逐条目重试，仍失败记入 `failedEntries`
 
 **为什么询问要放在解压之前（顺序 B）**：默认策略是 `ask`，最常见的重场景恰恰是「覆盖安装」—— 目标目录里几千个文件全部同名。如果询问发生在解压过程中、或者干脆因为「有交互回调」退回逐条目，那么整包（不只是冲突的）都会被拖回逐条目解码，用户完全感受不到提速。把询问提前到预解析阶段后：
 
@@ -223,6 +236,17 @@ foreach (var entry in bucket.BigFile.Concat(bucket.Unsafe).Concat(残留)) { …
 | **预解析 → 批量开始之间的窄竞态**（其它进程在这几毫秒里创建了目标文件） | 批量会静默覆盖，而今天在逐条目判断下会按 `Rename` 改名 | 批量调用**前一瞬**对 `Direct` 集合再做一次 `File.Exists` 复检（几千次 stat，毫秒级）；新出现的冲突条目移出主批量、按冲突策略重新分桶（Overwrite → 留在批量；其余 → Rename 桶） |
 
 其余情形（预解析后磁盘状态不再变化）无语义差异。
+
+#### 5.3.2 预解析的开销与可见性（2026-11-02 补充）
+
+`FileConflictHelper.ResolvePathAsync` 的**第一行就是 `File.Exists`**（`src\MantisZip.Core\Utils\FileConflictHelper.cs:69`），所以「预解析」天然等于「对上万条目逐个 stat」。在机械盘 / UNC 上这是秒级到几十秒级的开销，且全部发生在落盘之前 —— 不处理就会把「二次方解码」的假死换成「预解析假死」。四条约束：
+
+| # | 约束 | 说明 |
+|---|---|---|
+| P1 | 快路径：`Overwrite` + 无 resolver **零 stat** | 7z.dll 覆盖语义与策略一致，存在性无关紧要（§5.1） |
+| P2 | 定型即止：`Ask` 答「应用到全部」后停止 stat | 答复已决定一切；`Overwritten` 计数按 §5.3.1 的批量前复检补记 |
+| P3 | 上报「正在检查冲突 N/M」+ 每 N 条检查 `ct` | 进度窗口可见、可取消；文案走 i18n，不硬编码 |
+| P4 | stat 抛异常（UNC 掉线 / 权限）按「未知」处理 | 该条目退回逐条目，**绝不**假设「无冲突」后交给批量 |
 
 > 时序说明：**询问在解压之前**（§5.2 阶段 2a），**执行顺序是「主批量 → 改名桶二次批量 + 移动 → 逐条目（≥64MB / 不安全路径 / 批量失败残留）」**。用户看到的是：先集中答题 → 进度条快速推进（绝大部分文件瞬间出现）→ 最后一批改名文件随移动落到 `a (1).txt`。不再有「边解边问」的中断感，也不会出现「先盯着几个慢文件」。
 
@@ -297,6 +321,9 @@ catch (Exception ex) {
 | D10 | 不新增设置项/开关 | 规则 23（死开关）+ 用户视角「解压快」不需要选项；内部常量即可 |
 | D11 | 分支 `beta` | 规则 19：这是性能修复（issue #75），不是新功能叙事；与 self-contained `alpha` 特性不冲突 |
 | D12 | 不碰 ZIP 并行路径 | 那是独立的 HDD 节流问题，混在一起会污染回归面 |
+| D13 | 预解析对 `Overwrite` + 无 resolver **零 stat**，`Ask` 定型后停止 stat | `ResolvePathAsync` 第一行就是 `File.Exists`；2 万条 stat 在 HDD/UNC 上是新的一种假死（§5.3.2） |
+| D14 | 改名暂存目录放**目标目录内** `.mantiszip-staging-<guid>` | 同卷 ⇒ `File.Move` 是 rename；放同级会引入跨卷与权限两种失败模式（2026-11-02 用户拍板） |
+| D15 | 本次只优化全量解压，选中项 / 拖拽路径不动 | issue #75 的场景是全量解压；选中项是另一套分流，另加约一倍工作量（2026-11-02 用户拍板） |
 
 ## 7. 实施步骤
 
@@ -339,6 +366,7 @@ catch (Exception ex) {
 
 - 夹具 `%TEMP%\mz-7z-perf\big-solid.7z`（800 × 64KB solid）：修复前后耗时对比、`7z.exe x` 对照
 - 合成大夹具：**20,000 × 4KB solid（约 200MB）**，模拟用户场景，记录耗时与内存
+- **HDD 目标盘复测**（issue #75 的真实场景）：上述两个夹具解到机械盘，记录耗时；同时确认预解析阶段会显示「正在检查冲突 N/M」并在数秒内走完，不再出现「0% 不动」
 - 暂停 3s → 恢复；取消 → 校验已落盘文件数量与状态文案
 - 用户包（若拿到 `GitHubDesktop.3.6.10.Chs OSSSR.7z`）做修复前后对比，作为 issue 回复的实测数据
 
