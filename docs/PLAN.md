@@ -140,6 +140,7 @@
 | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 元数据显示位置可选（侧边面板 / 正文区） | [metadata-display-location.md](.omo/plans/未开始/metadata-display-location.md) | 🟢低 | 6-8h | 📋 2026-10-31 用户讨论后定案、待启动。exe 预览正文区只有条目名标题、大片空白，信息全在右侧面板；按类型加「显示位置」，选正文区时「程序信息」搬到正文区竖排渲染、面板只留「文件信息」。**只对没有其它正文内容的格式开放**（当前仅 `pe`），默认侧边面板、老配置不动 |
+| 文件名代码页检测与切换（Bandizip 式） | [file-name-codepage.md](.omo/plans/未开始/file-name-codepage.md) | 🟡中 | 14h（2天） | 📋 2026-11-02 用户要求、范围已定 B 档。现状只有「UTF-8 或 GBK」二选一猜测且无出口（Big5 / Shift-JIS / EUC-KR 命名必乱码）；补一条从引擎到 UI 的显式编码通道，列表 / 解压 / 预览 / 拖拽 / 删除共用同一编码，删除与加文件不再硬编码 GBK 重写中央目录。三条细节待拍板（下拉位置 / 是否含 TAR / 是否支持「其他代码页」输入） |
 
 
 ---
