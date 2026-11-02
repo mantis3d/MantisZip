@@ -286,12 +286,14 @@ public sealed class ThumbnailService : IDisposable
     }
 
     /// <summary>
-    /// 字节 → 128px 缩略图。<c>.ico</c> 走多尺寸图标提取，<c>.svg</c> 走矢量渲染，其余走 Skia 位图解码。
+    /// 字节 → 128px 缩略图。<c>.ico</c> 走多尺寸图标提取（取最接近 128 的帧，不是列表图标的 16），
+    /// <c>.svg</c> 走矢量渲染（矢量按 128 重绘，不受其声明尺寸限制），其余走 Skia 位图解码。
     /// </summary>
     private static Bitmap? DecodeImage(byte[] bytes, string extension)
     {
+        // 缩略图卡是 128px：必须取 ico 里最接近 128 的那一帧，取 16 帧再放大会糊成一团。
         if (extension.Equals(".ico", StringComparison.OrdinalIgnoreCase))
-            return IcoIconHelper.ExtractIcon(bytes);
+            return IcoIconHelper.ExtractIcon(bytes, ThumbnailSize);
 
         // 项目已引用 Svg.Skia（MantisZip.UI.Avalonia.csproj），矢量图单独渲染成位图，
         // 否则 SKBitmap.Decode 对 SVG 只会返回 null。
@@ -321,8 +323,13 @@ public sealed class ThumbnailService : IDisposable
     }
 
     /// <summary>
-    /// 用 Svg.Skia 把矢量图渲染成 ≤ <see cref="ThumbnailSize"/> 的位图。
+    /// 用 Svg.Skia 把矢量图渲染成最长边恰好 <see cref="ThumbnailSize"/> 的位图。
     /// </summary>
+    /// <remarks>
+    /// 矢量图**必须按目标尺寸重绘**，不能沿用 <see cref="ScaleToThumbnail"/> 的「小图不放大」规则：
+    /// SVG 的 CullRect 通常是它自己的坐标系（`viewBox="0 0 24 24"` 这种），按 24 渲染再显示到 128
+    /// 就是「低分辨率放大」，边缘糊、细线断。矢量放大没有画质损失，所以这里反过来 —— 小于目标尺寸也放大。
+    /// </remarks>
     private static Bitmap? RenderSvg(byte[] bytes)
     {
         using var svgStream = new MemoryStream(bytes, writable: false);
@@ -338,7 +345,10 @@ public sealed class ThumbnailService : IDisposable
         if (bounds.Width <= 0 || bounds.Height <= 0)
             return null;
 
-        var (targetWidth, targetHeight) = ScaleToThumbnail((int)Math.Ceiling(bounds.Width), (int)Math.Ceiling(bounds.Height));
+        var (targetWidth, targetHeight) = ScaleToSize(
+            (int)Math.Ceiling(bounds.Width),
+            (int)Math.Ceiling(bounds.Height),
+            ThumbnailSize);
 
         using var surface = SKSurface.Create(new SKImageInfo(targetWidth, targetHeight, SKColorType.Bgra8888, SKAlphaType.Premul));
         if (surface is null)
@@ -355,14 +365,24 @@ public sealed class ThumbnailService : IDisposable
         return Encode(image);
     }
 
-    /// <summary>等比缩放到最长边不超过 <see cref="ThumbnailSize"/>（小图不放大）。</summary>
+    /// <summary>等比缩放到最长边不超过 <see cref="ThumbnailSize"/>（位图小图不放大）。</summary>
     private static (int Width, int Height) ScaleToThumbnail(int width, int height)
     {
         var longest = Math.Max(width, height);
         if (longest <= ThumbnailSize)
             return (Math.Max(1, width), Math.Max(1, height));
 
-        var scale = (double)ThumbnailSize / longest;
+        return ScaleToSize(width, height, ThumbnailSize);
+    }
+
+    /// <summary>等比缩放到最长边恰好等于 <paramref name="longestSide"/>（小于也放大，供矢量图用）。</summary>
+    private static (int Width, int Height) ScaleToSize(int width, int height, int longestSide)
+    {
+        var longest = Math.Max(width, height);
+        if (longest <= 0)
+            return (Math.Max(1, longestSide), Math.Max(1, longestSide));
+
+        var scale = (double)longestSide / longest;
         return (Math.Max(1, (int)Math.Round(width * scale)), Math.Max(1, (int)Math.Round(height * scale)));
     }
 

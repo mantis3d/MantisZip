@@ -54,6 +54,35 @@ public class IcoIconHelperTests
         Assert.Equal(new PixelSize(256, 256), icon!.PixelSize);
     }
 
+    [AvaloniaFact]
+    public void ExtractIcon_WithPreferredSize128_ChoosesClosestTo128x128()
+    {
+        // 缩略图卡是 128px：多帧 ico 必须取 128 帧，不能取 16 帧再放大（会糊）
+        var icoData = PackIco(
+            (CreatePngBytes(16, 16), 16, 16),
+            (CreatePngBytes(128, 128), 128, 128),
+            (CreatePngBytes(32, 32), 32, 32));
+
+        using var icon = IcoIconHelper.ExtractIcon(icoData, 128);
+
+        Assert.NotNull(icon);
+        Assert.Equal(new PixelSize(128, 128), icon!.PixelSize);
+    }
+
+    [AvaloniaFact]
+    public void ExtractIcon_WithPreferredSize128_FallsBackToLargestWhenNoLargeFrame()
+    {
+        // 只有 16/48 两帧时，128 的「面积最接近」仍是 48（而不是 16）
+        var icoData = PackIco(
+            (CreatePngBytes(16, 16), 16, 16),
+            (CreatePngBytes(48, 48), 48, 48));
+
+        using var icon = IcoIconHelper.ExtractIcon(icoData, 128);
+
+        Assert.NotNull(icon);
+        Assert.Equal(new PixelSize(48, 48), icon!.PixelSize);
+    }
+
     [Fact]
     public void ExtractIcon_NonIcoPayloads_ReturnNull()
     {
