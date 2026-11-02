@@ -190,6 +190,12 @@ public class AppSettings
     public int MaxRecentFiles { get; set; } = 10;
     public string AppFontFamily { get; set; } = "";
     public string CompactnessMode { get; set; } = "Normal";
+    /// <summary>
+    /// 文件列表布局模式：Details=详情（默认，老用户界面不变）/ Tile=平铺 / Content=内容。
+    /// 存枚举（JSON 里是 0/1/2；字段缺失或无法识别时落到默认值 Details）。
+    /// 由 <c>MainWindowViewModel.LayoutMode</c> 读写（规则 23：有持久化就必须有运行时消费者）。
+    /// </summary>
+    public FileListLayoutMode FileListLayoutMode { get; set; } = FileListLayoutMode.Details;
     public string Language { get; set; } = "zh";
     /// <summary>
     /// 是否显示文件列表里的**数据条**（每行文字后那条表示相对占比的彩色横条）。

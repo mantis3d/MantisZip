@@ -51,6 +51,24 @@ public partial class ArchiveItemModel : ObservableObject
     [ObservableProperty]
     private Bitmap? _iconSource;
 
+    /// <summary>
+    /// 图像类内容卡的缩略图（Tile / Content 布局）。null = 无缩略图（卡片回退到扩展名图标）。
+    /// </summary>
+    [ObservableProperty]
+    private Bitmap? _thumbnailSource;
+
+    /// <summary>
+    /// 文本类内容卡的摘录（Tile / Content 布局）。null = 无可展示文本（卡片回退到扩展名图标）。
+    /// </summary>
+    [ObservableProperty]
+    private string? _textSnippet;
+
+    /// <summary>
+    /// 卡片布局（Tile / Content）里的选中视觉状态；详情布局用 DataGrid 自带的行选中，不读此属性。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSelected;
+
     [ObservableProperty]
     private double _sizeRatio;
 
@@ -83,6 +101,24 @@ public partial class ArchiveItemModel : ObservableObject
     public string DateBarBrushKey => UseDirProgressColor ? "ProgressBarDateDirBrush" : "ProgressBarDateBrush";
 
     public bool HasIcon => IconSource != null;
+
+    /// <summary>
+    /// 内容卡是否有内容可画（缩略图或文本摘录任一非空）。
+    /// 派生属性通知集中在这两个源属性的 partial 方法里（AGENTS.md「派生属性通知」），
+    /// 不要改成逐字段 <c>[NotifyPropertyChangedFor]</c>。
+    /// </summary>
+    public bool HasThumbnailContent => ThumbnailSource != null || !string.IsNullOrEmpty(TextSnippet);
+
+    partial void OnThumbnailSourceChanged(Bitmap? value)
+    {
+        OnPropertyChanged(nameof(HasThumbnailContent));
+    }
+
+    partial void OnTextSnippetChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasThumbnailContent));
+    }
+
 
     /// <summary>
     /// 排序用：目录为 0，文件为 1（实现目录优先排序）。

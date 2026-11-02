@@ -1,4 +1,9 @@
 ﻿{
+  "Toolbar_LayoutMode": "縮圖版面",
+  "LayoutMode_Details": "詳細",
+  "LayoutMode_Tile": "並排",
+  "LayoutMode_Content": "內容",
+  "LayoutMode_CycleTip": "切換縮圖版面",
   "Extract_PickerAdvancedMode": "進階模式",
   "Extract_TabOutput": "輸出設定",
   "Extract_TabAddArchives": "新增壓縮檔",

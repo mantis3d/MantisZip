@@ -9,6 +9,8 @@ using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core;
 using MantisZip.Core.Utils;
+using SharpSevenZip;
+using SharpSevenZip.Exceptions;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -287,8 +289,9 @@ public partial class MainWindowViewModel : ObservableObject
             "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_AutoExpand", "Tree_Filter",
             "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_GoUp",
             "Toolbar_CopyName", "Toolbar_Refresh",
-            "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode",
+            "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode", "Toolbar_LayoutMode",
             "ViewMode_All", "ViewMode_Files", "ViewMode_Dirs",
+            "LayoutMode_Details", "LayoutMode_Tile", "LayoutMode_Content", "LayoutMode_CycleTip",
             "Test_AboutWindow", "Test_SettingsWindow", "Test_PasswordManager",
             "Test_DonationDialog", "Test_LogPrivacyHelp", "Test_PasswordHelp",
             "Test_CommentDialog", "Test_PasswordEditDialog", "Test_PasswordDialog",
@@ -318,6 +321,7 @@ public partial class MainWindowViewModel : ObservableObject
         LocalizedStrings = newDict;
         OnPropertyChanged(nameof(LocalizedStrings));
         OnPropertyChanged(nameof(ViewModeLabel));
+        OnPropertyChanged(nameof(LayoutModeLabel));
 
         // Refresh match mode options display text
         MatchModeOptions.Clear();
@@ -799,6 +803,66 @@ public partial class MainWindowViewModel : ObservableObject
         _ => LocalizationManager.T("ViewMode_Dirs")
     };
 
+    // ── File list layout mode (Details / Tile / Content) ──
+
+    /// <summary>
+    /// 文件列表**布局**模式（详情 / 平铺 / 内容）。与 <see cref="FileListViewMode"/>（内容筛选）互不影响：
+    /// 本枚举决定每行怎么画，筛选枚举决定显示哪些行。
+    /// </summary>
+    [ObservableProperty]
+    private FileListLayoutMode _layoutMode;
+
+    partial void OnLayoutModeChanged(FileListLayoutMode value)
+    {
+        // 四个派生属性集中通知（AGENTS.md「派生属性通知」：禁止逐字段 NotifyPropertyChangedFor）
+        NotifyLayoutModeProperties();
+
+        // 持久化：与 Theme / CompactnessMode 相同的合并写（_appSettings 是启动副本，直接 Save() 会覆盖别处改动）
+        if (_appSettings.FileListLayoutMode != value)
+        {
+            _appSettings.FileListLayoutMode = value;
+            SaveSetting(s => s.FileListLayoutMode = value);
+        }
+
+        // 详情布局不画内容卡：离开详情才开始出图，回到详情则终止批次释放后台任务
+        if (value == FileListLayoutMode.Details)
+            CancelThumbnailBatch();
+        else
+            StartThumbnailBatchIfNeeded();
+    }
+
+    private void NotifyLayoutModeProperties()
+    {
+        OnPropertyChanged(nameof(IsDetailsLayout));
+        OnPropertyChanged(nameof(IsTileLayout));
+        OnPropertyChanged(nameof(IsContentLayout));
+        OnPropertyChanged(nameof(LayoutModeLabel));
+    }
+
+    public bool IsDetailsLayout => LayoutMode == FileListLayoutMode.Details;
+    public bool IsTileLayout => LayoutMode == FileListLayoutMode.Tile;
+    public bool IsContentLayout => LayoutMode == FileListLayoutMode.Content;
+
+    /// <summary>工具栏布局按钮的当前模式文案（随语言切换刷新，见 <see cref="UpdateLocalizedStrings"/>）。</summary>
+    public string LayoutModeLabel => LayoutMode switch
+    {
+        FileListLayoutMode.Tile => LocalizationManager.T("LayoutMode_Tile"),
+        FileListLayoutMode.Content => LocalizationManager.T("LayoutMode_Content"),
+        _ => LocalizationManager.T("LayoutMode_Details"),
+    };
+
+    /// <summary>循环切换布局：详情 → 平铺 → 内容 → 详情。</summary>
+    [RelayCommand]
+    private void CycleLayoutMode()
+    {
+        LayoutMode = LayoutMode switch
+        {
+            FileListLayoutMode.Details => FileListLayoutMode.Tile,
+            FileListLayoutMode.Tile => FileListLayoutMode.Content,
+            _ => FileListLayoutMode.Details,
+        };
+    }
+
     /// <summary>
     /// 匹配模式选项列表（子串匹配 / 通配符）。显示文本通过 UpdateLocalizedStrings() 刷新。
     /// </summary>
@@ -817,6 +881,10 @@ public partial class MainWindowViewModel : ObservableObject
         // 信息面板方向同样从设置初始化（此前 PreviewViewModel 硬编码默认 "Vertical"，保存的方向启动后丢失）
         Preview.InfoPanelOrientation = _appSettings.InfoPanelOrientation;
         IsPreviewVisible = _appSettings.ShowPreviewPanel;
+
+        // 文件列表布局：启动恢复上次选择。此时还没打开压缩包，OnLayoutModeChanged 里的批次启动会直接返回；
+        // 同值短路（_appSettings.FileListLayoutMode 已等于该值）保证启动不重复落盘。
+        LayoutMode = _appSettings.FileListLayoutMode;
 
         // 主题（三态）：初始化菜单按钮暗色状态显示
         IsDarkTheme = _appSettings.Theme switch
@@ -1225,6 +1293,8 @@ public partial class MainWindowViewModel : ObservableObject
         _iconLoadCts?.Cancel();
         _iconLoadCts?.Dispose();
         _iconLoadCts = null;
+        // 关包/换包：终止整包缩略图批次（否则后台会拿着已失效的路径继续读包），缓存随服务一起释放
+        CancelThumbnailBatch();
         ArchiveAvailability = ArchiveAvailability.Available;
         Entries.Clear();
         CurrentEntries.Clear();
@@ -1251,6 +1321,105 @@ public partial class MainWindowViewModel : ObservableObject
         _backStack.Clear();
         _forwardStack.Clear();
         NotifyNavigationState();
+    }
+
+    // ── File list thumbnail batch (Tile / Content layout) ──
+
+    /// <summary>
+    /// 当前压缩包的缩略图后台服务（仅 Tile / Content 布局需要；null = 没有进行中的批次）。
+    /// 服务内自带缓存与去重，换包 / 切目录 / 关包统一走 <see cref="CancelThumbnailBatch"/> 释放。
+    /// </summary>
+    private ThumbnailService? _thumbnailService;
+
+    /// <summary>当前 <see cref="_thumbnailService"/> 对应的压缩包路径（换包时重建服务）。</summary>
+    private string? _thumbnailServiceArchivePath;
+
+    /// <summary>固实 7z 判定缓存：同一压缩包只需开一次包探测。</summary>
+    private string? _thumbnailSolidArchivePath;
+    private bool _thumbnailSolidCache;
+
+    /// <summary>
+    /// 按需启动缩略图批次：详情布局 / 未打开压缩包 / 当前目录没有条目时什么都不做。
+    /// 过滤条件变化、切目录、刷新都会重填 <see cref="CurrentEntries"/> 并再次走到这里，
+    /// 服务内部按条目去重（命中缓存直接跳过），因此重复调用是安全的。
+    /// </summary>
+    public void StartThumbnailBatchIfNeeded()
+    {
+        if (LayoutMode == FileListLayoutMode.Details) return;
+        if (CurrentArchivePath is not { Length: > 0 } archivePath) return;
+        if (CurrentEntries.Count == 0) return;
+
+        if (_thumbnailService == null ||
+            !string.Equals(_thumbnailServiceArchivePath, archivePath, StringComparison.OrdinalIgnoreCase))
+        {
+            CancelThumbnailBatch();
+            _thumbnailService = new ThumbnailService(
+                archivePath,
+                GetSessionPassword(archivePath) ?? _currentPassword,
+                IsCurrentSevenZipSolid(archivePath));
+            _thumbnailServiceArchivePath = archivePath;
+        }
+
+        _thumbnailService.StartBatch(CurrentEntries);
+    }
+
+    /// <summary>
+    /// 取消并释放缩略图批次（切目录 / 刷新条目 / 关闭压缩包 / 回到详情布局）。
+    /// 缓存归服务所有，Dispose 后即释放；下次进入卡片布局按需重建。
+    /// </summary>
+    public void CancelThumbnailBatch()
+    {
+        if (_thumbnailService != null)
+        {
+            _thumbnailService.Cancel();
+            _thumbnailService.Dispose();
+            _thumbnailService = null;
+        }
+        _thumbnailServiceArchivePath = null;
+    }
+
+    /// <summary>
+    /// 当前压缩包是否固实 7z（固实包无法高效单条提取，缩略图服务会整体跳过文件内容图）。
+    /// 判定结果按压缩包路径缓存，关包后不清：同一文件重新打开只会得到同一个结论。
+    /// </summary>
+    private bool IsCurrentSevenZipSolid(string archivePath)
+    {
+        if (_currentFormat != ArchiveFormat.SevenZip) return false;
+        if (string.Equals(_thumbnailSolidArchivePath, archivePath, StringComparison.OrdinalIgnoreCase))
+            return _thumbnailSolidCache;
+
+        _thumbnailSolidArchivePath = archivePath;
+        _thumbnailSolidCache = DetectSevenZipSolid(archivePath, GetSessionPassword(archivePath) ?? _currentPassword);
+        return _thumbnailSolidCache;
+    }
+
+    /// <summary>
+    /// 复刻 Core <c>ArchiveEntryExtractor.IsSevenZipSolid</c> 的语义（该方法是 private，UI 层不可见）：
+    /// 读 <see cref="SharpSevenZipExtractor.IsSolid"/>，判不出来时按固实处理——宁可不做缩略图，
+    /// 也不要为一张图触发整包全量解压。加密文件名且无密码时连包都打不开，同样按固实处理。
+    /// </summary>
+    private static bool DetectSevenZipSolid(string archivePath, string? password)
+    {
+        try
+        {
+            using var extractor = string.IsNullOrEmpty(password)
+                ? new SharpSevenZipExtractor(archivePath)
+                : new SharpSevenZipExtractor(archivePath, password);
+            try
+            {
+                return extractor.IsSolid;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or SharpSevenZipArchiveException)
+            {
+                App.DebugLog($"[THB] IsSolid 探测失败，按固实处理：{ex.Message}");
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[THB] 打开压缩包做固实探测失败，按固实处理：{ex.Message}");
+            return true;
+        }
     }
 
     [RelayCommand]

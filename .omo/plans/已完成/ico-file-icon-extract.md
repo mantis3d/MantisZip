@@ -2,7 +2,7 @@
 
 > ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`IconService`/`IconProvider`、`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
 
-> **状态**: 🚧 进行中（2026-11-02 开工）| **阶段**: [⬜⬜⬜⬜⬜] (0/5)
+> **状态**: ✅ **已完成**（2026-11-02 实施并归档，随 v0.5.6）| **阶段**: [✅✅✅✅✅] (5/5)
 > **档位**: **A 档 · v0.5.6**（2026-10-29 从「小活清仓」提到 A 档：与 v0.5.6 的列表缩略图同属「列表里看得见」的一批）
 
 ## TL;DR
@@ -59,11 +59,11 @@
 
 ## 任务清单
 
-- [ ] **1. 新增 `IcoIconHelper`** — ICO 字节 → 16×16 `ImageSource`
-- [ ] **2. 接口新增 `ReadEntryBytesAsync` + 各引擎实现** — IArchiveEngine 接口新增该方法，ZipEngine/SevenZipEngine/TarGzEngine 各自实现（接口当前不存在）
-- [ ] **3. 文件列表异步图标加载** — 加载时占位 + 后台解析 `.ico`
-- [ ] **4. 本地化字符串** — 如果有需要用户感知的状态信息
-- [ ] **5. 单元测试** — `IcoIconHelper` 测试 + 集成验证
+- [x] **1. 新增 `IcoIconHelper`** — ICO 字节 → 16×16 `ImageSource`
+- [x] **2. ~~接口新增 `ReadEntryBytesAsync`~~ → 改用既有 `ArchiveEntryExtractor.ExtractEntryToMemoryAsync`（不扩引擎接口）** — IArchiveEngine 接口新增该方法，ZipEngine/SevenZipEngine/TarGzEngine 各自实现（接口当前不存在）
+- [x] **3. 文件列表异步图标加载** — 加载时占位 + 后台解析 `.ico`
+- [x] **4. 本地化字符串**（本实现无需新增 key） — 如果有需要用户感知的状态信息
+- [x] **5. 单元测试** — `IcoIconHelper` 测试 + 集成验证
 
 ---
 

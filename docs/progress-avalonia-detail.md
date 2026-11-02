@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-02** — 功能：文件列表缩略图查看方式（v0.5.6 第一项）
+  - **背景**：列表只有 DataGrid 一种形态，图片、文本、可执行文件全是一行文字 + 16px 图标，「看得见内容」这件事只发生在右侧预览面板。
+  - **三态布局**：`Models/FileListLayoutMode.cs`（`Details = 0 / Tile = 1 / Content = 2`）+ `AppSettings.FileListLayoutMode` 持久化；工具栏一个按钮（`CycleLayoutModeCommand`，图标 `IconThumbnails`）循环切换，`LayoutModeLabel` 随语言刷新；Details → 原 `FileListGrid` 加 `IsVisible`，Tile/Content → 两个 `ScrollViewer`（`TileLayoutScrollViewer` / `ContentLayoutScrollViewer`）互斥显示，三者都挂在 `Controls/ArchiveContentView.axaml` 的 `Grid.Row="2"`。
+  - **内容卡三档**：`StaticResource ThumbnailContentCard` 一个 128×128 `Panel` 三态叠放 —— ①`ThumbnailSource` 非空 → 真缩略图（`Stretch="Uniform"`，不放大）；②`TextSnippet` 非空 → 文字卡（`FontSize 11` + `CharacterEllipsis`，最多 150 个文本元素）；③`!HasThumbnailContent` → `IconSource` 32×32 居中（16px 图标放到 48 会发虚）。
+  - **服务层**：`Services/ThumbnailCache.cs`（LRU 300；`ThumbnailResult(Bitmap?, string?)`；并发去重用 `ConcurrentDictionary<string, Lazy<Task<...>>>` —— `GetOrAdd` 的 valueFactory 在竞争下可能被调两次；缓存 key = `archivePath + "|" + FullPath`，否则不同包同名条目会串图）+ `Services/ThumbnailService.cs`（128px / 8MB 上限 / 并发 4 / 固实 7z 跳过 / 会话密码；`.ico` 走 `IcoIconHelper`、`.svg` 走 Svg.Skia；`ClassifyKind` 与 `TruncateTextSnippet` 为纯静态便于单测）+ `Services/ThumbnailSelectionController.cs`（单选 / Ctrl 增删 / Shift 范围；Shift 优先；Ctrl 移除时 Primary 落到剩余首项）。
+  - **交互接线**：新建 `Views/MainWindow.Thumbnails.cs`（`partial class MainWindow`，563 行）—— 按 `x:Name` 找到两个 ScrollViewer 后程序化订阅（Tunnel 的 Pressed/Moved/Released + KeyDown/ContextRequested/DoubleTapped）；`HitTestArchiveItem` 沿视觉树找 `Control { DataContext: ArchiveItemModel }`；拖拽管线（覆层 / 状态光标 / OLE 拖拽 / 落点解压）从 DataGrid 抽成 `StartFileDragAsync(...)` 供两模式共用；`Views/MainWindow.axaml.cs` 1707 → 1548 行。
+  - **选择同步**：控制器结果写回前先置 `_isApplyingThumbnailSelection`，再写 `SelectedEntry` / `SelectedEntries`，最后**遍历 `CurrentEntries` 全量**置 `IsSelected` —— 否则隐藏的 DataGrid 会用单选回写盖掉多选，且残留高亮会留在切走的项上。
+  - **为什么不用 `ItemsRepeater`**：Avalonia 12.1.2 的 `Avalonia.Controls.dll` 里 `ItemsRepeater` / `UniformGridLayout` / `StackLayout` 三个类型都不存在（XAML 报 `AVLN2000`），NuGet 的 `Avalonia.Controls.ItemsRepeater` 最高只到 12.0.0 ⇒ 不加包，Tile 用 `ItemsControl` + `WrapPanel`（`ItemWidth="144"`）、Content 用 `ItemsControl` + `Vertical StackPanel`。代价是无 UI 虚拟化（超大目录一次性实例化全部项容器），缩略图靠服务侧并发 4 限流兜底。
+  - **行为变化**：Details 里 Enter 现在与双击一致（文件也提取并打开），因为任务书要求「Enter = 双击行为」。
+  - **i18n**：`Toolbar_LayoutMode` / `LayoutMode_Details` / `LayoutMode_Tile` / `LayoutMode_Content` / `LayoutMode_CycleTip`（i18n 1406 key）；Content 行的元数据标签复用既有 `DataGrid_Size/Compressed/Ratio/Modified`（计划里说的 `Metadata_Key_*` 三份 json 都不存在）。
+  - **测试**：`tests/MantisZip.UI.Avalonia.Tests/ThumbnailTests.cs` 47 例（分类映射 23 / 文本截断 7 / 缓存 7 / 选择控制器 10）。
+  - **真机验收**：`%TEMP%\mz-thumb.zip`（png / jpg / ico / txt / md / csv / svg / exe 各一）—— Tile 卡片显示真缩略图 + 文字卡 + 图标兜底；Content 行显示 128px 卡 + 名称 + 大小/压缩后/压缩率/修改日期；Details 与改动前一致；点布局按钮循环并落盘（重启保持）。
+  - **已知改进口子**：VM 每包 `new ThumbnailService` 且不传共享 `ThumbnailCache`（切目录丢缓存）；Tile/Content 无虚拟化；ICO 无缓存（筛选输入每敲一个字会重读最多 20 个 ico）。
 **2026-11-02** — 功能：压缩包内 `.ico` 显示自身图标（v0.5.6 第三项）
   - **背景**：包内 `.ico` 一直是通用图标。原因有两条：引擎的「图片」扩展名白名单只有系统已注册的位图格式；`ArchiveItemModel.IconSource` 由 `ArchiveFormatHelper` 按扩展名决定，`.ico` 落到通用文件图标。
   - **实现**：新增 `src/MantisZip.UI.Avalonia/Services/IcoIconHelper.cs`（`ExtractIcon(byte[])`：校验 ICONDIR（reserved=0 / type=1 / count>0 / 目录完整）→ 按 `Math.Abs(w*h - 256)` 选最接近 16×16 的帧（宽高字节 0 视作 256）→ 把该帧重打包成 `6+16+frameLen` 单帧 ico 交 `new Bitmap(stream)`；失败回退 `IcoParser.ExtractFrames(byte[])` 逐帧解码挑面积最接近 16×16；非法输入一律 `null` + 一行 `App.DebugLog`，不抛异常）+ `Services/IcoIconLoader.cs`（`Task.Run` 内逐条 `ArchiveEntryExtractor.ExtractEntryToMemoryAsync(..., maxBytes: 2MB, ...)` → `ExtractIcon` → `Dispatcher.UIThread.Post` 赋 `IconSource`；`MaxIcons = 20`；取消静默返回）。

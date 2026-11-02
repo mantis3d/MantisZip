@@ -1,4 +1,9 @@
 ﻿{
+  "Toolbar_LayoutMode": "Thumbnail layout",
+  "LayoutMode_Details": "Details",
+  "LayoutMode_Tile": "Tiles",
+  "LayoutMode_Content": "Content",
+  "LayoutMode_CycleTip": "Cycle thumbnail layout",
   "Extract_PickerAdvancedMode": "Advanced mode",
   "Extract_TabOutput": "Output",
   "Extract_TabAddArchives": "Add Archives",

@@ -13,6 +13,48 @@
        规则：拆出 UserControl 时，凡是被搬走的 XAML 引用到的局部资源必须一并搬过来。 -->
   <UserControl.Resources>
     <conv:RatioToWidthConverter x:Key="RatioToWidthConverter" />
+    <!-- 缩略图布局：选中态背景（true → ThemeToggleBrush 半透明强调色，false → Transparent）。
+         复用既有 BoolToToggleBgBrushConverter（与菜单/列头切换图标同源），不新增转换器类。 -->
+    <conv:BoolToToggleBgBrushConverter x:Key="ThumbnailSelectedBrushConverter" />
+    <!-- 文字片段非空判断（三态内容卡第 ② 态用），复用既有 StringNotEmptyConverter -->
+    <conv:StringNotEmptyConverter x:Key="ThumbnailTextNotEmptyConverter" />
+
+    <!-- ══════════════ 三态内容卡（平铺项 / 内容行共用） ══════════════
+         绑定对象是条目模型 ArchiveItemModel，按优先级三选一显示，全部用 IsVisible 组合判断，
+         不写转换器类：
+         ① ThumbnailSource 非空 → 128 内等比缩略图（最长边 128，保持宽高比）
+         ② 否则 TextSnippet 非空 → 128×128 文字卡片（文本类文件首屏内容预览）
+         ③ 否则 → IconSource 文件类型图标居中兜底（32px：16px 图标放大到 48 会发虚） -->
+    <DataTemplate x:Key="ThumbnailContentCard" x:DataType="models:ArchiveItemModel">
+      <Panel Width="128" Height="128">
+        <!-- ① 缩略图 -->
+        <Image Source="{Binding ThumbnailSource}"
+               Width="128" Height="128"
+               Stretch="Uniform"
+               IsVisible="{Binding ThumbnailSource, Converter={x:Static ObjectConverters.IsNotNull}}" />
+        <!-- ② 文字片段卡片 -->
+        <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                BorderBrush="{DynamicResource ThemeBorderBrush}"
+                BorderThickness="1"
+                CornerRadius="{DynamicResource BorderRadius}"
+                Width="128" Height="128"
+                IsVisible="{Binding TextSnippet, Converter={StaticResource ThumbnailTextNotEmptyConverter}}">
+          <TextBlock Text="{Binding TextSnippet}"
+                     FontSize="11"
+                     TextWrapping="Wrap"
+                     TextTrimming="CharacterEllipsis"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                     Padding="{DynamicResource SpacingXsThk}" />
+        </Border>
+        <!-- ③ 兜底图标（目录 / 二进制 / 超出缩略图上限的条目） -->
+        <Image Source="{Binding IconSource}"
+               Width="32" Height="32"
+               Stretch="Uniform"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               IsVisible="{Binding !HasThumbnailContent}" />
+      </Panel>
+    </DataTemplate>
   </UserControl.Resources>
 
   <!-- 压缩包内容区：目录树 / 文件列表 / 预览面板 / 拖拽添加覆层
@@ -170,6 +212,23 @@
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                          VerticalAlignment="Center" />
 
+              <!-- 布局模式切换（详情 → 平铺 → 内容 三态循环）：图标 + 当前模式文字。
+                   图标 IconThumbnails 与 ViewMode 按钮的 IconGrid 视觉区分；
+                   文案 LayoutModeLabel 由 VM 按当前模式本地化，随语言切换刷新（规则 13）。 -->
+              <Button Classes="ToolbarButton ToolbarIcon"
+                      Command="{Binding CycleLayoutModeCommand}"
+                      IsEnabled="{Binding IsArchiveLoaded}"
+                      ToolTip.Tip="{Binding LocalizedStrings[LayoutMode_CycleTip]}">
+                <PathIcon Data="{StaticResource IconThumbnails}"
+                          Width="16" Height="16"
+                          Classes="ToolbarButtonIcon"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Button>
+              <TextBlock Text="{Binding LayoutModeLabel}"
+                         FontSize="10"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         VerticalAlignment="Center" />
+
               <Border Width="1" Height="20" Margin="2,0"
                       VerticalAlignment="Center"
                       Background="{DynamicResource ThemeBorderBrush}" />
@@ -247,9 +306,10 @@
                                      EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
           </Border>
 
-          <!-- DataGrid -->
+          <!-- DataGrid（详情布局）：三布局容器之一，仅在 IsDetailsLayout 时可见 -->
           <DataGrid x:Name="FileListGrid"
                     Grid.Row="2"
+                    IsVisible="{Binding IsDetailsLayout}"
                     ItemsSource="{Binding CurrentEntries}"
                     SelectedItem="{Binding SelectedEntry}"
                     AutoGenerateColumns="False"
@@ -473,6 +533,209 @@
               </DataGridTemplateColumn>
             </DataGrid.Columns>
           </DataGrid>
+
+          <!-- ══════════════ 平铺布局（Tile）：缩略图网格 ══════════════
+               与 DataGrid 同处 Grid.Row=2，按 IsDetailsLayout / IsTileLayout / IsContentLayout 三选一显示。
+               Avalonia 12 已移除 ItemsRepeater / UniformGridLayout / StackLayout，故用 ItemsControl +
+               WrapPanel 铺网格（无 UI 虚拟化：缩略图由 VM 侧 ThumbnailService 限流批量加载，不依赖虚拟化）。
+               事件接线：ThumbnailLayout_*（按下/移动/键盘/右键）与 ThumbnailItem_DoubleTapped 由
+               MainWindow.Thumbnails.cs 的 SetupThumbnailLayoutEvents →
+               HookThumbnailLayoutContainer("TileLayoutScrollViewer") 按 x:Name 在代码里订阅
+               （Tunnel 阶段 + 容器级 DoubleTapped 兜底），因此这里不写 XAML 事件属性。 -->
+          <ScrollViewer x:Name="TileLayoutScrollViewer"
+                        Grid.Row="2"
+                        IsVisible="{Binding IsTileLayout}"
+                        Background="{DynamicResource ThemeSurfaceBgBrush}"
+                        Padding="{DynamicResource SpacingXsThk}"
+                        HorizontalScrollBarVisibility="Disabled"
+                        Focusable="True">
+            <!-- 右键菜单：与 DataGrid 内联菜单同构（DataContext 同为窗口 VM，命令绑定原样复用） -->
+            <ScrollViewer.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"
+                          Command="{Binding ExtractArchiveCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedHere]}"
+                          Command="{Binding ExtractSelectedHereCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedTo]}"
+                          Command="{Binding ExtractSelectedToCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_SmartExtract]}"
+                          Command="{Binding SmartExtractCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractTo]}"
+                          Command="{Binding ExtractToCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyName]}"
+                          Command="{Binding CopyFileNameCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyPath]}"
+                          Command="{Binding CopyFilePathCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
+                          Command="{Binding TestEntryCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
+                          Command="{Binding DeleteFilesCommand}"
+                          IsEnabled="{Binding CanDeleteEntries}" />
+              </ContextMenu>
+            </ScrollViewer.ContextMenu>
+            <ItemsControl ItemsSource="{Binding CurrentEntries}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <!-- 网格铺排：每格 144 宽（136 项壳 + 间距），左对齐、自动换行 -->
+                  <WrapPanel Orientation="Horizontal"
+                             ItemWidth="144"
+                             ItemSpacing="{DynamicResource SpacingXxs}"
+                             LineSpacing="{DynamicResource SpacingXxs}"
+                             ItemsAlignment="Start" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:ArchiveItemModel">
+                  <!-- 单个缩略图项：外壳 Border 承载选中高亮。
+                       宽度 136 = 128 内容卡 + 2×4 内边距（Padding 取 SpacingXxsThk：SpacingSmThk 的 12
+                       会让 128 卡溢出格子）；MinHeight 走紧凑度资源（规则 7）。 -->
+                  <Border Width="136"
+                          MinHeight="{DynamicResource ControlHeightXxl}"
+                          Padding="{DynamicResource SpacingXxsThk}"
+                          CornerRadius="{DynamicResource BorderRadius}"
+                          Background="{Binding IsSelected, Converter={StaticResource ThumbnailSelectedBrushConverter}}">
+                    <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                      <!-- 三态内容卡（缩略图 / 文字片段 / 类型图标） -->
+                      <ContentControl Content="{Binding}"
+                                      ContentTemplate="{StaticResource ThumbnailContentCard}"
+                                      HorizontalAlignment="Center" />
+                      <TextBlock Text="{Binding NameDisplay}"
+                                 FontSize="11"
+                                 TextWrapping="NoWrap"
+                                 TextTrimming="CharacterEllipsis"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    </StackPanel>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
+
+          <!-- ══════════════ 内容布局（Content）：左侧内容卡 + 右侧元数据 ══════════════
+               行 = 横向 Grid（左 128px 三态内容卡 + 右名称/大小/压缩后/压缩率/修改日期），
+               事件与菜单接线方式与平铺布局完全一致（代码侧按 ContentLayoutScrollViewer 订阅）。 -->
+          <ScrollViewer x:Name="ContentLayoutScrollViewer"
+                        Grid.Row="2"
+                        IsVisible="{Binding IsContentLayout}"
+                        Background="{DynamicResource ThemeSurfaceBgBrush}"
+                        Padding="{DynamicResource SpacingXsThk}"
+                        HorizontalScrollBarVisibility="Disabled"
+                        Focusable="True">
+            <!-- 右键菜单：与 DataGrid 内联菜单同构 -->
+            <ScrollViewer.ContextMenu>
+              <ContextMenu>
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Extract]}"
+                          Command="{Binding ExtractArchiveCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedHere]}"
+                          Command="{Binding ExtractSelectedHereCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractSelectedTo]}"
+                          Command="{Binding ExtractSelectedToCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_SmartExtract]}"
+                          Command="{Binding SmartExtractCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_ExtractTo]}"
+                          Command="{Binding ExtractToCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyName]}"
+                          Command="{Binding CopyFileNameCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_CopyPath]}"
+                          Command="{Binding CopyFilePathCommand}" />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
+                          Command="{Binding TestEntryCommand}" />
+                <Separator />
+                <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
+                          Command="{Binding DeleteFilesCommand}"
+                          IsEnabled="{Binding CanDeleteEntries}" />
+              </ContextMenu>
+            </ScrollViewer.ContextMenu>
+            <ItemsControl ItemsSource="{Binding CurrentEntries}">
+              <ItemsControl.ItemsPanel>
+                <ItemsPanelTemplate>
+                  <!-- 纵向列表：行间距用紧凑度资源 -->
+                  <StackPanel Orientation="Vertical" Spacing="{DynamicResource SpacingXxs}" />
+                </ItemsPanelTemplate>
+              </ItemsControl.ItemsPanel>
+              <ItemsControl.ItemTemplate>
+                <DataTemplate x:DataType="models:ArchiveItemModel">
+                  <!-- 单行：左 128 内容卡 + 右元数据块（名称加粗 14px + 四行「标签: 值」） -->
+                  <Border MinHeight="{DynamicResource ControlHeightXxl}"
+                          Padding="{DynamicResource SpacingXsThk}"
+                          CornerRadius="{DynamicResource BorderRadius}"
+                          Background="{Binding IsSelected, Converter={StaticResource ThumbnailSelectedBrushConverter}}">
+                    <Grid ColumnDefinitions="128,*">
+                      <ContentControl Grid.Column="0"
+                                      Content="{Binding}"
+                                      ContentTemplate="{StaticResource ThumbnailContentCard}"
+                                      VerticalAlignment="Top" />
+                      <StackPanel Grid.Column="1"
+                                  Margin="{DynamicResource SpacingSmThk}"
+                                  Spacing="{DynamicResource SpacingXxs}"
+                                  VerticalAlignment="Center">
+                        <TextBlock Text="{Binding NameDisplay}"
+                                   FontWeight="SemiBold"
+                                   FontSize="14"
+                                   TextWrapping="NoWrap"
+                                   TextTrimming="CharacterEllipsis"
+                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        <!-- 元数据四行：标签取既有 DataGrid_* 文案 key（已登记在 UpdateLocalizedStrings） -->
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Size]}"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          <TextBlock Text=":"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          <TextBlock Text="{Binding SizeDisplay}"
+                                     FontSize="11"
+                                     TextTrimming="CharacterEllipsis"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Compressed]}"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          <TextBlock Text=":"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          <TextBlock Text="{Binding CompressedSizeDisplay}"
+                                     FontSize="11"
+                                     TextTrimming="CharacterEllipsis"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Ratio]}"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          <TextBlock Text=":"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          <TextBlock Text="{Binding RatioDisplay}"
+                                     FontSize="11"
+                                     TextTrimming="CharacterEllipsis"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        </StackPanel>
+                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Modified]}"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          <TextBlock Text=":"
+                                     FontSize="11"
+                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          <TextBlock Text="{Binding LastModifiedDisplay}"
+                                     FontSize="11"
+                                     TextTrimming="CharacterEllipsis"
+                                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        </StackPanel>
+                      </StackPanel>
+                    </Grid>
+                  </Border>
+                </DataTemplate>
+              </ItemsControl.ItemTemplate>
+            </ItemsControl>
+          </ScrollViewer>
         </Grid>
       </Grid>
 

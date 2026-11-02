@@ -1,4 +1,9 @@
 ﻿{
+  "Toolbar_LayoutMode": "缩略图布局",
+  "LayoutMode_Details": "详情",
+  "LayoutMode_Tile": "平铺",
+  "LayoutMode_Content": "内容",
+  "LayoutMode_CycleTip": "切换缩略图布局",
   "Extract_PickerAdvancedMode": "高级模式",
   "Extract_TabOutput": "输出设置",
   "Extract_TabAddArchives": "添加压缩包",

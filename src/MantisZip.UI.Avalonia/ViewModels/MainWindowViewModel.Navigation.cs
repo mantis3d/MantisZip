@@ -206,6 +206,9 @@ public partial class MainWindowViewModel : ObservableObject
 
             // 通用图标已经填好（列表首帧不被阻塞），现在才去后台换成 .ico 文件自身的图标
             ReloadOwnIcoIcons();
+
+            // 卡片布局（平铺/内容）才需要缩略图：列表重填完成后按需启动（详情布局内部直接返回）
+            StartThumbnailBatchIfNeeded();
         }
         finally
         {
@@ -486,6 +489,8 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     partial void OnCurrentFolderChanged(string? value)
     {
+        // 切目录先终止上一目录的缩略图批次（缓存按目录粒度丢弃），随后 PopulateEntries 会按需重启
+        CancelThumbnailBatch();
         if (!AutoExpandTree) return;
         if (value == null) return;
         ExpandTreeToPath(value);
