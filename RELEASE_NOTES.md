@@ -18,6 +18,12 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 - **记住窗口尺寸** — 压缩设置窗、解压设置窗、文件选择器和设置窗口的尺寸现在会被记住（含两个设置窗的左右分栏宽度），下次打开回到上次拖动后的大小。只记尺寸不记位置：笔记本拔掉外接屏后把窗口还原到已不存在的坐标，很容易整窗跑到屏幕外；保存的尺寸不合法（0、负数、异常值）时一律回落到默认大小
 - **Window sizes are remembered** — the compression window, the extraction window, the file picker and the settings window now remember their size (including the left/right split width of the two settings windows), so they reopen at the size you last dragged them to. Size only, not position: after unplugging an external monitor, restoring a window to coordinates that no longer exist easily pushes it off-screen; and invalid saved sizes (zero, negative, garbage) always fall back to the default
 
+**性能 / Performance**
+
+- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）现在 1.7 秒解完，此前要 19 秒。只对 7z 整包解压生效，ZIP/RAR、加密包与单文件解压不受影响；条目很多的包会先短暂显示「正在检查冲突…」再开始解压。
+
+- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s. This applies to whole-archive extraction of 7z only: ZIP/RAR, encrypted archives and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts.
+
 **修复 / Fixes**
 
 - **自解压 exe 现在能真正打开了** — 修正 v0.5.4 的自解压支持：不再只看文件末尾 8KB，改为按 PE 结构定位内嵌压缩包，7-Zip 与 WinRAR 制作的安装包都能列出、预览、解压，RAR 自解压包的注释也能读到了

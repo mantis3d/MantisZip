@@ -151,6 +151,7 @@
   "Progress_Phase_ReadingArchive": "Reading archive…",
   "Progress_Phase_Compressing": "Compressing…",
   "Progress_Phase_Extracting": "Extracting…",
+  "Progress_Phase_CheckingConflicts": "Checking for conflicts…",
   "Progress_Phase_Finalizing": "Finalizing…",
   "Progress_Phase_Testing": "Verifying…",
   "Progress_FileCount_Scanning": "{0} files found",
@@ -1261,7 +1262,8 @@
   "Picker_AlreadyFavorite": "Already in favorites",
   "Picker_FileName": "File name",
   "Picker_FileType": "File type",
-  "Picker_FileTypeArchive": "Archive files",
+  "Picker_FileTypeArchive": "Archive files",
+
   "Picker_FileTypeSfxExe": "Self-extracting programs (*.exe)",
   "Picker_FileTypeAll": "All files",
   "Picker_PickItemsTitle": "Selected items",

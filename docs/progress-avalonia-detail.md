@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-02** — 性能：7z solid 全量解压改走批量接口（issue #75，800×64KB 从 19.3s → 1.67s）
+  - **触发**：issue #75 报告「解压海量小文件到机械硬盘时速度极慢」。用本机 7z.dll 造 800×64KB（52MB）solid 包实测：改造前 19.3s、同机 `7z.exe x` 0.56s、裸 `ExtractFiles` 0.86s ⇒ 差距全在逐条目 `ExtractFile`（solid 包每解一个条目都要重新定位解码块）。
+  - **分流**：`SevenZipEngine.ExtractAsync` 新增 `BuildBulkPlanAsync()` 闸门 —— `format == SevenZip`（`SfxProbe.TryGetPayloadFormat` 优先，回落 `GetFormatByExtension`）+ `extractor.IsSolid` + 无密码且无加密条目 + `options.ErrorResolver == null` + 可批量条目数 > 0；任一不满足即退回原逐条目路径。回退开关是 `private static readonly bool EnableBulkSolidExtract = true;`（写成 `const` 会让「关闭」分支被判死代码 CS0162）。
+  - **冲突预解析**：批量拿不到逐条 stat，于是把冲突判定提前到解压前一次分桶 —— 无冲突全进 `Direct`；`Overwrite` 且无 resolver 走零 stat 快路径（只留一次 `File.Exists` 供覆盖计数）；`Skip` 不进批量但照旧上报 `Skipped`；`Rename` / `OverwriteIfOlder` / `OverwriteIfSmaller` 进改名桶；`Ask`（出厂默认）在预解析阶段逐条问完、勾「应用到全部」后定型；归档内重名条目（`HashSet<string>` 认领落点，OrdinalIgnoreCase）与 `GetSafePath` 越界条目退逐条目。预解析开始报新阶段 `ArchivePhase.CheckingConflicts`，每 200 条刷一次进度。
+  - **执行**：`Direct` 桶一次 `extractor.ExtractFiles(destinationPath, indexes)`；改名桶先批量到目标目录内 `.mantiszip-staging-<guid>` 再逐条 `File.Move` 到预解析缓存的目标名（移动成功才计数，`IOException`/`UnauthorizedAccessException` 退回逐条目，`try/finally` 删暂存目录并清扫历史残留）；`BigFile`（≥64MB）/ `Unsafe` / `Duplicate` 桶最后逐条跑。三段共用同一批计数器，进度不跳变。
+  - **语义保持**：逐条目状态（Completed / Skipped / Overwritten / PermissionDenied / IoFailed）与 `ExtractResult` 计数不变；主进度百分比取「字节比 vs 文件计数比」最大值防倒退；`FileExtractionStarted` 里查取消标记并 `e.Cancel = true`（实测第 50 条即停、已落盘保留）；批量段抛异常时只对未完成条目逐条重试。
+  - **踩坑**：① `BulkEntryPlan` / `BulkExtractPlan` 必须同为 `internal`（private 嵌套在 internal 类里触发 CS0053）；② 零 stat 快路径让 `OverwrittenEntries` 归零（原逐条目路径靠 `ResolvePathAsync` 顺手 `RecordOverwritten`），改为预解析统一 `File.Exists` 存 `WasExisting`、批量回调里按「已存在且落点未改名」补记，语义与逐条目逐字对齐；③ `tests/MantisZip.Tests` 是 xUnit v2、没有 `TestContext`，不能用 `TestContext.Current.CancellationToken`。
+  - **测试**：新增 `tests/MantisZip.Tests/Engines/SevenZipEngineBulkExtractTests.cs` 5 例 —— 内容正确、80 条逐条目状态齐全（D11）、Skip 保留原文件、Rename 生成副本并清空暂存目录、Overwrite 计数与内容替换。语料现场造 80 条 solid 7z（40 顶层 + 40 子目录），找不到 7z.dll 时跳过。
+  - **验证**：core / avalonia（Release）0 警告；`tests` 全绿（2 条存量警告）；`ui-tests` 63.2s 全绿（28 条存量警告）；`i18n` 1398 key 三语一致；真机基准 `bulkMs=1673`。
+  - **边界**：只覆盖全量解压；勾选条目 / 拖拽解压仍走逐条目，另立计划 `.omo/plans/未开始/selected-items-bulk-extract.md`（用户 2026-11-02 定「先只做全量、看实测再决定」）；非 solid 包与加密包不受影响。
 **2026-10-31** — 增强：exe 预览的「程序信息」补四个字段（issue #74 后续）
   - **触发**：修完标题与 64 位元数据后，用户问「内容面板里东西几乎都清空了，补完后能回来吗」。结论是搬家不算丢失 —— 原 `PreviewPanel.axaml` 里硬编码的 5 行 legacy 键值块已并入右侧元数据面板；用户决定「保持现状，四个都加」。
   - **新增字段**：文件描述（复用 `AdditionalInfo`）/ 著作权（`LegalCopyright`）/ 原始文件名（`OriginalFilename`）/ 语言（`Language`）。

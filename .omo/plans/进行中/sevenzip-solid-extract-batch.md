@@ -1,6 +1,6 @@
 # 7z 全量解压改走批量接口（solid 归档性能修复）(SevenZip Solid Bulk Extract)
 
-> **状态**: 🚧 进行中（2026-11-02 开工）| **创建日期**: 2026-11-01
+> **状态**: 🟡 实现完成（2026-11-02；待真机 HDD 实测后归档）| **创建日期**: 2026-11-01
 > **关联**: GitHub issue #75（`[性能] 解压海量小文件到机械硬盘时速度极慢`）；`docs/KNOWN_ISSUES.md` 无相关条目
 > **前置**: 无（Core 引擎内部改造 + 复用现有进度/冲突契约）
 > **决策来源**: 2026-11-01 与用户讨论 —— 用户最初假设「多线程解压在慢速硬盘反而拖累」，实测证明根因是「solid 归档逐条目提取 → 对文件数二次方」；用户要求先说明用户体验影响（见计划内「体验变化矩阵」），随后指示「写计划，所有决策按照你认为最好的方式来确定」。本计划所有决策由实施者按证据拍板，已逐条记录理由（§6）。第二轮讨论补充：用户指出「覆盖安装」这类场景下默认 `ask` 策略必须仍然提速，据此把冲突询问改为**解压前一次问完**（D4b），并把批量失败回退收紧为**只重试未完成条目**（D6）。第三轮（2026-11-02）拍板：① 接受「冲突询问提前到解压开始前集中问完」；② 改名暂存目录放在**目标目录内**（`.mantiszip-staging-<guid>`）；③ 本次**只优化全量解压**，勾选条目 / 拖拽行走 `ExtractEntriesAsync` 不动。
@@ -429,3 +429,23 @@ catch (Exception ex) {
 2. ZIP 并行解压的 HDD 节流（`IOCTL_STORAGE_QUERY_PROPERTY` → `StorageDeviceSeekPenaltyProperty`；或 WMI `MSFT_PhysicalDisk.MediaType`），目标：`ParallelExtractDegree` 在 seek penalty 高的盘上自动降到 1–2
 3. 加密 solid 包批量解压（先测 `ExtractFiles(dir, indexes, password)` 的重载行为）
 4. 小文件聚合写（仅当批量路径落地后仍有写放大问题才考虑）
+
+## 14. 实施记录（2026-11-02）
+
+**代码落地（与 §7 的对应与差异）**：
+
+| 计划 | 实际 | 差异说明 |
+|---|---|---|
+| S1 抽三段 | `#region ExtractAsync（SharpSevenZipExtractor）` 整段重写，`ExtractAsync` 外壳不变，内部改为局部函数 `ExtractSingleEntryAsync` / `ExtractEntriesOneByOneAsync` / `BuildBulkPlanAsync` / `RunBulkSegmentAsync` / `RunBulkAsync` / `ReportMainProgress` / `ReportSkippedEntries` | 用闭包共享计数器代替参数透传（`ref` 不能跨 `async`），`continue` 改 `return` |
+| S3 抽 `internal static BulkExtractPlan BuildPlan(...)` | 未抽成静态方法，改为闭包内 `BuildBulkPlanAsync()`；但 `BulkEntryPlan` / `BulkExtractPlan` 仍是 `internal sealed class`（供测试与后续复用） | 预解析要读 `extractor.IsSolid` / `ArchiveFileData`，脱离实例反而要透传更多上下文；单测改为走公开的 `ExtractAsync` 覆盖 |
+| S5 测试 | 新增 `tests/MantisZip.Tests/Engines/SevenZipEngineBulkExtractTests.cs` 5 例（类名含 `SevenZipEngine` 以沿用 CI 的 `FullyQualifiedName!~SevenZipEngine` 过滤） | **未**新增 `tests/corpus/sevenzip/solid-small.7z`：语料由测试代码现场用 7z.dll 生成（80 条），找不到 `7z.dll` 时跳过；避免二进制语料入库 |
+| — | 新增 `ArchivePhase.CheckingConflicts` + 三语 key `Progress_Phase_CheckingConflicts` | 预解析期间进度条不显示「未知阶段」 |
+
+**实现中确认的细节**：① 归档内重名条目归入 `Duplicate` 桶走逐条目（逐条目路径写盘时会重新 `ResolvePathAsync`，语义与改造前完全一致，代价是重名条目多解码一遍）；② 零 stat 快路径仍保留每文件一次 `File.Exists` —— 否则 `OverwrittenEntries` 归零（首跑测试即 `Expected: 80 / Actual: 0`）；③ `EnableBulkSolidExtract` 必须是 `static readonly`（`const` 会让关闭分支被判不可达 CS0162）。
+
+**实测（本机 SSD，`%TEMP%` 夹具）**：800×64KB（52MB）solid 7z（archiveBytes=17191）`ExtractAsync` 全程 **1673ms**、800/800 成功；对照改造前 19.3s（§2.2）、`7z.exe x` 0.56s、裸 `ExtractFiles` 0.86s ⇒ 约 **11.5×**。略高于 §10 写的「≤1.5s」，差值来自 800 次 `File.Exists` 与逐条状态/进度上报。
+
+**仍未验收（需真机）**：§10 的 HDD（机械盘）目标盘复测、§5.5 暂停 3s→恢复行为、Task 8 的手工场景（Windows 资源管理器拖拽不涉及本改动，见 §4 非目标）。
+
+**验证**：core / avalonia（Release）0 警告；`tests` 全绿（2 条存量警告）；`ui-tests` 63.2s 全绿（28 条存量警告）；`i18n` 1398 key 三语一致。
+

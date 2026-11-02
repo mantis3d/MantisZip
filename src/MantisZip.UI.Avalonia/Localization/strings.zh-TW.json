@@ -151,6 +151,7 @@
   "Progress_Phase_ReadingArchive": "正在讀取壓縮檔…",
   "Progress_Phase_Compressing": "正在壓縮…",
   "Progress_Phase_Extracting": "正在解壓…",
+  "Progress_Phase_CheckingConflicts": "正在檢查衝突…",
   "Progress_Phase_Finalizing": "正在收尾…",
   "Progress_Phase_Testing": "正在校驗…",
   "Progress_FileCount_Scanning": "已發現 {0} 個檔案",
@@ -1261,7 +1262,8 @@
   "Picker_AlreadyFavorite": "已在我的最愛",
   "Picker_FileName": "檔案名",
   "Picker_FileType": "檔案類型",
-  "Picker_FileTypeArchive": "壓縮檔檔案",
+  "Picker_FileTypeArchive": "壓縮檔檔案",
+
   "Picker_FileTypeSfxExe": "自解壓程式 (*.exe)",
   "Picker_FileTypeAll": "所有檔案",
   "Picker_PickItemsTitle": "已選項目",

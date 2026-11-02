@@ -304,6 +304,23 @@ MantisZip/
 
 > AGENTS.md 受工作区指令 64KB 预算限制，以下小节从 AGENTS.md 迁出；AGENTS.md 保留摘要与链接，细节以本文为准。
 
+### 7z solid 批量解压分流（2026-11-02）
+
+solid 7z 每解一个条目都要重新定位解码块，逐条目 `ExtractFile` 会退化成二次方（800×64KB 实测 19.3s，同机 `7z.exe x` 0.56s）。`SevenZipEngine.ExtractAsync` 因此按条件分流到 `extractor.ExtractFiles(dir, indexes)`：
+
+| 条件 | 说明 |
+|---|---|
+| 格式 = `SevenZip` | `SfxProbe.TryGetPayloadFormat` 优先、回落 `GetFormatByExtension`（SFX 的 `.exe` 也会命中） |
+| `extractor.IsSolid` | 非 solid 逐条目本来就快，走批量无收益 |
+| 无密码且无加密条目 | 加密 solid 的批量重载行为未验证 |
+| `options.ErrorResolver == null` | 有 resolver 时必须逐条拿异常上下文 |
+| 可批量条目数 > 0 | 全被跳过/全是大文件时直接退回 |
+
+- **冲突必须提前判定**：批量时段内没有逐条 stat 的机会，`BuildBulkPlanAsync()` 在解压前一次分桶（`Direct` / `Rename` / `BigFile` / `Unsafe` / `Duplicate` / `Skipped` / `Directories`），期间上报 `ArchivePhase.CheckingConflicts`。`Overwrite` 且无 resolver 走零 stat 快路径；`Skip` 不进批量但照旧上报；`Rename` 系策略先批量到目标目录内 `.mantiszip-staging-<guid>` 再逐条 `File.Move`；`Ask` 在预解析阶段问完「应用到全部」后定型。
+- **语义必须保持**：逐条目状态（Completed / Skipped / Overwritten / PermissionDenied / IoFailed）与 `ExtractResult` 计数、`OverwrittenEntries` 都不能因为走批量而变 —— 覆盖计数依赖 `BulkEntryPlan.WasExisting`（预解析时的一次 `File.Exists`），**不要删掉这次探测**。
+- **不要改成一律 bulk**：ZIP/TAR/RAR、加密包、64MB 以上单文件、越界路径、归档内重名条目都必须走逐条目；批量段抛异常时只对未完成条目重试。回退开关 `EnableBulkSolidExtract` 是 `static readonly`（写 `const` 会让关闭分支被判不可达 CS0162）。
+- 覆盖范围仅「全量解压」；勾选条目 / 拖拽解压走 `ExtractEntriesAsync`，另见 `.omo/plans/未开始/selected-items-bulk-extract.md`。
+
 ### 并行解压架构
 
 ZIP 解压支持并行模式（`ZipEngine.SupportsParallelExtract = true`），通过**多实例并行 + 批次复用**实现线程安全与低开销：

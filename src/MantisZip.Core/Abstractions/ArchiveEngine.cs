@@ -355,6 +355,11 @@ public enum ArchivePhase
     /// <summary>把条目解出到磁盘。</summary>
     Extracting,
 
+    /// <summary>
+    /// 解压前的冲突预解析（solid 批量解压把冲突判定提前到解压开始前，逐条目 stat 可能耗时数秒）。
+    /// </summary>
+    CheckingConflicts,
+
     /// <summary>收尾：合并分组/分卷、补写 ZIP 注释、后置回填统计、清理临时文件。</summary>
     Finalizing,
 
