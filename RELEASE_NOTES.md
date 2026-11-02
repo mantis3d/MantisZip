@@ -23,6 +23,8 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 - ![批量删除：勾选 3 项只弹一次确认](docs/images/version/v0.5.6/CheckboxBatchDelete.png)
 - **压缩设置窗的预览树显示实时计数** — 后台扫描目录期间，根节点标题从静态的「加载中…」变成「加载中 N 个文件，X」并每半秒刷新，扫完自动切到真实统计；被文件过滤排除的条目不计数
 - **The compression window's preview tree counts as it scans** — while the folder scan runs in the background, the root node now reads "Loading N files, X" and refreshes twice a second instead of a static "Loading…", switching to the real totals when the scan finishes; entries excluded by the file filter are not counted
+- **缩略图卡片可调外观** — 「设置 → 外观 → 缩略图」可调三项，改完立刻生效不用重启：卡片外边框（默认关闭，白底图贴在浅色背景上时用来看清边界）、透明图是否垫一层纯色底（默认保留透明，垫色可自选）、缩略图尺寸三档 96 / 128 / 160 px
+- **Adjustable thumbnail cards** — Settings → Appearance → Thumbnails exposes three options that apply immediately: a card border (off by default, handy for white-background images on light surfaces), whether transparent images get a solid backdrop (transparency is kept by default; the backdrop colour is pickable), and the thumbnail size in three steps (96 / 128 / 160 px)
 
 ## v0.5.5
 
