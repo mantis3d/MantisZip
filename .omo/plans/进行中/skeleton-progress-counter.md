@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-> **档位**: **A 档 · v0.5.6**（2026-10-29 从「小活清仓」提到 A 档：骨架期的数字在动，直接决定打开大包时的第一印象）
+> **档位**: **A 档 · v0.5.6**  ·  **状态**: 🚧 进行中（2026-11-02 开工）（2026-10-29 从「小活清仓」提到 A 档：骨架期的数字在动，直接决定打开大包时的第一印象）
 
 ## TL;DR
 

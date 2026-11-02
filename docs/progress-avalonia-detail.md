@@ -6,6 +6,21 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-02** — 功能：压缩包内 `.ico` 显示自身图标（v0.5.6 第三项）
+  - **背景**：包内 `.ico` 一直是通用图标。原因有两条：引擎的「图片」扩展名白名单只有系统已注册的位图格式；`ArchiveItemModel.IconSource` 由 `ArchiveFormatHelper` 按扩展名决定，`.ico` 落到通用文件图标。
+  - **实现**：新增 `src/MantisZip.UI.Avalonia/Services/IcoIconHelper.cs`（`ExtractIcon(byte[])`：校验 ICONDIR（reserved=0 / type=1 / count>0 / 目录完整）→ 按 `Math.Abs(w*h - 256)` 选最接近 16×16 的帧（宽高字节 0 视作 256）→ 把该帧重打包成 `6+16+frameLen` 单帧 ico 交 `new Bitmap(stream)`；失败回退 `IcoParser.ExtractFrames(byte[])` 逐帧解码挑面积最接近 16×16；非法输入一律 `null` + 一行 `App.DebugLog`，不抛异常）+ `Services/IcoIconLoader.cs`（`Task.Run` 内逐条 `ArchiveEntryExtractor.ExtractEntryToMemoryAsync(..., maxBytes: 2MB, ...)` → `ExtractIcon` → `Dispatcher.UIThread.Post` 赋 `IconSource`；`MaxIcons = 20`；取消静默返回）。
+  - **接线**：`MainWindowViewModel.Navigation.cs` 的 `PopulateEntries()` 在 `EntriesRefreshed` 之后调 `ReloadOwnIcoIcons()`（列表先显示通用图标、首帧不阻塞），每次先 Cancel/Dispose 旧 `CancellationTokenSource`；`ClearArchiveInternal()` 里取消并释放。`IcoParser.ExtractFrames(string)` 拆成「读文件 → 委托」，新增 `ExtractFrames(byte[])` 重载（纯加法）。
+  - **测试**：`tests/MantisZip.UI.Avalonia.Tests/IcoIconHelperTests.cs` 6 例（单帧 16×16 PNG-ICO、多帧选 16×16、目录项宽高 0 → 256、空/4 字节/裸 PNG 全 `null`、count=0、偏移越界）。
+  - **真机验收**：`%TEMP%\mz-ico.zip`（`App.ico` 64.64 KB + `zip.ico` 67.94 KB + `readme.txt`）打开后两个 ico 显示各自图标、txt 仍为通用图标。
+  - **已知风险**：无缓存，`PopulateEntries()` 在筛选输入时也会跑 ⇒ 每敲一个字会取消上一批并重读最多 20 个 ico（后续可按包内条目集合缓存）。
+
+**2026-11-02** — 功能：骨架态实时进度计数（v0.5.6 第二项）
+  - **背景**：压缩设置窗右侧预览树在后台扫描大目录时，根节点只有静态「加载中…」，用户看不到任何进展。
+  - **实现**：`Services/ResultPreviewService.cs` 的 `BuildSourceSubtree` 增加可选 `IProgress<SkeletonProgress>?`；`SkeletonCounter` 按引用共享（`AddFile(long size)` → `FileCount++ / TotalSize += size / Report`），`BuildDirectoryNode` 递归透传，被过滤的文件不计数。`Models/PreviewTreeNode.cs` 新增 `CurrentSkeletonProgress`（Equals 去抖，同时通知 `CurrentSkeletonProgress` 与 `DirectoryInfoText`），`DirectoryInfoText` 在有进度且 `FileCount > 0` 时显示 `Preview_Result_SkeletonProgress`。
+  - **为什么三处偏离计划**：①累计器必须按引用共享 —— 计划写的「按值传累计器」会让兄弟目录各自重数、数字来回跳；②不能用 `Progress<T>` —— 它每次 `Report` 都 Post 到 UI 线程，几万文件会把队列塞满，改为同步写字典的 `SkeletonProgressSink` + `DispatcherTimer`（500 ms）拉取；③必须多一张「源路径 → 屏上节点」表 —— 浅层子树的节点是直接 `Children.Add` 挂进树的，不缓存实例就找不到要更新的对象。
+  - **接线**：`ViewModels/CompressSettingsViewModel.cs` 维护 `_skeletonProgressTrackers` / `_skeletonProgressTargets` / `_skeletonProgressLock` / `_skeletonProgressOwnerVersion`（版本守卫，预览重建后旧扫描的进度不会写进新树）；Phase B 前 `StartSkeletonProgress(version)`，外层 `finally` 里按版本 `StopSkeletonProgress()`；`Dialogs/CompressSettingsWindow.axaml.cs` 的 `OnClosed` 也停一次。
+  - **i18n**：`Preview_Result_SkeletonProgress`（三语：「加载中 {0} 个文件，{1}」/ "Loading {0} files, {1}" /「載入中 {0} 個檔案，{1}」），并在 `MainWindowViewModel` 的 keys 数组登记。
+  - **测试**：`CompressPreviewProgressiveTests` 5 例（跨兄弟目录累计单调不减、过滤文件不计、无 sink 行为不变、有/无进度文案、`(0,0)` 回退静态文案）。
 **2026-11-02** — 计划：进度窗口「文件冲突自动处理」控件（TeraCopy 式）设计立项 + 可交互原型
   - **需求**：用户提出「模仿 TeraCopy，在 `ProgressWindow.axaml` 里加一个设置文件冲突自动处理的控件」，先讨论再动手。定口径：① 运行中随时切换、立即生效；② 解压 + 压缩都要；③ 保留现有 `ConflictDialog`（默认「询问」仍弹窗）；④ 实例级不回写全局设置；⑤ 布局 = 信息区首行与「少 / 中 / 完整」同排。
   - **勘察结论**（决定可行性的两条）：① 引擎**每个冲突都重读**一次策略（`Utils/FileConflictHelper.cs:24,72`），所以「运行中改策略、对之后的冲突立即生效」引擎侧天然成立、不用动引擎；② 但策略在进引擎前被 `SelectedItemsExtractService.CreateExtractOptions`（`:127`）烤成 `ArchiveOptions` 快照，进度窗口拿不到引用 —— 只在 XAML 加控件会变成「点了没反应」的死开关（规则 23 事故原型）。解压三引擎全部经 `FileConflictHelper` 这一个决策点；压缩是另一条链（`Core/Services/CompressService.cs:453` 按**输出包**判定一次，枚举是 `Overwrite/Add/Rename/Cancel`），`CompressFlow.CreateResolver`（`:123`）前端可直接挂实时源。

@@ -7,7 +7,7 @@
 - **技术栈**: .NET 10 + Avalonia 12 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.5.5
+- **当前版本**: 0.5.6
 - **发布日期**: 2026-07-22
 
 ## 变更记录结构
@@ -25,6 +25,9 @@
 
 按月分组，每月按日期从新到旧排列。
 
+#### 2026-11
+- **11-02** — **压缩包内 `.ico` 文件显示自身图标（v0.5.6 第三项）**：此前列表里所有 `.ico` 都显示通用图标（引擎只认系统已注册的图片扩展名，`ArchiveItemModel.IconSource` 只按扩展名给）。新增 `Services/IcoIconHelper`（校验 ICONDIR → 按 `Math.Abs(w*h - 256)` 最小挑帧（宽高字节 0 视作 256）→ 重打包成单帧 ico 交 Avalonia 解码；失败回退 `IcoParser.ExtractFrames` 逐帧解码挑最接近 16×16 的帧）+ `Services/IcoIconLoader`（`Task.Run` 里按条目读进内存（上限 2 MB）解码，回 UI 线程赋 `IconSource`，最多 20 个，可取消）。列表**先显示通用图标**、首帧不阻塞，`PopulateEntries()` 之后异步刷新；切换包 / 关闭包 / 重新过滤都会取消上一批。测试 `IcoIconHelperTests` 6 例。真机验收：包内 `App.ico` / `zip.ico` 显示各自图标，`readme.txt` 仍为通用文本图标。
+- **11-02** — **骨架态实时进度计数（v0.5.6 第二项）**：压缩设置窗右侧预览树在后台扫描目录期间，根节点标题从静态「加载中…」变成「加载中 N 个文件，X」，每 500 ms 刷新，扫完由真实统计接管。实现：`ResultPreviewService.BuildSourceSubtree` 接受可选 `IProgress<SkeletonProgress>`，累计器**按引用共享**（兄弟目录不会各自重数、数字不回跳），被过滤的文件不计数；`CompressSettingsViewModel` 用 `DispatcherTimer` 拉取（不用 `Progress<T>`，避免几万文件把 UI 线程队列塞满），并维护「源路径 → 屏上节点」表（浅层子树节点直接挂进树，必须缓存实例）；窗口关闭 / 预览重建都停止并取消。i18n 新增 `Preview_Result_SkeletonProgress` 三语。测试 `CompressPreviewProgressiveTests` 新增 5 例（跨兄弟目录单调不减、过滤不计、无 sink 行为不变、有/无进度文案、0 文件回退静态文案）。
 #### 2026-10
 - **10-30** — **解压「选中项到 / 拖拽兜底」改用解压设置窗（v0.5.5 第三步后半）**：两个入口不再弹只能选目录的选择器，改弹解压设置窗并预置本次触发的条目集（`SelectedEntries`），窗口自己执行（确认即载荷 + 唯一执行器）；拖拽入口的收尾动作改为 `DragDropExtractPostActions`（不删原包）。原设计的「选择要解压的文件」条目页经用户质疑后砍掉。
 - **10-30** — **设置窗内嵌文件选择器（v0.5.5 第二项，已完成压缩窗 / 解压窗）**：把 `CustomFilePickerDialog` 的浏览区抽成可复用控件 `Controls/CustomFilePickerControl`（模态壳退化为 56+329 行薄壳），压缩设置窗与解压设置窗不再弹二级选择器——输出目录 / 添加文件 / 添加压缩包 / 目标目录四类选择全部内嵌在页签里；控件新增「简单模式」（当前目录选中即结果、无复选框）与「高级模式」（跨目录累积）、`SetSelectedPaths` 宿主回填、`PathChanged` 目录变化事件、`HideAccumulatedPanel`（宿主自带已选清单时收起控件内累积面板）、PickItems 扩展名白名单（解压窗用 Core 的 `ArchiveExtensionCatalog`，只列压缩包）。顺带修三个真 bug：XAML 的 `Checked/Unchecked`（WPF 写法，Avalonia 没有）被增量构建吞掉、简单模式初始化把预选源文件清空、`FileBrowserItem.CanCheck` 是普通属性导致勾了高级模式也看不到复选框。同日还补了**窗口尺寸记忆**：压缩/解压设置窗、文件选择器、设置窗记住尺寸（含两个设置窗的左右分栏宽度），只记尺寸不记位置（避免多显示器拔插后窗口跑到屏幕外）。

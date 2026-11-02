@@ -213,6 +213,7 @@
   "MsgBox_Copy": "複製錯誤資訊",
   "MsgBox_Copied": "已複製 ✓",
   "Preview_Result_LoadingMore": "載入中",
+  "Preview_Result_SkeletonProgress": "載入中 {0} 個檔案，{1}",
   "Filter_PickDateFrom": "從目前項目取日期作為起始日期",
   "Filter_PickDateTo": "從目前項目取日期作為到期日期",
   "Filter_PickSizeMin": "從目前項目取大小作為最小值",

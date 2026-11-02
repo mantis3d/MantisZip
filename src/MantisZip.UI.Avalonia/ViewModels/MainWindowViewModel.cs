@@ -271,7 +271,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Tooltip_Open", "Tooltip_Extract", "Tooltip_ExtractSelectedHere", "Tooltip_ExtractSelectedTo", "Tooltip_NewArchive",
             "Tooltip_Filter", "Tooltip_Preview", "Tooltip_SmartExtract", "Tooltip_Test",
             "Tooltip_AddFiles", "Tooltip_DeleteFiles", "Tooltip_Subfolders",
-            "Preview_Result_LoadingMore",
+            "Preview_Result_LoadingMore", "Preview_Result_SkeletonProgress",
             "Status_AddComplete", "Status_DeleteComplete", "Status_TestOK", "Status_TestFailed",
             "Status_CommentSaved", "Status_SmartExtractSingleRoot", "Status_SmartExtractNamed",
             "Status_CommentNotSupported", "Status_ConfirmDelete",
@@ -761,6 +761,15 @@ public partial class MainWindowViewModel : ObservableObject
 
     // ── View mode (All / Files / Directories) ──
 
+    /// <summary>
+    /// 列表的**内容筛选**模式（全部 / 只看文件 / 只看目录）。
+    /// </summary>
+    /// <remarks>
+    /// 注意与 <c>FileListLayoutMode</c>（**布局**：详情 / 平铺 / 内容，见 file-list-thumbnails）区分：
+    /// 本枚举决定「显示哪些行」，布局枚举决定「每行怎么画」，两者互不影响。
+    /// 名字保留 <c>FileListViewMode</c> 不改——它已被快捷键、菜单文案 key（<c>ViewMode_All</c> 等）与测试引用，
+    /// 重命名的收益不抵改动面。
+    /// </remarks>
     public enum FileListViewMode { All, FilesOnly, DirectoriesOnly }
 
     [ObservableProperty]
@@ -1212,6 +1221,10 @@ public partial class MainWindowViewModel : ObservableObject
     {
         // 关包即停监视（换包时 LoadArchiveAsync 会重新 Attach），并复位可用性
         DetachArchiveGuard();
+        // 关包后列表已清空，未完成的后台图标加载必须立刻停下（否则会拿着已失效的模型继续读包）
+        _iconLoadCts?.Cancel();
+        _iconLoadCts?.Dispose();
+        _iconLoadCts = null;
         ArchiveAvailability = ArchiveAvailability.Available;
         Entries.Clear();
         CurrentEntries.Clear();

@@ -23,6 +23,12 @@ namespace MantisZip.UI.Avalonia.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
     /// <summary>
+    /// 「.ico 条目显示自身图标」后台加载的取消源。
+    /// 每次列表重建都会取消并重建它：旧批次未完成的读取立即作废，不会把图标回填到已丢弃的模型上。
+    /// </summary>
+    private CancellationTokenSource? _iconLoadCts;
+
+    /// <summary>
     /// 统一导航入口：记录历史，更新 CurrentFolder，刷新条目列表，同步目录树选择。
     /// </summary>
     private void NavigateAndPushHistory(string path)
@@ -197,11 +203,45 @@ public partial class MainWindowViewModel : ObservableObject
 
             // 条目重填完成，通知视图重应用列排序
             EntriesRefreshed?.Invoke(this, EventArgs.Empty);
+
+            // 通用图标已经填好（列表首帧不被阻塞），现在才去后台换成 .ico 文件自身的图标
+            ReloadOwnIcoIcons();
         }
         finally
         {
             _isProgrammaticFilter = false;
         }
+    }
+
+    /// <summary>
+    /// 为当前列表中的 <c>.ico</c> 条目后台加载「文件自身嵌入」的图标。
+    /// <para>
+    /// 通用扩展名图标已在 <see cref="PopulateEntries"/> 里同步填好，这里只做替换，
+    /// 所以列表首帧完全不受读包/解码影响。每次调用都会取消上一批未完成的加载。
+    /// </para>
+    /// </summary>
+    private void ReloadOwnIcoIcons()
+    {
+        // 取消并释放上一批：列表已重建，旧的模型快照不再显示，继续回填只会浪费 I/O
+        _iconLoadCts?.Cancel();
+        _iconLoadCts?.Dispose();
+        _iconLoadCts = null;
+
+        // 没有打开的压缩包（空状态）时没有条目可读
+        if (CurrentArchivePath is not { Length: > 0 } archivePath)
+            return;
+
+        var cts = new CancellationTokenSource();
+        _iconLoadCts = cts;
+
+        // 传 List 快照而不是 ObservableCollection：加载期间列表可能被再次重建（Clear/Add）
+        _ = IcoIconLoader.LoadAsync(
+            CurrentEntries.ToList(),
+            archivePath,
+            _currentFormat,
+            _currentPassword,
+            IcoIconLoader.MaxIcons,
+            cts.Token);
     }
 
     /// <summary>

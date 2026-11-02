@@ -190,6 +190,8 @@ public partial class CompressSettingsWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         PersistGeometry();
+        // 骨架进度定时器被 Dispatcher 强引用：关窗必须停表并解绑 Tick，否则窗口与 VM 会一直挂着
+        ViewModel.StopSkeletonProgress();
         ViewModel.ConfirmCompleted -= OnConfirmCompleted;
         _completion.TrySetResult(_closedOutcome ?? new Cancelled<CompressSettings>());
     }

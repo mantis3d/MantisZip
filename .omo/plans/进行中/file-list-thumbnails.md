@@ -1,7 +1,7 @@
 # 文件列表缩略图查看方式 (file-list-thumbnails)
 
 > **档位**: **A 档 · v0.5.6**（2026-10-29 从 B 档升入 A 档：三种布局切换是「现代感」的最大来源，且 v0.5.4 已把取数层改成内存优先、缩略图可直接复用）
-> status: 待实施
+> status: 🚧 进行中（2026-11-02 开工，v0.5.6）
 > 创建日期: 2026-08-21
 > 适用范围: 仅 `MantisZip.UI.Avalonia`（规则 11，WPF 维护模式不动）
 > 依赖: 无（不依赖 preview-quick-modes / embedded-thumbnail-preview 先行）
