@@ -5,6 +5,14 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-02** — 修复：代码页按钮恒灰 + TAR/GZ 的 auto 检测补 ANSI 回退
+  - 现象：用户实测「不论我打开什么文件，那个按钮都是禁用的」。
+  - 根因：`CanChangeNameEncoding` 依赖 `IsArchiveLoaded`，但唯一一处 `OnPropertyChanged(nameof(CanChangeNameEncoding))` 在载入成功分支里、位于 `IsArchiveLoaded = true` **之前**（`src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs:1289` 通知，`:1327` 才置 true）。XAML 绑定第一次取到 false，此后再没有通知 ⇒ 按钮永久置灰。单元测试直接读属性，所以看不见这个缺陷。
+  - 修法：`partial void OnIsArchiveLoadedChanged(bool value)` 里补 `OnPropertyChanged(nameof(CanChangeNameEncoding))`（与原有的 `CanDeleteEntries` 通知同处）；新增回归用例 `LoadingArchive_NotifiesCanChangeAfterIsArchiveLoaded` —— 订阅 `PropertyChanged`，断言通知到达那一刻 `IsArchiveLoaded` 已经是 true（这条才能挡住同类回归）。
+  - TAR/GZ 的 auto（用户把决定权交给我）：此前 auto 一律按 UTF-8 解，GBK 命名的 tar 必然乱码。改为「先按 UTF-8 解一遍 → 条目名里出现替换字符 U+FFFD → 用系统 ANSI 再解一遍 → 重试干净才采用并把该编码回传」；`onEncodingResolved` 的调用挪到解完之后，否则回传不到重试后的实际编码。抽出 `CreateTarReaderOptions` / `ReadTarItems` / `HasReplacementCharacter` 三个私有静态方法，解析异常仍然向上抛（损坏包不能被静默当成空包）。
+  - 为什么只做一次 ANSI 重试、不做多编码打分：TAR 没有 ZIP 的 bit 11 可依据，唯一信号就是「解出来是不是合法 Unicode」。一次重试足以覆盖中文 Windows 上的老包；再猜更多编码反而可能拿错的编码去写（读写共用同一个键），把包改坏。
+  - 测试：新增 `tests/MantisZip.Tests/TarNameEncodingAutoTests.cs` 2 例（GBK 命名 tar 的 auto 回退到 ANSI 且回传键正确 / UTF-8 命名的 tar 保持 UTF-8）。
+  - 验证：core 与 avalonia（Release，`-t:Rebuild`）0 警告；`tests` 13.8s、`ui-tests` 40.8s 全绿。
 **2026-11-02** — 样式：主工具栏代码页控件改为「地球图标 + 文字按钮 + 检测徽章」（按用户实测反馈）
   - 起因：首版做成工具栏 `ComboBox`，用户实测提三点 —— ① 与工具栏其它「图标 + 文字」按钮不一致；② 打开 7z 时整个控件消失，工具栏随之抖动；③ 看不到本次实际生效的编码。
   - 改动：`src/MantisZip.UI.Avalonia/Views/MainWindow.axaml` 的 `ComboBox` 换成 `Button Classes="ToolbarButton"`（`x:Name="NameEncodingButton"`）+ `MenuFlyout`，内容为 `Grid 22×22` 的地球图标（`IconGlobe`）+ 右下角徽章 `Border`（`Background=ThemeAccentBrush`、`TextBlock FontSize=8`、`Foreground=ThemeTextOnAccentBrush`）+ 文字行（`Classes="ToolbarButtonLabel"` 绑 `NameEncodingDisplay`）；`IsEnabled="{Binding CanChangeNameEncoding}"` 取代原来的 `IsVisible`，7z/RAR 等不适用格式**置灰而不隐藏**。

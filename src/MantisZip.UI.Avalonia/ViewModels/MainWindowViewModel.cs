@@ -370,7 +370,13 @@ public partial class MainWindowViewModel : ObservableObject
         && (ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath)?.CanDelete(_currentFormat) ?? false);
 
     // 能力位随「压缩包加载状态」刷新（格式 `_currentFormat` 在 RefreshArchive 中先于本字段赋值）
-    partial void OnIsArchiveLoadedChanged(bool value) => OnPropertyChanged(nameof(CanDeleteEntries));
+    partial void OnIsArchiveLoadedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanDeleteEntries));
+        // 代码页按钮是否可用取决于「已开包 + 格式」：载入成功分支里通知 CanChangeNameEncoding 时
+        // IsArchiveLoaded 还是 false，只靠那一处通知会让按钮永久停在置灰态（2026-11-02 实测）
+        OnPropertyChanged(nameof(CanChangeNameEncoding));
+    }
 
     // ── 当前压缩包在磁盘上的可用性（打开中被删除 / 被替换） ─────────────────────────────
     //

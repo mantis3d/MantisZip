@@ -156,7 +156,12 @@
 
 顺带修掉的语义缺陷：`LoadArchiveAsync` 开头的 `ClearArchiveInternal()` 无条件复位代码页，导致「手选编码 → 立刻被自己触发的重载抹掉」；改为 `ClearArchiveInternal(bool resetNameEncoding = true)`，载入前按 `reloadingSameArchive` 决定是否保留，`CanChangeNameEncoding` 补 `IsArchiveLoaded`。
 
-测试：`tests/MantisZip.UI.Avalonia.Tests/NameEncodingToolbarTests.cs` 15 例。i18n 1405 → 1406（新增 `Toolbar_NameEncoding_Detected`）。
+测试：`tests/MantisZip.UI.Avalonia.Tests/NameEncodingToolbarTests.cs` 16 例（含「通知必须发生在 IsArchiveLoaded 之后」的回归）。i18n 1405 → 1406（新增 `Toolbar_NameEncoding_Detected`）。
+
+#### 11.6 首版实测回归（同日）
+
+- 缺陷：不论打开什么文件，代码页按钮恒灰 —— `CanChangeNameEncoding` 的通知发生在 `IsArchiveLoaded = true` 之前，绑定此后不再刷新。修法：在 `OnIsArchiveLoadedChanged` 里补通知，并加回归用例。
+- TAR/GZ 的 auto 决定（用户授权自行定）：做一次系统 ANSI 回退 —— 先按 UTF-8 解，条目名出现 U+FFFD 就用系统 ANSI 重解一遍，重试干净才采用并回传该编码，否则保留 UTF-8。理由：TAR 没有 bit 11，唯一可用信号是「是否是合法 Unicode」；多猜编码反而可能用错的编码去写、把包改坏。测试 `tests/MantisZip.Tests/TarNameEncodingAutoTests.cs` 2 例。
 ## 11. 实施记录（2026-11-02）
 
 ### 11.1 与计划的三处差异

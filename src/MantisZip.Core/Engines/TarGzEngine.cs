@@ -525,7 +525,8 @@ public class TarGzEngine : IArchiveEngine
         CoreLog.Info($"ListEntriesAsync: {archivePath}");
         var sw = Stopwatch.StartNew();
 
-        // TAR 条目名没有 UTF-8 标志位，SharpCompress 默认按 UTF-8 解；GBK 命名的包要靠调用方显式指定。
+        // TAR 条目名没有 UTF-8 标志位，SharpCompress 默认按 UTF-8 解。
+        // 手动指定编码时直接用它；auto 模式在解完一遍后按「有没有替换字符」做一次 ANSI 重试（见下）。
         Encoding? forcedEncoding = null;
         if (!NameEncodingCatalog.IsAuto(fileNameEncoding)
             && NameEncodingCatalog.TryResolve(fileNameEncoding, out var resolved)
@@ -533,14 +534,9 @@ public class TarGzEngine : IArchiveEngine
         {
             forcedEncoding = resolved;
         }
-        onEncodingResolved?.Invoke(NameEncodingCatalog.Describe(forcedEncoding ?? Encoding.UTF8));
 
-        var readerOptions = new ReaderOptions { LookForHeader = true };
-        if (forcedEncoding is not null)
-        {
-            readerOptions.ArchiveEncoding = new ArchiveEncoding { Default = forcedEncoding };
-            CoreLog.Info($"ListEntriesAsync: TAR file name encoding '{fileNameEncoding}' -> {forcedEncoding.WebName}");
-        }
+        // 最终实际生效的编码，解完后回传给调用方（auto 重试命中 ANSI 时会变）
+        var reportEncoding = forcedEncoding ?? Encoding.UTF8;
 
         var result = await Task.Run(() =>
         {
@@ -550,24 +546,25 @@ public class TarGzEngine : IArchiveEngine
 
             if (ext == ".tar" || isTarGz)
             {
-                // 注意：解析异常必须向上传播（不移除 catch 曾吞掉损坏 tar 的 IncorrectArchiveException，
+                // 注意：解析异常必须向上传播（`ReadTarItems` 里不 catch，曾因吞掉 IncorrectArchiveException
                 // 导致损坏包静默打开为空）。TarReader 对合法 tar 与空 tar 均能正常返回。
-                using var inputStream = File.OpenRead(archivePath);
-                using var reader = TarReader.OpenReader(inputStream, readerOptions);
-                while (reader.MoveToNextEntry())
+                items = ReadTarItems(archivePath, CreateTarReaderOptions(forcedEncoding));
+
+                // auto：先按 UTF-8 解。出现 U+FFFD 说明源文件名不是 UTF-8（老包多为 ANSI，中文 Windows 即 GBK），
+                // 换成系统 ANSI 再解一遍；重试仍有替换字符就保留 UTF-8 的结果 —— 宁可显示乱码，也不猜一个错的编码。
+                if (forcedEncoding is null && HasReplacementCharacter(items))
                 {
-                    var entry = reader.Entry;
-                    var entryKey = entry.Key ?? string.Empty;
-                    items.Add(new ArchiveItem
+                    var ansiEncoding = NameEncodingCatalog.ResolveSystemEncoding();
+                    if (ansiEncoding.CodePage != Encoding.UTF8.CodePage)
                     {
-                        Name = entryKey,
-                        FullPath = entry.IsDirectory ? entryKey.TrimEnd('/') : entryKey,
-                        Size = entry.Size,
-                        CompressedSize = entry.Size,
-                        LastModified = entry.LastModifiedTime ?? DateTime.MinValue,
-                        IsDirectory = entry.IsDirectory,
-                        IsEncrypted = false
-                    });
+                        var ansiItems = ReadTarItems(archivePath, CreateTarReaderOptions(ansiEncoding));
+                        if (!HasReplacementCharacter(ansiItems))
+                        {
+                            CoreLog.Info($"ListEntriesAsync: TAR name auto-detect fell back to ANSI ({ansiEncoding.WebName})");
+                            items = ansiItems;
+                            reportEncoding = ansiEncoding;
+                        }
+                    }
                 }
             }
             else if (ext == ".gz")
@@ -589,10 +586,49 @@ public class TarGzEngine : IArchiveEngine
             return (IReadOnlyList<ArchiveItem>)items;
         }, cancellationToken).ConfigureAwait(false);
 
+        // 回传实际生效的编码（放在解完之后：auto 重试可能改变了它）
+        onEncodingResolved?.Invoke(NameEncodingCatalog.Describe(reportEncoding));
+
         CoreLog.Exit();
         return result;
     }
 
+    /// <summary>TAR 读取选项：<paramref name="defaultEncoding"/> 为 null 时沿用 SharpCompress 默认（UTF-8）。</summary>
+    private static ReaderOptions CreateTarReaderOptions(Encoding? defaultEncoding)
+    {
+        var options = new ReaderOptions { LookForHeader = true };
+        if (defaultEncoding is not null)
+            options.ArchiveEncoding = new ArchiveEncoding { Default = defaultEncoding };
+        return options;
+    }
+
+    /// <summary>按给定选项读一遍 TAR 的条目列表（异常向上抛，不静默当成空包）。</summary>
+    private static List<ArchiveItem> ReadTarItems(string archivePath, ReaderOptions readerOptions)
+    {
+        var items = new List<ArchiveItem>();
+        using var inputStream = File.OpenRead(archivePath);
+        using var reader = TarReader.OpenReader(inputStream, readerOptions);
+        while (reader.MoveToNextEntry())
+        {
+            var entry = reader.Entry;
+            var entryKey = entry.Key ?? string.Empty;
+            items.Add(new ArchiveItem
+            {
+                Name = entryKey,
+                FullPath = entry.IsDirectory ? entryKey.TrimEnd('/') : entryKey,
+                Size = entry.Size,
+                CompressedSize = entry.Size,
+                LastModified = entry.LastModifiedTime ?? DateTime.MinValue,
+                IsDirectory = entry.IsDirectory,
+                IsEncrypted = false
+            });
+        }
+        return items;
+    }
+
+    /// <summary>条目名里是否出现了 UTF-8 解码失败留下的替换字符（U+FFFD）。</summary>
+    private static bool HasReplacementCharacter(IEnumerable<ArchiveItem> items)
+        => items.Any(item => item.Name.Contains('\uFFFD', StringComparison.Ordinal));
     public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();

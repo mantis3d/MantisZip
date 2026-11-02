@@ -105,6 +105,37 @@ public sealed class NameEncodingToolbarTests
         Assert.Equal("950", NameEncodingOption.ShortLabel(vm.ArchiveNameEncoding));
     }
 
+    /// <summary>
+    /// 回归测试（2026-11-02 实测「不论打开什么文件按钮都是灰的」）：
+    /// 载入成功分支里通知 <c>CanChangeNameEncoding</c> 时 <c>IsArchiveLoaded</c> 还是 false，
+    /// 只靠那一处通知，按钮会永久停在置灰态 —— 必须等 <c>IsArchiveLoaded</c> 变 true 后再通知一次。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task LoadingArchive_NotifiesCanChangeAfterIsArchiveLoaded()
+    {
+        var zipPath = CreateZip(Encoding.UTF8, "plain.txt");
+        try
+        {
+            var vm = new MainWindowViewModel();
+            var notifiedWhileLoaded = false;
+
+            vm.PropertyChanged += (_, e) =>
+            {
+                if (e.PropertyName == nameof(MainWindowViewModel.CanChangeNameEncoding) && vm.IsArchiveLoaded)
+                    notifiedWhileLoaded = true;
+            };
+
+            await vm.LoadArchiveAsync(zipPath);
+
+            Assert.True(notifiedWhileLoaded, "CanChangeNameEncoding 必须在 IsArchiveLoaded 置 true 之后通知一次");
+            Assert.True(vm.CanChangeNameEncoding);
+        }
+        finally
+        {
+            DeleteQuietly(zipPath);
+        }
+    }
+
     /// <summary>造一个条目名按指定代码页写入、且不置 UTF-8 标志位的 zip（老压缩包形态）。</summary>
     private static string CreateZip(Encoding encoding, params string[] entryNames)
     {
