@@ -1,3 +1,28 @@
+## v0.5.6
+
+### 文件说明 / File Description
+
+MantisZip-0.5.6-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.6-Setup-Offline.exe 是离线安装包。MantisZip-0.5.6-Portable.zip 是便携版，解压即用。MantisZip-0.5.6-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.6-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.6-Portable.zip is the portable version, extract and run. MantisZip-0.5.6-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **文件列表三种查看方式** — 列表工具栏新增布局切换按钮，在「详情（原来的表格）/ 平铺（卡片流）/ 内容行（大卡片 + 名称与大小、压缩率、修改日期）」之间循环，选择记进设置、下次打开保持。平铺与内容行模式下，图片显示真实缩略图（不放大、不拉伸）、文本类显示前 150 个字符的文字卡、其余文件显示图标兜底；右键菜单、拖拽到资源管理器、双击进入目录、`Enter` 打开都与表格模式一致
+- **Three ways to view the file list** — a new toolbar button cycles the list between details (the original grid), tiles (a card flow) and content rows (large card plus name, sizes, ratio and modified date); the choice is saved and restored. In tile and content modes, images show a real thumbnail (never upscaled or stretched), text files show a card with their first 150 characters, and everything else falls back to its icon; the context menu, dragging to Explorer, double-click to enter a folder and `Enter` to open all behave exactly as in the grid
+- ![平铺布局：图片显示缩略图、文本显示文字卡](docs/images/version/v0.5.6/ListTileLayout.png)
+- ![内容行布局：大卡片 + 名称与元数据](docs/images/version/v0.5.6/ListContentLayout.png)
+- **压缩包里的 .ico 显示自己的图标** — 此前列表里所有 `.ico` 都是通用图标，现在会从包里读出该文件、挑最接近 16×16 的那一帧显示（列表先显示通用图标、随后异步替换，不拖慢打开速度，单个包最多处理 20 个）
+- **.ico files show their own icon** — previously every `.ico` in the list used the generic icon; now the file is read from the archive and its frame closest to 16×16 is displayed (the list shows the generic icon first and swaps asynchronously, so opening stays fast, at most 20 per archive)
+- **复选框多选与批量删除** — 列表工具栏可切到复选框模式（默认关闭，开关记进设置）：每行前面出现复选框，勾选状态跨滚动、跨切目录保持，状态栏右侧显示「已选 N 项 · 共 X」；右键菜单补「全选可见 / 反选 / 清空勾选」。勾选多项后删除**只弹一次确认**（文案带条目数与总大小），删完列表刷新、勾选态自动清空。关闭复选框模式时行为与以前完全一致（仍是 Ctrl/Shift 多选）
+- **Checkbox selection and batch delete** — the list toolbar can switch to checkbox mode (off by default, the choice is saved): every row gets a checkbox, checked state survives scrolling and folder changes, and the status bar shows "N selected · X total"; the context menu gains select-all-visible, invert and clear. Deleting several checked entries asks for confirmation **once** (with the count and total size), then refreshes the list and clears the checkboxes. With checkbox mode off, everything works exactly as before (Ctrl/Shift multi-select)
+- ![勾选跨目录保持：根目录勾 2 项、子目录勾 1 项后回到根目录仍显示「已选 3 项」](docs/images/version/v0.5.6/CheckboxCrossFolder.png)
+- ![批量删除：勾选 3 项只弹一次确认](docs/images/version/v0.5.6/CheckboxBatchDelete.png)
+- **压缩设置窗的预览树显示实时计数** — 后台扫描目录期间，根节点标题从静态的「加载中…」变成「加载中 N 个文件，X」并每半秒刷新，扫完自动切到真实统计；被文件过滤排除的条目不计数
+- **The compression window's preview tree counts as it scans** — while the folder scan runs in the background, the root node now reads "Loading N files, X" and refreshes twice a second instead of a static "Loading…", switching to the real totals when the scan finishes; entries excluded by the file filter are not counted
 ## v0.5.5
 
 ### 文件说明 / File Description
