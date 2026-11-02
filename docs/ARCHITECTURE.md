@@ -319,7 +319,17 @@ solid 7z 每解一个条目都要重新定位解码块，逐条目 `ExtractFile`
 - **冲突必须提前判定**：批量时段内没有逐条 stat 的机会，`BuildBulkPlanAsync()` 在解压前一次分桶（`Direct` / `Rename` / `BigFile` / `Unsafe` / `Duplicate` / `Skipped` / `Directories`），期间上报 `ArchivePhase.CheckingConflicts`。`Overwrite` 且无 resolver 走零 stat 快路径；`Skip` 不进批量但照旧上报；`Rename` 系策略先批量到目标目录内 `.mantiszip-staging-<guid>` 再逐条 `File.Move`；`Ask` 在预解析阶段问完「应用到全部」后定型。
 - **语义必须保持**：逐条目状态（Completed / Skipped / Overwritten / PermissionDenied / IoFailed）与 `ExtractResult` 计数、`OverwrittenEntries` 都不能因为走批量而变 —— 覆盖计数依赖 `BulkEntryPlan.WasExisting`（预解析时的一次 `File.Exists`），**不要删掉这次探测**。
 - **不要改成一律 bulk**：ZIP/TAR/RAR、加密包、64MB 以上单文件、越界路径、归档内重名条目都必须走逐条目；批量段抛异常时只对未完成条目重试。回退开关 `EnableBulkSolidExtract` 是 `static readonly`（写 `const` 会让关闭分支被判不可达 CS0162）。
-- 覆盖范围仅「全量解压」；勾选条目 / 拖拽解压走 `ExtractEntriesAsync`，另见 `.omo/plans/未开始/selected-items-bulk-extract.md`。
+- **覆盖范围**：全量解压（`ExtractAsync`）与选中条目 / 拖拽解压（`ExtractEntriesAsync`）两个入口都走同一条批量思路，区别如下。
+
+| | `ExtractAsync`（全量） | `ExtractEntriesAsync`（选中 / 拖拽） |
+|---|---|---|
+| 落点 | 归档内相对布局，可直接落到目标目录 | 调用方 `outputPathOverrides` 逐个算好（扁平化 / 保留完整路径 / 重命名），**必须**先解码到暂存目录再按 override 移动 |
+| 批量闸门 | `IsSolid` 且无密码 / 无加密条目 / 无 `ErrorResolver` | 再额外要求选中非目录条目 ≥ 2（为 1 条建暂存不划算） |
+| 分桶 | `Direct` 段直接落地，`Rename` 走暂存 | `Direct` 段**全部**走暂存，逐条 `File.Move(overwrite: true)` 后计数 |
+| 进度单位 | 文件计数 / 字节比取 max | `unitsDone`（跳过 / 失败 / 已解码待移动 / 已移动 / 逐条目各 1），解码期间百分比不冻结 |
+
+- **选中路径的既有缺陷已修**：目录条目过去忽略 `outputPathOverrides`（扁平化对选中的空目录不生效），现在目录也走统一的 `ResolveTarget(entry, fileName)`。
+- **`ProcessedFiles` 语义不变**：只有真正移动到最终路径的文件才算 processed；暂存段「已解码未移动」只推进进度单位。
 
 ### 并行解压架构
 

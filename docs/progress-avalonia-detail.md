@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-02** — 性能：选中条目 / 拖拽解压改走批量接口（issue #75 的第二个入口，800×64KB 只解选中项 10.0s → 2.3s，约 4.4×）
+  - **触发**：全量解压走批量后用户实测通过，随即要求「把勾选那个也做了吧」。「勾选解压」与「拖到资源管理器」两条路径共用 `src/MantisZip.UI.Avalonia/Services/SelectedItemsExtractService.cs`，一直落到 `SevenZipEngine.ExtractEntriesAsync` 的逐条目 `Extractor.ExtractFile`。
+  - **两处与全量解压的关键差异**：① 落点不是「目标目录 + 归档内相对路径」，而是调用方 `:42-53` 用 `ExtractPathResolver.ResolveRelativePath` 算好的 `outputPathOverrides`（扁平化 / 保留完整路径 / 重命名都可能让多个条目落到同一路径）⇒ 批量段必须先把整批按归档布局解码到目标目录内的暂存目录，再按 override 逐条移动，不能直接落地；② 只解一部分条目时「建暂存 + 移动」本身有成本，因此要求选中非目录条目 ≥ 2 才批量。
+  - **分流闸门**（`CanUseBulk()`）：`EnableBulkSolidExtract && extractor.IsSolid && password == null && options?.ErrorResolver == null && selectedFiles.Count >= 2 && !任何选中条目 Encrypted`；任一不满足直接走改造前的逐条目路径。
+  - **冲突预解析**（`BuildBulkPlanAsync`，复用全量那套语义）：报 `ArchivePhase.CheckingConflicts`；目录条目进 `Directories`；`outputPathOverrides` 落点越出目标目录、或归档相对路径不安全 → `Unsafe`；`FileConflictHelper.ResolvePathAsync` 返回 `null` → `conflictStats.RecordSkipped()` + 只上报 `Skipped`、不移动；同一落点被第二条目认领 → `Duplicate`；≥ `BigFileThresholdBytes`（64MB）→ `BigFile`；其余进 `Direct`。
+  - **执行**（`RunSelectedBulkAsync`）：先按 override 补建选中的空目录 → 上报跳过项 → `extractor.ExtractFiles(stagingRoot, indexes)` 一次性解码到 `.mantiszip-staging-<guid>`（进入前先清扫同名残留）→ 逐条 `File.Move(stagedPath, finalPath, overwrite: true)` + `File.SetLastWriteTime`，**移动成功才** `processed++/handled++/processedBytes+=` 并上报 `Completed` 或 `Overwritten`；移动抛 `IOException` / `UnauthorizedAccessException` 按 `IoFailed` / `PermissionDenied` 记失败；暂存文件不存在（7z 静默跳过）→ 退回逐条目拿准确原因；`finally` 删暂存目录；最后 `BigFile ∪ Unsafe ∪ Duplicate ∪ manualFallback` 走逐条目。
+  - **顺带修的既有缺陷**：逐条目路径的目录分支原本只 `FileConflictHelper.GetSafePath(destinationPath, fileName)`，完全不看 `outputPathOverrides` ⇒ 扁平化 / 保留完整路径对「选中的空目录」不生效。现在目录也走统一的 `ResolveTarget(entry, fileName)`。
+  - **进度口径**：新增 `unitsDone` 统一单位（跳过 / 失败 / 已解码待移动 / 已移动 / 逐条目各计 1），`PercentComplete = unitsDone / totalTarget`；否则「整批解码到暂存」这段时间百分比完全不动。`ProcessedFiles` / `ExtractResult.SucceededEntries` 仍只统计真正移动到最终路径的文件。
+  - **踩坑**：① `SharpSevenZip` 的事件参数类型在 `SharpSevenZip.EventArguments` 命名空间，写 `SharpSevenZip.FileInfoEventArgs` 会 `CS0234`，文件顶部已有 `using` ⇒ 直接用 `FileInfoEventArgs` / `ProgressEventArgs`；② 计划里「跳过项的 `unitsDone++`」只能放在预解析里算一次，若在「能批量的不足 2 条」分支再调一次 `ReportSkippedEntries`，同一条目会被上报两次 ⇒ 该分支直接整体退回逐条目；③ 目录条目的归档键名带尾分隔符（`emptydir\`），测试里必须用 `ArchivePath.Normalize(entry.FileName)` 的结果当 key，猜 `"emptydir/"` 会静默不命中。
+  - **测试**：新增 `tests/MantisZip.Tests/Engines/SevenZipEngineSelectedBulkExtractTests.cs` 10 例 —— 只解选中项（未选中不落地）、扁平化 override 落点正确且不建原目录、逐条目状态齐全、`Skip` 不动已有文件、`Overwrite` 替换、`Rename` 写改名副本且暂存清理干净、取消不留残留、目录条目遵守 override（D7）、单条目走逐条目、未知键不抛异常。
+  - **实测**（临时基准，跑完即删）：800×64KB（52MB）solid 7z，全选解压 —— 批量 2250ms / 逐条目 9957ms，约 **4.4×**。
+  - **验证**：`build -Target core/avalonia -c Release` 均 0 警告；`tests`、`ui-tests`、`i18n`（1398 key）、`check`、`guards`（8 项）全绿。
+  - **边界**：只对未加密的 solid 7z 生效；ZIP / RAR / 加密 7z / 单条解压行为与耗时不变；`EnableBulkSolidExtract = false` 可整体回退到逐条目。
 **2026-11-02** — 性能：7z solid 全量解压改走批量接口（issue #75，800×64KB 从 19.3s → 1.67s）
   - **触发**：issue #75 报告「解压海量小文件到机械硬盘时速度极慢」。用本机 7z.dll 造 800×64KB（52MB）solid 包实测：改造前 19.3s、同机 `7z.exe x` 0.56s、裸 `ExtractFiles` 0.86s ⇒ 差距全在逐条目 `ExtractFile`（solid 包每解一个条目都要重新定位解码块）。
   - **分流**：`SevenZipEngine.ExtractAsync` 新增 `BuildBulkPlanAsync()` 闸门 —— `format == SevenZip`（`SfxProbe.TryGetPayloadFormat` 优先，回落 `GetFormatByExtension`）+ `extractor.IsSolid` + 无密码且无加密条目 + `options.ErrorResolver == null` + 可批量条目数 > 0；任一不满足即退回原逐条目路径。回退开关是 `private static readonly bool EnableBulkSolidExtract = true;`（写成 `const` 会让「关闭」分支被判死代码 CS0162）。

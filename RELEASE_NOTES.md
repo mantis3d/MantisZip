@@ -20,9 +20,9 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 **性能 / Performance**
 
-- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）现在 1.7 秒解完，此前要 19 秒。只对 7z 整包解压生效，ZIP/RAR、加密包与单文件解压不受影响；条目很多的包会先短暂显示「正在检查冲突…」再开始解压。
+- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）整包解压从 19 秒降到 1.7 秒，只解其中选中的条目也有 4 倍以上的提升（10 秒 → 2.3 秒）。只对未加密的 7z 生效：ZIP/RAR 与单文件解压不受影响，条目很多的包会先短暂显示「正在检查冲突…」再开始解压。
 
-- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s. This applies to whole-archive extraction of 7z only: ZIP/RAR, encrypted archives and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts.
+- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts.
 
 **修复 / Fixes**
 

@@ -1,6 +1,6 @@
 # 选中条目 / 拖拽解压改走批量接口（solid 性能）
 
-> **状态**：📋 待实施（决策已定，2026-11-02 拍板；**排在 7z 全量解压之后**，等真机实测再定档）| 创建 2026-11-02
+> **状态**：✅ 实现完成（2026-11-02；等真机 HDD 实测后归档）| 创建 2026-11-02
 > **关联**：issue #75「解压海量小文件到机械硬盘时速度极慢」
 > **前置**：[sevenzip-solid-extract-batch.md](sevenzip-solid-extract-batch.md)（全量解压批量分流）。本计划复用它的 `BulkExtractPlan` 与 staging 生命周期，**建议先做那份**
 > **分支**：`beta`
@@ -134,3 +134,34 @@
 | 同批还是分批 | **先只做全量解压，看实测再决定本计划** | 保持「待实施」，§6 已写明顺序 |
 | 逐条状态上报 | **保留** | 见 D11：批量后按预解析结果补报每条 `Completed` / `Skipped` / `Overwritten` |
 | 空目录 override 修复 | **放进本计划** | 见 D7 / D12 / §4.3 |
+
+## 13. 实施记录（2026-11-02）
+
+### 13.1 与计划的差异
+
+| 计划 | 实际 | 原因 |
+|---|---|---|
+| 新增 `BulkExtractPlan.BuildPlan(...)` 的「显式落点模式」 | 在 `ExtractEntriesAsync` 内写局部函数 `BuildBulkPlanAsync()`，直接复用现有 `BulkEntryPlan` / `BulkExtractPlan` 两个类型 | 落点表在 `SelectedItemsExtractService` 里、引擎只拿到 `outputPathOverrides`；局部函数能直接闭包访问 `keySet` / conflictStats / unitsDone，不必给类型加一堆参数 |
+| 批量阶段用「正在解码 N 个条目」概括进度 | 用 `FileExtractionStarted.FileInfo.FileName` 报真实条目名 + 真实文件百分比 | 事件里本来就有名字与 `PercentDelta`，假装粗颗粒反而丢信息；进度**不会**倒退，因为 `unitsDone` 只在解码完成 / 移动成功 / 跳过 / 失败时 +1 |
+| §4.1「无越界落点」作为闸门 | 越界条目改成 `Unsafe` 桶、只把该条目退回逐条目，不整体禁用批量 | 用户选 500 条时有一条落点异常不该让整批退回逐条目 |
+
+### 13.2 实现要点
+
+- 闸门 `CanUseBulk()`：`EnableBulkSolidExtract && extractor.IsSolid && password == null && options?.ErrorResolver == null && selectedFiles.Count >= 2 && !任何选中条目 Encrypted`。
+- 预解析 `BuildBulkPlanAsync()`：`ArchivePhase.CheckingConflicts` → 目录进 `Directories`（**用 override 落点**，D7 修复）→ 越界进 `Unsafe` → `ResolvePathAsync` 为 null 记 `RecordSkipped()` + 只上报 `Skipped` → 落点重复进 `Duplicate` → ≥64MB 进 `BigFile` → 其余进 `Direct`。
+- 执行 `RunSelectedBulkAsync()`：补建空目录 → 上报跳过项 → `CleanupStaleStagingDirectories` → `ExtractFiles(<dest>\.mantiszip-staging-<guid>, indexes)` → 逐条 `File.Move(overwrite: true)` + `SetLastWriteTime`，**移动成功才**计数与上报 `Completed` / `Overwritten` → `finally` 删暂存 → `BigFile ∪ Unsafe ∪ Duplicate ∪ manualFallback` 走逐条目。
+- 进度单位 `unitsDone`（跳过 / 失败 / 已解码待移动 / 已移动 / 逐条目各 1），`ProcessedFiles` 与 `ExtractResult.SucceededEntries` 仍只统计真正落到最终路径的文件。
+- 计划 §9.4 要求的日志已加：`ExtractEntriesAsync: bulk solid selected {N} entries, per-entry {M}, skipped {K}`；另有每段 `ExtractEntriesAsync: bulk segment {N} entries -> {stagingRoot}`。
+
+### 13.3 实测
+
+- 800×64KB（52MB）solid 7z，全选解压：批量 **2250ms** / 逐条目 9957ms ⇒ **4.4×**（逐条目这一侧用「设置 `ErrorResolver` ⇒ 闸门不成立」强制走回旧路径，两侧落盘文件数都是 800）。
+
+### 13.4 验证
+
+- `build -Target core/avalonia -c Release`：均 0 警告；新增 `SevenZipEngineSelectedBulkExtractTests` 10 例全过；`tests` / `ui-tests` / `i18n`（1398）/ `check` / `guards`（8）全绿。
+
+### 13.5 仍未验收
+
+- 真机机械硬盘上的收益（当前实测盘为 SSD）；
+- 「先只做全量解压」的原始拍板已被用户 2026-11-02 推翻为「两个入口都做」。

@@ -140,14 +140,13 @@
 | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 元数据显示位置可选（侧边面板 / 正文区） | [metadata-display-location.md](.omo/plans/未开始/metadata-display-location.md) | 🟢低 | 6-8h | 📋 2026-10-31 用户讨论后定案、待启动。exe 预览正文区只有条目名标题、大片空白，信息全在右侧面板；按类型加「显示位置」，选正文区时「程序信息」搬到正文区竖排渲染、面板只留「文件信息」。**只对没有其它正文内容的格式开放**（当前仅 `pe`），默认侧边面板、老配置不动 |
-| 选中条目 / 拖拽解压改走批量接口（solid 性能） | [selected-items-bulk-extract.md](.omo/plans/未开始/selected-items-bulk-extract.md) | 🟡中 | **2-2.5天** | issue #75 的另一半。`SelectedItemsExtractService` → `SevenZipEngine.ExtractEntriesAsync` 逐条目 `ExtractFile`，solid 下选中 N 条 = N 次块解码（选整个大目录时与全量解压同病）。改走「批量解码到目标目录内 `.mantiszip-staging-<guid>` → 按 `outputPathOverrides` 逐个 `File.Move`」：落点（扁平化 / 保留完整路径 / 重名）因此不受批量 API 限制；冲突仍 100% 预解析（已认领落点集合处理多条目同落点）；单条 / 加密 / `ErrorResolver` / 非 solid 走原路径。**依赖全量解压计划的 `BulkExtractPlan`，建议紧随其后做，增量 1-1.5 天** |
 
 
 ---
 
-## 进行中 —— 8 条计划（半途 7 条 + 实施中 1 条）
+## 进行中 —— 9 条计划（半途 7 条 + 实施中 2 条）
 
-> 前 7 条主体已落地，剩下的尾巴性质不同，**不适合当新计划排队**；最后一条是 2026-11-02 开工、正在实施的计划。
+> 前 7 条主体已落地，剩下的尾巴性质不同，**不适合当新计划排队**；最后两条是 2026-11-02 开工、正在实施的计划（同一功能的两个入口）。
 
 | 功能 | 设计文档 | 已做 | 剩余 | 我的建议 |
 |---|---|---|:--:|---|
@@ -157,7 +156,8 @@
 | 浮动/停靠预览面板 | [floating-preview-panel.md](.omo/plans/进行中/floating-preview-panel.md) | 四位置停靠切换已落地（右侧/下方可持久化） | 浮动独立窗口（Phase 1）、拖拽分离+边缘吸附（Phase 3） | **冻结**：停靠已覆盖 90% 场景 |
 | 可插拔预览模块体系 | [preview-modular-providers.md](.omo/plans/进行中/preview-modular-providers.md) | Task 1/4：`ITableDataProvider` 已入 Core 抽象层（`SqliteDataReader` 实现，提交 `1cef18f`） | 接口**零消费者**，UI SQLite 预览仍直连 `Microsoft.Data.Sqlite` | **并入或删除**：见「候选删除」 |
 | 文本/ZIP 注释回退编码策略 | [text-fallback-encoding-policy.md](.omo/plans/进行中/text-fallback-encoding-policy.md) | Phase 1（A1+A3）✅ 2026-10-20：`DecodeComment` 严格 UTF-8 → 严格 GB18030 → 宿主 ANSI；`ReadEocd`/`WriteEocd` 改字节透传；CI 侧 `zh-CN` pin 转为故意 en-US | Phase 2（可配置回退代码页）待定 | **冻结 Phase 2**：等真实用户报告再定，当前实现已覆盖主场景 |
-| 7z 全量解压改走批量接口（solid 性能） | [sevenzip-solid-extract-batch.md](.omo/plans/进行中/sevenzip-solid-extract-batch.md) | 计划 + 三轮拍板已定（分流条件 / 冲突预解析 / 暂存目录 / stat 快路径 / 只做全量） | S1–S6 实现（抽三段 → 批量段 → `BulkExtractPlan` → 逐条目段 → 测试 → 真机夹具） | **实施中**（2026-11-02 开工）：issue #75 的核心性能项 |
+| 7z 全量解压改走批量接口（solid 性能） | [sevenzip-solid-extract-batch.md](.omo/plans/进行中/sevenzip-solid-extract-batch.md) | 计划 + 三轮拍板已定（分流条件 / 冲突预解析 / 暂存目录 / stat 快路径 / 只做全量）；**代码已落地**（提交 `f382f145`，800×64KB 19.3s → 1.67s） | 真机 HDD 复测 + 暂停 3s→恢复验收 | **实施中**（2026-11-02 开工）：issue #75 的核心性能项 |
+| 选中条目 / 拖拽解压改走批量接口（solid 性能） | [selected-items-bulk-extract.md](.omo/plans/进行中/selected-items-bulk-extract.md) | 计划 + 三问拍板已定（先做全量 / 保留逐条状态 / 空目录 override 纳入）；**代码已落地**（800×64KB 只解选中项 10.0s → 2.3s，约 4.4×） | 真机 HDD 复测（SSD 实测已通过） | **实施中**（2026-11-02 开工）：issue #75 的另一半 |
 
 ---
 

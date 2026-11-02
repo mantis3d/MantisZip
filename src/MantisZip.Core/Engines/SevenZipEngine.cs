@@ -1560,38 +1560,96 @@ public class SevenZipEngine : IArchiveEngine
             using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
             var allEntries = extractor.ArchiveFileData.ToList();
-            int totalTarget = allEntries.Count(e => !e.IsDirectory && keySet.Contains(ArchivePath.Normalize(e.FileName)));
-            int processed = 0;
-            int handled = 0;   // 已处理（成功+跳过）文件数，仅用于百分比推进；跳过不计入 ProcessedFiles（已处理显示）
+
+            bool IsSelected(ArchiveFileInfo e) => keySet.Contains(ArchivePath.Normalize(e.FileName));
+
+            var selectedFiles = allEntries.Where(e => !e.IsDirectory && IsSelected(e)).ToList();
+            int totalTarget = selectedFiles.Count;
+            int processed = 0;   // 真正落地的文件数（ProcessedFiles / SucceededEntries）
+            int handled = 0;     // 已处理（成功 + 跳过 + 失败）文件数
             int failedEntries = 0;
             var conflictStats = new ConflictStatsCounter();
             var lastReportTime = DateTime.Now;
             var reportInterval = TimeSpan.FromMilliseconds(100);
-            long totalBytes = allEntries
-                .Where(e => !e.IsDirectory && keySet.Contains(ArchivePath.Normalize(e.FileName)))
-                .Sum(e => (long)e.Size);
+            long totalBytes = selectedFiles.Sum(e => (long)e.Size);
             long processedBytes = 0;
 
-            foreach (var entry in allEntries)
+            // 进度推进单位：跳过 / 失败 / 已解码待移动 / 已移动 / 逐条目各计 1。
+            // 批量阶段「解码完但还没移动」的条目也要推进百分比，否则大批量解码期间窗口看起来卡住。
+            int unitsDone = 0;
+
+            // 落点：优先用调用方算好的 override（扁平化 / 保留完整路径 / 重命名的唯一口径）
+            string ResolveTarget(ArchiveFileInfo entry, string fileName) =>
+                outputPathOverrides?.GetValueOrDefault(fileName)
+                ?? FileConflictHelper.GetSafePath(destinationPath, fileName);
+
+            double CurrentPercent() => totalTarget > 0 ? Math.Min((double)unitsDone / totalTarget * 100, 100) : 100;
+
+            void ReportMainProgress(string fileName, int filePercent, long fileTotalBytes)
+            {
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                {
+                    CurrentFile = fileName,
+                    PercentComplete = CurrentPercent(),
+                    FilePercentComplete = filePercent,
+                    TotalFiles = totalTarget,
+                    ProcessedFiles = processed,
+                    TotalBytes = totalBytes,
+                    ProcessedBytes = processedBytes,
+                    FileTotalBytes = fileTotalBytes,
+                }));
+                lastReportTime = DateTime.Now;
+            }
+
+            void ReportEntryFailure(BulkEntryPlan plan, string detail, int hresult, EntryFailureReason reason)
+            {
+                conflictStats.RecordFailed();
+                progress?.Report(new ArchiveProgress
+                {
+                    EntryKey = plan.FileName,
+                    EntryStatus = ArchiveEntryStatus.Failed,
+                    EntryFailureReason = reason,
+                    FileTotalBytes = (long)plan.Entry.Size,
+                    EntryErrorDetail = detail,
+                    EntryErrorHResult = hresult,
+                });
+                failedEntries++;
+                handled++;
+                unitsDone++;
+                processedBytes += (long)plan.Entry.Size;
+                ReportMainProgress(plan.FileName, 100, (long)plan.Entry.Size);
+            }
+
+            void ReportSkippedEntries(IReadOnlyList<ArchiveFileInfo> skipped)
+            {
+                foreach (var entry in skipped)
+                {
+                    var fileName = ArchivePath.Normalize(entry.FileName);
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Skipped });
+                    ReportMainProgress(fileName, 100, (long)entry.Size);
+                }
+            }
+
+            /// 逐条目路径（改造前的实现，原样保留）：单条选中、非 solid、加密、
+            /// 有 ErrorResolver、大文件、越界路径、归档内重名都走这里。
+            async Task ExtractSingleEntryAsync(ArchiveFileInfo entry)
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
                 string fileName = ArchivePath.Normalize(entry.FileName);
-
-                // 只提取请求的条目
                 if (!keySet.Contains(fileName))
-                    continue;
+                    return;
 
                 if (entry.IsDirectory)
                 {
-                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, fileName);
+                    // 目录也走 override：扁平化 / 保留完整路径对选中的空目录同样生效（修既有不一致）
+                    var dirPath = ResolveTarget(entry, fileName);
                     if (!Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
-                    continue;
+                    return;
                 }
 
-                var outputPath = outputPathOverrides?.GetValueOrDefault(fileName)
-                    ?? FileConflictHelper.GetSafePath(destinationPath, fileName);
+                var outputPath = ResolveTarget(entry, fileName);
                 var outDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);
@@ -1601,29 +1659,16 @@ public class SevenZipEngine : IArchiveEngine
                 if (resolvedPath == null)
                 {
                     conflictStats.RecordSkipped();
-                    // 逐条目状态（D2）
                     progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Skipped });
                     processedBytes += (long)entry.Size;
                     handled++;
-                    // 主进度报告：跳过条目也刷新进度（连续大量跳过时窗口长时间无更新、看似卡死）。
-                    // 7z 百分比为文件计数基准 → 用 handled 推进；跳过不计入 ProcessedFiles（已处理）。
-                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
-                    {
-                        CurrentFile = fileName,
-                        PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 0,
-                        FilePercentComplete = 100,
-                        TotalFiles = totalTarget,
-                        ProcessedFiles = processed,
-                        TotalBytes = totalBytes,
-                        ProcessedBytes = processedBytes,
-                        FileTotalBytes = (long)entry.Size,
-                    }));
-                    continue;
+                    unitsDone++;
+                    ReportMainProgress(fileName, 100, (long)entry.Size);
+                    return;
                 }
                 if (existedBefore && resolvedPath == outputPath)
                 {
                     conflictStats.RecordOverwritten();
-                    // 逐条目状态（D2）
                     progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Overwritten });
                 }
 
@@ -1632,7 +1677,7 @@ public class SevenZipEngine : IArchiveEngine
                 progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                 {
                     CurrentFile = fileName,
-                    PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 0,
+                    PercentComplete = CurrentPercent(),
                     TotalFiles = totalTarget,
                     ProcessedFiles = processed,
                     TotalBytes = totalBytes,
@@ -1651,14 +1696,11 @@ public class SevenZipEngine : IArchiveEngine
                             return;
 
                         var filePct = entrySize > 0 ? (double)bytesWritten / entrySize * 100 : 100;
-                        var overallPct = totalTarget > 0
-                            ? (double)(handled + (double)bytesWritten / entrySize) / totalTarget * 100
-                            : 0;
 
                         progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = fileName,
-                            PercentComplete = Math.Min(overallPct, 100),
+                            PercentComplete = CurrentPercent(),
                             FilePercentComplete = Math.Min(filePct, 100),
                             TotalFiles = totalTarget,
                             ProcessedFiles = processed,
@@ -1678,73 +1720,325 @@ public class SevenZipEngine : IArchiveEngine
 
                     processed++;
                     handled++;
+                    unitsDone++;
                     processedBytes += entrySize;
 
                     // 逐条目状态（D2）：写盘成功即上报 Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
                     if (!(existedBefore && resolvedPath == outputPath))
                         progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Completed });
 
-                    var now = DateTime.Now;
-                    if (now - lastReportTime >= reportInterval || processed == totalTarget)
+                    ReportMainProgress(fileName, 100, entrySize);
+                }
+                catch (OperationCanceledException) { throw; }
+                catch (UnauthorizedAccessException uax)
+                {
+                    CoreLog.Info($"ExtractEntriesAsync: permission denied for '{fileName}': {uax.Message}");
+                    conflictStats.RecordFailed();
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = (long)entry.Size, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
+                    failedEntries++;
+                    handled++;
+                    unitsDone++;
+                    processedBytes += entrySize;
+                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    ReportMainProgress(fileName, 100, entrySize);
+                }
+                catch (IOException iox)
+                {
+                    // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
+                    CoreLog.Info($"ExtractEntriesAsync: write failed for '{fileName}': {iox.Message}");
+                    conflictStats.RecordFailed();
+                    progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = (long)entry.Size, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
+                    failedEntries++;
+                    handled++;
+                    unitsDone++;
+                    processedBytes += entrySize;
+                    ReportMainProgress(fileName, 100, entrySize);
+                }
+            }
+
+            async Task ExtractEntriesOneByOneAsync(IEnumerable<ArchiveFileInfo> entries)
+            {
+                foreach (var entry in entries)
+                {
+                    await ExtractSingleEntryAsync(entry);
+                }
+            }
+
+            /// 选中条目的批量可行性闸门（计划 §4.1）：全部满足才批量。
+            bool CanUseBulk() =>
+                EnableBulkSolidExtract
+                && extractor.IsSolid
+                && password == null
+                && options?.ErrorResolver == null
+                && selectedFiles.Count >= 2                       // 单条：建暂存 + 移动纯亏
+                && !selectedFiles.Any(e => e.Encrypted);          // 加密 solid 的批量重载行为未验证
+
+            /// 冲突预解析（计划 §4.2 第 2 步）：落点已由 override 算好，这里只做「判冲突 + 分桶」。
+            async Task<BulkExtractPlan> BuildBulkPlanAsync()
+            {
+                var plan = new BulkExtractPlan();
+                var claimedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+                int scanned = 0;
+
+                progress.ReportPhase(ArchivePhase.CheckingConflicts);
+
+                foreach (var entry in allEntries)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+
+                    var fileName = ArchivePath.Normalize(entry.FileName);
+                    if (!keySet.Contains(fileName))
+                        continue;
+
+                    if (entry.IsDirectory)
+                    {
+                        plan.Directories.Add(entry);
+                        continue;
+                    }
+
+                    if (++scanned % ConflictScanReportEvery == 0)
                     {
                         progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = fileName,
-                            PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 100,
-                            FilePercentComplete = 100,
+                            PercentComplete = totalTarget > 0 ? Math.Min((double)scanned / totalTarget * 100, 100) : 0,
                             TotalFiles = totalTarget,
                             ProcessedFiles = processed,
                             TotalBytes = totalBytes,
                             ProcessedBytes = processedBytes,
                         }));
-                        lastReportTime = now;
+                    }
+
+                    var targetPath = ResolveTarget(entry, fileName);
+
+                    // 越界落点（override 指到目标目录外）与暂存布局不安全的条目一律逐条目
+                    if (!IsPathInsideDirectory(destinationPath, targetPath)
+                        || !IsPathInsideDirectory(destinationPath, Path.Combine(destinationPath, fileName)))
+                    {
+                        plan.Unsafe.Add(new BulkEntryPlan(entry, fileName, targetPath, targetPath, File.Exists(targetPath)));
+                        continue;
+                    }
+
+                    var existedBefore = File.Exists(targetPath);
+                    var resolvedPath = await FileConflictHelper.ResolvePathAsync(targetPath, options, entry.LastWriteTime, (long)entry.Size);
+                    if (resolvedPath == null)
+                    {
+                        conflictStats.RecordSkipped();
+                        plan.Skipped.Add(entry);
+                        unitsDone++;
+                        continue;
+                    }
+
+                    var planned = new BulkEntryPlan(entry, fileName, targetPath, resolvedPath, existedBefore);
+
+                    // 归档内重名 / 多条落到同一路径：交给逐条目（它会重新判冲突并选名，语义与今天一致）
+                    if (!claimedPaths.Add(resolvedPath))
+                    {
+                        plan.Duplicate.Add(planned);
+                        continue;
+                    }
+
+                    // 大文件走逐条目：避免 staging + 最终路径同时占两份盘
+                    if ((long)entry.Size >= BigFileThresholdBytes)
+                    {
+                        plan.BigFile.Add(planned);
+                        continue;
+                    }
+
+                    plan.Direct.Add(planned);
+                }
+
+                return plan;
+            }
+
+            /// 暂存段：一次 ExtractFiles 把整批条目解码到 stagingRoot（保持归档内相对布局）。
+            async Task RunBulkSegmentAsync(IReadOnlyList<BulkEntryPlan> segment, string stagingRoot)
+            {
+                var indexMap = segment.ToDictionary(x => x.Entry.Index, x => x);
+                var finished = new HashSet<int>();
+                double entryProgress = 0;
+
+                void OnStarted(object? sender, FileInfoEventArgs e)
+                {
+                    if (cancellationToken.IsCancellationRequested)
+                    {
+                        e.Cancel = true;
+                        return;
+                    }
+                    entryProgress = 0;
+                    if (indexMap.TryGetValue(e.FileInfo.Index, out var planned))
+                    {
+                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                        {
+                            CurrentFile = planned.FileName,
+                            PercentComplete = CurrentPercent(),
+                            FilePercentComplete = 0,
+                            TotalFiles = totalTarget,
+                            ProcessedFiles = processed,
+                            TotalBytes = totalBytes,
+                            ProcessedBytes = processedBytes,
+                            FileTotalBytes = (long)planned.Entry.Size,
+                        }));
                     }
                 }
-                catch (OperationCanceledException) { throw; }
-                catch (UnauthorizedAccessException uax)
+
+                void OnExtracting(object? sender, ProgressEventArgs e)
                 {
-                        CoreLog.Info($"ExtractEntriesAsync: permission denied for '{fileName}': {uax.Message}");
-                        conflictStats.RecordFailed();
-                        // 逐条目状态（D2）
-                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = (long)entry.Size, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
-                    failedEntries++;
-                    handled++;
-                    processedBytes += entrySize;
-                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
+                    entryProgress = Math.Min(entryProgress + e.PercentDelta, 100);
                     progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                     {
-                        CurrentFile = fileName,
-                        PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 0,
-                        FilePercentComplete = 100,
+                        PercentComplete = CurrentPercent(),
+                        FilePercentComplete = entryProgress,
                         TotalFiles = totalTarget,
                         ProcessedFiles = processed,
                         TotalBytes = totalBytes,
                         ProcessedBytes = processedBytes,
-                        FileTotalBytes = (long)entry.Size,
                     }));
                 }
-                catch (IOException iox)
+
+                void OnFinished(object? sender, FileInfoEventArgs e)
                 {
-                    // 目标文件被其他进程占用等 IO 失败：跳过该条目继续，避免单个文件中止整个解压
-                        CoreLog.Info($"ExtractEntriesAsync: write failed for '{fileName}': {iox.Message}");
-                        conflictStats.RecordFailed();
-                        // 逐条目状态（D2）
-                        progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = (long)entry.Size, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
-                    failedEntries++;
-                    handled++;
-                    processedBytes += entrySize;
-                    // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
-                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    // 暂存段不落地到最终路径：只计「已解码」，状态与计数留到移动成功之后上报
+                    finished.Add(e.FileInfo.Index);
+                    unitsDone++;
+                    ReportMainProgress(e.FileInfo.FileName, 100, (long)e.FileInfo.Size);
+                }
+
+                extractor.FileExtractionStarted += OnStarted;
+                extractor.Extracting += OnExtracting;
+                extractor.FileExtractionFinished += OnFinished;
+                try
+                {
+                    CoreLog.Info($"ExtractEntriesAsync: bulk segment {segment.Count} entries -> {stagingRoot}");
+                    extractor.ExtractFiles(stagingRoot, segment.Select(x => x.Entry.Index).ToArray());
+                }
+                finally
+                {
+                    extractor.FileExtractionStarted -= OnStarted;
+                    extractor.Extracting -= OnExtracting;
+                    extractor.FileExtractionFinished -= OnFinished;
+                }
+
+                // 7z 静默跳过的条目（目标被占用等）不会触发 Finished：不在这里记失败，
+                // 由调用方发现「暂存文件不存在」后退回逐条目，由逐条目给出准确原因。
+                foreach (var item in segment)
+                {
+                    if (!finished.Contains(item.Entry.Index))
+                        CoreLog.Info($"ExtractEntriesAsync: bulk entry not decoded: '{item.FileName}'");
+                }
+            }
+
+            async Task RunSelectedBulkAsync(BulkExtractPlan plan)
+            {
+                CoreLog.Info($"ExtractEntriesAsync: bulk solid selected {plan.BulkCount} entries, per-entry {plan.BigFile.Count + plan.Unsafe.Count + plan.Duplicate.Count}, skipped {plan.Skipped.Count}");
+
+                progress.ReportPhase(ArchivePhase.Extracting);
+
+                // 选中空目录：按 override 落点补建（修「目录条目忽略 override」的既有缺陷）
+                foreach (var dir in plan.Directories)
+                {
+                    var dirName = ArchivePath.Normalize(dir.FileName);
+                    var dirPath = ResolveTarget(dir, dirName);
+                    if (!Directory.Exists(dirPath))
+                        Directory.CreateDirectory(dirPath);
+                }
+
+                ReportSkippedEntries(plan.Skipped);
+
+                var stagingRoot = Path.Combine(destinationPath, StagingDirPrefix + Guid.NewGuid().ToString("N"));
+                CleanupStaleStagingDirectories(destinationPath);
+
+                var manualFallback = new List<BulkEntryPlan>();
+                try
+                {
+                    Directory.CreateDirectory(stagingRoot);
+                    await RunBulkSegmentAsync(plan.Direct, stagingRoot);
+
+                    foreach (var item in plan.Direct)
                     {
-                        CurrentFile = fileName,
-                        PercentComplete = totalTarget > 0 ? (double)handled / totalTarget * 100 : 0,
-                        FilePercentComplete = 100,
-                        TotalFiles = totalTarget,
-                        ProcessedFiles = processed,
-                        TotalBytes = totalBytes,
-                        ProcessedBytes = processedBytes,
-                        FileTotalBytes = (long)entry.Size,
-                    }));
+                        cancellationToken.ThrowIfCancellationRequested();
+
+                        var stagedPath = Path.Combine(stagingRoot, item.FileName);
+                        if (!File.Exists(stagedPath))
+                        {
+                            // 没解码出来：退回逐条目（它会重新判冲突、给出失败原因）
+                            manualFallback.Add(item);
+                            continue;
+                        }
+
+                        var finalPath = item.ResolvedPath ?? item.OutputPath;
+                        try
+                        {
+                            var finalDir = Path.GetDirectoryName(finalPath);
+                            if (!string.IsNullOrEmpty(finalDir) && !Directory.Exists(finalDir))
+                                Directory.CreateDirectory(finalDir);
+
+                            File.Move(stagedPath, finalPath, overwrite: true);
+
+                            try { File.SetLastWriteTime(finalPath, item.Entry.LastWriteTime); }
+                            catch (Exception tsEx)
+                            {
+                                CoreLog.Info($"ExtractEntriesAsync: failed to set timestamp on {finalPath}: {tsEx.Message}");
+                            }
+
+                            processed++;
+                            handled++;
+                            processedBytes += (long)item.Entry.Size;
+
+                            if (item.WasExisting && finalPath == item.OutputPath)
+                            {
+                                conflictStats.RecordOverwritten();
+                                progress?.Report(new ArchiveProgress { EntryKey = item.FileName, EntryStatus = ArchiveEntryStatus.Overwritten });
+                            }
+                            else
+                            {
+                                progress?.Report(new ArchiveProgress { EntryKey = item.FileName, EntryStatus = ArchiveEntryStatus.Completed });
+                            }
+
+                            ReportMainProgress(item.FileName, 100, (long)item.Entry.Size);
+                        }
+                        catch (UnauthorizedAccessException uax)
+                        {
+                            CoreLog.Info($"ExtractEntriesAsync: staging move denied for '{item.FileName}': {uax.Message}");
+                            ReportEntryFailure(item, uax.Message, uax.HResult, EntryFailureReason.PermissionDenied);
+                        }
+                        catch (IOException iox)
+                        {
+                            CoreLog.Info($"ExtractEntriesAsync: staging move failed for '{item.FileName}': {iox.Message}");
+                            ReportEntryFailure(item, iox.Message, iox.HResult, EntryFailureReason.IoFailed);
+                        }
+                    }
+                }
+                finally
+                {
+                    DeleteDirectoryQuietly(stagingRoot);
+                }
+
+                // 逐条目桶：大文件 / 不安全路径 / 归档内重名 / 暂存没落地的
+                foreach (var item in plan.BigFile.Concat(plan.Unsafe).Concat(plan.Duplicate).Concat(manualFallback))
+                {
+                    await ExtractSingleEntryAsync(item.Entry);
+                }
+            }
+
+            // ── 分流：solid 且选中 ≥2 条时批量解码到暂存再逐个移动，其余走逐条目 ──
+            if (!CanUseBulk())
+            {
+                await ExtractEntriesOneByOneAsync(allEntries);
+            }
+            else
+            {
+                var plan = await BuildBulkPlanAsync();
+                if (plan.BulkCount < 2)
+                {
+                    // 能批量的不足两条（全被跳过 / 全是大文件）：直接退回逐条目，
+                    // 由逐条目重新判定（这里不能再上报跳过的条目，否则同一条目会被上报两次）
+                    progress.ReportPhase(ArchivePhase.Extracting);
+                    await ExtractEntriesOneByOneAsync(allEntries);
+                }
+                else
+                {
+                    await RunSelectedBulkAsync(plan);
                 }
             }
 
