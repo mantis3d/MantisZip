@@ -141,6 +141,7 @@
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 元数据显示位置可选（侧边面板 / 正文区） | [metadata-display-location.md](.omo/plans/未开始/metadata-display-location.md) | 🟢低 | 6-8h | 📋 2026-10-31 用户讨论后定案、待启动。exe 预览正文区只有条目名标题、大片空白，信息全在右侧面板；按类型加「显示位置」，选正文区时「程序信息」搬到正文区竖排渲染、面板只留「文件信息」。**只对没有其它正文内容的格式开放**（当前仅 `pe`），默认侧边面板、老配置不动 |
 | 7z 全量解压改走批量接口（solid 性能） | [sevenzip-solid-extract-batch.md](.omo/plans/未开始/sevenzip-solid-extract-batch.md) | 🟡中 | **1.5-2天** | issue #75。solid 归档逐条目 `ExtractFile` ⇒ 对文件数**二次方**（实测 800×64KB：19.3s vs `7z.exe` 0.56s / 批量 0.86s）。满足严格分流条件时改走 `ExtractFiles(dir, indexes)`：冲突在解压**前**预解析（默认 `ask` 也集中问完、应用到全部即可整包提速）、改名条目走「二次批量→暂存→移动」、其余（非 solid / 加密 / `ErrorResolver` / ≥64MB / 不安全路径）单条目走原路径，批量失败只重试未完成条目。**最坏情况与今天等价** |
+| 选中条目 / 拖拽解压改走批量接口（solid 性能） | [selected-items-bulk-extract.md](.omo/plans/未开始/selected-items-bulk-extract.md) | 🟡中 | **2-2.5天** | issue #75 的另一半。`SelectedItemsExtractService` → `SevenZipEngine.ExtractEntriesAsync` 逐条目 `ExtractFile`，solid 下选中 N 条 = N 次块解码（选整个大目录时与全量解压同病）。改走「批量解码到目标目录内 `.mantiszip-staging-<guid>` → 按 `outputPathOverrides` 逐个 `File.Move`」：落点（扁平化 / 保留完整路径 / 重名）因此不受批量 API 限制；冲突仍 100% 预解析（已认领落点集合处理多条目同落点）；单条 / 加密 / `ErrorResolver` / 非 solid 走原路径。**依赖全量解压计划的 `BulkExtractPlan`，建议紧随其后做，增量 1-1.5 天** |
 
 
 ---
