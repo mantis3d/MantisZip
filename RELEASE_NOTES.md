@@ -25,6 +25,7 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 - **The compression window's preview tree counts as it scans** — while the folder scan runs in the background, the root node now reads "Loading N files, X" and refreshes twice a second instead of a static "Loading…", switching to the real totals when the scan finishes; entries excluded by the file filter are not counted
 - **缩略图卡片可调外观** — 「设置 → 外观 → 缩略图」可调三项，改完立刻生效不用重启：卡片外边框（默认关闭，白底图贴在浅色背景上时用来看清边界）、透明图是否垫一层纯色底（默认保留透明，垫色可自选）、缩略图尺寸三档 96 / 128 / 160 px
 - **Adjustable thumbnail cards** — Settings → Appearance → Thumbnails exposes three options that apply immediately: a card border (off by default, handy for white-background images on light surfaces), whether transparent images get a solid backdrop (transparency is kept by default; the backdrop colour is pickable), and the thumbnail size in three steps (96 / 128 / 160 px)
+- ![设置 → 外观 → 缩略图：外边框 / 垫底色 / 尺寸三档](docs/images/version/v0.5.6/ThumbnailCardSettings.png)
 
 ## v0.5.5
 

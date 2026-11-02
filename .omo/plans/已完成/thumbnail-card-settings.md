@@ -44,7 +44,7 @@ v0.5.6 加完「平铺 / 内容」两种缩略图布局后，卡片的观感是�
 - [x] T4 主窗口：`_thumbnailServiceSize` 比较重建 + `ReloadThumbnailsForStyleChange()` + 事件订阅
 - [x] T5 设置窗「外观 → 缩略图」子页签（边框 / 垫底色 + 取色 / 尺寸三档）+ VM 读写与本地化刷新
 - [x] T6 i18n 三语 11 个 key（`Settings_Tab_AppearanceThumbnail`、`Settings_Thumbnail_*`）
-- [x] T7 真机目视（边框开关 × 透明/垫色 × 三档尺寸；160px + 边框 + `#FFF2D5` 垫底已目视确认，设置窗子页签由用户手动确认）
+- [x] T7 真机目视（边框开关 × 透明/垫色 × 三档尺寸；160px + 边框 + `#FFF2D5` 垫底已目视确认；设置窗「外观 → 缩略图」子页签已截图 `docs/images/version/v0.5.6/ThumbnailCardSettings.png`）
 - [x] T8 测试与文档（细节文档 + PROGRESS + 规则 18 确认 RELEASE_NOTES）
 
 ## 验收口径
@@ -86,4 +86,5 @@ v0.5.6 加完「平铺 / 内容」两种缩略图布局后，卡片的观感是�
 - `dotnet build -c Release --no-incremental` 0 警告；`-Task test -Target ui-tests -c Release` 38.9s 全绿；`-Task test -Target tests` 全绿。
 - `-Task i18n` 1423 key、`-Task check` 版本 0.5.6 六处 / 1423 key / 8 守卫全绿。
 - 真机（`settings.json` 置 `FileListLayoutMode=1`、`ThumbnailShowBorder=true`、`ThumbnailUseTransparency=false`、`ThumbnailBackdropColor="#FFF2D5"`、`ThumbnailSize=160`）：平铺卡片变 160px、每张卡 1px 细边框、透明图周围露出米色垫底、文字卡同为米色底 ⇒ 四项设置全部生效。
-- **未做**：设置窗子页签的截图（UI 自动化点不开设置窗：`Ctrl+,` 与坐标点击均未生效，窗口位置还会被拖动），改由用户手动确认。
+- **设置窗截图（2026-11-02 补）**：`docs/images/version/v0.5.6/ThumbnailCardSettings.png`（916×678）。拍摄办法：临时加 `MZ_SHOT_THUMBNAIL_TAB=1` 环境变量钩子（`MainWindow.Opened` 自动打开设置窗、`SettingsWindow` 构造里把 `MainTabs.SelectedIndex = 2` / `AppearanceTabs.SelectedIndex = 1`），跑一次 Release 截图后 `git checkout` 撤销。
+- **踩坑（截图自动化）**：早先截不到设置窗，是因为脚本用 `SetWindowPos(hwnd, HWND_TOPMOST)` 把主窗口置顶——**非置顶的子窗口永远画不到置顶的 owner 之上**，`ShowDialog(this)` 弹出的设置窗其实已经打开、只是被主窗口盖住；且 Esc 既关菜单也关对话框，按 pid 枚举时窗口已被自己关掉。此时用 `HWND_NOTOPMOST`（-2）复位、或按子窗口自己的 `HWND` 矩形抓图，就没有问题。
