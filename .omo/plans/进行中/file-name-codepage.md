@@ -146,6 +146,17 @@
 3. **编码清单**（D4）：含「其他代码页…」手动填代码页数字 —— 用户选「要」。
 4. **开工时点**：用户选「先等 v0.5.5 发版」，故 v0.5.5 发版后开工（tag `v0.5.5` 已于 2026-11-02 推送）。
 
+#### 11.5 工具栏形态返工（同日实测反馈）
+
+用户看完首版提三点，全部采纳：① 控件要与工具栏其它「图标 + 文字」按钮一致（原为 `ComboBox`）；② 不适用格式（7z/RAR）不要隐藏、改成置灰；③ 要显示本次实际生效的编码。
+
+落地形态：`Button Classes="ToolbarButton"` + `MenuFlyout`，内容为地球图标 + 右下角徽章 + `NameEncodingDisplay` 文字；徽章文案由 `NameEncodingOption.ShortLabel()` 生成（`auto` 不画、`system`→`ANSI`、`other:<n>`→数字）。菜单项在 `MainWindow.RebuildNameEncodingMenu()` 里按 VM 的 `NameEncodingOptions` 现建（`ToggleType=Radio`、当前项打勾），Click 与 `MenuFlyout.Opened` 各触发一次（幂等兜底）。
+
+两处必须记住的 Avalonia 12 事实：`FlyoutBase` **没有 `Opening`**，只有 `Opened`/`Closed`；`MenuFlyout` 不在可视树里，`x:Name` **不生成字段**（`CS0103`）⇒ 命名 Button、从 `Button.Flyout` 取。
+
+顺带修掉的语义缺陷：`LoadArchiveAsync` 开头的 `ClearArchiveInternal()` 无条件复位代码页，导致「手选编码 → 立刻被自己触发的重载抹掉」；改为 `ClearArchiveInternal(bool resetNameEncoding = true)`，载入前按 `reloadingSameArchive` 决定是否保留，`CanChangeNameEncoding` 补 `IsArchiveLoaded`。
+
+测试：`tests/MantisZip.UI.Avalonia.Tests/NameEncodingToolbarTests.cs` 15 例。i18n 1405 → 1406（新增 `Toolbar_NameEncoding_Detected`）。
 ## 11. 实施记录（2026-11-02）
 
 ### 11.1 与计划的三处差异

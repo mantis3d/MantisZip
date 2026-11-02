@@ -5,6 +5,17 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-02** — 样式：主工具栏代码页控件改为「地球图标 + 文字按钮 + 检测徽章」（按用户实测反馈）
+  - 起因：首版做成工具栏 `ComboBox`，用户实测提三点 —— ① 与工具栏其它「图标 + 文字」按钮不一致；② 打开 7z 时整个控件消失，工具栏随之抖动；③ 看不到本次实际生效的编码。
+  - 改动：`src/MantisZip.UI.Avalonia/Views/MainWindow.axaml` 的 `ComboBox` 换成 `Button Classes="ToolbarButton"`（`x:Name="NameEncodingButton"`）+ `MenuFlyout`，内容为 `Grid 22×22` 的地球图标（`IconGlobe`）+ 右下角徽章 `Border`（`Background=ThemeAccentBrush`、`TextBlock FontSize=8`、`Foreground=ThemeTextOnAccentBrush`）+ 文字行（`Classes="ToolbarButtonLabel"` 绑 `NameEncodingDisplay`）；`IsEnabled="{Binding CanChangeNameEncoding}"` 取代原来的 `IsVisible`，7z/RAR 等不适用格式**置灰而不隐藏**。
+  - 菜单为什么在 code-behind 现建：选项文案要随语言变、当前项要打勾、「其他代码页…」要传命令参数 —— `RebuildNameEncodingMenu()` 每次 `flyout.Items.Clear()` 后按 `vm.NameEncodingOptions` 逐个建 `MenuItem`（`ToggleType=Radio`、`GroupName="NameEncoding"`、`Command=ChangeNameEncodingCommand`）。
+  - 两个 Avalonia 12 的坑：① `FlyoutBase` 只有 `Opened`/`Closed`，没有 `Opening`；② `MenuFlyout` 不在可视树里，`x:Name` **不生成字段**（`CS0103 The name 'NameEncodingFlyout' does not exist`）⇒ 必须命名 Button、从 `Button.Flyout` 取。`Button.OnClick` 先冒泡 Click 再弹 Flyout，故 Click 里重建能赶上本次弹出，`Opened` 再重建一次兜底（幂等）。
+  - 新增 `NameEncodingOption.ShortLabel()`（`auto`→空、`system`→`ANSI`、`other:<n>`→数字、`gbk`→`GBK`、`big5`→`BIG5`、`shift-jis`→`JIS`、`euc-kr`→`KR`、`gb18030`→`GB18`）与 VM 派生属性 `NameEncodingDisplay`/`NameEncodingBadgeText`/`HasNameEncodingBadge`/`NameEncodingToolTip`/`NameEncodingSelectedOption`（`other:<n>` 归到「其他代码页…」那项打勾），通知集中在 `partial void OnArchiveNameEncodingChanged` / `OnResolvedNameEncodingKeyChanged`。
+  - 主题：`ThemeLight.axaml` / `ThemeDark.axaml` 成对新增 `ThemeTextOnAccent`（Light `#FF0A2A45` / Dark `#FFFFFFFF`）与 `ThemeTextOnAccentBrush`，强调色底上的小徽章文字才可读。
+  - 顺带的语义修正（写测试时发现）：`LoadArchiveAsync` 开头会走 `ClearArchiveInternal()`，原实现无条件把代码页复位成默认值 ⇒ **手选编码刚生效就被自己触发的重载抹掉**。改为 `ClearArchiveInternal(bool resetNameEncoding = true)`，载入前判断 `reloadingSameArchive`（`CurrentArchivePath` 与待载入路径相同）取反传入；同时 `CanChangeNameEncoding` 补 `IsArchiveLoaded`，未开包时按钮置灰。
+  - i18n：新增 `Toolbar_NameEncoding_Detected`（zh-CN「检测到 {0}」/ en `Detected {0}` / zh-TW「偵測到 {0}」），key 数 1405 → **1406**。
+  - 测试：新增 `tests/MantisZip.UI.Avalonia.Tests/NameEncodingToolbarTests.cs` 15 例（`ShortLabel` 11 条 `[Theory]` + 未开包置灰无徽章 + GBK 包徽章/Tooltip + 切 Big5 后文字与徽章同步 + `other:950` 归到「其他代码页…」）。
+  - 验证：`build -Target avalonia -c Release` 0 警告；`ui-tests -c Release` 44.3s 全绿。
 **2026-11-02** — 样式：压缩设置窗口「输出方式」改为「左标签 + 三项横排」
   - 起因：用户反馈三项单选竖排占高太多（约 132px），希望改横排或换布局。
   - 改动：`src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml` 第 0 行分组（输出方式）由「标题 + `StackPanel Spacing` 竖排三项」改成 `Grid ColumnDefinitions="Auto,*"`：左列标题 `Compress_OutputMode`（`VerticalAlignment="Center"`、右侧 `Margin="0,0,12,0"`），右列 `WrapPanel Orientation="Horizontal"` 横排三个 `RadioButton`（每项 `Margin="0,0,12,0"`，最后一项无右边距）。

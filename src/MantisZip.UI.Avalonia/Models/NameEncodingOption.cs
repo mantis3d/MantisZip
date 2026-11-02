@@ -45,6 +45,39 @@ public sealed class NameEncodingOption
     /// </summary>
     public const string OtherPlaceholder = "other";
 
+    /// <summary>
+    /// 工具栏图标徽章用的「短标记」：徽章只有 22×22 图标那么大，写全名会溢出，
+    /// 所以只放 2–4 个字符（GBK / BIG5 / JIS / UTF8 / U16 …），完整名称交给 Tooltip。
+    /// <para>
+    /// 返回空串表示「不显示徽章」：未打开压缩包、或自动检测还没有结果（<c>null</c> / <c>auto</c>）。
+    /// </para>
+    /// </summary>
+    /// <param name="key">编码键（<see cref="NameEncodingCatalog"/> 认可的取值）。</param>
+    public static string ShortLabel(string? key)
+    {
+        if (string.IsNullOrEmpty(key) || NameEncodingCatalog.IsAuto(key))
+            return string.Empty;
+
+        if (string.Equals(key, NameEncodingCatalog.System, StringComparison.OrdinalIgnoreCase))
+            return "ANSI";
+
+        // 「其他代码页…」直接显示码页数字（950 / 932 …），比显示 "other:950" 直观
+        if (key.StartsWith(NameEncodingCatalog.OtherPrefix, StringComparison.OrdinalIgnoreCase))
+            return key[NameEncodingCatalog.OtherPrefix.Length..];
+
+        return key.ToLowerInvariant() switch
+        {
+            "utf-8" => "UTF8",
+            "utf-16" => "U16",
+            "gbk" => "GBK",
+            "gb18030" => "GB18",
+            "big5" => "BIG5",
+            "shift-jis" => "JIS",
+            "euc-kr" => "KR",
+            _ => key.ToUpperInvariant(),
+        };
+    }
+
     /// <summary>常用编码清单（键, 原生名）。</summary>
     private static readonly (string Key, string Label)[] CommonEncodings =
     [

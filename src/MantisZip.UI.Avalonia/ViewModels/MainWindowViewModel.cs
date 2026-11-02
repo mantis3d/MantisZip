@@ -603,24 +603,69 @@ public partial class MainWindowViewModel : ObservableObject
         NameEncodingCatalog.IsAuto(ArchiveNameEncoding) ? null : ArchiveNameEncoding;
 
     /// <summary>
-    /// 主工具栏代码页下拉是否可用：只有按名字解码的格式（ZIP / TAR / GZ）才需要；
-    /// 7z/RAR 的条目名是 UTF-16，没有代码页问题。
-    /// </summary>
-    /// <summary>
     /// 全量解压时把当前代码页透传给引擎：手动选了代码页就必须按同一口径打开，
     /// 否则列表名正确、解出来的文件名却是乱码。null = 自动检测（与改造前完全一致）。
     /// </summary>
     private ArchiveOptions? NameEncodingReadOptions() =>
         NameEncodingRequestKey is null ? null : new ArchiveOptions { ReadEncoding = NameEncodingRequestKey };
 
+    /// <summary>
+    /// 主工具栏代码页按钮是否可用：只有按名字解码的格式（ZIP / TAR / GZ）才需要；
+    /// 7z/RAR 的条目名是 UTF-16，没有代码页问题 —— 此时按钮**置灰而不隐藏**（2026-11-02 用户要求，
+    /// 工具栏不因格式切换而跳动）。
+    /// </summary>
     public bool CanChangeNameEncoding =>
-        _currentFormat is ArchiveFormat.Zip or ArchiveFormat.Tar or ArchiveFormat.GZip;
+        IsArchiveLoaded && _currentFormat is ArchiveFormat.Zip or ArchiveFormat.Tar or ArchiveFormat.GZip;
 
     /// <summary>
     /// 代码页下拉选项（自动 / 系统默认 / 常用编码 / 其他…）。文案随语言切换重建，见 <see cref="CultureChangedForNameEncoding"/>。
     /// </summary>
     [ObservableProperty]
     private IReadOnlyList<NameEncodingOption> _nameEncodingOptions = NameEncodingOption.BuildDefault();
+
+    /// <summary>工具栏按钮下方的文字：当前选中的编码项（自动检测 / 系统默认 / GBK / 其他…950）。</summary>
+    public string NameEncodingDisplay
+    {
+        get
+        {
+            foreach (var option in NameEncodingOptions)
+            {
+                if (string.Equals(option.Key, ArchiveNameEncoding, StringComparison.OrdinalIgnoreCase))
+                    return option.Display;
+            }
+
+            // 「其他代码页…」选过之后 ArchiveNameEncoding 是 other:950 这类值，选项里只有占位 other
+            return NameEncodingCatalog.IsAuto(ArchiveNameEncoding)
+                ? LocalizationManager.T("Toolbar_NameEncoding_Auto")
+                : ArchiveNameEncoding;
+        }
+    }
+
+    /// <summary>
+    /// 图标右下角徽章文字：本次载入**实际生效**的编码（自动检测出来的值也算），
+    /// 空串 = 不显示徽章（未打开压缩包，或还没拿到结果）。
+    /// </summary>
+    public string NameEncodingBadgeText => NameEncodingOption.ShortLabel(ResolvedNameEncodingKey);
+
+    /// <summary>是否要画徽章（避免空 Border 占位）。</summary>
+    public bool HasNameEncodingBadge => NameEncodingBadgeText.Length > 0;
+
+    /// <summary>工具栏按钮的 Tooltip：名称 + 实际生效的编码（含完整名称，徽章只放短标记）。</summary>
+    public string NameEncodingToolTip
+    {
+        get
+        {
+            var title = LocalizationManager.T("Toolbar_NameEncoding");
+            if (string.IsNullOrEmpty(ResolvedNameEncodingKey))
+                return title;
+
+            var detected = NameEncodingOption.ShortLabel(ResolvedNameEncodingKey);
+            if (detected.Length == 0)
+                return title;
+
+            return $"{title}\n{LocalizationManager.T("Toolbar_NameEncoding_Detected", detected)}";
+        }
+    }
 
     /// <summary>
     /// 切换文件名代码页：先记下新键，再按 <see cref="RefreshArchive"/> 的路子重载并尽量停在原目录。
@@ -658,10 +703,48 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     private void CultureChangedForNameEncoding()
     {
-        // 选中项本身（ArchiveNameEncoding 的值）不变，ComboBox 走 SelectedValue 绑定，
-        // 重建列表后由 View 重新选回去；只有「自动检测」「系统默认」「其他…」这些文案要换语言。
+        // 选中项本身（ArchiveNameEncoding 的值）不变，按钮文字/菜单勾选按新语言重算。
         NameEncodingOptions = NameEncodingOption.BuildDefault();
         OnPropertyChanged(nameof(NameEncodingOptions));
+        OnPropertyChanged(nameof(NameEncodingDisplay));
+        OnPropertyChanged(nameof(NameEncodingToolTip));
+    }
+
+    /// <summary>选中项变化 → 按钮文字与 Tooltip 跟着变。</summary>
+    partial void OnArchiveNameEncodingChanged(string value)
+    {
+        OnPropertyChanged(nameof(NameEncodingDisplay));
+        OnPropertyChanged(nameof(NameEncodingToolTip));
+        OnPropertyChanged(nameof(NameEncodingSelectedOption));
+    }
+
+    /// <summary>实际生效的编码变化 → 图标徽章与 Tooltip 跟着变。</summary>
+    partial void OnResolvedNameEncodingKeyChanged(string? value)
+    {
+        OnPropertyChanged(nameof(NameEncodingBadgeText));
+        OnPropertyChanged(nameof(HasNameEncodingBadge));
+        OnPropertyChanged(nameof(NameEncodingToolTip));
+    }
+
+    /// <summary>
+    /// 当前选中项（菜单里打勾用）：<c>other:950</c> 这类值归到「其他…」那一项上。
+    /// </summary>
+    public NameEncodingOption? NameEncodingSelectedOption
+    {
+        get
+        {
+            var targetKey = ArchiveNameEncoding.StartsWith(NameEncodingCatalog.OtherPrefix, StringComparison.OrdinalIgnoreCase)
+                ? NameEncodingOption.OtherPlaceholder
+                : ArchiveNameEncoding;
+
+            foreach (var option in NameEncodingOptions)
+            {
+                if (string.Equals(option.Key, targetKey, StringComparison.OrdinalIgnoreCase))
+                    return option;
+            }
+
+            return null;
+        }
     }
 
     /// <summary>
@@ -1023,7 +1106,9 @@ public partial class MainWindowViewModel : ObservableObject
 
         IsLoading = true;
         StatusMessage = LocalizationManager.T("Status_Loading");
-        ClearArchiveInternal();
+        // 刷新同一个包时保留用户手选的代码页；换成另一个包则复位成默认值
+        var reloadingSameArchive = string.Equals(CurrentArchivePath, path, StringComparison.OrdinalIgnoreCase);
+        ClearArchiveInternal(resetNameEncoding: !reloadingSameArchive);
 
         try
         {
@@ -1299,7 +1384,11 @@ public partial class MainWindowViewModel : ObservableObject
         Title = LocalizationManager.T("App_Title");
     }
 
-    private void ClearArchiveInternal()
+    /// <param name="resetNameEncoding">
+    /// 是否把「文件名代码页」复位成设置里的默认值。<c>false</c> 用于**重载同一个包**（刷新 / 手动改代码页），
+    /// 否则用户的临时选择会被自己刚触发的重载抹掉。
+    /// </param>
+    private void ClearArchiveInternal(bool resetNameEncoding = true)
     {
         // 关包即停监视（换包时 LoadArchiveAsync 会重新 Attach），并复位可用性
         DetachArchiveGuard();
@@ -1314,10 +1403,14 @@ public partial class MainWindowViewModel : ObservableObject
         FolderTreeRoot = null;
         _allRawItems = null;
         _archiveComment = null;
-        // 代码页是「每个包」的会话态：关包就回到自动检测，避免拿上一个包的选择去解下一个包
-        // 初值取设置里的「默认读取代码页」，主工具栏可对本包临时覆盖
-        ArchiveNameEncoding = AppSettings.Load()?.ReadNameEncoding ?? NameEncodingCatalog.Auto;
-        ResolvedNameEncodingKey = null;
+        if (resetNameEncoding)
+        {
+            // 代码页是「每个包」的会话态：关包就回到默认值，避免拿上一个包的选择去解下一个包
+            // 初值取设置里的「默认读取代码页」，主工具栏可对本包临时覆盖
+            ArchiveNameEncoding = AppSettings.Load()?.ReadNameEncoding ?? NameEncodingCatalog.Auto;
+            ResolvedNameEncodingKey = null;
+        }
+
         OnPropertyChanged(nameof(CanChangeNameEncoding));
         DirStats = string.Empty;
         FilterStats = string.Empty;

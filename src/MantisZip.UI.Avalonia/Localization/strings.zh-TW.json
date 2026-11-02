@@ -1182,6 +1182,7 @@
   "Toolbar_NameEncoding_OtherTitle": "輸入代碼頁",
   "Toolbar_NameEncoding_OtherHint": "請輸入代碼頁數字，例如 950（Big5）、932（Shift-JIS）。",
   "Toolbar_SmartExtract": "智慧解壓",
+  "Toolbar_NameEncoding_Detected": "偵測到 {0}",
   "Toolbar_Test": "測試",
   "Tooltip_AddFiles": "向壓縮檔增加檔案",
   "Tooltip_DeleteFiles": "刪除選取檔案",

@@ -1182,6 +1182,7 @@
   "Toolbar_NameEncoding_OtherTitle": "Enter code page",
   "Toolbar_NameEncoding_OtherHint": "Enter a code page number, e.g. 950 (Big5) or 932 (Shift-JIS).",
   "Toolbar_SmartExtract": "Smart",
+  "Toolbar_NameEncoding_Detected": "Detected {0}",
   "Toolbar_Test": "Test",
   "Tooltip_AddFiles": "Add files to archive",
   "Tooltip_DeleteFiles": "Delete selected files",
