@@ -150,10 +150,14 @@ public partial class MainWindowViewModel : ObservableObject
 
             var compressedSizeAvailable = GetCompressedSizeAvailable(_currentFormat);
 
+            // 复选框列订阅：先退订上一批（每次重建都是新实例），再加到新实例上
+            foreach (var stale in CurrentEntries)
+                stale.PropertyChanged -= OnEntryPropertyChanged;
             CurrentEntries.Clear();
             foreach (var item in entries)
             {
                 var model = ArchiveItemModel.FromCore(item);
+                model.PropertyChanged += OnEntryPropertyChanged;
                 if (model.IsDirectory)
                 {
                     // 应用目录聚合：大小 = 子树和，日期 = 子树最新，压缩后大小 = 子树和
@@ -200,6 +204,9 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 ComputeProgressBarRatios();
             }
+
+            // 复选框模式：把勾选态按 FullPath 还原到新一批实例上（跨目录 / 跨筛选保持勾选）
+            RestoreCheckedState();
 
             // 条目重填完成，通知视图重应用列排序
             EntriesRefreshed?.Invoke(this, EventArgs.Empty);

@@ -98,15 +98,31 @@ public partial class MainWindowViewModel : ObservableObject
         return completed;
     }
 
+    /// <summary>
+    /// 删除选中条目。复选框模式下作用于**全部勾选项**（可跨目录），否则只删当前 <see cref="SelectedEntry"/>。
+    /// </summary>
     [RelayCommand]
     private async Task DeleteFiles()
     {
-        if (CurrentArchivePath == null || SelectedEntry == null || RunWithProgress == null) return;
+        if (CurrentArchivePath == null || RunWithProgress == null) return;
         if (!EnsureArchiveAvailable()) return;
 
-        var entryPath = SelectedEntry.FullPath ?? SelectedEntry.Name;
-        if (entryPath == null) return;
-        string deleteEntryPath = entryPath; // guard narrows to non-null; explicit string type for array inference
+        // 目标集合：复选框模式下勾选集合优先（可跨目录，这是本模式的意义），
+        // 否则维持单条行为（旧路径完全不变）。
+        var targets = IsCheckboxMode && SelectedEntries.Count > 0
+            ? SelectedEntries.ToList()
+            : (SelectedEntry != null ? new List<ArchiveItemModel> { SelectedEntry } : new List<ArchiveItemModel>());
+
+        // 去重：勾选里可能同时含目录与它的子项，重复传给引擎会让同一路径被删两次。
+        var deletePaths = new List<string>();
+        foreach (var target in targets)
+        {
+            var path = target.FullPath ?? target.Name;
+            if (!string.IsNullOrEmpty(path) && !deletePaths.Contains(path, StringComparer.Ordinal))
+                deletePaths.Add(path!);
+        }
+
+        if (deletePaths.Count == 0) return;
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
         if (engine == null) return;
@@ -117,11 +133,28 @@ public partial class MainWindowViewModel : ObservableObject
 
         // 删除目录带递归语义（引擎按「条目本身 + 其下全部子条目」匹配），故确认框必须先把影响面
         // 算清楚：只写「删除此项？」会让用户以为只删掉一个空目录行。
-        var (fileCount, totalSize) = GetDeleteTargetStats(SelectedEntry);
+        var fileCount = 0;
+        long totalSize = 0;
+        foreach (var target in targets)
+        {
+            var (count, size) = GetDeleteTargetStats(target);
+            fileCount += count;
+            totalSize += size;
+        }
+
         var sizeText = FormatUtil.FormatSize(totalSize);
-        var confirmMessage = SelectedEntry.IsDirectory
-            ? LocalizationManager.T("Confirm_DeleteDirectoryFmt", deleteEntryPath, fileCount, sizeText)
-            : LocalizationManager.T("Confirm_DeleteFileFmt", deleteEntryPath, sizeText);
+        string confirmMessage;
+        if (deletePaths.Count > 1)
+        {
+            // 批量删除只弹一次确认（验收口径 3），文案按条数切换
+            confirmMessage = LocalizationManager.T("Confirm_DeleteMultipleFmt", deletePaths.Count, sizeText);
+        }
+        else
+        {
+            confirmMessage = targets[0].IsDirectory
+                ? LocalizationManager.T("Confirm_DeleteDirectoryFmt", deletePaths[0], fileCount, sizeText)
+                : LocalizationManager.T("Confirm_DeleteFileFmt", deletePaths[0], sizeText);
+        }
 
         var confirm = await AppMessageBox.Show(
             confirmMessage,
@@ -145,21 +178,22 @@ public partial class MainWindowViewModel : ObservableObject
         {
             StatusMessage = LocalizationManager.T("Status_DeleteComplete");
             pw.SetComplete(LocalizationManager.T("Status_DeleteComplete"));
+            // 删完勾选态必须清空（被删条目已不存在，留着会让下次删除再失败一次）
+            ClearCheckedCore();
             _ = RefreshArchiveAfterDeleteAsync();
         };
 
         await RunWithProgress(
             LocalizationManager.T("Status_DeletingFiles"),
-            new[] { deleteEntryPath },
+            deletePaths.ToArray(),
             async (progress, ct) =>
             {
                 // 删除会整包重写，须透传用户的 ZIP 文件名编码设置，
                 // 否则存活的其它条目可能被降级重写成乱码（与 AddFilesToArchiveAsync 同源）。
-                await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { deleteEntryPath }, password, progress, ct,
+                await engine.DeleteEntriesAsync(CurrentArchivePath, deletePaths.ToArray(), password, progress, ct,
                     new ArchiveOptions { FileNameEncoding = AppSettings.Load().ZipEncoding });
             });
     }
-
     /// <summary>
     /// 删除完成后的列表刷新（由进度窗完成回调以 fire-and-forget 方式发起）。
     /// 异常必须在这里吞掉：没有 await 的 Task 抛异常会变成未观察异常，而此刻用户已经在看

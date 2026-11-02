@@ -69,6 +69,14 @@ public partial class ArchiveItemModel : ObservableObject
     [ObservableProperty]
     private bool _isSelected;
 
+    /// <summary>
+    /// 主窗口列表**复选框列**的勾选状态（v0.5.6 `file-list-checkbox-selection`）。
+    /// 仅详情布局的复选框列绑定该属性；预览树复用本模型但不绑它。
+    /// 勾选是 <c>MainWindowViewModel.SelectedEntries</c> 的另一个入口，不构成第二份事实源。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isChecked;
+
     [ObservableProperty]
     private double _sizeRatio;
 

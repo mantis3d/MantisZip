@@ -291,11 +291,21 @@
                     Text="{Binding SelectionStats}"
                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                     FontSize="12" />
-        <TextBlock Grid.Column="1"
-                    Text="{Binding ArchiveStats}"
-                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                    FontSize="12"
-                    HorizontalAlignment="Center" />
+        <StackPanel Grid.Column="1"
+                    Orientation="Horizontal"
+                    Spacing="12"
+                    HorizontalAlignment="Center">
+          <TextBlock Text="{Binding ArchiveStats}"
+                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                      FontSize="12"
+                      VerticalAlignment="Center" />
+          <!-- 复选框模式的勾选摘要（「已选 N 项 · 共 X」）：未勾选时 CheckedSummary 为空串，不占视觉位置 -->
+          <TextBlock Text="{Binding CheckedSummary}"
+                      IsVisible="{Binding IsCheckboxMode}"
+                      Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                      FontSize="12"
+                      VerticalAlignment="Center" />
+        </StackPanel>
         <!-- Password status -->
         <StackPanel Grid.Column="2"
                     Orientation="Horizontal"

@@ -268,6 +268,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Main_ArchiveUnavailable_Reload", "Main_ArchiveUnavailable_Close",
             "Ctx_Extract", "Ctx_ExtractSelectedHere", "Ctx_ExtractSelectedTo", "Ctx_SmartExtract", "Ctx_ExtractTo",
             "Ctx_CopyName", "Ctx_CopyPath", "Ctx_Test", "Ctx_Delete",
+        "Menu_CheckAllVisible", "Menu_InvertChecked", "Menu_ClearChecked",
             "Menu_SmartExtract", "Menu_TestArchive", "Menu_AddFiles", "Menu_DeleteFiles", "Menu_ArchiveComment",
             "Toolbar_SmartExtract", "Toolbar_Test", "Toolbar_AddFiles", "Toolbar_DeleteFiles","Toolbar_ExtractSelected","Toolbar_ExtractArchive",
             "Tooltip_Open", "Tooltip_Extract", "Tooltip_ExtractSelectedHere", "Tooltip_ExtractSelectedTo", "Tooltip_NewArchive",
@@ -322,6 +323,8 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(LocalizedStrings));
         OnPropertyChanged(nameof(ViewModeLabel));
         OnPropertyChanged(nameof(LayoutModeLabel));
+        OnPropertyChanged(nameof(CheckedSummary));
+        OnPropertyChanged(nameof(CheckboxModeLabel));
 
         // Refresh match mode options display text
         MatchModeOptions.Clear();
@@ -863,6 +866,226 @@ public partial class MainWindowViewModel : ObservableObject
         };
     }
 
+    // ── File list checkbox selection (v0.5.6 file-list-checkbox-selection) ──
+
+    /// <summary>
+    /// 列表是否显示**复选框列**（持久化到 <see cref="AppSettings.FileListCheckboxMode"/>，默认关闭）。
+    /// 关闭时行为与引入复选框之前完全一致；勾选只是 <see cref="SelectedEntries"/> 的另一个入口，
+    /// 不新开第二份集合（否则复制路径 / 解压选中 / 删除三处要各自维护，迟早不一致）。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isCheckboxMode;
+
+    partial void OnIsCheckboxModeChanged(bool value)
+    {
+        NotifyCheckboxProperties();
+
+        // 持久化：与 Theme / LayoutMode 相同的合并写（_appSettings 是启动副本，直接 Save() 会覆盖别处改动）
+        if (_appSettings.FileListCheckboxMode != value)
+        {
+            _appSettings.FileListCheckboxMode = value;
+            SaveSetting(s => s.FileListCheckboxMode = value);
+        }
+
+        // 关闭复选框模式：清掉勾选态，避免下次开启时残留上一批勾选（验收口径 5）
+        if (!value)
+            ClearCheckedCore();
+    }
+
+    /// <summary>
+    /// 勾选态与 DataGrid 选区之间的双向同步闸门：进出同步时都要判，
+    /// 否则「勾选 → 改集合 → 回写选区 → SelectionChanged 又改集合」会打转（选择器控件已踩过）。
+    /// </summary>
+    private bool _syncingSelection;
+
+    /// <summary>勾选集合变化后请求视图把 <see cref="SelectedEntries"/> 写回 DataGrid 的 SelectedItems。</summary>
+    public event EventHandler? CheckedSelectionChanged;
+
+    private void NotifyCheckboxProperties()
+    {
+        OnPropertyChanged(nameof(CheckedCount));
+        OnPropertyChanged(nameof(CheckedSummary));
+    }
+
+    /// <summary>已勾选条目数（复选框与 <see cref="SelectedEntries"/> 是同一份事实源）。</summary>
+    public int CheckedCount => SelectedEntries.Count;
+
+    /// <summary>状态栏摘要「已选 N 项 · 共 X」；未勾选时为空串（状态栏不显示空文案）。</summary>
+    public string CheckedSummary => CheckedCount == 0
+        ? string.Empty
+        : LocalizationManager.T(
+            "FileList_CheckedSummaryFmt",
+            CheckedCount,
+            FormatUtil.FormatSize(SelectedEntries.Sum(e => e.Size)));
+
+    /// <summary>复选框模式工具条按钮的提示文案（随语言切换刷新，见 <see cref="UpdateLocalizedStrings"/>）。</summary>
+    public string CheckboxModeLabel => LocalizationManager.T("FileList_CheckboxMode");
+
+    /// <summary>
+    /// 行模型的 <c>IsChecked</c> 变化回调：把勾选落到 <see cref="SelectedEntries"/> 并请求视图同步高亮。
+    /// 订阅/退订在 <see cref="PopulateEntries"/> 重建 <see cref="CurrentEntries"/> 时成对完成。
+    /// </summary>
+    private void OnEntryPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ArchiveItemModel.IsChecked)) return;
+        if (_syncingSelection || sender is not ArchiveItemModel item) return;
+
+        if (item.IsChecked)
+        {
+            if (!SelectedEntries.Contains(item))
+                SelectedEntries.Add(item);
+        }
+        else
+        {
+            SelectedEntries.Remove(item);
+        }
+
+        NotifyCheckboxProperties();
+        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 视图侧选区变化后同步勾选态（复选框模式下 Ctrl/Shift 点选 = 勾选）。
+    /// 由 <c>MainWindow.FileListGrid_SelectionChanged</c> 调用。
+    /// </summary>
+    public void SyncCheckedFromSelection()
+    {
+        if (CurrentEntries.Count == 0) return;
+
+        var selected = new HashSet<ArchiveItemModel>(SelectedEntries);
+        _syncingSelection = true;
+        try
+        {
+            foreach (var entry in CurrentEntries)
+                entry.IsChecked = selected.Contains(entry);
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        NotifyCheckboxProperties();
+    }
+
+    /// <summary>
+    /// 列表重填后按 FullPath 还原勾选态，并把 <see cref="SelectedEntries"/> 里指向旧实例的项换成新实例
+    /// —— <see cref="PopulateEntries"/> 每次都重建 <see cref="ArchiveItemModel"/>，
+    /// 跨目录 / 跨筛选保持勾选只能靠路径匹配，不能靠实例引用。
+    /// </summary>
+    private void RestoreCheckedState()
+    {
+        if (SelectedEntries.Count == 0) return;
+
+        var byPath = new Dictionary<string, ArchiveItemModel>(StringComparer.Ordinal);
+        foreach (var entry in CurrentEntries)
+            byPath[entry.FullPath] = entry;
+
+        _syncingSelection = true;
+        try
+        {
+            for (var i = 0; i < SelectedEntries.Count; i++)
+            {
+                if (byPath.TryGetValue(SelectedEntries[i].FullPath, out var fresh))
+                {
+                    SelectedEntries[i] = fresh;
+                    fresh.IsChecked = true;
+                }
+            }
+
+            foreach (var entry in CurrentEntries)
+                entry.IsChecked = SelectedEntries.Contains(entry);
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        NotifyCheckboxProperties();
+        // 新目录的 DataGrid 选区为空：按勾选集合重新点亮（勾选是事实源，高亮跟随）
+        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>清空勾选态（不动 <see cref="SelectedEntry"/> 的预览联动）。</summary>
+    private void ClearCheckedCore()
+    {
+        _syncingSelection = true;
+        try
+        {
+            foreach (var entry in CurrentEntries)
+                entry.IsChecked = false;
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        SelectedEntries.Clear();
+        NotifyCheckboxProperties();
+        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>勾选当前列表里所有可见行（只作用当前目录，不动其它目录已有的勾选）。</summary>
+    [RelayCommand]
+    private void CheckAllVisible()
+    {
+        if (CurrentEntries.Count == 0) return;
+
+        _syncingSelection = true;
+        try
+        {
+            foreach (var entry in CurrentEntries)
+            {
+                entry.IsChecked = true;
+                if (!SelectedEntries.Contains(entry))
+                    SelectedEntries.Add(entry);
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        NotifyCheckboxProperties();
+        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>清空勾选（工具条 / 右键菜单入口）。</summary>
+    [RelayCommand]
+    private void ClearChecked() => ClearCheckedCore();
+
+    /// <summary>反选当前列表里可见的行（其它目录的勾选保持不变）。</summary>
+    [RelayCommand]
+    private void InvertChecked()
+    {
+        if (CurrentEntries.Count == 0) return;
+
+        _syncingSelection = true;
+        try
+        {
+            foreach (var entry in CurrentEntries)
+            {
+                entry.IsChecked = !entry.IsChecked;
+                if (entry.IsChecked)
+                {
+                    if (!SelectedEntries.Contains(entry))
+                        SelectedEntries.Add(entry);
+                }
+                else
+                {
+                    SelectedEntries.Remove(entry);
+                }
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        NotifyCheckboxProperties();
+        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+
     /// <summary>
     /// 匹配模式选项列表（子串匹配 / 通配符）。显示文本通过 UpdateLocalizedStrings() 刷新。
     /// </summary>
@@ -875,6 +1098,7 @@ public partial class MainWindowViewModel : ObservableObject
 
         // Load settings
         ShowProgressBars = _appSettings.ShowProgressBars;
+        IsCheckboxMode = _appSettings.FileListCheckboxMode;
         SeparateDirBaseline = _appSettings.SeparateDirBaseline;
         AutoExpandTree = _appSettings.AutoExpandTreeToCurrent;
         Preview.ShowInfoPanel = _appSettings.ShowPreviewInfoPanel;
@@ -1296,6 +1520,10 @@ public partial class MainWindowViewModel : ObservableObject
         // 关包/换包：终止整包缩略图批次（否则后台会拿着已失效的路径继续读包），缓存随服务一起释放
         CancelThumbnailBatch();
         ArchiveAvailability = ArchiveAvailability.Available;
+        // 复选框列：退订旧实例并清空勾选态（否则关包后仍留着指向已释放模型的 SelectedEntries）
+        foreach (var stale in CurrentEntries)
+            stale.PropertyChanged -= OnEntryPropertyChanged;
+        ClearCheckedCore();
         Entries.Clear();
         CurrentEntries.Clear();
         CurrentArchivePath = null;

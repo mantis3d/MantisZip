@@ -196,6 +196,13 @@ public class AppSettings
     /// 由 <c>MainWindowViewModel.LayoutMode</c> 读写（规则 23：有持久化就必须有运行时消费者）。
     /// </summary>
     public FileListLayoutMode FileListLayoutMode { get; set; } = FileListLayoutMode.Details;
+
+    /// <summary>
+    /// 主窗口列表是否显示**复选框列**（v0.5.6 `file-list-checkbox-selection`）。
+    /// 默认 false = 与引入复选框之前的行为完全一致（单击高亮+预览、Ctrl/Shift 多选）。
+    /// 由 <c>MainWindowViewModel.IsCheckboxMode</c> 读写（规则 23：有持久化就必须有运行时消费者）。
+    /// </summary>
+    public bool FileListCheckboxMode { get; set; } = false;
     public string Language { get; set; } = "zh";
     /// <summary>
     /// 是否显示文件列表里的**数据条**（每行文字后那条表示相对占比的彩色横条）。

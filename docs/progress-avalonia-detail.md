@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-02** — 功能：主窗口列表复选框多选（v0.5.6 最后一项）
+  - **背景**：#37 的第三件事「与主窗口文件列表统一」此前只统一了交互范式，主窗口列表本身没有复选框列。DataGrid 默认 `SelectionMode=Extended`，Ctrl/Shift 本来能多选，但那是「临时选区」——滚动、切目录、点别处就丢；用户要的是「持久累积」的勾选语义，且批量删除当时只支持单条（`DeleteFiles` 只看 `SelectedEntry`）。
+  - **状态归属**：`SelectedEntries`（`List<ArchiveItemModel>`）仍是唯一事实源，`ArchiveItemModel.IsChecked` 是它的镜像。`OnEntryPropertyChanged` 只认 `IsChecked`，在 `_syncingSelection` 闸门外增删 `SelectedEntries` 并触发 `CheckedSelectionChanged`；`SyncCheckedFromSelection()` 反向把 Ctrl/Shift 选区写回勾选；`RestoreCheckedState()` 在 `PopulateEntries()` 重建实例后按 `FullPath` 还原（跨目录/跨筛选保持的唯一办法，因为条目模型不是常驻对象）。
+  - **复选框列**：`ArchiveContentView.axaml` 的 `DataGrid.Columns` 首列插 `DataGridTemplateColumn Width="30" Tag="Checkbox"`；工具条加 `ToggleButton`（`IconCheckmark`）绑 `IsCheckboxMode`，右键菜单加「全选可见 / 反选 / 清空勾选」（均 `IsVisible="{Binding IsCheckboxMode}"`），状态栏右侧加 `CheckedSummary`（「已选 N 项 · 共 X」）。
+  - **批量删除**：`DeleteFiles()` 的 `targets` = 复选框模式且勾选非空时取 `SelectedEntries`，否则退回单条 `SelectedEntry`；路径去重后一次 `DeleteEntriesAsync`，`deletePaths.Count > 1` 用新 key `Confirm_DeleteMultipleFmt(count, size)` 弹一次确认，完成回调里先 `ClearCheckedCore()` 再刷新列表。
+  - **三个真 bug（都是静默/崩溃级）**：①`DataGridColumn` 不是 `Control`、不在视觉树上、不继承 DataContext ⇒ 列上的 `IsVisible="{Binding IsCheckboxMode}"` 永远不解析，列一直显示；改 code-behind `ApplyCheckboxColumnVisibility()` 按 `Tag` 匹配切 `IsVisible` 与 `DisplayIndex`。②`ApplyColumnStates` 回放会把新列顶到末尾并置隐藏（日志实测 `visible=True columns=7` → 回放后 `vis=False idx=6`）；修法是在回放字典构建时 `continue` 跳过 `Tag == "Checkbox"` 的列，并把首次显隐调用移到 `ApplySavedLayout()` 之后。③勾选集合可跨目录，而 DataGrid 只装当前目录条目 ⇒ `OnCheckedSelectionChanged` 把外部条目塞进 `SelectedItems` 直接抛 `ArgumentException: The item is not contained in the ItemsSource`（.NET Runtime 事件日志 12:52:03，`0xe0434352`，进程终止）；修法是先 `new HashSet<ArchiveItemModel>(vm.CurrentEntries)` 再只回填可见项。同时 `FileListGrid_SelectionChanged` 在复选框模式下**直接 return**（否则按选区重建集合会清掉跨目录勾选），`RestoreCheckedState()` 末尾主动触发 `CheckedSelectionChanged` 让新目录的 DataGrid 选区跟上。
+  - **偏差**：计划 T5 原要求设置页也给开关，实际**跳过**——工具条开关即入口，`AppSettings.FileListCheckboxMode` 已有运行时消费者，规则 23 的 `settingswiring` 守卫可过。
+  - **验证**：Release `--no-incremental` 0 警告；`ui-tests` 41.1s 全绿、`tests` 10.3s 全绿；i18n 1412 key；真机（`mz-cb.zip`：`sub/c.txt`、`sub/d.txt`、`a.txt`、`b.txt`）勾 a+b → 进 sub 勾 c → 回根仍「已选 3 项 · 共 14 B」且不崩；点删除**只弹一次**「将删除选中的 3 个条目（共 14 B）」，确认后包内只剩 `sub/`、勾选态清空、状态栏摘要消失。
 **2026-11-02** — 功能：文件列表缩略图查看方式（v0.5.6 第一项）
   - **背景**：列表只有 DataGrid 一种形态，图片、文本、可执行文件全是一行文字 + 16px 图标，「看得见内容」这件事只发生在右侧预览面板。
   - **三态布局**：`Models/FileListLayoutMode.cs`（`Details = 0 / Tile = 1 / Content = 2`）+ `AppSettings.FileListLayoutMode` 持久化；工具栏一个按钮（`CycleLayoutModeCommand`，图标 `IconThumbnails`）循环切换，`LayoutModeLabel` 随语言刷新；Details → 原 `FileListGrid` 加 `IsVisible`，Tile/Content → 两个 `ScrollViewer`（`TileLayoutScrollViewer` / `ContentLayoutScrollViewer`）互斥显示，三者都挂在 `Controls/ArchiveContentView.axaml` 的 `Grid.Row="2"`。

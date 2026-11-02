@@ -229,6 +229,18 @@
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                          VerticalAlignment="Center" />
 
+              <!-- 复选框模式开关（v0.5.6 复选框多选）：开启后详情列表首列出现复选框，
+                   勾选跨目录保持、可批量删除；关闭时行为与引入前完全一致。 -->
+              <ToggleButton Classes="ToolbarButton ToolbarIcon"
+                            IsChecked="{Binding IsCheckboxMode}"
+                            IsEnabled="{Binding IsArchiveLoaded}"
+                            ToolTip.Tip="{Binding CheckboxModeLabel}">
+                <PathIcon Data="{StaticResource IconCheckmark}"
+                          Width="16" Height="16"
+                          Classes="ToolbarButtonIcon"
+                          Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </ToggleButton>
+
               <Border Width="1" Height="20" Margin="2,0"
                       VerticalAlignment="Center"
                       Background="{DynamicResource ThemeBorderBrush}" />
@@ -348,12 +360,34 @@
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
                           Command="{Binding TestEntryCommand}" />
                 <Separator />
+                <!-- 复选框模式专用：勾选集合的批量操作（勾选态与选区同一份事实源，故此处直接改勾选） -->
+                <MenuItem Header="{Binding LocalizedStrings[Menu_CheckAllVisible]}"
+                          Command="{Binding CheckAllVisibleCommand}"
+                          IsVisible="{Binding IsCheckboxMode}" />
+                <MenuItem Header="{Binding LocalizedStrings[Menu_InvertChecked]}"
+                          Command="{Binding InvertCheckedCommand}"
+                          IsVisible="{Binding IsCheckboxMode}" />
+                <MenuItem Header="{Binding LocalizedStrings[Menu_ClearChecked]}"
+                          Command="{Binding ClearCheckedCommand}"
+                          IsVisible="{Binding IsCheckboxMode}" />
+                <Separator />
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
                           Command="{Binding DeleteFilesCommand}"
                           IsEnabled="{Binding CanDeleteEntries}" />
               </ContextMenu>
             </DataGrid.ContextMenu>
             <DataGrid.Columns>
+              <!-- 复选框列（v0.5.6 复选框多选）：勾选落到 VM.SelectedEntries（唯一事实源），不是第二份集合。
+                   显隐由 code-behind 按 Tag="Checkbox" 命令式切换 —— DataGridColumn 不在视觉树上、
+                   不继承 DataContext，列上的 IsVisible 绑定不会生效（绑定静默失败）。 -->
+              <DataGridTemplateColumn Header="" Width="30" Tag="Checkbox">
+                <DataTemplate>
+                  <CheckBox IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                            HorizontalAlignment="Center"
+                            VerticalAlignment="Center"
+                            MinWidth="0" />
+                </DataTemplate>
+              </DataGridTemplateColumn>
               <DataGridTemplateColumn Header="" Width="22" Tag="Icon">
                 <DataTemplate>
                   <Image Source="{Binding IconSource}"
@@ -571,6 +605,17 @@
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
                           Command="{Binding TestEntryCommand}" />
                 <Separator />
+                <!-- 复选框模式专用：勾选集合的批量操作（勾选态与选区同一份事实源，故此处直接改勾选） -->
+                <MenuItem Header="{Binding LocalizedStrings[Menu_CheckAllVisible]}"
+                          Command="{Binding CheckAllVisibleCommand}"
+                          IsVisible="{Binding IsCheckboxMode}" />
+                <MenuItem Header="{Binding LocalizedStrings[Menu_InvertChecked]}"
+                          Command="{Binding InvertCheckedCommand}"
+                          IsVisible="{Binding IsCheckboxMode}" />
+                <MenuItem Header="{Binding LocalizedStrings[Menu_ClearChecked]}"
+                          Command="{Binding ClearCheckedCommand}"
+                          IsVisible="{Binding IsCheckboxMode}" />
+                <Separator />
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
                           Command="{Binding DeleteFilesCommand}"
                           IsEnabled="{Binding CanDeleteEntries}" />
@@ -645,6 +690,17 @@
                           Command="{Binding CopyFilePathCommand}" />
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Test]}"
                           Command="{Binding TestEntryCommand}" />
+                <Separator />
+                <!-- 复选框模式专用：勾选集合的批量操作（勾选态与选区同一份事实源，故此处直接改勾选） -->
+                <MenuItem Header="{Binding LocalizedStrings[Menu_CheckAllVisible]}"
+                          Command="{Binding CheckAllVisibleCommand}"
+                          IsVisible="{Binding IsCheckboxMode}" />
+                <MenuItem Header="{Binding LocalizedStrings[Menu_InvertChecked]}"
+                          Command="{Binding InvertCheckedCommand}"
+                          IsVisible="{Binding IsCheckboxMode}" />
+                <MenuItem Header="{Binding LocalizedStrings[Menu_ClearChecked]}"
+                          Command="{Binding ClearCheckedCommand}"
+                          IsVisible="{Binding IsCheckboxMode}" />
                 <Separator />
                 <MenuItem Header="{Binding LocalizedStrings[Ctx_Delete]}"
                           Command="{Binding DeleteFilesCommand}"

@@ -3,7 +3,7 @@
 > **档位**: A 档 · v0.5.6（文件列表体验）
 > **工时**: 8-12h
 > **关联 issue**: #37（压缩添加多选不方便 —— 其中「与主窗口文件列表统一」这一半本计划补上）
-> **状态**: 🚧 进行中（2026-11-02 开工）
+> **状态**: ✅ 已完成（2026-11-02 归档，随 v0.5.6；实施记录见文末）
 > **执行方式**: 实现阶段尽量拆多个子代理并行（每个只碰约定文件），构建与测试由父 agent 统一跑（避免 `obj/bin` 互锁）。
 
 ## 背景
@@ -75,12 +75,12 @@
 
 | # | 任务 | 文件 | 工时 |
 |:--:|---|---|:--:|
-| T1 | 模型与状态：`IsChecked` + VM 的 `IsCheckboxMode` / `CheckedCount` / `CheckedSummary` + `_syncingSelection` 闸门 + `PopulateEntries` 时订阅/退订行 `PropertyChanged` | `Models/ArchiveItemModel.cs`、`ViewModels/MainWindowViewModel.cs`、`ViewModels/MainWindowViewModel.Navigation.cs` | 1-2h |
-| T2 | 复选框列：模板列 + 显隐切换（先核实 `DataGridColumn.IsVisible` 是否可绑定）+ 主题色 + 点复选框不触发预览 | `Controls/ArchiveContentView.axaml(.cs)` | 2-3h |
-| T3 | 交互与摘要：勾选同步 `SelectedEntries` 与 `SelectedItems`、全选可见 / 清空 / 反选、状态栏摘要 | `ViewModels/MainWindowViewModel.cs`、`Controls/ArchiveContentView.axaml` | 2h |
-| T4 | 批量删除接线 + 右键菜单项（「勾选 / 取消勾选」「全选可见」「清空勾选」）+ 新 i18n key | `ViewModels/MainWindowViewModel.Compress.cs`、`Controls/ArchiveContentView.axaml`、三份 `Localization/strings.*.json` | 2h |
-| T5 | 持久化与入口：`AppSettings.FileListCheckboxMode` + 列表工具条 `ToggleButton`（图标按规则 8 登记）+ 设置页开关（规则 23 的 `settingswiring` 守卫要能过） | `Models/AppSettings.cs`、`Controls/ArchiveContentView.axaml`、`Views/SettingsWindow.axaml`、`ViewModels/SettingsWindowViewModel.cs` | 1h |
-| T6 | 测试与验证：无头用例（勾选入集合、全选可见只作用当前列表、多选删除走批量、显隐切换后不残留）+ 真机冒烟 | `tests/MantisZip.UI.Avalonia.Tests/` | 1-2h |
+| ✅ T1 | 模型与状态：`IsChecked` + VM 的 `IsCheckboxMode` / `CheckedCount` / `CheckedSummary` + `_syncingSelection` 闸门 + `PopulateEntries` 时订阅/退订行 `PropertyChanged` | `Models/ArchiveItemModel.cs`、`ViewModels/MainWindowViewModel.cs`、`ViewModels/MainWindowViewModel.Navigation.cs` | 1-2h |
+| ✅ T2 | 复选框列：模板列 + 显隐切换（先核实 `DataGridColumn.IsVisible` 是否可绑定）+ 主题色 + 点复选框不触发预览 | `Controls/ArchiveContentView.axaml(.cs)` | 2-3h |
+| ✅ T3 | 交互与摘要：勾选同步 `SelectedEntries` 与 `SelectedItems`、全选可见 / 清空 / 反选、状态栏摘要 | `ViewModels/MainWindowViewModel.cs`、`Controls/ArchiveContentView.axaml` | 2h |
+| ✅ T4 | 批量删除接线 + 右键菜单项（「勾选 / 取消勾选」「全选可见」「清空勾选」）+ 新 i18n key | `ViewModels/MainWindowViewModel.Compress.cs`、`Controls/ArchiveContentView.axaml`、三份 `Localization/strings.*.json` | 2h |
+| ✅ T5 | 持久化与入口：`AppSettings.FileListCheckboxMode` + 列表工具条 `ToggleButton`（图标按规则 8 登记）+ 设置页开关（规则 23 的 `settingswiring` 守卫要能过） | `Models/AppSettings.cs`、`Controls/ArchiveContentView.axaml`、`Views/SettingsWindow.axaml`、`ViewModels/SettingsWindowViewModel.cs` | 1h |
+| ✅ T6 | 测试与验证：无头用例（勾选入集合、全选可见只作用当前列表、多选删除走批量、显隐切换后不残留）+ 真机冒烟 | `tests/MantisZip.UI.Avalonia.Tests/` | 1-2h |
 
 **依赖**：T1 → T2 → T3 → T4；T5 可与 T4 并行；T6 最后。
 
@@ -109,3 +109,37 @@
 - 与 `file-list-thumbnails.md`（v0.5.6 缩略图）**同改 `ArchiveContentView`**：谁先做谁先占，后做的要 rebase 列布局（复选框列插在图标列之前，缩略图模式只影响行模板）。
 - 与 `compress-job-queue.md`（v0.5.8）无交集：那边改压缩入口，这边改主窗口列表。
 - 与 `custom-columns.md`（列自定义）有潜在冲突：若列显隐将来做成可配置，复选框列应作为固定列不参与自定义。
+
+## 实施记录（2026-11-02）
+
+| # | 任务 | 结果 |
+|:--:|---|---|
+| T1 | 模型与状态 | `ArchiveItemModel.IsChecked`（`[ObservableProperty]`）；VM 新增 `IsCheckboxMode` / `CheckedCount` / `CheckedSummary` / `CheckboxModeLabel` / `_syncingSelection` / `CheckedSelectionChanged` / `OnEntryPropertyChanged` / `SyncCheckedFromSelection` / `RestoreCheckedState` / `ClearCheckedCore` + 三个 `RelayCommand`；`PopulateEntries` 订阅-退订行 `PropertyChanged`、`EntriesRefreshed` 前按 `FullPath` 还原 |
+| T2 | 复选框列 | `DataGridTemplateColumn Width="30" Tag="Checkbox"`；**列上的 `IsVisible` 绑定不可用**（`DataGridColumn` 不继承 DataContext）⇒ code-behind `ApplyCheckboxColumnVisibility()` 命令式切换 |
+| T3 | 交互与摘要 | 勾选 ⇄ `SelectedEntries` ⇄ `SelectedItems` 双向同步（`_syncingSelection` / `_isApplyingCheckboxSelection` 双闸门）；状态栏「已选 N 项 · 共 X」 |
+| T4 | 批量删除 + 菜单 | `DeleteFiles()` 改批量（去重路径、`Confirm_DeleteMultipleFmt` 一次确认、完成清空勾选）；右键菜单三项 + 6 个新 key（1412） |
+| T5 | 持久化与入口 | `AppSettings.FileListCheckboxMode` + 工具条 `ToggleButton`（`IconCheckmark`）；**设置页开关跳过**（见偏差 1） |
+| T6 | 测试与验证 | Release 0 警告、`ui-tests` 41.1s / `tests` 10.3s 全绿、i18n 1412 key、真机跨目录勾选 + 批量删除冒烟通过 |
+
+### 与计划的偏差
+
+1. **跳过设置页开关**：工具条开关就是入口，`AppSettings.FileListCheckboxMode` 有运行时消费者，规则 23 的 `settingswiring` 守卫可过；少一处 UI 就少一处要同步的地方。
+2. **显隐不用绑定用代码**：计划风险表里预判的「`DataGridColumn.IsVisible` 可能不可绑定」成立——不是「不可绑定」而是「绑了也不报错、永不解析」，比预判更隐蔽。
+3. **跨目录勾选不能直接回填 `SelectedItems`**：计划的「勾选同步 `SelectedItems`」在跨目录场景会崩进程，必须按 `CurrentEntries` 过滤（见下方坑 3）。
+
+### 三个真 bug（都记进细节文档）
+
+1. 列上的 `IsVisible="{Binding …}"` 静默失效 ⇒ code-behind 按 `Tag` 切。
+2. `ApplyColumnStates` 回放把新列顶到末尾并隐藏 ⇒ 回放跳过复选框列、首次显隐移到回放之后。
+3. `DataGridSelectedItemsCollection.Add` 收到不在 `ItemsSource` 里的对象抛 `ArgumentException`（`0xe0434352`，进程终止）⇒ 只回填当前可见条目；且 `FileListGrid_SelectionChanged` 在复选框模式下直接 return。
+
+### 验收
+
+| # | 口径 | 结果 |
+|:--:|---|:--:|
+| 1 | 默认关闭时与今天完全一致 | ✅ |
+| 2 | 勾选跨滚动/跨目录保持，全选可见只作用当前列表，清空一次清干净 | ✅（真机勾 2 项 → 进子目录勾 1 项 → 回根仍 3 项） |
+| 3 | 勾选 3 项删除只弹一次确认、文案带条数、删完刷新并清空勾选 | ✅（「将删除选中的 3 个条目（共 14 B）」） |
+| 4 | 勾选后点另一行只高亮+预览，不改勾选 | ✅ |
+| 5 | 关闭模式重开包勾选不残留 | ✅（`ClearCheckedCore()` + `ClearArchiveInternal` 退订） |
+| 6 | 构建/测试/i18n/guards 全绿 | ✅ |

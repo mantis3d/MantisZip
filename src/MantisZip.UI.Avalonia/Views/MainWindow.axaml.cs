@@ -587,6 +587,11 @@ public partial class MainWindow : Window
             var columnDict = new Dictionary<string, DataGridColumn>();
             foreach (var col in FileListGrid.Columns)
             {
+                // 复选框列不参与列状态持久化：它由 ApplyCheckboxColumnVisibility 独占管理，
+                // 一旦被这里的 DisplayIndex/IsVisible 回放碰到就会被顶到末尾并隐藏（实测）。
+                if (col.Tag is string cbTag && cbTag == "Checkbox")
+                    continue;
+
                 var id = GetColumnId(col);
                 if (id != null && !columnDict.ContainsKey(id))
                     columnDict[id] = col;
@@ -1054,6 +1059,15 @@ public partial class MainWindow : Window
         view.FileListGridControl.KeyDown += FileListGrid_KeyDown;
         view.FileListGridControl.Sorting += FileListGrid_Sorting;
 
+        // 复选框模式：勾选集合变化 → 回写 DataGrid 选区（Ctrl/Shift 点选的反向由 SelectionChanged 处理）
+        if (DataContext is MainWindowViewModel checkboxVm)
+        {
+            checkboxVm.CheckedSelectionChanged += OnCheckedSelectionChanged;
+            // DataGridColumn 不在视觉树上、不继承 DataContext ⇒ 列上的 IsVisible 绑定不生效，
+            // 只能在这里按 VM 状态命令式切显隐（首次 + 之后每次切换）。
+            checkboxVm.PropertyChanged += OnCheckboxVmPropertyChanged;
+        }
+
         // 文件列表「拖出」（拖拽解压）接线
         SetupFileListDragDrop();
 
@@ -1065,6 +1079,9 @@ public partial class MainWindow : Window
         ApplyColumnStates(_pendingColumnStates);
         UpdateSortArrows();
         ApplySavedLayout();   // 必须在 ApplyPreviewLayout() 之前（预览尺寸回填）
+
+        // 复选框列必须在列状态回放之后再应用显隐（回放会重排 DisplayIndex，先应用会被顶走）
+        ApplyCheckboxColumnVisibility();
         ApplyPreviewLayout();
 
         // 预览面板此刻创建（内容区已就位）——替代原「首帧后 0.5s 预取」
@@ -1434,11 +1451,81 @@ public partial class MainWindow : Window
         // 会以「单选」回写覆盖掉刚写入的多选集合 → 由写入口（ApplyThumbnailSelection）负责同步。
         if (_isApplyingThumbnailSelection) return;
 
+        // 复选框模式正在回写选区：避免「勾选 → 改集合 → 回写选区 → 又改集合」打转
+        if (_isApplyingCheckboxSelection) return;
+
+        // 复选框模式下勾选集合才是事实源：DataGrid 的选区只是高亮（由勾选回写驱动）。
+        // 这里绝不能按「当前选区」重建集合 —— 切目录/筛选会把选区清空，
+        // 那样跨目录勾选的条目会被一起清掉（实测过）。
+        if (vm.IsCheckboxMode) return;
+
         vm.SelectedEntries.Clear();
         foreach (var item in FileListGrid.SelectedItems)
         {
             if (item is ArchiveItemModel model)
                 vm.SelectedEntries.Add(model);
+        }
+    }
+
+    /// <summary>复选框模式下正在把 <c>SelectedEntries</c> 回写到 DataGrid 选区（防重入闸门）。</summary>
+    private bool _isApplyingCheckboxSelection;
+
+    private void OnCheckboxVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.IsCheckboxMode))
+            ApplyCheckboxColumnVisibility();
+    }
+
+    /// <summary>
+    /// 按 <see cref="MainWindowViewModel.IsCheckboxMode"/> 切换「复选框列」的显隐。
+    /// <para>
+    /// 为什么不用 XAML 绑定：<c>DataGridColumn</c> 不是 <c>Control</c>，不在视觉树上、不继承 DataContext，
+    /// 列上的 <c>IsVisible="{Binding …}"</c> 永远不会解析（绑定静默失败，表现为列一直在）。
+    /// </para>
+    /// </summary>
+    private void ApplyCheckboxColumnVisibility()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        var visible = vm.IsCheckboxMode;
+        foreach (var column in FileListGrid.Columns)
+        {
+            if (column.Tag is string tag && string.Equals(tag, "Checkbox", StringComparison.Ordinal))
+            {
+                column.IsVisible = visible;
+                if (visible) column.DisplayIndex = 0;
+                break;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 复选框勾选变化 → 把勾选集合写回 DataGrid 的 <c>SelectedItems</c>（行高亮与批量操作都靠它）。
+    /// 订阅点在 <see cref="EnsureArchiveContent"/>（列表控件加载后）。
+    /// </summary>
+    private void OnCheckedSelectionChanged(object? sender, EventArgs e)
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+        if (_isApplyingCheckboxSelection) return;
+
+        // DataGrid 只接受 ItemsSource 里的对象：勾选集合可以跨目录，而 DataGrid 只装了当前目录的条目。
+        // 直接 Add 跨目录条目会抛 ArgumentException（"The item is not contained in the ItemsSource"）
+        // —— 实测导致切换目录时整个进程崩溃。
+        var visible = new HashSet<ArchiveItemModel>(vm.CurrentEntries);
+
+        _isApplyingCheckboxSelection = true;
+        try
+        {
+            FileListGrid.SelectedItems.Clear();
+            foreach (var item in vm.SelectedEntries)
+            {
+                if (visible.Contains(item))
+                    FileListGrid.SelectedItems.Add(item);
+            }
+        }
+        finally
+        {
+            _isApplyingCheckboxSelection = false;
         }
     }
 
