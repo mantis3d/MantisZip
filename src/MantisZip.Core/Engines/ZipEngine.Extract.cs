@@ -36,7 +36,7 @@ public partial class ZipEngine
 
         // 先快速检查文件数量决定是否走并行
         int fileCount;
-        using (var quickArchive = OpenArchiveWithEncodingFallback(archivePath, password))
+        using (var quickArchive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
         {
             fileCount = quickArchive.Entries.Count(e => !e.IsDirectory);
         }
@@ -63,7 +63,7 @@ public partial class ZipEngine
 
         var result = await Task.Run(async () =>
         {
-            using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
+            using var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding);
 
             // 检查是否有加密条目但未提供密码
             var hasEncrypted = archive.Entries.Any(e => e.IsEncrypted);
@@ -297,7 +297,7 @@ public partial class ZipEngine
         var entryInfos = new List<(string Key, long Size, DateTime? Modified)>();
         long totalBytes = 0;
 
-        using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+        using (var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
         {
             var hasEncrypted = archive.Entries.Any(e => e.IsEncrypted);
             if (hasEncrypted && string.IsNullOrEmpty(password))
@@ -386,7 +386,7 @@ public partial class ZipEngine
             long batchProcessedBytes = 0;
 
             // ★ 每线程只打开 1 次 archive，处理整批文件
-            using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
+            using var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding);
 
             foreach (var (entryKey, entrySize, entryModified) in batch)
             {
@@ -773,7 +773,7 @@ public partial class ZipEngine
 
         // 先快速检查命中文件数决定是否走并行（与 ExtractAsync 决策逻辑一致）
         int fileCount;
-        using (var quickArchive = OpenArchiveWithEncodingFallback(archivePath, password))
+        using (var quickArchive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
         {
             fileCount = quickArchive.Entries.Count(e => !e.IsDirectory && entryKeys.Contains(ArchivePath.Normalize(e.Key)));
         }
@@ -812,7 +812,7 @@ public partial class ZipEngine
 
         await Task.Run(async () =>
         {
-            using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
+            using var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding);
             var entries = archive.Entries.ToList();
             // 阶段 2：正式解出条目
             progress.ReportPhase(ArchivePhase.Extracting);
@@ -1028,7 +1028,7 @@ public partial class ZipEngine
         var directoryPaths = new List<string>();
         long totalBytes = 0;
 
-        using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+        using (var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
         {
             var hasEncrypted = archive.Entries.Any(e => e.IsEncrypted);
             if (hasEncrypted && string.IsNullOrEmpty(password))
@@ -1123,7 +1123,7 @@ public partial class ZipEngine
             long batchProcessedBytes = 0;
 
             // ★ 每线程只打开 1 次 archive，处理整批文件
-            using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
+            using var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding);
 
             foreach (var (entryKey, entrySize, entryModified, outputPath) in batch)
             {

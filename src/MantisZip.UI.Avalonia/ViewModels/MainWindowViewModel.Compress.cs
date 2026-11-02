@@ -156,7 +156,12 @@ public partial class MainWindowViewModel : ObservableObject
                 // 删除会整包重写，须透传用户的 ZIP 文件名编码设置，
                 // 否则存活的其它条目可能被降级重写成乱码（与 AddFilesToArchiveAsync 同源）。
                 await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { deleteEntryPath }, password, progress, ct,
-                    new ArchiveOptions { FileNameEncoding = AppSettings.Load().ZipEncoding });
+                    new ArchiveOptions
+                    {
+                        // 手动指定代码页时，读与写必须同键：否则存活条目会被按另一种编码重写
+                        FileNameEncoding = NameEncodingRequestKey ?? AppSettings.Load().ZipEncoding,
+                        ReadEncoding = NameEncodingRequestKey
+                    });
             });
     }
 

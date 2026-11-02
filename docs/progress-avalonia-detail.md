@@ -6,6 +6,18 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-02** — 功能：文件名代码页检测与切换（Bandizip 式工具栏下拉，支持 ZIP / TAR / GZ）
+  - 起因：用户反馈希望有 Bandizip 那样的代码页检测与切换。现状只有内部启发式（UTF-8 能解 → 含 >127 字节 → bit 11 → CJK 占比判定 → GBK 重试），用户无法手动指定，Big5 / Shift-JIS / EUC-KR 命名的包必然乱码。
+  - 键表：新增 `src/MantisZip.Core/Utils/NameEncodingCatalog.cs` —— `auto` / `system` / `utf-8` / `gbk` / `gb18030` / `big5` / `shift-jis` / `euc-kr` / `other:<代码页>`；`TryResolve` 认不出时返回 false（**不静默换编码**），`Describe` 把 `Encoding` 回显成键（未知码页回 `other:<cp>`，null 回 `auto`）。
+  - 读路径：`IArchiveEngine.ListEntriesAsync` 与 `ZipEngine.OpenArchiveWithEncodingFallback` 末尾各加可选参数 `fileNameEncoding` + `onEncodingResolved`（新参数追加在 `CancellationToken` 之后，既有按位置传参的调用点零改动）；显式指定时跳过 bit 11 / CJK 启发式 / GBK 重试，直接按该编码打开。TAR/GZ 用 `ReaderOptions.ArchiveEncoding`；7z 条目名是 UTF-16，参数被忽略并回传 `utf-16`。
+  - 提取路径：`src/MantisZip.Core/Utils/ArchiveEntryExtractor.cs` 四个公开方法（`ExtractEntryAsync` / `ExtractHeadAsync` / `ExtractEntryToMemoryAsync` / `ExtractHeadTailAsync`）与非公开链路全部加同一参数并透传，保证「列表里看到的文件名 = 解出来的文件名」。
+  - 写路径（顺带修的既有缺陷）：`ResolveFileNameEncoding` 改为走 `NameEncodingCatalog`（此前只认 `gbk` / `default` / 其它一律 UTF-8），删除条目 / 添加文件时读与写使用同一个键。此前对 Big5 包做「删除条目」会按 GBK 重写中央目录，把存活条目的名字真正改坏。
+  - 会话与 UI：`MainWindowViewModel.ArchiveNameEncoding`（关包时取设置里的默认值）+ `ResolvedNameEncodingKey`（回显本次实际编码）+ `ChangeNameEncodingAsync` 命令（同值 / 不可用直接返回，选「其他代码页…」弹 `Dialogs/CodePageInputDialog`）+ `CanChangeNameEncoding`（仅 ZIP / TAR / GZ）。工具栏下拉按 Bandizip 位置放在主窗口顶层工具栏末尾（`Views/MainWindow.axaml`，密码按钮之前），选中即 `RefreshArchive()` 重载并尽量回到原目录。
+  - 设置：`AppSettings.ReadNameEncoding`（默认 `auto`）+ 设置页压缩页签的「默认读取代码页」下拉（`NameEncodingOption.BuildDefault()` 与工具栏共用一份键表），`ClearArchiveInternal` 时作为新开包初值。
+  - 编码键传参注意：`await Task.Run(async () => …)` 捕获上下文里对非空参数写 `options?.ReadEncoding` 会让编译器在后续代码把参数判成可能为 null（`CS8602` 打到同方法后段的 `options.Encrypt`），捕获变量里不要用 `?.` 试空。
+  - 测试：`tests/MantisZip.Tests/NameEncodingCatalogTests.cs` 6 例 + `tests/MantisZip.Tests/ZipNameEncodingTests.cs` 3 例（清单里造 Big5 命名 ZIP：指定 `big5` 能解出原名、指定 `gbk` 不会蒙对、删一条后存活条目名保持原名）。
+  - 验证：core / avalonia（Release）0 警告，`tests` 与 `ui-tests` 全绿（仅存量警告），`i18n` 1405 key 三语一致，`check` / `guards` 通过。
+  - 边界：7z / RAR 不显示下拉（条目名没有代码页问题）；加密包的密码流程与校验（`TestArchiveAsync`）仍走自动检测；CLI 无下拉入口，编码保持 `auto`。
 **2026-11-02** — 性能：选中条目 / 拖拽解压改走批量接口（issue #75 的第二个入口，800×64KB 只解选中项 10.0s → 2.3s，约 4.4×）
   - **触发**：全量解压走批量后用户实测通过，随即要求「把勾选那个也做了吧」。「勾选解压」与「拖到资源管理器」两条路径共用 `src/MantisZip.UI.Avalonia/Services/SelectedItemsExtractService.cs`，一直落到 `SevenZipEngine.ExtractEntriesAsync` 的逐条目 `Extractor.ExtractFile`。
   - **两处与全量解压的关键差异**：① 落点不是「目标目录 + 归档内相对路径」，而是调用方 `:42-53` 用 `ExtractPathResolver.ResolveRelativePath` 算好的 `outputPathOverrides`（扁平化 / 保留完整路径 / 重命名都可能让多个条目落到同一路径）⇒ 批量段必须先把整批按归档布局解码到目标目录内的暂存目录，再按 override 逐条移动，不能直接落地；② 只解一部分条目时「建暂存 + 移动」本身有成本，因此要求选中非目录条目 ≥ 2 才批量。

@@ -109,7 +109,8 @@ internal class DragDropService
             _currentFolder, preserveFullPath, _settings.FileConflictAction,
             vm?.ShowExtractFileConflictDialogAsync,
             LocalizationManager.T("Status_DragExtractingTo", folderName),
-            allowDeleteArchive: false);   // D18: 拖拽解压不显示「删原包」开关
+            allowDeleteArchive: false,   // D18: 拖拽解压不显示「删原包」开关
+            nameEncoding: vm?.NameEncodingRequestKey);   // 与文件列表用同一代码页，否则解出的名字会乱码
 
         // 6. Post-extraction: status message, optionally open target folder
         //    失败弹窗已由共享方法统一处理（拖拽与右键一致），此处仅设置状态栏消息

@@ -512,13 +512,35 @@ public class TarGzEngine : IArchiveEngine
         return false;
     }
 
-    public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(
+        string archivePath,
+        string? password = null,
+        CancellationToken cancellationToken = default,
+        string? fileNameEncoding = null,
+        Action<string>? onEncodingResolved = null)
     {
         CoreLog.Entry();
         if (!string.IsNullOrEmpty(password))
             CoreLog.Info($"WARN: TarGzEngine.ListEntriesAsync: password provided but TAR/GZ format does not support encryption (archive: {archivePath})");
         CoreLog.Info($"ListEntriesAsync: {archivePath}");
         var sw = Stopwatch.StartNew();
+
+        // TAR 条目名没有 UTF-8 标志位，SharpCompress 默认按 UTF-8 解；GBK 命名的包要靠调用方显式指定。
+        Encoding? forcedEncoding = null;
+        if (!NameEncodingCatalog.IsAuto(fileNameEncoding)
+            && NameEncodingCatalog.TryResolve(fileNameEncoding, out var resolved)
+            && resolved is not null)
+        {
+            forcedEncoding = resolved;
+        }
+        onEncodingResolved?.Invoke(NameEncodingCatalog.Describe(forcedEncoding ?? Encoding.UTF8));
+
+        var readerOptions = new ReaderOptions { LookForHeader = true };
+        if (forcedEncoding is not null)
+        {
+            readerOptions.ArchiveEncoding = new ArchiveEncoding { Default = forcedEncoding };
+            CoreLog.Info($"ListEntriesAsync: TAR file name encoding '{fileNameEncoding}' -> {forcedEncoding.WebName}");
+        }
 
         var result = await Task.Run(() =>
         {
@@ -531,7 +553,7 @@ public class TarGzEngine : IArchiveEngine
                 // 注意：解析异常必须向上传播（不移除 catch 曾吞掉损坏 tar 的 IncorrectArchiveException，
                 // 导致损坏包静默打开为空）。TarReader 对合法 tar 与空 tar 均能正常返回。
                 using var inputStream = File.OpenRead(archivePath);
-                using var reader = TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
+                using var reader = TarReader.OpenReader(inputStream, readerOptions);
                 while (reader.MoveToNextEntry())
                 {
                     var entry = reader.Entry;

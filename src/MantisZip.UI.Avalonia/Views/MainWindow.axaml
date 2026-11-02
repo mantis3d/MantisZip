@@ -198,6 +198,28 @@
                 VerticalAlignment="Center"
                 Background="{DynamicResource ThemeBorderBrush}"
                 Margin="4,0" />
+        <!--
+          文件名代码页下拉（对齐 Bandizip 的工具栏位置）：只在 ZIP/TAR/GZ 这类「按名字解码」的格式上出现，
+          7z/RAR 条目名是 UTF-16 没有代码页问题。选中即重载条目列表，ToolTip 回显本次实际使用的编码。
+        -->
+        <ComboBox IsVisible="{Binding CanChangeNameEncoding}"
+                  MinHeight="{DynamicResource ControlHeight}"
+                  MinWidth="120"
+                  VerticalAlignment="Center"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  ItemsSource="{Binding NameEncodingOptions}"
+                  SelectedValue="{Binding ArchiveNameEncoding}"
+                  SelectedValueBinding="{Binding Key}"
+                  ToolTip.Tip="{Binding LocalizedStrings[Toolbar_NameEncoding]}">
+          <!-- 下拉项：编码原生名不翻译，自动/系统默认/其他…走本地化 -->
+          <ComboBox.ItemTemplate>
+            <DataTemplate DataType="models:NameEncodingOption">
+              <TextBlock Text="{Binding Display}" />
+            </DataTemplate>
+          </ComboBox.ItemTemplate>
+        </ComboBox>
         <!-- 工具栏密码按钮：针对当前压缩包（对齐 WPF EnterPasswordBtn 三态：无加密禁用 / 未匹配红锁 / 已匹配绿开锁） -->
         <Button Classes="ToolbarButton"
                 Classes.passwordMatched="{Binding HasMatchedPassword}"

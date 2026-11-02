@@ -924,6 +924,14 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string CompressConflictActionText => LocalizationManager.T("Settings_Compress_ConflictAction");
     public string ZipDefaultOptionsText => LocalizationManager.T("Settings_Zip_DefaultOptions");
     public string ZipEncodingText => LocalizationManager.T("Settings_Zip_Encoding");
+
+    /// <summary>「默认读取代码页」标签（打开压缩包时条目名的解码方式）。</summary>
+    public string ReadNameEncodingText => LocalizationManager.T("Settings_Zip_ReadEncoding");
+
+    /// <summary>「默认读取代码页」下拉项（复用主工具栏的同一份编码键表）。</summary>
+    public IReadOnlyList<NameEncodingOption> ReadNameEncodingOptions => NameEncodingOption.BuildDefault();
+
+    [ObservableProperty] private NameEncodingOption? _selectedReadNameEncodingOption;
     public string ZipCompressionMethodText => LocalizationManager.T("Settings_Zip_CompressionMethod");
     public string ZipEncryptionMethodText => LocalizationManager.T("Settings_Zip_EncryptionMethod");
     public string SevenZipDefaultOptionsText => LocalizationManager.T("Settings_SevenZip_DefaultOptions");
@@ -1217,6 +1225,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         _zipCompressionMethod = _settings.ZipCompressionMethod;
         _zipEncryptionMethod = _settings.ZipEncryptionMethod;
         _zipEncoding = _settings.ZipEncoding;
+        _selectedReadNameEncodingOption = ReadNameEncodingOptions.FirstOrDefault(o => o.Key == _settings.ReadNameEncoding)
+            ?? ReadNameEncodingOptions.FirstOrDefault();
         _sevenZipEncryptHeaders = _settings.SevenZipEncryptHeaders;
 
         // Extract
@@ -1615,6 +1625,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CompressConflictActionText));
         OnPropertyChanged(nameof(ZipDefaultOptionsText));
         OnPropertyChanged(nameof(ZipEncodingText));
+        OnPropertyChanged(nameof(ReadNameEncodingText));
+        OnPropertyChanged(nameof(ReadNameEncodingOptions));
         OnPropertyChanged(nameof(ZipCompressionMethodText));
         OnPropertyChanged(nameof(ZipEncryptionMethodText));
         OnPropertyChanged(nameof(SevenZipDefaultOptionsText));
@@ -1835,6 +1847,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.ZipCompressionMethod = SelectedZipCompressionMethodOption?.Value ?? ZipCompressionMethod;
         _settings.ZipEncryptionMethod = SelectedZipEncryptionMethodOption?.Value ?? ZipEncryptionMethod;
         _settings.ZipEncoding = SelectedZipEncodingOption?.Value ?? ZipEncoding;
+        _settings.ReadNameEncoding = SelectedReadNameEncodingOption?.Key ?? "auto";
         _settings.SevenZipEncryptHeaders = SevenZipEncryptHeaders;
 
         // Preview

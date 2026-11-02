@@ -62,6 +62,12 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<string, Task<PasswordDialogResponse?>>? ShowPasswordDialog { get; set; }
 
     /// <summary>
+    /// 「其他代码页…」输入框：返回用户填的代码页数字（null = 取消）。
+    /// 「其他…」不是一个可解析的编码键，必须问出数字才能变成 other:n。
+    /// </summary>
+    public Func<Task<int?>>? ShowCodePageInputDialog { get; set; }
+
+    /// <summary>
     /// 由 View 设置的「查看已匹配密码」对话框回调。参数为密码条目与压缩包文件名（仅展示用），无返回值。
     /// </summary>
     public Func<Core.PasswordEntry, string, Task>? ShowMatchedPasswordDialog { get; set; }
@@ -251,6 +257,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Menu_NewArchive", "Menu_PasswordManager", "Menu_About", "Menu_Donate",
             "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
+            "Toolbar_NameEncoding", "Toolbar_NameEncoding_Auto", "Toolbar_NameEncoding_System", "Toolbar_NameEncoding_Other",
             "Menu_Toolbar",
             "Menu_DataBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation", "Menu_ShowInfoPanel",
             "Menu_ShowPreviewPanel", "Menu_SaveLayout",
@@ -317,6 +324,8 @@ public partial class MainWindowViewModel : ObservableObject
 
         LocalizedStrings = newDict;
         OnPropertyChanged(nameof(LocalizedStrings));
+        // 代码页下拉的「自动检测 / 系统默认 / 其他…」文案跟随语言重建
+        CultureChangedForNameEncoding();
         OnPropertyChanged(nameof(ViewModeLabel));
 
         // Refresh match mode options display text
@@ -576,6 +585,84 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _currentFolder;
+
+    /// <summary>
+    /// 文件名代码页键（取值见 <see cref="NameEncodingCatalog"/>）：默认 <c>auto</c>，
+    /// 用户可在主工具栏手动指定。切换后必须重新载入条目列表 —— 列表名是解压/预览/拖拽的唯一主键，
+    /// 只改显示会导致解压错名，所以本属性只由 <see cref="ChangeNameEncodingAsync"/> 改写。
+    /// </summary>
+    [ObservableProperty]
+    private string _archiveNameEncoding = NameEncodingCatalog.Auto;
+
+    /// <summary>上一次载入实际使用的编码键（自动检测结果或用户指定值），供工具栏回显。</summary>
+    [ObservableProperty]
+    private string? _resolvedNameEncodingKey;
+
+    /// <summary>传给引擎的编码键：<c>auto</c> 传 null（走引擎自带启发式检测）。</summary>
+    internal string? NameEncodingRequestKey =>
+        NameEncodingCatalog.IsAuto(ArchiveNameEncoding) ? null : ArchiveNameEncoding;
+
+    /// <summary>
+    /// 主工具栏代码页下拉是否可用：只有按名字解码的格式（ZIP / TAR / GZ）才需要；
+    /// 7z/RAR 的条目名是 UTF-16，没有代码页问题。
+    /// </summary>
+    /// <summary>
+    /// 全量解压时把当前代码页透传给引擎：手动选了代码页就必须按同一口径打开，
+    /// 否则列表名正确、解出来的文件名却是乱码。null = 自动检测（与改造前完全一致）。
+    /// </summary>
+    private ArchiveOptions? NameEncodingReadOptions() =>
+        NameEncodingRequestKey is null ? null : new ArchiveOptions { ReadEncoding = NameEncodingRequestKey };
+
+    public bool CanChangeNameEncoding =>
+        _currentFormat is ArchiveFormat.Zip or ArchiveFormat.Tar or ArchiveFormat.GZip;
+
+    /// <summary>
+    /// 代码页下拉选项（自动 / 系统默认 / 常用编码 / 其他…）。文案随语言切换重建，见 <see cref="CultureChangedForNameEncoding"/>。
+    /// </summary>
+    [ObservableProperty]
+    private IReadOnlyList<NameEncodingOption> _nameEncodingOptions = NameEncodingOption.BuildDefault();
+
+    /// <summary>
+    /// 切换文件名代码页：先记下新键，再按 <see cref="RefreshArchive"/> 的路子重载并尽量停在原目录。
+    /// </summary>
+    /// <param name="key">编码键（<c>auto</c> / <c>system</c> / <c>gbk</c> / <c>other:950</c> …）。</param>
+    [RelayCommand]
+    private async Task ChangeNameEncodingAsync(string? key)
+    {
+        if (string.IsNullOrEmpty(key) || string.Equals(key, ArchiveNameEncoding, StringComparison.Ordinal))
+            return;
+        if (!CanChangeNameEncoding)
+            return;
+
+        if (string.Equals(key, NameEncodingOption.OtherPlaceholder, StringComparison.Ordinal))
+        {
+            if (ShowCodePageInputDialog == null)
+                return;
+
+            var codePage = await ShowCodePageInputDialog();
+            if (codePage is null or <= 0)
+                return;
+
+            key = $"{NameEncodingCatalog.OtherPrefix}{codePage}";
+            if (string.Equals(key, ArchiveNameEncoding, StringComparison.Ordinal))
+                return;
+        }
+
+        ArchiveNameEncoding = key;
+        // 复用「刷新压缩包」：它会重新载入条目并尽量恢复到原来的目录/条目
+        await RefreshArchive();
+    }
+
+    /// <summary>
+    /// 语言切换后重建代码页下拉（"自动检测"/"系统默认"等文案要跟着变），保持当前选中项不变。
+    /// </summary>
+    private void CultureChangedForNameEncoding()
+    {
+        // 选中项本身（ArchiveNameEncoding 的值）不变，ComboBox 走 SelectedValue 绑定，
+        // 重建列表后由 View 重新选回去；只有「自动检测」「系统默认」「其他…」这些文案要换语言。
+        NameEncodingOptions = NameEncodingOption.BuildDefault();
+        OnPropertyChanged(nameof(NameEncodingOptions));
+    }
 
     /// <summary>
     /// 目录树"自动展开"开关：开启后每次切换目录自动展开到当前目录并收起其他分支。
@@ -947,7 +1034,7 @@ public partial class MainWindowViewModel : ObservableObject
             if (_sessionPasswords.TryGetValue(cacheKey, out var cachedPwd))
                 password = cachedPwd;
 
-            var result = await _archiveService.LoadArchiveAsync(path, password);
+            var result = await _archiveService.LoadArchiveAsync(path, password, fileNameEncoding: NameEncodingRequestKey);
             var engine = ArchiveEngineFactory.GetEngineByExtension(path);
 
             // ── Verify session-cached password before trusting it ──
@@ -960,7 +1047,7 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 _sessionPasswords.Remove(cacheKey);
                 password = null;
-                result = await _archiveService.LoadArchiveAsync(path, null);
+                result = await _archiveService.LoadArchiveAsync(path, null, fileNameEncoding: NameEncodingRequestKey);
             }
 
             // ── 密码解析流程（对齐 WPF ResolvePasswordAsync + LoadArchiveAsync 组合语义）──
@@ -1006,7 +1093,7 @@ public partial class MainWindowViewModel : ObservableObject
 
                             password = matchedPwd;
                             if (unlistable)
-                                result = await _archiveService.LoadArchiveAsync(path, password);
+                                result = await _archiveService.LoadArchiveAsync(path, password, fileNameEncoding: NameEncodingRequestKey);
                             if (!result.IsPasswordRequired)
                             {
                                 _sessionPasswords[cacheKey] = password;
@@ -1057,7 +1144,7 @@ public partial class MainWindowViewModel : ObservableObject
                         }
 
                         // 用密码完整加载一次（可列出场景同样重载以统一加载状态；条目内容一致）
-                        result = await _archiveService.LoadArchiveAsync(path, password);
+                        result = await _archiveService.LoadArchiveAsync(path, password, fileNameEncoding: NameEncodingRequestKey);
 
                         if (!result.IsPasswordRequired)
                         {
@@ -1113,6 +1200,8 @@ public partial class MainWindowViewModel : ObservableObject
                 // 确保打开压缩包后根目录预览能立即显示注释
                 CurrentArchivePath = path;
                 _currentFormat = ArchiveFormatHelper.GetFormat(path);
+                // 代码页下拉只在按名字解码的格式（ZIP/TAR/GZ）上可用，格式变了要重算可用性
+                OnPropertyChanged(nameof(CanChangeNameEncoding));
                 _archiveComment = ArchiveCommentReader.ReadComment(path, _currentFormat, _currentPassword);
 
                 foreach (var entry in result.Entries)
@@ -1151,6 +1240,8 @@ public partial class MainWindowViewModel : ObservableObject
                 }
 
                 IsArchiveLoaded = true;
+                // 回显本次实际生效的代码页（自动检测结果或用户手动指定的编码）
+                ResolvedNameEncodingKey = result.ResolvedNameEncoding;
                 // 打开成功后开始监视磁盘：包被外部删除 / 替换时界面要立刻知道（issue：解压删源包后状态残留）
                 AttachArchiveGuard(path);
                 RecentFilesManager.AddPath(path);
@@ -1223,6 +1314,11 @@ public partial class MainWindowViewModel : ObservableObject
         FolderTreeRoot = null;
         _allRawItems = null;
         _archiveComment = null;
+        // 代码页是「每个包」的会话态：关包就回到自动检测，避免拿上一个包的选择去解下一个包
+        // 初值取设置里的「默认读取代码页」，主工具栏可对本包临时覆盖
+        ArchiveNameEncoding = AppSettings.Load()?.ReadNameEncoding ?? NameEncodingCatalog.Auto;
+        ResolvedNameEncodingKey = null;
+        OnPropertyChanged(nameof(CanChangeNameEncoding));
         DirStats = string.Empty;
         FilterStats = string.Empty;
         EncodingInfo = string.Empty;

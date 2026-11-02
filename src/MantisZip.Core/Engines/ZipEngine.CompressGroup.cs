@@ -68,7 +68,7 @@ public partial class ZipEngine
             var existingNames = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var existingRawNames = new List<string>();
             var existingEntryInfo = new Dictionary<string, (long Size, DateTime? Modified)>(StringComparer.OrdinalIgnoreCase);
-            using (var archive = OpenArchiveWithEncodingFallback(archivePath))
+            using (var archive = OpenArchiveWithEncodingFallback(archivePath, null, options.ReadEncoding))
             {
                 foreach (var entry in archive.Entries)
                 {
@@ -247,7 +247,7 @@ public partial class ZipEngine
                 });
                 CoreLog.Trace("[TRACE] ZipEngine.AddToArchiveAsync: Phase 1 — extracting old entries");
 
-                using (var archive = OpenArchiveWithEncodingFallback(archivePath, options.Password))
+                using (var archive = OpenArchiveWithEncodingFallback(archivePath, options.Password, options.ReadEncoding))
                 {
                     // Check for encrypted entries before starting extraction.
                     // If any non-directory entry is encrypted and no password is
@@ -908,7 +908,7 @@ public partial class ZipEngine
                     var keepSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
                     var allEntryNames = new List<string>();
 
-                    using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+                    using (var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
                     {
                         foreach (var entry in archive.Entries)
                             allEntryNames.Add(entry.Key ?? string.Empty);
@@ -1002,7 +1002,7 @@ public partial class ZipEngine
 
                 // Pass 1: 验证 + 确定保留项
                 var keepNames = new List<string>();
-                using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+                using (var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
                 {
                     var allNames = new List<string>();
                     foreach (var entry in archive.Entries)
@@ -1044,13 +1044,13 @@ public partial class ZipEngine
 
                 // ── Check if source archive is encrypted ──
                 bool sourceIsEncrypted = false;
-                using (var checkArchive = OpenArchiveWithEncodingFallback(archivePath, password))
+                using (var checkArchive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
                 {
                     sourceIsEncrypted = checkArchive.Entries.Any(e => e.IsEncrypted);
                 }
 
                 // Pass 2: 提取保留条目到临时目录（带进度）
-                using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+                using (var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
                 {
                     // 先算 totalKeepBytes
                     foreach (var entry in archive.Entries)
@@ -1067,7 +1067,7 @@ public partial class ZipEngine
                 if (workTotal == 0) workTotal = 1;
 
                 // Pass 3: 实际提取
-                using (var archive = OpenArchiveWithEncodingFallback(archivePath, password))
+                using (var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
                 {
                     progress?.Report(new ArchiveProgress
                     {

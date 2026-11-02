@@ -1316,11 +1316,21 @@ public class SevenZipEngine : IArchiveEngine
     public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(
         string archivePath,
         string? password = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? fileNameEncoding = null,
+        Action<string>? onEncodingResolved = null)
     {
         CoreLog.Entry();
         archivePath = AnchorVolumeSet(archivePath);
         CoreLog.Info($"ListEntriesAsync: {archivePath}");
+
+        // 7z.dll 内部以 UTF-16 表示条目名，不存在代码页问题；编码参数只为接口一致，
+        // 这里回传 UTF-16 让 UI 的「代码页」控件对这种格式也无歧义（实际由 UI 隐藏控件）。
+        if (!string.IsNullOrWhiteSpace(fileNameEncoding) && !NameEncodingCatalog.IsAuto(fileNameEncoding))
+        {
+            CoreLog.Info($"ListEntriesAsync: file name encoding '{fileNameEncoding}' ignored for 7z (names are Unicode)");
+        }
+        onEncodingResolved?.Invoke("utf-16");
         var sw = Stopwatch.StartNew();
 
         EnsureLibraryPath();

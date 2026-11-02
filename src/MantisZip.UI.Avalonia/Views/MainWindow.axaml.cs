@@ -154,6 +154,8 @@ public partial class MainWindow : Window
                 Patterns = dialog.Patterns
             };
         };
+        // 工具栏文件名代码页下拉选「其他…」时的代码页输入框
+        vm.ShowCodePageInputDialog = () => CodePageInputDialog.ShowAsync(this);
         // 预览面板「输入密码」按钮共享同一密码对话框回调
         vm.Preview.ShowPasswordDialog = vm.ShowPasswordDialog;
         // 密码输入成功后重新触发当前条目的预览

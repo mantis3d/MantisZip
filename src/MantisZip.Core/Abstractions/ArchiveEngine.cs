@@ -95,8 +95,20 @@ public class ArchiveOptions
 
     /// <summary>
     /// ZIP 文件名编码："utf-8" / "gbk" / "default"。null 表示使用引擎默认（UTF-8）。
+    /// 写路径（新建、加文件、删条目、写注释）用它决定条目名如何编码。
     /// </summary>
     public string? FileNameEncoding { get; set; }
+
+    /// <summary>
+    /// 读取归档时条目名的编码键（见 <see cref="Utils.NameEncodingCatalog"/>）：
+    /// <c>auto</c>（缺省，引擎内部按 bit 11 → CJK 启发式 → GBK 重试）、
+    /// <c>utf-8</c> / <c>gbk</c> / <c>gb18030</c> / <c>big5</c> / <c>shift-jis</c> / <c>euc-kr</c> /
+    /// <c>system</c> / <c>other:&lt;代码页&gt;</c>。
+    ///
+    /// 与 <see cref="FileNameEncoding"/> 的区别：本属性只管**读**（列条目、解压、预览、校验按名字匹配），
+    /// 后者只管**写**。两者必须由调用方设成同一个值，否则会出现「列表看着对、解压按名字找不到」。
+    /// </summary>
+    public string? ReadEncoding { get; set; }
 
     /// <summary>
     /// 7z 压缩方法："LZMA" / "LZMA2" / "PPMd" / "BZip2" / "Deflate"。null 表示引擎默认（LZMA2）。
@@ -513,7 +525,17 @@ public class ExtractResult
         /// <summary>
         /// 列出压缩包内容
         /// </summary>
-        Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default);
+        /// <param name="fileNameEncoding">
+        /// 条目名编码键（见 <see cref="NameEncodingCatalog"/>），null / <c>auto</c> = 引擎自动检测。
+        /// 追加在 <paramref name="cancellationToken"/> 之后，避免破坏既有按位置传参的调用点。
+        /// </param>
+        /// <param name="onEncodingResolved">实际使用的编码键回调（供 UI 回显检测结果）；不支持猜测的引擎可忽略。</param>
+        Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(
+            string archivePath,
+            string? password = null,
+            CancellationToken cancellationToken = default,
+            string? fileNameEncoding = null,
+            Action<string>? onEncodingResolved = null);
 
         /// <summary>
         /// 测试压缩包完整性
