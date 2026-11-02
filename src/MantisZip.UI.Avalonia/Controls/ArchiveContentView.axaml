@@ -24,7 +24,8 @@
          不写转换器类：
          ① ThumbnailSource 非空 → 128 内等比缩略图（最长边 128，保持宽高比）
          ② 否则 TextSnippet 非空 → 128×128 文字卡片（文本类文件首屏内容预览）
-         ③ 否则 → IconSource 文件类型图标居中兜底（32px：16px 图标放大到 48 会发虚） -->
+         ③ 否则 → 文件类型图标兜底：有大图标时按 96px 显示（Windows 取 Shell 256px 档），
+              拿不到大图标才按 16px 原尺寸显示（16px 放大到 96 会发虚） -->
     <DataTemplate x:Key="ThumbnailContentCard" x:DataType="models:ArchiveItemModel">
       <Panel Width="128" Height="128">
         <!-- ① 缩略图 -->
@@ -46,13 +47,21 @@
                      Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                      Padding="{DynamicResource SpacingXsThk}" />
         </Border>
-        <!-- ③ 兜底图标（目录 / 二进制 / 超出缩略图上限的条目） -->
+        <!-- ③ 兜底图标（目录 / 二进制 / 视频 / 超出缩略图上限的条目）
+             优先大图标：Windows 取自 Shell 图像列表的 256px 档，按 96px 显示（缩图不糊）；
+             拿不到大图标（非 Windows / 该类型无大图）才退回 16px 原尺寸——16px 拉到 96 只会更糊。 -->
+        <Image Source="{Binding LargeIconSource}"
+               Width="96" Height="96"
+               Stretch="Uniform"
+               HorizontalAlignment="Center"
+               VerticalAlignment="Center"
+               IsVisible="{Binding ShowLargeIcon}" />
         <Image Source="{Binding IconSource}"
                Width="32" Height="32"
                Stretch="Uniform"
                HorizontalAlignment="Center"
                VerticalAlignment="Center"
-               IsVisible="{Binding !HasThumbnailContent}" />
+               IsVisible="{Binding ShowSmallIcon}" />
       </Panel>
     </DataTemplate>
   </UserControl.Resources>

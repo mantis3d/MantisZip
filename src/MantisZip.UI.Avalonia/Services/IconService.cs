@@ -62,6 +62,31 @@ internal static class IconService
     }
 
     /// <summary>
+    /// 取文件类型图标的**大尺寸版本**，专供缩略图卡 / 内容行兜底使用（96px 显示）。
+    /// </summary>
+    /// <param name="extension">File extension including the dot (e.g. ".mp4").</param>
+    /// <returns>
+    /// 256px（Jumbo）优先，退 48px / 32px；**非 Windows 返回 <see langword="null"/>**——
+    /// SkiaSharp 兜底图标是按 16px 绘制的，拉伸到 96px 只会更糊，不如让调用方继续显示 16px 原尺寸。
+    /// </returns>
+    public static Bitmap? GetLargeFileIcon(string extension)
+    {
+        if (!Win32IconProvider.IsSupported)
+            return null;
+
+        return Win32IconProvider.GetLargeFileIcon(extension);
+    }
+
+    /// <summary>取文件夹图标的**大尺寸版本**，语义同 <see cref="GetLargeFileIcon"/>。</summary>
+    public static Bitmap? GetLargeFolderIcon()
+    {
+        if (!Win32IconProvider.IsSupported)
+            return null;
+
+        return Win32IconProvider.GetLargeFolderIcon();
+    }
+
+    /// <summary>
     /// Clear all icon caches.
     /// </summary>
     public static void ClearCache()

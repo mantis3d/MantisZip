@@ -52,6 +52,13 @@ public partial class ArchiveItemModel : ObservableObject
     private Bitmap? _iconSource;
 
     /// <summary>
+    /// 卡片布局兜底用的**大尺寸**图标（Windows 上取自 Shell 图像列表的 256px 档）。
+    /// null = 拿不到大图标（非 Windows / 该类型无大图），卡片退回 <see cref="IconSource"/> 原尺寸显示。
+    /// </summary>
+    [ObservableProperty]
+    private Bitmap? _largeIconSource;
+
+    /// <summary>
     /// 图像类内容卡的缩略图（Tile / Content 布局）。null = 无缩略图（卡片回退到扩展名图标）。
     /// </summary>
     [ObservableProperty]
@@ -120,11 +127,27 @@ public partial class ArchiveItemModel : ObservableObject
     partial void OnThumbnailSourceChanged(Bitmap? value)
     {
         OnPropertyChanged(nameof(HasThumbnailContent));
+        OnPropertyChanged(nameof(ShowLargeIcon));
+        OnPropertyChanged(nameof(ShowSmallIcon));
     }
 
     partial void OnTextSnippetChanged(string? value)
     {
         OnPropertyChanged(nameof(HasThumbnailContent));
+        OnPropertyChanged(nameof(ShowLargeIcon));
+        OnPropertyChanged(nameof(ShowSmallIcon));
+    }
+
+    /// <summary>卡片是否走「大图标」兜底：无缩略图内容且拿到了大尺寸图标。</summary>
+    public bool ShowLargeIcon => !HasThumbnailContent && LargeIconSource != null;
+
+    /// <summary>卡片是否走「小图标原尺寸」兜底：无缩略图内容且没有大图标可用（非 Windows 常见）。</summary>
+    public bool ShowSmallIcon => !HasThumbnailContent && LargeIconSource == null;
+
+    partial void OnLargeIconSourceChanged(Bitmap? value)
+    {
+        OnPropertyChanged(nameof(ShowLargeIcon));
+        OnPropertyChanged(nameof(ShowSmallIcon));
     }
 
 

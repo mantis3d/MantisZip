@@ -168,11 +168,14 @@ public partial class MainWindowViewModel : ObservableObject
                         model.LastModified = stat.NewestModified;
                     }
                     model.IconSource = IconService.GetFolderIcon();
+                    model.LargeIconSource = IconService.GetLargeFolderIcon();
                 }
                 else
                 {
                     var ext = Path.GetExtension(model.Name);
                     model.IconSource = IconService.GetFileIcon(ext);
+                    // 卡片兜底用的大图标（Windows 取 Shell 256px 档；拿不到时为 null，卡片退回 16px 原尺寸）
+                    model.LargeIconSource = IconService.GetLargeFileIcon(ext);
                 }
                 // 按当前格式设置压缩后大小可用性（文件 + 目录一致）
                 model.CompressedSizeAvailable = compressedSizeAvailable;
