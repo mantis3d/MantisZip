@@ -1110,6 +1110,11 @@ public partial class MainWindowViewModel : ObservableObject
         // 同值短路（_appSettings.FileListLayoutMode 已等于该值）保证启动不重复落盘。
         LayoutMode = _appSettings.FileListLayoutMode;
 
+        // 设置窗口改「缩略图」外观后重取缩略图：App 是唯一共同祖先，静态事件解耦两个窗口的 VM。
+        // 生命周期与主窗口一致（单窗口应用），不做退订。
+        App.ThumbnailStyleChanged += (_, _) =>
+            global::Avalonia.Threading.Dispatcher.UIThread.Post(ReloadThumbnailsForStyleChange);
+
         // 主题（三态）：初始化菜单按钮暗色状态显示
         IsDarkTheme = _appSettings.Theme switch
         {
@@ -1562,6 +1567,9 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>当前 <see cref="_thumbnailService"/> 对应的压缩包路径（换包时重建服务）。</summary>
     private string? _thumbnailServiceArchivePath;
 
+    /// <summary>当前 <see cref="_thumbnailService"/> 使用的缩略图边长（设置里改尺寸后要重建服务）。</summary>
+    private int _thumbnailServiceSize;
+
     /// <summary>固实 7z 判定缓存：同一压缩包只需开一次包探测。</summary>
     private string? _thumbnailSolidArchivePath;
     private bool _thumbnailSolidCache;
@@ -1577,18 +1585,52 @@ public partial class MainWindowViewModel : ObservableObject
         if (CurrentArchivePath is not { Length: > 0 } archivePath) return;
         if (CurrentEntries.Count == 0) return;
 
+        var size = CurrentThumbnailSize();
         if (_thumbnailService == null ||
+            _thumbnailServiceSize != size ||
             !string.Equals(_thumbnailServiceArchivePath, archivePath, StringComparison.OrdinalIgnoreCase))
         {
             CancelThumbnailBatch();
             _thumbnailService = new ThumbnailService(
                 archivePath,
                 GetSessionPassword(archivePath) ?? _currentPassword,
-                IsCurrentSevenZipSolid(archivePath));
+                IsCurrentSevenZipSolid(archivePath),
+                cache: null,
+                thumbnailSize: size);
             _thumbnailServiceArchivePath = archivePath;
+            _thumbnailServiceSize = size;
         }
 
         _thumbnailService.StartBatch(CurrentEntries);
+    }
+
+    /// <summary>
+    /// 读取当前设置里的缩略图边长（96/128/160，非法值按 128）。
+    /// 每次启动批次都读一次：设置窗口改完尺寸后 <see cref="ReloadThumbnailsForStyleChange"/>
+    /// 会重新走到这里，服务因尺寸变化被重建，从而按新边长重新解码。
+    /// </summary>
+    private static int CurrentThumbnailSize()
+    {
+        var size = AppSettings.Load().ThumbnailSize;
+        return size is 96 or 128 or 160 ? size : ThumbnailService.DefaultThumbnailSize;
+    }
+
+    /// <summary>
+    /// 设置 → 外观 → 缩略图 保存后重取缩略图：清空已加载的位图（旧尺寸）并重启批次。
+    /// 只有尺寸变化才真的需要重新解码；边框 / 垫底色是资源驱动，模板会自己重绘。
+    /// </summary>
+    public void ReloadThumbnailsForStyleChange()
+    {
+        if (LayoutMode == FileListLayoutMode.Details) return;
+
+        CancelThumbnailBatch();
+
+        foreach (var entry in CurrentEntries)
+        {
+            entry.ThumbnailSource = null;
+        }
+
+        StartThumbnailBatchIfNeeded();
     }
 
     /// <summary>

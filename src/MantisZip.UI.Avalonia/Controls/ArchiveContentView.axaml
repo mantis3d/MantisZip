@@ -25,44 +25,53 @@
          ① ThumbnailSource 非空 → 128 内等比缩略图（最长边 128，保持宽高比）
          ② 否则 TextSnippet 非空 → 128×128 文字卡片（文本类文件首屏内容预览）
          ③ 否则 → 文件类型图标兜底：有大图标时按 96px 显示（Windows 取 Shell 256px 档），
-              拿不到大图标才按 16px 原尺寸显示（16px 放大到 96 会发虚） -->
+              拿不到大图标才按 16px 原尺寸显示（16px 放大到 96 会发虚）
+         尺寸/边框/垫底色全部走 DynamicResource（设置 → 外观 → 缩略图）：
+         ThumbnailCardSize（96/128/160）、ThumbnailCardBorderThickness（0 或 1）、
+         ThumbnailCardBackdropBrush（保留透明时 = 透明画刷，关闭时 = 用户选的实色）。 -->
     <DataTemplate x:Key="ThumbnailContentCard" x:DataType="models:ArchiveItemModel">
-      <Panel Width="128" Height="128">
-        <!-- ① 缩略图 -->
-        <Image Source="{Binding ThumbnailSource}"
-               Width="128" Height="128"
-               Stretch="Uniform"
-               IsVisible="{Binding ThumbnailSource, Converter={x:Static ObjectConverters.IsNotNull}}" />
-        <!-- ② 文字片段卡片 -->
-        <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
-                BorderBrush="{DynamicResource ThemeBorderBrush}"
-                BorderThickness="1"
-                CornerRadius="{DynamicResource BorderRadius}"
-                Width="128" Height="128"
-                IsVisible="{Binding TextSnippet, Converter={StaticResource ThumbnailTextNotEmptyConverter}}">
-          <TextBlock Text="{Binding TextSnippet}"
-                     FontSize="11"
-                     TextWrapping="Wrap"
-                     TextTrimming="CharacterEllipsis"
-                     Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                     Padding="{DynamicResource SpacingXsThk}" />
-        </Border>
-        <!-- ③ 兜底图标（目录 / 二进制 / 视频 / 超出缩略图上限的条目）
-             优先大图标：Windows 取自 Shell 图像列表的 256px 档，按 96px 显示（缩图不糊）；
-             拿不到大图标（非 Windows / 该类型无大图）才退回 16px 原尺寸——16px 拉到 96 只会更糊。 -->
-        <Image Source="{Binding LargeIconSource}"
-               Width="96" Height="96"
-               Stretch="Uniform"
-               HorizontalAlignment="Center"
-               VerticalAlignment="Center"
-               IsVisible="{Binding ShowLargeIcon}" />
-        <Image Source="{Binding IconSource}"
-               Width="32" Height="32"
-               Stretch="Uniform"
-               HorizontalAlignment="Center"
-               VerticalAlignment="Center"
-               IsVisible="{Binding ShowSmallIcon}" />
-      </Panel>
+      <Border Width="{DynamicResource ThumbnailCardSize}"
+              Height="{DynamicResource ThumbnailCardSize}"
+              Background="{DynamicResource ThumbnailCardBackdropBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="{DynamicResource ThumbnailCardBorderThickness}"
+              CornerRadius="{DynamicResource BorderRadius}"
+              ClipToBounds="True">
+        <Panel>
+          <!-- ① 缩略图 -->
+          <Image Source="{Binding ThumbnailSource}"
+                 Stretch="Uniform"
+                 IsVisible="{Binding ThumbnailSource, Converter={x:Static ObjectConverters.IsNotNull}}" />
+          <!-- ② 文字片段卡片 -->
+          <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1"
+                  CornerRadius="{DynamicResource BorderRadius}"
+                  IsVisible="{Binding TextSnippet, Converter={StaticResource ThumbnailTextNotEmptyConverter}}">
+            <TextBlock Text="{Binding TextSnippet}"
+                       FontSize="11"
+                       TextWrapping="Wrap"
+                       TextTrimming="CharacterEllipsis"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       Padding="{DynamicResource SpacingXsThk}" />
+          </Border>
+          <!-- ③ 兜底图标（目录 / 二进制 / 视频 / 超出缩略图上限的条目）
+               优先大图标：Windows 取自 Shell 图像列表的 256px 档，按 96px 显示（缩图不糊）；
+               拿不到大图标（非 Windows / 该类型无大图）才退回 16px 原尺寸——16px 拉到 96 只会更糊。 -->
+          <Image Source="{Binding LargeIconSource}"
+                 Width="96" Height="96"
+                 Stretch="Uniform"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"
+                 IsVisible="{Binding ShowLargeIcon}" />
+          <Image Source="{Binding IconSource}"
+                 Width="32" Height="32"
+                 Stretch="Uniform"
+                 HorizontalAlignment="Center"
+                 VerticalAlignment="Center"
+                 IsVisible="{Binding ShowSmallIcon}" />
+        </Panel>
+      </Border>
     </DataTemplate>
   </UserControl.Resources>
 
@@ -633,9 +642,9 @@
             <ItemsControl ItemsSource="{Binding CurrentEntries}">
               <ItemsControl.ItemsPanel>
                 <ItemsPanelTemplate>
-                  <!-- 网格铺排：每格 144 宽（136 项壳 + 间距），左对齐、自动换行 -->
+                  <!-- 网格铺排：格子宽 = 卡片边长 + 16（外壳内边距 + 间距），由设置 → 外观 → 缩略图决定 -->
                   <WrapPanel Orientation="Horizontal"
-                             ItemWidth="144"
+                             ItemWidth="{DynamicResource ThumbnailTileCellWidth}"
                              ItemSpacing="{DynamicResource SpacingXxs}"
                              LineSpacing="{DynamicResource SpacingXxs}"
                              ItemsAlignment="Start" />
@@ -644,9 +653,9 @@
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="models:ArchiveItemModel">
                   <!-- 单个缩略图项：外壳 Border 承载选中高亮。
-                       宽度 136 = 128 内容卡 + 2×4 内边距（Padding 取 SpacingXxsThk：SpacingSmThk 的 12
-                       会让 128 卡溢出格子）；MinHeight 走紧凑度资源（规则 7）。 -->
-                  <Border Width="136"
+                       宽度 = 卡片边长 + 8（2×4 内边距，Padding 取 SpacingXxsThk：SpacingSmThk 的 12
+                       会让卡片溢出格子）；MinHeight 走紧凑度资源（规则 7）。 -->
+                  <Border Width="{DynamicResource ThumbnailTileItemWidth}"
                           MinHeight="{DynamicResource ControlHeightXxl}"
                           Padding="{DynamicResource SpacingXxsThk}"
                           CornerRadius="{DynamicResource BorderRadius}"
@@ -725,12 +734,13 @@
               </ItemsControl.ItemsPanel>
               <ItemsControl.ItemTemplate>
                 <DataTemplate x:DataType="models:ArchiveItemModel">
-                  <!-- 单行：左 128 内容卡 + 右元数据块（名称加粗 14px + 四行「标签: 值」） -->
+                  <!-- 单行：左内容卡 + 右元数据块（名称加粗 14px + 四行「标签: 值」）
+                       左列用 Auto（卡片自带宽高资源），缩略图尺寸变化时自动跟随，无需改列宽 -->
                   <Border MinHeight="{DynamicResource ControlHeightXxl}"
                           Padding="{DynamicResource SpacingXsThk}"
                           CornerRadius="{DynamicResource BorderRadius}"
                           Background="{Binding IsSelected, Converter={StaticResource ThumbnailSelectedBrushConverter}}">
-                    <Grid ColumnDefinitions="128,*">
+                    <Grid ColumnDefinitions="Auto,*">
                       <ContentControl Grid.Column="0"
                                       Content="{Binding}"
                                       ContentTemplate="{StaticResource ThumbnailContentCard}"

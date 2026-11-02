@@ -6,6 +6,18 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-02** — 功能：缩略图卡片外观设置 + 清晰度修正（v0.5.6 收尾追加）
+  - **背景**：平铺/内容布局的卡片外观是写死的（128 px、无边框、透明区域露出列表底色）。用户提出：能否加外边框（白底图贴在浅色背景上分不清边界）、带透明通道的图能否改垫纯色底；追加要求是垫色要能自选、外边框默认关、尺寸也要可调。随后又报 `.ico` / `.svg` 的缩略图「用最低分辨率放大，很模糊」。
+  - **设置项（资源注入，不碰解码与模型）**：`AppSettings` 四个字段 `ThumbnailShowBorder`(false) / `ThumbnailUseTransparency`(true) / `ThumbnailBackdropColor`("#FFFFFF") / `ThumbnailSize`(128)；`App.Theming.ApplyThumbnailStyle()` 把它们翻成五个资源键（`ThumbnailCardBorderThickness` / `ThumbnailCardBackdropBrush` / `ThumbnailCardSize` / `ThumbnailTileItemWidth` / `ThumbnailTileCellWidth`），`ArchiveContentView.axaml` 的卡片改 `Border` 包 `Panel`、宽高边框背景全 `DynamicResource`，平铺 `WrapPanel ItemWidth` 与项宽、内容行首列 `Auto` 一并资源化。设置保存后 `App.RefreshThumbnailStyle()` → `ThumbnailStyleChanged` 事件 → 主窗 `ReloadThumbnailsForStyleChange()`，即时生效不重启。
+  - **尺寸参数化**：`ThumbnailService` 加 `DefaultThumbnailSize` 常量与构造器 `thumbnailSize` 形参，解码 / SVG 渲染 / 缩放 / 缓存键全链路带尺寸（键 `archivePath|entryPath|size`，来回切档不重复解码）；主窗口按 `_thumbnailServiceSize` 比较重建服务。
+  - **设置窗**：「外观」下新增「缩略图」子页签三张卡片（外边框开关 / 垫纯色底开关 + 取色 / 尺寸三档 ComboBox），保存写回四个字段；11 个三语 key（总数 1423）。
+  - **清晰度修正 1（`.ico`）**：原先卡片的 `.ico` 走 `IcoIconHelper.ExtractIcon(bytes)`——那是为列表行图标设计的「挑最接近 16×16 的帧」，16px 帧铺满 128px 卡片必然糊。改为 `ExtractIcon(bytes, preferredSize)` 并把挑帧判据从**面积差**改成**边长差**、目标 **160**：帧集合只有 {16,256} 时，按面积差对 128 会挑到 16（16128 vs 49152），按边长差对 160 才会挑 256（96 vs 144）。用户对这条的判断是对的，但只改数字不改判据没用——临界点要 `T > 181`。
+  - **清晰度修正 2（`.svg`）**：`RenderSvg` 原先复用了位图规则「小图不放大」，而 SVG 的 `CullRect` 是自身坐标系（`viewBox="0 0 24 24"`）⇒ 按 24px 渲染再拉伸。改用 `ScaleToSize(w, h, longestSide)`，矢量一律重绘到最长边 128。
+  - **清晰度修正 3（兜底图标）**：不支持缩略图的类型（目录、视频等）卡片里是 16px 系统小图标放大。新增 `Win32IconProvider.GetLargeFileIcon/GetLargeFolderIcon`，走 `SHGetImageList` 的 Jumbo(256) → ExtraLarge(96) → Large(48) 依次尝试，卡片按 96px 显示；`ArchiveItemModel` 加 `LargeIconSource` + `ShowLargeIcon`/`ShowSmallIcon`（缩略图或文字卡晚到时自动让位）。非 Windows 返回 null 保持原样（SkiaSharp 图标按 16px 绘制，拉伸更糊）。
+  - **踩坑**：①`SHGFI_SYSICONINDEX` 是 `0x4000`，第一版写成 `0x40000`（未定义位被 Shell 静默忽略）⇒ 所有类型都返回索引 0 = 通用白页图标，真机截图六张卡全是空白页。②Avalonia 12 的 `Avalonia.Controls.ColorPicker` **没有 `ColorPickerButton`**（只有 `ColorView`/`ColorSpectrum`/`ColorSlider`/`ColorPreviewer`/`ColorPicker` flyout），取色改为 `Button` + `Button.Flyout` 内嵌 `cp:ColorView`，按钮内容显示当前色值。③用 `git cat-file -p HEAD:<path>` 取原始 json 内容时它已带 U+FEFF，再用 `UTF8Encoding($true)` 写回会变成**双 BOM**（`EF BB BF EF BB BF`），`LocalizationManager` 静态构造直接 `JsonException: '0xEF' is an invalid start of a value`，4 个用例连带失败。
+  - **验证**：Release `--no-incremental` 0 警告；`ui-tests` 38.9s 全绿、`tests` 全绿；`-Task i18n` 1423 key、`-Task check` 版本 0.5.6 六处 / 1423 key / 8 守卫全绿。真机（`settings.json` 置 `FileListLayoutMode=1`、边框开、垫色 `#FFF2D5`、尺寸 160）：卡片 160px + 1px 边框 + 透明图周围米色垫底 + 文字卡同底色，四项全生效；`.ico` 与 `.svg` 卡片清晰度前后对比（4× 放大：糊边光晕 → 锐利），兜底大图标（文件夹/PDF/视频/音频/exe）96px 清晰。
+  - **未做**：设置窗子页签的实机截图（`Ctrl+,` 与坐标点击都没能驱动设置窗，窗口还会被拖走），改由用户手动目视确认。
+
 **2026-11-02** — 功能：主窗口列表复选框多选（v0.5.6 最后一项）
   - **背景**：#37 的第三件事「与主窗口文件列表统一」此前只统一了交互范式，主窗口列表本身没有复选框列。DataGrid 默认 `SelectionMode=Extended`，Ctrl/Shift 本来能多选，但那是「临时选区」——滚动、切目录、点别处就丢；用户要的是「持久累积」的勾选语义，且批量删除当时只支持单条（`DeleteFiles` 只看 `SelectedEntry`）。
   - **状态归属**：`SelectedEntries`（`List<ArchiveItemModel>`）仍是唯一事实源，`ArchiveItemModel.IsChecked` 是它的镜像。`OnEntryPropertyChanged` 只认 `IsChecked`，在 `_syncingSelection` 闸门外增删 `SelectedEntries` 并触发 `CheckedSelectionChanged`；`SyncCheckedFromSelection()` 反向把 Ctrl/Shift 选区写回勾选；`RestoreCheckedState()` 在 `PopulateEntries()` 重建实例后按 `FullPath` 还原（跨目录/跨筛选保持的唯一办法，因为条目模型不是常驻对象）。

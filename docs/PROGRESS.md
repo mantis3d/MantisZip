@@ -26,6 +26,7 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-11
+- **11-02** — **缩略图卡片外观设置 + 清晰度修正（v0.5.6 收尾追加）**：「设置 → 外观 → 缩略图」子页签可调卡片外边框（默认关）、透明图是否垫纯色底（取色器自选，默认保留透明）、三档尺寸 96/128/160，全部走资源注入即时生效、无需重启，缩略图缓存键加尺寸（来回切档不重复解码）。同时修三处清晰度：卡片里的 `.ico` 改取**边长**最接近 160 的帧（原按面积差，帧集 {16,256} 会挑到 16px 那张 ⇒ 放大发糊）、`.svg` 按卡片尺寸重绘（原按自身 viewBox 24px 渲染再拉伸）、无缩略图时改用系统大图标 96px（Windows 走 `SHGetImageList` 的 Jumbo 256px 档，`SHGFI_SYSICONINDEX` 必须是 `0x4000`，写成 `0x40000` 会被 Shell 忽略并退回通用白页图标）。Avalonia 12 没有 `ColorPickerButton`，取色改 `Button` + `Flyout` + `ColorView`。
 - **11-02** — **主窗口列表复选框多选（v0.5.6 最后一项）**：列表工具栏新增复选框模式开关，每行前面出现复选框，勾选状态**跨滚动、跨切目录保持**（`SelectedEntries` 仍是唯一事实源，`ArchiveItemModel.IsChecked` 双向同步，`PopulateEntries` 重建实例时按 `FullPath` 还原），状态栏右侧显示「已选 N 项 · 共 X」；右键菜单补「全选可见 / 反选 / 清空勾选」，批量删除一次确认（`Confirm_DeleteMultipleFmt` 按条数切文案）、删完自动清空勾选。关闭模式时行为与引入前完全一致（`AppSettings.FileListCheckboxMode` 默认 `false`）。实现踩到三个真 bug：`DataGridColumn` 不是 `Control`、不继承 DataContext ⇒ 列上的 `IsVisible` 绑定静默失效（改 code-behind 按 `Tag` 切）；`ApplyColumnStates` 回放会把新列顶到末尾并隐藏（回放跳过复选框列、首次显隐移到回放之后）；勾选集合可跨目录而 DataGrid 只装当前目录 ⇒ 往 `SelectedItems` 加外部对象直接崩进程（`ArgumentException: The item is not contained in the ItemsSource`），改为只回填当前可见条目。
 - **11-02** — **文件列表缩略图查看方式（v0.5.6 第一项）**：列表新增三种布局——详情（原 DataGrid）、平铺（卡片流）、内容行（大卡片 + 元数据），工具栏一个按钮循环切换并持久化到 `AppSettings.FileListLayoutMode`。内容卡三档：图片类显示 128px 真缩略图（`.ico` 走 `IcoIconHelper`、`.svg` 走 Svg.Skia，不放大）、文本类显示前 150 字符文字卡、其余显示图标兜底。实现 `Services/ThumbnailCache`（LRU 300，key 含包路径避免跨包串图，`Lazy<Task>` 保证并发只解一次）+ `Services/ThumbnailService`（8MB 上限 / 固实 7z 跳过 / 并发 4 / 会话密码）+ `Services/ThumbnailSelectionController`（单选 / Ctrl / Shift 共享选择层），拖拽管线从 DataGrid 抽成两模式共用（`Views/MainWindow.Thumbnails.cs`）。**Avalonia 12 没有 `ItemsRepeater`**（类型已移除、独立包只到 12.0.0）⇒ 用 `ItemsControl` + `WrapPanel`/`StackPanel`，无虚拟化，靠服务侧限流兜底。测试 `ThumbnailTests` 47 例。
 - **11-02** — **压缩包内 `.ico` 文件显示自身图标（v0.5.6 第三项）**：此前列表里所有 `.ico` 都显示通用图标（引擎只认系统已注册的图片扩展名，`ArchiveItemModel.IconSource` 只按扩展名给）。新增 `Services/IcoIconHelper`（校验 ICONDIR → 按 `Math.Abs(w*h - 256)` 最小挑帧（宽高字节 0 视作 256）→ 重打包成单帧 ico 交 Avalonia 解码；失败回退 `IcoParser.ExtractFrames` 逐帧解码挑最接近 16×16 的帧）+ `Services/IcoIconLoader`（`Task.Run` 里按条目读进内存（上限 2 MB）解码，回 UI 线程赋 `IconSource`，最多 20 个，可取消）。列表**先显示通用图标**、首帧不阻塞，`PopulateEntries()` 之后异步刷新；切换包 / 关闭包 / 重新过滤都会取消上一批。测试 `IcoIconHelperTests` 6 例。真机验收：包内 `App.ico` / `zip.ico` 显示各自图标，`readme.txt` 仍为通用文本图标。
@@ -283,6 +284,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 缩略图卡片外观设置（外边框 / 垫底色 + 取色器 / 三档尺寸；资源注入即时生效） | [thumbnail-card-settings.md](.omo/plans/已完成/thumbnail-card-settings.md) | 未发布（2026-11-02 归档，随 v0.5.6） |
 | 主窗口列表复选框多选（跨目录累积勾选 + 状态栏摘要 + 全选/反选/清空 + 批量删除） | [file-list-checkbox-selection.md](.omo/plans/已完成/file-list-checkbox-selection.md) | 未发布（2026-11-02 归档，随 v0.5.6） |
 | 文件列表缩略图查看方式（详情 / 平铺 / 内容三态 + 内容卡三档 + 选择层与拖拽管线抽取；Avalonia 12 无 ItemsRepeater → `ItemsControl` + `WrapPanel`） | [file-list-thumbnails.md](.omo/plans/已完成/file-list-thumbnails.md) | 未发布（2026-11-02 归档，随 v0.5.6） |
 | 包内 `.ico` 显示自身嵌入图标（`IcoIconHelper` 挑最接近 16×16 的帧重打包 + `IcoIconLoader` 后台最多 20 个异步回填） | [ico-file-icon-extract.md](.omo/plans/已完成/ico-file-icon-extract.md) | 未发布（2026-11-02 归档，随 v0.5.6） |

@@ -19,6 +19,9 @@
   <Application.Styles>
     <FluentTheme />
     <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+    <!-- ColorPicker（缩略图垫底色取色）：Avalonia 把取色器拆成独立包，必须显式并入 Fluent 样式，
+         否则 ColorPickerButton 弹出空白面板（控件存在但无模板）。版本须与 Avalonia 主包一致。 -->
+    <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"/>
 
     <!-- ════════════════════════════════════════════ -->
     <!-- GLOBAL CONTROL STYLES (applied app-wide)    -->

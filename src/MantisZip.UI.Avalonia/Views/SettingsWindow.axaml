@@ -6,6 +6,7 @@
         xmlns:behaviors="clr-namespace:MantisZip.UI.Avalonia.Behaviors"
         xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
         xmlns:local="clr-namespace:MantisZip.UI.Avalonia.Views"
+        xmlns:cp="clr-namespace:Avalonia.Controls;assembly=Avalonia.Controls.ColorPicker"
         x:Class="MantisZip.UI.Avalonia.Views.SettingsWindow"
         x:Name="SettingsWin"
         x:DataType="vm:SettingsWindowViewModel"
@@ -761,6 +762,74 @@
                           </DataTemplate>
                         </ComboBox.ItemTemplate>
                       </ComboBox>
+                    </StackPanel>
+                  </Border>
+                </StackPanel>
+              </ScrollViewer>
+            </TabItem>
+
+            <!-- 缩略图 Thumbnail：文件列表「平铺 / 内容」布局的卡片外观（v0.5.6 追加） -->
+            <TabItem Header="{Binding TabAppearanceThumbnailHeader}" Classes="compactTab"
+                     controls:TabItemExtensions.TabIcon="IconImage">
+              <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}">
+                <StackPanel Spacing="{DynamicResource SpacingSm}" Margin="{DynamicResource SpacingSmThk}">
+                  <!-- 外边框：0 或 1px，资源驱动（改完即时生效，不用重启） -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <CheckBox Content="{Binding ThumbnailShowBorderText}"
+                                IsChecked="{Binding ThumbnailShowBorder}" />
+                      <TextBlock Text="{Binding ThumbnailShowBorderHelpText}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 透明背景图垫底色：勾上 = 不保留透明，用下面的颜色垫底 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <CheckBox Content="{Binding ThumbnailBackdropText}"
+                                IsChecked="{Binding ThumbnailUseTransparency, Converter={x:Static BoolConverters.Not}}" />
+                      <TextBlock Text="{Binding ThumbnailBackdropHelpText}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <!-- 取色按钮：Avalonia 12 已移除 ColorPickerButton（包里只有 ColorView），
+                           故用 Button + Flyout 内嵌 ColorView；按钮上显示当前色值 -->
+                      <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}"
+                                  IsEnabled="{Binding !ThumbnailUseTransparency}">
+                        <TextBlock Text="{Binding ThumbnailBackdropColorText}" VerticalAlignment="Center" />
+                        <Button MinHeight="{DynamicResource ControlHeightSm}"
+                                Padding="{DynamicResource SpacingSmThk}">
+                          <TextBlock Text="{Binding ThumbnailBackdropColorHex}" />
+                          <Button.Flyout>
+                            <Flyout Placement="BottomEdgeAlignedLeft">
+                              <cp:ColorView Color="{Binding ThumbnailBackdropColor, Mode=TwoWay}"
+                                            Width="320" Height="360" />
+                            </Flyout>
+                          </Button.Flyout>
+                        </Button>
+                      </StackPanel>
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 缩略图尺寸：96 / 128 / 160（改尺寸会重新解码缩略图） -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding ThumbnailSizeText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding ThumbnailSizeOptions}"
+                                SelectedItem="{Binding SelectedThumbnailSizeOption}"
+                                Width="200" HorizontalAlignment="Left">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <TextBlock Text="{Binding ThumbnailSizeHelpText}"
+                                 TextWrapping="Wrap"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                     </StackPanel>
                   </Border>
                 </StackPanel>

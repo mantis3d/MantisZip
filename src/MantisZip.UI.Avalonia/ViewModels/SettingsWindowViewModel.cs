@@ -2,6 +2,7 @@ using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using Avalonia.Controls;
 using Avalonia.Controls.ApplicationLifetimes;
+using Avalonia.Media;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Controls;
@@ -425,6 +426,29 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private string _compactnessMode = "Normal";
 
+    // ── 外观 → 缩略图（缩略图列表的长相） ──
+    /// <summary>缩略图卡是否显示 1px 外边框（默认 false = 与引入该设置前一致）。</summary>
+    [ObservableProperty]
+    private bool _thumbnailShowBorder;
+
+    /// <summary>是否保留透明背景（true = 透明区域露出列表底色；false = 垫 <see cref="ThumbnailBackdropColor"/>）。</summary>
+    [ObservableProperty]
+    private bool _thumbnailUseTransparency = true;
+
+    /// <summary>不保留透明时垫的底色（#RRGGBB）。取色器绑定的是 Avalonia <c>Color</c>，保存时转字符串。</summary>
+    [ObservableProperty]
+    private Color _thumbnailBackdropColor = Colors.White;
+
+    /// <summary>缩略图卡片边长选项：小 96 / 中 128 / 大 160（<see cref="Option.Value"/> 存像素字符串，保存时解析）。</summary>
+    [ObservableProperty]
+    private Option? _selectedThumbnailSizeOption;
+
+    /// <summary>取色后刷新按钮上的色值文案。</summary>
+    partial void OnThumbnailBackdropColorChanged(Color value)
+    {
+        OnPropertyChanged(nameof(ThumbnailBackdropColorHex));
+    }
+
     // ── Password ──
     [ObservableProperty]
     private bool _showPasswordMatchNotification;
@@ -749,6 +773,9 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     public System.Collections.ObjectModel.ObservableCollection<Option> CompactnessModeOptions { get; } = new();
     [ObservableProperty] private Option? _selectedCompactnessModeOption;
+
+    /// <summary>缩略图卡片边长三档（小 96 / 中 128 / 大 160）。</summary>
+    public System.Collections.ObjectModel.ObservableCollection<Option> ThumbnailSizeOptions { get; } = new();
 
     public System.Collections.ObjectModel.ObservableCollection<Option> SelectedLanguageOptions { get; } = new();
     [ObservableProperty] private Option? _selectedSelectedLanguageOption;
@@ -1137,6 +1164,27 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AppearanceCompactnessNormalText => LocalizationManager.T("Settings_Appearance_Compactness_Normal");
     public string AppearanceCompactnessLooseText => LocalizationManager.T("Settings_Appearance_Compactness_Loose");
 
+    // ── 外观 → 缩略图 strings ──
+    /// <summary>子页签标题。</summary>
+    public string TabAppearanceThumbnailHeader => LocalizationManager.T("Settings_Tab_AppearanceThumbnail");
+    /// <summary>「显示 1px 外边框」勾选框。</summary>
+    public string ThumbnailShowBorderText => LocalizationManager.T("Settings_Thumbnail_ShowBorder");
+    public string ThumbnailShowBorderHelpText => LocalizationManager.T("Settings_Thumbnail_ShowBorder_Help");
+    /// <summary>「透明背景图垫底色」勾选框（勾上 = 不保留透明）。</summary>
+    public string ThumbnailBackdropText => LocalizationManager.T("Settings_Thumbnail_Backdrop");
+    public string ThumbnailBackdropHelpText => LocalizationManager.T("Settings_Thumbnail_Backdrop_Help");
+    /// <summary>垫底色标签（取色器旁）。</summary>
+    public string ThumbnailBackdropColorText => LocalizationManager.T("Settings_Thumbnail_BackdropColor");
+    /// <summary>取色按钮上显示的当前色值（#RRGGBB，方便用户直接看数值）。</summary>
+    public string ThumbnailBackdropColorHex =>
+        $"#{ThumbnailBackdropColor.R:X2}{ThumbnailBackdropColor.G:X2}{ThumbnailBackdropColor.B:X2}";
+    /// <summary>缩略图尺寸标签。</summary>
+    public string ThumbnailSizeText => LocalizationManager.T("Settings_Thumbnail_Size");
+    public string ThumbnailSizeSmallText => LocalizationManager.T("Settings_Thumbnail_Size_Small");
+    public string ThumbnailSizeMediumText => LocalizationManager.T("Settings_Thumbnail_Size_Medium");
+    public string ThumbnailSizeLargeText => LocalizationManager.T("Settings_Thumbnail_Size_Large");
+    public string ThumbnailSizeHelpText => LocalizationManager.T("Settings_Thumbnail_Size_Help");
+
     // ── Password strings ──
     public string PwdShowNotificationText => LocalizationManager.T("Settings_Pwd_ShowNotification");
     public string PwdRevealDefaultText => LocalizationManager.T("Settings_Pwd_RevealDefault");
@@ -1279,6 +1327,13 @@ public partial class SettingsWindowViewModel : ObservableObject
         _autoCloseDelaySeconds = _settings.AutoCloseDelaySeconds;
         _progressPinByDefault = _settings.ProgressPinByDefault;
 
+        // 外观 → 缩略图（Color.TryParse 失败时回落白色，与 App.ApplyThumbnailStyle 的兜底一致）
+        _thumbnailShowBorder = _settings.ThumbnailShowBorder;
+        _thumbnailUseTransparency = _settings.ThumbnailUseTransparency;
+        _thumbnailBackdropColor = Color.TryParse(_settings.ThumbnailBackdropColor, out var backdropColor)
+            ? backdropColor
+            : Colors.White;
+
         // Password
         _showPasswordMatchNotification = _settings.ShowPasswordMatchNotification;
         _passwordRevealByDefault = _settings.PasswordRevealByDefault;
@@ -1348,6 +1403,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         CompactnessModeOptions.Add(new Option(AppearanceCompactnessCompactText, "Compact"));
         CompactnessModeOptions.Add(new Option(AppearanceCompactnessNormalText, "Normal"));
         CompactnessModeOptions.Add(new Option(AppearanceCompactnessLooseText, "Loose"));
+
+        // 缩略图卡片边长（Value = 像素，保存时解析成 int）
+        ThumbnailSizeOptions.Clear();
+        ThumbnailSizeOptions.Add(new Option(ThumbnailSizeSmallText, "96"));
+        ThumbnailSizeOptions.Add(new Option(ThumbnailSizeMediumText, "128"));
+        ThumbnailSizeOptions.Add(new Option(ThumbnailSizeLargeText, "160"));
 
         // 左侧路径切换面板的固定标签（值 = PathTab 成员名，与 AppSettings.PickerSourceTab 的持久化字符串一致）
         PickerTabOptions.Clear();
@@ -1493,6 +1554,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedInfoPanelOrientationOption = InfoPanelOrientationOptions.FirstOrDefault(o => o.Value == InfoPanelOrientation);
         SelectedThemeOption = ThemeOptions.FirstOrDefault(o => o.Value == Theme);
         SelectedCompactnessModeOption = CompactnessModeOptions.FirstOrDefault(o => o.Value == CompactnessMode);
+        // 缩略图尺寸：持久化值可能是 96/128/160 之外的脏数据 ⇒ 落回「中 128」
+        SelectedThumbnailSizeOption =
+            ThumbnailSizeOptions.FirstOrDefault(o => o.Value == _settings.ThumbnailSize.ToString(System.Globalization.CultureInfo.InvariantCulture))
+            ?? ThumbnailSizeOptions.FirstOrDefault(o => o.Value == "128")
+            ?? ThumbnailSizeOptions.FirstOrDefault();
         // 固定标签下拉：优先保留当前已选项（语言切换重建列表时），否则由持久化值还原，空值/未知值落回「收藏」
         var pickerTabValue = SelectedPickerTabOption?.Value
                              ?? QuickPathControl.ParseTabOrDefault(_settings.PickerSourceTab).ToString();
@@ -1752,6 +1818,17 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AppearanceCompactnessCompactText));
         OnPropertyChanged(nameof(AppearanceCompactnessNormalText));
         OnPropertyChanged(nameof(AppearanceCompactnessLooseText));
+        OnPropertyChanged(nameof(TabAppearanceThumbnailHeader));
+        OnPropertyChanged(nameof(ThumbnailShowBorderText));
+        OnPropertyChanged(nameof(ThumbnailShowBorderHelpText));
+        OnPropertyChanged(nameof(ThumbnailBackdropText));
+        OnPropertyChanged(nameof(ThumbnailBackdropHelpText));
+        OnPropertyChanged(nameof(ThumbnailBackdropColorText));
+        OnPropertyChanged(nameof(ThumbnailSizeText));
+        OnPropertyChanged(nameof(ThumbnailSizeSmallText));
+        OnPropertyChanged(nameof(ThumbnailSizeMediumText));
+        OnPropertyChanged(nameof(ThumbnailSizeLargeText));
+        OnPropertyChanged(nameof(ThumbnailSizeHelpText));
         OnPropertyChanged(nameof(PwdShowNotificationText));
         OnPropertyChanged(nameof(PwdRevealDefaultText));
         OnPropertyChanged(nameof(FileAssocDescText));
@@ -1923,6 +2000,17 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.CompactnessMode = SelectedCompactnessModeOption?.Value ?? CompactnessMode;
         _settings.AutoCloseDelaySeconds = Math.Clamp(AutoCloseDelaySeconds, 0, 60);
         _settings.ProgressPinByDefault = ProgressPinByDefault;
+
+        // 外观 → 缩略图：尺寸从下拉的 Value 解析（非法落回 128，与运行时兜底一致）；
+        // 颜色写成 #RRGGBB，便于用户手工改 settings.json
+        _settings.ThumbnailShowBorder = ThumbnailShowBorder;
+        _settings.ThumbnailUseTransparency = ThumbnailUseTransparency;
+        _settings.ThumbnailBackdropColor =
+            $"#{ThumbnailBackdropColor.R:X2}{ThumbnailBackdropColor.G:X2}{ThumbnailBackdropColor.B:X2}";
+        _settings.ThumbnailSize =
+            int.TryParse(SelectedThumbnailSizeOption?.Value, out var thumbSize) && thumbSize is 96 or 128 or 160
+                ? thumbSize
+                : 128;
 
         // Password
         _settings.ShowPasswordMatchNotification = ShowPasswordMatchNotification;

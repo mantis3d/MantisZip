@@ -27,6 +27,17 @@
   "Breadcrumb_EditPlaceholder": "Type a path and press Enter",
 "Settings_Tab_Appearance_General": "Appearance",
 "Settings_Tab_Appearance_Progress": "Progress window",
+  "Settings_Tab_AppearanceThumbnail": "Thumbnails",
+  "Settings_Thumbnail_ShowBorder": "Show 1 px border",
+  "Settings_Thumbnail_ShowBorder_Help": "Draw a thin border around each thumbnail card. It helps separate white-background images from the surrounding surface. Affects the tile and content layouts only.",
+  "Settings_Thumbnail_Backdrop": "Fill transparent images with a color",
+  "Settings_Thumbnail_Backdrop_Help": "When enabled, images with an alpha channel (PNG / SVG) get a solid backdrop, so they look the same in light and dark themes. When disabled, transparent areas show the list background.",
+  "Settings_Thumbnail_BackdropColor": "Backdrop color",
+  "Settings_Thumbnail_Size": "Thumbnail size",
+  "Settings_Thumbnail_Size_Small": "Small (96 px)",
+  "Settings_Thumbnail_Size_Medium": "Medium (128 px, default)",
+  "Settings_Thumbnail_Size_Large": "Large (160 px)",
+  "Settings_Thumbnail_Size_Help": "Changing the size regenerates thumbnails at the new dimension (caches are keyed by size, so switching back and forth does not re-decode). Larger cards mean fewer items per screen.",
 "Settings_Progress_AutoCloseDelay_Help": "Applies only when the progress window is not pinned (📌) and no error occurred; 0 closes immediately after completion.",
 "Settings_Progress_PinByDefault": "Pin progress window by default (📌)",
 "Settings_Progress_PinByDefault_Help": "When enabled, the progress window opens pinned: completing or failing will not close it automatically — close it manually.",
@@ -1426,4 +1437,3 @@
   "AdaptiveHelp_Title": "Compression Speed-up Help",
   "AdaptiveHelp_Markdown": "Adaptive compression decides automatically whether to compress each file, avoiding wasted CPU on already-compressed data. The three switches below can be combined freely.\n\n## Adaptive Compression\nChooses the compression method by file type. Known compressed formats (JPEG, PNG, MP4, ZIP, and 60+ other extensions) are written as \"Store\" without re-compression — such data has no room left to shrink, so compressing it only wastes CPU and time; all other files are still compressed at your selected level.\n\n## Magic-number detection\nFor files whose **extension is unreliable** (renamed, no extension, or the extension does not match the actual content), MantisZip reads the file header to identify the real format; if it turns out to be an already-compressed format (e.g. JPEG, MP4, ZIP), the file is stored as-is instead of being compressed again.\n\n> **Tip**: magic-number detection only applies to **large files** (64 KB and above) and requires an extra header read, so it slightly increases compression time. For normally named photos/videos the extension rule already stores them, so enabling it rarely changes anything.\n\n## Multithreaded Compression\nUses multiple CPU cores to compress in parallel for faster compression, best for large files or many files (experimental). Can be enabled together with Adaptive Compression.\n\n> **Note**: your custom rules take priority over the built-in \"already-compressed formats are stored\" rule. \"Store\" rules always take effect; rules that specify a compression level do not take effect on the multithreaded path (groups are compressed in batches with one level per group), but they work fully on the serial path (small folders, encrypted archives, split archives)."
 }
-
