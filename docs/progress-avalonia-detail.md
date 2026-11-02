@@ -5,6 +5,12 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-02** — 样式：压缩设置窗口「输出方式」改为「左标签 + 三项横排」
+  - 起因：用户反馈三项单选竖排占高太多（约 132px），希望改横排或换布局。
+  - 改动：`src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml` 第 0 行分组（输出方式）由「标题 + `StackPanel Spacing` 竖排三项」改成 `Grid ColumnDefinitions="Auto,*"`：左列标题 `Compress_OutputMode`（`VerticalAlignment="Center"`、右侧 `Margin="0,0,12,0"`），右列 `WrapPanel Orientation="Horizontal"` 横排三个 `RadioButton`（每项 `Margin="0,0,12,0"`，最后一项无右边距）。
+  - 为什么用 `WrapPanel` 而不是 `StackPanel`：对话框左侧栏 `MinWidth="520"`，三项文案加起来约 430px，窄到这个宽度时 `StackPanel` 会溢出裁切（`WrapPanel` 会自动折成两行）。间距用逐项 `Margin` 而非 `Spacing` —— Avalonia 的 `WrapPanel` 没有 `Spacing` 属性，仓库里 `Controls/FileFilterEditor.axaml:72-93` 同为此写法。
+  - 效果：该分组高度从约 132px 降到约 40px，省出的空间让下方的输出目录选择器（`*` 行）更高。
+  - 验证：`build -Target avalonia -c Release` 0 警告；`ui-tests` 全绿（无布局断言依赖该分组）。
 
 **2026-11-02** — 功能：文件名代码页检测与切换（Bandizip 式工具栏下拉，支持 ZIP / TAR / GZ）
   - 起因：用户反馈希望有 Bandizip 那样的代码页检测与切换。现状只有内部启发式（UTF-8 能解 → 含 >127 字节 → bit 11 → CJK 占比判定 → GBK 重试），用户无法手动指定，Big5 / Shift-JIS / EUC-KR 命名的包必然乱码。
