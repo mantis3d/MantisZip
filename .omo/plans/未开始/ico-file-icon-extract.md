@@ -2,7 +2,8 @@
 
 > ⚠️ 本计划为 WPF 时代文档，示例 API 需按 Avalonia（`IconService`/`IconProvider`、`Avalonia.Media.Imaging.Bitmap`、`Dispatcher.UIThread` 等）重写；文件路径已更新为 Avalonia 项目路径。
 
-> **状态**: 📋 待定 | **阶段**: [⬜⬜⬜⬜⬜] (0/5)
+> **状态**: 📋 待开始 | **阶段**: [⬜⬜⬜⬜⬜] (0/5)
+> **档位**: **A 档 · v0.5.6**（2026-10-29 从「小活清仓」提到 A 档：与 v0.5.6 的列表缩略图同属「列表里看得见」的一批）
 
 ## TL;DR
 

@@ -77,7 +77,10 @@ public partial class MainWindowViewModel : ObservableObject
     /// 解压目标文件夹选择回调。传入待解压条目、初始路径、当前浏览目录（压缩包内）与保留完整路径设置，
     /// 返回所选结果（目标目录 <c>DestPath</c> + 对话框内「保留完整路径」勾选值 <c>PreserveFullPath</c>），取消返回 null。
     /// </summary>
-    public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<ExtractPickResult?>>? ShowExtractFolderPicker { get; set; }
+    /// <summary>条目选择入口（右键「解压到」/ 拖拽兜底）：返回 true = 已确认并执行，false = 用户取消。</summary>
+    /// <param name="allEntries">整包条目（预览树与过滤统计用）。</param>
+    /// <param name="presetEntries">本次实际解压的条目子集（写进载荷 SelectedEntries）。</param>
+    public Func<IReadOnlyList<ArchiveItem>, IReadOnlyList<ArchiveItem>, string?, string, string?, Task<bool>>? ShowExtractEntryPicker { get; set; }
 
     /// <summary>
     /// 压缩设置对话框回调。参数为预填的源路径；确认后的执行由回调内部完成
@@ -282,7 +285,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_Password",
             "Menu_Test",
             "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_AutoExpand", "Tree_Filter",
-            "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_AddressBar", "Nav_GoUp",
+            "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_GoUp",
             "Toolbar_CopyName", "Toolbar_Refresh",
             "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode",
             "ViewMode_All", "ViewMode_Files", "ViewMode_Dirs",

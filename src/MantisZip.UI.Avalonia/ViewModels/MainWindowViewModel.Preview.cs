@@ -347,7 +347,8 @@ public partial class MainWindowViewModel : ObservableObject
                     }
                     break;
                 case PreviewType.Pe:
-                    Preview.ShowPe(tempFile);
+                    // 标题用条目名：临时文件名 preview_<hash>.exe 不给用户看（issue #74 ①）
+                    Preview.ShowPe(tempFile, entry.NameDisplay ?? entry.Name);
                     StatusMessage = LocalizationManager.T("Preview_Pe", entry.DisplayName);
                     break;
                 case PreviewType.Image:

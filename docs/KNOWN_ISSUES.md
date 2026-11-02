@@ -33,6 +33,8 @@
 | **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 交互 / 文案 | 缺决策 | 已修复（三态契约，2026-10-28） | 已修复 |
 | **KI-009** | 5 个 AppSettings 死开关（存了值、有 UI、无消费者） | 技术债 / 死代码 | 缺决策 | 决定这 5 项的去留（接线 / 删属性 / 删 UI）时；守卫豁免表已按名登记，修一个删一行 | 阻塞中 |
+| **KI-010** | RAR4 分卷不做块链结构校验（末卷尾部损坏可能漏检） | 功能留白 | 成本超阈值 + 无法复现 | 拿到真实 RAR4 分卷夹具；或出现「RAR4 分卷被判完好」的用户反馈 | 阻塞中 |
+| **KI-011** | 并行解压/压缩不识别目标盘类型，机械盘上的并发写不做节流 | 性能 / 交互 | 成本超阈值 + 缺决策 | 有机械盘用户的实测数据（并发放大反而更慢）；或做 `selected-items-bulk-extract` 时顺带评估 | 阻塞中 |
 
 ---
 
@@ -130,8 +132,28 @@
 - **为什么现在不修**：**缺决策**。每一项都要先回答「这项设置还要不要」：要 → 补运行时消费者（`ExtractDestination` 需接进解压流程、`EnableExtractMenu`/`EnableQuickCompress` 需补菜单项）；不要 → 删属性 + 删设置窗口 UI + 删三语 key（与 2026-10-28 删「压缩完成后关闭对话框」是同一套动作，但删 5 项涉及设置页三处）。这不是技术难，是产品取舍。
 - **复评条件**：① 决定这 5 项去留时；② 或下次改设置窗口/解压流程时顺带清理（修掉一个必须从豁免表删一行，守卫会反向核对）。
 - **关联**：`AGENTS.md` 规则 23「设置项」一行；`scripts\verify-repo.ps1` 的 `Test-GuardSettingsWiring`。
-
 - **状态**：阻塞中
+
+## KI-010 RAR4 分卷不做块链结构校验（末卷尾部损坏可能漏检）
+
+- **发现**：2026-10-31（修 issue #68 评论 ②「WinRAR 分割包改坏后仍报完好」时）
+- **现象**：新增的 `RarHeaderValidator` 只解析 **RAR5** 块链；遇到 RAR4（签名第 7 字节 `0x00`）一律返回 `Unknown`，等于「测试压缩包」对 RAR4 单卷 / RAR4 分卷不做卷尾结构校验。RAR5 那条漏检（末卷 end-of-archive 块头被翻反，`7z.dll` 的 `Check()` 仍返回 true）在 RAR4 上大概率同样存在，但**本机无法验证**。
+- **证据**：`src/MantisZip.Core/Utils/RarHeaderValidator.cs` 的 `ValidateVolume` 在签名 `52 61 72 21 1A 07 00` 时直接 `Unknown`；`tests/MantisZip.Tests/Utils/RarHeaderValidatorTests.cs` 有 `Rar4Corpus_ReturnsUnknown` 钉住这一行为；仓库 `tests/corpus/corrupt-archives/*.rar` 全部是 RAR4（`valid.rar`、`valid-rar4.rar`、`corrupt-24..27`、`enc-05/06`）。本机 WinRAR 7.00 已移除 `-ma4`（`rar a -ma4 …` 报「未知选项: ma4」）、`-vn` 对 RAR5 无效 ⇒ 造不出 RAR4 分卷夹具。
+- **为什么现在不修**：**成本超阈值 + 无法复现**。RAR4 块结构与 RAR5 不同（块头布局、`PACK_SIZE`/`UNP_SIZE` 等字段位置、EoA 只有 7 字节无 flags），要另写一套解析器；而且没有夹具就没有验证手段，改了也只能「看起来对」。
+- **复评条件**：① 拿到一份**真实 RAR4 分卷夹具**（旧版 WinRAR / RAR 3.x 生成，或用户提供）时；② 或出现用户反馈「RAR4 分卷包被判定完好」的具体案例时。
+- **关联**：`docs/ARCHITECTURE.md`「分卷集命名与结构校验」小节的「已知边界」；issue #68 评论 ②。
+- **状态**：阻塞中
+
+## KI-011 并行解压/压缩不识别目标盘类型，机械盘上的并发写不做节流
+
+- **发现**：2026-11-02（做 issue #75「7z solid 全量解压改走批量接口」时顺带确认）
+- **现象**：`ParallelExtractDegree` 默认 `Environment.ProcessorCount`（可在设置里 1–16 调），ZIP 并行解压按该值开满；程序**从不询问目标盘是 SSD 还是 HDD**（没有 `IOCTL_STORAGE_QUERY_PROPERTY` / `StorageDeviceSeekPenaltyProperty`、也没有 WMI `MSFT_PhysicalDisk.MediaType` 的调用）。在机械盘上解压/压缩海量小文件时，并发写带来的寻道开销可能让结果比串行更慢 —— 用户报 issue #75 的场景正是机械盘。
+- **证据**：`src/MantisZip.Core/Abstractions/ArchiveEngine.cs` 的 `ArchiveOptions.ParallelExtractDegree` 与 `src/MantisZip.UI.Avalonia/Services/ParallelDegreeResolver.cs` 只按 CPU 与条目数决策；全仓搜 `SeekPenalty` / `MediaType` / `PhysicalDisk` 无命中。issue #75 的 800×64KB 实测在 SSD 上完成（19.3s → 1.67s），机械盘数据尚未取到。
+- **为什么现在不修**：**成本超阈值 + 缺决策**。① 判盘需要 WMI 或 `DeviceIoControl`，两条路都有代价（WMI 首次查询慢、`IOCTL` 要处理非本地盘/网络盘/动态盘）；② 判定完还得决定策略（自动降并发？每盘一个上限？只对小文件降？），属产品取舍；③ 本轮改的 solid 批量路径已经把「逐条重复解码」这个主因消掉，先看真机反馈更划算。
+- **复评条件**：① 拿到机械盘用户的实测数据（同一包、并发 1 与默认值对比），且确实「并发放大更慢」时；② 或做 `.omo/plans/未开始/selected-items-bulk-extract.md` 时顺带评估（那条计划同样会碰到 HDD 写放大）。
+- **关联**：`.omo/plans/进行中/sevenzip-solid-extract-batch.md` §13 第 2 条；`docs/ARCHITECTURE.md`「并行解压架构」小节。
+- **状态**：阻塞中
+
 ## 档案区（已修 / 不会修）
 
 > 修掉或决定放弃的条目移到这里，**保留 commit 或理由**。不要删行 —— 下次撞到同一个栈，靠这里判断「上次怎么处理的」。

@@ -1,13 +1,16 @@
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Interactivity;
-using Avalonia.Platform.Storage;
+using Avalonia.LogicalTree;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Controls;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.ViewModels;
+using System.Collections.Specialized;
 using System.ComponentModel;
 using System.Linq;
 
@@ -21,6 +24,11 @@ namespace MantisZip.UI.Avalonia.Dialogs;
 /// CLI 没有主窗口，只能非模态 <see cref="Window.Show"/> 后 await <see cref="Completion"/>。
 /// 两者都不回读窗口属性——载荷在确认事务里已冻结。
 /// </para>
+/// <para>
+/// 文件/目录选择按 AGENTS.md 规则 16「设置窗内嵌选择」：窗口内直接内嵌
+/// <see cref="CustomFilePickerControl"/>（输出设置 = PickFolder、添加压缩包 = PickItems），
+/// 不再为「设置窗里再弹一个选择器」新增 <c>ShowXxxAsync</c> 调用。
+/// </para>
 /// </summary>
 public partial class ExtractSettingsWindow : Window
 {
@@ -28,6 +36,14 @@ public partial class ExtractSettingsWindow : Window
 
     /// <summary>后台逐包校验的取消源（窗口关闭时取消，避免无谓 IO）。</summary>
     private CancellationTokenSource? _validationCts;
+
+    /// <summary>两个内嵌选择器完成 <c>Initialize</c> 之前，导航产生的事件不得回写 ViewModel。</summary>
+    private bool _pickersReady;
+
+    /// <summary>
+    /// 选择器 ↔ 「已选压缩包」列表的同步闸门：挡住「回填选择器 → 选择器 SelectionChanged → 又追加」的回环。
+    /// </summary>
+    private bool _syncingArchiveSelection;
 
     /// <summary>注入的执行器；设计时窗口（无参构造）没有它，也就不能真正开始解压。</summary>
     private readonly IExtractSession? _session;
@@ -60,9 +76,7 @@ public partial class ExtractSettingsWindow : Window
     /// </summary>
     public ExtractSettingsWindow()
     {
-        InitializeComponent();
-        ViewModel = new ExtractSettingsViewModel(Array.Empty<string>());
-        DataContext = ViewModel;
+        ViewModel = Initialize(Array.Empty<string>(), hideAddArchivesTab: false);
         SubscribeViewModel();
     }
 
@@ -79,14 +93,76 @@ public partial class ExtractSettingsWindow : Window
         IExtractSession session,
         ExtractRunContext context,
         IReadOnlyList<string> archivePaths)
+        : this(session, context, archivePaths, hideAddArchivesTab: false)
+    {
+    }
+
+    /// <summary>
+    /// 生产构造（带「添加压缩包」页显隐）：拖拽 / 右键「解压到」等入口的压缩包已由场景确定，
+    /// 不需要再让用户加包时传 <paramref name="hideAddArchivesTab"/> = <see langword="true"/>。
+    /// </summary>
+    /// <param name="session">解压执行器。</param>
+    /// <param name="context">宿主差异（Owner / Presenter / 退出策略）。</param>
+    /// <param name="archivePaths">待解压的压缩包路径。</param>
+    /// <param name="hideAddArchivesTab">是否隐藏「添加压缩包」选项卡。</param>
+    public ExtractSettingsWindow(
+        IExtractSession session,
+        ExtractRunContext context,
+        IReadOnlyList<string> archivePaths,
+        bool hideAddArchivesTab = false)
     {
         ArgumentNullException.ThrowIfNull(session);
         ArgumentNullException.ThrowIfNull(context);
         _session = session;
         _context = context;
 
-        ViewModel = Initialize(archivePaths);
+        ViewModel = Initialize(archivePaths, hideAddArchivesTab);
         SubscribeViewModel();
+    }
+
+    /// <summary>
+    /// 「解压选中项到」/ 拖拽兜底入口（v0.5.5 第三步后半）：窗口自己就是执行入口
+    /// （确认即载荷 + 唯一执行器），返回 true 表示已确认并执行（用户取消 → false）。
+    /// <para>
+    /// 勾选范围不由窗口改：本次要解压的条目由宿主在打开前定好，这里只把它写进载荷
+    /// （<c>SelectedEntries</c>），窗口内仍可选目标目录、冲突策略、过滤与并行度。
+    /// 2026-10-30 决定：不做「选择要解压的文件」页签 —— 该流程在右键/拖拽时已把子集定好，
+    /// 页签只多一个模式与一份状态，收益不足。
+    /// </para>
+    /// </summary>
+    /// <param name="entries">整包条目（仅用于预览树与过滤统计）。</param>
+    /// <param name="presetSelectedEntries">本次实际解压的条目（写进载荷 SelectedEntries）。</param>
+    /// <param name="currentFolder">压缩包内当前目录（写进载荷 CurrentFolder，供路径归属计算）。</param>
+    public static async Task<bool> ShowWithPresetSelectionAsync(
+        Window owner,
+        IExtractSession session,
+        ExtractRunContext context,
+        IReadOnlyList<string> archivePaths,
+        IReadOnlyList<ArchiveItem> entries,
+        IReadOnlyList<ArchiveItem> presetSelectedEntries,
+        string initialDestination,
+        string? currentFolder,
+        string? password)
+    {
+        var dialog = new ExtractSettingsWindow(
+            session, context, archivePaths,
+            hideAddArchivesTab: true);
+
+        if (!string.IsNullOrWhiteSpace(initialDestination))
+            dialog.ViewModel.DestinationPath = initialDestination;
+        if (!string.IsNullOrEmpty(password))
+            dialog.ViewModel.SetKnownPassword(password);
+        dialog.ViewModel.PresetSelectedEntries = presetSelectedEntries;
+        dialog.ViewModel.PresetCurrentFolder = currentFolder;
+        dialog.SetEntries(entries);
+
+        var confirmation = await dialog.ShowDialog<ConfirmOutcome<ExtractSettings>>(owner);
+        if (confirmation is not Confirmed<ExtractSettings> confirmed)
+            return false;
+
+        // 窗口自己执行载荷：调用方只拿「有没有跑完」，不再自己拼执行链
+        var outcome = await dialog.RunConfirmedAsync(confirmed.Value);
+        return outcome.IsCompleted;
     }
 
     /// <summary>
@@ -126,8 +202,26 @@ public partial class ExtractSettingsWindow : Window
     }
 
     /// <summary>关窗统一出口：解除订阅并把确认结果（缺省 = 取消）交给等待方。</summary>
+    /// <summary>恢复上次关闭时保存的窗口尺寸与左侧设置列宽度（2026-10-30）。</summary>
+    private void ApplyPersistedGeometry()
+    {
+        var settings = AppSettings.Load();
+        WindowPlacement.Apply(this, settings.ExtractWindowWidth, settings.ExtractWindowHeight);
+        WindowPlacement.ApplyLeftColumn(RootGrid, settings.ExtractWindowLeftColumnWidth, 620);
+    }
+
+    /// <summary>关闭时写回窗口尺寸与左侧设置列宽度（非法值回落 XAML 默认 1180×760 / 620）。</summary>
+    private void PersistGeometry()
+    {
+        var settings = AppSettings.Load();
+        settings.ExtractWindowWidth = WindowPlacement.Capture(Width, 1180);
+        settings.ExtractWindowHeight = WindowPlacement.Capture(Height, 760);
+        settings.ExtractWindowLeftColumnWidth = WindowPlacement.CaptureLeftColumn(RootGrid, 620);
+        settings.Save();
+    }
     private void OnClosed(object? sender, EventArgs e)
     {
+        PersistGeometry();
         ViewModel.ConfirmCompleted -= OnConfirmCompleted;
         _completion.TrySetResult(_closedOutcome ?? new Cancelled<ExtractSettings>());
     }
@@ -160,42 +254,65 @@ public partial class ExtractSettingsWindow : Window
     }
 
     /// <summary>
-    /// 生产构造的界面装配：建 ViewModel、接好浏览/解锁/校验等宿主回调。
+    /// 构造期的界面装配：建 ViewModel、接好内嵌选择器 / 解锁 / 校验等宿主回调。
     /// 返回装配好的 ViewModel，让构造函数以赋值表达式拿到确定非空的属性——避免构造函数里
     /// 「调用方法后才赋值」造成的可空流分析告警。
     /// </summary>
-    private ExtractSettingsViewModel Initialize(IReadOnlyList<string> archivePaths)
+    /// <param name="archivePaths">待解压的压缩包路径（设计时为空）。</param>
+    /// <param name="hideAddArchivesTab">是否隐藏「添加压缩包」选项卡。</param>
+    private ExtractSettingsViewModel Initialize(IReadOnlyList<string> archivePaths, bool hideAddArchivesTab)
     {
         InitializeComponent();
 
         ViewModel = new ExtractSettingsViewModel(archivePaths);
 
-        // 设置文件夹浏览回调（解压模式：弹窗内建 ResultTreeView 实时冲突检测）。
-        // 冲突预览语义绑定首包条目（与提取一致），无首包条目时无法预览。
-        ViewModel.BrowseFolder = async () =>
-        {
-            var first = ViewModel.FirstArchiveEntries;
-            if (first == null)
-                return null;
-            return (await CustomFilePickerDialog.ShowExtractFolderAsync(this, first, ViewModel.DestinationPath))?.DestPath;
-        };
-
         DataContext = ViewModel;
 
-        // 窗口关闭时取消后台逐包校验 + 冲突扫描
+        // 「添加压缩包」页按场景显隐（拖拽 / 「解压到」等已由入口确定压缩包时隐藏）
+        AddArchivesTab.IsVisible = !hideAddArchivesTab;
+
+
+        // 恢复上次关闭时保存的窗口尺寸与左侧设置列宽度（2026-10-30）
+        ApplyPersistedGeometry();
+
+        // 窗口关闭时取消后台逐包校验 + 冲突扫描，并断开列表回填订阅
         Closed += (_, _) =>
         {
             _validationCts?.Cancel();
             ViewModel.CancelConflictScan();
+            ViewModel.SourceItems.CollectionChanged -= OnSourceItemsChanged;
         };
 
-        // 浏览回调：解压模式文件夹对话框（内建 ResultTreeView 实时冲突检测）。
-        // QuickPathPicker 只收目录，此处返回目录即可。
-        DestinationPicker.BrowseAction = async (owner, current) =>
-            ViewModel.FirstArchiveEntries == null
-                ? null
-                : (await CustomFilePickerDialog.ShowExtractFolderAsync(
-                    owner ?? this, ViewModel.FirstArchiveEntries, ViewModel.DestinationPath))?.DestPath;
+        // ── 内嵌选择器：输出设置（PickFolder）──
+        // 切换浏览目录 = 更改解压目标；Initialize 期间的导航（把默认目标解析到最近存在的父目录）不回写，
+        // 否则会把默认的「目录\包名」覆盖成包所在目录。
+        DestinationPicker.PathChanged += OnDestinationPickerPathChanged;
+        DestinationPicker.Initialize(initialPath: ViewModel.DestinationPath);
+
+        // ── 内嵌选择器：添加压缩包（PickItems）──
+        // 扩展名清单取 Core 的单一事实源（ArchiveExtensionCatalog），不在这里硬编码。
+        ArchivePicker.SelectionChanged += OnArchivePickerSelectionChanged;
+        var archiveStartDir = ViewModel.SourceItems.Count > 0
+            ? System.IO.Path.GetDirectoryName(ViewModel.SourceItems[0].Path) ?? string.Empty
+            : string.Empty;
+        ArchivePicker.Initialize(
+            initialPath: archiveStartDir,
+            fileExtensions: ArchiveExtensionCatalog.EngineExtensions.ToArray());
+
+        // PickItems 控件自带右侧「累积选择」面板；本窗改由下方「已选压缩包」列表承担（计划第③点），
+        // 控件本身本轮冻结，故由宿主按控件内部命名折叠。
+        CollapsePickerAccumulatedPanel(ArchivePicker);
+
+        // 「高级模式」开关与压缩窗对称（2026-10-30 用户反馈）：关闭 = 单击即追加、切目录清空；
+        // 打开 = 跨目录累积（每个条目显示复选框）。默认关闭。
+        AdvancedModeCheck.IsChecked = false;
+        ArchivePicker.IsSimpleMode = true;
+
+        // PickItems 简单模式进入目录时会清空预选：Initialize 之后再把已选包回填进选择器。
+        SyncArchivePickerFromSourceItems();
+        ViewModel.SourceItems.CollectionChanged += OnSourceItemsChanged;
+
+        _pickersReady = true;
 
         // ── 手动解锁（自动匹配失败后的补救）：复用主流程 PasswordDialog ──
         ViewModel.ShowUnlockDialog = async (archivePath) =>
@@ -220,6 +337,9 @@ public partial class ExtractSettingsWindow : Window
                 await ViewModel.UnlockManuallyAsync(ViewModel.SelectedSourceItem);
         };
 
+        // 「已选压缩包」列表：Delete 逐项移除（回填选择器由集合事件统一处理）
+        FileListBox.KeyDown += OnFileListBoxKeyDown;
+
         // 双击树上 🔒 占位节点 → 同上（占位节点 FullPath = 源包路径）
         PreviewTree.NodeDoubleTapped += async (_, node) =>
         {
@@ -233,6 +353,145 @@ public partial class ExtractSettingsWindow : Window
 
         return ViewModel;
     }
+
+    /// <summary>
+    /// 输出设置页：浏览目录变化即写回解压目标（选择器只在用户导航后触发，初始化期间的事件被忽略）。
+    /// </summary>
+    /// <summary>
+    /// 「高级模式」开关：关闭 = 简单模式（单击即追加、切目录清空）；打开 = 跨目录累积（带复选框）。
+    /// 与压缩窗 <c>CompressSettingsWindow.OnAdvancedModeChanged</c> 同一语义，仅宿主不同。
+    /// </summary>
+    private void OnAdvancedModeChanged(object? sender, RoutedEventArgs e)
+    {
+        if (!_pickersReady && ArchivePicker is null) return;
+        ArchivePicker.IsSimpleMode = AdvancedModeCheck.IsChecked != true;
+    }
+    private void OnDestinationPickerPathChanged(object? sender, string path)
+    {
+        if (!_pickersReady || string.IsNullOrWhiteSpace(path)) return;
+        ViewModel.DestinationPath = path;
+    }
+
+    /// <summary>
+    /// 添加压缩包页：选择器 → ViewModel **只追加**。
+    /// <para>
+    /// PickItems 简单模式的语义是「当前目录列表选中项 = 结果」：切目录、单击目录行都会把累积集合
+    /// 清空或整体替换。若把「不在 <c>SelectedPaths</c> 里」当作删除，一次目录导航就会清空已选列表，
+    /// 所以这里只取差集新增；删除只走下方「已选压缩包」列表（行删除按钮 / Delete 键）。
+    /// </para>
+    /// </summary>
+    private void OnArchivePickerSelectionChanged(object? sender, EventArgs e)
+    {
+        if (!_pickersReady || _syncingArchiveSelection) return;
+
+        var known = ViewModel.SourceItems
+            .Select(item => item.Path)
+            .ToHashSet(StringComparer.OrdinalIgnoreCase);
+        var added = ArchivePicker.SelectedPaths.Where(path => !known.Contains(path)).ToList();
+        if (added.Count == 0) return;
+
+        // 追加会触发 SourceItems.CollectionChanged：置闸门避免它又回填选择器（回环）
+        _syncingArchiveSelection = true;
+        try
+        {
+            ViewModel.AddSourceArchives(added);
+        }
+        finally
+        {
+            _syncingArchiveSelection = false;
+        }
+
+        // 新行状态是 Pending：补跑逐包校验（已校验行不会被重复读取）
+        _ = ValidateSourceArchivesAsync();
+    }
+
+    /// <summary>
+    /// 「已选压缩包」列表增删 → 把行集合回填到选择器选中项（集合事件是唯一回填入口，
+    /// 保证删除后选择器不再显示已移除的包；<c>SourceArchiveItem</c> 行对象本身自始至终没被重建）。
+    /// </summary>
+    private void OnSourceItemsChanged(object? sender, NotifyCollectionChangedEventArgs e)
+    {
+        if (!_pickersReady || _syncingArchiveSelection) return;
+        SyncArchivePickerFromSourceItems();
+    }
+
+    /// <summary>把「已选压缩包」的路径集合回填进选择器（闸门内执行，选择器回抛的事件被忽略）。</summary>
+    private void SyncArchivePickerFromSourceItems()
+    {
+        _syncingArchiveSelection = true;
+        try
+        {
+            ArchivePicker.SetSelectedPaths(ViewModel.SourceItems.Select(item => item.Path).ToList());
+        }
+        finally
+        {
+            _syncingArchiveSelection = false;
+        }
+    }
+
+    /// <summary>新增压缩包后补跑逐包校验；窗口已关闭（取消源已取消）时静默返回。</summary>
+    private async Task ValidateSourceArchivesAsync()
+    {
+        try
+        {
+            await ViewModel.ValidateAllAsync(_validationCts?.Token ?? default);
+        }
+        catch (OperationCanceledException)
+        {
+            // 窗口关闭 / 校验被取消：行状态已回退 Pending，无需提示
+        }
+    }
+
+    /// <summary>「已选压缩包」列表键盘删除（逐项删除，不重建列表）。</summary>
+    private void OnFileListBoxKeyDown(object? sender, KeyEventArgs e)
+    {
+        // 只认 Delete：Backspace 容易误删（列表里按退格通常被理解为「返回」，不是「移除」）
+        if (e.Key != Key.Delete) return;
+        if (ViewModel.SelectedSourceItem is null) return;
+
+        ViewModel.RemoveSelectedSourceArchiveCommand.Execute(null);
+        e.Handled = true;
+    }
+
+    /// <summary>
+    /// 折叠 <see cref="CustomFilePickerControl"/> 在 PickItems 模式自带的右侧「累积选择」面板：
+    /// 计划第③点要求去掉它、改由下方「已选压缩包」列表承担（否则 620px 左栏被内部右栏再切走 260px，
+    /// 文件列表只剩两百来像素，且与下方列表语义重复）。
+    /// 控件本轮冻结（只许改本窗口的三个文件），故按控件内部命名折叠；任一元素缺失时静默降级
+    /// （面板照旧显示，功能不受影响），不抛异常让整个设置窗口不可用。
+    /// </summary>
+    private static void CollapsePickerAccumulatedPanel(CustomFilePickerControl picker)
+    {
+        if (FindPickerChild<Control>(picker, "PickItemsPanel") is { } panel)
+            panel.IsVisible = false;
+
+        if (FindPickerChild<Control>(picker, "RightSplitter") is { } splitter)
+            splitter.IsVisible = false;
+
+        if (FindPickerChild<Grid>(picker, "BrowserGrid") is not { } browser) return;
+
+        // 右栏列（第 5 列）与分割条列（第 4 列）：Auto + 0 宽，把空间全部还给文件列表
+        if (browser.ColumnDefinitions.Count > 4)
+        {
+            var rightColumn = browser.ColumnDefinitions[4];
+            rightColumn.Width = GridLength.Auto;
+            rightColumn.MinWidth = 0;
+            rightColumn.MaxWidth = double.PositiveInfinity;
+        }
+
+        if (browser.ColumnDefinitions.Count > 3)
+            browser.ColumnDefinitions[3].Width = new GridLength(0);
+    }
+
+    /// <summary>
+    /// 按名称取控件内部元素：先走名字域 <see cref="Control.FindControl{T}"/>，
+    /// 取不到再遍历逻辑树兜底（宿主折叠控件内部面板用，不依赖其视觉树已生成）。
+    /// </summary>
+    private static T? FindPickerChild<T>(Control root, string name) where T : Control
+        => root.FindControl<T>(name)
+           ?? ((ILogical)root).GetLogicalDescendants()
+               .OfType<T>()
+               .FirstOrDefault(child => child.Name == name);
 
     /// <summary>
     /// 注入首包（当前打开压缩包）的条目列表——MainWindow 单包路径使用：

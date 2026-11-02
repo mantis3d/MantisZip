@@ -114,4 +114,91 @@ public sealed class ArchiveVolumeSetTests : IDisposable
         Assert.Equal(plain, ArchiveVolumeSet.FindFirstVolume(plain));
         Assert.Null(ArchiveVolumeSet.FindFirstVolume(Path.Combine(_dir, "nope.zip")));
     }
+
+    [Fact]
+    public void TryGetVolumeBase_ParsesWinRarPartNaming()
+    {
+        Assert.True(ArchiveVolumeSet.TryGetVolumeBase(Path.Combine(_dir, "pack.part2.rar"), out var basePath, out var index));
+        Assert.Equal(Path.Combine(_dir, "pack.rar"), basePath);
+        Assert.Equal(2, index);
+
+        // 补零写法（part01）同样识别，锚点仍是 archive.rar
+        Assert.True(ArchiveVolumeSet.TryGetVolumeBase(Path.Combine(_dir, "pack.part01.rar"), out basePath, out index));
+        Assert.Equal(Path.Combine(_dir, "pack.rar"), basePath);
+        Assert.Equal(1, index);
+
+        // .rar 本身与非法卷号不算分卷
+        Assert.False(ArchiveVolumeSet.TryGetVolumeBase(Path.Combine(_dir, "pack.rar"), out _, out _));
+        Assert.False(ArchiveVolumeSet.TryGetVolumeBase(Path.Combine(_dir, "pack.part0.rar"), out _, out _));
+    }
+
+    [Fact]
+    public void TryGetVolumeBase_ParsesWinRarOldNaming()
+    {
+        // 旧式：首卷 archive.rar，其后 .r00（第 2 卷）、.r01（第 3 卷）
+        Assert.True(ArchiveVolumeSet.TryGetVolumeBase(Path.Combine(_dir, "pack.r00"), out var basePath, out var index));
+        Assert.Equal(Path.Combine(_dir, "pack.rar"), basePath);
+        Assert.Equal(2, index);
+
+        Assert.True(ArchiveVolumeSet.TryGetVolumeBase(Path.Combine(_dir, "pack.r01"), out basePath, out index));
+        Assert.Equal(Path.Combine(_dir, "pack.rar"), basePath);
+        Assert.Equal(3, index);
+    }
+
+    [Fact]
+    public void EnumerateVolumes_RarPartSet_IsContiguousAndOrdered()
+    {
+        var first = Create("pack.part1.rar");
+        var second = Create("pack.part2.rar");
+        var third = Create("pack.part3.rar");
+        Create("pack.part5.rar"); // 缺 part4 → 枚举到此为止
+
+        var volumes = ArchiveVolumeSet.EnumerateVolumes(Path.Combine(_dir, "pack.part2.rar"));
+
+        Assert.Equal([first, second, third], volumes);
+    }
+
+    [Fact]
+    public void EnumerateVolumes_RarOldSet_StartsWithPlainRar()
+    {
+        var first = Create("old.rar");
+        var r00 = Create("old.r00");
+        Create("old.r02"); // 缺 .r01 → 枚举到此为止
+
+        Assert.Equal([first, r00], ArchiveVolumeSet.EnumerateVolumes(Path.Combine(_dir, "old.r00")));
+    }
+
+    [Fact]
+    public void FindFirstVolume_RarPartAnchorsToPart1()
+    {
+        var first = Create("pack.part1.rar");
+        var third = Create("pack.part3.rar");
+
+        Assert.Equal(first, ArchiveVolumeSet.FindFirstVolume(third));
+    }
+
+    [Fact]
+    public void GetVolumeWatchFilter_CoversWholeSet()
+    {
+        // 监视过滤器要能看见整组的增删（ArchiveFileGuard 依赖它判定 Missing / Replaced）
+        Assert.Equal("pack.7z.*", ArchiveVolumeSet.GetVolumeWatchFilter(Path.Combine(_dir, "pack.7z.002")));
+        Assert.Equal("pack.part*.rar", ArchiveVolumeSet.GetVolumeWatchFilter(Path.Combine(_dir, "pack.part2.rar")));
+        Assert.Equal("pack.*", ArchiveVolumeSet.GetVolumeWatchFilter(Path.Combine(_dir, "pack.r00")));
+        Assert.Equal("pack.zip", ArchiveVolumeSet.GetVolumeWatchFilter(Path.Combine(_dir, "pack.zip")));
+    }
+
+    [Fact]
+    public void MatchesArchiveExtension_ShowsEveryVolumeOfTheSet()
+    {
+        // issue #70③：TEST.7z.002 之类中间卷也要能显示（此前只亮 *.001）
+        Assert.True(ArchiveVolumeSet.MatchesArchiveExtension(Path.Combine(_dir, "TEST.7z.002"), ".7z"));
+        Assert.True(ArchiveVolumeSet.MatchesArchiveExtension(Path.Combine(_dir, "TEST_RAR.part2.rar"), ".rar"));
+        Assert.True(ArchiveVolumeSet.MatchesArchiveExtension(Path.Combine(_dir, "old.r00"), ".rar"));
+        Assert.True(ArchiveVolumeSet.MatchesArchiveExtension(Path.Combine(_dir, "pack.tar.gz.002"), ".tar.gz"));
+
+        // 基名格式不同 / 不是分卷 / 空参数 → 不匹配
+        Assert.False(ArchiveVolumeSet.MatchesArchiveExtension(Path.Combine(_dir, "TEST.7z.002"), ".zip"));
+        Assert.False(ArchiveVolumeSet.MatchesArchiveExtension(Path.Combine(_dir, "TEST.7z"), ".7z"));
+        Assert.False(ArchiveVolumeSet.MatchesArchiveExtension(Path.Combine(_dir, "TEST.7z.002"), string.Empty));
+    }
 }

@@ -63,6 +63,12 @@ public class FileFormatInfo
     public string? Architecture { get; set; }
     /// <summary>子系统，如 "GUI"、"CUI"、"DLL"</summary>
     public string? Subsystem { get; set; }
+    /// <summary>著作权（版本资源 LegalCopyright）</summary>
+    public string? LegalCopyright { get; set; }
+    /// <summary>原始文件名（版本资源 OriginalFilename）</summary>
+    public string? OriginalFilename { get; set; }
+    /// <summary>版本资源语言，按资源目录的 lang id 推断，如 "英文(美国)"；推断不出时为 null</summary>
+    public string? Language { get; set; }
 
     // ── ICL 图标库 ──
     public int? IconCount { get; set; }

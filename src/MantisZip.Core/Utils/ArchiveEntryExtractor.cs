@@ -38,6 +38,8 @@ public static class ArchiveEntryExtractor
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractEntryAsync: {archivePath} ! {entryName} -> {outputPath}, format={format}, password={(password != null ? "***" : "null")}");
+        // 自解压 exe（PE 桩 + 内嵌包）按扩展名必然被判成 Zip，实际必须交 7z.dll（issue #36）
+        format = ResolveDispatchFormat(archivePath, format);
         var sw = Stopwatch.StartNew();
 
         return Task.Run(() =>
@@ -117,11 +119,9 @@ public static class ArchiveEntryExtractor
         // 最终路径安全检查：规范化后验证无路径穿越
         ValidateOutputPath(outputPath);
         // 先确保 7z.dll 路径已配置：本工具类可能在引擎方法入口之前就触达 SharpSevenZip
-        // （库是进程级单例，加载后无法换路径 → issue #52）
+        // （库是进程级单例，加载后无法换路径 → issue #52）；工厂内部同样会配，这里显式保留便于阅读
         SevenZipEngine.EnsureLibraryPath();
-        using var extractor = string.IsNullOrEmpty(password)
-            ? new SharpSevenZipExtractor(archivePath)
-            : new SharpSevenZipExtractor(archivePath, password);
+        using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
         // 统一路径分隔符为 /（RAR 文件可能使用 \），与 SevenZipEngine.ListEntriesAsync 保持一致
         var entry = extractor.ArchiveFileData.FirstOrDefault(e => ArchivePath.Normalize(e.FileName) == entryName);
         if (entry.FileName == null)
@@ -235,6 +235,8 @@ public static class ArchiveEntryExtractor
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractHeadAsync: {archivePath} ! {entryName}, maxBytes={maxBytes}, format={format}");
+        // 自解压 exe 的内嵌包必须交 7z.dll（issue #36）
+        format = ResolveDispatchFormat(archivePath, format);
         ct.ThrowIfCancellationRequested();
 
         return await Task.Run(async () =>
@@ -247,11 +249,7 @@ public static class ArchiveEntryExtractor
                 case ArchiveFormat.SevenZip:
                 case ArchiveFormat.Rar:
                 case ArchiveFormat.Iso:
-                    // 构造 extractor 前先配库路径（issue #52）
-                    SevenZipEngine.EnsureLibraryPath();
-                    using (var extractor = string.IsNullOrEmpty(password)
-                        ? new SharpSevenZipExtractor(archivePath)
-                        : new SharpSevenZipExtractor(archivePath, password))
+                    using (var extractor = SevenZipExtractorFactory.Create(archivePath, password))
                     {
                         if (format == ArchiveFormat.SevenZip && IsSevenZipSolid(extractor))
                         {
@@ -330,6 +328,8 @@ public static class ArchiveEntryExtractor
                 nameof(maxBytes), maxBytes, "maxBytes 必须大于 0");
         }
         CoreLog.Info($"ExtractEntryToMemoryAsync: format={format}, maxBytes={maxBytes}, entry={ArchivePath.GetFileName(entryName)}");
+        // 自解压 exe 的内嵌包必须交 7z.dll（issue #36）
+        format = ResolveDispatchFormat(archivePath, format);
         ct.ThrowIfCancellationRequested();
 
         return await Task.Run(async () =>
@@ -344,9 +344,7 @@ public static class ArchiveEntryExtractor
                 case ArchiveFormat.Iso:
                     // 构造 extractor 前先配库路径（issue #52）
                     SevenZipEngine.EnsureLibraryPath();
-                    using (var extractor = string.IsNullOrEmpty(password)
-                        ? new SharpSevenZipExtractor(archivePath)
-                        : new SharpSevenZipExtractor(archivePath, password))
+                    using (var extractor = SevenZipExtractorFactory.Create(archivePath, password))
                     {
                         // 加密文件名：无密码时连条目列表都读不出来，先按密码缺失失败（与 head 一致）
                         if (format == ArchiveFormat.SevenZip
@@ -424,6 +422,8 @@ public static class ArchiveEntryExtractor
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractHeadTailAsync: {archivePath} ! {entryName}, head={headBytes}, tail={tailBytes}, format={format}");
+        // head / tail 都按归一后的格式分发（自解压 exe → 7z.dll，issue #36）
+        format = ResolveDispatchFormat(archivePath, format);
 
         var head = await ExtractHeadAsync(archivePath, entryName, headBytes, format, password, ct);
 
@@ -529,6 +529,25 @@ public static class ArchiveEntryExtractor
         }
         return truncating.ToArray();
     }
+
+    /// <summary>
+    /// 归一自解压文件（SFX）的分发格式。
+    ///
+    /// <para>
+    /// SFX 是个 .exe：<see cref="ArchiveEngineFactory.GetFormatByExtension"/> 对未知扩展名一律返回
+    /// <see cref="ArchiveFormat.Zip"/>（魔数兜底路径依赖），于是内嵌 zip 会被送进 SharpCompress——
+    /// 实测它对 SFX zip 静默返回 0 个条目（不抛异常），用户看到的是空包，比报错更难查（issue #36）。
+    /// 因此只要 <see cref="SfxProbe.TryGetPayloadFormat"/> 认出内嵌载荷，就统一按
+    /// <see cref="ArchiveFormat.SevenZip"/> 分发：7z.dll 能打开 zip / 7z / RAR4 / RAR5 全部载荷，
+    /// 而具体格式由 <see cref="SevenZipExtractorFactory"/> 显式传给 7z.dll（避免其逐格式试探失败）。
+    /// </para>
+    /// <para>
+    /// 代价：SFX 也会走到下面 <c>format == SevenZip</c> 的固实 / 加密文件名判断。
+    /// 这两项对 zip / RAR 载荷的结果都是正常的（非固实、条目表可读），不会误判。
+    /// </para>
+    /// </summary>
+    private static ArchiveFormat ResolveDispatchFormat(string archivePath, ArchiveFormat format)
+        => SfxProbe.TryGetPayloadFormat(archivePath) is null ? format : ArchiveFormat.SevenZip;
 
     /// <summary>
     /// 检测 7z 压缩包是否使用固实压缩（Solid）。
@@ -915,9 +934,7 @@ public static class ArchiveEntryExtractor
             {
                 // 构造 extractor 前先配库路径（issue #52）
                 SevenZipEngine.EnsureLibraryPath();
-                using var extractor = string.IsNullOrEmpty(password)
-                    ? new SharpSevenZipExtractor(archivePath)
-                    : new SharpSevenZipExtractor(archivePath, password);
+                using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
                 // 固实 7z 不提取尾部
                 if (format == ArchiveFormat.SevenZip && IsSevenZipSolid(extractor))

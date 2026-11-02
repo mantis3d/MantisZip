@@ -1,6 +1,7 @@
 # 面包屑地址栏（PathBreadcrumb）改造
 
 > **状态**: 📋 计划中（待实施）
+> **档位**: **A 档 · v0.5.5 第一项**（2026-10-29 定为文件选择与导航阶段的首项：与内嵌选择器共用同一批回归面，一次跑完省一次全量验证）
 > **范围**: Avalonia 版三处地址栏统一改造（主窗口 / QuickPathPicker / CustomFilePickerDialog）
 > **修订**: 2026-10-21 — 按代码事实核对修正行号与行为描述（`TryConfirmFile` 无模式判断、`PathAutoComplete.Text` 实际 3 处直接同步）；`Path` 定为 StyledProperty + OneWay；补磁盘空路径态、`Breadcrumb_EditPlaceholder` 与三语同步；QuickPathPicker 恢复 4 宿主回归范围
 
@@ -224,12 +225,64 @@ public class PathBreadcrumb : UserControl
 
 ## 验收标准
 
-- [ ] 三处地址栏段点击导航与树/列表/前进后退结果一致（同一导航入口）
-- [ ] 编辑态：Enter 导航、ESC/失焦还原、补全可用（文本响应式）、`Ctrl+L`（窗口任意焦点位置）直达
-- [ ] **行为不变**：CustomFilePickerDialog 任意模式下地址栏输入已存在文件路径 Enter → `TryConfirmFile` 直接确认（与改造前 `PathAutoComplete_KeyDown` 完全一致，不加模式门）
-- [ ] QuickPathPicker 的 4 个宿主（压缩设置 / 解压设置 / 设置窗口 / UiTestWindow）路径选择、Enter 提交、历史记录均正常
-- [ ] 磁盘空路径：`QuickPathPicker.Path` 为空时显示占位文案，点击整行可进编辑态
-- [ ] 虚拟路径根段 📦 点击回根；磁盘根段（盘符/UNC）不可点
-- [ ] 长路径折叠 `…` 正常（点击忽略、ToolTip 显示完整路径）；超长单段被裁剪不溢出
-- [ ] 亮暗主题 + Compact/Normal/Loose 三档紧凑度均正常；运行中切换语言后 ToolTip/占位文案同步刷新
-- [ ] `dotnet build` 0 错误、Avalonia 测试全绿、`mantiszip_i18n` 三语校验通过
+- [ ] 三处地址栏段点击导航与树/列表/前进后退结果一致（同一导航入口）——代码已接线（三处都走 `NavigateRequested`），**待真机逐处点一遍**
+- [x] 编辑态：Enter 导航、ESC/失焦还原、补全可用（文本响应式）、`Ctrl+L`（窗口任意焦点位置）直达 —— Enter/ESC 有无头用例；`Ctrl+L` 是窗口级隧道监听（一处接线服务全部宿主）
+- [ ] **行为不变**：CustomFilePickerDialog 任意模式下地址栏输入已存在文件路径 Enter → `TryConfirmFile` 直接确认（与改造前 `PathAutoComplete_KeyDown` 完全一致，不加模式门）——代码逐字照抄原分支，**待真机确认**
+- [ ] QuickPathPicker 的 4 个宿主（压缩设置 / 解压设置 / 设置窗口 / UiTestWindow）路径选择、Enter 提交、历史记录均正常 —— **待真机确认**
+- [x] 磁盘空路径：`QuickPathPicker.Path` 为空时显示占位文案，点击整行可进编辑态 —— 无头用例断言 `EmptyHint` 可见
+- [x] 虚拟路径根段 📦 点击回根；磁盘根段（盘符/UNC）不可点 —— 无头用例断言段元素类型（TextBlock = 不可点）
+- [x] 长路径折叠 `…` 正常（点击忽略、ToolTip 显示完整路径）；超长单段被裁剪不溢出 —— 9 段折叠为 6 段有无头用例；裁剪靠 `ClipToBounds`
+- [ ] 亮暗主题 + Compact/Normal/Loose 三档紧凑度均正常；运行中切换语言后 ToolTip/占位文案同步刷新 —— **待真机确认**
+- [x] `dotnet build` 0 错误、Avalonia 测试全绿、`mantiszip_i18n` 三语校验通过
+
+## 实施记录（2026-10-29）
+
+**代码落地**
+
+| 文件 | 变更 |
+|---|---|
+| `src/MantisZip.UI.Avalonia/Controls/PathBreadcrumb.axaml` | 新建（95 行）：单行 Grid + 四层（`BlankClickTarget` 全宽透明承接空白点击 / `SegmentsPanel` / `EmptyHint` / `EditBox`）+ 六个局部样式（`Button.crumb`、`:pointerover`、`crumbCurrent`、`crumbSep`、`crumbEllipsis`、`crumbRoot`） |
+| `src/MantisZip.UI.Avalonia/Controls/PathBreadcrumb.axaml.cs` | 新建（496 行）：`BreadcrumbPathKind` 枚举、`Path`/`PathKind`/`FilterMode` 三个 StyledProperty（`Path` 默认 OneWay）、`EditCompletionProvider`/`MaxSegments=6`/`ArchiveRootTooltipKey`/`EditPlaceholderKey`、`NavigateRequested`/`EnumerationRequested`（后者预留未接）、`Text`、`EnterEditMode()`/`CloseEdit()`、`BuildSegments`（Virtual/Disk/UNC/相对路径）、`Fold`、`MarkCurrent`、窗口级 Ctrl+L 隧道监听 + `CultureChanged` 订阅（`DetachedFromVisualTree` 全部退订） |
+| `Controls/ArchiveContentView.axaml(.cs)`、`ArchiveContentView.Events.cs` | `AddressBar` 换 `PathBreadcrumb`（Virtual + `CurrentFolder` 单向绑定 + `ArchiveRootTooltipKey`）；接 `NavigateRequested` → `NavigateToFolderPath`、`EditCompletionProvider` → `FolderPaths`；删 `AddressBar_KeyDown` |
+| `Controls/QuickPathPicker.axaml(.cs)` | Row 0 换 `PathBreadcrumb`（Disk + `#RootControl.Path` 单向绑定）；删 `InitAutoComplete`/`PathInput_TextChanged`/`PathInput_KeyDown` 与全部 `PathInput.Text` 赋值；新增 `InitBreadcrumb()`（历史 + 父目录前缀补全、空串守卫、`CoerceToDirectory`、`PathHistoryManager.Record`）；4 处浮层入口前 `Breadcrumb.CloseEdit()` |
+| `Dialogs/CustomFilePickerDialog.axaml(.cs)` | 列 4 换 `PathBreadcrumb`（Disk）；`InitPathAutoComplete` → `InitBreadcrumb`，`NavigateRequested` **逐字照抄**原 `PathAutoComplete_KeyDown` 分支（`Directory.Exists`→`NavigateTo` / `File.Exists`→`TryConfirmFile`，无模式门）；3 处 `PathAutoComplete.Text = dir` → `PathCrumbs.Path = dir`；`GetSaveFileName()` 回落改 `PathCrumbs.Text` |
+| `Views/UiTestWindow.axaml` | 「自定义控件」页签新增 PathBreadcrumb 卡片（Virtual `docs/images/2026`、Disk 绑 `QuickPath`、Disk 空串三态） |
+| `Localization/strings.{zh-CN,en,zh-TW}.json` | 新增 `Breadcrumb_ArchiveRoot`、`Breadcrumb_EditPlaceholder`；删除 `Nav_AddressBar`、`Picker_AddressPlaceholder`、`QuickPath_SelectFolder`（1364 key） |
+| `ViewModels/MainWindowViewModel.cs` | `UpdateLocalizedStrings()` 的 keys 数组移除 `Nav_AddressBar`（新 key 走控件内 `LocalizationManager.T()`，不进 XAML 绑定数组） |
+| `tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbTests.cs` | 新建（6 个 `[AvaloniaFact]`）：Virtual 分段与末段加粗、Disk 盘符段不可点、空 Disk 显示 `EmptyHint`、点中间段上抛 `NavigateRequested("C:\Users")`、9 段折叠为 6 段、编辑态 Enter 上抛 / Esc 不上抛 |
+
+**与计划的偏差**
+
+1. `EnumerationRequested` 事件按计划预留但**第一版不接**（`#pragma warning disable CS0067`），避免无消费者的半成品接线。
+2. `CustomFilePickerDialog` 的 `GetSaveFileName()` 也用了旧 `PathAutoComplete.Text`（计划只列了 3 处赋值），一并改为 `PathCrumbs.Text` —— 否则「保存」模式拿不到用户刚输入的路径。
+3. 资源查找从 `FindResource` 改为 `TryFindResource`（虚拟根图标 / 前景色）：无头测试与设计器里资源未加载时 `FindResource` 返回 `UnsetValueType`，强转会抛 `InvalidCastException`。
+
+**验证**
+
+- `-Task build -Target avalonia -c Release`：0 警告。
+- `-Task test -Target ui-tests -c Release`：全绿（含新增 6 例）。
+- `-Task check`：版本 0.5.5 六处一致、三语 1364 key、8 项守卫全绿（含规则 13 的 key 登记校验——移除 `Nav_AddressBar` 后才通过）。
+- 真机取证：Release 版打开 `CustomFilePickerDialog`（Ctrl+O），地址栏显示 `E: › AI › IndexTTS2-SonicVale` 三段，分隔符与段样式正确，路径行颜色与「文件名」等 chrome 标签一致。
+
+**未做（留待真机冒烟）**：三处段点击导航一致性、`TryConfirmFile` 回车直确认、QuickPathPicker 四个宿主、亮暗主题 × 三档紧凑度、切语言后 ToolTip/占位刷新。
+
+## 实施后修正（2026-10-29，真机反馈）
+
+1. **末段可点进编辑**：末段（当前目录）由 `TextBlock` 改为 `Button.crumbCurrent`，单击 `EnterEditMode()`，不上抛 `NavigateRequested`。理由：编辑入口原本只藏在路径末尾空白处，路径一长就没有可点区域。
+2. **盘符段可点**：`BuildSegments` 的盘符段 `IsClickable = true`，上抛 `C:\`（带尾分隔符）。原设计「盘符不可点」的真正原因是 `C:` 是驱动器相对路径，上抛会被下游解析成该盘当前目录；UNC 根维持不可点。
+3. **外壳可见**：新增 `Border.crumbShell`（surface 底 + `ThemeBorderLightBrush` 边框 + 圆角 + 内边距），`:pointerover` 提亮、`:editing` 换强调色边框。
+4. **分隔符换图标**：`TextBlock "›"` → `PathIcon`（`IconChevronRight` 12×12，`ThemeTextSecondaryBrush`），资源缺失时退化回字形。
+5. **修「编辑态打字没反应」**：`EditBox.Focus()` 只聚焦 `AutoCompleteBox` 容器，内部 `TextBox` 从未拿到焦点；改为 `ApplyTemplate()` 后取内部 `TextBox` `Focus() + SelectAll()`，Enter/Esc 也改挂内部 `TextBox`（`AutoCompleteBox` 会吞 Esc）。
+
+验证：`PathBreadcrumbTests` 7 例 + 新增 `PathBreadcrumbHitTestTests` 2 例（真实指针命中）；Release 构建 0 警告、ui-tests 全绿、`-Task check` 8 项守卫全绿；真机 4 张取证。
+### 实施后修正 2（2026-10-29，真机反馈：高度跳动 + 候选下拉点击）
+
+- **编辑态高度跳动**：`EditBox` 固定 `Height=20`/`MinHeight=0`/`Padding=0`，并加 `AutoCompleteBox /template/ TextBox` 样式（透明底、无边框、`MinHeight=0`），使编辑态与浏览态外壳同高（实测都 30px）。
+- **候选下拉点击无效**：`DropDownOpened` 时把 `PointerPressed` 挂到 `Popup.Child`（类型是 `Border`），从 `e.Source` 向上找 `ListBoxItem` 提交；**不能**在 `SelectionChanged` 里提交（打字时控件会自动选中首候选 → 输到一半就跳走），也**不能**用 `PointerReleased`（按下即关下拉）。同时关闭 `IsTextCompletionEnabled`（默认开启会写乱输入串），并把「焦点在 `PopupRoot`」视为仍在本控件内。
+- **回归测试**：`tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbSuggestionClickTests.cs`（挂 Fluent 主题 + `ThemeLight.axaml`，从 `Popup.Child` 取候选项后 `RaiseEvent(PointerPressed)`）。
+
+- **2026-10-29 第三轮（真机）**：候选刷新延后后下拉不再自动打开 → 刷新完显式 `IsDropDownOpen`；主窗口地址栏 `ControlHeightSm` → `ControlHeightMd`；编辑态预填末尾分隔符（Disk `\` / Virtual `/`）且光标置末尾（不再全选）。
+
+- **2026-10-29 第四轮（真机）**：设置 → 路径面板里地址栏与卡片同色看不出边界 → 外壳底色 ThemeSurfaceBgBrush → ThemeHeaderBgBrush，边框 ThemeBorderLightBrush → ThemeBorderBrush，hover 加深、编辑态换 surface 底。
+- **2026-10-29 第五轮（真机）**：进出编辑态整行高度跳 13px → 外壳高度由内容决定（段 20 / 空路径占位 17+8+8=33 / 编辑框 20）。修法：内层 `Grid` 钉 `MinHeight=20`、`EmptyHint` 去掉上下 Margin。三处宿主实测浏览态与编辑态均为 30px；回归用例 `PathBreadcrumbLayoutTests`（红：`Expected 42 / Actual 30`）。
+- **2026-10-29 第六轮（用户提问「能不能做成固定高度的可复用面包屑」）**：现状是控件复用、但高度档位散在宿主（4 处）与控件内部（1 处）。改为控件自带 `MinHeight=ControlHeightMd`（32），宿主与演示卡全部删掉 Height/MinHeight；回归用例加「默认高度 = 32」。今后调高度只改 `Controls/PathBreadcrumb.axaml` 一处。对话框地址行同排的 5 个方形按钮也一并提到 32，整行齐平。

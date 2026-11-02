@@ -107,6 +107,7 @@ When releasing a new version, update the version string in ALL of these location
 - 修改计划 → 更新 PLAN.md 中对应任务的说明、优先级或状态
 - 执行计划 → 若计划文档不在 `.omo\plans\进行中` 内，先将对应计划移入 `.omo\plans\进行中` 目录再执行
 - 计划完成 → 将条目从 PLAN.md 移至 PROGRESS.md 的【历史设计方案索引】章节；先将对应计划移入 `.omo\plans\已完成` 中
+- **阶段开工前核对版本号**（2026-10-29 起）：A 档按版本阶段交付（`### 阶段 v0.5.x`）。动手前先看 `src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version` 是否等于该阶段版本号；**不一致就停下来问用户**「是否先升版本」，不擅自改（规则 2）。阶段做完 = 发版打 tag → 计划归档 → 与用户讨论从 B 档择优补下一阶段
 
 ### 规则 2：版本号变更
 
@@ -141,6 +142,11 @@ When releasing a new version, update the version string in ALL of these location
 | `ToolbarButtonLabel` | `TextBlock` | FontSize 13、水平居中（按钮文字） |
 | `compactTab` | `TabItem` | Padding `8,6`、MinHeight 36、FontSize 18 |
 | `ToggleIconBox` | `Border` | 16×16、圆角 3、边框 1.5、背景过渡（菜单切换指示） |
+| `addrRow` | `Grid`（地址栏行容器） | 该 `Grid` 的**直接子 `Button`** 自动 `ControlHeightMd × ControlHeightMd` 方块、Padding 0、内容居中、按钮三色（背景/前景/边框）；与 `PathBreadcrumb` 的固定高度齐平 |
+
+- **`addrRow` 的用法（地址栏行）**：容器写 `Classes="addrRow"`，里面的方形按钮（后退 / 前进 / 向上一级 / 系统浏览 / 收藏等）**只写 `x:Name` / `Grid.Column` / `Click` / `ToolTip.Tip`，不要再写 `Width` / `MinHeight` / `Background` / `Foreground` / `BorderBrush`**。样式选择器是 `Grid.addrRow > Button`（只匹配直接子级），所以按钮不要包进额外的 `StackPanel`，否则不生效
+  - 注意：Avalonia 的 `Style` **不会**自动套到全仓同名控件上——它的作用域是「命中选择器的元素」。所以「自动」只发生在**标了 `addrRow` 的容器内部**；新增地址栏行时唯一要做的事就是给容器挂这个类，逐个按钮不用管
+  - 若某天要改地址行按钮尺寸/配色，只改 `App.axaml` 的 `Grid.addrRow > Button` 一处；面包屑本身的高度与外观在 `Controls/PathBreadcrumb.axaml`（同样是一处）
 
 - **`PathIcon` 的 `Foreground` 必须显式给**：Avalonia 12 的 `IconElement.ForegroundProperty` 元数据是 `Inherits = true`，但实测工具栏 / 小按钮里的 `PathIcon` 仍取不到父控件的语义画刷（深色主题下呈默认黑、几乎不可见），所以一律按「显式设置」执行。**统一入口**：工具栏类图标挂 `Classes="ToolbarButtonIcon"`，命中 `App.axaml` 的 `PathIcon.ToolbarButtonIcon` 样式；该样式**必须写在 `ToggleButton:checked PathIcon` 之前**（Avalonia 无 CSS specificity、同名属性按定义顺序后者覆盖，放后面会把选中态的白图标覆盖成 Primary）。全局 `TextBlock` 样式**故意不设 Foreground**（继承父控件避免 emoji 压成单色），除非有明确理由不要显式设置
 - 不设置固定 `Height` 除非有充分理由；`ToggleIconBox` / 菜单图标槽位的详细用法见 ARCHITECTURE
@@ -309,6 +315,10 @@ CoreLog.RedactOverride = msg => LogRedactor.RedactPaths(msg, ...);
 | 打开单个文件 | `ShowOpenFileAsync(owner, initialPath, fileExtensions, fileTypes)` |
 | 选文件**或**文件夹（多选累积） | `ShowOpenItemsAsync(owner, initialPath)` → `IReadOnlyList<string>?` |
 | **解压目标目录**（带路径 + 冲突预览） | `ShowExtractFolderAsync(owner, entries, initialPath, currentFolder, preserveFullPath)` |
+| **设置窗内嵌选择**（不再弹模态窗） | 直接放 `Controls/CustomFilePickerControl`：`Mode` 选 `PickFolder` / `PickItems`，`IsSimpleMode=true`（无复选框、当前目录选中即结果），宿主接 `SelectionChanged` / `PathChanged` / `ConfirmRequested` |
+  - **内嵌选择器的过滤与累积面板**：`Mode=PickItems` 时传 `fileExtensions`（解压窗传 Core 的 `ArchiveExtensionCatalog.EngineExtensions`）即可只列这些扩展名；宿主自己已有「已选」清单时加 `HideAccumulatedPanel="True"`，否则控件内的累积面板会重复一遍并把文件列表挤成几十像素。
+
+- **设置窗里选文件/目录优先内嵌**（`CustomFilePickerControl`），不要为「设置窗里再弹一个选择器」新增 `ShowXxxAsync` 调用；只有「必须模态拿一个结果再返回」的场景（如 `CustomFilePickerDialog` 自身、`AddFavoriteDialog`）才用静态入口
 
 - **解压场景首选 `ShowExtractFolderAsync`**，且**必须实参 `currentFolder` + `preserveFullPath`**（取自 `MainWindowViewModel.CurrentFolder` 与 `AppSettings.ExtractPreserveFullPath`）——漏传会导致预览树与实际解压路径不一致
 - 限定扩展名用 `fileTypes: [new FileTypeOption(标签, 模式数组)]`；`Patterns` 空数组 = 不过滤；支持 `"*.json"` / `".json"` / `"json"` 三种写法；**不要**改 `MatchesFileFilter` 的 `SelectedIndex` 硬编码

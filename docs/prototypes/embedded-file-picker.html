@@ -1,0 +1,1383 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>内嵌文件选择器 — 原型（A 档 · v0.5.5）</title>
+<style>
+  /* ── 主题变量：取值与 src/MantisZip.UI.Avalonia/Themes/Theme{Dark,Light}.axaml 一致 ── */
+  :root[data-theme="dark"] {
+    --window: #1E1E1E; --surface: #252525; --header: #2A2A2A; --border: #3E3E3E;
+    --text: #E0E0E0; --text2: #999999; --accent: #0078D4; --accent-ink: #FFFFFF;
+    --btn: #3E3E3E; --btn-hover: #4A4A4A; --row-hover: #2E2E2E;
+    --sel-bg: rgba(0, 120, 212, .22); --sel-line: #0078D4;
+    --page: #141414; --warn: #F0B429; --ok: #4CC38A;
+  }
+  :root[data-theme="light"] {
+    --window: #F5F5F5; --surface: #FFFFFF; --header: #F0F0F0; --border: #E0E0E0;
+    --text: #1A1A1A; --text2: #666666; --accent: #60B8FC; --accent-ink: #08324D;
+    --btn: #E0E0E0; --btn-hover: #D3D3D3; --row-hover: #F0F4F8;
+    --sel-bg: rgba(96, 184, 252, .28); --sel-line: #2E8FD0;
+    --page: #EDEDED; --warn: #B26A00; --ok: #1E7B4B;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Segoe UI', 'Microsoft YaHei', system-ui, sans-serif;
+    background: var(--page); color: var(--text);
+    min-height: 100vh; padding: 24px 20px 40px;
+  }
+  .page { max-width: 1380px; margin: 0 auto; }
+
+  /* ── 页面头部 ── */
+  .page-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 14px; }
+  h1 { font-size: 17px; font-weight: 600; margin-bottom: 6px; }
+  .sub { font-size: 12px; color: var(--text2); }
+  .sub code { font-family: Consolas, monospace; font-size: 11px; background: var(--surface); padding: 1px 5px; border-radius: 3px; border: 1px solid var(--border); }
+  .page-tools { display: flex; align-items: center; gap: 8px; flex-shrink: 0; }
+
+  .seg { display: flex; border: 1px solid var(--border); border-radius: 6px; overflow: hidden; background: var(--surface); }
+  .seg button {
+    font: inherit; font-size: 12px; padding: 6px 12px; border: 0; cursor: pointer;
+    background: transparent; color: var(--text2); white-space: nowrap;
+  }
+  .seg button + button { border-left: 1px solid var(--border); }
+  .seg button:hover { background: var(--row-hover); color: var(--text); }
+  .seg button.on { background: var(--accent); color: var(--accent-ink); }
+
+  .ghost {
+    font: inherit; font-size: 12px; padding: 6px 12px; cursor: pointer;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 6px;
+  }
+  .ghost:hover { background: var(--row-hover); }
+
+  /* ── 窗口框架 ── */
+  .window {
+    background: var(--window); border: 1px solid var(--border); border-radius: 10px;
+    overflow: hidden; display: flex; flex-direction: column; min-height: 700px;
+    box-shadow: 0 12px 32px rgba(0, 0, 0, .28);
+  }
+  .win-title {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 10px 14px; background: var(--header); border-bottom: 1px solid var(--border);
+    font-size: 13px; font-weight: 600;
+  }
+  .win-x { color: var(--text2); cursor: default; font-size: 13px; }
+
+  .tabs { display: flex; gap: 2px; padding: 0 8px; background: var(--header); border-bottom: 1px solid var(--border); }
+  .tab {
+    font: inherit; font-size: 12.5px; padding: 8px 14px; cursor: pointer; border: 0; background: transparent;
+    color: var(--text2); border-bottom: 2px solid transparent; margin-bottom: -1px;
+  }
+  .tab:hover { color: var(--text); }
+  .tab.on { color: var(--text); border-bottom-color: var(--accent); background: var(--window); }
+  .tab.stub::after { content: "·"; margin-left: 4px; color: var(--warn); }
+
+  /* 窗口主体：左「Tab + 内容」/ 分隔条 / 右「预览树」（对应真实窗口的 ResultTreeView 侧栏） */
+  .win-main { flex: 1; display: grid; grid-template-columns: minmax(0, 1fr) 6px 384px; min-height: 0; }
+  .win-left { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .vsplit { background: var(--border); border-radius: 2px; }
+  .tab-body { flex: 1; padding: 14px; display: flex; flex-direction: column; gap: 12px; min-height: 0; }
+
+  /* 右侧预览树 */
+  .preview { display: flex; flex-direction: column; min-height: 0; background: var(--window); }
+    .targetnote { margin-top: 6px; font-size: 11.5px; color: var(--text2); }
+  .targetnote b { color: var(--text); font-weight: 600; }
+  .pv-head { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-bottom: 1px solid var(--border); background: var(--header); }
+  .pv-title { font-size: 12.5px; font-weight: 600; }
+  .pv-sub { font-size: 11px; color: var(--text2); }
+  .pv-head .sp { flex: 1; }
+  .pv-target { display: flex; align-items: center; gap: 6px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--text2); }
+  .pv-target .lbl { flex-shrink: 0; }
+  .pv-target .path { color: var(--text); font-family: Consolas, monospace; font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pv-opts { display: flex; align-items: center; gap: 10px; padding: 6px 10px; border-bottom: 1px solid var(--border); font-size: 11.5px; color: var(--text2); flex-wrap: wrap; }
+  .pv-toggle { display: inline-flex; align-items: center; gap: 5px; cursor: pointer; user-select: none; }
+  .pv-toggle .box { width: 13px; height: 13px; border: 1px solid var(--text2); border-radius: 3px; display: inline-grid; place-items: center; font-size: 9px; }
+  .pv-toggle .box.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+  .pv-tree { flex: 1; overflow: auto; }
+  .pv-row { display: grid; align-items: center; gap: 6px; height: 24px; padding: 0 10px; font-size: 12px; }
+  .pv-tree.t-compress .pv-row, .pv-tree.t-compress .pv-head-row { grid-template-columns: 14px 16px minmax(0, 1fr) 76px 70px 48px; }
+  .pv-tree.t-extract .pv-row, .pv-tree.t-extract .pv-head-row { grid-template-columns: 14px 16px minmax(0, 1fr) 74px 84px; }
+  .pv-head-row { display: grid; align-items: center; gap: 6px; height: 22px; padding: 0 10px;
+    position: sticky; top: 0; background: var(--header); border-bottom: 1px solid var(--border);
+    font-size: 10.5px; color: var(--text2); letter-spacing: .02em; }
+  .pv-head-row .c, .pv-row .c { text-align: right; white-space: nowrap; }
+  .pv-row:hover { background: var(--row-hover); }
+  .pv-row .tw { color: var(--text2); font-size: 10px; text-align: center; cursor: pointer; }
+  .pv-row .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .pv-row.dir .nm { font-weight: 600; }
+  .pv-row .c { color: var(--text2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; }
+  .pv-foot { display: flex; align-items: center; gap: 10px; padding: 7px 10px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--text2); }
+  .pv-foot b { color: var(--text); font-weight: 600; }
+  .pv-empty { padding: 28px 18px; color: var(--text2); font-size: 12px; text-align: center; line-height: 1.9; }
+
+  .win-footer {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 14px; border-top: 1px solid var(--border); background: var(--header);
+  }
+  .foot-hint { flex: 1; font-size: 11.5px; color: var(--text2); }
+  .foot-hint b { color: var(--text); font-weight: 600; }
+  .btn {
+    font: inherit; font-size: 12.5px; padding: 6px 18px; cursor: pointer; min-width: 80px;
+    background: var(--btn); color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+  }
+  .btn:hover { background: var(--btn-hover); }
+  .btn.primary { background: var(--accent); color: var(--accent-ink); border-color: transparent; font-weight: 600; }
+  .btn.primary:hover { filter: brightness(1.08); }
+
+  /* ── 卡片 ── */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 12px; }
+  .card-title { font-size: 12.5px; font-weight: 600; margin-bottom: 8px; }
+  .muted { color: var(--text2); font-size: 11.5px; line-height: 1.65; }
+  .muted code { font-family: Consolas, monospace; background: var(--window); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; }
+
+  /* ── 选择器面板 ── */
+  .picker { flex: 1; display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+  .picker-top { display: flex; align-items: center; gap: 8px; }
+  .navbtns { display: flex; gap: 4px; }
+  .navbtn {
+    width: 26px; height: 26px; display: grid; place-items: center; cursor: pointer;
+    background: var(--btn); border: 1px solid var(--border); border-radius: 4px; color: var(--text); font-size: 12px;
+  }
+  .navbtn:hover { background: var(--btn-hover); }
+  .navbtn[disabled] { opacity: .35; cursor: default; }
+  .navbtn[disabled]:hover { background: var(--btn); }
+  .crumbs { flex: 1; display: flex; align-items: center; gap: 2px; overflow: hidden;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 4px; padding: 3px 6px; height: 26px; }
+  .crumb { font-size: 12px; color: var(--text2); cursor: pointer; padding: 1px 4px; border-radius: 3px; white-space: nowrap; }
+  .crumb:hover { background: var(--row-hover); color: var(--text); }
+  .crumb.last { color: var(--text); font-weight: 600; }
+  .crumb-sep { font-size: 11px; color: var(--text2); opacity: .55; }
+
+  .modeswitch { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--text2); white-space: nowrap; }
+
+  .filterrow { display: flex; align-items: center; gap: 8px; }
+  .filterbox {
+    flex: 1; height: 26px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); font: inherit; font-size: 12px; padding: 0 8px; outline: none;
+  }
+  .filterbox:focus { border-color: var(--accent); }
+  .mini {
+    font: inherit; font-size: 11.5px; padding: 4px 10px; cursor: pointer; white-space: nowrap;
+    background: var(--btn); color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+  }
+  .mini:hover { background: var(--btn-hover); }
+
+  .split { flex: 1; display: grid; grid-template-columns: 214px 1fr; gap: 8px; min-height: 0; }
+
+  /* 输出设置页：左 QuickPath（收藏 + 目录树）＋ 右目录浏览 */
+  .folder-split { display: grid; grid-template-columns: 214px minmax(0, 1fr); gap: 8px; margin-top: 10px; }
+  .folder-main { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+  .folder-split .qp { max-height: 300px; }
+  .folder-split .qp .tree { max-height: 176px; }
+
+  /* ── QuickPathControl（照 Avalonia 控件 1:1 还原）────────────────────────
+     Row0：4 个方形 ToggleButton（书签/历史/闪电/文件夹）+ 搜索框；
+     Row1：ListBox（两行式：名称 + 完整路径，带来源标签）或 TreeView（盘符树）。
+     Tab 选中态＝强调色底 + 白图标；搜索框在目录树 Tab 下隐藏。 */
+  .qp { gap: 4px; }
+  .qp-tabs { display: grid; grid-template-columns: auto auto auto auto minmax(0, 1fr); gap: 4px; }
+  .qp-tab {
+    height: 26px; min-width: 26px; padding: 0 5px; display: inline-flex; align-items: center; justify-content: center;
+    background: var(--btn); border: 1px solid var(--border); border-radius: 4px; cursor: pointer; color: var(--text);
+  }
+  .qp-tab:hover { background: var(--btn-hover); }
+  .qp-tab.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+  .qp-tab svg { width: 16px; height: 16px; fill: currentColor; display: block; }
+  .qp-search {
+    height: 26px; min-width: 0; font: inherit; font-size: 12px; padding: 0 6px;
+    background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 4px;
+  }
+  .qp-search::placeholder { color: var(--text2); }
+  .qp-body { flex: 1; min-height: 0; overflow: auto; }
+  .qp-item { display: grid; grid-template-columns: 20px minmax(0, 1fr) auto; align-items: center; gap: 6px; padding: 3px 4px; border-radius: 4px; cursor: default; min-height: 34px; }
+  .qp-item:hover { background: var(--row-hover); }
+  .qp-item.cur { background: var(--sel-bg); box-shadow: inset 2px 0 0 var(--sel-line); }
+  .qp-item .qpic { display: inline-flex; align-items: center; justify-content: center; }
+  .qp-item .qpic svg { width: 16px; height: 16px; fill: var(--text); display: block; }
+  .qp-item .qnm { display: block; line-height: 1.25; font-size: 12.5px; color: var(--text); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qp-item .qsub { display: block; line-height: 1.25; font-size: 11px; color: var(--text2); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .qp-item .qtag { font-size: 10px; color: var(--text2); background: var(--window); border: 1px solid var(--border); border-radius: 3px; padding: 0 4px; }
+  .qp-empty { color: var(--text2); font-size: 12px; text-align: center; padding: 20px 8px; }
+  .qp-tree .trow { min-height: 26px; }
+
+  /* 左：QuickPathControl */
+  .qp { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 8px; display: flex; flex-direction: column; gap: 8px; overflow: hidden; }
+  .qp-title { font-size: 11px; color: var(--text2); letter-spacing: .04em; text-transform: uppercase; }
+  .chips { display: flex; flex-wrap: wrap; gap: 4px; }
+  .chip {
+    font-size: 11.5px; padding: 3px 8px; border-radius: 10px; cursor: pointer;
+    background: var(--btn); border: 1px solid var(--border); color: var(--text); white-space: nowrap;
+  }
+  .chip:hover { background: var(--btn-hover); }
+  .tree { flex: 1; overflow: auto; font-size: 12px; padding-right: 2px; }
+  .trow { display: flex; align-items: center; gap: 4px; padding: 3px 4px; border-radius: 4px; cursor: pointer; white-space: nowrap; }
+  .trow:hover { background: var(--row-hover); }
+  .trow.cwd { background: var(--sel-bg); box-shadow: inset 2px 0 0 var(--sel-line); }
+  .trow .tw { width: 12px; text-align: center; color: var(--text2); font-size: 10px; flex-shrink: 0; }
+  .trow .ti { font-size: 12px; flex-shrink: 0; }
+  .trow .tn { overflow: hidden; text-overflow: ellipsis; }
+  .arcinfo { background: var(--window); border: 1px solid var(--border); border-radius: 5px; padding: 8px; }
+  .arcname { font-size: 12.5px; font-weight: 600; margin-bottom: 4px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+  /* 右：列表 */
+  .listwrap { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; display: flex; flex-direction: column; min-height: 0; overflow: hidden; }
+  .lhead, .lrow {
+    display: grid; grid-template-columns: 26px 20px minmax(160px, 1fr) 128px 92px 84px;
+    align-items: center; gap: 6px; padding: 0 8px;
+  }
+  /* 简单模式不显示复选框列：整列去掉，名称直接跟在图标后 */
+  .listwrap.simple .lhead, .listwrap.simple .lrow { grid-template-columns: 20px minmax(160px, 1fr) 128px 92px 84px; }
+  .lhead { height: 26px; border-bottom: 1px solid var(--border); background: var(--header);
+    font-size: 11px; color: var(--text2); letter-spacing: .02em; }
+  .lbody { flex: 1; overflow: auto; }
+  .lrow { height: 28px; font-size: 12.5px; cursor: default; user-select: none; border-bottom: 1px solid transparent; }
+  .lrow:hover { background: var(--row-hover); }
+  .lrow.sel { background: var(--sel-bg); box-shadow: inset 2px 0 0 var(--sel-line); }
+  .lrow .cb { width: 14px; height: 14px; border: 1px solid var(--text2); border-radius: 3px; display: grid; place-items: center;
+    font-size: 10px; color: var(--accent-ink); background: transparent; justify-self: start; }
+  .lrow .cb.on { background: var(--accent); border-color: var(--accent); }
+  .lrow .ic { font-size: 13px; text-align: center; }
+  .lrow .nm { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .lrow.dir .nm { font-weight: 600; }
+  .lrow .col { color: var(--text2); font-size: 11.5px; text-align: right; overflow: hidden; white-space: nowrap; }
+  .lrow .col.type { text-align: left; }
+  .lrow.dir .col { color: var(--text2); }
+  .empty { padding: 28px; text-align: center; color: var(--text2); font-size: 12px; }
+
+  /* 已选列表 */
+  .selsec { display: flex; flex-direction: column; gap: 6px; height: 168px; }
+  .selhead { display: flex; align-items: center; gap: 8px; font-size: 12px; font-weight: 600; }
+  .selhead .count { color: var(--text2); font-weight: 400; font-size: 11.5px; }
+  .selhead .sp { flex: 1; }
+  .sellist { flex: 1; background: var(--surface); border: 1px solid var(--border); border-radius: 6px; overflow: auto; }
+  .srow { display: flex; align-items: center; gap: 8px; padding: 5px 10px; font-size: 12px; border-bottom: 1px solid var(--border); }
+  .srow:last-child { border-bottom: 0; }
+  .srow:hover { background: var(--row-hover); }
+  .srow .si { flex-shrink: 0; }
+  .srow .sn { flex-shrink: 0; max-width: 42%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srow .sp2 { flex: 1; color: var(--text2); font-size: 11px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .srow .sz { color: var(--text2); font-size: 11px; white-space: nowrap; }
+  .srow .rm { cursor: pointer; color: var(--text2); padding: 0 4px; border-radius: 3px; }
+  .srow .rm:hover { color: #E5534B; background: var(--btn); }
+  .selempty { padding: 20px; text-align: center; color: var(--text2); font-size: 12px; }
+
+  /* 输出设置：目录浏览 */
+  .folderpick { display: flex; flex-direction: column; gap: 10px; }
+  .outrow { display: flex; align-items: center; gap: 8px; }
+  .outrow label { font-size: 12px; color: var(--text2); width: 62px; flex-shrink: 0; }
+  .textbox { flex: 1; height: 28px; background: var(--surface); border: 1px solid var(--border); border-radius: 4px;
+    color: var(--text); font: inherit; font-size: 12.5px; padding: 0 8px; outline: none; }
+  .textbox:focus { border-color: var(--accent); }
+  .chkline { display: flex; align-items: center; gap: 8px; font-size: 12.5px; color: var(--text); }
+  .chkline .box { width: 14px; height: 14px; border: 1px solid var(--text2); border-radius: 3px; display: inline-grid; place-items: center; font-size: 10px; }
+  .chkline .box.on { background: var(--accent); border-color: var(--accent); color: var(--accent-ink); }
+
+  /* 说明图例 */
+  .legend { margin-top: 16px; display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+  .legend .card { background: var(--surface); }
+  .legend ul { margin: 6px 0 0 16px; font-size: 12px; line-height: 1.85; color: var(--text2); }
+  .legend li b { color: var(--text); font-weight: 600; }
+
+  .toast {
+    position: fixed; left: 50%; bottom: 26px; transform: translateX(-50%) translateY(12px);
+    background: var(--header); color: var(--text); border: 1px solid var(--border);
+    padding: 8px 16px; border-radius: 6px; font-size: 12px; opacity: 0; pointer-events: none;
+    transition: opacity .18s, transform .18s; box-shadow: 0 8px 20px rgba(0,0,0,.3); z-index: 9;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+<div class="page">
+
+  <div class="page-head">
+    <div>
+      <h1>文件选择器去弹窗化 — 内嵌 CustomFilePickerControl</h1>
+      <p class="sub">
+        A 档 · v0.5.5 ｜ 对应计划 <code>.omo/plans/未开始/embedded-file-picker.md</code>
+        ｜ 静态原型，仅演示交互与布局，不含真实文件系统
+      </p>
+    </div>
+    <div class="page-tools">
+      <div class="seg" id="scenarioSwitch">
+        <button data-act="scenario" data-v="compress" class="on">压缩设置</button>
+        <button data-act="scenario" data-v="extract">解压设置</button>
+        <button data-act="scenario" data-v="extract-to">选择要解压的文件</button>
+      </div>
+      <button class="ghost" data-act="theme" id="themeBtn">☀ 浅色</button>
+    </div>
+  </div>
+
+  <div class="window">
+    <div class="win-title">
+      <span id="winTitle">压缩设置</span>
+      <span class="win-x">✕</span>
+    </div>
+    <div class="win-main">
+      <div class="win-left">
+        <div class="tabs" id="tabs"></div>
+        <div class="tab-body" id="tabBody"></div>
+      </div>
+      <div class="vsplit" title="拖动调整宽度在真实实现里是 GridSplitter"></div>
+      <aside class="preview" id="preview"></aside>
+    </div>
+    <div class="win-footer">
+      <span class="foot-hint" id="footHint"></span>
+      <button class="btn" data-act="cancel">取消</button>
+      <button class="btn primary" data-act="ok">确定</button>
+    </div>
+  </div>
+
+  <div class="legend">
+    <div class="card">
+      <div class="card-title">简单 与 高级 的区别（计划第 2 条）</div>
+      <ul>
+        <li><b>简单</b>：不显示复选框；单击选中、<b>Shift 范围选</b>；「当前目录选中项 = 结果」，<b>切换目录会重置已选</b>（覆盖语义）。</li>
+        <li><b>高级</b>：显示复选框；勾选<b>跨目录记忆</b>，切走再回来仍保持；下方「已选」是跨目录累积结果。</li>
+        <li>两种模式下，下方「已选」都可逐项删除；点行可回到它所在目录并高亮。</li>
+      </ul>
+    </div>
+    <div class="card">
+      <div class="card-title">本原型覆盖的计划点</div>
+      <ul>
+        <li>① 选择器内嵌进设置窗（不再弹窗）—— 见「添加文件 / 添加压缩包」页。</li>
+        <li>③ 去掉右侧累积面板，改为下方「已选」列表，双向同步。</li>
+        <li>④ 左侧 <code>QuickPathControl</code>（收藏 / 目录树 / 搜索），左右布局。</li>
+        <li>⑤ 压缩窗 Tab 顺序：输出设置 → 添加文件 → 压缩设置 → 文件过滤。</li>
+        <li>⑥ 解压窗对称：添加压缩包 / 输出设置；「选择要解压的文件」页支持按条目解压。</li>
+      </ul>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ═══════════════ 1. 虚拟文件系统 ═══════════════ */
+const f = (name, size, mtime) => ({ name, type: 'file', size, mtime });
+const d = (name, mtime, children) => ({ name, type: 'dir', mtime, children });
+
+const FS = d('C:', '2026-10-20 08:00', [
+  d('Users', '2026-10-27 21:14', [
+    d('You', '2026-10-27 21:14', [
+      d('Desktop', '2026-10-27 21:14', [
+        f('README.txt', 2048, '2026-10-25 09:02'),
+        f('截图-2026-10-27.png', 1843200, '2026-10-27 21:14'),
+      ]),
+      d('Documents', '2026-10-26 09:31', [
+        d('Reports', '2026-10-24 15:02', [
+          f('2026-Q3-总结.md', 184320, '2026-10-24 15:02'),
+          f('年度预算.xlsx', 512000, '2026-10-22 11:40'),
+          f('客户名单.csv', 96400, '2026-10-18 09:12'),
+        ]),
+        d('Invoices', '2026-09-30 17:55', [
+          f('INV-2026-091.pdf', 803112, '2026-09-30 17:55'),
+          f('INV-2026-092.pdf', 744201, '2026-09-30 17:56'),
+        ]),
+        d('草稿', '2026-10-27 20:03', [f('未命名-1.txt', 1024, '2026-10-27 20:03')]),
+        f('会议纪要.md', 12288, '2026-10-26 09:31'),
+        f('路线图.drawio', 45900, '2026-10-20 14:12'),
+      ]),
+      d('Pictures', '2026-10-23 18:20', [
+        d('2026', '2026-10-23 18:20', [
+          f('IMG_0231.jpg', 3355443, '2026-10-23 18:20'),
+          f('IMG_0232.jpg', 3145728, '2026-10-23 18:21'),
+          f('IMG_0233.jpg', 2936012, '2026-10-23 18:22'),
+        ]),
+        d('Icons', '2026-10-11 12:00', [f('folder.ico', 68608, '2026-10-11 12:00')]),
+        f('wallpaper.png', 4718592, '2026-09-02 08:10'),
+      ]),
+      d('Downloads', '2026-10-27 19:44', [
+        f('backup-2026-10.zip', 10485760, '2026-10-27 19:44'),
+        f('setup.exe', 8921088, '2026-10-27 19:40'),
+        f('installer.msi', 12582912, '2026-10-20 10:02'),
+      ]),
+      d('Projects', '2026-10-28 01:12', [
+        d('MantisZip', '2026-10-28 01:12', [
+          f('README.md', 10240, '2026-10-28 01:12'),
+          f('CHANGELOG.md', 4096, '2026-10-26 22:40'),
+          f('MantisZip.sln', 6144, '2026-10-26 22:40'),
+        ]),
+        d('demo', '2026-10-15 16:30', [f('demo.mp4', 15728640, '2026-10-15 16:30')]),
+      ]),
+    ]),
+  ]),
+]);
+
+/* 压缩包内条目（「选择要解压的文件」页的数据源） */
+const ARCHIVE = {
+  name: 'backup-2026-10.zip',
+  size: 10485760,
+  entries: [
+    { path: 'docs/', isDir: true },
+    { path: 'docs/manual.pdf', size: 1204224 },
+    { path: 'docs/changelog.md', size: 8192 },
+    { path: 'src/', isDir: true },
+    { path: 'src/MantisZip.Core/', isDir: true },
+    { path: 'src/MantisZip.Core/Engines/', isDir: true },
+    { path: 'src/MantisZip.Core/Engines/ZipEngine.cs', size: 184320 },
+    { path: 'src/MantisZip.UI.Avalonia/', isDir: true },
+    { path: 'src/MantisZip.UI.Avalonia/MainWindow.axaml', size: 61440 },
+    { path: 'tools/', isDir: true },
+    { path: 'tools/build.ps1', size: 4096 },
+    { path: 'setup.exe', size: 8921088 },
+    { path: 'README.txt', size: 2048 },
+  ],
+};
+
+/* ═══════════════ 2. 状态 ═══════════════ */
+const state = {
+  scenario: 'compress',
+  tab: 1,
+  theme: 'dark',
+  mode: 'simple',          // simple | advanced
+  cwd: 'C:\\Users\\You\\Documents',
+  filter: '',
+  selected: [],            // [{path,name,size,isDir}]
+  lastIndex: -1,
+  expanded: new Set(['C:', 'C:\\Users', 'C:\\Users\\You', 'C:\\Users\\You\\Documents']),
+  folderMode: false,
+  // 预览树（右侧）用到的状态
+  outputName: 'backup-2026-10.zip',
+  targetDir: 'C:\\Users\\You\\Downloads\\backup-2026-10',
+  preserveFullPath: true,
+  pvCollapsed: new Set(),
+  qpTab: 'fav',
+  qpQuery: '',
+};
+
+const TABS = {
+  compress: [
+    { key: 'output', label: '输出设置' },
+    { key: 'add', label: '添加文件' },
+    { key: 'settings', label: '压缩设置', stub: true },
+    { key: 'filter', label: '文件过滤', stub: true },
+  ],
+  extract: [
+    { key: 'output', label: '输出设置' },
+    { key: 'add-archives', label: '添加压缩包' },
+    { key: 'settings', label: '解压设置', stub: true },
+  ],
+  'extract-to': [
+    { key: 'pick-entries', label: '选择要解压的文件' },
+    { key: 'output', label: '输出设置' },
+  ],
+};
+
+const WINDOW_TITLE = {
+  compress: '压缩设置',
+  extract: '解压设置',
+  'extract-to': '解压设置 — 选择要解压的文件',
+};
+
+/* 「选择要解压的文件」页的预勾选集合：本次触发的条目 */
+function preselectArchiveEntries() {
+  state.selected = ['docs/', 'docs/manual.pdf', 'setup.exe']
+    .map((p) => ARCHIVE.entries.find((x) => x.path === p))
+    .filter(Boolean)
+    .map((x) => ({
+      path: x.path,
+      name: (x.path.replace(/\/$/, '').split('/').pop()) || x.path,
+      size: x.size || 0,
+      isDir: !!x.isDir,
+    }));
+}
+
+/* 支持用查询参数直接打开某个场景：?scenario=extract&mode=advanced */
+(function applyQuery() {
+  const q = new URLSearchParams(location.search);
+  const s = q.get('scenario');
+  if (s && Object.prototype.hasOwnProperty.call(TABS, s)) state.scenario = s;
+  const m = q.get('mode');
+  if (m === 'advanced' || m === 'simple') state.mode = m;
+  const th = q.get('theme');
+  if (th === 'dark' || th === 'light') state.theme = th;
+  if (q.get('preserve') === '0') state.preserveFullPath = false;
+  state.tab = state.scenario === 'compress' ? 1 : 0;
+  const tb = q.get('tab');
+  if (tb !== null && tb !== '' && !Number.isNaN(Number(tb))) state.tab = Math.max(0, Number(tb));
+  if (state.scenario === 'extract') state.cwd = 'C:\\Users\\You\\Downloads';
+  if (state.scenario === 'compress') state.targetDir = 'C:\\Users\\You\\Documents';
+  else state.targetDir = 'C:\\Users\\You\\Downloads\\backup-2026-10';
+  if (state.scenario === 'extract-to') preselectArchiveEntries();
+  if (q.get('nav')) state.cwd = 'C:\\Users\\You\\' + q.get('nav');
+  const qs = q.get('qpq');
+  if (qs) state.qpQuery = qs;
+  const qt = q.get('qptab');
+  if (qt && ['fav', 'hist', 'win', 'tree'].indexOf(qt) >= 0) { state.qpTab = qt; if (qt === 'tree') state.expanded.add('C:'); }
+  if (q.get('pickdir')) state.targetDir = joinPath(state.cwd, q.get('pickdir'));
+  if (q.get('demo') === '1') seedDemoSelection();
+})();
+
+/* 演示用：预置几个已选项，方便看右侧预览树 */
+function dirSizeRec(path) {
+  const node = resolve(path);
+  if (!node || !node.children) return 0;
+  return node.children.reduce((s, c) => s + (c.type === 'dir' ? dirSizeRec(joinPath(path, c.name)) : (c.size || 0)), 0);
+}
+
+function makeSel(path, isDir) {
+  const parent = resolve(dirOf(path));
+  const hit = parent && parent.children ? parent.children.find((c) => c.name === baseName(path)) : null;
+  return { path, name: baseName(path), size: isDir ? dirSizeRec(path) : (hit ? hit.size : 0), isDir: !!isDir };
+}
+
+function seedDemoSelection() {
+  if (state.scenario === 'compress') {
+    state.cwd = 'C:\\Users\\You\\Documents';
+    state.selected = [makeSel(joinPath(state.cwd, '草稿'), true), makeSel(joinPath(state.cwd, '会议纪要.md'), false)];
+  } else if (state.scenario === 'extract') {
+    state.cwd = 'C:\\Users\\You\\Downloads';
+    state.selected = [makeSel(joinPath(state.cwd, ARCHIVE.name), false)];
+  }
+}
+
+/* ═══════════════ 3. 工具函数 ═══════════════ */
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+function formatSize(bytes) {
+  if (bytes == null) return '';
+  if (bytes < 1024) return bytes + ' B';
+  const units = ['KB', 'MB', 'GB', 'TB'];
+  let v = bytes / 1024, i = 0;
+  while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
+  return (v >= 100 ? v.toFixed(0) : v >= 10 ? v.toFixed(1) : v.toFixed(2)) + ' ' + units[i];
+}
+
+function joinPath(base, name) { return base.endsWith('\\') ? base + name : base + '\\' + name; }
+function dirOf(path) { const i = path.lastIndexOf('\\'); return i <= 0 ? path : path.slice(0, i); }
+function baseName(path) { const i = path.lastIndexOf('\\'); return i < 0 ? path : path.slice(i + 1); }
+
+function resolve(path) {
+  const parts = path.split('\\').filter(Boolean);
+  let node = FS;
+  for (let i = 0; i < parts.length; i++) {
+    if (i === 0 && parts[0] === 'C:') continue;
+    const next = (node.children || []).find((c) => c.name.toLowerCase() === parts[i].toLowerCase() && c.type === 'dir');
+    if (!next) return null;
+    node = next;
+  }
+  return node;
+}
+
+function listDir(path) {
+  const node = resolve(path);
+  if (!node || !node.children) return [];
+  return node.children
+    .map((c) => ({
+      name: c.name, type: c.type, size: c.size, mtime: c.mtime,
+      path: joinPath(path, c.name),
+    }))
+    .sort((a, b) => (a.type === b.type ? a.name.localeCompare(b.name) : a.type === 'dir' ? -1 : 1));
+}
+
+function fileKind(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  if (name.indexOf('.') < 0) return '文件';
+  const map = {
+    pdf: 'PDF 文档', md: 'Markdown', txt: '文本', csv: 'CSV', xlsx: 'Excel 工作簿',
+    zip: 'ZIP 压缩包', ico: '图标', png: 'PNG 图片', jpg: 'JPEG 图片', mp4: '视频',
+    exe: '应用程序', msi: '安装包', sln: '解决方案', cs: 'C# 源文件', axaml: 'AXAML',
+    ps1: 'PowerShell 脚本', drawio: '图表', log: '日志',
+  };
+  return map[ext] || (ext.toUpperCase() + ' 文件');
+}
+
+function iconFor(item) {
+  if (item.isDir || item.type === 'dir') return '📁';
+  const ext = (item.name.split('.').pop() || '').toLowerCase();
+  if (['zip', '7z', 'rar', 'gz', 'tar', 'iso'].includes(ext)) return '🗜️';
+  if (['png', 'jpg', 'jpeg', 'gif', 'webp', 'ico', 'bmp', 'svg'].includes(ext)) return '🖼️';
+  if (['pdf'].includes(ext)) return '📕';
+  if (['xlsx', 'xls', 'csv'].includes(ext)) return '📊';
+  if (['md', 'txt', 'log'].includes(ext)) return '📄';
+  if (['mp4', 'mkv', 'mov'].includes(ext)) return '🎬';
+  if (['exe', 'msi'].includes(ext)) return '⚙️';
+  return '📄';
+}
+
+function toast(msg) {
+  const t = $('#toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toast._h);
+  toast._h = setTimeout(() => t.classList.remove('show'), 2200);
+}
+
+const isSel = (path) => state.selected.some((s) => s.path === path);
+const selItem = (item) => ({ path: item.path, name: item.name, size: item.size, isDir: item.isDir || item.type === 'dir' });
+const totalSize = () => state.selected.reduce((n, s) => n + (s.size || 0), 0);
+
+/* ═══════════════ 4. 渲染：外壳 ═══════════════ */
+function renderShell() {
+  $('#winTitle').textContent = WINDOW_TITLE[state.scenario];
+  const tabs = TABS[state.scenario];
+  if (state.tab >= tabs.length) state.tab = 0;
+  $('#tabs').innerHTML = tabs
+    .map((t, i) => `<button class="tab ${i === state.tab ? 'on' : ''} ${t.stub ? 'stub' : ''}" data-act="tab" data-v="${i}">${t.label}</button>`)
+    .join('');
+  document.querySelectorAll('#scenarioSwitch button').forEach((b) => {
+    b.classList.toggle('on', b.dataset.v === state.scenario);
+  });
+  $('#themeBtn').textContent = state.theme === 'dark' ? '☀ 浅色' : '☾ 深色';
+  document.documentElement.dataset.theme = state.theme;
+}
+
+/* ═══════════════ 5. 渲染：选择器 ═══════════════ */
+function breadcrumbHtml(path) {
+  const parts = path.split('\\').filter(Boolean);
+  let acc = '';
+  return parts
+    .map((p, i) => {
+      acc = i === 0 ? p : acc + '\\' + p;
+      const last = i === parts.length - 1;
+      return `<span class="crumb ${last ? 'last' : ''}" data-act="nav" data-path="${esc(acc)}">${esc(p)}</span>`
+        + (last ? '' : '<span class="crumb-sep">›</span>');
+    })
+    .join('');
+}
+
+function treeHtml(node, path, depth) {
+  if (!node || node.type !== 'dir' || !node.children) return '';
+  const dirs = node.children.filter((c) => c.type === 'dir').sort((a, b) => a.name.localeCompare(b.name));
+  return dirs
+    .map((child) => {
+      const p = joinPath(path, child.name);
+      const on = state.cwd === p;
+      const expanded = state.expanded.has(p);
+      const hasKids = (child.children || []).some((c) => c.type === 'dir');
+      const row = `<div class="trow ${on ? 'cwd' : ''}" data-act="nav" data-path="${esc(p)}" style="padding-left:${depth * 12 + 4}px">
+          <span class="tw" data-act="toggle-tree" data-path="${esc(p)}">${hasKids ? (expanded ? '▾' : '▸') : ''}</span>
+          <span class="ti">${expanded && hasKids ? '📂' : '📁'}</span>
+          <span class="tn">${esc(child.name)}</span>
+        </div>`;
+      const kids = expanded && hasKids ? treeHtml(child, p, depth + 1) : '';
+      return row + kids;
+    })
+    .join('');
+}
+
+const ARCHIVE_EXTS = ['zip', '7z', 'rar', 'gz', 'tgz', 'tar', 'bz2', 'xz', 'iso', 'cab', 'jar', 'war', 'ear', 'apk', 'lz', 'zst'];
+function isArchiveName(name) {
+  const ext = (name.split('.').pop() || '').toLowerCase();
+  return ARCHIVE_EXTS.includes(ext);
+}
+
+function pickerItems() {
+  if (state.scenario === 'extract-to') return archiveItems();
+  const items = listDir(state.cwd).filter((it) =>
+    !state.filter || it.name.toLowerCase().includes(state.filter.toLowerCase()));
+  // 解压窗「添加压缩包」只列压缩包（目录仍可进入）
+  if (state.scenario === 'extract') return items.filter((it) => it.type === 'dir' || isArchiveName(it.name));
+  return items;
+}
+
+function archiveItems() {
+  return ARCHIVE.entries
+    .filter((e) => !state.filter || e.path.toLowerCase().includes(state.filter.toLowerCase()))
+    .map((e) => {
+      const clean = e.path.replace(/\/$/, '');
+      return {
+        path: e.path,
+        name: clean.split('/').pop() || e.path,
+        isDir: !!e.isDir,
+        size: e.size || 0,
+        mtime: '',
+        depth: (clean.match(/\//g) || []).length,
+        type: e.isDir ? 'dir' : 'file',
+      };
+    });
+}
+
+function rowsHtml(items) {
+  if (!items.length) return `<div class="empty">没有匹配的项</div>`;
+  const showCb = state.mode === 'advanced';
+  return items
+    .map((it, i) => {
+      const sel = isSel(it.path);
+      const isDir = it.isDir || it.type === 'dir';
+      const indentStyle = state.scenario === 'extract-to' ? `padding-left:${(it.depth || 0) * 14}px;` : '';
+      const cb = showCb ? `<span class="cb ${sel ? 'on' : ''}" data-act="cb" data-idx="${i}">${sel ? '✓' : ''}</span>` : '';
+      const sep = isDir ? (state.scenario === 'extract-to' ? '/' : '\\') : '';
+      return `<div class="lrow ${sel ? 'sel' : ''} ${isDir ? 'dir' : ''}" data-act="row" data-idx="${i}" data-path="${esc(it.path)}" style="${indentStyle}">
+          ${cb}
+          <span class="ic">${iconFor(it)}</span>
+          <span class="nm">${esc(it.name)}${sep}</span>
+          <span class="col">${isDir ? '' : esc(it.mtime || '')}</span>
+          <span class="col type">${isDir ? '文件夹' : fileKind(it.name)}</span>
+          <span class="col">${isDir ? '' : formatSize(it.size)}</span>
+        </div>`;
+    })
+    .join('');
+}
+
+function selectedHtml() {
+  const label = state.scenario === 'extract' ? '已选压缩包' : state.scenario === 'extract-to' ? '将解压的条目' : '已选源文件';
+  const rows = state.selected.length
+    ? state.selected
+        .map((s, i) => `<div class="srow" data-act="locate" data-idx="${i}" title="点击回到它所在的位置">
+            <span class="si">${iconFor(s)}</span>
+            <span class="sn">${esc(s.name)}</span>
+            <span class="sp2">${esc(s.path)}</span>
+            <span class="sz">${s.isDir ? '文件夹' : formatSize(s.size)}</span>
+            <span class="rm" data-act="rm" data-idx="${i}" title="从列表移除">✕</span>
+          </div>`)
+        .join('')
+    : `<div class="selempty">还没有选择。${state.mode === 'simple' ? '在列表里点选即可。' : '勾选复选框，可跨目录累积。'}</div>`;
+
+  return `<div class="selsec">
+      <div class="selhead">
+        <span>${label}</span>
+        <span class="count">${state.selected.length} 项 · 共 ${formatSize(totalSize())}</span>
+        <span class="sp"></span>
+        <button class="mini" data-act="clear">清空</button>
+      </div>
+      <div class="sellist">${rows}</div>
+    </div>`;
+}
+
+/* ═══════════════ 5. QuickPathControl（照 Avalonia 控件还原）═══════════════ */
+const QP_PATHS = {
+  bookmark: 'M6.2 21.85A0.75 0.75 0 0 1 5 21.25L5 6.25C5 4.45 6.46 3 8.25 3L15.75 3C17.55 3 19 4.46 19 6.25L19 21.25C19 21.85 18.3 22.21 17.81 21.85L12.01 17.67ZM17.5 6.25C17.5 5.28 16.72 4.5 15.75 4.5L8.25 4.5C7.29 4.5 6.5 5.28 6.5 6.25L6.5 19.78L11.56 16.14A0.75 0.75 0 0 1 12.44 16.14L17.5 19.78Z',
+  history: 'M12 4.5C16.1421 4.5 19.5 7.85786 19.5 12C19.5 16.1421 16.1421 19.5 12 19.5C7.85786 19.5 4.5 16.1421 4.5 12C4.5 11.6236 4.52772 11.2538 4.58123 10.8923C4.64845 10.4382 4.31609 10 3.85708 10C3.48623 10 3.161 10.2562 3.10471 10.6228C3.03576 11.0718 3 11.5317 3 12C3 16.9706 7.02944 21 12 21C16.9706 21 21 16.9706 21 12C21 7.02944 16.9706 3 12 3C9.69494 3 7.59227 3.86656 6 5.29168V4.25C6 3.83579 5.66421 3.5 5.25 3.5C4.83579 3.5 4.5 3.83579 4.5 4.25V7.25C4.5 7.66421 4.83579 8 5.25 8H8.25C8.66421 8 9 7.66421 9 7.25C9 6.83579 8.66421 6.5 8.25 6.5H6.90093C8.23907 5.25883 10.0309 4.5 12 4.5ZM12.5 7.75C12.5 7.33579 12.1642 7 11.75 7C11.3358 7 11 7.33579 11 7.75V12.25C11 12.6642 11.3358 13 11.75 13H14.75C15.1642 13 15.5 12.6642 15.5 12.25C15.5 11.8358 15.1642 11.5 14.75 11.5H12.5V7.75Z',
+  lightning: 'M7.42505 2.83052C7.60245 2.33254 8.07392 2 8.60256 2H15.0562C15.9094 2 16.5118 2.83587 16.242 3.64528L14.7905 8H18.7492C19.8534 8 20.4153 9.32683 19.647 10.1198L8.586 21.536C7.53226 22.6236 5.71405 21.6422 6.04495 20.1645L7.31418 14.4964L5.74573 14.4904C4.53898 14.4858 3.69895 13.2899 4.10392 12.1532L7.42505 2.83052ZM8.77889 3.5L5.51693 12.6565C5.45908 12.8189 5.57909 12.9898 5.75148 12.9904L8.25277 13C8.47997 13.0009 8.69453 13.1047 8.83621 13.2823C8.97789 13.4599 9.03142 13.6922 8.98177 13.9139L7.50871 20.4923L18.1589 9.5H13.7499C13.5088 9.5 13.2824 9.38411 13.1415 9.18853C13.0005 8.99296 12.9622 8.74154 13.0384 8.51283L14.7093 3.5H8.77889Z',
+  folder: 'M3.5 6.25V8H8.12868C8.32759 8 8.51836 7.92098 8.65901 7.78033L10.1893 6.25L8.65901 4.71967C8.51836 4.57902 8.32759 4.5 8.12868 4.5H5.25C4.2835 4.5 3.5 5.2835 3.5 6.25ZM2 6.25C2 4.45507 3.45507 3 5.25 3H8.12868C8.72542 3 9.29771 3.23705 9.71967 3.65901L11.5607 5.5H18.75C20.5449 5.5 22 6.95507 22 8.75V17.75C22 19.5449 20.5449 21 18.75 21H5.25C3.45507 21 2 19.5449 2 17.75V6.25ZM3.5 9.5V17.75C3.5 18.7165 4.2835 19.5 5.25 19.5H18.75C19.7165 19.5 20.5 18.7165 20.5 17.75V8.75C20.5 7.7835 19.7165 7 18.75 7H11.5607L9.71967 8.84099C9.29771 9.26295 8.72542 9.5 8.12868 9.5H3.5Z',
+  drive: 'M5.42 5.27A2.3 2.3 0 0 1 7.44 4L16.56 4C17.42 4 18.21 4.5 18.58 5.27L21.68 11.66Q21.99 12.33 22 13.07L22 16.75C22 17.99 21 19 19.75 19L4.25 19C3.01 19 2 18 2 16.75L2 13.07Q2 12.33 2.32 11.66ZM17.23 5.92A0.8 0.8 0 0 0 16.56 5.5L7.44 5.5A0.8 0.8 0 0 0 6.77 5.92L4.3 11L19.68 11ZM3.5 13.25L3.5 16.75C3.5 17.16 3.84 17.5 4.25 17.5L19.75 17.5C20.16 17.5 20.5 17.16 20.5 16.75L20.5 13.25A0.75 0.75 0 0 0 19.75 12.5L4.25 12.5A0.75 0.75 0 0 0 3.5 13.25M18 16A1 1 0 1 0 18 14A1 1 0 0 0 18 16'
+};
+function qpIcon(name) { return `<svg viewBox="0 0 24 24" aria-hidden="true"><path d="${QP_PATHS[name]}"/></svg>`; }
+
+/* 三个来源（真实控件里分别来自 FavoritePathManager / PathHistoryManager / ExplorerWindowTracker） */
+const QP_FAVORITES = [
+  { name: '文档', path: 'C:\\Users\\You\\Documents' },
+  { name: '下载', path: 'C:\\Users\\You\\Downloads' },
+  { name: '图片', path: 'C:\\Users\\You\\Pictures' },
+  { name: '项目', path: 'C:\\Users\\You\\Projects\\MantisZip' }
+];
+const QP_HISTORY = [
+  { name: 'Downloads', path: 'C:\\Users\\You\\Downloads' },
+  { name: 'Reports', path: 'C:\\Users\\You\\Documents\\Reports' },
+  { name: 'Icons', path: 'C:\\Users\\You\\Pictures\\2026\\Icons' },
+  { name: 'MantisZip', path: 'C:\\Users\\You\\Projects\\MantisZip' }
+];
+const QP_WINDOWS = [
+  { name: '文档', path: 'C:\\Users\\You\\Documents' },
+  { name: '演示包（已解压）', path: 'C:\\Users\\You\\Projects\\MantisZip\\demo' }
+];
+const QP_SOURCES = { fav: QP_FAVORITES, hist: QP_HISTORY, win: QP_WINDOWS };
+const QP_TAGS = { fav: '⭐', hist: '🕐', win: '🪟' };
+
+function qpListItems() {
+  const q = state.qpQuery.trim().toLowerCase();
+  if (!q) return (QP_SOURCES[state.qpTab] || []).map((it) => ({ ...it, tag: '' }));
+  const out = [];
+  for (const key of ['fav', 'hist', 'win']) {
+    for (const it of QP_SOURCES[key]) {
+      if (it.name.toLowerCase().includes(q) || it.path.toLowerCase().includes(q))
+        out.push({ ...it, tag: QP_TAGS[key] });
+    }
+  }
+  return out;
+}
+
+function qpListHtml() {
+  const items = qpListItems();
+  if (!items.length) {
+    const key = state.qpQuery.trim() ? 'QuickPath_EmptyHistory' : 'QuickPath_EmptyFavorites';
+    const text = state.qpQuery.trim()
+      ? '没有匹配的路径'
+      : state.qpTab === 'fav' ? '还没有收藏夹路径' : state.qpTab === 'hist' ? '还没有历史记录' : '没有打开的文件夹窗口';
+    return `<div class="qp-empty">${text}</div>`;
+  }
+  return items
+    .map((it) => `<div class="qp-item ${state.cwd === it.path ? 'cur' : ''}" data-act="qp-go" data-path="${esc(it.path)}" title="${esc(it.path)}">
+        <span class="qpic">${qpIcon('folder')}</span>
+        <span><span class="qnm">${esc(it.name)}</span><span class="qsub">${esc(it.path)}</span></span>
+        ${it.tag ? `<span class="qtag">${it.tag}</span>` : ''}
+      </div>`)
+    .join('');
+}
+
+function qpTreeHtml() {
+  const drive = `<div class="trow" data-act="qp-drive" data-path="C:">
+      <span class="tw" data-act="toggle-tree" data-path="C:">${state.expanded.has('C:') ? '▾' : '▸'}</span>
+      <span class="ti">${qpIcon('drive')}</span>
+      <span class="tn">本地磁盘 (C:)</span>
+    </div>`;
+  const kids = state.expanded.has('C:') ? treeHtml(FS, 'C:', 1) : '';
+  return drive + kids;
+}
+
+function qpBodyHtml() {
+  if (state.qpTab === 'tree') return `<div class="qp-tree">${qpTreeHtml()}</div>`;
+  return qpListHtml();
+}
+
+function quickPathHtml() {
+  const tab = (v, icon, title) => `<button class="qp-tab ${state.qpTab === v ? 'on' : ''}" data-act="qp-tab" data-v="${v}" title="${title}">${qpIcon(icon)}</button>`;
+  const showSearch = state.qpTab !== 'tree';
+  return `<aside class="qp">
+      <div class="qp-tabs">
+        ${tab('fav', 'bookmark', '收藏')}
+        ${tab('hist', 'history', '历史')}
+        ${tab('win', 'lightning', '窗口')}
+        ${tab('tree', 'folder', '目录树')}
+        ${showSearch ? `<input class="qp-search" id="qpSearch" placeholder="搜索路径…" value="${esc(state.qpQuery)}">` : ''}
+      </div>
+      <div class="qp-body" id="qpBody">${qpBodyHtml()}</div>
+    </aside>`;
+}
+function pickerHtml() {
+  const items = pickerItems();
+  const showCb = state.mode === 'advanced';
+  const isArchive = state.scenario === 'extract-to';
+  const tree = treeHtml(FS, 'C:', 0);
+
+  return `<div class="picker">
+    <div class="picker-top">
+      <div class="navbtns">
+        <button class="navbtn" data-act="up" title="上一级" ${isArchive ? 'disabled' : ''}>↑</button>
+        <button class="navbtn" data-act="home" title="回到用户目录" ${isArchive ? 'disabled' : ''}>🏠</button>
+      </div>
+      <div class="crumbs">${isArchive
+        ? `<span class="crumb last">${esc(ARCHIVE.name)}</span><span class="crumb-sep">·</span><span class="crumb">压缩包内条目</span>`
+        : breadcrumbHtml(state.cwd)}</div>
+      <div class="modeswitch">
+        <span>模式</span>
+        <div class="seg" style="height:24px">
+          <button data-act="mode" data-v="simple" class="${state.mode === 'simple' ? 'on' : ''}">简单</button>
+          <button data-act="mode" data-v="advanced" class="${state.mode === 'advanced' ? 'on' : ''}">高级</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="filterrow">
+      <input class="filterbox" id="filterBox" placeholder="在${isArchive ? '压缩包内' : '当前目录'}中筛选名称…" value="${esc(state.filter)}">
+      ${showCb ? `<button class="mini" data-act="selectall">全选可见</button>` : ''}
+      ${state.scenario === 'extract' ? '<span class="muted" style="white-space:nowrap">仅列出压缩包</span>' : ''}
+      <span class="muted" style="white-space:nowrap">${items.length} 项</span>
+    </div>
+
+    <div class="split">
+      ${isArchive ? `
+        <aside class="qp">
+          <div class="qp-title">压缩包</div>
+          <div class="arcinfo">
+            <div class="arcname">🗜️ ${esc(ARCHIVE.name)}</div>
+            <div class="muted">${formatSize(ARCHIVE.size)} · ${ARCHIVE.entries.length} 个条目</div>
+          </div>
+          <div class="qp-title">快速选择</div>
+          <div class="chips">
+            <span class="chip" data-act="arc-files">只要文件</span>
+            <span class="chip" data-act="arc-root">只看根级</span>
+            <span class="chip" data-act="arc-dirs">只要目录</span>
+          </div>
+          <div class="qp-title">提示</div>
+          <div class="muted">选目录等于整目录解压；切到<b>高级</b>可逐条挑。</div>
+        </aside>
+      ` : quickPathHtml()}
+
+      <div class="listwrap ${state.mode === 'advanced' ? '' : 'simple'}">
+        <div class="lhead">
+          ${showCb ? '<span></span>' : ''}<span></span><span>名称</span><span style="text-align:right">修改日期</span><span>类型</span><span style="text-align:right">大小</span>
+        </div>
+        <div class="lbody">${rowsHtml(items)}</div>
+      </div>
+    </div>
+
+    ${selectedHtml()}
+  </div>`;
+}
+
+/* ═══════════════ 6. 渲染：输出设置（目录内嵌浏览） ═══════════════ */
+function folderPickerHtml() {
+  const node = resolve(state.cwd);
+  const dirs = node && node.children ? node.children.filter((c) => c.type === 'dir') : [];
+  const files = node && node.children ? node.children.filter((c) => c.type === 'file') : [];
+  const isExtract = state.scenario !== 'compress';
+  const targetHere = state.targetDir === state.cwd;
+
+  const head = `
+    <div class="outrow">
+      <label>${isExtract ? '解压到' : '输出目录'}</label>
+      <input class="textbox" id="targetDirBox" value="${esc(state.targetDir)}" placeholder="目标目录（可直接编辑）">
+    </div>
+    <div class="targetnote">${targetHere
+      ? '目标就是当前浏览目录'
+      : state.targetDir.startsWith(state.cwd + '\\')
+        ? `目标是当前目录下的 <b>${esc(state.targetDir.slice(state.cwd.length + 1))}\\</b>`
+        : `目标不在当前浏览目录：<b>${esc(state.targetDir)}</b>`}${resolve(state.targetDir) ? '' : '　<b>（尚不存在，确定时新建）</b>'}</div>`;
+
+  const rows = dirs
+    .map((c) => {
+      const p = joinPath(state.cwd, c.name);
+      const picked = p === state.targetDir;
+      return `<div class="lrow dir ${picked ? 'sel' : ''}" data-act="pickdir" data-path="${esc(p)}" title="单击选中为目标，双击进入">
+        <span></span><span class="ic">📁</span><span class="nm">${esc(c.name)}\\</span>
+        <span class="col">${esc(c.mtime || '')}</span><span class="col type">文件夹</span><span class="col">${picked ? '目标' : ''}</span>
+      </div>`;
+    })
+    .join('');
+  const fileNote = files.length ? `　本目录下另有 ${files.length} 个文件（文件夹模式不可选）` : '';
+
+  const title = isExtract
+    ? '解压目标目录（单击目录选中，双击进入）'
+    : '压缩包保存位置（单击目录选中，双击进入）';
+
+  const extras = isExtract ? `
+      <div class="chkline" data-act="preserve"><span class="box ${state.preserveFullPath ? 'on' : ''}">${state.preserveFullPath ? '✓' : ''}</span>保留压缩包内完整路径</div>
+      <div class="muted" style="margin-top:6px">改这一项，右侧预览树的层级会跟着变</div>
+    ` : `
+      <div class="card">
+        <div class="card-title">其他输出选项</div>
+        <div class="outrow" style="margin-bottom:8px">
+          <label>文件名</label>
+          <input class="textbox" id="outputNameBox" value="${esc(state.outputName)}" placeholder="archive.zip">
+          <label style="width:auto;margin-left:8px">压缩级别</label>
+          <input class="textbox" style="max-width:80px" value="标准" readonly>
+        </div>
+        <div class="chkline"><span class="box on">✓</span>压缩完成后打开所在文件夹</div>
+        <div class="chkline" style="margin-top:6px"><span class="box"></span>已存在同名文件时直接覆盖</div>
+      </div>`;
+
+  return `<div class="card folderpick">
+      <div class="card-title">${title}</div>
+      ${head}
+      <div class="folder-split">
+        ${quickPathHtml()}
+        <div class="folder-main">
+          <div class="picker-top">
+            <div class="navbtns">
+              <button class="navbtn" data-act="up" title="上一级">↑</button>
+              <button class="navbtn" data-act="home" title="回到用户目录">🏠</button>
+            </div>
+            <div class="crumbs">${breadcrumbHtml(state.cwd)}</div>
+          </div>
+          <div class="listwrap" style="max-height:210px">
+            <div class="lhead"><span></span><span></span><span>名称</span><span style="text-align:right">修改日期</span><span>类型</span><span style="text-align:right">大小</span></div>
+            <div class="lbody">${rows || '<div class="empty">此目录下没有子文件夹，换一个位置看看</div>'}</div>
+          </div>
+          <div class="muted">单击目录＝选中为目标；双击＝进入；↑ / 面包屑 / 收藏 只换浏览位置${fileNote}</div>
+        </div>
+      </div>
+      ${isExtract ? `<div style="margin-top:10px">${extras}</div>` : ''}
+    </div>${extras && !isExtract ? extras : ''}`;
+}
+/* ═══════════════ 7. 渲染：占位页 ═══════════════ */
+function stubHtml(title, detail) {
+  return `<div class="card" style="flex:1">
+      <div class="card-title">${title}</div>
+      <div class="muted">${detail}</div>
+    </div>`;
+}
+
+/* ═══════════════ 8. 组装 ═══════════════ */
+function renderBody() {
+  const tab = TABS[state.scenario][state.tab];
+  const k = tab.key;
+
+  if (k === 'add' || k === 'add-archives' || k === 'pick-entries') {
+    $('#tabBody').innerHTML = pickerHtml();
+    $('#footHint').innerHTML = state.scenario === 'extract-to'
+      ? `已预勾选本次触发的条目；<b>确定后按选中条目解压</b>（未勾选的不解压）`
+      : state.mode === 'simple'
+        ? `<b>简单模式</b>：当前目录的选中项就是结果，切换目录会重置`
+        : `<b>高级模式</b>：勾选可跨目录累积，切目录不丢`;
+    return;
+  }
+  if (k === 'output') {
+    $('#tabBody').innerHTML = folderPickerHtml();
+    $('#footHint').innerHTML = (state.scenario === 'compress' ? '输出目录：' : '解压到：') + `<b>${esc(state.targetDir)}</b>`;
+    return;
+  }
+  if (k === 'settings' && state.scenario === 'compress') {
+    $('#tabBody').innerHTML = stubHtml('压缩设置（原「高级」+ 原「常规」合并）',
+      '本页吸收原「常规」页的全部项目（压缩级别 / 压缩方式 / 分卷 / 密码 / 注释 / 校验），并保留原「高级」的通道与并行度。原型不细化，仅示意 Tab 顺序：<code>输出设置 → 添加文件 → 压缩设置 → 文件过滤</code>。');
+    $('#footHint').innerHTML = 'Tab 顺序：输出设置 → 添加文件 → 压缩设置 → 文件过滤';
+    return;
+  }
+  if (k === 'filter') {
+    $('#tabBody').innerHTML = stubHtml('文件过滤（复用现有 FileFilterEditor）',
+      '过滤规则编辑器已在 <code>Controls/FileFilterEditor.axaml</code>，本计划不改其内部，只调整它在 Tab 里的位置。');
+    $('#footHint').innerHTML = '过滤规则决定压缩/解压时包含哪些条目';
+    return;
+  }
+  $('#tabBody').innerHTML = stubHtml('解压设置', '冲突处理 / 并行度 / 覆盖策略等原「常规」项目在本页。');
+  $('#footHint').innerHTML = '';
+}
+
+/* ═══════════════ 8.5 右侧预览树（对应真实窗口的 ResultTreeView 侧栏） ═══════════════ */
+const COMPRESS_RATIO = { txt: 0.42, md: 0.40, csv: 0.35, json: 0.30, log: 0.35, cs: 0.28, axaml: 0.30, ps1: 0.32, pdf: 0.92, png: 0.98, jpg: 0.97, ico: 0.62, mp4: 0.99, zip: 0.99, exe: 0.62, msi: 0.62, sln: 0.50, drawio: 0.50 };
+
+function estimateCompressed(name, size) {
+  const ext = (String(name).split('.').pop() || '').toLowerCase();
+  const r = COMPRESS_RATIO[ext] == null ? 0.55 : COMPRESS_RATIO[ext];
+  return Math.max(32, Math.round(size * r));
+}
+
+function fsPreviewNode(path, name, isDir) {
+  if (!isDir) {
+    const parent = resolve(dirOf(path));
+    const hit = parent && parent.children ? parent.children.find((c) => c.name === name) : null;
+    return { key: path, name, isDir: false, size: hit ? hit.size : 0, children: [] };
+  }
+  const node = resolve(path);
+  const kids = (node && node.children ? node.children : []).map((c) => fsPreviewNode(joinPath(path, c.name), c.name, c.type === 'dir'));
+  return { key: path, name, isDir: true, size: kids.reduce((s, c) => s + c.size, 0), children: kids };
+}
+
+function buildCompressPreview() {
+  const sel = state.selected;
+  const low = (s) => s.toLowerCase();
+  const roots = sel.filter((s) => !sel.some((o) => o !== s && o.isDir && low(s.path).startsWith(low(o.path) + '\\')));
+  return roots.map((s) => fsPreviewNode(s.path, s.name, !!s.isDir));
+}
+
+function sumTree(n) {
+  if (n.children.length) n.size = n.children.reduce((s, c) => s + sumTree(c), 0);
+  return n.size;
+}
+
+function entryTree(items) {
+  const root = { key: '', name: '', isDir: true, size: 0, children: [] };
+  items.forEach((it) => {
+    const parts = String(it.path).replace(/\/$/, '').split('/');
+    let cur = root, acc = '';
+    parts.forEach((p, i) => {
+      const last = i === parts.length - 1;
+      acc = acc ? acc + '/' + p : p;
+      let child = cur.children.find((c) => c.name === p);
+      if (!child) { child = { key: acc, name: p, isDir: last ? !!it.isDir : true, size: 0, children: [] }; cur.children.push(child); }
+      if (last && !child.isDir) child.size = it.size || 0;
+      cur = child;
+    });
+  });
+  sumTree(root);
+  return root.children;
+}
+
+function buildExtractPreview() {
+  return state.selected.map((a) => {
+    const kids = a.name === ARCHIVE.name ? entryTree(archiveItems()) : [];
+    return { key: a.path, name: a.name, isDir: true, size: kids.reduce((s, c) => s + c.size, 0) || (a.size || 0), children: kids };
+  });
+}
+
+/* 选中一个目录 = 整目录解压，所以预览要把该目录在包内的全部子孙条目都算进来 */
+function extractToEntries() {
+  const all = archiveItems();
+  const sel = state.selected;
+  const covered = (p) => sel.some((s) => p === s.path || p.startsWith(s.path.endsWith('/') ? s.path : s.path + '/'));
+  return all.filter((it) => covered(it.path));
+}
+
+function buildExtractToPreview() {
+  const picked = extractToEntries();
+  if (!state.preserveFullPath) {
+    return picked.filter((it) => !it.isDir)
+      .map((it) => ({ key: it.path, name: it.name, isDir: false, size: it.size || 0, children: [] }));
+  }
+  return entryTree(picked);
+}
+
+function previewTree() {
+  if (state.scenario === 'compress') return buildCompressPreview();
+  if (state.scenario === 'extract') return buildExtractPreview();
+  return buildExtractToPreview();
+}
+
+function walkFiles(nodes, out) {
+  nodes.forEach((n) => { if (n.isDir) walkFiles(n.children, out); else out.push(n); });
+  return out;
+}
+
+function ratioText(name, size) {
+  if (size <= 0) return '—';
+  return Math.round((estimateCompressed(name, size) / size) * 100) + '%';
+}
+
+function pvRows(nodes, depth, compress) {
+  return nodes.map((n) => {
+    const collapsed = state.pvCollapsed.has(n.key);
+    const hasKids = n.isDir && n.children.length > 0;
+    const tw = hasKids
+      ? `<span class="tw" data-act="pv-toggle" data-key="${esc(n.key)}">${collapsed ? '▸' : '▾'}</span>`
+      : '<span class="tw"></span>';
+    const indent = depth > 0 ? ` style="padding-left:${depth * 14}px"` : '';
+    const row = `<div class="pv-row ${n.isDir ? 'dir' : ''}">
+        ${tw}<span class="ic">${iconFor(n)}</span><span class="nm"${indent} title="${esc(n.name)}">${esc(n.name)}</span>
+        <span class="c">${n.isDir && !n.children.length ? '—' : formatSize(n.size)}</span>
+        ${compress
+          ? `<span class="c">${n.isDir ? '' : formatSize(estimateCompressed(n.name, n.size))}</span><span class="c">${n.isDir ? '' : ratioText(n.name, n.size)}</span>`
+          : `<span class="c">${n.isDir ? '文件夹' : fileKind(n.name)}</span>`}
+      </div>`;
+    return collapsed || !n.children.length ? row : row + pvRows(n.children, depth + 1, compress);
+  }).join('');
+}
+
+function renderPreview() {
+  const host = $('#preview');
+  if (!host) return;
+  const compress = state.scenario === 'compress';
+  const nodes = previewTree();
+  const files = walkFiles(nodes, []);
+  const total = files.reduce((s, f) => s + f.size, 0);
+  const compressed = files.reduce((s, f) => s + estimateCompressed(f.name, f.size), 0);
+  const sub = compress ? `${files.length} 个文件 · ${formatSize(total)}` : `${files.length} 项 · ${formatSize(total)}`;
+
+  const head = `<div class="pv-head"><span class="pv-title">预览</span><span class="pv-sub">${sub}</span><span class="sp"></span>
+      <button class="mini" data-act="pv-expand">展开全部</button></div>`;
+
+  const outPath = joinPath(state.targetDir, state.outputName);
+  const target = compress
+    ? `<div class="pv-target"><span class="lbl">输出</span><span class="path" title="${esc(outPath)}">${esc(outPath)}</span></div>`
+    : `<div class="pv-target"><span class="lbl">解压到</span><span class="path" title="${esc(state.targetDir)}">${esc(state.targetDir)}</span></div>`;
+
+  const opts = compress ? '' : `<div class="pv-opts">
+      <span class="pv-toggle" data-act="preserve"><span class="box ${state.preserveFullPath ? 'on' : ''}">${state.preserveFullPath ? '✓' : ''}</span>保留完整路径</span>
+      <span class="muted">${state.preserveFullPath ? '按包内层级落盘' : '所有文件平铺到目标目录'}</span>
+    </div>`;
+
+  let body;
+  if (!nodes.length) {
+    body = `<div class="pv-empty">${compress
+      ? '还没有添加源文件。<br>在「添加文件」页点选文件或文件夹即可。'
+      : state.scenario === 'extract' ? '还没有选择压缩包。<br>在「添加压缩包」页点选。' : '还没有勾选要解压的条目。'}</div>`;
+  } else {
+    const cols = compress
+      ? '<span></span><span></span><span>名称</span><span class="c">大小</span><span class="c">压缩后</span><span class="c">比率</span>'
+      : '<span></span><span></span><span>名称</span><span class="c">大小</span><span class="c">类型</span>';
+    body = `<div class="pv-head-row">${cols}</div>` + pvRows(nodes, 0, compress);
+  }
+
+  const foot = compress
+    ? `<div class="pv-foot"><span>共 <b>${files.length}</b> 个文件 · 原始 <b>${formatSize(total)}</b> · 预计压缩后 <b>${formatSize(compressed)}</b></span></div>`
+    : `<div class="pv-foot"><span>共 <b>${files.length}</b> 项 · 解压后 <b>${formatSize(total)}</b></span></div>`;
+
+  host.innerHTML = head + target + opts + `<div class="pv-tree ${compress ? 't-compress' : 't-extract'}">${body}</div>` + foot;
+}
+function render() {
+  renderShell();
+  renderBody();
+  renderPreview();
+}
+
+/* ═══════════════ 9. 交互 ═══════════════ */
+function navigate(path, silent) {
+  if (!path) return;
+  if (state.scenario !== 'extract-to' && !resolve(path)) return;
+  state.cwd = path;
+  state.filter = '';
+  state.lastIndex = -1;
+
+  // 展开所有祖先，保证树里能看到当前目录
+  const parts = path.split('\\');
+  let acc = parts[0];
+  state.expanded.add(acc);
+  for (let i = 1; i < parts.length; i++) { acc += '\\' + parts[i]; state.expanded.add(acc); }
+
+  // 简单模式的覆盖语义：换目录即重置已选（真实实现里由 CustomFilePickerControl 内部处理，静默重置）
+  if (state.mode === 'simple' && state.selected.length && !silent) {
+    const fromOtherDir = state.selected.some((s) => state.scenario !== 'extract-to' && (dirOf(s.path) || '') !== path);
+    if (fromOtherDir) state.selected = [];
+  }
+  render();
+}
+
+function applyRowSelect(items, idx, shift) {
+  const item = items[idx];
+  if (!item) return;
+  const target = selItem(item);
+
+  if (shift && state.lastIndex >= 0 && state.lastIndex !== idx) {
+    const a = Math.min(state.lastIndex, idx), b = Math.max(state.lastIndex, idx);
+    const range = items.slice(a, b + 1).map(selItem);
+    if (state.mode === 'simple') {
+      state.selected = range;
+    } else {
+      const map = new Map(state.selected.map((s) => [s.path, s]));
+      range.forEach((s) => map.set(s.path, s));
+      state.selected = [...map.values()];
+    }
+    state.lastIndex = idx;
+    render();
+    return;
+  }
+
+  if (state.mode === 'simple') {
+    state.selected = isSel(target.path) ? [] : [target];
+  } else {
+    state.selected = isSel(target.path)
+      ? state.selected.filter((s) => s.path !== target.path)
+      : [...state.selected, target];
+  }
+  state.lastIndex = idx;
+  render();
+}
+
+document.addEventListener('click', (e) => {
+  const t = e.target.closest('[data-act]');
+  if (!t) return;
+  const act = t.dataset.act;
+
+  if (act === 'theme') {
+    state.theme = state.theme === 'dark' ? 'light' : 'dark';
+    render();
+    return;
+  }
+  if (act === 'scenario') {
+    state.scenario = t.dataset.v;
+    state.tab = state.scenario === 'compress' ? 1 : 0;
+    state.selected = [];
+    state.filter = '';
+    state.lastIndex = -1;
+    if (state.scenario === 'extract') state.cwd = 'C:\\Users\\You\\Downloads';
+    state.targetDir = state.scenario === 'compress' ? 'C:\\Users\\You\\Documents' : 'C:\\Users\\You\\Downloads\\backup-2026-10';
+  if (state.scenario === 'extract-to') preselectArchiveEntries();
+    render();
+    return;
+  }
+  if (act === 'tab') {
+    state.tab = Number(t.dataset.v);
+    state.lastIndex = -1;
+    render();
+    return;
+  }
+  if (act === 'mode') {
+    const next = t.dataset.v;
+    if (next !== state.mode) {
+      state.mode = next;
+      // 切到简单模式时，只保留当前目录里的已选项，避免「看不见却被带入」的结果
+      if (next === 'simple' && state.scenario !== 'extract-to') {
+        state.selected = state.selected.filter((s) => dirOf(s.path) === state.cwd);
+      }
+      toast(next === 'simple' ? '简单模式：选中即结果，切换目录会重置' : '高级模式：勾选可跨目录累积');
+      render();
+    }
+    return;
+  }
+  if (act === 'qp-tab') {
+    const v = t.dataset.v;
+    if (v !== state.qpTab) {
+      state.qpTab = v;
+      state.qpQuery = '';
+      if (v === 'tree') state.expanded.add('C:');
+      render();
+    }
+    return;
+  }
+  if (act === 'qp-go') { navigate(t.dataset.path); return; }
+  if (act === 'qp-drive') {
+    if (state.expanded.has('C:')) state.expanded.delete('C:'); else state.expanded.add('C:');
+    render();
+    return;
+  }
+  if (act === 'toggle-tree') { /* 由树的行点击统一处理，避免双重触发 */ return; }
+  if (act === 'nav') { navigate(t.dataset.path); return; }
+  if (act === 'up') {
+    if (state.scenario === 'extract-to') { toast('压缩包内条目没有上级目录'); return; }
+    const up = dirOf(state.cwd);
+    navigate(up === state.cwd ? state.cwd : up);
+    return;
+  }
+  if (act === 'home') { navigate('C:\\Users\\You'); return; }
+  if (act === 'row' || act === 'cb') {
+    const idx = Number(t.dataset.idx);
+    applyRowSelect(pickerItems(), idx, e.shiftKey);
+    return;
+  }
+  if (act === 'selectall') {
+    const map = new Map(state.selected.map((s) => [s.path, s]));
+    pickerItems().forEach((it) => map.set(it.path, selItem(it)));
+    state.selected = [...map.values()];
+    render();
+    return;
+  }
+  if (act === 'arc-files' || act === 'arc-root' || act === 'arc-dirs') {
+    const all = archiveItems();
+    const pick = act === 'arc-files'
+      ? all.filter((it) => !it.isDir)
+      : act === 'arc-root'
+        ? all.filter((it) => (it.depth || 0) === 0)
+        : all.filter((it) => it.isDir);
+    state.selected = pick.map(selItem);
+    render();
+    return;
+  }
+  if (act === 'rm') {
+    const idx = Number(t.dataset.idx);
+    state.selected.splice(idx, 1);
+    render();
+    return;
+  }
+  if (act === 'locate') {
+    const idx = Number(t.dataset.idx);
+    const s = state.selected[idx];
+    if (!s) return;
+    if (state.scenario === 'extract-to') { toast('压缩包内条目没有对应的文件夹'); return; }
+    const dir = dirOf(s.path);
+    if (!dir) return;
+    navigate(dir, true);
+    if (state.mode === 'simple') { state.selected = [s]; render(); }
+    toast(`已定位到 ${dir}`);
+    return;
+  }
+  if (act === 'clear') { state.selected = []; render(); return; }
+  if (act === 'pv-expand') {
+    const keys = [];
+    const walk = (ns) => ns.forEach((n) => { if (n.isDir && n.children.length) { keys.push(n.key); walk(n.children); } });
+    walk(previewTree());
+    state.pvCollapsed = state.pvCollapsed.size === 0 ? new Set(keys) : new Set();
+    renderPreview();
+    return;
+  }
+  if (act === 'pv-toggle') {
+    const key = t.dataset.key;
+    if (state.pvCollapsed.has(key)) state.pvCollapsed.delete(key); else state.pvCollapsed.add(key);
+    renderPreview();
+    return;
+  }
+  if (act === 'preserve') { state.preserveFullPath = !state.preserveFullPath; render(); return; }
+  if (act === 'pickdir') { state.targetDir = t.dataset.path; render(); toast('目标目录：' + state.targetDir); return; }
+  if (act === 'newfolder') { toast('原型：将弹出「新建文件夹」输入框（真实实现走 CustomFilePickerControl）'); return; }
+  if (act === 'cancel') { toast('取消：不写回任何选择'); return; }
+  if (act === 'ok') {
+    const n = state.selected.length;
+    const names = state.selected.slice(0, 3).map((s) => s.name).join('、');
+    toast(n ? `确定：带回 ${n} 项（${names}${n > 3 ? '…' : ''}），共 ${formatSize(totalSize())}` : '确定：没有选择任何项');
+    return;
+  }
+});
+
+/* 双击目录进入（列表行） */
+document.addEventListener('dblclick', (e) => {
+  const row = e.target.closest('.lrow.dir');
+  if (!row) return;
+  const path = row.dataset.path;
+  navigate(path);
+});
+
+/* 过滤框：保持焦点与光标位置 */
+document.addEventListener('input', (e) => {
+  if (e.target.id === 'qpSearch') {
+    state.qpQuery = e.target.value || '';
+    const body = document.getElementById('qpBody');
+    if (body) body.innerHTML = qpBodyHtml();
+    return;
+  }
+  if (e.target.id === 'outputNameBox') { state.outputName = e.target.value || 'archive.zip'; renderPreview(); return; }
+  if (e.target.id === 'targetDirBox') { state.targetDir = e.target.value; renderPreview(); return; }
+  if (e.target.id !== 'filterBox') return;
+  state.filter = e.target.value;
+  state.lastIndex = -1;
+  const pos = e.target.selectionStart;
+  renderBody();
+  const box = $('#filterBox');
+  if (box) { box.focus(); box.setSelectionRange(pos, pos); }
+});
+
+render();
+</script>
+</body>
+</html>

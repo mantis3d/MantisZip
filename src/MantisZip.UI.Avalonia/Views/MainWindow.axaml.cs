@@ -275,8 +275,22 @@ public partial class MainWindow : Window
             }
         };
 
-        vm.ShowExtractFolderPicker = (entries, initialPath, currentFolder, preserveFullPath) =>
-            CustomFilePickerDialog.ShowExtractFolderAsync(this, entries, initialPath, currentFolder, preserveFullPath);
+        // 条目选择模式（v0.5.5 第三步后半）：弹解压设置窗的「选择要解压的文件」页，
+        // 窗口自己执行（确认即载荷 + 唯一执行器），返回值只表示「已确认」还是「取消」。
+        vm.ShowExtractEntryPicker = async (allEntries, presetEntries, initialPath, currentFolder, password) =>
+        {
+            var session = new ExtractSession();
+            var presenter = new MainWindowProgressPresenter();
+            var context = new ExtractRunContext(Owner: this, Presenter: presenter, ExitPolicy.None);
+            return await ExtractSettingsWindow.ShowWithPresetSelectionAsync(
+                this, session, context,
+                new[] { vm.CurrentArchivePath! },
+                allEntries,
+                presetEntries,
+                initialPath ?? string.Empty,
+                currentFolder,
+                password);
+        };
 
         vm.ShowCompressSettingsDialog = async (sourcePaths) =>
         {
@@ -1462,13 +1476,11 @@ public partial class MainWindow : Window
         return await CustomFilePickerDialog.ShowOpenFileAsync(
             this,
             initialPath: contextPath,
-            // 过滤模式从引擎工厂的单一事实源派生：早先这里硬编码 8 项，
+            // 文件类型下拉项从引擎工厂的单一事实源派生：早先这里硬编码 8 项，
             // 新增 .jar/.war/.ear/.apk（issue #54）时很容易漏同步。
             // 分卷集只认第一卷、故补 *.001（issue #70③）；设置 →「文件类型关联」里的自定义扩展名也一并纳入。
-            fileExtensions:
-            [
-                .. ArchiveFormatHelper.BuildOpenDialogPatterns(AppSettings.Load())
-            ]);
+            // 第三项「自解压程序 (*.exe)」默认不选中（issue #36）：只有要打开 SFX 时才需要列出 exe。
+            fileTypes: [.. ArchiveFormatHelper.BuildOpenDialogFileTypes(AppSettings.Load())]);
     }
 
     /// <summary>

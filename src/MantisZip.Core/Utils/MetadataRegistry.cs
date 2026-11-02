@@ -64,6 +64,9 @@ public static class MetadataKeys
     public const string Architecture = "Architecture";
     public const string Subsystem = "Subsystem";
     public const string Description = "Description";
+    public const string LegalCopyright = "LegalCopyright";
+    public const string OriginalFilename = "OriginalFilename";
+    public const string Language = "Language";
 
     // ── 字体 ──
     public const string FontName = "FontName";
@@ -132,6 +135,9 @@ public static class MetadataRegistry
             new(MetadataKeys.Architecture, "架构", "PE 信息"),
             new(MetadataKeys.Subsystem, "子系统", "PE 信息"),
             new(MetadataKeys.Description, "说明", "PE 信息"),
+            new(MetadataKeys.OriginalFilename, "原始文件名", "PE 信息"),
+            new(MetadataKeys.Language, "语言", "PE 信息"),
+            new(MetadataKeys.LegalCopyright, "著作权", "PE 信息"),
         ]);
 
         Register("image", [

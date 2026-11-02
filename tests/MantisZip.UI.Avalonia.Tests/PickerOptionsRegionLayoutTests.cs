@@ -332,11 +332,15 @@ private static ItemsControl FindOptionsItemsControl(CustomFilePickerDialog dialo
         }
     }
 
-    /// <summary>读取对话框 AXAML 源码（归一化空白，避免换行格式影响匹配）。</summary>
+    /// <summary>读取选择器 AXAML 源码（归一化空白，避免换行格式影响匹配）。</summary>
+    /// <remarks>
+    /// 2026-10-30：参数区已从 <c>Dialogs/CustomFilePickerDialog.axaml</c> 搬进
+    /// <c>Controls/CustomFilePickerControl.axaml</c>（内嵌化重构），被断言的三段源码随之搬家。
+    /// </remarks>
     private static string ReadDialogXaml() =>
         System.Text.RegularExpressions.Regex.Replace(
             File.ReadAllText(Path.Combine(GetRepoRoot(), "src", "MantisZip.UI.Avalonia",
-                "Dialogs", "CustomFilePickerDialog.axaml")),
+                "Controls", "CustomFilePickerControl.axaml")),
             @"\s+", " ");
 
     /// <summary>仓库根发现：自测试程序集输出目录上溯，直到找到含 <c>src</c> 的目录。
