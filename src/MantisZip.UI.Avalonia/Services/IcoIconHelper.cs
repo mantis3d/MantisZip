@@ -37,22 +37,27 @@ internal static class IcoIconHelper
     private const int ListIconSize = 16;
 
     /// <summary>
-    /// 解码 ICO 字节中面积最接近 16×16 的那一帧（文件列表行图标用）。
+    /// 解码 ICO 字节中边长最接近 16 的那一帧（文件列表行图标用）。
     /// </summary>
     /// <param name="icoData">完整的 ICO 文件字节（从文件头开始）。</param>
     /// <returns>解码后的位图；数据非法或解码失败时返回 <see langword="null"/>（不抛异常）。</returns>
     public static Bitmap? ExtractIcon(byte[] icoData) => ExtractIcon(icoData, ListIconSize);
 
     /// <summary>
-    /// 解码 ICO 字节中面积最接近 <paramref name="preferredSize"/> 平方的那一帧。
+    /// 解码 ICO 字节中边长最接近 <paramref name="preferredSize"/> 的那一帧。
     /// </summary>
     /// <param name="icoData">完整的 ICO 文件字节（从文件头开始）。</param>
-    /// <param name="preferredSize">期望的显示边长（像素）：16 = 列表行图标，128 = 缩略图卡。
-    /// ICO 里通常并存 16/32/48/64/128/256 多帧，取面积最接近的那帧才不会被「小图放大」糊掉。</param>
+    /// <param name="preferredSize">期望的显示边长（像素）：16 = 列表行图标，160 = 128px 缩略图卡
+    /// （见 <c>ThumbnailService</c> 里的说明：比卡片尺寸略大，才能在「只有 256 与 16 两帧」时选 256）。</param>
     /// <returns>解码后的位图；数据非法或解码失败时返回 <see langword="null"/>（不抛异常）。</returns>
+    /// <remarks>
+    /// 挑帧用**边长差**而不是面积差：面积差会严重偏向小帧 —— 帧集合 {16, 256} 对 128 的面积差是
+    /// 16128 与 49152，于是「最接近 128」反而选中 16 帧（放大到 128 糊成一团）；按边长差则 256 胜出。
+    /// 宁可拿大帧缩小（清晰），也不要拿小帧放大（糊）。
+    /// </remarks>
     public static Bitmap? ExtractIcon(byte[] icoData, int preferredSize)
     {
-        var targetArea = (long)Math.Max(1, preferredSize) * Math.Max(1, preferredSize);
+        var preferredSide = Math.Max(1, preferredSize);
 
         try
         {
@@ -87,8 +92,8 @@ internal static class IcoIconHelper
                 long width = icoData[entryOffset] == 0 ? 256 : icoData[entryOffset];
                 long height = icoData[entryOffset + 1] == 0 ? 256 : icoData[entryOffset + 1];
 
-                // 按面积差挑帧：面积最接近目标边长平方的那一帧缩放后最清晰（16 = 列表图标，128 = 缩略图）
-                long score = Math.Abs(width * height - targetArea);
+                // 按边长差挑帧（不用面积差，理由见方法 remarks）
+                long score = Math.Abs(Math.Max(width, height) - preferredSide);
                 if (score < bestScore)
                 {
                     bestScore = score;
@@ -135,7 +140,7 @@ internal static class IcoIconHelper
             WriteUInt32(singleFrameIco, HeaderSize + 12, RepackedFrameOffset);
             Buffer.BlockCopy(icoData, frameStartInt, singleFrameIco, RepackedFrameOffset, frameLengthInt);
 
-            return DecodeSingleFrame(singleFrameIco, icoData, targetArea);
+            return DecodeSingleFrame(singleFrameIco, icoData, preferredSide);
         }
         catch (Exception ex)
         {
@@ -150,8 +155,8 @@ internal static class IcoIconHelper
     /// </summary>
     /// <param name="singleFrameIco">重打包好的单帧 ICO 字节。</param>
     /// <param name="icoData">原始 ICO 字节（兜底时重新逐帧解析用）。</param>
-    /// <param name="targetArea">期望面积（兜底逐帧挑选时用）。</param>
-    private static Bitmap? DecodeSingleFrame(byte[] singleFrameIco, byte[] icoData, long targetArea)
+    /// <param name="preferredSide">期望边长（兜底逐帧挑选时用）。</param>
+    private static Bitmap? DecodeSingleFrame(byte[] singleFrameIco, byte[] icoData, long preferredSide)
     {
         try
         {
@@ -166,14 +171,14 @@ internal static class IcoIconHelper
         // 兜底：运行平台的解码器不认 ICO 容器时（Skia 的 ICO 支持并非所有构建都启用），
         // 改用预览画廊那条已验证的路径 —— IcoParser 会分别解码 PNG 帧与 BMP/DIB 帧
         // （含剥离 AND 掩码），再按面积挑最接近目标边长的一帧。
-        return DecodeViaIcoParser(icoData, targetArea);
+        return DecodeViaIcoParser(icoData, preferredSide);
     }
 
     /// <summary>
-    /// 用既有 <see cref="IcoParser"/> 逐帧解码并挑出面积最接近 <paramref name="targetArea"/> 的一帧。
+    /// 用既有 <see cref="IcoParser"/> 逐帧解码并挑出边长最接近 <paramref name="preferredSide"/> 的一帧。
     /// 未被选中的帧立刻释放，避免为了一个小图标白留几张 256×256 位图。
     /// </summary>
-    private static Bitmap? DecodeViaIcoParser(byte[] icoData, long targetArea)
+    private static Bitmap? DecodeViaIcoParser(byte[] icoData, long preferredSide)
     {
         try
         {
@@ -186,7 +191,7 @@ internal static class IcoIconHelper
 
             foreach (var frame in frames)
             {
-                long score = Math.Abs(((long)frame.Width * frame.Height) - targetArea);
+                long score = Math.Abs(Math.Max(frame.Width, frame.Height) - preferredSide);
                 if (score < bestScore)
                 {
                     bestScore = score;

@@ -45,6 +45,16 @@ public sealed class ThumbnailService : IDisposable
     /// <summary>缩略图最长边（像素）。</summary>
     public const int ThumbnailSize = 128;
 
+    /// <summary>
+    /// 从 ICO 里挑帧时「期望边长」——**故意大于 <see cref="ThumbnailSize"/>**。
+    /// </summary>
+    /// <remarks>
+    /// 老图标常见「只有 256 与 16 两帧」，若按 128 找最接近的帧，256 差 128、16 差 112 ⇒ 会选中 16 帧，
+    /// 放大到 128 糊成一团。取 160 时 256 只差 96、16 差 144 ⇒ 选中 256 帧，缩到 128 反而清晰。
+    /// 一句话：宁可拿大帧缩小，也不要拿小帧放大。
+    /// </remarks>
+    public const int IcoThumbnailPreferredSide = 160;
+
     /// <summary>单个条目允许生成缩略图的大小上限（8MB），超过直接跳过。</summary>
     public const long MaxThumbnailEntrySize = 8L * 1024 * 1024;
 
@@ -286,14 +296,17 @@ public sealed class ThumbnailService : IDisposable
     }
 
     /// <summary>
-    /// 字节 → 128px 缩略图。<c>.ico</c> 走多尺寸图标提取（取最接近 128 的帧，不是列表图标的 16），
+    /// 字节 → 128px 缩略图。<c>.ico</c> 走多尺寸图标提取（取边长最接近 160 的帧，不是列表图标的 16），
     /// <c>.svg</c> 走矢量渲染（矢量按 128 重绘，不受其声明尺寸限制），其余走 Skia 位图解码。
     /// </summary>
     private static Bitmap? DecodeImage(byte[] bytes, string extension)
     {
-        // 缩略图卡是 128px：必须取 ico 里最接近 128 的那一帧，取 16 帧再放大会糊成一团。
+        // 缩略图卡是 128px，但这里**故意要 160**：ico 里常见「只有 256 和 16 两帧」的老图标，
+        // 若按 128 找最接近，256 差 128、16 差 112 ⇒ 会选中 16 帧（放大到 128 糊成一团）；
+        // 要 160 时 256 只差 96、16 差 144 ⇒ 选中 256 帧（缩小到 128，清晰）。
+        // 一句话：宁可拿大帧缩小，也不要拿小帧放大。
         if (extension.Equals(".ico", StringComparison.OrdinalIgnoreCase))
-            return IcoIconHelper.ExtractIcon(bytes, ThumbnailSize);
+            return IcoIconHelper.ExtractIcon(bytes, IcoThumbnailPreferredSide);
 
         // 项目已引用 Svg.Skia（MantisZip.UI.Avalonia.csproj），矢量图单独渲染成位图，
         // 否则 SKBitmap.Decode 对 SVG 只会返回 null。

@@ -7,7 +7,7 @@ using Xunit;
 namespace MantisZip.UI.Avalonia.Tests;
 
 /// <summary>
-/// <see cref="IcoIconHelper"/> 的用例：手工打包 ICO 容器，验证「挑最接近 16×16 的帧」与「坏数据返回 null」。
+/// <see cref="IcoIconHelper"/> 的用例：手工打包 ICO 容器，验证「挑边长最接近目标的帧」与「坏数据返回 null」。
 ///
 /// <para>
 /// 这里用真实 Skia 生成 PNG 帧（见 <c>TestAppBuilder</c> 的 <c>UseHeadlessDrawing=false</c>）：
@@ -55,29 +55,46 @@ public class IcoIconHelperTests
     }
 
     [AvaloniaFact]
-    public void ExtractIcon_WithPreferredSize128_ChoosesClosestTo128x128()
+    public void ExtractIcon_WithPreferredSide160_ChoosesClosestTo160x160()
     {
-        // 缩略图卡是 128px：多帧 ico 必须取 128 帧，不能取 16 帧再放大（会糊）
+        // 缩略图卡是 128px，但挑帧要按 160 找（见 ThumbnailService.IcoThumbnailPreferredSide）：
+        // 多帧 ico 必须取 128 帧，不能取 16 帧再放大（会糊）
         var icoData = PackIco(
             (CreatePngBytes(16, 16), 16, 16),
             (CreatePngBytes(128, 128), 128, 128),
             (CreatePngBytes(32, 32), 32, 32));
 
-        using var icon = IcoIconHelper.ExtractIcon(icoData, 128);
+        using var icon = IcoIconHelper.ExtractIcon(icoData, ThumbnailService.IcoThumbnailPreferredSide);
 
         Assert.NotNull(icon);
         Assert.Equal(new PixelSize(128, 128), icon!.PixelSize);
     }
 
     [AvaloniaFact]
-    public void ExtractIcon_WithPreferredSize128_FallsBackToLargestWhenNoLargeFrame()
+    public void ExtractIcon_Only16And256_WithPreferredSide160_Chooses256()
     {
-        // 只有 16/48 两帧时，128 的「面积最接近」仍是 48（而不是 16）
+        // 回归：老图标常见「只有 256 与 16 两帧」。若按面积差找最接近 128 的帧，
+        // 16 帧（面积差 16128）会赢过 256 帧（面积差 49152）⇒ 选中 16 再放大，糊。
+        // 按边长差找 160 时 256 差 96、16 差 144 ⇒ 必须选中 256。
+        var icoData = PackIco(
+            (CreatePngBytes(16, 16), 16, 16),
+            (CreatePngBytes(256, 256), 0, 0));
+
+        using var icon = IcoIconHelper.ExtractIcon(icoData, ThumbnailService.IcoThumbnailPreferredSide);
+
+        Assert.NotNull(icon);
+        Assert.Equal(new PixelSize(256, 256), icon!.PixelSize);
+    }
+
+    [AvaloniaFact]
+    public void ExtractIcon_WithPreferredSide160_FallsBackToLargestWhenNoLargeFrame()
+    {
+        // 只有 16/48 两帧时，按边长差找 160 仍是 48（而不是 16）
         var icoData = PackIco(
             (CreatePngBytes(16, 16), 16, 16),
             (CreatePngBytes(48, 48), 48, 48));
 
-        using var icon = IcoIconHelper.ExtractIcon(icoData, 128);
+        using var icon = IcoIconHelper.ExtractIcon(icoData, ThumbnailService.IcoThumbnailPreferredSide);
 
         Assert.NotNull(icon);
         Assert.Equal(new PixelSize(48, 48), icon!.PixelSize);
