@@ -18,6 +18,9 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 - **记住窗口尺寸** — 压缩设置窗、解压设置窗、文件选择器和设置窗口的尺寸现在会被记住（含两个设置窗的左右分栏宽度），下次打开回到上次拖动后的大小。只记尺寸不记位置：笔记本拔掉外接屏后把窗口还原到已不存在的坐标，很容易整窗跑到屏幕外；保存的尺寸不合法（0、负数、异常值）时一律回落到默认大小
 - **Window sizes are remembered** — the compression window, the extraction window, the file picker and the settings window now remember their size (including the left/right split width of the two settings windows), so they reopen at the size you last dragged them to. Size only, not position: after unplugging an external monitor, restoring a window to coordinates that no longer exist easily pushes it off-screen; and invalid saved sizes (zero, negative, garbage) always fall back to the default
 
+- **文件名代码页可以手动切换了** — 打开 Big5、Shift-JIS 等旧编码命名的压缩包不再乱码：主工具栏末尾的代码页下拉选中即重载列表，「其他代码页…」还能填自定义数字，设置页可设「默认读取代码页」。
+
+- **File-name code pages can now be switched manually** — archives whose names use Big5, Shift-JIS or another legacy code page no longer show garbled names: pick a code page from the dropdown at the end of the main toolbar and the list reloads immediately, "Other code page..." accepts a custom number, and the settings window holds the default.
 **性能 / Performance**
 
 - **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）整包解压从 19 秒降到 1.7 秒，只解其中选中的条目也有 4 倍以上的提升（10 秒 → 2.3 秒）。只对未加密的 7z 生效：ZIP/RAR 与单文件解压不受影响，条目很多的包会先短暂显示「正在检查冲突…」再开始解压。
