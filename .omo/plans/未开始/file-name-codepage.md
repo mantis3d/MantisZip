@@ -1,6 +1,6 @@
 # 文件名代码页：检测结果回显 + 手动切换（Bandizip 式）
 
-> **状态**：📋 待实施（2026-11-02 范围已定 B 档，三条细节待拍板）| 创建 2026-11-02
+> **状态**：📋 待实施（2026-11-02 范围已定 B 档、UI 位置已定**主工具栏**；另两条细节待拍板）| 创建 2026-11-02
 > **关联**：用户反馈「希望像 Bandizip 一样能检测并切换代码页」
 > **分支**：`beta`
 > **范围**：**B 档** —— 手动切换 + 检测结果回显 + 默认读取编码设置 + 删除/加文件按当前编码重写 + TAR/GZ 一并支持
@@ -20,7 +20,7 @@
 - **引擎是单例**：`ArchiveEngineFactory._engines`（`ArchiveEngine.cs:596-603`）静态注册 3 个实例 ⇒ 不能把「当前归档编码」存成引擎字段（并行解压多实例、CLI 并发会串味）。
 - **TAR/GZ 同样没设编码**：`TarGzEngine.ListEntriesAsync`（`:515`）与 `ReaderOptions` 用点（`:57/534/636/814`）都没给 `ArchiveEncoding` ⇒ SharpCompress 默认 UTF-8，GBK tar 也乱码。
 - **预览的编码下拉不是同一样东西**：`PreviewViewModel.EncodingOptions`（`PreviewViewModel.cs:122-138`）只喂 `TextEncodingDetector.DecodeText` 解**文件内容**（`:945-951`），偏好全局存 `AppSettings.TextEncodingPreference`（`Models/AppSettings.cs:164`）。文件名编码与它无关，两者要并存且互不覆盖。
-- **UI 落点**：`src/MantisZip.UI.Avalonia/Controls/ArchiveContentView.axaml:163` 是文件列表工具栏里的视图模式切换按钮，同一行右侧有位置放代码页下拉。
+- **UI 落点（已定，2026-11-02 用户指定）**：主窗口**顶层工具栏** —— `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml:82-214`（`Grid.Row="1"` 的 `Border` + 横向 `StackPanel`，按钮统一 `Classes="ToolbarButton"`，图标 + 文字竖排）。代码页下拉放在该 `StackPanel` 末尾（`密码` 按钮之后、`</StackPanel>` 之前，即 212–213 行之间），与 Bandizip 工具栏右侧的「代码页」下拉一致。注意 `Controls/ArchiveContentView.axaml` 是**延迟创建**的（`MainWindow.EnsureArchiveContent()`），把控件放进去会导致未开包时不实例化、开包后才出现重排；放顶层工具栏则始终存在、只按 `IsVisible` 切换。
 - **7z/RAR 不受影响**：7z.dll 内部用 UTF-16 表示条目名，`SevenZipEngine` 无需改造。
 
 ## 3. 三个硬约束
@@ -53,12 +53,12 @@
 - `ChangeArchiveNameEncodingCommand(string key)`：设值 → `RefreshArchive()` 重载清单，重载后尽量保持当前所在目录（目录已不存在则退回根）→ 状态栏提示实际生效的编码；
 - 打开新包时复位为 `AppSettings.ReadNameEncoding`（默认 `"auto"`），不沿用上一个包的选择。
 
-### 4.3 UI：文件列表工具栏 + 查看菜单
+### 4.3 UI：主窗口顶层工具栏（Bandizip 同位置）
 
-- `Controls/ArchiveContentView.axaml`：视图模式按钮右侧新增 `ComboBox`（`IsVisible="{Binding CanChangeNameEncoding}"`），
+- `Views/MainWindow.axaml` 顶层工具栏 `StackPanel` 末尾（`密码` 按钮之后）新增 `ComboBox`（`IsVisible="{Binding CanChangeNameEncoding}"`、`MinHeight="{DynamicResource ControlHeight}"`、`Background="{DynamicResource ThemeSurfaceBgBrush}"`、`Foreground="{DynamicResource ThemeTextPrimaryBrush}"`、`ToolTip.Tip="{Binding LocalizedStrings[Toolbar_NameEncoding]}"`）：
   首项「自动检测」+ 选中后追加回显（如「自动检测 · 检测到 GBK」，数据源项文本随 `DetectedNameEncoding` 刷新）；
   其后为固定编码项 + 「其他…」（选中后弹输入框填代码页数字）。
-- 菜单「查看」下新增「代码页」子菜单，与工具栏**同源绑定**（同一 `SelectedArchiveEncodingOption` 与命令）。
+- 不上「查看」菜单（用户 2026-11-02 指定「跟 Bandizip 一致」，Bandizip 只有工具栏入口）；若日后反馈不易发现，再补菜单项，属增量。
 - i18n 新增 key（三语）：`Toolbar_NameEncoding`（「代码页」）、`NameEncoding_Auto`（「自动检测」）、`NameEncoding_Detected`（「自动检测 · 检测到 {0}」）、`NameEncoding_Other`（「其他代码页…」）、`NameEncoding_OtherPrompt`（输入框标题/说明）、`Status_NameEncodingChanged`（「代码页已切换为 {0}」）、`NameEncoding_WriteWarning`（手动编码下写操作提示）。**逐条登记到 `MainWindowViewModel` 的 `LocalizedStrings` keys 数组**（规则 13）。
 
 ### 4.4 自动检测结果回显
@@ -86,7 +86,7 @@
 |---|---|---|
 | D1 | 范围 | B 档（手动切换 + 回显 + 默认设置 + 写路径安全 + TAR/GZ） |
 | D2 | 支持格式 | ZIP + TAR/GZ；7z/RAR 隐藏控件（7z.dll 给 UTF-16，无此问题） |
-| D3 | 下拉位置 | 文件列表工具栏（视图模式旁）**和** 查看菜单，同源绑定 |
+| D3 | 下拉位置 | **主窗口顶层工具栏末尾**（取 `ToolbarButton` 行右端、密码按钮之后），无菜单入口 —— 2026-11-02 用户拍板「跟 Bandizip 一致」 |
 | D4 | 编码清单 | 预览那套（UTF-8 / UTF-16 LE / GBK / GB18030 / Big5 / Shift-JIS / EUC-KR / 系统 ANSI）+ 「其他…」数字输入 |
 | D5 | 是否持久化每包选择 | 否；只持久化「默认读取编码」 |
 | D6 | 切换后视图状态 | 重新载入清单，保持当前目录（不存在则退回根），保持排序/视图模式 |
@@ -102,7 +102,7 @@
 | S1 | `ZipEngine.OpenArchiveWithEncodingFallback` 加编码参数 + 回调；`TarGzEngine` 四处 `ReaderOptions` | 2h |
 | S2 | 接口加参（`ListEntriesAsync`）+ `ArchiveOptions.ReadEncoding` + `ArchiveEntryExtractor` 四方法 + 8 个 `ListEntriesAsync` 调用点 + 解压/校验调用点透传 | 3h |
 | S3 | `MainWindowViewModel` 会话态、选项源、切换命令、`RefreshArchive` 保留目录 | 2h |
-| S4 | UI（工具栏下拉 + 菜单 + 「其他…」输入框）+ i18n 7 个 key × 3 语 + 规则 13 登记 | 2h |
+| S4 | UI（主工具栏 `ComboBox` + 「其他…」输入框）+ i18n 7 个 key × 3 语 + 规则 13 登记 + 规则 4 主题样式 | 2h |
 | S5 | 写路径（删除/添加/注释）用当前编码 + 写前确认闸 | 1.5h |
 | S6 | `AppSettings.ReadNameEncoding` + 设置页下拉 + 接线守卫 | 1h |
 | S7 | 测试（Core 5 例 + UI 2 例 + 接线守卫 1 例）+ 文档 + 全量门禁 | 2.5h |
@@ -133,14 +133,14 @@
 
 - Big5 / Shift-JIS / EUC-KR 命名的 ZIP：默认乱码 → 下拉切换后列表正确，且**预览、解压、拖拽、选中项解压四处名字一致**。
 - GBK 命名的 tar.gz：同样可切换。
-- 7z / RAR 看不到该控件。
+- 7z / RAR 看不到该控件；未打开归档时也不显示。
 - 自动模式显示「检测到 GBK」之类的实际结果。
 - Big5 包删除一个条目后，剩余文件名不乱。
 - 设置页「默认读取编码」改成 Big5 后，新开 Big5 包直接正确、新开 GBK 包仍可用自动。
 - `check` / `i18n` / `guards` 全绿；新增测试实跑通过；`docs/ARCHITECTURE.md` 补一节「文件名代码页」。
 
-## 10. 待拍板（三条，默认按推荐值执行）
+## 10. 待拍板（两条，默认按推荐值执行）
 
-1. **位置**（D3）：工具栏 + 查看菜单两处同源 —— 推荐；只放工具栏亦可。
+1. ~~位置~~（D3）：**已定 —— 主窗口顶层工具栏末尾**，与 Bandizip 一致，无菜单入口（2026-11-02 拍板）。
 2. **格式范围**（D2）：ZIP + TAR/GZ，7z/RAR 隐藏 —— 推荐；只做 ZIP 可省 S1 的一半与 TAR 测试。
 3. **编码清单**（D4）：含「其他…」代码页数字输入 —— 推荐（Bandizip 有这一项，用户碰到 GB2312/GB18030 之外的台湾/日文旧包时用得上）；不要则删该项与输入框。
