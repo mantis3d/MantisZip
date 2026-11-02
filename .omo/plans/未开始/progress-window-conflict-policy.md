@@ -41,9 +41,9 @@ TeraCopy 的做法是把这件事变成进度窗口里的一个可见控件：�
 | 入口 | 进度窗口构造点 | 现在的冲突策略来源 | 本计划 |
 |---|---|---|---|
 | 主窗口「解压到…」对话框 | `Services/MainWindowProgressPresenter.cs:59`（经 `ExtractSession`） | `ExtractSettings.ConflictAction`（`Models/ExtractSettings.cs:77`） | 控件 + 实时源 |
-| 主窗口「解压到此处」`ExtractArchiveHere` | 同上（`Views/MainWindow.axaml.cs:339` 的 `RunWithProgress`） | **无**（`MainWindowViewModel.Extract.cs:59` 不传 options → 静默覆盖） | 控件 + 实时源（同时修复 KI-010） |
+| 主窗口「解压到此处」`ExtractArchiveHere` | 同上（`Views/MainWindow.axaml.cs:353` 的 `RunWithProgress` 委托） | **无**（`MainWindowViewModel.Extract.cs:59` 不传 options → 静默覆盖） | 控件 + 实时源（同时修复 KI-010） |
 | 「解压到同名目录」`ExtractArchiveToName` | 同上 | **无**（`:104`） | 同上 |
-| 「智能解压」`SmartExtract` | 同上 | **无**（`:325`） | 同上 |
+| 「智能解压」`SmartExtract` | 同上 | **无**（`:335`） | 同上 |
 | 右键/拖拽「解压选中项」 | `Services/ExtractFlow.cs:85`（自建窗口） | `AppSettings.FileConflictAction`（`Models/AppSettings.cs:85`） | 控件 + 实时源 |
 | 主窗口压缩对话框 | `MainWindowProgressPresenter.cs:59`（经 `CompressSession`） | `CompressSettings.ConflictAction` | 控件 + 实时源 |
 | CLI 解压（单文件） | `App.CliExtract.cs:569` | `AppSettings.FileConflictAction` | 控件 + 实时源 |
