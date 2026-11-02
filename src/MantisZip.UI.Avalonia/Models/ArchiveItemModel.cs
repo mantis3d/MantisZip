@@ -71,6 +71,17 @@ public partial class ArchiveItemModel : ObservableObject
     private string? _textSnippet;
 
     /// <summary>
+    /// 元数据卡的文本行（Tile / Content 布局，仅**当前选中**的那一张卡会填）。
+    /// <para>
+    /// 与 <see cref="TextSnippet"/> 的区别：文本卡来自条目内容的头部摘录，元数据卡来自格式解析器
+    /// （音频 / 视频 / 字体 / 可执行等）；两者不会同时有值，优先级见 <see cref="ShowMetadataCard"/>。
+    /// null 或空集合 = 该条目没有可展示的元数据（卡片回退到大图标）。
+    /// </para>
+    /// </summary>
+    [ObservableProperty]
+    private IReadOnlyList<string>? _metadataCardLines;
+
+    /// <summary>
     /// 卡片布局（Tile / Content）里的选中视觉状态；详情布局用 DataGrid 自带的行选中，不读此属性。
     /// </summary>
     [ObservableProperty]
@@ -138,11 +149,25 @@ public partial class ArchiveItemModel : ObservableObject
         OnPropertyChanged(nameof(ShowSmallIcon));
     }
 
-    /// <summary>卡片是否走「大图标」兜底：无缩略图内容且拿到了大尺寸图标。</summary>
-    public bool ShowLargeIcon => !HasThumbnailContent && LargeIconSource != null;
+    partial void OnMetadataCardLinesChanged(IReadOnlyList<string>? value)
+    {
+        OnPropertyChanged(nameof(ShowMetadataCard));
+        OnPropertyChanged(nameof(ShowLargeIcon));
+        OnPropertyChanged(nameof(ShowSmallIcon));
+    }
 
-    /// <summary>卡片是否走「小图标原尺寸」兜底：无缩略图内容且没有大图标可用（非 Windows 常见）。</summary>
-    public bool ShowSmallIcon => !HasThumbnailContent && LargeIconSource == null;
+    /// <summary>
+    /// 卡片是否显示「元数据文字卡」。优先级：缩略图 &gt; 文本摘录 &gt; 元数据 &gt; 大图标。
+    /// 三者互斥，避免同一张卡叠两层文字。
+    /// </summary>
+    public bool ShowMetadataCard =>
+        !HasThumbnailContent && MetadataCardLines is { Count: > 0 };
+
+    /// <summary>卡片是否走「大图标」兜底：无缩略图内容、无元数据卡且拿到了大尺寸图标。</summary>
+    public bool ShowLargeIcon => !HasThumbnailContent && !ShowMetadataCard && LargeIconSource != null;
+
+    /// <summary>卡片是否走「小图标原尺寸」兜底：无缩略图内容、无元数据卡且没有大图标可用（非 Windows 常见）。</summary>
+    public bool ShowSmallIcon => !HasThumbnailContent && !ShowMetadataCard && LargeIconSource == null;
 
     partial void OnLargeIconSourceChanged(Bitmap? value)
     {

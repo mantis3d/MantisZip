@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-02** — 功能：卡片元数据文字（选中项，v0.5.6 收尾追加）
+  - **背景**：卡片布局里没有缩略图也没有文本摘录的条目只能显示系统大图标（音频是播放图标、字体是字体图标），用户看不出「这是什么文件」。而 Core 里早就有这些格式的解析器（`FlacParser` / `RiffParser` / `Id3v2Parser` / `VideoParser` / `FontParser` / `PeParser`），预览面板也正是靠它们显示时长、分辨率、字形数、产品版本。用户（2026-11-02）问：能不能像文本缩略图那样把这些压成几行字显示在卡片上？
+  - **范围决策**：只做「当前选中」的那一张卡（每张卡都读一遍条目等于再叠一遍缩略图的 I/O）；首批覆盖音频 / 视频 / 字体 / 可执行四族（解析器现成、字段密度高），Office 与 PDF 需要整包读，留后续。
+  - **取数**（`src/MantisZip.UI.Avalonia/Services/MetadataCardService.cs`）：`Classify` 按扩展名判断格式族 → 超过 `MaxEntryBytes`（64 MB）直接返回空 → `ArchiveEntryExtractor.ExtractEntryAsync` 把条目落到 `%TEMP%\MantisZip\MetaCard\meta_{fnv64}{ext}` → 调对应解析器 → 排版。**独立临时目录**，不与 `PreviewService.ExtractToTempAsync` 共用单槽，避免预览与卡片互相删文件；换条目时删上一个；任何异常都只记一行 `App.DebugLog` 并回退大图标。
+  - **排版**（`Services/MetadataCardFormatter.cs`）：纯函数 `BuildLines(kind, info, labels)`，最多 3 行、空行丢弃、只有值不带标签（128 卡片一行只剩 ~110 px ≈ 20 个半角字符）。音频 = 「时长 · 码率」+「采样率 · 声道」+「标题 · 艺术家 · 专辑」；视频 = 「分辨率 · 时长」+「编码 · 容器名」+「标题」；字体 = 「字体名 · 字重」+「字形数 · 表数」；可执行 = 「产品名 · 版本」+「公司 · 架构 · 子系统」。文案（单声道 / 立体声 / `{0} 声道` / `{0} 字形` / `{0} 表`）走 `MetadataCardLabels.FromLocalization()` 取三语 json，测试传固定表（规则 13）。
+  - **卡片与优先级**：`ArchiveItemModel.MetadataCardLines` + `ShowMetadataCard`；`ShowLargeIcon` / `ShowSmallIcon` 加 `!ShowMetadataCard` ⇒ 四级互斥「缩略图 > 文本摘录 > 元数据 > 大图标」。`Controls/ArchiveContentView.axaml` 的 `ThumbnailContentCard` 里加 ②b 块（`Border` + `ItemsControl`，11 px 次要前景色）。
+  - **触发时序**（`ViewModels/MainWindowViewModel.MetadataCard.cs`）：`OnSelectedEntryChanged` → `RefreshMetadataCard`（取消上一轮 CTS → **先清旧卡文字** → 详情布局短路 → 发起取数）；异步回写前做「取消标记 + 归属条目」双重确认。`OnLayoutModeChanged` 也接一处：从详情切回卡片布局时选中项没变、不会触发选中变化，需要补一次；切回详情则清空并放弃在途取数。
+  - **两轮回炉（真机截图驱动）**：①第一版把「时长 · 码率 · 采样率 · 声道 · 位深」拼成一行，128 卡片里折成「… · 16」+「bit」，改为两条技术行并去掉位深（预览面板里仍有）；②视频第一版「分辨率 · 时长 · 编码」会把编码挤到下一行行首、行尾留一个多余分隔符「1080×1080 · 0:07 ·」，改成「分辨率 · 时长」/「编码 · 容器名」/「标题」。
+  - **验证**：真机 `%TEMP%\mz-meta.zip`（wav / ttf / mp4 / exe / dll）逐一选中，四张卡分别显示 `0:05 · 705 kbps`+`22050 Hz · 立体声`、`Arial · Normal`+`4,503 字形`、`1080×1080 · 0:07`+`H.264 · MP4 视频`、`PE 可执行文件`+`x64 · Other`；改选后旧卡文字立即消失。Release `--no-incremental` 0 警告；`-Task test -Target ui-tests` 全绿（新增 20 例）；`-Task i18n` 1428 key。
+  - **留白**：没做卡片级缓存（改选回上一个条目会重读一次）；若以后改成「所有卡都显示」，必须补缓存并与 `ThumbnailService` 共用并发上限。
+
 **2026-11-02** — 功能：缩略图卡片外观设置 + 清晰度修正（v0.5.6 收尾追加）
   - **背景**：平铺/内容布局的卡片外观是写死的（128 px、无边框、透明区域露出列表底色）。用户提出：能否加外边框（白底图贴在浅色背景上分不清边界）、带透明通道的图能否改垫纯色底；追加要求是垫色要能自选、外边框默认关、尺寸也要可调。随后又报 `.ico` / `.svg` 的缩略图「用最低分辨率放大，很模糊」。
   - **设置项（资源注入，不碰解码与模型）**：`AppSettings` 四个字段 `ThumbnailShowBorder`(false) / `ThumbnailUseTransparency`(true) / `ThumbnailBackdropColor`("#FFFFFF") / `ThumbnailSize`(128)；`App.Theming.ApplyThumbnailStyle()` 把它们翻成五个资源键（`ThumbnailCardBorderThickness` / `ThumbnailCardBackdropBrush` / `ThumbnailCardSize` / `ThumbnailTileItemWidth` / `ThumbnailTileCellWidth`），`ArchiveContentView.axaml` 的卡片改 `Border` 包 `Panel`、宽高边框背景全 `DynamicResource`，平铺 `WrapPanel ItemWidth` 与项宽、内容行首列 `Auto` 一并资源化。设置保存后 `App.RefreshThumbnailStyle()` → `ThumbnailStyleChanged` 事件 → 主窗 `ReloadThumbnailsForStyleChange()`，即时生效不重启。
