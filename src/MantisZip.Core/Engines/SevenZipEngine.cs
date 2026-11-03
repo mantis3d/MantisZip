@@ -1433,11 +1433,11 @@ public class SevenZipEngine : IArchiveEngine
 
                 var fileEntries = extractor.ArchiveFileData.Where(e => !e.IsDirectory).ToList();
 
-                // 2. RAR5 块链结构校验（issue #69 在 RAR 上的残留）：7z.dll 的 Check 只校验数据区与块头，
-                //    不校验卷尾 end-of-archive 块的头 CRC —— 末卷尾部被改坏时 Check 仍返回 true
-                //    （WinRAR 真分卷实测），而 7-Zip / UnRAR 命令行都报「Headers Error」。
-                //    这里按 RAR5 规范独立走一遍块链：头 CRC 不符 / 块越界 / 缺结束块 / 缺末卷都判无效。
-                //    非 RAR5（含 RAR4 与头部加密）返回 Unknown，行为与之前保持一致。
+                // 2. RAR 块链结构校验（issue #69 在 RAR 上的残留，issue #68 补 RAR4）：7z.dll 的 Check
+                //    只校验数据区与块头，不校验卷尾 end-of-archive 块的头 CRC —— 末卷尾部被改坏时
+                //    Check 仍返回 true（WinRAR 真分卷实测），而 7-Zip / UnRAR 命令行都报「Headers Error」。
+                //    这里按 RAR5 / RAR4 各自规范独立走一遍块链：头 CRC 不符 / 块越界 / 缺结束块 / 缺末卷
+                //    都判无效。头部加密或非 RAR 返回 Unknown，行为与之前保持一致。
                 if (valid
                     && RarHeaderValidator.Validate(archivePath, out var structureReason) == RarStructureStatus.Broken)
                 {

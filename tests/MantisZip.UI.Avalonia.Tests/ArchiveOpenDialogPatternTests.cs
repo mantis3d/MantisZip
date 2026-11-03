@@ -16,8 +16,10 @@ public class ArchiveOpenDialogPatternTests
         Assert.Contains("*.zip", patterns);
         Assert.Contains("*.7z", patterns);
         Assert.Contains("*.rar", patterns);
-        // issue #70③：分卷包只有第一卷（*.001）能选，其余卷由引擎回退。
+        // issue #70③ / #68：分卷包只有「能打开整组的那一卷」能选（数字分卷是 *.001、
+        // PKZIP 跨卷是 *.z01），其余卷由引擎回退。
         Assert.Contains("*.001", patterns);
+        Assert.Contains("*.z01", patterns);
     }
 
     [Fact]
@@ -34,11 +36,11 @@ public class ArchiveOpenDialogPatternTests
     [Fact]
     public void InvalidCustomExtensions_AreIgnored()
     {
-        // 显式传列表时不再叠加内置扩展名；非法项被忽略后只剩恒可见的分卷首卷。
+        // 显式传列表时不再叠加内置扩展名；非法项被忽略后只剩恒可见的分卷首卷（数字分卷 + PKZIP 跨卷）。
         var patterns = ArchiveFormatHelper.BuildOpenDialogPatterns(["", " ", ".", "..", "a*b", "x/y", "dir\\file"]);
 
         Assert.DoesNotContain(patterns, p => p is "*" or "*.");
-        Assert.Equal(["*.001"], patterns);
+        Assert.Equal(["*.001", "*.z01"], patterns);
     }
 
     [Fact]

@@ -5,6 +5,18 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-03** — 修复：issue #68 评论三件（RAR4 块链校验 / PKZIP 跨卷 `.z01` / 繁体用词）
+  - 起因（issue #68 报告者第三轮回复）：附了真实夹具并逐张截图说明 —— ① `RAR_V4_NO_Split.rar` 末尾 ENDARC 块的 `HEAD_SIZE` 由 7 改成 6 时「WinRAR 报错 / MantisZip 不报错」；② 分卷末卷尾部字节改坏时「WinRAR 也不报错」（说明 RAR4 分卷尾部本就不校验，不能算我们的失分项）；③ `ZIP_Split` 跨卷「只列出 `.zip` 一个文件、测试不通过、不能解压」；④ 繁体「壓縮檔完整性驗證透過」应为「通過」。
+  - RAR4 块链校验（`src/MantisZip.Core/Utils/RarHeaderValidator.cs`）：`ValidateVolume` 的签名分支从「RAR4 → `Unknown`」改为走 `ValidateRar4Volume`。块结构：固定头 7 字节（`HEAD_CRC(2) HEAD_TYPE(1) HEAD_FLAGS(2) HEAD_SIZE(2)`）；`HEAD_FLAGS & 0x8000` 时固定头后跟 `ADD_SIZE(4)` 数据区，`HEAD_FLAGS & 0x0100`（LHD_LARGE）时头部偏移 30 处另有 8 字节高位 `PACK_SIZE`；`HEAD_CRC` = CRC32（覆盖 `HEAD_TYPE` 起 `HEAD_SIZE-2` 字节）的低 16 位。校验项：`HEAD_SIZE >= 7`、块与数据区不越界、块头 CRC 相符、出现 `MAIN_HEAD(0x73)`、末块必须是 `ENDARC_HEAD(0x7B)`、多卷时 `MAIN_HEAD` 首卷位与 `ENDARC` 的「还有下一卷」位首尾自洽。
+  - **不要复发的反直觉点**：RAR4 的 `LHD_LARGE` 是 **`0x0100`** 而不是 `0x8000`（`0x8000` 是「块后带数据区」）。最初写错，`PACK_SIZE` 被拼成天文数字，块链第一步就越界。
+  - PKZIP 跨卷（`src/MantisZip.Core/Utils/ArchiveVolumeSet.cs`）：`VolumeSetKind` 新增 `ZipSpanned`；`ZipSpannedPartRegex = ^(?<root>.+)\.z(?<num>\d{2})$`；`IsZipSpanned` 要求 `.zNN` 与同名 `.zip` **互为条件**（只认一侧会把普通 zip 全当成第 1 张盘）；`TryGetVolumeBase` 让两者都指向末卷 `.zip`；新增 `EnumerateZipSpanned`（`.z01 → … → .zip`，遇缺号即停）；`FindFirstVolume` 对 `ZipSpanned` 返回末卷；`GetVolumeWatchFilter` → `<root>.*`；`VolumeFilterPatterns` 增补 `*.z01`。
+  - **不要复发的反直觉点**：跨卷 ZIP 的锚点必须是**末卷 `.zip`** —— 7z.dll 收到 `.z01` 会直接报 `Extension "z01" is not a supported archive file name extension`，而中央目录与 EOCD 只存在于末卷。把四卷按顺序拼成一个大文件也不行（EOCD 里的中央目录偏移是「卷内偏移」，拼接后不重定位，SharpCompress 只能列出 0 项）。
+  - 繁体用词（`src/MantisZip.UI.Avalonia/Localization/strings.zh-TW.json`）：`Status_TestOK` →「壓縮檔完整性驗證通過」、`Progress_PwdVerifying` →「密碼驗證通過，正在解壓...」；`Settings_AdaptiveMode_MultiThreaded_Hint` 的「並透過多執行緒加速」是 through 义，**保留**（文件里 `透過` 由 3 处降到 1 处）。
+  - 测试：`tests/MantisZip.Tests/Utils/RarHeaderValidatorTests.cs` 新增 `Validate_Rar4SingleVolumeCorpus_IsIntact`（仓库语料 `valid-rar4.rar`）、`Validate_Rar4TruncatedCorpus_IsBroken`（`corrupt-25-rar-truncated.rar`）、`Validate_Rar4TamperedEndOfArchiveSize_IsBroken`（现场把 ENDARC 的 `HEAD_SIZE` 改 6，用测试内的 `FindRar4EndOfArchiveOffset` 走块链定位）；`ArchiveVolumeSetTests` 新增 6 例（互认条件、基名指向末卷、枚举顺序、锚点、监视过滤器、`VolumeFilterPatterns`）；`SplitArchiveTests` 新增 `Factory_RoutesZipSpannedVolumesToSevenZipEngine`（路由 + `ResolveVolumeAnchor` 落到末卷）；`ArchiveOpenDialogPatternTests` 按 `*.z01` 更新两处期望。
+  - 验证：`build -Target core/-avalonia -c Release` 0 警告；`tests` 13.2s、`ui-tests` 47.8s 全绿；`i18n` 1406 key、`check` 0.5.5、`guards` 8/8。
+  - 真机证据（探针工程，不入仓库）：RAR4 五份样本 `Intact`；改坏 `RAR_V4_NO_Split.rar` 的 ENDARC 头长度后 `Broken // 第 1/1 卷 块头长度非法（偏移 3434693，长度 6）`，`TestArchiveAsync` True → False；篡改分卷 part04 后从任意一卷校验都报「第 4/4 卷」；`ZIP_Split` 从 `.z01` 或 `.zip` 打开都列 1 项、`TestArchive` False → True、两侧各解出 9,388,032 字节。
+  - 边界：RAR4 的**数据区内容**仍归 7z.dll 的 `Check()`（块链只看头）；跨卷 ZIP 只读（`HasVolumeSuffix` 使增删条目直接报「分卷压缩包不支持增删文件」）；`.partN.rar` 形态但其实是单卷的归档仍会被当分卷。
+
 **2026-11-03** — 修复：设置窗口「默认读取代码页」下拉空白 + 压缩级别兜底
   - 现象（用户实测）：「设置里面 zip 的默认『压缩级别』和『默认读取代码页』成了空白」。
   - 根因 1（已确证，`src/MantisZip.UI.Avalonia/ViewModels/SettingsWindowViewModel.cs`）：`ReadNameEncodingOptions` 当时是计算属性 `=> NameEncodingOption.BuildDefault()`，每次读都返回**新列表、新实例**；而 `NameEncodingOption` 是 **class**（引用相等），`Option` 是 **record**（值相等）。ComboBox 的 `SelectedItem` 是用 `Equals` 在 `ItemsSource` 里找项的 ⇒ class 型的选中项永远找不到实例，被清成 null ⇒ 空白。

@@ -33,7 +33,7 @@
 | **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 交互 / 文案 | 缺决策 | 已修复（三态契约，2026-10-28） | 已修复 |
 | **KI-009** | 5 个 AppSettings 死开关（存了值、有 UI、无消费者） | 技术债 / 死代码 | 缺决策 | 决定这 5 项的去留（接线 / 删属性 / 删 UI）时；守卫豁免表已按名登记，修一个删一行 | 阻塞中 |
-| **KI-010** | RAR4 分卷不做块链结构校验（末卷尾部损坏可能漏检） | 功能留白 | 成本超阈值 + 无法复现 | 拿到真实 RAR4 分卷夹具；或出现「RAR4 分卷被判完好」的用户反馈 | 阻塞中 |
+| **KI-010** | RAR4 分卷不做块链结构校验（末卷尾部损坏可能漏检） | 功能留白 | — | 已修复（RAR4 块链校验，2026-11-03，issue #68） | 已修复（2026-11-03） |
 | **KI-011** | 并行解压/压缩不识别目标盘类型，机械盘上的并发写不做节流 | 性能 / 交互 | 成本超阈值 + 缺决策 | 有机械盘用户的实测数据（并发放大反而更慢）；或做 `selected-items-bulk-extract` 时顺带评估 | 阻塞中 |
 
 ---
@@ -139,10 +139,9 @@
 - **发现**：2026-10-31（修 issue #68 评论 ②「WinRAR 分割包改坏后仍报完好」时）
 - **现象**：新增的 `RarHeaderValidator` 只解析 **RAR5** 块链；遇到 RAR4（签名第 7 字节 `0x00`）一律返回 `Unknown`，等于「测试压缩包」对 RAR4 单卷 / RAR4 分卷不做卷尾结构校验。RAR5 那条漏检（末卷 end-of-archive 块头被翻反，`7z.dll` 的 `Check()` 仍返回 true）在 RAR4 上大概率同样存在，但**本机无法验证**。
 - **证据**：`src/MantisZip.Core/Utils/RarHeaderValidator.cs` 的 `ValidateVolume` 在签名 `52 61 72 21 1A 07 00` 时直接 `Unknown`；`tests/MantisZip.Tests/Utils/RarHeaderValidatorTests.cs` 有 `Rar4Corpus_ReturnsUnknown` 钉住这一行为；仓库 `tests/corpus/corrupt-archives/*.rar` 全部是 RAR4（`valid.rar`、`valid-rar4.rar`、`corrupt-24..27`、`enc-05/06`）。本机 WinRAR 7.00 已移除 `-ma4`（`rar a -ma4 …` 报「未知选项: ma4」）、`-vn` 对 RAR5 无效 ⇒ 造不出 RAR4 分卷夹具。
-- **为什么现在不修**：**成本超阈值 + 无法复现**。RAR4 块结构与 RAR5 不同（块头布局、`PACK_SIZE`/`UNP_SIZE` 等字段位置、EoA 只有 7 字节无 flags），要另写一套解析器；而且没有夹具就没有验证手段，改了也只能「看起来对」。
-- **复评条件**：① 拿到一份**真实 RAR4 分卷夹具**（旧版 WinRAR / RAR 3.x 生成，或用户提供）时；② 或出现用户反馈「RAR4 分卷包被判定完好」的具体案例时。
-- **关联**：`docs/ARCHITECTURE.md`「分卷集命名与结构校验」小节的「已知边界」；issue #68 评论 ②。
-- **状态**：阻塞中
+- **已解决（2026-11-03）**：issue #68 报告者提供了真实 RAR4 夹具（`RAR_V4_NO_Split.rar` + `RAR_V4_Split.part01..04.rar`），据此实现 `ValidateRar4Volume`：固定头 7 字节 + `ADD_SIZE` 数据区 + 块头 CRC 低 16 位，校验项含 `MAIN_HEAD`/`ENDARC_HEAD` 存在性、块与数据区不越界、多卷首尾标志自洽。真机验证：5 份原样样本 `Intact`；把非分卷 ENDARC 的 `HEAD_SIZE` 由 7 改 6（报告者截图 shot1 的改法）后判 `Broken`，`TestArchiveAsync` 由 True 变 False；篡改分卷的 part04 后从任意一卷校验都能报到「第 4/4 卷」。回归刷子用**手工构造的 RAR4 头字节**，样本包不进仓库。
+- **关联**：`docs/ARCHITECTURE.md`「分卷集命名与结构校验」小节的 RAR4 块结构说明；issue #68。
+- **状态**：已修复（2026-11-03）
 
 ## KI-011 并行解压/压缩不识别目标盘类型，机械盘上的并发写不做节流
 

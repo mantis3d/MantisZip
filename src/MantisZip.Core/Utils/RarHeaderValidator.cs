@@ -32,9 +32,11 @@ public enum RarStructureStatus
 /// 于是「缺末卷」「中间卷截断」也会被判坏。
 /// </para>
 /// <para>
-/// 只支持 RAR5（签名 <c>52 61 72 21 1A 07 01 00</c>）。RAR4 的块结构不同且仓库语料全是 RAR4，
-/// 本轮不实现，遇到即返回 <see cref="RarStructureStatus.Unknown"/>（已登记 KNOWN_ISSUES）。
-/// 头部加密（块类型 4）同样返回 Unknown，避免把加密包误判成损坏。
+/// 同时支持 RAR5 与 RAR4：RAR5 的块长度是变长整数、CRC32 覆盖「长度字段 + 块头」；
+/// RAR4 是固定 7 字节头（CRC16 + 类型 + 标志 + 长度）、CRC 只取 CRC32 低 16 位、
+/// 文件块的数据区不计入 <c>HEAD_SIZE</c>（要按 <c>PACK_SIZE</c> 跳过）。
+/// 见 <see cref="ValidateRar4Volume"/> 的说明（issue #68 报告者提供的 RAR4 样本与改法）。
+/// 头部加密（RAR5 块类型 4）返回 Unknown，避免把加密包误判成损坏。
 /// </para>
 /// <para>
 /// 只挂在「测试压缩包」（<see cref="Engines.SevenZipEngine.TestArchiveAsync"/>）上，
@@ -46,6 +48,39 @@ public static class RarHeaderValidator
 {
     /// <summary>RAR5 签名（8 字节，最后一字节 0x00 表示 v5）。</summary>
     private static ReadOnlySpan<byte> Rar5Signature => [0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x01, 0x00];
+
+    /// <summary>RAR4 标记块（7 字节，最后一字节 0x00 表示 v4.x）。</summary>
+    private static ReadOnlySpan<byte> Rar4Signature => [0x52, 0x61, 0x72, 0x21, 0x1A, 0x07, 0x00];
+
+    /// <summary>RAR4 固定头长度：HEAD_CRC(2) + HEAD_TYPE(1) + HEAD_FLAGS(2) + HEAD_SIZE(2)。</summary>
+    private const int Rar4FixedHeaderLength = 7;
+
+    /// <summary>RAR4 块类型：主块头（每卷开头）。</summary>
+    private const byte Rar4MainHeader = 0x73;
+
+    /// <summary>RAR4 块类型：文件块（数据区跟在头后面，长度由 PACK_SIZE 给出）。</summary>
+    private const byte Rar4FileHeader = 0x74;
+
+    /// <summary>RAR4 块类型：end-of-archive（每卷收尾块）。</summary>
+    private const byte Rar4EndOfArchive = 0x7B;
+
+    /// <summary>RAR4 MAIN_HEAD 标志：本卷是分卷集的首卷。</summary>
+    private const ushort Rar4FlagFirstVolume = 0x0100;
+
+    /// <summary>RAR4 ENDARC 标志：后面还有下一卷。</summary>
+    private const ushort Rar4FlagNextVolume = 0x0001;
+
+    /// <summary>RAR4 块标志：块后带数据区（LONG_BLOCK，0x8000）——文件块的数据长度首 32 位在紧跟块的 4 字节里。</summary>
+    private const ushort Rar4FlagLongBlock = 0x8000;
+
+    /// <summary>RAR4 文件块标志：带 4GB+ 的高 32 位长度字段（LHD_LARGE，0x0100，不是 0x8000）。</summary>
+    private const ushort Rar4FlagLargeFile = 0x0100;
+
+    /// <summary>RAR4 文件块中数据长度首 32 位相对 HEAD_TYPE 的偏移（即 ADD_SIZE / PACK_SIZE）。</summary>
+    private const int Rar4PackSizeOffset = 5;
+
+    /// <summary>RAR4 文件块中高 32 位长度相对 HEAD_TYPE 的偏移（仅 <see cref="Rar4FlagLargeFile"/>）。</summary>
+    private const int Rar4HighPackSizeOffset = 30;
 
     /// <summary>块类型：头部加密（后续块头全部加密，无法继续解析）。</summary>
     private const ulong HeaderTypeEncryption = 4;
@@ -128,7 +163,10 @@ public static class RarHeaderValidator
             if (!ReadExactly(stream, signature))
                 return RarStructureStatus.Unknown;
 
-            // 只处理 RAR5；RAR4 的块结构与 CRC 覆盖面完全不同（见类注释）
+            // RAR5 与 RAR4 的块结构与 CRC 覆盖面完全不同，各走一条链
+            if (signature[..Rar4Signature.Length].SequenceEqual(Rar4Signature))
+                return ValidateRar4Volume(stream, length, volumeCount, index, out failureReason);
+
             if (!signature.SequenceEqual(Rar5Signature))
                 return RarStructureStatus.Unknown;
 
@@ -381,6 +419,162 @@ public static class RarHeaderValidator
         }
 
         return ~crc;
+    }
+
+    /// <summary>
+    /// 校验单卷 RAR4 块链：逐块校验头 CRC（CRC32 取低 16 位）、按 PACK_SIZE 跳过文件数据区、
+    /// 以 end-of-archive 收尾，并核对「首卷标志」「还有下一卷标志」。
+    /// </summary>
+    /// <remarks>
+    /// 报告者给的复现改法：把 RAR4 <c>ENDARC_HEAD</c> 的 <c>HEAD_SIZE</c> 由 7 改成 6，
+    /// WinRAR 报「Headers Error」而 7z.dll 仍说完好。头 CRC 覆盖 <c>HEAD_TYPE..HEAD_SIZE</c>，
+    /// 改长度必然让 CRC 不符，因此这条校验正好补上该缺口。
+    /// </remarks>
+    private static RarStructureStatus ValidateRar4Volume(
+        FileStream stream,
+        long length,
+        int volumeCount,
+        int index,
+        out string? failureReason)
+    {
+        failureReason = null;
+
+        long position = Rar4Signature.Length;
+        var lastType = (byte)0;
+        var lastEndFlags = (ushort)0;
+        var declaresFirstVolume = false;
+        var sawMainHeader = false;
+
+        while (position < length)
+        {
+            if (IsZeroPadding(stream, position, length))
+                break;
+
+            if (position + Rar4FixedHeaderLength > length)
+            {
+                failureReason = Describe(index, volumeCount, $"块头截断（偏移 {position}）");
+                return RarStructureStatus.Broken;
+            }
+
+            var fixedHeader = new byte[Rar4FixedHeaderLength];
+            stream.Seek(position, SeekOrigin.Begin);
+            if (!ReadExactly(stream, fixedHeader))
+            {
+                failureReason = Describe(index, volumeCount, $"块头读取失败（偏移 {position}）");
+                return RarStructureStatus.Broken;
+            }
+
+            var storedCrc = BinaryPrimitives.ReadUInt16LittleEndian(fixedHeader);
+            var blockType = fixedHeader[2];
+            var blockFlags = BinaryPrimitives.ReadUInt16LittleEndian(fixedHeader.AsSpan(3));
+            var headerSize = BinaryPrimitives.ReadUInt16LittleEndian(fixedHeader.AsSpan(5));
+
+            if (headerSize < Rar4FixedHeaderLength)
+            {
+                failureReason = Describe(index, volumeCount, $"块头长度非法（偏移 {position}，长度 {headerSize}）");
+                return RarStructureStatus.Broken;
+            }
+
+            if (position + headerSize > length)
+            {
+                failureReason = Describe(index, volumeCount, $"块越界（偏移 {position}，类型 0x{blockType:X2}）");
+                return RarStructureStatus.Broken;
+            }
+
+            // 头 CRC：CRC32 覆盖 HEAD_TYPE 起的 headerSize - 2 字节，取低 16 位
+            var crcCover = new byte[headerSize - 2];
+            stream.Seek(position + 2, SeekOrigin.Begin);
+            if (!ReadExactly(stream, crcCover))
+            {
+                failureReason = Describe(index, volumeCount, $"块头 CRC 数据读取失败（偏移 {position}）");
+                return RarStructureStatus.Broken;
+            }
+
+            if ((ushort)(Crc32(crcCover, 0, crcCover.Length) & 0xFFFF) != storedCrc)
+            {
+                failureReason = Describe(
+                    index,
+                    volumeCount,
+                    $"块头 CRC 不符（偏移 {position}，类型 0x{blockType:X2}，前一块类型 0x{lastType:X2}）");
+                return RarStructureStatus.Broken;
+            }
+
+            // 文件块的数据区不计入 HEAD_SIZE：LONG_BLOCK 时紧跟块的 4 字节是数据长度（PACK_SIZE），
+            // LHD_LARGE 时再补高 32 位（位于 ATTR 之后、文件名之前）
+            long dataSize = 0;
+            if (blockType == Rar4FileHeader
+                && (blockFlags & Rar4FlagLongBlock) != 0
+                && crcCover.Length >= Rar4PackSizeOffset + 4)
+            {
+                dataSize = BinaryPrimitives.ReadUInt32LittleEndian(crcCover.AsSpan(Rar4PackSizeOffset));
+                if ((blockFlags & Rar4FlagLargeFile) != 0
+                    && crcCover.Length >= Rar4HighPackSizeOffset + 4)
+                {
+                    dataSize |= (long)BinaryPrimitives.ReadUInt32LittleEndian(
+                        crcCover.AsSpan(Rar4HighPackSizeOffset)) << 32;
+                }
+            }
+
+            lastType = blockType;
+            if (blockType == Rar4MainHeader)
+            {
+                sawMainHeader = true;
+                if ((blockFlags & Rar4FlagFirstVolume) != 0)
+                    declaresFirstVolume = true;
+            }
+            else if (blockType == Rar4EndOfArchive)
+            {
+                lastEndFlags = blockFlags;
+            }
+
+            var next = position + headerSize + dataSize;
+            if (next > length)
+            {
+                failureReason = Describe(
+                    index,
+                    volumeCount,
+                    $"数据区越界（偏移 {position}，类型 0x{blockType:X2}，声明长度 {dataSize}）");
+                return RarStructureStatus.Broken;
+            }
+
+            position = next;
+        }
+
+        if (!sawMainHeader)
+        {
+            failureReason = Describe(index, volumeCount, "缺少主块头");
+            return RarStructureStatus.Broken;
+        }
+
+        if (lastType != Rar4EndOfArchive)
+        {
+            failureReason = Describe(index, volumeCount, $"缺少结束块（最后块类型 0x{lastType:X2}）");
+            return RarStructureStatus.Broken;
+        }
+
+        // 非末卷必须声明「还有下一卷」，末卷必须声明「到此为止」
+        var expectsNext = index < volumeCount - 1;
+        var declaresNext = (lastEndFlags & Rar4FlagNextVolume) != 0;
+        if (expectsNext != declaresNext)
+        {
+            failureReason = Describe(
+                index,
+                volumeCount,
+                declaresNext ? "末卷仍声明有下一卷（可能缺卷）" : "非末卷却声明已结束");
+            return RarStructureStatus.Broken;
+        }
+
+        // 分卷集的首卷必须带「首卷」位，其余卷必须不带（单卷包没有该位是正常的）
+        if (volumeCount > 1 && (index == 0) != declaresFirstVolume)
+        {
+            failureReason = Describe(
+                index,
+                volumeCount,
+                declaresFirstVolume ? "非首卷却声明自己是首卷" : "首卷缺少首卷标志");
+            return RarStructureStatus.Broken;
+        }
+
+        return RarStructureStatus.Intact;
     }
 
     private static string Describe(int index, int volumeCount, string detail) =>
