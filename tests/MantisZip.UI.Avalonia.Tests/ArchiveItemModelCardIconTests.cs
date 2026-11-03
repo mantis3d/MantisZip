@@ -92,54 +92,6 @@ public class ArchiveItemModelCardIconTests
         Assert.True(iconNotified > 0);
     }
 
-    /// <summary>
-    /// 元数据卡（v0.5.6 追加）优先级最高的一档：有元数据行时同样要把图标压下去，
-    /// 否则文字会和大图标叠在同一张卡上。
-    /// </summary>
-    [AvaloniaFact]
-    public void WithMetadataCardLines_HidesBothIcons()
-    {
-        var model = new ArchiveItemModel
-        {
-            Name = "movie.mp4",
-            LargeIconSource = CreateBitmap(256),
-            MetadataCardLines = ["1920×1080 · 1:35", "H.264"],
-        };
-
-        Assert.True(model.ShowMetadataCard);
-        Assert.False(model.ShowLargeIcon);
-        Assert.False(model.ShowSmallIcon);
-    }
-
-    /// <summary>空集合不算「有元数据卡」——解析器没取到字段时应继续显示大图标。</summary>
-    [AvaloniaFact]
-    public void EmptyMetadataCardLines_KeepsLargeIcon()
-    {
-        var model = new ArchiveItemModel
-        {
-            Name = "movie.mp4",
-            LargeIconSource = CreateBitmap(256),
-            MetadataCardLines = [],
-        };
-
-        Assert.False(model.ShowMetadataCard);
-        Assert.True(model.ShowLargeIcon);
-    }
-
-    /// <summary>缩略图 / 文本摘录存在时元数据卡让位（三者互斥，避免卡上叠两层文字）。</summary>
-    [AvaloniaFact]
-    public void WithThumbnail_MetadataCardStepsAside()
-    {
-        var model = new ArchiveItemModel
-        {
-            Name = "cover.mp3",
-            ThumbnailSource = CreateBitmap(128),
-            MetadataCardLines = ["3:45 · 192 kbps"],
-        };
-
-        Assert.False(model.ShowMetadataCard);
-        Assert.True(model.HasThumbnailContent);
-    }
 
     /// <summary>用 Skia 生成一张纯色 PNG 再交给 Avalonia 解码（与 IcoIconHelperTests 同一套路）。</summary>
     private static Bitmap CreateBitmap(int size)

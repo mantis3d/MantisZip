@@ -1,4 +1,4 @@
-﻿{
+{
   "Toolbar_LayoutMode": "縮圖版面",
   "LayoutMode_Details": "詳細",
   "LayoutMode_Tile": "並排",
@@ -38,11 +38,6 @@
   "Settings_Thumbnail_Size_Medium": "中（128 px，預設）",
   "Settings_Thumbnail_Size_Large": "大（160 px）",
   "Settings_Thumbnail_Size_Help": "改尺寸會按新邊長重新產生縮圖（既有快取按尺寸分開保存，來回切換不會重複解碼）。卡片越大，同一畫面能放下的項目越少。",
-    "MetadataCard_Mono": "單聲道",
-    "MetadataCard_Stereo": "立體聲",
-    "MetadataCard_ChannelFmt": "{0} 聲道",
-    "MetadataCard_GlyphFmt": "{0} 字形",
-    "MetadataCard_TableFmt": "{0} 表",
 "Settings_Progress_AutoCloseDelay_Help": "僅在進度視窗未釘住（📌）且未發生錯誤時生效；0 表示完成後立即關閉。",
 "Settings_Progress_PinByDefault": "預設釘住進度視窗（📌）",
 "Settings_Progress_PinByDefault_Help": "勾選後進度視窗一開啟就是釘住狀態：完成或發生錯誤都不會自動關閉，需要手動關閉。",

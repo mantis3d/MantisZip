@@ -79,16 +79,16 @@
 | ✅ 主窗口列表复选框多选 | [file-list-checkbox-selection.md](.omo/plans/已完成/file-list-checkbox-selection.md) | 🟡中 | 8-12h | 列表加复选框列（默认关闭，开关持久化到 `AppSettings.FileListCheckboxMode`）：勾选跨滚动/切目录保持、全选可见/清空、状态栏「已选 N 项」；顺带补上**批量删除**（`DeleteFiles` 现在仍只看 `SelectedEntry` 单条）。补 #37「与主窗口文件列表统一」这半 |
 | ✅ 缩略图卡片外观设置 | [thumbnail-card-settings.md](.omo/plans/已完成/thumbnail-card-settings.md) | 🟢低 | 2-3h | 「设置 → 外观 → 缩略图」子页签：卡片外边框开关（默认关）、透明图是否垫纯色底 + 取色器、三档尺寸 96/128/160。全部走资源注入即时生效，缓存按尺寸分开 |
 | ✅ 缩略图清晰度修正 | [file-list-thumbnails.md](.omo/plans/已完成/file-list-thumbnails.md) | 🟢低 | 1-2h | 卡片里的 `.ico` 取边长最接近 160 的帧（原按面积差会挑到 16px）、`.svg` 按卡片尺寸重绘（原按 viewBox 24px 渲染再放大）、无缩略图时改用系统大图标 96px |
-| ✅ 卡片元数据文字（选中项） | [metadata-card-selection.md](.omo/plans/已完成/metadata-card-selection.md) | 🟢低 | 2-3h | 音频 / 视频 / 字体 / 可执行的卡片在**选中时**显示 2–3 行格式元数据（时长·码率 / 分辨率·编码 / 字形数 / 产品版本），改选即撤旧文字；缩略图 > 文本卡 > 元数据 > 大图标四级互斥 |
 | ✅ 卡片视图复选框 + 快捷多选 | [checkbox-multiselect-shortcuts.md](.omo/plans/已完成/checkbox-multiselect-shortcuts.md) | 🟡中 | 4-6h | 平铺 / 内容行视图也显示复选框；**Shift 连选 + Ctrl 增减**（表格视图按复选框列同样生效）；「视图 → 列表布局」子菜单直达详情 / 平铺 / 内容，并加「复选框多选」开关 |
 
-> **v0.5.6 验收口径（✅ 已达成）**：列表能在三种布局间循环并记住选择；打开 1000+ 条目的包时骨架区能看到数字在涨；ico 文件在列表里显示自己的图标而不是通用图标；复选框模式勾选 3 项后删除只弹一次确认、删完勾选态清空，且默认关闭时行为与今天完全一致；缩略图卡片的外边框 / 垫底色 / 尺寸三项在设置里改完即时生效；卡片布局里选中音频 / 视频 / 字体 / 可执行文件时能看到 2–3 行格式元数据；卡片视图也能勾选，Shift 连选与「视图 → 列表布局」子菜单可用。
+> **v0.5.6 验收口径（✅ 已达成）**：列表能在三种布局间循环并记住选择；打开 1000+ 条目的包时骨架区能看到数字在涨；ico 文件在列表里显示自己的图标而不是通用图标；复选框模式勾选 3 项后删除只弹一次确认、删完勾选态清空，且默认关闭时行为与今天完全一致；缩略图卡片的外边框 / 垫底色 / 尺寸三项在设置里改完即时生效；卡片视图也能勾选，Shift 连选与「视图 → 列表布局」子菜单可用。
 
-### 阶段 v0.5.7 —— 预览与接线质量（约 15-21h）
+### 阶段 v0.5.7 —— 预览、接线质量与卡片元数据（约 27-37h）
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
 | 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/已完成/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。三者本来就在解析完整文档，省下的只是落盘，所以单独排在 A 档而不占 S 档 |
+| 卡片元数据（全卡头部窗口 + 小文件整条兜底） | [card-metadata-head-window.md](.omo/plans/未开始/card-metadata-head-window.md) | 🟡中 | 12-16h | 平铺 / 内容布局里**所有**候选卡显示 2–3 行格式元数据（音频 / 视频 / 字体 / 可执行 / PDF / Office / BT 种子 / SQLite / ISO），取数改成「读条目头部 256 KB → 解析」，小文件（≤2 MB）整条兜底、视频尾段（≤10 MB）补 moov；6 组开关在「设置 → 外观 → 缩略图」第 4 张卡片。原「选中项才显示」的 v0.5.6 版本已撤回 |
 | AXAML 编译期绑定（渐进式开启 `x:CompileBindings`） | [axaml-compiled-bindings.md](.omo/plans/未开始/axaml-compiled-bindings.md) | 🟡中 | 10-14h | 现状 50 个 `.axaml` 只有 1 个开编译绑定、13 个有 `x:DataType` ⇒ 属性名写错只在运行期表现成「没值 / 红字校验文本 / 永远默认值」。渐进三批推进 + `-Task guards` 第 9 条 `compilebindings`（只约束新增与已迁移文件，存量不判红）。它是规则 23「接线错了就失败得响」的兜底 |
 
 > **v0.5.7 验收口径**：Office 三族预览不再先落盘；迁移过的 axaml 里属性名写错会**构建失败**而不是静默空白。

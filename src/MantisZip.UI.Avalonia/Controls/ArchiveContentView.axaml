@@ -55,31 +55,7 @@
                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                        Padding="{DynamicResource SpacingXsThk}" />
           </Border>
-          <!-- ②b 元数据文字卡（音频 / 视频 / 字体 / 可执行，仅当前选中项）
 
-               与 ② 文本摘录卡的区别：文本卡来自条目内容的头部摘录（任何文本文件都有），
-               元数据卡来自格式解析器（时长 / 分辨率 / 字形数 / 产品版本等）。
-               两者互斥：有缩略图内容或文本摘录时不显示本块，见 ArchiveItemModel.ShowMetadataCard。
-               只对选中项取数，所以不会同时出现在多张卡上。 -->
-          <Border Background="{DynamicResource ThemeSurfaceBgBrush}"
-                  BorderBrush="{DynamicResource ThemeBorderBrush}"
-                  BorderThickness="1"
-                  CornerRadius="{DynamicResource BorderRadius}"
-                  IsVisible="{Binding ShowMetadataCard}">
-            <ItemsControl ItemsSource="{Binding MetadataCardLines}"
-                          Margin="{DynamicResource SpacingXsThk}">
-              <ItemsControl.ItemTemplate>
-                <DataTemplate>
-                  <TextBlock Text="{Binding}"
-                             FontSize="11"
-                             TextWrapping="Wrap"
-                             TextTrimming="CharacterEllipsis"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                             Margin="0,0,0,2" />
-                </DataTemplate>
-              </ItemsControl.ItemTemplate>
-            </ItemsControl>
-          </Border>
           <!-- ③ 兜底图标（目录 / 二进制 / 视频 / 超出缩略图上限的条目）
                优先大图标：Windows 取自 Shell 图像列表的 256px 档，按 96px 显示（缩图不糊）；
                拿不到大图标（非 Windows / 该类型无大图）才退回 16px 原尺寸——16px 拉到 96 只会更糊。 -->

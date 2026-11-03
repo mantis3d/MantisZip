@@ -1017,15 +1017,10 @@ public partial class MainWindowViewModel : ObservableObject
         if (value == FileListLayoutMode.Details)
         {
             CancelThumbnailBatch();
-            // 回到详情：卡片不再显示，撤掉元数据卡文字并放弃在途取数
-            RefreshMetadataCard(null);
         }
         else
         {
             StartThumbnailBatchIfNeeded();
-            // 从详情切到卡片布局时，选中项没变、不会触发 OnSelectedEntryChanged，
-            // 这里补一次，否则要等用户重新点一次才出元数据卡。
-            RefreshMetadataCard(SelectedEntry);
         }
     }
 
@@ -1382,8 +1377,6 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectionStats));
         App.DebugLog($"[PRV] OnSelectedEntryChanged: {(value?.Name ?? "null")}, archive={CurrentArchivePath != null}");
 
-        // 卡片布局的元数据卡：只服务当前选中项，与下面的预览是两个独立的取数（互不等待）
-        RefreshMetadataCard(value);
 
         if (value != null && CurrentArchivePath != null)
         {

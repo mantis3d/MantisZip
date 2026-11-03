@@ -1,4 +1,4 @@
-﻿{
+{
   "Toolbar_LayoutMode": "Thumbnail layout",
   "LayoutMode_Details": "Details",
   "LayoutMode_Tile": "Tiles",
@@ -38,11 +38,6 @@
   "Settings_Thumbnail_Size_Medium": "Medium (128 px, default)",
   "Settings_Thumbnail_Size_Large": "Large (160 px)",
   "Settings_Thumbnail_Size_Help": "Changing the size regenerates thumbnails at the new dimension (caches are keyed by size, so switching back and forth does not re-decode). Larger cards mean fewer items per screen.",
-    "MetadataCard_Mono": "Mono",
-    "MetadataCard_Stereo": "Stereo",
-    "MetadataCard_ChannelFmt": "{0} channels",
-    "MetadataCard_GlyphFmt": "{0} glyphs",
-    "MetadataCard_TableFmt": "{0} tables",
 "Settings_Progress_AutoCloseDelay_Help": "Applies only when the progress window is not pinned (📌) and no error occurred; 0 closes immediately after completion.",
 "Settings_Progress_PinByDefault": "Pin progress window by default (📌)",
 "Settings_Progress_PinByDefault_Help": "When enabled, the progress window opens pinned: completing or failing will not close it automatically — close it manually.",
