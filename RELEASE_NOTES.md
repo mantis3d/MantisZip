@@ -76,6 +76,14 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - ![exe 预览：标题用文件列表里的名字，右侧元数据面板显示产品/公司/版本](docs/images/version/v0.5.5/ExePreviewMetadata.png)
 
+- **RAR4 分卷包的损坏现在能测出来了** — 旧版 RAR3/RAR4 格式此前整条跳过结构校验，末卷尾部或块头被改坏也报「完整性验证通过」；现在按块链逐块核对头 CRC 与结束块，改坏一处即判损坏（顺带把繁体界面里两处「驗證透過」改成「驗證通過」）
+
+- **Damaged RAR4 volume sets are now detected** — the older RAR3/RAR4 format used to skip the structural check entirely, so a tampered block header or tail still reported "integrity verified"; the app now walks the RAR4 block chain and verifies every header CRC plus the end-of-archive block
+
+- **PKZIP 跨卷包（.z01/.z02 + .zip）能打开了** — 此前列表里只看到末卷 `.zip`，测试不通过、也解不开；现在按 `.z01 → … → .zip` 的顺序读整组，列条目、测试压缩包与解压都正常，打开对话框里也能选到 `.z01`
+
+- **Spanned PKZIP archives (.z01/.z02 + .zip) now open** — previously only the last `.zip` was listed, and the archive failed both the integrity test and extraction; the whole set is now read in `.z01 → … → .zip` order for listing, testing and extracting, and `.z01` is selectable in the open dialog
+
 ## v0.5.4
 
 ### 文件说明 / File Description
