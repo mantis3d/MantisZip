@@ -295,6 +295,8 @@
   "Extract_Preview_EncryptedNoMatch": "Encrypted · no matching password",
   "Extract_Preview_NotStarted": "Not started",
   "Menu_SaveLayout": "Save Layout",
+    "Menu_ListLayout": "List Layout",
+    "Menu_CheckboxMode": "Checkbox Selection",
   "Status_LayoutSaved": "Layout saved",
   "AddConflict_Title": "Add Conflict",
   "Main_DragAddConfirm": "Add {0} file(s)/folders to \"{1}\"?",

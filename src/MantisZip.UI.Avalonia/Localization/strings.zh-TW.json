@@ -295,6 +295,8 @@
   "Extract_Preview_EncryptedNoMatch": "內容已加密·密碼未符合",
   "Extract_Preview_NotStarted": "未開始",
   "Menu_SaveLayout": "儲存設定",
+    "Menu_ListLayout": "清單版面",
+    "Menu_CheckboxMode": "核取方塊多選",
   "Status_LayoutSaved": "設定已儲存",
   "AddConflict_Title": "增加衝突",
   "Main_DragAddConfirm": "將 {0} 個檔案/資料夾增加到「{1}」？",

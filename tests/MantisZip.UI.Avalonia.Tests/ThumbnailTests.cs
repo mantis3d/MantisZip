@@ -459,6 +459,101 @@ public class ThumbnailTests
         Assert.Same(items[0], result.Anchor);
     }
 
+    // ─────────────────────────── 复选框模式：快捷多选（2026-11-03） ───────────────────────────
+
+    [Fact]
+    public void Check_PlainClickChecksUncheckedRow()
+    {
+        var items = CreateItems(4);
+
+        var result = ThumbnailSelectionController.HandleCheckPointerPressed(
+            items[2], shift: false, items, anchor: null);
+
+        Assert.Same(items[2], result.Primary);
+        Assert.Same(items[2], Assert.Single(result.ToCheck));
+        Assert.Empty(result.ToUncheck);
+        Assert.Same(items[2], result.Anchor);
+    }
+
+    [Fact]
+    public void Check_PlainClickOnCheckedRowUnchecks()
+    {
+        var items = CreateItems(4);
+        items[1].IsChecked = true;
+
+        var result = ThumbnailSelectionController.HandleCheckPointerPressed(
+            items[1], shift: false, items, anchor: items[1]);
+
+        Assert.Same(items[1], Assert.Single(result.ToUncheck));
+        Assert.Empty(result.ToCheck);
+        Assert.Same(items[1], result.Anchor);
+    }
+
+    [Fact]
+    public void Check_ShiftClickChecksWholeRangeFromAnchor()
+    {
+        var items = CreateItems(6);
+
+        var result = ThumbnailSelectionController.HandleCheckPointerPressed(
+            items[4], shift: true, items, anchor: items[1]);
+
+        Assert.Equal(new[] { items[1], items[2], items[3], items[4] }, result.ToCheck);
+        Assert.Empty(result.ToUncheck);
+        Assert.Same(items[1], result.Anchor); // 锚点不变：连续 Shift 以首次点击为起点
+    }
+
+    [Fact]
+    public void Check_ShiftClickBackwardsChecksRange()
+    {
+        var items = CreateItems(6);
+
+        var result = ThumbnailSelectionController.HandleCheckPointerPressed(
+            items[1], shift: true, items, anchor: items[4]);
+
+        Assert.Equal(new[] { items[1], items[2], items[3], items[4] }, result.ToCheck);
+        Assert.Same(items[4], result.Anchor);
+    }
+
+    [Fact]
+    public void Check_ShiftClickNeverUnchecksAlreadyCheckedRows()
+    {
+        var items = CreateItems(5);
+        items[2].IsChecked = true;
+
+        var result = ThumbnailSelectionController.HandleCheckPointerPressed(
+            items[3], shift: true, items, anchor: items[1]);
+
+        Assert.Equal(new[] { items[1], items[3] }, result.ToCheck);
+        Assert.Empty(result.ToUncheck);
+    }
+
+    [Fact]
+    public void Check_ShiftClickWithoutValidAnchorChecksOnlyPressedRow()
+    {
+        var items = CreateItems(5);
+
+        var result = ThumbnailSelectionController.HandleCheckPointerPressed(
+            items[3], shift: true, items, anchor: null);
+
+        Assert.Same(items[3], Assert.Single(result.ToCheck));
+        Assert.Same(items[3], result.Anchor);
+    }
+
+    [Fact]
+    public void Check_NullPressedItemLeavesEverythingUntouched()
+    {
+        var items = CreateItems(3);
+        items[0].IsChecked = true;
+
+        var result = ThumbnailSelectionController.HandleCheckPointerPressed(
+            pressedItem: null, shift: true, items, anchor: items[0]);
+
+        Assert.Null(result.Primary);
+        Assert.Empty(result.ToCheck);
+        Assert.Empty(result.ToUncheck);
+        Assert.Same(items[0], result.Anchor);
+    }
+
     // ─────────────────────────── helpers ───────────────────────────
 
     private static Func<CancellationToken, Task<ThumbnailResult?>> TextFactory(string text) =>

@@ -685,17 +685,31 @@
                           Padding="{DynamicResource SpacingXxsThk}"
                           CornerRadius="{DynamicResource BorderRadius}"
                           Background="{Binding IsSelected, Converter={StaticResource ThumbnailSelectedBrushConverter}}">
-                    <StackPanel Spacing="{DynamicResource SpacingXxs}">
-                      <!-- 三态内容卡（缩略图 / 文字片段 / 类型图标） -->
-                      <ContentControl Content="{Binding}"
-                                      ContentTemplate="{StaticResource ThumbnailContentCard}"
-                                      HorizontalAlignment="Center" />
-                      <TextBlock Text="{Binding NameDisplay}"
-                                 FontSize="11"
-                                 TextWrapping="NoWrap"
-                                 TextTrimming="CharacterEllipsis"
-                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                    </StackPanel>
+                      <!-- 单个缩略图卡 + 复选框模式的勾选框（勾选框只显示状态，点击由卡片热区统一处理） -->
+                      <Panel>
+                        <StackPanel Spacing="{DynamicResource SpacingXxs}">
+                          <!-- 三态内容卡（缩略图 / 文字片段 / 类型图标） -->
+                          <ContentControl Content="{Binding}"
+                                ContentTemplate="{StaticResource ThumbnailContentCard}"
+                                HorizontalAlignment="Center" />
+                          <TextBlock Text="{Binding NameDisplay}"
+                                FontSize="11"
+                                TextWrapping="NoWrap"
+                                TextTrimming="CharacterEllipsis"
+                                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                        </StackPanel>
+                        <!-- 复选框模式的勾选框：整张卡片是勾选热区，Shift 连勾 / 单张切换的逻辑在
+                             MainWindow.Thumbnails.cs 的 ThumbnailLayout_PointerPressed；复选框自己不吃点击，
+                             否则会和卡片热区各切换一次而互相抵消。 -->
+                        <CheckBox MinWidth="0"
+                                Padding="0"
+                                Margin="{DynamicResource SpacingXxsThk}"
+                                HorizontalAlignment="Left"
+                                VerticalAlignment="Top"
+                                IsHitTestVisible="False"
+                                IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                IsVisible="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).IsCheckboxMode}" />
+                      </Panel>
                   </Border>
                 </DataTemplate>
               </ItemsControl.ItemTemplate>
@@ -766,10 +780,20 @@
                           CornerRadius="{DynamicResource BorderRadius}"
                           Background="{Binding IsSelected, Converter={StaticResource ThumbnailSelectedBrushConverter}}">
                     <Grid ColumnDefinitions="Auto,*">
-                      <ContentControl Grid.Column="0"
-                                      Content="{Binding}"
-                                      ContentTemplate="{StaticResource ThumbnailContentCard}"
-                                      VerticalAlignment="Top" />
+                      <Panel Grid.Column="0">
+                        <ContentControl Content="{Binding}"
+                                  ContentTemplate="{StaticResource ThumbnailContentCard}"
+                                  VerticalAlignment="Top" />
+                        <!-- 复选框模式的勾选框（只显示状态；点击由行热区统一处理，见 MainWindow.Thumbnails.cs） -->
+                        <CheckBox MinWidth="0"
+                                  Padding="0"
+                                  Margin="{DynamicResource SpacingXxsThk}"
+                                  HorizontalAlignment="Left"
+                                  VerticalAlignment="Top"
+                                  IsHitTestVisible="False"
+                                  IsChecked="{Binding IsChecked, Mode=TwoWay}"
+                                  IsVisible="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).IsCheckboxMode}" />
+                      </Panel>
                       <StackPanel Grid.Column="1"
                                   Margin="{DynamicResource SpacingSmThk}"
                                   Spacing="{DynamicResource SpacingXxs}"

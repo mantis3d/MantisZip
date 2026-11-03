@@ -295,6 +295,8 @@
   "Extract_Preview_EncryptedNoMatch": "内容已加密·密码未匹配",
   "Extract_Preview_NotStarted": "未开始",
   "Menu_SaveLayout": "保存布局",
+    "Menu_ListLayout": "列表布局",
+    "Menu_CheckboxMode": "复选框多选",
   "Status_LayoutSaved": "布局已保存",
   "AddConflict_Title": "添加冲突",
   "Main_DragAddConfirm": "将 {0} 个文件/文件夹添加到「{1}」？",

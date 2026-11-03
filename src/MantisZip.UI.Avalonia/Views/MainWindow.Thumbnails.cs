@@ -39,6 +39,12 @@ public partial class MainWindow
     /// </summary>
     private ArchiveItemModel? _thumbnailSelectionAnchor;
 
+    /// <summary>
+    /// 复选框模式的 Shift 连勾锚点（与选区锚点分开存：勾选和选区是两套状态，
+    /// 勾选模式下选区只是高亮，混用会让「先 Shift 选区再 Shift 连勾」跳错起点）。
+    /// </summary>
+    private ArchiveItemModel? _thumbnailCheckAnchor;
+
     /// <summary>平铺/内容容器的事件是否已订阅（内容区延迟创建，订阅动作必须幂等）。</summary>
     private bool _thumbnailLayoutEventsHooked;
 
@@ -130,6 +136,28 @@ public partial class MainWindow
         // 键盘操作的落点：把焦点移到容器，Enter/Back/Delete 才会派发到 ThumbnailLayout_KeyDown
         container.Focus();
 
+        // 复选框模式：**整张卡片就是勾选热区**。勾选逻辑全在这里（卡片里的 CheckBox 只负责显示），
+        // 否则「按下卡片」与「按下复选框」会各切换一次、互相抵消。
+        if (vm.IsCheckboxMode)
+        {
+            _dragStartEvent = null;
+            _dragPreservedSelection = null;
+
+            if (!point.Properties.IsLeftButtonPressed)
+            {
+                // 右键：命中项未勾选时先勾上，让右键菜单（删除 / 解压）作用于它
+                if (pressedItem != null && !pressedItem.IsChecked)
+                    ApplyCheckPointer(pressedItem, shift: false, vm);
+                return;
+            }
+
+            if (pressedItem == null) return;
+
+            ApplyCheckPointer(pressedItem, e.KeyModifiers.HasFlag(KeyModifiers.Shift), vm);
+            e.Handled = true;   // 阻止卡片内的 CheckBox 再切换一次
+            return;
+        }
+
         if (!point.Properties.IsLeftButtonPressed)
         {
             // 右键：命中项不在选区时单选它（已在选区内则保持多选，右键菜单作用于整批）
@@ -199,6 +227,45 @@ public partial class MainWindow
         {
             _isApplyingThumbnailSelection = false;
         }
+    }
+
+    /// <summary>
+    /// 把一次「勾选点击」（复选框模式）解释成勾选变更并写回模型。
+    /// 勾选集合本身由 VM 在 <see cref="ArchiveItemModel.IsChecked"/> 变化时维护
+    /// （<c>OnEntryPropertyChanged</c> → <c>SelectedEntries</c>），这里只补主选项与卡片高亮。
+    /// 平铺 / 内容行 / 详细信息三种布局共用同一份算法（<see cref="ThumbnailSelectionController.HandleCheckPointerPressed"/>）。
+    /// </summary>
+    private void ApplyCheckPointer(ArchiveItemModel? pressedItem, bool shift, MainWindowViewModel vm)
+    {
+        var result = ThumbnailSelectionController.HandleCheckPointerPressed(
+            pressedItem,
+            shift,
+            vm.CurrentEntries.ToList(),
+            _thumbnailCheckAnchor);
+
+        _thumbnailCheckAnchor = result.Anchor;
+
+        foreach (var item in result.ToCheck)
+            item.IsChecked = true;
+
+        foreach (var item in result.ToUncheck)
+            item.IsChecked = false;
+
+        // 主选中项照常写（预览 / 状态栏 / 卡片元数据文字都读它）
+        vm.SelectedEntry = result.Primary;
+
+        SyncThumbnailCheckHighlight(vm);
+    }
+
+    /// <summary>
+    /// 复选框模式下让卡片高亮跟随勾选集合（卡片视图的高亮源是 <see cref="ArchiveItemModel.IsSelected"/>，
+    /// 而勾选只改 <c>SelectedEntries</c>，不补这一步勾上的卡片不会变蓝）。
+    /// </summary>
+    private static void SyncThumbnailCheckHighlight(MainWindowViewModel vm)
+    {
+        var checkedItems = new HashSet<ArchiveItemModel>(vm.SelectedEntries);
+        foreach (var item in vm.CurrentEntries)
+            item.IsSelected = checkedItems.Contains(item);
     }
 
     /// <summary>

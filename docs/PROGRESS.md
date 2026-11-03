@@ -26,6 +26,7 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-11
+- **11-03** — **卡片视图复选框 + 快捷多选 + 视图菜单布局子菜单（v0.5.6 收尾追加）**：平铺 / 内容行两种卡片布局也显示复选框（默认关，跟随「复选框多选」开关），点**整张卡片即切换勾选**；新增 **Shift + 点击连选**（锚点到当前行只加不减）与 **Ctrl + 点击逐项增减**，卡片视图与表格视图共用 ThumbnailSelectionController.HandleCheckPointerPressed 一套判定；「视图」菜单新增「列表布局」子菜单（详情 / 平铺 / 内容直达，当前项打勾）与「复选框多选」开关。表格视图的 Shift 连勾在拖拽接线的 Tunnel 拦截里实现（DataGridCell 不公开 OwningColumn，改为视觉树上溯「先遇 Row 还是先遇 CheckBox」判定列）。-Task i18n 1430 key、8 条守卫全绿、ui-tests 45.3s 全绿。
 - **11-02** — **卡片元数据文字（选中项，v0.5.6 收尾追加）**：平铺 / 内容布局里，音频、视频、字体、可执行文件的卡片在**选中时**显示 2–3 行格式元数据（`0:05 · 705 kbps` / `1080×1080 · 0:07` + `H.264 · MP4 视频` / `Arial · Normal` + `4,503 字形` / 产品名 + 架构），改选下一个条目时旧卡文字立刻撤掉。取数走「整条目落临时文件 → Core 现成解析器 → 纯函数排版」：`Services/MetadataCardService`（独立 `%TEMP%\MantisZip\MetaCard\`，不跟预览抢临时文件槽；>64 MB 跳过；异常一律吞掉回退大图标）+ `Services/MetadataCardFormatter`（`Classify` 按扩展名、`BuildLines` 限 3 行、文案走 `MetadataCardLabels.FromLocalization()`）。卡片优先级四级互斥：缩略图 > 文本摘录 > 元数据 > 系统大图标（`ArchiveItemModel.ShowMetadataCard`）。只在卡片布局取数（详情布局短路），从详情切回卡片时给当前选中项补一次。i18n 新增 5 key。测试 `MetadataCardFormatterTests` 17 例 + 模型互斥 3 例。
 - **11-02** — **缩略图卡片外观设置 + 清晰度修正（v0.5.6 收尾追加）**：「设置 → 外观 → 缩略图」子页签可调卡片外边框（默认关）、透明图是否垫纯色底（取色器自选，默认保留透明）、三档尺寸 96/128/160，全部走资源注入即时生效、无需重启，缩略图缓存键加尺寸（来回切档不重复解码）。同时修三处清晰度：卡片里的 `.ico` 改取**边长**最接近 160 的帧（原按面积差，帧集 {16,256} 会挑到 16px 那张 ⇒ 放大发糊）、`.svg` 按卡片尺寸重绘（原按自身 viewBox 24px 渲染再拉伸）、无缩略图时改用系统大图标 96px（Windows 走 `SHGetImageList` 的 Jumbo 256px 档，`SHGFI_SYSICONINDEX` 必须是 `0x4000`，写成 `0x40000` 会被 Shell 忽略并退回通用白页图标）。Avalonia 12 没有 `ColorPickerButton`，取色改 `Button` + `Flyout` + `ColorView`。
 - **11-02** — **主窗口列表复选框多选（v0.5.6 最后一项）**：列表工具栏新增复选框模式开关，每行前面出现复选框，勾选状态**跨滚动、跨切目录保持**（`SelectedEntries` 仍是唯一事实源，`ArchiveItemModel.IsChecked` 双向同步，`PopulateEntries` 重建实例时按 `FullPath` 还原），状态栏右侧显示「已选 N 项 · 共 X」；右键菜单补「全选可见 / 反选 / 清空勾选」，批量删除一次确认（`Confirm_DeleteMultipleFmt` 按条数切文案）、删完自动清空勾选。关闭模式时行为与引入前完全一致（`AppSettings.FileListCheckboxMode` 默认 `false`）。实现踩到三个真 bug：`DataGridColumn` 不是 `Control`、不继承 DataContext ⇒ 列上的 `IsVisible` 绑定静默失效（改 code-behind 按 `Tag` 切）；`ApplyColumnStates` 回放会把新列顶到末尾并隐藏（回放跳过复选框列、首次显隐移到回放之后）；勾选集合可跨目录而 DataGrid 只装当前目录 ⇒ 往 `SelectedItems` 加外部对象直接崩进程（`ArgumentException: The item is not contained in the ItemsSource`），改为只回填当前可见条目。
@@ -285,6 +286,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 卡片视图复选框 + 快捷多选（Shift 连选 / Ctrl 增减 / 视图菜单布局子菜单） | [checkbox-multiselect-shortcuts.md](.omo/plans/已完成/checkbox-multiselect-shortcuts.md) | 未发布（2026-11-03 归档，随 v0.5.6） |
 | 卡片元数据文字（选中项：音频 / 视频 / 字体 / 可执行的格式元数据 2–3 行） | [metadata-card-selection.md](.omo/plans/已完成/metadata-card-selection.md) | 未发布（2026-11-02 归档，随 v0.5.6） |
 | 缩略图卡片外观设置（外边框 / 垫底色 + 取色器 / 三档尺寸；资源注入即时生效） | [thumbnail-card-settings.md](.omo/plans/已完成/thumbnail-card-settings.md) | 未发布（2026-11-02 归档，随 v0.5.6） |
 | 主窗口列表复选框多选（跨目录累积勾选 + 状态栏摘要 + 全选/反选/清空 + 批量删除） | [file-list-checkbox-selection.md](.omo/plans/已完成/file-list-checkbox-selection.md) | 未发布（2026-11-02 归档，随 v0.5.6） |

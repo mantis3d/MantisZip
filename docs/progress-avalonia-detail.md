@@ -6,6 +6,13 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-03** — 功能：卡片视图复选框 + 快捷多选 + 视图菜单布局子菜单（v0.5.6 收尾追加）
+  - **背景**：v0.5.6 的复选框多选只在详情（表格）视图提供；切到平铺 / 内容行后勾选集合虽然还在，但没法继续勾；而且只能逐条点复选框，没有 Shift / Ctrl 这类快捷多选。布局切换也只有工具栏一个循环按钮，菜单里没有直达入口。
+  - **勾选算法**：`Services/ThumbnailSelectionController.cs` 新增 `CheckResult(Primary, ToCheck, ToUncheck, Anchor)` 与 `HandleCheckPointerPressed(pressedItem, shift, orderedItems, anchor)` —— Shift = 锚点到该行**只加不减**地全勾（锚点不变，连续 Shift 以首次点击为起点扩缩；锚点失效则退化为只勾这一行），无修饰键 / Ctrl = 切换该行。纯函数、不改模型不碰 UI，三种布局共用。
+  - **卡片视图**：`Controls/ArchiveContentView.axaml` 的平铺项与内容行左列各加一个 `CheckBox`（`IsHitTestVisible="False"`，点击交给整卡热区，否则会与卡片各切换一次互相抵消；可见性绑 `IsCheckboxMode`）；`Views/MainWindow.Thumbnails.cs` 的 `PointerPressed` 在复选框模式下改为「整卡即勾选」，用**独立锚点** `_thumbnailCheckAnchor`（与选区锚点分开，否则 Shift 连勾会把选区一起扩出去），勾完按 `SelectedEntries` 回填 `IsSelected` 同步卡片高亮。
+  - **表格视图 Shift 连勾**：DataGrid 自带的 Shift 只扩行选区、不扩勾选，所以在拖拽接线的 Tunnel `PointerPressed` 里拦截。判断是否命中复选框列改为视觉树上溯（先遇 `DataGridRow` = 别的列，先遇 `CheckBox` 且 `DataContext` 是 `ArchiveItemModel` = 复选框列），因为 Avalonia 的 `DataGridCell` **不公开** `OwningColumn`（初版按列标记判断编译报 `CS1061`）。
+  - **视图菜单**：`Controls/Menus/ViewMenuItems.axaml` 顶部加「列表布局」子菜单（详情 / 平铺 / 内容，当前项用 `ToggleIconBox` 打勾）与「复选框多选」开关；对应命令 `SetDetailsLayout` / `SetTileLayout` / `SetContentLayout` / `ToggleCheckboxMode` 加在 `MainWindowViewModel`，`LocalizedStrings[...]` 的 key 登记进 `UpdateLocalizedStrings` 的 keys 数组。
+  - **验证**：Release `--no-incremental` 0 警告；`-Task i18n` 1430 key；`-Task check` 8 条守卫全绿；`-Task test -Target ui-tests` 45.3s 全绿（含新增 7 例）。真机（平铺布局 8 条目）：点第 1 张卡勾上、Shift 点第 4 张 → 1–4 全勾（「已选 4 项 · 共 44 B」）；切详情布局后 4 行仍勾选；详情里点 file5 再 Shift 点 file8 → 8 项全勾（「已选 8 项 · 共 88 B」）；「视图」菜单可见「列表布局 ›」与「复选框多选 ✓」。
 **2026-11-02** — 功能：卡片元数据文字（选中项，v0.5.6 收尾追加）
   - **背景**：卡片布局里没有缩略图也没有文本摘录的条目只能显示系统大图标（音频是播放图标、字体是字体图标），用户看不出「这是什么文件」。而 Core 里早就有这些格式的解析器（`FlacParser` / `RiffParser` / `Id3v2Parser` / `VideoParser` / `FontParser` / `PeParser`），预览面板也正是靠它们显示时长、分辨率、字形数、产品版本。用户（2026-11-02）问：能不能像文本缩略图那样把这些压成几行字显示在卡片上？
   - **范围决策**：只做「当前选中」的那一张卡（每张卡都读一遍条目等于再叠一遍缩略图的 I/O）；首批覆盖音频 / 视频 / 字体 / 可执行四族（解析器现成、字段密度高），Office 与 PDF 需要整包读，留后续。

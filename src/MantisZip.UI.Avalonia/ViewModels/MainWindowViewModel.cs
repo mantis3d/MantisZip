@@ -255,7 +255,7 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_Filter", "Toolbar_Preview",
             "Menu_Toolbar",
             "Menu_DataBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation", "Menu_ShowInfoPanel",
-            "Menu_ShowPreviewPanel", "Menu_SaveLayout",
+            "Menu_ShowPreviewPanel", "Menu_SaveLayout", "Menu_ListLayout", "Menu_CheckboxMode",
             "Filter_Search", "Filter_Exclude", "Filter_DateFrom", "Filter_DateTo",
             "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders", "Filter_ClearAll",
             "Filter_PickDateFrom", "Filter_PickDateTo", "Filter_PickSizeMin", "Filter_PickSizeMax",
@@ -875,6 +875,20 @@ public partial class MainWindowViewModel : ObservableObject
         };
     }
 
+    // ── 「视图 → 列表布局」子菜单（2026-11-03：菜单里直接指定布局，不必反复点工具栏循环） ──
+
+    /// <summary>切到详情布局（表格）。</summary>
+    [RelayCommand]
+    private void SetDetailsLayout() => LayoutMode = FileListLayoutMode.Details;
+
+    /// <summary>切到平铺布局（卡片流）。</summary>
+    [RelayCommand]
+    private void SetTileLayout() => LayoutMode = FileListLayoutMode.Tile;
+
+    /// <summary>切到内容行布局（大卡片 + 元数据）。</summary>
+    [RelayCommand]
+    private void SetContentLayout() => LayoutMode = FileListLayoutMode.Content;
+
     // ── File list checkbox selection (v0.5.6 file-list-checkbox-selection) ──
 
     /// <summary>
@@ -1061,6 +1075,10 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>清空勾选（工具条 / 右键菜单入口）。</summary>
     [RelayCommand]
     private void ClearChecked() => ClearCheckedCore();
+
+    /// <summary>开关复选框模式（工具栏按钮之外，2026-11-03 起「视图」菜单也提供入口）。</summary>
+    [RelayCommand]
+    private void ToggleCheckboxMode() => IsCheckboxMode = !IsCheckboxMode;
 
     /// <summary>反选当前列表里可见的行（其它目录的勾选保持不变）。</summary>
     [RelayCommand]

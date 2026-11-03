@@ -935,6 +935,33 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// 命中测试：判断按下位置是否落在「复选框列」的复选框上。
+    /// 只有该列的单元格模板里有 <see cref="CheckBox"/>，所以自命中元素上溯「先遇到 CheckBox 还是
+    /// 先遇到 DataGridRow」即可区分列（Avalonia 的 <c>DataGridCell</c> 不公开所属列，不能用列标记判断）。
+    /// 命中时返回该行的数据项，供复选框模式的 Shift 连勾使用；命中别的列返回 false。
+    /// </summary>
+    private static bool TryHitCheckbox(object? source, out ArchiveItemModel? item)
+    {
+        item = null;
+        for (var v = source as Visual; v != null; v = v.GetVisualParent())
+        {
+            if (v is DataGridRow row)
+            {
+                // 先碰到行 = 命中的是别的列（名称 / 大小 / 日期……），不抢它的点击
+                item = row.DataContext as ArchiveItemModel;
+                return false;
+            }
+
+            if (v is CheckBox { DataContext: ArchiveItemModel model })
+            {
+                item = model;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
     /// 详情列表双击：行为统一在 <see cref="HandleItemDoubleTapAsync"/>（平铺/内容模式共用同一入口）。
     /// </summary>
     private async void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
@@ -1572,6 +1599,21 @@ public partial class MainWindow : Window
         fileGrid.AddHandler(InputElement.PointerPressedEvent, (s, e) =>
         {
             _dragStartPoint = e.GetPosition(fileGrid);
+
+            // 复选框模式 + Shift：DataGrid 自己的 Shift 只扩「行选区」，勾选不会跟着扩。
+            // 这里在 Tunnel 阶段把「复选框列 + Shift」的按下拦下来，按区间直接勾选
+            // （勾选算法与平铺 / 内容行视图共用 ApplyCheckPointer，语义完全一致）。
+            if (DataContext is MainWindowViewModel gridVm
+                && gridVm.IsCheckboxMode
+                && e.KeyModifiers.HasFlag(KeyModifiers.Shift)
+                && TryHitCheckbox(e.Source, out var checkRow))
+            {
+                ApplyCheckPointer(checkRow, shift: true, gridVm);
+                e.Handled = true;
+                _dragStartEvent = null;
+                _dragPreservedSelection = null;
+                return;
+            }
 
             // 命中测试：仅在按下位置命中数据行时才记录拖拽起点。
             // 列标题（调整列宽/拖拽重排列）、空白区域、滚动条等按下不启动文件拖拽
