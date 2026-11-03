@@ -929,7 +929,13 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ReadNameEncodingText => LocalizationManager.T("Settings_Zip_ReadEncoding");
 
     /// <summary>「默认读取代码页」下拉项（复用主工具栏的同一份编码键表）。</summary>
-    public IReadOnlyList<NameEncodingOption> ReadNameEncodingOptions => NameEncodingOption.BuildDefault();
+    /// <remarks>
+    /// 必须是**稳定的集合实例**：ComboBox 的 SelectedItem 是用 Equals 在 ItemsSource 里找项的，
+    /// 而 <see cref="NameEncodingOption"/> 是 class（引用相等）——如果每次读属性都新建一份列表，
+    /// 选中项永远找不到对应实例，下拉框就显示空白（2026-11-03 用户实测反馈）。
+    /// 选项内容在 <see cref="PopulateComboOptions"/> 里填充，选中项在 <see cref="SetSelectedOptions"/> 里重选。
+    /// </remarks>
+    public System.Collections.ObjectModel.ObservableCollection<NameEncodingOption> ReadNameEncodingOptions { get; } = new();
 
     [ObservableProperty] private NameEncodingOption? _selectedReadNameEncodingOption;
     public string ZipCompressionMethodText => LocalizationManager.T("Settings_Zip_CompressionMethod");
@@ -1225,8 +1231,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         _zipCompressionMethod = _settings.ZipCompressionMethod;
         _zipEncryptionMethod = _settings.ZipEncryptionMethod;
         _zipEncoding = _settings.ZipEncoding;
-        _selectedReadNameEncodingOption = ReadNameEncodingOptions.FirstOrDefault(o => o.Key == _settings.ReadNameEncoding)
-            ?? ReadNameEncodingOptions.FirstOrDefault();
         _sevenZipEncryptHeaders = _settings.SevenZipEncryptHeaders;
 
         // Extract
@@ -1464,6 +1468,11 @@ public partial class SettingsWindowViewModel : ObservableObject
             var display = opt.Tag == "default" ? LocalizationManager.T("FormatOptions_Zip_EncodingDefault") : opt.Display;
             ZipEncodingOptions.Add(new Option(display, opt.Tag));
         }
+
+        // 「默认读取代码页」：与主工具栏共用同一份编码键表（自动检测 / 系统默认 / 六种常用 / 其他…）
+        ReadNameEncodingOptions.Clear();
+        foreach (var opt in NameEncodingOption.BuildDefault())
+            ReadNameEncodingOptions.Add(opt);
     }
 
     /// <summary>
@@ -1495,10 +1504,34 @@ public partial class SettingsWindowViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// 在压缩级别下拉里找与 <paramref name="level"/> 数值最接近的档位。
+    /// 用途：设置里存了不在预设档位中的旧值（0/3/5/9 之外）时，避免 ComboBox 显示空白。
+    /// </summary>
+    internal static Option? FindClosestLevelOption(IReadOnlyList<Option> options, int level)
+    {
+        Option? closest = null;
+        var bestDistance = int.MaxValue;
+        foreach (var option in options)
+        {
+            if (!int.TryParse(option.Value, out var value)) continue;
+            var distance = Math.Abs(value - level);
+            if (distance >= bestDistance) continue;
+            bestDistance = distance;
+            closest = option;
+        }
+
+        return closest;
+    }
+
     private void SetSelectedOptions()
     {
         SelectedDefaultFormatOption = DefaultFormatOptions.FirstOrDefault(o => o.Value == DefaultFormat);
-        SelectedDefaultLevelOption = DefaultLevelOptions.FirstOrDefault(o => o.Value == DefaultLevel.ToString());
+        // 压缩级别：旧版设置里可能存着不在预设档位里的值（如 1/2/4…），
+        // 直接 FirstOrDefault 会得到 null ⇒ ComboBox 显示空白（2026-11-03 用户实测反馈）。
+        // 找不到精确档位时退到数值最接近的档位，保证永远有选中项。
+        SelectedDefaultLevelOption = DefaultLevelOptions.FirstOrDefault(o => o.Value == DefaultLevel.ToString())
+            ?? FindClosestLevelOption(DefaultLevelOptions, DefaultLevel);
         SelectedPreviewPositionOption = PreviewPositionOptions.FirstOrDefault(o => o.Value == PreviewPosition.ToString());
         SelectedInfoPanelOrientationOption = InfoPanelOrientationOptions.FirstOrDefault(o => o.Value == InfoPanelOrientation);
         SelectedThemeOption = ThemeOptions.FirstOrDefault(o => o.Value == Theme);
@@ -1546,6 +1579,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedZipCompressionMethodOption = ZipCompressionMethodOptions.FirstOrDefault(o => o.Value == ZipCompressionMethod);
         SelectedZipEncryptionMethodOption = ZipEncryptionMethodOptions.FirstOrDefault(o => o.Value == ZipEncryptionMethod);
         SelectedZipEncodingOption = ZipEncodingOptions.FirstOrDefault(o => o.Value == ZipEncoding);
+        // 代码页下拉要按「当前选中项的键 → 设置里的键」重选：切换语言会重建选项集合，
+        // 不重选就会因为实例被换掉而显示空白；同时不能用 _settings 直接覆盖，否则会丢掉用户尚未保存的选择。
+        var readEncodingKey = SelectedReadNameEncodingOption?.Key ?? _settings.ReadNameEncoding;
+        SelectedReadNameEncodingOption = ReadNameEncodingOptions.FirstOrDefault(o => o.Key == readEncodingKey)
+            ?? ReadNameEncodingOptions.FirstOrDefault();
     }
 
     private void OnCultureChanged(object? sender, EventArgs e)
@@ -1626,7 +1664,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ZipDefaultOptionsText));
         OnPropertyChanged(nameof(ZipEncodingText));
         OnPropertyChanged(nameof(ReadNameEncodingText));
-        OnPropertyChanged(nameof(ReadNameEncodingOptions));
         OnPropertyChanged(nameof(ZipCompressionMethodText));
         OnPropertyChanged(nameof(ZipEncryptionMethodText));
         OnPropertyChanged(nameof(SevenZipDefaultOptionsText));

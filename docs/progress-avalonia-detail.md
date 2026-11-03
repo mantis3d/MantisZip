@@ -5,6 +5,15 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-03** — 修复：设置窗口「默认读取代码页」下拉空白 + 压缩级别兜底
+  - 现象（用户实测）：「设置里面 zip 的默认『压缩级别』和『默认读取代码页』成了空白」。
+  - 根因 1（已确证，`src/MantisZip.UI.Avalonia/ViewModels/SettingsWindowViewModel.cs`）：`ReadNameEncodingOptions` 当时是计算属性 `=> NameEncodingOption.BuildDefault()`，每次读都返回**新列表、新实例**；而 `NameEncodingOption` 是 **class**（引用相等），`Option` 是 **record**（值相等）。ComboBox 的 `SelectedItem` 是用 `Equals` 在 `ItemsSource` 里找项的 ⇒ class 型的选中项永远找不到实例，被清成 null ⇒ 空白。
+  - 修法 1：`ReadNameEncodingOptions` 改成稳定的 `ObservableCollection<NameEncodingOption>`，在 `PopulateComboOptions()` 里 `Clear()` 后填充、在 `SetSelectedOptions()` 里按「当前选中项的键 → 设置里的键」重选（切换语言会重建集合，不重选同样空白；也不能直接用设置值覆盖，否则会丢掉用户尚未保存的选择）；删掉 `OnCultureChanged` 里已无意义的 `OnPropertyChanged(nameof(ReadNameEncodingOptions))`。
+  - 根因 2（压缩级别，防御性修复）：`SelectedDefaultLevelOption = DefaultLevelOptions.FirstOrDefault(o => o.Value == DefaultLevel.ToString())` —— 设置里若存着不在预设档位（0/3/5/9）里的旧值，`FirstOrDefault` 返回 null ⇒ 同样空白。
+  - 修法 2：新增 `internal static Option? FindClosestLevelOption(IReadOnlyList<Option> options, int level)`，找不到精确档位时退到数值最接近的档位，保证永远有选中项。
+  - 回归测试 `tests/MantisZip.UI.Avalonia.Tests/SettingsOptionWiringTests.cs`：① `EverySelectedOption_IsContainedInItsOptionsCollection` —— 反射遍历所有 `Selected*Option` ↔ 对应 `*Options`，用 `Equals` 判断包含、一次列出全部违规项（该判据等价于「ComboBox 会不会显示空白」）；② `LevelFallback_PicksClosestOption`（4→3、8→9、12→9、-5→0、5→5）与 `LevelFallback_WithoutNumericOptions_ReturnsNull`。
+  - 验证：avalonia（Release）0 警告；`ui-tests`（全量、`--no-build`）42.1s 0 警告；`tests` 17.7s（2 条存量警告）；`check` 0.5.5、`guards` 8/8。
+  - 排查记录：headless 里 `SettingsWindow` 的页签内容不会被实例化到可视树（`Measure`/`Arrange` + `RunJobs` 后 `GetVisualDescendants().OfType<ComboBox>()` 仍为 0），所以「绑对了但界面看不见」这类问题只能用 VM 层合同断言兜住。
 **2026-11-03** — 功能：手动代码页改为「真强制读取」，写回仍按包声明编码
   - 起因（用户实测提问）：「打开一个有中文的压缩包，如果我故意切换到错误的代码页，是不是应该显示乱码？」实测确认此前不会 —— `SharpCompress` 只要条目名带 bit 11（UTF-8 标志位）就一律按 UTF-8 解，`ArchiveEncoding.Default` 被忽略，所以手动选的编码对「新式包」完全无效。
   - 根因与关键事实：`SharpCompress.Common.ArchiveEncoding` 除 `Default` 外还有 **`Forced`**（反射确认成员：`Default`/`Password`/`UTF8`/`Forced`/`CustomDecoder`）。实测 `new ReaderOptions { ArchiveEncoding = new ArchiveEncoding { Default = gbk, Forced = gbk } }`：UTF-8 标志位的包 → `涓枃鏂囦欢.txt`（乱码），GBK 老包 → 正确 ⇒ 只有 `Forced` 能盖过 bit 11。
