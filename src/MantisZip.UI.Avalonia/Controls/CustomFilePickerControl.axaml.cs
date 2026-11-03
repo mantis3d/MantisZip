@@ -992,6 +992,17 @@ public partial class CustomFilePickerControl : UserControl
             if (normalized != null && string.Equals(ext, normalized, StringComparison.OrdinalIgnoreCase))
                 return true;
         }
+
+        // 分卷文件（issue #70③ / #69②）：TEST.7z.002、pack.zip.004、old.r00、x.part2.rar 的扩展名
+        // 不是归档扩展名，直接比对会漏掉中间卷（此前只亮 *.001）。剥掉分卷后缀回到归档基名
+        // （TEST.7z / old.rar / x.rar）再按模式后缀匹配一次 —— 分卷集「全部显示」。
+        foreach (var pattern in patterns)
+        {
+            var normalized = NormalizeExtension(pattern);
+            if (normalized != null && ArchiveVolumeSet.MatchesArchiveExtension(filePath, normalized))
+                return true;
+        }
+
         return false;
     }
 

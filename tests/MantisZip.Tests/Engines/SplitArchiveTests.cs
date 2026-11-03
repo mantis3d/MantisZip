@@ -85,6 +85,23 @@ public sealed class SplitArchiveTests : IDisposable
     }
 
     [Fact]
+    public void Factory_RoutesZipSpannedVolumesToSevenZipEngine()
+    {
+        // issue #68：PKZIP 跨卷（archive.z01… + 末卷 archive.zip）也交给 7z.dll，
+        // 锚点必须是**末卷 .zip**（7z 不认识 .z01 扩展名）；这里只验路由，不验内容。
+        var part = Path.Combine(_work, "spanned.z01");
+        var last = Path.Combine(_work, "spanned.zip");
+        File.WriteAllBytes(part, new byte[4]);
+        File.WriteAllBytes(last, new byte[4]);
+
+        Assert.IsType<SevenZipEngine>(ArchiveEngineFactory.GetEngineByExtension(part));
+        Assert.IsType<SevenZipEngine>(ArchiveEngineFactory.GetEngineByExtension(last));
+        Assert.Equal(last, ArchiveEngineFactory.ResolveVolumeAnchor(part));
+        Assert.Equal(last, ArchiveEngineFactory.ResolveVolumeAnchor(last));
+    }
+
+
+    [Fact]
     public void Factory_ResolveVolumeAnchor_WalksBackToFirstVolume()
     {
         var first = CopyVolumeSet("vol-01-7z-split.001", "set.7z");
@@ -134,4 +151,77 @@ public sealed class SplitArchiveTests : IDisposable
 
         Assert.Equal(HeaderStructure.Intact, ArchiveHeaderProbe.Probe(first));
     }
+
+    #region RAR5 分卷（issue #69 在 RAR 上的残留 / issue #68② 的报告）
+
+    private static string Rar5CorpusPath(string fileName) =>
+        Path.Combine(GetRepoRoot(), "tests", "corpus", "rar5", fileName);
+
+    /// <summary>把语料里的 RAR5 分卷集整套复制到临时目录，返回各卷路径（按卷号顺序）。</summary>
+    private List<string> CopyRar5SplitSet()
+    {
+        var corpusDir = Path.GetDirectoryName(Rar5CorpusPath("valid-rar5-split.part1.rar"))!;
+        var copies = new List<string>();
+        foreach (var src in Directory.GetFiles(corpusDir, "valid-rar5-split.part*.rar")
+                     .OrderBy(p => p, StringComparer.OrdinalIgnoreCase))
+        {
+            var dest = Path.Combine(_work, Path.GetFileName(src));
+            File.Copy(src, dest);
+            copies.Add(dest);
+        }
+        return copies;
+    }
+
+    [Fact]
+    public async Task Rar5Split_ListsAndExtractsThroughSevenZipEngine()
+    {
+        // WinRAR 新式 .partN.rar 命名此前完全不认（不回溯首卷、删源包只删一卷）
+        var volumes = CopyRar5SplitSet();
+        var engine = new SevenZipEngine();
+
+        Assert.IsType<SevenZipEngine>(ArchiveEngineFactory.GetEngineByExtension(volumes[1]));
+
+        var entries = await engine.ListEntriesAsync(volumes[1]);
+        Assert.Equal(3, entries.Count);
+
+        var dest = Path.Combine(_work, "rar5-out");
+        var result = await engine.ExtractAsync(volumes[1], dest);
+
+        Assert.Equal(0, result.FailedEntries);
+        Assert.Equal(3, Directory.GetFiles(dest, "*", SearchOption.AllDirectories).Length);
+    }
+
+    [Fact]
+    public async Task TestArchiveAsync_IntactRar5Split_Passes()
+    {
+        var volumes = CopyRar5SplitSet();
+
+        Assert.True(await new SevenZipEngine().TestArchiveAsync(volumes[0]));
+    }
+
+    [Fact]
+    public async Task TestArchiveAsync_TailCorruptedRar5LastVolume_Fails()
+    {
+        // 报告者 #68② 的现象：WinRAR 分卷被「故意改坏」却显示没坏 ——
+        // 7z.dll 的 Check 不校验卷尾 end-of-archive 块的头 CRC，必须靠 RarHeaderValidator 补上
+        var volumes = CopyRar5SplitSet();
+        var last = volumes[^1];
+        var bytes = File.ReadAllBytes(last);
+        for (var i = Math.Max(0, bytes.Length - 64); i < bytes.Length; i++)
+            bytes[i] ^= 0xFF;
+        File.WriteAllBytes(last, bytes);
+
+        Assert.False(await new SevenZipEngine().TestArchiveAsync(volumes[0]));
+    }
+
+    [Fact]
+    public async Task TestArchiveAsync_MissingRar5LastVolume_Fails()
+    {
+        var volumes = CopyRar5SplitSet();
+        File.Delete(volumes[^1]);
+
+        Assert.False(await new SevenZipEngine().TestArchiveAsync(volumes[0]));
+    }
+
+    #endregion
 }

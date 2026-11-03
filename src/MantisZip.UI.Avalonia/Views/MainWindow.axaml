@@ -198,6 +198,48 @@
                 VerticalAlignment="Center"
                 Background="{DynamicResource ThemeBorderBrush}"
                 Margin="4,0" />
+        <!--
+          文件名代码页按钮（对齐 Bandizip 的工具栏位置）：与其它工具栏按钮同一套骨架 ——
+          图标在上、文字在下，点开弹出编码菜单。三种状态：
+            ① ZIP/TAR/GZ：可用，文字 = 当前选中的编码（自动检测 / 系统默认 / GBK / 其他…950）；
+            ② 7z / RAR：条目名是 UTF-16，没有代码页问题 ⇒ **置灰而不隐藏**（用户要求，工具栏不跳动）；
+            ③ 未打开压缩包：同样置灰。
+          图标右下角的小徽章显示「本次载入实际生效的编码」（自动检测出来的值也包括），
+          徽章内容为空时整块不画（HasNameEncodingBadge），完整名称走 ToolTip。
+          菜单项由 code-behind 在点击时按 NameEncodingOptions 现建（含单选勾），
+          这样能直接用 VM 的 ChangeNameEncodingCommand 与当前选中项，不必给模型塞命令。
+        -->
+        <Button x:Name="NameEncodingButton"
+                Classes="ToolbarButton"
+                IsEnabled="{Binding CanChangeNameEncoding}"
+                ToolTip.Tip="{Binding NameEncodingToolTip}"
+                Click="OnNameEncodingClick">
+          <Button.Flyout>
+            <MenuFlyout Placement="BottomEdgeAlignedLeft" Opened="OnNameEncodingMenuOpened" />
+          </Button.Flyout>
+          <StackPanel>
+            <Grid Width="22" Height="22">
+              <!-- 地球图标（与 设置 → 语言 同一枚几何） -->
+              <PathIcon Data="{StaticResource IconGlobe}" Classes="ToolbarButtonIcon"
+                        Width="22" Height="22"
+                        Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              <!-- 检测到的代码页徽章：压在图标右下角，8px 短标记（GBK / BIG5 / JIS / U16…） -->
+              <Border IsVisible="{Binding HasNameEncodingBadge}"
+                      HorizontalAlignment="Right" VerticalAlignment="Bottom"
+                      Margin="0,0,-5,-4"
+                      CornerRadius="3" Padding="2,0"
+                      Background="{DynamicResource ThemeAccentBrush}"
+                      BorderBrush="{DynamicResource ThemeSurfaceBgBrush}"
+                      BorderThickness="1">
+                <TextBlock Text="{Binding NameEncodingBadgeText}"
+                           FontSize="8"
+                           Foreground="{DynamicResource ThemeTextOnAccentBrush}" />
+              </Border>
+            </Grid>
+            <TextBlock Text="{Binding NameEncodingDisplay}"
+                       Classes="ToolbarButtonLabel" />
+          </StackPanel>
+        </Button>
         <!-- 工具栏密码按钮：针对当前压缩包（对齐 WPF EnterPasswordBtn 三态：无加密禁用 / 未匹配红锁 / 已匹配绿开锁） -->
         <Button Classes="ToolbarButton"
                 Classes.passwordMatched="{Binding HasMatchedPassword}"

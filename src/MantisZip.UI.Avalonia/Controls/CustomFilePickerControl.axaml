@@ -368,9 +368,13 @@
     </Grid>
 
     <!-- ═══════ Row 2: 文件名 + 文件类型（保存/打开模式） ═══════ -->
+    <!-- 文件类型列的宽度必须跟随内容（issue #68）：此前写死 110px，中文「压缩包文件」
+         的最后一个「案」被下拉箭头挤掉；「自解压程序 (*.exe)」更长，裁得更多。
+         改成 Auto 后由下拉项自身的期望宽度决定，任何语言/任何标签都不会裁字；
+         ComboBox 的 MinWidth 保底，避免「保存」模式（*.zip 这类短标签）比改前更窄。 -->
     <Grid x:Name="FileNameArea"
           Grid.Row="2"
-          ColumnDefinitions="60,*,60,110"
+          ColumnDefinitions="60,*,60,Auto"
           ColumnSpacing="{DynamicResource SpacingXs}"
           Margin="0,12,0,0">
       <!-- 文件名标签 -->
@@ -390,9 +394,10 @@
                  Text="{Binding FileTypeLabel}"
                  VerticalAlignment="Center"
                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-      <!-- 文件类型下拉选择器 -->
+      <!-- 文件类型下拉选择器：宽度随选中项文字自适应（见上方注释，issue #68） -->
       <ComboBox Grid.Column="3"
                 x:Name="FileTypeSelector"
+                MinWidth="110"
                 MinHeight="{DynamicResource ControlHeightSm}"
                 SelectionChanged="FileTypeSelector_SelectionChanged"
                 Background="{DynamicResource ThemeSurfaceBgBrush}"

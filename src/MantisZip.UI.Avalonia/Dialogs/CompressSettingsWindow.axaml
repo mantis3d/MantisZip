@@ -57,27 +57,36 @@
             <RowDefinition Height="Auto" />  <!-- 完成后行为（自动打开输出目录） -->
           </Grid.RowDefinitions>
 
-          <!-- 分组：输出模式（三个互斥单选，绑定 VM 的 IsManualMode/IsSeparateMode/IsCombinedMode） -->
+          <!-- 分组：输出模式（三个互斥单选，绑定 VM 的 IsManualMode/IsSeparateMode/IsCombinedMode）
+               2026-11-02 用户反馈：三项竖排占高太多，改为「左侧标题 + 右侧三项横排」。
+               用 WrapPanel 而不是 StackPanel：窗口被拖到最小宽度时三项自动折成两行，不会溢出裁切。 -->
           <Border Grid.Row="0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
-            <StackPanel Spacing="{DynamicResource SpacingXs}">
-              <TextBlock Text="{Binding LocalizedStrings[Compress_OutputMode]}"
-                         FontWeight="SemiBold" />
-              <!-- 手动指定输出路径 -->
-              <RadioButton GroupName="CompressOutputMode"
-                           IsChecked="{Binding IsManualMode}"
-                           Content="{Binding LocalizedStrings[Compress_OutputMode_Manual]}" />
-              <!-- 分别压缩到各自目录（每源自成包） -->
-              <RadioButton GroupName="CompressOutputMode"
-                           IsChecked="{Binding IsSeparateMode}"
-                           Content="{Binding LocalizedStrings[Compress_OutputMode_Separate]}" />
-              <!-- 合并压缩到同一个压缩包 -->
-              <RadioButton GroupName="CompressOutputMode"
-                           IsChecked="{Binding IsCombinedMode}"
-                           Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
-            </StackPanel>
+            <Grid ColumnDefinitions="Auto,*">
+              <TextBlock Grid.Column="0"
+                         Text="{Binding LocalizedStrings[Compress_OutputMode]}"
+                         FontWeight="SemiBold"
+                         VerticalAlignment="Center"
+                         Margin="0,0,12,0" />
+              <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
+                <!-- 手动指定输出路径 -->
+                <RadioButton GroupName="CompressOutputMode"
+                             Margin="0,0,12,0"
+                             IsChecked="{Binding IsManualMode}"
+                             Content="{Binding LocalizedStrings[Compress_OutputMode_Manual]}" />
+                <!-- 分别压缩到各自目录（每源自成包） -->
+                <RadioButton GroupName="CompressOutputMode"
+                             Margin="0,0,12,0"
+                             IsChecked="{Binding IsSeparateMode}"
+                             Content="{Binding LocalizedStrings[Compress_OutputMode_Separate]}" />
+                <!-- 合并压缩到同一个压缩包 -->
+                <RadioButton GroupName="CompressOutputMode"
+                             IsChecked="{Binding IsCombinedMode}"
+                             Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
+              </WrapPanel>
+            </Grid>
           </Border>
 
           <!-- 分组：输出目录（内嵌目录选择器，仅手动模式可见；分别/合并模式路径自动计算）。

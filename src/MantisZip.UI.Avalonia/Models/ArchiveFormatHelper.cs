@@ -1,5 +1,7 @@
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Models;
 
@@ -69,6 +71,28 @@ public static class ArchiveFormatHelper
 
         return patterns;
     }
+
+    /// <summary>
+    /// 「打开压缩包」对话框的文件类型下拉项：压缩包（**默认选中**）/ 自解压程序 / 所有文件。
+    /// </summary>
+    /// <remarks>
+    /// 自解压程序（.exe）单独一项且**不默认选中**（issue #36）：默认筛「压缩包」时目录里的
+    /// 普通 exe / 安装程序不会混进列表，需要打开 SFX 的用户才切这一项；而「所有文件」照旧兜底。
+    /// 注意别把 <c>*.exe</c> 塞进压缩包那组模式里——那等于默认把整个目录的可执行文件都列出来。
+    /// </remarks>
+    public static IReadOnlyList<FileTypeOption> BuildOpenDialogFileTypes(AppSettings settings)
+        =>
+        [
+            new FileTypeOption(
+                LocalizationManager.T("Picker_FileTypeArchive"),
+                [.. BuildOpenDialogPatterns(settings)]),
+            new FileTypeOption(
+                LocalizationManager.T("Picker_FileTypeSfxExe"),
+                ["*.exe"]),
+            new FileTypeOption(
+                LocalizationManager.T("Picker_FileTypeAll"),
+                [])
+        ];
 
     /// <summary>
     /// 自定义扩展名归一化：去空白、转小写、补前导点；空值 / 只有点号 / 含通配符或路径分隔符 → null。

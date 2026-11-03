@@ -57,7 +57,7 @@ public partial class MainWindowViewModel : ObservableObject
                 ExtractFlow.TrySeedEntryItemsInBackground(
                     ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct);
+                    CurrentArchivePath, dest, password, progress, ct, NameEncodingReadOptions());
             });
 
         if (completed)
@@ -102,7 +102,7 @@ public partial class MainWindowViewModel : ObservableObject
                 ExtractFlow.TrySeedEntryItemsInBackground(
                     ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct);
+                    CurrentArchivePath, dest, password, progress, ct, NameEncodingReadOptions());
             });
 
         if (completed)
@@ -194,7 +194,8 @@ public partial class MainWindowViewModel : ObservableObject
             CurrentArchivePath, password, entries, destinationPath,
             CurrentFolder ?? "", preserveFullPath ?? settings.ExtractPreserveFullPath, settings.FileConflictAction,
             ShowExtractFileConflictDialogAsync,
-            LocalizationManager.T("Status_Extracting"));
+            LocalizationManager.T("Status_Extracting"),
+            nameEncoding: NameEncodingRequestKey);
 
         switch (result.Status)
         {
@@ -333,7 +334,7 @@ public partial class MainWindowViewModel : ObservableObject
                 ExtractFlow.TrySeedEntryItemsInBackground(
                     ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct);
+                    CurrentArchivePath, dest, password, progress, ct, NameEncodingReadOptions());
             });
 
         if (completed)

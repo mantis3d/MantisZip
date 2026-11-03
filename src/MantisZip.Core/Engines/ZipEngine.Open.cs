@@ -42,8 +42,55 @@ public partial class ZipEngine
     /// 回退逻辑：只有 ZIP 条目未设置 UTF-8 标志（bit 11）且内容含高位字符时，
     /// 才尝试 GBK 回退。如果 bit 11 已设置，说明条目名是 UTF-8 编码，不进行回退。
     /// </summary>
-    internal static IArchive OpenArchiveWithEncodingFallback(string archivePath, string? password = null)
+    /// <param name="fileNameEncoding">
+    /// 文件名编码键（见 <see cref="NameEncodingCatalog"/>）。<c>null</c>/<c>auto</c> = 保持自动检测流程
+    /// （bit 11 → CJK 启发式 → GBK 重试）；其余值 = 强制按该编码打开，跳过全部启发式。
+    /// 键无法识别时退回自动检测并记日志 —— 绝不静默换成别的编码（猜错会写坏文件名）。
+    /// </param>
+    /// <param name="onEncodingResolved">
+    /// 实际使用的编码键回调（如 <c>gbk</c> / <c>big5</c>），供 UI 回显「自动检测 · 检测到 GBK」，
+    /// 避免为了回显再打开一次归档。
+    /// </param>
+    internal static IArchive OpenArchiveWithEncodingFallback(
+        string archivePath,
+        string? password = null,
+        string? fileNameEncoding = null,
+        Action<string>? onEncodingResolved = null)
     {
+        // ① 显式指定编码：跳过 bit 11 检查、CJK 启发式与 GBK 重试，一次到位
+        if (!NameEncodingCatalog.IsAuto(fileNameEncoding))
+        {
+            if (NameEncodingCatalog.TryResolve(fileNameEncoding, out var forcedEncoding) && forcedEncoding is not null)
+            {
+                CoreLog.Info($"OpenArchiveWithEncodingFallback: explicit file name encoding '{fileNameEncoding}' -> {forcedEncoding.WebName}");
+                onEncodingResolved?.Invoke(NameEncodingCatalog.Describe(forcedEncoding));
+                var forcedFs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
+                try
+                {
+                    return ZipArchive.OpenArchive(forcedFs, new ReaderOptions
+                    {
+                        Password = password ?? string.Empty,
+                        // Forced 而不是只设 Default：用户手动选定的代码页要能盖过包内 bit 11 的 UTF-8 声明，
+                        // 否则「选错代码页」在带 UTF-8 标志的包上毫无反应，看起来像开关失灵。
+                        // 选错就该看到乱码 —— 那正是让人确认「这个包不是这个编码」的依据。
+                        ArchiveEncoding = new SharpCompress.Common.ArchiveEncoding
+                        {
+                            Default = forcedEncoding,
+                            Forced = forcedEncoding
+                        }
+                    });
+                }
+                catch (Exception ex)
+                {
+                    CoreLog.Trace("OpenArchiveWithEncodingFallback: failed with explicit encoding {0}: {1}", fileNameEncoding ?? "null", ex.Message);
+                    forcedFs.Dispose();
+                    throw;
+                }
+            }
+
+            CoreLog.Info($"OpenArchiveWithEncodingFallback: unrecognized file name encoding '{fileNameEncoding}', falling back to auto detection");
+        }
+
         // 使用 FileShare.Delete 允许在 archive 仍持有流时删除原文件
         var fs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
         var options = new ReaderOptions { Password = password ?? string.Empty };
@@ -61,6 +108,7 @@ public partial class ZipEngine
                     Default = Encoding.GetEncoding("gbk")
                 }
             };
+            onEncodingResolved?.Invoke(NameEncodingCatalog.Describe(Encoding.GetEncoding("gbk")));
             // 严格 ZIP 解析（不用 ArchiveFactory.OpenArchive 魔数嗅探——
             // 损坏/全零文件会被误判为 Tar 静默返回 0 条目，吞掉损坏信号）
             return ZipArchive.OpenArchive(fs2, gbkOptions);
@@ -90,6 +138,7 @@ public partial class ZipEngine
                 if (ZipHasUtf8Flag(archivePath))
                 {
                     CoreLog.Info("OpenArchiveWithEncodingFallback: ZIP has UTF-8 flag (bit 11), keeping UTF-8 codec");
+                    onEncodingResolved?.Invoke(NameEncodingCatalog.Describe(Encoding.UTF8));
                     return archive;
                 }
 
@@ -98,6 +147,7 @@ public partial class ZipEngine
                 if (LooksLikeValidCjk(archive))
                 {
                     CoreLog.Info("OpenArchiveWithEncodingFallback: decoded names appear as valid CJK, keeping UTF-8 codec");
+                    onEncodingResolved?.Invoke(NameEncodingCatalog.Describe(Encoding.UTF8));
                     return archive;
                 }
 
@@ -107,6 +157,7 @@ public partial class ZipEngine
             }
 
             CoreLog.Info("OpenArchiveWithEncodingFallback: entries appear ASCII, keeping default codec");
+            onEncodingResolved?.Invoke(NameEncodingCatalog.Describe(Encoding.UTF8));
             return archive;
         }
         catch (Exception ex)
@@ -126,14 +177,23 @@ public partial class ZipEngine
     {
         if (!string.IsNullOrWhiteSpace(fileNameEncoding))
         {
-            var resolved = fileNameEncoding.ToLowerInvariant() switch
+            // 统一走 NameEncodingCatalog：除 gbk/default 外还支持 big5 / shift-jis / euc-kr /
+            // system / other:<代码页>，与「读条目名」用的是同一本键表（否则读 Big5 包正常、写回变 UTF-8）。
+            if (string.Equals(fileNameEncoding, "default", StringComparison.OrdinalIgnoreCase))
             {
-                "gbk" => Encoding.GetEncoding("GBK"),
-                "default" => Encoding.Default,
-                _ => Encoding.UTF8,
-            };
-            CoreLog.Info($"AddToArchiveAsync: using explicit FileNameEncoding '{fileNameEncoding}' -> {resolved.WebName}");
-            return resolved;
+                CoreLog.Info($"AddToArchiveAsync: using explicit FileNameEncoding 'default' -> {Encoding.Default.WebName}");
+                return Encoding.Default;
+            }
+
+            if (NameEncodingCatalog.TryResolve(fileNameEncoding, out var resolved) && resolved is not null)
+            {
+                CoreLog.Info($"AddToArchiveAsync: using explicit FileNameEncoding '{fileNameEncoding}' -> {resolved.WebName}");
+                return resolved;
+            }
+
+            // 认不出的键退回 UTF-8（与改造前一致），并留痕便于排查
+            CoreLog.Info($"AddToArchiveAsync: unknown FileNameEncoding '{fileNameEncoding}', falling back to UTF-8");
+            return Encoding.UTF8;
         }
 
         var inferred = ZipHasUtf8Flag(archivePath) ? Encoding.UTF8 : Encoding.GetEncoding("gbk");

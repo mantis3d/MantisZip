@@ -34,7 +34,12 @@ public partial class ZipEngine : IArchiveEngine
     /// </summary>
     public bool SupportsParallelExtract => true;
 
-    public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(string archivePath, string? password = null, CancellationToken cancellationToken = default)
+    public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(
+        string archivePath,
+        string? password = null,
+        CancellationToken cancellationToken = default,
+        string? fileNameEncoding = null,
+        Action<string>? onEncodingResolved = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ListEntriesAsync: {archivePath}");
@@ -42,7 +47,7 @@ public partial class ZipEngine : IArchiveEngine
 
         var result = await Task.Run(() =>
         {
-            using var archive = OpenArchiveWithEncodingFallback(archivePath, password);
+            using var archive = OpenArchiveWithEncodingFallback(archivePath, password, fileNameEncoding, onEncodingResolved);
 
             var items = archive.Entries.Select(entry =>
             {

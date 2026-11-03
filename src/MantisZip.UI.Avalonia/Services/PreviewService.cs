@@ -322,10 +322,11 @@ public class PreviewService
         ArchiveFormat archiveFormat,
         int headSize = 4096,
         string? password = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? fileNameEncoding = null)
     {
         var (type, format, displayName, _) = await ClassifyPreviewByMagicWithHeadAsync(
-            archivePath, entry, archiveFormat, headSize, password, ct);
+            archivePath, entry, archiveFormat, headSize, password, ct, fileNameEncoding);
         return (type, format, displayName);
     }
 
@@ -347,13 +348,14 @@ public class PreviewService
         ArchiveFormat archiveFormat,
         int headSize = 4096,
         string? password = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? fileNameEncoding = null)
     {
         try
         {
             // 1. 读取文件头部
             var head = await ArchiveEntryExtractor.ExtractHeadAsync(
-                archivePath, entry.FullPath, headSize, archiveFormat, password, ct);
+                archivePath, entry.FullPath, headSize, archiveFormat, password, ct, fileNameEncoding);
 
             if (head == null || head.Length == 0)
                 return (PreviewType.Unsupported, FileFormat.Unknown, null, head);
@@ -536,7 +538,8 @@ public class PreviewService
         ArchiveFormat format,
         PreviewType previewType,
         string? password = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? fileNameEncoding = null)
     {
         if (IsTextLikePreview(previewType))
         {
@@ -556,7 +559,7 @@ public class PreviewService
             try
             {
                 // ② 取 head（沿用 head LRU，上限 = 运行时 MaxTextPreviewBytes）
-                var head = await LoadTextHeadAsync(archivePath, entry, format, password, ct);
+                var head = await LoadTextHeadAsync(archivePath, entry, format, password, ct, fileNameEncoding);
                 if (head.Length > 0)
                 {
                     // ③ 条目比 head 大 ⇒ 只拿到了一部分，标记部分预览供 UI 提示
@@ -593,7 +596,7 @@ public class PreviewService
                 {
                     // +1 是为了让「刚好等于上限」通过、超出 1 字节即由提取器判定超限
                     var bytes = await ArchiveEntryExtractor.ExtractEntryToMemoryAsync(
-                        archivePath, entry.FullPath, format, MaxPreviewFileSize + 1, password, ct);
+                        archivePath, entry.FullPath, format, MaxPreviewFileSize + 1, password, ct, fileNameEncoding);
                     if (bytes.Length > 0)
                         return new PreviewContent(Bytes: bytes, TempPath: null, TotalSize: entry.Size);
 
@@ -610,7 +613,7 @@ public class PreviewService
 
         try
         {
-            var tempPath = await ExtractToTempAsync(archivePath, entry, format, password, ct);
+            var tempPath = await ExtractToTempAsync(archivePath, entry, format, password, ct, fileNameEncoding);
             return tempPath == null
                 ? null
                 : new PreviewContent(Bytes: null, TempPath: tempPath, TotalSize: entry.Size);
@@ -635,7 +638,8 @@ public class PreviewService
         ArchiveItemModel entry,
         ArchiveFormat format,
         string? password,
-        CancellationToken ct)
+        CancellationToken ct,
+        string? fileNameEncoding = null)
     {
         var maxBytes = (int)Math.Min(int.MaxValue, Math.Max(0, MaxTextPreviewBytes));
         var cacheKey = BuildHeadCacheKey(archivePath, entry);
@@ -647,7 +651,7 @@ public class PreviewService
         }
 
         var head = await ArchiveEntryExtractor.ExtractHeadAsync(
-            archivePath, entry.FullPath, maxBytes, format, password, ct);
+            archivePath, entry.FullPath, maxBytes, format, password, ct, fileNameEncoding);
 
         if (head.Length > 0)
             TryCacheHead(cacheKey, head);
@@ -777,7 +781,8 @@ public class PreviewService
         ArchiveItemModel entry,
         ArchiveFormat format,
         string? password = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        string? fileNameEncoding = null)
     {
         var tempDir = GetPreviewTempDir();
         var ext = Path.GetExtension(entry.Name);
@@ -804,7 +809,8 @@ public class PreviewService
                 tempFile,
                 format,
                 password: password,
-                ct);
+                ct,
+                fileNameEncoding);
 
             return tempFile;
         }
