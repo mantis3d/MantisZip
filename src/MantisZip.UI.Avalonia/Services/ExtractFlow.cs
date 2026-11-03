@@ -80,7 +80,8 @@ public static class ExtractFlow
         string conflictAction,
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
         string progressTitle,
-        bool allowDeleteArchive = true)
+        bool allowDeleteArchive = true,
+        string? nameEncoding = null)
     {
         var pw = new ProgressWindow(progressTitle);
         pw.InitCancellation();
@@ -111,7 +112,7 @@ public static class ExtractFlow
             await new SelectedItemsExtractService().ExtractEntriesAsync(
                 archivePath, password, entries, destinationPath,
                 conflictAction, currentFolder, preserveFullPath,
-                conflictDialog, progress, pw.CancellationToken);
+                conflictDialog, progress, pw.CancellationToken, nameEncoding);
 
             // 成功：标记批处理行完成 + 尊重 KeepOpenOnComplete 图钉（对齐 RunWithProgress 语义）
             pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
@@ -194,9 +195,10 @@ public static class ExtractFlow
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
         IProgress<ArchiveProgress> progress,
         CancellationToken ct,
-        ParallelExtractSettings? parallelOverride = null)
+        ParallelExtractSettings? parallelOverride = null,
+        string? nameEncoding = null)
     {
-        var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog);
+        var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog, nameEncoding);
 
         // 智能并行解压：经 ParallelDegreeResolver 5 步决策链解析线程数。
         // parallelOverride = 对话框本次快照（初值读设置、不回写）；null → 读 AppSettings（CLI 等无对话框路径）。

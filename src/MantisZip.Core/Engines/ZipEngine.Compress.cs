@@ -739,7 +739,7 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                 try
                 {
                     long totalCompressed = 0;
-                    using (var finalArchive = OpenArchiveWithEncodingFallback(outputPath, options.Password))
+                    using (var finalArchive = OpenArchiveWithEncodingFallback(outputPath, options.Password, options.ReadEncoding))
                     {
                         foreach (var entry in finalArchive.Entries)
                         {

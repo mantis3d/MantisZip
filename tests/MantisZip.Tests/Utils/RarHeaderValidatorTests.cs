@@ -125,10 +125,81 @@ public sealed class RarHeaderValidatorTests : IDisposable
     }
 
     [Fact]
-    public void Validate_Rar4Corpus_IsUnknown()
+    public void Validate_Rar4SingleVolumeCorpus_IsIntact()
     {
-        // 只支持 RAR5（RAR4 块结构不同，本轮不实现，已登记 KNOWN_ISSUES）
-        Assert.Equal(RarStructureStatus.Unknown, RarHeaderValidator.Validate(Rar4CorpusPath("valid-rar4.rar")));
+        // issue #68②：RAR4 此前一律 Unknown（不做块链校验），现在按 RAR4 块结构逐块验证
+        Assert.Equal(RarStructureStatus.Intact, RarHeaderValidator.Validate(Rar4CorpusPath("valid-rar4.rar")));
+    }
+
+    [Fact]
+    public void Validate_Rar4TruncatedCorpus_IsBroken()
+    {
+        Assert.Equal(RarStructureStatus.Broken, RarHeaderValidator.Validate(Rar4CorpusPath("corrupt-25-rar-truncated.rar")));
+    }
+
+    [Fact]
+    public void Validate_Rar4TamperedEndOfArchiveSize_IsBroken()
+    {
+        // 报告者 #68 截图 shot1 的改法：把末尾 ENDARC 块的 HEAD_SIZE 由 7 改成 6，
+        // WinRAR 报错、而我们此前说「完好」。这里按同样手法现场改坏一份语料。
+        var broken = Path.Combine(_work, "tampered-endarc.rar");
+        File.Copy(Rar4CorpusPath("valid-rar4.rar"), broken);
+
+        var bytes = File.ReadAllBytes(broken);
+        var endOfArchiveOffset = FindRar4EndOfArchiveOffset(bytes);
+        Assert.True(endOfArchiveOffset >= 0, "语料里没找到 RAR4 结束块，夹具已变");
+
+        // 固定头布局：HEAD_CRC(2) HEAD_TYPE(1) HEAD_FLAGS(2) HEAD_SIZE(2)
+        var headSizeOffset = endOfArchiveOffset + 5;
+        Assert.Equal(7, bytes[headSizeOffset] | (bytes[headSizeOffset + 1] << 8));
+        bytes[headSizeOffset] = 6;
+        bytes[headSizeOffset + 1] = 0;
+        File.WriteAllBytes(broken, bytes);
+
+        var status = RarHeaderValidator.Validate(broken, out var reason);
+        Assert.Equal(RarStructureStatus.Broken, status);
+        Assert.NotNull(reason);
+    }
+
+    /// <summary>在字节流里按 RAR4 块链找出 ENDARC 块（0x7B）的起始偏移，找不到返回 -1。</summary>
+    private static int FindRar4EndOfArchiveOffset(byte[] bytes)
+    {
+        const int fixedHeaderLength = 7;   // HEAD_CRC(2) + HEAD_TYPE(1) + HEAD_FLAGS(2) + HEAD_SIZE(2)
+        const int dataStart = 7;           // ADD_SIZE(4) 紧跟在固定头之后（绝对偏移 7）
+        const int longBlockFlag = 0x8000;
+        const int largeFileFlag = 0x0100;  // LHD_LARGE / LHD_LARGE：再跟 8 字节高位 PACK_SIZE
+
+        var position = 7;                  // 跳过 7 字节签名
+        while (position + fixedHeaderLength <= bytes.Length)
+        {
+            int headType = bytes[position + 2];
+            int flags = bytes[position + 3] | (bytes[position + 4] << 8);
+            int size = bytes[position + 5] | (bytes[position + 6] << 8);
+            if (size < fixedHeaderLength)
+                return -1;
+            if (headType == 0x7B)
+                return position;
+
+            long dataSize = 0;
+            if ((flags & longBlockFlag) != 0 && position + dataStart + 4 <= bytes.Length)
+            {
+                dataSize = (uint)(bytes[position + dataStart]
+                                  | (bytes[position + dataStart + 1] << 8)
+                                  | (bytes[position + dataStart + 2] << 16)
+                                  | (bytes[position + dataStart + 3] << 24));
+
+                if ((flags & largeFileFlag) != 0 && position + 32 <= bytes.Length)
+                {
+                    dataSize |= (long)(uint)(bytes[position + 30]
+                                             | (bytes[position + 31] << 8)
+                                             | (bytes[position + 32] << 16)
+                                             | (bytes[position + 33] << 24)) << 32;
+                }
+            }
+
+            position += size + (int)dataSize;
+        }
+        return -1;
     }
 
     [Fact]

@@ -5,7 +5,75 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-03** — 修复：issue #68 评论三件（RAR4 块链校验 / PKZIP 跨卷 `.z01` / 繁体用词）
+  - 起因（issue #68 报告者第三轮回复）：附了真实夹具并逐张截图说明 —— ① `RAR_V4_NO_Split.rar` 末尾 ENDARC 块的 `HEAD_SIZE` 由 7 改成 6 时「WinRAR 报错 / MantisZip 不报错」；② 分卷末卷尾部字节改坏时「WinRAR 也不报错」（说明 RAR4 分卷尾部本就不校验，不能算我们的失分项）；③ `ZIP_Split` 跨卷「只列出 `.zip` 一个文件、测试不通过、不能解压」；④ 繁体「壓縮檔完整性驗證透過」应为「通過」。
+  - RAR4 块链校验（`src/MantisZip.Core/Utils/RarHeaderValidator.cs`）：`ValidateVolume` 的签名分支从「RAR4 → `Unknown`」改为走 `ValidateRar4Volume`。块结构：固定头 7 字节（`HEAD_CRC(2) HEAD_TYPE(1) HEAD_FLAGS(2) HEAD_SIZE(2)`）；`HEAD_FLAGS & 0x8000` 时固定头后跟 `ADD_SIZE(4)` 数据区，`HEAD_FLAGS & 0x0100`（LHD_LARGE）时头部偏移 30 处另有 8 字节高位 `PACK_SIZE`；`HEAD_CRC` = CRC32（覆盖 `HEAD_TYPE` 起 `HEAD_SIZE-2` 字节）的低 16 位。校验项：`HEAD_SIZE >= 7`、块与数据区不越界、块头 CRC 相符、出现 `MAIN_HEAD(0x73)`、末块必须是 `ENDARC_HEAD(0x7B)`、多卷时 `MAIN_HEAD` 首卷位与 `ENDARC` 的「还有下一卷」位首尾自洽。
+  - **不要复发的反直觉点**：RAR4 的 `LHD_LARGE` 是 **`0x0100`** 而不是 `0x8000`（`0x8000` 是「块后带数据区」）。最初写错，`PACK_SIZE` 被拼成天文数字，块链第一步就越界。
+  - PKZIP 跨卷（`src/MantisZip.Core/Utils/ArchiveVolumeSet.cs`）：`VolumeSetKind` 新增 `ZipSpanned`；`ZipSpannedPartRegex = ^(?<root>.+)\.z(?<num>\d{2})$`；`IsZipSpanned` 要求 `.zNN` 与同名 `.zip` **互为条件**（只认一侧会把普通 zip 全当成第 1 张盘）；`TryGetVolumeBase` 让两者都指向末卷 `.zip`；新增 `EnumerateZipSpanned`（`.z01 → … → .zip`，遇缺号即停）；`FindFirstVolume` 对 `ZipSpanned` 返回末卷；`GetVolumeWatchFilter` → `<root>.*`；`VolumeFilterPatterns` 增补 `*.z01`。
+  - **不要复发的反直觉点**：跨卷 ZIP 的锚点必须是**末卷 `.zip`** —— 7z.dll 收到 `.z01` 会直接报 `Extension "z01" is not a supported archive file name extension`，而中央目录与 EOCD 只存在于末卷。把四卷按顺序拼成一个大文件也不行（EOCD 里的中央目录偏移是「卷内偏移」，拼接后不重定位，SharpCompress 只能列出 0 项）。
+  - 繁体用词（`src/MantisZip.UI.Avalonia/Localization/strings.zh-TW.json`）：`Status_TestOK` →「壓縮檔完整性驗證通過」、`Progress_PwdVerifying` →「密碼驗證通過，正在解壓...」；`Settings_AdaptiveMode_MultiThreaded_Hint` 的「並透過多執行緒加速」是 through 义，**保留**（文件里 `透過` 由 3 处降到 1 处）。
+  - 测试：`tests/MantisZip.Tests/Utils/RarHeaderValidatorTests.cs` 新增 `Validate_Rar4SingleVolumeCorpus_IsIntact`（仓库语料 `valid-rar4.rar`）、`Validate_Rar4TruncatedCorpus_IsBroken`（`corrupt-25-rar-truncated.rar`）、`Validate_Rar4TamperedEndOfArchiveSize_IsBroken`（现场把 ENDARC 的 `HEAD_SIZE` 改 6，用测试内的 `FindRar4EndOfArchiveOffset` 走块链定位）；`ArchiveVolumeSetTests` 新增 6 例（互认条件、基名指向末卷、枚举顺序、锚点、监视过滤器、`VolumeFilterPatterns`）；`SplitArchiveTests` 新增 `Factory_RoutesZipSpannedVolumesToSevenZipEngine`（路由 + `ResolveVolumeAnchor` 落到末卷）；`ArchiveOpenDialogPatternTests` 按 `*.z01` 更新两处期望。
+  - 验证：`build -Target core/-avalonia -c Release` 0 警告；`tests` 13.2s、`ui-tests` 47.8s 全绿；`i18n` 1406 key、`check` 0.5.5、`guards` 8/8。
+  - 真机证据（探针工程，不入仓库）：RAR4 五份样本 `Intact`；改坏 `RAR_V4_NO_Split.rar` 的 ENDARC 头长度后 `Broken // 第 1/1 卷 块头长度非法（偏移 3434693，长度 6）`，`TestArchiveAsync` True → False；篡改分卷 part04 后从任意一卷校验都报「第 4/4 卷」；`ZIP_Split` 从 `.z01` 或 `.zip` 打开都列 1 项、`TestArchive` False → True、两侧各解出 9,388,032 字节。
+  - 边界：RAR4 的**数据区内容**仍归 7z.dll 的 `Check()`（块链只看头）；跨卷 ZIP 只读（`HasVolumeSuffix` 使增删条目直接报「分卷压缩包不支持增删文件」）；`.partN.rar` 形态但其实是单卷的归档仍会被当分卷。
 
+**2026-11-03** — 修复：设置窗口「默认读取代码页」下拉空白 + 压缩级别兜底
+  - 现象（用户实测）：「设置里面 zip 的默认『压缩级别』和『默认读取代码页』成了空白」。
+  - 根因 1（已确证，`src/MantisZip.UI.Avalonia/ViewModels/SettingsWindowViewModel.cs`）：`ReadNameEncodingOptions` 当时是计算属性 `=> NameEncodingOption.BuildDefault()`，每次读都返回**新列表、新实例**；而 `NameEncodingOption` 是 **class**（引用相等），`Option` 是 **record**（值相等）。ComboBox 的 `SelectedItem` 是用 `Equals` 在 `ItemsSource` 里找项的 ⇒ class 型的选中项永远找不到实例，被清成 null ⇒ 空白。
+  - 修法 1：`ReadNameEncodingOptions` 改成稳定的 `ObservableCollection<NameEncodingOption>`，在 `PopulateComboOptions()` 里 `Clear()` 后填充、在 `SetSelectedOptions()` 里按「当前选中项的键 → 设置里的键」重选（切换语言会重建集合，不重选同样空白；也不能直接用设置值覆盖，否则会丢掉用户尚未保存的选择）；删掉 `OnCultureChanged` 里已无意义的 `OnPropertyChanged(nameof(ReadNameEncodingOptions))`。
+  - 根因 2（压缩级别，防御性修复）：`SelectedDefaultLevelOption = DefaultLevelOptions.FirstOrDefault(o => o.Value == DefaultLevel.ToString())` —— 设置里若存着不在预设档位（0/3/5/9）里的旧值，`FirstOrDefault` 返回 null ⇒ 同样空白。
+  - 修法 2：新增 `internal static Option? FindClosestLevelOption(IReadOnlyList<Option> options, int level)`，找不到精确档位时退到数值最接近的档位，保证永远有选中项。
+  - 回归测试 `tests/MantisZip.UI.Avalonia.Tests/SettingsOptionWiringTests.cs`：① `EverySelectedOption_IsContainedInItsOptionsCollection` —— 反射遍历所有 `Selected*Option` ↔ 对应 `*Options`，用 `Equals` 判断包含、一次列出全部违规项（该判据等价于「ComboBox 会不会显示空白」）；② `LevelFallback_PicksClosestOption`（4→3、8→9、12→9、-5→0、5→5）与 `LevelFallback_WithoutNumericOptions_ReturnsNull`。
+  - 验证：avalonia（Release）0 警告；`ui-tests`（全量、`--no-build`）42.1s 0 警告；`tests` 17.7s（2 条存量警告）；`check` 0.5.5、`guards` 8/8。
+  - 排查记录：headless 里 `SettingsWindow` 的页签内容不会被实例化到可视树（`Measure`/`Arrange` + `RunJobs` 后 `GetVisualDescendants().OfType<ComboBox>()` 仍为 0），所以「绑对了但界面看不见」这类问题只能用 VM 层合同断言兜住。
+**2026-11-03** — 功能：手动代码页改为「真强制读取」，写回仍按包声明编码
+  - 起因（用户实测提问）：「打开一个有中文的压缩包，如果我故意切换到错误的代码页，是不是应该显示乱码？」实测确认此前不会 —— `SharpCompress` 只要条目名带 bit 11（UTF-8 标志位）就一律按 UTF-8 解，`ArchiveEncoding.Default` 被忽略，所以手动选的编码对「新式包」完全无效。
+  - 根因与关键事实：`SharpCompress.Common.ArchiveEncoding` 除 `Default` 外还有 **`Forced`**（反射确认成员：`Default`/`Password`/`UTF8`/`Forced`/`CustomDecoder`）。实测 `new ReaderOptions { ArchiveEncoding = new ArchiveEncoding { Default = gbk, Forced = gbk } }`：UTF-8 标志位的包 → `涓枃鏂囦欢.txt`（乱码），GBK 老包 → 正确 ⇒ 只有 `Forced` 能盖过 bit 11。
+  - 修法 1（`src/MantisZip.Core/Engines/ZipEngine.Open.cs`）：显式编码分支里同时设 `Default` 与 `Forced`，注释写明「选错就该看到乱码 —— 那正是让人确认『这个包不是这个编码』的依据」。
+  - 修法 2（`src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs`，用户拍板「强制生效，但写操作仍用真实编码」）：删除条目的 copy-mode 快路径改为「双列目录」—— `displayNames`（按用户手选编码，用来判断用户点的是哪一条）与 `realNames`（按包声明编码，用来重写中央目录），keep 集按**序号**对应，避免在两种解码结果间做字符串映射（手选错编码时映射会丢信息）；抽出私有 `ListEntryNamesForDelete(archivePath, password, fileNameEncoding)`。
+  - **不要复发的反直觉点**：`encoding` 只作用于**新增条目**的名字；已有条目的名字是从中央目录原样拷贝的原始字节（`src/MantisZip.Core/Utils/ZipBinaryRewriter.cs:40-42` 的 `CdEntry.RawFileNameBytes` 注释）。所以 add 路径不需要也不应该按 `declaresUtf8` 改编码 —— 一度这么改，被 D 编码锁测试 `ZipEngineTests.AddToArchiveAsync_ExplicitGbk_WritesCjkNameAsGbk_WithoutUtf8Flag`（`tests/MantisZip.Tests/Engines/ZipEngineTests.cs:520`）挡住：显式 `FileNameEncoding="gbk"` 时新条目必须以 GBK 字节写入且不置 bit 11。同理删掉了「把乱码目录名翻回真实目录名」的 `TranslateEntryBasePath` —— 新增条目的目录前缀必须和写入编码自洽。
+  - 修法 3（预览走同一编码）：`src/MantisZip.UI.Avalonia/Services/PreviewService.cs` 的 `ClassifyPreviewByMagicAsync` / `ClassifyPreviewByMagicWithHeadAsync` / `LoadPreviewContentAsync` / `ExtractToTempAsync` 与私有 `LoadTextHeadAsync` 各加 `string? fileNameEncoding = null` 并透传给 `ArchiveEntryExtractor`；`MainWindowViewModel.Preview.cs` 三处调用补 `NameEncodingRequestKey`，否则手选代码页下预览会「条目找不到」。
+  - 测试：`tests/MantisZip.Tests/ZipNameEncodingTests.cs` 新增 2 例 —— `ListEntriesAsync_Utf8FlaggedArchive_ForcedWrongCodePage_ShowsMojibake`（`CreateUtf8FlaggedZip` 用 `ZipFile.Open(Create)` 造带 bit 11 的包，断言 auto 得原名、`gbk` 时名单不同且不含原名）与 `DeleteEntries_Utf8FlaggedArchive_WithForcedWrongCodePage_KeepsSurvivingNamesIntact`（按乱码名删一条，再用 auto 列，断言存活名字仍是原文且无 U+FFFD）。
+  - 验证：core（`-t:Rebuild`）与 avalonia（Release）0 警告；`tests` 10.4s、`ui-tests` 42.2s 全绿；`i18n` 1406 key、`check` 0.5.5、`guards` 8/8。
+  - 边界：7z/RAR 的条目名是 UTF-16 / 固定编码，本机制只对 ZIP / TAR / GZ 生效（控件在这两种格式上置灰）。
+**2026-11-02** — 修复：代码页按钮恒灰 + TAR/GZ 的 auto 检测补 ANSI 回退
+  - 现象：用户实测「不论我打开什么文件，那个按钮都是禁用的」。
+  - 根因：`CanChangeNameEncoding` 依赖 `IsArchiveLoaded`，但唯一一处 `OnPropertyChanged(nameof(CanChangeNameEncoding))` 在载入成功分支里、位于 `IsArchiveLoaded = true` **之前**（`src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs:1289` 通知，`:1327` 才置 true）。XAML 绑定第一次取到 false，此后再没有通知 ⇒ 按钮永久置灰。单元测试直接读属性，所以看不见这个缺陷。
+  - 修法：`partial void OnIsArchiveLoadedChanged(bool value)` 里补 `OnPropertyChanged(nameof(CanChangeNameEncoding))`（与原有的 `CanDeleteEntries` 通知同处）；新增回归用例 `LoadingArchive_NotifiesCanChangeAfterIsArchiveLoaded` —— 订阅 `PropertyChanged`，断言通知到达那一刻 `IsArchiveLoaded` 已经是 true（这条才能挡住同类回归）。
+  - TAR/GZ 的 auto（用户把决定权交给我）：此前 auto 一律按 UTF-8 解，GBK 命名的 tar 必然乱码。改为「先按 UTF-8 解一遍 → 条目名里出现替换字符 U+FFFD → 用系统 ANSI 再解一遍 → 重试干净才采用并把该编码回传」；`onEncodingResolved` 的调用挪到解完之后，否则回传不到重试后的实际编码。抽出 `CreateTarReaderOptions` / `ReadTarItems` / `HasReplacementCharacter` 三个私有静态方法，解析异常仍然向上抛（损坏包不能被静默当成空包）。
+  - 为什么只做一次 ANSI 重试、不做多编码打分：TAR 没有 ZIP 的 bit 11 可依据，唯一信号就是「解出来是不是合法 Unicode」。一次重试足以覆盖中文 Windows 上的老包；再猜更多编码反而可能拿错的编码去写（读写共用同一个键），把包改坏。
+  - 测试：新增 `tests/MantisZip.Tests/TarNameEncodingAutoTests.cs` 2 例（GBK 命名 tar 的 auto 回退到 ANSI 且回传键正确 / UTF-8 命名的 tar 保持 UTF-8）。
+  - 验证：core 与 avalonia（Release，`-t:Rebuild`）0 警告；`tests` 13.8s、`ui-tests` 40.8s 全绿。
+**2026-11-02** — 样式：主工具栏代码页控件改为「地球图标 + 文字按钮 + 检测徽章」（按用户实测反馈）
+  - 起因：首版做成工具栏 `ComboBox`，用户实测提三点 —— ① 与工具栏其它「图标 + 文字」按钮不一致；② 打开 7z 时整个控件消失，工具栏随之抖动；③ 看不到本次实际生效的编码。
+  - 改动：`src/MantisZip.UI.Avalonia/Views/MainWindow.axaml` 的 `ComboBox` 换成 `Button Classes="ToolbarButton"`（`x:Name="NameEncodingButton"`）+ `MenuFlyout`，内容为 `Grid 22×22` 的地球图标（`IconGlobe`）+ 右下角徽章 `Border`（`Background=ThemeAccentBrush`、`TextBlock FontSize=8`、`Foreground=ThemeTextOnAccentBrush`）+ 文字行（`Classes="ToolbarButtonLabel"` 绑 `NameEncodingDisplay`）；`IsEnabled="{Binding CanChangeNameEncoding}"` 取代原来的 `IsVisible`，7z/RAR 等不适用格式**置灰而不隐藏**。
+  - 菜单为什么在 code-behind 现建：选项文案要随语言变、当前项要打勾、「其他代码页…」要传命令参数 —— `RebuildNameEncodingMenu()` 每次 `flyout.Items.Clear()` 后按 `vm.NameEncodingOptions` 逐个建 `MenuItem`（`ToggleType=Radio`、`GroupName="NameEncoding"`、`Command=ChangeNameEncodingCommand`）。
+  - 两个 Avalonia 12 的坑：① `FlyoutBase` 只有 `Opened`/`Closed`，没有 `Opening`；② `MenuFlyout` 不在可视树里，`x:Name` **不生成字段**（`CS0103 The name 'NameEncodingFlyout' does not exist`）⇒ 必须命名 Button、从 `Button.Flyout` 取。`Button.OnClick` 先冒泡 Click 再弹 Flyout，故 Click 里重建能赶上本次弹出，`Opened` 再重建一次兜底（幂等）。
+  - 新增 `NameEncodingOption.ShortLabel()`（`auto`→空、`system`→`ANSI`、`other:<n>`→数字、`gbk`→`GBK`、`big5`→`BIG5`、`shift-jis`→`JIS`、`euc-kr`→`KR`、`gb18030`→`GB18`）与 VM 派生属性 `NameEncodingDisplay`/`NameEncodingBadgeText`/`HasNameEncodingBadge`/`NameEncodingToolTip`/`NameEncodingSelectedOption`（`other:<n>` 归到「其他代码页…」那项打勾），通知集中在 `partial void OnArchiveNameEncodingChanged` / `OnResolvedNameEncodingKeyChanged`。
+  - 主题：`ThemeLight.axaml` / `ThemeDark.axaml` 成对新增 `ThemeTextOnAccent`（Light `#FF0A2A45` / Dark `#FFFFFFFF`）与 `ThemeTextOnAccentBrush`，强调色底上的小徽章文字才可读。
+  - 顺带的语义修正（写测试时发现）：`LoadArchiveAsync` 开头会走 `ClearArchiveInternal()`，原实现无条件把代码页复位成默认值 ⇒ **手选编码刚生效就被自己触发的重载抹掉**。改为 `ClearArchiveInternal(bool resetNameEncoding = true)`，载入前判断 `reloadingSameArchive`（`CurrentArchivePath` 与待载入路径相同）取反传入；同时 `CanChangeNameEncoding` 补 `IsArchiveLoaded`，未开包时按钮置灰。
+  - i18n：新增 `Toolbar_NameEncoding_Detected`（zh-CN「检测到 {0}」/ en `Detected {0}` / zh-TW「偵測到 {0}」），key 数 1405 → **1406**。
+  - 测试：新增 `tests/MantisZip.UI.Avalonia.Tests/NameEncodingToolbarTests.cs` 15 例（`ShortLabel` 11 条 `[Theory]` + 未开包置灰无徽章 + GBK 包徽章/Tooltip + 切 Big5 后文字与徽章同步 + `other:950` 归到「其他代码页…」）。
+  - 验证：`build -Target avalonia -c Release` 0 警告；`ui-tests -c Release` 44.3s 全绿。
+**2026-11-02** — 样式：压缩设置窗口「输出方式」改为「左标签 + 三项横排」
+  - 起因：用户反馈三项单选竖排占高太多（约 132px），希望改横排或换布局。
+  - 改动：`src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml` 第 0 行分组（输出方式）由「标题 + `StackPanel Spacing` 竖排三项」改成 `Grid ColumnDefinitions="Auto,*"`：左列标题 `Compress_OutputMode`（`VerticalAlignment="Center"`、右侧 `Margin="0,0,12,0"`），右列 `WrapPanel Orientation="Horizontal"` 横排三个 `RadioButton`（每项 `Margin="0,0,12,0"`，最后一项无右边距）。
+  - 为什么用 `WrapPanel` 而不是 `StackPanel`：对话框左侧栏 `MinWidth="520"`，三项文案加起来约 430px，窄到这个宽度时 `StackPanel` 会溢出裁切（`WrapPanel` 会自动折成两行）。间距用逐项 `Margin` 而非 `Spacing` —— Avalonia 的 `WrapPanel` 没有 `Spacing` 属性，仓库里 `Controls/FileFilterEditor.axaml:72-93` 同为此写法。
+  - 效果：该分组高度从约 132px 降到约 40px，省出的空间让下方的输出目录选择器（`*` 行）更高。
+  - 验证：`build -Target avalonia -c Release` 0 警告；`ui-tests` 全绿（无布局断言依赖该分组）。
+
+**2026-11-02** — 功能：文件名代码页检测与切换（Bandizip 式工具栏下拉，支持 ZIP / TAR / GZ）
+  - 起因：用户反馈希望有 Bandizip 那样的代码页检测与切换。现状只有内部启发式（UTF-8 能解 → 含 >127 字节 → bit 11 → CJK 占比判定 → GBK 重试），用户无法手动指定，Big5 / Shift-JIS / EUC-KR 命名的包必然乱码。
+  - 键表：新增 `src/MantisZip.Core/Utils/NameEncodingCatalog.cs` —— `auto` / `system` / `utf-8` / `gbk` / `gb18030` / `big5` / `shift-jis` / `euc-kr` / `other:<代码页>`；`TryResolve` 认不出时返回 false（**不静默换编码**），`Describe` 把 `Encoding` 回显成键（未知码页回 `other:<cp>`，null 回 `auto`）。
+  - 读路径：`IArchiveEngine.ListEntriesAsync` 与 `ZipEngine.OpenArchiveWithEncodingFallback` 末尾各加可选参数 `fileNameEncoding` + `onEncodingResolved`（新参数追加在 `CancellationToken` 之后，既有按位置传参的调用点零改动）；显式指定时跳过 bit 11 / CJK 启发式 / GBK 重试，直接按该编码打开。TAR/GZ 用 `ReaderOptions.ArchiveEncoding`；7z 条目名是 UTF-16，参数被忽略并回传 `utf-16`。
+  - 提取路径：`src/MantisZip.Core/Utils/ArchiveEntryExtractor.cs` 四个公开方法（`ExtractEntryAsync` / `ExtractHeadAsync` / `ExtractEntryToMemoryAsync` / `ExtractHeadTailAsync`）与非公开链路全部加同一参数并透传，保证「列表里看到的文件名 = 解出来的文件名」。
+  - 写路径（顺带修的既有缺陷）：`ResolveFileNameEncoding` 改为走 `NameEncodingCatalog`（此前只认 `gbk` / `default` / 其它一律 UTF-8），删除条目 / 添加文件时读与写使用同一个键。此前对 Big5 包做「删除条目」会按 GBK 重写中央目录，把存活条目的名字真正改坏。
+  - 会话与 UI：`MainWindowViewModel.ArchiveNameEncoding`（关包时取设置里的默认值）+ `ResolvedNameEncodingKey`（回显本次实际编码）+ `ChangeNameEncodingAsync` 命令（同值 / 不可用直接返回，选「其他代码页…」弹 `Dialogs/CodePageInputDialog`）+ `CanChangeNameEncoding`（仅 ZIP / TAR / GZ）。工具栏下拉按 Bandizip 位置放在主窗口顶层工具栏末尾（`Views/MainWindow.axaml`，密码按钮之前），选中即 `RefreshArchive()` 重载并尽量回到原目录。
+  - 设置：`AppSettings.ReadNameEncoding`（默认 `auto`）+ 设置页压缩页签的「默认读取代码页」下拉（`NameEncodingOption.BuildDefault()` 与工具栏共用一份键表），`ClearArchiveInternal` 时作为新开包初值。
+  - 编码键传参注意：`await Task.Run(async () => …)` 捕获上下文里对非空参数写 `options?.ReadEncoding` 会让编译器在后续代码把参数判成可能为 null（`CS8602` 打到同方法后段的 `options.Encrypt`），捕获变量里不要用 `?.` 试空。
+  - 测试：`tests/MantisZip.Tests/NameEncodingCatalogTests.cs` 6 例 + `tests/MantisZip.Tests/ZipNameEncodingTests.cs` 3 例（清单里造 Big5 命名 ZIP：指定 `big5` 能解出原名、指定 `gbk` 不会蒙对、删一条后存活条目名保持原名）。
+  - 验证：core / avalonia（Release）0 警告，`tests` 与 `ui-tests` 全绿（仅存量警告），`i18n` 1405 key 三语一致，`check` / `guards` 通过。
+  - 边界：7z / RAR 不显示下拉（条目名没有代码页问题）；加密包的密码流程与校验（`TestArchiveAsync`）仍走自动检测；CLI 无下拉入口，编码保持 `auto`。
 **2026-11-02** — 性能：选中条目 / 拖拽解压改走批量接口（issue #75 的第二个入口，800×64KB 只解选中项 10.0s → 2.3s，约 4.4×）
   - **触发**：全量解压走批量后用户实测通过，随即要求「把勾选那个也做了吧」。「勾选解压」与「拖到资源管理器」两条路径共用 `src/MantisZip.UI.Avalonia/Services/SelectedItemsExtractService.cs`，一直落到 `SevenZipEngine.ExtractEntriesAsync` 的逐条目 `Extractor.ExtractFile`。
   - **两处与全量解压的关键差异**：① 落点不是「目标目录 + 归档内相对路径」，而是调用方 `:42-53` 用 `ExtractPathResolver.ResolveRelativePath` 算好的 `outputPathOverrides`（扁平化 / 保留完整路径 / 重命名都可能让多个条目落到同一路径）⇒ 批量段必须先把整批按归档布局解码到目标目录内的暂存目录，再按 override 逐条移动，不能直接落地；② 只解一部分条目时「建暂存 + 移动」本身有成本，因此要求选中非目录条目 ≥ 2 才批量。

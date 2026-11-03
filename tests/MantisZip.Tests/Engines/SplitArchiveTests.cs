@@ -85,6 +85,23 @@ public sealed class SplitArchiveTests : IDisposable
     }
 
     [Fact]
+    public void Factory_RoutesZipSpannedVolumesToSevenZipEngine()
+    {
+        // issue #68：PKZIP 跨卷（archive.z01… + 末卷 archive.zip）也交给 7z.dll，
+        // 锚点必须是**末卷 .zip**（7z 不认识 .z01 扩展名）；这里只验路由，不验内容。
+        var part = Path.Combine(_work, "spanned.z01");
+        var last = Path.Combine(_work, "spanned.zip");
+        File.WriteAllBytes(part, new byte[4]);
+        File.WriteAllBytes(last, new byte[4]);
+
+        Assert.IsType<SevenZipEngine>(ArchiveEngineFactory.GetEngineByExtension(part));
+        Assert.IsType<SevenZipEngine>(ArchiveEngineFactory.GetEngineByExtension(last));
+        Assert.Equal(last, ArchiveEngineFactory.ResolveVolumeAnchor(part));
+        Assert.Equal(last, ArchiveEngineFactory.ResolveVolumeAnchor(last));
+    }
+
+
+    [Fact]
     public void Factory_ResolveVolumeAnchor_WalksBackToFirstVolume()
     {
         var first = CopyVolumeSet("vol-01-7z-split.001", "set.7z");

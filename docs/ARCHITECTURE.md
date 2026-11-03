@@ -542,13 +542,16 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 | 数字后缀 | `pack.7z.001`、`pack.zip.002` | `.001` | 正则 `\.(\d{3})$`，基名剥掉数字后缀 |
 | WinRAR 新式 | `pack.part1.rar`、`pack.part02.rar` | `partN` 里序号最小者 | 正则 `\.part(\d+)\.rar$`，基名补回 `.rar` |
 | WinRAR 旧式 | `pack.rar` + `pack.r00`…`pack.r99` | `pack.rar` 本身 | 正则 `\.r(\d{2})$`，序号按 `N + 2` 归一 |
+| PKZIP 跨卷 | `pack.z01`、`pack.z02` + 末卷 `pack.zip` | **末卷 `pack.zip`** | 正则 `\.z(\d{2})$`；`.zNN` 与同名 `.zip` **互为条件**（缺一侧就不算跨卷），中央目录在末卷 |
 
-- **API**：`GetVolumeSetKind` / `TryGetVolumeBase` / `HasVolumeSuffix` / `EnumerateVolumes` / `FindFirstVolume` / `GetVolumeWatchFilter` / `MatchesArchiveExtension`；`VolumeFilterPatterns` 只保留 `["*.001"]`（唯一用途是让 `.001` 出现在「打开压缩包」筛选里）
+- **API**：`GetVolumeSetKind` / `TryGetVolumeBase` / `HasVolumeSuffix` / `EnumerateVolumes` / `FindFirstVolume` / `GetVolumeWatchFilter` / `MatchesArchiveExtension`；`VolumeFilterPatterns = ["*.001", "*.z01"]`（唯一用途是让这两类首卷出现在「打开压缩包」筛选里）
+- **`FindFirstVolume` 是「能打开整组的那一卷」而不是字面首卷**：数字 / RAR 分卷是第 1 卷，PKZIP 跨卷是**末卷 `.zip`** —— 7z.dll 收到 `.z01` 会报 `Extension "z01" is not a supported archive file name extension`，只有末卷（含中央目录与 EOCD）能打开
 - **消费者**：`ArchiveEngineFactory.GetEngineByExtension` 命中分卷命名即路由 `SevenZipEngine`（分卷包只读，增删条目直接抛 `NotSupportedException`）；`ResolveVolumeAnchor` 从任意一卷回退首卷；`ArchiveFileGuard` 用 `GetVolumeWatchFilter` 生成 `FileSystemWatcher` 过滤器（外部删卷 / 替换要能报警）；`CustomFilePickerControl.MatchesFileFilter` 在扩展名相等失败后调 `MatchesArchiveExtension` 回退 —— 所以同一套分卷**每一卷**都会列在打开对话框里（`.part2.rar` 靠 `.rar` 本来就能撞进去，`.7z.002` 必须靠这条回退）
 - **RAR5 结构校验**：`RarHeaderValidator.Validate(path)` 走一遍全部分卷的块链 —— 块头 CRC32（覆盖 `HeaderSize` 字段到头部末尾）、按 `HeaderFlags` 的 `0x0001`/`0x0002` 读 extras/数据区并按 `DataSize` **跳过数据区**、每卷必须以 end-of-archive 块收尾、非末卷 `EndFlags` bit0 = 1（缺卷即 `Broken`）、块越界/截断 `Broken`、≤1KB 全零尾部算填充；头加密或非 RAR5 返回 `Unknown`（只敢断定「坏」，不敢断定「好」）
+- **RAR4 结构校验（2026-11-03，issue #68）**：RAR4 签名 `52 61 72 21 1A 07 00` 走另一套块结构 —— 固定头 7 字节（`HEAD_CRC(2) HEAD_TYPE(1) HEAD_FLAGS(2) HEAD_SIZE(2)`），`HEAD_FLAGS & 0x8000` 时固定头后跟 `ADD_SIZE(4)` 数据区（`HEAD_FLAGS & 0x0100`＝LHD_LARGE 时另有 8 字节高位 `PACK_SIZE`，注意**不是** `0x8000`）；`HEAD_CRC` 是「CRC32 覆盖 `HEAD_TYPE` 起 `HEAD_SIZE-2` 字节」的低 16 位。校验项：块头 CRC、`HEAD_SIZE >= 7`、块与数据区不越界、必须出现 `MAIN_HEAD(0x73)` 且末块是 `ENDARC_HEAD(0x7B)`、多卷时 `MAIN_HEAD` 首卷位与 `ENDARC` 的「还有下一卷」位要首尾自洽。修复前 RAR4 一律 `Unknown`（等于「测试压缩包」对 RAR4 不做结构校验）
 - **挂载点只在 `SevenZipEngine.TestArchiveAsync`**（`extractor.Check()` 通过之后）。打开路径的 `ArchiveHeaderProbe.Probe` 仍只看签名，**不要**把结构校验挂进去 —— 那会让有效包在「打开」时被误判「文件损坏」
 - **为什么需要它**：`7z.dll` 的整包 `Check()` 不校验卷尾（末卷 end-of-archive 块头被翻反仍返回 true），而同一份夹具 `7z.exe t` 报 `ERRORS: Headers Error`、`UnRAR.exe t` 报「检测到损坏的文件头」
-- **已知边界**：RAR4 分卷不做块链校验（块结构不同，见 `docs/KNOWN_ISSUES.md` KI-010）；`.partN.rar` 形态但其实是单卷的归档会被认成分卷而禁写增删
+- **已知边界**：`.partN.rar` 形态但其实是单卷的归档会被认成分卷而禁写增删；RAR4 的**数据区内容**仍归 `7z.dll` 的 `Check()`（块链只看头）
 
 ### 进度上报契约
 

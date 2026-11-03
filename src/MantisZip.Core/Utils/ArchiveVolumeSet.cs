@@ -16,6 +16,12 @@ public enum VolumeSetKind
 
     /// <summary>WinRAR 旧式：首卷 <c>archive.rar</c>，其后 <c>archive.r00</c> … <c>.r99</c>（RAR4 时代）。</summary>
     RarOld,
+
+    /// <summary>
+    /// ZIP 跨卷（WinZip / PKZIP spanning，issue #68）：<c>archive.z01</c> … <c>archive.zNN</c>，
+    /// **末卷**是不带数字的 <c>archive.zip</c>，中央目录与 EOCD 都在它里面。
+    /// </summary>
+    ZipSpanned,
 }
 
 /// <summary>
@@ -55,6 +61,14 @@ public static class ArchiveVolumeSet
         @"^(?<root>.+)\.r(?<num>\d{2})$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
 
+    /// <summary>
+    /// ZIP 跨卷的非末卷名：<c>archive.z01</c> … <c>archive.zNN</c>（末卷是 <c>archive.zip</c>）。
+    /// 只认两位数字，避免与普通 <c>.z</c> 扩展名混淆。
+    /// </summary>
+    private static readonly Regex ZipSpannedPartRegex = new(
+        @"^(?<root>.+)\.z(?<num>\d{2})$",
+        RegexOptions.Compiled | RegexOptions.IgnoreCase);
+
     /// <summary>卷号上限（三位数字命名最多 999 卷；够任何实际分卷集使用）。</summary>
     private const int MaxVolumeCount = 999;
 
@@ -62,7 +76,7 @@ public static class ArchiveVolumeSet
     /// 文件选择器用的分卷过滤模式。分卷只认第一卷，故只列 <c>*.001</c>；中间卷会由
     /// <see cref="FindFirstVolume"/> 回退到第一卷，显示则由 <see cref="TryGetVolumeBase"/> 兜底。
     /// </summary>
-    public static readonly string[] VolumeFilterPatterns = ["*.001"];
+    public static readonly string[] VolumeFilterPatterns = ["*.001", "*.z01"];
 
     /// <summary>路径属于哪种分卷命名（<see cref="VolumeSetKind.None"/> 表示不是分卷）。</summary>
     public static VolumeSetKind GetVolumeSetKind(string path)
@@ -78,8 +92,29 @@ public static class ArchiveVolumeSet
             return VolumeSetKind.RarPart;
         if (RarOldRegex.IsMatch(name))
             return VolumeSetKind.RarOld;
+        if (IsZipSpanned(path))
+            return VolumeSetKind.ZipSpanned;
 
         return VolumeSetKind.None;
+    }
+
+    /// <summary>
+    /// 是否属于 ZIP 跨卷：<c>archive.z01</c> 之于 <c>archive.zip</c> 互为条件 —— 一侧存在才算「一套」，
+    /// 否则 <c>archive.z01</c> 只是个普通扩展名、<c>archive.zip</c> 只是个普通压缩包。
+    /// </summary>
+    private static bool IsZipSpanned(string path)
+    {
+        var name = Path.GetFileName(path);
+        var dir = Path.GetDirectoryName(path) ?? string.Empty;
+
+        var part = ZipSpannedPartRegex.Match(name);
+        if (part.Success)
+            return File.Exists(Path.Combine(dir, part.Groups["root"].Value + ".zip"));
+
+        if (name.Length > ".zip".Length && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+            return File.Exists(Path.Combine(dir, name[..^".zip".Length] + ".z01"));
+
+        return false;
     }
 
     /// <summary>
@@ -131,6 +166,37 @@ public static class ArchiveVolumeSet
             return true;
         }
 
+        var zipPart = ZipSpannedPartRegex.Match(name);
+        if (zipPart.Success && IsZipSpanned(path))
+        {
+            if (!int.TryParse(zipPart.Groups["num"].Value, out var zipIndex) || zipIndex < 1)
+                return false;
+
+            // .z01 = 第 1 卷；基名回到末卷 archive.zip（7z.dll 只认这个卷名）
+            basePath = Path.Combine(dir, zipPart.Groups["root"].Value + ".zip");
+            index = zipIndex;
+            return true;
+        }
+
+        if (name.Length > ".zip".Length
+            && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+            && IsZipSpanned(path))
+        {
+            // 末卷自身：卷号排在所有 .zNN 之后
+            var root = name[..^".zip".Length];
+            var partCount = 0;
+            for (var i = 1; i <= 99; i++)
+            {
+                if (!File.Exists(Path.Combine(dir, $"{root}.z{i:D2}")))
+                    break;
+                partCount++;
+            }
+
+            basePath = path;
+            index = partCount + 1;
+            return true;
+        }
+
         return false;
     }
 
@@ -174,13 +240,26 @@ public static class ArchiveVolumeSet
                     return EnumerateRarOld(dir, match.Groups["root"].Value);
                 }
 
+            case VolumeSetKind.ZipSpanned:
+                {
+                    var name = Path.GetFileName(path);
+                    var dir = Path.GetDirectoryName(path) ?? string.Empty;
+                    var root = name.Length > ".zip".Length
+                               && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+                        ? name[..^".zip".Length]
+                        : ZipSpannedPartRegex.Match(name).Groups["root"].Value;
+                    return EnumerateZipSpanned(dir, root);
+                }
+
             default:
                 return File.Exists(path) ? [path] : [];
         }
     }
 
     /// <summary>
-    /// 分卷集的锚点：传入任意一卷都回到第一卷；不是分卷命名则原样返回（文件不存在时为 null）。
+    /// 分卷集的锚点：传入任意一卷都回到「能打开整组的那一卷」。数字 / RAR 分卷是第 1 卷；
+    /// ZIP 跨卷是**末卷</b> <c>archive.zip</c>（7z.dll 只认这个卷名，<c>.z01</c> 会被判成不支持的扩展名）。
+    /// 不是分卷命名则原样返回（文件不存在时为 null）。
     /// </summary>
     public static string? FindFirstVolume(string path)
     {
@@ -188,7 +267,19 @@ public static class ArchiveVolumeSet
             return null;
 
         var volumes = EnumerateVolumes(path);
-        return volumes.Count > 0 ? volumes[0] : null;
+        if (volumes.Count == 0)
+            return null;
+
+        if (GetVolumeSetKind(path) == VolumeSetKind.ZipSpanned)
+        {
+            foreach (var volume in volumes)
+            {
+                if (volume.EndsWith(".zip", StringComparison.OrdinalIgnoreCase))
+                    return volume;
+            }
+        }
+
+        return volumes[0];
     }
 
     /// <summary>
@@ -208,6 +299,16 @@ public static class ArchiveVolumeSet
 
             case VolumeSetKind.RarOld:
                 return RarOldRegex.Match(name).Groups["root"].Value + ".*";
+
+            case VolumeSetKind.ZipSpanned:
+                {
+                    // 同一套里既有 archive.z01… 又有 archive.zip，都用 <root>.* 覆盖
+                    var root = name.Length > ".zip".Length
+                               && name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase)
+                        ? name[..^".zip".Length]
+                        : ZipSpannedPartRegex.Match(name).Groups["root"].Value;
+                    return root + ".*";
+                }
 
             default:
                 return name;
@@ -273,6 +374,25 @@ public static class ArchiveVolumeSet
                 break;
             volumes.Add(candidate);
         }
+        return volumes;
+    }
+
+    private static IReadOnlyList<string> EnumerateZipSpanned(string dir, string root)
+    {
+        // 读取顺序：archive.z01 → … → archive.zNN → archive.zip（中央目录在末卷）
+        var volumes = new List<string>();
+        for (var i = 1; i <= 99; i++)
+        {
+            var candidate = Path.Combine(dir, $"{root}.z{i:D2}");
+            if (!File.Exists(candidate))
+                break;
+            volumes.Add(candidate);
+        }
+
+        var last = Path.Combine(dir, root + ".zip");
+        if (File.Exists(last))
+            volumes.Add(last);
+
         return volumes;
     }
 }

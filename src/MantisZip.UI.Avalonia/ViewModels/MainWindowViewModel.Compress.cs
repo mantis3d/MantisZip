@@ -83,6 +83,9 @@ public partial class MainWindowViewModel : ObservableObject
                 // 文件名编码：与压缩对话框同源，透传用户的 ZIP 文件名编码设置。
                 // 此前未透传，引擎只能靠包内 bit 11 启发式猜编码，导致拖拽添加中文文件名乱码。
                 options.FileNameEncoding = settings.ZipEncoding;
+                // 手动代码页：界面上的目录名是按它解出来的；引擎写回时会翻回包内真实目录名，
+                // 否则会在这个（可能乱码的）名字下新建目录。
+                options.ReadEncoding = NameEncodingRequestKey;
                 // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
                 options.ErrorResolver = CompressFlow.CreateErrorResolver();
                 // entryBasePath：当前浏览的压缩包内目录，null=根目录（与 WPF 版行为一致）
@@ -156,7 +159,12 @@ public partial class MainWindowViewModel : ObservableObject
                 // 删除会整包重写，须透传用户的 ZIP 文件名编码设置，
                 // 否则存活的其它条目可能被降级重写成乱码（与 AddFilesToArchiveAsync 同源）。
                 await engine.DeleteEntriesAsync(CurrentArchivePath, new[] { deleteEntryPath }, password, progress, ct,
-                    new ArchiveOptions { FileNameEncoding = AppSettings.Load().ZipEncoding });
+                    new ArchiveOptions
+                    {
+                        // 手动指定代码页时，读与写必须同键：否则存活条目会被按另一种编码重写
+                        FileNameEncoding = NameEncodingRequestKey ?? AppSettings.Load().ZipEncoding,
+                        ReadEncoding = NameEncodingRequestKey
+                    });
             });
     }
 

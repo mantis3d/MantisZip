@@ -329,6 +329,20 @@
                         </ComboBox>
                       </Grid>
       
+                      <!-- 默认读取代码页：打开压缩包时条目名的解码方式（主工具栏下拉可对单个包临时覆盖） -->
+                      <Grid ColumnDefinitions="120,*">
+                        <TextBlock Text="{Binding ReadNameEncodingText}" VerticalAlignment="Center" />
+                        <ComboBox Grid.Column="1" ItemsSource="{Binding ReadNameEncodingOptions}"
+                                  SelectedItem="{Binding SelectedReadNameEncodingOption}"
+                                  Width="200" HorizontalAlignment="Left">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                              <TextBlock Text="{Binding Display}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                      </Grid>
+
                       <Grid ColumnDefinitions="120,*">
                         <TextBlock Text="{Binding ZipCompressionMethodText}" VerticalAlignment="Center" />
                         <ComboBox Grid.Column="1" ItemsSource="{Binding ZipCompressionMethodOptions}"

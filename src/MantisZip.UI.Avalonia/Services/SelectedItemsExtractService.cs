@@ -36,7 +36,8 @@ public sealed class SelectedItemsExtractService
         bool preserveFullPath,
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
         IProgress<ArchiveProgress> progress,
-        CancellationToken cancellationToken)
+        CancellationToken cancellationToken,
+        string? nameEncoding = null)
     {
         // Build entryKeys and pathOverrides via 统一路径计算（单一事实来源，预览树共用）
         var entryKeys = new List<string>();
@@ -52,7 +53,7 @@ public sealed class SelectedItemsExtractService
             pathOverrides[key] = FileConflictHelper.GetSafePath(destinationPath, safeEntryPath);
         }
 
-        var options = CreateExtractOptions(conflictAction, conflictDialog);
+        var options = CreateExtractOptions(conflictAction, conflictDialog, nameEncoding);
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
         if (engine == null) throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));
@@ -126,14 +127,15 @@ public sealed class SelectedItemsExtractService
     /// <returns>ArchiveOptions（Overwrite 也返回显式 options，调用方可直接设置 ParallelExtractDegree）。</returns>
     internal static ArchiveOptions CreateExtractOptions(
         string conflictAction,
-        Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog)
+        Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
+        string? nameEncoding = null)
     {
         var action = MapConflictActionString(conflictAction);
         if (action == FileConflictAction.Overwrite)
-            return new ArchiveOptions { ConflictAction = FileConflictAction.Overwrite }; // 默认行为即覆盖
+            return new ArchiveOptions { ConflictAction = FileConflictAction.Overwrite, ReadEncoding = nameEncoding }; // 默认行为即覆盖
 
         if (action != FileConflictAction.Ask || conflictDialog == null)
-            return new ArchiveOptions { ConflictAction = action };
+            return new ArchiveOptions { ConflictAction = action, ReadEncoding = nameEncoding };
 
         // Ask 模式：使用异步回调弹窗 + ApplyToAll 记忆
         bool applyToAll = false;
@@ -142,6 +144,7 @@ public sealed class SelectedItemsExtractService
         return new ArchiveOptions
         {
             ConflictAction = FileConflictAction.Ask,
+            ReadEncoding = nameEncoding,
             ConflictResolverAsync = async info =>
             {
                 if (applyToAll && chosenAction.HasValue)

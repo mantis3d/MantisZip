@@ -19,6 +19,12 @@ public class AppSettings
     public int DefaultLevel { get; set; } = 5;
     public bool KeepOriginalExtension { get; set; } = false;
     public string ZipEncoding { get; set; } = "utf-8";
+
+    /// <summary>
+    /// 打开压缩包时文件名（条目名）的默认读取代码页键，见 <see cref="MantisZip.Core.Utils.NameEncodingCatalog"/>。
+    /// "auto" 走引擎内启发式（bit 11 → CJK 判定 → GBK 重试）；主工具栏的代码页下拉可对单个压缩包临时覆盖。
+    /// </summary>
+    public string ReadNameEncoding { get; set; } = "auto";
     public string SevenZipCompressionMethod { get; set; } = "LZMA2";
     public bool SevenZipSolid { get; set; } = true;
     public string SevenZipSolidBlockSize { get; set; } = "";

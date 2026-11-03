@@ -154,6 +154,8 @@ public partial class MainWindow : Window
                 Patterns = dialog.Patterns
             };
         };
+        // 工具栏文件名代码页下拉选「其他…」时的代码页输入框
+        vm.ShowCodePageInputDialog = () => CodePageInputDialog.ShowAsync(this);
         // 预览面板「输入密码」按钮共享同一密码对话框回调
         vm.Preview.ShowPasswordDialog = vm.ShowPasswordDialog;
         // 密码输入成功后重新触发当前条目的预览
@@ -167,6 +169,9 @@ public partial class MainWindow : Window
             await dialog.ShowDialog<bool>(this);
         };
         DataContext = vm;
+
+        // 工具栏代码页菜单先建一份（语言切换/切换编码后由 Click 重新建，见 RebuildNameEncodingMenu）
+        RebuildNameEncodingMenu();
 
         // 菜单子项延迟创建（2026-10-22 启动优化阶段 3）：
         // 文件/编辑/视图/工具四个顶级菜单的子项（共 25 项 + 图标）已抽到
@@ -1478,7 +1483,7 @@ public partial class MainWindow : Window
             initialPath: contextPath,
             // 文件类型下拉项从引擎工厂的单一事实源派生：早先这里硬编码 8 项，
             // 新增 .jar/.war/.ear/.apk（issue #54）时很容易漏同步。
-            // 分卷集只认第一卷、故补 *.001（issue #70③）；设置 →「文件类型关联」里的自定义扩展名也一并纳入。
+            // 分卷集只认首卷、故补 *.001 / *.z01（issue #70③ / #68）；设置 →「文件类型关联」里的自定义扩展名也一并纳入。
             // 第三项「自解压程序 (*.exe)」默认不选中（issue #36）：只有要打开 SFX 时才需要列出 exe。
             fileTypes: [.. ArchiveFormatHelper.BuildOpenDialogFileTypes(AppSettings.Load())]);
     }
@@ -1715,5 +1720,50 @@ public partial class MainWindow : Window
                 App.DebugLog("[MainWindow] DragDrop cleanup done");
             }
         };
+    }
+
+    /// <summary>
+    /// 工具栏代码页按钮被点击：先重建菜单项，再让 <see cref="Button"/> 的 Flyout 照常弹出。
+    /// <para>
+    /// 为什么在 Click 里建而不是在 XAML 里静态列：选项文案要随语言变、「其他代码页…」需要
+    /// 走命令参数、当前项要打勾 —— 用 code-behind 现建能直接拿 <see cref="MainWindowViewModel"/> 的
+    /// 命令与选中项，不必给 NameEncodingOption 塞 ICommand。
+    /// </para>
+    /// <para>
+    /// Avalonia 的 <c>Button.OnClick</c> 先冒泡 Click 事件、再弹出 Flyout，所以这里重建完菜单项
+    /// 正好赶上本次弹出；同时 <see cref="MenuFlyout"/> 的 <c>Opened</c> 也会重建一次兜底
+    /// （重建是幂等的，不会重复添加）。
+    /// </para>
+    /// </summary>
+    private void OnNameEncodingClick(object? sender, RoutedEventArgs e) => RebuildNameEncodingMenu();
+
+    /// <summary>菜单弹出后按最新状态重建一次（兜底：若 Click 与弹窗顺序在某个平台上反转）。</summary>
+    private void OnNameEncodingMenuOpened(object? sender, EventArgs e) => RebuildNameEncodingMenu();
+
+    /// <summary>
+    /// 按 VM 的当前选项重建代码页菜单：九个固定项，当前项打勾（<see cref="MenuItemToggleType.Radio"/>），
+    /// 命令统一走 <c>ChangeNameEncodingCommand</c>（「其他代码页…」由 VM 内部再弹数字输入框）。
+    /// </summary>
+    private void RebuildNameEncodingMenu()
+    {
+        // Flyout 不在可视树里，x:Name 不会生成字段 ⇒ 从按钮上取
+        if (NameEncodingButton?.Flyout is not MenuFlyout flyout || DataContext is not MainWindowViewModel vm)
+            return;
+
+        var selectedKey = vm.NameEncodingSelectedOption?.Key;
+        flyout.Items.Clear();
+
+        foreach (var option in vm.NameEncodingOptions)
+        {
+            flyout.Items.Add(new MenuItem
+            {
+                Header = option.Display,
+                Command = vm.ChangeNameEncodingCommand,
+                CommandParameter = option.Key,
+                ToggleType = MenuItemToggleType.Radio,
+                GroupName = "NameEncoding",
+                IsChecked = string.Equals(option.Key, selectedKey, StringComparison.Ordinal),
+            });
+        }
     }
 }

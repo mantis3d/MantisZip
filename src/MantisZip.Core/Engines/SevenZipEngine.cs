@@ -1316,11 +1316,21 @@ public class SevenZipEngine : IArchiveEngine
     public async Task<IReadOnlyList<ArchiveItem>> ListEntriesAsync(
         string archivePath,
         string? password = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? fileNameEncoding = null,
+        Action<string>? onEncodingResolved = null)
     {
         CoreLog.Entry();
         archivePath = AnchorVolumeSet(archivePath);
         CoreLog.Info($"ListEntriesAsync: {archivePath}");
+
+        // 7z.dll 内部以 UTF-16 表示条目名，不存在代码页问题；编码参数只为接口一致，
+        // 这里回传 UTF-16 让 UI 的「代码页」控件对这种格式也无歧义（实际由 UI 隐藏控件）。
+        if (!string.IsNullOrWhiteSpace(fileNameEncoding) && !NameEncodingCatalog.IsAuto(fileNameEncoding))
+        {
+            CoreLog.Info($"ListEntriesAsync: file name encoding '{fileNameEncoding}' ignored for 7z (names are Unicode)");
+        }
+        onEncodingResolved?.Invoke("utf-16");
         var sw = Stopwatch.StartNew();
 
         EnsureLibraryPath();
@@ -1423,11 +1433,11 @@ public class SevenZipEngine : IArchiveEngine
 
                 var fileEntries = extractor.ArchiveFileData.Where(e => !e.IsDirectory).ToList();
 
-                // 2. RAR5 块链结构校验（issue #69 在 RAR 上的残留）：7z.dll 的 Check 只校验数据区与块头，
-                //    不校验卷尾 end-of-archive 块的头 CRC —— 末卷尾部被改坏时 Check 仍返回 true
-                //    （WinRAR 真分卷实测），而 7-Zip / UnRAR 命令行都报「Headers Error」。
-                //    这里按 RAR5 规范独立走一遍块链：头 CRC 不符 / 块越界 / 缺结束块 / 缺末卷都判无效。
-                //    非 RAR5（含 RAR4 与头部加密）返回 Unknown，行为与之前保持一致。
+                // 2. RAR 块链结构校验（issue #69 在 RAR 上的残留，issue #68 补 RAR4）：7z.dll 的 Check
+                //    只校验数据区与块头，不校验卷尾 end-of-archive 块的头 CRC —— 末卷尾部被改坏时
+                //    Check 仍返回 true（WinRAR 真分卷实测），而 7-Zip / UnRAR 命令行都报「Headers Error」。
+                //    这里按 RAR5 / RAR4 各自规范独立走一遍块链：头 CRC 不符 / 块越界 / 缺结束块 / 缺末卷
+                //    都判无效。头部加密或非 RAR 返回 Unknown，行为与之前保持一致。
                 if (valid
                     && RarHeaderValidator.Validate(archivePath, out var structureReason) == RarStructureStatus.Broken)
                 {

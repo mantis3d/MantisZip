@@ -1,0 +1,49 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.CodePageInputDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="380"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource DialogPadding}">
+
+  <!-- 主布局：说明文字 / 代码页输入 / 按钮行 -->
+  <Grid RowDefinitions="Auto,Auto,Auto"
+        Margin="{DynamicResource SpacingXsThk}">
+
+    <!-- 第 0 行：说明（选「其他代码页…」后告诉用户填什么） -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding HintText}"
+               TextWrapping="Wrap"
+               Margin="0,0,0,8"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+    <!-- 第 1 行：代码页数字输入（只允许数字，见 CodePageInputDialog.axaml.cs 的 TextInput 过滤） -->
+    <TextBox Grid.Row="1"
+             x:Name="CodePageTextBox"
+             Margin="0,0,0,12"
+             Background="{DynamicResource ThemeSurfaceBgBrush}"
+             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+             BorderBrush="{DynamicResource ThemeBorderBrush}"
+             PlaceholderText="{Binding HintText}" />
+
+    <!-- 第 2 行：确定 / 取消 -->
+    <StackPanel Grid.Row="2"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="{DynamicResource SpacingSm}">
+      <Button Content="{Binding OkText}"
+              Classes="primary"
+              MinHeight="{DynamicResource ControlHeight}"
+              IsDefault="True"
+              Click="Ok_Click" />
+      <Button Content="{Binding CancelText}"
+              MinHeight="{DynamicResource ControlHeight}"
+              IsCancel="True"
+              Click="Cancel_Click" />
+    </StackPanel>
+  </Grid>
+</Window>
