@@ -98,3 +98,25 @@ DataGrid 自带的 Shift 只扩**行选区**、不扩勾选，所以在拖拽接
 
 - Release `--no-incremental` 构建 0 警告；`-Task i18n` = 1430 key；`-Task check` 8 条守卫全绿；`-Task test -Target ui-tests` 45.3s 全绿（含新增 7 例）。
 - 真机（`%TEMP%\mz-cb2.zip` 8 个文件，平铺布局）：点第 1 张卡 → 勾上；Shift 点第 4 张 → 1–4 全勾、状态栏「已选 4 项 · 共 44 B」；切到详情布局 → 4 行仍勾选；在详情里点 file5、Shift 点 file8 → 8 项全勾、「已选 8 项 · 共 88 B」；「视图」菜单显示「列表布局 ›（详情 / 平铺 / 内容，当前项打勾）」与「复选框多选 ✓」。
+
+## 七、追加调整（2026-11-03，同日，用户追加要求）
+
+**要求（原文）**：「我希望加上我按 shift 或 ctrl 多选之后，点击复选框，那么我多选的那些复选框状态跟着一起变，你能明白吗？」
+**定案（用户选 A）**：行选择（蓝底高亮）与勾选**彻底分成两套状态** —— Ctrl/Shift 只改选区，点其中任意一行的复选框则把整组一起切换成与被点行相反的状态。
+
+### 改动
+
+| # | 内容 | 文件 |
+|---|---|---|
+| A1 | 新增 `CheckedEntries`（勾选投影，跨目录累积），`SelectedEntries` 退回「选区」单一职责；删除 `CheckedSelectionChanged` 事件与 `SyncCheckedFromSelection()` | `ViewModels/MainWindowViewModel.cs` |
+| A2 | 新增 `SetChecked(items, value)` / `ToggleCheckedForGroup(clicked, group)`（选区 ≥ 2 且包含被点项 → 整组取反，返回 true） | 同上 |
+| A3 | `FileListGrid_SelectionChanged` 去掉「复选框模式直接 return」与 `_isApplyingCheckboxSelection` 闸门（选区两种模式下都跟随 DataGrid）；新增 `SelectedGridItems()` 供成组切换取当前行选区 | `Views/MainWindow.axaml.cs` |
+| A4 | 表格 Tunnel 拦截：无修饰键 + 命中复选框 + 成组成功 → `Handled`（阻止 DataGrid 把选区折叠成单选） | 同上 |
+| A5 | 卡片视图 `ApplyCheckPointer(pressedItem, shift, ctrl, vm)` 三路径：Shift 区间连勾 / Ctrl 切换该卡并入出选区 / 无修饰键先试成组、否则单选并 `ApplyCardSelection` | `Views/MainWindow.Thumbnails.cs` |
+| A6 | 批量删除 `targets` 改读 `CheckedEntries` | `ViewModels/MainWindowViewModel.Compress.cs` |
+
+### 验证
+
+- Release `--no-incremental` 0 警告；`-Task test -Target ui-tests` 39.8s 全绿、`-Task test -Target tests` 17.1s 全绿；`-Task check` 8 条守卫全绿。
+- 真机详情视图：Ctrl 点 file2 / file3 / file4 → 点 file3 的复选框 → 三行一起勾、「已选 3 项 · 共 33 B」；再点一次 → 三行一起取消。
+- 真机平铺视图：Ctrl 点三张卡 → 点第二张 → 三卡一起勾（选区保留），再点一次 → 三卡一起取消而蓝框仍在（`%TEMP%\g6-3cards.png` / `g7-groupuncheck.png` / `g8-groupcheck.png`）。

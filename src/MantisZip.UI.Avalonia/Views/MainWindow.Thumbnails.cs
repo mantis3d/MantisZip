@@ -147,13 +147,17 @@ public partial class MainWindow
             {
                 // 右键：命中项未勾选时先勾上，让右键菜单（删除 / 解压）作用于它
                 if (pressedItem != null && !pressedItem.IsChecked)
-                    ApplyCheckPointer(pressedItem, shift: false, vm);
+                    ApplyCheckPointer(pressedItem, shift: false, ctrl: false, vm);
                 return;
             }
 
             if (pressedItem == null) return;
 
-            ApplyCheckPointer(pressedItem, e.KeyModifiers.HasFlag(KeyModifiers.Shift), vm);
+            ApplyCheckPointer(
+                pressedItem,
+                e.KeyModifiers.HasFlag(KeyModifiers.Shift),
+                e.KeyModifiers.HasFlag(KeyModifiers.Control),
+                vm);
             e.Handled = true;   // 阻止卡片内的 CheckBox 再切换一次
             return;
         }
@@ -231,41 +235,82 @@ public partial class MainWindow
 
     /// <summary>
     /// 把一次「勾选点击」（复选框模式）解释成勾选变更并写回模型。
-    /// 勾选集合本身由 VM 在 <see cref="ArchiveItemModel.IsChecked"/> 变化时维护
-    /// （<c>OnEntryPropertyChanged</c> → <c>SelectedEntries</c>），这里只补主选项与卡片高亮。
-    /// 平铺 / 内容行 / 详细信息三种布局共用同一份算法（<see cref="ThumbnailSelectionController.HandleCheckPointerPressed"/>）。
+    /// <para>
+    /// 三条路径（2026-11-03 起选区与勾选解耦）：
+    /// ① Shift = 从锚点到该卡**连勾**（只加不减），锚点不变；
+    /// ② Ctrl = 切换该卡勾选，并把它并进选区（用 Ctrl 累积一组，随后点其中任意一张即可整组切换）；
+    /// ③ 无修饰键 = 若当前选区有 2 项以上且包含该卡，**整组一起切换**成与它相反的状态；否则只切这一张。
+    /// </para>
+    /// 勾选集合由 VM 维护（<c>OnEntryPropertyChanged</c> → <c>CheckedEntries</c>），这里负责选区的写法与卡片高亮。
     /// </summary>
-    private void ApplyCheckPointer(ArchiveItemModel? pressedItem, bool shift, MainWindowViewModel vm)
+    private void ApplyCheckPointer(ArchiveItemModel? pressedItem, bool shift, bool ctrl, MainWindowViewModel vm)
     {
-        var result = ThumbnailSelectionController.HandleCheckPointerPressed(
-            pressedItem,
-            shift,
-            vm.CurrentEntries.ToList(),
-            _thumbnailCheckAnchor);
+        if (shift)
+        {
+            var ranged = ThumbnailSelectionController.HandleCheckPointerPressed(
+                pressedItem,
+                shift: true,
+                vm.CurrentEntries.ToList(),
+                _thumbnailCheckAnchor);
 
-        _thumbnailCheckAnchor = result.Anchor;
+            _thumbnailCheckAnchor = ranged.Anchor;
+            foreach (var item in ranged.ToCheck)
+                item.IsChecked = true;
 
-        foreach (var item in result.ToCheck)
-            item.IsChecked = true;
+            if (ranged.Primary != null)
+                vm.SelectedEntry = ranged.Primary;
 
-        foreach (var item in result.ToUncheck)
-            item.IsChecked = false;
+            return;
+        }
 
-        // 主选中项照常写（预览 / 状态栏 / 卡片元数据文字都读它）
-        vm.SelectedEntry = result.Primary;
+        if (pressedItem == null) return;
 
-        SyncThumbnailCheckHighlight(vm);
+        if (ctrl)
+        {
+            // Ctrl：切换该卡勾选，同时把它并进 / 移出选区（用于累积一组）
+            var nowChecked = !pressedItem.IsChecked;
+            vm.SetChecked(new[] { pressedItem }, nowChecked);
+
+            var selection = new List<ArchiveItemModel>(vm.SelectedEntries);
+            if (nowChecked)
+            {
+                if (!selection.Contains(pressedItem))
+                    selection.Add(pressedItem);
+            }
+            else
+            {
+                selection.Remove(pressedItem);
+            }
+
+            ApplyCardSelection(vm, selection, pressedItem);
+            return;
+        }
+
+        // 无修饰键：成组切换优先（选区里的行一起变）
+        if (vm.ToggleCheckedForGroup(pressedItem, vm.SelectedEntries))
+        {
+            vm.SelectedEntry = pressedItem;
+            return;
+        }
+
+        vm.SetChecked(new[] { pressedItem }, !pressedItem.IsChecked);
+        ApplyCardSelection(vm, new[] { pressedItem }, pressedItem);
     }
 
-    /// <summary>
-    /// 复选框模式下让卡片高亮跟随勾选集合（卡片视图的高亮源是 <see cref="ArchiveItemModel.IsSelected"/>，
-    /// 而勾选只改 <c>SelectedEntries</c>，不补这一步勾上的卡片不会变蓝）。
-    /// </summary>
-    private static void SyncThumbnailCheckHighlight(MainWindowViewModel vm)
+    /// <summary>写回卡片选区（<c>SelectedEntries</c> + 逐项 <c>IsSelected</c>）与主选中项。</summary>
+    private static void ApplyCardSelection(
+        MainWindowViewModel vm,
+        IReadOnlyList<ArchiveItemModel> selection,
+        ArchiveItemModel? primary)
     {
-        var checkedItems = new HashSet<ArchiveItemModel>(vm.SelectedEntries);
+        vm.SelectedEntries.Clear();
+        vm.SelectedEntries.AddRange(selection);
+
+        var selected = new HashSet<ArchiveItemModel>(selection);
         foreach (var item in vm.CurrentEntries)
-            item.IsSelected = checkedItems.Contains(item);
+            item.IsSelected = selected.Contains(item);
+
+        vm.SelectedEntry = primary ?? (selection.Count > 0 ? selection[0] : null);
     }
 
     /// <summary>

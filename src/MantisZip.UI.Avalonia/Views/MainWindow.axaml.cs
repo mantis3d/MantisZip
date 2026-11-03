@@ -1089,7 +1089,6 @@ public partial class MainWindow : Window
         // 复选框模式：勾选集合变化 → 回写 DataGrid 选区（Ctrl/Shift 点选的反向由 SelectionChanged 处理）
         if (DataContext is MainWindowViewModel checkboxVm)
         {
-            checkboxVm.CheckedSelectionChanged += OnCheckedSelectionChanged;
             // DataGridColumn 不在视觉树上、不继承 DataContext ⇒ 列上的 IsVisible 绑定不生效，
             // 只能在这里按 VM 状态命令式切显隐（首次 + 之后每次切换）。
             checkboxVm.PropertyChanged += OnCheckboxVmPropertyChanged;
@@ -1470,6 +1469,26 @@ public partial class MainWindow : Window
         _dragAddOverlayTimer.Stop();
     }
 
+    /// <summary>
+    /// 取当前 DataGrid 的行选区（成组勾选用）。复选框可以跨目录累积，但选区只会包含当前目录的行，
+    /// 所以这里直接读 <c>SelectedItems</c>，不读 <c>SelectedEntries</c>（后者在切换目录瞬间可能还是旧实例）。
+    /// </summary>
+    private IReadOnlyList<ArchiveItemModel> SelectedGridItems(MainWindowViewModel vm)
+    {
+        var grid = FileListGrid;
+        if (grid == null || grid.SelectedItems.Count == 0)
+            return vm.SelectedEntries;
+
+        var items = new List<ArchiveItemModel>(grid.SelectedItems.Count);
+        foreach (var item in grid.SelectedItems)
+        {
+            if (item is ArchiveItemModel model)
+                items.Add(model);
+        }
+
+        return items.Count > 0 ? items : vm.SelectedEntries;
+    }
+
     private void FileListGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm) return;
@@ -1478,14 +1497,8 @@ public partial class MainWindow : Window
         // 会以「单选」回写覆盖掉刚写入的多选集合 → 由写入口（ApplyThumbnailSelection）负责同步。
         if (_isApplyingThumbnailSelection) return;
 
-        // 复选框模式正在回写选区：避免「勾选 → 改集合 → 回写选区 → 又改集合」打转
-        if (_isApplyingCheckboxSelection) return;
-
-        // 复选框模式下勾选集合才是事实源：DataGrid 的选区只是高亮（由勾选回写驱动）。
-        // 这里绝不能按「当前选区」重建集合 —— 切目录/筛选会把选区清空，
-        // 那样跨目录勾选的条目会被一起清掉（实测过）。
-        if (vm.IsCheckboxMode) return;
-
+        // 复选框模式下选区与勾选是两套独立状态（2026-11-03 起）：
+        // 选区照常跟随 DataGrid，勾选由复选框 / 成组切换维护，互不覆盖。
         vm.SelectedEntries.Clear();
         foreach (var item in FileListGrid.SelectedItems)
         {
@@ -1494,8 +1507,6 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>复选框模式下正在把 <c>SelectedEntries</c> 回写到 DataGrid 选区（防重入闸门）。</summary>
-    private bool _isApplyingCheckboxSelection;
 
     private void OnCheckboxVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
@@ -1526,35 +1537,7 @@ public partial class MainWindow : Window
         }
     }
 
-    /// <summary>
-    /// 复选框勾选变化 → 把勾选集合写回 DataGrid 的 <c>SelectedItems</c>（行高亮与批量操作都靠它）。
-    /// 订阅点在 <see cref="EnsureArchiveContent"/>（列表控件加载后）。
-    /// </summary>
-    private void OnCheckedSelectionChanged(object? sender, EventArgs e)
-    {
-        if (DataContext is not MainWindowViewModel vm) return;
-        if (_isApplyingCheckboxSelection) return;
 
-        // DataGrid 只接受 ItemsSource 里的对象：勾选集合可以跨目录，而 DataGrid 只装了当前目录的条目。
-        // 直接 Add 跨目录条目会抛 ArgumentException（"The item is not contained in the ItemsSource"）
-        // —— 实测导致切换目录时整个进程崩溃。
-        var visible = new HashSet<ArchiveItemModel>(vm.CurrentEntries);
-
-        _isApplyingCheckboxSelection = true;
-        try
-        {
-            FileListGrid.SelectedItems.Clear();
-            foreach (var item in vm.SelectedEntries)
-            {
-                if (visible.Contains(item))
-                    FileListGrid.SelectedItems.Add(item);
-            }
-        }
-        finally
-        {
-            _isApplyingCheckboxSelection = false;
-        }
-    }
 
     public async void LoadArchiveOnStartup(string path)
     {
@@ -1600,19 +1583,33 @@ public partial class MainWindow : Window
         {
             _dragStartPoint = e.GetPosition(fileGrid);
 
-            // 复选框模式 + Shift：DataGrid 自己的 Shift 只扩「行选区」，勾选不会跟着扩。
-            // 这里在 Tunnel 阶段把「复选框列 + Shift」的按下拦下来，按区间直接勾选
-            // （勾选算法与平铺 / 内容行视图共用 ApplyCheckPointer，语义完全一致）。
+            // 复选框模式下的两个拦截（Tunnel 阶段，早于 DataGrid 自己的选区处理）：
+            //   ① Shift：DataGrid 的 Shift 只扩「行选区」，勾选不会跟着扩 ⇒ 按区间直接勾选；
+            //   ② 无修饰键且当前选区有 2 项以上：把这组一起切换成与被点行相反的状态
+            //      （先 Ctrl/Shift 选好几行，再点其中任意一行的复选框）。
             if (DataContext is MainWindowViewModel gridVm
                 && gridVm.IsCheckboxMode
-                && e.KeyModifiers.HasFlag(KeyModifiers.Shift)
-                && TryHitCheckbox(e.Source, out var checkRow))
+                && TryHitCheckbox(e.Source, out var checkRow)
+                && checkRow != null)
             {
-                ApplyCheckPointer(checkRow, shift: true, gridVm);
-                e.Handled = true;
-                _dragStartEvent = null;
-                _dragPreservedSelection = null;
-                return;
+                var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+                if (shift)
+                {
+                    ApplyCheckPointer(checkRow, shift: true, ctrl: false, gridVm);
+                    e.Handled = true;
+                    _dragStartEvent = null;
+                    _dragPreservedSelection = null;
+                    return;
+                }
+
+                if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)
+                    && gridVm.ToggleCheckedForGroup(checkRow, SelectedGridItems(gridVm)))
+                {
+                    e.Handled = true;
+                    _dragStartEvent = null;
+                    _dragPreservedSelection = null;
+                    return;
+                }
             }
 
             // 命中测试：仅在按下位置命中数据行时才记录拖拽起点。

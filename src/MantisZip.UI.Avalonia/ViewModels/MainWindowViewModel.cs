@@ -563,8 +563,18 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 当前选中的条目列表（由 View 的 SelectionChanged 同步）。
+    /// <para>
+    /// 与 <see cref="CheckedEntries"/> 是**两套独立状态**（2026-11-03 起）：选区决定复制 / 解压 / 拖拽 / 右键操作的作用对象，
+    /// 勾选只决定批量删除与状态栏摘要。复选框模式下用 Ctrl/Shift 建立选区后点复选框，可以把整组一起切换。
+    /// </para>
     /// </summary>
     public List<ArchiveItemModel> SelectedEntries { get; } = new();
+
+    /// <summary>
+    /// 当前**已勾选**的条目（跨目录累积）。唯一事实源仍是行模型上的 <see cref="ArchiveItemModel.IsChecked"/>，
+    /// 这个列表只是它的投影，供状态栏摘要与批量删除使用。
+    /// </summary>
+    public List<ArchiveItemModel> CheckedEntries { get; } = new();
 
     [ObservableProperty]
     private bool _isDarkTheme;
@@ -921,8 +931,6 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     private bool _syncingSelection;
 
-    /// <summary>勾选集合变化后请求视图把 <see cref="SelectedEntries"/> 写回 DataGrid 的 SelectedItems。</summary>
-    public event EventHandler? CheckedSelectionChanged;
 
     private void NotifyCheckboxProperties()
     {
@@ -930,8 +938,8 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CheckedSummary));
     }
 
-    /// <summary>已勾选条目数（复选框与 <see cref="SelectedEntries"/> 是同一份事实源）。</summary>
-    public int CheckedCount => SelectedEntries.Count;
+    /// <summary>已勾选条目数（勾选集合的投影，与选区无关）。</summary>
+    public int CheckedCount => CheckedEntries.Count;
 
     /// <summary>状态栏摘要「已选 N 项 · 共 X」；未勾选时为空串（状态栏不显示空文案）。</summary>
     public string CheckedSummary => CheckedCount == 0
@@ -939,13 +947,13 @@ public partial class MainWindowViewModel : ObservableObject
         : LocalizationManager.T(
             "FileList_CheckedSummaryFmt",
             CheckedCount,
-            FormatUtil.FormatSize(SelectedEntries.Sum(e => e.Size)));
+            FormatUtil.FormatSize(CheckedEntries.Sum(e => e.Size)));
 
     /// <summary>复选框模式工具条按钮的提示文案（随语言切换刷新，见 <see cref="UpdateLocalizedStrings"/>）。</summary>
     public string CheckboxModeLabel => LocalizationManager.T("FileList_CheckboxMode");
 
     /// <summary>
-    /// 行模型的 <c>IsChecked</c> 变化回调：把勾选落到 <see cref="SelectedEntries"/> 并请求视图同步高亮。
+    /// 行模型的 <c>IsChecked</c> 变化回调：把勾选落到 <see cref="CheckedEntries"/>（跨目录累积）。
     /// 订阅/退订在 <see cref="PopulateEntries"/> 重建 <see cref="CurrentEntries"/> 时成对完成。
     /// </summary>
     private void OnEntryPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
@@ -955,32 +963,44 @@ public partial class MainWindowViewModel : ObservableObject
 
         if (item.IsChecked)
         {
-            if (!SelectedEntries.Contains(item))
-                SelectedEntries.Add(item);
+            if (!CheckedEntries.Contains(item))
+                CheckedEntries.Add(item);
         }
         else
         {
-            SelectedEntries.Remove(item);
+            CheckedEntries.Remove(item);
         }
 
         NotifyCheckboxProperties();
-        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>
-    /// 视图侧选区变化后同步勾选态（复选框模式下 Ctrl/Shift 点选 = 勾选）。
-    /// 由 <c>MainWindow.FileListGrid_SelectionChanged</c> 调用。
+    /// 成组勾选：把 <paramref name="items"/> 全部设为 <paramref name="value"/>（批量删除 / 成组切换的内部实现）。
+    /// <para>
+    /// 闸门内直接改模型并同步 <see cref="CheckedEntries"/>：<c>IsChecked</c> 的属性回调在闸门内会直接 return，
+    /// 不指望它维护投影。跨目录的条目也会一起进 / 出投影。
+    /// </para>
     /// </summary>
-    public void SyncCheckedFromSelection()
+    public void SetChecked(IReadOnlyList<ArchiveItemModel> items, bool value)
     {
-        if (CurrentEntries.Count == 0) return;
-
-        var selected = new HashSet<ArchiveItemModel>(SelectedEntries);
         _syncingSelection = true;
         try
         {
-            foreach (var entry in CurrentEntries)
-                entry.IsChecked = selected.Contains(entry);
+            foreach (var item in items)
+            {
+                if (item.IsChecked != value)
+                    item.IsChecked = value;
+
+                if (value)
+                {
+                    if (!CheckedEntries.Contains(item))
+                        CheckedEntries.Add(item);
+                }
+                else
+                {
+                    CheckedEntries.Remove(item);
+                }
+            }
         }
         finally
         {
@@ -991,13 +1011,43 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     /// <summary>
-    /// 列表重填后按 FullPath 还原勾选态，并把 <see cref="SelectedEntries"/> 里指向旧实例的项换成新实例
+    /// 复选框模式下「成组切换」：若当前选区有 2 项以上且包含被点条目，则把整组设为与被点条目**相反**的状态。
+    /// <para>
+    /// 这是 2026-11-03 用户要求的交互：先用 Ctrl/Shift 选好几行，再点其中任意一行的复选框，
+    /// 选中行一起勾上（点的是未勾的）或一起取消（点的是已勾的）。
+    /// </para>
+    /// </summary>
+    /// <returns>是否按「组」处理；false 表示调用方应退回「只切换该行」。</returns>
+    public bool ToggleCheckedForGroup(ArchiveItemModel? clicked, IReadOnlyList<ArchiveItemModel>? group)
+    {
+        if (clicked is null || group is null || group.Count < 2)
+            return false;
+
+        var contains = false;
+        foreach (var item in group)
+        {
+            if (ReferenceEquals(item, clicked))
+            {
+                contains = true;
+                break;
+            }
+        }
+
+        if (!contains)
+            return false;
+
+        SetChecked(group, !clicked.IsChecked);
+        return true;
+    }
+
+    /// <summary>
+    /// 列表重填后按 FullPath 还原勾选态，并把 <see cref="CheckedEntries"/> 里指向旧实例的项换成新实例
     /// —— <see cref="PopulateEntries"/> 每次都重建 <see cref="ArchiveItemModel"/>，
     /// 跨目录 / 跨筛选保持勾选只能靠路径匹配，不能靠实例引用。
     /// </summary>
     private void RestoreCheckedState()
     {
-        if (SelectedEntries.Count == 0) return;
+        if (CheckedEntries.Count == 0) return;
 
         var byPath = new Dictionary<string, ArchiveItemModel>(StringComparer.Ordinal);
         foreach (var entry in CurrentEntries)
@@ -1006,17 +1056,17 @@ public partial class MainWindowViewModel : ObservableObject
         _syncingSelection = true;
         try
         {
-            for (var i = 0; i < SelectedEntries.Count; i++)
+            for (var i = 0; i < CheckedEntries.Count; i++)
             {
-                if (byPath.TryGetValue(SelectedEntries[i].FullPath, out var fresh))
+                if (byPath.TryGetValue(CheckedEntries[i].FullPath, out var fresh))
                 {
-                    SelectedEntries[i] = fresh;
+                    CheckedEntries[i] = fresh;
                     fresh.IsChecked = true;
                 }
             }
 
             foreach (var entry in CurrentEntries)
-                entry.IsChecked = SelectedEntries.Contains(entry);
+                entry.IsChecked = CheckedEntries.Contains(entry);
         }
         finally
         {
@@ -1024,8 +1074,6 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         NotifyCheckboxProperties();
-        // 新目录的 DataGrid 选区为空：按勾选集合重新点亮（勾选是事实源，高亮跟随）
-        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>清空勾选态（不动 <see cref="SelectedEntry"/> 的预览联动）。</summary>
@@ -1042,9 +1090,8 @@ public partial class MainWindowViewModel : ObservableObject
             _syncingSelection = false;
         }
 
-        SelectedEntries.Clear();
+        CheckedEntries.Clear();
         NotifyCheckboxProperties();
-        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>勾选当前列表里所有可见行（只作用当前目录，不动其它目录已有的勾选）。</summary>
@@ -1059,8 +1106,8 @@ public partial class MainWindowViewModel : ObservableObject
             foreach (var entry in CurrentEntries)
             {
                 entry.IsChecked = true;
-                if (!SelectedEntries.Contains(entry))
-                    SelectedEntries.Add(entry);
+                if (!CheckedEntries.Contains(entry))
+                    CheckedEntries.Add(entry);
             }
         }
         finally
@@ -1069,7 +1116,6 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         NotifyCheckboxProperties();
-        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
     /// <summary>清空勾选（工具条 / 右键菜单入口）。</summary>
@@ -1094,12 +1140,12 @@ public partial class MainWindowViewModel : ObservableObject
                 entry.IsChecked = !entry.IsChecked;
                 if (entry.IsChecked)
                 {
-                    if (!SelectedEntries.Contains(entry))
-                        SelectedEntries.Add(entry);
+                    if (!CheckedEntries.Contains(entry))
+                        CheckedEntries.Add(entry);
                 }
                 else
                 {
-                    SelectedEntries.Remove(entry);
+                    CheckedEntries.Remove(entry);
                 }
             }
         }
@@ -1109,7 +1155,6 @@ public partial class MainWindowViewModel : ObservableObject
         }
 
         NotifyCheckboxProperties();
-        CheckedSelectionChanged?.Invoke(this, EventArgs.Empty);
     }
 
 

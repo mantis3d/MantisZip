@@ -109,8 +109,9 @@ public partial class MainWindowViewModel : ObservableObject
 
         // 目标集合：复选框模式下勾选集合优先（可跨目录，这是本模式的意义），
         // 否则维持单条行为（旧路径完全不变）。
-        var targets = IsCheckboxMode && SelectedEntries.Count > 0
-            ? SelectedEntries.ToList()
+        // 复选框模式：批量删除的作用对象是**勾选集合**（与行选区解耦，2026-11-03 起）
+        var targets = IsCheckboxMode && CheckedEntries.Count > 0
+            ? CheckedEntries.ToList()
             : (SelectedEntry != null ? new List<ArchiveItemModel> { SelectedEntry } : new List<ArchiveItemModel>());
 
         // 去重：勾选里可能同时含目录与它的子项，重复传给引擎会让同一路径被删两次。
