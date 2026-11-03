@@ -13,8 +13,13 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **地址栏改成资源管理器式面包屑** — 主窗口压缩包内的路径栏、文件选择器的地址栏、快速路径栏三处现在统一为分段面包屑（`E: › AI › IndexTTS2-SonicVale`），点任意祖先段直接跳转；点当前段或末尾空白进入编辑（`Ctrl+L` 也可以），`Enter` 提交、`Esc` 或点别处还原。盘符段可点回盘根 `E:\`；分隔符换成箭头图标；进入编辑时自动在末尾补上 `\`（压缩包内路径补 `/`），直接敲子目录名就行，不用先自己打分隔符；输入时弹出的候选路径点一下即跳转。编辑态与浏览态高度一致（此前进出编辑态整行会跳 13px），地址栏也有了底色与边框，浅色/深色主题下都能看出这是一块可输入的导航区
 - **Address bars became Explorer-style breadcrumbs** — the in-archive path bar, the file picker's address bar and the quick-path bar are now one segmented breadcrumb (`E: › AI › IndexTTS2-SonicVale`); click any ancestor segment to jump, click the current segment or the empty space after it to edit (`Ctrl+L` works too), with `Enter` to submit and `Esc` or clicking elsewhere to revert. The drive segment now jumps back to the drive root `E:\`, separators are arrow icons, entering edit mode pre-fills the trailing `\` (or `/` inside an archive) so you can type a subfolder name straight away, and clicking a path suggestion navigates immediately. Edit and browse modes are exactly the same height now (previously the whole row jumped 13 px), and the bar has its own background and border so it reads as an input field in both themes
+
+- ![资源管理器式面包屑：主窗口压缩包内路径栏与文件选择器地址栏的分段显示](docs/images/version/v0.5.5/BreadcrumbAddressBar.png)
 - **设置窗口里选文件/目录不再弹窗** — 压缩设置窗改为六个页签（输出设置 / 添加文件 / 压缩设置 / 密码 / 注释 / 文件过滤），解压设置窗改为四个页签（输出设置 / 添加压缩包 / 文件过滤 / 加速）；「添加文件」「输出目录」「添加压缩包」「解压到」都直接内嵌选择器，不再弹一个模态窗口选完再回来。单击条目＝选中（文件和文件夹都可以），双击文件夹＝进入，两侧的已选清单与选择器实时同步；「高级模式」开关可切成跨目录累积勾选，切回简单模式则只保留当前目录的选中项。文件列表会随窗口高度弹性撑满，已选清单固定高度贴在下方
 - **No more modal pickers inside the settings windows** — the compression window now has six tabs (output, add files, compression, password, comment, file filter) and the extraction window four (output, add archives, file filter, speed-up); adding files, choosing the output folder, adding archives and choosing the extraction folder all use an embedded picker instead of a modal dialog you had to dismiss first. A single click selects an entry (files and folders alike), double-clicking a folder enters it, and the "selected" list on either side stays in sync with the picker; an "advanced mode" switch turns selection into a cross-folder accumulation, and switching back keeps only what is selected in the current folder. The file list stretches with the window height while the selected list keeps a fixed height at the bottom
+
+- ![压缩设置窗的六个页签与内嵌的「添加文件」「输出目录」选择器](docs/images/version/v0.5.5/InlinePickerCompress.png)
+- ![解压设置窗的四个页签与内嵌的「添加压缩包」「解压到」选择器](docs/images/version/v0.5.5/InlinePickerExtract.png)
 - **记住窗口尺寸** — 压缩设置窗、解压设置窗、文件选择器和设置窗口的尺寸现在会被记住（含两个设置窗的左右分栏宽度），下次打开回到上次拖动后的大小。只记尺寸不记位置：笔记本拔掉外接屏后把窗口还原到已不存在的坐标，很容易整窗跑到屏幕外；保存的尺寸不合法（0、负数、异常值）时一律回落到默认大小
 - **Window sizes are remembered** — the compression window, the extraction window, the file picker and the settings window now remember their size (including the left/right split width of the two settings windows), so they reopen at the size you last dragged them to. Size only, not position: after unplugging an external monitor, restoring a window to coordinates that no longer exist easily pushes it off-screen; and invalid saved sizes (zero, negative, garbage) always fall back to the default
 
@@ -22,9 +27,14 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **The output-mode choices in the compression window now sit in one row** — the three options went from a stacked column to a single line, shrinking that group from about 132 px to about 40 px and giving the height back to the output-folder picker.
 
+- ![压缩设置窗「输出方式」：左标签 + 三个选项一行横排](docs/images/version/v0.5.5/OutputModeRow.png)
+
 - **文件名代码页可以手动切换了** — 打开 Big5、Shift-JIS 等旧编码命名的压缩包不再乱码：主工具栏的地球图标按钮里选编码，列表立即重载，图标角上的小徽章显示当前生效的编码；「其他代码页…」可以填自定义数字，设置页可设「默认读取代码页」。手动选错代码页会真的看到乱码 —— 这正是确认「这个包不是这个编码」的办法。
 
 - **File-name code pages can now be switched manually** — archives whose names use Big5, Shift-JIS or another legacy code page no longer show garbled names: pick a code page from the globe button on the main toolbar and the list reloads at once, with a small badge on the icon showing the code page actually in effect; "Other code page..." takes a custom number and the settings window holds the default. Picking the wrong code page now really shows garbled names — which is how you can tell it is not that encoding.
+
+- ![主工具栏代码页按钮：地球图标 + 右下角徽章显示当前生效编码（如 GBK）](docs/images/version/v0.5.5/NameEncodingBadge.png)
+- ![点开代码页按钮后的编码菜单：自动检测 / 系统默认 / 各编码 / 其他代码页…](docs/images/version/v0.5.5/NameEncodingMenu.png)
 
 **性能 / Performance**
 
@@ -32,27 +42,39 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts.
 
+- ![7z 整包解压完成后的进度窗口：统计卡里的总用时与平均速度](docs/images/version/v0.5.5/SevenZipBulkExtract.png)
+
 **修复 / Fixes**
 
 - **自解压 exe 现在能真正打开了** — 修正 v0.5.4 的自解压支持：不再只看文件末尾 8KB，改为按 PE 结构定位内嵌压缩包，7-Zip 与 WinRAR 制作的安装包都能列出、预览、解压，RAR 自解压包的注释也能读到了
 
 - **Self-extracting exes now open for real** — this corrects the self-extracting support added in v0.5.4: instead of only scanning the last 8 KB, the app locates the embedded archive through the PE layout, so installers made by 7-Zip or WinRAR list, preview and extract correctly, and RAR self-extractors finally show their comment
 
+- ![打开一个自解压 exe：文件列表正常列出内嵌压缩包里的条目](docs/images/version/v0.5.5/SfxArchivePreview.png)
+
 - **打开对话框的「文件类型」不再裁掉文字** — 「文件类型」下拉原来固定 110px 宽，繁体界面「壓縮檔檔案」的最后一个字会被吃掉；现在宽度跟随内容，各语言都能完整显示
 
 - **The "file type" dropdown in the open dialog no longer clips its text** — the dropdown had a hard-coded 110 px width, so the last character of the Traditional Chinese label was cut off; it now sizes to its content and shows every label in full
+
+- ![打开对话框的「文件类型」下拉在繁体界面下完整显示，不再裁字](docs/images/version/v0.5.5/FileTypeDropdown.png)
 
 - **WinRAR 制作的分卷包能识别了** — WinRAR 7 默认用 `xxx.part1.rar` 命名分卷，此前只认 `xxx.001`，这类包从任意一卷打开都会提示损坏、删除源包也只删一卷；现在三种命名都能识别，任意一卷都能打开整包，测试压缩包也会读完全部卷并报出卷尾被改坏的情况
 
 - **RAR volume sets made by WinRAR are now recognised** — WinRAR 7 defaults to the `xxx.part1.rar` naming, which the app did not understand: opening from any volume reported the set as damaged, and deleting the source removed only one volume. All three naming schemes are recognised now, any volume opens the whole set, and the integrity test reads every volume and reports a damaged tail
 
+- ![WinRAR 的 xxx.part1.rar 分卷包能正常打开并列出内容](docs/images/version/v0.5.5/RarPartVolumes.png)
+
 - **分卷包的文件列表显示完整了** — 打开对话框里此前会出现 `xxx.7z.001` 有、`xxx.7z.002` 没有的情况；现在同一套分卷的每一卷都会列出
 
 - **Every volume of a set is now listed in the open dialog** — previously `xxx.7z.001` was listed while `xxx.7z.002` was not; now all volumes of the same set show up
 
+- ![打开对话框里同一套分卷的每一卷都列出（.7z.001 / .7z.002 …）](docs/images/version/v0.5.5/VolumeListComplete.png)
+
 - **exe 预览的标题现在用文件名，64 位程序的元数据也回来了** — 此前标题显示的是内部临时文件名（`preview_19bc1690cf247236.exe`），而且 64 位 exe 的「程序信息」整片空白；现在标题就是文件列表里的名字，产品名称、公司、版本等信息统一进右侧元数据面板（可在设置里开关与排序），x86 与 x64 都能读到，「程序信息」还多了原始文件名、语言、著作权与文件描述
 
 - **The exe preview title is now the file name, and 64-bit metadata is back** — the title used to show an internal temp name (`preview_19bc1690cf247236.exe`), and 64-bit executables had a completely empty "program info" panel; now the title is the name from the file list, and product name, company and version go into the right-hand metadata panel (configurable in settings) for both x86 and x64, and "program info" now also lists the original file name, language, copyright and description
+
+- ![exe 预览：标题用文件列表里的名字，右侧元数据面板显示产品/公司/版本](docs/images/version/v0.5.5/ExePreviewMetadata.png)
 
 ## v0.5.4
 
