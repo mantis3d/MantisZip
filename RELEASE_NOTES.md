@@ -6,7 +6,6 @@ MantisZip-0.5.5-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.
 
 MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.5-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.5-Portable.zip is the portable version, extract and run. MantisZip-0.5.5-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
 
-
 ### 更新内容 / Changelog
 
 **界面 / UI**
@@ -27,8 +26,6 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **The output-mode choices in the compression window now sit in one row** — the three options went from a stacked column to a single line, shrinking that group from about 132 px to about 40 px and giving the height back to the output-folder picker.
 
-- ![压缩设置窗「输出方式」：左标签 + 三个选项一行横排](docs/images/version/v0.5.5/OutputModeRow.png)
-
 - **文件名代码页可以手动切换了** — 打开 Big5、Shift-JIS 等旧编码命名的压缩包不再乱码：主工具栏的地球图标按钮里选编码，列表立即重载，图标角上的小徽章显示当前生效的编码；「其他代码页…」可以填自定义数字，设置页可设「默认读取代码页」。手动选错代码页会真的看到乱码 —— 这正是确认「这个包不是这个编码」的办法。
 
 - **File-name code pages can now be switched manually** — archives whose names use Big5, Shift-JIS or another legacy code page no longer show garbled names: pick a code page from the globe button on the main toolbar and the list reloads at once, with a small badge on the icon showing the code page actually in effect; "Other code page..." takes a custom number and the settings window holds the default. Picking the wrong code page now really shows garbled names — which is how you can tell it is not that encoding.
@@ -42,15 +39,11 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts.
 
-- ![7z 整包解压完成后的进度窗口：统计卡里的总用时与平均速度](docs/images/version/v0.5.5/SevenZipBulkExtract.png)
-
 **修复 / Fixes**
 
 - **自解压 exe 现在能真正打开了** — 修正 v0.5.4 的自解压支持：不再只看文件末尾 8KB，改为按 PE 结构定位内嵌压缩包，7-Zip 与 WinRAR 制作的安装包都能列出、预览、解压，RAR 自解压包的注释也能读到了
 
 - **Self-extracting exes now open for real** — this corrects the self-extracting support added in v0.5.4: instead of only scanning the last 8 KB, the app locates the embedded archive through the PE layout, so installers made by 7-Zip or WinRAR list, preview and extract correctly, and RAR self-extractors finally show their comment
-
-- ![打开一个自解压 exe：文件列表正常列出内嵌压缩包里的条目](docs/images/version/v0.5.5/SfxArchivePreview.png)
 
 - **打开对话框的「文件类型」不再裁掉文字** — 「文件类型」下拉原来固定 110px 宽，繁体界面「壓縮檔檔案」的最后一个字会被吃掉；现在宽度跟随内容，各语言都能完整显示
 
@@ -61,8 +54,6 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 - **WinRAR 制作的分卷包能识别了** — WinRAR 7 默认用 `xxx.part1.rar` 命名分卷，此前只认 `xxx.001`，这类包从任意一卷打开都会提示损坏、删除源包也只删一卷；现在三种命名都能识别，任意一卷都能打开整包，测试压缩包也会读完全部卷并报出卷尾被改坏的情况
 
 - **RAR volume sets made by WinRAR are now recognised** — WinRAR 7 defaults to the `xxx.part1.rar` naming, which the app did not understand: opening from any volume reported the set as damaged, and deleting the source removed only one volume. All three naming schemes are recognised now, any volume opens the whole set, and the integrity test reads every volume and reports a damaged tail
-
-- ![WinRAR 的 xxx.part1.rar 分卷包能正常打开并列出内容](docs/images/version/v0.5.5/RarPartVolumes.png)
 
 - **分卷包的文件列表显示完整了** — 打开对话框里此前会出现 `xxx.7z.001` 有、`xxx.7z.002` 没有的情况；现在同一套分卷的每一卷都会列出
 
@@ -169,7 +160,6 @@ MantisZip-0.5.3-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.
 
 MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.3-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.3-Portable.zip is the portable version, extract and run. MantisZip-0.5.3-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
 
-
 ### 更新内容 / Changelog
 
 **启动画面 / Splash Screen**
@@ -267,7 +257,6 @@ MantisZip-0.5.2-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.
 
 MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.2-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.2-Portable.zip is the portable version, extract and run. MantisZip-0.5.2-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
 
-
 ### 更新内容 / Changelog
 
 **新预览格式 / New Preview Formats**
@@ -317,7 +306,6 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Help dialogs fully Markdown-driven** — the four help windows (compression speed-up / parallel extraction / password manager / log privacy) now render from localized Markdown (tables supported, text selectable and copyable); help buttons unified as a question-mark icon
 - ![帮助弹窗 Markdown 渲染效果](docs/images/version/v0.5.2/HelpDialog.png)
 
-
 **界面 / UI**
 
 - **图标统一到 Fluent 24 网格** — 界面上的 117 个图标里有 49 个是从别的图标体系带过来的（字体字形坐标系，渲染出来比旁边明显更粗更黑）或手绘杂线；现已按 **Fluent 24 Regular** 统一重画这 50 个（连同 `IconOrientation` 的语义修正：原来画成「图像裂开/禁用」样，现在是表示面板方向的双向箭头；磁力链改为链环、HTML 预览改为代码括号），其余图标不动、资源键名一个没改，界面上的引用零改动
@@ -362,7 +350,6 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 - SixLabors.ImageSharp 安全升级 3.1.5 → 4.1.3，并覆盖 SQLitePCLRaw 原生库至 3.53.3
 - Security-upgraded SixLabors.ImageSharp from 3.1.5 to 4.1.3 and overlaid SQLitePCLRaw native binaries at 3.53.3
 
-
 ## v0.5.1
 
 ### 文件说明 / File Description
@@ -370,7 +357,6 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 MantisZip-0.5.1-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.1-Setup-Offline.exe 是离线安装包。MantisZip-0.5.1-Portable.zip 是便携版，解压即用。MantisZip-0.5.1-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
 
 MantisZip-0.5.1-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.1-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.1-Portable.zip is the portable version, extract and run. MantisZip-0.5.1-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
-
 
 ### 更新内容 / Changelog
 
@@ -398,7 +384,6 @@ MantisZip-0.5.1-Setup-WebSetup.exe requires internet during installation. Mantis
 - **7z multithreaded compression (`mt=on`)** — measured 4.63x speedup on 100 × 1MB random data; toggles available in both the compress dialog and Settings
 - 新增**并行解压线程数**设置项（1–16，默认随 CPU 核数，`1` 为串行回退）
 - Added a **parallel extraction thread count** setting (1–16, defaults to CPU core count; `1` falls back to serial)
-
 
 **交互 / Interactions**
 
@@ -449,7 +434,6 @@ MantisZip-0.5.1-Setup-WebSetup.exe requires internet during installation. Mantis
 - Avalonia 12.0.4 → 12.1.2 全栈升级，NuGet 核心依赖全面升级
 - Upgraded Avalonia from 12.0.4 to 12.1.2 across the stack, plus a broad upgrade of core NuGet dependencies
 
-
 ## v0.5.0
 
 ### 版本介绍 / Version Introduction
@@ -476,13 +460,11 @@ This is a **major version update** of MantisZip: the core framework has fully mi
 - 新增 **目标目录树预览** 控件，在压缩与解压窗口可查看将要生成的文件结构，如果有文件冲突会高亮提示。
 - Added **result preview tree** control — the compress/extract dialogs show the file structure that will be produced, with conflicts highlighted.
 
-
 **交互 / Interactions**
 - **拖拽双向** — 从窗口拖文件到资源管理器**实时解压**（Win32 覆层三色指示+动态光标+Esc 取消）；从资源管理器拖文件**添加到压缩包**（绿色覆层即时提示）
 - **Bidirectional drag & drop** — drag files from the window to Explorer for **real-time extraction** (Win32 overlay three-color indicator + dynamic cursor + Esc cancel); drag files from Explorer to **add them to the archive** (green overlay instant feedback)
 - **自定义文件选择器** — 多选累积、目录树、收藏/历史/窗口速选、盘符下拉、文件类型筛选，替代系统对话框
 - **Custom file picker** — multi-select accumulation, directory tree, favorites/history/windows quick-pick, drive dropdown, file type filter; replaces system dialogs
-
 
 **外观 / Appearance**
 - **紧凑度模式** — Compact/Normal/Loose 三档间距与控件高度，运行时切换无需重启
@@ -562,7 +544,6 @@ This is a **major version update** of MantisZip: the core framework has fully mi
 - 保存布局 — 拖动列宽/预览面板调整后可一键保存，「查看」菜单保留布局项，下次启动自动恢复
 - Save layout — after resizing columns or the preview panel, save once and it restores automatically on next launch (View menu → "Save Layout")
 
-
 ## v0.4.5
 
 ### 文件说明 / File Description
@@ -570,7 +551,6 @@ This is a **major version update** of MantisZip: the core framework has fully mi
 MantisZip-0.4.5-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.4.5-Setup-Offline.exe 是离线安装包。MantisZip-0.4.5-Portable.zip 是便携版，解压即用。
 
 MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. MantisZip-0.4.5-Setup-Offline.exe is a fully offline installer. MantisZip-0.4.5-Portable.zip is the portable version, extract and run.
-
 
 ### 更新内容 / Changelog
 
@@ -599,7 +579,6 @@ MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. Mantis
 - 修复安装后会导致别的软件安装完启动时错误本软件的问题。
 - Fixed issue where installing other software could incorrectly route their startup to MantisZip.
 
-
 ## v0.4.4
 
 ### 文件说明 / File Description
@@ -607,7 +586,6 @@ MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. Mantis
 MantisZip-0.4.4-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.4.4-Setup-Offline.exe 是离线安装包。
 
 MantisZip-0.4.4-Setup-WebSetup.exe requires internet during installation. MantisZip-0.4.4-Setup-Offline.exe is a fully offline installer.
-
 
 ### 更新内容 / Changelog
 
@@ -627,8 +605,6 @@ MantisZip-0.4.4-Setup-WebSetup.exe requires internet during installation. Mantis
 - Installer improvements: renamed to `WebSetup` (online) / `Offline` (offline); online installer automatically downloads required dependencies
 - 离线安装包新增自包含模式，无需安装 .NET Runtime
 - Offline installer now includes self-contained mode, no .NET Runtime installation required
-
-
 
 ## v0.4.3
 
@@ -662,7 +638,6 @@ MantisZip-0.4.3-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 - The "Switch" button shows currently open Explorer directories in a popup menu for quick switching.
 - ![快速路径切换](docs/images/version/v0.4.3/QuickPathQuickSwitch.png)
 
-
 ## v0.4.2
 
 ### 文件说明 / File Description
@@ -689,8 +664,6 @@ MantisZip-0.4.2-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 - ![设置提升](docs/images/version/v0.4.2/SettingPermission.png)
 - ![提升权限](docs/images/version/v0.4.2/ElevationPermission.png)
 
-
-
 ## v0.4.1
 
 ### 文件说明 / File Description
@@ -714,8 +687,6 @@ MantisZip-0.4.1-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 - 文件列表目录回车改成进入该目录
 - Changed Enter key on directories in the file list to navigate into that directory
 
-
-
 ## v0.4.0
 
 ### 文件说明 / File Description
@@ -734,12 +705,7 @@ MantisZip-0.4.0-Setup.exe requires the .NET runtime to be installed. MantisZip-0
 - ![MantisZip 极速预览总览](docs/images/preview-overview.gif)
 - ![压缩密码设置](docs/images/PasswordManager.png)
 
-
-
-
 ## v0.0.0
-
-
 
 # Release Notes / 发布说明
 
