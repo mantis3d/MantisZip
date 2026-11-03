@@ -81,6 +81,69 @@ public class ZipNameEncodingTests : IDisposable
 
     private const string TraditionalName = "中文檔案.txt";
 
+    // ── 用户手动选的代码页必须「真的生效」（含带 UTF-8 标志位的现代包） ──
+
+    [Fact]
+    public async Task ListEntriesAsync_Utf8FlaggedArchive_ForcedWrongCodePage_ShowsMojibake()
+    {
+        var archivePath = CreateUtf8FlaggedZip();
+        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+        Assert.NotNull(engine);
+
+        // 包内条目名自带 UTF-8 声明：只要不手动干预就该是正确名字
+        var auto = await engine!.ListEntriesAsync(archivePath);
+        var autoNames = auto.Where(i => !i.IsDirectory).Select(i => i.Name).ToList();
+        Assert.Contains(TraditionalName, autoNames);
+
+        // 手动选了错代码页 ⇒ 必须盖过包内 bit 11，看到乱码（否则用户会以为按钮失灵）
+        var wrong = await engine.ListEntriesAsync(archivePath, fileNameEncoding: "gbk");
+        var wrongNames = wrong.Where(i => !i.IsDirectory).Select(i => i.Name).ToList();
+        Assert.DoesNotContain(TraditionalName, wrongNames);
+        Assert.NotEqual(autoNames, wrongNames);
+    }
+
+    [Fact]
+    public async Task DeleteEntries_Utf8FlaggedArchive_WithForcedWrongCodePage_KeepsSurvivingNamesIntact()
+    {
+        var archivePath = CreateUtf8FlaggedZip();
+        var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
+        Assert.NotNull(engine);
+
+        // 界面按用户选的（错）代码页列出，用户点删其中一个 —— 名字是乱码，但删除本身要能对上号
+        var display = (await engine!.ListEntriesAsync(archivePath, fileNameEncoding: "gbk"))
+            .Where(i => !i.IsDirectory)
+            .ToList();
+        Assert.Equal(2, display.Count);
+        var victim = display[1];
+
+        await engine.DeleteEntriesAsync(
+            archivePath,
+            new[] { victim.FullPath ?? victim.Name },
+            options: new ArchiveOptions { ReadEncoding = "gbk", FileNameEncoding = "gbk" });
+
+        // 写回必须按包内声明（UTF-8）做：存活条目重新按自动检测读出来仍是原名，没被写成 GBK 乱码
+        var after = await engine.ListEntriesAsync(archivePath);
+        var afterNames = after.Where(i => !i.IsDirectory).Select(i => i.Name).ToList();
+        Assert.Single(afterNames);
+        Assert.Equal(TraditionalName, afterNames[0]);
+        Assert.DoesNotContain('\uFFFD', afterNames[0]);
+    }
+
+    /// <summary>造一个「条目名带 UTF-8 标志位（bit 11）」的现代包：.NET 的 ZipArchive 对非 ASCII 名会自动置位。</summary>
+    private string CreateUtf8FlaggedZip()
+    {
+        var path = Path.Combine(_root, "utf8-flagged.zip");
+        using var zip = System.IO.Compression.ZipFile.Open(path, System.IO.Compression.ZipArchiveMode.Create);
+        foreach (var (name, payload) in new[] { (TraditionalName, "alpha"), ("測試二.txt", "beta") })
+        {
+            var entry = zip.CreateEntry(name);
+            using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
+            writer.Write(payload);
+        }
+
+        return path;
+    }
+
     private string CreateBig5Zip()
     {
         var path = Path.Combine(_root, "big5.zip");

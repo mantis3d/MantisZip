@@ -70,7 +70,14 @@ public partial class ZipEngine
                     return ZipArchive.OpenArchive(forcedFs, new ReaderOptions
                     {
                         Password = password ?? string.Empty,
-                        ArchiveEncoding = new SharpCompress.Common.ArchiveEncoding { Default = forcedEncoding }
+                        // Forced 而不是只设 Default：用户手动选定的代码页要能盖过包内 bit 11 的 UTF-8 声明，
+                        // 否则「选错代码页」在带 UTF-8 标志的包上毫无反应，看起来像开关失灵。
+                        // 选错就该看到乱码 —— 那正是让人确认「这个包不是这个编码」的依据。
+                        ArchiveEncoding = new SharpCompress.Common.ArchiveEncoding
+                        {
+                            Default = forcedEncoding,
+                            Forced = forcedEncoding
+                        }
                     });
                 }
                 catch (Exception ex)

@@ -22,9 +22,9 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **The output-mode choices in the compression window now sit in one row** — the three options went from a stacked column to a single line, shrinking that group from about 132 px to about 40 px and giving the height back to the output-folder picker.
 
-- **文件名代码页可以手动切换了** — 打开 Big5、Shift-JIS 等旧编码命名的压缩包不再乱码：主工具栏的地球图标按钮里选编码，列表立即重载，图标角上的小徽章显示当前生效的编码；「其他代码页…」可以填自定义数字，设置页可设「默认读取代码页」。
+- **文件名代码页可以手动切换了** — 打开 Big5、Shift-JIS 等旧编码命名的压缩包不再乱码：主工具栏的地球图标按钮里选编码，列表立即重载，图标角上的小徽章显示当前生效的编码；「其他代码页…」可以填自定义数字，设置页可设「默认读取代码页」。手动选错代码页会真的看到乱码 —— 这正是确认「这个包不是这个编码」的办法。
 
-- **File-name code pages can now be switched manually** — archives whose names use Big5, Shift-JIS or another legacy code page no longer show garbled names: pick a code page from the globe button on the main toolbar and the list reloads at once, with a small badge on the icon showing the code page actually in effect; "Other code page..." takes a custom number and the settings window holds the default.
+- **File-name code pages can now be switched manually** — archives whose names use Big5, Shift-JIS or another legacy code page no longer show garbled names: pick a code page from the globe button on the main toolbar and the list reloads at once, with a small badge on the icon showing the code page actually in effect; "Other code page..." takes a custom number and the settings window holds the default. Picking the wrong code page now really shows garbled names — which is how you can tell it is not that encoding.
 
 **性能 / Performance**
 

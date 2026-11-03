@@ -192,3 +192,11 @@
 
 - 真机手测：Big5 / Shift-JIS 包切代码页后清单、预览、解压、删条目是否符合预期（自动化只覆盖 ZIP 读写与键表）。
 - RAR 未接（条目名同样有编码问题，但当前引擎读名字的方式不同，另立计划）。
+
+#### 11.7 手动代码页改为「真强制读取」（2026-11-03）
+
+- 用户实测提问：「故意切到错误代码页是不是该乱码？」实测此类「带 bit 11 的新式包」此前不会乱 —— `SharpCompress` 见标志位就按 UTF-8 解，`ArchiveEncoding.Default` 被忽略。
+- 拍板（用户）：「强制生效，但写操作仍用真实编码」。
+- 实现：`ZipEngine.OpenArchiveWithEncodingFallback` 显式编码分支同时设 `ArchiveEncoding.Default` 与 **`ArchiveEncoding.Forced`**；`ZipEngine.CompressGroup.DeleteEntriesAsync` 的 copy-mode 快路径改成「双列目录」（`displayNames` 按用户手选编码判断点哪条、`realNames` 按包声明编码重写中央目录），keep 集按序号对应；`PreviewService` 四个方法 + `MainWindowViewModel.Preview.cs` 三处透传 `NameEncodingRequestKey`。
+- 明确不做：add 路径不按 `declaresUtf8` 改编码（`encoding` 只作用于新增条目名，旧条目名是原始字节照抄），`TranslateEntryBasePath` 已删除 —— 依据 `ZipBinaryRewriter.CdEntry.RawFileNameBytes` 与 D 编码锁测试。
+- 测试：`ZipNameEncodingTests` +2 例（UTF-8 标志位包强解错编码显示乱码；按乱码名删条目后存活名字不变）。

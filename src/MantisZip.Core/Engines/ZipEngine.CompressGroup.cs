@@ -29,6 +29,7 @@ public partial class ZipEngine
 
         await Task.Run(async () =>
         {
+
             // 收集需要添加的新文件
             var newFiles = new List<(string FullPath, string EntryName)>();
             foreach (var sourcePath in sourcePaths)
@@ -145,6 +146,8 @@ public partial class ZipEngine
                     // 文件名编码：显式设置优先（与 CompressAsync 的 options.FileNameEncoding 同源，
                     // 拖拽添加由 AddFilesToArchiveAsync 透传 AppSettings.ZipEncoding）；
                     // 未设置时才按包内 bit 11 启发式推断。
+                    // 注意：这个编码只作用于**新增条目**的名字；已有条目的名字是从中央目录原样拷贝的
+                    // 原始字节（见 ZipBinaryRewriter.CdEntry.RawFileNameBytes），不会被重新编码。
                     var encoding = ResolveFileNameEncoding(options.FileNameEncoding, archivePath);
 
                     // Build NewEntry list from source paths with auto-cleanup
@@ -877,6 +880,20 @@ public partial class ZipEngine
         CoreLog.Exit();
     }
 
+    /// <summary>
+    /// 按指定代码页列出压缩包内的条目名（只取名字，按中央目录顺序）。
+    /// 删除条目要「界面上的名字」和「写回用的真实名字」各列一次，靠序号对应：
+    /// 同一次打开顺序一致，因此不必在两种解码结果之间做字符串映射（手选错误代码页时那种映射会丢信息）。
+    /// </summary>
+    private static List<string> ListEntryNamesForDelete(string archivePath, string? password, string? fileNameEncoding)
+    {
+        var names = new List<string>();
+        using var archive = OpenArchiveWithEncodingFallback(archivePath, password, fileNameEncoding);
+        foreach (var entry in archive.Entries)
+            names.Add(entry.Key ?? string.Empty);
+        return names;
+    }
+
     public async Task DeleteEntriesAsync(string archivePath, string[] entryPaths, string? password = null, IProgress<ArchiveProgress>? progress = null, CancellationToken cancellationToken = default, ArchiveOptions? options = null)
     {
         CoreLog.Entry();
@@ -899,24 +916,29 @@ public partial class ZipEngine
                     CoreLog.Info("DeleteEntriesAsync: attempting copy-mode fast path");
                     tempArchiveFast = Path.GetTempFileName() + ".zip";
 
-                    // 文件名编码：与 AddToArchiveAsync 同源，显式设置优先。
-                    // 删除会整包重写，此处若猜错编码会把存活的条目降级成乱码。
-                    var encoding = ResolveFileNameEncoding(options?.FileNameEncoding, archivePath);
+                    // 写操作用「压缩包自己声明的编码」，不用用户手动选的显示代码页：
+                    // 删条目要整包重写中央目录，若按用户手选的编码写回，存活条目会被改成乱码 —— 真的改坏包。
+                    // 包内条目名声明了 UTF-8（bit 11）时写回仍用 UTF-8；没声明才用用户指定的那套。
+                    var declaresUtf8 = ZipHasUtf8Flag(archivePath);
+                    var writeEncodingKey = declaresUtf8 ? null : options?.ReadEncoding;
+                    // declaresUtf8 时显式传 null：让 ResolveFileNameEncoding 按 bit 11 推断成 UTF-8，
+                    // 不能把用户手选的（可能错误的）编码写回去。
+                    var encoding = ResolveFileNameEncoding(
+                        declaresUtf8 ? null : (options?.FileNameEncoding ?? options?.ReadEncoding),
+                        archivePath);
 
                     // Build keep set: 所有未被 entryPaths 命中的条目。
                     // 命中语义统一走 ArchivePath.MatchesEntryOrDescendant —— 目标是目录时必须连带其下所有条目。
                     var keepSet = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
-                    var allEntryNames = new List<string>();
 
-                    using (var archive = OpenArchiveWithEncodingFallback(archivePath, password, options?.ReadEncoding))
-                    {
-                        foreach (var entry in archive.Entries)
-                            allEntryNames.Add(entry.Key ?? string.Empty);
-                    }
+                    // 界面上的条目名按用户指定的代码页解（可能是乱码），写回用的名字按压缩包声明解 —— 两次列目录
+                    // 顺序一致，所以「哪些条目要删」按序号对应，最后用真实名字组 keep 集。
+                    var displayNames = ListEntryNamesForDelete(archivePath, password, options?.ReadEncoding);
+                    var realNames = ListEntryNamesForDelete(archivePath, password, writeEncodingKey);
 
                     // 零命中必须报错：这条快路径从不校验存在性，静默返回会让用户看到「删除完成」而包内一字未动。
                     var missingEntry = entryPaths.FirstOrDefault(
-                        t => !allEntryNames.Any(n => ArchivePath.MatchesEntryOrDescendant(n, t)));
+                        t => !displayNames.Any(n => ArchivePath.MatchesEntryOrDescendant(n, t)));
                     if (missingEntry != null)
                     {
                         CoreLog.Error($"DeleteEntriesAsync: entry not found: {missingEntry}");
@@ -924,10 +946,12 @@ public partial class ZipEngine
                         throw new ArchiveEntryNotFoundException(missingEntry);
                     }
 
-                    foreach (var name in allEntryNames)
+                    for (var i = 0; i < realNames.Count; i++)
                     {
-                        if (!entryPaths.Any(t => ArchivePath.MatchesEntryOrDescendant(name, t)))
-                            keepSet.Add(name);
+                        // 两次列目录必须一一对应；数量不一致说明包在两次打开之间被改动，退回按名字判断。
+                        var displayName = i < displayNames.Count ? displayNames[i] : realNames[i];
+                        if (!entryPaths.Any(t => ArchivePath.MatchesEntryOrDescendant(displayName, t)))
+                            keepSet.Add(realNames[i]);
                     }
 
                     if (keepSet.Count == 0)

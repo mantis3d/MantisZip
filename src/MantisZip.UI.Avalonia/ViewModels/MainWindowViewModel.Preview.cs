@@ -190,7 +190,7 @@ public partial class MainWindowViewModel : ObservableObject
                     _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var pwd);
                     var (magicType, format, displayName) = await PreviewService.ClassifyPreviewByMagicAsync(
                         CurrentArchivePath, entry, _currentFormat,
-                        PreviewService.PreviewHeadSize, pwd);
+                        PreviewService.PreviewHeadSize, pwd, CancellationToken.None, NameEncodingRequestKey);
                     if (magicType != PreviewType.Unsupported && format != FileFormat.Unknown)
                     {
                         previewType = magicType;
@@ -249,7 +249,8 @@ public partial class MainWindowViewModel : ObservableObject
 
             // ── 取数（async, slow）：文本类走内存 head，Image / Pdf 优先内存、失败回落落盘，其余落盘 ──
             var content = await PreviewService.LoadPreviewContentAsync(
-                CurrentArchivePath, entry, _currentFormat, previewType, _currentPassword);
+                CurrentArchivePath, entry, _currentFormat, previewType, _currentPassword,
+                CancellationToken.None, NameEncodingRequestKey);
             var memoryBytes = content?.Bytes;
             App.DebugLog(memoryBytes != null
                 ? $"[PRV] Loaded {memoryBytes.Length} bytes in memory for '{entry.Name}'"
@@ -373,7 +374,9 @@ public partial class MainWindowViewModel : ObservableObject
                         break;
                     }
                     var imagePath = content.TempPath
-                        ?? await PreviewService.ExtractToTempAsync(CurrentArchivePath, entry, _currentFormat, _currentPassword);
+                        ?? await PreviewService.ExtractToTempAsync(
+                            CurrentArchivePath, entry, _currentFormat, _currentPassword,
+                            CancellationToken.None, NameEncodingRequestKey);
                     if (imagePath == null)
                     {
                         Preview.ShowUnsupported(LocalizationManager.T("Status_ExtractFailed"));

@@ -5,6 +5,16 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-03** — 功能：手动代码页改为「真强制读取」，写回仍按包声明编码
+  - 起因（用户实测提问）：「打开一个有中文的压缩包，如果我故意切换到错误的代码页，是不是应该显示乱码？」实测确认此前不会 —— `SharpCompress` 只要条目名带 bit 11（UTF-8 标志位）就一律按 UTF-8 解，`ArchiveEncoding.Default` 被忽略，所以手动选的编码对「新式包」完全无效。
+  - 根因与关键事实：`SharpCompress.Common.ArchiveEncoding` 除 `Default` 外还有 **`Forced`**（反射确认成员：`Default`/`Password`/`UTF8`/`Forced`/`CustomDecoder`）。实测 `new ReaderOptions { ArchiveEncoding = new ArchiveEncoding { Default = gbk, Forced = gbk } }`：UTF-8 标志位的包 → `涓枃鏂囦欢.txt`（乱码），GBK 老包 → 正确 ⇒ 只有 `Forced` 能盖过 bit 11。
+  - 修法 1（`src/MantisZip.Core/Engines/ZipEngine.Open.cs`）：显式编码分支里同时设 `Default` 与 `Forced`，注释写明「选错就该看到乱码 —— 那正是让人确认『这个包不是这个编码』的依据」。
+  - 修法 2（`src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs`，用户拍板「强制生效，但写操作仍用真实编码」）：删除条目的 copy-mode 快路径改为「双列目录」—— `displayNames`（按用户手选编码，用来判断用户点的是哪一条）与 `realNames`（按包声明编码，用来重写中央目录），keep 集按**序号**对应，避免在两种解码结果间做字符串映射（手选错编码时映射会丢信息）；抽出私有 `ListEntryNamesForDelete(archivePath, password, fileNameEncoding)`。
+  - **不要复发的反直觉点**：`encoding` 只作用于**新增条目**的名字；已有条目的名字是从中央目录原样拷贝的原始字节（`src/MantisZip.Core/Utils/ZipBinaryRewriter.cs:40-42` 的 `CdEntry.RawFileNameBytes` 注释）。所以 add 路径不需要也不应该按 `declaresUtf8` 改编码 —— 一度这么改，被 D 编码锁测试 `ZipEngineTests.AddToArchiveAsync_ExplicitGbk_WritesCjkNameAsGbk_WithoutUtf8Flag`（`tests/MantisZip.Tests/Engines/ZipEngineTests.cs:520`）挡住：显式 `FileNameEncoding="gbk"` 时新条目必须以 GBK 字节写入且不置 bit 11。同理删掉了「把乱码目录名翻回真实目录名」的 `TranslateEntryBasePath` —— 新增条目的目录前缀必须和写入编码自洽。
+  - 修法 3（预览走同一编码）：`src/MantisZip.UI.Avalonia/Services/PreviewService.cs` 的 `ClassifyPreviewByMagicAsync` / `ClassifyPreviewByMagicWithHeadAsync` / `LoadPreviewContentAsync` / `ExtractToTempAsync` 与私有 `LoadTextHeadAsync` 各加 `string? fileNameEncoding = null` 并透传给 `ArchiveEntryExtractor`；`MainWindowViewModel.Preview.cs` 三处调用补 `NameEncodingRequestKey`，否则手选代码页下预览会「条目找不到」。
+  - 测试：`tests/MantisZip.Tests/ZipNameEncodingTests.cs` 新增 2 例 —— `ListEntriesAsync_Utf8FlaggedArchive_ForcedWrongCodePage_ShowsMojibake`（`CreateUtf8FlaggedZip` 用 `ZipFile.Open(Create)` 造带 bit 11 的包，断言 auto 得原名、`gbk` 时名单不同且不含原名）与 `DeleteEntries_Utf8FlaggedArchive_WithForcedWrongCodePage_KeepsSurvivingNamesIntact`（按乱码名删一条，再用 auto 列，断言存活名字仍是原文且无 U+FFFD）。
+  - 验证：core（`-t:Rebuild`）与 avalonia（Release）0 警告；`tests` 10.4s、`ui-tests` 42.2s 全绿；`i18n` 1406 key、`check` 0.5.5、`guards` 8/8。
+  - 边界：7z/RAR 的条目名是 UTF-16 / 固定编码，本机制只对 ZIP / TAR / GZ 生效（控件在这两种格式上置灰）。
 **2026-11-02** — 修复：代码页按钮恒灰 + TAR/GZ 的 auto 检测补 ANSI 回退
   - 现象：用户实测「不论我打开什么文件，那个按钮都是禁用的」。
   - 根因：`CanChangeNameEncoding` 依赖 `IsArchiveLoaded`，但唯一一处 `OnPropertyChanged(nameof(CanChangeNameEncoding))` 在载入成功分支里、位于 `IsArchiveLoaded = true` **之前**（`src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.cs:1289` 通知，`:1327` 才置 true）。XAML 绑定第一次取到 false，此后再没有通知 ⇒ 按钮永久置灰。单元测试直接读属性，所以看不见这个缺陷。
