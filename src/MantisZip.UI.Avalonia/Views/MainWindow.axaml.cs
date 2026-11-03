@@ -1515,8 +1515,43 @@ public partial class MainWindow : Window
 
     private void OnCheckboxVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
     {
-        if (e.PropertyName == nameof(MainWindowViewModel.IsCheckboxMode))
+        if (e.PropertyName != nameof(MainWindowViewModel.IsCheckboxMode)) return;
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        // 切模式时 DataGrid 会因为增删「复选框列」、以及 SelectedItem 绑定重置自己的行选区：
+        // 整个过程必须屏蔽 FileListGrid_SelectionChanged 的回写，否则 VM 刚还原好的多选会被压成一条。
+        _isApplyingThumbnailSelection = true;
+        try
+        {
             ApplyCheckboxColumnVisibility();
+
+            // 关闭复选框模式时 VM 已把「当前目录内的勾选」还原成 SelectedEntries，
+            // 但表格的行选区由 DataGrid 自己持有，这里必须再回填一次。
+            if (!vm.IsCheckboxMode)
+                ApplyVmSelectionToGridCore(vm);
+        }
+        finally
+        {
+            _isApplyingThumbnailSelection = false;
+        }
+    }
+
+    /// <summary>
+    /// 把 VM 的选区写进 DataGrid 的 <c>SelectedItems</c>（仅当前目录内的行，跨目录项加进去会抛
+    /// <c>ArgumentException: The item is not contained in the ItemsSource</c>）。
+    /// 调用方须已置 <c>_isApplyingThumbnailSelection</c> 闸门。
+    /// </summary>
+    private void ApplyVmSelectionToGridCore(MainWindowViewModel vm)
+    {
+        var grid = FileListGrid;
+        if (grid == null) return;
+
+        grid.SelectedItems.Clear();
+        foreach (var entry in vm.SelectedEntries)
+        {
+            if (vm.CurrentEntries.Contains(entry))
+                grid.SelectedItems.Add(entry);
+        }
     }
 
     /// <summary>

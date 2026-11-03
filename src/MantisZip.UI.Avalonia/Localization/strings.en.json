@@ -1,4 +1,4 @@
-{
+﻿{
   "Toolbar_LayoutMode": "Thumbnail layout",
   "LayoutMode_Details": "Details",
   "LayoutMode_Tile": "Tiles",
@@ -10,7 +10,6 @@
   "Menu_CheckAllVisible": "Check all visible",
   "Menu_InvertChecked": "Invert selection",
   "Menu_ClearChecked": "Clear selection",
-  "Extract_PickerAdvancedMode": "Advanced mode",
   "Extract_TabOutput": "Output",
   "Extract_TabAddArchives": "Add Archives",
   "Extract_SelectedArchives": "Selected Archives",
@@ -21,7 +20,6 @@
   "Compress_TabOutput": "Output",
   "Compress_TabAddFiles": "Add Files",
   "Compress_TabCompress": "Compression",
-  "Compress_PickerAdvancedMode": "Advanced mode",
   "Compress_SelectedSources": "Selected sources",
   "Breadcrumb_ArchiveRoot": "Archive root",
   "Breadcrumb_EditPlaceholder": "Type a path and press Enter",
@@ -217,6 +215,7 @@
   "Settings_Compress_ConflictAction": "File conflict action",
   "Compress_WhenFileExists": "When file exists:",
   "Compress_Conflict_Ask": "Ask each time",
+  "Picker_CheckboxMode": "Checkbox mode",
   "Picker_PreserveFullPath": "Preserve full paths",
   "Picker_PreserveFullPathDisabledHint": "At the archive root, both settings produce the same result",
   "Picker_OptionsCaption": "Options",

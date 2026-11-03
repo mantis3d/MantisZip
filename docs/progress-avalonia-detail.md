@@ -5,6 +5,15 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-03** — 功能：复选框模式一致性（文件列表 ⇄ 压缩/解压选择器，v0.5.6 收尾追加）
+  - **背景**：用户提了两件事 —— ①文件列表切换复选框模式时要把当前选择状态转换成对应的目标状态；②压缩/解压里用复选框选文件的交互要跟文件列表一致。
+  - **第一件（文件列表）**：`OnIsCheckboxModeChanged` 原来只保存设置、关闭时清空勾选，没有任何转换。现在打开时把蓝底选区并入勾选（`SetChecked(SelectedEntries.ToList(), true)`），关闭时把当前目录内的勾选退回成选区（`CheckedEntries.Where(CurrentEntries.Contains)` → `ApplySelection`），跨目录的勾选按用户拍板丢弃。
+  - **关键顺序缺陷**：`ApplySelection` 里 `SelectedEntry` 必须先赋值、再填 `SelectedEntries`。反过来写时 `SelectedItem` 的双向绑定会立刻触发一次单选回写，把三行选区压成一行（真机现象：关掉复选框模式后只剩第一行选中）。视图侧同类问题：`OnCheckboxVmPropertyChanged` 的闸门必须罩住「列显隐 + 选区回填」整段，`ApplyVmSelectionToGrid` 因此拆出 `ApplyVmSelectionToGridCore`。
+  - **第二件（选择器）**：`Controls/CustomFilePickerControl.axaml.cs` 的 `IsSimpleMode`（简单=true）改名为 `IsCheckboxMode`（默认 false），语义逐处反写；`FileList_SelectionChanged` 在复选框模式下不再自动勾选；新增 Tunnel 的 `FileList_PointerPressed` —— 点行只高亮、点复选框才切换，Shift 从锚点连勾（只加不减）、Ctrl 逐项增减、选区多项时点任一复选框整组切换；右键补「全选可见 / 反选 / 清空勾选」三项（标题由 `LocalizationManager.T` 填，菜单只在复选框模式下挂到 `FileList.ContextMenu`）。
+  - **顺带修的第二个真缺陷**：`IsCheckboxMode` setter 原来「同值早退」，而初始值就是 false ⇒ 非复选框模式下 XAML 里静态挂上的右键菜单会残留（标题空白、点了没反应）。改为总是同步一次。
+  - **宿主与文案**：压缩窗、解压窗的模式开关改名 `CheckboxModeCheck` / `Picker_CheckboxMode` / `OnCheckboxModeChanged`；独立模态选择器保持「一直有复选框」的行为（`IsCheckboxMode = true`）。三份 json 删 `Extract_PickerAdvancedMode`、`Compress_PickerAdvancedMode`，加 `Picker_CheckboxMode` ⇒ i18n 1437 key。
+  - **测试**：新增 `CustomFilePickerCheckboxModeTests` 6 例真实指针用例（关掉时点行即结果、打开后点行只高亮、点复选框才累积、Shift 连勾整段、右键菜单只在复选框模式下有且三项有文字）。两个坑记在这里：无头宿主只配了裸 `Application`，ListBox 模板来自主题 ⇒ 必须先挂 `FluentTheme` + `ThemeLight`，否则一个 `ListBoxItem` 都不生成；`Initialize(initialPath:)` 的落点由 `AppSettings.DefaultPathOrder` 决定，测试里要再 `TryNavigate(dir)` 一次。
+  - **验证**：avalonia Release `--no-incremental` 0 警告；`ui-tests` 全绿；`tests` 15.1s 全绿；`i18n` 1437；`check` 8 条守卫全绿。真机：Ctrl 选 3 行 → 开复选框模式 → 三行勾上、蓝底保留、状态栏「已选 3 项 · 共 33 B」；切回普通模式 → 三行恢复蓝底选中。
 **2026-11-03** — 计划：撤回「卡片元数据文字（选中项）」，改为独立的「全卡头部窗口」计划
   - **为什么撤回**：v0.5.6 里做的版本只在**选中**那一张卡上显示元数据，每换一次选中就要读一遍条目；用户评估后认为「所有候选卡都能显示」才是真正有价值的形态，两者取数模型不同（前者按选中触发、后者要批量预取 + 缓存），塞在同一版里会互相将就。
   - **处理**：整个功能从 v0.5.6 撤回 —— 删掉 `Services/MetadataCardFormatter.cs`、`Services/MetadataCardService.cs`、`ViewModels/MainWindowViewModel.MetadataCard.cs`、`MetadataCardFormatterTests` 与模型上的 `MetadataCardLines`/`ShowMetadataCard`、卡片里的 ②b 文字块、三份 json 的 5 个 `MetadataCard_*` key（i18n 1443 → 1438），`ArchiveItemModelCardIconTests` 里为元数据卡加的 3 个用例一并删除；`RELEASE_NOTES.md` 对应中英两条、`docs/PLAN.md` 的 v0.5.6 表格行与该阶段验收口径里的那句话、`docs/PROGRESS.md` 的里程碑与历史索引行同步移除。

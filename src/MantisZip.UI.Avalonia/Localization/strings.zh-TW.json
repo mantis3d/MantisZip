@@ -1,4 +1,4 @@
-{
+﻿{
   "Toolbar_LayoutMode": "縮圖版面",
   "LayoutMode_Details": "詳細",
   "LayoutMode_Tile": "並排",
@@ -10,7 +10,6 @@
   "Menu_CheckAllVisible": "勾選所有可見項",
   "Menu_InvertChecked": "反選",
   "Menu_ClearChecked": "清除勾選",
-  "Extract_PickerAdvancedMode": "進階模式",
   "Extract_TabOutput": "輸出設定",
   "Extract_TabAddArchives": "新增壓縮檔",
   "Extract_SelectedArchives": "已選壓縮檔",
@@ -21,7 +20,6 @@
   "Compress_TabOutput": "輸出設定",
   "Compress_TabAddFiles": "新增檔案",
   "Compress_TabCompress": "壓縮設定",
-  "Compress_PickerAdvancedMode": "進階模式",
   "Compress_SelectedSources": "已選來源檔案",
   "Breadcrumb_ArchiveRoot": "壓縮檔根目錄",
   "Breadcrumb_EditPlaceholder": "輸入路徑後按 Enter",
@@ -217,6 +215,7 @@
   "Settings_Compress_ConflictAction": "檔案衝突處理",
   "Compress_WhenFileExists": "檔案存在時：",
   "Compress_Conflict_Ask": "每次詢問",
+  "Picker_CheckboxMode": "核取方塊模式",
   "Picker_PreserveFullPath": "保留完整路徑",
   "Picker_PreserveFullPathDisabledHint": "在壓縮包根目錄，勾選與否結果相同",
   "Picker_OptionsCaption": "本次參數",

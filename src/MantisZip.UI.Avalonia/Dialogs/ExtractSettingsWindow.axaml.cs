@@ -302,11 +302,10 @@ public partial class ExtractSettingsWindow : Window
         // PickItems 控件自带右侧「累积选择」面板；本窗改由下方「已选压缩包」列表承担（计划第③点），
         // 控件本身本轮冻结，故由宿主按控件内部命名折叠。
         CollapsePickerAccumulatedPanel(ArchivePicker);
-
-        // 「高级模式」开关与压缩窗对称（2026-10-30 用户反馈）：关闭 = 单击即追加、切目录清空；
-        // 打开 = 跨目录累积（每个条目显示复选框）。默认关闭。
-        AdvancedModeCheck.IsChecked = false;
-        ArchivePicker.IsSimpleMode = true;
+        // 「复选框模式」开关与压缩窗对称（2026-11-03 与主窗口文件列表统一）：关闭 = 单击即追加、切目录清空；
+        // 打开 = 跨目录累积（复选框 + Ctrl/Shift 连勾 + 右键全选/反选/清空）。默认关闭。
+        CheckboxModeCheck.IsChecked = false;
+        ArchivePicker.IsCheckboxMode = false;
 
         // PickItems 简单模式进入目录时会清空预选：Initialize 之后再把已选包回填进选择器。
         SyncArchivePickerFromSourceItems();
@@ -358,13 +357,13 @@ public partial class ExtractSettingsWindow : Window
     /// 输出设置页：浏览目录变化即写回解压目标（选择器只在用户导航后触发，初始化期间的事件被忽略）。
     /// </summary>
     /// <summary>
-    /// 「高级模式」开关：关闭 = 简单模式（单击即追加、切目录清空）；打开 = 跨目录累积（带复选框）。
-    /// 与压缩窗 <c>CompressSettingsWindow.OnAdvancedModeChanged</c> 同一语义，仅宿主不同。
+    /// 「复选框模式」开关：关闭 = 单击即追加、切目录清空；打开 = 跨目录累积（带复选框 + Ctrl/Shift 连勾）。
+    /// 与压缩窗 <c>CompressSettingsWindow.OnCheckboxModeChanged</c> 同一语义，仅宿主不同。
     /// </summary>
-    private void OnAdvancedModeChanged(object? sender, RoutedEventArgs e)
+    private void OnCheckboxModeChanged(object? sender, RoutedEventArgs e)
     {
         if (!_pickersReady && ArchivePicker is null) return;
-        ArchivePicker.IsSimpleMode = AdvancedModeCheck.IsChecked != true;
+        ArchivePicker.IsCheckboxMode = CheckboxModeCheck.IsChecked == true;
     }
     private void OnDestinationPickerPathChanged(object? sender, string path)
     {

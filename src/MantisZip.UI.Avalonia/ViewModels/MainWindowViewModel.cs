@@ -1074,8 +1074,8 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 列表是否显示**复选框列**（持久化到 <see cref="AppSettings.FileListCheckboxMode"/>，默认关闭）。
-    /// 关闭时行为与引入复选框之前完全一致；勾选只是 <see cref="SelectedEntries"/> 的另一个入口，
-    /// 不新开第二份集合（否则复制路径 / 解压选中 / 删除三处要各自维护，迟早不一致）。
+    /// 关闭时行为与引入复选框之前完全一致；勾选态另存于 <see cref="CheckedEntries"/>
+    /// （与选区 <see cref="SelectedEntries"/> 解耦，2026-11-03 起），删除 / 批量操作看勾选集合。
     /// </summary>
     [ObservableProperty]
     private bool _isCheckboxMode;
@@ -1091,9 +1091,57 @@ public partial class MainWindowViewModel : ObservableObject
             SaveSetting(s => s.FileListCheckboxMode = value);
         }
 
-        // 关闭复选框模式：清掉勾选态，避免下次开启时残留上一批勾选（验收口径 5）
-        if (!value)
+        if (value)
+        {
+            // 打开：把当前选区并入勾选（原有勾选保留）。
+            // 目的（2026-11-03 用户要求）：切换模式时选择状态要跟着转换，
+            // 不能「刚用 Ctrl 选好三行，一开复选框全白选」。
+            if (SelectedEntries.Count > 0)
+                SetChecked(SelectedEntries.ToList(), true);
+        }
+        else
+        {
+            // 关闭：当前目录内的勾选 → 选区（蓝底高亮），其它目录的勾选无处表示，随模式一起丢弃。
+            var restored = CheckedEntries.Where(CurrentEntries.Contains).ToList();
             ClearCheckedCore();
+            ApplySelection(restored);
+        }
+    }
+
+    /// <summary>
+    /// 程序化改写选区（复选框模式关闭时把勾选还原成高亮用）。
+    /// <para>
+    /// 只动 <see cref="SelectedEntries"/> / <see cref="SelectedEntry"/> 与行模型的 <c>IsSelected</c>：
+    /// DataGrid 的 <c>SelectedItems</c> 由视图在 <c>IsCheckboxMode</c> 变更通知里回填（VM 不引用控件）。
+    /// </para>
+    /// </summary>
+    private void ApplySelection(IReadOnlyList<ArchiveItemModel> items)
+    {
+        _syncingSelection = true;
+        try
+        {
+            // 先定 primary：这次赋值会经 DataGrid 的 SelectedItem 双向绑定触发一次「单选回写」，
+            // 把 VM 的选区压成一条——所以必须在填充多选之前做，填充放在后面才不会被覆盖。
+            SelectedEntry = items.Count > 0 ? items[0] : null;
+
+            SelectedEntries.Clear();
+            foreach (var item in items)
+            {
+                SelectedEntries.Add(item);
+                item.IsSelected = true;
+            }
+
+            // 复选框模式期间可能残留高亮（跨目录勾选切走再切回），这里全量对齐一次
+            foreach (var entry in CurrentEntries)
+            {
+                if (!SelectedEntries.Contains(entry))
+                    entry.IsSelected = false;
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
     }
 
     /// <summary>

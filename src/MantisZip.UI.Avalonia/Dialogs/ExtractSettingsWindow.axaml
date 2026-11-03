@@ -64,7 +64,7 @@
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
             <controls:CustomFilePickerControl x:Name="DestinationPicker"
                                               Mode="PickFolder"
-                                              IsSimpleMode="True" HideAccumulatedPanel="True" />
+ HideAccumulatedPanel="True" />
           </Border>
 
           <!-- 冲突处理方式（原「解压」页内容原样搬入输出设置） -->
@@ -118,15 +118,15 @@
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
             <controls:CustomFilePickerControl x:Name="ArchivePicker"
                                               Mode="PickItems"
-                                              IsSimpleMode="True" HideAccumulatedPanel="True" />
+ HideAccumulatedPanel="True" />
           </Border>
 
-          <!-- 高级模式开关：关闭 = 单击即追加、切目录清空；打开 = 跨目录累积（每个条目显示复选框） -->
-          <CheckBox x:Name="AdvancedModeCheck"
+          <!-- 复选框模式开关：关闭 = 单击即追加、切目录清空；打开 = 跨目录累积（复选框 + Ctrl/Shift 连勾 + 右键全选/反选/清空） -->
+          <CheckBox x:Name="CheckboxModeCheck"
                     Grid.Row="2"
                     Margin="0,8,0,0"
-                    Content="{Binding LocalizedStrings[Extract_PickerAdvancedMode]}"
-                    IsCheckedChanged="OnAdvancedModeChanged" />
+                    Content="{Binding LocalizedStrings[Picker_CheckboxMode]}"
+                    IsCheckedChanged="OnCheckboxModeChanged" />
 
           <!-- 已选压缩包：行对象由 ViewModel 持有（状态/进度），选择器只增删、不重建 -->
           <Border Grid.Row="3"

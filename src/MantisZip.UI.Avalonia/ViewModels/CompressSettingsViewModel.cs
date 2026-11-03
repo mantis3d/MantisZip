@@ -514,7 +514,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_TabOutput"] = LocalizationManager.T("Compress_TabOutput");
         LocalizedStrings["Compress_TabAddFiles"] = LocalizationManager.T("Compress_TabAddFiles");
         LocalizedStrings["Compress_TabCompress"] = LocalizationManager.T("Compress_TabCompress");
-        LocalizedStrings["Compress_PickerAdvancedMode"] = LocalizationManager.T("Compress_PickerAdvancedMode");
+        LocalizedStrings["Picker_CheckboxMode"] = LocalizationManager.T("Picker_CheckboxMode");
         LocalizedStrings["Compress_SelectedSources"] = LocalizationManager.T("Compress_SelectedSources");
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
         LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");

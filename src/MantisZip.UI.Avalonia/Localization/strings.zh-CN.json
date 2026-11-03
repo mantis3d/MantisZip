@@ -1,4 +1,4 @@
-{
+﻿{
   "Toolbar_LayoutMode": "缩略图布局",
   "LayoutMode_Details": "详情",
   "LayoutMode_Tile": "平铺",
@@ -10,7 +10,6 @@
   "Menu_CheckAllVisible": "勾选所有可见项",
   "Menu_InvertChecked": "反选",
   "Menu_ClearChecked": "清空勾选",
-  "Extract_PickerAdvancedMode": "高级模式",
   "Extract_TabOutput": "输出设置",
   "Extract_TabAddArchives": "添加压缩包",
   "Extract_SelectedArchives": "已选压缩包",
@@ -21,7 +20,6 @@
   "Compress_TabOutput": "输出设置",
   "Compress_TabAddFiles": "添加文件",
   "Compress_TabCompress": "压缩设置",
-  "Compress_PickerAdvancedMode": "高级模式",
   "Compress_SelectedSources": "已选源文件",
   "Breadcrumb_ArchiveRoot": "压缩包根目录",
   "Breadcrumb_EditPlaceholder": "输入路径后按 Enter",
@@ -217,6 +215,7 @@
   "Settings_Compress_ConflictAction": "文件冲突处理",
   "Compress_WhenFileExists": "文件存在时：",
   "Compress_Conflict_Ask": "每次询问",
+  "Picker_CheckboxMode": "复选框模式",
   "Picker_PreserveFullPath": "保留完整路径",
   "Picker_PreserveFullPathDisabledHint": "在压缩包根目录，勾选与否结果相同",
   "Picker_OptionsCaption": "本次参数",

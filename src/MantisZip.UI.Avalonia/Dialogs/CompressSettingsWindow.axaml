@@ -35,7 +35,7 @@
       <!-- ═══════════════════════════════════════════════════════════════
            Tab 1: 输出设置
              ① 输出模式单选（手动 / 分别 / 合并）
-             ② 输出目录：内嵌 CustomFilePickerControl（PickFolder + 简单模式）
+             ② 输出目录：内嵌 CustomFilePickerControl（PickFolder）
              ③ 输出文件名 + 扩展名标签（手动/合并模式）
              ④ 文件冲突策略
            ═══════════════════════════════════════════════════════════════ -->
@@ -102,13 +102,13 @@
                          Text="{Binding LocalizedStrings[Compress_OutputPath]}"
                          FontWeight="SemiBold" />
               <!-- 内嵌目录选择器：Mode=PickFolder（只取目录、不显示文件名区），
-                   IsSimpleMode=True（当前目录即结果、无复选框）。
+                   IsCheckboxMode=False（当前目录即结果、无复选框）。
                    PathChanged → 代码后台写回 ViewModel.OutputDirectory。
                    MinHeight 只是「窗口被压得很矮时的下限」，正常高度由 * 行决定。 -->
               <controls:CustomFilePickerControl Grid.Row="1"
                                                 x:Name="OutputPicker"
                                                 Mode="PickFolder"
-                                                IsSimpleMode="True"
+  
                                                 MinHeight="200"
                                                 Margin="0,6,0,0"
                                                 PathChanged="OnOutputPickerPathChanged" HideAccumulatedPanel="True" />
@@ -178,8 +178,8 @@
 
       <!-- ═══════════════════════════════════════════════════════════════
            Tab 2: 添加文件
-             ① 内嵌源文件选择器（PickItems + 简单模式：当前目录选中即结果、切目录清空）
-             ② 「高级模式」开关：勾选后 IsSimpleMode=False（显示复选框、跨目录累积）
+             ① 内嵌源文件选择器（PickItems，默认非复选框模式：当前目录选中即结果、切目录清空）
+             ② 「复选框模式」开关：勾选后 IsCheckboxMode=True（显示复选框、跨目录累积、Ctrl/Shift 连勾）
              ③ 已选源文件列表（与选择器双向同步，可批量移除）
            ═══════════════════════════════════════════════════════════════ -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabAddFiles]}"
@@ -202,17 +202,17 @@
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
             <controls:CustomFilePickerControl x:Name="SourcePicker"
                                               Mode="PickItems"
-                                              IsSimpleMode="True"
+
                                               SelectionChanged="OnSourcePickerSelectionChanged" HideAccumulatedPanel="True" />
           </Border>
 
-          <!-- 高级模式开关：关闭 = 简单模式（当前目录选中即结果、切目录清空）；
-               打开 = 跨目录累积（每个条目显示复选框，可多次添加后统一确认） -->
-          <CheckBox x:Name="AdvancedModeCheck"
+          <!-- 复选框模式开关：关闭 = 当前目录选中即结果、切目录清空；
+               打开 = 跨目录累积（每个条目显示复选框，Ctrl/Shift 连勾、右键全选/反选，可多次添加后统一确认） -->
+          <CheckBox x:Name="CheckboxModeCheck"
                     Grid.Row="1"
                     Margin="0,8,0,0"
-                    Content="{Binding LocalizedStrings[Compress_PickerAdvancedMode]}"
-                    IsCheckedChanged="OnAdvancedModeChanged" />
+                    Content="{Binding LocalizedStrings[Picker_CheckboxMode]}"
+                    IsCheckedChanged="OnCheckboxModeChanged" />
 
           <!-- 分组：已选源文件（与上方选择器双向同步的最终清单）。固定 180px：内容多时内部滚动 -->
           <Border Grid.Row="2"
