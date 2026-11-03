@@ -9,7 +9,7 @@
   - **为什么合并**：`beta` 上积了 31 个提交（v0.5.5 的除错与性能工作），`alpha` 在 v0.5.6 期间又改了同一批文件 ⇒ 越晚合并越痛，故按用户要求先合。
   - **方式**：`git merge --no-ff origin/beta`，冲突 8 个文件全部手工解决；`plans` 分支那种 cherry-pick 不适用于这里（beta 带的是产品代码，必须保留历史）。
   - **冲突解法**：`ViewModels/MainWindowViewModel.Compress.cs` 取并集（保留 alpha 的批量删除目标数组，同时采用 beta 的 `ArchiveOptions { FileNameEncoding = NameEncodingRequestKey ?? 设置值, ReadEncoding = NameEncodingRequestKey }`）；三份 `strings.*.json` 以 alpha 为底、按行级并集追加 beta 的 13 个 key（共 1443 key），并采纳 beta 的两处繁体用词修正（「驗證透過」→「通過」）；四份文档两侧全留并按日期重排。
-  - **KI 撞号处理**：beta 的 `KI-010`（RAR4 分卷不做块链校验，2026-10-31 登记，本次已修复）与 alpha 的 `KI-010`（三条原地解压路径不读冲突设置，2026-11-01 登记）撞号 ⇒ 保留 beta 的编号（发布说明与进度文档都在引用），alpha 那条改号 **KI-012**，同步改 `docs/PLAN.md:145` 与本文件、`.omo/plans/未开始/progress-window-conflict-policy.md` 的引用；`docs/KNOWN_ISSUES.md` 该条补「编号说明」。
+  - **KI 撞号处理**：beta 的 `KI-010`（RAR4 分卷不做块链校验，2026-10-31 登记，本次已修复）与 alpha 的 `KI-010`（三条原地解压路径不读冲突设置，2026-11-01 登记）撞号 ⇒ 保留 beta 的编号（发布说明与进度文档都在引用），alpha 那条改号 **KI-012**，同步改 `docs/PLAN.md:145` 与本文件、`.omo/plans/未开始/progress-window-conflict-policy.md` 的引用；`docs/KNOWN_ISSUES.md` 该条补「编号说明」。**同日再合并 `main`** 时又撞一次：`main` 的 `KI-012`（安装包确认框按钮文案不可自定义，2026-11-03 登记）也在抢这个号 ⇒ 按登记先后保留 alpha 的 KI-012、把安装包那条改为 **KI-013**（只改 `docs/KNOWN_ISSUES.md`，其它文件无引用）。**后续新登记从 KI-014 起。**
   - **顺带删掉**：beta 提交 `b06ba4f6` 误带的仓库根 **0 字节 `Program.cs`**（无 `Main`、不属任何项目，删掉不影响构建）。
   - **验证**：avalonia（Release，`--no-incremental`）✅ 93.8s / 0 警告；`tests` ✅ 28.0s；`ui-tests` ✅（31 条既有 xUnit 警告）；`i18n` ✅ 1443 key；`check` ✅ 8 条守卫（含 `dialog-seam`）。
 **2026-11-03** — 修复：issue #68 评论三件（RAR4 块链校验 / PKZIP 跨卷 `.z01` / 繁体用词）
