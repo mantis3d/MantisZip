@@ -426,6 +426,10 @@ public partial class IconTestViewModel : ObservableObject
         Add("资源库", "HTML", null, "IconHtml", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "自绘 <> 尖括号图标（tab 图标，设置-预览-HTML）");
 
+        // 文件列表布局模式（规则 8：新增 Geometry 必须在此登记，否则图标测试窗口看不到）
+        Add("文件列表", "缩略图布局", null, "IconThumbnails", IconStatus.Converted,
+            "Controls/ArchiveContentView.axaml", "文件列表工具栏「布局模式」循环按钮（详情/平铺/内容）");
+
         // 更新统计
         TotalCount = Icons.Count;
         ConvertedCount = Icons.Count(i => i.Status == IconStatus.Converted);

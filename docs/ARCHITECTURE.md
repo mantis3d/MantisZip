@@ -304,6 +304,33 @@ MantisZip/
 
 > AGENTS.md 受工作区指令 64KB 预算限制，以下小节从 AGENTS.md 迁出；AGENTS.md 保留摘要与链接，细节以本文为准。
 
+### 7z solid 批量解压分流（2026-11-02）
+
+solid 7z 每解一个条目都要重新定位解码块，逐条目 `ExtractFile` 会退化成二次方（800×64KB 实测 19.3s，同机 `7z.exe x` 0.56s）。`SevenZipEngine.ExtractAsync` 因此按条件分流到 `extractor.ExtractFiles(dir, indexes)`：
+
+| 条件 | 说明 |
+|---|---|
+| 格式 = `SevenZip` | `SfxProbe.TryGetPayloadFormat` 优先、回落 `GetFormatByExtension`（SFX 的 `.exe` 也会命中） |
+| `extractor.IsSolid` | 非 solid 逐条目本来就快，走批量无收益 |
+| 无密码且无加密条目 | 加密 solid 的批量重载行为未验证 |
+| `options.ErrorResolver == null` | 有 resolver 时必须逐条拿异常上下文 |
+| 可批量条目数 > 0 | 全被跳过/全是大文件时直接退回 |
+
+- **冲突必须提前判定**：批量时段内没有逐条 stat 的机会，`BuildBulkPlanAsync()` 在解压前一次分桶（`Direct` / `Rename` / `BigFile` / `Unsafe` / `Duplicate` / `Skipped` / `Directories`），期间上报 `ArchivePhase.CheckingConflicts`。`Overwrite` 且无 resolver 走零 stat 快路径；`Skip` 不进批量但照旧上报；`Rename` 系策略先批量到目标目录内 `.mantiszip-staging-<guid>` 再逐条 `File.Move`；`Ask` 在预解析阶段问完「应用到全部」后定型。
+- **语义必须保持**：逐条目状态（Completed / Skipped / Overwritten / PermissionDenied / IoFailed）与 `ExtractResult` 计数、`OverwrittenEntries` 都不能因为走批量而变 —— 覆盖计数依赖 `BulkEntryPlan.WasExisting`（预解析时的一次 `File.Exists`），**不要删掉这次探测**。
+- **不要改成一律 bulk**：ZIP/TAR/RAR、加密包、64MB 以上单文件、越界路径、归档内重名条目都必须走逐条目；批量段抛异常时只对未完成条目重试。回退开关 `EnableBulkSolidExtract` 是 `static readonly`（写 `const` 会让关闭分支被判不可达 CS0162）。
+- **覆盖范围**：全量解压（`ExtractAsync`）与选中条目 / 拖拽解压（`ExtractEntriesAsync`）两个入口都走同一条批量思路，区别如下。
+
+| | `ExtractAsync`（全量） | `ExtractEntriesAsync`（选中 / 拖拽） |
+|---|---|---|
+| 落点 | 归档内相对布局，可直接落到目标目录 | 调用方 `outputPathOverrides` 逐个算好（扁平化 / 保留完整路径 / 重命名），**必须**先解码到暂存目录再按 override 移动 |
+| 批量闸门 | `IsSolid` 且无密码 / 无加密条目 / 无 `ErrorResolver` | 再额外要求选中非目录条目 ≥ 2（为 1 条建暂存不划算） |
+| 分桶 | `Direct` 段直接落地，`Rename` 走暂存 | `Direct` 段**全部**走暂存，逐条 `File.Move(overwrite: true)` 后计数 |
+| 进度单位 | 文件计数 / 字节比取 max | `unitsDone`（跳过 / 失败 / 已解码待移动 / 已移动 / 逐条目各 1），解码期间百分比不冻结 |
+
+- **选中路径的既有缺陷已修**：目录条目过去忽略 `outputPathOverrides`（扁平化对选中的空目录不生效），现在目录也走统一的 `ResolveTarget(entry, fileName)`。
+- **`ProcessedFiles` 语义不变**：只有真正移动到最终路径的文件才算 processed；暂存段「已解码未移动」只推进进度单位。
+
 ### 并行解压架构
 
 ZIP 解压支持并行模式（`ZipEngine.SupportsParallelExtract = true`），通过**多实例并行 + 批次复用**实现线程安全与低开销：
@@ -378,7 +405,7 @@ await Parallel.ForEachAsync(batches, new ParallelOptions { MaxDegreeOfParallelis
 - **透明背景切换**: 图片/GIF/ICO 预览的 `DrawingBrush` 棋盘格（8×8），`IsTransparencyBgShown` 绑定 🏁 按钮
 - **信息面板（可配置元数据系统）**: 已从硬编码 `FormatMetadata` 重构为可配置系统（方案见 [metadata-panel-configurable.md](.omo/plans/已完成/metadata-panel-configurable.md)）：
   - **存储**: `MetadataSettingsManager` 持久化到独立 `%LOCALAPPDATA%\MantisZip\metadata-panel.json`（与 AppSettings 同目录不同文件），`SettingsChanged` 事件驱动刷新，`InitializeDefaultConfig` 自动补齐注册类型默认配置
-  - **注册与渲染**: `MetadataRegistry`（字段键/显示名/分类注册表）→ `MetadataRenderEngine.RenderCommon/RenderFormat` 按 `MetadataPanelSettings`（`TypeMetadataConfig.Enabled` + `FieldConfig.Position`(infoPanel/contentTop/hidden)/`Order`/`Row`）将字段分发到信息栏（`CommonSections`/`FormatSections` 分区渲染，`SectionOrder` 控制上下）与内容区顶部横条（`ContentTopItems`，随内容滚动）；PE 的旧 `PeTitle`/`PeSubtitle` 已被新系统替代
+  - **注册与渲染**: `MetadataRegistry`（字段键/显示名/分类注册表）→ `MetadataRenderEngine.RenderCommon/RenderFormat` 按 `MetadataPanelSettings`（`TypeMetadataConfig.Enabled` + `FieldConfig.Position`(infoPanel/contentTop/hidden)/`Order`/`Row`）将字段分发到信息栏（`CommonSections`/`FormatSections` 分区渲染，`SectionOrder` 控制上下）与内容区顶部横条（`ContentTopItems`，随内容滚动）；PE 预览的正文只有条目名标题（`ShowPe(filePath, displayTitle)`，标题不吃临时文件名；架构 / 子系统等一律进面板，正文不再重复显示），产品名称 / 公司 / 版本 / 原始文件名 / 语言 / 著作权等字段一律经 `RenderFormatToViewModel(..., "pe")` 渲染（2026-10-31 起；此前 PE 走 legacy `PeMetadata` 集合，是唯一绕过元数据面板的格式，设置里 PE 组的开关曾因此失效）
   - **接线**: `MetadataHelper.RenderCommonToViewModel/RenderFormatToViewModel` 供 `PreviewViewModel` 调用，同时同步 `FormatMetadata` 向后兼容；`UpdateCommonMetadata`（Phase 1）→ `ShowXxx`（Phase 2）两阶段填充
   - **全局显隐（持久化）**: 面板显隐 = 内容驱动 `IsInfoPanelVisible` && 用户偏好 `ShowInfoPanel`（`IsInfoPanelEffectiveVisible`）；`ShowInfoPanel` 持久化到 `AppSettings.ShowPreviewInfoPanel`（默认 true，与 WPF 同名），菜单（`ToggleInfoPanelVisibility`）与设置窗口双入口；`ApplyInfoPanelOrientation()` 切换右侧/下方位置（`InfoPanelOrientation` 已持久化）
 - **DataGrid**: CSV/SQLite 预览用 `Avalonia.Controls.DataGrid`（手动列创建以绕过 `AutoGenerateColumns` 对 `DataView` 的 bug）
@@ -506,6 +533,26 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 - `SevenZipEngine.CompressAsync` 使用 `SharpSevenZipCompressor`（7z.dll COM 绑定）
 - `ArchiveEntryExtractor`（Core/Utils）处理预览用单项提取；支持 Zip 与 7z
 
+### 分卷集命名与结构校验（2026-10-31）
+
+`ArchiveVolumeSet`（Core/Utils）是**分卷命名识别的单一事实源**，三种形态都要认（2026-10-31 由「只认 `.NNN`」扩展而来，issue #68 评论 ②③ / #69 / #70）：
+
+| 形态 | 例子 | 首卷 | 识别要点 |
+|---|---|---|---|
+| 数字后缀 | `pack.7z.001`、`pack.zip.002` | `.001` | 正则 `\.(\d{3})$`，基名剥掉数字后缀 |
+| WinRAR 新式 | `pack.part1.rar`、`pack.part02.rar` | `partN` 里序号最小者 | 正则 `\.part(\d+)\.rar$`，基名补回 `.rar` |
+| WinRAR 旧式 | `pack.rar` + `pack.r00`…`pack.r99` | `pack.rar` 本身 | 正则 `\.r(\d{2})$`，序号按 `N + 2` 归一 |
+| PKZIP 跨卷 | `pack.z01`、`pack.z02` + 末卷 `pack.zip` | **末卷 `pack.zip`** | 正则 `\.z(\d{2})$`；`.zNN` 与同名 `.zip` **互为条件**（缺一侧就不算跨卷），中央目录在末卷 |
+
+- **API**：`GetVolumeSetKind` / `TryGetVolumeBase` / `HasVolumeSuffix` / `EnumerateVolumes` / `FindFirstVolume` / `GetVolumeWatchFilter` / `MatchesArchiveExtension`；`VolumeFilterPatterns = ["*.001", "*.z01"]`（唯一用途是让这两类首卷出现在「打开压缩包」筛选里）
+- **`FindFirstVolume` 是「能打开整组的那一卷」而不是字面首卷**：数字 / RAR 分卷是第 1 卷，PKZIP 跨卷是**末卷 `.zip`** —— 7z.dll 收到 `.z01` 会报 `Extension "z01" is not a supported archive file name extension`，只有末卷（含中央目录与 EOCD）能打开
+- **消费者**：`ArchiveEngineFactory.GetEngineByExtension` 命中分卷命名即路由 `SevenZipEngine`（分卷包只读，增删条目直接抛 `NotSupportedException`）；`ResolveVolumeAnchor` 从任意一卷回退首卷；`ArchiveFileGuard` 用 `GetVolumeWatchFilter` 生成 `FileSystemWatcher` 过滤器（外部删卷 / 替换要能报警）；`CustomFilePickerControl.MatchesFileFilter` 在扩展名相等失败后调 `MatchesArchiveExtension` 回退 —— 所以同一套分卷**每一卷**都会列在打开对话框里（`.part2.rar` 靠 `.rar` 本来就能撞进去，`.7z.002` 必须靠这条回退）
+- **RAR5 结构校验**：`RarHeaderValidator.Validate(path)` 走一遍全部分卷的块链 —— 块头 CRC32（覆盖 `HeaderSize` 字段到头部末尾）、按 `HeaderFlags` 的 `0x0001`/`0x0002` 读 extras/数据区并按 `DataSize` **跳过数据区**、每卷必须以 end-of-archive 块收尾、非末卷 `EndFlags` bit0 = 1（缺卷即 `Broken`）、块越界/截断 `Broken`、≤1KB 全零尾部算填充；头加密或非 RAR5 返回 `Unknown`（只敢断定「坏」，不敢断定「好」）
+- **RAR4 结构校验（2026-11-03，issue #68）**：RAR4 签名 `52 61 72 21 1A 07 00` 走另一套块结构 —— 固定头 7 字节（`HEAD_CRC(2) HEAD_TYPE(1) HEAD_FLAGS(2) HEAD_SIZE(2)`），`HEAD_FLAGS & 0x8000` 时固定头后跟 `ADD_SIZE(4)` 数据区（`HEAD_FLAGS & 0x0100`＝LHD_LARGE 时另有 8 字节高位 `PACK_SIZE`，注意**不是** `0x8000`）；`HEAD_CRC` 是「CRC32 覆盖 `HEAD_TYPE` 起 `HEAD_SIZE-2` 字节」的低 16 位。校验项：块头 CRC、`HEAD_SIZE >= 7`、块与数据区不越界、必须出现 `MAIN_HEAD(0x73)` 且末块是 `ENDARC_HEAD(0x7B)`、多卷时 `MAIN_HEAD` 首卷位与 `ENDARC` 的「还有下一卷」位要首尾自洽。修复前 RAR4 一律 `Unknown`（等于「测试压缩包」对 RAR4 不做结构校验）
+- **挂载点只在 `SevenZipEngine.TestArchiveAsync`**（`extractor.Check()` 通过之后）。打开路径的 `ArchiveHeaderProbe.Probe` 仍只看签名，**不要**把结构校验挂进去 —— 那会让有效包在「打开」时被误判「文件损坏」
+- **为什么需要它**：`7z.dll` 的整包 `Check()` 不校验卷尾（末卷 end-of-archive 块头被翻反仍返回 true），而同一份夹具 `7z.exe t` 报 `ERRORS: Headers Error`、`UnRAR.exe t` 报「检测到损坏的文件头」
+- **已知边界**：`.partN.rar` 形态但其实是单卷的归档会被认成分卷而禁写增删；RAR4 的**数据区内容**仍归 `7z.dll` 的 `Check()`（块链只看头）
+
 ### 进度上报契约
 
 - `ArchiveProgress`（Core/Abstractions/ArchiveEngine.cs）：`PercentComplete`（总体 0–100）、`FilePercentComplete`（可空 double，单文件 0–100）、`FileName`（当前文件）、`Message`
@@ -526,7 +573,7 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 - **唯一入口**：`AdaptiveRuleMatcher.ResolveLevel(filePath, globalLevel, adaptiveCompression, adaptiveSmartDetect, rules, customFormats)`。优先级：**用户规则（扩展名）> SSOT 扩展名 > 魔数 > 全局级别**；引擎 4 条路径（MT 分拣 / MT 组内 7z / 串行写入 / `AddToArchiveAsync`）全部走它，禁止另起一套判定（历史事故：分拣说 Store、写入却 Deflate）。
 - **SSOT**：`ZipEntryClassifier` 提供 `IsCompressed(ext)` / `IsCompressedFormat(FileFormat)` / `IsCompressedByMagic(path)` / `TryReadHead` / `MatchCustomFormatByMagic`；`CompressedExtensions` 是扩展名侧唯一事实源，`CompressionCoefficients` 只做压缩率预估。
 - **魔数检测**：仅文件 ≥ 64KB（`MagicDetectMinBytes`）才读前 4KB；先按自定义格式 `MagicHex` 匹配（命中后查引用该 FormatId 的用户规则），再按 `FileFormatDetector.Detect` 判断是否为内置「已压缩」格式；任何 IO 异常都回落扩展名规则，不中断压缩。
-- **容器 / 子类型分层（2026-10-27，issue #54 / #36）**：`FileFormatDetector.DetectContainer` 只回答「是不是压缩包容器」（Zip / 7z / RAR / GZip 魔数），`Detect` 才对 ZIP 细分为 docx / odt / epub…；`DetectFormat` 一次给全（`FormatDetection(Container, Subtype)`）。**选引擎只读容器** —— `ArchiveEngineFactory.MapContainerToArchiveFormat` 是恒等映射（7 → 6），子类型一律不参与；**选预览器 / 判「内容已压缩」才读子类型**。历史事故：第 3 层只认 5 种 zip 子类型 ⇒「识别得越细越打不开」（jar 的首条目 `META-INF/MANIFEST.MF` 被判成 `Odt`，`Odt` 没有引擎 ⇒ 「不支持的文件格式」）。自解压 exe 走另一条路：`SfxProbe.TryDetectEmbeddedContainer` 仅在「扩展名未命中 + 文件头 `MZ`」时读尾部 8KB 窗口找 zip/7z/RAR 签名，命中即路由 `SevenZipEngine`（7z.dll 自己按签名搜索内嵌包；**禁止**路由 `ZipEngine` —— SharpCompress 对 SFX zip 静默返回 0 条）。
+- **容器 / 子类型分层（2026-10-27，issue #54 / #36）**：`FileFormatDetector.DetectContainer` 只回答「是不是压缩包容器」（Zip / 7z / RAR / GZip 魔数），`Detect` 才对 ZIP 细分为 docx / odt / epub…；`DetectFormat` 一次给全（`FormatDetection(Container, Subtype)`）。**选引擎只读容器** —— `ArchiveEngineFactory.MapContainerToArchiveFormat` 是恒等映射（7 → 6），子类型一律不参与；**选预览器 / 判「内容已压缩」才读子类型**。历史事故：第 3 层只认 5 种 zip 子类型 ⇒「识别得越细越打不开」（jar 的首条目 `META-INF/MANIFEST.MF` 被判成 `Odt`，`Odt` 没有引擎 ⇒ 「不支持的文件格式」）。自解压 exe 走另一条路：`SfxProbe.TryDetectPayload` 仅在「扩展名未命中 + 文件头 `MZ`」时工作 —— 先解析 PE 头与节表算镜像末尾（`max(PointerToRawData + SizeOfRawData)`），从该处起**有界前向扫描 1MB**（64KB 分块、命中即停）找 zip/7z/RAR 签名，PE 解析失败或该窗未命中再退回「头 16KB + 尾 8KB」窗口（2026-10-31 修：旧实现只读尾 8KB，真实安装器桩几十~几百 KB，归档起点永远落在窗口之外）；命中即路由 `SevenZipEngine`，并把载荷类型（`SfxPayloadKind`：Zip / SevenZip / Rar4 / Rar5）经 `SevenZipExtractorFactory` 显式传成 `SharpSevenZipExtractor(path, InArchiveFormat)` —— SharpSevenZip 的「逐格式试探」对「真 PE 桩 + 内嵌包」会失败（RAR SFX 报 `Invalid archive: open/read error!`），且 RAR4 只能用 `Rar4`、RAR5 只能用 `Rar`。**禁止**路由 `ZipEngine`（SharpCompress 对 SFX zip 静默返回 0 条）；`.exe` 的 `GetFormatByExtension` 仍恒返回 `Zip`（默认分支是载荷，不得改成 null），故条目预览 / 尾部提取经 `ArchiveEntryExtractor.ResolveDispatchFormat`、注释读取经 `ArchiveCommentReader.ReadComment` 各自归一到 `SevenZip`。`.exe` 不登记文件关联，只在「打开压缩包」对话框里单独一组「自解压程序 (*.exe)」（默认不选中）。
 - **规则生效范围**：仅 ZIP 路径；ZIP 加密子路径跳过逐条目降级。MT 路径下只有「仅存储」类规则全程生效，「指定压缩级别」类只对串行路径生效（设置页有提示 + 行内标记）。
 - **UI 现状**：设置页「自适应规则」「格式目录」「魔数检测」随自适应开关显示；ZIP 面板魔数检测随自适应开关显隐；「并行压缩组数」与「仅存储格式」控件已删除，`MultiThreadedStoreFormatIds` 仅作迁移字段。
 - **默认规则集**：6 类（图片/视频/音频/压缩包/字体/文档），迁移入口 `AppSettings.AdaptiveOverridesDefaultsVersion`；旧「仅存储格式」用户额外项迁移成一条 Store 规则。⚠ 图片类仍含 `Bmp`（旧默认行为保留），与 SSOT「BMP 未压缩」判定不一致，属已记录例外。

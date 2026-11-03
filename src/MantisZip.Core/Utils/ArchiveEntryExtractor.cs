@@ -28,16 +28,23 @@ public static class ArchiveEntryExtractor
     /// <summary>
     /// 将压缩包中的指定条目提取到目标文件
     /// </summary>
+    /// <param name="fileNameEncoding">
+    /// 条目名编码键（见 <see cref="NameEncodingCatalog"/>）；null / "auto" 表示按自动检测（UTF-8 → GBK 回退）。
+    /// 用户在文件列表里手动指定代码页后，预览/解压必须传同一个键，否则按名字匹配会对不上条目。
+    /// </param>
     public static Task ExtractEntryAsync(
         string archivePath,
         string entryName,
         string outputPath,
         ArchiveFormat format,
         string? password = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? fileNameEncoding = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractEntryAsync: {archivePath} ! {entryName} -> {outputPath}, format={format}, password={(password != null ? "***" : "null")}");
+        // 自解压 exe（PE 桩 + 内嵌包）按扩展名必然被判成 Zip，实际必须交 7z.dll（issue #36）
+        format = ResolveDispatchFormat(archivePath, format);
         var sw = Stopwatch.StartNew();
 
         return Task.Run(() =>
@@ -47,7 +54,7 @@ public static class ArchiveEntryExtractor
             switch (format)
             {
                 case ArchiveFormat.Zip:
-                    ExtractZipEntry(archivePath, entryName, outputPath, password);
+                    ExtractZipEntry(archivePath, entryName, outputPath, password, fileNameEncoding);
                     break;
 
                 case ArchiveFormat.SevenZip:
@@ -60,7 +67,7 @@ public static class ArchiveEntryExtractor
                     if (IsPlainGZipFile(archivePath))
                         ExtractGZipEntry(archivePath, entryName, outputPath);
                     else
-                        ExtractTarGzEntry(archivePath, entryName, outputPath);
+                        ExtractTarGzEntry(archivePath, entryName, outputPath, fileNameEncoding);
                     break;
 
                 case ArchiveFormat.GZip:
@@ -77,7 +84,7 @@ public static class ArchiveEntryExtractor
         // Note: CoreLog.Exit() not reached on exception path; OK for DEBUG-only logging
     }
 
-    private static void ExtractZipEntry(string archivePath, string entryName, string outputPath, string? password)
+    private static void ExtractZipEntry(string archivePath, string entryName, string outputPath, string? password, string? fileNameEncoding = null)
     {
         CoreLog.Info($"ExtractZipEntry: archive={archivePath}, entry={entryName}");
 
@@ -85,8 +92,9 @@ public static class ArchiveEntryExtractor
         ValidateOutputPath(outputPath);
 
         // 使用与 ZipEngine.ListEntriesAsync 相同的编码回退逻辑，
-        // 确保 GBK/CP437 编码的遗留 ZIP 也能正确匹配条目名
-        using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password);
+        // 确保 GBK/CP437 编码的遗留 ZIP 也能正确匹配条目名；
+        // fileNameEncoding 非空时由用户指定的代码页强制解码（与列表同一口径）
+        using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password, fileNameEncoding);
 
         var entry = archive.Entries.FindEntry(entryName);
         if (entry == null)
@@ -117,11 +125,9 @@ public static class ArchiveEntryExtractor
         // 最终路径安全检查：规范化后验证无路径穿越
         ValidateOutputPath(outputPath);
         // 先确保 7z.dll 路径已配置：本工具类可能在引擎方法入口之前就触达 SharpSevenZip
-        // （库是进程级单例，加载后无法换路径 → issue #52）
+        // （库是进程级单例，加载后无法换路径 → issue #52）；工厂内部同样会配，这里显式保留便于阅读
         SevenZipEngine.EnsureLibraryPath();
-        using var extractor = string.IsNullOrEmpty(password)
-            ? new SharpSevenZipExtractor(archivePath)
-            : new SharpSevenZipExtractor(archivePath, password);
+        using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
         // 统一路径分隔符为 /（RAR 文件可能使用 \），与 SevenZipEngine.ListEntriesAsync 保持一致
         var entry = extractor.ArchiveFileData.FirstOrDefault(e => ArchivePath.Normalize(e.FileName) == entryName);
         if (entry.FileName == null)
@@ -175,7 +181,7 @@ public static class ArchiveEntryExtractor
         CoreLog.Info($"ExtractGZipEntry: done");
     }
 
-    private static void ExtractTarGzEntry(string archivePath, string entryName, string outputPath)
+    private static void ExtractTarGzEntry(string archivePath, string entryName, string outputPath, string? fileNameEncoding = null)
     {
         CoreLog.Info($"ExtractTarGzEntry: archive={archivePath}, entry={entryName}");
 
@@ -183,7 +189,16 @@ public static class ArchiveEntryExtractor
         ValidateOutputPath(outputPath);
 
         using var inputStream = File.OpenRead(archivePath);
-        using var reader = SharpCompress.Readers.Tar.TarReader.OpenReader(inputStream, new ReaderOptions { LookForHeader = true });
+        var readerOptions = new ReaderOptions { LookForHeader = true };
+        // 用户手动指定代码页时（GBK/Big5 tar 等）按该编码解码条目名，与 ListEntriesAsync 同一口径
+        if (!string.IsNullOrEmpty(fileNameEncoding)
+            && !NameEncodingCatalog.IsAuto(fileNameEncoding)
+            && NameEncodingCatalog.TryResolve(fileNameEncoding, out var forcedEncoding)
+            && forcedEncoding is not null)
+        {
+            readerOptions.ArchiveEncoding = new SharpCompress.Common.ArchiveEncoding { Default = forcedEncoding };
+        }
+        using var reader = SharpCompress.Readers.Tar.TarReader.OpenReader(inputStream, readerOptions);
         while (reader.MoveToNextEntry())
         {
             var entry = reader.Entry;
@@ -231,10 +246,12 @@ public static class ArchiveEntryExtractor
     public static async Task<byte[]> ExtractHeadAsync(
         string archivePath, string entryName, int maxBytes,
         ArchiveFormat format, string? password = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, string? fileNameEncoding = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractHeadAsync: {archivePath} ! {entryName}, maxBytes={maxBytes}, format={format}");
+        // 自解压 exe 的内嵌包必须交 7z.dll（issue #36）
+        format = ResolveDispatchFormat(archivePath, format);
         ct.ThrowIfCancellationRequested();
 
         return await Task.Run(async () =>
@@ -242,16 +259,12 @@ public static class ArchiveEntryExtractor
             switch (format)
             {
                 case ArchiveFormat.Zip:
-                    return ExtractZipHeadToMemory(archivePath, entryName, maxBytes, password);
+                    return ExtractZipHeadToMemory(archivePath, entryName, maxBytes, password, fileNameEncoding);
 
                 case ArchiveFormat.SevenZip:
                 case ArchiveFormat.Rar:
                 case ArchiveFormat.Iso:
-                    // 构造 extractor 前先配库路径（issue #52）
-                    SevenZipEngine.EnsureLibraryPath();
-                    using (var extractor = string.IsNullOrEmpty(password)
-                        ? new SharpSevenZipExtractor(archivePath)
-                        : new SharpSevenZipExtractor(archivePath, password))
+                    using (var extractor = SevenZipExtractorFactory.Create(archivePath, password))
                     {
                         if (format == ArchiveFormat.SevenZip && IsSevenZipSolid(extractor))
                         {
@@ -319,7 +332,7 @@ public static class ArchiveEntryExtractor
     /// <exception cref="PasswordRequiredException">加密文件名的 7z 且未提供密码。</exception>
     public static async Task<byte[]> ExtractEntryToMemoryAsync(
         string archivePath, string entryName, ArchiveFormat format, long maxBytes,
-        string? password = null, CancellationToken ct = default)
+        string? password = null, CancellationToken ct = default, string? fileNameEncoding = null)
     {
         CoreLog.Entry();
         if (maxBytes <= 0)
@@ -330,6 +343,8 @@ public static class ArchiveEntryExtractor
                 nameof(maxBytes), maxBytes, "maxBytes 必须大于 0");
         }
         CoreLog.Info($"ExtractEntryToMemoryAsync: format={format}, maxBytes={maxBytes}, entry={ArchivePath.GetFileName(entryName)}");
+        // 自解压 exe 的内嵌包必须交 7z.dll（issue #36）
+        format = ResolveDispatchFormat(archivePath, format);
         ct.ThrowIfCancellationRequested();
 
         return await Task.Run(async () =>
@@ -337,16 +352,14 @@ public static class ArchiveEntryExtractor
             switch (format)
             {
                 case ArchiveFormat.Zip:
-                    return ExtractZipEntryToMemory(archivePath, entryName, maxBytes, password, ct);
+                    return ExtractZipEntryToMemory(archivePath, entryName, maxBytes, password, ct, fileNameEncoding);
 
                 case ArchiveFormat.SevenZip:
                 case ArchiveFormat.Rar:
                 case ArchiveFormat.Iso:
                     // 构造 extractor 前先配库路径（issue #52）
                     SevenZipEngine.EnsureLibraryPath();
-                    using (var extractor = string.IsNullOrEmpty(password)
-                        ? new SharpSevenZipExtractor(archivePath)
-                        : new SharpSevenZipExtractor(archivePath, password))
+                    using (var extractor = SevenZipExtractorFactory.Create(archivePath, password))
                     {
                         // 加密文件名：无密码时连条目列表都读不出来，先按密码缺失失败（与 head 一致）
                         if (format == ArchiveFormat.SevenZip
@@ -420,18 +433,20 @@ public static class ArchiveEntryExtractor
     public static async Task<(byte[] head, byte[]? tail)> ExtractHeadTailAsync(
         string archivePath, string entryName, int headBytes, int? tailBytes = null,
         ArchiveFormat format = ArchiveFormat.Zip, string? password = null,
-        CancellationToken ct = default)
+        CancellationToken ct = default, string? fileNameEncoding = null)
     {
         CoreLog.Entry();
         CoreLog.Info($"ExtractHeadTailAsync: {archivePath} ! {entryName}, head={headBytes}, tail={tailBytes}, format={format}");
+        // head / tail 都按归一后的格式分发（自解压 exe → 7z.dll，issue #36）
+        format = ResolveDispatchFormat(archivePath, format);
 
-        var head = await ExtractHeadAsync(archivePath, entryName, headBytes, format, password, ct);
+        var head = await ExtractHeadAsync(archivePath, entryName, headBytes, format, password, ct, fileNameEncoding);
 
         byte[]? tail = null;
         if (tailBytes.HasValue && tailBytes.Value > 0)
         {
             tail = await Task.Run(() =>
-                ExtractTailSync(archivePath, entryName, tailBytes.Value, format, password), ct);
+                ExtractTailSync(archivePath, entryName, tailBytes.Value, format, password, fileNameEncoding), ct);
         }
 
         return (head, tail);
@@ -457,12 +472,12 @@ public static class ArchiveEntryExtractor
     /// </para>
     /// </summary>
     private static byte[] ExtractZipHeadToMemory(
-        string archivePath, string entryName, int maxBytes, string? password)
+        string archivePath, string entryName, int maxBytes, string? password, string? fileNameEncoding = null)
     {
         if (maxBytes <= 0)
             return [];
 
-        using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password);
+        using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password, fileNameEncoding);
         var entry = archive.Entries.FindEntry(entryName);
         if (entry == null)
             throw new FileNotFoundException($"在压缩包中未找到条目: {entryName}");
@@ -529,6 +544,25 @@ public static class ArchiveEntryExtractor
         }
         return truncating.ToArray();
     }
+
+    /// <summary>
+    /// 归一自解压文件（SFX）的分发格式。
+    ///
+    /// <para>
+    /// SFX 是个 .exe：<see cref="ArchiveEngineFactory.GetFormatByExtension"/> 对未知扩展名一律返回
+    /// <see cref="ArchiveFormat.Zip"/>（魔数兜底路径依赖），于是内嵌 zip 会被送进 SharpCompress——
+    /// 实测它对 SFX zip 静默返回 0 个条目（不抛异常），用户看到的是空包，比报错更难查（issue #36）。
+    /// 因此只要 <see cref="SfxProbe.TryGetPayloadFormat"/> 认出内嵌载荷，就统一按
+    /// <see cref="ArchiveFormat.SevenZip"/> 分发：7z.dll 能打开 zip / 7z / RAR4 / RAR5 全部载荷，
+    /// 而具体格式由 <see cref="SevenZipExtractorFactory"/> 显式传给 7z.dll（避免其逐格式试探失败）。
+    /// </para>
+    /// <para>
+    /// 代价：SFX 也会走到下面 <c>format == SevenZip</c> 的固实 / 加密文件名判断。
+    /// 这两项对 zip / RAR 载荷的结果都是正常的（非固实、条目表可读），不会误判。
+    /// </para>
+    /// </summary>
+    private static ArchiveFormat ResolveDispatchFormat(string archivePath, ArchiveFormat format)
+        => SfxProbe.TryGetPayloadFormat(archivePath) is null ? format : ArchiveFormat.SevenZip;
 
     /// <summary>
     /// 检测 7z 压缩包是否使用固实压缩（Solid）。
@@ -744,9 +778,9 @@ public static class ArchiveEntryExtractor
     /// </para>
     /// </summary>
     private static byte[] ExtractZipEntryToMemory(
-        string archivePath, string entryName, long maxBytes, string? password, CancellationToken ct)
+        string archivePath, string entryName, long maxBytes, string? password, CancellationToken ct, string? fileNameEncoding = null)
     {
-        using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password);
+        using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password, fileNameEncoding);
         var entry = archive.Entries.FindEntry(entryName);
         if (entry == null)
         {
@@ -884,7 +918,7 @@ public static class ArchiveEntryExtractor
     /// </summary>
     private static byte[]? ExtractTailSync(
         string archivePath, string entryName, int tailBytes,
-        ArchiveFormat format, string? password)
+        ArchiveFormat format, string? password, string? fileNameEncoding = null)
     {
         const long MaxTailExtractSize = 10 * 1024 * 1024; // 10 MB
 
@@ -892,7 +926,7 @@ public static class ArchiveEntryExtractor
         {
             case ArchiveFormat.Zip:
             {
-                using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password);
+                using var archive = ZipEngine.OpenArchiveWithEncodingFallback(archivePath, password, fileNameEncoding);
                 var entry = archive.Entries.FindEntry(entryName);
                 if (entry == null || entry.IsDirectory)
                     return null;
@@ -915,9 +949,7 @@ public static class ArchiveEntryExtractor
             {
                 // 构造 extractor 前先配库路径（issue #52）
                 SevenZipEngine.EnsureLibraryPath();
-                using var extractor = string.IsNullOrEmpty(password)
-                    ? new SharpSevenZipExtractor(archivePath)
-                    : new SharpSevenZipExtractor(archivePath, password);
+                using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
                 // 固实 7z 不提取尾部
                 if (format == ArchiveFormat.SevenZip && IsSevenZipSolid(extractor))

@@ -9,6 +9,8 @@ using MantisZip.Core.Models;
 using MantisZip.Core.Services;
 using MantisZip.Core;
 using MantisZip.Core.Utils;
+using SharpSevenZip;
+using SharpSevenZip.Exceptions;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -62,6 +64,12 @@ public partial class MainWindowViewModel : ObservableObject
     public Func<string, Task<PasswordDialogResponse?>>? ShowPasswordDialog { get; set; }
 
     /// <summary>
+    /// 「其他代码页…」输入框：返回用户填的代码页数字（null = 取消）。
+    /// 「其他…」不是一个可解析的编码键，必须问出数字才能变成 other:n。
+    /// </summary>
+    public Func<Task<int?>>? ShowCodePageInputDialog { get; set; }
+
+    /// <summary>
     /// 由 View 设置的「查看已匹配密码」对话框回调。参数为密码条目与压缩包文件名（仅展示用），无返回值。
     /// </summary>
     public Func<Core.PasswordEntry, string, Task>? ShowMatchedPasswordDialog { get; set; }
@@ -77,7 +85,10 @@ public partial class MainWindowViewModel : ObservableObject
     /// 解压目标文件夹选择回调。传入待解压条目、初始路径、当前浏览目录（压缩包内）与保留完整路径设置，
     /// 返回所选结果（目标目录 <c>DestPath</c> + 对话框内「保留完整路径」勾选值 <c>PreserveFullPath</c>），取消返回 null。
     /// </summary>
-    public Func<IReadOnlyList<ArchiveItem>, string?, string, bool, Task<ExtractPickResult?>>? ShowExtractFolderPicker { get; set; }
+    /// <summary>条目选择入口（右键「解压到」/ 拖拽兜底）：返回 true = 已确认并执行，false = 用户取消。</summary>
+    /// <param name="allEntries">整包条目（预览树与过滤统计用）。</param>
+    /// <param name="presetEntries">本次实际解压的条目子集（写进载荷 SelectedEntries）。</param>
+    public Func<IReadOnlyList<ArchiveItem>, IReadOnlyList<ArchiveItem>, string?, string, string?, Task<bool>>? ShowExtractEntryPicker { get; set; }
 
     /// <summary>
     /// 压缩设置对话框回调。参数为预填的源路径；确认后的执行由回调内部完成
@@ -248,9 +259,10 @@ public partial class MainWindowViewModel : ObservableObject
             "Menu_NewArchive", "Menu_PasswordManager", "Menu_About", "Menu_Donate",
             "Toolbar_Open", "Toolbar_Extract", "Toolbar_Compress",
             "Toolbar_Filter", "Toolbar_Preview",
+            "Toolbar_NameEncoding", "Toolbar_NameEncoding_Auto", "Toolbar_NameEncoding_System", "Toolbar_NameEncoding_Other",
             "Menu_Toolbar",
             "Menu_DataBars", "Menu_SepDirBaseline", "Menu_InfoPanelOrientation", "Menu_ShowInfoPanel",
-            "Menu_ShowPreviewPanel", "Menu_SaveLayout",
+            "Menu_ShowPreviewPanel", "Menu_SaveLayout", "Menu_ListLayout", "Menu_CheckboxMode",
             "Filter_Search", "Filter_Exclude", "Filter_DateFrom", "Filter_DateTo",
             "Filter_SizeMin", "Filter_SizeMax", "Filter_ShowSubfolders", "Filter_ClearAll",
             "Filter_PickDateFrom", "Filter_PickDateTo", "Filter_PickSizeMin", "Filter_PickSizeMax",
@@ -263,12 +275,13 @@ public partial class MainWindowViewModel : ObservableObject
             "Main_ArchiveUnavailable_Reload", "Main_ArchiveUnavailable_Close",
             "Ctx_Extract", "Ctx_ExtractSelectedHere", "Ctx_ExtractSelectedTo", "Ctx_SmartExtract", "Ctx_ExtractTo",
             "Ctx_CopyName", "Ctx_CopyPath", "Ctx_Test", "Ctx_Delete",
+        "Menu_CheckAllVisible", "Menu_InvertChecked", "Menu_ClearChecked",
             "Menu_SmartExtract", "Menu_TestArchive", "Menu_AddFiles", "Menu_DeleteFiles", "Menu_ArchiveComment",
             "Toolbar_SmartExtract", "Toolbar_Test", "Toolbar_AddFiles", "Toolbar_DeleteFiles","Toolbar_ExtractSelected","Toolbar_ExtractArchive",
             "Tooltip_Open", "Tooltip_Extract", "Tooltip_ExtractSelectedHere", "Tooltip_ExtractSelectedTo", "Tooltip_NewArchive",
             "Tooltip_Filter", "Tooltip_Preview", "Tooltip_SmartExtract", "Tooltip_Test",
             "Tooltip_AddFiles", "Tooltip_DeleteFiles", "Tooltip_Subfolders",
-            "Preview_Result_LoadingMore",
+            "Preview_Result_LoadingMore", "Preview_Result_SkeletonProgress",
             "Status_AddComplete", "Status_DeleteComplete", "Status_TestOK", "Status_TestFailed",
             "Status_CommentSaved", "Status_SmartExtractSingleRoot", "Status_SmartExtractNamed",
             "Status_CommentNotSupported", "Status_ConfirmDelete",
@@ -282,10 +295,11 @@ public partial class MainWindowViewModel : ObservableObject
             "Toolbar_Password",
             "Menu_Test",
             "Tree_ExpandAll", "Tree_CollapseAll", "Tree_ExpandToCurrent", "Tree_AutoExpand", "Tree_Filter",
-            "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_AddressBar", "Nav_GoUp",
+            "Nav_GoRoot", "Nav_GoBack", "Nav_GoForward", "Nav_GoUp",
             "Toolbar_CopyName", "Toolbar_Refresh",
-            "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode",
+            "Toolbar_SelectAll", "Toolbar_InvertSelection", "Toolbar_ViewMode", "Toolbar_LayoutMode",
             "ViewMode_All", "ViewMode_Files", "ViewMode_Dirs",
+            "LayoutMode_Details", "LayoutMode_Tile", "LayoutMode_Content", "LayoutMode_CycleTip",
             "Test_AboutWindow", "Test_SettingsWindow", "Test_PasswordManager",
             "Test_DonationDialog", "Test_LogPrivacyHelp", "Test_PasswordHelp",
             "Test_CommentDialog", "Test_PasswordEditDialog", "Test_PasswordDialog",
@@ -314,7 +328,12 @@ public partial class MainWindowViewModel : ObservableObject
 
         LocalizedStrings = newDict;
         OnPropertyChanged(nameof(LocalizedStrings));
+        // 代码页下拉的「自动检测 / 系统默认 / 其他…」文案跟随语言重建
+        CultureChangedForNameEncoding();
         OnPropertyChanged(nameof(ViewModeLabel));
+        OnPropertyChanged(nameof(LayoutModeLabel));
+        OnPropertyChanged(nameof(CheckedSummary));
+        OnPropertyChanged(nameof(CheckboxModeLabel));
 
         // Refresh match mode options display text
         MatchModeOptions.Clear();
@@ -358,7 +377,13 @@ public partial class MainWindowViewModel : ObservableObject
         && (ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath)?.CanDelete(_currentFormat) ?? false);
 
     // 能力位随「压缩包加载状态」刷新（格式 `_currentFormat` 在 RefreshArchive 中先于本字段赋值）
-    partial void OnIsArchiveLoadedChanged(bool value) => OnPropertyChanged(nameof(CanDeleteEntries));
+    partial void OnIsArchiveLoadedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(CanDeleteEntries));
+        // 代码页按钮是否可用取决于「已开包 + 格式」：载入成功分支里通知 CanChangeNameEncoding 时
+        // IsArchiveLoaded 还是 false，只靠那一处通知会让按钮永久停在置灰态（2026-11-02 实测）
+        OnPropertyChanged(nameof(CanChangeNameEncoding));
+    }
 
     // ── 当前压缩包在磁盘上的可用性（打开中被删除 / 被替换） ─────────────────────────────
     //
@@ -553,8 +578,18 @@ public partial class MainWindowViewModel : ObservableObject
 
     /// <summary>
     /// 当前选中的条目列表（由 View 的 SelectionChanged 同步）。
+    /// <para>
+    /// 与 <see cref="CheckedEntries"/> 是**两套独立状态**（2026-11-03 起）：选区决定复制 / 解压 / 拖拽 / 右键操作的作用对象，
+    /// 勾选只决定批量删除与状态栏摘要。复选框模式下用 Ctrl/Shift 建立选区后点复选框，可以把整组一起切换。
+    /// </para>
     /// </summary>
     public List<ArchiveItemModel> SelectedEntries { get; } = new();
+
+    /// <summary>
+    /// 当前**已勾选**的条目（跨目录累积）。唯一事实源仍是行模型上的 <see cref="ArchiveItemModel.IsChecked"/>，
+    /// 这个列表只是它的投影，供状态栏摘要与批量删除使用。
+    /// </summary>
+    public List<ArchiveItemModel> CheckedEntries { get; } = new();
 
     [ObservableProperty]
     private bool _isDarkTheme;
@@ -573,6 +608,167 @@ public partial class MainWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string? _currentFolder;
+
+    /// <summary>
+    /// 文件名代码页键（取值见 <see cref="NameEncodingCatalog"/>）：默认 <c>auto</c>，
+    /// 用户可在主工具栏手动指定。切换后必须重新载入条目列表 —— 列表名是解压/预览/拖拽的唯一主键，
+    /// 只改显示会导致解压错名，所以本属性只由 <see cref="ChangeNameEncodingAsync"/> 改写。
+    /// </summary>
+    [ObservableProperty]
+    private string _archiveNameEncoding = NameEncodingCatalog.Auto;
+
+    /// <summary>上一次载入实际使用的编码键（自动检测结果或用户指定值），供工具栏回显。</summary>
+    [ObservableProperty]
+    private string? _resolvedNameEncodingKey;
+
+    /// <summary>传给引擎的编码键：<c>auto</c> 传 null（走引擎自带启发式检测）。</summary>
+    internal string? NameEncodingRequestKey =>
+        NameEncodingCatalog.IsAuto(ArchiveNameEncoding) ? null : ArchiveNameEncoding;
+
+    /// <summary>
+    /// 全量解压时把当前代码页透传给引擎：手动选了代码页就必须按同一口径打开，
+    /// 否则列表名正确、解出来的文件名却是乱码。null = 自动检测（与改造前完全一致）。
+    /// </summary>
+    private ArchiveOptions? NameEncodingReadOptions() =>
+        NameEncodingRequestKey is null ? null : new ArchiveOptions { ReadEncoding = NameEncodingRequestKey };
+
+    /// <summary>
+    /// 主工具栏代码页按钮是否可用：只有按名字解码的格式（ZIP / TAR / GZ）才需要；
+    /// 7z/RAR 的条目名是 UTF-16，没有代码页问题 —— 此时按钮**置灰而不隐藏**（2026-11-02 用户要求，
+    /// 工具栏不因格式切换而跳动）。
+    /// </summary>
+    public bool CanChangeNameEncoding =>
+        IsArchiveLoaded && _currentFormat is ArchiveFormat.Zip or ArchiveFormat.Tar or ArchiveFormat.GZip;
+
+    /// <summary>
+    /// 代码页下拉选项（自动 / 系统默认 / 常用编码 / 其他…）。文案随语言切换重建，见 <see cref="CultureChangedForNameEncoding"/>。
+    /// </summary>
+    [ObservableProperty]
+    private IReadOnlyList<NameEncodingOption> _nameEncodingOptions = NameEncodingOption.BuildDefault();
+
+    /// <summary>工具栏按钮下方的文字：当前选中的编码项（自动检测 / 系统默认 / GBK / 其他…950）。</summary>
+    public string NameEncodingDisplay
+    {
+        get
+        {
+            foreach (var option in NameEncodingOptions)
+            {
+                if (string.Equals(option.Key, ArchiveNameEncoding, StringComparison.OrdinalIgnoreCase))
+                    return option.Display;
+            }
+
+            // 「其他代码页…」选过之后 ArchiveNameEncoding 是 other:950 这类值，选项里只有占位 other
+            return NameEncodingCatalog.IsAuto(ArchiveNameEncoding)
+                ? LocalizationManager.T("Toolbar_NameEncoding_Auto")
+                : ArchiveNameEncoding;
+        }
+    }
+
+    /// <summary>
+    /// 图标右下角徽章文字：本次载入**实际生效**的编码（自动检测出来的值也算），
+    /// 空串 = 不显示徽章（未打开压缩包，或还没拿到结果）。
+    /// </summary>
+    public string NameEncodingBadgeText => NameEncodingOption.ShortLabel(ResolvedNameEncodingKey);
+
+    /// <summary>是否要画徽章（避免空 Border 占位）。</summary>
+    public bool HasNameEncodingBadge => NameEncodingBadgeText.Length > 0;
+
+    /// <summary>工具栏按钮的 Tooltip：名称 + 实际生效的编码（含完整名称，徽章只放短标记）。</summary>
+    public string NameEncodingToolTip
+    {
+        get
+        {
+            var title = LocalizationManager.T("Toolbar_NameEncoding");
+            if (string.IsNullOrEmpty(ResolvedNameEncodingKey))
+                return title;
+
+            var detected = NameEncodingOption.ShortLabel(ResolvedNameEncodingKey);
+            if (detected.Length == 0)
+                return title;
+
+            return $"{title}\n{LocalizationManager.T("Toolbar_NameEncoding_Detected", detected)}";
+        }
+    }
+
+    /// <summary>
+    /// 切换文件名代码页：先记下新键，再按 <see cref="RefreshArchive"/> 的路子重载并尽量停在原目录。
+    /// </summary>
+    /// <param name="key">编码键（<c>auto</c> / <c>system</c> / <c>gbk</c> / <c>other:950</c> …）。</param>
+    [RelayCommand]
+    private async Task ChangeNameEncodingAsync(string? key)
+    {
+        if (string.IsNullOrEmpty(key) || string.Equals(key, ArchiveNameEncoding, StringComparison.Ordinal))
+            return;
+        if (!CanChangeNameEncoding)
+            return;
+
+        if (string.Equals(key, NameEncodingOption.OtherPlaceholder, StringComparison.Ordinal))
+        {
+            if (ShowCodePageInputDialog == null)
+                return;
+
+            var codePage = await ShowCodePageInputDialog();
+            if (codePage is null or <= 0)
+                return;
+
+            key = $"{NameEncodingCatalog.OtherPrefix}{codePage}";
+            if (string.Equals(key, ArchiveNameEncoding, StringComparison.Ordinal))
+                return;
+        }
+
+        ArchiveNameEncoding = key;
+        // 复用「刷新压缩包」：它会重新载入条目并尽量恢复到原来的目录/条目
+        await RefreshArchive();
+    }
+
+    /// <summary>
+    /// 语言切换后重建代码页下拉（"自动检测"/"系统默认"等文案要跟着变），保持当前选中项不变。
+    /// </summary>
+    private void CultureChangedForNameEncoding()
+    {
+        // 选中项本身（ArchiveNameEncoding 的值）不变，按钮文字/菜单勾选按新语言重算。
+        NameEncodingOptions = NameEncodingOption.BuildDefault();
+        OnPropertyChanged(nameof(NameEncodingOptions));
+        OnPropertyChanged(nameof(NameEncodingDisplay));
+        OnPropertyChanged(nameof(NameEncodingToolTip));
+    }
+
+    /// <summary>选中项变化 → 按钮文字与 Tooltip 跟着变。</summary>
+    partial void OnArchiveNameEncodingChanged(string value)
+    {
+        OnPropertyChanged(nameof(NameEncodingDisplay));
+        OnPropertyChanged(nameof(NameEncodingToolTip));
+        OnPropertyChanged(nameof(NameEncodingSelectedOption));
+    }
+
+    /// <summary>实际生效的编码变化 → 图标徽章与 Tooltip 跟着变。</summary>
+    partial void OnResolvedNameEncodingKeyChanged(string? value)
+    {
+        OnPropertyChanged(nameof(NameEncodingBadgeText));
+        OnPropertyChanged(nameof(HasNameEncodingBadge));
+        OnPropertyChanged(nameof(NameEncodingToolTip));
+    }
+
+    /// <summary>
+    /// 当前选中项（菜单里打勾用）：<c>other:950</c> 这类值归到「其他…」那一项上。
+    /// </summary>
+    public NameEncodingOption? NameEncodingSelectedOption
+    {
+        get
+        {
+            var targetKey = ArchiveNameEncoding.StartsWith(NameEncodingCatalog.OtherPrefix, StringComparison.OrdinalIgnoreCase)
+                ? NameEncodingOption.OtherPlaceholder
+                : ArchiveNameEncoding;
+
+            foreach (var option in NameEncodingOptions)
+            {
+                if (string.Equals(option.Key, targetKey, StringComparison.OrdinalIgnoreCase))
+                    return option;
+            }
+
+            return null;
+        }
+    }
 
     /// <summary>
     /// 目录树"自动展开"开关：开启后每次切换目录自动展开到当前目录并收起其他分支。
@@ -758,6 +954,15 @@ public partial class MainWindowViewModel : ObservableObject
 
     // ── View mode (All / Files / Directories) ──
 
+    /// <summary>
+    /// 列表的**内容筛选**模式（全部 / 只看文件 / 只看目录）。
+    /// </summary>
+    /// <remarks>
+    /// 注意与 <c>FileListLayoutMode</c>（**布局**：详情 / 平铺 / 内容，见 file-list-thumbnails）区分：
+    /// 本枚举决定「显示哪些行」，布局枚举决定「每行怎么画」，两者互不影响。
+    /// 名字保留 <c>FileListViewMode</c> 不改——它已被快捷键、菜单文案 key（<c>ViewMode_All</c> 等）与测试引用，
+    /// 重命名的收益不抵改动面。
+    /// </remarks>
     public enum FileListViewMode { All, FilesOnly, DirectoriesOnly }
 
     [ObservableProperty]
@@ -787,6 +992,348 @@ public partial class MainWindowViewModel : ObservableObject
         _ => LocalizationManager.T("ViewMode_Dirs")
     };
 
+    // ── File list layout mode (Details / Tile / Content) ──
+
+    /// <summary>
+    /// 文件列表**布局**模式（详情 / 平铺 / 内容）。与 <see cref="FileListViewMode"/>（内容筛选）互不影响：
+    /// 本枚举决定每行怎么画，筛选枚举决定显示哪些行。
+    /// </summary>
+    [ObservableProperty]
+    private FileListLayoutMode _layoutMode;
+
+    partial void OnLayoutModeChanged(FileListLayoutMode value)
+    {
+        // 四个派生属性集中通知（AGENTS.md「派生属性通知」：禁止逐字段 NotifyPropertyChangedFor）
+        NotifyLayoutModeProperties();
+
+        // 持久化：与 Theme / CompactnessMode 相同的合并写（_appSettings 是启动副本，直接 Save() 会覆盖别处改动）
+        if (_appSettings.FileListLayoutMode != value)
+        {
+            _appSettings.FileListLayoutMode = value;
+            SaveSetting(s => s.FileListLayoutMode = value);
+        }
+
+        // 详情布局不画内容卡：离开详情才开始出图，回到详情则终止批次释放后台任务
+        if (value == FileListLayoutMode.Details)
+        {
+            CancelThumbnailBatch();
+            // 回到详情：卡片不再显示，撤掉元数据卡文字并放弃在途取数
+            RefreshMetadataCard(null);
+        }
+        else
+        {
+            StartThumbnailBatchIfNeeded();
+            // 从详情切到卡片布局时，选中项没变、不会触发 OnSelectedEntryChanged，
+            // 这里补一次，否则要等用户重新点一次才出元数据卡。
+            RefreshMetadataCard(SelectedEntry);
+        }
+    }
+
+    private void NotifyLayoutModeProperties()
+    {
+        OnPropertyChanged(nameof(IsDetailsLayout));
+        OnPropertyChanged(nameof(IsTileLayout));
+        OnPropertyChanged(nameof(IsContentLayout));
+        OnPropertyChanged(nameof(LayoutModeLabel));
+    }
+
+    public bool IsDetailsLayout => LayoutMode == FileListLayoutMode.Details;
+    public bool IsTileLayout => LayoutMode == FileListLayoutMode.Tile;
+    public bool IsContentLayout => LayoutMode == FileListLayoutMode.Content;
+
+    /// <summary>工具栏布局按钮的当前模式文案（随语言切换刷新，见 <see cref="UpdateLocalizedStrings"/>）。</summary>
+    public string LayoutModeLabel => LayoutMode switch
+    {
+        FileListLayoutMode.Tile => LocalizationManager.T("LayoutMode_Tile"),
+        FileListLayoutMode.Content => LocalizationManager.T("LayoutMode_Content"),
+        _ => LocalizationManager.T("LayoutMode_Details"),
+    };
+
+    /// <summary>循环切换布局：详情 → 平铺 → 内容 → 详情。</summary>
+    [RelayCommand]
+    private void CycleLayoutMode()
+    {
+        LayoutMode = LayoutMode switch
+        {
+            FileListLayoutMode.Details => FileListLayoutMode.Tile,
+            FileListLayoutMode.Tile => FileListLayoutMode.Content,
+            _ => FileListLayoutMode.Details,
+        };
+    }
+
+    // ── 「视图 → 列表布局」子菜单（2026-11-03：菜单里直接指定布局，不必反复点工具栏循环） ──
+
+    /// <summary>切到详情布局（表格）。</summary>
+    [RelayCommand]
+    private void SetDetailsLayout() => LayoutMode = FileListLayoutMode.Details;
+
+    /// <summary>切到平铺布局（卡片流）。</summary>
+    [RelayCommand]
+    private void SetTileLayout() => LayoutMode = FileListLayoutMode.Tile;
+
+    /// <summary>切到内容行布局（大卡片 + 元数据）。</summary>
+    [RelayCommand]
+    private void SetContentLayout() => LayoutMode = FileListLayoutMode.Content;
+
+    // ── File list checkbox selection (v0.5.6 file-list-checkbox-selection) ──
+
+    /// <summary>
+    /// 列表是否显示**复选框列**（持久化到 <see cref="AppSettings.FileListCheckboxMode"/>，默认关闭）。
+    /// 关闭时行为与引入复选框之前完全一致；勾选只是 <see cref="SelectedEntries"/> 的另一个入口，
+    /// 不新开第二份集合（否则复制路径 / 解压选中 / 删除三处要各自维护，迟早不一致）。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isCheckboxMode;
+
+    partial void OnIsCheckboxModeChanged(bool value)
+    {
+        NotifyCheckboxProperties();
+
+        // 持久化：与 Theme / LayoutMode 相同的合并写（_appSettings 是启动副本，直接 Save() 会覆盖别处改动）
+        if (_appSettings.FileListCheckboxMode != value)
+        {
+            _appSettings.FileListCheckboxMode = value;
+            SaveSetting(s => s.FileListCheckboxMode = value);
+        }
+
+        // 关闭复选框模式：清掉勾选态，避免下次开启时残留上一批勾选（验收口径 5）
+        if (!value)
+            ClearCheckedCore();
+    }
+
+    /// <summary>
+    /// 勾选态与 DataGrid 选区之间的双向同步闸门：进出同步时都要判，
+    /// 否则「勾选 → 改集合 → 回写选区 → SelectionChanged 又改集合」会打转（选择器控件已踩过）。
+    /// </summary>
+    private bool _syncingSelection;
+
+
+    private void NotifyCheckboxProperties()
+    {
+        OnPropertyChanged(nameof(CheckedCount));
+        OnPropertyChanged(nameof(CheckedSummary));
+    }
+
+    /// <summary>已勾选条目数（勾选集合的投影，与选区无关）。</summary>
+    public int CheckedCount => CheckedEntries.Count;
+
+    /// <summary>状态栏摘要「已选 N 项 · 共 X」；未勾选时为空串（状态栏不显示空文案）。</summary>
+    public string CheckedSummary => CheckedCount == 0
+        ? string.Empty
+        : LocalizationManager.T(
+            "FileList_CheckedSummaryFmt",
+            CheckedCount,
+            FormatUtil.FormatSize(CheckedEntries.Sum(e => e.Size)));
+
+    /// <summary>复选框模式工具条按钮的提示文案（随语言切换刷新，见 <see cref="UpdateLocalizedStrings"/>）。</summary>
+    public string CheckboxModeLabel => LocalizationManager.T("FileList_CheckboxMode");
+
+    /// <summary>
+    /// 行模型的 <c>IsChecked</c> 变化回调：把勾选落到 <see cref="CheckedEntries"/>（跨目录累积）。
+    /// 订阅/退订在 <see cref="PopulateEntries"/> 重建 <see cref="CurrentEntries"/> 时成对完成。
+    /// </summary>
+    private void OnEntryPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName != nameof(ArchiveItemModel.IsChecked)) return;
+        if (_syncingSelection || sender is not ArchiveItemModel item) return;
+
+        if (item.IsChecked)
+        {
+            if (!CheckedEntries.Contains(item))
+                CheckedEntries.Add(item);
+        }
+        else
+        {
+            CheckedEntries.Remove(item);
+        }
+
+        NotifyCheckboxProperties();
+    }
+
+    /// <summary>
+    /// 成组勾选：把 <paramref name="items"/> 全部设为 <paramref name="value"/>（批量删除 / 成组切换的内部实现）。
+    /// <para>
+    /// 闸门内直接改模型并同步 <see cref="CheckedEntries"/>：<c>IsChecked</c> 的属性回调在闸门内会直接 return，
+    /// 不指望它维护投影。跨目录的条目也会一起进 / 出投影。
+    /// </para>
+    /// </summary>
+    public void SetChecked(IReadOnlyList<ArchiveItemModel> items, bool value)
+    {
+        _syncingSelection = true;
+        try
+        {
+            foreach (var item in items)
+            {
+                if (item.IsChecked != value)
+                    item.IsChecked = value;
+
+                if (value)
+                {
+                    if (!CheckedEntries.Contains(item))
+                        CheckedEntries.Add(item);
+                }
+                else
+                {
+                    CheckedEntries.Remove(item);
+                }
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        NotifyCheckboxProperties();
+    }
+
+    /// <summary>
+    /// 复选框模式下「成组切换」：若当前选区有 2 项以上且包含被点条目，则把整组设为与被点条目**相反**的状态。
+    /// <para>
+    /// 这是 2026-11-03 用户要求的交互：先用 Ctrl/Shift 选好几行，再点其中任意一行的复选框，
+    /// 选中行一起勾上（点的是未勾的）或一起取消（点的是已勾的）。
+    /// </para>
+    /// </summary>
+    /// <returns>是否按「组」处理；false 表示调用方应退回「只切换该行」。</returns>
+    public bool ToggleCheckedForGroup(ArchiveItemModel? clicked, IReadOnlyList<ArchiveItemModel>? group)
+    {
+        if (clicked is null || group is null || group.Count < 2)
+            return false;
+
+        var contains = false;
+        foreach (var item in group)
+        {
+            if (ReferenceEquals(item, clicked))
+            {
+                contains = true;
+                break;
+            }
+        }
+
+        if (!contains)
+            return false;
+
+        SetChecked(group, !clicked.IsChecked);
+        return true;
+    }
+
+    /// <summary>
+    /// 列表重填后按 FullPath 还原勾选态，并把 <see cref="CheckedEntries"/> 里指向旧实例的项换成新实例
+    /// —— <see cref="PopulateEntries"/> 每次都重建 <see cref="ArchiveItemModel"/>，
+    /// 跨目录 / 跨筛选保持勾选只能靠路径匹配，不能靠实例引用。
+    /// </summary>
+    private void RestoreCheckedState()
+    {
+        if (CheckedEntries.Count == 0) return;
+
+        var byPath = new Dictionary<string, ArchiveItemModel>(StringComparer.Ordinal);
+        foreach (var entry in CurrentEntries)
+            byPath[entry.FullPath] = entry;
+
+        _syncingSelection = true;
+        try
+        {
+            for (var i = 0; i < CheckedEntries.Count; i++)
+            {
+                if (byPath.TryGetValue(CheckedEntries[i].FullPath, out var fresh))
+                {
+                    CheckedEntries[i] = fresh;
+                    fresh.IsChecked = true;
+                }
+            }
+
+            foreach (var entry in CurrentEntries)
+                entry.IsChecked = CheckedEntries.Contains(entry);
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        NotifyCheckboxProperties();
+    }
+
+    /// <summary>清空勾选态（不动 <see cref="SelectedEntry"/> 的预览联动）。</summary>
+    private void ClearCheckedCore()
+    {
+        _syncingSelection = true;
+        try
+        {
+            foreach (var entry in CurrentEntries)
+                entry.IsChecked = false;
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        CheckedEntries.Clear();
+        NotifyCheckboxProperties();
+    }
+
+    /// <summary>勾选当前列表里所有可见行（只作用当前目录，不动其它目录已有的勾选）。</summary>
+    [RelayCommand]
+    private void CheckAllVisible()
+    {
+        if (CurrentEntries.Count == 0) return;
+
+        _syncingSelection = true;
+        try
+        {
+            foreach (var entry in CurrentEntries)
+            {
+                entry.IsChecked = true;
+                if (!CheckedEntries.Contains(entry))
+                    CheckedEntries.Add(entry);
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        NotifyCheckboxProperties();
+    }
+
+    /// <summary>清空勾选（工具条 / 右键菜单入口）。</summary>
+    [RelayCommand]
+    private void ClearChecked() => ClearCheckedCore();
+
+    /// <summary>开关复选框模式（工具栏按钮之外，2026-11-03 起「视图」菜单也提供入口）。</summary>
+    [RelayCommand]
+    private void ToggleCheckboxMode() => IsCheckboxMode = !IsCheckboxMode;
+
+    /// <summary>反选当前列表里可见的行（其它目录的勾选保持不变）。</summary>
+    [RelayCommand]
+    private void InvertChecked()
+    {
+        if (CurrentEntries.Count == 0) return;
+
+        _syncingSelection = true;
+        try
+        {
+            foreach (var entry in CurrentEntries)
+            {
+                entry.IsChecked = !entry.IsChecked;
+                if (entry.IsChecked)
+                {
+                    if (!CheckedEntries.Contains(entry))
+                        CheckedEntries.Add(entry);
+                }
+                else
+                {
+                    CheckedEntries.Remove(entry);
+                }
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        NotifyCheckboxProperties();
+    }
+
+
     /// <summary>
     /// 匹配模式选项列表（子串匹配 / 通配符）。显示文本通过 UpdateLocalizedStrings() 刷新。
     /// </summary>
@@ -799,12 +1346,22 @@ public partial class MainWindowViewModel : ObservableObject
 
         // Load settings
         ShowProgressBars = _appSettings.ShowProgressBars;
+        IsCheckboxMode = _appSettings.FileListCheckboxMode;
         SeparateDirBaseline = _appSettings.SeparateDirBaseline;
         AutoExpandTree = _appSettings.AutoExpandTreeToCurrent;
         Preview.ShowInfoPanel = _appSettings.ShowPreviewInfoPanel;
         // 信息面板方向同样从设置初始化（此前 PreviewViewModel 硬编码默认 "Vertical"，保存的方向启动后丢失）
         Preview.InfoPanelOrientation = _appSettings.InfoPanelOrientation;
         IsPreviewVisible = _appSettings.ShowPreviewPanel;
+
+        // 文件列表布局：启动恢复上次选择。此时还没打开压缩包，OnLayoutModeChanged 里的批次启动会直接返回；
+        // 同值短路（_appSettings.FileListLayoutMode 已等于该值）保证启动不重复落盘。
+        LayoutMode = _appSettings.FileListLayoutMode;
+
+        // 设置窗口改「缩略图」外观后重取缩略图：App 是唯一共同祖先，静态事件解耦两个窗口的 VM。
+        // 生命周期与主窗口一致（单窗口应用），不做退订。
+        App.ThumbnailStyleChanged += (_, _) =>
+            global::Avalonia.Threading.Dispatcher.UIThread.Post(ReloadThumbnailsForStyleChange);
 
         // 主题（三态）：初始化菜单按钮暗色状态显示
         IsDarkTheme = _appSettings.Theme switch
@@ -824,6 +1381,9 @@ public partial class MainWindowViewModel : ObservableObject
     {
         OnPropertyChanged(nameof(SelectionStats));
         App.DebugLog($"[PRV] OnSelectedEntryChanged: {(value?.Name ?? "null")}, archive={CurrentArchivePath != null}");
+
+        // 卡片布局的元数据卡：只服务当前选中项，与下面的预览是两个独立的取数（互不等待）
+        RefreshMetadataCard(value);
 
         if (value != null && CurrentArchivePath != null)
         {
@@ -933,7 +1493,9 @@ public partial class MainWindowViewModel : ObservableObject
 
         IsLoading = true;
         StatusMessage = LocalizationManager.T("Status_Loading");
-        ClearArchiveInternal();
+        // 刷新同一个包时保留用户手选的代码页；换成另一个包则复位成默认值
+        var reloadingSameArchive = string.Equals(CurrentArchivePath, path, StringComparison.OrdinalIgnoreCase);
+        ClearArchiveInternal(resetNameEncoding: !reloadingSameArchive);
 
         try
         {
@@ -944,7 +1506,7 @@ public partial class MainWindowViewModel : ObservableObject
             if (_sessionPasswords.TryGetValue(cacheKey, out var cachedPwd))
                 password = cachedPwd;
 
-            var result = await _archiveService.LoadArchiveAsync(path, password);
+            var result = await _archiveService.LoadArchiveAsync(path, password, fileNameEncoding: NameEncodingRequestKey);
             var engine = ArchiveEngineFactory.GetEngineByExtension(path);
 
             // ── Verify session-cached password before trusting it ──
@@ -957,7 +1519,7 @@ public partial class MainWindowViewModel : ObservableObject
             {
                 _sessionPasswords.Remove(cacheKey);
                 password = null;
-                result = await _archiveService.LoadArchiveAsync(path, null);
+                result = await _archiveService.LoadArchiveAsync(path, null, fileNameEncoding: NameEncodingRequestKey);
             }
 
             // ── 密码解析流程（对齐 WPF ResolvePasswordAsync + LoadArchiveAsync 组合语义）──
@@ -1003,7 +1565,7 @@ public partial class MainWindowViewModel : ObservableObject
 
                             password = matchedPwd;
                             if (unlistable)
-                                result = await _archiveService.LoadArchiveAsync(path, password);
+                                result = await _archiveService.LoadArchiveAsync(path, password, fileNameEncoding: NameEncodingRequestKey);
                             if (!result.IsPasswordRequired)
                             {
                                 _sessionPasswords[cacheKey] = password;
@@ -1054,7 +1616,7 @@ public partial class MainWindowViewModel : ObservableObject
                         }
 
                         // 用密码完整加载一次（可列出场景同样重载以统一加载状态；条目内容一致）
-                        result = await _archiveService.LoadArchiveAsync(path, password);
+                        result = await _archiveService.LoadArchiveAsync(path, password, fileNameEncoding: NameEncodingRequestKey);
 
                         if (!result.IsPasswordRequired)
                         {
@@ -1110,6 +1672,8 @@ public partial class MainWindowViewModel : ObservableObject
                 // 确保打开压缩包后根目录预览能立即显示注释
                 CurrentArchivePath = path;
                 _currentFormat = ArchiveFormatHelper.GetFormat(path);
+                // 代码页下拉只在按名字解码的格式（ZIP/TAR/GZ）上可用，格式变了要重算可用性
+                OnPropertyChanged(nameof(CanChangeNameEncoding));
                 _archiveComment = ArchiveCommentReader.ReadComment(path, _currentFormat, _currentPassword);
 
                 foreach (var entry in result.Entries)
@@ -1148,6 +1712,8 @@ public partial class MainWindowViewModel : ObservableObject
                 }
 
                 IsArchiveLoaded = true;
+                // 回显本次实际生效的代码页（自动检测结果或用户手动指定的编码）
+                ResolvedNameEncodingKey = result.ResolvedNameEncoding;
                 // 打开成功后开始监视磁盘：包被外部删除 / 替换时界面要立刻知道（issue：解压删源包后状态残留）
                 AttachArchiveGuard(path);
                 RecentFilesManager.AddPath(path);
@@ -1205,11 +1771,25 @@ public partial class MainWindowViewModel : ObservableObject
         Title = LocalizationManager.T("App_Title");
     }
 
-    private void ClearArchiveInternal()
+    /// <param name="resetNameEncoding">
+    /// 是否把「文件名代码页」复位成设置里的默认值。<c>false</c> 用于**重载同一个包**（刷新 / 手动改代码页），
+    /// 否则用户的临时选择会被自己刚触发的重载抹掉。
+    /// </param>
+    private void ClearArchiveInternal(bool resetNameEncoding = true)
     {
         // 关包即停监视（换包时 LoadArchiveAsync 会重新 Attach），并复位可用性
         DetachArchiveGuard();
+        // 关包后列表已清空，未完成的后台图标加载必须立刻停下（否则会拿着已失效的模型继续读包）
+        _iconLoadCts?.Cancel();
+        _iconLoadCts?.Dispose();
+        _iconLoadCts = null;
+        // 关包/换包：终止整包缩略图批次（否则后台会拿着已失效的路径继续读包），缓存随服务一起释放
+        CancelThumbnailBatch();
         ArchiveAvailability = ArchiveAvailability.Available;
+        // 复选框列：退订旧实例并清空勾选态（否则关包后仍留着指向已释放模型的 SelectedEntries）
+        foreach (var stale in CurrentEntries)
+            stale.PropertyChanged -= OnEntryPropertyChanged;
+        ClearCheckedCore();
         Entries.Clear();
         CurrentEntries.Clear();
         CurrentArchivePath = null;
@@ -1220,6 +1800,15 @@ public partial class MainWindowViewModel : ObservableObject
         FolderTreeRoot = null;
         _allRawItems = null;
         _archiveComment = null;
+        if (resetNameEncoding)
+        {
+            // 代码页是「每个包」的会话态：关包就回到默认值，避免拿上一个包的选择去解下一个包
+            // 初值取设置里的「默认读取代码页」，主工具栏可对本包临时覆盖
+            ArchiveNameEncoding = AppSettings.Load()?.ReadNameEncoding ?? NameEncodingCatalog.Auto;
+            ResolvedNameEncodingKey = null;
+        }
+
+        OnPropertyChanged(nameof(CanChangeNameEncoding));
         DirStats = string.Empty;
         FilterStats = string.Empty;
         EncodingInfo = string.Empty;
@@ -1235,6 +1824,142 @@ public partial class MainWindowViewModel : ObservableObject
         _backStack.Clear();
         _forwardStack.Clear();
         NotifyNavigationState();
+    }
+
+    // ── File list thumbnail batch (Tile / Content layout) ──
+
+    /// <summary>
+    /// 当前压缩包的缩略图后台服务（仅 Tile / Content 布局需要；null = 没有进行中的批次）。
+    /// 服务内自带缓存与去重，换包 / 切目录 / 关包统一走 <see cref="CancelThumbnailBatch"/> 释放。
+    /// </summary>
+    private ThumbnailService? _thumbnailService;
+
+    /// <summary>当前 <see cref="_thumbnailService"/> 对应的压缩包路径（换包时重建服务）。</summary>
+    private string? _thumbnailServiceArchivePath;
+
+    /// <summary>当前 <see cref="_thumbnailService"/> 使用的缩略图边长（设置里改尺寸后要重建服务）。</summary>
+    private int _thumbnailServiceSize;
+
+    /// <summary>固实 7z 判定缓存：同一压缩包只需开一次包探测。</summary>
+    private string? _thumbnailSolidArchivePath;
+    private bool _thumbnailSolidCache;
+
+    /// <summary>
+    /// 按需启动缩略图批次：详情布局 / 未打开压缩包 / 当前目录没有条目时什么都不做。
+    /// 过滤条件变化、切目录、刷新都会重填 <see cref="CurrentEntries"/> 并再次走到这里，
+    /// 服务内部按条目去重（命中缓存直接跳过），因此重复调用是安全的。
+    /// </summary>
+    public void StartThumbnailBatchIfNeeded()
+    {
+        if (LayoutMode == FileListLayoutMode.Details) return;
+        if (CurrentArchivePath is not { Length: > 0 } archivePath) return;
+        if (CurrentEntries.Count == 0) return;
+
+        var size = CurrentThumbnailSize();
+        if (_thumbnailService == null ||
+            _thumbnailServiceSize != size ||
+            !string.Equals(_thumbnailServiceArchivePath, archivePath, StringComparison.OrdinalIgnoreCase))
+        {
+            CancelThumbnailBatch();
+            _thumbnailService = new ThumbnailService(
+                archivePath,
+                GetSessionPassword(archivePath) ?? _currentPassword,
+                IsCurrentSevenZipSolid(archivePath),
+                cache: null,
+                thumbnailSize: size);
+            _thumbnailServiceArchivePath = archivePath;
+            _thumbnailServiceSize = size;
+        }
+
+        _thumbnailService.StartBatch(CurrentEntries);
+    }
+
+    /// <summary>
+    /// 读取当前设置里的缩略图边长（96/128/160，非法值按 128）。
+    /// 每次启动批次都读一次：设置窗口改完尺寸后 <see cref="ReloadThumbnailsForStyleChange"/>
+    /// 会重新走到这里，服务因尺寸变化被重建，从而按新边长重新解码。
+    /// </summary>
+    private static int CurrentThumbnailSize()
+    {
+        var size = AppSettings.Load().ThumbnailSize;
+        return size is 96 or 128 or 160 ? size : ThumbnailService.DefaultThumbnailSize;
+    }
+
+    /// <summary>
+    /// 设置 → 外观 → 缩略图 保存后重取缩略图：清空已加载的位图（旧尺寸）并重启批次。
+    /// 只有尺寸变化才真的需要重新解码；边框 / 垫底色是资源驱动，模板会自己重绘。
+    /// </summary>
+    public void ReloadThumbnailsForStyleChange()
+    {
+        if (LayoutMode == FileListLayoutMode.Details) return;
+
+        CancelThumbnailBatch();
+
+        foreach (var entry in CurrentEntries)
+        {
+            entry.ThumbnailSource = null;
+        }
+
+        StartThumbnailBatchIfNeeded();
+    }
+
+    /// <summary>
+    /// 取消并释放缩略图批次（切目录 / 刷新条目 / 关闭压缩包 / 回到详情布局）。
+    /// 缓存归服务所有，Dispose 后即释放；下次进入卡片布局按需重建。
+    /// </summary>
+    public void CancelThumbnailBatch()
+    {
+        if (_thumbnailService != null)
+        {
+            _thumbnailService.Cancel();
+            _thumbnailService.Dispose();
+            _thumbnailService = null;
+        }
+        _thumbnailServiceArchivePath = null;
+    }
+
+    /// <summary>
+    /// 当前压缩包是否固实 7z（固实包无法高效单条提取，缩略图服务会整体跳过文件内容图）。
+    /// 判定结果按压缩包路径缓存，关包后不清：同一文件重新打开只会得到同一个结论。
+    /// </summary>
+    private bool IsCurrentSevenZipSolid(string archivePath)
+    {
+        if (_currentFormat != ArchiveFormat.SevenZip) return false;
+        if (string.Equals(_thumbnailSolidArchivePath, archivePath, StringComparison.OrdinalIgnoreCase))
+            return _thumbnailSolidCache;
+
+        _thumbnailSolidArchivePath = archivePath;
+        _thumbnailSolidCache = DetectSevenZipSolid(archivePath, GetSessionPassword(archivePath) ?? _currentPassword);
+        return _thumbnailSolidCache;
+    }
+
+    /// <summary>
+    /// 复刻 Core <c>ArchiveEntryExtractor.IsSevenZipSolid</c> 的语义（该方法是 private，UI 层不可见）：
+    /// 读 <see cref="SharpSevenZipExtractor.IsSolid"/>，判不出来时按固实处理——宁可不做缩略图，
+    /// 也不要为一张图触发整包全量解压。加密文件名且无密码时连包都打不开，同样按固实处理。
+    /// </summary>
+    private static bool DetectSevenZipSolid(string archivePath, string? password)
+    {
+        try
+        {
+            using var extractor = string.IsNullOrEmpty(password)
+                ? new SharpSevenZipExtractor(archivePath)
+                : new SharpSevenZipExtractor(archivePath, password);
+            try
+            {
+                return extractor.IsSolid;
+            }
+            catch (Exception ex) when (ex is InvalidOperationException or SharpSevenZipArchiveException)
+            {
+                App.DebugLog($"[THB] IsSolid 探测失败，按固实处理：{ex.Message}");
+                return true;
+            }
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[THB] 打开压缩包做固实探测失败，按固实处理：{ex.Message}");
+            return true;
+        }
     }
 
     [RelayCommand]

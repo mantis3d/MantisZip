@@ -154,6 +154,8 @@ public partial class MainWindow : Window
                 Patterns = dialog.Patterns
             };
         };
+        // 工具栏文件名代码页下拉选「其他…」时的代码页输入框
+        vm.ShowCodePageInputDialog = () => CodePageInputDialog.ShowAsync(this);
         // 预览面板「输入密码」按钮共享同一密码对话框回调
         vm.Preview.ShowPasswordDialog = vm.ShowPasswordDialog;
         // 密码输入成功后重新触发当前条目的预览
@@ -167,6 +169,9 @@ public partial class MainWindow : Window
             await dialog.ShowDialog<bool>(this);
         };
         DataContext = vm;
+
+        // 工具栏代码页菜单先建一份（语言切换/切换编码后由 Click 重新建，见 RebuildNameEncodingMenu）
+        RebuildNameEncodingMenu();
 
         // 菜单子项延迟创建（2026-10-22 启动优化阶段 3）：
         // 文件/编辑/视图/工具四个顶级菜单的子项（共 25 项 + 图标）已抽到
@@ -275,8 +280,22 @@ public partial class MainWindow : Window
             }
         };
 
-        vm.ShowExtractFolderPicker = (entries, initialPath, currentFolder, preserveFullPath) =>
-            CustomFilePickerDialog.ShowExtractFolderAsync(this, entries, initialPath, currentFolder, preserveFullPath);
+        // 条目选择模式（v0.5.5 第三步后半）：弹解压设置窗的「选择要解压的文件」页，
+        // 窗口自己执行（确认即载荷 + 唯一执行器），返回值只表示「已确认」还是「取消」。
+        vm.ShowExtractEntryPicker = async (allEntries, presetEntries, initialPath, currentFolder, password) =>
+        {
+            var session = new ExtractSession();
+            var presenter = new MainWindowProgressPresenter();
+            var context = new ExtractRunContext(Owner: this, Presenter: presenter, ExitPolicy.None);
+            return await ExtractSettingsWindow.ShowWithPresetSelectionAsync(
+                this, session, context,
+                new[] { vm.CurrentArchivePath! },
+                allEntries,
+                presetEntries,
+                initialPath ?? string.Empty,
+                currentFolder,
+                password);
+        };
 
         vm.ShowCompressSettingsDialog = async (sourcePaths) =>
         {
@@ -573,6 +592,11 @@ public partial class MainWindow : Window
             var columnDict = new Dictionary<string, DataGridColumn>();
             foreach (var col in FileListGrid.Columns)
             {
+                // 复选框列不参与列状态持久化：它由 ApplyCheckboxColumnVisibility 独占管理，
+                // 一旦被这里的 DisplayIndex/IsVisible 回放碰到就会被顶到末尾并隐藏（实测）。
+                if (col.Tag is string cbTag && cbTag == "Checkbox")
+                    continue;
+
                 var id = GetColumnId(col);
                 if (id != null && !columnDict.ContainsKey(id))
                     columnDict[id] = col;
@@ -915,49 +939,53 @@ public partial class MainWindow : Window
         return null;
     }
 
+    /// <summary>
+    /// 命中测试：判断按下位置是否落在「复选框列」的复选框上。
+    /// 只有该列的单元格模板里有 <see cref="CheckBox"/>，所以自命中元素上溯「先遇到 CheckBox 还是
+    /// 先遇到 DataGridRow」即可区分列（Avalonia 的 <c>DataGridCell</c> 不公开所属列，不能用列标记判断）。
+    /// 命中时返回该行的数据项，供复选框模式的 Shift 连勾使用；命中别的列返回 false。
+    /// </summary>
+    private static bool TryHitCheckbox(object? source, out ArchiveItemModel? item)
+    {
+        item = null;
+        for (var v = source as Visual; v != null; v = v.GetVisualParent())
+        {
+            if (v is DataGridRow row)
+            {
+                // 先碰到行 = 命中的是别的列（名称 / 大小 / 日期……），不抢它的点击
+                item = row.DataContext as ArchiveItemModel;
+                return false;
+            }
+
+            if (v is CheckBox { DataContext: ArchiveItemModel model })
+            {
+                item = model;
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /// <summary>
+    /// 详情列表双击：行为统一在 <see cref="HandleItemDoubleTapAsync"/>（平铺/内容模式共用同一入口）。
+    /// </summary>
     private async void FileListGrid_DoubleTapped(object? sender, TappedEventArgs e)
     {
         if (sender is not DataGrid grid) return;
         if (grid.SelectedItem is not ArchiveItemModel item) return;
-        if (DataContext is not MainWindowViewModel vm) return;
 
-        if (item.IsDirectory)
-        {
-            vm.NavigateToFolderPath(item.FullPath);
-            return;
-        }
-
-        // 文件双击：提取到临时目录并用系统默认方式打开
-        if (!string.IsNullOrEmpty(vm.CurrentArchivePath))
-            await vm.OpenEntryWithDefaultAppAsync(item);
+        await HandleItemDoubleTapAsync(item);
     }
 
+    /// <summary>
+    /// 详情列表键盘：语义统一在 <see cref="HandleFileListKeyDown"/>
+    /// （Enter = 双击行为、Back = 上溯、Delete = 删除；平铺/内容模式共用同一实现）。
+    /// </summary>
     private void FileListGrid_KeyDown(object? sender, global::Avalonia.Input.KeyEventArgs e)
     {
-        if (sender is not DataGrid grid) return;
-        if (grid.SelectedItem is not ArchiveItemModel item) return;
-        if (DataContext is not MainWindowViewModel vm) return;
+        if (sender is not DataGrid) return;
 
-        switch (e.Key)
-        {
-            case global::Avalonia.Input.Key.Enter:
-                if (item.IsDirectory)
-                {
-                    vm.NavigateToFolderPath(item.FullPath);
-                    e.Handled = true;
-                }
-                break;
-
-            case global::Avalonia.Input.Key.Back:
-                vm.GoUpCommand.Execute(null);
-                e.Handled = true;
-                break;
-
-            case global::Avalonia.Input.Key.Delete:
-                vm.DeleteFilesCommand.Execute(null);
-                e.Handled = true;
-                break;
-        }
+        HandleFileListKeyDown(e);
     }
 
     private void FileListGrid_Sorting(object? sender, DataGridColumnEventArgs e)
@@ -1063,13 +1091,28 @@ public partial class MainWindow : Window
         view.FileListGridControl.KeyDown += FileListGrid_KeyDown;
         view.FileListGridControl.Sorting += FileListGrid_Sorting;
 
+        // 复选框模式：勾选集合变化 → 回写 DataGrid 选区（Ctrl/Shift 点选的反向由 SelectionChanged 处理）
+        if (DataContext is MainWindowViewModel checkboxVm)
+        {
+            // DataGridColumn 不在视觉树上、不继承 DataContext ⇒ 列上的 IsVisible 绑定不生效，
+            // 只能在这里按 VM 状态命令式切显隐（首次 + 之后每次切换）。
+            checkboxVm.PropertyChanged += OnCheckboxVmPropertyChanged;
+        }
+
         // 文件列表「拖出」（拖拽解压）接线
         SetupFileListDragDrop();
+
+        // 平铺/内容布局（缩略图）容器的事件接线：选择层 / 双击 / 键盘 / 右键 / 拖出
+        // （实现在 MainWindow.Thumbnails.cs；容器为 x:Name，随内容区一起创建）
+        SetupThumbnailLayoutEvents();
 
         // 启动期推迟的恢复动作（此时控件已存在）
         ApplyColumnStates(_pendingColumnStates);
         UpdateSortArrows();
         ApplySavedLayout();   // 必须在 ApplyPreviewLayout() 之前（预览尺寸回填）
+
+        // 复选框列必须在列状态回放之后再应用显隐（回放会重排 DisplayIndex，先应用会被顶走）
+        ApplyCheckboxColumnVisibility();
         ApplyPreviewLayout();
 
         // 预览面板此刻创建（内容区已就位）——替代原「首帧后 0.5s 预取」
@@ -1431,9 +1474,36 @@ public partial class MainWindow : Window
         _dragAddOverlayTimer.Stop();
     }
 
+    /// <summary>
+    /// 取当前 DataGrid 的行选区（成组勾选用）。复选框可以跨目录累积，但选区只会包含当前目录的行，
+    /// 所以这里直接读 <c>SelectedItems</c>，不读 <c>SelectedEntries</c>（后者在切换目录瞬间可能还是旧实例）。
+    /// </summary>
+    private IReadOnlyList<ArchiveItemModel> SelectedGridItems(MainWindowViewModel vm)
+    {
+        var grid = FileListGrid;
+        if (grid == null || grid.SelectedItems.Count == 0)
+            return vm.SelectedEntries;
+
+        var items = new List<ArchiveItemModel>(grid.SelectedItems.Count);
+        foreach (var item in grid.SelectedItems)
+        {
+            if (item is ArchiveItemModel model)
+                items.Add(model);
+        }
+
+        return items.Count > 0 ? items : vm.SelectedEntries;
+    }
+
     private void FileListGrid_SelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         if (DataContext is not MainWindowViewModel vm) return;
+
+        // 缩略图模式（平铺/内容）正在写选区：隐藏的 DataGrid 仍双向绑定 SelectedEntry，
+        // 会以「单选」回写覆盖掉刚写入的多选集合 → 由写入口（ApplyThumbnailSelection）负责同步。
+        if (_isApplyingThumbnailSelection) return;
+
+        // 复选框模式下选区与勾选是两套独立状态（2026-11-03 起）：
+        // 选区照常跟随 DataGrid，勾选由复选框 / 成组切换维护，互不覆盖。
         vm.SelectedEntries.Clear();
         foreach (var item in FileListGrid.SelectedItems)
         {
@@ -1441,6 +1511,38 @@ public partial class MainWindow : Window
                 vm.SelectedEntries.Add(model);
         }
     }
+
+
+    private void OnCheckboxVmPropertyChanged(object? sender, System.ComponentModel.PropertyChangedEventArgs e)
+    {
+        if (e.PropertyName == nameof(MainWindowViewModel.IsCheckboxMode))
+            ApplyCheckboxColumnVisibility();
+    }
+
+    /// <summary>
+    /// 按 <see cref="MainWindowViewModel.IsCheckboxMode"/> 切换「复选框列」的显隐。
+    /// <para>
+    /// 为什么不用 XAML 绑定：<c>DataGridColumn</c> 不是 <c>Control</c>，不在视觉树上、不继承 DataContext，
+    /// 列上的 <c>IsVisible="{Binding …}"</c> 永远不会解析（绑定静默失败，表现为列一直在）。
+    /// </para>
+    /// </summary>
+    private void ApplyCheckboxColumnVisibility()
+    {
+        if (DataContext is not MainWindowViewModel vm) return;
+
+        var visible = vm.IsCheckboxMode;
+        foreach (var column in FileListGrid.Columns)
+        {
+            if (column.Tag is string tag && string.Equals(tag, "Checkbox", StringComparison.Ordinal))
+            {
+                column.IsVisible = visible;
+                if (visible) column.DisplayIndex = 0;
+                break;
+            }
+        }
+    }
+
+
 
     public async void LoadArchiveOnStartup(string path)
     {
@@ -1462,18 +1564,18 @@ public partial class MainWindow : Window
         return await CustomFilePickerDialog.ShowOpenFileAsync(
             this,
             initialPath: contextPath,
-            // 过滤模式从引擎工厂的单一事实源派生：早先这里硬编码 8 项，
+            // 文件类型下拉项从引擎工厂的单一事实源派生：早先这里硬编码 8 项，
             // 新增 .jar/.war/.ear/.apk（issue #54）时很容易漏同步。
-            // 分卷集只认第一卷、故补 *.001（issue #70③）；设置 →「文件类型关联」里的自定义扩展名也一并纳入。
-            fileExtensions:
-            [
-                .. ArchiveFormatHelper.BuildOpenDialogPatterns(AppSettings.Load())
-            ]);
+            // 分卷集只认首卷、故补 *.001 / *.z01（issue #70③ / #68）；设置 →「文件类型关联」里的自定义扩展名也一并纳入。
+            // 第三项「自解压程序 (*.exe)」默认不选中（issue #36）：只有要打开 SFX 时才需要列出 exe。
+            fileTypes: [.. ArchiveFormatHelper.BuildOpenDialogFileTypes(AppSettings.Load())]);
     }
 
     /// <summary>
     /// 文件列表「拖出」（拖拽解压）的事件接线。
     /// 2026-10-21 启动优化：内容区延迟创建 → 拖拽接线随内容区创建时进行（构造期不再查找控件）。
+    /// 拖拽主体（覆层 / 状态光标 / OLE 拖拽 / 落点解压）已抽到 <see cref="StartFileDragAsync"/>，
+    /// 与平铺/内容模式容器共用同一份实现；这里只保留「按下记起点 + 移动过阈值后启动」。
     /// </summary>
     private void SetupFileListDragDrop()
     {
@@ -1483,6 +1585,35 @@ public partial class MainWindow : Window
         fileGrid.AddHandler(InputElement.PointerPressedEvent, (s, e) =>
         {
             _dragStartPoint = e.GetPosition(fileGrid);
+
+            // 复选框模式下的两个拦截（Tunnel 阶段，早于 DataGrid 自己的选区处理）：
+            //   ① Shift：DataGrid 的 Shift 只扩「行选区」，勾选不会跟着扩 ⇒ 按区间直接勾选；
+            //   ② 无修饰键且当前选区有 2 项以上：把这组一起切换成与被点行相反的状态
+            //      （先 Ctrl/Shift 选好几行，再点其中任意一行的复选框）。
+            if (DataContext is MainWindowViewModel gridVm
+                && gridVm.IsCheckboxMode
+                && TryHitCheckbox(e.Source, out var checkRow)
+                && checkRow != null)
+            {
+                var shift = e.KeyModifiers.HasFlag(KeyModifiers.Shift);
+                if (shift)
+                {
+                    ApplyCheckPointer(checkRow, shift: true, ctrl: false, gridVm);
+                    e.Handled = true;
+                    _dragStartEvent = null;
+                    _dragPreservedSelection = null;
+                    return;
+                }
+
+                if (!e.KeyModifiers.HasFlag(KeyModifiers.Control)
+                    && gridVm.ToggleCheckedForGroup(checkRow, SelectedGridItems(gridVm)))
+                {
+                    e.Handled = true;
+                    _dragStartEvent = null;
+                    _dragPreservedSelection = null;
+                    return;
+                }
+            }
 
             // 命中测试：仅在按下位置命中数据行时才记录拖拽起点。
             // 列标题（调整列宽/拖拽重排列）、空白区域、滚动条等按下不启动文件拖拽
@@ -1524,184 +1655,68 @@ public partial class MainWindow : Window
 
         fileGrid.PointerMoved += async (s, e) =>
         {
-            if (_dragStartEvent == null) return;
+            // 拖拽起点由上面的 Tunnel PointerPressed 记录
+            if (_dragStartEvent is not { } triggerEvent) return;
 
-            var pos = e.GetPosition(fileGrid);
-            var delta = pos - _dragStartPoint;
-            // 拖拽启动阈值：镜像 WPF SystemParameters.MinimumHorizontalDragDistance (~4px)，
-            // 避免 32px 造成的"拖起来黏手"感
-            if (Math.Abs(delta.X) < 4 && Math.Abs(delta.Y) < 4)
-                return;
+            // 阈值 + 设置开关：与平铺/内容容器共用同一判据（TryBeginFileDrag）
+            if (!TryBeginFileDrag(e.GetPosition(fileGrid) - _dragStartPoint)) return;
 
-            // 设置开关：EnableDragExtract = false 时不启动拖拽（与 WPF MainWindow.DragDrop.cs 行为一致）
-            if (!AppSettings.Load().EnableDragExtract)
-            {
-                App.DebugLog("[MainWindow] EnableDragExtract off — drag skipped");
-                _dragStartEvent = null;
-                _dragPreservedSelection = null;
-                return;
-            }
+            // 先取后清：拖拽期间指针事件仍会派发，清空按下态可防止重入
+            _dragStartEvent = null;
+            var preservedSelection = _dragPreservedSelection;
+            _dragPreservedSelection = null;
 
-            // Save trigger event before nulling (Avalonia DragDrop.DoDragDropAsync needs it)
-            var triggerEvent = _dragStartEvent;
-            _dragStartEvent = null; // Prevent re-entry
+            var vm = DataContext as MainWindowViewModel;
+            if (vm?.SelectedEntry == null) return;
 
-            var vm2 = DataContext as MainWindowViewModel;
-            if (vm2?.SelectedEntry == null) return;
-            var archivePath = vm2.CurrentArchivePath;
-            if (string.IsNullOrEmpty(archivePath)) return;
-
-            // Get selected items (support multi-select)
-            var selectedItems = _dragPreservedSelection
-                ?? new List<ArchiveItem> { vm2.SelectedEntry.ToCoreItem() };
-            var allItems = vm2.GetAllRawItems();
-
-            var password = vm2.GetSessionPassword(archivePath);
-
-            // Expand items: directories become their contained files (flat list)
-            var expandedItems = DragDropItemExpander.ExpandItems(selectedItems, allItems);
-            if (expandedItems.Count == 0)
-                return;
-
-            _isOwnDrag = true;
-            vm2.StatusMessage = LocalizationManager.T("Status_DragHint");
-
-            // ── Create Avalonia overlay window (works on UI thread, controlled via Win32 from background) ──
-            var overlayWin = new Window
-            {
-                ShowInTaskbar = false,
-                Background = Brushes.Transparent,
-                Width = 1,
-                Height = 1,
-                Topmost = true,
-                ShowActivated = false,
-            };
-            overlayWin.Show();
-
-            var overlayHwnd = overlayWin.TryGetPlatformHandle()?.Handle ?? nint.Zero;
-            App.DebugLog($"[MainWindow] Overlay HWND=0x{overlayHwnd:X}");
-            if (overlayHwnd != nint.Zero)
-            {
-                var exStyle = NativeMethods.GetWindowLong(overlayHwnd, NativeMethods.GWL_EXSTYLE);
-                NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_EXSTYLE,
-                    exStyle | NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT
-                            | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW);
-
-                // Remove title bar via Win32 (avoids Avalonia 12 enum compatibility issues)
-                var overlayStyle = NativeMethods.GetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE);
-                NativeMethods.SetWindowLong(overlayHwnd, NativeMethods.GWL_STYLE,
-                    overlayStyle & ~0x00C00000u); // clear WS_CAPTION (title bar)
-
-            }
-
-            var mainHwnd = this.TryGetPlatformHandle()?.Handle ?? nint.Zero;
-            App.DebugLog($"[MainWindow] Main HWND=0x{mainHwnd:X}");
-            using var controller = new OverlayController(overlayHwnd, mainHwnd);
-            controller.Start();
-
-            // 拖拽光标：按 overlay 状态加载不同 .cur，源文件位于项目 Resources\Cursors\，
-            // 构建时复制到输出目录的 Resources\Cursors\ 下（与 MenuIcons 同模式）。
-            // 状态→文件约定：
-            //   None/默认        → DragCursor.cur     （金色）
-            //   Success(可放置)  → DragCursorOk.cur   （绿色）
-            //   Warning(警告)    → DragCursorWarn.cur （红色）
-            //   自家窗口         → DragCursorSelf.cur （灰色）
-            // 缺失文件回退基础 DragCursor.cur，再回退系统标准箭头（共享句柄，不可销毁）。
-            // 仅从文件加载的自定义句柄在拖拽结束后销毁。
-            var cursorHandles = new HashSet<nint>();
-            var cursorsDir = Path.Combine(AppContext.BaseDirectory, "Resources", "Cursors");
-
-            nint LoadStateCursor(string fileName, nint fallback)
-            {
-                var path = Path.Combine(cursorsDir, fileName);
-                if (File.Exists(path))
-                {
-                    var h = NativeMethods.LoadCursorFromFile(path);
-                    if (h != nint.Zero)
-                    {
-                        cursorHandles.Add(h);
-                        return h;
-                    }
-                }
-                return fallback;
-            }
-
-            var baseCursor = LoadStateCursor("DragCursor.cur", nint.Zero);
-            if (baseCursor == nint.Zero)
-                baseCursor = NativeMethods.LoadCursor(nint.Zero, new nint(NativeMethods.OCR_NORMAL));
-            var okCursor = LoadStateCursor("DragCursorOk.cur", baseCursor);
-            var warnCursor = LoadStateCursor("DragCursorWarn.cur", baseCursor);
-            var selfCursor = LoadStateCursor("DragCursorSelf.cur", baseCursor);
-
-            // 每次 GiveFeedback 按 overlay 当前状态动态选光标（与覆层颜色同一状态源）
-            Func<nint> cursorProvider = () =>
-            {
-                if (controller.IsOverOwnWindow)
-                    return selfCursor;
-                return controller.CurrentStatus switch
-                {
-                    DropTargetDetector.DropTargetStatus.Success => okCursor,
-                    DropTargetDetector.DropTargetStatus.Warning => warnCursor,
-                    _ => baseCursor
-                };
-            };
-
-            try
-            {
-                // 自实现 OLE 拖拽：GiveFeedback 返回 S_OK 并直接 SetCursor 自定义光标。
-                // Avalonia 的 DoDragDropAsync 内部固定返回 USEDEFAULTCURSORS，会让系统用
-                // LoadCursor(OCR_NO) 显示禁止光标，而替换 OCR_NO 资源表在本机无效（已实证），
-                // 因此绕开它自行控制光标。Esc 由 QueryContinueDrag 的 fEscapePressed 处理。
-                App.DebugLog("[MainWindow] Custom OLE DoDragDrop START");
-                _dragCancelled = false;
-                var result = CustomOleDragDrop.PerformDragDrop(
-                    triggerEvent, MantisZipDragFormatName, archivePath,
-                    cursorProvider, DragDropEffects.Copy,
-                    () => _dragCancelled = true);
-                App.DebugLog($"[MainWindow] Custom OLE DoDragDrop DONE: result={result}");
-
-                // Close overlay IMMEDIATELY after drag completes, before dialog processing
-                controller.Stop();
-                overlayWin.Close();
-                App.DebugLog("[MainWindow] Overlay closed");
-
-                if (_dragCancelled)
-                {
-                    // 用户按 Esc 或右键取消拖拽 → 不执行解压
-                    App.DebugLog("[MainWindow] Drag cancelled during drag — extraction skipped");
-                    if (vm2 != null)
-                        vm2.StatusMessage = LocalizationManager.T("Status_DragDragCancelled");
-                }
-                else
-                {
-                    NativeMethods.GetCursorPos(out var dropPt);
-                    App.DebugLog($"[MainWindow] Drop point captured: ({dropPt.X}, {dropPt.Y})");
-
-                    if (vm2 != null && !string.IsNullOrEmpty(archivePath))
-                    {
-                        vm2.StatusMessage = LocalizationManager.T("Status_DragDetectingTarget");
-                        var dragService = new DragDropService(
-                            archivePath, password, this, vm2.CurrentFolder ?? "");
-                        await dragService.ExecuteAfterDropAsync(
-                            selectedItems, allItems, vm2);
-                    }
-                }
-            }
-            catch (Exception ex)
-            {
-                App.DebugLog($"[MainWindow] DragDrop EXCEPTION: {ex.GetType().Name}: {ex.Message}");
-            }
-            finally
-            {
-                // 释放自定义光标句柄（仅从文件加载的；共享标准箭头不销毁）
-                foreach (var h in cursorHandles)
-                    NativeMethods.DestroyIcon(h);
-                // Safety net: ensure overlay is closed even if early close was skipped
-                try { overlayWin.Close(); } catch { }
-                try { controller.Stop(); } catch { }
-                _isOwnDrag = false;
-                App.DebugLog("[MainWindow] DragDrop cleanup done");
-            }
+            // 拖拽条目：多选时用按下瞬间的快照（preservedSelection），单选时用当前选中项
+            var items = new List<ArchiveItemModel> { vm.SelectedEntry };
+            await StartFileDragAsync(triggerEvent, items, preservedSelection);
         };
+    }
+
+    /// <summary>
+    /// 工具栏代码页按钮被点击：先重建菜单项，再让 <see cref="Button"/> 的 Flyout 照常弹出。
+    /// <para>
+    /// 为什么在 Click 里建而不是在 XAML 里静态列：选项文案要随语言变、「其他代码页…」需要
+    /// 走命令参数、当前项要打勾 —— 用 code-behind 现建能直接拿 <see cref="MainWindowViewModel"/> 的
+    /// 命令与选中项，不必给 NameEncodingOption 塞 ICommand。
+    /// </para>
+    /// <para>
+    /// Avalonia 的 <c>Button.OnClick</c> 先冒泡 Click 事件、再弹出 Flyout，所以这里重建完菜单项
+    /// 正好赶上本次弹出；同时 <see cref="MenuFlyout"/> 的 <c>Opened</c> 也会重建一次兜底
+    /// （重建是幂等的，不会重复添加）。
+    /// </para>
+    /// </summary>
+    private void OnNameEncodingClick(object? sender, RoutedEventArgs e) => RebuildNameEncodingMenu();
+
+    /// <summary>菜单弹出后按最新状态重建一次（兜底：若 Click 与弹窗顺序在某个平台上反转）。</summary>
+    private void OnNameEncodingMenuOpened(object? sender, EventArgs e) => RebuildNameEncodingMenu();
+
+    /// <summary>
+    /// 按 VM 的当前选项重建代码页菜单：九个固定项，当前项打勾（<see cref="MenuItemToggleType.Radio"/>），
+    /// 命令统一走 <c>ChangeNameEncodingCommand</c>（「其他代码页…」由 VM 内部再弹数字输入框）。
+    /// </summary>
+    private void RebuildNameEncodingMenu()
+    {
+        // Flyout 不在可视树里，x:Name 不会生成字段 ⇒ 从按钮上取
+        if (NameEncodingButton?.Flyout is not MenuFlyout flyout || DataContext is not MainWindowViewModel vm)
+            return;
+
+        var selectedKey = vm.NameEncodingSelectedOption?.Key;
+        flyout.Items.Clear();
+
+        foreach (var option in vm.NameEncodingOptions)
+        {
+            flyout.Items.Add(new MenuItem
+            {
+                Header = option.Display,
+                Command = vm.ChangeNameEncodingCommand,
+                CommandParameter = option.Key,
+                ToggleType = MenuItemToggleType.Radio,
+                GroupName = "NameEncoding",
+                IsChecked = string.Equals(option.Key, selectedKey, StringComparison.Ordinal),
+            });
+        }
     }
 }

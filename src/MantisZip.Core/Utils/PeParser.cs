@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.IO;
 using System.Text;
 
@@ -51,10 +52,13 @@ public static class PeParser
             uint numberOfRvaAndSizes;
             if (isPE32Plus)
             {
-                // PE32+：Subsystem 在 opt+72, NumberOfRvaAndSizes 在 opt+112
-                fs.Seek(optHeaderStart + 72, SeekOrigin.Begin);
+                // PE32+：Subsystem 与 PE32 同在 opt+68（PE32+ 少了 BaseOfData，之后的字段才偏移），
+                // NumberOfRvaAndSizes 在 opt+108（PE32 是 +92）。
+                // 2026-10-31 issue #74：此前误读 +72 / +112，导致所有 64 位 exe 的版本资源全丢、
+                // 子系统还读成 SizeOfStackReserve 的低字节（显示「Other」）。
+                fs.Seek(optHeaderStart + 68, SeekOrigin.Begin);
                 subsystem = reader.ReadUInt16();
-                fs.Seek(optHeaderStart + 112, SeekOrigin.Begin);
+                fs.Seek(optHeaderStart + 108, SeekOrigin.Begin);
                 numberOfRvaAndSizes = reader.ReadUInt32();
             }
             else
@@ -73,9 +77,9 @@ public static class PeParser
             {
                 long dataDirEntry2Offset;
                 if (isPE32Plus)
-                    dataDirEntry2Offset = optHeaderStart + 116 + 2 * 8;
+                    dataDirEntry2Offset = optHeaderStart + 112 + 2 * 8; // PE32+ DataDirectory 起点 = opt+112
                 else
-                    dataDirEntry2Offset = optHeaderStart + 96 + 2 * 8;
+                    dataDirEntry2Offset = optHeaderStart + 96 + 2 * 8;  // PE32 DataDirectory 起点 = opt+96
                 fs.Seek(dataDirEntry2Offset, SeekOrigin.Begin);
                 resourceDirRVA = reader.ReadUInt32();
                 resourceDirSize = reader.ReadUInt32();
@@ -99,11 +103,12 @@ public static class PeParser
 
             // ── 资源目录遍历：查找 RT_VERSION (ID=16) ──
             byte[]? versionData = null;
+            ushort languageId = 0;
             if (resourceDirRVA != 0)
             {
                 uint? rsrcOffset = ResolveRvaAbsolute(resourceDirRVA, sections);
                 if (rsrcOffset.HasValue)
-                    versionData = FindVersionResourceData(fs, reader, rsrcOffset.Value, resourceDirRVA, sections);
+                    versionData = FindVersionResourceData(fs, reader, rsrcOffset.Value, resourceDirRVA, sections, out languageId);
             }
 
             // ── 解析 VS_VERSIONINFO ──
@@ -113,13 +118,14 @@ public static class PeParser
             string? productVersion = null;
             string? fileDescription = null;
             string? legalCopyright = null;
+            string? originalFilename = null;
 
             if (versionData != null && versionData.Length > 0)
             {
                 using var vms = new MemoryStream(versionData);
                 using var vr = new BinaryReader(vms);
                 ParseVersionInfo(vr, out companyName, out productName, out fileVersion,
-                    out productVersion, out fileDescription, out legalCopyright);
+                    out productVersion, out fileDescription, out legalCopyright, out originalFilename);
             }
 
             // ── 构建 FileFormatInfo ──
@@ -157,6 +163,9 @@ public static class PeParser
                 Architecture = arch,
                 Subsystem = subSys,
                 AdditionalInfo = fileDescription,
+                LegalCopyright = legalCopyright,
+                OriginalFilename = originalFilename,
+                Language = ResolveLanguageName(languageId),
             };
         }
         catch (Exception ex)
@@ -183,10 +192,17 @@ public static class PeParser
     /// <summary>
     /// 在资源目录中查找 RT_VERSION 资源数据。
     /// </summary>
+    /// <param name="languageId">
+    /// 输出：数据条目所在的语言 ID（资源目录叶子的 name/id），如 0x0409 = 英文(美国)。
+    /// 版本资源没有声明语言时返回 0。
+    /// </param>
     private static byte[]? FindVersionResourceData(
         FileStream fs, BinaryReader reader, uint rsrcDirOffset, uint rsrcRVA,
-        List<(uint va, uint vs, uint rawOff, uint rawSize)> sections)
+        List<(uint va, uint vs, uint rawOff, uint rawSize)> sections,
+        out ushort languageId)
     {
+        languageId = 0;
+
         // 1) 在类型目录中找 RT_VERSION (ID=16)
         uint? typeEntryOff = FindResourceDirectoryEntryById(fs, reader, rsrcDirOffset, 16);
         if (typeEntryOff == null) return null;
@@ -209,12 +225,16 @@ public static class PeParser
             if (entryOff == null) return null;
 
             fs.Seek(entryOff.Value, SeekOrigin.Begin);
-            reader.ReadUInt32(); // skip name/id
+            uint nameOrId = reader.ReadUInt32(); // 名字或 ID（叶子层这里就是语言 ID）
             uint dataField = reader.ReadUInt32();
 
             if ((dataField & 0x80000000) == 0)
             {
                 // 数据条目 → 读取 IMAGE_RESOURCE_DATA_ENTRY
+                // 2026-10-31 issue #74：叶子条目的 name/id 即语言 ID，用于推断「语言」字段
+                if ((nameOrId & 0x80000000) == 0)
+                    languageId = (ushort)nameOrId;
+
                 uint? dataEntryAbs = RvaToOffsetInRsrc(rsrcDirOffset, dataField, rsrcRVA, sections);
                 if (dataEntryAbs == null) return null;
 
@@ -239,6 +259,28 @@ public static class PeParser
         }
 
         return null; // 超过最大深度
+    }
+
+    /// <summary>
+    /// 把版本资源语言 ID 转成人可读名称（如 0x0409 → "英文(美国)"）。
+    /// 用 <see cref="CultureInfo.GetCultureInfo(int)"/> 做映射，未安装/未知语言回落 "0x0409"。
+    /// </summary>
+    private static string? ResolveLanguageName(ushort languageId)
+    {
+        if (languageId == 0) return null;
+
+        try
+        {
+            return CultureInfo.GetCultureInfo(languageId).DisplayName;
+        }
+        catch (CultureNotFoundException)
+        {
+            return $"0x{languageId:X4}";
+        }
+        catch (ArgumentException)
+        {
+            return $"0x{languageId:X4}";
+        }
     }
 
     /// <summary>
@@ -297,7 +339,8 @@ public static class PeParser
         BinaryReader reader,
         out string? companyName, out string? productName,
         out string? fileVersion, out string? productVersion,
-        out string? fileDescription, out string? legalCopyright)
+        out string? fileDescription, out string? legalCopyright,
+        out string? originalFilename)
     {
         companyName = null;
         productName = null;
@@ -305,6 +348,7 @@ public static class PeParser
         productVersion = null;
         fileDescription = null;
         legalCopyright = null;
+        originalFilename = null;
 
         try
         {
@@ -390,15 +434,16 @@ public static class PeParser
                                 case "ProductVersion": productVersion ??= strValue; break;
                                 case "FileDescription": fileDescription = strValue; break;
                                 case "LegalCopyright": legalCopyright = strValue; break;
+                                case "OriginalFilename": originalFilename = strValue; break;
                             }
 
-                            reader.BaseStream.Seek(strStart + strLength, SeekOrigin.Begin);
+                            reader.BaseStream.Seek(AlignUp(strStart + strLength), SeekOrigin.Begin);
                         }
-                        reader.BaseStream.Seek(tableStart + tableLength, SeekOrigin.Begin);
+                        reader.BaseStream.Seek(AlignUp(tableStart + tableLength), SeekOrigin.Begin);
                     }
                 }
                 // VarFileInfo 跳过（不需要）
-                reader.BaseStream.Seek(childStart + childLength, SeekOrigin.Begin);
+                reader.BaseStream.Seek(AlignUp(childStart + childLength), SeekOrigin.Begin);
             }
         }
         catch (Exception ex)
@@ -433,4 +478,13 @@ public static class PeParser
         if (aligned > offset)
             reader.BaseStream.Seek(aligned, SeekOrigin.Begin);
     }
+
+    /// <summary>
+    /// 把块结束位置向上对齐到 4 字节边界。
+    /// 2026-10-31 issue #74：VS_VERSIONINFO 的 wLength 不保证是 4 的倍数
+    /// （真实样本里 7z.exe 的 String 条目就有 50 与 38 这样的长度），下一个块从对齐后的位置开始；
+    /// 直接跳到 <c>start + length</c> 会落到填充字节上，把后续条目全部读成 0，
+    /// 于是「产品名称 / 原始文件名 / 著作权」这些排在后面的字段全部丢失。
+    /// </summary>
+    private static long AlignUp(long position) => (position + 3) & ~3;
 }

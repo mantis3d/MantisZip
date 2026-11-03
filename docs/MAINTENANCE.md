@@ -176,6 +176,12 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 | 改了 `installer*.iss` 本机却没法验证 | 本机没有 ISCC（Inno Setup 编译器），`ci.yml` 也**不编译**安装包——只有 `release.yml` 打 tag 时才 `choco install innosetup` 后编译。所以 `.iss` 的语法/API 错误只能等首次发版暴露；改完至少要人工核对结构（`[Code]` 的 `begin`/`end` 计数、`[CustomMessages]` 中英成对、两个脚本的 AppId 保持一致），必要时在 beta 上推一个测试 tag 验证 |
 | 测试里写 `Avalonia.Themes.Fluent.FluentTheme` 报 `CS0234: 命名空间"MantisZip.UI.Avalonia"中不存在类型或命名空间名"Themes"` | 命名空间遮蔽：测试命名空间是 `MantisZip.UI.Avalonia.Tests`，简单名 `Avalonia` 会先解析成 `MantisZip.UI.Avalonia`。新增 `using` 必须写成 `global::Avalonia.Themes.Fluent;`（`Avalonia.Controls.Documents.Run` 同理） |
 | 无头测试里改 `TabControl.SelectedIndex` 后拿到的控件 `Bounds` 全是 0 | 页签内容控件在下一轮布局/调度才生成并排布：要循环 `Measure` → `Arrange` → `UpdateLayout()` → `Dispatcher.UIThread.RunJobs()` 数轮。另外被隐藏的分区（`IsEffectivelyVisible == false`，例如「还没有检查结果」时的详情块）里的按钮 `Bounds` 恒为 0，几何断言必须按**有效可见性**过滤，不能用 `IsVisible` |
+| `AutoCompleteBox` 里打字没反应（`IsFocused=true` 却收不到字符） | `AutoCompleteBox` 自身不处理文本输入：`Focus()` 它只会把焦点给容器，模板里的 `TextBox` 从未聚焦。必须 `ApplyTemplate()` 后取内部 `TextBox` 再 `Focus()`。另外 **Esc 会被 `AutoCompleteBox` 吞掉**（关自己的下拉），Enter/Esc 处理要挂到内部 `TextBox` 的 `KeyDown`，挂在容器上收不到 |
+| 无头截图里 `PathIcon` / `Shapes.Path` 不出现，但 `Border`、`TextBlock` 正常 | 本仓库无头环境 `window.CaptureRenderedFrame()` **不渲染几何图形**（用同屏红块 + ABC + 蓝路径验证过）。面包屑根图标「缺失」曾因此被误判为缺陷；图标/图形类视觉取证必须用真机 `CopyFromScreen` |
+| `AutoCompleteBox` 打字时自动选中首个候选，`SelectedItem` 在输入过程中就被设上 | 「选中即提交」不能写 `SelectionChanged`（会输到一半自动导航）；提交挂 `Popup.Child` 的 `PointerPressed`（下拉在按下瞬间就关，`PointerReleased` 收不到）；并关掉 `IsTextCompletionEnabled`（默认 `true`，会把候选剩余部分写进 `Text`，与「每次 `TextChanged` 重建 `ItemsSource`」叠加会写乱输入串） |
+| `AutoCompleteBox` 相关界面偶发 `ArgumentOutOfRangeException: Index was out of range`（`ItemsSourceView.GetAt` ← `SelectedItems.GetEnumerator`） | 在 `TextChanged` 里同步替换 `ItemsSource`，与 AutoCompleteBox 自己「关下拉 + 写回 `SelectedItem`」撞车。修法：候选刷新延后到 `DispatcherPriority.Background`（带代次号），换 `ItemsSource` 前先 `SelectedItem = null` |
+| `AutoCompleteBox` 打字后下拉不再弹出（延后刷新 `ItemsSource` 之后） | 候选刷新被 `Dispatcher.Post` 到 `Background`，控件自己那次 `TextUpdated` 已经关掉下拉。修法：刷新完显式 `IsDropDownOpen = 有候选 && 仍在编辑 && 文本非空` |
+| 地址栏（`PathBreadcrumb`）进出编辑态时整行高度跳变、下方内容跟着位移 | 外壳高度原本由内容决定：段按钮 20px、空路径占位文案 17px + 上下各 8px Margin = 33px、编辑框 20px ⇒ 三种内容三种高度（实测设置页浏览态 43 / 编辑态 30）。修法：内层 `Grid` 钉 `MinHeight=20`（与段按钮、编辑框同高），占位文案去掉上下 Margin；回归用例 `tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbLayoutTests.cs`（把修复退回会报 `Expected 42 / Actual 30`） |
 
 ## 9. 还没做的（有意留白，不是忘了）
 

@@ -28,6 +28,25 @@ public class PreviewTreeNode : FolderNode
     /// <summary>格式化的文件大小字符串。</summary>
     public string SizeDisplay { get; set; } = string.Empty;
 
+    /// <summary>
+    /// 骨架构建过程中的实时进度（文件数 + 大小，累计值）。
+    /// 非 null 时 <see cref="DirectoryInfoText"/> 显示「加载中 N 个文件，X」而不是静态「加载中」；
+    /// 由 <c>CompressSettingsViewModel</c> 的 500ms 定时器刷新，赋值会同时通知统计文案。
+    /// </summary>
+    public SkeletonProgress? CurrentSkeletonProgress
+    {
+        get => _currentSkeletonProgress;
+        set
+        {
+            // record 值相等即视为未变，避免 500ms 空刷
+            if (Equals(_currentSkeletonProgress, value)) return;
+            _currentSkeletonProgress = value;
+            OnPropertyChanged(nameof(CurrentSkeletonProgress));
+            OnPropertyChanged(nameof(DirectoryInfoText));
+        }
+    }
+    private SkeletonProgress? _currentSkeletonProgress;
+
     /// <summary>该节点在目标位置是否已存在同名文件。</summary>
     public bool ExistsAtDestination { get; set; }
 
@@ -69,13 +88,23 @@ public class PreviewTreeNode : FolderNode
     public int MaxChildDepth { get; set; }
 
     /// <summary>目录统计摘要文本，仅目录节点有值（空目录不显示统计行）。
-    /// 含占位子节点时显示「加载中」。</summary>
-    public string DirectoryInfoText =>
-        HasLoadingPlaceholderChild
-            ? LocalizationManager.T("Preview_Result_LoadingMore")
-            : !IsEmptyDirectory && Children.Count > 0 && !string.IsNullOrEmpty(FullPath)
+    /// 含占位子节点时显示「加载中」；有实时进度时显示「加载中 N 个文件，X」。</summary>
+    public string DirectoryInfoText
+    {
+        get
+        {
+            if (HasLoadingPlaceholderChild)
+            {
+                if (_currentSkeletonProgress is { FileCount: > 0 } sp)
+                    return LocalizationManager.T("Preview_Result_SkeletonProgress",
+                        sp.FileCount, FormatUtil.FormatSize(sp.TotalSize));
+                return LocalizationManager.T("Preview_Result_LoadingMore");
+            }
+            return !IsEmptyDirectory && Children.Count > 0 && !string.IsNullOrEmpty(FullPath)
                 ? LocalizationManager.T("Preview_Result_DirInfo", TotalDescendantCount, FormatUtil.FormatSize(TotalDescendantSize))
                 : string.Empty;
+        }
+    }
 
     private bool HasLoadingPlaceholderChild =>
         Children.OfType<PreviewTreeNode>().Any(c => c.IsLoadingPlaceholder || c.HasLoadingPlaceholderChild);
@@ -172,6 +201,7 @@ public class PreviewTreeNode : FolderNode
             Name = Name,
             FullPath = FullPath,
             DisplayLabel = DisplayLabel,
+            CurrentSkeletonProgress = CurrentSkeletonProgress,
             Size = Size,
             SizeDisplay = SizeDisplay,
             ExistsAtDestination = ExistsAtDestination,

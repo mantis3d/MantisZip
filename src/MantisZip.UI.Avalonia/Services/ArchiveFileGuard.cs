@@ -74,16 +74,9 @@ public sealed class ArchiveFileGuard : IDisposable
         Current = ArchiveAvailability.Available;
 
         _watchDirectory = Path.GetDirectoryName(_snapshot[0].Path);
-        if (ArchiveVolumeSet.HasVolumeSuffix(_archivePath)
-            && ArchiveVolumeSet.TryGetVolumeBase(_archivePath, out var volumeBase, out _))
-        {
-            // 分卷：监听 name.zip.001 … name.zip.NNN（任一卷缺失都算 Missing）。
-            _watchFilter = Path.GetFileName(volumeBase) + ".*";
-        }
-        else
-        {
-            _watchFilter = Path.GetFileName(_archivePath);
-        }
+        // 分卷要监听整组（name.zip.001 … / name.part*.rar），任一卷缺失都算 Missing；
+        // 具体前缀由 ArchiveVolumeSet 统一给出，避免各处各写一套分卷命名规则。
+        _watchFilter = ArchiveVolumeSet.GetVolumeWatchFilter(_archivePath);
 
         foreach (var item in _snapshot)
             _watchedFileNames.Add(Path.GetFileName(item.Path));

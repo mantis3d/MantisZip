@@ -1,6 +1,4 @@
 using MantisZip.Core.Abstractions;
-using MantisZip.Core.Engines;
-using SharpSevenZip;
 
 namespace MantisZip.Core.Utils;
 
@@ -26,6 +24,10 @@ public static class ArchiveCommentReader
     {
         try
         {
+            // 自解压 exe 按扩展名会被判成 Zip，内嵌 RAR 的注释得走 7z.dll 才读得到（issue #36）
+            if (SfxProbe.TryGetPayloadFormat(archivePath) is { } sfxFormat)
+                format = sfxFormat;
+
             return format switch
             {
                 ArchiveFormat.Zip => ReadZipComment(archivePath),
@@ -49,11 +51,8 @@ public static class ArchiveCommentReader
 
     private static string? ReadRarComment(string archivePath, string? password)
     {
-        SevenZipEngine.EnsureLibraryPath();
-
-        using var extractor = string.IsNullOrEmpty(password)
-            ? new SharpSevenZipExtractor(archivePath)
-            : new SharpSevenZipExtractor(archivePath, password);
+        // 工厂内部会配 7z.dll 路径（issue #52），并对自解压 exe 显式指定内嵌格式（#36）
+        using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
         foreach (var prop in extractor.ArchiveProperties)
         {

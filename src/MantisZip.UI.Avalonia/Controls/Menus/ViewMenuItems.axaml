@@ -14,6 +14,54 @@
     <conv:BoolToToggleBgBrushConverter x:Key="BoolToToggleBgBrushConverter" />
   </StackPanel.Resources>
 
+  <!-- 列表布局：详情 / 平铺 / 内容行三选一（与工具栏的循环切换按钮等价，
+       菜单里可以直接指定；勾选框模式的方块随当前布局亮起） -->
+  <MenuItem Header="{Binding LocalizedStrings[Menu_ListLayout]}"
+            IsEnabled="{Binding IsArchiveLoaded}">
+    <MenuItem Command="{Binding SetDetailsLayoutCommand}"
+              Header="{Binding LocalizedStrings[LayoutMode_Details]}">
+      <MenuItem.Icon>
+        <Border Classes="ToggleIconBox"
+                Background="{Binding IsDetailsLayout, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+          <PathIcon Data="{StaticResource IconGrid}" Width="10" Height="10"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Border>
+      </MenuItem.Icon>
+    </MenuItem>
+    <MenuItem Command="{Binding SetTileLayoutCommand}"
+              Header="{Binding LocalizedStrings[LayoutMode_Tile]}">
+      <MenuItem.Icon>
+        <Border Classes="ToggleIconBox"
+                Background="{Binding IsTileLayout, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+          <PathIcon Data="{StaticResource IconThumbnails}" Width="10" Height="10"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Border>
+      </MenuItem.Icon>
+    </MenuItem>
+    <MenuItem Command="{Binding SetContentLayoutCommand}"
+              Header="{Binding LocalizedStrings[LayoutMode_Content]}">
+      <MenuItem.Icon>
+        <Border Classes="ToggleIconBox"
+                Background="{Binding IsContentLayout, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+          <PathIcon Data="{StaticResource IconPanelRight}" Width="10" Height="10"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Border>
+      </MenuItem.Icon>
+    </MenuItem>
+  </MenuItem>
+  <!-- 复选框模式：勾选跨目录保持，Shift 连勾（卡片视图与表格视图行为一致） -->
+  <MenuItem Command="{Binding ToggleCheckboxModeCommand}"
+            IsEnabled="{Binding IsArchiveLoaded}"
+            Header="{Binding LocalizedStrings[Menu_CheckboxMode]}">
+    <MenuItem.Icon>
+      <Border Classes="ToggleIconBox"
+              Background="{Binding IsCheckboxMode, Converter={StaticResource BoolToToggleBgBrushConverter}}">
+        <PathIcon Data="{StaticResource IconCheckmark}" Width="10" Height="10"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Border>
+    </MenuItem.Icon>
+  </MenuItem>
+  <Separator />
   <!-- 切换主题：亮色/暗色/跟随系统 -->
   <MenuItem Command="{Binding ToggleThemeCommand}"
             Header="{Binding LocalizedStrings[Menu_ToggleTheme]}">

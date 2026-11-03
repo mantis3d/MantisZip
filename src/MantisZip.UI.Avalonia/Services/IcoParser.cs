@@ -20,17 +20,27 @@ internal static class IcoParser
     /// </summary>
     public static List<IcoFrame> ExtractFrames(string filePath)
     {
-        var result = new List<IcoFrame>();
-        byte[] fileBytes;
-
         try
         {
-            fileBytes = File.ReadAllBytes(filePath);
+            return ExtractFrames(File.ReadAllBytes(filePath));
         }
         catch
         {
-            return result;
+            // 读文件失败或解析异常：与既有行为一致，返回空列表
+            return [];
         }
+    }
+
+    /// <summary>
+    /// 从内存中的 ICO 字节解析出所有帧（按面积从大到小）。
+    /// <para>
+    /// 供「压缩包内 <c>.ico</c> 条目显示自身图标」使用：这些字节是从包内解压出来的，
+    /// 没有真实文件路径，走不了 <see cref="ExtractFrames(string)"/> 的读文件分支。
+    /// </para>
+    /// </summary>
+    public static List<IcoFrame> ExtractFrames(byte[] fileBytes)
+    {
+        var result = new List<IcoFrame>();
 
         if (fileBytes.Length < 6)
             return result;

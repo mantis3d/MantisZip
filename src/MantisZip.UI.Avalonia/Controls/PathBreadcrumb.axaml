@@ -1,0 +1,167 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+             x:Class="MantisZip.UI.Avalonia.Controls.PathBreadcrumb"
+             x:Name="RootControl"
+             ClipToBounds="True">
+  <!--
+    面包屑地址栏：浏览态（路径分段按钮，可逐段点击直达）与编辑态（AutoCompleteBox）互斥显示。
+    - 本控件不导航：段点击 / 末段点击（进编辑态）/ 编辑态 Enter 只上抛 NavigateRequested，由宿主决定导航
+    - Path 为 OneWay（宿主→控件），控件从不回写，从根上消除双向绑定环
+    - 外层 Border 提供可见的「输入框」外观：header 底（比 surface 卡片暗一档，白底卡片上也看得见）+ 边框，
+      hover 加深底色，编辑态换 surface 底 + 强调色边框
+  -->
+  <UserControl.Styles>
+    <!-- 外壳：让用户一眼看出这里是导航栏。
+         底色用 ThemeHeaderBgBrush 而不是 ThemeSurfaceBgBrush —— 后者与设置页的卡片底同色（都是 #FFFFFF），
+         嵌在卡片里就完全看不出来了；header 色比 surface 暗一档，白底卡片和窗口底上都成立 -->
+    <Style Selector="Border.crumbShell">
+      <Setter Property="Background" Value="{DynamicResource ThemeHeaderBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
+      <Setter Property="BorderThickness" Value="1" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+      <Setter Property="Padding" Value="{DynamicResource SpacingXxsThk}" />
+      <!-- 高度由控件自己决定（ControlHeightMd）：宿主一律不写 Height / MinHeight。
+           要调整面包屑高度就改这一处，不要回到各处宿主去覆盖。 -->
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
+    <!-- 悬停：底色再深一档，给出「可点」的暗示 -->
+    <Style Selector="Border.crumbShell:pointerover">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+    </Style>
+    <!-- 编辑态：换回 surface 底（像输入框）+ 强调色边框，与「输入框聚焦」同一语义 -->
+    <Style Selector="UserControl:editing Border.crumbShell">
+      <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeAccentBrush}" />
+    </Style>
+    <!-- 编辑态：AutoCompleteBox 内部的 TextBox 也要去掉自己的边框/底色/内边距，
+         否则外壳里会再套一个圆角输入框（双层边框），且其最小高度会把外壳撑高 -->
+    <Style Selector="AutoCompleteBox /template/ TextBox">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="MinHeight" Value="0" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="FontSize" Value="12" />
+    </Style>
+    <!-- 段按钮：紧凑外观，靠悬停色区分可点击 -->
+    <Style Selector="Button.crumb">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+      <Setter Property="Padding" Value="2,0" />
+      <Setter Property="MinHeight" Value="20" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.crumb:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <Style Selector="Button.crumb:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <!-- 末段（当前目录）：加粗 + 可点击（点它进编辑态），与祖先段区分但不失可点感 -->
+    <Style Selector="Button.crumbCurrent">
+      <Setter Property="Background" Value="Transparent" />
+      <Setter Property="BorderThickness" Value="0" />
+      <Setter Property="CornerRadius" Value="{DynamicResource BorderRadius}" />
+      <Setter Property="Padding" Value="2,0" />
+      <Setter Property="MinHeight" Value="20" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="FontWeight" Value="SemiBold" />
+      <Setter Property="Cursor" Value="Hand" />
+    </Style>
+    <Style Selector="Button.crumbCurrent:pointerover /template/ ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <Style Selector="Button.crumbCurrent:pointerover /template/ ContentPresenter#PART_ContentPresenter">
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonHoverBrush}" />
+    </Style>
+    <!-- 分隔符：真图标（细箭头），比「›」字形更清楚 -->
+    <Style Selector="PathIcon.crumbSep">
+      <Setter Property="Width" Value="12" />
+      <Setter Property="Height" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="1,0" />
+    </Style>
+    <!-- 分隔符兜底（图标资源未加载时退化用） -->
+    <Style Selector="TextBlock.crumbSep">
+      <Setter Property="FontSize" Value="11" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="1,0" />
+    </Style>
+    <!-- 不可点段（UNC 根 / 相对路径首段）：纯文本 -->
+    <Style Selector="TextBlock.crumbStatic">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="2,0" />
+    </Style>
+    <!-- 折叠省略号：仅展示 + ToolTip，不导航 -->
+    <Style Selector="TextBlock.crumbEllipsis">
+      <Setter Property="FontSize" Value="12" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextSecondaryBrush}" />
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="2,0" />
+    </Style>
+    <!-- 根段（盘符 / UNC 根 / 压缩包根图标）：可点时由代码挂 Hand 光标 -->
+    <Style Selector="StackPanel.crumbRoot">
+      <Setter Property="VerticalAlignment" Value="Center" />
+      <Setter Property="Margin" Value="2,0" />
+    </Style>
+  </UserControl.Styles>
+
+  <!-- 外壳 Border：可见的导航栏容器 -->
+  <Border x:Name="Shell" Classes="crumbShell">
+    <Grid RowDefinitions="Auto" MinHeight="20" ClipToBounds="True">
+      <!-- 点击承接层：全宽透明层，专收「末尾空白区」与「磁盘空路径整行」的点击（段按钮在其上层优先命中） -->
+      <Border x:Name="BlankClickTarget"
+              Background="Transparent"
+              Cursor="Ibeam"
+              PointerPressed="BlankClickTarget_PointerPressed" />
+
+      <!-- 浏览态：段列表（超长靠 ClipToBounds 裁剪，完整路径由各段 ToolTip 保底） -->
+      <StackPanel x:Name="SegmentsPanel"
+                  Orientation="Horizontal"
+                  VerticalAlignment="Center"
+                  Spacing="{DynamicResource SpacingXxs}" />
+
+      <!-- 浏览态空位：PathKind=Disk 且 Path 为空时显示占位文案，整行可点进编辑态。
+           注意不能带上下 Margin：占位文案（17px）+ 上下 8px 会把内层撑到 33px，
+           而编辑态只有 20px → 进出编辑态高度差 13px，整行跳动。 -->
+      <TextBlock x:Name="EmptyHint"
+                 IsVisible="False"
+                 VerticalAlignment="Center"
+                 Margin="2,0,0,0"
+                 FontSize="12"
+                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                 Cursor="Ibeam"
+                 PointerPressed="EmptyHint_PointerPressed" />
+
+      <!-- 编辑态：AutoCompleteBox（MinimumPrefixLength 固定 0，补全源由宿主注入） -->
+      <!-- 编辑态高度锁死为 20（与浏览态段按钮同高）：否则 AutoCompleteBox 的默认最小高度会把外壳撑高，
+           进/出编辑态时整行高度变化 → 下方内容整体跳动 -->
+      <AutoCompleteBox x:Name="EditBox"
+                       IsVisible="False"
+                       MinimumPrefixLength="0"
+                       FontSize="12"
+                       Height="20"
+                       MinHeight="0"
+                       Padding="0"
+                       VerticalAlignment="Center"
+                       Background="Transparent"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderThickness="0"
+                       KeyDown="EditBox_KeyDown"
+                       LostFocus="EditBox_LostFocus" />
+    </Grid>
+  </Border>
+</UserControl>

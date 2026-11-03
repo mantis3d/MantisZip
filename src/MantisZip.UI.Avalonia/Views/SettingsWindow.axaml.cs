@@ -31,6 +31,20 @@ public partial class SettingsWindow : Window
                 dlg.ShowDialog(this);
             };
         }
+
+        // 恢复上次关闭时保存的窗口尺寸（2026-10-30；主窗口走 WindowStateManager，这里只记尺寸）
+        var geometry = AppSettings.Load();
+        WindowPlacement.Apply(this, geometry.SettingsWindowWidth, geometry.SettingsWindowHeight);
+        Closed += OnClosed;
+    }
+
+    /// <summary>关闭时写回窗口尺寸（非法值回落 XAML 默认 900×640）。</summary>
+    private void OnClosed(object? sender, EventArgs e)
+    {
+        var settings = AppSettings.Load();
+        settings.SettingsWindowWidth = WindowPlacement.Capture(Width, 900);
+        settings.SettingsWindowHeight = WindowPlacement.Capture(Height, 640);
+        settings.Save();
     }
 
     private void OnSaveClick(object sender, RoutedEventArgs e)
@@ -43,6 +57,8 @@ public partial class SettingsWindow : Window
         App.RefreshCompactness();
         App.RefreshTheme();
         App.RefreshDebugLogSettings();
+        // 缩略图卡片外观（边框 / 垫底色 / 尺寸）：注入资源并通知主窗口按新尺寸重取缩略图
+        App.RefreshThumbnailStyle();
 
         Close();
     }

@@ -1,3 +1,115 @@
+## v0.5.6
+
+### 文件说明 / File Description
+
+MantisZip-0.5.6-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.6-Setup-Offline.exe 是离线安装包。MantisZip-0.5.6-Portable.zip 是便携版，解压即用。MantisZip-0.5.6-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.6-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.6-Portable.zip is the portable version, extract and run. MantisZip-0.5.6-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **文件列表三种查看方式** — 列表工具栏新增布局切换按钮，在「详情（原来的表格）/ 平铺（卡片流）/ 内容行（大卡片 + 名称与大小、压缩率、修改日期）」之间循环，选择记进设置、下次打开保持。平铺与内容行模式下，图片显示真实缩略图（不放大、不拉伸）、`.ico` 取图标里最清晰的那一帧（宁可缩小不放大：有 256 帧就用 256）、`.svg` 按卡片尺寸重新渲染（矢量重绘，不是小图放大）、文本类显示前 150 个字符的文字卡、其余文件显示系统大图标（Windows 取 256px 档，按 96px 显示）兜底；右键菜单、拖拽到资源管理器、双击进入目录、`Enter` 打开都与表格模式一致
+- **Three ways to view the file list** — a new toolbar button cycles the list between details (the original grid), tiles (a card flow) and content rows (large card plus name, sizes, ratio and modified date); the choice is saved and restored. In tile and content modes, images show a real thumbnail (never upscaled or stretched), `.ico` uses the sharpest frame available (downscale a big frame rather than upscale a small one: a 256 px frame wins over a 16 px one), `.svg` is re-rendered at card size (a vector redraw, not an upscaled small bitmap), text files show a card with their first 150 characters, and everything else falls back to its system icon at large size (the 256 px shell frame, drawn at 96 px); the context menu, dragging to Explorer, double-click to enter a folder and `Enter` to open all behave exactly as in the grid
+- ![平铺布局：图片显示缩略图、文本显示文字卡](docs/images/version/v0.5.6/ListTileLayout.png)
+- ![内容行布局：大卡片 + 名称与元数据](docs/images/version/v0.5.6/ListContentLayout.png)
+- **卡片元数据文字** — 平铺 / 内容行布局里，选中一个音频、视频、字体或可执行文件（`.exe` / `.dll`）时，卡片会显示 2–3 行该格式的关键信息：音频是时长与码率、采样率与声道、标题艺术家专辑；视频是分辨率与时长、编码与容器、标题；字体是字体名与字重、字形数与表数；可执行文件是产品名与版本、公司与架构。以前这些卡片只有一枚大图标，看不出文件到底是什么。只读当前选中的那一张卡，不额外拖慢列表
+- **Metadata text on cards** — in tile and content-row layouts, selecting an audio, video, font or executable (`.exe` / `.dll`) entry now shows two or three lines of that format's key facts: for audio the duration and bitrate, sample rate and channels, then title, artist and album; for video the resolution and duration, codec and container, then title; for fonts the family and weight, glyph and table counts; for executables the product name and version, company and architecture. Previously such cards showed only a large icon, so there was no way to tell what the file was. Only the selected card is read, so the list is not slowed down
+- **压缩包里的 .ico 显示自己的图标** — 此前列表里所有 `.ico` 都是通用图标，现在会从包里读出该文件、挑最接近 16×16 的那一帧显示（列表先显示通用图标、随后异步替换，不拖慢打开速度，单个包最多处理 20 个）
+- **.ico files show their own icon** — previously every `.ico` in the list used the generic icon; now the file is read from the archive and its frame closest to 16×16 is displayed (the list shows the generic icon first and swaps asynchronously, so opening stays fast, at most 20 per archive)
+- **复选框多选与批量删除** — 列表工具栏可切到复选框模式（默认关闭，开关记进设置）：每行前面出现复选框，勾选状态跨滚动、跨切目录保持，状态栏右侧显示「已选 N 项 · 共 X」；右键菜单补「全选可见 / 反选 / 清空勾选」。勾选多项后删除**只弹一次确认**（文案带条目数与总大小），删完列表刷新、勾选态自动清空。选区（蓝底高亮）与勾选是两套独立状态：先用 Ctrl/Shift 选好几行，再点其中任意一行的复选框，这几行会一起勾上 / 一起取消。关闭复选框模式时行为与以前完全一致（仍是 Ctrl/Shift 多选）
+- **Checkbox selection and batch delete** — the list toolbar can switch to checkbox mode (off by default, the choice is saved): every row gets a checkbox, checked state survives scrolling and folder changes, and the status bar shows "N selected · X total"; the context menu gains select-all-visible, invert and clear. Deleting several checked entries asks for confirmation **once** (with the count and total size), then refreshes the list and clears the checkboxes. Row selection (the blue highlight) and the checkboxes are independent: highlight several rows with Ctrl/Shift, then click the checkbox of any one of them and the whole group is checked or cleared together. With checkbox mode off, everything works exactly as before (Ctrl/Shift multi-select)
+- ![勾选跨目录保持：根目录勾 2 项、子目录勾 1 项后回到根目录仍显示「已选 3 项」](docs/images/version/v0.5.6/CheckboxCrossFolder.png)
+- ![批量删除：勾选 3 项只弹一次确认](docs/images/version/v0.5.6/CheckboxBatchDelete.png)
+- **卡片视图也能勾选，Shift 连选 / Ctrl 增减** — 平铺与内容行两种布局同样显示复选框（跟随工具栏的复选框模式开关），点整张卡片即勾选 / 取消，勾选跨布局、跨目录保持；新增快捷多选：**Shift + 点击**从上次点击的行连选到当前行（只加不减），**Ctrl + 点击**逐项增减
+- **Checkboxes in card views, with Shift range and Ctrl toggle** — tile and content layouts now show the same checkboxes (following the toolbar's checkbox-mode switch); clicking anywhere on a card toggles it, and checked state survives layout and folder changes. Two new shortcuts: **Shift + click** checks everything from the previously clicked row up to the current one (never unchecks), **Ctrl + click** toggles a single row
+- ![卡片视图的复选框与 Shift 连选：勾选 4 项后状态栏显示「已选 4 项 · 共 44 B」](docs/images/version/v0.5.6/CardViewCheckbox.png)
+- **「视图」菜单可直接指定列表布局** — 新增「列表布局」子菜单（详情 / 平铺 / 内容行三选一，当前布局打勾）与「复选框多选」开关，不必再用工具栏按钮循环切换
+- **The View menu can pick a list layout directly** — a new "List Layout" submenu (details, tiles or content rows, with the current one ticked) plus a "Checkbox Selection" switch, so you no longer have to cycle through the toolbar button- **压缩设置窗的预览树显示实时计数** — 后台扫描目录期间，根节点标题从静态的「加载中…」变成「加载中 N 个文件，X」并每半秒刷新，扫完自动切到真实统计；被文件过滤排除的条目不计数
+- **The compression window's preview tree counts as it scans** — while the folder scan runs in the background, the root node now reads "Loading N files, X" and refreshes twice a second instead of a static "Loading…", switching to the real totals when the scan finishes; entries excluded by the file filter are not counted
+- **缩略图卡片可调外观** — 「设置 → 外观 → 缩略图」可调三项，改完立刻生效不用重启：卡片外边框（默认关闭，白底图贴在浅色背景上时用来看清边界）、透明图是否垫一层纯色底（默认保留透明，垫色可自选）、缩略图尺寸三档 96 / 128 / 160 px
+- **Adjustable thumbnail cards** — Settings → Appearance → Thumbnails exposes three options that apply immediately: a card border (off by default, handy for white-background images on light surfaces), whether transparent images get a solid backdrop (transparency is kept by default; the backdrop colour is pickable), and the thumbnail size in three steps (96 / 128 / 160 px)
+- ![设置 → 外观 → 缩略图：外边框 / 垫底色 / 尺寸三档](docs/images/version/v0.5.6/ThumbnailCardSettings.png)
+
+## v0.5.5
+
+### 文件说明 / File Description
+
+MantisZip-0.5.5-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.5-Setup-Offline.exe 是离线安装包。MantisZip-0.5.5-Portable.zip 是便携版，解压即用。MantisZip-0.5.5-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.5-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.5-Portable.zip is the portable version, extract and run. MantisZip-0.5.5-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **地址栏改成资源管理器式面包屑** — 主窗口压缩包内的路径栏、文件选择器的地址栏、快速路径栏三处现在统一为分段面包屑（`E: › AI › IndexTTS2-SonicVale`），点任意祖先段直接跳转；点当前段或末尾空白进入编辑（`Ctrl+L` 也可以），`Enter` 提交、`Esc` 或点别处还原。盘符段可点回盘根 `E:\`；分隔符换成箭头图标；进入编辑时自动在末尾补上 `\`（压缩包内路径补 `/`），直接敲子目录名就行，不用先自己打分隔符；输入时弹出的候选路径点一下即跳转。编辑态与浏览态高度一致（此前进出编辑态整行会跳 13px），地址栏也有了底色与边框，浅色/深色主题下都能看出这是一块可输入的导航区
+- **Address bars became Explorer-style breadcrumbs** — the in-archive path bar, the file picker's address bar and the quick-path bar are now one segmented breadcrumb (`E: › AI › IndexTTS2-SonicVale`); click any ancestor segment to jump, click the current segment or the empty space after it to edit (`Ctrl+L` works too), with `Enter` to submit and `Esc` or clicking elsewhere to revert. The drive segment now jumps back to the drive root `E:\`, separators are arrow icons, entering edit mode pre-fills the trailing `\` (or `/` inside an archive) so you can type a subfolder name straight away, and clicking a path suggestion navigates immediately. Edit and browse modes are exactly the same height now (previously the whole row jumped 13 px), and the bar has its own background and border so it reads as an input field in both themes
+
+- ![资源管理器式面包屑：主窗口压缩包内路径栏与文件选择器地址栏的分段显示](docs/images/version/v0.5.5/BreadcrumbAddressBar.png)
+- **设置窗口里选文件/目录不再弹窗** — 压缩设置窗改为六个页签（输出设置 / 添加文件 / 压缩设置 / 密码 / 注释 / 文件过滤），解压设置窗改为四个页签（输出设置 / 添加压缩包 / 文件过滤 / 加速）；「添加文件」「输出目录」「添加压缩包」「解压到」都直接内嵌选择器，不再弹一个模态窗口选完再回来。单击条目＝选中（文件和文件夹都可以），双击文件夹＝进入，两侧的已选清单与选择器实时同步；「高级模式」开关可切成跨目录累积勾选，切回简单模式则只保留当前目录的选中项。文件列表会随窗口高度弹性撑满，已选清单固定高度贴在下方
+- **No more modal pickers inside the settings windows** — the compression window now has six tabs (output, add files, compression, password, comment, file filter) and the extraction window four (output, add archives, file filter, speed-up); adding files, choosing the output folder, adding archives and choosing the extraction folder all use an embedded picker instead of a modal dialog you had to dismiss first. A single click selects an entry (files and folders alike), double-clicking a folder enters it, and the "selected" list on either side stays in sync with the picker; an "advanced mode" switch turns selection into a cross-folder accumulation, and switching back keeps only what is selected in the current folder. The file list stretches with the window height while the selected list keeps a fixed height at the bottom
+
+- ![压缩设置窗的六个页签与内嵌的「添加文件」「输出目录」选择器](docs/images/version/v0.5.5/InlinePickerCompress.png)
+- ![解压设置窗的四个页签与内嵌的「添加压缩包」「解压到」选择器](docs/images/version/v0.5.5/InlinePickerExtract.png)
+- **记住窗口尺寸** — 压缩设置窗、解压设置窗、文件选择器和设置窗口的尺寸现在会被记住（含两个设置窗的左右分栏宽度），下次打开回到上次拖动后的大小。只记尺寸不记位置：笔记本拔掉外接屏后把窗口还原到已不存在的坐标，很容易整窗跑到屏幕外；保存的尺寸不合法（0、负数、异常值）时一律回落到默认大小
+- **Window sizes are remembered** — the compression window, the extraction window, the file picker and the settings window now remember their size (including the left/right split width of the two settings windows), so they reopen at the size you last dragged them to. Size only, not position: after unplugging an external monitor, restoring a window to coordinates that no longer exist easily pushes it off-screen; and invalid saved sizes (zero, negative, garbage) always fall back to the default
+
+- **压缩设置窗的「输出方式」改成横排** — 三个选项从竖排换成一行，这一组从约 132px 降到约 40px，省出的高度留给输出目录选择器。
+
+- **The output-mode choices in the compression window now sit in one row** — the three options went from a stacked column to a single line, shrinking that group from about 132 px to about 40 px and giving the height back to the output-folder picker.
+
+- **文件名代码页可以手动切换了** — 打开 Big5、Shift-JIS 等旧编码命名的压缩包不再乱码：主工具栏的地球图标按钮里选编码，列表立即重载，图标角上的小徽章显示当前生效的编码；「其他代码页…」可以填自定义数字，设置页可设「默认读取代码页」。手动选错代码页会真的看到乱码 —— 这正是确认「这个包不是这个编码」的办法。
+
+- **File-name code pages can now be switched manually** — archives whose names use Big5, Shift-JIS or another legacy code page no longer show garbled names: pick a code page from the globe button on the main toolbar and the list reloads at once, with a small badge on the icon showing the code page actually in effect; "Other code page..." takes a custom number and the settings window holds the default. Picking the wrong code page now really shows garbled names — which is how you can tell it is not that encoding.
+
+- ![主工具栏代码页按钮：地球图标 + 右下角徽章显示当前生效编码（如 GBK）](docs/images/version/v0.5.5/NameEncodingBadge.png)
+- ![点开代码页按钮后的编码菜单：自动检测 / 系统默认 / 各编码 / 其他代码页…](docs/images/version/v0.5.5/NameEncodingMenu.png)
+
+**性能 / Performance**
+
+- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）整包解压从 19 秒降到 1.7 秒，只解其中选中的条目也有 4 倍以上的提升（10 秒 → 2.3 秒）。只对未加密的 7z 生效：ZIP/RAR 与单文件解压不受影响，条目很多的包会先短暂显示「正在检查冲突…」再开始解压。
+
+- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts.
+
+**修复 / Fixes**
+
+- **自解压 exe 现在能真正打开了** — 修正 v0.5.4 的自解压支持：不再只看文件末尾 8KB，改为按 PE 结构定位内嵌压缩包，7-Zip 与 WinRAR 制作的安装包都能列出、预览、解压，RAR 自解压包的注释也能读到了
+
+- **Self-extracting exes now open for real** — this corrects the self-extracting support added in v0.5.4: instead of only scanning the last 8 KB, the app locates the embedded archive through the PE layout, so installers made by 7-Zip or WinRAR list, preview and extract correctly, and RAR self-extractors finally show their comment
+
+- **打开对话框的「文件类型」不再裁掉文字** — 「文件类型」下拉原来固定 110px 宽，繁体界面「壓縮檔檔案」的最后一个字会被吃掉；现在宽度跟随内容，各语言都能完整显示
+
+- **The "file type" dropdown in the open dialog no longer clips its text** — the dropdown had a hard-coded 110 px width, so the last character of the Traditional Chinese label was cut off; it now sizes to its content and shows every label in full
+
+- ![打开对话框的「文件类型」下拉在繁体界面下完整显示，不再裁字](docs/images/version/v0.5.5/FileTypeDropdown.png)
+
+- **WinRAR 制作的分卷包能识别了** — WinRAR 7 默认用 `xxx.part1.rar` 命名分卷，此前只认 `xxx.001`，这类包从任意一卷打开都会提示损坏、删除源包也只删一卷；现在三种命名都能识别，任意一卷都能打开整包，测试压缩包也会读完全部卷并报出卷尾被改坏的情况
+
+- **RAR volume sets made by WinRAR are now recognised** — WinRAR 7 defaults to the `xxx.part1.rar` naming, which the app did not understand: opening from any volume reported the set as damaged, and deleting the source removed only one volume. All three naming schemes are recognised now, any volume opens the whole set, and the integrity test reads every volume and reports a damaged tail
+
+- **分卷包的文件列表显示完整了** — 打开对话框里此前会出现 `xxx.7z.001` 有、`xxx.7z.002` 没有的情况；现在同一套分卷的每一卷都会列出
+
+- **Every volume of a set is now listed in the open dialog** — previously `xxx.7z.001` was listed while `xxx.7z.002` was not; now all volumes of the same set show up
+
+- ![打开对话框里同一套分卷的每一卷都列出（.7z.001 / .7z.002 …）](docs/images/version/v0.5.5/VolumeListComplete.png)
+
+- **exe 预览的标题现在用文件名，64 位程序的元数据也回来了** — 此前标题显示的是内部临时文件名（`preview_19bc1690cf247236.exe`），而且 64 位 exe 的「程序信息」整片空白；现在标题就是文件列表里的名字，产品名称、公司、版本等信息统一进右侧元数据面板（可在设置里开关与排序），x86 与 x64 都能读到，「程序信息」还多了原始文件名、语言、著作权与文件描述
+
+- **The exe preview title is now the file name, and 64-bit metadata is back** — the title used to show an internal temp name (`preview_19bc1690cf247236.exe`), and 64-bit executables had a completely empty "program info" panel; now the title is the name from the file list, and product name, company and version go into the right-hand metadata panel (configurable in settings) for both x86 and x64, and "program info" now also lists the original file name, language, copyright and description
+
+- ![exe 预览：标题用文件列表里的名字，右侧元数据面板显示产品/公司/版本](docs/images/version/v0.5.5/ExePreviewMetadata.png)
+
+- **RAR4 分卷包的损坏现在能测出来了** — 旧版 RAR3/RAR4 格式此前整条跳过结构校验，末卷尾部或块头被改坏也报「完整性验证通过」；现在按块链逐块核对头 CRC 与结束块，改坏一处即判损坏（顺带把繁体界面里两处「驗證透過」改成「驗證通過」）
+
+- **Damaged RAR4 volume sets are now detected** — the older RAR3/RAR4 format used to skip the structural check entirely, so a tampered block header or tail still reported "integrity verified"; the app now walks the RAR4 block chain and verifies every header CRC plus the end-of-archive block
+
+- **PKZIP 跨卷包（.z01/.z02 + .zip）能打开了** — 此前列表里只看到末卷 `.zip`，测试不通过、也解不开；现在按 `.z01 → … → .zip` 的顺序读整组，列条目、测试压缩包与解压都正常，打开对话框里也能选到 `.z01`
+
+- **Spanned PKZIP archives (.z01/.z02 + .zip) now open** — previously only the last `.zip` was listed, and the archive failed both the integrity test and extraction; the whole set is now read in `.z01 → … → .zip` order for listing, testing and extracting, and `.z01` is selectable in the open dialog
+
 ## v0.5.4
 
 ### 文件说明 / File Description
@@ -82,7 +194,6 @@ MantisZip-0.5.4-Setup-WebSetup.exe requires internet during installation. Mantis
 MantisZip-0.5.3-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.3-Setup-Offline.exe 是离线安装包。MantisZip-0.5.3-Portable.zip 是便携版，解压即用。MantisZip-0.5.3-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
 
 MantisZip-0.5.3-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.3-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.3-Portable.zip is the portable version, extract and run. MantisZip-0.5.3-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
-
 
 ### 更新内容 / Changelog
 
@@ -181,7 +292,6 @@ MantisZip-0.5.2-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.
 
 MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.2-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.2-Portable.zip is the portable version, extract and run. MantisZip-0.5.2-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
 
-
 ### 更新内容 / Changelog
 
 **新预览格式 / New Preview Formats**
@@ -231,7 +341,6 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Help dialogs fully Markdown-driven** — the four help windows (compression speed-up / parallel extraction / password manager / log privacy) now render from localized Markdown (tables supported, text selectable and copyable); help buttons unified as a question-mark icon
 - ![帮助弹窗 Markdown 渲染效果](docs/images/version/v0.5.2/HelpDialog.png)
 
-
 **界面 / UI**
 
 - **图标统一到 Fluent 24 网格** — 界面上的 117 个图标里有 49 个是从别的图标体系带过来的（字体字形坐标系，渲染出来比旁边明显更粗更黑）或手绘杂线；现已按 **Fluent 24 Regular** 统一重画这 50 个（连同 `IconOrientation` 的语义修正：原来画成「图像裂开/禁用」样，现在是表示面板方向的双向箭头；磁力链改为链环、HTML 预览改为代码括号），其余图标不动、资源键名一个没改，界面上的引用零改动
@@ -276,7 +385,6 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 - SixLabors.ImageSharp 安全升级 3.1.5 → 4.1.3，并覆盖 SQLitePCLRaw 原生库至 3.53.3
 - Security-upgraded SixLabors.ImageSharp from 3.1.5 to 4.1.3 and overlaid SQLitePCLRaw native binaries at 3.53.3
 
-
 ## v0.5.1
 
 ### 文件说明 / File Description
@@ -284,7 +392,6 @@ MantisZip-0.5.2-Setup-WebSetup.exe requires internet during installation. Mantis
 MantisZip-0.5.1-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.1-Setup-Offline.exe 是离线安装包。MantisZip-0.5.1-Portable.zip 是便携版，解压即用。MantisZip-0.5.1-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
 
 MantisZip-0.5.1-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.1-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.1-Portable.zip is the portable version, extract and run. MantisZip-0.5.1-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
-
 
 ### 更新内容 / Changelog
 
@@ -312,7 +419,6 @@ MantisZip-0.5.1-Setup-WebSetup.exe requires internet during installation. Mantis
 - **7z multithreaded compression (`mt=on`)** — measured 4.63x speedup on 100 × 1MB random data; toggles available in both the compress dialog and Settings
 - 新增**并行解压线程数**设置项（1–16，默认随 CPU 核数，`1` 为串行回退）
 - Added a **parallel extraction thread count** setting (1–16, defaults to CPU core count; `1` falls back to serial)
-
 
 **交互 / Interactions**
 
@@ -363,7 +469,6 @@ MantisZip-0.5.1-Setup-WebSetup.exe requires internet during installation. Mantis
 - Avalonia 12.0.4 → 12.1.2 全栈升级，NuGet 核心依赖全面升级
 - Upgraded Avalonia from 12.0.4 to 12.1.2 across the stack, plus a broad upgrade of core NuGet dependencies
 
-
 ## v0.5.0
 
 ### 版本介绍 / Version Introduction
@@ -390,13 +495,11 @@ This is a **major version update** of MantisZip: the core framework has fully mi
 - 新增 **目标目录树预览** 控件，在压缩与解压窗口可查看将要生成的文件结构，如果有文件冲突会高亮提示。
 - Added **result preview tree** control — the compress/extract dialogs show the file structure that will be produced, with conflicts highlighted.
 
-
 **交互 / Interactions**
 - **拖拽双向** — 从窗口拖文件到资源管理器**实时解压**（Win32 覆层三色指示+动态光标+Esc 取消）；从资源管理器拖文件**添加到压缩包**（绿色覆层即时提示）
 - **Bidirectional drag & drop** — drag files from the window to Explorer for **real-time extraction** (Win32 overlay three-color indicator + dynamic cursor + Esc cancel); drag files from Explorer to **add them to the archive** (green overlay instant feedback)
 - **自定义文件选择器** — 多选累积、目录树、收藏/历史/窗口速选、盘符下拉、文件类型筛选，替代系统对话框
 - **Custom file picker** — multi-select accumulation, directory tree, favorites/history/windows quick-pick, drive dropdown, file type filter; replaces system dialogs
-
 
 **外观 / Appearance**
 - **紧凑度模式** — Compact/Normal/Loose 三档间距与控件高度，运行时切换无需重启
@@ -476,7 +579,6 @@ This is a **major version update** of MantisZip: the core framework has fully mi
 - 保存布局 — 拖动列宽/预览面板调整后可一键保存，「查看」菜单保留布局项，下次启动自动恢复
 - Save layout — after resizing columns or the preview panel, save once and it restores automatically on next launch (View menu → "Save Layout")
 
-
 ## v0.4.5
 
 ### 文件说明 / File Description
@@ -484,7 +586,6 @@ This is a **major version update** of MantisZip: the core framework has fully mi
 MantisZip-0.4.5-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.4.5-Setup-Offline.exe 是离线安装包。MantisZip-0.4.5-Portable.zip 是便携版，解压即用。
 
 MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. MantisZip-0.4.5-Setup-Offline.exe is a fully offline installer. MantisZip-0.4.5-Portable.zip is the portable version, extract and run.
-
 
 ### 更新内容 / Changelog
 
@@ -513,7 +614,6 @@ MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. Mantis
 - 修复安装后会导致别的软件安装完启动时错误本软件的问题。
 - Fixed issue where installing other software could incorrectly route their startup to MantisZip.
 
-
 ## v0.4.4
 
 ### 文件说明 / File Description
@@ -521,7 +621,6 @@ MantisZip-0.4.5-Setup-WebSetup.exe requires internet during installation. Mantis
 MantisZip-0.4.4-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.4.4-Setup-Offline.exe 是离线安装包。
 
 MantisZip-0.4.4-Setup-WebSetup.exe requires internet during installation. MantisZip-0.4.4-Setup-Offline.exe is a fully offline installer.
-
 
 ### 更新内容 / Changelog
 
@@ -541,8 +640,6 @@ MantisZip-0.4.4-Setup-WebSetup.exe requires internet during installation. Mantis
 - Installer improvements: renamed to `WebSetup` (online) / `Offline` (offline); online installer automatically downloads required dependencies
 - 离线安装包新增自包含模式，无需安装 .NET Runtime
 - Offline installer now includes self-contained mode, no .NET Runtime installation required
-
-
 
 ## v0.4.3
 
@@ -576,7 +673,6 @@ MantisZip-0.4.3-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 - The "Switch" button shows currently open Explorer directories in a popup menu for quick switching.
 - ![快速路径切换](docs/images/version/v0.4.3/QuickPathQuickSwitch.png)
 
-
 ## v0.4.2
 
 ### 文件说明 / File Description
@@ -603,8 +699,6 @@ MantisZip-0.4.2-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 - ![设置提升](docs/images/version/v0.4.2/SettingPermission.png)
 - ![提升权限](docs/images/version/v0.4.2/ElevationPermission.png)
 
-
-
 ## v0.4.1
 
 ### 文件说明 / File Description
@@ -628,8 +722,6 @@ MantisZip-0.4.1-Setup-NoDotNet.exe requires the .NET runtime to be installed. Ma
 - 文件列表目录回车改成进入该目录
 - Changed Enter key on directories in the file list to navigate into that directory
 
-
-
 ## v0.4.0
 
 ### 文件说明 / File Description
@@ -648,12 +740,7 @@ MantisZip-0.4.0-Setup.exe requires the .NET runtime to be installed. MantisZip-0
 - ![MantisZip 极速预览总览](docs/images/preview-overview.gif)
 - ![压缩密码设置](docs/images/PasswordManager.png)
 
-
-
-
 ## v0.0.0
-
-
 
 # Release Notes / 发布说明
 

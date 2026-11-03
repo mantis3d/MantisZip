@@ -2,6 +2,8 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
+> **档位**: **A 档 · v0.5.6**  ·  **状态**: ✅ **已完成**（2026-11-02 实施并归档，随 v0.5.6）（2026-10-29 从「小活清仓」提到 A 档：骨架期的数字在动，直接决定打开大包时的第一印象）
+
 ## TL;DR
 
 > **Quick Summary**: 骨架加载期间，目录节点的统计区域（原本显示文件数/大小的地方）目前显示静态「加载中」。本计划改为**每 0.5s 更新一次实时进度**（如「加载中 1637 个文件，2.45GB」），让用户看到加载在推进。
@@ -50,9 +52,9 @@
 
 ### Definition of Done
 
-- [ ] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → Build succeeded（0 error）
-- [ ] `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj` → 全绿
-- [ ] `docs/PLAN.md` 已同步（规则 1）
+- [x] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → Build succeeded（0 error）
+- [x] `dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj` → 全绿
+- [x] `docs/PLAN.md` 已同步（规则 1）
 
 ### Must Have
 
@@ -104,7 +106,7 @@ Wave FINAL (After ALL tasks — user okay):
 
 ## TODOs
 
-- [ ] 1. 定义 SkeletonProgress record
+- [x] 1. 定义 SkeletonProgress record
 
   **What to do**:
 
@@ -130,8 +132,8 @@ Wave FINAL (After ALL tasks — user okay):
   - **Blocked By**: None
 
   **Acceptance Criteria**:
-  - [ ] `SkeletonProgress` record 存在
-  - [ ] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → Build succeeded
+  - [x] `SkeletonProgress` record 存在
+  - [x] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → Build succeeded
 
   **QA Scenarios**:
 
@@ -147,7 +149,7 @@ Wave FINAL (After ALL tasks — user okay):
 
 ---
 
-- [ ] 2. PreviewTreeNode 新增 CurrentSkeletonProgress + DirectoryInfoText 动态化
+- [x] 2. PreviewTreeNode 新增 CurrentSkeletonProgress + DirectoryInfoText 动态化
 
   **What to do**:
 
@@ -217,11 +219,11 @@ Wave FINAL (After ALL tasks — user okay):
   - **Blocked By**: Task 1
 
   **Acceptance Criteria**:
-  - [ ] `CurrentSkeletonProgress` 属性存在
-  - [ ] `DirectoryInfoText` 在有占位子节点时返回「加载中」或动态进度
-  - [ ] 两个 strings 文件均含 `Preview_Result_SkeletonProgress`
-  - [ ] `MainWindowViewModel.UpdateLocalizedStrings` 已注册
-  - [ ] `dotnet build` → Build succeeded
+  - [x] `CurrentSkeletonProgress` 属性存在
+  - [x] `DirectoryInfoText` 在有占位子节点时返回「加载中」或动态进度
+  - [x] 两个 strings 文件均含 `Preview_Result_SkeletonProgress`
+  - [x] `MainWindowViewModel.UpdateLocalizedStrings` 已注册
+  - [x] `dotnet build` → Build succeeded
 
   **QA Scenarios**:
 
@@ -239,7 +241,7 @@ Wave FINAL (After ALL tasks — user okay):
 
 ---
 
-- [ ] 3. BuildDirectoryNode 新增 IProgress 回调
+- [x] 3. BuildDirectoryNode 新增 IProgress 回调
 
   **What to do**:
 
@@ -292,11 +294,11 @@ Wave FINAL (After ALL tasks — user okay):
   - **Blocked By**: Task 1, 2
 
   **Acceptance Criteria**:
-  - [ ] `BuildDirectoryNode` 接受 `IProgress<SkeletonProgress>` 参数
-  - [ ] 每处理一个文件报告一次进度
-  - [ ] `BuildSourceSubtree` 接受并传递 `skeletonProgress`
-  - [ ] `dotnet build` → Build succeeded
-  - [ ] 既有测试全绿（96 passed）
+  - [x] `BuildDirectoryNode` 接受 `IProgress<SkeletonProgress>` 参数
+  - [x] 每处理一个文件报告一次进度
+  - [x] `BuildSourceSubtree` 接受并传递 `skeletonProgress`
+  - [x] `dotnet build` → Build succeeded
+  - [x] 既有测试全绿（96 passed）
 
   **QA Scenarios**:
 
@@ -314,7 +316,7 @@ Wave FINAL (After ALL tasks — user okay):
 
 ---
 
-- [ ] 4. CompressSettingsViewModel 添加 DispatcherTimer 轮询
+- [x] 4. CompressSettingsViewModel 添加 DispatcherTimer 轮询
 
   **What to do**:
 
@@ -428,11 +430,11 @@ Wave FINAL (After ALL tasks — user okay):
   - **Blocked By**: Task 1, 2, 3
 
   **Acceptance Criteria**:
-  - [ ] `_skeletonProgressTimer` 和 `_skeletonProgressTrackers` 字段存在
-  - [ ] `StartSkeletonProgressTimer` / `StopSkeletonProgressTimer` 方法存在
-  - [ ] Phase B 启动定时器，finally 停止
-  - [ ] `dotnet build` → Build succeeded
-  - [ ] 既有测试全绿
+  - [x] `_skeletonProgressTimer` 和 `_skeletonProgressTrackers` 字段存在
+  - [x] `StartSkeletonProgressTimer` / `StopSkeletonProgressTimer` 方法存在
+  - [x] Phase B 启动定时器，finally 停止
+  - [x] `dotnet build` → Build succeeded
+  - [x] 既有测试全绿
 
   **QA Scenarios**:
 
@@ -450,7 +452,7 @@ Wave FINAL (After ALL tasks — user okay):
 
 ---
 
-- [ ] 5. 单元测试 + 文档同步
+- [x] 5. 单元测试 + 文档同步
 
   **What to do**:
 
@@ -525,9 +527,9 @@ Wave FINAL (After ALL tasks — user okay):
   - **Blocked By**: Task 1, 2, 3, 4
 
   **Acceptance Criteria**:
-  - [ ] 新增 2 个测试方法
-  - [ ] `dotnet test` → 98 passed（96 existing + 2 new）, 0 failed, 2 skipped
-  - [ ] `docs/PLAN.md` 已加 P2 行
+  - [x] 新增 2 个测试方法
+  - [x] `dotnet test` → 98 passed（96 existing + 2 new）, 0 failed, 2 skipped
+  - [x] `docs/PLAN.md` 已加 P2 行
 
   **QA Scenarios**:
 

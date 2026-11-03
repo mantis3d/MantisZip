@@ -1,4 +1,5 @@
 using MantisZip.Core.FileFilter;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using Xunit;
@@ -294,7 +295,119 @@ public class CompressPreviewProgressiveTests : IDisposable
 
     #endregion
 
+    #region 10. 骨架加载期实时进度计数
+
+    [Fact]
+    public void BuildSourceSubtree_SkeletonProgress_AccumulatesAcrossSiblingDirectories()
+    {
+        // root/{a/x0..x2(各 10 字节), b/y0..y1(各 20 字节)}：两个兄弟目录共 5 个文件
+        var dirA = Path.Combine(_rootDir, "a");
+        var dirB = Path.Combine(_rootDir, "b");
+        Directory.CreateDirectory(dirA);
+        Directory.CreateDirectory(dirB);
+        for (int i = 0; i < 3; i++) File.WriteAllText(Path.Combine(dirA, $"x{i}.txt"), new string('x', 10));
+        for (int i = 0; i < 2; i++) File.WriteAllText(Path.Combine(dirB, $"y{i}.txt"), new string('y', 20));
+
+        var progress = new CollectingProgress<SkeletonProgress>();
+        var result = ResultPreviewService.BuildSourceSubtree(_rootDir, skeletonProgress: progress);
+
+        Assert.NotNull(result);
+        // 每个文件上报一次累计值
+        Assert.Equal(5, progress.Values.Count);
+
+        // 累计值必须单调不减：兄弟目录共享同一个计数器（按值传初始值会让第二个目录从 0 重数）
+        for (int i = 1; i < progress.Values.Count; i++)
+            Assert.True(progress.Values[i].FileCount >= progress.Values[i - 1].FileCount,
+                $"第 {i} 次上报回退了：{progress.Values[i - 1].FileCount} → {progress.Values[i].FileCount}");
+
+        var last = progress.Values[^1];
+        Assert.Equal(5, last.FileCount);
+        Assert.Equal(3 * 10L + 2 * 20L, last.TotalSize);
+    }
+
+    [Fact]
+    public void BuildSourceSubtree_SkeletonProgress_SkipsFilteredOutFiles()
+    {
+        // 被过滤的文件不进树，也不该计入「加载中 N 个文件」
+        File.WriteAllText(Path.Combine(_rootDir, "a.txt"), "a");
+        File.WriteAllText(Path.Combine(_rootDir, "b.log"), "b");
+        var filter = new FileFilterCriteria { ExcludeExtensions = { ".log" } };
+
+        var progress = new CollectingProgress<SkeletonProgress>();
+        var result = ResultPreviewService.BuildSourceSubtree(_rootDir, filter, skeletonProgress: progress);
+
+        Assert.NotNull(result);
+        var last = Assert.Single(progress.Values);
+        Assert.Equal(1, last.FileCount);
+        Assert.Equal(1L, last.TotalSize);
+    }
+
+    [Fact]
+    public void BuildSourceSubtree_NoProgressSink_StillBuildsNormally()
+    {
+        File.WriteAllText(Path.Combine(_rootDir, "a.txt"), "a");
+
+        // 不传 skeletonProgress（= null）：既有调用方路径不得受影响
+        var result = ResultPreviewService.BuildSourceSubtree(_rootDir);
+
+        Assert.NotNull(result);
+        Assert.True(result.IsFull);
+        Assert.Contains(result.Node.Children.OfType<PreviewTreeNode>(), c => c.Name == "a.txt");
+    }
+
+    [Fact]
+    public void DirectoryInfoText_WithSkeletonProgress_ShowsCountAndSize()
+    {
+        // 含占位子节点的目录节点 = 浅层阶段的「加载中」状态
+        var node = new PreviewTreeNode { Name = "dir", FullPath = "dir", IsDirectory = true };
+        node.Children.Add(new PreviewTreeNode { Name = "…", IsLoadingPlaceholder = true });
+
+        // 无进度：保持原行为（静态「加载中」）
+        Assert.Equal(LocalizationManager.T("Preview_Result_LoadingMore"), node.DirectoryInfoText);
+
+        // 有进度：显示「加载中 N 个文件，X」（大小复用 FormatUtil.FormatSize）
+        node.CurrentSkeletonProgress = new SkeletonProgress(5, 1024);
+        Assert.Equal(
+            LocalizationManager.T("Preview_Result_SkeletonProgress", 5, FormatUtil.FormatSize(1024)),
+            node.DirectoryInfoText);
+        Assert.Contains("5", node.DirectoryInfoText);
+        Assert.Contains(FormatUtil.FormatSize(1024), node.DirectoryInfoText);
+
+        // 赋值必须触发 DirectoryInfoText 的变更通知，否则界面不会刷新
+        var changed = new List<string?>();
+        node.PropertyChanged += (_, e) => changed.Add(e.PropertyName);
+        node.CurrentSkeletonProgress = new SkeletonProgress(6, 2048);
+        Assert.Contains(nameof(PreviewTreeNode.DirectoryInfoText), changed);
+
+        // ShallowClone 复制进度（合并预览等克隆场景不丢实时文案）
+        Assert.Equal(node.CurrentSkeletonProgress, node.ShallowClone().CurrentSkeletonProgress);
+    }
+
+    [Fact]
+    public void DirectoryInfoText_ZeroFileProgress_KeepsStaticLoadingText()
+    {
+        // 刚开始构建（已枚举 0 个文件）时不该显示「加载中 0 个文件，0 B」
+        var node = new PreviewTreeNode { Name = "dir", FullPath = "dir", IsDirectory = true };
+        node.Children.Add(new PreviewTreeNode { Name = "…", IsLoadingPlaceholder = true });
+        node.CurrentSkeletonProgress = new SkeletonProgress(0, 0);
+
+        Assert.Equal(LocalizationManager.T("Preview_Result_LoadingMore"), node.DirectoryInfoText);
+    }
+
+    #endregion
+
     #region Helpers
+
+    /// <summary>
+    /// 同步进度收集器。测试不能用 <see cref="Progress{T}"/>：没有同步上下文时它把回调 Post 到
+    /// 线程池，同步断言会读到空列表（与构建线程的时序完全脱钩）。
+    /// </summary>
+    private sealed class CollectingProgress<T> : IProgress<T>
+    {
+        public List<T> Values { get; } = new();
+
+        public void Report(T value) => Values.Add(value);
+    }
 
     private static IEnumerable<string> CollectLeafNames(PreviewTreeNode node)
     {

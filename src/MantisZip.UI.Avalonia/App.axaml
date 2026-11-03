@@ -19,6 +19,9 @@
   <Application.Styles>
     <FluentTheme />
     <StyleInclude Source="avares://Avalonia.Controls.DataGrid/Themes/Fluent.xaml"/>
+    <!-- ColorPicker（缩略图垫底色取色）：Avalonia 把取色器拆成独立包，必须显式并入 Fluent 样式，
+         否则 ColorPickerButton 弹出空白面板（控件存在但无模板）。版本须与 Avalonia 主包一致。 -->
+    <StyleInclude Source="avares://Avalonia.Controls.ColorPicker/Themes/Fluent/Fluent.xaml"/>
 
     <!-- ════════════════════════════════════════════ -->
     <!-- GLOBAL CONTROL STYLES (applied app-wide)    -->
@@ -101,6 +104,22 @@
     <Style Selector="Button:pressed">
       <Setter Property="Background" Value="{DynamicResource ThemeButtonPressedBrush}" />
       <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Style>
+
+    <!-- 地址栏行按钮（挂 Classes="addrRow" 的 Grid 的直接子 Button 自动套用）：
+         方形按钮 = ControlHeightMd × ControlHeightMd，与 PathBreadcrumb 的固定高度齐平。
+         背景/前景/边框与全局 Button 一致，这里显式写出只为让「地址行按钮」自成一套、
+         将来要改地址行按钮外观时只改这一处。
+         ⚠ 不要在地址行的按钮上再写 Width / MinHeight / Background —— 那等于绕开本样式。 -->
+    <Style Selector="Grid.addrRow > Button">
+      <Setter Property="Width" Value="{DynamicResource ControlHeightMd}" />
+      <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
+      <Setter Property="Padding" Value="0" />
+      <Setter Property="HorizontalContentAlignment" Value="Center" />
+      <Setter Property="VerticalContentAlignment" Value="Center" />
+      <Setter Property="Background" Value="{DynamicResource ThemeButtonBgBrush}" />
+      <Setter Property="Foreground" Value="{DynamicResource ThemeTextPrimaryBrush}" />
+      <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
     </Style>
 
     <!-- ToggleButton -->

@@ -1090,6 +1090,7 @@ public partial class ProgressViewModel : ObservableObject
         ArchivePhase.ReadingArchive => "Progress_Phase_ReadingArchive",
         ArchivePhase.Compressing => "Progress_Phase_Compressing",
         ArchivePhase.Extracting => "Progress_Phase_Extracting",
+        ArchivePhase.CheckingConflicts => "Progress_Phase_CheckingConflicts",
         ArchivePhase.Finalizing => "Progress_Phase_Finalizing",
         _ => "Progress_Phase_Testing",
     };

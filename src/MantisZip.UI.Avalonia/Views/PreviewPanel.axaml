@@ -300,30 +300,12 @@
                   RowHeight="{DynamicResource ControlHeightMd}"
                   GridLinesVisibility="All" />
 
-        <!-- PE 可执行文件预览：显示标题、副标题、元数据键值对 -->
+        <!-- PE 可执行文件预览：正文只显示条目名，架构/子系统与版本资源等字段统一走右侧元数据面板「程序信息」分区（避免重复显示） -->
         <StackPanel IsVisible="{Binding IsPeVisible}"
                     Spacing="{DynamicResource SpacingXs}">
           <TextBlock Text="{Binding PeTitle}"
                      FontSize="20"
                      FontWeight="Bold" />
-          <TextBlock Text="{Binding PeSubtitle}"
-                     FontSize="13"
-                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-          <Separator />
-          <ItemsControl ItemsSource="{Binding PeMetadata}">
-            <ItemsControl.ItemTemplate>
-              <DataTemplate x:DataType="vm:PeMetadataItem">
-                <Grid ColumnDefinitions="Auto,8,*"
-                      Margin="0,2">
-                  <TextBlock Text="{Binding Key}"
-                             FontWeight="Bold"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <TextBlock Grid.Column="2"
-                             Text="{Binding Value}" />
-                </Grid>
-              </DataTemplate>
-            </ItemsControl.ItemTemplate>
-          </ItemsControl>
         </StackPanel>
 
         <!-- 图片预览：支持缩放、透明背景棋盘格切换 -->

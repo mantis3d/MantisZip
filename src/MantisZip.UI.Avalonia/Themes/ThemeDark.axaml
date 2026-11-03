@@ -7,6 +7,8 @@
   <Color x:Key="ThemeTextSecondary">#FF999999</Color>
   <Color x:Key="ThemeBorder">#FF3E3E3E</Color>
   <Color x:Key="ThemeAccent">#FF0078D4</Color>
+  <!-- 强调色底上的文字（代码页徽章等小标记用），与 ThemeAccent 明暗互补 -->
+  <Color x:Key="ThemeTextOnAccent">#FFFFFFFF</Color>
   <!-- Surfaces -->
   <Color x:Key="ThemeSurfaceBg">#FF252525</Color>
   <Color x:Key="ThemeHeaderBg">#FF2A2A2A</Color>
@@ -63,6 +65,7 @@
   <SolidColorBrush x:Key="ThemeTextSecondaryBrush" Color="{StaticResource ThemeTextSecondary}" />
   <SolidColorBrush x:Key="ThemeBorderBrush" Color="{StaticResource ThemeBorder}" />
   <SolidColorBrush x:Key="ThemeAccentBrush" Color="{StaticResource ThemeAccent}" />
+  <SolidColorBrush x:Key="ThemeTextOnAccentBrush" Color="{StaticResource ThemeTextOnAccent}" />
   <SolidColorBrush x:Key="ThemeToggleBrush" Color="#A90078D4" />
   <SolidColorBrush x:Key="ThemeSurfaceBgBrush" Color="{StaticResource ThemeSurfaceBg}" />
   <SolidColorBrush x:Key="ThemeHeaderBgBrush" Color="{StaticResource ThemeHeaderBg}" />

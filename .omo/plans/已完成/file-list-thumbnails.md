@@ -1,6 +1,7 @@
 # 文件列表缩略图查看方式 (file-list-thumbnails)
 
-> status: 待实施
+> **档位**: **A 档 · v0.5.6**（2026-10-29 从 B 档升入 A 档：三种布局切换是「现代感」的最大来源，且 v0.5.4 已把取数层改成内存优先、缩略图可直接复用）
+> status: ✅ **已完成**（2026-11-02 实施并归档，随 v0.5.6；T1–T9 全部落地，实施记录见文末）
 > 创建日期: 2026-08-21
 > 适用范围: 仅 `MantisZip.UI.Avalonia`（规则 11，WPF 维护模式不动）
 > 依赖: 无（不依赖 preview-quick-modes / embedded-thumbnail-preview 先行）
@@ -250,3 +251,42 @@ public static SelectionResult HandlePointerPressed(
 2. **右键菜单 DataContext**：ContextMenu 在项模板内的命令绑定需 `RelativeSource` 或窗口级共享菜单资源（本计划已定共享资源方案）。
 3. **Svg.Skia/IcoParser 线程**：解码在后台线程进行，Avalonia Bitmap 从流创建是线程安全的；完成后经 UI 线程写 `ThumbnailSource`（MVVM `[ObservableProperty]` 自动封送需确认——若属性更新不在 UI 线程，worker 用 `Dispatcher.UIThread.Post` 回写）。
 4. **缓存内存**：300 项 × ~64KB ≈ 19MB，可接受；关包即清。
+---
+
+## 实施记录（2026-11-02，v0.5.6）
+
+四个并行子代理（服务层 / 状态与本地化 / XAML / 代码后置）+ 父 agent 统一构建，全部落盘并通过验证。
+
+### 与计划的实质偏差
+
+1. **Avalonia 12 没有 ItemsRepeater**（Avalonia.Controls.dll 12.1.2 里 ItemsRepeater/UniformGridLayout/StackLayout 三个类型都不存在，XAML 报 AVLN2000；NuGet 上的 Avalonia.Controls.ItemsRepeater 最高只到 12.0.0）⇒ 不加包，Tile 改 `ItemsControl` + `WrapPanel`（`ItemWidth="144"`）、Content 改 `ItemsControl` + `Vertical StackPanel`。**代价：无 UI 虚拟化**，超大目录会一次性实例化全部项容器；缩略图本身由 `ThumbnailService` 的并发 4 限流兜底。风险 1 的「滚动驱动可见范围」方案未启用。
+2. **XAML 落点不是 `MainWindow.axaml`**：内容区 2026-10-21 已抽成 `Controls/ArchiveContentView.axaml`，三态容器、项模板、工具栏布局按钮全部落在那里（542 → 805 行）；`Views/MainWindow.axaml` 一行未动。
+3. **XAML 里不写事件属性**：处理器在 `Views/MainWindow.Thumbnails.cs`（`MainWindow` partial），由 `SetupThumbnailLayoutEvents()` 按 `x:Name` 在代码里订阅（Tunnel 的 Pressed/Moved/Released + KeyDown/ContextRequested/DoubleTapped）。在 `ArchiveContentView` 上写 `PointerPressed="ThumbnailLayout_PointerPressed"` 会 `AVLN3000`。
+4. **元数据标签 key**：计划第 188 行说 `Metadata_Key_FileSize/CompressedSize/CompressionRatio/FileModifiedDate` 「已存在」是错的（三份 json 都没有）；改用既存在且已登记 keys 数组的 `DataGrid_Size`/`DataGrid_Compressed`/`DataGrid_Ratio`/`DataGrid_Modified`，模板内跨作用域取 VM 用 `{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Size]}`。
+5. **缓存 key 加包路径**：`archivePath + "|" + item.FullPath`，裸 `FullPath` 会让不同包同名条目串图。并发去重用 `ConcurrentDictionary<string, Lazy<Task<ThumbnailResult?>>>`（`GetOrAdd` 的 valueFactory 在竞争下可能被调两次）。
+6. **Enter 语义变化**：Details 里 Enter 现在与双击一致（文件也提取并打开），因为任务书要求「Enter = 双击行为」。旧的「Enter 只选中」语义已不存在。
+
+### 交付物
+
+| 文件 | 行数 | 说明 |
+|---|---|---|
+| `src/MantisZip.UI.Avalonia/Models/FileListLayoutMode.cs` | 11 | `Details = 0 / Tile = 1 / Content = 2` |
+| `src/MantisZip.UI.Avalonia/Services/ThumbnailCache.cs` | 201 | LRU 300、`ThumbnailResult(Bitmap?, string?)`、`GetOrCreateAsync` |
+| `src/MantisZip.UI.Avalonia/Services/ThumbnailService.cs` | 419 | 128px、8MB 上限、并发 4、固实 7z 跳过、`.ico` 走 `IcoIconHelper`、`.svg` 走 Svg.Skia、`ClassifyKind`/`TruncateTextSnippet` 纯静态 |
+| `src/MantisZip.UI.Avalonia/Services/ThumbnailSelectionController.cs` | 133 | 单选/Ctrl/Shift，Shift 优先，Ctrl 移除时 Primary 落到剩余首项 |
+| `src/MantisZip.UI.Avalonia/Views/MainWindow.Thumbnails.cs` | 563 | 三态事件接线 + 选择同步 + 拖拽管线抽取 + 键盘/右键 |
+| `tests/MantisZip.UI.Avalonia.Tests/ThumbnailTests.cs` | 489 | 47 例（分类 23 / 截断 7 / 缓存 7 / 选择 10） |
+
+其余：`Models/AppSettings.cs:198`、`Models/ArchiveItemModel.cs`（`ThumbnailSource`/`TextSnippet`/`IsSelected`/`HasThumbnailContent`）、`ViewModels/MainWindowViewModel.cs`（`LayoutMode`/`OnLayoutModeChanged`/`LayoutModeLabel`/`CycleLayoutMode`/`StartThumbnailBatchIfNeeded`/`CancelThumbnailBatch`/`DetectSevenZipSolid`）、`ViewModels/MainWindowViewModel.Navigation.cs`（`PopulateEntries` 末尾启动、`OnCurrentFolderChanged` 首行取消）、`Controls/ArchiveContentView.axaml`、`Resources/Icons/AppIcons.axaml`（`IconThumbnails`）、`ViewModels/IconTestViewModel.cs`、三份 strings json（+5 key，i18n 1406）。
+
+### 验证
+
+- `-Task build -Target avalonia -ExtraArgsJson '["-c","Release","--no-incremental"]'` → ✅ 13.8s，0 警告。
+- `-Task test -Target ui-tests -ExtraArgsJson '["-c","Release"]'` → ✅ 40.1s 全绿（31 条告警全为既有 xUnit1051/xUnit2012）。
+- 真机三种布局（`%TEMP%\mz-thumb.zip` 8 条目：png/jpg/ico/txt/md/csv/svg/exe）：Tile 卡片显示真缩略图 + 文字卡 + 图标兜底；Content 行显示 128px 卡 + 名称 + 大小/压缩后/压缩率/修改日期；Details 与改动前一致（含 `.ico` 自身图标）。布局按钮点击循环并落盘 `AppSettings.FileListLayoutMode`（重启保持）。
+
+### 已知改进口子（未做）
+
+1. VM 每个包 `new ThumbnailService` 且不传共享 `ThumbnailCache` ⇒ 切目录/切包丢缓存；传入共享 cache 即可跨目录复用。
+2. Tile/Content 无虚拟化，超大目录一次性铺满。
+3. ICO 无缓存，筛选输入每敲一个字会取消上批并重读最多 20 个 ico。

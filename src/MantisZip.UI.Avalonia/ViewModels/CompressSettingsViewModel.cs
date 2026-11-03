@@ -1,7 +1,9 @@
 using System.Collections.ObjectModel;
+using Avalonia.Controls;
 using System.Collections.Specialized;
 using System.IO;
 using System.Threading;
+using Avalonia.Threading;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core;
@@ -36,12 +38,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     public string SelectedPathsSummary => SelectedPaths.Count > 0
         ? LocalizationManager.T("Compress_NItemsSelected", SelectedPaths.Count)
         : LocalizationManager.T("Compress_NoFilesSelected");
-
-    /// <summary>由 View 设置的文件保存选择回调。返回选择的路径，取消返回 null。</summary>
-    public Func<Task<string?>>? BrowseOutput { get; set; }
-
-    /// <summary>由 View 设置的文件选择回调。返回选择的文件路径列表，取消返回 null。</summary>
-    public Func<Task<IReadOnlyList<string>?>>? PickFiles { get; set; }
 
     /// <summary>
     /// 确认事务的结果出口。窗口在构造时订阅，负责把三态翻译成窗口动作
@@ -80,6 +76,14 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>内嵌 QuickPathControl 仅在 Manual 模式下可见（Separate/Combined 自动计算路径）。</summary>
     public bool IsQuickPathVisible => OutputMode == CompressOutputMode.Manual;
+
+    /// <summary>
+    /// 「输出目录」分组所在网格行的高度：手动模式给 <c>*</c>（内嵌目录选择器吃掉剩余高度，
+    /// 窗口拉高时浏览区跟着变高）；分别/合并模式下分组本身隐藏，行高给 0，避免留一块空洞
+    /// （2026-10-30 用户反馈「压缩的输出页高度不是弹性的」）。
+    /// </summary>
+    public GridLength OutputPickerRowHeight =>
+        IsQuickPathVisible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
 
     /// <summary>输出文件扩展名标签（跟随格式）。</summary>
     public string OutputExtensionLabel => GetFormatExtension();
@@ -411,6 +415,24 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>上次渐进重组的时刻（节流用）。</summary>
     private DateTime _lastProgressiveAssemble = DateTime.MinValue;
 
+    /// <summary>骨架进度轮询间隔：用户能感知「数字在动」的最小节奏。</summary>
+    private static readonly TimeSpan SkeletonProgressInterval = TimeSpan.FromMilliseconds(500);
+
+    /// <summary>骨架进度轮询定时器。Phase B 期间运行，结束/取消/关窗立即停止并解绑 Tick。</summary>
+    private DispatcherTimer? _skeletonProgressTimer;
+
+    /// <summary>驱动当前定时器的构建版本号（0 = 无）。只用于「旧构建收尾不许掐掉新构建轮询」。</summary>
+    private int _skeletonProgressOwnerVersion;
+
+    /// <summary>各源最新骨架进度（绝对源路径 → 累计文件数/大小）；构建线程写入、UI 线程每 500ms 读取。</summary>
+    private readonly Dictionary<string, SkeletonProgress> _skeletonProgressTrackers = new();
+
+    /// <summary>各源在屏上的浅层子树根节点（装配时直接挂到树上，即屏幕上显示的实例）。</summary>
+    private readonly Dictionary<string, PreviewTreeNode> _skeletonProgressTargets = new();
+
+    /// <summary>保护上面两个字典（构建线程写、UI 线程读）。</summary>
+    private readonly object _skeletonProgressLock = new();
+
     /// <summary>文件过滤条件（由 View 在对话框关闭时从 FileFilterEditor 获取并设置）。</summary>
     public FileFilterCriteria? FileFilter { get; set; }
 
@@ -488,6 +510,12 @@ public partial class CompressSettingsViewModel : ObservableObject
         };
 
         // Populate localized strings
+        // Tab 标题：输出设置 / 添加文件 / 压缩设置（原「常规」+「高级」合并）
+        LocalizedStrings["Compress_TabOutput"] = LocalizationManager.T("Compress_TabOutput");
+        LocalizedStrings["Compress_TabAddFiles"] = LocalizationManager.T("Compress_TabAddFiles");
+        LocalizedStrings["Compress_TabCompress"] = LocalizationManager.T("Compress_TabCompress");
+        LocalizedStrings["Compress_PickerAdvancedMode"] = LocalizationManager.T("Compress_PickerAdvancedMode");
+        LocalizedStrings["Compress_SelectedSources"] = LocalizationManager.T("Compress_SelectedSources");
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
         LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
         LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");
@@ -740,14 +768,20 @@ public partial class CompressSettingsViewModel : ObservableObject
             _lastProgressiveAssemble = DateTime.UtcNow;
 
             // ── Phase B：全量（串行逐源；每源完成即渐进上屏）──
+            // 此阶段屏幕上仍是浅层树（目录节点显示「加载中」）：用 500ms 定时器把正在构建的源
+            // 已枚举的文件数/大小刷到节点上，文案变成「加载中 1637 个文件，2.45GB」。
+            StartSkeletonProgress(version);
             foreach (var p in paths)
             {
                 ct.ThrowIfCancellationRequested();
                 if (_sourceCache.TryGetValue(p, out var c) && c.IsFull) continue; // 已全量
 
-                var full = await Task.Run(() => ResultPreviewService.BuildSourceSubtree(p, filter, int.MaxValue, int.MaxValue, ct), ct);
+                var progressSink = new SkeletonProgressSink(sp => RecordSkeletonProgress(p, sp));
+                var full = await Task.Run(
+                    () => ResultPreviewService.BuildSourceSubtree(p, filter, int.MaxValue, int.MaxValue, ct, progressSink), ct);
                 if (version != _previewBuildVersion) return null;
                 if (full != null) _sourceCache[p] = full;
+                ForgetSkeletonProgress(p); // 该源已全量，后续由全量子树接管显示
 
                 // 节流：250ms 内的中间重组跳过（最后一次组装必然执行，不丢源）
                 if ((DateTime.UtcNow - _lastProgressiveAssemble).TotalMilliseconds >= 250)
@@ -779,6 +813,10 @@ public partial class CompressSettingsViewModel : ObservableObject
         }
         finally
         {
+            // 骨架进度定时器只由「当前这一轮构建」负责停：被新构建取代的旧构建走这里时
+            // owner 已易主，若照停不误会把新构建的轮询掐掉（新构建的 StartSkeletonProgress 已停过旧表）。
+            if (_skeletonProgressOwnerVersion == version) StopSkeletonProgress();
+
             if (version == _previewBuildVersion)
             {
                 IsPreviewBuilding = false;
@@ -795,6 +833,106 @@ public partial class CompressSettingsViewModel : ObservableObject
         var subtrees = paths.Select(p => _sourceCache.TryGetValue(p, out var st) ? st : (ResultPreviewService.SourceSubtree?)null).ToList();
         return await Task.Run(() => ResultPreviewService.AssembleCompressPreview(
             paths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter), ct);
+    }
+
+    /// <summary>
+    /// 开始骨架进度轮询（Phase B 前调用）：为每个仍处于浅层的源登记屏上节点，并启动 500ms 定时器。
+    /// 浅层子树节点在装配时被**直接挂到树上**（<c>archiveNode.Children.Add(st.Node)</c>），
+    /// 因此这里登记的实例就是用户正看着的那个节点，改它的进度即可实时刷新统计文案。
+    /// </summary>
+    /// <param name="version">当前预览构建版本号（用于判断定时器归属）。</param>
+    private void StartSkeletonProgress(int version)
+    {
+        StopSkeletonProgress(); // 任何在跑的旧轮询（含被取代的旧构建）先停
+        _skeletonProgressOwnerVersion = version;
+
+        int targetCount;
+        lock (_skeletonProgressLock)
+        {
+            foreach (var (sourcePath, subtree) in _sourceCache)
+            {
+                // 已全量的源不再显示「加载中」，无需计数
+                if (!subtree.IsFull) _skeletonProgressTargets[sourcePath] = subtree.Node;
+            }
+            targetCount = _skeletonProgressTargets.Count;
+        }
+
+        if (targetCount == 0) return; // 无可显示进度的源：不启动空定时器（避免无意义唤醒）
+
+        _skeletonProgressTimer = new DispatcherTimer(DispatcherPriority.Normal, Dispatcher.UIThread)
+        {
+            Interval = SkeletonProgressInterval
+        };
+        _skeletonProgressTimer.Tick += OnSkeletonProgressTick;
+        _skeletonProgressTimer.Start();
+    }
+
+    /// <summary>
+    /// 停止骨架进度轮询：停表 + 解绑 Tick + 清空进度表（幂等）。
+    /// 调用点三处：Phase B 结束/取消/异常（外层 finally，按版本号只停自己那一轮）、窗口关闭（CompressSettingsWindow.OnClosed）。
+    /// </summary>
+    public void StopSkeletonProgress()
+    {
+        if (_skeletonProgressTimer != null)
+        {
+            // DispatcherTimer 由 Dispatcher 持有强引用：不停表 + 不解绑会把本 VM 一起钉住
+            _skeletonProgressTimer.Stop();
+            _skeletonProgressTimer.Tick -= OnSkeletonProgressTick;
+            _skeletonProgressTimer = null;
+        }
+        _skeletonProgressOwnerVersion = 0;
+
+        lock (_skeletonProgressLock)
+        {
+            _skeletonProgressTrackers.Clear();
+            _skeletonProgressTargets.Clear();
+        }
+    }
+
+    /// <summary>定时器回调（UI 线程）：把各源最新累计值刷到屏上节点，赋值会触发 DirectoryInfoText 变更通知。</summary>
+    private void OnSkeletonProgressTick(object? sender, EventArgs e)
+    {
+        // 持锁只取快照；赋值放到锁外（PropertyChanged → 绑定求值会同步执行，不能占着锁）
+        var snapshot = new List<(PreviewTreeNode Node, SkeletonProgress Progress)>();
+        lock (_skeletonProgressLock)
+        {
+            foreach (var (sourcePath, progress) in _skeletonProgressTrackers)
+            {
+                if (_skeletonProgressTargets.TryGetValue(sourcePath, out var node))
+                    snapshot.Add((node, progress));
+            }
+        }
+
+        foreach (var (node, progress) in snapshot)
+            node.CurrentSkeletonProgress = progress;
+    }
+
+    /// <summary>记录某源的最新骨架进度（构建线程同步调用：只写字典，不碰 UI）。</summary>
+    private void RecordSkeletonProgress(string sourcePath, SkeletonProgress progress)
+    {
+        lock (_skeletonProgressLock)
+            _skeletonProgressTrackers[sourcePath] = progress;
+    }
+
+    /// <summary>源全量构建完成后丢弃其进度（屏上随即被全量子树替换）。</summary>
+    private void ForgetSkeletonProgress(string sourcePath)
+    {
+        lock (_skeletonProgressLock)
+            _skeletonProgressTrackers.Remove(sourcePath);
+    }
+
+    /// <summary>
+    /// 轻量进度接收器：只把最新累计值写进字典。
+    /// **不用** <see cref="Progress{T}"/>——它每次 Report 都会 Post 一个回调到同步上下文（UI 线程），
+    /// 几万个文件足以塞满 Dispatcher 队列、反而拖慢界面；本功能只需要 500ms 粒度的「最新值」。
+    /// </summary>
+    private sealed class SkeletonProgressSink : IProgress<SkeletonProgress>
+    {
+        private readonly Action<SkeletonProgress> _write;
+
+        public SkeletonProgressSink(Action<SkeletonProgress> write) => _write = write;
+
+        public void Report(SkeletonProgress value) => _write(value);
     }
 
     partial void OnCompressionLevelChanged(int value)
@@ -847,6 +985,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsBrowseButtonVisible));
         OnPropertyChanged(nameof(IsFileNameSectionVisible));
         OnPropertyChanged(nameof(IsQuickPathVisible));
+        OnPropertyChanged(nameof(OutputPickerRowHeight));
         OnPropertyChanged(nameof(OutputPathLabel));
         OnPropertyChanged(nameof(IsManualMode));
         OnPropertyChanged(nameof(IsSeparateMode));
@@ -1225,17 +1364,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         PasswordSearchText = "";
     }
 
-    [RelayCommand]
-    private async Task BrowseOutputPath()
-    {
-        if (BrowseOutput == null) return;
-        var path = await BrowseOutput();
-        if (!string.IsNullOrEmpty(path))
-        {
-            OutputPath = path;
-        }
-    }
-
     private bool CanExecuteStartCompress()
     {
         // 等待准备期间禁用（防重入：B 就绪前的等待窗口内再点一次）
@@ -1507,21 +1635,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     }
 
     // ── Source file management ──
-
-    [RelayCommand]
-    private async Task AddFiles()
-    {
-        if (PickFiles == null) return;
-        var files = await PickFiles();
-        if (files != null)
-        {
-            foreach (var f in files)
-            {
-                if (!SelectedPaths.Contains(f))
-                    SelectedPaths.Add(f);
-            }
-        }
-    }
 
     [RelayCommand]
     private void RemoveSelected(object? selectedItem)

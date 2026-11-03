@@ -70,7 +70,8 @@ public class ArchiveService
     public async Task<ArchiveLoadResult> LoadArchiveAsync(
         string archivePath,
         string? password = null,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        string? fileNameEncoding = null)
     {
         try
         {
@@ -80,7 +81,14 @@ public class ArchiveService
                 return ArchiveLoadResult.Failure(LocalizationManager.T("Status_UnsupportedFormat", Path.GetExtension(archivePath)));
             }
 
-            var items = await engine.ListEntriesAsync(archivePath, password, cancellationToken);
+            // 文件名代码页：auto/null 走引擎自带的启发式检测；用户手动指定时强制按该编码解码，
+            // 并把实际生效的键回传给调用方回显（工具栏「检测到: GBK」）。
+            string? resolvedEncoding = null;
+            var requestedEncoding = NameEncodingCatalog.IsAuto(fileNameEncoding) ? null : fileNameEncoding;
+
+            var items = await engine.ListEntriesAsync(
+                archivePath, password, cancellationToken, requestedEncoding,
+                key => resolvedEncoding = key);
             var itemsList = items.ToList();
 
             // 注意：条目列出成功即视为加载成功——即使含加密条目（ZIP/RAR/EncryptHeaders=false 的 7z
@@ -104,7 +112,7 @@ public class ArchiveService
                 }
             }
 
-            return ArchiveLoadResult.Success(models, itemsList);
+            return ArchiveLoadResult.Success(models, itemsList, resolvedEncoding);
         }
         catch (OperationCanceledException)
         {
@@ -148,11 +156,18 @@ public class ArchiveLoadResult
     /// </summary>
     public IReadOnlyList<ArchiveItem>? RawItems { get; private init; }
 
-    public static ArchiveLoadResult Success(List<ArchiveItemModel> entries, IReadOnlyList<ArchiveItem>? rawItems = null) => new()
+    /// <summary>
+    /// 本次列出条目时实际生效的文件名代码页键（见 <c>NameEncodingCatalog</c>）；
+    /// 自动检测时是检测结果，手动指定时就是该编码。7z 固定为 <c>utf-16</c>。
+    /// </summary>
+    public string? ResolvedNameEncoding { get; private init; }
+
+    public static ArchiveLoadResult Success(List<ArchiveItemModel> entries, IReadOnlyList<ArchiveItem>? rawItems = null, string? resolvedNameEncoding = null) => new()
     {
         IsSuccess = true,
         Entries = entries,
-        RawItems = rawItems
+        RawItems = rawItems,
+        ResolvedNameEncoding = resolvedNameEncoding
     };
 
     public static ArchiveLoadResult Failure(string message) => new()
