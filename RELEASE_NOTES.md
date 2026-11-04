@@ -1,3 +1,23 @@
+## v0.5.7
+
+### 文件说明 / File Description
+
+MantisZip-0.5.7-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.7-Setup-Offline.exe 是离线安装包。MantisZip-0.5.7-Portable.zip 是便携版，解压即用。MantisZip-0.5.7-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.7-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.7-Portable.zip is the portable version, extract and run. MantisZip-0.5.7-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **进度窗口的「冲突时:」下拉，运行中改了就生效** — 解压 / 压缩跑起来之后，进度窗口信息区首行右侧出现「冲突时:」下拉，与「精简 / 标准 / 完整」密度选择同排：解压 6 档（每次询问 / 覆盖 / 覆盖较旧 / 覆盖较小 / 重命名 / 跳过）、压缩 5 档（每次询问 / 覆盖 / 添加 / 重命名 / 跳过）。改动只影响**之后**遇到的冲突，已经落地的条目保持原结果，因此不必取消重来；冲突弹窗里勾「应用到全部」会反向刷新这个下拉，两边始终是同一个策略、不会各说各话。7z 固实包是个例外：它的落点必须在开始解压前一次性定案，所以进入解码阶段后下拉会变灰、提示换成「本次解压的冲突处理已在开始时一次性确定」；规划阶段（短暂显示「正在检查冲突…」时）仍然可以改，不会留一个改了没反应的开关。
+- **A conflict policy you can change mid-run** — once an extract or compress is running, the progress window's info row shows an "On conflict:" dropdown next to the density choices: six options for extraction (ask every time / overwrite / overwrite if older / overwrite if smaller / rename / skip) and five for compression (ask / overwrite / add / rename / skip). A change only affects the conflicts that come after it — entries already written keep their outcome — so there is no need to cancel and restart, and ticking "apply to all" in the conflict dialog writes the choice back into the dropdown so the two always agree. Solid 7z archives are the exception: their per-entry plan is fixed before decoding starts, so the dropdown greys out at that point and its tooltip says the policy was decided up front (it stays editable during the brief "checking for conflicts" phase, which keeps it from being a switch that does nothing).
+- ![进度窗口信息区首行右侧的「冲突时:」下拉：解压 6 档，规划阶段仍可改，固实包开始解码后自动置灰](docs/images/version/v0.5.7/ProgressConflictPolicy.png)
+
+**修复 / Fixes**
+
+- **「解压到此处」「解压到同一文件夹」「智能解压」不再无视冲突设置** — 这三条原地解压的路径此前调用引擎时**不传任何选项**，引擎对「没有设置」一律按覆盖处理：用户明明在设置里选了「每次询问」或「跳过」，点这三个入口仍然静默覆盖磁盘上的同名文件（登记为 KI-012，属于数据丢失级）。现在三条路径都带上默认策略与询问弹窗，进度窗口里同样出现「冲突时:」下拉，行为与其他解压入口完全一致：选「询问」就逐个弹、选「跳过」就一个都不动。
+- **"Extract here", "extract to folder" and smart extract no longer ignore your conflict settings** — those three in-place paths called the engine **without any options**, and the engine treats "no settings" as overwrite: even with "ask every time" or "skip" configured, these entry points silently replaced files of the same name on disk (tracked as KI-012, a data-loss class issue). All three now pass the default policy and the ask dialog, and their progress window shows the same "On conflict:" dropdown, so they behave exactly like every other extraction entry point: "ask" prompts per conflict, "skip" leaves every existing file untouched.
 ## v0.5.6
 
 ### 文件说明 / File Description
