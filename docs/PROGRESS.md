@@ -297,6 +297,9 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 7z solid 全量解压改走批量接口（SevenZipExtractorFactory 分流：满足条件走 ExtractFiles(destDir, indexes) 一次解压、冲突前置预解析、改名条目二次批量 + 同卷暂存 File.Move；800×64KB 19.3s → 1.67s） | [sevenzip-solid-extract-batch.md](.omo/plans/已完成/sevenzip-solid-extract-batch.md) | 未发布（2026-11-04 归档，随 v0.5.6；HDD 复测待做） |
+| 选中条目 / 拖拽解压改走批量接口（SelectedItemsExtractService 复用批量分流，800×64KB 只解选中项 10.0s → 2.3s，约 4.4×） | [selected-items-bulk-extract.md](.omo/plans/已完成/selected-items-bulk-extract.md) | 未发布（2026-11-04 归档，随 v0.5.6；HDD 复测待做） |
+| 文件名代码页检测与切换（NameEncodingCatalog 启发式检测 + 主工具栏下拉 + CodePageInputDialog「其他代码页」+ ArchiveOptions.ReadEncoding；覆盖 ZIP/TAR/GZ） | [file-name-codepage.md](.omo/plans/已完成/file-name-codepage.md) | 未发布（2026-11-04 归档，随 v0.5.6） |
 | 复选框模式一致性（切换模式时选区 ⇄ 勾选双向转换；压缩/解压选择器统一成「点行只高亮、点复选框才勾」+ Shift/Ctrl 连勾 + 右键全选/反选/清空） | [checkbox-mode-consistency.md](.omo/plans/已完成/checkbox-mode-consistency.md) | 未发布（2026-11-03 归档，随 v0.5.6） |
 | 卡片视图复选框 + 快捷多选（Shift 连选 / Ctrl 增减 / 视图菜单布局子菜单） | [checkbox-multiselect-shortcuts.md](.omo/plans/已完成/checkbox-multiselect-shortcuts.md) | 未发布（2026-11-03 归档，随 v0.5.6） |
 | 缩略图卡片外观设置（外边框 / 垫底色 + 取色器 / 三档尺寸；资源注入即时生效） | [thumbnail-card-settings.md](.omo/plans/已完成/thumbnail-card-settings.md) | 未发布（2026-11-02 归档，随 v0.5.6） |
