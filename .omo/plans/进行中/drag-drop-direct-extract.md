@@ -1,8 +1,10 @@
 # 拖拽直接解压 — 放弃 CF_HDROP，Drop 后检测目标窗口路径直接提取
 
-> **状态**: ✅ 代码实现完成（待手工测试） | **阶段**: [■■■■■■■■■■] (10/10) — ☑️ 代码实现已完成 (2026-07-23)
-> **分支**: `avalonia-port`
+> **状态**: 🟡 进行中 —— 主体已完成（Task 1–7，2026-07-23）；**文件树预览弹窗未实施**（2026-08-06 设计已确认，截至 2026-10-30 仍未落笔：`DragPreviewPopup.cs` 不存在、`DragPreviewBitmapBuilder` 零调用者、`OverlayController.SetPreview` 零调用者）
+> **阶段**: [■■■■■■■□□□] (7/10) — 2026-10-30 从 `已完成` 移回 `进行中`（原「10/10 已完成」与代码不符：预览弹窗整段未做，Task 8 手工验收与 5 条 DoD 仍未勾）
+> **分支**: `alpha` / `beta` / `plans`（原 `avalonia-port` 已不存在；代码改动按规则 19 落在 alpha 或 beta）
 > **2026-08-06 补充**: 预览弹窗（DragPreviewPopup）实施设计已确认——独立 Win32 弹窗跟随鼠标（不合成进覆盖层）+ PointerPressed 预取式渲染 + 双阈值降级。待实施，详见文末「预览弹窗实施补充」章节。
+> **2026-10-30 补充**: 用户明确**文件树预览弹窗的主要目的之一就是看落点冲突预览**（拖到某个 Explorer 窗口/桌面时，能看出有多少同名文件会被覆盖/重命名）。硬约束：拖拽期间 UI 线程被 OLE `DoDragDrop` 同步阻塞、`RenderTargetBitmap` 只能在 UI 线程 ⇒ 拖拽中途无法重渲染树位图，冲突标记只能走 GDI 文字（弹窗摘要栏 / 覆盖层），或改成「拖拽启动前按预测落点渲染」。**2026-10-30 已按用户拍板定稿为覆盖层方案**（两层 8 行 + 目标已存在即标红），见文末「落点冲突预览（设计已定稿 2026-10-30，待实施）」。
 
 ---
 
@@ -1994,3 +1996,164 @@ PerformDragDrop（自实现 OLE）→ 拖拽中弹窗持续显示 → 松手/取
 - [ ] ≤300 文件渲染 <100ms；301–2000 走前 2 层截断；>2000 走纯摘要
 - [ ] 拖拽启动零感知延迟（预取覆盖常见场景，250ms 上限兜底极端场景）
 - [ ] 覆盖层高亮/路径文字/四态光标功能无回归
+
+---
+
+## 落点冲突预览（设计已定稿 2026-10-30，待实施）
+
+> **状态**: 📐 设计已定稿（2026-10-30 用户逐项拍板），**代码未动**。
+> 定稿要点：做在**覆盖层**上（不新建弹窗）；只显示**部分**目录结构（两层、最多 8 行）；只看**直接子目录 / 子文件**是否冲突；性能优先（落点不变不重算、每轮 IO 有预算、慢盘超时降级）。
+
+### 用户口径（逐项拍板，2026-10-30）
+
+| 决策点 | 结论 |
+|---|---|
+| 显示位置 | **覆盖层**上（拖拽时跟随鼠标的那个框），不做预览弹窗 |
+| 显示范围 | 拖拽内容的目录结构，**两层、最多 8 行**，超出截断为「…另 N 项」 |
+| 判定粒度 | 只看**直接子目录 / 子文件**是否冲突，不递归深挖 |
+| 冲突标记 | **⚠ + 整行变红**；目录行带直接子项冲突计数 `⚠ src/ (3)` |
+| 判定口径 | **目标处已存在就算冲突** —— 文件、同名目录**都算**（同名目录会合并进去，仍标红，用户明确要求「看得更严」）；与设置的冲突策略无关 |
+| 与策略关系 | 不区分 Overwrite / Skip / Rename / Ask，一律按「已存在」标 |
+
+### 覆盖层形态
+
+```
+拖到此处：D:\Projects
+├─ docs/
+│  ├─ ⚠ readme.md
+│  └─ config.json
+├─ ⚠ src/ (3)
+└─ ⚠ notes.txt
+…另 4 项
+```
+
+- 第 1 行保持现有「拖到此处：<路径>」（超长仍走 `AbbreviatePath`），下面是树；窗口高度随行数自适应（最多约 9 行 ≈ 150px）。
+- 非冲突行用现有默认文字色；冲突行用覆盖层已有的 Warning 红 `0x004336F4` 且加 `⚠` 前缀。
+- 目录行 `(N)` = 该目录**直接子项**中已存在的数量；单目录预算内没扫完时显示 `(N+)`。
+- 无效落点 / 自家窗口：**不显示树**，维持现有 `DragOverlay_DragToFolder` / `DragOverlay_OwnWindow` / `DragOverlay_NoPath` 文案。
+
+### 数据来源与判定
+
+- 树**结构**取自拖拽启动前已有的 `Views/MainWindow.axaml.cs:1562` `DragDropItemExpander.ExpandItems(selectedItems, allItems)` 结果（现在只用于判空）：启动时折成行模型，**只算一次**，拖拽中不再读写压缩包。
+- **冲突布尔**在落点变化时于后台线程重算：判定「目标目录 + 相对路径」是否已存在；相对路径必须走 `MantisZip.Core/Utils/ExtractPathResolver.cs:53` `ResolveAll(...)` 并与本次 `preserveFullPath` 一致 —— 路径口径不得另写，否则会出现「预览说不冲突、实际覆盖了」（ARCHITECTURE 的路径契约）。
+- 只判定**实际显示的行**（≤8 行）与已展开目录的直接子项计数，不预判未显示的节点。
+
+### 性能预算（硬指标）
+
+| 项 | 预算 | 说明 |
+|---|---|---|
+| 重算触发 | 落点路径变化（去抖 150ms） | 落点不变、光标在框内移动 ⇒ 一次都不重算 |
+| 单轮存在性检查 | ≤ 40 次 | 8 行展示 + 每个已展开目录最多 30 个直接子项计数；超出该目录预算则显示 `(N+)` |
+| 慢盘 / 网络路径 | 单轮总超时 500ms | 超时本轮放弃标记：路径行尾加 `(?)`，树照常显示但不标红 —— 宁可「未知」也不能假「无冲突」 |
+| 每 100ms 重绘 | 0 次磁盘 IO | 只绘制缓存的（行文本 + 是否冲突） |
+
+### 实现清单
+
+1. `src/MantisZip.UI.Avalonia/Services/OverlayController.cs`：新增行模型（层级 / 名称 / 是否目录 / 是否冲突 / 子项冲突计数），`SetContentTree(...)` 传入结构；渲染从「单行路径（+ 可选预览位图）」扩成「路径行 + ≤8 行树」；窗口尺寸随行数自适应；`RunTrackingLoop` 里目标变化时触发冲突重算（去抖 + 预算 + 超时）。
+2. 新增 `src/MantisZip.UI.Avalonia/Services/DragConflictPreview.cs`（名称待定）：纯逻辑 —— 输入行模型 + 目标目录 + 可注入的文件系统探针与预算参数，输出带标记的行；便于单测，不依赖 Win32。
+3. `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`：把 `expandedItems` 折成行模型，在 `controller.Start()` 之后、`CustomOleDragDrop.PerformDragDrop` 之前调用 `SetContentTree(...)`。
+4. i18n：新增 1 个 key `DragOverlay_MoreItems`（`…另 {0} 项` / `…and {0} more` / zh-TW 同步），紧接 `DragOverlay_NoPath` 之后插入；`(N)` / `(N+)` / `(?)` / `⚠` 均为符号，不建 key。
+5. 测试 `tests/MantisZip.UI.Avalonia.Tests/DragConflictPreviewTests.cs`：8 行截断与「另 N 项」、目录计数与 `(N+)`、预算耗尽不抛、超时降级返回「未知」而不是「无冲突」、两层结构顺序稳定。
+
+### 风险 / 遗留
+
+- 覆盖层变高后可能遮住落点附近的文件名（用户已知悉并接受「够用」）。
+- `(?)` 未知态是否够清楚待实测；若含糊，改成路径行尾文案「冲突未知」（需加 key）。
+- 执行侧与预览解耦：实际落盘仍走 `Services/DragDropService.cs:108-113` → `ExtractFlow.RunSelectedItemsExtractionAsync(...)`（Ask 弹冲突框），本次不改执行语义。
+
+---
+
+## 双投放区（保留完整路径 / 扁平解压）—— 设计已定稿 2026-10-30，待实施
+
+> **状态**: 📐 设计已定稿（2026-10-30 用户拍板），**代码未动**。
+> 灵感来自 PotPlayer：拖视频进去时窗口分成「添加到列表 / 覆盖列表」两个投放区。这里换成「保留完整路径 / 扁平解压」两个区，**鼠标在哪一区松手就用哪一种路径口径**。
+> 与上一节的关系：上一节描述的「路径行 + 小树」是**区内的内容**；本节决定覆盖层怎么分区。目标判定失败（Warning / 路径未知）时退回上一节的单区形态。
+
+### 用户口径（2026-10-30 拍板）
+
+| 决策点 | 结论 |
+|---|---|
+| 分区位置 | 覆盖层已铺满目标窗口 ⇒ 直接把该窗口切成两个投放区（不是主窗口！） |
+| 分区方向 | **设置里可自定义，默认左右** —— 新增 `AppSettings.DragZoneSplitOrientation`（`leftRight` / `topBottom`） |
+| 两区语义 | 一区「保留完整路径」、一区「**相对路径**」，只影响 `preserveFullPath` |
+| 树预览 | **只有悬停区显示**小树 + 冲突标记；另一区压暗，只显示标题 + 结果示例路径 |
+| 默认高亮 | 跟当前设置 `AppSettings.ExtractPreserveFullPath`（平时怎么设，默认就亮哪区） |
+| 桌面目标 | 桌面（Progman / WorkerW）同样按窗口矩形分两半 |
+| 判定失败 | 目标路径拿不到（`#32770` 等 Warning）⇒ 退回单区文案，按设置值执行 |
+| 无差异时 | `currentFolder` 为空（压缩包根目录拖出）⇒ `preserveFullPath` 不影响结果，**合并成单区**（标题「解压到此处」），不假装有两种选择 |
+| 自家主窗口 | 保持现状（取消拖拽）；「拖回主窗口能做什么」另议，不在本计划内 |
+
+### 为什么可行（代码事实）
+
+- 覆盖层**已经铺满整个目标窗口**：`Services/OverlayController.cs:193-204` 取 `GetWindowRect(target)` 的宽高后 `SetWindowPos` 铺满，再画边框 + 居中文字 ⇒ 切成两区只是多画一条分隔线与两套文字。
+- **落点由我们自己判定**，不经过 Explorer：`GetCursorPos` + `GetWindowFromCursor` → `DropTargetDetector.DetectTargetDirectory()`；`preserveFullPath` 已是 `ExtractFlow.RunSelectedItemsExtractionAsync(..., preserveFullPath, ...)` 的**每-run 参数** ⇒ 松手瞬间按光标所在半区传值即可，不需要改设置、不需要新的回传通道（`CompressRunContext` 那类禁令不涉及这里，但仍不加「哪一区」以外的状态）。
+
+### 两区结果的差异（必须显示示例路径，否则用户看不出区别）
+
+打开 `Archive.zip`、在压缩包内 `sub/` 下浏览、拖出 `docs/a.txt`、目标窗口是 `D:\Projects`：
+
+| 区 | 落盘路径 |
+|---|---|
+| 保留完整路径（`preserveFullPath = true`） | `D:\Projects\sub\docs\a.txt` |
+| 扁平解压（`preserveFullPath = false`） | `D:\Projects\docs\a.txt` |
+
+`ExtractPathResolver.TrimCurrentFolderPrefix`（`MantisZip.Core/Utils/ExtractPathResolver.cs:23`）是唯一口径来源：`preserveFullPath=true` 或 `currentFolder` 为空时不裁剪前缀。
+
+### 布局（默认左右分区）
+
+```
+┌───────────────────────────┬───────────────────────────┐
+│ 保留完整路径                │ 相对路径                    │
+│ D:\Projects\sub\docs\a.txt │ D:\Projects\docs\a.txt     │
+│                           │                           │
+│ ├─ docs/                  │      （压暗，不显示树）      │
+│ │  ├─ ⚠ readme.md          │                           │
+│ │  └─ config.json          │                           │
+│ ├─ ⚠ src/ (3)             │                           │
+│ └─ ⚠ notes.txt            │                           │
+│  …另 4 项                  │           ← 光标在这半边     │
+└───────────────────────────┴───────────────────────────┘
+```
+
+- 悬停区：Success 绿边框、正常呼吸 alpha，内容 = 标题 + 结果示例路径 + 小树（≤8 行，见上一节）。
+- 非悬停区：呼吸 alpha 降到 40–60（压暗），只显示标题 + 结果示例路径，**不算冲突、不渲染树**。
+- 分隔线 1px，取当前状态色降亮度，**只画在内容区**（客户区，从标题栏下沿到窗口底部）；**命中判定仍按整个窗口宽度**的中点算 —— 鼠标停在标题栏 / 地址栏上也算在对应半区，落点照旧取该窗口路径。
+- 长路径按**各区自身宽度**独立缩写（`AbbreviatePath` 阈值按半宽重算），不能两区共用同一阈值。
+- 窗口过窄（例如 < 600px）时，区内只显示标题 + 结果路径 + 一行冲突汇总，不显示行树。
+
+### 细节定稿（2026-10-30 第二轮，逐项已定）
+
+| 细节 | 定稿 |
+|---|---|
+| 分隔线范围 | 视觉只画在**内容区**（客户区），**命中按整个窗口**宽度/高度中点判定（标题栏、地址栏上也算对应区） |
+| 两区标题 | 「保留完整路径」/「**相对路径**」—— 与设置项措辞镜像对应，不加副标题；两区各自的**结果示例路径**才是真正的解释 |
+| 呼吸动画 | 悬停区正常呼吸（40–120），非悬停区**固定压暗**（静态 alpha），跨区时交接，避免两区一起闪 |
+| 扩展位 | 区模型做成「标题 + 一组参数」，现在只放 `preserveFullPath`；将来要放「解压后打开目录」「解压并删除压缩包」等动作时不用重写渲染。**只留结构，不加功能** |
+| 大目标（最大化窗口 / 桌面） | 分区仍按半屏，但**文字与小树靠鼠标所在侧居中**，让视觉重心跟着鼠标走；分隔线位置不动 |
+| 窄窗口降级 | 区宽 < 约 300px（或整窗 < 600px）时区内只显示标题 + 结果示例路径 + 一行冲突汇总，不画行树 |
+
+### 交互
+
+1. 光标进入目标窗口 ⇒ 两区出现，默认高亮 = `ExtractPreserveFullPath ? 保留区 : 扁平区`。
+   - 例外：`currentFolder` 为空时（两区结果相同）只显示单区，不进入分区模式。
+   - 光标在窗口但两区结果相同时，单区按 `ExtractPreserveFullPath` 执行（此时该参数本就无效果）。
+2. 光标跨过中线 ⇒ 切换高亮，并触发**该区**的冲突计算（去抖 150ms、预算 40 次、慢盘 500ms 超时 → `(?)`），结果按 `(目标目录, preserveFullPath)` 缓存，来回切不再算。
+3. 松手 ⇒ 按松手时高亮区传 `preserveFullPath`；未进入任何区（理论不发生）⇒ 按设置值。
+4. Esc / 拖到无效区域 ⇒ 现有取消行为不变。
+
+### 实现清单
+
+1. `src/MantisZip.UI.Avalonia/Models/AppSettings.cs`：新增 `public string DragZoneSplitOrientation { get; set; } = "leftRight";`（取值 `leftRight` / `topBottom`）。
+2. `src/MantisZip.UI.Avalonia/Views/SettingsWindow.axaml`（解压 → 常规）：新增「拖拽投放区分区方向」下拉（左右 / 上下）+ `SettingsWindowViewModel` 属性 / 镜像 / 保存 / 文化通知四处；按规则 23 同一提交内接上消费者（覆盖层读它），并同步 `-Task guards` 的 `settingswiring` 守卫。
+3. `src/MantisZip.UI.Avalonia/Services/DragConflictPreview.cs`（上一节新建）：入参带 `preserveFullPath`，两区各自算一套路径与冲突。
+4. `src/MantisZip.UI.Avalonia/Services/OverlayController.cs`：新增 `SplitOrientation`、`SetDropZones(...)`、`HoveredZone` 判定（光标相对窗口矩形中点，按方向取 x 或 y）、双区渲染、每区缓存、非悬停区降 alpha、窄窗口降级。
+5. `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`：拖拽开始时把「展开后的条目 + 当前 `currentFolder` + 分区方向」交给 controller。
+6. `src/MantisZip.UI.Avalonia/Services/DragDropService.cs`：`ExecuteAfterDropAsync(..., bool? preserveFullPathOverride)`，为 null 时回落 `_settings.ExtractPreserveFullPath`，再传给 `RunSelectedItemsExtractionAsync`。
+7. i18n：新增 `DragZone_RelativePath`（相对路径 / Relative path）、`DragZone_Hint`（在此区松手即按此方式解压）、`Settings_Extract_DragZoneSplit`（拖拽投放区分区方向）、`Settings_Extract_DragZoneSplit_LeftRight`（左右）、`Settings_Extract_DragZoneSplit_TopBottom`（上下）；另一区标题复用既有 `Settings_Extract_PreserveFullPath`（保留完整路径）。三语同步。
+8. 测试 `tests/MantisZip.UI.Avalonia.Tests/DragDropZonesTests.cs`：分区方向命中判定（左右 / 上下各 2 例）、两区路径结果差异、默认高亮跟设置、Warning 退回单区、窄窗口降级、缓存命中不重复计算。
+
+### 风险 / 遗留
+
+- 覆盖半屏（最大化窗口 / 桌面）视觉冲击较大 —— 用户已确认按窗口边界对齐，接受遮挡。
+- 设置项新增会触发 `settingswiring` 守卫，必须同提交接上消费者（规则 23）。
+- 「拖回主窗口能做什么」是用户新提出的想法（2026-10-30 口头提及），未定方案，另行讨论，不写进本计划。

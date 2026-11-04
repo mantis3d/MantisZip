@@ -51,6 +51,40 @@ public partial class ArchiveItemModel : ObservableObject
     [ObservableProperty]
     private Bitmap? _iconSource;
 
+    /// <summary>
+    /// 卡片布局兜底用的**大尺寸**图标（Windows 上取自 Shell 图像列表的 256px 档）。
+    /// null = 拿不到大图标（非 Windows / 该类型无大图），卡片退回 <see cref="IconSource"/> 原尺寸显示。
+    /// </summary>
+    [ObservableProperty]
+    private Bitmap? _largeIconSource;
+
+    /// <summary>
+    /// 图像类内容卡的缩略图（Tile / Content 布局）。null = 无缩略图（卡片回退到扩展名图标）。
+    /// </summary>
+    [ObservableProperty]
+    private Bitmap? _thumbnailSource;
+
+    /// <summary>
+    /// 文本类内容卡的摘录（Tile / Content 布局）。null = 无可展示文本（卡片回退到扩展名图标）。
+    /// </summary>
+    [ObservableProperty]
+    private string? _textSnippet;
+
+
+    /// <summary>
+    /// 卡片布局（Tile / Content）里的选中视觉状态；详情布局用 DataGrid 自带的行选中，不读此属性。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isSelected;
+
+    /// <summary>
+    /// 主窗口列表**复选框列**的勾选状态（v0.5.6 `file-list-checkbox-selection`）。
+    /// 仅详情布局的复选框列绑定该属性；预览树复用本模型但不绑它。
+    /// 勾选是 <c>MainWindowViewModel.SelectedEntries</c> 的另一个入口，不构成第二份事实源。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isChecked;
+
     [ObservableProperty]
     private double _sizeRatio;
 
@@ -83,6 +117,41 @@ public partial class ArchiveItemModel : ObservableObject
     public string DateBarBrushKey => UseDirProgressColor ? "ProgressBarDateDirBrush" : "ProgressBarDateBrush";
 
     public bool HasIcon => IconSource != null;
+
+    /// <summary>
+    /// 内容卡是否有内容可画（缩略图或文本摘录任一非空）。
+    /// 派生属性通知集中在这两个源属性的 partial 方法里（AGENTS.md「派生属性通知」），
+    /// 不要改成逐字段 <c>[NotifyPropertyChangedFor]</c>。
+    /// </summary>
+    public bool HasThumbnailContent => ThumbnailSource != null || !string.IsNullOrEmpty(TextSnippet);
+
+    partial void OnThumbnailSourceChanged(Bitmap? value)
+    {
+        OnPropertyChanged(nameof(HasThumbnailContent));
+        OnPropertyChanged(nameof(ShowLargeIcon));
+        OnPropertyChanged(nameof(ShowSmallIcon));
+    }
+
+    partial void OnTextSnippetChanged(string? value)
+    {
+        OnPropertyChanged(nameof(HasThumbnailContent));
+        OnPropertyChanged(nameof(ShowLargeIcon));
+        OnPropertyChanged(nameof(ShowSmallIcon));
+    }
+
+
+    /// <summary>卡片是否走「大图标」兜底：无缩略图内容且拿到了大尺寸图标。</summary>
+    public bool ShowLargeIcon => !HasThumbnailContent && LargeIconSource != null;
+
+    /// <summary>卡片是否走「小图标原尺寸」兜底：无缩略图内容且没有大图标可用（非 Windows 常见）。</summary>
+    public bool ShowSmallIcon => !HasThumbnailContent && LargeIconSource == null;
+
+    partial void OnLargeIconSourceChanged(Bitmap? value)
+    {
+        OnPropertyChanged(nameof(ShowLargeIcon));
+        OnPropertyChanged(nameof(ShowSmallIcon));
+    }
+
 
     /// <summary>
     /// 排序用：目录为 0，文件为 1（实现目录优先排序）。

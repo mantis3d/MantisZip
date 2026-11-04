@@ -13,6 +13,7 @@ namespace MantisZip.UI.Avalonia.Services;
 /// </summary>
 public static class ResultPreviewService
 {
+
     /// <summary>单个源（文件或目录）的构建结果。</summary>
     /// <param name="Node">该源的子树节点（浅层或全量）。</param>
     /// <param name="IncludedFiles">该源内经过滤的匹配文件绝对路径清单（供 B 数据集白名单回填）。</param>
@@ -163,19 +164,23 @@ public static class ResultPreviewService
     /// <param name="maxDepth">最大递归深度（int.MaxValue=全量）。</param>
     /// <param name="maxWidthPerDir">每个目录最多平铺的子项数（int.MaxValue=不限）。</param>
     /// <param name="ct">取消令牌。</param>
+    /// <param name="skeletonProgress">骨架进度接收器（每枚举一个文件上报一次累计值）；null 表示不上报。
+    /// 回调在构建线程同步调用，实现方不得直接做 UI 操作。</param>
     public static SourceSubtree? BuildSourceSubtree(
         string sourcePath,
         FileFilterCriteria? filter = null,
         int maxDepth = int.MaxValue,
         int maxWidthPerDir = int.MaxValue,
-        CancellationToken ct = default)
+        CancellationToken ct = default,
+        IProgress<SkeletonProgress>? skeletonProgress = null)
     {
         ct.ThrowIfCancellationRequested();
         var included = new List<string>();
 
         if (Directory.Exists(sourcePath))
         {
-            var node = BuildDirectoryNode(sourcePath, sourcePath, filter, included, maxDepth, maxWidthPerDir, ct);
+            var node = BuildDirectoryNode(sourcePath, sourcePath, filter, included, maxDepth, maxWidthPerDir, ct, depth: 0,
+                skeletonCounter: skeletonProgress == null ? null : new SkeletonCounter(skeletonProgress));
             return new SourceSubtree(node, included, IsFull: maxDepth == int.MaxValue && maxWidthPerDir == int.MaxValue);
         }
 
@@ -192,7 +197,12 @@ public static class ResultPreviewService
                 IsExpanded = false,
                 IsFilteredOut = isFiltered
             };
-            if (!isFiltered) included.Add(sourcePath);
+            // 单文件源只有一个文件：直接上报一次累计值（文件节点不显示目录统计文案，仅为语义完整）
+            if (!isFiltered)
+            {
+                included.Add(sourcePath);
+                skeletonProgress?.Report(new SkeletonProgress(1, fi.Length));
+            }
             return new SourceSubtree(fileNode, included, IsFull: true);
         }
 
@@ -478,6 +488,32 @@ public static class ResultPreviewService
     }
 
     /// <summary>
+    /// 骨架构建的累计计数器：递归时**按引用**共享同一个实例。
+    /// 若按值传初始值，兄弟目录会各自从同一基数重新累加（a 报 1..3、b 又报 1..2），
+    /// 实时进度看起来会「往回跳」。仅由构建线程使用，无需加锁。
+    /// </summary>
+    private sealed class SkeletonCounter
+    {
+        private readonly IProgress<SkeletonProgress> _sink;
+
+        /// <summary>已枚举（计入树）的文件总数。</summary>
+        public int FileCount;
+
+        /// <summary>已枚举文件的大小之和（字节）。</summary>
+        public long TotalSize;
+
+        public SkeletonCounter(IProgress<SkeletonProgress> sink) => _sink = sink;
+
+        /// <summary>记入一个文件并上报最新累计值。</summary>
+        public void AddFile(long size)
+        {
+            FileCount++;
+            TotalSize += size;
+            _sink.Report(new SkeletonProgress(FileCount, TotalSize));
+        }
+    }
+
+    /// <summary>
     /// 根据路径构建一个目录节点及其内容的预览树。
     /// </summary>
     /// <param name="rootPath">源根目录绝对路径。</param>
@@ -488,9 +524,11 @@ public static class ResultPreviewService
     /// <param name="maxWidthPerDir">每个目录最多平铺的子项数（int.MaxValue=不限）。</param>
     /// <param name="ct">取消令牌。</param>
     /// <param name="depth">当前递归深度（由调用方控制）。</param>
+    /// <param name="skeletonCounter">骨架进度累计器（整个源共享同一实例；null 表示不上报）。</param>
     private static PreviewTreeNode BuildDirectoryNode(
         string rootPath, string currentPath, FileFilterCriteria? filter, List<string>? includedFiles,
-        int maxDepth = int.MaxValue, int maxWidthPerDir = int.MaxValue, CancellationToken ct = default, int depth = 0)
+        int maxDepth = int.MaxValue, int maxWidthPerDir = int.MaxValue, CancellationToken ct = default, int depth = 0,
+        SkeletonCounter? skeletonCounter = null)
     {
         ct.ThrowIfCancellationRequested();
 
@@ -529,7 +567,7 @@ public static class ResultPreviewService
                 }
                 else
                 {
-                    node.Children.Add(BuildDirectoryNode(rootPath, subDir.FullName, filter, includedFiles, maxDepth, maxWidthPerDir, ct, depth + 1));
+                    node.Children.Add(BuildDirectoryNode(rootPath, subDir.FullName, filter, includedFiles, maxDepth, maxWidthPerDir, ct, depth + 1, skeletonCounter));
                 }
                 added++;
             }
@@ -551,6 +589,8 @@ public static class ResultPreviewService
                     IsFilteredOut = isFiltered
                 });
                 if (!isFiltered && includedFiles != null) includedFiles.Add(file.FullName);
+                // 骨架进度：每处理一个文件上报一次累计值（被过滤的文件不进树，故不计入）
+                if (!isFiltered && skeletonCounter != null) skeletonCounter.AddFile(file.Length);
                 added++;
             }
         }

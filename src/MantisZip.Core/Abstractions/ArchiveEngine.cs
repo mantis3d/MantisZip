@@ -431,6 +431,16 @@ public class ArchiveProgress
     /// 仅 <see cref="ArchivePhase.Scanning"/> 上报携带；null = 未携带（UI 第三行显示「—」）。</summary>
     public long? ScannedBytes { get; set; }
 
+    /// <summary>
+    /// 已解码到暂存目录、尚未移动到最终位置的条目数。
+    /// 仅 7z solid 批量解压走「解码段 → 移动段」两段式时携带；null = 本报告未携带（UI 隐藏「暂存」统计卡）。
+    /// 解码段递增、移动段递减，全部落地后为 0。
+    /// </summary>
+    public int? StagedFiles { get; set; }
+
+    /// <summary>已解码到暂存目录的字节合计（与 <see cref="StagedFiles"/> 同源，随落地递减）。null = 未携带。</summary>
+    public long? StagedBytes { get; set; }
+
     /// <summary>ZIP 并行批次进度（0-100）。仅并行批次报告携带，供批次详细行 Percent。非并行为 null。</summary>
     public double? BatchPercentComplete { get; set; }
 

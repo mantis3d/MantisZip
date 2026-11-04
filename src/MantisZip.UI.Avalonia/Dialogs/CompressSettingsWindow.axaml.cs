@@ -190,6 +190,8 @@ public partial class CompressSettingsWindow : Window
     private void OnClosed(object? sender, EventArgs e)
     {
         PersistGeometry();
+        // 骨架进度定时器被 Dispatcher 强引用：关窗必须停表并解绑 Tick，否则窗口与 VM 会一直挂着
+        ViewModel.StopSkeletonProgress();
         ViewModel.ConfirmCompleted -= OnConfirmCompleted;
         _completion.TrySetResult(_closedOutcome ?? new Cancelled<CompressSettings>());
     }
@@ -309,12 +311,12 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
-    /// 「高级模式」开关：关闭 = 简单模式（当前目录选中即结果、切目录清空累积）；
-    /// 打开 = 跨目录累积（每条目显示复选框，多次添加后统一确认）。
+    /// 「复选框模式」开关（2026-11-03 与主窗口文件列表统一）：关闭 = 当前目录选中即结果、切目录清空累积；
+    /// 打开 = 跨目录累积（每条目显示复选框，Ctrl 逐项增减、Shift 连勾、右键全选/反选/清空）。
     /// </summary>
-    private void OnAdvancedModeChanged(object? sender, RoutedEventArgs e)
+    private void OnCheckboxModeChanged(object? sender, RoutedEventArgs e)
     {
-        SourcePicker.IsSimpleMode = AdvancedModeCheck.IsChecked != true;
+        SourcePicker.IsCheckboxMode = CheckboxModeCheck.IsChecked == true;
     }
 
     private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)

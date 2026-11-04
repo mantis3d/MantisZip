@@ -1,3 +1,39 @@
+## v0.5.6
+
+### 文件说明 / File Description
+
+MantisZip-0.5.6-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.6-Setup-Offline.exe 是离线安装包。MantisZip-0.5.6-Portable.zip 是便携版，解压即用。MantisZip-0.5.6-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.6-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.6-Portable.zip is the portable version, extract and run. MantisZip-0.5.6-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **文件列表三种查看方式** — 列表工具栏新增布局切换按钮，在「详情（原来的表格）/ 平铺（卡片流）/ 内容行（大卡片 + 名称与大小、压缩率、修改日期）」之间循环，选择记进设置、下次打开保持。平铺与内容行模式下，图片显示真实缩略图（不放大、不拉伸）、`.ico` 取图标里最清晰的那一帧（宁可缩小不放大：有 256 帧就用 256）、`.svg` 按卡片尺寸重新渲染（矢量重绘，不是小图放大）、文本类显示前 150 个字符的文字卡、其余文件显示系统大图标（Windows 取 256px 档，按 96px 显示）兜底；右键菜单、拖拽到资源管理器、双击进入目录、`Enter` 打开都与表格模式一致
+- **Three ways to view the file list** — a new toolbar button cycles the list between details (the original grid), tiles (a card flow) and content rows (large card plus name, sizes, ratio and modified date); the choice is saved and restored. In tile and content modes, images show a real thumbnail (never upscaled or stretched), `.ico` uses the sharpest frame available (downscale a big frame rather than upscale a small one: a 256 px frame wins over a 16 px one), `.svg` is re-rendered at card size (a vector redraw, not an upscaled small bitmap), text files show a card with their first 150 characters, and everything else falls back to its system icon at large size (the 256 px shell frame, drawn at 96 px); the context menu, dragging to Explorer, double-click to enter a folder and `Enter` to open all behave exactly as in the grid
+- ![平铺布局：图片显示缩略图、文本显示文字卡](docs/images/version/v0.5.6/ListTileLayout.png)
+- ![内容行布局：大卡片 + 名称与元数据](docs/images/version/v0.5.6/ListContentLayout.png)
+- **复选框模式保持一致的手势** — 文件列表里切换「复选框多选」时，当前的蓝底选区会转换成勾选（关掉时反向转回，只保留当前目录内的那些），不用先清空再重选；压缩与解压设置窗里的文件选择器改用同一套手势：点行只是高亮、点复选框才勾，`Shift` 连选一段、`Ctrl` 逐项增减，选中好几项后点其中任一复选框可整组勾上或取消，右键还有全选可见 / 反选 / 清空勾选
+- **Consistent checkbox gestures** — toggling checkbox selection in the file list now converts the current highlighted rows into checkmarks (and back again when you turn it off, keeping only the rows in the current folder), so nothing has to be re-picked; the file pickers inside the compress and extract settings windows use the same gestures: clicking a row only highlights it, clicking a checkbox ticks it, `Shift` selects a range, `Ctrl` toggles single rows, clicking any checkbox in a multi-row highlight ticks or clears the whole group, and the context menu offers select-all-visible, invert and clear
+
+- **压缩包里的 .ico 显示自己的图标** — 此前列表里所有 `.ico` 都是通用图标，现在会从包里读出该文件、挑最接近 16×16 的那一帧显示（列表先显示通用图标、随后异步替换，不拖慢打开速度，单个包最多处理 20 个）
+- **.ico files show their own icon** — previously every `.ico` in the list used the generic icon; now the file is read from the archive and its frame closest to 16×16 is displayed (the list shows the generic icon first and swaps asynchronously, so opening stays fast, at most 20 per archive)
+- **复选框多选与批量删除** — 列表工具栏可切到复选框模式（默认关闭，开关记进设置）：每行前面出现复选框，勾选状态跨滚动、跨切目录保持，状态栏右侧显示「已选 N 项 · 共 X」；右键菜单补「全选可见 / 反选 / 清空勾选」。勾选多项后删除**只弹一次确认**（文案带条目数与总大小），删完列表刷新、勾选态自动清空。选区（蓝底高亮）与勾选是两套独立状态：先用 Ctrl/Shift 选好几行，再点其中任意一行的复选框，这几行会一起勾上 / 一起取消。关闭复选框模式时行为与以前完全一致（仍是 Ctrl/Shift 多选）
+- **Checkbox selection and batch delete** — the list toolbar can switch to checkbox mode (off by default, the choice is saved): every row gets a checkbox, checked state survives scrolling and folder changes, and the status bar shows "N selected · X total"; the context menu gains select-all-visible, invert and clear. Deleting several checked entries asks for confirmation **once** (with the count and total size), then refreshes the list and clears the checkboxes. Row selection (the blue highlight) and the checkboxes are independent: highlight several rows with Ctrl/Shift, then click the checkbox of any one of them and the whole group is checked or cleared together. With checkbox mode off, everything works exactly as before (Ctrl/Shift multi-select)
+- ![勾选跨目录保持：根目录勾 2 项、子目录勾 1 项后回到根目录仍显示「已选 3 项」](docs/images/version/v0.5.6/CheckboxCrossFolder.png)
+- ![批量删除：勾选 3 项只弹一次确认](docs/images/version/v0.5.6/CheckboxBatchDelete.png)
+- **卡片视图也能勾选，Shift 连选 / Ctrl 增减** — 平铺与内容行两种布局同样显示复选框（跟随工具栏的复选框模式开关），点整张卡片即勾选 / 取消，勾选跨布局、跨目录保持；新增快捷多选：**Shift + 点击**从上次点击的行连选到当前行（只加不减），**Ctrl + 点击**逐项增减
+- **Checkboxes in card views, with Shift range and Ctrl toggle** — tile and content layouts now show the same checkboxes (following the toolbar's checkbox-mode switch); clicking anywhere on a card toggles it, and checked state survives layout and folder changes. Two new shortcuts: **Shift + click** checks everything from the previously clicked row up to the current one (never unchecks), **Ctrl + click** toggles a single row
+- ![卡片视图的复选框与 Shift 连选：勾选 4 项后状态栏显示「已选 4 项 · 共 44 B」](docs/images/version/v0.5.6/CardViewCheckbox.png)
+- **「视图」菜单可直接指定列表布局** — 新增「列表布局」子菜单（详情 / 平铺 / 内容行三选一，当前布局打勾）与「复选框多选」开关，不必再用工具栏按钮循环切换
+- **The View menu can pick a list layout directly** — a new "List Layout" submenu (details, tiles or content rows, with the current one ticked) plus a "Checkbox Selection" switch, so you no longer have to cycle through the toolbar button- **压缩设置窗的预览树显示实时计数** — 后台扫描目录期间，根节点标题从静态的「加载中…」变成「加载中 N 个文件，X」并每半秒刷新，扫完自动切到真实统计；被文件过滤排除的条目不计数
+- **The compression window's preview tree counts as it scans** — while the folder scan runs in the background, the root node now reads "Loading N files, X" and refreshes twice a second instead of a static "Loading…", switching to the real totals when the scan finishes; entries excluded by the file filter are not counted
+- **缩略图卡片可调外观** — 「设置 → 外观 → 缩略图」可调三项，改完立刻生效不用重启：卡片外边框（默认关闭，白底图贴在浅色背景上时用来看清边界）、透明图是否垫一层纯色底（默认保留透明，垫色可自选）、缩略图尺寸三档 96 / 128 / 160 px
+- **Adjustable thumbnail cards** — Settings → Appearance → Thumbnails exposes three options that apply immediately: a card border (off by default, handy for white-background images on light surfaces), whether transparent images get a solid backdrop (transparency is kept by default; the backdrop colour is pickable), and the thumbnail size in three steps (96 / 128 / 160 px)
+- ![设置 → 外观 → 缩略图：外边框 / 垫底色 / 尺寸三档](docs/images/version/v0.5.6/ThumbnailCardSettings.png)
+
 ## v0.5.5
 
 ### 文件说明 / File Description
@@ -35,9 +71,9 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 **性能 / Performance**
 
-- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）整包解压从 19 秒降到 1.7 秒，只解其中选中的条目也有 4 倍以上的提升（10 秒 → 2.3 秒）。只对未加密的 7z 生效：ZIP/RAR 与单文件解压不受影响，条目很多的包会先短暂显示「正在检查冲突…」再开始解压。
+- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）整包解压从 19 秒降到 1.7 秒，只解其中选中的条目也有 4 倍以上的提升（10 秒 → 2.3 秒）。只对未加密的 7z 生效：ZIP/RAR 与单文件解压不受影响，条目很多的包会先短暂显示「正在检查冲突…」再开始解压。这种两段式解压的进度现在也分两段显示：解码到暂存期间进度条走到一半为止，新增的「暂存」统计卡显示已解码、还没落到最终位置的条目数与大小；随后逐条落地时该卡递减、「已处理」递增，不会再有进度条先走满、状态卡片长时间不动的观感；进度推进按文件大小加权（小文件不再嗖嗖涨、大文件也不会解到 99% 还只挪一格），落地阶段按条目数推进
 
-- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts.
+- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts. Progress for this two-step extraction is now shown in two halves as well: the bar fills only to the halfway point while entries are decoded into staging, a new "staged" stat card reports how many of them are decoded but not yet moved into place (and counts down as they land), and the "processed" card only starts growing once files actually reach their destination — no more bar that hits 100 % while nothing has been written yet. Progress now advances in proportion to file size — small files no longer race ahead while a big one barely moves — with the staging-to-destination step advancing per entry.
 
 **修复 / Fixes**
 

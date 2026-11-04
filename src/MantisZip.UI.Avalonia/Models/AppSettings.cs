@@ -196,6 +196,50 @@ public class AppSettings
     public int MaxRecentFiles { get; set; } = 10;
     public string AppFontFamily { get; set; } = "";
     public string CompactnessMode { get; set; } = "Normal";
+    /// <summary>
+    /// 文件列表布局模式：Details=详情（默认，老用户界面不变）/ Tile=平铺 / Content=内容。
+    /// 存枚举（JSON 里是 0/1/2；字段缺失或无法识别时落到默认值 Details）。
+    /// 由 <c>MainWindowViewModel.LayoutMode</c> 读写（规则 23：有持久化就必须有运行时消费者）。
+    /// </summary>
+    public FileListLayoutMode FileListLayoutMode { get; set; } = FileListLayoutMode.Details;
+
+    /// <summary>
+    /// 主窗口列表是否显示**复选框列**（v0.5.6 `file-list-checkbox-selection`）。
+    /// 默认 false = 与引入复选框之前的行为完全一致（单击高亮+预览、Ctrl/Shift 多选）。
+    /// 由 <c>MainWindowViewModel.IsCheckboxMode</c> 读写（规则 23：有持久化就必须有运行时消费者）。
+    /// </summary>
+    public bool FileListCheckboxMode { get; set; } = false;
+
+    // ===== 缩略图卡片（设置 → 外观 → 缩略图） =====
+    /// <summary>
+    /// 缩略图卡片是否显示 1px 外边框。默认 false = 与引入该设置前完全一致。
+    /// 由 <c>App.ApplyThumbnailStyle()</c> 注入 <c>ThumbnailCardBorderThickness</c> 资源（规则 5 同款做法），
+    /// 卡片模板用 DynamicResource 取值 ⇒ 改设置即时生效、无需重启。
+    /// </summary>
+    public bool ThumbnailShowBorder { get; set; } = false;
+
+    /// <summary>
+    /// 缩略图是否**保留透明背景**（默认 true）。
+    /// true = 透明 PNG/SVG 的透明区域露出列表底色；false = 垫 <see cref="ThumbnailBackdropColor"/> 实色。
+    /// 注意语义：alpha 通道始终保留，这里只是决定「垫不垫底色」，不是重新解码。
+    /// </summary>
+    public bool ThumbnailUseTransparency { get; set; } = true;
+
+    /// <summary>
+    /// 不保留透明时垫的底色（#RRGGBB 或 #AARRGGBB）。默认白色 —— 与资源管理器的缩略图观感一致，
+    /// 且不受浅色/深色主题影响（该开关的意义就是让观感稳定）。
+    /// 解析失败（手工改坏 settings.json）时由 <c>App.ApplyThumbnailStyle()</c> 回落白色。
+    /// </summary>
+    public string ThumbnailBackdropColor { get; set; } = "#FFFFFF";
+
+    /// <summary>
+    /// 缩略图卡片边长（像素）：96 = 小 / 128 = 中（默认，与引入该设置前一致）/ 160 = 大。
+    /// 卡片、平铺格子、内容行左列均由此派生（<c>App.ApplyThumbnailStyle()</c> 注入三个资源）。
+    /// **改变尺寸会改变缩略图解码目标边长**，因此 <see cref="Services.ThumbnailCache"/> 的 key 带尺寸，
+    /// 且主窗口会清空已加载缩略图重新批量取一遍。
+    /// </summary>
+    public int ThumbnailSize { get; set; } = 128;
+
     public string Language { get; set; } = "zh";
     /// <summary>
     /// 是否显示文件列表里的**数据条**（每行文字后那条表示相对占比的彩色横条）。

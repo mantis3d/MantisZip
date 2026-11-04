@@ -116,6 +116,8 @@ public partial class App : Application
             _ => CompactnessMode.Normal,
         };
         ApplyCompactness(compactMode);
+        // 缩略图卡片外观（边框 / 垫底色 / 尺寸）同样走资源注入，卡片模板 DynamicResource 取值
+        ApplyThumbnailStyle(appSettings);
         Services.StartupTimer.Mark("Init.Settings");
 
         // ── CoreLog 初始化：注入诊断开关 + 路径脱敏委托 ──

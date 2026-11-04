@@ -57,6 +57,8 @@ public partial class SettingsWindow : Window
         App.RefreshCompactness();
         App.RefreshTheme();
         App.RefreshDebugLogSettings();
+        // 缩略图卡片外观（边框 / 垫底色 / 尺寸）：注入资源并通知主窗口按新尺寸重取缩略图
+        App.RefreshThumbnailStyle();
 
         Close();
     }

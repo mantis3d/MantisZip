@@ -24,7 +24,7 @@ namespace MantisZip.UI.Avalonia.Controls;
 /// 只剩标题栏、底部「确定 / 取消」与规则 15 唯一豁免的「系统浏览」原生逃生通道）。
 /// </para>
 /// <para>
-/// 使用顺序：先设 <see cref="Mode"/> / <see cref="IsSimpleMode"/>，再调 <see cref="Initialize"/>；
+/// 使用顺序：先设 <see cref="Mode"/> / <see cref="IsCheckboxMode"/>，再调 <see cref="Initialize"/>；
 /// 之后由宿主决定何时「确定」（<see cref="TryConfirm"/> 或响应 <see cref="ConfirmRequested"/>）。
 /// </para>
 /// </remarks>
@@ -36,26 +36,33 @@ public partial class CustomFilePickerControl : UserControl
     public PickerMode Mode { get; set; } = PickerMode.PickFolder;
 
     /// <summary>
-    /// 简单模式（默认 <c>true</c>）：不显示复选框，当前目录里选中的项就是结果，
-    /// 切换目录即清空已选（覆盖语义）。<c>false</c> = 高级模式：复选框 + 跨目录累积。
+    /// 复选框模式（默认 <c>false</c>）：显示复选框，勾选态跨目录累积；
+    /// 关闭时没有复选框，当前目录里选中的项就是结果，切换目录即清空已选（覆盖语义）。
     /// </summary>
     /// <remarks>
-    /// 设置窗口内嵌使用时默认简单模式；高级模式给「一次挑多个目录里的文件」用。
-    /// 切换时会就地刷新已加载列表的复选框列，并（切回简单时）把已选同步到列表选中态。
+    /// <para>
+    /// 与主窗口文件列表的「复选框多选」同名同义（2026-11-03 统一）：点行只改高亮、
+    /// 点复选框才切换勾选，Ctrl 逐项增减，Shift 从锚点连勾，选区有多项时点其中任一复选框整组切换。
+    /// </para>
+    /// <para>
+    /// 设置窗口内嵌使用时默认关闭；打开给「一次挑多个目录里的文件」用。
+    /// 切换时会就地刷新已加载列表的复选框列与右键菜单，并把已选同步到列表选中态。
+    /// </para>
     /// </remarks>
-    public bool IsSimpleMode
+    public bool IsCheckboxMode
     {
-        get => _isSimpleMode;
+        get => _isCheckboxMode;
         set
         {
-            if (_isSimpleMode == value) return;
-            _isSimpleMode = value;
-            ApplySimpleModeToItems();
+            // 不做「同值早退」：初始值就是 false，早退会让 XAML 里挂上的右键菜单
+            // 在非复选框模式下继续存在（标题是空的、点下去什么也不做）。总是同步一次。
+            _isCheckboxMode = value;
+            ApplyCheckboxModeToItems();
             ApplyRightPanelVisibility();
         }
     }
 
-    private bool _isSimpleMode = true;
+    private bool _isCheckboxMode;
 
     /// <summary>
     /// 是否隐藏控件内的「已选项目」累积面板（默认 false）。
@@ -224,6 +231,10 @@ public partial class CustomFilePickerControl : UserControl
     {
         InitializeComponent();
         DataContext = this;
+
+        // 复选框模式的手势必须抢在 ListBox 折叠选区、行内 CheckBox 默认切换之前处理（Tunnel），
+        // 否则「Ctrl/Shift + 点复选框」会被默认行为各切一次（2026-11-03）。
+        FileList.AddHandler(PointerPressedEvent, FileList_PointerPressed, RoutingStrategies.Tunnel);
     }
 
     // ── 公开初始化入口（等价于原对话框「构造 + 初始化」的全部副作用） ──────
@@ -848,7 +859,7 @@ public partial class CustomFilePickerControl : UserControl
 
         // 简单模式：切换目录即清空已选（「当前目录选中项 = 结果」的覆盖语义）。
         // 初始化期例外：构造时传入的预选源文件必须在首次 NavigateTo 之后仍然存在。
-        if (_isSimpleMode && Mode == PickerMode.PickItems && !_initializing)
+        if (!_isCheckboxMode && Mode == PickerMode.PickItems && !_initializing)
         {
             ClearAccumulatedSelection();
         }
@@ -1018,7 +1029,7 @@ public partial class CustomFilePickerControl : UserControl
             SizeText = string.Empty,
             ModifiedText = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
             ShowSubText = false,
-            CanCheck = Mode == PickerMode.PickItems && !_isSimpleMode
+            CanCheck = Mode == PickerMode.PickItems && _isCheckboxMode
         };
         SubscribeIsSelected(item);
         item.IsSelected = _accumulatedPaths.Contains(path, StringComparer.OrdinalIgnoreCase);
@@ -1038,7 +1049,7 @@ public partial class CustomFilePickerControl : UserControl
             SizeText = FormatUtil.FormatSize(info.Length),
             ModifiedText = info.LastWriteTime.ToString("yyyy-MM-dd HH:mm"),
             ShowSubText = false,
-            CanCheck = Mode == PickerMode.PickItems && !_isSimpleMode
+            CanCheck = Mode == PickerMode.PickItems && _isCheckboxMode
         };
         SubscribeIsSelected(item);
         item.IsSelected = _accumulatedPaths.Contains(path, StringComparer.OrdinalIgnoreCase);
@@ -1102,9 +1113,10 @@ public partial class CustomFilePickerControl : UserControl
         // PickItems：仅刷新批量按钮计数（Extended 多选）
         if (Mode == PickerMode.PickItems)
         {
-            // 简单模式没有复选框：列表里选中的文件就是结果（Shift/Ctrl 由 ListBox 自身处理）
-            if (_isSimpleMode) SyncAccumulatedFromListSelection();
-            else MarkListSelectionAsChecked();
+            // 非复选框模式没有复选框：列表里选中的文件就是结果（Shift/Ctrl 由 ListBox 自身处理）。
+            // 复选框模式（2026-11-03 起与主窗口文件列表统一）：点行只改高亮，不自动勾选，
+            // 勾选只能由复选框 / Ctrl / Shift / 成组切换 / 右键菜单改变。
+            if (!_isCheckboxMode) SyncAccumulatedFromListSelection();
             UpdatePickPanel();
             return;
         }
@@ -1146,7 +1158,7 @@ public partial class CustomFilePickerControl : UserControl
         {
             // 高级模式双击文件：切换勾选累积（IsSelected setter 经订阅累积），不关闭。
             // 简单模式单击即选中，双击不再改勾选，避免「点两下反而取消」。
-            if (!_isSimpleMode) item.IsSelected = !item.IsSelected;
+            if (_isCheckboxMode) item.IsSelected = !item.IsSelected;
         }
         else if (Mode == PickerMode.SaveFile)
         {
@@ -1170,7 +1182,7 @@ public partial class CustomFilePickerControl : UserControl
                 else if (Mode == PickerMode.PickItems)
                 {
                     // 高级模式：Enter 切换勾选（同双击），不关闭；简单模式由选中态决定结果
-                    if (!_isSimpleMode) item.IsSelected = !item.IsSelected;
+                    if (_isCheckboxMode) item.IsSelected = !item.IsSelected;
                 }
                 else if (Mode == PickerMode.SaveFile)
                     SyncFileNameBox(item.DisplayName); // 保存模式 Enter 文件 → 填入文件名
@@ -1296,7 +1308,7 @@ public partial class CustomFilePickerControl : UserControl
             {
                 item.IsSelected = _accumulatedPaths.Contains(item.FullPath, StringComparer.OrdinalIgnoreCase);
             }
-            if (_isSimpleMode) SyncListSelectionFromAccumulatedCore();
+            if (!_isCheckboxMode) SyncListSelectionFromAccumulatedCore();
         }
         finally
         {
@@ -1317,7 +1329,7 @@ public partial class CustomFilePickerControl : UserControl
     /// </summary>
     private void ApplyRightPanelVisibility()
     {
-        var showAccumulated = Mode == PickerMode.PickItems && !_isSimpleMode && !_hideAccumulatedPanel;
+        var showAccumulated = Mode == PickerMode.PickItems && _isCheckboxMode && !_hideAccumulatedPanel;
         var showExtractPanel = Mode == PickerMode.ExtractFolder;
 
         PickItemsPanel.IsVisible = showAccumulated;
@@ -1346,49 +1358,49 @@ public partial class CustomFilePickerControl : UserControl
             rightCol.MaxWidth = double.PositiveInfinity;
         }
     }
-    private void ApplySimpleModeToItems()
+    /// <summary>
+    /// 切换复选框模式时就地刷新已加载列表：复选框列的显隐、勾选态回显、
+    /// 右键菜单（全选可见 / 反选 / 清空勾选）与 Shift 锚点。
+    /// </summary>
+    private void ApplyCheckboxModeToItems()
     {
         _syncingSelection = true;
         try
         {
             foreach (var item in _fileItems)
             {
-                item.CanCheck = Mode == PickerMode.PickItems && !_isSimpleMode;
+                item.CanCheck = Mode == PickerMode.PickItems && _isCheckboxMode;
                 item.IsSelected = _accumulatedPaths.Contains(item.FullPath, StringComparer.OrdinalIgnoreCase);
             }
-            if (_isSimpleMode) SyncListSelectionFromAccumulatedCore();
+            if (!_isCheckboxMode) SyncListSelectionFromAccumulatedCore();
         }
         finally
         {
             _syncingSelection = false;
         }
+
+        _checkAnchor = null;
+
+        // 右键菜单只在复选框模式下挂上（非复选框模式没有勾选概念）
+        if (_isCheckboxMode && Mode == PickerMode.PickItems)
+        {
+            CheckAllVisibleItem.Header = LocalizationManager.T("Menu_CheckAllVisible");
+            InvertCheckedItem.Header = LocalizationManager.T("Menu_InvertChecked");
+            ClearCheckedItem.Header = LocalizationManager.T("Menu_ClearChecked");
+            FileList.ContextMenu = PickContextMenu;
+        }
+        else
+        {
+            FileList.ContextMenu = null;
+        }
+
         UpdatePickPanel();
     }
 
-    /// <summary>简单模式：列表里选中的文件就是结果（Shift/Ctrl 由 ListBox 自身处理，目录不计）。</summary>
     /// <summary>
-    /// 高级模式：把列表当前选中行标成「已勾选」（不反向取消）。
-    /// 统一交互语义（2026-10-30）：两种模式都是「单击行＝选中、双击目录＝进入」，
-    /// 高级模式多出的只是复选框能跨目录累积、点复选框才是取消。
+    /// 非复选框模式：列表里选中的文件就是结果（Shift/Ctrl 由 ListBox 自身处理，目录也算结果）。
+    /// 复选框模式下不再调用——那种模式点行只改高亮，勾选由 <see cref="FileList_PointerPressed"/> 统一处理。
     /// </summary>
-    private void MarkListSelectionAsChecked()
-    {
-        if (_syncingSelection) return;
-        _syncingSelection = true;
-        try
-        {
-            foreach (var item in (FileList.SelectedItems ?? Array.Empty<object>()).OfType<FileBrowserItem>())
-            {
-                item.IsSelected = true;
-            }
-        }
-        finally
-        {
-            _syncingSelection = false;
-        }
-        UpdatePickPanel();
-        SelectionChanged?.Invoke(this, EventArgs.Empty);
-    }
     private void SyncAccumulatedFromListSelection()
     {
         if (_syncingSelection) return;
@@ -1408,6 +1420,166 @@ public partial class CustomFilePickerControl : UserControl
         {
             _syncingSelection = false;
         }
+        UpdatePickPanel();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    // ── 复选框模式手势（2026-11-03 与主窗口文件列表统一） ─────────────────
+
+    /// <summary>Shift 连勾的锚点：复选框模式下最近一次通过复选框（或 Ctrl/普通点击）改过勾选的行。</summary>
+    private FileBrowserItem? _checkAnchor;
+
+    /// <summary>
+    /// 复选框模式下的指针拦截（Tunnel，抢在 ListBox 折叠选区与行内 CheckBox 默认切换之前）。
+    /// <para>
+    /// 语义与主窗口文件列表一致：<b>点行只改高亮</b>，只有点在复选框上才动勾选；
+    /// Ctrl = 切换该行，Shift = 从锚点连到该行（只加不减），
+    /// 选区有多项且包含该行时 = 整组切换（Ctrl/Shift 高亮几行后点任一复选框）。
+    /// </para>
+    /// </summary>
+    private void FileList_PointerPressed(object? sender, PointerPressedEventArgs e)
+    {
+        if (Mode != PickerMode.PickItems || !_isCheckboxMode) return;
+        if (!e.GetCurrentPoint(FileList).Properties.IsLeftButtonPressed) return;
+
+        var source = e.Source as Visual;
+        var item = source?.GetSelfAndVisualAncestors().OfType<ListBoxItem>().FirstOrDefault()?.DataContext as FileBrowserItem;
+        if (item is null || !item.CanCheck) return;
+
+        // 点在行上而不是复选框上：交给 ListBox 正常改高亮
+        if (source?.GetSelfAndVisualAncestors().OfType<CheckBox>().FirstOrDefault() is null) return;
+
+        if (e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            CheckRange(item);
+        }
+        else if (e.KeyModifiers.HasFlag(KeyModifiers.Control))
+        {
+            ApplyChecked(new[] { item }, !item.IsSelected);
+            _checkAnchor = item;
+        }
+        else
+        {
+            var selected = (FileList.SelectedItems ?? Array.Empty<object>())
+                .OfType<FileBrowserItem>()
+                .Where(i => i.CanCheck)
+                .ToList();
+
+            if (selected.Count >= 2 && selected.Contains(item))
+                ApplyChecked(selected, !item.IsSelected);
+            else
+                ApplyChecked(new[] { item }, !item.IsSelected);
+
+            _checkAnchor = item;
+        }
+
+        // 阻止 CheckBox 默认单击再切一次（否则与上面的赋值互相抵消）以及 ListBox 折叠选区
+        e.Handled = true;
+    }
+
+    /// <summary>Shift 连勾：从锚点到目标行之间的可见行全部勾上（只加不减，锚点不动）。</summary>
+    private void CheckRange(FileBrowserItem target)
+    {
+        var from = _checkAnchor ?? target;
+        var start = _fileItems.IndexOf(from);
+        var end = _fileItems.IndexOf(target);
+        if (start < 0 || end < 0)
+        {
+            ApplyChecked(new[] { target }, true);
+            return;
+        }
+
+        if (start > end) (start, end) = (end, start);
+
+        var range = new List<FileBrowserItem>(end - start + 1);
+        for (var i = start; i <= end; i++)
+        {
+            if (_fileItems[i].CanCheck) range.Add(_fileItems[i]);
+        }
+
+        ApplyChecked(range, true);
+    }
+
+    /// <summary>批量设置勾选态（唯一写入口：同步行内复选框、累积集合与右侧面板）。</summary>
+    private void ApplyChecked(IReadOnlyList<FileBrowserItem> items, bool value)
+    {
+        _syncingSelection = true;
+        try
+        {
+            foreach (var item in items)
+            {
+                if (!item.CanCheck) continue;
+                if (item.IsSelected != value) item.IsSelected = value;
+                UpdateAccumulatedCore(item.FullPath, value);
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        UpdatePickPanel();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>累积集合的静默增删（调用方负责批量结束后的 <see cref="UpdatePickPanel"/>）。</summary>
+    private void UpdateAccumulatedCore(string path, bool isChecked)
+    {
+        if (isChecked)
+        {
+            if (!_accumulatedPaths.Contains(path, StringComparer.OrdinalIgnoreCase))
+                _accumulatedPaths.Add(path);
+        }
+        else
+        {
+            _accumulatedPaths.RemoveAll(p => string.Equals(p, path, StringComparison.OrdinalIgnoreCase));
+        }
+    }
+
+    /// <summary>右键「全选可见」：当前目录里所有可勾选行（含子目录）全部勾上。</summary>
+    private void CheckAllVisible_Click(object? sender, RoutedEventArgs e)
+        => ApplyChecked(_fileItems.Where(i => i.CanCheck).ToList(), true);
+
+    /// <summary>右键「反选」：当前目录里可勾选行的勾选态取反（其它目录的累积不动）。</summary>
+    private void InvertChecked_Click(object? sender, RoutedEventArgs e)
+    {
+        var items = _fileItems.Where(i => i.CanCheck).ToList();
+        _syncingSelection = true;
+        try
+        {
+            foreach (var item in items)
+            {
+                var value = !item.IsSelected;
+                if (item.IsSelected != value) item.IsSelected = value;
+                UpdateAccumulatedCore(item.FullPath, value);
+            }
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
+        UpdatePickPanel();
+        SelectionChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>右键「清空勾选」：清掉全部勾选（含其它目录的累积），与主窗口同名菜单项一致。</summary>
+    private void ClearChecked_Click(object? sender, RoutedEventArgs e)
+    {
+        _syncingSelection = true;
+        try
+        {
+            foreach (var item in _fileItems)
+            {
+                if (item.IsSelected) item.IsSelected = false;
+            }
+            _accumulatedPaths.Clear();
+        }
+        finally
+        {
+            _syncingSelection = false;
+        }
+
         UpdatePickPanel();
         SelectionChanged?.Invoke(this, EventArgs.Empty);
     }

@@ -20,8 +20,8 @@ namespace MantisZip.UI.Avalonia.Tests;
 ///
 /// 覆盖三件事：
 /// ① 四个页签都在（输出设置 / 添加压缩包 / 文件过滤 / 加速）；
-/// ② 两个选择器按内嵌用法配置（目标目录=PickFolder、压缩包=PickItems，都是简单模式）；
-/// ③ 勾「高级模式」后压缩包选择器切回跨目录累积（与压缩窗对称，2026-10-30 用户反馈第 2 点）。
+    /// ② 两个选择器按内嵌用法配置（目标目录=PickFolder、压缩包=PickItems，默认都不是复选框模式）；
+    /// ③ 勾「复选框模式」后压缩包选择器切到跨目录累积 + 复选框手势（2026-11-03 与主窗口文件列表统一）。
 ///
 /// 另外锁住一个真实缺陷：新 key 只加进三份 JSON 还不够，VM 的 <c>LocalizedStrings</c>
 /// 是白名单字典，漏登记会让复选框**只剩一个空框没有文字**（当时真机就是这么发现的）。
@@ -68,23 +68,23 @@ public sealed class ExtractSettingsWindowEmbeddedPickerTests
             Assert.NotNull(destination);
             Assert.NotNull(archive);
 
-            // 目标目录：PickFolder + 简单模式（当前浏览目录即目标）
+            // 目标目录：PickFolder（非复选框模式：当前浏览目录即目标）
             Assert.Equal(PickerMode.PickFolder, destination!.Mode);
-            Assert.True(destination.IsSimpleMode);
+            Assert.False(destination.IsCheckboxMode);
 
-            // 压缩包：PickItems + 简单模式（默认）；勾「高级模式」后切回累积模式
+            // 压缩包：PickItems，默认非复选框模式；勾「复选框模式」后切到跨目录累积
             Assert.Equal(PickerMode.PickItems, archive!.Mode);
-            Assert.True(archive.IsSimpleMode);
+            Assert.False(archive.IsCheckboxMode);
 
-            var advanced = window.FindControl<CheckBox>("AdvancedModeCheck");
+            var advanced = window.FindControl<CheckBox>("CheckboxModeCheck");
             Assert.NotNull(advanced);
             advanced!.IsChecked = true;
             Pump(window);
-            Assert.False(archive.IsSimpleMode);
+            Assert.True(archive.IsCheckboxMode);
 
             advanced.IsChecked = false;
             Pump(window);
-            Assert.True(archive.IsSimpleMode);
+            Assert.False(archive.IsCheckboxMode);
         }
         finally
         {
@@ -93,11 +93,11 @@ public sealed class ExtractSettingsWindowEmbeddedPickerTests
     }
 
     /// <summary>
-    /// 「高级模式」复选框必须有文字：文案走 <c>LocalizedStrings[Extract_PickerAdvancedMode]</c>，
+    /// 「复选框模式」复选框必须有文字：文案走 <c>LocalizedStrings[Picker_CheckboxMode]</c>，
     /// 而 VM 的字典是白名单构建的——漏登记时 Binding 静默失败，真机上只剩一个空框。
     /// </summary>
     [AvaloniaFact]
-    public void AdvancedModeCheckBox_HasLocalizedLabel()
+    public void CheckboxModeCheckBox_HasLocalizedLabel()
     {
         var window = new ExtractSettingsWindow();
         try
@@ -105,16 +105,16 @@ public sealed class ExtractSettingsWindowEmbeddedPickerTests
             window.Show();
             Pump(window);
 
-            var advanced = window.FindControl<CheckBox>("AdvancedModeCheck");
+            var advanced = window.FindControl<CheckBox>("CheckboxModeCheck");
             Assert.NotNull(advanced);
 
             var label = advanced!.Content as string;
             Assert.False(string.IsNullOrWhiteSpace(label));
-            Assert.Equal(LocalizationManager.T("Extract_PickerAdvancedMode"), label);
+            Assert.Equal(LocalizationManager.T("Picker_CheckboxMode"), label);
 
             // VM 的白名单字典必须收录该 key，否则上面那行会在真实运行环境里拿到空串
             var vm = Assert.IsType<ExtractSettingsViewModel>(window.DataContext);
-            Assert.True(vm.LocalizedStrings.ContainsKey("Extract_PickerAdvancedMode"));
+            Assert.True(vm.LocalizedStrings.ContainsKey("Picker_CheckboxMode"));
         }
         finally
         {

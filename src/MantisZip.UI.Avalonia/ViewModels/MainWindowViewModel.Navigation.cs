@@ -23,6 +23,12 @@ namespace MantisZip.UI.Avalonia.ViewModels;
 public partial class MainWindowViewModel : ObservableObject
 {
     /// <summary>
+    /// 「.ico 条目显示自身图标」后台加载的取消源。
+    /// 每次列表重建都会取消并重建它：旧批次未完成的读取立即作废，不会把图标回填到已丢弃的模型上。
+    /// </summary>
+    private CancellationTokenSource? _iconLoadCts;
+
+    /// <summary>
     /// 统一导航入口：记录历史，更新 CurrentFolder，刷新条目列表，同步目录树选择。
     /// </summary>
     private void NavigateAndPushHistory(string path)
@@ -144,10 +150,14 @@ public partial class MainWindowViewModel : ObservableObject
 
             var compressedSizeAvailable = GetCompressedSizeAvailable(_currentFormat);
 
+            // 复选框列订阅：先退订上一批（每次重建都是新实例），再加到新实例上
+            foreach (var stale in CurrentEntries)
+                stale.PropertyChanged -= OnEntryPropertyChanged;
             CurrentEntries.Clear();
             foreach (var item in entries)
             {
                 var model = ArchiveItemModel.FromCore(item);
+                model.PropertyChanged += OnEntryPropertyChanged;
                 if (model.IsDirectory)
                 {
                     // 应用目录聚合：大小 = 子树和，日期 = 子树最新，压缩后大小 = 子树和
@@ -158,11 +168,14 @@ public partial class MainWindowViewModel : ObservableObject
                         model.LastModified = stat.NewestModified;
                     }
                     model.IconSource = IconService.GetFolderIcon();
+                    model.LargeIconSource = IconService.GetLargeFolderIcon();
                 }
                 else
                 {
                     var ext = Path.GetExtension(model.Name);
                     model.IconSource = IconService.GetFileIcon(ext);
+                    // 卡片兜底用的大图标（Windows 取 Shell 256px 档；拿不到时为 null，卡片退回 16px 原尺寸）
+                    model.LargeIconSource = IconService.GetLargeFileIcon(ext);
                 }
                 // 按当前格式设置压缩后大小可用性（文件 + 目录一致）
                 model.CompressedSizeAvailable = compressedSizeAvailable;
@@ -195,13 +208,53 @@ public partial class MainWindowViewModel : ObservableObject
                 ComputeProgressBarRatios();
             }
 
+            // 复选框模式：把勾选态按 FullPath 还原到新一批实例上（跨目录 / 跨筛选保持勾选）
+            RestoreCheckedState();
+
             // 条目重填完成，通知视图重应用列排序
             EntriesRefreshed?.Invoke(this, EventArgs.Empty);
+
+            // 通用图标已经填好（列表首帧不被阻塞），现在才去后台换成 .ico 文件自身的图标
+            ReloadOwnIcoIcons();
+
+            // 卡片布局（平铺/内容）才需要缩略图：列表重填完成后按需启动（详情布局内部直接返回）
+            StartThumbnailBatchIfNeeded();
         }
         finally
         {
             _isProgrammaticFilter = false;
         }
+    }
+
+    /// <summary>
+    /// 为当前列表中的 <c>.ico</c> 条目后台加载「文件自身嵌入」的图标。
+    /// <para>
+    /// 通用扩展名图标已在 <see cref="PopulateEntries"/> 里同步填好，这里只做替换，
+    /// 所以列表首帧完全不受读包/解码影响。每次调用都会取消上一批未完成的加载。
+    /// </para>
+    /// </summary>
+    private void ReloadOwnIcoIcons()
+    {
+        // 取消并释放上一批：列表已重建，旧的模型快照不再显示，继续回填只会浪费 I/O
+        _iconLoadCts?.Cancel();
+        _iconLoadCts?.Dispose();
+        _iconLoadCts = null;
+
+        // 没有打开的压缩包（空状态）时没有条目可读
+        if (CurrentArchivePath is not { Length: > 0 } archivePath)
+            return;
+
+        var cts = new CancellationTokenSource();
+        _iconLoadCts = cts;
+
+        // 传 List 快照而不是 ObservableCollection：加载期间列表可能被再次重建（Clear/Add）
+        _ = IcoIconLoader.LoadAsync(
+            CurrentEntries.ToList(),
+            archivePath,
+            _currentFormat,
+            _currentPassword,
+            IcoIconLoader.MaxIcons,
+            cts.Token);
     }
 
     /// <summary>
@@ -446,6 +499,8 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     partial void OnCurrentFolderChanged(string? value)
     {
+        // 切目录先终止上一目录的缩略图批次（缓存按目录粒度丢弃），随后 PopulateEntries 会按需重启
+        CancelThumbnailBatch();
         if (!AutoExpandTree) return;
         if (value == null) return;
         ExpandTreeToPath(value);

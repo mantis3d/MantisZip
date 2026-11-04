@@ -1,6 +1,6 @@
 # 7z 全量解压改走批量接口（solid 归档性能修复）(SevenZip Solid Bulk Extract)
 
-> **状态**: 🟡 实现完成（2026-11-02；待真机 HDD 实测后归档）| **创建日期**: 2026-11-01
+> **状态**: ✅ 已完成（2026-11-04 归档，随 v0.5.6）| 代码与 SSD 实测已通过；**HDD 真机复测未做**，列为 v0.5.6 发布前手工验收项
 > **关联**: GitHub issue #75（`[性能] 解压海量小文件到机械硬盘时速度极慢`）；`docs/KNOWN_ISSUES.md` 无相关条目
 > **前置**: 无（Core 引擎内部改造 + 复用现有进度/冲突契约）
 > **决策来源**: 2026-11-01 与用户讨论 —— 用户最初假设「多线程解压在慢速硬盘反而拖累」，实测证明根因是「solid 归档逐条目提取 → 对文件数二次方」；用户要求先说明用户体验影响（见计划内「体验变化矩阵」），随后指示「写计划，所有决策按照你认为最好的方式来确定」。本计划所有决策由实施者按证据拍板，已逐条记录理由（§6）。第二轮讨论补充：用户指出「覆盖安装」这类场景下默认 `ask` 策略必须仍然提速，据此把冲突询问改为**解压前一次问完**（D4b），并把批量失败回退收紧为**只重试未完成条目**（D6）。第三轮（2026-11-02）拍板：① 接受「冲突询问提前到解压开始前集中问完」；② 改名暂存目录放在**目标目录内**（`.mantiszip-staging-<guid>`）；③ 本次**只优化全量解压**，勾选条目 / 拖拽行走 `ExtractEntriesAsync` 不动。
@@ -449,3 +449,15 @@ catch (Exception ex) {
 
 **验证**：core / avalonia（Release）0 警告；`tests` 全绿（2 条存量警告）；`ui-tests` 63.2s 全绿（28 条存量警告）；`i18n` 1398 key 三语一致。
 
+
+## 后续：进度与统计口径修正（2026-11-04）
+
+用户实测批量解压时「第一阶段进度条就走完 100%、第二阶段不动」，定位到三处上报口径缺陷，见 docs/progress-avalonia-detail.md 的 2026-11-04 条目：
+
+1. 解码段的 FileExtractionFinished 未按选中集合（indexMap）过滤 ⇒ solid 块把未选中的条目也算进进度单位，分母只数选中条数，于是解码到一半就满格；
+2. 解码段没有文件内推进，只按文件个数跳格；
+3. 冲突预解析把「已扫描 / 目标数」当主进度，文件多时解压尚未开始就到 100%。
+
+改法：ArchiveProgress 增加 StagedFiles / StagedBytes；选中路径改为**半格制**（解码 +0.5、落地 +0.5，逐条目仍 +1）；三段回调统一按 indexMap 过滤；主进度加高水位钳位；扫描比移到 FilePercentComplete。UI 侧「进度窗口 → 完整档」新增「暂存」统计卡。
+
+回归测试：	ests/MantisZip.Tests/Engines/SevenZipEngineSelectedBulkProgressTests.cs（3 例）与 	ests/MantisZip.UI.Avalonia.Tests/ProgressStagedStatCardTests.cs（3 例）。

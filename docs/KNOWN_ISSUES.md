@@ -35,7 +35,8 @@
 | **KI-009** | 5 个 AppSettings 死开关（存了值、有 UI、无消费者） | 技术债 / 死代码 | 缺决策 | 决定这 5 项的去留（接线 / 删属性 / 删 UI）时；守卫豁免表已按名登记，修一个删一行 | 阻塞中 |
 | **KI-010** | RAR4 分卷不做块链结构校验（末卷尾部损坏可能漏检） | 功能留白 | — | 已修复（RAR4 块链校验，2026-11-03，issue #68） | 已修复（2026-11-03） |
 | **KI-011** | 并行解压/压缩不识别目标盘类型，机械盘上的并发写不做节流 | 性能 / 交互 | 成本超阈值 + 缺决策 | 有机械盘用户的实测数据（并发放大反而更慢）；或做 `selected-items-bulk-extract` 时顺带评估 | 阻塞中 |
-| **KI-012** | 安装包下载 .NET 前的确认框，无法把「取消」按钮文字换成「我会手动安装」 | 交互 / 文案 | 成本超阈值 | #23 再次要求精确文案时；或下次改安装包流程时 | 阻塞中 |
+| **KI-012** | 三条「原地解压」路径不读冲突设置、恒静默覆盖 | 功能一致性 | 等计划 | `progress-window-conflict-policy` 落地（Phase 3 接线并顺带修复）时 | 阻塞中 |
+| **KI-013** | 安装包下载 .NET 前的确认框，无法把「取消」按钮文字换成「我会手动安装」 | 交互 / 文案 | 成本超阈值 | #23 再次要求精确文案时；或下次改安装包流程时 | 阻塞中 |
 
 ---
 
@@ -152,9 +153,25 @@
 - **为什么现在不修**：**成本超阈值 + 缺决策**。① 判盘需要 WMI 或 `DeviceIoControl`，两条路都有代价（WMI 首次查询慢、`IOCTL` 要处理非本地盘/网络盘/动态盘）；② 判定完还得决定策略（自动降并发？每盘一个上限？只对小文件降？），属产品取舍；③ 本轮改的 solid 批量路径已经把「逐条重复解码」这个主因消掉，先看真机反馈更划算。
 - **复评条件**：① 拿到机械盘用户的实测数据（同一包、并发 1 与默认值对比），且确实「并发放大更慢」时；② 或做 `.omo/plans/未开始/selected-items-bulk-extract.md` 时顺带评估（那条计划同样会碰到 HDD 写放大）。
 - **关联**：`.omo/plans/进行中/sevenzip-solid-extract-batch.md` §13 第 2 条；`docs/ARCHITECTURE.md`「并行解压架构」小节。
+
 - **状态**：阻塞中
 
-## KI-012 安装包下载 .NET 前的确认框，无法把「取消」按钮文字换成「我会手动安装」
+## KI-012 三条「原地解压」路径不读冲突设置、恒静默覆盖
+
+- **发现**：2026-11-01（勘察「进度窗口冲突策略控件」时全量核对解压入口）
+- **现象**：`ExtractArchiveHere`（解压到此处）、`ExtractArchiveToName`（解压到同名目录）、`SmartExtract`（智能解压）三条入口在进度窗口里跑解压时**完全不看 `AppSettings.FileConflictAction`**：即使用户在设置里选了「询问」，也是静默覆盖磁盘上的同名文件，一个弹窗都不出。
+- **证据**：
+  - `src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Extract.cs:59`（ExtractArchiveHere）、`:104`（ExtractArchiveToName）、`:325`（SmartExtract）均调用 `new ExtractService().ExtractAsync(archivePath, dest, password, progress, ct)`，**不传第 6 个参数 `options`**。
+  - `src/MantisZip.UI.Avalonia/Services/ExtractService.cs:24-25` 注释自述：「`options` … When null, existing files are silently overwritten」。
+  - 引擎侧 `src/MantisZip.Core/Utils/FileConflictHelper.cs:24,72` 对 null options 回落到 `FileConflictAction.Overwrite`。
+  - 对照组：同仓库的对话框解压（`ExtractSession` → `ExtractFlow.ExtractAsync`）与右键/拖拽选中项（`ExtractFlow.RunSelectedItemsExtractionAsync`）都正确读取了设置。
+- **为什么现在不修**：**等计划**。这三条路径的进度窗口正是「文件冲突自动处理控件」要挂的地方；控件要真生效必须把 `ArchiveOptions` 与实时策略源一起传进去，属于 [progress-window-conflict-policy.md](../.omo/plans/未开始/progress-window-conflict-policy.md) Phase 3 的接线动作，单独先改会让同一段代码挨两遍返工。
+- **复评条件**：上述计划 Phase 3 落地当天（接线的同时把本条目置为「已修复」并移入档案区）；若该计划被冻结，则需单独排一个小修（三条路径各补一次 `CreateExtractOptions` + 传 `options`，约 1h）。
+- **关联**：`AGENTS.md` 规则 21；该计划「现状核实 → 入口矩阵」表。
+- **编号说明**：本条 2026-11-01 首次登记时编为 KI-010；2026-11-03 合并 `beta` 时与「RAR4 分卷不做块链结构校验」撞号（那条 2026-10-31 登记，v0.5.5 的发布说明与进度文档都已按 KI-010 引用），故本条改号为 **KI-012**；同日合并 `main` 时又与安装包确认框那条（2026-11-03 登记）撞号，按登记先后保留本条 KI-012、那条改为 KI-013。**后续新登记请从 KI-014 起。**
+- **状态**：阻塞中
+
+## KI-013 安装包下载 .NET 前的确认框，无法把「取消」按钮文字换成「我会手动安装」
 
 - **发现**：2026-11-03（复评 issue #23 时确认）
 - **现象**：`Setup-WebSetup.exe` 在检测到 .NET 10 运行时缺失时会弹确认框（`installer.iss:663` 的 `MsgBox(CustomMessage('DownloadConfirmMsg'), mbConfirmation, MB_YESNOCANCEL)`），三个按钮固定是「是 / 否 / 取消」。issue #23 要求把「取消」改成「我会手动安装」—— Inno Setup 的 `MsgBox` 只支持 `MB_YESNO` / `MB_YESNOCANCEL` 等固定组合，**按钮文字不能自定义**，要精确显示这五个字必须改成自定义向导页。
@@ -162,6 +179,7 @@
 - **为什么现在不修**：**成本超阈值**。功能上已经等价：选「否」＝跳过下载继续安装（之后自己装运行时），离线包 `Setup-Offline.exe` 本身自带运行时、全程不联网；只有「按钮文字必须精确显示『我会手动安装』」这一条做不到，需要一个自定义页面 + 实机跑一遍安装包才能验证，收益仅为文案。2026-11-03 与维护者确认按「已完成」关闭 issue #23，本条目只记录这处留白。
 - **复评条件**：① 报告者或用户在 issue #23 再次要求精确文案时；② 或下次改安装包流程（加别的依赖下载、重排安装页）时顺带做成自定义向导页。
 - **关联**：issue #23（已关闭）；`installer.iss` 的 `NextButtonClick` / `DownloadConfirmMsg`。
+- **编号说明**：本条 2026-11-03 首次登记时编为 KI-012；同日合并 `main` 到 `alpha` 时与「三条原地解压路径不读冲突设置」（2026-11-01 登记）撞号，按登记先后本条改号为 **KI-013**。
 - **状态**：阻塞中
 
 ## 档案区（已修 / 不会修）

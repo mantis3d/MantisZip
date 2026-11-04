@@ -195,6 +195,16 @@
                 </Grid>
               </DataTemplate>
             </ListBox.ItemTemplate>
+            <!-- 右键菜单（只在复选框模式下挂上，见 ApplyCheckboxModeToItems）：
+                 全选可见 / 反选 / 清空勾选，语义与主窗口文件列表的同名菜单项一致。
+                 标题在代码里用 LocalizationManager.T 填（本控件没有 VM）。 -->
+            <ListBox.ContextMenu>
+              <ContextMenu x:Name="PickContextMenu">
+                <MenuItem x:Name="CheckAllVisibleItem" Click="CheckAllVisible_Click" />
+                <MenuItem x:Name="InvertCheckedItem" Click="InvertChecked_Click" />
+                <MenuItem x:Name="ClearCheckedItem" Click="ClearChecked_Click" />
+              </ContextMenu>
+            </ListBox.ContextMenu>
           </ListBox>
         </Grid>
       </Border>

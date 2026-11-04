@@ -264,4 +264,64 @@ public partial class App : Application
         }
     }
 
+    // ════════════════════════════════════════════════════════════════
+    //  Thumbnail card style (设置 → 外观 → 缩略图)
+    // ════════════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 缩略图卡片设置变更后的通知（主窗口订阅后清空已加载缩略图，按新边长重新批量取）。
+    /// 用静态事件而不是给 VM 加依赖：设置窗口与主窗口互不引用，App 是唯一共同祖先。
+    /// </summary>
+    internal static event EventHandler? ThumbnailStyleChanged;
+
+    /// <summary>
+    /// 把缩略图卡片的三个外观开关注入成资源，卡片模板用 <c>{DynamicResource}</c> 取值：
+    /// ①边框厚度（0 或 1）②垫底画刷（透明 or 指定实色，仅在不保留透明时生效）③尺寸（卡片边长 + 两个派生宽度）。
+    /// 与 <see cref="ApplyCompactness"/> 同一套机制 ⇒ 改设置即时生效、无需重启、不用重建条目模型。
+    /// </summary>
+    private void ApplyThumbnailStyle(AppSettings settings)
+    {
+        var border = settings.ThumbnailShowBorder ? 1.0 : 0.0;
+        Resources["ThumbnailCardBorderThickness"] = new Thickness(border);
+
+        var backdrop = settings.ThumbnailUseTransparency
+            ? Brushes.Transparent
+            : ParseBackdropBrush(settings.ThumbnailBackdropColor);
+        Resources["ThumbnailCardBackdropBrush"] = backdrop;
+
+        // 尺寸：卡片边长 + 平铺项外壳宽度（卡片 + 2×4 内边距）+ WrapPanel 格子宽度（外壳 + 2×8 间距余量）
+        var size = settings.ThumbnailSize is 96 or 128 or 160 ? settings.ThumbnailSize : 128;
+        Resources["ThumbnailCardSize"] = (double)size;
+        Resources["ThumbnailTileItemWidth"] = (double)(size + 8);
+        Resources["ThumbnailTileCellWidth"] = (double)(size + 16);
+    }
+
+    /// <summary>解析垫底色；非法字符串（手工改坏 settings.json）回落白色，不抛。</summary>
+    private static IBrush ParseBackdropBrush(string? color)
+    {
+        if (!string.IsNullOrWhiteSpace(color) && Color.TryParse(color, out var parsed))
+        {
+            return new SolidColorBrush(parsed);
+        }
+
+        DebugLog($"[Thumbnail] 垫底色无法解析，回落白色：{color}");
+        return Brushes.White;
+    }
+
+    /// <summary>
+    /// 供 SettingsWindow 保存设置后立即刷新缩略图卡片外观（无需重启）。
+    /// 资源立即重建；主窗口通过 <see cref="ThumbnailStyleChanged"/> 重取缩略图（尺寸变了要重新解码）。
+    /// </summary>
+    internal static void RefreshThumbnailStyle()
+    {
+        if (Current is not App app)
+        {
+            return;
+        }
+
+        var settings = AppSettings.Load();
+        app.ApplyThumbnailStyle(settings);
+        ThumbnailStyleChanged?.Invoke(null, EventArgs.Empty);
+    }
+
 }

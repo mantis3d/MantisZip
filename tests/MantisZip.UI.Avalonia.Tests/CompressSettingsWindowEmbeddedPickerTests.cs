@@ -67,24 +67,22 @@ public sealed class CompressSettingsWindowEmbeddedPickerTests
             var source = window.FindControl<CustomFilePickerControl>("SourcePicker");
             Assert.NotNull(output);
             Assert.NotNull(source);
-
-            // 输出目录：PickFolder + 简单模式（当前目录选中即结果，不需要复选框）
+            // 输出目录：PickFolder（非复选框模式下当前目录选中即结果，不需要复选框）
             Assert.Equal(PickerMode.PickFolder, output!.Mode);
-            Assert.True(output.IsSimpleMode);
-
-            // 源文件：PickItems + 简单模式（默认）；勾「高级模式」后切回累积模式
+            Assert.False(output.IsCheckboxMode);
+            // 源文件：PickItems，默认非复选框模式；勾「复选框模式」后切到跨目录累积
             Assert.Equal(PickerMode.PickItems, source!.Mode);
-            Assert.True(source.IsSimpleMode);
+            Assert.False(source.IsCheckboxMode);
 
-            var advanced = window.FindControl<CheckBox>("AdvancedModeCheck");
+            var advanced = window.FindControl<CheckBox>("CheckboxModeCheck");
             Assert.NotNull(advanced);
             advanced!.IsChecked = true;
             Pump(window);
-            Assert.False(source.IsSimpleMode);
+            Assert.True(source.IsCheckboxMode);
 
             advanced.IsChecked = false;
             Pump(window);
-            Assert.True(source.IsSimpleMode);
+            Assert.False(source.IsCheckboxMode);
         }
         finally
         {
@@ -161,7 +159,7 @@ public sealed class CompressSettingsWindowEmbeddedPickerTests
             var picker = new Controls.CustomFilePickerControl
             {
                 Mode = PickerMode.PickItems,
-                IsSimpleMode = true,
+                IsCheckboxMode = false,
                 HideAccumulatedPanel = true
             };
             var window = new Window { Width = 800, Height = 600, Content = picker };
