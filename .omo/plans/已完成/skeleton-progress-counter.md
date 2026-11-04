@@ -554,3 +554,13 @@ Wave FINAL (After ALL tasks — user okay):
 | 3 | BuildDirectoryNode IProgress 回调 | ResultPreviewService.cs |
 | 4 | DispatcherTimer 轮询 | CompressSettingsViewModel.cs |
 | 5 | 单元测试 + 文档同步 | CompressPreviewProgressiveTests.cs, PLAN.md |
+## 实施补记（2026-11-04）
+
+**计划标记 5/5 完成时，功能实际不可见** —— 用户实测（m08704）预览树完全没有「加载中 N 个文件，X」。
+
+- **根因**：进度写在**原始节点**上，而屏幕显示的是 `ResultTreeView.RebuildDisplayTree()` → `DeepCloneNode()` 的深拷贝克隆体；`ShallowClone` 把 `CurrentSkeletonProgress` 当值拷贝，克隆体只保留克隆那一刻的值。Task 4 的验收只查「字段/方法存在 + 构建成功 + 既有单测绿」，单测又都是手动给节点赋值 —— **「定时器 → 屏幕」这一层没有任何覆盖**，故整条链路静默失效。
+- **修复 A（数字动起来）**：`PreviewTreeNode.Origin` 回指 + `SyncSkeletonProgressFromOrigins`（只抄 `CurrentSkeletonProgress`，O(显示节点)、不重建树）＋ `CompressSettingsViewModel.SkeletonProgressUpdated` 事件 → `CompressSettingsWindow` 订阅 → `ResultTreeView.SyncSkeletonProgress()`。
+- **修复 B（树渐进长出条目，用户 m08749 追加要求）**：`BuildSourceSubtree` 的 `snapshotSink / snapshotInterval（默认 800ms）/ snapshotMinNewFiles（默认 300）`，`SkeletonCounter` 双阈值深拷贝快照（`CloneForSnapshot`，目录标 `IsSkeletonPartial`、只有根带进度），VM 把快照当该源显示子树、沿用 250ms 节流的装配上屏。
+- **验收补充（今后同型任务的通则）**：涉及「后台算、UI 上屏」的功能，测试必须至少有一条**端到端**用例（触发源 → 可见状态变化），只测字段与方法存在不算完成；另外 `docs/ARCHITECTURE.md` 的预览子系统说明里已记录「显示树是深拷贝，改属性要经 `Origin`」这一约束。
+- **测试**：`tests/MantisZip.UI.Avalonia.Tests/SkeletonSnapshotProgressTests.cs` 6 例（快照递增、无接收器不打标、克隆标记与进度归属、无占位子节点仍显示数字、Origin 同步、无 Origin 零副作用）。
+- **验证**：avalonia Release 0 警告、`tests`、`ui-tests` 48.1s、`i18n` 1438、`check` 与 8 条守卫全绿。

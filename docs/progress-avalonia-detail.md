@@ -5,6 +5,16 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+
+**2026-11-04** — 修复：骨架进度的「加载中 N 个文件」看不见 + 新增快照式渐进上屏（预览树一边加载一边长出条目）
+  - **现象**（用户 m08704）：`.omo/plans/已完成/skeleton-progress-counter.md` 标记 5/5 完成，但实测预览树没有任何「加载中 N 个文件，X」效果。
+  - **根因**：进度由 `CompressSettingsViewModel.OnSkeletonProgressTick`（500ms）写到 `_skeletonProgressTargets` 登记的**原始节点**上，而屏幕显示的是 `ResultTreeView.RebuildDisplayTree()` → `DeepCloneNode(_originalRoot)` 的**深拷贝克隆体**；`ShallowClone` 把 `CurrentSkeletonProgress` 当值拷贝，克隆体只保留克隆那一刻的快照，之后所有赋值都落在原始节点上、永远上不了屏。原计划 Task 4 的验收只写「字段/方法存在 + 构建成功 + 既有测试绿」，单测又都是手动给节点赋值，**「定时器 → 屏幕」这一层没有任何覆盖**。
+  - **修法 A（让数字动起来）**：`PreviewTreeNode` 新增 `Origin`（克隆体回指原始节点，`ShallowClone` 里 `Origin = Origin ?? this`）与 `IsSkeletonPartial`（快照树不挂占位子节点，不能再用 `HasLoadingPlaceholderChild` 判断「还在加载」）；`DirectoryInfoText` 条件改成 `IsSkeletonPartial || HasLoadingPlaceholderChild`。新增 `internal static SyncSkeletonProgressFromOrigins(IEnumerable<PreviewTreeNode>)`：按 `Origin` 把 `CurrentSkeletonProgress` 抄到克隆体（`Equals` 比较、无变化不写），`ResultTreeView.SyncSkeletonProgress()` 转发它；`CompressSettingsViewModel` 新增 `public event Action? SkeletonProgressUpdated`，定时器刷完原始节点后触发，压缩设置窗口在 `SubscribeViewModel` 里订阅、`OnClosed` 里在 `StopSkeletonProgress()` 之前解绑（handler 只做 `PreviewTree?.SyncSkeletonProgress()`）。
+  - **修法 B（让树长出来，用户 m08749 要求「每隔一段看树长一点」）**：`ResultPreviewService` 新增 `SnapshotInterval = 800ms` / `SnapshotMinNewFiles = 300`，`BuildSourceSubtree` 增加 `snapshotSink / snapshotInterval / snapshotMinNewFiles` 三个可选参数（默认走常量，测试可传小阈值）；`SkeletonCounter` 增加 `AttachRoot`（`BuildDirectoryNode` 在 `depth == 0` 时登记树根）与双阈值判定 —— 文件数与时间都满足才 `CloneForSnapshot(_root, new SkeletonProgress(FileCount, TotalSize))`，深拷贝在构建线程完成，UI 之后只读这份快照。`CompressSettingsViewModel` 侧：Phase B 每源传 `snapshotSink`，收到后经 `Dispatcher.UIThread.Post` 做版本校验、把快照同时写进 `_skeletonSnapshots` 与 `_skeletonProgressTargets`（后续数字要刷在这份快照上）、再触发 250ms 节流的 `AssembleProgressiveAsync()`；`AssembleAsync` 的子项来源改为 `ResolveSubtreeForDisplay`（全量缓存 → 快照 → 浅层缓存）；`StopSkeletonProgress` 清空 `_skeletonSnapshots`，源构建完成即 `ForgetSkeletonSnapshot`。
+  - **不要复发的坑**：① 预览树里任何「改节点属性期望上屏」的功能都必须走 `Origin` 回指，或重建显示树 —— 直接改原始节点不会有任何视觉变化；② `SkeletonCounter` 的快照必须在构建线程深拷贝，不能在 UI 线程遍历还在生长的 `Children`；③ 快照树不挂占位子节点，所以「是否还在加载」的判定必须包含 `IsSkeletonPartial`。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/SkeletonSnapshotProgressTests.cs` 6 例 —— 阈值调到零后至少 3 份快照且 `FileCount` 严格递增、子节点数不减少、快照与活树不是同一实例；无 `snapshotSink` 时不给树打骨架标记；`CloneForSnapshot` 只给根带进度、子目录仍带 `IsSkeletonPartial`、文件节点两者皆无；`DirectoryInfoText` 在 `IsSkeletonPartial` 且无占位子节点时仍显示计数；`SyncSkeletonProgressFromOrigins` 把最新值抄进克隆体、无 `Origin` 节点零副作用。（子节点统计由装配阶段 `CalculateDescendantStats` 填充，单测里显式调 `RecalculateDescendantStats`。）
+  - **验证**：`build -Target avalonia -c Release` 0 警告；`tests` 25.1s（2 条存量警告）；`ui-tests` 48.1s 全绿；`-Task i18n` 1438；`-Task check` 与 8 条守卫全绿。
+
 **2026-11-04** — 修复：7z 两段式解压的进度与统计（用户实测「第一阶段就走完 100%」）
   - **现象**（用户 m12926）：选中项批量解压分为三段，第一段进度条就走完 100%，第二段进度条与统计卡都不更新，第三段才更新卡片；解压耗时本身正常。全量解压也有类似问题：文件多时进度条在解压开始前就冲到 100%。
   - **根因（三处，全在 Core 的进度上报口径）**：①解码段的 `FileExtractionFinished` 处理没有按选中集合过滤 —— solid 块会把整块条目都解码出来（含未选中的），而分母 `totalTarget` 只数选中条数，于是第 N 个选中条目解码完进度就满格，其余条目在满格下静默解码；②解码段没有文件内连续推进，只按「文件个数」跳格；③冲突预解析用「已扫描数 / 目标数」当主进度上报（每 200 个文件一次），文件多时解压还没开始进度条就到 100%。附带问题：解码期 `ProcessedFiles` 恒为 0，统计卡整排不动 —— 用户建议补一张「暂存」卡。

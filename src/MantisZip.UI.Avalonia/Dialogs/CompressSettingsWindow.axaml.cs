@@ -191,6 +191,7 @@ public partial class CompressSettingsWindow : Window
     {
         PersistGeometry();
         // 骨架进度定时器被 Dispatcher 强引用：关窗必须停表并解绑 Tick，否则窗口与 VM 会一直挂着
+        ViewModel.SkeletonProgressUpdated -= OnSkeletonProgressUpdated;
         ViewModel.StopSkeletonProgress();
         ViewModel.ConfirmCompleted -= OnConfirmCompleted;
         _completion.TrySetResult(_closedOutcome ?? new Cancelled<CompressSettings>());
@@ -447,7 +448,14 @@ public partial class CompressSettingsWindow : Window
     private void SubscribeViewModel()
     {
         ViewModel.PropertyChanged += OnViewModelPropertyChanged;
+        // 骨架进度写在原始节点上，屏幕是克隆体：定时器每轮回调后把最新值同步过去
+        ViewModel.SkeletonProgressUpdated += OnSkeletonProgressUpdated;
     }
+
+    /// <summary>
+    /// 骨架进度刷新（UI 线程）：只把进度值抄进显示层克隆体，不重建树、不动展开状态与滚动位置。
+    /// </summary>
+    private void OnSkeletonProgressUpdated() => PreviewTree?.SyncSkeletonProgress();
 
     /// <summary>
     /// 批量移除选中的源文件；删完把结果回填给内嵌选择器（双向同步的另一半）。
