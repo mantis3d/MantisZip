@@ -431,6 +431,8 @@ public partial class App : Application
                 {
                     // Task 6: 压缩流程标记 → 详细面板显示「压缩通道」说明行（Store 类文件不占通道）
                     window.IsCompressFlow = true;
+                    // 「冲突时:」能力位 + 初值（与下方 resolver 的 livePolicy 同源，避免死开关）
+                    window.SetConflictPolicyControl(ConflictPolicyFlow.Compress, request.ConflictAction);
                     // 列表播种：压缩流程枚举全量条目（后台；失败/取消/超阈值放弃，终态 upsert 兜底）
                     CompressFlow.TrySeedEntryItemsInBackground(window, request, window.CancellationToken);
                 },
@@ -440,10 +442,13 @@ public partial class App : Application
                         request,
                         progress,
                         token,
-                        // 冲突处理统一走 CompressFlow（弹窗 + ApplyToAll 记忆），与主窗口共用
+                        // 冲突处理统一走 CompressFlow（弹窗 + ApplyToAll 记忆），与主窗口共用；
+                        // 实时策略源 = 进度窗口下拉，勾「应用到全部」后回写下拉
                         conflictResolver: CompressFlow.CreateResolver(
                             info => CompressFlow.ShowConflictDialogAsync(presenter.ActiveWindow!, info),
-                            request.ConflictAction),
+                            request.ConflictAction,
+                            () => presenter.ActiveWindow?.ConflictPolicyCode,
+                            code => presenter.ActiveWindow?.SyncConflictPolicyFromDialog(code)),
                         onItemStatus: (index, status) =>
                         {
                             // 逐项状态更新驱动批处理文件列表（对齐 WPF CompressAsync onItemStatus 接线）

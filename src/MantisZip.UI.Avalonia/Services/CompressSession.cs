@@ -178,6 +178,13 @@ public sealed class CompressSession : ICompressSession
                         // 「压缩完成后打开目录」开关：只有宿主注入了打开能力才显示（CLI / 测试流程没有）。
                         if (_openOutputFolder is not null)
                             progressWindow.SetCompressPostActions(openFolder: true, openFolderSeed: settings.OpenFolderAfterCompress);
+
+                        // 「冲突时:」能力位 + 初值（初值 = 本次请求冻结的策略）。
+                        // 与下方 Operation 里传给 resolver 的 livePolicy 同源 —— 只有接了实时策略才显示，
+                        // 杜绝「下拉改了但引擎不读」的死开关。测试压缩包流程没有冲突概念，传 None 隐藏。
+                        progressWindow.SetConflictPolicyControl(
+                            context.IsTestFlow ? ConflictPolicyFlow.None : ConflictPolicyFlow.Compress,
+                            request.ConflictAction);
                     },
                     Operation = async (progress, runToken) =>
                     {
@@ -188,7 +195,13 @@ public sealed class CompressSession : ICompressSession
                             request,
                             progress,
                             linked.Token,
-                            CompressFlow.CreateResolver(info => ResolveConflictAsync(context, info), request.ConflictAction),
+                            CompressFlow.CreateResolver(
+                                info => ResolveConflictAsync(context, info),
+                                request.ConflictAction,
+                                // 实时策略源：进度窗口下拉（运行中可改；窗口已关则回退本次请求的策略）
+                                () => context.Presenter.ActiveWindow?.ConflictPolicyCode,
+                                // 弹窗勾「应用到全部」⇒ 把下拉同步成实际生效的动作
+                                code => context.Presenter.ActiveWindow?.SyncConflictPolicyFromDialog(code)),
                             // ⑥ 运行期逐条目状态写到当前进度窗口（原实现走 VM 上的 BatchStatusReporter）。
                             (index, status) =>
                             {

@@ -162,6 +162,8 @@
   "Progress_Tooltip_Ratio": "Ratio",
   "Progress_Stats_Scanning": "Scanning",
   "Progress_Stats_Staged": "Staged",
+  "Progress_ConflictPolicy_Label": "On conflict:",
+  "Progress_ConflictPolicy_Tip": "Switching at run time applies to later conflicts; entries already handled are unaffected",
   "Progress_Stats_Archive": "Archive",
   "Progress_Stats_ArchiveTotal": "of {0}",
   "Progress_Stats_TotalSize": "Total size {0}",

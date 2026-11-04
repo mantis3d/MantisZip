@@ -25,6 +25,10 @@ public sealed class SelectedItemsExtractService
     /// <param name="conflictDialog">Ask 冲突弹窗回调。返回用户选择与是否应用到全部；用户取消整个操作时应抛 OperationCanceledException。</param>
     /// <param name="progress">进度回调（由调用方创建，模态/非模态窗口均可）。</param>
     /// <param name="cancellationToken">取消令牌。</param>
+    /// <param name="nameEncoding">文件名代码页（null = 自动检测）。</param>
+    /// <param name="livePolicy">
+    /// 实时冲突策略源（进度窗口「冲突时:」下拉）；null = 用 <paramref name="conflictAction"/> 静态策略。
+    /// </param>
     /// <exception cref="OperationCanceledException">用户取消整个操作（Ask 冲突弹窗）。</exception>
     public async Task ExtractEntriesAsync(
         string archivePath,
@@ -37,7 +41,8 @@ public sealed class SelectedItemsExtractService
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
         IProgress<ArchiveProgress> progress,
         CancellationToken cancellationToken,
-        string? nameEncoding = null)
+        string? nameEncoding = null,
+        Func<FileConflictAction>? livePolicy = null)
     {
         // Build entryKeys and pathOverrides via 统一路径计算（单一事实来源，预览树共用）
         var entryKeys = new List<string>();
@@ -53,7 +58,7 @@ public sealed class SelectedItemsExtractService
             pathOverrides[key] = FileConflictHelper.GetSafePath(destinationPath, safeEntryPath);
         }
 
-        var options = CreateExtractOptions(conflictAction, conflictDialog, nameEncoding);
+        var options = CreateExtractOptions(conflictAction, conflictDialog, nameEncoding, livePolicy);
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
         if (engine == null) throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));
@@ -120,16 +125,86 @@ public sealed class SelectedItemsExtractService
     }
 
     /// <summary>
+    /// 把冲突动作反向映射成策略码（进度窗口下拉用）。
+    /// 用于冲突弹窗里勾了「应用到全部」后把下拉同步成实际生效的动作 —— 唯一写入口，
+    /// 让「当前策略」始终可见可改。返回 <see langword="null"/> 表示无需同步（Ask）。
+    /// </summary>
+    internal static string? ToConflictActionCode(FileConflictAction action) => action switch
+    {
+        FileConflictAction.Overwrite => "overwrite",
+        FileConflictAction.OverwriteIfOlder => "overwrite-if-older",
+        FileConflictAction.OverwriteIfSmaller => "overwrite-if-smaller",
+        FileConflictAction.Rename => "rename",
+        FileConflictAction.Skip => "skip",
+        _ => null,
+    };
+
+    /// <summary>
     /// 集中创建解压选项，统一处理冲突回调 + ApplyToAll 记忆。
     /// </summary>
     /// <param name="conflictAction">冲突策略字符串值。</param>
     /// <param name="conflictDialog">Ask 冲突弹窗回调（null 时 Ask 降级为直接弹引擎默认）。</param>
+    /// <param name="nameEncoding">文件名代码页（null = 自动检测）。</param>
+    /// <param name="livePolicy">
+    /// 实时冲突策略源（进度窗口「冲突时:」下拉）。传入后改为每次冲突都问它，
+    /// 因而「暂停 → 改下拉 → 继续」立即生效；<see langword="null"/> 时退回静态 <paramref name="conflictAction"/>，
+    /// 与引入前的行为逐字节一致。
+    /// </param>
     /// <returns>ArchiveOptions（Overwrite 也返回显式 options，调用方可直接设置 ParallelExtractDegree）。</returns>
     internal static ArchiveOptions CreateExtractOptions(
         string conflictAction,
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
-        string? nameEncoding = null)
+        string? nameEncoding = null,
+        Func<FileConflictAction>? livePolicy = null)
     {
+        // 实时策略模式：策略本身由进度窗口持有，可能在解压途中被改写，
+        // 所以静态 ConflictAction 只作兜底，引擎按 provider 逐个冲突取值。
+        if (livePolicy is not null)
+        {
+            bool liveApplyToAll = false;
+            FileConflictAction liveChosen = FileConflictAction.Ask;
+
+            return new ArchiveOptions
+            {
+                ConflictAction = FileConflictAction.Ask,
+                ConflictActionProvider = livePolicy,
+                ReadEncoding = nameEncoding,
+                ConflictResolverAsync = conflictDialog == null
+                    ? null
+                    : async info =>
+                    {
+                        if (liveApplyToAll)
+                        {
+                            CoreLog.ConflictTrace("resolver-live-memo action={0} file='{1}'", liveChosen, info.FilePath);
+                            return liveChosen;
+                        }
+
+                        // provider 已判断为 Ask 才会进 resolver；若此刻下拉已被改成自动策略
+                        // （典型：暂停时改的），直接按新策略走，不再弹窗 —— 否则会出现
+                        // 「下拉显示跳过、弹窗还在问覆盖」的矛盾。
+                        var current = livePolicy();
+                        if (current != FileConflictAction.Ask)
+                        {
+                            CoreLog.ConflictTrace("resolver-live-policy action={0} file='{1}'", current, info.FilePath);
+                            return current;
+                        }
+
+                        CoreLog.ConflictTrace("resolver-live-enter file='{0}'", info.FilePath);
+                        var (resultAction, applyAll) = await conflictDialog(info);
+                        CoreLog.ConflictTrace("resolver-live-returned action={0} applyAll={1} file='{2}'",
+                            resultAction, applyAll, info.FilePath);
+
+                        if (applyAll && resultAction != FileConflictAction.Ask)
+                        {
+                            liveApplyToAll = true;
+                            liveChosen = resultAction;
+                        }
+
+                        return resultAction;
+                    },
+            };
+        }
+
         var action = MapConflictActionString(conflictAction);
         if (action == FileConflictAction.Overwrite)
             return new ArchiveOptions { ConflictAction = FileConflictAction.Overwrite, ReadEncoding = nameEncoding }; // 默认行为即覆盖

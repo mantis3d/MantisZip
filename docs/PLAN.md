@@ -4,7 +4,7 @@
 
 **项目状态**: 🟢 开发中  
 **最后更新**: 2026-11-04  
-**当前版本**: 0.5.6
+**当前版本**: 0.5.7
 
 
 ---
@@ -87,14 +87,14 @@
 
 > **v0.5.6 验收口径（✅ 已达成）**：列表能在三种布局间循环并记住选择；打开 1000+ 条目的包时骨架区能看到数字在涨；ico 文件在列表里显示自己的图标而不是通用图标；复选框模式勾选 3 项后删除只弹一次确认、删完勾选态清空，且默认关闭时行为与今天完全一致；缩略图卡片的外边框 / 垫底色 / 尺寸三项在设置里改完即时生效；卡片视图也能勾选，Shift 连选与「视图 → 列表布局」子菜单可用；切换复选框模式时选区与勾选能互相转换，压缩/解压窗里的复选框选择手势与主列表一致。
 
-### 阶段 v0.5.7 —— 数据安全：冲突策略与原地解压修复（约 17-23h）
+### 阶段 v0.5.7 —— 数据安全：冲突策略与原地解压修复（约 17-23h，🚧 进行中：冲突策略 + KI-012 已完成，剩 Office 预览切片 3）
 
 > **2026-11-04 重排**：原定「Office 预览切片 3 + 卡片元数据 + AXAML 编译绑定」整体后移。依据是判据第 3 条（削减「点了没反应」类失信 bug 优先于增加功能面）：KI-012 是**数据丢失级**——「解压到此处 / 同名目录 / 智能解压」三条路径完全不读冲突设置、恒静默覆盖；它的阻塞条件 `progress-window-conflict-policy` 已于 2026-11-01 定稿、无设计风险，没有理由继续挂在 B 档。卡片元数据（新计划）与编译绑定（只防未来错误）都不该抢在这个窗口前面。
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 进度窗口「文件冲突自动处理」控件（TeraCopy 式） | [progress-window-conflict-policy.md](.omo/plans/未开始/progress-window-conflict-policy.md) | 🟡中 | 12-16h | 进度窗加「冲突时:」下拉（覆盖 / 跳过 / 重命名 / 询问），运行中切换立即生效；Core 只加一个 `ArchiveOptions.ConflictActionProvider` 动态源；实例级生效、不回写设置，保留 `ConflictDialog` 供「询问」使用；解压与压缩两侧都要接 |
-| KI-012：三条原地解压路径读冲突设置 | 同上（Phase 3 顺带修复） | 🟡中 | 含在上行 | `ViewModels/MainWindowViewModel.Extract.cs` 的「解压到此处 / 同名目录 / 智能解压」三处 `ExtractService.ExtractAsync(...)` 不传 `ArchiveOptions` ⇒ 恒静默覆盖；修完后三条路径与右键「解压选中项到」共用同一个 options 构造 |
+| ✅ 进度窗口「文件冲突自动处理」控件（TeraCopy 式） | [progress-window-conflict-policy.md](.omo/plans/已完成/progress-window-conflict-policy.md) | 🟡中 | 12-16h | 进度窗加「冲突时:」下拉（覆盖 / 跳过 / 重命名 / 询问），运行中切换立即生效；Core 只加一个 `ArchiveOptions.ConflictActionProvider` 动态源；实例级生效、不回写设置，保留 `ConflictDialog` 供「询问」使用；解压与压缩两侧都要接 |
+| ✅ KI-012：三条原地解压路径读冲突设置 | 同上（Phase 3 顺带修复，2026-11-04 已关闭） | 🟡中 | 含在上行 | `ViewModels/MainWindowViewModel.Extract.cs` 的「解压到此处 / 同名目录 / 智能解压」三处 `ExtractService.ExtractAsync(...)` 不传 `ArchiveOptions` ⇒ 恒静默覆盖；修完后三条路径与右键「解压选中项到」共用同一个 options 构造 |
 | 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/已完成/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。三者本来就在解析完整文档，省下的只是落盘 |
 
 > **v0.5.7 验收口径**：解压途中能从进度窗把「冲突时」切到覆盖 / 跳过 / 重命名且立刻生效；「解压到此处 / 同名目录 / 智能解压」遇到同名文件不再静默覆盖（默认仍问一次）；KI-012 关闭；Office 三族预览不再先落盘。

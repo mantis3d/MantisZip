@@ -267,6 +267,16 @@ public partial class ProgressViewModel : ObservableObject
         if (!string.IsNullOrEmpty(StatsStoreOnlyText))
             StatsStoreOnlyText = LocalizationManager.T("Progress_Stats_StoreOnlyFiles", _statsStoreOnlyFiles);
 
+        // 「文件冲突自动处理」控件：标签 / 提示 / 选项文案随语言切换重建，选中的策略码保持不变
+        var policyCode = ConflictPolicyCode;
+        if (ShowConflictPolicyControl)
+            SetConflictPolicyControl(_conflictPolicyFlow, policyCode);
+        else
+        {
+            OnPropertyChanged(nameof(ConflictPolicyLabel));
+            OnPropertyChanged(nameof(ConflictPolicyTip));
+        }
+
         // 批处理计数文案（BatchCountText 等）
         NotifyBatchProperties();
     }
@@ -2522,6 +2532,138 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>「完成后打开目录」开关的说明文案（压缩 / 解压两套措辞，随流程与文化切换刷新）。</summary>
     public string OpenFolderToggleTipText => LocalizationManager.T(
         _openFolderToggleIsCompressFlow ? "Compress_OpenFolderAfter" : "Settings_Extract_OpenFolderAfter");
+
+    // ════════════════════════════════════════════
+    //  进度窗口「冲突时:」控件（v0.5.7，TeraCopy 式）
+    //  —— 运行中切换立即对之后的冲突生效；实例级，不回写 AppSettings（规则 23）
+    // ════════════════════════════════════════════
+
+    /// <summary>解压侧 6 档策略码（顺序即展示顺序，值为设置里在用的字符串码）。</summary>
+    private static readonly string[] ExtractConflictPolicyCodes =
+    {
+        "ask", "overwrite", "overwrite-if-older", "overwrite-if-smaller", "rename", "skip",
+    };
+
+    /// <summary>压缩侧 5 档策略码（压缩无「按时间/大小覆盖」，另有「追加到已有包」）。</summary>
+    private static readonly string[] CompressConflictPolicyCodes =
+    {
+        "ask", "overwrite", "add", "rename", "skip",
+    };
+
+    private ConflictPolicyFlow _conflictPolicyFlow = ConflictPolicyFlow.None;
+    private string[] _conflictPolicyCodes = ExtractConflictPolicyCodes;
+
+    /// <summary>
+    /// 当前选中的策略下标。解压引擎可能在**后台线程**读它（每个冲突读一次），
+    /// 故一律 <see cref="Volatile.Read(ref int)"/> / <see cref="Volatile.Write(ref int)"/>，不读字符串属性。
+    /// </summary>
+    private int _conflictPolicyIndex;
+
+    /// <summary>下拉选项集合（按流程重建；文案随语言切换刷新）。</summary>
+    public ObservableCollection<Option> ConflictPolicyOptions { get; } = new();
+
+    /// <summary>能力位：只有该流程**真的接好线**时才为 true（测试/删除流程传 None ⇒ 隐藏，杜绝死开关）。</summary>
+    public bool ShowConflictPolicyControl => _conflictPolicyFlow != ConflictPolicyFlow.None;
+
+    /// <summary>控件标签「冲突时:」。</summary>
+    public string ConflictPolicyLabel => LocalizationManager.T("Progress_ConflictPolicy_Label");
+
+    /// <summary>控件说明（工具提示）。</summary>
+    public string ConflictPolicyTip => LocalizationManager.T("Progress_ConflictPolicy_Tip");
+
+    /// <summary>下拉当前选中项（ComboBox 双向绑定）。</summary>
+    public Option? SelectedConflictPolicyOption
+    {
+        get
+        {
+            var options = ConflictPolicyOptions;
+            if (options.Count == 0) return null;
+            var index = Math.Clamp(Volatile.Read(ref _conflictPolicyIndex), 0, options.Count - 1);
+            return options[index];
+        }
+        set
+        {
+            if (value == null) return;
+            var index = ConflictPolicyOptions.IndexOf(value);
+            if (index < 0) return;
+            Volatile.Write(ref _conflictPolicyIndex, index);
+            OnPropertyChanged();
+        }
+    }
+
+    /// <summary>当前策略码（字符串，压缩侧直接消费）。可能被后台线程调用。</summary>
+    public string ConflictPolicyCode
+    {
+        get
+        {
+            var codes = _conflictPolicyCodes;
+            if (codes.Length == 0) return "ask";
+            var index = Math.Clamp(Volatile.Read(ref _conflictPolicyIndex), 0, codes.Length - 1);
+            return codes[index];
+        }
+    }
+
+    /// <summary>当前策略（解压侧实时源）。可能被后台线程调用。</summary>
+    public FileConflictAction ConflictPolicy => SelectedItemsExtractService.MapConflictActionString(ConflictPolicyCode);
+
+    /// <summary>
+    /// 声明「冲突时」控件能力位并按流程建选项、落初值。
+    /// 必须在 <c>Show</c> 之前调用；<paramref name="flow"/> 为 <see cref="ConflictPolicyFlow.None"/> 时整行隐藏。
+    /// </summary>
+    public void SetConflictPolicyControl(ConflictPolicyFlow flow, string? initialCode)
+    {
+        _conflictPolicyFlow = flow;
+        _conflictPolicyCodes = flow == ConflictPolicyFlow.Compress ? CompressConflictPolicyCodes : ExtractConflictPolicyCodes;
+
+        ConflictPolicyOptions.Clear();
+        if (flow != ConflictPolicyFlow.None)
+        {
+            foreach (var display in ConflictPolicyDisplays(flow))
+                ConflictPolicyOptions.Add(display);
+        }
+
+        var index = initialCode == null ? -1 : Array.FindIndex(_conflictPolicyCodes, c => string.Equals(c, initialCode, StringComparison.OrdinalIgnoreCase));
+        Volatile.Write(ref _conflictPolicyIndex, index >= 0 ? index : 0);
+
+        OnPropertyChanged(nameof(ShowConflictPolicyControl));
+        OnPropertyChanged(nameof(ConflictPolicyOptions));
+        OnPropertyChanged(nameof(SelectedConflictPolicyOption));
+        OnPropertyChanged(nameof(ConflictPolicyLabel));
+        OnPropertyChanged(nameof(ConflictPolicyTip));
+    }
+
+    /// <summary>
+    /// 冲突弹窗勾「应用到全部」时把下拉同步成该动作（唯一写入口，UI 线程）——
+    /// 让「当前策略」始终可见可改，而不是藏在弹窗闭包里。
+    /// </summary>
+    public void SyncConflictPolicyFromDialog(string code)
+    {
+        var index = Array.FindIndex(_conflictPolicyCodes, c => string.Equals(c, code, StringComparison.OrdinalIgnoreCase));
+        if (index < 0 || ConflictPolicyOptions.Count == 0) return;
+        Volatile.Write(ref _conflictPolicyIndex, index);
+        OnPropertyChanged(nameof(SelectedConflictPolicyOption));
+    }
+
+    /// <summary>按流程生成选项（文案走规则 13，复用既有冲突标签 key，不新增选项文案）。</summary>
+    private static IEnumerable<Option> ConflictPolicyDisplays(ConflictPolicyFlow flow)
+    {
+        if (flow == ConflictPolicyFlow.Compress)
+        {
+            yield return new Option(LocalizationManager.T("Settings_Extract_Conflict_Ask"), "ask");
+            yield return new Option(LocalizationManager.T("CompressConflict_Overwrite"), "overwrite");
+            yield return new Option(LocalizationManager.T("CompressConflict_Add"), "add");
+            yield return new Option(LocalizationManager.T("CompressConflict_Rename"), "rename");
+            yield return new Option(LocalizationManager.T("CompressConflict_Skip"), "skip");
+            yield break;
+        }
+
+        yield return new Option(LocalizationManager.T("Settings_Extract_Conflict_Ask"), "ask");
+        yield return new Option(LocalizationManager.T("Settings_Extract_Conflict_Overwrite"), "overwrite");
+        yield return new Option(LocalizationManager.T("Settings_Extract_Conflict_OverwriteOlder"), "overwrite-if-older");
+        yield return new Option(LocalizationManager.T("Settings_Extract_Conflict_OverwriteSmaller"), "overwrite-if-smaller");
+        yield return new Option(LocalizationManager.T("Settings_Extract_Conflict_Rename"), "rename");
+        yield return new Option(LocalizationManager.T("Settings_Extract_Conflict_Skip"), "skip");
+    }
 
     // ════════════════════════════════════════════
     //  Progress Helpers

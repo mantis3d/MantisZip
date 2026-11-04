@@ -1,3 +1,4 @@
+using MantisZip.Core.Abstractions;
 using MantisZip.Core.Utils;
 using Xunit;
 
@@ -152,5 +153,131 @@ public class FileConflictHelperTests
         var testFile = Path.Combine(Path.GetTempPath(), $"test_{Guid.NewGuid():N}.txt");
         var result = FileConflictHelper.ResolvePath(testFile, null);
         Assert.Equal(testFile, result);
+    }
+
+    // ════════════════════════════════════════════════════════════════
+    //  ConflictActionProvider — 运行期动态策略源（v0.5.7）
+    // ════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ResolvePath_ProviderOverridesStaticAction()
+    {
+        // 静态 = 覆盖（会返回原路径），provider = 跳过（返回 null）⇒ provider 优先
+        using var temp = new TempFile();
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Overwrite,
+            ConflictActionProvider = () => FileConflictAction.Skip,
+        };
+
+        Assert.Null(FileConflictHelper.ResolvePath(temp.Path, options));
+    }
+
+    [Fact]
+    public async Task ResolvePathAsync_ProviderOverridesStaticAction()
+    {
+        using var temp = new TempFile();
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Overwrite,
+            ConflictActionProvider = () => FileConflictAction.Skip,
+        };
+
+        Assert.Null(await FileConflictHelper.ResolvePathAsync(temp.Path, options));
+    }
+
+    [Fact]
+    public void ResolvePath_ProviderReadPerConflict_ChangeTakesEffectImmediately()
+    {
+        // 模拟进度窗口运行中改下拉：同一个 options，下一次冲突就按新策略走
+        using var temp = new TempFile();
+        var action = FileConflictAction.Skip;
+        var options = new ArchiveOptions { ConflictActionProvider = () => action };
+
+        Assert.Null(FileConflictHelper.ResolvePath(temp.Path, options));
+
+        action = FileConflictAction.Overwrite;
+        Assert.Equal(temp.Path, FileConflictHelper.ResolvePath(temp.Path, options));
+    }
+
+    [Fact]
+    public void ResolvePath_ProviderNull_FallsBackToStaticAction()
+    {
+        // provider 为 null ⇒ 与引入该属性前逐字节一致
+        using var temp = new TempFile();
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Skip,
+            ConflictActionProvider = null,
+        };
+
+        Assert.Null(FileConflictHelper.ResolvePath(temp.Path, options));
+    }
+
+    [Fact]
+    public void ResolvePath_ProviderRename_ReturnsUniquePath()
+    {
+        using var temp = new TempFile();
+        var options = new ArchiveOptions
+        {
+            ConflictActionProvider = () => FileConflictAction.Rename,
+        };
+
+        var resolved = FileConflictHelper.ResolvePath(temp.Path, options);
+
+        Assert.NotNull(resolved);
+        Assert.NotEqual(temp.Path, resolved);
+        Assert.Equal(Path.GetDirectoryName(temp.Path), Path.GetDirectoryName(resolved));
+    }
+
+    [Fact]
+    public async Task ResolvePathAsync_ProviderAsk_InvokesAsyncResolver()
+    {
+        // provider 返回 Ask ⇒ 走询问回调（进度窗口在运行中切回「询问」时就是这样）
+        using var temp = new TempFile();
+        var asked = 0;
+        var options = new ArchiveOptions
+        {
+            ConflictAction = FileConflictAction.Overwrite,
+            ConflictActionProvider = () => FileConflictAction.Ask,
+            ConflictResolverAsync = _ =>
+            {
+                asked++;
+                return Task.FromResult(FileConflictAction.Skip);
+            },
+        };
+
+        Assert.Null(await FileConflictHelper.ResolvePathAsync(temp.Path, options));
+        Assert.Equal(1, asked);
+    }
+
+    [Fact]
+    public void ResolvePath_ProviderAskWithoutResolver_DoesNotThrow()
+    {
+        // 兜底：Ask 但没装 resolver ⇒ 既有语义（按 action 落到覆盖），不得抛异常
+        using var temp = new TempFile();
+        var options = new ArchiveOptions
+        {
+            ConflictActionProvider = () => FileConflictAction.Ask,
+        };
+
+        Assert.Equal(temp.Path, FileConflictHelper.ResolvePath(temp.Path, options));
+    }
+
+    /// <summary>临时文件夹具：构造即创建，Dispose 时删除。</summary>
+    private sealed class TempFile : IDisposable
+    {
+        public TempFile()
+        {
+            Path = System.IO.Path.Combine(System.IO.Path.GetTempPath(), $"mz_conflict_{Guid.NewGuid():N}.txt");
+            File.WriteAllText(Path, "existing");
+        }
+
+        public string Path { get; }
+
+        public void Dispose()
+        {
+            try { File.Delete(Path); } catch (IOException) { /* 清理失败不影响断言 */ }
+        }
     }
 }

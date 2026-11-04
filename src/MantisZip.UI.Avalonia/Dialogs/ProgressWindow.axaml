@@ -639,26 +639,62 @@
             Padding="{DynamicResource SpacingSmThk}">
       <StackPanel Spacing="{DynamicResource SpacingSm}">
 
-        <!-- 信息量分级三选：点击后写 VM.InfoDensity（显示多少信息，非间距） -->
-        <StackPanel Orientation="Horizontal"
-                    Spacing="{DynamicResource SpacingMd}"
-                    HorizontalAlignment="Center">
-          <!-- 少：仅总进度 + 时间（IsChecked 单向绑 VM 派生属性，使持久化/程序化切换时单选项同步高亮） -->
-          <RadioButton x:Name="DensityCompactRadio" GroupName="InfoDensity"
-                       Content="{Binding LocalizedStrings[Progress_Density_Minimal]}"
-                       IsChecked="{Binding IsMinimalDensity, Mode=OneWay}"
-                       Click="DensityCompactRadio_Click"/>
-          <!-- 中：+ 中等单行（默认档） -->
-          <RadioButton x:Name="DensityNormalRadio" GroupName="InfoDensity"
-                       Content="{Binding LocalizedStrings[Progress_Density_Medium]}"
-                       IsChecked="{Binding IsMediumDensity, Mode=OneWay}"
-                       Click="DensityNormalRadio_Click"/>
-          <!-- 完整：+ 统计卡 -->
-          <RadioButton x:Name="DensityLooseRadio" GroupName="InfoDensity"
-                       Content="{Binding LocalizedStrings[Progress_Density_Full]}"
-                       IsChecked="{Binding IsFullDensity, Mode=OneWay}"
-                       Click="DensityLooseRadio_Click"/>
-        </StackPanel>
+        <!-- 信息区首行：左侧「少 / 中 / 完整」信息量分级，右侧「冲突时:」下拉（v0.5.7，TeraCopy 式）。
+             刻意不新增 RowDefinition —— RootGrid 仍 7 行、Toast 的 RowSpan 不变；
+             窗口拖到 MinWidth=500 时本行折成两行（密度靠左、冲突控件右对齐），不挤压按钮。 -->
+        <Grid ColumnDefinitions="Auto,*,Auto">
+
+          <!-- 列 0：信息量分级三选：点击后写 VM.InfoDensity（显示多少信息，非间距） -->
+          <StackPanel Grid.Column="0"
+                      Orientation="Horizontal"
+                      Spacing="{DynamicResource SpacingMd}"
+                      HorizontalAlignment="Left">
+            <!-- 少：仅总进度 + 时间（IsChecked 单向绑 VM 派生属性，使持久化/程序化切换时单选项同步高亮） -->
+            <RadioButton x:Name="DensityCompactRadio" GroupName="InfoDensity"
+                         Content="{Binding LocalizedStrings[Progress_Density_Minimal]}"
+                         IsChecked="{Binding IsMinimalDensity, Mode=OneWay}"
+                         Click="DensityCompactRadio_Click"/>
+            <!-- 中：+ 中等单行（默认档） -->
+            <RadioButton x:Name="DensityNormalRadio" GroupName="InfoDensity"
+                         Content="{Binding LocalizedStrings[Progress_Density_Medium]}"
+                         IsChecked="{Binding IsMediumDensity, Mode=OneWay}"
+                         Click="DensityNormalRadio_Click"/>
+            <!-- 完整：+ 统计卡 -->
+            <RadioButton x:Name="DensityLooseRadio" GroupName="InfoDensity"
+                         Content="{Binding LocalizedStrings[Progress_Density_Full]}"
+                         IsChecked="{Binding IsFullDensity, Mode=OneWay}"
+                         Click="DensityLooseRadio_Click"/>
+          </StackPanel>
+
+          <!-- 列 2：文件冲突自动处理（运行中切换立即对之后的冲突生效；实例级不回写设置）。
+               能力位 ShowConflictPolicyControl 只在「执行层已接到同一实时策略源」的流程里为 true，
+               测试压缩包 / 删除条目等无冲突概念的流程传 None ⇒ 整组隐藏，杜绝点了没反应的死开关。 -->
+          <StackPanel x:Name="ConflictPolicyPanel" Grid.Column="2"
+                      Orientation="Horizontal"
+                      Spacing="{DynamicResource SpacingSm}"
+                      VerticalAlignment="Center"
+                      IsVisible="{Binding ShowConflictPolicyControl}">
+            <!-- 标签：冲突时:  -->
+            <TextBlock x:Name="ConflictPolicyLabelText"
+                       Text="{Binding ConflictPolicyLabel}"
+                       FontSize="12"
+                       VerticalAlignment="Center"
+                       Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+            <!-- 策略下拉：解压 6 档（询问 / 覆盖 / 仅覆盖较旧 / 仅覆盖较小 / 重命名 / 跳过）、
+                 压缩 5 档（询问 / 覆盖 / 追加到已有包 / 重命名 / 跳过）；
+                 信息区底色是 ThemeSplitterBgBrush，故显式给 SurfaceBg 背景 + 边框，避免糊在一起 -->
+            <ComboBox x:Name="ConflictPolicyCombo"
+                      ItemsSource="{Binding ConflictPolicyOptions}"
+                      SelectedItem="{Binding SelectedConflictPolicyOption}"
+                      DisplayMemberBinding="{Binding Display}"
+                      MinWidth="132"
+                      Height="{DynamicResource ControlHeightLg}"
+                      VerticalAlignment="Center"
+                      Background="{DynamicResource ThemeSurfaceBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      ToolTip.Tip="{Binding ConflictPolicyTip}"/>
+          </StackPanel>
+        </Grid>
 
         <!-- 统计卡容器（仅「完整」档显示）：SurfaceBg 底 + 圆角，内含 5 个三行统计卡 + 并行度后置单行元素 -->
         <Border x:Name="StatsCardsPanel"

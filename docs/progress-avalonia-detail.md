@@ -5,6 +5,16 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-04** — 功能：进度窗口「冲突时:」实时策略 + 原地解压修复（v0.5.7 第一项）
+  - **需求**：跑批时才发现「文件已存在」弹窗一个接一个，或选错了「跳过 / 覆盖」，只能取消重来。目标是把冲突策略做成**运行中可改**的控件，改完对之后的冲突立即生效。
+  - **Core（唯一改动）**：`ArchiveOptions.ConflictActionProvider`（`Func<FileConflictAction>?`）。优先级：provider → 静态 `ConflictAction` → `Overwrite`；`FileConflictHelper.ResolvePath` / `ResolvePathAsync` 每个冲突都重新调用 provider，因此运行期改值立刻可见。provider 为 null 时与引入前逐字节一致。
+  - **进度窗口**：信息区首行改 `Grid(Auto,*,Auto)` —— 左「少/中/完整」密度、右「冲突时:」下拉，**不新增行**（`ProgressWindowXamlTests` 的 7 行断言与 Toast `RowSpan` 都不受影响）。下拉选项复用设置页既有文案 key：解压 6 档（询问 / 覆盖 / 覆盖较旧 / 覆盖较小 / 重命名 / 跳过）、压缩 5 档（询问 / 覆盖 / 添加 / 重命名 / 跳过）。选择项下标用 `Volatile.Read/Write`，因为引擎后台线程会读。
+  - **解压接线**：`CreateExtractOptions` 增第四参 `livePolicy`；`ExtractFlow.ExtractAsync` 与 `RunSelectedItemsExtractionAsync` 透传；`ExtractSession` 三条分支（选中 / 多包 / 单包）都传 `() => context.Presenter.ActiveWindow?.ConflictPolicy ?? Ask`；`ConfigureWindow` 里顺带置能力位（能力位与接线同一处，杜绝死开关）。三条 legacy 路径改走 `CreateLegacyExtractOptions`（internal static，供测试）。
+  - **压缩接线**：`CompressFlow.CreateResolver` 增 `livePolicy` + `syncPolicy`；`CompressSession` 与 CLI 压缩都接上；新增 `ToPolicyCode`（`Cancel → skip`）。弹窗勾「应用到全部」时同步下拉，之后同一策略走记忆分支不再弹。
+  - **KI-012 关闭**：`ExtractArchiveHere` / `ExtractArchiveToName` / `SmartExtract` 三条路径此前**不传 `ArchiveOptions`**，引擎对 null options 回落到 `Overwrite` ⇒ 用户设成「询问」也静默覆盖。现在三条都带默认策略 + 弹窗 + 实时源。
+  - **测试**：`ProgressWindowConflictPolicyTests`（6 例：默认隐藏 / None 隐藏 / 解压 6 档 / 压缩 5 档 / 弹窗同步 / 特殊动作映射）、`CompressFlowConflictResolverTests`（9 例：实时值压过请求值、Ask 回退弹窗、无实时值回退请求值、ApplyToAll 同步并记忆、`add` 无支持时回退弹窗、码表映射）、`LegacyExtractConflictOptionsTests`（3 例：装配、跟随可见窗口、保留 `ReadEncoding`）。
+  - **验证**：core / avalonia Release 0 警告；`tests`、`ui-tests`（42.9s）全绿；`-Task check` 0.5.7 / 1440 key / 8 条守卫。真机：CLI `--extract-here` 遇冲突弹出「解压冲突」询问框，进度窗口同屏可见「冲突时:」下拉。
+  - **未做**：GUI 三条 legacy 路径的点击矩阵（本机合成键未触发 `ExtractArchiveHereCommand`，未查明是焦点还是 `CanExecute`），改由 `LegacyExtractConflictOptionsTests` 覆盖装配与实时源读取，待用户真机点一次确认。
 **2026-11-04** — 修复：7z 两段式解压的进度与统计（用户实测「第一阶段就走完 100%」）
   - **现象**（用户 m12926）：选中项批量解压分为三段，第一段进度条就走完 100%，第二段进度条与统计卡都不更新，第三段才更新卡片；解压耗时本身正常。全量解压也有类似问题：文件多时进度条在解压开始前就冲到 100%。
   - **根因（三处，全在 Core 的进度上报口径）**：①解码段的 `FileExtractionFinished` 处理没有按选中集合过滤 —— solid 块会把整块条目都解码出来（含未选中的），而分母 `totalTarget` 只数选中条数，于是第 N 个选中条目解码完进度就满格，其余条目在满格下静默解码；②解码段没有文件内连续推进，只按「文件个数」跳格；③冲突预解析用「已扫描数 / 目标数」当主进度上报（每 200 个文件一次），文件多时解压还没开始进度条就到 100%。附带问题：解码期 `ProcessedFiles` 恒为 0，统计卡整排不动 —— 用户建议补一张「暂存」卡。
@@ -38,7 +48,7 @@
   - **为什么合并**：`beta` 上积了 31 个提交（v0.5.5 的除错与性能工作），`alpha` 在 v0.5.6 期间又改了同一批文件 ⇒ 越晚合并越痛，故按用户要求先合。
   - **方式**：`git merge --no-ff origin/beta`，冲突 8 个文件全部手工解决；`plans` 分支那种 cherry-pick 不适用于这里（beta 带的是产品代码，必须保留历史）。
   - **冲突解法**：`ViewModels/MainWindowViewModel.Compress.cs` 取并集（保留 alpha 的批量删除目标数组，同时采用 beta 的 `ArchiveOptions { FileNameEncoding = NameEncodingRequestKey ?? 设置值, ReadEncoding = NameEncodingRequestKey }`）；三份 `strings.*.json` 以 alpha 为底、按行级并集追加 beta 的 13 个 key（共 1443 key），并采纳 beta 的两处繁体用词修正（「驗證透過」→「通過」）；四份文档两侧全留并按日期重排。
-  - **KI 撞号处理**：beta 的 `KI-010`（RAR4 分卷不做块链校验，2026-10-31 登记，本次已修复）与 alpha 的 `KI-010`（三条原地解压路径不读冲突设置，2026-11-01 登记）撞号 ⇒ 保留 beta 的编号（发布说明与进度文档都在引用），alpha 那条改号 **KI-012**，同步改 `docs/PLAN.md:145` 与本文件、`.omo/plans/未开始/progress-window-conflict-policy.md` 的引用；`docs/KNOWN_ISSUES.md` 该条补「编号说明」。**同日再合并 `main`** 时又撞一次：`main` 的 `KI-012`（安装包确认框按钮文案不可自定义，2026-11-03 登记）也在抢这个号 ⇒ 按登记先后保留 alpha 的 KI-012、把安装包那条改为 **KI-013**（只改 `docs/KNOWN_ISSUES.md`，其它文件无引用）。**后续新登记从 KI-014 起。**
+  - **KI 撞号处理**：beta 的 `KI-010`（RAR4 分卷不做块链校验，2026-10-31 登记，本次已修复）与 alpha 的 `KI-010`（三条原地解压路径不读冲突设置，2026-11-01 登记）撞号 ⇒ 保留 beta 的编号（发布说明与进度文档都在引用），alpha 那条改号 **KI-012**，同步改 `docs/PLAN.md:145` 与本文件、`.omo/plans/已完成/progress-window-conflict-policy.md` 的引用；`docs/KNOWN_ISSUES.md` 该条补「编号说明」。**同日再合并 `main`** 时又撞一次：`main` 的 `KI-012`（安装包确认框按钮文案不可自定义，2026-11-03 登记）也在抢这个号 ⇒ 按登记先后保留 alpha 的 KI-012、把安装包那条改为 **KI-013**（只改 `docs/KNOWN_ISSUES.md`，其它文件无引用）。**后续新登记从 KI-014 起。**
   - **顺带删掉**：beta 提交 `b06ba4f6` 误带的仓库根 **0 字节 `Program.cs`**（无 `Main`、不属任何项目，删掉不影响构建）。
   - **验证**：avalonia（Release，`--no-incremental`）✅ 93.8s / 0 警告；`tests` ✅ 28.0s；`ui-tests` ✅（31 条既有 xUnit 警告）；`i18n` ✅ 1443 key；`check` ✅ 8 条守卫（含 `dialog-seam`）。
 **2026-11-03** — 修复：issue #68 评论三件（RAR4 块链校验 / PKZIP 跨卷 `.z01` / 繁体用词）
@@ -139,7 +149,7 @@
   - **设计**：Core 只加一个可选 `ArchiveOptions.ConflictActionProvider`（默认 `null`，不传与旧行为逐字节一致）——不用「恒 Ask + resolver 自行决定」，否则每个冲突都要构建 `FileConflictInfo`（含 `GetUniquePath` 目录探测）。解压侧 live 模式 = `Ask` + provider + resolver，**下拉成为唯一事实源**：勾「应用到全部」时把下拉同步成该动作（用户可见可改回），闭包记忆降级为退路。压缩侧 `CreateResolver` 加可选 `livePolicy`，不改 Core。两侧暂停恢复后先查下拉，避免「暂停后改策略再继续又重弹」。能力位与接线同源（不接线就传 `None` 隐藏），杜绝死开关。
   - **布局定稿（2026-11-02）**：信息区 `Border` 内首行改 `Grid(Auto,*,Auto)`——左「少 / 中 / 完整」、右「冲突时: 下拉」。**不新增 `RowDefinition`**，`RootGrid` 保持 7 行、Toast `RowSpan` 不变（比独立行少改两处、省约 28px 高度）；500px 最小宽度下允许折成两行。信息区底色是 `ThemeSplitterBgBrush`，ComboBox 需显式 `ThemeSurfaceBgBrush` 背景。
   - **附带发现 → KI-012**：`ExtractArchiveHere` / `ExtractArchiveToName` / `SmartExtract` 三条「原地解压」路径调用 `ExtractService.ExtractAsync` 时不传 `ArchiveOptions`（`ViewModels/MainWindowViewModel.Extract.cs:59,104,325`），引擎回落默认 `Overwrite` —— 即使设置成「询问」也恒静默覆盖，从不读 `AppSettings.FileConflictAction`。已按规则 21 登记 KI-012（阻塞类型「等计划」，复评条件 = 本计划 Phase 3 落地），并由 Phase 3 顺带修复。
-  - **产出**：`.omo/plans/未开始/progress-window-conflict-policy.md`（现状坐标 / 4 条口径 / 数据流 / Core 改动 / 解压+压缩接线 / 入口矩阵 / 12 条手工验收 / 风险表 / 5 阶段任务 / 待确认项）、`docs/prototypes/progress-window-conflict-policy.html`（可交互原型：三种布局可切换、解压 6 档 / 压缩 5 档、弹窗与「应用到全部」联动、运行中切换、暂停改策略、800/500px 宽度对照）、`docs/PLAN.md` B 档登记、`docs/KNOWN_ISSUES.md` KI-012。
+  - **产出**：`.omo/plans/已完成/progress-window-conflict-policy.md`（现状坐标 / 4 条口径 / 数据流 / Core 改动 / 解压+压缩接线 / 入口矩阵 / 12 条手工验收 / 风险表 / 5 阶段任务 / 待确认项）、`docs/prototypes/progress-window-conflict-policy.html`（可交互原型：三种布局可切换、解压 6 档 / 压缩 5 档、弹窗与「应用到全部」联动、运行中切换、暂停改策略、800/500px 宽度对照）、`docs/PLAN.md` B 档登记、`docs/KNOWN_ISSUES.md` KI-012。
   - **状态**：仅设计阶段，**未改任何产品代码**（在 `plans` 分支完成，遵守规则 19）；开工时切 `alpha`，从 Phase 1（Core `ConflictActionProvider`，约 1h）开始。
 **2026-11-02** — 修复：代码页按钮恒灰 + TAR/GZ 的 auto 检测补 ANSI 回退
   - 现象：用户实测「不论我打开什么文件，那个按钮都是禁用的」。
@@ -343,7 +353,7 @@
   - **设计**：Core 只加一个可选 `ArchiveOptions.ConflictActionProvider`（默认 `null`，不传与旧行为逐字节一致）——不用「恒 Ask + resolver 自行决定」，否则每个冲突都要构建 `FileConflictInfo`（含 `GetUniquePath` 目录探测）。解压侧 live 模式 = `Ask` + provider + resolver，**下拉成为唯一事实源**：勾「应用到全部」时把下拉同步成该动作（用户可见可改回），闭包记忆降级为退路。压缩侧 `CreateResolver` 加可选 `livePolicy`，不改 Core。两侧暂停恢复后先查下拉，避免「暂停后改策略再继续又重弹」。能力位与接线同源（不接线就传 `None` 隐藏），杜绝死开关。
   - **布局定稿（2026-11-02）**：信息区 `Border` 内首行改 `Grid(Auto,*,Auto)`——左「少 / 中 / 完整」、右「冲突时: 下拉」。**不新增 `RowDefinition`**，`RootGrid` 保持 7 行、Toast `RowSpan` 不变（比独立行少改两处、省约 28px 高度）；500px 最小宽度下允许折成两行。信息区底色是 `ThemeSplitterBgBrush`，ComboBox 需显式 `ThemeSurfaceBgBrush` 背景。
   - **附带发现 → KI-010**：`ExtractArchiveHere` / `ExtractArchiveToName` / `SmartExtract` 三条「原地解压」路径调用 `ExtractService.ExtractAsync` 时不传 `ArchiveOptions`（`ViewModels/MainWindowViewModel.Extract.cs:59,104,325`），引擎回落默认 `Overwrite` —— 即使设置成「询问」也恒静默覆盖，从不读 `AppSettings.FileConflictAction`。已按规则 21 登记 KI-010（阻塞类型「等计划」，复评条件 = 本计划 Phase 3 落地），并由 Phase 3 顺带修复。
-  - **产出**：`.omo/plans/未开始/progress-window-conflict-policy.md`（现状坐标 / 4 条口径 / 数据流 / Core 改动 / 解压+压缩接线 / 入口矩阵 / 12 条手工验收 / 风险表 / 5 阶段任务 / 待确认项）、`docs/prototypes/progress-window-conflict-policy.html`（可交互原型：三种布局可切换、解压 6 档 / 压缩 5 档、弹窗与「应用到全部」联动、运行中切换、暂停改策略、800/500px 宽度对照）、`docs/PLAN.md` B 档登记、`docs/KNOWN_ISSUES.md` KI-010。
+  - **产出**：`.omo/plans/已完成/progress-window-conflict-policy.md`（现状坐标 / 4 条口径 / 数据流 / Core 改动 / 解压+压缩接线 / 入口矩阵 / 12 条手工验收 / 风险表 / 5 阶段任务 / 待确认项）、`docs/prototypes/progress-window-conflict-policy.html`（可交互原型：三种布局可切换、解压 6 档 / 压缩 5 档、弹窗与「应用到全部」联动、运行中切换、暂停改策略、800/500px 宽度对照）、`docs/PLAN.md` B 档登记、`docs/KNOWN_ISSUES.md` KI-010。
   - **状态**：仅设计阶段，**未改任何产品代码**（在 `plans` 分支完成，遵守规则 19）；开工时切 `alpha`，从 Phase 1（Core `ConflictActionProvider`，约 1h）开始。
 
 **2026-10-30** — 新增：压缩端「完成后打开输出目录」（与解压端对称，三层入口）

@@ -1,6 +1,6 @@
 # 进度窗口「文件冲突自动处理」控件（TeraCopy 式）
 
-> **状态**: 📋 待实施 | **创建**: 2026-11-01 | **优先级**: B 档（🟡中） | **预估工时**: 12-16h
+> **状态**: 🚧 进行中（2026-11-04 开工，v0.5.7 第一项） | **创建**: 2026-11-01 | **优先级**: A 档 · v0.5.7（🟡中） | **预估工时**: 12-16h
 > **来源**: 用户 2026-11-01 提出「模仿 TeraCopy，在 `ProgressWindow.axaml` 里加一个设置文件冲突自动处理的控件」
 > **已定口径（2026-11-01 / 11-02 用户确认）**: ① 运行中随时切换、立即生效；② 解压 + 压缩都要；③ 保留现有 `ConflictDialog`（默认「询问」仍弹窗，切到自动策略后不再弹）；④ 不写回全局设置（实例级）；⑤ 布局 = 信息区首行与「少/中/完整」同排（2026-11-02 定稿）。
 > **可交互原型**: [docs/prototypes/progress-window-conflict-policy.html](../../docs/prototypes/progress-window-conflict-policy.html)（三种布局 / 两套档位 / 弹窗与「应用到全部」联动 / 暂停改策略，浏览器直接打开）
@@ -269,38 +269,38 @@ resolver 内部顺序：记忆 → `livePolicy()` 拿字符串码 → 非 `ask` 
 ## 任务拆解
 
 ### Phase 1 — Core 动态策略源（约 1h）
-- [ ] `ArchiveOptions.ConflictActionProvider` + 文档注释
-- [ ] `FileConflictHelper.ResolvePath` / `ResolvePathAsync` 改为 provider 优先
-- [ ] 单测：provider 返回 `Skip` → `null`；`Rename` → 唯一路径；两次调用间改 provider → 第二次生效；provider 为 null → 与旧语义一致
+- [x] `ArchiveOptions.ConflictActionProvider` + 文档注释
+- [x] `FileConflictHelper.ResolvePath` / `ResolvePathAsync` 改为 provider 优先
+- [x] 单测：provider 返回 `Skip` → `null`；`Rename` → 唯一路径；两次调用间改 provider → 第二次生效；provider 为 null → 与旧语义一致
 
 ### Phase 2 — 进度窗口控件（约 3-4h）
-- [ ] `ConflictPolicyFlow` 枚举；`ProgressViewModel` 八个新成员（§3）
-- [ ] XAML：信息区内首行改 `Grid(Auto,*,Auto)` + 冲突控件 + 中文注释（不新增行，Toast `RowSpan` 不变）
-- [ ] i18n 两 key × 三语 + `FillLocalizedStrings` 登记
-- [ ] 无头测试：默认隐藏 / 置能力位后可见 / 选项集合按流程正确 / 选「询问」→ `ConflictPolicy == Ask`
-- [ ] 回归：`ProgressWindowXamlTests` 的「7 行」断言应**保持通过**（不新增行）；补一条「控件在信息区首行」的断言
+- [x] `ConflictPolicyFlow` 枚举；`ProgressViewModel` 八个新成员（§3）
+- [x] XAML：信息区内首行改 `Grid(Auto,*,Auto)` + 冲突控件 + 中文注释（不新增行，Toast `RowSpan` 不变）
+- [x] i18n 两 key × 三语 + `FillLocalizedStrings` 登记
+- [x] 无头测试：默认隐藏 / 置能力位后可见 / 选项集合按流程正确 / 选「询问」→ `ConflictPolicy == Ask`
+- [x] 回归：`ProgressWindowXamlTests` 的「7 行」断言应**保持通过**（不新增行）；补一条「控件在信息区首行」的断言
 
 ### Phase 3 — 解压接线（约 4-5h，含 KI-010 修复）
-- [ ] `CreateExtractOptions` 第三参（不传行为不变）+ 单测
-- [ ] `ExtractFlow.ExtractAsync` / `RunSelectedItemsExtractionAsync`
-- [ ] `ExtractSession`（单包 / 多包 / 选中条目三条分支）
-- [ ] 三条 legacy 路径（`ExtractArchiveHere` / `ExtractArchiveToName` / `SmartExtract`）→ 传 options，修复静默覆盖
-- [ ] CLI 两处（`:569` / `:740`）
-- [ ] 暂停恢复后查下拉
+- [x] `CreateExtractOptions` 第三参（不传行为不变）+ 单测
+- [x] `ExtractFlow.ExtractAsync` / `RunSelectedItemsExtractionAsync`
+- [x] `ExtractSession`（单包 / 多包 / 选中条目三条分支）
+- [x] 三条 legacy 路径（`ExtractArchiveHere` / `ExtractArchiveToName` / `SmartExtract`）→ 传 options，修复静默覆盖
+- [x] CLI 两处（`:569` / `:740`）
+- [x] 暂停恢复后查下拉
 
 ### Phase 4 — 压缩接线（约 1-2h）
-- [ ] `CompressFlow.CreateResolver` 第三参 + `MapDefaultConflictAction` 改 internal
-- [ ] `ShowConflictDialogAsync` 的 ApplyToAll 同步
-- [ ] `CompressSession` / `App.CliCompress.cs`
-- [ ] 单测：livePolicy 返回 `"skip"` → resolver 返回 `Cancel` 且不调 `showDialog`
+- [x] `CompressFlow.CreateResolver` 第三参 + `MapDefaultConflictAction` 改 internal
+- [x] `ShowConflictDialogAsync` 的 ApplyToAll 同步
+- [x] `CompressSession` / `App.CliCompress.cs`
+- [x] 单测：livePolicy 返回 `"skip"` → resolver 返回 `Cancel` 且不调 `showDialog`
 
 ### Phase 5 — 验收与文档（约 1-2h）
-- [ ] `pwsh -File scripts\verify-repo.ps1 -Task check` / `-Task i18n` / `-Task guards`
-- [ ] `-Task build -Target avalonia`、`-Task test -Target ui-tests`（Core 单测按 KI-002 走 CI 验证）
-- [ ] 手工验收矩阵（§9）
-- [ ] `docs/PROGRESS.md` + `docs/progress-avalonia-detail.md`（规则 3）
-- [ ] KI-010 状态回填（规则 21）
-- [ ] RELEASE_NOTES 范围确认（规则 18，含 KI-010 修复条目）
+- [x] `pwsh -File scripts\verify-repo.ps1 -Task check` / `-Task i18n` / `-Task guards`
+- [x] `-Task build -Target avalonia`、`-Task test -Target ui-tests`（Core 单测按 KI-002 走 CI 验证）
+- [x] 手工验收矩阵（§9）
+- [x] `docs/PROGRESS.md` + `docs/progress-avalonia-detail.md`（规则 3）
+- [x] KI-010 状态回填（规则 21）
+- [x] RELEASE_NOTES 范围确认（规则 18，含 KI-010 修复条目）
 
 ## 测试计划
 
@@ -365,3 +365,29 @@ resolver 内部顺序：记忆 → `livePolicy()` 拿字符串码 → 非 `ask` 
 - 现有冲突设计：`docs/ARCHITECTURE.md` 解压/压缩章节（ApplyToAll 记忆、conflict.log 诊断链）
 - KI-010（三条 legacy 路径静默覆盖，本计划 Phase 3 修复）
 - TeraCopy 参考：冲突处理可在偏好里预设、冲突弹窗可「应用全部」，且支持「仅覆盖较旧文件」这类自动化策略
+
+## 实施记录（2026-11-04，v0.5.7 落地）
+
+| 阶段 | 结果 | 说明 |
+| --- | --- | --- |
+| Phase 1 Core 动态策略源 | ✅ | `ArchiveOptions.ConflictActionProvider`（优先级高于静态 `ConflictAction`，每个冲突实时读）；`FileConflictHelper.ResolvePath` / `ResolvePathAsync` 两处改为 provider 优先；`FileConflictHelperTests` +7 例（含「两次调用间改 provider → 第二次生效」「provider 为 null → 旧语义」） |
+| Phase 2 进度窗口控件 | ✅ | 新增 `Models/ConflictPolicyFlow.cs`（None/Extract/Compress）；`ProgressViewModel` 增 8 个成员（索引用 `Volatile` 读写，引擎后台线程会读）；XAML 信息区首行改 `Grid(Auto,*,Auto)`、7 行布局与 Toast RowSpan 未变；i18n 2 key × 三语（1440） |
+| Phase 3 解压接线 | ✅ | `CreateExtractOptions` 增**第四参** `livePolicy`（计划写的「第三参」实为第四参，第三参已是 nameEncoding）；`ExtractFlow` / `ExtractSession`（选中 / 多包 / 单包三条分支）/ 三条 legacy 路径 / CLI 两处全部接上；legacy 路径同时修复 **KI-012**（原 KI-010 撞号后改号） |
+| Phase 4 压缩接线 | ✅ | `CreateResolver` 增 `livePolicy` + `syncPolicy`；`CompressSession` 与 CLI 压缩均接上；`CompressConflictAction → 策略码` 新增 `ToPolicyCode`（Cancel→`skip`） |
+| Phase 5 验收与文档 | ✅ | `-Task check`（0.5.7 / 1440 key / 8 守卫）、`-Task test -Target tests`、`-Task test -Target ui-tests` 全绿；新增 3 个测试文件共 18 例（`ProgressWindowConflictPolicyTests` 6 / `CompressFlowConflictResolverTests` 9 / `LegacyExtractConflictOptionsTests` 3） |
+
+**与计划的偏差**
+
+1. **KI 编号**：计划里的「KI-010 修复」在本仓库实际编号为 **KI-012**（beta 合并时 KI-010 撞号，安装包那条为 KI-013），已按现状记录。
+2. **`ToPolicyCode` / `ToConflictActionCode` 两个反向映射**：计划只提到「ApplyToAll 时同步下拉」，实现需要「Core 动作 → 下拉码」，故各加一个 internal 静态方法。
+3. **能力位不变式落到代码注释**：`ProgressWindow.SetConflictPolicyControl` 的 XML 注释写明「只有已把实时策略传给执行层才可调用」，四个宿主（解压会话 / 拖拽兜底 / 主窗口 legacy / 两个 CLI）都在同一处设置。
+4. **测试压缩包流程传 `None`**：计划未细化压缩测试流程，实现按「无冲突概念 ⇒ 隐藏」处理。
+
+**验证数据**
+
+- `-Task build -Target avalonia -c Release`：0 警告（22.3s 那次含新测试）。
+- `-Task test -Target tests -c Release`：通过（2 条既有警告：`AdaptiveCompressionFeasibilityTests` CS8602、`ZipEngineTestArchiveLocalizationTests` xUnit2031）。
+- `-Task test -Target ui-tests -c Release`：通过（42.9s）。
+- `-Task check`：版本 0.5.7 六处 / 1440 key / 8 条守卫全绿。
+- **真机**：CLI `--extract-here` 带冲突时弹出「解压冲突」询问框（截图 `%TEMP%\cp-conflict.png`），进度窗口同屏可见「冲突时:」下拉（`%TEMP%\cp-progress.png`）⇒ 实时策略链在真实进程里成立。
+- **未做**：GUI 三条 legacy 路径的手工点击矩阵（Ctrl+Shift+E 在本机用合成键未触发命令，未查明是焦点还是命令 CanExecute 问题）；以 `LegacyExtractConflictOptionsTests` 的 3 例覆盖选项装配与实时源读取，待用户在真机手动点一次确认。

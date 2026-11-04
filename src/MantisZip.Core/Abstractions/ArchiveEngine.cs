@@ -58,6 +58,16 @@ public class ArchiveOptions
     public FileConflictAction ConflictAction { get; set; } = FileConflictAction.Overwrite;
 
     /// <summary>
+    /// 冲突处理方式的**动态来源**，优先于 <see cref="ConflictAction"/>。
+    /// 每个冲突实时读取一次（进度窗口可在运行中改写下拉，之后的冲突立即按新策略走）；
+    /// 返回 <see cref="FileConflictAction.Ask"/> 且装有 <see cref="ConflictResolverAsync"/> /
+    /// <see cref="ConflictResolver"/> 时走询问回调。
+    /// null（默认）= 沿用静态 <see cref="ConflictAction"/>，与未引入该属性前逐字节一致。
+    /// 可能被后台线程调用。
+    /// </summary>
+    public Func<FileConflictAction>? ConflictActionProvider { get; set; }
+
+    /// <summary>
     /// 文件冲突时的回调。参数为冲突信息，返回处理方式。
     /// 当 <see cref="ConflictAction"/> 为 <see cref="FileConflictAction.Ask"/> 时调用。
     /// 可在后台线程调用，回调需自行处理 UI 线程问题。

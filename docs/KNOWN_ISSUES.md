@@ -35,7 +35,7 @@
 | **KI-009** | 5 个 AppSettings 死开关（存了值、有 UI、无消费者） | 技术债 / 死代码 | 缺决策 | 决定这 5 项的去留（接线 / 删属性 / 删 UI）时；守卫豁免表已按名登记，修一个删一行 | 阻塞中 |
 | **KI-010** | RAR4 分卷不做块链结构校验（末卷尾部损坏可能漏检） | 功能留白 | — | 已修复（RAR4 块链校验，2026-11-03，issue #68） | 已修复（2026-11-03） |
 | **KI-011** | 并行解压/压缩不识别目标盘类型，机械盘上的并发写不做节流 | 性能 / 交互 | 成本超阈值 + 缺决策 | 有机械盘用户的实测数据（并发放大反而更慢）；或做 `selected-items-bulk-extract` 时顺带评估 | 阻塞中 |
-| **KI-012** | 三条「原地解压」路径不读冲突设置、恒静默覆盖 | 功能一致性 | 等计划 | `progress-window-conflict-policy` 落地（Phase 3 接线并顺带修复）时 | 阻塞中 |
+| **KI-012** | 三条「原地解压」路径不读冲突设置、恒静默覆盖 | 功能一致性 | — | 已修复（v0.5.7：三条路径改传 `ArchiveOptions`，带默认策略 + Ask 弹窗 + 进度窗口实时源） | 已修复（2026-11-04） |
 | **KI-013** | 安装包下载 .NET 前的确认框，无法把「取消」按钮文字换成「我会手动安装」 | 交互 / 文案 | 成本超阈值 | #23 再次要求精确文案时；或下次改安装包流程时 | 阻塞中 |
 
 ---
@@ -153,7 +153,6 @@
 - **为什么现在不修**：**成本超阈值 + 缺决策**。① 判盘需要 WMI 或 `DeviceIoControl`，两条路都有代价（WMI 首次查询慢、`IOCTL` 要处理非本地盘/网络盘/动态盘）；② 判定完还得决定策略（自动降并发？每盘一个上限？只对小文件降？），属产品取舍；③ 本轮改的 solid 批量路径已经把「逐条重复解码」这个主因消掉，先看真机反馈更划算。
 - **复评条件**：① 拿到机械盘用户的实测数据（同一包、并发 1 与默认值对比），且确实「并发放大更慢」时；② 或做 `.omo/plans/未开始/selected-items-bulk-extract.md` 时顺带评估（那条计划同样会碰到 HDD 写放大）。
 - **关联**：`.omo/plans/进行中/sevenzip-solid-extract-batch.md` §13 第 2 条；`docs/ARCHITECTURE.md`「并行解压架构」小节。
-
 - **状态**：阻塞中
 
 ## KI-012 三条「原地解压」路径不读冲突设置、恒静默覆盖
@@ -165,11 +164,10 @@
   - `src/MantisZip.UI.Avalonia/Services/ExtractService.cs:24-25` 注释自述：「`options` … When null, existing files are silently overwritten」。
   - 引擎侧 `src/MantisZip.Core/Utils/FileConflictHelper.cs:24,72` 对 null options 回落到 `FileConflictAction.Overwrite`。
   - 对照组：同仓库的对话框解压（`ExtractSession` → `ExtractFlow.ExtractAsync`）与右键/拖拽选中项（`ExtractFlow.RunSelectedItemsExtractionAsync`）都正确读取了设置。
-- **为什么现在不修**：**等计划**。这三条路径的进度窗口正是「文件冲突自动处理控件」要挂的地方；控件要真生效必须把 `ArchiveOptions` 与实时策略源一起传进去，属于 [progress-window-conflict-policy.md](../.omo/plans/未开始/progress-window-conflict-policy.md) Phase 3 的接线动作，单独先改会让同一段代码挨两遍返工。
-- **复评条件**：上述计划 Phase 3 落地当天（接线的同时把本条目置为「已修复」并移入档案区）；若该计划被冻结，则需单独排一个小修（三条路径各补一次 `CreateExtractOptions` + 传 `options`，约 1h）。
-- **关联**：`AGENTS.md` 规则 21；该计划「现状核实 → 入口矩阵」表。
+- **修复**（2026-11-04，v0.5.7，随 [progress-window-conflict-policy.md](../.omo/plans/已完成/progress-window-conflict-policy.md) Phase 3 一并落地）：三条入口不再调用不带 `options` 的 `ExtractService.ExtractAsync`，改为 `LegacyExtractOptions()` → `SelectedItemsExtractService.CreateExtractOptions(AppSettings.FileConflictAction, 冲突弹窗, NameEncodingRequestKey, 实时策略源)`，于是：①设置里选的默认策略（覆盖 / 跳过 / 重命名 / 覆盖较旧 / 覆盖较小）真的生效；②选「询问」时逐个弹「文件已存在」对话框；③进度窗口信息区首行出现「冲突时:」下拉，运行中切换对之后的冲突立即生效；④弹窗里勾「应用到全部」会把下拉同步成该动作。回归测试：`tests/MantisZip.UI.Avalonia.Tests/LegacyExtractConflictOptionsTests.cs`（3 例，含「读取可见进度窗口的下拉作为实时策略」）。
+- **关联**：`AGENTS.md` 规则 21；[progress-window-conflict-policy.md](../.omo/plans/已完成/progress-window-conflict-policy.md)「现状核实 → 入口矩阵」表。
+- **状态**：✅ 已修复（2026-11-04，v0.5.7）
 - **编号说明**：本条 2026-11-01 首次登记时编为 KI-010；2026-11-03 合并 `beta` 时与「RAR4 分卷不做块链结构校验」撞号（那条 2026-10-31 登记，v0.5.5 的发布说明与进度文档都已按 KI-010 引用），故本条改号为 **KI-012**；同日合并 `main` 时又与安装包确认框那条（2026-11-03 登记）撞号，按登记先后保留本条 KI-012、那条改为 KI-013。**后续新登记请从 KI-014 起。**
-- **状态**：阻塞中
 
 ## KI-013 安装包下载 .NET 前的确认框，无法把「取消」按钮文字换成「我会手动安装」
 

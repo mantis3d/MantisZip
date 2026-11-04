@@ -47,6 +47,8 @@ public partial class MainWindowViewModel : ObservableObject
 
         // spec §11.2: 解压流程 → 两开关可见；非对话框流程种子 null → 镜像设置
         PendingExtractPostActions = (true, true, null);
+        // 冲突策略能力位：与 LegacyExtractOptions() 传给引擎的实时策略同源（死开关防线）
+        PendingConflictPolicyFlow = ConflictPolicyFlow.Extract;
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
@@ -57,7 +59,7 @@ public partial class MainWindowViewModel : ObservableObject
                 ExtractFlow.TrySeedEntryItemsInBackground(
                     ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct, NameEncodingReadOptions());
+                    CurrentArchivePath, dest, password, progress, ct, LegacyExtractOptions());
             });
 
         if (completed)
@@ -92,6 +94,8 @@ public partial class MainWindowViewModel : ObservableObject
 
         // spec §11.2: 解压流程 → 两开关可见；非对话框流程种子 null → 镜像设置
         PendingExtractPostActions = (true, true, null);
+        // 冲突策略能力位：与 LegacyExtractOptions() 传给引擎的实时策略同源（死开关防线）
+        PendingConflictPolicyFlow = ConflictPolicyFlow.Extract;
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_Extracting"),
@@ -102,7 +106,7 @@ public partial class MainWindowViewModel : ObservableObject
                 ExtractFlow.TrySeedEntryItemsInBackground(
                     ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct, NameEncodingReadOptions());
+                    CurrentArchivePath, dest, password, progress, ct, LegacyExtractOptions());
             });
 
         if (completed)
@@ -324,6 +328,8 @@ public partial class MainWindowViewModel : ObservableObject
 
         // spec §11.2: 解压流程 → 两开关可见；非对话框流程种子 null → 镜像设置
         PendingExtractPostActions = (true, true, null);
+        // 冲突策略能力位：与 LegacyExtractOptions() 传给引擎的实时策略同源（死开关防线）
+        PendingConflictPolicyFlow = ConflictPolicyFlow.Extract;
 
         var completed = await RunWithProgress(
             LocalizationManager.T("Status_SmartExtracting"),
@@ -334,7 +340,7 @@ public partial class MainWindowViewModel : ObservableObject
                 ExtractFlow.TrySeedEntryItemsInBackground(
                     ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct, NameEncodingReadOptions());
+                    CurrentArchivePath, dest, password, progress, ct, LegacyExtractOptions());
             });
 
         if (completed)
@@ -411,4 +417,53 @@ public partial class MainWindowViewModel : ObservableObject
         App.DebugLog($"[TestArchive] completed: ok={testOk}, archive={CurrentArchivePath}");
     }
 
+    /// <summary>
+    /// 三条「原地解压」legacy 路径（<c>ExtractArchiveHere</c> / <c>ExtractArchiveToName</c> / <c>SmartExtract</c>）
+    /// 共用的解压选项。
+    /// <para>
+    /// 历史缺陷（KI-012）：这三条路径直接调 <see cref="ExtractService.ExtractAsync"/> 且不传 options，
+    /// 于是**始终按引擎默认的「静默覆盖」执行** —— 无视设置里的冲突策略、冲突时也不询问，
+    /// 属于数据丢失级问题。现在与对话框路径同口径：设置里的策略 + 进度窗口「冲突时:」实时源
+    /// （运行中可改）+ Ask 时弹询问（勾「应用到全部」把下拉同步成实际生效的动作）。
+    /// </para>
+    /// </summary>
+    private ArchiveOptions LegacyExtractOptions()
+    {
+        var settings = AppSettings.Load();
+        return CreateLegacyExtractOptions(settings.FileConflictAction, NameEncodingRequestKey);
+    }
+
+    /// <summary>
+    /// 三条 legacy 路径的选项装配（可测：策略来源与实时端口全部在这里）。
+    /// </summary>
+    /// <param name="conflictAction">设置里的默认冲突策略（字符串码：ask / overwrite / rename / skip ...）。</param>
+    /// <param name="nameEncoding">文件名代码页（可选）。</param>
+    internal static ArchiveOptions CreateLegacyExtractOptions(string conflictAction, string? nameEncoding)
+    {
+        Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>> conflictDialog = async info =>
+        {
+            // 三条路径都跑在进度窗口内；窗口缺失说明宿主没按契约开窗，炸在产出点而不是弹窗里空引用。
+            var owner = ProgressWindow.CurrentVisible
+                ?? throw new InvalidOperationException(
+                    "LegacyExtractOptions: 冲突弹窗需要宿主窗口，但当前没有可见的进度窗口。");
+
+            var result = await ExtractFlow.ShowConflictDialogAsync(owner, info);
+
+            // 「应用到全部」⇒ 下拉同步成实际生效的动作（单一事实源 = 下拉，不再藏在闭包里）
+            if (result.ApplyToAll
+                && SelectedItemsExtractService.ToConflictActionCode(result.Action) is { } code)
+            {
+                owner.SyncConflictPolicyFromDialog(code);
+            }
+
+            return result;
+        };
+
+        // 实时策略源：进度窗口下拉（窗口不存在时回退 Ask，绝不静默覆盖）
+        Func<FileConflictAction> livePolicy = () =>
+            ProgressWindow.CurrentVisible?.ConflictPolicy ?? FileConflictAction.Ask;
+
+        return SelectedItemsExtractService.CreateExtractOptions(
+            conflictAction, conflictDialog, nameEncoding, livePolicy);
+    }
 }
