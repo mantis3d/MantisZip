@@ -161,6 +161,7 @@
   "Progress_Tooltip_Bytes": "位元組",
   "Progress_Tooltip_Ratio": "壓縮率",
   "Progress_Stats_Scanning": "掃描中",
+  "Progress_Stats_Staged": "暫存",
   "Progress_Stats_Archive": "壓縮包",
   "Progress_Stats_ArchiveTotal": "共 {0} 個",
   "Progress_Stats_TotalSize": "總大小 {0}",

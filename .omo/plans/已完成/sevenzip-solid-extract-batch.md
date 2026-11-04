@@ -449,3 +449,15 @@ catch (Exception ex) {
 
 **验证**：core / avalonia（Release）0 警告；`tests` 全绿（2 条存量警告）；`ui-tests` 63.2s 全绿（28 条存量警告）；`i18n` 1398 key 三语一致。
 
+
+## 后续：进度与统计口径修正（2026-11-04）
+
+用户实测批量解压时「第一阶段进度条就走完 100%、第二阶段不动」，定位到三处上报口径缺陷，见 docs/progress-avalonia-detail.md 的 2026-11-04 条目：
+
+1. 解码段的 FileExtractionFinished 未按选中集合（indexMap）过滤 ⇒ solid 块把未选中的条目也算进进度单位，分母只数选中条数，于是解码到一半就满格；
+2. 解码段没有文件内推进，只按文件个数跳格；
+3. 冲突预解析把「已扫描 / 目标数」当主进度，文件多时解压尚未开始就到 100%。
+
+改法：ArchiveProgress 增加 StagedFiles / StagedBytes；选中路径改为**半格制**（解码 +0.5、落地 +0.5，逐条目仍 +1）；三段回调统一按 indexMap 过滤；主进度加高水位钳位；扫描比移到 FilePercentComplete。UI 侧「进度窗口 → 完整档」新增「暂存」统计卡。
+
+回归测试：	ests/MantisZip.Tests/Engines/SevenZipEngineSelectedBulkProgressTests.cs（3 例）与 	ests/MantisZip.UI.Avalonia.Tests/ProgressStagedStatCardTests.cs（3 例）。

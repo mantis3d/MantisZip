@@ -161,6 +161,7 @@
   "Progress_Tooltip_Bytes": "字节",
   "Progress_Tooltip_Ratio": "压缩率",
   "Progress_Stats_Scanning": "扫描中",
+  "Progress_Stats_Staged": "暂存",
   "Progress_Stats_Archive": "压缩包",
   "Progress_Stats_ArchiveTotal": "共 {0} 个",
   "Progress_Stats_TotalSize": "总大小 {0}",

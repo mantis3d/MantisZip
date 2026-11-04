@@ -161,6 +161,7 @@
   "Progress_Tooltip_Bytes": "Bytes",
   "Progress_Tooltip_Ratio": "Ratio",
   "Progress_Stats_Scanning": "Scanning",
+  "Progress_Stats_Staged": "Staged",
   "Progress_Stats_Archive": "Archive",
   "Progress_Stats_ArchiveTotal": "of {0}",
   "Progress_Stats_TotalSize": "Total size {0}",

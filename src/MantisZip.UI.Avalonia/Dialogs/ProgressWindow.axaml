@@ -761,6 +761,37 @@
                            Foreground="{Binding StatsProcessedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeStatusSuccessBrush}"/>
               </StackPanel>
 
+              <!-- 卡 1a：暂存（📥；仅 7z solid 批量解压两段式上报）— 三行同构：图标+标题 / 待落地条目数 / 待落地字节
+                   口径 = 「已解码到暂存目录、还没移动到最终位置」的条目数：解码段递增、移动段递减，
+                   全部落地后归零 → 整卡隐藏。没有这张卡时，解码段唯一会动的只有进度条，
+                   用户会觉得「第二部分什么都没发生」。 -->
+              <StackPanel Spacing="{DynamicResource SpacingXxs}"
+                          MinWidth="80"
+                          HorizontalAlignment="Center"
+                          IsVisible="{Binding HasStatsStaged}">
+                <!-- 行 1：图标 + 标题（横排居中） -->
+                <StackPanel Orientation="Horizontal"
+                            Spacing="{DynamicResource SpacingXxs}"
+                            HorizontalAlignment="Center">
+                  <TextBlock Text="📥" FontSize="16"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+                  <TextBlock Text="{Binding StatsStagedLabel}" FontSize="11"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}"/>
+                </StackPanel>
+                <!-- 行 2：待落地条目数（数量行，与其它卡同构） -->
+                <TextBlock Text="{Binding StatsStagedCount}"
+                           FontSize="15" FontWeight="SemiBold"
+                           HorizontalAlignment="Center"
+                           Foreground="{DynamicResource ThemeProgressFillBrush}"/>
+                <!-- 行 3：待落地字节（— 灰 / 真实值强调色，DashBrush 动态切换） -->
+                <TextBlock Text="{Binding StatsStagedSize}"
+                           FontSize="13"
+                           HorizontalAlignment="Center"
+                           Foreground="{Binding StatsStagedSize, Converter={StaticResource DashBrush}, ConverterParameter=ThemeProgressFillBrush}"/>
+              </StackPanel>
+
               <!-- 卡 1b：已压缩（🗜；仅「自适应 ZIP」上报分类构成时出现）— 三行同构：图标+标题 / 文件数量 / 文件大小
                    口径 = 构成（本次有多少文件需要压缩），不随进度变化，进度由「已处理」卡承担 -->
               <StackPanel Spacing="{DynamicResource SpacingXxs}"

@@ -258,6 +258,7 @@ public partial class ProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(StatsStoreOnlyLabel));
         OnPropertyChanged(nameof(StatsArchiveLabel));
         OnPropertyChanged(nameof(ScanCardLabel));
+        OnPropertyChanged(nameof(StatsStagedLabel));
         // 「完成后打开目录」开关的说明文案随流程 / 语言切换（压缩说「压缩后」，解压说「解压后」）
         OnPropertyChanged(nameof(OpenFolderToggleTipText));
         // 已压缩 / 仅存储的完整文案随语言切换重新格式化（仅在有数据时重写，避免把未上报的卡显示出来）
@@ -1002,6 +1003,15 @@ public partial class ProgressViewModel : ObservableObject
         ScanCountText = null;
         // 自适应分类构成（已压缩 / 仅存储）属于「当前档案」，新档案/新操作先清空，等引擎重新上报
         ResetCompositionStats();
+        // 「暂存」卡属于「这一次操作」，新操作先归零（否则上一档案的暂存数会残留到下一次解压）
+        if (_statsStaged != 0 || _statsStagedBytes != 0)
+        {
+            _statsStaged = 0;
+            _statsStagedBytes = 0;
+            OnPropertyChanged(nameof(HasStatsStaged));
+            OnPropertyChanged(nameof(StatsStagedCount));
+            OnPropertyChanged(nameof(StatsStagedSize));
+        }
         IsIndeterminate = true;
         _preparingText = LocalizationManager.T("Progress_Preparing");
         StatusMessage = _preparingText;
@@ -1073,6 +1083,30 @@ public partial class ProgressViewModel : ObservableObject
 
     /// <summary>扫描文案是否显示在总体进度标签行：仅「少/中」档（「完整」档由统计卡「扫描」承担，避免重复）。</summary>
     public bool ShowScanCountInLabelRow => HasScanCount && !IsFullDensity;
+
+    // ════════════════════════════════════════════
+    //  「暂存」统计卡（7z solid 批量解压两段式专用）
+    //  解码段把条目解到暂存目录、此时 ProcessedFiles 恒为 0；
+    //  没有这张卡时，用户看到的是一段「什么都没发生」的时间（进度条在 50% 附近不动、卡片全空）。
+    // ════════════════════════════════════════════
+
+    /// <summary>已解码到暂存目录、尚未移动到最终位置的条目数（引擎 0 = 无该统计 → 整卡隐藏）。</summary>
+    private int _statsStaged;
+
+    /// <summary>已解码到暂存目录的字节合计（随移动到最终位置递减）。</summary>
+    private long _statsStagedBytes;
+
+    /// <summary>「暂存」卡可见性：引擎携带该统计且还有未落地的条目。</summary>
+    public bool HasStatsStaged => _statsStaged > 0;
+
+    /// <summary>「暂存」卡标题（本地化，语言切换时重算）。</summary>
+    public string StatsStagedLabel => LocalizationManager.T("Progress_Stats_Staged");
+
+    /// <summary>「暂存」卡第二行：待落地条目数。</summary>
+    public string StatsStagedCount => _statsStaged.ToString(System.Globalization.CultureInfo.InvariantCulture);
+
+    /// <summary>「暂存」卡第三行：待落地字节合计（未知时显示破折号）。</summary>
+    public string StatsStagedSize => _statsStagedBytes > 0 ? FormatUtil.FormatSize(_statsStagedBytes) : "—";
 
     partial void OnScanCountTextChanged(string? value)
     {
@@ -1366,6 +1400,23 @@ public partial class ProgressViewModel : ObservableObject
             ? LocalizationManager.T("Progress_Time_Remaining",
                 ProgressDisplayCalculator.FormatDuration(TimeSpan.FromSeconds(eta.Value)))
             : string.Empty;
+
+        // 「暂存」统计卡：7z solid 批量解压「解码段 → 移动段」两段式专用。
+        // 解码段只往暂存目录写、ProcessedFiles 恒为 0，这张卡是该阶段唯一会动的数字；
+        // 引擎不带该字段（其它所有路径）时保持 0 → 整卡隐藏，不影响既有卡片行。
+        if (p.StagedFiles.HasValue)
+        {
+            var staged = p.StagedFiles.Value;
+            var stagedBytes = p.StagedBytes ?? 0;
+            if (staged != _statsStaged || stagedBytes != _statsStagedBytes)
+            {
+                _statsStaged = staged;
+                _statsStagedBytes = stagedBytes;
+                OnPropertyChanged(nameof(HasStatsStaged));
+                OnPropertyChanged(nameof(StatsStagedCount));
+                OnPropertyChanged(nameof(StatsStagedSize));
+            }
+        }
 
         // 冲突统计（压缩路径恒不上报 → HasConflictStats 保持 false，统计项按 Rule 6 隐藏）
         if (p.SkippedFiles.HasValue || p.FailedFiles.HasValue || p.OverwrittenFiles.HasValue)

@@ -597,6 +597,11 @@ public class SevenZipEngine : IArchiveEngine
             // 批量段的文件内进度累积（Extracting 只给 PercentDelta，逐文件累加后归零）
             double bulkFileProgress = 0;
 
+            // 已解码到暂存（改名桶）、尚未改名到最终路径的条目（「暂存」统计卡数据源）：
+            // 解码段递增、改名段递减，全部落地后归零 → UI 整卡隐藏
+            int stagedFiles = 0;
+            long stagedBytes = 0;
+
             // 主进度报告：跳过/失败条目也要刷新（连续跳过时窗口长时间无更新、看似卡死）。
             // 7z 百分比为文件计数基准 → 用 handledFiles 推进；跳过不计入 ProcessedFiles（已处理）。
             void ReportMainProgress(string fileName, int filePercent, long fileTotalBytes)
@@ -611,6 +616,8 @@ public class SevenZipEngine : IArchiveEngine
                     TotalBytes = totalBytes,
                     ProcessedBytes = processedBytes,
                     FileTotalBytes = fileTotalBytes,
+                    StagedFiles = stagedFiles > 0 ? stagedFiles : null,
+                    StagedBytes = stagedFiles > 0 ? stagedBytes : null,
                 }));
             }
 
@@ -852,14 +859,17 @@ public class SevenZipEngine : IArchiveEngine
 
                     fileCount++;
 
-                    // 预解析进度：两万条 stat 期间界面必须有反馈（每 N 条一次，百分比按条目数）
+                    // 预解析进度：两万条 stat 期间界面必须有反馈（每 N 条一次）。
+                    // 注意主进度只能用「已落地」的 handledFiles：把扫描比当总进度会让条形图在解压
+                    // 还没开始就冲到 100%、随后又被打回 0%（用户实测「第一阶段就走完」）。
+                    // 扫描比改由「当前文件」条承担。
                     if (fileCount % ConflictScanReportEvery == 0)
                     {
                         progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = ArchivePath.Normalize(entry.FileName),
-                            PercentComplete = totalFiles > 0 ? (double)fileCount / totalFiles * 100 : 0,
-                            FilePercentComplete = 100,
+                            PercentComplete = totalFiles > 0 ? (double)handledFiles / totalFiles * 100 : 0,
+                            FilePercentComplete = totalFiles > 0 ? (double)fileCount / totalFiles * 100 : null,
                             TotalFiles = totalFiles,
                             ProcessedFiles = processedFiles,
                             TotalBytes = totalBytes,
@@ -982,7 +992,12 @@ public class SevenZipEngine : IArchiveEngine
 
                     if (staging)
                     {
-                        // 暂存段：计数与 Completed 都留到「改名成功」处，失败退回逐条目时不重复计数
+                        // 暂存段：计数与 Completed 都留到「改名成功」处，失败退回逐条目时不重复计数；
+                        // 但「已解码到暂存」要立刻反映到统计卡上，否则改名桶解码期间卡片全空。
+                        stagedFiles++;
+                        stagedBytes += (long)planned.Entry.Size;
+                        ReportMainProgress(planned.FileName, 100, (long)planned.Entry.Size);
+                        lastReportTime = DateTime.Now;
                         return;
                     }
 
@@ -1106,6 +1121,8 @@ public class SevenZipEngine : IArchiveEngine
                                 // 到这里才算真正落地：计数与状态在此上报（暂存段本身不计数）
                                 processedFiles++;
                                 handledFiles++;
+                                stagedFiles = Math.Max(0, stagedFiles - 1);
+                                stagedBytes = Math.Max(0, stagedBytes - (long)item.Entry.Size);
                                 processedBytes += (long)item.Entry.Size;
                                 progress?.Report(new ArchiveProgress { EntryKey = item.FileName, EntryStatus = ArchiveEntryStatus.Completed });
                                 ReportMainProgress(item.FileName, 100, (long)item.Entry.Size);
@@ -1114,6 +1131,8 @@ public class SevenZipEngine : IArchiveEngine
                             {
                                 // 撞占用/无权限：退回逐条目（它会重新选名并计数），暂存文件交给 finally 清掉
                                 CoreLog.Info($"ExtractAsync: staging move failed for '{item.FileName}' ({ex.GetType().Name}), falling back to per-entry");
+                                stagedFiles = Math.Max(0, stagedFiles - 1);
+                                stagedBytes = Math.Max(0, stagedBytes - (long)item.Entry.Size);
                                 await ExtractSingleEntryAsync(item.Entry);
                             }
                         }
@@ -1584,16 +1603,37 @@ public class SevenZipEngine : IArchiveEngine
             long totalBytes = selectedFiles.Sum(e => (long)e.Size);
             long processedBytes = 0;
 
-            // 进度推进单位：跳过 / 失败 / 已解码待移动 / 已移动 / 逐条目各计 1。
-            // 批量阶段「解码完但还没移动」的条目也要推进百分比，否则大批量解码期间窗口看起来卡住。
-            int unitsDone = 0;
+            // 进度推进单位（半格制）：解码段每完成一个选中条目 +0.5，把它移动到最终位置再 +0.5。
+            // 两段各占一半，条形图解码期走到 50%、移动期走到 100%，不会在「解码完但还没落地」时先满格。
+            // 逐条目路径（非批量）一条就是一次落地，仍 +1。
+            double unitsDone = 0;
+
+            // 已解码到暂存目录、尚未移动到最终位置的条目（「暂存」统计卡数据源）：解码段递增、移动段递减。
+            int stagedFiles = 0;
+            long stagedBytes = 0;
 
             // 落点：优先用调用方算好的 override（扁平化 / 保留完整路径 / 重命名的唯一口径）
             string ResolveTarget(ArchiveFileInfo entry, string fileName) =>
                 outputPathOverrides?.GetValueOrDefault(fileName)
                 ?? FileConflictHelper.GetSafePath(destinationPath, fileName);
 
-            double CurrentPercent() => totalTarget > 0 ? Math.Min((double)unitsDone / totalTarget * 100, 100) : 100;
+            // 主进度高水位：解码段要按「当前文件内进度」连续推进，换文件时该进度会归零，
+            // 于是可能出现 15% → 12.5% 的视觉回退；这里钳成单调不减，保证条形图只往前走。
+            double lastPercent = 0;
+
+            double ClampPercent(double value)
+            {
+                if (value > 100)
+                    value = 100;
+
+                if (value < lastPercent)
+                    return lastPercent;
+
+                lastPercent = value;
+                return value;
+            }
+
+            double CurrentPercent() => totalTarget > 0 ? ClampPercent((double)unitsDone / totalTarget * 100) : 100;
 
             void ReportMainProgress(string fileName, int filePercent, long fileTotalBytes)
             {
@@ -1607,6 +1647,9 @@ public class SevenZipEngine : IArchiveEngine
                     TotalBytes = totalBytes,
                     ProcessedBytes = processedBytes,
                     FileTotalBytes = fileTotalBytes,
+                    // 只有「还有条目压在暂存目录里」时才携带该统计（0 视为未携带 → UI 整卡隐藏）
+                    StagedFiles = stagedFiles > 0 ? stagedFiles : null,
+                    StagedBytes = stagedFiles > 0 ? stagedBytes : null,
                 }));
                 lastReportTime = DateTime.Now;
             }
@@ -1625,7 +1668,10 @@ public class SevenZipEngine : IArchiveEngine
                 });
                 failedEntries++;
                 handled++;
-                unitsDone++;
+                // 批量段：解码已记过 0.5，落地失败再补 0.5；文件随暂存目录一起清掉，暂存数同步减一
+                unitsDone += 0.5;
+                stagedFiles = Math.Max(0, stagedFiles - 1);
+                stagedBytes = Math.Max(0, stagedBytes - (long)plan.Entry.Size);
                 processedBytes += (long)plan.Entry.Size;
                 ReportMainProgress(plan.FileName, 100, (long)plan.Entry.Size);
             }
@@ -1672,7 +1718,7 @@ public class SevenZipEngine : IArchiveEngine
                     progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Skipped });
                     processedBytes += (long)entry.Size;
                     handled++;
-                    unitsDone++;
+                    unitsDone += 1;
                     ReportMainProgress(fileName, 100, (long)entry.Size);
                     return;
                 }
@@ -1730,7 +1776,7 @@ public class SevenZipEngine : IArchiveEngine
 
                     processed++;
                     handled++;
-                    unitsDone++;
+                    unitsDone += 1;
                     processedBytes += entrySize;
 
                     // 逐条目状态（D2）：写盘成功即上报 Completed（Overwritten 已在覆盖判定处上报，不重复覆盖）
@@ -1747,7 +1793,7 @@ public class SevenZipEngine : IArchiveEngine
                     progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.PermissionDenied, FileTotalBytes = (long)entry.Size, EntryErrorDetail = uax.Message, EntryErrorHResult = uax.HResult });
                     failedEntries++;
                     handled++;
-                    unitsDone++;
+                    unitsDone += 1;
                     processedBytes += entrySize;
                     // 主进度报告：失败条目也刷新进度（连续失败时窗口长时间无更新、看似卡死）；失败不计入 ProcessedFiles（已处理）。
                     ReportMainProgress(fileName, 100, entrySize);
@@ -1760,7 +1806,7 @@ public class SevenZipEngine : IArchiveEngine
                     progress?.Report(new ArchiveProgress { EntryKey = fileName, EntryStatus = ArchiveEntryStatus.Failed, EntryFailureReason = EntryFailureReason.IoFailed, FileTotalBytes = (long)entry.Size, EntryErrorDetail = iox.Message, EntryErrorHResult = iox.HResult });
                     failedEntries++;
                     handled++;
-                    unitsDone++;
+                    unitsDone += 1;
                     processedBytes += entrySize;
                     ReportMainProgress(fileName, 100, entrySize);
                 }
@@ -1811,7 +1857,12 @@ public class SevenZipEngine : IArchiveEngine
                         progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                         {
                             CurrentFile = fileName,
-                            PercentComplete = totalTarget > 0 ? Math.Min((double)scanned / totalTarget * 100, 100) : 0,
+                            // 冲突预解析不是解压进度：主进度保持真实值（此前把扫描比当成总进度，
+                            // 文件一多、解压还没开始条形图就冲到 100%），扫描比只放「当前文件」条。
+                            PercentComplete = CurrentPercent(),
+                            FilePercentComplete = totalTarget > 0
+                                ? Math.Min((double)scanned / totalTarget * 100, 100)
+                                : null,
                             TotalFiles = totalTarget,
                             ProcessedFiles = processed,
                             TotalBytes = totalBytes,
@@ -1835,7 +1886,7 @@ public class SevenZipEngine : IArchiveEngine
                     {
                         conflictStats.RecordSkipped();
                         plan.Skipped.Add(entry);
-                        unitsDone++;
+                        unitsDone += 1;
                         continue;
                     }
 
@@ -1867,6 +1918,18 @@ public class SevenZipEngine : IArchiveEngine
                 var indexMap = segment.ToDictionary(x => x.Entry.Index, x => x);
                 var finished = new HashSet<int>();
                 double entryProgress = 0;
+                // 当前正在解码的条目是否属于本次选中（solid 块会把整块文件都解出来，未选中的必须完全不参与进度）
+                bool currentIsSelected = false;
+                string currentFileName = string.Empty;
+                long currentFileBytes = 0;
+
+                // 解码段：每完成一个选中条目只走「半格」，另一半留给落地。
+                // 这样解码期条形图稳步走到 50%，移动期再从 50% 走到 100%；
+                // 之前按「完成一个 = 一格」计，选中 6 条/整块 30 条时，第 6 条解码完就 100%，
+                // 剩下 24 条在满格下静默解码——用户看到的「第一阶段走完、第二阶段不动」。
+                double DuringDecodePercent() => totalTarget > 0
+                    ? ClampPercent((unitsDone + 0.5 * entryProgress / 100) / totalTarget * 100)
+                    : 100;
 
                 void OnStarted(object? sender, FileInfoEventArgs e)
                 {
@@ -1876,33 +1939,51 @@ public class SevenZipEngine : IArchiveEngine
                         return;
                     }
                     entryProgress = 0;
-                    if (indexMap.TryGetValue(e.FileInfo.Index, out var planned))
+                    if (!indexMap.TryGetValue(e.FileInfo.Index, out var planned) || planned == null)
                     {
-                        progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
-                        {
-                            CurrentFile = planned.FileName,
-                            PercentComplete = CurrentPercent(),
-                            FilePercentComplete = 0,
-                            TotalFiles = totalTarget,
-                            ProcessedFiles = processed,
-                            TotalBytes = totalBytes,
-                            ProcessedBytes = processedBytes,
-                            FileTotalBytes = (long)planned.Entry.Size,
-                        }));
+                        // 未选中：solid 块会把整块文件都解出来，这类条目一律不参与进度与状态上报
+                        currentIsSelected = false;
+                        return;
                     }
+                    currentIsSelected = true;
+
+                    currentFileName = planned.FileName;
+                    currentFileBytes = (long)planned.Entry.Size;
+                    progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                    {
+                        CurrentFile = planned.FileName,
+                        PercentComplete = DuringDecodePercent(),
+                        FilePercentComplete = 0,
+                        TotalFiles = totalTarget,
+                        ProcessedFiles = processed,
+                        TotalBytes = totalBytes,
+                        ProcessedBytes = processedBytes,
+                        FileTotalBytes = currentFileBytes,
+                        StagedFiles = stagedFiles > 0 ? stagedFiles : null,
+                        StagedBytes = stagedFiles > 0 ? stagedBytes : null,
+                    }));
                 }
 
                 void OnExtracting(object? sender, ProgressEventArgs e)
                 {
+                    if (!currentIsSelected)
+                        return;
+
                     entryProgress = Math.Min(entryProgress + e.PercentDelta, 100);
+                    // 文件内连续推进：解码期间条形图按「已完成半格 + 当前文件半格内的进度」走，
+                    // 不再按文件个数跳格（否则小文件多时看起来一格一格顿住）
                     progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
                     {
-                        PercentComplete = CurrentPercent(),
+                        CurrentFile = currentFileName,
+                        PercentComplete = DuringDecodePercent(),
                         FilePercentComplete = entryProgress,
                         TotalFiles = totalTarget,
                         ProcessedFiles = processed,
                         TotalBytes = totalBytes,
                         ProcessedBytes = processedBytes,
+                        FileTotalBytes = currentFileBytes,
+                        StagedFiles = stagedFiles > 0 ? stagedFiles : null,
+                        StagedBytes = stagedFiles > 0 ? stagedBytes : null,
                     }));
                 }
 
@@ -1910,8 +1991,16 @@ public class SevenZipEngine : IArchiveEngine
                 {
                     // 暂存段不落地到最终路径：只计「已解码」，状态与计数留到移动成功之后上报
                     finished.Add(e.FileInfo.Index);
-                    unitsDone++;
-                    ReportMainProgress(e.FileInfo.FileName, 100, (long)e.FileInfo.Size);
+                    if (!indexMap.TryGetValue(e.FileInfo.Index, out var donePlan))
+                        return;
+
+                    // 未选中的条目也会触发 Finished（整块解码），绝不能计入进度——
+                    // 否则 totalTarget 只数选中条数、分子却被整块文件撑大，条形图提前满格。
+                    unitsDone += 0.5;
+                    stagedFiles++;
+                    stagedBytes += (long)donePlan.Entry.Size;
+                    entryProgress = 0;
+                    ReportMainProgress(donePlan.FileName, 100, (long)donePlan.Entry.Size);
                 }
 
                 extractor.FileExtractionStarted += OnStarted;
@@ -1993,6 +2082,10 @@ public class SevenZipEngine : IArchiveEngine
 
                             processed++;
                             handled++;
+                            // 落地成功：解码记过 0.5，这里补满最后一格；文件已离开暂存目录
+                            unitsDone += 0.5;
+                            stagedFiles = Math.Max(0, stagedFiles - 1);
+                            stagedBytes = Math.Max(0, stagedBytes - (long)item.Entry.Size);
                             processedBytes += (long)item.Entry.Size;
 
                             if (item.WasExisting && finalPath == item.OutputPath)
