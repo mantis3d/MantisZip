@@ -18,6 +18,7 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **「解压到此处」「解压到同一文件夹」「智能解压」不再无视冲突设置** — 这三条原地解压的路径此前调用引擎时**不传任何选项**，引擎对「没有设置」一律按覆盖处理：用户明明在设置里选了「每次询问」或「跳过」，点这三个入口仍然静默覆盖磁盘上的同名文件（登记为 KI-012，属于数据丢失级）。现在三条路径都带上默认策略与询问弹窗，进度窗口里同样出现「冲突时:」下拉，行为与其他解压入口完全一致：选「询问」就逐个弹、选「跳过」就一个都不动。
 - **"Extract here", "extract to folder" and smart extract no longer ignore your conflict settings** — those three in-place paths called the engine **without any options**, and the engine treats "no settings" as overwrite: even with "ask every time" or "skip" configured, these entry points silently replaced files of the same name on disk (tracked as KI-012, a data-loss class issue). All three now pass the default policy and the ask dialog, and their progress window shows the same "On conflict:" dropdown, so they behave exactly like every other extraction entry point: "ask" prompts per conflict, "skip" leaves every existing file untouched.
+
 ## v0.5.6
 
 ### 文件说明 / File Description
@@ -48,11 +49,17 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Checkboxes in card views, with Shift range and Ctrl toggle** — tile and content layouts now show the same checkboxes (following the toolbar's checkbox-mode switch); clicking anywhere on a card toggles it, and checked state survives layout and folder changes. Two new shortcuts: **Shift + click** checks everything from the previously clicked row up to the current one (never unchecks), **Ctrl + click** toggles a single row
 - ![卡片视图的复选框与 Shift 连选：勾选 4 项后状态栏显示「已选 4 项 · 共 44 B」](docs/images/version/v0.5.6/CardViewCheckbox.png)
 - **「视图」菜单可直接指定列表布局** — 新增「列表布局」子菜单（详情 / 平铺 / 内容行三选一，当前布局打勾）与「复选框多选」开关，不必再用工具栏按钮循环切换
-- **The View menu can pick a list layout directly** — a new "List Layout" submenu (details, tiles or content rows, with the current one ticked) plus a "Checkbox Selection" switch, so you no longer have to cycle through the toolbar button- **压缩设置窗的预览树显示实时计数** — 后台扫描目录期间，根节点标题从静态的「加载中…」变成「加载中 N 个文件，X」并每半秒刷新，扫完自动切到真实统计；被文件过滤排除的条目不计数
+- **The View menu can pick a list layout directly** — a new "List Layout" submenu (details, tiles or content rows, with the current one ticked) plus a "Checkbox Selection" switch, so you no longer have to cycle through the toolbar button
+- **压缩设置窗的预览树显示实时计数** — 后台扫描目录期间，根节点标题从静态的「加载中…」变成「加载中 N 个文件，X」并每半秒刷新，扫完自动切到真实统计；被文件过滤排除的条目不计数
 - **The compression window's preview tree counts as it scans** — while the folder scan runs in the background, the root node now reads "Loading N files, X" and refreshes twice a second instead of a static "Loading…", switching to the real totals when the scan finishes; entries excluded by the file filter are not counted
 - **缩略图卡片可调外观** — 「设置 → 外观 → 缩略图」可调三项，改完立刻生效不用重启：卡片外边框（默认关闭，白底图贴在浅色背景上时用来看清边界）、透明图是否垫一层纯色底（默认保留透明，垫色可自选）、缩略图尺寸三档 96 / 128 / 160 px
 - **Adjustable thumbnail cards** — Settings → Appearance → Thumbnails exposes three options that apply immediately: a card border (off by default, handy for white-background images on light surfaces), whether transparent images get a solid backdrop (transparency is kept by default; the backdrop colour is pickable), and the thumbnail size in three steps (96 / 128 / 160 px)
 - ![设置 → 外观 → 缩略图：外边框 / 垫底色 / 尺寸三档](docs/images/version/v0.5.6/ThumbnailCardSettings.png)
+
+**性能 / Performance**
+
+- **7z 两段式解压的进度不再先走满** — 固实包会把整块条目一次性解码到暂存、再从暂存逐条搬到最终位置；进度条现在分成两段：解码期间只走到一半，新增的「暂存」统计卡显示已解码、还没落地的条目数与大小，搬运时该卡递减、「已处理」递增，不会再出现进度条先满、状态卡片长时间不动。进度推进也从「按条目数均分」改成按文件大小加权（小文件不再嗖嗖涨、大文件不会解到 99% 还只挪一格），落地阶段仍按条目数推进（同盘改名只与条目数有关）。只影响未加密 7z 的批量解压，ZIP / RAR / 单条目解压不变
+- **Two-step 7z extraction no longer shows a bar that jumps to 100 %** — a solid archive decodes all its entries into staging in one go and then moves them into place one by one; the bar now fills only to the halfway point while decoding, a new "staged" stat card reports how many entries are decoded but not yet moved (and counts down as they land) while "processed" grows on every move, so the bar no longer hits 100 % while the cards sit still. Progress also advances in proportion to file size instead of merely counting entries — small files no longer race ahead while a big one barely moves — with the staging-to-destination step still advancing per entry (a same-volume rename costs one operation per entry). Only affects bulk extraction from unencrypted 7z archives; ZIP, RAR and single-entry extraction are unchanged
 
 ## v0.5.5
 
@@ -91,9 +98,9 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 **性能 / Performance**
 
-- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）整包解压从 19 秒降到 1.7 秒，只解其中选中的条目也有 4 倍以上的提升（10 秒 → 2.3 秒）。只对未加密的 7z 生效：ZIP/RAR 与单文件解压不受影响，条目很多的包会先短暂显示「正在检查冲突…」再开始解压。这种两段式解压的进度现在也分两段显示：解码到暂存期间进度条走到一半为止，新增的「暂存」统计卡显示已解码、还没落到最终位置的条目数与大小；随后逐条落地时该卡递减、「已处理」递增，不会再有进度条先走满、状态卡片长时间不动的观感；进度推进按文件大小加权（小文件不再嗖嗖涨、大文件也不会解到 99% 还只挪一格），落地阶段按条目数推进
+- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）整包解压从 19 秒降到 1.7 秒，只解其中选中的条目也有 4 倍以上的提升（10 秒 → 2.3 秒）。只对未加密的 7z 生效：ZIP/RAR 与单文件解压不受影响，条目很多的包会先短暂显示「正在检查冲突…」再开始解压
 
-- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts. Progress for this two-step extraction is now shown in two halves as well: the bar fills only to the halfway point while entries are decoded into staging, a new "staged" stat card reports how many of them are decoded but not yet moved into place (and counts down as they land), and the "processed" card only starts growing once files actually reach their destination — no more bar that hits 100 % while nothing has been written yet. Progress now advances in proportion to file size — small files no longer race ahead while a big one barely moves — with the staging-to-destination step advancing per entry.
+- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts.
 
 **修复 / Fixes**
 
