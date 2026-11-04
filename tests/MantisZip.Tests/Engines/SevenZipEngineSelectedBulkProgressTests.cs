@@ -77,7 +77,7 @@ public sealed class SevenZipEngineSelectedBulkProgressTests : IDisposable
         return null;
     }
 
-    private (string ArchivePath, List<string> RelativePaths)? CreateSolidArchive()
+    private (string ArchivePath, List<string> RelativePaths)? CreateSolidArchive(IReadOnlyList<int>? sizes = null)
     {
         var dllPath = Resolve7zDll();
         if (dllPath == null)
@@ -89,11 +89,12 @@ public sealed class SevenZipEngineSelectedBulkProgressTests : IDisposable
         var sourceDir = Path.Combine(workDir, "src");
         Directory.CreateDirectory(sourceDir);
 
+        var fileSizes = sizes ?? Enumerable.Repeat(FileSizeBytes, FileCount).ToList();
         var relativePaths = new List<string>();
-        for (var i = 0; i < FileCount; i++)
+        for (var i = 0; i < fileSizes.Count; i++)
         {
             var name = $"file-{i:D3}.bin";
-            File.WriteAllBytes(Path.Combine(sourceDir, name), MakeCompressible(FileSizeBytes));
+            File.WriteAllBytes(Path.Combine(sourceDir, name), MakeCompressible(fileSizes[i]));
             relativePaths.Add(name);
         }
 
@@ -234,6 +235,55 @@ public sealed class SevenZipEngineSelectedBulkProgressTests : IDisposable
             .Distinct(StringComparer.OrdinalIgnoreCase)
             .ToList();
         Assert.Empty(leaked);
+    }
+
+    [Fact]
+    public async Task ExtractEntriesAsync_SolidBulk_ProgressWeightedBySize()
+    {
+        // 3 个 64 KB + 1 个 4 MB：按条数均分时「解完 3 个小文件」就吃掉 75% 的解码预算（整条 37.5%），
+        // 大文件即使解到 99% 也只挪一格；按字节加权后小文件全部解完也只在个位数百分比。
+        var sizes = new[] { 64 * 1024, 64 * 1024, 64 * 1024, 4 * 1024 * 1024 };
+        var fixture = CreateSolidArchive(sizes);
+        if (fixture == null) return;
+        var (archivePath, relativePaths) = fixture.Value;
+        if (!IsSolid(archivePath)) return;
+
+        var destination = TrackTempDir(Path.Combine(Path.GetTempPath(), "MantisZipBulkProgress", Guid.NewGuid().ToString("N")));
+        var selected = relativePaths.ToArray();
+        var reports = new List<ArchiveProgress>();
+
+        var engine = new SevenZipEngine();
+        await engine.ExtractEntriesAsync(
+            archivePath, selected, destination, password: null,
+            progress: new SynchronousProgress<ArchiveProgress>(reports.Add),
+            cancellationToken: CancellationToken.None, options: null);
+
+        var samples = reports.Where(r => !r.EntryStatus.HasValue && r.TotalFiles > 0).ToList();
+        Assert.NotEmpty(samples);
+
+        // 大文件开始解码那一刻，主进度只应反映已解完的 3 个小文件：按字节加权约 6%，
+        // 按条数均分则是 37.5%（解码半格 × 3/4）——这里卡 15% 作为「确实按大小加权」的判据。
+        var bigName = relativePaths[^1];
+        var atBigStart = samples.FirstOrDefault(r =>
+            r.ProcessedFiles == 0 && string.Equals(r.CurrentFile, bigName, StringComparison.OrdinalIgnoreCase));
+        Assert.NotNull(atBigStart);
+        Assert.True(atBigStart!.PercentComplete < 15,
+            $"小文件解完就把进度推得太高（{atBigStart.PercentComplete:F1}%）：疑似仍按条目数均分");
+
+        // 大文件解码期间单调推进到约 50%（解码预算），落地后到 100%
+        Assert.Equal(100, samples[^1].PercentComplete, 3);
+        var percents = samples.Select(r => r.PercentComplete).ToList();
+        for (var i = 1; i < percents.Count; i++)
+            Assert.True(percents[i] >= percents[i - 1] - 0.001,
+                $"主进度回退：{percents[i - 1]:F1}% → {percents[i]:F1}%（第 {i} 个进度样本）");
+
+        // 4 个文件都按原始大小落盘
+        for (var i = 0; i < selected.Length; i++)
+        {
+            var extracted = Path.Combine(destination, selected[i]);
+            Assert.True(File.Exists(extracted), $"缺少选中文件：{selected[i]}");
+            Assert.Equal(sizes[i], new FileInfo(extracted).Length);
+        }
     }
 
     private sealed class SynchronousProgress<T> : IProgress<T>
