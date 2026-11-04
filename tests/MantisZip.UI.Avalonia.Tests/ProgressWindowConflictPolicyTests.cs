@@ -2,7 +2,9 @@ using Avalonia.Controls;
 using Avalonia.Headless.XUnit;
 using MantisZip.Core.Abstractions;
 using MantisZip.UI.Avalonia.Dialogs;
+using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.Models;
+using MantisZip.UI.Avalonia.ViewModels;
 using Xunit;
 
 namespace MantisZip.UI.Avalonia.Tests;
@@ -131,6 +133,41 @@ public class ProgressWindowConflictPolicyTests
 
         window.SyncConflictPolicyFromDialog("rename");
         Assert.Equal(FileConflictAction.Rename, window.ConflictPolicy);
+
+        window.Close();
+    }
+
+    /// <summary>
+    /// 固实批量解压的冲突预解析结束后引擎会上报 ConflictPolicyLocked：下拉必须置灰、
+    /// 提示换成「本次已定案」，否则用户会在一个改了没反应的开关上白折腾。
+    /// 新一轮运行（再次 SetConflictPolicyControl）必须解锁。
+    /// </summary>
+    [AvaloniaFact]
+    public void ConflictPolicy_EngineLocked_DisablesDropdownUntilNextRun()
+    {
+        var window = new ProgressWindow("test");
+        window.SetConflictPolicyControl(ConflictPolicyFlow.Extract, "ask");
+        window.Show();
+
+        var vm = (ProgressViewModel)window.DataContext!;
+        var combo = window.FindControl<ComboBox>("ConflictPolicyCombo");
+        Assert.NotNull(combo);
+        Assert.True(combo!.IsEnabled);
+        Assert.Equal(LocalizationManager.T("Progress_ConflictPolicy_Tip"), vm.ConflictPolicyTip);
+
+        // 引擎上报「已锁定」→ 置灰 + 换提示
+        vm.SetProgress(new ArchiveProgress { ConflictPolicyLocked = true });
+        Assert.False(combo.IsEnabled);
+        Assert.Equal(LocalizationManager.T("Progress_ConflictPolicy_Locked"), vm.ConflictPolicyTip);
+
+        // 后续未携带标记的上报不应解锁（黏滞）
+        vm.SetProgress(new ArchiveProgress());
+        Assert.False(combo.IsEnabled);
+
+        // 新一轮运行：重设能力位即解锁、提示复原
+        window.SetConflictPolicyControl(ConflictPolicyFlow.Extract, "ask");
+        Assert.True(combo.IsEnabled);
+        Assert.Equal(LocalizationManager.T("Progress_ConflictPolicy_Tip"), vm.ConflictPolicyTip);
 
         window.Close();
     }

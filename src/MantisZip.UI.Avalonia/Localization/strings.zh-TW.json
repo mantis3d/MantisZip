@@ -164,6 +164,7 @@
   "Progress_Stats_Staged": "暫存",
   "Progress_ConflictPolicy_Label": "衝突時:",
   "Progress_ConflictPolicy_Tip": "執行中切換會立即影響之後的衝突，已處理的項目不受影響",
+  "Progress_ConflictPolicy_Locked": "本次解壓的衝突處理已在開始時一次性確定，執行中不可修改",
   "Progress_Stats_Archive": "壓縮包",
   "Progress_Stats_ArchiveTotal": "共 {0} 個",
   "Progress_Stats_TotalSize": "總大小 {0}",

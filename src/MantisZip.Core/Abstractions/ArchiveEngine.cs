@@ -451,6 +451,12 @@ public class ArchiveProgress
     /// <summary>已解码到暂存目录的字节合计（与 <see cref="StagedFiles"/> 同源，随落地递减）。null = 未携带。</summary>
     public long? StagedBytes { get; set; }
 
+    /// <summary>
+    /// 冲突处理方式是否已被本次运行锁定。7z solid 批量解压在「冲突预解析」阶段就把每个条目
+    /// 的落点定死，之后解码 / 搬运不再读策略 ⇒ 从这里开始置 true，进度窗口据此禁用「冲突时:」下拉
+    /// （否则会留下一个改了没反应的开关）。null = 未携带（保持可改，ZIP / TarGz 等流式路径即如此）。
+    /// </summary>
+    public bool? ConflictPolicyLocked { get; set; }
     /// <summary>ZIP 并行批次进度（0-100）。仅并行批次报告携带，供批次详细行 Percent。非并行为 null。</summary>
     public double? BatchPercentComplete { get; set; }
 

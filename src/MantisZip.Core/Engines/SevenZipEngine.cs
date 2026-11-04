@@ -613,6 +613,11 @@ public class SevenZipEngine : IArchiveEngine
             int stagedFiles = 0;
             long stagedBytes = 0;
 
+            // 固实批量解压在「冲突预解析」阶段就把每个条目的落点（跳过 / 改名 / 覆盖）定死，
+            // 之后解码与搬运阶段不再读策略 ⇒ 从这里开始把进度窗口的「冲突时:」下拉锁掉，
+            // 免得用户对着一个改了没反应的开关点。
+            bool conflictPolicyLocked = false;
+
             // 主进度报告：跳过/失败条目也要刷新（连续跳过时窗口长时间无更新、看似卡死）。
             // 7z 百分比为文件计数基准 → 用 handledFiles 推进；跳过不计入 ProcessedFiles（已处理）。
             void ReportMainProgress(string fileName, int filePercent, long fileTotalBytes)
@@ -629,6 +634,26 @@ public class SevenZipEngine : IArchiveEngine
                     FileTotalBytes = fileTotalBytes,
                     StagedFiles = stagedFiles > 0 ? stagedFiles : null,
                     StagedBytes = stagedFiles > 0 ? stagedBytes : null,
+                    ConflictPolicyLocked = conflictPolicyLocked ? true : null,
+                }));
+            }
+
+            // 冲突已定案：发一帧把「冲突时:」下拉锁掉（此后每帧都会携带该标记）
+            void ReportConflictPolicyLocked()
+            {
+                conflictPolicyLocked = true;
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                {
+                    CurrentFile = string.Empty,
+                    PercentComplete = totalFiles > 0 ? handledFiles * 100 : 0,
+                    FilePercentComplete = null,
+                    TotalFiles = totalFiles,
+                    ProcessedFiles = processedFiles,
+                    TotalBytes = totalBytes,
+                    ProcessedBytes = processedBytes,
+                    StagedFiles = stagedFiles > 0 ? stagedFiles : null,
+                    StagedBytes = stagedFiles > 0 ? stagedBytes : null,
+                    ConflictPolicyLocked = true,
                 }));
             }
 
@@ -1083,6 +1108,7 @@ public class SevenZipEngine : IArchiveEngine
             {
                 CoreLog.Info($"ExtractAsync: bulk solid {plan.BulkCount} entries, per-entry {plan.BigFile.Count + plan.Unsafe.Count + plan.Duplicate.Count}, skipped {plan.Skipped.Count}");
 
+                ReportConflictPolicyLocked();
                 progress.ReportPhase(ArchivePhase.Extracting);
 
                 // 跳过桶：状态与进度照常上报
@@ -1626,6 +1652,11 @@ public class SevenZipEngine : IArchiveEngine
             int stagedFiles = 0;
             long stagedBytes = 0;
 
+            // 固实批量解压在「冲突预解析」阶段就把每个条目的落点（跳过 / 改名 / 覆盖）定死，
+            // 之后解码与搬运阶段不再读策略 ⇒ 从这里开始把进度窗口的「冲突时:」下拉锁掉，
+            // 免得用户对着一个改了没反应的开关点。
+            bool conflictPolicyLocked = false;
+
             // 单条条目占总进度的权重（解码段用）：字节约 9 成、每条固定约 1 成。
             // 全为 0 字节条目时（totalBytes == 0）退回按条数均分，否则谁都不动。
             const double ByteWeightShare = 0.9;
@@ -1676,6 +1707,27 @@ public class SevenZipEngine : IArchiveEngine
                     // 只有「还有条目压在暂存目录里」时才携带该统计（0 视为未携带 → UI 整卡隐藏）
                     StagedFiles = stagedFiles > 0 ? stagedFiles : null,
                     StagedBytes = stagedFiles > 0 ? stagedBytes : null,
+                    ConflictPolicyLocked = conflictPolicyLocked ? true : null,
+                }));
+                lastReportTime = DateTime.Now;
+            }
+
+            // 冲突已定案：发一帧把「冲突时:」下拉锁掉（此后每帧都会携带该标记）
+            void ReportConflictPolicyLocked()
+            {
+                conflictPolicyLocked = true;
+                progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
+                {
+                    CurrentFile = string.Empty,
+                    PercentComplete = CurrentPercent(),
+                    FilePercentComplete = null,
+                    TotalFiles = totalTarget,
+                    ProcessedFiles = processed,
+                    TotalBytes = totalBytes,
+                    ProcessedBytes = processedBytes,
+                    StagedFiles = stagedFiles > 0 ? stagedFiles : null,
+                    StagedBytes = stagedFiles > 0 ? stagedBytes : null,
+                    ConflictPolicyLocked = true,
                 }));
                 lastReportTime = DateTime.Now;
             }
@@ -2056,6 +2108,7 @@ public class SevenZipEngine : IArchiveEngine
             {
                 CoreLog.Info($"ExtractEntriesAsync: bulk solid selected {plan.BulkCount} entries, per-entry {plan.BigFile.Count + plan.Unsafe.Count + plan.Duplicate.Count}, skipped {plan.Skipped.Count}");
 
+                ReportConflictPolicyLocked();
                 progress.ReportPhase(ArchivePhase.Extracting);
 
                 // 选中空目录：按 override 落点补建（修「目录条目忽略 override」的既有缺陷）

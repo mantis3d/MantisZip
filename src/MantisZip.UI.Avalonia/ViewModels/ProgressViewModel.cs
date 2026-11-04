@@ -1261,6 +1261,15 @@ public partial class ProgressViewModel : ObservableObject
             return;
         }
 
+        // 固实批量解压的冲突预解析结束后，引擎会带 ConflictPolicyLocked=true 上报一次：
+        // 从这里起把「冲突时:」下拉锁掉并换提示（黏滞到下一轮 SetConflictPolicyControl）。
+        if (p.ConflictPolicyLocked == true && !_conflictPolicyLocked)
+        {
+            _conflictPolicyLocked = true;
+            OnPropertyChanged(nameof(IsConflictPolicyEnabled));
+            OnPropertyChanged(nameof(ConflictPolicyTip));
+        }
+
         // 首个上报到达 → 结束准备态（不定进度条恢复确定态）
         EndPreparing();
 
@@ -2559,6 +2568,11 @@ public partial class ProgressViewModel : ObservableObject
     /// </summary>
     private int _conflictPolicyIndex;
 
+    /// <summary>
+    /// 策略是否已被本次运行锁定（引擎在固实批量解压的冲突预解析结束后上报）。
+    /// 锁定时下拉禁用、提示换成「本次已定案」，避免留一个改了没反应的开关。
+    /// </summary>
+    private bool _conflictPolicyLocked;
     /// <summary>下拉选项集合（按流程重建；文案随语言切换刷新）。</summary>
     public ObservableCollection<Option> ConflictPolicyOptions { get; } = new();
 
@@ -2568,9 +2582,12 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>控件标签「冲突时:」。</summary>
     public string ConflictPolicyLabel => LocalizationManager.T("Progress_ConflictPolicy_Label");
 
-    /// <summary>控件说明（工具提示）。</summary>
-    public string ConflictPolicyTip => LocalizationManager.T("Progress_ConflictPolicy_Tip");
+    /// <summary>控件说明（工具提示）。锁定后换成「本次已定案」的解释。</summary>
+    public string ConflictPolicyTip => LocalizationManager.T(
+        _conflictPolicyLocked ? "Progress_ConflictPolicy_Locked" : "Progress_ConflictPolicy_Tip");
 
+    /// <summary>下拉是否可改：能力位打开且本次运行尚未锁定。</summary>
+    public bool IsConflictPolicyEnabled => ShowConflictPolicyControl && !_conflictPolicyLocked;
     /// <summary>下拉当前选中项（ComboBox 双向绑定）。</summary>
     public Option? SelectedConflictPolicyOption
     {
@@ -2615,6 +2632,9 @@ public partial class ProgressViewModel : ObservableObject
         _conflictPolicyFlow = flow;
         _conflictPolicyCodes = flow == ConflictPolicyFlow.Compress ? CompressConflictPolicyCodes : ExtractConflictPolicyCodes;
 
+        // 新一轮运行的起点：解锁（上一轮固实解压锁过的话这里必须复位）
+        _conflictPolicyLocked = false;
+
         ConflictPolicyOptions.Clear();
         if (flow != ConflictPolicyFlow.None)
         {
@@ -2630,6 +2650,7 @@ public partial class ProgressViewModel : ObservableObject
         OnPropertyChanged(nameof(SelectedConflictPolicyOption));
         OnPropertyChanged(nameof(ConflictPolicyLabel));
         OnPropertyChanged(nameof(ConflictPolicyTip));
+        OnPropertyChanged(nameof(IsConflictPolicyEnabled));
     }
 
     /// <summary>

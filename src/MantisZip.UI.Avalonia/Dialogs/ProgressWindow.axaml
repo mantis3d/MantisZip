@@ -688,6 +688,7 @@
                       SelectedItem="{Binding SelectedConflictPolicyOption}"
                       DisplayMemberBinding="{Binding Display}"
                       MinWidth="132"
+                      IsEnabled="{Binding IsConflictPolicyEnabled}"
                       Height="{DynamicResource ControlHeightLg}"
                       VerticalAlignment="Center"
                       Background="{DynamicResource ThemeSurfaceBgBrush}"
