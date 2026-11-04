@@ -21,7 +21,7 @@
          套方形尺寸与按钮三色；因此这些按钮不写 Width / MinHeight / Background。 -->
     <Grid Grid.Row="0"
           Classes="addrRow"
-          ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto"
+          ColumnDefinitions="Auto,Auto,Auto,Auto,Auto,*,Auto"
           ColumnSpacing="{DynamicResource SpacingXxs}"
           Margin="0,0,0,8">
       <!-- 后退按钮 -->
@@ -64,14 +64,27 @@
                   Height="16"
                   Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
       </Button>
+      <!-- 新建文件夹按钮（2026-11-04）：所有模式都可见（用户定的范围）。
+           点击弹输入框要名字，建完按模式决定「进入新目录」还是「只刷新列表」，
+           具体分流见 code-behind 的 CustomFilePickerControl.TryCreateFolder。
+           快捷键 Ctrl+Shift+N 由控件的 KeyDown 冒泡兜底（不依赖焦点在哪个子控件）。 -->
+      <Button Grid.Column="4"
+              x:Name="NewFolderButton"
+              Click="NewFolder_Click"
+              ToolTip.Tip="{Binding NewFolderTooltip}">
+        <PathIcon Data="{StaticResource IconFolderAdd}"
+                  Width="16"
+                  Height="16"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
       <!-- 路径输入框（支持自动补全；规则 16 定位：地址行必须用 PathBreadcrumb，不得退回 AutoCompleteBox） -->
-      <controls:PathBreadcrumb Grid.Column="4"
+      <controls:PathBreadcrumb Grid.Column="5"
                                x:Name="PathCrumbs"
                                PathKind="Disk"
                                FilterMode="Contains"
                                EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
       <!-- 添加收藏按钮 -->
-      <Button Grid.Column="5"
+      <Button Grid.Column="6"
               x:Name="AddFavoriteButton"
               Click="AddFavorite_Click">
         <PathIcon Data="{StaticResource IconBookmarkAdd}"

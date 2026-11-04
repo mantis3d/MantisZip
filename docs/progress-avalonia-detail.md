@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-04** — 功能：文件选择器「新建文件夹」（所有模式，`Ctrl+Shift+N`）
+  - **起因**：讨论「解压设置窗的目标路径输入框与面包屑是否重复」时确认两者不等价（输入框装**结果**、可指向不存在的目录；面包屑是**浏览游标**、只能停在已存在目录），但发现真问题 —— 解压默认目标是 `包所在目录\包名`（`ExtractSettingsViewModel.cs:270-276`），这个目录几乎一定还不存在，而选择器**没有任何建目录的路**：`NavigateTo` 遇 `!Directory.Exists` 直接 return，唯一的逃生口「系统浏览」只有 `CustomFilePickerDialog.axaml.cs:225` 订阅了 `SystemBrowseRequested`，压缩窗 / 解压窗的内嵌实例点了没反应。
+  - **实现（唯一实现点 `Controls/CustomFilePickerControl`）**：地址行在「系统浏览」之后加 `NewFolderButton`（`IconFolderAdd`，列定义 `Auto,Auto,Auto,Auto,Auto,*,Auto`）；构造里加 `AddHandler(KeyDownEvent, OnPickerKeyDown, RoutingStrategies.Tunnel)` 兜 `Ctrl+Shift+N`（不是任何子控件的默认手势，焦点在面包屑输入框 / 文件名框里也生效）。公开三个接缝供弹窗与测试用：`TryCreateFolder(name, out error)`（唯一落盘点）、`ValidateNewFolderName`（只校验不落盘，给输入框的 validator）、`SuggestNewFolderName()`（默认名 + 重名自动 `(2)`、`(3)`…）。
+  - **建完分流**（用户定的范围：所有模式都给）：`PickFolder` / `ExtractFolder` 导航进新目录（「当前目录即结果」，经 `PathChanged` 通知宿主，解压窗据此重建预览）；`SaveFile` 进目录后焦点落文件名框；`PickItems` / `OpenFile` **只刷新列表、不导航** —— 简单模式下切目录会清空累积选择（`NavigateTo`），OpenFile 进空目录等于把用户关进空房间，且 PickItems 里选中的目录会被当结果累加。
+  - **命名交互**：`InputDialog` 从 `Controls/FileFilterEditor.axaml.cs` 末尾的纯代码窗口抽成 `Dialogs/InputDialog.axaml(.cs)`（旧版是默认色，违反规则 4），新增 `Func<string,string?>? validator` + 错误行：校验失败**留窗**显示原因（空白 / 非法字符 / 同名已存在），关窗即放弃；构造后全选初值。`FileFilterEditor` 的「预设重命名 / 另存预设」两处调用改用它，行为不变。三语各加 8 个 `Picker_NewFolder*` key（i18n 1438 → 1446）。
+  - **踩到的坑（不要复发）**：`LoadDirectory` 会先 `FileList.SelectedItem = null`（`:1089`），那一瞬触发的 `SelectionChanged → SyncAccumulatedFromListSelection` 会把 `_accumulatedPaths` 清空 —— 于是「新建文件夹」这个纯浏览动作会**悄悄抹掉用户已选好的结果**（测试 `PickItems_SimpleMode_CreateFolder_KeepsSelectionAndStaysPut` 抓到的正是这个）。修法：`PickItems` / `OpenFile` 分支的 `LoadDirectory` + 回填选中态整段跑在 `_syncingSelection` 闸门内，刷新后按既有累积回填 `SelectedItems`（含目录），再 `UpdatePickPanel()`。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/CustomFilePickerNewFolderTests.cs` 6 例（PickFolder 建完真的导航并抛 `PathChanged`、PickItems 简单模式建完不清已选也不挪位置、重名拒绝且不落盘、空名/非法字符拒绝、建议名去重到 `(2)`/`(3)`、OpenFile 建完不导航）。
+  - **验证**：`build -Target avalonia` 0 错误；`test -Target ui-tests` 60.3s 全绿（31 条存量分析器警告，无新增失败）；`-Task check` 0.5.6 / 三语 1446 key / 8 条守卫全绿。**未做**：内嵌选择器的「系统浏览」死按钮（另记 KI-014）、`ShowExtractFolderAsync` 无调用方（KI-015）。
+
 **2026-11-04** — 修复：骨架进度的「加载中 N 个文件」看不见 + 新增快照式渐进上屏（预览树一边加载一边长出条目）
   - **现象**（用户 m08704）：`.omo/plans/已完成/skeleton-progress-counter.md` 标记 5/5 完成，但实测预览树没有任何「加载中 N 个文件，X」效果。
   - **根因**：进度由 `CompressSettingsViewModel.OnSkeletonProgressTick`（500ms）写到 `_skeletonProgressTargets` 登记的**原始节点**上，而屏幕显示的是 `ResultTreeView.RebuildDisplayTree()` → `DeepCloneNode(_originalRoot)` 的**深拷贝克隆体**；`ShallowClone` 把 `CurrentSkeletonProgress` 当值拷贝，克隆体只保留克隆那一刻的快照，之后所有赋值都落在原始节点上、永远上不了屏。原计划 Task 4 的验收只写「字段/方法存在 + 构建成功 + 既有测试绿」，单测又都是手动给节点赋值，**「定时器 → 屏幕」这一层没有任何覆盖**。

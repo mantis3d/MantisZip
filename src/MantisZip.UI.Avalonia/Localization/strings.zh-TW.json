@@ -1,4 +1,12 @@
 ﻿{
+  "Picker_NewFolder": "新增資料夾",
+  "Picker_NewFolderTitle": "新增資料夾",
+  "Picker_NewFolderPrompt": "資料夾名稱：",
+  "Picker_NewFolderDefaultName": "新增資料夾",
+  "Picker_NewFolderExists": "同名檔案或資料夾已存在，請換一個名稱。",
+  "Picker_NewFolderInvalidName": "名稱不能為空，也不能包含 \\ / : * ? \" < > | 這些字元。",
+  "Picker_NewFolderFailed": "無法新增資料夾：{0}",
+  "Picker_NewFolderNoPath": "目前尚未定位到任何目錄",
   "Toolbar_LayoutMode": "縮圖版面",
   "LayoutMode_Details": "詳細",
   "LayoutMode_Tile": "並排",

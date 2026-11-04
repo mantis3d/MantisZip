@@ -37,6 +37,8 @@
 | **KI-011** | 并行解压/压缩不识别目标盘类型，机械盘上的并发写不做节流 | 性能 / 交互 | 成本超阈值 + 缺决策 | 有机械盘用户的实测数据（并发放大反而更慢）；或做 `selected-items-bulk-extract` 时顺带评估 | 阻塞中 |
 | **KI-012** | 三条「原地解压」路径不读冲突设置、恒静默覆盖 | 功能一致性 | 等计划 | `progress-window-conflict-policy` 落地（Phase 3 接线并顺带修复）时 | 阻塞中 |
 | **KI-013** | 安装包下载 .NET 前的确认框，无法把「取消」按钮文字换成「我会手动安装」 | 交互 / 文案 | 成本超阈值 | #23 再次要求精确文案时；或下次改安装包流程时 | 阻塞中 |
+| **KI-014** | 内嵌选择器的「系统浏览」按钮是死按钮（压缩窗 / 解压窗点下去毫无反应） | 功能一致性 | 缺决策 | 用户反馈「内嵌选择器点系统浏览没反应」时；或决定内嵌宿主能否复用原生通道时 | 阻塞中 |
+| **KI-015** | `ShowExtractFolderAsync` 已无调用方（连同 `ExtractPickResult` 一起成了死 API） | 技术债 / 死代码 | 缺决策 | 下次动 `CustomFilePickerDialog` 静态入口或解压选目录链路时 | 阻塞中 |
 
 ---
 
@@ -181,6 +183,24 @@
 - **关联**：issue #23（已关闭）；`installer.iss` 的 `NextButtonClick` / `DownloadConfirmMsg`。
 - **编号说明**：本条 2026-11-03 首次登记时编为 KI-012；同日合并 `main` 到 `alpha` 时与「三条原地解压路径不读冲突设置」（2026-11-01 登记）撞号，按登记先后本条改号为 **KI-013**。
 - **状态**：阻塞中
+
+## KI-014 内嵌选择器的「系统浏览」按钮是死按钮
+
+- **发现**：2026-11-04（做「文件选择器新建文件夹」时核对四种宿主）
+- **现象**：`CustomFilePickerControl` 地址行的「系统浏览」按钮只上抛 `SystemBrowseRequested` 事件，而**全仓只有 `Dialogs/CustomFilePickerDialog.axaml.cs:225` 订阅它**。设置窗里内嵌的两处 —— `CompressSettingsWindow.OutputPicker`、`ExtractSettingsWindow.DestinationPicker`（以及 `QuickPathPicker`）—— 都没有订阅，用户点下去**完全没反应、也没有任何提示**。此前它不至于致命是因为选择器没法建目录；本轮补了「新建文件夹」，建目录已有正规入口，所以这个死按钮不再算阻断。
+- **证据**：`src/MantisZip.UI.Avalonia/Controls/CustomFilePickerControl.axaml.cs:1908-1912`（只 `SystemBrowseRequested?.Invoke`）；`rg SystemBrowseRequested src` 的订阅点只有 `CustomFilePickerDialog.axaml.cs:225`。
+- **为什么现在不修**：**缺决策**。修法要先回答一个规则 16 问题：内嵌宿主能不能走原生选择器？能 ⇒ 在压缩窗 / 解压窗各订阅一次（约 20 行）；不能 ⇒ 应该把按钮在非模态宿主里隐藏（`IsVisible=false`），否则等于承认有第二个豁免点。两条路产品语义不同，不适合顺手定。
+- **复评条件**：① 用户反馈「设置窗里的系统浏览点了没反应」时；② 或决定「内嵌宿主是否允许复用规则 16 的原生豁免通道」时。
+- **关联**：`.omo/plans/进行中/picker-new-folder.md` 的「非目标」；`AGENTS.md` 规则 16。
+
+## KI-015 `ShowExtractFolderAsync` 已无调用方
+
+- **发现**：2026-11-04（同上，核对选择器静态入口时）
+- **现象**：`Dialogs/CustomFilePickerDialog.ShowExtractFolderAsync`（返回强类型 `ExtractPickResult(DestPath, PreserveFullPath)`）目前**没有任何调用方**。它的两个原始消费者（拖拽兜底、`ExtractSelectedTo`）在 2026-10-30 改成「弹 `ExtractSettingsWindow` 并预置条目集」之后就不再走它；`ExtractPickResult` 因此成了只有定义、没有消费的死记录类型。文档与代码注释仍按「两个有对话框的消费点」描述，属实现已变、说明未跟。
+- **证据**：`rg ShowExtractFolderAsync src` → 只有 `CustomFilePickerDialog.axaml.cs:144` 的定义与 `:75` 的文档引用；`ExtractPickResult` 除定义（`Dialogs/ExtractPickResult.cs:23`）与该方法内构造外，`src/` 无其它引用。
+- **为什么现在不修**：**缺决策**。删掉要连带清 `ExtractPickResult` 与 `docs/ARCHITECTURE.md` / detail 里的引用；保留则要有人回答「以后还会不会用它」。而本轮改的控件与它无耦合，删除属独立清理动作。
+- **复评条件**：下次动 `CustomFilePickerDialog` 的静态入口，或再改「解压选目录」链路时 —— 一并决定「删入口 + 删 record」还是「接线复用」。
+- **关联**：`docs/progress-avalonia-detail.md` 2026-10-30「解压『选中项到 / 拖拽兜底』改用解压设置窗」条目。
 
 ## 档案区（已修 / 不会修）
 

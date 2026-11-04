@@ -383,8 +383,8 @@ public partial class IconTestViewModel : ObservableObject
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
         Add("资源库", "文件夹箭头左", null, "IconFolderArrowLeft", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
-        Add("资源库", "文件夹添加", null, "IconFolderAdd", IconStatus.Defined,
-            "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
+        Add("文件列表", "新建文件夹（选择器地址行）", null, "IconFolderAdd", IconStatus.Converted,
+            "Controls/CustomFilePickerControl.axaml", "文件选择器地址行「新建文件夹」按钮（所有模式）");
         Add("资源库", "文件夹箭头右", null, "IconFolderArrowRight", IconStatus.Defined,
             "Resources/Icons/AppIcons.axaml", "Fluent UI System Icon");
         Add("资源库", "文件夹提示", null, "IconFolderHint", IconStatus.Defined,

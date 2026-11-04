@@ -1,4 +1,12 @@
 ﻿{
+  "Picker_NewFolder": "新建文件夹",
+  "Picker_NewFolderTitle": "新建文件夹",
+  "Picker_NewFolderPrompt": "文件夹名称：",
+  "Picker_NewFolderDefaultName": "新建文件夹",
+  "Picker_NewFolderExists": "同名文件或文件夹已存在，请换一个名字。",
+  "Picker_NewFolderInvalidName": "名称不能为空，也不能包含 \\ / : * ? \" < > | 这些字符。",
+  "Picker_NewFolderFailed": "无法新建文件夹：{0}",
+  "Picker_NewFolderNoPath": "当前还没有定位到任何目录",
   "Toolbar_LayoutMode": "缩略图布局",
   "LayoutMode_Details": "详情",
   "LayoutMode_Tile": "平铺",

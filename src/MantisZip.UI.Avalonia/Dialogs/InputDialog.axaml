@@ -1,0 +1,60 @@
+<Window xmlns="https://github.com/avaloniaui"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        x:Class="MantisZip.UI.Avalonia.Dialogs.InputDialog"
+        x:CompileBindings="False"
+        Title="{Binding WinTitle}"
+        Width="380"
+        SizeToContent="Height"
+        WindowStartupLocation="CenterOwner"
+        CanResize="False"
+        Background="{DynamicResource ThemeWindowBgBrush}"
+        Padding="{DynamicResource DialogPadding}">
+
+  <!-- 通用「输入一行文本」弹窗（2026-11-04 从 Controls/FileFilterEditor.axaml.cs 的纯代码窗口抽出）：
+       当前消费者 = 文件过滤预设的「重命名 / 另存为新预设」、文件选择器的「新建文件夹」。
+       校验失败时必须留窗并显示原因（调用方传 validator），关窗即视为放弃。 -->
+  <Grid RowDefinitions="Auto,Auto,Auto,Auto"
+        Margin="{DynamicResource SpacingXsThk}">
+
+    <!-- 第 0 行：提示语（告诉用户这一行填什么） -->
+    <TextBlock Grid.Row="0"
+               Text="{Binding PromptText}"
+               TextWrapping="Wrap"
+               Margin="0,0,0,8"
+               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+
+    <!-- 第 1 行：输入框（初值由调用方给定，构造后全选，直接打字即可覆盖） -->
+    <TextBox Grid.Row="1"
+             x:Name="InputTextBox"
+             MinHeight="{DynamicResource ControlHeightSm}"
+             Margin="0,0,0,6"
+             Background="{DynamicResource ThemeSurfaceBgBrush}"
+             Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+             BorderBrush="{DynamicResource ThemeBorderBrush}" />
+
+    <!-- 第 2 行：校验错误行（无错误时整行隐藏，规则 6） -->
+    <TextBlock Grid.Row="2"
+               x:Name="ErrorTextBlock"
+               IsVisible="False"
+               TextWrapping="Wrap"
+               Margin="0,0,0,6"
+               FontSize="11"
+               Foreground="{DynamicResource ThemeStatusErrorBrush}" />
+
+    <!-- 第 3 行：确定 / 取消（Enter = 确定、Esc = 取消，走 IsDefault / IsCancel） -->
+    <StackPanel Grid.Row="3"
+                Orientation="Horizontal"
+                HorizontalAlignment="Right"
+                Spacing="{DynamicResource SpacingSm}">
+      <Button Content="{Binding OkText}"
+              Classes="primary"
+              MinHeight="{DynamicResource ControlHeight}"
+              IsDefault="True"
+              Click="Ok_Click" />
+      <Button Content="{Binding CancelText}"
+              MinHeight="{DynamicResource ControlHeight}"
+              IsCancel="True"
+              Click="Cancel_Click" />
+    </StackPanel>
+  </Grid>
+</Window>

@@ -1,4 +1,12 @@
 ﻿{
+  "Picker_NewFolder": "New folder",
+  "Picker_NewFolderTitle": "New folder",
+  "Picker_NewFolderPrompt": "Folder name:",
+  "Picker_NewFolderDefaultName": "New folder",
+  "Picker_NewFolderExists": "A file or folder with that name already exists. Please choose another name.",
+  "Picker_NewFolderInvalidName": "The name can't be empty or contain \\ / : * ? \" < > |.",
+  "Picker_NewFolderFailed": "Could not create the folder: {0}",
+  "Picker_NewFolderNoPath": "No folder is open yet",
   "Toolbar_LayoutMode": "Thumbnail layout",
   "LayoutMode_Details": "Details",
   "LayoutMode_Tile": "Tiles",
