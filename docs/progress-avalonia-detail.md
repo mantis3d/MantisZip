@@ -13,6 +13,7 @@
   - **状态提示**：守卫写进 `StatusMessage` 的那句话单独记在 `_guardStatusMessage`，`ApplyArchiveAvailability()` 在恢复 `Available` 时只清它（内容相等才清），不会顺手抹掉别的操作提示；新增 `internal` 可见性供测试直接驱动。
   - **F5 放开 `Replaced`**：新增 `EnsureArchiveRefreshable()`，只拦 `Missing`；`RefreshArchive()` 改用它 —— 刷新本身就是从磁盘重读，是替换态最安全的恢复动作，重载成功后守卫重新挂载、基线是替换后的文件、横幅自动消失。写操作（添加 / 删除 / 解压）仍走 `EnsureArchiveAvailable()`，替换态一律拦下，避免拿旧列表往新文件里写。
   - **删光所有条目**：ZIP 复制模式与 7z 在 `keepEntries.Count == 0` 时会 `File.Delete(archivePath)` 把整包移除（`ZipEngine.CompressGroup.cs:961` / `SevenZipEngine.cs:2270`），此时刷新无从谈起，原先会停在「压缩包已不在磁盘上」横幅。`DeleteFiles` 的完成回调现在先判 `!File.Exists(CurrentArchivePath)`：直接 `ClearArchiveInternal()` + 标题复位 + 提示「全部条目已删除，压缩包已移除」（新 key `Status_ArchiveRemovedAfterDeleteAll`），进度窗完成态用同一句。
+  - **横幅文案**：`Main_ArchiveReplaced_Detail` 与 `Status_ArchiveReplaced` 三语改为直接给出恢复动作 ——「按 F5 刷新可从磁盘重读（也可点「重新打开」）」，不再只说「请重新打开」。`Missing` 态的两条文案**不提 F5**（文件真没了时刷新仍被拦，只保留「重新打开 / 关闭压缩包」）。
   - **编辑注释的连带修正**：`_archiveComment` 只在打开时读一次，写完注释后根目录预览仍显示旧注释；现在写成功后同步 `_archiveComment` 并在根目录且无选中项时调 `UpdatePreviewForFolder()`。
   - **测试**（`tests/MantisZip.UI.Avalonia.Tests/ArchiveFileGuardTests.cs`，均 `[AvaloniaFact]`）：新增 6 例 —— 自写作用域内重写文件不报 `Replaced` 且释放后基线已重设、之后外部再改仍能正常报 `Replaced`（抑制没有把监视器弄哑）；自写删包后重设基线报 `Missing`；嵌套作用域内层释放不判定、不重设基线；`ViewModel_RefreshAllowsReplacedButStillBlocksMissing`（替换态写操作仍拦、刷新放行、删除后缺失态刷新也拦）；状态恢复清掉守卫提示；恢复时不误清无关状态提示。
   - **验证**：`build -Target avalonia` 0 警告；`test -Target ui-tests` 795 用例全绿（3 例既有跳过）；`-Task check` 0.5.6 六处一致 / 三语 1448 key / 9 条守卫全绿；`dotnet format analyzers --verify-no-changes` 通过。
