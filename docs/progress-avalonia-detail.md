@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-05** — 体验：文件选择器地址区拆两行（按钮行 + 面包屑整宽行）
+  - **起因**：11-04 新增「新建文件夹」后地址行有 6 个方形按钮（`ControlHeightMd` 见方 + 2px 间距），面包屑在内嵌 620px 列里只剩 **392px（63%）**（headless 实测 `PathCrumbs.Bounds.Width`），窗口拉到 `MinWidth 900`（左列 520px）时更窄，路径被折成 `E:\ … \Controls`。
+  - **改法**：`Controls/CustomFilePickerControl.axaml` 的 Row 0 从「一行 Grid」改成「外层 `StackPanel`（`Spacing=SpacingXxs`）→ 按钮行 `Grid`（`Classes="addrRow"`，列 `Auto,Auto,Auto,Auto,*,Auto,Auto`）→ `PathBreadcrumb` 独占下一行」。按钮行左：后退 / 前进 / 向上 / 系统浏览；右：**新建文件夹 / 添加收藏**（`*` 弹性空列推到行尾，用户指定的位置）。**行索引不动**（`BrowserGrid` / `FileNameArea` / `OptionsRow` 仍是 1/2/3），避免三处 `Grid.Row` 迁移带来的错位风险。
+  - **代价与收益**：垂直多占 36–46px（三档紧凑度的按钮行高 28/32/38 + 行距 2/4/6）；面包屑 392 → **≈610px**，路径基本能整条显示。
+  - **回归锁**：新增 `tests/MantisZip.UI.Avalonia.Tests/CustomFilePickerAddressLayoutTests.cs` 2 例 —— ①面包屑宽度 ≥ 控件宽度 80%（旧布局 63%，先红后绿）；②整行按钮都在面包屑**上方**，且「新建文件夹」「添加收藏」在行尾（`TranslatePoint` 比坐标，不依赖像素值）。
+  - **文档同步**：`App.axaml` 的 `Grid.addrRow` 注释与 `AGENTS.md` 规则 4 的 `addrRow` 两行说明（去掉「与 `PathBreadcrumb` 同高齐平」——拆行后不再同行，避免下次照旧描述理解）。
+  - **未覆盖**：`MinHeight 560` 时文件列表变矮的体感只能真机目视，headless 测不出。
+  - **验证**：`build -Target avalonia` 0 警告；`test -Target ui-tests` 46.8s 全绿；`-Task check`（0.5.6 / 三语 1446 key）、`-Task guards`（8 条）全绿。
+
 **2026-11-04** — 功能：文件选择器「新建文件夹」（所有模式，`Ctrl+Shift+N`）
   - **起因**：讨论「解压设置窗的目标路径输入框与面包屑是否重复」时确认两者不等价（输入框装**结果**、可指向不存在的目录；面包屑是**浏览游标**、只能停在已存在目录），但发现真问题 —— 解压默认目标是 `包所在目录\包名`（`ExtractSettingsViewModel.cs:270-276`），这个目录几乎一定还不存在，而选择器**没有任何建目录的路**：`NavigateTo` 遇 `!Directory.Exists` 直接 return，唯一的逃生口「系统浏览」只有 `CustomFilePickerDialog.axaml.cs:225` 订阅了 `SystemBrowseRequested`，压缩窗 / 解压窗的内嵌实例点了没反应。
   - **实现（唯一实现点 `Controls/CustomFilePickerControl`）**：地址行在「系统浏览」之后加 `NewFolderButton`（`IconFolderAdd`，列定义 `Auto,Auto,Auto,Auto,Auto,*,Auto`）；构造里加 `AddHandler(KeyDownEvent, OnPickerKeyDown, RoutingStrategies.Tunnel)` 兜 `Ctrl+Shift+N`（不是任何子控件的默认手势，焦点在面包屑输入框 / 文件名框里也生效）。公开三个接缝供弹窗与测试用：`TryCreateFolder(name, out error)`（唯一落盘点）、`ValidateNewFolderName`（只校验不落盘，给输入框的 validator）、`SuggestNewFolderName()`（默认名 + 重名自动 `(2)`、`(3)`…）。

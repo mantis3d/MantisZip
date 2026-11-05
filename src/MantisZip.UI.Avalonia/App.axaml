@@ -107,7 +107,8 @@
     </Style>
 
     <!-- 地址栏行按钮（挂 Classes="addrRow" 的 Grid 的直接子 Button 自动套用）：
-         方形按钮 = ControlHeightMd × ControlHeightMd，与 PathBreadcrumb 的固定高度齐平。
+         方形按钮 = ControlHeightMd × ControlHeightMd。2026-11-05 起地址区拆两行：
+         本样式只作用于「按钮行」，面包屑独占下一行整宽，两者不再要求同高齐平。
          背景/前景/边框与全局 Button 一致，这里显式写出只为让「地址行按钮」自成一套、
          将来要改地址行按钮外观时只改这一处。
          ⚠ 不要在地址行的按钮上再写 Width / MinHeight / Background —— 那等于绕开本样式。 -->
