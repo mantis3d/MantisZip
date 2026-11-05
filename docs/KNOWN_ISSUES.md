@@ -40,6 +40,7 @@
 | **KI-014** | 内嵌选择器的「系统浏览」按钮是死按钮（压缩窗 / 解压窗点下去毫无反应） | 功能一致性 | 缺决策 | 用户反馈「内嵌选择器点系统浏览没反应」时；或决定内嵌宿主能否复用原生通道时 | 阻塞中 |
 | **KI-015** | `ShowExtractFolderAsync` 已无调用方（连同 `ExtractPickResult` 一起成了死 API） | 技术债 / 死代码 | 缺决策 | 下次动 `CustomFilePickerDialog` 静态入口或解压选目录链路时 | 阻塞中 |
 | **KI-016** | 解压时输错密码被判成「文件损坏」，不弹密码框重试（`data error` 被当作损坏信号） | 交互 / 错误分类 | 缺决策 | 用户反馈「密码输错只提示损坏」时；或决定「解压失败统一走 `QuickVerifyPasswordEx` 二次判定」时 | 阻塞中 |
+| **KI-017** | 分卷包（`.001`/`.z01`/`.r00`/`.part1.rar`）与 SFX 的**格式身份**被扩展名直判成 Zip，预览 / 双击打开 / 缩略图全报 `Failed to locate the Zip Header` | 功能缺陷 | — | 已修复（`ResolveReaderFormat` 单一入口，2026-11-05） | 已修复（2026-11-05） |
 
 ---
 
@@ -220,3 +221,4 @@
 | 编号 | 标题 | 结局 | commit / 理由 | 关闭日期 |
 |---|---|---|---|---|
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 已修复：三态契约 + UI 分支 + 红绿验证的回归测试 | `fix(core,avalonia): 更新检查区分「无更新 / 失败」三态` | 2026-10-28 |
+| **KI-017** | 分卷包 / SFX 的格式身份被扩展名直判成 Zip（预览、双击打开、缩略图全报 `Failed to locate the Zip Header`） | 已修复：`ArchiveEngineFactory.ResolveReaderFormat` 作为「有效格式」唯一入口，`ArchiveFormatHelper.GetFormat` 委派它；分卷解析成 SevenZip 后同步用 `IsCurrentVolumeSet` 拦住增删条目；守卫 `formatidentity` 防复发 | `fix(core,avalonia): 分卷/SFX 格式身份统一走 ResolveReaderFormat` | 2026-11-05 |

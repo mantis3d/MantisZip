@@ -54,13 +54,13 @@
 | build / test | `ConvertFrom-BuildOutput`（解析诊断）、`Get-ConfigurationFromArgs`、`Get-TestAssemblyPath`、`Invoke-VerifyDotnet`（起子进程）、`Format-BuildResult` |
 | i18n | `Get-PlaceholderIndexes`、`Test-I18n`、`Format-I18nResult` |
 | version | `Test-VersionConsistency`、`Format-VersionResult` |
-| guards | `Test-GuardKeyBindings` / `Test-GuardI18nBindings` / `Test-GuardFilePicker` / `Test-GuardIcons`、`Test-Guards`、`Format-GuardsResult` |
+| guards | `Test-GuardKeyBindings` / `Test-GuardI18nBindings` / `Test-GuardFilePicker` / `Test-GuardIcons` / `Test-GuardFormatIdentity`、`Test-Guards`、`Format-GuardsResult` |
 | 入口 | `switch ($Task)`，每支 `exit ([int](-not $ok))` |
 
 `-Task check` = `version` + `i18n` + `guards`，纯文件校验，不构建。JSON 形状是
 `{ ok, checks: [ { task, result: {…} } ] }` —— 每项结果是完整对象，不平铺（避免与 `task` 字段抢名字）。
 
-## 4. 八条规则守卫（`-Task guards`）
+## 4. 九条规则守卫（`-Task guards`）
 
 把 AGENTS.md 里本可机器校验的人工自查变成门禁：
 
@@ -74,6 +74,7 @@
 | numericbinding | 22 | 扫全部 `.axaml`：`TextBox` 的 `Text` 绑到数字型属性却没挂 `behaviors:NumericInput.Enabled="True"`（且非只读、无 `Converter`、非禁用）即失败；整数型 `NumericUpDown` 绑 `int/long/short/byte` 却缺 `Classes="intOnly"` 也失败。**事故**：2026-10-28 设置窗口 7 处 `TextBox` 直绑 `int` → 敲字母渲染红色转换异常文本；2026-10-12 同类事故是 `NumericUpDown` 能输入小数 |
 | jsonoptions | 23 | `src/` 下（不含 `tests/`）单参数 `JsonSerializer.Deserialize<T>(json)` 即失败 —— 默认 options 区分大小写，键名不匹配时**反序列化「成功」但字段全空**。**事故**：2026-10-28 语言页「翻译贡献者」恒为空（`languages.json` 小写键） |
 | settingswiring | 23 | `AppSettings` 每个 public 属性必须在 `src/` 里有运行时消费者（排除设置窗口 VM 自身的读写、允许自身文件内的迁移逻辑）；否则视为**死开关**。豁免表 `$SETTINGS_WIRING_EXEMPT` 每项带原因并**双向核对**（属性删了/接上了都必须从表里删行）。**事故**：`CloseAfterCompress` 从 v0.2.0 存到 2026-10-28，全仓没人读 |
+| formatidentity | 23 | ① `src/MantisZip.UI.Avalonia` 里 `ArchiveEngineFactory.GetFormatByExtension(` 只允许出现在 `Models/ArchiveFormatHelper.cs`（其余必须走 `GetFormat` → `ResolveReaderFormat`）；② 该文件必须委派 `ResolveReaderFormat(`；③ `ArchiveEngine.cs` 的 `ResolveReaderFormat` 必须同时含分卷锚定（`TryGetVolumeBase`）与 SFX 探测（`SfxProbe.TryGetPayloadFormat`）；④ `MainWindowViewModel` 必须有 `IsCurrentVolumeSet`，且 `CanAddEntries` / `CanDeleteEntries` 都用它拦截。**事故**：分卷包与 SFX 的格式身份被 `Path.GetExtension` 直判成 `Zip`（默认分支兜底），预览/双击打开/缩略图全报 `Failed to locate the Zip Header`，而引擎路由本身是对的 → 两套事实源（KI-017，2026-11-05 修） |
 
 **已知覆盖边界**（别误以为全查了）：
 
@@ -85,6 +86,7 @@
 - numericbinding 靠「属性名在 UI 项目里声明为数字类型」推断：属性名重名（不同 VM 各有一个 `Size`）时会按最后一个声明算；`TextBox` 绑的是 `string` 而 VM 内部再 parse 的写法它看不见（那类写法本身也该改）。
 - jsonoptions 只查单参数形态；`JsonSerializer.Deserialize(json, new JsonSerializerOptions())` 这种「显式传了个默认 options」它抓不到（靠评审：要传 `JsonDefaults.CaseInsensitive`）。
 - settingswiring 的「消费者」是文本出现次数：只要属性名在别的文件里出现过就算接上，所以「读了但读了不用」查不出来；豁免表 `$SETTINGS_WIRING_EXEMPT` 是唯一的人工闸口，新增豁免必须在 reason 里写清原因并同步 `docs/KNOWN_ISSUES.md`。
+- formatidentity 只管「UI 有没有绕过单一入口」，查不出 `ResolveReaderFormat` 自己判错（那要靠 `ReaderFormatResolutionTests` 的用例）；也查不出 Core 里新写的直判点（如 `ListEntriesAsync` 的 ISO 判定）——新增格式时仍需补对应 InlineData。
 
 ## 5. CI 门禁（`.github/workflows/ci.yml`，共 7 步）
 
@@ -95,7 +97,7 @@
 |------|--------|
 | `-Task version` | 版本号 6 处漂移（AppConstants / csproj / PLAN / PROGRESS / 两个 .iss） |
 | `-Task i18n` | 三语 key 缺失/多余/占位符不一致/重复 key |
-| `-Task guards` | 上面八条规则 |
+| `-Task guards` | 上面九条规则 |
 | `dotnet restore -p:WarningsAsErrors=NU1901%3B…` | 已知漏洞依赖（`Directory.Build.props` 开 `NuGetAuditMode=all`，本地只告警） |
 | `dotnet format … analyzers --verify-no-changes --severity warn --include src\…` | 产品代码分析器告警（**只圈 `src/`**，tests 存量 xUnit 告警另议） |
 | `dotnet build --no-restore -c Release` + `dotnet test …` | 真正编译与用例 |

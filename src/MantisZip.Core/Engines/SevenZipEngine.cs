@@ -1380,8 +1380,13 @@ public class SevenZipEngine : IArchiveEngine
         {
             using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
-            // 预先确定格式，供 lambda 中使用
-            var format = ArchiveEngineFactory.GetFormatByExtension(archivePath);
+            // 预先确定格式，供 lambda 中使用。
+            // 按**卷基名**判（2026-11-05）：`1.7z.001` 只看扩展名会落到 Zip 占位默认值，
+            // 下面「ISO 不支持加密」的豁免就永远不成立（加密分区会被误标成加密条目）。
+            var formatPath = ArchiveVolumeSet.TryGetVolumeBase(archivePath, out var volumeBase, out _)
+                ? volumeBase
+                : archivePath;
+            var format = ArchiveEngineFactory.GetFormatByExtension(formatPath);
 
             var items = extractor.ArchiveFileData
                 .Where(entry =>

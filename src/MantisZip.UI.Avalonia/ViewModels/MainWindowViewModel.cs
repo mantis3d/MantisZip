@@ -358,9 +358,22 @@ public partial class MainWindowViewModel : ObservableObject
     {
         // 同步预览面板当前压缩包路径，供「输入密码」按钮的 CanExecute 判断使用
         Preview.CurrentPreviewFilePath = value;
-        // 换包后引擎能力位可能变化（zip ↔ tar），一并刷新删除入口可用性
+        // 换包后引擎能力位可能变化（zip ↔ tar / 单文件 ↔ 分卷），一并刷新删除入口可用性
         OnPropertyChanged(nameof(CanDeleteEntries));
+        OnPropertyChanged(nameof(CanAddEntries));
+        OnPropertyChanged(nameof(IsCurrentVolumeSet));
     }
+
+    /// <summary>
+    /// 当前压缩包是否为分卷集（<c>.7z.001</c> / <c>.zip.001</c> / <c>.z01</c> / <c>.r00</c> …）。
+    /// </summary>
+    /// <remarks>
+    /// 分卷包**只能读不能改**：7z.dll 能串卷解压，但不支持往多卷集里增删条目（SharpCompress 连读都不支持）。
+    /// 有效格式解析后分卷会被标成 SevenZip，而 <c>CanAdd(SevenZip)</c> / <c>CanDelete(SevenZip)</c> 都是 true，
+    /// 所以增删入口必须额外按这一位拦一次，否则会把「打开分卷包」变成「写入多卷集」。
+    /// </remarks>
+    public bool IsCurrentVolumeSet =>
+        CurrentArchivePath != null && ArchiveVolumeSet.HasVolumeSuffix(CurrentArchivePath);
 
     [ObservableProperty]
     private bool _isArchiveLoaded;
@@ -374,12 +387,28 @@ public partial class MainWindowViewModel : ObservableObject
         IsArchiveLoaded
         && !IsArchiveUnavailable
         && CurrentArchivePath != null
+        && !IsCurrentVolumeSet
         && (ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath)?.CanDelete(_currentFormat) ?? false);
+
+    /// <summary>
+    /// 当前压缩包是否支持追加条目（分卷集与 TAR/GZ 等只读格式为 false）。工具栏「添加文件」据此禁用。
+    /// </summary>
+    /// <remarks>
+    /// 与 <see cref="CanDeleteEntries"/> 同一套能力位 + 分卷位：分卷集有效格式是 SevenZip，而
+    /// <c>CanAdd(SevenZip)</c> 为 true —— 光看格式会把「只读的多卷集」显示成可写。
+    /// </remarks>
+    public bool CanAddEntries =>
+        IsArchiveLoaded
+        && !IsArchiveUnavailable
+        && CurrentArchivePath != null
+        && !IsCurrentVolumeSet
+        && (ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath)?.CanAdd(_currentFormat) ?? false);
 
     // 能力位随「压缩包加载状态」刷新（格式 `_currentFormat` 在 RefreshArchive 中先于本字段赋值）
     partial void OnIsArchiveLoadedChanged(bool value)
     {
         OnPropertyChanged(nameof(CanDeleteEntries));
+        OnPropertyChanged(nameof(CanAddEntries));
         // 代码页按钮是否可用取决于「已开包 + 格式」：载入成功分支里通知 CanChangeNameEncoding 时
         // IsArchiveLoaded 还是 false，只靠那一处通知会让按钮永久停在置灰态（2026-11-02 实测）
         OnPropertyChanged(nameof(CanChangeNameEncoding));
@@ -421,6 +450,7 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ArchiveAvailabilityTitleText));
         OnPropertyChanged(nameof(ArchiveAvailabilityDetailText));
         OnPropertyChanged(nameof(CanDeleteEntries));
+        OnPropertyChanged(nameof(CanAddEntries));
     }
 
     private ArchiveFileGuard? _archiveGuard;

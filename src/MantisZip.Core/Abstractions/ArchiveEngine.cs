@@ -666,6 +666,45 @@ public static class ArchiveEngineFactory
     }
 
     /// <summary>
+    /// 解析「这个路径该由哪个格式域 / 读取器处理」（有效格式）。
+    /// UI 的格式标签、缩略图、双击打开、单条提取都吃这个值；**判断分卷 / SFX 路径时不要再用
+    /// <see cref="GetFormatByExtension"/> 直判**——它只看扩展名，会把 <c>1.7z.001</c> 判成 Zip。
+    /// </summary>
+    /// <remarks>
+    /// <para>两套事实源分裂过一次（2026-11-05，KI-017）：引擎路由 <see cref="GetEngineByExtension"/>
+    /// 认分卷 → SevenZipEngine，而格式身份 <see cref="GetFormatByExtension"/> 对 <c>1.7z.001</c>
+    /// 只看到 <c>.001</c>、落到默认分支 <c>Zip</c>。于是分卷 7z 的预览 / 双击打开 / 缩略图全走
+    /// SharpCompress，报 <c>Failed to locate the Zip Header</c>；固实 SFX 的
+    /// <c>IsCurrentSevenZipSolid</c> 守卫也失效（每个缩略图退化成整包解压）。</para>
+    /// <para>语义是「<b>谁能读</b>」而不是「里面装的什么」：分卷与 SFX 只有 7z.dll 读得动，所以统一返回
+    /// <see cref="ArchiveFormat.SevenZip"/>。`.zip.001` / `.z01` 里的载荷仍是 zip，但读取器是
+    /// SevenZipEngine——下游的代码页、注释、添加条目都应按**读取器能力**判断。</para>
+    /// </remarks>
+    public static ArchiveFormat ResolveReaderFormat(string filePath)
+    {
+        // 分卷：与 GetEngineByExtension 的分支逐字对应（改一处必须改另一处，守卫 `formatidentity` 盯着）。
+        if (ArchiveVolumeSet.TryGetVolumeBase(filePath, out var volumeBase, out _))
+        {
+            var baseFormat = GetFormatByExtension(volumeBase);
+            if (baseFormat is ArchiveFormat.Zip or ArchiveFormat.SevenZip or ArchiveFormat.Rar)
+                return ArchiveFormat.SevenZip;
+
+            // 分卷但载荷不是 7z.dll 的强项（如 .tar.001）：按**基名**判，别落到 `.001` 那个占位默认值。
+            return baseFormat;
+        }
+
+        // SFX（issue #36）：MZ 桩 + 内嵌包同样只有 7z.dll 读得动。只对**目录里没有的扩展名**探文件头，
+        // 否则 GetFormat 这条热路径（密码缓存键等一次会话几十次）会反复读盘。
+        if (!ArchiveExtensionCatalog.Contains(Path.GetExtension(filePath))
+            && SfxProbe.TryGetPayloadFormat(filePath) is not null)
+        {
+            return ArchiveFormat.SevenZip;
+        }
+
+        return GetFormatByExtension(filePath);
+    }
+
+    /// <summary>
     /// 分卷集的锚点路径（issue #70①）：传入 <c>.002</c> 之后的任意一卷都回到 <c>.001</c>；
     /// 首卷缺失时返回原路径，让上游按「文件不存在 / 打不开」处理，而不是静默换一个包。
     /// </summary>

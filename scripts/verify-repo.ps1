@@ -895,6 +895,8 @@ function Format-VersionResult {
 #   - 规则 20：意图-执行只走契约（设置窗口构造点登记 / 双轨回传 / 执行器注入）
 #   - 规则 22：数字输入不得裸绑（2026-10-28 TextBox 直绑 int → 红色校验文本）
 #   - 规则 23：反序列化必须显式 options；AppSettings 不得有死开关
+#   - 规则 23：格式身份必须走 ResolveReaderFormat（2026-11-05，KI-017：分卷 .001 被扩展名直判成 Zip，
+#     预览 / 双击打开 / 缩略图全报 "Failed to locate the Zip Header"）
 # ---------------------------------------------------------------------------
 
 $GUARD_FILES = [ordered]@{
@@ -1558,6 +1560,96 @@ function Test-GuardSettingsWiring {
         })
 }
 
+function Test-GuardFormatIdentity {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $uiDir = Join-Path $RepoRoot $GUARD_UI_DIR
+    if (-not (Test-Path -LiteralPath $uiDir)) {
+        $issues.Add("读不到 UI 目录：$GUARD_UI_DIR")
+        return New-GuardResult -Id 'formatidentity' -Title '格式身份单一入口（规则 23）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    # ① UI 侧唯一允许直接问「扩展名 → 格式」的位置（它自己应委派 ResolveReaderFormat）。
+    #    其他调用点一律违规：分卷 / SFX 路径只看扩展名会被判成 Zip（KI-017 事故）。
+    $allowedRelative = 'src/MantisZip.UI.Avalonia/Models/ArchiveFormatHelper.cs'
+    $factoryCalls = 0
+    $files = Get-ChildItem -LiteralPath $uiDir -Recurse -Filter *.cs -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+
+    foreach ($file in $files) {
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+        $text = [System.IO.File]::ReadAllText($file.FullName)
+        foreach ($match in [regex]::Matches($text, 'ArchiveEngineFactory\.GetFormatByExtension\s*\(')) {
+            $factoryCalls++
+            if ($relative -eq $allowedRelative) { continue }
+            $line = Get-LineNumber -Text $text -Index $match.Index
+            $issues.Add("$relative`:$line 直接调 GetFormatByExtension —— 分卷(.001/.z01/.r00)与 SFX 会被判成 Zip（KI-017：预览/双击/缩略图报 Failed to locate the Zip Header）→ 改 ArchiveFormatHelper.GetFormat")
+        }
+    }
+
+    # ② 单一入口本身必须还在委派（拆掉它 = 全仓退回扩展名直判，且构建不报错）
+    $helperPath = Join-Path $RepoRoot $allowedRelative
+    if (Test-Path -LiteralPath $helperPath) {
+        $helperText = [System.IO.File]::ReadAllText($helperPath)
+        if ($helperText -notmatch 'ArchiveEngineFactory\.ResolveReaderFormat\s*\(') {
+            $issues.Add("$allowedRelative 的 GetFormat 未委派 ArchiveEngineFactory.ResolveReaderFormat（格式身份单一入口被拆掉）")
+        }
+    }
+    else {
+        $issues.Add("读不到 $allowedRelative")
+    }
+
+    # ③ 解析器必须仍然处理分卷与 SFX 两条（少了任一条都会静默退回 Zip）
+    $factoryPath = Join-Path $RepoRoot 'src/MantisZip.Core/Abstractions/ArchiveEngine.cs'
+    if (Test-Path -LiteralPath $factoryPath) {
+        $factoryText = [System.IO.File]::ReadAllText($factoryPath)
+        if ($factoryText -notmatch 'public static ArchiveFormat ResolveReaderFormat\s*\(') {
+            $issues.Add("src/MantisZip.Core/Abstractions/ArchiveEngine.cs 缺 ResolveReaderFormat（有效格式入口被删）")
+        }
+        else {
+            if ($factoryText -notmatch 'TryGetVolumeBase') {
+                $issues.Add("ResolveReaderFormat 未处理分卷（缺 TryGetVolumeBase 分支）→ 分卷会退回扩展名判成 Zip")
+            }
+            if ($factoryText -notmatch 'SfxProbe\.TryGetPayloadFormat') {
+                $issues.Add("ResolveReaderFormat 未处理 SFX（缺 SfxProbe.TryGetPayloadFormat 分支）→ SFX 会退回扩展名判成 Zip")
+            }
+        }
+    }
+    else {
+        $issues.Add("读不到 src/MantisZip.Core/Abstractions/ArchiveEngine.cs")
+    }
+
+    # ④ 分卷解析成 SevenZip 之后 CanAdd/CanDelete(SevenZip) 都是 true —— 增删入口必须另按分卷位拦一次，
+    #    否则「打开分卷包」会变成「往多卷集里写」（7z.dll 不支持原地更新多卷集）。
+    $vmPath = Join-Path $RepoRoot $GUARD_FILES.mainViewModel
+    if (Test-Path -LiteralPath $vmPath) {
+        $vmText = [System.IO.File]::ReadAllText($vmPath)
+        $hasVolumeFlag = $vmText -match 'IsCurrentVolumeSet\s*=>'
+        if (-not $hasVolumeFlag) {
+            $issues.Add("$($GUARD_FILES.mainViewModel) 缺 IsCurrentVolumeSet —— 分卷集会被当成可写包")
+        }
+        else {
+            $canDeleteBlock = [regex]::Match($vmText, '(?s)public bool CanDeleteEntries\s*=>.*?;')
+            $canAddBlock = [regex]::Match($vmText, '(?s)public bool CanAddEntries\s*=>.*?;')
+            if (-not ($canDeleteBlock.Success -and $canDeleteBlock.Value -match 'IsCurrentVolumeSet')) {
+                $issues.Add("$($GUARD_FILES.mainViewModel) 的 CanDeleteEntries 未拦分卷集（IsCurrentVolumeSet）")
+            }
+            if (-not ($canAddBlock.Success -and $canAddBlock.Value -match 'IsCurrentVolumeSet')) {
+                $issues.Add("$($GUARD_FILES.mainViewModel) 的 CanAddEntries 未拦分卷集（IsCurrentVolumeSet）")
+            }
+        }
+    }
+    else {
+        $issues.Add("读不到 $($GUARD_FILES.mainViewModel)")
+    }
+
+    return New-GuardResult -Id 'formatidentity' -Title '格式身份单一入口（规则 23）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            formatByExtensionCalls = $factoryCalls
+            allowedFile            = $allowedRelative
+        })
+}
+
 function Test-Guards {
     param([string]$RepoRoot, [string]$RelativeLocalizationDir)
 
@@ -1570,6 +1662,7 @@ function Test-Guards {
     $guards.Add((Test-GuardNumericBinding -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardJsonOptions -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardSettingsWiring -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardFormatIdentity -RepoRoot $RepoRoot))
 
     $failed = @($guards | Where-Object { -not $_.ok })
     return [ordered]@{

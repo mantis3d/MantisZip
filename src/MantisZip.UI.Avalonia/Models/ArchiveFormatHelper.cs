@@ -17,10 +17,16 @@ public static class ArchiveFormatHelper
         ArchiveEngineFactory.GetEngineByExtension(path) != null;
 
     /// <summary>
-    /// 获取压缩包格式。
+    /// 获取当前路径的**有效格式**（= 哪个读取器会去读它，分卷 / SFX 已解析成 SevenZip）。
     /// </summary>
+    /// <remarks>
+    /// UI 里 <c>_currentFormat</c> 及其全部下游（预览、双击打开、缩略图、固实守卫、代码页、注释、
+    /// 「压缩后大小」列、会话密码缓存键）都建立在它之上，所以这里必须走
+    /// <see cref="ArchiveEngineFactory.ResolveReaderFormat"/>：曾经直接调 GetFormatByExtension，
+    /// 导致 <c>1.7z.001</c> 被标成 Zip（2026-11-05，KI-017）。
+    /// </remarks>
     public static ArchiveFormat GetFormat(string path) =>
-        ArchiveEngineFactory.GetFormatByExtension(path);
+        ArchiveEngineFactory.ResolveReaderFormat(path);
 
     /// <summary>
     /// 「打开压缩包」对话框的筛选模式 —— 由设置里「文件类型关联」列表的**右列**（打开展示）派生。

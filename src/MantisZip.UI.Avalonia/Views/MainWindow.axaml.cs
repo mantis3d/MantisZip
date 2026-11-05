@@ -1349,7 +1349,9 @@ public partial class MainWindow : Window
             }
 
             var engine = ArchiveEngineFactory.GetEngineByExtension(vm!.CurrentArchivePath!);
-            bool canAdd = engine?.CanAdd(ArchiveFormatHelper.GetFormat(vm.CurrentArchivePath!)) == true;
+            // 分卷集不能追加条目（IsCurrentVolumeSet）：有效格式已解析成 SevenZip，光看 CanAdd 会误判成可写。
+            bool canAdd = !vm.IsCurrentVolumeSet
+                && engine?.CanAdd(ArchiveFormatHelper.GetFormat(vm.CurrentArchivePath!)) == true;
             if (canAdd)
             {
                 e.DragEffects = DragDropEffects.Copy;

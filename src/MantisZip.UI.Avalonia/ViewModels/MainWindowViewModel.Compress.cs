@@ -68,6 +68,10 @@ public partial class MainWindowViewModel : ObservableObject
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
         if (engine == null) return false;
 
+        // 分卷包只读：7z.dll 能串卷解压，但不支持往多卷集里追加条目。
+        // 入口按钮与拖拽覆层已按 IsCurrentVolumeSet 禁用，这里再兜底一次（快捷键 / 自动化会绕过按钮状态）。
+        if (IsCurrentVolumeSet) return false;
+
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
         var completed = await RunWithProgress(
@@ -133,7 +137,8 @@ public partial class MainWindowViewModel : ObservableObject
 
         // 只读格式（tar/gz…）不支持删除：入口按钮已按 CanDeleteEntries 禁用，这里再兜底一次，
         // 防止命令经快捷键 / 自动化等路径绕过按钮状态被触发。
-        if (!engine.CanDelete(_currentFormat)) return;
+        // 分卷集同理（CanDelete(SevenZip) 虽是 true，但多卷集不能原地更新）。
+        if (IsCurrentVolumeSet || !engine.CanDelete(_currentFormat)) return;
 
         // 删除目录带递归语义（引擎按「条目本身 + 其下全部子条目」匹配），故确认框必须先把影响面
         // 算清楚：只写「删除此项？」会让用户以为只删掉一个空目录行。

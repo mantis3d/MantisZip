@@ -6,6 +6,23 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-05** — 修复：分卷包 / 自解压 exe 的预览、双击打开、缩略图全部报「Zip Header 找不到」（KI-017）
+  - **起因**：用户修完加密分卷解压后追问「别处会有类似问题吗」，审计「格式判定」这条线时发现同一根因的第二个受害者 —— 引擎路由正确、**格式身份错误**。
+  - **现象与证据**（`E:\share\2026\zp\ttt\b\1.7z.001`，探针 `C:\Users\Admin\AppData\Local\Temp\mzprobe` mode `prev`）：`ArchiveEntryExtractor.ExtractHeadAsync(..., ArchiveFormat.Zip, "xxxx")` → `ArchiveException: Failed to locate the Zip Header`（64ms）；`ExtractEntryAsync` 同一异常（3ms）；同一入口改传 `ArchiveFormat.SevenZip` → head 103B / entry 103B 均成功。即**预览、双击打开（`OpenEntryWithDefaultAppAsync`）、内容缩略图（`ThumbnailService`）对分卷包是坏的**，用户只测了解压所以没踩到。
+  - **根因**：`MainWindowViewModel.cs:1715` 的 `_currentFormat = ArchiveFormatHelper.GetFormat(path)` → `ArchiveEngineFactory.GetFormatByExtension(path)` 纯按 `Path.GetExtension` 查表，`.001` / `.z01` / `.r00` / `.part1.rar` 这类**不是格式名**的扩展名落到 `_ => ArchiveFormat.Zip` 默认分支（该默认是「载荷兜底」，对 `.exe` 之外的写法没有意义），而 `GetEngineByExtension` 另有分卷特判、`ResolveDispatchFormat` 另有 SFX 特判 ⇒ 全仓**三套事实源**。连带失效：`IsCurrentSevenZipSolid`（固实包本该跳过缩略图）、`EditComment`（对 7z 分卷调 `ZipCommentHelper.WriteComment` 抛 `ZIP EOCD signature not found`）、`CanChangeNameEncoding` / `EncodingInfo`（7z.dll 读的条目名不走代码页）、`GetCompressedSizeAvailable`（显示恒 0 的列）、会话密码缓存键。
+  - **改法**：① Core 新增 `ArchiveEngineFactory.ResolveReaderFormat(filePath)`（`src/MantisZip.Core/Abstractions/ArchiveEngine.cs`，语义 =「谁能读这个路径」而不是「里面装的是什么」）：分卷先 `ArchiveVolumeSet.TryGetVolumeBase` 取基名，基名是 Zip / 7z / Rar ⇒ `SevenZip`（7z.dll 是唯一能读多卷的），基名是别的（如 `pack.tar.001`）⇒ 按基名返回；然后只对**目录里没有的扩展名**探 `SfxProbe.TryGetPayloadFormat`（`.exe` 等 SFX ⇒ `SevenZip`），末行回落 `GetFormatByExtension`。② `ArchiveFormatHelper.GetFormat` 改为委派它 ⇒ 一次修好 `_currentFormat` 的全部下游。③ 分卷改成 `SevenZip` 后 `CanAdd` / `CanDelete` 会返回 true，新增 `MainWindowViewModel.IsCurrentVolumeSet`（`ArchiveVolumeSet.HasVolumeSuffix`）拦住「添加文件」/「删除条目」/ 拖入添加覆层（`MainWindow.axaml` 的按钮 `IsEnabled` 改绑 `CanAddEntries`），避免把「只读」变成「可写」的新入口。④ `ExtractFlow.CanSeedEntries` 与 `SevenZipEngine.ListEntriesAsync` 的直判点同步改走分卷基名（后者修 ISO 加密误标、前者修 `pack.tar.001` 绕过「TAR 不播种」）。
+  - **测试**：新增 `tests/MantisZip.Tests/Utils/ReaderFormatResolutionTests.cs` 20 例（8 种分卷命名 → `SevenZip`、`pack.tar.001` → `Tar`、普通 `.zip/.jar/.7z/.rar/.iso/.tar/.tar.gz/.tgz`、PKZIP 跨卷末卷 `.zip`、`setup.exe`（MZ + 7z 签名）、`mystery.dat` 载荷兜底、分卷「引擎路由 ↔ 格式身份」一致性；不依赖 7z.dll，CI 会跑）；新增 `tests/MantisZip.Tests/Engines/SplitVolumeSevenZipEnginePreviewTests.cs` 3 例（`vol-01-7z-split.001` 的 `note1.txt` 头部预览、`payload.bin` 整条提取 262144B、`vol-03.zip.001` 单条提取；无 7z.dll 跳过）。
+  - **防复发**：`-Task guards` 新增 `formatidentity`（UI 目录里 `GetFormatByExtension(` 只许出现在 `ArchiveFormatHelper.cs`、该文件必须委派 `ResolveReaderFormat`、`ResolveReaderFormat` 必须同时含 `TryGetVolumeBase` 与 `SfxProbe`、`CanAddEntries` / `CanDeleteEntries` 必须含 `IsCurrentVolumeSet`），`docs/MAINTENANCE.md` §3/§4/§5 同步为九条。
+  - **验证**：`build -Target avalonia` 0 警告；`test -Target tests` 全绿（新增 23 例真跑通过）；`test -Target ui-tests` 45.2s 0 警告；`-Task guards` 9 项全绿。
+
+**2026-11-05** — 功能：密码默认显示设置扩展到所有密码输入框
+  - **起因**：用户希望所有密码输入框的「明文显示」初始状态都能在设置里切换。设置页已有「默认显示密码」（`AppSettings.PasswordRevealByDefault`，默认 `false`），但只接了密码库列表（`PasswordManagerWindow.axaml.cs` 的 `LoadPasswords(showPasswords:)`）与进度窗密码徽标 Flyout 两处查看场景，打开/解压密码框、压缩设置密码框、密码库编辑框、已匹配密码提示都还是固定掩码。
+  - **方案取舍**：复用同一个 `PasswordRevealByDefault`，不新增第二个开关 —— 语义都是「密码默认给不给看明文」，两个近义开关会造成「明明开了默认显示、这个框还是掩码」的困惑，也避免新增 `AppSettings` 字段触发设置项接线守卫。
+  - **改法**：① `Views/PasswordDialog.axaml.cs` 构造时按设置初始化 `_isRevealed` 并调 `ApplyRevealState()`（同时切 `PasswordChar` 与 `RevealEyeIcon.Data`），删掉选中已保存密码 / 切「输入新密码」时强制回 `'●'` 的两行；② `Dialogs/CompressSettingsWindow.axaml.cs` 新增 `ApplyPasswordRevealDefault()`，确认密码框补 `x:Name="ConfirmPasswordTextBox"`，`TogglePasswordReveal` 改为按 `PasswordTextBox.PasswordChar == '\0'` 判定并同步两个框及按钮文案；③ `Dialogs/PasswordManagerWindow.axaml.cs` 的 `ResetEditPanel()` 末尾按设置复位 `EditPasswordBox`，新增/编辑/删除共用；④ `Dialogs/MatchedPasswordDialog.axaml.cs` 抽出 `ApplyRevealState()` 控制明暗两段文本与两个眼睛图标；⑤ `Views/SettingsWindow.axaml` 开关下补说明文案，VM 新增 `PwdRevealDefaultHintText` 并在 `OnPropertyChanged` 列表登记；⑥ 清掉 `CompressSettingsViewModel` 中无绑定的 `_isPasswordRevealed` 与 `TogglePasswordReveal` 死代码。
+  - **行为边界**：各窗口在打开时 `AppSettings.Load()`，设置改动对已打开窗口不生效、下次打开生效；👁 仍可临时切换，复制按钮仍始终复制明文；出厂默认保持掩码优先。
+  - **i18n**：新增 `Settings_Pwd_RevealDefault_Hint`（zh-CN / en / zh-TW），1447 key；三份 json 的 UTF-8 BOM 在编辑后曾被剥掉，已用 `UTF8Encoding(true)` 重写恢复（CRLF 不变）。
+  - **验证**：`build -Target avalonia` 0 警告；`-Task i18n` 1447 一致；`-Task guards` 8 项全绿；`ui-tests` 52.0s 全绿（31 条警告为测试项目既有 xUnit 提示）。
+
 **2026-11-05** — 修复：`--extract-smart` 遇到加密文件名压缩包不弹密码框（静默退出）
   - **现象**（用户实测，Directory Opus 按钮 `--extract-smart {allfilepath$}`）：用 `7zG a ... -p"…" -mhe` 生成的包（`-mhe` 不带 `=off` 即加密文件名），右键/第三方文件管理器智能解压**什么都不发生** —— 没有进度窗、没有密码框，进程 1 秒内退出。同一命令对普通 ZIP AES / 仅加密数据的 7z 是正常的（会弹「需要密码」）。
   - **根因**：智能解压要先算目标目录（单根 → 包所在目录；散列 → 包名子目录），这一步在 `TryExtractSmartAsync` 里**先于取密码**执行，且 `ResolveSmartDestCliAsync` 调 `engine.ListEntriesAsync(archivePath)` **没传密码**。加密头的包在列条目时就抛 `SharpSevenZipArchiveException: Invalid archive: open/read error! Is it encrypted and a wrong password was provided?`，被外层 `catch (Exception)` 吞成一行 stderr 后 `return false` —— `PasswordRetryLoop`（真正弹密码框的那段）根本没机会执行。副作用：密码库里已保存的密码也救不了（`ResolveCliPassword` 同样排在结构分析之后）。
@@ -3593,6 +3610,15 @@
 
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
+
+#### v0.5.6 (2026-11-05) 修复：新增 `ArchiveEngineFactory.ResolveReaderFormat` —— 「格式身份」单一入口（KI-017）
+  - **起因**：修完上一节「加密 solid 分卷进不了批量」后复查同一条线，发现分卷闸门是**两处**用了错的键：一处是批量计划里的 `GetFormatByExtension`（上一节已修），另一处是整个 UI 的 `_currentFormat`。
+  - **根因**：`GetFormatByExtension` 纯按扩展名查表，`1.7z.001` 只认得到 `.001`，落到 `_ => ArchiveFormat.Zip`（注释明说这是「载荷兜底」，对 SFX 以外的写法没有意义）；而 `GetEngineByExtension` 有分卷特判、`ArchiveEntryExtractor.ResolveDispatchFormat` 有 SFX 特判 ⇒ **同一个路径有三种「格式」答案**。UI 拿错的答案去调 SharpCompress，分卷包/SFX 的预览与单条提取稳定报 `Failed to locate the Zip Header`。
+  - **改法**：`src/MantisZip.Core/Abstractions/ArchiveEngine.cs` 新增 `public static ArchiveFormat ResolveReaderFormat(string filePath)`，语义 =「谁能读这个路径」：① 分卷（`ArchiveVolumeSet.TryGetVolumeBase` 命中基名）且基名是 Zip/7z/Rar ⇒ `SevenZip`（7z.dll 是唯一能读多卷的读取器），基名是别的（`pack.tar.001`）⇒ 按基名返回；② 扩展名**不在** `ArchiveExtensionCatalog` 里才探 `SfxProbe.TryGetPayloadFormat`（`MZ` + 内嵌 zip/7z/RAR ⇒ `SevenZip`），保证 `GetFormat` 这个高频调用不会每次都读盘；③ 末行回落 `GetFormatByExtension`。`ArchiveFormatHelper.GetFormat` 改为委派它（UI 侧因此只剩一个入口），`ExtractFlow.CanSeedEntries` 与 `SevenZipEngine.ListEntriesAsync` 的直判点同步改为「先取分卷基名」——后者顺带修掉 `IsEncrypted` 的 ISO 误标，前者修掉 `pack.tar.001` 绕过「TAR 不播种」的漏洞。
+  - **回归测试**：`tests/MantisZip.Tests/Utils/ReaderFormatResolutionTests.cs` 20 例（8 种分卷命名、`pack.tar.001`、普通 `.zip/.jar/.7z/.rar/.iso/.tar/.tar.gz/.tgz`、PKZIP 跨卷末卷 `.zip`、SFX `.exe`、未知扩展名载荷兜底、分卷「引擎路由 ↔ 格式身份」一致性）；`tests/MantisZip.Tests/Engines/SplitVolumeSevenZipEnginePreviewTests.cs` 3 例用 `tests/corpus/corrupt-archives/` 的分卷语料真跑单条预览与单条提取（无 7z.dll 跳过）。
+  - **防复发**：`-Task guards` 新增 `formatidentity`（禁止 UI 绕过 `ArchiveFormatHelper.GetFormat`、要求 `ResolveReaderFormat` 同时具备分卷锚定与 SFX 探测、分卷只读闸门必须存在），见 `docs/MAINTENANCE.md` §4。
+  - **文档**：`docs/ARCHITECTURE.md` 的「`_currentFormat` classification」段改写为「格式身份 = 谁能读」，并在分卷章节点出新的消费者；`docs/KNOWN_ISSUES.md` 登记 KI-017 并归档。
+  - **验证**：`build -Target core` / `-Target avalonia` 各 0 警告；`test -Target tests` 全绿（新增 23 例真跑通过）；`-Task guards` 9 项全绿。
 
 #### v0.5.6 (2026-11-05) 性能：加密 solid 7z 解压改走批量接口（295s → 3.1s），顺带修掉分卷包进不了批量
   - **起因**（用户报障，`E:\share\2026\zp\ttt\b\1.7z.001`）：5 卷 48MB / 309 文件 / 13 blocks / `LZMA2:25 BCJ 7zAES` / `Solid = +` 的加密分卷包，Bandizip 原地解压约 5s，本应用「几十秒」以上。
