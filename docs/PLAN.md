@@ -160,6 +160,7 @@
 | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 元数据显示位置可选（侧边面板 / 正文区） | [metadata-display-location.md](.omo/plans/未开始/metadata-display-location.md) | 🟢低 | 6-8h | 📋 2026-10-31 用户讨论后定案、待启动。exe 预览正文区只有条目名标题、大片空白，信息全在右侧面板；按类型加「显示位置」，选正文区时「程序信息」搬到正文区竖排渲染、面板只留「文件信息」。**只对没有其它正文内容的格式开放**（当前仅 `pe`），默认侧边面板、老配置不动 |
+| 解压时同时解开内层压缩包（递归嵌套解压） | [nested-archive-extract.md](.omo/plans/未开始/nested-archive-extract.md) | 🟡中 | 16-22h | 📋 2026-11-05 用户逐项定稿、待排期。内层包解到同名子目录（原包保留）、递归可配深度默认 3（1-10）、只认 `.zip/.7z/.rar/.tar/.gz/.tgz/.tar.gz` 白名单（不做魔数，避开 Office/EPUB）、密码走外层→密码库→弹一次窗、冲突沿用本次策略（`ask` 也弹）、失败跳过并汇总、**5 处入口全覆盖**（对话框 / 三条原地解压 / 拖拽 / CLI）、深度 + 500 包 / 100GB 双硬上限。新增独立 `NestedExtractRunner` + Core 策略/扫描器，不改引擎契约
 
 
 ---

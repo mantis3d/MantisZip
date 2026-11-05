@@ -5,6 +5,13 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-05** — 计划：解压时递归解开内层压缩包（Nested Archive Extraction）设计定稿
+  - **需求**（用户 m00001）：下载/备份常是「套娃」压缩包，外层解完还要手动进目录逐个再解，次数一多就漏。全仓勘察确认此前**没有任何嵌套解压实现**，属全新功能。
+  - **定稿的 9 项决策**（逐项与用户确认）：内层包解到 `<所在目录>\<包名去扩展名>\` 且原包保留；递归可配深度默认 3（1-10）；只认 `.zip/.7z/.rar/.tar/.gz/.tgz/.tar.gz` 扩展名白名单、**不做魔数**（`.docx/.xlsx/.pptx/.epub` 文件头即 ZIP，魔数会把 Office 文档解开铺一地）；内层密码 = 外层密码 → 密码库 → 仍有失败弹一次窗（应用到剩余全部）→ 再失败跳过标记，CLI 不弹窗；内层冲突**沿用本次策略**（`ask` 也弹，不静默降级）；失败跳过但整体仍算成功并在结果里列原因；入口全覆盖（对话框 / 三条原地解压 / 拖拽含「解压选中项到」/ CLI）；开关 = 全局设置（默认关）+ 对话框复选框（本次可改）；深度 + 500 包 / 100GB 双硬上限。
+  - **方案**：不改引擎契约、不塞进 `ExtractService`（拿不到冲突弹窗与密码端口）。新增 Core 纯逻辑 `NestedArchivePolicy`（白名单 / `GetNestedDestination` / `ClampDepth` / 三个常量）与 `NestedArchiveScanner`（`mtime ≥ runStart-2s` + 白名单、排除源包、20 万文件上限），UI 新增独立 `Services/NestedExtractRunner`（复用 `ExtractFlow.ExtractAsync`，端口注入与 `ExtractSession` 同款）。接线 5 处：`ExtractSession.cs:296`（对话框 / CLI `--extract` / 拖拽兜底 / 双击）、`ExtractFlow.cs:73`（拖拽直投 + 右键选中项）、`MainWindowViewModel.Extract.cs:61/108/342`（三条 legacy）、`App.CliExtract.cs:639/859`（CLI 直解）。
+  - **计划文档**：[nested-archive-extract.md](.omo/plans/未开始/nested-archive-extract.md)（16-22h，三阶段交付）；已按规则 1 登记进 `docs/PLAN.md` B 档。**未排期**（A 档 v0.5.5–v0.5.10 已满编），产品代码落 `alpha`。
+  - **本次未改产品代码**（`plans` 分支，规则 19）。
+
 **2026-11-04** — 功能：进度窗口「冲突时:」实时策略 + 原地解压修复（v0.5.7 第一项）
   - **需求**：跑批时才发现「文件已存在」弹窗一个接一个，或选错了「跳过 / 覆盖」，只能取消重来。目标是把冲突策略做成**运行中可改**的控件，改完对之后的冲突立即生效。
   - **Core（唯一改动）**：`ArchiveOptions.ConflictActionProvider`（`Func<FileConflictAction>?`）。优先级：provider → 静态 `ConflictAction` → `Overwrite`；`FileConflictHelper.ResolvePath` / `ResolvePathAsync` 每个冲突都重新调用 provider，因此运行期改值立刻可见。provider 为 null 时与引入前逐字节一致。
