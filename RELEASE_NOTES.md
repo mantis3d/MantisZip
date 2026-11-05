@@ -41,6 +41,12 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Smart extract no longer fails silently on archives with encrypted file names** — a 7z created with `7z -mhe` (encrypted file names) or a RAR with encrypted names used to do nothing at all from the "Smart extract here" context menu or `--extract-smart`: no progress window, no password prompt, the process just exited. It now asks for the password and carries on; passwords already saved in the password manager work too.
 
+**性能 / Performance**
+
+- **加密 7z 解压快了几十倍** — 带密码的 7z（含 `.001` 分卷包）此前逐个文件解、每个文件都要重新解一遍整块数据，48 MB / 309 个文件要跑几分钟；现在整包一次解码，同样的包约 3 秒，与 Bandizip 同量级。选中部分文件解压同样受益。
+
+- **Password-protected 7z extraction is now many times faster** — a password-protected 7z (including `.001` split sets) used to be unpacked one file at a time, re-decoding the whole solid block for every file, so 48 MB across 309 files took minutes; the archive is now decoded in one pass, about 3 seconds for the same set — on par with Bandizip. Extracting only selected files benefits as well.
+
 ## v0.5.5
 
 ### 文件说明 / File Description

@@ -3594,6 +3594,18 @@
 ## 共享层（Core / ShellExt / 构建）
 这些变更影响两项目共用代码，按时间从新到旧排列。
 
+#### v0.5.6 (2026-11-05) 性能：加密 solid 7z 解压改走批量接口（295s → 3.1s），顺带修掉分卷包进不了批量
+  - **起因**（用户报障，`E:\share\2026\zp\ttt\b\1.7z.001`）：5 卷 48MB / 309 文件 / 13 blocks / `LZMA2:25 BCJ 7zAES` / `Solid = +` 的加密分卷包，Bandizip 原地解压约 5s，本应用「几十秒」以上。
+  - **根因一：加密闸门**。`SevenZipEngine.BuildBulkPlanAsync` 有 `if (hasEncrypted || !string.IsNullOrEmpty(password)) return null;`（计划 §5.10 原文「批量接口在加密 solid 上的密码行为未验证，收益不确定、风险不对称」），加密包因此永远退回逐条目 `ExtractFile` —— solid 包每解一个条目都要重解整块，成本随条目在流中的位置线性增长：探针采样 24 条跨包均匀文件，平均 1109ms/条（103B 的小文件也要 47ms、包尾 15KB 的 1865ms），外推 309 条 **343s**；实跑逐条目 **295–400s**。
+  - **根因二：分卷格式判定**。同方法的格式闸门用 `ArchiveEngineFactory.GetFormatByExtension(archivePath)`，`1.7z.001` 只认得到 `.001`，落到 `_ => ArchiveFormat.Zip` 默认分支 ⇒ **连非加密分卷包也走不进批量**（计划期夹具都是单卷 `.7z`，没人踩到）。只改加密闸门时实测仍 295s，正是被这一条拦住。
+  - **改法**（`src/MantisZip.Core/Engines/SevenZipEngine.cs`）：① 删掉加密闸门，只保留 `options?.ErrorResolver != null` 与 `!extractor.IsSolid`；② 格式判定改为 `ArchiveVolumeSet.TryGetVolumeBase(archivePath, out var base, out _) ? base : archivePath` 再配 `SfxProbe.TryGetPayloadFormat` 优先；③ 选中解压 `CanUseBulk()` 同步删掉 `password == null` 与 `!selectedFiles.Any(e => e.Encrypted)`，现为 `EnableBulkSolidExtract && IsSolid && ErrorResolver == null && 选中非目录条目 ≥ 2`。
+  - **放开前的三项验证**（同包探针）：① 批量**覆盖**目标已存在文件（6B 占位 → 9431B 归档大小）；② 同 solid 块的**未选中**条目也会触发 `FileExtractionFinished`（选中 10 条、finished 事件 24 个）⇒ 引擎 `indexMap.TryGetValue` 过滤必须保留（两个入口都已具备）；③ 错误密码时批量与逐条目抛**完全相同**的异常（`ExtractionFailedException: ... File is corrupted. Data error has occured.`，HResult 0x80131500）⇒ 用户体验不变。
+  - **实测**（走产品代码 `SevenZipEngine.ExtractAsync` / `ExtractEntriesAsync`）：全量 309 文件 **3095ms**（succeeded=309、failed=0、缺失 0、大小不符 0、Completed 事件 309）；选中 60/309 条 **2210ms**（落盘 60、暂存目录已清）。同机 Bandizip ≈5s。
+  - **回归测试**：新增 `tests/MantisZip.Tests/Engines/SevenZipEngineEncryptedBulkExtractTests.cs` 3 例（夹具现场用 7z.dll 造 30+30 条加密 solid 包，无 7z.dll 则跳过）—— 全量解出且逐条目状态一条不落、`Skip` 冲突策略保留既有文件、选中解压只落选中条目且暂存目录清空。类名带 `SevenZipEngine` 以沿用 CI 的 `FullyQualifiedName!~SevenZipEngine` 过滤。
+  - **已知遗留（既有行为，未修）**：错误密码的异常消息含 `data error`，`src/MantisZip.UI.Avalonia/Services/ArchiveService.cs:29` 的 `IsPasswordRelatedError` 据此判成「文件损坏」而不走 `PasswordRetryLoop`——逐条目时代同样如此，与本次改动无关，已登记为 **KI-016**。
+  - **文档**：`docs/ARCHITECTURE.md` §7z solid 批量解压分流 的分流条件表、覆盖范围表同步（删「无密码且无加密条目」，补分卷基名判定与加密放开的验证结论）；计划 `.omo/plans/已完成/sevenzip-solid-extract-batch.md` 的 §5.10 / §12 / §13 回填 + 新增「后续：加密 solid 放开（2026-11-05）」记录段。
+  - **验证**：`build -Target core` / `build -Target avalonia` 各 0 警告；`test -Target tests` 全绿（仅 2 条存量警告）；`test -Target ui-tests` 42.5s 全绿；新增 3 例单独跑 `--filter` 全绿（239/382/411ms，确认真跑了而非跳过）。
+
 #### v0.5.5 (2026-10-31) `PeParser` 修正 PE32+ 可选头偏移与版本资源块对齐
   - **触发**：issue #74（exe 预览标题是临时文件名 + 信息太少）排查中发现 64 位 exe 的版本资源整体读不到。
   - **PE32+ 偏移**：`Subsystem` `opt+72` → `+68`、`NumberOfRvaAndSizes` `opt+112` → `+108`、DataDirectory 基址 `+116` → `+112`（PE32 分支不变）。错误偏移让资源目录 RVA 恒为 0，版本资源无从读起，子系统还会读到 `SizeOfStackReserve` 低字节。

@@ -302,7 +302,14 @@ catch (Exception ex) {
 
 ### 5.10 加密
 
-`password != null` 或存在加密条目时**不走批量**（保持今天路径）。理由：批量接口在加密 solid 上的密码行为、加密头处理与逐条目不同，收益不确定、风险不对称；加密包文件数通常不多。后续可用真实加密 solid 包测量后另行放宽（记入 §12 复评）。
+**2026-11-05 复评后放开**：`password != null` 或存在加密条目现在**照常走批量**。
+
+- **实测（48MB / 309 文件 / 13 blocks 的加密 solid 分卷 7z，密码非空）**：`new SevenZipExtractor(path, password)` + `ExtractFiles(dir, indexes)` 一次解码 **4.2s**；同一包逐条目 `ExtractFile` 累计 **295–343s**（单文件成本随条目在 solid 流中的位置递增，与文件大小无关）。走产品代码端到端：`SevenZipEngine.ExtractAsync` 295s → **3.1s**，`ExtractEntriesAsync`（60/309 条）**2.2s**。
+- **放开前的三项验证**：① 批量**覆盖**目标目录已存在文件（6B 占位 → 9431B 归档大小）；② 同 solid 块的**未选中**条目也会触发 `FileExtractionFinished`（选中 10 条、finished 事件 24 个）⇒ `indexMap` 过滤必须保留；③ 错误密码时批量与逐条目抛**完全相同**的 `ExtractionFailedException: ... File is corrupted. Data error has occured.`。
+- **同时修掉一条隐藏闸门**：`BuildBulkPlanAsync` 用 `GetFormatByExtension(archivePath)` 判格式，`.001` 分卷包被判成 `Zip`（`_ => ArchiveFormat.Zip` 默认分支）⇒ **加密与非加密分卷包此前都走不进批量**。改为先 `ArchiveVolumeSet.TryGetVolumeBase` 取基名再判。
+- 仍保留的拦截：`options?.ErrorResolver != null`、`!extractor.IsSolid`、`ExtractEntriesAsync` 额外的「选中非目录条目 ≥ 2」。无密码的加密包不会走到批量（`ExtractAsync` 更早处已抛 password required）。
+- 回归测试：`tests/MantisZip.Tests/Engines/SevenZipEngineEncryptedBulkExtractTests.cs` 3 例（全量解出 + 逐条目状态、Skip 策略、选中解压 + 暂存清理）。
+- **遗留（既有行为，未修）**：错误密码的异常消息含 `data error`，`ArchiveService.IsPasswordRelatedError`（`src/MantisZip.UI.Avalonia/Services/ArchiveService.cs:29`）据此判成「文件损坏」而不走 `PasswordRetryLoop`。与批量放开无关（逐条目同样如此），已登记 **KI-016**。
 
 ## 6. 已拍板的决策（含理由）
 
@@ -423,11 +430,13 @@ catch (Exception ex) {
 - `docs/KNOWN_ISSUES.md`：登记「ZIP 并行写 HDD 未做并发节流」（阻塞类型 = 成本超阈值，复评 = 出现 HDD 用户反馈）
 - issue #75 回复：附修复前后实测数据与「非 solid 不变 / 加密暂不优化」的边界说明（等用户确认后再回复）
 
+> **2026-11-05 更新**：上面最后一条的「加密暂不优化」已作废 —— 加密 solid 包已实测并放开（见 §5.10 与文末「后续：加密 solid 放开」）。
+
 ## 13. 后续可评估（不在本计划）
 
 1. RAR/ISO 是否也能走批量（需测 solid 性与块结构）
 2. ZIP 并行解压的 HDD 节流（`IOCTL_STORAGE_QUERY_PROPERTY` → `StorageDeviceSeekPenaltyProperty`；或 WMI `MSFT_PhysicalDisk.MediaType`），目标：`ParallelExtractDegree` 在 seek penalty 高的盘上自动降到 1–2
-3. 加密 solid 包批量解压（先测 `ExtractFiles(dir, indexes, password)` 的重载行为）
+3. ~~加密 solid 包批量解压（先测 `ExtractFiles(dir, indexes, password)` 的重载行为）~~ → **2026-11-05 已完成**，见 §5.10 与文末记录
 4. 小文件聚合写（仅当批量路径落地后仍有写放大问题才考虑）
 
 ## 14. 实施记录（2026-11-02）
@@ -461,3 +470,20 @@ catch (Exception ex) {
 改法：ArchiveProgress 增加 StagedFiles / StagedBytes；选中路径改为**半格制**（解码 +0.5、落地 +0.5，逐条目仍 +1）；三段回调统一按 indexMap 过滤；主进度加高水位钳位；扫描比移到 FilePercentComplete。UI 侧「进度窗口 → 完整档」新增「暂存」统计卡。
 
 回归测试：	ests/MantisZip.Tests/Engines/SevenZipEngineSelectedBulkProgressTests.cs（3 例）与 	ests/MantisZip.UI.Avalonia.Tests/ProgressStagedStatCardTests.cs（3 例）。
+
+## 后续：加密 solid 放开（2026-11-05）
+
+**起因**（用户报障）：`E:\share\2026\zp\ttt\b\1.7z.001`（密码非空，5 卷 48MB / 309 文件 / 13 blocks / `LZMA2:25 BCJ 7zAES`，`Solid = +`）用 Bandizip 原地解压约 5s，本应用「几十秒」以上。
+
+**根因（两条闸门叠加）**：
+1. `BuildBulkPlanAsync` 原闸门 `if (hasEncrypted || !string.IsNullOrEmpty(password)) return null;` —— 加密包永远退回逐条目，solid 每文件重解整块，成本随条目位置线性增长。
+2. 同方法用 `ArchiveEngineFactory.GetFormatByExtension(archivePath)` 判格式，`1.7z.001` 只认到 `.001` ⇒ 默认分支 `ArchiveFormat.Zip` ⇒ **连非加密分卷包也进不了批量**（这条此前没人发现，因为计划期的夹具都是单卷 `.7z`）。
+
+**改动**（`src/MantisZip.Core/Engines/SevenZipEngine.cs`）：删除加密闸门（保留 `ErrorResolver` / `IsSolid` 拦截）；格式判定改为 `ArchiveVolumeSet.TryGetVolumeBase(archivePath, out base, out _) ? base : archivePath` + `SfxProbe.TryGetPayloadFormat` 优先；`CanUseBulk()` 同步删除 `password == null` 与 `!Any(e => e.Encrypted)`。
+
+**实测**：逐条目 295–343s → 批量 3.1s（同机 Bandizip ≈5s）；选中 60/309 条 2.2s。批量带密码的解码、覆盖、错误密码异常与逐条目一致（见 §5.10）。
+
+**回归测试**：`tests/MantisZip.Tests/Engines/SevenZipEngineEncryptedBulkExtractTests.cs` 3 例。
+
+**验证**：core / avalonia 构建 0 警告；`tests` 全绿（2 条存量警告）；`ui-tests` 42.5s 全绿。
+

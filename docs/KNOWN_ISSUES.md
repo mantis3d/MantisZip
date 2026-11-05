@@ -39,6 +39,7 @@
 | **KI-013** | 安装包下载 .NET 前的确认框，无法把「取消」按钮文字换成「我会手动安装」 | 交互 / 文案 | 成本超阈值 | #23 再次要求精确文案时；或下次改安装包流程时 | 阻塞中 |
 | **KI-014** | 内嵌选择器的「系统浏览」按钮是死按钮（压缩窗 / 解压窗点下去毫无反应） | 功能一致性 | 缺决策 | 用户反馈「内嵌选择器点系统浏览没反应」时；或决定内嵌宿主能否复用原生通道时 | 阻塞中 |
 | **KI-015** | `ShowExtractFolderAsync` 已无调用方（连同 `ExtractPickResult` 一起成了死 API） | 技术债 / 死代码 | 缺决策 | 下次动 `CustomFilePickerDialog` 静态入口或解压选目录链路时 | 阻塞中 |
+| **KI-016** | 解压时输错密码被判成「文件损坏」，不弹密码框重试（`data error` 被当作损坏信号） | 交互 / 错误分类 | 缺决策 | 用户反馈「密码输错只提示损坏」时；或决定「解压失败统一走 `QuickVerifyPasswordEx` 二次判定」时 | 阻塞中 |
 
 ---
 
@@ -201,6 +202,16 @@
 - **为什么现在不修**：**缺决策**。删掉要连带清 `ExtractPickResult` 与 `docs/ARCHITECTURE.md` / detail 里的引用；保留则要有人回答「以后还会不会用它」。而本轮改的控件与它无耦合，删除属独立清理动作。
 - **复评条件**：下次动 `CustomFilePickerDialog` 的静态入口，或再改「解压选目录」链路时 —— 一并决定「删入口 + 删 record」还是「接线复用」。
 - **关联**：`docs/progress-avalonia-detail.md` 2026-10-30「解压『选中项到 / 拖拽兜底』改用解压设置窗」条目。
+
+## KI-016 解压时输错密码被判定为「文件损坏」，不弹密码框重试
+
+- **发现**：2026-11-05（放开「加密 solid 走批量」时验证错误密码行为）
+- **现象**：仅加密数据、不加密文件名的 7z/zip，输错密码在**解压阶段**失败，异常消息是 `ExtractionFailedException: Could not extract files! Message: File is corrupted. Data error has occured.`；`ArchiveService.IsPasswordRelatedError` 的 `HasCorruptionSignal` 见到 `data error` 就先返回 false（「损坏优先」），于是 `PasswordRetryLoop.RunAsync` 直接上抛（`Services/PasswordRetryLoop.cs:101`）——用户看到的是**损坏提示**，而不是「密码错误，请重输」的弹框。
+- **证据**：① 探针跑真实产品代码 `new SevenZipEngine().ExtractAsync(1.7z.001, dest, "definitely-wrong")` → 抛上述异常（走新的批量段）；② 同一探针在批量放开**之前**用逐条目 `ExtractFile` 直接解，抛出的异常类型与消息逐字相同（HResult `0x80131500`）⇒ 与批量放开无关，是既有行为；③ 判定链 `src/MantisZip.UI.Avalonia/Services/ArchiveService.cs:29-49`（`HasCorruptionSignal` 含 `"data error"`，见 `:56`）+ `:125`、`Services/PasswordRetryLoop.cs:101`。
+- **为什么现在不修**：**缺决策**。`data error` 同时也是**真损坏包**的唯一信号，把它从「损坏优先」里摘掉就会让真损坏包反复弹密码框（输对了仍失败，还得靠 `QuickVerifyPasswordEx` 兜住，但那已经是第二次弹窗）。合理解法要么在 `Extract` 失败后按 `PasswordService.QuickVerifyPasswordEx` 二次判定再决定是否重弹，要么给 `data error` 加「已有密码且 header 结构完好」的额外条件 —— 两条都改变用户可见流程，不适合在性能修复里顺手改。
+- **影响面**：输错一次密码后只能自己发现、重新走一遍解压流程；不丢数据、不影响正确密码。
+- **复评条件**：① 用户反馈「密码输错后只提示损坏、没有重输机会」时；② 或决定「解压失败是否统一走 `QuickVerifyPasswordEx` 二次判定」时。
+- **关联**：`.omo/plans/已完成/sevenzip-solid-extract-batch.md` §5.10 的「遗留」段；`docs/progress-avalonia-detail.md` 2026-11-05「加密 solid 7z 改走批量」条目。
 
 ## 档案区（已修 / 不会修）
 

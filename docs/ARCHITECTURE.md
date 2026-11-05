@@ -310,21 +310,21 @@ solid 7z 每解一个条目都要重新定位解码块，逐条目 `ExtractFile`
 
 | 条件 | 说明 |
 |---|---|
-| 格式 = `SevenZip` | `SfxProbe.TryGetPayloadFormat` 优先、回落 `GetFormatByExtension`（SFX 的 `.exe` 也会命中） |
+| 格式 = `SevenZip` | `SfxProbe.TryGetPayloadFormat` 优先、回落 `GetFormatByExtension`（SFX 的 `.exe` 也会命中）；**分卷包先经 `ArchiveVolumeSet.TryGetVolumeBase` 取基名再判** —— 2026-11-05 前直接拿 `1.7z.001` 去判，落到 `_ => ArchiveFormat.Zip` 默认分支，整条批量路径对分卷包永久失效 |
 | `extractor.IsSolid` | 非 solid 逐条目本来就快，走批量无收益 |
-| 无密码且无加密条目 | 加密 solid 的批量重载行为未验证 |
 | `options.ErrorResolver == null` | 有 resolver 时必须逐条拿异常上下文 |
 | 可批量条目数 > 0 | 全被跳过/全是大文件时直接退回 |
 
 - **冲突必须提前判定**：批量时段内没有逐条 stat 的机会，`BuildBulkPlanAsync()` 在解压前一次分桶（`Direct` / `Rename` / `BigFile` / `Unsafe` / `Duplicate` / `Skipped` / `Directories`），期间上报 `ArchivePhase.CheckingConflicts`。`Overwrite` 且无 resolver 走零 stat 快路径；`Skip` 不进批量但照旧上报；`Rename` 系策略先批量到目标目录内 `.mantiszip-staging-<guid>` 再逐条 `File.Move`；`Ask` 在预解析阶段问完「应用到全部」后定型。
 - **语义必须保持**：逐条目状态（Completed / Skipped / Overwritten / PermissionDenied / IoFailed）与 `ExtractResult` 计数、`OverwrittenEntries` 都不能因为走批量而变 —— 覆盖计数依赖 `BulkEntryPlan.WasExisting`（预解析时的一次 `File.Exists`），**不要删掉这次探测**。
-- **不要改成一律 bulk**：ZIP/TAR/RAR、加密包、64MB 以上单文件、越界路径、归档内重名条目都必须走逐条目；批量段抛异常时只对未完成条目重试。回退开关 `EnableBulkSolidExtract` 是 `static readonly`（写 `const` 会让关闭分支被判不可达 CS0162）。
+- **加密包也走批量（2026-11-05 放开）**：`BuildBulkPlanAsync` / `CanUseBulk()` 不再因 `password != null` 或存在加密条目退回逐条目。48MB / 309 文件加密 solid 分卷包实测 295s → 3.1s（`ExtractFiles` 带密码构造 extractor 即工作正常）。放开前已验证三件事：① 批量确实覆盖已存在文件；② 同 solid 块的**未选中**条目也会触发 `FileExtractionFinished` ⇒ `indexMap` 过滤必须保留；③ 错误密码时逐条目与批量抛的异常类型/消息完全相同，用户体验不变。无密码的加密包不会走到这里（`ExtractAsync` 前面已抛「password required」）。
+- **不要改成一律 bulk**：ZIP/TAR/RAR、64MB 以上单文件、越界路径、归档内重名条目都必须走逐条目；批量段抛异常时只对未完成条目重试。回退开关 `EnableBulkSolidExtract` 是 `static readonly`（写 `const` 会让关闭分支被判不可达 CS0162）。
 - **覆盖范围**：全量解压（`ExtractAsync`）与选中条目 / 拖拽解压（`ExtractEntriesAsync`）两个入口都走同一条批量思路，区别如下。
 
 | | `ExtractAsync`（全量） | `ExtractEntriesAsync`（选中 / 拖拽） |
 |---|---|---|
 | 落点 | 归档内相对布局，可直接落到目标目录 | 调用方 `outputPathOverrides` 逐个算好（扁平化 / 保留完整路径 / 重命名），**必须**先解码到暂存目录再按 override 移动 |
-| 批量闸门 | `IsSolid` 且无密码 / 无加密条目 / 无 `ErrorResolver` | 再额外要求选中非目录条目 ≥ 2（为 1 条建暂存不划算） |
+| 批量闸门 | `IsSolid` 且无 `ErrorResolver`（加密不挡，见上） | 再额外要求选中非目录条目 ≥ 2（为 1 条建暂存不划算） |
 | 分桶 | `Direct` 段直接落地，`Rename` 走暂存 | `Direct` 段**全部**走暂存，逐条 `File.Move(overwrite: true)` 后计数 |
 | 进度单位 | 文件计数 / 字节比取 max | `unitsDone`（跳过 / 失败 / 已解码待移动 / 已移动 / 逐条目各 1），解码期间百分比不冻结 |
 
