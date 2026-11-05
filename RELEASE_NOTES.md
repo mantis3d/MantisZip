@@ -35,6 +35,12 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Adjustable thumbnail cards** — Settings → Appearance → Thumbnails exposes three options that apply immediately: a card border (off by default, handy for white-background images on light surfaces), whether transparent images get a solid backdrop (transparency is kept by default; the backdrop colour is pickable), and the thumbnail size in three steps (96 / 128 / 160 px)
 - ![设置 → 外观 → 缩略图：外边框 / 垫底色 / 尺寸三档](docs/images/version/v0.5.6/ThumbnailCardSettings.png)
 
+**修复 / Fixes**
+
+- **加密文件名的压缩包智能解压不再静默失败** — 用 `7z -mhe`（加密文件名）生成的 7z 或 RAR，右键「智能解压到此处」或命令行 `--extract-smart` 此前什么都不发生：没有进度窗、也没有密码框，进程直接退出。现在会正常弹出密码框，输对后继续解压；密码库里已保存的密码同样生效。
+
+- **Smart extract no longer fails silently on archives with encrypted file names** — a 7z created with `7z -mhe` (encrypted file names) or a RAR with encrypted names used to do nothing at all from the "Smart extract here" context menu or `--extract-smart`: no progress window, no password prompt, the process just exited. It now asks for the password and carries on; passwords already saved in the password manager work too.
+
 ## v0.5.5
 
 ### 文件说明 / File Description

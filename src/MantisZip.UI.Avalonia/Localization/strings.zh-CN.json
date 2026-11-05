@@ -1110,6 +1110,7 @@
   "Settings_Preview_Text_TextPreview": "启用文本预览",
   "Settings_Preview_Text_UnitMB": "MB",
   "Settings_Pwd_RevealDefault": "默认显示密码",
+  "Settings_Pwd_RevealDefault_Hint": "作用于密码库、匹配密码提示和所有密码输入框的初始状态；仍可用 👁 按钮临时切换。",
   "Settings_Pwd_ShowNotification": "显示密码匹配通知",
   "Settings_Save": "保存",
   "Settings_Tab_Appearance": "外观",

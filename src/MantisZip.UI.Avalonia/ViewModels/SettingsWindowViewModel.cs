@@ -1202,6 +1202,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     // ── Password strings ──
     public string PwdShowNotificationText => LocalizationManager.T("Settings_Pwd_ShowNotification");
     public string PwdRevealDefaultText => LocalizationManager.T("Settings_Pwd_RevealDefault");
+    public string PwdRevealDefaultHintText => LocalizationManager.T("Settings_Pwd_RevealDefault_Hint");
 
     // ── File Assoc strings ──
     public string FileAssocDescText => LocalizationManager.T("Settings_Assoc_Desc");
@@ -1880,6 +1881,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ThumbnailSizeHelpText));
         OnPropertyChanged(nameof(PwdShowNotificationText));
         OnPropertyChanged(nameof(PwdRevealDefaultText));
+        OnPropertyChanged(nameof(PwdRevealDefaultHintText));
         OnPropertyChanged(nameof(FileAssocDescText));
         OnPropertyChanged(nameof(FileAssocSelectAllText));
         OnPropertyChanged(nameof(FileAssocDeselectAllText));

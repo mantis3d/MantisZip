@@ -1110,6 +1110,7 @@
   "Settings_Preview_Text_TextPreview": "啟用文字預覽",
   "Settings_Preview_Text_UnitMB": "MB",
   "Settings_Pwd_RevealDefault": "預設顯示密碼",
+  "Settings_Pwd_RevealDefault_Hint": "作用於密碼庫、符合密碼提示和所有密碼輸入框的初始狀態；仍可用 👁 按鈕臨時切換。",
   "Settings_Pwd_ShowNotification": "顯示密碼符合通知",
   "Settings_Save": "儲存",
   "Settings_Tab_Appearance": "外觀",

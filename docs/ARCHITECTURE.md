@@ -809,9 +809,17 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 `ArchiveStructureAnalyzer`（Core/Utils）分析压缩包结构，决定智能解压直接解到当前目录还是子目录：
 
 - 扫描顶层条目：若 ≥60% 共享同一根目录 → 带子目录解压；否则直接解压
-- 由 `ArchiveEngineFactory.SmartExtractEntriesAsync` 调用分析器后带计算出的目标路径委托 `ExtractAsync`
+- 目标目录由调用方先算好再交给引擎 `ExtractAsync`：主窗口 `MainWindowViewModel.SmartExtract`（条目已在浏览时加载、密码在会话缓存里）；CLI `App.ResolveSmartDestWithPasswordAsync`（`App.CliExtract.cs`）
 
 触发入口：`--extract-smart` CLI 或右键「智能解压」。
+
+**反直觉实现（删掉会复发）**：CLI 智能解压的**结构分析必须先拿到密码**，且 `ListEntriesAsync` 必须把密码传下去。
+加密文件名的包（7z `-mhe=on`、RAR 加密文件名）不提供密码连条目都列不出来 —— 若像以前那样「先列目录算目标目录、后取密码」，
+异常会被外层 `catch` 吞成一行 stderr、进程直接退出，用户既看不到进度窗也看不到密码框（2026-11-05 修复）。
+现在 `TryExtractSmartAsync` 先 `ResolveCliPassword`（密码库匹配），再由 `ResolveSmartDestWithPasswordAsync`
+（复用 `PasswordRetryLoop`）在密码类异常时弹密码框、输对后重试结构分析，并把最终密码回传给解压阶段（否则解压时会再弹一次）。
+另：密码框是本路径**第一个 Avalonia 窗口**（早于进度窗），必须给它挂 `NativeSplash.Hook` 并显式 `Hide()`
+—— 原生 splash 是 `WS_EX_TOPMOST`，不挂 Hook 会一直压在密码框上方（2026-11-05 同日修复）。
 
 ### UI 样式与注释约定（细节）
 

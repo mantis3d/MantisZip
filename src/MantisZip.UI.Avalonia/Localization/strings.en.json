@@ -1110,6 +1110,7 @@
   "Settings_Preview_Text_TextPreview": "Enable text preview",
   "Settings_Preview_Text_UnitMB": "MB",
   "Settings_Pwd_RevealDefault": "Reveal password by default",
+  "Settings_Pwd_RevealDefault_Hint": "Applies to the initial state of the password vault, matched-password hints and all password inputs; you can still toggle with the 👁 button.",
   "Settings_Pwd_ShowNotification": "Show password match notification",
   "Settings_Save": "Save",
   "Settings_Tab_Appearance": "Appearance",

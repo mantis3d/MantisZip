@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-05** — 修复：`--extract-smart` 遇到加密文件名压缩包不弹密码框（静默退出）
+  - **现象**（用户实测，Directory Opus 按钮 `--extract-smart {allfilepath$}`）：用 `7zG a ... -p"…" -mhe` 生成的包（`-mhe` 不带 `=off` 即加密文件名），右键/第三方文件管理器智能解压**什么都不发生** —— 没有进度窗、没有密码框，进程 1 秒内退出。同一命令对普通 ZIP AES / 仅加密数据的 7z 是正常的（会弹「需要密码」）。
+  - **根因**：智能解压要先算目标目录（单根 → 包所在目录；散列 → 包名子目录），这一步在 `TryExtractSmartAsync` 里**先于取密码**执行，且 `ResolveSmartDestCliAsync` 调 `engine.ListEntriesAsync(archivePath)` **没传密码**。加密头的包在列条目时就抛 `SharpSevenZipArchiveException: Invalid archive: open/read error! Is it encrypted and a wrong password was provided?`，被外层 `catch (Exception)` 吞成一行 stderr 后 `return false` —— `PasswordRetryLoop`（真正弹密码框的那段）根本没机会执行。副作用：密码库里已保存的密码也救不了（`ResolveCliPassword` 同样排在结构分析之后）。
+  - **修法**：`TryExtractSmartAsync` 改为**先** `ResolveCliPassword`（密码库匹配），再走新增的 `App.ResolveSmartDestWithPasswordAsync` —— 复用 `PasswordRetryLoop.RunAsync`（`attempt` = 带密码重新列条目算目标目录），密码类异常 → 弹密码框 → `QuickVerifyPasswordEx` 判错则重弹 → 输对后用新密码重试；最终密码回传给解压阶段（否则 `RunCliExtractWithProgressAsync` 会再弹一次）。`ResolveSmartDestCliAsync` 增加 `password` / `ct` 形参并透传给 `ListEntriesAsync`。取消（关窗/取消按钮）→ `PasswordRetryCancelledException` → 静默退出；损坏包仍由 `ArchiveHeaderProbe` 判为非密码类，不弹框。多文件批处理 `RunCliDirectExtractBatchAsync` 同序修正（smart 分支共用新方法，弹窗 owner 解析为当前进度窗）。
+  - **接缝**：`PasswordRetryLoop.RunAsync` 新增可选 `promptPassword`（`Func<string, Task<string?>>`），生产为 null 时仍弹 `PasswordDialog`，测试注入回调即可在无 UI 环境验证「异常 → 取密码 → 重试」整条链路。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/SmartExtractPasswordTests.cs` 5 例（`enc-04-7z-encrypt-headers` / `enc-06-rar-headers-encrypted` 输对密码后成功且只问一次、取消抛 `PasswordRetryCancelledException`、输错一次后重弹且最终密码正确、普通包不弹、`corrupt-08-7z-bad-header` 判损坏不弹）。语料先复制到临时目录再跑（散列结构会创建子目录，避免污染 `tests/corpus`）。
+  - **真机端到端**：`--extract-smart` 跑 `enc-04` / `enc-06` → 出现「需要密码」窗 → 输入 `mantis` → 各解出 14 个文件、进程正常退出；关窗取消 → 静默退出、无残留文件；`valid.7z` → 无弹窗、正常解压。
+  - **splash 遮挡修复（同日追加，用户实测）**：密码框弹在结构分析阶段、早于进度窗，此时进程里没有任何 Avalonia 窗口；原生 splash 是 `WS_EX_TOPMOST`，只在 `NativeSplash.Hook(window)` 的 `Opened` 里才 `Hide()` —— 密码框没登记，于是 splash 一直压在它上方。修法：`PasswordRetryLoop.ShowPasswordDialogAsync` 创建密码框后先 `NativeSplash.Hook(dialog)`（与其他终端窗口同一条收尾：置前 + Hide），再显式 `NativeSplash.Hide()` 消掉弹窗首帧重叠；进度窗已存在的场景 Hide 是幂等 no-op。真机复验：`enc-04` 弹框时 `FindWindow("MantisZipNativeSplash")` 返回 0、截图密码框完整可见，输入 `mantis` 后解出 14 个文件正常退出。
+  - **文档**：`docs/ARCHITECTURE.md` 的 Smart Extract 段补「反直觉实现」说明（结构分析必须带密码），并修掉已失效的 `ArchiveEngineFactory.SmartExtractEntriesAsync` 引用。
+  - **验证**：`build -Target avalonia` 0 警告；`test -Target ui-tests` 全绿（含新增 5 例）；`-Task check`（0.5.6 / 三语 1446 key / 8 条守卫）全绿。
+
 **2026-11-05** — 体验：文件选择器地址区拆两行（按钮行 + 面包屑整宽行）
   - **起因**：11-04 新增「新建文件夹」后地址行有 6 个方形按钮（`ControlHeightMd` 见方 + 2px 间距），面包屑在内嵌 620px 列里只剩 **392px（63%）**（headless 实测 `PathCrumbs.Bounds.Width`），窗口拉到 `MinWidth 900`（左列 520px）时更窄，路径被折成 `E:\ … \Controls`。
   - **改法**：`Controls/CustomFilePickerControl.axaml` 的 Row 0 从「一行 Grid」改成「外层 `StackPanel`（`Spacing=SpacingXxs`）→ 按钮行 `Grid`（`Classes="addrRow"`，列 `Auto,Auto,Auto,Auto,*,Auto,Auto`）→ `PathBreadcrumb` 独占下一行」。按钮行左：后退 / 前进 / 向上 / 系统浏览；右：**新建文件夹 / 添加收藏**（`*` 弹性空列推到行尾，用户指定的位置）。**行索引不动**（`BrowserGrid` / `FileNameArea` / `OptionsRow` 仍是 1/2/3），避免三处 `Grid.Row` 迁移带来的错位风险。

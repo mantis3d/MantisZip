@@ -298,9 +298,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _rulesText = "";
 
-    [ObservableProperty]
-    private bool _isPasswordRevealed;
-
     /// <summary>Filtered list of password library entries.</summary>
     public ObservableCollection<Core.PasswordEntry> FilteredPasswordEntries { get; } = new();
 
@@ -1431,12 +1428,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     private void TogglePasswordMode()
     {
         IsPasswordLibraryMode = !IsPasswordLibraryMode;
-    }
-
-    [RelayCommand]
-    private void TogglePasswordReveal()
-    {
-        IsPasswordRevealed = !IsPasswordRevealed;
     }
 
     [RelayCommand]

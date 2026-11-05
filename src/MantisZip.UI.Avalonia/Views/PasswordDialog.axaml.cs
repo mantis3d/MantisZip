@@ -1,7 +1,9 @@
 using Avalonia.Controls;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using Avalonia.Media;
 using MantisZip.Core;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Views;
@@ -51,10 +53,17 @@ public partial class PasswordDialog : Window
 
     private bool _isUpdatingPasswordSelection;
 
+    /// <summary>当前是否明文显示（初始态取「默认显示密码」设置，之后由 👁 按钮临时切换）。</summary>
+    private bool _isRevealed;
+
     public PasswordDialog()
     {
         InitializeComponent();
         DataContext = this;
+
+        // 初始显示态跟随设置；只决定打开时的状态，不锁死切换。
+        _isRevealed = AppSettings.Load().PasswordRevealByDefault;
+        ApplyRevealState();
     }
 
     public PasswordDialog(string fileName) : this()
@@ -98,7 +107,6 @@ public partial class PasswordDialog : Window
             {
                 _isUpdatingPasswordSelection = true;
                 PasswordBox.Text = entry.Password;
-                PasswordBox.PasswordChar = '●';
                 SavePermanentlyCheck.IsChecked = true;
                 RememberCheck.IsChecked = true;
                 DescTextBox.Text = entry.Description ?? "";
@@ -111,17 +119,21 @@ public partial class PasswordDialog : Window
             // "New password" option selected — clear fields
             _isUpdatingPasswordSelection = true;
             PasswordBox.Text = "";
-            PasswordBox.PasswordChar = '●';
             _isUpdatingPasswordSelection = false;
         }
     }
 
     private void OnRevealToggle(object? sender, RoutedEventArgs e)
     {
-        if (PasswordBox.PasswordChar == '\0')
-            PasswordBox.PasswordChar = '●';
-        else
-            PasswordBox.PasswordChar = '\0';
+        _isRevealed = !_isRevealed;
+        ApplyRevealState();
+    }
+
+    /// <summary>把当前显示态落到密码框与 👁 图标上（初始态与切换共用一处）。</summary>
+    private void ApplyRevealState()
+    {
+        PasswordBox.PasswordChar = _isRevealed ? '\0' : '●';
+        RevealEyeIcon.Data = (Geometry?)this.FindResource(_isRevealed ? "IconEyeOff" : "IconEye");
     }
 
     private void OnRememberChanged(object? sender, RoutedEventArgs e)

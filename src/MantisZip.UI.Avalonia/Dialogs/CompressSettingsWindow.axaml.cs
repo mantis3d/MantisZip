@@ -65,6 +65,7 @@ public partial class CompressSettingsWindow : Window
     public CompressSettingsWindow()
     {
         InitializeComponent();
+        ApplyPasswordRevealDefault();
         ViewModel = new CompressSettingsViewModel(Array.Empty<string>());
         DataContext = ViewModel;
         SubscribeViewModel();
@@ -91,6 +92,7 @@ public partial class CompressSettingsWindow : Window
         _context = context;
 
         InitializeComponent();
+        ApplyPasswordRevealDefault();
 
         ViewModel = new CompressSettingsViewModel(sourcePaths);
 
@@ -589,20 +591,31 @@ public partial class CompressSettingsWindow : Window
     }
 
     /// <summary>
-    /// 切换密码显示/隐藏。
+    /// 按「默认显示密码」设置初始化新密码 / 确认密码两个输入框的显示态。
+    /// 只决定窗口打开时的状态，👁 按钮仍可随时临时切换；默认（false）保持 XAML 的掩码。
+    /// </summary>
+    private void ApplyPasswordRevealDefault()
+    {
+        if (!AppSettings.Load().PasswordRevealByDefault)
+            return;
+
+        PasswordTextBox.PasswordChar = '\0';
+        ConfirmPasswordTextBox.PasswordChar = '\0';
+        RevealButton.Content = LocalizationManager.T("Compress_HidePassword");
+    }
+
+    /// <summary>
+    /// 切换密码显示/隐藏（两个密码框同步切换）。
     /// </summary>
     private void TogglePasswordReveal(object? sender, RoutedEventArgs e)
     {
-        if (PasswordTextBox.PasswordChar == '●')
-        {
-            PasswordTextBox.PasswordChar = default;
-            RevealButton.Content = LocalizationManager.T("Compress_HidePassword");
-        }
-        else
-        {
-            PasswordTextBox.PasswordChar = '●';
-            RevealButton.Content = LocalizationManager.T("Compress_ShowPassword");
-        }
+        var nowRevealed = PasswordTextBox.PasswordChar == '\0';
+        var target = nowRevealed ? '●' : '\0';
+
+        PasswordTextBox.PasswordChar = target;
+        ConfirmPasswordTextBox.PasswordChar = target;
+        RevealButton.Content = LocalizationManager.T(
+            nowRevealed ? "Compress_ShowPassword" : "Compress_HidePassword");
     }
 
     /// <summary>从源路径列表中推导「场景相关路径」：取第一个文件/目录所在目录，供默认路径优先级链 context 使用。</summary>
