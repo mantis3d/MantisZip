@@ -1138,6 +1138,7 @@
   "Status_ConfirmDelete": "确定要删除此项吗？",
   "Status_Copied": "已复制",
   "Status_DeleteComplete": "文件已删除",
+  "Status_ArchiveRemovedAfterDeleteAll": "全部条目已删除，压缩包已移除",
   "Status_DeletingFiles": "正在从压缩包删除文件",
   "Status_Entries": "个条目",
   "Status_EntryTested": "已验证",

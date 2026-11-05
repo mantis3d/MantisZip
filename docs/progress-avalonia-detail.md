@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-05** — 修复：应用内添加 / 删除条目、编辑注释后被误判成「磁盘上的压缩包已被替换」（只读横幅回归）
+  - **现象**：对打开中的压缩包执行「添加文件」「删除条目」「编辑注释」后，界面立刻弹出只读横幅「磁盘上的压缩包已被替换」+「当前列表来自旧文件，编辑或解压前请重新打开」，列表停在操作前的内容；随后手动 F5 也被同一条守卫拦下，只能点「重新打开」才恢复。
+  - **根因**：`ArchiveFileGuard` 的基线只在打开时抓一次（`MainWindowViewModel.cs:1835` → 构造函数 `CaptureSnapshot`），判定依据是「长度 + 最后写入时间 + 卷数」。而这三个操作都是**整包重写**（ZIP 复制模式重写 / 7z 解出再压缩 / 注释原地改 EOCD），长度与 mtime 必然变化 ⇒ `Check()` 报 `Replaced`；`RefreshArchive()` 又调 `EnsureArchiveAvailable()`，同一份旧快照把自己拦下，于是「刷新」这个恢复动作永远失败。自写与外部替换在快照层面完全同形，靠阈值或时间窗猜测都不成立。
+  - **改法**：`ArchiveFileGuard` 新增显式自写协议 —— `BeginSelfWrite()` 返回 `IDisposable` 作用域，作用域内 `Check()` 直接返回当前状态（`_selfWriteDepth > 0` 早退），watcher 事件合并后的核对同样不再判定；作用域释放时 `Rebase()` 以磁盘现状重抓快照，把「自己刚写出的版本」作为新基线，文件真被删掉才报 `Missing`。支持嵌套（添加/删除内部若再套一层），只有最外层释放才重设基线，内层不会把写到一半的中间态当基线。三个自写入口全部包进去：`MainWindowViewModel.Compress.cs` 的 `AddFilesToArchiveAsync`、`DeleteFiles` 的引擎调用，以及 `MainWindowViewModel.cs` 的 `EditComment`。
+  - **状态提示**：守卫写进 `StatusMessage` 的那句话单独记在 `_guardStatusMessage`，`ApplyArchiveAvailability()` 在恢复 `Available` 时只清它（内容相等才清），不会顺手抹掉别的操作提示；新增 `internal` 可见性供测试直接驱动。
+  - **F5 放开 `Replaced`**：新增 `EnsureArchiveRefreshable()`，只拦 `Missing`；`RefreshArchive()` 改用它 —— 刷新本身就是从磁盘重读，是替换态最安全的恢复动作，重载成功后守卫重新挂载、基线是替换后的文件、横幅自动消失。写操作（添加 / 删除 / 解压）仍走 `EnsureArchiveAvailable()`，替换态一律拦下，避免拿旧列表往新文件里写。
+  - **删光所有条目**：ZIP 复制模式与 7z 在 `keepEntries.Count == 0` 时会 `File.Delete(archivePath)` 把整包移除（`ZipEngine.CompressGroup.cs:961` / `SevenZipEngine.cs:2270`），此时刷新无从谈起，原先会停在「压缩包已不在磁盘上」横幅。`DeleteFiles` 的完成回调现在先判 `!File.Exists(CurrentArchivePath)`：直接 `ClearArchiveInternal()` + 标题复位 + 提示「全部条目已删除，压缩包已移除」（新 key `Status_ArchiveRemovedAfterDeleteAll`），进度窗完成态用同一句。
+  - **编辑注释的连带修正**：`_archiveComment` 只在打开时读一次，写完注释后根目录预览仍显示旧注释；现在写成功后同步 `_archiveComment` 并在根目录且无选中项时调 `UpdatePreviewForFolder()`。
+  - **测试**（`tests/MantisZip.UI.Avalonia.Tests/ArchiveFileGuardTests.cs`，均 `[AvaloniaFact]`）：新增 6 例 —— 自写作用域内重写文件不报 `Replaced` 且释放后基线已重设、之后外部再改仍能正常报 `Replaced`（抑制没有把监视器弄哑）；自写删包后重设基线报 `Missing`；嵌套作用域内层释放不判定、不重设基线；`ViewModel_RefreshAllowsReplacedButStillBlocksMissing`（替换态写操作仍拦、刷新放行、删除后缺失态刷新也拦）；状态恢复清掉守卫提示；恢复时不误清无关状态提示。
+  - **验证**：`build -Target avalonia` 0 警告；`test -Target ui-tests` 795 用例全绿（3 例既有跳过）；`-Task check` 0.5.6 六处一致 / 三语 1448 key / 9 条守卫全绿；`dotnet format analyzers --verify-no-changes` 通过。
+
 **2026-11-05** — 修复：分卷包 / 自解压 exe 的预览、双击打开、缩略图全部报「Zip Header 找不到」（KI-017）
   - **起因**：用户修完加密分卷解压后追问「别处会有类似问题吗」，审计「格式判定」这条线时发现同一根因的第二个受害者 —— 引擎路由正确、**格式身份错误**。
   - **现象与证据**（`E:\share\2026\zp\ttt\b\1.7z.001`，探针 `C:\Users\Admin\AppData\Local\Temp\mzprobe` mode `prev`）：`ArchiveEntryExtractor.ExtractHeadAsync(..., ArchiveFormat.Zip, "xxxx")` → `ArchiveException: Failed to locate the Zip Header`（64ms）；`ExtractEntryAsync` 同一异常（3ms）；同一入口改传 `ArchiveFormat.SevenZip` → head 103B / entry 103B 均成功。即**预览、双击打开（`OpenEntryWithDefaultAppAsync`）、内容缩略图（`ThumbnailService`）对分卷包是坏的**，用户只测了解压所以没踩到。

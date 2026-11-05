@@ -1138,6 +1138,7 @@
   "Status_ConfirmDelete": "Are you sure you want to delete this item?",
   "Status_Copied": "Copied",
   "Status_DeleteComplete": "File deleted",
+  "Status_ArchiveRemovedAfterDeleteAll": "All entries deleted; the archive was removed",
   "Status_DeletingFiles": "Deleting files from archive",
   "Status_Entries": "items",
   "Status_EntryTested": "Tested",

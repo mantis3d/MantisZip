@@ -455,11 +455,15 @@ public partial class MainWindowViewModel : ObservableObject
 
     private ArchiveFileGuard? _archiveGuard;
 
+    /// <summary>守卫最近写进 <see cref="StatusMessage"/> 的那句话（状态恢复时只清它，不覆盖别的提示）。</summary>
+    private string? _guardStatusMessage;
+
     /// <summary>为刚打开的压缩包建立磁盘监视（会先释放上一份）。</summary>
     private void AttachArchiveGuard(string archivePath)
     {
         DetachArchiveGuard();
         ArchiveAvailability = ArchiveAvailability.Available;
+        _guardStatusMessage = null;
 
         var guard = ArchiveFileGuard.TryCreate(archivePath);
         if (guard == null)
@@ -480,13 +484,35 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     private void OnArchiveGuardAvailabilityChanged(object? sender, ArchiveAvailability availability)
+        => ApplyArchiveAvailability(availability);
+
+    /// <summary>
+    /// 把守卫状态映射到界面（internal 供测试直接驱动）。
+    /// 状态恢复 <see cref="ArchiveAvailability.Available"/> 时只清掉守卫自己写下的状态提示，
+    /// 避免「磁盘上的压缩包已被替换，建议重新打开」一直残留到下一次操作。
+    /// </summary>
+    internal void ApplyArchiveAvailability(ArchiveAvailability availability)
     {
         ArchiveAvailability = availability;
 
-        if (availability == ArchiveAvailability.Missing)
-            StatusMessage = LocalizationManager.T("Status_ArchiveMissing");
-        else if (availability == ArchiveAvailability.Replaced)
-            StatusMessage = LocalizationManager.T("Status_ArchiveReplaced");
+        switch (availability)
+        {
+            case ArchiveAvailability.Missing:
+                _guardStatusMessage = LocalizationManager.T("Status_ArchiveMissing");
+                StatusMessage = _guardStatusMessage;
+                break;
+
+            case ArchiveAvailability.Replaced:
+                _guardStatusMessage = LocalizationManager.T("Status_ArchiveReplaced");
+                StatusMessage = _guardStatusMessage;
+                break;
+
+            case ArchiveAvailability.Available:
+                if (StatusMessage == _guardStatusMessage)
+                    StatusMessage = null;
+                _guardStatusMessage = null;
+                break;
+        }
     }
 
     /// <summary>
@@ -505,10 +531,30 @@ public partial class MainWindowViewModel : ObservableObject
         if (File.Exists(CurrentArchivePath))
             return true;
 
-        ArchiveAvailability = ArchiveAvailability.Missing;
-        StatusMessage = LocalizationManager.T("Status_ArchiveMissing");
+        ApplyArchiveAvailability(ArchiveAvailability.Missing);
         return false;
     }
+
+    /// <summary>
+    /// 刷新专用守卫：被替换也放行（刷新就是从磁盘重读，是最安全的恢复动作），只有文件真没了才拦。
+    /// 添加 / 删除 / 解压等写操作仍走 <see cref="EnsureArchiveAvailable"/>，替换态一律拦下。
+    /// </summary>
+    internal bool EnsureArchiveRefreshable()
+    {
+        if (!IsArchiveLoaded || CurrentArchivePath == null)
+            return true;
+
+        _archiveGuard?.Check();
+        if (ArchiveAvailability == ArchiveAvailability.Missing)
+            return false;
+
+        if (File.Exists(CurrentArchivePath))
+            return true;
+
+        ApplyArchiveAvailability(ArchiveAvailability.Missing);
+        return false;
+    }
+
 
     /// <summary>
     /// 解压收尾后核对源包：本次把源包删掉了就直接关闭压缩包，避免界面继续停留在已不存在的包上。
@@ -1857,6 +1903,7 @@ public partial class MainWindowViewModel : ObservableObject
         // 关包/换包：终止整包缩略图批次（否则后台会拿着已失效的路径继续读包），缓存随服务一起释放
         CancelThumbnailBatch();
         ArchiveAvailability = ArchiveAvailability.Available;
+        _guardStatusMessage = null;
         // 复选框列：退订旧实例并清空勾选态（否则关包后仍留着指向已释放模型的 SelectedEntries）
         foreach (var stale in CurrentEntries)
             stale.PropertyChanged -= OnEntryPropertyChanged;
@@ -2096,7 +2143,8 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task RefreshArchive()
     {
         if (CurrentArchivePath == null) return;
-        if (!EnsureArchiveAvailable()) return;
+        // 刷新是「从磁盘重读」：被替换也放行（用新文件恢复），只有文件真没了才拦。
+        if (!EnsureArchiveRefreshable()) return;
 
         var savedFolder = CurrentFolder;
         var savedEntryName = SelectedEntry?.FullPath;
@@ -2206,7 +2254,16 @@ public partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            ZipCommentHelper.WriteComment(CurrentArchivePath, newComment);
+            // 自写窗口：注释是原地改写 EOCD，长度/修改时间都会变；不包起来会被守卫当成外部替换。
+            using (_archiveGuard?.BeginSelfWrite())
+                ZipCommentHelper.WriteComment(CurrentArchivePath, newComment);
+
+            // 注释预览的唯一事实源是 _archiveComment（只在打开时读一次）：写完同步更新，
+            // 否则根目录预览会一直显示旧注释，直到下一次重载。
+            _archiveComment = string.IsNullOrEmpty(newComment) ? null : newComment;
+            if (string.IsNullOrEmpty(CurrentFolder) && SelectedEntry == null)
+                UpdatePreviewForFolder();
+
             StatusMessage = LocalizationManager.T("Status_CommentSaved");
         }
         catch (Exception ex)

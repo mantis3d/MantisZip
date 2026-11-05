@@ -47,6 +47,10 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Split sets and self-extracting exes preview correctly again** — files inside `.001` / `.z01` / `.r00` / `.part1.rar` sets and self-extracting exes used to fail with a "Zip header not found" error instead of opening, and showed no content thumbnails; both work now. Split sets remain read-only for adding or removing files.
 
+- **应用内添加 / 删除条目、编辑注释后不再弹出「已被替换」横幅** — 此前这些操作会把应用自己刚写出的压缩包误判成外部替换，列表停在旧内容、只能重新打开；现在会自动刷新，删光所有条目则直接关闭压缩包并提示。压缩包真被外部替换时横幅照旧出现，并且可以直接按 F5 从磁盘重读。
+
+- **Adding or removing entries and editing the comment no longer trips the "replaced" banner** — the app used to mistake its own freshly written archive for an outside replacement, leaving the list stale until you reopened it; it now refreshes automatically, and deleting every entry closes the archive with a note. The banner still appears when another program really replaces the file, and F5 now reloads it from disk.
+
 **性能 / Performance**
 
 - **加密 7z 解压快了几十倍** — 带密码的 7z（含 `.001` 分卷包）此前逐个文件解、每个文件都要重新解一遍整块数据，48 MB / 309 个文件要跑几分钟；现在整包一次解码，同样的包约 3 秒，与 Bandizip 同量级。选中部分文件解压同样受益。
