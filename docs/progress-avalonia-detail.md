@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-06** — 计划：缩略图/图标缓存与列表惰性分批（v0.5.6 缩略图功能性能债）
+  - **起因**：`file-list-thumbnails.md`（v0.5.6 已完成）实施记录里登记的三条「已知改进口子」——①VM 每包 `new ThumbnailService(cache: null)` 自建缓存，切包/切目录丢缓存；②Tile/Content 无 UI 虚拟化（Avalonia 12 无 ItemsRepeater），超大目录一次性铺死；③`IcoIconLoader` 无缓存，筛选输入每敲一个字重读最多 20 个 ico。
+  - **访谈结论**：#1 与 #3 立即纳入；#2 采「A+B 两步走」——方案 A（分批惰性铺条，每批 200 滚动到底追加）为必做，方案 B（自写 VirtualizingPanel）留档，Phase 1 真机 QA 后由用户单独决策（Avalonia 12.1.2 渲染深水区，风险最高）。
+  - **新计划**（`.omo/plans/未开始/thumbnail-list-cache-virtualization.md`，Phase 1 预估 2-3 天）：T1 共享 `ThumbnailCache` 注入（构造参数已具备、`Dispose` 不碰注入缓存，纯接线）；T2 新 `IcoIconCache`（LRU 128）+ `IcoIconLoader` 命中短路（命中判定提前到 `Task.Run` 之外，UI 线程同步回填；命中路径禁止 Dispose 共享位图——现有取消路径会 `icon.Dispose()`，是需要分开标记的语义红线）；T3–T5 新 `VisibleChunkSource`（纯逻辑可单测）+ `VisibleEntries` 前缀集合 + 批次只处理已铺条目 + `CheckAllVisible` 等语义保持全列表；T6 文档双轨 + 11 条 QA。Phase 2 进入前置半天 spike 实测 `VirtualizingPanel` API 面，不可行直接闭案，无降级路径。
+  - **立项阶段自查修正**：写计划时发现候选循环初稿把 `maxIcons` 口径从「考虑过的 .ico 条目」漂移成「未命中的 .ico 条目」（二次筛选会悄悄回填超过 20 个），已改为 `seen` 计数命中与否都计——行为一致性钉子写进计划代码块。
+  - **排期**：`docs/PLAN.md` v0.5.10「新功能与债务」表新增一行；不触发版本号变更（规则 2）；执行分支 `beta`。计划暂缓——用户提出两项更紧急的缩略图显示改进（卡片格式指示 + 文件大小/数据条），随后另行立项讨论。
+  - **验证**：纯文档改动（1 个新计划文件 + PLAN.md 一行 + 本条目），未构建。
+
 **2026-11-06** — 计划：压缩文件名模板（由「后缀模板」改写为「文件名模板」）
   - **起因**：原计划 `.omo/plans/未开始/filename-suffix-template.md` 只描述「在原名后加日期/时间/序号后缀」，用户要求改成「整个文件名由模板决定」——后缀模板无法表达原名从哪来、原扩展名怎么办，也无法覆盖手动/合并模式的命名。
   - **核对现状后发现旧计划 8 处已脱节**：`CompressService.ComputeSeparateOutputPath` 现在只是 `CompressPathPlanner` 的薄包装（`CompressService.cs:429`）；预览与实际共用 B 数据集 `CompressPlan`（`GetOutputPaths` 有 Plan 就不重算，`:162-175`）⇒ 模板必须在**建 plan 时**生效而不是执行时拼；规则 20 禁止窗口关掉后回读属性；`AppSettings` 在 `Models/` 下；`HandleCompressQuick` 在 `App.CliCompress.cs:147`（名字计算 `:164-166`）；对话框已是 VM + `LocalizedStrings[...]` 绑定；`KeepOriginalExtension` 是设置窗的全局开关、压缩对话框里没有；占位符缺 `{name}`。

@@ -133,6 +133,7 @@
 |---|---|:--:|:--:|---|
 | 卡片元数据（全卡头部窗口 + 小文件整条兜底） | [card-metadata-head-window.md](.omo/plans/未开始/card-metadata-head-window.md) | 🟡中 | 12-16h | 平铺 / 内容布局里**所有**候选卡显示 2–3 行格式元数据（音频 / 视频 / 字体 / 可执行 / PDF / Office / BT 种子 / SQLite / ISO）；取数改成「读条目头部 256 KB → 解析」，小文件（≤2 MB）整条兜底、视频尾段（≤10 MB）补 moov；6 组开关在「设置 → 外观 → 缩略图」第 4 张卡片 |
 | AXAML 编译期绑定（渐进式开启 `x:CompileBindings`） | [axaml-compiled-bindings.md](.omo/plans/未开始/axaml-compiled-bindings.md) | 🟡中 | 10-14h | 50 个 `.axaml` 只有 1 个开编译绑定、13 个有 `x:DataType`；渐进三批推进 + `-Task guards` 第 9 条 `compilebindings`（只约束新增与已迁移文件） |
+| 缩略图/图标缓存与列表惰性分批（v0.5.6 缩略图功能性能债） | [thumbnail-list-cache-virtualization.md](.omo/plans/未开始/thumbnail-list-cache-virtualization.md) | 🟢低 | Phase 1 **2-3天** | 2026-11-06 立项（`file-list-thumbnails` 实施记录里三条已知改进口子）：①缩略图缓存跨包/跨目录共享（构造参数已具备，切包丢缓存）②ICO 列表图标 LRU 缓存（筛选每敲一字重读最多 20 个 ico）③平铺/内容布局分批惰性铺条（每批 200、滚动到底追加），作为无虚拟化的缓解；Phase 2 真虚拟化面板（自写 VirtualizingPanel）留档，待 Phase 1 QA 后由用户单独决策，未明确决策不得开工 |
 
 > **v0.5.10 尾部缓冲（进度紧就退回 B 档）**：剩余 3 项——压缩文件名模板（8-10h，`filename-template.md`；已由「后缀模板」改写为文件名模板，新增三入口默认值 + 命名预设 + 三模式接管）、预览「显示内容」开关（2-3h，`preview-show-content-toggle.md`）、提取日志与解压「后悔药」（3-4h，`extract-journal-undo.md`）。
 
