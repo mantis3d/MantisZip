@@ -85,6 +85,7 @@ public class PreviewService
     private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".txt", ".log", ".ini", ".cfg", ".conf", ".xml", ".json",
+        ".reg",
         ".cs", ".csproj", ".yaml", ".yml", ".toml",
         ".sh", ".bat", ".cmd", ".ps1", ".py", ".js", ".ts", ".tsx",
         ".css", ".scss", ".less",

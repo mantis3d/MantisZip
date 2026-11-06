@@ -1,6 +1,7 @@
 using System.IO.Compression;
 using System.Text;
 using MantisZip.Core.Abstractions;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using Xunit;
@@ -328,6 +329,42 @@ public class PreviewServiceContentTests
         finally
         {
             TryDeleteFile(tempPath);
+            DeleteDir(dir);
+        }
+    }
+
+    /// <summary>
+    /// regedit 导出的 .reg 是 UTF-16 LE + BOM：魔数检测必须判成 Text。
+    /// 回归点：旧实现按「NUL ≤ 1%」判文本，UTF-16 的 NUL 比例约 50% → 判成二进制 →
+    /// 预览落到「暂不支持预览此文件格式」。
+    /// </summary>
+    [Fact]
+    public async Task ClassifyPreviewByMagicAsync_Utf16RegEntry_ReturnsText()
+    {
+        var dir = NewTempDir();
+        try
+        {
+            PreviewService.ResetHeadCacheForTests();
+
+            var regText =
+                "Windows Registry Editor Version 5.00\r\n\r\n" +
+                "[HKEY_CURRENT_USER\\Software\\MantisZipTest]\r\n" +
+                "\"Value1\"=\"Data\"\r\n";
+            var payload = new byte[] { 0xFF, 0xFE }
+                .Concat(Encoding.Unicode.GetBytes(regText)).ToArray();
+            var zip = CreateZip(dir, ("test.reg", payload));
+
+            var (type, format, displayName) = await PreviewService.ClassifyPreviewByMagicAsync(
+                zip, NewEntry("test.reg", payload.Length), ArchiveFormat.Zip,
+                ct: TestContext.Current.CancellationToken);
+
+            Assert.Equal(PreviewType.Text, type);
+            Assert.Equal(FileFormat.Text, format);
+            Assert.NotNull(displayName);
+        }
+        finally
+        {
+            PreviewService.ResetHeadCacheForTests();
             DeleteDir(dir);
         }
     }

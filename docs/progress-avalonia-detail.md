@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-06** — 修复：`.reg` 文件预览提示「暂不支持预览此文件格式」（UTF-16 文本被当成二进制）
+  - **现象**（用户实测）：同一压缩包里 `.txt` 能正常预览，regedit 导出的 `.reg` 双击却显示「暂不支持预览此文件格式」。
+  - **根因**：两层都拦住了 `.reg`。① `PreviewService.TextExtensions` 白名单没有 `.reg`；② 更关键的是内容启发式 —— regedit 导出的是 **UTF-16 LE + BOM**，每个 ASCII 字符后跟一个 0x00，NUL 比例约 50%，而 `FileFormatDetector.LooksLikeText` 的判定是「NUL ≤ 1%」⇒ 直接判成二进制，魔数检测返回 `Unknown`，扩展名兜底也认不出，最终落到 `PreviewType.Unsupported`。解码侧同样缺失：`TextEncodingDetector.DecodeText` 只处理 UTF-8 BOM / 严格 UTF-8 / ANSI，UTF-16LE 的 ASCII 字节序列本身是合法 UTF-8（会解出 `R\0E\0G\0…`），带 BOM 时 `FF FE` 又不是合法 UTF-8（会落到 ANSI 解出 `ÿþ`）。
+  - **改法**：① 新增 `src/MantisZip.Core/Utils/Utf16TextHeuristic.cs`（`internal static`，检测与解码共用同一套阈值）：先认 BOM（`FF FE` / `FE FF`，权威零误判），无 BOM 时只接受「隔字节 NUL」形态（零字节位 ≥95% 全 0 且字符位 ≥85% 可打印 ASCII / 空白），不认无 BOM 的中日韩 UTF-16（两侧都非 0，任何阈值都可能把二进制误判成文本）。② `LooksLikeText` 在 NUL 比例判定**之前**先走该启发式。③ `DetectTextSubtype` 先按 UTF-16 解码（跳过 BOM）再做 SVG/HTML/XML/INI/JSON 判定；并新增 regedit 头识别（`Windows Registry Editor Version` / `REGEDIT4` → `FileFormat.Text`），避免 `.reg` 因「`[HKEY_…]` 段头 + 值行」被判成 `Ini` 后状态栏报「格式冲突」。④ `TextEncodingDetector.DecodeText` 在 UTF-8 BOM 之后、严格 UTF-8 之前插入 UTF-16 分支（去 BOM）；`DetectAndDecodeText` 在 Ude 之前判定 UTF-16 并返回 `utf-16` / `utf-16BE`（Ude 对 UTF-16 判定不稳定）。`DecodeComment` 不动。⑤ `DetectByExtension` 的 `.txt`/`.log` 行加上 `.reg`；`PreviewService.TextExtensions` 补 `.reg`。
+  - **覆盖面**：不只修 `.reg` —— 记事本「Unicode」保存的 `.txt`、PowerShell `Out-File -Encoding Unicode` 的日志等 UTF-16 文本同样恢复预览；编码下拉里原本就有 `UTF-16 LE` 选项，检测成功后状态栏会显示「检测到: utf-16」。
+  - **测试**：新增 `tests/MantisZip.Tests/Utils/FileFormatDetectorUtf16Tests.cs` 8 例（LE/BE BOM 的 reg 内容、无 BOM LE、无 BOM JSON 子类型、ANSI `REGEDIT4`、全零 / NUL 块+ASCII 反例、`.reg` 扩展名大小写）；`TextEncodingDetectorTests` 增 7 例（LE/BE BOM 解码去 BOM、无 BOM、显式 `utf-16`、`DetectAndDecodeText` 返回编码名、全零不抛）；`PreviewServiceContentTests` 增 1 例端到端 `ClassifyPreviewByMagicAsync_Utf16RegEntry_ReturnsText`。
+  - **验证**：`build -Target core` / `-Target avalonia` 0 警告；新增/相关 27 例 Core 测试全绿；`test -Target ui-tests` 796 例 0 失败（3 例既有跳过）；`-Task check` 版本 0.5.6 六处一致 / 三语 1448 key / 9 条守卫全绿。
+  - **环境说明**：本机 `dotnet test` 仍因 testhost 无法打开父进程句柄而中止（AGENTS.md 已记录的受限环境问题）；Core 测试改用 `xunit.runner.console 2.9.3`（临时目录内，runtimeconfig 指向 net10.0）跑通，全量 1034 例中 25 例失败均为缺 `7z.dll` 的既有环境失败（CI 同样过滤 7z 用例）。
+
 **2026-11-05** — 修复：应用内添加 / 删除条目、编辑注释后被误判成「磁盘上的压缩包已被替换」（只读横幅回归）
   - **现象**：对打开中的压缩包执行「添加文件」「删除条目」「编辑注释」后，界面立刻弹出只读横幅「磁盘上的压缩包已被替换」+「当前列表来自旧文件，编辑或解压前请重新打开」，列表停在操作前的内容；随后手动 F5 也被同一条守卫拦下，只能点「重新打开」才恢复。
   - **根因**：`ArchiveFileGuard` 的基线只在打开时抓一次（`MainWindowViewModel.cs:1835` → 构造函数 `CaptureSnapshot`），判定依据是「长度 + 最后写入时间 + 卷数」。而这三个操作都是**整包重写**（ZIP 复制模式重写 / 7z 解出再压缩 / 注释原地改 EOCD），长度与 mtime 必然变化 ⇒ `Check()` 报 `Replaced`；`RefreshArchive()` 又调 `EnsureArchiveAvailable()`，同一份旧快照把自己拦下，于是「刷新」这个恢复动作永远失败。自写与外部替换在快照层面完全同形，靠阈值或时间窗猜测都不成立。

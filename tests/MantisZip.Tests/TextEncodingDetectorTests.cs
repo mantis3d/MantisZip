@@ -56,6 +56,72 @@ public class TextEncodingDetectorTests
     }
 
     // ══════════════════════════════════════════════════════════════════
+    // UTF-16 —— regedit 导出的 .reg、记事本「Unicode」保存的文本
+    // 关键点：UTF-16LE 的 ASCII 字节序列本身是合法 UTF-8，
+    // 必须比严格 UTF-8 更早判定，否则解出 "R\0E\0G\0…"。
+    // ══════════════════════════════════════════════════════════════════
+
+    private const string Utf16Sample = "Windows Registry Editor Version 5.00";
+
+    [Fact]
+    public void DecodeText_Utf16LeWithBom_DecodesAndStripsBom()
+    {
+        var bytes = new byte[] { 0xFF, 0xFE }
+            .Concat(Encoding.Unicode.GetBytes(Utf16Sample)).ToArray();
+        Assert.Equal(Utf16Sample, TextEncodingDetector.DecodeText(bytes));
+    }
+
+    [Fact]
+    public void DecodeText_Utf16BeWithBom_DecodesAndStripsBom()
+    {
+        var bytes = new byte[] { 0xFE, 0xFF }
+            .Concat(Encoding.BigEndianUnicode.GetBytes(Utf16Sample)).ToArray();
+        Assert.Equal(Utf16Sample, TextEncodingDetector.DecodeText(bytes));
+    }
+
+    [Fact]
+    public void DecodeText_Utf16LeWithoutBom_Decodes()
+    {
+        var bytes = Encoding.Unicode.GetBytes(Utf16Sample);
+        Assert.Equal(Utf16Sample, TextEncodingDetector.DecodeText(bytes));
+    }
+
+    [Fact]
+    public void DecodeText_Utf16ExplicitEncodingName_Decodes()
+    {
+        var bytes = Encoding.Unicode.GetBytes("hello");
+        Assert.Equal("hello", TextEncodingDetector.DecodeText(bytes, "utf-16"));
+    }
+
+    [Fact]
+    public void DetectAndDecodeText_Utf16LeWithBom_ReportsEncodingName()
+    {
+        var bytes = new byte[] { 0xFF, 0xFE }
+            .Concat(Encoding.Unicode.GetBytes(Utf16Sample)).ToArray();
+        var (text, name) = TextEncodingDetector.DetectAndDecodeText(bytes);
+        Assert.Equal(Utf16Sample, text);
+        Assert.Equal("utf-16", name);
+    }
+
+    [Fact]
+    public void DetectAndDecodeText_Utf16BeWithBom_ReportsEncodingName()
+    {
+        var bytes = new byte[] { 0xFE, 0xFF }
+            .Concat(Encoding.BigEndianUnicode.GetBytes(Utf16Sample)).ToArray();
+        var (text, name) = TextEncodingDetector.DetectAndDecodeText(bytes);
+        Assert.Equal(Utf16Sample, text);
+        Assert.Equal("utf-16BE", name);
+    }
+
+    [Fact]
+    public void DecodeText_AllZeroBytes_DoesNotThrow()
+    {
+        // 全零不是 UTF-16 文本（无 BOM 且字符位没有可打印字符）→ 走 ANSI 回退
+        var text = TextEncodingDetector.DecodeText(new byte[16]);
+        Assert.NotNull(text);
+    }
+
+    // ══════════════════════════════════════════════════════════════════
     // DecodeComment —— ZIP 注释等「无编码标志自由文本」的解码
     // 核心契约：结果不得依赖宿主 locale（en-US 的系统 ANSI = 1252）
     // ══════════════════════════════════════════════════════════════════

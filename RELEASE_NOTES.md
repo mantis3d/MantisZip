@@ -51,6 +51,10 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Adding or removing entries and editing the comment no longer trips the "replaced" banner** — the app used to mistake its own freshly written archive for an outside replacement, leaving the list stale until you reopened it; it now refreshes automatically, and deleting every entry closes the archive with a note. The banner still appears when another program really replaces the file, and F5 now reloads it from disk.
 
+- **`.reg` 与 UTF-16 文本文件恢复预览** — regedit 导出的 `.reg`、记事本「Unicode」保存的文本此前一律显示「暂不支持预览此文件格式」，现在按文本正常显示，状态栏与编码菜单会标出「检测到: utf-16」。
+
+- **`.reg` and UTF-16 text files preview again** — regedit exports and text saved as "Unicode" in Notepad used to show "preview is not supported for this file format"; they now display as text, with the detected `utf-16` shown in the status bar and encoding menu.
+
 **性能 / Performance**
 
 - **加密 7z 解压快了几十倍** — 带密码的 7z（含 `.001` 分卷包）此前逐个文件解、每个文件都要重新解一遍整块数据，48 MB / 309 个文件要跑几分钟；现在整包一次解码，同样的包约 3 秒，与 Bandizip 同量级。选中部分文件解压同样受益。
