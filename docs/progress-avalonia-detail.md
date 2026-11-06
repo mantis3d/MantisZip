@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-06** — 计划：压缩文件名模板（由「后缀模板」改写为「文件名模板」）
+  - **起因**：原计划 `.omo/plans/未开始/filename-suffix-template.md` 只描述「在原名后加日期/时间/序号后缀」，用户要求改成「整个文件名由模板决定」——后缀模板无法表达原名从哪来、原扩展名怎么办，也无法覆盖手动/合并模式的命名。
+  - **核对现状后发现旧计划 8 处已脱节**：`CompressService.ComputeSeparateOutputPath` 现在只是 `CompressPathPlanner` 的薄包装（`CompressService.cs:429`）；预览与实际共用 B 数据集 `CompressPlan`（`GetOutputPaths` 有 Plan 就不重算，`:162-175`）⇒ 模板必须在**建 plan 时**生效而不是执行时拼；规则 20 禁止窗口关掉后回读属性；`AppSettings` 在 `Models/` 下；`HandleCompressQuick` 在 `App.CliCompress.cs:147`（名字计算 `:164-166`）；对话框已是 VM + `LocalizedStrings[...]` 绑定；`KeepOriginalExtension` 是设置窗的全局开关、压缩对话框里没有；占位符缺 `{name}`。
+  - **新计划**（`.omo/plans/未开始/filename-template.md`，旧文件 `git mv` 改名保留历史）：模板渲染**主名**、格式扩展名自动补；占位符 `{name}` `{ext}` `{parent}` `{date}` `{datetime}` `{seq}` `{seq:0000}` + `{{`/`}}` 转义；模板非空即接管命名并忽略 `KeepOriginalExtension`；手动/合并模式的「输出文件名」框变只读预览；三档默认模板（对话框 / `--compress-quick` / `--compress-separate`，设置页配置）；对话框内命名预设（名字 + 模板，上限 20，仅预设增删落盘，不写回默认值以沿用 `CompressSettingsViewModel.cs:192-193` 的既有约定）；确认时校验未知占位符 / 非法字符 / 空结果 / 多源重名 → `Rejected<CompressSettings>` 窗口内提示。
+  - **命名管线**：Core 新增 `FileNameTemplate`（`TryValidateSyntax` / `TryRender`）与 `FileNameTemplatePreset`；`CompressPathPlanner` 三个方法加可选模板参数（默认值保持旧行为，渲染失败静默回退旧命名，避免打字中途把预览树打空）；`CompressRequest` 增 `FileNameTemplate` + `TemplateTimestamp`，`CompressService` 在无 Plan 时用 `PlanSeparate` 统一解析。
+  - **工时**：原 2-3h → 8-10h（新增三入口默认值、预设、三模式接管、校验），`docs/PLAN.md:137` 已同步。
+  - **验证**：`-Task check` 版本 0.5.6 六处一致 / 三语 1448 key / 9 条守卫全绿（纯文档改动，未构建）。
+
 **2026-11-06** — 修复：`.reg` 文件预览提示「暂不支持预览此文件格式」（UTF-16 文本被当成二进制）
   - **现象**（用户实测）：同一压缩包里 `.txt` 能正常预览，regedit 导出的 `.reg` 双击却显示「暂不支持预览此文件格式」。
   - **根因**：两层都拦住了 `.reg`。① `PreviewService.TextExtensions` 白名单没有 `.reg`；② 更关键的是内容启发式 —— regedit 导出的是 **UTF-16 LE + BOM**，每个 ASCII 字符后跟一个 0x00，NUL 比例约 50%，而 `FileFormatDetector.LooksLikeText` 的判定是「NUL ≤ 1%」⇒ 直接判成二进制，魔数检测返回 `Unknown`，扩展名兜底也认不出，最终落到 `PreviewType.Unsupported`。解码侧同样缺失：`TextEncodingDetector.DecodeText` 只处理 UTF-8 BOM / 严格 UTF-8 / ANSI，UTF-16LE 的 ASCII 字节序列本身是合法 UTF-8（会解出 `R\0E\0G\0…`），带 BOM 时 `FF FE` 又不是合法 UTF-8（会落到 ANSI 解出 `ÿþ`）。
