@@ -53,8 +53,12 @@ public sealed class ThumbnailService : IDisposable
     /// </remarks>
     public const int IcoThumbnailPreferredSide = 160;
 
-    /// <summary>单个条目允许生成缩略图的大小上限（8MB），超过直接跳过。</summary>
-    public const long MaxThumbnailEntrySize = 8L * 1024 * 1024;
+    /// <summary>单个条目允许生成缩略图的大小上限（32MB），超过直接跳过。
+    /// <para>图像条目要**整份解压到字节缓冲**再解码，这个常量就是缓冲上界（并发 4 ⇒ 最坏
+    /// 128MB 瞬时字节内存）。2026-11-07 从 8MB 提到 32MB：用户真机反馈 &gt;8MB 的相机 JPG
+    /// 没有缩略图；同时 <see cref="DecodeImage"/> 改「SKCodec 降采样解码」，不再物化全分辨率
+    /// 位图（旧路径一张 4200×3200 大图解码峰值 ≈54MB × 并发 4 才是真正风险）。</para></summary>
+    public const long MaxThumbnailEntrySize = 32L * 1024 * 1024;
 
     /// <summary>文字类条目读取的头部字节数。</summary>
     public const int TextHeadSize = 4096;
@@ -225,7 +229,8 @@ public sealed class ThumbnailService : IDisposable
                 if (kind == ThumbnailKind.None)
                     continue;
 
-                // 图像：超大条目 / 7z 固实包直接跳过（固实包读一条 = 整包解压）。
+                // 图像：超大条目（>32MB）/ 7z 固实包直接跳过（固实包读一条 = 整包解压）。
+                // 32MB 内的相机 JPG 现在会生成缩略图（2026-11-07 从 8MB 提高 + 降采样解码）。
                 // 文字：没有大小上限，只读 4KB 头部，代价可控。
                 if (kind == ThumbnailKind.Image && (item.Size > MaxThumbnailEntrySize || _isSevenZipSolid))
                     continue;
@@ -310,8 +315,11 @@ public sealed class ThumbnailService : IDisposable
     /// <summary>
     /// 字节 → 卡片尺寸的缩略图（边长由设置 → 外观 → 缩略图决定）。<c>.ico</c> 走多尺寸图标提取（取边长最接近 160 的帧，不是列表图标的 16），
     /// <c>.svg</c> 走矢量渲染（矢量按目标边长重绘，不受其声明尺寸限制），其余走 Skia 位图解码。
+    /// <para>位图走 <c>SKCodec</c> 降采样解码（<c>GetScaledDimensions</c> + <c>GetPixels</c>）：
+    /// 大图不物化全分辨率位图，内存只与目标缩略图尺寸相关。</para>
+    /// <para>测试钩子：<c>internal</c> 供 ThumbnailTests 直接验证大图降采样解码（经 InternalsVisibleTo）。</para>
     /// </summary>
-    private static Bitmap? DecodeImage(byte[] bytes, string extension, int size)
+    internal static Bitmap? DecodeImage(byte[] bytes, string extension, int size)
     {
         // 缩略图卡是 128px，但这里**故意要 160**：ico 里常见「只有 256 和 16 两帧」的老图标，
         // 若按 128 找最接近，256 差 128、16 差 112 ⇒ 会选中 16 帧（放大到 128 糊成一团）；
@@ -325,22 +333,55 @@ public sealed class ThumbnailService : IDisposable
         if (extension.Equals(".svg", StringComparison.OrdinalIgnoreCase))
             return RenderSvg(bytes, size);
 
-        using var source = SKBitmap.Decode(bytes);
-        if (source is null || source.Width <= 0 || source.Height <= 0)
+        // 位图解码走 SKCodec 降采样：大图直接解到接近目标尺寸的小位图，不物化全分辨率位图。
+        // 旧实现 SKBitmap.Decode(bytes) 对 4200×3200 照片先分配 ≈54MB 位图（×并发 4 才是内存风险）。
+        using var stream = new SKMemoryStream(bytes);
+        using var codec = SKCodec.Create(stream);
+        if (codec is null)
+            return null;
+
+        var source = codec.Info;
+        if (source.Width <= 0 || source.Height <= 0)
             return null;
 
         var (targetWidth, targetHeight) = ScaleToThumbnail(source.Width, source.Height, size);
 
-        // 不需要缩放（小图）就直接编码，省一次重绘。
-        if (targetWidth == source.Width && targetHeight == source.Height)
-            return Encode(source);
+        // 选解码尺寸：源图不超过目标 → 原尺寸解码（沿用「小图不放大」语义）；否则请求
+        // 「受支持缩放档位里仍不低于目标尺寸」的那一档（档位是离散的，例如 300px 源请求
+        // 128 只给到 113，要退一档到 1/2=150 再画布缩到 128，否则缩略图会比以前小）。
+        var decodeWidth = source.Width;
+        var decodeHeight = source.Height;
+        var longestSide = Math.Max(source.Width, source.Height);
+        if (longestSide > size)
+        {
+            var scale = size / (float)longestSide;
+            var scaled = codec.GetScaledDimensions(scale);
+            if (scaled.Width < targetWidth || scaled.Height < targetHeight)
+                scaled = codec.GetScaledDimensions(Math.Min(1f, scale * 2f));
+
+            decodeWidth = scaled.Width;
+            decodeHeight = scaled.Height;
+        }
+
+        var decodeInfo = new SKImageInfo(decodeWidth, decodeHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+        using var decoded = new SKBitmap(decodeInfo);
+        var result = codec.GetPixels(decodeInfo, decoded.GetPixels());
+
+        // IncompleteInput：条目按 MaxThumbnailEntrySize 截断后缺尾部扫描数据，已解出的部分
+        // 仍可当缩略图（当成失败会让大图全部没图——2026-11-07 修复前 &gt;8MB JPG 就是没图）。
+        if (result is not (SKCodecResult.Success or SKCodecResult.IncompleteInput))
+            return null;
+
+        // 解码尺寸恰好等于目标尺寸：直接编码，省一次重绘。
+        if (decodeWidth == targetWidth && decodeHeight == targetHeight)
+            return Encode(decoded);
 
         using var target = new SKBitmap(new SKImageInfo(targetWidth, targetHeight, SKColorType.Bgra8888, SKAlphaType.Premul));
         using (var canvas = new SKCanvas(target))
         {
             canvas.Clear(SKColors.Transparent);
-            canvas.Scale(targetWidth / (float)source.Width, targetHeight / (float)source.Height);
-            canvas.DrawBitmap(source, 0, 0, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
+            canvas.Scale(targetWidth / (float)decodeWidth, targetHeight / (float)decodeHeight);
+            canvas.DrawBitmap(decoded, 0, 0, new SKSamplingOptions(SKFilterMode.Linear, SKMipmapMode.Linear));
             canvas.Flush();
         }
 

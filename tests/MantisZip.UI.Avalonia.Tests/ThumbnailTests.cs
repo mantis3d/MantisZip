@@ -554,7 +554,80 @@ public class ThumbnailTests
         Assert.Same(items[0], result.Anchor);
     }
 
+    // ─────────────────────────── 大图缩略图（2026-11-07 用户报障） ───────────────────────────
+
+    /// <summary>
+    /// 端到端回归：压缩包内 **大于旧 8MB 上限** 的 JPG 必须生成缩略图。
+    ///
+    /// 用户报障：&gt;10MB 左右的 jpg 没有缩略图。根因是 <c>RunBatchAsync</c> 对
+    /// <c>item.Size &gt; MaxThumbnailEntrySize</c> 的图像条目**直接 continue 跳过**
+    /// （旧上限 8MB，原意是内存保护）。修法：上限提到 32MB + 解码改 SKCodec 降采样
+    /// （不物化全分辨率位图），本用例钉住「大图也能出缩略图」。
+    /// </summary>
+    [AvaloniaFact]
+    public async Task Batch_GeneratesThumbnail_ForJpegLargerThanOldEightMbCap()
+    {
+        var jpeg = CreateNoiseJpeg(3200, 2600, quality: 100);
+        Assert.True(jpeg.Length > 8 * 1024 * 1024,
+            $"测试图必须大于旧上限 8MB 才能复现，实际 {jpeg.Length:N0} 字节");
+
+        var dir = Path.Combine(Path.GetTempPath(), "mantiszip-thumb-" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        var archivePath = Path.Combine(dir, "big.zip");
+        try
+        {
+            using (var fs = File.Create(archivePath))
+            using (var zip = new System.IO.Compression.ZipArchive(fs, System.IO.Compression.ZipArchiveMode.Create))
+            {
+                using var entry = zip.CreateEntry("big.jpg", System.IO.Compression.CompressionLevel.Fastest).Open();
+                entry.Write(jpeg, 0, jpeg.Length);
+            }
+
+            using var service = new ThumbnailService(archivePath, password: null, isSevenZipSolid: false);
+            var item = new ArchiveItemModel { Name = "big.jpg", FullPath = "big.jpg", Size = jpeg.Length };
+            service.StartBatch([item]);
+
+            var deadline = DateTime.UtcNow.AddSeconds(60);
+            while (item.ThumbnailSource is null && DateTime.UtcNow < deadline)
+                await Task.Delay(50);
+
+            Assert.NotNull(item.ThumbnailSource);
+        }
+        finally
+        {
+            try { Directory.Delete(dir, recursive: true); } catch { /* 清理失败不影响断言 */ }
+        }
+    }
+
+    /// <summary>
+    /// 降采样解码正确性：大图的缩略图最长边 == 请求尺寸，且不物化全分辨率位图
+    /// （实现走 <c>SKCodec.GetScaledDimensions</c> + <c>GetPixels</c>）。
+    /// </summary>
+    [AvaloniaFact]
+    public void DecodeImage_DownscalesLargeJpegToRequestedSize()
+    {
+        var jpeg = CreateNoiseJpeg(1600, 1200, quality: 90);
+
+        using var bitmap = ThumbnailService.DecodeImage(jpeg, ".jpg", 128);
+
+        Assert.NotNull(bitmap);
+        Assert.Equal(128, Math.Max(bitmap!.PixelSize.Width, bitmap.PixelSize.Height));
+    }
+
     // ─────────────────────────── helpers ───────────────────────────
+
+    /// <summary>用随机噪声生成 JPEG（噪声不可压缩 → 文件尺寸接近真实照片，3200×2600 q100 ≈ 10MB+）。</summary>
+    private static byte[] CreateNoiseJpeg(int width, int height, int quality)
+    {
+        using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque));
+        var pixels = new byte[width * height * 4];
+        new Random(20261107).NextBytes(pixels);
+        System.Runtime.InteropServices.Marshal.Copy(pixels, 0, bitmap.GetPixels(), pixels.Length);
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
+        return data.ToArray();
+    }
 
     private static Func<CancellationToken, Task<ThumbnailResult?>> TextFactory(string text) =>
         _ => Task.FromResult<ThumbnailResult?>(new ThumbnailResult(null, text));
