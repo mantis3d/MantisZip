@@ -778,6 +778,110 @@
                                 TextWrapping="NoWrap"
                                 TextTrimming="CharacterEllipsis"
                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          <!-- ══════ Tile 迷你信息行（假列头右键菜单控制显隐；数据条跟随 ShowProgressBars）════════
+                               结构与 Details 列的 CellTemplate 同构：数据条底纹（文件/目录双 Rectangle，
+                               UseDirProgressColor 切换）+ 文字覆盖；条宽 = RatioToWidthConverter(比例, 行宽)。
+                               行显隐由 App 注入的行资源（TileRowShow*）经 DynamicResource 驱动 ⇒
+                               假列头菜单切换即时生效、不走缩略图重解码；行高走紧凑度资源（规则 7）。
+                               Margin="4,0" 与 Details 数据条文字一致。 -->
+                          <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                                IsVisible="{DynamicResource ThumbnailRowSizeVisible}">
+                            <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
+                                       HorizontalAlignment="Left"
+                                       IsVisible="{Binding !UseDirProgressColor}">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="SizeRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <Rectangle Fill="{DynamicResource ProgressBarSizeDirBrush}"
+                                       HorizontalAlignment="Left"
+                                       IsVisible="{Binding UseDirProgressColor}">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="SizeRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <TextBlock Text="{Binding SizeDisplay}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          </Grid>
+                          <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                                IsVisible="{DynamicResource ThumbnailRowCompressedSizeVisible}">
+                            <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
+                                       HorizontalAlignment="Left"
+                                       IsVisible="{Binding !UseDirProgressColor}">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="CompressedSizeRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeDirBrush}"
+                                       HorizontalAlignment="Left"
+                                       IsVisible="{Binding UseDirProgressColor}">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="CompressedSizeRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <TextBlock Text="{Binding CompressedSizeDisplay}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          </Grid>
+                          <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                                IsVisible="{DynamicResource ThumbnailRowRatioVisible}">
+                            <!-- 压缩率：仅单画刷（与 Details 同款，无目录变体） -->
+                            <Rectangle Fill="{DynamicResource ProgressBarRatioBrush}"
+                                       HorizontalAlignment="Left">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="RatioBarValue" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <TextBlock Text="{Binding RatioDisplay}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          </Grid>
+                          <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                                IsVisible="{DynamicResource ThumbnailRowDateVisible}">
+                            <!-- 修改日期：单画刷（与 Details 同款）；短日期 yyyy-MM-dd（Tile 格宽放不下完整时间戳） -->
+                            <Rectangle Fill="{DynamicResource ProgressBarDateBrush}"
+                                       HorizontalAlignment="Left">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="DateRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <TextBlock Text="{Binding LastModifiedShortDisplay}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          </Grid>
                         </StackPanel>
                         <!-- 复选框模式的勾选框：整张卡片是勾选热区，Shift 连勾 / 单张切换的逻辑在
                              MainWindow.Thumbnails.cs 的 ThumbnailLayout_PointerPressed；复选框自己不吃点击，
@@ -962,55 +1066,162 @@
                                    TextWrapping="NoWrap"
                                    TextTrimming="CharacterEllipsis"
                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        <!-- 元数据四行：标签取既有 DataGrid_* 文案 key（已登记在 UpdateLocalizedStrings） -->
-                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Size]}"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text=":"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text="{Binding SizeDisplay}"
+                        <!-- ══════ 元数据四行（T4 改版）：定宽标签列（与假列头同键对齐）+ 数据条底纹
+                             + 行开关（DynamicResource 行资源，假列头右键菜单控制显隐）。
+                             条结构 = Details CellTemplate 同款：文件/目录双 Rectangle（UseDirProgressColor 切换）
+                             + 宽度 RatioToWidthConverter(比例, 行宽) + 文字覆盖；数据条跟随 ShowProgressBars。 -->
+                        <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                              IsVisible="{DynamicResource ThumbnailContentRowSizeVisible}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{DynamicResource ContentRowLabelColumnWidth}" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarSizeBrush}"
+                                     HorizontalAlignment="Left"
+                                     IsVisible="{Binding !UseDirProgressColor}">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="SizeRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarSizeDirBrush}"
+                                     HorizontalAlignment="Left"
+                                     IsVisible="{Binding UseDirProgressColor}">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="SizeRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Size]}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                            <TextBlock Text=":"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding SizeDisplay}"
                                      FontSize="11"
                                      TextTrimming="CharacterEllipsis"
                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Compressed]}"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text=":"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text="{Binding CompressedSizeDisplay}"
+                        </Grid>
+                        <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                              IsVisible="{DynamicResource ThumbnailContentRowCompressedSizeVisible}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{DynamicResource ContentRowLabelColumnWidth}" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
+                                     HorizontalAlignment="Left"
+                                     IsVisible="{Binding !UseDirProgressColor}">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="CompressedSizeRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarCompressedSizeDirBrush}"
+                                     HorizontalAlignment="Left"
+                                     IsVisible="{Binding UseDirProgressColor}">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="CompressedSizeRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Compressed]}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                            <TextBlock Text=":"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding CompressedSizeDisplay}"
                                      FontSize="11"
                                      TextTrimming="CharacterEllipsis"
                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Ratio]}"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text=":"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text="{Binding RatioDisplay}"
+                        </Grid>
+                        <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                              IsVisible="{DynamicResource ThumbnailContentRowRatioVisible}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{DynamicResource ContentRowLabelColumnWidth}" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <!-- 压缩率：仅单画刷（与 Details 同款，无目录变体） -->
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarRatioBrush}"
+                                     HorizontalAlignment="Left">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="RatioBarValue" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Ratio]}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                            <TextBlock Text=":"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding RatioDisplay}"
                                      FontSize="11"
                                      TextTrimming="CharacterEllipsis"
                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Modified]}"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text=":"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text="{Binding LastModifiedDisplay}"
+                        </Grid>
+                        <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                              IsVisible="{DynamicResource ThumbnailContentRowDateVisible}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="{DynamicResource ContentRowLabelColumnWidth}" />
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <!-- 修改日期：单画刷（与 Details 同款） -->
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarDateBrush}"
+                                     HorizontalAlignment="Left">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="DateRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Modified]}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                            <TextBlock Text=":"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding LastModifiedDisplay}"
                                      FontSize="11"
                                      TextTrimming="CharacterEllipsis"
                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        </StackPanel>
+                        </Grid>
                       </StackPanel>
                     </Grid>
                   </Border>
