@@ -789,6 +789,9 @@
                           <!-- ══════ Tile 迷你信息行（假列头右键菜单控制显隐；数据条跟随 ShowProgressBars）════════
                                结构与 Details 列的 CellTemplate 同构：数据条底纹（文件/目录双 Rectangle，
                                UseDirProgressColor 切换）+ 文字覆盖；条宽 = RatioToWidthConverter(比例, 行宽)。
+                               ⚠ 行宽基准是**本行 Grid 自身**（AncestorType=Grid），不是列表项 ContentPresenter：
+                               Tile 的格子宽 = 卡片 + 16，卡片内宽只有 卡片 - 8，用格子宽会让 100% 的条
+                               伸出卡片边框（2026-11-07 用户报障；回归见 CardRowDataBarLayoutTests）。
                                行显隐由 App 注入的行资源（TileRowShow*）经 DynamicResource 驱动 ⇒
                                假列头菜单切换即时生效、不走缩略图重解码；行高走紧凑度资源（规则 7）。
                                Margin="4,0" 与 Details 数据条文字一致。 -->
@@ -801,7 +804,7 @@
                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                   <Binding Path="SizeRatio" />
                                   <Binding Path="Bounds.Width"
-                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
                                 </MultiBinding>
                               </Rectangle.Width>
                             </Rectangle>
@@ -812,7 +815,7 @@
                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                   <Binding Path="SizeRatio" />
                                   <Binding Path="Bounds.Width"
-                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
                                 </MultiBinding>
                               </Rectangle.Width>
                             </Rectangle>
@@ -831,7 +834,7 @@
                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                   <Binding Path="CompressedSizeRatio" />
                                   <Binding Path="Bounds.Width"
-                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
                                 </MultiBinding>
                               </Rectangle.Width>
                             </Rectangle>
@@ -842,7 +845,7 @@
                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                   <Binding Path="CompressedSizeRatio" />
                                   <Binding Path="Bounds.Width"
-                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
                                 </MultiBinding>
                               </Rectangle.Width>
                             </Rectangle>
@@ -861,7 +864,7 @@
                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                   <Binding Path="RatioBarValue" />
                                   <Binding Path="Bounds.Width"
-                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
                                 </MultiBinding>
                               </Rectangle.Width>
                             </Rectangle>
@@ -880,7 +883,7 @@
                                 <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                   <Binding Path="DateRatio" />
                                   <Binding Path="Bounds.Width"
-                                           RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
                                 </MultiBinding>
                               </Rectangle.Width>
                             </Rectangle>
@@ -1079,7 +1082,10 @@
                         <!-- ══════ 元数据四行（T4 改版）：定宽标签列（与假列头同键对齐）+ 数据条底纹
                              + 行开关（DynamicResource 行资源，假列头右键菜单控制显隐）。
                              条结构 = Details CellTemplate 同款：文件/目录双 Rectangle（UseDirProgressColor 切换）
-                             + 宽度 RatioToWidthConverter(比例, 行宽) + 文字覆盖；数据条跟随 ShowProgressBars。 -->
+                             + 宽度 RatioToWidthConverter(比例, 行宽) + 文字覆盖；数据条跟随 ShowProgressBars。
+                             ⚠ 行宽基准是**本行 Grid 自身**（AncestorType=Grid），不是列表项 ContentPresenter：
+                             后者是整行宽度（含左侧缩略图卡），会让 100% 的条伸出右侧元数据栏
+                             （2026-11-07 同 Tile 一起修复；回归见 CardRowDataBarLayoutTests）。 -->
                         <Grid MinHeight="{DynamicResource ControlHeightSm}"
                               IsVisible="{DynamicResource ThumbnailContentRowSizeVisible}">
                           <Grid.ColumnDefinitions>
@@ -1098,7 +1104,7 @@
                               <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                 <Binding Path="SizeRatio" />
                                 <Binding Path="Bounds.Width"
-                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
                               </MultiBinding>
                             </Rectangle.Width>
                           </Rectangle>
@@ -1110,7 +1116,7 @@
                               <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                 <Binding Path="SizeRatio" />
                                 <Binding Path="Bounds.Width"
-                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
                               </MultiBinding>
                             </Rectangle.Width>
                           </Rectangle>
@@ -1146,7 +1152,7 @@
                               <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                 <Binding Path="CompressedSizeRatio" />
                                 <Binding Path="Bounds.Width"
-                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
                               </MultiBinding>
                             </Rectangle.Width>
                           </Rectangle>
@@ -1158,7 +1164,7 @@
                               <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                 <Binding Path="CompressedSizeRatio" />
                                 <Binding Path="Bounds.Width"
-                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
                               </MultiBinding>
                             </Rectangle.Width>
                           </Rectangle>
@@ -1194,7 +1200,7 @@
                               <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                 <Binding Path="RatioBarValue" />
                                 <Binding Path="Bounds.Width"
-                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
                               </MultiBinding>
                             </Rectangle.Width>
                           </Rectangle>
@@ -1230,7 +1236,7 @@
                               <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
                                 <Binding Path="DateRatio" />
                                 <Binding Path="Bounds.Width"
-                                         RelativeSource="{RelativeSource AncestorType=ContentPresenter}" />
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
                               </MultiBinding>
                             </Rectangle.Width>
                           </Rectangle>
