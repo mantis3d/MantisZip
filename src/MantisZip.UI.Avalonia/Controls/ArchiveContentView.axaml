@@ -71,6 +71,26 @@
                  HorizontalAlignment="Center"
                  VerticalAlignment="Center"
                  IsVisible="{Binding ShowSmallIcon}" />
+
+          <!-- ④ 格式角标：缩略图 / 文字卡态把兜底态的格式图标盖住了，这里以 chip 形式还给用户。
+               仅在卡片有内容（HasThumbnailContent = 缩略图或文字卡非空）时显示；兜底图标态
+               本身就是格式图标，不显示角标避免双图标。目录条目只有兜底态，天然不受影响。
+               Margin="0,0,2,2" 为 chip 右上角定位微调常量，豁免间距资源体系（chip 内边距语义）。 -->
+          <Border Width="{DynamicResource ControlHeightSm}"
+                  Height="{DynamicResource ControlHeightSm}"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Top"
+                  Margin="0,0,2,2"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}"
+                  Opacity="0.9"
+                  CornerRadius="{DynamicResource BorderRadius}"
+                  IsVisible="{Binding HasThumbnailContent}">
+            <Image Source="{Binding IconSource}"
+                   Width="14" Height="14"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+          </Border>
         </Panel>
       </Border>
     </DataTemplate>
