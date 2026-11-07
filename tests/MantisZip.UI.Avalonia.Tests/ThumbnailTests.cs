@@ -614,10 +614,47 @@ public class ThumbnailTests
         Assert.Equal(128, Math.Max(bitmap!.PixelSize.Width, bitmap.PixelSize.Height));
     }
 
+    /// <summary>
+    /// 像素数守卫：PNG/BMP 不支持降采样解码，压缩后很小的大尺寸图（纯色 → 几十 KB）
+    /// 也会整幅解码。超过 50MP（≈200MB 位图）必须返回 null，避免并发 4 时 OOM。
+    /// </summary>
+    [AvaloniaFact]
+    public void DecodeImage_SkipsPng_WhoseDecodedPixelsExceedGuard()
+    {
+        const int width = 7200, height = 7100;   // 51.1MP > 50MP
+        var png = CreateSolidPng(width, height);
+
+        Assert.True((long)width * height > ThumbnailService.MaxDecodePixels);
+        Assert.True(png.Length < 1024 * 1024, "纯色 PNG 压缩后应远小于 1MB（守卫必须在像素数而非字节数上）");
+
+        using var bitmap = ThumbnailService.DecodeImage(png, ".png", 128);
+
+        Assert.Null(bitmap);
+    }
+
+    /// <summary>
+    /// 守卫必须按**解码尺寸**而非源尺寸判定：JPEG 支持降采样档位，7200px 大图解码后
+    /// 只有 900px 级（&lt; 1MP），仍应正常出缩略图。
+    /// </summary>
+    [AvaloniaFact]
+    public void DecodeImage_StillDecodesHugeJpeg_BecauseScaledDecodeStaysUnderGuard()
+    {
+        const int width = 7200, height = 7100;
+        var jpeg = CreateSolidJpeg(width, height);
+
+        using var bitmap = ThumbnailService.DecodeImage(jpeg, ".jpg", 128);
+
+        Assert.NotNull(bitmap);
+        Assert.Equal(128, Math.Max(bitmap!.PixelSize.Width, bitmap.PixelSize.Height));
+    }
+
     // ─────────────────────────── helpers ───────────────────────────
 
     /// <summary>用随机噪声生成 JPEG（噪声不可压缩 → 文件尺寸接近真实照片，3200×2600 q100 ≈ 10MB+）。</summary>
-    private static byte[] CreateNoiseJpeg(int width, int height, int quality)
+    private static byte[] CreateNoiseJpeg(int width, int height, int quality) =>
+        CreateNoiseJpegAt(width, height, quality);
+
+    private static byte[] CreateNoiseJpegAt(int width, int height, int quality)
     {
         using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque));
         var pixels = new byte[width * height * 4];
@@ -626,6 +663,25 @@ public class ThumbnailTests
 
         using var image = SKImage.FromBitmap(bitmap);
         using var data = image.Encode(SKEncodedImageFormat.Jpeg, quality);
+        return data.ToArray();
+    }
+
+    /// <summary>生成纯色 PNG（极大尺寸在磁盘上也只有几十 KB，用来验证按像素数的守卫）。</summary>
+    private static byte[] CreateSolidPng(int width, int height) => CreateSolid(width, height, SKEncodedImageFormat.Png);
+
+    /// <summary>生成纯色 JPEG（大尺寸也只有一个很小的文件，解码走降采样档位）。</summary>
+    private static byte[] CreateSolidJpeg(int width, int height) => CreateSolid(width, height, SKEncodedImageFormat.Jpeg);
+
+    private static byte[] CreateSolid(int width, int height, SKEncodedImageFormat format)
+    {
+        using var bitmap = new SKBitmap(new SKImageInfo(width, height, SKColorType.Bgra8888, SKAlphaType.Opaque));
+        using (var canvas = new SKCanvas(bitmap))
+        {
+            canvas.Clear(SKColors.CornflowerBlue);
+        }
+
+        using var image = SKImage.FromBitmap(bitmap);
+        using var data = image.Encode(format, 90);
         return data.ToArray();
     }
 

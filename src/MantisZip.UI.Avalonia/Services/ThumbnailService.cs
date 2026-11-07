@@ -60,6 +60,12 @@ public sealed class ThumbnailService : IDisposable
     /// 位图（旧路径一张 4200×3200 大图解码峰值 ≈54MB × 并发 4 才是真正风险）。</para></summary>
     public const long MaxThumbnailEntrySize = 32L * 1024 * 1024;
 
+    /// <summary>解码像素数上限（50MP ≈ 200MB 位图）。
+    /// <para>只对「不能降采样解码」的格式生效（实测 SkiaSharp 4.152：PNG/BMP 忽略缩放请求，
+    /// 仍按原尺寸解码）——压缩后很小的大尺寸 PNG（纯色图）也可能解出上亿像素，并发 4 有 OOM 风险。
+    /// JPEG/WebP 支持缩放档位，解码后像素数远低于本值，不受影响。</para></summary>
+    public const long MaxDecodePixels = 50_000_000L;
+
     /// <summary>文字类条目读取的头部字节数。</summary>
     public const int TextHeadSize = 4096;
 
@@ -364,6 +370,13 @@ public sealed class ThumbnailService : IDisposable
         }
 
         var decodeInfo = new SKImageInfo(decodeWidth, decodeHeight, SKColorType.Bgra8888, SKAlphaType.Premul);
+
+        // 像素数守卫：按**解码尺寸**判定（不是源尺寸）。PNG/BMP 不支持降采样 ⇒ 解码尺寸 = 原尺寸，
+        // 压缩后几十 KB 的纯色大图也会整幅解码（50MP ≈ 200MB 位图，并发 4 有 OOM 风险）；
+        // JPEG/WebP 走缩放档位后解码像素数远低于阈值，不受影响。
+        if ((long)decodeWidth * decodeHeight > MaxDecodePixels)
+            return null;
+
         using var decoded = new SKBitmap(decodeInfo);
         var result = codec.GetPixels(decodeInfo, decoded.GetPixels());
 
