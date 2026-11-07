@@ -4,6 +4,7 @@
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
              xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              x:Class="MantisZip.UI.Avalonia.Controls.ArchiveContentView"
              x:DataType="vm:MainWindowViewModel">
 
@@ -18,6 +19,11 @@
     <conv:BoolToToggleBgBrushConverter x:Key="ThumbnailSelectedBrushConverter" />
     <!-- 文字片段非空判断（三态内容卡第 ② 态用），复用既有 StringNotEmptyConverter -->
     <conv:StringNotEmptyConverter x:Key="ThumbnailTextNotEmptyConverter" />
+    <!-- Content 模式元数据行标签列定宽（假列头单元与此同宽保证标签对齐）。
+         前置 spike（GridSharedSizeGroupSpikeTests，2026-11-07）：Avalonia 12 的
+         Grid.SharedSizeGroup 不跨 Grid 共享 ⇒ 走计划兜底方案定宽。
+         76px 覆盖最长标签（英文 "Compressed:" ≈71px @11pt；中文 4 字符 ≈48px），实测可微调。 -->
+    <sys:Double x:Key="ContentRowLabelColumnWidth">76</sys:Double>
 
     <!-- ══════════════ 三态内容卡（平铺项 / 内容行共用） ══════════════
          绑定对象是条目模型 ArchiveItemModel，按优先级三选一显示，全部用 IsVisible 组合判断，
@@ -615,8 +621,87 @@
                MainWindow.Thumbnails.cs 的 SetupThumbnailLayoutEvents →
                HookThumbnailLayoutContainer("TileLayoutScrollViewer") 按 x:Name 在代码里订阅
                （Tunnel 阶段 + 容器级 DoubleTapped 兜底），因此这里不写 XAML 事件属性。 -->
+          <!-- ══════ 平铺布局假列头：仿 Details 列头；右键 = 行显隐菜单（唯一入口），
+               左键 = 排序（三态循环与 Details 列头同语义，共用窗口级排序状态） ══════
+               最左「名称」单元恒显（名称不是信息行，兼做排序与全关时的右键宿主）；
+               信息行单元显隐与对应迷你行同步（DynamicResource 行资源）；
+               全关信息行时剩「名称」+ 空背景条，排序与右键入口均永在 -->
+          <Grid Grid.Row="2" RowDefinitions="Auto,*">
+            <Border x:Name="TileRowHeaderBorder"
+                    Grid.Row="0"
+                    Tag="TileRowHeader"
+                    IsVisible="{Binding IsTileLayout}"
+                    Height="{DynamicResource ControlHeightMd}"
+                    VerticalAlignment="Top"
+                    Background="{DynamicResource ThemeHeaderBgBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderLightBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="{DynamicResource SpacingXsThk}">
+              <Border.ContextMenu>
+                <ContextMenu Opening="CardRowHeaderContextMenu_Opening" />
+              </Border.ContextMenu>
+              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                <!-- ①「名称」：恒显（不可隐藏），左键 = 名称排序（DataGrid_Name 现有三语 key） -->
+                <Border Tag="Tile:Name"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowName" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+                <!-- ② 信息行单元（四个，见 CardRowCatalog）：图标/文字/排序路径与 Details 列头同款；
+                     IsVisible 与对应迷你行绑同一行资源 ⇒ 隐藏行连列头一起消失 -->
+                <Border Tag="Tile:Size"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        IsVisible="{DynamicResource ThumbnailRowSizeVisible}"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconRuler}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowSize" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+                <Border Tag="Tile:CompressedSize"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        IsVisible="{DynamicResource ThumbnailRowCompressedSizeVisible}"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowCompressedSize" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+                <Border Tag="Tile:RatioSort"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        IsVisible="{DynamicResource ThumbnailRowRatioVisible}"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconDataBarVertical}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowRatioSort" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+                <Border Tag="Tile:LastModified"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        IsVisible="{DynamicResource ThumbnailRowDateVisible}"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconCalendar}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowLastModified" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Border>
           <ScrollViewer x:Name="TileLayoutScrollViewer"
-                        Grid.Row="2"
+                        Grid.Row="1"
                         IsVisible="{Binding IsTileLayout}"
                         Background="{DynamicResource ThemeSurfaceBgBrush}"
                         Padding="{DynamicResource SpacingXsThk}"
@@ -711,12 +796,89 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </ScrollViewer>
+          </Grid>
 
           <!-- ══════════════ 内容布局（Content）：左侧内容卡 + 右侧元数据 ══════════════
                行 = 横向 Grid（左 128px 三态内容卡 + 右名称/大小/压缩后/压缩率/修改日期），
                事件与菜单接线方式与平铺布局完全一致（代码侧按 ContentLayoutScrollViewer 订阅）。 -->
+          <!-- 内容布局外壳：假列头 + 滚动区（包壳方式与平铺布局一致） -->
+          <Grid Grid.Row="2" RowDefinitions="Auto,*">
+          <Border Grid.Row="0"
+                  Tag="ContentRowHeader"
+                  IsVisible="{Binding IsContentLayout}"
+                  Height="{DynamicResource ControlHeightMd}"
+                  VerticalAlignment="Top"
+                  Background="{DynamicResource ThemeHeaderBgBrush}"
+                  BorderBrush="{DynamicResource ThemeBorderLightBrush}"
+                  BorderThickness="0,0,0,1"
+                  Padding="{DynamicResource SpacingXsThk}">
+            <Border.ContextMenu>
+              <ContextMenu Opening="CardRowHeaderContextMenu_Opening" />
+            </Border.ContextMenu>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <!-- 左垫位：内容行左侧三态内容卡的区域（卡片边长 + 行内边距），让标签单元落到元数据块起点 -->
+              <Border Width="{DynamicResource ThumbnailTileCellWidth}" />
+              <!-- 「名称」恒显单元（行内是元数据块首行加粗名称，未加 : 标签列——用同宽单元对齐） -->
+              <Border Tag="Content:Name"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowName" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+              <!-- 四个信息行单元：定宽标签列（与元数据行标签列同键 ContentRowLabelColumnWidth）；
+                   IsVisible 与对应元数据行绑同一行资源 ⇒ 隐藏行连列头一起消失 -->
+              <Border Tag="Content:Size"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      IsVisible="{DynamicResource ThumbnailContentRowSizeVisible}"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconRuler}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowSize" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+              <Border Tag="Content:CompressedSize"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      IsVisible="{DynamicResource ThumbnailContentRowCompressedSizeVisible}"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowCompressedSize" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+              <Border Tag="Content:RatioSort"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      IsVisible="{DynamicResource ThumbnailContentRowRatioVisible}"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconDataBarVertical}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowRatioSort" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+              <Border Tag="Content:LastModified"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      IsVisible="{DynamicResource ThumbnailContentRowDateVisible}"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconCalendar}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowLastModified" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Border>
           <ScrollViewer x:Name="ContentLayoutScrollViewer"
-                        Grid.Row="2"
+                        Grid.Row="1"
                         IsVisible="{Binding IsContentLayout}"
                         Background="{DynamicResource ThemeSurfaceBgBrush}"
                         Padding="{DynamicResource SpacingXsThk}"
@@ -856,6 +1018,7 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </ScrollViewer>
+          </Grid>
         </Grid>
       </Grid>
 
