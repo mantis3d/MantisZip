@@ -643,7 +643,10 @@
                     BorderThickness="0,0,0,1"
                     Padding="{DynamicResource SpacingXsThk}">
               <Border.ContextMenu>
-                <ContextMenu Opening="CardRowHeaderContextMenu_Opening" />
+                <!-- ⚠ Tile/Content 判定走本菜单 Tag（2026-11-07 回归：Avalonia 打开菜单时
+                     PlacementTarget 不自动回填（恒 null，WPF 语义），判别必须用菜单自带标识，
+                     回归见 CardRowHeaderMenuTests -->
+                <ContextMenu Opening="CardRowHeaderContextMenu_Opening" Tag="Tile" />
               </Border.ContextMenu>
               <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
                 <!-- ①「名称」：恒显（不可隐藏），左键 = 名称排序（DataGrid_Name 现有三语 key） -->
@@ -912,7 +915,8 @@
                事件与菜单接线方式与平铺布局完全一致（代码侧按 ContentLayoutScrollViewer 订阅）。 -->
           <!-- 内容布局外壳：假列头 + 滚动区（包壳方式与平铺布局一致） -->
           <Grid Grid.Row="2" RowDefinitions="Auto,*">
-          <Border Grid.Row="0"
+          <Border x:Name="ContentRowHeaderBorder"
+                  Grid.Row="0"
                   Tag="ContentRowHeader"
                   IsVisible="{Binding IsContentLayout}"
                   Height="{DynamicResource ControlHeightMd}"
@@ -922,7 +926,8 @@
                   BorderThickness="0,0,0,1"
                   Padding="{DynamicResource SpacingXsThk}">
             <Border.ContextMenu>
-              <ContextMenu Opening="CardRowHeaderContextMenu_Opening" />
+              <!-- ⚠ Tile/Content 判定走本菜单 Tag（同 Tile 列头，2026-11-07 回归） -->
+              <ContextMenu Opening="CardRowHeaderContextMenu_Opening" Tag="Content" />
             </Border.ContextMenu>
             <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
               <!-- 左垫位：内容行左侧三态内容卡的区域（卡片边长 + 行内边距），让标签单元落到元数据块起点 -->

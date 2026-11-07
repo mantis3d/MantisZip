@@ -123,7 +123,11 @@ public partial class ArchiveContentView
     private void CardRowHeaderContextMenu_Opening(object? sender, CancelEventArgs e)
     {
         if (sender is not ContextMenu menu) return;
-        var isTile = menu.PlacementTarget is Border { Tag: "TileRowHeader" };
+        // Tile/Content 判定走菜单自带 Tag（XAML 已给两个菜单分别写 Tag="Tile"/"Content"）。
+        // ⚠ 不要用 menu.PlacementTarget 判别：Avalonia 打开菜单时不自动回填该属性（恒 null，
+        //   WPF 语义才会自动回填），会退化成「两个菜单都写 Content 字段」（2026-11-07 回归，
+        //   用户真机发现 Tile 菜单开关无效反而改了 Content 的行；回归见 CardRowHeaderMenuTests）
+        var isTile = menu.Tag as string == "Tile";
         var vm = DataContext as MainWindowViewModel;
 
         menu.Items.Clear();
