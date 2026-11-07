@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-07** — 缩略图卡片格式角标 + 信息行数据条 + 假列头（行显隐右键菜单与列排序）落地（计划 `thumbnail-card-badge-and-row-bars`，v0.5.6 缩略图显示层改进，T1–T5 全部完成）
+  - **T1 格式角标**（`04438adf`）：`ThumbnailContentCard` 三态卡模板 Panel 内追加 chip 层（右上角、`ThemeSurfaceBgBrush` + `Opacity=0.9`），绑定既有 `HasThumbnailContent` / `IconSource`——仅缩略图/文字卡态显示，兜底图标态与目录条目天然不显示；`Margin="0,0,2,2"` 为 chip 定位常量（注释注明豁免间距资源体系原因）。
+  - **T2 设置持久化与资源注入**（`d17e2842`）：`AppSettings` 新增 8 个 bool（Tile 默认 大小+日期、Content 四行全开）+ `CardRowKind` 枚举；`App.ApplyThumbnailStyle` 启动时内联注入 8 个行可见性资源（settings 已在手不二次读盘），新增 `App.RefreshThumbnailRowResources()` 独立刷新入口（**不触发** `ThumbnailStyleChanged`——行显隐与解码无关，避免整包缩略图重解码）；VM 侧 `ToggleTileRow` / `ToggleContentRow` 单参命令（CommunityToolkit 不生成多参命令，计划里 `ToggleCardRow(bool, CardRowKind)` 签名实现时修正）+ `ToggleCardRowCore` 双写（启动内存副本 + `SaveSetting` 合并落盘）+ `GetCardRowValue` / `ApplyCardRow` internal 纯静态映射（零反射，可测）。
+  - **T3 假列头 + 列排序**（`beea0d04`）：Tile / Content 滚动区外包 Grid（Row="Auto,*"），假列头 Border（`ThemeHeaderBgBrush` 底 + 下边框、右键菜单挂整条 Border）+ 5 单元（恒显「名称」+ 四信息行单元，Tile 单元宽 = `ThumbnailTileCellWidth`、Content 用定宽标签列，`IsVisible` 绑同一行资源 ⇒ 隐藏行连列头一起消失）；菜单 Opening 动态构建（仿 Details 列头菜单，新建固定清单映射类 `CardRowCatalog`：TitleKey / IconKey / ResourceKey 全复用既有 key，i18n 零新增）；左键排序经 `CardHeaderSortRequested` 事件转 `MainWindow.OnCardHeaderSortTapped` 三态循环（新列升序 → 同列降序 → 恢复原序），与 Details 共用窗口级 `_lastSortMemberPath` / `_lastSortDescending`，`ApplyCurrentSort` 复用（压缩率走 `RatioSort`），零新增排序实现与持久化；`UpdateSortArrows` 内同步 `_archiveContent?.UpdateCardSortArrows`（两模式共 10 个箭头），内容区创建后即对齐 window.json 恢复的排序状态。
+  - **T4 信息行数据条底纹**（`e465ae70`）：Tile 名称行下插 4 条迷你行（大小/压缩后/压缩率/日期），Content 四元数据行从水平 StackPanel 改为「定宽标签列 + 数据条 + 文字」Grid；条结构复用 Details 列 CellTemplate 同款（文件/目录双 Rectangle 按 `UseDirProgressColor` 切换 + `RatioToWidthConverter` 宽度 + 文字覆盖），画刷 / 比例 / 数据条开关全走既有资源 ⇒ `ShowProgressBars` 关闭即整体消失、零额外接线；模型新属性 `ArchiveItemModel.LastModifiedShortDisplay`（yyyy-MM-dd 截片，注释钉住对 `LastModifiedDisplay` 格式前缀的依赖）。
+  - **前置 spike 结论**：Avalonia 12 `ColumnDefinition.SharedSizeGroup` **不跨 Grid 共享列宽**（实测同容器两 Grid 长标签 51px vs 短标签 27px），`GridSharedSizeGroupSpikeTests` 钉住现状防未来升级行为变化；Content 标签列对齐走计划兜底方案定宽常量 `ContentRowLabelColumnWidth=76px`（假列头单元与元数据行同键）。
+  - **测试**：新增 14 用例（`CardRowSettingsTests` 7 / `CardRowCatalogTests` 5 / `LastModifiedShortDisplayTests` 2 / spike 对照 1…）；`SaveSetting` 会写本机 settings.json，相关用例采用「快照 → 切两次还原 → finally 兜底还原」模式防污染，**后续同类测试沿用此模式**。
+  - **验证**：avalonia Debug 0 错误 + Release `--no-incremental` 终验 0 错误、`ui-tests` 811 全绿（795→811）、`tests` 全绿、`-Task check` / `guards`（9 项含 settingswiring）/ `i18n`（1448 key，0 新增）全绿；提交序列 `8b175d89`(docs) → `04438adf` → `d17e2842` → `beea0d04` → `e465ae70` → `f0d62063`(test)。
+
 **2026-11-06** — 计划：缩略图/图标缓存与列表惰性分批（v0.5.6 缩略图功能性能债）
   - **起因**：`file-list-thumbnails.md`（v0.5.6 已完成）实施记录里登记的三条「已知改进口子」——①VM 每包 `new ThumbnailService(cache: null)` 自建缓存，切包/切目录丢缓存；②Tile/Content 无 UI 虚拟化（Avalonia 12 无 ItemsRepeater），超大目录一次性铺死；③`IcoIconLoader` 无缓存，筛选输入每敲一个字重读最多 20 个 ico。
   - **访谈结论**：#1 与 #3 立即纳入；#2 采「A+B 两步走」——方案 A（分批惰性铺条，每批 200 滚动到底追加）为必做，方案 B（自写 VirtualizingPanel）留档，Phase 1 真机 QA 后由用户单独决策（Avalonia 12.1.2 渲染深水区，风险最高）。
