@@ -240,6 +240,35 @@ public class AppSettings
     /// </summary>
     public int ThumbnailSize { get; set; } = 128;
 
+    // ── 卡片信息行显示状态（2026-11-06 访谈：交互唯一入口 = Tile/Content 假列头右键菜单；
+    //    设置窗不加 UI；持久化重启恢复。命名 Tile/Content 前缀区分两模式独立配置 ──
+    // 消费者（规则 23：加设置项必须当次接线）：App.ApplyThumbnailStyle / RefreshThumbnailRowResources
+    // 注入行可见性资源 + 卡片迷你行/假列头模板的 {DynamicResource} 绑定。
+
+    /// <summary>Tile 迷你信息行：大小行。默认开（访谈默认 大小+修改日期）。</summary>
+    public bool TileRowShowSize { get; set; } = true;
+
+    /// <summary>Tile 迷你信息行：压缩后大小行。默认关。</summary>
+    public bool TileRowShowCompressedSize { get; set; } = false;
+
+    /// <summary>Tile 迷你信息行：压缩率行。默认关。</summary>
+    public bool TileRowShowRatio { get; set; } = false;
+
+    /// <summary>Tile 迷你信息行：修改日期行（短日期 yyyy-MM-dd）。默认开。</summary>
+    public bool TileRowShowDate { get; set; } = true;
+
+    /// <summary>Content 元数据行：大小行。默认开（v0.5.6 起四行全显，保持观感）。</summary>
+    public bool ContentRowShowSize { get; set; } = true;
+
+    /// <summary>Content 元数据行：压缩后大小行。默认开。</summary>
+    public bool ContentRowShowCompressedSize { get; set; } = true;
+
+    /// <summary>Content 元数据行：压缩率行。默认开。</summary>
+    public bool ContentRowShowRatio { get; set; } = true;
+
+    /// <summary>Content 元数据行：修改日期行。默认开。</summary>
+    public bool ContentRowShowDate { get; set; } = true;
+
     public string Language { get; set; } = "zh";
     /// <summary>
     /// 是否显示文件列表里的**数据条**（每行文字后那条表示相对占比的彩色横条）。

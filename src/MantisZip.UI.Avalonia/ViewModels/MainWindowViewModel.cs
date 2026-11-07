@@ -2324,6 +2324,60 @@ public partial class MainWindowViewModel : ObservableObject
         }
     }
 
+    // ── 卡片信息行切换（Tile/Content 假列头右键菜单唯一入口，thumbnail-card-badge-and-row-bars T2）──
+
+    /// <summary>
+    /// 切换一个卡片信息行的显示并重注入行资源。落盘走合并写（惯例同 <see cref="ToggleProgressBars"/>：
+    /// 直接 <see cref="AppSettings.Save"/> 会用启动副本整体覆盖用户刚在设置窗保存的其它设置）。
+    /// **禁止**在此触发 ThumbnailStyleChanged——行显隐与解码无关，触发会导致整包缩略图重解码。
+    /// </summary>
+    private void ToggleCardRowCore(bool isTileLayout, CardRowKind kind)
+    {
+        var newValue = !GetCardRowValue(_appSettings, isTileLayout, kind);
+
+        // 双写：启动内存副本（= Load() 缓存实例，保持读侧一致）+ 合并落盘
+        ApplyCardRow(_appSettings, isTileLayout, kind, newValue);
+        SaveSetting(s => ApplyCardRow(s, isTileLayout, kind, newValue));
+
+        App.RefreshThumbnailRowResources();
+    }
+
+    /// <summary>读加映射的当前值（(模式, 行) → AppSettings 字段；纯映射，不许反射/表达式树）。</summary>
+    internal static bool GetCardRowValue(AppSettings settings, bool isTile, CardRowKind kind) => (isTile, kind) switch
+    {
+        (true, CardRowKind.Size) => settings.TileRowShowSize,
+        (true, CardRowKind.CompressedSize) => settings.TileRowShowCompressedSize,
+        (true, CardRowKind.Ratio) => settings.TileRowShowRatio,
+        (true, CardRowKind.Date) => settings.TileRowShowDate,
+        (false, CardRowKind.Size) => settings.ContentRowShowSize,
+        (false, CardRowKind.CompressedSize) => settings.ContentRowShowCompressedSize,
+        (false, CardRowKind.Ratio) => settings.ContentRowShowRatio,
+        (false, CardRowKind.Date) => settings.ContentRowShowDate,
+        _ => true,
+    };
+
+    /// <summary>写映射（(模式, 行) → AppSettings 字段；纯映射且不落盘，落盘由调用方合并写）。</summary>
+    internal static void ApplyCardRow(AppSettings settings, bool isTile, CardRowKind kind, bool value)
+    {
+        switch (isTile, kind)
+        {
+            case (true, CardRowKind.Size): settings.TileRowShowSize = value; break;
+            case (true, CardRowKind.CompressedSize): settings.TileRowShowCompressedSize = value; break;
+            case (true, CardRowKind.Ratio): settings.TileRowShowRatio = value; break;
+            case (true, CardRowKind.Date): settings.TileRowShowDate = value; break;
+            case (false, CardRowKind.Size): settings.ContentRowShowSize = value; break;
+            case (false, CardRowKind.CompressedSize): settings.ContentRowShowCompressedSize = value; break;
+            case (false, CardRowKind.Ratio): settings.ContentRowShowRatio = value; break;
+            case (false, CardRowKind.Date): settings.ContentRowShowDate = value; break;
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleTileRow(CardRowKind kind) => ToggleCardRowCore(true, kind);
+
+    [RelayCommand]
+    private void ToggleContentRow(CardRowKind kind) => ToggleCardRowCore(false, kind);
+
     [RelayCommand]
     private void ToggleSepDirBaseline()
     {
