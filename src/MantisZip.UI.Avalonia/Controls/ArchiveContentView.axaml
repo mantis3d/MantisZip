@@ -22,7 +22,12 @@
     <!-- Content 模式元数据行标签列定宽（假列头单元与此同宽保证标签对齐）。
          前置 spike（GridSharedSizeGroupSpikeTests，2026-11-07）：Avalonia 12 的
          Grid.SharedSizeGroup 不跨 Grid 共享 ⇒ 走计划兜底方案定宽。
-         76px 覆盖最长标签（英文 "Compressed:" ≈71px @11pt；中文 4 字符 ≈48px），实测可微调。 -->
+         76px 覆盖最长标签（英文 "Compressed:" ≈71px @11pt；中文 4 字符 ≈48px），实测可微调。
+         ⚠ 本资源只能给 Double 型属性（假列头 Border.Width 等）用——GridLength 型属性
+         （RowDefinition/ColumnDefinition 的 Width/Height）禁止绑它：挂树重求值时
+         double→GridLength 强转抛 InvalidCastException 整进程崩溃（2026-11-07 事故，
+         崩溃回归见 ContentLayoutRenderTests）；元数据行的 ColumnDefinition 用字面量 76 与本资源同值同步。
+         与规则 5 的 double/Thickness 双资源同理：GridLength 属性也吃不到 double 值。 -->
     <sys:Double x:Key="ContentRowLabelColumnWidth">76</sys:Double>
 
     <!-- ══════════════ 三态内容卡（平铺项 / 内容行共用） ══════════════
@@ -1073,7 +1078,11 @@
                         <Grid MinHeight="{DynamicResource ControlHeightSm}"
                               IsVisible="{DynamicResource ThumbnailContentRowSizeVisible}">
                           <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="{DynamicResource ContentRowLabelColumnWidth}" />
+                            <ColumnDefinition Width="76" /><!-- ⚠ GridLength 属性不得绑 {DynamicResource}（2026-11-07 崩溃回归：
+                                                  ContentRowLabelColumnWidth 资源是 sys:Double，绑给 GridLength 类型的
+                                                  Columns.Width 在行挂树重求值时 double→GridLength 强转抛 InvalidCastException，
+                                                  整进程终止——修复 = 本处用字面常量；值必须与 ContentRowLabelColumnWidth
+                                                  资源保持一致（改任一处必须同步另一处）） -->
                             <ColumnDefinition Width="*" />
                           </Grid.ColumnDefinitions>
                           <Rectangle Grid.ColumnSpan="2"
@@ -1117,7 +1126,11 @@
                         <Grid MinHeight="{DynamicResource ControlHeightSm}"
                               IsVisible="{DynamicResource ThumbnailContentRowCompressedSizeVisible}">
                           <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="{DynamicResource ContentRowLabelColumnWidth}" />
+                            <ColumnDefinition Width="76" /><!-- ⚠ GridLength 属性不得绑 {DynamicResource}（2026-11-07 崩溃回归：
+                                                  ContentRowLabelColumnWidth 资源是 sys:Double，绑给 GridLength 类型的
+                                                  Columns.Width 在行挂树重求值时 double→GridLength 强转抛 InvalidCastException，
+                                                  整进程终止——修复 = 本处用字面常量；值必须与 ContentRowLabelColumnWidth
+                                                  资源保持一致（改任一处必须同步另一处）） -->
                             <ColumnDefinition Width="*" />
                           </Grid.ColumnDefinitions>
                           <Rectangle Grid.ColumnSpan="2"
@@ -1161,7 +1174,11 @@
                         <Grid MinHeight="{DynamicResource ControlHeightSm}"
                               IsVisible="{DynamicResource ThumbnailContentRowRatioVisible}">
                           <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="{DynamicResource ContentRowLabelColumnWidth}" />
+                            <ColumnDefinition Width="76" /><!-- ⚠ GridLength 属性不得绑 {DynamicResource}（2026-11-07 崩溃回归：
+                                                  ContentRowLabelColumnWidth 资源是 sys:Double，绑给 GridLength 类型的
+                                                  Columns.Width 在行挂树重求值时 double→GridLength 强转抛 InvalidCastException，
+                                                  整进程终止——修复 = 本处用字面常量；值必须与 ContentRowLabelColumnWidth
+                                                  资源保持一致（改任一处必须同步另一处）） -->
                             <ColumnDefinition Width="*" />
                           </Grid.ColumnDefinitions>
                           <!-- 压缩率：仅单画刷（与 Details 同款，无目录变体） -->
@@ -1193,7 +1210,11 @@
                         <Grid MinHeight="{DynamicResource ControlHeightSm}"
                               IsVisible="{DynamicResource ThumbnailContentRowDateVisible}">
                           <Grid.ColumnDefinitions>
-                            <ColumnDefinition Width="{DynamicResource ContentRowLabelColumnWidth}" />
+                            <ColumnDefinition Width="76" /><!-- ⚠ GridLength 属性不得绑 {DynamicResource}（2026-11-07 崩溃回归：
+                                                  ContentRowLabelColumnWidth 资源是 sys:Double，绑给 GridLength 类型的
+                                                  Columns.Width 在行挂树重求值时 double→GridLength 强转抛 InvalidCastException，
+                                                  整进程终止——修复 = 本处用字面常量；值必须与 ContentRowLabelColumnWidth
+                                                  资源保持一致（改任一处必须同步另一处）） -->
                             <ColumnDefinition Width="*" />
                           </Grid.ColumnDefinitions>
                           <!-- 修改日期：单画刷（与 Details 同款） -->
