@@ -308,6 +308,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 缩略图卡片格式角标 + 信息行数据条 + 假列头（行显隐右键菜单 = Tile/Content 配置分开的唯一入口 + 共享 Details 窗口级列排序；Avalonia 12 SharedSizeGroup 不跨 Grid 实测钉子 → Content 标签列定宽兜底；i18n 零新增、排序/数据条全复用 Details 既有资源） | [thumbnail-card-badge-and-row-bars.md](.omo/plans/已完成/thumbnail-card-badge-and-row-bars.md) | 未发布（2026-11-07 归档，随 v0.5.6 显示层改进） |
 | 7z solid 全量解压改走批量接口（SevenZipExtractorFactory 分流：满足条件走 ExtractFiles(destDir, indexes) 一次解压、冲突前置预解析、改名条目二次批量 + 同卷暂存 File.Move；800×64KB 19.3s → 1.67s） | [sevenzip-solid-extract-batch.md](.omo/plans/已完成/sevenzip-solid-extract-batch.md) | 未发布（2026-11-04 归档，随 v0.5.6；HDD 复测待做） |
 | 选中条目 / 拖拽解压改走批量接口（SelectedItemsExtractService 复用批量分流，800×64KB 只解选中项 10.0s → 2.3s，约 4.4×） | [selected-items-bulk-extract.md](.omo/plans/已完成/selected-items-bulk-extract.md) | 未发布（2026-11-04 归档，随 v0.5.6；HDD 复测待做） |
 | 文件名代码页检测与切换（NameEncodingCatalog 启发式检测 + 主工具栏下拉 + CodePageInputDialog「其他代码页」+ ArchiveOptions.ReadEncoding；覆盖 ZIP/TAR/GZ） | [file-name-codepage.md](.omo/plans/已完成/file-name-codepage.md) | 未发布（2026-11-04 归档，随 v0.5.6） |
