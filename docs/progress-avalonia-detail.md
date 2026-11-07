@@ -14,6 +14,7 @@
   - **前置 spike 结论**：Avalonia 12 `ColumnDefinition.SharedSizeGroup` **不跨 Grid 共享列宽**（实测同容器两 Grid 长标签 51px vs 短标签 27px），`GridSharedSizeGroupSpikeTests` 钉住现状防未来升级行为变化；Content 标签列对齐走计划兜底方案定宽常量 `ContentRowLabelColumnWidth=76px`（假列头单元与元数据行同键）。
   - **测试**：新增 14 用例（`CardRowSettingsTests` 7 / `CardRowCatalogTests` 5 / `LastModifiedShortDisplayTests` 2 / spike 对照 1…）；`SaveSetting` 会写本机 settings.json，相关用例采用「快照 → 切两次还原 → finally 兜底还原」模式防污染，**后续同类测试沿用此模式**。
   - **验证**：avalonia Debug 0 错误 + Release `--no-incremental` 终验 0 错误、`ui-tests` 811 全绿（795→811）、`tests` 全绿、`-Task check` / `guards`（9 项含 settingswiring）/ `i18n`（1448 key，0 新增）全绿；提交序列 `8b175d89`(docs) → `04438adf` → `d17e2842` → `beea0d04` → `e465ae70` → `f0d62063`(test)。
+  - **RELEASE_NOTES（规则 18 确认）**：用户选择「更新（推荐）」口径——合并为 1 条带 ①②③ 的**功能增强**条目入 v0.5.6「界面 / UI」节（紧跟卡片查看方式条目之后，中英镜像、每条不超过两句）；**不写「修复」条目**（v0.5.6 未打 tag，格式角标缺失等属同周期内引入并修掉、从未有用户拿到带该问题的正式版，符合规则 18 核心判据）。不设截图占位（无对应素材，发版截图流程另行处理）。
 
 **2026-11-06** — 计划：缩略图/图标缓存与列表惰性分批（v0.5.6 缩略图功能性能债）
   - **起因**：`file-list-thumbnails.md`（v0.5.6 已完成）实施记录里登记的三条「已知改进口子」——①VM 每包 `new ThumbnailService(cache: null)` 自建缓存，切包/切目录丢缓存；②Tile/Content 无 UI 虚拟化（Avalonia 12 无 ItemsRepeater），超大目录一次性铺死；③`IcoIconLoader` 无缓存，筛选输入每敲一个字重读最多 20 个 ico。
