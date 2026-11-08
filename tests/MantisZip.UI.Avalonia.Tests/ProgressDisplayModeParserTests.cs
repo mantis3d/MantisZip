@@ -5,7 +5,7 @@ namespace MantisZip.UI.Avalonia.Tests;
 
 /// <summary>
 /// 进度窗口显示偏好（内容模式 / 信息量分级）的持久化解析测试：
-/// 枚举 ↔ AppSettings 字符串 双向映射 + 未知/空值回退默认（详细 / 中）。
+/// 枚举 ↔ AppSettings 字符串 双向映射 + 未知/空值回退默认（详细 / 完整）。
 /// </summary>
 public class ProgressDisplayModeParserTests
 {
@@ -41,15 +41,15 @@ public class ProgressDisplayModeParserTests
     [InlineData(null)]
     [InlineData("")]
     [InlineData("bogus")]
-    public void ParseDensity_UnknownOrNull_FallsBackToMedium(string? value)
-        => Assert.Equal(ProgressInfoDensity.Medium, ProgressDisplayModeParser.ParseDensity(value));
+    public void ParseDensity_UnknownOrNull_FallsBackToFull(string? value)
+        => Assert.Equal(ProgressInfoDensity.Full, ProgressDisplayModeParser.ParseDensity(value));
 
     [Fact]
-    public void AppSettings_DisplayPreferenceDefaults_AreDetailedAndMedium()
+    public void AppSettings_DisplayPreferenceDefaults_AreDetailedAndFull()
     {
         var s = new AppSettings();
         Assert.Equal("detailed", s.ProgressContentMode);
-        Assert.Equal("medium", s.ProgressInfoDensity);
+        Assert.Equal("full", s.ProgressInfoDensity);
     }
 
     [Fact]

@@ -63,7 +63,7 @@ public partial class ProgressWindow : Window
         _vm = new ProgressViewModel();
         DataContext = _vm;
 
-        // 应用上次持久化的显示偏好（内容模式 / 信息量分级；首次使用为默认 详细 / 标准）。
+        // 应用上次持久化的显示偏好（内容模式 / 信息量分级；首次使用为默认 详细 / 完整）。
         // 须在 ApplyInfoDensity() 之前写入 VM——该调用按 InfoDensity 计算批列表高度。
         var displaySettings = AppSettings.Load();
         _vm.ContentMode = ProgressDisplayModeParser.ParseContentMode(displaySettings.ProgressContentMode);
@@ -91,7 +91,7 @@ public partial class ProgressWindow : Window
         // 已用时间行每秒刷新（引擎无报告期间也走字）
         _elapsedTimer.Tick += (_, _) => _vm.RefreshTimeDisplay();
 
-        // 按初始信息量分级（Medium）落地行距与批处理列表高度
+        // 按已应用的信息量分级落地行距与批处理列表高度
         ApplyInfoDensity();
 
         // 动态窗口高度下限：每次布局完成后同步 MinHeight = 内容自然高度（防手动缩窗裁切 UI）

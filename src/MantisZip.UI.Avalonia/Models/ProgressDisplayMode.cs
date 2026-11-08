@@ -9,7 +9,7 @@ public enum ProgressInfoDensity { Minimal, Medium, Full }
 /// <summary>
 /// 进度窗口显示偏好（内容模式 / 信息量分级）的持久化解析：
 /// AppSettings 字符串 ↔ 枚举 的双向映射。独立成静态类以便单测（不依赖窗口/文件系统）。
-/// 默认值：内容模式 <see cref="ProgressContentMode.Detailed"/>、信息量 <see cref="ProgressInfoDensity.Medium"/>。
+/// 默认值：内容模式 <see cref="ProgressContentMode.Detailed"/>、信息量 <see cref="ProgressInfoDensity.Full"/>。
 /// </summary>
 public static class ProgressDisplayModeParser
 {
@@ -33,15 +33,16 @@ public static class ProgressDisplayModeParser
     public static string ToSetting(ProgressInfoDensity density) => density switch
     {
         ProgressInfoDensity.Minimal => "minimal",
-        ProgressInfoDensity.Full => "full",
-        _ => "medium",
+        ProgressInfoDensity.Medium => "medium",
+        _ => "full",
     };
 
-    /// <summary>持久化字符串 → 信息量分级（未知/空值回退默认 Medium）。</summary>
+    /// <summary>持久化字符串 → 信息量分级（未知/空值回退默认 Full）。</summary>
     public static ProgressInfoDensity ParseDensity(string? value) => value switch
     {
         "minimal" => ProgressInfoDensity.Minimal,
+        "medium" => ProgressInfoDensity.Medium,
         "full" => ProgressInfoDensity.Full,
-        _ => ProgressInfoDensity.Medium,
+        _ => ProgressInfoDensity.Full,
     };
 }

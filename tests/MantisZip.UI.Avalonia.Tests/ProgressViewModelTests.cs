@@ -398,11 +398,11 @@ public class ProgressViewModelTests
     {
         var vm = new ProgressViewModel();
 
-        // 默认 Medium（中等单行可见、统计卡隐藏）
-        Assert.Equal(ProgressInfoDensity.Medium, vm.InfoDensity);
-        Assert.True(vm.IsMediumDensity);
+        // 默认 Full（2026-11-08 出厂默认由 Medium 改为 Full；统计卡可见、全部明细行显示）
+        Assert.Equal(ProgressInfoDensity.Full, vm.InfoDensity);
+        Assert.True(vm.IsFullDensity);
         Assert.False(vm.IsMinimalDensity);
-        Assert.False(vm.IsFullDensity);
+        Assert.False(vm.IsMediumDensity);
 
         var notified = new List<string>();
         vm.PropertyChanged += (_, e) => notified.Add(e.PropertyName ?? string.Empty);
@@ -419,13 +419,13 @@ public class ProgressViewModelTests
         Assert.False(vm.IsFullDensity);
         seen.Add((vm.IsMinimalDensity, vm.IsMediumDensity, vm.IsFullDensity));
 
-        vm.InfoDensity = ProgressInfoDensity.Full;
+        vm.InfoDensity = ProgressInfoDensity.Medium;
         Assert.False(vm.IsMinimalDensity);
-        Assert.False(vm.IsMediumDensity);
-        Assert.True(vm.IsFullDensity);
+        Assert.True(vm.IsMediumDensity);
+        Assert.False(vm.IsFullDensity);
         seen.Add((vm.IsMinimalDensity, vm.IsMediumDensity, vm.IsFullDensity));
 
-        // 三档输出互不相同（Medium 已在开头采集）
+        // 三档输出互不相同（Full 已在开头采集）
         Assert.Equal(3, seen.Distinct().Count());
 
         // 派生属性变更通知触发

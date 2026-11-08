@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-08** — 进度窗口「信息量 = 完整」随出厂默认固化（同日默认值固化的追加项）
+  - **默认值**：`AppSettings.ProgressInfoDensity` `"medium"`→`"full"`（用户把进度窗口信息量调到完整后要求一并固化）。同步三处「默认」语义：`ProgressDisplayModeParser.ParseDensity` 未知/空值回退由 Medium 改 Full、`ProgressViewModel._infoDensity` 初值改 Full，以及 `ProgressWindow` 构造/`ApplyInfoDensity` 两处注释。
+  - **顺带修掉一个隐性坑**：`ToSetting` 原先靠 `_ => "medium"` 兜住 Medium 分支，回退档改成 Full 后 `ParseDensity("medium")` 会落进回退档 → 往返测试当场变红；改为显式 `ProgressInfoDensity.Medium => "medium"` + `_ => "full"`，两侧 switch 对称。
+  - **回归钉子**：`FactoryDefaultsTests` 增加 `"full"` 断言；`ProgressDisplayModeParserTests` 两个用例改名改期望（`AppSettings_DisplayPreferenceDefaults_AreDetailedAndFull` / `ParseDensity_UnknownOrNull_FallsBackToFull`）；`ProgressViewModelTests.InfoDensity_ChangesVisibleDetailLevel` 初值断言改 Full，并把三档设置顺序重排为 Full→Minimal→Medium，保持「三种组合互不相同」的原意。
+  - **验证**：avalonia 构建 0 错误、`ui-tests` 全绿、`-Task check` / `guards`（9 项）/ `i18n`（1448 key）全绿。先写测试并确认 6 例变红（默认值/回退/VM 初值），再改实现转绿。
+
 **2026-11-08** — 出厂默认设置按用户真机配置固化（用户要求「把默认设置改成我刚刚这些」）
   - **背景**：用户在日常使用中把设置调成了自己习惯的一套，希望新装用户也拿到这套默认值。做法是逐项比对本机 `settings.json` / `window.json` / `layout.json` / `metadata-panel.json` 与代码默认值，只把**用户可改的默认值**固化，运行期状态（窗口位置、上次更新检查时间、选择器上次停留标签、收藏/最近、自适应规则迁移版本号）一律不动。
   - **`settings.json` 7 项**（`Models/AppSettings.cs`）：`AutoCloseDelaySeconds` 3→5、`TextPreviewFontSize` 13→18、`MaxPreviewFileSize` 15→20MB、`FontPreviewFontSize` 12→24、`ThumbnailShowBorder` false→true、`ThumbnailUseTransparency` true→false、`ThumbnailBackdropColor` `#FFFFFF`→`#7C818A`；同步 `PreviewService.MaxPreviewFileSize` 静态默认与 `SettingsWindowViewModel` 的字段初值（避免「设置窗默认」与「首次运行默认」两套值），并更新相关注释（含 `MainWindowViewModel.Preview.cs` 的 15MB 说明、`docs/KNOWN_ISSUES.md` KI-007 的 20MB 表述）。`ParallelExtractDegree` **保持 `Environment.ProcessorCount`**（用户本机 20 核、手动压到 16，写死会压低高核机器的默认值；用户确认）。
