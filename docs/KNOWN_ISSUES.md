@@ -30,7 +30,7 @@
 | **KI-004** | UI 测试用固定临时目录（非 GUID） | 测试卫生 | 成本超阈值 | 下次改这两个用例时顺带改；或出现「残留文件导致红」的实例 | 阻塞中 |
 | **KI-005** | 29 条 7z 用例被 CI 过滤、永不运行 | 覆盖缺口 | 等计划（CI 环境） | CI 装上 7-Zip 并去掉 `SevenZipEngine` 过滤 | 阻塞中 |
 | **KI-006** | `.jar/.war/.ear/.apk` 能打开但**不参与文件关联**（也不进右键菜单/设置页关联列表） | 功能留白 | 缺决策 + 成本 | 用户反馈「想在资源管理器里双击/右键打开 jar」时；或做「关联格式可勾选」设置项时 | 已修复（关联格式可勾选，2026-10-29） |
-| **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
+| **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 20MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 交互 / 文案 | 缺决策 | 已修复（三态契约，2026-10-28） | 已修复 |
 | **KI-009** | 5 个 AppSettings 死开关（存了值、有 UI、无消费者） | 技术债 / 死代码 | 缺决策 | 决定这 5 项的去留（接线 / 删属性 / 删 UI）时；守卫豁免表已按名登记，修一个删一行 | 阻塞中 |
 | **KI-010** | RAR4 分卷不做块链结构校验（末卷尾部损坏可能漏检） | 功能留白 | — | 已修复（RAR4 块链校验，2026-11-03，issue #68） | 已修复（2026-11-03） |
@@ -107,11 +107,11 @@
 - **已修复（2026-10-29）**：做「关联格式可勾选」时一并纳入。`src/MantisZip.Core/Utils/ArchiveExtensionCatalog.cs` 成为「哪些扩展名算压缩包」的单一事实源：`.jar/.war/.ear/.apk` 与分卷占位 `.001` 都在设置页逐行显示、**两列勾选**（左列文件关联 / 右列「打开压缩包」筛选），`AssociateByDefault: false` 保证默认仍不抢默认程序（用户想接管时自己勾）。`ShellIntegration.ArchiveExtensions` 改由目录派生（不再是写死 8 项），`IsAssocEnabledInSettings` 改读 `AppSettings.AssocExtensions` 集合，未设值时回落「目录默认值 + 自定义扩展名」。回归测试：`tests/MantisZip.UI.Avalonia.Tests/AssocPreferencesTests.cs`（目录默认值 / 两列互不影响 / `.tgz` 与 `.tar.gz` 互认 / 老布尔迁移）与 `ArchiveOpenDialogPatternTests.SettingsDrivenPatterns_FollowOpenDialogColumn`。
 - **状态**：已修复（2026-10-29，关联格式可勾选）
 
-## KI-007 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束）
+## KI-007 大 PDF 预览必须整条目落盘（无法部分预览，也不受 20MB 上限约束）
 
 - **发现**：2026-10-28（`preview-memory-first` 切片 4 判定时）
-- **现象**：预览压缩包里的 PDF 时，无论多大都必须先把**整条目**解压到 `%TEMP%\MantisZip\Preview\preview_*.pdf` 才能渲染首页；一个 500MB 的 PDF 会先占 500MB 临时磁盘，再解析出第 1 页。且 PDF 在 `PreviewService.MetadataOnlyExtensions` 里，**不受 `MaxPreviewFileSize`（默认 15MB）拦截**，所以它是唯一「没有大小闸门、又必须整条落盘」的预览类型。
-- **证据**：`src\MantisZip.Core\Utils\PdfParser.cs:64` 的 `ParseFromSeekable` 是**头尾双向扫描**（与 `PreviewViewModel.ShowPdfAsync` 一样依赖 xref/trailer 在文件**末尾**）⇒ 只给前 N 字节的截断数据解析不出任何页；`PreviewViewModel` 的 PDF 分支本来就只 `LoadPdfPageAsync(1)`（只渲染首页）。计划里曾设想「PDF 也走 head-only 部分预览」，实测后判定**不可行且是回归**（本来就不受 15MB 限制，加拒绝等于把能看的 PDF 变成不能看）。
+- **现象**：预览压缩包里的 PDF 时，无论多大都必须先把**整条目**解压到 `%TEMP%\MantisZip\Preview\preview_*.pdf` 才能渲染首页；一个 500MB 的 PDF 会先占 500MB 临时磁盘，再解析出第 1 页。且 PDF 在 `PreviewService.MetadataOnlyExtensions` 里，**不受 `MaxPreviewFileSize`（默认 20MB）拦截**，所以它是唯一「没有大小闸门、又必须整条落盘」的预览类型。
+- **证据**：`src\MantisZip.Core\Utils\PdfParser.cs:64` 的 `ParseFromSeekable` 是**头尾双向扫描**（与 `PreviewViewModel.ShowPdfAsync` 一样依赖 xref/trailer 在文件**末尾**）⇒ 只给前 N 字节的截断数据解析不出任何页；`PreviewViewModel` 的 PDF 分支本来就只 `LoadPdfPageAsync(1)`（只渲染首页）。计划里曾设想「PDF 也走 head-only 部分预览」，实测后判定**不可行且是回归**（本来就不受 20MB 限制，加拒绝等于把能看的 PDF 变成不能看）。
 - **为什么现在不修**：**成本超阈值 + 上游限制**。要真做到部分预览，得让 PdfPig 支持「从截断流式数据增量解析」或提供随机访问的异步加载器；当前的绕法是内存映射（`MemoryMappedFile`）+ PdfPig 随机访问流，改动面横跨 Core 解析层与三处调用点，而收益只对超大 PDF 成立。
 - **复评条件**：① PdfPig 发布支持截断/随机访问流解析的版本（升级时复评）；② 或用户反馈「预览 >100MB 的 PDF 卡顿 / `%TEMP%` 被涨满」——届时优先做内存映射而不是 head-only。
 - **关联**：`.omo/plans/已完成/preview-memory-first.md` 的 T10（PDF 一项已判定「一行不改」）。
