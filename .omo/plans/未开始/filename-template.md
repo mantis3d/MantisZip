@@ -12,6 +12,7 @@
 > 用一套占位符模板生成压缩包的**主名**，格式扩展名（`.zip` / `.7z` / `.tar.gz`）由所选格式自动追加，用户不用写扩展名。
 >
 > - 三个入口各有一个默认模板：**压缩对话框**、`--compress-quick`、`--compress-separate`
+> - 多源单包想按父目录命名就用 `{name:auto}`（该包只有 1 个源时自动退化为 `{name}`）
 > - 命名收敛在 Core 的 `CompressPathPlanner`，**预览树 = 实际输出**
 > - 模板非空即接管命名（忽略全局「保留源文件扩展名」开关）；对话框里手动/合并模式的「输出文件名」框变成只读预览
 > - 模板可在对话框里存成**命名预设**（名字 + 模板），随时切换
@@ -32,7 +33,7 @@
 | # | 问题 | 决定 |
 |---|---|---|
 | 1 | 模板产物 | **主名**，格式扩展名自动补 |
-| 2 | 占位符 | `{name}` `{ext}` `{parent}` `{date}` `{datetime}` `{seq}` `{seq:0000}` |
+| 2 | 占位符 | `{name}` `{name:auto}` `{ext}` `{parent}` `{date}` `{datetime}` `{seq}` `{seq:0000}` |
 | 3 | 与「保留源文件扩展名」的关系 | `{name}` **不含**扩展名，原扩展名用 `{ext}` 表达；**模板非空时忽略该全局开关** |
 | 4 | 非法名 / 重名 | **确认时校验并拒绝**，原因在窗口内显示（`Rejected<CompressSettings>`） |
 | 5 | 实时示例 | **要**：模板框下方显示「示例：report_2026-11-06.zip」，取第一个源、随源/格式/模板变化刷新 |
@@ -41,6 +42,8 @@
 | 8 | 预设 | **命名预设（名字 + 模板）**，在对话框内增删与切换 |
 | 9 | 按入口默认模板 | **三档**：压缩对话框、`--compress-quick`、`--compress-separate`（在设置页配置） |
 | 10 | `--compress-quick` 的 `{name}` | 取**第一个源**的主名（与现有 `App.CliCompress.cs:164` 一致） |
+| 11 | 多源单包想按父目录命名（2026-11-08） | 新增 `{name:auto}`：该包只有 1 个源 → 等于 `{name}`；≥2 个源 → 公共父目录名，取不到（跨盘 / 盘符根）→ 第一个源的主名 |
+| 12 | 多源时的 `{name}`（2026-11-08） | 统一为**第一个源的主名**（所有模式与入口一致），不再对 Combined 特判为公共父目录名 |
 
 ### 与旧计划的差异（为什么整篇重写）
 
@@ -63,7 +66,8 @@
 
 | 占位符 | 渲染结果 | 说明 |
 |---|---|---|
-| `{name}` | 源主名 | 文件 = 不含扩展名的文件名；目录 = 目录名；**不含**原扩展名 |
+| `{name}` | 源主名 | 文件 = 不含扩展名的文件名；目录 = 目录名；**不含**原扩展名。多源单包时取**第一个源** |
+| `{name:auto}` | 智能名 | 该包只含 1 个源 → 等于 `{name}`；≥2 个源 → **公共父目录名**；取不到（跨盘 / 盘符根）→ 第一个源的主名 |
 | `{ext}` | 源扩展名（含点） | `report.txt` → `.txt`；目录 → 空串；`.tar.gz` → `.gz`（`Path.GetExtension` 语义） |
 | `{parent}` | 父目录名 | `D:\工作\报告\a.txt` → `报告`；盘符根 → 空串 |
 | `{date}` | `2026-11-06` | 本批开始时刻，整批共用 |
@@ -75,6 +79,9 @@
 - 占位符**大小写不敏感**（`{NAME}` 等价 `{name}`），渲染前统一转小写匹配。
 - 未知占位符（`{foo}`）与未闭合（`{name`）→ 校验失败，不猜测。
 - `{seq:N}` 的宽度只接受 1-9 位数字；`{seq:abc}` 视为未知占位符。
+- `{name}` 只接受 `:auto` 一个参数；`{name:xxx}` 同样视为未知占位符（不猜、不忽略）。
+- **`{name:auto}` 按「该压缩包包含的源数」判定**，不是按整批源数：分别压缩每个包只含 1 个源 → 恒等于 `{name}`（不会出现「每个包都取同一个父目录名 → 全部重名」）；手动/合并/`--compress-quick` 是单包多源 → 按整批源数判定。
+- `{name:auto}` 与 `{name}` 都**不含**原扩展名；`{ext}` 始终指第一个源的扩展名（多源单包时）。
 
 ### 2. Core 渲染器（新文件）
 
@@ -83,8 +90,13 @@
 ```csharp
 namespace MantisZip.Core.Utils;
 
-/// <summary>渲染一次模板所需的上下文（与批绑定：同一批共用一个 Timestamp）。</summary>
-public sealed record FileNameTemplateContext(string SourcePath, int Sequence, DateTime Timestamp);
+/// <summary>
+/// 渲染一次模板所需的上下文（与批绑定：同一批共用一个 Timestamp）。
+/// <c>AutoName</c> 是 <c>{name:auto}</c> 的取值，由调用方按「该包包含的源数」算好传进来；
+/// <c>null</c> = 与 <c>{name}</c> 相同（单源包 / 分别压缩）。
+/// </summary>
+public sealed record FileNameTemplateContext(
+    string SourcePath, int Sequence, DateTime Timestamp, string? AutoName = null);
 
 public enum FileNameTemplateErrorKind
 {
@@ -139,10 +151,12 @@ public class FileNameTemplatePreset
 
 ```csharp
 public static string ComputeArchiveName(string sourcePath, string format, bool keepOriginalExt,
-    string? template = null, int sequence = 1, DateTime? timestamp = null)
+    string? template = null, int sequence = 1, DateTime? timestamp = null,
+    string? autoName = null)   // {name:auto} 的取值；null = 与 {name} 相同
 {
     if (!string.IsNullOrWhiteSpace(template)
-        && FileNameTemplate.TryRender(template, new FileNameTemplateContext(sourcePath, sequence, timestamp ?? DateTime.Now),
+        && FileNameTemplate.TryRender(template,
+            new FileNameTemplateContext(sourcePath, sequence, timestamp ?? DateTime.Now, autoName),
             out var baseName, out _))
     {
         return baseName + GetFormatExtension(format);   // 模板非空 ⇒ 忽略 keepOriginalExt
@@ -152,15 +166,29 @@ public static string ComputeArchiveName(string sourcePath, string format, bool k
 }
 
 public static string ComputeOutputPath(string sourcePath, string format, bool keepOriginalExt,
-    string? template = null, int sequence = 1, DateTime? timestamp = null);
+    string? template = null, int sequence = 1, DateTime? timestamp = null,
+    string? autoName = null);
+
+/// <summary>
+/// 单包多源（Manual / Combined / --compress-quick）的压缩包名。
+/// 只用于模板非空的情况：{name} 取第一个源，{name:auto} 取公共父目录名
+/// （取不到 → 第一个源的主名）。模板为空时调用方仍走各自的旧命名逻辑。
+/// </summary>
+public static string ComputeSingleArchiveName(
+    IReadOnlyList<string> sourcePaths, string format, bool keepOriginalExt,
+    string? template = null, DateTime? timestamp = null);
+
+/// <summary>公共父目录名；跨盘 / 盘符根 / 取不到 → null（调用方回退第一个源的主名）。</summary>
+public static string? ResolveAutoName(IReadOnlyList<string> sourcePaths);
 
 public static IReadOnlyList<CompressPlanItem> PlanSeparate(
     IReadOnlyList<string> sourcePaths, string format, bool keepOriginalExt,
-    string? template = null, DateTime? timestamp = null);   // sequence = index + 1
+    string? template = null, DateTime? timestamp = null);   // sequence = index + 1，autoName = null
 ```
 
 - **渲染失败时静默回退旧命名**：预览树不能因为用户正在打字（半截 `{na`）就崩掉或空掉；错误提示由 VM 单独显示（见 §5）。
 - `Timestamp` 由调用方在**批开始时取一次** `DateTime.Now`，整批共用 → 示例行与实际输出必然一致（跨午夜也不会一半新日期一半旧日期）。
+- `ResolveAutoName` 复用现有的公共父目录算法。该算法现在只存在于 `App.CliCompress.cs:494`（`internal static App.FindCommonParent`），**下沉到 Core** `Utils/PathCommonality.cs`（`FindCommonParent` + `IsDriveRoot`），`App.FindCommonParent` / `App.IsDriveRoot` 改为委派，避免出现第 4 份拷贝（`ShellExt/ContextMenuHandler.cs:1329` 是独立程序集里的镜像，保持不动，只更新注释指向 Core）。
 
 ### 4. 执行侧接线
 
@@ -184,7 +212,7 @@ GUI 侧（B 数据集是唯一事实源，模板必须在**建 plan 时**传入�
 
 - `ResultPreviewService.AssembleCompressPreview(...)`（`ResultPreviewService.cs:231`）加 `string? fileNameTemplate` 与 `DateTime templateTimestamp` 参数；
   - Separate 分支 `PlanSeparate(...)`（`:323`）透传；
-  - Manual/Combined 分支在 `outputPath` 为空时的兜底命名（`:270`）也用 `ComputeArchiveName(..., template, 1, timestamp)`。
+  - Manual/Combined 分支在 `outputPath` 为空时的兜底命名（`:270`）改用 `ComputeSingleArchiveName(sourcePaths, format, keepOriginalExt: false, template, timestamp)`（多源单包，`{name:auto}` 才有公共父目录可算）。
 - `CompressSettingsViewModel.AssembleAsync`（`:874`）把 VM 的 `FileNameTemplate` 与缓存的批时间戳传进去。
 - `CompressSettings`（`Models/CompressSettings.cs:174`）新增 `string? FileNameTemplate`（默认 `null`）；`CompressSession.BuildRequest`（`:265`）映射到 `CompressRequest`。
   - 有 B 数据集时模板不参与执行（路径来自 plan），但**必须照常传**：`--compress-separate` 等无 plan 的路径靠它。
@@ -193,11 +221,13 @@ GUI 侧（B 数据集是唯一事实源，模板必须在**建 plan 时**传入�
 
 | 模式 | 模板非空 | 模板为空 |
 |---|---|---|
-| **Manual** | 主名 = 模板渲染结果；`OutputFileName` 变成**只读**并显示渲染结果（不含扩展名，右侧 `.zip` 标签不变）；`OutputPath = 目录 + 主名 + 扩展名` | 现有行为，完全不变 |
-| **Separate** | 每源一条，`{seq}` 按源列表顺序；输出目录仍是源所在目录 | 现有行为 |
-| **Combined** | `{name}` = **公共父目录名**（无公共父目录时用盘符字母，与 `RefreshCombinedPath` 现有命名一致）；跨盘符已回退 Manual | 现有行为 |
+| **Manual** | 主名 = 模板渲染结果；`OutputFileName` 变成**只读**并显示渲染结果（不含扩展名，右侧 `.zip` 标签不变）；`OutputPath = 目录 + 主名 + 扩展名`。多源时 `{name}` 取第一个源，`{name:auto}` 取公共父目录名 | 现有行为，完全不变 |
+| **Separate** | 每源一条，`{seq}` 按源列表顺序；`{name:auto}` 恒等于 `{name}`（每个包只含 1 个源）；输出目录仍是源所在目录 | 现有行为 |
+| **Combined** | `{name}` = **第一个源的主名**；`{name:auto}` = 公共父目录名（取不到 → 第一个源的主名）；跨盘符已回退 Manual | 现有行为（默认名仍是公共父目录名，见 `CompressSettingsViewModel.cs:1794-1807`） |
 
-> Combined 的 `{name}` 取公共父目录名而非第一个源，是为了让「模板非空」时与「模板为空」时的默认命名指向同一个东西（`CompressSettingsViewModel.cs:1794-1807`），避免同一个包里 `{name}` 突然换了含义。`--compress-quick` 不同：它压的是「一堆散路径 → 一个包」，没有公共父目录概念，所以取第一个源（现有行为）。
+> `{name}` 在所有模式与入口都是「源主名，多源取第一个源」，不再对 Combined 特判。想保留 Combined 现有的「按父目录命名」习惯，写 `{name:auto}` —— 模板非空时行为由模板显式决定，模板为空时仍是原来的公共父目录命名，两条路径互不影响。
+>
+> `--compress-quick`（`App.CliCompress.cs:147`）是单包多源，`{name:auto}` 同样取公共父目录名；只有一个路径时自动退化为该路径的主名。
 
 新增 VM 属性：
 
@@ -242,6 +272,7 @@ public bool IsOutputFileNameReadOnly => OutputMode != CompressOutputMode.Manual 
   - 正常：`Foreground="{DynamicResource ThemeTextSecondaryBrush}"`，文本「示例：report_2026-11-06.zip」
   - 错误：`Foreground="{DynamicResource ThemeStatusErrorBrush}"`，文本「⚠ 未知占位符：{foo}」
   - 模板为空：显示「示例：保持现有命名（模板为空）」——明确告诉用户「不填 = 不启用」。
+  - 示例取「当前模式下第一个压缩包的第一个源」：Separate 按单源渲染（`{name:auto}` = `{name}`）；Manual/Combined 按整批源数渲染（`{name:auto}` = 公共父目录名）。这样示例与最终产物一致，不会出现「示例显示父目录名、实际落到第一个源名」。
 - 手动/合并模式下模板非空时，「输出文件名」框只读（`IsOutputFileNameReadOnly`），用户想手改就清空模板。
 - 所有新控件按规则 4 显式设主题画刷；间距/高度用 `SpacingXxxThk` / `ControlHeightSm`（规则 5）；新增区域加中文注释（规则 14）。
 
@@ -252,8 +283,8 @@ public bool IsOutputFileNameReadOnly => OutputMode != CompressOutputMode.Manual 
 | 行 | 绑定 | 说明文案 |
 |---|---|---|
 | 压缩对话框 | `FileNameTemplateDialog` | 三模式共用；空 = 不启用 |
-| 快速压缩（`--compress-quick`） | `FileNameTemplateQuick` | `{name}` 取第一个源 |
-| 分别压缩（`--compress-separate`） | `FileNameTemplateSeparate` | 每个源一条，`{seq}` 递增 |
+| 快速压缩（`--compress-quick`） | `FileNameTemplateQuick` | 单包多源；`{name}` = 第一个源，`{name:auto}` = 公共父目录名 |
+| 分别压缩（`--compress-separate`） | `FileNameTemplateSeparate` | 每个源一条，`{seq}` 递增；`{name:auto}` 恒等于 `{name}` |
 
 每行 = `TextBox`（可编辑）+ 右侧 `ComboBox`（列出预设名，选中即把模板文本填进左侧输入框，选完清空选择）。预设的**增删只在压缩对话框里做**（按用户选择），设置页只负责「填默认值」。
 
@@ -289,12 +320,12 @@ public bool RemoveFileNameTemplatePreset(string name);
 
 - `--compress-quick`（`App.CliCompress.cs:147`）：删掉 `:164-166` 的手算，改
   ```csharp
-  var archiveName = CompressPathPlanner.ComputeArchiveName(
-      first, settings.DefaultFormat, keepOriginalExt: false,
-      settings.FileNameTemplateQuick, sequence: 1);
+  var archiveName = CompressPathPlanner.ComputeSingleArchiveName(
+      myPaths, settings.DefaultFormat, keepOriginalExt: false,
+      settings.FileNameTemplateQuick);
   var outputPath = Path.Combine(dir, archiveName);
   ```
-  保留 `dir ??= Desktop` 的兜底（`ComputeOutputPath` 会退到 `"."`，不想要这个差异）。
+  保留 `dir ??= Desktop` 的兜底（`ComputeOutputPath` 会退到 `"."`，不想要这个差异）。模板为空时 `ComputeSingleArchiveName` 回退到「第一个源的主名 + 扩展名」，与现有行为逐字一致。
 - `--compress-separate`（`RunCompressSeparate`，`:258`）：`CompressRequest` 增加
   ```csharp
   FileNameTemplate = settings.FileNameTemplateSeparate,
@@ -304,11 +335,12 @@ public bool RemoveFileNameTemplatePreset(string name);
 
 ### 11. 帮助内容（规则 17）
 
-新增 `Compress_FileNameTemplate_Markdown`（三语），内容：占位符表 + 三个例子（`{name}_{date}` / `{parent}_{name}` / `{name}_{seq:0000}`）+ 三条规则：
+新增 `Compress_FileNameTemplate_Markdown`（三语），内容：占位符表 + 四个例子（`{name}_{date}` / `{name:auto}_{date}` / `{parent}_{name}` / `{name}_{seq:0000}`）+ 四条规则：
 
 1. 扩展名由格式自动补，不要在模板里写 `.zip`；
 2. 模板非空时「保留源文件扩展名」开关不生效，要保留原扩展名就写 `{ext}`；
-3. 分别压缩时模板里没有 `{name}` / `{seq}` / `{parent}` 会让多个源重名，确认时会被拦下。
+3. 分别压缩时模板里没有 `{name}` / `{seq}` / `{parent}` 会让多个源重名，确认时会被拦下；
+4. `{name:auto}` = 一个源时用源名、多个源时用公共父目录名（取不到则第一个源名）——「压一个文件按文件名、压一堆按文件夹名」用这一条就够。
 
 ---
 
@@ -384,8 +416,9 @@ public bool RemoveFileNameTemplatePreset(string name);
 
 | 测试文件 | 覆盖点 |
 |---|---|
-| `tests/MantisZip.Tests/FileNameTemplateTests.cs` | 每个占位符渲染；`{seq}` / `{seq:0000}`；大小写不敏感；`{{` `}}` 转义；未知占位符；未闭合；空模板返回「未启用」；`{parent}` 盘符根为空；目录源 `{ext}` 为空；非法字符；结尾点/空格；保留设备名；超长 |
-| `tests/MantisZip.Tests/CompressPathPlannerTemplateTests.cs` | 模板为空 = 旧行为逐字节一致；模板非空忽略 `keepOriginalExt`；`PlanSeparate` 的 `{seq}` 按顺序递增；渲染失败回退旧命名；`tar.gz` 双段扩展名 |
+| `tests/MantisZip.Tests/FileNameTemplateTests.cs` | 每个占位符渲染；`{seq}` / `{seq:0000}`；`{name:auto}` 在 `AutoName` 为 null / 非 null 时的两种结果；大小写不敏感（含 `{NAME:AUTO}`）；`{{` `}}` 转义；未知占位符；未闭合；空模板返回「未启用」；`{parent}` 盘符根为空；目录源 `{ext}` 为空；非法字符；结尾点/空格；保留设备名；超长 |
+| `tests/MantisZip.Tests/CompressPathPlannerTemplateTests.cs` | 模板为空 = 旧行为逐字节一致；模板非空忽略 `keepOriginalExt`；`PlanSeparate` 的 `{seq}` 按顺序递增且 `{name:auto}` 恒等于 `{name}`；`ComputeSingleArchiveName` 单源 = 源名、多源 = 公共父目录名、跨盘回退第一个源名；渲染失败回退旧命名；`tar.gz` 双段扩展名 |
+| `tests/MantisZip.Tests/PathCommonalityTests.cs` | `FindCommonParent` 从 `App` 下沉后行为不变（同目录 / 同盘不同目录 / 跨盘 → null / 盘符根 → `IsDriveRoot`） |
 | `tests/MantisZip.Tests/CompressServiceTemplateTests.cs`（可并入上一条） | `GetOutputPaths` 在「无 Plan + 模板非空 + Separate」时产出模板名；有 Plan 时以 Plan 为准 |
 | `tests/MantisZip.UI.Avalonia.Tests/CompressSettingsViewModelTemplateTests.cs` | 示例行随源/格式/模板刷新；模板非空 → `IsOutputFileNameReadOnly == true` 且 `OutputFileName` 为渲染结果；确认时四类拒绝原因各一条；重名检测（Separate 多源同名） |
 | `tests/MantisZip.UI.Avalonia.Tests/AboutWindowTests.cs`（既有） | 三语 key 集自动校验 |
@@ -406,6 +439,8 @@ pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests
 - [ ] 对话框里模板非空 → 手动模式的「输出文件名」变只读，且预览树里的包名与之一致
 - [ ] 确认时输入 `{foo}` → 窗口不关，提示「未知占位符：{foo}」
 - [ ] 确认时输入 `{name}` 且 Separate 多源 → 窗口不关，提示重名
+- [ ] `{name:auto}`：压单个文件 → 源名；压同一目录下 3 个文件 → 该目录名；压跨盘 2 个文件 → 第一个源名
+- [ ] `{name:auto}` 在分别压缩下恒等于 `{name}`（3 个文件产出 3 个不同名，不会撞名）
 - [ ] 设置页三档默认值分别对三个入口生效
 - [ ] 预设：保存 → 出现在下拉里 → 重启后仍在 → 可删除；上限 20 时有提示
 - [ ] 示例行在切换源/格式/模板时同步刷新
@@ -418,7 +453,8 @@ pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests
 | 风险 | 处置 |
 |---|---|
 | 模板与全局「保留扩展名」语义重叠 | 模板非空即接管，帮助文档写清；不在设置页置灰（少一处联动逻辑） |
-| Combined 的 `{name}` 是公共父目录名，与 quick 的「第一个源」不一致 | 各自贴合现有默认命名；帮助文档分模式说明。**这是本计划里唯一没有单独提问就定下的点**，实施前可再确认 |
+| 多源单包的默认命名（公共父目录名）与 `{name}` 的语义不同 | 模板为空时保持现有默认命名；模板非空时由模板显式决定，想按目录命名写 `{name:auto}` |
+| `{name:auto}` 在分别压缩里恒等于 `{name}`，用户可能误以为「多选时按目录命名」 | 帮助文档与设置页说明里写清「按该包包含的源数」；验收里单独列一条 |
 | 预览期间模板语法错误 | 渲染失败静默回退旧命名，错误只在示例行与确认时提示；预览树不空 |
 | `DateTime.Now` 跨午夜 | 批开始时取一次，整批共用 |
 | 预设写入 `AppSettings` 与「压缩设置不污染全局默认值」的既有约定 | 预设是显式动作（用户点「保存为预设」），不写回任何默认值字段 |
@@ -431,7 +467,8 @@ pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests
 |---|---|
 | `src/MantisZip.Core/Utils/FileNameTemplate.cs` | 新增 |
 | `src/MantisZip.Core/Utils/FileNameTemplatePreset.cs` | 新增 |
-| `src/MantisZip.Core/Utils/CompressPathPlanner.cs` | 三个方法加可选模板参数 |
+| `src/MantisZip.Core/Utils/PathCommonality.cs` | 新增：`FindCommonParent` / `IsDriveRoot` 从 `App.CliCompress.cs:494` 下沉 |
+| `src/MantisZip.Core/Utils/CompressPathPlanner.cs` | 三个方法加可选模板参数 + `ComputeSingleArchiveName` / `ResolveAutoName` |
 | `src/MantisZip.Core/Services/CompressService.cs` | `CompressRequest` 两字段 + 命名计划解析 |
 | `src/MantisZip.UI.Avalonia/Models/CompressSettings.cs` | record 加 `FileNameTemplate` |
 | `src/MantisZip.UI.Avalonia/Models/AppSettings.cs` | 三档默认值 + 预设列表 + 增删方法 |
@@ -441,10 +478,11 @@ pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests
 | `src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml(.cs)` | 新分组 + Row 重排 + 帮助按钮 |
 | `src/MantisZip.UI.Avalonia/ViewModels/SettingsWindowViewModel.cs` | 三档默认值 + 预设填入 |
 | `src/MantisZip.UI.Avalonia/Views/SettingsWindow.axaml` | 新分组（三行） |
-| `src/MantisZip.UI.Avalonia/App.CliCompress.cs` | quick 命名 + separate 传参 |
+| `src/MantisZip.UI.Avalonia/App.CliCompress.cs` | quick 命名 + separate 传参；`FindCommonParent` / `IsDriveRoot` 改为委派 Core |
 | `src/MantisZip.UI.Avalonia/Localization/strings.{zh-CN,en,zh-TW}.json` | 新增 key（成对） |
 | `tests/MantisZip.Tests/FileNameTemplateTests.cs` | 新增 |
 | `tests/MantisZip.Tests/CompressPathPlannerTemplateTests.cs` | 新增 |
+| `tests/MantisZip.Tests/PathCommonalityTests.cs` | 新增（下沉后行为不变） |
 | `tests/MantisZip.UI.Avalonia.Tests/CompressSettingsViewModelTemplateTests.cs` | 新增 |
 | `docs/PROGRESS.md` / `docs/progress-avalonia-detail.md` | 进度记录 |
 
