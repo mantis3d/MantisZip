@@ -1054,7 +1054,8 @@
                           Padding="{DynamicResource SpacingXsThk}"
                           CornerRadius="{DynamicResource BorderRadius}"
                           Background="{Binding IsSelected, Converter={StaticResource ThumbnailSelectedBrushConverter}}">
-                    <Grid ColumnDefinitions="Auto,*">
+                    <Grid ColumnDefinitions="Auto,*"
+                          ColumnSpacing="{DynamicResource SpacingSm}">
                       <Panel Grid.Column="0">
                         <ContentControl Content="{Binding}"
                                   ContentTemplate="{StaticResource ThumbnailContentCard}"
@@ -1069,10 +1070,12 @@
                                   IsChecked="{Binding IsChecked, Mode=TwoWay}"
                                   IsVisible="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).IsCheckboxMode}" />
                       </Panel>
+                      <!-- 右侧信息块与左侧缩略图**顶边对齐**（2026-11-08 用户报障：原 VerticalAlignment=Center
+                           让它在行内居中下沉，和缩略图错位）。水平间距改由 Grid.ColumnSpacing 提供，
+                           不再用 Margin 的竖直分量——否则顶边还会差 8px。回归见 CardRowContentAlignmentTests。 -->
                       <StackPanel Grid.Column="1"
-                                  Margin="{DynamicResource SpacingSmThk}"
                                   Spacing="{DynamicResource SpacingXxs}"
-                                  VerticalAlignment="Center">
+                                  VerticalAlignment="Top">
                         <TextBlock Text="{Binding NameDisplay}"
                                    FontWeight="SemiBold"
                                    FontSize="14"
