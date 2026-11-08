@@ -43,8 +43,11 @@ public class AppSettings
     public bool SevenZipMultithreaded { get; set; } = true;
 
     // ===== 自适应压缩（三个独立开关） =====
-    /// <summary>自适应压缩：已压缩文件自动 Store。仅对 ZIP + Deflate/Deflate64 有效。</summary>
-    public bool AdaptiveCompression { get; set; }
+    /// <summary>
+    /// 自适应压缩：已压缩文件自动 Store。仅对 ZIP + Deflate/Deflate64 有效。
+    /// 2026-11-08 按用户真机配置固化为**默认开启**（配套默认规则见 <see cref="GetDefaultAdaptiveOverrides"/>）。
+    /// </summary>
+    public bool AdaptiveCompression { get; set; } = true;
 
     /// <summary>魔数检测：自适应开启时，对大文件做魔数增强识别。自适应关闭时无效。</summary>
     public bool AdaptiveSmartDetect { get; set; }

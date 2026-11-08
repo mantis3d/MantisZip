@@ -22,6 +22,9 @@ public class FactoryDefaultsTests
         Assert.Equal(5, settings.AutoCloseDelaySeconds);
         // 2026-11-08 追加：用户把进度窗口「信息量」调到完整，随出厂默认固化
         Assert.Equal("full", settings.ProgressInfoDensity);
+        // 2026-11-08 追加：默认压缩等级 5 + 自适应压缩默认开启（用户真机配置）
+        Assert.Equal(5, settings.DefaultLevel);
+        Assert.True(settings.AdaptiveCompression);
         Assert.Equal(18, settings.TextPreviewFontSize);
         Assert.Equal(20L * 1024 * 1024, settings.MaxPreviewFileSize);
         Assert.Equal(24, settings.FontPreviewFontSize);

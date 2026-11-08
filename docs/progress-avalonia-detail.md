@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-08** — 压缩默认配置随出厂固化（默认等级 5 + 自适应压缩默认开启）
+  - **默认值**：`DefaultLevel` 本来就是 `5`（用户真机也是 5），本次补断言钉住、不改代码；`AdaptiveCompression` 默认 `false`→**`true`**。配套默认规则集 `GetDefaultAdaptiveOverrides()`（图片/视频/音频/压缩包/字体/文档六类 → Store）已由 `CreateWithDefaults` / `ApplyMigrations` 填充，开启后即按规则跳过已压缩格式，不依赖用户先配规则。
+  - **按用户意见不固化**：`Theme`（本机 `System`→`Dark` 非故意改动，不改出厂默认）、`ParallelExtractDegree`（保持 `Environment.ProcessorCount` 自适应，本机 20 核、临时值 16 不写死）。
+  - **回归钉子**：`FactoryDefaultsTests` 增加 `DefaultLevel == 5` 与 `AdaptiveCompression == true` 两条断言。
+  - **验证**：先补断言看 1 例变红（`AdaptiveCompression` 仍为 false）→ 改默认值转绿；avalonia 构建 0 错误、`ui-tests` 全绿、`-Task check` / `guards`（9 项）全绿。
+
 **2026-11-08** — 进度窗口「信息量 = 完整」随出厂默认固化（同日默认值固化的追加项）
   - **默认值**：`AppSettings.ProgressInfoDensity` `"medium"`→`"full"`（用户把进度窗口信息量调到完整后要求一并固化）。同步三处「默认」语义：`ProgressDisplayModeParser.ParseDensity` 未知/空值回退由 Medium 改 Full、`ProgressViewModel._infoDensity` 初值改 Full，以及 `ProgressWindow` 构造/`ApplyInfoDensity` 两处注释。
   - **顺带修掉一个隐性坑**：`ToSetting` 原先靠 `_ => "medium"` 兜住 Medium 分支，回退档改成 Full 后 `ParseDensity("medium")` 会落进回退档 → 往返测试当场变红；改为显式 `ProgressInfoDensity.Medium => "medium"` + `_ => "full"`，两侧 switch 对称。
