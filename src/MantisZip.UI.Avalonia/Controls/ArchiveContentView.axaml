@@ -115,8 +115,11 @@
        根 Grid 即拆分前的 ArchiveContentGrid（列/行定义与子元素坐标原样保留）→ 布局零变化。 -->
     <Grid x:Name="ArchiveContentGrid"
           IsVisible="{Binding IsArchiveLoaded}"
-          ColumnDefinitions="1*,5,2.5*,5,3*"
+          ColumnDefinitions="275*,5,769*,5,727*"
           RowDefinitions="*,0,0">
+      <!-- 三栏宽度权重（2026-11-08 按用户实际布局定为出厂默认）：用户窗口 1781 宽时
+           目录树 275 / 文件列表 769 / 预览 727（layout.json 记录的像素值）。这里折算成
+           同比例星号权重 ⇒ 换窗口尺寸时三栏等比缩放，而不是写死像素。 -->
       <!-- Folder tree panel (col 0) with tree toolbar -->
       <Border x:Name="FolderTreeBorder"
               Grid.Column="0"
@@ -447,7 +450,7 @@
                 </DataTemplate>
               </DataGridTemplateColumn>
               <DataGridTextColumn SortMemberPath="Name"
-                                  Width="250"
+                                  Width="374"
                                   MinWidth="120"
                                   MaxWidth="800">
                 <DataGridTextColumn.Header>
@@ -462,7 +465,7 @@
                 </DataGridTextColumn.Binding>
               </DataGridTextColumn>
               <DataGridTemplateColumn SortMemberPath="Size"
-                                      Width="80"
+                                      Width="116"
                                       MinWidth="60"
                                       MaxWidth="400">
                 <DataGridTemplateColumn.Header>
@@ -509,10 +512,12 @@
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
+              <!-- 默认隐藏（2026-11-08 按用户实际布局）：列头右键菜单「显示/隐藏列」可重新打开 -->
               <DataGridTemplateColumn SortMemberPath="CompressedSize"
-                                      Width="70"
+                                      Width="113"
                                       MinWidth="60"
-                                      MaxWidth="400">
+                                      MaxWidth="400"
+                                      IsVisible="False">
                 <DataGridTemplateColumn.Header>
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -554,7 +559,7 @@
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
               <DataGridTemplateColumn SortMemberPath="RatioSort"
-                                      Width="70"
+                                      Width="73"
                                       MinWidth="60"
                                       MaxWidth="300">
                 <DataGridTemplateColumn.Header>
@@ -585,7 +590,7 @@
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
               <DataGridTemplateColumn SortMemberPath="LastModified"
-                                      Width="100"
+                                      Width="149"
                                       MinWidth="80"
                                       MaxWidth="400">
                 <DataGridTemplateColumn.Header>

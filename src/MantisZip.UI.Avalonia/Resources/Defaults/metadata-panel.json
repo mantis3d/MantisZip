@@ -1,0 +1,449 @@
+{
+  "SectionOrder": [
+    "common",
+    "format"
+  ],
+  "Types": {
+    "common": {
+      "Enabled": true,
+      "Fields": {
+        "FileName": {
+          "Position": "infoPanel",
+          "Order": 50,
+          "Row": 0
+        },
+        "FileSize": {
+          "Position": "infoPanel",
+          "Order": 50,
+          "Row": 0
+        },
+        "CompressedSize": {
+          "Position": "infoPanel",
+          "Order": 50,
+          "Row": 0
+        },
+        "CompressionRatio": {
+          "Position": "infoPanel",
+          "Order": 50,
+          "Row": 0
+        },
+        "FileModifiedDate": {
+          "Position": "infoPanel",
+          "Order": 50,
+          "Row": 0
+        }
+      }
+    },
+    "docx": {
+      "Enabled": true,
+      "Fields": {
+        "Title": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "Author": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "Subject": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "PageCount": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "CreatedDate": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "DocModifiedDate": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        }
+      }
+    },
+    "xlsx": {
+      "Enabled": true,
+      "Fields": {
+        "Title": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "Author": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "Subject": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "SheetCount": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "CreatedDate": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "DocModifiedDate": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        }
+      }
+    },
+    "pptx": {
+      "Enabled": true,
+      "Fields": {
+        "Title": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "Author": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "Subject": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "SlideCount": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "CreatedDate": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        },
+        "DocModifiedDate": {
+          "Position": "infoPanel",
+          "Order": 60,
+          "Row": 0
+        }
+      }
+    },
+    "pe": {
+      "Enabled": true,
+      "Fields": {
+        "ProductName": {
+          "Position": "contentTop",
+          "Order": 70,
+          "Row": 1
+        },
+        "CompanyName": {
+          "Position": "contentTop",
+          "Order": 70,
+          "Row": 1
+        },
+        "FileVersion": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "ProductVersion": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "Architecture": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 4
+        },
+        "Subsystem": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 4
+        },
+        "Description": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 3
+        },
+        "OriginalFilename": {
+          "Position": "infoPanel",
+          "Order": 100,
+          "Row": 0
+        },
+        "Language": {
+          "Position": "infoPanel",
+          "Order": 100,
+          "Row": 0
+        },
+        "LegalCopyright": {
+          "Position": "infoPanel",
+          "Order": 100,
+          "Row": 0
+        }
+      }
+    },
+    "image": {
+      "Enabled": true,
+      "Fields": {
+        "Dimensions": {
+          "Position": "infoPanel",
+          "Order": 30,
+          "Row": 0
+        },
+        "ImageDpi": {
+          "Position": "infoPanel",
+          "Order": 30,
+          "Row": 0
+        },
+        "FrameCount": {
+          "Position": "infoPanel",
+          "Order": 30,
+          "Row": 0
+        }
+      }
+    },
+    "audio": {
+      "Enabled": true,
+      "Fields": {
+        "Duration": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "SampleRate": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "BitDepth": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "Channels": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "Bitrate": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "Artist": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "Album": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "Title": {
+          "Position": "infoPanel",
+          "Order": 80,
+          "Row": 0
+        }
+      }
+    },
+    "video": {
+      "Enabled": true,
+      "Fields": {
+        "Duration": {
+          "Position": "infoPanel",
+          "Order": 40,
+          "Row": 0
+        },
+        "Resolution": {
+          "Position": "infoPanel",
+          "Order": 40,
+          "Row": 0
+        },
+        "Codec": {
+          "Position": "infoPanel",
+          "Order": 40,
+          "Row": 0
+        },
+        "Bitrate": {
+          "Position": "infoPanel",
+          "Order": 40,
+          "Row": 0
+        }
+      }
+    },
+    "font": {
+      "Enabled": true,
+      "Fields": {
+        "FontName": {
+          "Position": "infoPanel",
+          "Order": 30,
+          "Row": 0
+        },
+        "FontStyle": {
+          "Position": "infoPanel",
+          "Order": 30,
+          "Row": 0
+        },
+        "GlyphCount": {
+          "Position": "infoPanel",
+          "Order": 30,
+          "Row": 0
+        }
+      }
+    },
+    "torrent": {
+      "Enabled": true,
+      "Fields": {
+        "InfoHash": {
+          "Position": "infoPanel",
+          "Order": 110,
+          "Row": 0
+        },
+        "FileCount": {
+          "Position": "infoPanel",
+          "Order": 50,
+          "Row": 0
+        },
+        "TotalSize": {
+          "Position": "infoPanel",
+          "Order": 110,
+          "Row": 0
+        },
+        "IsPrivate": {
+          "Position": "infoPanel",
+          "Order": 110,
+          "Row": 0
+        },
+        "CreatedBy": {
+          "Position": "infoPanel",
+          "Order": 110,
+          "Row": 0
+        },
+        "TorrentFileName": {
+          "Position": "infoPanel",
+          "Order": 110,
+          "Row": 1
+        },
+        "MagnetLink": {
+          "Position": "contentTop",
+          "Order": 110,
+          "Row": 1
+        },
+        "TrackerUrl": {
+          "Position": "contentTop",
+          "Order": 110,
+          "Row": 2
+        },
+        "TrackerCount": {
+          "Position": "contentTop",
+          "Order": 110,
+          "Row": 2
+        },
+        "CreatedDate": {
+          "Position": "contentTop",
+          "Order": 110,
+          "Row": 2
+        },
+        "AdditionalInfo": {
+          "Position": "infoPanel",
+          "Order": 110,
+          "Row": 0
+        }
+      }
+    },
+    "iso": {
+      "Enabled": true,
+      "Fields": {
+        "VolumeLabel": {
+          "Position": "infoPanel",
+          "Order": 30,
+          "Row": 0
+        },
+        "IsoFormat": {
+          "Position": "infoPanel",
+          "Order": 30,
+          "Row": 0
+        },
+        "TotalSize": {
+          "Position": "infoPanel",
+          "Order": 30,
+          "Row": 0
+        }
+      }
+    },
+    "sqlite": {
+      "Enabled": true,
+      "Fields": {
+        "TableCount": {
+          "Position": "infoPanel",
+          "Order": 10,
+          "Row": 0
+        }
+      }
+    },
+    "ico": {
+      "Enabled": true,
+      "Fields": {
+        "IconCount": {
+          "Position": "infoPanel",
+          "Order": 10,
+          "Row": 0
+        }
+      }
+    },
+    "pdf": {
+      "Enabled": true,
+      "Fields": {
+        "Title": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "Author": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "Subject": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "PageCount": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "Encrypted": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "CreatedDate": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        },
+        "DocModifiedDate": {
+          "Position": "infoPanel",
+          "Order": 70,
+          "Row": 0
+        }
+      }
+    }
+  },
+  "FieldLayoutMode": "horizontal"
+}

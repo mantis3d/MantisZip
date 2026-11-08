@@ -50,6 +50,12 @@
          （App.OnFrameworkInitializationCompleted），必须作为 AvaloniaResource 嵌入原始 xaml；
          Resources 下其余为非 axaml 资源（图标/光标等） -->
     <AvaloniaResource Include="Resources\**" />
+    <!-- 元数据面板出厂默认模板（2026-11-08 按用户实际配置固化）：作为 EmbeddedResource 读取，
+         不依赖 Avalonia 资源系统（纯 JSON 反序列化路径也能拿到），故从 Resources\** 通配里排除；
+         LogicalName 固定资源名，避免 RootNamespace 变化导致 GetManifestResourceStream 取不到。 -->
+    <AvaloniaResource Remove="Resources\Defaults\**" />
+    <EmbeddedResource Include="Resources\Defaults\metadata-panel.json"
+                      LogicalName="MantisZip.UI.Avalonia.Resources.Defaults.metadata-panel.json" />
     <!-- .axaml 交给 Avalonia XamlIl 预编译（生成 .g.cs）。先 Remove 清掉包内默认 glob 收集的条目
          （默认 glob 带 Exclude/SubType 元数据，与自定义 Include pattern 不同不会去重，会导致
          AVLN2002 duplicate x:Class），再按本规则重新 Include；Resources\** 下的 axaml

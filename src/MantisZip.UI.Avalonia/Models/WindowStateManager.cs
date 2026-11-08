@@ -27,11 +27,15 @@ internal static class WindowStateManager
     /// 仅在 Width/Height > 0 时恢复；忽略 Position 为默认值的情况。
     /// 返回保存的列状态（可能为 null，表示无列数据或加载失败）。
     /// sortColumnPath/sortDirection 输出持久化的列排序状态（0=无, 1=升序, 2=降序，与 WPF window.json 兼容）。
+    /// hadSnapshot 表示磁盘上是否存在可读的 window.json：调用方据此区分「首次运行（用出厂默认排序）」
+    /// 与「用户主动清除排序（SortColumnPath=null，必须保持不排序）」——两者输出都是 null，不能只看 sortColumnPath。
     /// </summary>
-    public static List<ColumnStateDto>? Load(Window window, out string? sortColumnPath, out int sortDirection)
+    public static List<ColumnStateDto>? Load(Window window, out string? sortColumnPath, out int sortDirection,
+        out bool hadSnapshot)
     {
         sortColumnPath = null;
         sortDirection = 0;
+        hadSnapshot = false;
 
         if (!File.Exists(ConfigFile))
             return null;
@@ -43,6 +47,7 @@ internal static class WindowStateManager
             if (snapshot == null)
                 return null;
 
+            hadSnapshot = true;
             sortColumnPath = snapshot.SortColumnPath;
             sortDirection = snapshot.SortDirection;
 

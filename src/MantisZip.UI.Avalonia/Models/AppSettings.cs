@@ -120,7 +120,7 @@ public class AppSettings
 
     // ===== 进度窗口 =====
     /// <summary>完成后自动关闭延时（秒，0–60；0 = 立即关闭）。📌/失败/测试流不受此影响（始终留窗）。</summary>
-    public int AutoCloseDelaySeconds { get; set; } = 3;
+    public int AutoCloseDelaySeconds { get; set; } = 5;
 
     /// <summary>
     /// 进度窗口默认是否钉住（📌）：true = 一打开就钉住，完成/出错都等手动关闭。
@@ -162,13 +162,13 @@ public class AppSettings
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;
     public long MaxTextPreviewBytes { get; set; } = 1 * 1024 * 1024; // 1 MB
-    public int TextPreviewFontSize { get; set; } = 13;
+    public int TextPreviewFontSize { get; set; } = 18;
     public int MaxTablePreviewRows { get; set; } = 100;
     public int MaxTablePreviewCols { get; set; } = 100;
-    public long MaxPreviewFileSize { get; set; } = 15 * 1024 * 1024;
+    public long MaxPreviewFileSize { get; set; } = 20 * 1024 * 1024;
     public string TextPreviewFontFamily { get; set; } = "";
     public string TextEncodingPreference { get; set; } = "auto";
-    public int FontPreviewFontSize { get; set; } = 12;
+    public int FontPreviewFontSize { get; set; } = 24;
     public string FontPreviewSampleText { get; set; } = "The quick brown fox jumps over the lazy dog.\n0123456789\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
     public bool FontPreviewEnableLigature { get; set; } = true;
     public int PreviewPosition { get; set; } = 4;
@@ -212,25 +212,26 @@ public class AppSettings
 
     // ===== 缩略图卡片（设置 → 外观 → 缩略图） =====
     /// <summary>
-    /// 缩略图卡片是否显示 1px 外边框。默认 false = 与引入该设置前完全一致。
+    /// 缩略图卡片是否显示 1px 外边框。默认 true（2026-11-08 按用户实际配置定为出厂默认）。
     /// 由 <c>App.ApplyThumbnailStyle()</c> 注入 <c>ThumbnailCardBorderThickness</c> 资源（规则 5 同款做法），
     /// 卡片模板用 DynamicResource 取值 ⇒ 改设置即时生效、无需重启。
     /// </summary>
-    public bool ThumbnailShowBorder { get; set; } = false;
+    public bool ThumbnailShowBorder { get; set; } = true;
 
     /// <summary>
-    /// 缩略图是否**保留透明背景**（默认 true）。
-    /// true = 透明 PNG/SVG 的透明区域露出列表底色；false = 垫 <see cref="ThumbnailBackdropColor"/> 实色。
+    /// 缩略图是否**保留透明背景**（默认 false = 垫 <see cref="ThumbnailBackdropColor"/> 实色；
+    /// 2026-11-08 按用户实际配置定为出厂默认）。
+    /// true = 透明 PNG/SVG 的透明区域露出列表底色；false = 垫底色。
     /// 注意语义：alpha 通道始终保留，这里只是决定「垫不垫底色」，不是重新解码。
     /// </summary>
-    public bool ThumbnailUseTransparency { get; set; } = true;
+    public bool ThumbnailUseTransparency { get; set; } = false;
 
     /// <summary>
-    /// 不保留透明时垫的底色（#RRGGBB 或 #AARRGGBB）。默认白色 —— 与资源管理器的缩略图观感一致，
-    /// 且不受浅色/深色主题影响（该开关的意义就是让观感稳定）。
+    /// 不保留透明时垫的底色（#RRGGBB 或 #AARRGGBB）。默认 #7C818A（中性灰；
+    /// 2026-11-08 按用户实际配置定为出厂默认，替代原白色）。
     /// 解析失败（手工改坏 settings.json）时由 <c>App.ApplyThumbnailStyle()</c> 回落白色。
     /// </summary>
-    public string ThumbnailBackdropColor { get; set; } = "#FFFFFF";
+    public string ThumbnailBackdropColor { get; set; } = "#7C818A";
 
     /// <summary>
     /// 缩略图卡片边长（像素）：96 = 小 / 128 = 中（默认，与引入该设置前一致）/ 160 = 大。

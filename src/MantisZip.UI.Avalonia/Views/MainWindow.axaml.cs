@@ -109,11 +109,16 @@ public partial class MainWindow : Window
         // 读取持久化的列状态/排序/布局快照（window.json）。
         // 2026-10-21 启动优化：压缩包内容区（目录树/文件列表/预览）已改为**延迟创建**，
         // 启动时这些控件尚不存在 → 此处只把快照存起来，等 EnsureArchiveContent() 创建控件后再应用。
-        var columnStates = WindowStateManager.Load(this, out var savedSortColumnPath, out var savedSortDirection);
+        var columnStates = WindowStateManager.Load(
+            this, out var savedSortColumnPath, out var savedSortDirection, out var hadWindowSnapshot);
         _pendingColumnStates = columnStates;
 
-        // 恢复持久化的列排序状态（方向编码与 WPF window.json 兼容：0=无, 1=升序, 2=降序）
-        _lastSortMemberPath = string.IsNullOrEmpty(savedSortColumnPath) ? null : savedSortColumnPath;
+        // 恢复持久化的列排序状态（方向编码与 WPF window.json 兼容：0=无, 1=升序, 2=降序）。
+        // 出厂默认 = 名称升序（2026-11-08）：仅当**从未有过 window.json**（首次运行）时生效；
+        // 已有快照但 SortColumnPath 为空 = 用户点列头第三下主动清除排序，必须保持不排序。
+        _lastSortMemberPath = !string.IsNullOrEmpty(savedSortColumnPath)
+            ? savedSortColumnPath
+            : hadWindowSnapshot ? null : "Name";
         _lastSortDescending = savedSortDirection == 2;
         // WindowStateManager.Load 读盘 + 列状态/排序恢复
         Services.StartupTimer.Mark("Win.State");

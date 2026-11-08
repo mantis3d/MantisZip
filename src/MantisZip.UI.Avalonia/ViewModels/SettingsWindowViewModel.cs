@@ -44,7 +44,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     private string _textPreviewFontFamily = "";
 
     [ObservableProperty]
-    private int _fontPreviewFontSize = 12;
+    private int _fontPreviewFontSize = 24;
 
     [ObservableProperty]
     private string _fontPreviewSampleText = "The quick brown fox jumps over the lazy dog.\n0123456789\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
@@ -58,7 +58,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(MaxPreviewFileSizeMB))]
     [NotifyPropertyChangedFor(nameof(MaxPreviewFileSizeMBText))]
-    private long _maxPreviewFileSize = 15 * 1024 * 1024;
+    private long _maxPreviewFileSize = 20 * 1024 * 1024;
 
     [ObservableProperty]
     private int _previewPosition = 4;
@@ -414,7 +414,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     private int _maxRecentFiles = 10;
 
     [ObservableProperty]
-    private int _autoCloseDelaySeconds = 3;
+    private int _autoCloseDelaySeconds = 5;
 
     /// <summary>进度窗口默认钉住（📌）：true = 一打开就钉住，完成/出错都等手动关。</summary>
     [ObservableProperty]
