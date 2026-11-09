@@ -166,21 +166,36 @@ public static class ResultPreviewService
     /// <param name="ct">取消令牌。</param>
     /// <param name="skeletonProgress">骨架进度接收器（每枚举一个文件上报一次累计值）；null 表示不上报。
     /// 回调在构建线程同步调用，实现方不得直接做 UI 操作。</param>
+    /// <param name="snapshotSink">骨架期快照接收器（每满 <paramref name="snapshotMinNewFiles"/> 个文件且距上次超过
+    /// <paramref name="snapshotInterval"/> 时交付一份「当前已构建部分」的深拷贝，供 UI 渐进长出条目）；
+    /// null 表示不做快照。回调同样在构建线程同步调用。</param>
+    /// <param name="snapshotInterval">快照最小间隔；null 用默认 <see cref="SnapshotInterval"/>（测试传 <see cref="TimeSpan.Zero"/>）。</param>
+    /// <param name="snapshotMinNewFiles">快照最小新增文件数；0 表示用默认 <see cref="SnapshotMinNewFiles"/>（测试传小值）。</param>
     public static SourceSubtree? BuildSourceSubtree(
         string sourcePath,
         FileFilterCriteria? filter = null,
         int maxDepth = int.MaxValue,
         int maxWidthPerDir = int.MaxValue,
         CancellationToken ct = default,
-        IProgress<SkeletonProgress>? skeletonProgress = null)
+        IProgress<SkeletonProgress>? skeletonProgress = null,
+        Action<PreviewTreeNode>? snapshotSink = null,
+        TimeSpan? snapshotInterval = null,
+        int snapshotMinNewFiles = 0)
     {
         ct.ThrowIfCancellationRequested();
         var included = new List<string>();
 
         if (Directory.Exists(sourcePath))
         {
+            var counter = skeletonProgress == null && snapshotSink == null
+                ? null
+                : new SkeletonCounter(
+                    skeletonProgress,
+                    snapshotSink,
+                    snapshotInterval ?? SnapshotInterval,
+                    snapshotMinNewFiles > 0 ? snapshotMinNewFiles : SnapshotMinNewFiles);
             var node = BuildDirectoryNode(sourcePath, sourcePath, filter, included, maxDepth, maxWidthPerDir, ct, depth: 0,
-                skeletonCounter: skeletonProgress == null ? null : new SkeletonCounter(skeletonProgress));
+                skeletonCounter: counter);
             return new SourceSubtree(node, included, IsFull: maxDepth == int.MaxValue && maxWidthPerDir == int.MaxValue);
         }
 
@@ -487,6 +502,12 @@ public static class ResultPreviewService
         return count;
     }
 
+    /// <summary>骨架快照的最小间隔：低于这个间隔不重复深拷贝（大树拷贝本身要花时间）。</summary>
+    internal static readonly TimeSpan SnapshotInterval = TimeSpan.FromMilliseconds(800);
+
+    /// <summary>骨架快照的最小新增文件数：太碎的快照只会让预览树不停重建。</summary>
+    internal const int SnapshotMinNewFiles = 300;
+
     /// <summary>
     /// 骨架构建的累计计数器：递归时**按引用**共享同一个实例。
     /// 若按值传初始值，兄弟目录会各自从同一基数重新累加（a 报 1..3、b 又报 1..2），
@@ -494,7 +515,13 @@ public static class ResultPreviewService
     /// </summary>
     private sealed class SkeletonCounter
     {
-        private readonly IProgress<SkeletonProgress> _sink;
+        private readonly IProgress<SkeletonProgress>? _sink;
+        private readonly Action<PreviewTreeNode>? _snapshotSink;
+        private readonly System.Diagnostics.Stopwatch _sinceSnapshot = System.Diagnostics.Stopwatch.StartNew();
+        private readonly TimeSpan _snapshotInterval;
+        private readonly int _snapshotMinNewFiles;
+        private int _filesSinceSnapshot;
+        private PreviewTreeNode? _root;
 
         /// <summary>已枚举（计入树）的文件总数。</summary>
         public int FileCount;
@@ -502,15 +529,57 @@ public static class ResultPreviewService
         /// <summary>已枚举文件的大小之和（字节）。</summary>
         public long TotalSize;
 
-        public SkeletonCounter(IProgress<SkeletonProgress> sink) => _sink = sink;
+        public SkeletonCounter(
+            IProgress<SkeletonProgress>? sink,
+            Action<PreviewTreeNode>? snapshotSink,
+            TimeSpan snapshotInterval,
+            int snapshotMinNewFiles)
+        {
+            _sink = sink;
+            _snapshotSink = snapshotSink;
+            _snapshotInterval = snapshotInterval;
+            _snapshotMinNewFiles = snapshotMinNewFiles;
+        }
 
-        /// <summary>记入一个文件并上报最新累计值。</summary>
+        /// <summary>登记正在生长的树根（只在 depth 0 调用一次），快照与进度文案都挂在它上面。</summary>
+        public void AttachRoot(PreviewTreeNode root) => _root = root;
+
+        /// <summary>记入一个文件：上报累计值，并在到达阈值时交出一份当前树的深拷贝。</summary>
         public void AddFile(long size)
         {
             FileCount++;
             TotalSize += size;
-            _sink.Report(new SkeletonProgress(FileCount, TotalSize));
+            _sink?.Report(new SkeletonProgress(FileCount, TotalSize));
+
+            if (_snapshotSink == null || _root == null) return;
+            _filesSinceSnapshot++;
+            if (_filesSinceSnapshot < _snapshotMinNewFiles || _sinceSnapshot.Elapsed < _snapshotInterval) return;
+
+            _filesSinceSnapshot = 0;
+            _sinceSnapshot.Restart();
+            // 深拷贝在构建线程完成：此后 UI 线程只读这份快照，不会碰到还在生长的活树。
+            _snapshotSink(CloneForSnapshot(_root, new SkeletonProgress(FileCount, TotalSize)));
         }
+    }
+
+    /// <summary>
+    /// 深拷贝一棵「还在生长」的树，用于骨架期渐进上屏。
+    /// 目录节点标 <see cref="PreviewTreeNode.IsSkeletonPartial"/>（让统计行显示「加载中」而不是最终统计），
+    /// 只有根节点带上当前累计进度（子目录行没有各自独立的计数）。
+    /// </summary>
+    internal static PreviewTreeNode CloneForSnapshot(PreviewTreeNode live, SkeletonProgress progress)
+        => CloneSubtree(live, progress);
+
+    /// <summary>递归克隆；<paramref name="progress"/> 只在根节点上非空（子目录行没有各自独立的计数）。</summary>
+    private static PreviewTreeNode CloneSubtree(PreviewTreeNode live, SkeletonProgress? progress)
+    {
+        var clone = live.ShallowClone();
+        clone.IsSkeletonPartial = live.IsDirectory;
+        clone.Origin = live;
+        clone.CurrentSkeletonProgress = progress;
+        foreach (var child in live.Children.OfType<PreviewTreeNode>())
+            clone.Children.Add(CloneSubtree(child, progress: null));
+        return clone;
     }
 
     /// <summary>
@@ -544,6 +613,9 @@ public static class ResultPreviewService
             IsExpanded = false,
             IsDirectory = true
         };
+
+        // 树根：让计数器知道该拿谁做快照（只在 depth 0 挂一次）
+        if (depth == 0) skeletonCounter?.AttachRoot(node);
 
         try
         {

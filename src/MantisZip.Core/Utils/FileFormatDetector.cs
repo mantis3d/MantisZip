@@ -449,7 +449,8 @@ public static class FileFormatDetector
             ".epub" => FileFormat.Epub,
             ".mobi" => FileFormat.Mobi,
             ".azw3" => FileFormat.Azw3,
-            ".txt" or ".log" => FileFormat.Text,
+            // .reg：regedit 导出的注册表脚本（UTF-16 LE + BOM，也可能是 ANSI 的 REGEDIT4），纯文本
+            ".txt" or ".log" or ".reg" => FileFormat.Text,
             ".csv" => FileFormat.Csv,
             ".json" => FileFormat.Json,
             ".xml" => FileFormat.Xml,
@@ -733,12 +734,21 @@ public static class FileFormatDetector
     /// <summary>
     /// 启发式判断字节数组是否看起来像文本内容（无魔数时的兜底策略）。
     /// 检查以下特征：
+    ///   - UTF-16（BOM 或隔字节 NUL）直接判文本，不参与下面的 NUL 比例检查
     ///   - null 字节比例 &lt; 1%（纯文本几乎不含 null）
     ///   - 可打印 ASCII + 空白字符比例 &gt; 80%
     ///   - 至少 8 字节才参与判断（避免空文件或极短内容的误判）
     /// </summary>
     private static bool LooksLikeText(byte[] data, int length)
     {
+        if (length < 2)
+            return false;
+
+        // UTF-16 必须先于 NUL 比例判定：其 ASCII 内容每个字符后跟一个 0x00，
+        // 按「null 比例 ≤1%」会被判成二进制（regedit 导出的 .reg 即此形态）。
+        if (Utf16TextHeuristic.TryGetEncoding(data, length, out _, out _))
+            return true;
+
         if (length < 8)
             return false;
 
@@ -814,26 +824,48 @@ public static class FileFormatDetector
         if (actualLen < 4)
             return FileFormat.Text;
 
-        // 尝试 UTF-8 解码；若有大量替换字符则回退到 CP1252
+        // UTF-16（regedit 导出的 .reg、记事本「Unicode」）必须先按 UTF-16 解码：
+        // 直接当 UTF-8 读会得到「R\0E\0G\0…」，所有子类型特征都匹配不上。
         string content;
-        try
+        if (Utf16TextHeuristic.TryGetEncoding(head, actualLen, out var utf16, out int bomOffset))
         {
-            content = Encoding.UTF8.GetString(head, 0, actualLen);
-            int replacementCount = 0;
-            foreach (char c in content)
-                if (c == '\uFFFD') replacementCount++;
-            if (replacementCount > actualLen * 0.1)
-                throw new InvalidOperationException("Too many UTF-8 replacement chars");
+            int bodyLen = actualLen - bomOffset;
+            content = bodyLen > 0
+                ? utf16.GetString(head, bomOffset, bodyLen)
+                : string.Empty;
         }
-        catch
+        else
         {
-            content = Encoding.GetEncoding(1252).GetString(head, 0, actualLen);
+            // 尝试 UTF-8 解码；若有大量替换字符则回退到 CP1252
+            try
+            {
+                content = Encoding.UTF8.GetString(head, 0, actualLen);
+                int replacementCount = 0;
+                foreach (char c in content)
+                    if (c == '\uFFFD') replacementCount++;
+                if (replacementCount > actualLen * 0.1)
+                    throw new InvalidOperationException("Too many UTF-8 replacement chars");
+            }
+            catch
+            {
+                content = Encoding.GetEncoding(1252).GetString(head, 0, actualLen);
+            }
         }
 
         // 跳过前导空白
         string trimmed = content.TrimStart();
         if (trimmed.Length == 0)
             return FileFormat.Text;
+
+        // ── 0. regedit 导出的注册表脚本（.reg）──
+        // 结构上像 INI（[HKEY_…] 段头 + "值"=数据），但语义是纯文本脚本：
+        // 若判成 Ini，扩展名兜底会得出 Text，状态栏就会提示「格式冲突」。
+        if (trimmed.StartsWith("Windows Registry Editor Version", StringComparison.OrdinalIgnoreCase) ||
+            trimmed.StartsWith("REGEDIT4", StringComparison.Ordinal))
+        {
+            CoreLog.Info("DetectTextSubtype: registry script detected");
+            return FileFormat.Text;
+        }
 
         // ── 1. SVG（最高优先级，特征极强）──
         if (ContainsSvgTag(trimmed))

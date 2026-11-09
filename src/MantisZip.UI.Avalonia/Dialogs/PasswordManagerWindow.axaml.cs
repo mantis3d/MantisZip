@@ -19,6 +19,9 @@ public partial class PasswordManagerWindow : Window
     private bool _isDeleteConfirm;
     private string? _editingId;
 
+    /// <summary>「默认显示密码」设置快照：编辑面板每次打开时据此复位密码框的显示态。</summary>
+    private bool _revealByDefault;
+
     // ── Localized string properties (bound via DataContext=self) ──
     public string WinTitle => LocalizationManager.T("PasswordManager_Title");
     public string SearchWatermark => LocalizationManager.T("PasswordManager_Search");
@@ -49,8 +52,8 @@ public partial class PasswordManagerWindow : Window
         InitializeComponent();
         DataContext = this;
         var settings = AppSettings.Load();
-        var showByDefault = settings.PasswordRevealByDefault;
-        LoadPasswords(showPasswords: showByDefault);
+        _revealByDefault = settings.PasswordRevealByDefault;
+        LoadPasswords(showPasswords: _revealByDefault);
     }
 
     // ── Data loading ──
@@ -120,6 +123,9 @@ public partial class PasswordManagerWindow : Window
         EditDesc.Text = "";
         EditPasswordBox.Text = "";
         EditRules.Text = "";
+
+        // 编辑面板每次打开都按设置复位显示态（不沿用上一次临时切换的结果）。
+        EditPasswordBox.PasswordChar = _revealByDefault ? '\0' : '●';
     }
 
     private void ShowEditPanel(string title, string saveBtnText)

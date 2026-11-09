@@ -95,8 +95,8 @@ public partial class ProgressViewModel : ObservableObject
     /// <summary>顶部内容模式（默认 Detailed；详见 <see cref="ContentMode"/>。窗口构造时按 AppSettings 持久化值覆盖）。</summary>
     private ProgressContentMode _contentMode = ProgressContentMode.Detailed;
 
-    /// <summary>信息量分级（默认 Medium；详见 <see cref="InfoDensity"/>）。</summary>
-    private ProgressInfoDensity _infoDensity = ProgressInfoDensity.Medium;
+    /// <summary>信息量分级（默认 Full；详见 <see cref="InfoDensity"/>）。</summary>
+    private ProgressInfoDensity _infoDensity = ProgressInfoDensity.Full;
 
     /// <summary>逐条目行集合（列表模式数据源；播种/引擎终态事件驱动）。</summary>
     private readonly ObservableCollection<EntryProgressItem> _entryItems = new();
@@ -528,7 +528,7 @@ public partial class ProgressViewModel : ObservableObject
         set { if (SetProperty(ref _contentMode, value)) NotifyDisplayProperties(); }
     }
 
-    /// <summary>信息量分级（v6 原型三档：Minimal/Medium/Full，控制「显示多少信息」非间距；默认 Medium）。</summary>
+    /// <summary>信息量分级（v6 原型三档：Minimal/Medium/Full，控制「显示多少信息」非间距；默认 Full）。</summary>
     public ProgressInfoDensity InfoDensity
     {
         get => _infoDensity;

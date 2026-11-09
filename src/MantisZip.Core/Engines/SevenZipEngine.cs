@@ -857,14 +857,23 @@ public class SevenZipEngine : IArchiveEngine
                 if (!EnableBulkSolidExtract)
                     return null;
 
+                // 格式判定要看「卷基名」：分卷首卷是 *.7z.001，Path.GetExtension 只认得到 ".001"，
+                // 默认分支会落到 Zip，于是整条批量路径被误判拦掉（2026-11-05 实测：加密分卷包
+                // 走不进批量，全量解压 309 文件 295s）。基名 *.7z 才能判出 SevenZip。
+                var formatPath = ArchiveVolumeSet.TryGetVolumeBase(archivePath, out var volumeBase, out _)
+                    ? volumeBase
+                    : archivePath;
                 var resolvedFormat = SfxProbe.TryGetPayloadFormat(archivePath)
-                    ?? ArchiveEngineFactory.GetFormatByExtension(archivePath);
+                    ?? ArchiveEngineFactory.GetFormatByExtension(formatPath);
                 if (resolvedFormat != ArchiveFormat.SevenZip)
                     return null;
 
-                // 加密包、非 solid 包、自定义 ErrorResolver 一律不碰（计划 §5.1/§5.10）
-                if (hasEncrypted || !string.IsNullOrEmpty(password))
-                    return null;
+                // 非 solid 包、自定义 ErrorResolver 一律不碰（计划 §5.1）。
+                // 加密包（计划 §5.10）：2026-11-05 复评后放开 —— 带密码的 solid 包批量接口同样可用
+                // （实测 48MB/309 文件的加密 solid 分卷包：逐条目 343s，一次 ExtractFiles 4.2s；
+                // 覆盖语义、FileExtractionStarted/Extracting/FileExtractionFinished 事件、
+                // 错误密码抛出的异常类型与逐条目完全一致，均由探针逐项验证）。
+                // 无密码的加密包不会走到这里（上面已抛「password required」）。
                 if (options?.ErrorResolver != null)
                     return null;
                 if (!extractor.IsSolid)
@@ -1397,8 +1406,13 @@ public class SevenZipEngine : IArchiveEngine
         {
             using var extractor = SevenZipExtractorFactory.Create(archivePath, password);
 
-            // 预先确定格式，供 lambda 中使用
-            var format = ArchiveEngineFactory.GetFormatByExtension(archivePath);
+            // 预先确定格式，供 lambda 中使用。
+            // 按**卷基名**判（2026-11-05）：`1.7z.001` 只看扩展名会落到 Zip 占位默认值，
+            // 下面「ISO 不支持加密」的豁免就永远不成立（加密分区会被误标成加密条目）。
+            var formatPath = ArchiveVolumeSet.TryGetVolumeBase(archivePath, out var volumeBase, out _)
+                ? volumeBase
+                : archivePath;
+            var format = ArchiveEngineFactory.GetFormatByExtension(formatPath);
 
             var items = extractor.ArchiveFileData
                 .Where(entry =>
@@ -1899,13 +1913,13 @@ public class SevenZipEngine : IArchiveEngine
             }
 
             /// 选中条目的批量可行性闸门（计划 §4.1）：全部满足才批量。
+            /// 加密 solid（计划 §5.10 2026-11-05 复评）：带密码的批量接口已验证可用
+            /// （覆盖语义、进度事件、错误密码异常与逐条目一致），故不再按加密与否拦截。
             bool CanUseBulk() =>
                 EnableBulkSolidExtract
                 && extractor.IsSolid
-                && password == null
                 && options?.ErrorResolver == null
-                && selectedFiles.Count >= 2                       // 单条：建暂存 + 移动纯亏
-                && !selectedFiles.Any(e => e.Encrypted);          // 加密 solid 的批量重载行为未验证
+                && selectedFiles.Count >= 2;                      // 单条：建暂存 + 移动纯亏
 
             /// 冲突预解析（计划 §4.2 第 2 步）：落点已由 override 算好，这里只做「判冲突 + 分桶」。
             async Task<BulkExtractPlan> BuildBulkPlanAsync()

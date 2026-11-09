@@ -235,7 +235,7 @@ public partial class MainWindowViewModel : ObservableObject
             // 与 WPF 版 MainWindow.Preview.cs 语义一致。
             // 文本三类（Text / Csv / Markdown）**不看** MaxPreviewFileSize：它们由 CanPreviewPartially 放行到
             // 「取 head + 部分预览」路径，真正的闸门是 PreviewService.MaxPartialPreviewBytes（256MB 硬上限）。
-            // Html（WebView 无法只渲染前 N 字节）与图片 / 其余格式仍在这里被 15MB 拒绝。
+            // Html（WebView 无法只渲染前 N 字节）与图片 / 其余格式仍在这里被 MaxPreviewFileSize（默认 20MB）拒绝。
             if (!PreviewService.IsMetadataOnlyExtension(ext)
                 && !PreviewService.CanPreviewPartially(previewType)
                 && entry.Size > PreviewService.MaxPreviewFileSize)

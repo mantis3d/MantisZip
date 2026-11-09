@@ -72,7 +72,7 @@ public static class TextEncodingDetector
 
     /// <summary>
     /// 从字节数组解码文本（用于内存中的短文本，如 ZIP EOCD 注释）。
-    /// 编码探测顺序：UTF-8 BOM → 严格 UTF-8（失败回退）→ 系统默认 ANSI 代码页。
+    /// 编码探测顺序：UTF-8 BOM → UTF-16（BOM / 隔字节 NUL）→ 严格 UTF-8（失败回退）→ 系统默认 ANSI 代码页。
     /// </summary>
     /// <param name="data">原始字节（不包含 BOM 时也正确处理）。</param>
     /// <param name="systemFallbackCodePage">系统默认 ANSI 代码页（如 936=GBK, 932=Shift-JIS）。传 0 使用当前系统的 ANSI 代码页。</param>
@@ -85,7 +85,13 @@ public static class TextEncodingDetector
         if (data.Length >= 3 && data[0] == 0xEF && data[1] == 0xBB && data[2] == 0xBF)
             return new UTF8Encoding(false).GetString(data, 3, data.Length - 3);
 
-        // 2. 严格 UTF-8：大多数现代工具/标准行为；无效字节序列即非 UTF-8
+        // 2. UTF-16（regedit 导出的 .reg、记事本「Unicode」）：必须先于严格 UTF-8 ——
+        //    UTF-16LE 的 ASCII 内容字节序列本身是合法 UTF-8（NUL 是合法字符），
+        //    先走 UTF-8 会解出「R\0E\0G\0…」；带 BOM 时 FF FE 又不是合法 UTF-8，会落到 ANSI 解出「ÿþ」。
+        if (Utf16TextHeuristic.TryGetEncoding(data, data.Length, out var utf16, out int bomOffset))
+            return utf16.GetString(data, bomOffset, data.Length - bomOffset);
+
+        // 3. 严格 UTF-8：大多数现代工具/标准行为；无效字节序列即非 UTF-8
         try
         {
             return new UTF8Encoding(false, true).GetString(data);
@@ -166,6 +172,11 @@ public static class TextEncodingDetector
     public static (string Text, string? EncodingName) DetectAndDecodeText(byte[] data, int systemFallbackCodePage = 0)
     {
         if (data.Length == 0) return (string.Empty, null);
+
+        // UTF-16 优先：Ude 对 UTF-16 的判定不稳定（常返回 null 或低置信度），
+        // 而 BOM / 隔字节 NUL 的判定是确定性的。
+        if (Utf16TextHeuristic.TryGetEncoding(data, data.Length, out var utf16, out int bomOffset))
+            return (utf16.GetString(data, bomOffset, data.Length - bomOffset), utf16.WebName);
 
         var (detected, confidence) = DetectEncoding(data);
         CoreLog.Trace("DetectAndDecodeText: detected={0}, confidence={1:P1}", detected ?? "null", confidence);

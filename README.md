@@ -109,7 +109,8 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 
 压缩/解压设置窗口实时文件树预览，冲突高亮、过滤灰显、精简模式、异步加载。
 
-![结果预览面板](docs/images/version/v0.5.0/ResultPreviewPanel.png)
+![结果预览面板](docs/images/version/v0.5.5/InlinePickerCompress.png)
+
 
 ----
 
@@ -139,7 +140,7 @@ MantisZip 是一款免费开源的压缩/解压工具，基于 .NET 10 + Avaloni
 
 解压时能实时预览解压路径与文件冲突
 
-![解压时能实时预览解压路径与文件冲突](docs/images/version/v0.5.0/CustomFilePickerExtract.png)
+![解压时能实时预览解压路径与文件冲突](docs/images/version/v0.5.5/InlinePickerExtractConflict.png)
 ----
 
 ### 🔑 智能密码管理器

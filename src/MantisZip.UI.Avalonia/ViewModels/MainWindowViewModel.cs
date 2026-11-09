@@ -365,9 +365,22 @@ public partial class MainWindowViewModel : ObservableObject
     {
         // 同步预览面板当前压缩包路径，供「输入密码」按钮的 CanExecute 判断使用
         Preview.CurrentPreviewFilePath = value;
-        // 换包后引擎能力位可能变化（zip ↔ tar），一并刷新删除入口可用性
+        // 换包后引擎能力位可能变化（zip ↔ tar / 单文件 ↔ 分卷），一并刷新删除入口可用性
         OnPropertyChanged(nameof(CanDeleteEntries));
+        OnPropertyChanged(nameof(CanAddEntries));
+        OnPropertyChanged(nameof(IsCurrentVolumeSet));
     }
+
+    /// <summary>
+    /// 当前压缩包是否为分卷集（<c>.7z.001</c> / <c>.zip.001</c> / <c>.z01</c> / <c>.r00</c> …）。
+    /// </summary>
+    /// <remarks>
+    /// 分卷包**只能读不能改**：7z.dll 能串卷解压，但不支持往多卷集里增删条目（SharpCompress 连读都不支持）。
+    /// 有效格式解析后分卷会被标成 SevenZip，而 <c>CanAdd(SevenZip)</c> / <c>CanDelete(SevenZip)</c> 都是 true，
+    /// 所以增删入口必须额外按这一位拦一次，否则会把「打开分卷包」变成「写入多卷集」。
+    /// </remarks>
+    public bool IsCurrentVolumeSet =>
+        CurrentArchivePath != null && ArchiveVolumeSet.HasVolumeSuffix(CurrentArchivePath);
 
     [ObservableProperty]
     private bool _isArchiveLoaded;
@@ -381,12 +394,28 @@ public partial class MainWindowViewModel : ObservableObject
         IsArchiveLoaded
         && !IsArchiveUnavailable
         && CurrentArchivePath != null
+        && !IsCurrentVolumeSet
         && (ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath)?.CanDelete(_currentFormat) ?? false);
+
+    /// <summary>
+    /// 当前压缩包是否支持追加条目（分卷集与 TAR/GZ 等只读格式为 false）。工具栏「添加文件」据此禁用。
+    /// </summary>
+    /// <remarks>
+    /// 与 <see cref="CanDeleteEntries"/> 同一套能力位 + 分卷位：分卷集有效格式是 SevenZip，而
+    /// <c>CanAdd(SevenZip)</c> 为 true —— 光看格式会把「只读的多卷集」显示成可写。
+    /// </remarks>
+    public bool CanAddEntries =>
+        IsArchiveLoaded
+        && !IsArchiveUnavailable
+        && CurrentArchivePath != null
+        && !IsCurrentVolumeSet
+        && (ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath)?.CanAdd(_currentFormat) ?? false);
 
     // 能力位随「压缩包加载状态」刷新（格式 `_currentFormat` 在 RefreshArchive 中先于本字段赋值）
     partial void OnIsArchiveLoadedChanged(bool value)
     {
         OnPropertyChanged(nameof(CanDeleteEntries));
+        OnPropertyChanged(nameof(CanAddEntries));
         // 代码页按钮是否可用取决于「已开包 + 格式」：载入成功分支里通知 CanChangeNameEncoding 时
         // IsArchiveLoaded 还是 false，只靠那一处通知会让按钮永久停在置灰态（2026-11-02 实测）
         OnPropertyChanged(nameof(CanChangeNameEncoding));
@@ -428,15 +457,20 @@ public partial class MainWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ArchiveAvailabilityTitleText));
         OnPropertyChanged(nameof(ArchiveAvailabilityDetailText));
         OnPropertyChanged(nameof(CanDeleteEntries));
+        OnPropertyChanged(nameof(CanAddEntries));
     }
 
     private ArchiveFileGuard? _archiveGuard;
+
+    /// <summary>守卫最近写进 <see cref="StatusMessage"/> 的那句话（状态恢复时只清它，不覆盖别的提示）。</summary>
+    private string? _guardStatusMessage;
 
     /// <summary>为刚打开的压缩包建立磁盘监视（会先释放上一份）。</summary>
     private void AttachArchiveGuard(string archivePath)
     {
         DetachArchiveGuard();
         ArchiveAvailability = ArchiveAvailability.Available;
+        _guardStatusMessage = null;
 
         var guard = ArchiveFileGuard.TryCreate(archivePath);
         if (guard == null)
@@ -457,13 +491,35 @@ public partial class MainWindowViewModel : ObservableObject
     }
 
     private void OnArchiveGuardAvailabilityChanged(object? sender, ArchiveAvailability availability)
+        => ApplyArchiveAvailability(availability);
+
+    /// <summary>
+    /// 把守卫状态映射到界面（internal 供测试直接驱动）。
+    /// 状态恢复 <see cref="ArchiveAvailability.Available"/> 时只清掉守卫自己写下的状态提示，
+    /// 避免「磁盘上的压缩包已被替换，建议重新打开」一直残留到下一次操作。
+    /// </summary>
+    internal void ApplyArchiveAvailability(ArchiveAvailability availability)
     {
         ArchiveAvailability = availability;
 
-        if (availability == ArchiveAvailability.Missing)
-            StatusMessage = LocalizationManager.T("Status_ArchiveMissing");
-        else if (availability == ArchiveAvailability.Replaced)
-            StatusMessage = LocalizationManager.T("Status_ArchiveReplaced");
+        switch (availability)
+        {
+            case ArchiveAvailability.Missing:
+                _guardStatusMessage = LocalizationManager.T("Status_ArchiveMissing");
+                StatusMessage = _guardStatusMessage;
+                break;
+
+            case ArchiveAvailability.Replaced:
+                _guardStatusMessage = LocalizationManager.T("Status_ArchiveReplaced");
+                StatusMessage = _guardStatusMessage;
+                break;
+
+            case ArchiveAvailability.Available:
+                if (StatusMessage == _guardStatusMessage)
+                    StatusMessage = null;
+                _guardStatusMessage = null;
+                break;
+        }
     }
 
     /// <summary>
@@ -482,10 +538,30 @@ public partial class MainWindowViewModel : ObservableObject
         if (File.Exists(CurrentArchivePath))
             return true;
 
-        ArchiveAvailability = ArchiveAvailability.Missing;
-        StatusMessage = LocalizationManager.T("Status_ArchiveMissing");
+        ApplyArchiveAvailability(ArchiveAvailability.Missing);
         return false;
     }
+
+    /// <summary>
+    /// 刷新专用守卫：被替换也放行（刷新就是从磁盘重读，是最安全的恢复动作），只有文件真没了才拦。
+    /// 添加 / 删除 / 解压等写操作仍走 <see cref="EnsureArchiveAvailable"/>，替换态一律拦下。
+    /// </summary>
+    internal bool EnsureArchiveRefreshable()
+    {
+        if (!IsArchiveLoaded || CurrentArchivePath == null)
+            return true;
+
+        _archiveGuard?.Check();
+        if (ArchiveAvailability == ArchiveAvailability.Missing)
+            return false;
+
+        if (File.Exists(CurrentArchivePath))
+            return true;
+
+        ApplyArchiveAvailability(ArchiveAvailability.Missing);
+        return false;
+    }
+
 
     /// <summary>
     /// 解压收尾后核对源包：本次把源包删掉了就直接关闭压缩包，避免界面继续停留在已不存在的包上。
@@ -1834,6 +1910,7 @@ public partial class MainWindowViewModel : ObservableObject
         // 关包/换包：终止整包缩略图批次（否则后台会拿着已失效的路径继续读包），缓存随服务一起释放
         CancelThumbnailBatch();
         ArchiveAvailability = ArchiveAvailability.Available;
+        _guardStatusMessage = null;
         // 复选框列：退订旧实例并清空勾选态（否则关包后仍留着指向已释放模型的 SelectedEntries）
         foreach (var stale in CurrentEntries)
             stale.PropertyChanged -= OnEntryPropertyChanged;
@@ -2073,7 +2150,8 @@ public partial class MainWindowViewModel : ObservableObject
     private async Task RefreshArchive()
     {
         if (CurrentArchivePath == null) return;
-        if (!EnsureArchiveAvailable()) return;
+        // 刷新是「从磁盘重读」：被替换也放行（用新文件恢复），只有文件真没了才拦。
+        if (!EnsureArchiveRefreshable()) return;
 
         var savedFolder = CurrentFolder;
         var savedEntryName = SelectedEntry?.FullPath;
@@ -2183,7 +2261,16 @@ public partial class MainWindowViewModel : ObservableObject
 
         try
         {
-            ZipCommentHelper.WriteComment(CurrentArchivePath, newComment);
+            // 自写窗口：注释是原地改写 EOCD，长度/修改时间都会变；不包起来会被守卫当成外部替换。
+            using (_archiveGuard?.BeginSelfWrite())
+                ZipCommentHelper.WriteComment(CurrentArchivePath, newComment);
+
+            // 注释预览的唯一事实源是 _archiveComment（只在打开时读一次）：写完同步更新，
+            // 否则根目录预览会一直显示旧注释，直到下一次重载。
+            _archiveComment = string.IsNullOrEmpty(newComment) ? null : newComment;
+            if (string.IsNullOrEmpty(CurrentFolder) && SelectedEntry == null)
+                UpdatePreviewForFolder();
+
             StatusMessage = LocalizationManager.T("Status_CommentSaved");
         }
         catch (Exception ex)
@@ -2243,6 +2330,60 @@ public partial class MainWindowViewModel : ObservableObject
             item.ProgressBarEnabled = ShowProgressBars;
         }
     }
+
+    // ── 卡片信息行切换（Tile/Content 假列头右键菜单唯一入口，thumbnail-card-badge-and-row-bars T2）──
+
+    /// <summary>
+    /// 切换一个卡片信息行的显示并重注入行资源。落盘走合并写（惯例同 <see cref="ToggleProgressBars"/>：
+    /// 直接 <see cref="AppSettings.Save"/> 会用启动副本整体覆盖用户刚在设置窗保存的其它设置）。
+    /// **禁止**在此触发 ThumbnailStyleChanged——行显隐与解码无关，触发会导致整包缩略图重解码。
+    /// </summary>
+    private void ToggleCardRowCore(bool isTileLayout, CardRowKind kind)
+    {
+        var newValue = !GetCardRowValue(_appSettings, isTileLayout, kind);
+
+        // 双写：启动内存副本（= Load() 缓存实例，保持读侧一致）+ 合并落盘
+        ApplyCardRow(_appSettings, isTileLayout, kind, newValue);
+        SaveSetting(s => ApplyCardRow(s, isTileLayout, kind, newValue));
+
+        App.RefreshThumbnailRowResources();
+    }
+
+    /// <summary>读加映射的当前值（(模式, 行) → AppSettings 字段；纯映射，不许反射/表达式树）。</summary>
+    internal static bool GetCardRowValue(AppSettings settings, bool isTile, CardRowKind kind) => (isTile, kind) switch
+    {
+        (true, CardRowKind.Size) => settings.TileRowShowSize,
+        (true, CardRowKind.CompressedSize) => settings.TileRowShowCompressedSize,
+        (true, CardRowKind.Ratio) => settings.TileRowShowRatio,
+        (true, CardRowKind.Date) => settings.TileRowShowDate,
+        (false, CardRowKind.Size) => settings.ContentRowShowSize,
+        (false, CardRowKind.CompressedSize) => settings.ContentRowShowCompressedSize,
+        (false, CardRowKind.Ratio) => settings.ContentRowShowRatio,
+        (false, CardRowKind.Date) => settings.ContentRowShowDate,
+        _ => true,
+    };
+
+    /// <summary>写映射（(模式, 行) → AppSettings 字段；纯映射且不落盘，落盘由调用方合并写）。</summary>
+    internal static void ApplyCardRow(AppSettings settings, bool isTile, CardRowKind kind, bool value)
+    {
+        switch (isTile, kind)
+        {
+            case (true, CardRowKind.Size): settings.TileRowShowSize = value; break;
+            case (true, CardRowKind.CompressedSize): settings.TileRowShowCompressedSize = value; break;
+            case (true, CardRowKind.Ratio): settings.TileRowShowRatio = value; break;
+            case (true, CardRowKind.Date): settings.TileRowShowDate = value; break;
+            case (false, CardRowKind.Size): settings.ContentRowShowSize = value; break;
+            case (false, CardRowKind.CompressedSize): settings.ContentRowShowCompressedSize = value; break;
+            case (false, CardRowKind.Ratio): settings.ContentRowShowRatio = value; break;
+            case (false, CardRowKind.Date): settings.ContentRowShowDate = value; break;
+        }
+    }
+
+    [RelayCommand]
+    private void ToggleTileRow(CardRowKind kind) => ToggleCardRowCore(true, kind);
+
+    [RelayCommand]
+    private void ToggleContentRow(CardRowKind kind) => ToggleCardRowCore(false, kind);
 
     [RelayCommand]
     private void ToggleSepDirBaseline()

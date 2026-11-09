@@ -171,6 +171,15 @@ public partial class ArchiveItemModel : ObservableObject
         LastModified > DateTime.MinValue ? LastModified.ToString("yyyy-MM-dd HH:mm:ss") : "";
 
     /// <summary>
+    /// 短日期显示（yyyy-MM-dd）：Tile 迷你行 / 假列头日期单元宽度（104~168px）放不下 19 字符时间戳。
+    /// 依赖 <see cref="LastModifiedDisplay"/> 固定 "yyyy-MM-dd" 前缀——若改该格式（如变成 dd/MM/yyyy），
+    /// 切出来的就不是纯日期了；格式变更时必须同步改这里的切片逻辑。
+    /// </summary>
+    public string LastModifiedShortDisplay => LastModifiedDisplay.Length >= 10
+        ? LastModifiedDisplay[..10]
+        : LastModifiedDisplay;
+
+    /// <summary>
     /// 压缩率（0–100 的百分比数值）。Size<=0 时返回 0。
     /// 派生自 <see cref="Size"/> / <see cref="CompressedSize"/>，聚合后自动重算。
     /// </summary>

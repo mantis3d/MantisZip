@@ -1363,6 +1363,11 @@
                           IsChecked="{Binding ShowPasswordMatchNotification}" />
                 <CheckBox Content="{Binding PwdRevealDefaultText}"
                           IsChecked="{Binding PasswordRevealByDefault}" />
+                <!-- 说明文案：该开关统一作用于密码库/匹配提示与所有密码输入框的初始显示态 -->
+                <TextBlock Text="{Binding PwdRevealDefaultHintText}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
               </StackPanel>
             </Border>
           </StackPanel>

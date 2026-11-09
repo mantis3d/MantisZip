@@ -87,13 +87,46 @@ public class PreviewTreeNode : FolderNode
     /// <summary>子孙最大深度（用于截断判断）。</summary>
     public int MaxChildDepth { get; set; }
 
+    /// <summary>
+    /// 该节点是否来自「骨架期快照」（后台还在枚举、树只长出了一部分）。
+    /// 快照树里不挂占位子节点（占位是浅层阶段的产物），因此不能用 <see cref="HasLoadingPlaceholderChild"/>
+    /// 判断是否还在加载，否则快照的根节点会误显示成最终统计。
+    /// </summary>
+    public bool IsSkeletonPartial { get; set; }
+
+    /// <summary>
+    /// 该显示节点（克隆体）对应的原始节点。屏幕上的树是深拷贝（见 ResultTreeView.RebuildDisplayTree），
+    /// 骨架进度写在原始节点上，靠这个回指把最新值同步到克隆体（ResultTreeView.SyncSkeletonProgress）。
+    /// </summary>
+    public PreviewTreeNode? Origin { get; set; }
+
+    /// <summary>
+    /// 把骨架期进度从原始节点同步到显示层克隆体（<see cref="Origin"/> 回指）。
+    /// 只按需写这一个值：O(显示节点)、不重建树、不动展开状态。
+    /// 抽成静态方法是为了能脱离 <c>ResultTreeView</c> 直接单测。
+    /// </summary>
+    internal static void SyncSkeletonProgressFromOrigins(IEnumerable<PreviewTreeNode> nodes)
+    {
+        foreach (var node in nodes)
+            SyncOne(node);
+
+        static void SyncOne(PreviewTreeNode node)
+        {
+            if (node.Origin is { } origin && !Equals(origin.CurrentSkeletonProgress, node.CurrentSkeletonProgress))
+                node.CurrentSkeletonProgress = origin.CurrentSkeletonProgress;
+
+            foreach (var child in node.Children.OfType<PreviewTreeNode>())
+                SyncOne(child);
+        }
+    }
+
     /// <summary>目录统计摘要文本，仅目录节点有值（空目录不显示统计行）。
-    /// 含占位子节点时显示「加载中」；有实时进度时显示「加载中 N 个文件，X」。</summary>
+    /// 含占位子节点或来自骨架期快照时显示「加载中」；有实时进度时显示「加载中 N 个文件，X」。</summary>
     public string DirectoryInfoText
     {
         get
         {
-            if (HasLoadingPlaceholderChild)
+            if (IsSkeletonPartial || HasLoadingPlaceholderChild)
             {
                 if (_currentSkeletonProgress is { FileCount: > 0 } sp)
                     return LocalizationManager.T("Preview_Result_SkeletonProgress",
@@ -221,7 +254,10 @@ public class PreviewTreeNode : FolderNode
             TruncatedCount = TruncatedCount,
             TruncatedDepth = TruncatedDepth,
             IsExpanded = IsExpanded,
-            IsSelected = IsSelected
+            IsSelected = IsSelected,
+            IsSkeletonPartial = IsSkeletonPartial,
+            // 克隆体记住「原始节点」：骨架进度只写在原始节点上，显示层靠它同步（多级克隆保持最终源头）
+            Origin = Origin ?? this
         };
     }
 }

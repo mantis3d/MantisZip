@@ -310,21 +310,21 @@ solid 7z 每解一个条目都要重新定位解码块，逐条目 `ExtractFile`
 
 | 条件 | 说明 |
 |---|---|
-| 格式 = `SevenZip` | `SfxProbe.TryGetPayloadFormat` 优先、回落 `GetFormatByExtension`（SFX 的 `.exe` 也会命中） |
+| 格式 = `SevenZip` | `SfxProbe.TryGetPayloadFormat` 优先、回落 `GetFormatByExtension`（SFX 的 `.exe` 也会命中）；**分卷包先经 `ArchiveVolumeSet.TryGetVolumeBase` 取基名再判** —— 2026-11-05 前直接拿 `1.7z.001` 去判，落到 `_ => ArchiveFormat.Zip` 默认分支，整条批量路径对分卷包永久失效 |
 | `extractor.IsSolid` | 非 solid 逐条目本来就快，走批量无收益 |
-| 无密码且无加密条目 | 加密 solid 的批量重载行为未验证 |
 | `options.ErrorResolver == null` | 有 resolver 时必须逐条拿异常上下文 |
 | 可批量条目数 > 0 | 全被跳过/全是大文件时直接退回 |
 
 - **冲突必须提前判定**：批量时段内没有逐条 stat 的机会，`BuildBulkPlanAsync()` 在解压前一次分桶（`Direct` / `Rename` / `BigFile` / `Unsafe` / `Duplicate` / `Skipped` / `Directories`），期间上报 `ArchivePhase.CheckingConflicts`。`Overwrite` 且无 resolver 走零 stat 快路径；`Skip` 不进批量但照旧上报；`Rename` 系策略先批量到目标目录内 `.mantiszip-staging-<guid>` 再逐条 `File.Move`；`Ask` 在预解析阶段问完「应用到全部」后定型。
 - **语义必须保持**：逐条目状态（Completed / Skipped / Overwritten / PermissionDenied / IoFailed）与 `ExtractResult` 计数、`OverwrittenEntries` 都不能因为走批量而变 —— 覆盖计数依赖 `BulkEntryPlan.WasExisting`（预解析时的一次 `File.Exists`），**不要删掉这次探测**。
-- **不要改成一律 bulk**：ZIP/TAR/RAR、加密包、64MB 以上单文件、越界路径、归档内重名条目都必须走逐条目；批量段抛异常时只对未完成条目重试。回退开关 `EnableBulkSolidExtract` 是 `static readonly`（写 `const` 会让关闭分支被判不可达 CS0162）。
+- **加密包也走批量（2026-11-05 放开）**：`BuildBulkPlanAsync` / `CanUseBulk()` 不再因 `password != null` 或存在加密条目退回逐条目。48MB / 309 文件加密 solid 分卷包实测 295s → 3.1s（`ExtractFiles` 带密码构造 extractor 即工作正常）。放开前已验证三件事：① 批量确实覆盖已存在文件；② 同 solid 块的**未选中**条目也会触发 `FileExtractionFinished` ⇒ `indexMap` 过滤必须保留；③ 错误密码时逐条目与批量抛的异常类型/消息完全相同，用户体验不变。无密码的加密包不会走到这里（`ExtractAsync` 前面已抛「password required」）。
+- **不要改成一律 bulk**：ZIP/TAR/RAR、64MB 以上单文件、越界路径、归档内重名条目都必须走逐条目；批量段抛异常时只对未完成条目重试。回退开关 `EnableBulkSolidExtract` 是 `static readonly`（写 `const` 会让关闭分支被判不可达 CS0162）。
 - **覆盖范围**：全量解压（`ExtractAsync`）与选中条目 / 拖拽解压（`ExtractEntriesAsync`）两个入口都走同一条批量思路，区别如下。
 
 | | `ExtractAsync`（全量） | `ExtractEntriesAsync`（选中 / 拖拽） |
 |---|---|---|
 | 落点 | 归档内相对布局，可直接落到目标目录 | 调用方 `outputPathOverrides` 逐个算好（扁平化 / 保留完整路径 / 重命名），**必须**先解码到暂存目录再按 override 移动 |
-| 批量闸门 | `IsSolid` 且无密码 / 无加密条目 / 无 `ErrorResolver` | 再额外要求选中非目录条目 ≥ 2（为 1 条建暂存不划算） |
+| 批量闸门 | `IsSolid` 且无 `ErrorResolver`（加密不挡，见上） | 再额外要求选中非目录条目 ≥ 2（为 1 条建暂存不划算） |
 | 分桶 | `Direct` 段直接落地，`Rename` 走暂存 | `Direct` 段**全部**走暂存，逐条 `File.Move(overwrite: true)` 后计数 |
 | 进度单位 | 文件计数 / 字节比取 max | `unitsDone`（跳过 / 失败 / 已解码待移动 / 已移动 / 逐条目各 1），解码期间百分比不冻结 |
 
@@ -546,7 +546,7 @@ MantisZip.Core ──────┬── MantisZip.UI.Avalonia ──reference
 
 - **API**：`GetVolumeSetKind` / `TryGetVolumeBase` / `HasVolumeSuffix` / `EnumerateVolumes` / `FindFirstVolume` / `GetVolumeWatchFilter` / `MatchesArchiveExtension`；`VolumeFilterPatterns = ["*.001", "*.z01"]`（唯一用途是让这两类首卷出现在「打开压缩包」筛选里）
 - **`FindFirstVolume` 是「能打开整组的那一卷」而不是字面首卷**：数字 / RAR 分卷是第 1 卷，PKZIP 跨卷是**末卷 `.zip`** —— 7z.dll 收到 `.z01` 会报 `Extension "z01" is not a supported archive file name extension`，只有末卷（含中央目录与 EOCD）能打开
-- **消费者**：`ArchiveEngineFactory.GetEngineByExtension` 命中分卷命名即路由 `SevenZipEngine`（分卷包只读，增删条目直接抛 `NotSupportedException`）；`ResolveVolumeAnchor` 从任意一卷回退首卷；`ArchiveFileGuard` 用 `GetVolumeWatchFilter` 生成 `FileSystemWatcher` 过滤器（外部删卷 / 替换要能报警）；`CustomFilePickerControl.MatchesFileFilter` 在扩展名相等失败后调 `MatchesArchiveExtension` 回退 —— 所以同一套分卷**每一卷**都会列在打开对话框里（`.part2.rar` 靠 `.rar` 本来就能撞进去，`.7z.002` 必须靠这条回退）
+- **消费者**：`ArchiveEngineFactory.GetEngineByExtension` 命中分卷命名即路由 `SevenZipEngine`（分卷包只读，增删条目直接抛 `NotSupportedException`）；`ArchiveEngineFactory.ResolveReaderFormat` 把同一套命名翻译成**格式身份** `SevenZip`（2026-11-05 起，KI-017）；`ResolveVolumeAnchor` 从任意一卷回退首卷；`ArchiveFileGuard` 用 `GetVolumeWatchFilter` 生成 `FileSystemWatcher` 过滤器（外部删卷 / 替换要能报警）；`CustomFilePickerControl.MatchesFileFilter` 在扩展名相等失败后调 `MatchesArchiveExtension` 回退 —— 所以同一套分卷**每一卷**都会列在打开对话框里（`.part2.rar` 靠 `.rar` 本来就能撞进去，`.7z.002` 必须靠这条回退）
 - **RAR5 结构校验**：`RarHeaderValidator.Validate(path)` 走一遍全部分卷的块链 —— 块头 CRC32（覆盖 `HeaderSize` 字段到头部末尾）、按 `HeaderFlags` 的 `0x0001`/`0x0002` 读 extras/数据区并按 `DataSize` **跳过数据区**、每卷必须以 end-of-archive 块收尾、非末卷 `EndFlags` bit0 = 1（缺卷即 `Broken`）、块越界/截断 `Broken`、≤1KB 全零尾部算填充；头加密或非 RAR5 返回 `Unknown`（只敢断定「坏」，不敢断定「好」）
 - **RAR4 结构校验（2026-11-03，issue #68）**：RAR4 签名 `52 61 72 21 1A 07 00` 走另一套块结构 —— 固定头 7 字节（`HEAD_CRC(2) HEAD_TYPE(1) HEAD_FLAGS(2) HEAD_SIZE(2)`），`HEAD_FLAGS & 0x8000` 时固定头后跟 `ADD_SIZE(4)` 数据区（`HEAD_FLAGS & 0x0100`＝LHD_LARGE 时另有 8 字节高位 `PACK_SIZE`，注意**不是** `0x8000`）；`HEAD_CRC` 是「CRC32 覆盖 `HEAD_TYPE` 起 `HEAD_SIZE-2` 字节」的低 16 位。校验项：块头 CRC、`HEAD_SIZE >= 7`、块与数据区不越界、必须出现 `MAIN_HEAD(0x73)` 且末块是 `ENDARC_HEAD(0x7B)`、多卷时 `MAIN_HEAD` 首卷位与 `ENDARC` 的「还有下一卷」位要首尾自洽。修复前 RAR4 一律 `Unknown`（等于「测试压缩包」对 RAR4 不做结构校验）
 - **挂载点只在 `SevenZipEngine.TestArchiveAsync`**（`extractor.Check()` 通过之后）。打开路径的 `ArchiveHeaderProbe.Probe` 仍只看签名，**不要**把结构校验挂进去 —— 那会让有效包在「打开」时被误判「文件损坏」
@@ -765,7 +765,13 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 
 #### `_currentFormat` classification（曾损坏，已修复）
 
-`_currentFormat` 现由 `LoadArchiveAsync` 中的 `GetFormatByExtension()` 按扩展名推导，替代旧的 `engine.CanHandle()` 判断（会把所有非 ZIP 格式误判为 `SevenZip`）。
+`_currentFormat` 现由 `LoadArchiveAsync` 中的 `ArchiveFormatHelper.GetFormat()` 推导，替代旧的 `engine.CanHandle()` 判断（会把所有非 ZIP 格式误判为 `SevenZip`）。
+
+⚠ **2026-11-05 起 `GetFormat` 不再是「扩展名 → 格式」，而是「谁能读这个路径」**：它委派 `ArchiveEngineFactory.ResolveReaderFormat(filePath)`（KI-017）。分卷包（`.001` / `.z01` / `.r00` / `.part1.rar`，基名是 zip / 7z / rar）与 SFX（`.exe` 等目录外扩展名 + 魔数命中）一律返回 `SevenZip`，因为只有 7z.dll 能读多卷与 PE 桩；普通路径仍是 `GetFormatByExtension` 的载荷判定。语义差了这一步，`_currentFormat = Zip` 的 `.7z.001` 会被 `ArchiveEntryExtractor` 送去 SharpCompress，预览 / 双击打开 / 缩略图全报 `Failed to locate the Zip Header`（引擎路由一直是对的，坏的只有格式身份）。
+
+- **单一入口**：UI 侧只能经 `ArchiveFormatHelper.GetFormat`；Core 侧新增直判点必须走 `ResolveReaderFormat`（守卫 `formatidentity` 强制）
+- **分卷包只读**：格式身份变成 `SevenZip` 后 `CanAdd(SevenZip)` / `CanDelete(SevenZip)` 会返回 true，故 `IsCurrentVolumeSet`（`ArchiveVolumeSet.HasVolumeSuffix`）必须同时拦住「添加文件」/「删除条目」/ 拖入添加覆层；`ArchiveVolumeSet` 自己抛的 `NotSupportedException` 是最后一道兜底
+- 回归：`tests/MantisZip.Tests/Utils/ReaderFormatResolutionTests.cs`（识别矩阵）+ `tests/MantisZip.Tests/Engines/SplitVolumeSevenZipEnginePreviewTests.cs`（用 `tests/corpus/corrupt-archives/vol-01-7z-split.001` / `vol-03.zip.001` 真跑单条预览与单条提取）
 
 #### TarGzEngine metadata（曾损坏，已修复）
 
@@ -809,9 +815,17 @@ Encoding.RegisterProvider(CodePagesEncodingProvider.Instance);
 `ArchiveStructureAnalyzer`（Core/Utils）分析压缩包结构，决定智能解压直接解到当前目录还是子目录：
 
 - 扫描顶层条目：若 ≥60% 共享同一根目录 → 带子目录解压；否则直接解压
-- 由 `ArchiveEngineFactory.SmartExtractEntriesAsync` 调用分析器后带计算出的目标路径委托 `ExtractAsync`
+- 目标目录由调用方先算好再交给引擎 `ExtractAsync`：主窗口 `MainWindowViewModel.SmartExtract`（条目已在浏览时加载、密码在会话缓存里）；CLI `App.ResolveSmartDestWithPasswordAsync`（`App.CliExtract.cs`）
 
 触发入口：`--extract-smart` CLI 或右键「智能解压」。
+
+**反直觉实现（删掉会复发）**：CLI 智能解压的**结构分析必须先拿到密码**，且 `ListEntriesAsync` 必须把密码传下去。
+加密文件名的包（7z `-mhe=on`、RAR 加密文件名）不提供密码连条目都列不出来 —— 若像以前那样「先列目录算目标目录、后取密码」，
+异常会被外层 `catch` 吞成一行 stderr、进程直接退出，用户既看不到进度窗也看不到密码框（2026-11-05 修复）。
+现在 `TryExtractSmartAsync` 先 `ResolveCliPassword`（密码库匹配），再由 `ResolveSmartDestWithPasswordAsync`
+（复用 `PasswordRetryLoop`）在密码类异常时弹密码框、输对后重试结构分析，并把最终密码回传给解压阶段（否则解压时会再弹一次）。
+另：密码框是本路径**第一个 Avalonia 窗口**（早于进度窗），必须给它挂 `NativeSplash.Hook` 并显式 `Hide()`
+—— 原生 splash 是 `WS_EX_TOPMOST`，不挂 Hook 会一直压在密码框上方（2026-11-05 同日修复）。
 
 ### UI 样式与注释约定（细节）
 

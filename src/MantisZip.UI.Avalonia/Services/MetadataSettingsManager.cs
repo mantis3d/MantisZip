@@ -21,6 +21,13 @@ public static class MetadataSettingsManager
     /// <summary>元数据面板设置变更时触发。ViewModel 可订阅以刷新绑定。</summary>
     public static event Action? SettingsChanged;
 
+    /// <summary>
+    /// 出厂默认模板的嵌入资源名（见 csproj 的 <c>LogicalName</c>）。
+    /// 内容 = 2026-11-08 用户实际配置（horizontal 字段布局 + 各类型字段的位置/顺序/行号）。
+    /// </summary>
+    internal const string DefaultTemplateResourceName =
+        "MantisZip.UI.Avalonia.Resources.Defaults.metadata-panel.json";
+
     public static MetadataPanelSettings Load()
     {
         if (_cached != null) return _cached;
@@ -29,8 +36,7 @@ public static class MetadataSettingsManager
         {
             if (!File.Exists(SettingsFile))
             {
-                _cached = new MetadataPanelSettings();
-                InitializeDefaultConfig(_cached);
+                _cached = CreateDefault();
                 return _cached;
             }
 
@@ -41,8 +47,7 @@ public static class MetadataSettingsManager
         }
         catch
         {
-            _cached = new MetadataPanelSettings();
-            InitializeDefaultConfig(_cached);
+            _cached = CreateDefault();
             return _cached;
         }
     }
@@ -69,6 +74,38 @@ public static class MetadataSettingsManager
     public static void ResetCache()
     {
         _cached = null;
+    }
+
+    /// <summary>
+    /// 创建出厂默认配置：读内置模板（<see cref="DefaultTemplateResourceName"/>）再补齐注册表里
+    /// 新增类型的字段。模板缺失/损坏时回落代码生成的最小默认值，保证功能不因此不可用。
+    /// </summary>
+    internal static MetadataPanelSettings CreateDefault()
+    {
+        var settings = LoadDefaultTemplate();
+        InitializeDefaultConfig(settings);
+        return settings;
+    }
+
+    private static MetadataPanelSettings LoadDefaultTemplate()
+    {
+        try
+        {
+            using var stream = typeof(MetadataSettingsManager).Assembly
+                .GetManifestResourceStream(DefaultTemplateResourceName);
+            if (stream is null)
+            {
+                return new MetadataPanelSettings();
+            }
+
+            using var reader = new StreamReader(stream);
+            return JsonSerializer.Deserialize<MetadataPanelSettings>(reader.ReadToEnd(), JsonDefaults.CaseInsensitive)
+                   ?? new MetadataPanelSettings();
+        }
+        catch
+        {
+            return new MetadataPanelSettings();
+        }
     }
 
     /// <summary>

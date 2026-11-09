@@ -4,6 +4,7 @@
              xmlns:models="clr-namespace:MantisZip.UI.Avalonia.Models"
              xmlns:conv="clr-namespace:MantisZip.UI.Avalonia.Converters"
              xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"
+             xmlns:sys="clr-namespace:System;assembly=mscorlib"
              x:Class="MantisZip.UI.Avalonia.Controls.ArchiveContentView"
              x:DataType="vm:MainWindowViewModel">
 
@@ -18,6 +19,16 @@
     <conv:BoolToToggleBgBrushConverter x:Key="ThumbnailSelectedBrushConverter" />
     <!-- 文字片段非空判断（三态内容卡第 ② 态用），复用既有 StringNotEmptyConverter -->
     <conv:StringNotEmptyConverter x:Key="ThumbnailTextNotEmptyConverter" />
+    <!-- Content 模式元数据行标签列定宽（假列头单元与此同宽保证标签对齐）。
+         前置 spike（GridSharedSizeGroupSpikeTests，2026-11-07）：Avalonia 12 的
+         Grid.SharedSizeGroup 不跨 Grid 共享 ⇒ 走计划兜底方案定宽。
+         76px 覆盖最长标签（英文 "Compressed:" ≈71px @11pt；中文 4 字符 ≈48px），实测可微调。
+         ⚠ 本资源只能给 Double 型属性（假列头 Border.Width 等）用——GridLength 型属性
+         （RowDefinition/ColumnDefinition 的 Width/Height）禁止绑它：挂树重求值时
+         double→GridLength 强转抛 InvalidCastException 整进程崩溃（2026-11-07 事故，
+         崩溃回归见 ContentLayoutRenderTests）；元数据行的 ColumnDefinition 用字面量 76 与本资源同值同步。
+         与规则 5 的 double/Thickness 双资源同理：GridLength 属性也吃不到 double 值。 -->
+    <sys:Double x:Key="ContentRowLabelColumnWidth">76</sys:Double>
 
     <!-- ══════════════ 三态内容卡（平铺项 / 内容行共用） ══════════════
          绑定对象是条目模型 ArchiveItemModel，按优先级三选一显示，全部用 IsVisible 组合判断，
@@ -71,6 +82,26 @@
                  HorizontalAlignment="Center"
                  VerticalAlignment="Center"
                  IsVisible="{Binding ShowSmallIcon}" />
+
+          <!-- ④ 格式角标：缩略图 / 文字卡态把兜底态的格式图标盖住了，这里以 chip 形式还给用户。
+               仅在卡片有内容（HasThumbnailContent = 缩略图或文字卡非空）时显示；兜底图标态
+               本身就是格式图标，不显示角标避免双图标。目录条目只有兜底态，天然不受影响。
+               Margin="0,0,2,2" 为 chip 右上角定位微调常量，豁免间距资源体系（chip 内边距语义）。 -->
+          <Border Width="{DynamicResource ControlHeightSm}"
+                  Height="{DynamicResource ControlHeightSm}"
+                  HorizontalAlignment="Right"
+                  VerticalAlignment="Top"
+                  Margin="0,0,2,2"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}"
+                  Opacity="0.9"
+                  CornerRadius="{DynamicResource BorderRadius}"
+                  IsVisible="{Binding HasThumbnailContent}">
+            <Image Source="{Binding IconSource}"
+                   Width="14" Height="14"
+                   Stretch="Uniform"
+                   HorizontalAlignment="Center"
+                   VerticalAlignment="Center" />
+          </Border>
         </Panel>
       </Border>
     </DataTemplate>
@@ -84,8 +115,11 @@
        根 Grid 即拆分前的 ArchiveContentGrid（列/行定义与子元素坐标原样保留）→ 布局零变化。 -->
     <Grid x:Name="ArchiveContentGrid"
           IsVisible="{Binding IsArchiveLoaded}"
-          ColumnDefinitions="1*,5,2.5*,5,3*"
+          ColumnDefinitions="275*,5,769*,5,727*"
           RowDefinitions="*,0,0">
+      <!-- 三栏宽度权重（2026-11-08 按用户实际布局定为出厂默认）：用户窗口 1781 宽时
+           目录树 275 / 文件列表 769 / 预览 727（layout.json 记录的像素值）。这里折算成
+           同比例星号权重 ⇒ 换窗口尺寸时三栏等比缩放，而不是写死像素。 -->
       <!-- Folder tree panel (col 0) with tree toolbar -->
       <Border x:Name="FolderTreeBorder"
               Grid.Column="0"
@@ -416,7 +450,7 @@
                 </DataTemplate>
               </DataGridTemplateColumn>
               <DataGridTextColumn SortMemberPath="Name"
-                                  Width="250"
+                                  Width="374"
                                   MinWidth="120"
                                   MaxWidth="800">
                 <DataGridTextColumn.Header>
@@ -431,7 +465,7 @@
                 </DataGridTextColumn.Binding>
               </DataGridTextColumn>
               <DataGridTemplateColumn SortMemberPath="Size"
-                                      Width="80"
+                                      Width="116"
                                       MinWidth="60"
                                       MaxWidth="400">
                 <DataGridTemplateColumn.Header>
@@ -478,10 +512,12 @@
                   </DataTemplate>
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
+              <!-- 默认隐藏（2026-11-08 按用户实际布局）：列头右键菜单「显示/隐藏列」可重新打开 -->
               <DataGridTemplateColumn SortMemberPath="CompressedSize"
-                                      Width="70"
+                                      Width="113"
                                       MinWidth="60"
-                                      MaxWidth="400">
+                                      MaxWidth="400"
+                                      IsVisible="False">
                 <DataGridTemplateColumn.Header>
                     <StackPanel Orientation="Horizontal" Spacing="3">
                         <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
@@ -523,7 +559,7 @@
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
               <DataGridTemplateColumn SortMemberPath="RatioSort"
-                                      Width="70"
+                                      Width="73"
                                       MinWidth="60"
                                       MaxWidth="300">
                 <DataGridTemplateColumn.Header>
@@ -554,7 +590,7 @@
                 </DataGridTemplateColumn.CellTemplate>
               </DataGridTemplateColumn>
               <DataGridTemplateColumn SortMemberPath="LastModified"
-                                      Width="100"
+                                      Width="149"
                                       MinWidth="80"
                                       MaxWidth="400">
                 <DataGridTemplateColumn.Header>
@@ -595,8 +631,90 @@
                MainWindow.Thumbnails.cs 的 SetupThumbnailLayoutEvents →
                HookThumbnailLayoutContainer("TileLayoutScrollViewer") 按 x:Name 在代码里订阅
                （Tunnel 阶段 + 容器级 DoubleTapped 兜底），因此这里不写 XAML 事件属性。 -->
+          <!-- ══════ 平铺布局假列头：仿 Details 列头；右键 = 行显隐菜单（唯一入口），
+               左键 = 排序（三态循环与 Details 列头同语义，共用窗口级排序状态） ══════
+               最左「名称」单元恒显（名称不是信息行，兼做排序与全关时的右键宿主）；
+               信息行单元显隐与对应迷你行同步（DynamicResource 行资源）；
+               全关信息行时剩「名称」+ 空背景条，排序与右键入口均永在 -->
+          <Grid Grid.Row="2" RowDefinitions="Auto,*">
+            <Border x:Name="TileRowHeaderBorder"
+                    Grid.Row="0"
+                    Tag="TileRowHeader"
+                    IsVisible="{Binding IsTileLayout}"
+                    Height="{DynamicResource ControlHeightMd}"
+                    VerticalAlignment="Top"
+                    Background="{DynamicResource ThemeHeaderBgBrush}"
+                    BorderBrush="{DynamicResource ThemeBorderLightBrush}"
+                    BorderThickness="0,0,0,1"
+                    Padding="{DynamicResource SpacingXsThk}">
+              <Border.ContextMenu>
+                <!-- ⚠ Tile/Content 判定走本菜单 Tag（2026-11-07 回归：Avalonia 打开菜单时
+                     PlacementTarget 不自动回填（恒 null，WPF 语义），判别必须用菜单自带标识，
+                     回归见 CardRowHeaderMenuTests -->
+                <ContextMenu Opening="CardRowHeaderContextMenu_Opening" Tag="Tile" />
+              </Border.ContextMenu>
+              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+                <!-- ①「名称」：恒显（不可隐藏），左键 = 名称排序（DataGrid_Name 现有三语 key） -->
+                <Border Tag="Tile:Name"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowName" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+                <!-- ② 信息行单元（四个，见 CardRowCatalog）：图标/文字/排序路径与 Details 列头同款；
+                     IsVisible 与对应迷你行绑同一行资源 ⇒ 隐藏行连列头一起消失 -->
+                <Border Tag="Tile:Size"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        IsVisible="{DynamicResource ThumbnailRowSizeVisible}"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconRuler}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowSize" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+                <Border Tag="Tile:CompressedSize"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        IsVisible="{DynamicResource ThumbnailRowCompressedSizeVisible}"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowCompressedSize" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+                <Border Tag="Tile:RatioSort"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        IsVisible="{DynamicResource ThumbnailRowRatioVisible}"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconDataBarVertical}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowRatioSort" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+                <Border Tag="Tile:LastModified"
+                        Width="{DynamicResource ThumbnailTileCellWidth}"
+                        Background="Transparent"
+                        IsVisible="{DynamicResource ThumbnailRowDateVisible}"
+                        Tapped="CardHeaderUnit_Tapped">
+                  <StackPanel Orientation="Horizontal" Spacing="3">
+                    <PathIcon Data="{StaticResource IconCalendar}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                    <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" VerticalAlignment="Center" />
+                    <TextBlock x:Name="TileSortArrowLastModified" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                  </StackPanel>
+                </Border>
+              </StackPanel>
+            </Border>
           <ScrollViewer x:Name="TileLayoutScrollViewer"
-                        Grid.Row="2"
+                        Grid.Row="1"
                         IsVisible="{Binding IsTileLayout}"
                         Background="{DynamicResource ThemeSurfaceBgBrush}"
                         Padding="{DynamicResource SpacingXsThk}"
@@ -673,6 +791,113 @@
                                 TextWrapping="NoWrap"
                                 TextTrimming="CharacterEllipsis"
                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          <!-- ══════ Tile 迷你信息行（假列头右键菜单控制显隐；数据条跟随 ShowProgressBars）════════
+                               结构与 Details 列的 CellTemplate 同构：数据条底纹（文件/目录双 Rectangle，
+                               UseDirProgressColor 切换）+ 文字覆盖；条宽 = RatioToWidthConverter(比例, 行宽)。
+                               ⚠ 行宽基准是**本行 Grid 自身**（AncestorType=Grid），不是列表项 ContentPresenter：
+                               Tile 的格子宽 = 卡片 + 16，卡片内宽只有 卡片 - 8，用格子宽会让 100% 的条
+                               伸出卡片边框（2026-11-07 用户报障；回归见 CardRowDataBarLayoutTests）。
+                               行显隐由 App 注入的行资源（TileRowShow*）经 DynamicResource 驱动 ⇒
+                               假列头菜单切换即时生效、不走缩略图重解码；行高走紧凑度资源（规则 7）。
+                               Margin="4,0" 与 Details 数据条文字一致。 -->
+                          <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                                IsVisible="{DynamicResource ThumbnailRowSizeVisible}">
+                            <Rectangle Fill="{DynamicResource ProgressBarSizeBrush}"
+                                       HorizontalAlignment="Left"
+                                       IsVisible="{Binding !UseDirProgressColor}">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="SizeRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <Rectangle Fill="{DynamicResource ProgressBarSizeDirBrush}"
+                                       HorizontalAlignment="Left"
+                                       IsVisible="{Binding UseDirProgressColor}">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="SizeRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <TextBlock Text="{Binding SizeDisplay}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          </Grid>
+                          <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                                IsVisible="{DynamicResource ThumbnailRowCompressedSizeVisible}">
+                            <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
+                                       HorizontalAlignment="Left"
+                                       IsVisible="{Binding !UseDirProgressColor}">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="CompressedSizeRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <Rectangle Fill="{DynamicResource ProgressBarCompressedSizeDirBrush}"
+                                       HorizontalAlignment="Left"
+                                       IsVisible="{Binding UseDirProgressColor}">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="CompressedSizeRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <TextBlock Text="{Binding CompressedSizeDisplay}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          </Grid>
+                          <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                                IsVisible="{DynamicResource ThumbnailRowRatioVisible}">
+                            <!-- 压缩率：仅单画刷（与 Details 同款，无目录变体） -->
+                            <Rectangle Fill="{DynamicResource ProgressBarRatioBrush}"
+                                       HorizontalAlignment="Left">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="RatioBarValue" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <TextBlock Text="{Binding RatioDisplay}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          </Grid>
+                          <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                                IsVisible="{DynamicResource ThumbnailRowDateVisible}">
+                            <!-- 修改日期：单画刷（与 Details 同款）；短日期 yyyy-MM-dd（Tile 格宽放不下完整时间戳） -->
+                            <Rectangle Fill="{DynamicResource ProgressBarDateBrush}"
+                                       HorizontalAlignment="Left">
+                              <Rectangle.Width>
+                                <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                  <Binding Path="DateRatio" />
+                                  <Binding Path="Bounds.Width"
+                                           RelativeSource="{RelativeSource AncestorType=Grid}" />
+                                </MultiBinding>
+                              </Rectangle.Width>
+                            </Rectangle>
+                            <TextBlock Text="{Binding LastModifiedShortDisplay}"
+                                       FontSize="11"
+                                       VerticalAlignment="Center"
+                                       Margin="4,0"
+                                       Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                          </Grid>
                         </StackPanel>
                         <!-- 复选框模式的勾选框：整张卡片是勾选热区，Shift 连勾 / 单张切换的逻辑在
                              MainWindow.Thumbnails.cs 的 ThumbnailLayout_PointerPressed；复选框自己不吃点击，
@@ -691,12 +916,91 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </ScrollViewer>
+          </Grid>
 
           <!-- ══════════════ 内容布局（Content）：左侧内容卡 + 右侧元数据 ══════════════
                行 = 横向 Grid（左 128px 三态内容卡 + 右名称/大小/压缩后/压缩率/修改日期），
                事件与菜单接线方式与平铺布局完全一致（代码侧按 ContentLayoutScrollViewer 订阅）。 -->
+          <!-- 内容布局外壳：假列头 + 滚动区（包壳方式与平铺布局一致） -->
+          <Grid Grid.Row="2" RowDefinitions="Auto,*">
+          <Border x:Name="ContentRowHeaderBorder"
+                  Grid.Row="0"
+                  Tag="ContentRowHeader"
+                  IsVisible="{Binding IsContentLayout}"
+                  Height="{DynamicResource ControlHeightMd}"
+                  VerticalAlignment="Top"
+                  Background="{DynamicResource ThemeHeaderBgBrush}"
+                  BorderBrush="{DynamicResource ThemeBorderLightBrush}"
+                  BorderThickness="0,0,0,1"
+                  Padding="{DynamicResource SpacingXsThk}">
+            <Border.ContextMenu>
+              <!-- ⚠ Tile/Content 判定走本菜单 Tag（同 Tile 列头，2026-11-07 回归） -->
+              <ContextMenu Opening="CardRowHeaderContextMenu_Opening" Tag="Content" />
+            </Border.ContextMenu>
+            <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
+              <!-- 左垫位：内容行左侧三态内容卡的区域（卡片边长 + 行内边距），让标签单元落到元数据块起点 -->
+              <Border Width="{DynamicResource ThumbnailTileCellWidth}" />
+              <!-- 「名称」恒显单元（行内是元数据块首行加粗名称，未加 : 标签列——用同宽单元对齐） -->
+              <Border Tag="Content:Name"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconCopy}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Name]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowName" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+              <!-- 四个信息行单元：定宽标签列（与元数据行标签列同键 ContentRowLabelColumnWidth）；
+                   IsVisible 与对应元数据行绑同一行资源 ⇒ 隐藏行连列头一起消失 -->
+              <Border Tag="Content:Size"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      IsVisible="{DynamicResource ThumbnailContentRowSizeVisible}"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconRuler}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Size]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowSize" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+              <Border Tag="Content:CompressedSize"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      IsVisible="{DynamicResource ThumbnailContentRowCompressedSizeVisible}"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconCompress}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Compressed]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowCompressedSize" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+              <Border Tag="Content:RatioSort"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      IsVisible="{DynamicResource ThumbnailContentRowRatioVisible}"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconDataBarVertical}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Ratio]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowRatioSort" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+              <Border Tag="Content:LastModified"
+                      Width="{DynamicResource ContentRowLabelColumnWidth}"
+                      Background="Transparent"
+                      IsVisible="{DynamicResource ThumbnailContentRowDateVisible}"
+                      Tapped="CardHeaderUnit_Tapped">
+                <StackPanel Orientation="Horizontal" Spacing="3">
+                  <PathIcon Data="{StaticResource IconCalendar}" Width="13" Height="13" Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  <TextBlock Text="{Binding LocalizedStrings[DataGrid_Modified]}" VerticalAlignment="Center" />
+                  <TextBlock x:Name="ContentSortArrowLastModified" Width="12" FontSize="10" VerticalAlignment="Center" Text="" />
+                </StackPanel>
+              </Border>
+            </StackPanel>
+          </Border>
           <ScrollViewer x:Name="ContentLayoutScrollViewer"
-                        Grid.Row="2"
+                        Grid.Row="1"
                         IsVisible="{Binding IsContentLayout}"
                         Background="{DynamicResource ThemeSurfaceBgBrush}"
                         Padding="{DynamicResource SpacingXsThk}"
@@ -755,7 +1059,8 @@
                           Padding="{DynamicResource SpacingXsThk}"
                           CornerRadius="{DynamicResource BorderRadius}"
                           Background="{Binding IsSelected, Converter={StaticResource ThumbnailSelectedBrushConverter}}">
-                    <Grid ColumnDefinitions="Auto,*">
+                    <Grid ColumnDefinitions="Auto,*"
+                          ColumnSpacing="{DynamicResource SpacingSm}">
                       <Panel Grid.Column="0">
                         <ContentControl Content="{Binding}"
                                   ContentTemplate="{StaticResource ThumbnailContentCard}"
@@ -770,65 +1075,193 @@
                                   IsChecked="{Binding IsChecked, Mode=TwoWay}"
                                   IsVisible="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).IsCheckboxMode}" />
                       </Panel>
+                      <!-- 右侧信息块与左侧缩略图**顶边对齐**（2026-11-08 用户报障：原 VerticalAlignment=Center
+                           让它在行内居中下沉，和缩略图错位）。水平间距改由 Grid.ColumnSpacing 提供，
+                           不再用 Margin 的竖直分量——否则顶边还会差 8px。回归见 CardRowContentAlignmentTests。 -->
                       <StackPanel Grid.Column="1"
-                                  Margin="{DynamicResource SpacingSmThk}"
                                   Spacing="{DynamicResource SpacingXxs}"
-                                  VerticalAlignment="Center">
+                                  VerticalAlignment="Top">
                         <TextBlock Text="{Binding NameDisplay}"
                                    FontWeight="SemiBold"
                                    FontSize="14"
                                    TextWrapping="NoWrap"
                                    TextTrimming="CharacterEllipsis"
                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        <!-- 元数据四行：标签取既有 DataGrid_* 文案 key（已登记在 UpdateLocalizedStrings） -->
-                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Size]}"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text=":"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text="{Binding SizeDisplay}"
+                        <!-- ══════ 元数据四行（T4 改版）：定宽标签列（与假列头同键对齐）+ 数据条底纹
+                             + 行开关（DynamicResource 行资源，假列头右键菜单控制显隐）。
+                             条结构 = Details CellTemplate 同款：文件/目录双 Rectangle（UseDirProgressColor 切换）
+                             + 宽度 RatioToWidthConverter(比例, 行宽) + 文字覆盖；数据条跟随 ShowProgressBars。
+                             ⚠ 行宽基准是**本行 Grid 自身**（AncestorType=Grid），不是列表项 ContentPresenter：
+                             后者是整行宽度（含左侧缩略图卡），会让 100% 的条伸出右侧元数据栏
+                             （2026-11-07 同 Tile 一起修复；回归见 CardRowDataBarLayoutTests）。 -->
+                        <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                              IsVisible="{DynamicResource ThumbnailContentRowSizeVisible}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="76" /><!-- ⚠ GridLength 属性不得绑 {DynamicResource}（2026-11-07 崩溃回归：
+                                                  ContentRowLabelColumnWidth 资源是 sys:Double，绑给 GridLength 类型的
+                                                  Columns.Width 在行挂树重求值时 double→GridLength 强转抛 InvalidCastException，
+                                                  整进程终止——修复 = 本处用字面常量；值必须与 ContentRowLabelColumnWidth
+                                                  资源保持一致（改任一处必须同步另一处）） -->
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarSizeBrush}"
+                                     HorizontalAlignment="Left"
+                                     IsVisible="{Binding !UseDirProgressColor}">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="SizeRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarSizeDirBrush}"
+                                     HorizontalAlignment="Left"
+                                     IsVisible="{Binding UseDirProgressColor}">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="SizeRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Size]}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                            <TextBlock Text=":"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding SizeDisplay}"
                                      FontSize="11"
                                      TextTrimming="CharacterEllipsis"
                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Compressed]}"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text=":"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text="{Binding CompressedSizeDisplay}"
+                        </Grid>
+                        <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                              IsVisible="{DynamicResource ThumbnailContentRowCompressedSizeVisible}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="76" /><!-- ⚠ GridLength 属性不得绑 {DynamicResource}（2026-11-07 崩溃回归：
+                                                  ContentRowLabelColumnWidth 资源是 sys:Double，绑给 GridLength 类型的
+                                                  Columns.Width 在行挂树重求值时 double→GridLength 强转抛 InvalidCastException，
+                                                  整进程终止——修复 = 本处用字面常量；值必须与 ContentRowLabelColumnWidth
+                                                  资源保持一致（改任一处必须同步另一处）） -->
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarCompressedSizeBrush}"
+                                     HorizontalAlignment="Left"
+                                     IsVisible="{Binding !UseDirProgressColor}">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="CompressedSizeRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarCompressedSizeDirBrush}"
+                                     HorizontalAlignment="Left"
+                                     IsVisible="{Binding UseDirProgressColor}">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="CompressedSizeRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Compressed]}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                            <TextBlock Text=":"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding CompressedSizeDisplay}"
                                      FontSize="11"
                                      TextTrimming="CharacterEllipsis"
                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Ratio]}"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text=":"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text="{Binding RatioDisplay}"
+                        </Grid>
+                        <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                              IsVisible="{DynamicResource ThumbnailContentRowRatioVisible}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="76" /><!-- ⚠ GridLength 属性不得绑 {DynamicResource}（2026-11-07 崩溃回归：
+                                                  ContentRowLabelColumnWidth 资源是 sys:Double，绑给 GridLength 类型的
+                                                  Columns.Width 在行挂树重求值时 double→GridLength 强转抛 InvalidCastException，
+                                                  整进程终止——修复 = 本处用字面常量；值必须与 ContentRowLabelColumnWidth
+                                                  资源保持一致（改任一处必须同步另一处）） -->
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <!-- 压缩率：仅单画刷（与 Details 同款，无目录变体） -->
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarRatioBrush}"
+                                     HorizontalAlignment="Left">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="RatioBarValue" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Ratio]}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                            <TextBlock Text=":"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding RatioDisplay}"
                                      FontSize="11"
                                      TextTrimming="CharacterEllipsis"
                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        </StackPanel>
-                        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXxs}">
-                          <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Modified]}"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text=":"
-                                     FontSize="11"
-                                     Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                          <TextBlock Text="{Binding LastModifiedDisplay}"
+                        </Grid>
+                        <Grid MinHeight="{DynamicResource ControlHeightSm}"
+                              IsVisible="{DynamicResource ThumbnailContentRowDateVisible}">
+                          <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="76" /><!-- ⚠ GridLength 属性不得绑 {DynamicResource}（2026-11-07 崩溃回归：
+                                                  ContentRowLabelColumnWidth 资源是 sys:Double，绑给 GridLength 类型的
+                                                  Columns.Width 在行挂树重求值时 double→GridLength 强转抛 InvalidCastException，
+                                                  整进程终止——修复 = 本处用字面常量；值必须与 ContentRowLabelColumnWidth
+                                                  资源保持一致（改任一处必须同步另一处）） -->
+                            <ColumnDefinition Width="*" />
+                          </Grid.ColumnDefinitions>
+                          <!-- 修改日期：单画刷（与 Details 同款） -->
+                          <Rectangle Grid.ColumnSpan="2"
+                                     Fill="{DynamicResource ProgressBarDateBrush}"
+                                     HorizontalAlignment="Left">
+                            <Rectangle.Width>
+                              <MultiBinding Converter="{StaticResource RatioToWidthConverter}">
+                                <Binding Path="DateRatio" />
+                                <Binding Path="Bounds.Width"
+                                         RelativeSource="{RelativeSource AncestorType=Grid}" />
+                              </MultiBinding>
+                            </Rectangle.Width>
+                          </Rectangle>
+                          <StackPanel Grid.Column="0" Orientation="Horizontal">
+                            <TextBlock Text="{Binding $parent[ItemsControl].((vm:MainWindowViewModel)DataContext).LocalizedStrings[DataGrid_Modified]}"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                            <TextBlock Text=":"
+                                       FontSize="11"
+                                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                          </StackPanel>
+                          <TextBlock Grid.Column="1"
+                                     Text="{Binding LastModifiedDisplay}"
                                      FontSize="11"
                                      TextTrimming="CharacterEllipsis"
                                      Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                        </StackPanel>
+                        </Grid>
                       </StackPanel>
                     </Grid>
                   </Border>
@@ -836,6 +1269,7 @@
               </ItemsControl.ItemTemplate>
             </ItemsControl>
           </ScrollViewer>
+          </Grid>
         </Grid>
       </Grid>
 

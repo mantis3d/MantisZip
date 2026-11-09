@@ -5,6 +5,7 @@ using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Controls.Shapes;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Platform;
 using MantisZip.UI.Avalonia.Converters;
@@ -89,6 +90,113 @@ public partial class ArchiveContentView
         if (Application.Current?.TryFindResource(key, out var brush) == true && brush is IBrush b)
             return b;
         return Brushes.Gray;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // 卡片信息行假列头（Tile / Content，thumbnail-card-badge-and-row-bars T3）
+    // ═══════════════════════════════════════════════════════════
+
+    /// <summary>
+    /// 假列头左键排序请求（列头单元 Tapped → MainWindow 订阅 → 复用窗口级排序状态）。
+    /// 参数 = 排序成员路径（与 Details 同名：Name/Size/CompressedSize/RatioSort/LastModified）。
+    /// </summary>
+    internal event EventHandler<string>? CardHeaderSortRequested;
+
+    /// <summary>
+    /// 列头单元左键（Tapped）：从 Tag（"Tile:Size" 之类）解析排序路径后抛给 MainWindow。
+    /// 右键走整条 Border 的 ContextMenu（语义自然分流，不会同时触发）。
+    /// </summary>
+    private void CardHeaderUnit_Tapped(object? sender, TappedEventArgs e)
+    {
+        if (sender is not Border { Tag: string tag }) return;
+        var sep = tag.IndexOf(':');
+        if (sep < 0) return;
+        CardHeaderSortRequested?.Invoke(this, tag[(sep + 1)..]);
+    }
+
+    /// <summary>
+    /// 卡片信息行假列头右键菜单：Opening 动态构建，与 Details 列头菜单同构
+    /// （ToggleIconBox 可见态图标 + 标题文字 + Click 即切）。数据源 = CardRowCatalog 四行固定清单；
+    /// Tile 与 Content 两个列头各一份菜单、各行独立状态（PlacementTarget 的 Tag 区分）。
+    /// 菜单挂在整条列头 Border 上 ⇒ 名称单元 / 空条右键也能开（入口永在）。
+    /// </summary>
+    private void CardRowHeaderContextMenu_Opening(object? sender, CancelEventArgs e)
+    {
+        if (sender is not ContextMenu menu) return;
+        // Tile/Content 判定走菜单自带 Tag（XAML 已给两个菜单分别写 Tag="Tile"/"Content"）。
+        // ⚠ 不要用 menu.PlacementTarget 判别：Avalonia 打开菜单时不自动回填该属性（恒 null，
+        //   WPF 语义才会自动回填），会退化成「两个菜单都写 Content 字段」（2026-11-07 回归，
+        //   用户真机发现 Tile 菜单开关无效反而改了 Content 的行；回归见 CardRowHeaderMenuTests）
+        var isTile = menu.Tag as string == "Tile";
+        var vm = DataContext as MainWindowViewModel;
+
+        menu.Items.Clear();
+        foreach (var kind in CardRowCatalog.Kinds)
+        {
+            var visible = MainWindowViewModel
+                .GetCardRowValue(MantisZip.UI.Avalonia.Models.AppSettings.Load(), isTile, kind);
+
+            // 与 Details 列头菜单同构：ToggleIconBox（可见=强调色底 / 空心）+ Details 同款列头图标
+            var iconBox = new Border
+            {
+                Classes = { "ToggleIconBox" },
+                Background = ToggleIconBackground(visible),
+                Child = Application.Current?.TryFindResource(CardRowCatalog.IconKey(kind), out var geo)
+                        is true && geo is Geometry g
+                    ? new PathIcon
+                    {
+                        Data = g,
+                        Width = 10,
+                        Height = 10,
+                        Foreground = GetThemeBrush("ThemeTextPrimaryBrush")
+                    }
+                    : null
+            };
+
+            var menuItem = new MenuItem
+            {
+                Icon = iconBox,
+                Header = LocalizationManager.T(CardRowCatalog.TitleKey(kind)),
+                Tag = kind
+            };
+
+            menuItem.Click += (_, _) =>
+            {
+                if (vm == null) return;
+                // 单参命令直调（CommunityToolkit 不生成多参命令，T2 已按 Tile/Content 拆两条）
+                if (isTile) vm.ToggleTileRowCommand.Execute(kind);
+                else vm.ToggleContentRowCommand.Execute(kind);
+                // 只把刚构建的图标翻面即可；菜单每次 Opening 全量重建，无陈旧态问题
+                iconBox.Background = ToggleIconBackground(!visible);
+            };
+            menu.Items.Add(menuItem);
+        }
+    }
+
+    /// <summary>本地排序箭头刷新（与 MainWindow.SetSortArrow 同规则：激活 ▲/▼，其余清空）。</summary>
+    private static void SetCardArrow(TextBlock? arrow, bool isActive, bool descending)
+    {
+        if (arrow == null) return;
+        arrow.Text = isActive ? (descending ? "▼" : "▲") : "";
+    }
+
+    /// <summary>
+    /// 刷新 Tile / Content 假列头共 10 个排序箭头（精度与 Details 同一份
+    /// _lastSortMemberPath/_lastSortDescending 同步——由 MainWindow.UpdateSortArrows 统一调用）。
+    /// Name 单元固定映射 "Name"；其余四个 = Details 列头同路径（走既有 GetSortValue）。
+    /// </summary>
+    internal void UpdateCardSortArrows(string? sortPath, bool descending)
+    {
+        SetCardArrow(TileSortArrowName, sortPath == "Name", descending);
+        SetCardArrow(TileSortArrowSize, sortPath == "Size", descending);
+        SetCardArrow(TileSortArrowCompressedSize, sortPath == "CompressedSize", descending);
+        SetCardArrow(TileSortArrowRatioSort, sortPath == "RatioSort", descending);
+        SetCardArrow(TileSortArrowLastModified, sortPath == "LastModified", descending);
+        SetCardArrow(ContentSortArrowName, sortPath == "Name", descending);
+        SetCardArrow(ContentSortArrowSize, sortPath == "Size", descending);
+        SetCardArrow(ContentSortArrowCompressedSize, sortPath == "CompressedSize", descending);
+        SetCardArrow(ContentSortArrowRatioSort, sortPath == "RatioSort", descending);
+        SetCardArrow(ContentSortArrowLastModified, sortPath == "LastModified", descending);
     }
 
     private static string GetColumnHeaderText(DataGridColumn column)

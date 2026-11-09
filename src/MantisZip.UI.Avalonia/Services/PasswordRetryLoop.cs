@@ -66,6 +66,9 @@ public static class PasswordRetryLoop
     /// <param name="setStatus">错密码 / 损坏提示回调（批处理接进度窗口 SetStatus，单文件接状态栏）。</param>
     /// <param name="attempt">以给定密码执行一次解压。</param>
     /// <param name="ct">取消令牌（<see cref="OperationCanceledException"/> 原样上抛，绝不吞）。</param>
+    /// <param name="promptPassword">取密码入口（参数 = 压缩包路径，返回 null = 用户取消）。
+    /// 为 null 时弹 <see cref="PasswordDialog"/>；测试注入此参数即可在无 UI 环境下验证
+    /// 「遇到密码类异常 → 取密码 → 重试」这条链路。</param>
     public static async Task<(PasswordRetryOutcome Outcome, string? Password)> RunAsync(
         string archivePath,
         string? initialPassword,
@@ -73,7 +76,8 @@ public static class PasswordRetryLoop
         Window? owner,
         Action<string> setStatus,
         Func<string?, CancellationToken, Task> attempt,
-        CancellationToken ct)
+        CancellationToken ct,
+        Func<string, Task<string?>>? promptPassword = null)
     {
         var password = initialPassword;
 
@@ -97,7 +101,9 @@ public static class PasswordRetryLoop
                 if (!ArchiveService.IsPasswordRelatedError(ex, archivePath))
                     throw;
 
-                var entered = await ShowPasswordDialogAsync(archivePath, owner);
+                var entered = promptPassword != null
+                    ? await promptPassword(archivePath)
+                    : await ShowPasswordDialogAsync(archivePath, owner);
                 if (entered == null)
                     return (PasswordRetryOutcome.Cancelled, null);
 
@@ -135,6 +141,14 @@ public static class PasswordRetryLoop
             return await Dispatcher.UIThread.InvokeAsync(async () =>
             {
                 var dialog = new PasswordDialog(Path.GetFileName(archivePath));
+
+                // splash 收尾：智能解压的密码框弹在结构分析阶段，早于进度窗，此时进程里可能一个
+                // Avalonia 窗口都没有 —— 原生 splash 是 WS_EX_TOPMOST，不挂 Hook 就会一直压在
+                // 密码框上方（用户可见遮挡）。Hook 与主窗 / 设置窗 / 进度窗同源（Opened → 置前 + Hide），
+                // 再显式 Hide 一次消掉弹窗首帧的重叠；已隐藏时 Hide 是幂等 no-op。
+                NativeSplash.Hook(dialog);
+                NativeSplash.Hide();
+
                 if (dialogOwner != null)
                 {
                     await dialog.ShowDialog(dialogOwner);

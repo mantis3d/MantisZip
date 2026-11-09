@@ -4,6 +4,7 @@ using Avalonia.Input.Platform;
 using Avalonia.Interactivity;
 using Avalonia.Media;
 using MantisZip.Core;
+using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 
 namespace MantisZip.UI.Avalonia.Dialogs;
@@ -55,11 +56,21 @@ public partial class MatchedPasswordDialog : Window
             DescriptionSection.IsVisible = true;
             DescriptionText.Text = $"{LocalizationManager.T("PwdMatched_DescriptionLabel")}: {entry.Description}";
         }
+
+        // 初始显示态跟随「默认显示密码」设置；仍可用 👁 临时切换。
+        _isRevealed = AppSettings.Load().PasswordRevealByDefault;
+        ApplyRevealState();
     }
 
     private void OnRevealClick(object? sender, RoutedEventArgs e)
     {
         _isRevealed = !_isRevealed;
+        ApplyRevealState();
+    }
+
+    /// <summary>把当前显示态落到掩码/明文文本与两个 👁 图标上（初始态与切换共用一处）。</summary>
+    private void ApplyRevealState()
+    {
         PwdMaskedText.IsVisible = !_isRevealed;
         PwdPlainText.IsVisible = _isRevealed;
         RevealEyeIcon.IsVisible = !_isRevealed;

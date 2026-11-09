@@ -294,6 +294,23 @@ public partial class App : Application
         Resources["ThumbnailCardSize"] = (double)size;
         Resources["ThumbnailTileItemWidth"] = (double)(size + 8);
         Resources["ThumbnailTileCellWidth"] = (double)(size + 16);
+
+        // 卡片信息行可见性（Tile 4 + Content 4）：settings 参数已在手，直接注入、
+        // 不调 RefreshThumbnailRowResources()（那会二次读盘——读盘版是菜单 Click 路径专用）。
+        InjectThumbnailRowResources(settings);
+    }
+
+    /// <summary>把 8 个行可见性资源写入 App.Resources（启动与菜单刷新共用的一段赋值）。</summary>
+    private void InjectThumbnailRowResources(AppSettings settings)
+    {
+        Resources["ThumbnailRowSizeVisible"] = settings.TileRowShowSize;
+        Resources["ThumbnailRowCompressedSizeVisible"] = settings.TileRowShowCompressedSize;
+        Resources["ThumbnailRowRatioVisible"] = settings.TileRowShowRatio;
+        Resources["ThumbnailRowDateVisible"] = settings.TileRowShowDate;
+        Resources["ThumbnailContentRowSizeVisible"] = settings.ContentRowShowSize;
+        Resources["ThumbnailContentRowCompressedSizeVisible"] = settings.ContentRowShowCompressedSize;
+        Resources["ThumbnailContentRowRatioVisible"] = settings.ContentRowShowRatio;
+        Resources["ThumbnailContentRowDateVisible"] = settings.ContentRowShowDate;
     }
 
     /// <summary>解析垫底色；非法字符串（手工改坏 settings.json）回落白色，不抛。</summary>
@@ -322,6 +339,22 @@ public partial class App : Application
         var settings = AppSettings.Load();
         app.ApplyThumbnailStyle(settings);
         ThumbnailStyleChanged?.Invoke(null, EventArgs.Empty);
+    }
+
+    /// <summary>
+    /// 卡片信息行可见性资源（Tile 4 + Content 4）：由假列头右键菜单写入设置后调用。
+    /// **不触发** <see cref="ThumbnailStyleChanged"/>——行显隐与解码无关，触发会导致
+    /// 整包缩略图重解码闪一下（T2 设计勘误后的独立入口，与 RefreshThumbnailStyle 互不调用）。
+    /// 无 App 环境（单测）静默返回。
+    /// </summary>
+    internal static void RefreshThumbnailRowResources()
+    {
+        if (Current is not App app)
+        {
+            return;
+        }
+
+        app.InjectThumbnailRowResources(AppSettings.Load());
     }
 
 }

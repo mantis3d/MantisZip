@@ -418,6 +418,8 @@ public static class ExtractFlow
     /// 成本≈解压一次，仅为填充预览列表不值得）；其余仅 zip/7z。
     /// 引擎类型兜一道的原因：魔数兜底路径下 <see cref="ArchiveEngineFactory.GetFormatByExtension"/>
     /// 会把未知扩展名判成 Zip，仅按格式判断可能把 TAR/GZ 误放进来。
+    /// 格式取**有效格式**（<see cref="ArchiveEngineFactory.ResolveReaderFormat"/>）而不是扩展名直判，
+    /// 否则 <c>pack.tar.001</c> 会落到 `.001` 的占位默认值 Zip，把「TAR 不播种」的约定绕过去（2026-11-05）。
     /// </summary>
     private static bool CanSeedEntries(string archivePath, IArchiveEngine? engine)
     {
@@ -425,7 +427,7 @@ public static class ExtractFlow
             return false;
         if (engine.SupportsParallelExtract)
             return true;
-        var format = ArchiveEngineFactory.GetFormatByExtension(archivePath);
+        var format = ArchiveEngineFactory.ResolveReaderFormat(archivePath);
         return format is ArchiveFormat.Zip or ArchiveFormat.SevenZip;
     }
 

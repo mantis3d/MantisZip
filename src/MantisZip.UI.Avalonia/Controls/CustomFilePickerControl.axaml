@@ -10,76 +10,98 @@
          文件名与类型行 / 通用参数区。背景沿用宿主窗口的 ThemeWindowBgBrush
          （缓存控件嵌进设置窗口时不额外铺底色，由宿主决定）。
        - 窗口标题栏、底部「确定 / 取消」按钮行、规则 15 唯一豁免的「系统浏览」
-         原生逃生通道由壳层 CustomFilePickerDialog 持有；「系统浏览」按钮位于下方
-         地址行内，点击只上抛 SystemBrowseRequested 事件，原生 StorageProvider
-         调用仍在 CustomFilePickerDialog.SystemBrowse_Click 内完成。
+         原生逃生通道由壳层 CustomFilePickerDialog 持有；「系统浏览」按钮位于地址区
+         的按钮行内（与后退/前进/向上同行），点击只上抛 SystemBrowseRequested 事件，
+         原生 StorageProvider 调用仍在 CustomFilePickerDialog.SystemBrowse_Click 内完成。
        ══════════════════════════════════════════════════════════════════════ -->
   <Grid RowDefinitions="Auto,*,Auto,Auto">
 
-    <!-- ═══════ Row 0: 地址栏 + 导航按钮 ═══════ -->
-    <!-- Classes="addrRow"：App.axaml 的 Grid.addrRow > Button 样式自动给这行的直接子 Button
-         套方形尺寸与按钮三色；因此这些按钮不写 Width / MinHeight / Background。 -->
-    <Grid Grid.Row="0"
-          Classes="addrRow"
-          ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto"
-          ColumnSpacing="{DynamicResource SpacingXxs}"
-          Margin="0,0,0,8">
-      <!-- 后退按钮 -->
-      <Button x:Name="BackButton"
-              Click="Back_Click"
-              ToolTip.Tip="{Binding BackText}">
-        <PathIcon Data="{StaticResource IconChevronLeft}"
-                  Width="16"
-                  Height="16"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-      </Button>
-      <!-- 前进按钮 -->
-      <Button Grid.Column="1"
-              x:Name="ForwardButton"
-              Click="Forward_Click"
-              ToolTip.Tip="{Binding ForwardText}">
-        <PathIcon Data="{StaticResource IconChevronRight}"
-                  Width="16"
-                  Height="16"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-      </Button>
-      <!-- 向上一级目录按钮 -->
-      <Button Grid.Column="2"
-              x:Name="UpButton"
-              Click="Up_Click"
-              ToolTip.Tip="{Binding UpText}">
-        <PathIcon Data="{StaticResource IconArrowUp}"
-                  Width="16"
-                  Height="16"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-      </Button>
-      <!-- 系统浏览按钮（打开系统文件夹选择器；点击上抛 SystemBrowseRequested，
-           原生调用在壳层 CustomFilePickerDialog.SystemBrowse_Click —— 规则 15 唯一豁免） -->
-      <Button Grid.Column="3"
-              x:Name="SystemBrowseButton"
-              Click="SystemBrowse_Click"
-              ToolTip.Tip="{Binding BrowseSystemTooltip}">
-        <PathIcon Data="{StaticResource IconFolder}"
-                  Width="16"
-                  Height="16"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-      </Button>
-      <!-- 路径输入框（支持自动补全；规则 16 定位：地址行必须用 PathBreadcrumb，不得退回 AutoCompleteBox） -->
-      <controls:PathBreadcrumb Grid.Column="4"
-                               x:Name="PathCrumbs"
+    <!-- ═══════ Row 0: 地址区（上：导航 / 动作按钮行；下：面包屑整宽行） ═══════ -->
+    <!-- 2026-11-05 拆两行：新增「新建文件夹」后地址行有 6 个方形按钮（ControlHeightMd 见方 + 2px 间距），
+         内嵌 620px 列里面包屑只剩 ≈390px、窗口拉到 MinWidth 900 时更窄，路径被折成「E:\ … \Controls」。
+         现在按钮集中在上行（左：导航；右：新建 + 收藏），面包屑独占下一行整宽。
+         布局关系由 tests/MantisZip.UI.Avalonia.Tests/CustomFilePickerAddressLayoutTests 钉住，别再把按钮塞回面包屑行。 -->
+    <StackPanel Grid.Row="0"
+                Spacing="{DynamicResource SpacingXxs}"
+                Margin="0,0,0,8">
+
+      <!-- 上行：按钮行。Classes="addrRow" 让 App.axaml 的 Grid.addrRow > Button 自动给这行的直接子
+           Button 套方形尺寸与按钮三色，因此这些按钮不写 Width / MinHeight / Background。
+           第 5 列（*）是弹性空列，把「新建文件夹 / 添加收藏」推到行尾。 -->
+      <Grid Classes="addrRow"
+            ColumnDefinitions="Auto,Auto,Auto,Auto,*,Auto,Auto"
+            ColumnSpacing="{DynamicResource SpacingXxs}">
+        <!-- 后退按钮 -->
+        <Button x:Name="BackButton"
+                Click="Back_Click"
+                ToolTip.Tip="{Binding BackText}">
+          <PathIcon Data="{StaticResource IconChevronLeft}"
+                    Width="16"
+                    Height="16"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <!-- 前进按钮 -->
+        <Button Grid.Column="1"
+                x:Name="ForwardButton"
+                Click="Forward_Click"
+                ToolTip.Tip="{Binding ForwardText}">
+          <PathIcon Data="{StaticResource IconChevronRight}"
+                    Width="16"
+                    Height="16"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <!-- 向上一级目录按钮 -->
+        <Button Grid.Column="2"
+                x:Name="UpButton"
+                Click="Up_Click"
+                ToolTip.Tip="{Binding UpText}">
+          <PathIcon Data="{StaticResource IconArrowUp}"
+                    Width="16"
+                    Height="16"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <!-- 系统浏览按钮（打开系统文件夹选择器；点击上抛 SystemBrowseRequested，
+             原生调用在壳层 CustomFilePickerDialog.SystemBrowse_Click —— 规则 15 唯一豁免） -->
+        <Button Grid.Column="3"
+                x:Name="SystemBrowseButton"
+                Click="SystemBrowse_Click"
+                ToolTip.Tip="{Binding BrowseSystemTooltip}">
+          <PathIcon Data="{StaticResource IconFolder}"
+                    Width="16"
+                    Height="16"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <!-- 新建文件夹按钮（2026-11-04 新增，2026-11-05 移到按钮行右端）：所有模式都可见（用户定的范围）。
+             点击弹输入框要名字，建完按模式决定「进入新目录」还是「只刷新列表」，
+             具体分流见 code-behind 的 CustomFilePickerControl.TryCreateFolder。
+             快捷键 Ctrl+Shift+N 由控件的 KeyDown 冒泡兜底（不依赖焦点在哪个子控件）。 -->
+        <Button Grid.Column="5"
+                x:Name="NewFolderButton"
+                Click="NewFolder_Click"
+                ToolTip.Tip="{Binding NewFolderTooltip}">
+          <PathIcon Data="{StaticResource IconFolderAdd}"
+                    Width="16"
+                    Height="16"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+        <!-- 添加收藏按钮（行末） -->
+        <Button Grid.Column="6"
+                x:Name="AddFavoriteButton"
+                Click="AddFavorite_Click">
+          <PathIcon Data="{StaticResource IconBookmarkAdd}"
+                    Width="16"
+                    Height="16"
+                    Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </Button>
+      </Grid>
+
+      <!-- 下行：面包屑（整宽）。段点击直达；点末尾空白或 Ctrl+L 进编辑态。
+           规则 16 定位：地址行必须用 PathBreadcrumb，不得退回 AutoCompleteBox。 -->
+      <controls:PathBreadcrumb x:Name="PathCrumbs"
                                PathKind="Disk"
                                FilterMode="Contains"
                                EditPlaceholderKey="Breadcrumb_EditPlaceholder" />
-      <!-- 添加收藏按钮 -->
-      <Button Grid.Column="5"
-              x:Name="AddFavoriteButton"
-              Click="AddFavorite_Click">
-        <PathIcon Data="{StaticResource IconBookmarkAdd}"
-                  Width="16"
-                  Height="16"
-                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-      </Button>
-    </Grid>
+    </StackPanel>
 
     <!-- ═══════ Row 1: 左侧快速路径 | 中间文件浏览器 | 右侧面板 ═══════ -->
     <Grid x:Name="BrowserGrid"
