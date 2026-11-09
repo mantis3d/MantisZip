@@ -298,9 +298,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _rulesText = "";
 
-    [ObservableProperty]
-    private bool _isPasswordRevealed;
-
     /// <summary>Filtered list of password library entries.</summary>
     public ObservableCollection<Core.PasswordEntry> FilteredPasswordEntries { get; } = new();
 
@@ -418,6 +415,9 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>骨架进度轮询间隔：用户能感知「数字在动」的最小节奏。</summary>
     private static readonly TimeSpan SkeletonProgressInterval = TimeSpan.FromMilliseconds(500);
 
+    /// <summary>渐进装配的最小间隔：与「源完成时的渐进上屏」共用，避免快照过密导致整树反复重建。</summary>
+    private const int ProgressiveAssembleIntervalMs = 250;
+
     /// <summary>骨架进度轮询定时器。Phase B 期间运行，结束/取消/关窗立即停止并解绑 Tick。</summary>
     private DispatcherTimer? _skeletonProgressTimer;
 
@@ -427,8 +427,12 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>各源最新骨架进度（绝对源路径 → 累计文件数/大小）；构建线程写入、UI 线程每 500ms 读取。</summary>
     private readonly Dictionary<string, SkeletonProgress> _skeletonProgressTrackers = new();
 
-    /// <summary>各源在屏上的浅层子树根节点（装配时直接挂到树上，即屏幕上显示的实例）。</summary>
+    /// <summary>各源在屏上的浅层子树根节点（装配时直接挂到树上，即屏幕上显示的实例）。
+    /// 快照到达后会被换成快照根（它才是当前克隆体的源头）。</summary>
     private readonly Dictionary<string, PreviewTreeNode> _skeletonProgressTargets = new();
+
+    /// <summary>各源最新的「骨架期快照」（后台还在枚举时树的部分拷贝）；装配优先用它，让树渐进长出条目。</summary>
+    private readonly Dictionary<string, PreviewTreeNode> _skeletonSnapshots = new();
 
     /// <summary>保护上面两个字典（构建线程写、UI 线程读）。</summary>
     private readonly object _skeletonProgressLock = new();
@@ -769,19 +773,60 @@ public partial class CompressSettingsViewModel : ObservableObject
 
             // ── Phase B：全量（串行逐源；每源完成即渐进上屏）──
             // 此阶段屏幕上仍是浅层树（目录节点显示「加载中」）：用 500ms 定时器把正在构建的源
-            // 已枚举的文件数/大小刷到节点上，文案变成「加载中 1637 个文件，2.45GB」。
+            // 已枚举的文件数/大小刷到节点上，文案变成「加载中 1637 个文件，2.45GB」；
+            // 同时构建线程每满一批文件交出一份快照，装配后让树「一段段长出来」。
             StartSkeletonProgress(version);
+
+            // 快照回调在构建线程触发（深拷贝已在那里完成），这里只负责切到 UI 线程登记 + 触发装配
+            void OnSnapshot(string sourcePath, PreviewTreeNode snapshot)
+            {
+                Dispatcher.UIThread.Post(() =>
+                {
+                    if (version != _previewBuildVersion) return;
+                    lock (_skeletonProgressLock)
+                    {
+                        _skeletonSnapshots[sourcePath] = snapshot;
+                        // 后续 500ms 的数字要刷到「当前屏上克隆体的源头」——也就是这份快照
+                        _skeletonProgressTargets[sourcePath] = snapshot;
+                    }
+                    _ = AssembleProgressiveAsync();
+                });
+            }
+
+            async Task AssembleProgressiveAsync()
+            {
+                // 与源完成时的渐进装配共用同一节流阈值：快照很密时不每个都重组整棵树
+                if ((DateTime.UtcNow - _lastProgressiveAssemble).TotalMilliseconds < ProgressiveAssembleIntervalMs) return;
+                try
+                {
+                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+                    if (version != _previewBuildVersion) return;
+                    PreviewRoot = progressive.Root;
+                    _lastProgressiveAssemble = DateTime.UtcNow;
+                }
+                catch (OperationCanceledException)
+                {
+                    // 被新一轮构建取代：静默
+                }
+                catch (Exception ex)
+                {
+                    App.DebugLog($"AssembleProgressive failed: {ex.Message}");
+                }
+            }
+
             foreach (var p in paths)
             {
                 ct.ThrowIfCancellationRequested();
                 if (_sourceCache.TryGetValue(p, out var c) && c.IsFull) continue; // 已全量
 
                 var progressSink = new SkeletonProgressSink(sp => RecordSkeletonProgress(p, sp));
+                var snapshotSink = new Action<PreviewTreeNode>(snap => OnSnapshot(p, snap));
                 var full = await Task.Run(
-                    () => ResultPreviewService.BuildSourceSubtree(p, filter, int.MaxValue, int.MaxValue, ct, progressSink), ct);
+                    () => ResultPreviewService.BuildSourceSubtree(p, filter, int.MaxValue, int.MaxValue, ct, progressSink, snapshotSink), ct);
                 if (version != _previewBuildVersion) return null;
                 if (full != null) _sourceCache[p] = full;
                 ForgetSkeletonProgress(p); // 该源已全量，后续由全量子树接管显示
+                ForgetSkeletonSnapshot(p);
 
                 // 节流：250ms 内的中间重组跳过（最后一次组装必然执行，不丢源）
                 if ((DateTime.UtcNow - _lastProgressiveAssemble).TotalMilliseconds >= 250)
@@ -830,9 +875,24 @@ public partial class CompressSettingsViewModel : ObservableObject
         List<string> paths, CompressOutputMode outputMode, string? outputPath,
         string format, bool keepOriginalExtension, FileFilterCriteria? filter, CancellationToken ct)
     {
-        var subtrees = paths.Select(p => _sourceCache.TryGetValue(p, out var st) ? st : (ResultPreviewService.SourceSubtree?)null).ToList();
+        var subtrees = paths.Select(ResolveSubtreeForDisplay).ToList();
         return await Task.Run(() => ResultPreviewService.AssembleCompressPreview(
             paths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter), ct);
+    }
+
+    /// <summary>
+    /// 取某个源在装配时使用的子树：已全量的原树 → 骨架期快照（树在长）→ 浅层树。
+    /// 快照带空 IncludedFiles（只用于显示统计；B 数据集/Plan 由 Phase C 用全量子树重算）。
+    /// </summary>
+    private ResultPreviewService.SourceSubtree? ResolveSubtreeForDisplay(string sourcePath)
+    {
+        if (_sourceCache.TryGetValue(sourcePath, out var cached) && cached.IsFull) return cached;
+        lock (_skeletonProgressLock)
+        {
+            if (_skeletonSnapshots.TryGetValue(sourcePath, out var snapshot))
+                return new ResultPreviewService.SourceSubtree(snapshot, new List<string>(), IsFull: false);
+        }
+        return _sourceCache.TryGetValue(sourcePath, out var shallow) ? shallow : null;
     }
 
     /// <summary>
@@ -886,8 +946,15 @@ public partial class CompressSettingsViewModel : ObservableObject
         {
             _skeletonProgressTrackers.Clear();
             _skeletonProgressTargets.Clear();
+            _skeletonSnapshots.Clear();
         }
     }
+
+    /// <summary>
+    /// 定时器把最新骨架进度刷到原始节点之后触发。屏幕上的树是深拷贝（ResultTreeView.RebuildDisplayTree），
+    /// 宿主（压缩设置窗口）订阅这里把增量同步到克隆体，否则数字永远停在克隆那一刻。
+    /// </summary>
+    public event Action? SkeletonProgressUpdated;
 
     /// <summary>定时器回调（UI 线程）：把各源最新累计值刷到屏上节点，赋值会触发 DirectoryInfoText 变更通知。</summary>
     private void OnSkeletonProgressTick(object? sender, EventArgs e)
@@ -903,8 +970,12 @@ public partial class CompressSettingsViewModel : ObservableObject
             }
         }
 
+        if (snapshot.Count == 0) return;
         foreach (var (node, progress) in snapshot)
             node.CurrentSkeletonProgress = progress;
+
+        // 原始节点已更新，通知宿主把同值同步到显示层克隆体
+        SkeletonProgressUpdated?.Invoke();
     }
 
     /// <summary>记录某源的最新骨架进度（构建线程同步调用：只写字典，不碰 UI）。</summary>
@@ -919,6 +990,13 @@ public partial class CompressSettingsViewModel : ObservableObject
     {
         lock (_skeletonProgressLock)
             _skeletonProgressTrackers.Remove(sourcePath);
+    }
+
+    /// <summary>源全量构建完成后丢弃其快照（全量子树已经在缓存里，装配优先取它）。</summary>
+    private void ForgetSkeletonSnapshot(string sourcePath)
+    {
+        lock (_skeletonProgressLock)
+            _skeletonSnapshots.Remove(sourcePath);
     }
 
     /// <summary>
@@ -1350,12 +1428,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     private void TogglePasswordMode()
     {
         IsPasswordLibraryMode = !IsPasswordLibraryMode;
-    }
-
-    [RelayCommand]
-    private void TogglePasswordReveal()
-    {
-        IsPasswordRevealed = !IsPasswordRevealed;
     }
 
     [RelayCommand]

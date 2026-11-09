@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Threading;
 using Avalonia.Threading;
 using MantisZip.Core.Utils;
 
@@ -40,6 +41,11 @@ public enum ArchiveAvailability
 /// 因此「同名文件被换成另一个包」会报告 <see cref="ArchiveAvailability.Replaced"/>，
 /// 不会被当成同一个包继续编辑。
 /// </para>
+/// <para>
+/// 本进程自己重写压缩包（添加 / 删除条目、改注释）时必须用 <see cref="BeginSelfWrite"/> 包住：
+/// 期间不判定外部变更，作用域结束时以磁盘现状重设基线；否则自己的写入会被误报成「被替换」，
+/// 并让随后的刷新被入口守卫拦下。
+/// </para>
 /// </remarks>
 public sealed class ArchiveFileGuard : IDisposable
 {
@@ -59,6 +65,12 @@ public sealed class ArchiveFileGuard : IDisposable
     private DispatcherTimer? _debounceTimer;
     private DispatcherTimer? _pollTimer;
     private bool _disposed;
+
+    /// <summary>
+    /// 自写嵌套深度：本进程正在重写压缩包期间 &gt; 0。
+    /// 写包必然改动长度 / 修改时间（临时文件替换时文件还会短暂消失），此时不能判定成外部变更。
+    /// </summary>
+    private int _selfWriteDepth;
 
     private ArchiveFileGuard(string archivePath)
     {
@@ -119,6 +131,11 @@ public sealed class ArchiveFileGuard : IDisposable
         if (_disposed)
             return Current;
 
+        // 自写期间不判定：此刻磁盘状态必然与基线不同（写到一半 / 临时文件覆盖），
+        // 基线由 BeginSelfWrite() 作用域结束时统一重设。
+        if (_selfWriteDepth > 0)
+            return Current;
+
         var next = Evaluate();
         if (next != Current)
         {
@@ -130,6 +147,21 @@ public sealed class ArchiveFileGuard : IDisposable
 
         return Current;
     }
+
+    /// <summary>
+    /// 标记「本进程正在重写这个压缩包」：作用域内忽略文件系统事件，释放时重设基线。
+    /// </summary>
+    /// <remarks>
+    /// 用法：<c>using (_archiveGuard?.BeginSelfWrite()) { ...写包... }</c>。
+    /// 必须在 UI 线程进入/释放（与 <see cref="Check"/>、<see cref="AvailabilityChanged"/> 同一线程）。
+    /// 允许嵌套：只有最外层释放时才重设基线，内层不会把写到一半的状态当成新基线。
+    /// </remarks>
+    public IDisposable BeginSelfWrite()
+    {
+        _selfWriteDepth++;
+        return new SelfWriteScope(this);
+    }
+
 
     public void Dispose()
     {
@@ -159,6 +191,38 @@ public sealed class ArchiveFileGuard : IDisposable
         _debounceTimer = null;
         _pollTimer?.Stop();
         _pollTimer = null;
+    }
+
+    /// <summary>退出自写抑制态；最外层结束时以磁盘现状重设基线。</summary>
+    private void EndSelfWrite()
+    {
+        if (_selfWriteDepth > 0)
+            _selfWriteDepth--;
+
+        if (_selfWriteDepth == 0)
+            Rebase();
+    }
+
+    /// <summary>
+    /// 以磁盘现状重设基线：自写结束后调用，把「自己刚写出来的版本」当成新的比对起点。
+    /// 只有文件真被自己删掉（删除全部条目会移除整包）时才报告 <see cref="ArchiveAvailability.Missing"/>。
+    /// </summary>
+    private void Rebase()
+    {
+        if (_disposed)
+            return;
+
+        _snapshot.Clear();
+        CaptureSnapshot();
+
+        var next = Evaluate();
+        if (next == Current)
+            return;
+
+        Current = next;
+        LifetimeDiagnostics.Log(
+            $"archive-guard rebased state={next} file='{Path.GetFileName(_archivePath)}'");
+        AvailabilityChanged?.Invoke(this, next);
     }
 
     private void CaptureSnapshot()
@@ -284,6 +348,20 @@ public sealed class ArchiveFileGuard : IDisposable
             _debounceTimer.Stop();
             _debounceTimer.Start();
         });
+    }
+
+    /// <summary>自写作用域：Dispose 时退出抑制态并重设基线（可重复 Dispose）。</summary>
+    private sealed class SelfWriteScope : IDisposable
+    {
+        private ArchiveFileGuard? _owner;
+
+        public SelfWriteScope(ArchiveFileGuard owner) => _owner = owner;
+
+        public void Dispose()
+        {
+            var owner = Interlocked.Exchange(ref _owner, null);
+            owner?.EndSelfWrite();
+        }
     }
 
     private readonly record struct VolumeSnapshot(string Path, long Length, DateTime LastWriteUtc);

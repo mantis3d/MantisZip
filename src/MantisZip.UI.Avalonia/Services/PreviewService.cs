@@ -85,6 +85,7 @@ public class PreviewService
     private static readonly HashSet<string> TextExtensions = new(StringComparer.OrdinalIgnoreCase)
     {
         ".txt", ".log", ".ini", ".cfg", ".conf", ".xml", ".json",
+        ".reg",
         ".cs", ".csproj", ".yaml", ".yml", ".toml",
         ".sh", ".bat", ".cmd", ".ps1", ".py", ".js", ".ts", ".tsx",
         ".css", ".scss", ".less",
@@ -201,7 +202,7 @@ public class PreviewService
     /// 预览文件大小上限（字节）。只读头的格式（见 MetadataOnlyExtensions）不受限制。
     /// 由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。
     /// </summary>
-    public static long MaxPreviewFileSize { get; set; } = 15 * 1024 * 1024;
+    public static long MaxPreviewFileSize { get; set; } = 20 * 1024 * 1024;
 
     /// <summary>
     /// 文本类预览大小上限（字节）。由 App.axaml.cs 在启动时、SettingsWindowViewModel.Save 在保存时同步。

@@ -171,6 +171,7 @@ public partial class CustomFilePickerControl : UserControl
     public string ForwardText => LocalizationManager.T("Picker_Forward");
     public string UpText => LocalizationManager.T("Picker_Up");
     public string BrowseSystemTooltip => LocalizationManager.T("Picker_BrowseSystemTooltip");
+    public string NewFolderTooltip => LocalizationManager.T("Picker_NewFolder");
     public string FileNameLabel => LocalizationManager.T("Picker_FileName");
     public string FileTypeLabel => LocalizationManager.T("Picker_FileType");
     public string ExtractPreviewTitle => LocalizationManager.T("Picker_ExtractPreviewTitle");
@@ -235,6 +236,10 @@ public partial class CustomFilePickerControl : UserControl
         // 复选框模式的手势必须抢在 ListBox 折叠选区、行内 CheckBox 默认切换之前处理（Tunnel），
         // 否则「Ctrl/Shift + 点复选框」会被默认行为各切一次（2026-11-03）。
         FileList.AddHandler(PointerPressedEvent, FileList_PointerPressed, RoutingStrategies.Tunnel);
+
+        // Ctrl+Shift+N 新建文件夹：Tunnel 保证焦点在面包屑输入框 / 文件名框里也照样生效
+        // （它不是任何子控件的默认手势，不会与输入法/文本编辑冲突）。
+        AddHandler(KeyDownEvent, OnPickerKeyDown, RoutingStrategies.Tunnel);
     }
 
     // ── 公开初始化入口（等价于原对话框「构造 + 初始化」的全部副作用） ──────
@@ -872,6 +877,175 @@ public partial class CustomFilePickerControl : UserControl
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
         UpdateFavoriteButtonState();
+    }
+
+    // ── 新建文件夹（2026-11-04） ───────────────────────────────────────────
+
+    /// <summary>
+    /// 在当前浏览目录下新建一个文件夹，并按模式决定建完之后停在哪里。
+    /// <para>
+    /// 两种模式分流的理由：<b>PickFolder / ExtractFolder</b> 的「当前目录即结果」，新建的目录
+    /// 必须导航进去才算选中（导航会经 <see cref="PathChanged"/> 通知宿主）；<b>SaveFile</b> 进去后
+    /// 焦点落文件名框。<b>PickItems / OpenFile</b> 则**不导航**——PickItems 简单模式下切目录会清空
+    /// 已累积选择（<see cref="NavigateTo"/>），OpenFile 进入空目录等于把用户关进空房间；
+    /// 而且 PickItems 里选中的目录会被当作结果累加（<see cref="SyncAccumulatedFromListSelection"/>），
+    /// 所以这两个模式连选中都不做，只刷新列表让新行可见。
+    /// </para>
+    /// </summary>
+    /// <param name="name">文件夹名（不含路径）；前后空白会被裁掉。</param>
+    /// <param name="error">失败原因（已本地化）；成功时为 <see langword="null"/>。</param>
+    /// <returns>建成功为 <see langword="true"/>。</returns>
+    public bool TryCreateFolder(string? name, out string? error)
+    {
+        error = ValidateNewFolderName(name);
+        if (error is not null) return false;
+
+        var folderName = (name ?? string.Empty).Trim();
+        var fullPath = Path.Combine(_currentDir, folderName);
+        try
+        {
+            Directory.CreateDirectory(fullPath);
+        }
+        catch (Exception ex)
+        {
+            error = LocalizationManager.T("Picker_NewFolderFailed", ex.Message);
+            return false;
+        }
+
+        // 建完分流：PickFolder / ExtractFolder / SaveFile 进入新目录，其余只刷新
+        if (Mode is PickerMode.PickFolder or PickerMode.ExtractFolder or PickerMode.SaveFile)
+        {
+            NavigateTo(fullPath);
+            if (Mode == PickerMode.SaveFile) FileNameBox.Focus();
+        }
+        else
+        {
+            // 刷新列表会先把 SelectedItem 置空（LoadDirectory:1089），那一瞬触发的
+            // SelectionChanged → SyncAccumulatedFromListSelection 会把累积选择一并清掉。
+            // 所以整段刷新要跑在 _syncingSelection 闸门内，刷新后按既有累积回填勾选 / 选中态：
+            // 「新建文件夹」是浏览目录的副产物，不许改动用户已经选好的结果。
+            _syncingSelection = true;
+            try
+            {
+                LoadDirectory(_currentDir);
+
+                // 新建项由 CreateDirItem 按 _accumulatedPaths 恢复勾选；这里补回列表选中态
+                // （含目录：简单模式下目录也可以是结果）。
+                if (FileList.SelectedItems is { } selectedItems)
+                {
+                    selectedItems.Clear();
+                    foreach (var item in _fileItems)
+                    {
+                        if (_accumulatedPaths.Contains(item.FullPath, StringComparer.OrdinalIgnoreCase))
+                            selectedItems.Add(item);
+                    }
+                }
+            }
+            finally
+            {
+                _syncingSelection = false;
+            }
+
+            UpdatePickPanel();
+            if (_fileItems.FirstOrDefault(i =>
+                    string.Equals(i.FullPath, fullPath, StringComparison.OrdinalIgnoreCase)) is { } created)
+            {
+                FileList.ScrollIntoView(created);
+            }
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// 只做校验、不落盘（供 <see cref="InputDialog"/> 的 validator 用：失败要留窗重填，
+    /// 不能在每次点确定时先建一遍目录再报「已存在」）。
+    /// </summary>
+    /// <param name="name">候选文件夹名。</param>
+    /// <returns>本地化错误文案；通过为 <see langword="null"/>。</returns>
+    public string? ValidateNewFolderName(string? name)
+    {
+        if (string.IsNullOrEmpty(_currentDir))
+            return LocalizationManager.T("Picker_NewFolderNoPath");
+
+        var trimmed = (name ?? string.Empty).Trim();
+        if (trimmed.Length == 0
+            || trimmed is "." or ".."
+            || trimmed.IndexOfAny(Path.GetInvalidFileNameChars()) >= 0)
+        {
+            return LocalizationManager.T("Picker_NewFolderInvalidName");
+        }
+
+        var fullPath = Path.Combine(_currentDir, trimmed);
+        return Directory.Exists(fullPath) || File.Exists(fullPath)
+            ? LocalizationManager.T("Picker_NewFolderExists")
+            : null;
+    }
+
+    /// <summary>
+    /// 建议的文件夹名：<c>新建文件夹</c>，同名已存在时自动追加 <c>(2)</c>、<c>(3)</c>…
+    /// （公开供输入框预填与测试断言用）。
+    /// </summary>
+    public string SuggestNewFolderName()
+    {
+        var baseName = LocalizationManager.T("Picker_NewFolderDefaultName");
+        if (!Directory.Exists(Path.Combine(_currentDir, baseName))) return baseName;
+
+        for (var i = 2; i < 1000; i++)
+        {
+            var candidate = $"{baseName} ({i})";
+            if (!Directory.Exists(Path.Combine(_currentDir, candidate))) return candidate;
+        }
+
+        // 极端情况（上千个同名目录）：退化成带后缀的一次性名字，仍然可用
+        return $"{baseName} ({Guid.NewGuid():N})";
+    }
+
+    /// <summary>地址行「新建文件夹」按钮：先问名字（带校验），再落盘。</summary>
+    private async void NewFolder_Click(object? sender, RoutedEventArgs e)
+        => await PromptAndCreateFolderAsync();
+
+    /// <summary>Ctrl+Shift+N 兜底：与按钮同一条路径。</summary>
+    private void OnPickerKeyDown(object? sender, KeyEventArgs e)
+    {
+        if (e.Key != Key.N
+            || !e.KeyModifiers.HasFlag(KeyModifiers.Control)
+            || !e.KeyModifiers.HasFlag(KeyModifiers.Shift))
+        {
+            return;
+        }
+
+        e.Handled = true;
+        _ = PromptAndCreateFolderAsync();
+    }
+
+    /// <summary>
+    /// 弹输入框问名字 → 建目录。校验失败时弹窗自己留窗显示原因（<see cref="InputDialog"/> 的
+    /// validator），所以这里只需处理「确认」与「放弃」两种结局。
+    /// </summary>
+    private async Task PromptAndCreateFolderAsync()
+    {
+        if (string.IsNullOrEmpty(_currentDir)) return;
+        if (OwnerWindow is not { } owner) return;
+
+        var dialog = new InputDialog(
+            LocalizationManager.T("Picker_NewFolderTitle"),
+            LocalizationManager.T("Picker_NewFolderPrompt"),
+            SuggestNewFolderName(),
+            ValidateNewFolderName);
+
+        if (await dialog.ShowDialog<bool>(owner) != true) return;
+
+        // validator 已把关，正常不会失败；失败（如弹窗期间被别的程序占用）也不静默——把原因弹出来
+        if (!TryCreateFolder(dialog.InputText, out var error) && error is not null)
+        {
+            await AppMessageBox.Show(
+                error,
+                LocalizationManager.T("Picker_NewFolderTitle"),
+                MessageBoxButton.OK,
+                MessageBoxImage.Warning,
+                owner);
+        }
     }
 
     private void Back_Click(object? sender, RoutedEventArgs e)

@@ -36,9 +36,6 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 - **Three ways to view the file list** — a new toolbar button cycles the list between details (the original grid), tiles (a card flow) and content rows (large card plus name, sizes, ratio and modified date); the choice is saved and restored. In tile and content modes, images show a real thumbnail (never upscaled or stretched), `.ico` uses the sharpest frame available (downscale a big frame rather than upscale a small one: a 256 px frame wins over a 16 px one), `.svg` is re-rendered at card size (a vector redraw, not an upscaled small bitmap), text files show a card with their first 150 characters, and everything else falls back to its system icon at large size (the 256 px shell frame, drawn at 96 px); the context menu, dragging to Explorer, double-click to enter a folder and `Enter` to open all behave exactly as in the grid
 - ![平铺布局：图片显示缩略图、文本显示文字卡](docs/images/version/v0.5.6/ListTileLayout.png)
 - ![内容行布局：大卡片 + 名称与元数据](docs/images/version/v0.5.6/ListContentLayout.png)
-- **复选框模式保持一致的手势** — 文件列表里切换「复选框多选」时，当前的蓝底选区会转换成勾选（关掉时反向转回，只保留当前目录内的那些），不用先清空再重选；压缩与解压设置窗里的文件选择器改用同一套手势：点行只是高亮、点复选框才勾，`Shift` 连选一段、`Ctrl` 逐项增减，选中好几项后点其中任一复选框可整组勾上或取消，右键还有全选可见 / 反选 / 清空勾选
-- **Consistent checkbox gestures** — toggling checkbox selection in the file list now converts the current highlighted rows into checkmarks (and back again when you turn it off, keeping only the rows in the current folder), so nothing has to be re-picked; the file pickers inside the compress and extract settings windows use the same gestures: clicking a row only highlights it, clicking a checkbox ticks it, `Shift` selects a range, `Ctrl` toggles single rows, clicking any checkbox in a multi-row highlight ticks or clears the whole group, and the context menu offers select-all-visible, invert and clear
-
 - **压缩包里的 .ico 显示自己的图标** — 此前列表里所有 `.ico` 都是通用图标，现在会从包里读出该文件、挑最接近 16×16 的那一帧显示（列表先显示通用图标、随后异步替换，不拖慢打开速度，单个包最多处理 20 个）
 - **.ico files show their own icon** — previously every `.ico` in the list used the generic icon; now the file is read from the archive and its frame closest to 16×16 is displayed (the list shows the generic icon first and swaps asynchronously, so opening stays fast, at most 20 per archive)
 - **复选框多选与批量删除** — 列表工具栏可切到复选框模式（默认关闭，开关记进设置）：每行前面出现复选框，勾选状态跨滚动、跨切目录保持，状态栏右侧显示「已选 N 项 · 共 X」；右键菜单补「全选可见 / 反选 / 清空勾选」。勾选多项后删除**只弹一次确认**（文案带条目数与总大小），删完列表刷新、勾选态自动清空。选区（蓝底高亮）与勾选是两套独立状态：先用 Ctrl/Shift 选好几行，再点其中任意一行的复选框，这几行会一起勾上 / 一起取消。关闭复选框模式时行为与以前完全一致（仍是 Ctrl/Shift 多选）
@@ -50,11 +47,37 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 - ![卡片视图的复选框与 Shift 连选：勾选 4 项后状态栏显示「已选 4 项 · 共 44 B」](docs/images/version/v0.5.6/CardViewCheckbox.png)
 - **「视图」菜单可直接指定列表布局** — 新增「列表布局」子菜单（详情 / 平铺 / 内容行三选一，当前布局打勾）与「复选框多选」开关，不必再用工具栏按钮循环切换
 - **The View menu can pick a list layout directly** — a new "List Layout" submenu (details, tiles or content rows, with the current one ticked) plus a "Checkbox Selection" switch, so you no longer have to cycle through the toolbar button
-- **压缩设置窗的预览树显示实时计数** — 后台扫描目录期间，根节点标题从静态的「加载中…」变成「加载中 N 个文件，X」并每半秒刷新，扫完自动切到真实统计；被文件过滤排除的条目不计数
-- **The compression window's preview tree counts as it scans** — while the folder scan runs in the background, the root node now reads "Loading N files, X" and refreshes twice a second instead of a static "Loading…", switching to the real totals when the scan finishes; entries excluded by the file filter are not counted
+- **压缩设置窗的预览树显示实时计数** — 后台扫描目录期间，树会一边扫描一边长出条目（约每 0.8 秒上新一批），根节点标题从静态的「加载中…」变成「加载中 N 个文件，X」并每半秒刷新，扫完自动切到真实统计；被文件过滤排除的条目不计数、也不会出现在渐进的树里
+- **The compression window's preview tree counts as it scans** — while the folder scan runs in the background, the tree now fills itself in as it goes (a fresh batch roughly every 0.8 s) and the root node reads "Loading N files, X", refreshing twice a second instead of showing a static "Loading…", then switching to the real totals when the scan finishes; entries excluded by the file filter are neither counted nor drawn
 - **缩略图卡片可调外观** — 「设置 → 外观 → 缩略图」可调三项，改完立刻生效不用重启：卡片外边框（默认关闭，白底图贴在浅色背景上时用来看清边界）、透明图是否垫一层纯色底（默认保留透明，垫色可自选）、缩略图尺寸三档 96 / 128 / 160 px
 - **Adjustable thumbnail cards** — Settings → Appearance → Thumbnails exposes three options that apply immediately: a card border (off by default, handy for white-background images on light surfaces), whether transparent images get a solid backdrop (transparency is kept by default; the backdrop colour is pickable), and the thumbnail size in three steps (96 / 128 / 160 px)
 - ![设置 → 外观 → 缩略图：外边框 / 垫底色 / 尺寸三档](docs/images/version/v0.5.6/ThumbnailCardSettings.png)
+- **「默认显示密码」覆盖所有密码框** — 设置里的这个开关现在也决定打开/解压密码对话框、压缩设置的密码与确认密码框、密码库编辑框和已匹配密码提示的初始状态；仍可用 👁 按钮临时切换，出厂默认关闭
+- **"Reveal password by default" now covers every password field** — the switch in Settings also sets the initial state of the open/extract password dialog, both password fields in the compress window, the vault editor and the matched-password hint; the 👁 button still toggles it and it stays off by default
+
+**修复 / Fixes**
+
+- **加密文件名的压缩包智能解压不再静默失败** — 用 `7z -mhe`（加密文件名）生成的 7z 或 RAR，右键「智能解压到此处」或命令行 `--extract-smart` 此前什么都不发生：没有进度窗、也没有密码框，进程直接退出。现在会正常弹出密码框，输对后继续解压；密码库里已保存的密码同样生效。
+
+- **Smart extract no longer fails silently on archives with encrypted file names** — a 7z created with `7z -mhe` (encrypted file names) or a RAR with encrypted names used to do nothing at all from the "Smart extract here" context menu or `--extract-smart`: no progress window, no password prompt, the process just exited. It now asks for the password and carries on; passwords already saved in the password manager work too.
+
+- **分卷包与自解压 exe 的预览恢复正常** — `.001` / `.z01` / `.r00` / `.part1.rar` 分卷包和自解压 exe 里的文件，此前双击只会报「找不到 Zip 头」，也不出内容缩略图；现在预览、双击打开都正常。分卷包仍不能在应用内增删文件。
+
+- **Split sets and self-extracting exes preview correctly again** — files inside `.001` / `.z01` / `.r00` / `.part1.rar` sets and self-extracting exes used to fail with a "Zip header not found" error instead of opening, and showed no content thumbnails; both work now. Split sets remain read-only for adding or removing files.
+
+- **应用内添加 / 删除条目、编辑注释后不再弹出「已被替换」横幅** — 此前这些操作会把应用自己刚写出的压缩包误判成外部替换，列表停在旧内容、只能重新打开；现在会自动刷新，删光所有条目则直接关闭压缩包并提示。压缩包真被外部替换时横幅照旧出现，并且可以直接按 F5 从磁盘重读。
+
+- **Adding or removing entries and editing the comment no longer trips the "replaced" banner** — the app used to mistake its own freshly written archive for an outside replacement, leaving the list stale until you reopened it; it now refreshes automatically, and deleting every entry closes the archive with a note. The banner still appears when another program really replaces the file, and F5 now reloads it from disk.
+
+- **`.reg` 与 UTF-16 文本文件恢复预览** — regedit 导出的 `.reg`、记事本「Unicode」保存的文本此前一律显示「暂不支持预览此文件格式」，现在按文本正常显示，状态栏与编码菜单会标出「检测到: utf-16」。
+
+- **`.reg` and UTF-16 text files preview again** — regedit exports and text saved as "Unicode" in Notepad used to show "preview is not supported for this file format"; they now display as text, with the detected `utf-16` shown in the status bar and encoding menu.
+
+**性能 / Performance**
+
+- **加密 7z 解压快了几十倍** — 带密码的 7z（含 `.001` 分卷包）此前逐个文件解、每个文件都要重新解一遍整块数据，48 MB / 309 个文件要跑几分钟；现在整包一次解码，同样的包约 3 秒，与 Bandizip 同量级。选中部分文件解压同样受益。
+
+- **Password-protected 7z extraction is now many times faster** — a password-protected 7z (including `.001` split sets) used to be unpacked one file at a time, re-decoding the whole solid block for every file, so 48 MB across 309 files took minutes; the archive is now decoded in one pass, about 3 seconds for the same set — on par with Bandizip. Extracting only selected files benefits as well.
 
 **性能 / Performance**
 

@@ -157,7 +157,7 @@ public partial class App : Application
     /// <summary>
     /// 带提权支持的异步智能解压。先分析目标目录可写性，权限不足时弹出提权对话框。
     /// 解压成功后根据 DeleteArchiveAfterExtract 设置尝试删除原包。
-    /// 自动尝试已保存密码。
+    /// 自动尝试已保存密码；结构分析阶段发现是加密头包时弹密码框取密码后重试。
     /// </summary>
     private static async Task<bool> TryExtractSmartAsync(
         string archivePath,
@@ -174,8 +174,15 @@ public partial class App : Application
                 return false;
             }
 
-            // 分析压缩包结构并确定目标目录（单根 → 压缩包所在目录；散列 → 命名子目录）
-            targetDir = await ResolveSmartDestCliAsync(archivePath, engine);
+            // 密码必须在结构分析之前解析：加密文件名（7z -mhe=on / RAR 加密文件名）的包
+            // 不给密码连条目都列不出来，结构分析必然抛密码类异常。此前该异常被外层 catch
+            // 吞成一行 stderr 后进程直接退出，用户看不到任何密码框（资源管理器 / 第三方
+            // 文件管理器右键「智能解压」遇到加密头包时静默失败）。
+            var password = ResolveCliPassword(archivePath, engine);
+
+            // 分析压缩包结构并确定目标目录（单根 → 压缩包所在目录；散列 → 命名子目录）。
+            // 结构分析本身因密码失败时（加密头包且密码库无匹配）弹密码框取密码后重试。
+            (targetDir, password) = await ResolveSmartDestWithPasswordAsync(archivePath, engine, password);
 
             // Check writability before extraction
             var unwritable = new List<string>();
@@ -185,9 +192,13 @@ public partial class App : Application
             if (unwritable.Count > 0)
                 return await HandleElevationAsync(unwritable, originalArgs, desktop);
 
-            var password = ResolveCliPassword(archivePath, engine);
             return await RunCliExtractWithProgressAsync(
                 archivePath, targetDir, password, engine, originalArgs, desktop);
+        }
+        catch (PasswordRetryCancelledException)
+        {
+            // 用户在密码框点取消：静默退出（Cancelled 不弹任何提示，与解压中的取消语义一致）
+            return false;
         }
         catch (UnauthorizedAccessException)
         {
@@ -207,9 +218,20 @@ public partial class App : Application
     /// 单根目录结构 → 压缩包所在目录；散列结构 → 压缩包名命名的子目录（自动创建）。
     /// 语义与 WPF ResolveSmartDestAsync 一致。
     /// </summary>
-    private static async Task<string> ResolveSmartDestCliAsync(string archivePath, IArchiveEngine engine)
+    /// <param name="archivePath">压缩包路径。</param>
+    /// <param name="engine">已解析的引擎。</param>
+    /// <param name="password">
+    /// 列条目用密码。<b>加密文件名的包（7z <c>-mhe=on</c> / RAR 加密文件名）不给密码连条目都列不出来</b>，
+    /// 必须传入；null = 无密码。
+    /// </param>
+    /// <param name="ct">取消令牌（透传给引擎列条目）。</param>
+    private static async Task<string> ResolveSmartDestCliAsync(
+        string archivePath,
+        IArchiveEngine engine,
+        string? password = null,
+        CancellationToken ct = default)
     {
-        var items = await engine.ListEntriesAsync(archivePath);
+        var items = await engine.ListEntriesAsync(archivePath, password, ct);
         var hasSingleRoot = ArchiveStructureAnalyzer.HasSingleRootDirectory(items);
 
         if (hasSingleRoot)
@@ -226,6 +248,50 @@ public partial class App : Application
         Directory.CreateDirectory(targetDir);
         Console.WriteLine($"SmartExtract: dispersed structure, extracting to {targetDir}");
         return targetDir;
+    }
+
+    /// <summary>
+    /// 结构分析 + 密码兜底：调用 <see cref="ResolveSmartDestCliAsync"/>，若因密码类异常失败
+    /// （加密头 7z/RAR 未给密码）则取密码后重试，直到成功、用户取消或判定损坏。
+    /// </summary>
+    /// <remarks>
+    /// 为什么需要单独一层：结构分析发生在进度窗口创建之前，此时既没有 owner 也没有
+    /// <c>ProgressWindow.CurrentVisible</c>；直接复用 <see cref="PasswordRetryLoop"/> 的
+    /// 「异常 → 取密码 → 重试」语义即可，弹窗退化为独立窗口。
+    /// 返回的密码是最终可用的密码，调用方必须沿用它做后续解压（否则又会在解压阶段重弹一次）。
+    /// </remarks>
+    /// <param name="archivePath">压缩包路径。</param>
+    /// <param name="engine">已解析的引擎。</param>
+    /// <param name="initialPassword">密码库匹配结果（可为 null）。</param>
+    /// <param name="promptPassword">取密码入口（参数 = 压缩包路径，返回 null = 取消）。
+    /// 为 null 时弹 <see cref="PasswordDialog"/>；测试注入此参数即可在无 UI 环境下验证。</param>
+    /// <param name="ct">取消令牌。</param>
+    /// <exception cref="PasswordRetryCancelledException">用户在密码框点取消。</exception>
+    /// <exception cref="InvalidDataException">压缩包损坏（继续弹密码无意义）。</exception>
+    internal static async Task<(string TargetDir, string? Password)> ResolveSmartDestWithPasswordAsync(
+        string archivePath,
+        IArchiveEngine engine,
+        string? initialPassword,
+        Func<string, Task<string?>>? promptPassword = null,
+        CancellationToken ct = default)
+    {
+        var targetDir = string.Empty;
+        var (outcome, password) = await PasswordRetryLoop.RunAsync(
+            archivePath, initialPassword, engine,
+            owner: null,
+            setStatus: msg => Console.Error.WriteLine(msg),
+            attempt: async (pwd, token) =>
+                targetDir = await ResolveSmartDestCliAsync(archivePath, engine, pwd, token),
+            ct: ct,
+            promptPassword: promptPassword);
+
+        if (outcome == PasswordRetryOutcome.Cancelled)
+            throw new PasswordRetryCancelledException(archivePath);
+        // 损坏/无效：结构分析都失败，继续重弹密码无意义 → 抛错走既有失败收尾（绝不落成功路径）
+        if (outcome == PasswordRetryOutcome.CorruptedOrInvalid)
+            throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
+
+        return (targetDir, password);
     }
 
     /// <summary>
@@ -808,19 +874,28 @@ public partial class App : Application
                             continue;
                         }
 
-                        // 每文件独立计算目标目录（与单文件 CLI 流程/WPF 语义一致）
-                        string targetDir = mode switch
-                        {
-                            "toname" => Path.Combine(
-                                Path.GetDirectoryName(archivePath) ?? ".",
-                                GetArchiveBaseName(archivePath)),
-                            "smart" => await ResolveSmartDestCliAsync(archivePath, engine),
-                            _ => Path.GetDirectoryName(archivePath) ?? "."
-                        };
-                        if (mode == "toname")
-                            Directory.CreateDirectory(targetDir);
-
+                        // 密码先解析：加密头的包（7z -mhe=on / RAR 加密文件名）不先拿到密码，
+                        // 下面的 smart 结构分析连条目都列不出来（会静默失败，弹不出密码框）
                         var password = ResolveCliPassword(archivePath, engine);
+
+                        // 每文件独立计算目标目录（与单文件 CLI 流程/WPF 语义一致）
+                        string targetDir;
+                        if (mode == "smart")
+                        {
+                            // 结构分析遇密码类异常 → 弹密码框取密码后重试（owner 解析为当前进度窗）
+                            (targetDir, password) = await ResolveSmartDestWithPasswordAsync(archivePath, engine, password);
+                        }
+                        else if (mode == "toname")
+                        {
+                            targetDir = Path.Combine(
+                                Path.GetDirectoryName(archivePath) ?? ".",
+                                GetArchiveBaseName(archivePath));
+                            Directory.CreateDirectory(targetDir);
+                        }
+                        else
+                        {
+                            targetDir = Path.GetDirectoryName(archivePath) ?? ".";
+                        }
 
                         // 路径 B（决策 D1）：解析前先亮 🔄 匹配中（密码库逐条尝试可能耗时）；
                         // 解析完成后再落终态——命中 → 🔑●●●●，无密码包 → 熄灭

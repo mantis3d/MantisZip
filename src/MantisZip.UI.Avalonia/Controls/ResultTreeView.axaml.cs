@@ -306,6 +306,13 @@ public partial class ResultTreeView : UserControl
     public void RefreshDisplay() => RebuildDisplayTree();
 
     /// <summary>
+    /// 把骨架期进度从原始节点同步到显示层克隆体。
+    /// 屏幕上的树是深拷贝（见 <see cref="RebuildDisplayTree"/>），逐条重建代价太高，
+    /// 所以只按 <see cref="PreviewTreeNode.Origin"/> 回指抄这一个值 —— O(显示节点)，不重建树、不动展开状态。
+    /// </summary>
+    public void SyncSkeletonProgress() => PreviewTreeNode.SyncSkeletonProgressFromOrigins(DisplayNodes);
+
+    /// <summary>
     /// 当 Root 属性变化时，保存原始树引用并重建显示树。
     /// </summary>
     private void OnRootChanged(PreviewTreeNode? root)

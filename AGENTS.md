@@ -142,9 +142,10 @@ When releasing a new version, update the version string in ALL of these location
 | `ToolbarButtonLabel` | `TextBlock` | FontSize 13、水平居中（按钮文字） |
 | `compactTab` | `TabItem` | Padding `8,6`、MinHeight 36、FontSize 18 |
 | `ToggleIconBox` | `Border` | 16×16、圆角 3、边框 1.5、背景过渡（菜单切换指示） |
-| `addrRow` | `Grid`（地址栏行容器） | 该 `Grid` 的**直接子 `Button`** 自动 `ControlHeightMd × ControlHeightMd` 方块、Padding 0、内容居中、按钮三色（背景/前景/边框）；与 `PathBreadcrumb` 的固定高度齐平 |
+| `addrRow` | `Grid`（地址栏行容器） | 该 `Grid` 的**直接子 `Button`** 自动 `ControlHeightMd × ControlHeightMd` 方块、Padding 0、内容居中、按钮三色（背景/前景/边框）。2026-11-05 起地址区拆两行（按钮行 + 面包屑整宽行），两者**不再要求同高齐平** |
 
-- **`addrRow` 的用法（地址栏行）**：容器写 `Classes="addrRow"`，里面的方形按钮（后退 / 前进 / 向上一级 / 系统浏览 / 收藏等）**只写 `x:Name` / `Grid.Column` / `Click` / `ToolTip.Tip`，不要再写 `Width` / `MinHeight` / `Background` / `Foreground` / `BorderBrush`**。样式选择器是 `Grid.addrRow > Button`（只匹配直接子级），所以按钮不要包进额外的 `StackPanel`，否则不生效
+- **`addrRow` 的用法（地址栏按钮行）**：容器写 `Classes="addrRow"`，里面的方形按钮（后退 / 前进 / 向上一级 / 系统浏览 / 新建文件夹 / 收藏等）**只写 `x:Name` / `Grid.Column` / `Click` / `ToolTip.Tip`，不要再写 `Width` / `MinHeight` / `Background` / `Foreground` / `BorderBrush`**。样式选择器是 `Grid.addrRow > Button`（只匹配直接子级），所以按钮不要包进按钮行内部的额外 `StackPanel`，否则不生效
+  - **2026-11-05 起的地址区布局**：按钮行与面包屑是**两行**（按钮行在上：左侧导航组、右侧 `*` 弹性空列推过去的「新建文件夹 / 添加收藏」；面包屑独占下行整宽）。`addrRow` 那个 `Grid` 自己可以放在外层 `StackPanel` 里（样式只认它与直接子 `Button` 的关系），布局关系由 `CustomFilePickerAddressLayoutTests` 两个用例钉住
   - 注意：Avalonia 的 `Style` **不会**自动套到全仓同名控件上——它的作用域是「命中选择器的元素」。所以「自动」只发生在**标了 `addrRow` 的容器内部**；新增地址栏行时唯一要做的事就是给容器挂这个类，逐个按钮不用管
   - 若某天要改地址行按钮尺寸/配色，只改 `App.axaml` 的 `Grid.addrRow > Button` 一处；面包屑本身的高度与外观在 `Controls/PathBreadcrumb.axaml`（同样是一处）
 

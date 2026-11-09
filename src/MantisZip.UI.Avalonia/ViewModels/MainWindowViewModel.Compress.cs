@@ -68,6 +68,10 @@ public partial class MainWindowViewModel : ObservableObject
         var engine = ArchiveEngineFactory.GetEngineByExtension(CurrentArchivePath);
         if (engine == null) return false;
 
+        // 分卷包只读：7z.dll 能串卷解压，但不支持往多卷集里追加条目。
+        // 入口按钮与拖拽覆层已按 IsCurrentVolumeSet 禁用，这里再兜底一次（快捷键 / 自动化会绕过按钮状态）。
+        if (IsCurrentVolumeSet) return false;
+
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
         var completed = await RunWithProgress(
@@ -75,6 +79,9 @@ public partial class MainWindowViewModel : ObservableObject
             files.ToArray(),
             async (progress, ct) =>
             {
+                // 自写窗口：本次重写的是「当前打开的包」，期间文件系统事件不算外部变更；
+                // 作用域结束时守卫重设基线，随后的 RefreshArchive 才不会被误判成「已被替换」。
+                using var selfWrite = _archiveGuard?.BeginSelfWrite();
                 // 复用解压冲突处理：同一 AppSettings.FileConflictAction 策略 + Ask 弹窗回调（标题区分）
                 var settings = AppSettings.Load();
                 var options = SelectedItemsExtractService.CreateExtractOptions(
@@ -133,7 +140,8 @@ public partial class MainWindowViewModel : ObservableObject
 
         // 只读格式（tar/gz…）不支持删除：入口按钮已按 CanDeleteEntries 禁用，这里再兜底一次，
         // 防止命令经快捷键 / 自动化等路径绕过按钮状态被触发。
-        if (!engine.CanDelete(_currentFormat)) return;
+        // 分卷集同理（CanDelete(SevenZip) 虽是 true，但多卷集不能原地更新）。
+        if (IsCurrentVolumeSet || !engine.CanDelete(_currentFormat)) return;
 
         // 删除目录带递归语义（引擎按「条目本身 + 其下全部子条目」匹配），故确认框必须先把影响面
         // 算清楚：只写「删除此项？」会让用户以为只删掉一个空目录行。
@@ -180,10 +188,23 @@ public partial class MainWindowViewModel : ObservableObject
         // 默认那条 SetComplete(Cli_StatusDone) 不会再执行。
         PendingCompletedCallback = pw =>
         {
-            StatusMessage = LocalizationManager.T("Status_DeleteComplete");
-            pw.SetComplete(LocalizationManager.T("Status_DeleteComplete"));
             // 删完勾选态必须清空（被删条目已不存在，留着会让下次删除再失败一次）
             ClearCheckedCore();
+
+            // 删除全部条目时引擎会把整包移除（ZIP / 7z 同）：没有可刷新的包了，
+            // 直接关包并说明，别把界面停在「压缩包已不在磁盘上」的只读横幅上。
+            if (CurrentArchivePath is not null && !File.Exists(CurrentArchivePath))
+            {
+                ClearArchiveInternal();
+                Title = LocalizationManager.T("App_Title");
+                var removedMessage = LocalizationManager.T("Status_ArchiveRemovedAfterDeleteAll");
+                StatusMessage = removedMessage;
+                pw.SetComplete(removedMessage);
+                return;
+            }
+
+            StatusMessage = LocalizationManager.T("Status_DeleteComplete");
+            pw.SetComplete(LocalizationManager.T("Status_DeleteComplete"));
             _ = RefreshArchiveAfterDeleteAsync();
         };
 
@@ -192,6 +213,8 @@ public partial class MainWindowViewModel : ObservableObject
             deletePaths.ToArray(),
             async (progress, ct) =>
             {
+                // 自写窗口：删除是整包重写，期间不判定外部变更；结束时重设基线。
+                using var selfWrite = _archiveGuard?.BeginSelfWrite();
                 // 删除会整包重写，须透传用户的 ZIP 文件名编码设置，
                 // 否则存活的其它条目可能被降级重写成乱码（与 AddFilesToArchiveAsync 同源）。
                 await engine.DeleteEntriesAsync(CurrentArchivePath, deletePaths.ToArray(), password, progress, ct,

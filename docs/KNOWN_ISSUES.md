@@ -30,13 +30,17 @@
 | **KI-004** | UI 测试用固定临时目录（非 GUID） | 测试卫生 | 成本超阈值 | 下次改这两个用例时顺带改；或出现「残留文件导致红」的实例 | 阻塞中 |
 | **KI-005** | 29 条 7z 用例被 CI 过滤、永不运行 | 覆盖缺口 | 等计划（CI 环境） | CI 装上 7-Zip 并去掉 `SevenZipEngine` 过滤 | 阻塞中 |
 | **KI-006** | `.jar/.war/.ear/.apk` 能打开但**不参与文件关联**（也不进右键菜单/设置页关联列表） | 功能留白 | 缺决策 + 成本 | 用户反馈「想在资源管理器里双击/右键打开 jar」时；或做「关联格式可勾选」设置项时 | 已修复（关联格式可勾选，2026-10-29） |
-| **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
+| **KI-007** | 大 PDF 预览必须整条目落盘（无法部分预览，也不受 20MB 上限约束） | 性能 / 磁盘 | 成本超阈值 + 上游限制 | PdfPig 支持从截断数据/随机访问流解析时；或用户反馈 >100MB PDF 预览卡顿、临时目录涨满 | 阻塞中 |
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 交互 / 文案 | 缺决策 | 已修复（三态契约，2026-10-28） | 已修复 |
 | **KI-009** | 5 个 AppSettings 死开关（存了值、有 UI、无消费者） | 技术债 / 死代码 | 缺决策 | 决定这 5 项的去留（接线 / 删属性 / 删 UI）时；守卫豁免表已按名登记，修一个删一行 | 阻塞中 |
 | **KI-010** | RAR4 分卷不做块链结构校验（末卷尾部损坏可能漏检） | 功能留白 | — | 已修复（RAR4 块链校验，2026-11-03，issue #68） | 已修复（2026-11-03） |
 | **KI-011** | 并行解压/压缩不识别目标盘类型，机械盘上的并发写不做节流 | 性能 / 交互 | 成本超阈值 + 缺决策 | 有机械盘用户的实测数据（并发放大反而更慢）；或做 `selected-items-bulk-extract` 时顺带评估 | 阻塞中 |
 | **KI-012** | 三条「原地解压」路径不读冲突设置、恒静默覆盖 | 功能一致性 | — | 已修复（v0.5.7：三条路径改传 `ArchiveOptions`，带默认策略 + Ask 弹窗 + 进度窗口实时源） | 已修复（2026-11-04） |
 | **KI-013** | 安装包下载 .NET 前的确认框，无法把「取消」按钮文字换成「我会手动安装」 | 交互 / 文案 | 成本超阈值 | #23 再次要求精确文案时；或下次改安装包流程时 | 阻塞中 |
+| **KI-014** | 内嵌选择器的「系统浏览」按钮是死按钮（压缩窗 / 解压窗点下去毫无反应） | 功能一致性 | 缺决策 | 用户反馈「内嵌选择器点系统浏览没反应」时；或决定内嵌宿主能否复用原生通道时 | 阻塞中 |
+| **KI-015** | `ShowExtractFolderAsync` 已无调用方（连同 `ExtractPickResult` 一起成了死 API） | 技术债 / 死代码 | 缺决策 | 下次动 `CustomFilePickerDialog` 静态入口或解压选目录链路时 | 阻塞中 |
+| **KI-016** | 解压时输错密码被判成「文件损坏」，不弹密码框重试（`data error` 被当作损坏信号） | 交互 / 错误分类 | 缺决策 | 用户反馈「密码输错只提示损坏」时；或决定「解压失败统一走 `QuickVerifyPasswordEx` 二次判定」时 | 阻塞中 |
+| **KI-017** | 分卷包（`.001`/`.z01`/`.r00`/`.part1.rar`）与 SFX 的**格式身份**被扩展名直判成 Zip，预览 / 双击打开 / 缩略图全报 `Failed to locate the Zip Header` | 功能缺陷 | — | 已修复（`ResolveReaderFormat` 单一入口，2026-11-05） | 已修复（2026-11-05） |
 
 ---
 
@@ -103,11 +107,11 @@
 - **已修复（2026-10-29）**：做「关联格式可勾选」时一并纳入。`src/MantisZip.Core/Utils/ArchiveExtensionCatalog.cs` 成为「哪些扩展名算压缩包」的单一事实源：`.jar/.war/.ear/.apk` 与分卷占位 `.001` 都在设置页逐行显示、**两列勾选**（左列文件关联 / 右列「打开压缩包」筛选），`AssociateByDefault: false` 保证默认仍不抢默认程序（用户想接管时自己勾）。`ShellIntegration.ArchiveExtensions` 改由目录派生（不再是写死 8 项），`IsAssocEnabledInSettings` 改读 `AppSettings.AssocExtensions` 集合，未设值时回落「目录默认值 + 自定义扩展名」。回归测试：`tests/MantisZip.UI.Avalonia.Tests/AssocPreferencesTests.cs`（目录默认值 / 两列互不影响 / `.tgz` 与 `.tar.gz` 互认 / 老布尔迁移）与 `ArchiveOpenDialogPatternTests.SettingsDrivenPatterns_FollowOpenDialogColumn`。
 - **状态**：已修复（2026-10-29，关联格式可勾选）
 
-## KI-007 大 PDF 预览必须整条目落盘（无法部分预览，也不受 15MB 上限约束）
+## KI-007 大 PDF 预览必须整条目落盘（无法部分预览，也不受 20MB 上限约束）
 
 - **发现**：2026-10-28（`preview-memory-first` 切片 4 判定时）
-- **现象**：预览压缩包里的 PDF 时，无论多大都必须先把**整条目**解压到 `%TEMP%\MantisZip\Preview\preview_*.pdf` 才能渲染首页；一个 500MB 的 PDF 会先占 500MB 临时磁盘，再解析出第 1 页。且 PDF 在 `PreviewService.MetadataOnlyExtensions` 里，**不受 `MaxPreviewFileSize`（默认 15MB）拦截**，所以它是唯一「没有大小闸门、又必须整条落盘」的预览类型。
-- **证据**：`src\MantisZip.Core\Utils\PdfParser.cs:64` 的 `ParseFromSeekable` 是**头尾双向扫描**（与 `PreviewViewModel.ShowPdfAsync` 一样依赖 xref/trailer 在文件**末尾**）⇒ 只给前 N 字节的截断数据解析不出任何页；`PreviewViewModel` 的 PDF 分支本来就只 `LoadPdfPageAsync(1)`（只渲染首页）。计划里曾设想「PDF 也走 head-only 部分预览」，实测后判定**不可行且是回归**（本来就不受 15MB 限制，加拒绝等于把能看的 PDF 变成不能看）。
+- **现象**：预览压缩包里的 PDF 时，无论多大都必须先把**整条目**解压到 `%TEMP%\MantisZip\Preview\preview_*.pdf` 才能渲染首页；一个 500MB 的 PDF 会先占 500MB 临时磁盘，再解析出第 1 页。且 PDF 在 `PreviewService.MetadataOnlyExtensions` 里，**不受 `MaxPreviewFileSize`（默认 20MB）拦截**，所以它是唯一「没有大小闸门、又必须整条落盘」的预览类型。
+- **证据**：`src\MantisZip.Core\Utils\PdfParser.cs:64` 的 `ParseFromSeekable` 是**头尾双向扫描**（与 `PreviewViewModel.ShowPdfAsync` 一样依赖 xref/trailer 在文件**末尾**）⇒ 只给前 N 字节的截断数据解析不出任何页；`PreviewViewModel` 的 PDF 分支本来就只 `LoadPdfPageAsync(1)`（只渲染首页）。计划里曾设想「PDF 也走 head-only 部分预览」，实测后判定**不可行且是回归**（本来就不受 20MB 限制，加拒绝等于把能看的 PDF 变成不能看）。
 - **为什么现在不修**：**成本超阈值 + 上游限制**。要真做到部分预览，得让 PdfPig 支持「从截断流式数据增量解析」或提供随机访问的异步加载器；当前的绕法是内存映射（`MemoryMappedFile`）+ PdfPig 随机访问流，改动面横跨 Core 解析层与三处调用点，而收益只对超大 PDF 成立。
 - **复评条件**：① PdfPig 发布支持截断/随机访问流解析的版本（升级时复评）；② 或用户反馈「预览 >100MB 的 PDF 卡顿 / `%TEMP%` 被涨满」——届时优先做内存映射而不是 head-only。
 - **关联**：`.omo/plans/已完成/preview-memory-first.md` 的 T10（PDF 一项已判定「一行不改」）。
@@ -180,6 +184,34 @@
 - **编号说明**：本条 2026-11-03 首次登记时编为 KI-012；同日合并 `main` 到 `alpha` 时与「三条原地解压路径不读冲突设置」（2026-11-01 登记）撞号，按登记先后本条改号为 **KI-013**。
 - **状态**：阻塞中
 
+## KI-014 内嵌选择器的「系统浏览」按钮是死按钮
+
+- **发现**：2026-11-04（做「文件选择器新建文件夹」时核对四种宿主）
+- **现象**：`CustomFilePickerControl` 地址行的「系统浏览」按钮只上抛 `SystemBrowseRequested` 事件，而**全仓只有 `Dialogs/CustomFilePickerDialog.axaml.cs:225` 订阅它**。设置窗里内嵌的两处 —— `CompressSettingsWindow.OutputPicker`、`ExtractSettingsWindow.DestinationPicker`（以及 `QuickPathPicker`）—— 都没有订阅，用户点下去**完全没反应、也没有任何提示**。此前它不至于致命是因为选择器没法建目录；本轮补了「新建文件夹」，建目录已有正规入口，所以这个死按钮不再算阻断。
+- **证据**：`src/MantisZip.UI.Avalonia/Controls/CustomFilePickerControl.axaml.cs:1908-1912`（只 `SystemBrowseRequested?.Invoke`）；`rg SystemBrowseRequested src` 的订阅点只有 `CustomFilePickerDialog.axaml.cs:225`。
+- **为什么现在不修**：**缺决策**。修法要先回答一个规则 16 问题：内嵌宿主能不能走原生选择器？能 ⇒ 在压缩窗 / 解压窗各订阅一次（约 20 行）；不能 ⇒ 应该把按钮在非模态宿主里隐藏（`IsVisible=false`），否则等于承认有第二个豁免点。两条路产品语义不同，不适合顺手定。
+- **复评条件**：① 用户反馈「设置窗里的系统浏览点了没反应」时；② 或决定「内嵌宿主是否允许复用规则 16 的原生豁免通道」时。
+- **关联**：`.omo/plans/进行中/picker-new-folder.md` 的「非目标」；`AGENTS.md` 规则 16。
+
+## KI-015 `ShowExtractFolderAsync` 已无调用方
+
+- **发现**：2026-11-04（同上，核对选择器静态入口时）
+- **现象**：`Dialogs/CustomFilePickerDialog.ShowExtractFolderAsync`（返回强类型 `ExtractPickResult(DestPath, PreserveFullPath)`）目前**没有任何调用方**。它的两个原始消费者（拖拽兜底、`ExtractSelectedTo`）在 2026-10-30 改成「弹 `ExtractSettingsWindow` 并预置条目集」之后就不再走它；`ExtractPickResult` 因此成了只有定义、没有消费的死记录类型。文档与代码注释仍按「两个有对话框的消费点」描述，属实现已变、说明未跟。
+- **证据**：`rg ShowExtractFolderAsync src` → 只有 `CustomFilePickerDialog.axaml.cs:144` 的定义与 `:75` 的文档引用；`ExtractPickResult` 除定义（`Dialogs/ExtractPickResult.cs:23`）与该方法内构造外，`src/` 无其它引用。
+- **为什么现在不修**：**缺决策**。删掉要连带清 `ExtractPickResult` 与 `docs/ARCHITECTURE.md` / detail 里的引用；保留则要有人回答「以后还会不会用它」。而本轮改的控件与它无耦合，删除属独立清理动作。
+- **复评条件**：下次动 `CustomFilePickerDialog` 的静态入口，或再改「解压选目录」链路时 —— 一并决定「删入口 + 删 record」还是「接线复用」。
+- **关联**：`docs/progress-avalonia-detail.md` 2026-10-30「解压『选中项到 / 拖拽兜底』改用解压设置窗」条目。
+
+## KI-016 解压时输错密码被判定为「文件损坏」，不弹密码框重试
+
+- **发现**：2026-11-05（放开「加密 solid 走批量」时验证错误密码行为）
+- **现象**：仅加密数据、不加密文件名的 7z/zip，输错密码在**解压阶段**失败，异常消息是 `ExtractionFailedException: Could not extract files! Message: File is corrupted. Data error has occured.`；`ArchiveService.IsPasswordRelatedError` 的 `HasCorruptionSignal` 见到 `data error` 就先返回 false（「损坏优先」），于是 `PasswordRetryLoop.RunAsync` 直接上抛（`Services/PasswordRetryLoop.cs:101`）——用户看到的是**损坏提示**，而不是「密码错误，请重输」的弹框。
+- **证据**：① 探针跑真实产品代码 `new SevenZipEngine().ExtractAsync(1.7z.001, dest, "definitely-wrong")` → 抛上述异常（走新的批量段）；② 同一探针在批量放开**之前**用逐条目 `ExtractFile` 直接解，抛出的异常类型与消息逐字相同（HResult `0x80131500`）⇒ 与批量放开无关，是既有行为；③ 判定链 `src/MantisZip.UI.Avalonia/Services/ArchiveService.cs:29-49`（`HasCorruptionSignal` 含 `"data error"`，见 `:56`）+ `:125`、`Services/PasswordRetryLoop.cs:101`。
+- **为什么现在不修**：**缺决策**。`data error` 同时也是**真损坏包**的唯一信号，把它从「损坏优先」里摘掉就会让真损坏包反复弹密码框（输对了仍失败，还得靠 `QuickVerifyPasswordEx` 兜住，但那已经是第二次弹窗）。合理解法要么在 `Extract` 失败后按 `PasswordService.QuickVerifyPasswordEx` 二次判定再决定是否重弹，要么给 `data error` 加「已有密码且 header 结构完好」的额外条件 —— 两条都改变用户可见流程，不适合在性能修复里顺手改。
+- **影响面**：输错一次密码后只能自己发现、重新走一遍解压流程；不丢数据、不影响正确密码。
+- **复评条件**：① 用户反馈「密码输错后只提示损坏、没有重输机会」时；② 或决定「解压失败是否统一走 `QuickVerifyPasswordEx` 二次判定」时。
+- **关联**：`.omo/plans/已完成/sevenzip-solid-extract-batch.md` §5.10 的「遗留」段；`docs/progress-avalonia-detail.md` 2026-11-05「加密 solid 7z 改走批量」条目。
+
 ## 档案区（已修 / 不会修）
 
 > 修掉或决定放弃的条目移到这里，**保留 commit 或理由**。不要删行 —— 下次撞到同一个栈，靠这里判断「上次怎么处理的」。
@@ -187,3 +219,4 @@
 | 编号 | 标题 | 结局 | commit / 理由 | 关闭日期 |
 |---|---|---|---|---|
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 已修复：三态契约 + UI 分支 + 红绿验证的回归测试 | `fix(core,avalonia): 更新检查区分「无更新 / 失败」三态` | 2026-10-28 |
+| **KI-017** | 分卷包 / SFX 的格式身份被扩展名直判成 Zip（预览、双击打开、缩略图全报 `Failed to locate the Zip Header`） | 已修复：`ArchiveEngineFactory.ResolveReaderFormat` 作为「有效格式」唯一入口，`ArchiveFormatHelper.GetFormat` 委派它；分卷解析成 SevenZip 后同步用 `IsCurrentVolumeSet` 拦住增删条目；守卫 `formatidentity` 防复发 | `fix(core,avalonia): 分卷/SFX 格式身份统一走 ResolveReaderFormat` | 2026-11-05 |

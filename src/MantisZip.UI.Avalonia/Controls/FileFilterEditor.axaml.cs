@@ -671,14 +671,11 @@ public partial class FileFilterEditor : UserControl
         var window = TopLevel.GetTopLevel(this) as Window;
         if (window == null) return;
 
+        // 预填当前名；尺寸交给 InputDialog 自己（Width 固定 + SizeToContent=Height）
         var dialog = new InputDialog(
             LocalizationManager.T("FileFilter_RenamePresetTitle"),
             LocalizationManager.T("FileFilter_PresetNamePrompt"),
-            preset.Name)   // pre-fill with current name
-        {
-            Width = 350,
-            Height = 160,
-        };
+            preset.Name);
         var result = await dialog.ShowDialog<bool?>(window);
         if (result == true && !string.IsNullOrWhiteSpace(dialog.InputText))
         {
@@ -702,11 +699,7 @@ public partial class FileFilterEditor : UserControl
         var dialog = new InputDialog(
             LocalizationManager.T("FileFilter_SavePresetTitle"),
             LocalizationManager.T("FileFilter_PresetNamePrompt"),
-            "")
-        {
-            Width = 350,
-            Height = 160,
-        };
+            "");
         var result = await dialog.ShowDialog<bool?>(window);
         if (result == true && !string.IsNullOrWhiteSpace(dialog.InputText))
             return dialog.InputText.Trim();
@@ -714,71 +707,3 @@ public partial class FileFilterEditor : UserControl
     }
 }
 
-/// <summary>
-/// 简单的输入对话框。
-/// </summary>
-public class InputDialog : Window
-{
-    public string InputText { get; private set; } = "";
-
-    public InputDialog(string title, string prompt, string defaultValue = "")
-    {
-        Title = title;
-        WindowStartupLocation = WindowStartupLocation.CenterOwner;
-        CanResize = false;
-
-        var grid = new Grid { Margin = new Thickness(15) };
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        grid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-
-        var label = new TextBlock
-        {
-            Text = prompt,
-            Margin = new Thickness(0, 0, 0, 8),
-        };
-        Grid.SetRow(label, 0);
-        grid.Children.Add(label);
-
-        var textBox = new TextBox
-        {
-            Text = defaultValue,
-            Margin = new Thickness(0, 0, 0, 10),
-            MinHeight = 22,
-        };
-        Grid.SetRow(textBox, 1);
-        grid.Children.Add(textBox);
-
-        var btnPanel = new StackPanel
-        {
-            Orientation = global::Avalonia.Layout.Orientation.Horizontal,
-            HorizontalAlignment = global::Avalonia.Layout.HorizontalAlignment.Right,
-        };
-        var okBtn = new Button
-        {
-            Content = LocalizationManager.T("Common_OK"),
-            Width = 70,
-            Height = 26,
-            Margin = new Thickness(0, 0, 6, 0),
-        };
-        okBtn.Click += (_, _) =>
-        {
-            InputText = textBox.Text ?? "";
-            Close(true);
-        };
-        btnPanel.Children.Add(okBtn);
-
-        var cancelBtn = new Button
-        {
-            Content = LocalizationManager.T("Common_Cancel"),
-            Width = 70,
-            Height = 26,
-        };
-        cancelBtn.Click += (_, _) => Close(false);
-        btnPanel.Children.Add(cancelBtn);
-
-        Grid.SetRow(btnPanel, 2);
-        grid.Children.Add(btnPanel);
-        Content = grid;
-    }
-}

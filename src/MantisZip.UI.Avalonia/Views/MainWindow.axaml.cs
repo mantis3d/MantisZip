@@ -109,11 +109,16 @@ public partial class MainWindow : Window
         // 读取持久化的列状态/排序/布局快照（window.json）。
         // 2026-10-21 启动优化：压缩包内容区（目录树/文件列表/预览）已改为**延迟创建**，
         // 启动时这些控件尚不存在 → 此处只把快照存起来，等 EnsureArchiveContent() 创建控件后再应用。
-        var columnStates = WindowStateManager.Load(this, out var savedSortColumnPath, out var savedSortDirection);
+        var columnStates = WindowStateManager.Load(
+            this, out var savedSortColumnPath, out var savedSortDirection, out var hadWindowSnapshot);
         _pendingColumnStates = columnStates;
 
-        // 恢复持久化的列排序状态（方向编码与 WPF window.json 兼容：0=无, 1=升序, 2=降序）
-        _lastSortMemberPath = string.IsNullOrEmpty(savedSortColumnPath) ? null : savedSortColumnPath;
+        // 恢复持久化的列排序状态（方向编码与 WPF window.json 兼容：0=无, 1=升序, 2=降序）。
+        // 出厂默认 = 名称升序（2026-11-08）：仅当**从未有过 window.json**（首次运行）时生效；
+        // 已有快照但 SortColumnPath 为空 = 用户点列头第三下主动清除排序，必须保持不排序。
+        _lastSortMemberPath = !string.IsNullOrEmpty(savedSortColumnPath)
+            ? savedSortColumnPath
+            : hadWindowSnapshot ? null : "Name";
         _lastSortDescending = savedSortDirection == 2;
         // WindowStateManager.Load 读盘 + 列状态/排序恢复
         Services.StartupTimer.Mark("Win.State");
@@ -1028,6 +1033,32 @@ public partial class MainWindow : Window
     }
 
     /// <summary>
+    /// 假列头排序（Tile/Content 各 5 个单元挂此入口，经 ArchiveContentView.CardHeaderSortRequested 转发）。
+    /// 与 Details 列头点击完全同一三态循环（新列升序 → 同列降序 → 清除排序恢复原序）和同一窗口级
+    /// 排序状态 ⇒ 切回 Details 列表所见一致；ApplyCurrentSort 重排 CurrentEntries ⇒ 卡片顺序自动跟随。
+    /// </summary>
+    private void OnCardHeaderSortTapped(object? sender, string sortPath)
+    {
+        if (_lastSortMemberPath != sortPath)
+        {
+            _lastSortMemberPath = sortPath;
+            _lastSortDescending = false;
+        }
+        else if (!_lastSortDescending)
+        {
+            _lastSortDescending = true;
+        }
+        else
+        {
+            _lastSortMemberPath = null;
+            _lastSortDescending = false;
+        }
+
+        ApplyCurrentSort();
+        UpdateSortArrows();
+    }
+
+    /// <summary>
     /// 注册全局快捷键（**菜单快捷键的唯一事实源**）。
     ///
     /// 背景：Avalonia 的 <c>MenuItem.InputGesture</c> **只显示**快捷键文字、不处理按键
@@ -1096,6 +1127,12 @@ public partial class MainWindow : Window
         view.FileListGridControl.DoubleTapped += FileListGrid_DoubleTapped;
         view.FileListGridControl.KeyDown += FileListGrid_KeyDown;
         view.FileListGridControl.Sorting += FileListGrid_Sorting;
+
+        // 假列头排序：Tile/Content 列头单元左键 → 同一窗口级排序状态（三态循环与 Details 一致）
+        view.CardHeaderSortRequested += OnCardHeaderSortTapped;
+
+        // 首次创建即对齐假列头箭头（window.json 恢复的排序状态可能非空）
+        view.UpdateCardSortArrows(_lastSortMemberPath, _lastSortDescending);
 
         // 复选框模式：勾选集合变化 → 回写 DataGrid 选区（Ctrl/Shift 点选的反向由 SelectionChanged 处理）
         if (DataContext is MainWindowViewModel checkboxVm)
@@ -1310,6 +1347,9 @@ public partial class MainWindow : Window
         SetSortArrow(CompressedSizeHeaderArrow, path == "CompressedSize", desc);
         SetSortArrow(RatioHeaderArrow, path == "RatioSort", desc);
         SetSortArrow(LastModifiedHeaderArrow, path == "LastModified", desc);
+
+        // 假列头箭头同步：Tile/Content 各 5 个单元吃同一份排序状态（内容区未创建时跳过）
+        _archiveContent?.UpdateCardSortArrows(path, desc);
     }
 
     private static void SetSortArrow(TextBlock? arrow, bool isActive, bool descending)
@@ -1355,7 +1395,9 @@ public partial class MainWindow : Window
             }
 
             var engine = ArchiveEngineFactory.GetEngineByExtension(vm!.CurrentArchivePath!);
-            bool canAdd = engine?.CanAdd(ArchiveFormatHelper.GetFormat(vm.CurrentArchivePath!)) == true;
+            // 分卷集不能追加条目（IsCurrentVolumeSet）：有效格式已解析成 SevenZip，光看 CanAdd 会误判成可写。
+            bool canAdd = !vm.IsCurrentVolumeSet
+                && engine?.CanAdd(ArchiveFormatHelper.GetFormat(vm.CurrentArchivePath!)) == true;
             if (canAdd)
             {
                 e.DragEffects = DragDropEffects.Copy;

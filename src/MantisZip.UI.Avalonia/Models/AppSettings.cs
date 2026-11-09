@@ -43,8 +43,11 @@ public class AppSettings
     public bool SevenZipMultithreaded { get; set; } = true;
 
     // ===== 自适应压缩（三个独立开关） =====
-    /// <summary>自适应压缩：已压缩文件自动 Store。仅对 ZIP + Deflate/Deflate64 有效。</summary>
-    public bool AdaptiveCompression { get; set; }
+    /// <summary>
+    /// 自适应压缩：已压缩文件自动 Store。仅对 ZIP + Deflate/Deflate64 有效。
+    /// 2026-11-08 按用户真机配置固化为**默认开启**（配套默认规则见 <see cref="GetDefaultAdaptiveOverrides"/>）。
+    /// </summary>
+    public bool AdaptiveCompression { get; set; } = true;
 
     /// <summary>魔数检测：自适应开启时，对大文件做魔数增强识别。自适应关闭时无效。</summary>
     public bool AdaptiveSmartDetect { get; set; }
@@ -120,7 +123,7 @@ public class AppSettings
 
     // ===== 进度窗口 =====
     /// <summary>完成后自动关闭延时（秒，0–60；0 = 立即关闭）。📌/失败/测试流不受此影响（始终留窗）。</summary>
-    public int AutoCloseDelaySeconds { get; set; } = 3;
+    public int AutoCloseDelaySeconds { get; set; } = 5;
 
     /// <summary>
     /// 进度窗口默认是否钉住（📌）：true = 一打开就钉住，完成/出错都等手动关闭。
@@ -162,13 +165,13 @@ public class AppSettings
     public bool EnableImagePreview { get; set; } = true;
     public bool EnableTextPreview { get; set; } = true;
     public long MaxTextPreviewBytes { get; set; } = 1 * 1024 * 1024; // 1 MB
-    public int TextPreviewFontSize { get; set; } = 13;
+    public int TextPreviewFontSize { get; set; } = 18;
     public int MaxTablePreviewRows { get; set; } = 100;
     public int MaxTablePreviewCols { get; set; } = 100;
-    public long MaxPreviewFileSize { get; set; } = 15 * 1024 * 1024;
+    public long MaxPreviewFileSize { get; set; } = 20 * 1024 * 1024;
     public string TextPreviewFontFamily { get; set; } = "";
     public string TextEncodingPreference { get; set; } = "auto";
-    public int FontPreviewFontSize { get; set; } = 12;
+    public int FontPreviewFontSize { get; set; } = 24;
     public string FontPreviewSampleText { get; set; } = "The quick brown fox jumps over the lazy dog.\n0123456789\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张";
     public bool FontPreviewEnableLigature { get; set; } = true;
     public int PreviewPosition { get; set; } = 4;
@@ -212,25 +215,26 @@ public class AppSettings
 
     // ===== 缩略图卡片（设置 → 外观 → 缩略图） =====
     /// <summary>
-    /// 缩略图卡片是否显示 1px 外边框。默认 false = 与引入该设置前完全一致。
+    /// 缩略图卡片是否显示 1px 外边框。默认 true（2026-11-08 按用户实际配置定为出厂默认）。
     /// 由 <c>App.ApplyThumbnailStyle()</c> 注入 <c>ThumbnailCardBorderThickness</c> 资源（规则 5 同款做法），
     /// 卡片模板用 DynamicResource 取值 ⇒ 改设置即时生效、无需重启。
     /// </summary>
-    public bool ThumbnailShowBorder { get; set; } = false;
+    public bool ThumbnailShowBorder { get; set; } = true;
 
     /// <summary>
-    /// 缩略图是否**保留透明背景**（默认 true）。
-    /// true = 透明 PNG/SVG 的透明区域露出列表底色；false = 垫 <see cref="ThumbnailBackdropColor"/> 实色。
+    /// 缩略图是否**保留透明背景**（默认 false = 垫 <see cref="ThumbnailBackdropColor"/> 实色；
+    /// 2026-11-08 按用户实际配置定为出厂默认）。
+    /// true = 透明 PNG/SVG 的透明区域露出列表底色；false = 垫底色。
     /// 注意语义：alpha 通道始终保留，这里只是决定「垫不垫底色」，不是重新解码。
     /// </summary>
-    public bool ThumbnailUseTransparency { get; set; } = true;
+    public bool ThumbnailUseTransparency { get; set; } = false;
 
     /// <summary>
-    /// 不保留透明时垫的底色（#RRGGBB 或 #AARRGGBB）。默认白色 —— 与资源管理器的缩略图观感一致，
-    /// 且不受浅色/深色主题影响（该开关的意义就是让观感稳定）。
+    /// 不保留透明时垫的底色（#RRGGBB 或 #AARRGGBB）。默认 #7C818A（中性灰；
+    /// 2026-11-08 按用户实际配置定为出厂默认，替代原白色）。
     /// 解析失败（手工改坏 settings.json）时由 <c>App.ApplyThumbnailStyle()</c> 回落白色。
     /// </summary>
-    public string ThumbnailBackdropColor { get; set; } = "#FFFFFF";
+    public string ThumbnailBackdropColor { get; set; } = "#7C818A";
 
     /// <summary>
     /// 缩略图卡片边长（像素）：96 = 小 / 128 = 中（默认，与引入该设置前一致）/ 160 = 大。
@@ -239,6 +243,35 @@ public class AppSettings
     /// 且主窗口会清空已加载缩略图重新批量取一遍。
     /// </summary>
     public int ThumbnailSize { get; set; } = 128;
+
+    // ── 卡片信息行显示状态（2026-11-06 访谈：交互唯一入口 = Tile/Content 假列头右键菜单；
+    //    设置窗不加 UI；持久化重启恢复。命名 Tile/Content 前缀区分两模式独立配置 ──
+    // 消费者（规则 23：加设置项必须当次接线）：App.ApplyThumbnailStyle / RefreshThumbnailRowResources
+    // 注入行可见性资源 + 卡片迷你行/假列头模板的 {DynamicResource} 绑定。
+
+    /// <summary>Tile 迷你信息行：大小行。默认开（访谈默认 大小+修改日期）。</summary>
+    public bool TileRowShowSize { get; set; } = true;
+
+    /// <summary>Tile 迷你信息行：压缩后大小行。默认关。</summary>
+    public bool TileRowShowCompressedSize { get; set; } = false;
+
+    /// <summary>Tile 迷你信息行：压缩率行。默认关。</summary>
+    public bool TileRowShowRatio { get; set; } = false;
+
+    /// <summary>Tile 迷你信息行：修改日期行（短日期 yyyy-MM-dd）。默认开。</summary>
+    public bool TileRowShowDate { get; set; } = true;
+
+    /// <summary>Content 元数据行：大小行。默认开（v0.5.6 起四行全显，保持观感）。</summary>
+    public bool ContentRowShowSize { get; set; } = true;
+
+    /// <summary>Content 元数据行：压缩后大小行。默认开。</summary>
+    public bool ContentRowShowCompressedSize { get; set; } = true;
+
+    /// <summary>Content 元数据行：压缩率行。默认开。</summary>
+    public bool ContentRowShowRatio { get; set; } = true;
+
+    /// <summary>Content 元数据行：修改日期行。默认开。</summary>
+    public bool ContentRowShowDate { get; set; } = true;
 
     public string Language { get; set; } = "zh";
     /// <summary>
@@ -250,8 +283,8 @@ public class AppSettings
     public bool ShowProgressBars { get; set; } = true;
     /// <summary>进度窗口内容模式持久化（"simple"/"detailed"/"list"；默认 "detailed"）。</summary>
     public string ProgressContentMode { get; set; } = "detailed";
-    /// <summary>进度窗口信息量分级持久化（"minimal"/"medium"/"full"；默认 "medium"）。</summary>
-    public string ProgressInfoDensity { get; set; } = "medium";
+    /// <summary>进度窗口信息量分级持久化（"minimal"/"medium"/"full"；默认 "full"，2026-11-08 按用户配置固化）。</summary>
+    public string ProgressInfoDensity { get; set; } = "full";
     /// <summary>进度窗口宽度持久化（像素；默认 800，窗口 MinWidth=500 兜底）。</summary>
     public double ProgressWindowWidth { get; set; } = 800;
 
