@@ -6,6 +6,16 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-10** — 计划：唯一根目录处理立计划 + HTML 原型（GitHub issue #35）
+  - **issue 梳理**：报告人吐槽的「选择器 Ctrl+A 后还要点添加所选」一线已由 2026-11-03 `checkbox-mode-consistency`（36da1ca）解决（Ctrl+A 全选后点组内任一行复选框整组打勾、右键「勾选所有可见项」），issue 回复闭环由 maintainer 自行处理；残留的是「唯一根目录」功能本体。
+  - **计划落地**：`.omo/plans/未开始/compress-extract-root-mode.md`（10–16h，B 档），用户逐项定稿 7 条决策：压缩设置窗三态选项（原样 / 去目录本身[仅单目录源，否则置灰] / 套唯一根目录[Separate 置灰，根名输入框默认包文件名可改]）+ 解压设置窗「去掉压缩包顶层目录」开关（无唯一根置灰、判定复用智能解压、策略挂 `ExtractPathResolver` 单一事实源）；默认值与其它压缩/解压设置一致——设置窗载入默认不回写、设置窗口改默认；先结构调整后 Filter/Plan 白名单的叠序硬约束；首版仅 GUI（CLI 后补）。`docs/PLAN.md` B 档表同步加行。
+  - **原型**：`docs/prototypes/compress-extract-root-mode.html`——控制台（源场景 / 输出模式 / 示例包 / 保留完整路径开关）+ 压缩解压两窗口 mock（三态组 + 根名字段 + 两条置灰门 + 包内/目标目录实时预览树）+ 主设置窗口默认值落点 mock + 决策对照表；headless 浏览器跑通全部场景（置灰门、散装自动回关、包名联动根名、三态预览计算）无 JS 报错。
+
+**2026-11-09** — 合并：`beta` → `plans`（v0.5.6 显示层改进与除错工作回流）
+  - **方式**：`git merge beta`；冲突 3 个文件且全为文档（`RELEASE_NOTES.md` / `docs/PROGRESS.md` / `docs/progress-avalonia-detail.md`），产品代码与三份 `strings.*.json` 自动合并、无冲突。
+  - **冲突解法**：三处都按「两侧全留 + 按日期重排」处理 —— 里程碑与历史设计方案索引各保留 beta 的 11-08 / 11-07 / 11-05 / 11-04 行与本分支的 11-04 冲突时策略行（同日条目把 v0.5.7 那条排在 v0.5.6 之后）；详细记录把「嵌套解压计划」（11-05）与「冲突时: 实时策略」（11-04）分别插回对应日期段；`RELEASE_NOTES.md` 的「压缩设置窗的预览树显示实时计数」取 beta 版措辞（多出「树一边扫描一边长出条目」半句，与本分支代码行为一致）。
+  - **验证**：无冲突标记残留；`-Task check` 通过 —— 版本 0.5.7 六处一致、三语 1451 key 一致、9 条守卫全绿（未构建、未跑测试，纯合并文档解冲突）。
+
 **2026-11-08** — 压缩默认配置随出厂固化（默认等级 5 + 自适应压缩默认开启）
   - **默认值**：`DefaultLevel` 本来就是 `5`（用户真机也是 5），本次补断言钉住、不改代码；`AdaptiveCompression` 默认 `false`→**`true`**。配套默认规则集 `GetDefaultAdaptiveOverrides()`（图片/视频/音频/压缩包/字体/文档六类 → Store）已由 `CreateWithDefaults` / `ApplyMigrations` 填充，开启后即按规则跳过已压缩格式，不依赖用户先配规则。
   - **按用户意见不固化**：`Theme`（本机 `System`→`Dark` 非故意改动，不改出厂默认）、`ParallelExtractDegree`（保持 `Environment.ProcessorCount` 自适应，本机 20 核、临时值 16 不写死）。
@@ -68,6 +78,13 @@
   - **测试**：新增 `tests/MantisZip.Tests/Utils/FileFormatDetectorUtf16Tests.cs` 8 例（LE/BE BOM 的 reg 内容、无 BOM LE、无 BOM JSON 子类型、ANSI `REGEDIT4`、全零 / NUL 块+ASCII 反例、`.reg` 扩展名大小写）；`TextEncodingDetectorTests` 增 7 例（LE/BE BOM 解码去 BOM、无 BOM、显式 `utf-16`、`DetectAndDecodeText` 返回编码名、全零不抛）；`PreviewServiceContentTests` 增 1 例端到端 `ClassifyPreviewByMagicAsync_Utf16RegEntry_ReturnsText`。
   - **验证**：`build -Target core` / `-Target avalonia` 0 警告；新增/相关 27 例 Core 测试全绿；`test -Target ui-tests` 796 例 0 失败（3 例既有跳过）；`-Task check` 版本 0.5.6 六处一致 / 三语 1448 key / 9 条守卫全绿。
   - **环境说明**：本机 `dotnet test` 仍因 testhost 无法打开父进程句柄而中止（AGENTS.md 已记录的受限环境问题）；Core 测试改用 `xunit.runner.console 2.9.3`（临时目录内，runtimeconfig 指向 net10.0）跑通，全量 1034 例中 25 例失败均为缺 `7z.dll` 的既有环境失败（CI 同样过滤 7z 用例）。
+
+**2026-11-05** — 计划：解压时递归解开内层压缩包（Nested Archive Extraction）设计定稿
+  - **需求**（用户 m00001）：下载/备份常是「套娃」压缩包，外层解完还要手动进目录逐个再解，次数一多就漏。全仓勘察确认此前**没有任何嵌套解压实现**，属全新功能。
+  - **定稿的 9 项决策**（逐项与用户确认）：内层包解到 `<所在目录>\<包名去扩展名>\` 且原包保留；递归可配深度默认 3（1-10）；只认 `.zip/.7z/.rar/.tar/.gz/.tgz/.tar.gz` 扩展名白名单、**不做魔数**（`.docx/.xlsx/.pptx/.epub` 文件头即 ZIP，魔数会把 Office 文档解开铺一地）；内层密码 = 外层密码 → 密码库 → 仍有失败弹一次窗（应用到剩余全部）→ 再失败跳过标记，CLI 不弹窗；内层冲突**沿用本次策略**（`ask` 也弹，不静默降级）；失败跳过但整体仍算成功并在结果里列原因；入口全覆盖（对话框 / 三条原地解压 / 拖拽含「解压选中项到」/ CLI）；开关 = 全局设置（默认关）+ 对话框复选框（本次可改）；深度 + 500 包 / 100GB 双硬上限。
+  - **方案**：不改引擎契约、不塞进 `ExtractService`（拿不到冲突弹窗与密码端口）。新增 Core 纯逻辑 `NestedArchivePolicy`（白名单 / `GetNestedDestination` / `ClampDepth` / 三个常量）与 `NestedArchiveScanner`（`mtime ≥ runStart-2s` + 白名单、排除源包、20 万文件上限），UI 新增独立 `Services/NestedExtractRunner`（复用 `ExtractFlow.ExtractAsync`，端口注入与 `ExtractSession` 同款）。接线 5 处：`ExtractSession.cs:296`（对话框 / CLI `--extract` / 拖拽兜底 / 双击）、`ExtractFlow.cs:73`（拖拽直投 + 右键选中项）、`MainWindowViewModel.Extract.cs:61/108/342`（三条 legacy）、`App.CliExtract.cs:639/859`（CLI 直解）。
+  - **计划文档**：[nested-archive-extract.md](.omo/plans/未开始/nested-archive-extract.md)（16-22h，三阶段交付）；已按规则 1 登记进 `docs/PLAN.md` B 档。**未排期**（A 档 v0.5.5–v0.5.10 已满编），产品代码落 `alpha`。
+  - **本次未改产品代码**（`plans` 分支，规则 19）。
 
 **2026-11-05** — 修复：应用内添加 / 删除条目、编辑注释后被误判成「磁盘上的压缩包已被替换」（只读横幅回归）
   - **现象**：对打开中的压缩包执行「添加文件」「删除条目」「编辑注释」后，界面立刻弹出只读横幅「磁盘上的压缩包已被替换」+「当前列表来自旧文件，编辑或解压前请重新打开」，列表停在操作前的内容；随后手动 F5 也被同一条守卫拦下，只能点「重新打开」才恢复。
