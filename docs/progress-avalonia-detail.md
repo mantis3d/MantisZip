@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-10** — 合并：`plans` → `alpha`（唯一根目录计划与原型回流；冲突解法与前次 beta→plans 同规）
+  - **方式**：`git merge plans`；产品代码零改动，只带入 `.omo/plans/未开始/{compress-extract-root-mode,nested-archive-extract}.md`、`docs/prototypes/compress-extract-root-mode.html` 与 `docs/PLAN.md` 两行；冲突只在 `docs/PROGRESS.md` 与本文档两处。
+  - **冲突根因（均为「同一内容在两侧位置不同」的搬运冲突）**：两侧各自合过 beta，11-04「冲突时: 实时策略」条目内容逐字相同但排序位置不同（alpha 放在 11-04 段首、plans 放在段尾）；plans 侧另有 11-10（唯一根目录计划）、11-09（beta→plans 合并）、11-05（嵌套解压计划）三条 alpha 没有的新记录。
+  - **解法**：新记录全留（11-10 / 11-09 / 11-05）；重复的 11-04 条目只留 alpha 位置的一份，删掉 plans 侧重复块。`PROGRESS.md` 解完与 alpha 原样一致（不产生里程碑变更）。
+  - **验证**：无冲突标记残留；`-Task check` 通过（版本 0.5.7 六处一致、三语 1451 key、9 条守卫全绿；纯文档合并，未构建/未跑测试）。
+
 **2026-11-10** — 计划：唯一根目录处理立计划 + HTML 原型（GitHub issue #35）
   - **issue 梳理**：报告人吐槽的「选择器 Ctrl+A 后还要点添加所选」一线已由 2026-11-03 `checkbox-mode-consistency`（36da1ca）解决（Ctrl+A 全选后点组内任一行复选框整组打勾、右键「勾选所有可见项」），issue 回复闭环由 maintainer 自行处理；残留的是「唯一根目录」功能本体。
   - **计划落地**：`.omo/plans/未开始/compress-extract-root-mode.md`（10–16h，B 档），用户逐项定稿 7 条决策：压缩设置窗三态选项（原样 / 去目录本身[仅单目录源，否则置灰] / 套唯一根目录[Separate 置灰，根名输入框默认包文件名可改]）+ 解压设置窗「去掉压缩包顶层目录」开关（无唯一根置灰、判定复用智能解压、策略挂 `ExtractPathResolver` 单一事实源）；默认值与其它压缩/解压设置一致——设置窗载入默认不回写、设置窗口改默认；先结构调整后 Filter/Plan 白名单的叠序硬约束；首版仅 GUI（CLI 后补）。`docs/PLAN.md` B 档表同步加行。
