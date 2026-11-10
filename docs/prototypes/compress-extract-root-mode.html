@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>唯一根目录处理 — 压缩三态 / 解压剥根 交互原型（issue #35）</title>
+<style>
+/* ══════════════════════════════════════════════════════════════════
+   页面骨架（与 docs/prototypes 其它原型一致的「深色工具页」风格）
+   ══════════════════════════════════════════════════════════════════ */
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+    font-family:-apple-system,BlinkMacSystemFont,'Segoe UI','Microsoft YaHei',Roboto,sans-serif;
+    background:#15152a; color:#eaeaea; padding:28px 20px 60px; min-height:100vh; font-size:14px;
+}
+h1 { text-align:center; color:#6bd46b; font-size:22px; margin-bottom:6px; }
+.subtitle { text-align:center; color:#888; font-size:13px; margin-bottom:14px; line-height:1.75; max-width:940px; margin-left:auto; margin-right:auto; }
+.phase-banner { max-width:940px; margin:0 auto 18px; padding:10px 14px; font-size:12px; line-height:1.7;
+                color:#ffd93d; background:#2a2a14; border:1px solid #6b5b1e; border-radius:6px; }
+.phase-banner b { color:#ffd93d; } .phase-banner code { color:#6bd46b; background:transparent; }
+.wrap { max-width:1180px; margin:0 auto; }
+code { background:#15152a; padding:1px 5px; border-radius:3px; font-family:Consolas,monospace; font-size:11.5px; color:#c792ea; }
+
+/* ── 顶部控制台 ─────────────────────────────────────────────── */
+.console { background:#22223c; border:1px solid #3d3d5c; border-radius:8px; padding:14px 16px; margin-bottom:18px; }
+.console-row { display:flex; flex-wrap:wrap; gap:22px; align-items:flex-start; }
+.console-group { display:flex; flex-direction:column; gap:6px; }
+.console-label { font-size:10px; text-transform:uppercase; letter-spacing:.6px; color:#777; }
+.seg { display:flex; background:#15152a; border:1px solid #3d3d5c; border-radius:6px; overflow:hidden; }
+.seg button { padding:5px 11px; border:none; background:transparent; color:#999; cursor:pointer; font-size:12px; transition:all .15s; white-space:nowrap; }
+.seg button:hover:enabled { background:#33335a; color:#eaeaea; }
+.seg button.active { background:#6bd46b; color:#15152a; font-weight:600; }
+.seg button:disabled { color:#555; cursor:not-allowed; }
+.console-hint { max-width:1180px; margin:0 auto 18px; font-size:12px; color:#999; line-height:1.7; }
+
+/* ── 双窗口布局 ───────────────────────────────────────────── */
+.demo-grid { display:grid; grid-template-columns:1fr 1fr; gap:18px; align-items:start; }
+@media (max-width:1080px){ .demo-grid { grid-template-columns:1fr; } }
+.col-head { font-size:13px; font-weight:600; color:#6bd46b; margin-bottom:8px; text-align:center; }
+.col-head small { color:#888; font-weight:400; margin-left:8px; }
+
+/* ── 窗口 mock ───────────────────────────────────────────── */
+.win { background:#2d2d44; border:1px solid #3d3d5c; border-radius:9px; box-shadow:0 10px 44px rgba(0,0,0,.5); overflow:hidden; }
+.win-titlebar { background:#3d3d5c; padding:9px 14px; display:flex; justify-content:space-between; align-items:center; font-size:13px; font-weight:600; }
+.win-titlebar .tb-right { display:flex; gap:14px; color:#888; font-weight:400; font-size:11px; }
+.win-body { padding:12px; display:flex; flex-direction:column; gap:10px; }
+.tabs { display:flex; gap:2px; background:#3d3d5c; border-bottom:1px solid #3d3d5c; padding:0 10px; }
+.tab { padding:8px 14px; font-size:12.5px; color:#aaa; border-bottom:2px solid transparent; }
+.tab.active { color:#eaeaea; font-weight:600; border-bottom-color:#6bd46b; }
+.field-row { display:flex; align-items:center; gap:8px; font-size:12.5px; }
+.field-row label { color:#999; min-width:86px; text-align:right; }
+.field-row input[type=text], .field-row select {
+    background:#15152a; color:#eaeaea; border:1px solid #3d3d5c; border-radius:5px;
+    padding:5px 8px; font-size:12px; width:200px; }
+.field-row input:disabled { color:#666; cursor:not-allowed; }
+.okbar { display:flex; justify-content:flex-end; gap:8px; padding-top:8px; border-top:1px solid #3d3d5c; }
+.btn { padding:5px 16px; border-radius:5px; border:1px solid #3d3d5c; background:#3d3d5c; color:#ccc; cursor:pointer; font-size:12px; }
+.btn.primary { background:#6bd46b; color:#15152a; font-weight:600; border-color:#6bd46b; }
+
+/* ── 新增控件（绿色高亮区块） ─────────────────────────────── */
+.new-block { border:1px solid #6bd46b; border-radius:7px; padding:10px 12px; background:#1b2a1b; position:relative; }
+.new-block .new-tag { position:absolute; top:-9px; right:10px; background:#6bd46b; color:#15152a; font-size:10px; font-weight:700; padding:1px 8px; border-radius:8px; letter-spacing:.5px; }
+.block-title { font-size:12.5px; color:#9fdc9f; font-weight:600; margin-bottom:4px; }
+.radio-line { display:flex; align-items:center; gap:7px; font-size:12.5px; color:#ccc; padding:4px 2px; border-radius:5px; cursor:pointer; }
+.radio-line.off { color:#666; cursor:not-allowed; }
+.radio-line input { accent-color:#6bd46b; width:15px; height:15px; cursor:pointer; }
+.radio-line input:disabled { cursor:not-allowed; }
+.radio-line .exclusive { font-size:10.5px; color:#ffd93d; border:1px solid #6b5b1e; border-radius:4px; padding:0 5px; margin-left:4px; white-space:nowrap; }
+.gray-tip { font-size:11px; color:#777; line-height:1.7; padding-left:2px; margin-top:4px; }
+.gray-tip.active-warn { color:#ffd93d; }
+.sub-field { margin:6px 0 0 22px; display:flex; align-items:center; gap:7px; font-size:12px; color:#999; }
+.sub-field input[type=text] { background:#15152a; color:#eaeaea; border:1px solid #3d3d5c; border-radius:5px; padding:4px 7px; font-size:12px; width:150px; }
+.sub-field input:disabled { color:#666; }
+.sub-field .default-mark { font-size:10.5px; color:#c792ea; }
+
+/* ── 源列表 / 预览树 ─────────────────────────────────────── */
+.panel { background:#20203a; border:1px solid #3d3d5c; border-radius:7px; overflow:hidden; }
+.panel-head { padding:7px 12px; font-size:11px; letter-spacing:.6px; text-transform:uppercase; color:#888; border-bottom:1px solid #3d3d5c; display:flex; justify-content:space-between; align-items:center; }
+.panel-body { padding:8px 12px 10px; font-family:Consolas,'Cascadia Mono',monospace; font-size:12px; line-height:1.85; color:#ccc; max-height:340px; overflow:auto; white-space:nowrap; }
+.src-row { display:flex; align-items:center; gap:6px; }
+.badge-kind { font-size:9.5px; padding:0 5px; border-radius:4px; border:1px solid #555577; color:#aaa; font-family:sans-serif; }
+.badge-kind.dir { color:#8fd9ff; border-color:#4c7fa6; }
+.badge-kind.file { color:#cfcfcf; border-color:#5a5a7a; }
+.tree .t-line { padding-left:14px; }
+.tree .t-dir { color:#8fd9ff; }
+.tree .t-file { color:#ccc; }
+.legend { margin-top:8px; padding:0 12px 10px; font-size:11px; color:#777; line-height:1.7; }
+
+/* ── 说明卡 / 决策对照 ───────────────────────────────────── */
+.notes { max-width:1180px; margin:22px auto 0; display:grid; grid-template-columns:1fr 1fr; gap:14px; }
+@media (max-width:1080px){ .notes { grid-template-columns:1fr; } }
+.note-card { background:#22223c; border:1px solid #3d3d5c; border-radius:8px; padding:12px 15px; font-size:12.5px; line-height:1.8; color:#bbb; }
+.note-card h3 { font-size:13px; color:#6bd46b; margin-bottom:8px; }
+.note-card table { width:100%; border-collapse:collapse; font-size:11.5px; }
+.note-card td, .note-card th { border:1px solid #3d3d5c; padding:4px 7px; text-align:left; vertical-align:top; }
+.note-card th { color:#888; font-weight:600; background:#15152a; }
+.section-title { max-width:1180px; margin:26px auto 10px; font-size:15px; color:#6bd46b; border-bottom:1px solid #3d3d5c; padding-bottom:6px; }
+</style>
+</head>
+<body>
+<h1>唯一根目录处理 — 压缩三态 / 解压剥根</h1>
+<div class="subtitle">GitHub issue #35 · 压缩设置窗「包内根目录」三态选项 + 解压设置窗「去掉压缩包顶层目录」开关<br>
+默认「原样 / 关」，现有所见即所得行为<b style="color:#6bd46b">零变化</b>；设计决策见 <code>.omo/plans/未开始/compress-extract-root-mode.md</code></div>
+
+<div class="phase-banner">
+    <b>原型范围</b>：只演示新增控件与置灰门。<b>① 压缩三态</b>：原样 / 去目录本身（仅单目录源可用）/ 套唯一根目录（Separate 置灰，根名输入框默认包文件名可改）。
+    <b>② 解压剥根</b>：开关只在包顶层<b>存在唯一单根目录</b>时可用，散装置灰；剥根逻辑挂在 <code>ExtractPathResolver</code>，预览树 = 实际解压（单一事实源）。
+    <b>③ 默认值</b>：设置窗每次载入默认、确认不回写；默认值在主设置窗口改（见底部说明卡）。
+</div>
+
+<div class="console">
+  <div class="console-row">
+    <div class="console-group">
+      <div class="console-label">压缩 · 源场景</div>
+      <div class="seg" id="segScenario">
+        <button data-v="single" class="active">单目录源</button>
+        <button data-v="mixed">多项混合源</button>
+      </div>
+    </div>
+    <div class="console-group">
+      <div class="console-label">压缩 · 输出模式</div>
+      <div class="seg" id="segOutput">
+        <button data-v="combined" class="active">合并成一包</button>
+        <button data-v="separate">每源一包 · Separate</button>
+      </div>
+    </div>
+    <div class="console-group">
+      <div class="console-label">解压 · 示例压缩包</div>
+      <div class="seg" id="segArchive">
+        <button data-v="root" class="active">唯一单根包（7zip/…）</button>
+        <button data-v="flat">散装顶层包</button>
+      </div>
+    </div>
+    <div class="console-group">
+      <div class="console-label">解压 · 与其它开关并存</div>
+      <label class="radio-line" style="color:#ccc;"><input type="checkbox" id="chkPreserve" checked> 保留完整路径（extract-preserve-full-path-toggle）</label>
+      <div style="font-size:11px;color:#777;">与本开关正交：两个独立状态，可同时开</div>
+    </div>
+  </div>
+</div>
+<div class="console-hint">切换上面三组，窗口里的置灰门 / 根名默认值 / 结构预览实时跟随。绿色框 = 本次新增控件。</div>
+
+<div class="wrap">
+<div class="demo-grid">
+
+  <!-- ═══════════════ 左列：压缩设置窗 ═══════════════ -->
+  <div>
+    <div class="col-head">压缩设置窗<small>三态选项 + 两条置灰门</small></div>
+    <div class="win">
+      <div class="win-titlebar"><span>压缩设置</span><span class="tb-right">— □ ×</span></div>
+      <div class="tabs"><div class="tab active">基本</div><div class="tab">高级</div><div class="tab">输出</div><div class="tab">注释</div><div class="tab">过滤</div></div>
+      <div class="win-body">
+        <div class="new-block">
+          <span class="new-tag">新增 · issue #35</span>
+          <div class="block-title">包内根目录</div>
+          <label class="radio-line"><input type="radio" name="rootMode" value="original"> 原样（不调整结构）</label>
+          <label class="radio-line" id="rowStrip"><input type="radio" name="rootMode" value="strip" id="radStrip"> 去目录本身（不含所选目录，仅直子项）<span class="exclusive" id="stripGate">仅单目录源</span></label>
+          <label class="radio-line"><input type="radio" name="rootMode" value="wrap" id="radWrap"> 套唯一根目录（全部条目加一层）</label>
+          <div class="sub-field" id="wrapNameField">
+              根名：<input type="text" id="rootName" value="demo-build"> <span class="default-mark" id="rootNameMark">默认 = 包文件名</span>
+          </div>
+          <div class="gray-tip" id="gateHint">置灰门：①「去目录本身」只在 Sources 恰为一个目录时可用；②「套唯一根目录」在「每源一包」时置灰（根名=包名，无意义）。</div>
+        </div>
+
+        <div class="field-row"><label>压缩包名</label><input type="text" id="archiveName" value="demo-build.7z"><span style="font-size:10.5px;color:#777;">（改它会联动根名默认值）</span></div>
+        <div class="field-row"><label>压缩格式</label><select><option>7z</option><option>zip</option><option>tar.gz</option></select></div>
+
+        <div class="panel">
+          <div class="panel-head"><span>源（Sources，本场景）</span><span id="srcHeadRight"></span></div>
+          <div class="panel-body" id="srcList"></div>
+        </div>
+        <div class="okbar"><button class="btn">取消</button><button class="btn primary">确定</button></div>
+      </div>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="panel">
+      <div class="panel-head"><span>包内结构预览</span><span id="modeEcho" style="text-transform:none;letter-spacing:0;"></span></div>
+      <div class="panel-body"><div class="tree" id="compressPreview"></div></div>
+      <div class="legend" id="compressLegend"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════ 右列：解压设置窗 ═══════════════ -->
+  <div>
+    <div class="col-head">解压设置窗<small>「去掉压缩包顶层目录」开关</small></div>
+    <div class="win">
+      <div class="win-titlebar"><span>解压设置</span><span class="tb-right">— □ ×</span></div>
+      <div class="tabs"><div class="tab active">选项</div><div class="tab">冲突</div><div class="tab">密码</div></div>
+      <div class="win-body">
+        <div class="new-block">
+          <span class="new-tag">新增 · issue #35</span>
+          <div class="block-title">去到目标目录的结构调整</div>
+          <label class="radio-line" id="rowStripRoot" style="color:#ccc;"><input type="checkbox" id="chkStripRoot"> 去掉压缩包顶层目录（唯一根剥离）</label>
+          <div class="gray-tip" id="stripRootTip"></div>
+        </div>
+        <div class="field-row"><label>解压目标</label><input type="text" value="E:\Test" readonly style="color:#aaa;"></div>
+        <div class="field-row"><label>示例包</label><input type="text" id="extArchiveName" value="test-build.7z" readonly style="color:#aaa;"></div>
+        <div class="field-row"><label>冲突策略</label><select><option>询问（默认）</option><option>覆盖</option><option>跳过</option></select></div>
+        <div class="okbar"><button class="btn">取消</button><button class="btn primary">确定</button></div>
+      </div>
+    </div>
+
+    <div style="height:12px;"></div>
+    <div class="panel">
+      <div class="panel-head"><span>解压预览（目标目录内）</span><span id="extEcho" style="text-transform:none;letter-spacing:0;"></span></div>
+      <div class="panel-body"><div class="tree" id="extractPreview"></div></div>
+      <div class="legend" id="extractLegend"></div>
+    </div>
+  </div>
+
+</div>
+
+<!-- ═══════════════ 默认值落点 ═══════════════ -->
+<div class="section-title">主设置窗口 — 新增默认值位置（设置窗载入 / 单次选择不回写）</div>
+<div class="demo-grid">
+  <div class="note-card">
+    <h3>设置 → 压缩 → 默认值（新增一节）</h3>
+    <table>
+      <tr><th style="width:170px;">包内根目录</th><td>
+        <div class="seg" style="display:inline-flex;"><button class="active">原样</button><button>去目录本身</button><button>套唯一根目录</button></div>
+        <div style="font-size:11px;color:#888;margin-top:5px;">压缩设置窗每次打开时<b style="color:#6bd46b">载入</b>该默认、点「确定」<b style="color:#6bd46b">不回写</b>；要改默认值来这里（与其它压缩默认值一致）。</div>
+      </td></tr>
+    </table>
+  </div>
+  <div class="note-card">
+    <h3>设置 → 解压 → 默认值（新增一行开关）</h3>
+    <table>
+      <tr><th style="width:170px;">去掉压缩包顶层目录</th><td>
+        <label class="radio-line" style="color:#ccc;cursor:default;"><input type="checkbox" checked disabled> 默认：关（与现状一致）</label>
+        <div style="font-size:11px;color:#888;">解压设置窗每次<b style="color:#6bd46b">载入默认、不回写</b>。包内无唯一根时窗内开关<b>置灰</b>（不走 NotStarted 提示）。</div>
+      </td></tr>
+    </table>
+  </div>
+</div>
+
+<!-- ═══════════════ 决策对照 ═══════════════ -->
+<div class="section-title">设计决策 → 原型对照（compress-extract-root-mode.md §二）</div>
+<div class="note-card">
+  <table>
+    <tr><th style="width:52px;">决策</th><th>定案</th><th>原型体现</th></tr>
+    <tr><td>①</td><td>三态选择组（原样 / 去目录本身 / 套唯一根目录），默认原样</td><td>压缩窗绿色框内的单选组</td></tr>
+    <tr><td>②</td><td>根名输入框，默认包文件名，可改</td><td>选「套根」时出现的根名字段（改包名联动默认值）</td></tr>
+    <tr><td>③</td><td>解压端无唯一根 → <b>置灰</b>，不弹 NotStarted</td><td>顶部切「散装顶层包」看开关变灰 + 说明文字</td></tr>
+    <tr><td>④</td><td>载入默认、确认不回写；默认在设置窗口改</td><td>上方两块「主设置窗口」mock —— 或本页面刷新后压缩窗核对回「原样」的复位语义</td></tr>
+    <tr><td>⑤</td><td>「去目录本身」仅单目录源生效，多源/混合置灰</td><td>顶部切「多项混合源」看置灰门 ①</td></tr>
+    <tr><td>⑥</td><td>Separate（每源一包）时「套根」置灰</td><td>顶部切「每源一包」看置灰门 ②；预览变多包结构</td></tr>
+    <tr><td>⑦</td><td>首版仅 GUI；CLI / COM 免窗直通列为范围外</td><td>—（见计划 §六）</td></tr>
+  </table>
+</div>
+
+<div class="section-title" style="border:none;font-size:12px;color:#777;">叠序硬约束（计划 §二）：先做结构调整（目录展开 / 根前缀 → 决定包内 entry 名），<b>再做</b> Filter 过滤与 Plan 白名单；否则过滤路径要重算两遍。</div>
+</div>
+
+<script>
+/* ══════════════════════════════════════════════════════════════════
+   数据模型（原型专用简化树；真实数据结构由引擎勘察后定）
+   ══════════════════════════════════════════════════════════════════ */
+const DIR_CHILDREN = [
+  { name:'7z.exe', dir:false },
+  { name:'7z.dll', dir:false },
+  { name:'docs', dir:true, children:[
+      { name:'history.txt', dir:false },
+      { name:'readme.md', dir:false },
+  ]},
+  { name:'Lang', dir:true, children:[
+      { name:'zh.txt', dir:false },
+      { name:'en.txt', dir:false },
+  ]},
+];
+const SCENARIOS = {
+  single: {
+    label:'单目录源', srcTag:'1 项',
+    sources:[ { name:'7zip', dir:true, children:DIR_CHILDREN } ],
+  },
+  mixed: {
+    label:'多项混合源', srcTag:'3 项（2 目录 + 1 文件）',
+    sources:[
+      { name:'7zip', dir:true, children:DIR_CHILDREN },
+      { name:'dist', dir:true, children:[ { name:'mz.exe', dir:false }, { name:'mz.ini', dir:false } ] },
+      { name:'ReadMe.txt', dir:false },
+    ],
+  },
+};
+const EXT_ARCHIVES = {
+  root: { name:'test-build.7z', uniqueRoot:'7zip', children:DIR_CHILDREN },
+  flat: { name:'tools.7z', uniqueRoot:null,
+          entries:[ { name:'7z.exe', dir:false },
+                    { name:'docs', dir:true, children:[{ name:'history.txt', dir:false }] },
+                    { name:'Lang', dir:true, children:[{ name:'en.txt', dir:false }] } ] },
+};
+
+/* ═════════════ 状态 ═════════════ */
+const st = {
+  scenario:'single', outputMode:'combined', rootMode:'original',
+  rootName:'demo-build', archiveName:'demo-build.7z',
+  extArchive:'root', stripRoot:true, preserve:true,
+};
+
+/* ── 工具：把目录树折叠成相对路径数组 ─────────────────── */
+function packPaths(src, base, out) {
+  if (src.dir) {
+    for (const c of src.children) packPaths(c, base + src.name + '/', out);
+    if (src.children.length === 0) out.push(base + src.name + '/');  // 空目录保留
+  } else {
+    out.push(base + src.name);
+  }
+}
+
+/* ═════════════ 压缩窗：源列表 ═════════════ */
+function renderSources() {
+  const s = SCENARIOS[st.scenario];
+  document.getElementById('srcHeadRight').textContent = s.label + ' · ' + s.srcTag;
+  document.getElementById('srcList').innerHTML = s.sources.map(src => {
+    const tag = src.dir ? '<span class="badge-kind dir">目录</span>' : '<span class="badge-kind file">文件</span>';
+    const extra = src.dir ? '　<span style="color:#7a7a9a;">(' + src.children.length + ' 个直子项)</span>' : '';
+    return '<div class="src-row">' + tag + '　<code>E:\\share\\' + src.name + '</code>' + extra + '</div>';
+  }).join('');
+}
+
+/* ═════════════ 压缩窗：三态置灰门 ═════════════ */
+function renderGates() {
+  const stripAvail = (st.scenario === 'single');      // 置灰门①：仅单目录源
+  const wrapAvail  = (st.outputMode !== 'separate');  // 置灰门②：Separate 禁套根
+  const radStrip = document.getElementById('radStrip');
+  const radWrap  = document.getElementById('radWrap');
+  radStrip.disabled = !stripAvail;
+  document.getElementById('rowStrip').classList.toggle('off', !stripAvail);
+  const sg = document.getElementById('stripGate');
+  sg.style.opacity = stripAvail ? '.5' : '1';
+  radWrap.disabled = !wrapAvail;
+
+  const hints = [];
+  if (!stripAvail) hints.push('「去目录本身」置灰：本场景有多/混合源，多个目录无法都展开到顶层（同名子项会碰撞）');
+  if (!wrapAvail)  hints.push('「套唯一根目录」置灰：Separate 每源一包，根名 = 各包名，无意义');
+  document.getElementById('gateHint').innerHTML = hints.length
+    ? '<span class="active-warn">⚠ ' + hints.join('<br>⚠ ') + '</span>'
+    : '置灰门：①「去目录本身」只在 Sources 恰为一个目录时可用；②「套唯一根目录」在「每源一包」时置灰。';
+
+  // 当前态被禁用时退回原样（与真实交互一致：置灰项不可选中）
+  if (st.rootMode === 'strip' && !stripAvail) st.rootMode = 'original';
+  if (st.rootMode === 'wrap'  && !wrapAvail)  st.rootMode = 'original';
+  document.querySelectorAll('input[name=rootMode]').forEach(r => { r.checked = (r.value === st.rootMode); });
+
+  // 根名字段：仅「套根」时显示
+  document.getElementById('wrapNameField').style.visibility = (st.rootMode === 'wrap') ? 'visible' : 'hidden';
+  document.getElementById('rootName').disabled = (st.rootMode !== 'wrap');
+}
+
+/* ═════════════ 压缩窗：包内结构预览 ═════════════ */
+function renderCompressPreview() {
+  const s = SCENARIOS[st.scenario];
+  const el = document.getElementById('compressPreview');
+  const lg = document.getElementById('compressLegend');
+
+  // 「原样」基线（用于判定改动行）
+  const baseline = [];
+  for (const src of s.sources) packPaths(src, '', baseline);
+  const changedDiffers = st.rootMode !== 'original';
+
+  if (st.outputMode === 'separate') {
+    // 每源一包：列出每个包名及其内部结构
+    let html = '';
+    for (const src of s.sources) {
+      const sub = [];
+      if (src.dir && st.rootMode === 'strip') {
+        for (const c of src.children) packPaths(c, '', sub);   // 去目录本身：直子项落包顶层
+      } else {
+        packPaths(src, '', sub);
+      }
+      const arcName = src.dir ? src.name + '.7z' : src.name.replace(/\.[^.]+$/, '') + '.7z';
+      html += '<div class="t-line t-dir">📦 ' + arcName + '</div>';
+      html += sub.map(p => '<div class="t-line" style="padding-left:30px;">└─ ' + p + '</div>').join('');
+    }
+    el.innerHTML = html;
+    document.getElementById('modeEcho').textContent = 'Separate · ' + (st.rootMode==='strip' ? '去目录本身' : '原样');
+    lg.innerHTML = 'Separate：每个源各自成一包。「套唯一根目录」置灰；「去目录本身」对本场景的目录源生效（每包仅含一个源，满足单目录条件）。';
+    return;
+  }
+
+  let paths = [];
+  if (st.rootMode === 'strip') {
+    // 仅单目录源：直子项展开到包顶层
+    for (const c of s.sources[0].children) packPaths(c, '', paths);
+    paths.sort();
+  } else if (st.rootMode === 'wrap') {
+    const root = (st.rootName || 'root').replace(/[\\\/]+$/, '');
+    for (const src of s.sources) packPaths(src, root + '/', paths);
+    paths.sort();
+  } else {
+    paths = baseline.slice();
+  }
+
+  const modeName = { original:'原样', strip:'去目录本身', wrap:'套根 <' + (st.rootMode==='wrap' ? st.rootName : '') + '/>' }[st.rootMode];
+  document.getElementById('modeEcho').textContent = modeName;
+  el.innerHTML = paths.map(p =>
+    '<div class="t-line ' + (p.endsWith('/') ? 't-dir' : 't-file') + (changedDiffers ? '"' : '"') + '>' +
+    (p.endsWith('/') ? '📁' : '📄') + ' ' + p + '</div>').join('');
+  const legends = {
+    original:'原样：与现状一致（默认态，所见即所得）。',
+    strip:'去目录本身：所选目录不进包 <span class="chip">7zip/ 层消失</span>，其直子项直接落包顶层，子目录结构以该目录为基准整体保留。',
+    wrap:'套唯一根目录：全部条目统一加一层 <span class="chip">' + (st.rootName || 'root') + '/</span> 前缀。根名默认取包文件名（demo-build.7z → demo-build），可改。',
+  };
+  lg.innerHTML = legends[st.rootMode] + (changedDiffers ? '　<b style="color:#9fdc9f;">（《规划里：此结构在 Filter/Plan 之前生成）</b>' : '');
+}
+
+/* ═════════════ 解压窗：开关可用性 + 预览 ═════════════ */
+function flattenWalk(list, base) {
+  const out = [];
+  for (const it of list) {
+    const np = base + it.p;
+    if (it.dir) {
+      out.push(np + '/');
+      for (const c of flattenWalk(it.children, np + '/')) out.push(c);
+    } else out.push(np);
+  }
+  return out;
+}
+// 剥一层根后的目标目录相对条目（去根目录项，子项上提）
+function stripRootFlatten(topItems) {
+  const out = [];
+  for (const it of topItems) {
+    if (it.dir) {
+      for (const c of flattenWalk(it.children, '')) out.push(c);
+    } else out.push(it.p);
+  }
+  return out.slice().sort();
+}
+
+function renderExtractPreview() {
+  const a = EXT_ARCHIVES[st.extArchive];
+  const avail = a.uniqueRoot !== null;
+  const chk = document.getElementById('chkStripRoot');
+  chk.disabled = !avail;
+  document.getElementById('rowStripRoot').classList.toggle('off', !avail);
+  if (!avail) chk.checked = false;   // 散装强制回关；回头切到唯一根包恢复默认开（演示语义）
+  st.stripRoot = avail && chk.checked;
+
+  document.getElementById('extArchiveName').value = a.name;
+  document.getElementById('stripRootTip').innerHTML = avail
+    ? '「' + a.name + '」顶层唯一根：<b style="color:#8fd9ff;">' + a.uniqueRoot + '/</b> → 开关可用。判定复用智能解压的「唯一单根」判定；策略挂 ExtractPathResolver，预览树 = 实际解压。'
+    : '<span class="active-warn">⚠「' + a.name + '」顶层有 3 个并列项（7z.exe / docs / Lang），不存在唯一单根 → 本开关<b>置灰</b>（不弹提示）。切回「唯一单根包」恢复。</span>';
+
+  // 顶层项：唯一根包 = 1 个目录；散装包 = 3 个并列项（子树条目统一归一成 {p,dir,children}）
+  const norm = list => list.map(c => ({ p:c.name, dir:c.dir, children:c.dir ? norm(c.children) : [] }));
+  const topItems = avail
+    ? [{ p:a.uniqueRoot, dir:true, children:norm(a.children) }]
+    : norm(a.entries);
+
+  const rel = st.stripRoot ? stripRootFlatten(topItems) : flattenWalk(topItems, '');
+  document.getElementById('extEcho').textContent =
+    a.name + ' · ' + (st.stripRoot ? '剥根 开' : (avail ? '剥根 关（原样）' : '置灰')) + ' · 保留完整路径 ' + (st.preserve ? '开' : '关');
+  document.getElementById('extractPreview').innerHTML = rel.map(p =>
+    '<div class="t-line ' + (p.endsWith('/') ? 't-dir' : 't-file') + '">' +
+    (p.endsWith('/') ? '📁' : '📄') + ' E:\\Test\\' + p + '</div>').join('');
+
+  const lg = document.getElementById('extractLegend');
+  lg.innerHTML = avail
+    ? (st.stripRoot
+        ? '剥根 <span class="chip">7zip/ 层消失</span>：目标目录顶层直接是包内容 —— 正是 Report 原始诉求「解压时不会出现多余一层目录」。'
+        : '原样（默认）：目标目录下出现一层 <span class="chip">7zip/</span> —— 与现状逐字节一致。')
+      + '　「保留完整路径」决定绝对基目录，与本开关正交（可同时开）。'
+    : '散装包：智能解压会自动改为「建包名目录」处理；此处手动开关置灰，用户不改默认行为。';
+}
+
+/* ═════════════ 控制台事件接线 ═════════════ */
+function segWire(id, key, after) {
+  document.getElementById(id).querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    if (b.disabled) return;
+    document.querySelectorAll('#' + id + ' button').forEach(x => x.classList.remove('active'));
+    b.classList.add('active');
+    st[key] = b.dataset.v;
+    if (after) after();
+  }));
+}
+
+segWire('segScenario','scenario', () => { st.rootMode='original'; renderAllComp(); });
+segWire('segOutput','outputMode',  () => { st.rootMode='original'; renderAllComp(); });
+segWire('segArchive','extArchive', () => { // 切示例包按「默认关」复位（演示「载入默认」语义）
+                                            document.getElementById('chkStripRoot').checked = false;
+                                            renderExtractPreview(); });
+
+document.querySelectorAll('input[name=rootMode]').forEach(r => r.addEventListener('change', () => { st.rootMode = r.value; renderAllComp(); }));
+document.getElementById('rootName').addEventListener('input', e => {
+  st.rootName = e.target.value.trim() || 'root';
+  renderCompressPreview();
+});
+document.getElementById('archiveName').addEventListener('input', e => {
+  st.archiveName = e.target.value;
+  // 根名默认值 = 包文件名（去扩展名）
+  const derived = st.archiveName.replace(/\.[^.]+$/, '');
+  document.getElementById('rootName').value = derived;
+  st.rootName = derived;
+  renderCompressPreview();
+});
+document.getElementById('chkStripRoot').addEventListener('change', () => renderExtractPreview());
+document.getElementById('chkPreserve').addEventListener('change', e => { st.preserve = e.target.checked; renderExtractPreview(); });
+
+function renderAllComp(){ renderGates(); renderSources(); renderCompressPreview(); }
+
+renderAllComp();
+renderExtractPreview();
+</script>
+</body>
+</html>

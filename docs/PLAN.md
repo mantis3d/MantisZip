@@ -162,6 +162,7 @@
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 元数据显示位置可选（侧边面板 / 正文区） | [metadata-display-location.md](.omo/plans/未开始/metadata-display-location.md) | 🟢低 | 6-8h | 📋 2026-10-31 用户讨论后定案、待启动。exe 预览正文区只有条目名标题、大片空白，信息全在右侧面板；按类型加「显示位置」，选正文区时「程序信息」搬到正文区竖排渲染、面板只留「文件信息」。**只对没有其它正文内容的格式开放**（当前仅 `pe`），默认侧边面板、老配置不动 |
 | 解压时同时解开内层压缩包（递归嵌套解压） | [nested-archive-extract.md](.omo/plans/未开始/nested-archive-extract.md) | 🟡中 | 16-22h | 📋 2026-11-05 用户逐项定稿、待排期。内层包解到同名子目录（原包保留）、递归可配深度默认 3（1-10）、只认 `.zip/.7z/.rar/.tar/.gz/.tgz/.tar.gz` 白名单（不做魔数，避开 Office/EPUB）、密码走外层→密码库→弹一次窗、冲突沿用本次策略（`ask` 也弹）、失败跳过并汇总、**5 处入口全覆盖**（对话框 / 三条原地解压 / 拖拽 / CLI）、深度 + 500 包 / 100GB 双硬上限。新增独立 `NestedExtractRunner` + Core 策略/扫描器，不改引擎契约
+| 唯一根目录处理（压缩去目录 / 套根 + 解压剥根） | [compress-extract-root-mode.md](.omo/plans/未开始/compress-extract-root-mode.md) | 🟡中 | 10-16h | 📋 2026-11-10 用户逐项定稿、待排期（GitHub issue #35）。压缩设置窗三态选项（原样 / 去目录本身[仅单目录源，否则置灰] / 套唯一根目录[Separate 模式置灰]，根名输入框默认包文件名）+ 解压设置窗「去掉压缩包顶层目录」开关（无唯一根置灰，判定复用智能解压，策略挂 `ExtractPathResolver` 保证预览与实解一致）。默认值与其它压缩/解压设置一样：窗内载入默认不回写、设置窗口改默认；首版只做 GUI（CLI 后补，见计划「范围外」）
 
 
 ---
