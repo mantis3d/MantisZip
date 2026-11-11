@@ -117,10 +117,11 @@
 
 ## 待回填 / 未决
 
-- [ ] 用户补两项诊断（2026-11-11 已请）：`%LOCALAPPDATA%\MantisZip\ShellExt\log.txt`（**注意：不是 `MantisZip\ShellExt.log`**，2026-11-10 的回复里路径写错了）与 `New-Object -ComObject MantisZip.ContextMenu` 的激活结果
-- [ ] 据激活结果确认 C 档：`DllGetClassObject` 失败的具体原因（位宽 / runtimeconfig / runtime 版本）
+- [x] 用户补两项诊断（2026-11-11 已请）：`%LOCALAPPDATA%\MantisZip\ShellExt\log.txt`（**注意：不是 `MantisZip\ShellExt.log`**，2026-11-10 的回复里路径写错了）与 `New-Object -ComObject MantisZip.ContextMenu` 的激活结果 —— 用户 2026-11-11 回填：**重装后菜单恢复正常**，激活命令「无任何报错、返回 `System.__ComObject`」= **激活成功**；`ShellExt\log.txt` 显示 `QueryContextMenu` 正常插入 8 项、图标预加载成功、无异常
+- [x] 据激活结果确认 C 档 —— **结论：激活本身没问题，`DllGetClassObject` 失败这个假设被推翻**。真实成因是「模块已加载」与「handler 是否被调用」的错位：升级前 `ShellExt\log.txt` **不存在**（handler 从未被实例化），但 Explorer 模块列表里已有 comhost.dll —— 最可能是 11-03 升级时旧 comhost 模块仍挂在当时那个 explorer.exe 进程里，磁盘文件被替换后该进程内的 COM 激活/模块状态与磁盘不一致，于是那个进程里不再调用 handler；旧代码只看「模块在不在」⇒ 判 `active`、删掉级联 ⇒ 「模块在、handler 不干活、兜底也没了」。用户重装会走 `--uninstall-shell`（内含 explorer.exe 重启），进程一换、模块重载即恢复 —— 与他「重装后立刻正常、日志里 8 项正常」完全吻合。**因此不需要再追激活失败的根因，要修的正是本计划的「假健康信号 + `active` 无回退」**
 - [x] 确认是否采纳提交 3（改出厂默认）—— 用户 2026-11-11 授权「都按最稳妥的方式，你自己决定」，已采纳（默认 `false`）
-- [ ] 0.5.6 安装包里的 `MantisZip.ShellExt.comhost.dll` 与 `MantisZip.ShellExt.runtimeconfig.json` 是否自洽（comhost 时间戳 2026-10-23 属 SDK 原生 shim 的正常日期，**不能**直接当作「未随升级更新」的证据）
+- [x] 0.5.6 安装包里的 `MantisZip.ShellExt.comhost.dll` 与 `MantisZip.ShellExt.runtimeconfig.json` 是否自洽 —— 用户实测重装后 handler 正常工作，且 comhost 版本号属 SDK 自带原生 shim，**不是**问题所在
+- [ ] **0.5.7 发布后请用户按「启用 → 右键压一次 → 再右键」复测**（用户已答应），通过后归档到 `.omo/plans/已完成`
 
 ## 实施记录（2026-11-11）
 

@@ -18,6 +18,7 @@
   - **测试**：新增 `tests/MantisZip.Tests/ShellMenuStatusMachineTests.cs` —— 决策表 17 组 `[InlineData]`、`DecideComAction_ActiveIsNotTerminal`（钉死「active 必须能降级」）、时间窗口序关系、`DefaultSettings_DynamicMenuIsOff`（默认值回归钉子）；`ShellMenuHeartbeatTests` 走 `RegistryHost` 沙箱（`MantisZip\MenuStatusSandbox`）覆盖无键 / 坏时间戳 / 死 PID→`Recent` / 过期→`Stale` / 活 Explorer PID→`Fresh`（无 Explorer 会话时跳过）。⚠ 沙箱态下写注册表必须传**生产路径**，`RegistryHost` 会自动重定向（首次写错路径导致 3 例读不到值）。
   - **验证**：avalonia 构建 0 错误、`-Task test -Target tests` 1058 全绿（新增 20 例）、`-Task test -Target ui-tests` 全绿、`-Task check` / `-Task guards`（9 项）/ `-Task i18n` 全绿；随后合并 `alpha`（版本 0.5.7）解掉两处文档冲突，构建 / `tests` / `ui-tests` / `check`（0.5.7 六处一致）/ `guards` / `i18n`（1452 key）全部复跑仍全绿。
   - **发布说明**：`RELEASE_NOTES.md` 的 v0.5.7 加两条 —— 「修复」节的右键菜单消失（issue #80）+ 新增「变更」节的「动态右键菜单改为实验开关，默认关闭」（用户确认按两条写）。
+  - **C 档结论（用户 2026-11-11 回填）**：`New-Object -ComObject MantisZip.ContextMenu` 无任何报错、返回 `System.__ComObject` ⇒ **激活成功**，「`DllGetClassObject` 失败」假设被推翻；重装后 `%LOCALAPPDATA%\MantisZip\ShellExt\log.txt` 显示 `QueryContextMenu` 正常插入 8 项、图标预加载成功。真实成因是**「模块已加载」≠「handler 被调用」**：升级前该日志文件根本不存在（handler 从未被实例化），但 Explorer 模块列表里已有 `comhost.dll` —— 11-03 升级时旧 comhost 模块仍挂在当时的 explorer.exe 进程里，磁盘文件被替换后该进程内不再调用 handler；旧代码把「模块在」当「能用」⇒ 判 `active` 并删掉级联。用户重装会走 `--uninstall-shell`（内含 explorer.exe 重启），进程一换、模块重载即恢复。**结论：无需再追激活失败根因，本计划的「换判据 + `active` 可回退」正是对症修法。**
   - **未修（登记 KI-018）**：`active` 状态下若 handler 再次静默失效，自愈要等下一次 MantisZip 启动 —— 菜单不出现时没有任何进程被拉起，缺少「常驻探针」这类成本不划算的手段。
 
 **2026-11-10** — 合并：`plans` → `alpha`（唯一根目录计划与原型回流；冲突解法与前次 beta→plans 同规）
