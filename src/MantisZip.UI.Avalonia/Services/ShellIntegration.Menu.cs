@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Threading;
 using Microsoft.Win32;
@@ -36,64 +37,133 @@ internal static partial class ShellIntegration
 
     /// <summary>
     /// 安装 Shell 右键菜单。
-    /// 根据 AppSettings.EnableDynamicMenu 决定使用 COM 动态菜单
-    /// 还是静态级联方案（ExtendedSubCommandsKey）。
+    /// 默认走静态级联方案（ExtendedSubCommandsKey，不依赖 Explorer 加载 .NET COM 组件）；
+    /// 仅当用户显式打开 <see cref="AppSettings.EnableDynamicMenu"/>（实验）时才注册 COM 动态菜单。
     /// </summary>
     public static void Install()
     {
         App.DebugLog("ShellIntegration.Install: starting");
-        var s = AppSettings.Load();
-        var exePath = GetExePath();
-
-        // 先清理旧注册，避免残留
-        Uninstall();
-
-        if (s.EnableDynamicMenu)
+        RunExclusive("Install", () =>
         {
-            if (!InstallCom())
+            var s = AppSettings.Load();
+            var exePath = GetExePath();
+
+            // 先清理旧注册，避免残留。
+            // 注意：这里**不能**调 Uninstall()——它会重启 Explorer（issue #80）。
+            CleanupRegistrations();
+
+            if (s.EnableDynamicMenu)
             {
-                App.DebugLog("ShellIntegration.Install: COM not available, installing cascade only");
-                SetDynamicMenuStatus(DynamicMenuStatus_Disabled);
-                InstallCascade(s, exePath);
+                if (!InstallCom())
+                {
+                    // COM 注册失败（DLL 缺失 / 位宽不符 / runtimeconfig 不匹配）→ 直接回退静态级联，
+                    // 状态写 fallback（设置页会显示「动态菜单加载失败，已回退到静态菜单」）。
+                    App.DebugLog("ShellIntegration.Install: COM not available, falling back to cascade");
+                    SetDynamicMenuStatus(DynamicMenuStatus_Fallback);
+                    InstallCascade(s, exePath);
+                }
+                else
+                {
+                    // COM 注册成功 → 进入「试用期」：级联兜底**同时**在位，
+                    // 等 COM handler 自己上报心跳（真的画出菜单了）才由 CheckComStatus 转 active 并撤掉级联。
+                    // 试用期内 COM 与级联会同时出现一次，这是有意的——宁可重一次，也不让用户两头空（issue #80）。
+                    App.DebugLog("ShellIntegration.Install: COM registered, status=pending (cascade stays as safety net until heartbeat proves COM works)");
+                    SetDynamicMenuStatus(DynamicMenuStatus_Pending);
+                    SetRegistryValue(ContextMenuRegPath, ComProbeStartUtcValue,
+                        DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+                    InstallCascade(s, exePath);
+                }
             }
             else
             {
-                // 仅注册 COM，不安装级联菜单（避免两个菜单同时出现）。
-                // 级联菜单会在 CheckComStatus() 发现 COM 尚未被 Explorer 加载时自动安装。
-                App.DebugLog("ShellIntegration.Install: COM registered, status=pending (cascade will be installed if COM not loaded in Explorer)");
-                SetDynamicMenuStatus(DynamicMenuStatus_Pending);
+                // 安装静态级联方案（可靠兼容所有 Windows 版本）
+                App.DebugLog("ShellIntegration.Install: using static cascade registration");
+                SetDynamicMenuStatus(DynamicMenuStatus_Disabled);
+                InstallCascade(s, exePath);
             }
-        }
-        else
-        {
-            // 安装静态级联方案（可靠兼容所有 Windows 版本）
-            App.DebugLog("ShellIntegration.Install: using static cascade registration");
-            SetDynamicMenuStatus(DynamicMenuStatus_Disabled);
-            InstallCascade(s, exePath);
-        }
 
-        // 通知 Windows Shell 刷新上下文菜单缓存
-        NotifyAssocChanged();
+            // 通知 Windows Shell 刷新上下文菜单缓存
+            NotifyAssocChanged();
 
-        // ── Install summary ──
-        var dynStatus = GetDynamicMenuStatus();
-        App.DebugLog($"ShellIntegration.Install: done — dynStatus={dynStatus}, installed={IsInstalled}, exePath={exePath}");
+            // ── Install summary ──
+            var dynStatus = GetDynamicMenuStatus();
+            App.DebugLog($"ShellIntegration.Install: done — dynStatus={dynStatus}, installed={IsInstalled}, exePath={exePath}");
+        });
     }
 
     /// <summary>
-    /// 卸载所有 MantisZip 右键菜单注册。
-    /// 卸载 COM 注册后重启 Explorer，确保 comhost.dll 句柄释放，
-    /// 避免 Inno Setup 卸载时因文件被占用而删除失败。
+    /// 卸载所有 MantisZip 右键菜单注册，并重启 Explorer 释放 comhost.dll 句柄。
+    /// ⚠ 只给 <c>--uninstall-shell</c>（Inno Setup 的 <c>[UninstallRun]</c>）用：
+    /// 卸载程序需要删除安装目录里的文件，Explorer 持有句柄会导致删除失败。
+    /// 设置页的「安装 / 应用」必须走 <see cref="CleanupRegistrations"/>，不能重启资源管理器。
     /// </summary>
     public static void Uninstall()
     {
         App.DebugLog("ShellIntegration.Uninstall: starting");
+        RunExclusive("Uninstall", () =>
+        {
+            CleanupRegistrations();
+            RestartExplorerForUnload();
+            NotifyAssocChanged();
+            App.DebugLog("ShellIntegration.Uninstall: done");
+        });
+    }
+
+    /// <summary>
+    /// 纯注册表清理：删掉级联 + COM + 状态键，**不重启 Explorer、不发 Shell 通知**。
+    /// <see cref="Install"/> 与 <see cref="Uninstall"/> 共用。
+    /// </summary>
+    private static void CleanupRegistrations()
+    {
         UninstallStaticMenus();
         UninstallCom();
         DeleteRegistryKey(ContextMenuRegPath);
-        RestartExplorerForUnload();
-        NotifyAssocChanged();
-        App.DebugLog("ShellIntegration.Uninstall: done");
+    }
+
+    /// <summary>
+    /// 从设置页卸载右键菜单：只清注册表并通知 Shell，**不重启资源管理器**。
+    /// （重启只属于安装程序卸载流程，见 <see cref="Uninstall"/>。）
+    /// </summary>
+    public static void RemoveMenus()
+    {
+        App.DebugLog("ShellIntegration.RemoveMenus: starting");
+        RunExclusive("RemoveMenus", () =>
+        {
+            CleanupRegistrations();
+            NotifyAssocChanged();
+            App.DebugLog("ShellIntegration.RemoveMenus: done");
+        });
+    }
+
+    /// <summary>
+    /// 用命名互斥把注册表写操作串行化。
+    /// 右键菜单会在多选时一次拉起多个 MantisZip 进程，它们同时跑 <see cref="CheckComStatus"/>，
+    /// 没有互斥时会出现「A 装级联、B 删级联」的交叉覆盖（issue #80 日志里 5 实例并发 1184ms）。
+    /// 异常**向上抛**（失败必须让用户看见，见规则 20）——两个调用方都已有 try/catch。
+    /// </summary>
+    private static void RunExclusive(string operation, Action action, int timeoutMs = 15000)
+    {
+        try
+        {
+            using var mutex = new Mutex(false, ShellRegMutexName);
+            bool acquired;
+            try { acquired = mutex.WaitOne(timeoutMs); }
+            catch (AbandonedMutexException) { acquired = true; } // 上一持有者崩溃 → 视为拿到
+
+            if (!acquired)
+            {
+                App.DebugLog($"ShellIntegration.{operation}: mutex timeout after {timeoutMs}ms, skipped");
+                return;
+            }
+
+            try { action(); }
+            finally { mutex.ReleaseMutex(); }
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"ShellIntegration.{operation}: failed: {ex.Message}");
+            throw;
+        }
     }
 
     /// <summary>
@@ -525,62 +595,180 @@ internal static partial class ShellIntegration
     }
 
     /// <summary>
-    /// 在应用启动时检查 Explorer 是否已经成功加载了 COM 组件。
-    /// 遍历所有 Explorer 进程的模块列表，查找 MantisZip.ShellExt.comhost.dll。
+    /// 应用启动时（含每次右键拉起的新进程）校正动态菜单状态。
+    ///
+    /// 判据只有一条：<b>handler 自己上报的心跳</b>（<see cref="LastRenderUtcValue"/>）。
+    /// 不再遍历 Explorer 模块列表 —— <c>comhost.dll</c> 是 .NET 的 native shim，Explorer 先
+    /// <c>LoadLibrary</c> 再问 <c>DllGetClassObject</c>，**激活失败时 DLL 仍留在模块列表里**，
+    /// 所以「模块存在」不能当「COM 能用」的判据（issue #80 根因 1）。
+    ///
+    /// 状态迁移：
+    /// <list type="bullet">
+    /// <item><c>pending</c> + 心跳新鲜 → <c>active</c>（撤掉级联，只剩 COM）</item>
+    /// <item><c>pending</c> + 试用期已过 → <c>fallback</c>（永久回退级联）</item>
+    /// <item><c>pending</c> + 其余 → 保持 <c>pending</c>，只补级联（用户始终有可用菜单）</item>
+    /// <item><c>active</c> + 心跳过期/从未 → <c>fallback</c> + 装回级联（issue #80 根因 2：原先 <c>active</c> 后永久早退）</item>
+    /// <item><c>fallback</c> → 确保级联在位</item>
+    /// <item><c>disabled</c> / <c>not_installed</c> → 不动</item>
+    /// </list>
     /// </summary>
     public static void CheckComStatus()
     {
         var status = GetDynamicMenuStatus();
-        if (status != DynamicMenuStatus_Pending) return;
+        if (status != DynamicMenuStatus_Pending
+            && status != DynamicMenuStatus_Active
+            && status != DynamicMenuStatus_Fallback)
+            return;
 
-        App.DebugLog("CheckComStatus: status=pending, scanning Explorer processes...");
-        bool found = false;
-        int explorerCount = 0;
+        RunExclusive("CheckComStatus", () =>
+        {
+            var health = ReadHeartbeatHealth();
+            switch (DecideComAction(status, health, IsProbeExpired()))
+            {
+                case ComStatusAction.PromoteToActive:
+                    App.DebugLog($"CheckComStatus: heartbeat={health}, promoting pending → active, removing cascade");
+                    SetDynamicMenuStatus(DynamicMenuStatus_Active);
+                    UninstallStaticMenus();
+                    NotifyAssocChanged();
+                    break;
+
+                case ComStatusAction.DemoteToFallback:
+                    App.DebugLog($"CheckComStatus: status={status}, heartbeat={health} → fallback, restoring cascade");
+                    SetDynamicMenuStatus(DynamicMenuStatus_Fallback);
+                    InstallCascade(AppSettings.Load(), GetExePath());
+                    NotifyAssocChanged();
+                    break;
+
+                case ComStatusAction.EnsureCascade:
+                    // 只在级联缺失时才写（幂等）：稳态下每次右键启动不再重写 ~60 个注册表键
+                    if (!IsCascadeInstalled())
+                    {
+                        App.DebugLog($"CheckComStatus: status={status}, heartbeat={health}, cascade missing → installing fallback menu");
+                        InstallCascade(AppSettings.Load(), GetExePath());
+                        NotifyAssocChanged();
+                    }
+                    break;
+
+                default:
+                    App.DebugLog($"CheckComStatus: status={status}, heartbeat={health}, nothing to do");
+                    break;
+            }
+        });
+    }
+
+    /// <summary>心跳健康度（<see cref="ReadHeartbeatHealth"/> 的返回值）。</summary>
+    internal enum ComHeartbeatHealth
+    {
+        /// <summary>≤ <see cref="FreshHeartbeatWindow"/> 且 PID 指向当前存活的 Explorer —— COM 刚刚确实画出了菜单。</summary>
+        Fresh,
+        /// <summary>≤ <see cref="RecentHeartbeatWindow"/> —— 曾经能用，暂不降级。</summary>
+        Recent,
+        /// <summary>早于 <see cref="RecentHeartbeatWindow"/> —— 可能已失效。</summary>
+        Stale,
+        /// <summary>从未写过 —— 升级前的老安装，或 COM 一次都没成功。</summary>
+        Never,
+    }
+
+    /// <summary>状态机的下一步动作。</summary>
+    internal enum ComStatusAction { None, PromoteToActive, DemoteToFallback, EnsureCascade }
+
+    /// <summary>「心跳新鲜」窗口：够覆盖「右键 → 点击菜单项 → 新进程启动」这一串，又不至于把隔夜的心跳当刚发生。</summary>
+    internal static readonly TimeSpan FreshHeartbeatWindow = TimeSpan.FromMinutes(30);
+
+    /// <summary>「心跳仍可信」窗口：这段时间内画出来过就暂不降级（避免长期不右键的用户被误判）。</summary>
+    internal static readonly TimeSpan RecentHeartbeatWindow = TimeSpan.FromDays(7);
+
+    /// <summary>试用期：<c>pending</c> 起 2 天内一次心跳都没收到 → 认定 COM 不可用，永久回退级联。</summary>
+    internal static readonly TimeSpan ComProbeWindow = TimeSpan.FromDays(2);
+
+    /// <summary>
+    /// 纯决策（不碰注册表，可单测）：当前状态 + 心跳健康度 + 试用期是否过期 → 下一步动作。
+    /// </summary>
+    internal static ComStatusAction DecideComAction(string status, ComHeartbeatHealth health, bool probeExpired)
+        => status switch
+        {
+            DynamicMenuStatus_Pending when health == ComHeartbeatHealth.Fresh => ComStatusAction.PromoteToActive,
+            DynamicMenuStatus_Pending when probeExpired => ComStatusAction.DemoteToFallback,
+            DynamicMenuStatus_Pending => ComStatusAction.EnsureCascade,
+            DynamicMenuStatus_Active when health is ComHeartbeatHealth.Stale or ComHeartbeatHealth.Never
+                => ComStatusAction.DemoteToFallback,
+            DynamicMenuStatus_Active => ComStatusAction.None,
+            DynamicMenuStatus_Fallback => ComStatusAction.EnsureCascade,
+            _ => ComStatusAction.None,
+        };
+
+    /// <summary>读取 handler 上报的心跳并折算成健康度。任何异常都按 <see cref="ComHeartbeatHealth.Never"/> 处理（宁可回退级联）。</summary>
+    internal static ComHeartbeatHealth ReadHeartbeatHealth()
+    {
         try
         {
-            foreach (var proc in Process.GetProcessesByName("explorer"))
-            {
-                explorerCount++;
-                try
-                {
-                    foreach (ProcessModule module in proc.Modules)
-                    {
-                        if (module.FileName.IndexOf("MantisZip.ShellExt.comhost.dll",
-                                StringComparison.OrdinalIgnoreCase) >= 0)
-                        {
-                            App.DebugLog($"CheckComStatus: found comhost.dll loaded in Explorer PID={proc.Id}, promoting to active");
-                            found = true;
-                            break;
-                        }
-                    }
-                }
-                catch (Exception ex)
-                {
-                    // Explorer 进程可能已退出，或某些模块无法访问
-                    App.DebugLog($"CheckComStatus: failed to enumerate modules for PID={proc.Id}: {ex.Message}");
-                }
-                if (found) break;
-            }
+            using var key = RegistryHost.Open(ContextMenuRegPath);
+            if (key?.GetValue(LastRenderUtcValue) is not string raw
+                || !DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var renderedUtc))
+                return ComHeartbeatHealth.Never;
+
+            var age = DateTime.UtcNow - renderedUtc.ToUniversalTime();
+            if (age < TimeSpan.Zero) age = TimeSpan.Zero; // 时钟回拨 → 当作刚刚发生
+
+            int pid = key.GetValue(LastRenderPidValue) is int p ? p : 0;
+            if (age <= FreshHeartbeatWindow && pid > 0 && IsProcessAlive(pid, "explorer"))
+                return ComHeartbeatHealth.Fresh;
+
+            return age <= RecentHeartbeatWindow ? ComHeartbeatHealth.Recent : ComHeartbeatHealth.Stale;
         }
         catch (Exception ex)
         {
-            App.DebugLog($"CheckComStatus: failed to enumerate Explorer processes: {ex.Message}");
+            App.DebugLog($"ReadHeartbeatHealth: failed: {ex.Message}");
+            return ComHeartbeatHealth.Never;
         }
+    }
 
-        if (found)
+    /// <summary>试用期是否已过。老安装没有 <see cref="ComProbeStartUtcValue"/> → 视为已过期（宁可回退级联）。</summary>
+    private static bool IsProbeExpired()
+    {
+        try
         {
-            SetDynamicMenuStatus(DynamicMenuStatus_Active);
-            App.DebugLog("CheckComStatus: status changed to active, removing static cascade menus");
-            UninstallStaticMenus();
-            NotifyAssocChanged();
+            using var key = RegistryHost.Open(ContextMenuRegPath);
+            if (key?.GetValue(ComProbeStartUtcValue) is not string raw
+                || !DateTime.TryParse(raw, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var startUtc))
+                return true;
+
+            return DateTime.UtcNow - startUtc.ToUniversalTime() > ComProbeWindow;
         }
-        else
+        catch
         {
-            // COM 尚未被 Explorer 加载 → 安装级联菜单作为兜底，确保右键菜单可用
-            App.DebugLog($"CheckComStatus: comhost.dll not found in {explorerCount} Explorer process(es), installing cascade as fallback");
-            var s = AppSettings.Load();
-            InstallCascade(s, GetExePath());
-            NotifyAssocChanged();
+            return true;
+        }
+    }
+
+    /// <summary>级联入口与子命令根是否都在位（两处缺一即视为未安装）。</summary>
+    private static bool IsCascadeInstalled()
+    {
+        try
+        {
+            using var entry = RegistryHost.Open($@"Software\Classes\*\shell\{CascadeRoot}");
+            if (entry == null) return false;
+            using var sub = RegistryHost.Open($@"Software\Classes\{CascadeRoot}\File\shell");
+            return sub != null;
+        }
+        catch
+        {
+            return false;
+        }
+    }
+
+    /// <summary>指定 PID 是否仍是同名进程（用于确认心跳来自当前这一代 Explorer）。</summary>
+    private static bool IsProcessAlive(int pid, string expectedName)
+    {
+        try
+        {
+            using var proc = Process.GetProcessById(pid);
+            return !proc.HasExited
+                && string.Equals(proc.ProcessName, expectedName, StringComparison.OrdinalIgnoreCase);
+        }
+        catch
+        {
+            return false;
         }
     }
 

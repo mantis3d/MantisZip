@@ -41,6 +41,7 @@
 | **KI-015** | `ShowExtractFolderAsync` 已无调用方（连同 `ExtractPickResult` 一起成了死 API） | 技术债 / 死代码 | 缺决策 | 下次动 `CustomFilePickerDialog` 静态入口或解压选目录链路时 | 阻塞中 |
 | **KI-016** | 解压时输错密码被判成「文件损坏」，不弹密码框重试（`data error` 被当作损坏信号） | 交互 / 错误分类 | 缺决策 | 用户反馈「密码输错只提示损坏」时；或决定「解压失败统一走 `QuickVerifyPasswordEx` 二次判定」时 | 阻塞中 |
 | **KI-017** | 分卷包（`.001`/`.z01`/`.r00`/`.part1.rar`）与 SFX 的**格式身份**被扩展名直判成 Zip，预览 / 双击打开 / 缩略图全报 `Failed to locate the Zip Header` | 功能缺陷 | — | 已修复（`ResolveReaderFormat` 单一入口，2026-11-05） | 已修复（2026-11-05） |
+| **KI-018** | 动态右键菜单（实验）在 `active` 状态下若 handler 静默失效，自愈要等下一次 MantisZip 启动 | 交互 / 自愈延迟 | 成本超阈值 | 有用户报告「开了动态菜单后又消失、长期不自愈」时；或引入常驻探针（计划任务 / 开机自检）时 | 阻塞中 |
 
 ---
 
@@ -213,6 +214,15 @@
 - **影响面**：输错一次密码后只能自己发现、重新走一遍解压流程；不丢数据、不影响正确密码。
 - **复评条件**：① 用户反馈「密码输错后只提示损坏、没有重输机会」时；② 或决定「解压失败是否统一走 `QuickVerifyPasswordEx` 二次判定」时。
 - **关联**：`.omo/plans/已完成/sevenzip-solid-extract-batch.md` §5.10 的「遗留」段；`docs/progress-avalonia-detail.md` 2026-11-05「加密 solid 7z 改走批量」条目。
+
+## KI-018 动态右键菜单（实验）在 `active` 状态下若 handler 静默失效，自愈要等下一次 MantisZip 启动
+
+- **发现**：2026-11-11（修 issue #80 时设计「`active` 可回退」留下的已知边界）
+- **现象**：修好之后 `active` 只会在「handler 真的画出过菜单」之后进入，且每次应用启动都会复查心跳、`Stale`/`Never` 就回退 `fallback` 并装回静态级联。但复查入口只有「MantisZip 进程启动」（右键点菜单项、双击压缩包、开主程序、CLI 任一路径）—— 如果 COM handler 在某次升级后彻底激活失败，菜单**根本不会出现**，用户也就不会拉起任何 MantisZip 进程，于是没有进程去执行回退，用户需要自己打开一次主程序（或双击任意压缩包）才自愈。
+- **证据**：`src/MantisZip.UI.Avalonia/Services/ShellIntegration.Menu.cs` 的 `CheckComStatus` 唯一调用方是 `App.axaml.cs:218`（启动期）；`src/MantisZip.ShellExt/ContextMenuHandler.cs` 的 `WriteRenderHeartbeat` 只在 `itemsAdded > 0` 分支执行 ⇒ handler 失效时既没有心跳、也没有进程启动。
+- **为什么现在不修**：**成本超阈值**。要真正「无启动自愈」只能上常驻手段（计划任务 / 开机自检 / Explorer 侧独立探针进程），对一个**默认关闭**的实验特性属于过度设计；当前设计的风险面已被「出厂默认静态级联」压到最低（只有主动打开实验开关的用户才可能遇到）。
+- **复评条件**：① 有用户报告「打开动态菜单后又消失、且打开主程序也没恢复」；② 或决定给动态菜单上常驻探针（计划任务 / 开机自检）时。
+- **关联**：`.omo/plans/进行中/shell-menu-disappear.md` 的「边界」段；`docs/PROGRESS.md` 2026-11-11 条目。
 
 ## 档案区（已修 / 不会修）
 

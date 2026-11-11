@@ -152,7 +152,12 @@ public class AppSettings
     public bool EnableCompressSeparate { get; set; } = true;
     public bool EnableCompressCombined { get; set; } = true;
     public bool ShowMenuIcons { get; set; } = true;
-    public bool EnableDynamicMenu { get; set; } = true;
+    /// <summary>
+    /// 是否启用 COM 动态菜单（实验）。
+    /// 默认 <c>false</c>：走静态级联菜单，不依赖 Explorer 加载 .NET COM 组件（issue #80）。
+    /// 打开后进入「试用期」：级联兜底同时保留，直到 COM handler 上报心跳证明它真的画出了菜单。
+    /// </summary>
+    public bool EnableDynamicMenu { get; set; } = false;
 
     // ===== 高级 =====
     public string SevenZipPath { get; set; } = "";

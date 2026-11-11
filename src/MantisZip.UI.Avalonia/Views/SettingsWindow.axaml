@@ -1457,8 +1457,10 @@
               <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding ContextMenuGroupDisplay}"
                            FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
+                <!-- 动态菜单为实验特性（issue #80）：默认走静态级联，悬停提示说明失败会自动回退 -->
                 <CheckBox Content="{Binding ContextMenuEnableDynamicMenu}"
-                          IsChecked="{Binding EnableDynamicMenu}" />
+                          IsChecked="{Binding EnableDynamicMenu}"
+                          ToolTip.Tip="{Binding ContextMenuEnableDynamicMenuHint}" />
                 <CheckBox Content="{Binding ContextMenuShowMenuIcons}"
                           IsChecked="{Binding ShowMenuIcons}" />
               </StackPanel>

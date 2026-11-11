@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-11** — 右键菜单「用一次就消失」修复（issue #80，计划 `shell-menu-disappear`）
+  - **现象与证据**：报告者启用动态菜单后右键压缩一次，菜单从此永久消失。回填 `DynamicMenuStatus=active`、`HKCU\Software\Classes\*\shell\MantisZip` 不存在（静态级联被删）、`...\shellex\ContextMenuHandlers\MantisZip` 仍在（COM 注册还在）；`lifecycle.log` 显示右键拉起 5 个实例并发跑启动逻辑（196–1206ms），`Init.ShellFirstRun` 翻转后降到 3–4.6ms。
+  - **根因 1（假健康信号）**：旧 `ShellIntegration.CheckComStatus` 用 `Process.Modules` 枚举 Explorer 里有没有 `MantisZip.ShellExt.comhost.dll` 当「COM 可用」判据。Explorer 的加载顺序是 `LoadLibrary(comhost.dll)` → `DllGetClassObject`，**激活失败时 DLL 仍留在模块列表**，于是「注册成功但激活失败」被误判成可用 → 状态推进 `active` → `UninstallStaticMenus()` 把静态级联删掉，而 COM 又画不出菜单，两头空。
+  - **根因 2（`active` 是终态）**：旧实现 `if (status != DynamicMenuStatus_Pending) return;`，进入 `active` 后永不复查；`DynamicMenuStatus_Fallback` 常量虽然定义了却从未被赋值，等于没有回退路径。用户升级/换版本后 comhost 与 DLL 版本不匹配也不会被发现。
+  - **A 换判据（handler 自报心跳）**：`ContextMenuHandler.QueryContextMenu` 在**真正插入菜单项之后**（`itemsAdded > 0`）调新增的 `WriteRenderHeartbeat()`，向 `HKCU\Software\MantisZip\ContextMenu` 写 `LastRenderUtc`（ISO8601 UTC）+ `LastRenderExplorerPid`（handler 跑在 explorer.exe 内，`Environment.ProcessId` 即 Explorer PID）；写失败静默（不影响菜单显示）。
+  - **B 状态机重写**：`ReadHeartbeatHealth()` 折算四档 —— `Fresh`（≤30 分钟且 PID 指向存活 Explorer）/ `Recent`（≤7 天）/ `Stale` / `Never`（无键、坏时间戳、异常一律算 Never，宁可回退级联）；`DecideComAction(status, health, probeExpired)` 是**纯函数决策表**：`pending`+Fresh→`PromoteToActive`（撤级联）、`pending`+试用期（`ComProbeStartUtc` 起 2 天）过期→`DemoteToFallback`、`pending`+其余→`EnsureCascade`、`active`+`Stale|Never`→`DemoteToFallback`+装回级联、`active`+`Fresh|Recent`→`None`、`fallback`→`EnsureCascade`、`disabled`/`not_installed`/未知→`None`。`EnsureCascade` 先 `IsCascadeInstalled()`（入口 + 子命令根两处都在位）判断，稳态下每次右键启动不再重写 ~60 个注册表键。
+  - **C 出厂默认回静态级联**：`AppSettings.EnableDynamicMenu` 默认 `true`→**`false`**（注释说明理由）；设置页文案改「启用动态菜单（实验）」+ 新增三语 key `Settings_ContextMenu_EnableDynamicMenu_Hint` 作 ToolTip（失败自动回退、菜单不会消失）。`pending` 期间 COM 与级联**同时在位**（宁可短暂出现两个入口，也不让用户两头空），`ContextMenuHandler` 删掉「插一条禁用分隔线占位」的旧逻辑，只按 `pending`/`active` 出真菜单、其余状态返回 0。
+  - **D 拆掉借道卸载 + 并发互斥 + 幂等写**：`Install()` 不再调 `Uninstall()`（后者会 `proc.Kill()` explorer.exe 再重启，设置页点「应用」就闪桌面），改为内部 `CleanupRegistrations()`（只删级联 + COM + 状态键，不重启不发通知）；新增 `RemoveMenus()` 给设置页「卸载右键菜单」用；`Uninstall()` 仅保留给 `--uninstall-shell`（Inno `[UninstallRun]` 需要释放 comhost.dll 句柄才能删文件）。`Install` / `Uninstall` / `RemoveMenus` / `CheckComStatus` 全部包进 `RunExclusive()`（命名互斥 `Local\MantisZip.ShellReg`，15s 超时，`AbandonedMutexException` 视为拿到），解决多选右键 5 实例并发「A 装级联、B 删级联」的交叉覆盖；`SetRegistryValue` / `SetRegistryDword` 改为幂等（值相同不写）。
+  - **接线修正**：`SettingsWindowViewModel.InstallShell` / `ApplyShellChanges` 去掉 `Uninstall()` 调用（`Install()` 自带清理），`UninstallShell` 改调 `RemoveMenus()` —— 设置页任何操作都不再重启资源管理器。
+  - **测试**：新增 `tests/MantisZip.Tests/ShellMenuStatusMachineTests.cs` —— 决策表 17 组 `[InlineData]`、`DecideComAction_ActiveIsNotTerminal`（钉死「active 必须能降级」）、时间窗口序关系、`DefaultSettings_DynamicMenuIsOff`（默认值回归钉子）；`ShellMenuHeartbeatTests` 走 `RegistryHost` 沙箱（`MantisZip\MenuStatusSandbox`）覆盖无键 / 坏时间戳 / 死 PID→`Recent` / 过期→`Stale` / 活 Explorer PID→`Fresh`（无 Explorer 会话时跳过）。⚠ 沙箱态下写注册表必须传**生产路径**，`RegistryHost` 会自动重定向（首次写错路径导致 3 例读不到值）。
+  - **验证**：avalonia 构建 0 错误、`-Task test -Target tests` 1058 全绿（新增 20 例）、`-Task test -Target ui-tests` 全绿、`-Task check`（0.5.6 / 1449 key）、`-Task guards`（9 项）、`-Task i18n` 全绿。
+  - **未修（登记 KI-018）**：`active` 状态下若 handler 再次静默失效，自愈要等下一次 MantisZip 启动 —— 菜单不出现时没有任何进程被拉起，缺少「常驻探针」这类成本不划算的手段。
+
 **2026-11-08** — 压缩默认配置随出厂固化（默认等级 5 + 自适应压缩默认开启）
   - **默认值**：`DefaultLevel` 本来就是 `5`（用户真机也是 5），本次补断言钉住、不改代码；`AdaptiveCompression` 默认 `false`→**`true`**。配套默认规则集 `GetDefaultAdaptiveOverrides()`（图片/视频/音频/压缩包/字体/文档六类 → Store）已由 `CreateWithDefaults` / `ApplyMigrations` 填充，开启后即按规则跳过已压缩格式，不依赖用户先配规则。
   - **按用户意见不固化**：`Theme`（本机 `System`→`Dark` 非故意改动，不改出厂默认）、`ParallelExtractDegree`（保持 `Environment.ProcessorCount` 自适应，本机 20 核、临时值 16 不写死）。

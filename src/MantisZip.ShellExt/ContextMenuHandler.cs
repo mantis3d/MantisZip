@@ -1,5 +1,6 @@
 using System.ComponentModel;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Reflection;
 using System.Runtime.InteropServices;
@@ -395,34 +396,15 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
     {
         ShellExtLog.Info($"IContextMenu.QueryContextMenu #{_instanceId} entered, idCmdFirst={idCmdFirst}, idCmdLast={idCmdLast}, uFlags=0x{uFlags:x8}, _selectedFiles.Count={_selectedFiles.Count}");
 
-        // If the menu is in "pending" state (COM shellex registered but not yet
-        // confirmed active), show a thin disabled separator instead of full menus.
-        // This prevents dual menus while Explorer loads the COM component.
-        // The cascade (static) menus installed as fallback handle actual operations.
+        // 状态机（issue #80）：只有 pending / active 才出真菜单。
+        // pending = 试用期：此时级联兜底也在位，会短暂出现两个「MantisZip」入口——这是有意的取舍，
+        // 宁可重一次也不让用户两头空。COM 只有在**真的把菜单画出来**之后才写心跳，
+        // UI 侧（ShellIntegration.CheckComStatus）据此转 active 并撤掉级联。
+        // 原先 pending 只插一条禁用分隔线，既没有真菜单、也无法证明自己可用，是 issue #80 的成因之一。
         string dynStatus = GetDynamicMenuStatus();
-        if (dynStatus == "pending")
+        if (dynStatus != "pending" && dynStatus != "active")
         {
-            ShellExtLog.Info("QueryContextMenu: status=pending, inserting separator as placeholder");
-            var sepMii = new MenuItemInfo
-            {
-                cbSize = Marshal.SizeOf<MenuItemInfo>(),
-                fMask = NativeMethods.MIIM_STRING | NativeMethods.MIIM_FTYPE | NativeMethods.MIIM_STATE,
-                fType = NativeMethods.MFT_STRING,
-                fState = NativeMethods.MFS_DISABLED | NativeMethods.MFS_GRAYED,
-                dwTypeData = Marshal.StringToCoTaskMemUni("────────"),
-                cch = 8,
-            };
-            bool sepOk = NativeMethods.InsertMenuItem(hMenu, indexMenu, true, ref sepMii);
-            Marshal.FreeCoTaskMem(sepMii.dwTypeData);
-            ShellExtLog.Info($"QueryContextMenu: separator placeholder inserted={sepOk}");
-            return sepOk ? 1 : 0;
-        }
-
-        // Guard: if status is neither "pending" nor "active" (e.g. "disabled"),
-        // don't add any items either — the COM component shouldn't show.
-        if (dynStatus != "active")
-        {
-            ShellExtLog.Info($"QueryContextMenu: status=\"{dynStatus}\", not active — returning 0");
+            ShellExtLog.Info($"QueryContextMenu: status=\"{dynStatus}\", not pending/active — returning 0");
             return 0;
         }
 
@@ -608,6 +590,7 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
                 NativeMethods.InsertMenuItem(hMenu, indexMenu, true, ref miiRoot);
                 Marshal.FreeCoTaskMem(miiRoot.dwTypeData);
                 ShellExtLog.Info($"QueryContextMenu: inserted popup submenu as \"MantisZip\" with {itemsAdded} items, hasIcon={hbmpMantisZip != IntPtr.Zero && _showIcons}");
+                WriteRenderHeartbeat();   // 只有真的画出来了才上报（issue #80 的唯一可信健康信号）
             }
             else
             {
@@ -1259,6 +1242,29 @@ public class ContextMenuHandler : IShellExtInit, IContextMenu
         {
             ShellExtLog.Warn($"GetDynamicMenuStatus: registry read failed — {ex.Message}");
             return "unknown";
+        }
+    }
+
+    /// <summary>
+    /// 上报「我确实把菜单画出来了」的心跳（issue #80）。
+    /// UI 侧 <c>ShellIntegration.CheckComStatus</c> 只认这个信号来判断 COM 动态菜单是否可用 ——
+    /// Explorer 会先 LoadLibrary(comhost.dll) 再问 DllGetClassObject，激活失败时 DLL 也留在模块列表里，
+    /// 所以「模块被加载」不能当判据。只有真的插入过菜单项，才写心跳。
+    /// 写失败不影响菜单显示，静默忽略。
+    /// </summary>
+    private void WriteRenderHeartbeat()
+    {
+        try
+        {
+            using var key = Microsoft.Win32.Registry.CurrentUser.CreateSubKey(
+                @"Software\MantisZip\ContextMenu", writable: true);
+            if (key is null) return;
+            key.SetValue("LastRenderUtc", DateTime.UtcNow.ToString("O", CultureInfo.InvariantCulture));
+            key.SetValue("LastRenderExplorerPid", Environment.ProcessId, Microsoft.Win32.RegistryValueKind.DWord);
+        }
+        catch (Exception ex)
+        {
+            ShellExtLog.Warn($"WriteRenderHeartbeat: registry write failed — {ex.Message}");
         }
     }
 

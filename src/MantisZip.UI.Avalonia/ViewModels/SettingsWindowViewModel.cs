@@ -1061,6 +1061,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ContextMenuEnableExtractTo => LocalizationManager.T("Settings_ContextMenu_EnableExtractTo");
     public string ContextMenuShowMenuIcons => LocalizationManager.T("Settings_ContextMenu_ShowMenuIcons");
     public string ContextMenuEnableDynamicMenu => LocalizationManager.T("Settings_ContextMenu_EnableDynamicMenu");
+    public string ContextMenuEnableDynamicMenuHint => LocalizationManager.T("Settings_ContextMenu_EnableDynamicMenu_Hint");
     public string ContextMenuInstall => LocalizationManager.T("Settings_ContextMenu_Install");
     public string ContextMenuUninstall => LocalizationManager.T("Settings_ContextMenu_Uninstall");
     public string ContextMenuStatusGroup => LocalizationManager.T("Settings_ContextMenu_StatusGroup");
@@ -1808,6 +1809,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ContextMenuEnableExtractTo));
         OnPropertyChanged(nameof(ContextMenuShowMenuIcons));
         OnPropertyChanged(nameof(ContextMenuEnableDynamicMenu));
+        OnPropertyChanged(nameof(ContextMenuEnableDynamicMenuHint));
         OnPropertyChanged(nameof(ContextMenuInstall));
         OnPropertyChanged(nameof(ContextMenuUninstall));
         OnPropertyChanged(nameof(ContextMenuStatusGroup));
@@ -2218,8 +2220,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
             Save();
-            ShellIntegration.Uninstall();
-            ShellIntegration.Install();
+            ShellIntegration.Install();          // Install 内部先做纯注册表清理，不重启资源管理器
             ShellIntegration.CheckComStatus();
             RefreshShellStatus();
             await AppMessageBox.Show(
@@ -2247,7 +2248,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         try
         {
             ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
-            ShellIntegration.Uninstall();
+            ShellIntegration.RemoveMenus();       // 设置页卸载：不重启资源管理器
             RefreshShellStatus();
             await AppMessageBox.Show(
                 LocalizationManager.T("Settings_ContextMenu_UpdatedMsg"),
@@ -2275,8 +2276,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
             Save();
-            ShellIntegration.Uninstall();
-            ShellIntegration.Install();
+            ShellIntegration.Install();          // Install 内部先做纯注册表清理，不重启资源管理器
             ShellIntegration.CheckComStatus();
             RefreshShellStatus();
         }
