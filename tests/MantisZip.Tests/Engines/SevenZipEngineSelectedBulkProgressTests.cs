@@ -146,6 +146,10 @@ public sealed class SevenZipEngineSelectedBulkProgressTests : IDisposable
 
         Assert.NotEmpty(reports);
 
+        // 固实批量解压在「冲突预解析」阶段就把落点定死，之后改下拉无效 ⇒ 必须上报「已锁定」，
+        // 进度窗口据此置灰那个下拉（否则会留下改了没反应的死开关）
+        Assert.Contains(reports, r => r.ConflictPolicyLocked == true);
+
         // 只看「进度样本」：带 EntryStatus/EntryKey 的条上报是逐条目事件通知（重名、失败原因等），
         // 它们不携带主进度，混进来会把条形图误判成回退。
         var samples = reports.Where(r => !r.EntryStatus.HasValue).ToList();

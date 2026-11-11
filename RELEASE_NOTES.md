@@ -1,3 +1,31 @@
+## v0.5.7
+
+### 文件说明 / File Description
+
+MantisZip-0.5.7-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.7-Setup-Offline.exe 是离线安装包。MantisZip-0.5.7-Portable.zip 是便携版，解压即用。MantisZip-0.5.7-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.7-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.7-Portable.zip is the portable version, extract and run. MantisZip-0.5.7-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **进度窗口的「冲突时:」下拉，运行中改了就生效** — 解压 / 压缩跑起来之后，进度窗口信息区首行右侧出现「冲突时:」下拉，与「精简 / 标准 / 完整」密度选择同排：解压 6 档（每次询问 / 覆盖 / 覆盖较旧 / 覆盖较小 / 重命名 / 跳过）、压缩 5 档（每次询问 / 覆盖 / 添加 / 重命名 / 跳过）。改动只影响**之后**遇到的冲突，已经落地的条目保持原结果，因此不必取消重来；冲突弹窗里勾「应用到全部」会反向刷新这个下拉，两边始终是同一个策略、不会各说各话。7z 固实包是个例外：它的落点必须在开始解压前一次性定案，所以进入解码阶段后下拉会变灰、提示换成「本次解压的冲突处理已在开始时一次性确定」；规划阶段（短暂显示「正在检查冲突…」时）仍然可以改，不会留一个改了没反应的开关。
+- **A conflict policy you can change mid-run** — once an extract or compress is running, the progress window's info row shows an "On conflict:" dropdown next to the density choices: six options for extraction (ask every time / overwrite / overwrite if older / overwrite if smaller / rename / skip) and five for compression (ask / overwrite / add / rename / skip). A change only affects the conflicts that come after it — entries already written keep their outcome — so there is no need to cancel and restart, and ticking "apply to all" in the conflict dialog writes the choice back into the dropdown so the two always agree. Solid 7z archives are the exception: their per-entry plan is fixed before decoding starts, so the dropdown greys out at that point and its tooltip says the policy was decided up front (it stays editable during the brief "checking for conflicts" phase, which keeps it from being a switch that does nothing).
+- ![进度窗口信息区首行右侧的「冲突时:」下拉：解压 6 档，规划阶段仍可改，固实包开始解码后自动置灰](docs/images/version/v0.5.7/ProgressConflictPolicy.png)
+
+**修复 / Fixes**
+
+- **「解压到此处」「解压到同一文件夹」「智能解压」不再无视冲突设置** — 这三条原地解压的路径此前调用引擎时**不传任何选项**，引擎对「没有设置」一律按覆盖处理：用户明明在设置里选了「每次询问」或「跳过」，点这三个入口仍然静默覆盖磁盘上的同名文件（登记为 KI-012，属于数据丢失级）。现在三条路径都带上默认策略与询问弹窗，进度窗口里同样出现「冲突时:」下拉，行为与其他解压入口完全一致：选「询问」就逐个弹、选「跳过」就一个都不动。
+- **"Extract here", "extract to folder" and smart extract no longer ignore your conflict settings** — those three in-place paths called the engine **without any options**, and the engine treats "no settings" as overwrite: even with "ask every time" or "skip" configured, these entry points silently replaced files of the same name on disk (tracked as KI-012, a data-loss class issue). All three now pass the default policy and the ask dialog, and their progress window shows the same "On conflict:" dropdown, so they behave exactly like every other extraction entry point: "ask" prompts per conflict, "skip" leaves every existing file untouched.
+- **右键菜单用一次就消失（issue #80）** — 启用「动态菜单」后右键压缩或解压一次，MantisZip 菜单项会永久消失。现在菜单组件自己上报「菜单确实画出来了」的心跳，一旦失效就自动回退到静态菜单，不会再出现「既没有动态菜单、也没有兜底」的两头空。
+- **The context menu no longer disappears after one use (issue #80)** — with the dynamic menu enabled, using MantisZip once from the right-click menu made the entry vanish for good. The menu component now reports its own "menu was drawn" heartbeat and falls back to the static menu when it stops, so the two can no longer cancel each other out.
+
+**变更 / Changes**
+
+- **动态右键菜单改为实验开关，默认关闭** — 默认使用静态级联菜单，不依赖资源管理器加载 .NET 组件。想用带文件名标签的动态菜单可在「设置 → 右键菜单」打开，失败会自动回退；同一页的「安装 / 应用」也不再重启资源管理器。
+- **The dynamic context menu is now an experimental opt-in, off by default** — the default is the static cascade menu, which doesn't rely on Explorer loading a .NET component. The dynamic menu with file-name labels can be enabled in Settings → Context menu and falls back automatically if it fails; "Install / Apply" on that page no longer restarts Explorer either.
+
 ## v0.5.6
 
 ### 文件说明 / File Description
@@ -58,6 +86,11 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Password-protected 7z extraction is now many times faster** — a password-protected 7z (including `.001` split sets) used to be unpacked one file at a time, re-decoding the whole solid block for every file, so 48 MB across 309 files took minutes; the archive is now decoded in one pass, about 3 seconds for the same set — on par with Bandizip. Extracting only selected files benefits as well.
 
+**性能 / Performance**
+
+- **7z 两段式解压的进度不再先走满** — 固实包会把整块条目一次性解码到暂存、再从暂存逐条搬到最终位置；进度条现在分成两段：解码期间只走到一半，新增的「暂存」统计卡显示已解码、还没落地的条目数与大小，搬运时该卡递减、「已处理」递增，不会再出现进度条先满、状态卡片长时间不动。进度推进也从「按条目数均分」改成按文件大小加权（小文件不再嗖嗖涨、大文件不会解到 99% 还只挪一格），落地阶段仍按条目数推进（同盘改名只与条目数有关）。只影响未加密 7z 的批量解压，ZIP / RAR / 单条目解压不变
+- **Two-step 7z extraction no longer shows a bar that jumps to 100 %** — a solid archive decodes all its entries into staging in one go and then moves them into place one by one; the bar now fills only to the halfway point while decoding, a new "staged" stat card reports how many entries are decoded but not yet moved (and counts down as they land) while "processed" grows on every move, so the bar no longer hits 100 % while the cards sit still. Progress also advances in proportion to file size instead of merely counting entries — small files no longer race ahead while a big one barely moves — with the staging-to-destination step still advancing per entry (a same-volume rename costs one operation per entry). Only affects bulk extraction from unencrypted 7z archives; ZIP, RAR and single-entry extraction are unchanged
+
 ## v0.5.5
 
 ### 文件说明 / File Description
@@ -95,9 +128,9 @@ MantisZip-0.5.5-Setup-WebSetup.exe requires internet during installation. Mantis
 
 **性能 / Performance**
 
-- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）整包解压从 19 秒降到 1.7 秒，只解其中选中的条目也有 4 倍以上的提升（10 秒 → 2.3 秒）。只对未加密的 7z 生效：ZIP/RAR 与单文件解压不受影响，条目很多的包会先短暂显示「正在检查冲突…」再开始解压。这种两段式解压的进度现在也分两段显示：解码到暂存期间进度条走到一半为止，新增的「暂存」统计卡显示已解码、还没落到最终位置的条目数与大小；随后逐条落地时该卡递减、「已处理」递增，不会再有进度条先走满、状态卡片长时间不动的观感；进度推进按文件大小加权（小文件不再嗖嗖涨、大文件也不会解到 99% 还只挪一格），落地阶段按条目数推进
+- **7z 大包里的小文件解压快了一个数量级** — 同一批 800 个 64KB 文件（共 52MB）整包解压从 19 秒降到 1.7 秒，只解其中选中的条目也有 4 倍以上的提升（10 秒 → 2.3 秒）。只对未加密的 7z 生效：ZIP/RAR 与单文件解压不受影响，条目很多的包会先短暂显示「正在检查冲突…」再开始解压
 
-- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts. Progress for this two-step extraction is now shown in two halves as well: the bar fills only to the halfway point while entries are decoded into staging, a new "staged" stat card reports how many of them are decoded but not yet moved into place (and counts down as they land), and the "processed" card only starts growing once files actually reach their destination — no more bar that hits 100 % while nothing has been written yet. Progress now advances in proportion to file size — small files no longer race ahead while a big one barely moves — with the staging-to-destination step advancing per entry.
+- **Extracting many small files from a 7z archive is now about ten times faster** — the same 800 files of 64 KB (52 MB in total) finish in 1.7 s instead of 19 s for whole-archive extraction, and extracting only the selected entries is over four times faster as well (10 s → 2.3 s). This applies to unencrypted 7z only: ZIP/RAR and single-entry extraction are unchanged, and archives with many entries briefly show "Checking for conflicts…" before extraction starts.
 
 **修复 / Fixes**
 

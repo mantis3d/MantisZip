@@ -120,9 +120,19 @@ public static class CompressFlow
     /// 默认冲突策略（来自设置/压缩对话框，仅本次压缩生效）："overwrite" / "add" / "rename" / "skip"。
     /// 非 "ask" 时直接映射不再弹窗；"add" 在格式不支持追加（!info.CanAdd）时回退弹窗。
     /// </param>
+    /// <param name="livePolicy">
+    /// 实时策略源（进度窗口「冲突时:」下拉，运行中可改）；非 null 时优先于 <paramref name="defaultAction"/>。
+    /// 返回 "ask" 时照常弹窗。
+    /// </param>
+    /// <param name="syncPolicy">
+    /// 冲突弹窗勾了「应用到全部」后的回写端口：把实际生效的策略码同步回下拉，
+    /// 让「当前策略」始终可见可改（单一事实源 = 下拉）。
+    /// </param>
     public static CompressConflictResolver CreateResolver(
         Func<CompressConflictInfo, Task<(MantisZip.Core.Abstractions.CompressConflictAction Action, string? CustomName, bool ApplyToAll)>> showDialog,
-        string? defaultAction = null)
+        string? defaultAction = null,
+        Func<string?>? livePolicy = null,
+        Action<string>? syncPolicy = null)
     {
         bool applyToAll = false;
         MantisZip.Core.Abstractions.CompressConflictAction? chosenAction = null;
@@ -133,10 +143,13 @@ public static class CompressFlow
             if (applyToAll && chosenAction.HasValue)
                 return new CompressConflictResolution(chosenAction.Value, null);
 
+            // 实时策略源优先（进度窗口下拉可能刚被改过），回退到本次请求冻结的策略
+            var effectiveAction = livePolicy?.Invoke() ?? defaultAction;
+
             // 默认冲突策略非 ask → 直接映射免弹窗（映射不可用时回退弹窗）
-            if (!string.IsNullOrEmpty(defaultAction) && defaultAction != "ask")
+            if (!string.IsNullOrEmpty(effectiveAction) && effectiveAction != "ask")
             {
-                var mapped = MapDefaultConflictAction(defaultAction, info);
+                var mapped = MapDefaultConflictAction(effectiveAction, info);
                 if (mapped.HasValue)
                     return new CompressConflictResolution(mapped.Value, null);
             }
@@ -146,6 +159,11 @@ public static class CompressFlow
             {
                 applyToAll = true;
                 chosenAction = action;
+
+                // 勾「应用到全部」⇒ 把下拉同步成实际生效的动作（否则会出现
+                // 「下拉还显示询问、实际已经不问了」的矛盾）
+                if (syncPolicy is not null && ToPolicyCode(action) is { } policyCode)
+                    syncPolicy(policyCode);
             }
 
             return action switch
@@ -156,6 +174,16 @@ public static class CompressFlow
             };
         };
     }
+
+    /// <summary>Core 冲突动作 → 进度窗口下拉策略码（Cancel 在压缩侧等价于「跳过」）。</summary>
+    internal static string? ToPolicyCode(MantisZip.Core.Abstractions.CompressConflictAction action) => action switch
+    {
+        MantisZip.Core.Abstractions.CompressConflictAction.Overwrite => "overwrite",
+        MantisZip.Core.Abstractions.CompressConflictAction.Add => "add",
+        MantisZip.Core.Abstractions.CompressConflictAction.Rename => "rename",
+        MantisZip.Core.Abstractions.CompressConflictAction.Cancel => "skip",
+        _ => null,
+    };
 
     /// <summary>
     /// 将默认冲突策略字符串映射为 Core 冲突动作。

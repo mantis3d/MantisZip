@@ -208,6 +208,29 @@ public partial class ProgressWindow : Window
     /// <summary>「完成后删原包」开关当前值（同上）。</summary>
     public bool DeleteArchiveAfterExtractValue => _vm.DeleteArchiveAfterExtract;
 
+    /// <summary>
+    /// 声明「冲突时:」控件（能力位 + 选项集 + 初值）；须在 Show 前调用。
+    /// <para>
+    /// <b>不变量</b>：只有当同一处代码**已经把 <see cref="ConflictPolicy"/> / <see cref="ConflictPolicyCode"/>
+    /// 作为实时策略源传给执行层**时才可调用；没有冲突概念的流程（测试压缩包 / 删除条目 / 测试菜单）
+    /// 必须传 <see cref="ConflictPolicyFlow.None"/> 让整组隐藏，否则就是「点了没反应的死开关」。
+    /// </para>
+    /// </summary>
+    public void SetConflictPolicyControl(ConflictPolicyFlow flow, string? initialCode)
+        => _vm.SetConflictPolicyControl(flow, initialCode);
+
+    /// <summary>解压侧实时策略（引擎每个冲突读一次；窗口不存在时调用方回退 Ask）。</summary>
+    public FileConflictAction ConflictPolicy => _vm.ConflictPolicy;
+
+    /// <summary>压缩侧实时策略码（<c>ask</c>/<c>overwrite</c>/<c>add</c>/<c>rename</c>/<c>skip</c>）。</summary>
+    public string ConflictPolicyCode => _vm.ConflictPolicyCode;
+
+    /// <summary>
+    /// 冲突弹窗勾「应用到全部」时把下拉同步成该动作 —— 唯一写入口，
+    /// 让「当前策略」始终可见可改（不再藏在弹窗闭包里）。UI 线程调用。
+    /// </summary>
+    public void SyncConflictPolicyFromDialog(string code) => _vm.SyncConflictPolicyFromDialog(code);
+
     // ════════════════════════════════════════════
     //  Initialization & Cancellation
     // ════════════════════════════════════════════

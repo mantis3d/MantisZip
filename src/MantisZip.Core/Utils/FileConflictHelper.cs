@@ -21,7 +21,10 @@ public static class FileConflictHelper
         if (!File.Exists(outputPath))
             return outputPath;
 
-        var action = options?.ConflictAction ?? FileConflictAction.Overwrite;
+        // 动态来源优先（进度窗口可在运行中改写），无则回退静态策略
+        var action = options?.ConflictActionProvider?.Invoke()
+                     ?? options?.ConflictAction
+                     ?? FileConflictAction.Overwrite;
 
         // Ask → 调用外部回调
         if (action == FileConflictAction.Ask && options?.ConflictResolver != null)
@@ -69,7 +72,10 @@ public static class FileConflictHelper
         if (!File.Exists(outputPath))
             return outputPath;
 
-        var action = options?.ConflictAction ?? FileConflictAction.Overwrite;
+        // 动态来源优先（进度窗口可在运行中改写），无则回退静态策略
+        var action = options?.ConflictActionProvider?.Invoke()
+                     ?? options?.ConflictAction
+                     ?? FileConflictAction.Overwrite;
 
         // Ask → 优先异步回调，其次退回到同步回调
         if (action == FileConflictAction.Ask && options != null)

@@ -4,7 +4,7 @@
 
 **项目状态**: 🟢 开发中  
 **最后更新**: 2026-11-04  
-**当前版本**: 0.5.6
+**当前版本**: 0.5.7
 
 
 ---
@@ -87,7 +87,7 @@
 
 > **v0.5.6 验收口径（✅ 已达成）**：列表能在三种布局间循环并记住选择；打开 1000+ 条目的包时骨架区能看到数字在涨；ico 文件在列表里显示自己的图标而不是通用图标；复选框模式勾选 3 项后删除只弹一次确认、删完勾选态清空，且默认关闭时行为与今天完全一致；缩略图卡片的外边框 / 垫底色 / 尺寸三项在设置里改完即时生效；卡片视图也能勾选，Shift 连选与「视图 → 列表布局」子菜单可用；切换复选框模式时选区与勾选能互相转换，压缩/解压窗里的复选框选择手势与主列表一致。
 
-### 缺陷修复 —— 右键菜单用一次就消失（issue #80，约 6-10h，建议随 v0.5.7 一起发）
+### 缺陷修复 —— 右键菜单用一次就消失（issue #80，约 6-10h，随 v0.5.7 一起发）
 
 > 用户可感知的功能回归（启用后只能用一次），按判据第 3 条「削减失信 bug 优先于增加功能面」插到 v0.5.7 前面。**2026-11-11 已实施**（代码 + 单测 + 门禁全绿，待用户真机复测）。
 
@@ -95,14 +95,14 @@
 |---|---|:--:|:--:|---|
 | issue #80：右键菜单执行一次后永久消失 | [shell-menu-disappear.md](.omo/plans/进行中/shell-menu-disappear.md) | 🟡中 | 6-10h | 三态状态机（`pending`/`active`/`disabled`）里 `CheckComStatus` 只处理 `pending`，一旦 `active` 就永久早退、删掉的级联兜底再也不会回来；`fallback` 常量定义了却从未写入。同时修 `Install()` 借道 `Uninstall()` 会 `Kill()` explorer.exe、多实例并发重写级联（右键启动 200ms~1.2s）。根因已由用户注册表证据确认（`DynamicMenuStatus=active` + 级联被删 + COM 键仍在）。**已实施（2026-11-11）**：A（handler 自报心跳 `LastRenderUtc`/`LastRenderExplorerPid` 替掉「dll 被 Explorer 加载」这个错误健康信号，`DecideComAction` 纯函数决策表，`active` 可回退）+ B（`EnableDynamicMenu` 出厂默认 `false`，COM 降为实验开关）+ D（`CleanupRegistrations` 拆掉 Explorer 重启、命名互斥、幂等写） |
 
-### 阶段 v0.5.7 —— 数据安全：冲突策略与原地解压修复（约 17-23h）
+### 阶段 v0.5.7 —— 数据安全：冲突策略与原地解压修复（约 17-23h，🚧 进行中：冲突策略 + KI-012 已完成，剩 Office 预览切片 3）
 
 > **2026-11-04 重排**：原定「Office 预览切片 3 + 卡片元数据 + AXAML 编译绑定」整体后移。依据是判据第 3 条（削减「点了没反应」类失信 bug 优先于增加功能面）：KI-012 是**数据丢失级**——「解压到此处 / 同名目录 / 智能解压」三条路径完全不读冲突设置、恒静默覆盖；它的阻塞条件 `progress-window-conflict-policy` 已于 2026-11-01 定稿、无设计风险，没有理由继续挂在 B 档。卡片元数据（新计划）与编译绑定（只防未来错误）都不该抢在这个窗口前面。
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| 进度窗口「文件冲突自动处理」控件（TeraCopy 式） | [progress-window-conflict-policy.md](.omo/plans/未开始/progress-window-conflict-policy.md) | 🟡中 | 12-16h | 进度窗加「冲突时:」下拉（覆盖 / 跳过 / 重命名 / 询问），运行中切换立即生效；Core 只加一个 `ArchiveOptions.ConflictActionProvider` 动态源；实例级生效、不回写设置，保留 `ConflictDialog` 供「询问」使用；解压与压缩两侧都要接 |
-| KI-012：三条原地解压路径读冲突设置 | 同上（Phase 3 顺带修复） | 🟡中 | 含在上行 | `ViewModels/MainWindowViewModel.Extract.cs` 的「解压到此处 / 同名目录 / 智能解压」三处 `ExtractService.ExtractAsync(...)` 不传 `ArchiveOptions` ⇒ 恒静默覆盖；修完后三条路径与右键「解压选中项到」共用同一个 options 构造 |
+| ✅ 进度窗口「文件冲突自动处理」控件（TeraCopy 式） | [progress-window-conflict-policy.md](.omo/plans/已完成/progress-window-conflict-policy.md) | 🟡中 | 12-16h | 进度窗加「冲突时:」下拉（覆盖 / 跳过 / 重命名 / 询问），运行中切换立即生效；Core 只加一个 `ArchiveOptions.ConflictActionProvider` 动态源；实例级生效、不回写设置，保留 `ConflictDialog` 供「询问」使用；解压与压缩两侧都要接 |
+| ✅ KI-012：三条原地解压路径读冲突设置 | 同上（Phase 3 顺带修复，2026-11-04 已关闭） | 🟡中 | 含在上行 | `ViewModels/MainWindowViewModel.Extract.cs` 的「解压到此处 / 同名目录 / 智能解压」三处 `ExtractService.ExtractAsync(...)` 不传 `ArchiveOptions` ⇒ 恒静默覆盖；修完后三条路径与右键「解压选中项到」共用同一个 options 构造 |
 | 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/已完成/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。三者本来就在解析完整文档，省下的只是落盘 |
 
 > **v0.5.7 验收口径**：解压途中能从进度窗把「冲突时」切到覆盖 / 跳过 / 重命名且立刻生效；「解压到此处 / 同名目录 / 智能解压」遇到同名文件不再静默覆盖（默认仍问一次）；KI-012 关闭；Office 三族预览不再先落盘。
@@ -169,6 +169,8 @@
 | RAR 压缩（外置 rar.exe） | [rar-compression.md](.omo/plans/未开始/rar-compression.md) | 🟡中 | 8-10h | 通过已安装的 WinRAR 实现 RAR 压缩（含 SevenZipEngine 注册冲突处理）。公开用户会问，但依赖外部程序 |
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 元数据显示位置可选（侧边面板 / 正文区） | [metadata-display-location.md](.omo/plans/未开始/metadata-display-location.md) | 🟢低 | 6-8h | 📋 2026-10-31 用户讨论后定案、待启动。exe 预览正文区只有条目名标题、大片空白，信息全在右侧面板；按类型加「显示位置」，选正文区时「程序信息」搬到正文区竖排渲染、面板只留「文件信息」。**只对没有其它正文内容的格式开放**（当前仅 `pe`），默认侧边面板、老配置不动 |
+| 解压时同时解开内层压缩包（递归嵌套解压） | [nested-archive-extract.md](.omo/plans/未开始/nested-archive-extract.md) | 🟡中 | 16-22h | 📋 2026-11-05 用户逐项定稿、待排期。内层包解到同名子目录（原包保留）、递归可配深度默认 3（1-10）、只认 `.zip/.7z/.rar/.tar/.gz/.tgz/.tar.gz` 白名单（不做魔数，避开 Office/EPUB）、密码走外层→密码库→弹一次窗、冲突沿用本次策略（`ask` 也弹）、失败跳过并汇总、**5 处入口全覆盖**（对话框 / 三条原地解压 / 拖拽 / CLI）、深度 + 500 包 / 100GB 双硬上限。新增独立 `NestedExtractRunner` + Core 策略/扫描器，不改引擎契约
+| 唯一根目录处理（压缩去目录 / 套根 + 解压剥根） | [compress-extract-root-mode.md](.omo/plans/未开始/compress-extract-root-mode.md) | 🟡中 | 10-16h | 📋 2026-11-10 用户逐项定稿、待排期（GitHub issue #35）。压缩设置窗三态选项（原样 / 去目录本身[仅单目录源，否则置灰] / 套唯一根目录[Separate 模式置灰]，根名输入框默认包文件名）+ 解压设置窗「去掉压缩包顶层目录」开关（无唯一根置灰，判定复用智能解压，策略挂 `ExtractPathResolver` 保证预览与实解一致）。默认值与其它压缩/解压设置一样：窗内载入默认不回写、设置窗口改默认；首版只做 GUI（CLI 后补，见计划「范围外」）
 
 
 ---

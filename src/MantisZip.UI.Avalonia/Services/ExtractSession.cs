@@ -156,6 +156,11 @@ public sealed class ExtractSession : IExtractSession
                             deleteArchive: true,
                             openFolderSeed: settings.OpenFolderAfterExtract,
                             deleteArchiveSeed: settings.DeleteArchiveAfterExtract);
+
+                        // 「冲突时:」能力位 + 初值（初值取本次设置；运行中改写不影响设置）。
+                        // 与下方 Operation 里传给执行层的 liveConflictPolicy 同源 —— 只有接了实时策略才显示，
+                        // 杜绝「下拉改了但引擎不读」的死开关。
+                        window.SetConflictPolicyControl(ConflictPolicyFlow.Extract, settings.ConflictAction);
                     },
                     Operation = async (progress, runToken) =>
                     {
@@ -163,15 +168,31 @@ public sealed class ExtractSession : IExtractSession
                         using var linked = CancellationTokenSource.CreateLinkedTokenSource(runToken, cancellationToken);
                         var ct = linked.Token;
 
+                        // 实时冲突策略：每次冲突都回读进度窗口下拉（窗口已关闭 / 无窗口 ⇒ 回退 Ask）。
+                        // 传进引擎后，「暂停 → 改下拉 → 继续」对之后的冲突立即生效。
+                        Func<FileConflictAction> liveConflictPolicy = () =>
+                            context.Presenter.ActiveWindow?.ConflictPolicy ?? FileConflictAction.Ask;
+
                         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>> conflictDialog =
-                            info =>
+                            async info =>
                             {
                                 // 冲突弹窗必须有宿主窗（原实现隐式依赖 ProgressWindow.CurrentVisible / 主窗口）。
                                 // 两者都缺说明宿主没按契约给窗口：炸在产出点，而不是在弹窗里空引用。
                                 var owner = context.Presenter.ActiveWindow ?? context.Owner
                                     ?? throw new InvalidOperationException(
                                         "ExtractSession: 冲突弹窗需要宿主窗口，但 context 里既无 Owner 也无活动进度窗。");
-                                return _showConflictDialog(owner, info);
+
+                                var result = await _showConflictDialog(owner, info);
+
+                                // 勾了「应用到全部」⇒ 把下拉同步成实际生效的动作：
+                                // 「当前策略」始终可见可改，而不是藏在已关闭弹窗的闭包里。
+                                if (result.ApplyToAll
+                                    && SelectedItemsExtractService.ToConflictActionCode(result.Action) is { } policyCode)
+                                {
+                                    context.Presenter.ActiveWindow?.SyncConflictPolicyFromDialog(policyCode);
+                                }
+
+                                return result;
                             };
 
                         if (useSelectedEntries)
@@ -189,7 +210,8 @@ public sealed class ExtractSession : IExtractSession
                                 settings.PreserveFullPath ?? appSettings?.ExtractPreserveFullPath ?? false,
                                 conflictDialog,
                                 progress,
-                                ct);
+                                ct,
+                                livePolicy: liveConflictPolicy);
 
                             // 选中条目路径的历史记录在服务内不发生（原实现由 ExtractFlow 记），这里补上。
                             PathHistoryManager.Record(settings.DestinationPath);
@@ -226,7 +248,8 @@ public sealed class ExtractSession : IExtractSession
                                         conflictDialog,
                                         progress,
                                         ct,
-                                        parallelOverride);
+                                        parallelOverride,
+                                        liveConflictPolicy: liveConflictPolicy);
 
                                     window?.UpdateBatchItemStatus(i, BatchItemStatus.Completed);
                                     succeededArchives.Add(archivePath);
@@ -265,7 +288,8 @@ public sealed class ExtractSession : IExtractSession
                                 conflictDialog,
                                 progress,
                                 ct,
-                                parallelOverride);
+                                parallelOverride,
+                                liveConflictPolicy: liveConflictPolicy);
 
                             succeededArchives.Add(firstArchive);
                         }

@@ -666,11 +666,26 @@ public partial class App : Application
                     ProgressWindow.CreateBackgroundProgress(progressWindow));
 
                 // 冲突策略来自 AppSettings.FileConflictAction（默认 ask）；
-                // Ask 弹 ConflictDialog（owner=进度窗口，与 --extract 弹窗批处理同逻辑）
+                // Ask 弹 ConflictDialog（owner=进度窗口，与 --extract 弹窗批处理同逻辑）。
+                // v0.5.7：进度窗口「冲突时:」下拉是本路径的实时策略源（运行中可改），
+                // 弹窗里勾「应用到全部」再把下拉同步成实际生效的动作。
                 var settings = AppSettings.Load();
+                await Dispatcher.UIThread.InvokeAsync(() =>
+                    progressWindow.SetConflictPolicyControl(ConflictPolicyFlow.Extract, settings.FileConflictAction));
                 var options = SelectedItemsExtractService.CreateExtractOptions(
                     settings.FileConflictAction,
-                    info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info));
+                    async info =>
+                    {
+                        var result = await ExtractFlow.ShowConflictDialogAsync(progressWindow, info);
+                        if (result.ApplyToAll
+                            && SelectedItemsExtractService.ToConflictActionCode(result.Action) is { } policyCode)
+                        {
+                            progressWindow.SyncConflictPolicyFromDialog(policyCode);
+                        }
+
+                        return result;
+                    },
+                    livePolicy: () => progressWindow.ConflictPolicy);
 
                 // 列表模式播种 + 并行度元数据：CLI 单文件叶子同样直连引擎、绕过 ExtractFlow.ExtractAsync，
                 // 故在此补齐两处接线（与 RunCliDirectExtractBatchAsync 多文件叶子同源）。
@@ -813,16 +828,30 @@ public partial class App : Application
         // spec §11.2: CLI 解压 → 只显示「删包」开关（打开目录的 CLI 接线属挂起计划，D18）
         progressWindow.SetExtractPostActions(openFolder: false, deleteArchive: true, openFolderSeed: null);
 
+        var settings = AppSettings.Load();
+        // v0.5.7：「冲突时:」能力位 + 初值（与下方传给引擎的 livePolicy 同源，杜绝死开关）
+        progressWindow.SetConflictPolicyControl(ConflictPolicyFlow.Extract, settings.FileConflictAction);
+
         var ct = progressWindow.CancellationToken;
         var doneEvent = new ManualResetEventSlim(false);
         Exception? captureException = null;
         bool cancelled = false;
         var succeededArchives = new List<string>();   // D19: 关窗后按开关最终值统一删包
 
-        var settings = AppSettings.Load();
         var conflictOptions = SelectedItemsExtractService.CreateExtractOptions(
             settings.FileConflictAction,
-            info => ExtractFlow.ShowConflictDialogAsync(progressWindow, info));
+            async info =>
+            {
+                var result = await ExtractFlow.ShowConflictDialogAsync(progressWindow, info);
+                if (result.ApplyToAll
+                    && SelectedItemsExtractService.ToConflictActionCode(result.Action) is { } policyCode)
+                {
+                    progressWindow.SyncConflictPolicyFromDialog(policyCode);
+                }
+
+                return result;
+            },
+            livePolicy: () => progressWindow.ConflictPolicy);
 
         _ = Task.Run(async () =>
         {

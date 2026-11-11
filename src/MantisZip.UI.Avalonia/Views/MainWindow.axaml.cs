@@ -370,6 +370,9 @@ public partial class MainWindow : Window
             vm.PendingCompletedCallback = null;
             var postActions = vm.PendingExtractPostActions;
             vm.PendingExtractPostActions = null;
+            // 「冲突时:」能力位：只有置位的入口才把下拉显示出来（置位的入口必须已把实时策略传给引擎）
+            var conflictPolicyFlow = vm.PendingConflictPolicyFlow;
+            vm.PendingConflictPolicyFlow = null;
             var isTestFlow = vm.PendingTestFlow;
             vm.PendingTestFlow = false;
 
@@ -390,6 +393,9 @@ public partial class MainWindow : Window
                         // spec §11.2: 解压后置开关能力位 + 初值（仅解压入口置位 → 压缩/测试流两开关隐藏）
                         if (postActions is { } pa)
                             window.SetExtractPostActions(pa.OpenFolder, pa.DeleteArchive, pa.OpenFolderSeed);
+                        // 「冲突时:」能力位 + 初值（初值 = 设置里的策略；运行中改写不回写设置）
+                        if (conflictPolicyFlow is { } flow)
+                            window.SetConflictPolicyControl(flow, AppSettings.Load().FileConflictAction);
                         // 批处理状态上报：操作闭包内经 BatchStatusReporter 传给引擎 onItemStatus
                         vm.BatchStatusReporter = (index, status) =>
                         {

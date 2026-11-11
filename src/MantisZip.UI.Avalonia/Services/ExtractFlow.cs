@@ -87,6 +87,28 @@ public static class ExtractFlow
         pw.InitCancellation();
         // spec §11.2: 选中条目解压 → 两开关可见（拖拽流程 allowDeleteArchive=false 隐藏删包开关）；初值镜像设置
         pw.SetExtractPostActions(openFolder: true, deleteArchive: allowDeleteArchive, openFolderSeed: null);
+        // 「冲突时:」能力位 + 初值：与下方传给 ExtractEntriesAsync 的实时策略同源，
+        // 只有接了实时策略才显示（否则就是点了没反应的死开关）。
+        pw.SetConflictPolicyControl(ConflictPolicyFlow.Extract, conflictAction);
+
+        // 实时冲突策略：每次冲突回读窗口下拉（pw 由本方法独占，无需走 Presenter.ActiveWindow）
+        Func<FileConflictAction> liveConflictPolicy = () => pw.ConflictPolicy;
+
+        // 勾了「应用到全部」⇒ 把下拉同步成实际生效的动作（单一事实源 = 下拉）
+        var liveConflictDialog = conflictDialog is null
+            ? null
+            : new Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>(
+                async info =>
+                {
+                    var result = await conflictDialog(info);
+                    if (result.ApplyToAll
+                        && SelectedItemsExtractService.ToConflictActionCode(result.Action) is { } code)
+                    {
+                        pw.SyncConflictPolicyFromDialog(code);
+                    }
+
+                    return result;
+                });
 
         var status = SelectedItemsExtractStatus.Success;
         string? errorMessage = null;
@@ -112,7 +134,7 @@ public static class ExtractFlow
             await new SelectedItemsExtractService().ExtractEntriesAsync(
                 archivePath, password, entries, destinationPath,
                 conflictAction, currentFolder, preserveFullPath,
-                conflictDialog, progress, pw.CancellationToken, nameEncoding);
+                liveConflictDialog, progress, pw.CancellationToken, nameEncoding, liveConflictPolicy);
 
             // 成功：标记批处理行完成 + 尊重 KeepOpenOnComplete 图钉（对齐 RunWithProgress 语义）
             pw.UpdateBatchItemStatus(0, BatchItemStatus.Completed);
@@ -185,6 +207,11 @@ public static class ExtractFlow
     /// <param name="progress">进度回调。</param>
     /// <param name="ct">取消令牌。</param>
     /// <param name="parallelOverride">解压对话框的本次并行设置快照（读设置初值、不回写）；null（CLI 等无对话框路径）时读 AppSettings。</param>
+    /// <param name="nameEncoding">文件名代码页（null = 自动检测）。</param>
+    /// <param name="liveConflictPolicy">
+    /// 实时冲突策略源（进度窗口「冲突时:」下拉）；null = 用 <paramref name="conflictAction"/> 静态策略。
+    /// 传入后「暂停 → 改下拉 → 继续」立即生效。
+    /// </param>
     /// <exception cref="NotSupportedException">不支持的压缩格式。</exception>
     public static async Task ExtractAsync(
         string archivePath,
@@ -196,9 +223,11 @@ public static class ExtractFlow
         IProgress<ArchiveProgress> progress,
         CancellationToken ct,
         ParallelExtractSettings? parallelOverride = null,
-        string? nameEncoding = null)
+        string? nameEncoding = null,
+        Func<FileConflictAction>? liveConflictPolicy = null)
     {
-        var options = SelectedItemsExtractService.CreateExtractOptions(conflictAction, conflictDialog, nameEncoding);
+        var options = SelectedItemsExtractService.CreateExtractOptions(
+            conflictAction, conflictDialog, nameEncoding, liveConflictPolicy);
 
         // 智能并行解压：经 ParallelDegreeResolver 5 步决策链解析线程数。
         // parallelOverride = 对话框本次快照（初值读设置、不回写）；null → 读 AppSettings（CLI 等无对话框路径）。

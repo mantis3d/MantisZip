@@ -16,8 +16,25 @@
   - **D 拆掉借道卸载 + 并发互斥 + 幂等写**：`Install()` 不再调 `Uninstall()`（后者会 `proc.Kill()` explorer.exe 再重启，设置页点「应用」就闪桌面），改为内部 `CleanupRegistrations()`（只删级联 + COM + 状态键，不重启不发通知）；新增 `RemoveMenus()` 给设置页「卸载右键菜单」用；`Uninstall()` 仅保留给 `--uninstall-shell`（Inno `[UninstallRun]` 需要释放 comhost.dll 句柄才能删文件）。`Install` / `Uninstall` / `RemoveMenus` / `CheckComStatus` 全部包进 `RunExclusive()`（命名互斥 `Local\MantisZip.ShellReg`，15s 超时，`AbandonedMutexException` 视为拿到），解决多选右键 5 实例并发「A 装级联、B 删级联」的交叉覆盖；`SetRegistryValue` / `SetRegistryDword` 改为幂等（值相同不写）。
   - **接线修正**：`SettingsWindowViewModel.InstallShell` / `ApplyShellChanges` 去掉 `Uninstall()` 调用（`Install()` 自带清理），`UninstallShell` 改调 `RemoveMenus()` —— 设置页任何操作都不再重启资源管理器。
   - **测试**：新增 `tests/MantisZip.Tests/ShellMenuStatusMachineTests.cs` —— 决策表 17 组 `[InlineData]`、`DecideComAction_ActiveIsNotTerminal`（钉死「active 必须能降级」）、时间窗口序关系、`DefaultSettings_DynamicMenuIsOff`（默认值回归钉子）；`ShellMenuHeartbeatTests` 走 `RegistryHost` 沙箱（`MantisZip\MenuStatusSandbox`）覆盖无键 / 坏时间戳 / 死 PID→`Recent` / 过期→`Stale` / 活 Explorer PID→`Fresh`（无 Explorer 会话时跳过）。⚠ 沙箱态下写注册表必须传**生产路径**，`RegistryHost` 会自动重定向（首次写错路径导致 3 例读不到值）。
-  - **验证**：avalonia 构建 0 错误、`-Task test -Target tests` 1058 全绿（新增 20 例）、`-Task test -Target ui-tests` 全绿、`-Task check`（0.5.6 / 1449 key）、`-Task guards`（9 项）、`-Task i18n` 全绿。
+  - **验证**：avalonia 构建 0 错误、`-Task test -Target tests` 1058 全绿（新增 20 例）、`-Task test -Target ui-tests` 全绿、`-Task check` / `-Task guards`（9 项）/ `-Task i18n` 全绿；随后合并 `alpha`（版本 0.5.7）解掉两处文档冲突，构建 / `tests` / `ui-tests` / `check`（0.5.7 六处一致）/ `guards` / `i18n`（1452 key）全部复跑仍全绿。
+  - **发布说明**：`RELEASE_NOTES.md` 的 v0.5.7 加两条 —— 「修复」节的右键菜单消失（issue #80）+ 新增「变更」节的「动态右键菜单改为实验开关，默认关闭」（用户确认按两条写）。
   - **未修（登记 KI-018）**：`active` 状态下若 handler 再次静默失效，自愈要等下一次 MantisZip 启动 —— 菜单不出现时没有任何进程被拉起，缺少「常驻探针」这类成本不划算的手段。
+
+**2026-11-10** — 合并：`plans` → `alpha`（唯一根目录计划与原型回流；冲突解法与前次 beta→plans 同规）
+  - **方式**：`git merge plans`；产品代码零改动，只带入 `.omo/plans/未开始/{compress-extract-root-mode,nested-archive-extract}.md`、`docs/prototypes/compress-extract-root-mode.html` 与 `docs/PLAN.md` 两行；冲突只在 `docs/PROGRESS.md` 与本文档两处。
+  - **冲突根因（均为「同一内容在两侧位置不同」的搬运冲突）**：两侧各自合过 beta，11-04「冲突时: 实时策略」条目内容逐字相同但排序位置不同（alpha 放在 11-04 段首、plans 放在段尾）；plans 侧另有 11-10（唯一根目录计划）、11-09（beta→plans 合并）、11-05（嵌套解压计划）三条 alpha 没有的新记录。
+  - **解法**：新记录全留（11-10 / 11-09 / 11-05）；重复的 11-04 条目只留 alpha 位置的一份，删掉 plans 侧重复块。`PROGRESS.md` 解完与 alpha 原样一致（不产生里程碑变更）。
+  - **验证**：无冲突标记残留；`-Task check` 通过（版本 0.5.7 六处一致、三语 1451 key、9 条守卫全绿；纯文档合并，未构建/未跑测试）。
+
+**2026-11-10** — 计划：唯一根目录处理立计划 + HTML 原型（GitHub issue #35）
+  - **issue 梳理**：报告人吐槽的「选择器 Ctrl+A 后还要点添加所选」一线已由 2026-11-03 `checkbox-mode-consistency`（36da1ca）解决（Ctrl+A 全选后点组内任一行复选框整组打勾、右键「勾选所有可见项」），issue 回复闭环由 maintainer 自行处理；残留的是「唯一根目录」功能本体。
+  - **计划落地**：`.omo/plans/未开始/compress-extract-root-mode.md`（10–16h，B 档），用户逐项定稿 7 条决策：压缩设置窗三态选项（原样 / 去目录本身[仅单目录源，否则置灰] / 套唯一根目录[Separate 置灰，根名输入框默认包文件名可改]）+ 解压设置窗「去掉压缩包顶层目录」开关（无唯一根置灰、判定复用智能解压、策略挂 `ExtractPathResolver` 单一事实源）；默认值与其它压缩/解压设置一致——设置窗载入默认不回写、设置窗口改默认；先结构调整后 Filter/Plan 白名单的叠序硬约束；首版仅 GUI（CLI 后补）。`docs/PLAN.md` B 档表同步加行。
+  - **原型**：`docs/prototypes/compress-extract-root-mode.html`——控制台（源场景 / 输出模式 / 示例包 / 保留完整路径开关）+ 压缩解压两窗口 mock（三态组 + 根名字段 + 两条置灰门 + 包内/目标目录实时预览树）+ 主设置窗口默认值落点 mock + 决策对照表；headless 浏览器跑通全部场景（置灰门、散装自动回关、包名联动根名、三态预览计算）无 JS 报错。
+
+**2026-11-09** — 合并：`beta` → `plans`（v0.5.6 显示层改进与除错工作回流）
+  - **方式**：`git merge beta`；冲突 3 个文件且全为文档（`RELEASE_NOTES.md` / `docs/PROGRESS.md` / `docs/progress-avalonia-detail.md`），产品代码与三份 `strings.*.json` 自动合并、无冲突。
+  - **冲突解法**：三处都按「两侧全留 + 按日期重排」处理 —— 里程碑与历史设计方案索引各保留 beta 的 11-08 / 11-07 / 11-05 / 11-04 行与本分支的 11-04 冲突时策略行（同日条目把 v0.5.7 那条排在 v0.5.6 之后）；详细记录把「嵌套解压计划」（11-05）与「冲突时: 实时策略」（11-04）分别插回对应日期段；`RELEASE_NOTES.md` 的「压缩设置窗的预览树显示实时计数」取 beta 版措辞（多出「树一边扫描一边长出条目」半句，与本分支代码行为一致）。
+  - **验证**：无冲突标记残留；`-Task check` 通过 —— 版本 0.5.7 六处一致、三语 1451 key 一致、9 条守卫全绿（未构建、未跑测试，纯合并文档解冲突）。
 
 **2026-11-08** — 压缩默认配置随出厂固化（默认等级 5 + 自适应压缩默认开启）
   - **默认值**：`DefaultLevel` 本来就是 `5`（用户真机也是 5），本次补断言钉住、不改代码；`AdaptiveCompression` 默认 `false`→**`true`**。配套默认规则集 `GetDefaultAdaptiveOverrides()`（图片/视频/音频/压缩包/字体/文档六类 → Store）已由 `CreateWithDefaults` / `ApplyMigrations` 填充，开启后即按规则跳过已压缩格式，不依赖用户先配规则。
@@ -82,6 +99,13 @@
   - **验证**：`build -Target core` / `-Target avalonia` 0 警告；新增/相关 27 例 Core 测试全绿；`test -Target ui-tests` 796 例 0 失败（3 例既有跳过）；`-Task check` 版本 0.5.6 六处一致 / 三语 1448 key / 9 条守卫全绿。
   - **环境说明**：本机 `dotnet test` 仍因 testhost 无法打开父进程句柄而中止（AGENTS.md 已记录的受限环境问题）；Core 测试改用 `xunit.runner.console 2.9.3`（临时目录内，runtimeconfig 指向 net10.0）跑通，全量 1034 例中 25 例失败均为缺 `7z.dll` 的既有环境失败（CI 同样过滤 7z 用例）。
 
+**2026-11-05** — 计划：解压时递归解开内层压缩包（Nested Archive Extraction）设计定稿
+  - **需求**（用户 m00001）：下载/备份常是「套娃」压缩包，外层解完还要手动进目录逐个再解，次数一多就漏。全仓勘察确认此前**没有任何嵌套解压实现**，属全新功能。
+  - **定稿的 9 项决策**（逐项与用户确认）：内层包解到 `<所在目录>\<包名去扩展名>\` 且原包保留；递归可配深度默认 3（1-10）；只认 `.zip/.7z/.rar/.tar/.gz/.tgz/.tar.gz` 扩展名白名单、**不做魔数**（`.docx/.xlsx/.pptx/.epub` 文件头即 ZIP，魔数会把 Office 文档解开铺一地）；内层密码 = 外层密码 → 密码库 → 仍有失败弹一次窗（应用到剩余全部）→ 再失败跳过标记，CLI 不弹窗；内层冲突**沿用本次策略**（`ask` 也弹，不静默降级）；失败跳过但整体仍算成功并在结果里列原因；入口全覆盖（对话框 / 三条原地解压 / 拖拽含「解压选中项到」/ CLI）；开关 = 全局设置（默认关）+ 对话框复选框（本次可改）；深度 + 500 包 / 100GB 双硬上限。
+  - **方案**：不改引擎契约、不塞进 `ExtractService`（拿不到冲突弹窗与密码端口）。新增 Core 纯逻辑 `NestedArchivePolicy`（白名单 / `GetNestedDestination` / `ClampDepth` / 三个常量）与 `NestedArchiveScanner`（`mtime ≥ runStart-2s` + 白名单、排除源包、20 万文件上限），UI 新增独立 `Services/NestedExtractRunner`（复用 `ExtractFlow.ExtractAsync`，端口注入与 `ExtractSession` 同款）。接线 5 处：`ExtractSession.cs:296`（对话框 / CLI `--extract` / 拖拽兜底 / 双击）、`ExtractFlow.cs:73`（拖拽直投 + 右键选中项）、`MainWindowViewModel.Extract.cs:61/108/342`（三条 legacy）、`App.CliExtract.cs:639/859`（CLI 直解）。
+  - **计划文档**：[nested-archive-extract.md](.omo/plans/未开始/nested-archive-extract.md)（16-22h，三阶段交付）；已按规则 1 登记进 `docs/PLAN.md` B 档。**未排期**（A 档 v0.5.5–v0.5.10 已满编），产品代码落 `alpha`。
+  - **本次未改产品代码**（`plans` 分支，规则 19）。
+
 **2026-11-05** — 修复：应用内添加 / 删除条目、编辑注释后被误判成「磁盘上的压缩包已被替换」（只读横幅回归）
   - **现象**：对打开中的压缩包执行「添加文件」「删除条目」「编辑注释」后，界面立刻弹出只读横幅「磁盘上的压缩包已被替换」+「当前列表来自旧文件，编辑或解压前请重新打开」，列表停在操作前的内容；随后手动 F5 也被同一条守卫拦下，只能点「重新打开」才恢复。
   - **根因**：`ArchiveFileGuard` 的基线只在打开时抓一次（`MainWindowViewModel.cs:1835` → 构造函数 `CaptureSnapshot`），判定依据是「长度 + 最后写入时间 + 卷数」。而这三个操作都是**整包重写**（ZIP 复制模式重写 / 7z 解出再压缩 / 注释原地改 EOCD），长度与 mtime 必然变化 ⇒ `Check()` 报 `Replaced`；`RefreshArchive()` 又调 `EnsureArchiveAvailable()`，同一份旧快照把自己拦下，于是「刷新」这个恢复动作永远失败。自写与外部替换在快照层面完全同形，靠阈值或时间窗猜测都不成立。
@@ -130,6 +154,18 @@
   - **文档同步**：`App.axaml` 的 `Grid.addrRow` 注释与 `AGENTS.md` 规则 4 的 `addrRow` 两行说明（去掉「与 `PathBreadcrumb` 同高齐平」——拆行后不再同行，避免下次照旧描述理解）。
   - **未覆盖**：`MinHeight 560` 时文件列表变矮的体感只能真机目视，headless 测不出。
   - **验证**：`build -Target avalonia` 0 警告；`test -Target ui-tests` 46.8s 全绿；`-Task check`（0.5.6 / 三语 1446 key）、`-Task guards`（8 条）全绿。
+
+**2026-11-04** — 功能：进度窗口「冲突时:」实时策略 + 原地解压修复（v0.5.7 第一项）
+  - **需求**：跑批时才发现「文件已存在」弹窗一个接一个，或选错了「跳过 / 覆盖」，只能取消重来。目标是把冲突策略做成**运行中可改**的控件，改完对之后的冲突立即生效。
+  - **Core（唯一改动）**：`ArchiveOptions.ConflictActionProvider`（`Func<FileConflictAction>?`）。优先级：provider → 静态 `ConflictAction` → `Overwrite`；`FileConflictHelper.ResolvePath` / `ResolvePathAsync` 每个冲突都重新调用 provider，因此运行期改值立刻可见。provider 为 null 时与引入前逐字节一致。
+  - **进度窗口**：信息区首行改 `Grid(Auto,*,Auto)` —— 左「少/中/完整」密度、右「冲突时:」下拉，**不新增行**（`ProgressWindowXamlTests` 的 7 行断言与 Toast `RowSpan` 都不受影响）。下拉选项复用设置页既有文案 key：解压 6 档（询问 / 覆盖 / 覆盖较旧 / 覆盖较小 / 重命名 / 跳过）、压缩 5 档（询问 / 覆盖 / 添加 / 重命名 / 跳过）。选择项下标用 `Volatile.Read/Write`，因为引擎后台线程会读。
+  - **解压接线**：`CreateExtractOptions` 增第四参 `livePolicy`；`ExtractFlow.ExtractAsync` 与 `RunSelectedItemsExtractionAsync` 透传；`ExtractSession` 三条分支（选中 / 多包 / 单包）都传 `() => context.Presenter.ActiveWindow?.ConflictPolicy ?? Ask`；`ConfigureWindow` 里顺带置能力位（能力位与接线同一处，杜绝死开关）。三条 legacy 路径改走 `CreateLegacyExtractOptions`（internal static，供测试）。
+  - **压缩接线**：`CompressFlow.CreateResolver` 增 `livePolicy` + `syncPolicy`；`CompressSession` 与 CLI 压缩都接上；新增 `ToPolicyCode`（`Cancel → skip`）。弹窗勾「应用到全部」时同步下拉，之后同一策略走记忆分支不再弹。
+  - **KI-012 关闭**：`ExtractArchiveHere` / `ExtractArchiveToName` / `SmartExtract` 三条路径此前**不传 `ArchiveOptions`**，引擎对 null options 回落到 `Overwrite` ⇒ 用户设成「询问」也静默覆盖。现在三条都带默认策略 + 弹窗 + 实时源。
+  - **测试**：`ProgressWindowConflictPolicyTests`（6 例：默认隐藏 / None 隐藏 / 解压 6 档 / 压缩 5 档 / 弹窗同步 / 特殊动作映射）、`CompressFlowConflictResolverTests`（9 例：实时值压过请求值、Ask 回退弹窗、无实时值回退请求值、ApplyToAll 同步并记忆、`add` 无支持时回退弹窗、码表映射）、`LegacyExtractConflictOptionsTests`（3 例：装配、跟随可见窗口、保留 `ReadEncoding`）。
+  - **验证**：core / avalonia Release 0 警告；`tests`、`ui-tests`（42.9s）全绿；`-Task check` 0.5.7 / 1440 key / 8 条守卫。真机：CLI `--extract-here` 遇冲突弹出「解压冲突」询问框，进度窗口同屏可见「冲突时:」下拉。
+  - **未做**：GUI 三条 legacy 路径的点击矩阵（本机合成键未触发 `ExtractArchiveHereCommand`，未查明是焦点还是 `CanExecute`），改由 `LegacyExtractConflictOptionsTests` 覆盖装配与实时源读取，待用户真机点一次确认。
+  - **再改（同日）：固实解压开始后锁定「冲突时:」下拉**（用户 m14206：「固实在开始解压就应该不允许用户修改了吧？」核实成立）。7z 固实包的批量计划只在 `IsSolid` 时构建，冲突在「阶段 2a：冲突预解析」一次性写进 `BulkEntryPlan`（跳过 / 重命名 / 直接写 / 大文件），之后解码与搬运都不再读策略 ⇒ 运行中改下拉对固实包**完全无效**，等于留了个改了没反应的开关。修法：`ArchiveProgress` 新增 `bool? ConflictPolicyLocked`（null = 未携带，保持可改），`SevenZipEngine` 两条批量路径在真正开始批量时上报 `true`（非固实、以及大文件 / 不安全路径 / 包内重名退回逐条目的情况都不锁，那些写盘时逐条判定，实时值仍有效）；`ProgressViewModel` 用**黏滞**锁接收（收到一次 true 就一直锁到下一次 `SetConflictPolicyControl`，而那是新一轮运行的起点），暴露 `IsConflictPolicyEnabled` 绑到下拉的 `IsEnabled`，tooltip 同时切成 `Progress_ConflictPolicy_Locked`（「本次解压的冲突处理已在开始时一次性确定，运行中不可修改」）。测试：`ProgressWindowConflictPolicyTests` 新增 `ConflictPolicy_EngineLocked_DisablesDropdownUntilNextRun`（初始可改 → 收到锁定 → 禁用且 tooltip 换文案 → 后续不带标记的上报仍锁定 → 新一轮解锁），`SevenZipEngineSelectedBulkProgressTests` 追加 `Assert.Contains(reports, r => r.ConflictPolicyLocked == true)`。i18n 1441 key；core / avalonia Release 0 警告、tests 9.7s 与 ui-tests 39.6s 全绿、check 8 守卫。
 
 **2026-11-04** — 功能：文件选择器「新建文件夹」（所有模式，`Ctrl+Shift+N`）
   - **起因**：讨论「解压设置窗的目标路径输入框与面包屑是否重复」时确认两者不等价（输入框装**结果**、可指向不存在的目录；面包屑是**浏览游标**、只能停在已存在目录），但发现真问题 —— 解压默认目标是 `包所在目录\包名`（`ExtractSettingsViewModel.cs:270-276`），这个目录几乎一定还不存在，而选择器**没有任何建目录的路**：`NavigateTo` 遇 `!Directory.Exists` 直接 return，唯一的逃生口「系统浏览」只有 `CustomFilePickerDialog.axaml.cs:225` 订阅了 `SystemBrowseRequested`，压缩窗 / 解压窗的内嵌实例点了没反应。
@@ -182,7 +218,7 @@
   - **为什么合并**：`beta` 上积了 31 个提交（v0.5.5 的除错与性能工作），`alpha` 在 v0.5.6 期间又改了同一批文件 ⇒ 越晚合并越痛，故按用户要求先合。
   - **方式**：`git merge --no-ff origin/beta`，冲突 8 个文件全部手工解决；`plans` 分支那种 cherry-pick 不适用于这里（beta 带的是产品代码，必须保留历史）。
   - **冲突解法**：`ViewModels/MainWindowViewModel.Compress.cs` 取并集（保留 alpha 的批量删除目标数组，同时采用 beta 的 `ArchiveOptions { FileNameEncoding = NameEncodingRequestKey ?? 设置值, ReadEncoding = NameEncodingRequestKey }`）；三份 `strings.*.json` 以 alpha 为底、按行级并集追加 beta 的 13 个 key（共 1443 key），并采纳 beta 的两处繁体用词修正（「驗證透過」→「通過」）；四份文档两侧全留并按日期重排。
-  - **KI 撞号处理**：beta 的 `KI-010`（RAR4 分卷不做块链校验，2026-10-31 登记，本次已修复）与 alpha 的 `KI-010`（三条原地解压路径不读冲突设置，2026-11-01 登记）撞号 ⇒ 保留 beta 的编号（发布说明与进度文档都在引用），alpha 那条改号 **KI-012**，同步改 `docs/PLAN.md:145` 与本文件、`.omo/plans/未开始/progress-window-conflict-policy.md` 的引用；`docs/KNOWN_ISSUES.md` 该条补「编号说明」。**同日再合并 `main`** 时又撞一次：`main` 的 `KI-012`（安装包确认框按钮文案不可自定义，2026-11-03 登记）也在抢这个号 ⇒ 按登记先后保留 alpha 的 KI-012、把安装包那条改为 **KI-013**（只改 `docs/KNOWN_ISSUES.md`，其它文件无引用）。**后续新登记从 KI-014 起。**
+  - **KI 撞号处理**：beta 的 `KI-010`（RAR4 分卷不做块链校验，2026-10-31 登记，本次已修复）与 alpha 的 `KI-010`（三条原地解压路径不读冲突设置，2026-11-01 登记）撞号 ⇒ 保留 beta 的编号（发布说明与进度文档都在引用），alpha 那条改号 **KI-012**，同步改 `docs/PLAN.md:145` 与本文件、`.omo/plans/已完成/progress-window-conflict-policy.md` 的引用；`docs/KNOWN_ISSUES.md` 该条补「编号说明」。**同日再合并 `main`** 时又撞一次：`main` 的 `KI-012`（安装包确认框按钮文案不可自定义，2026-11-03 登记）也在抢这个号 ⇒ 按登记先后保留 alpha 的 KI-012、把安装包那条改为 **KI-013**（只改 `docs/KNOWN_ISSUES.md`，其它文件无引用）。**后续新登记从 KI-014 起。**
   - **顺带删掉**：beta 提交 `b06ba4f6` 误带的仓库根 **0 字节 `Program.cs`**（无 `Main`、不属任何项目，删掉不影响构建）。
   - **验证**：avalonia（Release，`--no-incremental`）✅ 93.8s / 0 警告；`tests` ✅ 28.0s；`ui-tests` ✅（31 条既有 xUnit 警告）；`i18n` ✅ 1443 key；`check` ✅ 8 条守卫（含 `dialog-seam`）。
 **2026-11-03** — 修复：issue #68 评论三件（RAR4 块链校验 / PKZIP 跨卷 `.z01` / 繁体用词）
@@ -283,7 +319,7 @@
   - **设计**：Core 只加一个可选 `ArchiveOptions.ConflictActionProvider`（默认 `null`，不传与旧行为逐字节一致）——不用「恒 Ask + resolver 自行决定」，否则每个冲突都要构建 `FileConflictInfo`（含 `GetUniquePath` 目录探测）。解压侧 live 模式 = `Ask` + provider + resolver，**下拉成为唯一事实源**：勾「应用到全部」时把下拉同步成该动作（用户可见可改回），闭包记忆降级为退路。压缩侧 `CreateResolver` 加可选 `livePolicy`，不改 Core。两侧暂停恢复后先查下拉，避免「暂停后改策略再继续又重弹」。能力位与接线同源（不接线就传 `None` 隐藏），杜绝死开关。
   - **布局定稿（2026-11-02）**：信息区 `Border` 内首行改 `Grid(Auto,*,Auto)`——左「少 / 中 / 完整」、右「冲突时: 下拉」。**不新增 `RowDefinition`**，`RootGrid` 保持 7 行、Toast `RowSpan` 不变（比独立行少改两处、省约 28px 高度）；500px 最小宽度下允许折成两行。信息区底色是 `ThemeSplitterBgBrush`，ComboBox 需显式 `ThemeSurfaceBgBrush` 背景。
   - **附带发现 → KI-012**：`ExtractArchiveHere` / `ExtractArchiveToName` / `SmartExtract` 三条「原地解压」路径调用 `ExtractService.ExtractAsync` 时不传 `ArchiveOptions`（`ViewModels/MainWindowViewModel.Extract.cs:59,104,325`），引擎回落默认 `Overwrite` —— 即使设置成「询问」也恒静默覆盖，从不读 `AppSettings.FileConflictAction`。已按规则 21 登记 KI-012（阻塞类型「等计划」，复评条件 = 本计划 Phase 3 落地），并由 Phase 3 顺带修复。
-  - **产出**：`.omo/plans/未开始/progress-window-conflict-policy.md`（现状坐标 / 4 条口径 / 数据流 / Core 改动 / 解压+压缩接线 / 入口矩阵 / 12 条手工验收 / 风险表 / 5 阶段任务 / 待确认项）、`docs/prototypes/progress-window-conflict-policy.html`（可交互原型：三种布局可切换、解压 6 档 / 压缩 5 档、弹窗与「应用到全部」联动、运行中切换、暂停改策略、800/500px 宽度对照）、`docs/PLAN.md` B 档登记、`docs/KNOWN_ISSUES.md` KI-012。
+  - **产出**：`.omo/plans/已完成/progress-window-conflict-policy.md`（现状坐标 / 4 条口径 / 数据流 / Core 改动 / 解压+压缩接线 / 入口矩阵 / 12 条手工验收 / 风险表 / 5 阶段任务 / 待确认项）、`docs/prototypes/progress-window-conflict-policy.html`（可交互原型：三种布局可切换、解压 6 档 / 压缩 5 档、弹窗与「应用到全部」联动、运行中切换、暂停改策略、800/500px 宽度对照）、`docs/PLAN.md` B 档登记、`docs/KNOWN_ISSUES.md` KI-012。
   - **状态**：仅设计阶段，**未改任何产品代码**（在 `plans` 分支完成，遵守规则 19）；开工时切 `alpha`，从 Phase 1（Core `ConflictActionProvider`，约 1h）开始。
 **2026-11-02** — 修复：代码页按钮恒灰 + TAR/GZ 的 auto 检测补 ANSI 回退
   - 现象：用户实测「不论我打开什么文件，那个按钮都是禁用的」。
@@ -487,7 +523,7 @@
   - **设计**：Core 只加一个可选 `ArchiveOptions.ConflictActionProvider`（默认 `null`，不传与旧行为逐字节一致）——不用「恒 Ask + resolver 自行决定」，否则每个冲突都要构建 `FileConflictInfo`（含 `GetUniquePath` 目录探测）。解压侧 live 模式 = `Ask` + provider + resolver，**下拉成为唯一事实源**：勾「应用到全部」时把下拉同步成该动作（用户可见可改回），闭包记忆降级为退路。压缩侧 `CreateResolver` 加可选 `livePolicy`，不改 Core。两侧暂停恢复后先查下拉，避免「暂停后改策略再继续又重弹」。能力位与接线同源（不接线就传 `None` 隐藏），杜绝死开关。
   - **布局定稿（2026-11-02）**：信息区 `Border` 内首行改 `Grid(Auto,*,Auto)`——左「少 / 中 / 完整」、右「冲突时: 下拉」。**不新增 `RowDefinition`**，`RootGrid` 保持 7 行、Toast `RowSpan` 不变（比独立行少改两处、省约 28px 高度）；500px 最小宽度下允许折成两行。信息区底色是 `ThemeSplitterBgBrush`，ComboBox 需显式 `ThemeSurfaceBgBrush` 背景。
   - **附带发现 → KI-010**：`ExtractArchiveHere` / `ExtractArchiveToName` / `SmartExtract` 三条「原地解压」路径调用 `ExtractService.ExtractAsync` 时不传 `ArchiveOptions`（`ViewModels/MainWindowViewModel.Extract.cs:59,104,325`），引擎回落默认 `Overwrite` —— 即使设置成「询问」也恒静默覆盖，从不读 `AppSettings.FileConflictAction`。已按规则 21 登记 KI-010（阻塞类型「等计划」，复评条件 = 本计划 Phase 3 落地），并由 Phase 3 顺带修复。
-  - **产出**：`.omo/plans/未开始/progress-window-conflict-policy.md`（现状坐标 / 4 条口径 / 数据流 / Core 改动 / 解压+压缩接线 / 入口矩阵 / 12 条手工验收 / 风险表 / 5 阶段任务 / 待确认项）、`docs/prototypes/progress-window-conflict-policy.html`（可交互原型：三种布局可切换、解压 6 档 / 压缩 5 档、弹窗与「应用到全部」联动、运行中切换、暂停改策略、800/500px 宽度对照）、`docs/PLAN.md` B 档登记、`docs/KNOWN_ISSUES.md` KI-010。
+  - **产出**：`.omo/plans/已完成/progress-window-conflict-policy.md`（现状坐标 / 4 条口径 / 数据流 / Core 改动 / 解压+压缩接线 / 入口矩阵 / 12 条手工验收 / 风险表 / 5 阶段任务 / 待确认项）、`docs/prototypes/progress-window-conflict-policy.html`（可交互原型：三种布局可切换、解压 6 档 / 压缩 5 档、弹窗与「应用到全部」联动、运行中切换、暂停改策略、800/500px 宽度对照）、`docs/PLAN.md` B 档登记、`docs/KNOWN_ISSUES.md` KI-010。
   - **状态**：仅设计阶段，**未改任何产品代码**（在 `plans` 分支完成，遵守规则 19）；开工时切 `alpha`，从 Phase 1（Core `ConflictActionProvider`，约 1h）开始。
 
 **2026-10-30** — 新增：压缩端「完成后打开输出目录」（与解压端对称，三层入口）

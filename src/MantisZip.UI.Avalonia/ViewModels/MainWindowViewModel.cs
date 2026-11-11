@@ -173,6 +173,13 @@ public partial class MainWindowViewModel : ObservableObject
     public (bool OpenFolder, bool DeleteArchive, bool? OpenFolderSeed)? PendingExtractPostActions { get; set; }
 
     /// <summary>
+    /// 待声明的「冲突时:」能力位（RunWithProgress 消费，用完即清）。
+    /// 只允许在「已把窗口下拉作为实时策略源传给引擎」的入口置位 —— 否则会出现
+    /// 下拉能改、引擎不读的死开关（见 <c>progress-window-conflict-policy</c> 的不变量）。
+    /// </summary>
+    public ConflictPolicyFlow? PendingConflictPolicyFlow { get; set; }
+
+    /// <summary>
     /// 由 View 设置的批处理状态上报回调（索引 + 状态）。
     /// 操作闭包内可将其作为 onItemStatus 传给引擎，实时更新批处理列表项状态。
     /// </summary>
