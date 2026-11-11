@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现的功能见 [docs/PROGRESS.md](PROGRESS.md)，技术架构见 [docs/ARCHITECTURE.md](ARCHITECTURE.md)，每项计划的完整设计见 `.omo/plans/`。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-11-04  
+**最后更新**: 2026-11-11  
 **当前版本**: 0.5.7
 
 
@@ -87,7 +87,9 @@
 
 > **v0.5.6 验收口径（✅ 已达成）**：列表能在三种布局间循环并记住选择；打开 1000+ 条目的包时骨架区能看到数字在涨；ico 文件在列表里显示自己的图标而不是通用图标；复选框模式勾选 3 项后删除只弹一次确认、删完勾选态清空，且默认关闭时行为与今天完全一致；缩略图卡片的外边框 / 垫底色 / 尺寸三项在设置里改完即时生效；卡片视图也能勾选，Shift 连选与「视图 → 列表布局」子菜单可用；切换复选框模式时选区与勾选能互相转换，压缩/解压窗里的复选框选择手势与主列表一致。
 
-### 阶段 v0.5.7 —— 数据安全：冲突策略与原地解压修复（约 17-23h，🚧 进行中：冲突策略 + KI-012 已完成，剩 Office 预览切片 3）
+### 阶段 v0.5.7 —— 数据安全收尾与压缩文件名模板（约 20-26h，🚧 进行中：冲突策略 + KI-012 已完成，剩压缩文件名模板 8-10h）
+
+> **2026-11-11 调整**：v0.5.7 里的「Office 预览切片 3」后移，**并进 v0.5.10 新功能与债务**（与卡片元数据、AXAML 编译绑定同属预览/质量提升类，不挤占拖拽收尾的窗口）；空出的位置换成**压缩文件名模板**（8-10h）。理由：文件名模板直接消解「同日期同名的压缩包互相覆盖」这一日常痛点，且风险面小（Core 纯函数 + 命名收敛在 `CompressPathPlanner`，模板留空时行为逐字节不变）。
 
 > **2026-11-04 重排**：原定「Office 预览切片 3 + 卡片元数据 + AXAML 编译绑定」整体后移。依据是判据第 3 条（削减「点了没反应」类失信 bug 优先于增加功能面）：KI-012 是**数据丢失级**——「解压到此处 / 同名目录 / 智能解压」三条路径完全不读冲突设置、恒静默覆盖；它的阻塞条件 `progress-window-conflict-policy` 已于 2026-11-01 定稿、无设计风险，没有理由继续挂在 B 档。卡片元数据（新计划）与编译绑定（只防未来错误）都不该抢在这个窗口前面。
 
@@ -95,9 +97,9 @@
 |---|---|:--:|:--:|---|
 | ✅ 进度窗口「文件冲突自动处理」控件（TeraCopy 式） | [progress-window-conflict-policy.md](.omo/plans/已完成/progress-window-conflict-policy.md) | 🟡中 | 12-16h | 进度窗加「冲突时:」下拉（覆盖 / 跳过 / 重命名 / 询问），运行中切换立即生效；Core 只加一个 `ArchiveOptions.ConflictActionProvider` 动态源；实例级生效、不回写设置，保留 `ConflictDialog` 供「询问」使用；解压与压缩两侧都要接 |
 | ✅ KI-012：三条原地解压路径读冲突设置 | 同上（Phase 3 顺带修复，2026-11-04 已关闭） | 🟡中 | 含在上行 | `ViewModels/MainWindowViewModel.Extract.cs` 的「解压到此处 / 同名目录 / 智能解压」三处 `ExtractService.ExtractAsync(...)` 不传 `ArchiveOptions` ⇒ 恒静默覆盖；修完后三条路径与右键「解压选中项到」共用同一个 options 构造 |
-| 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/已完成/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。三者本来就在解析完整文档，省下的只是落盘 |
+| 压缩文件名模板（三入口默认值 + 命名预设） | [filename-template.md](.omo/plans/进行中/filename-template.md) | 🟡中 | 8-10h | 用占位符模板生成压缩包**主名**（`{name}` `{name:auto}` `{ext}` `{parent}` `{date}` `{datetime}` `{seq}` `{seq:0000}`），格式扩展名由所选格式自动补；模板非空即接管命名（忽略「保留源文件扩展名」，要保留请写 `{ext}`）；命名收敛在 Core 的 `CompressPathPlanner`，预览树 = 实际输出；压缩对话框 / `--compress-quick` / `--compress-separate` 三档默认值 + 可存命名预设；未知占位符 / 非法字符 / 渲染为空 / 多源重名在确认时拦截并给出原因 |
 
-> **v0.5.7 验收口径**：解压途中能从进度窗把「冲突时」切到覆盖 / 跳过 / 重命名且立刻生效；「解压到此处 / 同名目录 / 智能解压」遇到同名文件不再静默覆盖（默认仍问一次）；KI-012 关闭；Office 三族预览不再先落盘。
+> **v0.5.7 验收口径**：解压途中能从进度窗把「冲突时」切到覆盖 / 跳过 / 重命名且立刻生效；「解压到此处 / 同名目录 / 智能解压」遇到同名文件不再静默覆盖（默认仍问一次）；KI-012 关闭；文件名模板留空时命名与今天逐字节一致，填 `{name}_{date}` 后三个源分别产出带日期的主名、预览树与对话框只读框显示的就是最终文件名、未知占位符 `{foo}` 在确认时被拦下并给出原因。
 
 ### 阶段 v0.5.8 —— 拖拽收尾与碎片清仓（约 17-24h）
 
@@ -127,15 +129,16 @@
 
 ### 阶段 v0.5.10 —— 新功能与债务（约 22-30h，滚动，未排具体日期）
 
-> **2026-11-04 移入**：卡片元数据与 AXAML 编译绑定原先排在 v0.5.7，随「风险优先」重排整体后移。v0.5.9 的队列窗会强制开编译绑定，存量迁移可以慢慢来，不阻塞发布。
+> **2026-11-04 移入**：卡片元数据与 AXAML 编译绑定原先排在 v0.5.7，随「风险优先」重排整体后移。v0.5.9 的队列窗会强制开编译绑定，存量迁移可以慢慢来，不阻塞发布。**2026-11-11 追加**：Office 预览切片 3 也从 v0.5.7 后移进本阶段。
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
+| 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/已完成/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。三者本来就在解析完整文档，省下的只是落盘。2026-11-11 从 v0.5.7 后移至此 |
 | 卡片元数据（全卡头部窗口 + 小文件整条兜底） | [card-metadata-head-window.md](.omo/plans/未开始/card-metadata-head-window.md) | 🟡中 | 12-16h | 平铺 / 内容布局里**所有**候选卡显示 2–3 行格式元数据（音频 / 视频 / 字体 / 可执行 / PDF / Office / BT 种子 / SQLite / ISO）；取数改成「读条目头部 256 KB → 解析」，小文件（≤2 MB）整条兜底、视频尾段（≤10 MB）补 moov；6 组开关在「设置 → 外观 → 缩略图」第 4 张卡片 |
 | AXAML 编译期绑定（渐进式开启 `x:CompileBindings`） | [axaml-compiled-bindings.md](.omo/plans/未开始/axaml-compiled-bindings.md) | 🟡中 | 10-14h | 50 个 `.axaml` 只有 1 个开编译绑定、13 个有 `x:DataType`；渐进三批推进 + `-Task guards` 第 9 条 `compilebindings`（只约束新增与已迁移文件） |
 | 缩略图/图标缓存与列表惰性分批（v0.5.6 缩略图功能性能债） | [thumbnail-list-cache-virtualization.md](.omo/plans/未开始/thumbnail-list-cache-virtualization.md) | 🟢低 | Phase 1 **2-3天** | 2026-11-06 立项（`file-list-thumbnails` 实施记录里三条已知改进口子）：①缩略图缓存跨包/跨目录共享（构造参数已具备，切包丢缓存）②ICO 列表图标 LRU 缓存（筛选每敲一字重读最多 20 个 ico）③平铺/内容布局分批惰性铺条（每批 200、滚动到底追加），作为无虚拟化的缓解；Phase 2 真虚拟化面板（自写 VirtualizingPanel）留档，待 Phase 1 QA 后由用户单独决策，未明确决策不得开工。**暂缓**：被下条 UX 修复先做 |
 
-> **v0.5.10 尾部缓冲（进度紧就退回 B 档）**：剩余 3 项——压缩文件名模板（8-10h，`filename-template.md`；已由「后缀模板」改写为文件名模板，新增三入口默认值 + 命名预设 + 三模式接管）、预览「显示内容」开关（2-3h，`preview-show-content-toggle.md`）、提取日志与解压「后悔药」（3-4h，`extract-journal-undo.md`）。
+> **v0.5.10 尾部缓冲（进度紧就退回 B 档）**：剩余 2 项——预览「显示内容」开关（2-3h，`preview-show-content-toggle.md`）、提取日志与解压「后悔药」（3-4h，`extract-journal-undo.md`）。原在此列的「压缩文件名模板」已于 2026-11-11 升入 v0.5.7。
 
 ---
 
@@ -167,7 +170,7 @@
 
 ---
 
-## 进行中 —— 5 条计划（1 条已排入 v0.5.8，4 条待排 / 已在做）
+## 进行中 —— 6 条计划（2 条已排入 v0.5.x，4 条待排 / 已在做）
 
 > 2026-11-04 清账：7z solid 批量解压、选中条目批量解压、文件名代码页三条的代码与实测均已通过，已归档进「已完成」（HDD 真机复测仍列为 v0.5.6 发布前手工项）；预览扩展剩余部分、浮动面板、注释编码 Phase 2 三条转入「已冻结」；可插拔预览模块转「已归档」。
 
@@ -178,6 +181,7 @@
 | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | Core 侧 TAR 裸格式 / GZip 单文件压缩 + 文件关联已就绪 | UI 压缩格式下拉未放开；BZip2→XZ→Zstd→Brotli；7z.dll 只读格式 | **只做前半**：UI 下拉放开 + 7z.dll 只读解锁（读取做稳）；BZip2/XZ/Zstd **创建**无限期延后。待排（估 6-8h），不急 |
 | 文件选择器「新建文件夹」（所有模式） | [picker-new-folder.md](.omo/plans/进行中/picker-new-folder.md) | — | 已完成（T1–T6） | **待发版**（2026-11-04，`beta`）：地址行按钮 + `Ctrl+Shift+N` + 校验留窗的 `InputDialog`；PickFolder/ExtractFolder/SaveFile 建完进新目录，PickItems/OpenFile 只刷新。`ui-tests` 6 例全绿；归档待 `RELEASE_NOTES` 范围确认 |
 | 文件选择器地址区拆两行 | [picker-address-two-rows.md](.omo/plans/进行中/picker-address-two-rows.md) | — | 已完成（T1–T4） | **待发版**（2026-11-05，`beta`）：按钮行（左导航 / 右新建+收藏）+ 面包屑整宽行；面包屑 392 → ≈610px，垂直多占 36–46px。两个 headless 用例钉住布局关系；归档待 `RELEASE_NOTES` 范围确认 |
+| 压缩文件名模板（三入口默认值 + 命名预设） | [filename-template.md](.omo/plans/进行中/filename-template.md) | — | 进行中（2026-11-11 开工） | **已排入 v0.5.7**（8-10h）：占位符模板生成压缩包主名，三入口默认值 + 命名预设，命名收敛在 `CompressPathPlanner`（预览树 = 实际输出）；确认时校验未知占位符 / 非法字符 / 空结果 / 多源重名 |
 
 ---
 
@@ -222,6 +226,7 @@ preview-memory-first（S，已完成 2026-10-28）── 取数层复用 ──�
 progress-window-conflict-policy（**v0.5.7**）── Phase 3 接线 ──▶ 修复 KI-012（三条原地解压路径恒静默覆盖）；rar-compression（B 档）的冲突体验同批受益
 
 parallel-compress-plan-d ── 布局前提 ──▶ progress-bar-segments（**已排 v0.5.8**；D 仍在 B 档 ⇒ 先做「按当前布局着色」的兼容版，D 落地后补分段）
+filename-template（**v0.5.7 第二项**）── 命名收敛在 CompressPathPlanner ──▶ 预览树 / 三入口 / CLI 共用同一渲染结果（将来 archive-rename-entry 的「另存为」命名可复用）
 
 NuGet 升级（SharpCompress ≥0.49.0）── 联动 ──▶ selfcontained-size-optimization（B 档，TrimmerRootAssembly 需随升级更新）
 ```

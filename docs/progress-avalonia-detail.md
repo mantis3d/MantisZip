@@ -6,6 +6,12 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-11** — 计划调整：`filename-template` 升入 v0.5.7，Office 预览切片 3 后移 v0.5.10
+  - **背景**：v0.5.7 原定「冲突策略（已完成）+ KI-012（已完成）+ Office 预览切片 3（5-7h）」，用户要求把 Office 切片 3 推后，改为先做**压缩文件名模板**。
+  - **归属裁决（用户拍板）**：文件名模板**并入 v0.5.7 作为第二项**（不单开阶段，版本号保持 0.5.7，做完即可发版）；Office 切片 3 **并进 v0.5.10 新功能与债务**（与卡片元数据、AXAML 编译绑定同属预览/质量提升类，不挤占 v0.5.8 拖拽收尾的窗口）。
+  - **`docs/PLAN.md` 改动**：v0.5.7 标题改为「数据安全收尾与压缩文件名模板（约 20-26h）」；表格里 Office 行换成文件名模板行（8-10h）；验收口径去掉「Office 三族预览不再先落盘」、补文件名模板四条（留空逐字节一致 / `{name}_{date}` 三源分别产出 / 只读框 = 预览 = 最终名 / `{foo}` 确认时拦截）；`最后更新` → 2026-11-11；v0.5.10 表首行插入 Office 行（注明 11-11 从 v0.5.7 后移）；v0.5.10 尾部缓冲从 3 项减为 2 项（文件名模板已升档）；`## 进行中` 5 条 → 6 条并加本计划行；依赖链补 `filename-template ── 命名收敛在 CompressPathPlanner ──▶ 预览树 / 三入口 / CLI 共用同一渲染结果`。
+  - **计划文件**：`.omo/plans/未开始/filename-template.md` → `git mv` 到 `进行中/`；头部状态改「🚧 进行中（2026-11-11 开工，v0.5.7 第二项）」、目标版本改「v0.5.7（2026-11-11 由 v0.5.10 尾部缓冲移入）」。本文档 `:73` 的旧路径引用同步改 `进行中/`。
+  - **验证**：三份文档 `bom=False` / `loneLF=0` / `loneCR=0`；`-Task check` exit 0（版本 0.5.7 六处一致、三语 1451 key、9 条守卫全绿）；纯文档调整，未构建 / 未跑测试。
 **2026-11-10** — 合并：`plans` → `alpha`（唯一根目录计划与原型回流；冲突解法与前次 beta→plans 同规）
   - **方式**：`git merge plans`；产品代码零改动，只带入 `.omo/plans/未开始/{compress-extract-root-mode,nested-archive-extract}.md`、`docs/prototypes/compress-extract-root-mode.html` 与 `docs/PLAN.md` 两行；冲突只在 `docs/PROGRESS.md` 与本文档两处。
   - **冲突根因（均为「同一内容在两侧位置不同」的搬运冲突）**：两侧各自合过 beta，11-04「冲突时: 实时策略」条目内容逐字相同但排序位置不同（alpha 放在 11-04 段首、plans 放在段尾）；plans 侧另有 11-10（唯一根目录计划）、11-09（beta→plans 合并）、11-05（嵌套解压计划）三条 alpha 没有的新记录。
@@ -70,7 +76,7 @@
 **2026-11-06** — 计划：压缩文件名模板（由「后缀模板」改写为「文件名模板」）
   - **起因**：原计划 `.omo/plans/未开始/filename-suffix-template.md` 只描述「在原名后加日期/时间/序号后缀」，用户要求改成「整个文件名由模板决定」——后缀模板无法表达原名从哪来、原扩展名怎么办，也无法覆盖手动/合并模式的命名。
   - **核对现状后发现旧计划 8 处已脱节**：`CompressService.ComputeSeparateOutputPath` 现在只是 `CompressPathPlanner` 的薄包装（`CompressService.cs:429`）；预览与实际共用 B 数据集 `CompressPlan`（`GetOutputPaths` 有 Plan 就不重算，`:162-175`）⇒ 模板必须在**建 plan 时**生效而不是执行时拼；规则 20 禁止窗口关掉后回读属性；`AppSettings` 在 `Models/` 下；`HandleCompressQuick` 在 `App.CliCompress.cs:147`（名字计算 `:164-166`）；对话框已是 VM + `LocalizedStrings[...]` 绑定；`KeepOriginalExtension` 是设置窗的全局开关、压缩对话框里没有；占位符缺 `{name}`。
-  - **新计划**（`.omo/plans/未开始/filename-template.md`，旧文件 `git mv` 改名保留历史）：模板渲染**主名**、格式扩展名自动补；占位符 `{name}` `{ext}` `{parent}` `{date}` `{datetime}` `{seq}` `{seq:0000}` + `{{`/`}}` 转义；模板非空即接管命名并忽略 `KeepOriginalExtension`；手动/合并模式的「输出文件名」框变只读预览；三档默认模板（对话框 / `--compress-quick` / `--compress-separate`，设置页配置）；对话框内命名预设（名字 + 模板，上限 20，仅预设增删落盘，不写回默认值以沿用 `CompressSettingsViewModel.cs:192-193` 的既有约定）；确认时校验未知占位符 / 非法字符 / 空结果 / 多源重名 → `Rejected<CompressSettings>` 窗口内提示。
+  - **新计划**（`.omo/plans/进行中/filename-template.md`，旧文件 `git mv` 改名保留历史）：模板渲染**主名**、格式扩展名自动补；占位符 `{name}` `{ext}` `{parent}` `{date}` `{datetime}` `{seq}` `{seq:0000}` + `{{`/`}}` 转义；模板非空即接管命名并忽略 `KeepOriginalExtension`；手动/合并模式的「输出文件名」框变只读预览；三档默认模板（对话框 / `--compress-quick` / `--compress-separate`，设置页配置）；对话框内命名预设（名字 + 模板，上限 20，仅预设增删落盘，不写回默认值以沿用 `CompressSettingsViewModel.cs:192-193` 的既有约定）；确认时校验未知占位符 / 非法字符 / 空结果 / 多源重名 → `Rejected<CompressSettings>` 窗口内提示。
   - **命名管线**：Core 新增 `FileNameTemplate`（`TryValidateSyntax` / `TryRender`）与 `FileNameTemplatePreset`；`CompressPathPlanner` 三个方法加可选模板参数（默认值保持旧行为，渲染失败静默回退旧命名，避免打字中途把预览树打空）；`CompressRequest` 增 `FileNameTemplate` + `TemplateTimestamp`，`CompressService` 在无 Plan 时用 `PlanSeparate` 统一解析。
   - **2026-11-08 追加**：新增 `{name:auto}`（该包只含 1 个源 → 等于 `{name}`；≥2 个源 → 公共父目录名，跨盘/盘符根回退第一个源名），并把 `{name}` 的语义统一为「源主名，多源取第一个源」（取消 Combined 特判为公共父目录名）；公共父目录算法从 `App.CliCompress.cs:494` 下沉到 Core `Utils/PathCommonality.cs`，避免第 4 份拷贝。
   - **工时**：原 2-3h → 8-10h（新增三入口默认值、预设、三模式接管、校验），`docs/PLAN.md:137` 已同步。
