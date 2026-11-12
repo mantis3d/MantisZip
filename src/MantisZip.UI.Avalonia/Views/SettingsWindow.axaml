@@ -107,7 +107,7 @@
                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                  BorderBrush="{DynamicResource ThemeBorderBrush}" />
                         <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
-                        <controls:PlaceholderInsertButton Grid.Column="2" Classes="ToolbarButton"
+                        <controls:PlaceholderInsertButton Grid.Column="2"
                                                           TargetTextBox="{Binding #FileNameTemplateDialogBox}"
                                                           Content="{Binding FileNameTemplateInsertText}"
                                                           ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
@@ -126,7 +126,7 @@
                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                  BorderBrush="{DynamicResource ThemeBorderBrush}" />
                         <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
-                        <controls:PlaceholderInsertButton Grid.Column="2" Classes="ToolbarButton"
+                        <controls:PlaceholderInsertButton Grid.Column="2"
                                                           TargetTextBox="{Binding #FileNameTemplateQuickBox}"
                                                           Content="{Binding FileNameTemplateInsertText}"
                                                           ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
@@ -145,7 +145,7 @@
                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                  BorderBrush="{DynamicResource ThemeBorderBrush}" />
                         <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
-                        <controls:PlaceholderInsertButton Grid.Column="2" Classes="ToolbarButton"
+                        <controls:PlaceholderInsertButton Grid.Column="2"
                                                           TargetTextBox="{Binding #FileNameTemplateSeparateBox}"
                                                           Content="{Binding FileNameTemplateInsertText}"
                                                           ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />

@@ -110,7 +110,7 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         vm.FileNameTemplate = "{foo}";
 
         Assert.NotNull(vm.TemplateError);
-        Assert.True(vm.IsTemplateExampleError);
+        Assert.True(vm.IsTemplateErrorVisible);
     }
 
     [Fact]
@@ -122,7 +122,7 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         vm.FileNameTemplate = "{name}_{date}";
 
         Assert.Null(vm.TemplateError);
-        Assert.False(vm.IsTemplateExampleError);
+        Assert.False(vm.IsTemplateErrorVisible);
     }
 
     [Fact]

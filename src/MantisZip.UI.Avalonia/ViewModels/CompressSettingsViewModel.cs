@@ -669,6 +669,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_FileNameTemplate_PresetName"] = LocalizationManager.T("Compress_FileNameTemplate_PresetName");
         LocalizedStrings["Compress_FileNameTemplate_SavePreset"] = LocalizationManager.T("Compress_FileNameTemplate_SavePreset");
         LocalizedStrings["Compress_FileNameTemplate_DeletePreset"] = LocalizationManager.T("Compress_FileNameTemplate_DeletePreset");
+        LocalizedStrings["Compress_FileNameSection"] = LocalizationManager.T("Compress_FileNameSection");
+        LocalizedStrings["Compress_FileNameTemplate_RowLabel"] = LocalizationManager.T("Compress_FileNameTemplate_RowLabel");
         // 「插入占位符」按钮（规则 13：XAML 里的 LocalizedStrings[...] 必须登记，漏了按钮文字空白）
         LocalizedStrings["Compress_FileNameTemplate_Insert"] = LocalizationManager.T("Compress_FileNameTemplate_Insert");
         LocalizedStrings["Compress_FileNameTemplate_InsertTip"] = LocalizationManager.T("Compress_FileNameTemplate_InsertTip");
@@ -1175,12 +1177,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSeparateMode));
         OnPropertyChanged(nameof(IsCombinedMode));
         OnPropertyChanged(nameof(IsOutputFileNameReadOnly));
-        OnPropertyChanged(nameof(TemplateExampleText));
-        OnPropertyChanged(nameof(IsTemplateExampleError));
         RefreshOutputPathState();
         TemplateError = ValidateTemplateNow();
-        OnPropertyChanged(nameof(TemplateExampleText));
-        OnPropertyChanged(nameof(IsTemplateExampleError));
         UpdateCanCompress();
         if (AutoGenerateRules)
             RefreshAutoRules();
@@ -1232,21 +1230,11 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// </summary>
     public bool IsOutputFileNameReadOnly => OutputMode != CompressOutputMode.Manual || IsTemplateActive;
 
-    /// <summary>模板示例行（正常时给「当前模式第一个源」渲染出的文件名）。</summary>
-    public string TemplateExampleText
-    {
-        get
-        {
-            if (!IsTemplateActive)
-                return LocalizationManager.T("Compress_FileNameTemplate_Inactive");
-
-            var example = RenderTemplateForDisplay();
-            return example ?? LocalizationManager.T("Compress_FileNameTemplate_NoSource");
-        }
-    }
-
-    /// <summary>示例行是否显示为错误态（模板语法错或有源但渲染失败）。</summary>
-    public bool IsTemplateExampleError => IsTemplateActive && TemplateError != null;
+    /// <summary>
+    /// 模板错误行是否可见。只在模板启用且校验出问题时为 true ——
+    /// 正常时这一行完全不占位（原「示例行」已并入下方文件名框，见 2026-11-12 合并）。
+    /// </summary>
+    public bool IsTemplateErrorVisible => IsTemplateActive && TemplateError != null;
 
     /// <summary>模板内容变化 → 重渲染（只改显示与校验，不写回设置）。</summary>
     partial void OnFileNameTemplateChanged(string? value)
@@ -1255,15 +1243,14 @@ public partial class CompressSettingsViewModel : ObservableObject
         RefreshTemplatedOutputFileName();
         OnPropertyChanged(nameof(IsTemplateActive));
         OnPropertyChanged(nameof(IsOutputFileNameReadOnly));
-        OnPropertyChanged(nameof(TemplateExampleText));
-        OnPropertyChanged(nameof(IsTemplateExampleError));
+        OnPropertyChanged(nameof(IsTemplateErrorVisible));
         if (IsTemplateActive)
             BuildCompressPreview();
     }
 
     partial void OnTemplateErrorChanged(string? value)
     {
-        OnPropertyChanged(nameof(IsTemplateExampleError));
+        OnPropertyChanged(nameof(IsTemplateErrorVisible));
     }
 
     /// <summary>
@@ -1303,25 +1290,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         }
 
         return null;
-    }
-
-    /// <summary>按当前模式给「第一个源」渲染一次，用于示例行显示。</summary>
-    private string? RenderTemplateForDisplay()
-    {
-        if (!IsTemplateActive) return null;
-        var paths = SelectedPaths.ToList();
-        if (paths.Count == 0) return null;
-
-        if (OutputMode == CompressOutputMode.Separate)
-        {
-            return MantisZip.Core.Utils.FileNameTemplate.TryRender(
-                FileNameTemplate, BuildTemplateContext(paths), out var first, out _)
-                ? first + CompressPathPlanner.GetFormatExtension(DefaultFormat)
-                : null;
-        }
-
-        return CompressPathPlanner.ComputeSingleArchiveName(
-            paths, DefaultFormat, FileNameTemplate, _templateTimestamp);
     }
 
     /// <summary>模板渲染上下文（<c>{name:auto}</c> 在分别压缩下恒等于第一个源，故传 null）。</summary>
@@ -1472,8 +1440,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         // 扩展名是模板示例行的一部分，切换格式要重算示例与校验
         RefreshTemplatedOutputFileName();
         TemplateError = ValidateTemplateNow();
-        OnPropertyChanged(nameof(TemplateExampleText));
-        OnPropertyChanged(nameof(IsTemplateExampleError));
+        OnPropertyChanged(nameof(IsTemplateErrorVisible));
         // 切换格式时刷新预览树（压缩包扩展名变化）
         BuildCompressPreview();
     }

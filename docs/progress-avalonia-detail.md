@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-12** — 界面：压缩设置窗「文件名」卡片合并 + 按钮样式归位
+  - **背景**：用户报三个问题 —— ①新增的几个按钮误用了 `ToolbarButton`；②文件名模板应放到输出路径下面并与原有文件名显示合并；③原有文件名显示与新增提示文本内容重复。先讨论后动手，四项拍板：合成一张「文件名」卡片、普通按钮回归全局默认样式、删示例行及其属性与两个 key、帮助按钮留在标题行右侧。
+  - **根因**：`ToolbarButton` 是主窗口工具栏专用样式（`App.axaml:181`，`Height=ControlHeightLg` + `Background=ThemeHeaderBgBrush`），贴在卡片里比同排 `TextBox`（`MinHeight=ControlHeightSm`）高且底色像补丁；受影响的 7 个按钮是压缩窗「插入占位符 / 存为预设 / 删除 / 帮助」与设置页三行「插入占位符」。重复则是两处都渲染同一个 `ComputeSingleArchiveName` 结果（示例行与文件名框），未启用模板时连「留空则按原规则命名」都和 watermark 一字不差。
+  - **改动**（`src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml`）：行定义 6 → 5（`输出模式 / 输出路径 / 文件名 / 文件冲突策略 / 完成后行为`），删掉独立的「文件名模板」卡片，把「输出路径」上移一行；新卡片 `Grid.Row="2"` 自上而下是标题行（`Compress_FileNameSection` + 帮助按钮 `Classes="ToolbarIcon"`）、模板行（80px 标签列 `Compress_FileNameTemplate_RowLabel` + `FileNameTemplateBox` + 插入按钮在第 3 列）、预设行（`Margin="80,0,0,0"` 与上行对齐）、最终文件名行（`OutputFileName` + `OutputExtensionLabel`）、错误行（`TemplateError` + `IsTemplateErrorVisible`）。三个普通按钮去掉 `Classes="ToolbarButton"` 回归全局样式，帮助图标钮只留 `ToolbarIcon`；`Views/SettingsWindow.axaml` 三处同样去 class。
+  - **VM 清理**（`ViewModels/CompressSettingsViewModel.cs`）：删 `TemplateExampleText` 与 `IsTemplateExampleError`、删已无引用的私有 `RenderTemplateForDisplay()`（`BuildTemplateContext` 保留，`ValidateTemplateNow` 仍在用），新增 `IsTemplateErrorVisible => IsTemplateActive && TemplateError != null`；`OnOutputModeChanged` 里重复的两条通知去重；三份 json 删 `Compress_FileNameTemplate_Inactive` / `_NoSource`，新增 `Compress_FileNameSection`（文件名 / File name / 檔案名）与 `Compress_FileNameTemplate_RowLabel`（模板 / Template / 範本）并在 `LocalizedStrings` 登记 ⇒ `-Task i18n` 回到 **1483** key。
+  - **为什么这两行要挤进一张卡**：模板与最终文件名是「输入 → 输出」的因果对，分两张卡放时用户要在两处之间来回看；合成一张后左侧标签统一 80px、模板框结果与文件名框结果上下对齐，改模板能直接看到下面那行跟着变。
+  - **验证**：avalonia Release `--no-incremental` 13.5s / 22.6s **0 警告**；`ui-tests` 45.8s 全绿、`tests` 11.1s 全绿；`-Task check` 0.5.7 六处 / 1483 key / 9 条守卫；`CompressSettingsViewModelTemplateTests` 里两处 `IsTemplateExampleError` 断言同步改为 `IsTemplateErrorVisible`。真机（`--compress %TEMP%\mz-ph\report.txt`，窗口 1096×899）：卡片标题「文件名」、内层「模板」「文件名」两行左对齐、按钮与输入框齐高。
+
 **2026-11-12** — 功能：「插入占位符」下拉菜单（文件名模板）
   - **需求**：用户希望像常见软件那样，点一下弹出全部占位符的菜单，选一个就插到输入框光标处，不用手敲 `{name:auto}` 这种记不住的 token。
   - **纯函数层**：新建 `src/MantisZip.UI.Avalonia/Models/PlaceholderInsertion.cs`（`Insert(text, selectionStart, selectionEnd, token, out caretIndex)` 处理选区替换 / 反向选区交换 / 越界 clamp / 空文本；`ResolveInsertIndex(text, caretIndex)` 在光标无效时兜底到文本末尾）。
