@@ -99,6 +99,22 @@
 
 > **v0.5.7 验收口径**：解压途中能从进度窗把「冲突时」切到覆盖 / 跳过 / 重命名且立刻生效；「解压到此处 / 同名目录 / 智能解压」遇到同名文件不再静默覆盖（默认仍问一次）；KI-012 关闭；Office 三族预览不再先落盘。
 
+### 阶段（待定版本号）—— 网页类内容预览：HTML 兄弟资源 / MHT / CHM（插队，约 12-20h）
+
+> **2026-11-12 插队立项**：来自 issue #79（`.HTM 及 .MHT 及 .CHM 预览`）。判据第 3 条命中——`HTML 预览丢图丢样式` 是**点了没反应级**的失信 bug（用户看到的是一张没有样式、没有截图的裸网页），而 `.mht` / `.chm` 两个格式的可行性已用样本实测确认（详见设计文档 §1.2–1.3）。
+>
+> **⚠️ 开工前必须确认的两件事（规则 1 / 规则 2）**：① 本阶段**没有确定版本号**——是先发一个 v0.5.7.x 补丁，还是并进下一个 v0.5.x 阶段，需用户定；② 分支——①虽是 bug，但为避免同一批改动跨 `beta`/`alpha` 两分支，建议整体走 `alpha`。
+
+| 功能 | 设计文档 | 难度 | 工时 | 说明 |
+|---|---|:--:|:--:|---|
+| ① HTML 兄弟资源打包（修「丢图丢样式」） | [html-mht-chm-preview.md](.omo/plans/未开始/html-mht-chm-preview.md) | 🟡中 | 6-9h | 新增 `PreviewAssetBundler`：用 HtmlAgilityPack 收集被引用的相对路径资源，经 `ExtractEntriesAsync` + `outputPathOverrides` **按原相对结构**解压到临时 bundle 目录，再**剥掉 `crossorigin` / `integrity`**后导航。两个根因缺一不可（只解单条目 + `crossorigin` 在 `file://` 下被 CORS 拒）。顺带修 `MaxTextPreviewBytes`(1MB) 误判闸门 → `MaxPreviewFileSize`。样本实测：12.6 MB 整包 → 只解被引用的 6.69 MB |
+| ② `.mht` / `.mhtml` 预览 | 同上 §3.2 | 🟢低 | 2-3h | 新增 `FileFormat.Mht` / `PreviewType.Mht`；落盘**保留 `.mht` 后缀**后 `file://` 直导航；**绝不注入 CSP meta**（会破坏 multipart 结构）。样本 9.5 MB 整页正常。天花板已登 **KI-018**（Chromium MHTML 限制，不承诺第三方旧 MHT） |
+| ③ `.chm` 当只读容器打开 | 同上 §3.3 | 🟡中 | 4-8h | `ArchiveFormat` 加 `Chm` + `SevenZipEngine.CanHandle` 认它（`CanAdd`/`CanDelete` 保持只认 SevenZip ⇒ 天然只读）；`ArchiveExtensionCatalog` 加一行自动带动设置页/关联/对话框筛选；`ITSF` 魔数 + `.chm` 扩展名；过滤 `#`/`$` 开头的系统条目。仓库自带 `7z.dll` 26.00 实测可读（296 条目 405 ms），零新依赖；7z.dll 不支持时给明确提示 |
+
+> **本阶段验收口径**：压缩包里选中 `.htm` → 页面带样式、GIF 能看、徽章能显示；选中 `.mht` → 整页渲染；选中 `.chm` → 像压缩包一样打开、条目树干净、可整包解压、不能加/删条目；三者遇到「7z.dll 不支持 / MHTML 白屏」都只是**给出原因**，不崩、不静默。
+>
+> **明确不做**：CHM 阅读器（首页 + TOC 侧栏，D 档单独立项）、新增 HTML 安全开关（沿用现有 `AllowJavaScript` / `AllowExternalResources`）、`WebResourceRequested` 网络层拦截。
+
 ### 阶段 v0.5.8 —— 拖拽收尾与碎片清仓（约 17-24h）
 
 > **2026-11-04 重排**：`drag-drop-direct-extract` 自 2026-10-30 起挂在「7/10」，是唯一带「拖了没反应」风险的半成品（`DragPreviewPopup.cs` 至今不存在）。碎片清仓同时收到这里，避免小活池越攒越久。
