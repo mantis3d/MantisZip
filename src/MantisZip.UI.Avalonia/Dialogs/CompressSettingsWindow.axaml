@@ -114,14 +114,24 @@
                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                 </Button>
               </Grid>
-              <!-- 模板输入框：实时校验，语法错误不阻止继续输入（只在示例行与确认时提示） -->
-              <TextBox x:Name="FileNameTemplateBox"
-                       Text="{Binding FileNameTemplate}"
-                       Watermark="{Binding LocalizedStrings[Compress_FileNameTemplate_Placeholder]}"
-                       MinHeight="{DynamicResource ControlHeightSm}"
-                       Background="{DynamicResource ThemeSurfaceBgBrush}"
-                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              <!-- 模板输入框：实时校验，语法错误不阻止继续输入（只在示例行与确认时提示）。
+                   右侧「插入占位符」按钮弹出下拉，点一项即插到光标后（提示走 XAML 里的 ToolTip）。 -->
+              <Grid ColumnDefinitions="*,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                <TextBox Grid.Column="0"
+                         x:Name="FileNameTemplateBox"
+                         Text="{Binding FileNameTemplate}"
+                         Watermark="{Binding LocalizedStrings[Compress_FileNameTemplate_Placeholder]}"
+                         MinHeight="{DynamicResource ControlHeightSm}"
+                         Background="{DynamicResource ThemeSurfaceBgBrush}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到光标处 -->
+                <controls:PlaceholderInsertButton Grid.Column="1"
+                                                  Classes="ToolbarButton"
+                                                  TargetTextBox="{Binding #FileNameTemplateBox}"
+                                                  Content="{Binding LocalizedStrings[Compress_FileNameTemplate_Insert]}"
+                                                  ToolTip.Tip="{Binding LocalizedStrings[Compress_FileNameTemplate_InsertTip]}" />
+              </Grid>
               <!-- 命名预设：选中即填入输入框（不写回设置）；旁边的输入框 + 两个按钮用于增删预设 -->
               <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
                 <ComboBox ItemsSource="{Binding TemplatePresetOptions}"

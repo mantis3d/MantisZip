@@ -98,43 +98,58 @@
                       <TextBlock Text="{Binding FileNameTemplateHelpText}" FontSize="12" TextWrapping="Wrap"
                                  Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                       <!-- 行 1：压缩对话框默认值 -->
-                      <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                      <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
                         <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateDialogText}" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" Text="{Binding FileNameTemplateDialog}"
+                        <TextBox Grid.Column="1" x:Name="FileNameTemplateDialogBox" Text="{Binding FileNameTemplateDialog}"
                                  Watermark="{Binding FileNameTemplateRowHintText}"
                                  MinHeight="{DynamicResource ControlHeightSm}"
                                  Background="{DynamicResource ThemeSurfaceBgBrush}"
                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                  BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                        <ComboBox Grid.Column="2" ItemsSource="{Binding FileNameTemplatePresetOptions}"
+                        <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
+                        <controls:PlaceholderInsertButton Grid.Column="2" Classes="ToolbarButton"
+                                                          TargetTextBox="{Binding #FileNameTemplateDialogBox}"
+                                                          Content="{Binding FileNameTemplateInsertText}"
+                                                          ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
                                   SelectedItem="{Binding SelectedFileNameTemplatePresetDialog}"
                                   DisplayMemberBinding="{Binding Name}"
                                   MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
                       </Grid>
                       <!-- 行 2：快速压缩默认值 -->
-                      <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                      <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
                         <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateQuickText}" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" Text="{Binding FileNameTemplateQuick}"
+                        <TextBox Grid.Column="1" x:Name="FileNameTemplateQuickBox" Text="{Binding FileNameTemplateQuick}"
                                  Watermark="{Binding FileNameTemplateRowHintText}"
                                  MinHeight="{DynamicResource ControlHeightSm}"
                                  Background="{DynamicResource ThemeSurfaceBgBrush}"
                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                  BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                        <ComboBox Grid.Column="2" ItemsSource="{Binding FileNameTemplatePresetOptions}"
+                        <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
+                        <controls:PlaceholderInsertButton Grid.Column="2" Classes="ToolbarButton"
+                                                          TargetTextBox="{Binding #FileNameTemplateQuickBox}"
+                                                          Content="{Binding FileNameTemplateInsertText}"
+                                                          ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
                                   SelectedItem="{Binding SelectedFileNameTemplatePresetQuick}"
                                   DisplayMemberBinding="{Binding Name}"
                                   MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
                       </Grid>
                       <!-- 行 3：分别压缩默认值（若不含 {name}/{seq}/{parent}，多源会撞名，确认时被拦） -->
-                      <Grid ColumnDefinitions="150,*,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                      <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
                         <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateSeparateText}" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" Text="{Binding FileNameTemplateSeparate}"
+                        <TextBox Grid.Column="1" x:Name="FileNameTemplateSeparateBox" Text="{Binding FileNameTemplateSeparate}"
                                  Watermark="{Binding FileNameTemplateRowHintText}"
                                  MinHeight="{DynamicResource ControlHeightSm}"
                                  Background="{DynamicResource ThemeSurfaceBgBrush}"
                                  Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                  BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                        <ComboBox Grid.Column="2" ItemsSource="{Binding FileNameTemplatePresetOptions}"
+                        <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
+                        <controls:PlaceholderInsertButton Grid.Column="2" Classes="ToolbarButton"
+                                                          TargetTextBox="{Binding #FileNameTemplateSeparateBox}"
+                                                          Content="{Binding FileNameTemplateInsertText}"
+                                                          ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
                                   SelectedItem="{Binding SelectedFileNameTemplatePresetSeparate}"
                                   DisplayMemberBinding="{Binding Name}"
                                   MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />

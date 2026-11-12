@@ -669,6 +669,9 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_FileNameTemplate_PresetName"] = LocalizationManager.T("Compress_FileNameTemplate_PresetName");
         LocalizedStrings["Compress_FileNameTemplate_SavePreset"] = LocalizationManager.T("Compress_FileNameTemplate_SavePreset");
         LocalizedStrings["Compress_FileNameTemplate_DeletePreset"] = LocalizationManager.T("Compress_FileNameTemplate_DeletePreset");
+        // 「插入占位符」按钮（规则 13：XAML 里的 LocalizedStrings[...] 必须登记，漏了按钮文字空白）
+        LocalizedStrings["Compress_FileNameTemplate_Insert"] = LocalizationManager.T("Compress_FileNameTemplate_Insert");
+        LocalizedStrings["Compress_FileNameTemplate_InsertTip"] = LocalizationManager.T("Compress_FileNameTemplate_InsertTip");
 
         // 初始化压缩级别下拉选项（共享数据源，本地化 Display）
         CompressionLevelOptions = CompressionOptionData.LevelOptions

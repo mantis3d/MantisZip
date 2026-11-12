@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-12** — 功能：「插入占位符」下拉菜单（文件名模板）
+  - **需求**：用户希望像常见软件那样，点一下弹出全部占位符的菜单，选一个就插到输入框光标处，不用手敲 `{name:auto}` 这种记不住的 token。
+  - **纯函数层**：新建 `src/MantisZip.UI.Avalonia/Models/PlaceholderInsertion.cs`（`Insert(text, selectionStart, selectionEnd, token, out caretIndex)` 处理选区替换 / 反向选区交换 / 越界 clamp / 空文本；`ResolveInsertIndex(text, caretIndex)` 在光标无效时兜底到文本末尾）。
+  - **控件**：新建 `src/MantisZip.UI.Avalonia/Controls/PlaceholderInsertButton.cs`（`Button` 子类，`TargetTextBox` 样式属性 + `MenuFlyout`；`OnAttachedToVisualTree` 里建 flyout，`OnClick` 里**先** `RebuildItems()` **再** `base.OnClick()`；菜单项按 `FileNameTemplate.Placeholders` 生成、文案 = token + 本地化说明；`OnPreviewPointerPressed` 走 Tunnel 抢在菜单弹出前记下光标/选区）。
+  - **接线**：压缩对话框「文件名模板」输入框右侧、设置页「压缩 → 常规」三行模板输入框右侧各加一个按钮（设置页行定义 `150,*,Auto` → `150,*,Auto,Auto`，预设 `ComboBox` 移到第 3 列）。
+  - **三个真缺陷（教训必留）**：
+    - **派生 `Button` 必须重写 `StyleKeyOverride => typeof(Button)`**：不给时 Avalonia 按自身类型找 `ControlTheme`，找不到就**没有模板** —— 按钮既没有内边距也不可点击（实测 `Click` 完全不触发），外观还剩一个空框。
+    - **菜单项必须在 `OnClick` 里、`base.OnClick()` 之前建好**：放 `MenuFlyout.Opening` 里太晚，弹层已按空 `Items` 测过尺寸，真机上弹出来是 **2×32 的空条**（`EnumWindows` 量到的窗口尺寸）。
+    - **不要覆盖 `OnClick` 后再自己 `ShowAt`**：基类内建逻辑已会 `OpenFlyout`，再 `ShowAt` 一次会「开了又关」；也不要 `Dispatcher.Post` 延迟打开 —— 基类路径已避开 Popup 的光照判定。
+  - **未聚焦时的插入点**：`TextBox` 从未获得焦点时 `CaretIndex` 恒为 0，照它插会插到最前面。`OnPreviewPointerPressed` 里先看 `textBox.IsFocused`，未聚焦就记 `-1` 交 `ResolveInsertIndex` 兜底到末尾。
+  - **i18n**：三份 json 各 +10 key（`Compress_FileNameTemplate_Insert` / `_InsertTip` + 8 个 `_Token_*`）⇒ `-Task i18n` **1483** key；压缩对话框 2 个 key 走 `LocalizedStrings` 登记（规则 13），设置页 2 个走普通 VM 属性（`FileNameTemplateInsertText`/`...TipText`，在 `UpdateLocalizedTexts` 里通知）。
+  - **验证**：`PlaceholderInsertionTests` 11 例 + `PlaceholderInsertButtonTests` 3 例（点按钮 → 弹层 8 项；有焦点时插到光标；未聚焦时追加到末尾）全绿；avalonia Release `--no-incremental` 0 警告；`ui-tests` 42.0s、`tests` 13.8s 全绿；`-Task check` 版本 0.5.7 六处 / 1483 key / 9 条守卫。真机：点「插入占位符」弹层 346×250 列出 8 项（`{name}` … `{seq:0000}`，各带中文说明），点 `{date}` 后输入框内容变为 `{date}` 且光标在其后。
+
 **2026-11-11** — 功能：压缩文件名模板（v0.5.7 第二项）
   - **需求**：用户希望压缩包主名能按规则自动生成（例：`{name}_{date}`），解决「同日期同名的压缩包互相覆盖」；此前只有「保留/去掉源扩展名」一个开关，重名时靠手动改名。
   - **交付**：核心是新的 Core 纯函数 `src/MantisZip.Core/Utils/FileNameTemplate.cs`——tokenizer 支持 `{name}` / `{name:auto}` / `{ext}` / `{parent}` / `{date}` / `{datetime}` / `{seq}` / `{seq:0000}`（大小写不敏感、`{{`/`}}` 转义），并做三层校验（语法 → 渲染 → 结果）；结果层拦空结果、`Path.GetInvalidFileNameChars()` + 控制字符、结尾 `.` 或空格、Windows 保留设备名（`CON`/`PRN`/`AUX`/`NUL`/`COM1-9`/`LPT1-9`）与超长 200。附 `FileNameTemplatePreset`（命名预设）与 `PathCommonality`（`FindCommonParent`/`IsDriveRoot` 从 `App.CliCompress.cs` 下沉，避免第 4 份拷贝）。

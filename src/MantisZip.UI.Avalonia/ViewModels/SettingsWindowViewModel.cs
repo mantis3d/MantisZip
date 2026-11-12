@@ -967,6 +967,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string FileNameTemplateSeparateText => LocalizationManager.T("Settings_Compress_FileNameTemplate_Separate");
     public string FileNameTemplateRowHintText => LocalizationManager.T("Settings_Compress_FileNameTemplate_RowHint");
     public string FileNameTemplatePresetHintText => LocalizationManager.T("Settings_Compress_FileNameTemplate_PresetHint");
+    // 「插入占位符」按钮文案（设置页三行共用；规则 13 的登记在下面 UpdateLocalizedTexts 里通知）
+    public string FileNameTemplateInsertText => LocalizationManager.T("Compress_FileNameTemplate_Insert");
+    public string FileNameTemplateInsertTipText => LocalizationManager.T("Compress_FileNameTemplate_InsertTip");
 
     /// <summary>设置页里的预设下拉（选中即填进对应输入框；增删只在压缩对话框里做）。</summary>
     public System.Collections.ObjectModel.ObservableCollection<MantisZip.Core.Utils.FileNameTemplatePreset> FileNameTemplatePresetOptions { get; } = new();
@@ -1797,6 +1800,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(FileNameTemplateSeparateText));
         OnPropertyChanged(nameof(FileNameTemplateRowHintText));
         OnPropertyChanged(nameof(FileNameTemplatePresetHintText));
+        OnPropertyChanged(nameof(FileNameTemplateInsertText));
+        OnPropertyChanged(nameof(FileNameTemplateInsertTipText));
         OnPropertyChanged(nameof(CompressConflictActionText));
         OnPropertyChanged(nameof(ZipDefaultOptionsText));
         OnPropertyChanged(nameof(ZipEncodingText));
