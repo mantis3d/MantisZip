@@ -30,6 +30,8 @@ public static class ResultPreviewService
     /// <param name="progress">进度回调（0–100），在后台线程调用，需自行节流/封送到 UI 线程。</param>
     /// <param name="preserveFullPath">是否保留完整路径（AppSettings.ExtractPreserveFullPath）。</param>
     /// <param name="currentFolder">当前浏览的压缩包内路径（路径裁剪锚点，与解压侧 ExtractPathResolver 同语义）。</param>
+    /// <param name="stripRoot">要剥掉的包内根段（null = 不剥）；必须与执行侧同源，否则预览与实解对不上。</param>
+    /// <param name="addRoot">要加的根段（null = 不加）；同上。</param>
     /// <returns>根节点（destDir 自身），包含完整的树结构。</returns>
     public static PreviewTreeNode BuildExtractPreview(
         IEnumerable<ArchiveItem> entries,
@@ -39,7 +41,9 @@ public static class ResultPreviewService
         FileFilterCriteria? filter = null,
         IProgress<double>? progress = null,
         bool preserveFullPath = true,
-        string currentFolder = "")
+        string currentFolder = "",
+        string? stripRoot = null,
+        string? addRoot = null)
     {
         // 根节点即解压目标目录本身（不再有概念容器层）
         var destNode = new PreviewTreeNode
@@ -58,16 +62,20 @@ public static class ResultPreviewService
         // 统一路径计算（与解压侧 ExtractPathResolver 同语义）；恶意路径条目逐条跳过，不影响整树
         foreach (var item in itemsList.Where(i => i.IsDirectory))
         {
-            string path;
+            string? resolved;
             try
             {
-                path = ExtractPathResolver.ResolveRelativePath(item.FullPath ?? item.Name, currentFolder, preserveFullPath);
+                resolved = ExtractPathResolver.ResolveRelativePath(
+                    item.FullPath ?? item.Name, currentFolder, preserveFullPath, stripRoot, addRoot);
             }
             catch
             {
                 continue;
             }
-            path = path.TrimEnd('/');
+            // 剥根会把根目录条目本身剥成空 ⇒ 预览里也不该出现这一层
+            if (resolved == null)
+                continue;
+            var path = resolved.TrimEnd('/');
             if (path.Length > 0 && dirsAdded.Add(path))
                 AddFolderNode(destNode, path, item);
         }
@@ -93,7 +101,16 @@ public static class ResultPreviewService
             string fullPath;
             try
             {
-                fullPath = ExtractPathResolver.ResolveRelativePath(item.FullPath ?? item.Name, currentFolder, preserveFullPath);
+                var relative = ExtractPathResolver.ResolveRelativePath(
+                    item.FullPath ?? item.Name, currentFolder, preserveFullPath, stripRoot, addRoot);
+                // 剥根后不剩内容（根目录条目本身）⇒ 该文件条目不存在于结果中
+                if (relative == null)
+                {
+                    processedFiles++;
+                    ReportProgress();
+                    continue;
+                }
+                fullPath = relative;
             }
             catch
             {
@@ -228,6 +245,11 @@ public static class ResultPreviewService
     /// 装配压缩预览树：消费已构建的 subtrees（与 sourcePaths 同序，可含 null），
     /// 产出预览根节点与压缩计划。
     /// </summary>
+    /// <param name="rootMode">
+    /// 「包内根目录」四态（见 <see cref="RootDirectoryMode"/>）；决定预览里要不要省掉源目录那一层、
+    /// 要不要在最前面加一层根。必须与执行侧同源 —— 预览显示的样子就是压缩包里的样子。
+    /// </param>
+    /// <param name="wrapRoot">加根时使用的根名（空 = 用输出包名去扩展名）。</param>
     public static (PreviewTreeNode Root, CompressPlan Plan) AssembleCompressPreview(
         IReadOnlyList<string> sourcePaths,
         IReadOnlyList<SourceSubtree?> subtrees,
@@ -237,8 +259,21 @@ public static class ResultPreviewService
         bool keepOriginalExtension,
         FileFilterCriteria? filter,
         string? fileNameTemplate = null,
-        DateTime? templateTimestamp = null)
+        DateTime? templateTimestamp = null,
+        RootDirectoryMode rootMode = RootDirectoryMode.Original,
+        string? wrapRoot = null)
     {
+        // 「包内根目录」四态：Strip 只在源恰为一个目录时成立；Wrap 在 Separate 下不可用（UI 置灰），
+        // 这里再兜一次底（置灰失效时也不会产出「每包各套一层」这种形状）。
+        var hasSingleSourceDir = ArchiveRootPolicy.HasSingleSourceDirectory(sourcePaths);
+        var rootAdjustment = ArchiveRootPolicy.Resolve(rootMode, hasSingleSourceDir);
+        if (outputMode == CompressOutputMode.Separate && rootAdjustment.Wrap)
+            rootAdjustment = new RootAdjustment(rootAdjustment.Strip, false);
+
+        // 预览里要落地的两个段：剥 = 源目录名（仅单目录源），加 = 用户给的根名或输出包主名。
+        var previewStripRoot = rootAdjustment.Strip && hasSingleSourceDir
+            ? ArchiveRootPolicy.GetSourceStripName(sourcePaths[0])
+            : null;
         PreviewTreeNode root;
         IReadOnlyList<CompressPlanItem> planItems;
         string? planOutputPath = null;
@@ -297,12 +332,29 @@ public static class ResultPreviewService
                     ExistsAtDestination = File.Exists(effectiveOutputPath)
                 };
 
-                // 挂载各源子树
+                // 挂载各源子树（套根时先包一层「根目录」节点）
+                var wrapName = rootAdjustment.Wrap
+                    ? ArchiveRootPolicy.GetWrapName(wrapRoot, effectiveOutputPath)
+                    : null;
+                PreviewTreeNode? wrapNode = null;
+                if (wrapName != null)
+                {
+                    // 根名取用户输入，回落输出包主名；节点只用于展示这一层，不参与计划
+                    wrapNode = new PreviewTreeNode
+                    {
+                        Name = wrapName,
+                        FullPath = wrapName,
+                        IsDirectory = true,
+                        IsExpanded = true
+                    };
+                    archiveNode.Children.Add(wrapNode);
+                }
+
+                var mountTarget = wrapNode?.Children ?? archiveNode.Children;
                 for (int i = 0; i < sourcePaths.Count; i++)
                 {
-                    var st = subtrees[i];
-                    if (st != null)
-                        archiveNode.Children.Add(st.Node);
+                    foreach (var child in ProjectForRootMode(subtrees[i]?.Node, previewStripRoot, sourcePaths.Count == 1))
+                        mountTarget.Add(child);
                 }
 
                 archiveNode.IsArchiveEmpty = !NodeHasVisibleContent(archiveNode);
@@ -324,7 +376,7 @@ public static class ResultPreviewService
                 // B 数据集：每源一个输出包（Bug 2 语义：目录源用完整目录名）
                 planItems = CompressPathPlanner.PlanSeparate(sourcePaths, format, keepOriginalExtension, fileNameTemplate, templateTimestamp);
 
-                BuildSeparateArchivesPreview(root, sourcePaths, subtrees, planItems, format, keepOriginalExtension, fileNameTemplate, templateTimestamp);
+                BuildSeparateArchivesPreview(root, sourcePaths, subtrees, planItems, format, keepOriginalExtension, fileNameTemplate, templateTimestamp, previewStripRoot);
                 break;
             }
 
@@ -369,10 +421,12 @@ public static class ResultPreviewService
         string format = "zip",
         bool keepOriginalExtension = false,
         string? fileNameTemplate = null,
-        DateTime? templateTimestamp = null)
+        DateTime? templateTimestamp = null,
+        RootDirectoryMode rootMode = RootDirectoryMode.Original,
+        string? wrapRoot = null)
     {
         var subtrees = sourcePaths.Select(p => BuildSourceSubtree(p, filter)).ToList();
-        return AssembleCompressPreview(sourcePaths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter, fileNameTemplate, templateTimestamp);
+        return AssembleCompressPreview(sourcePaths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter, fileNameTemplate, templateTimestamp, rootMode, wrapRoot);
     }
 
     /// <summary>
@@ -388,6 +442,32 @@ public static class ResultPreviewService
             sourcePaths, format, fileNameTemplate, templateTimestamp);
         return templatedName
             ?? CompressPathPlanner.ComputeArchiveName(sourcePath, format, keepOriginalExt);
+    }
+
+    /// <summary>
+    /// 按「包内根目录」四态把一个源的子树投影成要挂进包里的顶层节点序列。
+    /// </summary>
+    /// <param name="node">该源构建好的子树根（单目录源 = 目录节点，单文件源 = 文件节点）。</param>
+    /// <param name="stripRoot">要剥掉的根段（null = 不剥）。</param>
+    /// <param name="singleSource">是否只有一个源（剥根只在单目录源时成立，与执行侧同一判据）。</param>
+    /// <returns>
+    /// 原样 / 套根 → 该源节点本身；剥根 → 目录节点内部的内容（源目录那一层不再出现），
+    /// 与引擎把该目录的子项直接放到包顶层一致。
+    /// </returns>
+    private static IReadOnlyList<PreviewTreeNode> ProjectForRootMode(
+        PreviewTreeNode? node, string? stripRoot, bool singleSource)
+    {
+        if (node == null)
+            return Array.Empty<PreviewTreeNode>();
+
+        if (string.IsNullOrEmpty(stripRoot) || !singleSource || !node.IsDirectory)
+            return new[] { node };
+
+        // 名字对不上说明这个源的目录层不是被剥的那一层（防御：别把入口的下层也剥掉）
+        if (!string.Equals(node.Name, stripRoot, StringComparison.OrdinalIgnoreCase))
+            return new[] { node };
+
+        return node.Children.OfType<PreviewTreeNode>().ToList();
     }
 
     /// <summary>
@@ -412,7 +492,8 @@ public static class ResultPreviewService
         string format,
         bool keepOriginalExtension,
         string? fileNameTemplate,
-        DateTime? templateTimestamp)
+        DateTime? templateTimestamp,
+        string? previewStripRoot)
     {
         // 源 → 计划项查找表（B 提供输出包路径）
         var itemBySource = new Dictionary<string, CompressPlanItem>();
@@ -464,9 +545,9 @@ public static class ResultPreviewService
                 };
 
                 // 挂载已构建的子树（替换原有的 BuildDirectoryNode/文件节点）
-                var st = subtrees[index];
-                if (st != null)
-                    archiveNode.Children.Add(st.Node);
+                // Separate 下 Wrap 恒不生效，只需处理剥根：目录节点被省掉、内容直接进包。
+                foreach (var child in ProjectForRootMode(subtrees[index]?.Node, previewStripRoot, sourcePaths.Count == 1))
+                    archiveNode.Children.Add(child);
 
                 archiveNode.IsArchiveEmpty = !NodeHasVisibleContent(archiveNode);
                 groupNode.Children.Add(archiveNode);

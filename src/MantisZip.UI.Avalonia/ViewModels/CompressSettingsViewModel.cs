@@ -594,6 +594,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         SelectedPaths.CollectionChanged += (_, _) =>
         {
             OnPropertyChanged(nameof(SelectedPathsSummary));
+            // 源多/少直接决定「智能去根」可不可用，必须在上面的属性通知之后立刻刷新
+            NotifyRootModeAvailability();
             UpdateAutoRules();
             BuildCompressPreview();
             if (OutputMode != CompressOutputMode.Manual)
@@ -687,6 +689,21 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_FileNameTemplate_Insert"] = LocalizationManager.T("Compress_FileNameTemplate_Insert");
         LocalizedStrings["Compress_FileNameTemplate_InsertTip"] = LocalizationManager.T("Compress_FileNameTemplate_InsertTip");
 
+        // 包内根目录四态（v0.5.8）。同规则 13：漏登记会让整组单选与说明文字空白。
+        LocalizedStrings["Compress_RootMode"] = LocalizationManager.T("Compress_RootMode");
+        LocalizedStrings["Compress_RootMode_Original"] = LocalizationManager.T("Compress_RootMode_Original");
+        LocalizedStrings["Compress_RootMode_Original_Tip"] = LocalizationManager.T("Compress_RootMode_Original_Tip");
+        LocalizedStrings["Compress_RootMode_SmartStrip"] = LocalizationManager.T("Compress_RootMode_SmartStrip");
+        LocalizedStrings["Compress_RootMode_SmartStrip_Tip"] = LocalizationManager.T("Compress_RootMode_SmartStrip_Tip");
+        LocalizedStrings["Compress_RootMode_SmartWrap"] = LocalizationManager.T("Compress_RootMode_SmartWrap");
+        LocalizedStrings["Compress_RootMode_SmartWrap_Tip"] = LocalizationManager.T("Compress_RootMode_SmartWrap_Tip");
+        LocalizedStrings["Compress_RootMode_AlwaysWrap"] = LocalizationManager.T("Compress_RootMode_AlwaysWrap");
+        LocalizedStrings["Compress_RootMode_AlwaysWrap_Tip"] = LocalizationManager.T("Compress_RootMode_AlwaysWrap_Tip");
+        LocalizedStrings["Compress_RootMode_WrapName"] = LocalizationManager.T("Compress_RootMode_WrapName");
+        LocalizedStrings["Compress_RootMode_WrapName_Watermark"] = LocalizationManager.T("Compress_RootMode_WrapName_Watermark");
+        // 注：下拉裁剪说明行（RootModeHint）走 VM 的 LocalizationManager.T，不经 LocalizedStrings 字典，
+        // 因此下面三个 key 不需要登记（规则 13 只要求 XAML 里的 LocalizedStrings[...] 必须登记）。
+
         // 初始化压缩级别下拉选项（共享数据源，本地化 Display）
         CompressionLevelOptions = CompressionOptionData.LevelOptions
             .Select(o => new CompressionOptionData.ComboOption(o.Tag, LocalizationManager.T("Compress_Level_" + o.Tag switch
@@ -760,6 +777,15 @@ public partial class CompressSettingsViewModel : ObservableObject
             FileNameTemplate = settings.FileNameTemplateDialog;
             ReloadTemplatePresets(settings);
 
+            // 包内根目录默认值：只在选项域内时采用，越界值回退原样（枚举来自 JSON，可能被手改）
+            if (Enum.IsDefined(settings.CompressRootMode))
+                RootMode = settings.CompressRootMode;
+            WrapRoot = settings.CompressRootName;
+
+            // 下拉项要在选完默认值之后建（控件的 SelectedItem 绑定靠选项集合才能解析出当前项）
+            RebuildRootModeOptions();
+            // 默认值可能落在当前不可用的档位上（比如设置里选了「智能去根」但这次是多源）⇒ 退回原样
+            NotifyRootModeAvailability();
             // 默认格式：仅当在合法选项域内时赋值，否则保持 "zip" 并记录日志
             if (FormatOptions.Contains(settings.DefaultFormat))
             {
@@ -995,9 +1021,13 @@ public partial class CompressSettingsViewModel : ObservableObject
         var template = IsTemplateActive ? FileNameTemplate : null;
         var timestamp = _templateTimestamp;
 
+        // 包内根目录同样取快照：预览树里的层级必须与执行时一致（预览 = 实际）。
+        var rootMode = RootMode;
+        var wrapRoot = IsWrapActive ? WrapRoot : null;
+
         return await Task.Run(() => ResultPreviewService.AssembleCompressPreview(
             paths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter,
-            template, timestamp), ct);
+            template, timestamp, rootMode, wrapRoot), ct);
     }
 
     /// <summary>
@@ -1190,6 +1220,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsSeparateMode));
         OnPropertyChanged(nameof(IsCombinedMode));
         OnPropertyChanged(nameof(IsOutputFileNameReadOnly));
+        // 分别压缩时每包各自一层，套根无意义 ⇒ 能力位随模式变化
+        NotifyRootModeAvailability();
         RefreshOutputPathState();
         TemplateError = ValidateTemplateNow();
         UpdateCanCompress();
@@ -1232,6 +1264,117 @@ public partial class CompressSettingsViewModel : ObservableObject
             ComposeManualOutputPath();
     }
 
+    // 四态用下拉而不是竖排单选：四个单选要占四行，而其中两档在多数场景下还用不上。
+    // 不可用的档位直接从选项里拿掉（而不是置灰），下方用一行灰字说明为什么少了几项 ——
+    // 既不占高度，也不会留下「选了却什么都不发生」的死选项。
+
+    /// <summary>下拉选项：按当前源集合与输出模式裁剪后的四态（顺序固定）。</summary>
+    public ObservableCollection<Option> RootModeOptions { get; } = new();
+
+    /// <summary>
+    /// 下拉当前选中项。写入按 <see cref="Option.Value"/> 里的枚举名解析 ——
+    /// 存名字而不是数值，将来枚举加减值不会让已保存的默认值错位，也不受语言影响。
+    /// </summary>
+    public Option? SelectedRootModeOption
+    {
+        get => RootModeOptions.FirstOrDefault(o => o.Value == RootMode.ToString());
+        set
+        {
+            if (value is null)
+                return;
+
+            if (Enum.TryParse<RootDirectoryMode>(value.Value, ignoreCase: true, out var parsed)
+                && Enum.IsDefined(parsed))
+            {
+                RootMode = parsed;
+            }
+        }
+    }
+
+    /// <summary>当前档位的解释文字（ComboBox 的 ToolTip：单选时代每个选项自带一句，改下拉后挂到下拉上）。</summary>
+    public string RootModeDescription => LocalizationManager.T($"Compress_RootMode_{RootMode}_Tip");
+
+    /// <summary>
+    /// 「为什么下拉里少了几项」——被隐掉的档位在两档都可用时为空串（该行不显示、不占高度）。
+    /// </summary>
+    public string RootModeHint
+    {
+        get
+        {
+            if (CanStripRoot && CanWrapRoot)
+                return "";
+
+            return LocalizationManager.T(
+                !CanStripRoot && !CanWrapRoot ? "Compress_RootMode_Hint_None"
+                : !CanStripRoot ? "Compress_RootMode_Hint_StripUnavailable"
+                : "Compress_RootMode_Hint_WrapUnavailable");
+        }
+    }
+
+    /// <summary>提示行是否可见。</summary>
+    public bool IsRootModeHintVisible => !(CanStripRoot && CanWrapRoot);
+
+    /// <summary>根目录模式变化 → 根名框显隐变化、说明文字换一句，预览树结构也变了。</summary>
+    partial void OnRootModeChanged(RootDirectoryMode value)
+    {
+        OnPropertyChanged(nameof(SelectedRootModeOption));
+        OnPropertyChanged(nameof(RootModeDescription));
+        OnPropertyChanged(nameof(IsWrapRootVisible));
+        OnPropertyChanged(nameof(IsWrapActive));
+        BuildCompressPreview();
+    }
+
+    /// <summary>根名变化 → 预览树里那一层的名字立刻跟着变。</summary>
+    partial void OnWrapRootChanged(string? value)
+    {
+        if (IsWrapActive)
+            BuildCompressPreview();
+    }
+
+    /// <summary>源集合 / 输出模式变化后重建下拉项（源从 1 个变 2 个，「智能去根」就消失了）。</summary>
+    private void NotifyRootModeAvailability()
+    {
+        OnPropertyChanged(nameof(CanStripRoot));
+        OnPropertyChanged(nameof(CanWrapRoot));
+        OnPropertyChanged(nameof(RootModeHint));
+        OnPropertyChanged(nameof(IsRootModeHintVisible));
+
+        RebuildRootModeOptions();
+
+        // 原来选了某一档、后来条件不再满足 ⇒ 静默退回原样，避免留下一个跑不起来的模式。
+        var stripGone = RootMode == RootDirectoryMode.SmartStrip && !CanStripRoot;
+        var wrapGone = IsWrapActive && !CanWrapRoot;
+        if (stripGone || wrapGone)
+        {
+            RootMode = RootDirectoryMode.Original;
+        }
+
+        OnPropertyChanged(nameof(SelectedRootModeOption));
+        OnPropertyChanged(nameof(IsWrapRootVisible));
+    }
+
+    /// <summary>按可用性重建下拉项；文案走本地化，值与枚举名一致。</summary>
+    private void RebuildRootModeOptions()
+    {
+        RootModeOptions.Clear();
+        RootModeOptions.Add(new Option(
+            LocalizationManager.T("Compress_RootMode_Original"), nameof(RootDirectoryMode.Original)));
+
+        if (CanStripRoot)
+        {
+            RootModeOptions.Add(new Option(
+                LocalizationManager.T("Compress_RootMode_SmartStrip"), nameof(RootDirectoryMode.SmartStrip)));
+        }
+
+        if (CanWrapRoot)
+        {
+            RootModeOptions.Add(new Option(
+                LocalizationManager.T("Compress_RootMode_SmartWrap"), nameof(RootDirectoryMode.SmartWrap)));
+            RootModeOptions.Add(new Option(
+                LocalizationManager.T("Compress_RootMode_AlwaysWrap"), nameof(RootDirectoryMode.AlwaysWrap)));
+        }
+    }
+
     // ── 文件名模板 ──
 
     /// <summary>模板是否启用（非空且非空白）。UI 用它切「只读文件名 + 示例行」。</summary>
@@ -1254,6 +1397,34 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// 但模板出错时必须仍然显示（错误提示就渲染在这一格里），否则用户看不到任何反馈。
     /// </summary>
     public bool IsFileNameRowVisible => IsFileNameSectionVisible || IsTemplateErrorVisible;
+
+    // ── 包内根目录（四态） ──
+
+    /// <summary>
+    /// 「包内根目录」四态。默认 <see cref="RootDirectoryMode.Original"/> = 与引入本功能前逐字节一致。
+    /// </summary>
+    [ObservableProperty]
+    private RootDirectoryMode _rootMode = RootDirectoryMode.Original;
+
+    /// <summary>加根时使用的根名；空 = 用压缩包文件名去扩展名。</summary>
+    [ObservableProperty]
+    private string? _wrapRoot;
+
+    /// <summary>
+    /// 「智能去除唯一根」是否可用：只有源恰为一个目录时才有「那个目录本身」可去掉。
+    /// 多源/单文件/混合时置灰，避免出现「勾了但什么也没发生」。
+    /// </summary>
+    public bool CanStripRoot => SelectedPaths.Count == 1 && Directory.Exists(SelectedPaths[0]);
+
+    /// <summary>「智能 / 始终添加唯一根」是否可用：分别压缩每包各一层，套根没有意义。</summary>
+    public bool CanWrapRoot => OutputMode != CompressOutputMode.Separate;
+
+    /// <summary>根名输入框是否可见（只在真的会加根时显示，避免多一行无意义控件）。</summary>
+    public bool IsWrapRootVisible => CanWrapRoot
+        && (RootMode == RootDirectoryMode.SmartWrap || RootMode == RootDirectoryMode.AlwaysWrap);
+
+    /// <summary>当前选择是否会真的加根（供预览与提示用）。</summary>
+    public bool IsWrapActive => RootMode is RootDirectoryMode.SmartWrap or RootDirectoryMode.AlwaysWrap;
 
     /// <summary>模板内容变化 → 重渲染（只改显示与校验，不写回设置）。</summary>
     partial void OnFileNameTemplateChanged(string? value)
@@ -1955,7 +2126,10 @@ public partial class CompressSettingsViewModel : ObservableObject
             Filter: FileFilter,
             Plan: planEntries,
             OpenFolderAfterCompress: OpenFolderAfterCompress,
-            FileNameTemplate: IsTemplateActive ? FileNameTemplate : null);
+            FileNameTemplate: IsTemplateActive ? FileNameTemplate : null,
+            RootMode: RootMode,
+            // 只有真会加根的两种模式才带上根名，避免「原样模式下留着一个以后会突然生效的名字」。
+            WrapRoot: IsWrapActive ? WrapRoot : null);
     }
 
     /// <summary>

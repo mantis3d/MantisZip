@@ -5,6 +5,7 @@ using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
 using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
 using MantisZip.UI.Avalonia.Dialogs;
@@ -197,6 +198,115 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// <summary>是否存在多个源压缩包（驱动「过滤仅对首包生效」提示显隐）。</summary>
     public bool HasMultipleArchives => SourceItems.Count > 1;
 
+    // ── 压缩包顶层目录（四态，v0.5.8） ──
+
+    /// <summary>
+    /// 「压缩包顶层目录」四态。默认 <see cref="RootDirectoryMode.Original"/> = 与引入本功能前一致。
+    /// 只存「用户选了什么」，剥哪一段 / 加什么名字由执行侧按整包条目解析（<c>ExtractRootPlan</c>）。
+    /// </summary>
+    [ObservableProperty]
+    private RootDirectoryMode _rootMode = RootDirectoryMode.Original;
+
+    /// <summary>
+    /// 「去掉唯一根目录」是否可用：包本身确实有唯一根才谈得上剥。
+    /// 判定与执行侧同源（<see cref="ArchiveStructureAnalyzer.HasSingleRootDirectory"/>），
+    /// 否则会出现「窗里能选、跑起来什么都不做」。
+    /// </summary>
+    public bool CanStripRoot =>
+        _firstArchiveEntries is { Count: > 0 } entries
+        && ArchiveStructureAnalyzer.HasSingleRootDirectory(entries);
+
+    /// <summary>
+    /// 四态下拉选项。不可用的档位（当前包没有唯一根 ⇒ 「智能去除」）直接从选项里拿掉，
+    /// 下方一行灰字说明为什么少了一项；这样既不占四行高度，也不留死选项。
+    /// </summary>
+    public ObservableCollection<Option> ExtractRootModeOptions { get; } = new();
+
+    /// <summary>下拉当前选中项（按枚举名匹配，与设置里存的字符串同形）。</summary>
+    public Option? SelectedExtractRootModeOption
+    {
+        get => ExtractRootModeOptions.FirstOrDefault(o => o.Value == RootMode.ToString());
+        set
+        {
+            if (value is null)
+                return;
+
+            if (Enum.TryParse<RootDirectoryMode>(value.Value, ignoreCase: true, out var parsed)
+                && Enum.IsDefined(parsed))
+            {
+                RootMode = parsed;
+            }
+        }
+    }
+
+    /// <summary>当前档位的解释文字（挂在 ComboBox 的 ToolTip 上）。</summary>
+    public string ExtractRootModeDescription => LocalizationManager.T($"Extract_RootMode_{RootMode}_Tip");
+
+    /// <summary>「为什么下拉里少了『智能去除』」——包本身有唯一根时为空串（该行不显示）。</summary>
+    public string ExtractRootModeHint => CanStripRoot
+        ? ""
+        : LocalizationManager.T("Extract_RootMode_Hint_StripUnavailable");
+
+    /// <summary>提示行是否可见。</summary>
+    public bool IsExtractRootModeHintVisible => !CanStripRoot;
+
+    /// <summary>模式变化 → 下拉选中项、说明文字与预览树都要跟着变。</summary>
+    partial void OnRootModeChanged(RootDirectoryMode value)
+    {
+        OnPropertyChanged(nameof(SelectedExtractRootModeOption));
+        OnPropertyChanged(nameof(ExtractRootModeDescription));
+
+        // 子树缓存里存的是「按旧模式算好的层级」，换模式必须整表失效，
+        // 否则预览会停在上一档的层数（缓存键只有包路径，看不出模式变了）。
+        InvalidatePreviewCache();
+        RebuildMergedPreview();
+    }
+
+    /// <summary>
+    /// 按当前四态 + 该包条目解析出「剥哪段 / 加什么根」。与执行侧共用
+    /// <see cref="ExtractRootPlan"/>，保证预览树和真正解压落在同一层级。
+    /// </summary>
+    private (string? StripRoot, string? AddRoot) ResolveRootPlan(
+        IReadOnlyList<ArchiveItem>? entries, string? archivePath)
+        => ExtractRootPlan.Resolve(RootMode, entries, archivePath);
+
+    /// <summary>
+    /// 首包条目变了 ⇒ 「能不能剥根」的结论可能翻转：重建下拉项，并把失效的选择静默退回原样，
+    /// 避免留着一个「窗里显示已选中、实际不生效」的死选项。
+    /// </summary>
+    private void NotifyRootModeAvailability()
+    {
+        OnPropertyChanged(nameof(CanStripRoot));
+        OnPropertyChanged(nameof(ExtractRootModeHint));
+        OnPropertyChanged(nameof(IsExtractRootModeHintVisible));
+
+        RebuildExtractRootModeOptions();
+
+        if (RootMode == RootDirectoryMode.SmartStrip && !CanStripRoot)
+            RootMode = RootDirectoryMode.Original;
+
+        OnPropertyChanged(nameof(SelectedExtractRootModeOption));
+    }
+
+    /// <summary>按可用性重建下拉项；文案走本地化，值等于枚举名。</summary>
+    private void RebuildExtractRootModeOptions()
+    {
+        ExtractRootModeOptions.Clear();
+        ExtractRootModeOptions.Add(new Option(
+            LocalizationManager.T("Extract_RootMode_Original"), nameof(RootDirectoryMode.Original)));
+
+        if (CanStripRoot)
+        {
+            ExtractRootModeOptions.Add(new Option(
+                LocalizationManager.T("Extract_RootMode_SmartStrip"), nameof(RootDirectoryMode.SmartStrip)));
+        }
+
+        ExtractRootModeOptions.Add(new Option(
+            LocalizationManager.T("Extract_RootMode_SmartWrap"), nameof(RootDirectoryMode.SmartWrap)));
+        ExtractRootModeOptions.Add(new Option(
+            LocalizationManager.T("Extract_RootMode_AlwaysWrap"), nameof(RootDirectoryMode.AlwaysWrap)));
+    }
+
     /// <summary>条目列表正在后台读取（驱动预览树 ⏳ 占位；区别于树构建的 IsPreviewBuilding）。</summary>
     [ObservableProperty]
     private bool _isListingPending;
@@ -290,6 +400,14 @@ public partial class ExtractSettingsViewModel : ObservableObject
         OpenFolderAfterExtract = settings.OpenFolderAfterExtract;
         // 解压后将原压缩包移入回收站：读取全局设置作为默认，勾选仅本次解压生效（不写回 AppSettings）
         DeleteArchiveAfterExtract = settings.DeleteArchiveAfterExtract;
+        // 顶层目录四态默认值（越界值回退原样——枚举从 JSON 来，可能被手改）
+        if (Enum.IsDefined(settings.ExtractRootMode))
+            RootMode = settings.ExtractRootMode;
+
+        // 下拉项先按当前可用性建好（此时首包条目还是 null，「智能去除」不会出现；
+        // 首包校验完成后由 NotifyRootModeAvailability 重建）。
+        RebuildExtractRootModeOptions();
+        NotifyRootModeAvailability();
 
         // 冲突策略选项（ComboBox 用对象绑定——Avalonia 无 WPF 的 SelectedValuePath）
         ConflictActionOptions.Add(new Option(LocalizationManager.T("Extract_Conflict_Ask"), "ask"));
@@ -338,7 +456,17 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Settings_ManualDegreeHint",
             "Settings_LargeArchivePreTest",
             // 「加速」页签底部的「仅对本次解压生效」提示：XAML 早已绑定，此前漏登记 → 一直显示空白
-            "Extract_ParallelNotSavedHint"
+            "Extract_ParallelNotSavedHint",
+            // 压缩包顶层目录四态（v0.5.8）：漏登记会让整组单选与置灰说明空白
+            "Extract_RootMode",
+            "Extract_RootMode_Original",
+            "Extract_RootMode_Original_Tip",
+            "Extract_RootMode_SmartStrip",
+            "Extract_RootMode_SmartStrip_Tip",
+            "Extract_RootMode_SmartWrap",
+            "Extract_RootMode_SmartWrap_Tip",
+            "Extract_RootMode_AlwaysWrap",
+            "Extract_RootMode_AlwaysWrap_Tip"
         };
         var dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
         foreach (var key in keys)
@@ -427,6 +555,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
                 && _entriesCache.TryGetValue(SourceItems[0].Path, out var newFirstEntries)
                     ? newFirstEntries
                     : null;
+            NotifyRootModeAvailability();
         }
 
         SyncSelectedPaths();
@@ -495,6 +624,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
         var first = SourceItems[0];
         _entriesCache[first.Path] = entries;
         _firstArchiveEntries = entries;
+        // 首包条目到位 ⇒ 「能不能剥根」有结论了
+        NotifyRootModeAvailability();
         first.ErrorMessage = null;
         first.Status = SourceArchiveStatus.Ok;
 
@@ -585,6 +716,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
                     string.Equals(item.Path, SourceItems[0].Path, StringComparison.OrdinalIgnoreCase))
                 {
                     _firstArchiveEntries = _entriesCache[item.Path];
+                    NotifyRootModeAvailability();
                 }
             }
             finally
@@ -689,6 +821,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
                         string.Equals(item.Path, SourceItems[0].Path, StringComparison.OrdinalIgnoreCase))
                     {
                         _firstArchiveEntries = entries;
+                        NotifyRootModeAvailability();
                     }
                     ok = true;
                 }
@@ -803,7 +936,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
                 IsBuildPending = false;
                 return;
             }
-            await BuildAndAssignSingleAsync(onlyEntries, destDir, filter);
+            await BuildAndAssignSingleAsync(onlyEntries, destDir, filter, sources[0].Path);
             return;
         }
 
@@ -832,9 +965,13 @@ public partial class ExtractSettingsViewModel : ObservableObject
                     var built = new List<PreviewTreeNode>();
                     for (int i = 0; i < toBuild.Count; i++)
                     {
+                        // 每包各自解析（多包批次里只有首包是真解压对象，其余为展示）；
+                        // 层级同样要与执行侧一致，故逐包调同一个决策层。
+                        var (subStripRoot, subAddRoot) = ResolveRootPlan(toBuild[i].Entries, toBuild[i].Item.Path);
                         var sub = ResultPreviewService.BuildExtractPreview(
                             toBuild[i].Entries, destDir,
-                            checkExists: true, filter: filter);
+                            checkExists: true, filter: filter,
+                            stripRoot: subStripRoot, addRoot: subAddRoot);
                         DecorateSubTree(sub, toBuild[i].Item);
                         built.Add(sub);
                     }
@@ -946,7 +1083,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
     /// <summary>单包路径：直接构建条目结构为根（无归档层），沿用 250ms 防闪烁加载态。
     /// 冲突检测分两阶段：depth 2 快速上屏 → 全量后台补全。</summary>
     private async Task BuildAndAssignSingleAsync(
-        IReadOnlyList<ArchiveItem> entries, string destDir, FileFilterCriteria? filter)
+        IReadOnlyList<ArchiveItem> entries, string destDir, FileFilterCriteria? filter,
+        string? archivePath = null)
     {
         // 取消前一轮冲突扫描（目标路径变化时快速终止无用 I/O）
         _conflictCts?.Cancel();
@@ -962,8 +1100,11 @@ public partial class ExtractSettingsViewModel : ObservableObject
         try
         {
             // Phase 1：构建树（不含冲突检测）+ 250ms 防闪烁
+            // 顶层目录四态：层级必须与执行侧同源，否则预览与实际解压对不上（本功能验收口径之一）。
+            var (stripRoot, addRoot) = ResolveRootPlan(entries, archivePath);
             var buildTask = Task.Run(() => ResultPreviewService.BuildExtractPreview(
-                entries, destDir, checkExists: false, filter: filter, progress: progress));
+                entries, destDir, checkExists: false, filter: filter, progress: progress,
+                stripRoot: stripRoot, addRoot: addRoot));
 
             var delayTask = Task.Delay(250);
             if (await Task.WhenAny(buildTask, delayTask) == delayTask)
@@ -1215,6 +1356,8 @@ public partial class ExtractSettingsViewModel : ObservableObject
             // 路径契约的执行输入：路径归属由 ExtractPathResolver 决定，这里只记录当前设置值。
             // 路径契约的执行输入：路径归属由 ExtractPathResolver 决定，这里只记录当前设置值。
             PreserveFullPath = appSettings.ExtractPreserveFullPath,
+            // 顶层目录四态：本次选择随载荷走，解析成 strip/add 由执行侧统一做
+            RootMode = RootMode,
             // 本次解压的并行度快照（对话框内改动本次生效、不回写全局设置）。
             ParallelOverride = BuildParallelSettings(),
         };

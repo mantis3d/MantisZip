@@ -100,8 +100,41 @@ public class ArchiveOptions
     /// <summary>
     /// 压缩单文件夹时是否保留外层目录根（如 Folder/file.txt vs file.txt）。
     /// 仅对 SevenZipEngine 的单目录压缩路径有效。
+    /// <para>
+    /// 「包内根目录」四态（<see cref="CompressRootMode"/>）接管后，本属性只在与
+    /// 「原样」等价的情形下起作用；两者同时被设置时以 <see cref="CompressRootMode"/> 为准。
+    /// </para>
     /// </summary>
     public bool PreserveDirectoryRoot { get; set; } = true;
+
+    /// <summary>
+    /// 压缩端「包内根目录」四态（见 <see cref="Utils.RootDirectoryMode"/>）。
+    /// 默认 <see cref="Utils.RootDirectoryMode.Original"/> = 与引入本功能前逐字节一致。
+    /// </summary>
+    public Utils.RootDirectoryMode CompressRootMode { get; set; } = Utils.RootDirectoryMode.Original;
+
+    /// <summary>
+    /// 压缩端「智能去除唯一根」时源的唯一目录（仅 <see cref="CompressRootMode"/> 为
+    /// <see cref="Utils.RootDirectoryMode.SmartStrip"/> 时有意义）；空 = 由引擎按源路径自行判定。
+    /// </summary>
+    public string? CompressStripRoot { get; set; }
+
+    /// <summary>
+    /// 压缩端「加一层根目录」时使用的根名；空 = 由引擎回落到压缩包文件名。
+    /// </summary>
+    public string? CompressWrapRoot { get; set; }
+
+    /// <summary>
+    /// 解压端：要剥掉的唯一根目录段（空/null = 不剥）。
+    /// 由调用方按 <see cref="Utils.ArchiveRootPolicy"/> 判定后填入 —— 引擎只负责执行，
+    /// 不自己再判一次「有没有唯一根」（否则预览树与实际的判定会漂移）。
+    /// </summary>
+    public string? StripRootDirectory { get; set; }
+
+    /// <summary>
+    /// 解压端：要加的一层根目录段（空/null = 不加）。
+    /// </summary>
+    public string? AddRootDirectory { get; set; }
 
     /// <summary>
     /// ZIP 文件名编码："utf-8" / "gbk" / "default"。null 表示使用引擎默认（UTF-8）。

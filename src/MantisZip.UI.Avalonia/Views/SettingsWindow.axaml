@@ -157,6 +157,32 @@
                     </StackPanel>
                   </Border>
 
+                  <!-- 包内根目录四态默认值（v0.5.8）：压缩对话框每次按这里的默认值开，单次选择不回写 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding CompressRootModeText}" FontWeight="SemiBold" />
+                      <ComboBox ItemsSource="{Binding CompressRootModeOptions}"
+                                SelectedItem="{Binding SelectedCompressRootModeOption}"
+                                Width="240" HorizontalAlignment="Left"
+                                ToolTip.Tip="{Binding CompressRootModeText}">
+                        <ComboBox.ItemTemplate>
+                          <DataTemplate>
+                            <TextBlock Text="{Binding Display}" />
+                          </DataTemplate>
+                        </ComboBox.ItemTemplate>
+                      </ComboBox>
+                      <!-- 默认根名：留空 = 按压缩包文件名去扩展名推导 -->
+                      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingXs}">
+                        <TextBlock Text="{Binding CompressRootNameText}" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" Text="{Binding CompressRootName}"
+                                 Width="240" HorizontalAlignment="Left"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 Background="{DynamicResource ThemeWindowBgBrush}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
                   <!-- 文件冲突默认策略：压缩时遇到同名文件的处理方式（ask=每次询问；仅本次压缩外的全局默认） -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -621,6 +647,22 @@
                           IsChecked="{Binding ExtractPreserveFullPath}" />
                 <CheckBox Content="{Binding ExtractDeleteAfterExtractText}"
                           IsChecked="{Binding DeleteArchiveAfterExtract}" />
+              </StackPanel>
+            </Border>
+            <!-- 压缩包顶层目录四态默认值（v0.5.8）：解压对话框每次按这里的默认值开，单次选择不回写 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding ExtractRootModeText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding ExtractRootModeOptions}"
+                          SelectedItem="{Binding SelectedExtractRootModeOption}"
+                          Width="240" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
               </StackPanel>
             </Border>
 

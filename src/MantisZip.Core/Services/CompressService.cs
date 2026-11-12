@@ -80,6 +80,19 @@ public class CompressRequest
     /// <summary>压缩单文件夹时是否保留外层目录根，仅 SevenZipEngine 有效</summary>
     public bool PreserveDirectoryRoot { get; init; } = true;
 
+    /// <summary>
+    /// 「包内根目录」四态（见 <see cref="RootDirectoryMode"/>）：原样 / 智能去除唯一根 /
+    /// 智能添加唯一根 / 始终添加唯一根。默认 <see cref="RootDirectoryMode.Original"/> = 逐字节不变。
+    /// </summary>
+    public RootDirectoryMode RootMode { get; init; } = RootDirectoryMode.Original;
+
+    /// <summary>
+    /// 「加一层根目录」时用的根名；空 = 由引擎回落到压缩包文件名去扩展名。
+    /// 仅 <see cref="RootMode"/> 为 <see cref="RootDirectoryMode.SmartWrap"/> /
+    /// <see cref="RootDirectoryMode.AlwaysWrap"/> 时有意义。
+    /// </summary>
+    public string? WrapRoot { get; init; }
+
     /// <summary>ZIP 文件名编码："utf-8" / "gbk" / "default"，null 表示引擎默认</summary>
     public string? FileNameEncoding { get; init; }
 
@@ -504,6 +517,8 @@ public static class CompressService
             Comment = resolvedComment,
             CommentDistribution = CommentDistribution.AllSame, // 已由 Service 解析完成
             PreserveDirectoryRoot = request.PreserveDirectoryRoot,
+            CompressRootMode = request.RootMode,
+            CompressWrapRoot = request.WrapRoot,
             FileNameEncoding = request.FileNameEncoding,
             SevenZipCompressionMethod = request.SevenZipCompressionMethod,
             SevenZipSolid = request.SevenZipSolid,

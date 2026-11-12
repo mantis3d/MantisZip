@@ -322,7 +322,9 @@ public class SevenZipEngine : IArchiveEngine
         SharpSevenZipCompressor compr,
         IProgress<ArchiveProgress>? progress,
         IReadOnlyList<string> compressedFiles,
-        string[] sourcePaths)
+        string[] sourcePaths,
+        string? stripRoot = null,
+        string? wrapRoot = null)
     {
         if (progress == null)
             return;
@@ -338,7 +340,7 @@ public class SevenZipEngine : IArchiveEngine
                 continue;
             if (!keyByLeaf.TryGetValue(leaf, out var queue))
                 keyByLeaf[leaf] = queue = new Queue<string>();
-            queue.Enqueue(BuildSourceRelativeKey(path, sourcePaths));
+            queue.Enqueue(BuildSourceRelativeKey(path, sourcePaths, stripRoot, wrapRoot));
         }
 
         // 在途队列：Started 推入（未预测到的文件推 null 占位保持配对平衡），Finished 出队上报
@@ -381,7 +383,11 @@ public class SevenZipEngine : IArchiveEngine
     /// 按 FileScanner 约定计算源相对路径条目键（目录源 = 目录名\相对路径，散文件 = 文件名），
     /// 与 ZipEngine 的 relativePath 语义一致；不匹配任何源时回退完整路径（保持唯一，绝不按文件名截断）。
     /// </summary>
-    private static string BuildSourceRelativeKey(string fullPath, string[] sourcePaths)
+    private static string BuildSourceRelativeKey(
+        string fullPath,
+        string[] sourcePaths,
+        string? stripRoot = null,
+        string? wrapRoot = null)
     {
         foreach (var source in sourcePaths)
         {
@@ -390,10 +396,14 @@ public class SevenZipEngine : IArchiveEngine
                 var relative = Path.GetRelativePath(source, fullPath);
                 if (relative == "." || relative.StartsWith("..", StringComparison.Ordinal) || Path.IsPathRooted(relative))
                     continue;
-                return Path.Combine(Path.GetFileName(source), relative);
+                var key = Path.Combine(Path.GetFileName(source), relative);
+                return ArchiveRootPolicy.Apply(key, stripRoot, wrapRoot) ?? key;
             }
             if (string.Equals(source, fullPath, StringComparison.OrdinalIgnoreCase))
-                return Path.GetFileName(fullPath);
+            {
+                var leaf = Path.GetFileName(fullPath);
+                return ArchiveRootPolicy.Apply(leaf, null, wrapRoot) ?? leaf;
+            }
         }
         return fullPath;
     }
@@ -663,14 +673,16 @@ public class SevenZipEngine : IArchiveEngine
                 if (entry.IsDirectory)
                 {
                     // 创建目录结构
-                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, entry.FileName);
-                    if (!Directory.Exists(dirPath))
+                    var dirPath = EntryOutputPath.Resolve(destinationPath, entry.FileName, options);
+                    if (dirPath != null && !Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
                     return;
                 }
 
                 string fileName = ArchivePath.Normalize(entry.FileName);
-                var outputPath = FileConflictHelper.GetSafePath(destinationPath, fileName);
+                var outputPath = EntryOutputPath.Resolve(destinationPath, fileName, options);
+                if (outputPath == null)
+                    return; // 剥根后条目消失
                 var outDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);
@@ -923,7 +935,9 @@ public class SevenZipEngine : IArchiveEngine
                     }
 
                     var fileName = ArchivePath.Normalize(entry.FileName);
-                    var outputPath = FileConflictHelper.GetSafePath(destinationPath, fileName);
+                    var outputPath = EntryOutputPath.Resolve(destinationPath, fileName, options);
+                    if (outputPath == null)
+                        continue; // 剥根后条目消失
 
                     // 路径安全：越界/绝对路径不进批量，退回逐条目（逐条目会走同一套 GetSafePath 与冲突判定）
                     if (!IsPathInsideDirectory(destinationPath, outputPath))
@@ -1126,8 +1140,8 @@ public class SevenZipEngine : IArchiveEngine
                 // 空目录：有文件的父目录由 7z.dll 建，纯空目录单独补
                 foreach (var dir in plan.Directories)
                 {
-                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, ArchivePath.Normalize(dir.FileName));
-                    if (!Directory.Exists(dirPath))
+                    var dirPath = EntryOutputPath.Resolve(destinationPath, ArchivePath.Normalize(dir.FileName), options);
+                    if (dirPath != null && !Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
                 }
 
@@ -1314,6 +1328,22 @@ public class SevenZipEngine : IArchiveEngine
                 // 阶段 2：正式压缩（7z 原生单次调用，进度来自压缩器事件）
                 progress.ReportPhase(ArchivePhase.Compressing);
 
+                // 「包内根目录」四态：7z 的 CompressDirectory/CompressFilesEncrypted 只能按公共根
+                // 推导条目名，改不了层级 ⇒ 激活时必须改走 CompressFileDictionary（字典 key 即条目名）。
+                // 判定结果同时喂给逐条目状态上报，否则进度窗的 Key 与实际条目名对不上。
+                var hasSingleSourceDir = ArchiveRootPolicy.HasSingleSourceDirectory(sourcePaths);
+                var rootAdjustment = ArchiveRootPolicy.Resolve(options.CompressRootMode, hasSingleSourceDir);
+                var stripRoot = rootAdjustment.Strip && hasSingleSourceDir
+                    ? ArchiveRootPolicy.GetSourceStripName(sourcePaths[0])
+                    : null;
+                var wrapRoot = rootAdjustment.Wrap
+                    ? ArchiveRootPolicy.GetWrapName(options.CompressWrapRoot, outputPath)
+                    : null;
+                if (rootAdjustment.IsActive)
+                {
+                    CoreLog.Info($"CompressAsync: rootMode={options.CompressRootMode}, strip='{stripRoot}', wrap='{wrapRoot}'");
+                }
+
                 // 单一目录·无白名单·且无文件被跳过 → 保留 CompressDirectory 的 PreserveDirectoryRoot 语义
                 bool singleDirClean = sourcePaths.Length == 1
                     && Directory.Exists(sourcePaths[0])
@@ -1321,9 +1351,34 @@ public class SevenZipEngine : IArchiveEngine
                     && validated.Count == files.Length;
 
                 // 逐条目状态（D2）：按源相对路径预填条目键，压缩器逐文件完成事件上报 Completed
-                AttachCompressorEntryTelemetry(compr, progress, validated, sourcePaths);
+                AttachCompressorEntryTelemetry(compr, progress, validated, sourcePaths, stripRoot, wrapRoot);
 
-                if (singleDirClean)
+                if (rootAdjustment.IsActive)
+                {
+                    // 逐文件写字典：key = 剥根/加根后的条目名，value = 源绝对路径。
+                    // 注意这里只放文件——Create 模式下 7z 由路径隐式补目录，空目录会丢（与 ZIP/TarGz 一致）。
+                    var rootDict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+                    foreach (var file in validated)
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        if (!File.Exists(file))
+                            continue;
+                        var relKey = BuildSourceRelativeKey(file, sourcePaths, stripRoot, wrapRoot);
+                        if (string.IsNullOrEmpty(relKey))
+                            continue;
+                        rootDict[relKey] = file;
+                    }
+
+                    if (rootDict.Count == 0)
+                    {
+                        CoreLog.Info("CompressAsync: root adjustment produced no entries, nothing to compress");
+                    }
+                    else
+                    {
+                        compr.CompressFileDictionary(rootDict, outputPath, options.Encrypt ? options.Password ?? "" : "");
+                    }
+                }
+                else if (singleDirClean)
                 {
                     // 单一目录且无文件白名单 — 使用 CompressDirectory
                     compr.PreserveDirectoryRoot = options.PreserveDirectoryRoot;
@@ -1684,9 +1739,10 @@ public class SevenZipEngine : IArchiveEngine
             double LandWeight() => totalTarget > 0 ? 0.5 / totalTarget : 0;
 
             // 落点：优先用调用方算好的 override（扁平化 / 保留完整路径 / 重命名的唯一口径）
-            string ResolveTarget(ArchiveFileInfo entry, string fileName) =>
+            // null = 剥根后该条目消失（如根目录条目本身），调用方跳过它
+            string? ResolveTarget(ArchiveFileInfo entry, string fileName) =>
                 outputPathOverrides?.GetValueOrDefault(fileName)
-                ?? FileConflictHelper.GetSafePath(destinationPath, fileName);
+                ?? EntryOutputPath.Resolve(destinationPath, fileName, options);
 
             // 主进度高水位：解码段要按「当前文件内进度」连续推进，换文件时该进度会归零，
             // 于是可能出现 15% → 12.5% 的视觉回退；这里钳成单调不减，保证条形图只往前走。
@@ -1792,12 +1848,14 @@ public class SevenZipEngine : IArchiveEngine
                 {
                     // 目录也走 override：扁平化 / 保留完整路径对选中的空目录同样生效（修既有不一致）
                     var dirPath = ResolveTarget(entry, fileName);
-                    if (!Directory.Exists(dirPath))
+                    if (dirPath != null && !Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
                     return;
                 }
 
                 var outputPath = ResolveTarget(entry, fileName);
+                if (outputPath == null)
+                    return; // 剥根后条目消失
                 var outDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                     Directory.CreateDirectory(outDir);
@@ -1963,6 +2021,8 @@ public class SevenZipEngine : IArchiveEngine
                     }
 
                     var targetPath = ResolveTarget(entry, fileName);
+                    if (targetPath == null)
+                        continue; // 剥根后条目消失
 
                     // 越界落点（override 指到目标目录外）与暂存布局不安全的条目一律逐条目
                     if (!IsPathInsideDirectory(destinationPath, targetPath)
@@ -2130,7 +2190,7 @@ public class SevenZipEngine : IArchiveEngine
                 {
                     var dirName = ArchivePath.Normalize(dir.FileName);
                     var dirPath = ResolveTarget(dir, dirName);
-                    if (!Directory.Exists(dirPath))
+                    if (dirPath != null && !Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
                 }
 

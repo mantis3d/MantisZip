@@ -17,16 +17,41 @@ internal static class FileScanner
     /// <param name="progress">扫描进度回调。</param>
     /// <param name="cancellationToken">取消令牌。</param>
     /// <param name="whitelist">文件白名单（绝对路径，大小写不敏感）；null = 收集全部。</param>
+    /// <param name="rootMode">
+    /// 「包内根目录」四态（见 <see cref="RootDirectoryMode"/>）；默认 <see cref="RootDirectoryMode.Original"/>
+    /// = 与引入本功能前逐字节一致。
+    /// </param>
+    /// <param name="wrapRoot">加一层根目录时使用的根名；空 = 由引擎回落到压缩包文件名。</param>
+    /// <param name="archivePath">
+    /// 目标压缩包路径：<paramref name="wrapRoot"/> 为空时用它去扩展名当根名。
+    /// 传 null 会回落到 <c>"archive"</c> —— 预览树与实解就会不一致，因此引擎侧**必须**传。
+    /// </param>
     public static (List<(string FullPath, string RelativePath)> Files, long TotalBytes) CollectFiles(
         string[] sourcePaths,
         IProgress<ArchiveProgress>? progress,
         CancellationToken cancellationToken,
-        IReadOnlySet<string>? whitelist = null)
+        IReadOnlySet<string>? whitelist = null,
+        RootDirectoryMode rootMode = RootDirectoryMode.Original,
+        string? wrapRoot = null,
+        string? archivePath = null)
     {
         var files = new List<(string FullPath, string RelativePath)>();
         long totalBytes = 0;
         var lastReportTime = DateTime.Now;
         var reportInterval = TimeSpan.FromMilliseconds(100);
+
+        // 「包内根目录」四态：一次判定，逐条目套用（②剥根 / ③④加根 / ①原样）。
+        // 剥根的候选段 = 唯一那个目录源的叶子名；加根段来自调用方给的根名。
+        var hasSingleSourceDir = ArchiveRootPolicy.HasSingleSourceDirectory(sourcePaths);
+        var adjustment = ArchiveRootPolicy.Resolve(rootMode, hasSingleSourceDir);
+        var stripRoot = adjustment.Strip && hasSingleSourceDir
+            ? ArchiveRootPolicy.GetSourceStripName(sourcePaths[0])
+            : null;
+        var effectiveWrap = adjustment.Wrap ? ArchiveRootPolicy.GetWrapName(wrapRoot, archivePath) : null;
+        if (adjustment.IsActive)
+        {
+            CoreLog.Info($"FileScanner.CollectFiles: rootMode={rootMode}, strip='{stripRoot}', wrap='{effectiveWrap}'");
+        }
 
         CoreLog.Info($"FileScanner.CollectFiles: scanning {sourcePaths.Length} source paths, whitelist={(whitelist != null ? $"{whitelist.Count} files" : "null")}");
 
@@ -42,6 +67,7 @@ internal static class FileScanner
                     if (whitelist != null && !whitelist.Contains(file))
                         continue;
                     var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
+                    relativePath = ArchiveRootPolicy.Apply(relativePath, stripRoot, effectiveWrap) ?? relativePath;
                     files.Add((file, relativePath));
 
                     // 累计总大小
@@ -55,7 +81,9 @@ internal static class FileScanner
             {
                 if (whitelist != null && !whitelist.Contains(sourcePath))
                     continue;
-                files.Add((sourcePath, Path.GetFileName(sourcePath)));
+                var singleRelative = ArchiveRootPolicy.Apply(Path.GetFileName(sourcePath), null, effectiveWrap)
+                    ?? Path.GetFileName(sourcePath);
+                files.Add((sourcePath, singleRelative));
                 try { totalBytes += new FileInfo(sourcePath).Length; } catch { /* 跳过无法读取的文件 */ }
             }
         }

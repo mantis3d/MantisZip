@@ -69,4 +69,51 @@ public static class ArchiveStructureAnalyzer
         CoreLog.Info($"ArchiveStructureAnalyzer: root='{singleRoot}', totalItems={items.Count} -> singleRoot={result}");
         return result;
     }
+
+    /// <summary>
+    /// 取压缩包的唯一根目录名（如 <c>7zip/</c> 里的 <c>7zip</c>）。
+    /// </summary>
+    /// <param name="items">压缩包条目列表。</param>
+    /// <returns>
+    /// 所有文件条目共享的首段目录名；散装（根目录下有文件）或多根时返回 <see langword="null"/>。
+    /// 空包 / 只有目录条目时同样返回 <see langword="null"/>（没有可剥的根）。
+    /// </returns>
+    /// <remarks>
+    /// 与 <see cref="HasSingleRootDirectory"/> 的区别：那个回答「能不能剥」，这个回答「剥哪一段」。
+    /// 剥根需要具体的段名，光有布尔值没法执行 —— 两者共用同一套判定，避免两处各判一次而漂移。
+    /// </remarks>
+    public static string? GetSingleRootDirectory(IReadOnlyList<ArchiveItem> items)
+    {
+        if (items == null || items.Count == 0)
+            return null;
+
+        string? singleRoot = null;
+        bool hasFileEntries = false;
+
+        foreach (var item in items)
+        {
+            if (item.IsDirectory)
+                continue;
+
+            hasFileEntries = true;
+
+            var fullPath = ArchivePath.Normalize(item.FullPath);
+            var firstSlash = fullPath.IndexOf('/');
+            var root = firstSlash >= 0 ? fullPath[..firstSlash] : string.Empty;
+
+            if (root.Length == 0)
+                return null;
+
+            if (singleRoot == null)
+            {
+                singleRoot = root;
+            }
+            else if (!string.Equals(singleRoot, root, StringComparison.OrdinalIgnoreCase))
+            {
+                return null;
+            }
+        }
+
+        return hasFileEntries ? singleRoot : null;
+    }
 }

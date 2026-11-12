@@ -402,18 +402,21 @@ public static class CompressFlow
                 .ToList();
         }
 
-        _ = SeedEntryItemsAsync(pw, request.SourcePaths, whitelist, ct);
+        _ = SeedEntryItemsAsync(pw, request, whitelist, ct);
     }
 
     /// <summary>后台枚举 + 播种（所有异常与取消都吞掉，只影响列表预览，不影响压缩本身）。</summary>
     private static async Task SeedEntryItemsAsync(
-        ProgressWindow pw, IReadOnlyList<string> sources,
+        ProgressWindow pw, CompressRequest request,
         IReadOnlyCollection<string>? whitelist, CancellationToken ct)
     {
         try
         {
             var items = await Task.Run(
-                () => SourceEntryEnumerator.Enumerate(sources, whitelist, ct), ct).ConfigureAwait(false);
+                () => SourceEntryEnumerator.Enumerate(
+                    request.SourcePaths, whitelist, ct,
+                    request.RootMode, request.WrapRoot, request.OutputPath),
+                ct).ConfigureAwait(false);
 
             if (items.Count == 0 || items.Count > MaxSeedEntryCount)
                 return;

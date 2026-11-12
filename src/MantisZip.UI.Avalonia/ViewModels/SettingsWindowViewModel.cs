@@ -5,6 +5,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Controls;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
@@ -119,6 +120,25 @@ public partial class SettingsWindowViewModel : ObservableObject
 
     [ObservableProperty]
     private string _fileNameTemplateSeparate = "";
+
+    // ── 包内根目录四态默认值（v0.5.8） ──
+    // 用 Option(Display, Value) 下拉与「文件冲突默认策略」保持同一种交互，
+    // Value 存枚举名（不是数值），将来加减值不会让旧配置错位。
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> CompressRootModeOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedCompressRootModeOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> ExtractRootModeOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedExtractRootModeOption;
+
+    /// <summary>压缩端套根时的默认根名（留空 = 按压缩包文件名推导）。</summary>
+    [ObservableProperty] private string _compressRootName = "";
+
+    /// <summary>压缩端四态默认值的枚举名（与 <see cref="CompressRootModeOptions"/> 的 Value 对应）。</summary>
+    [ObservableProperty] private string _compressRootMode = nameof(RootDirectoryMode.Original);
+
+    /// <summary>解压端四态默认值的枚举名。</summary>
+    [ObservableProperty] private string _extractRootMode = nameof(RootDirectoryMode.Original);
 
     // ── Compression advanced ──
     [ObservableProperty]
@@ -1066,6 +1086,9 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ExtractOpenFolderAfterText => LocalizationManager.T("Settings_Extract_OpenFolderAfter");
     public string ExtractEnableDragText => LocalizationManager.T("Settings_Extract_EnableDragExtract");
     public string ExtractPreserveFullPathText => LocalizationManager.T("Settings_Extract_PreserveFullPath");
+    public string CompressRootModeText => LocalizationManager.T("Settings_Compress_RootMode");
+    public string CompressRootNameText => LocalizationManager.T("Settings_Compress_RootName");
+    public string ExtractRootModeText => LocalizationManager.T("Settings_Extract_RootMode");
     public string ExtractDeleteAfterExtractText => LocalizationManager.T("Settings_Extract_DeleteArchiveAfterExtract");
     public string ExtractDoubleClickActionText => LocalizationManager.T("Settings_Extract_DoubleClickAction");
     public string ExtractDoubleClickThresholdText => LocalizationManager.T("Settings_Extract_DoubleClickThreshold");
@@ -1335,6 +1358,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         _fileNameTemplateSeparate = _settings.FileNameTemplateSeparate;
         ReloadFileNameTemplatePresets();
 
+        // 包内根目录四态默认值（越界值在 SetSelectedOptions 里回退到第一项）
+        CompressRootMode = _settings.CompressRootMode.ToString();
+        CompressRootName = _settings.CompressRootName;
+        ExtractRootMode = _settings.ExtractRootMode.ToString();
+
         // Compression advanced
         _sevenZipCompressionMethod = _settings.SevenZipCompressionMethod;
         _sevenZipSolid = _settings.SevenZipSolid;
@@ -1536,6 +1564,19 @@ public partial class SettingsWindowViewModel : ObservableObject
         CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_AutoRename"), "rename"));
         CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_Skip"), "skip"));
 
+        // 包内根目录四态：压缩端与解压端共用同一批四态文案（语义两侧对称）
+        CompressRootModeOptions.Clear();
+        CompressRootModeOptions.Add(new Option(LocalizationManager.T("Compress_RootMode_Original"), nameof(RootDirectoryMode.Original)));
+        CompressRootModeOptions.Add(new Option(LocalizationManager.T("Compress_RootMode_SmartStrip"), nameof(RootDirectoryMode.SmartStrip)));
+        CompressRootModeOptions.Add(new Option(LocalizationManager.T("Compress_RootMode_SmartWrap"), nameof(RootDirectoryMode.SmartWrap)));
+        CompressRootModeOptions.Add(new Option(LocalizationManager.T("Compress_RootMode_AlwaysWrap"), nameof(RootDirectoryMode.AlwaysWrap)));
+
+        ExtractRootModeOptions.Clear();
+        ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_Original"), nameof(RootDirectoryMode.Original)));
+        ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_SmartStrip"), nameof(RootDirectoryMode.SmartStrip)));
+        ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_SmartWrap"), nameof(RootDirectoryMode.SmartWrap)));
+        ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_AlwaysWrap"), nameof(RootDirectoryMode.AlwaysWrap)));
+
         DoubleClickActionOptions.Clear();
         DoubleClickActionOptions.Add(new Option(DoubleClickActionOpenText, "open"));
         DoubleClickActionOptions.Add(new Option(DoubleClickActionExtractHereText, "extract-here"));
@@ -1680,6 +1721,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedFileConflictActionOption = FileConflictActionOptions.FirstOrDefault(o => o.Value == FileConflictAction);
         SelectedCompressFileConflictActionOption = CompressFileConflictActionOptions.FirstOrDefault(o => o.Value == CompressFileConflictAction)
                                                    ?? CompressFileConflictActionOptions.FirstOrDefault();
+        SelectedCompressRootModeOption = CompressRootModeOptions.FirstOrDefault(o => o.Value == CompressRootMode)
+                                          ?? CompressRootModeOptions.FirstOrDefault();
+        SelectedExtractRootModeOption = ExtractRootModeOptions.FirstOrDefault(o => o.Value == ExtractRootMode)
+                                         ?? ExtractRootModeOptions.FirstOrDefault();
 
         SelectedDoubleClickActionOption = DoubleClickActionOptions.FirstOrDefault(o => o.Value == DoubleClickAction);
 
@@ -1839,6 +1884,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ExtractOpenFolderAfterText));
         OnPropertyChanged(nameof(ExtractEnableDragText));
         OnPropertyChanged(nameof(ExtractPreserveFullPathText));
+        OnPropertyChanged(nameof(CompressRootModeText));
+        OnPropertyChanged(nameof(CompressRootNameText));
+        OnPropertyChanged(nameof(ExtractRootModeText));
         OnPropertyChanged(nameof(ExtractDeleteAfterExtractText));
         OnPropertyChanged(nameof(ExtractDoubleClickActionText));
         OnPropertyChanged(nameof(ExtractDoubleClickThresholdText));
@@ -1995,6 +2043,10 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.FileNameTemplateDialog = FileNameTemplateDialog?.Trim() ?? "";
         _settings.FileNameTemplateQuick = FileNameTemplateQuick?.Trim() ?? "";
         _settings.FileNameTemplateSeparate = FileNameTemplateSeparate?.Trim() ?? "";
+        // 包内根目录四态默认值：Value 是枚举名，解析失败一律回退原样（与消费端默认一致）
+        _settings.CompressRootMode = ParseRootMode(SelectedCompressRootModeOption?.Value, _settings.CompressRootMode);
+        _settings.CompressRootName = CompressRootName?.Trim() ?? "";
+        _settings.ExtractRootMode = ParseRootMode(SelectedExtractRootModeOption?.Value, _settings.ExtractRootMode);
 
 
         // Adaptive Compression (三个独立开关)
@@ -2609,6 +2661,15 @@ public partial class SettingsWindowViewModel : ObservableObject
         foreach (var rule in AdaptiveOverrides)
             rule.Enabled = false;
     }
+
+    /// <summary>
+    /// 把下拉里的枚举名解析回 <see cref="RootDirectoryMode"/>。空白 / 无法识别一律沿用
+    /// <paramref name="fallback"/>（正常情况是当前设置值），保证「下拉异常不会悄悄改设置」。
+    /// </summary>
+    private static RootDirectoryMode ParseRootMode(string? value, RootDirectoryMode fallback)
+        => Enum.TryParse<RootDirectoryMode>(value, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed)
+            ? parsed
+            : fallback;
 }
 
 public record Option(string Display, string Value);

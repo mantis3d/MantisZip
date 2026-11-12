@@ -53,7 +53,8 @@
             <RowDefinition Height="Auto" />  <!-- 输出模式 -->
             <RowDefinition Height="{Binding OutputPickerRowHeight}" />  <!-- 输出路径（手动模式才占位） -->
             <RowDefinition Height="Auto" />  <!-- 文件名（模板 + 最终文件名，2026-11-12 合并为一张卡） -->
-            <RowDefinition Height="Auto" />  <!-- 文件冲突策略 -->
+            <RowDefinition Height="Auto" />  <!-- 包内根目录 -->
+          <RowDefinition Height="Auto" />  <!-- 文件冲突策略 -->
             <RowDefinition Height="Auto" />  <!-- 完成后行为（自动打开输出目录） -->
           </Grid.RowDefinitions>
 
@@ -228,8 +229,55 @@
             </StackPanel>
           </Border>
 
-          <!-- 分组：文件冲突策略（本次压缩遇到同名文件时的处理方式，覆盖/追加/自动重命名/跳过） -->
+          <!-- 分组：包内根目录（v0.5.8 四态单选）。
+               四态是互斥的单选而不是两个独立开关 —— 独立开关能组合出「既剥又加」这种非法态。
+               ①原样恒可用；②仅源恰为一个目录时可用；③④分别压缩时不可用（每包各一层，套根无意义）。
+               置灰项统一挂 ToolTip 说明为什么不可用，避免用户以为坏了。 -->
           <Border Grid.Row="3"
+                  Margin="0,8,0,0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <StackPanel Spacing="{DynamicResource SpacingXs}">
+              <!-- 标题：包内根目录 -->
+              <TextBlock Text="{Binding LocalizedStrings[Compress_RootMode]}"
+                         FontWeight="SemiBold" />
+              <!--
+                四态下拉（原先是竖排四个单选，太占高度）：不可用的档位直接从选项里拿掉，
+                下方用一行灰字说明为什么少了几项。ToolTip 显示当前档位的解释。
+              -->
+              <ComboBox ItemsSource="{Binding RootModeOptions}"
+                        SelectedItem="{Binding SelectedRootModeOption}"
+                        HorizontalAlignment="Left"
+                        MinWidth="240"
+                        ToolTip.Tip="{Binding RootModeDescription}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding Display}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <!-- 裁剪说明：两档都可用时整行隐藏（不占高度） -->
+              <TextBlock Text="{Binding RootModeHint}"
+                         IsVisible="{Binding IsRootModeHintVisible}"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         TextWrapping="Wrap" />
+              <!-- 根目录名：只在真会加根时出现（留空 = 用压缩包文件名去扩展名） -->
+              <Grid ColumnDefinitions="80,*" ColumnSpacing="{DynamicResource SpacingXs}"
+                    IsVisible="{Binding IsWrapRootVisible}">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding LocalizedStrings[Compress_RootMode_WrapName]}"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <TextBox Grid.Column="1"
+                         Text="{Binding WrapRoot}"
+                         Watermark="{Binding LocalizedStrings[Compress_RootMode_WrapName_Watermark]}" />
+              </Grid>
+            </StackPanel>
+          </Border>
+
+          <!-- 分组：文件冲突策略（本次压缩遇到同名文件时的处理方式，覆盖/追加/自动重命名/跳过） -->
+          <Border Grid.Row="4"
                   Margin="0,8,0,0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
@@ -249,7 +297,7 @@
 
           <!-- 分组：完成后行为（压缩成功后自动打开输出目录并选中产物；初值来自「设置 → 压缩 → 压缩选项」，
                进度窗口底部还能临时改。2026-10-30 从 beta 合并进来，放在输出相关选项旁边而不是密码页） -->
-          <Border Grid.Row="4"
+          <Border Grid.Row="5"
                   Margin="0,8,0,0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"

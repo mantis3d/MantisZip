@@ -34,7 +34,7 @@ public partial class ZipEngine
             progress.ReportPhase(ArchivePhase.Scanning);
 
             // 收集所有文件（使用 FileScanner 共享工具，边发现边报告进度）
-            var (files, totalBytes) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
+            var (files, totalBytes) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist, options.CompressRootMode, options.CompressWrapRoot, outputPath);
 
             if (files.Count == 0)
             {

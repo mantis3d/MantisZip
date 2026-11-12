@@ -172,6 +172,8 @@ public sealed record CompressPasswordWriteback(
 /// <param name="Plan">逐源执行计划，含「过滤后实际归档文件白名单」。</param>
 /// <param name="OpenFolderAfterCompress">本次压缩成功后是否打开输出所在目录并选中产物（进度窗口底部的开关可覆盖）。</param>
 /// <param name="FileNameTemplate">文件名模板（占位符形式，如 <c>{name}_{date}</c>）；<c>null</c>/空白 = 未启用（走旧命名）。启用时忽略「保留源文件扩展名」，要保留请写 <c>{ext}</c>。</param>
+/// <param name="RootMode">「包内根目录」四态（原样 / 智能去根 / 智能加根 / 始终加根）；默认原样 = 与引入前逐字节一致。</param>
+/// <param name="WrapRoot">加根时的根名；<c>null</c>/空白 = 用压缩包文件名去扩展名。</param>
 public sealed record CompressSettings(
     IReadOnlyList<CompressSourceEntry> Sources,
     CompressOutputMode OutputMode,
@@ -191,4 +193,6 @@ public sealed record CompressSettings(
     FileFilterCriteria? Filter,
     IReadOnlyList<CompressPlanEntry> Plan,
     bool OpenFolderAfterCompress = false,
-    string? FileNameTemplate = null);
+    string? FileNameTemplate = null,
+    MantisZip.Core.Utils.RootDirectoryMode RootMode = MantisZip.Core.Utils.RootDirectoryMode.Original,
+    string? WrapRoot = null);

@@ -29,6 +29,12 @@ public sealed class SelectedItemsExtractService
     /// <param name="livePolicy">
     /// 实时冲突策略源（进度窗口「冲突时:」下拉）；null = 用 <paramref name="conflictAction"/> 静态策略。
     /// </param>
+    /// <param name="stripRoot">
+    /// 要剥掉的包内根段（解压端「智能去除唯一根」已确认成立时由调用方解析；null = 不剥）。
+    /// </param>
+    /// <param name="addRoot">
+    /// 要加的根段（解压端「智能 / 始终添加唯一根」由调用方解析；null = 不加）。
+    /// </param>
     /// <exception cref="OperationCanceledException">用户取消整个操作（Ask 冲突弹窗）。</exception>
     public async Task ExtractEntriesAsync(
         string archivePath,
@@ -42,7 +48,9 @@ public sealed class SelectedItemsExtractService
         IProgress<ArchiveProgress> progress,
         CancellationToken cancellationToken,
         string? nameEncoding = null,
-        Func<FileConflictAction>? livePolicy = null)
+        Func<FileConflictAction>? livePolicy = null,
+        string? stripRoot = null,
+        string? addRoot = null)
     {
         // Build entryKeys and pathOverrides via 统一路径计算（单一事实来源，预览树共用）
         var entryKeys = new List<string>();
@@ -53,12 +61,23 @@ public sealed class SelectedItemsExtractService
             var key = item.FullPath ?? item.Name;
             entryKeys.Add(key);
 
-            // 净化后的目标相对路径：ExtractPathResolver = TrimCurrentFolderPrefix + SanitizeEntryPath
-            var safeEntryPath = ExtractPathResolver.ResolveRelativePath(key, currentFolder, preserveFullPath);
+            // 净化后的目标相对路径：先剥/加根 → TrimCurrentFolderPrefix → SanitizeEntryPath（叠序不可换）
+            var safeEntryPath = ExtractPathResolver.ResolveRelativePath(
+                key, currentFolder, preserveFullPath, stripRoot, addRoot);
+
+            // 剥根会把根目录条目本身剥成空 ⇒ 该条目不产生落点。连 key 一起丢弃：
+            // 留着 key 却没有 override，引擎会退回默认路径，结果就是「大部分少一层、
+            // 个别还是老路径」。文件条目同理不会再有内容可解。
+            if (safeEntryPath == null)
+            {
+                entryKeys.RemoveAt(entryKeys.Count - 1);
+                continue;
+            }
+
             pathOverrides[key] = FileConflictHelper.GetSafePath(destinationPath, safeEntryPath);
         }
 
-        var options = CreateExtractOptions(conflictAction, conflictDialog, nameEncoding, livePolicy);
+        var options = CreateExtractOptions(conflictAction, conflictDialog, nameEncoding, livePolicy, stripRoot, addRoot);
 
         var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
         if (engine == null) throw new NotSupportedException(LocalizationManager.T("Error_UnsupportedArchiveFormat"));
@@ -155,8 +174,13 @@ public sealed class SelectedItemsExtractService
         string conflictAction,
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>>? conflictDialog,
         string? nameEncoding = null,
-        Func<FileConflictAction>? livePolicy = null)
+        Func<FileConflictAction>? livePolicy = null,
+        string? stripRoot = null,
+        string? addRoot = null)
     {
+        // 「包内根目录」改写：null = 不剥/不加，与引入本功能前逐字节一致。
+        // 三条返回路径都要带上，漏一条就会出现「某个冲突策略下剥根失效」这种只在特定
+        // 设置组合下复现的缺陷。
         // 实时策略模式：策略本身由进度窗口持有，可能在解压途中被改写，
         // 所以静态 ConflictAction 只作兜底，引擎按 provider 逐个冲突取值。
         if (livePolicy is not null)
@@ -169,6 +193,8 @@ public sealed class SelectedItemsExtractService
                 ConflictAction = FileConflictAction.Ask,
                 ConflictActionProvider = livePolicy,
                 ReadEncoding = nameEncoding,
+                StripRootDirectory = stripRoot,
+                AddRootDirectory = addRoot,
                 ConflictResolverAsync = conflictDialog == null
                     ? null
                     : async info =>
@@ -207,10 +233,22 @@ public sealed class SelectedItemsExtractService
 
         var action = MapConflictActionString(conflictAction);
         if (action == FileConflictAction.Overwrite)
-            return new ArchiveOptions { ConflictAction = FileConflictAction.Overwrite, ReadEncoding = nameEncoding }; // 默认行为即覆盖
+            return new ArchiveOptions
+            {
+                ConflictAction = FileConflictAction.Overwrite, // 默认行为即覆盖
+                ReadEncoding = nameEncoding,
+                StripRootDirectory = stripRoot,
+                AddRootDirectory = addRoot,
+            };
 
         if (action != FileConflictAction.Ask || conflictDialog == null)
-            return new ArchiveOptions { ConflictAction = action, ReadEncoding = nameEncoding };
+            return new ArchiveOptions
+            {
+                ConflictAction = action,
+                ReadEncoding = nameEncoding,
+                StripRootDirectory = stripRoot,
+                AddRootDirectory = addRoot,
+            };
 
         // Ask 模式：使用异步回调弹窗 + ApplyToAll 记忆
         bool applyToAll = false;
@@ -220,6 +258,8 @@ public sealed class SelectedItemsExtractService
         {
             ConflictAction = FileConflictAction.Ask,
             ReadEncoding = nameEncoding,
+            StripRootDirectory = stripRoot,
+            AddRootDirectory = addRoot,
             ConflictResolverAsync = async info =>
             {
                 if (applyToAll && chosenAction.HasValue)

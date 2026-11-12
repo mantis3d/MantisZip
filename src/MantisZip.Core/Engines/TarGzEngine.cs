@@ -68,8 +68,9 @@ public class TarGzEngine : IArchiveEngine
                     var entryKey = entry.Key ?? string.Empty;
                     if (entry.IsDirectory)
                     {
-                        var dirPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
-                        if (!Directory.Exists(dirPath))
+                        // 剥根后根目录条目本身会被丢弃 → 不建空壳目录
+                        var dirPath = EntryOutputPath.Resolve(destinationPath, entryKey, options);
+                        if (dirPath != null && !Directory.Exists(dirPath))
                             Directory.CreateDirectory(dirPath);
                         continue;
                     }
@@ -79,7 +80,9 @@ public class TarGzEngine : IArchiveEngine
                         ? (double)inputStream.Position / totalCompressedBytes * 100
                         : 0;
 
-                    var outputFilePath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                    var outputFilePath = EntryOutputPath.Resolve(destinationPath, entryKey, options);
+                    if (outputFilePath == null)
+                        continue; // 剥根后条目消失（如根目录条目本身）
                     var outDir = Path.GetDirectoryName(outputFilePath);
                     if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                         Directory.CreateDirectory(outDir);
@@ -301,7 +304,7 @@ public class TarGzEngine : IArchiveEngine
                 // 阶段 1：扫描源目录
                 progress.ReportPhase(ArchivePhase.Scanning);
 
-                var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist);
+                var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist, options.CompressRootMode, options.CompressWrapRoot, outputPath);
                 CoreLog.Info($"CompressAsync: {files.Count} files to compress");
 
                 // 阶段 2：正式写出 tar/gz
@@ -892,7 +895,9 @@ public class TarGzEngine : IArchiveEngine
                     targetFound++;
 
                     var outputPath = outputPathOverrides?.GetValueOrDefault(normalizedKey)
-                        ?? FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                        ?? EntryOutputPath.Resolve(destinationPath, entryKey, options);
+                    if (outputPath == null)
+                        continue; // 剥根后条目消失
                     var outDir = Path.GetDirectoryName(outputPath);
                     if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))
                         Directory.CreateDirectory(outDir);
@@ -1023,7 +1028,10 @@ public class TarGzEngine : IArchiveEngine
             {
                 // 单纯 GZip 单文件 — 整个流解压到目标（条目名 = 去掉 .gz 的文件名）
                 var entryName = Path.GetFileNameWithoutExtension(archivePath);
+                // 单文件 .gz 的「条目名」恒为包名去扩展名：加根有意义，剥根只会把唯一这个名字剥空，
+                // 所以剥空时退回「不剥」而不是整条丢弃（丢了就等于什么都没解出来）。
                 var outputPath = outputPathOverrides?.GetValueOrDefault(ArchivePath.Normalize(entryName))
+                    ?? EntryOutputPath.Resolve(destinationPath, entryName, options)
                     ?? FileConflictHelper.GetSafePath(destinationPath, entryName);
                 var outDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outDir) && !Directory.Exists(outDir))

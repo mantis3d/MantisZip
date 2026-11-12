@@ -90,6 +90,30 @@
                 <TextBlock Text="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
                            TextWrapping="Wrap" />
               </CheckBox>
+
+              <!-- 压缩包顶层目录（v0.5.8 四态下拉）。
+                   四态互斥而不是两个独立开关 —— 独立开关能组合出「既剥又加」这种非法态。
+                   「智能去除」只在包确有唯一根时出现在选项里（判定与执行侧同源，否则会出现
+                   「窗里能选、跑起来什么都不做」）；消失的原因由下方一行灰字说明。 -->
+              <TextBlock Text="{Binding LocalizedStrings[Extract_RootMode]}"
+                         FontWeight="SemiBold"
+                         Margin="0,4,0,0" />
+              <ComboBox ItemsSource="{Binding ExtractRootModeOptions}"
+                        SelectedItem="{Binding SelectedExtractRootModeOption}"
+                        HorizontalAlignment="Left"
+                        MinWidth="240"
+                        ToolTip.Tip="{Binding ExtractRootModeDescription}">
+                <ComboBox.ItemTemplate>
+                  <DataTemplate>
+                    <TextBlock Text="{Binding Display}" />
+                  </DataTemplate>
+                </ComboBox.ItemTemplate>
+              </ComboBox>
+              <!-- 裁剪说明：包本来就有唯一根时整行隐藏（不占高度） -->
+              <TextBlock Text="{Binding ExtractRootModeHint}"
+                         IsVisible="{Binding IsExtractRootModeHintVisible}"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         TextWrapping="Wrap" />
             </StackPanel>
           </Border>
         </Grid>

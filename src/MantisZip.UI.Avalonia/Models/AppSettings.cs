@@ -85,6 +85,19 @@ public class AppSettings
     /// <summary>压缩时输出文件已存在（文件冲突）的默认处理：ask / overwrite / add / rename / skip</summary>
     public string CompressFileConflictAction { get; set; } = "ask";
 
+    // ===== 包内根目录（v0.5.8）=====
+    // 四态：Original / SmartStrip / SmartWrap / AlwaysWrap。存 int 而不是枚举字符串，
+    // 与 ArchiveRootPolicy.RootDirectoryMode 的数值绑定（那边注释已声明数值是持久化契约）。
+
+    /// <summary>压缩端「包内根目录」默认值。</summary>
+    public RootDirectoryMode CompressRootMode { get; set; } = RootDirectoryMode.Original;
+
+    /// <summary>压缩端套根时的默认根名；空 = 每次按压缩包文件名去扩展名推导。</summary>
+    public string CompressRootName { get; set; } = "";
+
+    /// <summary>解压端「压缩包顶层目录」默认值。</summary>
+    public RootDirectoryMode ExtractRootMode { get; set; } = RootDirectoryMode.Original;
+
     // ===== 压缩文件名模板（v0.5.7）=====
     // 三个入口各记一份默认值：项目里「压缩到此处/右键压缩」与「分别压缩」的命名诉求差别很大，
     // 一个全局默认值会互相拖累。空串 = 不启用（行为与引入前逐字节一致）。
