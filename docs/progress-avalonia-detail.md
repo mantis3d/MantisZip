@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-12** — 规则：按钮样式选型写进 AGENTS.md 规则 4，并新增第 10 条守卫 `buttonstyle`
+  - **背景**：同一天压缩设置窗 4 个按钮 + 设置页 3 个按钮误挂 `ToolbarButton`，表现为比同排输入框高半头、底色与卡片不一致。用户要求先把这条写进 `AGENTS.md`，避免后续新增按钮重复同一错误。
+  - **判据**：`ToolbarButton` / `ToolbarIcon` 只属于「贴在窗口头部条上的工具栏」（主窗口工具栏、内容区工具条、结果树工具条、进度窗底部开关行），判断依据是**容器底色**而非按钮形态 —— `ThemeHeaderBgBrush` 头部条才挂；`ThemeSurfaceBgBrush` 卡片（设置窗/对话框）里，有文字的按钮不挂 class 用全局 `Button` 默认样式，纯图标按钮只挂 `ToolbarIcon`。
+  - **同批补的一条**：自定义 `Button` / `ToggleButton` 子类必须覆盖 `protected override Type StyleKeyOverride => typeof(Button);`，否则 Avalonia 按子类类型找不到 `ControlTheme`，控件没有模板、`Click` 永不触发（`Controls/PlaceholderInsertButton.cs` 实测 `clicks=0`，补上即好）。
+  - **守卫 `buttonstyle`**（`scripts/verify-repo.ps1` 的 `Test-GuardButtonStyle`）：① 扫 `src/MantisZip.UI.Avalonia/Dialogs/*.axaml` + `Views/SettingsWindow.axaml`（共 31 个 XAML），`Classes` 按空白切 token 后含 `ToolbarButton` 即失败（避免误伤 `ToolbarButtonIcon` / `ToolbarButtonLabel`）；② 扫 `src/` 全部 `.cs`，`class X : Button/ToggleButton` 同文件无 `StyleKeyOverride` 即失败。
+  - **红绿验证**：绿 = 10 条守卫全过（`xamlFiles: 31`、`buttonTypes: 1`）；红①临时在 `Dialogs/HelpDialog.axaml` 插 `<Button Classes="ToolbarButton" Content="probe" />` → 3 处命中、`failedCount: 1`；红②临时删掉 `PlaceholderInsertButton.cs` 的 `StyleKeyOverride` → 1 处命中、`failedCount: 1`。两次都从原文还原。
+  - **同步**：`docs/MAINTENANCE.md` 的「九条规则守卫」改十条、加 `buttonstyle` 行与覆盖边界说明；`AGENTS.md` 维护脚本文具表的 `-Task guards` 行补「按钮样式选型（规则 4）」。
+  - **验证**：`-Task check` 全绿（0.5.7 六处 / 1483 key / 10 条守卫）。
+
 **2026-11-12** — 界面：压缩设置窗「文件名」卡片合并 + 按钮样式归位
   - **背景**：用户报三个问题 —— ①新增的几个按钮误用了 `ToolbarButton`；②文件名模板应放到输出路径下面并与原有文件名显示合并；③原有文件名显示与新增提示文本内容重复。先讨论后动手，四项拍板：合成一张「文件名」卡片、普通按钮回归全局默认样式、删示例行及其属性与两个 key、帮助按钮留在标题行右侧。
   - **根因**：`ToolbarButton` 是主窗口工具栏专用样式（`App.axaml:181`，`Height=ControlHeightLg` + `Background=ThemeHeaderBgBrush`），贴在卡片里比同排 `TextBox`（`MinHeight=ControlHeightSm`）高且底色像补丁；受影响的 7 个按钮是压缩窗「插入占位符 / 存为预设 / 删除 / 帮助」与设置页三行「插入占位符」。重复则是两处都渲染同一个 `ComputeSingleArchiveName` 结果（示例行与文件名框），未启用模板时连「留空则按原规则命名」都和 watermark 一字不差。

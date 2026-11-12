@@ -46,7 +46,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 | `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` | 构建并把 MSBuild 输出压成「文件:行:列 + 错误码」（项目级诊断无行列号时只显示 csproj 路径，如 restore/NU1301 失败） |
 | `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` | 跑测试 |
 | `pwsh -File scripts\verify-repo.ps1 -Task i18n` / `-Task version` | 单项检查 |
-| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8）/ 意图-执行接缝（规则 20）/ 数字输入受控（规则 22）/ 反序列化显式 options（规则 23）/ 设置项接线（规则 23） |
+| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8）/ 意图-执行接缝（规则 20）/ 数字输入受控（规则 22）/ 反序列化显式 options（规则 23）/ 设置项接线（规则 23）/ 格式身份单一入口（规则 23）/ 按钮样式选型（规则 4） |
 | 追加 `-Json` | 机器可读输出（插件内部用） |
 
 - `-Target`：`avalonia`（默认）/ `core` / `shell` / `tests` / `ui-tests` / `solution`
@@ -151,6 +151,18 @@ When releasing a new version, update the version string in ALL of these location
 
 - **`PathIcon` 的 `Foreground` 必须显式给**：Avalonia 12 的 `IconElement.ForegroundProperty` 元数据是 `Inherits = true`，但实测工具栏 / 小按钮里的 `PathIcon` 仍取不到父控件的语义画刷（深色主题下呈默认黑、几乎不可见），所以一律按「显式设置」执行。**统一入口**：工具栏类图标挂 `Classes="ToolbarButtonIcon"`，命中 `App.axaml` 的 `PathIcon.ToolbarButtonIcon` 样式；该样式**必须写在 `ToggleButton:checked PathIcon` 之前**（Avalonia 无 CSS specificity、同名属性按定义顺序后者覆盖，放后面会把选中态的白图标覆盖成 Primary）。全局 `TextBlock` 样式**故意不设 Foreground**（继承父控件避免 emoji 压成单色），除非有明确理由不要显式设置
 - 不设置固定 `Height` 除非有充分理由；`ToggleIconBox` / 菜单图标槽位的详细用法见 ARCHITECTURE
+
+- **`ToolbarButton` / `ToolbarIcon` 只属于「贴在窗口头部条上的工具栏」**（主窗口工具栏、内容区工具条、结果树工具条、进度窗底部开关行）。判断依据是**容器底色**，不是「按钮长得像工具按钮」：
+  - 容器是 `ThemeHeaderBgBrush` 的**头部条** → 挂 `ToolbarButton`（与整条融在一起）
+  - 容器是 `ThemeSurfaceBgBrush` 的**设置窗 / 对话框卡片** → **禁止挂 `ToolbarButton`**。它高度是 `ControlHeightLg`（比同排 `TextBox` 的 `MinHeight=ControlHeightSm` 高一档），底色是头部灰（贴进 `ThemeSurfaceBgBrush` 卡片里像一块补丁）。此时：
+    - 有文字的按钮 → **不挂任何 class**，用全局 `Button` 默认样式（`App.axaml` 的 `Style Selector="Button"`：`MinHeight=ControlHeightSm`、`Padding 8,4`、`ThemeButtonBgBrush`）
+    - 只有图标的按钮（帮助 `?`、编辑、删除）→ **只挂 `ToolbarIcon`**（方形 `ControlHeightSm`，与同排输入框齐高）
+  - **事故（2026-11-12）**：压缩设置窗「插入占位符 / 存为预设 / 删除 / 帮助」+ 设置页三行「插入占位符」共 7 处误挂 `ToolbarButton`，表现为按钮比输入框高半头、底色与卡片不一致
+- **自定义 `Button`（或 `ToggleButton`）子类必须覆盖 `StyleKeyOverride`**，否则 Avalonia 按子类类型找不到 `ControlTheme`，控件没有模板、**点了完全没反应**（不报错、不抛异常，只是 `Click` 永不触发）：
+  ```csharp
+  protected override Type StyleKeyOverride => typeof(Button);
+  ```
+  （2026-11-12 实测：`Controls/PlaceholderInsertButton.cs` 漏写时 `clicks=0`，补上后正常。参照 `ProgressPauseGate` 之外的自定义控件统一照此办理）
 
 ### 规则 5：紧凑度模式资源键名约定
 
