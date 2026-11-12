@@ -17,7 +17,8 @@
     - **不要覆盖 `OnClick` 后再自己 `ShowAt`**：基类内建逻辑已会 `OpenFlyout`，再 `ShowAt` 一次会「开了又关」；也不要 `Dispatcher.Post` 延迟打开 —— 基类路径已避开 Popup 的光照判定。
   - **未聚焦时的插入点**：`TextBox` 从未获得焦点时 `CaretIndex` 恒为 0，照它插会插到最前面。`OnPreviewPointerPressed` 里先看 `textBox.IsFocused`，未聚焦就记 `-1` 交 `ResolveInsertIndex` 兜底到末尾。
   - **i18n**：三份 json 各 +10 key（`Compress_FileNameTemplate_Insert` / `_InsertTip` + 8 个 `_Token_*`）⇒ `-Task i18n` **1483** key；压缩对话框 2 个 key 走 `LocalizedStrings` 登记（规则 13），设置页 2 个走普通 VM 属性（`FileNameTemplateInsertText`/`...TipText`，在 `UpdateLocalizedTexts` 里通知）。
-  - **验证**：`PlaceholderInsertionTests` 11 例 + `PlaceholderInsertButtonTests` 3 例（点按钮 → 弹层 8 项；有焦点时插到光标；未聚焦时追加到末尾）全绿；avalonia Release `--no-incremental` 0 警告；`ui-tests` 42.0s、`tests` 13.8s 全绿；`-Task check` 版本 0.5.7 六处 / 1483 key / 9 条守卫。真机：点「插入占位符」弹层 346×250 列出 8 项（`{name}` … `{seq:0000}`，各带中文说明），点 `{date}` 后输入框内容变为 `{date}` 且光标在其后。
+  - **验证**：`PlaceholderInsertionTests` 11 例 + `PlaceholderInsertButtonTests` 3 例（点按钮 → 弹层 8 项；有焦点时插到光标；未聚焦时追加到末尾）+ `SettingsWindowTemplateInsertTests` 3 例（设置页三行各有且仅有一个按钮、`TargetTextBox` 指向本行输入框；按钮在四列网格里落在第 2 列且整体在预设下拉左侧；按钮文案取自 `Compress_FileNameTemplate_Insert`）全绿；avalonia Release `--no-incremental` 0 警告；`ui-tests` 44.1s、`tests` 13.8s 全绿；`-Task check` 版本 0.5.7 六处 / 1483 key / 9 条守卫。真机：点「插入占位符」弹层 346×250 列出 8 项（`{name}` … `{seq:0000}`，各带中文说明），点 `{date}` 后输入框内容变为 `{date}` 且光标在其后。
+  - **为什么设置页单独要一组无头测试**：四列网格的列号、`TargetTextBox="{Binding #<name>}"` 指向哪一行，这两类接线错误编译期完全看不出来（XAML 里写错列号只是显示错位，指向错行则用户会插到别的输入框），必须物化 XAML 才能断言。
 
 **2026-11-11** — 功能：压缩文件名模板（v0.5.7 第二项）
   - **需求**：用户希望压缩包主名能按规则自动生成（例：`{name}_{date}`），解决「同日期同名的压缩包互相覆盖」；此前只有「保留/去掉源扩展名」一个开关，重名时靠手动改名。
