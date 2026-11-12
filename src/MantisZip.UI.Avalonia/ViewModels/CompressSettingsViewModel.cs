@@ -195,12 +195,17 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? _newPresetName;
 
-    /// <summary>选中预设 → 填进输入框并清空选择（避免二次选同一项不触发）。</summary>
+    /// <summary>
+    /// 选中预设 → 把模板填进输入框，并**保留选中态**。
+    /// 早先这里填完就置 null（为了能重复选同一项），结果「删除」按钮永远拿不到
+    /// <see cref="SelectedTemplatePreset"/>、点了没反应；改成保留选中，用户手动改模板
+    /// 改到与预设不同时再由 <see cref="OnFileNameTemplateChanged"/> 清掉选中。
+    /// </summary>
     partial void OnSelectedTemplatePresetChanged(FileNameTemplatePreset? value)
     {
         if (value is null) return;
+        if (string.Equals(FileNameTemplate, value.Template, StringComparison.Ordinal)) return;
         FileNameTemplate = value.Template;
-        SelectedTemplatePreset = null;
     }
 
     /// <summary>把当前模板存成一个命名预设（同名覆盖，上限 20 条），并写回设置。</summary>
@@ -595,6 +600,13 @@ public partial class CompressSettingsViewModel : ObservableObject
                 RefreshOutputPathState();
             else
                 TryAutoFillOutputPath();
+            // 源列表变了 {name}/{name:auto} 的取值也会变（1 源 = 源名、≥2 源 = 父目录名），
+            // 而 TryAutoFillOutputPath 在路径已存在时会早退 —— 必须在这里无条件重渲染一次。
+            if (IsTemplateActive)
+            {
+                TemplateError = ValidateTemplateNow();
+                RefreshTemplatedOutputFileName();
+            }
             UpdateCanCompress();
         };
 
@@ -1170,6 +1182,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsOutputPathReadOnly));
         OnPropertyChanged(nameof(IsBrowseButtonVisible));
         OnPropertyChanged(nameof(IsFileNameSectionVisible));
+        OnPropertyChanged(nameof(IsFileNameRowVisible));
         OnPropertyChanged(nameof(IsQuickPathVisible));
         OnPropertyChanged(nameof(OutputPickerRowHeight));
         OnPropertyChanged(nameof(OutputPathLabel));
@@ -1231,19 +1244,33 @@ public partial class CompressSettingsViewModel : ObservableObject
     public bool IsOutputFileNameReadOnly => OutputMode != CompressOutputMode.Manual || IsTemplateActive;
 
     /// <summary>
-    /// 模板错误行是否可见。只在模板启用且校验出问题时为 true ——
-    /// 正常时这一行完全不占位（原「示例行」已并入下方文件名框，见 2026-11-12 合并）。
+    /// 模板错误提示是否可见。只在模板启用且校验出问题时为 true ——
+    /// 正常时这一格显示普通文件名框，出错时由红框提示原位替换（同一格、不新增行）。
     /// </summary>
     public bool IsTemplateErrorVisible => IsTemplateActive && TemplateError != null;
+
+    /// <summary>
+    /// 「文件名」结果行是否可见。分别压缩时每个源各自成包、这一行没有意义要隐藏；
+    /// 但模板出错时必须仍然显示（错误提示就渲染在这一格里），否则用户看不到任何反馈。
+    /// </summary>
+    public bool IsFileNameRowVisible => IsFileNameSectionVisible || IsTemplateErrorVisible;
 
     /// <summary>模板内容变化 → 重渲染（只改显示与校验，不写回设置）。</summary>
     partial void OnFileNameTemplateChanged(string? value)
     {
+        // 手动改过模板且与当前选中的预设不一致 ⇒ 取消选中（避免下拉仍显示旧预设名）
+        if (SelectedTemplatePreset is { } preset
+            && !string.Equals(preset.Template, value, StringComparison.Ordinal))
+        {
+            SelectedTemplatePreset = null;
+        }
+
         TemplateError = ValidateTemplateNow();
         RefreshTemplatedOutputFileName();
         OnPropertyChanged(nameof(IsTemplateActive));
         OnPropertyChanged(nameof(IsOutputFileNameReadOnly));
         OnPropertyChanged(nameof(IsTemplateErrorVisible));
+        OnPropertyChanged(nameof(IsFileNameRowVisible));
         if (IsTemplateActive)
             BuildCompressPreview();
     }
@@ -1251,6 +1278,7 @@ public partial class CompressSettingsViewModel : ObservableObject
     partial void OnTemplateErrorChanged(string? value)
     {
         OnPropertyChanged(nameof(IsTemplateErrorVisible));
+        OnPropertyChanged(nameof(IsFileNameRowVisible));
     }
 
     /// <summary>

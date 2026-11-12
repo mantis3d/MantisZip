@@ -14,6 +14,14 @@
   - **为什么这两行要挤进一张卡**：模板与最终文件名是「输入 → 输出」的因果对，分两张卡放时用户要在两处之间来回看；合成一张后左侧标签统一 80px、模板框结果与文件名框结果上下对齐，改模板能直接看到下面那行跟着变。
   - **验证**：avalonia Release `--no-incremental` 13.5s / 22.6s **0 警告**；`ui-tests` 45.8s 全绿、`tests` 11.1s 全绿；`-Task check` 0.5.7 六处 / 1483 key / 9 条守卫；`CompressSettingsViewModelTemplateTests` 里两处 `IsTemplateExampleError` 断言同步改为 `IsTemplateErrorVisible`。真机（`--compress %TEMP%\mz-ph\report.txt`，窗口 1096×899）：卡片标题「文件名」、内层「模板」「文件名」两行左对齐、按钮与输入框齐高。
 
+**2026-11-12** — 修复：文件名模板三处交互缺陷（加源不重算 / 错误提示顶版 / 删除预设无效）
+  - **背景**：用户报三个问题 —— ①压缩设置里添加新文件时 `{name:auto}` 不刷新（单文件应等于该文件名，加第二个源应变成父目录名）；②模板非法时提示文本单独一行出现，把下面内容顶下去，应该原位替换文件名框里的文字并变红；③删除预设的按钮无效。
+  - **根因 1（加源不重算）**：`SelectedPaths.CollectionChanged` 只在 Manual 模式下调 `TryAutoFillOutputPath()`，而该函数开头就是 `if (!string.IsNullOrEmpty(OutputPath)) return;` —— 打开对话框时路径已填好，之后加文件全部早退，模板渲染根本没被触发。修法：集合变化后**无条件**重算一次（`TemplateError = ValidateTemplateNow(); RefreshTemplatedOutputFileName();`），`{name:auto}` 的语义本来就在 `CompressPathPlanner.ResolveAutoName` 里按源数决定（1 源 → null → 回退源主名；≥2 源 → 公共父目录名），只要重渲染结果自然就对。
+  - **根因 2（提示顶版）**：错误提示是一行独立的 `TextBlock`，出现时给卡片加了一行。修法（XAML）：文件名框与错误提示**叠在同一格**（同一个 `Grid.Column="1"`，`IsVisible` 互斥），错误态换成红边框 `Border` + 红色 `TextBlock`，最小高度同为 `ControlHeightSm`，所以位置和高度都不变；文案改 `TextWrapping="NoWrap"` + `TextTrimming="CharacterEllipsis"`，完整文本挂 `ToolTip` —— 未知占位符那条会把 8 个可用 token 全列出来，一旦允许换行这一行仍会被撑高（第一版就是这样，真机截图才看出来）。另加 `IsFileNameRowVisible => IsFileNameSectionVisible || IsTemplateErrorVisible`：分别压缩模式下文件名行本来是隐藏的，不这样处理会把错误提示一起吞掉。
+  - **根因 3（删除预设无效）**：`OnSelectedTemplatePresetChanged` 填完模板后立刻 `SelectedTemplatePreset = null`（当初是为了能重复选同一项），而 `DeleteTemplatePreset` 第一句就是 `if (SelectedTemplatePreset is null) return;` ⇒ 永远拿到 null。修法：保留选中态，改由 `OnFileNameTemplateChanged` 在「模板内容与选中预设不一致」时清空选中 —— 既保留了删除目标，也不会让下拉长期显示一个已不匹配的预设名。
+  - **测试**：`CompressSettingsViewModelTemplateTests` 从 11 例增到 14 例，其中 `PresetSelection_FillsTemplateAndClearsSelection` 按新语义改名为 `PresetSelection_FillsTemplateAndKeepsSelection` 并断言 `Assert.Same`；新增 `EditingTemplateAwayFromPreset_ClearsSelection`、`DeletePreset_RemovesSelectedPresetFromSettings`（断言 settings 里真的没了）、`AddingSource_ReRendersNameAuto`（单源 `{name:auto}` = `alpha`，加第二个源后变成父目录名）。
+  - **验证**：avalonia Release `--no-incremental` 21.8s / 13.1s **0 警告**；14 例模板用例全绿；`ui-tests` 46.0s 全绿、`tests` 11.1s 全绿；`-Task check` 0.5.7 六处 / 1483 key / 9 条守卫。真机（`--compress %TEMP%\mz-ph\report.txt`）：模板填 `{foo}` 时文件名框原位显示红框 + 红字「未知占位符 foo，可用：…」（单行省略，鼠标悬停看全文）、卡片高度不变；下拉选「日期」后模板变为 `{name}_{date}`、文件名变 `report_2026-11-12`、右侧预览树同步；点「删除」后 `settings.json` 里只剩「序号」、下拉同步。
+
 **2026-11-12** — 功能：「插入占位符」下拉菜单（文件名模板）
   - **需求**：用户希望像常见软件那样，点一下弹出全部占位符的菜单，选一个就插到输入框光标处，不用手敲 `{name:auto}` 这种记不住的 token。
   - **纯函数层**：新建 `src/MantisZip.UI.Avalonia/Models/PlaceholderInsertion.cs`（`Insert(text, selectionStart, selectionEnd, token, out caretIndex)` 处理选区替换 / 反向选区交换 / 越界 clamp / 空文本；`ResolveInsertIndex(text, caretIndex)` 在光标无效时兜底到文本末尾）。

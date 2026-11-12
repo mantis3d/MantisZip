@@ -182,7 +182,7 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
     }
 
     [Fact]
-    public void PresetSelection_FillsTemplateAndClearsSelection()
+    public void PresetSelection_FillsTemplateAndKeepsSelection()
     {
         Apply(s =>
         {
@@ -197,8 +197,87 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         vm.SelectedTemplatePreset = vm.TemplatePresetOptions[0];
 
         Assert.Equal("{name}_{date}", vm.FileNameTemplate);
-        Assert.Null(vm.SelectedTemplatePreset);
+        // 保留选中态，否则「删除」按钮拿不到目标、点了没反应（2026-11-12 修）
+        Assert.Same(vm.TemplatePresetOptions[0], vm.SelectedTemplatePreset);
         Assert.True(vm.HasTemplatePresets);
+    }
+
+    /// <summary>手动改模板改到与选中预设不一致时，下拉里的选中态要自动取消。</summary>
+    [Fact]
+    public void EditingTemplateAwayFromPreset_ClearsSelection()
+    {
+        Apply(s =>
+        {
+            s.FileNameTemplateDialog = "";
+            s.FileNameTemplatePresets.Clear();
+            s.FileNameTemplatePresets.Add(new FileNameTemplatePreset("日期", "{name}_{date}"));
+        });
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
+        vm.SelectedTemplatePreset = vm.TemplatePresetOptions[0];
+        Assert.NotNull(vm.SelectedTemplatePreset);
+
+        vm.FileNameTemplate = "{name}_custom";
+
+        Assert.Null(vm.SelectedTemplatePreset);
+    }
+
+    /// <summary>删除按钮此前无效：选中预设后立刻被置 null，命令里拿不到目标。现在要真能删掉。</summary>
+    [Fact]
+    public void DeletePreset_RemovesSelectedPresetFromSettings()
+    {
+        Apply(s =>
+        {
+            s.FileNameTemplateDialog = "";
+            s.FileNameTemplatePresets.Clear();
+            s.FileNameTemplatePresets.Add(new FileNameTemplatePreset("日期", "{name}_{date}"));
+            s.FileNameTemplatePresets.Add(new FileNameTemplatePreset("序号", "{name}_{seq:0000}"));
+        });
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
+        Assert.Equal(2, vm.TemplatePresetOptions.Count);
+
+        vm.SelectedTemplatePreset = vm.TemplatePresetOptions[0];
+        vm.DeleteTemplatePresetCommand.Execute(null);
+
+        Assert.Single(vm.TemplatePresetOptions);
+        Assert.Equal("序号", vm.TemplatePresetOptions[0].Name);
+        Assert.DoesNotContain(AppSettings.Load().FileNameTemplatePresets, p => p.Name == "日期");
+    }
+
+    /// <summary>
+    /// 源列表变化必须重渲染模板：1 个源时 <c>{name:auto}</c> = 该源主名，
+    /// 加到 2 个源变成父目录名。早先只在 Manual 且路径为空时才渲染，加文件后数字不更新。
+    /// </summary>
+    [Fact]
+    public void AddingSource_ReRendersNameAuto()
+    {
+        var dir = System.IO.Path.Combine(System.IO.Path.GetTempPath(), "mz_tpl_" + System.Guid.NewGuid().ToString("N"));
+        System.IO.Directory.CreateDirectory(dir);
+        try
+        {
+            var first = System.IO.Path.Combine(dir, "alpha.txt");
+            var second = System.IO.Path.Combine(dir, "beta.txt");
+            System.IO.File.WriteAllText(first, "a");
+            System.IO.File.WriteAllText(second, "b");
+
+            Apply(s => s.FileNameTemplateDialog = "");
+
+            var vm = new CompressSettingsViewModel(new[] { first });
+            vm.FileNameTemplate = "{name:auto}";
+
+            // 单源：{name:auto} 回退源主名
+            Assert.Equal("alpha", vm.OutputFileName);
+
+            vm.SelectedPaths.Add(second);
+
+            // 双源：{name:auto} 变成公共父目录名
+            Assert.Equal(System.IO.Path.GetFileName(dir), vm.OutputFileName);
+        }
+        finally
+        {
+            System.IO.Directory.Delete(dir, recursive: true);
+        }
     }
 
     [Fact]
