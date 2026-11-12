@@ -85,6 +85,55 @@ public class AppSettings
     /// <summary>压缩时输出文件已存在（文件冲突）的默认处理：ask / overwrite / add / rename / skip</summary>
     public string CompressFileConflictAction { get; set; } = "ask";
 
+    // ===== 压缩文件名模板（v0.5.7）=====
+    // 三个入口各记一份默认值：项目里「压缩到此处/右键压缩」与「分别压缩」的命名诉求差别很大，
+    // 一个全局默认值会互相拖累。空串 = 不启用（行为与引入前逐字节一致）。
+
+    /// <summary>压缩对话框（手动/合并/分别都走它）的文件名模板默认值。</summary>
+    public string FileNameTemplateDialog { get; set; } = "";
+
+    /// <summary>右键「快速压缩到此」等无对话框入口的文件名模板默认值。</summary>
+    public string FileNameTemplateQuick { get; set; } = "";
+
+    /// <summary>CLI <c>--compress-separate</c> 的文件名模板默认值。</summary>
+    public string FileNameTemplateSeparate { get; set; } = "";
+
+    /// <summary>命名预设（在压缩对话框里增删，最多 20 条）。</summary>
+    public List<FileNameTemplatePreset> FileNameTemplatePresets { get; set; } = new();
+
+    /// <summary>命名预设条数上限（与文件过滤预设保持一致）。</summary>
+    public const int MaxFileNameTemplatePresets = 20;
+
+    /// <summary>
+    /// 添加命名预设（同名覆盖、上限 <see cref="MaxFileNameTemplatePresets"/> 条）。
+    /// 同名覆盖而不是静默忽略：用户改了模板再存同一个名字，期望是更新而多出一条。
+    /// </summary>
+    public bool AddFileNameTemplatePreset(FileNameTemplatePreset preset)
+    {
+        if (preset is null || string.IsNullOrWhiteSpace(preset.Name) || string.IsNullOrWhiteSpace(preset.Template))
+            return false;
+
+        var existing = FileNameTemplatePresets.FindIndex(
+            p => string.Equals(p.Name, preset.Name, StringComparison.OrdinalIgnoreCase));
+        if (existing >= 0)
+        {
+            FileNameTemplatePresets[existing] = preset;
+            return true;
+        }
+
+        if (FileNameTemplatePresets.Count >= MaxFileNameTemplatePresets) return false;
+        FileNameTemplatePresets.Add(preset);
+        return true;
+    }
+
+    /// <summary>按名字删除命名预设；返回是否真的删掉了。</summary>
+    public bool RemoveFileNameTemplatePreset(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        return FileNameTemplatePresets.RemoveAll(
+            p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) > 0;
+    }
+
     // ===== 分卷 =====
     public string SplitSizeTag { get; set; } = "0";
     public string CustomSplitSizeMB { get; set; } = "";

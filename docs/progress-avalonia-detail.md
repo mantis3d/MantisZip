@@ -6,6 +6,23 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-11** — 功能：压缩文件名模板（v0.5.7 第二项）
+  - **需求**：用户希望压缩包主名能按规则自动生成（例：`{name}_{date}`），解决「同日期同名的压缩包互相覆盖」；此前只有「保留/去掉源扩展名」一个开关，重名时靠手动改名。
+  - **交付**：核心是新的 Core 纯函数 `src/MantisZip.Core/Utils/FileNameTemplate.cs`——tokenizer 支持 `{name}` / `{name:auto}` / `{ext}` / `{parent}` / `{date}` / `{datetime}` / `{seq}` / `{seq:0000}`（大小写不敏感、`{{`/`}}` 转义），并做三层校验（语法 → 渲染 → 结果）；结果层拦空结果、`Path.GetInvalidFileNameChars()` + 控制字符、结尾 `.` 或空格、Windows 保留设备名（`CON`/`PRN`/`AUX`/`NUL`/`COM1-9`/`LPT1-9`）与超长 200。附 `FileNameTemplatePreset`（命名预设）与 `PathCommonality`（`FindCommonParent`/`IsDriveRoot` 从 `App.CliCompress.cs` 下沉，避免第 4 份拷贝）。
+  - **命名管线**：`CompressPathPlanner` 的 `ComputeArchiveName` / `ComputeOutputPath` / `PlanSeparate` 三个方法各加可选模板参数（默认 `null` = 旧行为逐字节不变），新增 `ComputeSingleArchiveName`（多源单包：`{name}` 取首源、`{name:auto}` 取公共父目录名、跨盘回退首源名）、`ResolveAutoName` 与 `GetFormatExtension`（`.tar.gz` 双段）。**渲染失败静默回退旧命名是刻意的**：预览树不能因为用户正在敲半截 `{na` 就崩或空，错误改由对话框示例行与确认时提示。
+  - **执行侧透传**：`CompressRequest.FileNameTemplate` + `TemplateTimestamp`（批开始时取一次，跨午夜不半新半旧）；`GetOutputPaths` 与 `CompressSeparateAsync` 传 1-based 序号；`CompressSettings` record 末尾追加 `string? FileNameTemplate = null`（必须带默认值，否则 18 个位置参数的既有构造全炸）；`CompressSession.BuildRequest` 映射。
+  - **预览透传**：`ResultPreviewService.AssembleCompressPreview` 加两个参数，Separate 走 `PlanSeparate`、Manual / Combined 走 `ComputeSingleArchiveName` 兜底 —— 保证「预览树里看到的就是最终输出名」。
+  - **对话框**：`CompressSettingsWindow.axaml` 在「输出模式」与「输出目录」之间插入「文件名模板」分组（输入框 + `?` 帮助 + 预设 `ComboBox`/存为预设/删除 + 示例行 / 错误行），后续四个 `Grid.Row` 顺延；`CompressSettingsViewModel` 加 `FileNameTemplate` / `IsTemplateActive` / `IsOutputFileNameReadOnly`（手动与合并模式下自动只读并显示渲染结果）/ `TemplateExampleText` / `IsTemplateExampleError` / 预设增删命令，`ValidateForExecution` 新增第 ⑥ 步（模板非空时校验语法 + Separate 重名），帮助走 `HelpDialog` + `MarkdownHelpContent`（规则 17）。
+  - **三档默认值**：`AppSettings` 加 `FileNameTemplateDialog/Quick/Separate` 三个字段 + `FileNameTemplatePresets` 列表 + `AddFileNameTemplatePreset`（同名覆盖、上限 20）/ `RemoveFileNameTemplatePreset`，并在 `AppSettingsJsonContext` 注册 `FileNameTemplatePreset`（源生成上下文，缺了列表反序列化会失败）；设置页「压缩 → 常规」新增三行（各带预设下拉，选中即填入）。
+  - **CLI**：`--compress-quick` 改用 `ComputeSingleArchiveName`（模板为空时回退原手算）、`--compress-separate` 传模板与时间戳。
+  - **踩坑与缺陷（教训必留）**：
+    - `{seq:0000}` 的宽度**必须按位数本身**（`digits.Length`）；首版把 `0000` 当整数解析得到 0，直接判非法 —— 测试先行救回。
+    - 模板渲染的是**主名**不是路径：`{parent}\{name}` 里的分隔符按非法字符拒绝（不猜用户想建子目录），已加用例固化该语义。
+    - 真机发现 `TryAutoFillOutputPath()` 会先用「公共父目录名」写文件名、把模板结果盖掉 ⇒ 末尾补一次 `RefreshTemplatedOutputFileName()`；合并模式 `RefreshCombinedPath()` 完全忽略模板 ⇒ 抽出 `ResolveCombinedArchiveName` 并让两个调用点共用。
+    - `{date}` / `{datetime}` 实现是 `yyyy-MM-dd` / `yyyy-MM-dd_HHmmss`，帮助 Markdown 原写 `20261111`，三份 json 各改 4 处对齐实现。
+    - `Compress_FileNameTemplate_UnknownPlaceholder` / `_Duplicate` 走 `LocalizationManager.T(key, args)` → `string.Format`，文案里的 `{name}`/`{seq}` 会被当格式项抛 `FormatException`（catch 后回落原文，测试断言因此失败）⇒ 文案内示例改写成 `{{name}}`/`{{seq}}`。
+    - 用 PowerShell 拼接 i18n key 块时，最后一行必须显式补逗号（漏了会让 `ConvertFrom-Json` 报 "unexpected character"）；含中文弯引号的长 Markdown 不要直接写进 PowerShell 命令（会被当引号边界，整条命令语法错）——改为先写临时文件再按锚点行拼接。
+  - **验证**：新增 135 例测试（`FileNameTemplateTests` 76 / `CompressPathPlannerTemplateTests` 30 / `PathCommonalityTests` 18 / `CompressSettingsViewModelTemplateTests` 11）全绿；core 与 avalonia Release `--no-incremental` 0 警告；`tests` 10.6s、`ui-tests` 40.3～44.7s 全绿；`-Task i18n` 1473 key、`-Task check` 9 条守卫全绿。真机：`--compress-quick` + `{name}_{date}` → `report_2026-11-11.zip`；`--compress-separate` + `{name}_{seq:0000}` → `report_0001.zip` / `notes_0002.zip`；对话框截图确认分组布局与只读文件名。
 **2026-11-11** — 计划调整：`filename-template` 升入 v0.5.7，Office 预览切片 3 后移 v0.5.10
   - **背景**：v0.5.7 原定「冲突策略（已完成）+ KI-012（已完成）+ Office 预览切片 3（5-7h）」，用户要求把 Office 切片 3 推后，改为先做**压缩文件名模板**。
   - **归属裁决（用户拍板）**：文件名模板**并入 v0.5.7 作为第二项**（不单开阶段，版本号保持 0.5.7，做完即可发版）；Office 切片 3 **并进 v0.5.10 新功能与债务**（与卡片元数据、AXAML 编译绑定同属预览/质量提升类，不挤占 v0.5.8 拖拽收尾的窗口）。

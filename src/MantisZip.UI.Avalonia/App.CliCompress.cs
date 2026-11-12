@@ -161,9 +161,18 @@ public partial class App : Application
             ? Path.GetDirectoryName(first)
             : Path.GetDirectoryName(first.TrimEnd('\\', '/'));
         dir ??= Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        var baseName = Path.GetFileNameWithoutExtension(first.TrimEnd('\\', '/'));
-        var ext = settings.DefaultFormat == "tar.gz" ? ".tar.gz" : "." + settings.DefaultFormat;
-        var outputPath = Path.Combine(dir, baseName + ext);
+
+        // 命名统一收敛到 CompressPathPlanner（与 GUI 同一条路径）：模板非空时按模板渲染，
+        // 为空/渲染失败时它返回 null，这里退回原来的「首源主名 + 格式扩展名」。
+        var renderedName = CompressPathPlanner.ComputeSingleArchiveName(
+            myPaths, settings.DefaultFormat, settings.FileNameTemplateQuick, DateTime.Now);
+        if (renderedName is null)
+        {
+            var baseName = Path.GetFileNameWithoutExtension(first.TrimEnd('\\', '/'));
+            renderedName = baseName + CompressPathPlanner.GetFormatExtension(settings.DefaultFormat);
+        }
+
+        var outputPath = Path.Combine(dir, renderedName);
 
         var request = new CompressRequest
         {
@@ -270,6 +279,9 @@ public partial class App : Application
             CompressionLevel = settings.DefaultLevel,
             KeepOriginalExtension = false,
             PreserveDirectoryRoot = true,
+            // 文件名模板（分别压缩默认值）：没有预览阶段，靠请求把命名规则带到执行侧
+            FileNameTemplate = string.IsNullOrWhiteSpace(settings.FileNameTemplateSeparate) ? null : settings.FileNameTemplateSeparate,
+            TemplateTimestamp = DateTime.Now,
             // 文件冲突默认策略（ask = 弹窗；来自设置，仅本次压缩生效）
             ConflictAction = settings.CompressFileConflictAction,
             // 源文件读取错误（被占用等）→ 弹 ErrorDialog（重试/跳过/中止）
@@ -493,38 +505,15 @@ public partial class App : Application
     }
 
     // ════════════════════════════════════════════════════════════════
-    //  Path utilities
+    //  Path utilities —— 实现已下沉到 Core 的 PathCommonality
+    //  （Core 的 CompressPathPlanner.ResolveAutoName 也要用同一套算法，
+    //   这里只保留委派，避免出现多份拷贝。ShellExt 的 ContextMenuHandler
+    //   是独立程序集里的镜像，无法引用 Core 之外的同名实现，保持原样。）
     // ════════════════════════════════════════════════════════════════
 
     internal static string? FindCommonParent(List<string> paths)
-    {
-        if (paths.Count == 0) return null;
-        var parents = paths.Select(p =>
-        {
-            var trimmed = p.TrimEnd('\\', '/');
-            return File.Exists(trimmed)
-                ? Path.GetDirectoryName(trimmed) ?? ""
-                : Path.GetDirectoryName(trimmed) ?? "";
-        }).ToList();
-
-        if (parents.Any(string.IsNullOrEmpty)) return null;
-
-        var common = parents[0];
-        for (int i = 1; i < parents.Count; i++)
-        {
-            while (!parents[i].StartsWith(common, StringComparison.OrdinalIgnoreCase))
-            {
-                var parent = Path.GetDirectoryName(common);
-                if (parent == null) return null;
-                common = parent;
-            }
-        }
-        return common;
-    }
+        => PathCommonality.FindCommonParent(paths);
 
     internal static bool IsDriveRoot(string path)
-    {
-        var trimmed = path.TrimEnd('\\', '/');
-        return trimmed.Length == 2 && trimmed[1] == ':';
-    }
+        => PathCommonality.IsDriveRoot(path);
 }

@@ -235,7 +235,9 @@ public static class ResultPreviewService
         string? outputPath,
         string format,
         bool keepOriginalExtension,
-        FileFilterCriteria? filter)
+        FileFilterCriteria? filter,
+        string? fileNameTemplate = null,
+        DateTime? templateTimestamp = null)
     {
         PreviewTreeNode root;
         IReadOnlyList<CompressPlanItem> planItems;
@@ -267,7 +269,7 @@ public static class ResultPreviewService
                     var dir = Directory.Exists(first)
                         ? first.TrimEnd(Path.DirectorySeparatorChar)
                         : Path.GetDirectoryName(first) ?? "";
-                    effectiveOutputPath = Path.Combine(dir, ComputeArchiveName(first, format, keepOriginalExt: false));
+                    effectiveOutputPath = Path.Combine(dir, ComputeArchiveName(first, format, keepOriginalExt: false, fileNameTemplate, templateTimestamp, sourcePaths));
                 }
 
                 // 根节点为压缩包所在的父目录
@@ -320,9 +322,9 @@ public static class ResultPreviewService
                 };
 
                 // B 数据集：每源一个输出包（Bug 2 语义：目录源用完整目录名）
-                planItems = CompressPathPlanner.PlanSeparate(sourcePaths, format, keepOriginalExtension);
+                planItems = CompressPathPlanner.PlanSeparate(sourcePaths, format, keepOriginalExtension, fileNameTemplate, templateTimestamp);
 
-                BuildSeparateArchivesPreview(root, sourcePaths, subtrees, planItems, format, keepOriginalExtension);
+                BuildSeparateArchivesPreview(root, sourcePaths, subtrees, planItems, format, keepOriginalExtension, fileNameTemplate, templateTimestamp);
                 break;
             }
 
@@ -365,17 +367,28 @@ public static class ResultPreviewService
         CompressOutputMode outputMode = CompressOutputMode.Manual,
         string? outputPath = null,
         string format = "zip",
-        bool keepOriginalExtension = false)
+        bool keepOriginalExtension = false,
+        string? fileNameTemplate = null,
+        DateTime? templateTimestamp = null)
     {
         var subtrees = sourcePaths.Select(p => BuildSourceSubtree(p, filter)).ToList();
-        return AssembleCompressPreview(sourcePaths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter);
+        return AssembleCompressPreview(sourcePaths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter, fileNameTemplate, templateTimestamp);
     }
 
     /// <summary>
     /// 计算压缩包名称（唯一实现收敛到 Core 层 <see cref="CompressPathPlanner"/>）。
     /// </summary>
-    private static string ComputeArchiveName(string sourcePath, string format, bool keepOriginalExt)
-        => CompressPathPlanner.ComputeArchiveName(sourcePath, format, keepOriginalExt);
+    private static string ComputeArchiveName(
+        string sourcePath, string format, bool keepOriginalExt,
+        string? fileNameTemplate, DateTime? templateTimestamp,
+        IReadOnlyList<string> sourcePaths)
+    {
+        // 单包多源（Manual / Combined）无显式输出路径时，模板按「第一个源 + 公共父目录名」渲染。
+        var templatedName = CompressPathPlanner.ComputeSingleArchiveName(
+            sourcePaths, format, fileNameTemplate, templateTimestamp);
+        return templatedName
+            ?? CompressPathPlanner.ComputeArchiveName(sourcePath, format, keepOriginalExt);
+    }
 
     /// <summary>
     /// 递归检查节点及其所有子节点中是否有未被过滤的可见节点。
@@ -397,7 +410,9 @@ public static class ResultPreviewService
         IReadOnlyList<SourceSubtree?> subtrees,
         IReadOnlyList<CompressPlanItem> planItems,
         string format,
-        bool keepOriginalExtension)
+        bool keepOriginalExtension,
+        string? fileNameTemplate,
+        DateTime? templateTimestamp)
     {
         // 源 → 计划项查找表（B 提供输出包路径）
         var itemBySource = new Dictionary<string, CompressPlanItem>();
@@ -412,7 +427,8 @@ public static class ResultPreviewService
             var path = sourcePaths[i];
             var archivePath = itemBySource.TryGetValue(path, out var item)
                 ? item.OutputArchivePath
-                : CompressPathPlanner.ComputeOutputPath(path, format, keepOriginalExtension);
+                : CompressPathPlanner.ComputeOutputPath(
+                    path, format, keepOriginalExtension, fileNameTemplate, sequence: i + 1, timestamp: templateTimestamp);
             var parentDir = Path.GetDirectoryName(archivePath) ?? "";
 
             if (!groups.TryGetValue(parentDir, out var list))

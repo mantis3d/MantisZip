@@ -336,6 +336,10 @@ public sealed class CompressSession : ICompressSession
             ConflictAction = settings.ConflictAction,
             ParallelCompressDegree = settings.ParallelDegree,
             Plan = plan,
+            // 文件名模板：有 B 数据集时路径以 B 为准、模板不参与执行，但 CLI 的
+            // --compress-separate 没有预览阶段，靠它把命名规则带到执行侧。
+            FileNameTemplate = settings.FileNameTemplate,
+            TemplateTimestamp = DateTime.Now,
             ErrorResolver = CompressFlow.CreateErrorResolver(),
         };
     }

@@ -51,6 +51,7 @@
               TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />  <!-- 输出模式 -->
+            <RowDefinition Height="Auto" />  <!-- 文件名模板 -->
             <RowDefinition Height="{Binding OutputPickerRowHeight}" />  <!-- 输出目录（手动模式才占位） -->
             <RowDefinition Height="Auto" />  <!-- 输出文件名 -->
             <RowDefinition Height="Auto" />  <!-- 文件冲突策略 -->
@@ -89,9 +90,74 @@
             </Grid>
           </Border>
 
+          <!-- 分组：文件名模板（占位符形式，如 {name}_{date}；留空 = 完全按旧规则命名）。
+               启用后「输出文件名」框变为只读展示（渲染结果），分别压缩时每个源各自渲染一条。
+               示例行与错误提示同占一行：正常显示渲染结果、非法时显示原因（红色 ⚠）。 -->
+          <Border Grid.Row="1"
+                  Margin="0,8,0,0"
+                  BorderBrush="{DynamicResource ThemeBorderBrush}"
+                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                  Background="{DynamicResource ThemeSurfaceBgBrush}">
+            <StackPanel Spacing="{DynamicResource SpacingXs}">
+              <!-- 标题行：标签 + 帮助按钮 + 命名预设下拉 -->
+              <Grid ColumnDefinitions="Auto,*,Auto">
+                <TextBlock Grid.Column="0"
+                           Text="{Binding LocalizedStrings[Compress_FileNameTemplate]}"
+                           VerticalAlignment="Center"
+                           Margin="0,0,8,0" />
+                <!-- 帮助按钮：弹出占位符表与示例（HelpDialog + Markdown） -->
+                <Button Grid.Column="2"
+                        Classes="ToolbarButton ToolbarIcon"
+                        Command="{Binding ShowFileNameTemplateHelpCommand}"
+                        ToolTip.Tip="{Binding LocalizedStrings[Compress_FileNameTemplate_HelpTip]}">
+                  <PathIcon Data="{StaticResource IconQuestion}" Width="14" Height="14"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </Button>
+              </Grid>
+              <!-- 模板输入框：实时校验，语法错误不阻止继续输入（只在示例行与确认时提示） -->
+              <TextBox x:Name="FileNameTemplateBox"
+                       Text="{Binding FileNameTemplate}"
+                       Watermark="{Binding LocalizedStrings[Compress_FileNameTemplate_Placeholder]}"
+                       MinHeight="{DynamicResource ControlHeightSm}"
+                       Background="{DynamicResource ThemeSurfaceBgBrush}"
+                       Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                       BorderBrush="{DynamicResource ThemeBorderBrush}" />
+              <!-- 命名预设：选中即填入输入框（不写回设置）；旁边的输入框 + 两个按钮用于增删预设 -->
+              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+                <ComboBox ItemsSource="{Binding TemplatePresetOptions}"
+                          SelectedItem="{Binding SelectedTemplatePreset}"
+                          DisplayMemberBinding="{Binding Name}"
+                          MinWidth="180"
+                          IsVisible="{Binding HasTemplatePresets}" />
+                <TextBox Text="{Binding NewPresetName}"
+                         Watermark="{Binding LocalizedStrings[Compress_FileNameTemplate_PresetName]}"
+                         MinWidth="140"
+                         MinHeight="{DynamicResource ControlHeightSm}"
+                         Background="{DynamicResource ThemeSurfaceBgBrush}"
+                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                <Button Content="{Binding LocalizedStrings[Compress_FileNameTemplate_SavePreset]}"
+                        Command="{Binding SaveTemplatePresetCommand}"
+                        Classes="ToolbarButton" />
+                <Button Content="{Binding LocalizedStrings[Compress_FileNameTemplate_DeletePreset]}"
+                        Command="{Binding DeleteTemplatePresetCommand}"
+                        Classes="ToolbarButton"
+                        IsVisible="{Binding HasTemplatePresets}" />
+              </StackPanel>
+              <!-- 示例 / 错误行：正常显示渲染结果，非法时显示原因 -->
+              <TextBlock Text="{Binding TemplateExampleText}"
+                         IsVisible="{Binding !IsTemplateExampleError}"
+                         FontSize="11" TextWrapping="Wrap"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              <TextBlock Text="{Binding TemplateError}"
+                         IsVisible="{Binding IsTemplateExampleError}"
+                         FontSize="11" TextWrapping="Wrap"
+                         Foreground="{DynamicResource ThemeStatusErrorBrush}" />
+            </StackPanel>
+          </Border>
           <!-- 分组：输出目录（内嵌目录选择器，仅手动模式可见；分别/合并模式路径自动计算）。
                高度交给 Grid 的 * 行：标题 Auto + 选择器 * ，不再写死 Height="260"。 -->
-          <Border Grid.Row="1"
+          <Border Grid.Row="2"
                   Margin="0,8,0,0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
@@ -116,7 +182,7 @@
           </Border>
 
           <!-- 分组：输出文件名 + 扩展名（仅手动/合并模式可见；扩展名跟随所选格式） -->
-          <Border Grid.Row="2"
+          <Border Grid.Row="3"
                   Margin="0,8,0,0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
@@ -129,7 +195,7 @@
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
               <TextBox Grid.Column="1"
                        Text="{Binding OutputFileName}"
-                       IsReadOnly="{Binding IsOutputPathReadOnly}"
+                       IsReadOnly="{Binding IsOutputFileNameReadOnly}"
                        MinHeight="{DynamicResource ControlHeightSm}"
                        Background="{DynamicResource ThemeSurfaceBgBrush}"
                        Foreground="{DynamicResource ThemeTextPrimaryBrush}"
@@ -143,7 +209,7 @@
           </Border>
 
           <!-- 分组：文件冲突策略（本次压缩遇到同名文件时的处理方式，覆盖/追加/自动重命名/跳过） -->
-          <Border Grid.Row="3"
+          <Border Grid.Row="4"
                   Margin="0,8,0,0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
@@ -163,7 +229,7 @@
 
           <!-- 分组：完成后行为（压缩成功后自动打开输出目录并选中产物；初值来自「设置 → 压缩 → 压缩选项」，
                进度窗口底部还能临时改。2026-10-30 从 beta 合并进来，放在输出相关选项旁边而不是密码页） -->
-          <Border Grid.Row="4"
+          <Border Grid.Row="5"
                   Margin="0,8,0,0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
