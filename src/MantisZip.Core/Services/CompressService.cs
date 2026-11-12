@@ -51,6 +51,20 @@ public class CompressRequest
     public bool KeepOriginalExtension { get; init; }
 
     /// <summary>
+    /// 文件名模板（占位符形式，如 <c>{name}_{date}</c>）。null/空白 = 未启用（走旧命名）。
+    /// 启用时**忽略 <see cref="KeepOriginalExtension"/>**，要保留原扩展名请在模板里写 <c>{ext}</c>。
+    /// 有 <see cref="Plan"/> 时模板不参与执行（路径以 B 为准），但仍需照传：CLI 的
+    /// <c>--compress-separate</c> 靠它把命名规则带到无预览的路径上。
+    /// </summary>
+    public string? FileNameTemplate { get; init; }
+
+    /// <summary>
+    /// 模板里的 <c>{date}</c>/<c>{datetime}</c> 用的时间戳。调用方在**批开始时取一次**、
+    /// 整批共用 —— 跨午夜也不会出现一半新日期一半旧日期。null = 取当前时刻。
+    /// </summary>
+    public DateTime? TemplateTimestamp { get; init; }
+
+    /// <summary>
     /// 过滤后的压缩计划（B 数据集）。由 CompressFlow.BuildRequest 从预览构建结果注入。
     /// 非 null 时：Separate 模式按逐项（SourcePath + OutputArchivePath + IncludedFiles 白名单）执行；
     /// Manual/Combined 模式合并全部 IncludedFiles 为单一白名单。路径一律以 B 为准，不重算。
@@ -177,7 +191,7 @@ public static class CompressService
         return request.Mode switch
         {
             CompressOutputMode.Separate => request.SourcePaths
-                .Select(p => ComputeSeparateOutputPath(request, p))
+                .Select((p, index) => ComputeSeparateOutputPath(request, p, index + 1))
                 .ToList(),
             CompressOutputMode.Manual or CompressOutputMode.Combined =>
                 !string.IsNullOrEmpty(request.OutputPath)
@@ -261,7 +275,7 @@ public static class CompressService
             // 2. 计算输出路径（B 优先，否则本地公式）
             var outputPath = planItems != null
                 ? planItems[i].OutputArchivePath
-                : ComputeSeparateOutputPath(request, sourcePath);
+                : ComputeSeparateOutputPath(request, sourcePath, i + 1);
 
             // 2b. 该源的文件白名单（过滤激活时 B 提供匹配文件清单；null = 不过滤）
             IReadOnlySet<string>? whitelist = planItems?[i].IncludedFiles != null
@@ -425,9 +439,12 @@ public static class CompressService
     /// Separate 模式：为单个源文件计算输出路径。
     /// 唯一实现收敛到 <see cref="CompressPathPlanner"/>（目录源用完整目录名，忽略 keepOriginalExt）。
     /// 仅无 B 数据集时（如 CLI）退化使用；有 B 时路径一律取 B 的 OutputArchivePath。
+    /// <paramref name="sequence"/> 是 1 基序号，供模板的 <c>{seq}</c> 使用。
     /// </summary>
-    private static string ComputeSeparateOutputPath(CompressRequest request, string sourcePath)
-        => CompressPathPlanner.ComputeOutputPath(sourcePath, request.Format, request.KeepOriginalExtension);
+    private static string ComputeSeparateOutputPath(CompressRequest request, string sourcePath, int sequence)
+        => CompressPathPlanner.ComputeOutputPath(
+            sourcePath, request.Format, request.KeepOriginalExtension,
+            request.FileNameTemplate, sequence, request.TemplateTimestamp);
 
     /// <summary>
     /// 根据冲突处理结果计算新的输出路径。

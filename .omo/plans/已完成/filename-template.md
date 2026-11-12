@@ -1,7 +1,7 @@
 # 压缩文件名模板（FileName Template）
 
-> **状态**：未开始（2026-11-06 由「文件名后缀模板」改写为「文件名模板」）
-> **目标版本**：v0.5.10 尾部缓冲（B 档）
+> **状态**：✅ 已完成（2026-11-11 归档，随 v0.5.7；实施记录见文末）
+> **目标版本**：v0.5.7（2026-11-11 由「v0.5.10 尾部缓冲（B 档）」移入）
 > **预估工时**：8-10h（原后缀模板 2-3h；因新增「三入口默认值 + 命名预设 + 三模式接管」而扩大）
 > **前置**：无。`rg "FileNameTemplate|FileNameSuffixTemplate"` 在 `src/`、`tests/` 零命中，没有兼容包袱。
 
@@ -434,17 +434,17 @@ pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests
 
 ## 验收标准
 
-- [ ] 模板为空时，所有入口的行为与现在**完全一致**（既有测试零改动通过）
-- [ ] `{name}_{date}` 在分别压缩 3 个文件时产出 `a_2026-11-06.zip` / `b_...` / `c_...`
-- [ ] 对话框里模板非空 → 手动模式的「输出文件名」变只读，且预览树里的包名与之一致
-- [ ] 确认时输入 `{foo}` → 窗口不关，提示「未知占位符：{foo}」
-- [ ] 确认时输入 `{name}` 且 Separate 多源 → 窗口不关，提示重名
-- [ ] `{name:auto}`：压单个文件 → 源名；压同一目录下 3 个文件 → 该目录名；压跨盘 2 个文件 → 第一个源名
-- [ ] `{name:auto}` 在分别压缩下恒等于 `{name}`（3 个文件产出 3 个不同名，不会撞名）
-- [ ] 设置页三档默认值分别对三个入口生效
-- [ ] 预设：保存 → 出现在下拉里 → 重启后仍在 → 可删除；上限 20 时有提示
-- [ ] 示例行在切换源/格式/模板时同步刷新
-- [ ] `pwsh -File scripts\verify-repo.ps1 -Task check` / `-Task i18n` / `-Task guards` 全绿
+- [x] 模板为空时，所有入口的行为与现在**完全一致**（既有测试零改动通过）
+- [x] `{name}_{date}` 在分别压缩 3 个文件时产出 `a_2026-11-06.zip` / `b_...` / `c_...`
+- [x] 对话框里模板非空 → 手动模式的「输出文件名」变只读，且预览树里的包名与之一致
+- [x] 确认时输入 `{foo}` → 窗口不关，提示「未知占位符：{foo}」
+- [x] 确认时输入 `{name}` 且 Separate 多源 → 窗口不关，提示重名
+- [x] `{name:auto}`：压单个文件 → 源名；压同一目录下 3 个文件 → 该目录名；压跨盘 2 个文件 → 第一个源名
+- [x] `{name:auto}` 在分别压缩下恒等于 `{name}`（3 个文件产出 3 个不同名，不会撞名）
+- [x] 设置页三档默认值分别对三个入口生效
+- [x] 预设：保存 → 出现在下拉里 → 重启后仍在 → 可删除；上限 20 时有提示
+- [x] 示例行在切换源/格式/模板时同步刷新
+- [x] `pwsh -File scripts\verify-repo.ps1 -Task check` / `-Task i18n` / `-Task guards` 全绿
 
 ---
 
@@ -495,3 +495,46 @@ pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests
 设置页：`Settings_Compress_FileNameTemplate_Group`、`_Dialog`、`_Quick`、`_Separate`、`_Hint`
 
 > 以上均以 `Compress_FileNameTemplate` / `Settings_Compress_FileNameTemplate` 为前缀，实施时按实际拼接完整 key。
+
+---
+
+## 实施记录（2026-11-11，v0.5.7 落地）
+
+### 任务完成情况
+
+| 任务 | 结果 | 说明 |
+|---|---|---|
+| W1 / T1 Core 渲染器 | ✅ | `Utils/FileNameTemplate.cs`（tokenizer + `TryValidateSyntax` / `TryRender` / 结果校验）、`Utils/FileNameTemplatePreset.cs`、`Utils/PathCommonality.cs`；`FileNameTemplateTests` 76 例 |
+| W2 / T2 命名管线 | ✅ | `CompressPathPlanner` 五个方法加可选模板参数 + `ComputeSingleArchiveName` / `ResolveAutoName` / `GetFormatExtension`；`CompressPathPlannerTemplateTests` 30 例、`PathCommonalityTests` 18 例，模板为空时既有用例零改动通过 |
+| W2 / T3 执行侧透传 | ✅ | `CompressRequest.FileNameTemplate` / `TemplateTimestamp`、`GetOutputPaths` 与 `CompressSeparateAsync` 的序号、`CompressSettings` 末尾追加字段、`CompressSession.BuildRequest` 映射 |
+| W3 / T4 预览透传 | ✅ | `AssembleCompressPreview` / `BuildCompressPreview` 加参，Separate 走 `PlanSeparate`，Manual / Combined 走 `ComputeSingleArchiveName` 兜底 |
+| W3 / T5 对话框 UI + VM | ✅ | 新「文件名模板」分组（Row 重排、帮助按钮、预设增删、示例行/错误行）、`IsOutputFileNameReadOnly`、`ValidateForExecution` 第 ⑥ 步；`CompressSettingsViewModelTemplateTests` 11 例 |
+| W4 / T6 设置页三档默认值 | ✅ | `AppSettings` 三个模板字段 + 预设列表 + 两个增删方法（上限 20）、设置页三行 + 预设下拉 |
+| W5 / T7 CLI 两入口 | ✅ | `--compress-quick` 改用 `ComputeSingleArchiveName`、`--compress-separate` 传模板与时间戳 |
+| W6 / T8 i18n + 帮助 + 文档 | ✅ | 22 个新 key（对话框 15 + 设置页 7）、`Compress_FileNameTemplate_Markdown` 帮助正文、进度文档 |
+
+### 与计划的偏差（5 条）
+
+1. **测试文件路径**：计划写 `tests/MantisZip.Tests/FileNameTemplateTests.cs`，实际落在 `tests/MantisZip.Tests/Utils/` 下（与既有 `CompressPathPlannerTests` 同目录）。
+2. **`{date}` / `{datetime}` 格式**：实现用 `yyyy-MM-dd` / `yyyy-MM-dd_HHmmss`（可读性优先），计划与帮助 Markdown 原文写的 `20261111` 是错误示例，已同步改正三份 json 各 4 处。
+3. **新增 `CompressPathPlanner.GetFormatExtension`**：原本只在 VM 里有一份私有实现，模板渲染需要「主名 + 格式扩展名」的公共入口，遂下沉到 Core 供 VM / CLI / 规划器共用。
+4. **合并模式命名抽出 `ResolveCombinedArchiveName`**：计划只要求「模板接管文件名」，真机上发现 `RefreshCombinedPath` 与 `TryAutoFillOutputPath` 两处各自用 `ArchivePath.GetFileName(commonParent)`，必须同时改，否则合并模式静默忽略模板。
+5. **预设增删 UI 放进对话框**：计划写在「预设 ComboBox 选中即填」，实现时补了「存为预设」输入框与「删除」按钮（否则预设只能手改 json），设置页仍只做「填入」不做增删。
+
+### 真机发现并修掉的缺陷（2 个）
+
+1. **`TryAutoFillOutputPath` 覆盖模板结果**：构造末尾先按「公共父目录名」写文件名，模板渲染要等 `OnFileNameTemplateChanged` 才跑 ⇒ 打开对话框时文件名框显示的是目录名。修法 = 自动填充末尾补一次 `RefreshTemplatedOutputFileName()`。
+2. **合并模式忽略模板**：`RefreshCombinedPath` 直接用公共父目录名，修法见偏差 4。
+
+### 测试与验证
+
+- `FileNameTemplateTests` 76 例 / `CompressPathPlannerTemplateTests` 30 例 / `PathCommonalityTests` 18 例 / `CompressSettingsViewModelTemplateTests` 11 例，共 135 例全绿。
+- 写测试时救回两个实现错误：`{seq:0000}` 的宽度必须是**位数本身**（首版把 `0000` 当整数解析 = 0 被判非法）；模板渲染的是主名不是路径（`{parent}\{name}` 的分隔符按非法字符拒绝，属设计而非 bug，已加用例固化语义）。
+- `-Task i18n` 1473 key、`-Task check` 9 条守卫全绿、core 与 avalonia Release `--no-incremental` 0 警告、`tests` 与 `ui-tests` 全绿。
+- 真机：`--compress-quick` + `{name}_{date}` → `report_2026-11-11.zip`；`--compress-separate` + `{name}_{seq:0000}` → `report_0001.zip` / `notes_0002.zip`；对话框截图确认模板分组与只读文件名。
+
+### 留白（未做，供后续）
+
+- **CLI 合并（`--compress-combined`）未接模板**：合并模式的命名走 `OutputPath`，GUI 由 `ResolveCombinedArchiveName` 处理；CLI 合并暂无模板需求，若要做需先给该入口补「公共父目录 + 模板」的决策。
+- **`{ext}` 在目录源上为空**：目录压缩时无原扩展名，模板若只写 `{ext}` 会得到空主名被 `EmptyResult` 拦下，帮助文档已说明。
+- **帮助 Markdown 的示例文件名与格式扩展名**：示例里固定写 `.zip`，用户实际格式为 `.7z` / `.tar.gz` 时以实际为准（帮助中已注明「扩展名由所选格式自动追加」）。

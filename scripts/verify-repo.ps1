@@ -921,6 +921,10 @@ $RE_FILE_PICKER_API = [regex]::new('\b(OpenFilePickerAsync|SaveFilePickerAsync|O
 $RE_APP_ICON_KEY = [regex]::new('x:Key="([^"]+)"')
 $RE_ICON_RESOURCE_REF = [regex]::new('"Icon[A-Z][A-Za-z0-9]*"')
 $RE_SIGNED_METHOD = [regex]::new('(?m)^[ \t]*(?:private|protected|public|internal)[^\r\n;=]*?\b([A-Za-z_]\w*)\s*\(')
+# 规则 4：Classes="…" 的完整取值（用来按 token 判断，避免 ToolbarButtonIcon / ToolbarButtonLabel 误伤）
+$RE_CLASSES_ATTR = [regex]::new('Classes="([^"]*)"')
+# 规则 4：自定义 Button / ToggleButton 子类（含 partial / sealed / abstract / 泛型前的普通写法）
+$RE_BUTTON_SUBCLASS = [regex]::new('class\s+(\w+)\s*:\s*(?:Button|ToggleButton)\b')
 
 # ---------------------------------------------------------------------------
 # 静默失败面三个守卫（2026-10-28 新增）：这三条对应三次真实事故
@@ -1650,6 +1654,72 @@ function Test-GuardFormatIdentity {
         })
 }
 
+# 规则 4：按钮样式选型 + 自定义按钮子类必须有模板
+# 事故 1（2026-11-12）：压缩设置窗「插入占位符 / 存为预设 / 删除 / 帮助」+ 设置页三行「插入占位符」
+#   共 7 处误挂主窗口工具栏专用的 ToolbarButton —— 比同排输入框高一档、底色是头部灰，
+#   贴在设置窗/对话框的 ThemeSurfaceBgBrush 卡片里既不成组也像补丁。
+# 事故 2（2026-11-12）：PlaceholderInsertButton 漏写 StyleKeyOverride 时 Avalonia 按子类类型
+#   找不到 ControlTheme → 无模板 → 点了完全没反应（不报错、不抛异常，Click 永不触发）。
+function Test-GuardButtonStyle {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $scannedXaml = 0
+    $scannedTypes = 0
+
+    # ① 设置窗 / 对话框（ThemeSurfaceBgBrush 卡片）里不许出现独立的 ToolbarButton token
+    $uiRoot = Join-Path $RepoRoot 'src/MantisZip.UI.Avalonia'
+    $targets = [System.Collections.Generic.List[string]]::new()
+    $dialogsDir = Join-Path $uiRoot 'Dialogs'
+    if (Test-Path -LiteralPath $dialogsDir) {
+        foreach ($f in (Get-ChildItem -LiteralPath $dialogsDir -Filter *.axaml -File)) {
+            $targets.Add($f.FullName)
+        }
+    }
+    $settingsXaml = Join-Path $uiRoot 'Views/SettingsWindow.axaml'
+    if (Test-Path -LiteralPath $settingsXaml) { $targets.Add($settingsXaml) }
+
+    foreach ($path in $targets) {
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $path).Replace('\', '/')
+        $text = [System.IO.File]::ReadAllText($path)
+        $scannedXaml++
+        foreach ($match in $RE_CLASSES_ATTR.Matches($text)) {
+            $tokens = $match.Groups[1].Value -split '\s+'
+            if ($tokens -contains 'ToolbarButton') {
+                $line = Get-LineNumber -Text $text -Index $match.Index
+                $issues.Add("$relative`:$line 在设置窗/对话框里挂了 ToolbarButton（规则 4：卡片内用全局 Button 默认样式，纯图标按钮只挂 ToolbarIcon）")
+            }
+        }
+    }
+
+    # ② 自定义 Button / ToggleButton 子类必须覆盖 StyleKeyOverride，否则没有模板、点了没反应
+    $sourceDir = Join-Path $RepoRoot $GUARD_FILES.sourceDir
+    if (-not (Test-Path -LiteralPath $sourceDir)) {
+        $issues.Add("读不到源码目录：$($GUARD_FILES.sourceDir)")
+    }
+    else {
+        $files = Get-ChildItem -LiteralPath $sourceDir -Recurse -Filter *.cs -File |
+            Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+        foreach ($file in $files) {
+            $text = [System.IO.File]::ReadAllText($file.FullName)
+            $classMatch = $RE_BUTTON_SUBCLASS.Match($text)
+            if (-not $classMatch.Success) { continue }
+            $scannedTypes++
+            $name = $classMatch.Groups[1].Value
+            $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+            if ($text -notmatch 'StyleKeyOverride') {
+                $line = Get-LineNumber -Text $text -Index $classMatch.Index
+                $issues.Add("$relative`:$line 的 $name 继承自 Button/ToggleButton 但没有 StyleKeyOverride（漏了会没有模板、点击无响应）")
+            }
+        }
+    }
+
+    return New-GuardResult -Id 'buttonstyle' -Title '按钮样式选型（规则 4）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            xamlFiles   = $scannedXaml
+            buttonTypes = $scannedTypes
+        })
+}
+
 function Test-Guards {
     param([string]$RepoRoot, [string]$RelativeLocalizationDir)
 
@@ -1663,6 +1733,7 @@ function Test-Guards {
     $guards.Add((Test-GuardJsonOptions -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardSettingsWiring -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardFormatIdentity -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardButtonStyle -RepoRoot $RepoRoot))
 
     $failed = @($guards | Where-Object { -not $_.ok })
     return [ordered]@{

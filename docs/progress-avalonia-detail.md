@@ -6,6 +6,52 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-12** — 合并：`alpha` → `beta`（v0.5.7 发版前回流，冲突仅在三份文档）
+  - **方式**：`git merge alpha`（带入 alpha 侧 11-12 三笔提交 —— 压缩设置窗「文件名」卡片合并 + 按钮样式归位、文件名模板三处交互缺陷、按钮样式选型规则与第 10 条守卫 `buttonstyle`）；产品代码与测试代码零冲突，冲突文件全部是 `docs/PLAN.md`、`docs/PROGRESS.md`、`docs/progress-avalonia-detail.md`。
+  - **冲突根因**：beta 侧 11-11 的 issue #80（右键菜单「用一次就消失」）整节插在 v0.5.7 阶段小节之前，alpha 侧同时改写了同一处「v0.5.7 阶段头」（标题变「数据安全收尾与压缩文件名模板（✅ 已完成）」并把 Office 预览切片 3 移进 v0.5.10）—— 两侧在同一位置各自插入，形成搬运冲突。
+  - **解法**：三份文件统一按「两侧全留 + 同月从新到旧重排」处理 —— `PLAN.md` 的 #80 小节保留在 v0.5.7 **之前**（用户拍板，最小改动且与当时实际顺序一致），beta 侧那行已过期的「🚧 进行中：对话策略 + KI-012 已完成，剩 Office 预览切片 3」标题删除、由 alpha 的 ✅ 标题接管；`PROGRESS.md` 与本文档里 #80 的条目排在 11-12 三条之后、11-11 文件名模板之前；行尾保持 CRLF、UTF-8 无 BOM。
+  - **验证**：解完与 alpha 侧逐行比对只剩「#80 相关新增」（`PLAN.md` +8 行、`PROGRESS.md` +2 行、本文档 +15 行），抹去冲突区后与 alpha 逐字节一致；与 beta 侧比对只剩 alpha 的新增 + 有意删除的过期标题；无冲突标记残留；`-Task check` 版本 0.5.7 六处一致 / 三语 1484 key / 10 条守卫全绿，`-Task build -Target avalonia` 37.7s 0 警告，`tests` 22.4s 与 `ui-tests` 62.7s 全绿。
+  - **边界**：`issue #80` 的计划文件仍在 `.omo/plans/进行中/shell-menu-disappear.md`（等用户真机复测通过再归档），`RELEASE_NOTES.md` 的 v0.5.7 已含 #80 与文件名模板两条，本次合并不再改动。
+
+**2026-11-12** — 规则：按钮样式选型写进 AGENTS.md 规则 4，并新增第 10 条守卫 `buttonstyle`
+  - **背景**：同一天压缩设置窗 4 个按钮 + 设置页 3 个按钮误挂 `ToolbarButton`，表现为比同排输入框高半头、底色与卡片不一致。用户要求先把这条写进 `AGENTS.md`，避免后续新增按钮重复同一错误。
+  - **判据**：`ToolbarButton` / `ToolbarIcon` 只属于「贴在窗口头部条上的工具栏」（主窗口工具栏、内容区工具条、结果树工具条、进度窗底部开关行），判断依据是**容器底色**而非按钮形态 —— `ThemeHeaderBgBrush` 头部条才挂；`ThemeSurfaceBgBrush` 卡片（设置窗/对话框）里，有文字的按钮不挂 class 用全局 `Button` 默认样式，纯图标按钮只挂 `ToolbarIcon`。
+  - **同批补的一条**：自定义 `Button` / `ToggleButton` 子类必须覆盖 `protected override Type StyleKeyOverride => typeof(Button);`，否则 Avalonia 按子类类型找不到 `ControlTheme`，控件没有模板、`Click` 永不触发（`Controls/PlaceholderInsertButton.cs` 实测 `clicks=0`，补上即好）。
+  - **守卫 `buttonstyle`**（`scripts/verify-repo.ps1` 的 `Test-GuardButtonStyle`）：① 扫 `src/MantisZip.UI.Avalonia/Dialogs/*.axaml` + `Views/SettingsWindow.axaml`（共 31 个 XAML），`Classes` 按空白切 token 后含 `ToolbarButton` 即失败（避免误伤 `ToolbarButtonIcon` / `ToolbarButtonLabel`）；② 扫 `src/` 全部 `.cs`，`class X : Button/ToggleButton` 同文件无 `StyleKeyOverride` 即失败。
+  - **红绿验证**：绿 = 10 条守卫全过（`xamlFiles: 31`、`buttonTypes: 1`）；红①临时在 `Dialogs/HelpDialog.axaml` 插 `<Button Classes="ToolbarButton" Content="probe" />` → 3 处命中、`failedCount: 1`；红②临时删掉 `PlaceholderInsertButton.cs` 的 `StyleKeyOverride` → 1 处命中、`failedCount: 1`。两次都从原文还原。
+  - **同步**：`docs/MAINTENANCE.md` 的「九条规则守卫」改十条、加 `buttonstyle` 行与覆盖边界说明；`AGENTS.md` 维护脚本文具表的 `-Task guards` 行补「按钮样式选型（规则 4）」。
+  - **验证**：`-Task check` 全绿（0.5.7 六处 / 1483 key / 10 条守卫）。
+
+**2026-11-12** — 界面：压缩设置窗「文件名」卡片合并 + 按钮样式归位
+  - **背景**：用户报三个问题 —— ①新增的几个按钮误用了 `ToolbarButton`；②文件名模板应放到输出路径下面并与原有文件名显示合并；③原有文件名显示与新增提示文本内容重复。先讨论后动手，四项拍板：合成一张「文件名」卡片、普通按钮回归全局默认样式、删示例行及其属性与两个 key、帮助按钮留在标题行右侧。
+  - **根因**：`ToolbarButton` 是主窗口工具栏专用样式（`App.axaml:181`，`Height=ControlHeightLg` + `Background=ThemeHeaderBgBrush`），贴在卡片里比同排 `TextBox`（`MinHeight=ControlHeightSm`）高且底色像补丁；受影响的 7 个按钮是压缩窗「插入占位符 / 存为预设 / 删除 / 帮助」与设置页三行「插入占位符」。重复则是两处都渲染同一个 `ComputeSingleArchiveName` 结果（示例行与文件名框），未启用模板时连「留空则按原规则命名」都和 watermark 一字不差。
+  - **改动**（`src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml`）：行定义 6 → 5（`输出模式 / 输出路径 / 文件名 / 文件冲突策略 / 完成后行为`），删掉独立的「文件名模板」卡片，把「输出路径」上移一行；新卡片 `Grid.Row="2"` 自上而下是标题行（`Compress_FileNameSection` + 帮助按钮 `Classes="ToolbarIcon"`）、模板行（80px 标签列 `Compress_FileNameTemplate_RowLabel` + `FileNameTemplateBox` + 插入按钮在第 3 列）、预设行（`Margin="80,0,0,0"` 与上行对齐）、最终文件名行（`OutputFileName` + `OutputExtensionLabel`）、错误行（`TemplateError` + `IsTemplateErrorVisible`）。三个普通按钮去掉 `Classes="ToolbarButton"` 回归全局样式，帮助图标钮只留 `ToolbarIcon`；`Views/SettingsWindow.axaml` 三处同样去 class。
+  - **VM 清理**（`ViewModels/CompressSettingsViewModel.cs`）：删 `TemplateExampleText` 与 `IsTemplateExampleError`、删已无引用的私有 `RenderTemplateForDisplay()`（`BuildTemplateContext` 保留，`ValidateTemplateNow` 仍在用），新增 `IsTemplateErrorVisible => IsTemplateActive && TemplateError != null`；`OnOutputModeChanged` 里重复的两条通知去重；三份 json 删 `Compress_FileNameTemplate_Inactive` / `_NoSource`，新增 `Compress_FileNameSection`（文件名 / File name / 檔案名）与 `Compress_FileNameTemplate_RowLabel`（模板 / Template / 範本）并在 `LocalizedStrings` 登记 ⇒ `-Task i18n` 回到 **1483** key。
+  - **为什么这两行要挤进一张卡**：模板与最终文件名是「输入 → 输出」的因果对，分两张卡放时用户要在两处之间来回看；合成一张后左侧标签统一 80px、模板框结果与文件名框结果上下对齐，改模板能直接看到下面那行跟着变。
+  - **验证**：avalonia Release `--no-incremental` 13.5s / 22.6s **0 警告**；`ui-tests` 45.8s 全绿、`tests` 11.1s 全绿；`-Task check` 0.5.7 六处 / 1483 key / 9 条守卫；`CompressSettingsViewModelTemplateTests` 里两处 `IsTemplateExampleError` 断言同步改为 `IsTemplateErrorVisible`。真机（`--compress %TEMP%\mz-ph\report.txt`，窗口 1096×899）：卡片标题「文件名」、内层「模板」「文件名」两行左对齐、按钮与输入框齐高。
+
+**2026-11-12** — 修复：文件名模板三处交互缺陷（加源不重算 / 错误提示顶版 / 删除预设无效）
+  - **背景**：用户报三个问题 —— ①压缩设置里添加新文件时 `{name:auto}` 不刷新（单文件应等于该文件名，加第二个源应变成父目录名）；②模板非法时提示文本单独一行出现，把下面内容顶下去，应该原位替换文件名框里的文字并变红；③删除预设的按钮无效。
+  - **根因 1（加源不重算）**：`SelectedPaths.CollectionChanged` 只在 Manual 模式下调 `TryAutoFillOutputPath()`，而该函数开头就是 `if (!string.IsNullOrEmpty(OutputPath)) return;` —— 打开对话框时路径已填好，之后加文件全部早退，模板渲染根本没被触发。修法：集合变化后**无条件**重算一次（`TemplateError = ValidateTemplateNow(); RefreshTemplatedOutputFileName();`），`{name:auto}` 的语义本来就在 `CompressPathPlanner.ResolveAutoName` 里按源数决定（1 源 → null → 回退源主名；≥2 源 → 公共父目录名），只要重渲染结果自然就对。
+  - **根因 2（提示顶版）**：错误提示是一行独立的 `TextBlock`，出现时给卡片加了一行。修法（XAML）：文件名框与错误提示**叠在同一格**（同一个 `Grid.Column="1"`，`IsVisible` 互斥），错误态换成红边框 `Border` + 红色 `TextBlock`，最小高度同为 `ControlHeightSm`，所以位置和高度都不变；文案改 `TextWrapping="NoWrap"` + `TextTrimming="CharacterEllipsis"`，完整文本挂 `ToolTip` —— 未知占位符那条会把 8 个可用 token 全列出来，一旦允许换行这一行仍会被撑高（第一版就是这样，真机截图才看出来）。另加 `IsFileNameRowVisible => IsFileNameSectionVisible || IsTemplateErrorVisible`：分别压缩模式下文件名行本来是隐藏的，不这样处理会把错误提示一起吞掉。
+  - **根因 3（删除预设无效）**：`OnSelectedTemplatePresetChanged` 填完模板后立刻 `SelectedTemplatePreset = null`（当初是为了能重复选同一项），而 `DeleteTemplatePreset` 第一句就是 `if (SelectedTemplatePreset is null) return;` ⇒ 永远拿到 null。修法：保留选中态，改由 `OnFileNameTemplateChanged` 在「模板内容与选中预设不一致」时清空选中 —— 既保留了删除目标，也不会让下拉长期显示一个已不匹配的预设名。
+  - **测试**：`CompressSettingsViewModelTemplateTests` 从 11 例增到 14 例，其中 `PresetSelection_FillsTemplateAndClearsSelection` 按新语义改名为 `PresetSelection_FillsTemplateAndKeepsSelection` 并断言 `Assert.Same`；新增 `EditingTemplateAwayFromPreset_ClearsSelection`、`DeletePreset_RemovesSelectedPresetFromSettings`（断言 settings 里真的没了）、`AddingSource_ReRendersNameAuto`（单源 `{name:auto}` = `alpha`，加第二个源后变成父目录名）。
+  - **验证**：avalonia Release `--no-incremental` 21.8s / 13.1s **0 警告**；14 例模板用例全绿；`ui-tests` 46.0s 全绿、`tests` 11.1s 全绿；`-Task check` 0.5.7 六处 / 1483 key / 9 条守卫。真机（`--compress %TEMP%\mz-ph\report.txt`）：模板填 `{foo}` 时文件名框原位显示红框 + 红字「未知占位符 foo，可用：…」（单行省略，鼠标悬停看全文）、卡片高度不变；下拉选「日期」后模板变为 `{name}_{date}`、文件名变 `report_2026-11-12`、右侧预览树同步；点「删除」后 `settings.json` 里只剩「序号」、下拉同步。
+
+**2026-11-12** — 功能：「插入占位符」下拉菜单（文件名模板）
+  - **需求**：用户希望像常见软件那样，点一下弹出全部占位符的菜单，选一个就插到输入框光标处，不用手敲 `{name:auto}` 这种记不住的 token。
+  - **纯函数层**：新建 `src/MantisZip.UI.Avalonia/Models/PlaceholderInsertion.cs`（`Insert(text, selectionStart, selectionEnd, token, out caretIndex)` 处理选区替换 / 反向选区交换 / 越界 clamp / 空文本；`ResolveInsertIndex(text, caretIndex)` 在光标无效时兜底到文本末尾）。
+  - **控件**：新建 `src/MantisZip.UI.Avalonia/Controls/PlaceholderInsertButton.cs`（`Button` 子类，`TargetTextBox` 样式属性 + `MenuFlyout`；`OnAttachedToVisualTree` 里建 flyout，`OnClick` 里**先** `RebuildItems()` **再** `base.OnClick()`；菜单项按 `FileNameTemplate.Placeholders` 生成、文案 = token + 本地化说明；`OnPreviewPointerPressed` 走 Tunnel 抢在菜单弹出前记下光标/选区）。
+  - **接线**：压缩对话框「文件名模板」输入框右侧、设置页「压缩 → 常规」三行模板输入框右侧各加一个按钮（设置页行定义 `150,*,Auto` → `150,*,Auto,Auto`，预设 `ComboBox` 移到第 3 列）。
+  - **三个真缺陷（教训必留）**：
+    - **派生 `Button` 必须重写 `StyleKeyOverride => typeof(Button)`**：不给时 Avalonia 按自身类型找 `ControlTheme`，找不到就**没有模板** —— 按钮既没有内边距也不可点击（实测 `Click` 完全不触发），外观还剩一个空框。
+    - **菜单项必须在 `OnClick` 里、`base.OnClick()` 之前建好**：放 `MenuFlyout.Opening` 里太晚，弹层已按空 `Items` 测过尺寸，真机上弹出来是 **2×32 的空条**（`EnumWindows` 量到的窗口尺寸）。
+    - **不要覆盖 `OnClick` 后再自己 `ShowAt`**：基类内建逻辑已会 `OpenFlyout`，再 `ShowAt` 一次会「开了又关」；也不要 `Dispatcher.Post` 延迟打开 —— 基类路径已避开 Popup 的光照判定。
+  - **未聚焦时的插入点**：`TextBox` 从未获得焦点时 `CaretIndex` 恒为 0，照它插会插到最前面。`OnPreviewPointerPressed` 里先看 `textBox.IsFocused`，未聚焦就记 `-1` 交 `ResolveInsertIndex` 兜底到末尾。
+  - **i18n**：三份 json 各 +10 key（`Compress_FileNameTemplate_Insert` / `_InsertTip` + 8 个 `_Token_*`）⇒ `-Task i18n` **1483** key；压缩对话框 2 个 key 走 `LocalizedStrings` 登记（规则 13），设置页 2 个走普通 VM 属性（`FileNameTemplateInsertText`/`...TipText`，在 `UpdateLocalizedTexts` 里通知）。
+  - **验证**：`PlaceholderInsertionTests` 11 例 + `PlaceholderInsertButtonTests` 3 例（点按钮 → 弹层 8 项；有焦点时插到光标；未聚焦时追加到末尾）+ `SettingsWindowTemplateInsertTests` 3 例（设置页三行各有且仅有一个按钮、`TargetTextBox` 指向本行输入框；按钮在四列网格里落在第 2 列且整体在预设下拉左侧；按钮文案取自 `Compress_FileNameTemplate_Insert`）全绿；avalonia Release `--no-incremental` 0 警告；`ui-tests` 44.1s、`tests` 13.8s 全绿；`-Task check` 版本 0.5.7 六处 / 1483 key / 9 条守卫。真机：点「插入占位符」弹层 346×250 列出 8 项（`{name}` … `{seq:0000}`，各带中文说明），点 `{date}` 后输入框内容变为 `{date}` 且光标在其后。
+  - **为什么设置页单独要一组无头测试**：四列网格的列号、`TargetTextBox="{Binding #<name>}"` 指向哪一行，这两类接线错误编译期完全看不出来（XAML 里写错列号只是显示错位，指向错行则用户会插到别的输入框），必须物化 XAML 才能断言。
+
 **2026-11-11** — 右键菜单「用一次就消失」修复（issue #80，计划 `shell-menu-disappear`）
   - **现象与证据**：报告者启用动态菜单后右键压缩一次，菜单从此永久消失。回填 `DynamicMenuStatus=active`、`HKCU\Software\Classes\*\shell\MantisZip` 不存在（静态级联被删）、`...\shellex\ContextMenuHandlers\MantisZip` 仍在（COM 注册还在）；`lifecycle.log` 显示右键拉起 5 个实例并发跑启动逻辑（196–1206ms），`Init.ShellFirstRun` 翻转后降到 3–4.6ms。
   - **根因 1（假健康信号）**：旧 `ShellIntegration.CheckComStatus` 用 `Process.Modules` 枚举 Explorer 里有没有 `MantisZip.ShellExt.comhost.dll` 当「COM 可用」判据。Explorer 的加载顺序是 `LoadLibrary(comhost.dll)` → `DllGetClassObject`，**激活失败时 DLL 仍留在模块列表**，于是「注册成功但激活失败」被误判成可用 → 状态推进 `active` → `UninstallStaticMenus()` 把静态级联删掉，而 COM 又画不出菜单，两头空。
@@ -21,6 +67,29 @@
   - **C 档结论（用户 2026-11-11 回填）**：`New-Object -ComObject MantisZip.ContextMenu` 无任何报错、返回 `System.__ComObject` ⇒ **激活成功**，「`DllGetClassObject` 失败」假设被推翻；重装后 `%LOCALAPPDATA%\MantisZip\ShellExt\log.txt` 显示 `QueryContextMenu` 正常插入 8 项、图标预加载成功。真实成因是**「模块已加载」≠「handler 被调用」**：升级前该日志文件根本不存在（handler 从未被实例化），但 Explorer 模块列表里已有 `comhost.dll` —— 11-03 升级时旧 comhost 模块仍挂在当时的 explorer.exe 进程里，磁盘文件被替换后该进程内不再调用 handler；旧代码把「模块在」当「能用」⇒ 判 `active` 并删掉级联。用户重装会走 `--uninstall-shell`（内含 explorer.exe 重启），进程一换、模块重载即恢复。**结论：无需再追激活失败根因，本计划的「换判据 + `active` 可回退」正是对症修法。**
   - **未修（登记 KI-018）**：`active` 状态下若 handler 再次静默失效，自愈要等下一次 MantisZip 启动 —— 菜单不出现时没有任何进程被拉起，缺少「常驻探针」这类成本不划算的手段。
 
+**2026-11-11** — 功能：压缩文件名模板（v0.5.7 第二项）
+  - **需求**：用户希望压缩包主名能按规则自动生成（例：`{name}_{date}`），解决「同日期同名的压缩包互相覆盖」；此前只有「保留/去掉源扩展名」一个开关，重名时靠手动改名。
+  - **交付**：核心是新的 Core 纯函数 `src/MantisZip.Core/Utils/FileNameTemplate.cs`——tokenizer 支持 `{name}` / `{name:auto}` / `{ext}` / `{parent}` / `{date}` / `{datetime}` / `{seq}` / `{seq:0000}`（大小写不敏感、`{{`/`}}` 转义），并做三层校验（语法 → 渲染 → 结果）；结果层拦空结果、`Path.GetInvalidFileNameChars()` + 控制字符、结尾 `.` 或空格、Windows 保留设备名（`CON`/`PRN`/`AUX`/`NUL`/`COM1-9`/`LPT1-9`）与超长 200。附 `FileNameTemplatePreset`（命名预设）与 `PathCommonality`（`FindCommonParent`/`IsDriveRoot` 从 `App.CliCompress.cs` 下沉，避免第 4 份拷贝）。
+  - **命名管线**：`CompressPathPlanner` 的 `ComputeArchiveName` / `ComputeOutputPath` / `PlanSeparate` 三个方法各加可选模板参数（默认 `null` = 旧行为逐字节不变），新增 `ComputeSingleArchiveName`（多源单包：`{name}` 取首源、`{name:auto}` 取公共父目录名、跨盘回退首源名）、`ResolveAutoName` 与 `GetFormatExtension`（`.tar.gz` 双段）。**渲染失败静默回退旧命名是刻意的**：预览树不能因为用户正在敲半截 `{na` 就崩或空，错误改由对话框示例行与确认时提示。
+  - **执行侧透传**：`CompressRequest.FileNameTemplate` + `TemplateTimestamp`（批开始时取一次，跨午夜不半新半旧）；`GetOutputPaths` 与 `CompressSeparateAsync` 传 1-based 序号；`CompressSettings` record 末尾追加 `string? FileNameTemplate = null`（必须带默认值，否则 18 个位置参数的既有构造全炸）；`CompressSession.BuildRequest` 映射。
+  - **预览透传**：`ResultPreviewService.AssembleCompressPreview` 加两个参数，Separate 走 `PlanSeparate`、Manual / Combined 走 `ComputeSingleArchiveName` 兜底 —— 保证「预览树里看到的就是最终输出名」。
+  - **对话框**：`CompressSettingsWindow.axaml` 在「输出模式」与「输出目录」之间插入「文件名模板」分组（输入框 + `?` 帮助 + 预设 `ComboBox`/存为预设/删除 + 示例行 / 错误行），后续四个 `Grid.Row` 顺延；`CompressSettingsViewModel` 加 `FileNameTemplate` / `IsTemplateActive` / `IsOutputFileNameReadOnly`（手动与合并模式下自动只读并显示渲染结果）/ `TemplateExampleText` / `IsTemplateExampleError` / 预设增删命令，`ValidateForExecution` 新增第 ⑥ 步（模板非空时校验语法 + Separate 重名），帮助走 `HelpDialog` + `MarkdownHelpContent`（规则 17）。
+  - **三档默认值**：`AppSettings` 加 `FileNameTemplateDialog/Quick/Separate` 三个字段 + `FileNameTemplatePresets` 列表 + `AddFileNameTemplatePreset`（同名覆盖、上限 20）/ `RemoveFileNameTemplatePreset`，并在 `AppSettingsJsonContext` 注册 `FileNameTemplatePreset`（源生成上下文，缺了列表反序列化会失败）；设置页「压缩 → 常规」新增三行（各带预设下拉，选中即填入）。
+  - **CLI**：`--compress-quick` 改用 `ComputeSingleArchiveName`（模板为空时回退原手算）、`--compress-separate` 传模板与时间戳。
+  - **踩坑与缺陷（教训必留）**：
+    - `{seq:0000}` 的宽度**必须按位数本身**（`digits.Length`）；首版把 `0000` 当整数解析得到 0，直接判非法 —— 测试先行救回。
+    - 模板渲染的是**主名**不是路径：`{parent}\{name}` 里的分隔符按非法字符拒绝（不猜用户想建子目录），已加用例固化该语义。
+    - 真机发现 `TryAutoFillOutputPath()` 会先用「公共父目录名」写文件名、把模板结果盖掉 ⇒ 末尾补一次 `RefreshTemplatedOutputFileName()`；合并模式 `RefreshCombinedPath()` 完全忽略模板 ⇒ 抽出 `ResolveCombinedArchiveName` 并让两个调用点共用。
+    - `{date}` / `{datetime}` 实现是 `yyyy-MM-dd` / `yyyy-MM-dd_HHmmss`，帮助 Markdown 原写 `20261111`，三份 json 各改 4 处对齐实现。
+    - `Compress_FileNameTemplate_UnknownPlaceholder` / `_Duplicate` 走 `LocalizationManager.T(key, args)` → `string.Format`，文案里的 `{name}`/`{seq}` 会被当格式项抛 `FormatException`（catch 后回落原文，测试断言因此失败）⇒ 文案内示例改写成 `{{name}}`/`{{seq}}`。
+    - 用 PowerShell 拼接 i18n key 块时，最后一行必须显式补逗号（漏了会让 `ConvertFrom-Json` 报 "unexpected character"）；含中文弯引号的长 Markdown 不要直接写进 PowerShell 命令（会被当引号边界，整条命令语法错）——改为先写临时文件再按锚点行拼接。
+  - **验证**：新增 135 例测试（`FileNameTemplateTests` 76 / `CompressPathPlannerTemplateTests` 30 / `PathCommonalityTests` 18 / `CompressSettingsViewModelTemplateTests` 11）全绿；core 与 avalonia Release `--no-incremental` 0 警告；`tests` 10.6s、`ui-tests` 40.3～44.7s 全绿；`-Task i18n` 1473 key、`-Task check` 9 条守卫全绿。真机：`--compress-quick` + `{name}_{date}` → `report_2026-11-11.zip`；`--compress-separate` + `{name}_{seq:0000}` → `report_0001.zip` / `notes_0002.zip`；对话框截图确认分组布局与只读文件名。
+**2026-11-11** — 计划调整：`filename-template` 升入 v0.5.7，Office 预览切片 3 后移 v0.5.10
+  - **背景**：v0.5.7 原定「冲突策略（已完成）+ KI-012（已完成）+ Office 预览切片 3（5-7h）」，用户要求把 Office 切片 3 推后，改为先做**压缩文件名模板**。
+  - **归属裁决（用户拍板）**：文件名模板**并入 v0.5.7 作为第二项**（不单开阶段，版本号保持 0.5.7，做完即可发版）；Office 切片 3 **并进 v0.5.10 新功能与债务**（与卡片元数据、AXAML 编译绑定同属预览/质量提升类，不挤占 v0.5.8 拖拽收尾的窗口）。
+  - **`docs/PLAN.md` 改动**：v0.5.7 标题改为「数据安全收尾与压缩文件名模板（约 20-26h）」；表格里 Office 行换成文件名模板行（8-10h）；验收口径去掉「Office 三族预览不再先落盘」、补文件名模板四条（留空逐字节一致 / `{name}_{date}` 三源分别产出 / 只读框 = 预览 = 最终名 / `{foo}` 确认时拦截）；`最后更新` → 2026-11-11；v0.5.10 表首行插入 Office 行（注明 11-11 从 v0.5.7 后移）；v0.5.10 尾部缓冲从 3 项减为 2 项（文件名模板已升档）；`## 进行中` 5 条 → 6 条并加本计划行；依赖链补 `filename-template ── 命名收敛在 CompressPathPlanner ──▶ 预览树 / 三入口 / CLI 共用同一渲染结果`。
+  - **计划文件**：`.omo/plans/未开始/filename-template.md` → `git mv` 到 `进行中/`；头部状态改「🚧 进行中（2026-11-11 开工，v0.5.7 第二项）」、目标版本改「v0.5.7（2026-11-11 由 v0.5.10 尾部缓冲移入）」。本文档 `:73` 的旧路径引用同步改 `进行中/`。
+  - **验证**：三份文档 `bom=False` / `loneLF=0` / `loneCR=0`；`-Task check` exit 0（版本 0.5.7 六处一致、三语 1451 key、9 条守卫全绿）；纯文档调整，未构建 / 未跑测试。
 **2026-11-10** — 合并：`plans` → `alpha`（唯一根目录计划与原型回流；冲突解法与前次 beta→plans 同规）
   - **方式**：`git merge plans`；产品代码零改动，只带入 `.omo/plans/未开始/{compress-extract-root-mode,nested-archive-extract}.md`、`docs/prototypes/compress-extract-root-mode.html` 与 `docs/PLAN.md` 两行；冲突只在 `docs/PROGRESS.md` 与本文档两处。
   - **冲突根因（均为「同一内容在两侧位置不同」的搬运冲突）**：两侧各自合过 beta，11-04「冲突时: 实时策略」条目内容逐字相同但排序位置不同（alpha 放在 11-04 段首、plans 放在段尾）；plans 侧另有 11-10（唯一根目录计划）、11-09（beta→plans 合并）、11-05（嵌套解压计划）三条 alpha 没有的新记录。
@@ -85,7 +154,7 @@
 **2026-11-06** — 计划：压缩文件名模板（由「后缀模板」改写为「文件名模板」）
   - **起因**：原计划 `.omo/plans/未开始/filename-suffix-template.md` 只描述「在原名后加日期/时间/序号后缀」，用户要求改成「整个文件名由模板决定」——后缀模板无法表达原名从哪来、原扩展名怎么办，也无法覆盖手动/合并模式的命名。
   - **核对现状后发现旧计划 8 处已脱节**：`CompressService.ComputeSeparateOutputPath` 现在只是 `CompressPathPlanner` 的薄包装（`CompressService.cs:429`）；预览与实际共用 B 数据集 `CompressPlan`（`GetOutputPaths` 有 Plan 就不重算，`:162-175`）⇒ 模板必须在**建 plan 时**生效而不是执行时拼；规则 20 禁止窗口关掉后回读属性；`AppSettings` 在 `Models/` 下；`HandleCompressQuick` 在 `App.CliCompress.cs:147`（名字计算 `:164-166`）；对话框已是 VM + `LocalizedStrings[...]` 绑定；`KeepOriginalExtension` 是设置窗的全局开关、压缩对话框里没有；占位符缺 `{name}`。
-  - **新计划**（`.omo/plans/未开始/filename-template.md`，旧文件 `git mv` 改名保留历史）：模板渲染**主名**、格式扩展名自动补；占位符 `{name}` `{ext}` `{parent}` `{date}` `{datetime}` `{seq}` `{seq:0000}` + `{{`/`}}` 转义；模板非空即接管命名并忽略 `KeepOriginalExtension`；手动/合并模式的「输出文件名」框变只读预览；三档默认模板（对话框 / `--compress-quick` / `--compress-separate`，设置页配置）；对话框内命名预设（名字 + 模板，上限 20，仅预设增删落盘，不写回默认值以沿用 `CompressSettingsViewModel.cs:192-193` 的既有约定）；确认时校验未知占位符 / 非法字符 / 空结果 / 多源重名 → `Rejected<CompressSettings>` 窗口内提示。
+  - **新计划**（`.omo/plans/进行中/filename-template.md`，旧文件 `git mv` 改名保留历史）：模板渲染**主名**、格式扩展名自动补；占位符 `{name}` `{ext}` `{parent}` `{date}` `{datetime}` `{seq}` `{seq:0000}` + `{{`/`}}` 转义；模板非空即接管命名并忽略 `KeepOriginalExtension`；手动/合并模式的「输出文件名」框变只读预览；三档默认模板（对话框 / `--compress-quick` / `--compress-separate`，设置页配置）；对话框内命名预设（名字 + 模板，上限 20，仅预设增删落盘，不写回默认值以沿用 `CompressSettingsViewModel.cs:192-193` 的既有约定）；确认时校验未知占位符 / 非法字符 / 空结果 / 多源重名 → `Rejected<CompressSettings>` 窗口内提示。
   - **命名管线**：Core 新增 `FileNameTemplate`（`TryValidateSyntax` / `TryRender`）与 `FileNameTemplatePreset`；`CompressPathPlanner` 三个方法加可选模板参数（默认值保持旧行为，渲染失败静默回退旧命名，避免打字中途把预览树打空）；`CompressRequest` 增 `FileNameTemplate` + `TemplateTimestamp`，`CompressService` 在无 Plan 时用 `PlanSeparate` 统一解析。
   - **2026-11-08 追加**：新增 `{name:auto}`（该包只含 1 个源 → 等于 `{name}`；≥2 个源 → 公共父目录名，跨盘/盘符根回退第一个源名），并把 `{name}` 的语义统一为「源主名，多源取第一个源」（取消 Combined 特判为公共父目录名）；公共父目录算法从 `App.CliCompress.cs:494` 下沉到 Core `Utils/PathCommonality.cs`，避免第 4 份拷贝。
   - **工时**：原 2-3h → 8-10h（新增三入口默认值、预设、三模式接管、校验），`docs/PLAN.md:137` 已同步。

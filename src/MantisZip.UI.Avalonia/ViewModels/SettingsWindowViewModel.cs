@@ -110,6 +110,16 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _openFolderAfterCompress;
 
+    // ── 压缩文件名模板（v0.5.7，三入口各自的默认值；留空 = 按原规则命名） ──
+    [ObservableProperty]
+    private string _fileNameTemplateDialog = "";
+
+    [ObservableProperty]
+    private string _fileNameTemplateQuick = "";
+
+    [ObservableProperty]
+    private string _fileNameTemplateSeparate = "";
+
     // ── Compression advanced ──
     [ObservableProperty]
     private string _sevenZipCompressionMethod = "LZMA2";
@@ -948,6 +958,56 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
     public string CompressOpenFolderAfterText => LocalizationManager.T("Settings_Compress_OpenFolderAfter");
     public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
+
+    // 文件名模板分组（v0.5.7）
+    public string FileNameTemplateGroupText => LocalizationManager.T("Settings_Compress_FileNameTemplate");
+    public string FileNameTemplateHelpText => LocalizationManager.T("Settings_Compress_FileNameTemplate_Help");
+    public string FileNameTemplateDialogText => LocalizationManager.T("Settings_Compress_FileNameTemplate_Dialog");
+    public string FileNameTemplateQuickText => LocalizationManager.T("Settings_Compress_FileNameTemplate_Quick");
+    public string FileNameTemplateSeparateText => LocalizationManager.T("Settings_Compress_FileNameTemplate_Separate");
+    public string FileNameTemplateRowHintText => LocalizationManager.T("Settings_Compress_FileNameTemplate_RowHint");
+    public string FileNameTemplatePresetHintText => LocalizationManager.T("Settings_Compress_FileNameTemplate_PresetHint");
+    // 「插入占位符」按钮文案（设置页三行共用；规则 13 的登记在下面 UpdateLocalizedTexts 里通知）
+    public string FileNameTemplateInsertText => LocalizationManager.T("Compress_FileNameTemplate_Insert");
+    public string FileNameTemplateInsertTipText => LocalizationManager.T("Compress_FileNameTemplate_InsertTip");
+
+    /// <summary>设置页里的预设下拉（选中即填进对应输入框；增删只在压缩对话框里做）。</summary>
+    public System.Collections.ObjectModel.ObservableCollection<MantisZip.Core.Utils.FileNameTemplatePreset> FileNameTemplatePresetOptions { get; } = new();
+
+    [ObservableProperty] private MantisZip.Core.Utils.FileNameTemplatePreset? _selectedFileNameTemplatePresetDialog;
+    [ObservableProperty] private MantisZip.Core.Utils.FileNameTemplatePreset? _selectedFileNameTemplatePresetQuick;
+    [ObservableProperty] private MantisZip.Core.Utils.FileNameTemplatePreset? _selectedFileNameTemplatePresetSeparate;
+
+    /// <summary>预设列表来自设置，保存/删除在压缩对话框里，这里只读一份快照。</summary>
+    private void ReloadFileNameTemplatePresets()
+    {
+        FileNameTemplatePresetOptions.Clear();
+        foreach (var preset in _settings.FileNameTemplatePresets)
+            FileNameTemplatePresetOptions.Add(preset);
+    }
+
+    // 三个下拉各自「选中即填入」，填完清空选择，避免留下高亮误导
+    partial void OnSelectedFileNameTemplatePresetDialogChanged(MantisZip.Core.Utils.FileNameTemplatePreset? value)
+    {
+        if (value is null) return;
+        FileNameTemplateDialog = value.Template;
+        SelectedFileNameTemplatePresetDialog = null;
+    }
+
+    partial void OnSelectedFileNameTemplatePresetQuickChanged(MantisZip.Core.Utils.FileNameTemplatePreset? value)
+    {
+        if (value is null) return;
+        FileNameTemplateQuick = value.Template;
+        SelectedFileNameTemplatePresetQuick = null;
+    }
+
+    partial void OnSelectedFileNameTemplatePresetSeparateChanged(MantisZip.Core.Utils.FileNameTemplatePreset? value)
+    {
+        if (value is null) return;
+        FileNameTemplateSeparate = value.Template;
+        SelectedFileNameTemplatePresetSeparate = null;
+    }
+
     public string CompressConflictActionText => LocalizationManager.T("Settings_Compress_ConflictAction");
     public string ZipDefaultOptionsText => LocalizationManager.T("Settings_Zip_DefaultOptions");
     public string ZipEncodingText => LocalizationManager.T("Settings_Zip_Encoding");
@@ -1269,6 +1329,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         _keepOriginalExtension = _settings.KeepOriginalExtension;
         _openFolderAfterCompress = _settings.OpenFolderAfterCompress;
         _compressFileConflictAction = _settings.CompressFileConflictAction;
+
+        // 压缩文件名模板三档默认值 + 预设快照
+        _fileNameTemplateDialog = _settings.FileNameTemplateDialog;
+        _fileNameTemplateQuick = _settings.FileNameTemplateQuick;
+        _fileNameTemplateSeparate = _settings.FileNameTemplateSeparate;
+        ReloadFileNameTemplatePresets();
 
         // Compression advanced
         _sevenZipCompressionMethod = _settings.SevenZipCompressionMethod;
@@ -1728,6 +1794,15 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
         OnPropertyChanged(nameof(CompressOpenFolderAfterText));
         OnPropertyChanged(nameof(CompressOptionsText));
+        OnPropertyChanged(nameof(FileNameTemplateGroupText));
+        OnPropertyChanged(nameof(FileNameTemplateHelpText));
+        OnPropertyChanged(nameof(FileNameTemplateDialogText));
+        OnPropertyChanged(nameof(FileNameTemplateQuickText));
+        OnPropertyChanged(nameof(FileNameTemplateSeparateText));
+        OnPropertyChanged(nameof(FileNameTemplateRowHintText));
+        OnPropertyChanged(nameof(FileNameTemplatePresetHintText));
+        OnPropertyChanged(nameof(FileNameTemplateInsertText));
+        OnPropertyChanged(nameof(FileNameTemplateInsertTipText));
         OnPropertyChanged(nameof(CompressConflictActionText));
         OnPropertyChanged(nameof(ZipDefaultOptionsText));
         OnPropertyChanged(nameof(ZipEncodingText));
@@ -1917,6 +1992,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.KeepOriginalExtension = KeepOriginalExtension;
         _settings.OpenFolderAfterCompress = OpenFolderAfterCompress;
         _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
+
+        // 压缩文件名模板三档默认值（预设的增删在压缩对话框里，这里只写模板本身）
+        _settings.FileNameTemplateDialog = FileNameTemplateDialog?.Trim() ?? "";
+        _settings.FileNameTemplateQuick = FileNameTemplateQuick?.Trim() ?? "";
+        _settings.FileNameTemplateSeparate = FileNameTemplateSeparate?.Trim() ?? "";
+
 
         // Adaptive Compression (三个独立开关)
         _settings.AdaptiveCompression = AdaptiveCompression;

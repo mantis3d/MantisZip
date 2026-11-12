@@ -90,6 +90,73 @@
                     </StackPanel>
                   </Border>
 
+                  <!-- 文件名模板：三个入口各自的默认值（留空 = 按原规则命名）；预设的增删只在压缩对话框里做，这里是只读快照 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding FileNameTemplateGroupText}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding FileNameTemplateHelpText}" FontSize="12" TextWrapping="Wrap"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <!-- 行 1：压缩对话框默认值 -->
+                      <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                        <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateDialogText}" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" x:Name="FileNameTemplateDialogBox" Text="{Binding FileNameTemplateDialog}"
+                                 Watermark="{Binding FileNameTemplateRowHintText}"
+                                 MinHeight="{DynamicResource ControlHeightSm}"
+                                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                        <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
+                        <controls:PlaceholderInsertButton Grid.Column="2"
+                                                          TargetTextBox="{Binding #FileNameTemplateDialogBox}"
+                                                          Content="{Binding FileNameTemplateInsertText}"
+                                                          ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
+                                  SelectedItem="{Binding SelectedFileNameTemplatePresetDialog}"
+                                  DisplayMemberBinding="{Binding Name}"
+                                  MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
+                      </Grid>
+                      <!-- 行 2：快速压缩默认值 -->
+                      <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                        <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateQuickText}" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" x:Name="FileNameTemplateQuickBox" Text="{Binding FileNameTemplateQuick}"
+                                 Watermark="{Binding FileNameTemplateRowHintText}"
+                                 MinHeight="{DynamicResource ControlHeightSm}"
+                                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                        <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
+                        <controls:PlaceholderInsertButton Grid.Column="2"
+                                                          TargetTextBox="{Binding #FileNameTemplateQuickBox}"
+                                                          Content="{Binding FileNameTemplateInsertText}"
+                                                          ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
+                                  SelectedItem="{Binding SelectedFileNameTemplatePresetQuick}"
+                                  DisplayMemberBinding="{Binding Name}"
+                                  MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
+                      </Grid>
+                      <!-- 行 3：分别压缩默认值（若不含 {name}/{seq}/{parent}，多源会撞名，确认时被拦） -->
+                      <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                        <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateSeparateText}" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" x:Name="FileNameTemplateSeparateBox" Text="{Binding FileNameTemplateSeparate}"
+                                 Watermark="{Binding FileNameTemplateRowHintText}"
+                                 MinHeight="{DynamicResource ControlHeightSm}"
+                                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                        <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
+                        <controls:PlaceholderInsertButton Grid.Column="2"
+                                                          TargetTextBox="{Binding #FileNameTemplateSeparateBox}"
+                                                          Content="{Binding FileNameTemplateInsertText}"
+                                                          ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
+                        <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
+                                  SelectedItem="{Binding SelectedFileNameTemplatePresetSeparate}"
+                                  DisplayMemberBinding="{Binding Name}"
+                                  MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
                   <!-- 文件冲突默认策略：压缩时遇到同名文件的处理方式（ask=每次询问；仅本次压缩外的全局默认） -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">

@@ -118,6 +118,18 @@ public partial class CompressSettingsWindow : Window
         ViewModel.ShowMessage = (msg, title) =>
             AppMessageBox.Show(msg, title, MessageBoxButton.OK, MessageBoxImage.Warning, this);
 
+        // 文件名模板帮助：复用 HelpDialog 外壳 + Markdown 正文（规则 17，不另建一次性 Window）
+        ViewModel.ShowHelpDialog = async (title, markdown) =>
+        {
+            var dialog = new HelpDialog(title, new MarkdownHelpContent(markdown))
+            {
+                Width = 720,
+                Height = 620,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            await dialog.ShowDialog(this);
+        };
+
         // 过滤控件事件订阅提前到构造函数（原在 OnLoaded）：窗口刚弹出时用户操作过滤会导致
         // FilterChanged 未订阅、预览不重建、Plan 保持 null → 点击压缩静默退出。
         InitFileFilter();
