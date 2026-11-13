@@ -243,36 +243,45 @@
               <TextBlock Text="{Binding LocalizedStrings[Compress_RootMode]}"
                          FontWeight="SemiBold" />
               <!--
-                四态下拉（原先是竖排四个单选，太占高度）：不可用的档位直接从选项里拿掉，
-                下方用一行灰字说明为什么少了几项。ToolTip 显示当前档位的解释。
+                四态下拉 + 根目录名同一行（下拉定宽 150 靠左，根名吃掉剩余宽度），
+                比原先「下拉一行 / 根名一行」省一行高度。标签已精简成「保持原样 / 智能去根 /
+                智能加根 / 始终加根」，前提条件交给 ToolTip 与下方灰字说明。
+                不可用的档位直接从选项里拿掉，下方用一行灰字说明为什么少了几项。
+                不套根的档位（保持原样 / 智能去根）右侧那组整组隐藏，下拉仍在原处不跳动。
               -->
-              <ComboBox ItemsSource="{Binding RootModeOptions}"
-                        SelectedItem="{Binding SelectedRootModeOption}"
-                        HorizontalAlignment="Left"
-                        MinWidth="240"
-                        ToolTip.Tip="{Binding RootModeDescription}">
-                <ComboBox.ItemTemplate>
-                  <DataTemplate>
-                    <TextBlock Text="{Binding Display}" />
-                  </DataTemplate>
-                </ComboBox.ItemTemplate>
-              </ComboBox>
+              <Grid ColumnDefinitions="150,*" ColumnSpacing="{DynamicResource SpacingSm}">
+                <ComboBox Grid.Column="0"
+                          ItemsSource="{Binding RootModeOptions}"
+                          SelectedItem="{Binding SelectedRootModeOption}"
+                          HorizontalAlignment="Stretch"
+                          ToolTip.Tip="{Binding RootModeDescription}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <!-- 根目录名：只在真会加根时出现（留空 = 用压缩包文件名去扩展名）。
+                     内层用 Grid 而不是横向 StackPanel —— StackPanel 里子控件只拿到自身想要
+                     的宽度，输入框会被 watermark 的字数决定宽窄，撑不满剩余空间。 -->
+                <Grid Grid.Column="1"
+                      ColumnDefinitions="Auto,*"
+                      ColumnSpacing="{DynamicResource SpacingXs}"
+                      IsVisible="{Binding IsWrapRootVisible}">
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding LocalizedStrings[Compress_RootMode_WrapName]}"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <TextBox Grid.Column="1"
+                           Text="{Binding WrapRoot}"
+                           Watermark="{Binding LocalizedStrings[Compress_RootMode_WrapName_Watermark]}" />
+                </Grid>
+              </Grid>
               <!-- 裁剪说明：两档都可用时整行隐藏（不占高度） -->
               <TextBlock Text="{Binding RootModeHint}"
                          IsVisible="{Binding IsRootModeHintVisible}"
                          Foreground="{DynamicResource ThemeTextSecondaryBrush}"
                          TextWrapping="Wrap" />
-              <!-- 根目录名：只在真会加根时出现（留空 = 用压缩包文件名去扩展名） -->
-              <Grid ColumnDefinitions="80,*" ColumnSpacing="{DynamicResource SpacingXs}"
-                    IsVisible="{Binding IsWrapRootVisible}">
-                <TextBlock Grid.Column="0"
-                           Text="{Binding LocalizedStrings[Compress_RootMode_WrapName]}"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                <TextBox Grid.Column="1"
-                         Text="{Binding WrapRoot}"
-                         Watermark="{Binding LocalizedStrings[Compress_RootMode_WrapName_Watermark]}" />
-              </Grid>
             </StackPanel>
           </Border>
 

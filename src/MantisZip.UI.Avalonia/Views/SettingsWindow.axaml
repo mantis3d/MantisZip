@@ -162,24 +162,26 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding CompressRootModeText}" FontWeight="SemiBold" />
-                      <ComboBox ItemsSource="{Binding CompressRootModeOptions}"
-                                SelectedItem="{Binding SelectedCompressRootModeOption}"
-                                Width="240" HorizontalAlignment="Left"
-                                ToolTip.Tip="{Binding CompressRootModeText}">
-                        <ComboBox.ItemTemplate>
-                          <DataTemplate>
-                            <TextBlock Text="{Binding Display}" />
-                          </DataTemplate>
-                        </ComboBox.ItemTemplate>
-                      </ComboBox>
-                      <!-- 默认根名：留空 = 按压缩包文件名去扩展名推导 -->
-                      <Grid ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingXs}">
-                        <TextBlock Text="{Binding CompressRootNameText}" VerticalAlignment="Center" />
-                        <TextBox Grid.Column="1" Text="{Binding CompressRootName}"
-                                 Width="240" HorizontalAlignment="Left"
-                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                                 Background="{DynamicResource ThemeWindowBgBrush}"
-                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                      <!-- 包内根目录 + 默认根名同一行，各占一半宽度（v0.5.8 标签精简后不再需要 240px） -->
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource SpacingSm}">
+                        <ComboBox Grid.Column="0" ItemsSource="{Binding CompressRootModeOptions}"
+                                  SelectedItem="{Binding SelectedCompressRootModeOption}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="{Binding CompressRootModeText}">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                              <TextBlock Text="{Binding Display}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <!-- 默认根名：留空 = 按压缩包文件名去扩展名推导 -->
+                        <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingXs}">
+                          <TextBlock Grid.Column="0" Text="{Binding CompressRootNameText}" VerticalAlignment="Center" />
+                          <TextBox Grid.Column="1" Text="{Binding CompressRootName}"
+                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                   Background="{DynamicResource ThemeWindowBgBrush}"
+                                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                        </Grid>
                       </Grid>
                     </StackPanel>
                   </Border>
@@ -656,7 +658,7 @@
                 <TextBlock Text="{Binding ExtractRootModeText}" FontWeight="SemiBold" />
                 <ComboBox ItemsSource="{Binding ExtractRootModeOptions}"
                           SelectedItem="{Binding SelectedExtractRootModeOption}"
-                          Width="240" HorizontalAlignment="Left">
+                          Width="150" HorizontalAlignment="Left">
                   <ComboBox.ItemTemplate>
                     <DataTemplate>
                       <TextBlock Text="{Binding Display}" />
@@ -674,7 +676,7 @@
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                 <ComboBox ItemsSource="{Binding SmartExtractRootModeOptions}"
                           SelectedItem="{Binding SelectedSmartExtractRootModeOption}"
-                          Width="240" HorizontalAlignment="Left">
+                          Width="150" HorizontalAlignment="Left">
                   <ComboBox.ItemTemplate>
                     <DataTemplate>
                       <TextBlock Text="{Binding Display}" />

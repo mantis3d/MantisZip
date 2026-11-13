@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-13** — 交互：包内根目录四档标签精简 + 根目录名与下拉同行
+  - **用户反馈（原文）**：「包内根目录四档 有几个文本太长，后面都是"唯一根目录"字样，可以去掉或适当精简。相应 ui 宽度也可以缩短。」「后面"根目录名"的控件应该跟下拉选框放在一行，以节省空间。」
+  - **标签精简**（只改值、key 不变，三语 key 数仍 1513）：`保持原样` / `智能去根` / `智能加根` / `始终加根`（zh-TW：保持原樣 / 智慧去根 / 智慧加根 / 始終加根；en：Leave as is / Smart strip / Smart wrap / Always wrap）。原先四档都把「唯一根目录」这个**前提条件**写进名字里，而它本就缩在「包内根目录」标题下 —— 前提条件交给 ToolTip（`*_Tip` 一字未改）与那行灰字说明承载。
+  - **连带改文案**：两条灰字说明里写死了旧长名，会自相矛盾 ⇒ `Compress_RootMode_Hint_StripUnavailable` 与 `Extract_RootMode_Hint_StripUnavailable` 改为「智能去根」。
+  - **压缩对话框**（`Dialogs/CompressSettingsWindow.axaml`）：原「下拉一行 / 灰字一行 / 根名一行」三行改成「下拉 + 根名同一行」——`Grid ColumnDefinitions="150,*"`，下拉定宽 150 靠左、根名组（`Grid ColumnDefinitions="Auto,*"`，标签 + 输入框）吃掉剩余宽度并挂 `IsVisible="{Binding IsWrapRootVisible}"`，不套根时整组隐藏、下拉原位不跳动。**内层必须用 Grid 而不是横向 StackPanel**：StackPanel 里子控件只拿到自身想要的宽度，输入框会被 watermark 字数决定宽窄、撑不满剩余空间（首版写成 StackPanel，截图里输入框只有半截）。
+  - **解压对话框** 与 **设置页三处**：`MinWidth="240"` → `Width="150"`（解压端 + 压缩默认值 + 解压默认值 + 智能解压两档）；设置页「包内根目录 + 默认根目录名」改成 `Grid ColumnDefinitions="*,*"` 各占一半。
+  - **发布说明与配图同步**：`RELEASE_NOTES.md` 的 v0.5.8 章节里 13/17/19 行的旧长名全部改短（含「原样（不调整）」→「保持原样」、英文 "keep as-is" → "Leave as is"），两张配图重拍 —— `CompressRootFolder.png`（1082×873，两个散装文件 + 始终加根，下拉「始终加根」与「根目录名」同行，下方灰字「当前源不满足「智能去根」的条件（需只选中一个目录），该选项已隐藏。」）、`ExtractRootFolder.png`（1198×832，解压设置窗「压缩包顶层目录」下拉「智能加根」）。
+  - **验证**：`-Task i18n` 1513 key 三语一致；`-Task build -Target avalonia -ExtraArgsJson '["-c","Release","--no-incremental"]'` ✅ 18.4s / 18.9s **0 警告**；真机逐屏核对（压缩窗四档下拉、解压窗、设置页压缩/解压两个页签）。
+  - **踩坑**：①真机截图不能用 `GetWindowRect`（含 DWM 阴影，右侧会带上一条别的窗口残影）⇒ 改用 `DwmGetWindowAttribute(hwnd, 9 /*DWMWA_EXTENDED_FRAME_BOUNDS*/)`；②`SetWindowPos` 同时给 `SWP_NOSIZE` 与尺寸会静默忽略尺寸，想按指定尺寸取景必须只传 `SWP_NOACTIVATE|SWP_FRAMECHANGED`；③设置窗没有 CLI 参数（`--settings` 不被识别），得先开主窗口再点 Tools → 设置；④主窗口工具栏「工具」菜单在图像 x≈168（不是 x≈192），点偏了会落到「视图」菜单。
 **2026-11-13** — 版本号升级 v0.5.8（6 处同步）
   - 按 Version bump checklist 从 0.5.7 改到 0.5.8：`src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version`、`src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 的 `<Version>`、`installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值、`docs/PLAN.md` 与 `docs/PROGRESS.md` 的当前版本。
   - **没动 `RELEASE_NOTES.md`**：v0.5.8 章节已在 `b88cace8` 里按 0.5.8 的四个安装包名写好，六处此前反而停 0.5.7，本次是把两边对齐。

@@ -101,7 +101,7 @@
               <ComboBox ItemsSource="{Binding ExtractRootModeOptions}"
                         SelectedItem="{Binding SelectedExtractRootModeOption}"
                         HorizontalAlignment="Left"
-                        MinWidth="240"
+                        Width="150"
                         ToolTip.Tip="{Binding ExtractRootModeDescription}">
                 <ComboBox.ItemTemplate>
                   <DataTemplate>
