@@ -1,3 +1,29 @@
+## v0.5.8
+
+### 文件说明 / File Description
+
+MantisZip-0.5.8-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.8-Setup-Offline.exe 是离线安装包。MantisZip-0.5.8-Portable.zip 是便携版，解压即用。MantisZip-0.5.8-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.8-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.8-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.8-Portable.zip is the portable version, extract and run. MantisZip-0.5.8-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **压缩与解压都能指定「包内根目录」了** — 压缩设置窗新增「包内根目录」下拉：原样（不调整）/ 智能去除唯一根目录 / 智能添加唯一根目录 / 始终添加唯一根目录；后两档还能填「根目录名」，留空则用压缩包文件名。解压设置窗的「压缩包顶层目录」是同样的四档。右侧预览树显示的就是最终落进包里的结构，与实际输出共用同一套判定；某一档当前不适用时会直接从下拉里拿掉并附一行说明（只选了一个目录才有唯一根可去、分别压缩时不套根），不会留一个选了也不生效的开关。
+- **A root folder policy for both compression and extraction** — the compression window gains a "Folder inside archive" dropdown (keep as-is / smart-remove the single root / smart-add a root / always add a root); the last two also accept a custom root name that falls back to the archive name. The extraction window offers the same four choices as "Top folder of the archive". The preview tree already shows the structure that will end up in the archive, using the same rules as the real output, and a choice that does not apply right now is removed from the list with a note (only a single selected folder has a root to strip, separate compression adds no root), so there is never a switch that silently does nothing.
+- ![压缩设置窗「包内根目录」：选「始终添加唯一根目录」时出现「根目录名」输入框，右侧预览树显示最终结构](docs/images/version/v0.5.8/CompressRootFolder.png)
+- ![解压设置窗「压缩包顶层目录」：四档与压缩端一致，右侧预览树显示解压后的层级](docs/images/version/v0.5.8/ExtractRootFolder.png)
+- **「智能解压」可以选择加根还是去根了** — 设置 → 解压 新增「智能解压」卡片，两档：「智能添加唯一根目录」（默认）与以前的行为逐型一致（单根包落在包自带的那层、散装包补一层以包名命名的目录），「智能去除唯一根目录」则去掉包内唯一的顶层目录（散装与多根包本来就没有唯一根，因此原地平铺、不做改动）。工具栏、右键菜单与双击关联里的「智能解压」共用这一项设置。
+- **Smart extract can add or strip the top folder** — Settings → Extraction gains a "Smart extract" card with two choices: the default "smart-add a root" behaves exactly as before for every archive layout (a single-root archive keeps its own top folder, a loose archive gains a folder named after the archive), while "smart-remove the single root" drops the lone top folder — loose and multi-root archives have no single root, so their files simply land where they are. The toolbar button, the context menu and the double-click association all follow this setting.
+- **解压设置窗的默认目标目录改为压缩包所在目录** — 打开「解压设置」时不再预填「父目录\包名」，而是直接指向压缩包所在的目录，包名那一层改由「压缩包顶层目录」负责。可见差异有两处：单根包不再套两层同名目录（原来的「包名\包内根\」变成「包内根\」），自定义目标目录时散装包会多出一层以包名命名的目录。若想完全回到以前的层级，把「压缩包顶层目录」选成「原样（不调整）」即可。
+- **The extraction window now defaults to the archive's own folder** — opening "extract settings" pre-fills the folder the archive sits in rather than "parent\archive-name", with the archive-name level now handled by the top-folder setting. Two visible differences: a single-root archive no longer nests two identically named folders (the old "name\inner-root\" becomes "inner-root\"), and a loose archive extracted into a chosen folder gains one folder named after the archive. Selecting "keep as-is" for the top folder restores the previous layout exactly.
+
+**修复 / Fixes**
+
+- **智能解压完成后的状态栏文案不再与实际动作不符** — 单根压缩包此前提示「已剥离根文件夹」，而实际上那一层从没被剥掉过（自 v0.5.6 起）。现在按真正发生的事显示：已添加顶层文件夹 / 已去除顶层文件夹 / 目录结构未改动。
+- **The smart-extract status message now matches what actually happened** — a single-root archive used to report that the root folder had been removed while nothing was ever removed (since v0.5.6). The message now describes the real outcome: a top-level folder was added, the top-level folder was removed, or the folder structure was left unchanged.
+
 ## v0.5.7
 
 ### 文件说明 / File Description
@@ -16,6 +42,9 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 - **压缩包名可以按模板自动生成了** — 压缩设置的「输出模式」下面新增「文件名模板」一栏，填一串占位符就能让包名按规则来：`{name}` 源文件名、`{ext}` 源扩展名、`{parent}` 上级目录名、`{date}` 当天日期、`{datetime}` 到秒的日期时间、`{seq}` 序号（`{seq:0000}` 补到四位）、`{name:auto}` 按源数量自动取名字（压一个文件用文件名，压同目录多个文件用目录名）。格式扩展名由所选压缩格式自动补，不用自己写 `.zip`；模板非空时会接管命名（此时「保留源文件扩展名」失效，想保留就写 `{ext}`），预览树里看到的包名就是最终输出的包名，手动与合并模式下「输出文件名」变成只读并直接显示渲染结果。模板下面还有一行实时示例与错误提示，点右侧 `?` 有完整占位符说明；常用的几套可以「存为预设」，之后从下拉里一键填入。设置页「压缩 → 常规」另有三个默认值，分别作用于压缩对话框、快速压缩与单独压缩，留空则保持原有命名规则。模板留空时行为与之前完全一致；未知占位符（如 `{foo}`）、非法字符、渲染为空以及单独压缩时的重名，都会在点「开始压缩」时被拦下并说明原因。
 - **Name your archives with a template** — the compression settings gain a "File name template" field under the output mode: compose the archive name from placeholders — `{name}` source file name, `{ext}` source extension, `{parent}` parent folder name, `{date}` today's date, `{datetime}` date and time to the second, `{seq}` a sequence number (`{seq:0000}` zero-padded to four digits), and `{name:auto}` which picks a name based on how many sources are in the archive (the file name for one file, the folder name for several files from the same folder). The format extension is appended automatically, so there is no need to type `.zip`; a non-empty template takes over naming (which means "keep source file extension" no longer applies — write `{ext}` if you want it back), the preview tree already shows the final archive name, and in manual and combined modes the output file name becomes read-only and displays the rendered result. Below the field a live example and any error are shown, the `?` button opens the full placeholder reference, and frequently used templates can be saved as presets and filled in from a dropdown. The settings page (Compression → General) holds three defaults for the compression dialog, quick compression and separate compression, and leaving them empty keeps the previous naming rules. With an empty template nothing changes; unknown placeholders such as `{foo}`, invalid characters, an empty result, and duplicate names in separate mode are all rejected when you press "Start" with a reason shown.
 - ![压缩设置「文件名模板」：占位符输入框、预设、实时示例与只读的输出文件名；右侧预览树已显示最终包名 report_2026-11-12.zip](docs/images/version/v0.5.7/FileNameTemplate.png)
+- **文件名模板可以一键插入占位符** — 模板输入框右侧新增「插入占位符」按钮，点开列出全部 8 个占位符及各自一句说明（`{name}` / `{name:auto}` / `{ext}` / `{parent}` / `{date}` / `{datetime}` / `{seq}` / `{seq:0000}`），点其中一项即插到光标处（有选区则替换选区、输入框还没聚焦过就接着末尾写）。压缩设置窗的模板框与设置页的三行默认值各有一个，不必再手敲占位符。
+- **Insert placeholders into a file name template with one click** — a "Insert placeholder" button sits beside the template field: it lists all eight placeholders with a one-line description each (`{name}`, `{name:auto}`, `{ext}`, `{parent}`, `{date}`, `{datetime}`, `{seq}`, `{seq:0000}`), and picking one inserts it at the caret (replacing the selection if there is one, or appending when the field has never been focused). The compression window's template field and the three defaults on the settings page each have their own button, so there is no need to type the placeholders by hand.
+- ![压缩设置「插入占位符」：点开列出 8 个占位符，点选即插到光标处](docs/images/version/v0.5.7/InsertPlaceholder.png)
 
 **修复 / Fixes**
 
@@ -29,7 +58,6 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 MantisZip-0.5.6-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.6-Setup-Offline.exe 是离线安装包。MantisZip-0.5.6-Portable.zip 是便携版，解压即用。MantisZip-0.5.6-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
 
 MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.6-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.6-Portable.zip is the portable version, extract and run. MantisZip-0.5.6-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
-
 
 ### 更新内容 / Changelog
 
@@ -82,9 +110,8 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Password-protected 7z extraction is now many times faster** — a password-protected 7z (including `.001` split sets) used to be unpacked one file at a time, re-decoding the whole solid block for every file, so 48 MB across 309 files took minutes; the archive is now decoded in one pass, about 3 seconds for the same set — on par with Bandizip. Extracting only selected files benefits as well.
 
-**性能 / Performance**
-
 - **7z 两段式解压的进度不再先走满** — 固实包会把整块条目一次性解码到暂存、再从暂存逐条搬到最终位置；进度条现在分成两段：解码期间只走到一半，新增的「暂存」统计卡显示已解码、还没落地的条目数与大小，搬运时该卡递减、「已处理」递增，不会再出现进度条先满、状态卡片长时间不动。进度推进也从「按条目数均分」改成按文件大小加权（小文件不再嗖嗖涨、大文件不会解到 99% 还只挪一格），落地阶段仍按条目数推进（同盘改名只与条目数有关）。只影响未加密 7z 的批量解压，ZIP / RAR / 单条目解压不变
+
 - **Two-step 7z extraction no longer shows a bar that jumps to 100 %** — a solid archive decodes all its entries into staging in one go and then moves them into place one by one; the bar now fills only to the halfway point while decoding, a new "staged" stat card reports how many entries are decoded but not yet moved (and counts down as they land) while "processed" grows on every move, so the bar no longer hits 100 % while the cards sit still. Progress also advances in proportion to file size instead of merely counting entries — small files no longer race ahead while a big one barely moves — with the staging-to-destination step still advancing per entry (a same-volume rename costs one operation per entry). Only affects bulk extraction from unencrypted 7z archives; ZIP, RAR and single-entry extraction are unchanged
 
 ## v0.5.5
