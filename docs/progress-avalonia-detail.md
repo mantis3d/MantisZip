@@ -6,6 +6,11 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-13** — 版本号升级 v0.5.8（6 处同步）
+  - 按 Version bump checklist 从 0.5.7 改到 0.5.8：`src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version`、`src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 的 `<Version>`、`installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值、`docs/PLAN.md` 与 `docs/PROGRESS.md` 的当前版本。
+  - **没动 `RELEASE_NOTES.md`**：v0.5.8 章节已在 `b88cace8` 里按 0.5.8 的四个安装包名写好，六处此前反而停 0.5.7，本次是把两边对齐。
+  - 校验：`-Task version` 六处全为 0.5.8；`-Task check` 三项全绿（三语 1513 key、10 条守卫 `failedCount: 0`）；`-Task build -Target avalonia -ExtraArgsJson '["-c","Release"]'` ✅ 34.3s **0 警告**。
+  - 编码：两份 `.iss` 保持无 BOM + CRLF（首字节 59,32,77，`loneLF=0` / `loneCR=0`），改动仅 `#define` 一行。
 **2026-11-13** — 文档：v0.5.8 发布说明章节 + 回补 v0.5.7「插入占位符」+ 修 v0.5.6 重复小标题
   - **背景**：v0.5.8 两项（唯一根目录四态、智能解压两档）都已提交（`5f2ed247` / `70ac43d8`），用户要求现在就把发布说明写完，避免像 v0.5.7 那次攒到最后才发现内容放错节又返工。
   - **v0.5.8 章节**（`RELEASE_NOTES.md` 顶部，`## v0.5.8`）：文件说明中英各一段（四个安装包名按 0.5.8 命名）；「界面 / UI」三条 —— 压缩/解压两侧的「包内根目录」四档下拉（含根目录名、不适用档位从下拉拿掉 + 说明、预览树与实际输出共用判定）、智能解压两档（加根默认与旧行为逐型等价、去根去掉唯一顶层目录、三个入口共用设置）、解压设置窗默认目标目录改压缩包所在目录（两处可见差异：单根包少一层、散装包多一层）+ 两条配图；「修复 / Fixes」一条 —— 智能解压状态栏文案与代码不符（v0.5.6 已发布版本即存在）。

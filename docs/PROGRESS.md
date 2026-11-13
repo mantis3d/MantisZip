@@ -7,7 +7,7 @@
 - **技术栈**: .NET 10 + Avalonia 12 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.5.7
+- **当前版本**: 0.5.8
 - **发布日期**: 2026-07-22
 
 ## 变更记录结构
@@ -26,6 +26,8 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-11
+
+- **11-13** — **版本号升级 v0.5.8（6 处同步）**：按 Version bump checklist 把 `src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version`、`MantisZip.UI.Avalonia.csproj` 的 `<Version>`、两个 `.iss` 的 `MyAppVersion` 兜底值、`docs/PLAN.md` 与 `docs/PROGRESS.md` 的当前版本从 0.5.7 一起改到 0.5.8。没有改 `RELEASE_NOTES.md`——v0.5.8 章节已在 `b88cace8` 里按 0.5.8 的安装包名写好，两边此前不一致，本次对齐。校验 `-Task version` 六处全为 0.5.8、`-Task check` 三项全绿（三语 1513 key / 10 条守卫）、`-Task build -Target avalonia -c Release` 34.3s 0 警告。
 
 - **11-13** — **智能解压两档（加根 / 去根）+ 解压落点统一（v0.5.8 第二项）**：设置页「解压 → 常规」新增「智能解压」两档下拉（`智能加根` 默认 / `智能去根`），控制工具栏、右键菜单、双击关联四条路径。**两档 dest 统一成父目录**，只换根策略（加根 = `SmartWrap`、去根 = `SmartStrip`）——原来 dest 里隐含的 `\包名` 那层改由 `SmartWrap` 显式补回，故加根档逐型等价于改动前；去根档按「无唯一根则原地平铺」生效。解压设置对话框默认 dest 也从 `父目录\包名` 改成 `父目录`，解压端 `ExtractRootMode` 默认值随之改为「智能加根」；`SmartOpenPathResolver` 新增「已知计划」重载（加根 → 打开加出来那层、去根 → 打开父目录、未动 → 回落列条目），解压后打开的目录不再指错。状态栏按**实际动作**重写三条（旧 `Status_SmartExtractSingleRoot`「已剥离根文件夹」与代码不符——那段代码从没剥过任何东西）。CLI 单文件叶子 `RunCliExtractWithProgressAsync` 与多文件批处理 `RunCliDirectExtractBatchAsync` 补齐根策略，批处理的冲突 options 从循环外挪进循环内逐包重建（否则上一包的剥根/加根会串到下一包）。另两个入口（右键「解压选中项到…」/ 拖拽兜底）仍用 `父目录\包名`，用户另有计划，已登记 **KI-018**。测试新增 `SmartExtractSummaryKeyTests` 4 例、`SmartOpenPathResolverTests` 补 6 例、`ArchiveRootPolicyTests` 补 10 例，并把 `SmartExtractTests` 两个「把 dest 公式抄一遍再断言」的假用例改成断言 `ArchiveRootPolicy.Resolve` 的指令。`core` 17.1s / `avalonia` 24.8s（Release）0 警告、`tests` 11.9s、`ui-tests` 82.6s 全绿（914 passed / 0 failed）、`i18n` 1513 key、`check` 10 条守卫全绿。
 
