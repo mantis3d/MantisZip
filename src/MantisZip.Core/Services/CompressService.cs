@@ -20,7 +20,7 @@ public class CompressRequest
     /// <summary>源文件/目录路径列表</summary>
     public List<string> SourcePaths { get; init; } = new();
 
-    /// <summary>输出模式：Manual / Separate / Combined</summary>
+    /// <summary>输出模式：Manual / Separate</summary>
     public CompressOutputMode Mode { get; init; }
 
     /// <summary>压缩格式："zip" / "7z" / "tar.gz"</summary>
@@ -44,7 +44,7 @@ public class CompressRequest
     /// <summary>是否加密压缩包</summary>
     public bool Encrypt { get; init; }
 
-    /// <summary>Manual/Combined 模式：由调用方预计算的输出路径</summary>
+    /// <summary>Manual 模式：由调用方预计算的输出路径</summary>
     public string? OutputPath { get; init; }
 
     /// <summary>Separate 模式：是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）</summary>
@@ -67,7 +67,7 @@ public class CompressRequest
     /// <summary>
     /// 过滤后的压缩计划（B 数据集）。由 CompressFlow.BuildRequest 从预览构建结果注入。
     /// 非 null 时：Separate 模式按逐项（SourcePath + OutputArchivePath + IncludedFiles 白名单）执行；
-    /// Manual/Combined 模式合并全部 IncludedFiles 为单一白名单。路径一律以 B 为准，不重算。
+    /// Manual 模式合并全部 IncludedFiles 为单一白名单。路径一律以 B 为准，不重算。
     /// </summary>
     public CompressPlan? Plan { get; init; }
 
@@ -166,7 +166,7 @@ public static class CompressService
     /// <summary>
     /// 预计算压缩输出路径列表。用于调用方在启动前显示批处理文件列表。
     /// Separate 模式：每个源文件对应一个输出路径。
-    /// Manual/Combined 模式：单个输出路径。
+    /// Manual 模式：单个输出路径。
     /// </summary>
     public static List<string> GetOutputPaths(CompressRequest request)
     {
@@ -180,7 +180,7 @@ public static class CompressService
                 CompressOutputMode.Separate => request.Plan.Items
                     .Select(i => i.OutputArchivePath)
                     .ToList(),
-                CompressOutputMode.Manual or CompressOutputMode.Combined =>
+                CompressOutputMode.Manual =>
                     !string.IsNullOrEmpty(request.Plan.OutputPath)
                         ? new List<string> { request.Plan.OutputPath }
                         : new List<string>(), // fallback（正常不会走到）
@@ -193,7 +193,7 @@ public static class CompressService
             CompressOutputMode.Separate => request.SourcePaths
                 .Select((p, index) => ComputeSeparateOutputPath(request, p, index + 1))
                 .ToList(),
-            CompressOutputMode.Manual or CompressOutputMode.Combined =>
+            CompressOutputMode.Manual =>
                 !string.IsNullOrEmpty(request.OutputPath)
                     ? new List<string> { request.OutputPath }
                     : request.SourcePaths.ToList(), // fallback
@@ -203,7 +203,7 @@ public static class CompressService
 
     /// <summary>
     /// 执行压缩操作。根据 <paramref name="request"/> 中的 <see cref="CompressOutputMode"/>
-    /// 自动选择循环（Separate）或单次（Manual/Combined）执行路径。
+    /// 自动选择循环（Separate）或单次（Manual）执行路径。
     /// </summary>
     /// <param name="request">压缩参数</param>
     /// <param name="conflictResolver">文件冲突回调，null 表示直接覆盖</param>
@@ -231,7 +231,6 @@ public static class CompressService
         {
             CompressOutputMode.Separate => await CompressSeparateAsync(request, conflictResolver, progress, ct, onItemStatus, onItemOutputPath),
             CompressOutputMode.Manual => await CompressSingleAsync(request, conflictResolver, progress, ct, onItemOutputPath),
-            CompressOutputMode.Combined => await CompressSingleAsync(request, conflictResolver, progress, ct, onItemOutputPath),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Mode), request.Mode, null)
         };
     }
@@ -352,7 +351,7 @@ public static class CompressService
     }
 
     /// <summary>
-    /// Manual/Combined 模式：单次压缩，所有 SourcePaths 作为整体传入引擎。
+    /// Manual 模式：单次压缩，所有 SourcePaths 作为整体传入引擎。
     /// </summary>
     private static async Task<CompressResult> CompressSingleAsync(
         CompressRequest request,
@@ -364,7 +363,7 @@ public static class CompressService
         ct.ThrowIfCancellationRequested();
 
         var outputPath = request.OutputPath
-            ?? throw new InvalidOperationException("OutputPath is required for Manual/Combined mode.");
+            ?? throw new InvalidOperationException("OutputPath is required for Manual mode.");
 
         CoreLog.Info($"CompressService: single mode, output: {outputPath}");
 

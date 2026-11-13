@@ -259,7 +259,6 @@ public static class ResultPreviewService
         switch (outputMode)
         {
             case CompressOutputMode.Manual:
-            case CompressOutputMode.Combined:
             {
                 // 确定有效的输出路径
                 string? effectiveOutputPath = outputPath;

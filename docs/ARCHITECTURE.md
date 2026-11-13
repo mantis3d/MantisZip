@@ -721,7 +721,7 @@ private bool _optionA;
 | `--compress <paths...>` | Show compress dialog; multi-instance IPC merges paths from multiple Windows shell invocations |
 | `--compress-quick <paths...>` | Direct compress with AppSettings defaults + ProgressWindow, then exit |
 | `--compress-separate <paths...>` | Sequential per-item compress to each item's parent directory + ProgressWindow + IPC merge |
-| `--compress-combined <paths...>` | Combined single archive from all items with common parent name + IPC merge; prompts if cross-drive |
+| `--compress-combined <paths...>` | Combined single archive from all items with common parent name + IPC merge（内部按 `CompressOutputMode.Manual` 执行，多源一个包） |
 | `--extract-here <path>` | Direct extract to source directory with AppSettings defaults + ProgressWindow, then exit |
 | `--extract-smart <path>` | Smart extract (auto-detect top-level folder) + ProgressWindow, then exit |
 | `--extract-to-name <path>` | Extract to named folder (archive name without extension) + ProgressWindow, then exit |

@@ -526,7 +526,7 @@ public partial class CompressSettingsWindow : Window
 
     /// <summary>
     /// 根据预览树更新 ZIP 多线程选项可用性。
-    /// Manual/Combined：所有文件进同一个包，判定用根节点 TotalDescendantSize；
+    /// 单包：所有文件进同一个包，判定用根节点 TotalDescendantSize；
     /// Separate：每个源各自成包，引擎按单包大小判定，取所有压缩包节点的最大值。
     /// 与 ZipEngine.IsMultiThreadedEligible 的 MaxZip32Size（ZIP32 上限）语义对齐。
     /// </summary>

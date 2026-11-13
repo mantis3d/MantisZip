@@ -396,11 +396,11 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
     }
 
     /// <summary>
-    /// 合并模式下模板渲染的主名必须进输出路径（旧实现里 Combined 沿用了 Manual 早前填的路径，
-    /// 模板名显示在文件名框里却进不了实际产物名）。
+    /// 单包模式下模板渲染的主名必须进输出路径（旧实现里「合并」模式沿用了更早填好的路径，
+    /// 模板名显示在文件名框里却进不了实际产物名）。改造后单包只有一态，这条钉住回归。
     /// </summary>
     [Fact]
-    public void CombinedMode_TemplateName_IsUsedInOutputPath()
+    public void SingleArchiveMode_TemplateName_IsUsedInOutputPath()
     {
         Apply(s => s.FileNameTemplateDialog = "");
 
@@ -414,7 +414,6 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
             Path.Combine(dir, "a.txt"),
             Path.Combine(dir, "b.txt"),
         });
-        vm.OutputMode = CompressOutputMode.Combined;
         vm.FileNameTemplate = "{name:auto}_bak";
 
         var folderName = Path.GetFileName(dir);
@@ -432,5 +431,33 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         vm.OutputMode = CompressOutputMode.Separate;
 
         Assert.Null(vm.OutputPath);
+    }
+
+    /// <summary>
+    /// 「每个文件/文件夹各成一个压缩包」这一个开关就是输出模式的全部入口：
+    /// 勾上 ⇒ 逐项压缩（路径为空）；取消 ⇒ 单包（路径回来）。不再有第三个互斥态。
+    /// </summary>
+    [Fact]
+    public void PerItemArchiveSwitch_TogglesBetweenSingleAndSeparate()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dir = Path.Combine(_root, "switch");
+        Directory.CreateDirectory(dir);
+        var a = Path.Combine(dir, "a.txt");
+        File.WriteAllText(a, "x");
+
+        var vm = new CompressSettingsViewModel(new[] { a });
+        Assert.False(vm.IsPerItemArchive);
+        Assert.Equal(CompressOutputMode.Manual, vm.OutputMode);
+        Assert.NotNull(vm.OutputPath);
+
+        vm.IsPerItemArchive = true;
+        Assert.Equal(CompressOutputMode.Separate, vm.OutputMode);
+        Assert.Null(vm.OutputPath);
+
+        vm.IsPerItemArchive = false;
+        Assert.Equal(CompressOutputMode.Manual, vm.OutputMode);
+        Assert.Equal(Path.Combine(dir, "switch.zip"), vm.OutputPath);
     }
 }

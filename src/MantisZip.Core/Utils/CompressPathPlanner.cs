@@ -39,7 +39,7 @@ public static class CompressPathPlanner
         CommonParent,
         /// <summary>无公共子目录但所有源同盘 —— 落到盘符根（<c>C:\</c>）。</summary>
         DriveRoot,
-        /// <summary>跨盘符 —— 无法确定落点，Combined 需回退手动模式。</summary>
+        /// <summary>跨盘符 —— 无法确定落点，单包模式需等用户手选目录。</summary>
         CrossDrive,
         /// <summary>取不到（单源无目录、路径为空等）。</summary>
         Unresolved,
@@ -49,11 +49,10 @@ public static class CompressPathPlanner
     public readonly record struct OutputRootResolution(OutputRootKind Kind, string? Root);
 
     /// <summary>
-    /// 解析单包模式（Manual 自动填充 / Combined）的输出落点。
-    /// Manual 与 Combined 只有这一份实现，避免「对话框自动填充」与「合并模式」各算一套。
+    /// 解析单包模式（Manual / --compress-quick / CLI 合并压缩）的输出落点。
+    /// 只有这一份实现，避免「对话框自动填充」与「CLI 合并压缩」各算一套。
     /// </summary>
-    /// <param name="allowDriveRootFallback">同盘但无公共子目录时是否落到盘符根。
-    /// Manual 为 true、Combined 为 true（跨盘由调用方回退手动模式）。</param>
+    /// <param name="allowDriveRootFallback">同盘但无公共子目录时是否落到盘符根（调用方一般传 true）。</param>
     public static OutputRootResolution ResolveOutputRoot(
         IReadOnlyList<string> sourcePaths, bool allowDriveRootFallback = true)
     {
@@ -175,7 +174,7 @@ public static class CompressPathPlanner
     }
 
     /// <summary>
-    /// 单包多源（Manual / Combined / --compress-quick）的压缩包名。
+    /// 单包多源（Manual / --compress-quick / CLI 合并压缩）的压缩包名。
     /// <c>{name}</c> 取**第一个**源；<c>{name:auto}</c> 取公共父目录名（取不到 → 第一个源的主名）。
     /// 模板为空或渲染失败 ⇒ 返回 null，调用方仍走各自的旧命名逻辑（**不猜**）。
     /// </summary>
@@ -231,7 +230,7 @@ public static class CompressPathPlanner
     }
 
     /// <summary>
-    /// 批量规划 Manual/Combined 模式：单输出包 + 全部源（共享同一 OutputArchivePath）。
+    /// 批量规划 Manual 模式：单输出包 + 全部源（共享同一 OutputArchivePath）。
     /// </summary>
     public static IReadOnlyList<CompressPlanItem> PlanSingle(
         IReadOnlyList<string> sourcePaths, string outputPath, string format)

@@ -300,7 +300,7 @@ public static class CompressFlow
     /// <summary>
     /// 压缩成功后把输出目录写入路径历史（<see cref="PathHistoryManager"/>，
     /// QuickPathPicker 地址栏 / CustomFilePickerDialog 历史建议的数据源）。
-    /// 目录取自 GetOutputPaths 各输出文件的父目录并去重（Manual/Combined = 输出文件所在目录；
+    /// 目录取自 GetOutputPaths 各输出文件的父目录并去重（单包 = 输出文件所在目录；
     /// Separate = 各源条目所在目录）。失败仅记日志，不影响压缩结果。
     /// 由调用方在压缩确认成功后调用（主窗口 ExecuteCompressFromSettings / CLI CompressWithProgress）。
     /// </summary>

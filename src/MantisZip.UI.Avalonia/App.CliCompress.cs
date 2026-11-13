@@ -385,7 +385,8 @@ public partial class App : Application
         var request = new CompressRequest
         {
             SourcePaths = paths,
-            Mode = CompressOutputMode.Combined,
+            // 单包合并（--compress-combined）：行为与 Manual 一致（多源一个包），只是走 CLI 不弹设置窗
+            Mode = CompressOutputMode.Manual,
             Format = settings.DefaultFormat,
             CompressionLevel = settings.DefaultLevel,
             OutputPath = outputPath,

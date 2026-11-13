@@ -57,9 +57,11 @@
             <RowDefinition Height="Auto" />  <!-- 完成后行为（自动打开输出目录） -->
           </Grid.RowDefinitions>
 
-          <!-- 分组：输出模式（三个互斥单选，绑定 VM 的 IsManualMode/IsSeparateMode/IsCombinedMode）
-               2026-11-02 用户反馈：三项竖排占高太多，改为「左侧标题 + 右侧三项横排」。
-               用 WrapPanel 而不是 StackPanel：窗口被拖到最小宽度时三项自动折成两行，不会溢出裁切。 -->
+          <!-- 分组：输出方式（单个开关，绑定 VM 的 IsPerItemArchive）
+               勾上 = 每个文件/文件夹各自生成一个独立压缩包（逐项压缩）；取消 = 所有来源合并成一个压缩包。
+               2026-11-02 用户反馈：三项竖排占高太多，改为「左侧标题 + 右侧横排」。
+               2026-11-13 去掉第三个「自动（父文件夹名称）」：它的命名效果已被文件名模板的
+               {name:auto} 覆盖，压缩行为与单包模式完全等价，一个开关足够表达剩余两态。 -->
           <Border Grid.Row="0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
@@ -70,22 +72,11 @@
                          FontWeight="SemiBold"
                          VerticalAlignment="Center"
                          Margin="0,0,12,0" />
-              <WrapPanel Grid.Column="1" Orientation="Horizontal" VerticalAlignment="Center">
-                <!-- 手动指定输出路径 -->
-                <RadioButton GroupName="CompressOutputMode"
-                             Margin="0,0,12,0"
-                             IsChecked="{Binding IsManualMode}"
-                             Content="{Binding LocalizedStrings[Compress_OutputMode_Manual]}" />
-                <!-- 分别压缩到各自目录（每源自成包） -->
-                <RadioButton GroupName="CompressOutputMode"
-                             Margin="0,0,12,0"
-                             IsChecked="{Binding IsSeparateMode}"
-                             Content="{Binding LocalizedStrings[Compress_OutputMode_Separate]}" />
-                <!-- 合并压缩到同一个压缩包 -->
-                <RadioButton GroupName="CompressOutputMode"
-                             IsChecked="{Binding IsCombinedMode}"
-                             Content="{Binding LocalizedStrings[Compress_OutputMode_Combined]}" />
-              </WrapPanel>
+              <!-- 单个开关：勾选即逐项压缩，不勾即单包合并 -->
+              <CheckBox Grid.Column="1"
+                        VerticalAlignment="Center"
+                        IsChecked="{Binding IsPerItemArchive}"
+                        Content="{Binding LocalizedStrings[Compress_OutputMode_Separate]}" />
             </Grid>
           </Border>
 

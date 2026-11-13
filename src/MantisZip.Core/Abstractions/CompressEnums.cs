@@ -16,7 +16,9 @@ public enum CompressConflictAction
 /// </summary>
 public enum CompressOutputMode
 {
+    /// <summary>单个压缩包：所有源合并进一个包，输出路径可手动指定。</summary>
     Manual,
-    Separate,
-    Combined
+
+    /// <summary>逐项压缩：每个源文件/文件夹各自生成一个压缩包，落在各自源所在目录。</summary>
+    Separate
 }
