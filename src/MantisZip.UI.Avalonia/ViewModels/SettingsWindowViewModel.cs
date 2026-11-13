@@ -138,7 +138,15 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty] private string _compressRootMode = nameof(RootDirectoryMode.Original);
 
     /// <summary>解压端四态默认值的枚举名。</summary>
-    [ObservableProperty] private string _extractRootMode = nameof(RootDirectoryMode.Original);
+    [ObservableProperty] private string _extractRootMode = nameof(RootDirectoryMode.SmartWrap);
+
+    // ── 智能解压两档（v0.5.8 第二项） ──
+    // 只影响「智能解压」三个入口（工具栏 / 右键 / 双击关联），不影响解压设置对话框。
+    public System.Collections.ObjectModel.ObservableCollection<Option> SmartExtractRootModeOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedSmartExtractRootModeOption;
+
+    /// <summary>智能解压两档的枚举名（与 <see cref="SmartExtractRootModeOptions"/> 的 Value 对应）。</summary>
+    [ObservableProperty] private string _smartExtractRootMode = nameof(RootDirectoryMode.SmartWrap);
 
     // ── Compression advanced ──
     [ObservableProperty]
@@ -1089,6 +1097,8 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string CompressRootModeText => LocalizationManager.T("Settings_Compress_RootMode");
     public string CompressRootNameText => LocalizationManager.T("Settings_Compress_RootName");
     public string ExtractRootModeText => LocalizationManager.T("Settings_Extract_RootMode");
+    public string SmartExtractRootModeText => LocalizationManager.T("Settings_SmartExtract");
+    public string SmartExtractRootModeDescText => LocalizationManager.T("Settings_SmartExtract_Desc");
     public string ExtractDeleteAfterExtractText => LocalizationManager.T("Settings_Extract_DeleteArchiveAfterExtract");
     public string ExtractDoubleClickActionText => LocalizationManager.T("Settings_Extract_DoubleClickAction");
     public string ExtractDoubleClickThresholdText => LocalizationManager.T("Settings_Extract_DoubleClickThreshold");
@@ -1362,6 +1372,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         CompressRootMode = _settings.CompressRootMode.ToString();
         CompressRootName = _settings.CompressRootName;
         ExtractRootMode = _settings.ExtractRootMode.ToString();
+        SmartExtractRootMode = ArchiveRootPolicy.NormalizeSmartExtractMode(_settings.SmartExtractRootMode).ToString();
 
         // Compression advanced
         _sevenZipCompressionMethod = _settings.SevenZipCompressionMethod;
@@ -1577,6 +1588,11 @@ public partial class SettingsWindowViewModel : ObservableObject
         ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_SmartWrap"), nameof(RootDirectoryMode.SmartWrap)));
         ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_AlwaysWrap"), nameof(RootDirectoryMode.AlwaysWrap)));
 
+        // 智能解压两档：只有「智能加根 / 智能去根」，文案复用解压端四态里的两条
+        SmartExtractRootModeOptions.Clear();
+        SmartExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_SmartWrap"), nameof(RootDirectoryMode.SmartWrap)));
+        SmartExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_SmartStrip"), nameof(RootDirectoryMode.SmartStrip)));
+
         DoubleClickActionOptions.Clear();
         DoubleClickActionOptions.Add(new Option(DoubleClickActionOpenText, "open"));
         DoubleClickActionOptions.Add(new Option(DoubleClickActionExtractHereText, "extract-here"));
@@ -1725,6 +1741,8 @@ public partial class SettingsWindowViewModel : ObservableObject
                                           ?? CompressRootModeOptions.FirstOrDefault();
         SelectedExtractRootModeOption = ExtractRootModeOptions.FirstOrDefault(o => o.Value == ExtractRootMode)
                                          ?? ExtractRootModeOptions.FirstOrDefault();
+        SelectedSmartExtractRootModeOption = SmartExtractRootModeOptions.FirstOrDefault(o => o.Value == SmartExtractRootMode)
+                                             ?? SmartExtractRootModeOptions.FirstOrDefault();
 
         SelectedDoubleClickActionOption = DoubleClickActionOptions.FirstOrDefault(o => o.Value == DoubleClickAction);
 
@@ -1887,6 +1905,8 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(CompressRootModeText));
         OnPropertyChanged(nameof(CompressRootNameText));
         OnPropertyChanged(nameof(ExtractRootModeText));
+        OnPropertyChanged(nameof(SmartExtractRootModeText));
+        OnPropertyChanged(nameof(SmartExtractRootModeDescText));
         OnPropertyChanged(nameof(ExtractDeleteAfterExtractText));
         OnPropertyChanged(nameof(ExtractDoubleClickActionText));
         OnPropertyChanged(nameof(ExtractDoubleClickThresholdText));
@@ -2047,6 +2067,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.CompressRootMode = ParseRootMode(SelectedCompressRootModeOption?.Value, _settings.CompressRootMode);
         _settings.CompressRootName = CompressRootName?.Trim() ?? "";
         _settings.ExtractRootMode = ParseRootMode(SelectedExtractRootModeOption?.Value, _settings.ExtractRootMode);
+        // 智能解压两档：手改 JSON 成其它值时收敛回「智能加根」，不能让设置页显示一个运行时不认的值
+        _settings.SmartExtractRootMode = ArchiveRootPolicy.NormalizeSmartExtractMode(
+            ParseRootMode(SelectedSmartExtractRootModeOption?.Value, RootDirectoryMode.SmartWrap));
 
 
         // Adaptive Compression (三个独立开关)

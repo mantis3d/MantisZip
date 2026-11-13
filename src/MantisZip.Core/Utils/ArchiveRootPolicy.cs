@@ -81,6 +81,20 @@ public static class ArchiveRootPolicy
     };
 
     /// <summary>
+    /// 智能解压只支持两档：<see cref="RootDirectoryMode.SmartWrap"/>（智能加根，默认）与
+    /// <see cref="RootDirectoryMode.SmartStrip"/>（智能去根）。
+    /// <para>
+    /// 其余任何值（含 <see cref="RootDirectoryMode.Original"/>、<see cref="RootDirectoryMode.AlwaysWrap"/>、
+    /// 以及从 JSON 手改进来的越界值）一律回落 <see cref="RootDirectoryMode.SmartWrap"/>。
+    /// <b>为什么不回落 Original</b>：Original 会让「散装包建包名目录」这个动作彻底消失，
+    /// 用户只是手滑改了一个数字就静默退化成平铺，比报错更难排查；而 SmartWrap 是默认档，
+    /// 退化成它至少与「没配置过」的用户一致。
+    /// </para>
+    /// </summary>
+    public static RootDirectoryMode NormalizeSmartExtractMode(RootDirectoryMode mode)
+        => mode == RootDirectoryMode.SmartStrip ? RootDirectoryMode.SmartStrip : RootDirectoryMode.SmartWrap;
+
+    /// <summary>
     /// 压缩端「是否有唯一根」的判定：<paramref name="sourcePaths"/> 恰好是一个目录。
     /// <para>
     /// 为什么只认「恰一个目录」：多目录源必然在包顶层产出多个条目、文件+目录混合与纯文件源

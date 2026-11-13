@@ -96,7 +96,24 @@ public class AppSettings
     public string CompressRootName { get; set; } = "";
 
     /// <summary>解压端「压缩包顶层目录」默认值。</summary>
-    public RootDirectoryMode ExtractRootMode { get; set; } = RootDirectoryMode.Original;
+    /// <remarks>
+    /// 默认 <see cref="RootDirectoryMode.SmartWrap"/>（智能加根，v0.5.8 第二项改）：配合
+    /// 对话框默认落点 = 父目录，散装包会落在 <c>父目录\包名\</c>、单根包复用包自带的根。
+    /// 这条不变式是「每个包解压后必然落在一个顶层文件夹里」。想回到「平铺到目标目录」就选「原样」。
+    /// </remarks>
+    public RootDirectoryMode ExtractRootMode { get; set; } = RootDirectoryMode.SmartWrap;
+
+    /// <summary>
+    /// 智能解压（菜单 / 工具栏 / 右键 / 双击关联）的根策略，只有两档：
+    /// <see cref="RootDirectoryMode.SmartWrap"/>（智能加根，默认）与
+    /// <see cref="RootDirectoryMode.SmartStrip"/>（智能去根）。
+    /// </summary>
+    /// <remarks>
+    /// 两档的落点目录都是压缩包所在父目录，只换根策略。读值时必须过
+    /// <see cref="MantisZip.Core.Utils.ArchiveRootPolicy.NormalizeSmartExtractMode"/>：
+    /// 这个字段可能被手改成其它值，直接当四态用会让智能解压退化成「原样」。
+    /// </remarks>
+    public RootDirectoryMode SmartExtractRootMode { get; set; } = RootDirectoryMode.SmartWrap;
 
     // ===== 压缩文件名模板（v0.5.7）=====
     // 三个入口各记一份默认值：项目里「压缩到此处/右键压缩」与「分别压缩」的命名诉求差别很大，

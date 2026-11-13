@@ -1,4 +1,4 @@
-﻿{
+{
   "Picker_NewFolder": "新增資料夾",
   "Picker_NewFolderTitle": "新增資料夾",
   "Picker_NewFolderPrompt": "資料夾名稱：",
@@ -998,6 +998,8 @@
   "Settings_Compress_RootMode": "包內根目錄",
   "Settings_Compress_RootName": "預設根目錄名",
   "Settings_Extract_RootMode": "壓縮包頂層目錄",
+  "Settings_SmartExtract": "智慧解壓",
+  "Settings_SmartExtract_Desc": "控制工具列、右鍵選單與雙擊關聯裡的「智慧解壓」如何決定落點：智慧加根會在散裝包外面補一層以壓縮包命名的資料夾（單根包保持原樣）；智慧去根會移除壓縮包自帶的唯一頂層資料夾，讓內容直接落到壓縮包所在目錄。",
   "Compress_FileNameTemplate_Token_Name": "來源檔案或目錄的主名",
   "Compress_FileNameTemplate_Token_NameAuto": "單包多來源時取共同上層目錄名",
   "Compress_FileNameTemplate_Token_Ext": "來源的原始副檔名（含點）",
@@ -1234,8 +1236,9 @@
   "Status_SelectionCount": "已選取 {0} 個檔案",
   "Status_SelectionSize": "選取大小: {0}",
   "Status_SmartExtracting": "正在智慧解壓",
-  "Status_SmartExtractNamed": "智慧解壓完成（已解壓到命名資料夾）",
-  "Status_SmartExtractSingleRoot": "智慧解壓完成（已剝離根資料夾）",
+  "Status_SmartExtractAddedRoot": "智慧解壓完成（已新增頂層資料夾）",
+  "Status_SmartExtractStrippedRoot": "智慧解壓完成（已移除頂層資料夾）",
+  "Status_SmartExtractUnchanged": "智慧解壓完成（目錄結構未變動）",
   "Status_TestFailed": "壓縮檔測試失敗",
   "Status_TestingArchive": "正在測試壓縮檔",
   "Status_TestingEntry": "正在測試項目",

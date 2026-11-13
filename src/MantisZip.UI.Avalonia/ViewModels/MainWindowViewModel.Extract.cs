@@ -249,17 +249,22 @@ public partial class MainWindowViewModel : ObservableObject
     /// <summary>
     /// 打开解压后的文件夹（智能选择：若压缩包内所有条目共享一个公共根目录，
     /// 则打开 dest/公共根目录，否则直接打开 dest）。
+    /// <para>
+    /// 智能解压两档会把 <paramref name="stripRoot"/> / <paramref name="addRoot"/> 传进来：
+    /// 加了根就是 <c>dest\根名</c>、剥了根就是 <c>dest</c>，不再列一遍包去猜
+    /// —— 解压后源包可能已被「完成后删除压缩包」删掉。其余入口保持三参调用，行为不变。
+    /// </para>
     /// </summary>
-    private async Task OpenExtractedFolderAsync(string dest, string archivePath, string? password)
+    private async Task OpenExtractedFolderAsync(
+        string dest, string archivePath, string? password, string? stripRoot = null, string? addRoot = null)
     {
         if (ShowOpenFolderDialog == null) return;
 
         try
         {
             var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
-            var openPath = engine == null
-                ? dest
-                : await SmartOpenPathResolver.ResolveSmartOpenPathAsync(archivePath, dest, engine, password);
+            var openPath = await SmartOpenPathResolver.ResolveSmartOpenPathAsync(
+                archivePath, dest, engine, password, stripRoot, addRoot);
 
             if (OperatingSystem.IsWindows())
             {
@@ -315,14 +320,14 @@ public partial class MainWindowViewModel : ObservableObject
         if (CurrentArchivePath == null || RunWithProgress == null) return;
         if (!EnsureArchiveAvailable()) return;
 
+        // 落点恒为压缩包所在目录（父目录），「加根」那一层由根策略负责补 ——
+        // 旧代码把散装包的包名塞进 dest（parentDir\包名），那实际上是「智能加根」的临时替代，
+        // 与四态里的 SmartWrap 重复实现；现在统一成 dest=父目录 + 根策略。
         var parentDir = Path.GetDirectoryName(CurrentArchivePath)
                         ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
 
-        bool hasSingleRoot = _allRawItems != null && ArchiveStructureAnalyzer.HasSingleRootDirectory(_allRawItems);
-
-        var dest = hasSingleRoot
-            ? parentDir
-            : Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
+        var mode = ArchiveRootPolicy.NormalizeSmartExtractMode(AppSettings.Load().SmartExtractRootMode);
+        var (stripRoot, addRoot) = ExtractRootPlan.Resolve(mode, _allRawItems, CurrentArchivePath);
 
         _sessionPasswords.TryGetValue(GetSessionPasswordKey(CurrentArchivePath, _currentFormat), out var password);
 
@@ -340,24 +345,38 @@ public partial class MainWindowViewModel : ObservableObject
                 ExtractFlow.TrySeedEntryItemsInBackground(
                     ProgressWindow.CurrentVisible, CurrentArchivePath, password, filteredKeys: null, ct);
                 await new ExtractService().ExtractAsync(
-                    CurrentArchivePath, dest, password, progress, ct, LegacyExtractOptions());
+                    CurrentArchivePath, parentDir, password, progress, ct,
+                    LegacyExtractOptions(stripRoot, addRoot));
             });
 
         if (completed)
         {
-            StatusMessage = hasSingleRoot
-                ? LocalizationManager.T("Status_SmartExtractSingleRoot")
-                : LocalizationManager.T("Status_SmartExtractNamed");
+            StatusMessage = LocalizationManager.T(SmartExtractSummaryKey(stripRoot, addRoot));
             // D19: 后置动作读进度窗口开关最终值，回退设置
             App.TryDeleteArchiveAfterExtract(CurrentArchivePath!,
                 LastProgressWindow?.DeleteArchiveAfterExtractValue ?? AppSettings.Load().DeleteArchiveAfterExtract);
             if (LastProgressWindow?.OpenFolderAfterExtractValue ?? AppSettings.Load().OpenFolderAfterExtract)
             {
-                await OpenExtractedFolderAsync(dest, CurrentArchivePath!, password);
+                await OpenExtractedFolderAsync(parentDir, CurrentArchivePath!, password, stripRoot, addRoot);
             }
             // 勾了「解压完成后删除压缩包」时源包已不在了：立刻关包，别让界面停在空路径上
             SyncArchiveStateAfterExtract();
         }
+    }
+
+    /// <summary>
+    /// 智能解压完成后状态栏文案的 key（按**实际发生的动作**选，不是按包结构）：
+    /// 加根 → 已添加顶层文件夹；去根 → 已去除顶层文件夹；两者都没动 → 未改动目录结构。
+    /// <para>
+    /// 旧实现按 <c>hasSingleRoot</c> 二分，给单根包配的文案是「已剥离根文件夹」——
+    /// 但那段代码从头到尾没有剥任何东西，属于**文案与代码不符**，用户看到会以为行为变了。
+    /// </para>
+    /// </summary>
+    internal static string SmartExtractSummaryKey(string? stripRoot, string? addRoot)
+    {
+        if (addRoot != null) return "Status_SmartExtractAddedRoot";
+        if (stripRoot != null) return "Status_SmartExtractStrippedRoot";
+        return "Status_SmartExtractUnchanged";
     }
 
     [RelayCommand]
@@ -427,10 +446,10 @@ public partial class MainWindowViewModel : ObservableObject
     /// （运行中可改）+ Ask 时弹询问（勾「应用到全部」把下拉同步成实际生效的动作）。
     /// </para>
     /// </summary>
-    private ArchiveOptions LegacyExtractOptions()
+    private ArchiveOptions LegacyExtractOptions(string? stripRoot = null, string? addRoot = null)
     {
         var settings = AppSettings.Load();
-        return CreateLegacyExtractOptions(settings.FileConflictAction, NameEncodingRequestKey);
+        return CreateLegacyExtractOptions(settings.FileConflictAction, NameEncodingRequestKey, stripRoot, addRoot);
     }
 
     /// <summary>
@@ -438,7 +457,13 @@ public partial class MainWindowViewModel : ObservableObject
     /// </summary>
     /// <param name="conflictAction">设置里的默认冲突策略（字符串码：ask / overwrite / rename / skip ...）。</param>
     /// <param name="nameEncoding">文件名代码页（可选）。</param>
-    internal static ArchiveOptions CreateLegacyExtractOptions(string conflictAction, string? nameEncoding)
+    /// <param name="stripRoot">要剥掉的顶层根段（智能解压「去根」时非空，其余路径传 null）。</param>
+    /// <param name="addRoot">要添加的顶层根段（智能解压「加根」时非空，其余路径传 null）。</param>
+    internal static ArchiveOptions CreateLegacyExtractOptions(
+        string conflictAction,
+        string? nameEncoding,
+        string? stripRoot = null,
+        string? addRoot = null)
     {
         Func<FileConflictInfo, Task<(FileConflictAction Action, bool ApplyToAll)>> conflictDialog = async info =>
         {
@@ -464,6 +489,6 @@ public partial class MainWindowViewModel : ObservableObject
             ProgressWindow.CurrentVisible?.ConflictPolicy ?? FileConflictAction.Ask;
 
         return SelectedItemsExtractService.CreateExtractOptions(
-            conflictAction, conflictDialog, nameEncoding, livePolicy);
+            conflictAction, conflictDialog, nameEncoding, livePolicy, stripRoot, addRoot);
     }
 }

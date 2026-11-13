@@ -1,4 +1,4 @@
-﻿{
+{
   "Picker_NewFolder": "新建文件夹",
   "Picker_NewFolderTitle": "新建文件夹",
   "Picker_NewFolderPrompt": "文件夹名称：",
@@ -998,6 +998,8 @@
   "Settings_Compress_RootMode": "包内根目录",
   "Settings_Compress_RootName": "默认根目录名",
   "Settings_Extract_RootMode": "压缩包顶层目录",
+  "Settings_SmartExtract": "智能解压",
+  "Settings_SmartExtract_Desc": "控制工具栏、右键菜单与双击关联里的「智能解压」如何决定落点：智能加根会在散装包外面补一层以压缩包命名的文件夹（单根包保持原样）；智能去根会去掉压缩包自带的唯一顶层文件夹，让内容直接落到压缩包所在目录。",
   "Compress_FileNameTemplate_Token_Name": "源文件或目录的主名",
   "Compress_FileNameTemplate_Token_NameAuto": "单包多源时取公共父目录名",
   "Compress_FileNameTemplate_Token_Ext": "源的原始扩展名（含点）",
@@ -1234,8 +1236,9 @@
   "Status_SelectionCount": "已选中 {0} 个文件",
   "Status_SelectionSize": "选中大小: {0}",
   "Status_SmartExtracting": "正在智能解压",
-  "Status_SmartExtractNamed": "智能解压完成（已解压到命名文件夹）",
-  "Status_SmartExtractSingleRoot": "智能解压完成（已剥离根文件夹）",
+  "Status_SmartExtractAddedRoot": "智能解压完成（已添加顶层文件夹）",
+  "Status_SmartExtractStrippedRoot": "智能解压完成（已去除顶层文件夹）",
+  "Status_SmartExtractUnchanged": "智能解压完成（目录结构未改动）",
   "Status_TestFailed": "压缩包测试失败",
   "Status_TestingArchive": "正在测试压缩包",
   "Status_TestingEntry": "正在测试条目",

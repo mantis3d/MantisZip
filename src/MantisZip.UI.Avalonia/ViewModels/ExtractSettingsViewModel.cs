@@ -377,12 +377,13 @@ public partial class ExtractSettingsViewModel : ObservableObject
         ArchivePaths = archivePaths;
         SelectedPaths = archivePaths.ToList();
 
-        // 默认目标路径：第一个压缩包所在目录/压缩包名
+        // 默认目标路径：第一个压缩包所在目录（父目录）。
+        // 「包名那一层」由根策略负责补（默认 SmartWrap：散装/多根包自动加包名根、单根包不动），
+        // 所以 dest 不再预先拼 \包名 —— 否则散装包会多两层、与工具栏「智能解压」落点不一致。
+        // 单根包因此比旧默认少一层（旧：父目录\包名\根\…，新：父目录\根\…），这是本次有意消掉的重复嵌套。
         if (archivePaths.Count > 0)
         {
-            var dir = Path.GetDirectoryName(archivePaths[0]) ?? "";
-            var name = Path.GetFileNameWithoutExtension(archivePaths[0]);
-            DestinationPath = Path.Combine(dir, name);
+            DestinationPath = Path.GetDirectoryName(archivePaths[0]) ?? "";
         }
 
         // 预选当前设置中的冲突策略（对齐 WPF ExtractSettingsWindow 从 FileConflictAction 预选）

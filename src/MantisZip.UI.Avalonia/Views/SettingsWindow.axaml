@@ -665,6 +665,24 @@
                 </ComboBox>
               </StackPanel>
             </Border>
+            <!-- 智能解压两档（v0.5.8）：只影响工具栏/右键/双击关联的「智能解压」，不影响解压设置对话框 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding SmartExtractRootModeText}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SmartExtractRootModeDescText}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <ComboBox ItemsSource="{Binding SmartExtractRootModeOptions}"
+                          SelectedItem="{Binding SelectedSmartExtractRootModeOption}"
+                          Width="240" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+            </Border>
 
             <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                     CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">

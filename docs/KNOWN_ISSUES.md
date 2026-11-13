@@ -41,6 +41,7 @@
 | **KI-015** | `ShowExtractFolderAsync` 已无调用方（连同 `ExtractPickResult` 一起成了死 API） | 技术债 / 死代码 | 缺决策 | 下次动 `CustomFilePickerDialog` 静态入口或解压选目录链路时 | 阻塞中 |
 | **KI-016** | 解压时输错密码被判成「文件损坏」，不弹密码框重试（`data error` 被当作损坏信号） | 交互 / 错误分类 | 缺决策 | 用户反馈「密码输错只提示损坏」时；或决定「解压失败统一走 `QuickVerifyPasswordEx` 二次判定」时 | 阻塞中 |
 | **KI-017** | 分卷包（`.001`/`.z01`/`.r00`/`.part1.rar`）与 SFX 的**格式身份**被扩展名直判成 Zip，预览 / 双击打开 / 缩略图全报 `Failed to locate the Zip Header` | 功能缺陷 | — | 已修复（`ResolveReaderFormat` 单一入口，2026-11-05） | 已修复（2026-11-05） |
+| **KI-018** | 「解压选中项到…」与「拖拽兜底」两个入口的初始目录仍是 `父目录\包名`，与解压设置对话框改后的「父目录」不一致 | 功能一致性 | 等计划 | 用户另有一份针对这两个入口的计划落地时；或再次统一解压落点语义时 | 阻塞中 |
 
 ---
 
@@ -211,6 +212,18 @@
 - **影响面**：输错一次密码后只能自己发现、重新走一遍解压流程；不丢数据、不影响正确密码。
 - **复评条件**：① 用户反馈「密码输错后只提示损坏、没有重输机会」时；② 或决定「解压失败是否统一走 `QuickVerifyPasswordEx` 二次判定」时。
 - **关联**：`.omo/plans/已完成/sevenzip-solid-extract-batch.md` §5.10 的「遗留」段；`docs/progress-avalonia-detail.md` 2026-11-05「加密 solid 7z 改走批量」条目。
+
+## KI-018 两个入口的初始解压目录仍是「父目录\包名」
+
+- **发现**：2026-11-13（讨论 `smart-extract-root-mode` 的落点统一时）
+- **现象**：本轮把解压设置对话框的默认落点从 `父目录\包名` 改成 `父目录`（配合根策略默认值改成「智能加根」），但**另外两个入口仍在显式拼 `父目录\包名`**，三处默认落点分裂：
+  - `src/MantisZip.UI.Avalonia/ViewModels/MainWindowViewModel.Extract.cs:165` — `var defaultDest = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));`（右键「解压选中项到…」→ 传给 `ShowExtractEntryPicker`）
+  - `src/MantisZip.UI.Avalonia/Services/DragDropService.cs:84` — `var initialPath = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(_archivePath));`（拖拽兜底 → `ExtractSettingsWindow.ShowWithPresetSelectionAsync`）
+  - 对照：`src/MantisZip.UI.Avalonia/ViewModels/ExtractSettingsViewModel.cs:385` 的构造器默认值（本轮已改）
+- **证据**：上述两处 `Path.Combine(parentDir, Path.GetFileNameWithoutExtension(...))` 均把包名塞进 dest；而对话框本轮改成 `parentDir` 后由根策略（`SmartWrap`）负责那一层。三个入口走的是同一个 `ExtractSettingsWindow`，只是前两者用 `initialDestination` 覆盖了构造器默认值，于是同一个包从右键/拖拽进来会解到两层、从菜单进来会解到一层。
+- **为什么现在不修**：**等计划**。用户明确要求「另外两个入口先不要改，我另有计划」（2026-11-13），本轮只记录不改。
+- **复评条件**：用户那份针对这两个入口的计划落地时；或再次统一解压落点语义（改 `ExtractSettingsWindow.ShowWithPresetSelectionAsync` 的 `initialDestination` 语义）时。
+- **关联**：`.omo/plans/进行中/smart-extract-root-mode.md`；`docs/progress-avalonia-detail.md` 2026-11-13「智能解压加根/去根与落点统一」条目。
 
 ## 档案区（已修 / 不会修）
 

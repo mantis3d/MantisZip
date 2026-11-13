@@ -165,6 +165,8 @@ public partial class App : Application
         IClassicDesktopStyleApplicationLifetime desktop)
     {
         string targetDir = string.Empty;
+        string? stripRoot = null;
+        string? addRoot = null;
         try
         {
             var engine = ArchiveEngineFactory.GetEngineByExtension(archivePath);
@@ -180,9 +182,11 @@ public partial class App : Application
             // 文件管理器右键「智能解压」遇到加密头包时静默失败）。
             var password = ResolveCliPassword(archivePath, engine);
 
-            // 分析压缩包结构并确定目标目录（单根 → 压缩包所在目录；散列 → 命名子目录）。
+            // 分析压缩包结构并确定目标目录 + 根策略（落点恒为包所在目录，
+            // 「加根」那一层由根策略补；散装包加包名根，单根包不动/去根时剥根）。
             // 结构分析本身因密码失败时（加密头包且密码库无匹配）弹密码框取密码后重试。
-            (targetDir, password) = await ResolveSmartDestWithPasswordAsync(archivePath, engine, password);
+            (targetDir, password, stripRoot, addRoot) =
+                await ResolveSmartDestWithPasswordAsync(archivePath, engine, password);
 
             // Check writability before extraction
             var unwritable = new List<string>();
@@ -193,7 +197,7 @@ public partial class App : Application
                 return await HandleElevationAsync(unwritable, originalArgs, desktop);
 
             return await RunCliExtractWithProgressAsync(
-                archivePath, targetDir, password, engine, originalArgs, desktop);
+                archivePath, targetDir, password, engine, originalArgs, desktop, stripRoot, addRoot);
         }
         catch (PasswordRetryCancelledException)
         {
@@ -214,9 +218,16 @@ public partial class App : Application
     }
 
     /// <summary>
-    /// 智能解压目标目录计算（单文件与批处理共用）：
-    /// 单根目录结构 → 压缩包所在目录；散列结构 → 压缩包名命名的子目录（自动创建）。
-    /// 语义与 WPF ResolveSmartDestAsync 一致。
+    /// 智能解压目标目录 + 根策略计算（单文件与批处理共用）。
+    /// <para>
+    /// 落点**恒为压缩包所在目录**；「加根」那一层交给根策略补（<c>RootDirectoryMode.SmartWrap</c>
+    /// 对散装/多根包加包名根、对单根包不动；<c>SmartStrip</c> 对单根包剥根、对散装包不动）。
+    /// </para>
+    /// <para>
+    /// 旧实现把散装包的包名塞进 dest（<c>父目录\包名</c>），那实际上是「智能加根」的临时替代，
+    /// 与四态里的 <c>SmartWrap</c> 重复实现；现在统一成 dest=父目录 + 根策略，
+    /// 三种包型的落点与旧行为逐字节等价（由 <see cref="ArchiveRootPolicy"/> 的测试盯着）。
+    /// </para>
     /// </summary>
     /// <param name="archivePath">压缩包路径。</param>
     /// <param name="engine">已解析的引擎。</param>
@@ -225,29 +236,21 @@ public partial class App : Application
     /// 必须传入；null = 无密码。
     /// </param>
     /// <param name="ct">取消令牌（透传给引擎列条目）。</param>
-    private static async Task<string> ResolveSmartDestCliAsync(
+    private static async Task<(string TargetDir, string? StripRoot, string? AddRoot)> ResolveSmartDestCliAsync(
         string archivePath,
         IArchiveEngine engine,
         string? password = null,
         CancellationToken ct = default)
     {
         var items = await engine.ListEntriesAsync(archivePath, password, ct);
-        var hasSingleRoot = ArchiveStructureAnalyzer.HasSingleRootDirectory(items);
+        var parentDir = Path.GetDirectoryName(archivePath) ?? ".";
 
-        if (hasSingleRoot)
-        {
-            // Single root folder: extract to the archive's directory (压缩包所在目录), not the process working directory
-            Console.WriteLine("SmartExtract: single root detected, extracting to archive directory");
-            return Path.GetDirectoryName(archivePath) ?? ".";
-        }
+        // 读值是设置里的对外契约：两档之外的值一律回落「智能加根」
+        var mode = ArchiveRootPolicy.NormalizeSmartExtractMode(AppSettings.Load().SmartExtractRootMode);
+        var (stripRoot, addRoot) = ExtractRootPlan.Resolve(mode, items, archivePath);
 
-        // Dispersed files: extract to named subfolder
-        var targetDir = Path.Combine(
-            Path.GetDirectoryName(archivePath) ?? ".",
-            GetArchiveBaseName(archivePath));
-        Directory.CreateDirectory(targetDir);
-        Console.WriteLine($"SmartExtract: dispersed structure, extracting to {targetDir}");
-        return targetDir;
+        Console.WriteLine($"SmartExtract: mode={mode}, strip={stripRoot ?? "-"}, add={addRoot ?? "-"}, dest={parentDir}");
+        return (parentDir, stripRoot, addRoot);
     }
 
     /// <summary>
@@ -268,7 +271,8 @@ public partial class App : Application
     /// <param name="ct">取消令牌。</param>
     /// <exception cref="PasswordRetryCancelledException">用户在密码框点取消。</exception>
     /// <exception cref="InvalidDataException">压缩包损坏（继续弹密码无意义）。</exception>
-    internal static async Task<(string TargetDir, string? Password)> ResolveSmartDestWithPasswordAsync(
+    internal static async Task<(string TargetDir, string? Password, string? StripRoot, string? AddRoot)>
+        ResolveSmartDestWithPasswordAsync(
         string archivePath,
         IArchiveEngine engine,
         string? initialPassword,
@@ -276,12 +280,20 @@ public partial class App : Application
         CancellationToken ct = default)
     {
         var targetDir = string.Empty;
+        string? stripRoot = null;
+        string? addRoot = null;
         var (outcome, password) = await PasswordRetryLoop.RunAsync(
             archivePath, initialPassword, engine,
             owner: null,
             setStatus: msg => Console.Error.WriteLine(msg),
             attempt: async (pwd, token) =>
-                targetDir = await ResolveSmartDestCliAsync(archivePath, engine, pwd, token),
+            {
+                // 三元组一次取全：根策略与落点必须同源，拆两次列包会拿到不一致的结论
+                var resolved = await ResolveSmartDestCliAsync(archivePath, engine, pwd, token);
+                targetDir = resolved.TargetDir;
+                stripRoot = resolved.StripRoot;
+                addRoot = resolved.AddRoot;
+            },
             ct: ct,
             promptPassword: promptPassword);
 
@@ -291,7 +303,7 @@ public partial class App : Application
         if (outcome == PasswordRetryOutcome.CorruptedOrInvalid)
             throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
 
-        return (targetDir, password);
+        return (targetDir, password, stripRoot, addRoot);
     }
 
     /// <summary>
@@ -626,7 +638,9 @@ public partial class App : Application
         string? password,
         IArchiveEngine engine,
         string[] originalArgs,
-        IClassicDesktopStyleApplicationLifetime desktop)
+        IClassicDesktopStyleApplicationLifetime desktop,
+        string? stripRoot = null,
+        string? addRoot = null)
     {
         // 显式管理退出：进度窗口是 CLI 模式下唯一窗口，默认 OnLastWindowClose 会在用户
         // 点击 X 时立即退出进程，后台解压被强杀中断（对齐 WPF 的 OnExplicitShutdown 用法）
@@ -685,7 +699,9 @@ public partial class App : Application
 
                         return result;
                     },
-                    livePolicy: () => progressWindow.ConflictPolicy);
+                    livePolicy: () => progressWindow.ConflictPolicy,
+                    stripRoot: stripRoot,
+                    addRoot: addRoot);
 
                 // 列表模式播种 + 并行度元数据：CLI 单文件叶子同样直连引擎、绕过 ExtractFlow.ExtractAsync，
                 // 故在此补齐两处接线（与 RunCliDirectExtractBatchAsync 多文件叶子同源）。
@@ -838,21 +854,6 @@ public partial class App : Application
         bool cancelled = false;
         var succeededArchives = new List<string>();   // D19: 关窗后按开关最终值统一删包
 
-        var conflictOptions = SelectedItemsExtractService.CreateExtractOptions(
-            settings.FileConflictAction,
-            async info =>
-            {
-                var result = await ExtractFlow.ShowConflictDialogAsync(progressWindow, info);
-                if (result.ApplyToAll
-                    && SelectedItemsExtractService.ToConflictActionCode(result.Action) is { } policyCode)
-                {
-                    progressWindow.SyncConflictPolicyFromDialog(policyCode);
-                }
-
-                return result;
-            },
-            livePolicy: () => progressWindow.ConflictPolicy);
-
         _ = Task.Run(async () =>
         {
             try
@@ -878,12 +879,15 @@ public partial class App : Application
                         // 下面的 smart 结构分析连条目都列不出来（会静默失败，弹不出密码框）
                         var password = ResolveCliPassword(archivePath, engine);
 
-                        // 每文件独立计算目标目录（与单文件 CLI 流程/WPF 语义一致）
+                        // 每文件独立计算目标目录 + 根策略（与单文件 CLI 流程同源）
                         string targetDir;
+                        string? stripRoot = null;
+                        string? addRoot = null;
                         if (mode == "smart")
                         {
                             // 结构分析遇密码类异常 → 弹密码框取密码后重试（owner 解析为当前进度窗）
-                            (targetDir, password) = await ResolveSmartDestWithPasswordAsync(archivePath, engine, password);
+                            (targetDir, password, stripRoot, addRoot) =
+                                await ResolveSmartDestWithPasswordAsync(archivePath, engine, password);
                         }
                         else if (mode == "toname")
                         {
@@ -896,6 +900,25 @@ public partial class App : Application
                         {
                             targetDir = Path.GetDirectoryName(archivePath) ?? ".";
                         }
+
+                        // 根策略按**包**算，故冲突 options 必须逐包重建：建在循环外会让
+                        // 上一包的剥根/加根串到下一包（多选混解时落点错乱）。
+                        var conflictOptions = SelectedItemsExtractService.CreateExtractOptions(
+                            settings.FileConflictAction,
+                            async info =>
+                            {
+                                var result = await ExtractFlow.ShowConflictDialogAsync(progressWindow, info);
+                                if (result.ApplyToAll
+                                    && SelectedItemsExtractService.ToConflictActionCode(result.Action) is { } policyCode)
+                                {
+                                    progressWindow.SyncConflictPolicyFromDialog(policyCode);
+                                }
+
+                                return result;
+                            },
+                            livePolicy: () => progressWindow.ConflictPolicy,
+                            stripRoot: stripRoot,
+                            addRoot: addRoot);
 
                         // 路径 B（决策 D1）：解析前先亮 🔄 匹配中（密码库逐条尝试可能耗时）；
                         // 解析完成后再落终态——命中 → 🔑●●●●，无密码包 → 熄灭

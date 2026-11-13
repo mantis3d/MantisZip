@@ -299,4 +299,38 @@ public class ArchiveRootPolicyTests
         Assert.Equal("a_b", ArchiveRootPolicy.GetWrapName("a/b"));
         Assert.Equal("a_b_c", ArchiveRootPolicy.GetWrapName(@"a\b:c"));
     }
+
+    // ===== NormalizeSmartExtractMode（智能解压两档）=====
+
+    [Theory]
+    [InlineData(RootDirectoryMode.SmartWrap, RootDirectoryMode.SmartWrap)]
+    [InlineData(RootDirectoryMode.SmartStrip, RootDirectoryMode.SmartStrip)]
+    // 两档之外的任何值都回落默认档：Original / AlwaysWrap / 越界数字
+    [InlineData(RootDirectoryMode.Original, RootDirectoryMode.SmartWrap)]
+    [InlineData(RootDirectoryMode.AlwaysWrap, RootDirectoryMode.SmartWrap)]
+    [InlineData((RootDirectoryMode)99, RootDirectoryMode.SmartWrap)]
+    [InlineData((RootDirectoryMode)(-1), RootDirectoryMode.SmartWrap)]
+    public void NormalizeSmartExtractMode_OnlyKeepsSmartStrip(RootDirectoryMode input, RootDirectoryMode expected)
+        => Assert.Equal(expected, ArchiveRootPolicy.NormalizeSmartExtractMode(input));
+
+    /// <summary>
+    /// 两档 × 三种包型 → 真正的指令。这是智能解压落点的唯一事实源，
+    /// 测试它而不是在测试里把 dest 公式抄一遍（旧用例就是那么写的，等于测自己的算术）。
+    /// </summary>
+    [Theory]
+    // 智能加根：单根不动（复用包自带根）、散装/多根补一层
+    [InlineData(RootDirectoryMode.SmartWrap, true, false, false)]
+    [InlineData(RootDirectoryMode.SmartWrap, false, false, true)]
+    // 智能去根：单根剥、散装/多根不动（= 原地平铺）
+    [InlineData(RootDirectoryMode.SmartStrip, true, true, false)]
+    [InlineData(RootDirectoryMode.SmartStrip, false, false, false)]
+    public void SmartExtract_TwoModes_ProduceExpectedAdjustment(
+        RootDirectoryMode mode, bool hasSingleRoot, bool expectStrip, bool expectWrap)
+    {
+        var normalized = ArchiveRootPolicy.NormalizeSmartExtractMode(mode);
+        var adjustment = ArchiveRootPolicy.Resolve(normalized, hasSingleRoot);
+
+        Assert.Equal(expectStrip, adjustment.Strip);
+        Assert.Equal(expectWrap, adjustment.Wrap);
+    }
 }
