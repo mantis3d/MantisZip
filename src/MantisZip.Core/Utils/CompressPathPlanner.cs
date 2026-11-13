@@ -30,6 +30,99 @@ public static class CompressPathPlanner
             ? ".tar.gz"
             : "." + format;
 
+    /// <summary>单包模式输出「落点」的种类。</summary>
+    public enum OutputRootKind
+    {
+        /// <summary>没有任何源。</summary>
+        NoSources,
+        /// <summary>源存在公共父目录（且不是盘符根）。</summary>
+        CommonParent,
+        /// <summary>无公共子目录但所有源同盘 —— 落到盘符根（<c>C:\</c>）。</summary>
+        DriveRoot,
+        /// <summary>跨盘符 —— 无法确定落点，Combined 需回退手动模式。</summary>
+        CrossDrive,
+        /// <summary>取不到（单源无目录、路径为空等）。</summary>
+        Unresolved,
+    }
+
+    /// <summary>落点解析结果：种类 + 目录（<see cref="OutputRootKind.NoSources"/> 等无目录时为 null）。</summary>
+    public readonly record struct OutputRootResolution(OutputRootKind Kind, string? Root);
+
+    /// <summary>
+    /// 解析单包模式（Manual 自动填充 / Combined）的输出落点。
+    /// Manual 与 Combined 只有这一份实现，避免「对话框自动填充」与「合并模式」各算一套。
+    /// </summary>
+    /// <param name="allowDriveRootFallback">同盘但无公共子目录时是否落到盘符根。
+    /// Manual 为 true、Combined 为 true（跨盘由调用方回退手动模式）。</param>
+    public static OutputRootResolution ResolveOutputRoot(
+        IReadOnlyList<string> sourcePaths, bool allowDriveRootFallback = true)
+    {
+        if (sourcePaths.Count == 0) return new(OutputRootKind.NoSources, null);
+
+        var common = PathCommonality.FindCommonParent(sourcePaths);
+        if (common != null && !PathCommonality.IsDriveRoot(common))
+            return new(OutputRootKind.CommonParent, common);
+
+        if (!AllPathsSameDrive(sourcePaths))
+            return new(OutputRootKind.CrossDrive, null);
+
+        if (!allowDriveRootFallback) return new(OutputRootKind.Unresolved, null);
+
+        var root = Path.GetPathRoot(sourcePaths[0]);
+        return string.IsNullOrEmpty(root)
+            ? new(OutputRootKind.Unresolved, null)
+            : new(OutputRootKind.DriveRoot, root);
+    }
+
+    /// <summary>判断所有源路径是否在同一个盘符下。</summary>
+    public static bool AllPathsSameDrive(IReadOnlyList<string> sourcePaths)
+    {
+        string? drive = null;
+        foreach (var p in sourcePaths)
+        {
+            var d = Path.GetPathRoot(p);
+            if (string.IsNullOrEmpty(d)) return false;
+            if (drive == null)
+                drive = d;
+            else if (!string.Equals(drive, d, StringComparison.OrdinalIgnoreCase))
+                return false;
+        }
+        return drive != null;
+    }
+
+    /// <summary>
+    /// 单包模式的压缩包主名（不含扩展名）：模板启用且渲染成功 ⇒ 模板结果；
+    /// 否则回退「落点目录名」（盘符根回退盘符字母，如 <c>C:\</c> ⇒ <c>C</c>）。
+    /// </summary>
+    public static string ResolveSingleBaseName(
+        IReadOnlyList<string> sourcePaths, string format, string root,
+        string? template = null, DateTime? timestamp = null)
+    {
+        var rendered = ComputeSingleArchiveName(sourcePaths, format, template, timestamp);
+        if (rendered is not null)
+        {
+            var ext = GetFormatExtension(format);
+            return rendered.EndsWith(ext, StringComparison.OrdinalIgnoreCase)
+                ? rendered[..^ext.Length]
+                : rendered;
+        }
+
+        var trimmedRoot = root.TrimEnd('\\', '/');
+        return PathCommonality.IsDriveRoot(trimmedRoot)
+            ? trimmedRoot.TrimEnd(':')
+            : ArchivePath.GetFileName(trimmedRoot);
+    }
+
+    /// <summary>
+    /// Manual 模式：目录 + 主名 + 格式扩展名。任一输入为空 ⇒ null（调用方视为路径无效）。
+    /// </summary>
+    public static string? ComputeManualOutputPath(string? outputDirectory, string? outputFileName, string format)
+    {
+        if (string.IsNullOrWhiteSpace(outputDirectory)) return null;
+        if (string.IsNullOrWhiteSpace(outputFileName)) return null;
+        return Path.Combine(outputDirectory, outputFileName + GetFormatExtension(format));
+    }
+
     /// <summary>
     /// 计算压缩包文件名（不含路径）。
     /// </summary>

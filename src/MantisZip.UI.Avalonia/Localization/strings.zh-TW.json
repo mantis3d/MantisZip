@@ -528,7 +528,6 @@
   "Compress_Pwd_Selected": "已選擇: {0}",
   "Compress_Pwd_UpdateRules": "更新符合規則",
   "Compress_Remove": "移除",
-  "Compress_SeparateSummary": "自動：每個檔案分別壓縮到各自目錄，共 {0} 個壓縮檔",
   "Compress_ShowPassword": "顯示",
   "Compress_SourceFiles": "來源檔案",
   "Compress_Start": "開始壓縮",

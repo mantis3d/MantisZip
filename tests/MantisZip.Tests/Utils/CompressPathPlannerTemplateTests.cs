@@ -232,6 +232,108 @@ public class CompressPathPlannerTemplateTests
             new[] { @"C:\x.txt", @"C:\y.txt" }));
 
     // ════════════════════════════════════════════════════════════════
+    //  落点解析 / 手动路径合成（CompressSettingsViewModel 唯一入口的下沉实现）
+    // ════════════════════════════════════════════════════════════════
+
+    [Fact]
+    public void ResolveOutputRoot_EmptySources_ReturnsNoSources()
+    {
+        var result = CompressPathPlanner.ResolveOutputRoot(Array.Empty<string>());
+        Assert.Equal(CompressPathPlanner.OutputRootKind.NoSources, result.Kind);
+        Assert.Null(result.Root);
+    }
+
+    [Fact]
+    public void ResolveOutputRoot_SameDirectory_ReturnsCommonParent()
+    {
+        var result = CompressPathPlanner.ResolveOutputRoot(new[] { @"D:\a\x.txt", @"D:\a\y.txt" });
+        Assert.Equal(CompressPathPlanner.OutputRootKind.CommonParent, result.Kind);
+        Assert.Equal(@"D:\a", result.Root);
+    }
+
+    [Fact]
+    public void ResolveOutputRoot_SiblingsUnderSharedParent_ReturnsThatParent()
+    {
+        var result = CompressPathPlanner.ResolveOutputRoot(
+            new[] { @"D:\a\sub\x.txt", @"D:\a\other\y.txt" });
+        Assert.Equal(CompressPathPlanner.OutputRootKind.CommonParent, result.Kind);
+        Assert.Equal(@"D:\a", result.Root);
+    }
+
+    [Fact]
+    public void ResolveOutputRoot_NoCommonSubdirectoryButSameDrive_ReturnsDriveRoot()
+    {
+        var result = CompressPathPlanner.ResolveOutputRoot(new[] { @"D:\x.txt", @"D:\y.txt" });
+        Assert.Equal(CompressPathPlanner.OutputRootKind.DriveRoot, result.Kind);
+        Assert.Equal(@"D:\", result.Root);
+    }
+
+    [Fact]
+    public void ResolveOutputRoot_DirectoryNamesThatPrefixEachOther_ReturnsDriveRoot()
+    {
+        // D:\a 与 D:\ab 两个目录名互为前缀：公共父目录是 D:\，不是 D:\a
+        var result = CompressPathPlanner.ResolveOutputRoot(new[] { @"D:\a\b\x.txt", @"D:\ab\y.txt" });
+        Assert.Equal(CompressPathPlanner.OutputRootKind.DriveRoot, result.Kind);
+        Assert.Equal(@"D:\", result.Root);
+    }
+
+    [Fact]
+    public void ResolveOutputRoot_CrossDrive_ReturnsCrossDrive()
+    {
+        var result = CompressPathPlanner.ResolveOutputRoot(new[] { @"C:\one\x.txt", @"D:\two\y.txt" });
+        Assert.Equal(CompressPathPlanner.OutputRootKind.CrossDrive, result.Kind);
+        Assert.Null(result.Root);
+    }
+
+    [Fact]
+    public void ResolveOutputRoot_DriveRootFallbackDisabled_ReturnsUnresolved()
+    {
+        var result = CompressPathPlanner.ResolveOutputRoot(
+            new[] { @"D:\x.txt", @"D:\y.txt" }, allowDriveRootFallback: false);
+        Assert.Equal(CompressPathPlanner.OutputRootKind.Unresolved, result.Kind);
+        Assert.Null(result.Root);
+    }
+
+    [Theory]
+    [InlineData(@"D:\a", "x", "zip", @"D:\a\x.zip")]
+    [InlineData(@"D:\a", "x", "7z", @"D:\a\x.7z")]
+    [InlineData(@"D:\a", "x", "tar.gz", @"D:\a\x.tar.gz")]
+    public void ComputeManualOutputPath_CombinesDirectoryNameAndFormatExtension(
+        string dir, string name, string format, string expected)
+        => Assert.Equal(expected, CompressPathPlanner.ComputeManualOutputPath(dir, name, format));
+
+    [Theory]
+    [InlineData(null, "x")]
+    [InlineData("", "x")]
+    [InlineData("   ", "x")]
+    [InlineData(@"D:\a", null)]
+    [InlineData(@"D:\a", "")]
+    [InlineData(@"D:\a", "   ")]
+    public void ComputeManualOutputPath_AnyInputBlank_ReturnsNull(string? dir, string? name)
+        => Assert.Null(CompressPathPlanner.ComputeManualOutputPath(dir, name, "zip"));
+
+    [Fact]
+    public void ResolveSingleBaseName_NoTemplate_UsesRootDirectoryName()
+        => Assert.Equal("a", CompressPathPlanner.ResolveSingleBaseName(
+            new[] { @"D:\a\x.txt", @"D:\a\y.txt" }, "zip", @"D:\a"));
+
+    [Fact]
+    public void ResolveSingleBaseName_NoTemplate_DriveRootUsesDriveLetter()
+        => Assert.Equal("D", CompressPathPlanner.ResolveSingleBaseName(
+            new[] { @"D:\x.txt", @"D:\y.txt" }, "zip", @"D:\"));
+
+    [Fact]
+    public void ResolveSingleBaseName_Template_TakesPrecedenceOverRootName()
+        => Assert.Equal("x_2026-11-06", CompressPathPlanner.ResolveSingleBaseName(
+            new[] { @"D:\a\x.txt", @"D:\a\y.txt" }, "zip", @"D:\a",
+            template: "{name}_{date}", timestamp: Stamp));
+
+    [Fact]
+    public void ResolveSingleBaseName_InvalidTemplate_FallsBackToRootName()
+        => Assert.Equal("a", CompressPathPlanner.ResolveSingleBaseName(
+            new[] { @"D:\a\x.txt", @"D:\a\y.txt" }, "zip", @"D:\a", template: "{foo}"));
+
+    // ════════════════════════════════════════════════════════════════
     //  格式扩展名
     // ════════════════════════════════════════════════════════════════
 

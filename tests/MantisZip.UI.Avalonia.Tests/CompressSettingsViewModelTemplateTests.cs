@@ -300,4 +300,137 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         Assert.NotNull(vm.TemplateError);
         Assert.Equal(AppSettings.MaxFileNameTemplatePresets, vm.TemplatePresetOptions.Count);
     }
+
+    /// <summary>
+    /// 缺陷 G 的回归网：模板启用后改输出目录，<see cref="CompressSettingsViewModel.OutputPath"/>
+    /// 必须跟着换目录（旧实现只重渲染文件名、不重算路径，预览树与实际产物都停在旧目录）。
+    /// </summary>
+    [Fact]
+    public void TemplateActive_ChangingOutputDirectory_UpdatesOutputPathAndKeepsTemplateName()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dirA = Path.Combine(_root, "dirA");
+        var dirB = Path.Combine(_root, "dirB");
+        Directory.CreateDirectory(dirA);
+        Directory.CreateDirectory(dirB);
+        var source = Path.Combine(dirA, "report.txt");
+        File.WriteAllText(source, "x");
+
+        var vm = new CompressSettingsViewModel(new[] { source });
+        vm.FileNameTemplate = "{name}_bak";
+
+        Assert.Equal("report_bak", vm.OutputFileName);
+        Assert.Equal(Path.Combine(dirA, "report_bak.zip"), vm.OutputPath);
+
+        vm.OutputDirectory = dirB;
+
+        // 目录变了 → 路径必须跟着变（名字仍由模板决定）
+        Assert.Equal("report_bak", vm.OutputFileName);
+        Assert.Equal(Path.Combine(dirB, "report_bak.zip"), vm.OutputPath);
+    }
+
+    /// <summary>
+    /// 缺陷 G 的第二种表现：未启用模板时改目录，路径也要跟随（旧实现靠 ComposeManualOutputPath
+    /// 写 OutputPath，重构后由同一入口算出，这里钉住不许回退）。
+    /// </summary>
+    [Fact]
+    public void ManualMode_ChangingOutputDirectory_UpdatesOutputPath()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dirA = Path.Combine(_root, "dirA");
+        var dirB = Path.Combine(_root, "dirB");
+        Directory.CreateDirectory(dirA);
+        Directory.CreateDirectory(dirB);
+        File.WriteAllText(Path.Combine(dirA, "report.txt"), "x");
+
+        var vm = new CompressSettingsViewModel(new[] { Path.Combine(dirA, "report.txt") });
+        vm.OutputFileName = "mine";
+        Assert.Equal(Path.Combine(dirA, "mine.zip"), vm.OutputPath);
+
+        vm.OutputDirectory = dirB;
+        Assert.Equal(Path.Combine(dirB, "mine.zip"), vm.OutputPath);
+    }
+
+    /// <summary>
+    /// 分别压缩的重名校验按**完整路径**判重，不是按文件名：
+    /// A/report.txt 与 B/report.txt 各自落在自己的目录，两个 report.zip 并存是合法的。
+    /// </summary>
+    [Fact]
+    public void SeparateMode_TemplateRenderSameNameInDifferentDirectories_IsNotDuplicate()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dirA = Path.Combine(_root, "dirA");
+        var dirB = Path.Combine(_root, "dirB");
+        Directory.CreateDirectory(dirA);
+        Directory.CreateDirectory(dirB);
+        File.WriteAllText(Path.Combine(dirA, "report.txt"), "x");
+        File.WriteAllText(Path.Combine(dirB, "report.txt"), "y");
+
+        var vm = new CompressSettingsViewModel(new[]
+        {
+            Path.Combine(dirA, "report.txt"),
+            Path.Combine(dirB, "report.txt"),
+        });
+        vm.OutputMode = CompressOutputMode.Separate;
+        vm.FileNameTemplate = "{name}";
+
+        Assert.Null(vm.TemplateError);
+    }
+
+    /// <summary>
+    /// 分别压缩且两个源在**同一目录**、模板又不带区分度 ⇒ 仍必须拦下（不能静默覆盖）。
+    /// </summary>
+    [Fact]
+    public void SeparateMode_TemplateSameNameInSameDirectory_IsStillDuplicate()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt"), MakeFile("b.txt") });
+        vm.OutputMode = CompressOutputMode.Separate;
+        vm.FileNameTemplate = "{parent}";
+
+        Assert.NotNull(vm.TemplateError);
+    }
+
+    /// <summary>
+    /// 合并模式下模板渲染的主名必须进输出路径（旧实现里 Combined 沿用了 Manual 早前填的路径，
+    /// 模板名显示在文件名框里却进不了实际产物名）。
+    /// </summary>
+    [Fact]
+    public void CombinedMode_TemplateName_IsUsedInOutputPath()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dir = Path.Combine(_root, "proj");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "a.txt"), "x");
+        File.WriteAllText(Path.Combine(dir, "b.txt"), "y");
+
+        var vm = new CompressSettingsViewModel(new[]
+        {
+            Path.Combine(dir, "a.txt"),
+            Path.Combine(dir, "b.txt"),
+        });
+        vm.OutputMode = CompressOutputMode.Combined;
+        vm.FileNameTemplate = "{name:auto}_bak";
+
+        var folderName = Path.GetFileName(dir);
+        Assert.Equal(folderName + "_bak", vm.OutputFileName);
+        Assert.Equal(Path.Combine(dir, folderName + "_bak.zip"), vm.OutputPath);
+    }
+
+    /// <summary>分别压缩没有单一路径：<see cref="CompressSettingsViewModel.OutputPath"/> 为 null（不再塞提示串）。</summary>
+    [Fact]
+    public void SeparateMode_OutputPath_IsNull()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
+        vm.OutputMode = CompressOutputMode.Separate;
+
+        Assert.Null(vm.OutputPath);
+    }
 }

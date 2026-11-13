@@ -528,7 +528,6 @@
   "Compress_Pwd_Selected": "已选择: {0}",
   "Compress_Pwd_UpdateRules": "更新匹配规则",
   "Compress_Remove": "移除",
-  "Compress_SeparateSummary": "自动：每个文件分别压缩到各自目录，共 {0} 个压缩包",
   "Compress_ShowPassword": "显示",
   "Compress_SourceFiles": "源文件",
   "Compress_Start": "开始压缩",

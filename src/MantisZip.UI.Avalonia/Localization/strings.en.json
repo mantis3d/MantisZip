@@ -528,7 +528,6 @@
   "Compress_Pwd_Selected": "Selected: {0}",
   "Compress_Pwd_UpdateRules": "Update matching rules",
   "Compress_Remove": "Remove",
-  "Compress_SeparateSummary": "Auto: each file compressed separately to its folder, {0} archives",
   "Compress_ShowPassword": "Show",
   "Compress_SourceFiles": "Source Files",
   "Compress_Start": "Compress",

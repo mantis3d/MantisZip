@@ -59,17 +59,8 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     // ── Output mode ──
 
-    /// <summary>Manual 模式下的输出路径缓存，切换模式不丢失。</summary>
-    private string? _cachedManualPath;
-
     [ObservableProperty]
     private CompressOutputMode _outputMode = CompressOutputMode.Manual;
-
-    /// <summary>输出路径在非 Manual 模式下只读。</summary>
-    public bool IsOutputPathReadOnly => OutputMode != CompressOutputMode.Manual;
-
-    /// <summary>浏览按钮仅在 Manual 模式下显示。</summary>
-    public bool IsBrowseButtonVisible => OutputMode == CompressOutputMode.Manual;
 
     /// <summary>文件名 / 扩展名区域仅在 Manual/Combined 模式下可见。</summary>
     public bool IsFileNameSectionVisible => OutputMode != CompressOutputMode.Separate;
@@ -87,14 +78,6 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>输出文件扩展名标签（跟随格式）。</summary>
     public string OutputExtensionLabel => GetFormatExtension();
-
-    /// <summary>输出路径标签文字随模式变化。</summary>
-    public string OutputPathLabel => OutputMode switch
-    {
-        CompressOutputMode.Separate => LocalizationManager.T("Compress_OutputMode_Separate"),
-        CompressOutputMode.Combined => LocalizationManager.T("Compress_OutputMode_Combined"),
-        _ => LocalizationManager.T("Compress_OutputPath"),
-    };
 
     /// <summary>RadioButton 绑定：Manual 模式。</summary>
     public bool IsManualMode
@@ -146,19 +129,39 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private CompressionOptionData.ComboOption? _selectedLevelOption;
 
-    [ObservableProperty]
     private string? _outputPath;
+
+    /// <summary>
+    /// 最终输出路径 —— **派生值，只读**。唯一写入点是 <see cref="RecomputeOutputPath"/>：
+    /// 它由输入面（<see cref="OutputMode"/> / <see cref="OutputDirectory"/> / <see cref="OutputFileName"/> /
+    /// <see cref="FileNameTemplate"/> / <see cref="DefaultFormat"/> / <see cref="SelectedPaths"/>）纯函数算出。
+    /// 预览树、执行载荷、路径合法性判定都只读这一个字段，所以「界面显示」「预览」「实际压缩」不可能再分叉
+    /// （2026-11-13 缺陷：模板启用时改输出目录，选择器已是新目录、OutputPath 却还是旧目录，
+    /// 预览树与真实产物一起停在旧目录）。
+    /// </summary>
+    public string? OutputPath
+    {
+        get => _outputPath;
+        private set
+        {
+            if (!SetProperty(ref _outputPath, value)) return;
+
+            StartCompressCommand.NotifyCanExecuteChanged();
+            if (AutoGenerateRules)
+                RefreshAutoRules();
+        }
+    }
 
     /// <summary>输出路径的目录部分（内嵌 QuickPathControl 选择）。仅 Manual 模式使用。</summary>
     [ObservableProperty]
     private string? _outputDirectory;
 
-    /// <summary>输出文件名（不含扩展名，扩展名由格式决定）。仅 Manual 模式使用。</summary>
+    /// <summary>输出文件名（不含扩展名，扩展名由格式决定）。Manual 下可编辑，Combined/模板启用时只读展示。</summary>
     [ObservableProperty]
     private string? _outputFileName;
 
-    /// <summary>防重入标记：OutputPath ↔ (OutputDirectory+OutputFileName) 双向同步。</summary>
-    private bool _isSyncingOutputPath;
+    /// <summary>防重入标记：<see cref="RecomputeOutputPath"/> 在途（各输入面 setter 会回调进来）。</summary>
+    private bool _isRecomputingOutputPath;
 
     // ── 文件名模板 ──
     // 模板启用时命名由模板渲染决定：Manual/Combined 下渲染「第一个源 + 公共父目录名」，
@@ -595,18 +598,11 @@ public partial class CompressSettingsViewModel : ObservableObject
         {
             OnPropertyChanged(nameof(SelectedPathsSummary));
             UpdateAutoRules();
-            BuildCompressPreview();
-            if (OutputMode != CompressOutputMode.Manual)
-                RefreshOutputPathState();
-            else
-                TryAutoFillOutputPath();
-            // 源列表变了 {name}/{name:auto} 的取值也会变（1 源 = 源名、≥2 源 = 父目录名），
-            // 而 TryAutoFillOutputPath 在路径已存在时会早退 —— 必须在这里无条件重渲染一次。
+            // 源列表是输出路径的输入面：{name}/{name:auto} 的取值随源数量变化，
+            // 一并重算路径（内部按需重渲染模板 + 重建预览树）。
+            RecomputeOutputPath();
             if (IsTemplateActive)
-            {
                 TemplateError = ValidateTemplateNow();
-                RefreshTemplatedOutputFileName();
-            }
             UpdateCanCompress();
         };
 
@@ -789,15 +785,12 @@ public partial class CompressSettingsViewModel : ObservableObject
         // handler won't fire for items added before it was attached).
         UpdateAutoRules();
 
-        // 自动填充输出路径：CollectionChanged 不会为构造时已添加的路径触发，
-        // 需显式调用（对齐 WPF ShowCompressWindow 自动填充输出路径；CLI --compress 依赖此逻辑）
-        TryAutoFillOutputPath();
-
-        // Build initial compress preview from source paths。
-        // 必须在 TryAutoFillOutputPath 之后调用（旧顺序：BuildCompressPreview 在 TryAutoFillOutputPath
-        // 之前，构造时 OutputPath 为空导致 IsOutputPathValid 早退、Plan=null，且路径填充后不再触发重建，
-        // 产生「窗口打开但 B 数据集未就绪、按钮却可点」的竞态 → 点击压缩静默退出）。
-        BuildCompressPreview();
+        // 初始化输出路径：CollectionChanged 不会为构造时已添加的路径触发，需显式算一次
+        // （Manual 自动填充 / Combined 推导落点 / 模板渲染都在这一个入口里）。
+        // 顺序很关键：它内部会重建预览树，必须在这里先跑完，否则窗口打开时
+        // 路径还是空、IsOutputPathValid 早退、Plan=null，留下「按钮可点但数据集未就绪」的竞态
+        //（点击压缩静默退出）。
+        RecomputeOutputPath();
     }
 
     /// <summary>
@@ -1179,57 +1172,156 @@ public partial class CompressSettingsViewModel : ObservableObject
     partial void OnOutputModeChanged(CompressOutputMode value)
     {
         // Notify all dependent properties (including RadioButton bindings)
-        OnPropertyChanged(nameof(IsOutputPathReadOnly));
-        OnPropertyChanged(nameof(IsBrowseButtonVisible));
         OnPropertyChanged(nameof(IsFileNameSectionVisible));
         OnPropertyChanged(nameof(IsFileNameRowVisible));
         OnPropertyChanged(nameof(IsQuickPathVisible));
         OnPropertyChanged(nameof(OutputPickerRowHeight));
-        OnPropertyChanged(nameof(OutputPathLabel));
         OnPropertyChanged(nameof(IsManualMode));
         OnPropertyChanged(nameof(IsSeparateMode));
         OnPropertyChanged(nameof(IsCombinedMode));
         OnPropertyChanged(nameof(IsOutputFileNameReadOnly));
-        RefreshOutputPathState();
+        // 模式是输出路径的输入面之一：统一重算（内部会重建预览树 + 刷新规则）
+        RecomputeOutputPath();
         TemplateError = ValidateTemplateNow();
         UpdateCanCompress();
-        if (AutoGenerateRules)
-            RefreshAutoRules();
-        // 切换输出方式时刷新预览树（不同模式树结构不同）
-        BuildCompressPreview();
     }
 
-    partial void OnOutputPathChanged(string? value)
-    {
-        StartCompressCommand.NotifyCanExecuteChanged();
-        if (AutoGenerateRules)
-            RefreshAutoRules();
-        BuildCompressPreview();
+    /// <summary>QuickPathControl 选择目录 → 重算输出路径。</summary>
+    partial void OnOutputDirectoryChanged(string? value) => RecomputeOutputPath();
 
-        // 外部设置完整路径（如自动填充/Combined 合成）时，拆分为目录 + 文件名供 UI 展示
-        if (!_isSyncingOutputPath && OutputMode == CompressOutputMode.Manual)
+    /// <summary>文件名输入 → 重算输出路径。</summary>
+    partial void OnOutputFileNameChanged(string? value) => RecomputeOutputPath();
+
+    // ── 输出路径：唯一写入点 ──
+
+    /// <summary>
+    /// 重算并写入 <see cref="OutputPath"/>（**唯一**入口）。所有输出相关输入面
+    /// （模式 / 目录 / 文件名 / 模板 / 格式 / 源列表）变化后都调它，预览树与执行载荷随之同步。
+    /// </summary>
+    /// <remarks>
+    /// 算法只有一份、全部在 <see cref="CompressPathPlanner"/>：
+    /// Manual = 目录 + 文件名 + 扩展名（<c>ComputeManualOutputPath</c>）；
+    /// Combined = 落点（<c>ResolveOutputRoot</c>）+ 主名（<c>ResolveSingleBaseName</c>，模板优先）；
+    /// Separate = 空（每个源各自成包，由 <c>PlanSeparate</c> 决定）。
+    /// 值真的变了才赋值，所以 <see cref="OutputPath"/> 的 setter 里重建预览不会自激。
+    /// 跨盘的 Combined 无法推导落点：回退 Manual 并提示，由用户自己选目录（保持历史行为）。
+    /// </remarks>
+    private void RecomputeOutputPath()
+    {
+        // 重入守卫既挡住「给输入面填默认值 → 触发 setter → 又回到这里」的递归，
+        // 也顺带把一次调用链压缩成「只重建一次预览树」。
+        if (_isRecomputingOutputPath) return;
+        _isRecomputingOutputPath = true;
+        try
         {
-            SplitOutputPath(value);
+            var next = ComputeOutputPathForCurrentInputs();
+            // 值没变也要重建预览：路径相同不代表预览树没变
+            // （例如 Manual 下目录/文件名都不动、只是新增了一个源，树里要出现新的子树）。
+            OutputPath = next;
+            UpdateCanCompress();
+            BuildCompressPreview();
+        }
+        finally
+        {
+            _isRecomputingOutputPath = false;
         }
     }
 
-    /// <summary>QuickPathControl 选择目录 → 合成完整输出路径。</summary>
-    partial void OnOutputDirectoryChanged(string? value)
+    /// <summary>按当前输入面算出应有的输出路径（纯函数，不写任何字段）。</summary>
+    private string? ComputeOutputPathForCurrentInputs()
     {
-        ComposeManualOutputPath();
+        // 模板启用时先渲染主名：它是 Manual/Combined 共用的文件名来源，
+        // 也是「改输出目录 → 路径跟着走」的关键（旧实现只改 OutputFileName、漏了重算 OutputPath）。
+        if (IsTemplateActive)
+            SyncTemplatedOutputFileName();
+
+        var paths = SelectedPaths.ToList();
+        var format = DefaultFormat;
+
+        // 没有源就没有输出路径：留下旧值会让「选中的是空列表、路径框里却还写着上一次的文件」。
+        if (paths.Count == 0) return null;
+
+        // 每个源各自成包，没有单一路径；执行侧走 PlanSeparate。
+        if (OutputMode == CompressOutputMode.Separate) return null;
+
+        if (OutputMode == CompressOutputMode.Combined)
+        {
+            var root = CompressPathPlanner.ResolveOutputRoot(paths);
+            if (root.Kind == CompressPathPlanner.OutputRootKind.CrossDrive)
+            {
+                // 跨盘符无法推导落点：回退 Manual（历史行为），路径交用户手选。
+                // 这次赋值会触发 OnOutputModeChanged → RecomputeOutputPath，但被重入守卫挡回来，
+                // 所以必须在这里自己接着按 Manual 规则算一遍，否则 OutputPath 会停在旧值。
+                OutputMode = CompressOutputMode.Manual;
+                _ = AppMessageBox.Show(
+                    LocalizationManager.T("Compress_CombinedUnavailable"),
+                    LocalizationManager.T("Compress_Title"),
+                    MessageBoxButton.OK,
+                    MessageBoxImage.Warning);
+            }
+            else
+            {
+                if (root.Root is null) return null;
+
+                var baseName = CompressPathPlanner.ResolveSingleBaseName(
+                    paths, format, root.Root, FileNameTemplate, _templateTimestamp);
+                return CompressPathPlanner.ComputeManualOutputPath(root.Root, baseName, format);
+            }
+        }
+
+        // Manual（含 Combined 跨盘回退过来的 Manual）：
+        // 首次进入（或此前没算过）时给两个输入面填默认值 —— 目录 = 源的落点，
+        // 文件名 = 落点目录名（模板启用时是模板渲染结果）。只填「空」的那一项，
+        // 用户改过的值一律不动（旧实现里「改目录但文件名不变」就是这个语义）。
+        SeedManualOutputInputs(paths, format);
+        return CompressPathPlanner.ComputeManualOutputPath(OutputDirectory, OutputFileName, format);
     }
 
-    /// <summary>文件名输入 → 合成完整输出路径。</summary>
-    partial void OnOutputFileNameChanged(string? value)
+    /// <summary>
+    /// Manual 模式下给「空白」的输入面填默认值（对齐旧 <c>TryAutoFillOutputPath</c> 的可观测行为）：
+    /// 目录 = 源的落点（公共父目录，或同盘时盘符根），文件名 = 落点目录名（模板启用时已被模板渲染填好）。
+    /// <para>
+    /// 只填空的那一项 —— 用户改过的值一律保留。旧实现里「改了目录但文件名不变」正是这个语义
+    /// （InputFileName 非空 ⇒ 不再重填），这里保持一致。
+    /// </para>
+    /// </summary>
+    private void SeedManualOutputInputs(IReadOnlyList<string> paths, string format)
     {
-        ComposeManualOutputPath();
+        if (paths.Count == 0) return;
+
+        var root = CompressPathPlanner.ResolveOutputRoot(paths);
+        // 跨盘符 / 取不到落点：保持空白，让用户自己选目录（与旧行为一致）。
+        if (root.Root is null) return;
+
+        if (string.IsNullOrWhiteSpace(OutputDirectory))
+            OutputDirectory = root.Root;
+
+        if (string.IsNullOrWhiteSpace(OutputFileName))
+        {
+            var baseName = CompressPathPlanner.ResolveSingleBaseName(
+                paths, format, root.Root, FileNameTemplate, _templateTimestamp);
+            if (!string.IsNullOrWhiteSpace(baseName))
+                OutputFileName = baseName;
+        }
     }
 
-    /// <summary>格式切换 → 重新合成（扩展名变化）。</summary>
-    private void OnOutputFileNameOrFormatChanged()
+    /// <summary>
+    /// 模板启用时把渲染结果写进「输出文件名」框（只读展示）。
+    /// 只改文件名这一输入面，不改路径 —— 路径由 <see cref="RecomputeOutputPath"/> 统一合成。
+    /// 模板为空时不碰用户手填的文件名。
+    /// </summary>
+    private void SyncTemplatedOutputFileName()
     {
-        if (OutputMode == CompressOutputMode.Manual)
-            ComposeManualOutputPath();
+        if (OutputMode == CompressOutputMode.Separate) return;
+
+        var rendered = CompressPathPlanner.ComputeSingleArchiveName(
+            SelectedPaths.ToList(), DefaultFormat, FileNameTemplate, _templateTimestamp);
+        if (rendered is null) return;
+
+        var ext = CompressPathPlanner.GetFormatExtension(DefaultFormat);
+        OutputFileName = rendered.EndsWith(ext, StringComparison.OrdinalIgnoreCase)
+            ? rendered[..^ext.Length]
+            : rendered;
     }
 
     // ── 文件名模板 ──
@@ -1266,13 +1358,12 @@ public partial class CompressSettingsViewModel : ObservableObject
         }
 
         TemplateError = ValidateTemplateNow();
-        RefreshTemplatedOutputFileName();
         OnPropertyChanged(nameof(IsTemplateActive));
         OnPropertyChanged(nameof(IsOutputFileNameReadOnly));
         OnPropertyChanged(nameof(IsTemplateErrorVisible));
         OnPropertyChanged(nameof(IsFileNameRowVisible));
-        if (IsTemplateActive)
-            BuildCompressPreview();
+        // 模板是输出路径的输入面之一：重算路径（内部同步文件名 + 重建预览树）
+        RecomputeOutputPath();
     }
 
     partial void OnTemplateErrorChanged(string? value)
@@ -1297,15 +1388,17 @@ public partial class CompressSettingsViewModel : ObservableObject
 
         if (OutputMode == CompressOutputMode.Separate)
         {
-            // 分别压缩：每个源都要有区分度，否则两个源会撞到同一个包名。
-            var names = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
+            // 分别压缩：每个源各自落到**自己的父目录**，所以只要完整路径不同就不冲突
+            // （A/report.txt 与 B/report.txt 都渲染成 report.zip 是合法的，各自在不同目录）。
+            // 只有同一个输出目录里撞了同名包才算重名 —— 按全路径判重，不能用文件名。
+            var usedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var plan = CompressPathPlanner.PlanSeparate(
                 paths, DefaultFormat, KeepOriginalExtension, FileNameTemplate, _templateTimestamp);
             foreach (var item in plan)
             {
-                var name = Path.GetFileName(item.OutputArchivePath);
-                if (!names.Add(name))
-                    return LocalizationManager.T("Compress_FileNameTemplate_Duplicate", name);
+                if (!usedPaths.Add(item.OutputArchivePath))
+                    return LocalizationManager.T(
+                        "Compress_FileNameTemplate_Duplicate", Path.GetFileName(item.OutputArchivePath));
             }
         }
         else if (CompressPathPlanner.ComputeSingleArchiveName(
@@ -1337,41 +1430,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         _ => LocalizationManager.T("Compress_FileNameTemplate_InvalidResult"),
     };
 
-    /// <summary>
-    /// 模板启用时把渲染结果写进「输出文件名」框（只读展示），并重算 Manual 的完整路径。
-    /// 模板为空时不碰用户手填的文件名。
-    /// </summary>
-    private void RefreshTemplatedOutputFileName()
-    {
-        if (!IsTemplateActive) return;
-        if (OutputMode == CompressOutputMode.Separate) return;
-
-        var rendered = CompressPathPlanner.ComputeSingleArchiveName(
-            SelectedPaths.ToList(), DefaultFormat, FileNameTemplate, _templateTimestamp);
-        if (rendered is null) return;
-
-        var ext = CompressPathPlanner.GetFormatExtension(DefaultFormat);
-        var baseName = rendered.EndsWith(ext, StringComparison.OrdinalIgnoreCase)
-            ? rendered[..^ext.Length]
-            : rendered;
-
-        _isSyncingOutputPath = true;
-        try
-        {
-            OutputFileName = baseName;
-            if (OutputMode == CompressOutputMode.Manual
-                && !string.IsNullOrEmpty(OutputDirectory)
-                && !string.IsNullOrEmpty(baseName))
-            {
-                OutputPath = Path.Combine(OutputDirectory, baseName + GetFormatExtension());
-            }
-        }
-        finally
-        {
-            _isSyncingOutputPath = false;
-        }
-    }
-
     /// <summary>打开模板帮助（占位符表 + 示例 + 规则）。</summary>
     [RelayCommand]
     private async Task ShowFileNameTemplateHelpAsync()
@@ -1385,92 +1443,20 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>由 View 提供的帮助弹窗回调（参数：标题、Markdown 正文）。</summary>
     public Func<string, string, Task>? ShowHelpDialog { get; set; }
 
-    /// <summary>
-    /// 将完整输出路径拆分为目录 + 文件名（不含扩展名）。
-    /// </summary>
-    private void SplitOutputPath(string? fullPath)
-    {
-        if (string.IsNullOrWhiteSpace(fullPath)) return;
-
-        _isSyncingOutputPath = true;
-        try
-        {
-            // 去掉扩展名（含 .tar.gz 双段）
-            var dir = Path.GetDirectoryName(fullPath) ?? string.Empty;
-            var fileName = Path.GetFileName(fullPath);
-            foreach (var ext in new[] { ".tar.gz", ".7z", ".zip" })
-            {
-                if (fileName.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
-                {
-                    fileName = fileName[..^ext.Length];
-                    break;
-                }
-            }
-            if (!string.IsNullOrEmpty(fileName))
-                OutputFileName = fileName;
-            if (!string.IsNullOrEmpty(dir))
-                OutputDirectory = dir;
-        }
-        finally
-        {
-            _isSyncingOutputPath = false;
-        }
-    }
-
-    /// <summary>
-    /// Manual 模式：由目录 + 文件名 + 格式扩展名合成完整输出路径。
-    /// </summary>
-    private void ComposeManualOutputPath()
-    {
-        if (_isSyncingOutputPath) return;
-        if (OutputMode != CompressOutputMode.Manual) return;
-
-        // 模板启用时文件名由模板渲染（RefreshTemplatedOutputFileName 负责），
-        // 这里再用用户手填的名字合成会把渲染结果盖掉。
-        if (IsTemplateActive) return;
-
-        var dir = OutputDirectory;
-        var name = OutputFileName;
-        if (string.IsNullOrEmpty(dir) || string.IsNullOrEmpty(name))
-            return;
-
-        _isSyncingOutputPath = true;
-        try
-        {
-            var ext = GetFormatExtension();
-            OutputPath = Path.Combine(dir, name + ext);
-        }
-        finally
-        {
-            _isSyncingOutputPath = false;
-        }
-    }
-
     partial void OnDefaultFormatChanged(string value)
     {
-        if (OutputMode == CompressOutputMode.Combined)
-            RefreshCombinedPath();
-
         // tar.gz 不支持加密，切过去时自动取消加密
         if (value == "tar.gz")
             Encrypt = false;
 
-        // Manual 模式：格式切换 → 重新合成输出路径（扩展名变化）
-        if (OutputMode == CompressOutputMode.Manual)
-            ComposeManualOutputPath();
-
         OnPropertyChanged(nameof(IsZipFormat));
         OnPropertyChanged(nameof(IsSevenZipFormat));
         OnPropertyChanged(nameof(OutputExtensionLabel));
-        if (AutoGenerateRules)
-            RefreshAutoRules();
         OnPropertyChanged(nameof(IsFormatEncryptionSupported));
-        // 扩展名是模板示例行的一部分，切换格式要重算示例与校验
-        RefreshTemplatedOutputFileName();
+        // 扩展名是输出路径的输入面之一（也进模板示例）：一并重算 + 校验
+        RecomputeOutputPath();
         TemplateError = ValidateTemplateNow();
         OnPropertyChanged(nameof(IsTemplateErrorVisible));
-        // 切换格式时刷新预览树（压缩包扩展名变化）
-        BuildCompressPreview();
     }
 
     partial void OnIsPasswordLibraryModeChanged(bool value)
@@ -1665,18 +1651,15 @@ public partial class CompressSettingsViewModel : ObservableObject
                 break;
 
             case CompressOutputMode.Combined:
-                var commonParent = App.FindCommonParent(SelectedPaths.ToList());
-                if (commonParent != null && !App.IsDriveRoot(commonParent))
+                // 合并模式的包名直接取唯一输出路径的主名，避免这里再手算一套落点规则
+                //（两套算法并存正是「规则文字和实际路径不一致」的温床）。
+                if (!string.IsNullOrEmpty(OutputPath))
                 {
-                    var archiveName = ArchivePath.GetFileName(commonParent);
-                    RulesText = $"{archiveName}*{ext}";
-                }
-                else if (AllPathsSameDrive(SelectedPaths))
-                {
-                    // 同盘符但无公共子目录：压缩包名与盘符相同（如 C.zip）
-                    var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
-                    var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
-                    RulesText = $"{driveLetter}*{ext}";
+                    var combinedName = Path.GetFileName(OutputPath);
+                    if (combinedName.EndsWith(ext, StringComparison.OrdinalIgnoreCase))
+                        combinedName = combinedName[..^ext.Length];
+                    if (!string.IsNullOrEmpty(combinedName))
+                        RulesText = $"{combinedName}*{ext}";
                 }
                 break;
         }
@@ -2020,144 +2003,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     // ── Output mode helpers ──
 
     /// <summary>
-    /// 根据当前模式刷新输出路径的显示内容（路径 + 可编辑状态）。
-    /// </summary>
-    private void RefreshOutputPathState()
-    {
-        switch (OutputMode)
-        {
-            case CompressOutputMode.Manual:
-                // 回到 Manual：恢复缓存路径；无缓存则清空（避免残留其他模式的说明文本）
-                OutputPath = _cachedManualPath;
-                _cachedManualPath = null;
-                break;
-
-            case CompressOutputMode.Separate:
-                // 首次离开 Manual 时缓存路径；之后不再覆盖（避免转两次模式后丢失原始路径）
-                _cachedManualPath ??= OutputPath;
-                OutputPath = LocalizationManager.T("Compress_SeparateSummary", SelectedPaths.Count);
-                break;
-
-            case CompressOutputMode.Combined:
-                // 首次离开 Manual 时缓存路径；之后不再覆盖
-                _cachedManualPath ??= OutputPath;
-                RefreshCombinedPath();
-                break;
-        }
-    }
-
-    /// <summary>
-    /// Manual 模式下输出路径为空时，根据源文件自动生成默认路径。
-    /// 行为与 <see cref="RefreshCombinedPath"/> 一致但不弹跨盘符警告（保持空路径让用户手动设置）。
-    /// </summary>
-    private void TryAutoFillOutputPath()
-    {
-        if (OutputMode != CompressOutputMode.Manual) return;
-        if (!string.IsNullOrEmpty(OutputPath)) return;
-        if (SelectedPaths.Count == 0) return;
-
-        var commonParent = App.FindCommonParent(SelectedPaths.ToList());
-        if (commonParent != null && !App.IsDriveRoot(commonParent))
-        {
-            var archiveName = ResolveCombinedArchiveName(commonParent);
-            var ext = GetFormatExtension();
-            OutputPath = System.IO.Path.Combine(commonParent, archiveName + ext);
-        }
-        else if (AllPathsSameDrive(SelectedPaths))
-        {
-            var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
-            var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
-            var ext = GetFormatExtension();
-            OutputPath = System.IO.Path.Combine(root, driveLetter + ext);
-        }
-        // 跨盘符：保持空路径，用户手动设置
-
-        // 模板启用时用模板重算文件名（否则自动填充会先把「目录名」写进文件名框）。
-        // RefreshTemplatedOutputFileName 只在 OutputDirectory 非空时改 OutputPath，
-        // 这里路径已由上面填好，行为是「换掉文件名、保留目录」。
-        if (IsTemplateActive) RefreshTemplatedOutputFileName();
-    }
-
-    /// <summary>
-    /// 合并模式（自动/父目录命名）的压缩包主名：模板启用时按模板渲染（<c>{name}</c> 取首源，
-    /// <c>{name:auto}</c> 取公共父目录名），否则沿用公共父目录名。
-    /// </summary>
-    private string ResolveCombinedArchiveName(string commonParent)
-    {
-        if (IsTemplateActive)
-        {
-            var rendered = CompressPathPlanner.ComputeSingleArchiveName(
-                SelectedPaths.ToList(), DefaultFormat, FileNameTemplate, _templateTimestamp);
-            if (rendered is not null)
-            {
-                var ext = CompressPathPlanner.GetFormatExtension(DefaultFormat);
-                return rendered.EndsWith(ext, StringComparison.OrdinalIgnoreCase)
-                    ? rendered[..^ext.Length]
-                    : rendered;
-            }
-        }
-
-        return ArchivePath.GetFileName(commonParent);
-    }
-
-    /// <summary>
-    /// 计算 Combined 模式的输出路径：公共父目录下的合并压缩包。
-    /// </summary>
-    private void RefreshCombinedPath()
-    {
-        if (SelectedPaths.Count == 0)
-        {
-            OutputPath = "";
-            return;
-        }
-
-        var commonParent = App.FindCommonParent(SelectedPaths.ToList());
-        if (commonParent != null && !App.IsDriveRoot(commonParent))
-        {
-            var archiveName = ResolveCombinedArchiveName(commonParent);
-            var ext = GetFormatExtension();
-            OutputPath = System.IO.Path.Combine(commonParent, archiveName + ext);
-        }
-        else if (AllPathsSameDrive(SelectedPaths))
-        {
-            // 同盘符但无公共子目录 — 输出到盘符根目录，压缩包名与盘符相同（如 C:\C.zip）
-            var root = Path.GetPathRoot(SelectedPaths[0]) ?? "C:\\";
-            var driveLetter = root.TrimEnd('\\', '/').TrimEnd(':');
-            var ext = GetFormatExtension();
-            OutputPath = System.IO.Path.Combine(root, driveLetter + ext);
-        }
-        else
-        {
-            // 跨驱动器 — 回退到手动模式
-            OutputMode = CompressOutputMode.Manual;
-            // 通知用户
-            _ = AppMessageBox.Show(
-                LocalizationManager.T("Compress_CombinedUnavailable"),
-                LocalizationManager.T("Compress_Title"),
-                MessageBoxButton.OK,
-                MessageBoxImage.Warning);
-        }
-    }
-
-    /// <summary>
-    /// 判断所有源路径是否在同一个盘符下。
-    /// </summary>
-    private static bool AllPathsSameDrive(IEnumerable<string> paths)
-    {
-        string? drive = null;
-        foreach (var p in paths)
-        {
-            var d = Path.GetPathRoot(p);
-            if (string.IsNullOrEmpty(d)) return false;
-            if (drive == null)
-                drive = d;
-            else if (!string.Equals(drive, d, StringComparison.OrdinalIgnoreCase))
-                return false;
-        }
-        return drive != null;
-    }
-
-    /// <summary>
     /// 从当前选择的格式推断文件扩展名。
     /// </summary>
     private string GetFormatExtension()
@@ -2167,19 +2012,6 @@ public partial class CompressSettingsViewModel : ObservableObject
             "tar.gz" => ".tar.gz",
             _ => "." + DefaultFormat,
         };
-    }
-
-    /// <summary>
-    /// 根据源路径推断默认文件名。
-    /// </summary>
-    private string GetDefaultFileName()
-    {
-        if (SelectedPaths.Count == 0) return "archive";
-        if (SelectedPaths.Count == 1 && File.Exists(SelectedPaths[0]))
-            return Path.GetFileNameWithoutExtension(SelectedPaths[0]);
-        if (SelectedPaths.Count == 1 && Directory.Exists(SelectedPaths[0]))
-            return ArchivePath.GetFileName(SelectedPaths[0]);
-        return $"archive_{DateTime.Now:yyyyMMddHHmmss}";
     }
 
     /// <summary>
