@@ -88,8 +88,8 @@ public partial class CompressSettingsViewModel : ObservableObject
     public GridLength OutputPickerRowHeight =>
         IsQuickPathVisible ? new GridLength(1, GridUnitType.Star) : new GridLength(0);
 
-    /// <summary>输出文件扩展名标签（跟随格式）。</summary>
-    public string OutputExtensionLabel => GetFormatExtension();
+    /// <summary>输出文件扩展名标签（跟随格式，唯一实现见 Core 的 <see cref="CompressPathPlanner.GetFormatExtension"/>）。</summary>
+    public string OutputExtensionLabel => CompressPathPlanner.GetFormatExtension(DefaultFormat);
 
     [ObservableProperty]
     private string _defaultFormat = "zip";
@@ -147,7 +147,7 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? _outputDirectory;
 
-    /// <summary>输出文件名（不含扩展名，扩展名由格式决定）。Manual 下可编辑，Combined/模板启用时只读展示。</summary>
+    /// <summary>输出文件名（不含扩展名，扩展名由格式决定）。单包模式可编辑，模板启用时只读展示。</summary>
     [ObservableProperty]
     private string? _outputFileName;
 
@@ -166,13 +166,21 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     /// <summary>
     /// 模板里 <c>{date}</c>/<c>{datetime}</c> 用的时间戳：对话框一开就定住，
-    /// 免得预览在午夜前后一半新日期一半旧日期（执行侧由会话在批开始时另取一次）。
+    /// 免得预览在午夜前后一半新日期一半旧日期。确认时整个时间戳随载荷一起冻结
+    /// （<see cref="Models.CompressSettings.TemplateTimestamp"/>），执行侧用同一个值。
     /// </summary>
     private readonly DateTime _templateTimestamp = DateTime.Now;
 
     /// <summary>模板语法/结果错误（已本地化）；无错为 <see langword="null"/>。</summary>
     [ObservableProperty]
     private string? _templateError;
+
+    /// <summary>
+    /// 预设操作失败的提示（如超过 20 条上限）。与 <see cref="TemplateError"/> 分开：
+    /// 预设存不下不代表模板本身非法，挤进错误槽会把「文件名」框顶成红框、盖掉可读的渲染结果。
+    /// </summary>
+    [ObservableProperty]
+    private string? _templatePresetMessage;
 
     /// <summary>命名预设下拉的数据源（在对话框里增删，立即写回设置）。</summary>
     public ObservableCollection<FileNameTemplatePreset> TemplatePresetOptions { get; } = new();
@@ -214,7 +222,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         var settings = AppSettings.Load();
         if (!settings.AddFileNameTemplatePreset(new FileNameTemplatePreset(name, FileNameTemplate!)))
         {
-            TemplateError = LocalizationManager.T("Compress_FileNameTemplate_PresetLimit",
+            // 走独立的提示槽：模板本身没问题，不能让它把「文件名」那一格变成红框错误。
+            TemplatePresetMessage = LocalizationManager.T("Compress_FileNameTemplate_PresetLimit",
                 AppSettings.MaxFileNameTemplatePresets);
             return;
         }
@@ -222,6 +231,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         settings.Save();
         ReloadTemplatePresets(settings);
         NewPresetName = null;
+        TemplatePresetMessage = null;
     }
 
     /// <summary>删除选中的命名预设并写回设置。</summary>
@@ -775,7 +785,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         UpdateAutoRules();
 
         // 初始化输出路径：CollectionChanged 不会为构造时已添加的路径触发，需显式算一次
-        // （Manual 自动填充 / Combined 推导落点 / 模板渲染都在这一个入口里）。
+        // （单包模式的自动填充与模板渲染都在这一个入口里）。
         // 顺序很关键：它内部会重建预览树，必须在这里先跑完，否则窗口打开时
         // 路径还是空、IsOutputPathValid 早退、Plan=null，留下「按钮可点但数据集未就绪」的竞态
         //（点击压缩静默退出）。
@@ -1304,6 +1314,9 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// </summary>
     public bool IsTemplateErrorVisible => IsTemplateActive && TemplateError != null;
 
+    /// <summary>预设操作提示（如超过上限）是否可见。与模板错误分开，不占用「文件名」那一格。</summary>
+    public bool IsTemplatePresetMessageVisible => TemplatePresetMessage != null;
+
     /// <summary>
     /// 「文件名」结果行是否可见。分别压缩时每个源各自成包、这一行没有意义要隐藏；
     /// 但模板出错时必须仍然显示（错误提示就渲染在这一格里），否则用户看不到任何反馈。
@@ -1334,6 +1347,9 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(IsTemplateErrorVisible));
         OnPropertyChanged(nameof(IsFileNameRowVisible));
     }
+
+    partial void OnTemplatePresetMessageChanged(string? value)
+        => OnPropertyChanged(nameof(IsTemplatePresetMessageVisible));
 
     /// <summary>
     /// 立刻校验一次模板（语法 + 结果合法性 + 分别压缩下的重名）。
@@ -1383,13 +1399,26 @@ public partial class CompressSettingsViewModel : ObservableObject
         Timestamp: _templateTimestamp,
         AutoName: CompressPathPlanner.ResolveAutoName(paths));
 
+    /// <summary>
+    /// 把 Core 的错误分类翻成可操作的提示。四类「结果不合法」各有独立文案：
+    /// 只说「不是合法文件名」用户不知道要改哪里（改字、去尾点、缩短、换掉设备名）。
+    /// </summary>
     private static string DescribeTemplateError(FileNameTemplateError? error) => error?.Kind switch
     {
+        // 语法校验成功时不会有 error，走到这儿说明调用方没拿到具体分类，给最泛的一条。
         null => LocalizationManager.T("Compress_FileNameTemplate_InvalidResult"),
         FileNameTemplateErrorKind.UnknownPlaceholder =>
             LocalizationManager.T("Compress_FileNameTemplate_UnknownPlaceholder", error.Token ?? ""),
         FileNameTemplateErrorKind.Unterminated =>
             LocalizationManager.T("Compress_FileNameTemplate_Unterminated"),
+        FileNameTemplateErrorKind.EmptyResult =>
+            LocalizationManager.T("Compress_FileNameTemplate_EmptyResult"),
+        FileNameTemplateErrorKind.InvalidChar =>
+            LocalizationManager.T("Compress_FileNameTemplate_InvalidChar"),
+        FileNameTemplateErrorKind.InvalidName =>
+            LocalizationManager.T("Compress_FileNameTemplate_InvalidName"),
+        FileNameTemplateErrorKind.TooLong =>
+            LocalizationManager.T("Compress_FileNameTemplate_TooLong", MantisZip.Core.Utils.FileNameTemplate.MaxBaseNameLength),
         _ => LocalizationManager.T("Compress_FileNameTemplate_InvalidResult"),
     };
 
@@ -1825,7 +1854,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         // 万一为空就交出空计划，由执行器按「无可执行条目」处理（不在这里抛异常）。
         var items = Plan?.Items ?? Array.Empty<CompressPlanItem>();
 
-        // 源清单：同一源在 Combined 模式下可能出现多次（不同过滤），按源去重后保留首次出现的目标路径。
+        // 源清单：同一源在合并模式（多源一个包）下可能出现多次（不同过滤），按源去重后保留首次出现的目标路径。
         var sources = new List<CompressSourceEntry>(items.Count);
         var seenSources = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
         foreach (var item in items)
@@ -1892,7 +1921,10 @@ public partial class CompressSettingsViewModel : ObservableObject
             Filter: FileFilter,
             Plan: planEntries,
             OpenFolderAfterCompress: OpenFolderAfterCompress,
-            FileNameTemplate: IsTemplateActive ? FileNameTemplate : null);
+            FileNameTemplate: IsTemplateActive ? FileNameTemplate : null,
+            // 把对话框打开时定住的时间戳一起冻结：预览树用的就是它，执行侧必须同一个值，
+            // 否则跨午夜会「预览 11-14、落盘 11-15」。
+            TemplateTimestamp: _templateTimestamp);
     }
 
     /// <summary>
@@ -1955,18 +1987,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     }
 
     // ── Output mode helpers ──
-
-    /// <summary>
-    /// 从当前选择的格式推断文件扩展名。
-    /// </summary>
-    private string GetFormatExtension()
-    {
-        return DefaultFormat switch
-        {
-            "tar.gz" => ".tar.gz",
-            _ => "." + DefaultFormat,
-        };
-    }
 
     /// <summary>
     /// 检查输出路径在当前模式下是否有效。

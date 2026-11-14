@@ -172,6 +172,16 @@
                         Command="{Binding DeleteTemplatePresetCommand}"
                         IsVisible="{Binding HasTemplatePresets}" />
               </StackPanel>
+              <!-- 预设操作提示（如超过 20 条上限）：独立一行，不复用「文件名」那一格的错误槽，
+                   否则模板本身合法时也会把可读的文件名顶成红框 -->
+              <TextBlock Text="{Binding TemplatePresetMessage}"
+                         IsVisible="{Binding IsTemplatePresetMessageVisible}"
+                         Margin="80,0,0,0"
+                         TextWrapping="NoWrap"
+                         TextTrimming="CharacterEllipsis"
+                         FontSize="12"
+                         ToolTip.Tip="{Binding TemplatePresetMessage}"
+                         Foreground="{DynamicResource ThemeStatusErrorBrush}" />
               <!-- 最终文件名 + 扩展名：启用模板时只读展示渲染结果，未启用时可直接编辑。
                    分别压缩模式下整行隐藏（每个源各自成包，见 IsFileNameSectionVisible）。 -->
               <Grid ColumnDefinitions="80,*,Auto"

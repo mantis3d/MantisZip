@@ -297,8 +297,61 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
 
         vm.SaveTemplatePresetCommand.Execute(null);
 
-        Assert.NotNull(vm.TemplateError);
+        // 上限提示走独立槽位：模板本身合法，不能把「文件名」那一格顶成红框
+        Assert.NotNull(vm.TemplatePresetMessage);
+        Assert.True(vm.IsTemplatePresetMessageVisible);
+        Assert.Null(vm.TemplateError);
+        Assert.False(vm.IsTemplateErrorVisible);
         Assert.Equal(AppSettings.MaxFileNameTemplatePresets, vm.TemplatePresetOptions.Count);
+    }
+
+    /// <summary>
+    /// 缺陷回归：模板合法 + 预设超限时，「文件名」结果格必须继续显示渲染结果而不是错误红框
+    ///（旧实现把上限提示塞进 <c>TemplateError</c>，<c>IsTemplateErrorVisible</c> 变真、文件名被吞掉）。
+    /// </summary>
+    [Fact]
+    public void SavePreset_OverLimit_DoesNotHideRenderedFileName()
+    {
+        Apply(s =>
+        {
+            s.FileNameTemplateDialog = "";
+            s.FileNameTemplatePresets.Clear();
+            for (var i = 0; i < AppSettings.MaxFileNameTemplatePresets; i++)
+                s.FileNameTemplatePresets.Add(new FileNameTemplatePreset("p" + i, "{name}_" + i));
+        });
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("report.txt") });
+        vm.FileNameTemplate = "{name}_bak";
+        Assert.Equal("report_bak", vm.OutputFileName);
+        Assert.False(vm.IsTemplateErrorVisible);
+
+        vm.SaveTemplatePresetCommand.Execute(null);
+
+        Assert.Equal("report_bak", vm.OutputFileName);
+        Assert.False(vm.IsTemplateErrorVisible);
+        Assert.True(vm.IsTemplatePresetMessageVisible);
+    }
+
+    /// <summary>存下预设后提示应清除（否则用户改好后又看到一条过期红字）。</summary>
+    [Fact]
+    public void SavePreset_Success_ClearsPresetMessage()
+    {
+        Apply(s =>
+        {
+            s.FileNameTemplateDialog = "";
+            s.FileNameTemplatePresets.Clear();
+        });
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
+        vm.FileNameTemplate = "{name}_new";
+        vm.NewPresetName = "新预设";
+
+        vm.SaveTemplatePresetCommand.Execute(null);
+
+        Assert.Null(vm.TemplatePresetMessage);
+        Assert.False(vm.IsTemplatePresetMessageVisible);
+        Assert.Single(vm.TemplatePresetOptions);
+        Assert.True(vm.HasTemplatePresets);
     }
 
     /// <summary>

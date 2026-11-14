@@ -114,6 +114,7 @@
                         <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
                                   SelectedItem="{Binding SelectedFileNameTemplatePresetDialog}"
                                   DisplayMemberBinding="{Binding Name}"
+                                  IsVisible="{Binding HasFileNameTemplatePresets}"
                                   MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
                       </Grid>
                       <!-- 行 2：快速压缩默认值 -->
@@ -133,6 +134,7 @@
                         <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
                                   SelectedItem="{Binding SelectedFileNameTemplatePresetQuick}"
                                   DisplayMemberBinding="{Binding Name}"
+                                  IsVisible="{Binding HasFileNameTemplatePresets}"
                                   MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
                       </Grid>
                       <!-- 行 3：分别压缩默认值（若不含 {name}/{seq}/{parent}，多源会撞名，确认时被拦） -->
@@ -152,6 +154,7 @@
                         <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
                                   SelectedItem="{Binding SelectedFileNameTemplatePresetSeparate}"
                                   DisplayMemberBinding="{Binding Name}"
+                                  IsVisible="{Binding HasFileNameTemplatePresets}"
                                   MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
                       </Grid>
                     </StackPanel>

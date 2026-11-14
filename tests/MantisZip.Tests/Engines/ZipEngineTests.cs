@@ -1709,8 +1709,12 @@ public class ZipEngineTests : IDisposable
 
     /// <summary>
     /// ZIP32 上限守卫（copy-mode 不支持 ZIP64）。
+    /// <para>
     /// 条目数与 4GB 总量都无法用小文件真实构造（需 65280 个文件 / 4GB 数据），
-    /// 因此直接对私有准入函数做边界断言，避免把重型 IO 塞进单元测试。
+    /// 因此直接对纯策略函数 <c>DescribeZip32LimitViolation</c> 做边界断言。
+    /// <b>必须断言这一层而不是整个准入函数</b>：后者末尾还有临时盘剩余空间预检，
+    /// 断言整链会变成「本机 C 盘剩余 &lt; 8GB 就红」的环境依赖用例（曾实际发生）。
+    /// </para>
     /// </summary>
     [Theory]
     [InlineData(10_000, 1L * 1024 * 1024 * 1024, true)]
@@ -1727,20 +1731,38 @@ public class ZipEngineTests : IDisposable
     [InlineData(10, 4_294_967_294L, false)]
     [InlineData(10, 4_294_967_295L, false)]
     [InlineData(10, 5L * 1024 * 1024 * 1024, false)]
-    public void IsMultiThreadedEligible_Zip32Limits_GuardBoundaries(int entryCount, long totalSize, bool expected)
+    public void DescribeZip32LimitViolation_GuardBoundaries(int entryCount, long totalSize, bool allowed)
     {
-        var method = typeof(ZipEngine).GetMethod(
-            "IsMultiThreadedEligible",
-            System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Static);
-        Assert.NotNull(method);
+        var violation = ZipEngine.DescribeZip32LimitViolation(entryCount, totalSize);
 
-        var eligible = (bool)method!.Invoke(null, [
-            new ArchiveOptions { MultiThreadedCompression = true, AdaptiveCompression = true },
-            entryCount,
-            totalSize,
-        ])!;
+        if (allowed) Assert.Null(violation);
+        else Assert.NotNull(violation);
+    }
 
-        Assert.Equal(expected, eligible);
+    /// <summary>
+    /// 临时空间预检的阈值：需求 ≈ 2× 输入，判定只看可用字节数（不读磁盘）。
+    /// 真实准入函数在空间不足时回落串行，这条用例把「阈值算错会不会静默放行」钉住。
+    /// </summary>
+    [Theory]
+    [InlineData(100L, 200L, true)]    // 恰好 2× → 准入（边界闭合）
+    [InlineData(100L, 199L, false)]   // 少 1 字节 → 拒绝
+    [InlineData(0L, 0L, true)]        // 空输入 → 准入
+    [InlineData(4_294_967_293L, 8_589_934_586L, true)]
+    [InlineData(4_294_967_293L, 8_589_934_585L, false)]
+    public void HasEnoughTempSpaceFor_RequiresTwiceTheInput(long totalSize, long available, bool expected)
+    {
+        Assert.Equal(expected, ZipEngine.HasEnoughTempSpaceFor(totalSize, available));
+    }
+
+    /// <summary>2× 需求在 <c>long.MaxValue</c> 附近必须饱和，不能回绕成负数（否则预检永远放行）。</summary>
+    [Fact]
+    public void RequiredTempBytes_SaturatesInsteadOfOverflowing()
+    {
+        Assert.Equal(long.MaxValue, ZipEngine.RequiredTempBytes(long.MaxValue));
+        Assert.Equal(long.MaxValue, ZipEngine.RequiredTempBytes(long.MaxValue / 2 + 1));
+        Assert.Equal(200L, ZipEngine.RequiredTempBytes(100L));
+        Assert.False(ZipEngine.HasEnoughTempSpaceFor(long.MaxValue, long.MaxValue - 1),
+            "输入接近 long.MaxValue 时 2× 需求饱和为 long.MaxValue，可用空间差一字节也应拒绝");
     }
 
     /// <summary>

@@ -974,6 +974,12 @@ public partial class SettingsWindowViewModel : ObservableObject
     /// <summary>设置页里的预设下拉（选中即填进对应输入框；增删只在压缩对话框里做）。</summary>
     public System.Collections.ObjectModel.ObservableCollection<MantisZip.Core.Utils.FileNameTemplatePreset> FileNameTemplatePresetOptions { get; } = new();
 
+    /// <summary>
+    /// 是否有可用预设（决定三行预设下拉是否显示）。与压缩对话框的 <c>HasTemplatePresets</c> 同一语义：
+    /// 没有预设时不该留一个永远点不开的空下拉占位。
+    /// </summary>
+    public bool HasFileNameTemplatePresets => FileNameTemplatePresetOptions.Count > 0;
+
     [ObservableProperty] private MantisZip.Core.Utils.FileNameTemplatePreset? _selectedFileNameTemplatePresetDialog;
     [ObservableProperty] private MantisZip.Core.Utils.FileNameTemplatePreset? _selectedFileNameTemplatePresetQuick;
     [ObservableProperty] private MantisZip.Core.Utils.FileNameTemplatePreset? _selectedFileNameTemplatePresetSeparate;
@@ -984,6 +990,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         FileNameTemplatePresetOptions.Clear();
         foreach (var preset in _settings.FileNameTemplatePresets)
             FileNameTemplatePresetOptions.Add(preset);
+        OnPropertyChanged(nameof(HasFileNameTemplatePresets));
     }
 
     // 三个下拉各自「选中即填入」，填完清空选择，避免留下高亮误导

@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.FileFilter;
@@ -172,6 +173,11 @@ public sealed record CompressPasswordWriteback(
 /// <param name="Plan">逐源执行计划，含「过滤后实际归档文件白名单」。</param>
 /// <param name="OpenFolderAfterCompress">本次压缩成功后是否打开输出所在目录并选中产物（进度窗口底部的开关可覆盖）。</param>
 /// <param name="FileNameTemplate">文件名模板（占位符形式，如 <c>{name}_{date}</c>）；<c>null</c>/空白 = 未启用（走旧命名）。启用时忽略「保留源文件扩展名」，要保留请写 <c>{ext}</c>。</param>
+/// <param name="TemplateTimestamp">
+/// 模板渲染时间戳（<c>{date}</c>/<c>{datetime}</c> 用），由对话框在打开时取一次并冻结进载荷。
+/// 必须与预览树使用同一个值，否则跨午夜时「预览显示 11-14、落盘却是 11-15」。
+/// <c>null</c> = 调用方没有预览阶段（CLI），执行侧自行取当前时刻。
+/// </param>
 public sealed record CompressSettings(
     IReadOnlyList<CompressSourceEntry> Sources,
     CompressOutputMode OutputMode,
@@ -191,4 +197,5 @@ public sealed record CompressSettings(
     FileFilterCriteria? Filter,
     IReadOnlyList<CompressPlanEntry> Plan,
     bool OpenFolderAfterCompress = false,
-    string? FileNameTemplate = null);
+    string? FileNameTemplate = null,
+    DateTime? TemplateTimestamp = null);

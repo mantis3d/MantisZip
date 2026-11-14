@@ -42,6 +42,9 @@
 | **KI-016** | 解压时输错密码被判成「文件损坏」，不弹密码框重试（`data error` 被当作损坏信号） | 交互 / 错误分类 | 缺决策 | 用户反馈「密码输错只提示损坏」时；或决定「解压失败统一走 `QuickVerifyPasswordEx` 二次判定」时 | 阻塞中 |
 | **KI-017** | 分卷包（`.001`/`.z01`/`.r00`/`.part1.rar`）与 SFX 的**格式身份**被扩展名直判成 Zip，预览 / 双击打开 / 缩略图全报 `Failed to locate the Zip Header` | 功能缺陷 | — | 已修复（`ResolveReaderFormat` 单一入口，2026-11-05） | 已修复（2026-11-05） |
 | **KI-018** | 动态右键菜单（实验）在 `active` 状态下若 handler 静默失效，自愈要等下一次 MantisZip 启动 | 交互 / 自愈延迟 | 成本超阈值 | 有用户报告「开了动态菜单后又消失、长期不自愈」时；或引入常驻探针（计划任务 / 开机自检）时 | 阻塞中 |
+| **KI-019** | `--compress-combined` 不接受文件名模板（CLI 合并路径自算名字，设置页里的模板对它无效） | 功能留白 | 缺决策 | 用户反馈「CLI 合并压缩出来的名字不受模板控制」时；或决定合并路径是否纳入模板体系时 |
+| **KI-020** | `{ext}` 对目录源渲染成空串（模板里靠它区分源时会得到同名结果） | 功能留白 | 缺决策 | 用户反馈「目录源模板命名撞名」时；或决定目录源 `{ext}` 该退化成什么（空 / 格式扩展名 / 目录名）时 |
+| **KI-021** | 模板帮助的示例固定写 `.zip`（非 zip 格式下示例与产物扩展名不符） | 文档 / 文案 | 成本超阈值 | 有用户对示例扩展名提出疑问时；或下次整体重写模板帮助文案时 |
 
 ---
 
@@ -221,6 +224,33 @@
 - **为什么现在不修**：**成本超阈值**。要真正「无启动自愈」只能上常驻手段（计划任务 / 开机自检 / Explorer 侧独立探针进程），对一个**默认关闭**的实验特性属于过度设计；当前设计的风险面已被「出厂默认静态级联」压到最低（只有主动打开实验开关的用户才可能遇到）。
 - **复评条件**：① 有用户报告「打开动态菜单后又消失、且打开主程序也没恢复」；② 或决定给动态菜单上常驻探针（计划任务 / 开机自检）时。
 - **关联**：`.omo/plans/进行中/shell-menu-disappear.md` 的「边界」段；`docs/PROGRESS.md` 2026-11-11 条目。
+
+## KI-019 `--compress-combined` 不接受文件名模板（CLI 合并路径自算名字）
+
+- **发现**：2026-11-14（复查 v0.5.7 `filename-template` 计划实现时确认，计划「留白」第 1 条）
+- **现象**：GUI 的合并（单包多源）压缩与 `--compress-quick` / `--compress-separate` 都走 `FileNameTemplate`，但 CLI 的 `--compress-combined` 完全不读模板：`src/MantisZip.UI.Avalonia/App.CliCompress.cs:359-408 RunCompressCombined` 自己算 `FindCommonParent(...) + Path.GetFileName(commonParent.TrimEnd(...))`（无公共父目录时用首源主名 + 手写扩展名三元式），构造 `CompressRequest` 时也没传 `FileNameTemplate`。设置页里三项模板默认值对它一律无效，用户无从得知。
+- **证据**：`App.CliCompress.cs:359-408` 无 `FileNameTemplate` 字段；同文件 `:168`（quick）与 `:283`（separate）都有传入，对照即知缺口在 combined 这一条路径。
+- **为什么现在不修**：**缺决策**。合并模式（`CompressOutputMode.Manual` + 多源一个包）在 GUI 里靠 `CompressPathPlanner.ComputeSingleArchiveName` 拿模板，CLI 这条路径历史上是独立算名字的薄壳；直接接模板要决定「合并模式该用哪一档默认值」（`FileNameTemplateDialog` 是 GUI 对话框的默认值，CLI 从没打开过对话框），属于产品口径而不是顺手补一行。
+- **复评条件**：① 用户反馈「CLI 合并压缩的名字不受模板控制」；② 或决定「CLI 三入口各自读哪一档模板默认值」（可与 `FileNameTemplateQuick` / `Separate` 补齐成三档）时。
+- **关联**：`.omo/plans/已完成/filename-template.md` 的「留白」段；`docs/MAINTENANCE.md §9`。
+
+## KI-020 `{ext}` 对目录源渲染成空串
+
+- **发现**：2026-11-14（复查时确认，计划「留白」第 2 条）
+- **现象**：模板里的 `{ext}` 只对文件源有意义：`src/MantisZip.Core/Utils/FileNameTemplate.cs:301-310 GetPrimaryExtension` 对目录源返回空串（`LooksLikeDirectory` 分支直接 `return string.Empty`）。于是 `{parent}_{name}{ext}` 这类模板压缩目录时后半段凭空消失，用户以为写错了占位符。
+- **证据**：`FileNameTemplate.cs:301-310`；帮助文案 `Compress_FileNameTemplate_Token_Ext`（三语）只写「源的原始扩展名（含点）」，没说明目录源为空；2026-11-14 已在帮助「规则」段补一句提示（文案层缓解，行为未改）。
+- **为什么现在不修**：**缺决策**。目录本身没有扩展名，可选项都各有副作用（保持空串 / 退化成格式扩展名 / 退化成目录名），且改动会影响 `{name:auto}` 与逐项压缩的重名判定；等有真实需求再定口径。
+- **复评条件**：① 用户反馈「目录源模板命名撞名 / 占位符消失」；② 或决定目录源 `{ext}` 的语义时。
+- **关联**：`.omo/plans/已完成/filename-template.md` 的「留白」段；`docs/MAINTENANCE.md §9`。
+
+## KI-021 模板帮助的示例固定写 `.zip`
+
+- **发现**：2026-11-14（复查时确认，计划「留白」第 3 条）
+- **现象**：`Compress_FileNameTemplate_Markdown`（三语）的四条示例全部以 `.zip` 结尾（`report_2026-11-11.zip`、`report_0001.zip` 等），但扩展名实际由格式决定：默认格式切到 `.7z` / `.tar.gz` 时，示例与真实产物不符。
+- **证据**：`src/MantisZip.UI.Avalonia/Localization/strings.zh-CN.json` 的 `Compress_FileNameTemplate_Markdown`；`CompressPathPlanner.GetFormatExtension` 按 `DefaultFormat` 拼扩展名。
+- **为什么现在不修**：**成本超阈值**。Markdown 是**静态文案**，无法引用运行时格式；要做到「示例跟随当前格式」得把帮助正文改成代码生成（占位符表已在 `Placeholders` 单一事实源，但示例句是自然语言），收益不抵复杂度。当前文案已写明「扩展名由格式自动补」，读者不会真的写 `.zip`。
+- **复评条件**：① 有用户对示例扩展名提出疑问；② 或下次整体重写模板帮助文案时（可与 KI-019 / KI-020 一并复评）。
+- **关联**：`.omo/plans/已完成/filename-template.md` 的「留白」段；`docs/MAINTENANCE.md §9`。
 
 ## 档案区（已修 / 不会修）
 

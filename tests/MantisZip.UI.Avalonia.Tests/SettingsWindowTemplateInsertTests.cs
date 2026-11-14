@@ -79,6 +79,8 @@ public sealed class SettingsWindowTemplateInsertTests
                 .Single(b => ReferenceEquals(b.TargetTextBox, box));
 
             // 同一行里「输入框 → 按钮 → 预设下拉」从左到右，按钮必须卡在中间
+            // 预设下拉在没有预设时按 HasFileNameTemplatePresets 隐藏（Bounds 恒 0），
+            // 所以只对**有效可见**的下拉做几何断言，隐藏二叉不影响列序断言。
             var combos = window.GetVisualDescendants()
                 .OfType<ComboBox>()
                 .Where(c => Grid.GetColumn(c) == 3)
@@ -90,7 +92,7 @@ public sealed class SettingsWindowTemplateInsertTests
 
             var buttonRight = button.TranslatePoint(new Point(button.Bounds.Width, 0), window);
             Assert.NotNull(buttonRight);
-            foreach (var combo in combos)
+            foreach (var combo in combos.Where(c => c.IsEffectivelyVisible))
             {
                 var comboLeft = combo.TranslatePoint(new Point(0, 0), window);
                 Assert.NotNull(comboLeft);
