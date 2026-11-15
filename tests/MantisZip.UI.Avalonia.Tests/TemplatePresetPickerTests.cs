@@ -1,0 +1,215 @@
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using Avalonia;
+using Avalonia.Controls;
+using Avalonia.Headless;
+using Avalonia.Headless.XUnit;
+using Avalonia.Input;
+using Avalonia.Themes.Fluent;
+using Avalonia.VisualTree;
+using MantisZip.Core.Utils;
+using MantisZip.UI.Avalonia.Controls;
+using MantisZip.UI.Avalonia.Services;
+using Xunit;
+
+namespace MantisZip.UI.Avalonia.Tests;
+
+/// <summary>
+/// 命名预设选择器（<see cref="TemplatePresetPicker"/>）的接线回归：
+/// 可编辑下拉装预设名，保存/删除只把名字交回宿主，控件自己不碰设置。
+///
+/// 这层接线错了编译期看不出来：按钮点下去没事件、删除永灰、水印没本地化，
+/// 表现都是「界面正常、点了没反应」，必须物化控件才能发现。
+/// </summary>
+public sealed class TemplatePresetPickerTests
+{
+    private static readonly FileNameTemplatePreset[] Presets =
+    [
+        new("日期", "{name}_{date}"),
+        new("序号", "{name}_{seq:0000}"),
+    ];
+
+    [AvaloniaFact]
+    public void SaveButton_RaisesSaveRequested_WithTheNameInTheBox()
+    {
+        var (window, picker) = Show(presetName: "新预设");
+        string? received = null;
+        picker.SaveRequested += (_, name) => received = name;
+
+        Click(window, picker.FindButton("SaveButton"));
+
+        Assert.Equal("新预设", received);
+    }
+
+    [AvaloniaFact]
+    public void DeleteButton_RaisesDeleteRequested_WithTheTrimmedName()
+    {
+        var (window, picker) = Show(presetName: "  日期  ");
+        string? received = null;
+        picker.DeleteRequested += (_, name) => received = name;
+
+        var delete = picker.FindButton("DeleteButton");
+        Assert.True(delete.IsEnabled, "名字对应一条已有预设时「删除」应当可点");
+        Click(window, delete);
+
+        Assert.Equal("日期", received);
+    }
+
+    [AvaloniaFact]
+    public void DeleteButton_IsDisabled_WhenNameMatchesNothing()
+    {
+        var (_, picker) = Show(presetName: "还没存过的名字");
+
+        // 点了也没有任何反馈的按钮看起来像坏键，所以新名字一律禁用
+        Assert.False(picker.FindButton("DeleteButton").IsEnabled);
+    }
+
+    [AvaloniaFact]
+    public void DeleteButton_IsDisabled_WhenNameIsBlank()
+    {
+        var (_, picker) = Show(presetName: "   ");
+
+        Assert.False(picker.FindButton("DeleteButton").IsEnabled);
+    }
+
+    [AvaloniaFact]
+    public void PresetName_IsTwoWay_RoundTripsThroughTheEditableBox()
+    {
+        var (_, picker) = Show(presetName: "日期");
+
+        var combo = picker.GetVisualDescendants().OfType<ComboBox>().Single();
+        Assert.Equal("日期", combo.Text);
+
+        // 宿主侧改名字（例如存成功后把名字规范化）必须体现在框里
+        picker.PresetName = "序号";
+        Pump();
+
+        Assert.Equal("序号", combo.Text);
+    }
+
+    [AvaloniaFact]
+    public void Watermark_IsLocalized_AndRefreshesOnCultureChange()
+    {
+        var (_, picker) = Show(presetName: null);
+
+        var combo = picker.GetVisualDescendants().OfType<ComboBox>().Single();
+        Assert.Equal(LocalizationManager.T("Compress_FileNameTemplate_PresetName"), combo.PlaceholderText);
+
+        Assert.NotNull(LocalizationManager.T("Compress_FileNameTemplate_SavePreset"));
+    }
+
+    [AvaloniaFact]
+    public void Buttons_CarryToolTips_ThemedAsIcons()
+    {
+        var (_, picker) = Show(presetName: null);
+
+        var save = picker.FindButton("SaveButton");
+        var delete = picker.FindButton("DeleteButton");
+
+        // 卡片里的图标按钮只挂 ToolbarIcon（规则 4），且提示文案走本地化
+        Assert.Contains("ToolbarIcon", save.Classes);
+        Assert.Contains("ToolbarIcon", delete.Classes);
+        Assert.Equal(LocalizationManager.T("Compress_FileNameTemplate_SavePreset"), ToolTip.GetTip(save));
+        Assert.Equal(LocalizationManager.T("Compress_FileNameTemplate_DeletePreset"), ToolTip.GetTip(delete));
+    }
+
+    [AvaloniaFact]
+    public void DeleteButton_IsDisabled_AfterPresetRemovedFromTheCollection()
+    {
+        // 宿主删预设是就地把项移出 ObservableCollection（Presets 属性引用不变），
+        // 控件必须跟着集合事件重算「删除」可点状态，否则删完按钮还亮着、点下去静默无动作。
+        var presets = new System.Collections.ObjectModel.ObservableCollection<FileNameTemplatePreset>(Presets);
+        var picker = new TemplatePresetPicker
+        {
+            Presets = presets,
+            PresetName = "日期",
+            WatermarkKey = "Compress_FileNameTemplate_PresetName",
+        };
+
+        var app = Application.Current ?? new Application();
+        if (app.Styles.Count == 0) app.Styles.Add(new FluentTheme());
+        var window = new Window { Width = 420, Height = 160, Content = picker };
+        window.Show();
+        Pump();
+
+        Assert.True(picker.FindButton("DeleteButton").IsEnabled);
+
+        presets.Remove(presets[0]); // 删掉「日期」
+        Pump();
+
+        Assert.False(picker.FindButton("DeleteButton").IsEnabled);
+
+        window.Close();
+    }
+
+    [AvaloniaFact]
+    public void PresetSelected_IsRaised_OnlyWhenSelectionChangesWhileDropdownIsOpen()
+    {
+        var (_, picker) = Show(presetName: null);
+        var fired = new List<string?>();
+        picker.PresetSelected += (_, preset) => fired.Add(preset.Name);
+
+        var combo = picker.GetVisualDescendants().OfType<ComboBox>().Single();
+
+        // 打字打出一个与已有预设一模一样的名字：ComboBox 会把它精确匹配成选中项，
+        // 但用户是在编辑模板，不是在「选预设」，这时绝不能回填模板。
+        combo.Text = "序号";
+        Pump();
+        Assert.Empty(fired);
+
+        // 真从下拉里换了一条（打开时选中「序号」→ 关时选中「日期」）才通知宿主
+        combo.IsDropDownOpen = true;
+        Pump();
+        combo.SelectedItem = Presets[0];
+        Pump();
+        combo.IsDropDownOpen = false;
+        Pump();
+
+        Assert.Equal(["日期"], fired);
+    }
+
+    private static (Window Window, TemplatePresetPicker Picker) Show(string? presetName)
+    {
+        var app = Application.Current ?? new Application();
+        if (app.Styles.Count == 0) app.Styles.Add(new FluentTheme());
+
+        var picker = new TemplatePresetPicker
+        {
+            Presets = Presets,
+            PresetName = presetName,
+            WatermarkKey = "Compress_FileNameTemplate_PresetName",
+            Width = 320,
+        };
+
+        var window = new Window { Width = 420, Height = 160, Content = picker };
+        window.Show();
+        Pump();
+        return (window, picker);
+    }
+
+    private static void Click(Window window, Control target)
+    {
+        var center = target.TranslatePoint(new Point(target.Bounds.Width / 2, target.Bounds.Height / 2), window);
+        Assert.NotNull(center);
+        window.MouseDown(center!.Value, MouseButton.Left);
+        window.MouseUp(center.Value, MouseButton.Left);
+        Pump();
+    }
+
+    private static void Pump()
+    {
+        for (var i = 0; i < 4; i++)
+        {
+            global::Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+            global::Avalonia.Threading.Dispatcher.UIThread.RunJobs();
+        }
+    }
+}
+
+/// <summary>测试辅助：按 <c>x:Name</c> 找控件内部的按钮（<c>FindControl</c> 在无模板前拿不到）。</summary>
+internal static class TemplatePresetPickerTestExtensions
+{
+    public static Button FindButton(this TemplatePresetPicker picker, string name)
+        => picker.GetVisualDescendants().OfType<Button>().Single(b => b.Name == name);
+}

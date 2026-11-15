@@ -182,32 +182,31 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string? _templatePresetMessage;
 
-    /// <summary>命名预设下拉的数据源（在对话框里增删，立即写回设置）。</summary>
+    /// <summary>命名预设下拉的数据源（对话框与设置页共享同一份预设库，增删都立即写回设置）。</summary>
     public ObservableCollection<FileNameTemplatePreset> TemplatePresetOptions { get; } = new();
 
-    /// <summary>选中的命名预设；选中即把模板填进输入框，之后清空选择。</summary>
+    /// <summary>
+    /// 预设名框里的名字（可编辑下拉框的唯一权威值）。既可以是已有预设名（选中/覆盖/删除的目标），
+    /// 也可以是一个还没存过的新名字。与模板内容互不覆盖：改模板不会清掉名字，改名字也不动模板。
+    /// </summary>
     [ObservableProperty]
-    private FileNameTemplatePreset? _selectedTemplatePreset;
+    private string? _templatePresetName;
 
-    /// <summary>是否有可用预设（决定预设下拉是否显示）。</summary>
+    /// <summary>预设提示是不是一条失败信息（决定提示行用红色还是次要色）。</summary>
     [ObservableProperty]
-    private bool _hasTemplatePresets;
-
-    /// <summary>新预设的名字（来自输入框，用于「存为预设」）。</summary>
-    [ObservableProperty]
-    private string? _newPresetName;
+    private bool _isTemplatePresetMessageError;
 
     /// <summary>
-    /// 选中预设 → 把模板填进输入框，并**保留选中态**。
-    /// 早先这里填完就置 null（为了能重复选同一项），结果「删除」按钮永远拿不到
-    /// <see cref="SelectedTemplatePreset"/>、点了没反应；改成保留选中，用户手动改模板
-    /// 改到与预设不同时再由 <see cref="OnFileNameTemplateChanged"/> 清掉选中。
+    /// 用户从下拉里点中一条预设 → 把它的模板填进输入框，同时把名字留在框里
+    ///（名字 = 这条预设，之后「存为预设」是覆盖它、「删除」是删它）。
     /// </summary>
-    partial void OnSelectedTemplatePresetChanged(FileNameTemplatePreset? value)
+    public void ApplyTemplatePreset(FileNameTemplatePreset? preset)
     {
-        if (value is null) return;
-        if (string.Equals(FileNameTemplate, value.Template, StringComparison.Ordinal)) return;
-        FileNameTemplate = value.Template;
+        if (preset is null) return;
+
+        TemplatePresetName = preset.Name;
+        if (string.Equals(FileNameTemplate, preset.Template, StringComparison.Ordinal)) return;
+        FileNameTemplate = preset.Template;
     }
 
     /// <summary>把当前模板存成一个命名预设（同名覆盖，上限 20 条），并写回设置。</summary>
@@ -215,34 +214,46 @@ public partial class CompressSettingsViewModel : ObservableObject
     private void SaveTemplatePreset()
     {
         if (!IsTemplateActive) return;
-        var name = string.IsNullOrWhiteSpace(NewPresetName)
+        var name = string.IsNullOrWhiteSpace(TemplatePresetName)
             ? (FileNameTemplate ?? string.Empty)
-            : NewPresetName!.Trim();
+            : TemplatePresetName!.Trim();
 
         var settings = AppSettings.Load();
+        var overwriting = settings.FileNameTemplatePresets.Any(
+            p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+
         if (!settings.AddFileNameTemplatePreset(new FileNameTemplatePreset(name, FileNameTemplate!)))
         {
             // 走独立的提示槽：模板本身没问题，不能让它把「文件名」那一格变成红框错误。
             TemplatePresetMessage = LocalizationManager.T("Compress_FileNameTemplate_PresetLimit",
                 AppSettings.MaxFileNameTemplatePresets);
+            IsTemplatePresetMessageError = true;
             return;
         }
 
         settings.Save();
         ReloadTemplatePresets(settings);
-        NewPresetName = null;
-        TemplatePresetMessage = null;
+        TemplatePresetName = name;
+        TemplatePresetMessage = LocalizationManager.T(
+            overwriting ? "Compress_FileNameTemplate_PresetUpdated" : "Compress_FileNameTemplate_PresetSaved",
+            name);
+        IsTemplatePresetMessageError = false;
     }
 
-    /// <summary>删除选中的命名预设并写回设置。</summary>
+    /// <summary>删除名字框里那条预设并写回设置。</summary>
     [RelayCommand]
     private void DeleteTemplatePreset()
     {
-        if (SelectedTemplatePreset is null) return;
+        var name = TemplatePresetName?.Trim();
+        if (string.IsNullOrEmpty(name)) return;
+
         var settings = AppSettings.Load();
-        settings.RemoveFileNameTemplatePreset(SelectedTemplatePreset.Name);
+        if (!settings.RemoveFileNameTemplatePreset(name)) return;
+
         settings.Save();
         ReloadTemplatePresets(settings);
+        TemplatePresetMessage = null;
+        IsTemplatePresetMessageError = false;
     }
 
     /// <summary>把预设列表同步进下拉（保持与 settings.json 一致）。</summary>
@@ -251,7 +262,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         TemplatePresetOptions.Clear();
         foreach (var preset in settings.FileNameTemplatePresets)
             TemplatePresetOptions.Add(preset);
-        HasTemplatePresets = TemplatePresetOptions.Count > 0;
     }
 
     [ObservableProperty]
@@ -1317,6 +1327,10 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>预设操作提示（如超过上限）是否可见。与模板错误分开，不占用「文件名」那一格。</summary>
     public bool IsTemplatePresetMessageVisible => TemplatePresetMessage != null;
 
+    /// <summary>预设操作成功的提示（「已保存 / 已更新」）是否可见 —— 成功与失败共用一条提示槽。</summary>
+    public bool IsTemplatePresetMessageSuccessVisible
+        => TemplatePresetMessage != null && !IsTemplatePresetMessageError;
+
     /// <summary>
     /// 「文件名」结果行是否可见。分别压缩时每个源各自成包、这一行没有意义要隐藏；
     /// 但模板出错时必须仍然显示（错误提示就渲染在这一格里），否则用户看不到任何反馈。
@@ -1326,13 +1340,9 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>模板内容变化 → 重渲染（只改显示与校验，不写回设置）。</summary>
     partial void OnFileNameTemplateChanged(string? value)
     {
-        // 手动改过模板且与当前选中的预设不一致 ⇒ 取消选中（避免下拉仍显示旧预设名）
-        if (SelectedTemplatePreset is { } preset
-            && !string.Equals(preset.Template, value, StringComparison.Ordinal))
-        {
-            SelectedTemplatePreset = null;
-        }
-
+        // 注意：这里**不清空** TemplatePresetName。名字框装的是「要覆盖/要删除的那条预设」，
+        // 用户改了模板但没改名字，本意就是「把这套新模板存回同名预设」，清掉名字会让
+        // 「存为预设」拿不到名字、只能拿模板文本当名字（2026-11-14 换可编辑下拉后确立）。
         TemplateError = ValidateTemplateNow();
         OnPropertyChanged(nameof(IsTemplateActive));
         OnPropertyChanged(nameof(IsOutputFileNameReadOnly));
@@ -1349,7 +1359,13 @@ public partial class CompressSettingsViewModel : ObservableObject
     }
 
     partial void OnTemplatePresetMessageChanged(string? value)
-        => OnPropertyChanged(nameof(IsTemplatePresetMessageVisible));
+    {
+        OnPropertyChanged(nameof(IsTemplatePresetMessageVisible));
+        OnPropertyChanged(nameof(IsTemplatePresetMessageSuccessVisible));
+    }
+
+    partial void OnIsTemplatePresetMessageErrorChanged(bool value)
+        => OnPropertyChanged(nameof(IsTemplatePresetMessageSuccessVisible));
 
     /// <summary>
     /// 立刻校验一次模板（语法 + 结果合法性 + 分别压缩下的重名）。

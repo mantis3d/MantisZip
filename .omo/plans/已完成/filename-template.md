@@ -286,7 +286,9 @@ public bool IsOutputFileNameReadOnly => OutputMode != CompressOutputMode.Manual 
 | 快速压缩（`--compress-quick`） | `FileNameTemplateQuick` | 单包多源；`{name}` = 第一个源，`{name:auto}` = 公共父目录名 |
 | 分别压缩（`--compress-separate`） | `FileNameTemplateSeparate` | 每个源一条，`{seq}` 递增；`{name:auto}` 恒等于 `{name}` |
 
-每行 = `TextBox`（可编辑）+ 右侧 `ComboBox`（列出预设名，选中即把模板文本填进左侧输入框，选完清空选择）。预设的**增删只在压缩对话框里做**（按用户选择），设置页只负责「填默认值」。
+每行 = `TextBox`（可编辑）+ 右侧 `TemplatePresetPicker`（可复用的「可编辑预设名下拉 + 保存/删除图标按钮」：下拉列出预设名，选中即把模板文本填进左侧输入框；也能直接打新名字并存/删，与压缩对话框共用同一份预设库）。
+
+> **2026-11-15 更新**：原方案是「下拉 + 预设名输入框 + 存为预设/删除文字按钮」，后按用户要求合并为 `Controls/TemplatePresetPicker`（`ComboBox IsEditable` + 两个 `ToolbarIcon` 图标按钮），并把**增删权限放到两处**（设置页也能存/删，即时持久化）。早先「增删只在压缩对话框里做」的说法已作废。
 
 `SettingsWindowViewModel` 新增 6 个属性（3 个值 + 3 个标题）+ `TemplatePresetOptions`，并在 `SaveSettings`（`:1915` 一带）写回。
 

@@ -334,6 +334,27 @@ public partial class CompressSettingsWindow : Window
         SourcePicker.IsCheckboxMode = CheckboxModeCheck.IsChecked == true;
     }
 
+    /// <summary>
+    /// 命名预设被点中 → 把它的模板填进模板输入框（名字反过来留在预设名框里，
+    /// 于是随后「存为预设」是覆盖它、「删除」是删它）。
+    /// </summary>
+    private void OnTemplatePresetSelected(object? sender, MantisZip.Core.Utils.FileNameTemplatePreset preset)
+        => ViewModel.ApplyTemplatePreset(preset);
+
+    /// <summary>「存为预设」图标按钮 → 用预设名框里的名字 + 当前模板写回设置（同名覆盖）。</summary>
+    private void OnTemplatePresetSaveRequested(object? sender, string name)
+    {
+        ViewModel.TemplatePresetName = name;
+        ViewModel.SaveTemplatePresetCommand.Execute(null);
+    }
+
+    /// <summary>「删除」图标按钮 → 删掉预设名框里那条预设。</summary>
+    private void OnTemplatePresetDeleteRequested(object? sender, string name)
+    {
+        ViewModel.TemplatePresetName = name;
+        ViewModel.DeleteTemplatePresetCommand.Execute(null);
+    }
+
     private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         // 切换 Tab 后窗口高度可能变化，等布局完成后再检查位置

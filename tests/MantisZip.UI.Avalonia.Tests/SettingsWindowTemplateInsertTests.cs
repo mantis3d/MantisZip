@@ -62,7 +62,7 @@ public sealed class SettingsWindowTemplateInsertTests
     }
 
     [AvaloniaFact]
-    public void InsertButtons_SitLeftOfThePresetCombo_InTheSameRow()
+    public void InsertButtons_SitLeftOfThePresetPicker_InTheSameRow()
     {
         EnsureTheme();
         var window = new SettingsWindow();
@@ -78,27 +78,27 @@ public sealed class SettingsWindowTemplateInsertTests
                 .OfType<PlaceholderInsertButton>()
                 .Single(b => ReferenceEquals(b.TargetTextBox, box));
 
-            // 同一行里「输入框 → 按钮 → 预设下拉」从左到右，按钮必须卡在中间
-            // 预设下拉在没有预设时按 HasFileNameTemplatePresets 隐藏（Bounds 恒 0），
-            // 所以只对**有效可见**的下拉做几何断言，隐藏二叉不影响列序断言。
-            var combos = window.GetVisualDescendants()
-                .OfType<ComboBox>()
-                .Where(c => Grid.GetColumn(c) == 3)
+            // 同一行里「输入框 → 按钮 → 预设选择器」从左到右，按钮必须卡在中间。
+            // 预设选择器已换成可复用的 TemplatePresetPicker（内部 ComboBox 不再是网格的直接子级，
+            // 拿 Grid.GetColumn 找不到它），所以这里直接量控件本体。
+            var pickers = window.GetVisualDescendants()
+                .OfType<TemplatePresetPicker>()
+                .Where(p => Grid.GetColumn(p) == 3)
                 .ToList();
-            Assert.NotEmpty(combos);
+            Assert.Equal(3, pickers.Count);
 
             Assert.Equal(1, Grid.GetColumn(box));
             Assert.Equal(2, Grid.GetColumn(button));
 
             var buttonRight = button.TranslatePoint(new Point(button.Bounds.Width, 0), window);
             Assert.NotNull(buttonRight);
-            foreach (var combo in combos.Where(c => c.IsEffectivelyVisible))
+            foreach (var picker in pickers)
             {
-                var comboLeft = combo.TranslatePoint(new Point(0, 0), window);
-                Assert.NotNull(comboLeft);
-                // 按钮整体在预设下拉左侧（列顺序接反时会在这里失败）
-                Assert.True(buttonRight!.Value.X <= comboLeft!.Value.X + 1,
-                    $"插入按钮右缘 {buttonRight.Value.X} 应不大于预设下拉左缘 {comboLeft.Value.X}");
+                var pickerLeft = picker.TranslatePoint(new Point(0, 0), window);
+                Assert.NotNull(pickerLeft);
+                // 按钮整体在预设选择器左侧（列顺序接反时会在这里失败）
+                Assert.True(buttonRight!.Value.X <= pickerLeft!.Value.X + 1,
+                    $"插入按钮右缘 {buttonRight.Value.X} 应不大于预设选择器左缘 {pickerLeft.Value.X}");
             }
         }
         finally

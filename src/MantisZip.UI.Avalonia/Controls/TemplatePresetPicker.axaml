@@ -1,0 +1,42 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MantisZip.UI.Avalonia.Controls.TemplatePresetPicker"
+             x:CompileBindings="False">
+
+  <!-- ═══════ 命名预设选择器（可复用） ═══════
+       一行解决「选预设 / 起名字 / 存预设 / 删预设」：
+         · 可编辑下拉框：既能从列表里点已有预设名，也能直接打一个新名字
+         · 保存按钮（纯图标）：用框里的名字 + 宿主提供的模板内容存成预设（同名覆盖）
+         · 删除按钮（纯图标）：删掉框里名字对应的预设
+       宿主只需给 Presets / PresetName / WatermarkKey 等属性，然后接 Save / Delete / 选中事件：
+       选中事件只交出「选了哪条预设」，模板怎么填、设置怎么写都在宿主那边决定。 -->
+  <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+
+    <!-- 可编辑下拉：文本（预设名）是权威值，SelectedItem 只是从 Text 精确匹配出来的镜像。
+         选已有预设名时由 DropDownClosed 回填模板（打字打出一模一样的名字不会触发，避免误覆盖）。 -->
+    <ComboBox x:Name="NameBox"
+              Grid.Column="0"
+              IsEditable="True"
+              DisplayMemberBinding="{Binding Name}"
+              MinHeight="{DynamicResource ControlHeightSm}"
+              HorizontalAlignment="Stretch" />
+
+    <!-- 存为预设：纯图标按钮（卡片内只挂 ToolbarIcon，规则 4） -->
+    <Button x:Name="SaveButton"
+            Grid.Column="1"
+            Classes="ToolbarIcon"
+            Click="OnSaveClick">
+      <PathIcon Data="{StaticResource IconSave}" Width="14" Height="14"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Button>
+
+    <!-- 删除预设：纯图标按钮 -->
+    <Button x:Name="DeleteButton"
+            Grid.Column="2"
+            Classes="ToolbarIcon"
+            Click="OnDeleteClick">
+      <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14"
+                Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+    </Button>
+  </Grid>
+</UserControl>

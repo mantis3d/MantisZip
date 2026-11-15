@@ -90,7 +90,9 @@
                     </StackPanel>
                   </Border>
 
-                  <!-- 文件名模板：三个入口各自的默认值（留空 = 按原规则命名）；预设的增删只在压缩对话框里做，这里是只读快照 -->
+                  <!-- 文件名模板：三个入口各自的默认值（留空 = 按原规则命名）。
+                       每行右侧是可编辑的预设选择器（选已有预设即填入模板；也能起新名字 / 存 / 删），
+                       预设库与压缩对话框共用同一份设置，增删即时持久化。 -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
@@ -111,12 +113,29 @@
                                                           TargetTextBox="{Binding #FileNameTemplateDialogBox}"
                                                           Content="{Binding FileNameTemplateInsertText}"
                                                           ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
-                        <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
-                                  SelectedItem="{Binding SelectedFileNameTemplatePresetDialog}"
-                                  DisplayMemberBinding="{Binding Name}"
-                                  IsVisible="{Binding HasFileNameTemplatePresets}"
-                                  MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
+                        <!-- 可编辑预设名 + 保存/删除图标按钮（无预设时也能打字起名字，因此不再隐藏） -->
+                        <controls:TemplatePresetPicker Grid.Column="3"
+                                                       MinWidth="150"
+                                                       Presets="{Binding FileNameTemplatePresetOptions}"
+                                                       PresetName="{Binding FileNameTemplatePresetNameDialog, Mode=TwoWay}"
+                                                       WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                                       Tag="Dialog"
+                                                       ToolTip.Tip="{Binding FileNameTemplatePresetHintText}"
+                                                       PresetSelected="OnPresetSelected"
+                                                       SaveRequested="OnPresetSaveRequested"
+                                                       DeleteRequested="OnPresetDeleteRequested" />
                       </Grid>
+                      <!-- 行 1 的预设操作提示（超限 / 已保存 / 已更新）；失败红、成功次要色 -->
+                      <TextBlock Text="{Binding FileNameTemplatePresetMessageDialog}"
+                                 IsVisible="{Binding IsFileNameTemplatePresetMessageErrorDialog}"
+                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageDialog}"
+                                 Foreground="{DynamicResource ThemeStatusErrorBrush}" />
+                      <TextBlock Text="{Binding FileNameTemplatePresetMessageDialog}"
+                                 IsVisible="{Binding IsFileNameTemplatePresetMessageSuccessDialog}"
+                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageDialog}"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                       <!-- 行 2：快速压缩默认值 -->
                       <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
                         <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateQuickText}" VerticalAlignment="Center" />
@@ -131,12 +150,27 @@
                                                           TargetTextBox="{Binding #FileNameTemplateQuickBox}"
                                                           Content="{Binding FileNameTemplateInsertText}"
                                                           ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
-                        <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
-                                  SelectedItem="{Binding SelectedFileNameTemplatePresetQuick}"
-                                  DisplayMemberBinding="{Binding Name}"
-                                  IsVisible="{Binding HasFileNameTemplatePresets}"
-                                  MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
+                        <controls:TemplatePresetPicker Grid.Column="3"
+                                                       MinWidth="150"
+                                                       Presets="{Binding FileNameTemplatePresetOptions}"
+                                                       PresetName="{Binding FileNameTemplatePresetNameQuick, Mode=TwoWay}"
+                                                       WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                                       Tag="Quick"
+                                                       ToolTip.Tip="{Binding FileNameTemplatePresetHintText}"
+                                                       PresetSelected="OnPresetSelected"
+                                                       SaveRequested="OnPresetSaveRequested"
+                                                       DeleteRequested="OnPresetDeleteRequested" />
                       </Grid>
+                      <TextBlock Text="{Binding FileNameTemplatePresetMessageQuick}"
+                                 IsVisible="{Binding IsFileNameTemplatePresetMessageErrorQuick}"
+                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageQuick}"
+                                 Foreground="{DynamicResource ThemeStatusErrorBrush}" />
+                      <TextBlock Text="{Binding FileNameTemplatePresetMessageQuick}"
+                                 IsVisible="{Binding IsFileNameTemplatePresetMessageSuccessQuick}"
+                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageQuick}"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                       <!-- 行 3：分别压缩默认值（若不含 {name}/{seq}/{parent}，多源会撞名，确认时被拦） -->
                       <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
                         <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateSeparateText}" VerticalAlignment="Center" />
@@ -151,12 +185,27 @@
                                                           TargetTextBox="{Binding #FileNameTemplateSeparateBox}"
                                                           Content="{Binding FileNameTemplateInsertText}"
                                                           ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
-                        <ComboBox Grid.Column="3" ItemsSource="{Binding FileNameTemplatePresetOptions}"
-                                  SelectedItem="{Binding SelectedFileNameTemplatePresetSeparate}"
-                                  DisplayMemberBinding="{Binding Name}"
-                                  IsVisible="{Binding HasFileNameTemplatePresets}"
-                                  MinWidth="140" ToolTip.Tip="{Binding FileNameTemplatePresetHintText}" />
+                        <controls:TemplatePresetPicker Grid.Column="3"
+                                                       MinWidth="150"
+                                                       Presets="{Binding FileNameTemplatePresetOptions}"
+                                                       PresetName="{Binding FileNameTemplatePresetNameSeparate, Mode=TwoWay}"
+                                                       WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                                       Tag="Separate"
+                                                       ToolTip.Tip="{Binding FileNameTemplatePresetHintText}"
+                                                       PresetSelected="OnPresetSelected"
+                                                       SaveRequested="OnPresetSaveRequested"
+                                                       DeleteRequested="OnPresetDeleteRequested" />
                       </Grid>
+                      <TextBlock Text="{Binding FileNameTemplatePresetMessageSeparate}"
+                                 IsVisible="{Binding IsFileNameTemplatePresetMessageErrorSeparate}"
+                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageSeparate}"
+                                 Foreground="{DynamicResource ThemeStatusErrorBrush}" />
+                      <TextBlock Text="{Binding FileNameTemplatePresetMessageSeparate}"
+                                 IsVisible="{Binding IsFileNameTemplatePresetMessageSuccessSeparate}"
+                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
+                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageSeparate}"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                     </StackPanel>
                   </Border>
 

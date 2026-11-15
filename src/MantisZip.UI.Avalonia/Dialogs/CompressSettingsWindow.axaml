@@ -152,36 +152,35 @@
                                                   Content="{Binding LocalizedStrings[Compress_FileNameTemplate_Insert]}"
                                                   ToolTip.Tip="{Binding LocalizedStrings[Compress_FileNameTemplate_InsertTip]}" />
               </Grid>
-              <!-- 命名预设：选中即填入模板输入框（不写回设置）；旁边的输入框 + 两个按钮用于增删预设 -->
-              <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}" Margin="80,0,0,0">
-                <ComboBox ItemsSource="{Binding TemplatePresetOptions}"
-                          SelectedItem="{Binding SelectedTemplatePreset}"
-                          DisplayMemberBinding="{Binding Name}"
-                          MinWidth="180"
-                          IsVisible="{Binding HasTemplatePresets}" />
-                <TextBox Text="{Binding NewPresetName}"
-                         Watermark="{Binding LocalizedStrings[Compress_FileNameTemplate_PresetName]}"
-                         MinWidth="140"
-                         MinHeight="{DynamicResource ControlHeightSm}"
-                         Background="{DynamicResource ThemeSurfaceBgBrush}"
-                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
-                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
-                <Button Content="{Binding LocalizedStrings[Compress_FileNameTemplate_SavePreset]}"
-                        Command="{Binding SaveTemplatePresetCommand}" />
-                <Button Content="{Binding LocalizedStrings[Compress_FileNameTemplate_DeletePreset]}"
-                        Command="{Binding DeleteTemplatePresetCommand}"
-                        IsVisible="{Binding HasTemplatePresets}" />
-              </StackPanel>
-              <!-- 预设操作提示（如超过 20 条上限）：独立一行，不复用「文件名」那一格的错误槽，
-                   否则模板本身合法时也会把可读的文件名顶成红框 -->
+              <!-- 命名预设：可编辑下拉框（装预设名）+ 保存/删除两个纯图标按钮。
+                   下拉项 = 已有预设；打字 = 新名字（或要覆盖的名字）；点已有预设会回填上方模板。
+                   增删都走 TemplatePresetPicker 的事件，由 VM 写回设置（即时生效）。 -->
+              <controls:TemplatePresetPicker Margin="80,0,0,0"
+                                             Presets="{Binding TemplatePresetOptions}"
+                                             PresetName="{Binding TemplatePresetName, Mode=TwoWay}"
+                                             WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                             PresetSelected="OnTemplatePresetSelected"
+                                             SaveRequested="OnTemplatePresetSaveRequested"
+                                             DeleteRequested="OnTemplatePresetDeleteRequested" />
+              <!-- 预设操作提示（超过 20 条上限 / 已保存 / 已更新）：独立一行，
+                   不复用「文件名」那一格的错误槽，否则模板本身合法时也会把可读的文件名顶成红框。
+                   失败用红色、成功用次要色 —— 两个 TextBlock 由 IsError 互斥显示。 -->
               <TextBlock Text="{Binding TemplatePresetMessage}"
-                         IsVisible="{Binding IsTemplatePresetMessageVisible}"
+                         IsVisible="{Binding IsTemplatePresetMessageError}"
                          Margin="80,0,0,0"
                          TextWrapping="NoWrap"
                          TextTrimming="CharacterEllipsis"
                          FontSize="12"
                          ToolTip.Tip="{Binding TemplatePresetMessage}"
                          Foreground="{DynamicResource ThemeStatusErrorBrush}" />
+              <TextBlock Text="{Binding TemplatePresetMessage}"
+                         Margin="80,0,0,0"
+                         TextWrapping="NoWrap"
+                         TextTrimming="CharacterEllipsis"
+                         FontSize="12"
+                         ToolTip.Tip="{Binding TemplatePresetMessage}"
+                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                         IsVisible="{Binding IsTemplatePresetMessageSuccessVisible}" />
               <!-- 最终文件名 + 扩展名：启用模板时只读展示渲染结果，未启用时可直接编辑。
                    分别压缩模式下整行隐藏（每个源各自成包，见 IsFileNameSectionVisible）。 -->
               <Grid ColumnDefinitions="80,*,Auto"
