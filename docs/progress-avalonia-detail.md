@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-15** — 可编辑下拉外框缺一块：全局 TextBox 样式盖住 ComboBox 边框
+  - **症状**：用户报「预设行那个下拉控件外面边框缺一块，鼠标划过时又正常」。截图与像素扫描一致：外框只剩右侧一段弧线，上边左半段、左边上半段整段纯白；100% 缩放下必现，125% 及以上消失，hover 后恢复正常。
+  - **根因**：`App.axaml` 的「非热态 TextBox」样式（`TextBox:not(:pointerover):not(:focus-within):not(:disabled) /template/ Border#PART_BorderElement`，给普通输入框铺 `ThemeSurfaceBgBrush` 底）**同时命中了 Fluent ComboBox 可编辑模式内嵌的 `PART_EditableTextBox`**。ComboBox 自己画一圈 1px 边框，而这个内嵌 TextBox 占满左侧 68%，它的模板 Border 被涂成不透明纯白（`#FFFFFFFF`）后正好压在边框上 ⇒ 左半截边框消失。hover 时内嵌 TextBox 进入 `:pointerover`，选择器的 `:not(:pointerover)` 不再命中、白底让位，边框才露出来 —— 所以「划上去就正常」。二分定位：单独加 Fluent+主题 = 0/100 缺失；只加 TextBox 那条 `/template/ Border#PART_BorderElement` = 97/100 缺失；全量 App 样式 = 100/100。
+  - **修法**：在选择器末尾追加 `:not(#PART_EditableTextBox)`，把可编辑下拉的内嵌 TextBox 排除在这条样式之外，并就地写注释说明为什么不能删（含上面这条 hover 机理）。内层 Border 是 TextBox 的**模板子级**，正常写法需要 `/template/`；而它已经在一条带 `/template/` 的选择器尾巴上，Avalonia 不支持双层 `/template/` 穿透（实测各种 `ComboBox /template/ TextBox#...` 写法都改不动它），只能按名字在源头排除。
+  - **试过但无效（不要再走一遍）**：`ComboBox /template/ TextBox#PART_EditableTextBox` 设 `Background=Transparent`（画底的是 TextBox 自己的模板 Border，不是 TextBox 本体）；给它设 `Margin=1` 内缩（确实能把缺口从 99/100 降到 5/100，但属于绕过 —— 白底仍在、换个内边距就会复发）；设 `CornerRadius`（该 Border `BorderThickness=0,0,0,0` 不描边，形状无关）。
+  - **回归测试** `tests/MantisZip.UI.Avalonia.Tests/ComboEditableBorderTests.cs`（2 例）：① 源码级 —— 读 `App.axaml` 定位那条选择器，断言含 `PART_BorderElement` 与 `:not(#PART_EditableTextBox)`；② 运行期 —— 并入真实 `App.axaml` 样式后物化 `TemplatePresetPicker`，断言内嵌 Border 的 `Background` 不是不透明实色画刷、ComboBox 外框 `BorderThickness.Left > 0`，并在 96 DPI 下渲染扫像素核对「上边左半段 / 左边上半段」缺失像素 ≤ 各段 1/4（缺陷复现时缺 98%/100%）。反向验证：把选择器里的 `:not(#PART_EditableTextBox)` 删掉，两例都红。
+  - **测试环境要点（否则这条用例永远「单跑绿、全量红」或反过来）**：无头宿主 `TestAppBuilder` 用 `AppBuilder.Configure<Application>()`，**不跑 `App.Initialize()`、默认没有任何全局样式**，所以普通控件测试渲染出来一律「正常」，真机缺陷被完全掩盖；要复现必须先 `new MantisZip.UI.Avalonia.App(); app.Initialize();`，把拿到的 `Style` 逐个 `Remove` 掉 owner 再挂到**本用例自己的 `Window.Styles`**（不能直接塞 `Application.Current.Styles`：同进程里 `AboutWindowUpdateTabTests` / `PathBreadcrumbSuggestionClickTests` 等会往全局表里加 `FluentTheme` 与局部 `Style`，共用一张表结果随执行顺序漂移），另外还得补 `FluentTheme` 与 `ThemeLight.axaml` / `AppIcons.axaml` 两个资源字典，否则控件没模板、边框刷为空。
+  - **验证**：`build -Target avalonia`（Release）0 警告；`test -Target ui-tests` 全绿（891 通过 / 3 跳过）。
+
 **2026-11-15** — 命名预设改「可编辑下拉 + 图标按钮」单控件，压缩对话框与设置页三行共用
   - **起因**：用户提出「预设那行是下拉框 + 名字输入框 + 保存按钮，我记得有能同时充当框和输入框的控件，希望替换成它」。讨论后四项拍板：① 可编辑框里装**预设名**（不是模板文本）；② 选中已有预设要把它模板填进上方模板框；③「保存」「删除」都做纯图标按钮、紧挨下拉；④ 做成可复用控件，压缩对话框与设置页三行**一起替换**。追加三问：设置页也要能增删（原先计划写的是「增删只在对话框」）、改模板后预设名要保留（名字 = 要覆盖/要删除的那条）、存成功也要有提示。
   - **控件选型**：用 `ComboBox IsEditable="True"` 而非 `AutoCompleteBox`。`AutoCompleteBox` 打字时会把首个候选自动设成 `SelectedItem`（`Controls/PathBreadcrumb.axaml.cs:603` 有踩坑注释），而 `ComboBox.TextChanged` 只在**完全同名**（`CurrentCultureIgnoreCase` 精确比对）时才联动 `SelectedItem`，行为可预期。

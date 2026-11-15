@@ -64,7 +64,16 @@
         </Setter.Value>
       </Setter>
     </Style>
-    <Style Selector="TextBox:not(:pointerover):not(:focus-within):not(:disabled) /template/ Border#PART_BorderElement">
+    <!-- 非热态 TextBox 底色/边框（见上一条注释）。
+         ⚠ 必须排除 ComboBox 可编辑模式内嵌的 TextBox（模板里叫 PART_EditableTextBox）：
+         Fluent 的 ComboBox 自己画一圈 1px 边框，可编辑模式下内部又嵌入一个占满左侧的
+         TextBox；若它也吃到本样式，其 Border#PART_BorderElement 会被涂成不透明的
+         ThemeSurfaceBgBrush（浅色主题=纯白），正好盖住 ComboBox 边框的左半截 ——
+         表现为「可编辑下拉外框缺一块，鼠标划上去又正常」（hover 时 :not(:pointerover)
+         不再命中，白底让位、边框重现）。曾实际发生（2026-11-15）。
+         注：内层 Border 是 TextBox 的模板子级，不能反过来用 /template/ 选择器去改它
+         （Avalonia 不支持双层 /template/ 穿透），只能在这里按名字排除。 -->
+    <Style Selector="TextBox:not(:pointerover):not(:focus-within):not(:disabled):not(#PART_EditableTextBox) /template/ Border#PART_BorderElement">
       <Setter Property="Background" Value="{DynamicResource ThemeSurfaceBgBrush}" />
       <Setter Property="BorderBrush" Value="{DynamicResource ThemeBorderBrush}" />
     </Style>
