@@ -1,4 +1,5 @@
 ﻿{
+  "Preview_AnimationFrameLimited": "動畫影格過多（共 {0} 格），為控制記憶體用量已僅顯示首格",
   "Picker_NewFolder": "新增資料夾",
   "Picker_NewFolderTitle": "新增資料夾",
   "Picker_NewFolderPrompt": "資料夾名稱：",

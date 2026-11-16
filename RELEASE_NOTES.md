@@ -19,6 +19,9 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 
 **修复 / Fixes**
 
+- **带调色板的 ICO 打不开、动画 WebP 预览卡顿（issue #89）** — ① 低色深（1 / 4 / 8 位）ICO 的像素起始偏移漏算了调色板长度，整帧解不出来、预览直接报不支持；② 动画 WebP 改为链式增量解码并直写位图，26 帧的文件从 7.9 秒降到 0.4 秒左右，帧数超过 600 或像素总量超过 192 MB 时只显示首帧并在画面上说明原因。
+- **Palette ICOs failed to open and animated WebP previews crawled (issue #89)** — palette-based ICO frames (1 / 4 / 8-bit) computed the pixel offset without the palette size, so the frame never decoded and the preview reported the file as unsupported; animated WebP now decodes frames incrementally straight into bitmaps, cutting a 26-frame file from 7.9 s to about 0.4 s, and files over 600 frames or 192 MB of pixels show only the first frame with an on-screen explanation.
+- ![ICO 图标预览已能显示带调色板的帧；动画 WebP 预览帧数超限时只显示首帧并给出说明](docs/images/version/v0.5.7/Issue89Preview.png)
 - **「解压到此处」「解压到同一文件夹」「智能解压」不再无视冲突设置** — 这三条原地解压的路径此前调用引擎时**不传任何选项**，引擎对「没有设置」一律按覆盖处理：用户明明在设置里选了「每次询问」或「跳过」，点这三个入口仍然静默覆盖磁盘上的同名文件（登记为 KI-012，属于数据丢失级）。现在三条路径都带上默认策略与询问弹窗，进度窗口里同样出现「冲突时:」下拉，行为与其他解压入口完全一致：选「询问」就逐个弹、选「跳过」就一个都不动。
 - **"Extract here", "extract to folder" and smart extract no longer ignore your conflict settings** — those three in-place paths called the engine **without any options**, and the engine treats "no settings" as overwrite: even with "ask every time" or "skip" configured, these entry points silently replaced files of the same name on disk (tracked as KI-012, a data-loss class issue). All three now pass the default policy and the ask dialog, and their progress window shows the same "On conflict:" dropdown, so they behave exactly like every other extraction entry point: "ask" prompts per conflict, "skip" leaves every existing file untouched.
 - **右键菜单用一次就消失（issue #80）** — 启用「动态菜单」后右键压缩或解压一次，MantisZip 菜单项会永久消失。现在菜单组件自己上报「菜单确实画出来了」的心跳，一旦失效就自动回退到静态菜单，不会再出现「既没有动态菜单、也没有兜底」的两头空。

@@ -187,7 +187,10 @@ internal static class IcoParser
             writer.Write(fileSize);
             writer.Write((short)0);
             writer.Write((short)0);
-            writer.Write(14 + headerSize); // pixel data offset
+            // pixel data offset 必须跳过「文件头 14 字节 + DIB 头 headerSize + 调色板 paletteSize」。
+            // 漏掉 paletteSize 时，BMP 解码器会把调色板前 N 字节当成像素数据读，
+            // 1/4/8bpp（带调色板）的 ICO 帧必然解不出（issue #89 的 Test_01/Test_02.ico 均为 4bpp + 16 色）。
+            writer.Write(14 + headerSize + paletteSize); // pixel data offset
             writer.Write(dibData, 0, dibWithoutAndMask);
             writer.Flush();
             ms.Position = 0;
