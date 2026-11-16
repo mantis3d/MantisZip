@@ -194,6 +194,7 @@ node tools\dsh-plugin-mantiszip\test\self-test.mjs --skip-build
 - **覆盖率**：VSTest 走 `--collect` 不通，MTP 要给测试项目加 `Microsoft.Testing.Extensions.CodeCoverage`，涉及测试依赖决策。
 - **Dependabot**：`NuGet` + `github-actions` 两条生态。
 - **ISCC 干跑**：PR 上编译安装脚本，防 `installer.iss` 语法错误到发版才暴露。
+- **文件名模板三处留白**（v0.5.7 计划自认的边界，已登记为 [KI-019 / KI-020 / KI-021](KNOWN_ISSUES.md)）：① `--compress-combined` 不接模板（CLI 合并路径自算名字）；② `{ext}` 对目录源渲染成空串；③ 帮助示例固定写 `.zip`。前两条改行为、第三条改文案，三条都等真实需求或下次重写模板帮助时一并处理。
 
 ## 10. 相关文件
 

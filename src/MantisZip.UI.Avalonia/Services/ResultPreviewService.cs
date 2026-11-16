@@ -294,7 +294,6 @@ public static class ResultPreviewService
         switch (outputMode)
         {
             case CompressOutputMode.Manual:
-            case CompressOutputMode.Combined:
             {
                 // 确定有效的输出路径
                 string? effectiveOutputPath = outputPath;
@@ -381,15 +380,10 @@ public static class ResultPreviewService
             }
 
             default:
-                root = new PreviewTreeNode
-                {
-                    Name = "",
-                    FullPath = "",
-                    DisplayLabel = "",
-                    IsExpanded = true
-                };
-                planItems = Array.Empty<CompressPlanItem>();
-                break;
+                // 目前只有 Manual / Separate 两态。新增模式却忘了在这里接线时，宁可当场炸掉：
+                // 旧实现返回空预览树，界面表现为「没有内容可压缩」，比异常更难查。
+                throw new ArgumentOutOfRangeException(
+                    nameof(outputMode), outputMode, "Unsupported compress output mode for preview assembly.");
         }
 
         CalculateDescendantStats(root);
@@ -437,7 +431,7 @@ public static class ResultPreviewService
         string? fileNameTemplate, DateTime? templateTimestamp,
         IReadOnlyList<string> sourcePaths)
     {
-        // 单包多源（Manual / Combined）无显式输出路径时，模板按「第一个源 + 公共父目录名」渲染。
+        // 单包多源无显式输出路径时，模板按「第一个源 + 公共父目录名」渲染。
         var templatedName = CompressPathPlanner.ComputeSingleArchiveName(
             sourcePaths, format, fileNameTemplate, templateTimestamp);
         return templatedName

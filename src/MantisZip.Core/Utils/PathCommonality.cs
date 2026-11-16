@@ -37,7 +37,7 @@ public static class PathCommonality
         var common = parents[0];
         for (int i = 1; i < parents.Count; i++)
         {
-            while (!parents[i].StartsWith(common, StringComparison.OrdinalIgnoreCase))
+            while (!IsWithin(common, parents[i]))
             {
                 var parent = Path.GetDirectoryName(common);
                 if (parent == null) return null;
@@ -45,6 +45,25 @@ public static class PathCommonality
             }
         }
         return common;
+    }
+
+    /// <summary>
+    /// 判断 <paramref name="candidate"/> 是否落在 <paramref name="ancestor"/> 之内（含两者相等）。
+    /// 前缀命中后还要求下一字符是目录分隔符 —— 否则 <c>D:\a</c> 会被当成 <c>D:\ab</c> 的祖先
+    /// （<c>"ab"</c> 恰以 <c>"a"</c> 开头），公共父目录会退化成 <c>D:\a</c> 而不是 <c>D:\</c>。
+    /// 盘符根（<c>D:\</c>）去掉尾分隔符后长度相等即同层，无需再看下一字符。
+    /// </summary>
+    private static bool IsWithin(string ancestor, string candidate)
+    {
+        var lhs = ancestor.TrimEnd('\\', '/');
+        var rhs = candidate.TrimEnd('\\', '/');
+
+        if (rhs.Equals(lhs, StringComparison.OrdinalIgnoreCase)) return true;
+        if (rhs.Length <= lhs.Length) return false;
+        if (!rhs.StartsWith(lhs, StringComparison.OrdinalIgnoreCase)) return false;
+
+        var next = rhs[lhs.Length];
+        return next == '\\' || next == '/';
     }
 
     /// <summary>

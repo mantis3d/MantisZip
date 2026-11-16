@@ -999,14 +999,62 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string FileNameTemplateInsertText => LocalizationManager.T("Compress_FileNameTemplate_Insert");
     public string FileNameTemplateInsertTipText => LocalizationManager.T("Compress_FileNameTemplate_InsertTip");
 
-    /// <summary>设置页里的预设下拉（选中即填进对应输入框；增删只在压缩对话框里做）。</summary>
+    /// <summary>设置页里的预设选择器下拉项（与压缩对话框共用同一份预设库，增删即时持久化）。</summary>
     public System.Collections.ObjectModel.ObservableCollection<MantisZip.Core.Utils.FileNameTemplatePreset> FileNameTemplatePresetOptions { get; } = new();
 
-    [ObservableProperty] private MantisZip.Core.Utils.FileNameTemplatePreset? _selectedFileNameTemplatePresetDialog;
-    [ObservableProperty] private MantisZip.Core.Utils.FileNameTemplatePreset? _selectedFileNameTemplatePresetQuick;
-    [ObservableProperty] private MantisZip.Core.Utils.FileNameTemplatePreset? _selectedFileNameTemplatePresetSeparate;
+    /// <summary>三行各自的预设名框内容（可编辑下拉的文本，双向）。空串 = 还没选/还没起名。</summary>
+    [ObservableProperty] private string? _fileNameTemplatePresetNameDialog;
+    [ObservableProperty] private string? _fileNameTemplatePresetNameQuick;
+    [ObservableProperty] private string? _fileNameTemplatePresetNameSeparate;
 
-    /// <summary>预设列表来自设置，保存/删除在压缩对话框里，这里只读一份快照。</summary>
+    /// <summary>三行各自的预设操作提示（保存/更新/超限/删除）。与行共用一条槽，成功与失败靠 IsError 区分。</summary>
+    [ObservableProperty] private string? _fileNameTemplatePresetMessageDialog;
+    [ObservableProperty] private string? _fileNameTemplatePresetMessageQuick;
+    [ObservableProperty] private string? _fileNameTemplatePresetMessageSeparate;
+
+    [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorDialog;
+    [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorQuick;
+    [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorSeparate;
+
+    public bool IsFileNameTemplatePresetMessageVisibleDialog => FileNameTemplatePresetMessageDialog != null;
+    public bool IsFileNameTemplatePresetMessageVisibleQuick => FileNameTemplatePresetMessageQuick != null;
+    public bool IsFileNameTemplatePresetMessageVisibleSeparate => FileNameTemplatePresetMessageSeparate != null;
+
+    public bool IsFileNameTemplatePresetMessageSuccessDialog
+        => FileNameTemplatePresetMessageDialog != null && !IsFileNameTemplatePresetMessageErrorDialog;
+    public bool IsFileNameTemplatePresetMessageSuccessQuick
+        => FileNameTemplatePresetMessageQuick != null && !IsFileNameTemplatePresetMessageErrorQuick;
+    public bool IsFileNameTemplatePresetMessageSuccessSeparate
+        => FileNameTemplatePresetMessageSeparate != null && !IsFileNameTemplatePresetMessageErrorSeparate;
+
+    partial void OnFileNameTemplatePresetMessageDialogChanged(string? value)
+    {
+        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageVisibleDialog));
+        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessDialog));
+    }
+
+    partial void OnFileNameTemplatePresetMessageQuickChanged(string? value)
+    {
+        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageVisibleQuick));
+        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessQuick));
+    }
+
+    partial void OnFileNameTemplatePresetMessageSeparateChanged(string? value)
+    {
+        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageVisibleSeparate));
+        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessSeparate));
+    }
+
+    partial void OnIsFileNameTemplatePresetMessageErrorDialogChanged(bool value)
+        => OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessDialog));
+
+    partial void OnIsFileNameTemplatePresetMessageErrorQuickChanged(bool value)
+        => OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessQuick));
+
+    partial void OnIsFileNameTemplatePresetMessageErrorSeparateChanged(bool value)
+        => OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessSeparate));
+
+    /// <summary>预设列表来自设置（与压缩对话框共享同一份）。</summary>
     private void ReloadFileNameTemplatePresets()
     {
         FileNameTemplatePresetOptions.Clear();
@@ -1014,26 +1062,121 @@ public partial class SettingsWindowViewModel : ObservableObject
             FileNameTemplatePresetOptions.Add(preset);
     }
 
-    // 三个下拉各自「选中即填入」，填完清空选择，避免留下高亮误导
-    partial void OnSelectedFileNameTemplatePresetDialogChanged(MantisZip.Core.Utils.FileNameTemplatePreset? value)
+    /// <summary>某一行选中了已有预设 → 把它的模板填进本行模板框，名字留在预设名框里。</summary>
+    public void ApplyFileNameTemplatePreset(Models.FileNameTemplateRow row, MantisZip.Core.Utils.FileNameTemplatePreset? preset)
     {
-        if (value is null) return;
-        FileNameTemplateDialog = value.Template;
-        SelectedFileNameTemplatePresetDialog = null;
+        if (preset is null) return;
+
+        switch (row)
+        {
+            case Models.FileNameTemplateRow.Dialog:
+                FileNameTemplatePresetNameDialog = preset.Name;
+                if (!string.Equals(FileNameTemplateDialog, preset.Template, StringComparison.Ordinal))
+                    FileNameTemplateDialog = preset.Template;
+                break;
+            case Models.FileNameTemplateRow.Quick:
+                FileNameTemplatePresetNameQuick = preset.Name;
+                if (!string.Equals(FileNameTemplateQuick, preset.Template, StringComparison.Ordinal))
+                    FileNameTemplateQuick = preset.Template;
+                break;
+            case Models.FileNameTemplateRow.Separate:
+                FileNameTemplatePresetNameSeparate = preset.Name;
+                if (!string.Equals(FileNameTemplateSeparate, preset.Template, StringComparison.Ordinal))
+                    FileNameTemplateSeparate = preset.Template;
+                break;
+        }
     }
 
-    partial void OnSelectedFileNameTemplatePresetQuickChanged(MantisZip.Core.Utils.FileNameTemplatePreset? value)
+    /// <summary>
+    /// 某一行「存为预设」：用该行的预设名框 + 该行模板写回设置（同名覆盖，上限 20 条）。
+    /// 预设是全应用共享的库数据（压缩对话框也用同一份），所以立即持久化，不跟着本窗口的「取消」回滚。
+    /// </summary>
+    public void SaveFileNameTemplatePreset(Models.FileNameTemplateRow row)
     {
-        if (value is null) return;
-        FileNameTemplateQuick = value.Template;
-        SelectedFileNameTemplatePresetQuick = null;
+        var name = TemplateNameOf(row);
+        var template = TemplateTextOf(row);
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            SetPresetMessage(row, LocalizationManager.T("Compress_FileNameTemplate_EmptyResult"), isError: true);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(name)) name = template.Trim();
+
+        var overwriting = _settings.FileNameTemplatePresets.Any(
+            p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        if (!_settings.AddFileNameTemplatePreset(new MantisZip.Core.Utils.FileNameTemplatePreset(name, template)))
+        {
+            SetPresetMessage(row,
+                LocalizationManager.T("Compress_FileNameTemplate_PresetLimit", AppSettings.MaxFileNameTemplatePresets),
+                isError: true);
+            return;
+        }
+
+        _settings.Save();
+        ReloadFileNameTemplatePresets();
+        SetPresetName(row, name);
+        SetPresetMessage(row,
+            LocalizationManager.T(
+                overwriting ? "Compress_FileNameTemplate_PresetUpdated" : "Compress_FileNameTemplate_PresetSaved",
+                name),
+            isError: false);
     }
 
-    partial void OnSelectedFileNameTemplatePresetSeparateChanged(MantisZip.Core.Utils.FileNameTemplatePreset? value)
+    /// <summary>某一行「删除」：删掉该行预设名框里那条预设并立即持久化。</summary>
+    public void DeleteFileNameTemplatePreset(Models.FileNameTemplateRow row)
     {
-        if (value is null) return;
-        FileNameTemplateSeparate = value.Template;
-        SelectedFileNameTemplatePresetSeparate = null;
+        var name = TemplateNameOf(row).Trim();
+        if (string.IsNullOrEmpty(name)) return;
+        if (!_settings.RemoveFileNameTemplatePreset(name)) return;
+
+        _settings.Save();
+        ReloadFileNameTemplatePresets();
+        SetPresetMessage(row, null, isError: false);
+    }
+
+    private string TemplateNameOf(Models.FileNameTemplateRow row) => row switch
+    {
+        Models.FileNameTemplateRow.Dialog => FileNameTemplatePresetNameDialog ?? "",
+        Models.FileNameTemplateRow.Quick => FileNameTemplatePresetNameQuick ?? "",
+        _ => FileNameTemplatePresetNameSeparate ?? "",
+    };
+
+    private string? TemplateTextOf(Models.FileNameTemplateRow row) => row switch
+    {
+        Models.FileNameTemplateRow.Dialog => FileNameTemplateDialog,
+        Models.FileNameTemplateRow.Quick => FileNameTemplateQuick,
+        _ => FileNameTemplateSeparate,
+    };
+
+    private void SetPresetName(Models.FileNameTemplateRow row, string? name)
+    {
+        switch (row)
+        {
+            case Models.FileNameTemplateRow.Dialog: FileNameTemplatePresetNameDialog = name; break;
+            case Models.FileNameTemplateRow.Quick: FileNameTemplatePresetNameQuick = name; break;
+            default: FileNameTemplatePresetNameSeparate = name; break;
+        }
+    }
+
+    private void SetPresetMessage(Models.FileNameTemplateRow row, string? message, bool isError)
+    {
+        switch (row)
+        {
+            case Models.FileNameTemplateRow.Dialog:
+                FileNameTemplatePresetMessageDialog = message;
+                IsFileNameTemplatePresetMessageErrorDialog = isError;
+                break;
+            case Models.FileNameTemplateRow.Quick:
+                FileNameTemplatePresetMessageQuick = message;
+                IsFileNameTemplatePresetMessageErrorQuick = isError;
+                break;
+            default:
+                FileNameTemplatePresetMessageSeparate = message;
+                IsFileNameTemplatePresetMessageErrorSeparate = isError;
+                break;
+        }
     }
 
     public string CompressConflictActionText => LocalizationManager.T("Settings_Compress_ConflictAction");
@@ -1154,6 +1297,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ContextMenuEnableExtractTo => LocalizationManager.T("Settings_ContextMenu_EnableExtractTo");
     public string ContextMenuShowMenuIcons => LocalizationManager.T("Settings_ContextMenu_ShowMenuIcons");
     public string ContextMenuEnableDynamicMenu => LocalizationManager.T("Settings_ContextMenu_EnableDynamicMenu");
+    public string ContextMenuEnableDynamicMenuHint => LocalizationManager.T("Settings_ContextMenu_EnableDynamicMenu_Hint");
     public string ContextMenuInstall => LocalizationManager.T("Settings_ContextMenu_Install");
     public string ContextMenuUninstall => LocalizationManager.T("Settings_ContextMenu_Uninstall");
     public string ContextMenuStatusGroup => LocalizationManager.T("Settings_ContextMenu_StatusGroup");
@@ -1951,6 +2095,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ContextMenuEnableExtractTo));
         OnPropertyChanged(nameof(ContextMenuShowMenuIcons));
         OnPropertyChanged(nameof(ContextMenuEnableDynamicMenu));
+        OnPropertyChanged(nameof(ContextMenuEnableDynamicMenuHint));
         OnPropertyChanged(nameof(ContextMenuInstall));
         OnPropertyChanged(nameof(ContextMenuUninstall));
         OnPropertyChanged(nameof(ContextMenuStatusGroup));
@@ -2374,8 +2519,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
             Save();
-            ShellIntegration.Uninstall();
-            ShellIntegration.Install();
+            ShellIntegration.Install();          // Install 内部先做纯注册表清理，不重启资源管理器
             ShellIntegration.CheckComStatus();
             RefreshShellStatus();
             await AppMessageBox.Show(
@@ -2403,7 +2547,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         try
         {
             ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
-            ShellIntegration.Uninstall();
+            ShellIntegration.RemoveMenus();       // 设置页卸载：不重启资源管理器
             RefreshShellStatus();
             await AppMessageBox.Show(
                 LocalizationManager.T("Settings_ContextMenu_UpdatedMsg"),
@@ -2431,8 +2575,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
             Save();
-            ShellIntegration.Uninstall();
-            ShellIntegration.Install();
+            ShellIntegration.Install();          // Install 内部先做纯注册表清理，不重启资源管理器
             ShellIntegration.CheckComStatus();
             RefreshShellStatus();
         }

@@ -41,6 +41,26 @@ public class PathCommonalityTests
     public void FindCommonParent_DriveRootCommon_ReturnsDriveRoot()
         => Assert.Equal(@"D:\", PathCommonality.FindCommonParent([@"D:\x.txt", @"D:\y.txt"]));
 
+    /// <summary>
+    /// 目录名互为前缀（<c>D:\a</c> 与 <c>D:\ab</c>）：公共父目录必须是盘符根，
+    /// 不能因为字符串前缀命中就把 <c>D:\a</c> 当成祖先 —— 否则 <c>{name:auto}</c>
+    /// 会渲染成 "a" 而不是按设计回退（2026-11-13 实测缺陷）。
+    /// </summary>
+    [Fact]
+    public void FindCommonParent_SiblingDirectoryNamesWhereOneIsPrefixOfOther_ReturnsDriveRoot()
+        => Assert.Equal(@"D:\", PathCommonality.FindCommonParent([@"D:\a\b\x.txt", @"D:\ab\y.txt"]));
+
+    /// <summary>多层都在同一盘且名字互为前缀：公共父目录仍是盘符根。</summary>
+    [Fact]
+    public void FindCommonParent_PrefixSharingSiblingDirectories_ReturnsDriveRoot()
+        => Assert.Equal(@"D:\", PathCommonality.FindCommonParent(
+            [@"D:\work\report\x.txt", @"D:\workshop\report\y.txt"]));
+
+    /// <summary>名字只是前缀、但确实同属一个真祖先时，仍应返回该真祖先（别把修法做过度）。</summary>
+    [Fact]
+    public void FindCommonParent_SharedRealAncestorWithPrefixSiblings_ReturnsThatAncestor()
+        => Assert.Equal(@"D:\a", PathCommonality.FindCommonParent([@"D:\a\b\x.txt", @"D:\a\bc\y.txt"]));
+
     [Theory]
     [InlineData(@"C:\")]
     [InlineData("C:")]

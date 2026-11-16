@@ -50,6 +50,13 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **「解压到此处」「解压到同一文件夹」「智能解压」不再无视冲突设置** — 这三条原地解压的路径此前调用引擎时**不传任何选项**，引擎对「没有设置」一律按覆盖处理：用户明明在设置里选了「每次询问」或「跳过」，点这三个入口仍然静默覆盖磁盘上的同名文件（登记为 KI-012，属于数据丢失级）。现在三条路径都带上默认策略与询问弹窗，进度窗口里同样出现「冲突时:」下拉，行为与其他解压入口完全一致：选「询问」就逐个弹、选「跳过」就一个都不动。
 - **"Extract here", "extract to folder" and smart extract no longer ignore your conflict settings** — those three in-place paths called the engine **without any options**, and the engine treats "no settings" as overwrite: even with "ask every time" or "skip" configured, these entry points silently replaced files of the same name on disk (tracked as KI-012, a data-loss class issue). All three now pass the default policy and the ask dialog, and their progress window shows the same "On conflict:" dropdown, so they behave exactly like every other extraction entry point: "ask" prompts per conflict, "skip" leaves every existing file untouched.
+- **右键菜单用一次就消失（issue #80）** — 启用「动态菜单」后右键压缩或解压一次，MantisZip 菜单项会永久消失。现在菜单组件自己上报「菜单确实画出来了」的心跳，一旦失效就自动回退到静态菜单，不会再出现「既没有动态菜单、也没有兜底」的两头空。
+- **The context menu no longer disappears after one use (issue #80)** — with the dynamic menu enabled, using MantisZip once from the right-click menu made the entry vanish for good. The menu component now reports its own "menu was drawn" heartbeat and falls back to the static menu when it stops, so the two can no longer cancel each other out.
+
+**变更 / Changes**
+
+- **动态右键菜单改为实验开关，默认关闭** — 默认使用静态级联菜单，不依赖资源管理器加载 .NET 组件。想用带文件名标签的动态菜单可在「设置 → 右键菜单」打开，失败会自动回退；同一页的「安装 / 应用」也不再重启资源管理器。
+- **The dynamic context menu is now an experimental opt-in, off by default** — the default is the static cascade menu, which doesn't rely on Explorer loading a .NET component. The dynamic menu with file-name labels can be enabled in Settings → Context menu and falls back automatically if it fails; "Install / Apply" on that page no longer restarts Explorer either.
 
 ## v0.5.6
 

@@ -182,7 +182,7 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
     }
 
     [Fact]
-    public void PresetSelection_FillsTemplateAndKeepsSelection()
+    public void PresetSelection_FillsTemplateAndKeepsName()
     {
         Apply(s =>
         {
@@ -194,17 +194,19 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
         Assert.Single(vm.TemplatePresetOptions);
 
-        vm.SelectedTemplatePreset = vm.TemplatePresetOptions[0];
+        vm.ApplyTemplatePreset(vm.TemplatePresetOptions[0]);
 
         Assert.Equal("{name}_{date}", vm.FileNameTemplate);
-        // 保留选中态，否则「删除」按钮拿不到目标、点了没反应（2026-11-12 修）
-        Assert.Same(vm.TemplatePresetOptions[0], vm.SelectedTemplatePreset);
-        Assert.True(vm.HasTemplatePresets);
+        // 名字留在预设名框里：否则「删除」拿不到目标、点了没反应（2026-11-12 修的同一个坑）
+        Assert.Equal("日期", vm.TemplatePresetName);
     }
 
-    /// <summary>手动改模板改到与选中预设不一致时，下拉里的选中态要自动取消。</summary>
+    /// <summary>
+    /// 改模板不清预设名：名字是「要覆盖 / 要删除的那条预设」。用户改完模板用同名再存，
+    /// 期望就是更新那一条；早先这里把选中态清成 null，等于把「覆盖」变成了「新起一条」。
+    /// </summary>
     [Fact]
-    public void EditingTemplateAwayFromPreset_ClearsSelection()
+    public void EditingTemplateAwayFromPreset_KeepsPresetName()
     {
         Apply(s =>
         {
@@ -214,15 +216,15 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         });
 
         var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
-        vm.SelectedTemplatePreset = vm.TemplatePresetOptions[0];
-        Assert.NotNull(vm.SelectedTemplatePreset);
+        vm.ApplyTemplatePreset(vm.TemplatePresetOptions[0]);
+        Assert.Equal("日期", vm.TemplatePresetName);
 
         vm.FileNameTemplate = "{name}_custom";
 
-        Assert.Null(vm.SelectedTemplatePreset);
+        Assert.Equal("日期", vm.TemplatePresetName);
     }
 
-    /// <summary>删除按钮此前无效：选中预设后立刻被置 null，命令里拿不到目标。现在要真能删掉。</summary>
+    /// <summary>删除按钮此前无效：选中预设后立刻被置 null，命令里拿不到目标。现在按名字删。</summary>
     [Fact]
     public void DeletePreset_RemovesSelectedPresetFromSettings()
     {
@@ -237,7 +239,7 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
         Assert.Equal(2, vm.TemplatePresetOptions.Count);
 
-        vm.SelectedTemplatePreset = vm.TemplatePresetOptions[0];
+        vm.ApplyTemplatePreset(vm.TemplatePresetOptions[0]);
         vm.DeleteTemplatePresetCommand.Execute(null);
 
         Assert.Single(vm.TemplatePresetOptions);
@@ -293,11 +295,232 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
 
         var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
         vm.FileNameTemplate = "{name}_new";
-        vm.NewPresetName = "新预设";
+        vm.TemplatePresetName = "新预设";
 
         vm.SaveTemplatePresetCommand.Execute(null);
 
-        Assert.NotNull(vm.TemplateError);
+        // 上限提示走独立槽位：模板本身合法，不能把「文件名」那一格顶成红框
+        Assert.NotNull(vm.TemplatePresetMessage);
+        Assert.True(vm.IsTemplatePresetMessageVisible);
+        Assert.True(vm.IsTemplatePresetMessageError);
+        Assert.False(vm.IsTemplatePresetMessageSuccessVisible);
+        Assert.Null(vm.TemplateError);
+        Assert.False(vm.IsTemplateErrorVisible);
         Assert.Equal(AppSettings.MaxFileNameTemplatePresets, vm.TemplatePresetOptions.Count);
+    }
+
+    /// <summary>
+    /// 缺陷回归：模板合法 + 预设超限时，「文件名」结果格必须继续显示渲染结果而不是错误红框
+    ///（旧实现把上限提示塞进 <c>TemplateError</c>，<c>IsTemplateErrorVisible</c> 变真、文件名被吞掉）。
+    /// </summary>
+    [Fact]
+    public void SavePreset_OverLimit_DoesNotHideRenderedFileName()
+    {
+        Apply(s =>
+        {
+            s.FileNameTemplateDialog = "";
+            s.FileNameTemplatePresets.Clear();
+            for (var i = 0; i < AppSettings.MaxFileNameTemplatePresets; i++)
+                s.FileNameTemplatePresets.Add(new FileNameTemplatePreset("p" + i, "{name}_" + i));
+        });
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("report.txt") });
+        vm.FileNameTemplate = "{name}_bak";
+        Assert.Equal("report_bak", vm.OutputFileName);
+        Assert.False(vm.IsTemplateErrorVisible);
+
+        vm.SaveTemplatePresetCommand.Execute(null);
+
+        Assert.Equal("report_bak", vm.OutputFileName);
+        Assert.False(vm.IsTemplateErrorVisible);
+        Assert.True(vm.IsTemplatePresetMessageVisible);
+    }
+
+    /// <summary>
+    /// 存下预设后给一条成功提示。换成可编辑下拉之后，同名覆盖与新增只差一个提示，
+    /// 静默保存会让用户分不清「存上了」还是「没反应」。
+    /// </summary>
+    [Fact]
+    public void SavePreset_Success_ShowsSavedMessage()
+    {
+        Apply(s =>
+        {
+            s.FileNameTemplateDialog = "";
+            s.FileNameTemplatePresets.Clear();
+        });
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
+        vm.FileNameTemplate = "{name}_new";
+        vm.TemplatePresetName = "新预设";
+
+        vm.SaveTemplatePresetCommand.Execute(null);
+
+        Assert.NotNull(vm.TemplatePresetMessage);
+        Assert.True(vm.IsTemplatePresetMessageVisible);
+        Assert.False(vm.IsTemplatePresetMessageError);
+        Assert.True(vm.IsTemplatePresetMessageSuccessVisible);
+        Assert.Single(vm.TemplatePresetOptions);
+        // 名字保留：紧接着再点「存为预设」应当是覆盖同一条
+        Assert.Equal("新预设", vm.TemplatePresetName);
+    }
+
+    /// <summary>
+    /// 缺陷 G 的回归网：模板启用后改输出目录，<see cref="CompressSettingsViewModel.OutputPath"/>
+    /// 必须跟着换目录（旧实现只重渲染文件名、不重算路径，预览树与实际产物都停在旧目录）。
+    /// </summary>
+    [Fact]
+    public void TemplateActive_ChangingOutputDirectory_UpdatesOutputPathAndKeepsTemplateName()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dirA = Path.Combine(_root, "dirA");
+        var dirB = Path.Combine(_root, "dirB");
+        Directory.CreateDirectory(dirA);
+        Directory.CreateDirectory(dirB);
+        var source = Path.Combine(dirA, "report.txt");
+        File.WriteAllText(source, "x");
+
+        var vm = new CompressSettingsViewModel(new[] { source });
+        vm.FileNameTemplate = "{name}_bak";
+
+        Assert.Equal("report_bak", vm.OutputFileName);
+        Assert.Equal(Path.Combine(dirA, "report_bak.zip"), vm.OutputPath);
+
+        vm.OutputDirectory = dirB;
+
+        // 目录变了 → 路径必须跟着变（名字仍由模板决定）
+        Assert.Equal("report_bak", vm.OutputFileName);
+        Assert.Equal(Path.Combine(dirB, "report_bak.zip"), vm.OutputPath);
+    }
+
+    /// <summary>
+    /// 缺陷 G 的第二种表现：未启用模板时改目录，路径也要跟随（旧实现靠 ComposeManualOutputPath
+    /// 写 OutputPath，重构后由同一入口算出，这里钉住不许回退）。
+    /// </summary>
+    [Fact]
+    public void ManualMode_ChangingOutputDirectory_UpdatesOutputPath()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dirA = Path.Combine(_root, "dirA");
+        var dirB = Path.Combine(_root, "dirB");
+        Directory.CreateDirectory(dirA);
+        Directory.CreateDirectory(dirB);
+        File.WriteAllText(Path.Combine(dirA, "report.txt"), "x");
+
+        var vm = new CompressSettingsViewModel(new[] { Path.Combine(dirA, "report.txt") });
+        vm.OutputFileName = "mine";
+        Assert.Equal(Path.Combine(dirA, "mine.zip"), vm.OutputPath);
+
+        vm.OutputDirectory = dirB;
+        Assert.Equal(Path.Combine(dirB, "mine.zip"), vm.OutputPath);
+    }
+
+    /// <summary>
+    /// 分别压缩的重名校验按**完整路径**判重，不是按文件名：
+    /// A/report.txt 与 B/report.txt 各自落在自己的目录，两个 report.zip 并存是合法的。
+    /// </summary>
+    [Fact]
+    public void SeparateMode_TemplateRenderSameNameInDifferentDirectories_IsNotDuplicate()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dirA = Path.Combine(_root, "dirA");
+        var dirB = Path.Combine(_root, "dirB");
+        Directory.CreateDirectory(dirA);
+        Directory.CreateDirectory(dirB);
+        File.WriteAllText(Path.Combine(dirA, "report.txt"), "x");
+        File.WriteAllText(Path.Combine(dirB, "report.txt"), "y");
+
+        var vm = new CompressSettingsViewModel(new[]
+        {
+            Path.Combine(dirA, "report.txt"),
+            Path.Combine(dirB, "report.txt"),
+        });
+        vm.OutputMode = CompressOutputMode.Separate;
+        vm.FileNameTemplate = "{name}";
+
+        Assert.Null(vm.TemplateError);
+    }
+
+    /// <summary>
+    /// 分别压缩且两个源在**同一目录**、模板又不带区分度 ⇒ 仍必须拦下（不能静默覆盖）。
+    /// </summary>
+    [Fact]
+    public void SeparateMode_TemplateSameNameInSameDirectory_IsStillDuplicate()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt"), MakeFile("b.txt") });
+        vm.OutputMode = CompressOutputMode.Separate;
+        vm.FileNameTemplate = "{parent}";
+
+        Assert.NotNull(vm.TemplateError);
+    }
+
+    /// <summary>
+    /// 单包模式下模板渲染的主名必须进输出路径（旧实现里「合并」模式沿用了更早填好的路径，
+    /// 模板名显示在文件名框里却进不了实际产物名）。改造后单包只有一态，这条钉住回归。
+    /// </summary>
+    [Fact]
+    public void SingleArchiveMode_TemplateName_IsUsedInOutputPath()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dir = Path.Combine(_root, "proj");
+        Directory.CreateDirectory(dir);
+        File.WriteAllText(Path.Combine(dir, "a.txt"), "x");
+        File.WriteAllText(Path.Combine(dir, "b.txt"), "y");
+
+        var vm = new CompressSettingsViewModel(new[]
+        {
+            Path.Combine(dir, "a.txt"),
+            Path.Combine(dir, "b.txt"),
+        });
+        vm.FileNameTemplate = "{name:auto}_bak";
+
+        var folderName = Path.GetFileName(dir);
+        Assert.Equal(folderName + "_bak", vm.OutputFileName);
+        Assert.Equal(Path.Combine(dir, folderName + "_bak.zip"), vm.OutputPath);
+    }
+
+    /// <summary>分别压缩没有单一路径：<see cref="CompressSettingsViewModel.OutputPath"/> 为 null（不再塞提示串）。</summary>
+    [Fact]
+    public void SeparateMode_OutputPath_IsNull()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("a.txt") });
+        vm.OutputMode = CompressOutputMode.Separate;
+
+        Assert.Null(vm.OutputPath);
+    }
+
+    /// <summary>
+    /// 「每个文件/文件夹各成一个压缩包」这一个开关就是输出模式的全部入口：
+    /// 勾上 ⇒ 逐项压缩（路径为空）；取消 ⇒ 单包（路径回来）。不再有第三个互斥态。
+    /// </summary>
+    [Fact]
+    public void PerItemArchiveSwitch_TogglesBetweenSingleAndSeparate()
+    {
+        Apply(s => s.FileNameTemplateDialog = "");
+
+        var dir = Path.Combine(_root, "switch");
+        Directory.CreateDirectory(dir);
+        var a = Path.Combine(dir, "a.txt");
+        File.WriteAllText(a, "x");
+
+        var vm = new CompressSettingsViewModel(new[] { a });
+        Assert.False(vm.IsPerItemArchive);
+        Assert.Equal(CompressOutputMode.Manual, vm.OutputMode);
+        Assert.NotNull(vm.OutputPath);
+
+        vm.IsPerItemArchive = true;
+        Assert.Equal(CompressOutputMode.Separate, vm.OutputMode);
+        Assert.Null(vm.OutputPath);
+
+        vm.IsPerItemArchive = false;
+        Assert.Equal(CompressOutputMode.Manual, vm.OutputMode);
+        Assert.Equal(Path.Combine(dir, "switch.zip"), vm.OutputPath);
     }
 }
