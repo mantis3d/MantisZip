@@ -34,27 +34,27 @@
 
       <!-- ═══════════════════════════════════════════════════════════════
            Tab 1: 输出设置
-             ① 输出模式单选（手动 / 分别 / 合并）
+             ① 输出方式开关（合并成一个包 / 每个文件各成一个包）
              ② 输出目录：内嵌 CustomFilePickerControl（PickFolder）
-             ③ 输出文件名 + 扩展名标签（手动/合并模式）
-             ④ 文件冲突策略
+             ③ 文件名模板 + 最终文件名
+           （文件冲突策略与「完成后打开目录」2026-11-17 移入「压缩设置」页，
+             本页只留「产物放在哪、叫什么」，把高度还给目录选择器）
            ═══════════════════════════════════════════════════════════════ -->
       <TabItem Header="{Binding LocalizedStrings[Compress_TabOutput]}"
                 Classes="compactTab"
                 controls:TabItemExtensions.TabIcon="IconSettings">
         <!-- 本页用弹性行：输出目录选择器吃掉剩余高度，其它分组按内容高度贴顶。
              窗口拉高时只有浏览区变高，上下两端始终对齐（2026-10-30 用户反馈）。
-             第 2 行高度绑定 VM.OutputPickerRowHeight：手动模式 = * ，其余模式 = 0，
-             这样「分别/合并」模式隐藏输出目录分组时不会留一块空洞。 -->
+             第 2 行高度绑定 VM.OutputPickerRowHeight：单包模式 = * ，逐项压缩 = 0，
+             这样「每个文件各成一个包」时隐藏输出目录分组不会留一块空洞。
+             移除两张常驻卡后，窗口偏矮时目录选择器不再被挤到只剩几十像素（2026-11-17 用户反馈「太挤」）。 -->
         <Grid Margin="0,8,0,0"
               Background="{DynamicResource ThemeWindowBgBrush}"
               TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
           <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />  <!-- 输出模式 -->
-            <RowDefinition Height="{Binding OutputPickerRowHeight}" />  <!-- 输出路径（手动模式才占位） -->
+            <RowDefinition Height="Auto" />  <!-- 输出方式 -->
+            <RowDefinition Height="{Binding OutputPickerRowHeight}" />  <!-- 输出路径（单包模式才占位） -->
             <RowDefinition Height="Auto" />  <!-- 文件名（模板 + 最终文件名，2026-11-12 合并为一张卡） -->
-            <RowDefinition Height="Auto" />  <!-- 文件冲突策略 -->
-            <RowDefinition Height="Auto" />  <!-- 完成后行为（自动打开输出目录） -->
           </Grid.RowDefinitions>
 
           <!-- 分组：输出方式（单个开关，绑定 VM 的 IsPerItemArchive）
@@ -228,37 +228,6 @@
             </StackPanel>
           </Border>
 
-          <!-- 分组：文件冲突策略（本次压缩遇到同名文件时的处理方式，覆盖/追加/自动重命名/跳过） -->
-          <Border Grid.Row="3"
-                  Margin="0,8,0,0"
-                  BorderBrush="{DynamicResource ThemeBorderBrush}"
-                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                  Background="{DynamicResource ThemeSurfaceBgBrush}">
-            <StackPanel Spacing="{DynamicResource SpacingXs}">
-              <!-- 标签：文件存在时： -->
-              <TextBlock Text="{Binding LocalizedStrings[Compress_WhenFileExists]}"
-                         FontWeight="SemiBold" />
-              <!-- 冲突策略下拉：每次询问 / 覆盖 / 追加 / 自动重命名 / 跳过 -->
-              <ComboBox x:Name="ConflictActionCombo"
-                        ItemsSource="{Binding ConflictActionOptions}"
-                        SelectedItem="{Binding SelectedConflictActionOption}"
-                        DisplayMemberBinding="{Binding Display}"
-                        Width="240" HorizontalAlignment="Left" />
-            </StackPanel>
-          </Border>
-
-          <!-- 分组：完成后行为（压缩成功后自动打开输出目录并选中产物；初值来自「设置 → 压缩 → 压缩选项」，
-               进度窗口底部还能临时改。2026-10-30 从 beta 合并进来，放在输出相关选项旁边而不是密码页） -->
-          <Border Grid.Row="4"
-                  Margin="0,8,0,0"
-                  BorderBrush="{DynamicResource ThemeBorderBrush}"
-                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                  Background="{DynamicResource ThemeSurfaceBgBrush}">
-            <CheckBox IsChecked="{Binding OpenFolderAfterCompress}">
-              <TextBlock Text="{Binding LocalizedStrings[Compress_OpenFolderAfter]}"
-                         TextWrapping="Wrap" />
-            </CheckBox>
-          </Border>
         </Grid>
       </TabItem>
 
@@ -438,6 +407,35 @@
                              Margin="4,0,0,0"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                 </Grid>
+              </StackPanel>
+            </Border>
+
+            <!-- 分组：文件冲突策略 + 完成后行为（2026-11-17 从「输出设置」页搬来，合成为一张卡）
+                 搬动原因：输出设置页有「目录选择器」这条弹性行，四张常驻卡把窗口高度吃满后，
+                 选择器会被压到几十像素（用户反馈「太挤」）。这两项讲的是「产物撞名怎么办、压完去哪」，
+                 与「怎么压」同属行为类选项，放在分卷之后语义也顺。
+                 本页是 ScrollViewer，窗口再矮也只是滚动，不会挤压任何控件。
+                 对照：解压设置窗同样把「冲突 + 打开目录 + 删源包」放同一张卡，两个对话框形态一致。
+                 「冲突时:」在进度窗口另有运行中可改的实时下拉，「打开目录」也有 📁 开关，
+                 这里给的是本次压缩的初值。 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding LocalizedStrings[Compress_WhenFileExists]}"
+                           FontWeight="SemiBold" />
+                <!-- 冲突策略下拉：每次询问 / 覆盖 / 追加 / 自动重命名 / 跳过 -->
+                <ComboBox x:Name="ConflictActionCombo"
+                          ItemsSource="{Binding ConflictActionOptions}"
+                          SelectedItem="{Binding SelectedConflictActionOption}"
+                          DisplayMemberBinding="{Binding Display}" />
+                <!-- 完成后行为：压缩成功后自动打开输出目录并选中产物（进度窗口底部 📁 开关仍可临时改） -->
+                <CheckBox x:Name="OpenFolderAfterCheck"
+                          Margin="0,4,0,0"
+                          IsChecked="{Binding OpenFolderAfterCompress}">
+                  <TextBlock Text="{Binding LocalizedStrings[Compress_OpenFolderAfter]}"
+                             TextWrapping="Wrap" />
+                </CheckBox>
               </StackPanel>
             </Border>
           </StackPanel>
