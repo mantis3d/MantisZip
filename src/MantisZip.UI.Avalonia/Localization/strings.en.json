@@ -1,4 +1,5 @@
-{
+﻿{
+  "Preview_AnimationFrameLimited": "Too many frames ({0} total); only the first frame is shown to limit memory use",
   "Picker_NewFolder": "New folder",
   "Picker_NewFolderTitle": "New folder",
   "Picker_NewFolderPrompt": "Folder name:",

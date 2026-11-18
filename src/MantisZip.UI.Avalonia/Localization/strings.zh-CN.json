@@ -1,4 +1,5 @@
-{
+﻿{
+  "Preview_AnimationFrameLimited": "动画帧数过多（共 {0} 帧），为控制内存占用已仅显示首帧",
   "Picker_NewFolder": "新建文件夹",
   "Picker_NewFolderTitle": "新建文件夹",
   "Picker_NewFolderPrompt": "文件夹名称：",

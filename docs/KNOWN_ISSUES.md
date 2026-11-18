@@ -26,7 +26,7 @@
 |---|---|---|---|---|---|
 | **KI-001** | Avalonia 无头测试跨线程竞态 | 测试基础设施 | 等上游 | Avalonia 发布含 `#22021` 修复的版本；或频率升到每 3 次 run 至少 1 次 | 阻塞中 |
 | **KI-002** | Core 测试本地跑不了 + `-Task test -Target tests` 假绿 | 测试基础设施 | 缺决策 + 成本 | ① 下次需要在本地验 Core 测试时；② 或加固 `verify-repo.ps1` 时 | 阻塞中 |
-| **KI-003** | 24 项 SkiaSharp 4.x CS0618 deprecation | 技术债 | 成本超阈值 | 下次动 `IconProvider` / `IcoParser` / `PreviewViewModel` 时顺带清 | 阻塞中 |
+| **KI-003** | 24 项 SkiaSharp 4.x CS0618 deprecation | 技术债 | 成本超阈值 | 已修复（`96417c6c`，2026-09-27） | 已修复（2026-09-27） |
 | **KI-004** | UI 测试用固定临时目录（非 GUID） | 测试卫生 | 成本超阈值 | 下次改这两个用例时顺带改；或出现「残留文件导致红」的实例 | 阻塞中 |
 | **KI-005** | 29 条 7z 用例被 CI 过滤、永不运行 | 覆盖缺口 | 等计划（CI 环境） | CI 装上 7-Zip 并去掉 `SevenZipEngine` 过滤 | 阻塞中 |
 | **KI-006** | `.jar/.war/.ear/.apk` 能打开但**不参与文件关联**（也不进右键菜单/设置页关联列表） | 功能留白 | 缺决策 + 成本 | 用户反馈「想在资源管理器里双击/右键打开 jar」时；或做「关联格式可勾选」设置项时 | 已修复（关联格式可勾选，2026-10-29） |
@@ -78,7 +78,8 @@
 - **证据**：[progress-avalonia-detail.md:1547](progress-avalonia-detail.md)（升级条目与 24 项统计）、[:1553](progress-avalonia-detail.md)（技术债清单）。
 - **为什么现在不修**：**成本超阈值（收益低）**。改法已明确 —— `SKPath.MoveTo/LineTo/Close` → `SKPathBuilder`、`SKCanvas.DrawBitmap` → 新 `SKSamplingOptions` 重载 —— 但要遍历图标加载与预览绘制路径，属于「顺手做」而不是「专门做」。
 - **复评条件**：① 下次改 `IconProvider` / `IcoParser` / `PreviewViewModel` 时顺带清理；② SkiaSharp 宣布移除旧 API（届时会变成编译错误，自动强制处理）。
-- **状态**：阻塞中
+- **复评结论（2026-11-16）**：已随提交 `96417c6c`（2026-09-27，"fix: 修复编译警告 (CS0618, CS8602, MVVMTK0034)"）清零 —— `IconProvider` 改 `SKPathBuilder.Detach()`、`IcoParser` 与 `PreviewViewModel` 改 `SKSamplingOptions` 重载、`PreviewViewModel.Bitmap.Save` 去掉过时参数。2026-11-16 复跑 `dotnet build --no-incremental` 实测 **0 条 CS0618**（余下 8 条全是 XAML `AVLN5001 TextBox.Watermark` 过时提示，与本条无关）。
+- **状态**：✅ 已修复（2026-09-27，`96417c6c`）
 
 ## KI-004 UI 测试用固定临时目录（非 GUID）
 
@@ -271,5 +272,6 @@
 
 | 编号 | 标题 | 结局 | commit / 理由 | 关闭日期 |
 |---|---|---|---|---|
+| **KI-003** | 24 项 SkiaSharp 4.x CS0618 deprecation | 已修复：`96417c6c` 清空 24 项（`SKPathBuilder` / `SKSamplingOptions` / `Bitmap.Save`） | `fix: 修复编译警告 (CS0618, CS8602, MVVMTK0034)` | 2026-09-27 |
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 已修复：三态契约 + UI 分支 + 红绿验证的回归测试 | `fix(core,avalonia): 更新检查区分「无更新 / 失败」三态` | 2026-10-28 |
 | **KI-017** | 分卷包 / SFX 的格式身份被扩展名直判成 Zip（预览、双击打开、缩略图全报 `Failed to locate the Zip Header`） | 已修复：`ArchiveEngineFactory.ResolveReaderFormat` 作为「有效格式」唯一入口，`ArchiveFormatHelper.GetFormat` 委派它；分卷解析成 SevenZip 后同步用 `IsCurrentVolumeSet` 拦住增删条目；守卫 `formatidentity` 防复发 | `fix(core,avalonia): 分卷/SFX 格式身份统一走 ResolveReaderFormat` | 2026-11-05 |

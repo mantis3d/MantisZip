@@ -323,18 +323,29 @@
         </ScrollViewer>
 
         <!-- GIF/动画图片预览：支持帧控制（上一帧/播放暂停/下一帧） -->
-        <ScrollViewer x:Name="GifPreviewScrollViewer" IsVisible="{Binding IsAnimatedImageVisible}"
-                      HorizontalScrollBarVisibility="Auto"
-                      VerticalScrollBarVisibility="Auto">
-          <Grid>
-            <Rectangle Fill="{DynamicResource TransparencyCheckerboardBrush}"
-                       IsVisible="{Binding IsTransparencyBgShown}" />
-            <Image Source="{Binding PreviewImage}"
-                   Width="{Binding ScaledWidth}"
-                   Height="{Binding ScaledHeight}"
-                   Stretch="Uniform" />
-          </Grid>
-        </ScrollViewer>
+        <Grid IsVisible="{Binding IsAnimatedImageVisible}" RowDefinitions="Auto,*">
+          <!-- 帧内存闸门提示：动画过大时只解码首帧，此处说明原因与真实帧数（空串自动折起） -->
+          <TextBlock Grid.Row="0"
+                     Text="{Binding AnimationFrameLimitNotice}"
+                     IsVisible="{Binding IsAnimationFrameLimited}"
+                     TextWrapping="Wrap"
+                     FontSize="12"
+                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                     Margin="{DynamicResource SpacingXsThk}" />
+          <ScrollViewer Grid.Row="1"
+                        x:Name="GifPreviewScrollViewer"
+                        HorizontalScrollBarVisibility="Auto"
+                        VerticalScrollBarVisibility="Auto">
+            <Grid>
+              <Rectangle Fill="{DynamicResource TransparencyCheckerboardBrush}"
+                         IsVisible="{Binding IsTransparencyBgShown}" />
+              <Image Source="{Binding PreviewImage}"
+                     Width="{Binding ScaledWidth}"
+                     Height="{Binding ScaledHeight}"
+                     Stretch="Uniform" />
+            </Grid>
+          </ScrollViewer>
+        </Grid>
 
         <!-- ICO 多帧画廊：显示所有帧，支持 FlattenAlpha 切换和透明背景棋盘格 -->
         <ScrollViewer IsVisible="{Binding IsIcoGalleryVisible}"

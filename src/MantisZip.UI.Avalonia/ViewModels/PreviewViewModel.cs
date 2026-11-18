@@ -177,6 +177,10 @@ public partial class PreviewViewModel : ObservableObject
     {
         UpdateLocalizedStrings();
         RefreshEncodingOptions();
+
+        // 闸门提示文案是 ShowGif 时一次性算好的，切换语言需重算（否则停留在旧语言）
+        if (IsAnimationFrameLimited && _limitedTotalFrameCount.HasValue)
+            AnimationFrameLimitNotice = LocalizationManager.T("Preview_AnimationFrameLimited", _limitedTotalFrameCount.Value);
     }
 
     private void UpdateLocalizedStrings()
@@ -750,7 +754,8 @@ public partial class PreviewViewModel : ObservableObject
         IsInfoPanelVisible = true;
     }
 
-    public bool HasAnimationControls => PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.AnimationControls);
+    public bool HasAnimationControls =>
+        !IsAnimationFrameLimited && PreviewCapabilities.For(PreviewType).HasFlag(PreviewCapability.AnimationControls);
 
     // ── Ligature toggle ──
 
@@ -774,11 +779,36 @@ public partial class PreviewViewModel : ObservableObject
     [ObservableProperty]
     private bool _isFlattenAlpha;
 
+    /// <summary>
+    /// 动画是否因帧数 / 像素内存超预算而只解码了首帧（GifDecoder 闸门生效）。
+    /// true 时隐藏播放/跳帧控件，标题与元数据注明「只显示了首帧」。
+    /// </summary>
+    [ObservableProperty]
+    private bool _isAnimationFrameLimited;
+
+    partial void OnIsAnimationFrameLimitedChanged(bool value)
+    {
+        OnPropertyChanged(nameof(HasAnimationControls));
+    }
+
+    /// <summary>
+    /// 动画帧内存闸门生效时的提示文案（已本地化，空串表示不显示）。
+    /// 用户看到静止首帧时必须知道原因，否则会被当成「动画坏了」。
+    /// </summary>
+    [ObservableProperty]
+    private string _animationFrameLimitNotice = string.Empty;
+
     public bool CanLigatureToggle => _fontSupportsLigature;
 
     private List<AnimationFrameData>? _gifFrames;
     private int _gifCurrentFrameIndex;
     private DispatcherTimer? _gifTimer;
+
+    /// <summary>
+    /// 动画帧内存闸门生效时文件里的原始帧总数（未生效时为 null）。
+    /// 用于标题与元数据告知用户「只显示了首帧」以及真实帧数。
+    /// </summary>
+    private int? _limitedTotalFrameCount;
 
 
     // ── Toolbar commands ──
@@ -1599,6 +1629,10 @@ var formatValues = new Dictionary<string, string?>
         StopGifTimer();
         _gifFrames = null;
 
+        // 每次进入动画预览都先复位闸门状态，避免上一个文件的「仅显示首帧」提示残留
+        IsAnimationFrameLimited = false;
+        _limitedTotalFrameCount = null;
+
         try
         {
             List<AnimationFrameData>? frames = null;
@@ -1611,18 +1645,23 @@ var formatValues = new Dictionary<string, string?>
                 frames = ApngDecoder.DecodeFrames(filePath);
             }
             
-            // 回退到 GIF 解码器
+            // 回退到 GIF / 动画 WebP 解码器（链式增量解码，见 GifDecoder 注释）
+            // 闸门生效时只解首帧：记下真实帧总数，供标题与元数据告知用户「为什么不动」
+            int? limitedTotalFrames = null;
             if (frames == null || frames.Count == 0)
             {
-                var gifFrames = GifDecoder.DecodeFrames(filePath);
-                if (gifFrames != null && gifFrames.Count > 0)
+                var decoded = GifDecoder.DecodeFrames(filePath);
+                if (decoded != null && decoded.Frames.Count > 0)
                 {
                     // 转换为通用 AnimationFrameData
-                    frames = new List<AnimationFrameData>(gifFrames.Count);
-                    foreach (var gf in gifFrames)
+                    frames = new List<AnimationFrameData>(decoded.Frames.Count);
+                    foreach (var gf in decoded.Frames)
                     {
                         frames.Add(new AnimationFrameData { Bitmap = gf.Bitmap, DelayMs = gf.DelayMs });
                     }
+
+                    if (decoded.IsFrameLimitApplied)
+                        limitedTotalFrames = decoded.TotalFrameCount;
                 }
             }
 
@@ -1636,6 +1675,8 @@ var formatValues = new Dictionary<string, string?>
             IsPlaying = true;
             CurrentFrame = 0;
             _gifCurrentFrameIndex = 0;
+            _limitedTotalFrameCount = limitedTotalFrames;
+            IsAnimationFrameLimited = limitedTotalFrames.HasValue;
 
             _gifFrames = frames;
 
@@ -1664,10 +1705,17 @@ var formatValues = new Dictionary<string, string?>
             IsToolbarVisible = true;
             var isGif = ext.Equals(".gif", StringComparison.OrdinalIgnoreCase);
             PreviewHeaderText = LocalizationManager.T(isGif ? "Preview_Header_Gif" : (isApng ? "Preview_Header_Apng" : "Preview_Header_AnimatedImage"));
+
+            // 闸门生效时用户看到的是「静止的首帧」，必须在标题下方明示原因与真实帧数
+            AnimationFrameLimitNotice = IsAnimationFrameLimited && _limitedTotalFrameCount.HasValue
+                ? LocalizationManager.T("Preview_AnimationFrameLimited", _limitedTotalFrameCount.Value)
+                : string.Empty;
+
             var gifFormatValues = new Dictionary<string, string?>
             {
                 [MetadataKeys.Dimensions] = $"{ImageWidth} × {ImageHeight}",
-                [MetadataKeys.FrameCount] = TotalFrames.ToString(),
+                // 闸门生效时元数据仍显示文件里的真实帧数，而不是已解码的 1
+                [MetadataKeys.FrameCount] = (_limitedTotalFrameCount ?? TotalFrames).ToString(),
             };
             MetadataHelper.RenderFormatToViewModel(this, gifFormatValues, "image");
         }
@@ -3484,6 +3532,9 @@ var formatValues = new Dictionary<string, string?>
         _lastPreviewFilePath = null;
         StopGifTimer();
         _gifFrames = null;
+        IsAnimationFrameLimited = false;
+        AnimationFrameLimitNotice = string.Empty;
+        _limitedTotalFrameCount = null;
         FontFamily = global::Avalonia.Media.FontFamily.Default;
         IsPreviewVisible = false;
         IsToolbarVisible = false;

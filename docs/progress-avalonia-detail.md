@@ -6,6 +6,20 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-18** — 合并 beta 到 alpha（issue #89 预览修复 + 输出设置页瘦身）
+
+- **用户指令**：「beta分支又做了一些修正，合并到alpha分支来吧。」
+- **beta 侧 3 笔提交**：`7054e97e` fix(avalonia) issue #89（`IcoParser.DecodeBmpFrame` 补调色板长度；`GifDecoder` 链式增量解码 + 帧内存闸门 600 帧 / 192MB；`PreviewViewModel.IsAnimationFrameLimited`）；`529e41c2` refactor 压缩设置窗输出页瘦身（输出页 5→3 行，冲突策略 + 完成后行为搬进「压缩设置」页，新增 `CompressSettingsTabLayoutTests`）；`13b581ce` docs 发布说明。
+- **冲突 1（三份 strings.json）**：beta 在文件头插了 `Preview_AnimationFrameLimited`，alpha 没有 ⇒ 保留 beta 那行。merge 写出的冲突块两个 `{` 里第二个带 BOM；`HEAD` 侧 json blob 本身无 BOM（`git show HEAD:…` 首字节 123,10），而 `.editorconfig` 要求 `utf-8-bom` ⇒ 写回时显式用 `New-Object System.Text.UTF8Encoding($true)`。修完三份各 1530 key。
+- **冲突 2（CompressSettingsWindow.axaml 两处）**：①`Grid.RowDefinitions` 保留 alpha 的 4 条（输出方式 / 输出路径 / 文件名 / 包内根目录），beta 的 3 条是它删掉两张卡后的版本；②输出页底部只留「包内根目录」卡，beta 搬走的「文件冲突策略」与「完成后行为」已在其「压缩设置」页（现 `:504-530`，`x:Name="ConflictActionCombo"` / `OpenFolderAfterCheck`），无重名无重复。
+- **冲突 3-4（docs/PROGRESS.md 与 docs/progress-avalonia-detail.md）**：HEAD 侧（11-18 根名模板 / 11-16 合并记录）与 beta 侧（11-17 输出页瘦身 / 11-16 issue #89）同月撞同一插入点 ⇒ 两侧全留、按「同日按提交时间从晚到早」重排：11-18 根名 → 11-17 瘦身(20:20) → 11-16 issue#89(19:39) → 11-16 合并(11:42)。
+- **合并后修的 3 处**：
+  - `tests/MantisZip.UI.Avalonia.Tests/CompressSettingsTabLayoutTests.cs:OutputTab_GridRowsMatchHighestRowIndex` 期望 3 → **4**：beta 删两张卡、alpha 同期加「包内根目录」卡，合并后的真实布局是 4 行；断言跟着**合并结果**走而非任一侧原始期望。
+  - `tests/MantisZip.UI.Avalonia.Tests/CompressSettingsViewModelRootNameTests.cs:ExampleText_EmptyInputFallsBackToArchiveName` 期望 `"report"` → `Path.GetFileName(_root)` 且追加 `Assert.Equal(vm.OutputFileName, vm.RootNameExampleText)`。**这条在合并前的 `6e8ea385` 上就已失败**（用 `git worktree add` 在临时目录验过），不是合并回归：根名留空回落的是「压缩包主名」，而 beta 的「输出路径单一变量」重构后默认包名 = 落点目录名，不再等于源文件名。补的等值断言比写死字符串更能防止两侧漂移。
+  - `RELEASE_NOTES.md` 删掉指向 `docs/images/version/v0.5.7/Issue89Preview.png` 的图片引用 —— 该文件在 beta 与 alpha 两侧都不存在（`git ls-tree` 确认），是 beta 文档自带的断链；删后 81 条图片引用 0 断链。
+- **验证**：`core` 7.3s、`avalonia --no-incremental` 28.5s、`tests` 6.5s、`ui-tests` 2.9s 构建全 0 警告；`-Task test -Target tests` 13.0s 全绿；`-Task test -Target ui-tests` **964 例全绿（959+2 修复后 961 通过 / 3 跳过）**；`-Task i18n` 1530 key 三语一致；`-Task check` 10 条守卫 `failedCount: 0`、version 六处 0.5.8。
+- **教训**：`git worktree add` 是判定「这个失败是不是本次合并引入」的最快手段（在临时目录 checkout 合并前的 commit 直接跑同一用例）；只改工作区 json 而不注意 BOM 会让下次 diff 出现整文件重写。
+
 **2026-11-18** — 功能：根目录名模板（包内根目录的加根名支持占位符，v0.5.8 第三项）
   - **需求**：用户问「这个『默认根目录名』能不能用跟文件名模板一样或者类似的占位符？」压缩端加根时根名只能留空（回落压缩包名）或填字面量，想按日期/源目录名命名只能手工改。
   - **用户拍板三问**：①占位符只暴露对目录名有意义的 5 个（`{name}` / `{parent}` / `{date}` / `{datetime}` / `{archive}`，去掉 `{ext}` / `{seq}`，补一个现在只能靠留空实现的 `{archive}`）②多源时 `{name}` 取公共父目录名、取不到才回落首源主名（与 `CompressPathPlanner.ResolveAutoName` 一致）③渲染失败在对话框拦下、引擎侧静默回落压缩包名。
@@ -24,6 +38,29 @@
   - **验证**：`core` / `avalonia --no-incremental`（46.0s）0 警告；`tests` 17.7s；`ui-tests` 全绿；`i18n` 1529 key 三语一致；`check` version 六处 0.5.8 + 10 条守卫 `failedCount: 0`。
   - **留白**：CLI（`--compress` 系列）仍无 RootMode / WrapRoot 参数 ⇒ 根名模板在 CLI 侧不可达；解压端根名只从包名推导不接模板；设置页默认根名粘贴非法模板要到对话框才报。
 
+**2026-11-17** — 压缩设置窗「输出设置」页瘦身：冲突策略 + 完成后打开目录搬进「压缩设置」页
+  - **背景**：用户报「压缩窗口的输出路径 tab 内容太多、太挤，考虑把下面的『文件冲突选项』和『压缩完成打开目录选项』移到别处」，给了两个候选（放进「压缩设置」页 / 移到右侧预览树下方）。先给了建议（选前者，且两张卡合成一张），用户回「开工吧」。
+  - **「挤」的真实机理**：`Dialogs/CompressSettingsWindow.axaml` 输出设置页的行定义是 `Auto / {Binding OutputPickerRowHeight} / Auto / Auto / Auto`，第 2 行是**弹性行**——内嵌 `CustomFilePickerControl` 吃掉剩余高度，其余四张 `Auto` 常驻卡按内容高度贴顶。窗口偏矮时四张卡吃满，目录选择器被压到几十像素。所以搬走两张 `Auto` 卡（冲突策略、完成后行为）换回的是**约两行高度**，这才是真正的收益；不是「卡片太多」的观感问题。
+  - **为什么否方案二（预览树下方）**：右列是 `Width="*"`，窗口 `MinWidth=900` 而左列固定 `Width="620"`，右栏最窄约 240px，而冲突下拉当时写死 `Width="240"`，塞进去必溢出（还得改 Stretch 并重验最窄态）；右栏整块是 `ResultTreeView`，压缩对话框里用户最想看的正是这棵树，加常驻条等于永久扣高度；且预览下面是跨三列的「开始压缩 / 取消」栏，再叠一条配置条就变成「两条底栏」，内容还与预览无关。
+  - **改动**：输出设置页行定义 5 → **3**（输出方式 / 弹性目录行 / 文件名卡），删掉 `Grid.Row="3"`（冲突）与 `Grid.Row="4"`（完成后行为）两张 `Border`；两项**合成一张卡**追加到「压缩设置」页末尾（分卷卡之后），内容顺序 = `Compress_WhenFileExists` 标题 → 冲突 `ComboBox` → 打开目录 `CheckBox`。先例是解压窗把「冲突 + 打开目录 + 删源包」放同一张卡（`Dialogs/ExtractSettingsWindow.axaml:71-100`），两个对话框形态对齐。冲突下拉去掉写死的 `Width="240" HorizontalAlignment="Left"` 改撑满；给勾选框加 `x:Name="OpenFolderAfterCheck"`（原来无名，无头用例无法寻址）。
+  - **零 VM 改动**：两个控件绑的还是 `ConflictActionOptions` / `SelectedConflictActionOption` / `OpenFolderAfterCompress`，`CompressSettingsViewModel` / `CompressSettings` / `CompressSession` 一行未动。i18n 复用 `Compress_WhenFileExists` / `Compress_OpenFolderAfter`，**1487 key 不变**。运行时调整入口仍在进度窗（「冲突时:」实时下拉 `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml:672-696` + 底部 📁 开关），对话框给的是本次压缩的初值。
+  - **顺手清理**：输出页顶部注释块（`:34-41` 的 ①②③④）去掉了已删的「合并」态与两个已搬走的项，改为三项；`Grid.RowDefinitions` 内联注释同步。
+  - **施工中真踩到的坑**：第一版把新卡插进「压缩设置」页时忘了删输出页原卡（当时只是把 `Grid.Row="3"` 改成 `"2"`），文件里出现两个 `x:Name="ConflictActionCombo"`。构建 0 警告、`ui-tests` 全绿——`FindControl` 只返回第一个、不报错，`CompressConflictComboProbeTests` 命中的是残留的那个，两个卡的绑定各自都能工作，所以「界面正常」而冗余卡仍压在输出页上。这正是新用例要钉的失败模式。
+  - **新增回归** `tests/MantisZip.UI.Avalonia.Tests/CompressSettingsTabLayoutTests.cs`（5 例，源码文本级）：① 页签切分前置条件（≥6 个页签且含 `Compress_TabOutput` / `Compress_TabCompress`，防正则失效后空集合假绿）；② 两个控件在「压缩设置」页；③ 「输出设置」页**不得**再出现它们；④ 两个 `x:Name` 全文件唯一（含本次踩坑的注释）；⑤ 输出页 `RowDefinition` 数 = 3 且最大 `Grid.Row` 小于行数。选源码文本级而非无头渲染，是因为要钉的正是「XAML 里住哪一行/哪一个页签」，这件事在视觉树上早已不可见（无头窗口也拿不到页签归属的稳定判据）。
+  - **验证**：`-Task build -Target avalonia` 0 警告；`-Task test -Target ui-tests` 全绿；`-Task i18n` 1487 key；`-Task guards` 10 项全绿。
+
+**2026-11-16** — issue #89：带调色板的 ICO 解不出 + 动画 WebP 预览慢（链式增量解码 + 帧内存闸门）
+  - **症状**：报告者附 `Sample_ICO_WEBP.zip`（Test_01/02.ico 766B、Test_03.webp 14 帧、Test_04.webp 26 帧）。ICO 选中后右侧面板显示「不支持的格式」；WebP 选中后要等 3.5~7.9 秒才出画面。
+  - **ICO 根因**：`IcoParser.DecodeBmpFrame` 把 ICO 里的裸 DIB 重新包一层 BMP 文件头再交 SkiaSharp，`bfOffBits` 写成 `14 + headerSize`（=54）**漏了调色板长度**，BMP 解码器把调色板前 64 字节当像素数据读 ⇒ `SKBitmap.Decode` 返回畸形位图或 null ⇒ `ExtractFrames` 空 ⇒ `ShowIcoGallery` 走 `ShowUnsupported`。样本目录项 32×32、`biHeight=64`、`biBitCount=4`、`clrUsed=0`（实为 16 色 × 4 字节 = 64B 调色板），布局 40(头)+64(调色板)+512(XOR)+128(AND)=744，≤8bpp 的帧 100% 命中。**修法**：`writer.Write(14 + headerSize + paletteSize);`（一处）。顺带验证：手工 AND 掩码的透明结果与 Skia 原生 ICO 解码**逐像素一致**（Test_01 alpha0=543、Test_02=480），`IcoIconHelper` 的重打包路径本来就好（所以列表缩略图此前正常，只有预览画廊坏）。
+  - **WebP 根因**：动画 WebP 走 `.webp → PreviewType.Image → ShowImageCore 里 codec.FrameCount>1 → ShowGif → GifDecoder.DecodeFrames`，旧实现每帧新建全尺寸 `SKBitmap`、`SKCodecOptions(i)` **逐帧独立解码**，再用 `SKImage.FromBitmap + Encode(Png,100) + new Bitmap(ms)` 走 PNG 往返。探针实测（SkiaSharp 4.152.0）：Test_03 解码 1344ms + PNG 2184ms（≈3.5s）、Test_04 4042ms + 3873ms（≈7.9s）；首帧只要 7/9ms；单帧 BGRA memcpy（1280×531 ≈2598KB）3 次仅 2ms/1ms ⇒ PNG 往返是纯浪费，降采样收益有限（@0.5 = 243ms / @0.25 = 140ms）。
+  - **修法一（链式增量解码）**：第 0 帧 `new SKCodecOptions(0)`、第 i 帧 `new SKCodecOptions(i, i - 1)` 以第 i-1 帧为 priorFrame，复用单个 `SKBitmap canvasBitmap`（`SKImageInfo(width, height, Bgra8888, Premul)`）+ 一个 `byte[] pixelBuffer`；每帧 `new WriteableBitmap(new PixelSize(w,h), new Vector(96,96), PixelFormat.Bgra8888, AlphaFormat.Premul)` + `using (var locked = frameBitmap.Lock()) Marshal.Copy(...)`（**彻底去掉 PNG 往返**，与 `PreviewViewModel.FlattenAlphaSkia`、字体预览两处既有直拷范式一致）。`CopyPixels` 在 `RowBytes != width*4` 时逐行拷，避免把行填充字节当像素。实测 Test_03 1092→**182ms**、Test_04 4314→**361ms**（≈12×），且与独立解码**逐字节一致**（mismatchFrames=0、diffPx=0，scale 1/0.5/0.25 三档全 0 差异）。
+  - **修法二（帧内存闸门）**：`GifDecoder.MaxAnimationFrames = 600`、`MaxAnimationBytes = 192MB`，`internal static bool ExceedsFrameBudget(int frameCount, long frameBytes)` 判「帧数超限 或 总像素内存超限」⇒ 只解首帧并把 `TotalFrameCount`（真实帧数）与 `IsFrameLimitApplied` 带出；单帧本身即超 192MB 时返回 null（避免一次分配出几百 MB）。返回类型 `List<GifFrameData>?` → `GifDecodeResult?`（`Frames` / `TotalFrameCount` / `IsFrameLimitApplied`）。
+  - **UI 接线**：`PreviewViewModel` 新增 `IsAnimationFrameLimited`（派生通知 `HasAnimationControls`，限制生效时隐藏上一帧/播放/下一帧三键，而不是留一排点了没反应的键）+ `AnimationFrameLimitNotice`（三语 `Preview_AnimationFrameLimited`，`{0}` = 真实帧数）+ `_limitedTotalFrameCount`；`ShowGif` 开头复位、成功路径按 `limitedTotalFrames` 赋值、元数据 `FrameCount` 改用**真实帧数**（不是已解码的 1）、`OnCultureChanged` 按当前语言重算提示、`Clear()` 复位三者。`PreviewPanel.axaml` 的 `GifPreviewScrollViewer` 外包 `Grid RowDefinitions="Auto,*"`，提示行在 `Row=0`（空串时随 `IsVisible` 折起）。
+  - **不动**：APNG（`ApngDecoder` 同样 PNG 往返，用户明确要求本轮只覆盖 GIF/WebP）。
+  - **测试**：新增 `IcoParserPaletteTests`（5 例：4bpp/8bpp/1bpp 调色板 DIB 必须解出、4bpp 像素颜色必须命中调色板登记值、垃圾数据仍返回空）与 `GifDecoderTests`（5 例：链式解码与独立解码逐像素一致、预算内返回全部帧且位图是 `WriteableBitmap` 且时延 ≥50ms、`ExceedsFrameBudget` 帧数/内存/边界三档、坏文件返回 null、`GetFrameCount` 与 `TotalFrameCount` 一致）。素材用仓库自带 `docs/images/**.gif`，无外部依赖。真实样本另行一次性验过（ICO 两帧解出 32×32 且有透明像素、WebP 14/26 帧全解且解码 <1.2s），验完即删。
+  - **验证**：`build -Target avalonia` 0 警告（Release `--no-incremental` 亦 0）、`i18n` 1487 key、`guards` 10 项、`test -Target ui-tests` 全绿（32 条存量警告，无新增）。
+  - **踩坑**：`Bitmap.Save(Stream)` 无参重载已废弃（CS0618），测试里转 SkiaSharp 须写 `bitmap.Save(ms, new PngBitmapEncoderOptions())`。
+  - **发布说明（规则 18）**：v0.5.7 尚未发布（最新 tag 仍是 v0.5.6），而报告者用的是已发布的 V0.5.6 ⇒ 属「上一版本已发布、用户实际可能遇到」，在 `RELEASE_NOTES.md` 的 `## v0.5.7` → `**修复 / Fixes**` 节顶部补一条中英文「修复」条目（含两条子项 ①②，中英镜像同长），截图占位 `docs/images/version/v0.5.7/Issue89Preview.png`（图待补）。
 **2026-11-16** — 合并 beta 到 alpha：右键菜单心跳修复 / 压缩输出路径与输出方式重构 / 模板复查 / 命名预设单控件
   - **用户指令**：beta 分支上修了一批问题，要求合并进 alpha 并处理冲突。`git merge-base` = `4acd2a56`，beta 独有 9 笔（issue #80 心跳自愈 → 两次 alpha 合入 → 输出路径单一变量 → 输出方式三态收敛 → 模板复查修复 → 命名预设单控件 → 可编辑下拉边框），alpha 独有 6 笔（v0.5.8 的唯根处理 / 智能解压两档 / 发布说明 / 版本号 / 标签精简）。
   - **冲突 1（`src/MantisZip.UI.Avalonia/Models/CompressSettings.cs`）**：两侧都在位置记录末尾追加字段，解法 = 两侧全留，顺序为 beta 的 `DateTime? TemplateTimestamp = null` 在前、alpha 的 `RootMode` / `WrapRoot` 在后 —— 保持既有的位置参数前缀不变，`<param>` 文档同样两侧全留。

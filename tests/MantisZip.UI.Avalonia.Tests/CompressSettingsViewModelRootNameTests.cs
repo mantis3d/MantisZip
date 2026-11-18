@@ -153,8 +153,14 @@ public class CompressSettingsViewModelRootNameTests : IDisposable
         var vm = new CompressSettingsViewModel(new[] { MakeFile("report.txt") });
         vm.WrapRoot = "";
 
-        // 留空 = 未启用模板，与引入功能前一致（用压缩包文件名）
-        Assert.Equal("report", vm.RootNameExampleText);
+        // 留空 = 未启用模板 ⇒ 回落到「压缩包主名」。
+        // 注意这里**不是**源文件名：压缩包默认按落点目录命名（单个 report.txt 落在夹具目录里，
+        // 包名就是夹具目录名），根名跟着包名走才是「预览 = 实际」。
+        // 2026-11-18 合并 beta 后修正断言 —— 旧断言写死 "report" 是按源文件名猜的，
+        // 在「输出路径单一变量」重构后（默认包名 = 落点目录名）已经过期。
+        Assert.Equal(Path.GetFileName(_root), vm.RootNameExampleText);
+        // 与 VM 自己算出的包名一致：这条不变量比具体字符串更能防止两边漂移。
+        Assert.Equal(vm.OutputFileName, vm.RootNameExampleText);
     }
 
     // ════════════════════════════════════════════════════════════════
