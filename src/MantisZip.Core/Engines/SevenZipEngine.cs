@@ -1337,7 +1337,8 @@ public class SevenZipEngine : IArchiveEngine
                     ? ArchiveRootPolicy.GetSourceStripName(sourcePaths[0])
                     : null;
                 var wrapRoot = rootAdjustment.Wrap
-                    ? ArchiveRootPolicy.GetWrapName(options.CompressWrapRoot, outputPath)
+                    ? ArchiveRootPolicy.ResolveWrapName(
+                        options.CompressWrapRoot, sourcePaths, outputPath, options.CompressWrapRootTimestamp)
                     : null;
                 if (rootAdjustment.IsActive)
                 {

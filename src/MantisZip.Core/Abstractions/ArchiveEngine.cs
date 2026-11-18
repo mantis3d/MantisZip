@@ -121,8 +121,15 @@ public class ArchiveOptions
 
     /// <summary>
     /// 压缩端「加一层根目录」时使用的根名；空 = 由引擎回落到压缩包文件名。
+    /// 含 <c>{…}</c> 时按 <see cref="Utils.RootNameTemplate"/> 渲染，渲染失败静默回落压缩包文件名。
     /// </summary>
     public string? CompressWrapRoot { get; set; }
+
+    /// <summary>
+    /// 根名模板里 <c>{date}</c> / <c>{datetime}</c> 的取值（批级时间戳，与文件名模板共用）；
+    /// null = 用到时取当前时间。预览侧必须传同一个值，否则预览与实解的根名会跨午夜不一致。
+    /// </summary>
+    public DateTime? CompressWrapRootTimestamp { get; set; }
 
     /// <summary>
     /// 解压端：要剥掉的唯一根目录段（空/null = 不剥）。

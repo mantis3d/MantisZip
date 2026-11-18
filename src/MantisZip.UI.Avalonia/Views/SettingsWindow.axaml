@@ -226,15 +226,19 @@
                             </DataTemplate>
                           </ComboBox.ItemTemplate>
                         </ComboBox>
-                        <!-- 默认根名：留空 = 按压缩包文件名去扩展名推导 -->
+                        <!-- 默认根名：留空 = 按压缩包文件名去扩展名推导；可填占位符（{name}/{parent}/{date}/{datetime}/{archive}） -->
                         <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingXs}">
                           <TextBlock Grid.Column="0" Text="{Binding CompressRootNameText}" VerticalAlignment="Center" />
                           <TextBox Grid.Column="1" Text="{Binding CompressRootName}"
+                                   ToolTip.Tip="{Binding CompressRootNameHintText}"
                                    Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                                    Background="{DynamicResource ThemeWindowBgBrush}"
                                    BorderBrush="{DynamicResource ThemeBorderBrush}" />
                         </Grid>
                       </Grid>
+                      <TextBlock Text="{Binding CompressRootNameHintText}"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                 TextWrapping="Wrap" />
                     </StackPanel>
                   </Border>
                   <!-- 文件冲突默认策略：压缩时遇到同名文件的处理方式（ask=每次询问；仅本次压缩外的全局默认） -->

@@ -33,6 +33,10 @@ public static class SourceEntryEnumerator
     /// </param>
     /// <param name="wrapRoot">加一层根目录时使用的根名；空 = 由引擎回落到压缩包文件名。</param>
     /// <param name="archivePath">目标压缩包路径：<paramref name="wrapRoot"/> 为空时用它去扩展名当根名。</param>
+    /// <param name="wrapTimestamp">
+    /// 根名模板里 <c>{date}</c> / <c>{datetime}</c> 的取值；null = 取当前时间。
+    /// 必须与执行侧传同一个值，否则播种 Key 与引擎上报的条目名会对不上。
+    /// </param>
     /// <returns>(Key=条目相对路径, Name=文件名, Size=字节数) 列表。</returns>
     public static IReadOnlyList<(string Key, string Name, long Size)> Enumerate(
         IReadOnlyList<string> sourcePaths,
@@ -40,7 +44,8 @@ public static class SourceEntryEnumerator
         CancellationToken cancellationToken = default,
         RootDirectoryMode rootMode = RootDirectoryMode.Original,
         string? wrapRoot = null,
-        string? archivePath = null)
+        string? archivePath = null,
+        DateTime? wrapTimestamp = null)
     {
         ArgumentNullException.ThrowIfNull(sourcePaths);
 
@@ -49,7 +54,7 @@ public static class SourceEntryEnumerator
             : new HashSet<string>(whitelist, StringComparer.OrdinalIgnoreCase);
 
         // progress 传 null：播种只是枚举，不需要扫描进度上报
-        var (files, _) = FileScanner.CollectFiles(sourcePaths.ToArray(), null, cancellationToken, set, rootMode, wrapRoot, archivePath);
+        var (files, _) = FileScanner.CollectFiles(sourcePaths.ToArray(), null, cancellationToken, set, rootMode, wrapRoot, archivePath, wrapTimestamp);
 
         var result = new List<(string Key, string Name, long Size)>(files.Count);
         foreach (var (fullPath, relativePath) in files)

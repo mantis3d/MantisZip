@@ -1239,6 +1239,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ExtractPreserveFullPathText => LocalizationManager.T("Settings_Extract_PreserveFullPath");
     public string CompressRootModeText => LocalizationManager.T("Settings_Compress_RootMode");
     public string CompressRootNameText => LocalizationManager.T("Settings_Compress_RootName");
+    public string CompressRootNameHintText => LocalizationManager.T("Settings_Compress_RootName_Hint");
     public string ExtractRootModeText => LocalizationManager.T("Settings_Extract_RootMode");
     public string SmartExtractRootModeText => LocalizationManager.T("Settings_SmartExtract");
     public string SmartExtractRootModeDescText => LocalizationManager.T("Settings_SmartExtract_Desc");
@@ -2048,6 +2049,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ExtractPreserveFullPathText));
         OnPropertyChanged(nameof(CompressRootModeText));
         OnPropertyChanged(nameof(CompressRootNameText));
+        OnPropertyChanged(nameof(CompressRootNameHintText));
         OnPropertyChanged(nameof(ExtractRootModeText));
         OnPropertyChanged(nameof(SmartExtractRootModeText));
         OnPropertyChanged(nameof(SmartExtractRootModeDescText));

@@ -265,7 +265,7 @@
                      内层用 Grid 而不是横向 StackPanel —— StackPanel 里子控件只拿到自身想要
                      的宽度，输入框会被 watermark 的字数决定宽窄，撑不满剩余空间。 -->
                 <Grid Grid.Column="1"
-                      ColumnDefinitions="Auto,*"
+                      ColumnDefinitions="Auto,*,Auto"
                       ColumnSpacing="{DynamicResource SpacingXs}"
                       IsVisible="{Binding IsWrapRootVisible}">
                   <TextBlock Grid.Column="0"
@@ -273,9 +273,44 @@
                              VerticalAlignment="Center"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                   <TextBox Grid.Column="1"
+                           x:Name="WrapRootBox"
                            Text="{Binding WrapRoot}"
                            Watermark="{Binding LocalizedStrings[Compress_RootMode_WrapName_Watermark]}" />
+                  <!-- 插入占位符：根名只支持 5 个 token（没有 {ext}/{seq}），
+                       按钮按 PlaceholderSet.RootName 生成菜单，避免诱导写出必错的模板。 -->
+                  <controls:PlaceholderInsertButton Grid.Column="2"
+                                                    Placeholders="RootName"
+                                                    TargetTextBox="{Binding #WrapRootBox}"
+                                                    Content="{Binding LocalizedStrings[Compress_RootName_Insert]}"
+                                                    ToolTip.Tip="{Binding LocalizedStrings[Compress_RootName_InsertTip]}" />
                 </Grid>
+              </Grid>
+              <!-- 示例 / 错误行：只在加根时出现。合法时显示「本批的根目录会叫 xxx」，
+                   非法时同一格换成红色原因（右侧帮助按钮打开占位符表）。 -->
+              <Grid ColumnDefinitions="*,Auto"
+                    ColumnSpacing="{DynamicResource SpacingXs}"
+                    IsVisible="{Binding IsWrapRootVisible}">
+                <!-- 示例行（次要色）：正常渲染出的根目录名 -->
+                <TextBlock Grid.Column="0"
+                           Text="{Binding RootNameExampleText}"
+                           IsVisible="{Binding !IsRootNameErrorVisible}"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <!-- 错误行（红色）：与示例行同格互斥，不额外占高度 -->
+                <TextBlock Grid.Column="0"
+                           Text="{Binding RootNameError}"
+                           IsVisible="{Binding IsRootNameErrorVisible}"
+                           TextWrapping="Wrap"
+                           VerticalAlignment="Center"
+                           Foreground="{DynamicResource ThemeStatusErrorBrush}" />
+                <Button Grid.Column="1"
+                        Classes="ToolbarIcon"
+                        Command="{Binding ShowRootNameHelpCommand}"
+                        ToolTip.Tip="{Binding LocalizedStrings[Compress_RootName_HelpTip]}">
+                  <PathIcon Data="{StaticResource IconQuestion}" Width="14" Height="14"
+                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                </Button>
               </Grid>
               <!-- 裁剪说明：两档都可用时整行隐藏（不占高度） -->
               <TextBlock Text="{Binding RootModeHint}"

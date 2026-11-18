@@ -304,7 +304,7 @@ public class TarGzEngine : IArchiveEngine
                 // 阶段 1：扫描源目录
                 progress.ReportPhase(ArchivePhase.Scanning);
 
-                var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist, options.CompressRootMode, options.CompressWrapRoot, outputPath);
+                var (files, _) = FileScanner.CollectFiles(sourcePaths, progress, cancellationToken, options.FileWhitelist, options.CompressRootMode, options.CompressWrapRoot, outputPath, options.CompressWrapRootTimestamp);
                 CoreLog.Info($"CompressAsync: {files.Count} files to compress");
 
                 // 阶段 2：正式写出 tar/gz

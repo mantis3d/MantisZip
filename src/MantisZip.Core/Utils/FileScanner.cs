@@ -26,6 +26,10 @@ internal static class FileScanner
     /// 目标压缩包路径：<paramref name="wrapRoot"/> 为空时用它去扩展名当根名。
     /// 传 null 会回落到 <c>"archive"</c> —— 预览树与实解就会不一致，因此引擎侧**必须**传。
     /// </param>
+    /// <param name="wrapTimestamp">
+    /// 根名模板里 <c>{date}</c> / <c>{datetime}</c> 的取值；null = 取当前时间。
+    /// 批级时间戳由调用方传进来，避免「预览 23:59、执行 00:01」。
+    /// </param>
     public static (List<(string FullPath, string RelativePath)> Files, long TotalBytes) CollectFiles(
         string[] sourcePaths,
         IProgress<ArchiveProgress>? progress,
@@ -33,7 +37,8 @@ internal static class FileScanner
         IReadOnlySet<string>? whitelist = null,
         RootDirectoryMode rootMode = RootDirectoryMode.Original,
         string? wrapRoot = null,
-        string? archivePath = null)
+        string? archivePath = null,
+        DateTime? wrapTimestamp = null)
     {
         var files = new List<(string FullPath, string RelativePath)>();
         long totalBytes = 0;
@@ -47,7 +52,9 @@ internal static class FileScanner
         var stripRoot = adjustment.Strip && hasSingleSourceDir
             ? ArchiveRootPolicy.GetSourceStripName(sourcePaths[0])
             : null;
-        var effectiveWrap = adjustment.Wrap ? ArchiveRootPolicy.GetWrapName(wrapRoot, archivePath) : null;
+        var effectiveWrap = adjustment.Wrap
+            ? ArchiveRootPolicy.ResolveWrapName(wrapRoot, sourcePaths, archivePath, wrapTimestamp)
+            : null;
         if (adjustment.IsActive)
         {
             CoreLog.Info($"FileScanner.CollectFiles: rootMode={rootMode}, strip='{stripRoot}', wrap='{effectiveWrap}'");

@@ -92,7 +92,7 @@ public static class FileNameTemplate
             error = null;
             return true;
         }
-        return TryTokenize(template, out _, out error);
+        return TemplateLexing.TryTokenize(template, IsKnownToken, out _, out error);
     }
 
     /// <summary>
@@ -115,7 +115,7 @@ public static class FileNameTemplate
             return false;
         }
 
-        if (!TryTokenize(template, out var segments, out error)) return false;
+        if (!TemplateLexing.TryTokenize(template, IsKnownToken, out var segments, out error)) return false;
 
         var sb = new StringBuilder(template.Length + 16);
         foreach (var segment in segments!)
@@ -130,7 +130,7 @@ public static class FileNameTemplate
         }
 
         var rendered = sb.ToString();
-        if (!TryValidateResult(rendered, out error)) return false;
+        if (!TemplateLexing.TryValidateResult(rendered, MaxBaseNameLength, out error)) return false;
 
         baseName = rendered;
         return true;
@@ -139,82 +139,8 @@ public static class FileNameTemplate
     // ════════════════════════════════════════════════════════════════
     //  词法
     // ════════════════════════════════════════════════════════════════
-
-    private readonly record struct Segment(bool IsLiteral, string Text);
-
-    private static bool TryTokenize(
-        string template, out List<Segment>? segments, out FileNameTemplateError? error)
-    {
-        segments = new List<Segment>(8);
-        error = null;
-
-        var literal = new StringBuilder();
-        for (int i = 0; i < template.Length; i++)
-        {
-            char ch = template[i];
-
-            if (ch == '{')
-            {
-                // {{ → 字面量 {
-                if (i + 1 < template.Length && template[i + 1] == '{')
-                {
-                    literal.Append('{');
-                    i++;
-                    continue;
-                }
-
-                int close = template.IndexOf('}', i + 1);
-                if (close < 0)
-                {
-                    error = new FileNameTemplateError(
-                        FileNameTemplateErrorKind.Unterminated, template[i..]);
-                    segments = null;
-                    return false;
-                }
-
-                // 未闭合嵌套 { 视为未闭合（如 "{a{b}"）
-                int nested = template.IndexOf('{', i + 1);
-                if (nested >= 0 && nested < close)
-                {
-                    error = new FileNameTemplateError(
-                        FileNameTemplateErrorKind.Unterminated, template[i..close]);
-                    segments = null;
-                    return false;
-                }
-
-                var token = template[(i + 1)..close];
-                if (!IsKnownToken(token))
-                {
-                    error = new FileNameTemplateError(
-                        FileNameTemplateErrorKind.UnknownPlaceholder, token);
-                    segments = null;
-                    return false;
-                }
-
-                if (literal.Length > 0)
-                {
-                    segments.Add(new Segment(true, literal.ToString()));
-                    literal.Clear();
-                }
-                segments.Add(new Segment(false, token.ToLowerInvariant()));
-                i = close;
-                continue;
-            }
-
-            // }} → 字面量 }；单个 } 也按字面量处理
-            if (ch == '}' && i + 1 < template.Length && template[i + 1] == '}')
-            {
-                literal.Append('}');
-                i++;
-                continue;
-            }
-
-            literal.Append(ch);
-        }
-
-        if (literal.Length > 0) segments.Add(new Segment(true, literal.ToString()));
-        return true;
-    }
+    // 分词与结果校验已抽到 TemplateLexing（与根目录名模板共用一份实现），
+    // 这里只保留「哪些 token 算已知」这一项本模板独有的判定。
 
     /// <summary>token 已转小写后传入（校验时也先转小写）。</summary>
     private static bool IsKnownToken(string token)
@@ -335,83 +261,5 @@ public static class FileNameTemplate
         {
             return false;
         }
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    //  结果校验
-    // ════════════════════════════════════════════════════════════════
-
-    private static bool TryValidateResult(string rendered, out FileNameTemplateError? error)
-    {
-        error = null;
-
-        if (string.IsNullOrWhiteSpace(rendered))
-        {
-            error = new FileNameTemplateError(FileNameTemplateErrorKind.EmptyResult, Rendered: rendered);
-            return false;
-        }
-
-        if (HasInvalidChar(rendered))
-        {
-            error = new FileNameTemplateError(FileNameTemplateErrorKind.InvalidChar, Rendered: rendered);
-            return false;
-        }
-
-        if (rendered[^1] is '.' or ' ')
-        {
-            error = new FileNameTemplateError(FileNameTemplateErrorKind.InvalidName, Rendered: rendered);
-            return false;
-        }
-
-        if (IsReservedDeviceName(rendered))
-        {
-            error = new FileNameTemplateError(FileNameTemplateErrorKind.InvalidName, Rendered: rendered);
-            return false;
-        }
-
-        if (rendered.Length > MaxBaseNameLength)
-        {
-            error = new FileNameTemplateError(FileNameTemplateErrorKind.TooLong, Rendered: rendered);
-            return false;
-        }
-
-        return true;
-    }
-
-    private static bool HasInvalidChar(string value)
-    {
-        foreach (var c in value)
-        {
-            if (char.IsControl(c)) return true;
-            if (c is '/' or '\\' or ':' or '*' or '?' or '"' or '<' or '>' or '|') return true;
-            if (Array.IndexOf(Path.GetInvalidFileNameChars(), c) >= 0) return true;
-        }
-        return false;
-    }
-
-    /// <summary>命中 Windows 保留设备名即不可用（<c>CON.txt</c> 也算）。</summary>
-    private static bool IsReservedDeviceName(string rendered)
-    {
-        int dot = rendered.IndexOf('.');
-        var stem = (dot >= 0 ? rendered[..dot] : rendered).Trim().ToUpperInvariant();
-        if (stem.Length == 0) return false;
-
-        switch (stem)
-        {
-            case "CON":
-            case "PRN":
-            case "AUX":
-            case "NUL":
-                return true;
-        }
-
-        if (stem.Length == 4)
-        {
-            var prefix = stem[..3];
-            char digit = stem[3];
-            if ((prefix == "COM" || prefix == "LPT") && digit is >= '1' and <= '9') return true;
-        }
-
-        return false;
     }
 }

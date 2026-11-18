@@ -135,6 +135,55 @@ public static class ArchiveRootPolicy
     }
 
     /// <summary>
+    /// 压缩端加根时的根名：在 <see cref="GetWrapName"/> 之上接住**根目录名模板**。
+    /// <para>
+    /// 三种情况分得很清，因为它们的失败语义不同：
+    /// </para>
+    /// <list type="bullet">
+    /// <item>空白 → 回落压缩包名（与 <see cref="GetWrapName"/> 完全一致）。</item>
+    /// <item>不含 <c>{</c> 的**字面名** → 原样交给 <see cref="GetWrapName"/>，
+    /// 保留「非法字符净化成 <c>_</c>」这一既有语义（改掉会让老配置静默变名）。</item>
+    /// <item>含 <c>{</c> 的**模板** → 走 <see cref="RootNameTemplate.TryRender"/>；
+    /// 渲染或校验失败**静默回落压缩包名**并写 <c>CoreLog</c> —— 执行期不能因为一个占位符
+    /// 让整批压缩失败（对话框侧已在「开始压缩」前拦下，这里只是兜底）。</item>
+    /// </list>
+    /// </summary>
+    /// <param name="templateOrName">对话框里那一串（可能是模板，也可能是纯字面名）。</param>
+    /// <param name="sourcePaths">本批的源列表；<c>{name}</c> 多源时取公共父目录名。</param>
+    /// <param name="fallbackArchivePath">回落用的压缩包路径；同时也是 <c>{archive}</c> 的取值。</param>
+    /// <param name="timestamp">批级时间戳（与文件名模板共用，避免跨午夜不一致）。</param>
+    public static string ResolveWrapName(
+        string? templateOrName,
+        IReadOnlyList<string>? sourcePaths = null,
+        string? fallbackArchivePath = null,
+        DateTime? timestamp = null)
+    {
+        var raw = templateOrName?.Trim();
+        if (string.IsNullOrEmpty(raw)) return GetWrapName(null, fallbackArchivePath);
+
+        // 字面名（无花括号）走旧路径：净化而非报错，与引入模板前逐字节一致。
+        if (raw.IndexOf('{') < 0) return GetWrapName(raw, fallbackArchivePath);
+
+        var ctx = new RootNameTemplateContext(
+            sourcePaths ?? Array.Empty<string>(),
+            timestamp ?? DateTime.Now,
+            string.IsNullOrWhiteSpace(fallbackArchivePath)
+                ? null
+                : ArchivePath.GetFileNameWithoutExtension(fallbackArchivePath));
+
+        if (RootNameTemplate.TryRender(raw, ctx, out var rendered, out var error))
+        {
+            var sanitized = SanitizeDirectorySegment(rendered);
+            if (!string.IsNullOrEmpty(sanitized)) return sanitized;
+        }
+
+        var fallback = GetWrapName(null, fallbackArchivePath);
+        CoreLog.Info(
+            $"ArchiveRootPolicy.ResolveWrapName: 根名模板 '{raw}' 渲染失败（{error?.Kind.ToString() ?? "结果为空"}），回落到 '{fallback}'");
+        return fallback;
+    }
+
+    /// <summary>
     /// 把一个相对路径按调整结果改写。
     /// <para>
     /// <paramref name="stripRoot"/> 非空且该路径位于它之下时剥掉该前缀（含该前缀本身的那个目录条目

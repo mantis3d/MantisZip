@@ -332,8 +332,10 @@ public static class ResultPreviewService
                 };
 
                 // 挂载各源子树（套根时先包一层「根目录」节点）
+                // 根名与执行侧走同一个 ResolveWrapName：这样「预览 = 实际」对根名模板同样成立。
                 var wrapName = rootAdjustment.Wrap
-                    ? ArchiveRootPolicy.GetWrapName(wrapRoot, effectiveOutputPath)
+                    ? ArchiveRootPolicy.ResolveWrapName(
+                        wrapRoot, sourcePaths, effectiveOutputPath, templateTimestamp)
                     : null;
                 PreviewTreeNode? wrapNode = null;
                 if (wrapName != null)

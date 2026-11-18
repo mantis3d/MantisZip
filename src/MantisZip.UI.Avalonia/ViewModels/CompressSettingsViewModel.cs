@@ -706,6 +706,10 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_RootMode_AlwaysWrap_Tip"] = LocalizationManager.T("Compress_RootMode_AlwaysWrap_Tip");
         LocalizedStrings["Compress_RootMode_WrapName"] = LocalizationManager.T("Compress_RootMode_WrapName");
         LocalizedStrings["Compress_RootMode_WrapName_Watermark"] = LocalizationManager.T("Compress_RootMode_WrapName_Watermark");
+        // 根目录名模板的「插入占位符」按钮与帮助入口（v0.5.8 第三项）
+        LocalizedStrings["Compress_RootName_Insert"] = LocalizationManager.T("Compress_RootName_Insert");
+        LocalizedStrings["Compress_RootName_InsertTip"] = LocalizationManager.T("Compress_RootName_InsertTip");
+        LocalizedStrings["Compress_RootName_HelpTip"] = LocalizationManager.T("Compress_RootName_HelpTip");
         // 注：下拉裁剪说明行（RootModeHint）走 VM 的 LocalizationManager.T，不经 LocalizedStrings 字典，
         // 因此下面三个 key 不需要登记（规则 13 只要求 XAML 里的 LocalizedStrings[...] 必须登记）。
 
@@ -1396,14 +1400,131 @@ public partial class CompressSettingsViewModel : ObservableObject
         OnPropertyChanged(nameof(RootModeDescription));
         OnPropertyChanged(nameof(IsWrapRootVisible));
         OnPropertyChanged(nameof(IsWrapActive));
+        // 根名模板的校验与示例都只在「加根」档有意义：切走时要把错误清掉，
+        // 否则从「始终加根」切回「保持原样」会留下一条无主的红字。
+        RootNameError = ValidateRootNameNow();
+        OnPropertyChanged(nameof(IsRootNameTemplateActive));
+        OnPropertyChanged(nameof(IsRootNameErrorVisible));
+        OnPropertyChanged(nameof(RootNameExampleText));
+        OnPropertyChanged(nameof(IsRootNameExampleError));
         BuildCompressPreview();
     }
 
-    /// <summary>根名变化 → 预览树里那一层的名字立刻跟着变。</summary>
+    /// <summary>根名变化 → 预览树里那一层的名字立刻跟着变（并重算模板错误）。</summary>
     partial void OnWrapRootChanged(string? value)
     {
+        RootNameError = ValidateRootNameNow();
+        OnPropertyChanged(nameof(IsRootNameErrorVisible));
+        OnPropertyChanged(nameof(RootNameExampleText));
+        OnPropertyChanged(nameof(IsRootNameExampleError));
         if (IsWrapActive)
             BuildCompressPreview();
+    }
+
+    /// <summary>根名模板语法/结果错误（已本地化）；无错或未启用为 <see langword="null"/>。</summary>
+    [ObservableProperty]
+    private string? _rootNameError;
+
+    partial void OnRootNameErrorChanged(string? value)
+        => OnPropertyChanged(nameof(IsRootNameErrorVisible));
+
+    /// <summary>
+    /// 根名模板是否启用：只对含 <c>{</c> 的输入算「模板」；纯字面名仍走旧路径
+    /// （净化非法字符而非报错），否则老配置里的 <c>a:b</c> 会突然变成红框。
+    /// </summary>
+    public bool IsRootNameTemplateActive => IsWrapActive && WrapRoot?.IndexOf('{') >= 0;
+
+    /// <summary>根名错误行是否可见。</summary>
+    public bool IsRootNameErrorVisible => IsRootNameTemplateActive && RootNameError != null;
+
+    /// <summary>
+    /// 示例行：按当前源与本批时间戳渲染一次，告诉用户「这一批的根目录会叫什么」。
+    /// 未启用模板时给占位说明；渲染失败时给错误（与 <see cref="RootNameError"/> 同源）。
+    /// </summary>
+    public string RootNameExampleText
+    {
+        get
+        {
+            if (!IsWrapActive) return string.Empty;
+            var template = WrapRoot?.Trim();
+            if (string.IsNullOrEmpty(template) || template!.IndexOf('{') < 0)
+            {
+                // 字面名 / 留空：直接显示最终会用的那一个名字（留空时回落压缩包名）。
+                return MantisZip.Core.Utils.ArchiveRootPolicy.ResolveWrapName(
+                    WrapRoot, SelectedPaths.ToList(), CurrentOutputPathOrNull(), _templateTimestamp);
+            }
+
+            if (RootNameError != null) return RootNameError;
+            return MantisZip.Core.Utils.ArchiveRootPolicy.ResolveWrapName(
+                template, SelectedPaths.ToList(), CurrentOutputPathOrNull(), _templateTimestamp);
+        }
+    }
+
+    /// <summary>示例行是不是一条错误（决定用红字还是次要色）。</summary>
+    public bool IsRootNameExampleError => IsWrapActive && RootNameError != null;
+
+    /// <summary>
+    /// 立刻校验一次根名模板（语法 + 渲染结果）。
+    /// 与文件名模板不同：**不做重名检查** —— 根名只影响包内一层目录，重名不产生冲突。
+    /// </summary>
+    private string? ValidateRootNameNow()
+    {
+        if (!IsWrapActive) return null;
+
+        var template = WrapRoot?.Trim();
+        if (string.IsNullOrEmpty(template) || template!.IndexOf('{') < 0) return null; // 字面名/留空：旧路径
+
+        if (!MantisZip.Core.Utils.RootNameTemplate.TryValidateSyntax(template, out var syntaxError))
+            return DescribeRootNameError(syntaxError);
+
+        MantisZip.Core.Utils.RootNameTemplate.TryRender(
+            template, BuildRootNameContext(), out _, out var renderError);
+        return renderError is null ? null : DescribeRootNameError(renderError);
+    }
+
+    /// <summary>根名模板渲染上下文（多源 <c>{name}</c> 取公共父目录名，由 Core 内部再算）。</summary>
+    private MantisZip.Core.Utils.RootNameTemplateContext BuildRootNameContext() => new(
+        SelectedPaths.ToList(),
+        _templateTimestamp,
+        CurrentOutputPathOrNull() is { } path
+            ? Path.GetFileNameWithoutExtension(path)
+            : null);
+
+    /// <summary>当前输出包路径（预览与执行同源；没什么可算时返回 null）。</summary>
+    private string? CurrentOutputPathOrNull()
+    {
+        var dir = OutputDirectory;
+        var name = OutputFileName;
+        if (string.IsNullOrWhiteSpace(dir) || string.IsNullOrWhiteSpace(name)) return null;
+        return Path.Combine(dir!, name!);
+    }
+
+    private static string DescribeRootNameError(FileNameTemplateError? error) => error?.Kind switch
+    {
+        null => LocalizationManager.T("Compress_FileNameTemplate_InvalidResult"),
+        FileNameTemplateErrorKind.UnknownPlaceholder =>
+            LocalizationManager.T("Compress_RootName_UnknownPlaceholder", error.Token ?? ""),
+        FileNameTemplateErrorKind.Unterminated =>
+            LocalizationManager.T("Compress_RootName_Unterminated"),
+        FileNameTemplateErrorKind.EmptyResult =>
+            LocalizationManager.T("Compress_RootName_EmptyResult"),
+        FileNameTemplateErrorKind.InvalidChar =>
+            LocalizationManager.T("Compress_RootName_InvalidChar"),
+        FileNameTemplateErrorKind.InvalidName =>
+            LocalizationManager.T("Compress_RootName_InvalidName"),
+        FileNameTemplateErrorKind.TooLong =>
+            LocalizationManager.T("Compress_RootName_TooLong", MantisZip.Core.Utils.RootNameTemplate.MaxNameLength),
+        _ => LocalizationManager.T("Compress_FileNameTemplate_InvalidResult"),
+    };
+
+    /// <summary>打开根名模板帮助（只列 5 个占位符）。</summary>
+    [RelayCommand]
+    private async Task ShowRootNameHelpAsync()
+    {
+        if (ShowHelpDialog is null) return;
+        await ShowHelpDialog(
+            LocalizationManager.T("Compress_RootName_HelpTitle"),
+            LocalizationManager.T("Compress_RootName_Markdown"));
     }
 
     /// <summary>源集合 / 输出模式变化后重建下拉项（源从 1 个变 2 个，「智能去根」就消失了）。</summary>
@@ -1426,6 +1547,11 @@ public partial class CompressSettingsViewModel : ObservableObject
 
         OnPropertyChanged(nameof(SelectedRootModeOption));
         OnPropertyChanged(nameof(IsWrapRootVisible));
+        // 源集合变化会改变 `{name}` 的取值（单源 → 多源时改取公共父目录名）⇒ 示例与校验都要重算。
+        RootNameError = ValidateRootNameNow();
+        OnPropertyChanged(nameof(IsRootNameTemplateActive));
+        OnPropertyChanged(nameof(RootNameExampleText));
+        OnPropertyChanged(nameof(IsRootNameExampleError));
     }
 
     /// <summary>按可用性重建下拉项；文案走本地化，值与枚举名一致。</summary>
@@ -2019,6 +2145,15 @@ public partial class CompressSettingsViewModel : ObservableObject
             var templateRejection = ValidateTemplateNow();
             if (templateRejection != null)
                 return templateRejection;
+        }
+
+        // ⑦ 根目录名模板不合法（语法错 / 结果非法）。留空或纯字面名时整步跳过 ——
+        //    字面名走「净化非法字符」的旧语义，不能因为写了个 a:b 就拒绝压缩。
+        if (IsRootNameTemplateActive)
+        {
+            var rootNameRejection = ValidateRootNameNow();
+            if (rootNameRejection != null)
+                return rootNameRejection;
         }
 
         return null;

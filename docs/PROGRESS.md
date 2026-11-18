@@ -27,6 +27,8 @@
 
 #### 2026-11
 
+- **11-18** — **根目录名模板（v0.5.8 第三项）**：压缩设置窗「包内根目录」的根名输入框与设置页「默认根目录名」支持 5 个占位符（`{name}` / `{parent}` / `{date}` / `{datetime}` / `{archive}`）——`{name}` 单源取源主名、多源取公共父目录名，`{archive}` 取最终压缩包主名。词法与结果校验从 `FileNameTemplate` 抽成共用的 `TemplateLexing`（两套模板共用转义 / 未闭合 / 长度 / 保留设备名规则，各写一份必然漂移）；`ArchiveRootPolicy.ResolveWrapName` 三分支保证「不含 `{` 的字面名走旧路径、净化成 `_` 而不报错」逐字节不变；预览树与实际压缩共用同一解析。UI 侧加「插入占位符」按钮（`PlaceholderSet` 按目标框切换集合，根名框不出现 `{ext}` / `{seq}`）、示例行实时显示本批会用的根名、填错转红；`ValidateForExecution` 新增第 ⑦ 步在「开始压缩」前拦下非法模板。测试 90 例（`RootNameTemplateTests` 58 / `ArchiveRootPolicyWrapNameTests` 19 / `CompressSettingsViewModelRootNameTests` 13）；`core` 与 `avalonia --no-incremental` 0 警告、`tests` 17.7s、`ui-tests` 全绿、i18n 1529 key、check 10 条守卫。真机三场景（模板生效 `{name}_{date}` → 包内 `7zip_2026-11-18/…`、`{foo}` 被拦、插入菜单只列 5 项）全过。
+
 - **11-16** — **合并 beta 到 alpha：右键菜单心跳修复 + 压缩输出路径与输出方式重构 + 文件名模板复查修复 + 命名预设单控件**：beta 侧 9 笔提交（issue #80 心跳自愈、输出路径单一变量、输出方式三态收敛为单开关、模板复查、可编辑预设下拉、可编辑下拉边框）并入 alpha，与 v0.5.8 的唯一根目录、智能解压两档共存。冲突 5 处：`CompressSettings` 位置记录两侧追加字段（beta 的 `TemplateTimestamp` 在前、alpha 的 `RootMode`/`WrapRoot` 在后）；`CompressSettingsViewModel` 的 `OnOutputModeChanged` 改接 beta 的 `RecomputeOutputPath()`（`RefreshOutputPathState` 已被删除）且 `CaptureSettings()` 四字段并存；`KNOWN_ISSUES.md` 的 KI 撞号（beta 的 11-11 / 11-14 登记在先，占 KI-018..021，alpha 那条重编号 **KI-022**）；`PROGRESS.md` 与 `progress-avalonia-detail.md` 的同月段落按「从新到旧、同日按提交时间从晚到早」重排。验证：`core` / `avalonia`（--no-incremental）/ `tests` / `ui-tests` 全部 0 警告构建，两套测试全绿，`-Task check` 版本 0.5.8 六处 / 1516 key / 10 守卫全绿。
 
 - **11-15** — **可编辑下拉外框缺一块（全局 TextBox 样式盖住 ComboBox 边框）**：预设行的可编辑下拉在 100% 缩放下外框左半截消失、鼠标划上去又正常。根因是 `App.axaml` 那条给普通输入框铺底的「非热态 TextBox」样式**连带命中了 ComboBox 可编辑模式内嵌的 `PART_EditableTextBox`**：它的模板 Border 被涂成不透明纯白、正好压住 ComboBox 自己画的 1px 边框；hover 时 `:not(:pointerover)` 不再命中、白底让位，所以「划上去就正常」。修法是给该选择器补 `:not(#PART_EditableTextBox)` 从源头排除（内层 Border 属模板子级，Avalonia 不支持双层 `/template/` 穿透，改不动它）。新增 `ComboEditableBorderTests` 两例（源码级选择器绊线 + 96 DPI 渲染扫描外框上半段像素），反向验证删掉排除项两例都红。隐患成因值得记：无头测试宿主不加载 `App.axaml` 全局样式，普通控件测试渲染出来一律「正常」，这类「只在真机复现」的样式串味缺陷此前完全无覆盖。
@@ -337,6 +339,7 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 根目录名模板（加根名支持占位符：`{name}`/`{parent}`/`{date}`/`{datetime}`/`{archive}`；词法与结果校验抽成共用 `TemplateLexing`；`ResolveWrapName` 保证字面名逐字节不变；插入菜单按目标框切换集合；预览 = 实际） | [root-name-template.md](.omo/plans/已完成/root-name-template.md) | 未发布（2026-11-18 归档，随 v0.5.8） |
 | 智能解压两档（加根 / 去根）+ 解压落点统一（两档 dest 都取父目录、只换根策略；对话框默认落点同步改父目录；SmartOpenPathResolver 已知计划重载修「解压后打开错层」；状态栏三条按实际动作重写） | [smart-extract-root-mode.md](.omo/plans/已完成/smart-extract-root-mode.md) | 未发布（2026-11-13 归档，随 v0.5.8） |
 | 唯一根目录处理（压缩端 / 解压端各四态下拉：原样 / 智能去除 / 智能添加 / 始终添加；判定统一收敛在 `ArchiveRootPolicy`，预览与实解共用同一解析；不可用档位从下拉里拿掉 + 一行说明） | [compress-extract-root-mode.md](.omo/plans/已完成/compress-extract-root-mode.md) | 未发布（2026-11-12 归档，随 v0.5.8） |
 | 压缩文件名模板（占位符 `{name}`/`{name:auto}`/`{ext}`/`{parent}`/`{date}`/`{datetime}`/`{seq}`；命名收敛在 `CompressPathPlanner`，三入口默认值 + 命名预设；留空零行为变更，渲染失败静默回退旧命名） | [filename-template.md](.omo/plans/已完成/filename-template.md) | 未发布（2026-11-11 归档，随 v0.5.7） |

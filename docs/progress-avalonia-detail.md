@@ -6,6 +6,24 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-18** — 功能：根目录名模板（包内根目录的加根名支持占位符，v0.5.8 第三项）
+  - **需求**：用户问「这个『默认根目录名』能不能用跟文件名模板一样或者类似的占位符？」压缩端加根时根名只能留空（回落压缩包名）或填字面量，想按日期/源目录名命名只能手工改。
+  - **用户拍板三问**：①占位符只暴露对目录名有意义的 5 个（`{name}` / `{parent}` / `{date}` / `{datetime}` / `{archive}`，去掉 `{ext}` / `{seq}`，补一个现在只能靠留空实现的 `{archive}`）②多源时 `{name}` 取公共父目录名、取不到才回落首源主名（与 `CompressPathPlanner.ResolveAutoName` 一致）③渲染失败在对话框拦下、引擎侧静默回落压缩包名。
+  - **Core 词法抽取**：新建 `src/MantisZip.Core/Utils/TemplateLexing.cs`（`internal static`）—— `Segment` / `TryTokenize(template, Func<string,bool> isKnownToken, out List<Segment>?, out FileNameTemplateError?)` / `TryValidateResult(rendered, maxLength, out error)` / `HasInvalidChar` / `IsReservedDeviceName`；`src/MantisZip.Core/Utils/FileNameTemplate.cs` 删掉自己那 5 份副本改为委托（`IsKnownToken` 保留作 `Func` 实参），**零行为变更**。注释写明「各写一份必然漂移成『文件名允许、根目录名不允许』这种难以解释的差异」。
+  - **Core 根名模板**：新建 `src/MantisZip.Core/Utils/RootNameTemplate.cs` —— `RootNameTemplateContext(IReadOnlyList<string> SourcePaths, DateTime Timestamp, string? ArchiveName)`、`Placeholders` 5 项、`MaxNameLength = 200`、`DefaultExample = "{name}_{date}"`、`TryValidateSyntax` / `TryRender`。`{name}` 单源走 `FileNameTemplate.GetPrimaryName`、多源走 `ResolveAutoName`。
+  - **策略接入**：`ArchiveRootPolicy.ResolveWrapName(templateOrName, sourcePaths, fallbackArchivePath, timestamp)` 三分支 —— 空白 → `GetWrapName(null, …)`；**不含 `{` 的字面名** → `GetWrapName(raw, …)`（保留「非法字符净化成 `_`」老语义，否则老配置会静默变名）；**含 `{` 的模板** → 渲染成功则 `SanitizeDirectorySegment` 后返回，失败则回落压缩包名 + `CoreLog.Info`。`GetWrapName` 本体一行未改，解压端 `ExtractRootPlan.cs:52` 的调用点保持原样。
+  - **时间戳同源**：`FileScanner.CollectFiles` 新增第 8 个可选参数 `DateTime? wrapTimestamp`；`ArchiveOptions.CompressWrapRootTimestamp`；`CompressService.BuildOptions` 取 `request.TemplateTimestamp`；`ZipEngine.Compress.cs` / `TarGzEngine.cs` / `SevenZipEngine.cs` 三处透传；`SourceEntryEnumerator.Enumerate` 同步（否则播种 Key 与引擎上报的条目名对不上，进度窗 Pending 行永远等不到终态）。
+  - **预览 = 实际**：`ResultPreviewService.AssembleCompressPreview` 的 `wrapName` 改走同一个 `ResolveWrapName(wrapRoot, sourcePaths, effectiveOutputPath, templateTimestamp)`，复用已有的第 9 个形参，无需新增。
+  - **UI**：`CompressSettingsViewModel` 新增 `RootNameError` / `IsRootNameTemplateActive`（只对含 `{` 的输入算模板）/ `IsRootNameErrorVisible` / `RootNameExampleText` / `IsRootNameExampleError` / `ValidateRootNameNow()` / `DescribeRootNameError()` / `ShowRootNameHelpCommand`；`ValidateForExecution` 新增第 ⑦ 步；`OnRootModeChanged` / `OnWrapRootChanged` / `NotifyRootModeAvailability` 全部触发重算（切走加根档要清掉无主红字）。
+  - **UI 控件**：新建 `Controls/PlaceholderSet.cs`（`FileName` / `RootName`）；`PlaceholderInsertButton` 新增 `Placeholders` 属性，按集合取 token（根名框因此不出现 `{ext}` / `{seq}`），`"{archive}"` 映射到 `Compress_RootName_Token_Archive`。
+  - **XAML**：`Dialogs/CompressSettingsWindow.axaml` 根名行 `ColumnDefinitions="Auto,*,Auto"` + `x:Name="WrapRootBox"` + 插入按钮；新增示例/错误**同格互斥**行（反相 `IsVisible`，出错只换字色不额外长高）+ 帮助按钮 `Classes="ToolbarIcon"`（先写成 `ToolbarButton ToolbarIcon` 被规则 4 守卫拦下，已改）。解压端与智能解压不接模板（范围外）。
+  - **设置页**：`Views/SettingsWindow.axaml` 默认根名下方加一行说明（`Settings_Compress_RootName_Hint`），不做实时校验 —— 那里没有本批源上下文，渲染不了 `{name}`。
+  - **i18n**：13 个 `Compress_RootName_*` + 1 个 `Settings_Compress_RootName_Hint`，三语 1516 → **1529 key**。踩坑：`LocalizationManager.T(key, args)` 走 `string.Format`，`_UnknownPlaceholder` 里的占位符示例必须写成 `{{name}}` / `{{seq}}` 双花括号，否则 `FormatException`（v0.5.7 踩过同款）。
+  - **测试 90 例**：`tests/MantisZip.Tests/Utils/RootNameTemplateTests.cs`（58）、`ArchiveRootPolicyWrapNameTests.cs`（19，含 `NonTemplateInput_MatchesGetWrapNameExactly` 四组逐字相等）、`tests/MantisZip.UI.Avalonia.Tests/CompressSettingsViewModelRootNameTests.cs`（13，`IDisposable` 备份还原设置 + `ResetCacheForTests`）。测试自己写错两处已修：`archive.tar.gz` 的 `{name}` 只掉一层扩展名（期望 `archive.tar`）；`{parent}` 取紧邻上一层（`D:\工作\报告\a.txt` → `报告`）。
+  - **真机三场景**：`CompressRootMode=3` + `CompressRootName={name}_{date}` ⇒ 对话框示例行 `7zip_2026-11-18`、预览树根节点同值、产出包内实测 `7zip_2026-11-18/7zip/a.txt` + `…/inner/b.txt`（**预览 = 实际**）；`{foo}` ⇒ 示例行转红、点「开始压缩」弹同文案且不产出包、按钮置灰；插入菜单只列 5 项。
+  - **验证**：`core` / `avalonia --no-incremental`（46.0s）0 警告；`tests` 17.7s；`ui-tests` 全绿；`i18n` 1529 key 三语一致；`check` version 六处 0.5.8 + 10 条守卫 `failedCount: 0`。
+  - **留白**：CLI（`--compress` 系列）仍无 RootMode / WrapRoot 参数 ⇒ 根名模板在 CLI 侧不可达；解压端根名只从包名推导不接模板；设置页默认根名粘贴非法模板要到对话框才报。
+
 **2026-11-16** — 合并 beta 到 alpha：右键菜单心跳修复 / 压缩输出路径与输出方式重构 / 模板复查 / 命名预设单控件
   - **用户指令**：beta 分支上修了一批问题，要求合并进 alpha 并处理冲突。`git merge-base` = `4acd2a56`，beta 独有 9 笔（issue #80 心跳自愈 → 两次 alpha 合入 → 输出路径单一变量 → 输出方式三态收敛 → 模板复查修复 → 命名预设单控件 → 可编辑下拉边框），alpha 独有 6 笔（v0.5.8 的唯根处理 / 智能解压两档 / 发布说明 / 版本号 / 标签精简）。
   - **冲突 1（`src/MantisZip.UI.Avalonia/Models/CompressSettings.cs`）**：两侧都在位置记录末尾追加字段，解法 = 两侧全留，顺序为 beta 的 `DateTime? TemplateTimestamp = null` 在前、alpha 的 `RootMode` / `WrapRoot` 在后 —— 保持既有的位置参数前缀不变，`<param>` 文档同样两侧全留。

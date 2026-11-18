@@ -29,6 +29,15 @@ public class PlaceholderInsertButton : Button
     public static readonly StyledProperty<TextBox?> TargetTextBoxProperty =
         AvaloniaProperty.Register<PlaceholderInsertButton, TextBox?>(nameof(TargetTextBox));
 
+    /// <summary>
+    /// 这一枚按钮服务的是哪一套占位符。默认 <see cref="PlaceholderSet.FileName"/>；
+    /// 根目录名输入框用 <see cref="PlaceholderSet.RootName"/> —— 根名只支持 5 个占位符，
+    /// 把 <c>{ext}</c>/<c>{seq}</c> 也列出来会诱导用户写出必错的模板。
+    /// </summary>
+    public static readonly StyledProperty<PlaceholderSet> PlaceholdersProperty =
+        AvaloniaProperty.Register<PlaceholderInsertButton, PlaceholderSet>(
+            nameof(Placeholders), PlaceholderSet.FileName);
+
     /// <summary>弹出前捕获的光标位置；负数 = 尚未交互过。</summary>
     private int _caret = -1;
 
@@ -45,6 +54,13 @@ public class PlaceholderInsertButton : Button
     {
         get => GetValue(TargetTextBoxProperty);
         set => SetValue(TargetTextBoxProperty, value);
+    }
+
+    /// <summary>这一枚按钮服务的占位符集合。</summary>
+    public PlaceholderSet Placeholders
+    {
+        get => GetValue(PlaceholdersProperty);
+        set => SetValue(PlaceholdersProperty, value);
     }
 
     /// <summary>
@@ -108,7 +124,10 @@ public class PlaceholderInsertButton : Button
     {
         if (_flyout is null) return;
         _flyout.Items.Clear();
-        foreach (var token in FileNameTemplate.Placeholders)
+        var tokens = Placeholders == PlaceholderSet.RootName
+            ? RootNameTemplate.Placeholders
+            : FileNameTemplate.Placeholders;
+        foreach (var token in tokens)
         {
             var item = new MenuItem
             {
@@ -130,6 +149,7 @@ public class PlaceholderInsertButton : Button
         "{datetime}" => LocalizationManager.T("Compress_FileNameTemplate_Token_DateTime"),
         "{seq}" => LocalizationManager.T("Compress_FileNameTemplate_Token_Seq"),
         "{seq:0000}" => LocalizationManager.T("Compress_FileNameTemplate_Token_SeqWidth"),
+        "{archive}" => LocalizationManager.T("Compress_RootName_Token_Archive"),
         _ => string.Empty,
     };
 

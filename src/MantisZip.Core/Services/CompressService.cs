@@ -518,6 +518,7 @@ public static class CompressService
             PreserveDirectoryRoot = request.PreserveDirectoryRoot,
             CompressRootMode = request.RootMode,
             CompressWrapRoot = request.WrapRoot,
+            CompressWrapRootTimestamp = request.TemplateTimestamp,
             FileNameEncoding = request.FileNameEncoding,
             SevenZipCompressionMethod = request.SevenZipCompressionMethod,
             SevenZipSolid = request.SevenZipSolid,
