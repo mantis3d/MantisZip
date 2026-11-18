@@ -4,13 +4,14 @@
 // 背景（2026-11-17）：用户反馈「输出设置页内容太多太挤」——那页的第 2 行是弹性行
 // （内嵌目录选择器），四张 Auto 卡把高度吃满后选择器被压到几十像素。于是把
 // 「文件冲突策略」与「完成后打开输出目录」搬进「压缩设置」页，并合成一张卡。
+// 2026-11-18 又把「包内根目录」照同样理由搬过去 —— 输出页只留「产物放在哪、叫什么」。
 //
 // 这类搬迁没有任何编译期保护：XAML 里放错页签照样 0 警告、照样能构建，
 // 只有用户点开对话框才发现。更危险的是「复制粘贴后忘了改 x:Name」——
 // 两个同名控件会让 FindControl 只找到第一个，事件接线指向错误的那个
 // （本次施工中真的发生过一次，构建依旧全绿）。所以这里钉两件事：
-//   ① 冲突下拉与「打开输出目录」在「压缩设置」页、不在「输出设置」页；
-//   ② 整个文件里 ConflictActionCombo 只出现一次。
+//   ① 冲突下拉 / 「打开输出目录」/ 根目录名在「压缩设置」页、不在「输出设置」页；
+//   ② 整个文件里这些 x:Name 只出现一次。
 // ============================================================================
 using System;
 using System.IO;
@@ -32,6 +33,9 @@ public class CompressSettingsTabLayoutTests
 
     /// <summary>「压缩完成后打开输出目录」勾选框的 x:Name（无头用例靠它 FindControl）。</summary>
     private const string OpenFolderCheckName = "OpenFolderAfterCheck";
+
+    /// <summary>根目录名输入框的 x:Name（<c>PlaceholderInsertButton.TargetTextBox</c> 靠它定位）。</summary>
+    private const string WrapRootBoxName = "WrapRootBox";
 
     /// <summary>仓库根定位：从测试程序集目录向上找到含 src 目录的一层（同 LocalizedStringsWiringTests）。</summary>
     private static string GetRepoRoot()
@@ -107,6 +111,9 @@ public class CompressSettingsTabLayoutTests
         Assert.True(
             compressTab.Contains(OpenFolderCheckName, StringComparison.Ordinal),
             $"「压缩设置」页缺少 {OpenFolderCheckName}：「压缩完成后打开输出目录」应在本页");
+        Assert.True(
+            compressTab.Contains(WrapRootBoxName, StringComparison.Ordinal),
+            $"「压缩设置」页缺少 {WrapRootBoxName}：包内根目录卡应在本页（2026-11-18 从输出设置页搬来）");
     }
 
     /// <summary>
@@ -125,6 +132,9 @@ public class CompressSettingsTabLayoutTests
         Assert.False(
             outputTab.Contains(OpenFolderCheckName, StringComparison.Ordinal),
             $"「输出设置」页又出现了 {OpenFolderCheckName}，应从本页移除");
+        Assert.False(
+            outputTab.Contains(WrapRootBoxName, StringComparison.Ordinal),
+            $"「输出设置」页又出现了 {WrapRootBoxName}：包内根目录卡应只在「压缩设置」页");
     }
 
     /// <summary>
@@ -137,7 +147,7 @@ public class CompressSettingsTabLayoutTests
     public void MovedControls_AreUniqueInWholeXaml()
     {
         var xaml = ReadXaml();
-        foreach (var name in new[] { ConflictComboName, OpenFolderCheckName })
+        foreach (var name in new[] { ConflictComboName, OpenFolderCheckName, WrapRootBoxName })
         {
             var occurrences = Regex.Matches(xaml, $"x:Name=\"{Regex.Escape(name)}\"").Count;
             Assert.True(
@@ -147,12 +157,11 @@ public class CompressSettingsTabLayoutTests
     }
 
     /// <summary>
-    /// 「输出设置」页的 Grid 行数（输出方式 / 弹性目录行 / 文件名卡 / 包内根目录）。
+    /// 「输出设置」页的 Grid 行数（输出方式 / 弹性目录行 / 文件名卡）。
     /// 行数与 <c>Grid.Row</c> 最大值必须对得上，否则多出来的那张卡会跟别人叠在同一行。
     /// <para>
-    /// 2026-11-18 合并 beta 时把 <c>expectedRowCount</c> 从 3 改成 4：beta 那侧删掉了冲突策略与
-    /// 「完成后行为」两张卡（搬去「压缩设置」页），而 alpha 这侧同期新增了「包内根目录」卡，
-    /// 两边合并后的真实布局是 4 行 —— 断言必须跟着**合并结果**走，而不是任一侧的原始期望。
+    /// 2026-11-18 把 <c>expectedRowCount</c> 从 4 改回 3：合并 beta 后本是 4 行（多了「包内根目录」），
+    /// 同日又把那张卡搬去「压缩设置」页，输出页回到「产物放在哪、叫什么」三张卡。
     /// </para>
     /// </summary>
     [Fact]
@@ -161,12 +170,12 @@ public class CompressSettingsTabLayoutTests
         var outputTab = SplitTabsByKey(ReadXaml())["Compress_TabOutput"];
 
         // 与 XAML 里 <Grid.RowDefinitions> 的注释保持一一对应：
-        // 0 输出方式 / 1 弹性目录行 / 2 文件名卡 / 3 包内根目录。
-        const int expectedRowCount = 4;
+        // 0 输出方式 / 1 弹性目录行 / 2 文件名卡。
+        const int expectedRowCount = 3;
         var rowDefs = Regex.Matches(outputTab, "<RowDefinition\\s+Height=").Count;
         Assert.True(
             rowDefs == expectedRowCount,
-            $"「输出设置」页应有 {expectedRowCount} 条 RowDefinition（实际 {rowDefs} 条）：输出方式 / 弹性目录行 / 文件名卡 / 包内根目录");
+            $"「输出设置」页应有 {expectedRowCount} 条 RowDefinition（实际 {rowDefs} 条）：输出方式 / 弹性目录行 / 文件名卡");
 
         var rowIndexes = Regex.Matches(outputTab, "Grid\\.Row=\"([0-9]+)\"")
             .Select(m => int.Parse(m.Groups[1].Value))

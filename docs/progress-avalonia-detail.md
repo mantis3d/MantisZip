@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-18** — 交互：「包内根目录」卡也搬到「压缩设置」页
+
+- **用户指令**：「『包内根目录』也移动到『压缩设置』页里」。
+- **动机**：与 11-17 搬冲突策略 / 完成后行为同一个理由 —— 输出设置页的第 2 行是弹性行（内嵌目录选择器），每多一张 Auto 卡就少给它一份高度。搬完后输出页只剩「产物放在哪、叫什么」三张卡（输出方式 / 目录选择器 / 文件名），「怎么产出」的四项（格式与级别 / 分卷 / 包内根目录 / 冲突与完成后行为）全在「压缩设置」页，该页是 ScrollViewer，窗口再矮也只是滚动。
+- **改动（只碰 XAML 与测试，VM 零改动）**：`src/MantisZip.UI.Avalonia/Dialogs/CompressSettingsWindow.axaml` 把「包内根目录」整张 `Border`（含四态下拉 / 根名输入框 / 插入占位符按钮 / 示例与错误行 / 裁剪说明灰字）从输出页 `Grid.Row="3"` 整块搬到压缩设置页的分卷卡与冲突策略卡之间；输出页删掉为此准备的 `<RowDefinition Height="Auto" />`，行数 4 → 3；两张卡的注释同步改成「本页只剩三张卡 / 本卡于 2026-11-18 从输出设置页搬来」。代码里没有任何 `FindControl("WrapRootBox")` 之类的命令式引用（只有 `PlaceholderInsertButton.TargetTextBox="{Binding #WrapRootBox}"` 这条 XAML 内引用），所以搬迁不需要改 CS。
+- **回归绊线同步扩到三项**：`tests/MantisZip.UI.Avalonia.Tests/CompressSettingsTabLayoutTests.cs` 新增 `WrapRootBoxName = "WrapRootBox"` 常量，`ConflictAndOpenFolder_LiveInCompressTab` 与 `OutputTab_NoLongerHostsConflictOrOpenFolder` 各加一条断言，`MovedControls_AreUniqueInWholeXaml` 的检查数组从 2 个名字扩到 3 个；`OutputTab_GridRowsMatchHighestRowIndex` 的 `expectedRowCount` 从 4 改回 **3**（合并 beta 当天先是 3→4，因为两卡去一卡来，现在再去一卡）。
+- **验证**：`avalonia -c Release --no-incremental` 35.9s 0 警告；`CompressSettingsTabLayoutTests` + `CompressSettingsViewModelRootNameTests` 共 17 例全绿；真机 1082×892 与 760px 窄窗两档都核对过 —— 窄窗下「始终加根 ▾ │ 根目录名 [留空则用压缩包文件名] [插入占位符]」整行仍读得通、示例行与帮助按钮都在、预览树根同步变成 `Temp`。
+- **踩坑**：`$env:TEMP\mz-click-title.ps1` 每次点击前会先点一下空白处激活窗口，这一击会把**已展开的 ComboBox 下拉菜单收起来**，导致紧接着的选项点击落到下层控件上（本轮因此误勾了「压缩完成后打开输出目录」两次、根目录模式还停在「保持原样」）。改用 `$env:TEMP\mz-click-nofocus.ps1`（只 `SetForegroundWindow` + 直接点，不做激活预点击）后一次成功。另外窗口滚动后控件 y 坐标会变，每次点击前应重新截一张定位，不要沿用上一张的坐标。
+
 **2026-11-18** — 合并 beta 到 alpha（issue #89 预览修复 + 输出设置页瘦身）
 
 - **用户指令**：「beta分支又做了一些修正，合并到alpha分支来吧。」

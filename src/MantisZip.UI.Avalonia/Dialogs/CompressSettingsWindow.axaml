@@ -47,7 +47,9 @@
              窗口拉高时只有浏览区变高，上下两端始终对齐（2026-10-30 用户反馈）。
              第 2 行高度绑定 VM.OutputPickerRowHeight：单包模式 = * ，逐项压缩 = 0，
              这样「每个文件各成一个包」时隐藏输出目录分组不会留一块空洞。
-             移除两张常驻卡后，窗口偏矮时目录选择器不再被挤到只剩几十像素（2026-11-17 用户反馈「太挤」）。 -->
+             本页只剩「产物放在哪、叫什么」三张卡：冲突策略 / 完成后行为 / 包内根目录
+             都是行为类选项，分别于 2026-11-17、2026-11-18 搬去「压缩设置」页，
+             窗口偏矮时目录选择器不再被挤到只剩几十像素。 -->
         <Grid Margin="0,8,0,0"
               Background="{DynamicResource ThemeWindowBgBrush}"
               TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
@@ -55,7 +57,6 @@
             <RowDefinition Height="Auto" />  <!-- 输出方式 -->
             <RowDefinition Height="{Binding OutputPickerRowHeight}" />  <!-- 输出路径（单包模式才占位） -->
             <RowDefinition Height="Auto" />  <!-- 文件名（模板 + 最终文件名，2026-11-12 合并为一张卡） -->
-            <RowDefinition Height="Auto" />  <!-- 包内根目录 -->
           </Grid.RowDefinitions>
 
           <!-- 分组：输出方式（单个开关，绑定 VM 的 IsPerItemArchive）
@@ -226,97 +227,6 @@
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
               </Grid>
 
-            </StackPanel>
-          </Border>
-
-          <!-- 分组：包内根目录（v0.5.8 四态单选）。
-               四态是互斥的单选而不是两个独立开关 —— 独立开关能组合出「既剥又加」这种非法态。
-               ①原样恒可用；②仅源恰为一个目录时可用；③④分别压缩时不可用（每包各一层，套根无意义）。
-               置灰项统一挂 ToolTip 说明为什么不可用，避免用户以为坏了。 -->
-          <Border Grid.Row="3"
-                  Margin="0,8,0,0"
-                  BorderBrush="{DynamicResource ThemeBorderBrush}"
-                  BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
-                  Background="{DynamicResource ThemeSurfaceBgBrush}">
-            <StackPanel Spacing="{DynamicResource SpacingXs}">
-              <!-- 标题：包内根目录 -->
-              <TextBlock Text="{Binding LocalizedStrings[Compress_RootMode]}"
-                         FontWeight="SemiBold" />
-              <!--
-                四态下拉 + 根目录名同一行（下拉定宽 150 靠左，根名吃掉剩余宽度），
-                比原先「下拉一行 / 根名一行」省一行高度。标签已精简成「保持原样 / 智能去根 /
-                智能加根 / 始终加根」，前提条件交给 ToolTip 与下方灰字说明。
-                不可用的档位直接从选项里拿掉，下方用一行灰字说明为什么少了几项。
-                不套根的档位（保持原样 / 智能去根）右侧那组整组隐藏，下拉仍在原处不跳动。
-              -->
-              <Grid ColumnDefinitions="150,*" ColumnSpacing="{DynamicResource SpacingSm}">
-                <ComboBox Grid.Column="0"
-                          ItemsSource="{Binding RootModeOptions}"
-                          SelectedItem="{Binding SelectedRootModeOption}"
-                          HorizontalAlignment="Stretch"
-                          ToolTip.Tip="{Binding RootModeDescription}">
-                  <ComboBox.ItemTemplate>
-                    <DataTemplate>
-                      <TextBlock Text="{Binding Display}" />
-                    </DataTemplate>
-                  </ComboBox.ItemTemplate>
-                </ComboBox>
-                <!-- 根目录名：只在真会加根时出现（留空 = 用压缩包文件名去扩展名）。
-                     内层用 Grid 而不是横向 StackPanel —— StackPanel 里子控件只拿到自身想要
-                     的宽度，输入框会被 watermark 的字数决定宽窄，撑不满剩余空间。 -->
-                <Grid Grid.Column="1"
-                      ColumnDefinitions="Auto,*,Auto"
-                      ColumnSpacing="{DynamicResource SpacingXs}"
-                      IsVisible="{Binding IsWrapRootVisible}">
-                  <TextBlock Grid.Column="0"
-                             Text="{Binding LocalizedStrings[Compress_RootMode_WrapName]}"
-                             VerticalAlignment="Center"
-                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                  <TextBox Grid.Column="1"
-                           x:Name="WrapRootBox"
-                           Text="{Binding WrapRoot}"
-                           Watermark="{Binding LocalizedStrings[Compress_RootMode_WrapName_Watermark]}" />
-                  <!-- 插入占位符：根名只支持 5 个 token（没有 {ext}/{seq}），
-                       按钮按 PlaceholderSet.RootName 生成菜单，避免诱导写出必错的模板。 -->
-                  <controls:PlaceholderInsertButton Grid.Column="2"
-                                                    Placeholders="RootName"
-                                                    TargetTextBox="{Binding #WrapRootBox}"
-                                                    Content="{Binding LocalizedStrings[Compress_RootName_Insert]}"
-                                                    ToolTip.Tip="{Binding LocalizedStrings[Compress_RootName_InsertTip]}" />
-                </Grid>
-              </Grid>
-              <!-- 示例 / 错误行：只在加根时出现。合法时显示「本批的根目录会叫 xxx」，
-                   非法时同一格换成红色原因（右侧帮助按钮打开占位符表）。 -->
-              <Grid ColumnDefinitions="*,Auto"
-                    ColumnSpacing="{DynamicResource SpacingXs}"
-                    IsVisible="{Binding IsWrapRootVisible}">
-                <!-- 示例行（次要色）：正常渲染出的根目录名 -->
-                <TextBlock Grid.Column="0"
-                           Text="{Binding RootNameExampleText}"
-                           IsVisible="{Binding !IsRootNameErrorVisible}"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-                <!-- 错误行（红色）：与示例行同格互斥，不额外占高度 -->
-                <TextBlock Grid.Column="0"
-                           Text="{Binding RootNameError}"
-                           IsVisible="{Binding IsRootNameErrorVisible}"
-                           TextWrapping="Wrap"
-                           VerticalAlignment="Center"
-                           Foreground="{DynamicResource ThemeStatusErrorBrush}" />
-                <Button Grid.Column="1"
-                        Classes="ToolbarIcon"
-                        Command="{Binding ShowRootNameHelpCommand}"
-                        ToolTip.Tip="{Binding LocalizedStrings[Compress_RootName_HelpTip]}">
-                  <PathIcon Data="{StaticResource IconQuestion}" Width="14" Height="14"
-                            Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
-                </Button>
-              </Grid>
-              <!-- 裁剪说明：两档都可用时整行隐藏（不占高度） -->
-              <TextBlock Text="{Binding RootModeHint}"
-                         IsVisible="{Binding IsRootModeHintVisible}"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                         TextWrapping="Wrap" />
             </StackPanel>
           </Border>
         </Grid>
@@ -498,6 +408,99 @@
                              Margin="4,0,0,0"
                              Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                 </Grid>
+              </StackPanel>
+            </Border>
+
+            <!-- 分组：包内根目录（v0.5.8 四态单选 + 根目录名模板）。
+                 2026-11-18 从「输出设置」页搬来：它与冲突策略、完成后行为同属「怎么产出」的
+                 行为类选项，放在「怎么压」这一页语义连续；输出页只留「产物放在哪、叫什么」，
+                 把高度让给目录选择器。
+                 四态是互斥的单选而不是两个独立开关 —— 独立开关能组合出「既剥又加」这种非法态。
+                 ①原样恒可用；②仅源恰为一个目录时可用；③④分别压缩时不可用（每包各一层，套根无意义）。
+                 不可用档位直接从选项里拿掉（不是置灰），下方用一行灰字说明为什么少了几项。 -->
+            <Border
+                    BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <!-- 标题：包内根目录 -->
+                <TextBlock Text="{Binding LocalizedStrings[Compress_RootMode]}"
+                           FontWeight="SemiBold" />
+                <!--
+                  四态下拉 + 根目录名同一行（下拉定宽 150 靠左，根名吃掉剩余宽度），
+                  比原先「下拉一行 / 根名一行」省一行高度。标签已精简成「保持原样 / 智能去根 /
+                  智能加根 / 始终加根」，前提条件交给 ToolTip 与下方灰字说明。
+                  不可用的档位直接从选项里拿掉，下方用一行灰字说明为什么少了几项。
+                  不套根的档位（保持原样 / 智能去根）右侧那组整组隐藏，下拉仍在原处不跳动。
+                -->
+                <Grid ColumnDefinitions="150,*" ColumnSpacing="{DynamicResource SpacingSm}">
+                  <ComboBox Grid.Column="0"
+                            ItemsSource="{Binding RootModeOptions}"
+                            SelectedItem="{Binding SelectedRootModeOption}"
+                            HorizontalAlignment="Stretch"
+                            ToolTip.Tip="{Binding RootModeDescription}">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                  <!-- 根目录名：只在真会加根时出现（留空 = 用压缩包文件名去扩展名）。
+                       内层用 Grid 而不是横向 StackPanel —— StackPanel 里子控件只拿到自身想要
+                       的宽度，输入框会被 watermark 的字数决定宽窄，撑不满剩余空间。 -->
+                  <Grid Grid.Column="1"
+                        ColumnDefinitions="Auto,*,Auto"
+                        ColumnSpacing="{DynamicResource SpacingXs}"
+                        IsVisible="{Binding IsWrapRootVisible}">
+                    <TextBlock Grid.Column="0"
+                               Text="{Binding LocalizedStrings[Compress_RootMode_WrapName]}"
+                               VerticalAlignment="Center"
+                               Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                    <TextBox Grid.Column="1"
+                             x:Name="WrapRootBox"
+                             Text="{Binding WrapRoot}"
+                             Watermark="{Binding LocalizedStrings[Compress_RootMode_WrapName_Watermark]}" />
+                    <!-- 插入占位符：根名只支持 5 个 token（没有 {ext}/{seq}），
+                         按钮按 PlaceholderSet.RootName 生成菜单，避免诱导写出必错的模板。 -->
+                    <controls:PlaceholderInsertButton Grid.Column="2"
+                                                      Placeholders="RootName"
+                                                      TargetTextBox="{Binding #WrapRootBox}"
+                                                      Content="{Binding LocalizedStrings[Compress_RootName_Insert]}"
+                                                      ToolTip.Tip="{Binding LocalizedStrings[Compress_RootName_InsertTip]}" />
+                  </Grid>
+                </Grid>
+                <!-- 示例 / 错误行：只在加根时出现。合法时显示「本批的根目录会叫 xxx」，
+                     非法时同一格换成红色原因（右侧帮助按钮打开占位符表）。 -->
+                <Grid ColumnDefinitions="*,Auto"
+                      ColumnSpacing="{DynamicResource SpacingXs}"
+                      IsVisible="{Binding IsWrapRootVisible}">
+                  <!-- 示例行（次要色）：正常渲染出的根目录名 -->
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding RootNameExampleText}"
+                             IsVisible="{Binding !IsRootNameErrorVisible}"
+                             TextWrapping="Wrap"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                  <!-- 错误行（红色）：与示例行同格互斥，不额外占高度 -->
+                  <TextBlock Grid.Column="0"
+                             Text="{Binding RootNameError}"
+                             IsVisible="{Binding IsRootNameErrorVisible}"
+                             TextWrapping="Wrap"
+                             VerticalAlignment="Center"
+                             Foreground="{DynamicResource ThemeStatusErrorBrush}" />
+                  <Button Grid.Column="1"
+                          Classes="ToolbarIcon"
+                          Command="{Binding ShowRootNameHelpCommand}"
+                          ToolTip.Tip="{Binding LocalizedStrings[Compress_RootName_HelpTip]}">
+                    <PathIcon Data="{StaticResource IconQuestion}" Width="14" Height="14"
+                              Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+                  </Button>
+                </Grid>
+                <!-- 裁剪说明：两档都可用时整行隐藏（不占高度） -->
+                <TextBlock Text="{Binding RootModeHint}"
+                           IsVisible="{Binding IsRootModeHintVisible}"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           TextWrapping="Wrap" />
               </StackPanel>
             </Border>
 
