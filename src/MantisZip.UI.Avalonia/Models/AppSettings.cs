@@ -513,6 +513,18 @@ public class AppSettings
     /// </summary>
     private static string? _unreadableSettingsFile;
 
+    /// <summary>
+    /// 测试用的设置文件重定向（null = 用真实 <see cref="SettingsFile"/>）。
+    /// 存在的理由：测试要覆盖「读盘 → 改 → 落盘 → 再读」的完整链路，而 <see cref="SettingsFile"/>
+    /// 由静态构造决定、指向**真实用户目录**——老做法是测试改完再还原，一旦中途异常就把本机设置带走，
+    /// 且并发/顺序一变就互相污染（CompressSettingsViewModelTemplateTests 曾因此偶发失败）。
+    /// 生产路径从不设置它，行为逐字节不变。
+    /// </summary>
+    private static string? _settingsFileOverride;
+
+    /// <summary>当前生效的设置文件：测试重定向生效时取它，否则真实路径。</summary>
+    private static string EffectiveSettingsFile => _settingsFileOverride ?? SettingsFile;
+
     public static AppSettings Load()
     {
         lock (SyncRoot)
@@ -520,7 +532,7 @@ public class AppSettings
             // 缓存命中（startup-appsettings-cache：每进程只读盘一次）
             if (_cached != null) return _cached;
 
-            var (settings, cacheable) = LoadCore(SettingsFile);
+            var (settings, cacheable) = LoadCore(EffectiveSettingsFile);
             // 异常态不缓存：下次 Load 重试读盘，避免把损坏文件态固化
             if (cacheable) _cached = settings;
             return settings;
@@ -672,7 +684,7 @@ public class AppSettings
 
     private static string OneLine(string? text) => (text ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ');
 
-    public bool Save() => SaveTo(SettingsFile);
+    public bool Save() => SaveTo(EffectiveSettingsFile);
 
     /// <summary>
     /// 写入指定路径（<see cref="Save"/> 走 <c>SettingsFile</c>，测试用其余路径）。
@@ -742,6 +754,44 @@ public class AppSettings
         lock (SyncRoot)
         {
             _cached = null;
+        }
+    }
+
+    /// <summary>
+    /// 测试钩子：把 <see cref="Load"/> / <see cref="Save"/> 的落点重定向到临时文件，并清空缓存，
+    /// 让测试从头读自己的沙箱。返回的句柄 <see cref="Dispose"/> 时恢复真实路径并再次清缓存。
+    /// </summary>
+    /// <param name="settingsFile">临时设置文件路径（父目录不存在会自动创建）。</param>
+    internal static IDisposable UseIsolatedSettingsFileForTests(string settingsFile)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingsFile);
+
+        lock (SyncRoot)
+        {
+            var previous = _settingsFileOverride;
+            _settingsFileOverride = settingsFile;
+            _unreadableSettingsFile = null;
+            _cached = null;
+            return new SettingsFileScope(previous);
+        }
+    }
+
+    /// <summary>恢复重定向前的路径并清缓存，保证不把沙箱实例留在进程级缓存里。</summary>
+    private sealed class SettingsFileScope(string? previous) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            lock (SyncRoot)
+            {
+                _settingsFileOverride = previous;
+                _unreadableSettingsFile = null;
+                _cached = null;
+            }
         }
     }
 

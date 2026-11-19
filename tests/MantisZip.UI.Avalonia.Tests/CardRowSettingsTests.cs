@@ -8,7 +8,7 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// 卡片信息行显示状态（thumbnail-card-badge-and-row-bars 计划 T2）：
 /// ① 8 个 AppSettings bool 的默认值（访谈决策 7/8：Tile 默认 大小+日期，Content 全开）；
 /// ② <c>MainWindowViewModel.GetCardRowValue / ApplyCardRow</c>（纯静态映射）的全组合对应关系；
-/// ③ 切换命令翻转 + 二次执行还原（SaveSetting 落盘净零，不污染本机 settings.json）；
+/// ③ 切换命令翻转 + 二次执行还原（设置走 <see cref="AppSettingsTestSandbox"/>，不再写本机 settings.json）；
 /// ④ <c>App.RefreshThumbnailRowResources</c> 无 App 环境静默返回（单测兜底）。
 /// </summary>
 public class CardRowSettingsTests
@@ -111,48 +111,23 @@ public class CardRowSettingsTests
     [Fact]
     public void ToggleCommands_FlipMappedField_AndRestoreOnSecondCall()
     {
-        AppSettings.ResetCacheForTests();
-        var snapshot = new
-        {
-            AppSettings.Load().TileRowShowSize,
-            AppSettings.Load().TileRowShowCompressedSize,
-            AppSettings.Load().TileRowShowRatio,
-            AppSettings.Load().TileRowShowDate,
-            AppSettings.Load().ContentRowShowSize,
-            AppSettings.Load().ContentRowShowCompressedSize,
-            AppSettings.Load().ContentRowShowRatio,
-            AppSettings.Load().ContentRowShowDate,
-        };
+        using var sandbox = new AppSettingsTestSandbox();
 
-        try
-        {
-            var vm = new MainWindowViewModel();
+        var vm = new MainWindowViewModel();
 
-            // Tile 模式四个 kind 逐一翻转 → 对应字段取反（按默认映射），Content 不变
-            vm.ToggleTileRowCommand.Execute(CardRowKind.Size);
-            Assert.NotEqual(snapshot.TileRowShowSize, AppSettings.Load().TileRowShowSize);
-            vm.ToggleTileRowCommand.Execute(CardRowKind.Size);   // 二次执行还原（落盘净零）
-            Assert.Equal(snapshot.TileRowShowSize, AppSettings.Load().TileRowShowSize);
+        // Tile 模式四个 kind 逐一翻转 → 对应字段取反（按默认映射），Content 不变
+        Assert.True(AppSettings.Load().TileRowShowSize);
+        vm.ToggleTileRowCommand.Execute(CardRowKind.Size);
+        Assert.False(AppSettings.Load().TileRowShowSize);
+        vm.ToggleTileRowCommand.Execute(CardRowKind.Size);   // 二次执行还原（落盘净零）
+        Assert.True(AppSettings.Load().TileRowShowSize);
 
-            vm.ToggleContentRowCommand.Execute(CardRowKind.CompressedSize);
-            Assert.NotEqual(snapshot.ContentRowShowCompressedSize, AppSettings.Load().ContentRowShowCompressedSize);
-            vm.ToggleContentRowCommand.Execute(CardRowKind.CompressedSize);
-            Assert.Equal(snapshot.ContentRowShowCompressedSize, AppSettings.Load().ContentRowShowCompressedSize);
-        }
-        finally
-        {
-            // 兜底：把 8 个字段全部按快照还原，防测试中断半途污染本机设置
-            var disk = AppSettings.Load();
-            MainWindowViewModel.ApplyCardRow(disk, true, CardRowKind.Size, snapshot.TileRowShowSize);
-            MainWindowViewModel.ApplyCardRow(disk, true, CardRowKind.CompressedSize, snapshot.TileRowShowCompressedSize);
-            MainWindowViewModel.ApplyCardRow(disk, true, CardRowKind.Ratio, snapshot.TileRowShowRatio);
-            MainWindowViewModel.ApplyCardRow(disk, true, CardRowKind.Date, snapshot.TileRowShowDate);
-            MainWindowViewModel.ApplyCardRow(disk, false, CardRowKind.Size, snapshot.ContentRowShowSize);
-            MainWindowViewModel.ApplyCardRow(disk, false, CardRowKind.CompressedSize, snapshot.ContentRowShowCompressedSize);
-            MainWindowViewModel.ApplyCardRow(disk, false, CardRowKind.Ratio, snapshot.ContentRowShowRatio);
-            MainWindowViewModel.ApplyCardRow(disk, false, CardRowKind.Date, snapshot.ContentRowShowDate);
-            disk.Save();
-        }
+        // Content 默认全开：翻一次关、再翻回来
+        Assert.True(AppSettings.Load().ContentRowShowCompressedSize);
+        vm.ToggleContentRowCommand.Execute(CardRowKind.CompressedSize);
+        Assert.False(AppSettings.Load().ContentRowShowCompressedSize);
+        vm.ToggleContentRowCommand.Execute(CardRowKind.CompressedSize);
+        Assert.True(AppSettings.Load().ContentRowShowCompressedSize);
     }
 
     // ── ④ 无 App 环境兜底 ─────────────────────────────────────

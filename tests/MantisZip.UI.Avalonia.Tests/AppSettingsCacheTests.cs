@@ -6,14 +6,15 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// <summary>
 /// AppSettings 进程级缓存（startup-appsettings-cache 三期）：
 /// Load 同实例复用、ResetCacheForTests 复位后重新读盘。
-/// Save→缓存同步语义不在此测（Save 写真实用户文件，SettingsFile static readonly 不可注入），
-/// 由 Task 3 GUI 验收覆盖。
+/// Save→缓存同步语义不在此测（2026-11-19 起可用 <see cref="AppSettingsTestSandbox"/> 把它重定向到
+/// 临时文件来测，但本类只钉缓存语义，落盘链路由 <see cref="AppSettingsTestSandboxTests"/> 覆盖）。
 /// </summary>
 public class AppSettingsCacheTests
 {
     [Fact]
     public void Load_IsCached_ReturnsSameInstanceAcrossCalls()
     {
+        using var sandbox = new AppSettingsTestSandbox();
         AppSettings.ResetCacheForTests();
 
         var a = AppSettings.Load();
@@ -25,6 +26,9 @@ public class AppSettingsCacheTests
     [Fact]
     public void ResetCacheForTests_NextLoadIsNewInstance_WithMirrorValues()
     {
+        using var sandbox = new AppSettingsTestSandbox();
+        AppSettings.ResetCacheForTests();
+
         var before = AppSettings.Load();
 
         AppSettings.ResetCacheForTests();
