@@ -624,6 +624,10 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_TabCompress"] = LocalizationManager.T("Compress_TabCompress");
         LocalizedStrings["Picker_CheckboxMode"] = LocalizationManager.T("Picker_CheckboxMode");
         LocalizedStrings["Compress_SelectedSources"] = LocalizationManager.T("Compress_SelectedSources");
+        // 「已选源文件」右键菜单 + 复制成功提示（2026-11-18）：
+        // 路径在列表里必然被裁剪，用户要靠右键菜单拿到可粘贴的完整路径。
+        LocalizedStrings["Ctx_CopyPath"] = LocalizationManager.T("Ctx_CopyPath");
+        LocalizedStrings["Progress_Toast_Copied"] = LocalizationManager.T("Progress_Toast_Copied");
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
         LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
         LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");

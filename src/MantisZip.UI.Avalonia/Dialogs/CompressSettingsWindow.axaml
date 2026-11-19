@@ -292,14 +292,18 @@
                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
               </Grid>
-              <!-- 源文件列表：支持多选，显示路径，工具提示显示完整路径 -->
+              <!-- 源文件列表：支持多选，显示路径，工具提示显示完整路径。
+                   PathSegmentEllipsis（2026-11-18）：路径超宽时按**路径段**从中间挖掉、保留尾部文件名。
+                   原先的 CharacterEllipsis 是从尾巴开始砍，而文件名正好在尾巴上 —— 路径一深，
+                   用户最先看不见的正是文件名（内嵌选择器与解压窗都只显示文件名，只有这里是全路径）。 -->
               <ListBox x:Name="SourceFilesList"
                        Grid.Row="1"
                        Margin="0,6,0,0"
                        SelectionMode="Multiple"
                        ItemsSource="{Binding SelectedPaths}"
                        BorderBrush="{DynamicResource ThemeBorderBrush}"
-                       Background="{DynamicResource ThemeSurfaceBgBrush}">
+                       Background="{DynamicResource ThemeSurfaceBgBrush}"
+                       ContextRequested="OnSourceFilesListContextRequested">
                 <ListBox.ItemContainerTheme>
                   <ControlTheme TargetType="ListBoxItem">
                     <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
@@ -315,14 +319,43 @@
                     </Style>
                   </ControlTheme>
                 </ListBox.ItemContainerTheme>
+                <!-- 右键菜单：复制选中条目的完整路径（多选即多行）。
+                     路径在列表里必然被裁剪，用户要拿完整路径（贴到命令行/日志/脚本里）只能靠菜单或悬停提示。 -->
+                <ListBox.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem x:Name="CopyPathMenuItem"
+                              Header="{Binding LocalizedStrings[Ctx_CopyPath]}"
+                              Click="OnSourceFileCopyPathClick" />
+                  </ContextMenu>
+                </ListBox.ContextMenu>
                 <ListBox.ItemTemplate>
                   <DataTemplate>
+                    <!-- TextTrimming 用 PathSegmentEllipsis 而不是 CharacterEllipsis：
+                         前者按「路径段」挖掉中间、保住尾部文件名，后者从尾巴砍 —— 正好砍掉文件名。 -->
                     <TextBlock Text="{Binding}"
-                               TextTrimming="CharacterEllipsis"
+                               TextTrimming="PathSegmentEllipsis"
                                ToolTip.Tip="{Binding}" />
                   </DataTemplate>
                 </ListBox.ItemTemplate>
               </ListBox>
+              <!-- 复制成功提示：浮现 1.6s 后隐藏（复用进度窗的 Toast 文案）。
+                   IsHitTestVisible=False 只作提示，点击穿透不挡列表操作。 -->
+              <Border x:Name="CopyPathToast"
+                      Grid.Row="1"
+                      IsVisible="False"
+                      IsHitTestVisible="False"
+                      VerticalAlignment="Bottom"
+                      HorizontalAlignment="Center"
+                      Margin="0,0,0,8"
+                      Padding="10,4"
+                      CornerRadius="{DynamicResource BorderRadius}"
+                      Background="{DynamicResource ThemeHeaderBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+                <TextBlock Text="{Binding LocalizedStrings[Progress_Toast_Copied]}"
+                           FontSize="12"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Border>
               <!-- 选中文件摘要信息（数量、总大小等） -->
               <TextBlock Grid.Row="2"
                          Margin="0,6,0,0"

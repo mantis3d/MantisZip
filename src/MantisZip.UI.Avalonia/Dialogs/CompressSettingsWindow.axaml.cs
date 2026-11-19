@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
@@ -28,6 +29,9 @@ public partial class CompressSettingsWindow : Window
     /// 两个方向（选择器 → VM、VM → 选择器）都会触发对方的事件，不设这道闸会无限往返。
     /// </summary>
     private bool _syncingSelection;
+
+    /// <summary>「复制路径」成功提示的隐藏计时器（1.6s 一次性；关窗必须停表，否则窗口被 Dispatcher 强引用）。</summary>
+    private DispatcherTimer? _copyToastTimer;
 
     /// <summary>「添加文件」Tab 内嵌选择器的初始浏览目录（第一个源路径所在目录，可能为 null）。</summary>
     private readonly string? _initialSourcePath;
@@ -207,6 +211,9 @@ public partial class CompressSettingsWindow : Window
         // 骨架进度定时器被 Dispatcher 强引用：关窗必须停表并解绑 Tick，否则窗口与 VM 会一直挂着
         ViewModel.SkeletonProgressUpdated -= OnSkeletonProgressUpdated;
         ViewModel.StopSkeletonProgress();
+        // 复制提示计时器同理：不停表会让窗口在关闭后继续被 Dispatcher 引用
+        _copyToastTimer?.Stop();
+        _copyToastTimer = null;
         ViewModel.ConfirmCompleted -= OnConfirmCompleted;
         _completion.TrySetResult(_closedOutcome ?? new Cancelled<CompressSettings>());
     }
@@ -506,6 +513,59 @@ public partial class CompressSettingsWindow : Window
         }
 
         SyncPickerFromSelection();
+    }
+
+    private void OnSourceFilesListContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        // 菜单挂在 ListBox 上，空白处右键也会弹；没有选区就没有可复制的路径。
+        CopyPathMenuItem.IsEnabled = SourceFilesList.SelectedItems?.Count > 0;
+    }
+
+    /// <summary>
+    /// 「复制路径」：把列表里选中的条目按行写入剪贴板（多选即多行，与主窗口同名命令一致）。
+    /// 完整路径是这一列唯一无法在界面上完整呈现的信息（列表用 PathSegmentEllipsis 裁剪、tooltip 可能被屏幕边缘切掉），
+    /// 所以这里是用户拿到「可粘贴的原样路径」的正式出口。
+    /// </summary>
+    private async void OnSourceFileCopyPathClick(object? sender, RoutedEventArgs e)
+    {
+        var paths = SourceFilesList.SelectedItems?.Cast<string>().ToList() ?? new List<string>();
+        if (paths.Count == 0) return;
+
+        var text = string.Join(Environment.NewLine, paths);
+
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard == null) return;
+            var transfer = new DataTransfer();
+            var item = new DataTransferItem();
+            item.SetText(text);
+            transfer.Add(item);
+            await clipboard.SetDataAsync(transfer);
+            ShowCopyPathToast();
+        }
+        catch (Exception ex)
+        {
+            // 剪贴板是尽力而为操作：失败只记日志，不打断用户正在做的事
+            App.DebugLog($"CompressSettingsWindow: copy source paths failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>复制成功提示：浮现 1.6s 后隐藏（与进度窗 CopyToast 的时长一致）。</summary>
+    private void ShowCopyPathToast()
+    {
+        CopyPathToast.IsVisible = true;
+
+        _copyToastTimer?.Stop();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1600) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            CopyPathToast.IsVisible = false;
+            if (ReferenceEquals(_copyToastTimer, timer)) _copyToastTimer = null;
+        };
+        timer.Start();
+        _copyToastTimer = timer;
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
