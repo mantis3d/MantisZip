@@ -6,6 +6,14 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-19** — 压缩设置窗「文件名」卡：命名预设并进模板输入行（与设置页同形态）
+  - **背景**：用户反馈「压缩窗口里面预设那行跟模板输入合并为一行，就跟设置里一样」—— 原来「命名预设」是卡片里的独立一行，还带 `Margin="80,0,0,0"` 左缩进，视觉上像模板输入框的附属说明，实际却占掉一整行高度。
+  - **改动**：`Dialogs/CompressSettingsWindow.axaml` 的模板输入行 `<Grid ColumnDefinitions="80,*,Auto">` 扩成 `"80,*,Auto,Auto"`，`TemplatePresetPicker` 从独立行移入第 3 列（`Grid.Column="3"` + `MinWidth="150"`，与设置页同值），插到「插入占位符」按钮右侧。形态与设置页三行模板输入（`Views/SettingsWindow.axaml:103/140/188` 的 `150,*,Auto,Auto`）对齐：一行解决「写模板 / 插占位符 / 选存预设」。标签列仍 80（对话框左列 620 比设置窗 900 窄，沿用原有窄标签），预设提示两行的 `Margin="80,0,0,0"` 保留，仍与输入框左缘对齐。
+  - **零后端改动**：`PresetSelected` / `SaveRequested` / `DeleteRequested` 三个 code-behind 处理器、VM 的 `TemplatePresetOptions` / `TemplatePresetName` / `SaveTemplatePresetCommand` / `DeleteTemplatePresetCommand` 全部原地不动 —— 这个控件本来就按「宿主给属性 + 接事件」设计，搬家只动列。
+  - **为什么必须物化窗口才测得出来**：把控件放进同一个 Grid 只是「看起来在同一行」，真正决定同行的是 `ColumnDefinitions` 的列数与各自的 `Grid.Column`。列写少一列、或者预设忘了写 `Grid.Column`（默认 0）就会跟标签列重叠，编译期与纯源码文本断言都看不出来。新增 `tests/MantisZip.UI.Avalonia.Tests/CompressTemplateRowLayoutTests.cs` 2 例：① 三者是同一 `Grid` 的直接子级、列号依次 1/2/3、后两列宽度为 `Auto`；② 用 `TranslatePoint` 量「预设左缘在模板框右缘右侧」且两者中心 Y 相差不超过半个控件高度（分处两行时会差一整行）。
+  - **测试侧踩坑**：无头宿主只配了裸 `Application`，不加 `FluentTheme` 时 `TemplatePresetPicker` 在视觉树里根本找不到（`Single()` 抛 `Sequence contains no matching element`），照 `SettingsWindowTemplateInsertTests` 的做法补 `EnsureTheme()`。
+  - **验证**：`-Task build -Target avalonia` 0 警告；全量 ui-tests 918 例（915 passed / 0 failed / 3 skipped）；新增 2 例单跑通过；`-Task check` 全绿（0.5.7 六处 / 1487 key / 10 守卫）。
+
 **2026-11-19** — 设置文件的测试沙箱：UI 测试不再读写真实 `settings.json`
   - **背景**：2026-11-11 归档「文件名模板」时留下一条口径 —— `CompressSettingsViewModelTemplateTests` 的 vstest 路径偶发失败，怀疑是测试并行竞态。复查后推翻了这个判断：`tests/MantisZip.UI.Avalonia.Tests/TestParallelization.cs:8` 早有 `[assembly: CollectionBehavior(DisableTestParallelization = true)]`（为保护 `LocalizationManager.CurrentLanguage`），所以**不是并行**。真正的问题是「测试直接读写用户真实设置文件」：3 个类（`CompressSettingsViewModelTemplateTests`、`CardRowSettingsTests`、`CardRowHeaderMenuTests`）都是 `AppSettings.Load()` → 改 → `Save()` 写到 `%LOCALAPPDATA%\MantisZip\settings.json`，再靠 `finally` / `Dispose` 按快照还原。中途抛异常就把本机设置带走，而且 `_cached` 是进程级的，一个用例留下的中间态会被后续用例读到 —— 这解释了「单独跑永远绿、全量跑偶尔红」。
   - **修法**：`src/MantisZip.UI.Avalonia/Models/AppSettings.cs` 新增 `internal static IDisposable UseIsolatedSettingsFileForTests(string settingsFile)`，把 `Load()` / `Save()` 的落点从静态只读的 `SettingsFile` 改到传入路径（`EffectiveSettingsFile => _settingsFileOverride ?? SettingsFile`），进入与退出时都清 `_cached` 和 `_unreadableSettingsFile`。沿 `ResetCacheForTests()` 的既有先例，走 `InternalsVisibleTo`；**生产路径从不设置它，行为逐字节不变**。测试侧新增 `tests/MantisZip.UI.Avalonia.Tests/AppSettingsTestSandbox.cs`（`using var sandbox = new AppSettingsTestSandbox();` 一句话接管，目录用 `mz-settings-{guid}`，Dispose 时恢复并递归删除）。

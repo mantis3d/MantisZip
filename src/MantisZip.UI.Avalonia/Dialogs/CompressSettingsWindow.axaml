@@ -131,9 +131,11 @@
                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                 </Button>
               </Grid>
-              <!-- 模板输入框：实时校验，语法错误不阻止继续输入（只在下方错误行与确认时提示）。
-                   右侧「插入占位符」按钮弹出下拉，点一项即插到光标后。 -->
-              <Grid ColumnDefinitions="80,*,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+              <!-- 模板输入行：标签 → 模板输入框 → 插入占位符按钮 → 命名预设选择器，四列同一行
+                   （2026-11-19 把原来独占一行的「命名预设」并进来，形态与设置页
+                   Views/SettingsWindow.axaml 的三行模板输入保持一致：一行解决「写模板 / 插占位符 / 选存预设」）。
+                   实时校验：语法错误不阻止继续输入（只在下方错误行与确认时提示）。 -->
+              <Grid ColumnDefinitions="80,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
                 <TextBlock Grid.Column="0"
                            Text="{Binding LocalizedStrings[Compress_FileNameTemplate_RowLabel]}"
                            VerticalAlignment="Center"
@@ -151,17 +153,19 @@
                                                   TargetTextBox="{Binding #FileNameTemplateBox}"
                                                   Content="{Binding LocalizedStrings[Compress_FileNameTemplate_Insert]}"
                                                   ToolTip.Tip="{Binding LocalizedStrings[Compress_FileNameTemplate_InsertTip]}" />
+                <!-- 命名预设：可编辑下拉框（装预设名）+ 保存/删除两个纯图标按钮。
+                     下拉项 = 已有预设；打字 = 新名字（或要覆盖的名字）；点已有预设会回填同行模板。
+                     增删都走 TemplatePresetPicker 的事件，由 VM 写回设置（即时生效）。
+                     MinWidth 与设置页同值，窗口拉到最窄时先压模板输入框、预设选择器不塌。 -->
+                <controls:TemplatePresetPicker Grid.Column="3"
+                                               MinWidth="150"
+                                               Presets="{Binding TemplatePresetOptions}"
+                                               PresetName="{Binding TemplatePresetName, Mode=TwoWay}"
+                                               WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                               PresetSelected="OnTemplatePresetSelected"
+                                               SaveRequested="OnTemplatePresetSaveRequested"
+                                               DeleteRequested="OnTemplatePresetDeleteRequested" />
               </Grid>
-              <!-- 命名预设：可编辑下拉框（装预设名）+ 保存/删除两个纯图标按钮。
-                   下拉项 = 已有预设；打字 = 新名字（或要覆盖的名字）；点已有预设会回填上方模板。
-                   增删都走 TemplatePresetPicker 的事件，由 VM 写回设置（即时生效）。 -->
-              <controls:TemplatePresetPicker Margin="80,0,0,0"
-                                             Presets="{Binding TemplatePresetOptions}"
-                                             PresetName="{Binding TemplatePresetName, Mode=TwoWay}"
-                                             WatermarkKey="Compress_FileNameTemplate_PresetName"
-                                             PresetSelected="OnTemplatePresetSelected"
-                                             SaveRequested="OnTemplatePresetSaveRequested"
-                                             DeleteRequested="OnTemplatePresetDeleteRequested" />
               <!-- 预设操作提示（超过 20 条上限 / 已保存 / 已更新）：独立一行，
                    不复用「文件名」那一格的错误槽，否则模板本身合法时也会把可读的文件名顶成红框。
                    失败用红色、成功用次要色 —— 两个 TextBlock 由 IsError 互斥显示。 -->
