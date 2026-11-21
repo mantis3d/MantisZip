@@ -6,6 +6,22 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-21** — 未定义主题画刷导致边框/分隔线静默消失（含新增 `resourcekeys` 守卫）
+  - **背景**：审查 AGENTS.md 时效性时顺手做了一次资源键全量审计——把全仓 `{DynamicResource X}` / `{StaticResource X}` 的引用键与「`x:Key` 定义 ∪ `Resources["…"]` 运行时注入」做差集，差集里出现 `ThemeBorderLightBrush`（5 处引用）和 `ThemeTextDisabledBrush`（1 处引用）。`git log --all -S 'x:Key="ThemeBorderLightBrush"'` 零命中 ⇒ **这两个键全历史从未定义过**。
+  - **用户可见后果**：画刷解析不到 = null，`Border.BorderBrush = null` 时该边**不绘制**。具体是 `Controls/ArchiveContentView.axaml:647` 与 `:933` 两处表头下沿 1px 分隔线消失、`Dialogs/AboutWindow.axaml:517` 的「贡献者」列表框外框消失、`Dialogs/ProgressWindow.axaml:472` 的压缩通道提示行上边框消失、`Views/SettingsWindow.axaml:1120` 的 `<Border Height="1" Background=…>` 分隔线**变成一条隐形占位**（高度占着、什么都不画）；`Dialogs/ArchiveCommentDialog.axaml:38` 的「仅 ZIP 支持注释」提示文字回落到继承色（应该是更浅的次要色）。构建、分析器、918 例测试**全部长期全绿**——这是典型的「接线错了不响」。
+  - **修法**：按规则 4「无对应资源就成对添加」，在 `Themes/ThemeLight.axaml` 与 `Themes/ThemeDark.axaml` 各加 2 个 `Color` + 2 个 `SolidColorBrush`：`ThemeBorderLight`（Light `#FFEDEDED` / Dark `#FF2F2F2F`，比 `ThemeBorder` 弱一档）与 `ThemeTextDisabled`（Light `#FFA0A0A0` / Dark `#FF6E6E6E`，比 `ThemeTextSecondary` 更弱）。两个主题的 `x:Key` 集合从 138 各增至 142，`Compare-Object` 复核**完全一致**；未改动任何引用点（6 处引用本来是对的，缺的是定义）。
+  - **新增守卫 `resourcekeys`（第 11 条，规则 4）**：`scripts/verify-repo.ps1` 的 `Test-GuardResourceKeys`——扫 `src/MantisZip.UI.Avalonia` 下全部 `.axaml`（先用 `$RE_XAML_COMMENT` 剔除 `<!-- -->` 块，避免把注释里的示例当定义），收集 `$RE_RESOURCE_REF` 命中的引用键，与「`.axaml` 的 `x:Key` ∪ `.cs` 的 `Resources["X"]`」比对；`Resources[k + "Thk"]` 这类拼接注入用「后缀表 + 前缀字面量」反推（`SpacingXsThk` 靠 `"SpacingXs"` + 后缀 `Thk` 放行）。
+  - **为什么不扫 C# 侧**：首版把 `.cs` 里的 `DynamicResource` 也纳入引用集合，立刻在 `Converters/BoolToIconConverter.cs:12` 的 XML 文档注释上误报（`ConverterParameter=IconEye|IconEyeOff` 那段）。C# 查资源走 `TryFindResource("…")` / `Resources.TryGetResource("…")`，键是运行时参数、字符串随处可见，文本级静态判断误报率过高 ⇒ 决定**只在 `.axaml` 上做门禁**，C# 侧继续靠评审。这条已写进 `docs/MAINTENANCE.md` §4 的「已知覆盖边界」。
+  - **负向验证**：临时造一个只含 `HEAD` 版主题文件 + `SettingsWindow.axaml` + 空 `MantisZip.sln` 的目录当 `-Root`，守卫按预期报出 `ThemeBorderLightBrush` 与 6 个未定义的 `Icon*`（因为只放了主题文件、没放 `AppIcons.axaml`），`ok=False`；恢复完整树后 `ok=True`。说明守卫确实能拦住，不是空转。
+  - **验证**：`-Task guards` 11 项全绿；`-Task check` 全绿。
+
+**2026-11-21** — AGENTS.md 时效性体检：修 4 处过期表述 + 新增规则 24/25
+  - **背景**：AGENTS.md 上次改动是 commit `4acd2a56`，其后 16 个 commit（含 `4ad9130c` ComboBox 边框、`33840af7` 设置沙箱、`70655700` 预设并进模板行）都没回头更新它，逐条核对发现 4 处已与仓库不符。
+  - **修正项**：① 「五条守卫的覆盖边界」→「十一条」（`AGENTS.md:57`，实际早已是 10 条、本次加第 11 条）；② 删掉 `plans` 分支可改文档清单里的 `CLAUDE.md`（`AGENTS.md:379`）——`git ls-files | Select-String CLAUDE` 零命中，仓库从来没有这个文件；③ 规则 13 的「keys 数组（约 line 203 起）」改成「搜 `UpdateLocalizedStrings` 找 `var keys = new[] { … }`，别记死行号」——实际在 `ViewModels/MainWindowViewModel.cs:249`（数组 :259-261），行号已漂移 56 行；④ `docs/MAINTENANCE.md` 的 guards 函数清单从 6 个补到 11 个、章节标题与 CI 表里的「十条」改「十一条」、脚本规模「约 1300 行」改「约 2000 行」（实测 1970）。
+  - **新增规则 24「测试不得读写真实用户设置文件」**：把 `33840af7` 的事故沉淀成规则——`AppSettings._cached` 是进程级、`SettingsFile` 指向真实用户目录，老写法「读真实文件 → 改 → 写回 → finally 还原」中途抛异常就带走本机设置，且中间态会被后续用例读到（症状「单跑绿、全量偶尔红」）。规则里显式点明**别拿 `DisableTestParallelization` 当解药**（它治的是 `LocalizationManager.CurrentLanguage` 竞态），正确写法是 `using var sandbox = new AppSettingsTestSandbox();`。
+  - **新增规则 25「无头测试宿主的样式前提」**：`tests/MantisZip.UI.Avalonia.Tests/TestAppBuilder.cs` 用 `AppBuilder.Configure<Application>()`，**不跑 `App.Initialize()`、没有任何全局样式**，所以依赖 `Style` / `ControlTheme` 才成立的缺陷在无头测试里复现不出来（`4ad9130c` 的 ComboBox 可编辑态边框事故即此类）。规则给出四步：自建 `App` 并 `Initialize()` → 补 `FluentTheme` + `ThemeLight.axaml` + `AppIcons.axaml` → 样式挂**本用例自己的 `Window.Styles`**（禁止塞 `Application.Current.Styles`，那是进程级单例会污染同批次用例）→ 断言用像素/布局实测而非「属性被设置了」。
+  - **未纳入**：审查中提到的「结构性问题（AGENTS.md 42.5 KB / 450 行偏胖，规则 4 单条 38 行）」按用户选择**本轮不处理**——瘦身会让 AGENTS.md 从自足速查变成需要翻文档，改动面过大，留待以后单独讨论。
+
 **2026-11-19** — 压缩设置窗「文件名」卡：命名预设并进模板输入行（与设置页同形态）
   - **背景**：用户反馈「压缩窗口里面预设那行跟模板输入合并为一行，就跟设置里一样」—— 原来「命名预设」是卡片里的独立一行，还带 `Margin="80,0,0,0"` 左缩进，视觉上像模板输入框的附属说明，实际却占掉一整行高度。
   - **改动**：`Dialogs/CompressSettingsWindow.axaml` 的模板输入行 `<Grid ColumnDefinitions="80,*,Auto">` 扩成 `"80,*,Auto,Auto"`，`TemplatePresetPicker` 从独立行移入第 3 列（`Grid.Column="3"` + `MinWidth="150"`，与设置页同值），插到「插入占位符」按钮右侧。形态与设置页三行模板输入（`Views/SettingsWindow.axaml:103/140/188` 的 `150,*,Auto,Auto`）对齐：一行解决「写模板 / 插占位符 / 选存预设」。标签列仍 80（对话框左列 620 比设置窗 900 窄，沿用原有窄标签），预设提示两行的 `Margin="80,0,0,0"` 保留，仍与输入框左缘对齐。

@@ -925,6 +925,13 @@ $RE_SIGNED_METHOD = [regex]::new('(?m)^[ \t]*(?:private|protected|public|interna
 $RE_CLASSES_ATTR = [regex]::new('Classes="([^"]*)"')
 # 规则 4：自定义 Button / ToggleButton 子类（含 partial / sealed / abstract / 泛型前的普通写法）
 $RE_BUTTON_SUBCLASS = [regex]::new('class\s+(\w+)\s*:\s*(?:Button|ToggleButton)\b')
+# 规则 4：资源键（x:Key 定义 / Resource= 引用 / 运行时 Resources["…"] 注入）
+$RE_XAML_KEY = [regex]::new('x:Key="([^"]+)"')
+$RE_XAML_COMMENT = [regex]::new('<!--.*?-->', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+$RE_RESOURCE_REF = [regex]::new('\b(?:Dynamic|Static)Resource\s+(?<key>[A-Za-z_][\w.]*)')
+$RE_RESOURCES_INDEXER = [regex]::new('Resources\["([^"]+)"\]')
+# 运行时拼接注入的键（如 Resources[k + "Thk"]）：后缀 → 前缀必须能在 .cs 里找到字面量
+$RESOURCE_KEY_COMPOSED_SUFFIX = @('Thk')
 
 # ---------------------------------------------------------------------------
 # 静默失败面三个守卫（2026-10-28 新增）：这三条对应三次真实事故
@@ -1720,6 +1727,97 @@ function Test-GuardButtonStyle {
         })
 }
 
+function Test-GuardResourceKeys {
+    param([string]$RepoRoot)
+
+    # 规则 4：DynamicResource / StaticResource 引用的键必须有定义，否则静默取不到值
+    # （画刷缺失 = 透明 → 边框/分隔线直接消失，构建与测试全绿，只有用户看得见）。
+    # 定义来源三处：Theme*.axaml 的 x:Key、src 下任意 .axaml 的 x:Key、
+    # 以及运行时 Resources["…"] = … 注入（紧凑度/缩略图参数）。
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $uiRoot = Join-Path $RepoRoot $GUARD_FILES.sourceDir
+    $scannedXaml = 0
+    $scannedKeys = 0
+
+    if (-not (Test-Path -LiteralPath $uiRoot)) {
+        $issues.Add("读不到源码目录：$($GUARD_FILES.sourceDir)")
+        return New-GuardResult -Id 'resourcekeys' -Title '资源键定义（规则 4）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    $xamlFiles = Get-ChildItem -LiteralPath $uiRoot -Recurse -Filter *.axaml -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+    $csFiles = Get-ChildItem -LiteralPath $uiRoot -Recurse -Filter *.cs -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+
+    # ① 定义集合：.axaml 的 x:Key（注释块先剔除，避免把注释里的示例当成定义）
+    $defined = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($file in $xamlFiles) {
+        $text = $RE_XAML_COMMENT.Replace([System.IO.File]::ReadAllText($file.FullName), '')
+        foreach ($match in $RE_XAML_KEY.Matches($text)) { [void]$defined.Add($match.Groups[1].Value) }
+    }
+
+    # ② 运行时注入：Resources["Key"] = …（含 Thk 这类拼接后缀，靠字面量前缀反推）
+    $codeTexts = @{}
+    foreach ($file in $csFiles) {
+        $codeTexts[$file.FullName] = [System.IO.File]::ReadAllText($file.FullName)
+    }
+    foreach ($text in $codeTexts.Values) {
+        foreach ($match in $RE_RESOURCES_INDEXER.Matches($text)) { [void]$defined.Add($match.Groups[1].Value) }
+    }
+    # Resources[k + "Thk"] 形态：把 .cs 里出现过的、以该后缀结尾的字面量前缀也视为可定义
+    # （例：suffix Thk → "SpacingXsThk" 由 "SpacingXs" + "Thk" 生成，源码里没有 "SpacingXsThk" 字面量）
+    $composedSuffixes = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($text in $codeTexts.Values) {
+        foreach ($match in [regex]::Matches($text, 'Resources\[\s*\w+\s*\+\s*"(?<suffix>[A-Za-z]+)"\s*\]')) {
+            [void]$composedSuffixes.Add($match.Groups['suffix'].Value)
+        }
+        foreach ($suffix in $RESOURCE_KEY_COMPOSED_SUFFIX) { [void]$composedSuffixes.Add($suffix) }
+    }
+
+    # ③ 引用集合：只扫 .axaml（XAML 的 {DynamicResource X} / {StaticResource X}）。
+    # C# 侧用字符串键查资源（TryFindResource / Resources.TryGetResource），键名是运行时参数，
+    # 文本级静态判断误报率高（XML 文档注释里就有示例），不纳入本守卫范围。
+    $refs = [ordered]@{}
+    foreach ($file in $xamlFiles) {
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+        $text = $RE_XAML_COMMENT.Replace([System.IO.File]::ReadAllText($file.FullName), '')
+        $scannedXaml++
+        foreach ($match in $RE_RESOURCE_REF.Matches($text)) {
+            $key = $match.Groups['key'].Value
+            if (-not $refs.Contains($key)) { $refs[$key] = [System.Collections.Generic.List[string]]::new() }
+            $line = Get-LineNumber -Text $text -Index $match.Index
+            $refs[$key].Add("$relative`:$line")
+        }
+    }
+
+    $scannedKeys = $refs.Count
+    foreach ($key in $refs.Keys) {
+        if ($defined.Contains($key)) { continue }
+        # 拼接生成：去掉已知后缀后，前缀必须是 .cs 里的字面量
+        $composed = $false
+        foreach ($suffix in $composedSuffixes) {
+            if ($key.EndsWith($suffix) -and $key.Length -gt $suffix.Length) {
+                $prefix = $key.Substring(0, $key.Length - $suffix.Length)
+                foreach ($text in $codeTexts.Values) {
+                    if ($text.Contains('"' + $prefix + '"')) { $composed = $true; break }
+                }
+            }
+            if ($composed) { break }
+        }
+        if ($composed) { continue }
+
+        $where = ($refs[$key] | Select-Object -First 3) -join '、'
+        $more = if ($refs[$key].Count -gt 3) { " 等 $($refs[$key].Count) 处" } else { '' }
+        $issues.Add("资源键 '$key' 被引用但从未定义（$where$more）→ 运行时静默取不到值；规则 4 要求在 ThemeLight.axaml + ThemeDark.axaml 成对补 <SolidColorBrush> 或改引用已有键")
+    }
+
+    return New-GuardResult -Id 'resourcekeys' -Title '资源键定义（规则 4）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            xamlFiles = $scannedXaml
+            keysUsed  = $scannedKeys
+            keysDefined = $defined.Count
+        })
+}
+
 function Test-Guards {
     param([string]$RepoRoot, [string]$RelativeLocalizationDir)
 
@@ -1734,6 +1832,7 @@ function Test-Guards {
     $guards.Add((Test-GuardSettingsWiring -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardFormatIdentity -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardButtonStyle -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardResourceKeys -RepoRoot $RepoRoot))
 
     $failed = @($guards | Where-Object { -not $_.ok })
     return [ordered]@{
