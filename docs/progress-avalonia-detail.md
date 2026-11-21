@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-21** — 门面文档时效性守卫 `agentsdoc`：让 AGENTS.md 的过期表述自己报错
+  - **背景**：上一轮体检修了 4 处过期表述，但那 4 处**全是靠人眼一条条读出来的**——AGENTS.md 上次改动到这次之间隔了 16 个 commit，此后又加了 `resourcekeys` 守卫，条数直接又漂了一格。规则 23 的口径是「守卫只增有事故的」，而文档过期这次是真踩到了（`CLAUDE.md` 幽灵文件、守卫数写「五条」实际 10 条、`UpdateLocalizedStrings()` 行号漂 56 行），够格立守卫。
+  - **新守卫 `agentsdoc`（第 12 条，规则 3）**：`scripts/verify-repo.ps1` 的 `Test-GuardAgentsDoc`，查 `AGENTS.md` + `docs/MAINTENANCE.md` 三件事：① **幽灵文件**——反引号里形如 `a/b/c.ext` 的 token（`$RE_DOC_PATH_TOKEN`，扩展名白名单 axaml/cs/ps1/md/json/yml/iss/props/csproj/sln/txt）按 `src/MantisZip.UI.Avalonia/` 等 9 个前缀依次展开，全都 `Test-Path` 失败即报；② **行号硬引用**——`$RE_DOC_LINE_REF` 命中「line + 数字」「第 + 数字 + 行」即报；③ **条数漂移**——正文里的「N 条守卫」必须等于实际注册数（`GuardCount` 由 `Test-Guards` 传入，传的是**含本项在内**的 `$guards.Count + 1`，所以新增守卫而不改文档立刻失败），「共 N 步 / CI N 步」必须等于 `ci.yml` 的 `run:` 行数。中文数字靠 `ConvertFrom-ChineseNumeral` 转（覆盖一~二十）。
+  - **误报率实测**：拿全仓跑一遍，28 个路径 token 全部解析成功、0 误报；`%LOCALAPPDATA%\…\settings.json`（环境变量）与带通配符的 token 由正则结构天然排除，`Controls/CustomFilePickerControl`（无扩展名）同理。
+  - **负向验证**：临时往 `AGENTS.md` 插一行「参考 `src/MantisZip.UI.Avalonia/Views/GhostFile.axaml` 与 `line 42`」并把「十二条守卫」改回「五条」，守卫准确报出 3 条 issue（幽灵文件、行号硬引用、守卫条数 5≠12），恢复后 `ok=True`。这条守卫自身也当场抓到自己：写文档时把「`line 123`」当示例写进 MAINTENANCE 的覆盖边界说明里，第一次跑就被自己的规则拦下，改成「line + 数字」的描述性写法才过——说明它不是空转。
+  - **规则 3 补一条**：正文加「**顺手体检 AGENTS.md**」——一次计划做完或做过架构级改动后，回头扫一眼本文件；`agentsdoc` 能拦幽灵文件/行号/条数，但「表述是否还成立」（删了资源键、换了做法、守卫覆盖边界变了）只能靠人看。
+  - **已知边界**（已写进 `docs/MAINTENANCE.md` §4）：只认反引号里且带分隔符 + 已知扩展名的路径；查不出「文件还在但内容已过时」；中文数字超二十静默跳过，需扩表。
+  - **验证**：`-Task guards` 12 项全绿；`-Task check` 全绿；脚本 1970 → 2094 行。
+
 **2026-11-21** — 未定义主题画刷导致边框/分隔线静默消失（含新增 `resourcekeys` 守卫）
   - **背景**：审查 AGENTS.md 时效性时顺手做了一次资源键全量审计——把全仓 `{DynamicResource X}` / `{StaticResource X}` 的引用键与「`x:Key` 定义 ∪ `Resources["…"]` 运行时注入」做差集，差集里出现 `ThemeBorderLightBrush`（5 处引用）和 `ThemeTextDisabledBrush`（1 处引用）。`git log --all -S 'x:Key="ThemeBorderLightBrush"'` 零命中 ⇒ **这两个键全历史从未定义过**。
   - **用户可见后果**：画刷解析不到 = null，`Border.BorderBrush = null` 时该边**不绘制**。具体是 `Controls/ArchiveContentView.axaml:647` 与 `:933` 两处表头下沿 1px 分隔线消失、`Dialogs/AboutWindow.axaml:517` 的「贡献者」列表框外框消失、`Dialogs/ProgressWindow.axaml:472` 的压缩通道提示行上边框消失、`Views/SettingsWindow.axaml:1120` 的 `<Border Height="1" Background=…>` 分隔线**变成一条隐形占位**（高度占着、什么都不画）；`Dialogs/ArchiveCommentDialog.axaml:38` 的「仅 ZIP 支持注释」提示文字回落到继承色（应该是更浅的次要色）。构建、分析器、918 例测试**全部长期全绿**——这是典型的「接线错了不响」。

@@ -46,7 +46,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 | `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` | 构建并把 MSBuild 输出压成「文件:行:列 + 错误码」（项目级诊断无行列号时只显示 csproj 路径，如 restore/NU1301 失败） |
 | `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` | 跑测试 |
 | `pwsh -File scripts\verify-repo.ps1 -Task i18n` / `-Task version` | 单项检查 |
-| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8）/ 意图-执行接缝（规则 20）/ 数字输入受控（规则 22）/ 反序列化显式 options（规则 23）/ 设置项接线（规则 23）/ 格式身份单一入口（规则 23）/ 按钮样式选型（规则 4）/ 资源键定义（规则 4） |
+| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8）/ 意图-执行接缝（规则 20）/ 数字输入受控（规则 22）/ 反序列化显式 options（规则 23）/ 设置项接线（规则 23）/ 格式身份单一入口（规则 23）/ 按钮样式选型（规则 4）/ 资源键定义（规则 4）/ 门面文档时效性（规则 3） |
 | 追加 `-Json` | 机器可读输出（插件内部用） |
 
 - `-Target`：`avalonia`（默认）/ `core` / `shell` / `tests` / `ui-tests` / `solution`
@@ -54,7 +54,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - **退出码 0 = 通过，1 = 有问题** ⇒ CI 可直接用；`-Json` 时 `ok` 字段同义
 - `-Task test` 有一条**兜底**：`dotnet test` 失败且没有解析到任何编译诊断（= 测试根本没跑起来，如 VSTest testhost 在受限环境里无法打开父进程句柄）时，自动改用 `dotnet exec <测试程序集>` 直跑 xunit v3 的 MTP 入口，绕开 testhost；JSON 里 `runner` 为 `mtp`、`fallbackFrom` 为 `vstest`。编译错误或真实用例失败**不会**触发兜底
 - agent 面板里对应工具名：`mantiszip_verify` / `mantiszip_i18n` / `mantiszip_version` / `mantiszip_guards`（DSH 本地插件 `tools/dsh-plugin-mantiszip`，薄壳而已）
-- **换机器 / 换 agent 接手，或要改这套门禁时，先读 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)**：组成图、每个 task 干什么、十一条守卫的覆盖边界、CI 七步门禁、反直觉实现（删掉会复发的写法）、环境坑、有意留白
+- **换机器 / 换 agent 接手，或要改这套门禁时，先读 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)**：组成图、每个 task 干什么、十二条守卫的覆盖边界、CI 七步门禁、反直觉实现（删掉会复发的写法）、环境坑、有意留白
 
 ## Architecture（速查）
 
@@ -125,6 +125,7 @@ When releasing a new version, update the version string in ALL of these location
   - Avalonia 以日期为标识（`**2026-07-16**`）、共享层以版本号为标识（`#### v0.x.x (2026-07-16)`）
   - 同一日期多条按从晚到早排列（最新的在最上方）
 - 一次变更若属里程碑级，PROGRESS 加一行 + 细节文档同步追加；涉及多个领域（如 Core）在各对应文档各加一条；属于已有规划任务的标注进度
+- **顺手体检 AGENTS.md**：一次计划做完、或做了一次架构级 / 跨多文件的改动之后，回头扫一眼本文件——**新增的守卫改了条数、删掉了文件、挪了实现、换了做法，都在这里留着一句过期的话**。要改就同一次提交里改掉（`-Task guards` 的 `agentsdoc` 会拦幽灵文件、行号硬引用和守卫/CI 步数漂移，但「表述是否还成立」只能靠人看）
 
 ### 规则 4：新 UI 控件必须应用主题样式
 

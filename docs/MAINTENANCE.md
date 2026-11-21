@@ -60,7 +60,7 @@
 `-Task check` = `version` + `i18n` + `guards`，纯文件校验，不构建。JSON 形状是
 `{ ok, checks: [ { task, result: {…} } ] }` —— 每项结果是完整对象，不平铺（避免与 `task` 字段抢名字）。
 
-## 4. 十一条规则守卫（`-Task guards`）
+## 4. 十二条规则守卫（`-Task guards`）
 
 把 AGENTS.md 里本可机器校验的人工自查变成门禁：
 
@@ -77,6 +77,7 @@
 | formatidentity | 23 | ① `src/MantisZip.UI.Avalonia` 里 `ArchiveEngineFactory.GetFormatByExtension(` 只允许出现在 `Models/ArchiveFormatHelper.cs`（其余必须走 `GetFormat` → `ResolveReaderFormat`）；② 该文件必须委派 `ResolveReaderFormat(`；③ `ArchiveEngine.cs` 的 `ResolveReaderFormat` 必须同时含分卷锚定（`TryGetVolumeBase`）与 SFX 探测（`SfxProbe.TryGetPayloadFormat`）；④ `MainWindowViewModel` 必须有 `IsCurrentVolumeSet`，且 `CanAddEntries` / `CanDeleteEntries` 都用它拦截。**事故**：分卷包与 SFX 的格式身份被 `Path.GetExtension` 直判成 `Zip`（默认分支兜底），预览/双击打开/缩略图全报 `Failed to locate the Zip Header`，而引擎路由本身是对的 → 两套事实源（KI-017，2026-11-05 修） |
 | buttonstyle | 4 | ① `Dialogs/*.axaml` 与 `Views/SettingsWindow.axaml`（= `ThemeSurfaceBgBrush` 卡片语境）里 `Classes="…"` 按空白切 token 后**含 `ToolbarButton`** 即失败（`ToolbarButtonIcon` / `ToolbarButtonLabel` 不算）；② `src/` 下 `class X : Button` / `class X : ToggleButton` 的文件里找不到 `StyleKeyOverride` 即失败。**事故**：2026-11-12 压缩设置窗 + 设置页共 7 处把工具栏专用的 `ToolbarButton` 挂到卡片里（比输入框高一档、底色是头部灰）；同日 `PlaceholderInsertButton` 漏 `StyleKeyOverride` → 无模板 → 点击完全无响应（`clicks=0`） |
 | resourcekeys | 4 | 扫 `src/MantisZip.UI.Avalonia` 下全部 `.axaml`（跳过注释块）里的 `{DynamicResource X}` / `{StaticResource X}`：**X 必须能在 `.axaml` 的 `x:Key` 或 `.cs` 的 `Resources["X"]` / `Resources[k + "Thk"]` 里找到定义**，否则运行时静默取不到值。**事故**：`ThemeBorderLightBrush`（5 处）与 `ThemeTextDisabledBrush`（1 处）**全历史从未定义**——画刷为 null 后边框/分隔线直接消失、提示文字回落默认色，而构建与全部测试长期全绿 |
+| agentsdoc | 3 | 查 `AGENTS.md` + `docs/MAINTENANCE.md` 三件事：① 反引号里的路径 token（`a/b/c.ext` 形态，按 `src/MantisZip.UI.Avalonia/` 等前缀展开）必须真实存在 ② 不出现「line + 数字」「第 + 数字 + 行」这类行号硬引用 ③ 正文里的守卫条数与 CI 步数必须等于实际值（GuardCount 由 `Test-Guards` 传入，含本项）。**事故**：AGENTS.md 里写着早已不存在的 `CLAUDE.md`（`git ls-files` 零命中）、守卫条数写「五条」实际 10 条、`UpdateLocalizedStrings()` 的行号漂了 56 行，都没人发现 |
 
 **已知覆盖边界**（别误以为全查了）：
 
@@ -91,6 +92,7 @@
 - formatidentity 只管「UI 有没有绕过单一入口」，查不出 `ResolveReaderFormat` 自己判错（那要靠 `ReaderFormatResolutionTests` 的用例）；也查不出 Core 里新写的直判点（如 `ListEntriesAsync` 的 ISO 判定）——新增格式时仍需补对应 InlineData。
 - buttonstyle 是**文本级**检查：① 只看 `Dialogs/` 与 `Views/SettingsWindow.axaml` 两个位置，其它「卡片语境」的新窗口（若将来出现）需要手动加进 `Test-GuardButtonStyle` 的目标表；② 它只判「有没有覆盖 `StyleKeyOverride`」，查不出覆盖成了别的类型（应当 `typeof(Button)`）；③ `Classes` 值用空格切 token，`Classes="{Binding …}"` 这种动态绑定不受检查（本来也不该给按钮挂动态 class）。
 - resourcekeys 只查**键有没有定义**，查不出「定义成别的类型」（把 `Thickness` 键用在 `Foreground` 上它看不见）；它也**不扫 C# 侧**的字符串键查找（`TryFindResource("…")` / `Resources.TryGetResource("…")`）——键名是运行时参数，XML 注释里就有示例，文本级静态判断误报率过高，那部分仍靠评审。拼接注入只认 `Resources[k + "后缀"]` 这一形态且后缀表写死（`$RESOURCE_KEY_COMPOSED_SUFFIX`），新增别的拼接方式要同步加后缀。
+- agentsdoc 只认**反引号里**且形如 `a/b/c.ext`（含分隔符 + 已知扩展名）的路径 token：正文里裸写的路径不查；`%LOCALAPPDATA%\…\settings.json` 这类环境变量路径与带通配符的跳过。它查不出「文件还在但内容已过时」（只在 `scripts/verify-repo.ps1` 加的 resourcekeys 守卫这件事，得靠人写进文档）、也查不出「规则描述与实际代码语义不符」。守卫条数只认中文数字一到二十与阿拉伯数字两种写法，超范围会静默跳过（`ConvertFrom-ChineseNumeral` 返回 $null），那时要扩表。
 
 ## 5. CI 门禁（`.github/workflows/ci.yml`，共 7 步）
 
@@ -101,7 +103,7 @@
 |------|--------|
 | `-Task version` | 版本号 6 处漂移（AppConstants / csproj / PLAN / PROGRESS / 两个 .iss） |
 | `-Task i18n` | 三语 key 缺失/多余/占位符不一致/重复 key |
-| `-Task guards` | 上面十一条规则 |
+| `-Task guards` | 上面十二条规则 |
 | `dotnet restore -p:WarningsAsErrors=NU1901%3B…` | 已知漏洞依赖（`Directory.Build.props` 开 `NuGetAuditMode=all`，本地只告警） |
 | `dotnet format … analyzers --verify-no-changes --severity warn --include src\…` | 产品代码分析器告警（**只圈 `src/`**，tests 存量 xUnit 告警另议） |
 | `dotnet build --no-restore -c Release` + `dotnet test …` | 真正编译与用例 |
