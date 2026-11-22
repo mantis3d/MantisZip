@@ -137,7 +137,7 @@ private static AppSettings CreateWithDefaults()
 
 - `docs/ARCHITECTURE.md:692` 的设置项清单里删 `KeepOriginalExtension`。
 - `docs/PROGRESS.md` + `docs/progress-avalonia-detail.md` 按规则 3 记录。
-- `RELEASE_NOTES.md`：**先向用户确认范围**（规则 18）。倾向写两条：① 新装自带默认命名模板与两条预设；② 「保留源扩展名」开关移除，分别压缩保留扩展名请用 `{ext}`。后者是上一版本已发布、用户可能依赖的能力，属「修复/变更」而非「本版本内新引入又修掉」。
+- `RELEASE_NOTES.md`：**已向用户确认（2026-11-22，规则 18）—— 两条都写**，均落在 v0.5.7 的「变更 / Changes」节：① 新装自带默认命名模板与两条预设；② 「保留源文件扩展名」开关移除（v0.5.6 已发布、用户可能依赖的能力，属「变更」而非「本版本内新引入又修掉」）。同时修掉 v0.5.7 模板条目里那句已失效的「此时『保留源文件扩展名』失效」。
 
 ---
 
