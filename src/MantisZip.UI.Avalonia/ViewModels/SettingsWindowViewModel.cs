@@ -988,43 +988,14 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorQuick;
     [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorSeparate;
 
-    public bool IsFileNameTemplatePresetMessageVisibleDialog => FileNameTemplatePresetMessageDialog != null;
-    public bool IsFileNameTemplatePresetMessageVisibleQuick => FileNameTemplatePresetMessageQuick != null;
-    public bool IsFileNameTemplatePresetMessageVisibleSeparate => FileNameTemplatePresetMessageSeparate != null;
-
-    public bool IsFileNameTemplatePresetMessageSuccessDialog
-        => FileNameTemplatePresetMessageDialog != null && !IsFileNameTemplatePresetMessageErrorDialog;
-    public bool IsFileNameTemplatePresetMessageSuccessQuick
-        => FileNameTemplatePresetMessageQuick != null && !IsFileNameTemplatePresetMessageErrorQuick;
-    public bool IsFileNameTemplatePresetMessageSuccessSeparate
-        => FileNameTemplatePresetMessageSeparate != null && !IsFileNameTemplatePresetMessageErrorSeparate;
-
-    partial void OnFileNameTemplatePresetMessageDialogChanged(string? value)
+    /// <summary>
+    /// 某一行预设消息的气泡自动收起后清空该行消息（成功消息 1.6s 后由 TemplatePresetPicker 回调）。
+    /// 不清空的话，下次同样的消息值没变、不会触发变更通知，气泡就再也弹不出来。
+    /// </summary>
+    public void DismissFileNameTemplatePresetMessage(Models.FileNameTemplateRow row)
     {
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageVisibleDialog));
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessDialog));
+        SetPresetMessage(row, null, isError: false);
     }
-
-    partial void OnFileNameTemplatePresetMessageQuickChanged(string? value)
-    {
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageVisibleQuick));
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessQuick));
-    }
-
-    partial void OnFileNameTemplatePresetMessageSeparateChanged(string? value)
-    {
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageVisibleSeparate));
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessSeparate));
-    }
-
-    partial void OnIsFileNameTemplatePresetMessageErrorDialogChanged(bool value)
-        => OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessDialog));
-
-    partial void OnIsFileNameTemplatePresetMessageErrorQuickChanged(bool value)
-        => OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessQuick));
-
-    partial void OnIsFileNameTemplatePresetMessageErrorSeparateChanged(bool value)
-        => OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessSeparate));
 
     /// <summary>预设列表来自设置（与压缩对话框共享同一份）。</summary>
     private void ReloadFileNameTemplatePresets()

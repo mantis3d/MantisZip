@@ -72,6 +72,16 @@ public partial class SettingsWindow : Window
         vm.DeleteFileNameTemplatePreset(row);
     }
 
+    /// <summary>预设消息气泡 1.6s 自动收起后回调：清空该行消息，让下次同样的消息还能重新弹出。</summary>
+    private void OnPresetMessageDismissed(object? sender, EventArgs e)
+    {
+        if (sender is not TemplatePresetPicker { Tag: string tag }) return;
+        if (DataContext is not SettingsWindowViewModel vm) return;
+        if (!TryParseRow(tag, out var row)) return;
+
+        vm.DismissFileNameTemplatePresetMessage(row);
+    }
+
     /// <summary>把控件 <c>Tag</c> 翻译成行枚举；Tag 是 XAML 里手写的字面量，拼错时静默无动作。</summary>
     private static bool TryParseRow(string tag, out FileNameTemplateRow row)
         => Enum.TryParse(tag, ignoreCase: true, out row);

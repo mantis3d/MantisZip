@@ -1328,12 +1328,11 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// </summary>
     public bool IsTemplateErrorVisible => IsTemplateActive && TemplateError != null;
 
-    /// <summary>预设操作提示（如超过上限）是否可见。与模板错误分开，不占用「文件名」那一格。</summary>
-    public bool IsTemplatePresetMessageVisible => TemplatePresetMessage != null;
-
-    /// <summary>预设操作成功的提示（「已保存 / 已更新」）是否可见 —— 成功与失败共用一条提示槽。</summary>
-    public bool IsTemplatePresetMessageSuccessVisible
-        => TemplatePresetMessage != null && !IsTemplatePresetMessageError;
+    /// <summary>
+    /// 预设操作结果的气泡自动收起后清空消息，让下一次同样的消息还能重新弹出
+    /// （值没变不会触发变更通知，气泡就再也不出来了）。
+    /// </summary>
+    public void DismissTemplatePresetMessage() => TemplatePresetMessage = null;
 
     /// <summary>
     /// 「文件名」结果行是否可见。分别压缩时每个源各自成包、这一行没有意义要隐藏；
@@ -1347,6 +1346,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         // 注意：这里**不清空** TemplatePresetName。名字框装的是「要覆盖/要删除的那条预设」，
         // 用户改了模板但没改名字，本意就是「把这套新模板存回同名预设」，清掉名字会让
         // 「存为预设」拿不到名字、只能拿模板文本当名字（2026-11-14 换可编辑下拉后确立）。
+        // 但上一条预设操作消息是**旧模板**的结果（失败尤其如此），模板一变就作废。
+        TemplatePresetMessage = null;
         TemplateError = ValidateTemplateNow();
         OnPropertyChanged(nameof(IsTemplateActive));
         OnPropertyChanged(nameof(IsOutputFileNameReadOnly));
@@ -1364,12 +1365,8 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     partial void OnTemplatePresetMessageChanged(string? value)
     {
-        OnPropertyChanged(nameof(IsTemplatePresetMessageVisible));
-        OnPropertyChanged(nameof(IsTemplatePresetMessageSuccessVisible));
+        // 消息由 TemplatePresetPicker 的气泡渲染，宿主这边没有派生可见性属性要通知。
     }
-
-    partial void OnIsTemplatePresetMessageErrorChanged(bool value)
-        => OnPropertyChanged(nameof(IsTemplatePresetMessageSuccessVisible));
 
     /// <summary>
     /// 立刻校验一次模板（语法 + 结果合法性 + 分别压缩下的重名）。

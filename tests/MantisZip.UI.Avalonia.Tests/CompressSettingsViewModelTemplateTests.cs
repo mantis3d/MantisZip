@@ -284,9 +284,7 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
 
         // 上限提示走独立槽位：模板本身合法，不能把「文件名」那一格顶成红框
         Assert.NotNull(vm.TemplatePresetMessage);
-        Assert.True(vm.IsTemplatePresetMessageVisible);
         Assert.True(vm.IsTemplatePresetMessageError);
-        Assert.False(vm.IsTemplatePresetMessageSuccessVisible);
         Assert.Null(vm.TemplateError);
         Assert.False(vm.IsTemplateErrorVisible);
         Assert.Equal(AppSettings.MaxFileNameTemplatePresets, vm.TemplatePresetOptions.Count);
@@ -316,7 +314,7 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
 
         Assert.Equal("report_bak", vm.OutputFileName);
         Assert.False(vm.IsTemplateErrorVisible);
-        Assert.True(vm.IsTemplatePresetMessageVisible);
+        Assert.True(vm.IsTemplatePresetMessageError);
     }
 
     /// <summary>
@@ -339,12 +337,14 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         vm.SaveTemplatePresetCommand.Execute(null);
 
         Assert.NotNull(vm.TemplatePresetMessage);
-        Assert.True(vm.IsTemplatePresetMessageVisible);
         Assert.False(vm.IsTemplatePresetMessageError);
-        Assert.True(vm.IsTemplatePresetMessageSuccessVisible);
         Assert.Single(vm.TemplatePresetOptions);
         // 名字保留：紧接着再点「存为预设」应当是覆盖同一条
         Assert.Equal("新预设", vm.TemplatePresetName);
+
+        // 气泡收起后宿主清空消息，下一次同样的消息（值没变）才能再次触发变更通知
+        vm.DismissTemplatePresetMessage();
+        Assert.Null(vm.TemplatePresetMessage);
     }
 
     /// <summary>

@@ -113,29 +113,22 @@
                                                           TargetTextBox="{Binding #FileNameTemplateDialogBox}"
                                                           Content="{Binding FileNameTemplateInsertText}"
                                                           ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
-                        <!-- 可编辑预设名 + 保存/删除图标按钮（无预设时也能打字起名字，因此不再隐藏） -->
+                        <!-- 可编辑预设名 + 保存/删除图标按钮（无预设时也能打字起名字，因此不再隐藏）。
+                             操作结果走控件内的浮层气泡（不占布局，行的位置不会跳动）。 -->
                         <controls:TemplatePresetPicker Grid.Column="3"
                                                        MinWidth="150"
                                                        Presets="{Binding FileNameTemplatePresetOptions}"
                                                        PresetName="{Binding FileNameTemplatePresetNameDialog, Mode=TwoWay}"
                                                        WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                                       Message="{Binding FileNameTemplatePresetMessageDialog}"
+                                                       IsMessageError="{Binding IsFileNameTemplatePresetMessageErrorDialog}"
                                                        Tag="Dialog"
                                                        ToolTip.Tip="{Binding FileNameTemplatePresetHintText}"
                                                        PresetSelected="OnPresetSelected"
                                                        SaveRequested="OnPresetSaveRequested"
-                                                       DeleteRequested="OnPresetDeleteRequested" />
+                                                       DeleteRequested="OnPresetDeleteRequested"
+                                                       MessageDismissed="OnPresetMessageDismissed" />
                       </Grid>
-                      <!-- 行 1 的预设操作提示（超限 / 已保存 / 已更新）；失败红、成功次要色 -->
-                      <TextBlock Text="{Binding FileNameTemplatePresetMessageDialog}"
-                                 IsVisible="{Binding IsFileNameTemplatePresetMessageErrorDialog}"
-                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageDialog}"
-                                 Foreground="{DynamicResource ThemeStatusErrorBrush}" />
-                      <TextBlock Text="{Binding FileNameTemplatePresetMessageDialog}"
-                                 IsVisible="{Binding IsFileNameTemplatePresetMessageSuccessDialog}"
-                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageDialog}"
-                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                       <!-- 行 2：快速压缩默认值 -->
                       <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
                         <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateQuickText}" VerticalAlignment="Center" />
@@ -155,22 +148,15 @@
                                                        Presets="{Binding FileNameTemplatePresetOptions}"
                                                        PresetName="{Binding FileNameTemplatePresetNameQuick, Mode=TwoWay}"
                                                        WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                                       Message="{Binding FileNameTemplatePresetMessageQuick}"
+                                                       IsMessageError="{Binding IsFileNameTemplatePresetMessageErrorQuick}"
                                                        Tag="Quick"
                                                        ToolTip.Tip="{Binding FileNameTemplatePresetHintText}"
                                                        PresetSelected="OnPresetSelected"
                                                        SaveRequested="OnPresetSaveRequested"
-                                                       DeleteRequested="OnPresetDeleteRequested" />
+                                                       DeleteRequested="OnPresetDeleteRequested"
+                                                       MessageDismissed="OnPresetMessageDismissed" />
                       </Grid>
-                      <TextBlock Text="{Binding FileNameTemplatePresetMessageQuick}"
-                                 IsVisible="{Binding IsFileNameTemplatePresetMessageErrorQuick}"
-                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageQuick}"
-                                 Foreground="{DynamicResource ThemeStatusErrorBrush}" />
-                      <TextBlock Text="{Binding FileNameTemplatePresetMessageQuick}"
-                                 IsVisible="{Binding IsFileNameTemplatePresetMessageSuccessQuick}"
-                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageQuick}"
-                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                       <!-- 行 3：分别压缩默认值（若不含 {name}/{seq}/{parent}，多源会撞名，确认时被拦） -->
                       <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
                         <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateSeparateText}" VerticalAlignment="Center" />
@@ -190,22 +176,15 @@
                                                        Presets="{Binding FileNameTemplatePresetOptions}"
                                                        PresetName="{Binding FileNameTemplatePresetNameSeparate, Mode=TwoWay}"
                                                        WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                                       Message="{Binding FileNameTemplatePresetMessageSeparate}"
+                                                       IsMessageError="{Binding IsFileNameTemplatePresetMessageErrorSeparate}"
                                                        Tag="Separate"
                                                        ToolTip.Tip="{Binding FileNameTemplatePresetHintText}"
                                                        PresetSelected="OnPresetSelected"
                                                        SaveRequested="OnPresetSaveRequested"
-                                                       DeleteRequested="OnPresetDeleteRequested" />
+                                                       DeleteRequested="OnPresetDeleteRequested"
+                                                       MessageDismissed="OnPresetMessageDismissed" />
                       </Grid>
-                      <TextBlock Text="{Binding FileNameTemplatePresetMessageSeparate}"
-                                 IsVisible="{Binding IsFileNameTemplatePresetMessageErrorSeparate}"
-                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageSeparate}"
-                                 Foreground="{DynamicResource ThemeStatusErrorBrush}" />
-                      <TextBlock Text="{Binding FileNameTemplatePresetMessageSeparate}"
-                                 IsVisible="{Binding IsFileNameTemplatePresetMessageSuccessSeparate}"
-                                 Margin="150,0,0,0" FontSize="12" TextWrapping="NoWrap" TextTrimming="CharacterEllipsis"
-                                 ToolTip.Tip="{Binding FileNameTemplatePresetMessageSeparate}"
-                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
                     </StackPanel>
                   </Border>
 

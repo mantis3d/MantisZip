@@ -169,6 +169,75 @@ public sealed class TemplatePresetPickerTests
         Assert.Equal(["日期"], fired);
     }
 
+    /// <summary>
+    /// 操作结果走浮层气泡：消息出现时控件高度不变（气泡不进布局流），
+    /// 这是 2026-11-21 用户明确要求的「不要挤出新的一行」。
+    /// </summary>
+    [AvaloniaFact]
+    public void Message_ShowsInPopup_WithoutTakingLayoutSpace()
+    {
+        var (_, picker) = Show(presetName: "新预设");
+        var before = picker.Bounds.Height;
+
+        picker.Message = "已保存预设 新预设。";
+        Pump();
+
+        Assert.True(picker.IsMessagePopupOpen);
+        Assert.Equal(before, picker.Bounds.Height);
+    }
+
+    /// <summary>成功消息到点后自动收起，并回调宿主清空消息属性。</summary>
+    [AvaloniaFact]
+    public void SuccessMessage_ClosesItself_AndAsksHostToClearIt()
+    {
+        var (_, picker) = Show(presetName: "新预设");
+        var dismissed = 0;
+        picker.MessageDismissed += (_, _) => dismissed++;
+
+        picker.Message = "已保存预设 新预设。";
+        picker.IsMessageError = false;
+        Pump();
+        Assert.True(picker.IsMessagePopupOpen);
+
+        // 无头测试里 DispatcherTimer 不自行到期，直接驱动「到期」这一步：
+        // 验证的是到期之后的行为（收气泡 + 回调宿主），1.6s 的计时本身靠人工验证。
+        picker.DismissMessageNow();
+        Pump();
+
+        Assert.False(picker.IsMessagePopupOpen);
+        Assert.Equal(1, dismissed);
+    }
+
+    /// <summary>失败消息常驻：用户必须读到「为什么存不上」，不能一闪而过。</summary>
+    [AvaloniaFact]
+    public void ErrorMessage_StaysUntilHostClearsIt()
+    {
+        var (_, picker) = Show(presetName: "新预设");
+        var dismissed = 0;
+        picker.MessageDismissed += (_, _) => dismissed++;
+
+        picker.Message = "预设最多 20 条，删掉一条再存。";
+        picker.IsMessageError = true;
+        Pump();
+        Assert.True(picker.IsMessagePopupOpen);
+
+        // 失败态不启动自动收起计时器：等再久也要留着
+        Wait(120);
+        Assert.True(picker.IsMessagePopupOpen);
+        Assert.Equal(0, dismissed);
+
+        picker.Message = null;
+        Pump();
+        Assert.False(picker.IsMessagePopupOpen);
+    }
+
+    /// <summary>等一小段真实时间（不依赖定时器回调，只让 UI 线程喘口气并泵一次消息）。</summary>
+    private static void Wait(int milliseconds)
+    {
+        System.Threading.Thread.Sleep(milliseconds);
+        Pump();
+    }
+
     private static (Window Window, TemplatePresetPicker Picker) Show(string? presetName)
     {
         var app = Application.Current ?? new Application();

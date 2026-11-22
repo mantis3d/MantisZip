@@ -362,6 +362,10 @@ public partial class CompressSettingsWindow : Window
         ViewModel.DeleteTemplatePresetCommand.Execute(null);
     }
 
+    /// <summary>预设消息气泡 1.6s 自动收起后回调：清空消息，让下次同样的消息还能重新弹出。</summary>
+    private void OnTemplatePresetMessageDismissed(object? sender, EventArgs e)
+        => ViewModel.DismissTemplatePresetMessage();
+
     private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
         // 切换 Tab 后窗口高度可能变化，等布局完成后再检查位置
