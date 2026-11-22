@@ -56,6 +56,11 @@
     <AvaloniaResource Remove="Resources\Defaults\**" />
     <EmbeddedResource Include="Resources\Defaults\metadata-panel.json"
                       LogicalName="MantisZip.UI.Avalonia.Resources.Defaults.metadata-panel.json" />
+    <!-- 出厂默认设置（2026-11-22）：整份 AppSettings 快照，设置文件缺失/损坏且备份也读不出时作为
+         默认值来源。维护方式 = 直接改这个 json（改完重新 build 即生效），新增的 C# 属性在 json 里
+         缺项时自动保留字段初值，不需要合并逻辑。同样从 Resources\** 通配里排除并按固定资源名嵌入。 -->
+    <EmbeddedResource Include="Resources\Defaults\settings.json"
+                      LogicalName="MantisZip.UI.Avalonia.Resources.Defaults.settings.json" />
     <!-- .axaml 交给 Avalonia XamlIl 预编译（生成 .g.cs）。先 Remove 清掉包内默认 glob 收集的条目
          （默认 glob 带 Exclude/SubType 元数据，与自定义 Include pattern 不同不会去重，会导致
          AVLN2002 duplicate x:Class），再按本规则重新 Include；Resources\** 下的 axaml

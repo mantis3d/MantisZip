@@ -461,6 +461,8 @@ using var sandbox = new AppSettingsTestSandbox();   // tests/MantisZip.UI.Avalon
 
 它把 Load/Save 的落点改到一次性临时目录并在 `Dispose` 恢复（底层是 `AppSettings.UseIsolatedSettingsFileForTests(path)`，经 `InternalsVisibleTo` 暴露）。**禁止**在测试里直接 `File.Copy` / `File.Delete` 真实 settings.json，也不要断言真实文件的时间戳或内容。
 
+**程序集级安全网（2026-11-22 加）**：`tests/MantisZip.UI.Avalonia.Tests/AppSettingsTestRedirect.cs` 用 `[ModuleInitializer]` 在程序集加载期就把落点重定向到一次性目录、进程退出时删除，句柄刻意不释放。原因见事故：UI 测试里有十几处「只 new 一个窗口/VM，`OnClosed` 里就落盘」的用例（`CompressSettingsWindow.PersistGeometry` / `ExtractSettingsWindow.PersistGeometry` / `ProgressWindow.OnClosed` / `MainWindowViewModel.SaveSetting` …）从来没写沙箱；一次全量 ui-tests 的 `SaveTo` 共 79 次，**42 次直接写进真实 `%LOCALAPPDATA%\MantisZip\settings.json`**，其中 35 次写的是「模板空、预设空」的裸实例 —— 用户保存的命名预设就这么被冲掉了。所以「谁需要谁自己 using」不够：漏掉的用例必须失败在明处。这层只保证「漏了沙箱」不会污染用户磁盘，**需要精确控制设置内容的用例仍要自己 `using var sandbox = ...`**（在安全网之上再重定向、退出还原）。
+
 ### 规则 25：无头测试宿主的样式前提——要复现真机缺陷必须自带样式
 
 `tests/MantisZip.UI.Avalonia.Tests/TestAppBuilder.cs` 用 `AppBuilder.Configure<Application>()`：**不跑 `App.Initialize()`、默认没有任何全局样式**（`App.axaml` 的 `Styles` 一条都不在）。于是依赖 `Style` / `ControlTheme` 才成立的缺陷（例：`ComboBox` 可编辑态边框被模板覆盖、`Button` 没有模板导致点了没反应）在无头测试里**完全复现不出来**，测试照旧全绿。

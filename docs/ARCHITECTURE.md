@@ -688,6 +688,12 @@ private bool _optionA;
 
 `AppSettings` singleton 存在于 `MantisZip.UI.Avalonia/Models/AppSettings.cs`，序列化到 `%LOCALAPPDATA%\MantisZip\settings.json`（进程级缓存，见 `Load()`/`Save()` 静态缓存）。
 
+**出厂默认值 = 内嵌 JSON 快照**（2026-11-22）：`Resources/Defaults/settings.json`（117 键，`EmbeddedResource` + 固定 `LogicalName`）是设置文件**不存在**、或损坏且 `.bak` 也读不出时的默认值来源 —— `CreateWithDefaults()` = `LoadDefaultSettingsTemplate() ?? CreateBuiltInDefaults()` → `ApplyInstallChoices()` → `ApplyMigrations()`。缺键自动保留 C# 字段初值，所以**没有 merge 逻辑，改默认值就直接改这个 json、重新 build 即生效**。代码里的 `CreateBuiltInDefaults()` 只是「快照资源都读不出来」的兜底，两边核心语义（自适应默认规则 + `{name:auto}` + 两条命名预设）必须一致，由 `tests/MantisZip.UI.Avalonia.Tests/AppSettingsDefaultSettingsJsonTests.cs` 钉住（另含「json 里每个键都得对得上真实属性」的体检）。
+
+安装器不再预置 `settings.json`（原 `installer/prebuilt/settings.json` 已删——它缺 `FileNameTemplate*`、留着 5 个已删键和十余处过期默认值，与代码事实源必然漂移；`prebuilt/window.json` 保留，走 `WindowStateManager` 另一条线）。向导里选的语言/主题改为写一次性 `install-choices.json`（与 `settings.json` 同目录），应用首启 `ApplyInstallChoices()` 读一次覆盖 `Language`/`Theme` 后立即删除；已有 `settings.json` 时不读。
+
+**测试必须重定向落点**：真实路径由静态构造决定 + `_cached` 是进程级缓存，所以测试读写真文件会带走用户设置、也会跨用例串状态。单用例用 `using var sandbox = new AppSettingsTestSandbox();`；程序集级还有 `tests/MantisZip.UI.Avalonia.Tests/AppSettingsTestRedirect.cs`（`[ModuleInitializer]`）兜住「忘写沙箱」的用例（详见 AGENTS.md 规则 24）。
+
 设置包含以下分类：
 - **压缩**：DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipMultithreaded, SevenZipEncryptHeaders
 - **分卷**：SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB

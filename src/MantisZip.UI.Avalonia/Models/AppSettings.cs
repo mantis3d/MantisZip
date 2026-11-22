@@ -797,20 +797,133 @@ public class AppSettings
         }
     }
 
-    /// <summary>创建带默认自适应规则的新实例。</summary>
+    /// <summary>
+    /// 出厂默认设置的嵌入资源名（见 csproj 的 <c>LogicalName</c>）。
+    /// 内容是**整份 AppSettings 快照**，维护方式就是直接改
+    /// <c>src/MantisZip.UI.Avalonia/Resources/Defaults/settings.json</c>：新增的 C# 属性在 json 里
+    /// 缺项时自动保留字段初值（反序列化语义），不需要任何合并逻辑。
+    /// </summary>
+    internal const string DefaultSettingsResourceName =
+        "MantisZip.UI.Avalonia.Resources.Defaults.settings.json";
+
+    /// <summary>
+    /// 安装器写入的一次性「向导选择」文件名：内含 <c>Language</c> / <c>Theme</c> 两个键。
+    /// 应用首启读一次即删除，之后一切以 settings.json 为准。
+    /// </summary>
+    private const string InstallChoicesFileName = "install-choices.json";
+
+    /// <summary>
+    /// 创建出厂默认实例：优先读内嵌的默认设置快照
+    /// （<see cref="DefaultSettingsResourceName"/>），再套用安装器的一次性向导选择。
+    /// 内嵌资源缺失/损坏时回落到代码里写的最小默认值，保证「读不出默认」不会让功能不可用。
+    /// </summary>
     private static AppSettings CreateWithDefaults()
+    {
+        var settings = LoadDefaultSettingsTemplate() ?? CreateBuiltInDefaults();
+        ApplyInstallChoices(settings);
+        ApplyMigrations(settings);
+        return settings;
+    }
+
+    /// <summary>
+    /// 代码里的最小默认值（内嵌快照读不出来时的兜底）。内容必须与
+    /// <c>Resources/Defaults/settings.json</c> 的核心语义一致：默认自适应规则 + 出厂命名模板与两条预设。
+    /// 预设名是**用户可编辑的数据**，不是界面文案，故不走 i18n（规则 13 的内容数据豁免）。
+    /// </summary>
+    private static AppSettings CreateBuiltInDefaults()
     {
         var settings = new AppSettings();
         settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
-
-        // 出厂默认命名（2026-11-22）：新装即带上「按源名命名」与两条常用预设，
-        // 避免用户第一次打开压缩对话框时模板、预设全空。只在设置文件**不存在**时生效，
-        // 已有 settings.json 的用户不受影响（也不会覆盖用户主动清空的模板）。
-        // 预设名是**用户可编辑的数据**，不是界面文案，故不走 i18n（规则 13 的内容数据豁免）。
         settings.FileNameTemplateDialog = "{name:auto}";
         settings.FileNameTemplatePresets.Add(new FileNameTemplatePreset("Auto Name", "{name:auto}"));
         settings.FileNameTemplatePresets.Add(new FileNameTemplatePreset("Name & Date", "{name:auto}-{date}"));
         return settings;
+    }
+
+    /// <summary>
+    /// 读取内嵌的默认设置快照。读不出来（资源缺失、JSON 损坏）返回 <c>null</c>，由调用方回落代码默认值。
+    /// </summary>
+    private static AppSettings? LoadDefaultSettingsTemplate()
+    {
+        try
+        {
+            using var stream = typeof(AppSettings).Assembly.GetManifestResourceStream(DefaultSettingsResourceName);
+            if (stream is null)
+            {
+                LogDefaultsFallback("embedded resource missing");
+                return null;
+            }
+
+            using var reader = new StreamReader(stream);
+            var parsed = JsonSerializer.Deserialize(reader.ReadToEnd(), AppSettingsJsonContext.Default.AppSettings);
+            if (parsed is null)
+            {
+                LogDefaultsFallback("embedded resource deserialized to null");
+                return null;
+            }
+
+            return parsed;
+        }
+        catch (Exception ex)
+        {
+            LogDefaultsFallback($"{ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 套用安装器写入的一次性向导选择（语言 / 主题）并删除该文件。
+    /// 为什么单独走一个文件而不是让安装器直接写 settings.json：settings.json 只能有**一个**事实源
+    /// （内嵌快照），否则安装器里那份会常年落后于代码、并把出厂默认覆盖成旧值。
+    /// 读不到/解析失败都当没有，不影响首启。
+    /// </summary>
+    private static void ApplyInstallChoices(AppSettings settings)
+    {
+        try
+        {
+            var dir = IsPortableMode ? DataDir : Path.GetDirectoryName(EffectiveSettingsFile) ?? DataDir;
+            var path = Path.Combine(dir, InstallChoicesFileName);
+            if (!File.Exists(path)) return;
+
+            var json = File.ReadAllText(path);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("Language", out var language) && language.ValueKind == JsonValueKind.String)
+            {
+                var code = language.GetString();
+                if (!string.IsNullOrWhiteSpace(code)) settings.Language = code;
+            }
+
+            if (root.TryGetProperty("Theme", out var theme) && theme.ValueKind == JsonValueKind.String)
+            {
+                var value = theme.GetString();
+                if (!string.IsNullOrWhiteSpace(value)) settings.Theme = value;
+            }
+
+            TryDeleteInstallChoices(path);
+        }
+        catch
+        {
+            // 向导选择只是锦上添花：解析失败就当用户没选，绝不因此让首启失败
+        }
+    }
+
+    private static void TryDeleteInstallChoices(string path)
+    {
+        try { File.Delete(path); } catch { /* 删不掉下次还会再套一次，同值无副作用 */ }
+    }
+
+    private static void LogDefaultsFallback(string reason)
+    {
+        try
+        {
+            Services.LifetimeDiagnostics.Log($"default settings fallback to built-in defaults reason='{OneLine(reason)}'");
+        }
+        catch
+        {
+            // 日志写不了不影响默认值生成
+        }
     }
 
     /// <summary>
