@@ -103,9 +103,6 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private int _updateFrequencyIndex = 2;
 
-    [ObservableProperty]
-    private bool _keepOriginalExtension;
-
     /// <summary>压缩完成后打开输出所在目录（与解压端 <see cref="OpenFolderAfterExtract"/> 对称）。</summary>
     [ObservableProperty]
     private bool _openFolderAfterCompress;
@@ -954,7 +951,6 @@ public partial class SettingsWindowViewModel : ObservableObject
     // Compress strings
     public string DefaultFormatText => LocalizationManager.T("Settings_DefaultFormat");
     public string CompressionLevelText => LocalizationManager.T("Settings_CompressionLevel");
-    public string KeepOriginalExtensionText => LocalizationManager.T("Settings_Compress_KeepExt");
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
     public string CompressOpenFolderAfterText => LocalizationManager.T("Settings_Compress_OpenFolderAfter");
     public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
@@ -1440,7 +1436,6 @@ public partial class SettingsWindowViewModel : ObservableObject
             UpdateCheckFrequencyNames.Parse(_settings.UpdateCheckFrequency));
 
         // Compress (additional)
-        _keepOriginalExtension = _settings.KeepOriginalExtension;
         _openFolderAfterCompress = _settings.OpenFolderAfterCompress;
         _compressFileConflictAction = _settings.CompressFileConflictAction;
 
@@ -1904,7 +1899,6 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         OnPropertyChanged(nameof(DefaultFormatText));
         OnPropertyChanged(nameof(CompressionLevelText));
-        OnPropertyChanged(nameof(KeepOriginalExtensionText));
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
         OnPropertyChanged(nameof(CompressOpenFolderAfterText));
         OnPropertyChanged(nameof(CompressOptionsText));
@@ -2103,7 +2097,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compress
         _settings.DefaultFormat = SelectedDefaultFormatOption?.Value ?? DefaultFormat;
         _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
-        _settings.KeepOriginalExtension = KeepOriginalExtension;
         _settings.OpenFolderAfterCompress = OpenFolderAfterCompress;
         _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
 

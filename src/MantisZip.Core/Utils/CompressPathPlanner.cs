@@ -12,13 +12,14 @@ namespace MantisZip.Core.Utils;
 /// （CompressService）均消费本类，杜绝两侧各算一套导致的路径漂移。
 ///
 /// 语义（与历史实现逐字一致，仅收敛为单一实现）：
-/// - 目录源：用完整目录名（忽略 keepOriginalExt）
-/// - 文件源：keepOriginalExt 为 true 保留扩展名，否则去掉
+/// - 目录源：用完整目录名
+/// - 文件源：用主名（**恒去扩展名**）
 /// - 扩展名：tar.gz 双段，其余单段
 ///
 /// 文件名模板（2026-11-11 起）：所有命名入口都能带一个可选 <c>template</c>。
-/// 模板非空且渲染成功 ⇒ 用它渲染的主名 + 格式扩展名（**忽略 keepOriginalExt**，
-/// 要保留原扩展名请写 <c>{ext}</c>）；模板为空或渲染失败 ⇒ 一律回退上面的旧逻辑。
+/// 模板非空且渲染成功 ⇒ 用它渲染的主名 + 格式扩展名；模板为空或渲染失败 ⇒ 一律回退上面的旧逻辑。
+/// 要保留源的原始扩展名，在模板里写 <c>{ext}</c>（2026-11-22 删掉了原来的全局「保留源扩展名」开关，
+/// 它名义全局、实际只作用于分别压缩，语义与 <c>{ext}</c> 重复）。
 /// 渲染失败静默回退是刻意的：预览树不能因为用户正在敲半截 <c>{na</c> 就崩/空，
 /// 错误提示由调用方（VM）单独显示。
 /// </summary>
@@ -130,21 +131,20 @@ public static class CompressPathPlanner
     /// <param name="timestamp">批次时间戳（<c>{date}</c>/<c>{datetime}</c> 用）；null = 当前时刻。</param>
     /// <param name="autoName"><c>{name:auto}</c> 的取值；null/空 = 与 <c>{name}</c> 相同。</param>
     public static string ComputeArchiveName(
-        string sourcePath, string format, bool keepOriginalExt,
+        string sourcePath, string format,
         string? template = null, int sequence = 1, DateTime? timestamp = null,
         string? autoName = null)
     {
         if (TryRenderBaseName(sourcePath, template, sequence, timestamp, autoName, out var baseName))
             return baseName + GetFormatExtension(format);
 
-        // 旧逻辑原样保留（模板为空、或渲染失败时的兜底）
+        // 旧逻辑原样保留（模板为空、或渲染失败时的兜底）：主名恒去扩展名，
+        // 要保留源的原始扩展名请在模板里写 {ext}
         string legacyBaseName;
         if (Directory.Exists(sourcePath))
             legacyBaseName = Path.GetFileName(sourcePath.TrimEnd(Path.DirectorySeparatorChar, Path.AltDirectorySeparatorChar));
         else
-            legacyBaseName = keepOriginalExt
-                ? Path.GetFileName(sourcePath)
-                : Path.GetFileNameWithoutExtension(sourcePath);
+            legacyBaseName = Path.GetFileNameWithoutExtension(sourcePath);
 
         return legacyBaseName + GetFormatExtension(format);
     }
@@ -153,7 +153,7 @@ public static class CompressPathPlanner
     /// 计算输出路径（源 → 目标压缩包绝对路径）。目录源去尾分隔符再取父目录。
     /// </summary>
     public static string ComputeOutputPath(
-        string sourcePath, string format, bool keepOriginalExt,
+        string sourcePath, string format,
         string? template = null, int sequence = 1, DateTime? timestamp = null,
         string? autoName = null)
     {
@@ -170,7 +170,7 @@ public static class CompressPathPlanner
 
         return Path.Combine(
             parent,
-            ComputeArchiveName(sourcePath, format, keepOriginalExt, template, sequence, timestamp, autoName));
+            ComputeArchiveName(sourcePath, format, template, sequence, timestamp, autoName));
     }
 
     /// <summary>
@@ -213,7 +213,7 @@ public static class CompressPathPlanner
     /// 模板里的 <c>{seq}</c> 取「源在列表中的 1 基下标」；每个包只含 1 个源 ⇒ <c>{name:auto}</c> 恒等于 <c>{name}</c>。
     /// </summary>
     public static IReadOnlyList<CompressPlanItem> PlanSeparate(
-        IReadOnlyList<string> sourcePaths, string format, bool keepOriginalExt,
+        IReadOnlyList<string> sourcePaths, string format,
         string? template = null, DateTime? timestamp = null)
     {
         var list = new List<CompressPlanItem>(sourcePaths.Count);
@@ -223,7 +223,7 @@ public static class CompressPathPlanner
             list.Add(new CompressPlanItem(
                 SourcePath: p,
                 OutputArchivePath: ComputeOutputPath(
-                    p, format, keepOriginalExt, template, sequence: i + 1, timestamp: timestamp),
+                    p, format, template, sequence: i + 1, timestamp: timestamp),
                 IncludedFiles: null));
         }
         return list;

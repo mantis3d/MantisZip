@@ -69,7 +69,7 @@ public sealed class CompressConflictDefaultActionTests : IDisposable
 
         var (_, plan) = ResultPreviewService.AssembleCompressPreview(
             [source], [subtree], CompressOutputMode.Manual, output, "zip",
-            keepOriginalExtension: true, filter: null);
+            filter: null);
 
         // 计划输出路径必须就是用户填的那个（已存在）路径，否则冲突检测永远不触发 → 策略「不起作用」
         Assert.Single(plan.Items);

@@ -17,7 +17,6 @@ public class AppSettings
     // ===== 压缩 =====
     public string DefaultFormat { get; set; } = "zip";
     public int DefaultLevel { get; set; } = 5;
-    public bool KeepOriginalExtension { get; set; } = false;
     public string ZipEncoding { get; set; } = "utf-8";
 
     /// <summary>
@@ -571,7 +570,10 @@ public class AppSettings
         }
 
         LogSettingsRecovery(quarantined, error, backupError, restored != null);
-        return (restored ?? new AppSettings(), false);
+        // 主文件坏、备份也读不出来 ⇒ 用户手上已经没有设置，等同首装：
+        // 走 CreateWithDefaults 而不是裸 new AppSettings()，否则「设置丢了」会连带
+        // 把出厂默认模板与预设一起丢掉，用户看到的是全空白（与全新安装不一致）。
+        return (restored ?? CreateWithDefaults(), false);
     }
 
     /// <summary>
@@ -800,6 +802,14 @@ public class AppSettings
     {
         var settings = new AppSettings();
         settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+
+        // 出厂默认命名（2026-11-22）：新装即带上「按源名命名」与两条常用预设，
+        // 避免用户第一次打开压缩对话框时模板、预设全空。只在设置文件**不存在**时生效，
+        // 已有 settings.json 的用户不受影响（也不会覆盖用户主动清空的模板）。
+        // 预设名是**用户可编辑的数据**，不是界面文案，故不走 i18n（规则 13 的内容数据豁免）。
+        settings.FileNameTemplateDialog = "{name:auto}";
+        settings.FileNameTemplatePresets.Add(new FileNameTemplatePreset("Auto Name", "{name:auto}"));
+        settings.FileNameTemplatePresets.Add(new FileNameTemplatePreset("Name & Date", "{name:auto}-{date}"));
         return settings;
     }
 

@@ -202,7 +202,6 @@ public sealed class CompressOpenFolderAfterTests : IDisposable
             SevenZipMultithreaded: false,
             SevenZipEncryptHeaders: false,
             FileNameEncoding: "utf-8",
-            KeepOriginalExtension: false,
             AdaptiveCompression: false,
             AdaptiveSmartDetect: false);
 

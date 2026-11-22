@@ -273,7 +273,7 @@ public class CompressPreviewProgressiveTests : IDisposable
         var (root2, plan2) = ResultPreviewService.AssembleCompressPreview(
             paths, subtrees, Core.Abstractions.CompressOutputMode.Manual,
             outputPath: Path.Combine(_rootDir, "out.zip"),
-            format: "zip", keepOriginalExtension: false, filter: null);
+            format: "zip", filter: null);
 
         // 结构等价：root 子节点数相同
         Assert.Equal(root1.Children.Count, root2.Children.Count);

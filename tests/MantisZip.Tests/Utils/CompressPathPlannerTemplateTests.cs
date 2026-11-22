@@ -8,7 +8,8 @@ namespace MantisZip.Tests.Utils;
 
 /// <summary>
 /// CompressPathPlanner 的模板接入。
-/// 核心不变量：模板为空时行为与引入前**逐字节一致**（零回归），模板非空时忽略 keepOriginalExt。
+/// 核心不变量：模板为空时行为与引入前**逐字节一致**（零回归，文件源恒去扩展名），
+/// 模板非空时由模板决定主名（要保留源扩展名就写 {ext}）。
 /// </summary>
 public class CompressPathPlannerTemplateTests
 {
@@ -19,19 +20,18 @@ public class CompressPathPlannerTemplateTests
     // ════════════════════════════════════════════════════════════════
 
     [Theory]
-    [InlineData(@"D:\work\report.txt", "zip", false, "report.zip")]
-    [InlineData(@"D:\work\report.txt", "zip", true, "report.txt.zip")]
-    [InlineData(@"D:\work\report.txt", "7z", false, "report.7z")]
-    [InlineData(@"D:\work\report.txt", "tar.gz", false, "report.tar.gz")]
+    [InlineData(@"D:\work\report.txt", "zip", "report.zip")]
+    [InlineData(@"D:\work\report.txt", "7z", "report.7z")]
+    [InlineData(@"D:\work\report.txt", "tar.gz", "report.tar.gz")]
     public void ComputeArchiveName_NoTemplate_MatchesLegacyBehavior(
-        string source, string format, bool keepOriginalExt, string expected)
+        string source, string format, string expected)
     {
-        Assert.Equal(expected, CompressPathPlanner.ComputeArchiveName(source, format, keepOriginalExt));
+        Assert.Equal(expected, CompressPathPlanner.ComputeArchiveName(source, format));
         // 显式传 null / 空白也应等价
         Assert.Equal(expected, CompressPathPlanner.ComputeArchiveName(
-            source, format, keepOriginalExt, template: null));
+            source, format, template: null));
         Assert.Equal(expected, CompressPathPlanner.ComputeArchiveName(
-            source, format, keepOriginalExt, template: "   "));
+            source, format, template: "   "));
     }
 
     [Fact]
@@ -40,7 +40,7 @@ public class CompressPathPlannerTemplateTests
         // 半截模板（用户正在打字）不能崩，也不能改变命名
         Assert.Equal(
             "report.zip",
-            CompressPathPlanner.ComputeArchiveName(@"D:\work\report.txt", "zip", false, template: "{na"));
+            CompressPathPlanner.ComputeArchiveName(@"D:\work\report.txt", "zip", template: "{na"));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -53,20 +53,15 @@ public class CompressPathPlannerTemplateTests
         Assert.Equal(
             "report_2026-11-06.zip",
             CompressPathPlanner.ComputeArchiveName(
-                @"D:\work\report.txt", "zip", false, template: "{name}_{date}", timestamp: Stamp));
+                @"D:\work\report.txt", "zip", template: "{name}_{date}", timestamp: Stamp));
     }
 
     [Fact]
-    public void ComputeArchiveName_Template_IgnoresKeepOriginalExt()
+    public void ComputeArchiveName_NoTemplate_FileSourceAlwaysDropsExtension()
     {
-        // 模板非空时 keepOriginalExt 不再参与命名
-        var withFlag = CompressPathPlanner.ComputeArchiveName(
-            @"D:\work\report.txt", "zip", true, template: "{name}", timestamp: Stamp);
-        var withoutFlag = CompressPathPlanner.ComputeArchiveName(
-            @"D:\work\report.txt", "zip", false, template: "{name}", timestamp: Stamp);
-
-        Assert.Equal("report.zip", withFlag);
-        Assert.Equal(withFlag, withoutFlag);
+        // 2026-11-22 删掉了「保留源扩展名」开关：文件源的主名恒去扩展名，
+        // 要保留只能在模板里写 {ext}。这里钉住「没有别的地方能把它加回来」。
+        Assert.Equal("report.zip", CompressPathPlanner.ComputeArchiveName(@"D:\work\report.txt", "zip"));
     }
 
     [Fact]
@@ -75,7 +70,7 @@ public class CompressPathPlannerTemplateTests
         Assert.Equal(
             "report.txt.zip",
             CompressPathPlanner.ComputeArchiveName(
-                @"D:\work\report.txt", "zip", false, template: "{name}{ext}", timestamp: Stamp));
+                @"D:\work\report.txt", "zip", template: "{name}{ext}", timestamp: Stamp));
     }
 
     [Fact]
@@ -84,7 +79,7 @@ public class CompressPathPlannerTemplateTests
         Assert.Equal(
             "report_2026-11-06.tar.gz",
             CompressPathPlanner.ComputeArchiveName(
-                @"D:\work\report.txt", "tar.gz", false, template: "{name}_{date}", timestamp: Stamp));
+                @"D:\work\report.txt", "tar.gz", template: "{name}_{date}", timestamp: Stamp));
     }
 
     [Fact]
@@ -93,7 +88,7 @@ public class CompressPathPlannerTemplateTests
         Assert.Equal(
             "report_0002.zip",
             CompressPathPlanner.ComputeArchiveName(
-                @"D:\work\report.txt", "zip", false, template: "{name}_{seq:0000}",
+                @"D:\work\report.txt", "zip", template: "{name}_{seq:0000}",
                 sequence: 2, timestamp: Stamp));
     }
 
@@ -103,7 +98,7 @@ public class CompressPathPlannerTemplateTests
         Assert.Equal(
             "项目A.zip",
             CompressPathPlanner.ComputeArchiveName(
-                @"D:\work\report.txt", "zip", false, template: "{name:auto}",
+                @"D:\work\report.txt", "zip", template: "{name:auto}",
                 timestamp: Stamp, autoName: "项目A"));
     }
 
@@ -115,7 +110,7 @@ public class CompressPathPlannerTemplateTests
     public void ComputeOutputPath_Template_KeepsSourceDirectory()
     {
         var result = CompressPathPlanner.ComputeOutputPath(
-            @"D:\work\report.txt", "zip", false, template: "{name}_{date}", timestamp: Stamp);
+            @"D:\work\report.txt", "zip", template: "{name}_{date}", timestamp: Stamp);
 
         Assert.Equal(@"D:\work\report_2026-11-06.zip", result);
     }
@@ -125,7 +120,7 @@ public class CompressPathPlannerTemplateTests
     {
         Assert.Equal(
             @"D:\work\report.zip",
-            CompressPathPlanner.ComputeOutputPath(@"D:\work\report.txt", "zip", false));
+            CompressPathPlanner.ComputeOutputPath(@"D:\work\report.txt", "zip"));
     }
 
     // ════════════════════════════════════════════════════════════════
@@ -136,7 +131,7 @@ public class CompressPathPlannerTemplateTests
     public void PlanSeparate_NoTemplate_MatchesLegacyBehavior()
     {
         var sources = new[] { @"D:\a\x.txt", @"D:\a\y.txt" };
-        var plan = CompressPathPlanner.PlanSeparate(sources, "zip", false);
+        var plan = CompressPathPlanner.PlanSeparate(sources, "zip");
 
         Assert.Equal(2, plan.Count);
         Assert.Equal(@"D:\a\x.zip", plan[0].OutputArchivePath);
@@ -148,7 +143,7 @@ public class CompressPathPlannerTemplateTests
     {
         var sources = new[] { @"D:\a\x.txt", @"D:\a\y.txt", @"D:\b\z.txt" };
         var plan = CompressPathPlanner.PlanSeparate(
-            sources, "zip", false, template: "{name}_{seq:0000}", timestamp: Stamp);
+            sources, "zip", template: "{name}_{seq:0000}", timestamp: Stamp);
 
         Assert.Equal(@"D:\a\x_0001.zip", plan[0].OutputArchivePath);
         Assert.Equal(@"D:\a\y_0002.zip", plan[1].OutputArchivePath);
@@ -160,7 +155,7 @@ public class CompressPathPlannerTemplateTests
     {
         var sources = new[] { @"D:\a\x.txt", @"D:\a\y.txt" };
         var withAuto = CompressPathPlanner.PlanSeparate(
-            sources, "zip", false, template: "{name:auto}", timestamp: Stamp);
+            sources, "zip", template: "{name:auto}", timestamp: Stamp);
 
         Assert.Equal(@"D:\a\x.zip", withAuto[0].OutputArchivePath);
         Assert.Equal(@"D:\a\y.zip", withAuto[1].OutputArchivePath);

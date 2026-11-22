@@ -47,12 +47,9 @@ public class CompressRequest
     /// <summary>Manual 模式：由调用方预计算的输出路径</summary>
     public string? OutputPath { get; init; }
 
-    /// <summary>Separate 模式：是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）</summary>
-    public bool KeepOriginalExtension { get; init; }
-
     /// <summary>
     /// 文件名模板（占位符形式，如 <c>{name}_{date}</c>）。null/空白 = 未启用（走旧命名）。
-    /// 启用时**忽略 <see cref="KeepOriginalExtension"/>**，要保留原扩展名请在模板里写 <c>{ext}</c>。
+    /// 要保留源的原始扩展名，在模板里写 <c>{ext}</c>。
     /// 有 <see cref="Plan"/> 时模板不参与执行（路径以 B 为准），但仍需照传：CLI 的
     /// <c>--compress-separate</c> 靠它把命名规则带到无预览的路径上。
     /// </summary>
@@ -436,13 +433,13 @@ public static class CompressService
 
     /// <summary>
     /// Separate 模式：为单个源文件计算输出路径。
-    /// 唯一实现收敛到 <see cref="CompressPathPlanner"/>（目录源用完整目录名，忽略 keepOriginalExt）。
+    /// 唯一实现收敛到 <see cref="CompressPathPlanner"/>（目录源用完整目录名，文件源恒去扩展名）。
     /// 仅无 B 数据集时（如 CLI）退化使用；有 B 时路径一律取 B 的 OutputArchivePath。
     /// <paramref name="sequence"/> 是 1 基序号，供模板的 <c>{seq}</c> 使用。
     /// </summary>
     private static string ComputeSeparateOutputPath(CompressRequest request, string sourcePath, int sequence)
         => CompressPathPlanner.ComputeOutputPath(
-            sourcePath, request.Format, request.KeepOriginalExtension,
+            sourcePath, request.Format,
             request.FileNameTemplate, sequence, request.TemplateTimestamp);
 
     /// <summary>

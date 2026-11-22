@@ -312,7 +312,6 @@ public sealed class CompressSession : ICompressSession
             },
             SplitSize = settings.SplitSizeBytes,
             PreserveDirectoryRoot = appSettings.PreserveDirectoryRoot,
-            KeepOriginalExtension = settings.EngineOptions.KeepOriginalExtension,
             FileNameEncoding = settings.EngineOptions.FileNameEncoding,
             ZipCompressionMethod = settings.EngineOptions.ZipCompressionMethod,
             ZipEncryptionMethod = settings.EngineOptions.ZipEncryptionMethod,

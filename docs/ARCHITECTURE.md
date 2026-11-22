@@ -689,7 +689,7 @@ private bool _optionA;
 `AppSettings` singleton 存在于 `MantisZip.UI.Avalonia/Models/AppSettings.cs`，序列化到 `%LOCALAPPDATA%\MantisZip\settings.json`（进程级缓存，见 `Load()`/`Save()` 静态缓存）。
 
 设置包含以下分类：
-- **压缩**：DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipMultithreaded, SevenZipEncryptHeaders
+- **压缩**：DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipMultithreaded, SevenZipEncryptHeaders
 - **分卷**：SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB
 - **解压**：ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
 - **解压扩展**：EnableDragExtract, ExtractPreserveFullPath

@@ -94,10 +94,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _defaultFormat = "zip";
 
-    /// <summary>Separate 模式下是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）。</summary>
-    [ObservableProperty]
-    private bool _keepOriginalExtension;
-
     /// <summary>本次压缩成功后打开输出所在目录并选中产物（初值镜像设置，不回写；进度窗口底部还能临时改）。</summary>
     [ObservableProperty]
     private bool _openFolderAfterCompress;
@@ -748,7 +744,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         try
         {
             var settings = AppSettings.Load();
-            KeepOriginalExtension = settings.KeepOriginalExtension;
             OpenFolderAfterCompress = settings.OpenFolderAfterCompress;
             FileNameEncoding = settings.ZipEncoding ?? "utf-8";
             ZipCompressionMethod = settings.ZipCompressionMethod ?? "deflate";
@@ -851,7 +846,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         var outputMode = OutputMode;
         var outputPath = OutputPath;
         var format = DefaultFormat;
-        var keepOriginalExtension = KeepOriginalExtension;
 
         // 过滤签名变化 → 整表失效；源集变化 → 清理已移除源的缓存
         var sig = FilterSignature(filter);
@@ -884,7 +878,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             await shallowTask;
             if (version != _previewBuildVersion) return null;
 
-            var assembled = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+            var assembled = await AssembleAsync(paths, outputMode, outputPath, format, filter, ct);
             if (version != _previewBuildVersion) return null;
             PreviewRoot = assembled.Root;
             IsPreviewBuilding = false;
@@ -918,7 +912,7 @@ public partial class CompressSettingsViewModel : ObservableObject
                 if ((DateTime.UtcNow - _lastProgressiveAssemble).TotalMilliseconds < ProgressiveAssembleIntervalMs) return;
                 try
                 {
-                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, filter, ct);
                     if (version != _previewBuildVersion) return;
                     PreviewRoot = progressive.Root;
                     _lastProgressiveAssemble = DateTime.UtcNow;
@@ -950,7 +944,7 @@ public partial class CompressSettingsViewModel : ObservableObject
                 // 节流：250ms 内的中间重组跳过（最后一次组装必然执行，不丢源）
                 if ((DateTime.UtcNow - _lastProgressiveAssemble).TotalMilliseconds >= 250)
                 {
-                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, filter, ct);
                     if (version != _previewBuildVersion) return null;
                     PreviewRoot = progressive.Root;
                     _lastProgressiveAssemble = DateTime.UtcNow;
@@ -958,7 +952,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             }
 
             // ── Phase C：最终组装（含完整 Plan）──
-            var final = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+            var final = await AssembleAsync(paths, outputMode, outputPath, format, filter, ct);
             if (version != _previewBuildVersion) return null;
             PreviewRoot = final.Root;
             Plan = final.Plan;
@@ -992,7 +986,7 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>后台装配预览树（含 stats）+ Plan，仅把结果赋值切回 UI 线程。</summary>
     private async Task<(PreviewTreeNode Root, CompressPlan Plan)> AssembleAsync(
         List<string> paths, CompressOutputMode outputMode, string? outputPath,
-        string format, bool keepOriginalExtension, FileFilterCriteria? filter, CancellationToken ct)
+        string format, FileFilterCriteria? filter, CancellationToken ct)
     {
         var subtrees = paths.Select(ResolveSubtreeForDisplay).ToList();
 
@@ -1002,7 +996,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         var timestamp = _templateTimestamp;
 
         return await Task.Run(() => ResultPreviewService.AssembleCompressPreview(
-            paths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter,
+            paths, subtrees, outputMode, outputPath, format, filter,
             template, timestamp), ct);
     }
 
@@ -1389,7 +1383,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             // 只有同一个输出目录里撞了同名包才算重名 —— 按全路径判重，不能用文件名。
             var usedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var plan = CompressPathPlanner.PlanSeparate(
-                paths, DefaultFormat, KeepOriginalExtension, FileNameTemplate, _templateTimestamp);
+                paths, DefaultFormat, FileNameTemplate, _templateTimestamp);
             foreach (var item in plan)
             {
                 if (!usedPaths.Add(item.OutputArchivePath))
@@ -1912,7 +1906,6 @@ public partial class CompressSettingsViewModel : ObservableObject
             SevenZipMultithreaded: SevenZipMultithreaded,
             SevenZipEncryptHeaders: SevenZipEncryptHeaders,
             FileNameEncoding: FileNameEncoding,
-            KeepOriginalExtension: KeepOriginalExtension,
             AdaptiveCompression: AdaptiveCompression,
             AdaptiveSmartDetect: AdaptiveSmartDetect);
 

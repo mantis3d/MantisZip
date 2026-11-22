@@ -66,7 +66,6 @@ public sealed record CompressPlanEntry(
 /// <param name="SevenZipMultithreaded">7z 引擎内部是否多线程。</param>
 /// <param name="SevenZipEncryptHeaders">7z 是否连文件头一起加密（隐藏文件名）。</param>
 /// <param name="FileNameEncoding">文件名编码（ZIP 遗留编码兼容用）；<c>null</c> 表示自动。</param>
-/// <param name="KeepOriginalExtension">是否保留源文件的原始扩展名。</param>
 /// <param name="AdaptiveCompression">是否启用自适应压缩（按文件类型自动挑算法）。</param>
 /// <param name="AdaptiveSmartDetect">自适应压缩是否启用智能识别。</param>
 public sealed record CompressEngineOptions(
@@ -81,7 +80,6 @@ public sealed record CompressEngineOptions(
     bool SevenZipMultithreaded,
     bool SevenZipEncryptHeaders,
     string? FileNameEncoding,
-    bool KeepOriginalExtension,
     bool AdaptiveCompression,
     bool AdaptiveSmartDetect);
 

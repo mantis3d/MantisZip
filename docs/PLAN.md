@@ -178,7 +178,7 @@
 
 ---
 
-## 进行中 —— 5 条计划（1 条已排入 v0.5.x，4 条待排 / 已在做）
+## 进行中 —— 6 条计划（2 条已排入 v0.5.x，4 条待排 / 已在做）
 
 > 2026-11-04 清账：7z solid 批量解压、选中条目批量解压、文件名代码页三条的代码与实测均已通过，已归档进「已完成」（HDD 真机复测仍列为 v0.5.6 发布前手工项）；预览扩展剩余部分、浮动面板、注释编码 Phase 2 三条转入「已冻结」；可插拔预览模块转「已归档」。
 
@@ -189,6 +189,7 @@
 | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | Core 侧 TAR 裸格式 / GZip 单文件压缩 + 文件关联已就绪 | UI 压缩格式下拉未放开；BZip2→XZ→Zstd→Brotli；7z.dll 只读格式 | **只做前半**：UI 下拉放开 + 7z.dll 只读解锁（读取做稳）；BZip2/XZ/Zstd **创建**无限期延后。待排（估 6-8h），不急 |
 | 文件选择器「新建文件夹」（所有模式） | [picker-new-folder.md](.omo/plans/进行中/picker-new-folder.md) | — | 已完成（T1–T6） | **待发版**（2026-11-04，`beta`）：地址行按钮 + `Ctrl+Shift+N` + 校验留窗的 `InputDialog`；PickFolder/ExtractFolder/SaveFile 建完进新目录，PickItems/OpenFile 只刷新。`ui-tests` 6 例全绿；归档待 `RELEASE_NOTES` 范围确认 |
 | 文件选择器地址区拆两行 | [picker-address-two-rows.md](.omo/plans/进行中/picker-address-two-rows.md) | — | 已完成（T1–T4） | **待发版**（2026-11-05，`beta`）：按钮行（左导航 / 右新建+收藏）+ 面包屑整宽行；面包屑 392 → ≈610px，垂直多占 36–46px。两个 headless 用例钉住布局关系；归档待 `RELEASE_NOTES` 范围确认 |
+| 出厂默认命名模板 + 删除「保留源扩展名」开关 | [default-filename-template.md](.omo/plans/进行中/default-filename-template.md) | — | **待发版**（2026-11-22，`beta`） | 新装即带 `{name:auto}` + 两条内置预设（`CreateWithDefaults` 注入，只对「设置文件不存在」生效）；同时删掉名义全局、实际只管分别压缩的 `KeepOriginalExtension` 开关（语义已被 `{ext}` 覆盖，且会成为出厂即死开关）。约 15 文件：Core 去形参 + 位置参数 record 少一项 + 三语删 key |
 
 ---
 
