@@ -53,8 +53,9 @@ public static class AdaptiveRuleMatcher
                     if (def.Extensions.Contains(ext, StringComparer.OrdinalIgnoreCase))
                     {
                         var resolved = ResolveAdaptiveLevel(rule.Level, rule.CustomLevel, globalLevel);
+                        // 出厂规则的 Name 为空、名称在 NameKey 里（界面层负责本地化），日志里退回键名以免打出空串
                         CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: rule '{0}' matched (format={1}, ext={2}, level={3}) → {4}",
-                            rule.Name, formatId, ext, rule.Level, resolved);
+                            string.IsNullOrEmpty(rule.Name) ? rule.NameKey ?? "?" : rule.Name, formatId, ext, rule.Level, resolved);
                         return resolved;
                     }
                 }
@@ -85,7 +86,7 @@ public static class AdaptiveRuleMatcher
 
                     var resolved = ResolveAdaptiveLevel(rule.Level, rule.CustomLevel, globalLevel);
                     CoreLog.Trace("AdaptiveRuleMatcher.ResolveLevel: custom magic '{0}' matched rule '{1}' → {2}",
-                        customFormatId, rule.Name, resolved);
+                        customFormatId, string.IsNullOrEmpty(rule.Name) ? rule.NameKey ?? "?" : rule.Name, resolved);
                     return resolved;
                 }
             }

@@ -724,6 +724,7 @@ public partial class SettingsWindowViewModel : ObservableObject
             AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
             {
                 Name = rule.Name,
+                NameKey = rule.NameKey,
                 FormatIds = rule.FormatIds,
                 Level = rule.Level,
                 Enabled = rule.Enabled,
@@ -1943,6 +1944,16 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AddRuleText));
         OnPropertyChanged(nameof(ResetDefaultsText));
 
+        // 出厂规则名是 i18n 文案，切语言后逐行刷新（用户自定义名不受影响，DisplayName 走 Name）
+        foreach (var rule in AdaptiveOverrides)
+            rule.NotifyDisplayName();
+
+        // 自定义格式行的编辑/删除按钮提示同样是本地化文案
+        foreach (var fmt in CustomFormats)
+        {
+            fmt.NotifyLocalizedTexts();
+        }
+
         OnPropertyChanged(nameof(ExtractDefaultDestText));
         OnPropertyChanged(nameof(ExtractConflictActionText));
         OnPropertyChanged(nameof(ExtractOpenFolderAfterText));
@@ -2113,6 +2124,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.AdaptiveOverrides = AdaptiveOverrides.Select(vm => new AdaptiveOverrideRule
         {
             Name = vm.Name,
+            NameKey = vm.NameKey,
             FormatIds = vm.FormatIds,
             Level = vm.Level,
             Enabled = vm.Enabled,
@@ -2680,7 +2692,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
             {
+                // 新增规则的名字一定是用户自己敲的 → 不带 NameKey（不参与语言切换）
                 Name = dialog.RuleName,
+                NameKey = null,
                 Level = dialog.SelectedLevel,
                 FormatIds = dialog.SelectedFormatIds,
                 Enabled = true,
@@ -2694,12 +2708,19 @@ public partial class SettingsWindowViewModel : ObservableObject
         var dialog = new EditAdaptiveRuleDialog();
         var allFormats = FormatCatalog.GetAll().Concat(CustomFormats.Select(f => f.ToFormatDefinition())).ToList();
         dialog.PopulateFormats(allFormats, rule.FormatIds);
-        dialog.SetExistingValues(rule.Name, rule.Level, rule.FormatIds);
+        // 传**当前显示文本**：用户没改名就直接点确定时，NameKey 必须保留，
+        // 否则出厂规则会被固化成一个语言的名字，之后切语言不再跟着变。
+        dialog.SetExistingValues(rule.DisplayName, rule.Level, rule.FormatIds);
         if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
         if (result == true)
         {
-            rule.Name = dialog.RuleName;
+            if (dialog.NameChanged)
+            {
+                rule.NameKey = null;
+                rule.Name = dialog.RuleName;
+            }
+            // 未改名：Name/NameKey 原样保留，继续跟随界面语言
             rule.Level = dialog.SelectedLevel;
             rule.FormatIds = dialog.SelectedFormatIds;
         }
@@ -2710,11 +2731,44 @@ public partial class SettingsWindowViewModel : ObservableObject
         AdaptiveOverrides.Remove(rule);
     }
 
+    /// <summary>
+    /// 「恢复默认」：把规则列表整体重建为出厂六类规则（含 <c>NameKey</c>），
+    /// 用户自建规则会被清掉，故先确认。
+    /// 2026-11-23 修正：此前实现只是把现有规则的 <c>Enabled</c> 全设成 false，按钮名不副实。
+    /// </summary>
     [RelayCommand]
-    private void ResetDefaults()
+    private async Task ResetDefaults(Window? owner)
     {
-        foreach (var rule in AdaptiveOverrides)
-            rule.Enabled = false;
+        var confirmed = await AppMessageBox.Show(
+            LocalizationManager.T("Settings_AdaptiveOverrides_ResetDefaultsConfirm"),
+            LocalizationManager.T("Settings_AdaptiveOverrides_ResetDefaults"),
+            MessageBoxButton.YesNo, MessageBoxImage.Question,
+            owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        if (confirmed != MessageBoxResult.Yes) return;
+
+        RestoreFactoryRules();
+    }
+
+    /// <summary>
+    /// 把规则列表重建为出厂六类规则（含 <c>NameKey</c>），清掉用户自建规则。
+    /// 与确认框分离，便于单测直接验证重建结果。
+    /// </summary>
+    internal void RestoreFactoryRules()
+    {
+        AdaptiveOverrides.Clear();
+        foreach (var rule in AppSettings.GetDefaultAdaptiveOverrides())
+        {
+            AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
+            {
+                Name = rule.Name,
+                NameKey = rule.NameKey,
+                FormatIds = rule.FormatIds,
+                Level = rule.Level,
+                Enabled = rule.Enabled,
+                CustomLevel = rule.CustomLevel,
+                IsMultiThreadedEnabled = MultiThreadedCompression,
+            });
+        }
     }
 }
 
@@ -2735,6 +2789,19 @@ public partial class FormatDefinitionViewModel : ObservableObject
     /// <summary>魔数 hex 显示（Phase 2 / Task 11：魔数检测落地后恢复显示）。</summary>
     public string MagicHexDisplay => string.IsNullOrEmpty(MagicHex) ? "" : $"[{MagicHex}]";
 
+    /// <summary>编辑按钮提示（规则 13：走本地化，不在 XAML 里写死）。</summary>
+    public string FormatEditTooltipText => LocalizationManager.T("Settings_FormatCatalog_EditTooltip");
+
+    /// <summary>删除按钮提示。</summary>
+    public string FormatDeleteTooltipText => LocalizationManager.T("Settings_FormatCatalog_DeleteTooltip");
+
+    /// <summary>语言切换后刷新本地化的按钮提示。</summary>
+    public void NotifyLocalizedTexts()
+    {
+        OnPropertyChanged(nameof(FormatEditTooltipText));
+        OnPropertyChanged(nameof(FormatDeleteTooltipText));
+    }
+
     /// <summary>将 ViewModel 转换为 FormatDefinition 模型，用于持久化保存。</summary>
     public FormatDefinition ToFormatDefinition() => new()
     {
@@ -2752,6 +2819,15 @@ public partial class FormatDefinitionViewModel : ObservableObject
 public partial class AdaptiveOverrideRuleViewModel : ObservableObject
 {
     [ObservableProperty] private string _name = "";
+
+    /// <summary>
+    /// 出厂默认规则的内置名 i18n 键；非空时 <see cref="DisplayName"/> 用它、忽略 <see cref="Name"/>。
+    /// 用户把名字改成自己的文本时清空（见 <c>EditAdaptiveRuleDialog</c> 的改名判定）。
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    private string? _nameKey;
+
     [ObservableProperty] private bool _enabled = true;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LevelDisplay))]
@@ -2760,6 +2836,28 @@ public partial class AdaptiveOverrideRuleViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LevelDisplay))]
     private int? _customLevel;
+
+    /// <summary>
+    /// 列表里显示的名字：出厂规则跟随界面语言（取 <see cref="NameKey"/> 的文案），
+    /// 用户规则显示自己写的 <see cref="Name"/>。切语言时由设置页 VM 逐个通知刷新。
+    /// </summary>
+    public string DisplayName => string.IsNullOrEmpty(NameKey) ? Name : LocalizationManager.T(NameKey);
+
+    /// <summary>语言切换后刷新本行的全部本地化文本（<see cref="LocalizationManager.T"/> 不是绑定属性）。</summary>
+    public void NotifyDisplayName()
+    {
+        OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(EditTooltipText));
+        OnPropertyChanged(nameof(DeleteTooltipText));
+    }
+
+    /// <summary>编辑按钮提示（规则 13：走本地化，不在 XAML 里写死）。</summary>
+    public string EditTooltipText => LocalizationManager.T("Settings_AdaptiveRules_EditTooltip");
+
+    /// <summary>删除按钮提示。</summary>
+    public string DeleteTooltipText => LocalizationManager.T("Settings_AdaptiveRules_DeleteTooltip");
+
+    partial void OnNameChanged(string value) => OnPropertyChanged(nameof(DisplayName));
 
     /// <summary>格式 ID 列表（逗号分隔显示）。</summary>
     public string FormatIdsDisplay => string.Join(", ", FormatIds);
