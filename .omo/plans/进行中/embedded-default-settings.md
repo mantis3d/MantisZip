@@ -9,7 +9,7 @@
 三件事凑到一起，暴露了同一个根问题：**「默认设置」有三个事实源，全都在漂**。
 
 1. `AppSettings.CreateWithDefaults()` 只注入自适应规则，其余全是 C# 字段初值 —— 想改默认值只能改代码。
-2. 安装版新用户的实际默认值来自 `installer/prebuilt/settings.json`（85 键的快照）—— 与 C# 属性比对后有 5 个键已不存在、缺新增的 `FileNameTemplate*` 四键、十余处值与代码初值不同。两份事实源必然漂移。
+2. 安装版新用户的实际默认值来自 `installer/prebuilt/settings.json`（85 键的快照）—— 与 C# 属性比对后有 3 个键已不存在（`CloseAfterCompress`/`KeepOriginalExtension`/`UseColorEmoji`）、缺新增的 `FileNameTemplate*` 四键、十余处值与代码初值不同。两份事实源必然漂移。
 3. 用户自己保存的命名预设被冲掉一次：全量 ui-tests 里 42 次 `SaveTo` 直接写真实 `%LOCALAPPDATA%\MantisZip\settings.json`，其中 35 次写的是「模板空、预设空」的裸实例。
 
 顺带发现安装向导的语言/主题选择**空转两个月**：`__LANG__`/`__THEME__` 占位符在 `8ea6bdb2`（2026-08-08）被替换成字面量，而两份 iss 的 `PatchSettingsThemeAndLanguage` 还在 `StringChange` 找占位符。
@@ -41,13 +41,16 @@
 ```
 CreateWithDefaults()
   = LoadDefaultSettingsTemplate() ?? CreateBuiltInDefaults()
-  → ApplyInstallChoices(settings)
+  → ApplyInstallChoices(settings)   // 返回被读到的 choices 路径
   → ApplyMigrations(settings)
+  → choicesFile != null && SaveTo(EffectiveSettingsFile) → 删除 choicesFile
 ```
 
 - `LoadDefaultSettingsTemplate()`：`GetManifestResourceStream` → `JsonSerializer.Deserialize(..., AppSettingsJsonContext.Default.AppSettings)`；缺失 / 为 null / 异常 → `LogDefaultsFallback(reason)` 返回 null。**缺键自动保留字段初值 ⇒ 不需要 merge 逻辑。**
 - `CreateBuiltInDefaults()`：保留原代码兜底，核心语义（自适应默认规则 + `{name:auto}` + 两条预设）必须与 JSON 一致。
-- `ApplyInstallChoices()`：`dir = IsPortableMode ? DataDir : Path.GetDirectoryName(EffectiveSettingsFile) ?? DataDir`，存在 `install-choices.json` 则读 `Language`/`Theme` 覆盖、然后删除；全 try/catch 静默（向导选择只是锦上添花，绝不能让首启失败）。
+- `ApplyInstallChoices()`：`dir = IsPortableMode ? DataDir : Path.GetDirectoryName(EffectiveSettingsFile) ?? DataDir`，存在 `install-choices.json` 则读 `Language`/`Theme` 覆盖并**返回该路径**（不再自己删）；全 try/catch 静默（向导选择只是锦上添花，绝不能让首启失败）。
+  - **为什么必须当场落盘再删**（2026-11-23 补）：`install-choices.json` 是一次性文件，而启动路径从不写 `settings.json`（唯一会自动写盘的是联网成功的更新检查）⇒ 早先「套用后即删、但不落盘」时，离线用户 / 把更新检查设为「关闭」的用户 / 装完立刻关掉的用户第二次启动就退回出厂默认（实测首启 `en`/`Dark`、二启 `zh`/`System`）。
+  - 落盘失败（只读目录、磁盘满）就不删，下次启动再套一次；同值重复套用无副作用。
 
 ### 3. 安装器
 
@@ -59,7 +62,7 @@ CreateWithDefaults()
 ### 4. 测试
 
 - `tests/MantisZip.UI.Avalonia.Tests/AppSettingsTestRedirect.cs`：`[ModuleInitializer]` 在程序集加载期把落点重定向到 `Path.GetTempPath()/mz-ui-tests-settings-<guid>/settings.json`，句柄刻意不释放，`ProcessExit` 删目录。这是「忘写沙箱」的安全网。
-- `tests/MantisZip.UI.Avalonia.Tests/AppSettingsDefaultSettingsJsonTests.cs`（9 例）：资源存在且可反序列化 / **每个键都对得上真实属性** / 出厂模板与预设 / 不含机器相关键 / 不含已废弃键 / `CreateBuiltInDefaults` 语义一致 / `install-choices` 生效即删 / 有设置文件时不覆盖 / 坏 JSON 不炸首启。
+- `tests/MantisZip.UI.Avalonia.Tests/AppSettingsDefaultSettingsJsonTests.cs`（10 例）：资源存在且可反序列化 / **每个键都对得上真实属性** / 出厂模板与预设 / 不含机器相关键 / 不含已废弃键 / `CreateBuiltInDefaults` 语义一致 / `install-choices` 生效即删 / 有设置文件时不覆盖 / 坏 JSON 不炸首启 / **向导选择套用后落盘，第二次启动仍是向导选择**（2026-11-23 补）。
 
 ### 5. 文档
 
@@ -74,7 +77,7 @@ CreateWithDefaults()
 |---|---|
 | JSON 快照与 C# 属性漂移（键名打错 / 属性删了 json 没删） | `AppSettingsDefaultSettingsJsonTests.EveryKey_MapsToRealProperty` 双向体检，删属性忘改 json 当场红 |
 | 内嵌资源读不出来（打包/裁剪问题） | `CreateBuiltInDefaults()` 兜底 + `LogDefaultsFallback` 记 `lifecycle.log` |
-| 向导选择文件残留后误覆盖用户设置 | `ApplyInstallChoices` 只在「本次是 `CreateWithDefaults()`」路径里跑；已有 settings.json 时根本不调它 |
+| 向导选择文件残留后误覆盖用户设置 | `ApplyInstallChoices` 只在「本次是 `CreateWithDefaults()`」路径里跑；已有 settings.json 时根本不调它。套用后在 `CreateWithDefaults()` 里立刻落盘、落盘成功才删文件 —— 否则离线用户第二次启动就退回出厂默认 |
 | 端口/便携模式路径不一致 | `IsPortableMode ? DataDir : settings 同目录`，与 `EffectiveSettingsFile` 同源 |
 
 ## 验收

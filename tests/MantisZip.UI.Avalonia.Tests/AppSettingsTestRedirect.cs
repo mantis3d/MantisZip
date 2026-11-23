@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.Runtime.CompilerServices;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Models;
 
 namespace MantisZip.UI.Avalonia.Tests;
@@ -12,7 +13,7 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// 为什么要这一层（2026-11-22 实测事故）：UI 测试里有十几处「只 new 一个窗口/VM 就会在关闭时落盘」
 /// 的用例（<c>CompressSettingsWindow.PersistGeometry</c> / <c>ExtractSettingsWindow.PersistGeometry</c> /
 /// <c>ProgressWindow.OnClosed</c> / <c>MainWindowViewModel.SaveSetting</c> …），它们都没有用
-/// <see cref="AppSettingsTestSandbox"/>。跑一次全量 ui-tests，<c>SaveTo</c> 一共被调用 79 次，
+/// <see cref="AppSettingsTestSandbox"/>。跑一次全量 ui-tests，<c>SaveTo</c> 一共被调用 80 次，
 /// 其中 42 次直接落到真实的 <c>%LOCALAPPDATA%\MantisZip\settings.json</c>，
 /// 而其中 35 次写的是「模板空、预设空」的裸实例 —— 用户保存的命名预设就是这样被测试冲掉的。
 ///
@@ -34,6 +35,10 @@ internal static class AppSettingsTestRedirect
 
         // 句柄刻意不释放：随进程结束一起消失，避免「某个测试先跑完就提前解除重定向」
         AppSettings.UseIsolatedSettingsFileForTests(Path.Combine(dir, "settings.json"));
+
+        // Core 侧的 path-history.json / favorites.json / debug.log / conflict.log 各自从
+        // AppDataPaths.Dir 拼路径，与 settings.json 是两个独立的落点，这里一并重定向。
+        AppDataPaths.UseIsolatedDirForTests(dir);
 
         AppDomain.CurrentDomain.ProcessExit += (_, _) =>
         {

@@ -32,6 +32,21 @@ public class AppSettingsTestSandboxTests
     }
 
     [Fact]
+    public void Sandbox_RedirectsDataDir_SoWindowAndRecentStateAlsoLandInTemp()
+    {
+        using var sandbox = new AppSettingsTestSandbox();
+
+        // recent.json / window.json / layout.json / metadata-panel.json / lifecycle.log
+        // 全都从 AppSettings.DataDir 拼路径。只重定向 settings.json 的话，
+        // 跑一次测试照样会把这些文件写成测试数据（2026-11-23 实测三份文件 mtime 被刷成同一秒）。
+        Assert.Equal(sandbox.Root, AppSettings.DataDir);
+
+        var stateFile = Path.Combine(AppSettings.DataDir, "window.json");
+        File.WriteAllText(stateFile, "{}");
+        Assert.StartsWith(sandbox.Root, stateFile, System.StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
     public void Sandbox_Dispose_RestoresRealSettingsFile_AndDiskIsUntouched()
     {
         var realSettingsFile = Path.Combine(AppSettings.DataDir, "settings.json");
@@ -40,9 +55,11 @@ public class AppSettingsTestSandboxTests
             : (System.DateTime?)null;
 
         string sandboxFile;
+        string sandboxRoot;
         using (var sandbox = new AppSettingsTestSandbox())
         {
             sandboxFile = sandbox.SettingsFile;
+            sandboxRoot = sandbox.Root;
             AppSettings.Load().FileNameTemplateDialog = "{name}_sandbox";
             AppSettings.Load().Save();
             Assert.NotEqual(realSettingsFile, sandboxFile);
@@ -50,8 +67,13 @@ public class AppSettingsTestSandboxTests
 
         // 沙箱目录连同文件一起清掉
         Assert.False(File.Exists(sandboxFile), "沙箱文件应随 Dispose 删除");
+        Assert.False(Directory.Exists(sandboxRoot), "沙箱目录应随 Dispose 删除");
 
-        // 真实设置文件：存在性不变、修改时间不变（没被写）
+        // 数据目录恢复成沙箱外的落点（本程序集的安全网目录，而不是刚删掉的沙箱）
+        Assert.NotEqual(sandboxRoot, AppSettings.DataDir);
+        Assert.Equal(Path.GetDirectoryName(realSettingsFile), AppSettings.DataDir);
+
+        // 沙箱外的那份设置：存在性不变、修改时间不变（沙箱期间一次都没被写）
         var stampAfter = File.Exists(realSettingsFile)
             ? File.GetLastWriteTimeUtc(realSettingsFile)
             : (System.DateTime?)null;

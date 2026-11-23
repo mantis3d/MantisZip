@@ -266,7 +266,12 @@ public partial class TemplatePresetPicker : UserControl
         }
         else if (change.Property == IsMessageErrorProperty)
         {
-            UpdateMessageIcon();
+            // 宿主的赋值顺序是「先 Message、再 IsMessageError」（CompressSettingsViewModel.SaveTemplatePreset
+            // 与 SettingsWindowViewModel.SetPresetMessage 都是这样），所以设消息那一刻标志还是旧值：
+            // 失败消息会被当成成功消息起一个 1.6s 计时器，标志随后变成 true 却没人停表 ——
+            // 用户看到「预设最多 20 条」的红色警告闪一下就没了。标志变化必须重新走一遍同步，
+            // 让计时器按最新的 IsMessageError 重新判定（错误 → 不起表）。
+            SyncMessagePopup(Message);
         }
     }
 

@@ -763,7 +763,7 @@ begin
     InstallChoicesFile := SettingsDir + '\install-choices.json';
     WindowFile := SettingsDir + '\window.json';
 
-    // 首次安装时把向导选的语言/主题写成一次性文件，应用首启读一次即删除。
+    // 首次安装时把向导选的语言/主题写成一次性文件，应用首启读一次、落盘进 settings.json 后才删除。
     // settings.json 由应用自己用内嵌的出厂默认值生成——安装器不再预置整份默认设置，
     // 否则那份 json 会常年落后于代码（旧文件缺 FileNameTemplate 四键、还塞了十几个过期默认值），
     // 且向导的 __LANG__/__THEME__ 占位符替换自 8ea6bdb2 起就已空转。

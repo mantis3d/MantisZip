@@ -457,7 +457,18 @@ public class AppSettings
     public static bool IsPortableMode { get; private set; }
 
     /// <summary>应用数据目录：便携模式 = exe 旁 Data/，否则 = %LOCALAPPDATA%\MantisZip。</summary>
-    public static string DataDir { get; private set; } = "";
+    public static string DataDir => _dataDirOverride ?? _dataDir;
+
+    private static string _dataDir = "";
+
+    /// <summary>
+    /// 测试重定向用的数据目录覆盖（见 <see cref="UseIsolatedSettingsFileForTests"/>）。
+    /// 生产路径从不设置。之所以连它一起重定向：<c>recent.json</c> / <c>window.json</c> /
+    /// <c>layout.json</c> / <c>metadata-panel.json</c> / <c>lifecycle.log</c> 全都从
+    /// <see cref="DataDir"/> 拼路径，只护住 settings.json 的话，跑一次 ui-tests 依旧会改写
+    /// 用户的「最近打开」「窗口布局」（2026-11-23 实测：三份文件 mtime 被刷新成同一秒）。
+    /// </summary>
+    private static string? _dataDirOverride;
 
     /// <summary>
     /// 临时文件根目录：便携模式 = exe 旁 Data/Temp/，普通模式 = %TEMP%/MantisZip/。
@@ -488,16 +499,16 @@ public class AppSettings
         {
             var dataDir = Path.Combine(AppContext.BaseDirectory, "Data");
             Directory.CreateDirectory(dataDir);
-            DataDir = dataDir;
+            _dataDir = dataDir;
             SettingsDir = dataDir;
             SettingsFile = Path.Combine(dataDir, "settings.json");
             PasswordManager.CustomDataDir = dataDir;
         }
         else
         {
-            DataDir = Path.Combine(
+            _dataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
-            SettingsDir = DataDir;
+            SettingsDir = _dataDir;
             SettingsFile = Path.Combine(SettingsDir, "settings.json");
         }
     }
@@ -762,6 +773,11 @@ public class AppSettings
     /// <summary>
     /// 测试钩子：把 <see cref="Load"/> / <see cref="Save"/> 的落点重定向到临时文件，并清空缓存，
     /// 让测试从头读自己的沙箱。返回的句柄 <see cref="Dispose"/> 时恢复真实路径并再次清缓存。
+    /// <para>
+    /// 同时把 <see cref="DataDir"/> 指向该文件所在目录：<c>recent.json</c> / <c>window.json</c> /
+    /// <c>layout.json</c> / <c>metadata-panel.json</c> / <c>lifecycle.log</c> 都从 DataDir 拼路径，
+    /// 只重定向 settings.json 的话测试照样会改写用户的「最近打开」与「窗口布局」。
+    /// </para>
     /// </summary>
     /// <param name="settingsFile">临时设置文件路径（父目录不存在会自动创建）。</param>
     internal static IDisposable UseIsolatedSettingsFileForTests(string settingsFile)
@@ -770,16 +786,18 @@ public class AppSettings
 
         lock (SyncRoot)
         {
-            var previous = _settingsFileOverride;
+            var previousFile = _settingsFileOverride;
+            var previousDir = _dataDirOverride;
             _settingsFileOverride = settingsFile;
+            _dataDirOverride = Path.GetDirectoryName(settingsFile) ?? previousDir;
             _unreadableSettingsFile = null;
             _cached = null;
-            return new SettingsFileScope(previous);
+            return new SettingsFileScope(previousFile, previousDir);
         }
     }
 
     /// <summary>恢复重定向前的路径并清缓存，保证不把沙箱实例留在进程级缓存里。</summary>
-    private sealed class SettingsFileScope(string? previous) : IDisposable
+    private sealed class SettingsFileScope(string? previousFile, string? previousDir) : IDisposable
     {
         private bool _disposed;
 
@@ -790,7 +808,8 @@ public class AppSettings
 
             lock (SyncRoot)
             {
-                _settingsFileOverride = previous;
+                _settingsFileOverride = previousFile;
+                _dataDirOverride = previousDir;
                 _unreadableSettingsFile = null;
                 _cached = null;
             }
@@ -808,7 +827,7 @@ public class AppSettings
 
     /// <summary>
     /// 安装器写入的一次性「向导选择」文件名：内含 <c>Language</c> / <c>Theme</c> 两个键。
-    /// 应用首启读一次即删除，之后一切以 settings.json 为准。
+    /// 应用首启读一次、把选择写进 settings.json 之后才删除，之后一切以 settings.json 为准。
     /// </summary>
     private const string InstallChoicesFileName = "install-choices.json";
 
@@ -820,8 +839,17 @@ public class AppSettings
     private static AppSettings CreateWithDefaults()
     {
         var settings = LoadDefaultSettingsTemplate() ?? CreateBuiltInDefaults();
-        ApplyInstallChoices(settings);
+        var choicesFile = ApplyInstallChoices(settings);
         ApplyMigrations(settings);
+
+        // 向导选择必须**当场固化**：install-choices.json 是一次性文件，删掉就再没有第二份来源。
+        // 早先「套用完就删、但不落盘」有个只在离线用户身上出现的坑——启动路径从不写 settings.json
+        // （唯一会自动写盘的是更新检查，且只在联网成功时才写），于是第二次启动重新走本方法时
+        // 向导选择已经没了，语言/主题被打回出厂默认（2026-11-23 实测：首启 en/Dark，二启 zh/System）。
+        // 落盘成功与否决定要不要删：写不下去就把文件留着，下次启动还能再套一次（同值，无副作用）。
+        if (choicesFile is not null && settings.SaveTo(EffectiveSettingsFile))
+            TryDeleteInstallChoices(choicesFile);
+
         return settings;
     }
 
@@ -872,18 +900,22 @@ public class AppSettings
     }
 
     /// <summary>
-    /// 套用安装器写入的一次性向导选择（语言 / 主题）并删除该文件。
+    /// 套用安装器写入的一次性向导选择（语言 / 主题）。
     /// 为什么单独走一个文件而不是让安装器直接写 settings.json：settings.json 只能有**一个**事实源
     /// （内嵌快照），否则安装器里那份会常年落后于代码、并把出厂默认覆盖成旧值。
     /// 读不到/解析失败都当没有，不影响首启。
+    /// <para>
+    /// 返回被读到的那个文件路径（没有则 <c>null</c>）。**删除交给调用方**：只有把套用后的设置
+    /// 成功写进 settings.json 之后才允许删，否则选择会丢在半路（见 <see cref="CreateWithDefaults"/>）。
+    /// </para>
     /// </summary>
-    private static void ApplyInstallChoices(AppSettings settings)
+    private static string? ApplyInstallChoices(AppSettings settings)
     {
         try
         {
             var dir = IsPortableMode ? DataDir : Path.GetDirectoryName(EffectiveSettingsFile) ?? DataDir;
             var path = Path.Combine(dir, InstallChoicesFileName);
-            if (!File.Exists(path)) return;
+            if (!File.Exists(path)) return null;
 
             var json = File.ReadAllText(path);
             using var doc = JsonDocument.Parse(json);
@@ -901,11 +933,12 @@ public class AppSettings
                 if (!string.IsNullOrWhiteSpace(value)) settings.Theme = value;
             }
 
-            TryDeleteInstallChoices(path);
+            return path;
         }
         catch
         {
             // 向导选择只是锦上添花：解析失败就当用户没选，绝不因此让首启失败
+            return null;
         }
     }
 

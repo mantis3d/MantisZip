@@ -19,6 +19,8 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 
 **修复 / Fixes**
 
+- **安装时选的语言和主题现在真的生效了** — 安装向导里选的语言与深浅色主题此前根本没有落到程序里，无论选什么都按浅色中文启动（装好后再去设置里改才会记住）。现在向导的选择会在首次启动时应用并保存下来。
+- **The language and theme you pick in the installer now actually apply** — the choices made in the setup wizard never made it into the app, so it always started in light theme and Chinese no matter what was selected (changing them in settings afterwards did work). The wizard's choices are now applied on first launch and saved.
 - **带调色板的 ICO 打不开、动画 WebP 预览卡顿（issue #89）** — ① 低色深（1 / 4 / 8 位）ICO 的像素起始偏移漏算了调色板长度，整帧解不出来、预览直接报不支持；② 动画 WebP 改为链式增量解码并直写位图，26 帧的文件从 7.9 秒降到 0.4 秒左右，帧数超过 600 或像素总量超过 192 MB 时只显示首帧并在画面上说明原因。
 - **Palette ICOs failed to open and animated WebP previews crawled (issue #89)** — palette-based ICO frames (1 / 4 / 8-bit) computed the pixel offset without the palette size, so the frame never decoded and the preview reported the file as unsupported; animated WebP now decodes frames incrementally straight into bitmaps, cutting a 26-frame file from 7.9 s to about 0.4 s, and files over 600 frames or 192 MB of pixels show only the first frame with an on-screen explanation.
 - ![ICO 图标预览已能显示带调色板的帧；动画 WebP 预览帧数超限时只显示首帧并给出说明](docs/images/version/v0.5.7/Issue89Preview.png)

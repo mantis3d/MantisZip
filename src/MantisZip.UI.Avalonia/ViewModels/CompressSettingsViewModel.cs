@@ -155,7 +155,8 @@ public partial class CompressSettingsViewModel : ObservableObject
     // 逐项压缩下每个源各渲染一条。空模板 = 完全走旧命名（逐字节不变）。
 
     /// <summary>
-    /// 文件名模板（占位符形式）。空白 = 未启用。启用时「保留源文件扩展名」失效，要保留请写 <c>{ext}</c>。
+    /// 文件名模板（占位符形式）。空白 = 未启用。启用时命名完全由模板决定，
+    /// 源扩展名要保留就在模板里写 <c>{ext}</c>（「保留源文件扩展名」开关已于 2026-11-22 删除）。
     /// </summary>
     [ObservableProperty]
     private string? _fileNameTemplate;

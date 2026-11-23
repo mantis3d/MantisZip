@@ -15,10 +15,12 @@ namespace MantisZip.UI.Avalonia.Models;
 /// </summary>
 internal static class LayoutStateManager
 {
-    private static readonly string BaseDir = AppSettings.DataDir;
-
-    private static readonly string ConfigFile =
-        Path.Combine(BaseDir, "layout.json");
+    /// <summary>
+    /// 布局快照路径。**每次现取** <see cref="AppSettings.DataDir"/>——静态字段会在类型初始化时
+    /// 固化真实用户目录，测试重定向数据目录后仍然写到用户那里（2026-11-23 同批修复）。
+    /// </summary>
+    private static string ConfigFile =>
+        Path.Combine(AppSettings.DataDir, "layout.json");
 
     /// <summary>布局 JSON 选项：注册 GridLength 转换器（对象形态 {"value":N,"unit":N}；读取兼容旧版裸数字）。</summary>
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -54,8 +56,8 @@ internal static class LayoutStateManager
     {
         try
         {
-            if (!Directory.Exists(BaseDir))
-                Directory.CreateDirectory(BaseDir);
+            if (!Directory.Exists(AppSettings.DataDir))
+                Directory.CreateDirectory(AppSettings.DataDir);
 
             var json = JsonSerializer.Serialize(snapshot, JsonOptions);
             File.WriteAllText(ConfigFile, json);

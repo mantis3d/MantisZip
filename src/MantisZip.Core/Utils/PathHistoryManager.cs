@@ -18,10 +18,11 @@ public static class PathHistoryManager
 {
     private const int MaxEntries = 50;
 
-    private static readonly string AppDataPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
-
-    private static readonly string FilePath = Path.Combine(AppDataPath, "path-history.json");
+    /// <summary>
+    /// 历史文件路径。经 <see cref="AppDataPaths"/> 解析而不是在静态字段里固化成真实用户目录——
+    /// 否则测试换不了落点，跑一次 Core 测试就会重写用户的 <c>path-history.json</c>（2026-11-23 实测）。
+    /// </summary>
+    private static string FilePath => Path.Combine(AppDataPaths.Dir, "path-history.json");
 
     private static readonly object _lock = new();
     private static List<PathHistoryEntry> _entries = new();

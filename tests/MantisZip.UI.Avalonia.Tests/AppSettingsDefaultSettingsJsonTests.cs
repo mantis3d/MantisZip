@@ -187,6 +187,32 @@ public class AppSettingsDefaultSettingsJsonTests
     }
 
     [Fact]
+    public void InstallChoices_SurviveSecondLaunch_ByBeingPersistedOnFirstUse()
+    {
+        using var sandbox = new AppSettingsTestSandbox();
+        var choices = Path.Combine(sandbox.Root, "install-choices.json");
+        File.WriteAllText(choices, """{"Language":"en","Theme":"Dark"}""");
+
+        // 第一次启动：向导选择生效
+        var first = AppSettings.Load();
+        Assert.Equal("en", first.Language);
+        Assert.Equal("Dark", first.Theme);
+        Assert.False(File.Exists(choices), "向导选择文件读一次即删");
+
+        // 启动路径从不写 settings.json（唯一的自动写盘是联网成功的更新检查），
+        // 所以「套用后必须当场落盘」是向导选择能活到第二次启动的唯一保障。
+        Assert.True(
+            File.Exists(sandbox.SettingsFile),
+            "套用向导选择后必须立刻落盘，否则第二次启动会退回出厂默认");
+
+        // 第二次启动：全新的读盘上下文，选择必须还在
+        AppSettings.ResetCacheForTests();
+        var second = AppSettings.Load();
+        Assert.Equal("en", second.Language);
+        Assert.Equal("Dark", second.Theme);
+    }
+
+    [Fact]
     public void InstallOptions_WithMalformedJson_DoNotBreakStartup()
     {
         using var sandbox = new AppSettingsTestSandbox();

@@ -17,9 +17,8 @@ namespace MantisZip.Core.Utils;
 /// </summary>
 internal static class CoreLog
 {
-    private static readonly string LogPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "MantisZip", "debug.log");
+    /// <summary>debug.log 路径。经 <see cref="AppDataPaths"/> 解析，测试可重定向到临时目录。</summary>
+    private static string LogPath => Path.Combine(AppDataPaths.Dir, "debug.log");
 
     private static readonly object _lock = new();
 
@@ -141,9 +140,8 @@ internal static class CoreLog
     /// 冲突日志路径。默认 %LOCALAPPDATA%\MantisZip\conflict.log；
     /// 测试可覆盖为临时目录（进程级设置，测试类内串行使用）。
     /// </summary>
-    internal static string ConflictLogPath { get; set; } = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "MantisZip", "conflict.log");
+    internal static string ConflictLogPath { get; set; } =
+        Path.Combine(AppDataPaths.Dir, "conflict.log");
 
     /// <summary>
     /// 日志文件大小上限（10 MB）。超过时自动轮转。
