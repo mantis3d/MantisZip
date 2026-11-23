@@ -21,6 +21,7 @@
   "Menu_ClearChecked": "Clear selection",
   "Extract_TabOutput": "Output",
   "Extract_TabAddArchives": "Add Archives",
+  "Extract_TabOptions": "Extraction",
   "Extract_SelectedArchives": "Selected Archives",
   "Extract_RemoveSelected": "Remove Selected",
   "Extract_OutputPickerHint": "Browsing to another folder below changes the extraction destination; the path above can also be edited directly.",

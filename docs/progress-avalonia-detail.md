@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-23** — 交互：解压设置窗新增「解压设置」页，行为类选项从「输出设置」搬出
+  - **用户指令**：「解压窗口加一个"解压设置"tab，把"输出设置"里面文件冲突等移动到这个新tab里面，跟压缩端一致。你看看有哪些应该移进去，哪些不应该」
+  - **为什么搬**：输出设置页塞了四张常驻卡（目标目录 / 冲突策略 / 完成后行为 / 压缩包顶层目录），第 2 行是弹性的目录选择器 —— 与压缩端 2026-11-17（冲突策略 + 完成后行为）和 11-18（包内根目录）是同一个病：常驻卡吃满高度后选择器只剩几十像素。新页是 `ScrollViewer`，窗口再矮也只是滚动，不挤压任何控件。
+  - **搬进「解压设置」页**（`ExtractSettingsWindow.axaml` 新增 `TabItem x:Name="ExtractOptionsTab"`，插在第 3 位）：① 文件冲突策略下拉（6 档：询问 / 覆盖 / 仅更旧时覆盖 / 仅更小时覆盖 / 重命名 / 跳过，`x:Name="ConflictActionCombo"`）；② 「解压后打开文件夹」（`OpenFolderAfterCheck`）；③ 「解压后将原压缩包移入回收站」（`DeleteArchiveAfterCheck`）；④ 「压缩包顶层目录」四态下拉（`ExtractRootModeCombo`，含裁剪说明灰字）。前两项 + 第三项合成一张卡（与压缩端「冲突策略 + 完成后行为」同构），顶层目录单独一张卡。
+  - **留在「输出设置」页**：目标目录标题、可直接编辑的路径框（`DestinationPathBox`）、内嵌 `CustomFilePickerControl`（`DestinationPicker`）。理由：这三样回答的是「解压到哪」，是本页唯一职责；且选择器是唯一需要弹性的行。输出页 `Grid.RowDefinitions` 从 4 行收回 **3 行**。
+  - **为什么不并「加速」页**：并行度是性能选项而非解压行为；压缩端对话框没有对应页，两边本来就不对称，硬并在一个页里会让「解压设置」变得很长、需要滚动。
+  - **页签次序为什么是第 3 位**：镜像压缩端「输出设置 → 添加文件 → 压缩设置 → 密码 → 注释 → 文件过滤」的「先定产物、再定输入、再定行为」次序 —— 解压端就是「输出设置 → 添加压缩包 → 解压设置 → 文件过滤 → 加速」。
+  - **i18n**：新增 `Extract_TabOptions`（解压设置 / Extraction / 解壓設定），插在 `Extract_TabAddArchives` 之后，三份 json ⇒ **1530 key**；`ExtractSettingsViewModel` 的 `LocalizedStrings` 白名单同步登记（漏登记会让页签只剩图标没有文字）。
+  - **回归绊线**：新建 `tests/MantisZip.UI.Avalonia.Tests/ExtractSettingsTabLayoutTests.cs`（6 例，与 `CompressSettingsTabLayoutTests` 同构）—— 页签可解析且两页都在、四张行为卡都在新页、输出页只剩目标目录、四个 `x:Name` 全文件唯一、输出页 Grid 行数 = 3 且 `Grid.Row` 最大值不越界。`ExtractSettingsWindowEmbeddedPickerTests` 的页签计数从 4 改 5。
+  - **测试踩的两个坑**：① 首版行数断言只认 `<RowDefinition Height="…" />` 元素写法，而解压窗用的是简写 `RowDefinitions="Auto,Auto,*"` ⇒ 数到 0 条直接红；改成两种写法都支持的 `CountRowDefinitions` 辅助方法。② `CompressSettingsViewModelRootNameTests.ExampleText_EmptyInputFallsBackToArchiveName` 是**本机配置依赖的偶发失败** —— 它读真实 `settings.json`，出厂默认把 `FileNameTemplateDialog` 设成 `{name:auto}` 后包名来自模板渲染（`report`）而不是落点目录名，断言写死目录名就会飘。改用 `AppSettingsTestSandbox` 并把断言换成「根名 == `vm.OutputFileName`」这条不变量，另补一条「文件名模板留空时回落到落点目录名」的用例把两条路径都钉住（13 例全绿）。
+  - **验证**：`avalonia -c Release --no-incremental` ✅ 70.3s 0 警告；`ui-tests` 全量 **997 例（994 通过 / 3 跳过 / 0 失败）41s**；`tests` 全绿；`i18n` 1530 key 三语一致；`check` 12 条守卫 `failedCount: 0`；`RELEASE_NOTES` 未动（本轮不属用户可见的发布级差异，待 v0.5.8 章节统一维护）。
+  - **真机核对**：`--extract %TEMP%\mz-tabqa\shots.zip` 打开对话框，输出页只剩目标目录 + 选择器（选择器明显变高）；点「解压设置」页签可见两张卡（冲突策略 6 档下拉 + 两个勾选框；压缩包顶层目录下拉 + 说明灰字），布局与压缩端「压缩设置」页同构。截图存 `%TEMP%\tab-out-1.png`、`%TEMP%\tab-opts.png`。现场已 `Stop-Process` 并从 `%TEMP%\settings.bak-tab.json` 还原 settings.json。
+
 **2026-11-23** — 合并 beta 到 alpha（出厂默认模板与设置 + 预设气泡/向导首启/测试隔离 + 预览与多选修复 + 两守卫）
   - **用户指令**：「我在beta分支做了很多修复，在远程端没有拉取下来，请你拉取beta分支并合并到alpha分支，并帮我处理冲突。」
   - **拉取先踩了一脚（必留）**：`git fetch origin` 报 `Failed to connect to github.com port 443 via 127.0.0.1 after 2052 ms`。根因不是网络，而是仓库 `.git/config` 里 `http.proxy` / `https.proxy` 都指着 `socks5://127.0.0.1:10090`，而该端口没有监听（`Test-NetConnection` False、`Get-NetTCPConnection -State Listen` 无匹配）。解法是**单次命令内清空代理**：`git -c http.proxy= -c https.proxy= fetch origin beta alpha`，不要去改 `.git/config`。直连可达（`Resolve-DnsName github.com` → `20.247.166.64`）。
@@ -152,7 +165,6 @@
   - **真机三场景**：`CompressRootMode=3` + `CompressRootName={name}_{date}` ⇒ 对话框示例行 `7zip_2026-11-18`、预览树根节点同值、产出包内实测 `7zip_2026-11-18/7zip/a.txt` + `…/inner/b.txt`（**预览 = 实际**）；`{foo}` ⇒ 示例行转红、点「开始压缩」弹同文案且不产出包、按钮置灰；插入菜单只列 5 项。
   - **验证**：`core` / `avalonia --no-incremental`（46.0s）0 警告；`tests` 17.7s；`ui-tests` 全绿；`i18n` 1529 key 三语一致；`check` version 六处 0.5.8 + 10 条守卫 `failedCount: 0`。
   - **留白**：CLI（`--compress` 系列）仍无 RootMode / WrapRoot 参数 ⇒ 根名模板在 CLI 侧不可达；解压端根名只从包名推导不接模板；设置页默认根名粘贴非法模板要到对话框才报。
-
 
 **2026-11-17** — 压缩设置窗「输出设置」页瘦身：冲突策略 + 完成后打开目录搬进「压缩设置」页
   - **背景**：用户报「压缩窗口的输出路径 tab 内容太多、太挤，考虑把下面的『文件冲突选项』和『压缩完成打开目录选项』移到别处」，给了两个候选（放进「压缩设置」页 / 移到右侧预览树下方）。先给了建议（选前者，且两张卡合成一张），用户回「开工吧」。

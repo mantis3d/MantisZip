@@ -12,33 +12,28 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// <summary>
 /// 压缩设置对话框里的「根目录名模板」：活字名/模板分派、示例行、确认拦截、载荷透传。
 /// 关键不变量：不含花括号的字面名仍按旧语义净化（<c>a:b</c> 不该变成红框）。
+/// 设置读写走 <see cref="AppSettingsTestSandbox"/>：用例跑在自己的临时目录里。
 /// </summary>
+/// <remarks>
+/// 2026-11-23 换成沙箱：此前的「读真实 settings.json → 改 → finally 还原」写法会让断言依赖
+/// 本机配置 —— 出厂默认把 <c>FileNameTemplateDialog</c> 设成 <c>{name:auto}</c> 时，
+/// 压缩包默认主名来自模板渲染（<c>report</c>），没有模板时才回落到落点目录名，
+/// 于是「根名留空回落包名」这条断言在同一台机器上时而通过时而失败。
+/// </remarks>
 public class CompressSettingsViewModelRootNameTests : IDisposable
 {
+    private readonly AppSettingsTestSandbox _sandbox;
     private readonly string _root;
-    private readonly RootDirectoryMode _rootMode;
-    private readonly string _rootName;
 
     public CompressSettingsViewModelRootNameTests()
     {
-        _root = Path.Combine(Path.GetTempPath(), "mz-rootname-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_root);
-
-        var settings = AppSettings.Load();
-        _rootMode = settings.CompressRootMode;
-        _rootName = settings.CompressRootName;
+        _sandbox = new AppSettingsTestSandbox();
+        _root = _sandbox.Root;
     }
 
     public void Dispose()
     {
-        try { Directory.Delete(_root, recursive: true); } catch { /* 清理失败不影响断言 */ }
-
-        // 设置是进程级缓存 + 落盘，测试必须还原，否则污染其它用例
-        var settings = AppSettings.Load();
-        settings.CompressRootMode = _rootMode;
-        settings.CompressRootName = _rootName;
-        settings.Save();
-        AppSettings.ResetCacheForTests();
+        _sandbox.Dispose();
         GC.SuppressFinalize(this);
     }
 
@@ -146,20 +141,34 @@ public class CompressSettingsViewModelRootNameTests : IDisposable
     }
 
     [Fact]
-    public void ExampleText_EmptyInputFallsBackToArchiveName()
+    public void ExampleText_EmptyInputMatchesArchiveName()
     {
         Apply(s => s.CompressRootMode = RootDirectoryMode.AlwaysWrap);
 
         var vm = new CompressSettingsViewModel(new[] { MakeFile("report.txt") });
         vm.WrapRoot = "";
 
-        // 留空 = 未启用模板 ⇒ 回落到「压缩包主名」。
-        // 注意这里**不是**源文件名：压缩包默认按落点目录命名（单个 report.txt 落在夹具目录里，
-        // 包名就是夹具目录名），根名跟着包名走才是「预览 = 实际」。
-        // 2026-11-18 合并 beta 后修正断言 —— 旧断言写死 "report" 是按源文件名猜的，
-        // 在「输出路径单一变量」重构后（默认包名 = 落点目录名）已经过期。
+        // 留空 = 未启用模板 ⇒ 回落到「压缩包主名」，而包名由文件名模板（出厂默认 {name:auto}）
+        // 或落点目录名决定 —— 根名只要**等于 VM 自己算出的包名**，「预览 = 实际」就成立。
+        // 这条不变量比写死具体字符串更抗两侧重构：2026-11-18 与 11-23 两次改动都只动了包名来源。
+        Assert.Equal(vm.OutputFileName, vm.RootNameExampleText);
+        Assert.False(vm.IsRootNameExampleError);
+    }
+
+    [Fact]
+    public void ExampleText_EmptyInputWithNoFileNameTemplate_FallsBackToOutputDirName()
+    {
+        // 文件名模板留空时包名来自落点目录名（沙箱目录），根名跟着它走
+        Apply(s =>
+        {
+            s.CompressRootMode = RootDirectoryMode.AlwaysWrap;
+            s.FileNameTemplateDialog = "";
+        });
+
+        var vm = new CompressSettingsViewModel(new[] { MakeFile("report.txt") });
+        vm.WrapRoot = "";
+
         Assert.Equal(Path.GetFileName(_root), vm.RootNameExampleText);
-        // 与 VM 自己算出的包名一致：这条不变量比具体字符串更能防止两边漂移。
         Assert.Equal(vm.OutputFileName, vm.RootNameExampleText);
     }
 

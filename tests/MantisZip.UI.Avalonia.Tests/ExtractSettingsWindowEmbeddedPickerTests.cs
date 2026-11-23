@@ -19,9 +19,9 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// 解压设置窗内嵌选择器（v0.5.5「文件选择器去弹窗化」第三步）的回归用例。
 ///
 /// 覆盖三件事：
-/// ① 四个页签都在（输出设置 / 添加压缩包 / 文件过滤 / 加速）；
-    /// ② 两个选择器按内嵌用法配置（目标目录=PickFolder、压缩包=PickItems，默认都不是复选框模式）；
-    /// ③ 勾「复选框模式」后压缩包选择器切到跨目录累积 + 复选框手势（2026-11-03 与主窗口文件列表统一）。
+/// ① 五个页签都在（输出设置 / 添加压缩包 / 解压设置 / 文件过滤 / 加速）；
+/// ② 两个选择器按内嵌用法配置（目标目录=PickFolder、压缩包=PickItems，默认都不是复选框模式）；
+/// ③ 勾「复选框模式」后压缩包选择器切到跨目录累积 + 复选框手势（2026-11-03 与主窗口文件列表统一）。
 ///
 /// 另外锁住一个真实缺陷：新 key 只加进三份 JSON 还不够，VM 的 <c>LocalizedStrings</c>
 /// 是白名单字典，漏登记会让复选框**只剩一个空框没有文字**（当时真机就是这么发现的）。
@@ -29,7 +29,7 @@ namespace MantisZip.UI.Avalonia.Tests;
 public sealed class ExtractSettingsWindowEmbeddedPickerTests
 {
     [AvaloniaFact]
-    public void Window_HasFourTabs_WithNonEmptyHeaders()
+    public void Window_HasFiveTabs_WithNonEmptyHeaders()
     {
         var window = new ExtractSettingsWindow();
         try
@@ -39,13 +39,13 @@ public sealed class ExtractSettingsWindowEmbeddedPickerTests
 
             var tabs = window.GetVisualDescendants().OfType<TabControl>().FirstOrDefault();
             Assert.NotNull(tabs);
-            // 五个 TabItem：四个业务页 + 「选择要解压的文件」（条目选择模式下才可见，2026-10-30）
-        Assert.Equal(4, tabs!.ItemCount);
+            // 五个业务页：2026-11-23 从「输出设置」拆出「解压设置」（冲突策略 / 完成后行为 / 顶层目录）
+            Assert.Equal(5, tabs!.ItemCount);
 
             var headers = tabs.Items.OfType<TabItem>()
                 .Select(t => t.Header as string)
                 .ToList();
-            Assert.Equal(4, headers.Count); // 输出设置 / 添加压缩包 / 文件过滤 / 加速
+            Assert.Equal(5, headers.Count); // 输出设置 / 添加压缩包 / 解压设置 / 文件过滤 / 加速
             Assert.All(headers.Where(h => h is not null), h => Assert.False(string.IsNullOrWhiteSpace(h))); // 隐藏页的 Header 绑定可能尚未求值
         }
         finally

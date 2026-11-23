@@ -21,6 +21,7 @@
   "Menu_ClearChecked": "清空勾选",
   "Extract_TabOutput": "输出设置",
   "Extract_TabAddArchives": "添加压缩包",
+  "Extract_TabOptions": "解压设置",
   "Extract_SelectedArchives": "已选压缩包",
   "Extract_RemoveSelected": "移除所选",
   "Extract_OutputPickerHint": "切换下方浏览目录即更改解压目标；也可直接编辑上面的路径。",

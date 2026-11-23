@@ -441,6 +441,7 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_TabFilter",
             "Extract_TabOutput",
             "Extract_TabAddArchives",
+            "Extract_TabOptions",
             "Extract_SelectedArchives",
             "Extract_AddArchivesPickerHint",
             "Extract_OutputPickerHint",
