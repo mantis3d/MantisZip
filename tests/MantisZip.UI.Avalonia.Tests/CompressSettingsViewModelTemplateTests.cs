@@ -13,44 +13,27 @@ namespace MantisZip.UI.Avalonia.Tests;
 /// <summary>
 /// 压缩设置对话框里的「文件名模板」：默认值装载、三模式行为、校验拦截。
 /// 模板留空必须与引入前逐字节一致，这些用例是那条不变量的回归网。
+/// 设置读写走 <see cref="AppSettingsTestSandbox"/>：用例跑在自己的临时目录里，不再碰真实 settings.json。
 /// </summary>
 public class CompressSettingsViewModelTemplateTests : IDisposable
 {
+    private readonly AppSettingsTestSandbox _sandbox;
     private readonly string _root;
-    private readonly string _dialog;
-    private readonly string _quick;
-    private readonly string _separate;
-    private readonly FileNameTemplatePreset[] _presets;
 
     public CompressSettingsViewModelTemplateTests()
     {
-        _root = Path.Combine(Path.GetTempPath(), "mz-tpl-" + Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_root);
-
-        var settings = AppSettings.Load();
-        _dialog = settings.FileNameTemplateDialog;
-        _quick = settings.FileNameTemplateQuick;
-        _separate = settings.FileNameTemplateSeparate;
-        _presets = settings.FileNameTemplatePresets.ToArray();
+        _sandbox = new AppSettingsTestSandbox();
+        _root = _sandbox.Root;
     }
 
     public void Dispose()
     {
-        try { Directory.Delete(_root, recursive: true); } catch { /* 清理失败不影响断言 */ }
-
-        // 设置是进程级缓存 + 落盘，测试必须还原，否则污染其它用例
-        var settings = AppSettings.Load();
-        settings.FileNameTemplateDialog = _dialog;
-        settings.FileNameTemplateQuick = _quick;
-        settings.FileNameTemplateSeparate = _separate;
-        settings.FileNameTemplatePresets.Clear();
-        settings.FileNameTemplatePresets.AddRange(_presets);
-        settings.Save();
-        AppSettings.ResetCacheForTests();
+        _sandbox.Dispose();
         GC.SuppressFinalize(this);
     }
 
-    private static void Apply(Action<AppSettings> mutate)
+    /// <summary>改设置并落盘到沙箱：模拟「上次运行留下的模板配置」，再让 VM 从盘上读。</summary>
+    private void Apply(Action<AppSettings> mutate)
     {
         var settings = AppSettings.Load();
         mutate(settings);
@@ -301,9 +284,7 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
 
         // 上限提示走独立槽位：模板本身合法，不能把「文件名」那一格顶成红框
         Assert.NotNull(vm.TemplatePresetMessage);
-        Assert.True(vm.IsTemplatePresetMessageVisible);
         Assert.True(vm.IsTemplatePresetMessageError);
-        Assert.False(vm.IsTemplatePresetMessageSuccessVisible);
         Assert.Null(vm.TemplateError);
         Assert.False(vm.IsTemplateErrorVisible);
         Assert.Equal(AppSettings.MaxFileNameTemplatePresets, vm.TemplatePresetOptions.Count);
@@ -333,7 +314,7 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
 
         Assert.Equal("report_bak", vm.OutputFileName);
         Assert.False(vm.IsTemplateErrorVisible);
-        Assert.True(vm.IsTemplatePresetMessageVisible);
+        Assert.True(vm.IsTemplatePresetMessageError);
     }
 
     /// <summary>
@@ -356,12 +337,14 @@ public class CompressSettingsViewModelTemplateTests : IDisposable
         vm.SaveTemplatePresetCommand.Execute(null);
 
         Assert.NotNull(vm.TemplatePresetMessage);
-        Assert.True(vm.IsTemplatePresetMessageVisible);
         Assert.False(vm.IsTemplatePresetMessageError);
-        Assert.True(vm.IsTemplatePresetMessageSuccessVisible);
         Assert.Single(vm.TemplatePresetOptions);
         // 名字保留：紧接着再点「存为预设」应当是覆盖同一条
         Assert.Equal("新预设", vm.TemplatePresetName);
+
+        // 气泡收起后宿主清空消息，下一次同样的消息（值没变）才能再次触发变更通知
+        vm.DismissTemplatePresetMessage();
+        Assert.Null(vm.TemplatePresetMessage);
     }
 
     /// <summary>

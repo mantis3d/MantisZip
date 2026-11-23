@@ -133,9 +133,11 @@
                             Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
                 </Button>
               </Grid>
-              <!-- 模板输入框：实时校验，语法错误不阻止继续输入（只在下方错误行与确认时提示）。
-                   右侧「插入占位符」按钮弹出下拉，点一项即插到光标后。 -->
-              <Grid ColumnDefinitions="80,*,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+              <!-- 模板输入行：标签 → 模板输入框 → 插入占位符按钮 → 命名预设选择器，四列同一行
+                   （2026-11-19 把原来独占一行的「命名预设」并进来，形态与设置页
+                   Views/SettingsWindow.axaml 的三行模板输入保持一致：一行解决「写模板 / 插占位符 / 选存预设」）。
+                   实时校验：语法错误不阻止继续输入（只在下方错误行与确认时提示）。 -->
+              <Grid ColumnDefinitions="80,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
                 <TextBlock Grid.Column="0"
                            Text="{Binding LocalizedStrings[Compress_FileNameTemplate_RowLabel]}"
                            VerticalAlignment="Center"
@@ -153,36 +155,22 @@
                                                   TargetTextBox="{Binding #FileNameTemplateBox}"
                                                   Content="{Binding LocalizedStrings[Compress_FileNameTemplate_Insert]}"
                                                   ToolTip.Tip="{Binding LocalizedStrings[Compress_FileNameTemplate_InsertTip]}" />
+                <!-- 命名预设：可编辑下拉框（装预设名）+ 保存/删除两个纯图标按钮。
+                     下拉项 = 已有预设；打字 = 新名字（或要覆盖的名字）；点已有预设会回填同行模板。
+                     增删都走 TemplatePresetPicker 的事件，由 VM 写回设置（即时生效）。
+                     MinWidth 与设置页同值，窗口拉到最窄时先压模板输入框、预设选择器不塌。 -->
+                <controls:TemplatePresetPicker Grid.Column="3"
+                                               MinWidth="150"
+                                               Presets="{Binding TemplatePresetOptions}"
+                                               PresetName="{Binding TemplatePresetName, Mode=TwoWay}"
+                                               WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                               Message="{Binding TemplatePresetMessage}"
+                                               IsMessageError="{Binding IsTemplatePresetMessageError}"
+                                               PresetSelected="OnTemplatePresetSelected"
+                                               SaveRequested="OnTemplatePresetSaveRequested"
+                                               DeleteRequested="OnTemplatePresetDeleteRequested"
+                                               MessageDismissed="OnTemplatePresetMessageDismissed" />
               </Grid>
-              <!-- 命名预设：可编辑下拉框（装预设名）+ 保存/删除两个纯图标按钮。
-                   下拉项 = 已有预设；打字 = 新名字（或要覆盖的名字）；点已有预设会回填上方模板。
-                   增删都走 TemplatePresetPicker 的事件，由 VM 写回设置（即时生效）。 -->
-              <controls:TemplatePresetPicker Margin="80,0,0,0"
-                                             Presets="{Binding TemplatePresetOptions}"
-                                             PresetName="{Binding TemplatePresetName, Mode=TwoWay}"
-                                             WatermarkKey="Compress_FileNameTemplate_PresetName"
-                                             PresetSelected="OnTemplatePresetSelected"
-                                             SaveRequested="OnTemplatePresetSaveRequested"
-                                             DeleteRequested="OnTemplatePresetDeleteRequested" />
-              <!-- 预设操作提示（超过 20 条上限 / 已保存 / 已更新）：独立一行，
-                   不复用「文件名」那一格的错误槽，否则模板本身合法时也会把可读的文件名顶成红框。
-                   失败用红色、成功用次要色 —— 两个 TextBlock 由 IsError 互斥显示。 -->
-              <TextBlock Text="{Binding TemplatePresetMessage}"
-                         IsVisible="{Binding IsTemplatePresetMessageError}"
-                         Margin="80,0,0,0"
-                         TextWrapping="NoWrap"
-                         TextTrimming="CharacterEllipsis"
-                         FontSize="12"
-                         ToolTip.Tip="{Binding TemplatePresetMessage}"
-                         Foreground="{DynamicResource ThemeStatusErrorBrush}" />
-              <TextBlock Text="{Binding TemplatePresetMessage}"
-                         Margin="80,0,0,0"
-                         TextWrapping="NoWrap"
-                         TextTrimming="CharacterEllipsis"
-                         FontSize="12"
-                         ToolTip.Tip="{Binding TemplatePresetMessage}"
-                         Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                         IsVisible="{Binding IsTemplatePresetMessageSuccessVisible}" />
               <!-- 最终文件名 + 扩展名：启用模板时只读展示渲染结果，未启用时可直接编辑。
                    分别压缩模式下整行隐藏（每个源各自成包，见 IsFileNameSectionVisible）。 -->
               <Grid ColumnDefinitions="80,*,Auto"
@@ -293,14 +281,18 @@
                         Foreground="{DynamicResource ThemeTextPrimaryBrush}"
                         BorderBrush="{DynamicResource ThemeBorderBrush}" />
               </Grid>
-              <!-- 源文件列表：支持多选，显示路径，工具提示显示完整路径 -->
+              <!-- 源文件列表：支持多选，显示路径，工具提示显示完整路径。
+                   PathSegmentEllipsis（2026-11-18）：路径超宽时按**路径段**从中间挖掉、保留尾部文件名。
+                   原先的 CharacterEllipsis 是从尾巴开始砍，而文件名正好在尾巴上 —— 路径一深，
+                   用户最先看不见的正是文件名（内嵌选择器与解压窗都只显示文件名，只有这里是全路径）。 -->
               <ListBox x:Name="SourceFilesList"
                        Grid.Row="1"
                        Margin="0,6,0,0"
                        SelectionMode="Multiple"
                        ItemsSource="{Binding SelectedPaths}"
                        BorderBrush="{DynamicResource ThemeBorderBrush}"
-                       Background="{DynamicResource ThemeSurfaceBgBrush}">
+                       Background="{DynamicResource ThemeSurfaceBgBrush}"
+                       ContextRequested="OnSourceFilesListContextRequested">
                 <ListBox.ItemContainerTheme>
                   <ControlTheme TargetType="ListBoxItem">
                     <Setter Property="MinHeight" Value="{DynamicResource ControlHeightMd}" />
@@ -316,14 +308,43 @@
                     </Style>
                   </ControlTheme>
                 </ListBox.ItemContainerTheme>
+                <!-- 右键菜单：复制选中条目的完整路径（多选即多行）。
+                     路径在列表里必然被裁剪，用户要拿完整路径（贴到命令行/日志/脚本里）只能靠菜单或悬停提示。 -->
+                <ListBox.ContextMenu>
+                  <ContextMenu>
+                    <MenuItem x:Name="CopyPathMenuItem"
+                              Header="{Binding LocalizedStrings[Ctx_CopyPath]}"
+                              Click="OnSourceFileCopyPathClick" />
+                  </ContextMenu>
+                </ListBox.ContextMenu>
                 <ListBox.ItemTemplate>
                   <DataTemplate>
+                    <!-- TextTrimming 用 PathSegmentEllipsis 而不是 CharacterEllipsis：
+                         前者按「路径段」挖掉中间、保住尾部文件名，后者从尾巴砍 —— 正好砍掉文件名。 -->
                     <TextBlock Text="{Binding}"
-                               TextTrimming="CharacterEllipsis"
+                               TextTrimming="PathSegmentEllipsis"
                                ToolTip.Tip="{Binding}" />
                   </DataTemplate>
                 </ListBox.ItemTemplate>
               </ListBox>
+              <!-- 复制成功提示：浮现 1.6s 后隐藏（复用进度窗的 Toast 文案）。
+                   IsHitTestVisible=False 只作提示，点击穿透不挡列表操作。 -->
+              <Border x:Name="CopyPathToast"
+                      Grid.Row="1"
+                      IsVisible="False"
+                      IsHitTestVisible="False"
+                      VerticalAlignment="Bottom"
+                      HorizontalAlignment="Center"
+                      Margin="0,0,0,8"
+                      Padding="10,4"
+                      CornerRadius="{DynamicResource BorderRadius}"
+                      Background="{DynamicResource ThemeHeaderBgBrush}"
+                      BorderBrush="{DynamicResource ThemeBorderBrush}"
+                      BorderThickness="1">
+                <TextBlock Text="{Binding LocalizedStrings[Progress_Toast_Copied]}"
+                           FontSize="12"
+                           Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+              </Border>
               <!-- 选中文件摘要信息（数量、总大小等） -->
               <TextBlock Grid.Row="2"
                          Margin="0,6,0,0"

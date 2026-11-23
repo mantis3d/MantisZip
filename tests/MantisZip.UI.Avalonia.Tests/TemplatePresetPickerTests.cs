@@ -169,7 +169,105 @@ public sealed class TemplatePresetPickerTests
         Assert.Equal(["日期"], fired);
     }
 
-    private static (Window Window, TemplatePresetPicker Picker) Show(string? presetName)
+    /// <summary>
+    /// 操作结果走浮层气泡：消息出现时控件高度不变（气泡不进布局流），
+    /// 这是 2026-11-21 用户明确要求的「不要挤出新的一行」。
+    /// </summary>
+    [AvaloniaFact]
+    public void Message_ShowsInPopup_WithoutTakingLayoutSpace()
+    {
+        var (_, picker) = Show(presetName: "新预设");
+        var before = picker.Bounds.Height;
+
+        picker.Message = "已保存预设 新预设。";
+        Pump();
+
+        Assert.True(picker.IsMessagePopupOpen);
+        Assert.Equal(before, picker.Bounds.Height);
+    }
+
+    /// <summary>成功消息到点后自动收起，并回调宿主清空消息属性。</summary>
+    [AvaloniaFact]
+    public void SuccessMessage_ClosesItself_AndAsksHostToClearIt()
+    {
+        var (_, picker) = Show(presetName: "新预设");
+        var dismissed = 0;
+        picker.MessageDismissed += (_, _) => dismissed++;
+
+        picker.Message = "已保存预设 新预设。";
+        picker.IsMessageError = false;
+        Pump();
+        Assert.True(picker.IsMessagePopupOpen);
+
+        // 无头测试里 DispatcherTimer 不自行到期，直接驱动「到期」这一步：
+        // 验证的是到期之后的行为（收气泡 + 回调宿主），1.6s 的计时本身靠人工验证。
+        picker.DismissMessageNow();
+        Pump();
+
+        Assert.False(picker.IsMessagePopupOpen);
+        Assert.Equal(1, dismissed);
+    }
+
+    /// <summary>
+    /// 失败消息常驻：用户必须读到「为什么存不上」，不能一闪而过。
+    /// <para>
+    /// 这里必须让「成功消息时长」真的过去再断言——历史上的写法是只等 120ms、
+    /// 而控件默认时长 1600ms，于是「计时器没起来」和「计时器起来了但还没到点」
+    /// 两种状态都通过，测不出「失败消息被当成成功消息收起」这个真实缺陷。
+    /// </para>
+    /// </summary>
+    [AvaloniaFact]
+    public async System.Threading.Tasks.Task ErrorMessage_StaysUntilHostClearsIt()
+    {
+        var (_, picker) = Show(presetName: "新预设", successDuration: TimeSpan.FromMilliseconds(150));
+        var dismissed = 0;
+        picker.MessageDismissed += (_, _) => dismissed++;
+
+        // 宿主的真实赋值顺序：先 Message，再 IsMessageError（见 SetPresetMessage）。
+        picker.Message = "预设最多 20 条，删掉一条再存。";
+        picker.IsMessageError = true;
+        Pump();
+        Assert.True(picker.IsMessagePopupOpen);
+
+        // 等到远超成功时长：失败态不该启动自动收起计时器
+        await System.Threading.Tasks.Task.Delay(600);
+        Pump();
+        Assert.True(picker.IsMessagePopupOpen, "失败消息被自动收起了 —— 应按 IsMessageError 常驻");
+        Assert.Equal(0, dismissed);
+
+        picker.Message = null;
+        Pump();
+        Assert.False(picker.IsMessagePopupOpen);
+    }
+
+    /// <summary>
+    /// 错误消息之后紧跟一条成功消息：成功消息仍必须按时收起。
+    /// 反过来同理——两个属性各自的变更都要让计时器按最新的 <see cref="TemplatePresetPicker.IsMessageError"/> 重判，
+    /// 只处理 Message 一侧会漏掉「标志晚到」的半个状态机。
+    /// </summary>
+    [AvaloniaFact]
+    public async System.Threading.Tasks.Task SuccessMessage_AfterErrorMessage_StillClosesItself()
+    {
+        var (_, picker) = Show(presetName: "新预设", successDuration: TimeSpan.FromMilliseconds(150));
+
+        picker.Message = "预设最多 20 条，删掉一条再存。";
+        picker.IsMessageError = true;
+        Pump();
+        Assert.True(picker.IsMessagePopupOpen);
+
+        // 换成功消息，宿主依旧先写 Message 再写标志
+        picker.Message = "已保存预设 新预设。";
+        picker.IsMessageError = false;
+        Pump();
+        Assert.True(picker.IsMessagePopupOpen);
+
+        await System.Threading.Tasks.Task.Delay(600);
+        Pump();
+        Assert.False(picker.IsMessagePopupOpen, "错误之后的成功消息没有自动收起 —— 计时器没被重新启动");
+    }
+
+    private static (Window Window, TemplatePresetPicker Picker) Show(
+        string? presetName, TimeSpan? successDuration = null)
     {
         var app = Application.Current ?? new Application();
         if (app.Styles.Count == 0) app.Styles.Add(new FluentTheme());
@@ -181,6 +279,7 @@ public sealed class TemplatePresetPickerTests
             WatermarkKey = "Compress_FileNameTemplate_PresetName",
             Width = 320,
         };
+        if (successDuration is { } duration) picker.SuccessMessageDuration = duration;
 
         var window = new Window { Width = 420, Height = 160, Content = picker };
         window.Show();

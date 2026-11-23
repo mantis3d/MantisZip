@@ -12,9 +12,13 @@ namespace MantisZip.UI.Avalonia.Services;
 /// </summary>
 public static class MetadataSettingsManager
 {
-    private static readonly string SettingsDir = AppSettings.DataDir;
-    private static readonly string SettingsFile =
-        Path.Combine(SettingsDir, "metadata-panel.json");
+    /// <summary>
+    /// 元数据面板配置路径。**每次现取** <see cref="AppSettings.DataDir"/>：静态字段会在类型初始化时
+    /// 固化真实用户目录，测试重定向数据目录后仍然写用户的 metadata-panel.json（2026-11-23 同批修复）。
+    /// </summary>
+    private static string SettingsDir => AppSettings.DataDir;
+
+    private static string SettingsFile => Path.Combine(SettingsDir, "metadata-panel.json");
 
     private static MetadataPanelSettings? _cached;
 

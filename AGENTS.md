@@ -46,7 +46,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 | `pwsh -File scripts\verify-repo.ps1 -Task build -Target avalonia` | 构建并把 MSBuild 输出压成「文件:行:列 + 错误码」（项目级诊断无行列号时只显示 csproj 路径，如 restore/NU1301 失败） |
 | `pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests` | 跑测试 |
 | `pwsh -File scripts\verify-repo.ps1 -Task i18n` / `-Task version` | 单项检查 |
-| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8）/ 意图-执行接缝（规则 20）/ 数字输入受控（规则 22）/ 反序列化显式 options（规则 23）/ 设置项接线（规则 23）/ 格式身份单一入口（规则 23）/ 按钮样式选型（规则 4） |
+| `pwsh -File scripts\verify-repo.ps1 -Task guards` | 规则守卫：快捷键登记（规则 10.1）/ i18n 绑定登记（规则 13）/ 文件选择器（规则 16）/ 图标登记（规则 8）/ 意图-执行接缝（规则 20）/ 数字输入受控（规则 22）/ 反序列化显式 options（规则 23）/ 设置项接线（规则 23）/ 格式身份单一入口（规则 23）/ 按钮样式选型（规则 4）/ 资源键定义（规则 4）/ 门面文档时效性（规则 3） |
 | 追加 `-Json` | 机器可读输出（插件内部用） |
 
 - `-Target`：`avalonia`（默认）/ `core` / `shell` / `tests` / `ui-tests` / `solution`
@@ -54,7 +54,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - **退出码 0 = 通过，1 = 有问题** ⇒ CI 可直接用；`-Json` 时 `ok` 字段同义
 - `-Task test` 有一条**兜底**：`dotnet test` 失败且没有解析到任何编译诊断（= 测试根本没跑起来，如 VSTest testhost 在受限环境里无法打开父进程句柄）时，自动改用 `dotnet exec <测试程序集>` 直跑 xunit v3 的 MTP 入口，绕开 testhost；JSON 里 `runner` 为 `mtp`、`fallbackFrom` 为 `vstest`。编译错误或真实用例失败**不会**触发兜底
 - agent 面板里对应工具名：`mantiszip_verify` / `mantiszip_i18n` / `mantiszip_version` / `mantiszip_guards`（DSH 本地插件 `tools/dsh-plugin-mantiszip`，薄壳而已）
-- **换机器 / 换 agent 接手，或要改这套门禁时，先读 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)**：组成图、每个 task 干什么、五条守卫的覆盖边界、CI 七步门禁、反直觉实现（删掉会复发的写法）、环境坑、有意留白
+- **换机器 / 换 agent 接手，或要改这套门禁时，先读 [docs/MAINTENANCE.md](docs/MAINTENANCE.md)**：组成图、每个 task 干什么、十二条守卫的覆盖边界、CI 七步门禁、反直觉实现（删掉会复发的写法）、环境坑、有意留白
 
 ## Architecture（速查）
 
@@ -125,6 +125,7 @@ When releasing a new version, update the version string in ALL of these location
   - Avalonia 以日期为标识（`**2026-07-16**`）、共享层以版本号为标识（`#### v0.x.x (2026-07-16)`）
   - 同一日期多条按从晚到早排列（最新的在最上方）
 - 一次变更若属里程碑级，PROGRESS 加一行 + 细节文档同步追加；涉及多个领域（如 Core）在各对应文档各加一条；属于已有规划任务的标注进度
+- **顺手体检 AGENTS.md**：一次计划做完、或做了一次架构级 / 跨多文件的改动之后，回头扫一眼本文件——**新增的守卫改了条数、删掉了文件、挪了实现、换了做法，都在这里留着一句过期的话**。要改就同一次提交里改掉（`-Task guards` 的 `agentsdoc` 会拦幽灵文件、行号硬引用和守卫/CI 步数漂移，但「表述是否还成立」只能靠人看）
 
 ### 规则 4：新 UI 控件必须应用主题样式
 
@@ -286,7 +287,7 @@ dotnet test tests\MantisZip.UI.Avalonia.Tests\MantisZip.UI.Avalonia.Tests.csproj
 - **XAML 静态文案**：绑定 VM 属性或 `LocalizedStrings[Key]`（字典索引器绑定需 VM 实现 `LocalizedStrings` 并在 `OnCultureChanged` 刷新）
 - **Window/UserControl code-behind（DataContext=self）**：暴露 `public string XxxText => LocalizationManager.T("Key")` 并绑定，同时加 `x:CompileBindings="False"`
 - **新增 key 必须成对添加**到 `strings.zh-CN.json`、`strings.en.json`、`strings.zh-TW.json`（三语 key 集必须完全同步，`AboutWindowTests.AllThreeLanguages_HaveSameKeySet` 校验）；插入到文件头 `{` 之后（不排序），保持 **UTF-8 with BOM** + CRLF + 2 空格缩进（三份文件现状即带 BOM，`.editorconfig` 的 `[*.json] charset = utf-8-bom` 为准；改成无 BOM 会与既有文件不一致）
-- **XAML `LocalizedStrings[Key]` 绑定的 key 必须登记**到 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组（约 line 203 起的 `new[] { ... }`）。该字典**不是全量加载** JSON——漏登记会导致菜单/工具栏文字空白（图标仍在）且构建不报错
+- **XAML `LocalizedStrings[Key]` 绑定的 key 必须登记**到 `MainWindowViewModel.UpdateLocalizedStrings()` 的 keys 数组（`ViewModels/MainWindowViewModel.cs` 里 `var keys = new[] { ... }` 那段，搜索 `UpdateLocalizedStrings` 即可，别记死行号）。该字典**不是全量加载** JSON——漏登记会导致菜单/工具栏文字空白（图标仍在）且构建不报错；`-Task guards` 的 `i18n-bindings` 会拦
 - 完成后 `dotnet build` 无新增错误，并扫描确认无遗漏硬编码
 - **改完文案必须跑** `pwsh -File scripts\verify-repo.ps1 -Task i18n`（agent 面板里是 `mantiszip_i18n`）：校验三语 key 集合、`{0}` 占位符、重复 key、空值。工具不可用时手工比对三份文件——现有测试只校验解析后的 key 集合，**测不出重复 key**（JSON 解析会折叠）
 
@@ -376,7 +377,7 @@ git grep -n -E "OpenFilePickerAsync|SaveFilePickerAsync|OpenFolderPickerAsync" -
 `plans` 分支是**计划分支**：只写计划、改文档、做优先级与方案讨论，不承载产品代码改动。
 
 - **默认禁止**在 `plans` 分支上修改 `src/`、`tests/` 下的任何文件
-- **可在 `plans` 分支改**：`docs/`、`.omo/plans/`、`AGENTS.md`、`CLAUDE.md`、`RELEASE_NOTES.md` 等文档；以及不参与产品构建与 CI 门禁的**只读勘察 / 评审辅助脚本**（如 `scripts/render-icon-montage.ps1`）——它们服务于「把计划写清楚」，不是产品功能
+- **可在 `plans` 分支改**：`docs/`、`.omo/plans/`、`AGENTS.md`、`RELEASE_NOTES.md` 等文档；以及不参与产品构建与 CI 门禁的**只读勘察 / 评审辅助脚本**（如 `scripts/render-icon-montage.ps1`）——它们服务于「把计划写清楚」，不是产品功能
 - **把代码改动放对分支**：新功能 → `alpha`；缺陷复现 / 修错 / 验证 → `beta`；发版 → `main`
 - **用户在 `plans` 分支上要求改代码时，必须先停下来问**，给出两个选项、**不许替用户默认选**：
   1. **忘记切分支**（最常见）→ 建议先 `git switch alpha`（或 `beta`）再动手，等用户确认
@@ -444,6 +445,38 @@ switch (await ViewModel.TryConfirmAsync())
 
 - **守卫**：`-Task guards` 的 `jsonoptions`（单参数 `Deserialize` 即失败）与 `settingswiring`（`AppSettings` 属性在 `src/` 无消费者即失败；豁免表 `$SETTINGS_WIRING_EXEMPT` 带原因，修掉一个必须删一行，双向核对）
 - **守卫只增有事故的**：每条守卫必须对应一次真实发生过的事故（写进 `docs/MAINTENANCE.md` §4 的表格），不要为「理论上可能」写规则，否则门禁会膨胀到没人维护
+
+### 规则 24：测试不得读写真实用户设置文件
+
+`AppSettings.SettingsFile` 由静态构造决定、指向真实用户目录（`%LOCALAPPDATA%\MantisZip\settings.json`），而 `AppSettings._cached` 是**进程级**缓存。测试里「读真实文件 → 改 → 写回 → finally 还原」的老写法有两个坑，且都不是并行引起的（**别拿 `DisableTestParallelization` 当解药**，它解决的是 `LocalizationManager.CurrentLanguage` 这类全局静态竞态，见 `tests/MantisZip.UI.Avalonia.Tests/TestParallelization.cs`）：
+
+- 中途抛异常 → 本机用户设置被测试带走
+- `_cached` 跨用例残留 → 同批次后面的用例读到别人留下的中间态，症状是「单跑绿、全量偶尔红」
+
+**唯一正确写法**：测试方法开头一行
+
+```csharp
+using var sandbox = new AppSettingsTestSandbox();   // tests/MantisZip.UI.Avalonia.Tests/AppSettingsTestSandbox.cs
+```
+
+它把 Load/Save 的落点改到一次性临时目录并在 `Dispose` 恢复（底层是 `AppSettings.UseIsolatedSettingsFileForTests(path)`，经 `InternalsVisibleTo` 暴露）。**禁止**在测试里直接 `File.Copy` / `File.Delete` 真实 settings.json，也不要断言真实文件的时间戳或内容。
+
+**程序集级安全网（2026-11-22 加）**：`tests/MantisZip.UI.Avalonia.Tests/AppSettingsTestRedirect.cs` 用 `[ModuleInitializer]` 在程序集加载期就把落点重定向到一次性目录、进程退出时删除，句柄刻意不释放。原因见事故：UI 测试里有十几处「只 new 一个窗口/VM，`OnClosed` 里就落盘」的用例（`CompressSettingsWindow.PersistGeometry` / `ExtractSettingsWindow.PersistGeometry` / `ProgressWindow.OnClosed` / `MainWindowViewModel.SaveSetting` …）从来没写沙箱；一次全量 ui-tests 的 `SaveTo` 共 80 次，**42 次直接写进真实 `%LOCALAPPDATA%\MantisZip\settings.json`**，其中 35 次写的是「模板空、预设空」的裸实例 —— 用户保存的命名预设就这么被冲掉了。所以「谁需要谁自己 using」不够：漏掉的用例必须失败在明处。这层只保证「漏了沙箱」不会污染用户磁盘，**需要精确控制设置内容的用例仍要自己 `using var sandbox = ...`**（在安全网之上再重定向、退出还原）。
+
+**同一个文件（`settings.json`）之外，数据目录也要一起重定向（2026-11-23 补）**：`recent.json` / `window.json` / `layout.json` / `metadata-panel.json` / `lifecycle.log` 都从 `AppSettings.DataDir` 拼路径，Core 侧的 `favorites.json` / `path-history.json` / `debug.log` / `conflict.log` 走 `MantisZip.Core.Utils.AppDataPaths.Dir`。只护住 settings.json 时，跑一次全量 ui-tests 仍会把用户的「最近打开」「窗口布局」写成测试数据（实测三份文件 mtime 被刷成同一秒）。现在：UI 测试的 `AppSettingsTestSandbox` / `AppSettingsTestRedirect` 会把 `DataDir` 一并指向沙箱；Core 测试由 `tests/MantisZip.Tests/TestAppDataRedirect.cs`（同样 `[ModuleInitializer]`）护住 `AppDataPaths.Dir`。**写这些管理器时不要用 `static readonly string Path = ...` 固化路径** —— 静态字段在类型初始化那一刻取到真实目录，之后重定向再也管不到，必须写成每次现取的属性。
+
+### 规则 25：无头测试宿主的样式前提——要复现真机缺陷必须自带样式
+
+`tests/MantisZip.UI.Avalonia.Tests/TestAppBuilder.cs` 用 `AppBuilder.Configure<Application>()`：**不跑 `App.Initialize()`、默认没有任何全局样式**（`App.axaml` 的 `Styles` 一条都不在）。于是依赖 `Style` / `ControlTheme` 才成立的缺陷（例：`ComboBox` 可编辑态边框被模板覆盖、`Button` 没有模板导致点了没反应）在无头测试里**完全复现不出来**，测试照旧全绿。
+
+要写这类回归测试：
+
+1. 本用例内 `var app = new MantisZip.UI.Avalonia.App(); app.Initialize();`（不要指望宿主已经调过）
+2. 补 `FluentTheme` + `Themes/ThemeLight.axaml` + `Resources/Icons/AppIcons.axaml` 三个资源字典
+3. 样式挂到**本用例自己的 `Window.Styles`**——**禁止**塞 `Application.Current.Styles`：那是进程级单例，会污染同批次其他用例（无头宿主整进程复用），症状是别的用例突然样式错乱
+4. 断言用像素或布局实测（96 DPI 下 `RenderTargetBitmap` 扫像素、泵一轮 `LayoutManager`），不要只断言「属性被设置了」
+
+参照实现：`tests/MantisZip.UI.Avalonia.Tests/ComboEditableBorderTests.cs`（2 例）、`AboutWindowUpdateTabTests.cs`、`ContentLayoutRenderTests.cs`。
 
 ## 未来工作
 

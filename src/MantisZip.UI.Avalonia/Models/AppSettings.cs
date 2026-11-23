@@ -17,7 +17,6 @@ public class AppSettings
     // ===== 压缩 =====
     public string DefaultFormat { get; set; } = "zip";
     public int DefaultLevel { get; set; } = 5;
-    public bool KeepOriginalExtension { get; set; } = false;
     public string ZipEncoding { get; set; } = "utf-8";
 
     /// <summary>
@@ -488,7 +487,18 @@ public class AppSettings
     public static bool IsPortableMode { get; private set; }
 
     /// <summary>应用数据目录：便携模式 = exe 旁 Data/，否则 = %LOCALAPPDATA%\MantisZip。</summary>
-    public static string DataDir { get; private set; } = "";
+    public static string DataDir => _dataDirOverride ?? _dataDir;
+
+    private static string _dataDir = "";
+
+    /// <summary>
+    /// 测试重定向用的数据目录覆盖（见 <see cref="UseIsolatedSettingsFileForTests"/>）。
+    /// 生产路径从不设置。之所以连它一起重定向：<c>recent.json</c> / <c>window.json</c> /
+    /// <c>layout.json</c> / <c>metadata-panel.json</c> / <c>lifecycle.log</c> 全都从
+    /// <see cref="DataDir"/> 拼路径，只护住 settings.json 的话，跑一次 ui-tests 依旧会改写
+    /// 用户的「最近打开」「窗口布局」（2026-11-23 实测：三份文件 mtime 被刷新成同一秒）。
+    /// </summary>
+    private static string? _dataDirOverride;
 
     /// <summary>
     /// 临时文件根目录：便携模式 = exe 旁 Data/Temp/，普通模式 = %TEMP%/MantisZip/。
@@ -519,16 +529,16 @@ public class AppSettings
         {
             var dataDir = Path.Combine(AppContext.BaseDirectory, "Data");
             Directory.CreateDirectory(dataDir);
-            DataDir = dataDir;
+            _dataDir = dataDir;
             SettingsDir = dataDir;
             SettingsFile = Path.Combine(dataDir, "settings.json");
             PasswordManager.CustomDataDir = dataDir;
         }
         else
         {
-            DataDir = Path.Combine(
+            _dataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
-            SettingsDir = DataDir;
+            SettingsDir = _dataDir;
             SettingsFile = Path.Combine(SettingsDir, "settings.json");
         }
     }
@@ -543,6 +553,18 @@ public class AppSettings
     /// </summary>
     private static string? _unreadableSettingsFile;
 
+    /// <summary>
+    /// 测试用的设置文件重定向（null = 用真实 <see cref="SettingsFile"/>）。
+    /// 存在的理由：测试要覆盖「读盘 → 改 → 落盘 → 再读」的完整链路，而 <see cref="SettingsFile"/>
+    /// 由静态构造决定、指向**真实用户目录**——老做法是测试改完再还原，一旦中途异常就把本机设置带走，
+    /// 且并发/顺序一变就互相污染（CompressSettingsViewModelTemplateTests 曾因此偶发失败）。
+    /// 生产路径从不设置它，行为逐字节不变。
+    /// </summary>
+    private static string? _settingsFileOverride;
+
+    /// <summary>当前生效的设置文件：测试重定向生效时取它，否则真实路径。</summary>
+    private static string EffectiveSettingsFile => _settingsFileOverride ?? SettingsFile;
+
     public static AppSettings Load()
     {
         lock (SyncRoot)
@@ -550,7 +572,7 @@ public class AppSettings
             // 缓存命中（startup-appsettings-cache：每进程只读盘一次）
             if (_cached != null) return _cached;
 
-            var (settings, cacheable) = LoadCore(SettingsFile);
+            var (settings, cacheable) = LoadCore(EffectiveSettingsFile);
             // 异常态不缓存：下次 Load 重试读盘，避免把损坏文件态固化
             if (cacheable) _cached = settings;
             return settings;
@@ -589,7 +611,10 @@ public class AppSettings
         }
 
         LogSettingsRecovery(quarantined, error, backupError, restored != null);
-        return (restored ?? new AppSettings(), false);
+        // 主文件坏、备份也读不出来 ⇒ 用户手上已经没有设置，等同首装：
+        // 走 CreateWithDefaults 而不是裸 new AppSettings()，否则「设置丢了」会连带
+        // 把出厂默认模板与预设一起丢掉，用户看到的是全空白（与全新安装不一致）。
+        return (restored ?? CreateWithDefaults(), false);
     }
 
     /// <summary>
@@ -702,7 +727,7 @@ public class AppSettings
 
     private static string OneLine(string? text) => (text ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ');
 
-    public bool Save() => SaveTo(SettingsFile);
+    public bool Save() => SaveTo(EffectiveSettingsFile);
 
     /// <summary>
     /// 写入指定路径（<see cref="Save"/> 走 <c>SettingsFile</c>，测试用其余路径）。
@@ -775,12 +800,193 @@ public class AppSettings
         }
     }
 
-    /// <summary>创建带默认自适应规则的新实例。</summary>
+    /// <summary>
+    /// 测试钩子：把 <see cref="Load"/> / <see cref="Save"/> 的落点重定向到临时文件，并清空缓存，
+    /// 让测试从头读自己的沙箱。返回的句柄 <see cref="Dispose"/> 时恢复真实路径并再次清缓存。
+    /// <para>
+    /// 同时把 <see cref="DataDir"/> 指向该文件所在目录：<c>recent.json</c> / <c>window.json</c> /
+    /// <c>layout.json</c> / <c>metadata-panel.json</c> / <c>lifecycle.log</c> 都从 DataDir 拼路径，
+    /// 只重定向 settings.json 的话测试照样会改写用户的「最近打开」与「窗口布局」。
+    /// </para>
+    /// </summary>
+    /// <param name="settingsFile">临时设置文件路径（父目录不存在会自动创建）。</param>
+    internal static IDisposable UseIsolatedSettingsFileForTests(string settingsFile)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingsFile);
+
+        lock (SyncRoot)
+        {
+            var previousFile = _settingsFileOverride;
+            var previousDir = _dataDirOverride;
+            _settingsFileOverride = settingsFile;
+            _dataDirOverride = Path.GetDirectoryName(settingsFile) ?? previousDir;
+            _unreadableSettingsFile = null;
+            _cached = null;
+            return new SettingsFileScope(previousFile, previousDir);
+        }
+    }
+
+    /// <summary>恢复重定向前的路径并清缓存，保证不把沙箱实例留在进程级缓存里。</summary>
+    private sealed class SettingsFileScope(string? previousFile, string? previousDir) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            lock (SyncRoot)
+            {
+                _settingsFileOverride = previousFile;
+                _dataDirOverride = previousDir;
+                _unreadableSettingsFile = null;
+                _cached = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 出厂默认设置的嵌入资源名（见 csproj 的 <c>LogicalName</c>）。
+    /// 内容是**整份 AppSettings 快照**，维护方式就是直接改
+    /// <c>src/MantisZip.UI.Avalonia/Resources/Defaults/settings.json</c>：新增的 C# 属性在 json 里
+    /// 缺项时自动保留字段初值（反序列化语义），不需要任何合并逻辑。
+    /// </summary>
+    internal const string DefaultSettingsResourceName =
+        "MantisZip.UI.Avalonia.Resources.Defaults.settings.json";
+
+    /// <summary>
+    /// 安装器写入的一次性「向导选择」文件名：内含 <c>Language</c> / <c>Theme</c> 两个键。
+    /// 应用首启读一次、把选择写进 settings.json 之后才删除，之后一切以 settings.json 为准。
+    /// </summary>
+    private const string InstallChoicesFileName = "install-choices.json";
+
+    /// <summary>
+    /// 创建出厂默认实例：优先读内嵌的默认设置快照
+    /// （<see cref="DefaultSettingsResourceName"/>），再套用安装器的一次性向导选择。
+    /// 内嵌资源缺失/损坏时回落到代码里写的最小默认值，保证「读不出默认」不会让功能不可用。
+    /// </summary>
     private static AppSettings CreateWithDefaults()
+    {
+        var settings = LoadDefaultSettingsTemplate() ?? CreateBuiltInDefaults();
+        var choicesFile = ApplyInstallChoices(settings);
+        ApplyMigrations(settings);
+
+        // 向导选择必须**当场固化**：install-choices.json 是一次性文件，删掉就再没有第二份来源。
+        // 早先「套用完就删、但不落盘」有个只在离线用户身上出现的坑——启动路径从不写 settings.json
+        // （唯一会自动写盘的是更新检查，且只在联网成功时才写），于是第二次启动重新走本方法时
+        // 向导选择已经没了，语言/主题被打回出厂默认（2026-11-23 实测：首启 en/Dark，二启 zh/System）。
+        // 落盘成功与否决定要不要删：写不下去就把文件留着，下次启动还能再套一次（同值，无副作用）。
+        if (choicesFile is not null && settings.SaveTo(EffectiveSettingsFile))
+            TryDeleteInstallChoices(choicesFile);
+
+        return settings;
+    }
+
+    /// <summary>
+    /// 代码里的最小默认值（内嵌快照读不出来时的兜底）。内容必须与
+    /// <c>Resources/Defaults/settings.json</c> 的核心语义一致：默认自适应规则 + 出厂命名模板与两条预设。
+    /// 预设名是**用户可编辑的数据**，不是界面文案，故不走 i18n（规则 13 的内容数据豁免）。
+    /// </summary>
+    private static AppSettings CreateBuiltInDefaults()
     {
         var settings = new AppSettings();
         settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+        settings.FileNameTemplateDialog = "{name:auto}";
+        settings.FileNameTemplatePresets.Add(new FileNameTemplatePreset("Auto Name", "{name:auto}"));
+        settings.FileNameTemplatePresets.Add(new FileNameTemplatePreset("Name & Date", "{name:auto}-{date}"));
         return settings;
+    }
+
+    /// <summary>
+    /// 读取内嵌的默认设置快照。读不出来（资源缺失、JSON 损坏）返回 <c>null</c>，由调用方回落代码默认值。
+    /// </summary>
+    private static AppSettings? LoadDefaultSettingsTemplate()
+    {
+        try
+        {
+            using var stream = typeof(AppSettings).Assembly.GetManifestResourceStream(DefaultSettingsResourceName);
+            if (stream is null)
+            {
+                LogDefaultsFallback("embedded resource missing");
+                return null;
+            }
+
+            using var reader = new StreamReader(stream);
+            var parsed = JsonSerializer.Deserialize(reader.ReadToEnd(), AppSettingsJsonContext.Default.AppSettings);
+            if (parsed is null)
+            {
+                LogDefaultsFallback("embedded resource deserialized to null");
+                return null;
+            }
+
+            return parsed;
+        }
+        catch (Exception ex)
+        {
+            LogDefaultsFallback($"{ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 套用安装器写入的一次性向导选择（语言 / 主题）。
+    /// 为什么单独走一个文件而不是让安装器直接写 settings.json：settings.json 只能有**一个**事实源
+    /// （内嵌快照），否则安装器里那份会常年落后于代码、并把出厂默认覆盖成旧值。
+    /// 读不到/解析失败都当没有，不影响首启。
+    /// <para>
+    /// 返回被读到的那个文件路径（没有则 <c>null</c>）。**删除交给调用方**：只有把套用后的设置
+    /// 成功写进 settings.json 之后才允许删，否则选择会丢在半路（见 <see cref="CreateWithDefaults"/>）。
+    /// </para>
+    /// </summary>
+    private static string? ApplyInstallChoices(AppSettings settings)
+    {
+        try
+        {
+            var dir = IsPortableMode ? DataDir : Path.GetDirectoryName(EffectiveSettingsFile) ?? DataDir;
+            var path = Path.Combine(dir, InstallChoicesFileName);
+            if (!File.Exists(path)) return null;
+
+            var json = File.ReadAllText(path);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("Language", out var language) && language.ValueKind == JsonValueKind.String)
+            {
+                var code = language.GetString();
+                if (!string.IsNullOrWhiteSpace(code)) settings.Language = code;
+            }
+
+            if (root.TryGetProperty("Theme", out var theme) && theme.ValueKind == JsonValueKind.String)
+            {
+                var value = theme.GetString();
+                if (!string.IsNullOrWhiteSpace(value)) settings.Theme = value;
+            }
+
+            return path;
+        }
+        catch
+        {
+            // 向导选择只是锦上添花：解析失败就当用户没选，绝不因此让首启失败
+            return null;
+        }
+    }
+
+    private static void TryDeleteInstallChoices(string path)
+    {
+        try { File.Delete(path); } catch { /* 删不掉下次还会再套一次，同值无副作用 */ }
+    }
+
+    private static void LogDefaultsFallback(string reason)
+    {
+        try
+        {
+            Services.LifetimeDiagnostics.Log($"default settings fallback to built-in defaults reason='{OneLine(reason)}'");
+        }
+        catch
+        {
+            // 日志写不了不影响默认值生成
+        }
     }
 
     /// <summary>

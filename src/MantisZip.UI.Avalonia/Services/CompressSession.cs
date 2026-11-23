@@ -315,7 +315,6 @@ public sealed class CompressSession : ICompressSession
             // 「包内根目录」四态：用户在对话框里的决定，必须随载荷走（默认原样）。
             RootMode = settings.RootMode,
             WrapRoot = settings.WrapRoot,
-            KeepOriginalExtension = settings.EngineOptions.KeepOriginalExtension,
             FileNameEncoding = settings.EngineOptions.FileNameEncoding,
             ZipCompressionMethod = settings.EngineOptions.ZipCompressionMethod,
             ZipEncryptionMethod = settings.EngineOptions.ZipEncryptionMethod,

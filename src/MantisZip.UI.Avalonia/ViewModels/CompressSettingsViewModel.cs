@@ -94,10 +94,6 @@ public partial class CompressSettingsViewModel : ObservableObject
     [ObservableProperty]
     private string _defaultFormat = "zip";
 
-    /// <summary>Separate 模式下是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）。</summary>
-    [ObservableProperty]
-    private bool _keepOriginalExtension;
-
     /// <summary>本次压缩成功后打开输出所在目录并选中产物（初值镜像设置，不回写；进度窗口底部还能临时改）。</summary>
     [ObservableProperty]
     private bool _openFolderAfterCompress;
@@ -159,7 +155,8 @@ public partial class CompressSettingsViewModel : ObservableObject
     // 逐项压缩下每个源各渲染一条。空模板 = 完全走旧命名（逐字节不变）。
 
     /// <summary>
-    /// 文件名模板（占位符形式）。空白 = 未启用。启用时「保留源文件扩展名」失效，要保留请写 <c>{ext}</c>。
+    /// 文件名模板（占位符形式）。空白 = 未启用。启用时命名完全由模板决定，
+    /// 源扩展名要保留就在模板里写 <c>{ext}</c>（「保留源文件扩展名」开关已于 2026-11-22 删除）。
     /// </summary>
     [ObservableProperty]
     private string? _fileNameTemplate;
@@ -626,6 +623,10 @@ public partial class CompressSettingsViewModel : ObservableObject
         LocalizedStrings["Compress_TabCompress"] = LocalizationManager.T("Compress_TabCompress");
         LocalizedStrings["Picker_CheckboxMode"] = LocalizationManager.T("Picker_CheckboxMode");
         LocalizedStrings["Compress_SelectedSources"] = LocalizationManager.T("Compress_SelectedSources");
+        // 「已选源文件」右键菜单 + 复制成功提示（2026-11-18）：
+        // 路径在列表里必然被裁剪，用户要靠右键菜单拿到可粘贴的完整路径。
+        LocalizedStrings["Ctx_CopyPath"] = LocalizationManager.T("Ctx_CopyPath");
+        LocalizedStrings["Progress_Toast_Copied"] = LocalizationManager.T("Progress_Toast_Copied");
         LocalizedStrings["Compress_TabGeneral"] = LocalizationManager.T("Compress_TabGeneral");
         LocalizedStrings["Compress_TabAdvanced"] = LocalizationManager.T("Compress_TabAdvanced");
         LocalizedStrings["Compress_VolumeSize"] = LocalizationManager.T("Compress_VolumeSize");
@@ -765,7 +766,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         try
         {
             var settings = AppSettings.Load();
-            KeepOriginalExtension = settings.KeepOriginalExtension;
             OpenFolderAfterCompress = settings.OpenFolderAfterCompress;
             FileNameEncoding = settings.ZipEncoding ?? "utf-8";
             ZipCompressionMethod = settings.ZipCompressionMethod ?? "deflate";
@@ -877,7 +877,6 @@ public partial class CompressSettingsViewModel : ObservableObject
         var outputMode = OutputMode;
         var outputPath = OutputPath;
         var format = DefaultFormat;
-        var keepOriginalExtension = KeepOriginalExtension;
 
         // 过滤签名变化 → 整表失效；源集变化 → 清理已移除源的缓存
         var sig = FilterSignature(filter);
@@ -910,7 +909,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             await shallowTask;
             if (version != _previewBuildVersion) return null;
 
-            var assembled = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+            var assembled = await AssembleAsync(paths, outputMode, outputPath, format, filter, ct);
             if (version != _previewBuildVersion) return null;
             PreviewRoot = assembled.Root;
             IsPreviewBuilding = false;
@@ -944,7 +943,7 @@ public partial class CompressSettingsViewModel : ObservableObject
                 if ((DateTime.UtcNow - _lastProgressiveAssemble).TotalMilliseconds < ProgressiveAssembleIntervalMs) return;
                 try
                 {
-                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, filter, ct);
                     if (version != _previewBuildVersion) return;
                     PreviewRoot = progressive.Root;
                     _lastProgressiveAssemble = DateTime.UtcNow;
@@ -976,7 +975,7 @@ public partial class CompressSettingsViewModel : ObservableObject
                 // 节流：250ms 内的中间重组跳过（最后一次组装必然执行，不丢源）
                 if ((DateTime.UtcNow - _lastProgressiveAssemble).TotalMilliseconds >= 250)
                 {
-                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+                    var progressive = await AssembleAsync(paths, outputMode, outputPath, format, filter, ct);
                     if (version != _previewBuildVersion) return null;
                     PreviewRoot = progressive.Root;
                     _lastProgressiveAssemble = DateTime.UtcNow;
@@ -984,7 +983,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             }
 
             // ── Phase C：最终组装（含完整 Plan）──
-            var final = await AssembleAsync(paths, outputMode, outputPath, format, keepOriginalExtension, filter, ct);
+            var final = await AssembleAsync(paths, outputMode, outputPath, format, filter, ct);
             if (version != _previewBuildVersion) return null;
             PreviewRoot = final.Root;
             Plan = final.Plan;
@@ -1018,7 +1017,7 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// <summary>后台装配预览树（含 stats）+ Plan，仅把结果赋值切回 UI 线程。</summary>
     private async Task<(PreviewTreeNode Root, CompressPlan Plan)> AssembleAsync(
         List<string> paths, CompressOutputMode outputMode, string? outputPath,
-        string format, bool keepOriginalExtension, FileFilterCriteria? filter, CancellationToken ct)
+        string format, FileFilterCriteria? filter, CancellationToken ct)
     {
         var subtrees = paths.Select(ResolveSubtreeForDisplay).ToList();
 
@@ -1032,7 +1031,7 @@ public partial class CompressSettingsViewModel : ObservableObject
         var wrapRoot = IsWrapActive ? WrapRoot : null;
 
         return await Task.Run(() => ResultPreviewService.AssembleCompressPreview(
-            paths, subtrees, outputMode, outputPath, format, keepOriginalExtension, filter,
+            paths, subtrees, outputMode, outputPath, format, filter,
             template, timestamp, rootMode, wrapRoot), ct);
     }
 
@@ -1593,12 +1592,11 @@ public partial class CompressSettingsViewModel : ObservableObject
     /// </summary>
     public bool IsTemplateErrorVisible => IsTemplateActive && TemplateError != null;
 
-    /// <summary>预设操作提示（如超过上限）是否可见。与模板错误分开，不占用「文件名」那一格。</summary>
-    public bool IsTemplatePresetMessageVisible => TemplatePresetMessage != null;
-
-    /// <summary>预设操作成功的提示（「已保存 / 已更新」）是否可见 —— 成功与失败共用一条提示槽。</summary>
-    public bool IsTemplatePresetMessageSuccessVisible
-        => TemplatePresetMessage != null && !IsTemplatePresetMessageError;
+    /// <summary>
+    /// 预设操作结果的气泡自动收起后清空消息，让下一次同样的消息还能重新弹出
+    /// （值没变不会触发变更通知，气泡就再也不出来了）。
+    /// </summary>
+    public void DismissTemplatePresetMessage() => TemplatePresetMessage = null;
 
     /// <summary>
     /// 「文件名」结果行是否可见。分别压缩时每个源各自成包、这一行没有意义要隐藏；
@@ -1640,6 +1638,8 @@ public partial class CompressSettingsViewModel : ObservableObject
         // 注意：这里**不清空** TemplatePresetName。名字框装的是「要覆盖/要删除的那条预设」，
         // 用户改了模板但没改名字，本意就是「把这套新模板存回同名预设」，清掉名字会让
         // 「存为预设」拿不到名字、只能拿模板文本当名字（2026-11-14 换可编辑下拉后确立）。
+        // 但上一条预设操作消息是**旧模板**的结果（失败尤其如此），模板一变就作废。
+        TemplatePresetMessage = null;
         TemplateError = ValidateTemplateNow();
         OnPropertyChanged(nameof(IsTemplateActive));
         OnPropertyChanged(nameof(IsOutputFileNameReadOnly));
@@ -1657,12 +1657,8 @@ public partial class CompressSettingsViewModel : ObservableObject
 
     partial void OnTemplatePresetMessageChanged(string? value)
     {
-        OnPropertyChanged(nameof(IsTemplatePresetMessageVisible));
-        OnPropertyChanged(nameof(IsTemplatePresetMessageSuccessVisible));
+        // 消息由 TemplatePresetPicker 的气泡渲染，宿主这边没有派生可见性属性要通知。
     }
-
-    partial void OnIsTemplatePresetMessageErrorChanged(bool value)
-        => OnPropertyChanged(nameof(IsTemplatePresetMessageSuccessVisible));
 
     /// <summary>
     /// 立刻校验一次模板（语法 + 结果合法性 + 分别压缩下的重名）。
@@ -1685,7 +1681,7 @@ public partial class CompressSettingsViewModel : ObservableObject
             // 只有同一个输出目录里撞了同名包才算重名 —— 按全路径判重，不能用文件名。
             var usedPaths = new HashSet<string>(StringComparer.OrdinalIgnoreCase);
             var plan = CompressPathPlanner.PlanSeparate(
-                paths, DefaultFormat, KeepOriginalExtension, FileNameTemplate, _templateTimestamp);
+                paths, DefaultFormat, FileNameTemplate, _templateTimestamp);
             foreach (var item in plan)
             {
                 if (!usedPaths.Add(item.OutputArchivePath))
@@ -2217,7 +2213,6 @@ public partial class CompressSettingsViewModel : ObservableObject
             SevenZipMultithreaded: SevenZipMultithreaded,
             SevenZipEncryptHeaders: SevenZipEncryptHeaders,
             FileNameEncoding: FileNameEncoding,
-            KeepOriginalExtension: KeepOriginalExtension,
             AdaptiveCompression: AdaptiveCompression,
             AdaptiveSmartDetect: AdaptiveSmartDetect);
 

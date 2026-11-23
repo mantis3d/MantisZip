@@ -277,7 +277,6 @@ public partial class App : Application
             Mode = CompressOutputMode.Separate,
             Format = settings.DefaultFormat,
             CompressionLevel = settings.DefaultLevel,
-            KeepOriginalExtension = false,
             PreserveDirectoryRoot = true,
             // 文件名模板（分别压缩默认值）：没有预览阶段，靠请求把命名规则带到执行侧
             FileNameTemplate = string.IsNullOrWhiteSpace(settings.FileNameTemplateSeparate) ? null : settings.FileNameTemplateSeparate,

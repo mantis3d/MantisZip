@@ -42,6 +42,8 @@ public class CardRowHeaderMenuTests
     [AvaloniaFact]
     public void TileRowHeaderMenu_Click_TogglesTileField_NotContentField()
     {
+        using var sandbox = new AppSettingsTestSandbox();
+
         var win = new MainWindow();
         var host = win.FindControl<ContentControl>("ArchiveContentHost");
         Assert.NotNull(host);
@@ -52,41 +54,16 @@ public class CardRowHeaderMenuTests
         var border = Assert.IsType<Border>(view.FindControl<Border>("TileRowHeaderBorder"));
         var menu = Assert.IsType<ContextMenu>(border!.ContextMenu);
 
-        AppSettings.ResetCacheForTests();
-        var snap = new
-        {
-            AppSettings.Load().TileRowShowSize,
-            AppSettings.Load().TileRowShowCompressedSize,
-            AppSettings.Load().TileRowShowRatio,
-            AppSettings.Load().TileRowShowDate,
-            AppSettings.Load().ContentRowShowSize,
-            AppSettings.Load().ContentRowShowCompressedSize,
-            AppSettings.Load().ContentRowShowRatio,
-            AppSettings.Load().ContentRowShowDate,
-        };
-        try
-        {
-            RaiseOpening(view, menu);
-            ClickFirstItem(menu);
-            // Tile 菜单必须翻 Tile 的字段（Content 零变化）
-            Assert.NotEqual(snap.TileRowShowSize, AppSettings.Load().TileRowShowSize);
-            Assert.Equal(snap.ContentRowShowSize, AppSettings.Load().ContentRowShowSize);
-            Assert.Equal(snap.ContentRowShowCompressedSize, AppSettings.Load().ContentRowShowCompressedSize);
-        }
-        finally
-        {
-            // 落盘净零：8 字段全部按快照还原（惯例同 CardRowSettingsTests）
-            var disk = AppSettings.Load();
-            MainWindowViewModel.ApplyCardRow(disk, true, CardRowKind.Size, snap.TileRowShowSize);
-            MainWindowViewModel.ApplyCardRow(disk, true, CardRowKind.CompressedSize, snap.TileRowShowCompressedSize);
-            MainWindowViewModel.ApplyCardRow(disk, true, CardRowKind.Ratio, snap.TileRowShowRatio);
-            MainWindowViewModel.ApplyCardRow(disk, true, CardRowKind.Date, snap.TileRowShowDate);
-            MainWindowViewModel.ApplyCardRow(disk, false, CardRowKind.Size, snap.ContentRowShowSize);
-            MainWindowViewModel.ApplyCardRow(disk, false, CardRowKind.CompressedSize, snap.ContentRowShowCompressedSize);
-            MainWindowViewModel.ApplyCardRow(disk, false, CardRowKind.Ratio, snap.ContentRowShowRatio);
-            MainWindowViewModel.ApplyCardRow(disk, false, CardRowKind.Date, snap.ContentRowShowDate);
-            disk.Save();
-        }
+        // 沙箱内是默认值：Tile 大小 = 开、Content 全部 = 开，翻转即由 true 变 false
+        Assert.True(AppSettings.Load().TileRowShowSize);
+        Assert.True(AppSettings.Load().ContentRowShowSize);
+
+        RaiseOpening(view, menu);
+        ClickFirstItem(menu);
+        // Tile 菜单必须翻 Tile 的字段（Content 零变化）
+        Assert.False(AppSettings.Load().TileRowShowSize);
+        Assert.True(AppSettings.Load().ContentRowShowSize);
+        Assert.True(AppSettings.Load().ContentRowShowCompressedSize);
 
         win.Close();
     }
@@ -94,6 +71,8 @@ public class CardRowHeaderMenuTests
     [AvaloniaFact]
     public void ContentRowHeaderMenu_Click_TogglesContentField_NotTileField()
     {
+        using var sandbox = new AppSettingsTestSandbox();
+
         var win = new MainWindow();
         var host = win.FindControl<ContentControl>("ArchiveContentHost");
         Assert.NotNull(host);
@@ -104,23 +83,14 @@ public class CardRowHeaderMenuTests
         var border = Assert.IsType<Border>(view.FindControl<Border>("ContentRowHeaderBorder"));
         var menu = Assert.IsType<ContextMenu>(border!.ContextMenu);
 
-        AppSettings.ResetCacheForTests();
-        var snapSize = AppSettings.Load().ContentRowShowSize;
-        var snapTile = AppSettings.Load().TileRowShowSize;
-        try
-        {
-            RaiseOpening(view, menu);
-            ClickFirstItem(menu);
-            // Content 菜单必须翻 Content 的字段（Tile 零变化）
-            Assert.NotEqual(snapSize, AppSettings.Load().ContentRowShowSize);
-            Assert.Equal(snapTile, AppSettings.Load().TileRowShowSize);
-        }
-        finally
-        {
-            var disk = AppSettings.Load();
-            MainWindowViewModel.ApplyCardRow(disk, false, CardRowKind.Size, snapSize);
-            disk.Save();
-        }
+        Assert.True(AppSettings.Load().ContentRowShowSize);
+        Assert.True(AppSettings.Load().TileRowShowSize);
+
+        RaiseOpening(view, menu);
+        ClickFirstItem(menu);
+        // Content 菜单必须翻 Content 的字段（Tile 零变化）
+        Assert.False(AppSettings.Load().ContentRowShowSize);
+        Assert.True(AppSettings.Load().TileRowShowSize);
 
         win.Close();
     }

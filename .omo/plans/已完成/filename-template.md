@@ -492,11 +492,28 @@ pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests
 
 ## 附录：新增本地化 key 清单（三语成对）
 
-对话框：`Compress_FileNameTemplate`、`_Placeholder`、`_Example`、`_ExampleNone`、`_ExampleError`、`_Help`、`_Preset`、`_SavePreset`、`_DeletePreset`、`_PresetName`、`_PresetNameEmpty`、`_PresetLimit`、`_PresetExists`、`_DeleteConfirm`、`_UnknownPlaceholder`、`_InvalidResult`、`_Duplicate`、`_Markdown`
+> 下表是**归档时（提交 `4acd2a56`）三份 json 里的实际 key**，已按实施结果校正过两次；
+> 计划正文早期列的 `_Example` / `_ExampleNone` / `_ExampleError` / `_Group` / `_Hint` / `_Preset` /
+> `_PresetNameEmpty` / `_PresetExists` / `_DeleteConfirm` / `_Help`（对话框侧）均未落地或已删，
+> 不在表内。
 
-设置页：`Settings_Compress_FileNameTemplate_Group`、`_Dialog`、`_Quick`、`_Separate`、`_Hint`
+对话框（25 个，含 8 个占位符条目）：
 
-> 以上均以 `Compress_FileNameTemplate` / `Settings_Compress_FileNameTemplate` 为前缀，实施时按实际拼接完整 key。
+| 类别 | key |
+|---|---|
+| 分组 / 行标签 | `Compress_FileNameSection`、`Compress_FileNameTemplate`、`Compress_FileNameTemplate_RowLabel` |
+| 输入辅助 | `Compress_FileNameTemplate_Placeholder`、`_Insert`、`_InsertTip`、`_Unterminated` |
+| 占位符下拉（8 个） | `_Token_Name`、`_Token_NameAuto`、`_Token_Ext`、`_Token_Parent`、`_Token_Date`、`_Token_DateTime`、`_Token_Seq`、`_Token_SeqWidth` |
+| 预设 | `_PresetName`、`_SavePreset`、`_DeletePreset`、`_PresetLimit` |
+| 错误文案 | `_UnknownPlaceholder`、`_InvalidResult`、`_Duplicate` |
+| 帮助 | `_HelpTitle`、`_HelpTip`、`_Markdown` |
+
+设置页（7 个）：`Settings_Compress_FileNameTemplate`（裸标题）、`_Dialog`、`_Quick`、`_Separate`、`_RowHint`、`_PresetHint`、`_Help`
+
+> 上表第二列省略了 `Compress_FileNameTemplate` / `Settings_Compress_FileNameTemplate` 前缀，实际 key 按前缀拼接。
+> 归档后又补过 6 个（`_EmptyResult` / `_InvalidChar` / `_InvalidName` / `_TooLong` 由 `4a9c12b1` 2026-11-14 的复查修复引入、
+> `_PresetSaved` / `_PresetUpdated` 由 `592177f4` 2026-11-15 的「命名预设改可编辑下拉」引入），现三语模板相关 key 共 35 个 ——
+> 本附录记的是**归档时**的口径，不随后续改动维护。
 
 ---
 
@@ -509,18 +526,18 @@ pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests
 | W1 / T1 Core 渲染器 | ✅ | `Utils/FileNameTemplate.cs`（tokenizer + `TryValidateSyntax` / `TryRender` / 结果校验）、`Utils/FileNameTemplatePreset.cs`、`Utils/PathCommonality.cs`；`FileNameTemplateTests` 76 例 |
 | W2 / T2 命名管线 | ✅ | `CompressPathPlanner` 五个方法加可选模板参数 + `ComputeSingleArchiveName` / `ResolveAutoName` / `GetFormatExtension`；`CompressPathPlannerTemplateTests` 30 例、`PathCommonalityTests` 18 例，模板为空时既有用例零改动通过 |
 | W2 / T3 执行侧透传 | ✅ | `CompressRequest.FileNameTemplate` / `TemplateTimestamp`、`GetOutputPaths` 与 `CompressSeparateAsync` 的序号、`CompressSettings` 末尾追加字段、`CompressSession.BuildRequest` 映射 |
-| W3 / T4 预览透传 | ✅ | `AssembleCompressPreview` / `BuildCompressPreview` 加参，Separate 走 `PlanSeparate`，Manual / Combined 走 `ComputeSingleArchiveName` 兜底 |
-| W3 / T5 对话框 UI + VM | ✅ | 新「文件名模板」分组（Row 重排、帮助按钮、预设增删、示例行/错误行）、`IsOutputFileNameReadOnly`、`ValidateForExecution` 第 ⑥ 步；`CompressSettingsViewModelTemplateTests` 11 例 |
+| W3 / T4 预览透传 | ✅ | `AssembleCompressPreview` / `BuildCompressPreview` 加参，Separate 走 `PlanSeparate`，单包（当时叫 Manual / Combined）走 `ComputeSingleArchiveName` 兜底 |
+| W3 / T5 对话框 UI + VM | ✅ | 新「文件名模板」分组（Row 重排、帮助按钮、预设增删、错误行）、`IsOutputFileNameReadOnly`、`ValidateForExecution` 第 ⑥ 步；`CompressSettingsViewModelTemplateTests` 14 例 |
 | W4 / T6 设置页三档默认值 | ✅ | `AppSettings` 三个模板字段 + 预设列表 + 两个增删方法（上限 20）、设置页三行 + 预设下拉 |
 | W5 / T7 CLI 两入口 | ✅ | `--compress-quick` 改用 `ComputeSingleArchiveName`、`--compress-separate` 传模板与时间戳 |
-| W6 / T8 i18n + 帮助 + 文档 | ✅ | 22 个新 key（对话框 15 + 设置页 7）、`Compress_FileNameTemplate_Markdown` 帮助正文、进度文档 |
+| W6 / T8 i18n + 帮助 + 文档 | ✅ | 32 个新 key（对话框 25 + 设置页 7）、`Compress_FileNameTemplate_Markdown` 帮助正文、进度文档 |
 
 ### 与计划的偏差（5 条）
 
 1. **测试文件路径**：计划写 `tests/MantisZip.Tests/FileNameTemplateTests.cs`，实际落在 `tests/MantisZip.Tests/Utils/` 下（与既有 `CompressPathPlannerTests` 同目录）。
 2. **`{date}` / `{datetime}` 格式**：实现用 `yyyy-MM-dd` / `yyyy-MM-dd_HHmmss`（可读性优先），计划与帮助 Markdown 原文写的 `20261111` 是错误示例，已同步改正三份 json 各 4 处。
 3. **新增 `CompressPathPlanner.GetFormatExtension`**：原本只在 VM 里有一份私有实现，模板渲染需要「主名 + 格式扩展名」的公共入口，遂下沉到 Core 供 VM / CLI / 规划器共用。
-4. **合并模式命名抽出 `ResolveCombinedArchiveName`**：计划只要求「模板接管文件名」，真机上发现 `RefreshCombinedPath` 与 `TryAutoFillOutputPath` 两处各自用 `ArchivePath.GetFileName(commonParent)`，必须同时改，否则合并模式静默忽略模板。
+4. **合并模式命名抽出 `ResolveCombinedArchiveName`**：计划只要求「模板接管文件名」，真机上发现 `RefreshCombinedPath` 与 `TryAutoFillOutputPath` 两处各自用 `ArchivePath.GetFileName(commonParent)`，必须同时改，否则合并模式静默忽略模板。（该函数已于 2026-11-13 提交 `a597669d` 随「输出方式三态 → 单开关」一并删除，单包模式现走 `CompressPathPlanner.ComputeSingleArchiveName`。）
 5. **预设增删 UI 放进对话框**：计划写在「预设 ComboBox 选中即填」，实现时补了「存为预设」输入框与「删除」按钮（否则预设只能手改 json），设置页仍只做「填入」不做增删。
 
 ### 真机发现并修掉的缺陷（2 个）
@@ -530,13 +547,13 @@ pwsh -File scripts\verify-repo.ps1 -Task test -Target ui-tests
 
 ### 测试与验证
 
-- `FileNameTemplateTests` 76 例 / `CompressPathPlannerTemplateTests` 30 例 / `PathCommonalityTests` 18 例 / `CompressSettingsViewModelTemplateTests` 11 例，共 135 例全绿。
+- `FileNameTemplateTests` 76 例 / `CompressPathPlannerTemplateTests` 30 例 / `PathCommonalityTests` 18 例 / `CompressSettingsViewModelTemplateTests` 14 例，共 138 例全绿（归档时口径；`f1219068` 把 VM 那组从 11 加到 14 后各数仍全绿）。
 - 写测试时救回两个实现错误：`{seq:0000}` 的宽度必须是**位数本身**（首版把 `0000` 当整数解析 = 0 被判非法）；模板渲染的是主名不是路径（`{parent}\{name}` 的分隔符按非法字符拒绝，属设计而非 bug，已加用例固化语义）。
-- `-Task i18n` 1473 key、`-Task check` 9 条守卫全绿、core 与 avalonia Release `--no-incremental` 0 警告、`tests` 与 `ui-tests` 全绿。
+- `-Task i18n` 1483 key、`-Task check` 10 条守卫全绿、core 与 avalonia Release `--no-incremental` 0 警告、`tests` 与 `ui-tests` 全绿。
 - 真机：`--compress-quick` + `{name}_{date}` → `report_2026-11-11.zip`；`--compress-separate` + `{name}_{seq:0000}` → `report_0001.zip` / `notes_0002.zip`；对话框截图确认模板分组与只读文件名。
 
 ### 留白（未做，供后续）
 
-- **CLI 合并（`--compress-combined`）未接模板**：合并模式的命名走 `OutputPath`，GUI 由 `ResolveCombinedArchiveName` 处理；CLI 合并暂无模板需求，若要做需先给该入口补「公共父目录 + 模板」的决策。
-- **`{ext}` 在目录源上为空**：目录压缩时无原扩展名，模板若只写 `{ext}` 会得到空主名被 `EmptyResult` 拦下，帮助文档已说明。
-- **帮助 Markdown 的示例文件名与格式扩展名**：示例里固定写 `.zip`，用户实际格式为 `.7z` / `.tar.gz` 时以实际为准（帮助中已注明「扩展名由所选格式自动追加」）。
+- **CLI 合并（`--compress-combined`）未接模板**：合并模式的命名走 `OutputPath`，GUI 单包模式由 `CompressPathPlanner.ComputeSingleArchiveName` 处理（原 `ResolveCombinedArchiveName` 已于 2026-11-13 的三态收敛提交 `a597669d` 删除）；CLI 合并暂无模板需求，若要做需先给该入口补「公共父目录 + 模板」的决策。**已登记 `KI-019`**（`docs/KNOWN_ISSUES.md`，阻塞类型「缺决策」）。
+- **`{ext}` 在目录源上为空**：目录压缩时无原扩展名，模板若只写 `{ext}` 会得到空主名被 `EmptyResult` 拦下，帮助文档已说明。**已登记 `KI-020`**。
+- **帮助 Markdown 的示例文件名与格式扩展名**：示例里固定写 `.zip`，用户实际格式为 `.7z` / `.tar.gz` 时以实际为准（帮助中已注明「扩展名由所选格式自动追加」）。**已登记 `KI-021`**。

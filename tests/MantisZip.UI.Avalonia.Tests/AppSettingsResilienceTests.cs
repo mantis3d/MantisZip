@@ -104,6 +104,10 @@ public sealed class AppSettingsResilienceTests : IDisposable
 
         Assert.False(cacheable);
         Assert.Equal(new AppSettings().DefaultLevel, settings.DefaultLevel);
+        // 主文件与备份都读不出来 ⇒ 用户手上没有设置，等同首装：出厂默认模板与预设
+        // 必须一起回来（裸 new AppSettings() 会让模板、预设全空，与全新安装不一致）
+        Assert.Equal("{name:auto}", settings.FileNameTemplateDialog);
+        Assert.Equal(2, settings.FileNameTemplatePresets.Count);
         Assert.NotEmpty(Directory.GetFiles(_dir, "settings.json.bad-*"));
     }
 

@@ -17,10 +17,13 @@ namespace MantisZip.UI.Avalonia.Models;
 /// </summary>
 internal static class WindowStateManager
 {
-    private static readonly string BaseDir = AppSettings.DataDir;
-
-    private static readonly string ConfigFile =
-        Path.Combine(BaseDir, "window.json");
+    /// <summary>
+    /// 窗口状态文件路径。**每次现取** <see cref="AppSettings.DataDir"/>，不要缓存到静态字段里：
+    /// 测试沙箱会临时重定向数据目录，静态字段一旦在类型初始化时固化，之后就永远指向真实用户目录
+    /// （2026-11-23 实测：跑一次 ui-tests 就把用户的 window.json 改写了）。
+    /// </summary>
+    private static string ConfigFile =>
+        Path.Combine(AppSettings.DataDir, "window.json");
 
     /// <summary>
     /// 从 JSON 恢复窗口状态。
@@ -110,8 +113,8 @@ internal static class WindowStateManager
                 SortDirection = sortDirection,
             };
 
-            if (!Directory.Exists(BaseDir))
-                Directory.CreateDirectory(BaseDir);
+            if (!Directory.Exists(AppSettings.DataDir))
+                Directory.CreateDirectory(AppSettings.DataDir);
 
             var json = JsonSerializer.Serialize(snapshot, new JsonSerializerOptions { WriteIndented = true });
             File.WriteAllText(ConfigFile, json);

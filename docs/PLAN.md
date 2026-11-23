@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现的功能见 [docs/PROGRESS.md](PROGRESS.md)，技术架构见 [docs/ARCHITECTURE.md](ARCHITECTURE.md)，每项计划的完整设计见 `.omo/plans/`。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-11-18  
+**最后更新**: 2026-11-23  
 **当前版本**: 0.5.8
 
 
@@ -131,6 +131,7 @@
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
+| **CLI 无人值守健壮性**（挂死修复 + 真实退出码） | [cli-unattended-robustness.md](.omo/plans/未开始/cli-unattended-robustness.md) | 🟡中 | **8-12h** | 🔥 **2026-11-22 新增，P0**。实测：`--extract-here` 遇「损坏包 / 截断包 / 加密包无密码 / 同名冲突」四种情形**永久挂死**（>12s 强杀）；40 处 `AppShutdown.Request` 零处传非零码 ⇒ 成功与失败脚本侧无法区分。修法：新增 `CliHostPolicy`（无人值守标记，全仓现无）+ `CliExitCode`（0/1/2/3），冲突 `ask`→静默改名、缺密码快速失败、错误窗 10s 兜底关闭、五条 CLI 执行链返回值改 `int`。**不动工程结构**（不拆独立 exe），也不修输出重定向（`WinExe` 固有） |
 | 拖拽直接解压 · 收尾（预览弹窗 + 双投放区 + 落点冲突预览） | [drag-drop-direct-extract.md](.omo/plans/进行中/drag-drop-direct-extract.md) | 🔴高 | 10-14h | 文件树预览弹窗（独立 Win32 窗、跟随鼠标、`PointerPressed` 预取式渲染、双阈值降级）+ 双投放区（保留完整路径 / 扁平解压，方向可设）+ 落点冲突预览（覆盖层最多 8 行、目标已存在即标红、每轮 IO ≤40 次 + 慢盘 500ms 降级）+ Task 8 手工验收。**硬约束**：拖拽期间 UI 线程被 OLE `DoDragDrop` 阻塞，渲染必须提前完成 |
 | 进度条分段着色 | [progress-bar-segments.md](.omo/plans/未开始/progress-bar-segments.md) | 🟡中 | 3-4h | 按批处理项状态着色（红=失败 / 绿=成功 / 青=跳过 / 蓝=进行中）；原依赖 `parallel-compress-plan-d` 的布局前提，D 仍在 B 档 ⇒ 先做「按当前布局着色」的兼容版，D 落地后补分段 |
 | CLI 解压后打开文件夹对齐 | [cli-extract-open-folder.md](.omo/plans/未开始/cli-extract-open-folder.md) | 🟢低 | 2-3h | CLI 解压成功后复用 `SmartOpenPathResolver`；多文件批处理保持不开 |
@@ -193,7 +194,7 @@
 
 ---
 
-## 进行中 —— 5 条计划（1 条已排入 v0.5.x，4 条待排 / 已在做）
+## 进行中 —— 7 条计划（4 条已排入 v0.5.x，3 条待排 / 已在做）
 
 > 2026-11-04 清账：7z solid 批量解压、选中条目批量解压、文件名代码页三条的代码与实测均已通过，已归档进「已完成」（HDD 真机复测仍列为 v0.5.6 发布前手工项）；预览扩展剩余部分、浮动面板、注释编码 Phase 2 三条转入「已冻结」；可插拔预览模块转「已归档」。2026-11-13：智能解压两档并入 v0.5.8 第二项，本表加一行。
 
@@ -204,6 +205,8 @@
 | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | Core 侧 TAR 裸格式 / GZip 单文件压缩 + 文件关联已就绪 | UI 压缩格式下拉未放开；BZip2→XZ→Zstd→Brotli；7z.dll 只读格式 | **只做前半**：UI 下拉放开 + 7z.dll 只读解锁（读取做稳）；BZip2/XZ/Zstd **创建**无限期延后。待排（估 6-8h），不急 |
 | 文件选择器「新建文件夹」（所有模式） | [picker-new-folder.md](.omo/plans/进行中/picker-new-folder.md) | — | 已完成（T1–T6） | **待发版**（2026-11-04，`beta`）：地址行按钮 + `Ctrl+Shift+N` + 校验留窗的 `InputDialog`；PickFolder/ExtractFolder/SaveFile 建完进新目录，PickItems/OpenFile 只刷新。`ui-tests` 6 例全绿；归档待 `RELEASE_NOTES` 范围确认 |
 | 文件选择器地址区拆两行 | [picker-address-two-rows.md](.omo/plans/进行中/picker-address-two-rows.md) | — | 已完成（T1–T4） | **待发版**（2026-11-05，`beta`）：按钮行（左导航 / 右新建+收藏）+ 面包屑整宽行；面包屑 392 → ≈610px，垂直多占 36–46px。两个 headless 用例钉住布局关系；归档待 `RELEASE_NOTES` 范围确认 |
+| 出厂默认命名模板 + 删除「保留源扩展名」开关 | [default-filename-template.md](.omo/plans/进行中/default-filename-template.md) | — | **待发版**（2026-11-22，`beta`） | 新装即带 `{name:auto}` + 两条内置预设（`CreateWithDefaults` 注入，只对「设置文件不存在」生效）；同时删掉名义全局、实际只管分别压缩的 `KeepOriginalExtension` 开关（语义已被 `{ext}` 覆盖，且会成为出厂即死开关）。约 15 文件：Core 去形参 + 位置参数 record 少一项 + 三语删 key |
+| 出厂默认设置内嵌进程序 + 安装器不再预置 settings.json | [embedded-default-settings.md](.omo/plans/进行中/embedded-default-settings.md) | — | **待发版**（2026-11-22，`beta`） | 默认值收敛成一份编译进程序的 `Resources/Defaults/settings.json`（117 键，缺键自动保留字段初值，改完重新 build 即生效），替换「设置文件缺失 / 损坏且备份读不出」两条回落路径；删掉已腐朽的 `installer/prebuilt/settings.json`（缺 `FileNameTemplate*`、3 个已删键、十余处过期值）。向导语言/主题改走一次性 `install-choices.json`（应用首启套用并落盘后才删）—— 顺带修好自 `8ea6bdb2` 起空转两个月的选择。另加程序集级测试沙箱 `AppSettingsTestRedirect`：此前全量 ui-tests 有 42 次 `SaveTo` 直接写真实 settings.json（35 次写「模板空预设空」实例，用户预设就是这样被冲掉的） |
 
 ---
 

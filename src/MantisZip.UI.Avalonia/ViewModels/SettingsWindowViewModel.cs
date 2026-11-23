@@ -104,9 +104,6 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private int _updateFrequencyIndex = 2;
 
-    [ObservableProperty]
-    private bool _keepOriginalExtension;
-
     /// <summary>压缩完成后打开输出所在目录（与解压端 <see cref="OpenFolderAfterExtract"/> 对称）。</summary>
     [ObservableProperty]
     private bool _openFolderAfterCompress;
@@ -982,7 +979,6 @@ public partial class SettingsWindowViewModel : ObservableObject
     // Compress strings
     public string DefaultFormatText => LocalizationManager.T("Settings_DefaultFormat");
     public string CompressionLevelText => LocalizationManager.T("Settings_CompressionLevel");
-    public string KeepOriginalExtensionText => LocalizationManager.T("Settings_Compress_KeepExt");
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
     public string CompressOpenFolderAfterText => LocalizationManager.T("Settings_Compress_OpenFolderAfter");
     public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
@@ -1016,43 +1012,14 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorQuick;
     [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorSeparate;
 
-    public bool IsFileNameTemplatePresetMessageVisibleDialog => FileNameTemplatePresetMessageDialog != null;
-    public bool IsFileNameTemplatePresetMessageVisibleQuick => FileNameTemplatePresetMessageQuick != null;
-    public bool IsFileNameTemplatePresetMessageVisibleSeparate => FileNameTemplatePresetMessageSeparate != null;
-
-    public bool IsFileNameTemplatePresetMessageSuccessDialog
-        => FileNameTemplatePresetMessageDialog != null && !IsFileNameTemplatePresetMessageErrorDialog;
-    public bool IsFileNameTemplatePresetMessageSuccessQuick
-        => FileNameTemplatePresetMessageQuick != null && !IsFileNameTemplatePresetMessageErrorQuick;
-    public bool IsFileNameTemplatePresetMessageSuccessSeparate
-        => FileNameTemplatePresetMessageSeparate != null && !IsFileNameTemplatePresetMessageErrorSeparate;
-
-    partial void OnFileNameTemplatePresetMessageDialogChanged(string? value)
+    /// <summary>
+    /// 某一行预设消息的气泡自动收起后清空该行消息（成功消息 1.6s 后由 TemplatePresetPicker 回调）。
+    /// 不清空的话，下次同样的消息值没变、不会触发变更通知，气泡就再也弹不出来。
+    /// </summary>
+    public void DismissFileNameTemplatePresetMessage(Models.FileNameTemplateRow row)
     {
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageVisibleDialog));
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessDialog));
+        SetPresetMessage(row, null, isError: false);
     }
-
-    partial void OnFileNameTemplatePresetMessageQuickChanged(string? value)
-    {
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageVisibleQuick));
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessQuick));
-    }
-
-    partial void OnFileNameTemplatePresetMessageSeparateChanged(string? value)
-    {
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageVisibleSeparate));
-        OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessSeparate));
-    }
-
-    partial void OnIsFileNameTemplatePresetMessageErrorDialogChanged(bool value)
-        => OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessDialog));
-
-    partial void OnIsFileNameTemplatePresetMessageErrorQuickChanged(bool value)
-        => OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessQuick));
-
-    partial void OnIsFileNameTemplatePresetMessageErrorSeparateChanged(bool value)
-        => OnPropertyChanged(nameof(IsFileNameTemplatePresetMessageSuccessSeparate));
 
     /// <summary>预设列表来自设置（与压缩对话框共享同一份）。</summary>
     private void ReloadFileNameTemplatePresets()
@@ -1503,7 +1470,6 @@ public partial class SettingsWindowViewModel : ObservableObject
             UpdateCheckFrequencyNames.Parse(_settings.UpdateCheckFrequency));
 
         // Compress (additional)
-        _keepOriginalExtension = _settings.KeepOriginalExtension;
         _openFolderAfterCompress = _settings.OpenFolderAfterCompress;
         _compressFileConflictAction = _settings.CompressFileConflictAction;
 
@@ -1997,7 +1963,6 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         OnPropertyChanged(nameof(DefaultFormatText));
         OnPropertyChanged(nameof(CompressionLevelText));
-        OnPropertyChanged(nameof(KeepOriginalExtensionText));
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
         OnPropertyChanged(nameof(CompressOpenFolderAfterText));
         OnPropertyChanged(nameof(CompressOptionsText));
@@ -2202,7 +2167,6 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compress
         _settings.DefaultFormat = SelectedDefaultFormatOption?.Value ?? DefaultFormat;
         _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
-        _settings.KeepOriginalExtension = KeepOriginalExtension;
         _settings.OpenFolderAfterCompress = OpenFolderAfterCompress;
         _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
 

@@ -6,6 +6,7 @@ using Avalonia.Controls;
 using Avalonia.Controls.Primitives;
 using Avalonia.Data;
 using Avalonia.Interactivity;
+using Avalonia.Threading;
 using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Services;
 
@@ -54,6 +55,26 @@ public partial class TemplatePresetPicker : UserControl
         AvaloniaProperty.Register<TemplatePresetPicker, string?>(
             nameof(DeleteToolTipKey), "Compress_FileNameTemplate_DeletePreset");
 
+    /// <summary>
+    /// 操作结果消息（已保存 / 已更新 / 超过上限）。null = 不显示气泡。
+    /// <para>
+    /// 消息走<b>浮层气泡</b>（Popup），脱离布局流——出现和消失都不会把下面的行顶下去。
+    /// 成功消息 <see cref="SuccessMessageDuration"/> 后自动收起并把属性清空；失败消息常驻，
+    /// 直到宿主清空它或用户改动模板（宿主在模板变更时自己清）。
+    /// </para>
+    /// </summary>
+    public static readonly StyledProperty<string?> MessageProperty =
+        AvaloniaProperty.Register<TemplatePresetPicker, string?>(nameof(Message));
+
+    /// <summary>消息是不是一条失败提示（决定气泡图标：红警告三角 vs 绿对勾）。</summary>
+    public static readonly StyledProperty<bool> IsMessageErrorProperty =
+        AvaloniaProperty.Register<TemplatePresetPicker, bool>(nameof(IsMessageError));
+
+    /// <summary>成功消息在气泡里停留的时长（毫秒）。失败消息不受此限制。</summary>
+    public static readonly StyledProperty<TimeSpan> SuccessMessageDurationProperty =
+        AvaloniaProperty.Register<TemplatePresetPicker, TimeSpan>(
+            nameof(SuccessMessageDuration), TimeSpan.FromMilliseconds(1600));
+
     /// <summary>下拉打开那一刻的选中项，用来判断「打开期间是否真的换了一条预设」。</summary>
     private object? _selectionAtOpen;
 
@@ -72,6 +93,9 @@ public partial class TemplatePresetPicker : UserControl
     /// </summary>
     private System.Collections.Specialized.INotifyCollectionChanged? _presetsNotifier;
 
+    /// <summary>成功消息的自动收起计时器（失败消息不启动；控件分离时停掉防泄漏）。</summary>
+    private DispatcherTimer? _messageTimer;
+
     /// <summary>用户从下拉里点中了一条已有预设（宿主据此把模板填进上方输入框）。</summary>
     public event EventHandler<FileNameTemplatePreset>? PresetSelected;
 
@@ -80,6 +104,16 @@ public partial class TemplatePresetPicker : UserControl
 
     /// <summary>点了「删除」→ 宿主删掉该名字对应的预设（参数 = 框里的名字）。</summary>
     public event EventHandler<string>? DeleteRequested;
+
+    /// <summary>
+    /// 成功消息自动收起后触发：宿主应当把自己的消息属性清成 null。
+    /// <para>
+    /// 由宿主清而不是控件自己写回 <see cref="MessageProperty"/>：那是单向绑定的目标，
+    /// 控件直接改会破坏绑定链；交给宿主清，消息属性与气泡状态永远一致。
+    /// 清成 null 还有个必须性——宿主下次设同一个字符串时值没变，变更通知不发，气泡就不会再出现。
+    /// </para>
+    /// </summary>
+    public event EventHandler? MessageDismissed;
 
     public TemplatePresetPicker()
     {
@@ -121,6 +155,27 @@ public partial class TemplatePresetPicker : UserControl
         set => SetValue(DeleteToolTipKeyProperty, value);
     }
 
+    public string? Message
+    {
+        get => GetValue(MessageProperty);
+        set => SetValue(MessageProperty, value);
+    }
+
+    public bool IsMessageError
+    {
+        get => GetValue(IsMessageErrorProperty);
+        set => SetValue(IsMessageErrorProperty, value);
+    }
+
+    public TimeSpan SuccessMessageDuration
+    {
+        get => GetValue(SuccessMessageDurationProperty);
+        set => SetValue(SuccessMessageDurationProperty, value);
+    }
+
+    /// <summary>结果气泡当前是否弹出（只读，供宿主与回归测试观察）。</summary>
+    public bool IsMessagePopupOpen => MessagePopup.IsOpen;
+
     protected override void OnApplyTemplate(TemplateAppliedEventArgs e)
     {
         base.OnApplyTemplate(e);
@@ -143,6 +198,8 @@ public partial class TemplatePresetPicker : UserControl
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         Unsubscribe();
+        StopMessageTimer();
+        MessagePopup.IsOpen = false;
         base.OnDetachedFromVisualTree(e);
     }
 
@@ -203,6 +260,82 @@ public partial class TemplatePresetPicker : UserControl
         {
             ToolTip.SetTip(DeleteButton, DeleteToolTipKey is { Length: > 0 } k ? LocalizationManager.T(k) : null);
         }
+        else if (change.Property == MessageProperty)
+        {
+            SyncMessagePopup(change.GetNewValue<string?>());
+        }
+        else if (change.Property == IsMessageErrorProperty)
+        {
+            // 宿主的赋值顺序是「先 Message、再 IsMessageError」（CompressSettingsViewModel.SaveTemplatePreset
+            // 与 SettingsWindowViewModel.SetPresetMessage 都是这样），所以设消息那一刻标志还是旧值：
+            // 失败消息会被当成成功消息起一个 1.6s 计时器，标志随后变成 true 却没人停表 ——
+            // 用户看到「预设最多 20 条」的红色警告闪一下就没了。标志变化必须重新走一遍同步，
+            // 让计时器按最新的 IsMessageError 重新判定（错误 → 不起表）。
+            SyncMessagePopup(Message);
+        }
+    }
+
+    /// <summary>
+    /// 消息变化 → 弹/收气泡。成功消息按时长自动收起；失败消息常驻，等宿主清空。
+    /// <para>
+    /// 气泡是 <c>Popup</c>（脱离布局流）：它出现时不会让下面的「文件名」行下移，
+    /// 也不会改变控件自身高度——这是 2026-11-21 用户明确要求的效果。
+    /// </para>
+    /// </summary>
+    private void SyncMessagePopup(string? message)
+    {
+        StopMessageTimer();
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            MessageText.Text = null;
+            MessagePopup.IsOpen = false;
+            return;
+        }
+
+        MessageText.Text = message;
+        UpdateMessageIcon();
+        MessagePopup.IsOpen = true;
+
+        // 失败消息常驻：用户必须读到「为什么存不上」（超上限 / 模板为空）。
+        if (IsMessageError) return;
+
+        var timer = new DispatcherTimer { Interval = SuccessMessageDuration };
+        timer.Tick += (_, _) => DismissMessageNow();
+        timer.Start();
+        _messageTimer = timer;
+    }
+
+    /// <summary>
+    /// 立刻收起气泡并通知宿主清空消息。
+    /// <para>
+    /// 生产路径由成功消息的 <see cref="DispatcherTimer"/> 到期时调用；无头测试里调度器定时器不会自行到期，
+    /// 回归测试直接调本方法验证「收起 + 回调宿主」这半个行为（1.6s 的计时本身由人工验证）。
+    /// </para>
+    /// </summary>
+    internal void DismissMessageNow()
+    {
+        StopMessageTimer();
+        MessagePopup.IsOpen = false;
+        MessageText.Text = null;
+
+        // 成功消息是瞬时的：收起后通知宿主清空消息属性 ——
+        // 否则宿主下次设同一个字符串（值没变）不会触发变更通知，气泡就再也不出来了。
+        MessageDismissed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>按 <see cref="IsMessageError"/> 切换气泡图标：失败 = 红警告三角，成功 = 绿对勾。</summary>
+    private void UpdateMessageIcon()
+    {
+        var hasMessage = !string.IsNullOrWhiteSpace(Message);
+        MessageErrorIcon.IsVisible = hasMessage && IsMessageError;
+        MessageSuccessIcon.IsVisible = hasMessage && !IsMessageError;
+    }
+
+    private void StopMessageTimer()
+    {
+        _messageTimer?.Stop();
+        _messageTimer = null;
     }
 
     /// <summary>切换预设集合时迁移集合变更订阅（旧集合退订、新集合订阅）。</summary>
