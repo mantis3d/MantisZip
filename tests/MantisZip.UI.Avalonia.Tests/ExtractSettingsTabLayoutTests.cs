@@ -164,13 +164,15 @@ public class ExtractSettingsTabLayoutTests
     }
 
     /// <summary>
-    /// 「输出设置」页的 Grid 行数（目标目录标题 / 可编辑输入行 / 弹性选择器行）。
+    /// 「输出设置」页的 Grid 行数（目标目录标题 / 弹性选择器行）。
     /// 行数与 <c>Grid.Row</c> 最大值必须对得上，否则多出来的控件会跟别人叠在同一行。
     /// <para>
     /// 2026-11-23 从 4 行收回 3 行：行为卡搬走后本页只剩「解压到哪」。
+    /// 2026-11-24 再从 3 行收回 2 行：整条路径文本框与灰字说明删除
+    /// （路径由选择器地址行的面包屑承担），本页只剩标题 + 选择器。
     /// </para>
     /// <para>
-    /// 注意：本窗用的是简写形态 <c>RowDefinitions="Auto,Auto,*"</c>，不是压缩窗那种
+    /// 注意：本窗用的是简写形态 <c>RowDefinitions="Auto,*"</c>，不是压缩窗那种
     /// <c>&lt;RowDefinition Height="…" /&gt;</c> 元素写法 —— 两种形态都要能数，否则
     /// 换个写法测试就假绿（本次首版只认元素写法，实测数到 0 条才暴露）。
     /// </para>
@@ -181,12 +183,12 @@ public class ExtractSettingsTabLayoutTests
         var outputTab = SplitTabsByKey(ReadXaml())["Extract_TabOutput"];
 
         // 与 XAML 里 RowDefinitions 的注释保持一一对应：
-        // 0 目标目录标题 / 1 可编辑输入行 / 2 弹性选择器行。
-        const int expectedRowCount = 3;
+        // 0 目标目录标题 / 1 弹性选择器行。
+        const int expectedRowCount = 2;
         var rowDefs = CountRowDefinitions(outputTab);
         Assert.True(
             rowDefs == expectedRowCount,
-            $"「输出设置」页应有 {expectedRowCount} 行（实际 {rowDefs} 行）：目标目录标题 / 可编辑输入行 / 弹性选择器行");
+            $"「输出设置」页应有 {expectedRowCount} 行（实际 {rowDefs} 行）：目标目录标题 / 弹性选择器行");
 
         var rowIndexes = Regex.Matches(outputTab, "Grid\\.Row=\"([0-9]+)\"")
             .Select(m => int.Parse(m.Groups[1].Value))
@@ -195,6 +197,29 @@ public class ExtractSettingsTabLayoutTests
         Assert.True(
             rowIndexes < rowDefs,
             $"「输出设置」页出现 Grid.Row=\"{rowIndexes}\"，但只定义了 {rowDefs} 行 —— 该控件会叠到别的行上");
+    }
+
+    /// <summary>
+    /// 「输出设置」页不再有第二条路径输入：整条路径由选择器地址行的面包屑承担，
+    /// 页内保留一个同样内容的 <c>TextBox</c> 就是重复显示（2026-11-24 删除）。
+    /// <para>
+    /// 绊线方式：本页（从 <c>Extract_TabOutput</c> 起、到选择器 Border 之前）不得出现 <c>&lt;TextBox</c>。
+    /// 选择器内部自己的 <c>TextBox</c> 在另一个文件里，不受影响。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public void OutputTab_HasNoExtraPathTextBox()
+    {
+        var outputTab = SplitTabsByKey(ReadXaml())["Extract_TabOutput"];
+
+        Assert.False(
+            outputTab.Contains("DestinationPathBox", StringComparison.Ordinal),
+            "「输出设置」页又出现了 DestinationPathBox：整条路径已由选择器地址行的面包屑承担");
+
+        var beforePicker = outputTab[..outputTab.IndexOf("CustomFilePickerControl", StringComparison.Ordinal)];
+        Assert.False(
+            beforePicker.Contains("<TextBox", StringComparison.Ordinal),
+            "「输出设置」页在选择器之前又出现了 TextBox：路径只能有一个编辑入口（面包屑），否则两次显示互相打架");
     }
 
     /// <summary>

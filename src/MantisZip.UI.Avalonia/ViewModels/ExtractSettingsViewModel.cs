@@ -1,4 +1,4 @@
-using System.Collections.ObjectModel;
+﻿using System.Collections.ObjectModel;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using MantisZip.Core;
@@ -426,7 +426,6 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_Title",
             "Extract_SourceArchives",
             "Extract_Destination",
-            "Extract_DestinationPlaceholder",
             "Extract_Browse",
             "Extract_WhenFileExists",
             "Extract_ConflictAction",
@@ -444,7 +443,6 @@ public partial class ExtractSettingsViewModel : ObservableObject
             "Extract_TabOptions",
             "Extract_SelectedArchives",
             "Extract_AddArchivesPickerHint",
-            "Extract_OutputPickerHint",
             "Extract_RemoveSelected",
             "Extract_AddArchivesEmptyHint",
             "Extract_Source_MultiFilterHint",

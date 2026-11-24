@@ -39,31 +39,27 @@
                Header="{Binding LocalizedStrings[Extract_TabOutput]}"
                Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconFolder">
-        <Grid RowDefinitions="Auto,Auto,*"
+        <Grid RowDefinitions="Auto,*"
               Margin="0,8,0,0">
-          <!-- 目标目录标题 -->
+          <!-- 目标目录标题（2026-11-24 起本页只剩这一行 + 选择器：
+               原来的整条路径文本框与「切换下方浏览目录…」灰字已删除 ——
+               路径由选择器地址行的 PathBreadcrumb 承担（可点段导航、Ctrl+L 或点末段进编辑态），
+               多留一份同样的路径既重复又占高度。 -->
           <TextBlock Grid.Row="0"
                      Text="{Binding LocalizedStrings[Extract_Destination]}"
                      FontWeight="SemiBold" />
 
-          <!-- 目标目录可直接编辑；下方选择器切换浏览目录时实时跟随（见 code-behind 的 PathChanged） -->
-          <StackPanel Grid.Row="1" Spacing="4" Margin="0,6,0,8">
-            <TextBox x:Name="DestinationPathBox"
-                     Text="{Binding DestinationPath, Mode=TwoWay}"
-                     PlaceholderText="{Binding LocalizedStrings[Extract_DestinationPlaceholder]}" />
-            <TextBlock Text="{Binding LocalizedStrings[Extract_OutputPickerHint]}"
-                       FontSize="11"
-                       TextWrapping="Wrap"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-          </StackPanel>
-
-          <!-- 内嵌文件夹选择器：只列目录，双击进入；当前浏览目录即解压目标 -->
-          <Border Grid.Row="2"
+          <!-- 内嵌文件夹选择器：只列目录，双击进入；当前浏览目录即解压目标。
+               AllowCreateMissingFolder：地址栏输入尚不存在的目录时询问是否创建
+               （解压目标允许提前不存在，真正落盘由 ExtractSession 兜底）。 -->
+          <Border Grid.Row="1"
+                  Margin="0,6,0,0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="4" Padding="8"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
             <controls:CustomFilePickerControl x:Name="DestinationPicker"
                                               Mode="PickFolder"
+                                              AllowCreateMissingFolder="True"
                                               HideAccumulatedPanel="True" />
           </Border>
         </Grid>

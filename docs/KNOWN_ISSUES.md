@@ -45,7 +45,7 @@
 | **KI-019** | `--compress-combined` 不接受文件名模板（CLI 合并路径自算名字，设置页里的模板对它无效） | 功能留白 | 缺决策 | 用户反馈「CLI 合并压缩出来的名字不受模板控制」时；或决定合并路径是否纳入模板体系时 |
 | **KI-020** | `{ext}` 对目录源渲染成空串（模板里靠它区分源时会得到同名结果） | 功能留白 | 缺决策 | 用户反馈「目录源模板命名撞名」时；或决定目录源 `{ext}` 该退化成什么（空 / 格式扩展名 / 目录名）时 |
 | **KI-021** | 模板帮助的示例固定写 `.zip`（非 zip 格式下示例与产物扩展名不符） | 文档 / 文案 | 成本超阈值 | 有用户对示例扩展名提出疑问时；或下次整体重写模板帮助文案时 |
-| **KI-022** | 「解压选中项到…」与「拖拽兜底」两个入口的初始目录仍是 `父目录\包名`，与解压设置对话框改后的「父目录」不一致 | 功能一致性 | 等计划 | 用户另有一份针对这两个入口的计划落地时；或再次统一解压落点语义时 | 阻塞中 |
+| **KI-022** | 「解压选中项到…」与「拖拽兜底」两个入口的初始目录仍是 `父目录\包名`，与解压设置对话框改后的「父目录」不一致 | 功能一致性 | — | 已修复（两处改传父目录，包名那层交给 `RootMode`；`ExtractDefaultDestWiringTests` 防复发） | 已修复（2026-11-24） |
 
 ---
 
@@ -262,12 +262,13 @@
   - `src/MantisZip.UI.Avalonia/Services/DragDropService.cs:84` — `var initialPath = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(_archivePath));`（拖拽兜底 → `ExtractSettingsWindow.ShowWithPresetSelectionAsync`）
   - 对照：`src/MantisZip.UI.Avalonia/ViewModels/ExtractSettingsViewModel.cs:385` 的构造器默认值（本轮已改）
 - **证据**：上述两处 `Path.Combine(parentDir, Path.GetFileNameWithoutExtension(...))` 均把包名塞进 dest；而对话框本轮改成 `parentDir` 后由根策略（`SmartWrap`）负责那一层。三个入口走的是同一个 `ExtractSettingsWindow`，只是前两者用 `initialDestination` 覆盖了构造器默认值，于是同一个包从右键/拖拽进来会解到两层、从菜单进来会解到一层。
-- **为什么现在不修**：**等计划**。用户明确要求「另外两个入口先不要改，我另有计划」（2026-11-13），本轮只记录不改。
+- **为什么当时不修**：**等计划**。用户明确要求「另外两个入口先不要改，我另有计划」（2026-11-13），本轮只记录不改。
 - **复评条件**：用户那份针对这两个入口的计划落地时；或再次统一解压落点语义（改 `ExtractSettingsWindow.ShowWithPresetSelectionAsync` 的 `initialDestination` 语义）时。
-- **关联**：`.omo/plans/进行中/smart-extract-root-mode.md`；`docs/progress-avalonia-detail.md` 2026-11-13「智能解压加根/去根与落点统一」条目。
+- **关联**：`.omo/plans/已完成/smart-extract-root-mode.md`；`docs/progress-avalonia-detail.md` 2026-11-13「智能解压加根/去根与落点统一」条目。
+- **修复**（2026-11-24，随「删掉解压窗重复路径框」一并落地）：两处都改成**直接传父目录**——`MainWindowViewModel.Extract.cs` 的 `var defaultDest = parentDir;`、`DragDropService.cs` 的 `var initialPath = parentDir;`，与对话框构造器默认值、智能解压档位三者同源；包名那一层统一由 `RootMode`（默认 `SmartWrap`）负责。复发绊线：`tests/MantisZip.UI.Avalonia.Tests/ExtractDefaultDestWiringTests.cs`（5 例，源码文本级守卫：禁止两处再出现 `Path.Combine(parentDir, Path.GetFileNameWithoutExtension(...))` 形态，并断言注释里保留 KI-022 说明；已做红绿验证 —— 把 `initialPath` 改回拼接后立刻 2 例失败）。
+- **状态**：✅ 已修复（2026-11-24）
 
 ## 档案区（已修 / 不会修）
-
 > 修掉或决定放弃的条目移到这里，**保留 commit 或理由**。不要删行 —— 下次撞到同一个栈，靠这里判断「上次怎么处理的」。
 
 | 编号 | 标题 | 结局 | commit / 理由 | 关闭日期 |
@@ -275,3 +276,4 @@
 | **KI-003** | 24 项 SkiaSharp 4.x CS0618 deprecation | 已修复：`96417c6c` 清空 24 项（`SKPathBuilder` / `SKSamplingOptions` / `Bitmap.Save`） | `fix: 修复编译警告 (CS0618, CS8602, MVVMTK0034)` | 2026-09-27 |
 | **KI-008** | 断网时「关于 → 更新」页签把检查失败显示成「已是最新版本」 | 已修复：三态契约 + UI 分支 + 红绿验证的回归测试 | `fix(core,avalonia): 更新检查区分「无更新 / 失败」三态` | 2026-10-28 |
 | **KI-017** | 分卷包 / SFX 的格式身份被扩展名直判成 Zip（预览、双击打开、缩略图全报 `Failed to locate the Zip Header`） | 已修复：`ArchiveEngineFactory.ResolveReaderFormat` 作为「有效格式」唯一入口，`ArchiveFormatHelper.GetFormat` 委派它；分卷解析成 SevenZip 后同步用 `IsCurrentVolumeSet` 拦住增删条目；守卫 `formatidentity` 防复发 | `fix(core,avalonia): 分卷/SFX 格式身份统一走 ResolveReaderFormat` | 2026-11-05 |
+| **KI-022** | 「解压选中项到…」与「拖拽兜底」两个入口的初始目录仍是 `父目录\包名`，与对话框改后的「父目录」不一致（同一个包从右键/拖拽进来解两层、从菜单进来解一层） | 已修复：两处改传父目录（`var defaultDest = parentDir;` / `var initialPath = parentDir;`），包名那层统一交给 `RootMode`（默认 `SmartWrap`）；新增 `ExtractDefaultDestWiringTests` 源码守卫防复发 | `refactor(avalonia): 解压窗去掉重复路径框，面包屑可建目录，KI-022 落点统一` | 2026-11-24 |

@@ -162,7 +162,11 @@ public partial class MainWindowViewModel : ObservableObject
 
         var parentDir = Path.GetDirectoryName(CurrentArchivePath)
                         ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-        var defaultDest = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(CurrentArchivePath));
+
+        // 默认落点 = 压缩包所在目录（2026-11-24 与对话框构造器默认值、智能解压档位统一）。
+        // 曾经拼过 \包名：那时对话框还没有根策略，「包名那一层」得靠 dest 补；
+        // 现在那一层由 RootMode（默认 SMART_WRAP）负责，再拼一次就会解出两层（KI-022）。
+        var defaultDest = parentDir;
 
         var settings = AppSettings.Load();
         // 条目选择模式（v0.5.5 第三步后半）：对话框自己就是执行入口（确认即载荷 + 唯一执行器），

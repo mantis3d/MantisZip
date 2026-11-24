@@ -36,6 +36,22 @@ public partial class CustomFilePickerControl : UserControl
     public PickerMode Mode { get; set; } = PickerMode.PickFolder;
 
     /// <summary>
+    /// 地址栏输入尚不存在的目录时，是否询问「是否创建」并建目录后进入（默认 <c>false</c>）。
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// 只对「允许提前不存在」的目标开：输出目录（压缩窗 <c>OutputPicker</c>）与
+    /// 解压目标（解压窗 <c>DestinationPicker</c>）—— 这两个路径的落盘由执行层兜底建目录
+    /// （<c>ExtractSession.TryEnsureDestination</c> / 压缩引擎写盘时建目录），所以在选之前不存在是合法的。
+    /// </para>
+    /// <para>
+    /// 「添加压缩包 / 添加文件」这类**读**场景必须保持默认 <c>false</c>：那里输入一个不存在的路径
+    /// 应该什么都不发生，绝不能替用户凭空建出目录来。
+    /// </para>
+    /// </remarks>
+    public bool AllowCreateMissingFolder { get; set; }
+
+    /// <summary>
     /// 复选框模式（默认 <c>false</c>）：显示复选框，勾选态跨目录累积；
     /// 关闭时没有复选框，当前目录里选中的项就是结果，切换目录即清空已选（覆盖语义）。
     /// </summary>
@@ -833,7 +849,9 @@ public partial class CustomFilePickerControl : UserControl
             return suggestions.Distinct(StringComparer.OrdinalIgnoreCase).ToList();
         };
 
-        // 段点击 / 编辑态 Enter：严格照抄原 PathAutoComplete_KeyDown 分支（含 Trim，且**不加模式门**）
+        // 段点击 / 编辑态 Enter：含 Trim；已存在的目录直接进入、已存在的文件走确认。
+        // 路径不存在时不再静默 —— 宿主开了 AllowCreateMissingFolder（输出目录 / 解压目标这类
+        // 「允许提前不存在」的场景）就询问是否创建，其余宿主保持原样（什么都不做）。
         PathCrumbs.NavigateRequested += (_, raw) =>
         {
             var text = (raw ?? string.Empty).Trim();
@@ -845,7 +863,74 @@ public partial class CustomFilePickerControl : UserControl
             {
                 TryConfirmFile(text);
             }
+            else if (AllowCreateMissingFolder && text.Length > 0)
+            {
+                RequestCreateMissingFolder(text);
+            }
         };
+    }
+
+    /// <summary>
+    /// 地址栏输入了尚不存在的目录：询问是否创建，确认后建目录并进入。
+    /// <para>
+    /// 只在 <see cref="AllowCreateMissingFolder"/> 为真时被调用。建目录失败要显式报错而不是静默 ——
+    /// 否则用户看到的是「输了路径点了回车，界面一动不动」。
+    /// </para>
+    /// <para>
+    /// 不做「像不像目录」的猜测（带点的文件夹名很常见，猜错会拦掉合法输入）：询问文案带上完整路径，
+    /// 用户自己看得见将要建的是什么，点「否」就什么都不做。
+    /// </para>
+    /// </summary>
+    private void RequestCreateMissingFolder(string path) => _ = CreateMissingFolderAsync(path);
+
+    /// <summary>询问 → 建目录 → 进入。抽成方法只为让 <c>async void</c> 的吞异常风险收在一处。</summary>
+    private async Task CreateMissingFolderAsync(string path)
+    {
+        var answer = await AppMessageBox.Show(
+            LocalizationManager.T("Picker_CreateMissingFolder", path),
+            LocalizationManager.T("Picker_CreateMissingFolderTitle"),
+            MessageBoxButton.YesNo, MessageBoxImage.Question, OwnerWindow);
+
+        if (answer != MessageBoxResult.Yes) return;
+
+        if (!TryCreateDirectory(path, out var error))
+        {
+            await AppMessageBox.Show(
+                LocalizationManager.T("Picker_CreateMissingFolderFailed", error),
+                LocalizationManager.T("Picker_CreateMissingFolderTitle"),
+                MessageBoxButton.OK, MessageBoxImage.Error, OwnerWindow);
+            return;
+        }
+
+        NavigateTo(path);
+    }
+
+    /// <summary>
+    /// 建出 <paramref name="path"/>（含中间层）。失败返回 <c>false</c> 并给出本地化原因。
+    /// 抽成公开方法是为了让「询问→建目录」这条链里唯一有副作用的一步能脱离弹窗被测试。
+    /// </summary>
+    /// <param name="path">要创建的目录路径。</param>
+    /// <param name="error">失败原因（成功时为 <c>null</c>）。</param>
+    public bool TryCreateDirectory(string path, out string? error)
+    {
+        error = null;
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            error = LocalizationManager.T("Picker_NewFolderNoPath");
+            return false;
+        }
+
+        try
+        {
+            Directory.CreateDirectory(path);
+            return true;
+        }
+        catch (Exception ex)
+        {
+            App.DebugLog($"[CustomFilePickerControl] create missing folder failed: {path}: {ex.Message}");
+            error = ex.Message;
+            return false;
+        }
     }
 
     // ── Navigation ─────────────────────────────────────────────────────────
@@ -869,7 +954,6 @@ public partial class CustomFilePickerControl : UserControl
             ClearAccumulatedSelection();
         }
 
-        CurrentPathText.Text = dir;
         PathCrumbs.Path = dir;
         PathHistoryManager.Record(dir);
         PathChanged?.Invoke(this, dir);
@@ -1056,7 +1140,6 @@ public partial class CustomFilePickerControl : UserControl
         if (!string.IsNullOrEmpty(_currentDir))
             _forwardStack.Add(_currentDir);
         _currentDir = dir;
-        CurrentPathText.Text = dir;
         PathCrumbs.Path = dir;
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);
@@ -1071,7 +1154,6 @@ public partial class CustomFilePickerControl : UserControl
         if (!string.IsNullOrEmpty(_currentDir))
             _backStack.Add(_currentDir);
         _currentDir = dir;
-        CurrentPathText.Text = dir;
         PathCrumbs.Path = dir;
         LoadDirectory(dir);
         QuickPath.SetCurrentPath(dir);

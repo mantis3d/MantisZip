@@ -97,11 +97,12 @@
               <!-- 内嵌目录选择器：Mode=PickFolder（只取目录、不显示文件名区），
                    IsCheckboxMode=False（当前目录即结果、无复选框）。
                    PathChanged → 代码后台写回 ViewModel.OutputDirectory。
+                   AllowCreateMissingFolder：地址栏输入尚不存在的目录时询问是否创建（输出目录允许提前不存在）。
                    MinHeight 只是「窗口被压得很矮时的下限」，正常高度由 * 行决定。 -->
               <controls:CustomFilePickerControl Grid.Row="1"
                                                 x:Name="OutputPicker"
                                                 Mode="PickFolder"
-  
+                                                AllowCreateMissingFolder="True"
                                                 MinHeight="200"
                                                 Margin="0,6,0,0"
                                                 PathChanged="OnOutputPickerPathChanged" HideAccumulatedPanel="True" />

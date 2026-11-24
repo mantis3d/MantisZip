@@ -137,17 +137,11 @@
               BorderThickness="1"
               CornerRadius="4"
               Background="{DynamicResource ThemeSurfaceBgBrush}">
-        <Grid RowDefinitions="Auto,*">
-          <!-- 当前路径显示 -->
-          <TextBlock x:Name="CurrentPathText"
-                     Grid.Row="0"
-                     Margin="8,6"
-                     FontSize="11"
-                     Foreground="{DynamicResource ThemeTextSecondaryBrush}"
-                     TextTrimming="CharacterEllipsis" />
+        <!-- 2026-11-24：列表上方那行灰色全路径（原 CurrentPathText）已删除 ——
+             同一条路径在地址栏面包屑里已经完整可读可编辑，再列一遍纯属重复且白占一行高度。 -->
+        <Grid>
           <!-- 文件/目录列表（多选；行高用紧凑度资源键，规则 7） -->
           <ListBox x:Name="FileList"
-                   Grid.Row="1"
                    Background="Transparent"
                    BorderThickness="0"
                    SelectionMode="Multiple"

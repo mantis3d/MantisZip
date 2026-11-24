@@ -79,9 +79,9 @@ internal class DragDropService
         {
             var parentDir = Path.GetDirectoryName(_archivePath)
                             ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop);
-            // 初始目录 = 压缩包同名文件夹（尚不存在也无妨：选择器会回退到最近的已存在父目录，
-            // 真正创建由解压流程负责）
-            var initialPath = Path.Combine(parentDir, Path.GetFileNameWithoutExtension(_archivePath));
+            // 初始目录 = 压缩包所在目录（2026-11-24 与对话框构造器默认值、智能解压档位统一）。
+            // 曾经拼过 \包名 —— 那一层现在由 RootMode（默认 SMART_WRAP）负责，再拼一次就多一层（KI-022）。
+            var initialPath = parentDir;
 
             App.DebugLog("[DragDropService] DetectTargetDirectory returned null, showing custom extract folder picker...");
             // 条目选择模式（v0.5.5 第三步后半）：拖拽兜底改弹解压设置窗的「选择要解压的文件」页，
