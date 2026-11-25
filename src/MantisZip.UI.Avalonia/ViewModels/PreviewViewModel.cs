@@ -2016,9 +2016,28 @@ var formatValues = new Dictionary<string, string?>
         }
     }
 
+    /// <summary>
+    /// 把样本文本里的 CRLF / 单独 CR 统一成 LF。
+    /// 折行只按 <c>'\n'</c> 切分，残留的 <c>'\r'</c> 会留在行尾参与绘制 ——
+    /// 字形表里没有 U+000D 的字体（Arial / 微软雅黑等）会把它画成一个方块。
+    /// </summary>
+    internal static string NormalizeFontSampleText(string? sampleText)
+    {
+        if (string.IsNullOrEmpty(sampleText)) return sampleText ?? string.Empty;
+        if (sampleText.IndexOf('\r') < 0) return sampleText;
+
+        return sampleText.Replace("\r\n", "\n").Replace('\r', '\n');
+    }
+
     private void RenderFontPreview(byte[] fontData, string sampleText, bool isDark)
     {
         PreviewImage = null;
+
+        // 样本文本可能带 CRLF（用户从设置页粘贴、或出厂默认快照里写的就是 \r\n），
+        // 而下面的折行只按 '\n' 切 —— 不归一的话每行尾部留一个 '\r'，
+        // 在没给它设字形的字体里会画成豆腐块（Arial / 微软雅黑实测多出方块）。
+        sampleText = NormalizeFontSampleText(sampleText);
+
         _fontPreviewSampleText = sampleText;
         // 保留原始（未过滤）样本文本，供渲染失败时回退显示，避免显示被过滤后的空文本
         var originalSampleText = sampleText;

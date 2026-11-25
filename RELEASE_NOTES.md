@@ -12,10 +12,10 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **进度窗口的「冲突时:」下拉，运行中改了就生效** — 解压 / 压缩运行时，进度窗口信息区首行右侧出现「冲突时:」下拉：解压 6 档（每次询问 / 覆盖 / 覆盖较旧 / 覆盖较小 / 重命名 / 跳过）、压缩 5 档（每次询问 / 覆盖 / 添加 / 重命名 / 跳过）。改动只影响之后遇到的冲突，不必取消重来；冲突弹窗里勾「应用到全部」会反向刷新下拉，两边始终一致。7z 固实包例外：落点在开始解压前就已定案，进入解码阶段后下拉变灰并说明原因。
 - **A conflict policy you can change mid-run** — the progress window shows an "On conflict:" dropdown while extracting or compressing: six options for extraction (ask / overwrite / overwrite if older / overwrite if smaller / rename / skip) and five for compression (ask / overwrite / add / rename / skip). A change affects only the conflicts after it, so there is no need to cancel and restart. Solid 7z archives are the exception: their plan is fixed before decoding starts, so the dropdown greys out with a note saying why.
-- ![进度窗口信息区首行右侧的「冲突时:」下拉：解压 6 档，固实包开始解码后自动置灰](docs/images/version/v0.5.7/ProgressConflictPolicy.png)
+- ![进度窗口信息区首行右侧的「冲突时:」下拉，与「精简 / 标准 / 完整」密度选择同排](docs/images/version/v0.5.7/ProgressConflictPolicy.png)
 - **压缩包名可以按模板自动生成了** — 压缩设置里新增「文件名模板」，用占位符拼包名：`{name}` 源文件名、`{ext}` 源扩展名、`{parent}` 上级目录名、`{date}` / `{datetime}` 日期时间、`{seq}` 序号（`{seq:0000}` 补四位）、`{name:auto}` 按源数量自动取名。格式扩展名自动补，预览树里看到的包名就是最终包名；模板留空则行为与之前完全一致。右侧 `?` 有完整说明，常用模板可「存为预设」，设置页还能为三种入口分别设默认值。
 - **Name your archives with a template** — compose the archive name from placeholders: `{name}` source file name, `{ext}` source extension, `{parent}` parent folder name, `{date}` / `{datetime}` date and time, `{seq}` a sequence number (`{seq:0000}` zero-padded), and `{name:auto}` which picks a name based on how many sources there are. The format extension is appended automatically, the preview tree shows the final name, and an empty template keeps the previous behaviour. The `?` button opens the reference, and templates can be saved as presets.
-- ![压缩设置「文件名模板」：占位符输入框、预设与只读的输出文件名；右侧预览树已显示最终包名](docs/images/version/v0.5.7/FileNameTemplate.png)
+- ![压缩设置「文件名模板」：占位符按钮与预设下拉都在模板输入行里，下方是输出文件名，扩展名由格式自动补](docs/images/version/v0.5.7/FileNameTemplate.png)
 
 **修复 / Fixes**
 
@@ -23,7 +23,7 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 - **The language and theme you pick in the installer now actually apply** — the choices made in the setup wizard never made it into the app, so it always started in light theme and Chinese no matter what was selected (changing them in settings afterwards did work). The wizard's choices are now applied on first launch and saved.
 - **带调色板的 ICO 打不开、动画 WebP 预览卡顿（issue #89）** — ① 低色深（1 / 4 / 8 位）ICO 的像素起始偏移漏算了调色板长度，整帧解不出来、预览直接报不支持；② 动画 WebP 改为链式增量解码并直写位图，26 帧的文件从 7.9 秒降到 0.4 秒左右，帧数超过 600 或像素总量超过 192 MB 时只显示首帧并在画面上说明原因。
 - **Palette ICOs failed to open and animated WebP previews crawled (issue #89)** — palette-based ICO frames (1 / 4 / 8-bit) computed the pixel offset without the palette size, so the frame never decoded and the preview reported the file as unsupported; animated WebP now decodes frames incrementally straight into bitmaps, cutting a 26-frame file from 7.9 s to about 0.4 s, and files over 600 frames or 192 MB of pixels show only the first frame with an on-screen explanation.
-- ![ICO 图标预览已能显示带调色板的帧；动画 WebP 预览帧数超限时只显示首帧并给出说明](docs/images/version/v0.5.7/Issue89Preview.png)
+- ![带调色板的 ICO 帧已能正常预览：选中 Test_02.ico，右侧元数据与图标都显示出来了](docs/images/version/v0.5.7/Issue89Preview.png)
 - **「解压到此处」「解压到同一文件夹」「智能解压」不再无视冲突设置** — 这三条原地解压路径此前调用引擎时不传任何选项，引擎一律按覆盖处理，用户选了「每次询问」或「跳过」也照旧静默覆盖同名文件（KI-012，数据丢失级）。现在三条路径都带上默认策略与询问弹窗，进度窗口里也有「冲突时:」下拉，与其他解压入口完全一致。
 - **"Extract here", "extract to folder" and smart extract no longer ignore your conflict settings** — those three in-place paths called the engine without any options, and the engine treats "no settings" as overwrite, silently replacing files of the same name even when "ask every time" or "skip" was configured (tracked as KI-012, a data-loss class issue). All three now pass the default policy and the ask dialog, and their progress window shows the same "On conflict:" dropdown as every other extraction entry point.
 - **右键菜单用一次就消失（issue #80）** — 启用「动态菜单」后右键压缩或解压一次，MantisZip 菜单项会永久消失。现在菜单组件自己上报「菜单确实画出来了」的心跳，一旦失效就自动回退到静态菜单，不会再出现「既没有动态菜单、也没有兜底」的两头空。

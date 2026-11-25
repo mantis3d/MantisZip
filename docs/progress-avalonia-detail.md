@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-25** — 字体预览样本文本归一换行 + 出厂默认固化「目录树自动展开」
+  - **起因**：用户说「settings.json 是我刚刚手动编辑的」——工作树里那份 `src/MantisZip.UI.Avalonia/Resources/Defaults/settings.json` 的未提交改动出自他手，不是产物污染。diff 两处：`FontPreviewSampleText` 末尾追加一行连字样本（`== === >= <> <= !=`）、`AutoExpandTreeToCurrent` `false` → `true`。
+  - **顺带查出的真缺陷**：追加那行写的是 CRLF（JSON 里是 `\r\n`），而 `PreviewViewModel.RenderFontPreview` 的折行只 `sampleText.Split('\n')`，行尾那个 `'\r'` 会被当作字符继续参与 `MeasureText` / `DrawText`。实测：`CascadiaCode.ttf` / `consola.ttf` 的 U+000D 有零宽字形（看不出问题），`arial.ttf` / `msyh.ttc` 的字形表里没有 U+000D ⇒ 画成 notdef 豆腐块（探针：`列张` 104 → `列张\r` 156 个不透明像素，多出的正好一个方块宽）。也就是说用户用微软雅黑之类的中文字体看预览时，每行尾巴会多一个方块。
+  - **修法**：新增 `internal static string NormalizeFontSampleText(string?)`（`\r\n` 与孤立 `\r` 一律折成 `\n`；不含 CR 时原样返回**同一实例**，避免无谓分配），在 `RenderFontPreview` 入口先归一再用。出厂快照那行连字样本同步改成纯 `\n`（JSON 里写 `\n` 而不是 `\r\n`）。为什么在渲染入口而不是在设置页保存时归一：设置文件可能由用户手改、由旧版本写入、由安装器带入，**任何来源都可能带 CR**，只有渲染侧是唯一必经之路。
+  - **出厂默认固化**：`AutoExpandTreeToCurrent` 由 `false` 改为 `true`（用户真机偏好，新装即开启）。注意这条值**只存在于内嵌快照里** —— `AppSettings` 字段初值仍是 `false`（那是「快照读不出来」的兜底路径），所以 `FactoryDefaultsTests` 新增一条专门钉快照侧的行为，断言走 `AppSettings.Load()`（沙箱、无设置文件 ⇒ 读内嵌快照）而不是 `new AppSettings()`。
+  - **测试**：新增 `tests/MantisZip.UI.Avalonia.Tests/FontSampleTextNewlineTests.cs`（8 例：CRLF / 孤立 CR / 纯 LF 三种输入 → 都归一成 LF；连续空行保留；空串与 null → 空串；纯 LF 文本 `Assert.Same` 原样返回；出厂快照不含 `\r` 且确实含 `>=` 连字样本 —— 最后这条同时防止「样本被删了用例却还是绿」）。`FactoryDefaultsTests` 增 `EmbeddedDefaults_PinUserProfile_ForTreeAutoExpand`。
+  - **验证**：`-Task build -Target avalonia` 35.4s 0 警告；`-Task test -Target ui-tests` 全绿（62.5s）；`-Task test -Target tests` 全绿（16.3s）；`-Task i18n` 1507 key 三语一致；`-Task check` 全绿（0.5.7 六处 / 12 条守卫）。
+  - **坑（探针阶段）**：`HarfBuzzSharp.Buffer` 与 `System.Buffer` 同名，`using HarfBuzzSharp;` 后必须写全限定名（CS0104）；`SKCanvas.DrawText(ushort[] glyphs, ...)` 的重载在本项目的 SkiaSharp 版本里不存在可用签名，验字形可见性要走 `font.GetGlyphPath(glyph)` 看 `Bounds`，或直接数渲染后的不透明像素。
+
 **2026-11-24** — 内置过滤预设名改为 i18n 键（`NameKey` + `Key`）
   - **起因**：用户在自适应规则名改完后追问「自带的『文件过滤规则』是否需要做同样的修正」。查证：`src/MantisZip.Core/FileFilter/FileFilterPreset.GetBuiltInPresets()` 的 8 条内置预设名是中文硬编码，`src/MantisZip.UI.Avalonia/Controls/FileFilterEditor.axaml.cs` 的 `RebuildDisplayItems()` 直接 `DisplayName = p.Name` ⇒ 英文/繁中界面下预设下拉仍是「📷 仅图片」等中文。
   - **为什么不能照抄自适应规则那套**：`AdaptiveOverrideRule` 的做法是「`Name` 清空、只留 `NameKey`」，但 `FileFilterPreset.Name` 在本类型里**兼任运行期标识** —— `FileFilterEditor` 用 `Preset?.Name == autoSelectName` 回找选中项、用 `Name` 判基底预设是否还在、把 `preset.Name` 存进 `_basePresetName` 作为「当前基底」。若把 8 条内置预设的 `Name` 全部清成空串，这些比对会全部命中空串 ⇒ 下拉永远停在第 1 条（「— 无 —」），且不报错、构建与门禁都发现不了。
