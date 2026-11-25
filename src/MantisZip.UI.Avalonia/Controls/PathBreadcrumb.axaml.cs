@@ -594,6 +594,7 @@ public partial class PathBreadcrumb : UserControl
         }
 
         // 不可点段（UNC 根 / 相对路径首段）：纯文本展示
+        // （TextBlock 本来就不解析助记符，`_` 原样显示）
         if (!seg.IsClickable)
         {
             var label = new TextBlock { Text = seg.Label, Classes = { "crumbStatic" } };
@@ -601,7 +602,17 @@ public partial class PathBreadcrumb : UserControl
             return label;
         }
 
-        var button = new Button { Content = seg.Label, Classes = { "crumb" } };
+        // ⚠ 不能用 `Content = seg.Label`（字符串）：Button 的 ContentPresenter 默认
+        // RecognizesAccessKey=True，会把第一个 `_` 当成助记符前缀吃掉、把后一个字符变成
+        // Alt 快捷键，于是 `my_folder_name` 显示成 `myfolder_name`（2026-11-25 修复）。
+        // 塞 TextBlock 就绕过 AccessText 解析，文字原样渲染；顺带与末段分支保持同一形态。
+        var segmentLabel = new TextBlock
+        {
+            Text = seg.Label,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var button = new Button { Content = segmentLabel, Classes = { "crumb" } };
+
         ToolTip.SetTip(button, seg.Tooltip);
         button.Click += (_, e) =>
         {

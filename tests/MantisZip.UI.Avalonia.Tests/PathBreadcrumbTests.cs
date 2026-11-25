@@ -119,7 +119,7 @@ public class PathBreadcrumbTests
         // 盘符段可点，且上抛「C:\」而不是「C:」（后者是驱动器相对路径）
         var host = crumb.FindControl<StackPanel>("SegmentsPanel")!;
         var drive = Assert.IsType<Button>(host.Children[0]);
-        Assert.Equal("C:", drive.Content);
+        Assert.Equal("C:", Assert.IsType<TextBlock>(drive.Content).Text);
 
         string? navigated = null;
         crumb.NavigateRequested += (_, p) => navigated = p;
@@ -149,7 +149,8 @@ public class PathBreadcrumbTests
         crumb.NavigateRequested += (_, p) => navigated = p;
 
         var host = crumb.FindControl<StackPanel>("SegmentsPanel")!;
-        var usersButton = host.Children.OfType<Button>().First(b => (string?)b.Content == "Users");
+        var usersButton = host.Children.OfType<Button>()
+            .First(b => Assert.IsType<TextBlock>(b.Content).Text == "Users");
         usersButton.RaiseEvent(new RoutedEventArgs(Button.ClickEvent));
 
         Assert.Equal(@"C:\Users", navigated);
@@ -326,6 +327,38 @@ public class PathBreadcrumbTests
 
         // 空路径不预填分隔符，否则会凭空造出一个「根」提示
         Assert.Equal(string.Empty, edit.Text);
+
+        window.Close();
+    }
+
+    /// <summary>
+    /// 段名里的下划线必须原样显示。反例锁：<c>C:\my_folder_name</c> 的祖先段此前用
+    /// <c>Button.Content = "my_folder_name"</c>（字符串），而 <c>Button</c> 的 <c>ContentPresenter</c>
+    /// 默认 <c>RecognizesAccessKey = true</c>，会把首个 <c>_</c> 当助记符前缀吃掉 ⇒ 渲染成 <c>myfolder_name</c>。
+    /// 现在 Content 一律是 <see cref="TextBlock"/>，助记符解析被绕开。
+    /// </summary>
+    [AvaloniaFact]
+    public void SegmentLabel_WithUnderscores_IsRenderedVerbatim()
+    {
+        var (window, crumb) = ShowCrumb(@"C:\my_folder_name\another_one");
+
+        Assert.Equal(new[] { "C:", "my_folder_name", "another_one" }, SegmentTexts(crumb));
+
+        // 断言的是「渲染出来的文字」：拿 TextBlock.TextLayout 的实际 run 文本，
+        // 而不是 TextBlock.Text —— 后者无论是否被 AccessText 处理都原样，测不出这个缺陷。
+        var host = crumb.FindControl<StackPanel>("SegmentsPanel")!;
+        var labels = host.Children.OfType<Button>().Select(b => Assert.IsType<TextBlock>(b.Content)).ToList();
+        Assert.Equal(3, labels.Count);
+        foreach (var tb in labels)
+        {
+#pragma warning disable CS0618 // TextLayout 是 public 但官方标注「不用于外部」
+            var rendered = string.Concat(tb.TextLayout!.TextLines.SelectMany(l => l.TextRuns).OfType<global::Avalonia.Media.TextFormatting.TextRun>().Select(r => r.Text));
+#pragma warning restore CS0618
+            Assert.Equal(tb.Text, rendered);
+        }
+        // 带下划线的两段必须是原样（盘符段 C: 本来就没有下划线，不参与）
+        Assert.Contains(labels, tb => tb.Text == "my_folder_name");
+        Assert.Contains(labels, tb => tb.Text == "another_one");
 
         window.Close();
     }
