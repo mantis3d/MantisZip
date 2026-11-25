@@ -36,6 +36,8 @@ MantisZip-0.5.8-Setup-WebSetup.exe requires internet during installation. Mantis
 - **The smart-extract status message now matches what actually happened** — a single-root archive used to report that the root folder had been removed while nothing was ever removed (since v0.5.6). The message now describes the real outcome: a top-level folder was added, the top-level folder was removed, or the folder structure was left unchanged.
 - **长路径的面包屑不再按层数硬折** — 此前固定「最多 6 段」，层数多但很短的路径会被白白折掉、白扔一大截可用宽度，而层数少但很长的路径反而不折、溢出后被裁成半截段名（连省略号都没有）。现在按控件实际可用宽度逐段量算，放得下就全显示、放不下才从中间折叠，末段超长时自己带省略号收尾；窗口拉宽拉窄也会跟着重新展开或折叠。
 - **The breadcrumb no longer folds long paths by segment count** — it used to cap at 6 segments, so a deep but short path was folded needlessly while a shallow but very wide path was not folded at all and got clipped mid-word with no ellipsis. It now measures the actual available width per segment, folds only when it really does not fit, trims the last segment with an ellipsis, and re-expands or re-folds as the window is resized.
+- **面包屑里带下划线的文件夹名能完整显示了** — 此前段名里的第一个下划线被当成菜单助记符前缀吞掉、后面那个字符还变成了 Alt 快捷键，`my_folder_name` 会显示成 `myfolder_name`（真实文件夹名越规范越容易踩到）。现在按原样显示，括号、连字符等其他符号不受影响。
+- **Folder names containing underscores are shown in full in the breadcrumb** — the first underscore used to be swallowed as a menu mnemonic prefix (and the following character hijacked as an Alt shortcut), so `my_folder_name` rendered as `myfolder_name`. Names are now shown verbatim; other punctuation such as parentheses and hyphens was never affected.
 
 ## v0.5.7
 
