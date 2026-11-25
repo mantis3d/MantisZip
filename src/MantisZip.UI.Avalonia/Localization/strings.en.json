@@ -1,4 +1,12 @@
 ﻿{
+  "FileFilter_BuiltInPreset_Image": "📷 Images only",
+  "FileFilter_BuiltInPreset_Audio": "🎵 Audio only",
+  "FileFilter_BuiltInPreset_Video": "🎬 Video only",
+  "FileFilter_BuiltInPreset_Document": "📄 Documents only",
+  "FileFilter_BuiltInPreset_Archive": "🗜 Archives only",
+  "FileFilter_BuiltInPreset_LargeFile": "📦 Large files (>100MB)",
+  "FileFilter_BuiltInPreset_ThisMonth": "📅 Modified this month",
+  "FileFilter_BuiltInPreset_ExcludeTemp": "🗑 Exclude cache/temp files",
   "Settings_AdaptiveRuleName_Image": "Images",
   "Settings_AdaptiveRuleName_Video": "Videos",
   "Settings_AdaptiveRuleName_Audio": "Audio",

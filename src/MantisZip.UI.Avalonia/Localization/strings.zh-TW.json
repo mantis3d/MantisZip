@@ -1,4 +1,12 @@
 ﻿{
+  "FileFilter_BuiltInPreset_Image": "📷 僅圖片",
+  "FileFilter_BuiltInPreset_Audio": "🎵 僅音訊",
+  "FileFilter_BuiltInPreset_Video": "🎬 僅視訊",
+  "FileFilter_BuiltInPreset_Document": "📄 僅文件",
+  "FileFilter_BuiltInPreset_Archive": "🗜 僅壓縮檔",
+  "FileFilter_BuiltInPreset_LargeFile": "📦 大檔案(>100MB)",
+  "FileFilter_BuiltInPreset_ThisMonth": "📅 本月修改",
+  "FileFilter_BuiltInPreset_ExcludeTemp": "🗑 排除快取/暫存檔",
   "Settings_AdaptiveRuleName_Image": "圖片類",
   "Settings_AdaptiveRuleName_Video": "視訊類",
   "Settings_AdaptiveRuleName_Audio": "音訊類",

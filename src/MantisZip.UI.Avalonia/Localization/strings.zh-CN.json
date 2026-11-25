@@ -1,4 +1,12 @@
 ﻿{
+  "FileFilter_BuiltInPreset_Image": "📷 仅图片",
+  "FileFilter_BuiltInPreset_Audio": "🎵 仅音频",
+  "FileFilter_BuiltInPreset_Video": "🎬 仅视频",
+  "FileFilter_BuiltInPreset_Document": "📄 仅文档",
+  "FileFilter_BuiltInPreset_Archive": "🗜 仅压缩包",
+  "FileFilter_BuiltInPreset_LargeFile": "📦 大文件(>100MB)",
+  "FileFilter_BuiltInPreset_ThisMonth": "📅 本月修改",
+  "FileFilter_BuiltInPreset_ExcludeTemp": "🗑 排除缓存/临时文件",
   "Settings_AdaptiveRuleName_Image": "图片类",
   "Settings_AdaptiveRuleName_Video": "视频类",
   "Settings_AdaptiveRuleName_Audio": "音频类",
