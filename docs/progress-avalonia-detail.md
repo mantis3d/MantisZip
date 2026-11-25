@@ -6,6 +6,18 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-25** — 修复：面包屑按「实际宽度」折叠，不再按段数硬折（`PathBreadcrumb`）
+  - **用户反馈**：「面包屑导航的长路径截断，现在似乎是按照层数而非长度截短的，导致会把层数较多但是较短的路径截短，而层数较少但是较长的却不会截短。你先看看，然后跟我讨论。」
+  - **根因一（主因）**：`src/MantisZip.UI.Avalonia/Controls/PathBreadcrumb.axaml.cs` 里的 `public int MaxSegments { get; set; } = 6;` 只在**数段数**，与可用宽度毫无关系；5 个宿主（解压/压缩设置窗、文件选择器、`QuickPathPicker`、`ArchiveContentView`）没有一个改过它。
+  - **根因二（取证新发现）**：不折叠时也**没有任何溢出保护** —— `SegmentsPanel` 是横向 `StackPanel`，测量拿无限宽、子项永不自缩，外层 `UserControl ClipToBounds="True"` 直接硬切，用户看到的是**残缺的真实段名**（比折叠更误导）。
+  - **真机取证四用例**（解压设置窗，面包屑可用宽度约 730px）：A `E:\mzbcA\a\b\c\d\e\f`（8 段 20 字符）被白折成 6 段、白扔约 520px；B/C（5 段 90/103 字符）不折叠正常；D（5 段 101 字符全大写）**溢出被硬切**成 `GGGG…HHHH` 缺尾无省略号 —— D 的字符数比 C 少却溢出，证明**连字符数都不可靠，只有实测像素才准**。
+  - **改法**：①删掉 `MaxSegments` 属性与 `Fold(...)`，改为 `FitToWidth(segments, available)`：`Shell.Bounds.Width` 减内边距当可用宽度，逐段 `Measure` 量宽（**必须先把视图挂进 `SegmentsPanel` 再量** —— 脱树的 `Button` 还没应用控件模板，`Measure` 恒得 0，会全部算成放得下），放得下全显示、放不下则留首段 + `…` + 末尾能塞下的若干段；②`Shell.SizeChanged`（宽度真的变了才重排）接上重算，窗口缩放跟着变；③末段（当前目录）自己都超宽时改 `TextTrimming.CharacterEllipsis` 自省略，不再靠 `ClipToBounds` 硬切；④`…` 的 ToolTip 从「复述第一个被隐藏段的路径」改为「已隐藏 N 个路径段」（新增 i18n key `Breadcrumb_HiddenSegments`，三语 1531 → **1532 key**）。
+  - **用户三点拍板**（回答「1，不留。2，你决定。3，修」）：`MaxSegments` 不留；末段省略方式由我定（选 `CharacterEllipsis`，保留开头最符合直觉）；`…` 的 ToolTip 顺手修。
+  - **回归绊线**（`tests/MantisZip.UI.Avalonia.Tests/PathBreadcrumbTests.cs`，删掉按段数折叠的旧用例，改为 6 条）：深而短不折叠 / 宽而浅必折叠 / 折叠后 ToolTip 报隐藏段数 / 末段超宽自省略 / 拉宽后重新放开 / 拉窄后重新折叠；后两条专钉「只在 `Path` 变化时重算」这个旧缺口。ToolTip 用例的期望隐藏数**由「总段数 - 可见段数」推出**而不是写死，避免字体或紧凑度档位变化时假红。
+  - **验证**：`avalonia -c Release --no-incremental` 0 警告；`PathBreadcrumbTests` 16 例全绿；全量 `ui-tests` **1008 通过 / 3 跳过 / 0 失败**；`-Task check` 版本 0.5.8 六处 + **1532 key** 三语一致 + 12 条守卫全绿。
+  - **真机复验**：A 现在完整显示 `E: › mzbcA › a › b › c › d › e › f` 且只用约 300px；B 不再被截；D 折成 `E: › … › GGGG…HHHH…`（末段自省略、不再硬切）；窗口拉宽到 1546px 后 D 自动展开、拉窄回 1226px 再折。
+  - **踩坑**：①无头测试里**宽度依赖实测 Bounds**，`Show()` 之后必须 `Dispatcher.UIThread.RunJobs()` + 再 `UpdateLayout()`，否则断言看到的是「还没折」的中间态；②`SetWindowPos` 给小于窗口最小宽度的尺寸会被忽略（`MinWidth` 生效），想验「拉窄后重新折叠」只能靠无头测试或拉宽方向；③`-Task build -Json` 的 JSON **没有** `diagnostics` 字段且 `tail` 可能为空，定位编译错误要直接 `dotnet build <csproj>` 再 `Select-String "error "`。
+
 **2026-11-24** — 交互：解压窗去掉重复的整条路径框，面包屑支持「不存在则建目录」，KI-022 落点统一
   - **用户指令**：「你看解压窗口上面还有一个完整的路径，它跟面包屑导航重复。之前保留他的目的现在应该已经被包内根目录覆盖了，你看它是不是可以去掉了？跟我讨论。」随后三问确认：「不存在的目标目录」→ 让面包屑支持输入不存在路径并询问是否创建；KI-022 两个入口 → 同批改成传父目录；`CurrentPathText` 灰色全路径 → 一起删。
   - **为什么删**：同一页里同一条路径有三个显示面（整条文本框 / 面包屑地址栏 / 选择器列表上方的灰色全路径）。`git log -S DestinationPathBox` 只有 `f82852de` 一笔，是内嵌改造时新写的，不是从旧 `QuickPathPicker` 继承；压缩窗**从来没有**整条输出目录文本框，解压窗这一行属不对称遗留。`docs/progress-avalonia-detail.md:13` 当年写的理由是「这三样回答的都是『解压到哪』」，只说同属一页、未要求两条编辑入口。

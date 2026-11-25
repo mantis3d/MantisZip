@@ -35,6 +35,7 @@
   "Compress_SelectedSources": "Selected sources",
   "Breadcrumb_ArchiveRoot": "Archive root",
   "Breadcrumb_EditPlaceholder": "Type a path and press Enter",
+  "Breadcrumb_HiddenSegments": "{0} path segment(s) hidden",
 "Settings_Tab_Appearance_General": "Appearance",
 "Settings_Tab_Appearance_Progress": "Progress window",
   "Settings_Tab_AppearanceThumbnail": "Thumbnails",

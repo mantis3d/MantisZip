@@ -35,6 +35,7 @@
   "Compress_SelectedSources": "已選來源檔案",
   "Breadcrumb_ArchiveRoot": "壓縮檔根目錄",
   "Breadcrumb_EditPlaceholder": "輸入路徑後按 Enter",
+  "Breadcrumb_HiddenSegments": "已隱藏 {0} 個路徑段",
 "Settings_Tab_Appearance_General": "外觀",
 "Settings_Tab_Appearance_Progress": "進度視窗",
   "Settings_Tab_AppearanceThumbnail": "縮圖",

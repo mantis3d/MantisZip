@@ -34,6 +34,8 @@ MantisZip-0.5.8-Setup-WebSetup.exe requires internet during installation. Mantis
 - **The right-click "Extract selected to…" and drag-and-drop extraction no longer add an extra folder layer** — both entries still computed the initial folder as "parent\archive-name" while the dialog itself defaults to "parent" and lets the archive top folder policy add that layer, so the mismatch produced a duplicated same-name folder. Both now pass the parent folder, matching the dialog default and both smart-extract modes.
 - **智能解压完成后的状态栏文案不再与实际动作不符** — 单根压缩包此前提示「已剥离根文件夹」，而实际上那一层从没被剥掉过（自 v0.5.6 起）。现在按真正发生的事显示：已添加顶层文件夹 / 已去除顶层文件夹 / 目录结构未改动。
 - **The smart-extract status message now matches what actually happened** — a single-root archive used to report that the root folder had been removed while nothing was ever removed (since v0.5.6). The message now describes the real outcome: a top-level folder was added, the top-level folder was removed, or the folder structure was left unchanged.
+- **长路径的面包屑不再按层数硬折** — 此前固定「最多 6 段」，层数多但很短的路径会被白白折掉、白扔一大截可用宽度，而层数少但很长的路径反而不折、溢出后被裁成半截段名（连省略号都没有）。现在按控件实际可用宽度逐段量算，放得下就全显示、放不下才从中间折叠，末段超长时自己带省略号收尾；窗口拉宽拉窄也会跟着重新展开或折叠。
+- **The breadcrumb no longer folds long paths by segment count** — it used to cap at 6 segments, so a deep but short path was folded needlessly while a shallow but very wide path was not folded at all and got clipped mid-word with no ellipsis. It now measures the actual available width per segment, folds only when it really does not fit, trims the last segment with an ellipsis, and re-expands or re-folds as the window is resized.
 
 ## v0.5.7
 

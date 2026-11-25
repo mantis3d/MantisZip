@@ -92,8 +92,11 @@ public partial class PathBreadcrumb : UserControl
     /// </summary>
     public Func<string?, IEnumerable<string>>? EditCompletionProvider { get; set; }
 
-    /// <summary>折叠阈值：段数超过该值时中间段合并为 <c>…</c>。</summary>
-    public int MaxSegments { get; set; } = 6;
+    /// <summary>段间分隔符的固定占宽（图标 12 + 左右 margin 各 1）。</summary>
+    private const double SeparatorWidth = 14;
+
+    /// <summary>折叠时省略号段自身占的宽度（<c>…</c> 小号字 + 左右 margin）。</summary>
+    private const double EllipsisWidth = 16;
 
     /// <summary>虚拟根段（📦）的 ToolTip 本地化 key。</summary>
     public string? ArchiveRootTooltipKey { get; set; }
@@ -249,12 +252,23 @@ public partial class PathBreadcrumb : UserControl
         }
         RefreshSegments();
 
+        // 窗口缩放 / 侧栏拖动会改变可用宽度：按宽度折叠的结论必须跟着重算，
+        // 否则窗口拉窄后会停在旧结论上、被 ClipToBounds 硬切（2026-11-25 前的真实缺陷）。
+        // 只在宽度真的变了时才重画 —— SizeChanged 在高度变化时也会触发，那两个方向不需要重排。
+        Shell.SizeChanged += OnShellSizeChanged;
+
         // 窗口级 Ctrl+L：挂在 TopLevel 隧道阶段 → 焦点在列表/树/任意控件时都能直达地址栏，
         // 宿主无需逐个窗口接线（一处接线服务全部宿主）
         _topLevel = TopLevel.GetTopLevel(this);
         _topLevel?.AddHandler(KeyDownEvent, OnTopLevelKeyDown, global::Avalonia.Interactivity.RoutingStrategies.Tunnel);
     }
 
+    /// <summary>外壳宽度变化时重排段（首次布局也走这里：Attached 时 Bounds 还是 0，拿不到可用宽度）。</summary>
+    private void OnShellSizeChanged(object? sender, SizeChangedEventArgs e)
+    {
+        if (Math.Abs(e.NewSize.Width - e.PreviousSize.Width) < 0.5) return;
+        RefreshSegments();
+    }
 
     private void OnTopLevelKeyDown(object? sender, KeyEventArgs e)
     {
@@ -268,6 +282,7 @@ public partial class PathBreadcrumb : UserControl
     protected override void OnDetachedFromVisualTree(VisualTreeAttachmentEventArgs e)
     {
         base.OnDetachedFromVisualTree(e);
+        Shell.SizeChanged -= OnShellSizeChanged;
         if (_topLevel is not null)
         {
             _topLevel.RemoveHandler(KeyDownEvent, OnTopLevelKeyDown);
@@ -347,7 +362,7 @@ public partial class PathBreadcrumb : UserControl
         SegmentsPanel.Children.Clear();
 
         var path = Path ?? string.Empty;
-        var segments = BuildSegments(path, PathKind, MaxSegments, ArchiveRootTooltipKey);
+        var segments = BuildSegments(path, PathKind, ArchiveRootTooltipKey);
 
         // 磁盘空路径：显示占位文案，整行可点进编辑态
         var emptyDisk = PathKind == BreadcrumbPathKind.Disk && segments.Count == 0;
@@ -361,19 +376,39 @@ public partial class PathBreadcrumb : UserControl
 
         SegmentsPanel.IsVisible = !emptyDisk && !_isEditing;
 
-        for (var i = 0; i < segments.Count; i++)
+        // 按**实测可用宽度**决定显示几段（旧实现按段数阈值，深而短的路径会被白折）。
+        var available = AvailablePanelWidth();
+        var visible = available > 0 ? FitToWidth(segments, available) : segments;
+
+        for (var i = 0; i < visible.Count; i++)
         {
-            var seg = segments[i];
-            SegmentsPanel.Children.Add(BuildSegmentView(seg));
+            var seg = visible[i];
+            // 末段是当前目录：可用宽度连它一段都放不下时，把它自身按字符省略，而不是靠 ClipToBounds 硬切
+            var trimTo = seg.IsCurrent ? RemainingWidthFor(visible, i, available) : null;
+            SegmentsPanel.Children.Add(BuildSegmentView(seg, trimTo));
 
             // 末段之后不画分隔符
-            if (i < segments.Count - 1)
+            if (i < visible.Count - 1)
             {
                 SegmentsPanel.Children.Add(CreateSeparator());
             }
         }
 
         ApplyLocalizedPlaceholder();
+    }
+
+    /// <summary>
+    /// 面包屑外壳内部可用的横向空间（已扣掉 <see cref="Border"/> 的内边距）。
+    /// 尚未完成首次布局时返回 0 —— 调用方据此「先全画」，等 <c>Shell.SizeChanged</c> 再收一遍。
+    /// </summary>
+    private double AvailablePanelWidth()
+    {
+        var outer = Shell.Bounds.Width;
+        if (outer <= 0) return 0;
+
+        var padding = Shell.Padding;
+        var inner = outer - padding.Left - padding.Right;
+        return inner > 0 ? inner : 0;
     }
 
     /// <summary>段间分隔符：优先用真图标（<c>IconChevronRight</c>），资源未加载时退化为 <c>›</c> 字形。</summary>
@@ -388,7 +423,117 @@ public partial class PathBreadcrumb : UserControl
         return new PathIcon { Data = data, Classes = { "crumbSep" } };
     }
 
-    private Control BuildSegmentView(Segment seg)
+    // ── 宽度折叠 ────────────────────────────────────────────────────────────
+
+    /// <summary>
+    /// 按可用宽度裁出要显示的段：**放得下就全显示**，放不下则保留首段 + <c>…</c> + 末尾能塞下的若干段。
+    /// <paramref name="available"/> 为 0（尚未布局）时不裁剪，等 <c>Shell.SizeChanged</c> 再收。
+    /// </summary>
+    private List<Segment> FitToWidth(List<Segment> segments, double available)
+    {
+        if (segments.Count <= 1 || available <= 0) return segments;
+
+        var widths = segments.Select(MeasureSegmentWidth).ToList();
+        var total = TotalWidth(widths);
+        if (total <= available) return segments;
+
+        // 首段必留；末段尽量留（当前目录）。从末尾往前累加，直到装不下。
+        var headWidth = widths[0];
+        var tail = new List<int>();
+        var used = headWidth + JunctionWidth + EllipsisWidth;    // 首段 › …
+        for (var i = segments.Count - 1; i >= 1; i--)
+        {
+            var cost = widths[i] + JunctionWidth;                // … › 该段
+            if (used + cost > available && tail.Count > 0) break;
+            used += cost;
+            tail.Insert(0, i);
+        }
+
+        var hidden = segments.Count - 1 - tail.Count;
+        if (hidden <= 0) return segments;
+
+        var result = new List<Segment>(tail.Count + 2) { segments[0] };
+        result.Add(new Segment(
+            "…",
+            string.Empty,
+            IsClickable: false,
+            IsCurrent: false,
+            IsVirtualRoot: false,
+            IsEllipsis: true,
+            Tooltip: LocalizationManager.T("Breadcrumb_HiddenSegments", hidden)));
+        foreach (var i in tail) result.Add(segments[i]);
+        return result;
+    }
+
+    /// <summary>
+    /// 两段之间的成本：分隔符本体 + 它前后的 <see cref="StackPanel.Spacing"/> 间隙。
+    /// 间隙随紧凑度档位变化（2/4/6），必须按当前值算，否则窄档下会低估、宽档下会高估。
+    /// </summary>
+    private double JunctionWidth => SeparatorWidth + (SegmentsPanel.Spacing * 2);
+
+    /// <summary>所有段连同段间分隔符的总宽度。</summary>
+    private double TotalWidth(IReadOnlyList<double> widths)
+    {
+        double total = 0;
+        for (var i = 0; i < widths.Count; i++)
+        {
+            total += widths[i];
+            if (i < widths.Count - 1) total += JunctionWidth;
+        }
+        return total;
+    }
+
+    /// <summary>
+    /// 单段实际占宽：段视图里最宽的那个子元素。
+    /// 根段是 <c>StackPanel</c>（图标，固定 14+margin）、省略号是 <c>TextBlock</c>、
+    /// 其余是 <c>Button</c> / <c>TextBlock</c>——统一走 <see cref="Layoutable.Measure"/>，与真实渲染同一套文本栈。
+    /// <para>
+    /// **必须先把视图挂进面板再量**：脱树的 <c>Button</c> 还没应用控件模板，<c>Measure</c> 恒得 0，
+    /// 折叠加宽会全部算成「放得下」（2026-11-25 实测踩到：400px 窗口里 4 段 510px 也不折）。
+    /// 量完立刻摘掉，不会留在视觉树里，也不会触发可见的重排。
+    /// </para>
+    /// </summary>
+    private double MeasureSegmentWidth(Segment seg)
+    {
+        var view = BuildSegmentView(seg, trimTo: null);
+        SegmentsPanel.Children.Add(view);
+        try
+        {
+            view.Measure(Size.Infinity);
+            return view.DesiredSize.Width;
+        }
+        finally
+        {
+            SegmentsPanel.Children.Remove(view);
+        }
+    }
+
+    /// <summary>
+    /// 给末段留的剩余宽度：可用宽度减去「它前面所有段 + 分隔符」。
+    /// 结果为 null 表示不裁剪（放得下）。
+    /// </summary>
+    private double? RemainingWidthFor(IReadOnlyList<Segment> visible, int index, double available)
+    {
+        // 只有末段需要裁剪；其它段要么整段显示、要么已被 FitToWidth 折掉
+        if (index != visible.Count - 1) return null;
+        if (available <= 0) return null;
+
+        var widths = visible.Select(MeasureSegmentWidth).ToList();
+        double used = 0;
+        for (var i = 0; i < index; i++)
+        {
+            used += widths[i] + JunctionWidth;
+        }
+
+        var remaining = available - used;
+        return remaining >= widths[index] ? null : Math.Max(0, remaining);
+    }
+
+    /// <summary>
+    /// 构建段视图。<paramref name="trimTo"/> 非 null 时表示该段要按此宽度截断显示（只有末段会用到）——
+    /// 用 <see cref="TextTrimming"/> 让文字自己省略，而不是让外层 <c>ClipToBounds</c> 硬切掉半个字。
+    /// </summary>
+    private Control BuildSegmentView(Segment seg, double? trimTo)
     {
         // 折叠省略号：仅展示 + ToolTip
         if (seg.IsEllipsis)
@@ -429,7 +574,16 @@ public partial class PathBreadcrumb : UserControl
         // 末段（当前目录）：可点击——点它进编辑态，而不是「导航到自己」
         if (seg.IsCurrent)
         {
-            var current = new Button { Content = seg.Label, Classes = { "crumbCurrent" } };
+            var label = new TextBlock
+            {
+                Text = seg.Label,
+                VerticalAlignment = VerticalAlignment.Center,
+                // 末段超宽时自己省略（保留开头 + 省略号），完整路径仍在 ToolTip 里
+                TextTrimming = trimTo is null ? TextTrimming.None : TextTrimming.CharacterEllipsis,
+            };
+            if (trimTo is { } w) label.MaxWidth = w;
+
+            var current = new Button { Content = label, Classes = { "crumbCurrent" } };
             ToolTip.SetTip(current, seg.Tooltip);
             current.Click += (_, e) =>
             {
@@ -458,10 +612,10 @@ public partial class PathBreadcrumb : UserControl
     }
 
     /// <summary>
-    /// 按路径类型切段。<c>Virtual</c>：<c>/</c> 分隔，根段 = 📦；<c>Disk</c>：<c>\</c> 分隔，盘符段可点（上抛 <c>C:\</c>）、UNC 根不可点。
-    /// 段数超过 <paramref name="maxSegments"/> 时折叠中间段为单个省略号段。
+    /// 按路径类型切段（**不折叠**，折叠由 <see cref="FitToWidth"/> 按实际宽度决定）。
+    /// <c>Virtual</c>：<c>/</c> 分隔，根段 = 📦；<c>Disk</c>：<c>\</c> 分隔，盘符段可点（上抛 <c>C:\</c>）、UNC 根不可点。
     /// </summary>
-    private static List<Segment> BuildSegments(string path, BreadcrumbPathKind kind, int maxSegments, string? archiveRootTooltipKey)
+    private static List<Segment> BuildSegments(string path, BreadcrumbPathKind kind, string? archiveRootTooltipKey)
     {
         var list = new List<Segment>();
         var trimmed = (path ?? string.Empty).Trim();
@@ -481,7 +635,7 @@ public partial class PathBreadcrumb : UserControl
 
             if (parts.Length == 0) return list;
 
-            return MarkCurrent(Fold(list, maxSegments));
+            return MarkCurrent(list);
         }
 
         // Disk
@@ -509,7 +663,7 @@ public partial class PathBreadcrumb : UserControl
                 list.Add(new Segment(part, current, true, false, false, false, current));
             }
 
-            return MarkCurrent(Fold(list, maxSegments));
+            return MarkCurrent(list);
         }
 
         // 盘符根（C:）或相对路径首段
@@ -536,27 +690,7 @@ public partial class PathBreadcrumb : UserControl
             list.Add(new Segment(pieces[i], cur2, true, false, false, false, cur2));
         }
 
-        return MarkCurrent(Fold(list, maxSegments));
-    }
-
-    /// <summary>段数超过阈值时把中间段折叠为单个省略号段（保留首段 + 末尾若干段）。</summary>
-    private static List<Segment> Fold(List<Segment> segments, int maxSegments)
-    {
-        if (maxSegments < 3) maxSegments = 3;
-        if (segments.Count <= maxSegments) return segments;
-
-        var keepTail = maxSegments - 2; // 首段 + … + keepTail 段
-        var head = segments[0];
-        var hiddenFirst = segments[1];
-        var tail = segments.Skip(segments.Count - keepTail).ToList();
-
-        var result = new List<Segment>(maxSegments)
-        {
-            head,
-            new Segment("…", string.Empty, false, false, false, true, hiddenFirst.Tooltip),
-        };
-        result.AddRange(tail);
-        return result;
+        return MarkCurrent(list);
     }
 
     /// <summary>把「末段」标记为当前目录（加粗 + 点击进编辑态，而不是导航到自己）。</summary>
