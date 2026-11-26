@@ -1,3 +1,15 @@
+## v0.5.9
+
+### 文件说明 / File Description
+
+MantisZip-0.5.9-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.9-Setup-Offline.exe 是离线安装包。MantisZip-0.5.9-Portable.zip 是便携版，解压即用。MantisZip-0.5.9-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.9-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.9-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.9-Portable.zip is the portable version, extract and run. MantisZip-0.5.9-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+### 更新内容 / Changelog
+
+> 本节改动随 v0.5.9 阶段（拖拽收尾与碎片清仓）的落地逐条补充。上一个尚未发版的 v0.5.8 章节列出的改动同样包含在 0.5.9 安装包内，详见下方 `## v0.5.8`。
+
 ## v0.5.8
 
 ### 文件说明 / File Description
