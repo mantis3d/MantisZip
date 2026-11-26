@@ -115,6 +115,17 @@ internal static partial class ShellIntegration
     // 注册表路径 — COM 组件及 UI 设置共享
     private const string ContextMenuRegPath = @"Software\MantisZip\ContextMenu";
 
+    // ── 动态菜单健康信号（issue #80）──────────────────────────────────────────
+    // 判「COM 动态菜单到底能不能用」的唯一可信信号是 handler 自己上报：
+    // Explorer 会先 LoadLibrary(comhost.dll) 再问 DllGetClassObject，即使激活失败
+    // DLL 也留在模块列表里，所以「模块存在」不能当判据（这正是 issue #80 的根因 1）。
+    internal const string LastRenderUtcValue = "LastRenderUtc";          // handler 真正插入菜单项后写 ISO8601 UTC
+    internal const string LastRenderPidValue = "LastRenderExplorerPid";  // 写入时的 Explorer 进程 PID
+    internal const string ComProbeStartUtcValue = "ComProbeStartUtc";    // 试用期起点（Install 转 pending 时写）
+
+    /// <summary>注册表写操作的命名互斥名（多实例并发时串行化，见 <c>ShellIntegration.Menu.RunExclusive</c>）。</summary>
+    internal const string ShellRegMutexName = @"Local\MantisZip.ShellReg";
+
     // DynamicMenuStatus 取值（存储在 ContextMenuRegPath 下）
     public const string DynamicMenuStatus_Active = "active";
     public const string DynamicMenuStatus_Fallback = "fallback";
@@ -145,13 +156,19 @@ internal static partial class ShellIntegration
     private static void SetRegistryValue(string subKey, string? valueName, string value)
     {
         using var key = RegistryHost.Create(subKey);
-        key?.SetValue(valueName, value);
+        if (key == null) return;
+        // 幂等：值一致就不写。右键菜单会在多选时一次拉起多个进程，
+        // 每个都跑一遍级联注册，跳过一致项能把每次启动的注册表写入降到 0（issue #80）。
+        if (key.GetValue(valueName) as string == value) return;
+        key.SetValue(valueName, value);
     }
 
     private static void SetRegistryDword(string subKey, string valueName, int value)
     {
         using var key = RegistryHost.Create(subKey);
-        key?.SetValue(valueName, value, RegistryValueKind.DWord);
+        if (key == null) return;
+        if (key.GetValue(valueName) is int current && current == value) return; // 同上，幂等
+        key.SetValue(valueName, value, RegistryValueKind.DWord);
     }
 
     private static void DeleteRegistryKey(string subKey)

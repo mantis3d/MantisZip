@@ -5,7 +5,11 @@
   <Color x:Key="ThemeWindowBg">#FF1E1E1E</Color>
   <Color x:Key="ThemeTextPrimary">#FFE0E0E0</Color>
   <Color x:Key="ThemeTextSecondary">#FF999999</Color>
+  <!-- 禁用/次要提示文字（如「仅 ZIP 支持注释」），比 ThemeTextSecondary 更弱 -->
+  <Color x:Key="ThemeTextDisabled">#FF6E6E6E</Color>
   <Color x:Key="ThemeBorder">#FF3E3E3E</Color>
+  <!-- 更淡的边框/分隔线（表头下沿、卡片内分隔），比 ThemeBorder 弱一档 -->
+  <Color x:Key="ThemeBorderLight">#FF2F2F2F</Color>
   <Color x:Key="ThemeAccent">#FF0078D4</Color>
   <!-- 强调色底上的文字（代码页徽章等小标记用），与 ThemeAccent 明暗互补 -->
   <Color x:Key="ThemeTextOnAccent">#FFFFFFFF</Color>
@@ -63,7 +67,11 @@
   <SolidColorBrush x:Key="ThemeWindowBgBrush" Color="{StaticResource ThemeWindowBg}" />
   <SolidColorBrush x:Key="ThemeTextPrimaryBrush" Color="{StaticResource ThemeTextPrimary}" />
   <SolidColorBrush x:Key="ThemeTextSecondaryBrush" Color="{StaticResource ThemeTextSecondary}" />
+  <!-- 禁用/次要提示文字：与 ThemeTextSecondaryBrush 同族但更弱 -->
+  <SolidColorBrush x:Key="ThemeTextDisabledBrush" Color="{StaticResource ThemeTextDisabled}" />
   <SolidColorBrush x:Key="ThemeBorderBrush" Color="{StaticResource ThemeBorder}" />
+  <!-- 细边框/分隔线：比 ThemeBorderBrush 弱一档 -->
+  <SolidColorBrush x:Key="ThemeBorderLightBrush" Color="{StaticResource ThemeBorderLight}" />
   <SolidColorBrush x:Key="ThemeAccentBrush" Color="{StaticResource ThemeAccent}" />
   <SolidColorBrush x:Key="ThemeTextOnAccentBrush" Color="{StaticResource ThemeTextOnAccent}" />
   <SolidColorBrush x:Key="ThemeToggleBrush" Color="#A90078D4" />

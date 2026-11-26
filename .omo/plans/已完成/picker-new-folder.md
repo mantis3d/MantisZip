@@ -1,6 +1,6 @@
 # 文件选择器「新建文件夹」
 
-> **状态**：实现与验证完成（2026-11-04，`beta` 分支），待用户确认 `RELEASE_NOTES.md` 范围后归档
+> **状态**：✅ 已完成（2026-11-04 实施，`beta` 分支；随 **v0.5.6** 发布，2026-11-26 归档）
 > **关联代码**：`Controls/CustomFilePickerControl`、`Dialogs/CustomFilePickerDialog`、`Dialogs/InputDialog`（本轮新建）、`Controls/FileFilterEditor`
 
 ## 背景

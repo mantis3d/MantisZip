@@ -80,8 +80,6 @@
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
                     <StackPanel Spacing="{DynamicResource SpacingXs}">
                       <TextBlock Text="{Binding CompressOptionsText}" FontWeight="SemiBold" />
-                      <CheckBox Content="{Binding KeepOriginalExtensionText}"
-                                IsChecked="{Binding KeepOriginalExtension}" />
                       <CheckBox Content="{Binding PreserveDirectoryRootText}"
                                 IsChecked="{Binding PreserveDirectoryRoot}" />
                       <!-- 压缩完成后打开输出目录（与解压端「解压后打开目标目录」对称；对话框可临时改，进度窗口底部也能改） -->
@@ -90,6 +88,136 @@
                     </StackPanel>
                   </Border>
 
+                  <!-- 文件名模板：三个入口各自的默认值（留空 = 按原规则命名）。
+                       每行右侧是可编辑的预设选择器（选已有预设即填入模板；也能起新名字 / 存 / 删），
+                       预设库与压缩对话框共用同一份设置，增删即时持久化。 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding FileNameTemplateGroupText}" FontWeight="SemiBold" />
+                      <TextBlock Text="{Binding FileNameTemplateHelpText}" FontSize="12" TextWrapping="Wrap"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                      <!-- 行 1：压缩对话框默认值 -->
+                      <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                        <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateDialogText}" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" x:Name="FileNameTemplateDialogBox" Text="{Binding FileNameTemplateDialog}"
+                                 Watermark="{Binding FileNameTemplateRowHintText}"
+                                 MinHeight="{DynamicResource ControlHeightSm}"
+                                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                        <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
+                        <controls:PlaceholderInsertButton Grid.Column="2"
+                                                          TargetTextBox="{Binding #FileNameTemplateDialogBox}"
+                                                          Content="{Binding FileNameTemplateInsertText}"
+                                                          ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
+                        <!-- 可编辑预设名 + 保存/删除图标按钮（无预设时也能打字起名字，因此不再隐藏）。
+                             操作结果走控件内的浮层气泡（不占布局，行的位置不会跳动）。 -->
+                        <controls:TemplatePresetPicker Grid.Column="3"
+                                                       MinWidth="150"
+                                                       Presets="{Binding FileNameTemplatePresetOptions}"
+                                                       PresetName="{Binding FileNameTemplatePresetNameDialog, Mode=TwoWay}"
+                                                       WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                                       Message="{Binding FileNameTemplatePresetMessageDialog}"
+                                                       IsMessageError="{Binding IsFileNameTemplatePresetMessageErrorDialog}"
+                                                       Tag="Dialog"
+                                                       ToolTip.Tip="{Binding FileNameTemplatePresetHintText}"
+                                                       PresetSelected="OnPresetSelected"
+                                                       SaveRequested="OnPresetSaveRequested"
+                                                       DeleteRequested="OnPresetDeleteRequested"
+                                                       MessageDismissed="OnPresetMessageDismissed" />
+                      </Grid>
+                      <!-- 行 2：快速压缩默认值 -->
+                      <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                        <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateQuickText}" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" x:Name="FileNameTemplateQuickBox" Text="{Binding FileNameTemplateQuick}"
+                                 Watermark="{Binding FileNameTemplateRowHintText}"
+                                 MinHeight="{DynamicResource ControlHeightSm}"
+                                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                        <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
+                        <controls:PlaceholderInsertButton Grid.Column="2"
+                                                          TargetTextBox="{Binding #FileNameTemplateQuickBox}"
+                                                          Content="{Binding FileNameTemplateInsertText}"
+                                                          ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
+                        <controls:TemplatePresetPicker Grid.Column="3"
+                                                       MinWidth="150"
+                                                       Presets="{Binding FileNameTemplatePresetOptions}"
+                                                       PresetName="{Binding FileNameTemplatePresetNameQuick, Mode=TwoWay}"
+                                                       WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                                       Message="{Binding FileNameTemplatePresetMessageQuick}"
+                                                       IsMessageError="{Binding IsFileNameTemplatePresetMessageErrorQuick}"
+                                                       Tag="Quick"
+                                                       ToolTip.Tip="{Binding FileNameTemplatePresetHintText}"
+                                                       PresetSelected="OnPresetSelected"
+                                                       SaveRequested="OnPresetSaveRequested"
+                                                       DeleteRequested="OnPresetDeleteRequested"
+                                                       MessageDismissed="OnPresetMessageDismissed" />
+                      </Grid>
+                      <!-- 行 3：分别压缩默认值（若不含 {name}/{seq}/{parent}，多源会撞名，确认时被拦） -->
+                      <Grid ColumnDefinitions="150,*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+                        <TextBlock Grid.Column="0" Text="{Binding FileNameTemplateSeparateText}" VerticalAlignment="Center" />
+                        <TextBox Grid.Column="1" x:Name="FileNameTemplateSeparateBox" Text="{Binding FileNameTemplateSeparate}"
+                                 Watermark="{Binding FileNameTemplateRowHintText}"
+                                 MinHeight="{DynamicResource ControlHeightSm}"
+                                 Background="{DynamicResource ThemeSurfaceBgBrush}"
+                                 Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                 BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                        <!-- 插入占位符：菜单项由控件按 FileNameTemplate.Placeholders 生成，插到本行输入框的光标处 -->
+                        <controls:PlaceholderInsertButton Grid.Column="2"
+                                                          TargetTextBox="{Binding #FileNameTemplateSeparateBox}"
+                                                          Content="{Binding FileNameTemplateInsertText}"
+                                                          ToolTip.Tip="{Binding FileNameTemplateInsertTipText}" />
+                        <controls:TemplatePresetPicker Grid.Column="3"
+                                                       MinWidth="150"
+                                                       Presets="{Binding FileNameTemplatePresetOptions}"
+                                                       PresetName="{Binding FileNameTemplatePresetNameSeparate, Mode=TwoWay}"
+                                                       WatermarkKey="Compress_FileNameTemplate_PresetName"
+                                                       Message="{Binding FileNameTemplatePresetMessageSeparate}"
+                                                       IsMessageError="{Binding IsFileNameTemplatePresetMessageErrorSeparate}"
+                                                       Tag="Separate"
+                                                       ToolTip.Tip="{Binding FileNameTemplatePresetHintText}"
+                                                       PresetSelected="OnPresetSelected"
+                                                       SaveRequested="OnPresetSaveRequested"
+                                                       DeleteRequested="OnPresetDeleteRequested"
+                                                       MessageDismissed="OnPresetMessageDismissed" />
+                      </Grid>
+                    </StackPanel>
+                  </Border>
+
+                  <!-- 包内根目录四态默认值（v0.5.8）：压缩对话框每次按这里的默认值开，单次选择不回写 -->
+                  <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                          CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+                    <StackPanel Spacing="{DynamicResource SpacingXs}">
+                      <TextBlock Text="{Binding CompressRootModeText}" FontWeight="SemiBold" />
+                      <!-- 包内根目录 + 默认根名同一行，各占一半宽度（v0.5.8 标签精简后不再需要 240px） -->
+                      <Grid ColumnDefinitions="*,*" ColumnSpacing="{DynamicResource SpacingSm}">
+                        <ComboBox Grid.Column="0" ItemsSource="{Binding CompressRootModeOptions}"
+                                  SelectedItem="{Binding SelectedCompressRootModeOption}"
+                                  HorizontalAlignment="Stretch"
+                                  ToolTip.Tip="{Binding CompressRootModeText}">
+                          <ComboBox.ItemTemplate>
+                            <DataTemplate>
+                              <TextBlock Text="{Binding Display}" />
+                            </DataTemplate>
+                          </ComboBox.ItemTemplate>
+                        </ComboBox>
+                        <!-- 默认根名：留空 = 按压缩包文件名去扩展名推导；可填占位符（{name}/{parent}/{date}/{datetime}/{archive}） -->
+                        <Grid Grid.Column="1" ColumnDefinitions="Auto,*" ColumnSpacing="{DynamicResource SpacingXs}">
+                          <TextBlock Grid.Column="0" Text="{Binding CompressRootNameText}" VerticalAlignment="Center" />
+                          <TextBox Grid.Column="1" Text="{Binding CompressRootName}"
+                                   ToolTip.Tip="{Binding CompressRootNameHintText}"
+                                   Foreground="{DynamicResource ThemeTextPrimaryBrush}"
+                                   Background="{DynamicResource ThemeWindowBgBrush}"
+                                   BorderBrush="{DynamicResource ThemeBorderBrush}" />
+                        </Grid>
+                      </Grid>
+                      <TextBlock Text="{Binding CompressRootNameHintText}"
+                                 Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                                 TextWrapping="Wrap" />
+                    </StackPanel>
+                  </Border>
                   <!-- 文件冲突默认策略：压缩时遇到同名文件的处理方式（ask=每次询问；仅本次压缩外的全局默认） -->
                   <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
                           CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
@@ -220,14 +348,14 @@
                                   <!-- 编辑按钮（矢量图标：IconEdit） -->
                                   <Button Grid.Column="1" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="EditCustomFormat_Click"
-                                          ToolTip.Tip="编辑">
+                                          ToolTip.Tip="{Binding FormatEditTooltipText}">
                                     <PathIcon Data="{StaticResource IconEdit}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                   <!-- 删除按钮（矢量图标：IconDelete） -->
                                   <Button Grid.Column="2" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="DeleteCustomFormat_Click"
-                                          ToolTip.Tip="删除">
+                                          ToolTip.Tip="{Binding FormatDeleteTooltipText}">
                                     <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
@@ -270,7 +398,7 @@
                             <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
                               <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
                                 <CheckBox IsChecked="{Binding Enabled}" Grid.Column="0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}" Grid.Column="1" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}" Grid.Column="1" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding FormatIdsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Grid.Column="2" VerticalAlignment="Center" Margin="8,0"/>
                                 <TextBlock Text="→" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Grid.Column="3" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding LevelDisplay}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" Grid.Column="4" VerticalAlignment="Center" Margin="8,0"/>
@@ -280,12 +408,12 @@
                                            IsVisible="{Binding ShowMtIneffectiveBadge}"/>
                                 <StackPanel Orientation="Horizontal" Grid.Column="6">
                                   <!-- 编辑按钮（矢量图标：IconEdit） -->
-                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="编辑">
+                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="{Binding EditTooltipText}">
                                     <PathIcon Data="{StaticResource IconEdit}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                   <!-- 删除按钮（矢量图标：IconDelete） -->
-                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="删除">
+                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="{Binding DeleteTooltipText}">
                                     <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
@@ -299,7 +427,7 @@
                       <!-- 规则操作按钮：普通按钮（单行文字，勿用 ToolbarButton——见上） -->
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Content="{Binding AddRuleText}" Command="{Binding AddRuleCommand}" CommandParameter="{Binding #SettingsWin}" Padding="12,4"/>
-                        <Button Content="{Binding ResetDefaultsText}" Command="{Binding ResetDefaultsCommand}" Padding="12,4"/>
+                        <Button Content="{Binding ResetDefaultsText}" Command="{Binding ResetDefaultsCommand}" CommandParameter="{Binding #SettingsWin}" Padding="12,4"/>
                       </StackPanel>
                     </StackPanel>
                   </Border>
@@ -554,6 +682,40 @@
                           IsChecked="{Binding ExtractPreserveFullPath}" />
                 <CheckBox Content="{Binding ExtractDeleteAfterExtractText}"
                           IsChecked="{Binding DeleteArchiveAfterExtract}" />
+              </StackPanel>
+            </Border>
+            <!-- 压缩包顶层目录四态默认值（v0.5.8）：解压对话框每次按这里的默认值开，单次选择不回写 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding ExtractRootModeText}" FontWeight="SemiBold" />
+                <ComboBox ItemsSource="{Binding ExtractRootModeOptions}"
+                          SelectedItem="{Binding SelectedExtractRootModeOption}"
+                          Width="150" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+              </StackPanel>
+            </Border>
+            <!-- 智能解压两档（v0.5.8）：只影响工具栏/右键/双击关联的「智能解压」，不影响解压设置对话框 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding SmartExtractRootModeText}" FontWeight="SemiBold" />
+                <TextBlock Text="{Binding SmartExtractRootModeDescText}" TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+                <ComboBox ItemsSource="{Binding SmartExtractRootModeOptions}"
+                          SelectedItem="{Binding SelectedSmartExtractRootModeOption}"
+                          Width="150" HorizontalAlignment="Left">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
               </StackPanel>
             </Border>
 
@@ -1457,8 +1619,10 @@
               <StackPanel Spacing="{DynamicResource SpacingXs}">
                 <TextBlock Text="{Binding ContextMenuGroupDisplay}"
                            FontWeight="SemiBold" FontSize="13" Margin="0,0,0,4" />
+                <!-- 动态菜单为实验特性（issue #80）：默认走静态级联，悬停提示说明失败会自动回退 -->
                 <CheckBox Content="{Binding ContextMenuEnableDynamicMenu}"
-                          IsChecked="{Binding EnableDynamicMenu}" />
+                          IsChecked="{Binding EnableDynamicMenu}"
+                          ToolTip.Tip="{Binding ContextMenuEnableDynamicMenuHint}" />
                 <CheckBox Content="{Binding ContextMenuShowMenuIcons}"
                           IsChecked="{Binding ShowMenuIcons}" />
               </StackPanel>

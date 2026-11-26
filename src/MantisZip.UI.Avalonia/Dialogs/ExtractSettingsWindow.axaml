@@ -29,68 +29,38 @@
       <ColumnDefinition Width="*" />
     </Grid.ColumnDefinitions>
 
-    <!-- ═══════ 左侧：设置选项卡（顺序：输出设置 → 添加压缩包 → 文件过滤 → 加速） ═══════ -->
+    <!-- ═══════ 左侧：设置选项卡（顺序：输出设置 → 添加压缩包 → 解压设置 → 文件过滤 → 加速） ═══════ -->
     <TabControl Grid.Column="0" Grid.Row="0"
                 Background="{DynamicResource ThemeWindowBgBrush}"
                 TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
 
-      <!-- ══ 选项卡 1：输出设置（解压目标 + 冲突处理；目标是解压载荷的一部分） ══ -->
+      <!-- ══ 选项卡 1：输出设置（只留解压目标；目标是解压载荷的一部分） ══ -->
       <TabItem x:Name="OutputTab"
                Header="{Binding LocalizedStrings[Extract_TabOutput]}"
                Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconFolder">
-        <Grid RowDefinitions="Auto,Auto,*,Auto"
+        <Grid RowDefinitions="Auto,*"
               Margin="0,8,0,0">
-          <!-- 目标目录标题 -->
+          <!-- 目标目录标题（2026-11-24 起本页只剩这一行 + 选择器：
+               原来的整条路径文本框与「切换下方浏览目录…」灰字已删除 ——
+               路径由选择器地址行的 PathBreadcrumb 承担（可点段导航、Ctrl+L 或点末段进编辑态），
+               多留一份同样的路径既重复又占高度。 -->
           <TextBlock Grid.Row="0"
                      Text="{Binding LocalizedStrings[Extract_Destination]}"
                      FontWeight="SemiBold" />
 
-          <!-- 目标目录可直接编辑；下方选择器切换浏览目录时实时跟随（见 code-behind 的 PathChanged） -->
-          <StackPanel Grid.Row="1" Spacing="4" Margin="0,6,0,8">
-            <TextBox x:Name="DestinationPathBox"
-                     Text="{Binding DestinationPath, Mode=TwoWay}"
-                     PlaceholderText="{Binding LocalizedStrings[Extract_DestinationPlaceholder]}" />
-            <TextBlock Text="{Binding LocalizedStrings[Extract_OutputPickerHint]}"
-                       FontSize="11"
-                       TextWrapping="Wrap"
-                       Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
-          </StackPanel>
-
-          <!-- 内嵌文件夹选择器：只列目录，双击进入；当前浏览目录即解压目标 -->
-          <Border Grid.Row="2"
+          <!-- 内嵌文件夹选择器：只列目录，双击进入；当前浏览目录即解压目标。
+               AllowCreateMissingFolder：地址栏输入尚不存在的目录时询问是否创建
+               （解压目标允许提前不存在，真正落盘由 ExtractSession 兜底）。 -->
+          <Border Grid.Row="1"
+                  Margin="0,6,0,0"
                   BorderBrush="{DynamicResource ThemeBorderBrush}"
                   BorderThickness="1" CornerRadius="4" Padding="8"
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
             <controls:CustomFilePickerControl x:Name="DestinationPicker"
                                               Mode="PickFolder"
- HideAccumulatedPanel="True" />
-          </Border>
-
-          <!-- 冲突处理方式（原「解压」页内容原样搬入输出设置） -->
-          <Border Grid.Row="3"
-                  Margin="0,12,0,0"
-                  BorderBrush="{DynamicResource ThemeBorderBrush}"
-                  BorderThickness="1" CornerRadius="4" Padding="12"
-                  Background="{DynamicResource ThemeSurfaceBgBrush}">
-            <StackPanel Spacing="8">
-              <TextBlock Text="{Binding LocalizedStrings[Extract_WhenFileExists]}"
-                         FontWeight="SemiBold" />
-              <ComboBox ItemsSource="{Binding ConflictActionOptions}"
-                        SelectedItem="{Binding SelectedConflictActionOption}"
-                        DisplayMemberBinding="{Binding Display}"
-                        HorizontalAlignment="Stretch" />
-              <CheckBox IsChecked="{Binding OpenFolderAfterExtract}">
-                <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
-                           TextWrapping="Wrap" />
-              </CheckBox>
-
-              <!-- 解压后将原压缩包移入回收站：默认值取自设置窗口同名选项，勾选仅本次解压生效，不写回全局设置 -->
-              <CheckBox IsChecked="{Binding DeleteArchiveAfterExtract}">
-                <TextBlock Text="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
-                           TextWrapping="Wrap" />
-              </CheckBox>
-            </StackPanel>
+                                              AllowCreateMissingFolder="True"
+                                              HideAccumulatedPanel="True" />
           </Border>
         </Grid>
       </TabItem>
@@ -118,7 +88,7 @@
                   Background="{DynamicResource ThemeSurfaceBgBrush}">
             <controls:CustomFilePickerControl x:Name="ArchivePicker"
                                               Mode="PickItems"
- HideAccumulatedPanel="True" />
+                                              HideAccumulatedPanel="True" />
           </Border>
 
           <!-- 复选框模式开关：关闭 = 单击即追加、切目录清空；打开 = 跨目录累积（复选框 + Ctrl/Shift 连勾 + 右键全选/反选/清空） -->
@@ -217,7 +187,82 @@
         </Grid>
       </TabItem>
 
-      <!-- ══ 选项卡 3：文件过滤（内容不变） ══ -->
+      <!-- ══ 选项卡 3：解压设置（2026-11-23 从「输出设置」页搬来，形态对齐压缩端「压缩设置」页）
+           本页全是「解压行为」类选项：撞名怎么办、解压后去哪、源包要不要留、包内要不要加/去一层根。
+           为什么搬：输出设置页有「目录选择器」这条弹性行，常驻卡一多，选择器就被压到几十像素；
+           本页是 ScrollViewer，窗口再矮也只是滚动，不会挤压任何控件。 ══ -->
+      <TabItem x:Name="ExtractOptionsTab"
+               Header="{Binding LocalizedStrings[Extract_TabOptions]}"
+               Classes="compactTab"
+               controls:TabItemExtensions.TabIcon="IconWrench">
+        <ScrollViewer Background="{DynamicResource ThemeWindowBgBrush}"
+                      TextElement.Foreground="{DynamicResource ThemeTextPrimaryBrush}">
+          <StackPanel Spacing="{DynamicResource SpacingSm}"
+                      Margin="0,8,0,0">
+
+            <!-- 分组：文件冲突策略 + 完成后行为（合成为一张卡，与压缩端同构） -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding LocalizedStrings[Extract_WhenFileExists]}"
+                           FontWeight="SemiBold" />
+                <!-- 冲突策略下拉：每次询问 / 覆盖 / 仅在更旧时覆盖 / 仅在更小时覆盖 / 自动重命名 / 跳过 -->
+                <ComboBox x:Name="ConflictActionCombo"
+                          ItemsSource="{Binding ConflictActionOptions}"
+                          SelectedItem="{Binding SelectedConflictActionOption}"
+                          DisplayMemberBinding="{Binding Display}"
+                          HorizontalAlignment="Stretch" />
+                <!-- 完成后行为：解压成功后自动打开目标目录 -->
+                <CheckBox x:Name="OpenFolderAfterCheck"
+                          Margin="0,4,0,0"
+                          IsChecked="{Binding OpenFolderAfterExtract}">
+                  <TextBlock Text="{Binding LocalizedStrings[Extract_OpenFolder]}"
+                             TextWrapping="Wrap" />
+                </CheckBox>
+                <!-- 解压后将原压缩包移入回收站：默认值取自设置窗口同名选项，勾选仅本次解压生效，不写回全局设置 -->
+                <CheckBox x:Name="DeleteArchiveAfterCheck"
+                          IsChecked="{Binding DeleteArchiveAfterExtract}">
+                  <TextBlock Text="{Binding LocalizedStrings[Settings_Extract_DeleteArchiveAfterExtract]}"
+                             TextWrapping="Wrap" />
+                </CheckBox>
+              </StackPanel>
+            </Border>
+
+            <!-- 分组：压缩包顶层目录（v0.5.8 四态下拉）
+                 四态互斥而不是两个独立开关 —— 独立开关能组合出「既剥又加」这种非法态。
+                 「智能去除」只在包确有唯一根时出现在选项里（判定与执行侧同源，否则会出现
+                 「窗里能选、跑起来什么都不做」）；消失的原因由下方一行灰字说明。 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}"
+                    BorderThickness="1" CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}"
+                    Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding LocalizedStrings[Extract_RootMode]}"
+                           FontWeight="SemiBold" />
+                <ComboBox x:Name="ExtractRootModeCombo"
+                          ItemsSource="{Binding ExtractRootModeOptions}"
+                          SelectedItem="{Binding SelectedExtractRootModeOption}"
+                          HorizontalAlignment="Left"
+                          Width="150"
+                          ToolTip.Tip="{Binding ExtractRootModeDescription}">
+                  <ComboBox.ItemTemplate>
+                    <DataTemplate>
+                      <TextBlock Text="{Binding Display}" />
+                    </DataTemplate>
+                  </ComboBox.ItemTemplate>
+                </ComboBox>
+                <!-- 裁剪说明：包本来就有唯一根时整行隐藏（不占高度） -->
+                <TextBlock Text="{Binding ExtractRootModeHint}"
+                           IsVisible="{Binding IsExtractRootModeHintVisible}"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}"
+                           TextWrapping="Wrap" />
+              </StackPanel>
+            </Border>
+          </StackPanel>
+        </ScrollViewer>
+      </TabItem>
+
+      <!-- ══ 选项卡 4：文件过滤（内容不变） ══ -->
       <TabItem Header="{Binding LocalizedStrings[Extract_TabFilter]}"
                Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconFilter">
@@ -227,7 +272,7 @@
         </ScrollViewer>
       </TabItem>
 
-      <!-- ══ 选项卡 4：加速（并行解压；与设置窗口对称；初值读取设置，本次解压生效不回写） ══ -->
+      <!-- ══ 选项卡 5：加速（并行解压；与设置窗口对称；初值读取设置，本次解压生效不回写） ══ -->
       <TabItem Header="{Binding LocalizedStrings[Settings_ExtractTab_Parallel]}"
                Classes="compactTab"
                controls:TabItemExtensions.TabIcon="IconLightning">

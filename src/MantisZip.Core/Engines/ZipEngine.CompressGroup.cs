@@ -1550,20 +1550,13 @@ public partial class ZipEngine
             return false;
         }
 
-        // ZIP32 上限：条目数上限 65535，留出目录条目余量
-        const int MaxZip32Entries = ushort.MaxValue - 256;
-        if (totalEntryCount > MaxZip32Entries)
+        // ZIP32 上限：条目数上限 65535，留出目录条目余量；总量 < 4GB 即可保证单条目也 < 4GB
+        // （deflate/store 输出不会大于输入），故无需逐文件 stat，避免大批量场景额外的 IO 开销。
+        // 判定抽到 <see cref="DescribeZip32LimitViolation"/>：纯策略、不碰磁盘，
+        // 边界用例可以直接断言它（否则「总量贴近 4GB」这类用例会被临时盘剩余空间左右）。
+        if (DescribeZip32LimitViolation(totalEntryCount, totalSize) is { } zip32Violation)
         {
-            CoreLog.Info($"ZipEngine: MultiThreaded skipped — {totalEntryCount} entries exceed ZIP32 limit ({MaxZip32Entries})");
-            return false;
-        }
-
-        // 总量 < 4GB 即可保证单条目也 < 4GB（deflate/store 输出不会大于输入），
-        // 故无需逐文件 stat，避免大批量场景额外的 IO 开销
-        const long MaxZip32Size = uint.MaxValue - 1L;
-        if (totalSize >= MaxZip32Size)
-        {
-            CoreLog.Info($"ZipEngine: MultiThreaded skipped — total size {totalSize} exceeds ZIP32 limit ({MaxZip32Size})");
+            CoreLog.Info($"ZipEngine: MultiThreaded skipped — {zip32Violation}");
             return false;
         }
 
@@ -1577,11 +1570,10 @@ public partial class ZipEngine
                 var tempRoot = Path.GetPathRoot(Path.GetTempPath());
                 if (!string.IsNullOrEmpty(tempRoot))
                 {
-                    long required = totalSize > long.MaxValue / 2 ? long.MaxValue : totalSize * 2;
                     long available = new DriveInfo(tempRoot).AvailableFreeSpace;
-                    if (available < required)
+                    if (!HasEnoughTempSpaceFor(totalSize, available))
                     {
-                        CoreLog.Info($"ZipEngine: MultiThreaded skipped — temp drive {tempRoot} has {available} bytes free, needs ~{required}");
+                        CoreLog.Info($"ZipEngine: MultiThreaded skipped — temp drive {tempRoot} has {available} bytes free, needs ~{RequiredTempBytes(totalSize)}");
                         return false;
                     }
                 }
@@ -1595,6 +1587,37 @@ public partial class ZipEngine
 
         return true;
     }
+
+    /// <summary>ZIP32 规模上限（条目数 + 总量）：通过返回 <see langword="null"/>，否则返回拒绝原因。</summary>
+    /// <remarks>
+    /// 单条目上限 65535 留 256 条余量给目录条目；总量保守取 <c>uint.MaxValue - 1</c>，
+    /// copy-mode 遇到 <c>0xFFFFFFFF</c> 哨兵会抛 <see cref="ZipCopyModeException"/> 且无内部回落，
+    /// 差一个字节最多回落串行，放宽则可能直接压缩失败。
+    /// <para>
+    /// 抽成独立纯函数只为可测：这些边界值无法用小文件真实构造（需 65280 个文件 / 4GB 数据），
+    /// 混在 <see cref="IsMultiThreadedEligible"/> 里断言会被本机临时盘剩余空间干扰。
+    /// </para>
+    /// </remarks>
+    internal static string? DescribeZip32LimitViolation(int totalEntryCount, long totalSize)
+    {
+        const int MaxZip32Entries = ushort.MaxValue - 256;
+        if (totalEntryCount > MaxZip32Entries)
+            return $"{totalEntryCount} entries exceed ZIP32 limit ({MaxZip32Entries})";
+
+        const long MaxZip32Size = uint.MaxValue - 1L;
+        if (totalSize >= MaxZip32Size)
+            return $"total size {totalSize} exceeds ZIP32 limit ({MaxZip32Size})";
+
+        return null;
+    }
+
+    /// <summary>MT 峰值临时空间需求：约 2× 输入字节，饱和到 <see cref="long.MaxValue"/> 防溢出。</summary>
+    internal static long RequiredTempBytes(long totalSize)
+        => totalSize > long.MaxValue / 2 ? long.MaxValue : totalSize * 2;
+
+    /// <summary>临时盘剩余空间是否够 MT 峰值（纯判定，不读磁盘，便于边界测试）。</summary>
+    internal static bool HasEnoughTempSpaceFor(long totalSize, long availableFreeBytes)
+        => availableFreeBytes >= RequiredTempBytes(totalSize);
 
     /// <summary>
     /// 判定所选 ZIP 压缩方法能否被 <see cref="ZipBinaryRewriter"/> 的 copy-mode 重写承载。

@@ -300,7 +300,7 @@ public static class CompressFlow
     /// <summary>
     /// 压缩成功后把输出目录写入路径历史（<see cref="PathHistoryManager"/>，
     /// QuickPathPicker 地址栏 / CustomFilePickerDialog 历史建议的数据源）。
-    /// 目录取自 GetOutputPaths 各输出文件的父目录并去重（Manual/Combined = 输出文件所在目录；
+    /// 目录取自 GetOutputPaths 各输出文件的父目录并去重（单包 = 输出文件所在目录；
     /// Separate = 各源条目所在目录）。失败仅记日志，不影响压缩结果。
     /// 由调用方在压缩确认成功后调用（主窗口 ExecuteCompressFromSettings / CLI CompressWithProgress）。
     /// </summary>
@@ -402,18 +402,21 @@ public static class CompressFlow
                 .ToList();
         }
 
-        _ = SeedEntryItemsAsync(pw, request.SourcePaths, whitelist, ct);
+        _ = SeedEntryItemsAsync(pw, request, whitelist, ct);
     }
 
     /// <summary>后台枚举 + 播种（所有异常与取消都吞掉，只影响列表预览，不影响压缩本身）。</summary>
     private static async Task SeedEntryItemsAsync(
-        ProgressWindow pw, IReadOnlyList<string> sources,
+        ProgressWindow pw, CompressRequest request,
         IReadOnlyCollection<string>? whitelist, CancellationToken ct)
     {
         try
         {
             var items = await Task.Run(
-                () => SourceEntryEnumerator.Enumerate(sources, whitelist, ct), ct).ConfigureAwait(false);
+                () => SourceEntryEnumerator.Enumerate(
+                    request.SourcePaths, whitelist, ct,
+                    request.RootMode, request.WrapRoot, request.OutputPath),
+                ct).ConfigureAwait(false);
 
             if (items.Count == 0 || items.Count > MaxSeedEntryCount)
                 return;

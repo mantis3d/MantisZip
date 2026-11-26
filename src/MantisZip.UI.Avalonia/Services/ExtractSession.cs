@@ -200,6 +200,13 @@ public sealed class ExtractSession : IExtractSession
                             // ⑧-a 选中条目：走 SelectedItemsExtractService（与预览树同一路径契约），
                             //      窗口由 presenter 提供，故不调用 ExtractFlow 里那个自建窗口的封装。
                             var appSettings = _loadSettings();
+
+                            // 「包内根目录」四态：按整包条目判定（不能用勾选子集——勾了一半的
+                            // 唯一根包，子集里可能就没有根了，判定会与预览树不一致）。
+                            var (selectedStripRoot, selectedAddRoot) = await ExtractRootPlan.ResolveAsync(
+                                _getEngine(firstArchive), firstArchive, firstPassword, ct, nameEncoding: null,
+                                settings.RootMode);
+
                             await new SelectedItemsExtractService().ExtractEntriesAsync(
                                 firstArchive,
                                 firstPassword,
@@ -211,7 +218,9 @@ public sealed class ExtractSession : IExtractSession
                                 conflictDialog,
                                 progress,
                                 ct,
-                                livePolicy: liveConflictPolicy);
+                                livePolicy: liveConflictPolicy,
+                                stripRoot: selectedStripRoot,
+                                addRoot: selectedAddRoot);
 
                             // 选中条目路径的历史记录在服务内不发生（原实现由 ExtractFlow 记），这里补上。
                             PathHistoryManager.Record(settings.DestinationPath);
@@ -249,7 +258,8 @@ public sealed class ExtractSession : IExtractSession
                                         progress,
                                         ct,
                                         parallelOverride,
-                                        liveConflictPolicy: liveConflictPolicy);
+                                        liveConflictPolicy: liveConflictPolicy,
+                                        rootMode: settings.RootMode);
 
                                     window?.UpdateBatchItemStatus(i, BatchItemStatus.Completed);
                                     succeededArchives.Add(archivePath);
@@ -289,7 +299,8 @@ public sealed class ExtractSession : IExtractSession
                                 progress,
                                 ct,
                                 parallelOverride,
-                                liveConflictPolicy: liveConflictPolicy);
+                                liveConflictPolicy: liveConflictPolicy,
+                                rootMode: settings.RootMode);
 
                             succeededArchives.Add(firstArchive);
                         }

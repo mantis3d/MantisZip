@@ -94,13 +94,19 @@ public partial class ZipEngine
 
                 if (entry.IsDirectory)
                 {
-                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
-                    if (!Directory.Exists(dirPath))
+                    // 剥根后根目录条目本身会被丢弃 → 不建空壳目录
+                    var dirPath = EntryOutputPath.Resolve(destinationPath, entryKey, options);
+                    if (dirPath != null && !Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
                     continue;
                 }
 
-                var outputPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                var outputPath = EntryOutputPath.Resolve(destinationPath, entryKey, options);
+                if (outputPath == null)
+                {
+                    processedBytes += entry.Size;
+                    continue; // 剥根后条目消失（如根目录条目本身）
+                }
                 var outputDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                 {
@@ -327,7 +333,7 @@ public partial class ZipEngine
 
         // 2. 创建所有目标目录（单线程，避免竞态）
         var dirs = entryInfos
-            .Select(info => Path.GetDirectoryName(FileConflictHelper.GetSafePath(destinationPath, info.Key)))
+            .Select(info => Path.GetDirectoryName(EntryOutputPath.Resolve(destinationPath, info.Key, options)))
             .Where(d => !string.IsNullOrEmpty(d))
             .Distinct();
 
@@ -392,7 +398,12 @@ public partial class ZipEngine
             {
                 ct.ThrowIfCancellationRequested();
 
-                var outputPath = FileConflictHelper.GetSafePath(destinationPath, entryKey);
+                var outputPath = EntryOutputPath.Resolve(destinationPath, entryKey, options);
+                if (outputPath == null)
+                {
+                    batchProcessedBytes += entrySize;
+                    continue; // 剥根后条目消失
+                }
 
                 // 冲突处理：快速路径（文件不存在）不弹窗；Ask 异步弹窗经信号量全局串行（异步不能持 lock 跨 await）
                 string? resolvedPath;
@@ -836,14 +847,20 @@ public partial class ZipEngine
 
                 if (entry.IsDirectory)
                 {
-                    var dirPath = FileConflictHelper.GetSafePath(destinationPath, normalizedKey);
-                    if (!Directory.Exists(dirPath))
+                    var dirPath = EntryOutputPath.Resolve(destinationPath, normalizedKey, options);
+                    if (dirPath != null && !Directory.Exists(dirPath))
                         Directory.CreateDirectory(dirPath);
                     continue;
                 }
 
+                // 剥根/加根后该条目可能整个消失（如根目录条目本身）→ 跳过，不建空壳
                 var outputPath = outputPathOverrides?.GetValueOrDefault(normalizedKey)
-                    ?? FileConflictHelper.GetSafePath(destinationPath, normalizedKey);
+                    ?? EntryOutputPath.Resolve(destinationPath, normalizedKey, options);
+                if (outputPath == null)
+                {
+                    processedBytes += entry.Size;
+                    continue;
+                }
                 var outputDir = Path.GetDirectoryName(outputPath);
                 if (!string.IsNullOrEmpty(outputDir) && !Directory.Exists(outputDir))
                     Directory.CreateDirectory(outputDir);
@@ -1044,13 +1061,17 @@ public partial class ZipEngine
 
                 if (entry.IsDirectory)
                 {
-                    directoryPaths.Add(FileConflictHelper.GetSafePath(destinationPath, normalizedKey));
+                    var dirPath = EntryOutputPath.Resolve(destinationPath, normalizedKey, options);
+                    if (dirPath != null)
+                        directoryPaths.Add(dirPath);
                     continue;
                 }
 
-                var outputPath = outputPathOverrides?.GetValueOrDefault(normalizedKey)
-                    ?? FileConflictHelper.GetSafePath(destinationPath, normalizedKey);
-                entryInfos.Add((entryKey, entry.Size, entry.LastModifiedTime ?? DateTime.MinValue, outputPath));
+                var resolvedOutputPath = outputPathOverrides?.GetValueOrDefault(normalizedKey)
+                    ?? EntryOutputPath.Resolve(destinationPath, normalizedKey, options);
+                if (resolvedOutputPath == null)
+                    continue; // 剥根后条目本身消失 → 不计入待解压集合
+                entryInfos.Add((entryKey, entry.Size, entry.LastModifiedTime ?? DateTime.MinValue, resolvedOutputPath));
                 totalBytes += entry.Size;
             }
         }

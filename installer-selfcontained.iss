@@ -5,7 +5,7 @@
 
 #define MyAppName "MantisZip"
 #ifndef MyAppVersion
-#define MyAppVersion "0.5.7"
+#define MyAppVersion "0.5.8"
 #endif
 #define MyAppPublisher "MantisZip Contributors"
 #define MyAppURL "https://github.com/mantis3d/MantisZip"
@@ -115,9 +115,9 @@ Source: "publish_output_selfcontained\contributors-financial.csv"; DestDir: "{ap
 ; 7z.dll (SharpSevenZip) is distributed under GNU Lesser General Public License
 Source: "lgpl.txt"; DestDir: "{app}"; Flags: ignoreversion
 
-; === Prebuilt user settings (copied to %LOCALAPPDATA% on fresh install) ===
-; Replace files in installer\prebuilt\ with your own settings from %LOCALAPPDATA%\MantisZip\
-Source: "installer\prebuilt\settings.json"; DestDir: "{app}\prebuilt"; Flags: ignoreversion
+; === Prebuilt window layout (copied to %LOCALAPPDATA% on fresh install) ===
+; settings.json 不再预置：出厂默认值编译在程序里（Resources/Defaults/settings.json），
+; 安装器只负责把向导选的语言/主题写成一次性 install-choices.json。
 Source: "installer\prebuilt\window.json"; DestDir: "{app}\prebuilt"; Flags: ignoreversion
 
 [Icons]
@@ -333,24 +333,6 @@ begin
   end;
 end;
 
-// Replace placeholder tokens in the copied settings.json with actual wizard selections.
-procedure PatchSettingsThemeAndLanguage(const FileName: String);
-var
-  Content: AnsiString;
-  ContentStr: String;
-begin
-  if LoadStringFromFile(FileName, Content) then
-  begin
-    ContentStr := Content;
-    StringChange(ContentStr, '__LANG__', GetAppLanguageCode);
-    StringChange(ContentStr, '__THEME__', GetSelectedTheme);
-    Content := ContentStr;
-    SaveStringToFile(FileName, Content, False);
-    Log('Settings patched with wizard theme/language selection.');
-  end
-  else
-    Log('Failed to load settings.json for theme/language patching.');
-end;
 
 procedure InitializeWizard;
 begin
@@ -545,6 +527,7 @@ var
   Json: string;
   SettingsDir: string;
   SettingsFile: string;
+  InstallChoicesFile: string;
   WindowFile: string;
   ManifestPath: string;
   ManifestJson: string;
@@ -569,33 +552,26 @@ begin
 
     SettingsDir := ExpandConstant('{localappdata}\MantisZip');
     SettingsFile := SettingsDir + '\settings.json';
+    InstallChoicesFile := SettingsDir + '\install-choices.json';
     WindowFile := SettingsDir + '\window.json';
 
-    // Only write on fresh install — don't overwrite existing user settings on upgrade
+    // 首次安装时把向导选的语言/主题写成一次性文件，应用首启读一次、落盘进 settings.json 后才删除。
+    // settings.json 由应用自己用内嵌的出厂默认值生成——安装器不再预置整份默认设置，
+    // 否则那份 json 会常年落后于代码，且向导的 __LANG__/__THEME__ 占位符替换早已空转。
     if not FileExists(SettingsFile) then
     begin
-      Log('Writing prebuilt settings to: ' + SettingsDir);
+      Log('Writing wizard choices to: ' + SettingsDir);
       if not DirExists(SettingsDir) then
         CreateDir(SettingsDir);
 
-      // Copy prebuilt settings.json (including Language + Theme from wizard)
-      // Users can replace installer\prebuilt\ with their own files before building the installer
-      if CopyFile(ExpandConstant('{app}\prebuilt\settings.json'), SettingsFile, False) then
-      begin
-        Log('Prebuilt settings.json copied.')
-        // Override placeholder tokens with actual wizard selections
-        PatchSettingsThemeAndLanguage(SettingsFile);
-      end
+      Json := '{' +
+        '"Language": "' + GetAppLanguageCode + '",' +
+        '"Theme": "' + GetSelectedTheme + '"' +
+        '}';
+      if SaveStringToFile(InstallChoicesFile, Json, False) then
+        Log('install-choices.json written (language + theme from wizard).')
       else
-      begin
-        Log('Failed to copy prebuilt settings.json, writing minimal config...');
-        // Fallback: write minimal settings (Language + Theme from wizard)
-        Json := '{' +
-          '"Language": "' + GetAppLanguageCode + '",' +
-          '"Theme": "' + GetSelectedTheme + '"' +
-          '}';
-        SaveStringToFile(SettingsFile, Json, False);
-      end;
+        Log('Failed to write install-choices.json; app will use built-in defaults.');
 
       // Copy prebuilt window.json if it exists
       if FileExists(ExpandConstant('{app}\prebuilt\window.json')) then

@@ -133,6 +133,17 @@ public sealed record ExtractSettings
     public ParallelExtractSettings? ParallelOverride { get; init; }
 
     /// <summary>
+    /// 解压端「包内根目录」四态（见 <see cref="MantisZip.Core.Utils.RootDirectoryMode"/>）。
+    /// 默认 <see cref="MantisZip.Core.Utils.RootDirectoryMode.Original"/> = 与引入本功能前逐字节一致。
+    /// <para>
+    /// 执行器读它、结合「包是否确有唯一根」解析出要剥的根段 / 要加的根段，再交给
+    /// <c>ExtractPathResolver</c> 与 <c>EntryOutputPath</c>。这里只存「用户选了什么」，
+    /// 不存解析结果 —— 解析结果是包内容的函数，不该进载荷。
+    /// </para>
+    /// </summary>
+    public MantisZip.Core.Utils.RootDirectoryMode RootMode { get; init; } = MantisZip.Core.Utils.RootDirectoryMode.Original;
+
+    /// <summary>
     /// 由已有字段推导的条目范围，供执行器与调用方以同一口径判决。
     /// <para>
     /// 注意 <see cref="ExtractEntryScope.FilteredEntries"/> 的判定用「非 null」而不是「非空」：

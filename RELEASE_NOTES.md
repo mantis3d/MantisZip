@@ -1,3 +1,44 @@
+## v0.5.8
+
+### 文件说明 / File Description
+
+MantisZip-0.5.8-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.8-Setup-Offline.exe 是离线安装包。MantisZip-0.5.8-Portable.zip 是便携版，解压即用。MantisZip-0.5.8-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
+
+MantisZip-0.5.8-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.8-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.8-Portable.zip is the portable version, extract and run. MantisZip-0.5.8-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
+
+### 更新内容 / Changelog
+
+**界面 / UI**
+
+- **压缩与解压都能指定「包内根目录」了** — 压缩设置窗新增「包内根目录」下拉：保持原样 / 智能去根 / 智能加根 / 始终加根；后两档还能填「根目录名」，留空则用压缩包文件名（与下拉同一行，省一行高度）。解压设置窗的「压缩包顶层目录」是同样的四档。右侧预览树显示的就是最终落进包里的结构，与实际输出共用同一套判定；某一档当前不适用时会直接从下拉里拿掉并附一行说明（只选了一个目录才有唯一根可去、分别压缩时不套根），不会留一个选了也不生效的开关。
+- **A root folder policy for both compression and extraction** — the compression window gains a "Folder inside archive" dropdown (Leave as is / Smart strip / Smart wrap / Always wrap); the last two also accept a custom root name that falls back to the archive name, sitting on the same row as the dropdown. The extraction window offers the same four choices as "Top folder of the archive". The preview tree already shows the structure that will end up in the archive, using the same rules as the real output, and a choice that does not apply right now is removed from the list with a note (only a single selected folder has a root to strip, separate compression adds no root), so there is never a switch that silently does nothing.
+- ![压缩设置窗「压缩设置」页的「包内根目录」卡：选「始终加根」时同一行出现「根目录名」输入框，右侧预览树显示最终结构](docs/images/version/v0.5.8/CompressRootFolder.png)
+- ![解压设置窗「压缩包顶层目录」：四档与压缩端一致，右侧预览树显示解压后的层级](docs/images/version/v0.5.8/ExtractRootFolder.png)
+- **「智能解压」可以选择加根还是去根了** — 设置 → 解压 新增「智能解压」卡片，两档：「智能加根」（默认）与以前的行为逐型一致（单根包落在包自带的那层、散装包补一层以包名命名的目录），「智能去根」则去掉包内唯一的顶层目录（散装与多根包本来就没有唯一根，因此原地平铺、不做改动）。工具栏、右键菜单与双击关联里的「智能解压」共用这一项设置。
+- **Smart extract can add or strip the top folder** — Settings → Extraction gains a "Smart extract" card with two choices: the default "smart-add a root" behaves exactly as before for every archive layout (a single-root archive keeps its own top folder, a loose archive gains a folder named after the archive), while "smart-remove the single root" drops the lone top folder — loose and multi-root archives have no single root, so their files simply land where they are. The toolbar button, the context menu and the double-click association all follow this setting.
+- **解压设置窗的默认目标目录改为压缩包所在目录** — 打开「解压设置」时不再预填「父目录\包名」，而是直接指向压缩包所在的目录，包名那一层改由「压缩包顶层目录」负责。可见差异有两处：单根包不再套两层同名目录（原来的「包名\包内根\」变成「包内根\」），自定义目标目录时散装包会多出一层以包名命名的目录。若想完全回到以前的层级，把「压缩包顶层目录」选成「保持原样」即可。
+- **The extraction window now defaults to the archive's own folder** — opening "extract settings" pre-fills the folder the archive sits in rather than "parent\archive-name", with the archive-name level now handled by the top-folder setting. Two visible differences: a single-root archive no longer nests two identically named folders (the old "name\inner-root\" becomes "inner-root\"), and a loose archive extracted into a chosen folder gains one folder named after the archive. Selecting "Leave as is" for the top folder restores the previous layout exactly.
+- **「根目录名」也能用占位符了** — 压缩设置窗「包内根目录」的根目录名与设置 → 压缩的「默认根目录名」都支持 5 个占位符：`{name}`（源文件或目录的主名；多选时取公共父目录名）、`{parent}`（源的上级目录名）、`{date}`（日期）、`{datetime}`（日期时间）、`{archive}`（压缩包主名）。输入框右侧的「插入占位符」会列出这 5 项，输入框下方的示例行实时显示这一批会用的根名；填了不认识的占位符或路径分隔符时示例行转红，点「开始压缩」会被拦下并说明原因。留空或填普通文字时行为与以前完全一致（`a:b` 这类仍按老规则净化成 `a_b`，不会突然报错）。
+- **The root folder name now accepts placeholders** — the root folder name in the compression window's "Folder inside archive" card and the "Default root folder name" under Settings → Compression both support five placeholders: `{name}` (the source file or folder name, or the shared parent folder name when several items are selected), `{parent}` (the source's parent folder name), `{date}`, `{datetime}`, and `{archive}` (the archive's own name). The "Insert placeholder" button beside the box lists exactly those five, and the example line under the box shows the root name this batch will use. An unknown placeholder or a path separator turns that line red and blocks "Start" with an explanation. Leaving it empty or typing plain text keeps the previous behavior byte for byte (something like `a:b` is still sanitized to `a_b` rather than rejected).
+- ![压缩设置窗「压缩设置」页的「包内根目录」卡：根目录名填 `{name}_{date}`，示例行显示本批会用的根名 `photos_2026-11-18`，右侧预览树根节点同值](docs/images/version/v0.5.8/RootNameTemplate.png)
+- **解压设置窗重新分了工** — 「输出设置」页此前塞了目标目录、文件冲突策略、完成后行为与压缩包顶层目录四张常驻卡，把目录选择器挤到只剩几十像素。现在行为类选项整体搬到新加的「解压设置」页（第 3 个页签，与压缩端的「压缩设置」页同构），「输出设置」页只剩「解压到哪」。另外那条与地址栏面包屑完全重复的整条路径输入框（连同选择器里的一行灰色全路径）一并去掉，路径统一由面包屑承担：既可直接点段导航，也可点末段或按 Ctrl+L 进编辑态。
+- **The extraction window now splits its options across two pages** — the "Output" tab used to hold four always-visible cards (destination, file conflict policy, after-extraction behaviour, and the archive top folder), squeezing the folder picker down to a few dozen pixels. The behaviour options moved to a new "Extraction" tab (third tab, mirroring the compression window's "Compression" tab), leaving the "Output" tab with nothing but "where to extract". The full-width path text box that duplicated the breadcrumb — plus a second grey full-path line inside the picker — is gone; the breadcrumb is now the single place for the path: click a segment to jump, or click the last segment (or press Ctrl+L) to edit it.
+- ![解压设置窗「解压设置」页：文件冲突策略、完成后行为与「压缩包顶层目录」都搬到了这里，与压缩端「压缩设置」页同构](docs/images/version/v0.5.8/ExtractOptionsPage.png)
+- **目标目录可以直接输一条还不存在的路径** — 在此之前，在面包屑里输入一个不存在的目录会静默什么都不发生，只能先在选择器里逐层新建。现在输出目录与解压目标的地址栏会问一句「该文件夹尚不存在，是否现在创建？」，确认后逐层建出并直接进去；指向已存在文件的路径仍按打开文件处理，「添加压缩包」那类只读场景不受影响。
+- **You can now type a target folder that does not exist yet** — previously, entering a non-existent folder in the breadcrumb silently did nothing and the only way forward was creating each level inside the picker. The address bars for the output folder and the extraction target now ask "This folder doesn't exist yet. Create it now?", and on confirmation create the whole chain and jump into it. Paths pointing at an existing file still open that file, and read-only contexts such as "Add archive" are unaffected.
+- ![面包屑询问框：该文件夹尚不存在，是否现在创建](docs/images/version/v0.5.8/BreadcrumbCreateFolder.png)
+
+**修复 / Fixes**
+
+- **右键「解压选中项到…」与拖拽解压的默认目录不再多套一层包名** — 这两个入口此前仍按「父目录\包名」算初始目录，而对话框本身的默认值是「父目录」、包名那一层早交给「压缩包顶层目录」负责，两边不一致会让解压结果多出一层同名目录。现在两处统一传父目录，与对话框、智能解压两档的落点规则一致。
+- **The right-click "Extract selected to…" and drag-and-drop extraction no longer add an extra folder layer** — both entries still computed the initial folder as "parent\archive-name" while the dialog itself defaults to "parent" and lets the archive top folder policy add that layer, so the mismatch produced a duplicated same-name folder. Both now pass the parent folder, matching the dialog default and both smart-extract modes.
+- **智能解压完成后的状态栏文案不再与实际动作不符** — 单根压缩包此前提示「已剥离根文件夹」，而实际上那一层从没被剥掉过（自 v0.5.6 起）。现在按真正发生的事显示：已添加顶层文件夹 / 已去除顶层文件夹 / 目录结构未改动。
+- **The smart-extract status message now matches what actually happened** — a single-root archive used to report that the root folder had been removed while nothing was ever removed (since v0.5.6). The message now describes the real outcome: a top-level folder was added, the top-level folder was removed, or the folder structure was left unchanged.
+- **长路径的面包屑不再按层数硬折** — 此前固定「最多 6 段」，层数多但很短的路径会被白白折掉、白扔一大截可用宽度，而层数少但很长的路径反而不折、溢出后被裁成半截段名（连省略号都没有）。现在按控件实际可用宽度逐段量算，放得下就全显示、放不下才从中间折叠，末段超长时自己带省略号收尾；窗口拉宽拉窄也会跟着重新展开或折叠。
+- **The breadcrumb no longer folds long paths by segment count** — it used to cap at 6 segments, so a deep but short path was folded needlessly while a shallow but very wide path was not folded at all and got clipped mid-word with no ellipsis. It now measures the actual available width per segment, folds only when it really does not fit, trims the last segment with an ellipsis, and re-expands or re-folds as the window is resized.
+- **面包屑里带下划线的文件夹名能完整显示了** — 此前段名里的第一个下划线被当成菜单助记符前缀吞掉、后面那个字符还变成了 Alt 快捷键，`my_folder_name` 会显示成 `myfolder_name`（真实文件夹名越规范越容易踩到）。现在按原样显示，括号、连字符等其他符号不受影响。
+- **Folder names containing underscores are shown in full in the breadcrumb** — the first underscore used to be swallowed as a menu mnemonic prefix (and the following character hijacked as an Alt shortcut), so `my_folder_name` rendered as `myfolder_name`. Names are now shown verbatim; other punctuation such as parentheses and hyphens was never affected.
+
 ## v0.5.7
 
 ### 文件说明 / File Description
@@ -10,14 +51,44 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 
 **界面 / UI**
 
-- **进度窗口的「冲突时:」下拉，运行中改了就生效** — 解压 / 压缩跑起来之后，进度窗口信息区首行右侧出现「冲突时:」下拉，与「精简 / 标准 / 完整」密度选择同排：解压 6 档（每次询问 / 覆盖 / 覆盖较旧 / 覆盖较小 / 重命名 / 跳过）、压缩 5 档（每次询问 / 覆盖 / 添加 / 重命名 / 跳过）。改动只影响**之后**遇到的冲突，已经落地的条目保持原结果，因此不必取消重来；冲突弹窗里勾「应用到全部」会反向刷新这个下拉，两边始终是同一个策略、不会各说各话。7z 固实包是个例外：它的落点必须在开始解压前一次性定案，所以进入解码阶段后下拉会变灰、提示换成「本次解压的冲突处理已在开始时一次性确定」；规划阶段（短暂显示「正在检查冲突…」时）仍然可以改，不会留一个改了没反应的开关。
-- **A conflict policy you can change mid-run** — once an extract or compress is running, the progress window's info row shows an "On conflict:" dropdown next to the density choices: six options for extraction (ask every time / overwrite / overwrite if older / overwrite if smaller / rename / skip) and five for compression (ask / overwrite / add / rename / skip). A change only affects the conflicts that come after it — entries already written keep their outcome — so there is no need to cancel and restart, and ticking "apply to all" in the conflict dialog writes the choice back into the dropdown so the two always agree. Solid 7z archives are the exception: their per-entry plan is fixed before decoding starts, so the dropdown greys out at that point and its tooltip says the policy was decided up front (it stays editable during the brief "checking for conflicts" phase, which keeps it from being a switch that does nothing).
-- ![进度窗口信息区首行右侧的「冲突时:」下拉：解压 6 档，规划阶段仍可改，固实包开始解码后自动置灰](docs/images/version/v0.5.7/ProgressConflictPolicy.png)
+- **进度窗口的「冲突时:」下拉，运行中改了就生效** — 解压 / 压缩运行时，进度窗口信息区首行右侧出现「冲突时:」下拉：解压 6 档（每次询问 / 覆盖 / 覆盖较旧 / 覆盖较小 / 重命名 / 跳过）、压缩 5 档（每次询问 / 覆盖 / 添加 / 重命名 / 跳过）。改动只影响之后遇到的冲突，不必取消重来；冲突弹窗里勾「应用到全部」会反向刷新下拉，两边始终一致。7z 固实包例外：落点在开始解压前就已定案，进入解码阶段后下拉变灰并说明原因。
+- **A conflict policy you can change mid-run** — the progress window shows an "On conflict:" dropdown while extracting or compressing: six options for extraction (ask / overwrite / overwrite if older / overwrite if smaller / rename / skip) and five for compression (ask / overwrite / add / rename / skip). A change affects only the conflicts after it, so there is no need to cancel and restart. Solid 7z archives are the exception: their plan is fixed before decoding starts, so the dropdown greys out with a note saying why.
+- ![进度窗口信息区首行右侧的「冲突时:」下拉，与「精简 / 标准 / 完整」密度选择同排](docs/images/version/v0.5.7/ProgressConflictPolicy.png)
+- **压缩包名可以按模板自动生成了** — 压缩设置里新增「文件名模板」，用占位符拼包名：`{name}` 源文件名、`{ext}` 源扩展名、`{parent}` 上级目录名、`{date}` / `{datetime}` 日期时间、`{seq}` 序号（`{seq:0000}` 补四位）、`{name:auto}` 按源数量自动取名。格式扩展名自动补，预览树里看到的包名就是最终包名；模板留空则行为与之前完全一致。右侧 `?` 有完整说明，常用模板可「存为预设」，设置页还能为三种入口分别设默认值。
+- **Name your archives with a template** — compose the archive name from placeholders: `{name}` source file name, `{ext}` source extension, `{parent}` parent folder name, `{date}` / `{datetime}` date and time, `{seq}` a sequence number (`{seq:0000}` zero-padded), and `{name:auto}` which picks a name based on how many sources there are. The format extension is appended automatically, the preview tree shows the final name, and an empty template keeps the previous behaviour. The `?` button opens the reference, and templates can be saved as presets.
+- ![压缩设置「文件名模板」：占位符按钮与预设下拉都在模板输入行里，下方是输出文件名，扩展名由格式自动补](docs/images/version/v0.5.7/FileNameTemplate.png)
+- **文件名模板可以一键插入占位符** — 模板输入框右侧新增「插入占位符」按钮，点开列出全部 8 个占位符及各自一句说明（`{name}` / `{name:auto}` / `{ext}` / `{parent}` / `{date}` / `{datetime}` / `{seq}` / `{seq:0000}`），点其中一项即插到光标处（有选区则替换选区、输入框还没聚焦过就接着末尾写）。压缩设置窗的模板框与设置页的三行默认值各有一个，不必再手敲占位符。
+- **Insert placeholders into a file name template with one click** — a "Insert placeholder" button sits beside the template field: it lists all eight placeholders with a one-line description each (`{name}`, `{name:auto}`, `{ext}`, `{parent}`, `{date}`, `{datetime}`, `{seq}`, `{seq:0000}`), and picking one inserts it at the caret (replacing the selection if there is one, or appending when the field has never been focused). The compression window's template field and the three defaults on the settings page each have their own button, so there is no need to type the placeholders by hand.
+- ![压缩设置「插入占位符」：点开列出 8 个占位符，点选即插到光标处](docs/images/version/v0.5.7/InsertPlaceholder.png)
 
 **修复 / Fixes**
 
-- **「解压到此处」「解压到同一文件夹」「智能解压」不再无视冲突设置** — 这三条原地解压的路径此前调用引擎时**不传任何选项**，引擎对「没有设置」一律按覆盖处理：用户明明在设置里选了「每次询问」或「跳过」，点这三个入口仍然静默覆盖磁盘上的同名文件（登记为 KI-012，属于数据丢失级）。现在三条路径都带上默认策略与询问弹窗，进度窗口里同样出现「冲突时:」下拉，行为与其他解压入口完全一致：选「询问」就逐个弹、选「跳过」就一个都不动。
-- **"Extract here", "extract to folder" and smart extract no longer ignore your conflict settings** — those three in-place paths called the engine **without any options**, and the engine treats "no settings" as overwrite: even with "ask every time" or "skip" configured, these entry points silently replaced files of the same name on disk (tracked as KI-012, a data-loss class issue). All three now pass the default policy and the ask dialog, and their progress window shows the same "On conflict:" dropdown, so they behave exactly like every other extraction entry point: "ask" prompts per conflict, "skip" leaves every existing file untouched.
+- **安装时选的语言和主题现在真的生效了** — 安装向导里选的语言与深浅色主题此前根本没有落到程序里，无论选什么都按浅色中文启动（装好后再去设置里改才会记住）。现在向导的选择会在首次启动时应用并保存下来。
+- **The language and theme you pick in the installer now actually apply** — the choices made in the setup wizard never made it into the app, so it always started in light theme and Chinese no matter what was selected (changing them in settings afterwards did work). The wizard's choices are now applied on first launch and saved.
+- **带调色板的 ICO 打不开、动画 WebP 预览卡顿（issue #89）** — ① 低色深（1 / 4 / 8 位）ICO 的像素起始偏移漏算了调色板长度，整帧解不出来、预览直接报不支持；② 动画 WebP 改为链式增量解码并直写位图，26 帧的文件从 7.9 秒降到 0.4 秒左右，帧数超过 600 或像素总量超过 192 MB 时只显示首帧并在画面上说明原因。
+- **Palette ICOs failed to open and animated WebP previews crawled (issue #89)** — palette-based ICO frames (1 / 4 / 8-bit) computed the pixel offset without the palette size, so the frame never decoded and the preview reported the file as unsupported; animated WebP now decodes frames incrementally straight into bitmaps, cutting a 26-frame file from 7.9 s to about 0.4 s, and files over 600 frames or 192 MB of pixels show only the first frame with an on-screen explanation.
+- ![带调色板的 ICO 帧已能正常预览：选中 Test_02.ico，右侧元数据与图标都显示出来了](docs/images/version/v0.5.7/Issue89Preview.png)
+- **「解压到此处」「解压到同一文件夹」「智能解压」不再无视冲突设置** — 这三条原地解压路径此前调用引擎时不传任何选项，引擎一律按覆盖处理，用户选了「每次询问」或「跳过」也照旧静默覆盖同名文件（KI-012，数据丢失级）。现在三条路径都带上默认策略与询问弹窗，进度窗口里也有「冲突时:」下拉，与其他解压入口完全一致。
+- **"Extract here", "extract to folder" and smart extract no longer ignore your conflict settings** — those three in-place paths called the engine without any options, and the engine treats "no settings" as overwrite, silently replacing files of the same name even when "ask every time" or "skip" was configured (tracked as KI-012, a data-loss class issue). All three now pass the default policy and the ask dialog, and their progress window shows the same "On conflict:" dropdown as every other extraction entry point.
+- **右键菜单用一次就消失（issue #80）** — 启用「动态菜单」后右键压缩或解压一次，MantisZip 菜单项会永久消失。现在菜单组件自己上报「菜单确实画出来了」的心跳，一旦失效就自动回退到静态菜单，不会再出现「既没有动态菜单、也没有兜底」的两头空。
+- **The context menu no longer disappears after one use (issue #80)** — with the dynamic menu enabled, using MantisZip once from the right-click menu made the entry vanish for good. The menu component now reports its own "menu was drawn" heartbeat and falls back to the static menu when it stops, so the two can no longer cancel each other out.
+- **规则名与内置过滤预设名现在跟随界面语言** — 「设置 → 加速」的自适应规则名，以及压缩 / 解压设置里「文件过滤」内置预设的名字（仅图片、大文件、本月修改等），此前都写死成中文，切到英文或繁中界面仍是中文。现在两处都随界面语言切换；你自己改过名的规则、自己存的预设照原样显示，不会被翻译。
+- **Rule names and built-in filter presets now follow the interface language** — the adaptive rule names under Settings → Speed, and the built-in file-filter presets in the compression / extraction windows (Images only, Large files, Modified this month, …) were hard-coded Chinese and stayed Chinese on the English and Traditional Chinese interface. Both now follow the interface language; rules you renamed yourself and presets you saved keep exactly the text you typed.
+- **「恢复默认」现在真的恢复出厂规则** — 自适应规则的「恢复默认」按钮此前只是把现有规则全部禁用，点完拿到一片空列表。现在会重建出厂六类规则（你自己添加的规则会被清掉，所以先弹确认框）。
+- **"Restore defaults" now actually restores the factory rules** — the button used to just disable every existing adaptive rule, leaving an empty list. It now rebuilds the six factory rules, asking for confirmation first because the rules you added yourself are cleared.
+
+**变更 / Changes**
+
+- **压缩窗口的「输出方式」从三个选项简化成一个开关** — 「合并（按公共父目录名）」算出的包名与模板的 `{name:auto}` 完全相同，于是只保留一个「每个文件/文件夹各自成一个压缩包」开关：不勾压成一个包，勾上则每个源各自出包。跨盘符多选时不再弹提示，输出目录留空由你自己选。
+- **The output mode in the compression window is now a single switch** — the combined option only re-derived a name that the file name template's `{name:auto}` produces anyway, so it is gone; a single "each file/folder gets its own archive" checkbox now covers both cases (off = one archive, on = one archive per source). Multi-source selections that span drives simply leave the output folder empty for you to pick, with no separate notice.
+- **压缩窗口「输出设置」页不再拥挤** — 该页的目录选择器是唯一能伸缩的控件，却被四张常驻卡挤到只剩几十像素。现在把「文件冲突策略」和「压缩完成后打开输出目录」移入「压缩设置」页合成一张卡，两项取值与行为都不变（运行中仍可在进度窗口临时改），输出页只留「放在哪、叫什么」。
+- **The output tab of the compression window is no longer cramped** — the folder picker on that tab was the only control that could give up height, so four fixed cards squeezed it down to a few dozen pixels. The conflict policy and "open the output folder when done" now live together on the compression tab; both keep the same values and behaviour (still adjustable mid-run), and the output tab is left with just "where the archive goes and what it is called".
+- **动态右键菜单改为实验开关，默认关闭** — 默认使用静态级联菜单，不依赖资源管理器加载 .NET 组件。想用带文件名标签的动态菜单可在「设置 → 右键菜单」打开，失败会自动回退；同一页的「安装 / 应用」也不再重启资源管理器。
+- **The dynamic context menu is now an experimental opt-in, off by default** — the default is the static cascade menu, which doesn't rely on Explorer loading a .NET component. The dynamic menu with file-name labels can be enabled in Settings → Context menu and falls back automatically if it fails; "Install / Apply" on that page no longer restarts Explorer either.
+- **新装自带默认命名模板与两条预设** — 全新安装（或设置文件缺失、损坏读不出来）时，压缩对话框的模板框预填 `{name:auto}`，预设下拉自带「Auto Name」与「Name & Date」两条，不再是一片空。已有 `settings.json` 的用户不受影响。
+- **New installs start with a default file name template and two presets** — on a fresh install (or when the settings file is missing or unreadable) the compression dialog's template field already holds `{name:auto}` and the preset dropdown carries "Auto Name" and "Name & Date" instead of being empty. Existing settings files are left untouched.
+- **「保留源文件扩展名」开关移除** — 它只对分别压缩生效，模板非空时更是被完全忽略。现在分别压缩一律去掉源扩展名（`hello.txt` → `hello.zip`），要保留就在模板里写 `{ext}`。
+- **The "keep source file extension" switch is gone** — it only applied to separate compression and was ignored outright whenever a template was set. Separate compression now always drops the source extension (`hello.txt` → `hello.zip`); write `{ext}` in the template to keep it.
 
 ## v0.5.6
 
@@ -26,7 +97,6 @@ MantisZip-0.5.7-Setup-WebSetup.exe requires internet during installation. Mantis
 MantisZip-0.5.6-Setup-WebSetup.exe 是需要联网才能安装的。MantisZip-0.5.6-Setup-Offline.exe 是离线安装包。MantisZip-0.5.6-Portable.zip 是便携版，解压即用。MantisZip-0.5.6-Portable-Web.zip 是无依赖便携版，需要电脑安装有 .NET 10 运行时才能正常使用。
 
 MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. MantisZip-0.5.6-Setup-Offline.exe is a fully offline installer. MantisZip-0.5.6-Portable.zip is the portable version, extract and run. MantisZip-0.5.6-Portable-Web.zip is a dependency-free portable version that requires the .NET 10 runtime to be installed on your computer.
-
 
 ### 更新内容 / Changelog
 
@@ -79,9 +149,8 @@ MantisZip-0.5.6-Setup-WebSetup.exe requires internet during installation. Mantis
 
 - **Password-protected 7z extraction is now many times faster** — a password-protected 7z (including `.001` split sets) used to be unpacked one file at a time, re-decoding the whole solid block for every file, so 48 MB across 309 files took minutes; the archive is now decoded in one pass, about 3 seconds for the same set — on par with Bandizip. Extracting only selected files benefits as well.
 
-**性能 / Performance**
-
 - **7z 两段式解压的进度不再先走满** — 固实包会把整块条目一次性解码到暂存、再从暂存逐条搬到最终位置；进度条现在分成两段：解码期间只走到一半，新增的「暂存」统计卡显示已解码、还没落地的条目数与大小，搬运时该卡递减、「已处理」递增，不会再出现进度条先满、状态卡片长时间不动。进度推进也从「按条目数均分」改成按文件大小加权（小文件不再嗖嗖涨、大文件不会解到 99% 还只挪一格），落地阶段仍按条目数推进（同盘改名只与条目数有关）。只影响未加密 7z 的批量解压，ZIP / RAR / 单条目解压不变
+
 - **Two-step 7z extraction no longer shows a bar that jumps to 100 %** — a solid archive decodes all its entries into staging in one go and then moves them into place one by one; the bar now fills only to the halfway point while decoding, a new "staged" stat card reports how many entries are decoded but not yet moved (and counts down as they land) while "processed" grows on every move, so the bar no longer hits 100 % while the cards sit still. Progress also advances in proportion to file size instead of merely counting entries — small files no longer race ahead while a big one barely moves — with the staging-to-destination step still advancing per entry (a same-volume rename costs one operation per entry). Only affects bulk extraction from unencrypted 7z archives; ZIP, RAR and single-entry extraction are unchanged
 
 ## v0.5.5

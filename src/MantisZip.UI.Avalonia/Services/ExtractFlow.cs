@@ -212,6 +212,11 @@ public static class ExtractFlow
     /// 实时冲突策略源（进度窗口「冲突时:」下拉）；null = 用 <paramref name="conflictAction"/> 静态策略。
     /// 传入后「暂停 → 改下拉 → 继续」立即生效。
     /// </param>
+    /// <param name="rootMode">
+    /// 解压端「包内根目录」四态（见 <see cref="RootDirectoryMode"/>）；默认
+    /// <see cref="RootDirectoryMode.Original"/> = 与引入本功能前逐字节一致。
+    /// 非原样时本方法自行列一次条目、经 <see cref="ExtractRootPlan"/> 解析出要剥/要加的根段。
+    /// </param>
     /// <exception cref="NotSupportedException">不支持的压缩格式。</exception>
     public static async Task ExtractAsync(
         string archivePath,
@@ -224,10 +229,17 @@ public static class ExtractFlow
         CancellationToken ct,
         ParallelExtractSettings? parallelOverride = null,
         string? nameEncoding = null,
-        Func<FileConflictAction>? liveConflictPolicy = null)
+        Func<FileConflictAction>? liveConflictPolicy = null,
+        RootDirectoryMode rootMode = RootDirectoryMode.Original)
     {
+        // 「包内根目录」四态 → 确定指令：智能去根要包确有唯一根、智能加根要包没有唯一根，
+        // 判定靠这次列条目完成（原样模式下不列，零额外开销）。
+        var (stripRoot, addRoot) = await ExtractRootPlan.ResolveAsync(
+            ArchiveEngineFactory.GetEngineByExtension(archivePath),
+            archivePath, password, ct, nameEncoding, rootMode);
+
         var options = SelectedItemsExtractService.CreateExtractOptions(
-            conflictAction, conflictDialog, nameEncoding, liveConflictPolicy);
+            conflictAction, conflictDialog, nameEncoding, liveConflictPolicy, stripRoot, addRoot);
 
         // 智能并行解压：经 ParallelDegreeResolver 5 步决策链解析线程数。
         // parallelOverride = 对话框本次快照（初值读设置、不回写）；null → 读 AppSettings（CLI 等无对话框路径）。

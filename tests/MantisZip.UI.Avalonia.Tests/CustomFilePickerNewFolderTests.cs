@@ -172,4 +172,63 @@ public class CustomFilePickerNewFolderTests
 
         Cleanup(window, dir);
     }
+
+    // ── 2026-11-24：地址栏输入尚不存在的路径时建目录 ──────────────────────
+    //
+    // 「询问 → 建目录 → 进入」这条链里，弹窗那两步没法在无头环境里驱动
+    // （No 分支什么都不做、创建失败才弹错误框），唯一有副作用、值得钉住的是
+    // TryCreateDirectory 本身。宿主开关 AllowCreateMissingFolder 只决定
+    // NavigateRequested 走不走这条路，是纯布尔判断。
+
+    [AvaloniaFact]
+    public void TryCreateDirectory_CreatesNestedFoldersInOneGo()
+    {
+        var (window, picker, dir) = Show(PickerMode.PickFolder);
+
+        // 深层路径一次建出来 —— 这也是不用「新建文件夹」按钮逐层建的原因
+        var target = Path.Combine(dir, "一", "二", "三");
+
+        Assert.True(picker.TryCreateDirectory(target, out var error));
+        Assert.Null(error);
+        Assert.True(Directory.Exists(target));
+
+        Cleanup(window, dir);
+    }
+
+    [AvaloniaFact]
+    public void TryCreateDirectory_ExistingFolder_IsIdempotent()
+    {
+        var (window, picker, dir) = Show(PickerMode.PickFolder);
+
+        // 用户手输一个恰好已存在的目录（比如刚被别人建了）：不该报错
+        Assert.True(picker.TryCreateDirectory(dir, out var error));
+        Assert.Null(error);
+        Assert.True(Directory.Exists(dir));
+
+        Cleanup(window, dir);
+    }
+
+    [AvaloniaFact]
+    public void TryCreateDirectory_BlankPath_ReturnsErrorWithoutTouchingDisk()
+    {
+        var (window, picker, dir) = Show(PickerMode.PickFolder);
+
+        Assert.False(picker.TryCreateDirectory("   ", out var error));
+        Assert.False(string.IsNullOrWhiteSpace(error));
+        // 报错文案走本地化，和「新建文件夹」按钮那条共用同一个 key
+        Assert.Equal(LocalizationManager.T("Picker_NewFolderNoPath"), error);
+
+        Cleanup(window, dir);
+    }
+
+    [AvaloniaFact]
+    public void AllowCreateMissingFolder_DefaultsToFalse()
+    {
+        // 默认 false 是安全底线：「添加压缩包 / 添加文件」这类读场景输错路径
+        // 必须什么都不做，不能替用户凭空建出目录来。Show() 不设该属性，即出厂默认值。
+        var (window, picker, dir) = Show(PickerMode.PickItems);
+        Assert.False(picker.AllowCreateMissingFolder);
+
+        Cleanup(window, dir);
+    }
 }

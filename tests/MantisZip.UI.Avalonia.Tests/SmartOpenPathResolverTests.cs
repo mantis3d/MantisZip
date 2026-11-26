@@ -1,3 +1,5 @@
+using System.Collections.Generic;
+using System.IO;
 using MantisZip.Core.Abstractions;
 using MantisZip.UI.Avalonia.Services;
 using Xunit;
@@ -84,5 +86,58 @@ public class SmartOpenPathResolverTests
             Dir("other/")
         };
         Assert.Null(SmartOpenPathResolver.GetCommonRootDirectory(entries));
+    }
+
+    // ===== ResolveOpenPath（已知根策略时的纯函数版本，智能解压两档用它）=====
+
+    [Fact]
+    public void ResolveOpenPath_AddedRoot_OpensThatFolder()
+    {
+        // 散装包加了「backup」根 → 内容都在 dest\backup 下，打开它
+        var result = SmartOpenPathResolver.ResolveOpenPath(@"D:\dl", stripRoot: null, addRoot: "backup", commonRoot: null);
+        Assert.Equal(Path.Combine(@"D:\dl", "backup"), result);
+    }
+
+    [Fact]
+    public void ResolveOpenPath_StrippedRoot_OpensDest()
+    {
+        // 剥了根 → 内容摊平进 dest，再进一层就是空的
+        var result = SmartOpenPathResolver.ResolveOpenPath(
+            @"D:\dl", stripRoot: "photos", addRoot: null, commonRoot: "photos");
+        Assert.Equal(@"D:\dl", result);
+    }
+
+    [Fact]
+    public void ResolveOpenPath_StructuralNoop_FallsBackToCommonRoot()
+    {
+        // 智能加根遇单根包：结构没动，包自带的根还在 dest 下面一层
+        var result = SmartOpenPathResolver.ResolveOpenPath(
+            @"D:\dl", stripRoot: null, addRoot: null, commonRoot: "photos");
+        Assert.Equal(Path.Combine(@"D:\dl", "photos"), result);
+    }
+
+    [Fact]
+    public void ResolveOpenPath_StructuralNoopNoCommonRoot_OpensDest()
+    {
+        var result = SmartOpenPathResolver.ResolveOpenPath(
+            @"D:\dl", stripRoot: null, addRoot: null, commonRoot: null);
+        Assert.Equal(@"D:\dl", result);
+    }
+
+    [Fact]
+    public void ResolveOpenPath_BothRootsGiven_AddWins()
+    {
+        // 理论上不会同时给；给两份时以「加了根」为准（内容确实在那一层）
+        var result = SmartOpenPathResolver.ResolveOpenPath(
+            @"D:\dl", stripRoot: "photos", addRoot: "backup", commonRoot: "photos");
+        Assert.Equal(Path.Combine(@"D:\dl", "backup"), result);
+    }
+
+    [Fact]
+    public void ResolveOpenPath_EmptyStringsTreatedAsNoop()
+    {
+        var result = SmartOpenPathResolver.ResolveOpenPath(
+            @"D:\dl", stripRoot: "", addRoot: "", commonRoot: "");
+        Assert.Equal(@"D:\dl", result);
     }
 }

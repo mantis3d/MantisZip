@@ -3,6 +3,7 @@ using Avalonia.Controls;
 using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Interactivity;
+using MantisZip.UI.Avalonia.Controls;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 using MantisZip.UI.Avalonia.Services;
@@ -37,6 +38,53 @@ public partial class SettingsWindow : Window
         WindowPlacement.Apply(this, geometry.SettingsWindowWidth, geometry.SettingsWindowHeight);
         Closed += OnClosed;
     }
+
+    /// <summary>
+    /// 三行文件名模板的预设选择器回调（控件只发事件，写设置归 VM）。
+    /// 行身份靠控件 <c>Tag</c>（Dialog/Quick/Separate），这样三个 handler 只需写一份。
+    /// </summary>
+    private void OnPresetSelected(object? sender, MantisZip.Core.Utils.FileNameTemplatePreset preset)
+    {
+        if (sender is not TemplatePresetPicker { Tag: string tag }) return;
+        if (DataContext is not SettingsWindowViewModel vm) return;
+        if (!TryParseRow(tag, out var row)) return;
+
+        vm.ApplyFileNameTemplatePreset(row, preset);
+    }
+
+    /// <summary>「存为预设」图标按钮：用该行预设名框里的名字 + 该行模板写回设置（同名覆盖）。</summary>
+    private void OnPresetSaveRequested(object? sender, string name)
+    {
+        if (sender is not TemplatePresetPicker { Tag: string tag }) return;
+        if (DataContext is not SettingsWindowViewModel vm) return;
+        if (!TryParseRow(tag, out var row)) return;
+
+        vm.SaveFileNameTemplatePreset(row);
+    }
+
+    /// <summary>「删除」图标按钮：删掉该行预设名框里那条预设。</summary>
+    private void OnPresetDeleteRequested(object? sender, string name)
+    {
+        if (sender is not TemplatePresetPicker { Tag: string tag }) return;
+        if (DataContext is not SettingsWindowViewModel vm) return;
+        if (!TryParseRow(tag, out var row)) return;
+
+        vm.DeleteFileNameTemplatePreset(row);
+    }
+
+    /// <summary>预设消息气泡 1.6s 自动收起后回调：清空该行消息，让下次同样的消息还能重新弹出。</summary>
+    private void OnPresetMessageDismissed(object? sender, EventArgs e)
+    {
+        if (sender is not TemplatePresetPicker { Tag: string tag }) return;
+        if (DataContext is not SettingsWindowViewModel vm) return;
+        if (!TryParseRow(tag, out var row)) return;
+
+        vm.DismissFileNameTemplatePresetMessage(row);
+    }
+
+    /// <summary>把控件 <c>Tag</c> 翻译成行枚举；Tag 是 XAML 里手写的字面量，拼错时静默无动作。</summary>
+    private static bool TryParseRow(string tag, out FileNameTemplateRow row)
+        => Enum.TryParse(tag, ignoreCase: true, out row);
 
     /// <summary>关闭时写回窗口尺寸（非法值回落 XAML 默认 900×640）。</summary>
     private void OnClosed(object? sender, EventArgs e)

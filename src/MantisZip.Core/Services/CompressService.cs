@@ -20,7 +20,7 @@ public class CompressRequest
     /// <summary>源文件/目录路径列表</summary>
     public List<string> SourcePaths { get; init; } = new();
 
-    /// <summary>输出模式：Manual / Separate / Combined</summary>
+    /// <summary>输出模式：Manual / Separate</summary>
     public CompressOutputMode Mode { get; init; }
 
     /// <summary>压缩格式："zip" / "7z" / "tar.gz"</summary>
@@ -44,16 +44,27 @@ public class CompressRequest
     /// <summary>是否加密压缩包</summary>
     public bool Encrypt { get; init; }
 
-    /// <summary>Manual/Combined 模式：由调用方预计算的输出路径</summary>
+    /// <summary>Manual 模式：由调用方预计算的输出路径</summary>
     public string? OutputPath { get; init; }
 
-    /// <summary>Separate 模式：是否保留源文件扩展名（如 "file.txt" → "file.txt.zip"）</summary>
-    public bool KeepOriginalExtension { get; init; }
+    /// <summary>
+    /// 文件名模板（占位符形式，如 <c>{name}_{date}</c>）。null/空白 = 未启用（走旧命名）。
+    /// 要保留源的原始扩展名，在模板里写 <c>{ext}</c>。
+    /// 有 <see cref="Plan"/> 时模板不参与执行（路径以 B 为准），但仍需照传：CLI 的
+    /// <c>--compress-separate</c> 靠它把命名规则带到无预览的路径上。
+    /// </summary>
+    public string? FileNameTemplate { get; init; }
+
+    /// <summary>
+    /// 模板里的 <c>{date}</c>/<c>{datetime}</c> 用的时间戳。调用方在**批开始时取一次**、
+    /// 整批共用 —— 跨午夜也不会出现一半新日期一半旧日期。null = 取当前时刻。
+    /// </summary>
+    public DateTime? TemplateTimestamp { get; init; }
 
     /// <summary>
     /// 过滤后的压缩计划（B 数据集）。由 CompressFlow.BuildRequest 从预览构建结果注入。
     /// 非 null 时：Separate 模式按逐项（SourcePath + OutputArchivePath + IncludedFiles 白名单）执行；
-    /// Manual/Combined 模式合并全部 IncludedFiles 为单一白名单。路径一律以 B 为准，不重算。
+    /// Manual 模式合并全部 IncludedFiles 为单一白名单。路径一律以 B 为准，不重算。
     /// </summary>
     public CompressPlan? Plan { get; init; }
 
@@ -65,6 +76,19 @@ public class CompressRequest
 
     /// <summary>压缩单文件夹时是否保留外层目录根，仅 SevenZipEngine 有效</summary>
     public bool PreserveDirectoryRoot { get; init; } = true;
+
+    /// <summary>
+    /// 「包内根目录」四态（见 <see cref="RootDirectoryMode"/>）：原样 / 智能去除唯一根 /
+    /// 智能添加唯一根 / 始终添加唯一根。默认 <see cref="RootDirectoryMode.Original"/> = 逐字节不变。
+    /// </summary>
+    public RootDirectoryMode RootMode { get; init; } = RootDirectoryMode.Original;
+
+    /// <summary>
+    /// 「加一层根目录」时用的根名；空 = 由引擎回落到压缩包文件名去扩展名。
+    /// 仅 <see cref="RootMode"/> 为 <see cref="RootDirectoryMode.SmartWrap"/> /
+    /// <see cref="RootDirectoryMode.AlwaysWrap"/> 时有意义。
+    /// </summary>
+    public string? WrapRoot { get; init; }
 
     /// <summary>ZIP 文件名编码："utf-8" / "gbk" / "default"，null 表示引擎默认</summary>
     public string? FileNameEncoding { get; init; }
@@ -152,7 +176,7 @@ public static class CompressService
     /// <summary>
     /// 预计算压缩输出路径列表。用于调用方在启动前显示批处理文件列表。
     /// Separate 模式：每个源文件对应一个输出路径。
-    /// Manual/Combined 模式：单个输出路径。
+    /// Manual 模式：单个输出路径。
     /// </summary>
     public static List<string> GetOutputPaths(CompressRequest request)
     {
@@ -166,7 +190,7 @@ public static class CompressService
                 CompressOutputMode.Separate => request.Plan.Items
                     .Select(i => i.OutputArchivePath)
                     .ToList(),
-                CompressOutputMode.Manual or CompressOutputMode.Combined =>
+                CompressOutputMode.Manual =>
                     !string.IsNullOrEmpty(request.Plan.OutputPath)
                         ? new List<string> { request.Plan.OutputPath }
                         : new List<string>(), // fallback（正常不会走到）
@@ -177,9 +201,9 @@ public static class CompressService
         return request.Mode switch
         {
             CompressOutputMode.Separate => request.SourcePaths
-                .Select(p => ComputeSeparateOutputPath(request, p))
+                .Select((p, index) => ComputeSeparateOutputPath(request, p, index + 1))
                 .ToList(),
-            CompressOutputMode.Manual or CompressOutputMode.Combined =>
+            CompressOutputMode.Manual =>
                 !string.IsNullOrEmpty(request.OutputPath)
                     ? new List<string> { request.OutputPath }
                     : request.SourcePaths.ToList(), // fallback
@@ -189,7 +213,7 @@ public static class CompressService
 
     /// <summary>
     /// 执行压缩操作。根据 <paramref name="request"/> 中的 <see cref="CompressOutputMode"/>
-    /// 自动选择循环（Separate）或单次（Manual/Combined）执行路径。
+    /// 自动选择循环（Separate）或单次（Manual）执行路径。
     /// </summary>
     /// <param name="request">压缩参数</param>
     /// <param name="conflictResolver">文件冲突回调，null 表示直接覆盖</param>
@@ -217,7 +241,6 @@ public static class CompressService
         {
             CompressOutputMode.Separate => await CompressSeparateAsync(request, conflictResolver, progress, ct, onItemStatus, onItemOutputPath),
             CompressOutputMode.Manual => await CompressSingleAsync(request, conflictResolver, progress, ct, onItemOutputPath),
-            CompressOutputMode.Combined => await CompressSingleAsync(request, conflictResolver, progress, ct, onItemOutputPath),
             _ => throw new ArgumentOutOfRangeException(nameof(request.Mode), request.Mode, null)
         };
     }
@@ -261,7 +284,7 @@ public static class CompressService
             // 2. 计算输出路径（B 优先，否则本地公式）
             var outputPath = planItems != null
                 ? planItems[i].OutputArchivePath
-                : ComputeSeparateOutputPath(request, sourcePath);
+                : ComputeSeparateOutputPath(request, sourcePath, i + 1);
 
             // 2b. 该源的文件白名单（过滤激活时 B 提供匹配文件清单；null = 不过滤）
             IReadOnlySet<string>? whitelist = planItems?[i].IncludedFiles != null
@@ -338,7 +361,7 @@ public static class CompressService
     }
 
     /// <summary>
-    /// Manual/Combined 模式：单次压缩，所有 SourcePaths 作为整体传入引擎。
+    /// Manual 模式：单次压缩，所有 SourcePaths 作为整体传入引擎。
     /// </summary>
     private static async Task<CompressResult> CompressSingleAsync(
         CompressRequest request,
@@ -350,7 +373,7 @@ public static class CompressService
         ct.ThrowIfCancellationRequested();
 
         var outputPath = request.OutputPath
-            ?? throw new InvalidOperationException("OutputPath is required for Manual/Combined mode.");
+            ?? throw new InvalidOperationException("OutputPath is required for Manual mode.");
 
         CoreLog.Info($"CompressService: single mode, output: {outputPath}");
 
@@ -423,11 +446,14 @@ public static class CompressService
 
     /// <summary>
     /// Separate 模式：为单个源文件计算输出路径。
-    /// 唯一实现收敛到 <see cref="CompressPathPlanner"/>（目录源用完整目录名，忽略 keepOriginalExt）。
+    /// 唯一实现收敛到 <see cref="CompressPathPlanner"/>（目录源用完整目录名，文件源恒去扩展名）。
     /// 仅无 B 数据集时（如 CLI）退化使用；有 B 时路径一律取 B 的 OutputArchivePath。
+    /// <paramref name="sequence"/> 是 1 基序号，供模板的 <c>{seq}</c> 使用。
     /// </summary>
-    private static string ComputeSeparateOutputPath(CompressRequest request, string sourcePath)
-        => CompressPathPlanner.ComputeOutputPath(sourcePath, request.Format, request.KeepOriginalExtension);
+    private static string ComputeSeparateOutputPath(CompressRequest request, string sourcePath, int sequence)
+        => CompressPathPlanner.ComputeOutputPath(
+            sourcePath, request.Format,
+            request.FileNameTemplate, sequence, request.TemplateTimestamp);
 
     /// <summary>
     /// 根据冲突处理结果计算新的输出路径。
@@ -487,6 +513,9 @@ public static class CompressService
             Comment = resolvedComment,
             CommentDistribution = CommentDistribution.AllSame, // 已由 Service 解析完成
             PreserveDirectoryRoot = request.PreserveDirectoryRoot,
+            CompressRootMode = request.RootMode,
+            CompressWrapRoot = request.WrapRoot,
+            CompressWrapRootTimestamp = request.TemplateTimestamp,
             FileNameEncoding = request.FileNameEncoding,
             SevenZipCompressionMethod = request.SevenZipCompressionMethod,
             SevenZipSolid = request.SevenZipSolid,

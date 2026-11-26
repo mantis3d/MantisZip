@@ -17,7 +17,6 @@ public class AppSettings
     // ===== 压缩 =====
     public string DefaultFormat { get; set; } = "zip";
     public int DefaultLevel { get; set; } = 5;
-    public bool KeepOriginalExtension { get; set; } = false;
     public string ZipEncoding { get; set; } = "utf-8";
 
     /// <summary>
@@ -84,6 +83,85 @@ public class AppSettings
     public bool SevenZipEncryptHeaders { get; set; } = true;
     /// <summary>压缩时输出文件已存在（文件冲突）的默认处理：ask / overwrite / add / rename / skip</summary>
     public string CompressFileConflictAction { get; set; } = "ask";
+
+    // ===== 包内根目录（v0.5.8）=====
+    // 四态：Original / SmartStrip / SmartWrap / AlwaysWrap。存 int 而不是枚举字符串，
+    // 与 ArchiveRootPolicy.RootDirectoryMode 的数值绑定（那边注释已声明数值是持久化契约）。
+
+    /// <summary>压缩端「包内根目录」默认值。</summary>
+    public RootDirectoryMode CompressRootMode { get; set; } = RootDirectoryMode.Original;
+
+    /// <summary>压缩端套根时的默认根名；空 = 每次按压缩包文件名去扩展名推导。</summary>
+    public string CompressRootName { get; set; } = "";
+
+    /// <summary>解压端「压缩包顶层目录」默认值。</summary>
+    /// <remarks>
+    /// 默认 <see cref="RootDirectoryMode.SmartWrap"/>（智能加根，v0.5.8 第二项改）：配合
+    /// 对话框默认落点 = 父目录，散装包会落在 <c>父目录\包名\</c>、单根包复用包自带的根。
+    /// 这条不变式是「每个包解压后必然落在一个顶层文件夹里」。想回到「平铺到目标目录」就选「原样」。
+    /// </remarks>
+    public RootDirectoryMode ExtractRootMode { get; set; } = RootDirectoryMode.SmartWrap;
+
+    /// <summary>
+    /// 智能解压（菜单 / 工具栏 / 右键 / 双击关联）的根策略，只有两档：
+    /// <see cref="RootDirectoryMode.SmartWrap"/>（智能加根，默认）与
+    /// <see cref="RootDirectoryMode.SmartStrip"/>（智能去根）。
+    /// </summary>
+    /// <remarks>
+    /// 两档的落点目录都是压缩包所在父目录，只换根策略。读值时必须过
+    /// <see cref="MantisZip.Core.Utils.ArchiveRootPolicy.NormalizeSmartExtractMode"/>：
+    /// 这个字段可能被手改成其它值，直接当四态用会让智能解压退化成「原样」。
+    /// </remarks>
+    public RootDirectoryMode SmartExtractRootMode { get; set; } = RootDirectoryMode.SmartWrap;
+
+    // ===== 压缩文件名模板（v0.5.7）=====
+    // 三个入口各记一份默认值：项目里「压缩到此处/右键压缩」与「分别压缩」的命名诉求差别很大，
+    // 一个全局默认值会互相拖累。空串 = 不启用（行为与引入前逐字节一致）。
+
+    /// <summary>压缩对话框（手动/合并/分别都走它）的文件名模板默认值。</summary>
+    public string FileNameTemplateDialog { get; set; } = "";
+
+    /// <summary>右键「快速压缩到此」等无对话框入口的文件名模板默认值。</summary>
+    public string FileNameTemplateQuick { get; set; } = "";
+
+    /// <summary>CLI <c>--compress-separate</c> 的文件名模板默认值。</summary>
+    public string FileNameTemplateSeparate { get; set; } = "";
+
+    /// <summary>命名预设（在压缩对话框里增删，最多 20 条）。</summary>
+    public List<FileNameTemplatePreset> FileNameTemplatePresets { get; set; } = new();
+
+    /// <summary>命名预设条数上限（与文件过滤预设保持一致）。</summary>
+    public const int MaxFileNameTemplatePresets = 20;
+
+    /// <summary>
+    /// 添加命名预设（同名覆盖、上限 <see cref="MaxFileNameTemplatePresets"/> 条）。
+    /// 同名覆盖而不是静默忽略：用户改了模板再存同一个名字，期望是更新而多出一条。
+    /// </summary>
+    public bool AddFileNameTemplatePreset(FileNameTemplatePreset preset)
+    {
+        if (preset is null || string.IsNullOrWhiteSpace(preset.Name) || string.IsNullOrWhiteSpace(preset.Template))
+            return false;
+
+        var existing = FileNameTemplatePresets.FindIndex(
+            p => string.Equals(p.Name, preset.Name, StringComparison.OrdinalIgnoreCase));
+        if (existing >= 0)
+        {
+            FileNameTemplatePresets[existing] = preset;
+            return true;
+        }
+
+        if (FileNameTemplatePresets.Count >= MaxFileNameTemplatePresets) return false;
+        FileNameTemplatePresets.Add(preset);
+        return true;
+    }
+
+    /// <summary>按名字删除命名预设；返回是否真的删掉了。</summary>
+    public bool RemoveFileNameTemplatePreset(string? name)
+    {
+        if (string.IsNullOrWhiteSpace(name)) return false;
+        return FileNameTemplatePresets.RemoveAll(
+            p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase)) > 0;
+    }
 
     // ===== 分卷 =====
     public string SplitSizeTag { get; set; } = "0";
@@ -152,7 +230,12 @@ public class AppSettings
     public bool EnableCompressSeparate { get; set; } = true;
     public bool EnableCompressCombined { get; set; } = true;
     public bool ShowMenuIcons { get; set; } = true;
-    public bool EnableDynamicMenu { get; set; } = true;
+    /// <summary>
+    /// 是否启用 COM 动态菜单（实验）。
+    /// 默认 <c>false</c>：走静态级联菜单，不依赖 Explorer 加载 .NET COM 组件（issue #80）。
+    /// 打开后进入「试用期」：级联兜底同时保留，直到 COM handler 上报心跳证明它真的画出了菜单。
+    /// </summary>
+    public bool EnableDynamicMenu { get; set; } = false;
 
     // ===== 高级 =====
     public string SevenZipPath { get; set; } = "";
@@ -404,7 +487,18 @@ public class AppSettings
     public static bool IsPortableMode { get; private set; }
 
     /// <summary>应用数据目录：便携模式 = exe 旁 Data/，否则 = %LOCALAPPDATA%\MantisZip。</summary>
-    public static string DataDir { get; private set; } = "";
+    public static string DataDir => _dataDirOverride ?? _dataDir;
+
+    private static string _dataDir = "";
+
+    /// <summary>
+    /// 测试重定向用的数据目录覆盖（见 <see cref="UseIsolatedSettingsFileForTests"/>）。
+    /// 生产路径从不设置。之所以连它一起重定向：<c>recent.json</c> / <c>window.json</c> /
+    /// <c>layout.json</c> / <c>metadata-panel.json</c> / <c>lifecycle.log</c> 全都从
+    /// <see cref="DataDir"/> 拼路径，只护住 settings.json 的话，跑一次 ui-tests 依旧会改写
+    /// 用户的「最近打开」「窗口布局」（2026-11-23 实测：三份文件 mtime 被刷新成同一秒）。
+    /// </summary>
+    private static string? _dataDirOverride;
 
     /// <summary>
     /// 临时文件根目录：便携模式 = exe 旁 Data/Temp/，普通模式 = %TEMP%/MantisZip/。
@@ -435,16 +529,16 @@ public class AppSettings
         {
             var dataDir = Path.Combine(AppContext.BaseDirectory, "Data");
             Directory.CreateDirectory(dataDir);
-            DataDir = dataDir;
+            _dataDir = dataDir;
             SettingsDir = dataDir;
             SettingsFile = Path.Combine(dataDir, "settings.json");
             PasswordManager.CustomDataDir = dataDir;
         }
         else
         {
-            DataDir = Path.Combine(
+            _dataDir = Path.Combine(
                 Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
-            SettingsDir = DataDir;
+            SettingsDir = _dataDir;
             SettingsFile = Path.Combine(SettingsDir, "settings.json");
         }
     }
@@ -459,6 +553,18 @@ public class AppSettings
     /// </summary>
     private static string? _unreadableSettingsFile;
 
+    /// <summary>
+    /// 测试用的设置文件重定向（null = 用真实 <see cref="SettingsFile"/>）。
+    /// 存在的理由：测试要覆盖「读盘 → 改 → 落盘 → 再读」的完整链路，而 <see cref="SettingsFile"/>
+    /// 由静态构造决定、指向**真实用户目录**——老做法是测试改完再还原，一旦中途异常就把本机设置带走，
+    /// 且并发/顺序一变就互相污染（CompressSettingsViewModelTemplateTests 曾因此偶发失败）。
+    /// 生产路径从不设置它，行为逐字节不变。
+    /// </summary>
+    private static string? _settingsFileOverride;
+
+    /// <summary>当前生效的设置文件：测试重定向生效时取它，否则真实路径。</summary>
+    private static string EffectiveSettingsFile => _settingsFileOverride ?? SettingsFile;
+
     public static AppSettings Load()
     {
         lock (SyncRoot)
@@ -466,7 +572,7 @@ public class AppSettings
             // 缓存命中（startup-appsettings-cache：每进程只读盘一次）
             if (_cached != null) return _cached;
 
-            var (settings, cacheable) = LoadCore(SettingsFile);
+            var (settings, cacheable) = LoadCore(EffectiveSettingsFile);
             // 异常态不缓存：下次 Load 重试读盘，避免把损坏文件态固化
             if (cacheable) _cached = settings;
             return settings;
@@ -505,7 +611,10 @@ public class AppSettings
         }
 
         LogSettingsRecovery(quarantined, error, backupError, restored != null);
-        return (restored ?? new AppSettings(), false);
+        // 主文件坏、备份也读不出来 ⇒ 用户手上已经没有设置，等同首装：
+        // 走 CreateWithDefaults 而不是裸 new AppSettings()，否则「设置丢了」会连带
+        // 把出厂默认模板与预设一起丢掉，用户看到的是全空白（与全新安装不一致）。
+        return (restored ?? CreateWithDefaults(), false);
     }
 
     /// <summary>
@@ -618,7 +727,7 @@ public class AppSettings
 
     private static string OneLine(string? text) => (text ?? string.Empty).Replace('\r', ' ').Replace('\n', ' ');
 
-    public bool Save() => SaveTo(SettingsFile);
+    public bool Save() => SaveTo(EffectiveSettingsFile);
 
     /// <summary>
     /// 写入指定路径（<see cref="Save"/> 走 <c>SettingsFile</c>，测试用其余路径）。
@@ -691,91 +800,326 @@ public class AppSettings
         }
     }
 
-    /// <summary>创建带默认自适应规则的新实例。</summary>
+    /// <summary>
+    /// 测试钩子：把 <see cref="Load"/> / <see cref="Save"/> 的落点重定向到临时文件，并清空缓存，
+    /// 让测试从头读自己的沙箱。返回的句柄 <see cref="Dispose"/> 时恢复真实路径并再次清缓存。
+    /// <para>
+    /// 同时把 <see cref="DataDir"/> 指向该文件所在目录：<c>recent.json</c> / <c>window.json</c> /
+    /// <c>layout.json</c> / <c>metadata-panel.json</c> / <c>lifecycle.log</c> 都从 DataDir 拼路径，
+    /// 只重定向 settings.json 的话测试照样会改写用户的「最近打开」与「窗口布局」。
+    /// </para>
+    /// </summary>
+    /// <param name="settingsFile">临时设置文件路径（父目录不存在会自动创建）。</param>
+    internal static IDisposable UseIsolatedSettingsFileForTests(string settingsFile)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(settingsFile);
+
+        lock (SyncRoot)
+        {
+            var previousFile = _settingsFileOverride;
+            var previousDir = _dataDirOverride;
+            _settingsFileOverride = settingsFile;
+            _dataDirOverride = Path.GetDirectoryName(settingsFile) ?? previousDir;
+            _unreadableSettingsFile = null;
+            _cached = null;
+            return new SettingsFileScope(previousFile, previousDir);
+        }
+    }
+
+    /// <summary>恢复重定向前的路径并清缓存，保证不把沙箱实例留在进程级缓存里。</summary>
+    private sealed class SettingsFileScope(string? previousFile, string? previousDir) : IDisposable
+    {
+        private bool _disposed;
+
+        public void Dispose()
+        {
+            if (_disposed) return;
+            _disposed = true;
+
+            lock (SyncRoot)
+            {
+                _settingsFileOverride = previousFile;
+                _dataDirOverride = previousDir;
+                _unreadableSettingsFile = null;
+                _cached = null;
+            }
+        }
+    }
+
+    /// <summary>
+    /// 出厂默认设置的嵌入资源名（见 csproj 的 <c>LogicalName</c>）。
+    /// 内容是**整份 AppSettings 快照**，维护方式就是直接改
+    /// <c>src/MantisZip.UI.Avalonia/Resources/Defaults/settings.json</c>：新增的 C# 属性在 json 里
+    /// 缺项时自动保留字段初值（反序列化语义），不需要任何合并逻辑。
+    /// </summary>
+    internal const string DefaultSettingsResourceName =
+        "MantisZip.UI.Avalonia.Resources.Defaults.settings.json";
+
+    /// <summary>
+    /// 安装器写入的一次性「向导选择」文件名：内含 <c>Language</c> / <c>Theme</c> 两个键。
+    /// 应用首启读一次、把选择写进 settings.json 之后才删除，之后一切以 settings.json 为准。
+    /// </summary>
+    private const string InstallChoicesFileName = "install-choices.json";
+
+    /// <summary>
+    /// 创建出厂默认实例：优先读内嵌的默认设置快照
+    /// （<see cref="DefaultSettingsResourceName"/>），再套用安装器的一次性向导选择。
+    /// 内嵌资源缺失/损坏时回落到代码里写的最小默认值，保证「读不出默认」不会让功能不可用。
+    /// </summary>
     private static AppSettings CreateWithDefaults()
+    {
+        var settings = LoadDefaultSettingsTemplate() ?? CreateBuiltInDefaults();
+        var choicesFile = ApplyInstallChoices(settings);
+        ApplyMigrations(settings);
+
+        // 向导选择必须**当场固化**：install-choices.json 是一次性文件，删掉就再没有第二份来源。
+        // 早先「套用完就删、但不落盘」有个只在离线用户身上出现的坑——启动路径从不写 settings.json
+        // （唯一会自动写盘的是更新检查，且只在联网成功时才写），于是第二次启动重新走本方法时
+        // 向导选择已经没了，语言/主题被打回出厂默认（2026-11-23 实测：首启 en/Dark，二启 zh/System）。
+        // 落盘成功与否决定要不要删：写不下去就把文件留着，下次启动还能再套一次（同值，无副作用）。
+        if (choicesFile is not null && settings.SaveTo(EffectiveSettingsFile))
+            TryDeleteInstallChoices(choicesFile);
+
+        return settings;
+    }
+
+    /// <summary>
+    /// 代码里的最小默认值（内嵌快照读不出来时的兜底）。内容必须与
+    /// <c>Resources/Defaults/settings.json</c> 的核心语义一致：默认自适应规则 + 出厂命名模板与两条预设。
+    /// 预设名是**用户可编辑的数据**，不是界面文案，故不走 i18n（规则 13 的内容数据豁免）。
+    /// </summary>
+    private static AppSettings CreateBuiltInDefaults()
     {
         var settings = new AppSettings();
         settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+        settings.FileNameTemplateDialog = "{name:auto}";
+        settings.FileNameTemplatePresets.Add(new FileNameTemplatePreset("Auto Name", "{name:auto}"));
+        settings.FileNameTemplatePresets.Add(new FileNameTemplatePreset("Name & Date", "{name:auto}-{date}"));
         return settings;
+    }
+
+    /// <summary>
+    /// 读取内嵌的默认设置快照。读不出来（资源缺失、JSON 损坏）返回 <c>null</c>，由调用方回落代码默认值。
+    /// </summary>
+    private static AppSettings? LoadDefaultSettingsTemplate()
+    {
+        try
+        {
+            using var stream = typeof(AppSettings).Assembly.GetManifestResourceStream(DefaultSettingsResourceName);
+            if (stream is null)
+            {
+                LogDefaultsFallback("embedded resource missing");
+                return null;
+            }
+
+            using var reader = new StreamReader(stream);
+            var parsed = JsonSerializer.Deserialize(reader.ReadToEnd(), AppSettingsJsonContext.Default.AppSettings);
+            if (parsed is null)
+            {
+                LogDefaultsFallback("embedded resource deserialized to null");
+                return null;
+            }
+
+            return parsed;
+        }
+        catch (Exception ex)
+        {
+            LogDefaultsFallback($"{ex.GetType().Name}: {ex.Message}");
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// 套用安装器写入的一次性向导选择（语言 / 主题）。
+    /// 为什么单独走一个文件而不是让安装器直接写 settings.json：settings.json 只能有**一个**事实源
+    /// （内嵌快照），否则安装器里那份会常年落后于代码、并把出厂默认覆盖成旧值。
+    /// 读不到/解析失败都当没有，不影响首启。
+    /// <para>
+    /// 返回被读到的那个文件路径（没有则 <c>null</c>）。**删除交给调用方**：只有把套用后的设置
+    /// 成功写进 settings.json 之后才允许删，否则选择会丢在半路（见 <see cref="CreateWithDefaults"/>）。
+    /// </para>
+    /// </summary>
+    private static string? ApplyInstallChoices(AppSettings settings)
+    {
+        try
+        {
+            var dir = IsPortableMode ? DataDir : Path.GetDirectoryName(EffectiveSettingsFile) ?? DataDir;
+            var path = Path.Combine(dir, InstallChoicesFileName);
+            if (!File.Exists(path)) return null;
+
+            var json = File.ReadAllText(path);
+            using var doc = JsonDocument.Parse(json);
+            var root = doc.RootElement;
+
+            if (root.TryGetProperty("Language", out var language) && language.ValueKind == JsonValueKind.String)
+            {
+                var code = language.GetString();
+                if (!string.IsNullOrWhiteSpace(code)) settings.Language = code;
+            }
+
+            if (root.TryGetProperty("Theme", out var theme) && theme.ValueKind == JsonValueKind.String)
+            {
+                var value = theme.GetString();
+                if (!string.IsNullOrWhiteSpace(value)) settings.Theme = value;
+            }
+
+            return path;
+        }
+        catch
+        {
+            // 向导选择只是锦上添花：解析失败就当用户没选，绝不因此让首启失败
+            return null;
+        }
+    }
+
+    private static void TryDeleteInstallChoices(string path)
+    {
+        try { File.Delete(path); } catch { /* 删不掉下次还会再套一次，同值无副作用 */ }
+    }
+
+    private static void LogDefaultsFallback(string reason)
+    {
+        try
+        {
+            Services.LifetimeDiagnostics.Log($"default settings fallback to built-in defaults reason='{OneLine(reason)}'");
+        }
+        catch
+        {
+            // 日志写不了不影响默认值生成
+        }
     }
 
     /// <summary>
     /// 返回默认自适应压缩覆盖规则（**与 SSOT「已压缩」集合对齐** —— Phase 2 / Task 10 + 合并）。
     /// 六类：图片 / 视频 / 音频 / 压缩包 / 字体 / 文档（字体与文档来自旧「仅存储格式」默认列表，合并后并入）。
     /// 不含未压缩格式：svg（XML 文本）/ tar（未压缩归档）/ wav（PCM）/ tga/hdr/exr（未压缩位图）。
+    ///
+    /// 名称一律走 <see cref="AdaptiveOverrideRule.NameKey"/> 而不是写死中文：出厂规则的名称是**界面文案**，
+    /// 切到英文/繁中时必须跟着变。用户改名后 NameKey 清空、改用自己写进 Name 的文本（见规则编辑对话框）。
     /// </summary>
     internal static List<AdaptiveOverrideRule> GetDefaultAdaptiveOverrides() => new()
     {
-        new() { Name = "图片类", FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "视频类", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "音频类", FormatIds = new() { "Mp3", "Flac", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "压缩包类", FormatIds = new() { "Zip", "SevenZip", "Rar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "字体类", FormatIds = new() { "Ttf", "Otf", "Woff", "Woff2" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "文档类", FormatIds = new() { "Pdf", "Docx", "Xlsx", "Pptx", "Epub" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Image", FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Video", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Audio", FormatIds = new() { "Mp3", "Flac", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Archive", FormatIds = new() { "Zip", "SevenZip", "Rar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Font", FormatIds = new() { "Ttf", "Otf", "Woff", "Woff2" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Document", FormatIds = new() { "Pdf", "Docx", "Xlsx", "Pptx", "Epub" }, Level = AdaptiveLevel.Store, Enabled = true },
     };
 
-    /// <summary>默认规则集版本（与 SSOT 对齐 + 并入旧「仅存储格式」后的版本号）。</summary>
-    private const int CurrentAdaptiveOverridesDefaultsVersion = 1;
+    /// <summary>
+    /// 默认规则集版本。
+    /// v1 = 六类默认规则（名称写死中文）；v2 = 名称改为 <see cref="AdaptiveOverrideRule.NameKey"/>（可随语言切换）。
+    /// </summary>
+    private const int CurrentAdaptiveOverridesDefaultsVersion = 2;
 
     /// <summary>
     /// 迁移旧持久化数据（Phase 2 / Task 10 + 「仅存储格式」合并）：
-    /// ① 旧版默认规则集（4 条，名称与格式 ID 完全一致）→ 整体替换为新的 6 类默认规则集；
+    /// v0 → v1：
+    /// ① 旧版默认规则集（4 条，格式 ID 集合完全一致）→ 整体替换为新的 6 类默认规则集；
     ///    用户自行增删改过的规则集原样保留（只推进版本号）。
     /// ② 旧「仅存储格式」列表中**用户额外添加**的格式 ID（不在旧默认列表内）→ 迁移为一条
     ///    「仅存储格式（迁移）」规则（Store 级别）；旧默认列表本身已被 SSOT 覆盖，不再重复迁移。
     /// ③ 迁移后清空旧列表（该功能已并入自适应规则）。
+    /// v1 → v2：把仍是出厂默认名的六类规则改成 <see cref="AdaptiveOverrideRule.NameKey"/>，
+    ///    让它们随界面语言切换（v1 的默认名是写死的中文）。
     /// </summary>
     internal static void MigrateAdaptiveOverridesDefaults(AppSettings settings)
     {
-        if (settings.AdaptiveOverridesDefaultsVersion >= CurrentAdaptiveOverridesDefaultsVersion)
+        var version = settings.AdaptiveOverridesDefaultsVersion;
+        if (version >= CurrentAdaptiveOverridesDefaultsVersion)
             return;
 
-        if (IsLegacyDefaultOverrides(settings.AdaptiveOverrides))
-            settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
-
-        // 旧「仅存储格式」列表 → 规则（仅迁移用户额外添加的 ID）
-        var legacyDefaults = GetDefaultMultiThreadedStoreFormatIds();
-        var customStoreIds = (settings.MultiThreadedStoreFormatIds ?? new List<string>())
-            .Where(id => !legacyDefaults.Contains(id))
-            .ToList();
-        if (customStoreIds.Count > 0)
+        if (version < 1)
         {
-            settings.AdaptiveOverrides.Add(new AdaptiveOverrideRule
+            if (IsLegacyDefaultOverrides(settings.AdaptiveOverrides))
+                settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+
+            // 旧「仅存储格式」列表 → 规则（仅迁移用户额外添加的 ID）
+            var legacyDefaults = GetDefaultMultiThreadedStoreFormatIds();
+            var customStoreIds = (settings.MultiThreadedStoreFormatIds ?? new List<string>())
+                .Where(id => !legacyDefaults.Contains(id))
+                .ToList();
+            if (customStoreIds.Count > 0)
             {
-                Name = "仅存储格式（迁移）",
-                FormatIds = customStoreIds,
-                Level = AdaptiveLevel.Store,
-                Enabled = true,
-            });
+                settings.AdaptiveOverrides.Add(new AdaptiveOverrideRule
+                {
+                    NameKey = "Settings_AdaptiveRuleName_MigratedStoreOnly",
+                    FormatIds = customStoreIds,
+                    Level = AdaptiveLevel.Store,
+                    Enabled = true,
+                });
+            }
+            settings.MultiThreadedStoreFormatIds = new List<string>();
         }
-        settings.MultiThreadedStoreFormatIds = new List<string>();
+
+        if (version < 2)
+            ConvertDefaultRuleNamesToKeys(settings.AdaptiveOverrides);
 
         settings.AdaptiveOverridesDefaultsVersion = CurrentAdaptiveOverridesDefaultsVersion;
     }
 
-    /// <summary>判断当前规则集是否仍为旧版默认规则集（名称 + 格式 ID 集合逐一比对）。</summary>
+    /// <summary>
+    /// v1 → v2：把名称仍是出厂中文名的规则换成 i18n 键。
+    /// 只按**名称**匹配（格式与级别保留用户改动），且已有 <see cref="AdaptiveOverrideRule.NameKey"/> 的不动——
+    /// 用户自己改过名的规则不会被误伤（那些名字是用户自己敲的，不可能是这几个出厂名）。
+    /// </summary>
+    private static void ConvertDefaultRuleNamesToKeys(List<AdaptiveOverrideRule>? rules)
+    {
+        if (rules == null) return;
+
+        foreach (var rule in rules)
+        {
+            if (!string.IsNullOrEmpty(rule.NameKey)) continue;
+            var key = LegacyDefaultRuleNameToKey(rule.Name);
+            if (key is null) continue;
+            rule.NameKey = key;
+            rule.Name = "";
+        }
+    }
+
+    /// <summary>v1 出厂默认名 → i18n 键；不是出厂名则返回 null。</summary>
+    private static string? LegacyDefaultRuleNameToKey(string? name) => name switch
+    {
+        "图片类" => "Settings_AdaptiveRuleName_Image",
+        "视频类" => "Settings_AdaptiveRuleName_Video",
+        "音频类" => "Settings_AdaptiveRuleName_Audio",
+        "压缩包类" => "Settings_AdaptiveRuleName_Archive",
+        "字体类" => "Settings_AdaptiveRuleName_Font",
+        "文档类" => "Settings_AdaptiveRuleName_Document",
+        "仅存储格式（迁移）" => "Settings_AdaptiveRuleName_MigratedStoreOnly",
+        _ => null,
+    };
+
+    /// <summary>
+    /// 判断当前规则集是否仍为 v0 的旧版默认规则集。
+    /// **只按格式 ID 集合判定，不看规则名**——名称是用户可以随手改的，拿它当判据会让
+    /// 「改个名字」的用户永远失去默认集升级（2026-11-23 修正）。
+    /// </summary>
     private static bool IsLegacyDefaultOverrides(List<AdaptiveOverrideRule>? rules)
     {
         if (rules == null || rules.Count != 4) return false;
 
-        // 旧版默认：图片类/视频类/音频类/压缩包类
-        var expected = new (string Name, string[] Formats)[]
+        // 旧版默认：图片类/视频类/音频类/压缩包类（按格式 ID 集合比对，不依赖顺序与名称）
+        var expected = new string[][]
         {
-            ("图片类", new[] { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" }),
-            ("视频类", new[] { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }),
-            ("音频类", new[] { "Mp3", "Flac", "Wav", "Ogg" }),
-            ("压缩包类", new[] { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }),
+            new[] { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" },
+            new[] { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" },
+            new[] { "Mp3", "Flac", "Wav", "Ogg" },
+            new[] { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" },
         };
 
-        foreach (var (name, formats) in expected)
+        var remaining = new List<AdaptiveOverrideRule>(rules);
+        foreach (var formats in expected)
         {
-            var rule = rules.FirstOrDefault(r => r.Name == name);
-            if (rule == null) return false;
-            if (rule.FormatIds.Count != formats.Length) return false;
-            if (!formats.All(f => rule.FormatIds.Contains(f))) return false;
+            var rule = remaining.FirstOrDefault(r =>
+                r.FormatIds.Count == formats.Length
+                && formats.All(f => r.FormatIds.Contains(f)));
+            if (rule is null) return false;
             if (rule.Level != AdaptiveLevel.Store || !rule.Enabled) return false;
+            remaining.Remove(rule);
         }
-        return true;
+        return remaining.Count == 0;
     }
 
     /// <summary>旧「仅存储格式」默认 ID 列表（内置已压缩格式）—— 仅用于迁移时区分「用户自定义项」。</summary>

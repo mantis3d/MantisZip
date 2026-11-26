@@ -312,7 +312,9 @@ public sealed class CompressSession : ICompressSession
             },
             SplitSize = settings.SplitSizeBytes,
             PreserveDirectoryRoot = appSettings.PreserveDirectoryRoot,
-            KeepOriginalExtension = settings.EngineOptions.KeepOriginalExtension,
+            // 「包内根目录」四态：用户在对话框里的决定，必须随载荷走（默认原样）。
+            RootMode = settings.RootMode,
+            WrapRoot = settings.WrapRoot,
             FileNameEncoding = settings.EngineOptions.FileNameEncoding,
             ZipCompressionMethod = settings.EngineOptions.ZipCompressionMethod,
             ZipEncryptionMethod = settings.EngineOptions.ZipEncryptionMethod,
@@ -336,6 +338,12 @@ public sealed class CompressSession : ICompressSession
             ConflictAction = settings.ConflictAction,
             ParallelCompressDegree = settings.ParallelDegree,
             Plan = plan,
+            // 文件名模板：有 B 数据集时路径以 B 为准、模板不参与执行，但 CLI 的
+            // --compress-separate 没有预览阶段，靠它把命名规则带到执行侧。
+            FileNameTemplate = settings.FileNameTemplate,
+            // 载荷里冻结的时间戳优先（GUI 的预览树用的就是它）；CLI 没有预览阶段，载荷为 null 时现取，
+            // 避免「预览显示 11-14、执行落盘 11-15」这类跨午夜不一致。
+            TemplateTimestamp = settings.TemplateTimestamp ?? DateTime.Now,
             ErrorResolver = CompressFlow.CreateErrorResolver(),
         };
     }

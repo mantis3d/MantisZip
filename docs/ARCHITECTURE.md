@@ -688,8 +688,16 @@ private bool _optionA;
 
 `AppSettings` singleton 存在于 `MantisZip.UI.Avalonia/Models/AppSettings.cs`，序列化到 `%LOCALAPPDATA%\MantisZip\settings.json`（进程级缓存，见 `Load()`/`Save()` 静态缓存）。
 
+**出厂默认值 = 内嵌 JSON 快照**（2026-11-22）：`Resources/Defaults/settings.json`（117 键，`EmbeddedResource` + 固定 `LogicalName`）是设置文件**不存在**、或损坏且 `.bak` 也读不出时的默认值来源 —— `CreateWithDefaults()` = `LoadDefaultSettingsTemplate() ?? CreateBuiltInDefaults()` → `ApplyInstallChoices()` → `ApplyMigrations()` → 向导选择落盘后删 `install-choices.json`。缺键自动保留 C# 字段初值，所以**没有 merge 逻辑，改默认值就直接改这个 json、重新 build 即生效**。代码里的 `CreateBuiltInDefaults()` 只是「快照资源都读不出来」的兜底，两边核心语义（自适应默认规则 + `{name:auto}` + 两条命名预设）必须一致，由 `tests/MantisZip.UI.Avalonia.Tests/AppSettingsDefaultSettingsJsonTests.cs` 钉住（另含「json 里每个键都得对得上真实属性」的体检）。
+
+安装器不再预置 `settings.json`（原 `installer/prebuilt/settings.json` 已删——它缺 `FileNameTemplate*`、留着 3 个已删键和十余处过期默认值，与代码事实源必然漂移；`prebuilt/window.json` 保留，走 `WindowStateManager` 另一条线）。向导里选的语言/主题改为写一次性 `install-choices.json`（与 `settings.json` 同目录），应用首启 `ApplyInstallChoices()` 读一次覆盖 `Language`/`Theme`，**落盘成功后才删该文件**（启动路径不写 settings.json，先删后不落盘会让离线用户第二次启动退回出厂默认）；已有 `settings.json` 时不读。
+
+**测试必须重定向落点**：真实路径由静态构造决定 + `_cached` 是进程级缓存，所以测试读写真文件会带走用户设置、也会跨用例串状态。单用例用 `using var sandbox = new AppSettingsTestSandbox();`；程序集级还有 `tests/MantisZip.UI.Avalonia.Tests/AppSettingsTestRedirect.cs`（`[ModuleInitializer]`）兜住「忘写沙箱」的用例（详见 AGENTS.md 规则 24）。
+
+重定向有**两条链**，缺一条就会漏：① `settings.json` 走 `AppSettings.EffectiveSettingsFile`（`UseIsolatedSettingsFileForTests`）；② **数据目录**走 `AppSettings.DataDir`（`recent.json` / `window.json` / `layout.json` / `metadata-panel.json` / `lifecycle.log`）与 Core 的 `MantisZip.Core.Utils.AppDataPaths.Dir`（`path-history.json` / `favorites.json` / `debug.log` / `conflict.log`）。沙箱会把两条链一起指向同一个临时目录，Core 测试侧由 `tests/MantisZip.Tests/TestAppDataRedirect.cs` 负责。**这些路径一律写成每次现取的属性**（`private static string FilePath => Path.Combine(AppSettings.DataDir, "…")`）：写成 `static readonly` 会在类型初始化那一刻固化真实目录，之后重定向再也管不到（2026-11-23 实测：跑一次 Core 测试就重写用户 `path-history.json`）。
+
 设置包含以下分类：
-- **压缩**：DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), KeepOriginalExtension, ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipMultithreaded, SevenZipEncryptHeaders
+- **压缩**：DefaultFormat (zip/7z/tar.gz), DefaultLevel (1–9), ZipEncoding, ZipCompressionMethod, ZipEncryptionMethod, SevenZipCompressionMethod, SevenZipSolid, SevenZipSolidBlockSize, SevenZipDictionarySize, SevenZipNumFastBytes, SevenZipMatchFinder, SevenZipMultithreaded, SevenZipEncryptHeaders
 - **分卷**：SplitSizeTag (0=不分卷/1MB/10MB/…), CustomSplitSizeMB
 - **解压**：ExtractDestination (ask/same-dir/desktop), FileConflictAction (ask/overwrite/rename/skip), OpenFolderAfterExtract
 - **解压扩展**：EnableDragExtract, ExtractPreserveFullPath
@@ -721,7 +729,7 @@ private bool _optionA;
 | `--compress <paths...>` | Show compress dialog; multi-instance IPC merges paths from multiple Windows shell invocations |
 | `--compress-quick <paths...>` | Direct compress with AppSettings defaults + ProgressWindow, then exit |
 | `--compress-separate <paths...>` | Sequential per-item compress to each item's parent directory + ProgressWindow + IPC merge |
-| `--compress-combined <paths...>` | Combined single archive from all items with common parent name + IPC merge; prompts if cross-drive |
+| `--compress-combined <paths...>` | Combined single archive from all items with common parent name + IPC merge（内部按 `CompressOutputMode.Manual` 执行，多源一个包） |
 | `--extract-here <path>` | Direct extract to source directory with AppSettings defaults + ProgressWindow, then exit |
 | `--extract-smart <path>` | Smart extract (auto-detect top-level folder) + ProgressWindow, then exit |
 | `--extract-to-name <path>` | Extract to named folder (archive name without extension) + ProgressWindow, then exit |

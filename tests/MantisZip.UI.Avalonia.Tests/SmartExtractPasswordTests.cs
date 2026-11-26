@@ -33,7 +33,7 @@ public class SmartExtractPasswordTests
         var engine = ArchiveEngineFactory.GetEngineByExtension(tmp.ArchivePath)!;
         var prompts = 0;
 
-        var (targetDir, password) = await App.ResolveSmartDestWithPasswordAsync(
+        var (targetDir, password, _, _) = await App.ResolveSmartDestWithPasswordAsync(
             tmp.ArchivePath,
             engine,
             initialPassword: null,
@@ -75,7 +75,7 @@ public class SmartExtractPasswordTests
         var engine = ArchiveEngineFactory.GetEngineByExtension(tmp.ArchivePath)!;
         var prompts = 0;
 
-        var (_, password) = await App.ResolveSmartDestWithPasswordAsync(
+        var (_, password, _, _) = await App.ResolveSmartDestWithPasswordAsync(
             tmp.ArchivePath,
             engine,
             initialPassword: null,
@@ -97,7 +97,7 @@ public class SmartExtractPasswordTests
         var engine = ArchiveEngineFactory.GetEngineByExtension(tmp.ArchivePath)!;
         var prompts = 0;
 
-        var (targetDir, password) = await App.ResolveSmartDestWithPasswordAsync(
+        var (targetDir, password, _, _) = await App.ResolveSmartDestWithPasswordAsync(
             tmp.ArchivePath,
             engine,
             initialPassword: null,

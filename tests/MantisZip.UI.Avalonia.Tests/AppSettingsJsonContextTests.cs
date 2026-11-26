@@ -25,7 +25,7 @@ public class AppSettingsJsonContextTests
             {
                 new AdaptiveOverrideRule
                 {
-                    Name = "图片",
+                    NameKey = "Settings_AdaptiveRuleName_Image",
                     FormatIds = { "Jpeg", "Png" },
                     Level = AdaptiveLevel.Custom,
                     CustomLevel = 3,
@@ -62,7 +62,9 @@ public class AppSettingsJsonContextTests
         Assert.Equal(new[] { ".abc", ".def" }, back.CustomAssocExtensions);
 
         var rule = Assert.Single(back.AdaptiveOverrides);
-        Assert.Equal("图片", rule.Name);
+        // v2：出厂规则名走 i18n 键（NameKey），Name 留空；用户自定义规则则相反
+        Assert.Equal("Settings_AdaptiveRuleName_Image", rule.NameKey);
+        Assert.Equal("", rule.Name);
         Assert.Equal(new[] { "Jpeg", "Png" }, rule.FormatIds);
         Assert.Equal(AdaptiveLevel.Custom, rule.Level);
         Assert.Equal(3, rule.CustomLevel);

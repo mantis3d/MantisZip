@@ -15,7 +15,7 @@ issue #79 是**三件独立的事**，可行性差异很大，而且①根本不
 1. **`.htm` 丢图丢样式** —— 根因有两个，缺一都修不好：
    - `PreviewService.ExtractToTempAsync`（`Services/PreviewService.cs:780`）**只解压被选中的那一个条目**，同包里 `TEST_files/` 的 85 个资源从未落盘；
    - 资源落盘也不够：样本里 183 个 `<link>` 全带 `crossorigin="anonymous"`，在 `file://` 下走 CORS 检查、**CSS 全灭**（实测：带它无样式，去掉它整页正常）。
-2. **`.mht` 能满血渲染** —— Chromium 直接 `file://` 导航 `.mht` 效果与 `.htm` 一致（实测逐像素级一致）。**约束**：必须保留 `.mht` 后缀、**不能注入 CSP meta**（会破坏 multipart 结构）。天花板是 Chromium 自己的 MHTML 实现（见 KI-018）。
+2. **`.mht` 能满血渲染** —— Chromium 直接 `file://` 导航 `.mht` 效果与 `.htm` 一致（实测逐像素级一致）。**约束**：必须保留 `.mht` 后缀、**不能注入 CSP meta**（会破坏 multipart 结构）。天花板是 Chromium 自己的 MHTML 实现（见 KI-023）。
 3. **`.chm` 性价比最高** —— 仓库自带 `7z.dll` 26.00 x64/x86 都含 `Chm` handler，`SharpSevenZip` 可直接列条目 / 单条提取 / 整包解压（实测 296 条目 405ms）。接入现有格式体系即可，**零新依赖**。
 
 **结论**：做 A + B + C，约 12-20h。D（CHM 阅读器：首页 + TOC 侧栏）复用 A 的打包器，单独立项。
@@ -199,7 +199,7 @@ BundleAsync(archivePath, entry, format, allEntries, password, ct) → BundleResu
 | `crossorigin` 之外还有别的坑（未穷尽） | 部分页面仍丢样式 | 每次做完用样本 + 至少一个「其他来源保存的网页」实测；降级路径永远保留 |
 | 临时盘被大网页写满 | 用户磁盘 | 只解被引用资源 + 单文件 20 MB / 累计 50 MB 双预算 + 落盘目录纳入启动清理 |
 | `7z.dll` 版本差异导致 CHM 打不开 | 该用户完全不可用 | 明确报错文案 + 设置页已有 7z.dll 路径可换；文档记一句「需 7z.dll 支持 CHM」 |
-| MHT 是 Chromium 自己存的才渲染得好（第三方 IE 时代 MHT 可能白屏） | 部分用户觉得「没修好」 | 已登 **KI-018**；UI 上不承诺、失败给降级提示 |
+| MHT 是 Chromium 自己存的才渲染得好（第三方 IE 时代 MHT 可能白屏） | 部分用户觉得「没修好」 | 已登 **KI-023**；UI 上不承诺、失败给降级提示 |
 | CHM 系统条目漏过滤污染条目树 | 观感差 | 用例钉住「列表里不含 `#` / `$` 开头条目」 |
 | `PreviewType` / `FileFormat` / `ArchiveFormat` 三处枚举各加值，可能漏 switch | 静默走到 Unsupported | 三个 `switch` 都有 `_ =>` 兜底但会**静默**；测试矩阵覆盖新值 |
 
@@ -220,14 +220,14 @@ BundleAsync(archivePath, entry, format, allEntries, password, ct) → BundleResu
 1. **不做 CHM 阅读器（首页 + TOC 侧栏）** —— D 档，单独立项。
 2. **不改 HTML 的 JavaScript / 外部资源安全策略** —— 沿用现有 `AllowJavaScript` / `AllowExternalResources` 设置，不新增开关。
 3. **不用 `WebResourceRequested` 做网络层拦截** —— `file://` + 同目录落盘已验证足够。
-4. **不支持 `.mht` 里的 `file:///` 绝对引用**（Chromium 也不解析）—— 只在文档与 KI-018 说明。
+4. **不支持 `.mht` 里的 `file:///` 绝对引用**（Chromium 也不解析）—— 只在文档与 KI-023 说明。
 5. **不做「网页另存为 MHT」** —— 与本 issue 无关。
 
 ---
 
 ## 8. 关联
 
-- 规则 13（三语 key）、规则 14（AXAML 中文注释，若动 XAML）、规则 21（KI-018）、规则 1（PLAN 同步 + 阶段版本核对）
+- 规则 13（三语 key）、规则 14（AXAML 中文注释，若动 XAML）、规则 21（KI-023）、规则 1（PLAN 同步 + 阶段版本核对）
 - 相关既有计划：`.omo/plans/已完成/html-preview-webview-fallback.md`（WebView + 降级双轨，本计划在其上加「兄弟资源」一层）、`.omo/plans/已完成/remove-webview2-preview.md`（历史：曾整体移除 WebView，后被 fallback 计划部分回滚 —— **本计划不重开那条路线**）
 - 已知关联缺陷：KI-005（7z 用例被 CI 过滤）、KI-007（大文件预览整条目落盘，CHM 同理）
 

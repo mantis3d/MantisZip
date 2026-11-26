@@ -298,8 +298,13 @@ public class CompressServiceTests : IDisposable
         Assert.Equal(0, result.Failed);
     }
 
+    /// <summary>
+    /// 分别压缩的默认命名：文件源恒去扩展名（hello.txt → hello.zip）。
+    /// 2026-11-22 删掉了「保留源扩展名」开关，这个用例钉住默认语义；
+    /// 要保留扩展名的路径由下面的 <see cref="Separate_Template_CanKeepSourceExtension"/> 覆盖。
+    /// </summary>
     [Fact]
-    public async Task KeepOriginalExtension_True()
+    public async Task Separate_SingleFile_DropsSourceExtension()
     {
         var progress = new TestProgress();
         var tempDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
@@ -312,38 +317,41 @@ public class CompressServiceTests : IDisposable
             SourcePaths = new List<string> { sourceFile },
             Mode = CompressOutputMode.Separate,
             Format = "zip",
-            KeepOriginalExtension = true,
-        };
-
-        var result = await CompressService.CompressAsync(request, null, progress, CancellationToken.None);
-
-        Assert.Equal(1, result.Succeeded);
-        var outputPath = Path.Combine(tempDir, "hello.txt.zip");
-        TrackFile(outputPath);
-        Assert.True(File.Exists(outputPath));
-    }
-
-    [Fact]
-    public async Task KeepOriginalExtension_False()
-    {
-        var progress = new TestProgress();
-        var tempDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
-        Directory.CreateDirectory(tempDir);
-        var sourceFile = TrackFile(Path.Combine(tempDir, "hello.txt"));
-        await File.WriteAllTextAsync(sourceFile, "test");
-
-        var request = new CompressRequest
-        {
-            SourcePaths = new List<string> { sourceFile },
-            Mode = CompressOutputMode.Separate,
-            Format = "zip",
-            KeepOriginalExtension = false,
         };
 
         var result = await CompressService.CompressAsync(request, null, progress, CancellationToken.None);
 
         Assert.Equal(1, result.Succeeded);
         var outputPath = Path.Combine(tempDir, "hello.zip");
+        TrackFile(outputPath);
+        Assert.True(File.Exists(outputPath));
+    }
+
+    /// <summary>
+    /// 要保留源扩展名只能在模板里写 {ext}（开关已删）。
+    /// 走无 Plan 的路径，直接验证请求里的模板能落到实际输出文件名上。
+    /// </summary>
+    [Fact]
+    public async Task Separate_Template_CanKeepSourceExtension()
+    {
+        var progress = new TestProgress();
+        var tempDir = TrackDir(Path.Combine(Path.GetTempPath(), "MantisZipTest", Guid.NewGuid().ToString()));
+        Directory.CreateDirectory(tempDir);
+        var sourceFile = TrackFile(Path.Combine(tempDir, "hello.txt"));
+        await File.WriteAllTextAsync(sourceFile, "test");
+
+        var request = new CompressRequest
+        {
+            SourcePaths = new List<string> { sourceFile },
+            Mode = CompressOutputMode.Separate,
+            Format = "zip",
+            FileNameTemplate = "{name}{ext}",
+        };
+
+        var result = await CompressService.CompressAsync(request, null, progress, CancellationToken.None);
+
+        Assert.Equal(1, result.Succeeded);
+        var outputPath = Path.Combine(tempDir, "hello.txt.zip");
         TrackFile(outputPath);
         Assert.True(File.Exists(outputPath));
     }

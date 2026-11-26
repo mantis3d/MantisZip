@@ -1,6 +1,6 @@
 # 文件选择器地址区拆两行（按钮行 / 面包屑行）
 
-> **状态**：已完成并验证（2026-11-05，`beta` 分支），待用户确认 `RELEASE_NOTES.md` 范围后归档
+> **状态**：✅ 已完成（2026-11-05 实施，`beta` 分支；随 **v0.5.6** 发布，2026-11-26 归档）
 > **关联代码**：`Controls/CustomFilePickerControl.axaml`（唯一改动点）、`App.axaml`（`Grid.addrRow` 注释）、`AGENTS.md` 规则 4
 
 ## 目标

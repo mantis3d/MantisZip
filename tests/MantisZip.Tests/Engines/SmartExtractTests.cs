@@ -146,33 +146,44 @@ public class SmartExtractTests : IDisposable
         Assert.False(ArchiveStructureAnalyzer.HasSingleRootDirectory(items));
     }
 
-    [Fact]
-    public async Task SingleRootZipArchive_SmartDestIsParentDir()
+    /// <summary>
+    /// 智能解压两档 × 单根包：加根档不动、去根档剥掉那一层。
+    /// <para>
+    /// 这里断言的是 <see cref="ArchiveRootPolicy"/> 产出的**指令**，不是把落点公式抄一遍再比
+    /// ——旧用例就是那样写的，等于在测测试自己的算术（无论产品代码改不改都会绿）。
+    /// </para>
+    /// </summary>
+    [Theory]
+    [InlineData(RootDirectoryMode.SmartWrap, false)]
+    [InlineData(RootDirectoryMode.SmartStrip, true)]
+    public async Task SingleRootArchive_SmartExtract_ProducesExpectedInstruction(
+        RootDirectoryMode mode, bool expectStrip)
     {
         var archive = TrackFile(CreateZipWithSingleRoot("mydata"));
-        var parentDir = Path.GetDirectoryName(archive)!;
-
         var items = await _engine.ListEntriesAsync(archive);
-        var dest = ArchiveStructureAnalyzer.HasSingleRootDirectory(items)
-            ? parentDir
-            : Path.Combine(parentDir, Path.GetFileNameWithoutExtension(archive));
 
-        Assert.Equal(parentDir, dest);
+        var adjustment = ArchiveRootPolicy.Resolve(mode, ArchiveStructureAnalyzer.HasSingleRootDirectory(items));
+
+        Assert.Equal(expectStrip, adjustment.Strip);
+        Assert.False(adjustment.Wrap);   // 单根包永远不会被加根（只有一个源目录，套了就是两层）
     }
 
-    [Fact]
-    public async Task MultiRootZipArchive_SmartDestIsArchiveNamedFolder()
+    /// <summary>
+    /// 智能解压两档 × 多根包：加根档补一层、去根档什么都不做（= 原地平铺）。
+    /// </summary>
+    [Theory]
+    [InlineData(RootDirectoryMode.SmartWrap, true)]
+    [InlineData(RootDirectoryMode.SmartStrip, false)]
+    public async Task MultiRootArchive_SmartExtract_ProducesExpectedInstruction(
+        RootDirectoryMode mode, bool expectWrap)
     {
         var archive = TrackFile(CreateZipWithMultipleRoots());
-        var parentDir = Path.GetDirectoryName(archive)!;
-        var archiveName = Path.GetFileNameWithoutExtension(archive);
-
         var items = await _engine.ListEntriesAsync(archive);
-        var dest = ArchiveStructureAnalyzer.HasSingleRootDirectory(items)
-            ? parentDir
-            : Path.Combine(parentDir, archiveName);
 
-        Assert.Equal(Path.Combine(parentDir, archiveName), dest);
+        var adjustment = ArchiveRootPolicy.Resolve(mode, ArchiveStructureAnalyzer.HasSingleRootDirectory(items));
+
+        Assert.Equal(expectWrap, adjustment.Wrap);
+        Assert.False(adjustment.Strip);  // 没有唯一根可剥
     }
 
     [Fact]

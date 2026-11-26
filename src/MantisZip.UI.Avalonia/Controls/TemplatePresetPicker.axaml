@@ -1,0 +1,88 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             x:Class="MantisZip.UI.Avalonia.Controls.TemplatePresetPicker"
+             x:CompileBindings="False">
+
+  <!-- ═══════ 命名预设选择器（可复用） ═══════
+       一行解决「选预设 / 起名字 / 存预设 / 删预设」：
+         · 可编辑下拉框：既能从列表里点已有预设名，也能直接打一个新名字
+         · 保存按钮（纯图标）：用框里的名字 + 宿主提供的模板内容存成预设（同名覆盖）
+         · 删除按钮（纯图标）：删掉框里名字对应的预设
+       宿主只需给 Presets / PresetName / WatermarkKey 等属性，然后接 Save / Delete / 选中事件：
+       选中事件只交出「选了哪条预设」，模板怎么填、设置怎么写都在宿主那边决定。
+
+       操作结果（已保存 / 已更新 / 超过上限）走**浮层气泡**，脱离布局流：
+       出现与消失都不会把下面的行往下推（2026-11-21 用户明确要求不挤出一行空间）。 -->
+  <Grid>
+
+    <Grid ColumnDefinitions="*,Auto,Auto" ColumnSpacing="{DynamicResource SpacingXs}">
+
+      <!-- 可编辑下拉：文本（预设名）是权威值，SelectedItem 只是从 Text 精确匹配出来的镜像。
+           选已有预设名时由 DropDownClosed 回填模板（打字打出一模一样的名字不会触发，避免误覆盖）。 -->
+      <ComboBox x:Name="NameBox"
+                Grid.Column="0"
+                IsEditable="True"
+                DisplayMemberBinding="{Binding Name}"
+                MinHeight="{DynamicResource ControlHeightSm}"
+                HorizontalAlignment="Stretch" />
+
+      <!-- 存为预设：纯图标按钮（卡片内只挂 ToolbarIcon，规则 4） -->
+      <Button x:Name="SaveButton"
+              Grid.Column="1"
+              Classes="ToolbarIcon"
+              Click="OnSaveClick">
+        <PathIcon Data="{StaticResource IconSave}" Width="14" Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+
+      <!-- 删除预设：纯图标按钮 -->
+      <Button x:Name="DeleteButton"
+              Grid.Column="2"
+              Classes="ToolbarIcon"
+              Click="OnDeleteClick">
+        <PathIcon Data="{StaticResource IconDelete}" Width="14" Height="14"
+                  Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+      </Button>
+    </Grid>
+
+    <!-- 操作结果气泡：锚在预设名下拉框下方浮出（不参与布局，行高恒定）。
+         IsHitTestVisible=False：只作提示，点击穿透，不挡下方的模板 / 文件名输入框。
+         成功消息 1.6s 后自动收起并把 Message 清空；失败消息常驻，直到宿主清空或用户改动模板。 -->
+    <Popup x:Name="MessagePopup"
+           PlacementTarget="{Binding #NameBox}"
+           Placement="Bottom"
+           VerticalOffset="4"
+           IsLightDismissEnabled="False"
+           IsHitTestVisible="False">
+      <Border MaxWidth="320"
+              Padding="8,5"
+              CornerRadius="{DynamicResource BorderRadius}"
+              Background="{DynamicResource ThemeHeaderBgBrush}"
+              BorderBrush="{DynamicResource ThemeBorderBrush}"
+              BorderThickness="1">
+        <StackPanel Orientation="Horizontal" Spacing="{DynamicResource SpacingXs}">
+          <!-- 失败：警告三角（红） -->
+          <PathIcon x:Name="MessageErrorIcon"
+                    Data="{StaticResource IconWarning}"
+                    Width="14" Height="14"
+                    VerticalAlignment="Center"
+                    IsVisible="False"
+                    Foreground="{DynamicResource ThemeStatusErrorBrush}" />
+          <!-- 成功：对勾（绿）。形状与失败区分，不只靠颜色 -->
+          <PathIcon x:Name="MessageSuccessIcon"
+                    Data="{StaticResource IconCheckmark}"
+                    Width="14" Height="14"
+                    VerticalAlignment="Center"
+                    IsVisible="False"
+                    Foreground="{DynamicResource ThemeStatusSuccessBrush}" />
+          <TextBlock x:Name="MessageText"
+                     FontSize="12"
+                     TextWrapping="Wrap"
+                     MaxWidth="280"
+                     VerticalAlignment="Center"
+                     Foreground="{DynamicResource ThemeTextPrimaryBrush}" />
+        </StackPanel>
+      </Border>
+    </Popup>
+  </Grid>
+</UserControl>

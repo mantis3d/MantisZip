@@ -2,6 +2,7 @@ using System.ComponentModel;
 using System.Linq;
 using Avalonia.Controls;
 using Avalonia.Interactivity;
+using Avalonia.Input;
 using Avalonia.Media;
 using Avalonia.Threading;
 using MantisZip.Core.Abstractions;
@@ -28,6 +29,9 @@ public partial class CompressSettingsWindow : Window
     /// 两个方向（选择器 → VM、VM → 选择器）都会触发对方的事件，不设这道闸会无限往返。
     /// </summary>
     private bool _syncingSelection;
+
+    /// <summary>「复制路径」成功提示的隐藏计时器（1.6s 一次性；关窗必须停表，否则窗口被 Dispatcher 强引用）。</summary>
+    private DispatcherTimer? _copyToastTimer;
 
     /// <summary>「添加文件」Tab 内嵌选择器的初始浏览目录（第一个源路径所在目录，可能为 null）。</summary>
     private readonly string? _initialSourcePath;
@@ -118,6 +122,18 @@ public partial class CompressSettingsWindow : Window
         ViewModel.ShowMessage = (msg, title) =>
             AppMessageBox.Show(msg, title, MessageBoxButton.OK, MessageBoxImage.Warning, this);
 
+        // 文件名模板帮助：复用 HelpDialog 外壳 + Markdown 正文（规则 17，不另建一次性 Window）
+        ViewModel.ShowHelpDialog = async (title, markdown) =>
+        {
+            var dialog = new HelpDialog(title, new MarkdownHelpContent(markdown))
+            {
+                Width = 720,
+                Height = 620,
+                WindowStartupLocation = WindowStartupLocation.CenterOwner,
+            };
+            await dialog.ShowDialog(this);
+        };
+
         // 过滤控件事件订阅提前到构造函数（原在 OnLoaded）：窗口刚弹出时用户操作过滤会导致
         // FilterChanged 未订阅、预览不重建、Plan 保持 null → 点击压缩静默退出。
         InitFileFilter();
@@ -195,6 +211,9 @@ public partial class CompressSettingsWindow : Window
         // 骨架进度定时器被 Dispatcher 强引用：关窗必须停表并解绑 Tick，否则窗口与 VM 会一直挂着
         ViewModel.SkeletonProgressUpdated -= OnSkeletonProgressUpdated;
         ViewModel.StopSkeletonProgress();
+        // 复制提示计时器同理：不停表会让窗口在关闭后继续被 Dispatcher 引用
+        _copyToastTimer?.Stop();
+        _copyToastTimer = null;
         ViewModel.ConfirmCompleted -= OnConfirmCompleted;
         _completion.TrySetResult(_closedOutcome ?? new Cancelled<CompressSettings>());
     }
@@ -321,6 +340,31 @@ public partial class CompressSettingsWindow : Window
     {
         SourcePicker.IsCheckboxMode = CheckboxModeCheck.IsChecked == true;
     }
+
+    /// <summary>
+    /// 命名预设被点中 → 把它的模板填进模板输入框（名字反过来留在预设名框里，
+    /// 于是随后「存为预设」是覆盖它、「删除」是删它）。
+    /// </summary>
+    private void OnTemplatePresetSelected(object? sender, MantisZip.Core.Utils.FileNameTemplatePreset preset)
+        => ViewModel.ApplyTemplatePreset(preset);
+
+    /// <summary>「存为预设」图标按钮 → 用预设名框里的名字 + 当前模板写回设置（同名覆盖）。</summary>
+    private void OnTemplatePresetSaveRequested(object? sender, string name)
+    {
+        ViewModel.TemplatePresetName = name;
+        ViewModel.SaveTemplatePresetCommand.Execute(null);
+    }
+
+    /// <summary>「删除」图标按钮 → 删掉预设名框里那条预设。</summary>
+    private void OnTemplatePresetDeleteRequested(object? sender, string name)
+    {
+        ViewModel.TemplatePresetName = name;
+        ViewModel.DeleteTemplatePresetCommand.Execute(null);
+    }
+
+    /// <summary>预设消息气泡 1.6s 自动收起后回调：清空消息，让下次同样的消息还能重新弹出。</summary>
+    private void OnTemplatePresetMessageDismissed(object? sender, EventArgs e)
+        => ViewModel.DismissTemplatePresetMessage();
 
     private void OnTabSelectionChanged(object? sender, SelectionChangedEventArgs e)
     {
@@ -475,6 +519,59 @@ public partial class CompressSettingsWindow : Window
         SyncPickerFromSelection();
     }
 
+    private void OnSourceFilesListContextRequested(object? sender, ContextRequestedEventArgs e)
+    {
+        // 菜单挂在 ListBox 上，空白处右键也会弹；没有选区就没有可复制的路径。
+        CopyPathMenuItem.IsEnabled = SourceFilesList.SelectedItems?.Count > 0;
+    }
+
+    /// <summary>
+    /// 「复制路径」：把列表里选中的条目按行写入剪贴板（多选即多行，与主窗口同名命令一致）。
+    /// 完整路径是这一列唯一无法在界面上完整呈现的信息（列表用 PathSegmentEllipsis 裁剪、tooltip 可能被屏幕边缘切掉），
+    /// 所以这里是用户拿到「可粘贴的原样路径」的正式出口。
+    /// </summary>
+    private async void OnSourceFileCopyPathClick(object? sender, RoutedEventArgs e)
+    {
+        var paths = SourceFilesList.SelectedItems?.Cast<string>().ToList() ?? new List<string>();
+        if (paths.Count == 0) return;
+
+        var text = string.Join(Environment.NewLine, paths);
+
+        try
+        {
+            var clipboard = TopLevel.GetTopLevel(this)?.Clipboard;
+            if (clipboard == null) return;
+            var transfer = new DataTransfer();
+            var item = new DataTransferItem();
+            item.SetText(text);
+            transfer.Add(item);
+            await clipboard.SetDataAsync(transfer);
+            ShowCopyPathToast();
+        }
+        catch (Exception ex)
+        {
+            // 剪贴板是尽力而为操作：失败只记日志，不打断用户正在做的事
+            App.DebugLog($"CompressSettingsWindow: copy source paths failed: {ex.Message}");
+        }
+    }
+
+    /// <summary>复制成功提示：浮现 1.6s 后隐藏（与进度窗 CopyToast 的时长一致）。</summary>
+    private void ShowCopyPathToast()
+    {
+        CopyPathToast.IsVisible = true;
+
+        _copyToastTimer?.Stop();
+        var timer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1600) };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            CopyPathToast.IsVisible = false;
+            if (ReferenceEquals(_copyToastTimer, timer)) _copyToastTimer = null;
+        };
+        timer.Start();
+        _copyToastTimer = timer;
+    }
+
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs e)
     {
         switch (e.PropertyName)
@@ -514,7 +611,7 @@ public partial class CompressSettingsWindow : Window
 
     /// <summary>
     /// 根据预览树更新 ZIP 多线程选项可用性。
-    /// Manual/Combined：所有文件进同一个包，判定用根节点 TotalDescendantSize；
+    /// 单包：所有文件进同一个包，判定用根节点 TotalDescendantSize；
     /// Separate：每个源各自成包，引擎按单包大小判定，取所有压缩包节点的最大值。
     /// 与 ZipEngine.IsMultiThreadedEligible 的 MaxZip32Size（ZIP32 上限）语义对齐。
     /// </summary>

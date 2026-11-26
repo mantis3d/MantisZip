@@ -10,6 +10,7 @@ namespace MantisZip.UI.Avalonia.Models;
 /// </summary>
 [JsonSourceGenerationOptions(WriteIndented = true)]
 [JsonSerializable(typeof(AppSettings))]
+[JsonSerializable(typeof(MantisZip.Core.Utils.FileNameTemplatePreset))]
 internal partial class AppSettingsJsonContext : JsonSerializerContext
 {
 }

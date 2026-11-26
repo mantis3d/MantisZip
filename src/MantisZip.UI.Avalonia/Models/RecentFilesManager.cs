@@ -9,8 +9,13 @@ namespace MantisZip.UI.Avalonia.Models;
 /// </summary>
 public static class RecentFilesManager
 {
-    private static readonly string SettingsDir = AppSettings.DataDir;
-    private static readonly string RecentFile = Path.Combine(SettingsDir, "recent.json");
+    /// <summary>
+    /// 最近文件清单路径。**每次现取** <see cref="AppSettings.DataDir"/>：静态字段会在类型初始化时
+    /// 固化真实用户目录，测试重定向数据目录后仍然写用户的 recent.json（2026-11-23 同批修复）。
+    /// </summary>
+    private static string SettingsDir => AppSettings.DataDir;
+
+    private static string RecentFile => Path.Combine(SettingsDir, "recent.json");
     private const int DefaultMaxEntries = 10;
 
     private static List<string>? _cache;

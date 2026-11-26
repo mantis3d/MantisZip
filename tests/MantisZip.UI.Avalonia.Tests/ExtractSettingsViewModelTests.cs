@@ -6,12 +6,19 @@ namespace MantisZip.UI.Avalonia.Tests;
 
 public class ExtractSettingsViewModelTests
 {
+    /// <summary>
+    /// v0.5.8 有意变更：默认落点从「父目录\包名」改成「父目录」。
+    /// <para>
+    /// 包名那一层现在由根策略补（默认智能加根），单根包因此比旧默认少一层
+    /// ——正是要消掉的那层重复嵌套（`backup.zip` 里的 `backup/photos/`）。
+    /// </para>
+    /// </summary>
     [Fact]
     public void Constructor_WithSingleArchive_SetsDefaultDestination()
     {
         var paths = new[] { @"C:\archives\test.zip" };
         var vm = new ExtractSettingsViewModel(paths);
-        Assert.Equal(@"C:\archives\test", vm.DestinationPath);
+        Assert.Equal(@"C:\archives", vm.DestinationPath);
     }
 
     [Fact]

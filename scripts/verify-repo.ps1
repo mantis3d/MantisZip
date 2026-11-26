@@ -921,6 +921,40 @@ $RE_FILE_PICKER_API = [regex]::new('\b(OpenFilePickerAsync|SaveFilePickerAsync|O
 $RE_APP_ICON_KEY = [regex]::new('x:Key="([^"]+)"')
 $RE_ICON_RESOURCE_REF = [regex]::new('"Icon[A-Z][A-Za-z0-9]*"')
 $RE_SIGNED_METHOD = [regex]::new('(?m)^[ \t]*(?:private|protected|public|internal)[^\r\n;=]*?\b([A-Za-z_]\w*)\s*\(')
+# 规则 4：Classes="…" 的完整取值（用来按 token 判断，避免 ToolbarButtonIcon / ToolbarButtonLabel 误伤）
+$RE_CLASSES_ATTR = [regex]::new('Classes="([^"]*)"')
+# 规则 4：自定义 Button / ToggleButton 子类（含 partial / sealed / abstract / 泛型前的普通写法）
+$RE_BUTTON_SUBCLASS = [regex]::new('class\s+(\w+)\s*:\s*(?:Button|ToggleButton)\b')
+# 规则 4：资源键（x:Key 定义 / Resource= 引用 / 运行时 Resources["…"] 注入）
+$RE_XAML_KEY = [regex]::new('x:Key="([^"]+)"')
+$RE_XAML_COMMENT = [regex]::new('<!--.*?-->', [System.Text.RegularExpressions.RegexOptions]::Singleline)
+$RE_RESOURCE_REF = [regex]::new('\b(?:Dynamic|Static)Resource\s+(?<key>[A-Za-z_][\w.]*)')
+$RE_RESOURCES_INDEXER = [regex]::new('Resources\["([^"]+)"\]')
+# 运行时拼接注入的键（如 Resources[k + "Thk"]）：后缀 → 前缀必须能在 .cs 里找到字面量
+$RESOURCE_KEY_COMPOSED_SUFFIX = @('Thk')
+
+# 文档时效性（规则 3）：AGENTS.md / MAINTENANCE.md 是「每次 session 必读」的门面，
+# 写着已删除的文件、或把守卫条数写死在正文里，都会在无人察觉时变成误导。
+$AGENTSDOC_FILES = @('AGENTS.md', 'docs/MAINTENANCE.md')
+# 反引号里形如 a/b/c.ext 的 token 才当路径检查（排除 %ENV%、通配符、src/… 这类占位）
+$RE_DOC_PATH_TOKEN = [regex]::new('`((?:[\w.\-]+[/\\])+[\w.\-]+\.(?:axaml|cs|ps1|md|json|yml|yaml|iss|props|csproj|xaml|sln|txt))`')
+$RE_DOC_LINE_REF = [regex]::new('(?i)\bline\s+\d+|第\s*\d+\s*行')
+$RE_DOC_GUARD_COUNT = [regex]::new('([一二三四五六七八九十]+)\s*条(?:规则)?守卫')
+$RE_DOC_CI_STEP_COUNT = [regex]::new('(?:共\s*([0-9]+)\s*步|CI\s*([一二三四五六七八九十]+)\s*步)')
+# 相对路径按这些前缀依次解析（文档里的短路径省略了 src/MantisZip.UI.Avalonia/ 之类）
+$AGENTSDOC_PATH_ROOTS = @(
+    ''
+    'src/MantisZip.UI.Avalonia/'
+    'src/MantisZip.Core/'
+    'src/MantisZip.ShellExt/'
+    'tests/MantisZip.UI.Avalonia.Tests/'
+    'tests/MantisZip.Tests/'
+    'scripts/'
+    'docs/'
+    'tools/dsh-plugin-mantiszip/'
+)
+# 允许文档提到尚不存在的文件（每项必须带原因）
+$AGENTSDOC_PATH_ALLOW = @()
 
 # ---------------------------------------------------------------------------
 # 静默失败面三个守卫（2026-10-28 新增）：这三条对应三次真实事故
@@ -1650,6 +1684,253 @@ function Test-GuardFormatIdentity {
         })
 }
 
+# 规则 4：按钮样式选型 + 自定义按钮子类必须有模板
+# 事故 1（2026-11-12）：压缩设置窗「插入占位符 / 存为预设 / 删除 / 帮助」+ 设置页三行「插入占位符」
+#   共 7 处误挂主窗口工具栏专用的 ToolbarButton —— 比同排输入框高一档、底色是头部灰，
+#   贴在设置窗/对话框的 ThemeSurfaceBgBrush 卡片里既不成组也像补丁。
+# 事故 2（2026-11-12）：PlaceholderInsertButton 漏写 StyleKeyOverride 时 Avalonia 按子类类型
+#   找不到 ControlTheme → 无模板 → 点了完全没反应（不报错、不抛异常，Click 永不触发）。
+function Test-GuardButtonStyle {
+    param([string]$RepoRoot)
+
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $scannedXaml = 0
+    $scannedTypes = 0
+
+    # ① 设置窗 / 对话框（ThemeSurfaceBgBrush 卡片）里不许出现独立的 ToolbarButton token
+    $uiRoot = Join-Path $RepoRoot 'src/MantisZip.UI.Avalonia'
+    $targets = [System.Collections.Generic.List[string]]::new()
+    $dialogsDir = Join-Path $uiRoot 'Dialogs'
+    if (Test-Path -LiteralPath $dialogsDir) {
+        foreach ($f in (Get-ChildItem -LiteralPath $dialogsDir -Filter *.axaml -File)) {
+            $targets.Add($f.FullName)
+        }
+    }
+    $settingsXaml = Join-Path $uiRoot 'Views/SettingsWindow.axaml'
+    if (Test-Path -LiteralPath $settingsXaml) { $targets.Add($settingsXaml) }
+
+    foreach ($path in $targets) {
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $path).Replace('\', '/')
+        $text = [System.IO.File]::ReadAllText($path)
+        $scannedXaml++
+        foreach ($match in $RE_CLASSES_ATTR.Matches($text)) {
+            $tokens = $match.Groups[1].Value -split '\s+'
+            if ($tokens -contains 'ToolbarButton') {
+                $line = Get-LineNumber -Text $text -Index $match.Index
+                $issues.Add("$relative`:$line 在设置窗/对话框里挂了 ToolbarButton（规则 4：卡片内用全局 Button 默认样式，纯图标按钮只挂 ToolbarIcon）")
+            }
+        }
+    }
+
+    # ② 自定义 Button / ToggleButton 子类必须覆盖 StyleKeyOverride，否则没有模板、点了没反应
+    $sourceDir = Join-Path $RepoRoot $GUARD_FILES.sourceDir
+    if (-not (Test-Path -LiteralPath $sourceDir)) {
+        $issues.Add("读不到源码目录：$($GUARD_FILES.sourceDir)")
+    }
+    else {
+        $files = Get-ChildItem -LiteralPath $sourceDir -Recurse -Filter *.cs -File |
+            Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+        foreach ($file in $files) {
+            $text = [System.IO.File]::ReadAllText($file.FullName)
+            $classMatch = $RE_BUTTON_SUBCLASS.Match($text)
+            if (-not $classMatch.Success) { continue }
+            $scannedTypes++
+            $name = $classMatch.Groups[1].Value
+            $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+            if ($text -notmatch 'StyleKeyOverride') {
+                $line = Get-LineNumber -Text $text -Index $classMatch.Index
+                $issues.Add("$relative`:$line 的 $name 继承自 Button/ToggleButton 但没有 StyleKeyOverride（漏了会没有模板、点击无响应）")
+            }
+        }
+    }
+
+    return New-GuardResult -Id 'buttonstyle' -Title '按钮样式选型（规则 4）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            xamlFiles   = $scannedXaml
+            buttonTypes = $scannedTypes
+        })
+}
+
+function Test-GuardResourceKeys {
+    param([string]$RepoRoot)
+
+    # 规则 4：DynamicResource / StaticResource 引用的键必须有定义，否则静默取不到值
+    # （画刷缺失 = 透明 → 边框/分隔线直接消失，构建与测试全绿，只有用户看得见）。
+    # 定义来源三处：Theme*.axaml 的 x:Key、src 下任意 .axaml 的 x:Key、
+    # 以及运行时 Resources["…"] = … 注入（紧凑度/缩略图参数）。
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $uiRoot = Join-Path $RepoRoot $GUARD_FILES.sourceDir
+    $scannedXaml = 0
+    $scannedKeys = 0
+
+    if (-not (Test-Path -LiteralPath $uiRoot)) {
+        $issues.Add("读不到源码目录：$($GUARD_FILES.sourceDir)")
+        return New-GuardResult -Id 'resourcekeys' -Title '资源键定义（规则 4）' -Ok $false -Issues $issues -Details ([ordered]@{})
+    }
+
+    $xamlFiles = Get-ChildItem -LiteralPath $uiRoot -Recurse -Filter *.axaml -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+    $csFiles = Get-ChildItem -LiteralPath $uiRoot -Recurse -Filter *.cs -File |
+        Where-Object { $_.FullName -notmatch '[\\/](bin|obj)[\\/]' }
+
+    # ① 定义集合：.axaml 的 x:Key（注释块先剔除，避免把注释里的示例当成定义）
+    $defined = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($file in $xamlFiles) {
+        $text = $RE_XAML_COMMENT.Replace([System.IO.File]::ReadAllText($file.FullName), '')
+        foreach ($match in $RE_XAML_KEY.Matches($text)) { [void]$defined.Add($match.Groups[1].Value) }
+    }
+
+    # ② 运行时注入：Resources["Key"] = …（含 Thk 这类拼接后缀，靠字面量前缀反推）
+    $codeTexts = @{}
+    foreach ($file in $csFiles) {
+        $codeTexts[$file.FullName] = [System.IO.File]::ReadAllText($file.FullName)
+    }
+    foreach ($text in $codeTexts.Values) {
+        foreach ($match in $RE_RESOURCES_INDEXER.Matches($text)) { [void]$defined.Add($match.Groups[1].Value) }
+    }
+    # Resources[k + "Thk"] 形态：把 .cs 里出现过的、以该后缀结尾的字面量前缀也视为可定义
+    # （例：suffix Thk → "SpacingXsThk" 由 "SpacingXs" + "Thk" 生成，源码里没有 "SpacingXsThk" 字面量）
+    $composedSuffixes = [System.Collections.Generic.HashSet[string]]::new()
+    foreach ($text in $codeTexts.Values) {
+        foreach ($match in [regex]::Matches($text, 'Resources\[\s*\w+\s*\+\s*"(?<suffix>[A-Za-z]+)"\s*\]')) {
+            [void]$composedSuffixes.Add($match.Groups['suffix'].Value)
+        }
+        foreach ($suffix in $RESOURCE_KEY_COMPOSED_SUFFIX) { [void]$composedSuffixes.Add($suffix) }
+    }
+
+    # ③ 引用集合：只扫 .axaml（XAML 的 {DynamicResource X} / {StaticResource X}）。
+    # C# 侧用字符串键查资源（TryFindResource / Resources.TryGetResource），键名是运行时参数，
+    # 文本级静态判断误报率高（XML 文档注释里就有示例），不纳入本守卫范围。
+    $refs = [ordered]@{}
+    foreach ($file in $xamlFiles) {
+        $relative = [System.IO.Path]::GetRelativePath($RepoRoot, $file.FullName).Replace('\', '/')
+        $text = $RE_XAML_COMMENT.Replace([System.IO.File]::ReadAllText($file.FullName), '')
+        $scannedXaml++
+        foreach ($match in $RE_RESOURCE_REF.Matches($text)) {
+            $key = $match.Groups['key'].Value
+            if (-not $refs.Contains($key)) { $refs[$key] = [System.Collections.Generic.List[string]]::new() }
+            $line = Get-LineNumber -Text $text -Index $match.Index
+            $refs[$key].Add("$relative`:$line")
+        }
+    }
+
+    $scannedKeys = $refs.Count
+    foreach ($key in $refs.Keys) {
+        if ($defined.Contains($key)) { continue }
+        # 拼接生成：去掉已知后缀后，前缀必须是 .cs 里的字面量
+        $composed = $false
+        foreach ($suffix in $composedSuffixes) {
+            if ($key.EndsWith($suffix) -and $key.Length -gt $suffix.Length) {
+                $prefix = $key.Substring(0, $key.Length - $suffix.Length)
+                foreach ($text in $codeTexts.Values) {
+                    if ($text.Contains('"' + $prefix + '"')) { $composed = $true; break }
+                }
+            }
+            if ($composed) { break }
+        }
+        if ($composed) { continue }
+
+        $where = ($refs[$key] | Select-Object -First 3) -join '、'
+        $more = if ($refs[$key].Count -gt 3) { " 等 $($refs[$key].Count) 处" } else { '' }
+        $issues.Add("资源键 '$key' 被引用但从未定义（$where$more）→ 运行时静默取不到值；规则 4 要求在 ThemeLight.axaml + ThemeDark.axaml 成对补 <SolidColorBrush> 或改引用已有键")
+    }
+
+    return New-GuardResult -Id 'resourcekeys' -Title '资源键定义（规则 4）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            xamlFiles = $scannedXaml
+            keysUsed  = $scannedKeys
+            keysDefined = $defined.Count
+        })
+}
+
+function ConvertFrom-ChineseNumeral {
+    param([string]$Text)
+
+    # 只覆盖本仓库会写到的 1–20（守卫条数、CI 步数），足够；更多再说
+    $table = [ordered]@{
+        '一' = 1; '二' = 2; '三' = 3; '四' = 4; '五' = 5
+        '六' = 6; '七' = 7; '八' = 8; '九' = 9; '十' = 10
+        '十一' = 11; '十二' = 12; '十三' = 13; '十四' = 14; '十五' = 15
+        '十六' = 16; '十七' = 17; '十八' = 18; '十九' = 19; '二十' = 20
+    }
+    if ($table.Contains($Text)) { return $table[$Text] }
+    return $null
+}
+
+function Test-GuardAgentsDoc {
+    param([string]$RepoRoot, [int]$GuardCount, [int]$CiStepCount)
+
+    # 规则 3：AGENTS.md / docs/MAINTENANCE.md 是门面文档，写完就没人回头看。
+    # 三查都是「零误报」的机械项：① 反引号路径必须真实存在 ② 不出现会漂移的行号硬引用
+    # ③ 正文里写死的守卫条数必须等于实际注册数（GuardCount 由 Test-Guards 传进来，
+    # 所以新增守卫而不改文档会立刻失败）。
+    $issues = [System.Collections.Generic.List[string]]::new()
+    $scannedFiles = 0
+    $scannedPaths = 0
+
+    foreach ($relativeDoc in $AGENTSDOC_FILES) {
+        $docPath = Join-Path $RepoRoot $relativeDoc
+        if (-not (Test-Path -LiteralPath $docPath)) {
+            $issues.Add("读不到文档：$relativeDoc")
+            continue
+        }
+        $scannedFiles++
+        $text = [System.IO.File]::ReadAllText($docPath)
+
+        # ① 反引号里的路径 token 必须真实存在
+        foreach ($match in $RE_DOC_PATH_TOKEN.Matches($text)) {
+            $token = $match.Groups[1].Value
+            if ($AGENTSDOC_PATH_ALLOW -contains $token) { continue }
+            $scannedPaths++
+            $candidates = @()
+            $normalized = $token -replace '\\', '/'
+            foreach ($root in $AGENTSDOC_PATH_ROOTS) {
+                $candidates += ((Join-Path $RepoRoot ($root + $normalized)) -replace '\\', '/')
+            }
+            $found = $false
+            foreach ($candidate in $candidates) {
+                if (Test-Path -LiteralPath $candidate) { $found = $true; break }
+            }
+            if (-not $found) {
+                $line = Get-LineNumber -Text $text -Index $match.Index
+                $issues.Add("$relativeDoc`:$line 提到的文件不存在：$token（删掉这一项，或补上该文件）")
+            }
+        }
+
+        # ② 行号一改就漂：改用「搜函数名 / 搜字符串」定位
+        foreach ($match in $RE_DOC_LINE_REF.Matches($text)) {
+            $line = Get-LineNumber -Text $text -Index $match.Index
+            $issues.Add("$relativeDoc`:$line 写了行号硬引用「$($match.Value)」（行号会漂；改成搜函数名或搜唯一字符串定位）")
+        }
+
+        # ③ 写死的守卫条数必须等于实际注册数
+        foreach ($match in $RE_DOC_GUARD_COUNT.Matches($text)) {
+            $written = ConvertFrom-ChineseNumeral $match.Groups[1].Value
+            if ($null -eq $written) { continue }
+            if ($written -ne $GuardCount) {
+                $line = Get-LineNumber -Text $text -Index $match.Index
+                $issues.Add("$relativeDoc`:$line 写「$($match.Value)」，实际注册 $GuardCount 条守卫（新增/删除守卫时同步改这里）")
+            }
+        }
+
+        # ④ 写死的 CI 步数必须等于 workflows 里的 run 步数
+        foreach ($match in $RE_DOC_CI_STEP_COUNT.Matches($text)) {
+            $raw = if ($match.Groups[1].Success) { $match.Groups[1].Value } else { $match.Groups[2].Value }
+            $written = if ($raw -match '^\d+$') { [int]$raw } else { ConvertFrom-ChineseNumeral $raw }
+            if ($null -eq $written) { continue }
+            if ($written -ne $CiStepCount) {
+                $line = Get-LineNumber -Text $text -Index $match.Index
+                $issues.Add("$relativeDoc`:$line 写「$($match.Value)」，工作流实际有 $CiStepCount 个 run 步骤（增删 CI 步骤时同步改这里）")
+            }
+        }
+    }
+
+    return New-GuardResult -Id 'agentsdoc' -Title '门面文档时效性（规则 3）' -Ok ($issues.Count -eq 0) -Issues $issues -Details ([ordered]@{
+            docs       = $scannedFiles
+            paths      = $scannedPaths
+            guardCount = $GuardCount
+            ciSteps    = $CiStepCount
+        })
+}
+
 function Test-Guards {
     param([string]$RepoRoot, [string]$RelativeLocalizationDir)
 
@@ -1663,6 +1944,19 @@ function Test-Guards {
     $guards.Add((Test-GuardJsonOptions -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardSettingsWiring -RepoRoot $RepoRoot))
     $guards.Add((Test-GuardFormatIdentity -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardButtonStyle -RepoRoot $RepoRoot))
+    $guards.Add((Test-GuardResourceKeys -RepoRoot $RepoRoot))
+
+    # CI 的 run 步数（文档里写死「共 N 步」时用它核对）
+    $ciStepCount = 0
+    $ciPath = Join-Path $RepoRoot '.github/workflows/ci.yml'
+    if (Test-Path -LiteralPath $ciPath) {
+        $ciText = [System.IO.File]::ReadAllText($ciPath)
+        $ciStepCount = [regex]::Matches($ciText, '(?m)^\s+run:').Count
+    }
+
+    # 放在最后：GuardCount 传的是「含本项在内」的总数，新增守卫不改文档即失败
+    $guards.Add((Test-GuardAgentsDoc -RepoRoot $RepoRoot -GuardCount ($guards.Count + 1) -CiStepCount $ciStepCount))
 
     $failed = @($guards | Where-Object { -not $_.ok })
     return [ordered]@{

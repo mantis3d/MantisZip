@@ -22,10 +22,11 @@ internal class FavoriteData
 
 public static class FavoritePathManager
 {
-    private static readonly string AppDataPath = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "MantisZip");
-
-    private static readonly string FilePath = Path.Combine(AppDataPath, "favorites.json");
+    /// <summary>
+    /// 收藏文件路径。经 <see cref="AppDataPaths"/> 解析（而不是静态固化成真实用户目录），
+    /// 测试才能把它重定向到临时目录，不碰用户的 <c>favorites.json</c>。
+    /// </summary>
+    private static string FilePath => Path.Combine(AppDataPaths.Dir, "favorites.json");
 
     private static readonly object _lock = new();
 

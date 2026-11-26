@@ -5,6 +5,7 @@ using Avalonia.Controls.ApplicationLifetimes;
 using Avalonia.Media;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Controls;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
@@ -103,12 +104,46 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private int _updateFrequencyIndex = 2;
 
-    [ObservableProperty]
-    private bool _keepOriginalExtension;
-
     /// <summary>压缩完成后打开输出所在目录（与解压端 <see cref="OpenFolderAfterExtract"/> 对称）。</summary>
     [ObservableProperty]
     private bool _openFolderAfterCompress;
+
+    // ── 压缩文件名模板（v0.5.7，三入口各自的默认值；留空 = 按原规则命名） ──
+    [ObservableProperty]
+    private string _fileNameTemplateDialog = "";
+
+    [ObservableProperty]
+    private string _fileNameTemplateQuick = "";
+
+    [ObservableProperty]
+    private string _fileNameTemplateSeparate = "";
+
+    // ── 包内根目录四态默认值（v0.5.8） ──
+    // 用 Option(Display, Value) 下拉与「文件冲突默认策略」保持同一种交互，
+    // Value 存枚举名（不是数值），将来加减值不会让旧配置错位。
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> CompressRootModeOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedCompressRootModeOption;
+
+    public System.Collections.ObjectModel.ObservableCollection<Option> ExtractRootModeOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedExtractRootModeOption;
+
+    /// <summary>压缩端套根时的默认根名（留空 = 按压缩包文件名推导）。</summary>
+    [ObservableProperty] private string _compressRootName = "";
+
+    /// <summary>压缩端四态默认值的枚举名（与 <see cref="CompressRootModeOptions"/> 的 Value 对应）。</summary>
+    [ObservableProperty] private string _compressRootMode = nameof(RootDirectoryMode.Original);
+
+    /// <summary>解压端四态默认值的枚举名。</summary>
+    [ObservableProperty] private string _extractRootMode = nameof(RootDirectoryMode.SmartWrap);
+
+    // ── 智能解压两档（v0.5.8 第二项） ──
+    // 只影响「智能解压」三个入口（工具栏 / 右键 / 双击关联），不影响解压设置对话框。
+    public System.Collections.ObjectModel.ObservableCollection<Option> SmartExtractRootModeOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedSmartExtractRootModeOption;
+
+    /// <summary>智能解压两档的枚举名（与 <see cref="SmartExtractRootModeOptions"/> 的 Value 对应）。</summary>
+    [ObservableProperty] private string _smartExtractRootMode = nameof(RootDirectoryMode.SmartWrap);
 
     // ── Compression advanced ──
     [ObservableProperty]
@@ -717,6 +752,7 @@ public partial class SettingsWindowViewModel : ObservableObject
             AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
             {
                 Name = rule.Name,
+                NameKey = rule.NameKey,
                 FormatIds = rule.FormatIds,
                 Level = rule.Level,
                 Enabled = rule.Enabled,
@@ -944,10 +980,173 @@ public partial class SettingsWindowViewModel : ObservableObject
     // Compress strings
     public string DefaultFormatText => LocalizationManager.T("Settings_DefaultFormat");
     public string CompressionLevelText => LocalizationManager.T("Settings_CompressionLevel");
-    public string KeepOriginalExtensionText => LocalizationManager.T("Settings_Compress_KeepExt");
     public string PreserveDirectoryRootText => LocalizationManager.T("Settings_Compress_PreserveRoot");
     public string CompressOpenFolderAfterText => LocalizationManager.T("Settings_Compress_OpenFolderAfter");
     public string CompressOptionsText => LocalizationManager.T("Settings_Compress_Options");
+
+    // 文件名模板分组（v0.5.7）
+    public string FileNameTemplateGroupText => LocalizationManager.T("Settings_Compress_FileNameTemplate");
+    public string FileNameTemplateHelpText => LocalizationManager.T("Settings_Compress_FileNameTemplate_Help");
+    public string FileNameTemplateDialogText => LocalizationManager.T("Settings_Compress_FileNameTemplate_Dialog");
+    public string FileNameTemplateQuickText => LocalizationManager.T("Settings_Compress_FileNameTemplate_Quick");
+    public string FileNameTemplateSeparateText => LocalizationManager.T("Settings_Compress_FileNameTemplate_Separate");
+    public string FileNameTemplateRowHintText => LocalizationManager.T("Settings_Compress_FileNameTemplate_RowHint");
+    public string FileNameTemplatePresetHintText => LocalizationManager.T("Settings_Compress_FileNameTemplate_PresetHint");
+    // 「插入占位符」按钮文案（设置页三行共用；规则 13 的登记在下面 UpdateLocalizedTexts 里通知）
+    public string FileNameTemplateInsertText => LocalizationManager.T("Compress_FileNameTemplate_Insert");
+    public string FileNameTemplateInsertTipText => LocalizationManager.T("Compress_FileNameTemplate_InsertTip");
+
+    /// <summary>设置页里的预设选择器下拉项（与压缩对话框共用同一份预设库，增删即时持久化）。</summary>
+    public System.Collections.ObjectModel.ObservableCollection<MantisZip.Core.Utils.FileNameTemplatePreset> FileNameTemplatePresetOptions { get; } = new();
+
+    /// <summary>三行各自的预设名框内容（可编辑下拉的文本，双向）。空串 = 还没选/还没起名。</summary>
+    [ObservableProperty] private string? _fileNameTemplatePresetNameDialog;
+    [ObservableProperty] private string? _fileNameTemplatePresetNameQuick;
+    [ObservableProperty] private string? _fileNameTemplatePresetNameSeparate;
+
+    /// <summary>三行各自的预设操作提示（保存/更新/超限/删除）。与行共用一条槽，成功与失败靠 IsError 区分。</summary>
+    [ObservableProperty] private string? _fileNameTemplatePresetMessageDialog;
+    [ObservableProperty] private string? _fileNameTemplatePresetMessageQuick;
+    [ObservableProperty] private string? _fileNameTemplatePresetMessageSeparate;
+
+    [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorDialog;
+    [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorQuick;
+    [ObservableProperty] private bool _isFileNameTemplatePresetMessageErrorSeparate;
+
+    /// <summary>
+    /// 某一行预设消息的气泡自动收起后清空该行消息（成功消息 1.6s 后由 TemplatePresetPicker 回调）。
+    /// 不清空的话，下次同样的消息值没变、不会触发变更通知，气泡就再也弹不出来。
+    /// </summary>
+    public void DismissFileNameTemplatePresetMessage(Models.FileNameTemplateRow row)
+    {
+        SetPresetMessage(row, null, isError: false);
+    }
+
+    /// <summary>预设列表来自设置（与压缩对话框共享同一份）。</summary>
+    private void ReloadFileNameTemplatePresets()
+    {
+        FileNameTemplatePresetOptions.Clear();
+        foreach (var preset in _settings.FileNameTemplatePresets)
+            FileNameTemplatePresetOptions.Add(preset);
+    }
+
+    /// <summary>某一行选中了已有预设 → 把它的模板填进本行模板框，名字留在预设名框里。</summary>
+    public void ApplyFileNameTemplatePreset(Models.FileNameTemplateRow row, MantisZip.Core.Utils.FileNameTemplatePreset? preset)
+    {
+        if (preset is null) return;
+
+        switch (row)
+        {
+            case Models.FileNameTemplateRow.Dialog:
+                FileNameTemplatePresetNameDialog = preset.Name;
+                if (!string.Equals(FileNameTemplateDialog, preset.Template, StringComparison.Ordinal))
+                    FileNameTemplateDialog = preset.Template;
+                break;
+            case Models.FileNameTemplateRow.Quick:
+                FileNameTemplatePresetNameQuick = preset.Name;
+                if (!string.Equals(FileNameTemplateQuick, preset.Template, StringComparison.Ordinal))
+                    FileNameTemplateQuick = preset.Template;
+                break;
+            case Models.FileNameTemplateRow.Separate:
+                FileNameTemplatePresetNameSeparate = preset.Name;
+                if (!string.Equals(FileNameTemplateSeparate, preset.Template, StringComparison.Ordinal))
+                    FileNameTemplateSeparate = preset.Template;
+                break;
+        }
+    }
+
+    /// <summary>
+    /// 某一行「存为预设」：用该行的预设名框 + 该行模板写回设置（同名覆盖，上限 20 条）。
+    /// 预设是全应用共享的库数据（压缩对话框也用同一份），所以立即持久化，不跟着本窗口的「取消」回滚。
+    /// </summary>
+    public void SaveFileNameTemplatePreset(Models.FileNameTemplateRow row)
+    {
+        var name = TemplateNameOf(row);
+        var template = TemplateTextOf(row);
+        if (string.IsNullOrWhiteSpace(template))
+        {
+            SetPresetMessage(row, LocalizationManager.T("Compress_FileNameTemplate_EmptyResult"), isError: true);
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(name)) name = template.Trim();
+
+        var overwriting = _settings.FileNameTemplatePresets.Any(
+            p => string.Equals(p.Name, name, StringComparison.OrdinalIgnoreCase));
+
+        if (!_settings.AddFileNameTemplatePreset(new MantisZip.Core.Utils.FileNameTemplatePreset(name, template)))
+        {
+            SetPresetMessage(row,
+                LocalizationManager.T("Compress_FileNameTemplate_PresetLimit", AppSettings.MaxFileNameTemplatePresets),
+                isError: true);
+            return;
+        }
+
+        _settings.Save();
+        ReloadFileNameTemplatePresets();
+        SetPresetName(row, name);
+        SetPresetMessage(row,
+            LocalizationManager.T(
+                overwriting ? "Compress_FileNameTemplate_PresetUpdated" : "Compress_FileNameTemplate_PresetSaved",
+                name),
+            isError: false);
+    }
+
+    /// <summary>某一行「删除」：删掉该行预设名框里那条预设并立即持久化。</summary>
+    public void DeleteFileNameTemplatePreset(Models.FileNameTemplateRow row)
+    {
+        var name = TemplateNameOf(row).Trim();
+        if (string.IsNullOrEmpty(name)) return;
+        if (!_settings.RemoveFileNameTemplatePreset(name)) return;
+
+        _settings.Save();
+        ReloadFileNameTemplatePresets();
+        SetPresetMessage(row, null, isError: false);
+    }
+
+    private string TemplateNameOf(Models.FileNameTemplateRow row) => row switch
+    {
+        Models.FileNameTemplateRow.Dialog => FileNameTemplatePresetNameDialog ?? "",
+        Models.FileNameTemplateRow.Quick => FileNameTemplatePresetNameQuick ?? "",
+        _ => FileNameTemplatePresetNameSeparate ?? "",
+    };
+
+    private string? TemplateTextOf(Models.FileNameTemplateRow row) => row switch
+    {
+        Models.FileNameTemplateRow.Dialog => FileNameTemplateDialog,
+        Models.FileNameTemplateRow.Quick => FileNameTemplateQuick,
+        _ => FileNameTemplateSeparate,
+    };
+
+    private void SetPresetName(Models.FileNameTemplateRow row, string? name)
+    {
+        switch (row)
+        {
+            case Models.FileNameTemplateRow.Dialog: FileNameTemplatePresetNameDialog = name; break;
+            case Models.FileNameTemplateRow.Quick: FileNameTemplatePresetNameQuick = name; break;
+            default: FileNameTemplatePresetNameSeparate = name; break;
+        }
+    }
+
+    private void SetPresetMessage(Models.FileNameTemplateRow row, string? message, bool isError)
+    {
+        switch (row)
+        {
+            case Models.FileNameTemplateRow.Dialog:
+                FileNameTemplatePresetMessageDialog = message;
+                IsFileNameTemplatePresetMessageErrorDialog = isError;
+                break;
+            case Models.FileNameTemplateRow.Quick:
+                FileNameTemplatePresetMessageQuick = message;
+                IsFileNameTemplatePresetMessageErrorQuick = isError;
+                break;
+            default:
+                FileNameTemplatePresetMessageSeparate = message;
+                IsFileNameTemplatePresetMessageErrorSeparate = isError;
+                break;
+        }
+    }
+
     public string CompressConflictActionText => LocalizationManager.T("Settings_Compress_ConflictAction");
     public string ZipDefaultOptionsText => LocalizationManager.T("Settings_Zip_DefaultOptions");
     public string ZipEncodingText => LocalizationManager.T("Settings_Zip_Encoding");
@@ -1006,6 +1205,12 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ExtractOpenFolderAfterText => LocalizationManager.T("Settings_Extract_OpenFolderAfter");
     public string ExtractEnableDragText => LocalizationManager.T("Settings_Extract_EnableDragExtract");
     public string ExtractPreserveFullPathText => LocalizationManager.T("Settings_Extract_PreserveFullPath");
+    public string CompressRootModeText => LocalizationManager.T("Settings_Compress_RootMode");
+    public string CompressRootNameText => LocalizationManager.T("Settings_Compress_RootName");
+    public string CompressRootNameHintText => LocalizationManager.T("Settings_Compress_RootName_Hint");
+    public string ExtractRootModeText => LocalizationManager.T("Settings_Extract_RootMode");
+    public string SmartExtractRootModeText => LocalizationManager.T("Settings_SmartExtract");
+    public string SmartExtractRootModeDescText => LocalizationManager.T("Settings_SmartExtract_Desc");
     public string ExtractDeleteAfterExtractText => LocalizationManager.T("Settings_Extract_DeleteArchiveAfterExtract");
     public string ExtractDoubleClickActionText => LocalizationManager.T("Settings_Extract_DoubleClickAction");
     public string ExtractDoubleClickThresholdText => LocalizationManager.T("Settings_Extract_DoubleClickThreshold");
@@ -1061,6 +1266,7 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string ContextMenuEnableExtractTo => LocalizationManager.T("Settings_ContextMenu_EnableExtractTo");
     public string ContextMenuShowMenuIcons => LocalizationManager.T("Settings_ContextMenu_ShowMenuIcons");
     public string ContextMenuEnableDynamicMenu => LocalizationManager.T("Settings_ContextMenu_EnableDynamicMenu");
+    public string ContextMenuEnableDynamicMenuHint => LocalizationManager.T("Settings_ContextMenu_EnableDynamicMenu_Hint");
     public string ContextMenuInstall => LocalizationManager.T("Settings_ContextMenu_Install");
     public string ContextMenuUninstall => LocalizationManager.T("Settings_ContextMenu_Uninstall");
     public string ContextMenuStatusGroup => LocalizationManager.T("Settings_ContextMenu_StatusGroup");
@@ -1265,9 +1471,20 @@ public partial class SettingsWindowViewModel : ObservableObject
             UpdateCheckFrequencyNames.Parse(_settings.UpdateCheckFrequency));
 
         // Compress (additional)
-        _keepOriginalExtension = _settings.KeepOriginalExtension;
         _openFolderAfterCompress = _settings.OpenFolderAfterCompress;
         _compressFileConflictAction = _settings.CompressFileConflictAction;
+
+        // 压缩文件名模板三档默认值 + 预设快照
+        _fileNameTemplateDialog = _settings.FileNameTemplateDialog;
+        _fileNameTemplateQuick = _settings.FileNameTemplateQuick;
+        _fileNameTemplateSeparate = _settings.FileNameTemplateSeparate;
+        ReloadFileNameTemplatePresets();
+
+        // 包内根目录四态默认值（越界值在 SetSelectedOptions 里回退到第一项）
+        CompressRootMode = _settings.CompressRootMode.ToString();
+        CompressRootName = _settings.CompressRootName;
+        ExtractRootMode = _settings.ExtractRootMode.ToString();
+        SmartExtractRootMode = ArchiveRootPolicy.NormalizeSmartExtractMode(_settings.SmartExtractRootMode).ToString();
 
         // Compression advanced
         _sevenZipCompressionMethod = _settings.SevenZipCompressionMethod;
@@ -1470,6 +1687,24 @@ public partial class SettingsWindowViewModel : ObservableObject
         CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_AutoRename"), "rename"));
         CompressFileConflictActionOptions.Add(new Option(LocalizationManager.T("CompressConflict_Skip"), "skip"));
 
+        // 包内根目录四态：压缩端与解压端共用同一批四态文案（语义两侧对称）
+        CompressRootModeOptions.Clear();
+        CompressRootModeOptions.Add(new Option(LocalizationManager.T("Compress_RootMode_Original"), nameof(RootDirectoryMode.Original)));
+        CompressRootModeOptions.Add(new Option(LocalizationManager.T("Compress_RootMode_SmartStrip"), nameof(RootDirectoryMode.SmartStrip)));
+        CompressRootModeOptions.Add(new Option(LocalizationManager.T("Compress_RootMode_SmartWrap"), nameof(RootDirectoryMode.SmartWrap)));
+        CompressRootModeOptions.Add(new Option(LocalizationManager.T("Compress_RootMode_AlwaysWrap"), nameof(RootDirectoryMode.AlwaysWrap)));
+
+        ExtractRootModeOptions.Clear();
+        ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_Original"), nameof(RootDirectoryMode.Original)));
+        ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_SmartStrip"), nameof(RootDirectoryMode.SmartStrip)));
+        ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_SmartWrap"), nameof(RootDirectoryMode.SmartWrap)));
+        ExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_AlwaysWrap"), nameof(RootDirectoryMode.AlwaysWrap)));
+
+        // 智能解压两档：只有「智能加根 / 智能去根」，文案复用解压端四态里的两条
+        SmartExtractRootModeOptions.Clear();
+        SmartExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_SmartWrap"), nameof(RootDirectoryMode.SmartWrap)));
+        SmartExtractRootModeOptions.Add(new Option(LocalizationManager.T("Extract_RootMode_SmartStrip"), nameof(RootDirectoryMode.SmartStrip)));
+
         DoubleClickActionOptions.Clear();
         DoubleClickActionOptions.Add(new Option(DoubleClickActionOpenText, "open"));
         DoubleClickActionOptions.Add(new Option(DoubleClickActionExtractHereText, "extract-here"));
@@ -1614,6 +1849,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         SelectedFileConflictActionOption = FileConflictActionOptions.FirstOrDefault(o => o.Value == FileConflictAction);
         SelectedCompressFileConflictActionOption = CompressFileConflictActionOptions.FirstOrDefault(o => o.Value == CompressFileConflictAction)
                                                    ?? CompressFileConflictActionOptions.FirstOrDefault();
+        SelectedCompressRootModeOption = CompressRootModeOptions.FirstOrDefault(o => o.Value == CompressRootMode)
+                                          ?? CompressRootModeOptions.FirstOrDefault();
+        SelectedExtractRootModeOption = ExtractRootModeOptions.FirstOrDefault(o => o.Value == ExtractRootMode)
+                                         ?? ExtractRootModeOptions.FirstOrDefault();
+        SelectedSmartExtractRootModeOption = SmartExtractRootModeOptions.FirstOrDefault(o => o.Value == SmartExtractRootMode)
+                                             ?? SmartExtractRootModeOptions.FirstOrDefault();
 
         SelectedDoubleClickActionOption = DoubleClickActionOptions.FirstOrDefault(o => o.Value == DoubleClickAction);
 
@@ -1723,10 +1964,18 @@ public partial class SettingsWindowViewModel : ObservableObject
 
         OnPropertyChanged(nameof(DefaultFormatText));
         OnPropertyChanged(nameof(CompressionLevelText));
-        OnPropertyChanged(nameof(KeepOriginalExtensionText));
         OnPropertyChanged(nameof(PreserveDirectoryRootText));
         OnPropertyChanged(nameof(CompressOpenFolderAfterText));
         OnPropertyChanged(nameof(CompressOptionsText));
+        OnPropertyChanged(nameof(FileNameTemplateGroupText));
+        OnPropertyChanged(nameof(FileNameTemplateHelpText));
+        OnPropertyChanged(nameof(FileNameTemplateDialogText));
+        OnPropertyChanged(nameof(FileNameTemplateQuickText));
+        OnPropertyChanged(nameof(FileNameTemplateSeparateText));
+        OnPropertyChanged(nameof(FileNameTemplateRowHintText));
+        OnPropertyChanged(nameof(FileNameTemplatePresetHintText));
+        OnPropertyChanged(nameof(FileNameTemplateInsertText));
+        OnPropertyChanged(nameof(FileNameTemplateInsertTipText));
         OnPropertyChanged(nameof(CompressConflictActionText));
         OnPropertyChanged(nameof(ZipDefaultOptionsText));
         OnPropertyChanged(nameof(ZipEncodingText));
@@ -1759,11 +2008,27 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(AddRuleText));
         OnPropertyChanged(nameof(ResetDefaultsText));
 
+        // 出厂规则名是 i18n 文案，切语言后逐行刷新（用户自定义名不受影响，DisplayName 走 Name）
+        foreach (var rule in AdaptiveOverrides)
+            rule.NotifyDisplayName();
+
+        // 自定义格式行的编辑/删除按钮提示同样是本地化文案
+        foreach (var fmt in CustomFormats)
+        {
+            fmt.NotifyLocalizedTexts();
+        }
+
         OnPropertyChanged(nameof(ExtractDefaultDestText));
         OnPropertyChanged(nameof(ExtractConflictActionText));
         OnPropertyChanged(nameof(ExtractOpenFolderAfterText));
         OnPropertyChanged(nameof(ExtractEnableDragText));
         OnPropertyChanged(nameof(ExtractPreserveFullPathText));
+        OnPropertyChanged(nameof(CompressRootModeText));
+        OnPropertyChanged(nameof(CompressRootNameText));
+        OnPropertyChanged(nameof(CompressRootNameHintText));
+        OnPropertyChanged(nameof(ExtractRootModeText));
+        OnPropertyChanged(nameof(SmartExtractRootModeText));
+        OnPropertyChanged(nameof(SmartExtractRootModeDescText));
         OnPropertyChanged(nameof(ExtractDeleteAfterExtractText));
         OnPropertyChanged(nameof(ExtractDoubleClickActionText));
         OnPropertyChanged(nameof(ExtractDoubleClickThresholdText));
@@ -1808,6 +2073,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(ContextMenuEnableExtractTo));
         OnPropertyChanged(nameof(ContextMenuShowMenuIcons));
         OnPropertyChanged(nameof(ContextMenuEnableDynamicMenu));
+        OnPropertyChanged(nameof(ContextMenuEnableDynamicMenuHint));
         OnPropertyChanged(nameof(ContextMenuInstall));
         OnPropertyChanged(nameof(ContextMenuUninstall));
         OnPropertyChanged(nameof(ContextMenuStatusGroup));
@@ -1912,9 +2178,21 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Compress
         _settings.DefaultFormat = SelectedDefaultFormatOption?.Value ?? DefaultFormat;
         _settings.DefaultLevel = int.TryParse(SelectedDefaultLevelOption?.Value, out var l) ? l : 5;
-        _settings.KeepOriginalExtension = KeepOriginalExtension;
         _settings.OpenFolderAfterCompress = OpenFolderAfterCompress;
         _settings.CompressFileConflictAction = SelectedCompressFileConflictActionOption?.Value ?? CompressFileConflictAction;
+
+        // 压缩文件名模板三档默认值（预设的增删在压缩对话框里，这里只写模板本身）
+        _settings.FileNameTemplateDialog = FileNameTemplateDialog?.Trim() ?? "";
+        _settings.FileNameTemplateQuick = FileNameTemplateQuick?.Trim() ?? "";
+        _settings.FileNameTemplateSeparate = FileNameTemplateSeparate?.Trim() ?? "";
+        // 包内根目录四态默认值：Value 是枚举名，解析失败一律回退原样（与消费端默认一致）
+        _settings.CompressRootMode = ParseRootMode(SelectedCompressRootModeOption?.Value, _settings.CompressRootMode);
+        _settings.CompressRootName = CompressRootName?.Trim() ?? "";
+        _settings.ExtractRootMode = ParseRootMode(SelectedExtractRootModeOption?.Value, _settings.ExtractRootMode);
+        // 智能解压两档：手改 JSON 成其它值时收敛回「智能加根」，不能让设置页显示一个运行时不认的值
+        _settings.SmartExtractRootMode = ArchiveRootPolicy.NormalizeSmartExtractMode(
+            ParseRootMode(SelectedSmartExtractRootModeOption?.Value, RootDirectoryMode.SmartWrap));
+
 
         // Adaptive Compression (三个独立开关)
         _settings.AdaptiveCompression = AdaptiveCompression;
@@ -1923,6 +2201,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         _settings.AdaptiveOverrides = AdaptiveOverrides.Select(vm => new AdaptiveOverrideRule
         {
             Name = vm.Name,
+            NameKey = vm.NameKey,
             FormatIds = vm.FormatIds,
             Level = vm.Level,
             Enabled = vm.Enabled,
@@ -2218,8 +2497,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
             Save();
-            ShellIntegration.Uninstall();
-            ShellIntegration.Install();
+            ShellIntegration.Install();          // Install 内部先做纯注册表清理，不重启资源管理器
             ShellIntegration.CheckComStatus();
             RefreshShellStatus();
             await AppMessageBox.Show(
@@ -2247,7 +2525,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         try
         {
             ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
-            ShellIntegration.Uninstall();
+            ShellIntegration.RemoveMenus();       // 设置页卸载：不重启资源管理器
             RefreshShellStatus();
             await AppMessageBox.Show(
                 LocalizationManager.T("Settings_ContextMenu_UpdatedMsg"),
@@ -2275,8 +2553,7 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             ShellStatusText = LocalizationManager.T("Settings_ContextMenu_StatusChecking");
             Save();
-            ShellIntegration.Uninstall();
-            ShellIntegration.Install();
+            ShellIntegration.Install();          // Install 内部先做纯注册表清理，不重启资源管理器
             ShellIntegration.CheckComStatus();
             RefreshShellStatus();
         }
@@ -2492,7 +2769,9 @@ public partial class SettingsWindowViewModel : ObservableObject
         {
             AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
             {
+                // 新增规则的名字一定是用户自己敲的 → 不带 NameKey（不参与语言切换）
                 Name = dialog.RuleName,
+                NameKey = null,
                 Level = dialog.SelectedLevel,
                 FormatIds = dialog.SelectedFormatIds,
                 Enabled = true,
@@ -2506,12 +2785,19 @@ public partial class SettingsWindowViewModel : ObservableObject
         var dialog = new EditAdaptiveRuleDialog();
         var allFormats = FormatCatalog.GetAll().Concat(CustomFormats.Select(f => f.ToFormatDefinition())).ToList();
         dialog.PopulateFormats(allFormats, rule.FormatIds);
-        dialog.SetExistingValues(rule.Name, rule.Level, rule.FormatIds);
+        // 传**当前显示文本**：用户没改名就直接点确定时，NameKey 必须保留，
+        // 否则出厂规则会被固化成一个语言的名字，之后切语言不再跟着变。
+        dialog.SetExistingValues(rule.DisplayName, rule.Level, rule.FormatIds);
         if (owner != null) dialog.WindowStartupLocation = WindowStartupLocation.CenterOwner;
         var result = await dialog.ShowDialog<bool?>((owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null))!);
         if (result == true)
         {
-            rule.Name = dialog.RuleName;
+            if (dialog.NameChanged)
+            {
+                rule.NameKey = null;
+                rule.Name = dialog.RuleName;
+            }
+            // 未改名：Name/NameKey 原样保留，继续跟随界面语言
             rule.Level = dialog.SelectedLevel;
             rule.FormatIds = dialog.SelectedFormatIds;
         }
@@ -2522,12 +2808,54 @@ public partial class SettingsWindowViewModel : ObservableObject
         AdaptiveOverrides.Remove(rule);
     }
 
+    /// <summary>
+    /// 「恢复默认」：把规则列表整体重建为出厂六类规则（含 <c>NameKey</c>），
+    /// 用户自建规则会被清掉，故先确认。
+    /// 2026-11-23 修正：此前实现只是把现有规则的 <c>Enabled</c> 全设成 false，按钮名不副实。
+    /// </summary>
     [RelayCommand]
-    private void ResetDefaults()
+    private async Task ResetDefaults(Window? owner)
     {
-        foreach (var rule in AdaptiveOverrides)
-            rule.Enabled = false;
+        var confirmed = await AppMessageBox.Show(
+            LocalizationManager.T("Settings_AdaptiveOverrides_ResetDefaultsConfirm"),
+            LocalizationManager.T("Settings_AdaptiveOverrides_ResetDefaults"),
+            MessageBoxButton.YesNo, MessageBoxImage.Question,
+            owner ?? (App.Current?.ApplicationLifetime is IClassicDesktopStyleApplicationLifetime desktop ? desktop.MainWindow : null));
+        if (confirmed != MessageBoxResult.Yes) return;
+
+        RestoreFactoryRules();
     }
+
+    /// <summary>
+    /// 把规则列表重建为出厂六类规则（含 <c>NameKey</c>），清掉用户自建规则。
+    /// 与确认框分离，便于单测直接验证重建结果。
+    /// </summary>
+    internal void RestoreFactoryRules()
+    {
+        AdaptiveOverrides.Clear();
+        foreach (var rule in AppSettings.GetDefaultAdaptiveOverrides())
+        {
+            AdaptiveOverrides.Add(new AdaptiveOverrideRuleViewModel
+            {
+                Name = rule.Name,
+                NameKey = rule.NameKey,
+                FormatIds = rule.FormatIds,
+                Level = rule.Level,
+                Enabled = rule.Enabled,
+                CustomLevel = rule.CustomLevel,
+                IsMultiThreadedEnabled = MultiThreadedCompression,
+            });
+        }
+    }
+
+    /// <summary>
+    /// 把下拉里的枚举名解析回 <see cref="RootDirectoryMode"/>。空白 / 无法识别一律沿用
+    /// <paramref name="fallback"/>（正常情况是当前设置值），保证「下拉异常不会悄悄改设置」。
+    /// </summary>
+    private static RootDirectoryMode ParseRootMode(string? value, RootDirectoryMode fallback)
+        => Enum.TryParse<RootDirectoryMode>(value, ignoreCase: true, out var parsed) && Enum.IsDefined(parsed)
+            ? parsed
+            : fallback;
 }
 
 public record Option(string Display, string Value);
@@ -2547,6 +2875,19 @@ public partial class FormatDefinitionViewModel : ObservableObject
     /// <summary>魔数 hex 显示（Phase 2 / Task 11：魔数检测落地后恢复显示）。</summary>
     public string MagicHexDisplay => string.IsNullOrEmpty(MagicHex) ? "" : $"[{MagicHex}]";
 
+    /// <summary>编辑按钮提示（规则 13：走本地化，不在 XAML 里写死）。</summary>
+    public string FormatEditTooltipText => LocalizationManager.T("Settings_FormatCatalog_EditTooltip");
+
+    /// <summary>删除按钮提示。</summary>
+    public string FormatDeleteTooltipText => LocalizationManager.T("Settings_FormatCatalog_DeleteTooltip");
+
+    /// <summary>语言切换后刷新本地化的按钮提示。</summary>
+    public void NotifyLocalizedTexts()
+    {
+        OnPropertyChanged(nameof(FormatEditTooltipText));
+        OnPropertyChanged(nameof(FormatDeleteTooltipText));
+    }
+
     /// <summary>将 ViewModel 转换为 FormatDefinition 模型，用于持久化保存。</summary>
     public FormatDefinition ToFormatDefinition() => new()
     {
@@ -2564,6 +2905,15 @@ public partial class FormatDefinitionViewModel : ObservableObject
 public partial class AdaptiveOverrideRuleViewModel : ObservableObject
 {
     [ObservableProperty] private string _name = "";
+
+    /// <summary>
+    /// 出厂默认规则的内置名 i18n 键；非空时 <see cref="DisplayName"/> 用它、忽略 <see cref="Name"/>。
+    /// 用户把名字改成自己的文本时清空（见 <c>EditAdaptiveRuleDialog</c> 的改名判定）。
+    /// </summary>
+    [ObservableProperty]
+    [NotifyPropertyChangedFor(nameof(DisplayName))]
+    private string? _nameKey;
+
     [ObservableProperty] private bool _enabled = true;
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LevelDisplay))]
@@ -2572,6 +2922,28 @@ public partial class AdaptiveOverrideRuleViewModel : ObservableObject
     [ObservableProperty]
     [NotifyPropertyChangedFor(nameof(LevelDisplay))]
     private int? _customLevel;
+
+    /// <summary>
+    /// 列表里显示的名字：出厂规则跟随界面语言（取 <see cref="NameKey"/> 的文案），
+    /// 用户规则显示自己写的 <see cref="Name"/>。切语言时由设置页 VM 逐个通知刷新。
+    /// </summary>
+    public string DisplayName => string.IsNullOrEmpty(NameKey) ? Name : LocalizationManager.T(NameKey);
+
+    /// <summary>语言切换后刷新本行的全部本地化文本（<see cref="LocalizationManager.T"/> 不是绑定属性）。</summary>
+    public void NotifyDisplayName()
+    {
+        OnPropertyChanged(nameof(DisplayName));
+        OnPropertyChanged(nameof(EditTooltipText));
+        OnPropertyChanged(nameof(DeleteTooltipText));
+    }
+
+    /// <summary>编辑按钮提示（规则 13：走本地化，不在 XAML 里写死）。</summary>
+    public string EditTooltipText => LocalizationManager.T("Settings_AdaptiveRules_EditTooltip");
+
+    /// <summary>删除按钮提示。</summary>
+    public string DeleteTooltipText => LocalizationManager.T("Settings_AdaptiveRules_DeleteTooltip");
+
+    partial void OnNameChanged(string value) => OnPropertyChanged(nameof(DisplayName));
 
     /// <summary>格式 ID 列表（逗号分隔显示）。</summary>
     public string FormatIdsDisplay => string.Join(", ", FormatIds);
