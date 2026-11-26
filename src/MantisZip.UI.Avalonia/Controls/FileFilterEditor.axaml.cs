@@ -67,8 +67,12 @@ public partial class FileFilterEditor : UserControl
     /// <summary>当前大小单位乘数（默认 MB）。</summary>
     private long _sizeUnitMultiplier = 1048576L;
 
-    /// <summary>当前选中的基底预设名（null 表示无预设或"— 无 —"）。</summary>
-    private string? _basePresetName;
+    /// <summary>
+    /// 当前选中的基底预设标识（<see cref="FileFilterPreset.Key"/>：内置预设 = i18n 键，
+    /// 用户预设 = 用户输入名）。null 表示无预设或"— 无 —"。
+    /// 不能用 <see cref="FileFilterPreset.Name"/> 做标识：内置预设的 Name 恒为空串。
+    /// </summary>
+    private string? _basePresetKey;
 
     /// <summary>基底预设被选中时的条件快照，用于检测修改。</summary>
     private FileFilterCriteria? _baseCriteria;
@@ -303,16 +307,16 @@ public partial class FileFilterEditor : UserControl
         _displayItems.Clear();
         _displayItems.Add(_noneItem);
 
-        // 内置预设
+        // 内置预设：显示名走 i18n 键（英文/繁中界面不再显示中文内置名）
         foreach (var p in FileFilterPreset.GetBuiltInPresets())
         {
-            _displayItems.Add(new PresetItem { DisplayName = p.Name, Preset = p });
+            _displayItems.Add(new PresetItem { DisplayName = DisplayNameOf(p), Preset = p });
         }
 
-        // 用户预设
+        // 用户预设：用户输入的名字原样显示，不翻译
         foreach (var p in _presets)
         {
-            _displayItems.Add(new PresetItem { DisplayName = p.Name, Preset = p });
+            _displayItems.Add(new PresetItem { DisplayName = DisplayNameOf(p), Preset = p });
         }
 
         if (_tempPresetItem != null)
@@ -322,14 +326,14 @@ public partial class FileFilterEditor : UserControl
         PresetCombo.ItemsSource = null;
         PresetCombo.ItemsSource = _displayItems;
 
-        // 确定选中项
+        // 确定选中项（一律按 Key 比对：内置预设的 Name 恒为空串）
         PresetItem? toSelect;
         if (autoSelectName != null)
         {
-            toSelect = _displayItems.Find(i => !i.IsNoneItem && !i.IsTemporary && i.Preset?.Name == autoSelectName);
+            toSelect = _displayItems.Find(i => !i.IsNoneItem && !i.IsTemporary && i.Preset?.Key == autoSelectName);
             if (toSelect != null)
             {
-                _basePresetName = autoSelectName;
+                _basePresetKey = autoSelectName;
                 _baseCriteria = CloneCriteria(toSelect.Preset!.Criteria);
                 PresetCombo.SelectedItem = toSelect;
                 SetFilter(toSelect.Preset.Criteria);
@@ -343,9 +347,9 @@ public partial class FileFilterEditor : UserControl
         {
             PresetCombo.SelectedItem = _tempPresetItem;
         }
-        else if (_basePresetName != null)
+        else if (_basePresetKey != null)
         {
-            toSelect = _displayItems.Find(i => !i.IsNoneItem && !i.IsTemporary && i.Preset?.Name == _basePresetName);
+            toSelect = _displayItems.Find(i => !i.IsNoneItem && !i.IsTemporary && i.Preset?.Key == _basePresetKey);
             if (toSelect != null)
                 PresetCombo.SelectedItem = toSelect;
             else
@@ -399,12 +403,13 @@ public partial class FileFilterEditor : UserControl
     /// </summary>
     private void CheckAndUpdateTempPreset()
     {
-        if (_basePresetName == null || _baseCriteria == null) return;
+        if (_basePresetKey == null || _baseCriteria == null) return;
 
-        // 基底预设已被删除时不创建临时（内置 + 用户）
-        var baseExists = FileFilterPreset.GetBuiltInPresets().Any(p => p.Name == _basePresetName)
-                      || _presets.Any(p => p.Name == _basePresetName);
-        if (!baseExists)
+        // 基底预设已被删除时不创建临时（内置 + 用户）；按 Key 判定，内置预设的 Name 恒为空串
+        var builtIns = FileFilterPreset.GetBuiltInPresets();
+        var basePreset = builtIns.FirstOrDefault(p => p.Key == _basePresetKey)
+                      ?? _presets.FirstOrDefault(p => p.Key == _basePresetKey);
+        if (basePreset == null)
         {
             if (_tempPresetItem != null)
             {
@@ -427,8 +432,10 @@ public partial class FileFilterEditor : UserControl
         else
         {
             // 与基底不一致 → 创建或更新临时
+            // 临时名一律用「显示名 + 已修改」：基底是内置预设时用本地化名拼，
+            // 不能拼 _basePresetKey（那是 i18n 键，会拼出 FileFilter_BuiltInPreset_Image（已修改））
             var modifier = LocalizationManager.T("FileFilter_Modified");
-            var tempName = _basePresetName + modifier;
+            var tempName = DisplayNameOf(basePreset) + modifier;
             if (_tempPresetItem == null)
             {
                 _tempPresetItem = new PresetItem
@@ -436,7 +443,7 @@ public partial class FileFilterEditor : UserControl
                     DisplayName = tempName,
                     IsTemporary = true,
                     TempCriteria = CloneCriteria(current),
-                    SourcePresetName = _basePresetName,
+                    SourcePresetName = _basePresetKey,
                 };
                 RebuildDisplayItems();
             }
@@ -444,9 +451,17 @@ public partial class FileFilterEditor : UserControl
             {
                 // 仅更新条件，不切换选中
                 _tempPresetItem.TempCriteria = CloneCriteria(current);
+                _tempPresetItem.DisplayName = tempName;
             }
         }
     }
+
+    /// <summary>
+    /// 预设的下拉显示名：内置预设走 <see cref="FileFilterPreset.NameKey"/> 的本地化文本，
+    /// 用户预设原样返回 <see cref="FileFilterPreset.Name"/>（用户输入的数据不翻译）。
+    /// </summary>
+    private static string DisplayNameOf(FileFilterPreset preset)
+        => string.IsNullOrEmpty(preset.NameKey) ? preset.Name : LocalizationManager.T(preset.NameKey);
 
     private List<string> GetSelectedExtensions()
     {
@@ -595,7 +610,7 @@ public partial class FileFilterEditor : UserControl
         {
             // 选择"— 无 —"：清空过滤、清空预设跟踪
             ClearFilter();
-            _basePresetName = null;
+            _basePresetKey = null;
             _baseCriteria = null;
             _tempPresetItem = null;
         }
@@ -611,19 +626,19 @@ public partial class FileFilterEditor : UserControl
             var preset = item.Preset;
             if (preset != null)
             {
-                _basePresetName = preset.Name;
+                _basePresetKey = preset.Key;
                 _baseCriteria = CloneCriteria(preset.Criteria);
                 SetFilter(preset.Criteria);
 
                 // 重建列表，保留已有的临时预设，强制选中当前基底
                 _isInternalUpdate = false;
-                RebuildDisplayItems(autoSelectName: preset.Name);
+                RebuildDisplayItems(autoSelectName: preset.Key);
                 _isInternalUpdate = true;
             }
             else
             {
                 ClearFilter();
-                _basePresetName = null;
+                _basePresetKey = null;
                 _baseCriteria = null;
                 _tempPresetItem = null;
             }

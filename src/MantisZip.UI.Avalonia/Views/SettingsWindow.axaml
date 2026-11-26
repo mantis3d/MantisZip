@@ -348,14 +348,14 @@
                                   <!-- 编辑按钮（矢量图标：IconEdit） -->
                                   <Button Grid.Column="1" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="EditCustomFormat_Click"
-                                          ToolTip.Tip="编辑">
+                                          ToolTip.Tip="{Binding FormatEditTooltipText}">
                                     <PathIcon Data="{StaticResource IconEdit}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                   <!-- 删除按钮（矢量图标：IconDelete） -->
                                   <Button Grid.Column="2" Classes="ToolbarIcon"
                                           Tag="{Binding}" Click="DeleteCustomFormat_Click"
-                                          ToolTip.Tip="删除">
+                                          ToolTip.Tip="{Binding FormatDeleteTooltipText}">
                                     <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
@@ -398,7 +398,7 @@
                             <Border Padding="4,2" Background="{DynamicResource ThemeSurfaceBgBrush}">
                               <Grid ColumnDefinitions="Auto,*,Auto,Auto,Auto,Auto,Auto">
                                 <CheckBox IsChecked="{Binding Enabled}" Grid.Column="0" VerticalAlignment="Center"/>
-                                <TextBlock Text="{Binding Name}" FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}" Grid.Column="1" VerticalAlignment="Center"/>
+                                <TextBlock Text="{Binding DisplayName}" FontWeight="SemiBold" Foreground="{DynamicResource ThemeTextPrimaryBrush}" Grid.Column="1" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding FormatIdsDisplay}" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Grid.Column="2" VerticalAlignment="Center" Margin="8,0"/>
                                 <TextBlock Text="→" Foreground="{DynamicResource ThemeTextSecondaryBrush}" Grid.Column="3" VerticalAlignment="Center"/>
                                 <TextBlock Text="{Binding LevelDisplay}" Foreground="{DynamicResource ThemeTextPrimaryBrush}" Grid.Column="4" VerticalAlignment="Center" Margin="8,0"/>
@@ -408,12 +408,12 @@
                                            IsVisible="{Binding ShowMtIneffectiveBadge}"/>
                                 <StackPanel Orientation="Horizontal" Grid.Column="6">
                                   <!-- 编辑按钮（矢量图标：IconEdit） -->
-                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="编辑">
+                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="EditRule_Click" ToolTip.Tip="{Binding EditTooltipText}">
                                     <PathIcon Data="{StaticResource IconEdit}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
                                   <!-- 删除按钮（矢量图标：IconDelete） -->
-                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="删除">
+                                  <Button Classes="ToolbarIcon" Tag="{Binding}" Click="DeleteRule_Click" ToolTip.Tip="{Binding DeleteTooltipText}">
                                     <PathIcon Data="{StaticResource IconDelete}" Width="16" Height="16"
                                               Foreground="{DynamicResource ThemeTextPrimaryBrush}"/>
                                   </Button>
@@ -427,7 +427,7 @@
                       <!-- 规则操作按钮：普通按钮（单行文字，勿用 ToolbarButton——见上） -->
                       <StackPanel Orientation="Horizontal" Spacing="8">
                         <Button Content="{Binding AddRuleText}" Command="{Binding AddRuleCommand}" CommandParameter="{Binding #SettingsWin}" Padding="12,4"/>
-                        <Button Content="{Binding ResetDefaultsText}" Command="{Binding ResetDefaultsCommand}" Padding="12,4"/>
+                        <Button Content="{Binding ResetDefaultsText}" Command="{Binding ResetDefaultsCommand}" CommandParameter="{Binding #SettingsWin}" Padding="12,4"/>
                       </StackPanel>
                     </StackPanel>
                   </Border>

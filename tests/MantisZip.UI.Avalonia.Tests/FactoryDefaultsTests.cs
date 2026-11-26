@@ -41,6 +41,19 @@ public class FactoryDefaultsTests
     }
 
     [Fact]
+    public void EmbeddedDefaults_PinUserProfile_ForTreeAutoExpand()
+    {
+        // 2026-11-25：用户把「目录树自动展开到当前目录」改成默认开启（新装即生效），
+        // 这条值只存在于内嵌快照里 —— AppSettings 的字段初值仍是 false（兜底路径），
+        // 所以钉住快照这一侧，防止有人按旧印象「顺手改回去」而没人发现。
+        using var sandbox = new AppSettingsTestSandbox();
+
+        var settings = AppSettings.Load();
+
+        Assert.True(settings.AutoExpandTreeToCurrent);
+    }
+
+    [Fact]
     public void MetadataPanel_DefaultTemplate_IsEmbeddedUserProfile()
     {
         var settings = MetadataSettingsManager.CreateDefault();

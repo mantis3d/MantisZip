@@ -993,79 +993,133 @@ public class AppSettings
     /// 返回默认自适应压缩覆盖规则（**与 SSOT「已压缩」集合对齐** —— Phase 2 / Task 10 + 合并）。
     /// 六类：图片 / 视频 / 音频 / 压缩包 / 字体 / 文档（字体与文档来自旧「仅存储格式」默认列表，合并后并入）。
     /// 不含未压缩格式：svg（XML 文本）/ tar（未压缩归档）/ wav（PCM）/ tga/hdr/exr（未压缩位图）。
+    ///
+    /// 名称一律走 <see cref="AdaptiveOverrideRule.NameKey"/> 而不是写死中文：出厂规则的名称是**界面文案**，
+    /// 切到英文/繁中时必须跟着变。用户改名后 NameKey 清空、改用自己写进 Name 的文本（见规则编辑对话框）。
     /// </summary>
     internal static List<AdaptiveOverrideRule> GetDefaultAdaptiveOverrides() => new()
     {
-        new() { Name = "图片类", FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "视频类", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "音频类", FormatIds = new() { "Mp3", "Flac", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "压缩包类", FormatIds = new() { "Zip", "SevenZip", "Rar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "字体类", FormatIds = new() { "Ttf", "Otf", "Woff", "Woff2" }, Level = AdaptiveLevel.Store, Enabled = true },
-        new() { Name = "文档类", FormatIds = new() { "Pdf", "Docx", "Xlsx", "Pptx", "Epub" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Image", FormatIds = new() { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Video", FormatIds = new() { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Audio", FormatIds = new() { "Mp3", "Flac", "Ogg" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Archive", FormatIds = new() { "Zip", "SevenZip", "Rar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Font", FormatIds = new() { "Ttf", "Otf", "Woff", "Woff2" }, Level = AdaptiveLevel.Store, Enabled = true },
+        new() { NameKey = "Settings_AdaptiveRuleName_Document", FormatIds = new() { "Pdf", "Docx", "Xlsx", "Pptx", "Epub" }, Level = AdaptiveLevel.Store, Enabled = true },
     };
 
-    /// <summary>默认规则集版本（与 SSOT 对齐 + 并入旧「仅存储格式」后的版本号）。</summary>
-    private const int CurrentAdaptiveOverridesDefaultsVersion = 1;
+    /// <summary>
+    /// 默认规则集版本。
+    /// v1 = 六类默认规则（名称写死中文）；v2 = 名称改为 <see cref="AdaptiveOverrideRule.NameKey"/>（可随语言切换）。
+    /// </summary>
+    private const int CurrentAdaptiveOverridesDefaultsVersion = 2;
 
     /// <summary>
     /// 迁移旧持久化数据（Phase 2 / Task 10 + 「仅存储格式」合并）：
-    /// ① 旧版默认规则集（4 条，名称与格式 ID 完全一致）→ 整体替换为新的 6 类默认规则集；
+    /// v0 → v1：
+    /// ① 旧版默认规则集（4 条，格式 ID 集合完全一致）→ 整体替换为新的 6 类默认规则集；
     ///    用户自行增删改过的规则集原样保留（只推进版本号）。
     /// ② 旧「仅存储格式」列表中**用户额外添加**的格式 ID（不在旧默认列表内）→ 迁移为一条
     ///    「仅存储格式（迁移）」规则（Store 级别）；旧默认列表本身已被 SSOT 覆盖，不再重复迁移。
     /// ③ 迁移后清空旧列表（该功能已并入自适应规则）。
+    /// v1 → v2：把仍是出厂默认名的六类规则改成 <see cref="AdaptiveOverrideRule.NameKey"/>，
+    ///    让它们随界面语言切换（v1 的默认名是写死的中文）。
     /// </summary>
     internal static void MigrateAdaptiveOverridesDefaults(AppSettings settings)
     {
-        if (settings.AdaptiveOverridesDefaultsVersion >= CurrentAdaptiveOverridesDefaultsVersion)
+        var version = settings.AdaptiveOverridesDefaultsVersion;
+        if (version >= CurrentAdaptiveOverridesDefaultsVersion)
             return;
 
-        if (IsLegacyDefaultOverrides(settings.AdaptiveOverrides))
-            settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
-
-        // 旧「仅存储格式」列表 → 规则（仅迁移用户额外添加的 ID）
-        var legacyDefaults = GetDefaultMultiThreadedStoreFormatIds();
-        var customStoreIds = (settings.MultiThreadedStoreFormatIds ?? new List<string>())
-            .Where(id => !legacyDefaults.Contains(id))
-            .ToList();
-        if (customStoreIds.Count > 0)
+        if (version < 1)
         {
-            settings.AdaptiveOverrides.Add(new AdaptiveOverrideRule
+            if (IsLegacyDefaultOverrides(settings.AdaptiveOverrides))
+                settings.AdaptiveOverrides = GetDefaultAdaptiveOverrides();
+
+            // 旧「仅存储格式」列表 → 规则（仅迁移用户额外添加的 ID）
+            var legacyDefaults = GetDefaultMultiThreadedStoreFormatIds();
+            var customStoreIds = (settings.MultiThreadedStoreFormatIds ?? new List<string>())
+                .Where(id => !legacyDefaults.Contains(id))
+                .ToList();
+            if (customStoreIds.Count > 0)
             {
-                Name = "仅存储格式（迁移）",
-                FormatIds = customStoreIds,
-                Level = AdaptiveLevel.Store,
-                Enabled = true,
-            });
+                settings.AdaptiveOverrides.Add(new AdaptiveOverrideRule
+                {
+                    NameKey = "Settings_AdaptiveRuleName_MigratedStoreOnly",
+                    FormatIds = customStoreIds,
+                    Level = AdaptiveLevel.Store,
+                    Enabled = true,
+                });
+            }
+            settings.MultiThreadedStoreFormatIds = new List<string>();
         }
-        settings.MultiThreadedStoreFormatIds = new List<string>();
+
+        if (version < 2)
+            ConvertDefaultRuleNamesToKeys(settings.AdaptiveOverrides);
 
         settings.AdaptiveOverridesDefaultsVersion = CurrentAdaptiveOverridesDefaultsVersion;
     }
 
-    /// <summary>判断当前规则集是否仍为旧版默认规则集（名称 + 格式 ID 集合逐一比对）。</summary>
+    /// <summary>
+    /// v1 → v2：把名称仍是出厂中文名的规则换成 i18n 键。
+    /// 只按**名称**匹配（格式与级别保留用户改动），且已有 <see cref="AdaptiveOverrideRule.NameKey"/> 的不动——
+    /// 用户自己改过名的规则不会被误伤（那些名字是用户自己敲的，不可能是这几个出厂名）。
+    /// </summary>
+    private static void ConvertDefaultRuleNamesToKeys(List<AdaptiveOverrideRule>? rules)
+    {
+        if (rules == null) return;
+
+        foreach (var rule in rules)
+        {
+            if (!string.IsNullOrEmpty(rule.NameKey)) continue;
+            var key = LegacyDefaultRuleNameToKey(rule.Name);
+            if (key is null) continue;
+            rule.NameKey = key;
+            rule.Name = "";
+        }
+    }
+
+    /// <summary>v1 出厂默认名 → i18n 键；不是出厂名则返回 null。</summary>
+    private static string? LegacyDefaultRuleNameToKey(string? name) => name switch
+    {
+        "图片类" => "Settings_AdaptiveRuleName_Image",
+        "视频类" => "Settings_AdaptiveRuleName_Video",
+        "音频类" => "Settings_AdaptiveRuleName_Audio",
+        "压缩包类" => "Settings_AdaptiveRuleName_Archive",
+        "字体类" => "Settings_AdaptiveRuleName_Font",
+        "文档类" => "Settings_AdaptiveRuleName_Document",
+        "仅存储格式（迁移）" => "Settings_AdaptiveRuleName_MigratedStoreOnly",
+        _ => null,
+    };
+
+    /// <summary>
+    /// 判断当前规则集是否仍为 v0 的旧版默认规则集。
+    /// **只按格式 ID 集合判定，不看规则名**——名称是用户可以随手改的，拿它当判据会让
+    /// 「改个名字」的用户永远失去默认集升级（2026-11-23 修正）。
+    /// </summary>
     private static bool IsLegacyDefaultOverrides(List<AdaptiveOverrideRule>? rules)
     {
         if (rules == null || rules.Count != 4) return false;
 
-        // 旧版默认：图片类/视频类/音频类/压缩包类
-        var expected = new (string Name, string[] Formats)[]
+        // 旧版默认：图片类/视频类/音频类/压缩包类（按格式 ID 集合比对，不依赖顺序与名称）
+        var expected = new string[][]
         {
-            ("图片类", new[] { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" }),
-            ("视频类", new[] { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" }),
-            ("音频类", new[] { "Mp3", "Flac", "Wav", "Ogg" }),
-            ("压缩包类", new[] { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" }),
+            new[] { "Jpeg", "Png", "WebP", "Bmp", "Gif", "Ico", "Tga", "Hdr", "Exr", "Svg" },
+            new[] { "Mp4", "Mkv", "WebM", "Wmv", "Mov", "Avi", "Flv" },
+            new[] { "Mp3", "Flac", "Wav", "Ogg" },
+            new[] { "Zip", "SevenZip", "Rar", "Tar", "Gz", "Bz2", "Xz", "Zstd", "Iso" },
         };
 
-        foreach (var (name, formats) in expected)
+        var remaining = new List<AdaptiveOverrideRule>(rules);
+        foreach (var formats in expected)
         {
-            var rule = rules.FirstOrDefault(r => r.Name == name);
-            if (rule == null) return false;
-            if (rule.FormatIds.Count != formats.Length) return false;
-            if (!formats.All(f => rule.FormatIds.Contains(f))) return false;
+            var rule = remaining.FirstOrDefault(r =>
+                r.FormatIds.Count == formats.Length
+                && formats.All(f => r.FormatIds.Contains(f)));
+            if (rule is null) return false;
             if (rule.Level != AdaptiveLevel.Store || !rule.Enabled) return false;
+            remaining.Remove(rule);
         }
-        return true;
+        return remaining.Count == 0;
     }
 
     /// <summary>旧「仅存储格式」默认 ID 列表（内置已压缩格式）—— 仅用于迁移时区分「用户自定义项」。</summary>

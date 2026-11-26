@@ -46,8 +46,15 @@ public enum AdaptiveCompressionMode
 /// </summary>
 public class AdaptiveOverrideRule
 {
-    /// <summary>规则名称，如 "图片类"、"视频类"。</summary>
+    /// <summary>规则名称，如 "图片类"、"视频类"。用户自定义规则名存放于此字段。</summary>
     public string Name { get; set; } = "";
+
+    /// <summary>
+    /// 出厂默认规则的内置名 i18n 键（如 <c>"Settings_AdaptiveRuleName_Image"</c>）。
+    /// 非空时界面显示该键的本地化文本并忽略 <see cref="Name"/>，用户改名时清空本字段。
+    /// 名称为 null/空 + <see cref="Name"/> 为空表示「未命名」。
+    /// </summary>
+    public string? NameKey { get; set; }
 
     /// <summary>引用的格式 ID 列表，如 ["Jpeg", "Png", "WebP"]。</summary>
     public List<string> FormatIds { get; set; } = new();

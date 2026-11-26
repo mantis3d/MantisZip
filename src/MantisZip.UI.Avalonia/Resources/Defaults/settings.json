@@ -16,7 +16,8 @@
   "CustomFormats": [],
   "AdaptiveOverrides": [
     {
-      "Name": "图片类",
+      "Name": "",
+      "NameKey": "Settings_AdaptiveRuleName_Image",
       "FormatIds": [
         "Jpeg",
         "Png",
@@ -30,7 +31,8 @@
       "CustomLevel": null
     },
     {
-      "Name": "视频类",
+      "Name": "",
+      "NameKey": "Settings_AdaptiveRuleName_Video",
       "FormatIds": [
         "Mp4",
         "Mkv",
@@ -45,7 +47,8 @@
       "CustomLevel": null
     },
     {
-      "Name": "音频类",
+      "Name": "",
+      "NameKey": "Settings_AdaptiveRuleName_Audio",
       "FormatIds": [
         "Mp3",
         "Flac",
@@ -56,7 +59,8 @@
       "CustomLevel": null
     },
     {
-      "Name": "压缩包类",
+      "Name": "",
+      "NameKey": "Settings_AdaptiveRuleName_Archive",
       "FormatIds": [
         "Zip",
         "SevenZip",
@@ -72,7 +76,8 @@
       "CustomLevel": null
     },
     {
-      "Name": "字体类",
+      "Name": "",
+      "NameKey": "Settings_AdaptiveRuleName_Font",
       "FormatIds": [
         "Ttf",
         "Otf",
@@ -84,7 +89,8 @@
       "CustomLevel": null
     },
     {
-      "Name": "文档类",
+      "Name": "",
+      "NameKey": "Settings_AdaptiveRuleName_Document",
       "FormatIds": [
         "Pdf",
         "Docx",
@@ -97,7 +103,7 @@
       "CustomLevel": null
     }
   ],
-  "AdaptiveOverridesDefaultsVersion": 1,
+  "AdaptiveOverridesDefaultsVersion": 2,
   "ZipCompressionMethod": "deflate",
   "ZipEncryptionMethod": "aes256",
   "SevenZipEncryptHeaders": true,
@@ -160,7 +166,7 @@
   "TextPreviewFontFamily": "",
   "TextEncodingPreference": "auto",
   "FontPreviewFontSize": 24,
-  "FontPreviewSampleText": "The quick brown fox jumps over the lazy dog.\n0123456789\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张",
+  "FontPreviewSampleText": "The quick brown fox jumps over the lazy dog.\n0123456789\n天地玄黄 宇宙洪荒 日月盈昃 辰宿列张\n== === >= <> <= !=",
   "FontPreviewEnableLigature": true,
   "PreviewPosition": 4,
   "InfoPanelOrientation": "Vertical",
@@ -196,7 +202,7 @@
   "ProgressContentMode": "detailed",
   "ProgressInfoDensity": "full",
   "SeparateDirBaseline": false,
-  "AutoExpandTreeToCurrent": false,
+  "AutoExpandTreeToCurrent": true,
   "CustomAssocExtensions": [],
   "AssocExtensions": [
     ".zip",
