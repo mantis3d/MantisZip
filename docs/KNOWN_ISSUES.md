@@ -41,6 +41,7 @@
 | **KI-015** | `ShowExtractFolderAsync` 已无调用方（连同 `ExtractPickResult` 一起成了死 API） | 技术债 / 死代码 | 缺决策 | 下次动 `CustomFilePickerDialog` 静态入口或解压选目录链路时 | 阻塞中 |
 | **KI-016** | 解压时输错密码被判成「文件损坏」，不弹密码框重试（`data error` 被当作损坏信号） | 交互 / 错误分类 | 缺决策 | 用户反馈「密码输错只提示损坏」时；或决定「解压失败统一走 `QuickVerifyPasswordEx` 二次判定」时 | 阻塞中 |
 | **KI-017** | 分卷包（`.001`/`.z01`/`.r00`/`.part1.rar`）与 SFX 的**格式身份**被扩展名直判成 Zip，预览 / 双击打开 / 缩略图全报 `Failed to locate the Zip Header` | 功能缺陷 | — | 已修复（`ResolveReaderFormat` 单一入口，2026-11-05） | 已修复（2026-11-05） |
+| **KI-018** | `.mht/.mhtml` 预览的天花板是 Chromium 自己的 MHTML 实现：IE 时代第三方工具存的 MHT 可能白屏，脚本与表单被禁，部分 content-encoding 不支持 | 功能留白 | 等上游 | Edge/WebView2 放开 MHTML 兼容性（可跟踪 Chromium MHTML 相关 issue 是否关闭） | 阻塞中 |
 
 ---
 
@@ -211,6 +212,15 @@
 - **影响面**：输错一次密码后只能自己发现、重新走一遍解压流程；不丢数据、不影响正确密码。
 - **复评条件**：① 用户反馈「密码输错后只提示损坏、没有重输机会」时；② 或决定「解压失败是否统一走 `QuickVerifyPasswordEx` 二次判定」时。
 - **关联**：`.omo/plans/已完成/sevenzip-solid-extract-batch.md` §5.10 的「遗留」段；`docs/progress-avalonia-detail.md` 2026-11-05「加密 solid 7z 改走批量」条目。
+
+## KI-018 `.mht/.mhtml` 预览的天花板是 Chromium 的 MHTML 实现
+
+- **发现**：2026-11-12（评估 issue #79 的 `.mht` 诉求，用样本 `TestPreview/Test_MHT.zip` 实测）
+- **现象**：`file://` 直接导航 `.mht` 在 Edge / WebView2 下能渲染（本机样本 9.5 MB、`From: <Saved by Blink>`、85 段 multipart/related、42 个 css part，渲染完整）。但 Chromium 的 MHTML 支持面很窄：**只有 Blink 自己存的才基本可靠**；IE / 老工具存的 MHT 常白屏，重载后**脚本不执行、表单被禁用**，且部分 `Content-Transfer-Encoding` 不支持。也就是说「我们做完了，某些用户的 MHT 仍然打不开」。
+- **证据**：① 本机 headless Edge 渲染样本成功（`file:///…/Test_MHT.mht` → 整页正常，与去 `crossorigin` 的 `.htm` 渲染几乎一致）；② 上游文档与官方回复：[textslashplain: MHTML in Chromium](https://textslashplain.com/2022/02/09/mhtml-in-chromium/) 列出「No Script / Disabled Forms / Resources May not load / Encodings」四条限制；[WebView2Feedback #4309](https://github.com/MicrosoftEdge/WebView2Feedback/issues/4309) 官方明确 `.mht` 仅在**直接导航本地文件**时渲染，经 `SetVirtualHostNameToFolderMapping` 会变成下载（by design）。
+- **为什么现在不修**：**等上游**。这是 Chromium 的能力边界，不是我们的实现缺陷；我们能做的最优解（保留 `.mht` 后缀 + `file://` 直导航 + 不注入 CSP meta）已经写在 `.omo/plans/未开始/html-mht-chm-preview.md` §3.2，做完就到顶了。
+- **复评条件**：Chromium 放宽 MHTML 兼容性（跟踪 [chromium MHTML issue 列表](https://bugs.chromium.org/p/chromium/issues/list?q=summary%3AMHTML) 中「第三方 MHT 白屏」类条目是否关闭）；或用户提供具体打不开的样本、且我们能确认是本题而非实现 bug。
+- **关联**：`.omo/plans/未开始/html-mht-chm-preview.md`（B 档设计）；issue #79。
 
 ## 档案区（已修 / 不会修）
 
