@@ -287,7 +287,9 @@ public partial class ZipEngine
                             Directory.CreateDirectory(outDir);
 
                         var entrySize = entry.Size;
-                        using (var entryStream = entry.OpenEntryStream())
+                        // WinZip AES 条目（issue #91）改走 ZipEntryAccess 自研解密层（密码字节编码可探测），
+                        // 其余条目内部仍走 entry.OpenEntryStream()，行为不变。
+                        using (var entryStream = ZipEntryAccess.OpenReadStream(archivePath, entry, options.Password))
                         using (var outStream = File.Create(outPath))
                         {
                             var buffer = new byte[CopyBufferSize];
@@ -1121,7 +1123,9 @@ public partial class ZipEngine
                             Directory.CreateDirectory(outDir);
 
                         var entrySize = entry.Size;
-                        using (var entryStream = entry.OpenEntryStream())
+                        // WinZip AES 条目（issue #91）改走 ZipEntryAccess 自研解密层（密码字节编码可探测），
+                        // 其余条目内部仍走 entry.OpenEntryStream()，行为不变。
+                        using (var entryStream = ZipEntryAccess.OpenReadStream(archivePath, entry, password))
                         using (var outStream = File.Create(outPath))
                         {
                             var buffer = new byte[CopyBufferSize];

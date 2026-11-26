@@ -1,4 +1,5 @@
 ﻿{
+  "Error_Extract_AllEntriesFailed": "全部 {0} 個檔案都解壓失敗，未寫出任何內容。若壓縮檔已加密，請確認輸入的密碼正確。",
   "FileFilter_BuiltInPreset_Image": "📷 僅圖片",
   "FileFilter_BuiltInPreset_Audio": "🎵 僅音訊",
   "FileFilter_BuiltInPreset_Video": "🎬 僅視訊",

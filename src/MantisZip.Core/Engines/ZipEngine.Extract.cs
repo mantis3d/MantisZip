@@ -153,9 +153,10 @@ public partial class ZipEngine
                     {
                         // 官方 CRC 校验路径（见 CreateCrcExtractionOptions）：读完即比对 CRC，
                         // 损坏则抛 InvalidFormatException，由下方 catch 逐条目上报失败（不中止整批）。
-                        entry.WriteTo(outputStream, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
+                        // WinZip AES 条目（issue #91）改走 ZipEntryAccess：SharpCompress 把密码字节
+                        // 写死成 UTF-8，GBK 密码写出的包永远「bad password」，只能自研解密层接管。
+                        ZipEntryAccess.WriteTo(archivePath, entry, outputStream, password, entryProcessed =>
                         {
-                            var entryProcessed = rep.BytesTransferred;
                             var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
                             var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
                             progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -171,7 +172,7 @@ public partial class ZipEngine
                                 BatchProcessedBytes = processedBytes + entryProcessed,
                                 BatchTotalBytes = totalBytes
                             }));
-                        }));
+                        }, (int)CopyBufferSize);
                     }
                     // 恢复文件原始修改时间
                     try { File.SetLastWriteTime(resolvedPath, entryModified); } catch (Exception tsEx) { CoreLog.Info($"ExtractAsyncSequential: failed to set timestamp on {resolvedPath}: {tsEx.Message}"); }
@@ -506,9 +507,11 @@ public partial class ZipEngine
 
                     using var outputStream = File.Create(resolvedPath);
                     // 官方 CRC 校验路径（见 CreateCrcExtractionOptions）：损坏则抛 InvalidFormatException，由下方 catch 逐条目上报。
-                    await entry.WriteToAsync(outputStream, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
+                    // WinZip AES 条目（issue #91）改走 ZipEntryAccess：SharpCompress 把密码字节写死成
+                    // UTF-8，GBK 密码写出的包永远判「bad password」，只能由自研解密层接管；
+                    // 非 AES 条目仍走官方 WriteTo，行为与改动前逐字节一致。
+                    ZipEntryAccess.WriteTo(archivePath, entry, outputStream, password, entryProcessed =>
                     {
-                        var entryProcessed = rep.BytesTransferred;
                         // 先在锁内拷贝共享变量，释放锁后再上报进度，避免锁竞争
                         int localProcessedFiles;
                         long localProcessedBytes;
@@ -538,7 +541,7 @@ public partial class ZipEngine
                             BatchProcessedFiles = batchProcessedFiles,
                             BatchTotalFiles = batchTotalFiles
                         }));
-                    }), ct);
+                    }, (int)CopyBufferSize);
 
                     // 恢复文件原始修改时间
                     try { File.SetLastWriteTime(resolvedPath, entryModified ?? DateTime.MinValue); }
@@ -903,9 +906,9 @@ public partial class ZipEngine
                     using (var outputStream = File.Create(resolvedPath))
                     {
                         // 官方 CRC 校验路径（见 CreateCrcExtractionOptions）：损坏则抛 InvalidFormatException，由下方 catch 逐条目上报。
-                        entry.WriteTo(outputStream, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
+                        // WinZip AES 条目（issue #91）改走 ZipEntryAccess（自研解密层接管密码字节编码）。
+                        ZipEntryAccess.WriteTo(archivePath, entry, outputStream, password, entryProcessed =>
                         {
-                            var entryProcessed = rep.BytesTransferred;
                             var filePct = entrySize > 0 ? (double)entryProcessed / entrySize * 100 : 100;
                             var overallPct = totalBytes > 0 ? (double)(processedBytes + entryProcessed) / totalBytes * 100 : 0;
                             progress?.Report(conflictStats.ApplyTo(new ArchiveProgress
@@ -921,7 +924,7 @@ public partial class ZipEngine
                                 BatchProcessedBytes = processedBytes + entryProcessed,
                                 BatchTotalBytes = totalBytes
                             }));
-                        }));
+                        }, (int)CopyBufferSize);
                     }
 
                     try { File.SetLastWriteTime(resolvedPath, entryModified); } catch { CoreLog.Trace("ZipEngine.ExtractAsync: failed to set last write time for '{0}'", resolvedPath); }
@@ -1252,9 +1255,11 @@ public partial class ZipEngine
 
                     using var outputStream = File.Create(resolvedPath);
                     // 官方 CRC 校验路径（见 CreateCrcExtractionOptions）：损坏则抛 InvalidFormatException，由下方 catch 逐条目上报。
-                    await entry.WriteToAsync(outputStream, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
+                    // WinZip AES 条目（issue #91）改走 ZipEntryAccess：SharpCompress 把密码字节写死成
+                    // UTF-8，GBK 密码写出的包永远判「bad password」，只能由自研解密层接管；
+                    // 非 AES 条目仍走官方 WriteTo，行为与改动前逐字节一致。
+                    ZipEntryAccess.WriteTo(archivePath, entry, outputStream, password, entryProcessed =>
                     {
-                        var entryProcessed = rep.BytesTransferred;
                         // 先在锁内拷贝共享变量，释放锁后再上报进度，避免锁竞争
                         int localProcessedFiles;
                         long localProcessedBytes;
@@ -1284,7 +1289,7 @@ public partial class ZipEngine
                             BatchProcessedFiles = batchProcessedFiles,
                             BatchTotalFiles = batchTotalFiles
                         }));
-                    }), ct);
+                    }, (int)CopyBufferSize);
 
                     // 恢复文件原始修改时间
                     try { File.SetLastWriteTime(resolvedPath, entryModified ?? DateTime.MinValue); }

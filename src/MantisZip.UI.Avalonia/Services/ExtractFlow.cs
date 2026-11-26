@@ -290,13 +290,20 @@ public static class ExtractFlow
 
             // 叶子 2/5：过滤分支直连引擎，绕过 ExtractService，故在此单独接密码弹窗兜底。
             // 非过滤分支经 ExtractService（叶子 1）已覆盖，此处不重复包装。
+            // 同样要旁路统计逐条目结果：条目全失败时引擎不抛异常，只上报 Failed 状态，
+            // 不检查就会出现「进度窗口显示完成、目标目录空无一物」的静默失败。
+            var filteredTracker = new ExtractOutcomeTracker(progress);
             var (outcome, _) = await PasswordRetryLoop.RunAsync(
                 archivePath, password, engine,
                 owner: null,
                 setStatus: _ => { },
                 attempt: async (pwd, token) =>
+                {
+                    // 每轮重试先清零：上一轮的完成/失败计数不能带进本轮判定
+                    filteredTracker.Reset();
                     await engine.ExtractEntriesAsync(
-                        archivePath, filteredKeys, dest, pwd, progress, token, options),
+                        archivePath, filteredKeys, dest, pwd, filteredTracker, token, options);
+                },
                 ct: ct);
 
             if (outcome == PasswordRetryOutcome.Cancelled)
@@ -305,6 +312,9 @@ public static class ExtractFlow
             // 禁止落成功路径（否则下方 PathHistoryManager.Record 会记录损坏包的目录）
             if (outcome == PasswordRetryOutcome.CorruptedOrInvalid)
                 throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
+
+            // 与 ExtractService 同一判据：选中条目全部失败 = 什么都没解出来，必须报错。
+            filteredTracker.ThrowIfNothingWritten();
         }
         else
         {

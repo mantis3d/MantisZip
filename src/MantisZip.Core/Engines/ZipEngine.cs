@@ -129,9 +129,11 @@ public partial class ZipEngine : IArchiveEngine
                         // 注意：OpenEntryStream() 是裸流、不校验 CRC（旧注释的假设不成立），
                         // 只有 WriteTo + CheckCrc=true 才会在读完时对比条目 CRC，
                         // 不一致时抛 InvalidFormatException → 由下方 catch 归类为失败。
-                        entry.WriteTo(Stream.Null, CreateCrcExtractionOptions(), new InlineProgress<ProgressReport>(rep =>
+                        // WinZip AES 条目（issue #91）走 ZipEntryAccess：SharpCompress 把 AES
+                        // 密码写死成 UTF-8，GBK 密码的包永远「密码错误」，必须自研解密层接管。
+                        ZipEntryAccess.WriteTo(archivePath, entry, Stream.Null, password, written =>
                         {
-                            var filePct = entrySize > 0 ? (double)rep.BytesTransferred / entrySize * 100 : 100;
+                            var filePct = entrySize > 0 ? (double)written / entrySize * 100 : 100;
                             progress?.Report(new ArchiveProgress
                             {
                                 EntryKey = entryKey,
@@ -141,7 +143,7 @@ public partial class ZipEngine : IArchiveEngine
                                 TotalFiles = totalFiles,
                                 ProcessedFiles = processedFiles,
                             });
-                        }));
+                        }, (int)CopyBufferSize);
 
                         processedFiles++;
                         progress?.Report(new ArchiveProgress

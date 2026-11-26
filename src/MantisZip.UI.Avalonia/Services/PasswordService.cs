@@ -60,6 +60,13 @@ public class PasswordService
         {
             if (engine is ZipEngine)
             {
+                // WinZip AES 条目（issue #91）：SharpCompress 把密码字节写死成 UTF-8，GBK 密码写出的包
+                // 永远判「bad password」。这里直接比对条目的 2 字节 verifier，按 UTF-8 / 系统 ANSI /
+                // GBK / GB18030 逐个候选试——与解压路径（ZipEntryAccess）完全同一套策略。
+                var aesEntryName = ZipEntryAccess.FindAnyAesEntryName(archivePath);
+                if (aesEntryName != null)
+                    return ZipEntryAccess.VerifyAesPassword(archivePath, aesEntryName, password);
+
                 using var fs = File.Open(archivePath, FileMode.Open, FileAccess.Read, FileShare.Read | FileShare.Delete);
                 // 严格 ZIP 解析：ArchiveFactory.OpenArchive 的魔数嗅探会把损坏/全零文件误判为 Tar，
                 // 导致密码验证静默通过。ZipArchive.OpenArchive 对非 ZIP 抛 ArchiveException（外层分类为未知/损坏）。
@@ -68,6 +75,7 @@ public class PasswordService
                 if (entry == null)
                     return true;
 
+                // AES 条目已在上面短路；此处只可能是 ZipCrypto 等上游能自行解密的条目
                 using var s = entry.OpenEntryStream();
                 s.ReadByte();
                 return true;

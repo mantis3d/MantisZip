@@ -38,6 +38,8 @@ MantisZip-0.5.8-Setup-WebSetup.exe requires internet during installation. Mantis
 - **The breadcrumb no longer folds long paths by segment count** — it used to cap at 6 segments, so a deep but short path was folded needlessly while a shallow but very wide path was not folded at all and got clipped mid-word with no ellipsis. It now measures the actual available width per segment, folds only when it really does not fit, trims the last segment with an ellipsis, and re-expands or re-folds as the window is resized.
 - **面包屑里带下划线的文件夹名能完整显示了** — 此前段名里的第一个下划线被当成菜单助记符前缀吞掉、后面那个字符还变成了 Alt 快捷键，`my_folder_name` 会显示成 `myfolder_name`（真实文件夹名越规范越容易踩到）。现在按原样显示，括号、连字符等其他符号不受影响。
 - **Folder names containing underscores are shown in full in the breadcrumb** — the first underscore used to be swallowed as a menu mnemonic prefix (and the following character hijacked as an Alt shortcut), so `my_folder_name` rendered as `myfolder_name`. Names are now shown verbatim; other punctuation such as parentheses and hyphens was never affected.
+- **使用 GBK 编码中文密码的 WinZip AES 加密包，输入正确密码不再被判为「密码错误」** — 部分工具（如 pyzipper）会用 GBK 而不是 UTF-8 把中文密码写进 AES 密钥，此前这类包无论怎么输都提示密码错误。现在会依次尝试 UTF-8、系统 ANSI、GBK、GB18030 四种密码编码并自动采用命中的那一种，无需修改 Windows 区域设置；AES 完整性认证与 CRC 校验照常执行。
+- **WinZip AES archives created with a GBK-encoded Chinese password now accept the correct password** — some tools (pyzipper among them) encode the password as GBK rather than UTF-8 before deriving the AES key, and such archives used to report a wrong password no matter what was typed. MantisZip now tries UTF-8, the system ANSI code page, GBK and GB18030 in turn and uses whichever matches, with no change to the Windows region settings; the AES integrity check and CRC validation still run as before.
 
 ## v0.5.7
 

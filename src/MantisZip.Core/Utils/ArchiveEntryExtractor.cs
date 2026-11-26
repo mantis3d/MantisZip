@@ -113,7 +113,9 @@ public static class ArchiveEntryExtractor
 
         using (var outStream = File.Open(outputPath, FileMode.Create, FileAccess.Write))
         {
-            entry.WriteTo(outStream);
+            // 走 ZipEntryAccess：WinZip AES 条目（issue #91）需要自研解密层接管密码字节编码，
+            // 非 AES 条目内部仍走官方 entry.WriteTo（现在顺带启用 CRC 校验，损坏包不再静默解出）。
+            ZipEntryAccess.WriteTo(archivePath, entry, outStream, password);
         }
         CoreLog.Info($"ExtractZipEntry: done");
     }
@@ -484,7 +486,9 @@ public static class ArchiveEntryExtractor
         if (entry.IsDirectory)
             return [];
 
-        using var entryStream = entry.OpenEntryStream();
+        // 走 ZipEntryAccess：WinZip AES 条目（issue #91）由自研解密层接管；
+        // 非 AES 条目内部仍是 entry.OpenEntryStream()（只读前缀、不校验 CRC，保持原语义）。
+        using var entryStream = ZipEntryAccess.OpenReadStream(archivePath, entry, password);
         return ReadHeadFromStream(entryStream, maxBytes);
     }
 
@@ -790,7 +794,9 @@ public static class ArchiveEntryExtractor
         if (entry.IsDirectory)
             return [];
 
-        using var entryStream = entry.OpenEntryStream();
+        // 走 ZipEntryAccess：WinZip AES 条目（issue #91）由自研解密层接管；
+        // 非 AES 条目内部仍是 entry.OpenEntryStream()（整条目读入内存，长度由 ReadWholeEntryToMemory 兜底）。
+        using var entryStream = ZipEntryAccess.OpenReadStream(archivePath, entry, password);
         return ReadWholeEntryToMemory(entryStream, entryName, maxBytes, entry.Size, ct);
     }
 
@@ -939,7 +945,9 @@ public static class ArchiveEntryExtractor
                 // 无法像 head 那样读满即停），因此这里保持原有的整条目解压行为不变，
                 // 只靠上面的 MaxTailExtractSize 上限控制内存。
                 using var ms = new MemoryStream();
-                entry.WriteTo(ms);
+                // 走 ZipEntryAccess：WinZip AES 条目（issue #91）由自研解密层接管；
+                // 非 AES 条目内部仍走官方 entry.WriteTo（CRC 校验随之一并生效）。
+                ZipEntryAccess.WriteTo(archivePath, entry, ms, password);
                 return ExtractTailFromBuffer(ms.ToArray(), tailBytes);
             }
 

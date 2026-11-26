@@ -108,14 +108,21 @@ public sealed class SelectedItemsExtractService
 
         // 所有格式统一走按条目提取（TarGzEngine 已实现，不再降级全量解压）
         // 叶子 3/5：选中条目解压直连引擎 → 密码弹窗兜底在此（拖拽解压经本方法自动覆盖）
+        // 旁路统计逐条目结果：引擎对单个条目失败只上报 Failed 状态、不抛异常，
+        // 不检查就会出现「进度窗口显示完成、目标目录空无一物」的静默失败（issue #91）。
+        var tracker = new ExtractOutcomeTracker(progress);
         var (outcome, _) = await PasswordRetryLoop.RunAsync(
             archivePath, password, engine,
             owner: null,
             setStatus: _ => { },
             attempt: async (pwd, token) =>
+            {
+                // 每轮重试先清零：上一轮的完成/失败计数不能带进本轮判定
+                tracker.Reset();
                 await engine.ExtractEntriesAsync(
                     archivePath, entryKeys, destinationPath,
-                    pwd, progress, token, options, pathOverrides),
+                    pwd, tracker, token, options, pathOverrides);
+            },
             ct: cancellationToken);
 
         if (outcome == PasswordRetryOutcome.Cancelled)
@@ -124,6 +131,9 @@ public sealed class SelectedItemsExtractService
         // 禁止落成功路径（否则调用方记录路径历史且 CLI 直解批处理会误删损坏源包）
         if (outcome == PasswordRetryOutcome.CorruptedOrInvalid)
             throw new InvalidDataException(LocalizationManager.T("Status_ArchiveCorrupted"));
+
+        // 选中条目全部失败 = 什么都没解出来，必须报错（不能落成功路径记路径历史）。
+        tracker.ThrowIfNothingWritten();
     }
 
     /// <summary>

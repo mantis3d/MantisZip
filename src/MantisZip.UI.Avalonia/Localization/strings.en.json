@@ -1,4 +1,5 @@
 ﻿{
+  "Error_Extract_AllEntriesFailed": "All {0} file(s) failed to extract; nothing was written. If the archive is encrypted, check that the password is correct.",
   "FileFilter_BuiltInPreset_Image": "📷 Images only",
   "FileFilter_BuiltInPreset_Audio": "🎵 Audio only",
   "FileFilter_BuiltInPreset_Video": "🎬 Video only",
