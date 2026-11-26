@@ -6,6 +6,19 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-26** — 文档：计划台账审计（5 条已发版计划归档 + PLAN.md 六类问题修正）
+  - **用户指令**：「你检查一下 plan.md 里面所有计划完成度与实际代码是否符合，是否需要更新计划文档。」
+  - **审计口径**：`git show <tag>:<path>` + `rg` 实测，不读计划自述。`docs/PLAN.md` 引 77 处 / 唯一 71 个计划文件，链接 0 断链；但状态标记与实际发布情况对不上。
+  - **问题一（最严重）**：`## 进行中` 表 7 行里有 4 行自述「待发版」，实测早已随版本出去：`picker-new-folder`（`f751b94a` 是 v0.5.6 祖先，`git show v0.5.6:…CustomFilePickerControl.axaml.cs` 里 `NewFolder` 命中 15 处）、`picker-address-two-rows`（v0.5.6 的 axaml 里已有「Row 0: 地址区（上：导航 / 动作按钮行；下：面包屑整宽行）」注释）、`default-filename-template` + `embedded-default-settings`（v0.5.7 的 `Resources/Defaults/settings.json` 才出现，`CreateWithDefaults` 在 v0.5.6 还是裸 `new AppSettings()`）。第五份 `shell-menu-disappear`（issue #80）也已随 v0.5.7 发。
+  - **问题二**：`已冻结` 表被一个空行切成两段，后 3 行（`preview-extended-formats` / `floating-preview-panel` / `text-fallback-encoding-policy`）没有表头，Markdown 渲染时不成表格。
+  - **问题三**：v0.5.11 尾部缓冲两项（`preview-show-content-toggle` / `extract-journal-undo`）只有行内反引号、没有 Markdown 链接 ⇒ 断链检查扫不到，已改成正经表格行。
+  - **问题四**：`winget-publishing.md` 在 `ef833898`（A 档改为按版本阶段交付）那次重排里被无声丢弃（`git show ef833898^:docs/PLAN.md` 有那一行、`git show ef833898:docs/PLAN.md` 命中 0），计划文件本身完好（0/6），已补回 B 档并标注恢复来源。
+  - **问题五**：`v0.5.5` 标题写「已完成」但验收口径行缺 `（✅ 已达成）`（v0.5.6–v0.5.8 都有）；`最后更新` 停在 2026-11-23。
+  - **问题六**：`axaml-compiled-bindings` 行的「50 个 `.axaml` 只有 1 个开编译绑定」实测应为 **55 个 / 0 个**（38 个文件显式 `x:CompileBindings="False"`，13 个有 `x:DataType`），且 `compilebindings` 守卫**尚未建**（现有 12 条守卫里没有它）—— 已在 PLAN 里按实测改写并注明守卫待建。
+  - **交付**：五份计划 `git mv` 到 `.omo/plans/已完成/` + 改写状态头（标明随哪个版本发布）；PLAN.md 六处修正；`docs/PROGRESS.md` 历史索引表补 5 行 + 加 11-26 里程碑。
+  - **遗留**：这四条功能**从未进 `RELEASE_NOTES.md`**（`新建文件夹` / `两行` / `install-choices` / `Resources/Defaults` 全部 0 命中），属发布说明缺漏 —— 是否回补 v0.5.6 / v0.5.7 章节待用户决定（按规则 18 不擅自写入）。
+  - **验证**：两文件 `bom=False` / `loneLF=0` / `loneCR=0` / `triple=0`；PLAN 结构自检「无表头表格」= 0 处。
+
 **2026-11-26** — 合并 beta 到 alpha（v0.5.7 发版后的 7 笔）
   - **用户指令**：「请帮我解决合并分支的冲突。」
   - **现场**：alpha HEAD `6a59ea9b`；`MERGE_HEAD` = `3e638032`（`Merge branch 'beta' for v0.5.7`，且 `git tag v0.5.7` 正指向它 ⇒ **v0.5.7 已发版**）；merge-base `4cce044e`。
@@ -119,7 +132,7 @@
   - **为什么静态字段是陷阱**：`private static readonly string BaseDir = AppSettings.DataDir;` 在 `WindowStateManager` 首次被访问时求值 —— 那一刻可能早于测试设置沙箱，取到的是真实 `%LOCALAPPDATA%\MantisZip`，之后无论怎么重定向都写真实文件。这类「初始化顺序依赖」不可能靠断言兜住，只能靠写法约束（已写进 `AGENTS.md` 规则 24）。
   - **实测验证**：跑 `PathHistoryManagerTests`（11 例）前后真实 `path-history.json` 的 mtime 与 MD5 **完全不变**（修前会变）；全量 ui-tests（937 例 / 934 passed + 3 skipped）前后 `settings.json`/`settings.json.bak`/`window.json`/`recent.json`/`layout.json`/`metadata-panel.json`/`lifecycle.log`/`favorites.json`/`path-history.json`/`conflict.log`/`debug.log` **11 个文件 MD5 与 mtime 全部未变**。
   - **未重定向的留白（已核查风险低）**：`%APPDATA%\MantisZip\.masterkey` 与 `passwords.json`（`AesGcmDataProtector` / `PasswordManager`，`rg "PasswordManager\.(Save|Add|Remove|Clear)" tests` 零命中 ⇒ 测试不写）、`Services/StartupTimer.cs:80-84` 的 `startup-trace.log`（自己拼 `LocalApplicationData`，不在 `AppDataPaths` 链上）。
-  - **文档同步**：`AGENTS.md` 规则 24 补「数据目录也要一起重定向」整段（含禁用 `static readonly` 固化路径的硬性要求）并把事故数字统一成 80；`docs/PROGRESS.md` / `docs/progress-avalonia-detail.md` 同日条目；`docs/ARCHITECTURE.md` 与 `.omo/plans/进行中/embedded-default-settings.md` 的「读一次即删」措辞改「落盘后才删」；`RELEASE_NOTES.md` v0.5.7 「修复」节补「安装时选的语言和主题现在真的生效了」，同时把 `installer/prebuilt/settings.json` 的「5 个已删键」订正为 3（`PickItemsPanelWidth`/`ExtractFolderPanelWidth` 仍在用）。
+  - **文档同步**：`AGENTS.md` 规则 24 补「数据目录也要一起重定向」整段（含禁用 `static readonly` 固化路径的硬性要求）并把事故数字统一成 80；`docs/PROGRESS.md` / `docs/progress-avalonia-detail.md` 同日条目；`docs/ARCHITECTURE.md` 与 `.omo/plans/已完成/embedded-default-settings.md` 的「读一次即删」措辞改「落盘后才删」；`RELEASE_NOTES.md` v0.5.7 「修复」节补「安装时选的语言和主题现在真的生效了」，同时把 `installer/prebuilt/settings.json` 的「5 个已删键」订正为 3（`PickItemsPanelWidth`/`ExtractFolderPanelWidth` 仍在用）。
   - **验证**：`-Task build -Target core` / `-Target avalonia` 0 警告，`-Task test -Target tests` / `-Target ui-tests` 全绿，`-Task check` 版本 0.5.7 六处 + 三语 1486 key + 12 条守卫全绿。
 
 **2026-11-22** — 出厂默认设置改为内嵌 JSON 快照 + 安装器只写一次性向导选择 + 测试程序集级设置沙箱
@@ -342,7 +355,7 @@
   - **冲突根因**：beta 侧 11-11 的 issue #80（右键菜单「用一次就消失」）整节插在 v0.5.7 阶段小节之前，alpha 侧同时改写了同一处「v0.5.7 阶段头」（标题变「数据安全收尾与压缩文件名模板（✅ 已完成）」并把 Office 预览切片 3 移进 v0.5.10）—— 两侧在同一位置各自插入，形成搬运冲突。
   - **解法**：三份文件统一按「两侧全留 + 同月从新到旧重排」处理 —— `PLAN.md` 的 #80 小节保留在 v0.5.7 **之前**（用户拍板，最小改动且与当时实际顺序一致），beta 侧那行已过期的「🚧 进行中：对话策略 + KI-012 已完成，剩 Office 预览切片 3」标题删除、由 alpha 的 ✅ 标题接管；`PROGRESS.md` 与本文档里 #80 的条目排在 11-12 三条之后、11-11 文件名模板之前；行尾保持 CRLF、UTF-8 无 BOM。
   - **验证**：解完与 alpha 侧逐行比对只剩「#80 相关新增」（`PLAN.md` +8 行、`PROGRESS.md` +2 行、本文档 +15 行），抹去冲突区后与 alpha 逐字节一致；与 beta 侧比对只剩 alpha 的新增 + 有意删除的过期标题；无冲突标记残留；`-Task check` 版本 0.5.7 六处一致 / 三语 1484 key / 10 条守卫全绿，`-Task build -Target avalonia` 37.7s 0 警告，`tests` 22.4s 与 `ui-tests` 62.7s 全绿。
-  - **边界**：`issue #80` 的计划文件仍在 `.omo/plans/进行中/shell-menu-disappear.md`（等用户真机复测通过再归档），`RELEASE_NOTES.md` 的 v0.5.7 已含 #80 与文件名模板两条，本次合并不再改动。
+  - **边界**：`issue #80` 的计划文件已归档到 `.omo/plans/已完成/shell-menu-disappear.md`（2026-11-26 随计划台账审计归档），`RELEASE_NOTES.md` 的 v0.5.7 已含 #80 与文件名模板两条，本次合并不再改动。
 
 **2026-11-13** — 交互：包内根目录四档标签精简 + 根目录名与下拉同行
   - **用户反馈（原文）**：「包内根目录四档 有几个文本太长，后面都是"唯一根目录"字样，可以去掉或适当精简。相应 ui 宽度也可以缩短。」「后面"根目录名"的控件应该跟下拉选框放在一行，以节省空间。」

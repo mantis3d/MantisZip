@@ -26,6 +26,11 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-11
+- **11-26** — **计划台账审计：5 条已发版计划归档、PLAN.md 六类问题修正**
+  - 逐项核对 `docs/PLAN.md` 71 个计划与真实代码（`git show <tag>:<path>` + `rg` 实测，不靠计划自述）。查出 5 条自述「待发版」实际已随 **v0.5.6 / v0.5.7** 发布：`picker-new-folder`（`f751b94a` 是 v0.5.6 祖先）、`picker-address-two-rows`、`default-filename-template`、`embedded-default-settings`（`Resources/Defaults/settings.json` 只在 v0.5.7 出现）、`shell-menu-disappear`（issue #80 已随 v0.5.7 发）。
+  - 五份计划 `git mv` 到 `.omo/plans/已完成/` 并改写状态头；`RELEASE_NOTES.md` 对其中四条**完全没有条目**（`新建文件夹` / `两行` / `install-choices` / `Resources/Defaults` 全部 0 命中）—— 属发布说明缺漏，已记录待用户决定是否补写进 v0.5.6 / v0.5.7 章节。
+  - 另修五处文档缺陷：①`已冻结` 表被一个空行切成两段（后 3 行不成表格）②v0.5.11 尾部缓冲两项只有行内反引号没有链接 ③`winget-publishing.md` 在 `ef833898` 的 A 档重排里被无声丢弃，补回 B 档 ④v0.5.5 验收口径缺 `✅ 已达成` ⑤`97` 行的「50 个 axaml / 1 个开编译绑定」实测应为 **55 / 0**，且 `compilebindings` 守卫尚未建。
+  - 校验：`docs/PLAN.md` 287 行、`docs/PROGRESS.md` 520 行，两文件 `bom=False` / `loneLF=0` / `loneCR=0` / `triple=0`；PLAN 全表结构自检通过（唯一无表头表格 = 0 处）。
 
 - **11-26** — **合并 beta 到 alpha（v0.5.7 发版后的 7 笔：自适应规则名 / 过滤预设名改 i18n 键、发布说明精简、字体预览样本归一换行）**
   - 7 笔提交：`b3b2097c` 自适应规则名改 i18n 键 → `f9902ddd` 内置过滤预设名改 i18n 键 → `41dcbc16`/`fc1dba74`/`b6d8147e` 发布说明精简与补图 → `4fb3d32e` 字体预览样本文本归一换行 → `3e638032` Merge beta for v0.5.7。
@@ -383,6 +388,11 @@
 
 | 功能 | 设计文档 | 实现版本 |
 |------|----------|:--------:|
+| 文件选择器「新建文件夹」（所有模式：地址行按钮 + `Ctrl+Shift+N` + 校验留窗的 `InputDialog`；PickFolder/ExtractFolder/SaveFile 建完进新目录，PickItems/OpenFile 只刷新） | [picker-new-folder.md](.omo/plans/已完成/picker-new-folder.md) | v0.5.6（2026-11-04 实施，2026-11-26 归档） |
+| 文件选择器地址区拆两行（按钮行 左导航 / 右新建+收藏，面包屑整宽行 392 → ≈610px；两个 headless 用例钉住布局关系） | [picker-address-two-rows.md](.omo/plans/已完成/picker-address-two-rows.md) | v0.5.6（2026-11-05 实施，2026-11-26 归档） |
+| 出厂默认命名模板 + 删除「保留源扩展名」开关（新装即带 `{name:auto}` + 两条内置预设；`KeepOriginalExtension` 连根去掉，语义由 `{ext}` 覆盖） | [default-filename-template.md](.omo/plans/已完成/default-filename-template.md) | v0.5.7（2026-11-22 实施，2026-11-26 归档） |
+| 出厂默认设置内嵌进程序 + 安装器不再预置 settings.json（默认值收敛成编译进程序的 `Resources/Defaults/settings.json` 117 键；向导语言/主题改走一次性 `install-choices.json` 并在首启落盘后才删；加程序集级测试沙箱 `AppSettingsTestRedirect`） | [embedded-default-settings.md](.omo/plans/已完成/embedded-default-settings.md) | v0.5.7（2026-11-22 实施，2026-11-26 归档） |
+| 右键菜单用一次就消失（issue #80：handler 自报心跳 `LastRenderUtc`/`LastRenderExplorerPid` 替掉「dll 被 Explorer 加载」这个错误健康信号，`DecideComAction` 纯函数决策表，`active` 可回退；`EnableDynamicMenu` 出厂默认关闭降为实验开关；`CleanupRegistrations` 拆掉 Explorer 重启、命名互斥、幂等写） | [shell-menu-disappear.md](.omo/plans/已完成/shell-menu-disappear.md) | v0.5.7（2026-11-11 实施，2026-11-26 归档） |
 | 根目录名模板（加根名支持占位符：`{name}`/`{parent}`/`{date}`/`{datetime}`/`{archive}`；词法与结果校验抽成共用 `TemplateLexing`；`ResolveWrapName` 保证字面名逐字节不变；插入菜单按目标框切换集合；预览 = 实际） | [root-name-template.md](.omo/plans/已完成/root-name-template.md) | 未发布（2026-11-18 归档，随 v0.5.8） |
 | 智能解压两档（加根 / 去根）+ 解压落点统一（两档 dest 都取父目录、只换根策略；对话框默认落点同步改父目录；SmartOpenPathResolver 已知计划重载修「解压后打开错层」；状态栏三条按实际动作重写） | [smart-extract-root-mode.md](.omo/plans/已完成/smart-extract-root-mode.md) | 未发布（2026-11-13 归档，随 v0.5.8） |
 | 唯一根目录处理（压缩端 / 解压端各四态下拉：原样 / 智能去除 / 智能添加 / 始终添加；判定统一收敛在 `ArchiveRootPolicy`，预览与实解共用同一解析；不可用档位从下拉里拿掉 + 一行说明） | [compress-extract-root-mode.md](.omo/plans/已完成/compress-extract-root-mode.md) | 未发布（2026-11-12 归档，随 v0.5.8） |

@@ -3,7 +3,7 @@
 > 未来待开发功能规划。已实现的功能见 [docs/PROGRESS.md](PROGRESS.md)，技术架构见 [docs/ARCHITECTURE.md](ARCHITECTURE.md)，每项计划的完整设计见 `.omo/plans/`。
 
 **项目状态**: 🟢 开发中  
-**最后更新**: 2026-11-23  
+**最后更新**: 2026-11-26  
 **当前版本**: 0.5.8
 
 
@@ -70,7 +70,7 @@
 | ✅ 面包屑地址栏（PathBreadcrumb） | [path-breadcrumb.md](.omo/plans/已完成/path-breadcrumb.md) | 🟡中 | 6-8h | 三处地址栏（主窗口 / QuickPathPicker / CustomFilePickerDialog）改为资源管理器式面包屑：段点击直达 + Ctrl+L 进编辑态 + 段数阈值折叠 + 虚拟根段。2026-10-21 已按代码核准（`TryConfirmFile` 无模式判断须保持现状；`Path` 定为 StyledProperty + OneWay；QuickPathPicker 4 宿主纳入回归）。接缝改造后它的头号风险（逐字符回写 Path）已降级为「按钮可用性 / 实时提示」。**2026-10-29 已完成并归档**（三处接入 + 6 个无头用例；真机冒烟项见计划末「未做」） |
 | ✅ 文件选择器去弹窗化（内嵌控件） | [embedded-file-picker.md](.omo/plans/已完成/embedded-file-picker.md) | 🟡中 | 8-16h | 把文件/目录选择器内嵌进压缩/解压设置窗：抽出 `Controls/CustomFilePickerControl` 纯控件，压缩窗 6 页签 / 解压窗 4 页签内嵌（简单/高级模式、已选清单、弹性高度），「解压选中项到 / 拖拽兜底」改用解压设置窗 + 预置选中集；`CustomFilePickerDialog` 静态入口与「系统浏览」豁免不动。**2026-10-30 已完成并归档** |
 
-> **v0.5.5 验收口径**：三处地址栏都能像资源管理器一样点段跳转、Ctrl+L 编辑；压缩/解压设置窗不再弹模态选择器，选完当场回填；窗口缩放与深浅主题下都不丢焦点、不串路径。
+> **v0.5.5 验收口径（✅ 已达成）**：三处地址栏都能像资源管理器一样点段跳转、Ctrl+L 编辑；压缩/解压设置窗不再弹模态选择器，选完当场回填；窗口缩放与深浅主题下都不丢焦点、不串路径。
 
 ### 阶段 v0.5.6 —— 文件列表体验（约 17-25h，✅ 已完成）
 
@@ -87,13 +87,13 @@
 
 > **v0.5.6 验收口径（✅ 已达成）**：列表能在三种布局间循环并记住选择；打开 1000+ 条目的包时骨架区能看到数字在涨；ico 文件在列表里显示自己的图标而不是通用图标；复选框模式勾选 3 项后删除只弹一次确认、删完勾选态清空，且默认关闭时行为与今天完全一致；缩略图卡片的外边框 / 垫底色 / 尺寸三项在设置里改完即时生效；卡片视图也能勾选，Shift 连选与「视图 → 列表布局」子菜单可用；切换复选框模式时选区与勾选能互相转换，压缩/解压窗里的复选框选择手势与主列表一致。
 
-### 缺陷修复 —— 右键菜单用一次就消失（issue #80，约 6-10h，随 v0.5.7 一起发）
+### 已完成修复 —— 右键菜单用一次就消失（issue #80，2026-11-11 完成，随 v0.5.7 发布）
 
-> 用户可感知的功能回归（启用后只能用一次），按判据第 3 条「削减失信 bug 优先于增加功能面」插到 v0.5.7 前面。**2026-11-11 已实施**（代码 + 单测 + 门禁全绿，待用户真机复测）。
+> 用户可感知的功能回归（启用后只能用一次），按判据第 3 条「削减失信 bug 优先于增加功能面」插到 v0.5.7 前面。**2026-11-11 已实施**（代码 + 单测 + 门禁全绿），随 **v0.5.7 发布**；2026-11-26 归档至 `.omo/plans/已完成/`。
 
 | 功能 | 设计文档 | 难度 | 工时 | 说明 |
 |---|---|:--:|:--:|---|
-| issue #80：右键菜单执行一次后永久消失 | [shell-menu-disappear.md](.omo/plans/进行中/shell-menu-disappear.md) | 🟡中 | 6-10h | 三态状态机（`pending`/`active`/`disabled`）里 `CheckComStatus` 只处理 `pending`，一旦 `active` 就永久早退、删掉的级联兜底再也不会回来；`fallback` 常量定义了却从未写入。同时修 `Install()` 借道 `Uninstall()` 会 `Kill()` explorer.exe、多实例并发重写级联（右键启动 200ms~1.2s）。根因已由用户注册表证据确认（`DynamicMenuStatus=active` + 级联被删 + COM 键仍在）。**已实施（2026-11-11）**：A（handler 自报心跳 `LastRenderUtc`/`LastRenderExplorerPid` 替掉「dll 被 Explorer 加载」这个错误健康信号，`DecideComAction` 纯函数决策表，`active` 可回退）+ B（`EnableDynamicMenu` 出厂默认 `false`，COM 降为实验开关）+ D（`CleanupRegistrations` 拆掉 Explorer 重启、命名互斥、幂等写） |
+| issue #80：右键菜单执行一次后永久消失 | [shell-menu-disappear.md](.omo/plans/已完成/shell-menu-disappear.md) | 🟡中 | 6-10h | 三态状态机（`pending`/`active`/`disabled`）里 `CheckComStatus` 只处理 `pending`，一旦 `active` 就永久早退、删掉的级联兜底再也不会回来；`fallback` 常量定义了却从未写入。同时修 `Install()` 借道 `Uninstall()` 会 `Kill()` explorer.exe、多实例并发重写级联（右键启动 200ms~1.2s）。根因已由用户注册表证据确认（`DynamicMenuStatus=active` + 级联被删 + COM 键仍在）。**已实施（2026-11-11）**：A（handler 自报心跳 `LastRenderUtc`/`LastRenderExplorerPid` 替掉「dll 被 Explorer 加载」这个错误健康信号，`DecideComAction` 纯函数决策表，`active` 可回退）+ B（`EnableDynamicMenu` 出厂默认 `false`，COM 降为实验开关）+ D（`CleanupRegistrations` 拆掉 Explorer 重启、命名互斥、幂等写） |
 
 ### 阶段 v0.5.7 —— 数据安全收尾与压缩文件名模板（约 20-26h，✅ 已完成）
 
@@ -160,10 +160,12 @@
 |---|---|:--:|:--:|---|
 | 预览取数层内存优先（切片 3：Office） | [preview-memory-first.md](.omo/plans/已完成/preview-memory-first.md) | 🟡中 | 5-7h | Office 各 `*.Open(Stream)`（`SpreadsheetDocument` / `WordprocessingDocument` / `PresentationDocument`），字体明确豁免。三者本来就在解析完整文档，省下的只是落盘。2026-11-11 从 v0.5.7 后移至此 |
 | 卡片元数据（全卡头部窗口 + 小文件整条兜底） | [card-metadata-head-window.md](.omo/plans/未开始/card-metadata-head-window.md) | 🟡中 | 12-16h | 平铺 / 内容布局里**所有**候选卡显示 2–3 行格式元数据（音频 / 视频 / 字体 / 可执行 / PDF / Office / BT 种子 / SQLite / ISO）；取数改成「读条目头部 256 KB → 解析」，小文件（≤2 MB）整条兜底、视频尾段（≤10 MB）补 moov；6 组开关在「设置 → 外观 → 缩略图」第 4 张卡片 |
-| AXAML 编译期绑定（渐进式开启 `x:CompileBindings`） | [axaml-compiled-bindings.md](.omo/plans/未开始/axaml-compiled-bindings.md) | 🟡中 | 10-14h | 50 个 `.axaml` 只有 1 个开编译绑定、13 个有 `x:DataType`；渐进三批推进 + `-Task guards` 第 9 条 `compilebindings`（只约束新增与已迁移文件） |
+| AXAML 编译期绑定（渐进式开启 `x:CompileBindings`） | [axaml-compiled-bindings.md](.omo/plans/未开始/axaml-compiled-bindings.md) | 🟡中 | 10-14h | 2026-11-26 实测：`src/` 下 55 个 `.axaml`，**0 个**开 `x:CompileBindings="True"`（38 个文件显式写 `False`），13 个有 `x:DataType`；`compilebindings` 守卫**尚未建**（现有 12 条守卫里没有它）。渐进三批推进 + 新守卫（只约束新增与已迁移文件） |
 | 缩略图/图标缓存与列表惰性分批（v0.5.6 缩略图功能性能债） | [thumbnail-list-cache-virtualization.md](.omo/plans/未开始/thumbnail-list-cache-virtualization.md) | 🟢低 | Phase 1 **2-3天** | 2026-11-06 立项（`file-list-thumbnails` 实施记录里三条已知改进口子）：①缩略图缓存跨包/跨目录共享（构造参数已具备，切包丢缓存）②ICO 列表图标 LRU 缓存（筛选每敲一字重读最多 20 个 ico）③平铺/内容布局分批惰性铺条（每批 200、滚动到底追加），作为无虚拟化的缓解；Phase 2 真虚拟化面板（自写 VirtualizingPanel）留档，待 Phase 1 QA 后由用户单独决策，未明确决策不得开工。**暂缓**：被下条 UX 修复先做 |
+| 预览「显示内容」开关 | [preview-show-content-toggle.md](.omo/plans/未开始/preview-show-content-toggle.md) | 🟢低 | 2-3h | **v0.5.11 尾部缓冲**（进度紧就退回 B 档）：预览面板顶部加一个「显示内容」开关，让用户能在大文件预览卡顿时临时关掉内容区只看元数据 |
+| 提取日志与解压「后悔药」 | [extract-journal-undo.md](.omo/plans/未开始/extract-journal-undo.md) | 🟡中 | 3-4h | **v0.5.11 尾部缓冲**（进度紧就退回 B 档）：记录每次解压的落点与覆盖情况，支持事后按记录撤销一批刚解压出来的文件 |
 
-> **v0.5.11 尾部缓冲（进度紧就退回 B 档）**：剩余 2 项——预览「显示内容」开关（2-3h，`preview-show-content-toggle.md`）、提取日志与解压「后悔药」（3-4h，`extract-journal-undo.md`）。原在此列的「压缩文件名模板」已于 2026-11-11 升入 v0.5.7。
+> 剩余 2 项（上两行）为 v0.5.11 尾部缓冲：进度紧就退回 B 档。原在此列的「压缩文件名模板」已于 2026-11-11 升入 v0.5.7。
 
 ---
 
@@ -190,23 +192,21 @@
 | 压缩/解压配置预设 | [compress-preset.md](.omo/plans/未开始/compress-preset.md) | 🟡中 | 3-4h | 命名预设保存全部设置 |
 | 元数据显示位置可选（侧边面板 / 正文区） | [metadata-display-location.md](.omo/plans/未开始/metadata-display-location.md) | 🟢低 | 6-8h | 📋 2026-10-31 用户讨论后定案、待启动。exe 预览正文区只有条目名标题、大片空白，信息全在右侧面板；按类型加「显示位置」，选正文区时「程序信息」搬到正文区竖排渲染、面板只留「文件信息」。**只对没有其它正文内容的格式开放**（当前仅 `pe`），默认侧边面板、老配置不动 |
 | 解压时同时解开内层压缩包（递归嵌套解压） | [nested-archive-extract.md](.omo/plans/未开始/nested-archive-extract.md) | 🟡中 | 16-22h | 📋 2026-11-05 用户逐项定稿、待排期。内层包解到同名子目录（原包保留）、递归可配深度默认 3（1-10）、只认 `.zip/.7z/.rar/.tar/.gz/.tgz/.tar.gz` 白名单（不做魔数，避开 Office/EPUB）、密码走外层→密码库→弹一次窗、冲突沿用本次策略（`ask` 也弹）、失败跳过并汇总、**5 处入口全覆盖**（对话框 / 三条原地解压 / 拖拽 / CLI）、深度 + 500 包 / 100GB 双硬上限。新增独立 `NestedExtractRunner` + Core 策略/扫描器，不改引擎契约
+| Winget 发布 | [winget-publishing.md](.omo/plans/未开始/winget-publishing.md) | 🟢低 | 1-2h | 发布到 Windows Package Manager 社区仓库；首次手动提交后 CI 自动化。公开用户的分发入口，1-2h 的性价比极高。**2026-11-26 从历史恢复**：2026-11 那次「A 档改为按版本阶段交付」的重排（`ef833898`）把它从表里丢了，计划文件本身完好（0/6） |
 
 
 ---
 
-## 进行中 —— 7 条计划（4 条已排入 v0.5.x，3 条待排 / 已在做）
+## 进行中 —— 3 条计划（1 条已排入 v0.5.9，2 条待排 / 已在做）
 
 > 2026-11-04 清账：7z solid 批量解压、选中条目批量解压、文件名代码页三条的代码与实测均已通过，已归档进「已完成」（HDD 真机复测仍列为 v0.5.6 发布前手工项）；预览扩展剩余部分、浮动面板、注释编码 Phase 2 三条转入「已冻结」；可插拔预览模块转「已归档」。2026-11-13：智能解压两档并入 v0.5.8 第二项，本表加一行。
+> 2026-11-26：picker-new-folder（v0.5.6）、picker-address-two-rows（v0.5.6）、default-filename-template（v0.5.7）、mbedded-default-settings（v0.5.7）、shell-menu-disappear（v0.5.7）五条已随版本发布，2026-11-26 一并归档进「已完成」；本表由 7 条减为 3 条（都是真正未完成的计划）。
 
 | 功能 | 设计文档 | 已做 | 剩余 | 我的建议 |
 |---|---|---|---|---|
 | 拖拽直接解压 + 文件树预览弹窗 | [drag-drop-direct-extract.md](.omo/plans/进行中/drag-drop-direct-extract.md) | 主体 Task 1–7 ✅（自实现 OLE 拖拽 `CustomOleDragDrop` + `OverlayController` 三色覆盖层 + 落点检测 + 拖拽后统一走 `ExtractFlow`） | **文件树预览弹窗整体未实施**（`DragPreviewPopup.cs` 不存在）+ 双投放区 + 落点冲突预览 + Task 8 手工验收 | **已排入 v0.5.9**（10-14h）：唯一带「拖了没反应」风险的半成品，优先收尾 |
 | 压缩加速三开关 UI 收敛 + 魔数检测/自适应规则 | [adaptive-compress-ui-convergence.md](.omo/plans/进行中/adaptive-compress-ui-convergence.md) | Phase 1 ✅ / Phase 2 主体 ✅（Task 9-11；SSOT 统一到 `ZipEntryClassifier`、`AdaptiveRuleMatcher.ResolveLevel` 唯一决策入口、仅存储格式并入规则、MT 提示、CLI 开关） | Task 12 本机基准测试 UI、Task 13 组数定标 | **收尾**（1-2h）：不补就是文档里长期留个「P1 完成但没做完」，可搭 v0.5.9 碎片清仓 |
 | 新增压缩格式（BZip2/XZ/Zstd/Brotli + 7z.dll 只读） | [new-format-support.md](.omo/plans/进行中/new-format-support.md) | Core 侧 TAR 裸格式 / GZip 单文件压缩 + 文件关联已就绪 | UI 压缩格式下拉未放开；BZip2→XZ→Zstd→Brotli；7z.dll 只读格式 | **只做前半**：UI 下拉放开 + 7z.dll 只读解锁（读取做稳）；BZip2/XZ/Zstd **创建**无限期延后。待排（估 6-8h），不急 |
-| 文件选择器「新建文件夹」（所有模式） | [picker-new-folder.md](.omo/plans/进行中/picker-new-folder.md) | — | 已完成（T1–T6） | **待发版**（2026-11-04，`beta`）：地址行按钮 + `Ctrl+Shift+N` + 校验留窗的 `InputDialog`；PickFolder/ExtractFolder/SaveFile 建完进新目录，PickItems/OpenFile 只刷新。`ui-tests` 6 例全绿；归档待 `RELEASE_NOTES` 范围确认 |
-| 文件选择器地址区拆两行 | [picker-address-two-rows.md](.omo/plans/进行中/picker-address-two-rows.md) | — | 已完成（T1–T4） | **待发版**（2026-11-05，`beta`）：按钮行（左导航 / 右新建+收藏）+ 面包屑整宽行；面包屑 392 → ≈610px，垂直多占 36–46px。两个 headless 用例钉住布局关系；归档待 `RELEASE_NOTES` 范围确认 |
-| 出厂默认命名模板 + 删除「保留源扩展名」开关 | [default-filename-template.md](.omo/plans/进行中/default-filename-template.md) | — | **待发版**（2026-11-22，`beta`） | 新装即带 `{name:auto}` + 两条内置预设（`CreateWithDefaults` 注入，只对「设置文件不存在」生效）；同时删掉名义全局、实际只管分别压缩的 `KeepOriginalExtension` 开关（语义已被 `{ext}` 覆盖，且会成为出厂即死开关）。约 15 文件：Core 去形参 + 位置参数 record 少一项 + 三语删 key |
-| 出厂默认设置内嵌进程序 + 安装器不再预置 settings.json | [embedded-default-settings.md](.omo/plans/进行中/embedded-default-settings.md) | — | **待发版**（2026-11-22，`beta`） | 默认值收敛成一份编译进程序的 `Resources/Defaults/settings.json`（117 键，缺键自动保留字段初值，改完重新 build 即生效），替换「设置文件缺失 / 损坏且备份读不出」两条回落路径；删掉已腐朽的 `installer/prebuilt/settings.json`（缺 `FileNameTemplate*`、3 个已删键、十余处过期值）。向导语言/主题改走一次性 `install-choices.json`（应用首启套用并落盘后才删）—— 顺带修好自 `8ea6bdb2` 起空转两个月的选择。另加程序集级测试沙箱 `AppSettingsTestRedirect`：此前全量 ui-tests 有 42 次 `SaveTo` 直接写真实 settings.json（35 次写「模板空预设空」实例，用户预设就是这样被冲掉的） |
 
 ---
 
@@ -223,7 +223,6 @@
 | 跨平台移植（macOS / Linux） | [cross-platform-port.md](.omo/plans/未开始/cross-platform-port.md) | 6-8周 | 📋 **2026-10-24 确认：暂不投入（「想想」）**。这是战略选择不是功能。WPF→Avalonia 迁移已完成，剩余为 macOS/Linux 适配 | 决策上要做跨平台时，**先花 1 天做可移植性体检**（Win32 依赖隔离成接口 + linux CI 只跑 Core 测试），再决定是否投 8 周 |
 | Win11 一级右键菜单 | [win11-first-level-menu.md](.omo/plans/未开始/win11-first-level-menu.md) | 1-2周 | 需 MSIX sparse package + 签名，**成本被低估**；现有 Inno 安装的右键菜单已可用 | 打包链路支持 MSIX 签名后 |
 | 压缩包管理器（历史/标签/目录树） | [archive-manager.md](.omo/plans/未开始/archive-manager.md) | 2-3天 | SQLite 持久化 + 独立窗口，收益可疑（解压软件不需要「资料库」） | 有用户明确要求历史管理 |
-
 | 扩展预览格式支持（剩余：LNK/DBF/EPUB/字幕/STL + 插件化） | [preview-extended-formats.md](.omo/plans/进行中/preview-extended-formats.md) | 3.5/6 阶段已落地 | 已有预览深度已超出用户预期；Magick.NET / LibVLC 插件化是成本黑洞 | 用户点名要 LNK/EPUB 等具体格式时，只做该格式的最小支持 |
 | 浮动/停靠预览面板（浮动独立窗 + 边缘吸附） | [floating-preview-panel.md](.omo/plans/进行中/floating-preview-panel.md) | 四位置停靠已落地 | 停靠已覆盖 90% 场景，浮动窗是「复杂大于收益」 | 有多屏用户明确要「预览浮到主窗之外」时 |
 | 文本/ZIP 注释回退编码策略 Phase 2（可配置回退代码页） | [text-fallback-encoding-policy.md](.omo/plans/进行中/text-fallback-encoding-policy.md) | Phase 1 已完成 | 现实现覆盖主场景（严格 UTF-8 → GB18030 → 宿主 ANSI） | 有真实用户报告注释乱码时再定 |

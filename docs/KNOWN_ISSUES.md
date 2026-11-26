@@ -197,7 +197,7 @@
 - **证据**：`src/MantisZip.UI.Avalonia/Controls/CustomFilePickerControl.axaml.cs:1908-1912`（只 `SystemBrowseRequested?.Invoke`）；`rg SystemBrowseRequested src` 的订阅点只有 `CustomFilePickerDialog.axaml.cs:225`。
 - **为什么现在不修**：**缺决策**。修法要先回答一个规则 16 问题：内嵌宿主能不能走原生选择器？能 ⇒ 在压缩窗 / 解压窗各订阅一次（约 20 行）；不能 ⇒ 应该把按钮在非模态宿主里隐藏（`IsVisible=false`），否则等于承认有第二个豁免点。两条路产品语义不同，不适合顺手定。
 - **复评条件**：① 用户反馈「设置窗里的系统浏览点了没反应」时；② 或决定「内嵌宿主是否允许复用规则 16 的原生豁免通道」时。
-- **关联**：`.omo/plans/进行中/picker-new-folder.md` 的「非目标」；`AGENTS.md` 规则 16。
+- **关联**：`.omo/plans/已完成/picker-new-folder.md` 的「非目标」；`AGENTS.md` 规则 16。
 
 ## KI-015 `ShowExtractFolderAsync` 已无调用方
 
@@ -225,7 +225,7 @@
 - **证据**：`src/MantisZip.UI.Avalonia/Services/ShellIntegration.Menu.cs` 的 `CheckComStatus` 唯一调用方是 `App.axaml.cs:218`（启动期）；`src/MantisZip.ShellExt/ContextMenuHandler.cs` 的 `WriteRenderHeartbeat` 只在 `itemsAdded > 0` 分支执行 ⇒ handler 失效时既没有心跳、也没有进程启动。
 - **为什么现在不修**：**成本超阈值**。要真正「无启动自愈」只能上常驻手段（计划任务 / 开机自检 / Explorer 侧独立探针进程），对一个**默认关闭**的实验特性属于过度设计；当前设计的风险面已被「出厂默认静态级联」压到最低（只有主动打开实验开关的用户才可能遇到）。
 - **复评条件**：① 有用户报告「打开动态菜单后又消失、且打开主程序也没恢复」；② 或决定给动态菜单上常驻探针（计划任务 / 开机自检）时。
-- **关联**：`.omo/plans/进行中/shell-menu-disappear.md` 的「边界」段；`docs/PROGRESS.md` 2026-11-11 条目。
+- **关联**：`.omo/plans/已完成/shell-menu-disappear.md` 的「边界」段；`docs/PROGRESS.md` 2026-11-11 条目。
 
 ## KI-019 `--compress-combined` 不接受文件名模板（CLI 合并路径自算名字）
 

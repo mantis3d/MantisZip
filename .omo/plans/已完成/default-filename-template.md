@@ -1,6 +1,6 @@
 # 出厂默认命名模板 + 删除「保留源扩展名」开关
 
-> **状态**：实施中（2026-11-22，`beta` 分支）
+> **状态**：✅ 已完成（2026-11-22 实施，`beta` 分支；随 **v0.5.7** 发布，2026-11-26 归档）
 > **关联代码**：`Models/AppSettings`、`Core/Utils/CompressPathPlanner`、`Core/Services/CompressService`、`UI.Avalonia/Services/ResultPreviewService`、`UI.Avalonia/ViewModels/{CompressSettingsViewModel,SettingsWindowViewModel}`、`UI.Avalonia/Views/SettingsWindow.axaml`
 > **前置**：`filename-template`（v0.5.7 已归档）
 
