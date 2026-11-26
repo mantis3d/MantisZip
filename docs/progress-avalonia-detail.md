@@ -9,8 +9,9 @@
 
 - 按 Version bump checklist 从 `0.5.8` 改到 `0.5.9`：`src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version`、`src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 的 `<Version>`、`docs/PLAN.md` 与 `docs/PROGRESS.md` 的「当前版本」、`installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值（两份 `.iss` 改动只有这一行，保持无 BOM + CRLF）。
 - 校验：`-Task version` 六处全部匹配 `0.5.9`（appConstants / csproj / plan / progress / installer / installerSelfContained）；`-Task check` 三项全绿。
-- **没有动 `RELEASE_NOTES.md`**：v0.5.8 章节已按四个 `MantisZip-0.5.8-*.exe` / `-Portable*.zip` 包名写好，但 v0.5.8 **从未打 tag**（`git tag` 只到 v0.5.7，`git ls-remote --tags origin` 也只有 `v0.5.6` / `v0.5.7`）。若 v0.5.8 与 v0.5.9 合并成一次发布，需要把 v0.5.8 章节的包名改 `0.5.9` 并把两节内容并进 `## v0.5.9`；若补打 v0.5.8 tag，则 v0.5.9 另开一节。两种口径都由用户定，本轮不擅自决定。
+- **当时没动 `RELEASE_NOTES.md`**：v0.5.8 章节已按四个 `MantisZip-0.5.8-*.exe` / `-Portable*.zip` 包名写好，但 v0.5.8 **从未打 tag**（`git tag` 只到 v0.5.7，`git ls-remote --tags origin` 也只有 `v0.5.6` / `v0.5.7`）。若 v0.5.8 与 v0.5.9 合并成一次发布，需要把 v0.5.8 章节的包名改 `0.5.9` 并把两节内容并进 `## v0.5.9`；若补打 v0.5.8 tag，则 v0.5.9 另开一节。两种口径都由用户定，本轮不擅自决定。
 - **分支现状（记录，不是本轮改动）**：`alpha`、`plans` 与 `origin/alpha` 都指向同一个提交 `37a0f3ec`（`plans` 上那次「合并 alpha 到 plans」的 merge 提交，其相对 `alpha` 的差异只有 6 个文档文件：`docs/PLAN.md` 的网页类内容预览阶段、`docs/KNOWN_ISSUES.md` 的 KI-023、两个计划文件与两处进度文档）。也就是说 `alpha` 目前也带着 `plans` 的文档增量。
+- **发布说明口径（用户 2026-11-26 拍板）**：v0.5.8 章节原样保留（内容与四个 `0.5.8` 包名都不动），在 `RELEASE_NOTES.md` 顶部新开 `## v0.5.9`（文件说明四个 `0.5.9` 包名 + 一行说明「本节随 v0.5.9 阶段落地逐条补充；尚未发版的 v0.5.8 内容同样包含在 0.5.9 安装包内」）。功能条目等阶段实际落地后按规则 18 补，不先写没做的。
 
 **2026-11-26** — 合并 alpha 到 plans（首次把真实代码并入计划分支）
 

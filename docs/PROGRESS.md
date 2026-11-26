@@ -26,7 +26,7 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-11
-- **11-26** — **版本号升级 v0.5.9（6 处同步）**：按 Version bump checklist 把 `src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version`、`MantisZip.UI.Avalonia.csproj` 的 `<Version>`、`docs/PLAN.md` 与 `docs/PROGRESS.md` 的「当前版本」、`installer.iss` 与 `installer-selfcontained.iss` 的 `MyAppVersion` 兜底值从 `0.5.8` 改为 `0.5.9`（`-Task version` 六处全部匹配）。`RELEASE_NOTES.md` 暂未新增 `## v0.5.9` 章节 —— v0.5.8 章节（含四个 0.5.8 安装包名）至今未发版（`git tag` 只到 v0.5.7，远端同样只有 v0.5.6 / v0.5.7），发布说明的合并口径待定。
+- **11-26** — **版本号升级 v0.5.9（6 处同步）**：按 Version bump checklist 把 `src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version`、`MantisZip.UI.Avalonia.csproj` 的 `<Version>`、`docs/PLAN.md` 与 `docs/PROGRESS.md` 的「当前版本」、`installer.iss` 与 `installer-selfcontained.iss` 的 `MyAppVersion` 兜底值从 `0.5.8` 改为 `0.5.9`（`-Task version` 六处全部匹配）。`RELEASE_NOTES.md` 新增 `## v0.5.9` 章节（文件说明 + 一行范围说明，功能条目随阶段落地补）—— v0.5.8 章节（含四个 0.5.8 安装包名）至今未发版（`git tag` 只到 v0.5.7，远端同样只有 v0.5.6 / v0.5.7），发布说明口径已定（2026-11-26 用户拍板）：v0.5.8 章节原样保留，顶部新开 `## v0.5.9`，功能条目随 v0.5.9 阶段落地逐条补。
 
 - **11-26** — **计划台账审计：5 条已发版计划归档、PLAN.md 六类问题修正**
   - 逐项核对 `docs/PLAN.md` 71 个计划与真实代码（`git show <tag>:<path>` + `rg` 实测，不靠计划自述）。查出 5 条自述「待发版」实际已随 **v0.5.6 / v0.5.7** 发布：`picker-new-folder`（`f751b94a` 是 v0.5.6 祖先）、`picker-address-two-rows`、`default-filename-template`、`embedded-default-settings`（`Resources/Defaults/settings.json` 只在 v0.5.7 出现）、`shell-menu-disappear`（issue #80 已随 v0.5.7 发）。
