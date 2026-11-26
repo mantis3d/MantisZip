@@ -7,7 +7,7 @@
 - **技术栈**: .NET 10 + Avalonia 12 + SharpCompress + SharpSevenZip
 
 ## 版本
-- **当前版本**: 0.5.8
+- **当前版本**: 0.5.9
 - **发布日期**: 2026-07-22
 
 ## 变更记录结构
@@ -26,12 +26,15 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-11
+- **11-26** — **版本号升级 v0.5.9（6 处同步）**：按 Version bump checklist 把 `src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version`、`MantisZip.UI.Avalonia.csproj` 的 `<Version>`、`docs/PLAN.md` 与 `docs/PROGRESS.md` 的「当前版本」、`installer.iss` 与 `installer-selfcontained.iss` 的 `MyAppVersion` 兜底值从 `0.5.8` 改为 `0.5.9`（`-Task version` 六处全部匹配）。`RELEASE_NOTES.md` 暂未新增 `## v0.5.9` 章节 —— v0.5.8 章节（含四个 0.5.8 安装包名）至今未发版（`git tag` 只到 v0.5.7，远端同样只有 v0.5.6 / v0.5.7），发布说明的合并口径待定。
+
 - **11-26** — **计划台账审计：5 条已发版计划归档、PLAN.md 六类问题修正**
-- **11-26** — **合并 alpha 到 plans（引入 v0.5.7 / v0.5.8 全部代码与文档，冲突仅两处文档）**：`plans` 首次把 `alpha` 的真实代码并进来（此前只带计划文档）。173 个文件已暂存，含 v0.5.8 三项功能（唯一根目录处理、智能解压两档、根目录名模板）、v0.5.7 发版后的 7 笔、5 条已发版计划归档与 `.omo/plans/` 下大量 rename。冲突两处：**① `docs/PLAN.md`** —— `plans` 的「阶段（待定版本号）—— 网页类内容预览」整段与 alpha 的 v0.5.8 / v0.5.9 编号撞位，解法 = 保留 alpha 的 v0.5.8（✅ 已完成）与 v0.5.9 顺序，把网页预览阶段整段安置在两者之间（保留它自带的「⚠️ 开工前必须确认的两件事：没有确定版本号」）；**② `docs/KNOWN_ISSUES.md`** —— KI 撞号，`plans` 的 `.mht` 那条自 2026-11-12 登记为 KI-018，与 alpha 11-11 / 11-14 登记的 KI-018..021 冲突，按「登记先后」重编号为 **KI-023**（正文移到 KI-022 之后、档案区之前），连带改 `html-mht-chm-preview.md` 4 处与 `smart-extract-root-mode.md` 5 处引用（后者本应指向 KI-022，此前是过期编号）。验证：`-Task check` 三任务全绿（version 0.5.8 六处 / i18n 1553 key 三语一致 / guards 12 条 0 失败）、全仓无冲突标记、`docs/PLAN.md` 71 个计划链接 0 断链。
   - 逐项核对 `docs/PLAN.md` 71 个计划与真实代码（`git show <tag>:<path>` + `rg` 实测，不靠计划自述）。查出 5 条自述「待发版」实际已随 **v0.5.6 / v0.5.7** 发布：`picker-new-folder`（`f751b94a` 是 v0.5.6 祖先）、`picker-address-two-rows`、`default-filename-template`、`embedded-default-settings`（`Resources/Defaults/settings.json` 只在 v0.5.7 出现）、`shell-menu-disappear`（issue #80 已随 v0.5.7 发）。
   - 五份计划 `git mv` 到 `.omo/plans/已完成/` 并改写状态头；`RELEASE_NOTES.md` 对其中四条**完全没有条目**（`新建文件夹` / `两行` / `install-choices` / `Resources/Defaults` 全部 0 命中）—— 属发布说明缺漏，已记录待用户决定是否补写进 v0.5.6 / v0.5.7 章节。
   - 另修五处文档缺陷：①`已冻结` 表被一个空行切成两段（后 3 行不成表格）②v0.5.11 尾部缓冲两项只有行内反引号没有链接 ③`winget-publishing.md` 在 `ef833898` 的 A 档重排里被无声丢弃，补回 B 档 ④v0.5.5 验收口径缺 `✅ 已达成` ⑤`97` 行的「50 个 axaml / 1 个开编译绑定」实测应为 **55 / 0**，且 `compilebindings` 守卫尚未建。
   - 校验：`docs/PLAN.md` 287 行、`docs/PROGRESS.md` 520 行，两文件 `bom=False` / `loneLF=0` / `loneCR=0` / `triple=0`；PLAN 全表结构自检通过（唯一无表头表格 = 0 处）。
+
+- **11-26** — **合并 alpha 到 plans（引入 v0.5.7 / v0.5.8 全部代码与文档，冲突仅两处文档）**：`plans` 首次把 `alpha` 的真实代码并进来（此前只带计划文档）。173 个文件已暂存，含 v0.5.8 三项功能（唯一根目录处理、智能解压两档、根目录名模板）、v0.5.7 发版后的 7 笔、5 条已发版计划归档与 `.omo/plans/` 下大量 rename。冲突两处：**① `docs/PLAN.md`** —— `plans` 的「阶段（待定版本号）—— 网页类内容预览」整段与 alpha 的 v0.5.8 / v0.5.9 编号撞位，解法 = 保留 alpha 的 v0.5.8（✅ 已完成）与 v0.5.9 顺序，把网页预览阶段整段安置在两者之间（保留它自带的「⚠️ 开工前必须确认的两件事：没有确定版本号」）；**② `docs/KNOWN_ISSUES.md`** —— KI 撞号，`plans` 的 `.mht` 那条自 2026-11-12 登记为 KI-018，与 alpha 11-11 / 11-14 登记的 KI-018..021 冲突，按「登记先后」重编号为 **KI-023**（正文移到 KI-022 之后、档案区之前），连带改 `html-mht-chm-preview.md` 4 处与 `smart-extract-root-mode.md` 5 处引用（后者本应指向 KI-022，此前是过期编号）。验证：`-Task check` 三任务全绿（version 0.5.8 六处 / i18n 1553 key 三语一致 / guards 12 条 0 失败）、全仓无冲突标记、`docs/PLAN.md` 71 个计划链接 0 断链。
 
 - **11-26** — **合并 beta 到 alpha（v0.5.7 发版后的 7 笔：自适应规则名 / 过滤预设名改 i18n 键、发布说明精简、字体预览样本归一换行）**
   - 7 笔提交：`b3b2097c` 自适应规则名改 i18n 键 → `f9902ddd` 内置过滤预设名改 i18n 键 → `41dcbc16`/`fc1dba74`/`b6d8147e` 发布说明精简与补图 → `4fb3d32e` 字体预览样本文本归一换行 → `3e638032` Merge beta for v0.5.7。
