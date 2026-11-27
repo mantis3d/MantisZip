@@ -5,6 +5,18 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+
+**2026-11-27** — 计划：进度窗「完整」档改统计卡行底纹 + 状态面板 7 行压到 3 行 + 列表档可点统计卡做过滤（issue #81）
+
+- **用户指令**：m24023「你再看看 #81 ，跟我讨论一下」→ m24137「"完整"档底下的进度条，我想改成统计卡行的底纹进度条」→ m24150「底纹不确定态先更换颜色行不行？比如不确定态就是填充黄色」→ m24495「我希望"列表"模式的列表可以选择过滤，比如切换到只显示"出错"的文件」→ m24569「它是不是跟下面的状态面板功能重叠了？能合并一下吗？」→ m24605「胶囊能改成两行的按钮吗？跟完整档显示的信息一致？」→ m24653「挺好，更新计划吧」。
+- **核实结论**：issue #81 四条问题在 v0.5.6 截图里成立，且 `ProgressWindow.axaml` 七行结构至今未变。最要命的是第 2 条 —— `IsMinimalDensity` 只绑在它自己那个 RadioButton 的 `IsChecked`（`:655`），没有任何内容绑定它，所谓「精简」档只改批列表高度（5 行 vs 8 行）。根因是 `progress-window-prototype-alignment.md`（`ContentMode`）、`progress-stats-cards-three-row.md`（`InfoDensity`）、`batch-progress-list.md`（批处理行）三个计划各自落地、无人回看整体。
+- **底纹方案**：`StatsCardsPanel`（`:701-705`）的 `Background` 改 `MultiBinding` → 4-stop `LinearGradientBrush`；判定走 `StatusKind` 而非布尔标志（`IsComplete` 不存在、`HasFailures` 无通知）；`IsIndeterminate` 优先于 `StatusKind`，用满宽淡黄代替滚动动画（`:1025` 准备态、`:1158` 扫描阶段都会置 true，底纹静止会被误判卡死，靠 `ScanCountText` 动态计数兜底）。
+- **溢出隐患**：9 卡 × `MinWidth=80` + 8 × `SpacingLg`(24) = 912px，窗口 `MinWidth=500`、默认 800、`RootGrid` 带 `ClipToBounds` ⇒ 一旦自适应 ZIP 让跳过/出错/已压缩/仅存储全上报就被硬切。改 `WrapPanel`（无 `Spacing`，间距落子项 `Margin`）+ 80→72、24→8 ⇒ **712px**。
+- **列表档可点卡**：五张（已完成 / 跳过 / 出错 / 已覆盖 / 全部）与完整档十张卡共用同一套 `ControlTheme`（切档不跳），点卡过滤列表、再点回全部。应用层不用 `ICollectionView`（**Avalonia 12.1.2 主包实测无此类型**），改为「全量 `_entryItems` 不动 + `EntryViewItems` 投影集合」，过滤只认 `State`。
+- **唯一数据缺口**：`ProgressViewModel` 只有跳过/出错/已覆盖三个累加器，**「已完成」没有**。补齐四点，其中最关键的是 `ActivateEntryByName`（`:1866`）在 `:1884` 直接改 `previousActive.State = Completed` **绕过了 `UpdateEntryStatus`**，不补会少计最后一行（验收方式：单文件压缩完成后「已完成」显示 1 而不是 0）。
+- **三个 HTML 原型**：`progress-stats-card-fill.html`（底纹 + 紧凑化）、`progress-window-full.html`（整窗 1:1 复刻七行，含 A/B/C/D 改造清单表）、`progress-filter-cards.html`（**最终版**，列表档五张可点卡，四开关：主题 × 档位 × 合并前后 × 总大小卡）。原型里踩到一个真 bug：`.panel{display:none}` 与内层 `.detailed{display:flex}` 同权重、后者后出现 ⇒ 内层把外层顶掉，详细面板在所有档位都可见；改名 `.dwrap` 修复。
+- **排期**：底纹版工时 4-4.5h → **17-20.5h**（底纹 4-4.5h + 紧凑化 5.5-7h + 列表档 6.5-8h），v0.5.9 阶段总工时 35.5-49.5h → **约 43-58.5h**；`progress-bar-segments.md`（分段着色）**后推 v0.5.10**，并全量更正其中四类过期内容（「`IsIndeterminate` 是死绑定」判断已被实测推翻、四处行号重定位、XAML 接线两条反转）。
+- **验证**：`-Task check` ok=True（version 六处 `0.5.9` / i18n `1553` key / guards 12 条）；`docs/PLAN.md` 72 个链接 0 断链；四份文档 `bom=False` / `loneLF=0` / `loneCR=0`。
 **2026-11-27** — 交互：进度窗「完整」档改统计卡行底纹 + 状态面板从 7 行压到 3 行（计划立项 + HTML 原型）
 
 - **来由**：issue #81（Koewen，v0.5.6）反馈进度窗信息冗余 —— 同一个 40% 出现 4 次、三根进度条粗细圆角各不相同、「简约」与「精简」两套视图切换语义重叠。核对后确认：截图虽是 v0.5.6 的，但 `ProgressWindow.axaml` 的 Row 0–6 七行结构与 v0.5.6 逐行一致，问题今天依然存在。
@@ -12,8 +24,8 @@
 - **用户拍板**：底纹进度条取代「完整」档的独立总条；不确定态（准备/扫描）**填满宽淡黄**而不是滚动动画（底纹滚不了）；「状态面板一行就能排下」；`progress-bar-segments.md` 往后推一个版本。
 - **方案三件事**：①底纹 —— `StatsCardsPanel.Background` 改 `MultiBinding` → 4-stop `LinearGradientBrush`（照抄 `Converters/BatchStatusConverters.cs:67-102` 的写法，alpha 从 35% 降到 15% 以免压字），六态判定统一走 `ProgressStatusKind`（**不能绑 `HasFailures`**，`:900` 是只读计算属性无通知）；②视图切换两行合一行五档（极简/标准/详细/完整/列表，新增 `AppSettings.ProgressDetailLevel`，留两个旧字段做迁移）；③卡片压进一行 —— `MinWidth` 80→72、间距 24→8 ⇒ 712px，字号各降一档。
 - **高度账**：视图切换 2→1 行、卡片 1 行（完整可见）、段2+百分比+时间 3→1 行、独立总条 1→0 行 ⇒ **7 行 → 3 行**。底部合并行 = 左「⚙ 4 · ⚡ 6.8 MB/s · 🗜 11.76 MB (28%)」+ 右「31% · 已用 00:12 · 剩余 00:26」。
-- **交付**：`.omo/plans/未开始/progress-stats-card-fill.md`（288 行；T1–T9 合计 9.5-11.5h，其中底纹本体 4-4.5h、紧凑化 5.5-7h）+ `docs/prototypes/progress-stats-card-fill.html`（468 行，浅/深 × 七状态 × 880/560 窗口可直接切）。
-- **排期**：`docs/PLAN.md` v0.5.9 加该行（阶段 33-46.5h → **35.5-49.5h**）；`progress-bar-segments.md` 从 v0.5.9 **后推到 v0.5.10**（v0.5.10 工时 12-20h → 15-24h），依赖链小节同步。
+- **交付**：`.omo/plans/未开始/progress-stats-card-fill.md`（288 行；T1–T9 合计 9.5-11.5h，其中底纹本体 4-4.5h、紧凑化 5.5-7h）+ `docs/prototypes/progress-stats-card-fill.html`（468 行，浅/深 × 七状态 × 880/560 窗口可直接切）。**当日后续扩入「列表档可点统计卡做过滤」，终稿 374 行 / T1–T13 / 17-20.5h，见本文件更上方同名条目。**
+- **排期**：`docs/PLAN.md` v0.5.9 加该行（阶段 33-46.5h → **35.5-49.5h**）；`progress-bar-segments.md` 从 v0.5.9 **后推到 v0.5.10**（v0.5.10 工时 12-20h → 15-24h），依赖链小节同步。当日后续再追加列表档过滤，阶段工时终值 **约 43-58.5h**。
 - **顺带更正 `progress-bar-segments.md` 的四类过期内容**：①「`IsIndeterminate` 是死绑定」已推翻 —— `ProgressViewModel.cs:1025`（准备）与 `:1158`（扫描）会置 true，`ProgressWindow.axaml:1192` 有绑定；②行号 186-204 / 192-197 / 198-203 / 172-177 **全部失效**，重定位到 `:1183-1195` / `:1190-1195` / `:1183-1186` / `:346-349`；③「移除 `IsIndeterminate` 绑定」改为「转发给新控件」；④补一条与底纹版的分工说明（底纹只服务「完整」档，分段条服务其余三档，不冲突）。
 - **验证**：`-Task check` ok=True（version 0.5.9 六处 / i18n 1553 key / guards 12 条 `failedCount=0`）；四份文件 `bom=False` / `loneLF=0` / `loneCR=0`；84 个计划链接 0 断链、无表头表格 0 处。
 

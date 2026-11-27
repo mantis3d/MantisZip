@@ -1,7 +1,8 @@
 # 进度窗「完整」档：统计卡行改为底纹进度条
 
 > **状态**: 📋 待实施 | **创建日期**: 2026-11-27 | **最近修正**: 2026-11-27
-> **关联计划**: issue #81（进度窗口信息冗余）、`progress-stats-cards-three-row.md`（✅ 已完成的 9 张三行统计卡，本计划在它的容器上加底纹）、`progress-bar-segments.md`（按压缩包状态分段着色，本计划**不做**，留待以后再议）
+> **关联计划**: issue #81（进度窗口信息冗余）、`progress-stats-cards-three-row.md`（✅ 已完成的 9 张三行统计卡，本计划在它的容器上加底纹）、`progress-bar-segments.md`（按压缩包状态分段着色，本计划**不做**，已排 v0.5.10）
+> **范围（2026-11-27 扩为三件）**: ① 完整档统计卡行改底纹进度条 ② 状态面板 7 行 → 3 行 ③ **列表档卡行改成可点统计卡做过滤**（§2.9）
 > **前置**: 无（纯 Avalonia UI 层，规则 11）
 > **决策来源**: 2026-11-27 与用户讨论逐条拍板（见 §八）
 
@@ -9,15 +10,16 @@
 
 把「完整」档（`InfoDensity = Full`）统计卡行的那块 `Border` 背景改成**底纹进度条**：进度直接铺在 9 张统计卡后面，不再占用独立一行。多态配色 —— 进行中按 `PercentComplete` 截断、**不确定态（准备 / 扫描）填充淡黄**、完成转绿 / 失败转红 / 取消转灰（判定统一走 `ProgressStatusKind`）。
 
-**同一批顺带把状态面板从 7 行压到 3 行**：
+**同一批顺带做四件事（前三件把状态面板从 7 行压到 3 行）**：
 
 1. 视图切换 **两行 → 一行五档**（极简 / 标准 / 详细 / 完整 / 列表，修掉「简约 vs 精简」词冲突与 `IsMinimalDensity` 无内容绑定的缺陷）
 2. 9 张卡 **压进一行**（卡片 `MinWidth` 80 → 72、间距 24 → 8 ⇒ 912px → 712px）
 3. 段 2（并行 / 速度 / 压缩后）+ 百分比 + 时间 **合并成底部一行**
+4. **列表档的卡行换成可点统计卡**（§2.9）—— 五张：已完成 / 跳过 / 出错 / 已覆盖 / 全部，尺寸与完整档十张卡完全一致，点卡即过滤列表、再点回「全部」。同时补齐「已完成」的计数（`ProgressViewModel` 现在只有跳过 / 出错 / 已覆盖三个累加器）
 
 配套：卡片行从横向 `StackPanel` 改 `WrapPanel`（窄窗自然换行而不是被 `ClipToBounds` 硬切），独立总进度条改成「完整档时隐藏」。
 
-HTML 原型：`docs/prototypes/progress-stats-card-fill.html`（浅/深 × 七状态 × 880/560 窗口，可直接在浏览器里切）。
+HTML 原型：`docs/prototypes/progress-stats-card-fill.html`（底纹与紧凑化：浅/深 × 七状态 × 880/560 窗口）、`docs/prototypes/progress-filter-cards.html`（列表档可点卡：主题 × 档位 × 合并前后 × 总大小卡 四个开关）。
 
 ## 一、背景
 
@@ -209,6 +211,68 @@ public enum ProgressStatusKind { Preparing, Running, Paused, Completed, Failed, 
 - 压缩汇总项（`🗜 … (率%)`）只在 `HasOverallCompression` 为真时显示（真机仅 ZIP 且完成/失败时），与现状一致。
 - 扫描态的「已发现 N 个文件」原本占百分比行左侧，合并后位置被挤 ⇒ 移到左侧元信息区（`🔍 1284`），或扫描期临时替换百分比位置。**这一条待真机定**（原型里暂让它消失，因为「扫描」卡已经在显示计数）。
 
+### 2.9 列表档：把统计卡行换成「可点统计卡」做过滤
+
+**问题**：`InfoDensity = Full` 时「完整」与「列表」两档都显示卡行，而列表档的卡行与列表面板的逐条目列表冲突 ——
+用户要「只看出错的文件」（issue #81 之外的独立需求，用户 2026-11-27 提出），
+而卡行里的「跳过 3 / 出错 1 / 已覆盖 1」既是统计、又是天然的过滤入口。同一串数字在两处重复出现，正是 issue #81 批的冗余。
+
+**做法**：卡行**在列表档换成可点版本**，尺寸与结构完全一致，只多边框 / hover / 选中态：
+
+| | 完整档（Detailed + Full） | 列表档（List + Full） |
+|---|---|---|
+| 卡片数 | 10 张只读 | 5 张可点 |
+| 内容 | 扫描 / 压缩包 / 已处理 / 暂存 / 压缩后 / 仅存储 / 跳过 / 出错 / 已覆盖 / 总大小 | 已完成 / 跳过 / 出错 / 已覆盖 / 全部 |
+| 度量 | `MinWidth=72`、三行同构 | **完全一致**（否则切档会跳） |
+| 边框 | 无 | 1px `ThemeBorderBrush` |
+| hover | 无（`IsHitTestVisible=false`） | 提亮 |
+| 选中 | 不适用 | 强调色边框 + 淡底 |
+
+**为什么去掉另外五张**（全部有实测依据）：
+
+| 卡 | 数据源 | 列表档为什么不要 |
+|---|---|---|
+| 🔍 扫描 | `_scanFoundFiles = p.TotalFiles`（`ProgressViewModel.cs:1283`） | 与「全部」重复 |
+| 📦 压缩包 | `_statsArchiveCurrent` / `_statsArchiveTotal` | 批处理区表头已有 `BatchCountText`（`ProgressWindow.axaml:78`） |
+| ✅ 已处理 | `_statsProcessed = p.ProcessedFiles`（`:1468`） | **含跳过与出错**，语义与「已完成」重叠 |
+| 📥 暂存 | `_statsStagedBytes`（仅 7z solid 批量解压） | 解压专属，压缩流程恒为空 |
+| 🗜 压缩后 / 💾 仅存储 | `_statsCompressed` / `_statsStoreOnly`（仅自适应 ZIP） | 引擎内部分类，切回完整档就能看 |
+| 📏 总大小 | `_statsTotalBytes = p.TotalBytes`（`:1478`） | **保留** —— 挪成「全部」卡的第三行（`41.76 MB`） |
+
+**卡片顺序与交互**：
+
+```
+┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐ ┌────────┐
+│ ✅ 已完成│ │ ⏭ 跳过  │ │ ❌ 出错  │ │ ↻ 已覆盖 │ │ Σ 全部  │
+│ 1,233  │ │   3    │ │   1    │ │   1    │ │ 1,248  │
+│ 23.8 MB│ │  20 KB │ │ 1.2 GB │ │ 860 KB │ │41.76 MB│
+└────────┘ └────────┘ └────────┘ └────────┘ └────────┘
+```
+
+- 「全部」放**最右**：它本质是「取消过滤」，放末尾读起来像「以上这些之和」。
+- 点已选中的卡再点一次 → 回到「全部」（与「全部」卡并被两个入口，避免用户找不到出口）。
+
+**数据源盘点（关键结论：只有一处缺口）**：
+
+| 卡 | 计数 | 大小 |
+|---|---|---|
+| 跳过 | `StatsSkippedCount`（`:851`，已有） | `StatsSkippedSize`（已有） |
+| 出错 | `StatsFailedCount`（`:854`，已有） | `StatsFailedSize`（已有） |
+| 已覆盖 | `StatsOverwrittenCount`（`:857`，已有） | `StatsOverwrittenSize`（已有） |
+| 全部 | `EntryItems.Count`（`:613`） | `StatsTotalSizeValue`（`:1478`，已有） |
+| **已完成** | **缺** | **缺** |
+
+补齐方式（照抄 `AccumulateTerminalBytes` 的既有模式）：
+
+1. 新增字段 `private long _statsCompleted;` 与 `private long _statsCompletedBytes;`
+2. `AccumulateTerminalBytes(state, size)` 加 `case EntryRowState.Completed:`（`ProgressViewModel.cs:1827`）
+3. `UpdateEntryStatus` 的「只计一次」守卫（`:1805`）加 `or EntryRowState.Completed`
+4. **`ActivateEntryByName` 里另补一处累加** —— 它在 `:1884` 直接把上一行置 `Completed`，**绕过了 `UpdateEntryStatus`**，漏了会少计最后一行
+
+**HTML 原型**：`docs/prototypes/progress-filter-cards.html`
+（顶部四个开关：主题浅/深 × 档位完整/列表 × 对比合并后/合并前 × 总大小卡保留/去掉）。
+前两版被取代的原型：`progress-entry-filter.html`（胶囊三种形态对比）、`progress-filter-merge.html`（胶囊 vs 卡行合并）。
+
 ## 三、实现清单
 
 | # | 任务 | 落点 | 估时 |
@@ -223,8 +287,13 @@ public enum ProgressStatusKind { Preparing, Running, Paused, Completed, Failed, 
 | T8 | 单测：六态配色 / 0% 与 100% 边界 / `IsIndeterminate` 优先于 `StatusKind` / 五档与两旧字段的映射 | 新增 `ProgressFillBrushConverterTests.cs` + 扩 `ProgressViewModel` 相关测试 | 1-1.5h |
 | T9 | 真机六态截图（准备 / 扫描 / 进行中 / 暂停 / 完成 / 失败）+ 9 卡全上报不溢出 + 500/800/1200 三档窗口宽 | 手工 | 1h |
 
-**合计约 9.5-11.5h**（含验证；底纹本体 4-4.5h，新增的紧凑化 5.5-7h）。
+| T10 | 抽卡片 `ControlTheme` / `DataTemplate`，让只读卡与可点卡共用同一套三行度量（`MinWidth=72`），只靠 `IsHitTestVisible` 区分 | `Dialogs/ProgressWindow.axaml` 卡片模板 + 新增 `Resources/` 主题 | 1.5h |
+| T11 | 新增 `_statsCompleted` / `_statsCompletedBytes` + `AccumulateTerminalBytes` 加 `case Completed` + `UpdateEntryStatus` 守卫加 `or Completed` + **`ActivateEntryByName` 补一处累加**（§2.9 缺口的四点） | `ViewModels/ProgressViewModel.cs:1805` / `:1827` / `:1884` | 1.5h |
+| T12 | 列表档卡行换成五张可点卡（`IsListMode` 分支），含选中态 / hover / 再点回「全部」；`EntryViewItems` 投影集合 + 过滤时机挂 `State` 变化 | `Dialogs/ProgressWindow.axaml` + `ViewModels/ProgressViewModel.cs` + 新增 `EntryFilter` 相关 | 3-4h |
+| T13 | 空状态（过滤后 0 条 → 「没有匹配的条目 + 显示全部」） | `Dialogs/ProgressWindow.axaml` 列表面板 | 0.5h |
+**合计约 17-20.5h**（含验证）：底纹本体 4-4.5h + 紧凑化 5.5-7h + 列表档可点卡与过滤 6.5-8h（T10-T13）。
 
+> 2026-11-27 追加 §2.9 后，本计划从「只做底纹与紧凑化」扩为「底纹 + 紧凑化 + 列表档过滤」三件事；`docs/PLAN.md` 的工时需同步。
 ## 四、验收口径
 
 1. 「完整」档不再有独立总进度条，进度表现为统计卡行底纹。
@@ -237,6 +306,11 @@ public enum ProgressStatusKind { Preparing, Running, Paused, Completed, Failed, 
 8. **视图切换只有一组 5 档单选**（极简 / 标准 / 详细 / 完整 / 列表），不再有「显示：」与「信息量：」两行；选「极简」时内容确实变少（旧版 `IsMinimalDensity` 无内容绑定的缺陷一并修掉）。
 9. 五档与两个旧 `AppSettings` 字段的迁移正确：旧配置文件读进来落在合理档位，写完新配置后再次打开保持档位。
 10. `-Task build -Target avalonia -c Release` 0 警告；`ui-tests` 全绿。
+11. **列表档的卡行是可点版本**：五张（已完成 / 跳过 / 出错 / 已覆盖 / 全部），尺寸与完整档十张卡完全一致，切档不跳。
+12. 点「出错」卡后列表只剩失败条目；再点一次同一张卡回到「全部」（或点末尾「全部」卡）。
+13. 过滤后 0 条时显示「没有匹配的条目 + 显示全部」，点按钮回到全部。
+14. 「已完成」卡的数字与大小随压缩推进增长；**最后一条**（由 `ActivateEntryByName` 置 Completed 的那条）也被计入 —— 验证方式：单文件压缩完成后，「已完成」卡显示 1 而不是 0。
+15. 过滤只认 `State`：进行中的行百分比从 40% 涨到 41% 时列表不重算（不闪）。
 
 ## 五、范围外
 
@@ -244,6 +318,8 @@ public enum ProgressStatusKind { Preparing, Running, Paused, Completed, Failed, 
 - **不确定态滚动动画** —— 见 §2.3，需要再加。
 - **issue #81 的 A（紧急修复）/ B（信息去重）/ D（#76 三卡）三块** —— 各自单独排期；本计划只做底纹、溢出与视图切换（C）。
 - **`progress-bar-segments.md` 里「`DragDropService` 失败路径补状态上报」** —— 与本计划无关，留给该计划。
+- **5000 条播种上限放宽**（`MaxSeedEntryCount`）—— 超过 5000 条一条行都不建（`CompressFlow.cs:377` / `ExtractFlow.cs:426`），列表与过滤都无从谈起。是否退化成「只播异常项 + 最后 N 条」需单独决策，不在本计划。
+- **文件名搜索框 / 按大小排序 / 多选交叉过滤** —— 原型评估时已排除（见 `progress-entry-filter.html` 侧栏末节）。
 
 ## 六、风险
 
@@ -256,6 +332,9 @@ public enum ProgressStatusKind { Preparing, Running, Paused, Completed, Failed, 
 | **卡片压到 72px 后三字标签被挤换行** | 中 | 退一步到 76px（9 × 76 + 8 × 8 = 748px，800 窗口仍放得下）；或标签缩成两字 |
 | **五档控件在 `MinWidth=500` 下放不下** | 中 | 三档兜底：收紧间距 12 → 8 / 标签缩两字 / 改图标分段控件 |
 | **新增第五档「详细」(Detailed+Medium) 与原「完整」的差异不够明显** | 低 | 详细 = 详细列表 + 批列表 8 行、无统计卡；完整 = + 统计卡（底纹）。真机对比若说不清，就把「详细」改为「批列表 11 行但无统计卡」 |
+| 两档卡行高度算错 | 🟡 中 | 切档时整行跳一下 | T10 抽同一套 `ControlTheme`；单测断言两态 `DesiredSize.Height` 相等 |
+| 「已完成」重复计数 | 🟡 中 | 数字虚高 | 沿用 `row.State != state` 守卫；`ActivateEntryByName` 的补点单独加测试 |
+| 过滤造成列表滚动位置错乱 | 🟢 低 | 用户找不到刚看的那行 | 切过滤后滚回顶部（`MaxHeight=150` 只有 6 行） |
 
 ## 七、待讨论（用户说「细节再讨论」）
 
@@ -266,6 +345,8 @@ public enum ProgressStatusKind { Preparing, Running, Paused, Completed, Failed, 
 5. 暂停态用「同色降 alpha」还是明确换成黄色/橙色（现在是按前者写的）。
 6. **扫描态的「已发现 N 个文件」挪到哪**：底部合并行后它原来占的位置没了。候选：①左侧元信息区（`🔍 1284`）②扫描期临时替换右侧百分比位置 ③干脆不显示（「扫描」卡已经在显示计数）。
 7. **五档标签的措辞**：极简 / 标准 / 详细 / 完整 / 列表 —— 「详细」与「完整」在中文里也容易混，是否改成「标准 / 详细 / 完整」之外更区分度高的词（如「精简 / 常规 / 详细 / 完整 / 列表」）。
+8. **列表档的「已处理 742」去哪** —— 「全部」卡的第三行现在是总大小（41.76 MB）。要不要改成「已处理 742」？两者只能放一个（卡片只有三行）。
+9. **「初始状态是否默认选中「全部」** —— 原型里是（`aria-pressed=true`）。若默认不选任何卡，列表显示全部但没有任何卡高亮，可能让人误以为过滤失效。
 
 ## 八、决策记录
 
@@ -279,6 +360,10 @@ public enum ProgressStatusKind { Preparing, Running, Paused, Completed, Failed, 
 - **段 2 + 百分比 + 时间合并成底部一行**（用户：「"并行 4 压缩后 11.76 MB (28%)" 这些应该跟 "31% 已用 00:12" 那些放在一行就行，现在这个三行太浪费空间」）。
 - **状态面板压到一行排下**（用户：「挺好，状态面板里面能再紧凑一些吧？我希望一行就能排下」→ §2.7 视图切换合一行 + §2.4 卡片压一行 + §2.8 高度账）。
 - **`progress-bar-segments.md` 往后推一个版本**（用户：「把 progress-bar-segments.md 这个计划往后推一个版本」→ 从 v0.5.9 移到 v0.5.10）。
+- **列表档要可过滤**（用户：「我希望"列表"模式的列表可以选择过滤，比如切换到只显示"出错"的文件」）。
+- **过滤器与统计卡行合并**（用户：「它是不是跟下面的状态面板功能重叠了？能合并一下吗？」→ 确认重叠：跳过/出错/已覆盖三个数字同源）。
+- **胶囊改成两行卡片、与完整档同构**（用户：「就是这个胶囊导致信息变少，胶囊能改成两行的按钮吗？跟完整档显示的信息一致？」→ 定为三行同构卡片，尺寸与完整档完全一致）。
+- **「全部」卡放最右**（本质是「取消过滤」，放末尾读作「以上这些之和」；MVP 期间保留，避免过滤后没有可见出口）。
 
 ---
 

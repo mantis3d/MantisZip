@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light" data-filter="all" data-state="running" data-variant="chips">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>列表面板 · 状态过滤器原型</title>
+<style>
+html[data-filter="all"] .segmented [data-f="all"],
+html[data-filter="problem"] .segmented [data-f="problem"],
+html[data-filter="done"] .segmented [data-f="done"]{
+  background:var(--accent); color:#fff; font-weight:600;
+}
+html[data-theme="light"]{
+  --win-bg:#FFFFFF; --surface:#FFFFFF; --panel:#E0E0E0; --border:#E0E0E0;
+  --text:#1A1A1A; --text2:#6B6B6B; --btn-bg:#F5F5F5; --hover:#EDEDED;
+  --progress:#2196F3; --accent:#60B8FC; --page-bg:#F0F2F5; --page-fg:#303030;
+  --ok:#4CAF50; --err:#F44336; --skip:#00BCD4; --warn:#FFB300;
+}
+html[data-theme="dark"]{
+  --win-bg:#1E1E1E; --surface:#252525; --panel:#3E3E3E; --border:#3E3E3E;
+  --text:#E8E8E8; --text2:#A0A0A0; --btn-bg:#2D2D2D; --hover:#3A3A3A;
+  --progress:#64B5F6; --accent:#0078D4; --page-bg:#141414; --page-fg:#D8D8D8;
+  --ok:#66BB6A; --err:#EF5350; --skip:#4DD0E1; --warn:#FFC107;
+}
+*{box-sizing:border-box}
+body{
+  margin:0; padding:20px 24px 60px;
+  font-family:"Segoe UI","Microsoft YaHei UI","PingFang SC",sans-serif;
+  background:var(--page-bg); color:var(--page-fg); font-size:13px;
+}
+h1{font-size:17px; margin:0 0 4px}
+.sub{margin:0 0 14px; color:#888; font-size:12px; line-height:1.7}
+h2{font-size:14px; margin:32px 0 10px; padding-bottom:6px; border-bottom:1px solid rgba(128,128,128,.3)}
+h3{font-size:12.5px; margin:16px 0 8px; color:#888}
+code{background:rgba(128,128,128,.14); padding:0 4px; border-radius:3px; font-size:11.5px}
+
+.ctrl{
+  display:flex; flex-wrap:wrap; gap:8px 20px; align-items:center;
+  padding:10px 14px; margin-bottom:16px;
+  background:var(--win-bg); border:1px solid var(--border); border-radius:6px; color:var(--text);
+}
+.ctrl .grp{display:flex; gap:4px; align-items:center}
+.ctrl .lbl{font-size:11px; color:var(--text2); margin-right:2px}
+.ctrl button{
+  font:inherit; font-size:11.5px; padding:3px 10px; cursor:pointer;
+  background:var(--btn-bg); color:var(--text); border:1px solid var(--border); border-radius:4px;
+}
+.ctrl button[aria-pressed="true"]{background:var(--accent); color:#fff; border-color:transparent; font-weight:600}
+
+.stage{display:flex; gap:28px; flex-wrap:wrap; align-items:flex-start}
+.win{
+  width:800px; max-width:100%;
+  background:var(--win-bg); border:1px solid var(--border); border-radius:8px;
+  overflow:hidden; box-shadow:0 8px 28px rgba(0,0,0,.16); color:var(--text);
+}
+.titlebar{
+  display:flex; align-items:center; gap:8px; height:30px; padding:0 10px;
+  background:var(--panel); border-bottom:1px solid var(--border);
+  font-size:11.5px; color:var(--text2);
+}
+.titlebar .dots{display:flex; gap:5px; margin-left:auto}
+.titlebar .dots i{width:9px; height:9px; border-radius:50%; background:var(--border); display:block}
+.root{display:flex; flex-direction:column; gap:4px; padding:12px}
+
+/* ── 列表面板 ─────────────────────────────────────────── */
+.listpanel{
+  display:flex; flex-direction:column;
+  border:1px solid var(--border); border-radius:4px; padding:2px;
+  background:var(--surface);
+}
+
+/* ① 过滤条 · 胶囊变体 */
+.filterbar{
+  display:flex; align-items:center; gap:6px;
+  padding:3px 2px 4px; border-bottom:1px solid rgba(128,128,128,.14);
+  margin-bottom:2px; flex-wrap:wrap;
+}
+.chip{
+  display:inline-flex; align-items:center; gap:5px;
+  font-size:11px; padding:1px 9px; border-radius:10px; cursor:default;
+  border:1px solid var(--border); background:transparent; color:var(--text2);
+  line-height:17px; white-space:nowrap;
+}
+.chip .n{font-variant-numeric:tabular-nums; opacity:.8}
+.chip:hover{background:var(--hover)}
+.chip[aria-pressed="true"]{background:var(--accent); border-color:transparent; color:#fff; font-weight:600}
+.chip[aria-pressed="true"] .n{opacity:.95}
+.chip.warn .n{color:var(--warn)}
+.chip[aria-pressed="true"].warn .n{color:#fff}
+
+/* ② 过滤条 · 可编辑下拉变体 */
+.filterbar.sel{gap:8px}
+.combo{
+  height:22px; padding:0 6px; font:inherit; font-size:11.5px;
+  background:var(--surface); border:1px solid var(--border); border-radius:4px;
+  color:var(--text); min-width:150px; cursor:pointer;
+}
+.segmented{display:inline-flex; border:1px solid var(--border); border-radius:4px; overflow:hidden}
+.segmented span{
+  font-size:11px; padding:2px 10px; color:var(--text2); border-right:1px solid var(--border);
+}
+.segmented span:last-child{border-right:0}
+.segmented span.on{background:var(--accent); color:#fff; font-weight:600}
+
+/* ── 行 ───────────────────────────────────────────────── */
+.rows{max-height:150px; overflow-y:auto; display:flex; flex-direction:column}
+.row{
+  display:grid; grid-template-columns:16px 1fr 60px auto auto; gap:8px; align-items:center;
+  min-height:22px; padding:1px 4px; border-radius:3px; position:relative;
+}
+.row:hover{background:rgba(128,128,128,.08)}
+.row .ic{font-size:11px; text-align:center; line-height:1}
+.row .name{font-size:12px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.row .size{font-size:11px; color:var(--text2); text-align:right}
+.row .st{font-size:11px; text-align:right; white-space:nowrap}
+.i-run{color:var(--progress)}
+.i-ok{color:var(--ok)}
+.i-fail{color:var(--err)}
+.i-skip{color:var(--skip)}
+.i-pend{color:var(--text2); opacity:.5}
+.i-ovr{color:var(--progress)}
+.s-fail{color:var(--err)}
+.s-skip{color:var(--skip)}
+.s-ok{color:var(--ok)}
+.s-run{color:var(--progress)}
+.s-pend{color:var(--text2)}
+.row.hide{display:none}
+
+/* 空状态 */
+.empty{
+  display:none; flex-direction:column; align-items:center; justify-content:center;
+  gap:6px; padding:18px 10px; color:var(--text2); font-size:11.5px;
+}
+.empty.show{display:flex}
+.empty button{
+  font:inherit; font-size:11px; padding:2px 10px; cursor:pointer;
+  background:var(--btn-bg); color:var(--text); border:1px solid var(--border); border-radius:4px;
+}
+
+/* 其它面板不吃过滤条 */
+.other{display:none; padding:6px; font-size:12px; color:var(--text2)}
+html[data-variant="other"] .other{display:block}
+html[data-variant="other"] .listpanel{display:none}
+
+/* ── 表格区 ───────────────────────────────────────────── */
+table.fix{width:100%; border-collapse:collapse; font-size:12px; background:var(--win-bg); color:var(--text); border:1px solid var(--border)}
+table.fix th,table.fix td{border-bottom:1px solid var(--border); padding:6px 9px; text-align:left; vertical-align:top}
+table.fix th{background:var(--panel); font-weight:600; font-size:11.5px}
+table.fix td.k{white-space:nowrap; font-weight:600; width:110px}
+table.fix tr:last-child td{border-bottom:0}
+.muted{color:#888; font-size:11.5px; line-height:1.75}
+.bad{color:var(--err)}
+.good{color:var(--ok)}
+</style>
+</head>
+<body>
+
+<h1>列表面板 · 状态过滤器原型</h1>
+<p class="sub">
+  进度窗口「列表」档（Row 2 的 <code>ListPanel</code>）当前只把 <code>EntryItems</code> 平铺出来，
+  出错的条目混在几千行里找不到。这一版给列表加一条过滤栏 —— 三种形态画在一起，可以切换比较。
+</p>
+
+<div class="ctrl">
+  <div class="grp">
+    <span class="lbl">主题</span>
+    <button data-set="theme:light" aria-pressed="true">浅色</button>
+    <button data-set="theme:dark" aria-pressed="false">深色</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">形态</span>
+    <button data-set="variant:chips" aria-pressed="true">① 胶囊</button>
+    <button data-set="variant:combo" aria-pressed="false">② 下拉</button>
+    <button data-set="variant:segmented" aria-pressed="false">③ 分段</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">场景</span>
+    <button data-set="state:running" aria-pressed="true">进行中</button>
+    <button data-set="state:done" aria-pressed="false">完成</button>
+  </div>
+</div>
+
+<div class="stage">
+<div class="win">
+  <div class="titlebar">
+    <span>正在压缩…</span>
+    <span class="dots"><i></i><i></i><i></i></span>
+  </div>
+
+  <div class="root">
+
+    <!-- ══ 列表面板 ══ -->
+    <div class="listpanel">
+
+      <!-- ① 胶囊形态 -->
+      <div class="filterbar" data-show="chips">
+        <span class="chip" data-f="all" aria-pressed="true">全部 <span class="n">1,248</span></span>
+        <span class="chip warn" data-f="problem">异常 <span class="n">4</span></span>
+        <span class="chip" data-f="failed">出错 <span class="n">1</span></span>
+        <span class="chip" data-f="skipped">跳过 <span class="n">3</span></span>
+        <span class="chip" data-f="done">已完成 <span class="n">1,233</span></span>
+      </div>
+
+      <!-- ② 下拉形态 -->
+      <div class="filterbar sel" data-show="combo">
+        <select class="combo" id="comboSel" style="padding-right:4px">
+          <option value="all">全部条目（1,248）</option>
+          <option value="problem">异常（4）</option>
+          <option value="failed">出错（1）</option>
+          <option value="skipped">跳过（3）</option>
+          <option value="done">已完成（1,233）</option>
+        </select>
+      </div>
+
+      <!-- ③ 分段形态 -->
+      <div class="filterbar sel" data-show="segmented">
+        <span class="segmented">
+          <span class="on" data-f="all">全部</span>
+          <span data-f="problem">异常</span>
+          <span data-f="done">完成</span>
+        </span>
+        <span class="muted" style="font-size:11px;margin-left:auto">4 条异常</span>
+      </div>
+
+      <!-- 行 -->
+      <div class="rows" id="rows">
+        <div class="row" data-s="done">
+          <span class="ic i-ok">✓</span>
+          <span class="name">IMG_2026_年度总结_现场照片_001.jpg</span>
+          <span class="size">2.4 MB</span>
+          <span class="st s-ok">已完成</span>
+          <span class="st s-ok"></span>
+        </div>
+        <div class="row" data-s="done">
+          <span class="ic i-ok">✓</span>
+          <span class="name">IMG_2026_年度总结_现场照片_002.jpg</span>
+          <span class="size">2.1 MB</span>
+          <span class="st s-ok">已完成</span>
+          <span class="st s-ok"></span>
+        </div>
+        <div class="row" data-s="run">
+          <span class="ic i-run">◐</span>
+          <span class="name">IMG_2026_年度总结_现场照片_003.jpg</span>
+          <span class="size">1.9 MB</span>
+          <span class="st s-run">40%</span>
+          <span class="st s-run"></span>
+        </div>
+        <div class="row" data-s="skip">
+          <span class="ic i-skip">⏭</span>
+          <span class="name">node_modules/.cache/webpack_缓存索引.json</span>
+          <span class="size">18 KB</span>
+          <span class="st s-skip">已跳过</span>
+          <span class="st s-skip"></span>
+        </div>
+        <div class="row" data-s="fail">
+          <span class="ic i-fail">✕</span>
+          <span class="name">项目备份_2026-11-27.zip</span>
+          <span class="size">1.2 GB</span>
+          <span class="st s-fail">文件被占用</span>
+          <span class="st s-fail"></span>
+        </div>
+        <div class="row" data-s="pend">
+          <span class="ic i-pend">○</span>
+          <span class="name">日志_2026-11-26.log</span>
+          <span class="size">3.4 MB</span>
+          <span class="st s-pend">等待中</span>
+          <span class="st s-pend"></span>
+        </div>
+        <div class="row" data-s="skip">
+          <span class="ic i-skip">⏭</span>
+          <span class="name">node_modules/.cache/eslint_诊断缓存.bin</span>
+          <span class="size">2 KB</span>
+          <span class="st s-skip">已跳过</span>
+          <span class="st s-skip"></span>
+        </div>
+        <div class="row" data-s="ovr">
+          <span class="ic i-ovr">↻</span>
+          <span class="name">旧版_报告.pdf</span>
+          <span class="size">860 KB</span>
+          <span class="st s-run">已覆盖</span>
+          <span class="st s-run"></span>
+        </div>
+        <div class="row" data-s="skip">
+          <span class="ic i-skip">⏭</span>
+          <span class="name">node_modules/.cache/typescript_构建信息.tsbuildinfo</span>
+          <span class="size">512 KB</span>
+          <span class="st s-skip">已跳过</span>
+          <span class="st s-skip"></span>
+        </div>
+      </div>
+
+      <!-- 空状态（过滤后 0 条） -->
+      <div class="empty" id="empty">
+        <span>没有匹配的条目</span>
+        <button id="btnAll">显示全部</button>
+      </div>
+
+    </div>
+
+    <!-- 其它面板占位（示意 Row 2 里过滤器只在列表档出现） -->
+    <div class="other">
+      ← 切到「极简 / 标准 / 详细 / 完整」档时，<b>不会</b>出现过滤栏 —— 那些面板没有逐条目列表。
+    </div>
+
+  </div>
+</div>
+
+<!-- 侧栏：参数说明 -->
+<div style="flex:1;min-width:320px;max-width:440px;font-size:12px;line-height:1.8;color:var(--page-fg)">
+  <h3 style="margin-top:0">过滤选项从哪来</h3>
+  <table class="fix">
+    <tr><th>选项</th><th>命中条件</th><th>数字来源</th></tr>
+    <tr><td class="k">全部</td><td><code>State</code> 任意</td><td><code>EntryItems.Count</code></td></tr>
+    <tr><td class="k">异常</td><td><code>Failed</code> + <code>Skipped</code></td><td><code>StatsFailedCount + StatsSkippedCount</code></td></tr>
+    <tr><td class="k">出错</td><td><code>State == Failed</code></td><td><code>StatsFailedCount</code></td></tr>
+    <tr><td class="k">跳过</td><td><code>State == Skipped</code></td><td><code>StatsSkippedCount</code></td></tr>
+    <tr><td class="k">已完成</td><td><code>State == Completed</code></td><td>需新增（现无此计数）</td></tr>
+  </table>
+  <p class="muted">
+    「异常」把出错和跳过合成一档 —— 用户点它的动机通常是「哪些没成功」，而不是严格区分。
+    「出错 / 跳过」单独一档则给需要区分的人。
+  </p>
+
+  <h3>三种形态的取舍</h3>
+  <table class="fix">
+    <tr><th>形态</th><th>优点</th><th>缺点</th></tr>
+    <tr><td class="k">① 胶囊</td><td>数字就在按钮上，一眼看到「有 4 条异常」；单击直达</td><td>5 个胶囊在 500 窄窗口会换行，吃掉 1-2 行高度</td></tr>
+    <tr><td class="k">② 下拉</td><td>最省宽度，永远 1 行</td><td>要点开才知道有几条异常 —— 恰恰是用户最想知道的</td></tr>
+    <tr><td class="k">③ 分段</td><td>比胶囊紧凑，数字挪到右侧显示</td><td>右侧数字和分段控件分离，扫视时对不上</td></tr>
+  </table>
+  <p class="muted">
+    我倾向 <b>①胶囊</b>，但只留 3 个：<b>全部 / 异常 / 已完成</b> —— 「出错 / 跳过」收进「异常」里。
+    这样 500 宽窗口也排得下（约 300px）。多用几轮后如果确实需要区分，再加回。
+  </p>
+
+  <h3>两个必须一起做的小东西</h3>
+  <p class="muted">
+    <b>空状态</b>：过滤后 0 条时要显式提示 + 一个「显示全部」按钮，否则列表一片空白会被当成 bug（本原型已画，切到只有「出错」且没有失败项的状态可见）。<br><br>
+    <b>实时增减</b>：过滤「已完成」时，一个 Pending 行跑完成必须<b>立刻出现在列表里</b>，Pending 时又必须<b>立刻消失</b> —— 所以过滤判定挂在 <code>State</code> 变化上，不能只在切换过滤器时算一次。
+  </p>
+</div>
+</div>
+
+<h2>实现要点（给后续计划用）</h2>
+<table class="fix">
+  <tr><th style="width:130px">点</th><th>做法</th></tr>
+  <tr>
+    <td class="k">数据源</td>
+    <td>不动 <code>_entryItems</code>（全量、供 <code>ActivateEntryByName</code> 按 <code>Name</code> 匹配用），
+        另开 <code>ObservableCollection&lt;EntryProgressItem&gt; EntryViewItems</code> 作为视图绑定源。
+        <b>不要</b>用 <code>ICollectionView</code> —— Avalonia 12 主包没有这个类型（实测 <code>Avalonia.Controls.dll</code> 零命中，也没引 <code>CommunityToolkit</code> 的集合视图）。</td>
+  </tr>
+  <tr>
+    <td class="k">过滤时机</td>
+    <td>①切换过滤器时全量重算一次；②<code>UpdateEntryStatus</code> 与 <code>ActivateEntryByName</code> 里
+        <code>State</code> 变化后<b>单行</b>增删（O(1) 判断 + O(n) 定位，5000 条可接受）。
+        <b>只认 <code>State</code></b> —— <code>Percent</code> 每帧都变，不能触发重算。</td>
+  </tr>
+  <tr>
+    <td class="k">顺序</td>
+    <td>过滤后保持<b>播种原序</b>（按 <code>_entryItems</code> 下标重排），不要按状态分组 ——
+        用户找的是「那个出错的文件在哪个位置」，分组会让他失去上下文。</td>
+  </tr>
+  <tr>
+    <td class="k">滚动位置</td>
+    <td>切过滤器后滚回顶部。列表 <code>MaxHeight=150</code> 只有 6 行，保留滚动位置没有意义。</td>
+  </tr>
+  <tr>
+    <td class="k">徽标数字</td>
+    <td><code>StatsFailedCount</code> / <code>StatsSkippedCount</code> / <code>StatsOverwrittenCount</code> 已存在（<code>ProgressViewModel.cs:851-857</code>），
+        直接绑。<b>「已完成」缺一个计数</b> —— 需在 <code>AccumulateTerminalBytes</code> 旁边加 <code>_entryCompletedCount</code>，或从 <code>_entryItems</code> 现算（5000 条 <1ms，但每次都要算）。</td>
+  </tr>
+  <tr>
+    <td class="k">空状态</td>
+    <td>过滤结果 0 条 → 显示「没有匹配的条目 + 显示全部」覆盖层。这一块 <code>ProgressWindow.axaml</code> 现在没有，必须新增。</td>
+  </tr>
+  <tr>
+    <td class="k">持久化</td>
+    <td>我倾向<b>实例级</b>（关窗即忘），与「保持打开」「冲突策略下拉」一致。
+        若写进 <code>AppSettings</code>，会多一个 <code>settingswiring</code> 守卫要接的消费者。</td>
+  </tr>
+  <tr>
+    <td class="k">5000 条上限</td>
+    <td><b>这是过滤器的软肋</b>：<code>MaxSeedEntryCount = 5000</code> 是「超过就一条行都不建」（<code>CompressFlow.cs:377</code> / <code>ExtractFlow.cs:426</code>）。
+        超过 5000 的包，列表本来就是空的，过滤器也就无从谈起。要不要放宽成「只播种异常项 + 最后 500 条」需要单独决策。</td>
+  </tr>
+</table>
+
+<h2>已经确认不做的</h2>
+<p class="muted">
+  ① <b>文件名搜索框</b> —— 5000 条实时过滤可接受，但本轮没验证过输入法与中文匹配，先不加。<br>
+  ② <b>按大小 / 时间排序</b> —— 播种顺序是压缩包内顺序，打乱后用户无法定位。<br>
+  ③ <b>把过滤器放到「详细」面板</b> —— 详细面板是并行通道（4-8 行），本来就没有几千条，不需要。<br>
+  ④ <b>多选交叉过滤</b>（「出错 + 跳过」同时勾）—— 单选用胶囊已够，多选会引入「选中 0 项 = 显示全部还是显示空」的歧义。
+</p>
+
+<script>
+(function(){
+  var root = document.documentElement;
+
+  // 完成/进行中场景切换：把仍在跑的行折成终态，演示终态下的过滤
+  function applyState(){
+    var st = root.getAttribute('data-state') || 'running';
+    document.querySelectorAll('#rows .row').forEach(function(r){
+      var s = r.getAttribute('data-s');
+      if (st === 'done' && (s === 'run' || s === 'pend')) {
+        r.setAttribute('data-s', r.dataset.orig || 'done');
+      } else if (st === 'done' && !r.dataset.orig) {
+        r.dataset.orig = s;
+      }
+      if (st !== 'done' && r.dataset.orig) {
+        r.setAttribute('data-s', r.dataset.orig);
+        delete r.dataset.orig;
+      }
+    });
+    applyFilter();
+  }
+
+  var FILTERS = {
+    all:     function(s){ return true; },
+    problem: function(s){ return s === 'fail' || s === 'skip'; },
+    failed:  function(s){ return s === 'fail'; },
+    skipped: function(s){ return s === 'skip'; },
+    done:    function(s){ return s === 'done'; }
+  };
+
+  function matches(state, filter){
+    var fn = FILTERS[filter];
+    return fn ? fn(state) : true;
+  }
+
+  function applyFilter(){
+    var f = root.getAttribute('data-filter') || 'all';
+    var rows = document.querySelectorAll('#rows .row');
+    var visible = 0;
+
+    rows.forEach(function(r){
+      var ok = matches(r.getAttribute('data-s'), f);
+      r.classList.toggle('hide', !ok);
+      if (ok) visible++;
+    });
+
+    // 空状态：仅当「有行但被全部过滤掉」才算空
+    var empty = document.getElementById('empty');
+    empty.classList.toggle('show', rows.length > 0 && visible === 0);
+  }
+
+  function applyVariant(){
+    var v = root.getAttribute('data-variant') || 'chips';
+    document.querySelectorAll('.filterbar').forEach(function(bar){
+      bar.style.display = (bar.getAttribute('data-show') === v) ? 'flex' : 'none';
+    });
+  }
+
+  // 点击胶囊 / 分段
+  document.querySelectorAll('[data-f]').forEach(function(el){
+    el.addEventListener('click', function(){
+      var f = el.getAttribute('data-f');
+      root.setAttribute('data-filter', f);
+      var cb = document.getElementById('comboSel');
+      if (cb) cb.value = f;
+      document.querySelectorAll('[data-f]').forEach(function(x){
+        x.setAttribute('aria-pressed', String(x === el));
+        if (x.hasAttribute('aria-pressed')) {
+          x.classList.toggle('on', x === el);
+        }
+      });
+      applyFilter();
+    });
+  });
+
+  var combo = document.getElementById('comboSel');
+  if (combo) {
+    combo.addEventListener('change', function(){
+      root.setAttribute('data-filter', combo.value);
+      document.querySelectorAll('[data-f]').forEach(function(x){
+        x.setAttribute('aria-pressed', String(x.getAttribute('data-f') === combo.value));
+      });
+      applyFilter();
+    });
+  }
+
+  document.getElementById('btnAll').addEventListener('click', function(){
+    var first = document.querySelector('[data-f="all"]');
+    if (first) first.click();
+  });
+
+  document.querySelectorAll('[data-set]').forEach(function(btn){
+    btn.addEventListener('click', function(){
+      var p = btn.getAttribute('data-set').split(':');
+      root.setAttribute('data-' + p[0], p[1]);
+      btn.parentNode.querySelectorAll('button').forEach(function(b){
+        b.setAttribute('aria-pressed', String(b === btn));
+      });
+      if (p[0] === 'variant') applyVariant();
+      if (p[0] === 'state') applyState();
+    });
+  });
+
+  applyVariant();
+  applyState();
+})();
+</script>
+</body>
+</html>
