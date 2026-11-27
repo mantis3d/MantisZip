@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>进度窗统计卡行底纹进度条 — 审阅原型</title>
+<style>
+/* ══════════════════════════════════════════════════════════════
+   调色板双层（沿用原型家族惯例）：
+   ① 页面框架层 —— 原型家族框架配色
+   ② 模拟窗口层 —— ThemeLight / ThemeDark 真实资源键色值
+      （取自 src/MantisZip.UI.Avalonia/Themes/Theme{Light,Dark}.axaml）
+   ══════════════════════════════════════════════════════════════ */
+:root {
+  /* ① 原型框架配色 */
+  --bg:#1a1a2e; --section:#252540; --item:#3d3d5c; --accent:#6bd46b;
+  --accent2:#4ecdc4; --text:#eaeaea; --dim:#888; --dimmer:#666;
+
+  /* ② 浅色主题（ThemeLight.axaml） */
+  --lt-window:#F5F5F5;      /* ThemeWindowBg       */
+  --lt-splitter:#E0E0E0;    /* ThemeSplitterBg     */
+  --lt-surface:#FFFFFF;     /* ThemeSurfaceBg      */
+  --lt-border:#E0E0E0;      /* ThemeBorder         */
+  --lt-primary:#1A1A1A;     /* ThemeTextPrimary    */
+  --lt-secondary:#666666;   /* ThemeTextSecondary  */
+  --lt-success:#4CAF50;     /* ThemeStatusSuccess  */
+  --lt-warning:#FFE082;     /* ThemeStatusWarning  */
+  --lt-error:#F44336;       /* ThemeStatusError    */
+  --lt-progress:#2196F3;    /* ThemeProgressFillBrush */
+  --lt-progressbg:#C8C8C8;  /* ThemeProgressBgBrush   */
+  --lt-accent:#60B8FC;      /* ThemeAccent         */
+
+  /* ② 深色主题（ThemeDark.axaml） */
+  --dk-window:#1E1E1E;
+  --dk-splitter:#3E3E3E;
+  --dk-surface:#252525;
+  --dk-border:#3E3E3E;
+  --dk-primary:#E0E0E0;
+  --dk-secondary:#999999;
+  --dk-success:#2E7D32;
+  --dk-warning:#5C4A1E;
+  --dk-error:#C62828;
+  --dk-progress:#64B5F6;
+  --dk-progressbg:#555555;
+  --dk-accent:#0078D4;
+}
+* { box-sizing:border-box; margin:0; padding:0; }
+body { background:var(--bg); color:var(--text); font-family:"Segoe UI","Microsoft YaHei",system-ui,sans-serif;
+       padding:28px 16px 80px; display:flex; flex-direction:column; align-items:center; gap:18px; }
+h1 { font-size:20px; color:var(--accent); }
+h2 { font-size:14px; color:var(--accent2); margin:6px 0 0; font-weight:600; }
+.caption { max-width:900px; font-size:12px; color:var(--dim); line-height:1.9; }
+.caption b { color:var(--accent); } .caption .k { color:var(--accent2); font-family:Consolas,monospace; }
+.caption ul { margin:6px 0 0 18px; } .caption li { margin:3px 0; }
+
+/* 控件条（切主题 / 切状态） */
+.bar { display:flex; flex-wrap:wrap; gap:8px; align-items:center; max-width:900px;
+       background:var(--section); border:1px solid var(--item); border-radius:8px; padding:10px 14px; }
+.bar .lbl { font-size:11px; color:var(--dim); margin-right:2px; }
+.btn { font-size:12px; color:var(--text); background:var(--item); border:1px solid var(--item-hover,#454570);
+       border-radius:5px; padding:4px 11px; cursor:pointer; font-family:inherit; }
+.btn:hover { background:var(--item-hover,#454570); }
+.btn.on { background:var(--accent); color:#12201a; border-color:var(--accent); font-weight:600; }
+
+/* ═══ 模拟窗口：880px 宽（真机 ProgressWindow 默认 800）+ 可切 560px 窄窗 ═══ */
+.window { background:var(--w-bg); border:1px solid var(--w-border); border-radius:10px;
+          overflow:hidden; box-shadow:0 8px 40px rgba(0,0,0,.5); transition:width .18s; }
+.window.light { --w-bg:var(--lt-window); --w-border:var(--lt-border); --w-primary:var(--lt-primary);
+                --w-secondary:var(--lt-secondary); --w-surface:var(--lt-surface); --w-splitter:var(--lt-splitter);
+                --w-progress:var(--lt-progress); --w-progressbg:var(--lt-progressbg);
+                --w-success:var(--lt-success); --w-warning:var(--lt-warning); --w-error:var(--lt-error);
+                --w-accent:var(--lt-accent); }
+.window.dark  { --w-bg:var(--dk-window); --w-border:var(--dk-border); --w-primary:var(--dk-primary);
+                --w-secondary:var(--dk-secondary); --w-surface:var(--dk-surface); --w-splitter:var(--dk-splitter);
+                --w-progress:var(--dk-progress); --w-progressbg:var(--dk-progressbg);
+                --w-success:var(--dk-success); --w-warning:var(--dk-warning); --w-error:var(--dk-error);
+                --w-accent:var(--dk-accent); }
+.titlebar { display:flex; align-items:center; gap:8px; padding:9px 14px; background:var(--w-splitter);
+            border-bottom:1px solid var(--w-border); font-size:13px; font-weight:600; color:var(--w-primary); }
+.titlebar .dot { width:10px; height:10px; border-radius:50%; background:var(--dim); }
+.titlebar .name { color:var(--w-secondary); font-size:12px; font-weight:400; margin-left:auto; }
+.stub { padding:22px 14px; text-align:center; font-size:11px; color:var(--dimmer);
+        letter-spacing:.5px; border-bottom:1px solid var(--w-border); }
+
+/* 信息区：真机 Grid.Row=3，ThemeSplitterBg 底 + 1px ThemeBorderBrush + 圆角 + Padding SpacingSmThk(12) */
+.info { background:var(--w-splitter); border:1px solid var(--w-border); border-radius:6px;
+        margin:12px; padding:10px; display:flex; flex-direction:column; gap:8px; }
+
+/* 内容模式行（简约 / 详细 / 列表）与信息密度行（极简 / 标准 / 详细 / 完整 / 列表） */
+.mode { display:flex; justify-content:center; align-items:center; gap:12px; font-size:12px; color:var(--w-secondary); white-space:nowrap; }
+.mode .r { display:flex; align-items:center; gap:5px; }
+.mode .rd { width:13px; height:13px; border-radius:50%; border:1px solid var(--w-secondary); }
+.mode .r.on { color:var(--w-primary); }
+.mode .r.on .rd { border-color:var(--w-accent); background:radial-gradient(circle, var(--w-accent) 0 3.5px, transparent 4px); }
+
+/* ═══════ 核心：统计卡行底纹 ═══════ */
+.statsPanel { position:relative; border-radius:6px; padding:12px; overflow:hidden;
+              background:var(--w-surface); }
+/* 底纹层（绝对定位铺满，位于卡片之下） */
+.statsPanel .fill { position:absolute; inset:0; border-radius:6px;
+                    transition:background .25s ease; }
+/* 卡片行（承载 9 张卡；本体透明，让底纹透出） */
+.cards { position:relative; display:flex; flex-wrap:wrap; justify-content:center;
+         gap:4px 24px; transition:gap .2s; }
+/* 宽屏不换行 / 窄屏换行的对比开关 */
+.cards.nowrap { flex-wrap:nowrap; gap:4px 24px; }
+/* 主张：收窄卡片的「自然宽度」（72px 起 + 4~8px 间距）⇒ 856px 可用宽下 9 张一行排得下；
+   低于约 700px 才换行（对应真机 WrapPanel 的自然回退，不硬压字）。 */
+.cards.fit { flex-wrap:wrap; gap:4px 8px; }
+.cards.fit .card { flex:1 1 72px; min-width:72px; }
+.cards.fit .card .r1 .lab { font-size:10.5px; }
+.cards.fit .card .r2 { font-size:13px; }
+.cards.fit .card .r3 { font-size:11.5px; }
+.cards.fit .card .r1 .ico { font-size:14px; }
+.card { min-width:80px; display:flex; flex-direction:column; align-items:center; gap:2px; }
+.card .r1 { display:flex; align-items:center; gap:4px; }
+.card .r1 .ico { font-size:16px; line-height:1; }
+.card .r1 .lab { font-size:11px; color:var(--w-secondary); white-space:nowrap; }
+.card .r2 { font-size:15px; font-weight:600; color:var(--w-primary); }
+.card .r3 { font-size:13px; color:var(--w-secondary); }
+.card .r3.accent { color:var(--w-progress); }
+.card.hidden { display:none; }
+
+/* 段 2：并行度 + 压缩后大小（改造前独占一行） */
+.seg2 { display:flex; flex-wrap:wrap; justify-content:center; align-items:center; gap:6px 18px;
+        position:relative; font-size:12px; }
+.seg2 .pair { display:flex; align-items:center; gap:4px; }
+.seg2 .pair .k { color:var(--w-secondary); }
+.seg2 .pair .v { color:var(--w-progress); font-weight:600; }
+
+/* 百分比行（保留） */
+.pctrow { display:flex; justify-content:space-between; align-items:center; }
+.pctrow .left { font-size:11px; font-weight:600; color:var(--w-secondary); }
+.pctrow .right { font-size:12px; font-weight:700; color:var(--w-primary); }
+
+/* ═══ 改造后：元信息 / 百分比 / 时间合并成一行（省掉 2 行高度）═══ */
+.footer { display:flex; justify-content:space-between; align-items:center; gap:12px;
+          font-size:12px; flex-wrap:wrap; }
+.footer .meta { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.footer .meta .pair { display:flex; align-items:center; gap:4px; }
+.footer .meta .pair .k { color:var(--w-secondary); font-size:12px; }
+.footer .meta .pair .v { color:var(--w-progress); font-weight:600; }
+.footer .right { display:flex; align-items:center; gap:6px; }
+.footer .right .pct { font-size:13px; font-weight:700; color:var(--w-primary); }
+.footer .right .tm { font-size:12px; color:var(--w-secondary); }
+.footer .sep { color:var(--w-secondary); opacity:.55; font-size:11px; }
+
+/* 旧版独立总进度条（对照用；「完整」档改造后隐藏） */
+.oldbar { height:28px; border-radius:4px; background:var(--w-progressbg); overflow:hidden; position:relative; }
+.oldbar .v { height:100%; background:var(--w-progress); width:0%; transition:width .25s,background .25s; }
+.oldbar.indet .v { width:32%; animation:slide 1.15s linear infinite; }
+@keyframes slide { from{transform:translateX(-100%);} to{transform:translateX(320%);} }
+
+/* 时间行 */
+.time { display:flex; justify-content:space-between; font-size:12px; color:var(--w-secondary); }
+
+/* 状态说明徽标 */
+.badge { display:inline-block; font-size:10px; padding:1px 7px; border-radius:9px;
+         border:1px solid var(--item-hover,#454570); color:var(--dim); margin-left:8px; }
+
+/* 对照区：两个窗口并排 */
+.compare { display:flex; gap:18px; flex-wrap:wrap; justify-content:center; align-items:flex-start; }
+.compare .col { display:flex; flex-direction:column; align-items:center; gap:8px; }
+.compare .col h3 { font-size:12px; color:var(--dim); font-weight:500; }
+</style>
+</head>
+<body>
+
+<h1>进度窗「完整」档 — 统计卡行底纹进度条</h1>
+
+<div class="caption">
+  <b>要验证什么</b>：把「完整」档那根独立总进度条去掉，进度改成铺在 9 张统计卡后面的<b>底纹</b>。多态配色全部走 <span class="k">ProgressStatusKind</span>。
+  <ul>
+    <li><b>确定态</b>（进行中）：<span class="k">ThemeProgressFillBrush</span> 按 <span class="k">PercentComplete</span> 截断</li>
+    <li><b>不确定态</b>（准备 / 扫描）：满宽<b>淡黄</b> <span class="k">ThemeStatusWarning</span> 15% 透明度 —— 替代原生的滚动动画</li>
+    <li><b>完成 / 失败 / 取消 / 暂停</b>：绿 / 红 / 灰 / 蓝降 alpha（满宽或截断）</li>
+    <li><b>顺带修溢出</b>：卡片行 9×80 + 8×24 = <b>912px</b>，超过默认窗口 800 与 <span class="k">MinWidth=500</span>，现在被 <span class="k">ClipToBounds</span> 硬切 → 改 <span class="k">WrapPanel</span> 换行</li>
+    <li><b>顺带省两行高度</b>：段 2（并行 / 速度 / 压缩后）+ 百分比行 + 时间行今天各占一行，合并成底部<b>一行</b>——左边元信息、右边「百分比 · 已用 · 剩余」</li>
+    <li><b>顺带合并两套视图切换</b>：「显示：简约/详细/列表」与「信息量：极简/标准/完整」语义重叠且各占一行，合并成<b>一行 5 档</b>（极简 / 标准 / 详细 / 完整 / 列表），状态面板从 2 行降到 1 行</li>
+  </ul>
+</div>
+
+<!-- 控件条 -->
+<div class="bar">
+  <span class="lbl">主题</span>
+  <button class="btn on" data-theme="light">浅色</button>
+  <button class="btn" data-theme="dark">深色</button>
+  <span class="lbl" style="margin-left:14px">状态</span>
+  <button class="btn" data-state="preparing">准备</button>
+  <button class="btn" data-state="scanning">扫描</button>
+  <button class="btn on" data-state="running">进行中</button>
+  <button class="btn" data-state="paused">暂停</button>
+  <button class="btn" data-state="completed">完成</button>
+  <button class="btn" data-state="failed">失败</button>
+  <button class="btn" data-state="cancelled">取消</button>
+  <span class="lbl" style="margin-left:14px">窗口宽</span>
+  <button class="btn on" data-w="880">880（默认 800+）</button>
+  <button class="btn" data-w="560">560（窄）</button>
+</div>
+
+<!-- ═══════ 改造后：底纹版 ═══════ -->
+<div class="compare">
+  <div class="col">
+    <h3>改造后 —— 底纹进度条（本原型主张）</h3>
+    <div class="window light" id="win" style="width:880px">
+      <div class="titlebar"><span class="dot"></span>正在压缩...<span class="name">30 / 96 个文件</span></div>
+      <div class="stub">文件列表 / 预览区（本原型省略）</div>
+
+      <div class="info">
+        <!-- 视图档位（原「显示：简约/详细/列表」+「信息量：极简/标准/完整」两行合并为一行五档） -->
+        <div class="mode">
+          <span>视图:</span>
+          <span class="r"><span class="rd"></span>极简</span>
+          <span class="r"><span class="rd"></span>标准</span>
+          <span class="r"><span class="rd"></span>详细</span>
+          <span class="r on"><span class="rd"></span>完整</span>
+          <span class="r"><span class="rd"></span>列表</span>
+        </div>
+
+        <!-- ═══ 统计卡区：底纹 + 卡片行 ═══ -->
+        <div class="statsPanel">
+          <div class="fill" id="fill"></div>
+          <div class="cards fit" id="cards">
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">压缩包</span></div><div class="r2">1/1</div><div class="r3">共 1 个</div></div>
+            <div class="card"><div class="r1"><span class="ico">📄</span><span class="lab">已处理</span></div><div class="r2">30</div><div class="r3 accent">41.76 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📥</span><span class="lab">暂存</span></div><div class="r2">4</div><div class="r3">3.12 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">🗜</span><span class="lab">已压缩</span></div><div class="r2">18</div><div class="r3">8.44 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">仅存储</span></div><div class="r2">5</div><div class="r3">1.20 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">⏭</span><span class="lab">跳过</span></div><div class="r2">2</div><div class="r3">96 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">❌</span><span class="lab">出错</span></div><div class="r2">0</div><div class="r3">—</div></div>
+            <div class="card"><div class="r1"><span class="ico">🔁</span><span class="lab">已覆盖</span></div><div class="r2">1</div><div class="r3">12 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📊</span><span class="lab">总大小</span></div><div class="r2">66</div><div class="r3 accent">11.76 MB</div></div>
+          </div>
+        </div>
+
+        <!-- 底部一行：左元信息（并行 / 速度 / 压缩后）· 右百分比 + 时间 -->
+        <div class="footer">
+          <div class="meta">
+            <span class="pair"><span class="v">⚙ 4</span></span>
+            <span class="sep">·</span>
+            <span class="pair"><span class="v">⚡ 6.8 MB/s</span></span>
+            <span class="sep" id="sepZip">·</span>
+            <span class="pair" id="pairZip"><span class="v">🗜 11.76 MB (28%)</span></span>
+          </div>
+          <div class="right">
+            <span class="pct"><span id="pct">31</span>%</span>
+            <span class="tm"><span id="elapsed">已用 00:12</span></span>
+            <span class="tm" id="remainWrap">· 剩余 00:26</span>
+          </div>
+        </div>
+
+        <!-- 旧版独立总进度条：改造后隐藏（仅完整档） -->
+        <div class="oldbar" id="oldbar" style="display:none"><div class="v" id="oldbarv"></div></div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════ 对照：改造前 vs 改造后 ═══════ -->
+<h2>对照 —— 同一状态下的「改造前 / 改造后」</h2>
+<div class="caption" style="max-width:880px">
+  左边是今天的样子：卡片行下面<b>另起</b>一根总进度条，再往下还有「并行 / 压缩后」与「百分比」与「时间」三个独立行。右边是改造后的样子：进度铺进卡片区，底部只剩<b>一行</b>（左元信息 + 右百分比/时间）—— 一共省掉三行高度。
+</div>
+<div class="compare">
+  <div class="col">
+    <h3>改造前（独立总进度条 + 卡片行）</h3>
+    <div class="window light" style="width:880px">
+      <div class="titlebar"><span class="dot"></span>正在压缩...<span class="name">30 / 96 个文件</span></div>
+      <div class="info" style="gap:10px">
+        <div class="statsPanel" style="background:var(--w-surface)">
+          <div class="cards fit">
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">压缩包</span></div><div class="r2">1/1</div><div class="r3">共 1 个</div></div>
+            <div class="card"><div class="r1"><span class="ico">📄</span><span class="lab">已处理</span></div><div class="r2">30</div><div class="r3 accent">41.76 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📥</span><span class="lab">暂存</span></div><div class="r2">4</div><div class="r3">3.12 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">🗜</span><span class="lab">已压缩</span></div><div class="r2">18</div><div class="r3">8.44 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">仅存储</span></div><div class="r2">5</div><div class="r3">1.20 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">⏭</span><span class="lab">跳过</span></div><div class="r2">2</div><div class="r3">96 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">❌</span><span class="lab">出错</span></div><div class="r2">0</div><div class="r3">—</div></div>
+            <div class="card"><div class="r1"><span class="ico">🔁</span><span class="lab">已覆盖</span></div><div class="r2">1</div><div class="r3">12 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📊</span><span class="lab">总大小</span></div><div class="r2">66</div><div class="r3 accent">11.76 MB</div></div>
+          </div>
+        </div>
+        <div class="seg2">
+          <span class="pair"><span class="k">并行</span><span class="v">4</span></span>
+          <span class="pair"><span class="k">压缩后</span><span class="v">11.76 MB (28%)</span></span>
+        </div>
+        <div class="pctrow"><span class="left"></span><span class="right">31%</span></div>
+        <div class="oldbar"><div class="v" style="width:31%"></div></div>
+        <div class="time"><span>已用 00:12</span><span>剩余 00:26</span></div>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <h3>改造后（底纹 + 底部合并一行）</h3>
+    <div class="window light" style="width:880px">
+      <div class="titlebar"><span class="dot"></span>正在压缩...<span class="name">30 / 96 个文件</span></div>
+      <div class="info" style="gap:10px">
+        <div class="statsPanel">
+          <div class="fill" style="background:linear-gradient(to right, rgba(33,150,243,.40) 0%, rgba(33,150,243,.40) 31%, transparent 31%, transparent 100%)"></div>
+          <div class="cards fit">
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">压缩包</span></div><div class="r2">1/1</div><div class="r3">共 1 个</div></div>
+            <div class="card"><div class="r1"><span class="ico">📄</span><span class="lab">已处理</span></div><div class="r2">30</div><div class="r3 accent">41.76 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📥</span><span class="lab">暂存</span></div><div class="r2">4</div><div class="r3">3.12 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">🗜</span><span class="lab">已压缩</span></div><div class="r2">18</div><div class="r3">8.44 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">仅存储</span></div><div class="r2">5</div><div class="r3">1.20 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">⏭</span><span class="lab">跳过</span></div><div class="r2">2</div><div class="r3">96 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">❌</span><span class="lab">出错</span></div><div class="r2">0</div><div class="r3">—</div></div>
+            <div class="card"><div class="r1"><span class="ico">🔁</span><span class="lab">已覆盖</span></div><div class="r2">1</div><div class="r3">12 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📊</span><span class="lab">总大小</span></div><div class="r2">66</div><div class="r3 accent">11.76 MB</div></div>
+          </div>
+        </div>
+        <div class="footer">
+          <div class="meta">
+            <span class="pair"><span class="v">⚙ 4</span></span>
+            <span class="sep">·</span>
+            <span class="pair"><span class="v">⚡ 6.8 MB/s</span></span>
+          </div>
+          <div class="right">
+            <span class="pct">31%</span>
+            <span class="tm">已用 00:12</span>
+            <span class="tm">· 剩余 00:26</span>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>窄窗下的换行（WrapPanel 的必要性）</h2>
+<div class="caption" style="max-width:880px">
+  卡片行 9×80 + 8×24 = <b>912px</b>。窗口 880px 时右端已被切掉（下面左图）；改 <span class="k">WrapPanel</span> 后自动换到第二行（下面右图）。
+</div>
+<div class="compare">
+  <div class="col">
+    <h3>不改 —— 硬切</h3>
+    <div class="window light" style="width:560px">
+      <div class="info" style="margin:12px">
+        <div class="statsPanel" style="overflow:hidden">
+          <div class="cards nowrap" style="justify-content:flex-start">
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">压缩包</span></div><div class="r2">1/1</div><div class="r3">共 1 个</div></div>
+            <div class="card"><div class="r1"><span class="ico">📄</span><span class="lab">已处理</span></div><div class="r2">30</div><div class="r3 accent">41.76 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📥</span><span class="lab">暂存</span></div><div class="r2">4</div><div class="r3">3.12 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">🗜</span><span class="lab">已压缩</span></div><div class="r2">18</div><div class="r3">8.44 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">仅存储</span></div><div class="r2">5</div><div class="r3">1.20 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">⏭</span><span class="lab">跳过</span></div><div class="r2">2</div><div class="r3">96 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">❌</span><span class="lab">出错</span></div><div class="r2">0</div><div class="r3">—</div></div>
+            <div class="card"><div class="r1"><span class="ico">🔁</span><span class="lab">已覆盖</span></div><div class="r2">1</div><div class="r3">12 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📊</span><span class="lab">总大小</span></div><div class="r2">66</div><div class="r3 accent">11.76 MB</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="col">
+    <h3>改 WrapPanel —— 自动换行</h3>
+    <div class="window light" style="width:560px">
+      <div class="info" style="margin:12px">
+        <div class="statsPanel">
+          <div class="fill" style="background:linear-gradient(to right, rgba(33,150,243,.35) 0%, rgba(33,150,243,.35) 31%, transparent 31%, transparent 100%)"></div>
+          <div class="cards" style="justify-content:center; gap:8px 18px">
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">压缩包</span></div><div class="r2">1/1</div><div class="r3">共 1 个</div></div>
+            <div class="card"><div class="r1"><span class="ico">📄</span><span class="lab">已处理</span></div><div class="r2">30</div><div class="r3 accent">41.76 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📥</span><span class="lab">暂存</span></div><div class="r2">4</div><div class="r3">3.12 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">🗜</span><span class="lab">已压缩</span></div><div class="r2">18</div><div class="r3">8.44 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📦</span><span class="lab">仅存储</span></div><div class="r2">5</div><div class="r3">1.20 MB</div></div>
+            <div class="card"><div class="r1"><span class="ico">⏭</span><span class="lab">跳过</span></div><div class="r2">2</div><div class="r3">96 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">❌</span><span class="lab">出错</span></div><div class="r2">0</div><div class="r3">—</div></div>
+            <div class="card"><div class="r1"><span class="ico">🔁</span><span class="lab">已覆盖</span></div><div class="r2">1</div><div class="r3">12 KB</div></div>
+            <div class="card"><div class="r1"><span class="ico">📊</span><span class="lab">总大小</span></div><div class="r2">66</div><div class="r3 accent">11.76 MB</div></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<h2>各态配色速查</h2>
+<div class="caption" style="max-width:880px">
+  <ul>
+    <li><b>准备 / 扫描</b>（<span class="k">IsIndeterminate=true</span>）：满宽淡黄，透明度 15%</li>
+    <li><b>进行中</b>（<span class="k">StatusKind=Running</span>）：主进度色，按 <span class="k">PercentComplete</span> 截断</li>
+    <li><b>暂停</b>（<span class="k">Paused</span>）：同色降到 50% alpha，宽度不变</li>
+    <li><b>完成</b>（<span class="k">Completed</span>）：满宽绿，15%</li>
+    <li><b>失败</b>（<span class="k">Failed</span>）：满宽红，15%</li>
+    <li><b>取消</b>（<span class="k">Cancelled</span>）：满宽灰，15%</li>
+  </ul>
+  深色主题下 <span class="k">ThemeStatusWarning</span> 是暗棕 <span class="k">#5C4A1E</span>，15% 后几乎看不见 —— 这是深色主题切换时最需要确认的一点（可能要把深色档的 alpha 提到 25%）。
+</div>
+
+<script>
+/* 状态 → 底纹渐变 + 百分比 + 旧条显隐 */
+const STATES = {
+  preparing: { pct: 0,  indet: true,  color: 'warning',  label: '正在准备…',            elapsed: '已用 00:00', remain: '' },
+  scanning:  { pct: 0,  indet: true,  color: 'warning',  label: '已发现 1,284 个文件',   elapsed: '已用 00:03', remain: '' },
+  running:   { pct: 31, indet: false, color: 'progress', label: '30 / 96 个文件',        elapsed: '已用 00:12', remain: '剩余 00:26' },
+  paused:    { pct: 31, indet: false, color: 'progress50', label: '已暂停',              elapsed: '已用 00:12', remain: '剩余 00:26' },
+  completed: { pct: 100, indet: false, color: 'success', label: '压缩完成',              elapsed: '总用时 00:38', remain: '' },
+  failed:    { pct: 100, indet: false, color: 'error',   label: '压缩失败',              elapsed: '总用时 00:38', remain: '' },
+  cancelled: { pct: 31, indet: false, color: 'secondary', label: '已取消',               elapsed: '已用 00:12', remain: '' }
+};
+
+let curState = 'running', curTheme = 'light';
+
+function rgbaOf(kind, win) {
+  // 从当前主题变量取基色，再套 alpha
+  const cs = getComputedStyle(win);
+  const map = {
+    progress:   [cs.getPropertyValue('--w-progress').trim(),   .40],
+    progress50: [cs.getPropertyValue('--w-progress').trim(),   .20],
+    warning:    [cs.getPropertyValue('--w-warning').trim(),    .15],
+    success:    [cs.getPropertyValue('--w-success').trim(),    .15],
+    error:      [cs.getPropertyValue('--w-error').trim(),      .15],
+    secondary:  [cs.getPropertyValue('--w-secondary').trim(),  .15]
+  };
+  const [hex, a] = map[kind];
+  const h = hex.replace('#','');
+  const r = parseInt(h.substring(0,2),16), g = parseInt(h.substring(2,4),16), b = parseInt(h.substring(4,6),16);
+  return `rgba(${r},${g},${b},${a})`;
+}
+
+function apply() {
+  const win = document.getElementById('win');
+  const st  = STATES[curState];
+  const fill = document.getElementById('fill');
+  const stop = st.indet ? 100 : st.pct;
+  const c = rgbaOf(st.color, win);
+  fill.style.background = `linear-gradient(to right, ${c} 0%, ${c} ${stop}%, transparent ${stop}%, transparent 100%)`;
+
+  document.getElementById('pct').textContent = st.indet ? '—' : st.pct;
+  document.getElementById('elapsed').textContent = st.elapsed;
+  document.getElementById('remainWrap').textContent = st.remain ? '· ' + st.remain : '';
+
+  // 压缩汇总只在 ZIP 压缩完成后才存在（其他状态整项隐藏，与真机 HasOverallCompression 一致）
+  const showZip = curState === 'completed' || curState === 'failed';
+  document.getElementById('pairZip').style.display = showZip ? '' : 'none';
+  document.getElementById('sepZip').style.display = showZip ? '' : 'none';
+
+  // 改造后「完整」档不再有独立总条
+  document.getElementById('oldbar').style.display = 'none';
+}
+
+document.querySelectorAll('[data-theme]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-theme]').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  curTheme = b.dataset.theme;
+  const win = document.getElementById('win');
+  win.classList.remove('light','dark');
+  win.classList.add(curTheme);
+  apply();
+});
+
+document.querySelectorAll('[data-state]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-state]').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  curState = b.dataset.state;
+  apply();
+});
+
+document.querySelectorAll('[data-w]').forEach(b => b.onclick = () => {
+  document.querySelectorAll('[data-w]').forEach(x => x.classList.remove('on'));
+  b.classList.add('on');
+  document.getElementById('win').style.width = b.dataset.w + 'px';
+});
+
+apply();
+</script>
+</body>
+</html>

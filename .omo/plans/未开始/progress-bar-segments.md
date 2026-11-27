@@ -1,5 +1,9 @@
 # ProgressWindow 总进度条分段着色（按压缩包状态）
 
+> **状态**: 📋 待实施 | **创建日期**: 2026-11（原排 v0.5.9）| **最近修正**: 2026-11-27
+> **排期**: **v0.5.10**（2026-11-27 从 v0.5.9 后推一个版本 —— 用户：「把 progress-bar-segments.md 这个计划往后推一个版本」。原因是同阶段的 [progress-stats-card-fill.md](progress-stats-card-fill.md) 已把「完整」档的进度改到底纹，先看效果再定分段条形态更省返工）
+> **与本计划互斥的部分**：`progress-stats-card-fill` 只改「完整」档的底纹（`:701-705`），本计划替换的是独立总进度条（`:1190-1195`），两者不冲突；但「完整」档改造后那根本计划要替换的条会变成「非完整档才显示」，实施时需按新条件接线。
+
 ## TL;DR
 
 > **Quick Summary**: 将 ProgressWindow 的总进度条（Row 4）从普通 `ProgressBar` 替换为自定义 `SegmentProgressBar` 控件，按批处理项状态将进度条分成 N 段并着色：失败段红色、成功段绿色、跳过段青色、进行中段蓝色（按该项进度填充）、未处理段背景色，段间以**动态预算制缝隙**（gap = min(2px, 条宽×15%/(N-1))）分隔，大批次数时缝隙自动收缩至不可见，内容不被挤占。所有模式（含单文件）均分段。
@@ -37,7 +41,7 @@
 **Research Findings**:
 - `BatchItem`/`BatchItemStatus`（Pending/InProgress/Completed/Skipped/Failed）定义在 **Core 层** `src\MantisZip.Core\Models\ProgressBatchItem.cs`，含 `Progress`(0-100)、`ErrorMessage`，实现 `INotifyPropertyChanged`；Avalonia 通过 `ProgressViewModel.BatchItems`（ObservableCollection）暴露
 - 批量加权公式（ProgressViewModel.SetProgress:221-229）：每项恰好占 `100/N` 百分比段 → 与用户的"5%-10% 一段"语义完全吻合
-- **`ProgressViewModel.IsIndeterminate` 是死绑定**：全项目仅 `ResultTreeView` 加载覆层（ResultTreeView.axaml.cs:166）对自身进度条置 true，ProgressWindow 总条从未启用，批量模式始终确定进度 → 新控件无需处理 indeterminate
+- ⚠️ **原「`IsIndeterminate` 是死绑定」的判断已过时（2026-11-27 实测更正）**：`ProgressViewModel.cs:1025`（准备态）与 `:1158`（扫描阶段，注释「总数未知：进度条滚动而非僵在 0%」）都会置 `IsIndeterminate = true`，且 `ProgressWindow.axaml:1192` 有 `IsIndeterminate="{Binding IsIndeterminate}"` 绑定 ⇒ **新控件必须处理 indeterminate**（准备/扫描期显示不确定态：整体淡色或滚光，不能僵在 0%）
 - **关键陷阱**：`SetComplete`（ProgressViewModel:275-278）强制 `PercentComplete = 100` → 新控件**必须从 `BatchItems` 推导段，不能绑 `PercentComplete`**，否则失败时显示满条绿
 - 失败上报路径：
   - GUI：`MainWindow.axaml.cs` RunWithProgress catch(:231-234) → `UpdateBatchItemStatus(0, Failed)`（丢消息）
@@ -52,7 +56,7 @@
 - 数据源必须绑 `BatchItems` 而非 `PercentComplete`（否则 SetComplete 强制 100% 导致失败满条绿）→ 已采纳
 - 颜色需用不透明版本（现有 35% alpha 为列表行叠加设计）→ 已与用户确认用不透明版
 - `HasOverallFailed` 是过度设计：仅 DragDropService 需要补齐状态上报，RunWithProgress/CompressWithProgress 已上报 → 改为只需补 DragDropService
-- `IsIndeterminate` 死绑定 → 控件无需处理
+- `IsIndeterminate` 死绑定这个结论**已被推翻**（见 Context 更正）→ 控件**必须**处理不确定态
 - count==0/1 边界、主题切换时渲染时读取 brush（不缓存）、resize/DPI 需 ArrangeOverride → 已纳入任务要求
 - `HasFailures` 已存在，不造重叠标志 → 已采纳
 
@@ -278,11 +282,11 @@ Max Concurrent: 3 (Wave 2)
   - 尺寸/DPI：重写 `MeasureOverride`/`ArrangeOverride` 或处理 `Bounds` 变化（Render 时用 `Bounds` 而非缓存尺寸）；默认 Height 建议用紧凑度资源（规则 5），但控件自身不硬编码高度——由 XAML 侧给 Height（见 Task 3）
   - 主题正确性：Render 时**每次**通过 `TryGetResource("ThemeProgressBgBrush", ...)` 读取轨道背景（或绑定 DynamicResource 属性），不得缓存 brush（主题切换后重绘）
   - 清理：`OnDetachedFromVisualTree` 时退订 CollectionChanged/PropertyChanged 防泄漏
-  - **不得**使用 `PercentComplete`/`Value`；`IsIndeterminate` 无需处理（死绑定，见 Context）
+  - **不得**使用 `PercentComplete`/`Value`；**必须**处理 `IsIndeterminate`（准备 / 扫描期，见 Context 更正）
 
   **Must NOT do**:
   - 不绑 PercentComplete（SetComplete 强制 100% 陷阱）
-  - 不处理 IsIndeterminate（ProgressWindow 总条从未启用）
+  - 不新增 i18n key、不改版本号（`IsIndeterminate` 必须处理，见 Context 更正）
   - 不改 Core BatchItem
   - 不写死高度/间距数值（用主题/紧凑度资源，规则 4/5）
   - 不新增本地化 key
@@ -306,7 +310,7 @@ Max Concurrent: 3 (Wave 2)
   **Pattern References** (existing code to follow):
   - `src/MantisZip.UI.Avalonia/Controls/ResultTreeView.axaml.cs` - 现有 Avalonia 自定义控件结构参考（样式属性定义、OnXxxChanged 模式）
   - `src/MantisZip.UI.Avalonia/Controls/QuickPathPicker.axaml.cs` - 自包含控件参考
-  - `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml:186-204` - 现有总进度条结构（替换对象）+ 右侧 42px 数字 TextBlock（保留）
+  - `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml:1183-1195`（2026-11-27 重定位；原写 186-204 已失效）- 现有总进度条结构（替换对象）+ 右侧百分比 TextBlock（保留）
 
   **API/Type References** (contracts to implement against):
   - `src/MantisZip.Core/Models/ProgressBatchItem.cs` - `BatchItem`（含 `Status`/`Progress`/INotifyPropertyChanged）与 `BatchItemStatus`
@@ -333,7 +337,7 @@ Max Concurrent: 3 (Wave 2)
   - [ ] 段区间计算抽为可测试的纯方法（internal/public static）——**含缝隙公式**：`ComputeSegments(int count, double width)` 返回含 gap 的段几何（或单独 `ComputeGap(int count, double width)` 可测）
   - [ ] Render 中 Failed→红/Completed→绿/Skipped→青/InProgress→蓝（引用 Task 1 GetColor）/Pending→轨道背景；InProgress 填充至 item.Progress
   - [ ] 段间动态预算缝隙（gap = min(2px, 宽×15%/(N-1))）、圆角使用主题资源
-  - [ ] 无 PercentComplete/Value 绑定、无 IsIndeterminate 处理
+  - [ ] 无 PercentComplete/Value 绑定；**有** IsIndeterminate 处理（不确定态不僵在 0%）
   - [ ] `dotnet build src\MantisZip.UI.Avalonia\MantisZip.UI.Avalonia.csproj` → Build succeeded
   - [ ] `lsp_diagnostics` 无错误
 
@@ -384,18 +388,18 @@ Max Concurrent: 3 (Wave 2)
 - [ ] 3. ProgressWindow.axaml Row 4 总进度条替换为 SegmentProgressBar
 
   **What to do**:
-  - 在 `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml` 的 Row 4（:186-204）把现有 `<ProgressBar ...>`（:192-197）替换为 `<controls:SegmentProgressBar ...>`
-  - 保留 Grid 列结构与右侧 42px 百分比 TextBlock（:198-203，`Text="{Binding PercentComplete, StringFormat=\{0\}%}"`）——数字继续由 PercentComplete 驱动，**不改动**
+  - 在 `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml` 的 Row 4（**2026-11-27 重定位到 `:1190-1195`**，原写 186-204 已失效）把现有 `<ProgressBar ...>` 替换为 `<controls:SegmentProgressBar ...>`
+  - 保留 Grid 列结构与右侧百分比 TextBlock（**重定位到 `:1183-1186`**，`Text="{Binding PercentComplete, StringFormat=\{0\}%}"`）——数字继续由 PercentComplete 驱动，**不改动**
   - 新增 xmlns：在 Window 根元素加 `xmlns:controls="clr-namespace:MantisZip.UI.Avalonia.Controls"`
   - 绑定与属性：
     - `ItemsSource="{Binding BatchItems}"`（ProgressViewModel.BatchItems 已存在）
     - `Height="22"`（保持与现状一致；现有硬编码 22——按规则 5 可改用紧凑度资源，但控件高度变更可能影响布局，默认保持 22 并注释说明，或映射到 `ControlHeightSm/Md`；以最小视觉回归为准）
-    - 移除 `Value`/`Minimum`/`Maximum`/`IsIndeterminate`/`Foreground` 绑定（新控件不需要）
+    - 移除 `Value`/`Minimum`/`Maximum`/`Foreground` 绑定；**`IsIndeterminate` 改为传给新控件**（`IsIndeterminate="{Binding IsIndeterminate}"`，准备 / 扫描期由新控件画不确定态，见 Context 更正）
   - 布局说明注释：`<!-- Row 4: 总体进度条（分段状态着色）-->`
   - 验证现有 XAML 有无 x:CompileBindings 影响（当前 Window 根是 `x:CompileBindings="False"`，ItemsSource 绑定直接用即可）
 
   **Must NOT do**:
-  - 不动 Row 3 文件进度条（:172-177 的 ProgressBar 保留）
+  - 不动 Row 3 文件进度条（**重定位到 `:346-349` 附近的百分比 + 当前文件进度条**；原写 172-177 已失效）
   - 不动 Row 4 右侧数字 TextBlock
   - 不改 ProgressViewModel 的 PercentComplete 计算逻辑
   - 不新增本地化 key
@@ -417,7 +421,7 @@ Max Concurrent: 3 (Wave 2)
 
   **Pattern References**:
   - `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml:1-17` - Window 根元素 + xmlns 声明（加 controls 命名空间的锚点）
-  - `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml:186-204` - Row 4 现有结构（替换目标 + 保留的右侧数字）
+  - `src/MantisZip.UI.Avalonia/Dialogs/ProgressWindow.axaml:1183-1195` - Row 4 现有结构（替换目标 + 保留的右侧数字）
   - `src/MantisZip.UI.Avalonia/Controls/ResultTreeView.axaml:1-15` - 自定义控件在 XAML 中的 xmlns 用法参考（若 ResultTreeView 用在某 axaml 中，直接照抄其 xmlns 写法）
 
   **API/Type References**:
@@ -445,7 +449,7 @@ Max Concurrent: 3 (Wave 2)
     Preconditions: SegmentProgressBar.cs 已编译（Task 2 完成）
     Steps:
       1. read ProgressWindow.axaml Row 4 区域
-      2. 断言: 控件类型为 SegmentProgressBar、ItemsSource 绑 BatchItems、无 Value/IsIndeterminate 残留绑定、右侧数字 TextBlock 原样存在
+      2. 断言: 控件类型为 SegmentProgressBar、ItemsSource 绑 BatchItems、无 Value 残留绑定、`IsIndeterminate` 已转发给新控件、右侧数字 TextBlock 原样存在
       3. 断言 xmlns:controls 声明存在
     Expected Result: 上述断言全部为真
     Failure Indicators: 控件类型错误、残留旧绑定、数字 TextBlock 丢失、xmlns 缺失

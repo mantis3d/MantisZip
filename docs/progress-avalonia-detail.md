@@ -5,6 +5,18 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-27** — 交互：进度窗「完整」档改统计卡行底纹 + 状态面板从 7 行压到 3 行（计划立项 + HTML 原型）
+
+- **来由**：issue #81（Koewen，v0.5.6）反馈进度窗信息冗余 —— 同一个 40% 出现 4 次、三根进度条粗细圆角各不相同、「简约」与「精简」两套视图切换语义重叠。核对后确认：截图虽是 v0.5.6 的，但 `ProgressWindow.axaml` 的 Row 0–6 七行结构与 v0.5.6 逐行一致，问题今天依然存在。
+- **两条实测证据**：①`IsMinimalDensity` 全 XAML 里只出现在它自己那个 `RadioButton.IsChecked`（`:655`），**没有任何内容绑定它** ⇒ 「精简」档除了批列表高度 5 行 vs 8 行之外什么都不变；②统计卡行 9 × `MinWidth=80` + 8 × `SpacingLg`(Normal=24) = **912px**，而窗口 `MinWidth=500`、默认 800、`RootGrid` 带 `ClipToBounds="True"` ⇒ 一旦 9 张卡全上报就被硬切（现在只显示 2-4 张所以没暴露）。
+- **用户拍板**：底纹进度条取代「完整」档的独立总条；不确定态（准备/扫描）**填满宽淡黄**而不是滚动动画（底纹滚不了）；「状态面板一行就能排下」；`progress-bar-segments.md` 往后推一个版本。
+- **方案三件事**：①底纹 —— `StatsCardsPanel.Background` 改 `MultiBinding` → 4-stop `LinearGradientBrush`（照抄 `Converters/BatchStatusConverters.cs:67-102` 的写法，alpha 从 35% 降到 15% 以免压字），六态判定统一走 `ProgressStatusKind`（**不能绑 `HasFailures`**，`:900` 是只读计算属性无通知）；②视图切换两行合一行五档（极简/标准/详细/完整/列表，新增 `AppSettings.ProgressDetailLevel`，留两个旧字段做迁移）；③卡片压进一行 —— `MinWidth` 80→72、间距 24→8 ⇒ 712px，字号各降一档。
+- **高度账**：视图切换 2→1 行、卡片 1 行（完整可见）、段2+百分比+时间 3→1 行、独立总条 1→0 行 ⇒ **7 行 → 3 行**。底部合并行 = 左「⚙ 4 · ⚡ 6.8 MB/s · 🗜 11.76 MB (28%)」+ 右「31% · 已用 00:12 · 剩余 00:26」。
+- **交付**：`.omo/plans/未开始/progress-stats-card-fill.md`（288 行；T1–T9 合计 9.5-11.5h，其中底纹本体 4-4.5h、紧凑化 5.5-7h）+ `docs/prototypes/progress-stats-card-fill.html`（468 行，浅/深 × 七状态 × 880/560 窗口可直接切）。
+- **排期**：`docs/PLAN.md` v0.5.9 加该行（阶段 33-46.5h → **35.5-49.5h**）；`progress-bar-segments.md` 从 v0.5.9 **后推到 v0.5.10**（v0.5.10 工时 12-20h → 15-24h），依赖链小节同步。
+- **顺带更正 `progress-bar-segments.md` 的四类过期内容**：①「`IsIndeterminate` 是死绑定」已推翻 —— `ProgressViewModel.cs:1025`（准备）与 `:1158`（扫描）会置 true，`ProgressWindow.axaml:1192` 有绑定；②行号 186-204 / 192-197 / 198-203 / 172-177 **全部失效**，重定位到 `:1183-1195` / `:1190-1195` / `:1183-1186` / `:346-349`；③「移除 `IsIndeterminate` 绑定」改为「转发给新控件」；④补一条与底纹版的分工说明（底纹只服务「完整」档，分段条服务其余三档，不冲突）。
+- **验证**：`-Task check` ok=True（version 0.5.9 六处 / i18n 1553 key / guards 12 条 `failedCount=0`）；四份文件 `bom=False` / `loneLF=0` / `loneCR=0`；84 个计划链接 0 断链、无表头表格 0 处。
+
 **2026-11-27** — 文档：阶段排期调整（网页类内容预览定为 v0.5.10，队列与债务各顺延一位）
 
 - 用户指令：把 `docs/PLAN.md` 的「### 阶段（待定版本号）—— 网页类内容预览：HTML 兄弟资源 / MHT / CHM（插队，约 12-20h）」放到 0.5.10，原本的 0.5.10 向后顺延。

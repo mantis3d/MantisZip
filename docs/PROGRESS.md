@@ -26,6 +26,14 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-11
+- **11-27** — **进度窗「完整」档改统计卡行底纹 + 状态面板从 7 行压到 3 行（计划立项）**
+  - 用户诉求：issue #81 反馈进度窗「同一个 40% 出现 4 次」「三根进度条粗细圆角各不相同」；先问「底纹进度条可行吗」，再要求「状态面板一行就能排下」。
+  - 实证：`ProgressWindow.axaml` 的 `IsMinimalDensity` 全 XAML 里只出现在它自己那个 `RadioButton.IsChecked`，**没有任何内容绑定它** ⇒ 「精简」档几乎不改变任何东西；统计卡行 9×80 + 8×24 = **912px** 超出默认窗口 800 与 `MinWidth=500`，被 `ClipToBounds` 硬切；批处理行图标显示不全是 emoji 缺字。
+  - 方案：底纹 = `StatsCardsPanel.Background` 改 `MultiBinding` → 4-stop `LinearGradientBrush`（照抄 `Converters/BatchStatusConverters.cs` 的 `ProgressStatusToBackgroundConverter`），六态走 `ProgressStatusKind`，不确定态（准备/扫描）填满宽淡黄而非滚动动画；同批把视图切换两行合一行五档、9 卡压进一行（`MinWidth` 80→72、间距 24→8 ⇒ 712px）、段 2+百分比+时间合并成底部一行，状态面板 **7 行 → 3 行**。
+  - 交付：`.omo/plans/未开始/progress-stats-card-fill.md`（288 行，10 节，T1–T9 合计 **9.5-11.5h**）+ `docs/prototypes/progress-stats-card-fill.html`（468 行原型，浅/深 × 七状态 × 880/560 窗口）。
+  - 排期：`docs/PLAN.md` v0.5.9 新增该行、阶段工时 33-46.5h → **35.5-49.5h**；`progress-bar-segments.md` **从 v0.5.9 后推到 v0.5.10**（用户指令），v0.5.10 工时 12-20h → 15-24h。
+  - 顺带更正 `progress-bar-segments.md` 的三处过期判断：①「`IsIndeterminate` 是死绑定」已推翻（`ProgressViewModel.cs:1025` 与 `:1158` 会置 true，`ProgressWindow.axaml:1192` 有绑定）②行号 186-204 / 192-197 / 198-203 / 172-177 全部重定位到 `:1183-1195` / `:1190-1195` / `:1183-1186` / `:346-349` ③「移除 `IsIndeterminate` 绑定」改为「转发给新控件」。
+  - 校验：`-Task check` ok=True（version 六处 0.5.9 / i18n 1553 key / guards 12 条 failedCount=0）；三份文档 + 一份原型 `bom=False` / `loneLF=0` / `loneCR=0`；84 个计划链接 0 断链、无表头表格 0 处。
 - **11-27** — **阶段排期调整：网页类内容预览定为 v0.5.10，其后两段各顺延一位**
   - 用户指令：把 `docs/PLAN.md` 的「### 阶段（待定版本号）—— 网页类内容预览」放到 0.5.10，原 0.5.10 向后顺延。
   - 结果：`### 阶段（待定版本号）—— 网页类内容预览…` → `### 阶段 v0.5.10 —— 网页类内容预览：HTML 兄弟资源 / MHT / CHM（约 12-20h）` 并前移到 v0.5.9 之后；原「压缩任务队列」由 v0.5.10 → **v0.5.11**；原「新功能与债务」由 v0.5.11 → **v0.5.12**。
