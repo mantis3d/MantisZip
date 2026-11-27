@@ -5,6 +5,17 @@
 ---
 
 ## MantisZip.UI.Avalonia（主力版）
+**2026-11-27** — 文档：`drag-drop-direct-extract` 计划重写为「主从式多投放区」
+
+- 用户指令：m23729「树肯定是要的，但是我觉得只显示少量节点就好，冲突检测一层目录或者两层可能就够……还有双投放区这个我要改一下，改成多投放区」；后续 m23741（主区域 + 小格条带）、m23754（长宽比自动切换 / 先硬编码 / 标题写参数名 / 加「打开解压窗口」格）、m23763（极简档只留两格）、m23767→m23774（树溢出覆盖层外**先不做**）。
+- 最终形态：一个主区域（目标目录 + 预览树）+ 一条参数条带；鼠标在主区域用设置默认参数，悬停某格则主区域立即按该格重算。三格硬编码「保留完整路径 / 扁平解压 / 始终加根」+ 分隔线 + 「打开解压窗口…」格。
+- **一层判定的可证明性**（写进计划，取代原「IO 预算 + 慢盘降级 + `(N+)` / `(?)` 未知态」）：`ExtractPathResolver.ResolveRelativePath` 输出恒为相对路径，拼上目标目录后形如 `<顶层项>\<其余>` ⇒ 顶层项不存在则整条不存在。唯一例外 `AlwaysWrap` 顶层只 1 项，撞上后再枚举一层补计数。
+- 三档降级：常规（`w≥480 && h≥360`，树 ≤8 行）/ 紧凑（`w≥320 && h≥240`，树 3 行 + 条带压成一行）/ 极小（只剩「默认」+「打开解压窗口…」两格，不画树）。长宽比 ≥1.75 条带在底部 `max(64, h×8%)`，否则右侧 `max(150, w×12%)`。
+- 计划文件 2159 → 1561 行：删 610 行历史代码块（调了不存在的 `ResultPreviewService.BuildDragPreview(archivePath, expanded, format)`、`PreviewTreeNode.DisplayName`；真实落点是 `OverlayController` 而非 `DragOverlayWindow`；`_trackingThread` 在旧代码 0 命中、真实代码 3 处）、Task 7 重置为 7.1-7.7、Task 8 按新形态重写 5 组手工验收、`## 预览弹窗实施补充（2026-08-06）` 92 行压成「废弃三」、DoD 修掉 8 条指向已废弃类型的表述并补 5 条新验收。
+- 计划文件头部同步：「状态 🟡 进行中（Task 1–6 完成，Task 7/8 未完成）」「阶段 `[■■■■■■□□□□]` (6/10)」，并写明 Task 7 的 7.2/7.3/7.4 虽勾了但没落地（`DragPreviewPopup.cs` 不存在、`DragPreviewBitmapBuilder` 零调用者、`OverlayController.SetPreview` 零调用者、`Dwm` 在覆盖层里零命中）。
+- `docs/PLAN.md` 同步：阶段工时 17-24h → **29-42h**；该行改为「拖拽直接解压 · 收尾（主从式多投放区 + 一层冲突预览）」22-30h；v0.5.9 验收口径按新形态重写。
+- **踩坑**：①PowerShell 的 `-like` 把反引号当转义符，匹配含反引号的字符串必须用 `.Contains()`（本轮因此误改了头部状态行，已还原）②`$list.InsertRange($i, @(...))` 传字面量抛 `MethodException`，要显式 `List[string]` + 逐个 `Add` ③`Get-Content` + `WriteAllLines` 会把 CRLF 写成混合行尾（`loneLF=234`），要 `[regex]::Split($t,"`r`n|`n")` 后统一。
+
 **2026-11-26** — 版本号升级 v0.5.9（6 处同步）
 
 - 按 Version bump checklist 从 `0.5.8` 改到 `0.5.9`：`src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version`、`src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 的 `<Version>`、`docs/PLAN.md` 与 `docs/PROGRESS.md` 的「当前版本」、`installer.iss` 与 `installer-selfcontained.iss` 的 `#define MyAppVersion` 兜底值（两份 `.iss` 改动只有这一行，保持无 BOM + CRLF）。

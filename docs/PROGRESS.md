@@ -26,6 +26,12 @@
 按月分组，每月按日期从新到旧排列。
 
 #### 2026-11
+- **11-27** — **`drag-drop-direct-extract` 计划重写：拖拽视觉层改成「主从式多投放区」**
+  - 用户逐项拍板（m23729 / m23741 / m23754 / m23763 / m23759）：覆盖层 = 一个主区域（目标目录 + 预览树）+ 一条参数条带；鼠标在主区域用设置默认参数，在某格则主区域立即按该格重算。硬编码三格「保留完整路径 / 扁平解压 / 始终加根」+ 分隔线 + 第四格「打开解压窗口…」。
+  - **冲突只判一层**并给了可证明性：`ExtractPathResolver.ResolveRelativePath` 输出恒为相对路径，拼上目标目录后每条路径的第一级都是顶层项 ⇒ 顶层项不存在则整条不存在。原来的「每轮 IO ≤40 次 / 慢盘 500ms 降级 → `(N+)` / `(?)` 未知态」全部作废；落点变化时枚举一次目录、各格内存查表，切格 0 次 IO。
+  - 计划文件从 2159 行改写到 1561 行：删掉 610 行历史代码块（调了不存在的 `ResultPreviewService.BuildDragPreview`、`PreviewTreeNode.DisplayName`，且落点是 `OverlayController` 而非 `DragOverlayWindow`）、重置 Task 7 为 7.1-7.7 新子项表、Task 8 换成按三档布局 / 四格悬停 / 极小档两格 / 检测失败唯一格 / 长宽比换边组织的手工验收清单、「预览弹窗实施补充」整节压成「废弃三」、DoD 补齐主从式方案的 5 条验收项。
+  - `docs/PLAN.md` 同步：阶段工时 17-24h → **29-42h**，该行改为「主从式多投放区 + 一层冲突预览」22-30h，v0.5.9 验收口径按新形态重写。
+
 - **11-26** — **版本号升级 v0.5.9（6 处同步）**：按 Version bump checklist 把 `src/MantisZip.UI.Avalonia/AppConstants.cs` 的 `Version`、`MantisZip.UI.Avalonia.csproj` 的 `<Version>`、`docs/PLAN.md` 与 `docs/PROGRESS.md` 的「当前版本」、`installer.iss` 与 `installer-selfcontained.iss` 的 `MyAppVersion` 兜底值从 `0.5.8` 改为 `0.5.9`（`-Task version` 六处全部匹配）。`RELEASE_NOTES.md` 新增 `## v0.5.9` 章节（文件说明 + 一行范围说明，功能条目随阶段落地补）—— v0.5.8 章节（含四个 0.5.8 安装包名）至今未发版（`git tag` 只到 v0.5.7，远端同样只有 v0.5.6 / v0.5.7），发布说明口径已定（2026-11-26 用户拍板）：v0.5.8 章节原样保留，顶部新开 `## v0.5.9`，功能条目随 v0.5.9 阶段落地逐条补。
 
 - **11-26** — **计划台账审计：5 条已发版计划归档、PLAN.md 六类问题修正**

@@ -1,10 +1,10 @@
 # 拖拽直接解压 — 放弃 CF_HDROP，Drop 后检测目标窗口路径直接提取
 
-> **状态**: 🟡 进行中 —— 主体已完成（Task 1–7，2026-07-23）；**文件树预览弹窗未实施**（2026-08-06 设计已确认，截至 2026-10-30 仍未落笔：`DragPreviewPopup.cs` 不存在、`DragPreviewBitmapBuilder` 零调用者、`OverlayController.SetPreview` 零调用者）
-> **阶段**: [■■■■■■■□□□] (7/10) — 2026-10-30 从 `已完成` 移回 `进行中`（原「10/10 已完成」与代码不符：预览弹窗整段未做，Task 8 手工验收与 5 条 DoD 仍未勾）
-> **分支**: `alpha` / `beta` / `plans`（原 `avalonia-port` 已不存在；代码改动按规则 19 落在 alpha 或 beta）
-> **2026-08-06 补充**: 预览弹窗（DragPreviewPopup）实施设计已确认——独立 Win32 弹窗跟随鼠标（不合成进覆盖层）+ PointerPressed 预取式渲染 + 双阈值降级。待实施，详见文末「预览弹窗实施补充」章节。
-> **2026-10-30 补充**: 用户明确**文件树预览弹窗的主要目的之一就是看落点冲突预览**（拖到某个 Explorer 窗口/桌面时，能看出有多少同名文件会被覆盖/重命名）。硬约束：拖拽期间 UI 线程被 OLE `DoDragDrop` 同步阻塞、`RenderTargetBitmap` 只能在 UI 线程 ⇒ 拖拽中途无法重渲染树位图，冲突标记只能走 GDI 文字（弹窗摘要栏 / 覆盖层），或改成「拖拽启动前按预测落点渲染」。**2026-10-30 已按用户拍板定稿为覆盖层方案**（两层 8 行 + 目标已存在即标红），见文末「落点冲突预览（设计已定稿 2026-10-30，待实施）」。
+> **状态**: 🟡 进行中 —— 拖拽编排主体已完成（Task 1–6，2026-07-23）；**视觉反馈层（Task 7）与手工验收（Task 8）未完成**。
+> **阶段**: [■■■■■■□□□□] (6/10) — 2026-11-27 按实测重算：Task 7 的 7.2/7.3/7.4 勾了但没落地（`DragPreviewPopup.cs` 不存在、`DragPreviewBitmapBuilder` 零调用者、`OverlayController.SetPreview` 零调用者、`Dwm` 在覆盖层里零命中），不计入完成。
+> **分支**: `alpha` / `beta`（代码改动按规则 19 落地；`plans` 只写文档）
+> **2026-11-27 重写**: 视觉反馈层的设计**整体换成「主从式多投放区」** —— 覆盖层 = 一个主区域（目标目录 + 预览树）+ 一条参数条带，鼠标移到某个格子，主区域立即按该格参数重算。**2026-08-06 的「独立 Win32 预览弹窗」方案已废弃**（用户 2026-10-30 与 2026-11-27 两次确认不做弹窗），2026-10-30 的「落点冲突预览」与「双投放区」两节也已废弃。现设计见文末「落点冲突预览与多投放区 —— 主从式覆盖层」，废弃内容见「已废弃设计（存档）」。
+> **硬约束**: 拖拽期间 UI 线程被 OLE `DoDragDrop` 同步阻塞（`Services/CustomOleDragDrop.cs:387` 调 `NativeMethods.DoDragDrop`），树与冲突标记必须在拖拽启动前算好，拖拽中只能做 GDI 绘制与内存查表。
 
 ---
 
@@ -15,15 +15,15 @@
 **核心流程**：
 ```
 用户按住拖拽 → DoDragDropAsync(自定义格式) 立即响应
-    → 拖拽途中：独立 Win32 线程覆盖层实时高亮目标窗口
-    → 拖拽途中：Win32 预览弹窗跟随鼠标，预渲染的 ResultTreeView 文件树
+    → 拖拽前：把展开后的条目折成行模型，算好各投放区的顶层项与冲突（一次性）
+    → 拖拽途中：Win32 覆盖层实时高亮目标窗口，主区域显示「目标目录 + 预览树」
+    → 拖拽途中：鼠标移到参数条带的某一格 ⇒ 主区域按该格参数重算并重绘（内存查表，零 IO）
     → 用户松手 → DoDragDropAsync 返回
-    → 获取鼠标位置 (GetCursorPos)
+    → 取鼠标位置 (GetCursorPos) + 松手时悬停的格 (controller.HoveredZone)
     → WindowFromPoint → ShellWindows COM / Win32 EnumChildWindows → 取得目标路径
-    → 如果是桌面路径 / 检测失败 → 弹文件夹选择对话框
-    → ProgressWindow 显示解压进度
-    → 直接提取到目标目录
-    → 完成
+    → 悬停的是「打开解压窗口」格 ⇒ 弹解压设置窗（不解压）
+    → 检测失败 / 无目标 ⇒ 同样弹解压设置窗
+    → 否则：ProgressWindow 显示解压进度 → 直接提取到目标目录 → 完成
 ```
 
 **涉及文件**（全部在 `src/MantisZip.UI.Avalonia/` 下）:
@@ -34,13 +34,17 @@
 | `Services/DragDropService.cs` | 🆕 新增 — 拖拽编排 |
 | `Services/DragDropItemExpander.cs` | 🆕 新增 — 多选展开 + 路径裁剪 |
 | `Services/DragOverlayWindow.cs` | ⛔ 已废弃 — 重构为 Avalonia Window + `OverlayController`（后台线程 UpdateLayeredWindow） |
-| `Services/DragPreviewPopup.cs` | 🆕 待新增 — 独立 Win32 预览弹窗（跟随鼠标，460×680，预取式渲染 + 双阈值降级） |
+| ~~`Services/DragPreviewPopup.cs`~~ | ⛔ **不新增** — 独立 Win32 预览弹窗方案 2026-11-27 废弃，改为主从式覆盖层 |
 | `Views/MainWindow.axaml.cs` | 🔧 修改 — 替换现有拖拽代码 |
 | `ViewModels/MainWindowViewModel.cs` | 🔧 修改 — 补充拖拽相关状态 |
 | `Models/ArchiveItemModel.cs` | 🔧 修改 — 补充 ToCoreItem 转换 |
 | `MantisZip.UI.Avalonia.csproj` | 🔧 修改 — ADD SHDocVw COM 引用 |
-| `Themes/ThemeLight.axaml` | 🔧 修改 — 新增覆盖层颜色键 |
-| `Themes/ThemeDark.axaml` | 🔧 修改 — 新增覆盖层颜色键 |
+| ~~`Themes/ThemeLight.axaml`~~ | ⛔ **不新增** — 覆盖层是 Win32 GDI 绘制，绑不了 Avalonia 资源 |
+| ~~`Themes/ThemeDark.axaml`~~ | ⛔ **不新增** — 同上 |
+| `Services/DragConflictPreview.cs` | 🆕 新增 — 一层冲突判定 + 按结果去重（纯逻辑，可单测） |
+| `Services/OverlayController.cs` | 🔧 修改 — 逐行渲染 + 多投放区条带 + 三档降级 + 悬停判定 |
+| `Services/ExtractFlow.cs` | 🔧 修改 — `RunSelectedItemsExtractionAsync` 加 `rootMode` 形参 |
+| `Views/MainWindow.Thumbnails.cs` | 🔧 修改 — 拖拽入口喂条目/尺寸给覆盖层、松手时传 `HoveredZone` |
 
 **运行时依赖变化**: 新增 SHDocVw COM 引用（Windows 内置，无需分发）
 
@@ -83,24 +87,24 @@
 ```
 MainWindow.axaml.cs（UI 线程）
     │ PointerPressed → 记录起始点 + 选中项
-    │ PointerMoved → 预渲染 ResultTreeView 到位图
+    │ PointerMoved → 折成行模型（树 + 各参数格的结果）
     │              → 超过阈值启动 DoDragDropAsync
     │ DoDragDropAsync(自定义 DataTransfer) → 阻塞 UI 线程
-    │    └─ Win32 独立线程 (DragOverlayWindow)
+    │    └─ Win32 独立线程 (OverlayController)
     │       ├─ 实时跟踪鼠标位置
     │       ├─ 覆盖层：高亮目标窗口 (绿/红/灰)
-    │       └─ 预览弹窗：跟随鼠标显示文件树
+    │       └─ 覆盖层主区域：目标目录 + 预览树；底部/右侧参数条带
     └─ 用户松手 → DoDragDropAsync 返回
     └──────────────────────────────────────────────┐
                                                     ▼
 DragDropService.DetectAndExtractAsync()
-    │ 1. 销毁 DragOverlayWindow + DragPreviewPopup
+    │ 1. 销毁覆盖层（记下松手时悬停的格 controller.HoveredZone）
     │ 2. GetCursorPos() → 获取松手时的鼠标坐标
     │ 3. DropTargetDetector.GetPathFromHwnd(hWnd)
     │    ├─ ShellWindows COM → Explorer 路径
     │    ├─ Win32 EnumChildWindows → #32770 对话框路径
     │    ├─ 桌面 (Progman/WorkerW) → 桌面路径
-    │    └─ 其他/失败 → 弹 OpenFolderDialog
+    │    └─ 其他/失败 → 弹解压设置窗（ExtractSettingsWindow.ShowWithPresetSelectionAsync）
     │ 4. 如果有多个文件→展开目录
     │ 5. ProgressWindow 显示解压进度
     │ 6. ArchiveEntryExtractor.ExtractEntryAsync → 逐个提取到目标
@@ -130,7 +134,7 @@ DropTargetDetector.GetPathFromHwnd(hWnd)
     └─ 全部失败 → return (null, None)
 ```
 
-### DragOverlayWindow 状态机（含 PreviewPopup）
+### OverlayController 状态机（主从式多投放区）
 
 ```
 Hidden ──→ Showing ──→ Tracking ──→ Hiding ──→ Hidden
@@ -853,9 +857,8 @@ fileGrid.PointerMoved += async (s, e) =>
     var format = ArchiveFormatHelper.GetFormat(archivePath);
     var password = vm2.GetSessionPassword(archivePath); // 需要 ViewModel 暴露此方法
 
-    // ═══ 预渲染预览文件树（DragPreviewPopup 用）═══
-    var previewPopupContent = await DragPreviewBitmapBuilder.RenderAsync(
-        selectedItems, allItems, format, archivePath);
+    // ═══ 折成行模型（拖拽前一次算好，拖拽中不再读写压缩包）═══
+    var treeRows = DragConflictPreview.BuildRowModel(selectedItems, allItems, vm2.CurrentFolder);
 
     // Start drag with custom data format (unrecognized by Explorer)
     var data = new DataTransfer();
@@ -864,16 +867,16 @@ fileGrid.PointerMoved += async (s, e) =>
     _isOwnDrag = true;
     vm2.StatusMessage = "拖拽到 Explorer 或桌面以直接解压";
 
-    // ═══ 启动 Win32 覆盖层 + 预览弹窗（独立线程）═══
-    var overlay = new DragOverlayWindow();
-    overlay.SetPreviewBitmap(previewPopupContent);
-    overlay.Show();
+    // ═══ 启动 Win32 覆盖层（独立线程；主从式多投放区）═══
+    using var controller = new OverlayController(overlayHwnd, mainHwnd);
+    controller.SetContent(treeRows, vm2.CurrentFolder);
+    controller.Start();
 
     await DragDrop.DoDragDropAsync(triggerEvent, data, DragDropEffects.Copy);
 
     // ═══ 拖拽结束，销毁覆盖层 ═══
-    overlay.Close();
-    overlay.Dispose();
+    var hovered = controller.HoveredZone;
+    // using 自动 Dispose；hovered 交给 DragDropService
 
     _isOwnDrag = false;
     vm2.StatusMessage = "检测目标位置...";
@@ -990,720 +993,112 @@ private void CleanupDragDropTemp()  // ⛔ 不再需要
 > Avalonia 分支已确认：`DragDrop.DropEvent` 使用 `e.DataTransfer.Formats.Contains(DataFormat.File)`，
 > 拖入保护逻辑（`_isOwnDrag`）已存在 ✅
 
-### Task 7: 拖拽视觉反馈（Win32 覆盖层 + PreviewPopup）
-
-**Files:**
-- Create: `Services/DragOverlayWindow.cs`
-- Create: `Services/DragPreviewPopup.cs`
-- Create: `Services/DragPreviewBitmapBuilder.cs`
-- Modify: `Themes/ThemeLight.axaml` — 新增覆盖层颜色键
-- Modify: `Themes/ThemeDark.axaml` — 新增覆盖层颜色键
-
-> **关键技术决策**：Avalonia 的 `DoDragDropAsync` 在 Windows 上调用 `ole32.dll!DoDragDrop`，该调用**阻塞 UI 线程**（虽然内部运行自己的消息泵，但 Avalonia 控件无法更新）。因此覆盖层必须使用**纯 Win32 窗口 + 独立线程**，不能是 Avalonia 控件。
-
-- [x] **7.1 实现 DragOverlayWindow（纯 Win32）**
-
-```csharp
-// Services/DragOverlayWindow.cs
-using System.Diagnostics;
-using System.Runtime.InteropServices;
-using System.Threading;
-
-namespace MantisZip.UI.Avalonia.Services;
-
-/// <summary>
-/// 拖拽目标高亮覆盖层。纯 Win32 实现，独立线程运行，不依赖 Avalonia UI 线程。
-/// </summary>
-public class DragOverlayWindow : IDisposable
-{
-    private nint _hwnd = nint.Zero;
-    private Thread? _uiThread;
-    private CancellationTokenSource? _cts;
-    private readonly ManualResetEvent _windowCreated = new(false);
-    private readonly ManualResetEvent _windowClosed = new(false);
-
-    // 状态
-    private DropTargetStatus _status = DropTargetStatus.None;
-    private NativeMethods.RECT _targetRect;
-    private string? _targetPath;
-    private readonly object _stateLock = new();
-
-    // Win32 窗口过程委托（必须存字段防止 GC 回收）
-    private readonly WndProcDelegate _wndProcDelegate;
-
-    // 动画
-    private readonly System.Timers.Timer _animationTimer;
-    private double _opacityPhase = 0; // 0~1
-
-    // 性能节流
-    private nint _lastHwnd = nint.Zero;
-    private readonly Stopwatch _hoverTimer = new();
-    private const int HoverThresholdMs = 150;
-
-    public DragOverlayWindow()
-    {
-        _wndProcDelegate = WndProc; // 防止 GC 回收窗口过程委托
-        _animationTimer = new System.Timers.Timer(50); // 20fps
-        _animationTimer.Elapsed += (_, _) => UpdateAnimation();
-    }
-
-    /// <summary>
-    /// 在独立线程上创建并显示覆盖层窗口。
-    /// </summary>
-    public void Show()
-    {
-        _cts = new CancellationTokenSource();
-        _uiThread = new Thread(RunWindowLoop)
-        {
-            IsBackground = true,
-            Name = "DragOverlayThread"
-        };
-        _uiThread.SetApartmentState(ApartmentState.STA);
-        _uiThread.Start();
-        _windowCreated.WaitOne(5000); // 等待窗口创建
-    }
-
-    /// <summary>
-    /// 关闭覆盖层窗口。
-    /// </summary>
-    public void Close()
-    {
-        _cts?.Cancel();
-        if (_hwnd != nint.Zero)
-        {
-            NativeMethods.DestroyWindow(_hwnd);
-            _hwnd = nint.Zero;
-        }
-        _windowClosed.WaitOne(2000);
-    }
-
-    public void Dispose()
-    {
-        Close();
-        _animationTimer?.Dispose();
-        _cts?.Dispose();
-        _windowCreated?.Dispose();
-        _windowClosed?.Dispose();
-        _hoverTimer?.Stop();
-    }
-
-    private void RunWindowLoop()
-    {
-        try
-        {
-            // 注册窗口类
-            var hInstance = NativeMethods.GetModuleHandle(null);
-            var wndClass = new NativeMethods.WNDCLASSEX
-            {
-                cbSize = (uint)Marshal.SizeOf<NativeMethods.WNDCLASSEX>(),
-                lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate),
-                hInstance = hInstance,
-                hCursor = nint.Zero,
-                hbrBackground = nint.Zero,
-                lpszClassName = "MantisZipDragOverlay"
-            };
-            NativeMethods.RegisterClassEx(ref wndClass);
-
-            // 创建窗口
-            _hwnd = NativeMethods.CreateWindowEx(
-                NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_TRANSPARENT | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW,
-                "MantisZipDragOverlay",
-                "",
-                NativeMethods.WS_POPUP,
-                0, 0, 0, 0,
-                nint.Zero, nint.Zero, hInstance, nint.Zero);
-
-            if (_hwnd == nint.Zero) return;
-
-            // 设置初始透明度
-            NativeMethods.SetLayeredWindowAttributes(_hwnd, 0, 0, NativeMethods.LWA_ALPHA);
-            NativeMethods.ShowWindow(_hwnd, NativeMethods.SW_SHOW);
-
-            _windowCreated.Set();
-            _animationTimer.Start();
-
-            // 消息循环
-            while (!_cts!.IsCancellationRequested)
-            {
-                if (PeekMessage(out var msg, nint.Zero, 0, 0, 1))
-                {
-                    TranslateMessage(ref msg);
-                    DispatchMessage(ref msg);
-                }
-                else
-                {
-                    Thread.Sleep(1);
-                }
-
-                // 更新目标检测（性能节流：仅 HWND 变化或停留超过阈值时更新）
-                UpdateTargetDetection();
-            }
-        }
-        finally
-        {
-            _animationTimer?.Stop();
-            _windowClosed.Set();
-        }
-    }
-
-    private void UpdateTargetDetection()
-    {
-        if (!NativeMethods.GetCursorPos(out var pt)) return;
-        var hWnd = NativeMethods.WindowFromPoint(pt);
-
-        // 性能节流：只有 HWND 变化时才重置计时器
-        if (hWnd != _lastHwnd)
-        {
-            _lastHwnd = hWnd;
-            _hoverTimer.Restart();
-            return; // 等待停留阈值
-        }
-
-        if (_hoverTimer.ElapsedMilliseconds < HoverThresholdMs)
-            return;
-
-        // 获取目标窗口边界
-        if (!NativeMethods.GetWindowRect(hWnd, out var rect))
-            return;
-
-        // 检测路径和状态
-        var (path, status) = DropTargetDetector.DetectTargetDirectory();
-
-        lock (_stateLock)
-        {
-            _targetRect = rect;
-            _targetPath = path;
-            _status = status;
-        }
-
-        // 更新窗口位置和大小
-        NativeMethods.SetWindowPos(_hwnd, NativeMethods.HWND_TOPMOST,
-            rect.Left, rect.Top, rect.Right - rect.Left, rect.Bottom - rect.Top,
-            NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
-    }
-
-    private void UpdateAnimation()
-    {
-        if (_hwnd == nint.Zero) return;
-
-        _opacityPhase += 0.05;
-        if (_opacityPhase > 1) _opacityPhase = 0;
-
-        // 计算呼吸效果：0.15 ~ 0.45
-        var breathAlpha = (byte)(40 + Math.Sin(_opacityPhase * Math.PI * 2) * 25);
-
-        // 根据状态选择颜色
-        uint borderColor;
-        uint fillColor;
-        lock (_stateLock)
-        {
-            switch (_status)
-            {
-                case DropTargetStatus.Success:
-                    borderColor = 0xFF4CAF50; // 绿色
-                    fillColor = 0x664CAF50;   // 半透明绿
-                    break;
-                case DropTargetStatus.Warning:
-                    borderColor = 0xFFF44336; // 红色
-                    fillColor = 0x66F44336;   // 半透明红
-                    break;
-                default:
-                    borderColor = 0xFF808080; // 灰色
-                    fillColor = 0x22808080;   // 极透明灰
-                    break;
-            }
-        }
-
-        // 使用 UpdateLayeredWindow 更新（性能更好，但实现复杂）
-        // 简化方案：SetLayeredWindowAttributes 只支持整体透明度
-        // 要实现颜色 + 透明度，需要双缓冲位图 + UpdateLayeredWindow
-        // 这里先用简化版：SetLayeredWindowAttributes 设置整体透明度
-        // TODO: 若性能不足，改用 UpdateLayeredWindow 实现带颜色的半透明
-
-        NativeMethods.SetLayeredWindowAttributes(_hwnd, 0, breathAlpha, NativeMethods.LWA_ALPHA);
-        NativeMethods.UpdateWindow(_hwnd);
-    }
-
-    private nint WndProc(nint hWnd, uint msg, nint wParam, nint lParam)
-    {
-        switch (msg)
-        {
-            case 0x0002: // WM_DESTROY
-                return 0;
-            case 0x0083: // WM_NCCALCSIZE
-                return 0; // 移除非客户区（无边框）
-            case 0x0084: // WM_NCHITTEST
-                return -1; // HTTRANSPARENT：鼠标穿透
-        }
-        return DefWindowProc(hWnd, msg, wParam, lParam);
-    }
-
-    // P/Invoke 委托和辅助方法
-    private delegate nint WndProcDelegate(nint hWnd, uint msg, nint wParam, nint lParam);
-
-    [DllImport("user32.dll")]
-    private static extern bool PeekMessage(out MSG lpMsg, nint hWnd, uint wMsgFilterMin, uint wMsgFilterMax, uint wRemoveMsg);
-
-    [DllImport("user32.dll")]
-    private static extern bool TranslateMessage(ref MSG lpMsg);
-
-    [DllImport("user32.dll")]
-    private static extern nint DispatchMessage(ref MSG lpMsg);
-
-    [DllImport("user32.dll")]
-    private static extern nint DefWindowProc(nint hWnd, uint uMsg, nint wParam, nint lParam);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct MSG
-    {
-        public nint hwnd;
-        public uint message;
-        public nint wParam;
-        public nint lParam;
-        public uint time;
-        public NativeMethods.POINT pt;
-    }
-}
-```
-
-- [x] **7.2 实现 DragPreviewPopup（Win32 预览弹窗） + DragPreviewBitmapBuilder**
-
-预览弹窗是一个纯 Win32 弹出窗口，在拖拽期间跟随鼠标显示预渲染的 ResultTreeView 位图。内容预先在 UI 线程渲染（因为 DoDragDropAsync 会阻塞 UI 线程，渲染必须在之前完成）。
-
-**DragPreviewBitmapBuilder**（UI 线程，拖拽启动前调用）：
-
-```csharp
-// Services/DragPreviewBitmapBuilder.cs
-using System.Runtime.InteropServices;
-using Avalonia.Media.Imaging;
-using MantisZip.Core.Abstractions;
-using MantisZip.UI.Avalonia.Controls;
-
-namespace MantisZip.UI.Avalonia.Services;
-
-/// <summary>
-/// 预渲染 ResultTreeView 到位图，供 DragPreviewPopup 在 Win32 弹窗中显示。
-/// 必须在 UI 线程调用（在 DoDragDropAsync 之前）。
-/// </summary>
-internal static class DragPreviewBitmapBuilder
-{
-    /// <summary>
-    /// 构建预览树并渲染为 byte[] (BGRA 32bpp, top-down)。
-    /// <param name="maxWidth">弹窗最大宽度，超出裁剪</param>
-    /// <param name="maxHeight">弹窗最大高度，超出显示 "…还有 N 个"</param>
-    /// </summary>
-    public static async Task<PreviewBitmapData> RenderAsync(
-        IReadOnlyList<ArchiveItem> selectedItems,
-        IReadOnlyList<ArchiveItem> allItems,
-        ArchiveFormat format,
-        string archivePath,
-        int maxWidth = 320,
-        int maxHeight = 500)
-    {
-        // Step 1: 展开选中项
-        var expanded = DragDropItemExpander.ExpandItems(selectedItems, allItems);
-        if (expanded.Count == 0) return PreviewBitmapData.Empty;
-
-        // Step 2: 用 ResultPreviewService 构建预览树
-        var root = ResultPreviewService.BuildDragPreview(
-            archivePath, expanded, format);
-
-        // Step 3: 创建 ResultTreeView 并渲染到位图
-        var treeView = new ResultTreeView
-        {
-            Root = new PreviewTreeNode
-            {
-                DisplayName = Path.GetFileName(archivePath),
-                IsExpanded = true,
-                Children = root?.Children ?? new()
-            },
-            Width = maxWidth,
-            CompactMode = true,
-            MaxItemsPerDirectory = 10,
-            MaxDepth = 5,
-            ShowFilteredGhosts = false
-        };
-
-        // 测量 + 布置（必须在 UI 线程）
-        treeView.Measure(new Size(maxWidth, double.PositiveInfinity));
-        var desiredH = Math.Min(treeView.DesiredSize.Height, maxHeight);
-        treeView.Arrange(new Rect(0, 0, maxWidth, desiredH));
-
-        var pixelSize = new PixelSize((int)treeView.DesiredSize.Width, (int)desiredH);
-
-        // 对极小树设置最小高度
-        pixelSize = pixelSize with { Height = Math.Max(pixelSize.Height, 40) };
-
-        var rtb = new RenderTargetBitmap(pixelSize);
-        rtb.Render(treeView);
-
-        // Step 4: 提取像素数据
-        var pixels = new byte[pixelSize.Width * pixelSize.Height * 4];
-        rtb.CopyPixels(pixels, pixelSize.Width * 4, 0);
-
-        // Step 5: 计算摘要
-        var summary = BuildSummary(expanded);
-
-        return new PreviewBitmapData
-        {
-            Pixels = pixels,
-            Width = pixelSize.Width,
-            Height = pixelSize.Height,
-            Summary = summary,
-            TotalFiles = expanded.Count
-        };
-    }
-
-    private static string BuildSummary(IReadOnlyList<ArchiveItem> items)
-    {
-        var total = items.Count;
-        long totalSize = items.Sum(i => i.Size);
-        return $"{total} 个文件 / {FormatUtil.FormatSize(totalSize)}";
-    }
-}
-
-/// <summary>
-/// 预渲染的位图数据，从 UI 线程传递到 Win32 线程。
-/// </summary>
-public class PreviewBitmapData
-{
-    public byte[] Pixels { get; set; } = Array.Empty<byte>();
-    public int Width { get; set; }
-    public int Height { get; set; }
-    public string Summary { get; set; } = "";
-    public int TotalFiles { get; set; }
-
-    public static readonly PreviewBitmapData Empty = new();
-}
-```
-
-**DragPreviewPopup**（Win32 线程，与 DragOverlayWindow 同线程）：
-
-在 `DragOverlayWindow` 的构造函数接收位图数据，在消息循环中创建并更新弹出窗口：
-
-```csharp
-// Services/DragPreviewPopup.cs (partial, 在 DragOverlayWindow 内使用)
-// 作为 DragOverlayWindow 内部管理的辅助类，或 DragOverlayWindow 的组成部分
-
-/// <summary>
-/// 预渲染树位图的 Win32 预览弹窗。跟随鼠标，无焦点，可穿透点击。
-/// 与 DragOverlayWindow 运行在同一 Win32 线程。
-/// </summary>
-internal class DragPreviewPopup : IDisposable
-{
-    private nint _hwnd = nint.Zero;
-    private readonly nint _hBitmap;
-    private readonly int _width;
-    private readonly int _height;
-    private readonly string _summary;
-    private readonly int _offsetX = 20;  // 鼠标右偏
-    private readonly int _offsetY = 24;  // 鼠标下偏
-
-    // 窗口类名
-    private const string ClassName = "MantisZipDragPreview";
-
-    public DragPreviewPopup(nint hInstance, PreviewBitmapData bitmapData)
-    {
-        _width = bitmapData.Width;
-        _height = bitmapData.Height;
-        _summary = bitmapData.Summary;
-
-        // BGRA → HBITMAP (32bpp top-down DIB)
-        _hBitmap = CreateBitmapFromPixels(bitmapData.Pixels, _width, _height, hInstance);
-
-        CreateWindow(hInstance);
-    }
-
-    public void UpdatePosition(int cursorX, int cursorY)
-    {
-        if (_hwnd == nint.Zero) return;
-        NativeMethods.SetWindowPos(_hwnd, NativeMethods.HWND_TOPMOST,
-            cursorX + _offsetX, cursorY + _offsetY,
-            _width, _height + SummaryBarHeight,
-            NativeMethods.SWP_NOACTIVATE | NativeMethods.SWP_SHOWWINDOW);
-    }
-
-    private void CreateWindow(nint hInstance)
-    {
-        // 注册窗口类
-        var wndClass = new NativeMethods.WNDCLASSEX
-        {
-            cbSize = (uint)Marshal.SizeOf<NativeMethods.WNDCLASSEX>(),
-            lpfnWndProc = Marshal.GetFunctionPointerForDelegate(_wndProcDelegate),
-            hInstance = hInstance,
-            hCursor = nint.Zero,
-            hbrBackground = CreateSolidBrush(0x00F5F5F5), // 浅灰背景
-            lpszClassName = ClassName
-        };
-        RegisterClassEx(ref wndClass);
-
-        _hwnd = NativeMethods.CreateWindowEx(
-            NativeMethods.WS_EX_LAYERED | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW,
-            ClassName, "",
-            NativeMethods.WS_POPUP | NativeMethods.WS_BORDER,
-            0, 0, _width, _height + SummaryBarHeight,
-            nint.Zero, nint.Zero, hInstance, nint.Zero);
-
-        if (_hwnd != nint.Zero)
-        {
-            // 点击穿透
-            var exStyle = NativeMethods.GetWindowLong(_hwnd, NativeMethods.GWL_EXSTYLE);
-            NativeMethods.SetWindowLong(_hwnd, NativeMethods.GWL_EXSTYLE,
-                exStyle | NativeMethods.WS_EX_TRANSPARENT);
-            // 初始透明度
-            NativeMethods.SetLayeredWindowAttributes(_hwnd, 0, 230, NativeMethods.LWA_ALPHA);
-        }
-    }
-
-    // 从像素数据创建 HBITMAP
-    private static nint CreateBitmapFromPixels(byte[] pixels, int w, int h, nint hInstance)
-    {
-        var bmi = new BITMAPINFO
-        {
-            bmiHeader = new BITMAPINFOHEADER
-            {
-                biSize = Marshal.SizeOf<BITMAPINFOHEADER>(),
-                biWidth = w,
-                biHeight = -h, // top-down
-                biPlanes = 1,
-                biBitCount = 32,
-                biCompression = 0 // BI_RGB
-            }
-        };
-
-        var hdc = NativeMethods.GetDC(nint.Zero);
-        nint hBitmap;
-        try
-        {
-            hBitmap = CreateDIBSection(hdc, ref bmi, 0, out var bitsPtr, nint.Zero, 0);
-            Marshal.Copy(pixels, 0, bitsPtr, pixels.Length);
-        }
-        finally
-        {
-            NativeMethods.ReleaseDC(nint.Zero, hdc);
-        }
-        return hBitmap;
-    }
-
-    // WM_PAINT 绘制：摘要栏 + 树位图
-    private nint WndProc(nint hWnd, uint msg, nint wParam, nint lParam)
-    {
-        const int WM_PAINT = 0x000F;
-
-        switch (msg)
-        {
-            case WM_PAINT:
-            {
-                var ps = new PAINTSTRUCT();
-                var hdc = BeginPaint(hWnd, out ps);
-                
-                // 绘制位图
-                var hdcMem = CreateCompatibleDC(hdc);
-                var old = SelectObject(hdcMem, _hBitmap);
-                BitBlt(hdc, 0, SummaryBarHeight, _width, _height,
-                    hdcMem, 0, 0, SRCCOPY);
-                SelectObject(hdcMem, old);
-                DeleteDC(hdcMem);
-
-                // 绘制摘要栏
-                var bgBrush = CreateSolidBrush(0xFFFFFFFF);
-                var oldBrush = SelectObject(hdc, bgBrush);
-                Rectangle(hdc, 0, 0, _width, SummaryBarHeight);
-                SelectObject(hdc, oldBrush);
-                DeleteObject(bgBrush);
-
-                // 摘要文字
-                SetBkMode(hdc, 1); // TRANSPARENT
-                var rect = new RECT { Left = 6, Top = 0, Right = _width - 6, Bottom = SummaryBarHeight };
-                DrawText(hdc, _summary, -1, ref rect, 0x0000); // DT_LEFT
-
-                EndPaint(hWnd, ref ps);
-                return 0;
-            }
-            case 0x0084: // WM_NCHITTEST
-                return -1; // HTTRANSPARENT — 鼠标穿透
-        }
-        return DefWindowProc(hWnd, msg, wParam, lParam);
-    }
-
-    private const int SummaryBarHeight = 24;
-
-    // 需要补充的 P/Invoke
-    [DllImport("gdi32.dll")]
-    private static extern nint CreateCompatibleDC(nint hdc);
-    [DllImport("gdi32.dll")]
-    private static extern nint CreateDIBSection(nint hdc, ref BITMAPINFO pbmi,
-        uint usage, out nint ppvBits, nint hSection, uint offset);
-    [DllImport("gdi32.dll")]
-    private static extern nint SelectObject(nint hdc, nint h);
-    [DllImport("gdi32.dll")]
-    private static extern bool DeleteDC(nint hdc);
-    [DllImport("gdi32.dll")]
-    private static extern bool BitBlt(nint hdc, int x, int y, int cx, int cy,
-        nint hdcSrc, int x1, int y1, uint rop);
-    [DllImport("gdi32.dll")]
-    private static extern bool Rectangle(nint hdc, int left, int top, int right, int bottom);
-    [DllImport("user32.dll")]
-    private static extern nint BeginPaint(nint hWnd, out PAINTSTRUCT lpPaint);
-    [DllImport("user32.dll")]
-    private static extern bool EndPaint(nint hWnd, ref PAINTSTRUCT lpPaint);
-    [DllImport("user32.dll")]
-    private static extern int DrawText(nint hdc, string lpchText, int cchText,
-        ref RECT lprc, uint format);
-    [DllImport("gdi32.dll")]
-    private static extern int SetBkMode(nint hdc, int mode);
-
-    [StructLayout(LayoutKind.Sequential)]
-    private struct BITMAPINFO { public BITMAPINFOHEADER bmiHeader; }
-    [StructLayout(LayoutKind.Sequential)]
-    private struct BITMAPINFOHEADER
-    {
-        public int biSize; public int biWidth; public int biHeight;
-        public short biPlanes; public short biBitCount;
-        public int biCompression; public int biSizeImage;
-        public int biXPelsPerMeter; public int biYPelsPerMeter;
-        public int biClrUsed; public int biClrImportant;
-    }
-    [StructLayout(LayoutKind.Sequential)]
-    private struct PAINTSTRUCT { public nint hdc; public bool fErase; public RECT rcPaint; public bool fRestore; public bool fIncUpdate; public int reserved1; public int reserved2; public int reserved3; public int reserved4; public int reserved5; public int reserved6; public int reserved7; public int reserved8; }
-}
-```
-
-> **注意**：`BITMAPINFO` 和 `BITMAPINFOHEADER` 的 struct 布局需与 Win32 SDK 严格对齐（`Pack=1` 已默认），实际实施时请验证 `Marshal.SizeOf` 返回值。
-
-**集成到 DragOverlayWindow**：
-
-```csharp
-// DragOverlayWindow 新增
-
-// 预览弹窗数据（UI 线程预渲染，构造时传入）
-private PreviewBitmapData? _previewBitmapData;
-
-public void SetPreviewBitmap(PreviewBitmapData data)
-{
-    _previewBitmapData = data;
-}
-
-// 在 RunWindowLoop 中，窗口创建后初始化 PreviewPopup
-private DragPreviewPopup? _previewPopup;
-
-private void RunWindowLoop()
-{
-    // ... 现有窗口注册和创建代码 ...
-
-    // 创建预览弹窗（仅在提供了位图数据时）
-    if (_previewBitmapData != null && _previewBitmapData.Pixels.Length > 0)
-    {
-        _previewPopup = new DragPreviewPopup(hInstance, _previewBitmapData);
-    }
-
-    _windowCreated.Set();
-    _animationTimer.Start();
-
-    // 消息循环
-    while (!_cts!.IsCancellationRequested)
-    {
-        // ... 现有 PeekMessage 循环 ...
-        UpdateTargetDetection();
-        UpdatePreviewPopupPosition(); // 新增
-    }
-}
-
-private void UpdatePreviewPopupPosition()
-{
-    if (_previewPopup == null) return;
-    if (!NativeMethods.GetCursorPos(out var pt)) return;
-    _previewPopup.UpdatePosition(pt.X, pt.Y);
-}
-
-// Close 时销毁
-public void Close()
-{
-    _previewPopup?.Dispose();
-    _previewPopup = null;
-    // ... 现有销毁代码 ...
-}
-```
-
-**DragOverlayWindow NativeMethods 补充**：
-
-需要在原有 `NativeMethods.cs` 中补充以下 P/Invoke（部分已有则跳过）：
-- `GetDC` / `ReleaseDC`（已有或补充）
-- `CreateSolidBrush`（已有 ✅）
-- `DeleteObject`（已有 ✅）
-- `SetWindowLong` / `GetWindowLong`（已有 ✅）
-- `SetLayeredWindowAttributes`（已有 ✅）
-
-新增：
-- `CreateDIBSection` — gdi32.dll
-- `CreateCompatibleDC` — gdi32.dll
-- `SelectObject` — gdi32.dll
-- `DeleteDC` — gdi32.dll
-- `BitBlt` — gdi32.dll
-- `BeginPaint` / `EndPaint` — user32.dll
-- `DrawText` — user32.dll
-- `SetBkMode` — gdi32.dll
-- `Rectangle` — gdi32.dll
-
-> 实际实施时建议将 GDI 相关 P/Invoke 集中到 `NativeMethods.cs`，避免分散。
-
-- [x] **7.3 主题资源补充**
-> 以下颜色值为硬编码参考，Win32 覆盖层无法直接绑定 Avalonia 资源，需保持值一致。
-> 若需在 Avalonia 控件中引用这些颜色，按 Avalonia 公约使用 `Brush` 后缀键名。
-
-在 `Themes/ThemeLight.axaml` 和 `Themes/ThemeDark.axaml` 中新增覆盖层颜色键（仅供未来参考）：
-
-```xml
-<!-- ThemeLight.axaml / ThemeDark.axaml 新增 -->
-<!-- 拖拽覆盖层（硬编码参考值，Win32 覆盖层直接使用） -->
-<SolidColorBrush x:Key="DragDropBorderSuccessBrush" Color="#FF4CAF50"/>
-<SolidColorBrush x:Key="DragDropFillSuccessBrush" Color="#664CAF50"/>
-<SolidColorBrush x:Key="DragDropBorderWarningBrush" Color="#FFF44336"/>
-<SolidColorBrush x:Key="DragDropFillWarningBrush" Color="#66F44336"/>
-<SolidColorBrush x:Key="DragDropBorderNoneBrush" Color="#FF808080"/>
-<SolidColorBrush x:Key="DragDropFillNoneBrush" Color="#22808080"/>
-```
-
-- [x] **7.4 Win11 圆角适配**
-
-使用 `DwmGetWindowAttribute` 获取 `DWMWA_EXTENDED_FRAME_BOUNDS`，给覆盖层窗口设置对应的圆角：
-
-```csharp
-// 在 UpdateTargetDetection 中，获取目标窗口的 DWM 边界
-if (NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DWMWA_EXTENDED_FRAME_BOUNDS, out var dwmRect, (uint)Marshal.SizeOf<NativeMethods.RECT>()) == 0)
-{
-    // 使用 dwmRect 替代 GetWindowRect 的结果（更精确的视觉边界）
-    rect = dwmRect;
-}
-```
-
-> 注：Win32 窗口的圆角需通过 `SetWindowRgn` 或 `DwmSetWindowAttribute` (`DWMWA_WINDOW_CORNER_PREFERENCE`) 实现。简单方案：不强制圆角，用矩形框+粗边框即可达到清晰视觉效果。
+### Task 7: 拖拽视觉反馈（主从式覆盖层）
+
+> **2026-11-27 重写**：本节原有的 610 行代码块（`DragOverlayWindow` / `DragPreviewPopup` / `DragPreviewBitmapBuilder` 三个完整实现）**是历史草稿，已全部删除**。原因见下。
+
+**为什么删掉旧代码块**：
+
+| 问题 | 实测证据 |
+|---|---|
+| 代码里调了不存在的 API | 旧 7.2 的 260 行代码块调 `ResultPreviewService.BuildDragPreview(archivePath, expanded, format)` —— 该重载不存在；真实签名是 `BuildExtractPreview(IEnumerable<ArchiveItem> entries, string destDir, ...)` |
+| 属性名不存在 | 旧代码用 `PreviewTreeNode.DisplayName`；真实属性是 `Name` / `DisplayLabel` |
+| 与真实实现完全分叉 | 实际落地的是 `Services/OverlayController.cs`（717 行，Avalonia `Window` + 后台线程 `UpdateLayeredWindow`），不是 `DragOverlayWindow`（纯 Win32 + 自建消息循环）；`_trackingThread` 在旧代码里 0 命中、真实代码里 3 处 |
+| 整段方案已被否决 | 用户 2026-10-30 与 2026-11-27 两次确认**不做独立预览弹窗** ⇒ `DragPreviewPopup` 永远不会有 |
+
+**Task 7 的实际状态**（按实测重算，不再是「已完成」）：
+
+| 子项 | 原标记 | 实际 |
+|---|---|---|
+| 7.1 覆盖层基础 | `[x]` | ✅ **真的做了** —— 但落点是 `Services/OverlayController.cs`，不是计划里的 `Services/DragOverlayWindow.cs` |
+| 7.2 预览弹窗 + 位图构建 | `[x]` | ❌ **未做** —— `DragPreviewPopup.cs` 不存在；`DragPreviewBitmapBuilder.cs` 存在但 **0 调用者**；且方案已废弃 |
+| 7.3 主题资源补充 | `[x]` | ⚠️ **名义完成** —— `DragDropBorderSuccessBrush` 等 6 键在 `ThemeLight.axaml` / `ThemeDark.axaml` 各 3 处，但计划自己写着「仅供未来参考」「Win32 覆盖层无法直接绑定 Avalonia 资源」 ⇒ 纯摆设键 |
+| 7.4 Win11 圆角适配 | `[x]` | ❌ **未做** —— `OverlayController.cs` 里 `Dwm` 零命中；`NativeMethods.cs:261` 的 `DwmGetWindowAttribute` 声明与 `:323` 的 `DWMWA_EXTENDED_FRAME_BOUNDS = 9` 均无人调用 |
+
+**Task 7 要做的（按新设计，详见文末「落点冲突预览与多投放区 —— 主从式覆盖层」）**：
+
+| # | 子项 | 涉及文件 |
+|---|---|---|
+| 7.1 | 一层冲突判定 + 按结果去重（纯逻辑） | 🆕 `Services/DragConflictPreview.cs` |
+| 7.2 | `OverlayRender` 从「整段画两遍」改成「逐行画 + 逐行设色」，字号改固定档 | 🔧 `Services/OverlayController.cs` |
+| 7.3 | 主区域（目标目录 + 树）+ 参数条带 + 悬停判定 + 长宽比自动换边 + 三档降级 | 🔧 `Services/OverlayController.cs` |
+| 7.4 | 「打开解压窗口」格 + `DragDropChoice` 从松手处传到 `DragDropService` | 🔧 `Views/MainWindow.Thumbnails.cs`、`Services/DragDropService.cs` |
+| 7.5 | `RunSelectedItemsExtractionAsync` 加 `rootMode` 形参（下游 `SelectedItemsExtractService` 已支持 `stripRoot` / `addRoot`） | 🔧 `Services/ExtractFlow.cs` |
+| 7.6 | i18n 7 个新 key 三语 | 三份 `Localization/strings.*.json` |
+| 7.7 | 逻辑测试 + 结构绊线 | 🆕 `tests/MantisZip.UI.Avalonia.Tests/DragConflictPreviewTests.cs` 等 |
+
+**不再需要的**（旧计划里的，全部作废）：
+
+- ❌ 新建 `Services/DragOverlayWindow.cs`（已被 `OverlayController` 取代）
+- ❌ 新建 `Services/DragPreviewPopup.cs`（方案否决）
+- ❌ 改造 `Services/DragPreviewBitmapBuilder.cs`（0 调用者，且树改由 GDI 逐行画，不需要位图）
+- ❌ 新增 `ThemeLight.axaml` / `ThemeDark.axaml` 的覆盖层颜色键（GDI 绑不了 Avalonia 资源）
+- ❌ Win11 圆角（GDI 分层窗口无边框可圆）
+
+> **⚠️ `DragPreviewBitmapBuilder.cs` 的去留**：它现在 0 调用者。按「不用的代码不留」的原则应删；但它 136 行里有可复用的「展开 → `BuildExtractPreview` → 折行」逻辑，`DragConflictPreview.BuildRowModel` 可以从它抄。**实施时先抄逻辑，再删文件**，并在 `docs/KNOWN_ISSUES.md` 或提交信息里注明。
 
 ### Task 8: 手动测试验证 [⏳]
 
-> [⏳] 测试验证需要可运行的 Avalonia 应用。
-> 以下测试清单中的预期行为是设计目标，但覆盖层颜色响应、DPI 表现、多选交互均需
-> 在实际 Avalonia 环境中验证。实施时建议边构建边测试，不必等到所有 Task 完成。
+> [⏳] 需要可运行的 Avalonia 应用 + 至少一个 Explorer 窗口。覆盖层的三档布局、悬停判定、长宽比换边都**只能在真机上验**（无头测试覆盖不到 Win32 分层窗口）。建议边实现边验证。
 
-- [x] **8.1 场景测试清单** (⏳ 需手工运行验证 — 见下方说明)
+- [ ] **8.1 基础拖拽（沿用旧清单，去掉预览弹窗项）**
 
 | 场景 | 预期 |
 |------|------|
-| 拖拽一个文件到 Explorer 窗口 | 覆盖层变绿 + 预览弹窗显示文件树 → 检测到目录 → ProgressWindow → 文件出现在该目录 |
-| 拖拽到桌面 | 覆盖层变绿 + 预览弹窗 → 检测到桌面路径 → 提取到桌面 |
-| 拖拽到非 Explorer 区域（如 Chrome） | 覆盖层变灰 + 预览弹窗依然可见 → DropTargetDetector 返回 null → 弹出文件夹选择对话框 |
-| 拖拽到 #32770 对话框 | 覆盖层变红 + 预览弹窗 → 提示需确认 → 弹出文件夹选择对话框 |
-| 拖拽多个文件（Ctrl+点击多选） | 预览弹窗显示展开后的完整文件树和摘要统计 |
-| 拖拽目录（子文件展开） | 预览弹窗正确显示目录展开后的文件树结构 |
-| 拖拽加密文件 | 预览弹窗包含加密文件，使用会话密码提取 |
-| 拖拽到一半按 Esc 取消 | DoDragDropAsync 返回 → Overlay + PreviewPopup 销毁 → StatusMessage 更新，无额外操作 |
-| 目标目录已有同名文件 | 根据 AppSettings.FileConflictAction 处理 |
-| EnableDragExtract = false | 不启动拖拽 |
-| 快速划过多个窗口 | 覆盖层不闪烁（150ms 防抖生效）；预览弹窗始终跟随鼠标 |
-| 预览弹窗遮挡问题 | 预览弹窗应显示在鼠标右下 20px 偏移，不遮挡鼠标下方的目标窗口边界 |
-| DPI 缩放 150% | 覆盖层 + 预览弹窗大小和位置正确 |
+| 拖一个文件到 Explorer 窗口 | 覆盖层变绿 → 主区域显示目标目录 + 树 → 松手 → ProgressWindow → 文件出现在该目录 |
+| 拖到桌面 | 覆盖层变绿 → 检测到桌面路径 → 提取到桌面 |
+| 拖到非 Explorer 区域（如 Chrome） | 覆盖层变灰 → `DetectTargetDirectory` 返回 null → **只有「打开解压窗口…」一格可选**（见 8.4） |
+| 拖到 #32770 对话框 | 覆盖层变红 → 提示需确认 → 松手走解压设置窗 |
+| 拖多个文件（Ctrl+多选） | 主区域树显示展开后的完整结构（受行数上限约束） |
+| 拖目录（子文件展开） | 树显示展开后的结构，折叠符号正确 |
+| 拖加密压缩包 | 用会话密码提取；密码缺失时走原提示流程 |
+| 拖到一半按 Esc | 覆盖层销毁 → StatusMessage 更新，无额外操作 |
+| 目标目录已有同名文件 | 按 `AppSettings.FileConflictAction` 处理（与投放区选择无关） |
+| `EnableDragExtract = false` | 不启动拖拽 |
+| 快速划过多个窗口 | 覆盖层不闪烁（150ms 防抖生效） |
+| DPI 150% | 覆盖层大小、位置、字号都正确 |
 
----
+- [ ] **8.2 三档布局**（改目标窗口尺寸后重新拖）
+
+| 目标窗口尺寸 | 预期布局 |
+|---|---|
+| 1600×900（常规档） | 竖长条：条带在右侧，主区域树最多 8 行 + 示例路径全显示 |
+| 1000×420（常规档，横长） | 横长条：条带在底部，厚度 ≥ 64px |
+| 460×340（紧凑档） | 树降到 3 行（只显顶层），条带压成一行纯文字，当前格反色 |
+| 300×200（极小档） | 主区域只有一行落点、**不画树**；条带只剩「默认」「打开解压窗口…」两格 |
+| 1200×900 → 拖拽中把窗口拉窄到 300 宽 | 覆盖层跟随重排（`UpdatePosition` 每 100ms 重取 `GetWindowRect`） |
+
+- [ ] **8.3 参数条带与悬停**
+
+| 操作 | 预期 |
+|---|---|
+| 鼠标在**主区域** | 用设置里的默认参数（`ExtractPreserveFullPath` / `ExtractRootMode`） |
+| 悬停「保留完整路径」 | 主区域树立即变成 `preserveFullPath=true` 的结构；格子高亮 |
+| 悬停「扁平解压」 | 树变成 `preserveFullPath=false` 结构（`currentFolder` 为空时该格**不出现**） |
+| 悬停「始终加根」 | 树的顶层变成一个新目录（名字 = 压缩包主名或 `CompressRootName`） |
+| 悬停某个格但结果与默认相同 | 该格灰显 + 标注「与默认相同」，**不隐藏**（避免宽度跳变） |
+| 在「始终加根」格松手 | 实际落点 = 加根后的路径，与树里显示的一致 |
+| 快速在多个格之间移动 | 无闪烁、无「先白后红」（树只在算完后一次性重绘） |
+
+- [ ] **8.4 冲突标记与「打开解压窗口」格**
+
+| 场景 | 预期 |
+|---|---|
+| 目标目录已有同名顶层项 | 对应行**白字 + 整行半透明红底 + `⚠` 前缀**（不是红字压绿底） |
+| 顶层项不存在但更深的子项同名 | **不标冲突**（一层判定即可证明：顶层不存在 ⇒ 整条路径不存在） |
+| 目标目录为空 | 全部行无标记 |
+| 悬停「打开解压窗口…」格 | 主区域**只写一行说明、不画树**；松手弹出预选了当前条目与目标目录的解压设置窗 |
+| 目标检测失败（拖到 Chrome） | 「打开解压窗口…」是**唯一**可选格；松手必弹解压设置窗（不静默丢弃） |
+| 拖拽中目标窗口被关闭 | 覆盖层不再高亮，降级为「检测失败」路径 |
+
+- [ ] **8.5 长宽比换边与回退**
+
+| 操作 | 预期 |
+|---|---|
+| 目标窗口 `w/h ≥ 1.75` | 条带在**底部**，厚度 `max(64, h × 8%)` |
+| 目标窗口 `w/h < 1.75` | 条带在**右侧**，厚度 `max(150, w × 12%)` |
+| 拖拽中窗口从宽变窄跨过 1.75 | 条带换边一次，无残影（整块重绘） |
+| 可用格 > 5（将来参数变多） | 只显示前 5 个，其余不渲染 |
 
 ## 风险
 
@@ -1786,22 +1181,27 @@ if (NativeMethods.DwmGetWindowAttribute(hWnd, NativeMethods.DWMWA_EXTENDED_FRAME
 ## Definition of Done
 
 - [⏳] `DropTargetDetector` 能正确检测 Explorer 窗口路径和桌面路径
-- [x] 检测失败时弹文件夹选择对话框 — DragDropService.ExecuteAfterDropAsync 含 fallback 路径 (code review)
+- [x] 检测失败时弹解压设置窗 — `DragDropService.ExecuteAfterDropAsync` 的 fallback 走 `ExtractSettingsWindow.ShowWithPresetSelectionAsync`（规则 16，不用原生 StorageProvider）
 - [x] 多选拖拽展开目录，路径裁剪正确 — DragDropItemExpander 逻辑已验证 (code review)
 - [x] 直接解压到目标目录，不走 temp — 代码无 temp 目录引用 (code review)
 - [⏳] `ProgressWindow` 在解压期间正常显示进度
 - [x] 加密文件使用会话密码解压 — password 参数通过 ArchiveEntryExtractor 传递 (code review)
 - [x] 文件冲突处理遵守 `AppSettings.FileConflictAction` — 字符串匹配逻辑已验证 (code review)
-- [x] 拖拽取消（Esc）无残留 — overlay.Close()+Dispose() 在 finally 块执行 (code review)
-- [⏳] `DragOverlayWindow` 在拖拽期间正确显示绿/红/灰状态
+- [x] 拖拽取消（Esc）无残留 — `OverlayController` 在 finally 块 `Dispose()`
+- [⏳] `OverlayController` 在拖拽期间正确显示绿/红/灰状态
 - [x] 覆盖层不遮挡目标窗口内容 — WS_EX_TRANSPARENT + HWND_TOPMOST (code review)
-- [⏳] `DragPreviewPopup` 在拖拽期间跟随鼠标显示预渲染的文件树
-- [⏳] 预览弹窗位图生成正确（Avalonia `RenderTargetBitmap` → GDI `CreateDIBSection` 像素一致）
-- [x] 预览弹窗不遮挡目标窗口内容 — 偏移右下 20px + 点击穿透 (code review)
-- [⏳] 大文件树时渲染时间可接受（300 文件 < 100ms）— 需要性能测试
-- [x] DragOverlayWindow 的动画不影响性能 — 20fps + 50ms 定时器低消耗 (code review)
+- [ ] 主区域显示目标目录 + 预览树（常规档 ≤8 行 / 紧凑档 3 行 / 极小档不画树）
+- [ ] 逐行渲染正确：每行文字、缩进、颜色独立（`OverlayRender` 已从「整段画两遍」改为「逐行画」）
+- [x] 覆盖层不遮挡目标窗口内容 — `WS_EX_TRANSPARENT` + `HWND_TOPMOST`（点击穿透，鼠标命中的是下层真实窗口）
+- [ ] 大文件树时行模型构建 < 100ms（300 条目）— 需要性能测试
+- [x] `OverlayController` 的动画不影响性能 — 后台线程 + 100ms 追踪循环低消耗
 - [x] `dotnet build src/MantisZip.UI.Avalonia/MantisZip.UI.Avalonia.csproj` 通过
 - [x] `dotnet test tests/MantisZip.Tests/MantisZip.Tests.csproj` 通过
+- [ ] 参数条带三格（保留完整路径 / 扁平解压 / 始终加根）+ 分隔线 + 「打开解压窗口…」格都可用
+- [ ] 悬停格子时主区域立即按该格参数重算（切格 0 次文件 IO，内存查表）
+- [ ] 长宽比 ≥ 1.75 条带在底部、否则在右侧；三档降级（常规 / 紧凑 / 极小）按尺寸生效
+- [ ] 目标检测失败时「打开解压窗口…」是唯一可选格，松手必弹设置窗（不静默丢弃）
+- [ ] `dotnet test tests/MantisZip.UI.Avalonia.Tests/MantisZip.UI.Avalonia.Tests.csproj` 通过（含 `DragConflictPreviewTests`）
 
 ---
 
@@ -1907,253 +1307,255 @@ struct FILEDESCRIPTORW
 
 ---
 
-## 预览弹窗实施补充（2026-08-06）
+## 落点冲突预览与多投放区 —— 主从式覆盖层（设计定稿 2026-11-27）
 
-> **状态**: 📋 设计已确认，待实施 | 需求：**完整目录树 + 拖拽过程中持续可见**
+> **状态**: 📐 设计已定稿（2026-11-27 用户逐项拍板），**代码未动**。
+> **取代关系**：本节**取代** 2026-10-30 的「落点冲突预览」与「双投放区」两节（那两节的设计已被推翻，历史内容见文末「已废弃设计（存档）」）。
+> 定稿要点：覆盖层 = **一个主区域 + 一条参数条带**；主区域显示目标目录 + 预览树，鼠标移到条带某一格 ⇒ 主区域**即时按该格参数重算**；冲突判定**只查一层**（可证明）；三档降级应对小窗口。
 
-### 决策背景
-
-预览弹窗的需求被明确为两点：显示**完整目录树**（非摘要文字），且在**拖拽过程中持续可见**。由此排除三条候选路线：
-
-| 候选方案 | 排除原因 |
-|---------|---------|
-| 主窗口覆盖预览（ResultTreeView 盖住目录树/文件列表） | `DoDragDrop` 同步阻塞 UI 线程，拖拽期间主窗口控件无法更新；且用户拖出时视线已离开主窗口，预览在拖拽中不可见 |
-| 合成进覆盖层（现有 60×60 preview 槽位） | 槽位是**缩略图级别**（`iconSize = 60`，固定底中），装不下完整树；树要完整就得大，必然糊在目标窗口内容上，遮挡用户要看的文件列表 |
-| 覆盖层文字摘要 | 信息量不足（用户明确要完整树） |
-
-**选定方案**：独立 Win32 预览弹窗跟随鼠标（恢复原计划 `DragPreviewPopup` 语义），复用已验证的 OverlayController 模式（后台线程 + `UpdateLayeredWindow`）。
-
-### 现状盘点（两端代码已存在，只缺接线）
-
-- `DragPreviewBitmapBuilder` — ✅ 已完成：展开 → `BuildExtractPreview` → ResultTreeView → Measure/Arrange → `RenderTargetBitmap` → BGRA 像素 + i18n 摘要（`Drag_FileCount`）。当前 **0 调用者**
-- `OverlayController.SetPreview()` / `PreviewImageData` / `CompositeImage` — ✅ 已实现，当前 **0 调用者**（将移除，见下）
-- `OverlayRender` 的 60×60 preview 合成槽位 — ✅ 已实现（preview 存在时合成、否则画 status 图标，二者互斥）— ⛔ **将移除**
-
-### 关键约束（决定时序设计）
-
-1. `RenderTargetBitmap.Render` 必须在 **UI 线程**执行；`DoDragDrop` 同步阻塞 UI 线程 → **预览渲染必须在拖拽启动前完成，拖拽启动后永远无法补渲染**（"先启动拖拽、渲染完再喂"不可行）
-2. 渲染不可中断（RenderTargetBitmap 无 cancel）→ 成本靠**渲染前分类**控制（按展开文件数决定渲染形态）
-3. 弹窗显示/跟随不依赖 UI 线程（后台线程 + 位图数据），与覆盖层同生命周期
-
-### 预取式渲染时序
-
-```
-PointerPressed（鼠标按下）
-    │ 记录选中项 → 统计展开文件数（O(n) 遍历，毫秒级）
-    │ 按数量分类：完整树 / 截断树(前2层) / 纯摘要
-    │ 启动异步渲染任务（UI 线程）
-    ▼
-PointerMoved 超过 4px 阈值（通常已过 100–400ms）
-    ├─ 渲染已完成 → 创建预览弹窗 + SetPreview → 立即显示树，零延迟启动拖拽
-    ├─ 渲染未完成（大树）→ 等待至上限 250ms，弹窗显示「构建中」占位（GDI 文字，后台线程可画）
-    │     ├─ 250ms 内完成 → 显示树
-    │     └─ 超过 250ms → 放弃树，切换为纯摘要文字，立即启动拖拽（不阻塞）
-    ▼
-PerformDragDrop（自实现 OLE）→ 拖拽中弹窗持续显示 → 松手/取消 → 销毁弹窗
-```
-
-> 预取利用「按下 → 移动超阈值」的天然时间窗口把渲染藏进去，常见场景（≤300 文件）零感知延迟。极端场景由 250ms 上限兜底，拖拽启动永不阻塞。
-
-### 降级策略（双阈值，已确认）
-
-| 展开文件数 | 渲染形态 | 目标耗时 |
-|-----------|---------|---------|
-| ≤300 | 完整树（ResultTreeView 全量，截断显示「…还有 N 个」） | <100ms |
-| 301 – 2000 | 前 2 层 + 摘要栏「共 N 个文件 / XX MB，仅显示前 M 项」 | <250ms |
-| >2000 | 纯摘要文字（无树，GDI 绘制，毫秒级） | 即时 |
-
-兜底：等待渲染 >250ms 仍未完 → 强制切纯摘要并立即启动拖拽。
-
-### 弹窗规格（已确认）
-
-- **尺寸**：460×680（位图），超出摘要栏显示截断统计
-- **跟随**：鼠标右下 20px 偏移，后台追踪循环（100ms 节流，与覆盖层一致）
-- **出屏翻转**：右/下越出虚拟屏幕边界时翻转到鼠标另一侧
-- **绘制**：`UpdateLayeredWindow` + BGRA DIB，`DragPreviewBitmapBuilder` 输出的位图 + GDI 摘要栏
-- **不遮挡**：弹窗跟随鼠标，目标窗口覆盖层（高亮边框 + 路径文字）职责不变，二者互不干扰
-
-### 涉及文件
-
-| 文件 | 操作 |
-|------|------|
-| `Services/DragPreviewPopup.cs` | 🆕 新增 — 独立 Win32 预览弹窗（后台线程 + UpdateLayeredWindow，460×680，跟随鼠标 + 出屏翻转 + 摘要栏 + 「构建中」占位） |
-| `Services/DragPreviewBitmapBuilder.cs` | 🔧 修改 — 增加复杂度分类入口（按展开文件数选择 完整树/截断树/纯摘要 路径）；移除未使用的 `format` 参数 |
-| `Services/OverlayController.cs` | 🔧 修改 — 移除 preview 合成槽位（`SetPreview`/`PreviewImageData`/`CompositeImage` 及 OverlayRender 的 preview 参数）；恢复 status 图标逻辑为无条件绘制 |
-| `Views/MainWindow.axaml.cs` | 🔧 修改 — PointerPressed 启动预渲染任务 → PointerMoved 超阈值检查完成状态/等待上限 → 弹窗创建/关闭与 overlay 同生命周期 |
-
-### 任务清单
-
-- [ ] **1. DragPreviewBitmapBuilder 分类改造**：新增按展开文件数选择渲染形态的入口；截断树（前 2 层）与纯摘要两条新路径；清理 `format` 参数
-- [ ] **2. 新建 DragPreviewPopup**：窗口注册/创建（模式参照 OverlayController）；`SetPreview(byte[], w, h)` 位图 + GDI 摘要栏；「构建中」占位文字；跟随鼠标 + 出屏翻转
-- [ ] **3. OverlayController 清理**：移除 preview 合成槽位，恢复 status 图标无条件绘制
-- [ ] **4. MainWindow 接线**：PointerPressed 预渲染 → PointerMoved 分类检查/等待上限 → 弹窗生命周期（创建/显示/销毁，与 overlay 同步）
-- [ ] **5. 验证**：拖拽启动延迟（≤300 文件零感知、>2000 文件 ≤250ms）；弹窗跟随/出屏翻转；遮挡关系；覆盖层功能回归（高亮/文字/光标四态）
-
-### Definition of Done 补充
-
-- [ ] 预览弹窗在拖拽过程中持续可见，跟随鼠标（右下 20px，出屏翻转）
-- [ ] 完整目录树在 460×680 弹窗内清晰可读（截断显示「…还有 N 个」）
-- [ ] ≤300 文件渲染 <100ms；301–2000 走前 2 层截断；>2000 走纯摘要
-- [ ] 拖拽启动零感知延迟（预取覆盖常见场景，250ms 上限兜底极端场景）
-- [ ] 覆盖层高亮/路径文字/四态光标功能无回归
-
----
-
-## 落点冲突预览（设计已定稿 2026-10-30，待实施）
-
-> **状态**: 📐 设计已定稿（2026-10-30 用户逐项拍板），**代码未动**。
-> 定稿要点：做在**覆盖层**上（不新建弹窗）；只显示**部分**目录结构（两层、最多 8 行）；只看**直接子目录 / 子文件**是否冲突；性能优先（落点不变不重算、每轮 IO 有预算、慢盘超时降级）。
-
-### 用户口径（逐项拍板，2026-10-30）
+### 用户口径（2026-11-27 逐项拍板）
 
 | 决策点 | 结论 |
 |---|---|
-| 显示位置 | **覆盖层**上（拖拽时跟随鼠标的那个框），不做预览弹窗 |
-| 显示范围 | 拖拽内容的目录结构，**两层、最多 8 行**，超出截断为「…另 N 项」 |
-| 判定粒度 | 只看**直接子目录 / 子文件**是否冲突，不递归深挖 |
-| 冲突标记 | **⚠ + 整行变红**；目录行带直接子项冲突计数 `⚠ src/ (3)` |
-| 判定口径 | **目标处已存在就算冲突** —— 文件、同名目录**都算**（同名目录会合并进去，仍标红，用户明确要求「看得更严」）；与设置的冲突策略无关 |
-| 与策略关系 | 不区分 Overwrite / Skip / Rename / Ask，一律按「已存在」标 |
+| 整体形态 | **主从式**：主区域最大（目标目录 + 预览树），其余是**小格子**排成一条，用简短文字表示各自的参数 |
+| 格子语义 | 一格 = **同一参数的一个取值**；不是「把不同参数混在一起」 |
+| 悬停行为 | 鼠标在主区域 ⇒ 用**设置里的默认参数**；鼠标在某个格子 ⇒ 主区域的目标目录与预览树**立即按该格重算** |
+| 树的规模 | 保留树，但**只显示少量节点**（顶层层级，最多 8 行） |
+| 冲突检测粒度 | **只查一层**（必要时两层）——理由见下「一层足够」的可证明性 |
+| 变体来源 | **第一版硬编码**，不做设置项勾选 |
+| 格子标题 | 写**参数名**（「保留完整路径 / 扁平解压 / 始终加根」），结果示例路径放下面一行 |
+| 长宽比 | **自动切换**条带方向（不新增设置项） |
+| 额外格 | 再加一格「**打开解压窗口**」：松手不解压，直接弹解压设置窗 |
+| 打开窗格被悬停时 | 主区域**只写一行说明**，不画树、不算冲突 |
+| 目标检测失败时 | 「打开解压窗口」格成为**唯一可选格**（替代现在直接弹窗） |
+| 窄窗口 | 三档降级；**极小档只保留「默认」和「打开解压窗口」两格** |
+| 树溢出到覆盖层外 | ❌ **不做**（用户 2026-11-27 决定「先不加，等功能完成后再看」），见「风险 / 遗留」 |
 
-### 覆盖层形态
+### 一层足够 —— 可证明，不是经验
+
+**命题**：若顶层项在目标处都不存在，则该批条目**一定不会产生任何冲突**。
+
+**证明**：`ExtractPathResolver.ResolveRelativePath(entryKey, currentFolder, preserveFullPath, stripRoot, addRoot)` 的输出恒为相对路径，拼上目标目录后形如 `<顶层项>\<其余>`。任何文件要落盘，其**每一级父目录都必须先存在**——而顶层项是这条路径的第一级，其余各级都在它下面。所以顶层项不存在 ⇒ 整条路径不存在 ⇒ 无冲突。∎
+
+**推论（省掉的复杂度）**：
+
+- 顶层项存在 ⇒ 里面**必然**要合并，具体撞几个文件**不改变「该不该提醒」这个结论**（用户原话：「第一层目录就有冲突，那么里面文件是否冲突就没那么重要了」）
+- 因此**不需要**「40 次检查预算」「500ms 超时」以及由此产生的 `(N+)` / `(?)` **未知态**——判定结果是确定的，不存在「算不出来」
+- 计划原先的「宁可知未知也不能假无冲突」（旧 `:2047`）**不再需要**，因为不再有未知
+
+**唯一的例外**：`AlwaysWrap` 时顶层只有 1 项（根目录名），它撞上后「里面撞几个」才有信息量。若该格被悬停且顶层项是目录，**再枚举一层**补计数——撞上的顶层项通常 ≤2 个，成本可忽略。
+
+### 覆盖层布局
 
 ```
-拖到此处：D:\Projects
-├─ docs/
-│  ├─ ⚠ readme.md
-│  └─ config.json
-├─ ⚠ src/ (3)
-└─ ⚠ notes.txt
-…另 4 项
+┌──────────────────────────────────────────────────────────────┐
+│ 拖到此处：D:\Projects                                         │  ← 主区域
+│                                                               │
+│  ├─ sub/                                                      │
+│  │  ├─ ⚠ docs/                                                │     （目标目录 + 预览树）
+│  │  │  ├─ ⚠ readme.md                                         │
+│  │  │  └─ config.json                                         │
+│  │  └─ notes.txt                                              │
+│  └─ ⚠ src/                                                    │
+├─────────────┬─────────────┬─────────────┬───────┬────────────┤
+│ 保留完整路径 │ 扁平解压     │ 始终加根     │       │ 打开解压窗口… │  ← 参数条带
+│ D:\P\sub\…  │ D:\P\…      │ D:\P\sub\…  │       │            │
+└─────────────┴─────────────┴─────────────┴───────┴────────────┘
+                                           ↑ 分隔线：右侧不是参数格
 ```
 
-- 第 1 行保持现有「拖到此处：<路径>」（超长仍走 `AbbreviatePath`），下面是树；窗口高度随行数自适应（最多约 9 行 ≈ 150px）。
-- 非冲突行用现有默认文字色；冲突行用覆盖层已有的 Warning 红 `0x004336F4` 且加 `⚠` 前缀。
-- 目录行 `(N)` = 该目录**直接子项**中已存在的数量；单目录预算内没扫完时显示 `(N+)`。
-- 无效落点 / 自家窗口：**不显示树**，维持现有 `DragOverlay_DragToFolder` / `DragOverlay_OwnWindow` / `DragOverlay_NoPath` 文案。
+**第一版硬编码的格（从左到右）**：
 
-### 数据来源与判定
+| # | 标题 | 参数 | 说明 |
+|---|---|---|---|
+| 1 | 保留完整路径 | `preserveFullPath = true` | 与设置项同名（复用 `Settings_Extract_PreserveFullPath`） |
+| 2 | 扁平解压 | `preserveFullPath = false` | 新 key `DragZone_Flat` |
+| 3 | 始终加根 | `RootMode = AlwaysWrap` | 新 key `DragZone_AlwaysWrap` |
+| — | （分隔线） | — | 视觉上把「参数格」与「动作格」分开 |
+| 4 | 打开解压窗口… | 不走解压 | 新 key `DragZone_OpenDialog`；被悬停时主区域只写一行说明 |
 
-- 树**结构**取自拖拽启动前已有的 `Views/MainWindow.axaml.cs:1562` `DragDropItemExpander.ExpandItems(selectedItems, allItems)` 结果（现在只用于判空）：启动时折成行模型，**只算一次**，拖拽中不再读写压缩包。
-- **冲突布尔**在落点变化时于后台线程重算：判定「目标目录 + 相对路径」是否已存在；相对路径必须走 `MantisZip.Core/Utils/ExtractPathResolver.cs:53` `ResolveAll(...)` 并与本次 `preserveFullPath` 一致 —— 路径口径不得另写，否则会出现「预览说不冲突、实际覆盖了」（ARCHITECTURE 的路径契约）。
-- 只判定**实际显示的行**（≤8 行）与已展开目录的直接子项计数，不预判未显示的节点。
+**格子的取舍（按结果去重）**：
 
-### 性能预算（硬指标）
+`preserveFullPath` 与 `RootMode` 是**不同的参数**，第一版把它们**并列成三个独立的格**（等价于「选了哪个格就只用那个参数」），不叠加成 2×3 网格——叠加会产生 6 个格子且语义交叉。
+仍然需要去重：若 `currentFolder` 为空（从压缩包根目录拖出），`preserveFullPath` 不影响任何路径 ⇒ 去掉「扁平解压」格。若某些格算出的顶层项集合与「默认」完全相同 ⇒ 该格灰显并标注「与默认相同」（不隐藏，避免格子宽度跳变）。
 
-| 项 | 预算 | 说明 |
+### 长宽比自动切换
+
+不新增设置项，纯几何判断（`OverlayController` 已有目标窗口的 `w` / `h`）：
+
+| 条件 | 条带位置 | 条带厚度 |
 |---|---|---|
-| 重算触发 | 落点路径变化（去抖 150ms） | 落点不变、光标在框内移动 ⇒ 一次都不重算 |
-| 单轮存在性检查 | ≤ 40 次 | 8 行展示 + 每个已展开目录最多 30 个直接子项计数；超出该目录预算则显示 `(N+)` |
-| 慢盘 / 网络路径 | 单轮总超时 500ms | 超时本轮放弃标记：路径行尾加 `(?)`，树照常显示但不标红 —— 宁可「未知」也不能假「无冲突」 |
-| 每 100ms 重绘 | 0 次磁盘 IO | 只绘制缓存的（行文本 + 是否冲突） |
+| `w / h ≥ 1.75` | **底部**横条 | `max(64, h × 8%)` |
+| `w / h < 1.75` | **右侧**竖条 | `max(150, w × 12%)` |
+
+- 格子数 2 时平分；3 时第 1 格占 40%（标题最长），其余平分；含「打开解压窗口」格时该格固定占 1/3 宽度并被分隔线隔开。
+- 超过 5 格不滚动（覆盖层不是真控件），改为只显示前 5 格。
+
+### 三档降级
+
+覆盖层**铺满目标窗口**（`OverlayController.cs:193-204` 用 `GetWindowRect` 的宽高调 `SetWindowPos`），所以目标窗口多小它就有多小。按 `w × h` 分三档：
+
+| 档 | 条件 | 主区域 | 条带 |
+|---|---|---|---|
+| **常规** | `w ≥ 480 && h ≥ 360` | 路径行 + 树（≤8 行） | 全部格子 + 示例路径 |
+| **紧凑** | `w ≥ 320 && h ≥ 240` | 路径行 + 树降到 **3 行**（只显示顶层项） | 压缩成**一行纯文字**，当前悬停格反色标记；不画示例路径 |
+| **极小** | 其他 | **只有一行落点**（`解压到 D:\P…`），不画树 | **只有两格**：「默认」「打开解压窗口…」 |
+
+- 极小档的关键决策：**宁可不给选择，也不给看不清的选择**。三个参数格在这种尺寸下每格仅约 90px 宽，拖拽时难以瞄准；而「默认」与「弹窗口」是唯二仍有意义的选择。
+- 极小档悬停「打开解压窗口」时，主区域写「在窗口里选择位置」（新 key，需缩写到当前字号放得下）。
+- 三档**共用同一套行渲染器**：把要画的内容组织成 `(text, color, isWarning)` 的行数组，极小幅 1 行、紧凑档 4 行、常规档 10 行。这样 `OverlayRender` 只需从「整段画两遍」改成「逐行画」一次，三档都受益。
+
+### 鼠标命中判定（限制：覆盖层是点击穿透的）
+
+覆盖层窗口创建于 `Views/MainWindow.Thumbnails.cs:427-456`，ex-style 为：
+
+```csharp
+WS_EX_LAYERED | WS_EX_TRANSPARENT | WS_EX_NOACTIVATE | WS_EX_TOOLWINDOW
+```
+
+`WS_EX_TRANSPARENT` ⇒ **鼠标命中测试直接穿过覆盖层**，`DropTargetDetector.DetectTargetDirectory()` 的 `WindowFromPoint` 拿到的永远是下层真实窗口。这是刻意的（松手时 Explorer 才是真正的投放目标），但也意味着：
+
+- **格子不是控件**：没有 hover 样式、没有光标变化、没有点击反馈
+- 悬停判定必须**自己算**：`GetCursorPos()` → 减去覆盖层矩形原点 → 与各格矩形比较，在 `RunTrackingLoop` 的 100ms tick 里完成（纯算术，零 IO）
+
+### 数据流与性能
+
+**目标目录的枚举只做一次**：落点变化（去抖 150ms）时 `Directory.EnumerateFileSystemEntries(dir)` 一次，得到 `HashSet<(string Name, bool IsDir)>`（Windows 用 `OrdinalIgnoreCase`）。
+
+**所有格子的路径都在内存里算**：
+
+- 拖拽启动前已把 `DragDropItemExpander.ExpandItems(selectedItems, allItems)` 的结果折成行模型（`Views/MainWindow.Thumbnails.cs` 的拖拽入口），**拖拽中不再读写压缩包**
+- `preserveFullPath` 是 `ExtractFlow.RunSelectedItemsExtractionAsync` 的既有每-run 形参，直接传值
+- `RootMode` 走 `ExtractRootPlan.Resolve(mode, entries, archivePath)`（**纯函数**，entries 已在手）→ 得到 `(stripRoot, addRoot)`
+- 各格的顶层项集合在内存里比对上面的 `HashSet` ⇒ **N 个格子的 IO 成本与 1 个格子几乎相同**
+
+**硬指标**：
+
+| 项 | 预算 |
+|---|---|
+| 落点变化时的目录枚举 | 1 次/落点（去抖 150ms） |
+| 格子间切换 | **0 次磁盘 IO**（只查内存 HashSet） |
+| 每 100ms 重绘 | 0 次磁盘 IO（只绘制缓存的行数组） |
+| 慢盘 / 网络路径 | 无额外超时——枚举本身在后台线程，切格时读缓存；首次枚举未完成时主区域显示「正在检查…」（新 key），不标红也不标绿 |
+
+**避免「先白后红」闪烁**：目标变化或切格时，先只更新路径行（用户此刻最需要的），树与冲突标记等这次枚举/计算完成后**一次性绘制**，不做「逐行补标记」。
+
+### 行渲染的结构性改造
+
+现状 `OverlayRender`（`Services/OverlayController.cs:315`）是**整段文字一次性 `GdiDrawText` 画两遍**（`:455` 阴影、`:459` 主文字），全程单一颜色。要支持「逐行不同颜色」必须改：
+
+1. 把 `string text` 换成 `IReadOnlyList<OverlayLine>`（`Text` / `Color` / `IsWarning`）
+2. 逐行 `GdiDrawText`，每行前后 `GdiSetTextColor`
+3. 字号：`:418-426` 的「按 `Math.Min(w, h)` 自适应 36/28/24/20/16px」是为**两行路径**设计的，9 行时会被压到不可读 ⇒ 常规档固定 **13-14px**，紧凑档 12px，极小档按档位单独算
+4. 行高 = 字号 × 1.5；树行左缩进按层级 × 16px
+5. 冲突行：**白字 + 整行半透明红底 + `⚠` 前缀**（不用红字——`OverlayRender` 的 Success 底色是绿 `0x006BD46B`，红字压绿底红绿色盲不可辨；颜色只做辅助，`⚠` 才是主信号）
 
 ### 实现清单
 
-1. `src/MantisZip.UI.Avalonia/Services/OverlayController.cs`：新增行模型（层级 / 名称 / 是否目录 / 是否冲突 / 子项冲突计数），`SetContentTree(...)` 传入结构；渲染从「单行路径（+ 可选预览位图）」扩成「路径行 + ≤8 行树」；窗口尺寸随行数自适应；`RunTrackingLoop` 里目标变化时触发冲突重算（去抖 + 预算 + 超时）。
-2. 新增 `src/MantisZip.UI.Avalonia/Services/DragConflictPreview.cs`（名称待定）：纯逻辑 —— 输入行模型 + 目标目录 + 可注入的文件系统探针与预算参数，输出带标记的行；便于单测，不依赖 Win32。
-3. `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`：把 `expandedItems` 折成行模型，在 `controller.Start()` 之后、`CustomOleDragDrop.PerformDragDrop` 之前调用 `SetContentTree(...)`。
-4. i18n：新增 1 个 key `DragOverlay_MoreItems`（`…另 {0} 项` / `…and {0} more` / zh-TW 同步），紧接 `DragOverlay_NoPath` 之后插入；`(N)` / `(N+)` / `(?)` / `⚠` 均为符号，不建 key。
-5. 测试 `tests/MantisZip.UI.Avalonia.Tests/DragConflictPreviewTests.cs`：8 行截断与「另 N 项」、目录计数与 `(N+)`、预算耗尽不抛、超时降级返回「未知」而不是「无冲突」、两层结构顺序稳定。
+1. **新增** `src/MantisZip.UI.Avalonia/Services/DragConflictPreview.cs`（纯逻辑，不依赖 Win32，便于单测）：
+   - `static IReadOnlyList<string> ResolveTopLevels(IReadOnlyList<ArchiveItem> expanded, string currentFolder, bool preserveFullPath, RootDirectoryMode rootMode, string archivePath)` —— 走 `ExtractPathResolver.ResolveAll` 取相对路径的首段
+   - `static DragConflictResult Compare(IReadOnlyList<string> topLevels, IReadOnlySet<string> existingEntries)` —— 返回冲突的顶层项名与（可选）子项计数
+   - 按结果去重的辅助方法
+2. **`src/MantisZip.UI.Avalonia/Services/OverlayController.cs`**：
+   - `SetContent(IReadOnlyList<OverlayZone> zones, IReadOnlyList<ArchiveItem> expanded, string currentFolder, ...)` —— 拖拽开始前一次传入
+   - 新增 `OverlayZone`（`Title` / `Parameters` / `IsAction` / `IsDefault`）
+   - `RunTrackingLoop` 里：算光标落在哪个格 → 切格时只在内存里重算行 → 触发重绘
+   - 落点变化时在**后台线程**枚举目标目录（不阻塞 100ms 循环）
+   - `OverlayRender` 改逐行渲染（见上）
+   - 三档降级、长宽比切换、条带绘制、分隔线
+3. **`src/MantisZip.UI.Avalonia/Services/ExtractFlow.cs`**：`RunSelectedItemsExtractionAsync` 加 `RootDirectoryMode rootMode = RootDirectoryMode.Original` 形参（`preserveFullPath` 之后），内部 `ExtractRootPlan.Resolve` 后传给 `SelectedItemsExtractService.ExtractEntriesAsync(... stripRoot, addRoot ...)`——**下游已支持这两个形参，只差这一层透传**。
+4. **`src/MantisZip.UI.Avalonia/Services/DragDropService.cs`**：`ExecuteAfterDropAsync` 增加 `DragDropChoice? choice = null`（记录松手时悬停的格），据此决定：
+   - `choice.IsAction`（打开解压窗口）⇒ 直接走**现有**的兜底分支（`:78-97` 的 `ExtractSettingsWindow.ShowWithPresetSelectionAsync`），**不新增执行路径**
+   - 否则把 `choice.PreserveFullPath` / `choice.RootMode` 传给 `ExtractFlow.RunSelectedItemsExtractionAsync`
+   - `choice == null`（未进入任何格）⇒ 沿用设置的默认值
+5. **`src/MantisZip.UI.Avalonia/Views/MainWindow.Thumbnails.cs`**：拖拽入口把「展开后的条目 + `currentFolder` + 目标窗口尺寸」交给 controller；松手后把 `controller.HoveredZone` 传给 `DragDropService`。
+6. **i18n**（三份 json）：
+   - 新 key：`DragZone_Flat`（扁平解压 / Flat）、`DragZone_AlwaysWrap`（始终加根 / Always add root）、`DragZone_OpenDialog`（打开解压窗口… / Open Extract dialog…）、`DragZone_OpenDialogHint`（在窗口里选择位置 / Choose the location in the dialog）、`DragZone_SameAsDefault`（与默认相同 / Same as default）、`DragOverlay_Checking`（正在检查… / Checking…）、`DragOverlay_MoreItems`（…另 {0} 项 / …and {0} more）
+   - 复用既有：`Settings_Extract_PreserveFullPath`、`DragOverlay_TargetPath`
+   - `LocalizedStrings` 白名单（若相关 VM 有）与三语同步
+7. **测试**：
+   - `tests/MantisZip.Tests/` 或 `MantisZip.UI.Avalonia.Tests/DragConflictPreviewTests.cs`：一层判定（顶层全不存在 ⇒ 无冲突、顶层存在 ⇒ 冲突）、`currentFolder` 非空时的顶层名、`StripRoot` / `AddRoot` 影响、`AlwaysWrap` 只有一个顶层项、按结果去重、`(N)` 计数
+   - `OverlayZoneTests`：长宽比阈值命中、三档阈值、格子矩形计算（左右上下各 2 例）
+   - 结构级绊线（照仓库既有做法）：`ExtractFlow.RunSelectedItemsExtractionAsync` 必须有 `rootMode` 形参；`DragDropService` 里「打开解压窗口」分支必须调用 `ExtractSettingsWindow.ShowWithPresetSelectionAsync`（钉死「不新增执行路径」）
+8. **手工验收**（Task 8 重写）：三档尺寸各验一遍、四个格子的悬停效果、极小档两格、「打开解压窗口」格、目标检测失败时该格为唯一选项、长宽比跨阈值时条带换边。
+
+### 工时重估（2026-11-27）
+
+| 阶段 | 工时 |
+|---|---|
+| `DragConflictPreview` 纯逻辑 + 单测 | 3-4h |
+| `OverlayRender` 逐行渲染改造 | 4-5h |
+| 多投放区（条带 / 悬停 / 长宽比 / 三档 / 分隔线） | 6-8h |
+| 「打开解压窗口」格 + `DragDropChoice` 透传 | 1-2h |
+| `ExtractFlow` 加 `rootMode` 形参 | 1-2h |
+| i18n（7 个新 key 三语） | 0.5-1h |
+| 测试（逻辑 + 结构绊线） | 4-5h |
+| 手工验收 | 2-3h |
+| **合计** | **约 22-30h** |
+
+> 原 `docs/PLAN.md` 写 10-14h 是按「覆盖层两行字 + 简单双区」估的；实际含逐行渲染改造、三档降级、四格条带与参数透传，按上表重估。`docs/PLAN.md` 已同步改为 22-30h、阶段工时 29-42h。
 
 ### 风险 / 遗留
 
-- 覆盖层变高后可能遮住落点附近的文件名（用户已知悉并接受「够用」）。
-- `(?)` 未知态是否够清楚待实测；若含糊，改成路径行尾文案「冲突未知」（需加 key）。
-- 执行侧与预览解耦：实际落盘仍走 `Services/DragDropService.cs:108-113` → `ExtractFlow.RunSelectedItemsExtractionAsync(...)`（Ask 弹冲突框），本次不改执行语义。
+| 项 | 说明 |
+|---|---|
+| **树溢出到覆盖层外** | 用户 2026-11-27 明确**先不做**。技术代价见当时的评估：覆盖层矩形被 `SetWindowPos` 钉死在目标窗口上（`OverlayController.cs:193-204`），外扩要重算整块背景填充（`:365-391` 按整个 `w × h` 逐像素填）、重画边框、并处理「光标落在溢出区算哪个窗口」的歧义；且会遮住邻近窗口。**等功能完成后再评估** |
+| 覆盖层遮住目标窗口文件名 | 常规档树 ≤8 行（约 150px 高），已有现象，用户接受「够用」 |
+| 格子不是控件 | `WS_EX_TRANSPARENT` 决定没有 hover / 点击反馈，只能靠主区域内容变化传达「参数变了」；必要时在条带上方加一行细提示 |
+| 条带压住底部投放区 | 条带贴在目标窗口底部时，那里本来就是用户可能想丢东西的位置。缓解：厚度压到 `max(64, h×8%)`；且悬停格子时主区域标题明显变化（`拖到此处：D:\Projects（扁平）`） |
+| 目标检测失败时的行为变更 | 从「直接弹解压设置窗」改成「极小档只有『打开解压窗口』一格可选、常规档仍显示全部格但主区域写『无法识别目标目录』」。**不新增执行路径**，仍走 `DragDropService.cs:78-97` 的现有分支 |
+| 执行侧与预览解耦 | 实际落盘仍走 `ExtractFlow.RunSelectedItemsExtractionAsync`（Ask 弹冲突框），本次不改执行语义 |
 
 ---
 
-## 双投放区（保留完整路径 / 扁平解压）—— 设计已定稿 2026-10-30，待实施
+## 已废弃设计（存档）
 
-> **状态**: 📐 设计已定稿（2026-10-30 用户拍板），**代码未动**。
-> 灵感来自 PotPlayer：拖视频进去时窗口分成「添加到列表 / 覆盖列表」两个投放区。这里换成「保留完整路径 / 扁平解压」两个区，**鼠标在哪一区松手就用哪一种路径口径**。
-> 与上一节的关系：上一节描述的「路径行 + 小树」是**区内的内容**；本节决定覆盖层怎么分区。目标判定失败（Warning / 路径未知）时退回上一节的单区形态。
+以下三节于 2026-08-06 / 2026-10-30 定稿、**2026-11-27 被上方「主从式覆盖层」取代**。内容保留供追溯，**不要照此实施**。
 
-### 用户口径（2026-10-30 拍板）
+### 废弃一：落点冲突预览的 2026-10-30 版本
 
-| 决策点 | 结论 |
-|---|---|
-| 分区位置 | 覆盖层已铺满目标窗口 ⇒ 直接把该窗口切成两个投放区（不是主窗口！） |
-| 分区方向 | **设置里可自定义，默认左右** —— 新增 `AppSettings.DragZoneSplitOrientation`（`leftRight` / `topBottom`） |
-| 两区语义 | 一区「保留完整路径」、一区「**相对路径**」，只影响 `preserveFullPath` |
-| 树预览 | **只有悬停区显示**小树 + 冲突标记；另一区压暗，只显示标题 + 结果示例路径 |
-| 默认高亮 | 跟当前设置 `AppSettings.ExtractPreserveFullPath`（平时怎么设，默认就亮哪区） |
-| 桌面目标 | 桌面（Progman / WorkerW）同样按窗口矩形分两半 |
-| 判定失败 | 目标路径拿不到（`#32770` 等 Warning）⇒ 退回单区文案，按设置值执行 |
-| 无差异时 | `currentFolder` 为空（压缩包根目录拖出）⇒ `preserveFullPath` 不影响结果，**合并成单区**（标题「解压到此处」），不假装有两种选择 |
-| 自家主窗口 | 保持现状（取消拖拽）；「拖回主窗口能做什么」另议，不在本计划内 |
+被取代的要点：
 
-### 为什么可行（代码事实）
+- 「覆盖层最多 8 行 + 每轮 IO ≤40 次 + 慢盘 500ms 降级 → `(N+)` / `(?)` 未知态」——**未知态不需要了**，见上方「一层足够」的可证明性
+- `Views/MainWindow.axaml.cs:1562`、`ExtractPathResolver.cs:53`、`OverlayController.cs:193-204` 等**行号锚点全部失效**（拖拽代码已移到 `Views/MainWindow.Thumbnails.cs`）；改为按符号名定位
+- 单区形态（只有一个目标目录 + 一棵树）⇒ 现在是主区域 + 参数条带
 
-- 覆盖层**已经铺满整个目标窗口**：`Services/OverlayController.cs:193-204` 取 `GetWindowRect(target)` 的宽高后 `SetWindowPos` 铺满，再画边框 + 居中文字 ⇒ 切成两区只是多画一条分隔线与两套文字。
-- **落点由我们自己判定**，不经过 Explorer：`GetCursorPos` + `GetWindowFromCursor` → `DropTargetDetector.DetectTargetDirectory()`；`preserveFullPath` 已是 `ExtractFlow.RunSelectedItemsExtractionAsync(..., preserveFullPath, ...)` 的**每-run 参数** ⇒ 松手瞬间按光标所在半区传值即可，不需要改设置、不需要新的回传通道（`CompressRunContext` 那类禁令不涉及这里，但仍不加「哪一区」以外的状态）。
+保留有效的部分（已并入上方）：
 
-### 两区结果的差异（必须显示示例路径，否则用户看不出区别）
+- 树结构取自 `DragDropItemExpander.ExpandItems(selectedItems, allItems)`，启动前折成行模型、拖拽中不再读写压缩包
+- 冲突判定必须走 `ExtractPathResolver.ResolveAll`，与本次 `preserveFullPath` 一致——路径口径不得另写，否则「预览说不冲突、实际覆盖了」
+- 「目标处已存在就算冲突」（文件、同名目录都算），与冲突策略无关
 
-打开 `Archive.zip`、在压缩包内 `sub/` 下浏览、拖出 `docs/a.txt`、目标窗口是 `D:\Projects`：
+### 废弃二：双投放区的 2026-10-30 版本
 
-| 区 | 落盘路径 |
-|---|---|
-| 保留完整路径（`preserveFullPath = true`） | `D:\Projects\sub\docs\a.txt` |
-| 扁平解压（`preserveFullPath = false`） | `D:\Projects\docs\a.txt` |
+被取代的要点：
 
-`ExtractPathResolver.TrimCurrentFolderPrefix`（`MantisZip.Core/Utils/ExtractPathResolver.cs:23`）是唯一口径来源：`preserveFullPath=true` 或 `currentFolder` 为空时不裁剪前缀。
+- **「把目标窗口切成两个等分投放区」⇒ 改成「主区域 + 参数条带」**。等分两区要在半宽里塞两层树，可读性差；主从式只有一棵树、占满宽度
+- 「非悬停区压暗但只显示标题 + 结果路径」这种折中做法**不再需要**——小格子天然就是「一行标题 + 一行示例」
+- 「红字压绿底」的红绿盲问题在格子方案下自然消失（冲突标记只出现在主区域的白字上）
+- 「两区各自算一套路径与冲突」⇒ **不再成立**：目标目录只枚举一次，各格只查内存 HashSet，IO 成本与单区持平
+- `AppSettings.DragZoneSplitOrientation`（`leftRight` / `topBottom`）**不新增**——改为按长宽比自动切换
 
-### 布局（默认左右分区）
+保留有效的部分（已并入上方）：
 
-```
-┌───────────────────────────┬───────────────────────────┐
-│ 保留完整路径                │ 相对路径                    │
-│ D:\Projects\sub\docs\a.txt │ D:\Projects\docs\a.txt     │
-│                           │                           │
-│ ├─ docs/                  │      （压暗，不显示树）      │
-│ │  ├─ ⚠ readme.md          │                           │
-│ │  └─ config.json          │                           │
-│ ├─ ⚠ src/ (3)             │                           │
-│ └─ ⚠ notes.txt            │                           │
-│  …另 4 项                  │           ← 光标在这半边     │
-└───────────────────────────┴───────────────────────────┘
-```
+- 「命中判定仍按整个窗口算」——改为按条带矩形 + 光标坐标算（覆盖层点击穿透，没法用控件响应）
+- 「扩展位：区模型做成『标题 + 一组参数』」——已实现为 `OverlayZone`
+- 「`currentFolder` 为空时两区结果相同 ⇒ 合并成单区」——升级为通用的「按结果去重」
 
-- 悬停区：Success 绿边框、正常呼吸 alpha，内容 = 标题 + 结果示例路径 + 小树（≤8 行，见上一节）。
-- 非悬停区：呼吸 alpha 降到 40–60（压暗），只显示标题 + 结果示例路径，**不算冲突、不渲染树**。
-- 分隔线 1px，取当前状态色降亮度，**只画在内容区**（客户区，从标题栏下沿到窗口底部）；**命中判定仍按整个窗口宽度**的中点算 —— 鼠标停在标题栏 / 地址栏上也算在对应半区，落点照旧取该窗口路径。
-- 长路径按**各区自身宽度**独立缩写（`AbbreviatePath` 阈值按半宽重算），不能两区共用同一阈值。
-- 窗口过窄（例如 < 600px）时，区内只显示标题 + 结果路径 + 一行冲突汇总，不显示行树。
+### 废弃三：独立预览弹窗（2026-08-06 版「预览弹窗实施补充」）
 
-### 细节定稿（2026-10-30 第二轮，逐项已定）
+原方案：`DragPreviewPopup` + `DragPreviewBitmapBuilder`，用 Avalonia `RenderTargetBitmap` 预渲染 `ResultTreeView`，再以 `UpdateLayeredWindow` 在鼠标右下 20px 弹出 460×680 独立窗口。
 
-| 细节 | 定稿 |
-|---|---|
-| 分隔线范围 | 视觉只画在**内容区**（客户区），**命中按整个窗口**宽度/高度中点判定（标题栏、地址栏上也算对应区） |
-| 两区标题 | 「保留完整路径」/「**相对路径**」—— 与设置项措辞镜像对应，不加副标题；两区各自的**结果示例路径**才是真正的解释 |
-| 呼吸动画 | 悬停区正常呼吸（40–120），非悬停区**固定压暗**（静态 alpha），跨区时交接，避免两区一起闪 |
-| 扩展位 | 区模型做成「标题 + 一组参数」，现在只放 `preserveFullPath`；将来要放「解压后打开目录」「解压并删除压缩包」等动作时不用重写渲染。**只留结构，不加功能** |
-| 大目标（最大化窗口 / 桌面） | 分区仍按半屏，但**文字与小树靠鼠标所在侧居中**，让视觉重心跟着鼠标走；分隔线位置不动 |
-| 窄窗口降级 | 区宽 < 约 300px（或整窗 < 600px）时区内只显示标题 + 结果示例路径 + 一行冲突汇总，不画行树 |
+**被取代的原因**：
 
-### 交互
+- 该方案需要「目标窗口 + 弹窗」两个分层窗口同时跟随，拖拽中要维护三处坐标（目标、弹窗、鼠标），出屏翻转逻辑复杂；
+- 弹窗必然遮住一部分目标窗口内容，而用户真正要看的恰恰是「落到目标目录里会是什么样」；
+- 用户 2026-10-30 与 2026-11-27 **两次确认不做弹窗** ⇒ 改为把目标目录与树直接画在覆盖层的主区域里，一格都不用跟随鼠标。
 
-1. 光标进入目标窗口 ⇒ 两区出现，默认高亮 = `ExtractPreserveFullPath ? 保留区 : 扁平区`。
-   - 例外：`currentFolder` 为空时（两区结果相同）只显示单区，不进入分区模式。
-   - 光标在窗口但两区结果相同时，单区按 `ExtractPreserveFullPath` 执行（此时该参数本就无效果）。
-2. 光标跨过中线 ⇒ 切换高亮，并触发**该区**的冲突计算（去抖 150ms、预算 40 次、慢盘 500ms 超时 → `(?)`），结果按 `(目标目录, preserveFullPath)` 缓存，来回切不再算。
-3. 松手 ⇒ 按松手时高亮区传 `preserveFullPath`；未进入任何区（理论不发生）⇒ 按设置值。
-4. Esc / 拖到无效区域 ⇒ 现有取消行为不变。
+**保留有效的部分**（已并入主从式方案）：
 
-### 实现清单
+- 「拖拽启动前一次性算好、拖拽中只做 GDI 绘制」的时序原则 —— 这条是硬约束（`Services/CustomOleDragDrop.cs:387` 的 OLE `DoDragDrop` 同步阻塞 UI 线程），主从式方案沿用；
+- 树结构取自 `DragDropItemExpander.ExpandItems` + `ExtractPathResolver.ResolveAll`，与执行侧同源。
 
-1. `src/MantisZip.UI.Avalonia/Models/AppSettings.cs`：新增 `public string DragZoneSplitOrientation { get; set; } = "leftRight";`（取值 `leftRight` / `topBottom`）。
-2. `src/MantisZip.UI.Avalonia/Views/SettingsWindow.axaml`（解压 → 常规）：新增「拖拽投放区分区方向」下拉（左右 / 上下）+ `SettingsWindowViewModel` 属性 / 镜像 / 保存 / 文化通知四处；按规则 23 同一提交内接上消费者（覆盖层读它），并同步 `-Task guards` 的 `settingswiring` 守卫。
-3. `src/MantisZip.UI.Avalonia/Services/DragConflictPreview.cs`（上一节新建）：入参带 `preserveFullPath`，两区各自算一套路径与冲突。
-4. `src/MantisZip.UI.Avalonia/Services/OverlayController.cs`：新增 `SplitOrientation`、`SetDropZones(...)`、`HoveredZone` 判定（光标相对窗口矩形中点，按方向取 x 或 y）、双区渲染、每区缓存、非悬停区降 alpha、窄窗口降级。
-5. `src/MantisZip.UI.Avalonia/Views/MainWindow.axaml.cs`：拖拽开始时把「展开后的条目 + 当前 `currentFolder` + 分区方向」交给 controller。
-6. `src/MantisZip.UI.Avalonia/Services/DragDropService.cs`：`ExecuteAfterDropAsync(..., bool? preserveFullPathOverride)`，为 null 时回落 `_settings.ExtractPreserveFullPath`，再传给 `RunSelectedItemsExtractionAsync`。
-7. i18n：新增 `DragZone_RelativePath`（相对路径 / Relative path）、`DragZone_Hint`（在此区松手即按此方式解压）、`Settings_Extract_DragZoneSplit`（拖拽投放区分区方向）、`Settings_Extract_DragZoneSplit_LeftRight`（左右）、`Settings_Extract_DragZoneSplit_TopBottom`（上下）；另一区标题复用既有 `Settings_Extract_PreserveFullPath`（保留完整路径）。三语同步。
-8. 测试 `tests/MantisZip.UI.Avalonia.Tests/DragDropZonesTests.cs`：分区方向命中判定（左右 / 上下各 2 例）、两区路径结果差异、默认高亮跟设置、Warning 退回单区、窄窗口降级、缓存命中不重复计算。
+**`DragPreviewBitmapBuilder.cs` 的处理**：它 136 行、**当前 0 调用者**。其中「展开 → `BuildExtractPreview` → 折行」的逻辑可移植到 `DragConflictPreview.BuildRowModel`；移植完成后该文件应删除。
 
-### 风险 / 遗留
-
-- 覆盖半屏（最大化窗口 / 桌面）视觉冲击较大 —— 用户已确认按窗口边界对齐，接受遮挡。
-- 设置项新增会触发 `settingswiring` 守卫，必须同提交接上消费者（规则 23）。
-- 「拖回主窗口能做什么」是用户新提出的想法（2026-10-30 口头提及），未定方案，另行讨论，不写进本计划。
