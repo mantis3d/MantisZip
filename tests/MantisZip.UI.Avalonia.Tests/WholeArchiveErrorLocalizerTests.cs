@@ -125,6 +125,64 @@ public class WholeArchiveErrorLocalizerTests
         Assert.Equal(LocalizationManager.T("Error_Whole_Corrupted"), message);
     }
 
+    /// <summary>
+    /// 基类 <c>SharpSevenZipException</c> 的兜底映射（issue #92）：密码含非 ASCII 字符时
+    /// 7z.dll 抛的正是裸基类 "Invalid arguments provided. (0x80070057: E_INVALIDARG)"，
+    /// 修复前会落到 default 变成「操作失败：+ 英文错误码」。
+    /// </summary>
+    [Fact]
+    public void ToUserText_SharpSevenZipException_LocalizesToInvalidArguments()
+    {
+        var ex = new SharpSevenZip.Exceptions.SharpSevenZipException(
+            "Invalid arguments provided. (0x80070057: E_INVALIDARG)");
+
+        var (message, detail) = WholeArchiveErrorLocalizer.ToUserText(ex);
+
+        Assert.Equal(LocalizationManager.T("Error_Whole_SevenZipInvalidArguments"), message);
+        Assert.Equal(ex.Message, detail);
+    }
+
+    /// <summary>
+    /// 基类兜底不得吞掉三个派生类的专属映射（switch 顺序守卫）：
+    /// 若有人把 <c>case SharpSevenZipException</c> 挪到派生类之前，本用例会失败。
+    /// </summary>
+    [Fact]
+    public void ToUserText_SharpSevenZipDerivedExceptions_StillUseTheirOwnKeys()
+    {
+        var library = new SharpSevenZip.Exceptions.SharpSevenZipLibraryException("Can not load 7-zip library!");
+        var archive = new SharpSevenZip.Exceptions.SharpSevenZipArchiveException("Invalid archive: open/read error!");
+        var extraction = new SharpSevenZip.Exceptions.ExtractionFailedException("File is corrupted.");
+
+        Assert.Equal(
+            LocalizationManager.T("Error_Whole_SevenZipLibrary"),
+            WholeArchiveErrorLocalizer.ToUserText(library).Message);
+        Assert.Equal(
+            LocalizationManager.T("Error_Whole_CorruptedOrPassword"),
+            WholeArchiveErrorLocalizer.ToUserText(archive).Message);
+        Assert.Equal(
+            LocalizationManager.T("Error_Whole_Corrupted"),
+            WholeArchiveErrorLocalizer.ToUserText(extraction).Message);
+        Assert.NotEqual(
+            LocalizationManager.T("Error_Whole_SevenZipInvalidArguments"),
+            WholeArchiveErrorLocalizer.ToUserText(library).Message);
+    }
+
+    /// <summary>
+    /// Core 就地拒绝的参数组合（ZipCrypto / 分卷 + 非 ASCII 密码）给的是中英双语可读文案，
+    /// 界面必须原样透传，不能套上「操作失败：」前缀。
+    /// </summary>
+    [Fact]
+    public void ToUserText_NotSupportedExceptionWithCjkMessage_PassesThroughWithoutPrefix()
+    {
+        const string message = "ZIP 传统加密（ZipCrypto）与分卷压缩不支持含中文等非 ASCII 字符的密码。";
+        var ex = new NotSupportedException(message);
+
+        var (text, detail) = WholeArchiveErrorLocalizer.ToUserText(ex);
+
+        Assert.Equal(message, text);
+        Assert.Null(detail);
+    }
+
     [Fact]
     public void ToUserText_EncryptedArchiveMessage_MapsToEncryptedKey()
     {

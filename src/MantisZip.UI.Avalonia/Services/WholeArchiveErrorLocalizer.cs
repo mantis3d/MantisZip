@@ -76,6 +76,18 @@ public static class WholeArchiveErrorLocalizer
             case SharpSevenZipLibraryException:
                 return (LocalizationManager.T("Error_Whole_SevenZipLibrary"), ex.Message);
 
+            // SharpSevenZip 其余失败（基类，必须排在 ExtractionFailed / Archive / Library 三个派生类之后，
+            // 否则那三个分支永远不可达）。典型代表是 "Invalid arguments provided. (0x80070057:
+            // E_INVALIDARG)" —— issue #92 之前密码含非 ASCII 字符时压缩必现，此前落到 default
+            // 变成「操作失败：+ 英文错误码」。
+            case SharpSevenZipException:
+                return (LocalizationManager.T("Error_Whole_SevenZipInvalidArguments"), ex.Message);
+
+            // Core 就地拒绝的参数组合（如「ZipCrypto / 分卷 + 非 ASCII 密码」）：消息已是中英双语
+            // 且直接可读，透传原文避免套上一层「操作失败：」。
+            case NotSupportedException nse when ContainsCjk(nse.Message):
+                return (nse.Message, null);
+
             // Core 对「加密包无密码」抛 InvalidOperationException（消息含「加密」/encrypted）：
             // 映射到干净本地化文案。不改 Core 消息本身——其为中英双语且被密码分类启发式
             // （PasswordService.ClassifyGenericException 查 "password"/"encrypted"）依赖。

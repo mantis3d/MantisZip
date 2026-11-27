@@ -1,4 +1,5 @@
 ﻿{
+  "Error_Whole_SevenZipInvalidArguments": "7z 引擎拒绝了这次操作：参数无效。常见原因是密码或文件名包含当前系统代码页无法表示的字符，请改用不含特殊字符的密码。",
   "Error_Extract_AllEntriesFailed": "全部 {0} 个文件都解压失败，未能写出任何内容。若压缩包已加密，请确认输入的密码正确。",
   "FileFilter_BuiltInPreset_Image": "📷 仅图片",
   "FileFilter_BuiltInPreset_Audio": "🎵 仅音频",

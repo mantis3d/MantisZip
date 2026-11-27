@@ -380,13 +380,29 @@ internal static class ZipEntryAccess
                 derived.MacKey,
                 expectedMac);
 
+            // AES 包裹的只是压缩后字节，内层压缩方法与普通条目一致（0x9901 的 ActualMethod）。
+            // 注意：SharpCompress 自己的 AES 分支只覆盖 None/Deflate 的少数方法，且把 LZMA 一律判成
+            // 「LZMA with pkware encryption」—— 那是 ZipCrypto 的限制，WinZip AES 下并不成立
+            // （实测 AES + LZMA 包可正常解出）。这里按实际方法分派，保住 #91 之前
+            // （v0.5.7 纯 SharpCompress 路径）能读的全部方法。
             Stream decompressed = extraInfo.ActualMethod switch
             {
-                0 => decrypt,                                    // Store
+                0 => decrypt, // Store
                 8 => new System.IO.Compression.DeflateStream(decrypt, CompressionMode.Decompress, leaveOpen: false),
+                9 => new SharpCompress.Compressors.Deflate64.Deflate64Stream(
+                    decrypt, SharpCompress.Compressors.CompressionMode.Decompress),
+                12 => SharpCompress.Compressors.BZip2.BZip2Stream.Create(
+                    decrypt,
+                    SharpCompress.Compressors.CompressionMode.Decompress,
+                    decompressConcatenated: false,
+                    leaveOpen: false,
+                    tolerateTruncatedStream: false),
+                14 => OpenLzmaStream(decrypt),
+                98 => OpenPpmdStream(decrypt),
                 _ => throw new NotSupportedException(
-                    $"WinZip AES: 不支持的压缩方法 {extraInfo.ActualMethod}（条目 {info.EntryName}）。" +
-                    "本实现覆盖 Store/Deflate，其余方法请用支持该格式的工具解压。"),
+                    $"WinZip AES: 该条目的压缩方法不受支持（方法 {extraInfo.ActualMethod}，条目 {info.EntryName}）。"
+                    + " WinZip AES: unsupported inner compression method for this entry. "
+                    + "本程序支持 Store / Deflate / Deflate64 / BZip2 / LZMA / PPMd，其余方法请用支持该格式的工具解压。"),
             };
 
             // AE-1（version 1）在头里带真实 CRC32；AE-2（version 2）CRC 字段恒为 0，完整性由 HMAC 负责
@@ -402,6 +418,37 @@ internal static class ZipEntryAccess
             fs.Dispose();
             throw;
         }
+    }
+
+    /// <summary>
+    /// ZIP 里的 PPMd 条目在压缩数据最前面带 2 字节属性（模型阶数 + 分配器大小），
+    /// 需要先读出来构造 <c>PpmdProperties</c>，剩余字节才是 PPMd 码流。
+    /// 与 SharpCompress 自己的 ZIP PPMd 分支（<c>ZipFilePart.CreateDecompressionStream</c>）一致。
+    /// </summary>
+    private static Stream OpenPpmdStream(Stream source)
+    {
+        Span<byte> properties = stackalloc byte[2];
+        source.ReadExactly(properties);
+        var ppmProperties = new SharpCompress.Compressors.PPMd.PpmdProperties(properties);
+        return SharpCompress.Compressors.PPMd.PpmdStream.Create(ppmProperties, source, compress: false);
+    }
+
+    /// <summary>
+    /// ZIP 里的 LZMA 条目数据以「版本号(2) + 属性长度(2) + 属性 + 码流」开头，
+    /// 属性长度实测恒为 5。码流自带结束标记（EOS），所以用两参 <c>Create(properties, stream)</c>
+    /// 即可解到底 —— 传 inSize/outSize 反而在部分样本上抛 <c>DataErrorException: Data Error</c>。
+    /// </summary>
+    private static Stream OpenLzmaStream(Stream source)
+    {
+        Span<byte> header = stackalloc byte[4];
+        source.ReadExactly(header);
+        int propertiesLength = BinaryPrimitives.ReadUInt16LittleEndian(header[2..]);
+        if (propertiesLength is <= 0 or > 8)
+            throw new InvalidFormatException($"WinZip AES: LZMA 属性长度非法（{propertiesLength}）");
+
+        var properties = new byte[propertiesLength];
+        source.ReadExactly(properties);
+        return SharpCompress.Compressors.LZMA.LzmaStream.Create(properties, source, leaveOpen: false);
     }
 
     /// <summary>由密码字节派生三元组（加密密钥 / 认证密钥）。</summary>

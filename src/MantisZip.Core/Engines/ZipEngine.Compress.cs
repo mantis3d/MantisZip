@@ -62,6 +62,26 @@ public partial class ZipEngine
                 var reportInterval = TimeSpan.FromMilliseconds(100);
                 var isEncrypted = options.Encrypt && !string.IsNullOrEmpty(options.Password);
 
+                // issue #92：7z.dll 写 ZIP+AES 时会把密码转成系统 ANSI 交给加密回调，
+                // 密码只要含任意 >127 的字符就抛 E_INVALIDARG（"Invalid arguments provided"）。
+                // 唯一绕法：先用纯 ASCII 占位密码压出包，再在字节层把 AES 密钥换成真实密码。
+                // 传统 ZipCrypto 的密钥派生是 CRC 迭代，换不了，只能给出明确报错。
+                var requiresRekey = isEncrypted && ZipWinZipAesRekey.NeedsRekey(options.Password);
+                if (requiresRekey
+                    && (MapZipEncryptionMethod(options.ZipEncryptionMethod) == ZipEncryptionMethod.ZipCrypto
+                        || options.SplitSize > 0))
+                {
+                    throw new NotSupportedException(
+                        "ZIP 传统加密（ZipCrypto）与分卷压缩不支持含中文等非 ASCII 字符的密码，"
+                        + "请改用 AES 加密或不含非 ASCII 字符的密码。"
+                        + " Legacy ZIP encryption (ZipCrypto) and split volumes do not support "
+                        + "passwords with non-ASCII characters; switch to AES or use an ASCII password.");
+                }
+
+                var compressionPassword = requiresRekey
+                    ? ZipWinZipAesRekey.PlaceholderPassword
+                    : options.Password ?? "";
+
                 if (isEncrypted)
                 {
                     // SharpSevenZip 支持 ZIP + AES-256 加密（SharpCompress ZipWriter 不支持加密）
@@ -132,7 +152,20 @@ var zipMethod = MapZipMethodToS7Z(options.ZipCompressionMethod);
                         ReadErrorHandler.CreateSkippedReporter(progress, sourceFilePaths));
                     if (validated.Count > 0)
                     {
-                        s7zCompressor.CompressFilesEncrypted(outputPath, options.Password ?? "", validated.ToArray());
+                        s7zCompressor.CompressFilesEncrypted(
+                            outputPath, compressionPassword, validated.ToArray());
+
+                        // 密码含非 ASCII 字符（issue #92）：7z.dll 在把密码转成系统 ANSI 时会抛
+                        // E_INVALIDARG，所以上面用的是纯 ASCII 占位密码，这里再把 AES 密钥换成真实密码。
+                        // WinZip AES 是纯 CTR keystream，换密钥只需两遍 AES-CTR 异或，不必解压、长度不变。
+                        if (requiresRekey)
+                        {
+                            ZipWinZipAesRekey.Rekey(
+                                outputPath, ZipWinZipAesRekey.PlaceholderPassword, options.Password!);
+                            CoreLog.Info(
+                                $"CompressAsync: re-keyed WinZip AES entries to the real password "
+                                + $"({options.Password!.Length} chars)");
+                        }
                     }
                     else
                     {
