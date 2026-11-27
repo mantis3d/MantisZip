@@ -1,4 +1,12 @@
 ﻿{
+  "Settings_Pwd_Defaults": "密码默认值",
+  "Settings_Pwd_ModeDefault": "默认密码模式",
+  "Settings_Pwd_ModeDefault_Library": "密码库",
+  "Settings_Pwd_ModeDefault_New": "新密码",
+  "Settings_Pwd_AutoRulesDefault": "默认勾选「自动生成规则」",
+  "Settings_Pwd_UpdateRulesDefault": "默认勾选「更新匹配规则」",
+  "Settings_Pwd_SavePermanentlyDefault": "密码对话框默认勾选「永久保存到密码库」",
+  "Settings_Pwd_Defaults_Hint": "只决定压缩设置窗与密码对话框打开时的初始状态；在窗内临时改动仅对本次生效，不会改变这里的默认值。",
   "Error_Whole_SevenZipInvalidArguments": "7z 引擎拒绝了这次操作：参数无效。常见原因是密码或文件名包含当前系统代码页无法表示的字符，请改用不含特殊字符的密码。",
   "Error_Extract_AllEntriesFailed": "全部 {0} 个文件都解压失败，未能写出任何内容。若压缩包已加密，请确认输入的密码正确。",
   "FileFilter_BuiltInPreset_Image": "📷 仅图片",

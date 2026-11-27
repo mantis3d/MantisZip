@@ -1,4 +1,12 @@
 ﻿{
+  "Settings_Pwd_Defaults": "密碼預設值",
+  "Settings_Pwd_ModeDefault": "預設密碼模式",
+  "Settings_Pwd_ModeDefault_Library": "密碼程式庫",
+  "Settings_Pwd_ModeDefault_New": "新密碼",
+  "Settings_Pwd_AutoRulesDefault": "預設勾選「自動產生規則」",
+  "Settings_Pwd_UpdateRulesDefault": "預設勾選「更新符合規則」",
+  "Settings_Pwd_SavePermanentlyDefault": "密碼對話框預設勾選「永久儲存到密碼程式庫」",
+  "Settings_Pwd_Defaults_Hint": "只決定壓縮設定窗與密碼對話框開啟時的初始狀態；在窗內臨時變更僅對本次生效，不會改變這裡的預設值。",
   "Error_Whole_SevenZipInvalidArguments": "7z 引擎拒絕了這次操作：參數無效。常見原因是密碼或檔名含有目前系統代碼頁無法表示的字元，請改用不含特殊字元的密碼。",
   "Error_Extract_AllEntriesFailed": "全部 {0} 個檔案都解壓失敗，未寫出任何內容。若壓縮檔已加密，請確認輸入的密碼正確。",
   "FileFilter_BuiltInPreset_Image": "📷 僅圖片",

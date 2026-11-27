@@ -491,6 +491,22 @@ public partial class SettingsWindowViewModel : ObservableObject
     [ObservableProperty]
     private bool _passwordRevealByDefault;
 
+    // ── Password Defaults（issue #87）──
+    // 四项只影响「压缩设置窗 / 密码对话框打开时的初始状态」，与上面两个实时选项语义不同。
+    // 密码模式在设置页是两档下拉（SettingsWindow 全页无 RadioButton），压缩设置窗那边才是单选按钮。
+
+    /// <summary>密码模式默认值的后备字段（"library" / "new"），下拉选中的 Value 与它对齐。</summary>
+    private string _passwordModeDefault = "library";
+
+    [ObservableProperty]
+    private bool _autoGenerateRulesByDefault = true;
+
+    [ObservableProperty]
+    private bool _updateMatchingRulesByDefault = true;
+
+    [ObservableProperty]
+    private bool _savePermanentlyByDefault;
+
     // ── File Assoc ──
     [ObservableProperty]
     private bool _assocZip = true;
@@ -867,6 +883,12 @@ public partial class SettingsWindowViewModel : ObservableObject
     public System.Collections.ObjectModel.ObservableCollection<Option> ZipEncodingOptions { get; } = new();
     [ObservableProperty] private Option? _selectedZipEncodingOption;
 
+    // ── Password Defaults（issue #87）──
+    // 密码模式默认值用两档下拉而不是单选：本页 61 个 ComboBox、0 个 RadioButton，
+    // 风格上就该是下拉（压缩设置窗里的两档才是 RadioButton，两边形态不同是有意的）。
+    public System.Collections.ObjectModel.ObservableCollection<Option> PasswordModeDefaultOptions { get; } = new();
+    [ObservableProperty] private Option? _selectedPasswordModeDefaultOption;
+
     // ── Localized strings ──
 
     public string WindowTitle => LocalizationManager.T("Settings_Title");
@@ -948,6 +970,13 @@ public partial class SettingsWindowViewModel : ObservableObject
     public string AllowNavigationText => LocalizationManager.T("Settings_AllowNavigation");
 
     public string PasswordOptionsSectionText => LocalizationManager.T("Settings_Pwd_Options");
+    // 密码默认值卡片（issue #87）：标题 + 四个标签 + 一行说明
+    public string PwdDefaultsSectionText => LocalizationManager.T("Settings_Pwd_Defaults");
+    public string PwdModeDefaultText => LocalizationManager.T("Settings_Pwd_ModeDefault");
+    public string PwdAutoRulesDefaultText => LocalizationManager.T("Settings_Pwd_AutoRulesDefault");
+    public string PwdUpdateRulesDefaultText => LocalizationManager.T("Settings_Pwd_UpdateRulesDefault");
+    public string PwdSavePermanentlyDefaultText => LocalizationManager.T("Settings_Pwd_SavePermanentlyDefault");
+    public string PwdDefaultsHintText => LocalizationManager.T("Settings_Pwd_Defaults_Hint");
     public string AssocSectionText => LocalizationManager.T("Settings_Assoc_Title");
     public string DebugSectionText => LocalizationManager.T("Settings_Debug_Title");
 
@@ -1570,6 +1599,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         _showPasswordMatchNotification = _settings.ShowPasswordMatchNotification;
         _passwordRevealByDefault = _settings.PasswordRevealByDefault;
 
+        // Password Defaults（issue #87）
+        _passwordModeDefault = _settings.PasswordModeDefault;
+        _autoGenerateRulesByDefault = _settings.AutoGenerateRulesByDefault;
+        _updateMatchingRulesByDefault = _settings.UpdateMatchingRulesByDefault;
+        _savePermanentlyByDefault = _settings.SavePermanentlyByDefault;
+
         // File Assoc
         _assocZip = _settings.AssocZip;
         _assoc7z = _settings.Assoc7z;
@@ -1770,6 +1805,13 @@ public partial class SettingsWindowViewModel : ObservableObject
         ReadNameEncodingOptions.Clear();
         foreach (var opt in NameEncodingOption.BuildDefault())
             ReadNameEncodingOptions.Add(opt);
+
+        // 密码模式默认值两档（issue #87）：值域与 AppSettings.PasswordModeDefault 一致
+        PasswordModeDefaultOptions.Clear();
+        PasswordModeDefaultOptions.Add(new Option(LocalizationManager.T("Settings_Pwd_ModeDefault_Library"), "library"));
+        PasswordModeDefaultOptions.Add(new Option(LocalizationManager.T("Settings_Pwd_ModeDefault_New"), "new"));
+        SelectedPasswordModeDefaultOption = PasswordModeDefaultOptions.FirstOrDefault(o => o.Value == _passwordModeDefault)
+            ?? PasswordModeDefaultOptions[0];
     }
 
     /// <summary>
@@ -2148,6 +2190,13 @@ public partial class SettingsWindowViewModel : ObservableObject
         OnPropertyChanged(nameof(PwdShowNotificationText));
         OnPropertyChanged(nameof(PwdRevealDefaultText));
         OnPropertyChanged(nameof(PwdRevealDefaultHintText));
+        // 密码默认值卡片（issue #87）
+        OnPropertyChanged(nameof(PwdDefaultsSectionText));
+        OnPropertyChanged(nameof(PwdModeDefaultText));
+        OnPropertyChanged(nameof(PwdAutoRulesDefaultText));
+        OnPropertyChanged(nameof(PwdUpdateRulesDefaultText));
+        OnPropertyChanged(nameof(PwdSavePermanentlyDefaultText));
+        OnPropertyChanged(nameof(PwdDefaultsHintText));
         OnPropertyChanged(nameof(FileAssocDescText));
         OnPropertyChanged(nameof(FileAssocSelectAllText));
         OnPropertyChanged(nameof(FileAssocDeselectAllText));
@@ -2346,6 +2395,12 @@ public partial class SettingsWindowViewModel : ObservableObject
         // Password
         _settings.ShowPasswordMatchNotification = ShowPasswordMatchNotification;
         _settings.PasswordRevealByDefault = PasswordRevealByDefault;
+
+        // Password Defaults（issue #87）：写入的是「默认值」，不影响任何已打开的对话框
+        _settings.PasswordModeDefault = SelectedPasswordModeDefaultOption?.Value ?? "library";
+        _settings.AutoGenerateRulesByDefault = AutoGenerateRulesByDefault;
+        _settings.UpdateMatchingRulesByDefault = UpdateMatchingRulesByDefault;
+        _settings.SavePermanentlyByDefault = SavePermanentlyByDefault;
 
         // File Assoc：两列勾选 → 两个集合（AssocZip/Assoc7z… 只保留给老配置迁移，不再写）
         _settings.AssocExtensions = AssocPreferences.Normalize(

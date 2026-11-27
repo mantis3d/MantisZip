@@ -62,8 +62,36 @@ public partial class PasswordDialog : Window
         DataContext = this;
 
         // 初始显示态跟随设置；只决定打开时的状态，不锁死切换。
-        _isRevealed = AppSettings.Load().PasswordRevealByDefault;
+        var settings = AppSettings.Load();
+        _isRevealed = settings.PasswordRevealByDefault;
         ApplyRevealState();
+
+        // 两个勾选框的初值跟随设置（issue #87）。必须在 InitializeComponent 之后显式赋值：
+        // XAML 里的 IsChecked 是硬编码的，留着它们当「默认值」等于设置项形同虚设。
+        ApplyDefaultOptions(settings);
+    }
+
+    /// <summary>
+    /// 按设置写入两个勾选框的初值。这里刻意只写初值、不写回设置 ——
+    /// issue #87 的约定是「窗内临时改动只对本次生效，不回写全局默认值」。
+    /// </summary>
+    private void ApplyDefaultOptions(AppSettings settings)
+    {
+        // 赋值本身会触发 IsCheckedChanged 处理器（同步 PatternsTextBox 的只读态与自动规则文本），
+        // 所以这里不需要再手工复刻一份逻辑。此时 FileName 可能还是空的，
+        // 带文件名的构造里会在 FileName 赋值后再补一次自动规则。
+        SavePermanentlyCheck.IsChecked = settings.SavePermanentlyByDefault;
+        AutoGenerateRulesCheck.IsChecked = settings.AutoGenerateRulesByDefault;
+
+        // 值没变化时 IsCheckedChanged 不会触发（XAML 里 AutoGenerateRulesCheck 的初值就是 True），
+        // 只依赖事件会让「默认勾上自动规则」这条路径漏掉只读态 —— 显式补一次。
+        SyncPatternsReadOnly();
+    }
+
+    /// <summary>规则框的只读态跟随「自动生成规则」：勾上就由程序生成、不许手改。</summary>
+    private void SyncPatternsReadOnly()
+    {
+        PatternsTextBox.IsReadOnly = AutoGenerateRulesCheck.IsChecked == true;
     }
 
     public PasswordDialog(string fileName) : this()
@@ -71,6 +99,11 @@ public partial class PasswordDialog : Window
         FileName = fileName;
         FileNameText.Text = fileName;
         LoadSavedPasswords();
+
+        // 上面 ApplyDefaultOptions 里 FileName 还是空的，RefreshAutoRules 会提前返回；
+        // 拿到文件名后补一次，否则「默认勾选自动生成规则」看不到规则文本（issue #87）。
+        if (SavePermanentlyCheck.IsChecked == true && AutoGenerateRulesCheck.IsChecked == true)
+            RefreshAutoRules();
     }
 
     private void LoadSavedPasswords()
@@ -153,7 +186,7 @@ public partial class PasswordDialog : Window
     {
         if (AutoGenerateRulesCheck.IsChecked == true && SavePermanentlyCheck.IsChecked == true)
             RefreshAutoRules();
-        PatternsTextBox.IsReadOnly = AutoGenerateRulesCheck.IsChecked == true;
+        SyncPatternsReadOnly();
     }
 
     private void RefreshAutoRules()

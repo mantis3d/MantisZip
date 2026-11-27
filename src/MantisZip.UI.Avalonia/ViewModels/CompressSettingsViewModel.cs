@@ -779,6 +779,13 @@ public partial class CompressSettingsViewModel : ObservableObject
             AdaptiveCompression = settings.AdaptiveCompression;
             ZipEncryptionMethod = settings.ZipEncryptionMethod ?? "aes256";
             SevenZipEncryptHeaders = settings.SevenZipEncryptHeaders;
+
+            // 密码相关默认值（issue #87）：只影响本窗口打开时的初始状态，窗内改动不回写设置。
+            // 「更新匹配规则」与「保存到密码库」在界面上共用一个勾选框（文案由 SaveCheckLabel
+            // 按密码模式切换），所以它们分别对应下面两个字段，不要合并成一个。
+            IsPasswordLibraryMode = !string.Equals(settings.PasswordModeDefault, "new", StringComparison.OrdinalIgnoreCase);
+            AutoGenerateRules = settings.AutoGenerateRulesByDefault;
+            SaveToLibrary = settings.UpdateMatchingRulesByDefault;
             // 文件冲突默认策略：非法值经 OnConflictActionChanged 同步回退到第一项（每次询问）
             ConflictAction = settings.CompressFileConflictAction;
 

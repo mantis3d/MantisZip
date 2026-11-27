@@ -1,4 +1,12 @@
 ﻿{
+  "Settings_Pwd_Defaults": "Password Defaults",
+  "Settings_Pwd_ModeDefault": "Default password mode",
+  "Settings_Pwd_ModeDefault_Library": "Password Library",
+  "Settings_Pwd_ModeDefault_New": "New Password",
+  "Settings_Pwd_AutoRulesDefault": "Auto-generate rules is checked by default",
+  "Settings_Pwd_UpdateRulesDefault": "Update matching rules is checked by default",
+  "Settings_Pwd_SavePermanentlyDefault": "Save permanently is checked by default in the password dialog",
+  "Settings_Pwd_Defaults_Hint": "Only controls the initial state of the compression settings window and the password dialog; changes made inside those windows apply to that run only and never alter these defaults.",
   "Error_Whole_SevenZipInvalidArguments": "The 7z engine rejected this operation: invalid arguments. This usually means the password or a file name contains characters the current system code page cannot represent; try a password without special characters.",
   "Error_Extract_AllEntriesFailed": "All {0} file(s) failed to extract; nothing was written. If the archive is encrypted, check that the password is correct.",
   "FileFilter_BuiltInPreset_Image": "📷 Images only",

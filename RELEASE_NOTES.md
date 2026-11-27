@@ -28,6 +28,12 @@ MantisZip-0.5.8-Setup-WebSetup.exe requires internet during installation. Mantis
 - **You can now type a target folder that does not exist yet** — previously, entering a non-existent folder in the breadcrumb silently did nothing and the only way forward was creating each level inside the picker. The address bars for the output folder and the extraction target now ask "This folder doesn't exist yet. Create it now?", and on confirmation create the whole chain and jump into it. Paths pointing at an existing file still open that file, and read-only contexts such as "Add archive" are unaffected.
 - ![面包屑询问框：该文件夹尚不存在，是否现在创建](docs/images/version/v0.5.8/BreadcrumbCreateFolder.png)
 
+**新增 / Features**
+
+- **四项密码默认值都能记住并改动了** — 设置 → 密码 新增「密码默认值」卡片：默认密码模式（密码库 / 新密码）、是否默认勾选「自动生成规则」与「更新匹配规则」、密码对话框是否默认勾选「永久保存到密码库」。默认值与改动前完全一致，没动过设置的用户察觉不到差别；窗内临时改动只对本次生效，不会覆盖这里的默认值。
+- **Four password defaults are now remembered and configurable** — Settings → Password gains a "Password Defaults" card covering the default password mode (library / new password), whether "auto-generate rules" and "update matching rules" start checked, and whether the password dialog pre-checks "save permanently". The defaults match the previous behaviour exactly, so nothing changes unless you edit them; changes made inside a window apply only to that run and never overwrite the defaults.
+- ![设置 → 密码 的「密码默认值」卡片：密码模式下拉与三个默认勾选项](docs/images/version/v0.5.8/PasswordDefaults.png)
+
 **修复 / Fixes**
 
 - **右键「解压选中项到…」与拖拽解压的默认目录不再多套一层包名** — 这两个入口此前仍按「父目录\包名」算初始目录，而对话框本身的默认值是「父目录」、包名那一层早交给「压缩包顶层目录」负责，两边不一致会让解压结果多出一层同名目录。现在两处统一传父目录，与对话框、智能解压两档的落点规则一致。

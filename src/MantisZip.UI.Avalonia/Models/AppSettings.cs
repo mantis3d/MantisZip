@@ -276,6 +276,20 @@ public class AppSettings
     public bool ShowPasswordMatchNotification { get; set; } = true;
     public bool PasswordRevealByDefault { get; set; } = false;
 
+    /// <summary>
+    /// 密码相关控件的默认值（issue #87）。四项都只影响「窗口/对话框打开时的初始状态」，
+    /// 用户在某次压缩里临时改动不会回写这里 —— 与其它设置项的语义不同，别把它当成实时状态。
+    /// 默认值刻意与 v0.5.8 之前的硬编码行为逐项一致，没改过设置的老用户升级后行为不变。
+    /// </summary>
+    /// <summary>压缩设置窗加密页默认选中的密码模式："library"（密码库，默认）或 "new"（新密码）。</summary>
+    public string PasswordModeDefault { get; set; } = "library";
+    /// <summary>「自动产生规则」是否默认勾选（压缩设置窗与密码对话框共用）。</summary>
+    public bool AutoGenerateRulesByDefault { get; set; } = true;
+    /// <summary>「更新符合规则」是否默认勾选（压缩设置窗的密码库模式）。</summary>
+    public bool UpdateMatchingRulesByDefault { get; set; } = true;
+    /// <summary>密码对话框里「永久保存到密码库」是否默认勾选。</summary>
+    public bool SavePermanentlyByDefault { get; set; } = false;
+
     // ===== 外观 =====
     /// <summary>主题：System=跟随系统 / Light=亮色 / Dark=暗色（三态）</summary>
     public string Theme { get; set; } = "System";
@@ -676,6 +690,13 @@ public class AppSettings
         if (settings.OpenDialogExtensions is not null)
         {
             settings.OpenDialogExtensions = AssocPreferences.Normalize(settings.OpenDialogExtensions);
+        }
+
+        // 密码模式默认值只有 library / new 两个合法值。手改 settings.json 写错（或将来改名）时
+        // 回落到 library，否则压缩设置窗打开后两档单选都不亮，用户会以为这是新引入的 bug。
+        if (!string.Equals(settings.PasswordModeDefault, "new", StringComparison.OrdinalIgnoreCase))
+        {
+            settings.PasswordModeDefault = "library";
         }
     }
 

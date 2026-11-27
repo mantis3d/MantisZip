@@ -6,6 +6,24 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-27** — issue #87：密码相关默认值可配置（加密模式 / 自动生成规则 / 更新匹配规则 / 永久保存）
+
+- **用户指令**（m02308）：「写计划吧，算在v0.5.8里面，写完就开工吧」—— 原定 v0.5.9 的碎片清仓被提前并入 v0.5.8 作为第四项。
+- **问题**：四项密码相关选择每次都是硬编码初值 —— 压缩设置窗的密码模式永远从「密码库」开始（`CompressSettingsViewModel.cs` 的 `_isPasswordLibraryMode = true`）、「自动生成规则」与「更新匹配规则」永远从勾选开始（同文件的 `_autoGenerateRules = true` / `_saveToLibrary = true`）、密码对话框的两个勾选框写死在 XAML 里（`PasswordDialog.axaml:63 IsChecked="False"`、`:70 IsChecked="True"`）。`AppSettings` 的密码段只有 `ShowPasswordMatchNotification` 与 `PasswordRevealByDefault` 两字段，四项默认值一个都没有 ⇒ 用户改一次、下次开窗仍是老样子。
+- **新增设置项**（`src/MantisZip.UI.Avalonia/Models/AppSettings.cs` 密码段）：`PasswordModeDefault`（`"library"` / `"new"`）、`AutoGenerateRulesByDefault`、`UpdateMatchingRulesByDefault`、`SavePermanentlyByDefault`。**默认值刻意与改动前的硬编码行为逐项一致（`library` / `true` / `true` / `false`）⇒ 没动过设置的老用户升级后行为完全不变**，这是本次唯一的兼容性承诺；出厂 `Resources/Defaults/settings.json` 同步补四键（117 → 121）。
+- **归一化**：`ApplyMigrations` 里加一条 —— `PasswordModeDefault` 不是 `new` 就回落 `library`。理由：手改 `settings.json` 写成非法值时，两档 ComboBox 会一个都选不中，那种空态会被当成新引入的 bug。
+- **设置页**（`SettingsWindow.axaml` 密码选项卡）：在既有「密码选项」卡片之后新增第二张同款 `Border` 卡片「密码默认值」，含一个两档 `ComboBox`（`PasswordModeDefaultOptions` + `SelectedPasswordModeDefaultOption`，用设置页既有的 `Option(Display, Value)` 模式）与三个 `CheckBox`，末尾一行 `FontSize=11` 的说明：「只决定压缩设置窗与密码对话框打开时的初始状态；在窗内临时改动仅对本次生效，不会改变这里的默认值。」该页文案一向走 VM 属性而不是 `LocalizedStrings[...]`，六个新属性照此加，并在 `OnCultureChanged` 里登记刷新。
+- **消费端一 —— 压缩设置窗**（`CompressSettingsViewModel`）：默认值加载块（`AppSettings.Load()` 的那个 `try`）里读三项；`-- 关键映射`：「更新匹配规则」与「保存到密码库」在界面上**共用同一个勾选框**（文案由 `SaveCheckLabel` 按密码模式在 `Compress_Pwd_UpdateRules` / `Compress_Pwd_SaveToLibrary` 之间切换），所以 `SaveToLibrary` 要读 `UpdateMatchingRulesByDefault` 而不是想象出来的「SaveToLibraryByDefault」，两个字段不能合并。
+- **消费端二 —— 密码对话框**（`PasswordDialog.axaml.cs`）：构造里 `ApplyDefaultOptions(settings)` 按设置写两个勾选框初值，紧接着显式调一次 `SyncPatternsReadOnly()`；带文件名的构造在 `LoadSavedPasswords()` 之后补一次 `RefreshAutoRules()`。
+- **踩到的真缺陷（只在测试里现形）**：
+  - ① `ApplyRevealState` 里 `RevealEyeIcon.Data = (Geometry?)this.FindResource(...)` —— 无头测试宿主是裸 `Application`，`App.axaml` 的 `ResourceInclude(AppIcons.axaml)` 不生效，`FindResource` 返回 `UnsetValue`，强转直接 `InvalidCastException`。**生产环境不受影响**（资源一定在），因此不改产品代码，新建测试辅助 `AppIconResources` 在用例里临时并入图标字典、`Dispose` 时移除。
+  - ② XAML 里 `AutoGenerateRulesCheck` 的初值本身就是 `True`，构造里再赋 `true` 属于「值没变化」⇒ Avalonia 不触发 `IsCheckedChanged` ⇒ 「默认勾上自动规则」这条路径漏掉规则框的只读态。改成无条件显式 `SyncPatternsReadOnly()`。这类「默认值恰好等于 XAML 初值时事件不触发」的坑，只要逻辑写在 change 事件里就会踩。
+  - ③ 顺带确认：`ApplyDefaultOptions` 执行时 `FileName` 还是空串，`RefreshAutoRules()` 会提前返回，所以带文件名的构造必须再补一次 —— 否则规则框在默认勾选自动规则时是空的。
+- **测试**（新增 `tests/MantisZip.UI.Avalonia.Tests/PasswordDefaultsSettingsTests.cs`，11 例）：出厂默认四值；出厂 json 含四键；非法密码模式归一化；`new` 值被保留；压缩设置窗按设置初始化三项；压缩设置窗内切换不回写设置；密码对话框两个勾选框按设置初始化；默认勾自动规则时按文件名预填规则且只读；对话框内切换不回写设置；设置页 VM 暴露四项；设置页保存后持久化并归一化（用 `vm.SaveCommand.Execute(null)` —— `SettingsWindowViewModel` 没有公开 `Save()`）。
+- **守卫放行**：`设置项接线`（规则 23）把 `SettingsWindowViewModel.cs` 排除在「消费者」之外，所以只做「AppSettings 字段 + 设置页读写」会被判死开关。本次两个消费端真读这些属性，守卫自然通过。
+- **验证**：`-Task build -Target avalonia` 0 警告；`-Task i18n` 三语 1563 key（新增 8 个 `Settings_Pwd_*`）；`-Task guards` 12 项全绿；`-Task test -Target tests` 通过（2 条存量警告）；`-Task test -Target ui-tests` 通过（83.1s，0 警告）。
+- **踩坑（i18n）**：英文文案里写 `Check "Auto-generate rules" by default` 时内部双引号把 JSON 截断（`After parsing a value an unexpected character was encountered: A`），改成 `\(` 转义又报 `Bad JSON escape sequence` —— 最终改成不含引号的 `Auto-generate rules is checked by default` 句式。
+
 **2026-11-27** — issue #92：ZIP + AES 非 ASCII 密码压缩直接失败（占位密码 + 就地换密钥）+ 补 #91 引入的内层压缩方法回归
 
 - **用户指令**（m01824）：「都做」—— 指 A（修 #91 引入的 AES 解密回归）+ B（做 #92 的占位密码换密钥）+ 错误映射一起交付。

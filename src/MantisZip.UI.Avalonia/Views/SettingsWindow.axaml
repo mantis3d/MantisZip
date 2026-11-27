@@ -1532,6 +1532,39 @@
                            Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
               </StackPanel>
             </Border>
+
+            <!-- 密码默认值卡片（issue #87）：只决定「压缩设置窗 / 密码对话框打开时的初始状态」，
+                 窗内的临时改动不回写这里。密码模式用两档下拉而非单选 —— 本页既有语言是 ComboBox。 -->
+            <Border BorderBrush="{DynamicResource ThemeBorderBrush}" BorderThickness="1"
+                    CornerRadius="{DynamicResource BorderRadius}" Padding="{DynamicResource SpacingSmThk}" Background="{DynamicResource ThemeSurfaceBgBrush}">
+              <StackPanel Spacing="{DynamicResource SpacingXs}">
+                <TextBlock Text="{Binding PwdDefaultsSectionText}" FontWeight="SemiBold" />
+                <!-- 默认密码模式：library = 密码库 / new = 新密码 -->
+                <Grid ColumnDefinitions="120,*">
+                  <TextBlock Text="{Binding PwdModeDefaultText}" VerticalAlignment="Center" />
+                  <ComboBox Grid.Column="1" ItemsSource="{Binding PasswordModeDefaultOptions}"
+                            SelectedItem="{Binding SelectedPasswordModeDefaultOption}"
+                            Width="200" HorizontalAlignment="Left">
+                    <ComboBox.ItemTemplate>
+                      <DataTemplate>
+                        <TextBlock Text="{Binding Display}" />
+                      </DataTemplate>
+                    </ComboBox.ItemTemplate>
+                  </ComboBox>
+                </Grid>
+                <CheckBox Content="{Binding PwdAutoRulesDefaultText}"
+                          IsChecked="{Binding AutoGenerateRulesByDefault}" />
+                <CheckBox Content="{Binding PwdUpdateRulesDefaultText}"
+                          IsChecked="{Binding UpdateMatchingRulesByDefault}" />
+                <CheckBox Content="{Binding PwdSavePermanentlyDefaultText}"
+                          IsChecked="{Binding SavePermanentlyByDefault}" />
+                <!-- 说明文案：强调「只是初值」，窗内临时改动不回写 -->
+                <TextBlock Text="{Binding PwdDefaultsHintText}"
+                           FontSize="11"
+                           TextWrapping="Wrap"
+                           Foreground="{DynamicResource ThemeTextSecondaryBrush}" />
+              </StackPanel>
+            </Border>
           </StackPanel>
         </ScrollViewer>
       </TabItem>
