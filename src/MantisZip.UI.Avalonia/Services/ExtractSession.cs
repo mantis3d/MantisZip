@@ -203,9 +203,11 @@ public sealed class ExtractSession : IExtractSession
 
                             // 「包内根目录」四态：按整包条目判定（不能用勾选子集——勾了一半的
                             // 唯一根包，子集里可能就没有根了，判定会与预览树不一致）。
+                            // 确认事务已把预览用的整包条目冻结进载荷，直接用它判定；
+                            // 载荷里没有（如 CLI 直连）才自行列包兜底。
                             var (selectedStripRoot, selectedAddRoot) = await ExtractRootPlan.ResolveAsync(
                                 _getEngine(firstArchive), firstArchive, firstPassword, ct, nameEncoding: null,
-                                settings.RootMode);
+                                settings.RootMode, settings.GetKnownEntries(firstArchive));
 
                             await new SelectedItemsExtractService().ExtractEntriesAsync(
                                 firstArchive,
@@ -248,6 +250,10 @@ public sealed class ExtractSession : IExtractSession
 
                                 try
                                 {
+                                    // 逐包取确认时冻结的条目：多包批处理里每个包各按自己的结构判根，
+                                    // 漏传就会退回「执行段再列一次」的旧路径。
+                                    // 注：实参表里不要写行内 // 注释 —— 源码守卫测试会先把空白（含换行）
+                                    // 压成单空格再配对圆括号，行注释会一路吞到文件末尾导致守卫误报。
                                     await ExtractFlow.ExtractAsync(
                                         archivePath,
                                         settings.DestinationPath,
@@ -259,7 +265,8 @@ public sealed class ExtractSession : IExtractSession
                                         ct,
                                         parallelOverride,
                                         liveConflictPolicy: liveConflictPolicy,
-                                        rootMode: settings.RootMode);
+                                        rootMode: settings.RootMode,
+                                        knownEntries: settings.GetKnownEntries(archivePath));
 
                                     window?.UpdateBatchItemStatus(i, BatchItemStatus.Completed);
                                     succeededArchives.Add(archivePath);
@@ -300,7 +307,8 @@ public sealed class ExtractSession : IExtractSession
                                 ct,
                                 parallelOverride,
                                 liveConflictPolicy: liveConflictPolicy,
-                                rootMode: settings.RootMode);
+                                rootMode: settings.RootMode,
+                                knownEntries: settings.GetKnownEntries(firstArchive));
 
                             succeededArchives.Add(firstArchive);
                         }

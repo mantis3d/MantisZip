@@ -1358,6 +1358,13 @@ public partial class ExtractSettingsViewModel : ObservableObject
             PreserveFullPath = appSettings.ExtractPreserveFullPath,
             // 顶层目录四态：本次选择随载荷走，解析成 strip/add 由执行侧统一做
             RootMode = RootMode,
+            // 预览用的那份条目随载荷一起冻结：根目录四态要判「包是否确有唯一根」，执行段若自己
+            // 再列一遍，TAR/GZ 会白扫一次全流，编码/密码差异还可能列出不同的名字（剥根静默失效）。
+            // 只放校验成功的包；空字典 = 没取到任何条目，执行器按引入本字段前的方式自行列包。
+            KnownEntries = _entriesCache.Count > 0
+                ? new Dictionary<string, IReadOnlyList<ArchiveItem>>(
+                    _entriesCache, StringComparer.OrdinalIgnoreCase)
+                : null,
             // 本次解压的并行度快照（对话框内改动本次生效、不回写全局设置）。
             ParallelOverride = BuildParallelSettings(),
         };

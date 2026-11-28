@@ -215,7 +215,11 @@ public static class ExtractFlow
     /// <param name="rootMode">
     /// 解压端「包内根目录」四态（见 <see cref="RootDirectoryMode"/>）；默认
     /// <see cref="RootDirectoryMode.Original"/> = 与引入本功能前逐字节一致。
-    /// 非原样时本方法自行列一次条目、经 <see cref="ExtractRootPlan"/> 解析出要剥/要加的根段。
+    /// 非原样时由 <see cref="ExtractRootPlan"/> 解析出要剥/要加的根段。
+    /// </param>
+    /// <param name="knownEntries">
+    /// 确认事务冻结下来的整包条目（<see cref="ExtractSettings.KnownEntries"/>）。非空时根策略判定
+    /// 与列表播种都用它，本方法因此<b>一次都不列包</b>；null 时按引入本字段前的方式自行列。
     /// </param>
     /// <exception cref="NotSupportedException">不支持的压缩格式。</exception>
     public static async Task ExtractAsync(
@@ -230,13 +234,15 @@ public static class ExtractFlow
         ParallelExtractSettings? parallelOverride = null,
         string? nameEncoding = null,
         Func<FileConflictAction>? liveConflictPolicy = null,
-        RootDirectoryMode rootMode = RootDirectoryMode.Original)
+        RootDirectoryMode rootMode = RootDirectoryMode.Original,
+        IReadOnlyList<ArchiveItem>? knownEntries = null)
     {
         // 「包内根目录」四态 → 确定指令：智能去根要包确有唯一根、智能加根要包没有唯一根，
-        // 判定靠这次列条目完成（原样模式下不列，零额外开销）。
+        // 判定靠条目完成（原样模式下不列，零额外开销）。有确认时冻结的条目就直接用，
+        // 不再列包 —— 既省掉 TAR/GZ 的一次全流扫描，也保证判定输入与预览完全同源。
         var (stripRoot, addRoot) = await ExtractRootPlan.ResolveAsync(
             ArchiveEngineFactory.GetEngineByExtension(archivePath),
-            archivePath, password, ct, nameEncoding, rootMode);
+            archivePath, password, ct, nameEncoding, rootMode, knownEntries);
 
         var options = SelectedItemsExtractService.CreateExtractOptions(
             conflictAction, conflictDialog, nameEncoding, liveConflictPolicy, stripRoot, addRoot);
@@ -276,8 +282,9 @@ public static class ExtractFlow
         // T9/D7: 列表模式播种（后台列目录 → SeedEntries；不 await，解压不等播种）。
         // TAR/GZ 与非 zip/7z 在 CanSeedEntries 内拦下 → 零 ListEntriesAsync 调用；
         // >5000 条跳过播种转渐进模式。播种结果由 UpdateEntryStatus 的 upsert 兜底。
+        // 有确认时冻结的条目就直接用它播种：与解压同一份数据，连这一次列包也省掉。
         TrySeedEntryItemsInBackground(
-            ProgressWindow.CurrentVisible, archivePath, password, filteredKeys, ct);
+            ProgressWindow.CurrentVisible, archivePath, password, filteredKeys, ct, knownEntries);
 
         // 有过滤条件：仅解压匹配条目（统一入口；无 pathOverrides = 保留完整路径）。
         // 注意用 `!= null` 而非 `is { Count: > 0 }`：过滤激活但零匹配（空列表）也必须走
@@ -480,9 +487,14 @@ public static class ExtractFlow
     /// <remarks>
     /// CLI 批处理直解路径绕过 <see cref="ExtractAsync"/>，需自行调用本方法，故为 internal 而非 private。
     /// </remarks>
+    /// <param name="knownEntries">
+    /// 调用方已持有的整包条目（确认事务冻结的那一份）。非空时直接用它播种、不再列包；
+    /// null 时按原方式后台列目录。
+    /// </param>
     internal static void TrySeedEntryItemsInBackground(
         ProgressWindow? pw, string archivePath, string? password,
-        List<string>? filteredKeys, CancellationToken ct)
+        List<string>? filteredKeys, CancellationToken ct,
+        IReadOnlyList<ArchiveItem>? knownEntries = null)
     {
         if (pw == null)
             return;
@@ -492,6 +504,20 @@ public static class ExtractFlow
             return;
         if (!CanSeedEntries(archivePath, engine))
             return; // TAR/GZ / 非 zip/7z：不产生任何 ListEntriesAsync 调用
+
+        if (knownEntries is { Count: > 0 })
+        {
+            // 已持有条目：同 AllowSeed 阈值与过滤语义，纯内存建行，零 IO。
+            if (knownEntries.Count > MaxSeedEntryCount)
+                return;
+            if (filteredKeys is { Count: 0 })
+                return;
+
+            var rows = BuildSeedRows(knownEntries, filteredKeys);
+            if (rows.Count > 0)
+                pw.SeedEntries(rows);
+            return;
+        }
 
         _ = SeedEntryItemsAsync(pw, engine, archivePath, password, filteredKeys, ct);
     }

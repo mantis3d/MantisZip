@@ -60,11 +60,19 @@ public static class ExtractRootPlan
     }
 
     /// <summary>
-    /// 与 <see cref="Resolve"/> 相同，但自己去列一次条目。
+    /// 与 <see cref="Resolve"/> 相同，但在没有现成条目时自己去列一次。
     /// </summary>
     /// <remarks>
+    /// <para>
     /// 三条执行链（整包 / 过滤 / 选中条目）都要判「包有没有唯一根」，各写一次就等于三个判定点
     /// 迟早不一致；统一从这里进。原样模式直接短路，不列条目、零额外开销。
+    /// </para>
+    /// <para>
+    /// <paramref name="knownEntries"/> 非空时直接用这批条目判定，<b>不再列包</b>：确认事务已经把
+    /// 「用户当时看到的条目」冻结进载荷（<see cref="Models.ExtractSettings.KnownEntries"/>），
+    /// 执行段再列一次既慢又可能因编码/密码差异列出一份不同的名字，反倒让「预览 = 实际」漂移。
+    /// 对 TAR/GZ 尤其关键 —— 它们的 <c>ListEntriesAsync</c> 是全流扫描，成本≈解压一次。
+    /// </para>
     /// </remarks>
     public static async Task<(string? StripRoot, string? AddRoot)> ResolveAsync(
         IArchiveEngine? engine,
@@ -72,9 +80,16 @@ public static class ExtractRootPlan
         string? password,
         CancellationToken cancellationToken,
         string? nameEncoding,
-        RootDirectoryMode mode)
+        RootDirectoryMode mode,
+        IReadOnlyList<ArchiveItem>? knownEntries = null)
     {
-        if (mode == RootDirectoryMode.Original || engine == null)
+        if (mode == RootDirectoryMode.Original)
+            return (null, null);
+
+        if (knownEntries is { Count: > 0 })
+            return Resolve(mode, knownEntries, archivePath);
+
+        if (engine == null)
             return (null, null);
 
         var entries = await engine.ListEntriesAsync(archivePath, password, cancellationToken, nameEncoding);

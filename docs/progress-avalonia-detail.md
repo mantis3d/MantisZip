@@ -6,6 +6,17 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-28** — 根目录四态计划审查后修两处：压缩播种 Key 的时间戳同源 + 解压复用确认时冻结的条目
+
+- **起因**（m00001）：用户「你看看这项目，刚刚完成了 `.omo/plans/已完成/compress-extract-root-mode.md` 这个计划，你看看有没有什么问题，然后跟我讨论」。全量审查后按严重度列了清单，用户拍板本轮只修两项，其余先不动。
+- **① 压缩端播种 Key 与引擎上报不同源**（`src/MantisZip.UI.Avalonia/Services/CompressFlow.cs` 的 `SeedEntryItemsAsync`）：`SourceEntryEnumerator.Enumerate(...)` 的实参只传到第 6 个 `archivePath`，第 7 个 `wrapTimestamp` 一直是缺省 ⇒ `ArchiveRootPolicy.ResolveWrapName` 里 `timestamp ?? DateTime.Now` 另取当前时间；而载荷里的 `TemplateTimestamp` 是对话框打开时冻结的批级时间戳（`CompressSettingsViewModel._templateTimestamp`）。根名含 `{date}` / `{datetime}` 且跨午夜时，播种 Key 与引擎上报的条目名差一天/一秒。注意症状不是「卡在 Pending 不动」而是**多出一行永远 Pending 的幽灵行** —— `ProgressViewModel.UpdateEntryStatus` 按 `ArchivePath.Normalize(entryKey)` 查不到时会 upsert 新建行。修法：补传 `request.TemplateTimestamp`。
+- **② 解压执行段重复列包**：三条执行链（整包 / 过滤 / 选中条目）都先走 `ExtractRootPlan.ResolveAsync` 自行 `ListEntriesAsync` 判「包是否确有唯一根」，随后列表播种又会再列一次；对 TAR/GZ 这类 `ListEntriesAsync` 是全流扫描的格式，一次判定≈再解压一遍。修法：确认事务把**预览用的那份条目**冻结进载荷 —— `ExtractSettings.KnownEntries`（`压缩包路径 → 条目`，OrdinalIgnoreCase 浅拷贝）+ `GetKnownEntries(archivePath)`；`ExtractRootPlan.ResolveAsync` 加末位可选参 `knownEntries`，非空直接走纯函数 `Resolve`；`ExtractFlow.ExtractAsync`、`ExtractSession` 三条分支全部透传；`ExtractFlow.TrySeedEntryItemsInBackground` 同期改成「已持有条目就纯内存建行」，保留 5000 行阈值与过滤语义。
+- **载荷边界为什么没破**：`ExtractSettings` 类注释原本写死「解析结果是包内容的函数，不该进载荷」。这次进载荷的是**解析输入**（用户确认那一刻看到的整包条目），不是解析结论 —— 结论可以随时从同一份输入重算；两条注释都已改写说明这个区别。
+- **踩到的守卫坑**：`ExtractParallelDegreeWiringTests.ExtractSeam_CarriesParallelOverrideIntoSession` 会先把源码 `\s+` 压成单空格再配对圆括号，所以实参表里写行内 `//` 注释会被压成一行、一路吞到文件尾，报「未找到与下标 xxx 处的 '(' 配对的 ')'」。修法：注释挪到实参表上方，并在调用点补一句「实参表里别写行内注释」的注记。
+- **测试**：`tests/MantisZip.Tests/Services/SourceEntryEnumeratorTests.cs` 新增 `Enumerate_WrapTimestamp_IsUsedForRootNameTemplate`（`AlwaysWrap` + `wrapRoot: "pack_{date}"` + `wrapTimestamp: 2001-02-03` → Key 必须是 `pack_2001-02-03/ts/a.txt`；首版按 `pack_2001-02-03/a.txt` 写，实际目录源先带自己的目录名，已按引擎 `BuildSourceRelativeKey` 的同序修正）；`tests/MantisZip.UI.Avalonia.Tests/ExtractSettingsSeamTests.cs` 新增 `ConfirmTransaction_FreezesKnownEntries`（走过的包能取回条目、没走过的包必须 null，否则会拿别人的结构判根），并在既有 `ConfirmTransaction_CarriesEveryExecutionSetting` 补 `Assert.Null(settings.KnownEntries)` 与 `Assert.Null(settings.GetKnownEntries(...))`。
+- **验证**：`-Task build -Target avalonia` 0 警告；`-Task test -Target tests` 通过（1437 例，2 条存量警告）；`-Task test -Target ui-tests` 通过（1066 例）；`-Task guards` 12 项全绿；`-Task check` 版本 0.5.8 六处一致、三语 1563 key。
+- **顺手清掉**：两份早前导出的上下文转储 `.omo/tmp-b6.txt` / `.omo/tmp-b7.txt`（工具输出原文，未跟踪）。
+
 **2026-11-27** — issue #87：密码相关默认值可配置（加密模式 / 自动生成规则 / 更新匹配规则 / 永久保存）
 
 - **用户指令**（m02308）：「写计划吧，算在v0.5.8里面，写完就开工吧」—— 原定 v0.5.9 的碎片清仓被提前并入 v0.5.8 作为第四项。

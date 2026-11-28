@@ -54,6 +54,31 @@ public sealed class SourceEntryEnumeratorTests : IDisposable
         Assert.Equal(7, only.Size);
     }
 
+    /// <summary>
+    /// 根名模板的批级时间戳必须由调用方传入（而不是枚举器自己取 <c>DateTime.Now</c>）：
+    /// 播种用的 Key 与压缩引擎上报的条目名必须逐字符一致，否则进度列表会多出永远 Pending 的幽灵行。
+    /// 这里用一个明显落在过去的固定日期断言「传进来的时间戳真的被用上了」。
+    /// </summary>
+    [Fact]
+    public void Enumerate_WrapTimestamp_IsUsedForRootNameTemplate()
+    {
+        var dir = Path.Combine(_root, "ts");
+        Directory.CreateDirectory(dir);
+        File.WriteAllBytes(Path.Combine(dir, "a.txt"), new byte[5]);
+
+        var items = SourceEntryEnumerator.Enumerate(
+            new[] { dir },
+            rootMode: MantisZip.Core.Utils.RootDirectoryMode.AlwaysWrap,
+            wrapRoot: "pack_{date}",
+            wrapTimestamp: new DateTime(2001, 2, 3));
+
+        var only = Assert.Single(items);
+        // 目录源先带自己的目录名（ts/），再由加根策略整体套上 wrap 层 —— 与 SevenZipEngine 的
+        // BuildSourceRelativeKey 同序（先 Path.Combine(源目录名, 相对路径) 再 Apply）。
+        Assert.Equal("pack_2001-02-03/ts/a.txt", only.Key);
+        Assert.Equal("a.txt", only.Name);
+    }
+
     [Fact]
     public void Enumerate_Whitelist_FiltersFiles()
     {

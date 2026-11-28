@@ -138,10 +138,36 @@ public sealed record ExtractSettings
     /// <para>
     /// 执行器读它、结合「包是否确有唯一根」解析出要剥的根段 / 要加的根段，再交给
     /// <c>ExtractPathResolver</c> 与 <c>EntryOutputPath</c>。这里只存「用户选了什么」，
-    /// 不存解析结果 —— 解析结果是包内容的函数，不该进载荷。
+    /// 不存解析结果 —— 解析结果可以随时从 <see cref="KnownEntries"/> 重算（同一份输入 ⇒ 同一个结论），
+    /// 存进来只会多一份会过期的副本。见 <see cref="KnownEntries"/> 为何条目本身进了载荷。
     /// </para>
     /// </summary>
     public MantisZip.Core.Utils.RootDirectoryMode RootMode { get; init; } = MantisZip.Core.Utils.RootDirectoryMode.Original;
+
+    /// <summary>
+    /// 确认那一刻用户实际看到的整包条目（压缩包路径 → 条目，大小写不敏感）。
+    /// <para>
+    /// 为什么「解析结果」这次可以进载荷：根目录四态要判「包是否确有唯一根」，而这份判定必须是
+    /// **预览用的那一批条目**。执行段自己再列一遍，轻则白扫一次（TAR/GZ 的
+    /// <c>ListEntriesAsync</c> 是全流扫描，成本≈解压一次），重则因编码/密码差异列出一份不同的
+    /// 名字，剥根前缀匹配不上 → 用户在界面上选的那一档静默不生效。所以这里冻结的不是
+    /// 「解析结论」，而是预览与执行共用的**输入**。
+    /// </para>
+    /// <para>
+    /// <c>null</c> 或缺项 = 该包没取到条目（校验失败 / CLI 直连路径），执行器自行列包兜底。
+    /// </para>
+    /// </summary>
+    public IReadOnlyDictionary<string, IReadOnlyList<ArchiveItem>>? KnownEntries { get; init; }
+
+    /// <summary>
+    /// 取某个包在确认时已知的条目；没有则返回 <c>null</c>（调用方自行列包，行为与引入本字段前一致）。
+    /// </summary>
+    public IReadOnlyList<ArchiveItem>? GetKnownEntries(string archivePath)
+        => KnownEntries is { Count: > 0 } map
+           && map.TryGetValue(archivePath, out var entries)
+           && entries is { Count: > 0 }
+            ? entries
+            : null;
 
     /// <summary>
     /// 由已有字段推导的条目范围，供执行器与调用方以同一口径判决。
