@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light" data-view="full" data-state="running" data-scene="multi" data-76="off">
+<html lang="zh-CN" data-theme="light" data-view="full" data-state="running" data-scene="multi" data-flow="compress" data-width="800" data-76="off" data-cpos="mode" data-fill="info" data-allrow="size" data-lite="off" data-listcards="filters">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>进度窗口原型 · issue #81 改造后（整窗）</title>
+<title>进度窗口原型 · issue #81 改造后（整窗 · 全交互）</title>
 <style>
 /* ══════════════════════════════════════════════════════════════
    配色：直接取 ThemeLight.axaml / ThemeDark.axaml 的真实键值
@@ -14,11 +14,12 @@ html[data-theme="light"]{
   --progress:#2196F3; --progress-bg:#C8C8C8;
   --ok:#4CAF50; --err:#F44336; --warn:#FFE082; --accent:#60B8FC;
   --page-bg:#F0F2F5; --page-fg:#303030;
-  --card-bg:rgba(255,255,255,.82);
   --fill35:rgba(33,150,243,.35);
-  --fill35warn:rgba(255,224,130,.55);
-  --fill35ok:rgba(76,175,80,.16);
-  --fill35err:rgba(244,67,54,.16);
+  --fill35warn:rgba(255,179,0,.30);
+  --fill35ok:rgba(76,175,80,.20);
+  --fill35err:rgba(244,67,54,.20);
+  --fill35off:rgba(158,158,158,.20);
+  --tint:rgba(96,184,252,.16);
 }
 html[data-theme="dark"]{
   --win-bg:#1E1E1E; --surface:#252525; --panel:#3E3E3E; --border:#3E3E3E;
@@ -26,11 +27,12 @@ html[data-theme="dark"]{
   --progress:#64B5F6; --progress-bg:#555555;
   --ok:#66BB6A; --err:#EF5350; --warn:#B08A2E; --accent:#0078D4;
   --page-bg:#141414; --page-fg:#D8D8D8;
-  --card-bg:rgba(37,37,37,.82);
   --fill35:rgba(100,181,246,.35);
-  --fill35warn:rgba(176,138,46,.55);
-  --fill35ok:rgba(102,187,106,.16);
-  --fill35err:rgba(239,83,80,.16);
+  --fill35warn:rgba(255,193,7,.26);
+  --fill35ok:rgba(102,187,106,.22);
+  --fill35err:rgba(239,83,80,.24);
+  --fill35off:rgba(160,160,160,.22);
+  --tint:rgba(0,120,212,.22);
 }
 
 *{box-sizing:border-box}
@@ -40,9 +42,10 @@ body{
   background:var(--page-bg); color:var(--page-fg); font-size:13px;
 }
 h1{font-size:17px; margin:0 0 4px}
-.sub{margin:0 0 14px; color:#888; font-size:12px; line-height:1.6}
+.sub{margin:0 0 14px; color:#888; font-size:12px; line-height:1.7}
 h2{font-size:14px; margin:34px 0 10px; padding-bottom:6px; border-bottom:1px solid rgba(128,128,128,.3)}
 h3{font-size:12.5px; margin:18px 0 8px; color:#888}
+.muted{color:#888}
 
 /* ── 顶部控制条 ───────────────────────────────────────────── */
 .ctrl{
@@ -62,8 +65,11 @@ h3{font-size:12.5px; margin:18px 0 8px; color:#888}
   background:var(--accent); color:#fff; border-color:transparent; font-weight:600;
 }
 .ctrl label{display:flex; gap:5px; align-items:center; font-size:11.5px; color:var(--text2); cursor:pointer}
+.ctrl input[type=range]{accent-color:var(--accent); width:130px}
 
-/* ── 窗口外壳 ─────────────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════════
+   窗口外壳
+   ══════════════════════════════════════════════════════════════ */
 .stage{display:flex; gap:24px; align-items:flex-start; flex-wrap:wrap}
 .win{
   width:800px; max-width:100%;
@@ -73,8 +79,8 @@ h3{font-size:12.5px; margin:18px 0 8px; color:#888}
   box-shadow:0 8px 28px rgba(0,0,0,.16);
   color:var(--text);
 }
-.win.narrow{width:560px}
-.win.tiny{width:500px}
+html[data-width="560"] .win{width:560px}
+html[data-width="500"] .win{width:500px}
 .titlebar{
   display:flex; align-items:center; gap:8px;
   height:30px; padding:0 10px;
@@ -85,7 +91,7 @@ h3{font-size:12.5px; margin:18px 0 8px; color:#888}
 .titlebar .dots i{width:9px; height:9px; border-radius:50%; background:var(--border); display:block}
 
 /* RootGrid：Margin=SpacingMd → 12px；RowSpacing=SpacingXs → 4px */
-.root{display:flex; flex-direction:column; gap:4px; padding:12px}
+.root{display:flex; flex-direction:column; gap:4px; padding:12px; position:relative}
 
 /* ── Row 0 批处理区 ───────────────────────────────────────── */
 .batch{
@@ -96,12 +102,16 @@ h3{font-size:12.5px; margin:18px 0 8px; color:#888}
 .batch-head{display:flex; justify-content:space-between; align-items:baseline; padding:0 2px}
 .batch-head .t{font-size:12px; font-weight:600}
 .batch-head .n{font-size:11px; color:var(--text2)}
+html[data-scene="single"] .batch-head{display:none}
 .batch-list{display:flex; flex-direction:column; gap:2px}
 .brow{
   display:grid; grid-template-columns:16px 1fr auto auto; gap:8px;
   align-items:center; padding:3px 4px; border-radius:3px;
   min-height:26px; position:relative; overflow:hidden;
+  cursor:pointer; border:1px solid transparent;
 }
+.brow:hover{background:var(--tint)}
+.brow.sel{border-color:var(--accent); background:var(--tint)}
 .brow .fillbg{
   position:absolute; inset:0; z-index:0;
   background:linear-gradient(to right, var(--fill35) var(--w,0%), transparent var(--w,0%));
@@ -116,8 +126,14 @@ h3{font-size:12.5px; margin:18px 0 8px; color:#888}
 .brow .errmsg{font-size:11px; color:var(--err); max-width:300px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
 .brow .badge{
   font-size:10.5px; color:var(--text2); border:1px solid var(--border);
-  border-radius:3px; padding:0 4px; line-height:15px;
+  border-radius:3px; padding:0 4px; line-height:15px; cursor:pointer;
 }
+.brow .badge:hover{border-color:var(--accent); color:var(--text)}
+html[data-scene="single"] .brow.extra{display:none}
+html[data-scene="single"] .brow{padding:1px 4px}
+html[data-scene="single"] .brow .sub{display:none}
+/* B 项「百分比只出现一次」：单包时行内百分比也藏掉，只留底部合并行右侧那个 */
+html[data-scene="single"] .brow .pct{display:none}
 
 /* 状态图标（改造：emoji → PathIcon） */
 svg.ic{width:16px; height:16px; display:block; flex:none}
@@ -127,27 +143,40 @@ svg.ic.sm{width:14px; height:14px}
 .i-ok{color:var(--ok)}
 .i-fail{color:var(--err)}
 .i-skip{color:#00BCD4}
+.i-ovr{color:#FB8C00}
 
-/* ── Row 1 视图切换：两行合一行五档 ───────────────────────── */
-.mode{display:flex; gap:10px; align-items:center; justify-content:center; white-space:nowrap; flex-wrap:wrap}
+/* ── Row 1 视图切换：两行合一行五档（可点）──────────────────
+   左边「视图」标签与分段捆成一个整体，用 `1fr auto 1fr` 三列的中列承载 ⇒ 整体严格居中；
+   右边那列（也是 1fr）放冲突下拉并右对齐，冲突控件的存在不会把分段挤歪。
+   不用 flex 的原因：flex 里要么分段靠左、要么被右侧控件撑歪，只有等分三列能真居中。 */
+.mode{
+  display:grid; grid-template-columns:1fr auto 1fr; gap:10px; align-items:center;
+  white-space:nowrap;
+}
 .mode .lbl{font-size:12px; color:var(--text2)}
+.mode .segwrap{grid-column:2; display:flex; gap:10px; align-items:center}
+.mode .mount{grid-column:3; justify-self:end}
 .mode .seg{
   display:inline-flex; border:1px solid var(--border); border-radius:4px; overflow:hidden;
 }
-.mode .seg span{
-  font-size:11.5px; padding:2px 11px; color:var(--text2); cursor:default;
-  border-right:1px solid var(--border);
+.mode .seg button{
+  font:inherit; font-size:11.5px; padding:2px 11px; color:var(--text2);
+  background:transparent; border:0; border-right:1px solid var(--border); cursor:pointer;
 }
-.mode .seg span:last-child{border-right:0}
-html[data-view="minimal"] .mode .seg span[data-v="minimal"],
-html[data-view="standard"] .mode .seg span[data-v="standard"],
-html[data-view="detailed"] .mode .seg span[data-v="detailed"],
-html[data-view="full"] .mode .seg span[data-v="full"],
-html[data-view="list"] .mode .seg span[data-v="list"]{
+.mode .seg button:last-child{border-right:0}
+/* ⑤ 已定：「列表」不在「信息量递增」这条轴上，用一道更重的分隔线把它与前四档分开 */
+.mode .seg button[data-v="full"]{border-right:1px solid var(--text2); padding-right:14px}
+.mode .seg button[data-v="list"]{padding-left:14px}
+.mode .seg button:hover{background:var(--tint); color:var(--text)}
+html[data-view="minimal"]  .mode .seg button[data-v="minimal"],
+html[data-view="standard"] .mode .seg button[data-v="standard"],
+html[data-view="detailed"] .mode .seg button[data-v="detailed"],
+html[data-view="full"]     .mode .seg button[data-v="full"],
+html[data-view="list"]     .mode .seg button[data-v="list"]{
   background:var(--accent); color:#fff; font-weight:600;
 }
 
-/* ── Row 2 内容区 ─────────────────────────────────────────── */
+/* ── Row 2 内容区（三面板互斥）────────────────────────────── */
 .panel{display:none}
 html[data-view="minimal"] .panel.simple,
 html[data-view="standard"] .panel.simple{display:block}
@@ -160,12 +189,16 @@ html[data-view="list"] .panel.list{display:block}
 .simple .row2{display:flex; justify-content:space-between; font-size:11px; color:var(--text2); margin-bottom:3px}
 .bar{height:22px; border-radius:3px; background:var(--progress-bg); overflow:hidden}
 .bar > i{display:block; height:100%; background:var(--progress); border-radius:3px}
+html[data-state="done"] .bar > i{background:var(--ok)}
+html[data-state="fail"] .bar > i{background:var(--err)}
+html[data-state="cancel"] .bar > i{background:var(--text2)}
+html[data-state="paused"] .bar > i{opacity:.5}
 
 .dwrap{
   border:1px solid var(--border); border-radius:4px; padding:2px;
   display:flex; flex-direction:column; gap:2px;
 }
-.dhdr{font-size:10px; font-weight:600; color:var(--text2); padding:1px 3px}
+.dhdr{font-size:10px; font-weight:600; color:var(--text2); padding:1px 3px; display:flex; justify-content:space-between}
 .drow{
   display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center;
   padding:2px 4px; border-radius:3px; position:relative; overflow:hidden;
@@ -180,59 +213,189 @@ html[data-view="list"] .panel.list{display:block}
 .dright{display:flex; gap:8px; align-items:center; font-size:10.5px; color:var(--text2); white-space:nowrap}
 .dright b{font-weight:600; color:var(--text)}
 
-.list .lrow{display:flex; justify-content:space-between; font-size:11.5px; padding:2px 4px; border-bottom:1px solid rgba(128,128,128,.12)}
+/* 列表档（可过滤） */
+.llist{display:flex; flex-direction:column; max-height:150px; overflow-y:auto; position:relative}
+.lrow{
+  display:grid; grid-template-columns:16px 1fr 60px auto; gap:8px; align-items:center;
+  min-height:24px; padding:2px 4px; border-radius:3px;
+  border-bottom:1px solid rgba(128,128,128,.12); font-size:11.5px; cursor:pointer;
+}
+.lrow:hover{background:var(--tint)}
+.lrow.hide{display:none}
+.lrow .ln{overflow:hidden; text-overflow:ellipsis; white-space:nowrap}
+.lrow .ls{font-size:11px; color:var(--text2); text-align:right; font-variant-numeric:tabular-nums}
+.lrow .lt{font-size:11px; text-align:right; white-space:nowrap}
+.lrow.fail .lt{color:var(--err)} .lrow.skip .lt{color:#00BCD4}
+.lrow.ovr .lt{color:#FB8C00} .lrow.done .lt{color:var(--ok)}
+.lrow.pend .lt,.lrow.run .lt{color:var(--text2)}
+.lempty{
+  display:none; padding:16px 8px; text-align:center; font-size:12px; color:var(--text2);
+}
+.lempty.show{display:block}
+.lempty button{
+  margin-left:8px; font:inherit; font-size:11.5px; padding:2px 10px; cursor:pointer;
+  background:var(--btn-bg); color:var(--text); border:1px solid var(--border); border-radius:4px;
+}
 
-/* ── Row 3 信息区 ─────────────────────────────────────────── */
+/* ── Row 3 信息区（底纹进度条挂这一整块）──────────────────── */
 .info{
-  display:flex; flex-direction:column; gap:8px;
+  position:relative; overflow:hidden;
+  display:flex; flex-direction:column; gap:6px;
   background:var(--panel); border:1px solid var(--border);
   border-radius:4px; padding:8px;
+  --w:31%;
 }
-.info-head{display:grid; grid-template-columns:1fr auto; gap:8px; align-items:center}
-.conflict{display:flex; gap:6px; align-items:center; font-size:11.5px; color:var(--text2)}
+.info > *:not(.fill){position:relative; z-index:1}
+.info > .fill{
+  position:absolute; inset:0; z-index:0;
+  width:var(--w,31%); background:var(--fill35);
+  transition:width .3s ease, background-color .25s ease, opacity .25s ease;
+  pointer-events:none;
+}
+.conflict{display:flex; gap:6px; align-items:center; font-size:11.5px; color:var(--text2); position:relative}
 .conflict .combo{
-  display:inline-flex; align-items:center; gap:10px;
+  display:inline-flex; align-items:center; gap:10px; cursor:pointer;
   min-width:132px; height:28px; padding:0 8px;
   background:var(--surface); border:1px solid var(--border); border-radius:4px;
   font-size:12px; color:var(--text);
 }
 .conflict .combo::after{content:"▾"; color:var(--text2); margin-left:auto}
-
-/* 统计卡行：底纹承载进度（本次改造核心） */
-.stats{
-  position:relative; overflow:hidden;
-  background:var(--surface); border-radius:4px; padding:8px;
-  display:flex; flex-direction:column; gap:6px;
+.conflict .combo[aria-disabled="true"]{opacity:.5; cursor:not-allowed}
+.conflict .popup{
+  display:none; position:absolute; top:30px; right:0; z-index:20;
+  min-width:150px; padding:4px;
+  background:var(--surface); border:1px solid var(--border); border-radius:4px;
+  box-shadow:0 6px 18px rgba(0,0,0,.22);
 }
-.stats .fill{
-  position:absolute; inset:0; width:0;
-  background:var(--fill35);
-  transition:width .35s ease, background-color .25s ease;
+/* 冲突下拉默认挂在 Row 1 视图切换右侧（#conflictMount），不再独占信息区首行。
+   500 宽实测仍能一行放下（视图段 ~195px + 冲突 ~197px，内容区约 468px），故不设折行兜底。 */
+.conflict .popup.open{display:block}
+.conflict .popup button{
+  display:block; width:100%; text-align:left; font:inherit; font-size:12px;
+  padding:3px 8px; border:0; border-radius:3px; cursor:pointer;
+  background:transparent; color:var(--text);
+}
+.conflict .popup button:hover{background:var(--tint)}
+.conflict .popup button[aria-selected="true"]{background:var(--accent); color:#fff}
+.conflict .popup button:disabled{opacity:.4; cursor:not-allowed}
+
+/* 统计卡行（完整档 10 张只读 / 列表档 5 张可点） */
+.stats{background:var(--surface); border-radius:4px; padding:6px 8px; display:flex; flex-direction:column; gap:4px; position:relative; overflow:hidden}
+.stats > *:not(.fill2){position:relative; z-index:1}
+/* ③ 对比用：底纹「只挂卡片行」时的那一层（默认隐藏，挂整块时由 .info > .fill 承担）*/
+.stats > .fill2{
+  position:absolute; inset:0; z-index:0; display:none;
+  width:var(--w,31%); background:var(--fill35);
+  transition:width .3s ease, background-color .25s ease, opacity .25s ease;
   pointer-events:none;
 }
-.stats > *:not(.fill){position:relative; z-index:1}
-.cards{display:flex; flex-wrap:wrap; gap:4px 8px; justify-content:center}
+html[data-fill="cards"] .info > .fill{display:none}
+html[data-fill="cards"] .stats > .fill2{display:block}
+html[data-view="minimal"] .stats,
+html[data-view="standard"] .stats,
+html[data-view="detailed"] .stats{display:none}
+.cards{display:flex; flex-wrap:wrap; gap:6px 4px; justify-content:center; align-items:stretch}
+/* ② 已定：真机用 WrapPanel.ItemSpacing = SpacingXxs（2/4/6）+ LineSpacing（Normal 档 = 4/6）
+   还原后一行 9 张卡 = 648 + 8×4 = 680px < 可用 718px，三档紧凑度都不换行 */
 .card{
   flex:0 1 72px; min-width:72px; text-align:center;
-  display:flex; flex-direction:column; gap:1px;
-  line-height:1.3;
+  display:flex; flex-direction:column; gap:1px; line-height:1.3;
+  padding:1px 4px; border:1px solid transparent; border-radius:4px;
+  font:inherit; background:transparent; color:var(--text);
 }
+.cards.ro .card{cursor:default}
+.cards.click .card{cursor:pointer}
+.cards.click .card:hover{background:var(--tint)}
+.cards.click .card[aria-pressed="true"]{border-color:var(--accent); background:var(--tint)}
 .card .ci{font-size:0; line-height:0; display:flex; justify-content:center; margin-bottom:1px}
 .card .ci svg{width:14px; height:14px; color:var(--text2)}
 .card .cl{font-size:10.5px; color:var(--text2); white-space:nowrap}
 .card .cv{font-size:13px; font-weight:600; white-space:nowrap}
-.card .cs{font-size:11.5px; color:var(--text2); white-space:nowrap}
-.card.hide{display:none}
+.card .cs{font-size:11px; color:var(--text2); white-space:nowrap}
+html[data-view="full"] .cards.click{display:none}
+html[data-view="list"] .cards.ro{display:none}
+/* ── 列表档卡片行的三种形态（data-listcards）──────────────────────
+   filters：只有 5 张可点过滤卡（现状，信息损失最多）
+   both   ：上行 5 张可点卡做过滤 + 下行 5 张只读卡补回被丢的指标（推荐）
+   full   ：13 张只读卡一行（信息全回来，但没有过滤入口了，用来对比）*/
+.cards.ro.lilist{display:none}
+html[data-view="list"][data-listcards="both"] .cards.ro.lilist{display:flex}
+html[data-view="list"][data-listcards="full"] .cards.ro{display:flex}
+html[data-view="list"][data-listcards="full"] .cards.click{display:none}
+html[data-view="list"][data-listcards="full"] .cards.ro.lilist{display:none}
+/* 一行混排：5 张可点卡 + 1px 竖分隔 + 3 张只读卡，总宽 8×72 + 7×4 = 604px < 可用 718px，
+   不占额外高度，也不需要第二行。 */
+.cards.click .sep{width:1px; align-self:stretch; background:var(--border); margin:2px 4px; flex:0 0 1px}
+/* 500 宽：八张卡按可用宽度平分（每张约 54px），而不是保持 72px 定宽后折行。
+   卡片本来就是 3 行竖排（标题 / 数量 / 大小），宽度不到 72px 也不会截断文字。 */
+html[data-width="500"] .cards .card{flex:1 1 0; min-width:0; padding:1px 2px}
+html[data-width="500"] .card .cv{font-size:12px}
+html[data-width="500"] .card .cl,
+html[data-width="500"] .card .cs{font-size:9.5px}
+html[data-listcards="filters"] .cards.click .sep,
+html[data-listcards="filters"] .cards.click .linfo,
+html[data-listcards="both"] .cards.click .sep,
+html[data-listcards="both"] .cards.click .linfo,
+html[data-listcards="full"] .cards.click .sep,
+html[data-listcards="full"] .cards.click .linfo{display:none}
+html[data-listcards="oneline"] .cards.click .sep,
+html[data-listcards="oneline"] .cards.click .linfo{display:flex}
+/* 轻量档卡片行（data-lite="on" 时给极简/标准/详细也放卡片，把 footer 里的
+   「已处理 / 总大小」升级成同构卡片；同时撤掉独立总条，让底纹单独承担进度） */
+.stats.lite{display:none}
+/* 轻量档只有 2-4 张卡，若按 72px 定宽会缩在左边一小截，底纹也跟着只有一小截 ⇒
+   让它们 flex:1 平分整行，底纹才能读成「一根进度条」 */
+.stats.lite .cards .card{flex:1 1 0; min-width:0}
+/* 三档卡片数量：极简 3 / 标准 8 / 详细 9
+   详细档把「并行」换成「跳过 / 出错」—— 内容区标题已经写着「并行通道（4）」，
+   而逐行视图只显示正在跑的通道，出问题的文件反而看不见，所以异常计数更该在这里。 */
+html[data-view="minimal"]  .stats.lite .card:nth-child(n+4){display:none}
+html[data-view="standard"] .stats.lite .card:nth-child(n+9){display:none}
+html[data-view="detailed"] #liteParCard{display:none}
+/* 500 宽：八张卡按 4+4 折两行（数值不被截断，窗口高 +26px）。
+   真机用 WrapPanel 会自然折行，这里用 data-width 模拟同一行为。 */
+html[data-width="500"] .stats.lite .cards .card{flex:1 1 calc(25% - 3px); min-width:0}
+/* 极简档只留三项：进度 / 已用 / 剩余（数据类与性能类属于「多出来的信息」，
+   与极简的原意冲突）—— 截断规则见下方「三档卡片数量」 */
+html[data-lite="on"][data-view="minimal"] .stats.lite,
+html[data-lite="on"][data-view="standard"] .stats.lite,
+html[data-lite="on"][data-view="detailed"] .stats.lite{display:flex}
+html[data-lite="on"][data-view="minimal"] .totalbar,
+html[data-lite="on"][data-view="standard"] .totalbar,
+html[data-lite="on"][data-view="detailed"] .totalbar{display:none}
+/* 百分比 / 已用 / 剩余搬进卡片之后，底部合并行整条没有存在理由 ⇒ 整条隐藏。
+   信息区只剩「底纹 + 一行卡片」，与完整 / 列表档是同一套表达。 */
+html[data-lite="on"][data-view="minimal"] .foot,
+html[data-lite="on"][data-view="standard"] .foot,
+html[data-lite="on"][data-view="detailed"] .foot{display:none}
 
-html[data-view="minimal"] .stats,
-html[data-view="standard"] .stats,
-html[data-view="detailed"] .stats{display:none}
-html[data-view="minimal"] .foot .meta{display:none}
-/* 完整 / 列表档：已处理与总大小已在统计卡里，底部不再重复 */
-html[data-view="full"] #m-processed,
-html[data-view="full"] #m-total,
-html[data-view="list"] #m-processed,
-html[data-view="list"] #m-total{display:none}
+/* 卡片接管后，底部左元信息整条让位 —— 否则「并行 / 速度」会在卡片与底行各出现一次
+   （这正是 issue #81 B 项要治的「同一信息两处重复」）*/
+html[data-lite="on"][data-view="minimal"] .foot .meta,
+html[data-lite="on"][data-view="standard"] .foot .meta,
+html[data-lite="on"][data-view="detailed"] .foot .meta{display:none}
+
+/* #76 三项统计：压缩前 / 压缩后 / 压缩率 取代「总大小」 */
+html[data-76="on"] #card-total{display:none}
+html[data-76="off"] #card-before,
+html[data-76="off"] #card-after,
+html[data-76="off"] #card-ratio{display:none}
+/* 「暂存」只出现在解压流程（7z 固实包解码暂存），压缩流程隐藏 */
+html[data-flow="compress"] #card-staged{display:none}
+
+/* 段 3：终态汇总（仅完整/列表档 + 终态） */
+.done3{
+  display:none; justify-content:center; gap:14px; flex-wrap:wrap;
+  font-size:12px; color:var(--text); padding-top:2px;
+}
+html[data-view="full"] .done3,
+html[data-view="list"] .done3{display:flex}
+html[data-state="running"] .done3,
+html[data-state="paused"] .done3,
+html[data-state="prepare"] .done3,
+html[data-state="scan"] .done3{display:none!important}
+.done3 span{display:inline-flex; gap:3px; align-items:center; white-space:nowrap}
+.done3 b{font-weight:600}
 
 /* 底部合并行：左元信息 + 右进度/时间 */
 .foot{display:flex; justify-content:space-between; align-items:center; gap:12px; font-size:12px}
@@ -240,17 +403,39 @@ html[data-view="list"] #m-total{display:none}
 .foot .meta span{display:inline-flex; gap:4px; align-items:center; white-space:nowrap}
 .foot .meta svg{width:13px; height:13px}
 .foot .right{display:flex; gap:12px; align-items:center; white-space:nowrap}
-.foot .pct{font-size:13px; font-weight:700; color:var(--text)}
+.foot .pct{font-size:13px; font-weight:700; color:var(--text); font-variant-numeric:tabular-nums}
 .foot .tm{color:var(--text2); font-variant-numeric:tabular-nums}
+html[data-view="minimal"] .foot .meta{display:none}
+html[data-view="full"] #m-processed,
+html[data-view="full"] #m-total,
+html[data-view="list"] #m-processed,
+html[data-view="list"] #m-total{display:none}
+html[data-view="minimal"] #m-parallel,
+html[data-view="minimal"] #m-speed,
+html[data-view="standard"] #m-comp,
+html[data-view="detailed"] #m-comp{display:none}
+/* 扫描态：左元信息换成「已发现 N 个文件」（issue #81 待定项①）
+   ⚠️ 基础规则带 !important，这里的覆盖也必须带，否则永远不显示（踩过） */
+html[data-state="scan"] #m-scan{display:inline-flex!important}
+html[data-state="scan"] #m-processed,
+html[data-state="scan"] #m-total,
+html[data-state="scan"] #m-parallel,
+html[data-state="scan"] #m-speed,
+html[data-state="scan"] #m-comp{display:none}
+#m-scan{display:none!important; font-weight:600; color:var(--text)}
+/* ④ 已定：完整档有「扫描」卡，底部不再重复（真机写作 ShowScanCountInFooter = HasScanCount && !IsFullDensity）
+   ⇒ 完整档扫描期整条左元信息藏掉，只留右侧「已用」；卡片上的 1,248 就是唯一出处。
+   并行度 / 速度在扫描阶段本来也没值，不借机放出来。 */
+html[data-view="full"] #m-scan{display:none!important}
+html[data-view="full"][data-state="scan"] .foot .meta{display:none}
 
-/* 独立总进度条（仅非「完整」档显示） */
-.totalbar{height:28px; border-radius:3px; background:var(--progress-bg); overflow:hidden; position:relative}
-.totalbar > i{display:block; height:100%; background:var(--progress); border-radius:3px; width:0}
+/* 独立总进度条（仅极简/标准/详细档显示） */
+.totalbar{height:22px; border-radius:3px; background:var(--progress-bg); overflow:hidden; position:relative}
+.totalbar > i{display:block; height:100%; background:var(--progress); border-radius:3px; width:0; transition:width .3s ease}
 html[data-view="full"] .totalbar,
 html[data-view="list"] .totalbar{display:none}
-/* 不确定态：斜纹流动（真机由原生 ProgressBar 提供） */
 .totalbar.indet > i{
-  width:100%!important; opacity:.75;
+  width:100%!important; opacity:.85;
   background:repeating-linear-gradient(115deg,var(--warn) 0 14px,transparent 14px 28px);
   animation:flow 1s linear infinite;
 }
@@ -260,75 +445,118 @@ html[data-view="list"] .totalbar{display:none}
 .status{display:grid; grid-template-columns:auto 1fr auto; gap:8px; align-items:center}
 .status .st-icon svg{width:20px; height:20px}
 .status .st-text{font-size:20px; font-weight:600; color:var(--text2)}
-.status .note{font-size:12px; color:var(--text2); margin-top:1px}
 .status .copy{
   width:28px; height:22px; display:flex; align-items:center; justify-content:center;
   background:var(--btn-bg); border:1px solid var(--border); border-radius:4px; position:relative;
+  cursor:pointer;
 }
+.status .copy:hover{border-color:var(--accent)}
 .status .copy svg{width:14px; height:14px; color:var(--text)}
-/* 改造：原来没有 ToolTip */
 .status .copy::after{
-  content:"复制状态文本"; position:absolute; bottom:26px; right:0;
+  content:"复制状态文本"; position:absolute; bottom:26px; right:0; z-index:30;
   background:rgba(0,0,0,.86); color:#fff; font-size:10.5px; padding:2px 6px;
-  border-radius:3px; white-space:nowrap; opacity:0; transition:opacity .15s;
+  border-radius:3px; white-space:nowrap; opacity:0; transition:opacity .15s; pointer-events:none;
 }
 .status .copy:hover::after{opacity:1}
 
 /* ── Row 5 错误摘要 ───────────────────────────────────────── */
-.errs{display:none; flex-direction:column; gap:2px; font-size:12px}
+.errs{display:none; grid-template-columns:1fr auto; gap:8px; font-size:12px}
 html[data-state="fail"] .errs,
-html[data-state="done"] .errs{display:flex}
-.errs .e{color:var(--err)}
-.errs .w{color:var(--warn)}
+html[data-state="done"] .errs{display:grid}
+.errs .e{color:var(--err); display:block}
+.errs .w{color:var(--warn); display:block}
+.errs .copy2{
+  width:28px; height:22px; display:flex; align-items:center; justify-content:center;
+  background:var(--btn-bg); border:1px solid var(--border); border-radius:4px;
+  cursor:pointer; align-self:start; position:relative;
+}
+.errs .copy2:hover{border-color:var(--accent)}
+.errs .copy2 svg{width:14px; height:14px; color:var(--text)}
+/* A 项：错误摘要的复制按钮原来也没有 ToolTip（真机 SummaryCopyBtn，ProgressWindow.axaml:1294-1307） */
+.errs .copy2::after{
+  content:"复制错误摘要"; position:absolute; bottom:26px; right:0; z-index:30;
+  background:rgba(0,0,0,.86); color:#fff; font-size:10.5px; padding:2px 6px;
+  border-radius:3px; white-space:nowrap; opacity:0; transition:opacity .15s; pointer-events:none;
+}
+.errs .copy2:hover::after{opacity:1}
 
 /* ── Row 6 按钮行 ─────────────────────────────────────────── */
-.btns{display:grid; grid-template-columns:auto 1fr auto auto; gap:8px; align-items:center; margin-top:2px}
+.btns{display:grid; grid-template-columns:auto 1fr auto auto auto; gap:8px; align-items:center; margin-top:2px}
+/* 列位显式指定：真机 XAML 是 Grid.Column 0/1/2/3，隐藏暂停按钮时取消按钮不能顶到第 3 列
+   （auto-placement 会让它落进 1fr 列被拉宽，真机不会） */
+.btns .left{grid-column:1}
+.btns .countdown{grid-column:2}
+.btns #conflictBtns{grid-column:3}
+.btns .abtn.pause{grid-column:4}
+.btns .abtn.cancel{grid-column:5}
 .btns .left{display:flex; gap:4px}
+/* 冲突下拉挂靠位：空的时候不占格（控制条「冲突位置」切到视图行时，按钮行这格必须是 0 宽） */
+.btns #conflictBtns:empty{display:none}
+.btns #conflictBtns{display:flex; align-items:center}
+/* 挂到按钮行时下拉向上展开（下方是窗口底边，往下开会溢出） */
+html[data-cpos="btns"] .conflict .popup{top:auto; bottom:30px}
 .tg{
   width:44px; height:36px; display:flex; align-items:center; justify-content:center;
   background:var(--btn-bg); border:1px solid var(--border); border-radius:4px;
+  cursor:pointer; position:relative;
 }
+.tg:hover{border-color:var(--accent)}
 .tg svg{width:16px; height:16px; color:var(--text)}
 .tg.on{background:var(--accent); border-color:transparent}
 .tg.on svg{color:#fff}
-.btns .countdown{display:flex; gap:4px; align-items:center; font-size:13px; color:var(--text2)}
-.btns .countdown .num{
-  width:24px; text-align:right; font-size:18px;
-  background:var(--surface); border:1px solid var(--border); border-radius:3px; padding:0 3px;
+/* 失败/测试流由 VM 自动压钉（OnHasErrorsChanged ⇒ KeepOpenOnComplete=true），用 .auto 只在视觉上点亮，不改用户点选的 .on */
+.tg.auto{background:var(--accent); border-color:transparent}
+.tg.auto svg{color:#fff}
+.tg[hidden]{display:none}
+.tg::after{
+  content:attr(data-tip); position:absolute; bottom:42px; left:0; z-index:30;
+  background:rgba(0,0,0,.86); color:#fff; font-size:10.5px; padding:2px 6px;
+  border-radius:3px; white-space:nowrap; opacity:0; transition:opacity .15s; pointer-events:none;
 }
+.tg:hover::after{opacity:1}
+.btns .countdown{display:flex; gap:4px; align-items:center; font-size:13px; color:var(--text2); margin-left:6px}
+.btns .countdown .num{
+  width:26px; text-align:right; font-size:18px;
+  background:var(--surface); border:1px solid var(--border); border-radius:3px; padding:0 3px;
+  color:var(--text); font-family:inherit;
+}
+.btns .countdown.hide{display:none}
 .abtn{
   height:36px; min-width:80px; display:flex; gap:4px; align-items:center; justify-content:center;
   background:var(--btn-bg); border:1px solid var(--border); border-radius:4px;
-  font-size:12.5px; color:var(--text); cursor:default; padding:0 10px;
+  font:inherit; font-size:12.5px; color:var(--text); cursor:pointer; padding:0 10px;
 }
+.abtn:hover{border-color:var(--accent)}
 .abtn svg{width:16px; height:16px; color:var(--text)}
 /* 改造：取消是破坏性操作，不再与暂停同款 */
 .abtn.cancel{border-color:var(--err); color:var(--err)}
 .abtn.cancel svg{color:var(--err)}
-html[data-state="done"] .abtn.pause,
-html[data-state="fail"] .abtn.pause{display:none}
+.abtn.cancel:hover{background:rgba(244,67,54,.12)}
+/* 终态：取消按钮变「关闭」（ProgressWindow.axaml.cs:283 SetComplete 换文案 + 换勾图标） */
+.abtn.cancel.term{border-color:var(--border); color:var(--text)}
+.abtn.cancel.term svg{color:var(--ok)}
+.abtn.cancel.term:hover{background:var(--tint); border-color:var(--accent)}
+.abtn.pause[hidden]{display:none}
+
+/* ── 复制成功 Toast ───────────────────────────────────────── */
+.toast{
+  position:absolute; left:50%; bottom:10px; transform:translateX(-50%);
+  padding:5px 12px; border-radius:4px; font-size:12px;
+  background:var(--surface); color:var(--ok);
+  border:1px solid var(--ok); box-shadow:0 2px 8px rgba(0,0,0,.25);
+  opacity:0; transition:opacity .2s; pointer-events:none; z-index:40;
+}
+.toast.show{opacity:1}
 
 /* ── 状态态对底纹的影响 ───────────────────────────────────── */
-html[data-state="prepare"] .stats .fill,
-html[data-state="scan"] .stats .fill{background:var(--fill35warn); width:100%!important}
-html[data-state="paused"] .stats .fill{opacity:.55}
-html[data-state="done"] .stats .fill{background:var(--fill35ok); width:100%!important}
-html[data-state="fail"] .stats .fill{background:var(--fill35err); width:100%!important}
-html[data-state="done"] .bar > i,
-html[data-state="fail"] .bar > i{background:var(--ok)}
-html[data-state="fail"] .bar > i{background:var(--err)}
-html[data-state="paused"] .bar > i{opacity:.5}
-
-/* ── 场景切换 ─────────────────────────────────────────────── */
-html[data-scene="single"] .brow.extra{display:none}
-html[data-scene="single"] .batch-head{display:none}
-html[data-scene="single"] .brow{padding:1px 4px}
-html[data-scene="single"] .brow .sub{display:none}
-html[data-76="on"] #card-total{display:none}
-html[data-76="off"] #card-before,
-html[data-76="off"] #card-ratio{display:none}
-html[data-76="on"] .foot .meta .m-comp,
-html[data-76="on"] .foot .meta #m-total{display:none}
+/* 六态作用于两层底纹（.fill-el）：挂整块的 .info > .fill 与只挂卡片行的 .stats > .fill2 */
+html[data-state="prepare"] .fill-el,
+html[data-state="scan"] .fill-el{width:100%!important; background:var(--fill35warn)}
+html[data-state="running"] .fill-el{width:var(--w,31%); background:var(--fill35)}
+html[data-state="paused"] .fill-el{width:var(--w,31%); background:var(--fill35); opacity:.55}
+html[data-state="done"] .fill-el{width:100%!important; background:var(--fill35ok)}
+html[data-state="fail"] .fill-el{width:100%!important; background:var(--fill35err)}
+html[data-state="cancel"] .fill-el{width:100%!important; background:var(--fill35off)}
 
 /* ── 说明区 ───────────────────────────────────────────────── */
 table.fix{width:100%; border-collapse:collapse; font-size:12px; background:var(--win-bg); color:var(--text); border:1px solid var(--border)}
@@ -337,7 +565,8 @@ table.fix th{background:var(--panel); font-weight:600; font-size:11.5px}
 table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
 .tag{display:inline-block; font-size:10px; padding:0 5px; border-radius:3px; line-height:16px; color:#fff; margin-right:4px}
 .tag.A{background:#E53935}.tag.B{background:#FB8C00}.tag.C{background:#8E24AA}.tag.D{background:#546E7A}
-.muted{color:#888}
+.tag.E{background:#00897B}
+code{background:rgba(128,128,128,.16); padding:0 3px; border-radius:2px; font-size:11.5px}
 </style>
 </head>
 <body>
@@ -349,21 +578,26 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
   <symbol id="ic-fail" viewBox="0 0 24 24"><path d="M6 6l12 12M18 6L6 18" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round"/></symbol>
   <symbol id="ic-skip" viewBox="0 0 24 24"><path d="M5 5l9 7-9 7z" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"/><path d="M18 5v14" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></symbol>
   <symbol id="ic-pending" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6" fill="none" stroke="currentColor" stroke-width="2"/></symbol>
+  <symbol id="ic-ovr" viewBox="0 0 24 24"><path d="M4 12a8 8 0 0 1 13.7-5.6L20 8" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M20 4v4h-4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/><path d="M20 12a8 8 0 0 1-13.7 5.6L4 16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M4 20v-4h4" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/></symbol>
   <symbol id="ic-pin" viewBox="0 0 24 24"><path d="M9 3h6l-1 6 4 3v2H6v-2l4-3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/><path d="M12 14v7" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="ic-folder" viewBox="0 0 24 24"><path d="M3 6h6l2 2h10v11H3z" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="ic-trash" viewBox="0 0 24 24"><path d="M5 7h14M9 7V4h6v3M7 7l1 13h8l1-13" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"/></symbol>
   <symbol id="ic-copy" viewBox="0 0 24 24"><rect x="8" y="8" width="11" height="12" rx="1.5" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M5 16V5h11" fill="none" stroke="currentColor" stroke-width="1.7"/></symbol>
   <symbol id="ic-pause" viewBox="0 0 24 24"><path d="M9 5v14M15 5v14" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/></symbol>
+<symbol id="ic-play" viewBox="0 0 24 24"><path d="M7 4.5l13 7.5-13 7.5z" fill="currentColor"/></symbol>
   <symbol id="ic-gear" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2" fill="none" stroke="currentColor" stroke-width="1.7"/><path d="M12 2.5v3M12 18.5v3M21.5 12h-3M5.5 12h-3M19 5l-2.1 2.1M7.1 16.9L5 19M19 19l-2.1-2.1M7.1 7.1L5 5" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"/></symbol>
   <symbol id="ic-bolt" viewBox="0 0 24 24"><path d="M13 2L4.5 14H10l-1 8 8.5-12H12z" fill="currentColor"/></symbol>
   <symbol id="ic-box" viewBox="0 0 24 24"><path d="M4 7l8-4 8 4v10l-8 4-8-4z" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linejoin="round"/><path d="M4 7l8 4 8-4M12 11v10" fill="none" stroke="currentColor" stroke-width="1.6"/></symbol>
   <symbol id="ic-scan" viewBox="0 0 24 24"><path d="M4 8V4h4M20 8V4h-4M4 16v4h4M20 16v4h-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/><path d="M4 12h16" stroke="currentColor" stroke-width="1.6"/></symbol>
+  <symbol id="ic-key" viewBox="0 0 24 24"><circle cx="8" cy="12" r="4" fill="none" stroke="currentColor" stroke-width="1.8"/><path d="M12 12h9M17 12v3M20 12v2" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"/></symbol>
 </svg>
 
-<h1>进度窗口原型 —— issue #81 改造后（整窗）</h1>
+<h1>进度窗口原型 —— issue #81 改造后（整窗 · 全交互）</h1>
 <p class="sub">
-  按 <code>Dialogs/ProgressWindow.axaml</code> 的七行结构（批处理区 / 视图切换 / 内容区 / 信息区 / 状态行 / 错误摘要 / 按钮行）1:1 复刻，并把 #81 的
-  <b>A 紧急修复</b>、<b>B 信息去重</b>、<b>C 五档归并</b> 全部画进去；<b>D（#76 三项统计）</b>用右下角开关切换预览。
+  按 <code>Dialogs/ProgressWindow.axaml</code> 的七行结构（批处理区 / 视图切换 / 内容区 / 信息区 / 状态行 / 错误摘要 / 按钮行）1:1 复刻，
+  并叠 <code>progress-stats-card-fill.md</code> 的三件套：<b>底纹进度条</b> + <b>状态面板压到 3 行</b> + <b>列表档可点统计卡做过滤</b>。<br>
+  <b>这一版里所有看起来能点的东西都能点</b> —— 顶部控制条改场景，窗口内部改状态；点「暂停 / 取消 / 复制 / 冲突下拉 / 统计卡 / 列表行 / 视图分段」都有真实反馈。<br>
+  <b>2026-11-28 新增两组对比开关</b>：<b>③ 底纹挂哪一层</b>（整块信息区 / 只挂卡片行）与 <b>⑥ 「全部」卡第三行</b>（总大小 / 已处理 742）—— 这两条是 §七 里还没定的最后两条，做出来给你直接对着看。
 </p>
 
 <!-- ════════ 控制条 ════════ -->
@@ -372,6 +606,11 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
     <span class="lbl">主题</span>
     <button data-set="theme:light" aria-pressed="true">浅色</button>
     <button data-set="theme:dark" aria-pressed="false">深色</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">流程</span>
+    <button data-set="flow:compress" aria-pressed="true">压缩</button>
+    <button data-set="flow:extract" aria-pressed="false">解压</button>
   </div>
   <div class="grp">
     <span class="lbl">场景</span>
@@ -386,6 +625,7 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
     <button data-set="state:paused" aria-pressed="false">暂停</button>
     <button data-set="state:done" aria-pressed="false">完成</button>
     <button data-set="state:fail" aria-pressed="false">失败</button>
+    <button data-set="state:cancel" aria-pressed="false">取消</button>
   </div>
   <div class="grp">
     <span class="lbl">视图</span>
@@ -395,7 +635,45 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
     <button data-set="view:full" aria-pressed="true">完整</button>
     <button data-set="view:list" aria-pressed="false">列表</button>
   </div>
+  <div class="grp">
+    <span class="lbl">宽度</span>
+    <button data-set="width:800" aria-pressed="true">800</button>
+    <button data-set="width:560" aria-pressed="false">560</button>
+    <button data-set="width:500" aria-pressed="false">500</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">冲突位置</span>
+    <button data-set="cpos:mode" aria-pressed="true">视图行</button>
+    <button data-set="cpos:btns" aria-pressed="false">按钮行</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">③ 底纹挂</span>
+    <button data-set="fill:info" aria-pressed="true">整块信息区</button>
+    <button data-set="fill:cards" aria-pressed="false">只挂卡片行</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">⑥ 全部卡第三行</span>
+    <button data-set="allrow:size" aria-pressed="true">总大小</button>
+    <button data-set="allrow:processed" aria-pressed="false">已处理 742</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">⑧ 列表档卡片</span>
+    <button data-set="listcards:filters" aria-pressed="true">只有过滤卡</button>
+    <button data-set="listcards:both" aria-pressed="false">过滤+信息</button>
+    <button data-set="listcards:full" aria-pressed="false">只留信息卡</button>
+    <button data-set="listcards:oneline" aria-pressed="false">混排一行</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">⑦ 轻量档卡片</span>
+    <button data-set="lite:off" aria-pressed="true">不加（现状）</button>
+    <button data-set="lite:on" aria-pressed="false">也放卡片</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">进度 <span id="pctLab">31%</span></span>
+    <input type="range" id="pctRange" min="0" max="100" value="31">
+  </div>
   <label><input type="checkbox" id="opt76"> #76 三项统计（待定）</label>
+  <label><input type="checkbox" id="optLock"> 冲突策略锁定（7z 固实包解码中）</label>
 </div>
 
 <!-- ════════ 窗口 ════════ -->
@@ -403,7 +681,7 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
 <div class="win" id="win">
 
   <div class="titlebar">
-    <span>正在压缩…</span>
+    <span id="winTitle">正在压缩…</span>
     <span class="dots"><i></i><i></i><i></i></span>
   </div>
 
@@ -413,22 +691,22 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
     <div class="batch">
       <div class="batch-head">
         <span class="t">压缩包列表</span>
-        <span class="n">3 个压缩包</span>
+        <span class="n" id="batchCount">3 个压缩包</span>
       </div>
       <div class="batch-list">
 
-        <div class="brow">
+        <div class="brow sel" data-i="0">
           <span class="fillbg" style="--w:64%"></span>
           <svg class="ic i-run"><use href="#ic-run"/></svg>
           <div style="min-width:0">
             <div class="name">mz-demo-photos.zip</div>
             <p class="sub">已处理 12.2 MB / 41.76 MB</p>
           </div>
-          <span class="badge">🔑●●●●</span>
+          <span class="badge" title="密码匹配中…">🔑 ●●●●</span>
           <span class="pct">64%</span>
         </div>
 
-        <div class="brow extra">
+        <div class="brow extra" data-i="1">
           <span class="fillbg" style="--w:100%"></span>
           <svg class="ic i-ok"><use href="#ic-ok"/></svg>
           <div style="min-width:0">
@@ -439,7 +717,7 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
           <span class="pct">100%</span>
         </div>
 
-        <div class="brow extra">
+        <div class="brow extra" data-i="2">
           <span class="fillbg" style="--w:0%"></span>
           <svg class="ic i-fail"><use href="#ic-fail"/></svg>
           <div style="min-width:0">
@@ -453,29 +731,40 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
       </div>
     </div>
 
-    <!-- ── Row 1 视图切换（两行合一行五档）─────────────── -->
+    <!-- ── Row 1 视图切换（两行合一行五档，可点）+ 冲突下拉挂靠位 ──
+         「冲突时:」下拉原来独占信息区首行（左边空着），现在挂到这一行右端：
+         视图分段居中，冲突控件贴右，三列 grid 保证居中是真的居中。 -->
     <div class="mode">
-      <span class="lbl">视图</span>
-      <span class="seg">
-        <span data-v="minimal">极简</span>
-        <span data-v="standard">标准</span>
-        <span data-v="detailed">详细</span>
-        <span data-v="full">完整</span>
-        <span data-v="list">列表</span>
+      <span class="segwrap">
+        <span class="lbl">视图</span>
+        <span class="seg">
+          <button data-v="minimal">极简</button>
+          <button data-v="standard">标准</button>
+          <button data-v="detailed">详细</button>
+          <button data-v="full">完整</button>
+          <button data-v="list">列表</button>
+        </span>
+      </span>
+      <span class="mount" id="conflictMount">
+        <span class="conflict" id="conflictBox">
+          <span>冲突时:</span>
+          <span class="combo" id="combo" role="button" tabindex="0">每次询问</span>
+          <div class="popup" id="comboPopup"></div>
+        </span>
       </span>
     </div>
 
     <!-- ── Row 2 内容区（三面板互斥）───────────────────── -->
     <div class="panel simple">
       <div class="dir">D:\Projects\mz-demo\photos</div>
-      <div class="fname">IMG_2026_年度总结_现场照片_001.jpg</div>
-      <div class="row2"><span>当前文件</span><span>40%</span></div>
-      <div class="bar"><i style="width:40%"></i></div>
+      <div class="fname" id="simpleName">IMG_2026_年度总结_现场照片_001.jpg</div>
+      <div class="row2"><span>当前文件</span><span id="simplePct">40%</span></div>
+      <div class="bar"><i id="simpleBar" style="width:40%"></i></div>
     </div>
 
     <div class="panel detailed">
       <div class="dwrap">
-        <div class="dhdr">并行通道（4）</div>
+        <div class="dhdr"><span>并行通道（4）</span><span>双击行可定位文件</span></div>
 
         <div class="drow">
           <span class="fillbg" style="--w:100%"></span>
@@ -516,51 +805,112 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
     </div>
 
     <div class="panel list">
-      <div class="list">
-        <div class="lrow"><span>IMG_2026_年度总结_现场照片_001.jpg</span><span>100%</span></div>
-        <div class="lrow"><span>IMG_2026_年度总结_现场照片_002.jpg</span><span>40%</span></div>
-        <div class="lrow"><span>IMG_2026_年度总结_现场照片_003.jpg</span><span>0%</span></div>
-        <div class="lrow"><span>IMG_2026_年度总结_现场照片_004.jpg</span><span>100%</span></div>
+      <div class="llist" id="llist">
+        <div class="lrow done" data-s="done"><svg class="ic sm i-ok"><use href="#ic-ok"/></svg><span class="ln">IMG_2026_年度总结_现场照片_001.jpg</span><span class="ls">2.4 MB</span><span class="lt">已完成</span></div>
+        <div class="lrow done" data-s="done"><svg class="ic sm i-ok"><use href="#ic-ok"/></svg><span class="ln">IMG_2026_年度总结_现场照片_002.jpg</span><span class="ls">2.1 MB</span><span class="lt">已完成</span></div>
+        <div class="lrow run" data-s="run"><svg class="ic sm i-run"><use href="#ic-run"/></svg><span class="ln">IMG_2026_年度总结_现场照片_003.jpg</span><span class="ls">1.9 MB</span><span class="lt">40%</span></div>
+        <div class="lrow done" data-s="done"><svg class="ic sm i-ok"><use href="#ic-ok"/></svg><span class="ln">IMG_2026_年度总结_现场照片_004.jpg</span><span class="ls">2.6 MB</span><span class="lt">已完成</span></div>
+        <div class="lrow skip" data-s="skip"><svg class="ic sm i-skip"><use href="#ic-skip"/></svg><span class="ln">node_modules/.cache/webpack_缓存索引.json</span><span class="ls">18 KB</span><span class="lt">已跳过</span></div>
+        <div class="lrow fail" data-s="fail"><svg class="ic sm i-fail"><use href="#ic-fail"/></svg><span class="ln">项目备份_2026-11-27.zip</span><span class="ls">1.2 GB</span><span class="lt">文件被占用</span></div>
+        <div class="lrow pend" data-s="pend"><svg class="ic sm i-pending"><use href="#ic-pending"/></svg><span class="ln">日志_2026-11-26.log</span><span class="ls">3.4 MB</span><span class="lt">等待中</span></div>
+        <div class="lrow skip" data-s="skip"><svg class="ic sm i-skip"><use href="#ic-skip"/></svg><span class="ln">eslint_诊断缓存.bin</span><span class="ls">96 KB</span><span class="lt">已跳过</span></div>
+        <div class="lrow ovr" data-s="ovr"><svg class="ic sm i-ovr"><use href="#ic-ovr"/></svg><span class="ln">旧版_报告.pdf</span><span class="ls">860 KB</span><span class="lt">已覆盖</span></div>
+        <div class="lrow done" data-s="done"><svg class="ic sm i-ok"><use href="#ic-ok"/></svg><span class="ln">合同_2026_final.docx</span><span class="ls">320 KB</span><span class="lt">已完成</span></div>
+        <div class="lrow done" data-s="done"><svg class="ic sm i-ok"><use href="#ic-ok"/></svg><span class="ln">预算表_2026Q4.xlsx</span><span class="ls">148 KB</span><span class="lt">已完成</span></div>
+        <div class="lrow skip" data-s="skip"><svg class="ic sm i-skip"><use href="#ic-skip"/></svg><span class="ln">typescript_构建信息.tsbuildinfo</span><span class="ls">512 KB</span><span class="lt">已跳过</span></div>
+        <div class="lrow done" data-s="done"><svg class="ic sm i-ok"><use href="#ic-ok"/></svg><span class="ln">会议纪要_11月.md</span><span class="ls">22 KB</span><span class="lt">已完成</span></div>
+        <div class="lrow done" data-s="done"><svg class="ic sm i-ok"><use href="#ic-ok"/></svg><span class="ln">架构图_v3.png</span><span class="ls">780 KB</span><span class="lt">已完成</span></div>
+      </div>
+      <div class="lempty" id="lempty">
+        没有匹配的条目
+        <button id="emptyAll">显示全部</button>
       </div>
     </div>
 
-    <!-- ── Row 3 信息区 ────────────────────────────────── -->
-    <div class="info">
+    <!-- ── Row 3 信息区（底纹挂整块）─────────────────────
+         冲突下拉已搬到 Row 1 视图切换右侧（#conflictMount），本区不再有首行 ——
+         直接是统计卡（完整/列表档）或中等单行（标准/详细档）。 -->
+    <div class="info" id="info">
+      <span class="fill fill-el" id="fill"></span>
 
-      <div class="info-head">
-        <span></span>
-        <div class="conflict">
-          <span>冲突时:</span>
-          <span class="combo">每次询问</span>
+      <!-- 统计卡行：完整档 10 张只读 / 列表档 5 张可点 -->
+      <div class="stats">
+        <span class="fill2 fill-el" id="fill2"></span>
+        <div class="cards ro">
+          <!-- 完整档卡片：三行同构 —— 标题 / 数量（分子）/ 大小（分母），与列表档可点卡完全一致
+               （真机 ProgressWindow.axaml:711-1002 本来就是三行，原型此前偷懒只画了两行）-->
+          <div class="card"><span class="ci"><svg><use href="#ic-scan"/></svg></span><span class="cl">扫描</span><span class="cv">1,248</span><span class="cs">12.4 GB</span></div>
+          <div class="card"><span class="cl">压缩包</span><span class="cv">2/3</span><span class="cs">11.76 MB</span></div>
+          <div class="card"><span class="cl">已处理</span><span class="cv">742</span><span class="cs">41.76 MB</span></div>
+          <div class="card" id="card-staged"><span class="cl">暂存</span><span class="cv">128</span><span class="cs">3.2 GB</span></div>
+          <div class="card" id="card-before"><span class="cl">压缩前</span><span class="cv">41.76 MB</span><span class="cs">1,248 个</span></div>
+          <div class="card" id="card-after"><span class="cl">压缩后</span><span class="cv">11.76 MB</span><span class="cs">1,248 个</span></div>
+          <div class="card" id="card-ratio"><span class="cl">压缩率</span><span class="cv">28%</span><span class="cs">41.76→11.76</span></div>
+          <div class="card"><span class="cl">已压缩</span><span class="cv">318</span><span class="cs">8.9 MB</span></div>
+          <div class="card"><span class="cl">仅存储</span><span class="cv">410</span><span class="cs">32.8 MB</span></div>
+          <div class="card"><span class="cl">跳过</span><span class="cv">3</span><span class="cs">626 KB</span></div>
+          <div class="card"><span class="cl">出错</span><span class="cv">1</span><span class="cs">1.2 GB</span></div>
+          <div class="card"><span class="cl">已覆盖</span><span class="cv">1</span><span class="cs">860 KB</span></div>
+          <div class="card" id="card-total"><span class="cl">总大小</span><span class="cv">41.76 MB</span><span class="cs">1,248 个</span></div>
+        </div>
+        <div class="cards click">
+          <button class="card" data-f="done" aria-pressed="false"><span class="cl">已完成</span><span class="cv" data-n="done">7</span><span class="cs">16.3 MB</span></button>
+          <button class="card" data-f="skip" aria-pressed="false"><span class="cl">跳过</span><span class="cv" data-n="skip">3</span><span class="cs">626 KB</span></button>
+          <button class="card" data-f="fail" aria-pressed="false"><span class="cl">出错</span><span class="cv" data-n="fail">1</span><span class="cs">1.2 GB</span></button>
+          <button class="card" data-f="ovr" aria-pressed="false"><span class="cl">已覆盖</span><span class="cv" data-n="ovr">1</span><span class="cs">860 KB</span></button>
+          <button class="card" data-f="all" aria-pressed="true"><span class="cl">全部</span><span class="cv" data-n="all">14</span><span class="cs" id="allRow">41.76 MB</span></button>
+          <!-- 一行混排模式（data-listcards="oneline"）：竖线右侧是「真正会丢」的三项，
+               只读、不可点，与左侧过滤卡同一套三行同构。 -->
+          <span class="sep"></span>
+          <div class="card linfo"><span class="cl">扫描</span><span class="cv">1,248</span><span class="cs">12.4 GB</span></div>
+          <div class="card linfo"><span class="cl">已压缩</span><span class="cv">318</span><span class="cs">8.9 MB</span></div>
+          <div class="card linfo"><span class="cl">仅存储</span><span class="cv">410</span><span class="cs">32.8 MB</span></div>
+        </div>
+        <!-- 列表档补充行（data-listcards="both"）：把过滤卡覆盖不到的指标补回来。
+             这些卡没有过滤语义，所以只读、且与上行保持同一套三行同构。 -->
+        <div class="cards ro lilist">
+          <div class="card"><span class="cl">扫描</span><span class="cv">1,248</span><span class="cs">12.4 GB</span></div>
+          <div class="card"><span class="cl">压缩包</span><span class="cv">2/3</span><span class="cs">11.76 MB</span></div>
+          <div class="card"><span class="cl">已处理</span><span class="cv">742</span><span class="cs">41.76 MB</span></div>
+          <div class="card"><span class="cl">已压缩</span><span class="cv">318</span><span class="cs">8.9 MB</span></div>
+          <div class="card"><span class="cl">仅存储</span><span class="cv">410</span><span class="cs">32.8 MB</span></div>
+          <div class="card" id="listStaged"><span class="cl">暂存</span><span class="cv">128</span><span class="cs">3.2 GB</span></div>
+          <div class="card"><span class="cl">总大小</span><span class="cv">41.76 MB</span><span class="cs">1,248 个</span></div>
+        </div>
+        <!-- 段 3：终态汇总（仅完整/列表档 + 终态） -->
+        <div class="done3">
+          <span><svg class="ic sm"><use href="#ic-box"/></svg>生成 <b>3</b> 个压缩包</span>
+          <span><svg class="ic sm"><use href="#ic-bolt"/></svg>平均 <b>5.2 MB/s</b></span>
+          <span><svg class="ic sm"><use href="#ic-ok"/></svg>压缩后 <b>11.76 MB（28%）</b></span>
         </div>
       </div>
 
-      <!-- 统计卡行：底纹 = 总进度（本次改造核心） -->
-      <div class="stats">
-        <span class="fill" id="fill"></span>
-        <div class="cards">
-          <div class="card"><span class="ci"><svg><use href="#ic-scan"/></svg></span><span class="cl">扫描</span><span class="cv">1,248</span></div>
-          <div class="card"><span class="cl">压缩包</span><span class="cv">2/3</span></div>
-          <div class="card"><span class="cl">已处理</span><span class="cv">742</span></div>
-          <div class="card" id="card-before"><span class="cl">压缩前</span><span class="cv">41.76 MB</span></div>
-          <div class="card"><span class="cl">压缩后</span><span class="cv">11.76 MB</span></div>
-          <div class="card" id="card-ratio"><span class="cl">压缩率</span><span class="cv">28%</span></div>
-          <div class="card"><span class="cl">已压缩</span><span class="cv">318</span></div>
-          <div class="card"><span class="cl">仅存储</span><span class="cv">410</span></div>
-          <div class="card"><span class="cl">跳过</span><span class="cv">1</span><span class="cs">带原因</span></div>
-          <div class="card"><span class="cl">出错</span><span class="cv">1</span><span class="cs">占用</span></div>
-          <div class="card" id="card-total"><span class="cl">总大小</span><span class="cv">41.76 MB</span></div>
+      <!-- 轻量档卡片行：data-lite="on" 时出现在极简/标准/详细三档 -->
+      <div class="stats lite">
+        <span class="fill2 fill-el" id="fill2b"></span>
+        <div class="cards ro">
+          <div class="card"><span class="cl" id="litePctLabel">进度</span><span class="cv" id="litePct">31%</span></div>
+          <div class="card"><span class="cl">已用</span><span class="cv" id="liteElapsed">00:12</span></div>
+          <div class="card"><span class="cl">剩余</span><span class="cv" id="liteRemain">00:26</span></div>
+          <div class="card"><span class="cl">已处理</span><span class="cv" id="liteDone">742</span></div>
+          <div class="card"><span class="cl">总数量</span><span class="cv" id="liteTotalCount">1,248</span></div>
+          <div class="card"><span class="cl">总大小</span><span class="cv">41.76 MB</span></div>
+          <div class="card"><span class="cl">速度</span><span class="cv" id="liteSpeed">6.8 MB/s</span></div>
+          <div class="card" id="liteParCard"><span class="cl">并行</span><span class="cv" id="litePar">4</span></div>
+          <div class="card"><span class="cl">跳过</span><span class="cv">3</span></div>
+          <div class="card"><span class="cl">出错</span><span class="cv">1</span></div>
         </div>
       </div>
 
       <!-- 底部合并行：段 2 + 百分比 + 时间，原来 3 行 -->
       <div class="foot">
         <div class="meta">
+          <span id="m-scan">已发现 1,248 个文件 · 12.4 GB</span>
           <span id="m-processed">已处理 742</span>
           <span id="m-total">总大小 41.76 MB</span>
-          <span><svg><use href="#ic-gear"/></svg>4</span>
-          <span><svg style="color:var(--progress)"><use href="#ic-bolt"/></svg>6.8 MB/s</span>
-          <span class="m-comp"><svg style="color:var(--ok)"><use href="#ic-box"/></svg>11.76 MB (28%)</span>
+          <span id="m-parallel"><svg><use href="#ic-gear"/></svg>4</span>
+          <span id="m-speed"><svg style="color:var(--progress)"><use href="#ic-bolt"/></svg>6.8 MB/s</span>
+          <span id="m-comp" class="m-comp"><svg style="color:var(--ok)"><use href="#ic-box"/></svg>11.76 MB (28%)</span>
         </div>
         <div class="right">
           <span class="pct" id="pct">31%</span>
@@ -569,38 +919,45 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
         </div>
       </div>
 
-      <!-- 独立总进度条：仅极简/标准/详细/列表档显示 -->
+      <!-- 独立总进度条：仅极简/标准/详细档显示 -->
       <div class="totalbar" id="totalbar"><i id="totalbarfill"></i></div>
-
     </div>
 
     <!-- ── Row 4 状态行 ────────────────────────────────── -->
     <div class="status">
-      <span class="st-icon"><svg style="color:var(--progress)"><use href="#ic-run"/></svg></span>
+      <span class="st-icon" id="stIcon"><svg style="color:var(--progress)"><use href="#ic-run"/></svg></span>
       <div>
         <div class="st-text" id="statusText">正在压缩…</div>
-        <div class="note">可取消，已完成的条目会保留</div>
       </div>
-      <span class="copy"><svg><use href="#ic-copy"/></svg></span>
+      <span class="copy" id="copyStatus"><svg><use href="#ic-copy"/></svg></span>
     </div>
 
     <!-- ── Row 5 错误摘要 ──────────────────────────────── -->
     <div class="errs">
-      <span class="e">1 个文件失败：mz-demo-logs.zip — 文件被占用，无法读取</span>
-      <span class="w">1 个文件已跳过：node_modules/.cache（超出分卷上限）</span>
+      <div>
+        <span class="e">1 个文件失败：mz-demo-logs.zip — 文件被占用，无法读取</span>
+        <span class="w">3 个文件已跳过：node_modules/.cache、eslint_诊断缓存.bin、typescript_构建信息.tsbuildinfo</span>
+      </div>
+      <span class="copy2" id="copySummary"><svg><use href="#ic-copy"/></svg></span>
     </div>
 
     <!-- ── Row 6 按钮行 ────────────────────────────────── -->
     <div class="btns">
       <div class="left">
-        <span class="tg"><svg><use href="#ic-pin"/></svg></span>
-        <span class="tg on"><svg><use href="#ic-folder"/></svg></span>
-        <span class="tg"><svg><use href="#ic-trash"/></svg></span>
+        <span class="tg" id="tgPin" data-tip="完成后保持窗口打开"><svg><use href="#ic-pin"/></svg></span>
+        <span class="tg on" id="tgFolder" data-tip="压缩后打开目标目录"><svg><use href="#ic-folder"/></svg></span>
+        <span class="tg" id="tgTrash" data-tip="解压后把原压缩包移入回收站"><svg><use href="#ic-trash"/></svg></span>
       </div>
-      <div class="countdown"><span class="num">3</span><span>秒后自动关闭</span></div>
-      <span class="abtn pause"><svg><use href="#ic-pause"/></svg><span id="pauseLabel">暂停</span></span>
-      <span class="abtn cancel"><svg><use href="#ic-fail"/></svg>取消</span>
+      <div class="countdown" id="countdown"><input class="num" id="cdNum" value="3"><span>秒后自动关闭</span></div>
+      <!-- 备选位置：冲突下拉可搬到这里（控制条「冲突位置」= 按钮行）。
+           真机按钮行是 Grid.Column 0/1/2/3，加这一格要把暂停/取消各右移一列。 -->
+      <span class="mount" id="conflictBtns"></span>
+      <button class="abtn pause" id="pauseBtn"><svg><use id="pauseIcon" href="#ic-pause"/></svg><span id="pauseLabel">暂停</span></button>
+      <button class="abtn cancel" id="cancelBtn"><svg><use id="cancelIcon" href="#ic-fail"/></svg><span id="cancelLabel">取消</span></button>
     </div>
+
+    <!-- 复制成功 Toast -->
+    <div class="toast" id="toast">已复制到剪贴板</div>
 
   </div>
 </div>
@@ -610,7 +967,7 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
 <h2>改造清单（对应 issue #81 四条 + #76 一条）</h2>
 
 <table class="fix">
-  <tr><th style="width:100px">分类</th><th>改了什么</th><th style="width:40%">为什么</th></tr>
+  <tr><th style="width:100px">分类</th><th>改了什么</th><th style="width:38%">为什么</th></tr>
 
   <tr>
     <td class="k"><span class="tag A">A</span>图标</td>
@@ -620,8 +977,8 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
 
   <tr>
     <td class="k"><span class="tag A">A</span>ToolTip</td>
-    <td>状态行右侧复制按钮补 <code>ToolTip</code>「复制状态文本」</td>
-    <td>全窗口唯一没有 ToolTip 的纯图标按钮（<code>ProgressWindow.axaml:1246-1258</code>）</td>
+    <td>状态行右侧复制按钮补 <code>ToolTip</code>「复制状态文本」；错误摘要里的第二个复制按钮同样补上</td>
+    <td>全窗口唯一没有 ToolTip 的纯图标按钮（<code>ProgressWindow.axaml:1246-1258</code>）；<code>SummaryCopyBtn</code> 更是连提示都没有</td>
   </tr>
 
   <tr>
@@ -650,13 +1007,13 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
 
   <tr>
     <td class="k"><span class="tag B">B</span>三行合一</td>
-    <td>「并行 4 / 压缩后 11.76 MB (28%)」+「31%」+「已用/剩余」合并成底部一行</td>
+    <td>「并行 4 / 速度 / 压缩后 (28%)」+「31%」+「已用 / 剩余」合并成底部一行</td>
     <td>三段信息各占一行，窗口白白高出 3 行</td>
   </tr>
 
   <tr>
     <td class="k"><span class="tag C">C</span>视图切换</td>
-    <td>「简约/详细/列表」与「精简/标准/完整」两行两套，合并成一行五档（极简/标准/详细/完整/列表）</td>
+    <td>「简约 / 详细 / 列表」与「精简 / 标准 / 完整」两行两套，合并成一行五档（极简 / 标准 / 详细 / 完整 / 列表）</td>
     <td>「简约」与「精简」两个近义词各表示一次「少」，用户无法区分；且「精简」档原本几乎不改变任何内容（<code>IsMinimalDensity</code> 只出现在它自己的 RadioButton 上）</td>
   </tr>
 
@@ -668,19 +1025,84 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
 
   <tr>
     <td class="k"><span class="tag C">C</span>卡片一行</td>
-    <td>9 张卡 <code>MinWidth</code> 80→72、间距 24→8、字号各降一档，800 宽窗口一行排下（712px）；窄窗由 <code>WrapPanel</code> 自然换行</td>
-    <td>原来 9 × 80 + 8 × 24 = 912px &gt; 800，靠「只显示有数据的卡」侥幸没暴露，一旦 ZIP 自适应全上报就被 <code>ClipToBounds</code> 硬切</td>
+    <td>卡 <code>MinWidth</code> 80→72、间距用 <code>WrapPanel.ItemSpacing</code>=<code>SpacingXxs</code>（2/4/6）+ <code>LineSpacing</code>、字号各降一档，800 宽一行排下；窄窗由 <code>WrapPanel</code> 自然换行</td>
+    <td>原来 9 × 80 + 8 × 24 = 912px &gt; 800，靠「只显示有数据的卡」侥幸没暴露，一旦 ZIP 自适应全上报就被 <code>ClipToBounds</code> 硬切。<br><b>计划里原写的「<code>WrapPanel</code> 没有 <code>Spacing</code>」是错的</b> —— Avalonia 12 实测有 <code>ItemSpacing</code> / <code>LineSpacing</code>，可直接 <code>{DynamicResource …}</code></td>
   </tr>
 
   <tr>
     <td class="k"><span class="tag D">D</span>三项统计</td>
-    <td>「总大小」卡在压缩流程拆成「压缩前 / 压缩后 / 压缩率」三连卡（悬浮「总大小」卡的位置），底部 <code>🗜</code> 那项同步删掉避免重复；7z/tar.gz 拿不到的数显「—」</td>
+    <td>「总大小」卡在压缩流程拆成「压缩前 / 压缩后 / 压缩率」三连卡；底部 <code>🗜</code> 那项同步删掉避免重复；7z / tar.gz 拿不到的数显「—」</td>
     <td>来自 #76 图 4。数据都已有：<code>TotalBytes</code>、<code>TotalCompressedBytes</code>（仅 ZIP 上报）、<code>OverallCompressionText</code></td>
   </tr>
+
+  <tr>
+    <td class="k"><span class="tag E">E</span>底纹</td>
+    <td>信息区整块（<code>.info</code>，含内边距与边框）挂一层底纹进度：进行中按百分比截断、准备/扫描满宽淡黄、完成淡绿、失败淡红、取消淡灰、暂停降透明度。<br><b>挂整块还是只挂卡片行，用控制条「③ 底纹挂」现场对比</b></td>
+    <td>替代完整档的独立总进度条 —— 那一根条只在完整档存在，切到别的档又冒出来，同一信息两套呈现</td>
+  </tr>
+
+  <tr>
+    <td class="k"><span class="tag E">E</span>列表过滤</td>
+    <td>列表档的统计卡行换成 5 张<b>可点卡</b>（已完成 / 跳过 / 出错 / 已覆盖 / 全部，<b>全部在最右</b>），尺寸与完整档完全一致；再点一次已选中的卡回到「全部」</td>
+    <td>过滤值与卡片上的数字同源，不用另起一套胶囊；三行同构卡与完整档切档不跳</td>
+  </tr>
+</table>
+
+<h2>本轮两组对比开关（§七 里最后两条待定项）</h2>
+<p class="sub" style="margin:0 0 8px">
+  §七 十一条里，其余九条已经定下来了（下面「已定项落地情况」表）。剩这两条你说「在原型里都做出来对比一下」，所以做成了控制条上的两组按钮 —— 点一下就能看到差别。
+</p>
+<table class="fix">
+  <tr><th style="width:170px">开关</th><th style="width:150px">两个取值</th><th>差别在哪 / 我的建议</th></tr>
+
+  <tr>
+    <td class="k"><span class="tag E">E</span>③ 底纹挂哪层</td>
+    <td><b>整块信息区</b>（默认）<br><b>只挂卡片行</b></td>
+    <td>
+      <b>整块</b>：底纹铺满 Row 3（含边框内侧与内边距），底部合并行「并行 4 · 6.8 MB/s · 31% 已用 剩余」也站在色块上 —— 整块面板读作「一根粗进度条」。<br>
+      <b>只挂卡片行</b>：底纹缩进到统计卡那张白底卡片里，底部合并行保持面板底色 —— 边界清楚，但切到极简/标准/详细档时（那三档没有卡片行）底纹会整块消失，与另三档的独立总条不是同一套视觉。<br>
+      <b>建议：整块</b>（与下面「底纹尺寸账」里的 +0.5h 对应）。
+    </td>
+  </tr>
+
+  <tr>
+    <td class="k"><span class="tag E">E</span>⑥ 全部卡第三行</td>
+    <td><b>总大小</b>（默认）<br><b>已处理 742</b></td>
+    <td>
+      <b>总大小 41.76 MB</b>：与同卡第二行「14」同轴（都是「这堆东西有多少」）。<br>
+      <b>已处理 742</b>：与百分比/底纹同轴（都是「做到哪了」），但它<b>含跳过与出错</b>，与「已完成 7」并排放会在同一张卡里出现两个口径不同的计数。<br>
+      <b>建议：总大小</b>。列表档删掉「已处理」卡之后，它的信息已被百分比与「已完成」卡分别承担。
+    </td>
+  </tr>
+</table>
+
+<h2>底纹尺寸账（③ 的具体实现差别）</h2>
+<table class="fix">
+  <tr><th style="width:170px">挂哪一层</th><th style="width:120px">覆盖面</th><th>代价 / 副作用</th></tr>
+  <tr><td class="k">整块信息区</td><td>Row 3 全部<br>（卡片行 + 底部合并行 + 内边距）</td><td>要在 <code>Border</code> 里多套一层 <code>Panel</code> + 一个 <code>Border</code> 当底纹层（不能直接改 <code>Border.Background</code>，会顶掉 <code>ThemeSplitterBgBrush</code>）；圆角要减 1px 或给外层 <code>ClipToBounds</code>。<b>+0.5h</b></td></tr>
+  <tr><td class="k">只挂卡片行</td><td>统计卡那个白底卡片<br>（<code>StatsCardsPanel</code>）</td><td>改动小（只改那一块的 <code>Background</code> 为 <code>MultiBinding</code>），但极简/标准/详细三档没有卡片行 ⇒ 那三档只剩独立总条，四档视觉不统一</td></tr>
 </table>
 <p class="muted" style="font-size:11.5px;line-height:1.7;margin-top:10px">
-  D 项用户说「要再想想」，所以做成了右下角开关 —— 勾选即切到三项，可以直观比较窗口高度与信息密度。
+  <b>E 类是本轮新增的。</b>D 项用户说「要再想想」，所以做成了顶部控制条开关 —— 勾选即切到三项，可以直观比较窗口高度与信息密度。
 </p>
+
+<h2>已定项落地情况（§七 九条）</h2>
+<table class="fix">
+  <tr><th style="width:44px">#</th><th style="width:150px">议题</th><th style="width:190px">结论</th><th>这一版原型里的体现</th></tr>
+  <tr><td class="k">1</td><td>完成/失败/取消变色</td><td>做</td><td>六态全有：进行中淡蓝按百分比截断 / 准备·扫描满宽淡黄 / 完成淡绿 / 失败淡红 / 取消淡灰 / 暂停降透明度</td></tr>
+  <tr><td class="k">2</td><td>深色淡黄 alpha</td><td>26%</td><td><code>--fill35warn:rgba(255,193,7,.26)</code>（浅色 .30）</td></tr>
+  <tr><td class="k">5</td><td>暂停态配色</td><td>同进行中色 + <code>.55</code></td><td>不换色，只降透明度</td></tr>
+  <tr><td class="k">9</td><td>默认选中「全部」</td><td>是</td><td>列表档五张卡里「全部」默认 <code>aria-pressed="true"</code></td></tr>
+  <tr><td class="k">①</td><td>「冲突位置」开关</td><td>真机实现不留</td><td>控制条上保留，只为评审时来回比较（计划 §2.10 已注明）</td></tr>
+  <tr><td class="k">②</td><td>卡片间距</td><td><code>ItemSpacing</code> + <code>SpacingXxs</code></td><td>本版已把卡片间距从 8px 收到 4px（主轴上更紧，换行行距 6px），一行十张仍有余量</td></tr>
+  <tr><td class="k">④</td><td>扫描计数挪哪</td><td><b>已作废</b> —— 轻量档也有卡片后，第一张卡直接变身「已发现 1,248」</td><td>扫描态：<code>#litePctLabel</code> 写「已发现」、值写 <code>1,248</code>，其余四项写「—」；不再需要底部合并行腾位置</td></tr>
+  <tr><td class="k">⑤</td><td>五档措辞</td><td>极简 / 标准 / 详细 / 完整 / 列表 + 分隔线</td><td>「完整」与「列表」之间加了一道更重的竖线</td></tr>
+  <tr><td class="k">⑧</td><td>状态说明行</td><td>本计划不做</td><td>状态行下面那行说明已从原型删掉（真机压缩/解压流程里它恒为空）</td></tr>
+  <tr><td class="k">③</td><td>底纹挂哪层</td><td>只挂卡片行（用户定）</td><td>六态底纹全部改挂 <code>.stats</code> / <code>.stats.lite</code>；整块 <code>.info</code> 那层留作对比开关</td></tr>
+  <tr><td class="k">⑥</td><td>「全部」卡第三行</td><td>总大小（与「14」同轴）</td><td>「已处理 742」的候选保留在控制条上做对比</td></tr>
+  <tr><td class="k">⑦</td><td>轻量档也放卡片</td><td>做，3 / 8 / 9 张</td><td>极简 3（进度/已用/剩余）、标准 8（+已处理/总数量/总大小/速度/并行）、详细 9（去并行、加跳过/出错）</td></tr>
+  <tr><td class="k">⑨</td><td>列表档信息损失</td><td><b>混排一行</b>（推荐）</td><td>5 张可点卡 + 竖线 + 扫描/已压缩/仅存储 三张只读，604px &lt; 718px，高度不变；另有「两行」「只留信息卡」两种形态可切</td></tr>
+</table>
 
 <h2>状态面板高度账：7 行 → 3 行</h2>
 <table class="fix">
@@ -691,108 +1113,430 @@ table.fix td.k{white-space:nowrap; font-weight:600; width:120px}
   <tr><td class="k">总体百分比</td><td>1 行</td><td>0</td><td>并入底部合并行右侧</td></tr>
   <tr><td class="k">时间（已用/剩余）</td><td>1 行</td><td>0</td><td>并入底部合并行右侧</td></tr>
   <tr><td class="k">底部合并行</td><td>—</td><td>1 行</td><td>左元信息 + 右进度/时间</td></tr>
-  <tr><td class="k">独立总进度条</td><td>1 行</td><td>0（完整档）</td><td>完整档改统计卡行底纹；其余三档仍保留这根条</td></tr>
+  <tr><td class="k">独立总进度条</td><td>1 行</td><td>0（完整 / 列表档）</td><td>完整 / 列表档改统计卡区底纹；其余三档仍保留这根条</td></tr>
 </table>
 
 <h2>各档到底显示什么</h2>
 <table class="fix">
-  <tr><th style="width:90px">档位</th><th style="width:150px">内容区</th><th style="width:150px">信息区</th><th>底部合并行</th></tr>
-  <tr><td class="k">极简</td><td>简约面板（目录 + 文件名 + 单条进度）</td><td>视图切换 + 底部合并行 + 独立总条</td><td>只有右侧「31% · 已用 · 剩余」</td></tr>
-  <tr><td class="k">标准</td><td>简约面板</td><td>同上</td><td>左：已处理 / 总大小 / 并行 / 速度；右：进度与时间</td></tr>
-  <tr><td class="k">详细</td><td>详细面板（并行通道逐行）</td><td>同上</td><td>同标准</td></tr>
-  <tr><td class="k">完整</td><td>详细面板</td><td><b>统计卡行（底纹）</b> + 底部合并行</td><td>左：并行 / 速度 / 压缩汇总；右：进度与时间</td></tr>
-  <tr><td class="k">列表</td><td>列表面板</td><td><b>统计卡行（底纹）</b> + 底部合并行</td><td>同完整</td></tr>
+  <tr><th style="width:90px">档位</th><th style="width:170px">内容区</th><th style="width:190px">信息区</th><th>底部合并行</th></tr>
+  <tr><td class="k">极简</td><td>简约面板（目录 + 文件名 + 单条进度）</td><td><b>卡片 3 张</b>：进度 / 已用 / 剩余</td><td><b>无</b> —— 整行已撤，时间信息全在卡片里</td></tr>
+  <tr><td class="k">标准</td><td>简约面板</td><td><b>卡片 8 张</b>：进度 / 已用 / 剩余 / 已处理 742 / 总数量 1,248 / 总大小 41.76 MB / 速度 / 并行</td><td><b>无</b></td></tr>
+  <tr><td class="k">详细</td><td>详细面板（并行通道逐行）</td><td><b>卡片 9 张</b>：同标准，但「并行」换成「跳过 3 / 出错 1」</td><td><b>无</b></td></tr>
+  <tr><td class="k">完整</td><td>详细面板</td><td><b>10 张只读统计卡（底纹）</b> + 底部合并行</td><td>左：并行 / 速度 / 压缩汇总；右：进度与时间</td></tr>
+  <tr><td class="k">列表</td><td>列表面板（<b>可过滤</b>）</td><td><b>5 张可点卡（底纹）</b> + 底部合并行</td><td>同完整</td></tr>
 </table>
 <p class="muted" style="font-size:11.5px;line-height:1.7;margin-top:8px">
   批处理区（压缩包列表）在所有档位都显示 —— 它是「这次要处理几个包」的唯一入口，不属于信息密度的一部分。
-  单包场景下它会被压成一行（见 A/B 项）。
+  单包场景下它会被压成一行（见 B 项）。<br>
+  扫描态下底部左元信息整条换成「已发现 N 个文件 · 12.4 GB」，因为扫描阶段还没有「已处理 / 总大小」这两个数。
 </p>
+
+<h2>这一版可点的东西（逐项走一遍）</h2>
+<table class="fix">
+  <tr><th style="width:150px">控件</th><th style="width:230px">点击后会发生什么</th><th>说明</th></tr>
+  <tr><td class="k">视图分段（5 档）</td><td>切换内容区面板 + 信息区结构</td><td>原来这两组单选互相不知道对方存在</td></tr>
+  <tr><td class="k">统计卡（列表档）</td><td>过滤下方列表，再点一次回「全部」</td><td>数字与过滤条件同源</td></tr>
+  <tr><td class="k">列表行</td><td>高亮</td><td>真机里是 <code>ListBox</code> 选中态</td></tr>
+  <tr><td class="k">批处理行</td><td>高亮选中</td><td>真机里 <code>SelectionMode=Single</code></td></tr>
+  <tr><td class="k">冲突策略下拉</td><td>展开 6 档（解压）/ 5 档（压缩），选中即生效</td><td>勾「冲突策略锁定」演示 7z 固实包解码中的置灰态</td></tr>
+  <tr><td class="k">暂停 / 继续</td><td>切 paused ↔ running，按钮文字与图标一起换（⏸ ⇄ ▶）</td><td>真机是 <code>IsPauseButtonVisible</code> + <code>PauseButtonIcon</code> 换 <code>IconPause</code>/<code>IconPlay</code></td></tr>
+  <tr><td class="k">取消</td><td>切 cancelled 态，底纹转灰；进入任意终态后按钮自己变成「关闭 ✓」</td><td>真机 <code>SetComplete</code> 里换文案 + 换 <code>IconCheckmark</code>（<code>ProgressWindow.axaml.cs:283</code>）</td></tr>
+  <tr><td class="k">保持打开（📌）</td><td>切换后用来自动点亮：失败态一律压钉、不给倒计时</td><td>真机 <code>OnHasErrorsChanged</code> 自动 <code>KeepOpenOnComplete = true</code>（<code>ProgressViewModel.cs:488-495</code>）</td></tr>
+  <tr><td class="k">保持打开 / 打开目录 / 移回收站</td><td>三个 ToggleButton 各自切换，悬停出 ToolTip</td><td>移回收站只在解压流程显示</td></tr>
+  <tr><td class="k">两个复制按钮</td><td>底部弹「已复制到剪贴板」Toast（1.6s）</td><td>原来只有状态行那个，且无提示</td></tr>
+  <tr><td class="k">倒计时数字框</td><td>可直接改数字</td><td>聚焦冻结倒数 / Enter 提交 / Esc 回退；失败态压钉后整组隐藏</td></tr>
+  <tr><td class="k">进度滑块（控制条）</td><td>拖到哪底纹就截到哪</td><td>非进行中状态会被自动切回「进行中」，否则颜色对不上</td></tr>
+</table>
+
 <h2>这一版没解决的</h2>
 <p class="sub" style="margin:0">
-  ① 扫描态「已发现 N 个文件」在 3 行版本里没有位置 —— 现在临时替换底部左元信息，还没定稿。<br>
-  ② 底纹在「不确定态」（准备/扫描）用满宽淡黄代替滚动动画，静止不动可能被误认为卡死，靠扫描计数兜底。<br>
-  ③ 5 档在 <code>MinWidth=500</code> 时略挤，需要真机量一次；放不下就退成图标分段控件。<br>
-  ④ 批处理行百分比在单包时已隐藏，但多包时与底部百分比仍共存 —— 语义不同（单包 vs 总体），需要确认是否可接受。
+  ① <b>#76 三项统计与卡片宽度的冲突</b>（唯一还没定的一条）：勾上 #76 后完整档变 11 张卡（解压流程再加「暂存」是 12 张），800 宽下按 72 卡宽 + 4 间距仍有 792px 与 872px，<b>必然换行</b>。真机要一行放下，要么把三张合成一张三行的「压缩前 / 后 / 率」，要么接受开启时换行。这一条是给 D 项拍板时看的，勾一下就能看到差距。<br>
+  ② 底纹在「不确定态」（准备 / 扫描）用满宽淡黄代替滚动动画，静止不动可能被误认为卡死，靠扫描计数兜底。<br>
+  ③ 5 档在 <code>MinWidth=500</code> 时仍是一行（实测约 402px vs 可用 468px，余 66px），但已经很紧；真机字号若比原型大一点就会溢出。<br>
+  ④ 批处理行百分比在单包时已隐藏，但多包时与底部百分比仍共存 —— 语义不同（单包 vs 总体），需要确认是否可接受。<br>
+  ⑤ 列表档的「已完成 / 跳过 / 出错 / 已覆盖 / 全部」五个数字需要给 <code>ProgressViewModel</code> 补一个带通知的已完成计数（<code>_statsCompleted</code>），否则最后一条永远少 1。<br>
+  ⑥ <code>MaxSeedEntryCount = 5000</code>：超过 5000 条的包一条行都不建，过滤与列表档都会是空的，这是既有上限，不在本次范围。
 </p>
 
 <script>
 (function(){
-  var root = document.documentElement;
-  var fmt = function(n){ return String(Math.round(n)).padStart(2,'0'); };
+  var root  = document.documentElement;
+  // 初值从 <html data-*> 读，方便外部渲染变体（无头截图 / 手工深链）直接定场景
+  var state = root.getAttribute('data-state')  || 'running';
+  var flow  = root.getAttribute('data-flow')   || 'compress';
+  var view  = root.getAttribute('data-view')   || 'full';
+  var scene = root.getAttribute('data-scene')  || 'multi';
+  var filter = 'all';
 
-  var STATES = {
-    prepare: {pct:null, text:'正在准备…',   pause:'暂停', elapsed:'已用 00:00', remain:'', indet:true },
-    scan:    {pct:null, text:'正在扫描…',   pause:'暂停', elapsed:'已用 00:02', remain:'', indet:true },
-    running: {pct:31,   text:'正在压缩…',   pause:'暂停', elapsed:'已用 00:12', remain:'剩余 00:26' },
-    paused:  {pct:31,   text:'已暂停',      pause:'继续', elapsed:'已用 00:12', remain:'剩余 00:26' },
-    done:    {pct:100,  text:'压缩完成',    pause:'',     elapsed:'已用 00:38', remain:'' },
-    fail:    {pct:100,  text:'压缩失败',    pause:'',     elapsed:'已用 00:38', remain:'' }
+  var FLOWS = {
+    compress: {verb:'压缩', running:'正在压缩…', done:'压缩完成', fail:'压缩失败', cancel:'已取消',
+               openTip:'压缩后打开目标目录', note:'可取消，已完成的条目会保留'},
+    extract:  {verb:'解压', running:'正在解压…', done:'解压完成', fail:'解压失败', cancel:'已取消',
+               openTip:'解压后打开目标目录', note:'可取消，已完成的条目会保留'}
   };
 
-  function apply(){
-    var st = root.getAttribute('data-state');
-    var s  = STATES[st] || STATES.running;
+  var STATES = {
+    prepare: {pct:null, text:'正在准备…', pause:'暂停', elapsed:'已用 00:00', remain:'', indet:true,  note:'正在统计文件与体积'},
+    scan:    {pct:null, text:'正在扫描…', pause:'暂停', elapsed:'已用 00:02', remain:'', indet:true,  note:'扫描完成后开始处理'},
+    running: {pct:31,   text:null,        pause:'暂停', elapsed:'已用 00:12', remain:'剩余 00:26', note:null},
+    paused:  {pct:31,   text:'已暂停',    pause:'继续', elapsed:'已用 00:12', remain:'剩余 00:26', note:'继续后将从中断处恢复'},
+    done:    {pct:100,  text:null,        pause:'',     elapsed:'已用 00:38', remain:'', note:null},
+    fail:    {pct:100,  text:null,        pause:'',     elapsed:'已用 00:38', remain:'', note:'失败的文件已跳过，其余照常完成'},
+    cancel:  {pct:100,  text:'已取消',    pause:'',     elapsed:'已用 00:21', remain:'', note:'已完成的条目已保留'}
+  };
 
-    // 底纹宽度 / 独立条
-    var fill = document.getElementById('fill');
-    var tb   = document.getElementById('totalbar');
-    var tbF  = document.getElementById('totalbarfill');
+  var CONFLICT = {
+    compress:[['ask','每次询问'],['overwrite','覆盖'],['add','追加到已有包'],['rename','自动重命名'],['skip','跳过']],
+    extract: [['ask','每次询问'],['overwrite','覆盖'],['overwrite-if-older','仅覆盖较旧'],['overwrite-if-smaller','仅覆盖较小'],['rename','重命名'],['skip','跳过']]
+  };
+  var curConflict = 'ask';
+
+  var FILTERS = {
+    all:  function(){ return true; },
+    done: function(s){ return s === 'done'; },
+    skip: function(s){ return s === 'skip'; },
+    fail: function(s){ return s === 'fail'; },
+    ovr:  function(s){ return s === 'ovr'; }
+  };
+
+  var $ = function(id){ return document.getElementById(id); };
+
+  /* ── 底纹 / 进度条 / 状态文本 ───────────────────────────── */
+  function applyState(){
+    var s = STATES[state] || STATES.running;
     var w = (s.pct === null) ? 100 : s.pct;
 
-    fill.style.width = w + '%';
-    tbF.style.width  = (s.pct === null ? 0 : s.pct) + '%';
+    $('info').style.setProperty('--w', w + '%');
+    $('simpleBar').style.width = (s.pct === null ? 40 : s.pct) + '%';
+    $('simplePct').textContent = (s.pct === null) ? '—' : s.pct + '%';
+    $('totalbarfill').style.width = (s.pct === null ? 0 : s.pct) + '%';
+    $('totalbar').classList.toggle('indet', !!s.indet);
 
-    tb.classList.toggle('indet', !!s.indet);
+    $('pct').textContent  = (s.pct === null) ? '' : s.pct + '%';
+    $('pctLab').textContent = (s.pct === null) ? '—' : s.pct + '%';
+    if (s.pct !== null) $('pctRange').value = s.pct;
 
-    // 文本
-    document.getElementById('pct').textContent = (s.pct === null) ? '' : s.pct + '%';
-    document.getElementById('elapsed').textContent = s.elapsed;
-    var r = document.getElementById('remain');
+    $('elapsed').textContent = s.elapsed;
+    // 轻量档三张时间卡（百分比 / 已用 / 剩余）；不确定态与无剩余时写「—」，避免卡片空着
+    // 扫描 / 准备态：第一张卡改成「已发现 1,248」，承担 issue #81 待定项④
+    // （轻量档没有「扫描」卡，扫描期若无任何数字变化会被误判卡死）
+    if (s.pct === null) {
+      $('litePctLabel').textContent = '已发现';
+      $('litePct').textContent = (state === 'scan') ? '1,248' : '—';
+      // 扫描 / 准备期「已处理 / 速度 / 并行」都还没有意义，写「—」而不是留一个假数字
+      $('liteDone').textContent  = '—';
+      $('liteTotalCount').textContent = '—';
+      $('liteSpeed').textContent = '—';
+      $('litePar').textContent   = '—';
+    } else {
+      $('litePctLabel').textContent = '进度';
+      $('litePct').textContent = s.pct + '%';
+      $('liteDone').textContent  = '742';
+      $('liteTotalCount').textContent = '1,248';
+      $('liteSpeed').textContent = (state === 'done') ? '5.2 MB/s' : '6.8 MB/s';
+      $('litePar').textContent   = '4';
+    }
+    $('liteElapsed').textContent = s.elapsed.replace(/^已用\s*/, '');
+    $('liteRemain').textContent = s.remain ? s.remain.replace(/^剩余\s*/, '') : '—';
+    var r = $('remain');
     r.textContent = s.remain;
     r.style.display = s.remain ? '' : 'none';
-    document.getElementById('statusText').textContent = s.text;
 
-    var pl = document.getElementById('pauseLabel');
-    pl.textContent = s.pause;
-    var pb = document.querySelector('.abtn.pause');
-    pb.style.display = s.pause ? '' : 'none';
+    var f = FLOWS[flow];
+    var txt = s.text;
+    if (txt === null) txt = (state === 'running') ? f.running : f.done;
+    if (state === 'fail') txt = f.fail;
 
-    // 状态图标颜色
-    var icon = document.querySelector('.st-icon svg');
+    $('statusText').textContent = txt;
+    $('winTitle').textContent  = txt;
+
+    var pb = $('pauseBtn');
+    $('pauseLabel').textContent = s.pause;
+    // 暂停 ↔ 继续时图标也换（ProgressWindow.axaml.cs:696 IconPlay / :1036 IconPause）
+    $('pauseIcon').setAttribute('href', state === 'paused' ? '#ic-play' : '#ic-pause');
+    pb.hidden = !s.pause;
+    // 倒计时只在「完成且未压钉」时出现。失败态 OnHasErrorsChanged 会自动压钉（ProgressViewModel.cs:488-495）
+    // ⇒ 失败时图钉亮起、没有倒计时；这里用 .auto 只在失败档视觉压钉，切走后复原，方便来回对比。
+    $('tgPin').classList.toggle('auto', state === 'fail');
+    var pinned = $('tgPin').classList.contains('on') || $('tgPin').classList.contains('auto');
+    $('countdown').classList.toggle('hide', state !== 'done' || pinned);
+
+    // 终态：取消按钮变「关闭」+ 勾图标（ProgressWindow.axaml.cs:283 SetComplete 里的真实行为）
+    var term = (state === 'done' || state === 'fail' || state === 'cancel');
+    var cb = $('cancelBtn');
+    $('cancelLabel').textContent = term ? '关闭' : '取消';
+    $('cancelIcon').setAttribute('href', term ? '#ic-ok' : '#ic-fail');
+    cb.classList.toggle('term', term);
+
     var col = 'var(--progress)';
-    if (st === 'done') col = 'var(--ok)';
-    if (st === 'fail') col = 'var(--err)';
-    if (st === 'paused') col = 'var(--warn)';
-    icon.style.color = col;
+    if (state === 'done')   col = 'var(--ok)';
+    if (state === 'fail')   col = 'var(--err)';
+    if (state === 'paused') col = 'var(--warn)';
+    if (state === 'cancel') col = 'var(--text2)';
+    $('stIcon').querySelector('svg').style.color = col;
 
     // 批处理行在终态的表现
     document.querySelectorAll('.brow').forEach(function(b, i){
       var bg = b.querySelector('.fillbg');
       if (!bg) return;
-      if (st === 'done') bg.style.setProperty('--w', '100%');
-      if (st === 'fail' && i === 2) bg.style.setProperty('--w', '0%');
+      if (state === 'done' || state === 'cancel') bg.style.setProperty('--w', '100%');
+      if (state === 'fail') { bg.style.setProperty('--w', i === 2 ? '0%' : (i === 0 ? '64%' : '100%')); }
     });
   }
 
-  document.querySelectorAll('[data-set]').forEach(function(btn){
+  /* ── 流程（压缩 / 解压）─────────────────────────────────── */
+  function applyFlow(){
+    var f = FLOWS[flow];
+    $('batchCount').textContent = scene === 'multi' ? '3 个压缩包' : '1 个压缩包';
+    $('tgFolder').setAttribute('data-tip', f.openTip);
+    $('tgTrash').hidden = (flow !== 'extract');
+    $('tgTrash').classList.toggle('on', false);
+    buildConflictOptions();
+    applyState();
+  }
+
+  /* ── ⑥ 「全部」卡第三行：总大小 ↔ 已处理（对比用）──────────
+     总大小 = StatsTotalSizeValue（全集，与第二行条目数同轴）
+     已处理 = StatsProcessedCount（引擎上报，含跳过与出错，与百分比同轴）*/
+  function applyAllRow(){
+    var v = root.getAttribute('data-allrow') || 'size';
+    var el = $('allRow');
+    if (el) el.textContent = (v === 'processed') ? '已处理 742' : '41.76 MB';
+  }
+
+  /* ── 冲突策略下拉 ───────────────────────────────────────── */
+  function buildConflictOptions(){
+    var list = CONFLICT[flow];
+    if (!list.some(function(p){ return p[0] === curConflict; })) curConflict = 'ask';
+    var pop = $('comboPopup');
+    pop.innerHTML = '';
+    list.forEach(function(p){
+      var b = document.createElement('button');
+      b.textContent = p[1];
+      b.setAttribute('aria-selected', String(p[0] === curConflict));
+      b.addEventListener('click', function(e){
+        e.stopPropagation();
+        curConflict = p[0];
+        paintConflict();
+        pop.classList.remove('open');
+      });
+      pop.appendChild(b);
+    });
+    paintConflict();
+  }
+  function paintConflict(){
+    var list = CONFLICT[flow];
+    var hit = list.filter(function(p){ return p[0] === curConflict; })[0];
+    $('combo').textContent = hit ? hit[1] : '每次询问';
+    var locked = $('optLock').checked;
+    $('combo').setAttribute('aria-disabled', String(locked));
+    $('comboPopup').querySelectorAll('button').forEach(function(b){ b.disabled = locked; });
+  }
+
+  /* ── 冲突下拉搬位置：视图行（默认）↔ 按钮行 ───────────────
+     真机实现时这是二选一的布局决定，原型里让她能来回切着比较：
+     视图行 = 分段居中 + 冲突贴右（省一行信息区首行）；按钮行 = 挤在倒计时与暂停之间。 */
+  function mountConflict(pos){
+    var box = $('conflictBox');
+    var host = pos === 'btns' ? $('conflictBtns') : $('conflictMount');
+    host.appendChild(box);
+    $('comboPopup').classList.remove('open');
+  }
+
+  /* ── 列表过滤 ───────────────────────────────────────────── */
+  function applyFilter(){
+    var rows = document.querySelectorAll('#llist .lrow');
+    var visible = 0;
+    rows.forEach(function(row){
+      var s = row.getAttribute('data-s');
+      var ok = (FILTERS[filter] || FILTERS.all)(s);
+      row.classList.toggle('hide', !ok);
+      if (ok) visible++;
+    });
+    $('lempty').classList.toggle('show', rows.length > 0 && visible === 0);
+    document.querySelectorAll('.cards.click .card').forEach(function(c){
+      c.setAttribute('aria-pressed', String(c.getAttribute('data-f') === filter));
+    });
+    // 徽标数字按实际行统计，避免与列表对不上
+    var counts = {all:0, done:0, skip:0, fail:0, ovr:0};
+    rows.forEach(function(row){
+      var s = row.getAttribute('data-s');
+      counts.all++;
+      if (counts[s] !== undefined) counts[s]++;
+    });
+    document.querySelectorAll('[data-n]').forEach(function(el){
+      var k = el.getAttribute('data-n');
+      el.textContent = String(counts[k] === undefined ? 0 : counts[k]);
+    });
+  }
+
+  /* ── Toast ──────────────────────────────────────────────── */
+  var toastTimer = null;
+  function showToast(msg){
+    var t = $('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    if (toastTimer) clearTimeout(toastTimer);
+    toastTimer = setTimeout(function(){ t.classList.remove('show'); }, 1600);
+  }
+
+  /* ── 控制条：theme / flow / scene / state / view / width ─── */
+  document.querySelectorAll('.ctrl [data-set]').forEach(function(btn){
     btn.addEventListener('click', function(){
       var parts = btn.getAttribute('data-set').split(':');
       var key = parts[0], val = parts[1];
       root.setAttribute('data-' + key, val);
-      // 同组按钮 aria-pressed
       btn.parentNode.querySelectorAll('button').forEach(function(b){
         b.setAttribute('aria-pressed', String(b === btn));
       });
-      apply();
+      if (key === 'state')  { state = val; applyState(); }
+      if (key === 'flow')   { flow  = val; applyFlow(); }
+      if (key === 'scene')  { scene = val; applyFlow(); }
+      if (key === 'cpos')   { mountConflict(val); }
+      if (key === 'allrow') { applyAllRow(); }
+      if (key === 'fill')   { applyAllRow(); }   // fill 由 CSS 驱动，无需额外处理
+      // view / width / theme 由 CSS 直接驱动
     });
   });
 
-  var opt76 = document.getElementById('opt76');
-  opt76.addEventListener('change', function(){
-    root.setAttribute('data-76', opt76.checked ? 'on' : 'off');
+  /* ── 窗口内：视图分段 ───────────────────────────────────── */
+  document.querySelectorAll('.mode .seg button').forEach(function(b){
+    b.addEventListener('click', function(){
+      var v = b.getAttribute('data-v');
+      root.setAttribute('data-view', v);
+      view = v;
+      document.querySelectorAll('[data-set="view:' + v + '"]').forEach(function(x){
+        x.parentNode.querySelectorAll('button').forEach(function(y){
+          y.setAttribute('aria-pressed', String(y === x));
+        });
+      });
+    });
   });
 
-  apply();
+  /* ── 窗口内：统计卡过滤 ─────────────────────────────────── */
+  document.querySelectorAll('.cards.click .card').forEach(function(c){
+    c.addEventListener('click', function(){
+      var f = c.getAttribute('data-f');
+      if (f !== 'all' && filter === f) f = 'all';
+      filter = f;
+      applyFilter();
+    });
+  });
+  $('emptyAll').addEventListener('click', function(){
+    filter = 'all';
+    applyFilter();
+  });
+
+  /* ── 窗口内：列表行 / 批处理行选中 ──────────────────────── */
+  document.querySelectorAll('#llist .lrow').forEach(function(row){
+    row.addEventListener('click', function(){
+      document.querySelectorAll('#llist .lrow').forEach(function(x){ x.style.background = ''; });
+      row.style.background = 'var(--tint)';
+    });
+  });
+  document.querySelectorAll('.brow').forEach(function(row){
+    row.addEventListener('click', function(e){
+      if (e.target.classList.contains('badge')) {
+        showToast('密码匹配中…（Flyout 展示路径与来源）');
+        return;
+      }
+      document.querySelectorAll('.brow').forEach(function(x){ x.classList.remove('sel'); });
+      row.classList.add('sel');
+    });
+  });
+
+  /* ── 窗口内：暂停 / 取消 ────────────────────────────────── */
+  $('pauseBtn').addEventListener('click', function(){
+    state = (state === 'paused') ? 'running' : 'paused';
+    applyState();
+    document.querySelectorAll('[data-set="state:' + state + '"]').forEach(function(x){
+      x.parentNode.querySelectorAll('button').forEach(function(y){
+        y.setAttribute('aria-pressed', String(y === x));
+      });
+    });
+  });
+  $('cancelBtn').addEventListener('click', function(){
+    state = 'cancel';
+    applyState();
+    document.querySelectorAll('[data-set="state:cancel"]').forEach(function(x){
+      x.parentNode.querySelectorAll('button').forEach(function(y){
+        y.setAttribute('aria-pressed', String(y === x));
+      });
+    });
+  });
+
+  /* ── 窗口内：三个 ToggleButton ──────────────────────────── */
+  ['tgPin','tgFolder','tgTrash'].forEach(function(id){
+    $(id).addEventListener('click', function(){
+      this.classList.toggle('on');
+    });
+  });
+
+  /* ── 窗口内：复制按钮 + Toast ───────────────────────────── */
+  $('copyStatus').addEventListener('click', function(){
+    showToast('已复制状态文本');
+  });
+  $('copySummary').addEventListener('click', function(){
+    showToast('已复制错误摘要');
+  });
+
+  /* ── 窗口内：冲突下拉展开 / 收起 ────────────────────────── */
+  $('combo').addEventListener('click', function(e){
+    e.stopPropagation();
+    if (this.getAttribute('aria-disabled') === 'true') return;
+    $('comboPopup').classList.toggle('open');
+  });
+  document.addEventListener('click', function(){
+    $('comboPopup').classList.remove('open');
+  });
+
+  /* ── 控制条：进度滑块 / 两个复选 ────────────────────────── */
+  $('pctRange').addEventListener('input', function(){
+    var v = parseInt(this.value, 10);
+    $('info').style.setProperty('--w', v + '%');
+    $('totalbarfill').style.width = v + '%';
+    $('pct').textContent = v + '%';
+    $('pctLab').textContent = v + '%';
+    $('simpleBar').style.width = v + '%';
+    $('simplePct').textContent = v + '%';
+    if (state !== 'running' && state !== 'paused') {
+      state = 'running';
+      document.querySelectorAll('[data-set="state:running"]').forEach(function(x){
+        x.parentNode.querySelectorAll('button').forEach(function(y){
+          y.setAttribute('aria-pressed', String(y === x));
+        });
+      });
+      applyState();
+    }
+  });
+
+  $('opt76').addEventListener('change', function(){
+    root.setAttribute('data-76', this.checked ? 'on' : 'off');
+  });
+  $('optLock').addEventListener('change', function(){
+    paintConflict();
+  });
+
+  /* ── 控制条与窗口内控件的高亮同步（初值可能来自 <html data-*>）── */
+  function syncControls(){
+    document.querySelectorAll('.ctrl [data-set]').forEach(function(btn){
+      var p = btn.getAttribute('data-set').split(':');
+      var cur = root.getAttribute('data-' + p[0]);
+      btn.setAttribute('aria-pressed', String(cur === p[1]));
+    });
+    document.querySelectorAll('.mode .seg button').forEach(function(b){
+      b.setAttribute('aria-pressed', String(root.getAttribute('data-view') === b.getAttribute('data-v')));
+    });
+    $('opt76').checked  = root.getAttribute('data-76') === 'on';
+    $('optLock').checked = false;
+  }
+
+  /* ── 首屏 ──────────────────────────────────────────────── */
+  syncControls();
+  mountConflict(root.getAttribute('data-cpos') || 'mode');
+  applyFlow();
+  applyFilter();
+  applyAllRow();
 })();
 </script>
 </body>

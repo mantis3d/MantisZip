@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="zh-CN" data-theme="light" data-view="list" data-compare="new" data-filter="all" data-total="keep">
+<html lang="zh-CN" data-theme="light" data-view="list" data-compare="new" data-filter="all" data-total="keep" data-state="running">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -10,14 +10,26 @@ html[data-theme="light"]{
   --text:#1A1A1A; --text2:#6B6B6B; --btn-bg:#F5F5F5; --hover:#EDEDED;
   --progress:#2196F3; --accent:#60B8FC; --page-bg:#F0F2F5; --page-fg:#303030;
   --ok:#4CAF50; --err:#F44336; --skip:#00BCD4; --warn:#FFB300;
-  --fill35:rgba(33,150,243,.35); --tint:rgba(96,184,252,.14); --tintHover:rgba(96,184,252,.22);
+  /* 底纹五态：进行中 / 不确定(准备·扫描) / 完成 / 失败·取消 / 暂停 */
+  --fill35:rgba(33,150,243,.35);
+  --fill35warn:rgba(255,179,0,.30);
+  --fill35ok:rgba(76,175,80,.20);
+  --fill35err:rgba(244,67,54,.20);
+  --fill35off:rgba(158,158,158,.20);
+  --tint:rgba(96,184,252,.14); --tintHover:rgba(96,184,252,.22);
 }
 html[data-theme="dark"]{
   --win-bg:#1E1E1E; --surface:#252525; --panel:#3E3E3E; --border:#3E3E3E;
   --text:#E8E8E8; --text2:#A0A0A0; --btn-bg:#2D2D2D; --hover:#3A3A3A;
   --progress:#64B5F6; --accent:#0078D4; --page-bg:#141414; --page-fg:#D8D8D8;
   --ok:#66BB6A; --err:#EF5350; --skip:#4DD0E1; --warn:#FFC107;
-  --fill35:rgba(100,181,246,.35); --tint:rgba(0,120,212,.22); --tintHover:rgba(0,120,212,.32);
+  /* 深色下 alpha 略提，否则压在 #252525 上几乎看不出 */
+  --fill35:rgba(100,181,246,.35);
+  --fill35warn:rgba(255,193,7,.26);
+  --fill35ok:rgba(102,187,106,.22);
+  --fill35err:rgba(239,83,80,.24);
+  --fill35off:rgba(160,160,160,.22);
+  --tint:rgba(0,120,212,.22); --tintHover:rgba(0,120,212,.32);
 }
 *{box-sizing:border-box}
 body{
@@ -127,6 +139,28 @@ html[data-view="list"] .panel.list{display:block}
 }
 .stack{display:flex; flex-direction:column; width:100%; gap:4px}
 
+/* ══ Row 3 底纹进度条：铺在卡行后面，不占独立一行 ══════════
+   .bottom 带 padding:4px 6px + 1px 边框；底纹 inset:0 铺到边框内侧（含内边距区）。
+   宽度只由 --w 决定 ⇒ 切档（完整 ↔ 列表）时进度完全不跳。 */
+.bottom{position:relative; overflow:hidden; --w:31%}
+.bottom .fill{
+  position:absolute; inset:0; border-radius:4px;
+  width:var(--w,31%);
+  background:var(--fill35);
+  transition:width .25s ease, background .25s ease, opacity .25s ease;
+  pointer-events:none; z-index:0;
+}
+.bottom .stack{position:relative; z-index:1}
+
+/* 五态：不确定态（准备/扫描）优先于 StatusKind，铺满淡黄 */
+html[data-state="preparing"] .bottom .fill,
+html[data-state="scanning"]  .bottom .fill{width:100%; background:var(--fill35warn)}
+html[data-state="running"]   .bottom .fill{width:var(--w,31%); background:var(--fill35)}
+html[data-state="paused"]    .bottom .fill{width:var(--w,31%); background:var(--fill35); opacity:.55}
+html[data-state="completed"] .bottom .fill{width:100%; background:var(--fill35ok)}
+html[data-state="failed"]    .bottom .fill{width:100%; background:var(--fill35err)}
+html[data-state="cancelled"] .bottom .fill{width:100%; background:var(--fill35off)}
+
 /* 卡行：两档共用同一套卡片度量 */
 .cards{display:flex; flex-wrap:wrap; gap:4px 8px; width:100%}
 .card{
@@ -225,6 +259,20 @@ table.fix tr:last-child td{border-bottom:0}
     <button data-set="total:keep" aria-pressed="true">保留</button>
     <button data-set="total:drop" aria-pressed="false">去掉</button>
   </div>
+  <div class="grp">
+    <span class="lbl">底纹状态</span>
+    <button data-state="preparing">准备</button>
+    <button data-state="scanning">扫描</button>
+    <button data-state="running" aria-pressed="true">进行中</button>
+    <button data-state="paused">暂停</button>
+    <button data-state="completed">完成</button>
+    <button data-state="failed">失败</button>
+    <button data-state="cancelled">取消</button>
+  </div>
+  <div class="grp">
+    <span class="lbl">进度 <span id="pctLab">31%</span></span>
+    <input type="range" id="pctRange" min="0" max="100" value="31" style="width:120px;accent-color:var(--accent)">
+  </div>
 </div>
 
 <div class="stage">
@@ -285,6 +333,7 @@ table.fix tr:last-child td{border-bottom:0}
 
     <!-- Row 3 -->
     <div class="bottom">
+      <div class="fill"></div>
       <div class="stack">
         <div class="oldbar">旧版：下面两行同时存在（卡行 + 过滤胶囊），多占一行</div>
 
@@ -338,7 +387,7 @@ table.fix tr:last-child td{border-bottom:0}
         <span>📥 24.9 MB</span>
       </div>
       <div class="right">
-        <span class="pct">31%</span>
+        <span class="pct" id="pctFoot">31%</span>
         <span>已用 00:12</span>
         <span>剩余 00:26</span>
       </div>
@@ -358,6 +407,30 @@ table.fix tr:last-child td{border-bottom:0}
     <tr><td class="k">选中</td><td>不适用</td><td>强调色边框 + 淡底</td></tr>
     <tr><td class="k">指针</td><td><code>pointer-events:none</code></td><td><code>cursor:pointer</code></td></tr>
   </table>
+
+  <h3>底纹进度条怎么看</h3>
+  <table class="fix">
+    <tr><th style="width:104px">状态</th><th>底纹表现</th></tr>
+    <tr><td class="k">准备 / 扫描</td><td class="keep">铺满整行淡黄（<code>--fill35warn</code>）。不确定态<b>优先于</b> StatusKind，百分比显示「—」</td></tr>
+    <tr><td class="k">进行中</td><td>按进度截断淡蓝（<code>--fill35</code>），宽度 = <code>--w</code>；拖顶部滑块即可看任意位置</td></tr>
+    <tr><td class="k">暂停</td><td>同进行中但整体 <code>opacity:.55</code>，一眼能看出「卡住了但没死」</td></tr>
+    <tr><td class="k">完成</td><td>铺满整行淡绿（<code>--fill35ok</code>）</td></tr>
+    <tr><td class="k">失败</td><td>铺满整行淡红（<code>--fill35err</code>）</td></tr>
+    <tr><td class="k">取消</td><td>铺满整行淡灰（<code>--fill35off</code>）</td></tr>
+  </table>
+  <p class="muted">
+    <b>底纹铺到哪</b>：<code>.bottom</code> 带 <code>padding:4px 6px</code> + 1px 边框，底纹 <code>inset:0</code>
+    ⇒ 一直铺到边框内侧、含内边距区，看起来是「整块卡行的底」而不是「卡片下面的条」。<br>
+    <b>为什么只留底纹不留独立总条</b>：完整档本来有一根独立总条（<code>ProgressWindow.axaml:1190-1195</code>），
+    底纹就是来顶替它的。无头渲染会看到 4 个 Tab 宽度不一致时卡片换行，那时底纹仍只算一整块 —— 真机是
+    <code>WrapPanel</code>，换行后底纹高度自动跟着长，不会只盖住第一行（这是原型和真机的唯一差异，已记进计划风险表）。
+  </p>
+
+  <h3>底纹在「完整」档要不要一起给</h3>
+  <p class="muted">
+    给。切「完整」档即可看到十张卡后面的同一块底纹 —— 两个档位共用同一个 <code>.bottom</code> 容器，
+    切档时进度宽度完全不变（<code>--w</code> 只由状态与滑块决定），所以切换不会有跳动。
+  </p>
 
   <h3>卡片数量与顺序</h3>
   <p class="muted">
@@ -507,6 +580,58 @@ table.fix tr:last-child td{border-bottom:0}
       document.querySelectorAll('[data-f]').forEach(function(x){
         x.setAttribute('aria-pressed', String(x.getAttribute('data-f') === f));
       });
+
+  // ── Row 3 底纹：状态 + 进度位置 ──
+  var STATE_PCT = {
+    preparing: null, scanning: null,
+    running: 31, paused: 31,
+    completed: 100, failed: 100, cancelled: 100
+  };
+
+  function applyFill(){
+    var st = root.getAttribute("data-state") || "running";
+    var bottom = document.querySelector(".bottom");
+    if (!bottom) return;
+    var pct = STATE_PCT[st];
+    if (pct !== null && pct !== undefined) {
+      bottom.style.setProperty("--w", pct + "%");
+      document.getElementById("pctRange").value = pct;
+      document.getElementById("pctLab").textContent = pct + "%";
+      document.getElementById("pctFoot").textContent = pct + "%";
+    } else {
+      // 不确定态：宽度铺满，百分比无意义
+      document.getElementById("pctLab").textContent = "—";
+      document.getElementById("pctFoot").textContent = "—";
+    }
+  }
+
+  document.querySelectorAll("[data-state]").forEach(function(btn){
+    btn.addEventListener("click", function(){
+      root.setAttribute("data-state", btn.getAttribute("data-state"));
+      document.querySelectorAll("[data-state]").forEach(function(b){
+        b.setAttribute("aria-pressed", String(b === btn));
+      });
+      applyFill();
+    });
+  });
+
+  var range = document.getElementById("pctRange");
+  if (range) {
+    range.addEventListener("input", function(){
+      var v = Number(range.value);
+      document.getElementById("pctLab").textContent = v + "%";
+      document.getElementById("pctFoot").textContent = v + "%";
+      var bottom = document.querySelector(".bottom");
+      if (bottom) bottom.style.setProperty("--w", v + "%");
+      // 拖动进度条时自动切到「进行中」，否则颜色对不上
+      if (root.getAttribute("data-state") !== "running" && root.getAttribute("data-state") !== "paused") {
+        root.setAttribute("data-state", "running");
+        document.querySelectorAll("[data-state]").forEach(function(b){
+          b.setAttribute("aria-pressed", String(b.getAttribute("data-state") === "running"));
+        });
+      }
+    });
+  }
       applyFilter();
     });
   });
@@ -527,6 +652,7 @@ table.fix tr:last-child td{border-bottom:0}
   })();
 
   applyFilter();
+  applyFill();
 })();
 </script>
 </body>
