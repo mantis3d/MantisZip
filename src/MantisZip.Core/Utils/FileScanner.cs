@@ -46,16 +46,11 @@ internal static class FileScanner
         var reportInterval = TimeSpan.FromMilliseconds(100);
 
         // 「包内根目录」四态：一次判定，逐条目套用（②剥根 / ③④加根 / ①原样）。
-        // 剥根的候选段 = 唯一那个目录源的叶子名；加根段来自调用方给的根名。
-        var hasSingleSourceDir = ArchiveRootPolicy.HasSingleSourceDirectory(sourcePaths);
-        var adjustment = ArchiveRootPolicy.Resolve(rootMode, hasSingleSourceDir);
-        var stripRoot = adjustment.Strip && hasSingleSourceDir
-            ? ArchiveRootPolicy.GetSourceStripName(sourcePaths[0])
-            : null;
-        var effectiveWrap = adjustment.Wrap
-            ? ArchiveRootPolicy.ResolveWrapName(wrapRoot, sourcePaths, archivePath, wrapTimestamp)
-            : null;
-        if (adjustment.IsActive)
+        // 判定与根名回落收在 ArchiveRootPolicy.ResolveSourceRoots —— 7z 的新建与追加、
+        // 本扫描器共用同一份，避免「预览 = 新建 ≠ 追加」。
+        var (stripRoot, effectiveWrap) = ArchiveRootPolicy.ResolveSourceRoots(
+            rootMode, sourcePaths, wrapRoot, archivePath, wrapTimestamp);
+        if (stripRoot != null || effectiveWrap != null)
         {
             CoreLog.Info($"FileScanner.CollectFiles: rootMode={rootMode}, strip='{stripRoot}', wrap='{effectiveWrap}'");
         }

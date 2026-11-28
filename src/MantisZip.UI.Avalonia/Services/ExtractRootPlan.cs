@@ -41,8 +41,10 @@ public static class ExtractRootPlan
         if (mode == RootDirectoryMode.Original)
             return (null, null);
 
-        var hasSingleRoot = entries is { Count: > 0 } && ArchiveStructureAnalyzer.HasSingleRootDirectory(entries);
-        var adjustment = ArchiveRootPolicy.Resolve(mode, hasSingleRoot);
+        // 「能不能剥」与「剥哪一段」是同一个判定，交给 HasStrippableRoot 一次答完：
+        // 空包与「只有目录条目」的包在这里就已经是 false，不会出现「窗里能选、跑起来什么都不做」。
+        var hasStrippableRoot = ArchiveStructureAnalyzer.HasStrippableRoot(entries);
+        var adjustment = ArchiveRootPolicy.Resolve(mode, hasStrippableRoot);
 
         // 剥哪一段：只有「确有唯一根」时才有可剥的名字；加哪一段：默认用包名（去扩展名）。
         var stripRoot = adjustment.Strip
@@ -52,7 +54,7 @@ public static class ExtractRootPlan
             ? ArchiveRootPolicy.GetWrapName(preferredName: null, fallbackArchivePath: archivePath)
             : null;
 
-        // 剥根段拿不到（例如纯目录包）时宁可不动，也不要"剥了但没有名字"这种半生效状态。
+        // 兜底（理论上不可达：HasStrippableRoot 已保证有名字）。宁可不动，也不要「剥了但没有名字」的半生效状态。
         if (adjustment.Strip && stripRoot == null)
             return (null, null);
 
@@ -60,11 +62,19 @@ public static class ExtractRootPlan
     }
 
     /// <summary>
-    /// 与 <see cref="Resolve"/> 相同，但自己去列一次条目。
+    /// 与 <see cref="Resolve"/> 相同，但在没有现成条目时自己去列一次。
     /// </summary>
     /// <remarks>
+    /// <para>
     /// 三条执行链（整包 / 过滤 / 选中条目）都要判「包有没有唯一根」，各写一次就等于三个判定点
     /// 迟早不一致；统一从这里进。原样模式直接短路，不列条目、零额外开销。
+    /// </para>
+    /// <para>
+    /// <paramref name="knownEntries"/> 非空时直接用这批条目判定，<b>不再列包</b>：确认事务已经把
+    /// 「用户当时看到的条目」冻结进载荷（<see cref="Models.ExtractSettings.KnownEntries"/>），
+    /// 执行段再列一次既慢又可能因编码/密码差异列出一份不同的名字，反倒让「预览 = 实际」漂移。
+    /// 对 TAR/GZ 尤其关键 —— 它们的 <c>ListEntriesAsync</c> 是全流扫描，成本≈解压一次。
+    /// </para>
     /// </remarks>
     public static async Task<(string? StripRoot, string? AddRoot)> ResolveAsync(
         IArchiveEngine? engine,
@@ -72,9 +82,16 @@ public static class ExtractRootPlan
         string? password,
         CancellationToken cancellationToken,
         string? nameEncoding,
-        RootDirectoryMode mode)
+        RootDirectoryMode mode,
+        IReadOnlyList<ArchiveItem>? knownEntries = null)
     {
-        if (mode == RootDirectoryMode.Original || engine == null)
+        if (mode == RootDirectoryMode.Original)
+            return (null, null);
+
+        if (knownEntries is { Count: > 0 })
+            return Resolve(mode, knownEntries, archivePath);
+
+        if (engine == null)
             return (null, null);
 
         var entries = await engine.ListEntriesAsync(archivePath, password, cancellationToken, nameEncoding);

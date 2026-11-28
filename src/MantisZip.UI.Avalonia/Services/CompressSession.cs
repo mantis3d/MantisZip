@@ -10,6 +10,7 @@ using MantisZip.Core;
 using MantisZip.Core.Abstractions;
 using MantisZip.Core.Models;
 using MantisZip.Core.Services;
+using MantisZip.Core.Utils;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
 
@@ -314,7 +315,9 @@ public sealed class CompressSession : ICompressSession
             PreserveDirectoryRoot = appSettings.PreserveDirectoryRoot,
             // 「包内根目录」四态：用户在对话框里的决定，必须随载荷走（默认原样）。
             RootMode = settings.RootMode,
-            WrapRoot = settings.WrapRoot,
+            // 根名只在「会加根」的档位上有意义：原样 / 智能去根时留着上一轮的旧根名，
+            // 就等于让载荷里塞一个本次不会被读、却随时可能被下游误用的值。
+            WrapRoot = ArchiveRootPolicy.IsWrapMode(settings.RootMode) ? settings.WrapRoot : null,
             FileNameEncoding = settings.EngineOptions.FileNameEncoding,
             ZipCompressionMethod = settings.EngineOptions.ZipCompressionMethod,
             ZipEncryptionMethod = settings.EngineOptions.ZipEncryptionMethod,

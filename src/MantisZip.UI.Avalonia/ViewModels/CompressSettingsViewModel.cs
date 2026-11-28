@@ -1633,11 +1633,10 @@ public partial class CompressSettingsViewModel : ObservableObject
     public bool CanWrapRoot => OutputMode != CompressOutputMode.Separate;
 
     /// <summary>根名输入框是否可见（只在真的会加根时显示，避免多一行无意义控件）。</summary>
-    public bool IsWrapRootVisible => CanWrapRoot
-        && (RootMode == RootDirectoryMode.SmartWrap || RootMode == RootDirectoryMode.AlwaysWrap);
+    public bool IsWrapRootVisible => CanWrapRoot && IsWrapActive;
 
-    /// <summary>当前选择是否会真的加根（供预览与提示用）。</summary>
-    public bool IsWrapActive => RootMode is RootDirectoryMode.SmartWrap or RootDirectoryMode.AlwaysWrap;
+    /// <summary>当前选择是否会真的加根（供预览与提示用）。判定放在 Core，与载荷裁剪同源。</summary>
+    public bool IsWrapActive => ArchiveRootPolicy.IsWrapMode(RootMode);
 
     /// <summary>模板内容变化 → 重渲染（只改显示与校验，不写回设置）。</summary>
     partial void OnFileNameTemplateChanged(string? value)

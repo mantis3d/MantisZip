@@ -1,6 +1,7 @@
 using System;
 using System.Linq;
 using System.Reflection;
+using MantisZip.Core.Abstractions;
 using MantisZip.Core.Services;
 using MantisZip.UI.Avalonia.Dialogs;
 using MantisZip.UI.Avalonia.Models;
@@ -103,6 +104,45 @@ public class ExtractSettingsSeamTests
         // 未启用过滤时不过滤整包：FilteredEntryKeys 为 null = 整包，空集合才是「有意零匹配」
         Assert.Null(settings.FilteredEntryKeys);
         Assert.Null(settings.SelectedEntries);
+
+        // 确认时已知的条目随载荷冻结（根目录四态判据的执行侧输入）：没走过的包必须是 null，
+        // 执行器才会按引入本字段前的方式自行列包。
+        Assert.Null(settings.KnownEntries);
+        Assert.Null(settings.GetKnownEntries(SeedArchives[0]));
+    }
+
+    /// <summary>
+    /// 守卫③补充：确认事务必须把「预览用的那批条目」一起冻结进载荷。
+    /// <para>
+    /// 锁定的回归：执行段自己再列一遍包时，TAR/GZ 要白扫一次全流（成本≈解压一次），
+    /// 且编码/密码差异可能列出不同的名字 → 剥根前缀匹配不上，用户选的档位静默不生效。
+    /// 这里不放行为级断言（无 IArchiveEngine 假实现），只钉住接线必达。
+    /// </para>
+    /// </summary>
+    [Fact]
+    public async Task ConfirmTransaction_FreezesKnownEntries()
+    {
+        var vm = new ExtractSettingsViewModel(SeedArchives)
+        {
+            DestinationPath = @"C:\mz-seam-extract-probe-known",
+        };
+        vm.SetFirstArchiveEntries(new[]
+        {
+            new ArchiveItem { Name = "root/a.txt", FullPath = "root/a.txt" },
+            new ArchiveItem { Name = "root/b.txt", FullPath = "root/b.txt" },
+        });
+        vm.SetKnownPassword("pw");
+
+        var confirmed = Assert.IsType<Confirmed<ExtractSettings>>(
+            await vm.TryConfirmAsync(TestContext.Current.CancellationToken));
+        var settings = confirmed.Value;
+
+        var known = Assert.IsAssignableFrom<IReadOnlyList<ArchiveItem>>(
+            settings.GetKnownEntries(SeedArchives[0]));
+        Assert.Equal(2, known.Count);
+        Assert.Equal("root/a.txt", known[0].Name);
+        // 未走过的包不回落到首包条目（否则会拿别人的结构判根）
+        Assert.Null(settings.GetKnownEntries(@"C:\other\pack.zip"));
     }
 
     /// <summary>

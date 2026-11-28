@@ -71,6 +71,23 @@ public static class ArchiveStructureAnalyzer
     }
 
     /// <summary>
+    /// 判断压缩包里的条目是否**真的能剥掉一层**：存在可命名的唯一根。
+    /// </summary>
+    /// <remarks>
+    /// 与 <see cref="HasSingleRootDirectory"/> 的差别只在两个边界：空包、以及「只有目录条目」
+    /// 的包 —— 那两种情况下 <see cref="HasSingleRootDirectory"/> 回答 <see langword="true"/>
+    /// （结构上确实没有散落文件），但 <see cref="GetSingleRootDirectory"/> 取不到名字，
+    /// 剥根无从执行。UI 用它决定「智能去根」档位要不要出现，否则会出现「窗里能选、
+    /// 跑起来什么都不做」的死选项；执行侧也用它，避免「剥了但没有名字」的半生效状态。
+    /// <para>
+    /// 实现**故意直接问 <see cref="GetSingleRootDirectory"/>**：剥根的前提是拿到那一段名字，
+    /// 「能不能剥」和「剥哪一段」本来就是同一个判定的两种说法，分两处写必然漂移。
+    /// </para>
+    /// </remarks>
+    public static bool HasStrippableRoot(IReadOnlyList<ArchiveItem>? items)
+        => items is { Count: > 0 } && GetSingleRootDirectory(items) != null;
+
+    /// <summary>
     /// 取压缩包的唯一根目录名（如 <c>7zip/</c> 里的 <c>7zip</c>）。
     /// </summary>
     /// <param name="items">压缩包条目列表。</param>

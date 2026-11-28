@@ -412,10 +412,15 @@ public static class CompressFlow
     {
         try
         {
+            // 根名模板的时间戳必须与执行侧同源：request.TemplateTimestamp 是对话框打开时冻结进
+            // 载荷的批级时间戳（CompressSession 落到 CompressWrapRootTimestamp），这里若漏传，
+            // FileScanner 会另取 DateTime.Now —— 根名含 {date}/{datetime} 且跨午夜时，播种 Key
+            // 与引擎上报的条目名差一秒，进度列表就会多出一行永远 Pending 的幽灵行。
             var items = await Task.Run(
                 () => SourceEntryEnumerator.Enumerate(
                     request.SourcePaths, whitelist, ct,
-                    request.RootMode, request.WrapRoot, request.OutputPath),
+                    request.RootMode, request.WrapRoot, request.OutputPath,
+                    request.TemplateTimestamp),
                 ct).ConfigureAwait(false);
 
             if (items.Count == 0 || items.Count > MaxSeedEntryCount)
