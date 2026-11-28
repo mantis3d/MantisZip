@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-28** — 计划立项定稿：CLI 无人值守健壮性（挂死修复 + 真实退出码，P0 12-16h）
+  - **触发**：源自 2026-11-22 的「CLI 要不要拆独立 exe」调研。实测发现与分发形态无关的两条行为缺陷：`--extract-here` 遇到损坏包 / 截断包 / 加密包无密码 / 同名冲突四种情形**永久挂起**（>12s 强杀）；40 处 `AppShutdown.Request` 零处传非零码 ⇒ 脚本侧无法区分成功与失败。
+  - **计划文档**：[cli-unattended-robustness.md](.omo/plans/未开始/cli-unattended-robustness.md)（2026-11-22 立项，11-27 按 HEAD 现状重写，11-28 按探针实测修正判定代码）。`docs/PLAN.md` 的 v0.5.9 阶段首行同步（工时 8-12h → 12-16h，阶段合计 17-24h → 19-26h）。
+  - **判定方式定案（2026-11-27，用户选定「只做 B、不加设置项」）**：无人值守 = **父控制台自动判定 + `--unattended` / `--interactive` 显式覆盖**，不加 `AppSettings` 属性、不动设置页、不改注册表命令行。**关键动机**：右键菜单的 `--extract-here` / `--extract-smart` 走的正是这批 CLI 路径，若把「CLI 路径」直接等同于「无人值守」，会把用户本可用的冲突框 / 密码框 / UAC 提权框一并关掉——原挂死「因为它在等人」，人不在才是缺陷。不改注册表意味着老用户无需重装菜单（也不需要一个 `MenuSchema` 版本标记 + 启动自愈）。
+  - **探针实测（推翻计划初稿的判定代码）**：临时 WinExe 探针（`%TEMP%` 下一次性工程，未入库）在两种宿主下测三个 P/Invoke。有父控制台（pwsh 调用）：`GetConsoleWindow=0`、未 attach 时 `GetConsoleProcessList=0`、`AttachConsole(ATTACH_PARENT_PROCESS)=1`、attach 后 `count=3`。无控制台（GUI 父进程 `UseShellExecute=false` 拉起，模拟 Explorer 右键）：`AttachConsole` 返回 **0 / err=6（`ERROR_INVALID_HANDLE`）**。**结论**：`GetConsoleProcessList` 在 WinExe 下不先 attach 恒为 0，初稿「先看 `GetConsoleWindow` 再数进程」的写法会把所有宿主判成交互（判定恒假、功能全不生效）；必须改成先 `AttachConsole` 成功再数 `count > 1`，随后 `FreeConsole()` 脱开。
+  - **按代码现状修正的四处计划缺陷**：① 冲突注入点不是 `CreateExtractOptions` 的第一个参数（有 `livePolicy` 时被完全忽略），而是 `SetConflictPolicyControl(flow, initialCode)` 的初始值；② 不用 `PasswordService.HasEncryptedEntries` 预检（异常与未知引擎时保守 `return true`，会把损坏包误判成缺密码），改用 `PasswordRetryLoop` 的 `promptPassword: ` 注入让引擎报错自己决定语义；③ CLI 两条叶子直连 `engine.ExtractAsync` 绕过 v0.5.8 新增的 `ExtractOutcomeTracker`，「一条都没写出来」仍算成功，必须补接；④ 「五条执行链返回值改 `int`」是白工（调用多为 fire-and-forget），只改 `TryExtractArchiveAsync` / `TryExtractSmartAsync`（`Task<int?>`，`null` = 已提权重启）与 `RunCliExtractWithProgressAsync`（`Task<int>`）。
+  - **顺带的核实产出**：Avalonia 12.1.2 里 `ClassicDesktopStyleApplicationLifetime` **没有** `ExitCode` 属性（`Shutdown(int)` 只在 `IControlledApplicationLifetime` 上，`StartWithClassicDesktopLifetime` 返回 `void`）⇒ 退出码唯一通道是 `desktop.Shutdown(exitCode)`，不需要 `Environment.Exit`；`Program.cs` 仍要改，但只改「摘宿主开关」一处（必须在 `ShouldShowSplash` 之前），且 `App.axaml.cs` 因自己重读 `Environment.GetCommandLineArgs()` 必须同样过滤一次，否则 `--unattended` 会落到 `switch` 的 `default` 分支直接开 GUI。
+  - **验证**：`pwsh -File scripts\verify-repo.ps1 -Task check` 全绿（版本 0.5.8 六处一致、三语 1563 key、12 项守卫）。本类改动不含产品代码，未跑构建与测试。
+
 **2026-11-27** — issue #87：密码相关默认值可配置（加密模式 / 自动生成规则 / 更新匹配规则 / 永久保存）
 
 - **用户指令**（m02308）：「写计划吧，算在v0.5.8里面，写完就开工吧」—— 原定 v0.5.9 的碎片清仓被提前并入 v0.5.8 作为第四项。
