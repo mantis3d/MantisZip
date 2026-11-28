@@ -1034,7 +1034,7 @@
   "Extract_RootMode_SmartWrap_Tip": "Archives that already have one top folder are left alone; a folder named after the archive is only added when entries sit loose at the top level.",
   "Extract_RootMode_AlwaysWrap": "Always wrap",
   "Extract_RootMode_AlwaysWrap_Tip": "Unconditionally add one folder named after the archive; an archive that already has one ends up nested two levels deep.",
-    "Extract_RootMode_Hint_StripUnavailable": "This archive has no single top folder, so smart strip is hidden here.",
+    "Extract_RootMode_Hint_StripUnavailable": "This archive has no top folder that can be stripped (empty archive, folders only, or files spread across the top level or several folders), so smart strip is hidden here.",
   "Settings_Compress_RootMode": "Root folder in archive",
   "Settings_Compress_RootName": "Default root folder name",
   "Settings_Compress_RootName_Hint": "Leave empty to use the archive file name. Placeholders {name} {parent} {date} {datetime} {archive} are supported; an invalid template is rejected in the compress settings dialog.",

@@ -81,6 +81,14 @@ public static class ArchiveRootPolicy
     };
 
     /// <summary>
+    /// 该档位是否会「加一层根目录」。根名输入框是否显示、根名要不要随载荷走、执行侧要不要解析
+    /// 根名，三处都问这一个问题 —— 各写一遍 <c>mode == SmartWrap || mode == AlwaysWrap</c>
+    /// 就会漏掉一处（漏在载荷上就是「原样档带着上一轮留下的根名跑」）。
+    /// </summary>
+    public static bool IsWrapMode(RootDirectoryMode mode)
+        => mode is RootDirectoryMode.SmartWrap or RootDirectoryMode.AlwaysWrap;
+
+    /// <summary>
     /// 智能解压只支持两档：<see cref="RootDirectoryMode.SmartWrap"/>（智能加根，默认）与
     /// <see cref="RootDirectoryMode.SmartStrip"/>（智能去根）。
     /// <para>

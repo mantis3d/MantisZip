@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-28** — 根目录四态审查第四批：加根判定收成一处 + 「能剥」判定与执行侧同源
+
+- **起因**：用户接着第三批说「都做掉吧」，把剩余清单里最后两项（E「根名随载荷走不裁剪」、G「空包/纯目录包的判定三处口径不一致」）一并收掉。
+- **① 加根判定三处各写一遍**：根名输入框是否显示（`CompressSettingsViewModel.IsWrapRootVisible`）、根名要不要随载荷走（`CompressSession.BuildRequest`）、执行侧要不要解析根名，原本是三段手抄的 `RootMode == SmartWrap || RootMode == AlwaysWrap`（其中一处还写的是 `is RootDirectoryMode.SmartWrap or AlwaysWrap`）。收成 `ArchiveRootPolicy.IsWrapMode(mode)`（`src/MantisZip.Core/Utils/ArchiveRootPolicy.cs`），三处全部改调它。**为什么现在必须收**：`CompressSession` 第 317 行原本无条件写 `WrapRoot = settings.WrapRoot` —— GUI 侧快照已经按 `IsWrapActive` 裁过，但 CLI 与测试直接构造载荷时「原样档带着上一轮留下的根名」会原封不动进引擎。改成 `IsWrapMode(...) ? settings.WrapRoot : null` 后，这条缺口在契约层就不可能发生，而不是靠每个调用方自觉。
+- **② 「能不能剥」比「有没有唯一根」严一档**：`ArchiveStructureAnalyzer.HasSingleRootDirectory` 对**空包**与**只有目录条目**的包都回答 `true`（结构上确实没有散落文件），但 `GetSingleRootDirectory` 在这两种情况下取不到名字，剥根无从执行 —— 于是 `ExtractRootPlan.Resolve`（UI 执行侧）与 `ExtractSettingsViewModel.CanStripRoot`（对话框下拉）各自抄了一份 `entries is { Count: > 0 } && HasSingleRootDirectory(entries)`。新增 `HasStrippableRoot(items)`（`=> items is { Count: > 0 } && GetSingleRootDirectory(items) != null`）后两处都改调它：`Resolve` 里 `HasSingleRootDirectory` 只喂 `ArchiveRootPolicy.Resolve` 的结构判定，剩下的「剥了却没名字」分支退化成纯兜底。行为变化只有一处 —— 纯目录包/空包不再把「智能去根」摆进下拉（此前是能选、跑起来什么都不做）。
+- **③ 提示文案随之改写**：`Extract_RootMode_Hint_StripUnavailable` 三语从「没有唯一顶层目录（条目散在顶层或分布在多个目录）」改成「没有可剥的顶层目录（空包、只有目录条目，或条目散在顶层/多个目录）」——旧文案对新出现的两个不可用原因说不通。
+- **测试**：`tests/MantisZip.Tests/Engines/SmartExtractTests.cs` 新增 5 例 `HasStrippableRoot`（单根 true；空包 / null / 纯目录 / 散装 / 多根 false，其中纯目录那例同时断言 `HasSingleRootDirectory` 仍为 true，把两者的分歧点钉住）；`tests/MantisZip.Tests/Utils/ArchiveRootPolicyTests.cs` 新增 `IsWrapMode` 的 5 例 `Theory`（含越界值 `(RootDirectoryMode)99`）；`tests/MantisZip.UI.Avalonia.Tests/CompressSessionWrapRootTrimTests.cs`（新文件，4 例）通过注入的 `compressAsync` 端口捕获执行器递给引擎的请求，逐档断言根名是否被裁剪；`tests/MantisZip.UI.Avalonia.Tests/ExtractSettingsViewModelTests.cs` 新增 4 例（单根可见、纯目录隐藏、散装隐藏、从智能去根回落原样）。
+- **验证**：`-Task build -Target core` / `-Target avalonia` 0 警告；`-Task test -Target tests` 通过（2 条存量警告）；`-Task test -Target ui-tests` 通过（33 条存量警告）；`-Task guards` 12 项全绿；`-Task check` 版本 0.5.8 六处一致、三语 1563 key。
+
 **2026-11-28** — 根目录四态审查第三批：追加路径接上四态 + 分卷包根名归卷 + 清掉三处死代码
 
 - **起因**：承接同日审查（见下一条），用户从剩余清单里勾了「追加到已有包不吃四态」「分卷包加根名带格式名」「清理死代码」三项。

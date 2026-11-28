@@ -1034,7 +1034,7 @@
   "Extract_RootMode_SmartWrap_Tip": "压缩包本来就有唯一根目录时保持不动，只有条目散在顶层时才套一层以压缩包命名的目录。",
   "Extract_RootMode_AlwaysWrap": "始终加根",
   "Extract_RootMode_AlwaysWrap_Tip": "无条件套一层以压缩包命名的目录；原本已有根目录时会变成两层。",
-    "Extract_RootMode_Hint_StripUnavailable": "该压缩包没有唯一顶层目录（条目散在顶层或分布在多个目录），「智能去根」选项已隐藏。",
+    "Extract_RootMode_Hint_StripUnavailable": "该压缩包没有可剥的顶层目录（空包、只有目录条目，或条目散在顶层/多个目录），「智能去根」选项已隐藏。",
   "Settings_Compress_RootMode": "包内根目录",
   "Settings_Compress_RootName": "默认根目录名",
   "Settings_Compress_RootName_Hint": "留空则用压缩包文件名；可填占位符 {name} {parent} {date} {datetime} {archive}，非法的模板会在压缩设置窗里被拦下。",

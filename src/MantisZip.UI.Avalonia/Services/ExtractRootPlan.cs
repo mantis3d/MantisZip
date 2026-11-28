@@ -41,8 +41,10 @@ public static class ExtractRootPlan
         if (mode == RootDirectoryMode.Original)
             return (null, null);
 
-        var hasSingleRoot = entries is { Count: > 0 } && ArchiveStructureAnalyzer.HasSingleRootDirectory(entries);
-        var adjustment = ArchiveRootPolicy.Resolve(mode, hasSingleRoot);
+        // 「能不能剥」与「剥哪一段」是同一个判定，交给 HasStrippableRoot 一次答完：
+        // 空包与「只有目录条目」的包在这里就已经是 false，不会出现「窗里能选、跑起来什么都不做」。
+        var hasStrippableRoot = ArchiveStructureAnalyzer.HasStrippableRoot(entries);
+        var adjustment = ArchiveRootPolicy.Resolve(mode, hasStrippableRoot);
 
         // 剥哪一段：只有「确有唯一根」时才有可剥的名字；加哪一段：默认用包名（去扩展名）。
         var stripRoot = adjustment.Strip
@@ -52,7 +54,7 @@ public static class ExtractRootPlan
             ? ArchiveRootPolicy.GetWrapName(preferredName: null, fallbackArchivePath: archivePath)
             : null;
 
-        // 剥根段拿不到（例如纯目录包）时宁可不动，也不要"剥了但没有名字"这种半生效状态。
+        // 兜底（理论上不可达：HasStrippableRoot 已保证有名字）。宁可不动，也不要「剥了但没有名字」的半生效状态。
         if (adjustment.Strip && stripRoot == null)
             return (null, null);
 

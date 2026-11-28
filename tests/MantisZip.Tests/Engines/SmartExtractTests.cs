@@ -124,6 +124,63 @@ public class SmartExtractTests : IDisposable
         Assert.False(ArchiveStructureAnalyzer.HasSingleRootDirectory(items));
     }
 
+    // ===== ArchiveStructureAnalyzer.HasStrippableRoot =====
+    // 「能剥」比「有唯一根」严一档：剥根需要拿到那一段名字，空包与纯目录包都没有名字。
+
+    [Fact]
+    public void HasStrippableRoot_SingleRootFolder_ReturnsTrue()
+    {
+        var items = new List<ArchiveItem>
+        {
+            new() { FullPath = "rootdir/a.txt", Size = 10 },
+            new() { FullPath = "rootdir/sub/b.txt", Size = 20 },
+        };
+
+        Assert.True(ArchiveStructureAnalyzer.HasStrippableRoot(items));
+    }
+
+    [Fact]
+    public void HasStrippableRoot_EmptyArchive_ReturnsFalse()
+    {
+        // 与 HasSingleRootDirectory 的分歧点①：空包没有可剥的名字。
+        Assert.False(ArchiveStructureAnalyzer.HasStrippableRoot(Array.Empty<ArchiveItem>()));
+        Assert.False(ArchiveStructureAnalyzer.HasStrippableRoot(null));
+    }
+
+    [Fact]
+    public void HasStrippableRoot_OnlyDirectories_ReturnsFalse()
+    {
+        // 与 HasSingleRootDirectory 的分歧点②：只有目录条目时取不到「哪个文件在根下」。
+        var items = new List<ArchiveItem>
+        {
+            new() { FullPath = "dir1/", IsDirectory = true, Size = 0 },
+            new() { FullPath = "dir2/", IsDirectory = true, Size = 0 },
+        };
+
+        Assert.True(ArchiveStructureAnalyzer.HasSingleRootDirectory(items));
+        Assert.False(ArchiveStructureAnalyzer.HasStrippableRoot(items));
+    }
+
+    [Fact]
+    public void HasStrippableRoot_FilesAtRoot_ReturnsFalse()
+    {
+        var items = new List<ArchiveItem> { new() { FullPath = "a.txt", Size = 10 } };
+
+        Assert.False(ArchiveStructureAnalyzer.HasStrippableRoot(items));
+    }
+
+    [Fact]
+    public void HasStrippableRoot_MultipleRoots_ReturnsFalse()
+    {
+        var items = new List<ArchiveItem>
+        {
+            new() { FullPath = "docs/intro.md", Size = 30 },
+            new() { FullPath = "src/lib.rs", Size = 200 },
+        };
+
+        Assert.False(ArchiveStructureAnalyzer.HasStrippableRoot(items));
+    }
+
     // ===== End-to-end with real ZIP archives =====
 
     [Fact]

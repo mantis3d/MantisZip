@@ -379,6 +379,21 @@ public class ArchiveRootPolicyTests
         }
     }
 
+    // ===== IsWrapMode（会加根的两档）=====
+
+    /// <summary>
+    /// 会加根的档位只有 ③④：根名输入框是否显示、根名要不要随载荷走、执行侧要不要解析根名
+    /// 都问这一个判定。②智能去根虽然也「动根」，但不加根，故不算。
+    /// </summary>
+    [Theory]
+    [InlineData(RootDirectoryMode.Original, false)]
+    [InlineData(RootDirectoryMode.SmartStrip, false)]
+    [InlineData(RootDirectoryMode.SmartWrap, true)]
+    [InlineData(RootDirectoryMode.AlwaysWrap, true)]
+    [InlineData((RootDirectoryMode)99, false)]
+    public void IsWrapMode_OnlyWrapModes_ReturnTrue(RootDirectoryMode mode, bool expected)
+        => Assert.Equal(expected, ArchiveRootPolicy.IsWrapMode(mode));
+
     // ===== NormalizeSmartExtractMode（智能解压两档）=====
 
     [Theory]

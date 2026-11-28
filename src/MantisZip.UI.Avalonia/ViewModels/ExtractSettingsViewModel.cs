@@ -208,13 +208,11 @@ public partial class ExtractSettingsViewModel : ObservableObject
     private RootDirectoryMode _rootMode = RootDirectoryMode.Original;
 
     /// <summary>
-    /// 「去掉唯一根目录」是否可用：包本身确实有唯一根才谈得上剥。
-    /// 判定与执行侧同源（<see cref="ArchiveStructureAnalyzer.HasSingleRootDirectory"/>），
-    /// 否则会出现「窗里能选、跑起来什么都不做」。
+    /// 「去掉唯一根目录」是否可用：包本身必须有**可剥的**唯一根才谈得上剥。
+    /// 判定与执行侧同源（<see cref="ArchiveStructureAnalyzer.HasStrippableRoot"/>），
+    /// 否则会出现「窗里能选、跑起来什么都不做」——空包和「只有目录条目」的包正属此类。
     /// </summary>
-    public bool CanStripRoot =>
-        _firstArchiveEntries is { Count: > 0 } entries
-        && ArchiveStructureAnalyzer.HasSingleRootDirectory(entries);
+    public bool CanStripRoot => ArchiveStructureAnalyzer.HasStrippableRoot(_firstArchiveEntries);
 
     /// <summary>
     /// 四态下拉选项。不可用的档位（当前包没有唯一根 ⇒ 「智能去除」）直接从选项里拿掉，

@@ -1034,7 +1034,7 @@
   "Extract_RootMode_SmartWrap_Tip": "壓縮包本來就有唯一根目錄時保持不動，只有條目散在頂層時才套一層以壓縮包命名的目錄。",
   "Extract_RootMode_AlwaysWrap": "始終加根",
   "Extract_RootMode_AlwaysWrap_Tip": "無條件套一層以壓縮包命名的目錄；原本已有根目錄時會變成兩層。",
-    "Extract_RootMode_Hint_StripUnavailable": "此壓縮包沒有唯一頂層目錄（項目散在頂層或分布在多個目錄），「智慧去根」選項已隱藏。",
+    "Extract_RootMode_Hint_StripUnavailable": "此壓縮包沒有可剝的頂層目錄（空包、只有目錄項目，或項目散在頂層/多個目錄），「智慧去根」選項已隱藏。",
   "Settings_Compress_RootMode": "包內根目錄",
   "Settings_Compress_RootName": "預設根目錄名",
   "Settings_Compress_RootName_Hint": "留空則用壓縮包檔名；可填佔位符 {name} {parent} {date} {datetime} {archive}，非法的模板會在壓縮設定窗裡被攔下。",
