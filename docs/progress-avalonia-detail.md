@@ -6,6 +6,15 @@
 
 ## MantisZip.UI.Avalonia（主力版）
 
+**2026-11-28** — 根目录四态审查第三批：追加路径接上四态 + 分卷包根名归卷 + 清掉三处死代码
+
+- **起因**：承接同日审查（见下一条），用户从剩余清单里勾了「追加到已有包不吃四态」「分卷包加根名带格式名」「清理死代码」三项。
+- **① 追加到已有包不读四态**（`src/MantisZip.Core/Engines/ZipEngine.CompressGroup.cs`、`src/MantisZip.Core/Engines/SevenZipEngine.cs`）：新建压缩包时 `FileScanner` / 7z 的 `CompressFileDictionary` 都按 `CompressRootMode` 改写条目名，而 `AddToArchiveAsync` 两条实现都只写 `Path.Combine(目录名, 相对路径)`，完全没看 `CompressRootMode` / `CompressWrapRoot`。用户选「智能去根」而冲突策略恰好是「追加」时，包内层级与预览树不一致（`CompressService.CompressSingleAsync` / `CompressSeparateAsync` 的 `isAdd` 分支直达引擎）。修法不是各补一段判定，而是把判定本身收成 `ArchiveRootPolicy.ResolveSourceRoots(mode, sourcePaths, wrapRootTemplate, archivePath, timestamp)` —— 一次给出「要剥的根段 + 要加的根段」，`FileScanner`（ZIP/TAR.GZ）、7z 新建、两处追加四个消费点全部改调它。默认 `Original` 时返回 `(null, null)`，条目名与引入本功能前逐字节一致。
+- **② 分卷包根名带格式名**（`src/MantisZip.Core/Utils/ArchiveRootPolicy.cs`）：`GetWrapName` 走 `ArchivePath.GetFileNameWithoutExtension`，对 `pack.7z.001` 会算出 `pack.7z`，用户在目标目录里看到一层带格式名的目录。新增 `GetArchiveBaseName` 先用 `ArchiveVolumeSet.TryGetVolumeBase` 归到基卷（`pack.7z.001` / `pack.zip.001` / `pack.part2.rar` / `pack.r01` → `pack`），`GetWrapName` 与 `ResolveWrapName` 里 `{archive}` 的取值、模板失败回落值都改走它。
+- **③ 死代码**：`src/MantisZip.Core/Utils/EntryOutputPath.cs` 的 `IsDropped`（用 `Path.GetTempPath()` 当 destinationPath 做副作用式判空）、`EffectiveStripRoot`、`EffectiveAddRoot` 与 `src/MantisZip.Core/Abstractions/ArchiveEngine.cs` 的 `ArchiveOptions.CompressStripRoot` 全仓零调用者（计划口径是「同一份判定只有一处」，留着等于给下一个人两种选法）。删除时连 `EntryOutputPath.cs` 里已经用不到的 `using System;` / `using System.IO;` 一并清掉。
+- **测试**：新增 `tests/MantisZip.Tests/Services/AddToArchiveRootModeTests.cs`（6 例，真压包再读回条目名）—— ZIP 的 Original / SmartStrip / AlwaysWrap、`entryBasePath` 与加根叠序（`docs/wrap/7zip/...`）、7z 的 SmartStrip、以及「追加时根名回落必须用真实包名而不是字面量 archive」；`tests/MantisZip.Tests/Utils/ArchiveRootPolicyTests.cs` 补 6 例分卷归卷（`Theory` 覆盖四种卷名）+ `GetArchiveBaseName` 空输入 + 4 例 `ResolveSourceRoots`。
+- **验证**：`-Task build -Target core` / `-Target avalonia` 0 警告；`-Task test -Target tests` 通过（2 条存量警告）；`-Task test -Target ui-tests` 通过（33 条存量警告）；`-Task guards` 12 项全绿；`-Task check` 版本 0.5.8 六处一致、三语 1563 key。
+
 **2026-11-28** — 根目录四态计划审查后修两处：压缩播种 Key 的时间戳同源 + 解压复用确认时冻结的条目
 
 - **起因**（m00001）：用户「你看看这项目，刚刚完成了 `.omo/plans/已完成/compress-extract-root-mode.md` 这个计划，你看看有没有什么问题，然后跟我讨论」。全量审查后按严重度列了清单，用户拍板本轮只修两项，其余先不动。

@@ -1,5 +1,3 @@
-using System;
-using System.IO;
 using MantisZip.Core.Abstractions;
 
 namespace MantisZip.Core.Utils;
@@ -52,31 +50,5 @@ public static class EntryOutputPath
             options?.AddRootDirectory);
 
         return adjusted == null ? null : FileConflictHelper.SanitizeEntryPath(adjusted);
-    }
-
-    /// <summary>
-    /// 判断某个条目在剥根后是否还有内容（用于「目录条目要不要建」）。
-    /// 与 <see cref="Resolve"/> 返回 null 判据完全一致，这里单独暴露只为读起来清楚。
-    /// </summary>
-    public static bool IsDropped(string entryName, ArchiveOptions? options)
-        => Resolve(destinationPath: Path.GetTempPath(), entryName, options) == null;
-
-    /// <summary>
-    /// 取本次解压的「有效剥根段」：<see cref="ArchiveOptions.StripRootDirectory"/> 去空白后的值，
-    /// 空/空白返回 null。集中一处，避免各引擎对「空字符串算不算启用」判断不一致。
-    /// </summary>
-    public static string? EffectiveStripRoot(ArchiveOptions? options)
-    {
-        var value = options?.StripRootDirectory;
-        return string.IsNullOrWhiteSpace(value) ? null : value;
-    }
-
-    /// <summary>
-    /// 取本次解压的「有效加根段」，语义同 <see cref="EffectiveStripRoot"/>。
-    /// </summary>
-    public static string? EffectiveAddRoot(ArchiveOptions? options)
-    {
-        var value = options?.AddRootDirectory;
-        return string.IsNullOrWhiteSpace(value) ? null : value;
     }
 }

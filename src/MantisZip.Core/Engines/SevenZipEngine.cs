@@ -1331,15 +1331,15 @@ public class SevenZipEngine : IArchiveEngine
                 // 「包内根目录」四态：7z 的 CompressDirectory/CompressFilesEncrypted 只能按公共根
                 // 推导条目名，改不了层级 ⇒ 激活时必须改走 CompressFileDictionary（字典 key 即条目名）。
                 // 判定结果同时喂给逐条目状态上报，否则进度窗的 Key 与实际条目名对不上。
+                // 判定本身收在 ArchiveRootPolicy.ResolveSourceRoots：新建、追加、ZIP/TAR.GZ 的扫描器共用一份。
                 var hasSingleSourceDir = ArchiveRootPolicy.HasSingleSourceDirectory(sourcePaths);
                 var rootAdjustment = ArchiveRootPolicy.Resolve(options.CompressRootMode, hasSingleSourceDir);
-                var stripRoot = rootAdjustment.Strip && hasSingleSourceDir
-                    ? ArchiveRootPolicy.GetSourceStripName(sourcePaths[0])
-                    : null;
-                var wrapRoot = rootAdjustment.Wrap
-                    ? ArchiveRootPolicy.ResolveWrapName(
-                        options.CompressWrapRoot, sourcePaths, outputPath, options.CompressWrapRootTimestamp)
-                    : null;
+                var (stripRoot, wrapRoot) = ArchiveRootPolicy.ResolveSourceRoots(
+                    options.CompressRootMode,
+                    sourcePaths,
+                    options.CompressWrapRoot,
+                    outputPath,
+                    options.CompressWrapRootTimestamp);
                 if (rootAdjustment.IsActive)
                 {
                     CoreLog.Info($"CompressAsync: rootMode={options.CompressRootMode}, strip='{stripRoot}', wrap='{wrapRoot}'");
@@ -2538,6 +2538,22 @@ public class SevenZipEngine : IArchiveEngine
             // 对 null 流会抛 NullReferenceException（7z.dll 在 Update 模式会对目录项调用 GetStream）。
             // 目录结构由文件路径隐式生成，归档内/UI 目录树均能正确还原。
             var fileDict = new Dictionary<string, string>();
+
+            // 「包内根目录」四态：追加到已有包与新建压缩包必须走同一套判定
+            // （ArchiveRootPolicy.ResolveSourceRoots），否则用户在对话框选了「剥/加根」、
+            // 冲突策略又恰好是「追加」时，包内层级会和预览树不一致。
+            // 默认 Original 时 strip/wrap 都为 null，条目名与引入本功能前逐字节一致。
+            var (stripRoot, wrapRootName) = ArchiveRootPolicy.ResolveSourceRoots(
+                options.CompressRootMode,
+                sourcePaths,
+                options.CompressWrapRoot,
+                archivePath,
+                options.CompressWrapRootTimestamp);
+            if (stripRoot != null || wrapRootName != null)
+            {
+                CoreLog.Info($"AddToArchiveAsync: rootMode={options.CompressRootMode}, strip='{stripRoot}', wrap='{wrapRootName}'");
+            }
+
             foreach (var sourcePath in sourcePaths)
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -2552,12 +2568,15 @@ public class SevenZipEngine : IArchiveEngine
                         if (options.FileWhitelist != null && !options.FileWhitelist.Contains(file))
                             continue;
                         var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
+                        relativePath = ArchiveRootPolicy.Apply(relativePath, stripRoot, wrapRootName) ?? relativePath;
                         fileDict[basePath + relativePath.Replace('\\', '/')] = file;
                     }
                 }
                 else if (File.Exists(sourcePath))
                 {
-                    fileDict[basePath + Path.GetFileName(sourcePath)] = sourcePath;
+                    var leafName = ArchiveRootPolicy.Apply(Path.GetFileName(sourcePath), null, wrapRootName)
+                        ?? Path.GetFileName(sourcePath);
+                    fileDict[basePath + leafName.Replace('\\', '/')] = sourcePath;
                 }
             }
 

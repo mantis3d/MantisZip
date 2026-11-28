@@ -118,8 +118,28 @@ public static class ArchiveRootPolicy
         => ArchivePath.GetFileName(ArchivePath.TrimEndSeparator(sourcePath));
 
     /// <summary>
+    /// 压缩包路径 → 可当目录名用的基名（去扩展名）。分卷包先归到**基卷**再取：
+    /// <c>pack.7z.001</c> → <c>pack</c>（而不是 <c>pack.7z</c>）、<c>pack.part2.rar</c> → <c>pack</c>。
+    /// <para>
+    /// 不归卷时 <see cref="ArchivePath.GetFileNameWithoutExtension"/> 只去掉最后一段，
+    /// 用户会在目标目录里看到一层带格式名的 <c>pack.7z</c>，与「根名 = 包名」的直觉不符。
+    /// </para>
+    /// </summary>
+    public static string GetArchiveBaseName(string? archivePath)
+    {
+        if (string.IsNullOrWhiteSpace(archivePath))
+            return string.Empty;
+
+        var basePath = ArchiveVolumeSet.TryGetVolumeBase(archivePath, out var volumeBase, out _)
+            ? volumeBase
+            : archivePath;
+        return ArchivePath.GetFileNameWithoutExtension(basePath);
+    }
+
+    /// <summary>
     /// 加根时使用的根名。优先用调用方给的名字（压缩端输入框、解压端压缩包名），
-    /// 为空时回落到 <paramref name="fallbackArchivePath"/> 的文件名去扩展名，再不行用 <c>"archive"</c>。
+    /// 为空时回落到 <paramref name="fallbackArchivePath"/> 的基名（见 <see cref="GetArchiveBaseName"/>），
+    /// 再不行用 <c>"archive"</c>。
     /// <para>
     /// 结果会被 <see cref="SanitizeDirectorySegment"/> 清掉非法字符与首尾空白 —— 压缩包名
     /// 里出现 <c>:</c> 或 <c>/</c> 时不该让整个压缩失败。
@@ -129,9 +149,43 @@ public static class ArchiveRootPolicy
     {
         var name = preferredName?.Trim();
         if (string.IsNullOrEmpty(name) && !string.IsNullOrWhiteSpace(fallbackArchivePath))
-            name = ArchivePath.GetFileNameWithoutExtension(fallbackArchivePath);
+            name = GetArchiveBaseName(fallbackArchivePath);
         name = SanitizeDirectorySegment(name);
         return string.IsNullOrEmpty(name) ? "archive" : name;
+    }
+
+    /// <summary>
+    /// 压缩端一次判定：这次要剥的根段与要加的根段（两者至多一个非空）。
+    /// <para>
+    /// <b>唯一实现</b>：<see cref="FileScanner"/>（ZIP / TAR.GZ）、7z 的「新建压缩包」与「追加到已有包」
+    /// 都必须走这里。各处各写一遍「有没有唯一根 / 剥哪一段 / 根名怎么回落」，
+    /// 必然漂移成「预览 = 新建 ≠ 追加」——追加路径漏掉四态就是这类漏接的典型。
+    /// </para>
+    /// </summary>
+    /// <param name="mode">压缩端四态。</param>
+    /// <param name="sourcePaths">本批源路径（判定唯一根与 <c>{name}</c> 都靠它）。</param>
+    /// <param name="wrapRootTemplate">用户输入的根名（可为模板）；null/空 = 回落压缩包名。</param>
+    /// <param name="archivePath">目标压缩包路径，用于根名回落与 <c>{archive}</c>。</param>
+    /// <param name="timestamp">根名模板的批级时间戳。</param>
+    public static (string? StripRoot, string? WrapRoot) ResolveSourceRoots(
+        RootDirectoryMode mode,
+        IReadOnlyList<string>? sourcePaths,
+        string? wrapRootTemplate = null,
+        string? archivePath = null,
+        DateTime? timestamp = null)
+    {
+        var hasSingleSourceDir = HasSingleSourceDirectory(sourcePaths);
+        var adjustment = Resolve(mode, hasSingleSourceDir);
+        if (!adjustment.IsActive)
+            return (null, null);
+
+        var stripRoot = adjustment.Strip && sourcePaths is { Count: > 0 }
+            ? GetSourceStripName(sourcePaths[0])
+            : null;
+        var wrapRoot = adjustment.Wrap
+            ? ResolveWrapName(wrapRootTemplate, sourcePaths, archivePath, timestamp)
+            : null;
+        return (stripRoot, wrapRoot);
     }
 
     /// <summary>
@@ -169,7 +223,7 @@ public static class ArchiveRootPolicy
             timestamp ?? DateTime.Now,
             string.IsNullOrWhiteSpace(fallbackArchivePath)
                 ? null
-                : ArchivePath.GetFileNameWithoutExtension(fallbackArchivePath));
+                : GetArchiveBaseName(fallbackArchivePath));
 
         if (RootNameTemplate.TryRender(raw, ctx, out var rendered, out var error))
         {

@@ -300,6 +300,85 @@ public class ArchiveRootPolicyTests
         Assert.Equal("a_b_c", ArchiveRootPolicy.GetWrapName(@"a\b:c"));
     }
 
+    // ── 分卷包根名：先归到基卷再取，别把格式名带进目录里 ──
+
+    [Theory]
+    // 7z / zip 分卷：pack.7z.001 → pack（而不是 pack.7z）
+    [InlineData(@"D:\out\pack.7z.001", "pack")]
+    [InlineData(@"D:\out\pack.zip.001", "pack")]
+    // rar 两种卷名
+    [InlineData(@"D:\out\pack.part2.rar", "pack")]
+    [InlineData(@"D:\out\pack.r01", "pack")]
+    // 普通包与双扩展名照旧
+    [InlineData(@"D:\out\archive.7z", "archive")]
+    [InlineData(@"D:\out\archive.tar.gz", "archive")]
+    public void GetWrapName_VolumeSet_UsesBaseNameWithoutFormat(string archivePath, string expected)
+        => Assert.Equal(expected, ArchiveRootPolicy.GetWrapName(null, archivePath));
+
+    [Fact]
+    public void GetWrapName_VolumeSet_TemplateFallbackAlsoUsesBaseName()
+    {
+        // 根名模板渲染失败时的回落同样要归卷，否则 {archive} 与回落值会不一致
+        var name = ArchiveRootPolicy.ResolveWrapName("x_{unknown}/y", fallbackArchivePath: @"D:\out\pack.7z.001");
+        Assert.Equal("pack", name);
+    }
+
+    [Fact]
+    public void GetArchiveBaseName_EmptyInput_ReturnsEmpty()
+    {
+        Assert.Equal("", ArchiveRootPolicy.GetArchiveBaseName(null));
+        Assert.Equal("", ArchiveRootPolicy.GetArchiveBaseName("   "));
+    }
+
+    // ===== ResolveSourceRoots（新建 / 追加 / 扫描器共用的唯一判定）=====
+
+    [Fact]
+    public void ResolveSourceRoots_Original_DoesNothing()
+        => Assert.Equal((null, null), ArchiveRootPolicy.ResolveSourceRoots(RootDirectoryMode.Original, null));
+
+    [Fact]
+    public void ResolveSourceRoots_SmartStrip_SingleDirectory_StripsThatDirectory()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "MantisZipRoot_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            var (strip, wrap) = ArchiveRootPolicy.ResolveSourceRoots(RootDirectoryMode.SmartStrip, [dir]);
+            Assert.Equal(Path.GetFileName(dir), strip);
+            Assert.Null(wrap);
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void ResolveSourceRoots_AlwaysWrap_ResolvesNameFromArchive()
+    {
+        // 没有显式根名时由包名回落，且与 GetWrapName 同源
+        var (strip, wrap) = ArchiveRootPolicy.ResolveSourceRoots(
+            RootDirectoryMode.AlwaysWrap, null, wrapRootTemplate: null, archivePath: @"D:\out\pack.7z.001");
+        Assert.Null(strip);
+        Assert.Equal("pack", wrap);
+    }
+
+    [Fact]
+    public void ResolveSourceRoots_SmartWrap_WithSingleDirectory_DoesNotWrap()
+    {
+        var dir = Path.Combine(Path.GetTempPath(), "MantisZipRoot_" + Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(dir);
+        try
+        {
+            Assert.Equal((null, null), ArchiveRootPolicy.ResolveSourceRoots(
+                RootDirectoryMode.SmartWrap, [dir], "wrap", @"D:\out\pack.zip"));
+        }
+        finally
+        {
+            Directory.Delete(dir, recursive: true);
+        }
+    }
+
     // ===== NormalizeSmartExtractMode（智能解压两档）=====
 
     [Theory]

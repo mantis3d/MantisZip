@@ -31,6 +31,20 @@ public partial class ZipEngine
         {
 
             // 收集需要添加的新文件
+            // 「包内根目录」四态：追加到已有包必须和新建走同一套判定（ArchiveRootPolicy.ResolveSourceRoots），
+            // 否则用户在对话框里选了「剥/加根」、冲突策略又恰好是「追加」时，包内层级会和预览树不一致。
+            // 默认 Original 时 strip/wrap 都为 null，条目名与引入本功能前逐字节一致。
+            var (stripRoot, wrapRootName) = ArchiveRootPolicy.ResolveSourceRoots(
+                options.CompressRootMode,
+                sourcePaths,
+                options.CompressWrapRoot,
+                archivePath,
+                options.CompressWrapRootTimestamp);
+            if (stripRoot != null || wrapRootName != null)
+            {
+                CoreLog.Info($"AddToArchiveAsync: rootMode={options.CompressRootMode}, strip='{stripRoot}', wrap='{wrapRootName}'");
+            }
+
             var newFiles = new List<(string FullPath, string EntryName)>();
             foreach (var sourcePath in sourcePaths)
             {
@@ -46,13 +60,17 @@ public partial class ZipEngine
                         if (options.FileWhitelist != null && !options.FileWhitelist.Contains(file))
                             continue;
                         var relativePath = Path.Combine(dirName, Path.GetRelativePath(sourcePath, file));
+                        // 剥根时若整条路径就是那个根目录本身 → null（丢弃），与 FileScanner 同语义
+                        relativePath = ArchiveRootPolicy.Apply(relativePath, stripRoot, wrapRootName) ?? relativePath;
                         var entryName = string.IsNullOrEmpty(entryBasePath) ? relativePath : entryBasePath + "/" + relativePath;
                         newFiles.Add((file, entryName));
                     }
                 }
                 else if (File.Exists(sourcePath))
                 {
-                    var entryName = string.IsNullOrEmpty(entryBasePath) ? Path.GetFileName(sourcePath) : entryBasePath + "/" + Path.GetFileName(sourcePath);
+                    var leafName = ArchiveRootPolicy.Apply(Path.GetFileName(sourcePath), null, wrapRootName)
+                        ?? Path.GetFileName(sourcePath);
+                    var entryName = string.IsNullOrEmpty(entryBasePath) ? leafName : entryBasePath + "/" + leafName;
                     newFiles.Add((sourcePath, entryName));
                 }
             }

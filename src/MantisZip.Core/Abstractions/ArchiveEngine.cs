@@ -114,12 +114,6 @@ public class ArchiveOptions
     public Utils.RootDirectoryMode CompressRootMode { get; set; } = Utils.RootDirectoryMode.Original;
 
     /// <summary>
-    /// 压缩端「智能去除唯一根」时源的唯一目录（仅 <see cref="CompressRootMode"/> 为
-    /// <see cref="Utils.RootDirectoryMode.SmartStrip"/> 时有意义）；空 = 由引擎按源路径自行判定。
-    /// </summary>
-    public string? CompressStripRoot { get; set; }
-
-    /// <summary>
     /// 压缩端「加一层根目录」时使用的根名；空 = 由引擎回落到压缩包文件名。
     /// 含 <c>{…}</c> 时按 <see cref="Utils.RootNameTemplate"/> 渲染，渲染失败静默回落压缩包文件名。
     /// </summary>
